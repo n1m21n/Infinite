@@ -5,13 +5,16 @@
 //   b) runs Rename, Colour, Move Left, Move Right, Duplicate, Delete (and middle-click Close where the panel closes
 //      pages), checks each result, then Undo (and Redo);
 //   c) saves the patch, loads it back, and checks page order and colour came back.
-// Then it opens each 2D View More.. popover and checks it is one compact column (no wider than kPopoverW).
+// It also checks Cmd+R starts a rename on each strip and that the Piano Roll inspector colour undoes.
+// Then it opens each 2D View More.. popover and checks it is one compact column (no wider than kPopoverW), and
+// right-clicks free space and a control in each docked panel: one dock menu shape, never over a control.
 // INFINITE_PAGEMENUSHOT=<dir>: one full-window shot per panel with the page menu open.
 // Plan: internal/plans/ui-system/panel-consistency-final-prompt.md (Step 2).
 #include "app/AppShared.h"
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/PagePicker.h"
 #include "app/selftest/UiAudit.h"
+#include "imgui_internal.h"
 
 #include <GLFW/glfw3.h>
 #include "imgui_impl_glfw.h"
@@ -19,6 +22,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <memory>
 #include <functional>
 #include <string>
 #include <vector>
@@ -62,6 +67,7 @@ namespace
       std::string what;
       std::function<bool()> fn;
       int wait = 1;
+      int timeout = 120; // kTimeout; a scan over a panel takes longer
    };
    constexpr int kTimeout = 120;
    std::vector<Step> sSteps;
@@ -76,7 +82,10 @@ namespace
    {
       sSteps.push_back({ what, [fn] { fn(); return true; }, wait });
    }
-   void Until(const std::string& what, std::function<bool()> pred, int wait = 1) { sSteps.push_back({ what, std::move(pred), wait }); }
+   void Until(const std::string& what, std::function<bool()> pred, int wait = 1, int timeout = kTimeout)
+   {
+      sSteps.push_back({ what, std::move(pred), wait, timeout });
+   }
 
    const PanelCase& Cur() { return sCases[sPanel]; }
 
@@ -269,6 +278,43 @@ namespace
       Do("close menu", [] { ImGui::ClosePopupsExceptModals(); }, 2);
       Until("menu closed", [] { const PagePicker::Probe* p = P(); return p != nullptr && !p->menuOpen; }, 1);
 
+      // Cmd+R over the strip starts a rename on the current page (Enter keeps the name).
+      Until("pointer on the current chip", [] {
+         const PagePicker::Probe* p = P();
+         ImVec2 at;
+         if (p == nullptr || !Chip(std::max(0, p->current))(at))
+            return false;
+         sMouse = at;
+         return true;
+      }, 3);
+      Do("mod down", [] { ImGui::GetIO().AddKeyEvent(ImGuiMod_Ctrl, true); }, 1);
+      Key(ImGuiKey_R);
+      Do("mod up", [] { ImGui::GetIO().AddKeyEvent(ImGuiMod_Ctrl, false); }, 1);
+      Expect("Cmd+R starts a rename", [] { const PagePicker::Probe* p = P(); return p != nullptr && p->renaming >= 0 && p->renaming == p->current; });
+      Key(ImGuiKey_Enter);
+      Until("rename ends", [] { const PagePicker::Probe* p = P(); return p != nullptr && p->renaming < 0; }, 2);
+
+      // Piano Roll: the page colour set from the inspector undoes in one step.
+      if (Cur().open == &gPianoRollOpen)
+      {
+         static unsigned int sColour = 0;
+         static bool sChanged = false;
+         Click("settings chip opens the inspector", [](ImVec2& p) { ImVec2 a, b; if (!UiAudit::FindItem("##pianoSettings", nullptr, 0, &a, &b)) return false; p = Mid(a, b); return true; });
+         Do("colour before", [] { const PagePicker::Probe* p = P(); sColour = p != nullptr && p->current >= 0 ? p->entries[p->current].color : 0; }, 0);
+         Click("inspector colour dot", [](ImVec2& p) { ImVec2 a, b; if (!UiAudit::FindItem("##pageColour", nullptr, 0, &a, &b)) return false; p = Mid(a, b); return true; });
+         Click("picker square", [](ImVec2& p) { ImVec2 a, b; if (!UiAudit::FindItem("sv", nullptr, 0, &a, &b)) return false; p = ImVec2(a.x + (b.x - a.x) * 0.7f, a.y + (b.y - a.y) * 0.3f); return true; });
+         Do("close picker", [] { ImGui::ClosePopupsExceptModals(); sMouse = ImVec2(-1.0f, -1.0f); }, 4);
+         Expect("inspector colour changes the page", [] {
+            const PagePicker::Probe* p = P();
+            sChanged = p != nullptr && p->current >= 0 && p->entries[p->current].color != sColour;
+            return sChanged;
+         });
+         Until("gesture ends", [] { return !gArrangeGestureOpen; }, 2);
+         Do("undo", [] { if (sChanged) Undo(); }, 3); // only a real change: Undo would take back a page otherwise
+         Expect("Undo inspector colour", [] { const PagePicker::Probe* p = P(); return sChanged && p != nullptr && p->current >= 0 && p->entries[p->current].color == sColour; });
+         Click("settings chip closes the inspector", [](ImVec2& p) { ImVec2 a, b; if (!UiAudit::FindItem("##pianoSettings", nullptr, 0, &a, &b)) return false; p = Mid(a, b); return true; });
+      }
+
       // b) Each row, then Undo / Redo.
       Rename(0, "PgA");
       Rename(1, "PgB");
@@ -382,6 +428,166 @@ namespace
       Do("panel done", [] { printf("  -- %s done\n", Cur().name); }, 1);
    }
 
+   // Dock menus (fix groups A and F): a right-click on free space in each docked panel opens one menu with a
+   // "Dock Position" submenu and a "Close <Panel>" row; a right-click on a control in the panel never opens it.
+   struct DockCase
+   {
+      const char* name;
+      const char* card; // the docked card's child window id
+      bool* open;
+      const char* close;          // the Close row; "A|B" when the label follows the panel's face
+      const char* item = nullptr; // the control to right-click (its label); null: any control found by scanning
+   };
+   bool FindAny(const std::string& labels)
+   {
+      ImVec2 a, b;
+      size_t from = 0;
+      while (from <= labels.size())
+      {
+         const size_t bar = labels.find('|', from);
+         const std::string one = labels.substr(from, bar == std::string::npos ? std::string::npos : bar - from);
+         if (UiAudit::FindItem(one.c_str(), nullptr, 0, &a, &b))
+            return true;
+         if (bar == std::string::npos)
+            break;
+         from = bar + 1;
+      }
+      return false;
+   }
+   ImGuiWindow* CardWindow(const char* card)
+   {
+      ImGuiWindow* best = nullptr;
+      for (ImGuiWindow* w : GImGui->Windows)
+         if (w->WasActive && std::strstr(w->Name, card) != nullptr && (best == nullptr || std::strlen(w->Name) < std::strlen(best->Name)))
+            best = w;
+      return best;
+   }
+   bool OverCard(const char* card)
+   {
+      const ImGuiWindow* h = GImGui->HoveredWindow;
+      return h != nullptr && std::strstr(h->Name, card) != nullptr;
+   }
+   bool DockMenuShown()
+   {
+      ImVec2 a, b;
+      return UiAudit::FindItem("Dock Position", nullptr, 0, &a, &b);
+   }
+   // Walks points over the card (its header band first) until one is free space (`wantItem` false) or a control
+   // (`wantItem` true), right-clicks it, and hands the result to `judge`; `judge` returns true when it is done.
+   struct Scan
+   {
+      std::vector<ImVec2> pts;
+      size_t i = 0;
+      int sub = 0, wakeAt = 0, tries = 0;
+   };
+   void ScanClick(const DockCase& dc, bool wantItem, std::function<bool(Scan&)> judge, std::string what)
+   {
+      auto st = std::make_shared<Scan>();
+      Until(what, [=] {
+         const int f = ImGui::GetFrameCount();
+         if (st->pts.empty())
+         {
+            const ImGuiWindow* w = CardWindow(dc.card);
+            if (w == nullptr)
+               return false;
+            const ImVec2 o = w->Pos, sz = w->Size;
+            ImVec2 a, b;
+            if (wantItem && dc.item != nullptr)
+            {
+               if (!UiAudit::FindItem(dc.item, dc.card, 0, &a, &b))
+                  return false;
+               st->pts.push_back(Mid(a, b));
+            }
+            else
+            {
+               for (float y = 4.0f; y < std::min(40.0f, sz.y - 4.0f); y += 6.0f)
+                  for (float x = 8.0f; x < sz.x - 8.0f; x += 18.0f)
+                     st->pts.push_back(ImVec2(o.x + x, o.y + y));
+               for (float y = 48.0f; y < sz.y - 8.0f; y += 36.0f)
+                  for (float x = 12.0f; x < sz.x - 8.0f; x += 36.0f)
+                     st->pts.push_back(ImVec2(o.x + x, o.y + y));
+            }
+         }
+         if (f < st->wakeAt)
+            return false;
+         switch (st->sub)
+         {
+            case 0:
+               if (st->i >= st->pts.size() || st->tries > 12)
+               {
+                  if (wantItem && st->tries == 0)
+                     printf("  [skip] %s: %s (no control in the empty panel)\n", dc.name, what.c_str());
+                  else
+                     Check(std::string(dc.name) + ": " + what + " (no spot found)", false);
+                  return true;
+               }
+               sMouse = st->pts[st->i];
+               st->sub = 1;
+               st->wakeAt = f + 2;
+               return false;
+            case 1:
+            {
+               const bool item = GImGui->HoveredId != 0 || GImGui->HoveredIdPreviousFrame != 0;
+               if (OverCard(dc.card) && item == wantItem && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
+               {
+                  ImGui::GetIO().AddMouseButtonEvent(1, true);
+                  st->sub = 2;
+                  st->wakeAt = f + 1;
+               }
+               else
+               {
+                  if (dc.item != nullptr && wantItem)
+                     printf("    %s: %s at (%.0f, %.0f) not taken: over %s, hovered id %08X\n", dc.name, dc.item, sMouse.x, sMouse.y,
+                            GImGui->HoveredWindow != nullptr ? GImGui->HoveredWindow->Name : "(none)", GImGui->HoveredId);
+                  st->i++;
+                  st->sub = 0;
+               }
+               return false;
+            }
+            case 2:
+               ImGui::GetIO().AddMouseButtonEvent(1, false);
+               st->sub = 3;
+               st->wakeAt = f + 4;
+               return false;
+            default:
+            {
+               const bool done = judge(*st);
+               ImGui::ClosePopupsExceptModals();
+               st->tries++;
+               st->i += 3;
+               st->sub = 0;
+               st->wakeAt = f + 3;
+               return done;
+            }
+         }
+      }, 2, 4000);
+   }
+   void ScriptDock(const DockCase& dc)
+   {
+      bool* open = dc.open;
+      Do(std::string(dc.name) + ": dock set up", [open] {
+         NewPatch();
+         gDrumPanelOpen = gMixerPanelOpen = gPianoRollOpen = gCurveEditorOpen = gFieldPatcherOpen = gPerfPanelOpen = false;
+         gView2DOpen = gView3DOpen = gArrangePanelOpen = gSampleStudioOpen = gModMatrixOpen = gViewportPanelOpen = gTerminalOpen = false;
+         *open = true;
+         if (open == &gTerminalOpen)
+            gTerminalFace = 1; // the tabs face, whatever the profile's face is
+      }, 8);
+      const std::string name = dc.name, close = dc.close;
+      ScanClick(dc, false, [name, close](Scan&) {
+         if (!DockMenuShown())
+            return false; // this free spot is outside the panel's menu band: try another
+         Check(name + ": free-space right-click opens Dock Position > | " + close, FindAny(close));
+         return true;
+      }, "dock menu on free space");
+      const std::string on = dc.item != nullptr ? std::string("a ") + dc.item + " control" : "a control";
+      ScanClick(dc, true, [name, on](Scan&) {
+         Check(name + ": right-click on " + on + " opens no dock menu", !DockMenuShown());
+         return true;
+      }, "no dock menu over a control");
+      Do(std::string(dc.name) + ": dock done", [open] { *open = false; sMouse = ImVec2(-1.0f, -1.0f); }, 2);
+   }
+
    // The 2D View's More.. popovers: one compact column, kPopoverW wide at most.
    std::vector<std::string> sMoreDone;
    void ScriptMore()
@@ -473,6 +679,22 @@ void RunPageMenuTest(int frameId, GLFWwindow* window)
       if (getenv("INFINITE_PAGEMENUONLY") == nullptr)
          for (int i = 0; i < 3; i++)
             ScriptMore();
+      const char* only = getenv("INFINITE_PAGEMENUONLY");
+      if (only == nullptr || std::string(only).find("Dock") != std::string::npos)
+      {
+         static const DockCase kDocks[] = {
+            { "Mixer", "##mixerpanelcontent", &gMixerPanelOpen, "Close Mixer" },
+            { "Mod Matrix", "##modmatrixpanelcontent", &gModMatrixOpen, "Close Mod Matrix" },
+            { "Viewport", "##viewportpanelcontent", &gViewportPanelOpen, "Close Viewport" },
+            { "Sample Studio", "##studiopanelcontent", &gSampleStudioOpen, "Close Sample Studio" },
+            { "Terminal", "##terminalcontent", &gTerminalOpen, "Close Terminal|Close Chat", "##tab" },
+            { "2D View", "##view2dcontent", &gView2DOpen, "Close 2D View" },
+            { "3D View", "##view3dcontent", &gView3DOpen, "Close 3D View" },
+            { "Timeline", "##arrangepanelinnercontent", &gArrangePanelOpen, "Close Timeline" },
+         };
+         for (const DockCase& dc : kDocks)
+            ScriptDock(dc);
+      }
       sNextFrame = frameId;
    }
 
@@ -505,7 +727,7 @@ void RunPageMenuTest(int frameId, GLFWwindow* window)
       sStepFrom = -1;
       return;
    }
-   if (frameId - sStepFrom > kTimeout)
+   if (frameId - sStepFrom > st.timeout)
    {
       const bool expect = st.what.rfind("EXPECT|", 0) == 0;
       const std::string what = expect ? st.what.substr(7) : st.what;
