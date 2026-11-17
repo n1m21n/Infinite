@@ -1798,25 +1798,26 @@ namespace app
                MenuParts::EndPopup();
             }
          }
-         nextTo(tok::space_4);
-         const bool inspWasOpen = gArrangeClipSettingsPanelOpen;
-         ActionButton::Scoped() = inspWasOpen ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         if (ActionButton::Draw("##sessioninspectortoggle", ImVec2(tok::control_h, tok::control_h)))
-            gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
-         ActionButton::Scoped() = ActionButton::Kind::Plain;
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", inspWasOpen ? T("Clip Inspector: Open") : T("Settings of the selected clip. Double-click a clip to open it."));
-         glyph::DrawEdit(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, inspWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol);
          const float toolbarBottom = ImGui::GetItemRectMax().y;
 
-         // Pinned right: Session Audio (the twin of the Timeline's chip), and Render Take left of it.
+         // Pinned right, the Timeline's order: Render Take, Audio, then the inspector toggle in the corner.
          {
             const ImVec2 saved = ImGui::GetCursorScreenPos();
             const bool sessionMode = gAudioMode == AudioMode::Session;
-            const char* audioLabel = sessionMode ? T("Session Audio On") : T("Enable Session Audio");
-            const float audioW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
             const float right = ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - ImGui::GetStyle().WindowPadding.x;
-            ImGui::SetCursorScreenPos(ImVec2(right - audioW, toolbarOrigin.y));
+            const bool inspWasOpen = gArrangeClipSettingsPanelOpen;
+            ImGui::SetCursorScreenPos(ImVec2(right - tok::control_h, toolbarOrigin.y));
+            ActionButton::Scoped() = inspWasOpen ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
+            if (ActionButton::Draw("##sessioninspectortoggle", ImVec2(tok::control_h, tok::control_h)))
+               gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
+            ActionButton::Scoped() = ActionButton::Kind::Plain;
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", inspWasOpen ? T("Clip Inspector: Open") : T("Settings of the selected clip. Double-click a clip to open it."));
+            glyph::DrawEdit(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, inspWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol);
+            const char* audioLabel = T("Audio");
+            const float audioW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
+            const float audioX = right - tok::control_h - tok::space_1 - audioW;
+            ImGui::SetCursorScreenPos(ImVec2(audioX, toolbarOrigin.y));
             if (ChipButton::Draw(audioLabel, sessionMode, tok::control_h))
                SetSessionAudio(!sessionMode);
             if (ImGui::IsItemHovered())
@@ -1828,7 +1829,7 @@ namespace app
             {
                const char* takeLabel = T("Render Take");
                const float takeW = ImGui::CalcTextSize(takeLabel).x + 2.0f * tok::space_2;
-               ImGui::SetCursorScreenPos(ImVec2(right - audioW - tok::space_1 - takeW, toolbarOrigin.y));
+               ImGui::SetCursorScreenPos(ImVec2(audioX - tok::space_2 - takeW, toolbarOrigin.y));
                if (ChipButton::Draw(takeLabel, false, tok::control_h))
                {
                   // Record wrote the take onto the Timeline; the render dialog opens right here with its span
