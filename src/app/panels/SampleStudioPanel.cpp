@@ -2011,6 +2011,8 @@ namespace
             if (p.stretchMode < 2)
                p.stretchMode = 3; // tonal: the length changes, the pitch does not
             s.dirty = true;
+            // The playhead rides the border being dragged (as a DAW's warp marker does), so the edge is where it sits.
+            s.headFrame = (double)s.doc.EndOf(j);
          }
       }
       if (active && s.dragKind == 5 && s.dragIndex >= 0 && s.dragIndex < s.doc.Count())

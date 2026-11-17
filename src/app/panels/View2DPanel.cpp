@@ -5549,8 +5549,8 @@ namespace
          else
          {
             const bool any = !sSel.empty();
-            if (any && MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
             if (any && MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
+            if (any && MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
             if (!sClip.empty() && MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
             if (any && MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
             if (SelectionActsOnPixels(doc))
@@ -5562,13 +5562,6 @@ namespace
                }
             if (any && MenuParts::Item(T("Free Transform"), Sc("Ctrl+T"), FreeTransformOn(doc)))
                FreeTransformOn(doc) ? EndFreeTransform(doc, true) : BeginFreeTransform(doc);
-            if (any && MenuParts::Item(T("Delete"), "Delete"))
-            {
-               if (SelectionActsOnPixels(doc))
-                  ClearOrFill(doc, 0);
-               else
-                  sPending.what = Pending::Delete;
-            }
             MenuParts::Separator();
             // What the active layer is decides what else is offered: pixels, image, text, shapes, group, fill or adjustment.
             if (Layer* k = Active(doc))
@@ -5662,6 +5655,17 @@ namespace
             }
             if (ViewTurned() && MenuParts::Item(T("Reset Rotation"), Sc("Ctrl+Shift+0")))
                TurnViewAbout(doc, -sViewAngle, ImVec2((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f));
+            if (any)
+            {
+               MenuParts::Separator();
+               if (MenuParts::Item(T("Delete"), "Delete"))
+               {
+                  if (SelectionActsOnPixels(doc))
+                     ClearOrFill(doc, 0);
+                  else
+                     sPending.what = Pending::Delete;
+               }
+            }
             MenuParts::EndPopup();
       
          }
@@ -9296,8 +9300,13 @@ namespace
          {
             if (!Selected(id))
                SelectOnly(id);
-            if (MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
+            if (MenuParts::Item(T("Rename"), nullptr))
+            {
+               sRename = id;
+               std::snprintf(sRenameBuf, sizeof(sRenameBuf), "%s", LayerName(*l).c_str());
+            }
             if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
+            if (MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
             if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"), false, !sClip.empty())) sPending.what = Pending::Paste;
             if (MenuParts::Item(T("Duplicate Layer"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
             MenuParts::Separator();
@@ -9352,11 +9361,6 @@ namespace
                l->warpOn = false;
                std::fill(l->warp, l->warp + 8, 0.0f);
                Touch();
-            }
-            if (MenuParts::Item(T("Rename"), nullptr))
-            {
-               sRename = id;
-               std::snprintf(sRenameBuf, sizeof(sRenameBuf), "%s", LayerName(*l).c_str());
             }
             MenuParts::Separator();
             if (MenuParts::Item(T("Delete Layer"), "Delete")) sPending.what = Pending::Delete;

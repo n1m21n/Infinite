@@ -1165,6 +1165,22 @@ namespace
       if (MenuParts::BeginPopup("##fpNodeMenu"))
       {
          const std::vector<int> sel = SelectedIds(p);
+         if (MenuParts::Item(T("Rename"), nullptr, false, s.ctxBox != 0))
+            if (const Field::BoxNode* rb = p.graph.FindBox(s.ctxBox))
+            {
+               s.renameBox = rb->id;
+               std::snprintf(s.boxNameBuf, sizeof(s.boxNameBuf), "%s", BoxTitle(*rb));
+               s.boxNameFocus = true;
+            }
+         if (MenuParts::Item(T("Cut"), nullptr, false, !sel.empty()))
+         {
+            CopyBoxes(p, sel);
+            for (int id : sel)
+               RemoveBox(p, id);
+            changed = true;
+         }
+         if (MenuParts::Item(T("Copy"), nullptr, false, !sel.empty()))
+            CopyBoxes(p, sel);
          if (MenuParts::Item(T("Duplicate"), nullptr, false, !sel.empty()))
          {
             CopyBoxes(p, sel);
@@ -1174,22 +1190,6 @@ namespace
             if (PasteBoxes(p, ImVec2(tl.x + 40.0f, tl.y + 40.0f)) > 0)
                Commit(p, h, "Duplicate Boxes"), changed = false;
          }
-         if (MenuParts::Item(T("Copy"), nullptr, false, !sel.empty()))
-            CopyBoxes(p, sel);
-         if (MenuParts::Item(T("Cut"), nullptr, false, !sel.empty()))
-         {
-            CopyBoxes(p, sel);
-            for (int id : sel)
-               RemoveBox(p, id);
-            changed = true;
-         }
-         if (MenuParts::Item(T("Rename"), nullptr, false, s.ctxBox != 0))
-            if (const Field::BoxNode* rb = p.graph.FindBox(s.ctxBox))
-            {
-               s.renameBox = rb->id;
-               std::snprintf(s.boxNameBuf, sizeof(s.boxNameBuf), "%s", BoxTitle(*rb));
-               s.boxNameFocus = true;
-            }
          MenuParts::Separator();
          if (MenuParts::Item(T("Disconnect")))
          {

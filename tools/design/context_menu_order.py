@@ -60,6 +60,16 @@ MENUS = {
     "##mixerpanelctx": "Mixer panel",
     "##stripctx": "Mixer strip",
     "##insctx": "Mixer insert",
+    "##drumDockMenu": "Drum dock",
+    "##fpDockMenu": "Field patcher dock",
+    "##fpNodeMenu": "Field patcher node",
+    "##fpLinkMenu": "Field patcher link",
+    "##fpStripMenu": "Field patcher strip",
+    "##fpFooterMenu": "Field patcher footer",
+    "##fpEmptyMenu": "Field patcher empty space",
+    "##v2dcanvasmenu": "2D view canvas",
+    "##v2ddockmenu": "2D view dock",
+    "##rowmenu": "2D view layer row",
 }
 # Menus that are a function body, not a popup block: id -> (file, function name).
 FRAGMENTS = {
@@ -78,7 +88,7 @@ RANKS = [
     (23, L(r"Duplicate", r"Duplicate (?:Page|Group|Track|Scene|scene)")),
     (30, L(r"Mute", r"Solo", r"Active", r"Hide", r"Bypass(?: Node| selection)?", r"Enable Node", r"Toggle Enabled",
            r"Turn Group (?:On|Off)")),
-    (90, re.compile(r"^(?:Delete\b|Remove$)")),   # the 3D view keeps Blender's "Remove" (X)
+    (90, re.compile(r"^(?:Delete\b(?!.*Mask)|Remove$)")),   # the 3D view keeps Blender's "Remove" (X)
 ]
 # Cut / Copy / Paste are only edit actions inside a context menu; a tool picker's "Cut" (blade tool) is not one.
 WORDING = [  # (label regex, what to use)
@@ -89,7 +99,7 @@ WORDING = [  # (label regex, what to use)
 ]
 # Canonical hint per action (None = no hint is fine too). A set means any of them.
 HINTS = [
-    (re.compile(r"^(?:Delete\b|Remove$)"), {"Backspace", "X"}, "Backspace (3D view: X)"),
+    (re.compile(r"^(?:Delete\b(?!.*Mask)|Remove$)"), {"Backspace", "X", "Delete"}, "Backspace (3D view: X)"),
     (re.compile(r"^Duplicate(?: (?:Page|Group|Track|Scene|scene))?$"), {"MODKEY+D", "Shift+D"}, "MODKEY+D (3D view and Piano Roll: Shift+D)"),
     (re.compile(r"^Cut$"), {"MODKEY+X"}, "MODKEY+X"),
     (re.compile(r"^Copy(?: scene)?$"), {"MODKEY+C"}, "MODKEY+C"),

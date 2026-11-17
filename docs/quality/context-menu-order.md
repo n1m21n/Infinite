@@ -63,6 +63,13 @@ wrapped in `L()` and need no new translation entries when only reordered.
 | Session scene | `src/app/panels/ArrangeSessionGrid.cpp:497` | Launch Quantize > / Keep Other Tracks Playing [x] / Then Play Next Scene [x] / Next Scene After > / Stop Scene / Send Scene to Timeline / Insert Scene Above / Duplicate Scene `MODKEY+D` / Delete Scene `Backspace` |
 | Session dock | `src/app/panels/ArrangeSessionGrid.cpp:1952` | Dock Position > / Close Session |
 | Curve editor | `src/app/panels/CurveEditorPanel.cpp:1360` | (computed) / Handles > / Quantise to Grid `Q` / (computed) / Copy `MODKEY+C` / Paste `MODKEY+V` / Delete `Backspace` |
+| Drum dock | `src/app/panels/DrumPanel.cpp:389` | Dock Position > / Close Drums |
+| Field patcher dock | `src/app/panels/FieldPatcherPanel.cpp:741` | (items drawn by helper) |
+| Field patcher node | `src/app/panels/FieldPatcherPanel.cpp:1165` | Rename / Cut / Copy / Duplicate / Disconnect / Delete |
+| Field patcher link | `src/app/panels/FieldPatcherPanel.cpp:1211` | Delete Wire |
+| Field patcher strip | `src/app/panels/FieldPatcherPanel.cpp:1598` | (items drawn by helper) |
+| Field patcher footer | `src/app/panels/FieldPatcherPanel.cpp:1681` | (items drawn by helper) |
+| Field patcher empty space | `src/app/panels/FieldPatcherPanel.cpp:1710` | Empty page / (computed) > / (computed) |
 | Library sample / media entry | `src/app/panels/LibraryPanels.cpp:650` | Remove from favourites / (computed) |
 | Library plugin entry | `src/app/panels/LibraryPanels.cpp:1126` | Remove from favourites / (computed) |
 | Library field preset | `src/app/panels/LibraryPanels.cpp:1332` | Remove from favourites / (computed) |
@@ -76,6 +83,9 @@ wrapped in `L()` and need no new translation entries when only reordered.
 | Piano roll note / clip / empty stretch | `src/app/panels/PianoRollPanel.cpp:1174` | Add Note / Add Clip / Settings / Duplicate `Shift+D` / Mute `0` / Quantise > / Fx > / Delete `Backspace` |
 | Sample studio waveform / slice | `src/app/panels/SampleStudioPanel.cpp:2219` | Settings `Double-click` / Copy `MODKEY+C` / Paste at playhead `MODKEY+V` / Mute `M` / Solo `S` / Reverse `V` / Colour > / Split here `Double-click top` / Join `J` / Play slice `Q` / Convert to node / Zoom to selection `Z` / Zoom out `Shift+Z` / Delete `Backspace` |
 | Terminal dock | `src/app/panels/TerminalPanel.cpp:688` | Dock Position > / Close Chat |
+| 2D view canvas | `src/app/panels/View2DPanel.cpp:5542` | Cut / Copy / Paste / Duplicate / Layer via Cut / Free Transform / Mask from Selection / Deselect / Invert Selection / Fill... `Shift+F5` / Convert to Draw Node / Rasterize Layer / Effect on Below / Edit Text / Rasterize Layer / Convert to Shapes / Convert to Text Node / Rasterize Layer / Convert to Sketch Node / Ungroup / Edit Fill... / Add Layer Mask / Delete Layer Mask / Group / Arrange > / Select All Layers / Fit on Screen / Actual Pixels / Reset Rotation / Delete `Delete` |
+| 2D view layer row | `src/app/panels/View2DPanel.cpp:9299` | Rename / Cut / Copy / Paste / Duplicate Layer / Merge Layers / Merge Down / Merge Visible / Flatten Image / Group Layers / Ungroup / Release Clipping Mask / Add Layer Mask / Mask from Selection / Delete Layer Mask / Add Vector Mask / Delete Vector Mask / Edit Fill... / Convert to Draw Node / Rasterize Layer / Rasterize Layer / Convert to Sketch Node / Convert to Text Node / Convert to Shapes / Layer as Output / Effect on Below / Reset Distort / Delete Layer `Delete` |
+| 2D view dock | `src/app/panels/View2DPanel.cpp:11552` | Dock Position > / Close 2D View |
 | 3D view select tool | `src/app/panels/View3DPanel.cpp:5748` | (computed) / Clear Rulers |
 | 3D view Add (+ scene) items | `src/app/panels/View3DPanel.cpp:7979` | From canvas > / Camera / (computed) / HDRI... / New scene / Copy scene `MODKEY+C` / Paste scene `MODKEY+V` / Duplicate scene `MODKEY+D` / Delete scene |
 | 3D view (object / empty space) | `src/app/panels/View3DPanel.cpp:8068` | Rename `F2` / Copy / Paste / Duplicate `Shift+D` / Hide `H` / Frame `F` / Group `MODKEY+G` / Ungroup `MODKEY+Shift+G` / Source > / Object > / Go to node / Remove `X` / Add > / Select > / Frame all `Home` / View > |
