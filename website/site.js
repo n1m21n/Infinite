@@ -662,7 +662,7 @@
     const wrap = $('#tickers');
     const count = $('#node-count');
     if (!wrap || typeof NODE_LIBRARY === 'undefined') return;
-    if (count) count.textContent = NODE_LIBRARY.length;
+    if (count) count.textContent = 377; // every node type in the engine (src/core/chat/NodeVocab.gen.h), not the marquee list length
     // one tape per family of the canvas: visuals, sound, control
     const TAPES = [
       ['ticker-1', ['Source', 'Compositing', 'Effects', '3D']],
