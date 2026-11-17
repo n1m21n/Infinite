@@ -36,7 +36,11 @@ head2 "P11 platform contract - every Platform:: declaration has both implementat
 GUARD=$(grep -n '^#if defined(_WIN32)' src/platform/Platform.h | tail -1 | cut -d: -f1)
 GUARD=${GUARD:-999999}
 # An inline function is defined right there in the header and needs neither.
+# Only namespace-scope lines count (brace depth 1 is inside `namespace Platform {`).
+# A member function of a struct or class in the header (e.g. TextCurveBuilder's
+# Move/Line/Cubic/Quad/Close) is implicitly inline, and was a false positive here.
 head -n "$((GUARD - 1))" src/platform/Platform.h \
+  | awk '{ if (depth == 1) print; o = gsub(/\{/, "{"); c = gsub(/\}/, "}"); depth += o - c }' \
   | grep -vE '^[[:space:]]*(static[[:space:]]+)?(inline|constexpr)\b' \
   | grep -oE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_:<>,* &]*[ *&]([A-Z][A-Za-z0-9_]*)\(' \
   | grep -oE '[A-Z][A-Za-z0-9_]*\($' | tr -d '(' | sort -u > /tmp/pillar_decls.txt
