@@ -1330,6 +1330,96 @@ MODULATOR · SIGNAL OUT. Learns where you leave each knob and how fast you move 
 Try: play for a minute, let go, and watch the patch keep evolving.
 Chain: Drift -> Analog (Cutoff)
 
+### Chorus
+AUDIO · EFFECT. Thickens a sound by mixing in two or three slightly detuned copies, each wobbled by an LFO. Spread widens it across the stereo field.
+Try: put Depth low and Rate slow on a pad for a lush, wider sound.
+Chain: Analog -> Chorus -> Audio Out
+
+### Flanger
+AUDIO · EFFECT. The jet-plane swoosh: a very short delay with feedback, swept in time, which makes a moving comb of notches. Feedback past zero gives a hollower, nasal tone.
+Try: turn Feedback up and sweep Rate slowly under a drum loop.
+Chain: Audio In -> Flanger -> Audio Out
+
+### Phaser
+AUDIO · EFFECT. Sweeps a chain of allpass filters to carve moving notches into the sound. Order sets how many notches, from a gentle shimmer to a deep swirl.
+Try: raise Order to 8 and set Rate to one bar on a synth chord.
+Chain: Audio In -> Phaser -> Audio Out
+
+### Limiter
+AUDIO · EFFECT. A brickwall limiter: nothing passes above its ceiling. Gain pushes the signal into it, Release sets how fast it recovers, and the meter shows how much it is holding back.
+Try: push Gain up on a finished mix to get it loud without clipping.
+Chain: Audio In -> Limiter -> Audio Out
+
+### Dynamics
+AUDIO · EFFECT. A compressor: it turns the loud peaks down so quiet and loud parts sit closer together. Threshold, Ratio, Attack, Release and Makeup set how hard it works. A sidechain input can drive the detector from another sound.
+Try: send a kick into the sidechain input so the pad ducks under every hit.
+Chain: Audio In -> Dynamics -> Audio Out
+
+### Stereo
+AUDIO · EFFECT. Widens or narrows the stereo image. Width 0 makes the sound mono, 1 leaves it as it is, 2 exaggerates it. Bass mono keeps the low end in the centre so it survives a mono speaker.
+Try: set Width to 1.6 and turn Bass Mono on for a wider mix that still folds to mono.
+Chain: Audio In -> Stereo -> Audio Out
+
+### Tremolo
+AUDIO · EFFECT. Pulses the loudness up and down with a slow LFO, so the level wobbles while the pitch stays put. Stereo phase makes left and right pulse at different times.
+Try: set Rate to a sixteenth of the tempo for a choppy, gated pulse on a pad.
+Chain: Analog -> Tremolo -> Audio Out
+
+### Pitch Shifter
+AUDIO · EFFECT. Moves the pitch up or down in semitones without changing the speed. Grain size trades smoothness for tracking. There is no formant correction, so big shifts also change the timbre: voices sound chipmunk or deep.
+Try: drop a vocal down two semitones with a small grain for fast material.
+Chain: Audio In -> Pitch Shifter -> Audio Out
+
+### Transient Shaper
+AUDIO · EFFECT. Makes the hits (the attack) louder or softer than the sustain (the body) without a threshold or ratio to set. Good for punchier drums or rounder plucks.
+Try: raise Attack on a drum loop to add snap.
+Chain: Audio In -> Transient Shaper -> Audio Out
+
+### Stutter
+AUDIO · EFFECT. A beat-repeat glitch: it captures a short slice of each cycle and loops that slice for the rest of the cycle, then records fresh audio. Grain sets how much of the cycle it captures.
+Try: set the grain to a sixteenth and let it stutter a vocal line.
+Chain: Audio In -> Stutter -> Audio Out
+
+### Ring Mod
+AUDIO · EFFECT. Multiplies the sound by an oscillator. The original pitches are replaced by sum and difference tones: a metallic, robotic, bell-like sound.
+Try: ring-modulate a sine and play a chord for a clanging bell tone.
+Chain: Analog -> Ring Mod -> Audio Out
+
+### Frequency Shifter
+AUDIO · EFFECT. Moves every partial up or down by the same number of Hz, so the harmonics no longer line up: alien, barber-pole or inharmonic. Unlike Pitch Shifter, the intervals break.
+Try: shift a drone by a few Hz so it beats and shimmers.
+Chain: Audio In -> Frequency Shifter -> Audio Out
+
+### Formant Filter
+AUDIO · EFFECT. Three bandpass filters tuned to the formants of a vowel, morphed A-E-I-O-U by the vowel knob. It makes any sound speak like a vowel, not only voices.
+Try: run a saw synth through it and sweep the vowel for a talking synth.
+Chain: Analog -> Formant Filter -> Audio Out
+
+### Wavetable Shaper
+AUDIO · EFFECT. Reshapes a sound with a wavetable used as a transfer curve: quiet and loud parts are bent by different amounts. Drive pushes it harder into the curve.
+Try: raise Drive on a sine to turn it into a rich, buzzing tone.
+Chain: Audio In -> Wavetable Shaper -> Audio Out
+
+### Piano
+AUDIO · SYNTH. A physically modelled piano: a grand, a Rhodes or a Wurlitzer. Play harder and the hammer hits harder. The electric pianos make their sound through a steel tine or reed and a pickup.
+Try: choose Rhodes and play soft chords for an electric piano.
+Chain: MIDI Notes -> Piano -> Audio Out
+
+### Metallic
+AUDIO · SYNTH. A physical model of struck and plucked metal: bells, gongs, bars, plates, chimes and tines. The material picks the body, and the strike sets how bright it rings.
+Try: pick a bell material and play one note for a chime.
+Chain: MIDI Notes -> Metallic -> Audio Out
+
+### Wind
+AUDIO · SYNTH. A physically modelled wind instrument: a clarinet reed, a sax reed, a flute's air jet or brass lips. Breath is how hard you blow.
+Try: raise Breath slowly on a held note for a swelling wind line.
+Chain: MIDI Notes -> Wind -> Audio Out
+
+### Keyboard
+NOTES · SOURCE. A note source with no hardware: click and drag the on-screen piano, or hover the node and type on the laptop keyboard, where the bottom row is one octave.
+Try: hover the node and play a melody with the Z, X and C keys.
+Chain: Keyboard -> Analog -> Audio Out
+
 ## New Compositing, 3D & Mesh Tools
 The visual side of v0.6: motion analysis, fluid and fog, physics, plants from text, and the primitives and mesh operators earlier editions of this guide missed.
 
@@ -1339,7 +1429,8 @@ Try: displace a second picture along the motion of a video.
 Chain: Video -> Optical Flow -> Displace
 
 ### Time Machine
-COMPOSITING · IMAGE IN/OUT. Shows each pixel from a different moment: it keeps the last frames and a grey map (the second input) says how far back every pixel looks. A left-to-right ramp, the default, gives a slit-scan. Length sets how many frames are kept, up to 60.
+)AGENTDOC"
+R"AGENTDOC(COMPOSITING · IMAGE IN/OUT. Shows each pixel from a different moment: it keeps the last frames and a grey map (the second input) says how far back every pixel looks. A left-to-right ramp, the default, gives a slit-scan. Length sets how many frames are kept, up to 60.
 Try: feed it a radial gradient so the middle of the picture lags behind the edges.
 Chain: Video -> Time Machine -> Output
 
@@ -1421,8 +1512,7 @@ Chain: Sphere -> Extrude -> Render 3D
 ### Twist
 3D · GEOMETRY OUT. Twists the mesh around a chosen axis by Angle: the further a point is along the axis, the more it rotates.
 Try: animate Angle with an LFO to wring a tall box like a towel.
-)AGENTDOC"
-R"AGENTDOC(Chain: Cube -> Twist -> Render 3D
+Chain: Cube -> Twist -> Render 3D
 
 ### Cone
 3D · GEOMETRY OUT. A cone. Sides sets how many-sided it is.
@@ -1463,6 +1553,142 @@ Chain: Cross -> Extrude -> Render 3D
 3D · GEOMETRY OUT. A circular wedge. Inner Ratio controls how much of the circle is cut away.
 Try: animate it into a loading ring.
 Chain: Pie -> Render 3D
+
+### Crop
+PICTURE · EFFECT. Trims the picture from each edge: Left, Right, Top and Bottom. Outside decides what fills the cut-away area: it stays transparent, the kept part zooms to fill the frame, or it takes a Fill colour.
+Try: crop 10 percent off each side and set Outside to zoom to fill the frame.
+Chain: Image Source -> Crop -> Output
+
+### Posterize
+PICTURE · COMPOSITING. Reduces the picture to a fixed number of tone levels per colour channel, giving flat, poster-style colour bands.
+Try: set Levels to 3 for a screen-print look.
+Chain: Image Source -> Posterize -> Output
+
+### Threshold
+PICTURE · COMPOSITING. Makes the picture pure black or white: anything brighter than the Threshold goes white, the rest goes black.
+Try: raise Threshold until only the highlights of a photo are left.
+Chain: Image Source -> Threshold -> Output
+
+### Drop Shadow
+PICTURE · COMPOSITING. A soft shadow behind the picture's shape, in a chosen Colour, with Offset X and Y and an Opacity.
+Try: offset the shadow down and to the right in a dark colour for a lifted look.
+Chain: Text -> Drop Shadow -> Output
+
+### Emboss
+PICTURE · EFFECT. Turns the edges into a raised, relief-like bump by comparing the picture with a shifted copy of itself. Its style keeps the colours or goes flat grey.
+Try: set the style to Grey and the angle to 45 for a carved-stone look.
+Chain: Image Source -> Emboss -> Output
+
+### Opacity
+PICTURE · COMPOSITING. Fades the whole picture's transparency without tinting it. The fade stays with the picture as it goes down the chain.
+Try: wire an LFO into Opacity to pulse a logo in and out.
+Chain: Image Source -> Opacity -> Output
+
+### Exposure
+PICTURE · COMPOSITING. Brightens or darkens the picture in camera stops. Each stop doubles or halves the light.
+Try: nudge Exposure up one stop on a dark photo.
+Chain: Image Source -> Exposure -> Output
+
+### Lookup
+PICTURE · COMPOSITING. Recolours the picture using a second image as a colour strip: each pixel's brightness picks a colour from that strip. Offset shifts the pick, Mix blends with the original.
+Try: patch a gradient into the second input for a false-colour map.
+Chain: Image Source -> Lookup -> Output
+
+### Vignette
+PICTURE · EFFECT. Darkens the picture toward its edges to frame the centre. Radius sets the size of the clear middle and Softness the falloff.
+Try: set Radius to 0.6 and Softness high on a portrait.
+Chain: Image Source -> Vignette -> Output
+
+### Halftone
+PICTURE · EFFECT. Renders the picture as a printed dot pattern. Scale sets the dot density and Angle rotates the grid. The Colour style uses three angled colour dot layers.
+Try: switch to Colour and set Scale small for a comic print.
+Chain: Image Source -> Halftone -> Output
+
+### Pixelate
+PICTURE · EFFECT. Breaks the picture into flat square blocks. Block Size sets how big each block is.
+Try: animate Block Size with an LFO for a pixel zoom.
+Chain: Image Source -> Pixelate -> Output
+
+### Symmetry
+PICTURE · EFFECT. Mirrors the picture across the X axis, the Y axis or both, from a chosen centre point. Flip reverses the picture before mirroring.
+Try: choose both axes for a four-way mirror.
+Chain: Image Source -> Symmetry -> Output
+
+### Gradient Map
+PICTURE · COMPOSITING. Remaps the picture's brightness onto a two-colour gradient from a Shadow colour to a Highlight colour. Mix blends with the original colour.
+Try: set the shadows to deep blue and the highlights to orange for a duotone.
+Chain: Image Source -> Gradient Map -> Output
+
+### Color Overlay
+PICTURE · COMPOSITING. Tints the whole picture toward a colour at a chosen opacity. Nothing else changes.
+Try: set a warm colour at 0.3 opacity for a sunset wash.
+Chain: Image Source -> Color Overlay -> Output
+
+### Outer Glow
+PICTURE · COMPOSITING. Adds a soft glow in a colour around the outline of the picture, spreading outward. Amount sets the strength.
+Try: put a bright cyan glow around a white logo.
+Chain: Text -> Outer Glow -> Output
+
+### Displace
+PICTURE · EFFECT. Pushes each pixel by a map: the red and green of a second image, or a built-in animated wave if nothing is patched. Map Scale sets how big the map is.
+Try: feed a noise image into the map input so the picture ripples like water.
+Chain: Image Source -> Displace -> Output
+
+### Unsharp Mask
+PICTURE · EFFECT. Sharpens by adding back the difference between the picture and a blurred copy, which exaggerates the edges. Amount is the strength, Radius the width of edges it reacts to.
+Try: raise Amount to 1.5 on a soft photo.
+Chain: Image Source -> Unsharp Mask -> Output
+
+### Add Noise
+PICTURE · EFFECT. Adds random grain to every pixel, re-randomised each frame. Amount sets how strong it is.
+Try: use a small Amount over a dark gradient for film grain.
+Chain: Image Source -> Add Noise -> Output
+
+### Lens Distortion
+PICTURE · EFFECT. Simulates a camera lens. Barrel bows the picture in or out, Chromatic splits the colours for fringing, and Zoom scales the result.
+Try: set Barrel slightly negative and Chromatic small for a wide-angle lens.
+)AGENTDOC"
+R"AGENTDOC(Chain: Image Source -> Lens Distortion -> Output
+
+### Convolve
+PICTURE · EFFECT. A 3 by 3 grid of numbers that defines a filter. Blur, sharpen and edge detection are all just different grids; Mix blends the result with the original.
+Try: type a grid that is all ones except the centre for a sharpen.
+Chain: Image Source -> Convolve -> Output
+
+### Circle
+PICTURE · SOURCE. A filled or stroked circle, with size, feather, stroke and background controls.
+Try: feather the edge and wire an LFO into the size for a pulsing dot.
+Chain: Circle -> Bloom -> Output
+
+### Triangle
+PICTURE · SOURCE. A filled or stroked triangle, with the same size, feather and stroke controls as the other shapes.
+Try: animate the rotation for a spinning arrow.
+Chain: Triangle -> Output
+
+### Star
+PICTURE · SOURCE. A star with Sides for the number of points and Inner Ratio for how deep the points cut in.
+Try: lower Inner Ratio for spiky stars and raise it for a flower.
+Chain: Star -> Output
+
+### Gear
+PICTURE · SOURCE. A cogwheel silhouette. Sides sets the tooth count.
+Try: set the tooth count to 12 and turn it with an LFO.
+Chain: Gear -> Output
+
+### Mirror
+3D · MESH. Mirrors a mesh across a plane perpendicular to a chosen Axis, at a given offset. Keep original keeps the source too, and weld seam joins the halves.
+Try: mirror on X with weld seam for a symmetric character.
+Chain: Cube -> Mirror -> Output
+
+### Smooth
+3D · MESH. Relaxes each vertex toward its neighbours, so the mesh softens. Iterations and Strength control how much.
+Try: run a few iterations on a noisy displacement to calm it.
+Chain: Displacement -> Smooth -> Output
+
+### Union
+3D · MESH. Fuses two or more closed solids into one, keeping their combined outer surface.
+Try: union a cube and a sphere into one blob.
+Chain: Cube -> Sphere -> Union -> Output
 )AGENTDOC";
 
    inline const char* kUiGuide =
