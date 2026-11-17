@@ -45,6 +45,68 @@ bool RunCompAudit(); // selftest/CompAudit.cpp
 // to call again between frames: the atlas is rebuilt from scratch and, when the GL renderer
 // already exists, its font texture is recreated. Style metrics are never rescaled here -
 // they are in points like everything else, so there is nothing to compound.
+// Merges OS symbol and CJK fallback faces into the current ImFont (MergeMode=true) so
+// characters outside Inter and the bundled Noto subset never render as tofu on any OS.
+void MergePlatformFallbackFonts(ImGuiIO& io, float bakedPx, bool ja)
+{
+   std::vector<std::string> paths;
+   auto addPath = [&](const std::string& p)
+   {
+      if (p.empty())
+         return;
+      for (const std::string& existing : paths)
+         if (existing == p)
+            return;
+      std::error_code ec;
+      if (std::filesystem::exists(AppPaths::FsPath(p), ec))
+         paths.push_back(p);
+   };
+   [[maybe_unused]] auto addFamily = [&](const char* family) { addPath(Platform::FontFileForFamily(family)); };
+
+#if defined(_WIN32)
+   addPath("C:\\Windows\\Fonts\\seguisym.ttf");
+   addFamily("Segoe UI Symbol");
+   if (ja)
+   {
+      addPath("C:\\Windows\\Fonts\\YuGothR.ttc");
+      addFamily("Yu Gothic");
+   }
+   addPath("C:\\Windows\\Fonts\\msyh.ttc");
+   addFamily("Microsoft YaHei");
+   addPath("C:\\Windows\\Fonts\\YuGothR.ttc");
+   addPath("C:\\Windows\\Fonts\\msgothic.ttc");
+   addPath("C:\\Windows\\Fonts\\malgun.ttf");
+#elif defined(__APPLE__)
+   addPath("/System/Library/Fonts/Apple Symbols.ttf");
+   if (ja)
+      addPath("/System/Library/Fonts/Hiragino Sans GB.ttc");
+   addPath("/System/Library/Fonts/PingFang.ttc");
+   addPath("/System/Library/Fonts/Hiragino Sans GB.ttc");
+   addPath("/System/Library/Fonts/Supplemental/Arial Unicode.ttf");
+#else
+   addFamily("Noto Sans Symbols");
+   addFamily("Noto Sans Symbols 2");
+   addFamily("DejaVu Sans");
+   addPath("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+   addPath("/usr/share/fonts/TTF/DejaVuSans.ttf");
+   if (ja)
+      addFamily("Noto Sans CJK JP");
+   addFamily("Noto Sans CJK SC");
+   addFamily("Noto Sans CJK JP");
+   addFamily("WenQuanYi Zen Hei");
+   addPath("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc");
+   addPath("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc");
+   addPath("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc");
+#endif
+
+   for (const std::string& p : paths)
+   {
+      ImFontConfig cfg;
+      cfg.MergeMode = true;
+      io.Fonts->AddFontFromFileTTF(p.c_str(), bakedPx, &cfg);
+   }
+}
+
 void ApplyUiScale(GLFWwindow* window, bool rendererReady)
 {
    // A queued language switch lands here, between frames, so no label pointer fetched earlier in
@@ -81,10 +143,20 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    const char* candidates[] = {
       chosenFontPath.c_str(), // empty for the default, or if the bundled file is missing
       bundledInter.c_str(),
+#if defined(_WIN32)
+      "C:\\Windows\\Fonts\\segoeui.ttf",
+      "C:\\Windows\\Fonts\\arial.ttf",
+#elif defined(__APPLE__)
       "/System/Library/Fonts/SFNS.ttf",
       "/System/Library/Fonts/HelveticaNeue.ttc",
       "/System/Library/Fonts/Helvetica.ttc",
       "/System/Library/Fonts/Supplemental/Arial.ttf",
+#else
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/TTF/DejaVuSans.ttf",
+      "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+      "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+#endif
    };
    // ImGui bakes only Basic Latin + Latin-1 unless told otherwise, so names in other scripts
    // (ł, ő, Ж, λ, ạ) drew as '?'. Latin Extended-A/B, Greek, Cyrillic, Latin Extended
@@ -136,6 +208,7 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
             cjkCfg.MergeMode = true;
             io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg);
          }
+         MergePlatformFallbackFonts(io, bakedPx, ja);
       }
       // Infinite Glyphs (art/icons/src -> tools/design/build_glyphs.py): our own icon set, merged into
       // the same atlas at PUA codepoints with MergeMode=true so glyphs ride the same baseline/line-height

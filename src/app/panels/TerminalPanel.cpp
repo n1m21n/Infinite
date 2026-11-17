@@ -1062,6 +1062,7 @@ namespace
 }
 
 ImFont* TerminalMonoFont() { return sFont; }
+void MergePlatformFallbackFonts(ImGuiIO& io, float bakedPx, bool ja);
 
 void TerminalLoadFonts(float bakedPx)
 {
@@ -1072,7 +1073,8 @@ void TerminalLoadFonts(float bakedPx)
    if (regular.empty())
       return;
    // Dynamic atlas: only glyphs that are drawn get rasterized, so the whole faces and their fallback can be merged.
-   const std::string noto = BundledResourcePath("fonts/NotoSansSC-Subset.otf");
+   const bool ja = I18n::CurrentLanguage() == "ja";
+   const std::string noto = BundledResourcePath(ja ? "fonts/NotoSansJP-Subset.otf" : "fonts/NotoSansSC-Subset.otf");
    const std::string inter = BundledResourcePath("fonts/Inter-Regular.ttf");
    const auto load = [&](const std::string& path)
    {
@@ -1085,6 +1087,7 @@ void TerminalLoadFonts(float bakedPx)
          io.Fonts->AddFontFromFileTTF(inter.c_str(), bakedPx, &merge);
       if (!noto.empty())
          io.Fonts->AddFontFromFileTTF(noto.c_str(), bakedPx, &merge);
+      MergePlatformFallbackFonts(io, bakedPx, ja);
       return font;
    };
    sFont = load(regular);
