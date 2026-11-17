@@ -803,6 +803,19 @@ namespace app
             group->label = args[0];
             gPatchDirty = true;
          }
+         else if (action == "drum")
+         {
+            const std::string what = args.empty() ? std::string() : args[0];
+            const std::string arg = args.size() > 1 ? args[1] : std::string();
+            if (!DrumPanelRun(gn.index, what, arg, outResult, outError) && outError.empty())
+               outError = "drum open|close|dock|lanes|fill|grooves|groove|folder";
+         }
+         else if (action == "mixer")
+         {
+            // The canvas menu's Open in Mixer panel: the Mixer panel opens on this node's page.
+            if (!MixerPanelShowMixer(gn.index))
+               outError = "mixer: this node has no Mixer page";
+         }
          else if (action == "params")
             gn.showParams = on;
          else if (action == "viewport")
