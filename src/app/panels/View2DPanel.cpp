@@ -4123,7 +4123,7 @@ namespace
          dot(b, 2.5f, false);
          const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
          char t[64];
-         std::snprintf(t, sizeof t, "%.0f px  %.1f\xc2\xb0", std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f);
+         std::snprintf(t, sizeof t, "%.0f px  %.1f°", std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f);
          const ImVec2 at(b.x + 10.0f, b.y + 6.0f);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
@@ -6812,8 +6812,8 @@ namespace
          static const char* kProfiles[4] = { "Flat", "Round", "Ridge", "Ribbon" };
          MoreCombo(T("Profile"), &b.profile, kProfiles, 4);
          MorePct(T("Depth"), &b.depth, 0.0f, 300.0f);
-         MoreSlider(T("Light"), &b.lightAz, -180.0f, 180.0f, "%.0f\xC2\xB0");
-         MoreSlider(T("Light height"), &b.lightEl, 5.0f, 90.0f, "%.0f\xC2\xB0");
+         MoreSlider(T("Light"), &b.lightAz, -180.0f, 180.0f, "%.0f°");
+         MoreSlider(T("Light height"), &b.lightEl, 5.0f, 90.0f, "%.0f°");
       }
       MoreHeader(T("Texture"), false, false);
       static const char* kGrains[4] = { "Off", "Paper", "Weave", "Noise" };
@@ -7021,7 +7021,7 @@ namespace
             if (TextChip(L("All layers##v2dcloneall"), sCloneAll, T("Copy from the whole picture")))
                sCloneAll = !sCloneAll;
             gap();
-            BarSlider("##v2dsrot", &b.sourceRotate, -180.0f, 180.0f, "Rotation %.0f\xC2\xB0", kWellM);
+            BarSlider("##v2dsrot", &b.sourceRotate, -180.0f, 180.0f, "Rotation %.0f°", kWellM);
             next();
             float sc = b.sourceScale * 100.0f;
             BarSlider("##v2dsscale", &sc, 10.0f, 400.0f, "Scale %.0f%%", kWellM);
@@ -7047,7 +7047,7 @@ namespace
             MoreHeader(T("Tip"), true);
             MorePct(T("Spacing"), &b.spacing, 1.0f, 200.0f);
             MorePct(T("Roundness"), &b.roundness, 5.0f, 100.0f);
-            MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+            MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f°");
             MorePct(T("Smoothing"), &b.smoothing, 0.0f, 100.0f);
             float stab = (float)b.stabiliser;
             MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
@@ -7140,7 +7140,7 @@ namespace
                Pairs g;
                MorePct(T("Spacing"), &b.spacing, 1.0f, 200.0f);
                MorePct(T("Roundness"), &b.roundness, 5.0f, 100.0f);
-               MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+               MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f°");
                MoreCheck(T("Hard edge"), &b.pencil);
             }
             MoreHeader(T("Dynamics"));
@@ -7339,7 +7339,7 @@ namespace
          {
             const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
             ImGui::AlignTextToFramePadding();
-            ImGui::Text(T("%.1f px   %.1f\xC2\xB0   W %.0f  H %.0f"), std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f, std::fabs(dx),
+            ImGui::Text(T("%.1f px   %.1f°   W %.0f  H %.0f"), std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f, std::fabs(dx),
                         std::fabs(dy));
             next();
             if (TextChip(L("Clear##v2dmclear"), false, nullptr))
@@ -7494,7 +7494,7 @@ namespace
          if (t.fillType >= 1 && t.fillType <= 4)
          {
             if (t.fillType != 2)
-               changed |= SliderRow(T("Angle##v2dvfa"), &t.fillAngle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+               changed |= SliderRow(T("Angle##v2dvfa"), &t.fillAngle, -180.0f, 180.0f, "%.0f°");
             const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
             if (GradientRows("##v2dvfillstops", t.fillStops, t.fillC, white))
                changed = true;
@@ -8641,9 +8641,9 @@ namespace
          sTool = kMeshWarp;
       }
       MenuParts::Separator();
-      if (MenuParts::Item(T("Rotate 180\xc2\xb0"))) TurnSelection(doc, 180.0f);
-      if (MenuParts::Item(T("Rotate 90\xc2\xb0 Clockwise"))) TurnSelection(doc, 90.0f);
-      if (MenuParts::Item(T("Rotate 90\xc2\xb0 Counter Clockwise"))) TurnSelection(doc, -90.0f);
+      if (MenuParts::Item(T("Rotate 180°"))) TurnSelection(doc, 180.0f);
+      if (MenuParts::Item(T("Rotate 90° Clockwise"))) TurnSelection(doc, 90.0f);
+      if (MenuParts::Item(T("Rotate 90° Counter Clockwise"))) TurnSelection(doc, -90.0f);
       MenuParts::Separator();
       if (MenuParts::Item(T("Flip Horizontal"))) FlipSelection(doc, false);
       if (MenuParts::Item(T("Flip Vertical"))) FlipSelection(doc, true);
@@ -8690,7 +8690,7 @@ namespace
          float v[5] = { cx, cy, std::fabs(b0->sx) > 1e-6f ? a->sx / b0->sx * 100.0f : 100.0f,
                         std::fabs(b0->sy) > 1e-6f ? a->sy / b0->sy * 100.0f : 100.0f, a->angle };
          static const char* kId[5] = { "##ftx", "##fty", "##ftw", "##fth", "##fta" };
-         static const char* kFmt[5] = { "X %.0f", "Y %.0f", "W %.1f%%", "H %.1f%%", "%.1f\xc2\xb0" };
+         static const char* kFmt[5] = { "X %.0f", "Y %.0f", "W %.1f%%", "H %.1f%%", "%.1f°" };
          static const float kSpeed[5] = { 1.0f, 1.0f, 0.5f, 0.5f, 0.5f };
          int changed = -1;
          for (int i = 0; i < 5; i++)
@@ -9635,8 +9635,8 @@ namespace
          ComboRow(T("Material"), &l->reliefMat, { T("Plasticine"), T("Metal"), T("Chrome"), T("Ink stipple") });
          {
             Pairs g;
-            SliderRow(T("Light"), &l->reliefLight, -180.0f, 180.0f, "%.0f\xC2\xB0");
-            SliderRow(T("Light height"), &l->reliefElev, 5.0f, 90.0f, "%.0f\xC2\xB0");
+            SliderRow(T("Light"), &l->reliefLight, -180.0f, 180.0f, "%.0f°");
+            SliderRow(T("Light height"), &l->reliefElev, 5.0f, 90.0f, "%.0f°");
          }
          SliderRow(T("Depth"), &l->reliefDepth, 0.0f, 40.0f, "%.1f px");
       }
@@ -9676,7 +9676,7 @@ namespace
          if (type == 1 || type == 3 || type == 4 || type == 5)
          {
             ModNext(*l, Scene2DNode::kLfFillAngle);
-            SliderRow(T("Angle"), &l->fillAngle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+            SliderRow(T("Angle"), &l->fillAngle, -180.0f, 180.0f, "%.0f°");
          }
       }
       if (l->kind == Kind::Adjust)
@@ -9893,7 +9893,7 @@ namespace
             ModNext(*l, Scene2DNode::kLfZ);
             DragRow(T("Depth"), &l->z, 1.0f, "Z %.0f");
             float* const rot[3] = { &l->rx, &l->ry, &l->angle };
-            const char* const fmts[3] = { "X %.0f\xC2\xB0", "Y %.0f\xC2\xB0", "Z %.0f\xC2\xB0" };
+            const char* const fmts[3] = { "X %.0f°", "Y %.0f°", "Z %.0f°" };
             const int mf[3] = { Scene2DNode::kLfRotX, Scene2DNode::kLfRotY, Scene2DNode::kLfAngle };
             DragMulti(T("Rotate"), rot, fmts, 3, 0.5f, -360.0f, 360.0f, l, mf);
          }
@@ -9902,8 +9902,8 @@ namespace
             ModNext(*l, Scene2DNode::kLfAngle);
             {
                Pairs g;
-               DragRow(T("Angle"), &l->angle, 0.5f, "%.1f\xC2\xB0", -180.0f, 180.0f);
-               DragRow(T("Shear"), &l->shear, 0.5f, "%.1f\xC2\xB0", -80.0f, 80.0f);
+               DragRow(T("Angle"), &l->angle, 0.5f, "%.1f°", -180.0f, 180.0f);
+               DragRow(T("Shear"), &l->shear, 0.5f, "%.1f°", -80.0f, 80.0f);
             }
          }
          int anchor = (int)std::lround(l->ay * 2.0f) * 3 + (int)std::lround(l->ax * 2.0f);
@@ -10590,7 +10590,7 @@ namespace
       {
          if (primary)
             ModNext(l, fb + 2);
-         SliderRow(T("Angle"), &f.angle, -180.0f, 180.0f, "%.0f\xC2\xB0");
+         SliderRow(T("Angle"), &f.angle, -180.0f, 180.0f, "%.0f°");
       }
       if (t == S::kFxShadow || t == S::kFxInner || t == S::kFxBevel || t == S::kFxSatin)
       {
