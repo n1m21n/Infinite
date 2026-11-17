@@ -4,14 +4,18 @@ Branch `release/2.0-manual`, worktree `rel-manual`. Source audit only: no app wa
 
 ## Status
 
-- Step 1 (coverage audit, this file): done from source.
-- Step 2 (fresh captures): NOT STARTED. Blocked. The release gate runner is running P2 against the same binary
-  (`tools/release/run_gate.sh --phase P2 --bin .../infinte-base/build/Infinite.app/Contents/MacOS/Infinite`,
-  pids 58994 / 59173, started 21:53). P2 is the serial app battery including a census of every node.
-  The off-screen capture tool (`tools/manual/ui_shots_offscreen.py`) also uses the shared control port (7794) and
-  overwrites `~/Library/Application Support/Infinite/control_token`, so running it beside P2 would corrupt the gate run.
-  The machine is 8 GB. Captures resume when the gate is finished or when the owner says to stop it.
-- Steps 3-6 (explanations, PDF rebuild, PDF check, manifest): depend on step 2.
+The audit below was written from source before any capture. Current state:
+
+- Node shots: 744 of 744 raw PNGs (372 spawnable types, closed and open), minimum width 262 px.
+  Verified by `tools/manual/verify_nodes.py`; output in `docs/release/manual-shots-2.0.json`.
+- Chapter 29 UI shots: regenerated at 3200x2000 (`docs/ui_screenshots/`, commit ab5e2cf4).
+- PDFs rebuilt (Node Reference, Field Language, Headless User Guide); `pdf_check.py` passes with blank-area warnings only.
+- Known exceptions: 12 node shots with a red boolean/instance outline (Intersect, Union, Difference, Instance on Points),
+  recorded in `docs/shots/manifest.json` and `docs/release/known-issues-2.0.md`.
+- Dropdown (d) states: NOT DONE. This is a stated gap. The pass is last in the queue, to run only after the build
+  agent reports its test runs. Any item not covered by that pass stays listed in the gap section below.
+- Video In caption: kept in the manifest, but Video In has no card in the chapter list, so the caption does not appear
+  in the PDF text yet (stated gap).
 
 ## Chapter numbering
 
