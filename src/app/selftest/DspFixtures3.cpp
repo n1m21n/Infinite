@@ -815,7 +815,7 @@ static bool RunDrumSequencerFixture()
       Patch::SaveParams(src.get(), saved);
       bool pageSaved = false;
       for (const auto& kv : saved)
-         if (kv.first.find("editPage") != std::string::npos || kv.first.find("page") != std::string::npos)
+         if (kv.first == "editPage")
             pageSaved = true;
       auto dst = std::make_unique<DrumSequencerNode>();
       Patch::LoadParams(dst.get(), saved);
