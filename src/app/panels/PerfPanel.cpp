@@ -2374,7 +2374,7 @@ namespace app
             }
             else if (cmd && ImGui::IsKeyPressed(ImGuiKey_V, false))
                PerfPasteRecords(gPerfClipboard);
-            else if (kio.KeyShift && !cmd && ImGui::IsKeyPressed(ImGuiKey_D, false))
+            else if ((cmd || kio.KeyShift) && ImGui::IsKeyPressed(ImGuiKey_D, false))
                PerfDuplicateSelection();
             else if (cmd && ImGui::IsKeyPressed(ImGuiKey_A, false))
                PerfSelectAllOnPage();

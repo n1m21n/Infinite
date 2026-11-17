@@ -2444,7 +2444,7 @@ namespace
       if (command && pressed(ImGuiKey_GraveAccent))
          sOverlays = !sOverlays;
       if (command && pressed(ImGuiKey_G))
-         GroupSelected(scene, !io.KeyAlt);
+         GroupSelected(scene, !(io.KeyShift || io.KeyAlt));
       if (command && !io.KeyAlt && !io.KeyShift && pressed(ImGuiKey_C))
          sCopiedScene = scene->SceneText();
       if (command && !io.KeyAlt && !io.KeyShift && pressed(ImGuiKey_V) && !sCopiedScene.empty())

@@ -1070,8 +1070,9 @@ namespace
          }
          else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
             ed::ClearSelection();
-         else if (io.KeyShift && !cmd && ImGui::IsKeyPressed(ImGuiKey_Y, false))
-            ed::NavigateToContent(0.2f); // Shift+Y fits the view, as on the main canvas
+         else if ((!cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F, false)) ||
+                  (io.KeyShift && !cmd && ImGui::IsKeyPressed(ImGuiKey_Y, false)))
+            ed::NavigateToContent(0.2f); // F / Shift+Y fits the view, as on the main canvas
       }
 
       ed::Suspend();

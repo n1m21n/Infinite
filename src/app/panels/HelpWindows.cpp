@@ -617,7 +617,7 @@ namespace app
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Duplicate"), MODKEY "+D / Shift+D", I18N_KEY("Duplicate selected nodes in-place. Canvas only - with the timeline focused, this duplicates clips instead") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Delete"), "Delete / Backspace / Shift+X", I18N_KEY("Delete selected nodes, groups, or links") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Delete Cable"), "X", I18N_KEY("Delete selected cable/link only") },
-      { I18N_KEY("Edit & Canvas"), I18N_KEY("Select All"), "Shift+A", I18N_KEY("Select all nodes on the canvas") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Select All"), MODKEY "+A / Shift+A", I18N_KEY("Select all nodes on the canvas") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("UI Scale"), MODKEY "+= / " MODKEY "+-", I18N_KEY("Make the whole interface bigger or smaller in 0.1 steps (0.5x to 2x); same setting as Settings > UI Scale") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Walk Params"), "Tab / Shift+Tab", I18N_KEY("Click a node, then Tab loops through that node's parameters (Shift+Tab goes backwards). Digits type a value; Esc leaves") },
       { I18N_KEY("Edit & Canvas"), I18N_KEY("Nudge Param"), "Left / Right", I18N_KEY("With a param focused by Tab: Left/Down lowers it, Right/Up raises it one step; Alt = x10") },
@@ -659,7 +659,7 @@ namespace app
 
       // Performance Matrix - edit mode, panel clicked
       { I18N_KEY("Performance Matrix"), I18N_KEY("Copy / Cut / Paste Controls"), MODKEY "+C / " MODKEY "+X / " MODKEY "+V", I18N_KEY("In edit mode, with the panel clicked: copy or cut the selected controls, or paste them") },
-      { I18N_KEY("Performance Matrix"), I18N_KEY("Duplicate Controls"), "Shift+D", I18N_KEY("Duplicate the selected controls") },
+      { I18N_KEY("Performance Matrix"), I18N_KEY("Duplicate Controls"), MODKEY "+D / Shift+D", I18N_KEY("Duplicate the selected controls") },
       { I18N_KEY("Performance Matrix"), I18N_KEY("Select All Controls"), MODKEY "+A", I18N_KEY("Select every control on the page") },
       { I18N_KEY("Performance Matrix"), I18N_KEY("Delete Controls"), "Delete / Backspace", I18N_KEY("Delete the selected controls; Esc clears the selection") },
       { I18N_KEY("Performance Matrix"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
@@ -722,7 +722,7 @@ namespace app
       { I18N_KEY("Field Patcher"), I18N_KEY("Copy / Cut / Paste Boxes"), MODKEY "+C / " MODKEY "+X / " MODKEY "+V", I18N_KEY("Copy or cut the selected boxes, or paste them") },
       { I18N_KEY("Field Patcher"), I18N_KEY("Duplicate Boxes"), MODKEY "+D", I18N_KEY("Duplicate the selected boxes") },
       { I18N_KEY("Field Patcher"), I18N_KEY("Select All Boxes"), MODKEY "+A", I18N_KEY("Select every box on the page") },
-      { I18N_KEY("Field Patcher"), I18N_KEY("Fit Page"), "Shift+Y", I18N_KEY("Frame every box on the page") },
+      { I18N_KEY("Field Patcher"), I18N_KEY("Fit Page"), "F / Shift+Y", I18N_KEY("Frame every box on the page") },
       { I18N_KEY("Field Patcher"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
 
       // Curve Editor
@@ -752,7 +752,7 @@ namespace app
       // the canvas's own Cmd+C/V/D/G and Delete stand down meanwhile.
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Video Track"), "Shift+J", I18N_KEY("Add a new video track below the selected track. Every key in this section needs the timeline panel focused - click inside it first") },
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Audio Track"), "Shift+K", I18N_KEY("Add a new audio track below the selected track (Shift+K toggles the audio engine when the canvas has focus)") },
-      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Select All Clips"), "Shift+A", I18N_KEY("Select every clip on the timeline") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Select All Clips"), MODKEY "+A / Shift+A", I18N_KEY("Select every clip on the timeline") },
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Timeline Tools"), "A / P / T / R / Z / H", I18N_KEY("Select, Pencil, Trim, Range, Zoom and Hand; press a tool's key again, or Esc, to go back to Select") },
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Copy / Paste Clips"), MODKEY "+C / " MODKEY "+V", I18N_KEY("Copy the selected clips; paste at the playhead on the last-clicked clip's lane") },
       { I18N_KEY("Arrangement Timeline"), I18N_KEY("Duplicate Clips"), MODKEY "+D / Shift+D", I18N_KEY("Copy the selected block right after itself (the same keys duplicate nodes when the canvas has focus)") },
@@ -832,7 +832,7 @@ namespace app
       { I18N_KEY("3D View"), I18N_KEY("Duplicate"), "Shift+D", I18N_KEY("Duplicate the selected items") },
       { I18N_KEY("3D View"), I18N_KEY("Remove"), "X / Delete / Backspace", I18N_KEY("Take the selected items out of the view; the nodes stay on the canvas") },
       { I18N_KEY("3D View"), I18N_KEY("Hide / Show"), "H / Shift+H / Alt+H", I18N_KEY("Hide the selection, hide everything else, show everything") },
-      { I18N_KEY("3D View"), I18N_KEY("Group / Ungroup"), MODKEY "+G / " MODKEY "+Alt+G", I18N_KEY("Group the selected items, or dissolve the group") },
+      { I18N_KEY("3D View"), I18N_KEY("Group / Ungroup"), MODKEY "+G / " MODKEY "+Shift+G", I18N_KEY("Group the selected items, or dissolve the group") },
       { I18N_KEY("3D View"), I18N_KEY("Rename Item"), "F2", I18N_KEY("Rename the selected item") },
       { I18N_KEY("3D View"), I18N_KEY("Frame"), "F / Home", I18N_KEY("F (or Keypad .) frames the selection, everything when nothing is selected; Home frames everything, or resets the camera view's zoom and pan") },
       { I18N_KEY("3D View"), I18N_KEY("Pivot to 3D Cursor"), "Shift+Double-click", I18N_KEY("Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + middle-drag pans it away") },

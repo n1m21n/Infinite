@@ -665,11 +665,11 @@ void DrawLinks(FrameCtx& fc)
                       (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))))
          Redo();
 
-      // Shift+A selects every node on the canvas. !gArrangeFocused: the
-      // timeline has its own Shift+A (select all clips) while it owns the
+      // Cmd+A / Shift+A selects every node on the canvas. !gArrangeFocused: the
+      // timeline has its own Cmd+A / Shift+A (select all clips) while it owns the
       // keyboard, same as its sibling shortcuts below.
       const bool doSelectAll = gRequestSelectAll ||
-         (!typing && !gPerfMatrixFocused && !gArrangeFocused && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false));
+         (!typing && !gPerfMatrixFocused && !gArrangeFocused && (cmdOrCtrl || io.KeyShift) && ImGui::IsKeyPressed(ImGuiKey_A, false));
       gRequestSelectAll = false;
       if (doSelectAll)
       {

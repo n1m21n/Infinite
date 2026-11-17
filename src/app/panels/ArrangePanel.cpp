@@ -1109,7 +1109,7 @@ namespace app
          const bool noMods = !cmd && !kio.KeyAlt && !kio.KeyShift;
          const Arrange::Tick playTick = ArrangePlayTick();
 
-         if (!cmd && kio.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false))
+         if ((cmd || kio.KeyShift) && ImGui::IsKeyPressed(ImGuiKey_A, false))
          {
             gArrangeSel.clear();
             for (const Arrange::Lane& l : gArrange.lanes)

@@ -72,6 +72,94 @@ RESERVED = {
 }
 OS_OWN = {"Quit", "Hide", "Minimize", "Minimise"}
 
+# Core verbs: one canonical chord app-wide (written with macOS's Cmd for MODIS/MODKEY; Ctrl on Win/Linux).
+CORE_VERBS = {
+    "Cut": "Cmd+X",
+    "Copy": "Cmd+C",
+    "Paste": "Cmd+V",
+    "Duplicate": "Cmd+D",
+    "Delete": "Delete",
+    "Select All": "Cmd+A",
+    "Group": "Cmd+G",
+    "Ungroup": "Cmd+Shift+G",
+    "Undo": "Cmd+Z",
+    "Redo": "Cmd+Shift+Z",
+    "Zoom": "=",
+    "Frame": "F",
+}
+
+# Intentional domain-specific exceptions where a verb cannot use the canonical chord:
+#   Terminal: Ctrl+C/V are shell signals/literals on Windows/Linux, so TERMKEY (Ctrl+Shift) is used.
+#   2D View: Cmd+D is Deselect (Photoshop convention), so Duplicate Layer uses Cmd+J; Zoom uses Cmd+= / Cmd+-.
+#   3D View: A/Alt+A and Shift+D follow Blender convention (Cmd+D is Duplicate Scene).
+CORE_VERB_ALLOW = {
+    ("Terminal", "Copy"),
+    ("Terminal", "Paste"),
+    ("2D View", "Duplicate"),
+    ("2D View", "Zoom"),
+    ("3D View", "Duplicate"),
+    ("3D View", "Select All"),
+}
+
+# Exact action-name -> list of (verb, chord_index_or_None) for kShortcuts rows that express core verbs.
+# When chord_index is None, all chords in the row belong to that verb; when an int, that slash-separated piece.
+CORE_ACTION_MAP = {
+    "Undo": [("Undo", None)],
+    "Redo": [("Redo", None)],
+    "Undo / Redo Studio Edit": [("Undo", 0), ("Redo", 1)],
+    "Copy": [("Copy", None)],
+    "Paste": [("Paste", None)],
+    "Copy / Paste": [("Copy", 0), ("Paste", 1)],
+    "Copy / Paste Clips": [("Copy", 0), ("Paste", 1)],
+    "Copy / Cut / Paste Controls": [("Copy", 0), ("Cut", 1), ("Paste", 2)],
+    "Copy / Cut / Paste Slices": [("Copy", 0), ("Cut", 1), ("Paste", 2)],
+    "Copy / Cut / Paste Notes": [("Copy", 0), ("Cut", 1), ("Paste", 2)],
+    "Copy / Cut / Paste Boxes": [("Copy", 0), ("Cut", 1), ("Paste", 2)],
+    "Copy / Cut / Paste Clip": [("Copy", 0), ("Cut", 1), ("Paste", 2)],
+    "Copy / Cut / Paste": [("Copy", 0), ("Cut", 1), ("Paste", 2)],
+    "Copy / Clear Selection": [("Copy", 0)],
+    "Copy / Paste / Duplicate Scene": [("Copy", 0), ("Paste", 1), ("Duplicate", 2)],
+    "Duplicate": [("Duplicate", None)],
+    "Duplicate Controls": [("Duplicate", None)],
+    "Duplicate Notes": [("Duplicate", None)],
+    "Duplicate Boxes": [("Duplicate", None)],
+    "Duplicate Clips": [("Duplicate", None)],
+    "Duplicate Clip": [("Duplicate", None)],
+    "Duplicate Layer": [("Duplicate", None)],
+    "Delete": [("Delete", None)],
+    "Delete Controls": [("Delete", None)],
+    "Delete Slices": [("Delete", None)],
+    "Delete Notes": [("Delete", None)],
+    "Delete Box or Wire": [("Delete", None)],
+    "Delete Points": [("Delete", None)],
+    "Delete Clips": [("Delete", None)],
+    "Clear Clip": [("Delete", None)],
+    "Delete Layer": [("Delete", None)],
+    "Remove": [("Delete", None)],
+    "Select All": [("Select All", None)],
+    "Select All Controls": [("Select All", None)],
+    "Select All Slices": [("Select All", None)],
+    "Select All Notes": [("Select All", None)],
+    "Select All Boxes": [("Select All", None)],
+    "Select All Points": [("Select All", None)],
+    "Select All Clips": [("Select All", None)],
+    "Select All / None": [("Select All", None)],
+    "Group Selection": [("Group", None)],
+    "Ungroup": [("Ungroup", None)],
+    "Group / Ungroup Clips": [("Group", 0), ("Ungroup", 1)],
+    "Group / Ungroup": [("Group", 0), ("Ungroup", 1)],
+    "Zoom Sample Studio": [("Zoom", None)],
+    "Zoom Piano Roll": [("Zoom", None)],
+    "Zoom Timeline In / Out": [("Zoom", None)],
+    "Zoom 2D View": [("Zoom", None)],
+    "Zoom 3D View": [("Zoom", None)],
+    "Fit View to Content": [("Frame", None)],
+    "Fit Page": [("Frame", None)],
+    "Fit Curve": [("Frame", None)],
+    "Zoom Timeline to Fit": [("Frame", None)],
+    "Frame": [("Frame", None)],
+}
+
 # ---------------------------------------------------------------------------
 # 2. Table-vs-code drift rules (from shortcuts-sweep/check.py)
 # ---------------------------------------------------------------------------
@@ -193,6 +281,33 @@ def check_overlap_and_os():
     return n, areas, bad
 
 
+def check_core_verbs():
+    text = SRC_HELP.read_text()
+    issues = []
+    for m in ROW_RX.finditer(text):
+        cat, act, expr = m.group(1), m.group(2), m.group(3)
+        mappings = CORE_ACTION_MAP.get(act)
+        if not mappings:
+            continue
+        row_chords = chords(key_text(expr, "macOS"))
+        for verb, idx in mappings:
+            if (cat, verb) in CORE_VERB_ALLOW:
+                continue
+            canon = CORE_VERBS[verb]
+            if idx is not None:
+                if idx >= len(row_chords):
+                    issues.append(f"core verb '{verb}' in {cat} ('{act}'): missing chord at index {idx} in {row_chords}")
+                    continue
+                actual = [row_chords[idx]]
+            else:
+                actual = row_chords
+            # Normalize Shift+Cmd+G -> Cmd+Shift+G for comparison
+            norm = lambda c: "+".join(sorted(c.split("+")[:-1], key=lambda x: MODS.index(x) if x in MODS else 99) + [c.split("+")[-1]]).lower()
+            if norm(canon) not in [norm(a) for a in actual]:
+                issues.append(f"core verb '{verb}' in {cat} ('{act}'): has {actual}, expected {canon}")
+    return issues
+
+
 def check_drift(quiet=False):
     src, locate = appsrc.read_indexed(str(ROOT))
     tbl = re.search(r"static const ShortcutEntry kShortcuts\[\] = \{(.*?)\n      \};", src, re.S)
@@ -262,13 +377,17 @@ def check_drift(quiet=False):
 def main():
     quiet = "--quiet" in sys.argv
     n_chords, areas, overlap_bad = check_overlap_and_os()
+    verb_bad = check_core_verbs()
     stats, drift_bad = check_drift(quiet=quiet)
 
-    total_bad = len(overlap_bad) + len(drift_bad)
+    total_bad = len(overlap_bad) + len(verb_bad) + len(drift_bad)
     if not quiet:
         print(f"keys gate [overlap/os]: {n_chords} chords in {areas} areas x {len(PLATFORMS)} OS, {len(overlap_bad)} problem(s)")
         for b in overlap_bad:
             print(" ", b)
+        print(f"keys gate [core verbs]: {len(CORE_VERBS)} verbs checked, {len(verb_bad)} problem(s)")
+        for v in verb_bad:
+            print(" ", v)
         if stats:
             print(
                 f"keys gate [drift]: {stats['rows']} documented rows, {stats['handled']} handled keys, "
