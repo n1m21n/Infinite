@@ -41,12 +41,11 @@ def library_block(its):
             '\n  </script>\n  <noscript>\n    <h2>All library items</h2>\n    <ul>\n' + lis + '\n    </ul>\n  </noscript>\n  <!-- seo:end -->')
 
 def meta_desc(d):
-    """The meta description: the item's line plus a download note, using the longest note that keeps it within the
-    site audit's 160 characters."""
+    """The meta description: the item's line plus a download note, fitted to 160 escaped characters (gen_nodes.fit_desc)."""
     for tail in (" Free to download for Infinite, the open-source audiovisual workstation.", " Free to download for Infinite.", ""):
-        if len(d + tail) <= 160:
+        if len(html.escape(d + tail, quote=True)) <= 160:
             return d + tail
-    return d[:157].rsplit(" ", 1)[0] + "..."
+    return gen_nodes.fit_desc(d)
 
 def embed_slugs():
     """Slugs of the live WebGL embeds (website/embeds/<slug>.html), so an item page can link to its live version."""
@@ -179,8 +178,12 @@ def main():
     blog_pages = [("blog/", 0.8)] + [("blog/" + q["slug"] + ".html", 0.7) for q in posts if "slug" in q]
     embed_pages = [("embeds/" + i["slug"] + ".html", 0.7) for i in json.load(open(os.path.join(W, "embeds/embeds.json")))["items"]]
     pages = [("", 1.0), ("library.html", 0.8), ("samples/", 0.9), ("piano/", 0.7)] + blog_pages + embed_pages + [("plugin.html", 0.9), ("buy.html", 0.9), ("developers.html", 0.7), ("chat.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("privacy.html", 0.3), ("refund.html", 0.3), ("terms.html", 0.3), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3), ("llms.txt", 0.6), ("llms-full.txt", 0.5)]
+    seen = set(); urls = []
+    for u, pr in pages + [(f"library/{i['id']}.html", 0.5) for i in its] + [(u, 0.8 if u == "nodes/" else 0.5) for u in gen_nodes.sitemap_paths()]:
+        if u not in seen:   # one <loc> per page: the same page can come from more than one list
+            seen.add(u); urls.append((u, pr))
     open(os.path.join(W, "sitemap.xml"), "w").write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-        "".join(f"  <url><loc>{BASE}{u}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>\n" for u, pr in pages + [(f"library/{i['id']}.html", 0.5) for i in its] + [(u, 0.8 if u == "nodes/" else 0.5) for u in gen_nodes.sitemap_paths()]) + "</urlset>\n")
+        "".join(f"  <url><loc>{BASE}{u}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>\n" for u, pr in urls) + "</urlset>\n")
     open(os.path.join(W, "robots.txt"), "w").write(
         "# Everyone is welcome, search engines and AI agents included.\nUser-agent: *\nAllow: /\n\n" +
         "".join(f"User-agent: {b}\nAllow: /\n\n" for b in ("GPTBot", "ChatGPT-User", "OAI-SearchBot", "ClaudeBot", "Claude-User", "Claude-SearchBot", "PerplexityBot", "Google-Extended", "Applebot-Extended", "Applebot", "CCBot", "Amazonbot", "Meta-ExternalAgent", "meta-externalagent", "cohere-ai", "DuckAssistBot", "Bytespider", "YouBot", "MistralAI-User", "Perplexity-User", "Googlebot", "Bingbot")) +

@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Mapping node: controls, inputs and a free patch</title>
-  <meta name="description" content="Changes how a material&#x27;s texture maps are looked up on a surface without altering the mesh itself, UV, Generated, or Object coordinate space, plus per-axis...">
+  <meta name="description" content="Changes how a material&#x27;s texture maps are looked up on a surface, in UV, Generated or Object coordinates, without altering the mesh itself.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/mapping.html">
   <meta property="og:title" content="Mapping node: controls, inputs and a free patch">
-  <meta property="og:description" content="Changes how a material&#x27;s texture maps are looked up on a surface without altering the mesh itself, UV, Generated, or Object coordinate space, plus per-axis...">
+  <meta property="og:description" content="Changes how a material&#x27;s texture maps are looked up on a surface, in UV, Generated or Object coordinates, without altering the mesh itself.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/mapping.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/mapping.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Mapping node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Changes how a material&#x27;s texture maps are looked up on a surface without altering the mesh itself, UV, Generated, or Object coordinate space, plus per-axis...">
+  <meta name="twitter:description" content="Changes how a material&#x27;s texture maps are looked up on a surface, in UV, Generated or Object coordinates, without altering the mesh itself.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/mapping.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Mapping node: controls, inputs and a free patch", "description": "Changes how a material's texture maps are looked up on a surface without altering the mesh itself, UV, Generated, or Object coordinate space, plus per-axis...", "url": "https://infinitedevices.org/nodes/mapping.html", "image": "https://infinitedevices.org/assets/nodes/hd/mapping.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "3D", "mainEntityOfPage": "https://infinitedevices.org/nodes/mapping.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Mapping node: controls, inputs and a free patch", "description": "Changes how a material's texture maps are looked up on a surface, in UV, Generated or Object coordinates, without altering the mesh itself.", "url": "https://infinitedevices.org/nodes/mapping.html", "image": "https://infinitedevices.org/assets/nodes/hd/mapping.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "3D", "mainEntityOfPage": "https://infinitedevices.org/nodes/mapping.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Mapping", "item": "https://infinitedevices.org/nodes/mapping.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Mapping Node", "description": "Changes how a material's texture maps are looked up on a surface without altering the mesh itself, UV, Generated, or Object coordinate space, plus per-axis...", "image": "https://infinitedevices.org/assets/nodes/hd/mapping.webp", "category": "3D", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/mapping.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Mapping Node", "description": "Changes how a material's texture maps are looked up on a surface, in UV, Generated or Object coordinates, without altering the mesh itself.", "image": "https://infinitedevices.org/assets/nodes/hd/mapping.webp", "category": "3D", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/mapping.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -154,7 +154,7 @@ cable out 0 view</code></pre>
           <p class="hand">your turn</p>
           <h2>Patch it yourself</h2>
           <p>Infinite is free and open source for macOS, Windows and Linux. Drop Mapping on the canvas, wire it to anything and play.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="./">All 308 nodes</a></p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="./">All 377 nodes</a></p>
         </aside>
         <section class="post-related" aria-label="More nodes"><h2>More 3d nodes</h2><div class="rel-grid"><a class="rel-card" href="audio-ribbon.html"><span class="mono">3D</span><b>Audio Ribbon</b></a><a class="rel-card" href="particle-system.html"><span class="mono">3D</span><b>Particle System</b></a><a class="rel-card" href="audio-displacement.html"><span class="mono">3D</span><b>Audio Displacement</b></a><a class="rel-card" href="cloth.html"><span class="mono">3D</span><b>Cloth</b></a><a class="rel-card" href="displacement.html"><span class="mono">3D</span><b>Displacement</b></a><a class="rel-card" href="join-geometry.html"><span class="mono">3D</span><b>Join Geometry</b></a><a class="rel-card" href="material.html"><span class="mono">3D</span><b>Material</b></a><a class="rel-card" href="metaballs.html"><span class="mono">3D</span><b>Metaballs</b></a></div></section>
       </div>

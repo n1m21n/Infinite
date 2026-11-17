@@ -281,14 +281,37 @@ def title_for(name):
     return name + " node"
 
 
+def fit_desc(s, lo=70, hi=160):
+    """Fit text to a meta description: at most `hi` characters as the HTML attribute is written (escaped), never a
+    mid-word cut. Prefers the longest run of whole sentences; otherwise cuts at a word and ends with a full stop."""
+    s = " ".join(s.split())
+    n = lambda x: len(html.escape(x, quote=True))
+    if n(s) <= hi:
+        return s
+    best = ""
+    for m in re.finditer(r"[.!?](?=\s|$)", s):
+        cand = s[:m.end()]
+        if n(cand) <= hi:
+            best = cand
+    if len(best) >= lo:
+        return best
+    out = ""
+    for w in s.split(" "):
+        cand = (out + " " + w).strip()
+        if n(cand.rstrip(",;:") + ".") > hi:
+            break
+        out = cand
+    return out.rstrip(",;:") + "."
+
+
 def meta_for(name, cat, desc, ncontrols):
     tail = " A free %s node in Infinite, with its controls and an example patch." % CAT_LABEL.get(cat, cat).lower()
     s = first_sentence(desc)
     for c in (s + tail, s + " A free Infinite node with its controls and an example patch.", s + " A free Infinite node with a patch.", s):
-        if 70 <= len(c) <= 160:
+        if 70 <= len(c) and len(html.escape(c, quote=True)) <= 160:
             return c
-    c = (s + " " + tail)[:157].rsplit(" ", 1)[0].rstrip(",;:") + "..."
-    return c if len(c) >= 70 else ("%s is %s in Infinite. Read what it does and download a free example patch." % (name, CAT_BLURB.get(cat, "a node")))[:160]
+    c = fit_desc(s + " " + tail)
+    return c if len(c) >= 70 else fit_desc("%s is %s in Infinite. Read what it does and download a free example patch." % (name, CAT_BLURB.get(cat, "a node")))
 
 
 def fallback_desc(name, t, ctr):
