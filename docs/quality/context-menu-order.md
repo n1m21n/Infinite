@@ -9,18 +9,19 @@ Top to bottom, groups separated where the menu is long enough to need it:
 
 | # | Group | Examples |
 |---|---|---|
-| 1 | Settings / Open / Rename | Settings, Rename, Edit Note |
+| 1 | Rename / Open | Rename, Edit Note |
 | 2 | Edit | Cut, Copy, Paste, Duplicate |
 | 3 | State toggles | Mute, Solo, Bypass, Enable, Hide, Lock, Active |
 | 4 | Actions and submenus | Quantise, Fx, Colour, Group, Ungroup, Render, Go to node |
 | 5 | Separator | |
-| 6 | Delete, always last | Delete, Delete Track, Delete Note |
+| 6 | Delete | Delete, Delete Track, Delete Note |
+| 7 | Settings, the very last row | Settings, Clip Settings (people click it for more) |
 
 Rules the lint enforces (ranks 10 / 20-23 / 30 / 90):
 
-- Delete is the last item of its menu (submenus are skipped).
+- Delete comes after everything but Settings; Settings, where a menu has it, is the last row, under Delete.
 - Duplicate comes before Delete and before the state toggles.
-- Settings and Rename come first.
+- Rename comes first.
 - Items in exclusive if/else branches are not compared with each other.
 
 ## Wording and hints
@@ -52,12 +53,12 @@ wrapped in `L()` and need no new translation entries when only reordered.
 | Node (group / note / node variants) | `src/app/frame/StagePopupsA.cpp:95` | Rename / Cut `MODKEY+X` / Copy `MODKEY+C` / Duplicate `MODKEY+D` / Turn Group Off / Ungroup / Delete Group `Backspace` / Edit Note / Cut `MODKEY+X` / Copy `MODKEY+C` / Duplicate `MODKEY+D` / Font Size > / Change Colour... / Ungroup / Delete Note `Backspace` / Cut `MODKEY+X` / Copy `MODKEY+C` / Duplicate `MODKEY+D` / (computed) `B` / Presets > / Open in Piano Roll / Hide params / Show params / Hide viewport / Show viewport / Open in viewport panel / Open in Drum panel `Shift+J` / Open in Mixer panel `Shift+L` / Show modulation matrix / Add to Timeline > / Add to Session > / Add to Timeline / Add to Session / Output window > / Open in new window / Reference in chat / Help / Ungroup / Delete Node `Backspace` |
 | Side panel module (search) | `src/app/frame/StageSidePanels.cpp:560` | Remove from favourites / (computed) |
 | Side panel module (category) | `src/app/frame/StageSidePanels.cpp:622` | Remove from favourites / (computed) |
-| Arrange clip (timeline + session slot) | `src/app/panels/ArrangePanel.cpp:77` | Rename `MODKEY+R` / Colour Tint > / Assign Node... / Rename `MODKEY+R` / Active / Clip Settings / Blend Mode > / Colour Tint > / Assign Node... / Output > / Split at Playhead `MODKEY+E` / Group `MODKEY+G` / Ungroup `MODKEY+Shift+G` / Delete `Backspace` |
-| Arrange viewport dock | `src/app/panels/ArrangePanel.cpp:1550` | Viewport Position > |
-| Arrange marker | `src/app/panels/ArrangePanel.cpp:2128` | Rename / Colour > / Delete Marker |
-| Arrange track header | `src/app/panels/ArrangePanel.cpp:3922` | Rename Track `MODKEY+R` / Duplicate Track `MODKEY+D` / Add Video Track / Add Audio Track / Remove from Group / Convert to Group / Group Selected / Render Track / Delete Track |
-| Arrange track-group header | `src/app/panels/ArrangePanel.cpp:4026` | Rename Group `MODKEY+R` / Duplicate Group / Toggle Enabled / Add Video Track / Add Audio Track / Render Group / Ungroup (Keep Tracks) / Delete Group + Tracks |
-| Arrange empty track area | `src/app/panels/ArrangePanel.cpp:4284` | Add Video Track / Add Audio Track / Add Track Group / Paste at Playhead `MODKEY+V` |
+| Arrange clip (timeline + session slot) | `src/app/panels/ArrangePanel.cpp:77` | Rename `MODKEY+R` / Colour Tint > / Assign Node... / Rename `MODKEY+R` / Active / Blend Mode > / Colour Tint > / Assign Node... / Output > / Split at Playhead `MODKEY+E` / Group `MODKEY+G` / Ungroup `MODKEY+Shift+G` / Delete `Backspace` |
+| Arrange viewport dock | `src/app/panels/ArrangePanel.cpp:1558` | Viewport Position > |
+| Arrange marker | `src/app/panels/ArrangePanel.cpp:2136` | Rename / Colour > / Delete Marker |
+| Arrange track header | `src/app/panels/ArrangePanel.cpp:3930` | Rename Track `MODKEY+R` / Duplicate Track `MODKEY+D` / Add Video Track / Add Audio Track / Remove from Group / Convert to Group / Group Selected / Render Track / Delete Track |
+| Arrange track-group header | `src/app/panels/ArrangePanel.cpp:4034` | Rename Group `MODKEY+R` / Duplicate Group / Toggle Enabled / Add Video Track / Add Audio Track / Render Group / Ungroup (Keep Tracks) / Delete Group + Tracks |
+| Arrange empty track area | `src/app/panels/ArrangePanel.cpp:4292` | Add Video Track / Add Audio Track / Add Track Group / Paste at Playhead `MODKEY+V` |
 | Session track | `src/app/panels/ArrangeSessionGrid.cpp:88` | Add Video Track / Add Audio Track / Group This Track / Ungroup Track / Stop Track / Rename Track / Duplicate Track / Delete Track |
 | Session empty slot | `src/app/panels/ArrangeSessionGrid.cpp:348` | Add Clip / Paste `MODKEY+V` / Launch Row in Group / Paste Selected Timeline Clip / Stop Track |
 | Session scene | `src/app/panels/ArrangeSessionGrid.cpp:497` | Launch Quantize > / Keep Other Tracks Playing [x] / Then Play Next Scene [x] / Next Scene After > / Stop Scene / Send Scene to Timeline / Insert Scene Above / Duplicate Scene `MODKEY+D` / Delete Scene `Backspace` |
@@ -80,8 +81,8 @@ wrapped in `L()` and need no new translation entries when only reordered.
 | Mod matrix dock | `src/app/panels/ModMatrixPanel.cpp:986` | Dock Position > / Close Mod Matrix |
 | Performance control | `src/app/panels/PerfPanel.cpp:501` | Rename / Type > / Assign X Axis... / Assign Y Axis... / Clear Destinations / Listening X... (Move MIDI CC) / (computed) / Listening Y... (Move MIDI CC) / (computed) / Clear MIDI Bindings / Assign Parameter... / Clear Destination / (computed) / (computed) / Clear MIDI Binding / Colour Tint > |
 | Performance canvas | `src/app/panels/PerfPanel.cpp:2357` | Dock Position > / + Add Control > / Clear Page Controls / Close Performance |
-| Piano roll note / clip / empty stretch | `src/app/panels/PianoRollPanel.cpp:1174` | Add Note / Add Clip / Settings / Duplicate `Shift+D` / Mute `0` / Quantise > / Fx > / Delete `Backspace` |
-| Sample studio waveform / slice | `src/app/panels/SampleStudioPanel.cpp:2219` | Settings `Double-click` / Copy `MODKEY+C` / Paste at playhead `MODKEY+V` / Mute `M` / Solo `S` / Reverse `V` / Colour > / Split here `Double-click top` / Join `J` / Play slice `Q` / Convert to node / Zoom to selection `Z` / Zoom out `Shift+Z` / Delete `Backspace` |
+| Piano roll note / clip / empty stretch | `src/app/panels/PianoRollPanel.cpp:1174` | Add Note / Add Clip / Duplicate `Shift+D` / Mute `0` / Quantise > / Fx > / Delete `Backspace` / Settings |
+| Sample studio waveform / slice | `src/app/panels/SampleStudioPanel.cpp:2221` | Copy `MODKEY+C` / Paste at playhead `MODKEY+V` / Mute `M` / Solo `S` / Reverse `V` / Colour > / Split here `Double-click top` / Join `J` / Play slice `Q` / Convert to node / Zoom to selection `Z` / Zoom out `Shift+Z` / Delete `Backspace` / Settings `Double-click` |
 | Terminal dock | `src/app/panels/TerminalPanel.cpp:688` | Dock Position > / Close Chat |
 | 2D view canvas | `src/app/panels/View2DPanel.cpp:5542` | Cut / Copy / Paste / Duplicate / Layer via Cut / Free Transform / Mask from Selection / Deselect / Invert Selection / Fill... `Shift+F5` / Convert to Draw Node / Rasterize Layer / Effect on Below / Edit Text / Rasterize Layer / Convert to Shapes / Convert to Text Node / Rasterize Layer / Convert to Sketch Node / Ungroup / Edit Fill... / Add Layer Mask / Delete Layer Mask / Group / Arrange > / Select All Layers / Fit on Screen / Actual Pixels / Reset Rotation / Delete `Delete` |
 | 2D view layer row | `src/app/panels/View2DPanel.cpp:9299` | Rename / Cut / Copy / Paste / Duplicate Layer / Merge Layers / Merge Down / Merge Visible / Flatten Image / Group Layers / Ungroup / Release Clipping Mask / Add Layer Mask / Mask from Selection / Delete Layer Mask / Add Vector Mask / Delete Vector Mask / Edit Fill... / Convert to Draw Node / Rasterize Layer / Rasterize Layer / Convert to Sketch Node / Convert to Text Node / Convert to Shapes / Layer as Output / Effect on Below / Reset Distort / Delete Layer `Delete` |

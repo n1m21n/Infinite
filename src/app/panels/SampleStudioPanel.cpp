@@ -2221,10 +2221,6 @@ namespace
       if (!MenuParts::BeginPopup("##studioWaveMenu"))
          return;
       const bool any = !s.sel.empty();
-      // Shows or hides the settings side, as its toolbar chip does.
-      if (MenuParts::Item(T("Settings"), "Double-click", s.settingsOpen, any))
-         s.settingsOpen = !s.settingsOpen;
-      MenuParts::Separator();
       if (MenuParts::Item(T("Copy"), MODKEY "+C", false, any))
          CopySelected();
       if (MenuParts::Item(T("Paste at playhead"), MODKEY "+V", false, s.clip.has_value()))
@@ -2263,6 +2259,10 @@ namespace
       MenuParts::Separator();
       if (MenuParts::Item(T("Delete"), "Backspace", false, any && (int)s.sel.size() < s.doc.Count()))
          DeleteSelected();
+      MenuParts::Separator();
+      // Shows or hides the settings side, as its toolbar chip does.
+      if (MenuParts::Item(T("Settings"), "Double-click", s.settingsOpen, any))
+         s.settingsOpen = !s.settingsOpen;
       MenuParts::EndPopup();
    }
 

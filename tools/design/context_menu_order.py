@@ -4,11 +4,12 @@
 Static source scan (no app build). The canonical order and the full inventory live in
 docs/quality/context-menu-order.md. Within one menu, items run in this order:
 
-  1. Settings / Rename / Edit      (rank 10)
+  1. Rename / Edit                 (rank 10)
   2. Cut, Copy, Paste, Duplicate   (rank 20..23)
   3. State toggles                 (rank 30: Mute, Solo, Active, Hide, Bypass, Enable, Turn Group On/Off)
   4. everything else               (submenus, view, actions: unranked, free order)
-  5. Delete*                       (rank 90: LAST, nothing after it)
+  5. Delete*                       (rank 90)
+  6. Settings                      (rank 95: the very last row, under Delete - the way on to more settings)
 
 Rules checked per menu (branches that exclude each other, such as the group / note / node variants of the
 node menu, are checked separately):
@@ -81,13 +82,14 @@ BEGINS = ("MenuParts::BeginPopup", "BeginPickerMenu", "MenuParts::BeginContextIt
 # ---------------------------------------------------------------- canonical order
 def L(*a): return re.compile("^(?:" + "|".join(a) + ")$")
 RANKS = [
-    (10, L(r"Settings\.*", r"Rename", r"Rename (?:Track|Group|Page|Marker)", r"Edit Note")),
+    (10, L(r"Rename", r"Rename (?:Track|Group|Page|Marker)", r"Edit Note")),
     (20, L(r"Cut")),
     (21, L(r"Copy", r"Copy scene")),
     (22, L(r"Paste", r"Paste at [Pp]layhead", r"Paste scene")),
     (23, L(r"Duplicate", r"Duplicate (?:Page|Group|Track|Scene|scene)")),
     (30, L(r"Mute", r"Solo", r"Active", r"Hide", r"Bypass(?: Node| selection)?", r"Enable Node", r"Toggle Enabled",
            r"Turn Group (?:On|Off)")),
+    (95, L(r"Settings\.*", r"Clip Settings")),
     (90, re.compile(r"^(?:Delete\b(?!.*Mask)|Remove$)")),   # the 3D view keeps Blender's "Remove" (X)
 ]
 # Cut / Copy / Paste are only edit actions inside a context menu; a tool picker's "Cut" (blade tool) is not one.
@@ -321,9 +323,11 @@ def check_menu(name, items):
             c = items[b]
             if exclusive(a.block, c.block): continue
             rc = rank_of(c.label)
-            if ra == 90 and a.label is not None:
-                out.append(f"order: {name}: \"{c.label or '?'}\" comes after \"{a.label}\" (Delete is last)")
-            elif ra is not None and rc is not None and ra > rc and ra != 90:
+            if ra == 95 and a.label is not None:
+                out.append(f"order: {name}: \"{c.label or '?'}\" comes after \"{a.label}\" (Settings is last)")
+            elif ra == 90 and a.label is not None and rc != 95:
+                out.append(f"order: {name}: \"{c.label or '?'}\" comes after \"{a.label}\" (Delete is last, only Settings may follow)")
+            elif ra is not None and rc is not None and ra > rc and ra not in (90, 95):
                 out.append(f"order: {name}: \"{c.label}\" should come before \"{a.label}\"")
     # dedupe, keep order
     seen, res = set(), []

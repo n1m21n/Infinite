@@ -3407,11 +3407,6 @@ namespace
             ArrangeEdit([&] { NewClipAt(page, s.menuTick); });
          return;
       }
-      if (MenuParts::Item(L("Settings")))
-      {
-         s.settingsOpen = true;
-         s.genOpen = false;
-      }
       if (MenuParts::Item(L("Duplicate"), "Shift+D"))
       {
          if (s.menuKind == 1)
@@ -3487,6 +3482,12 @@ namespace
          }
          else
             DeleteSelection();
+      }
+      MenuParts::Separator();
+      if (MenuParts::Item(L("Settings")))
+      {
+         s.settingsOpen = true;
+         s.genOpen = false;
       }
    }
 

@@ -134,6 +134,22 @@ namespace app
                if (MenuParts::Item(L("Duplicate"), MODKEY "+D", false, !ctxSelIds.empty()))
                   ArrangeDuplicateSelection();
             };
+            // Clip Settings is the menu's last row, under Delete: the way on to every other value of the clip.
+            auto drawClipSettingsRow = [&]()
+            {
+            // Values (fades, gain, pan, pitch, tempo, opacity, grade) live in the Clip Settings inspector, never in
+            // this menu: menus hold verbs (lint: no sliders inside a menu).
+            // Checked while the inspector shows this clip: the Session's inspector follows the selected slot.
+            const bool inspectorOnThis = gArrangeClipSettingsPanelOpen &&
+               (gArrangeSettingsPanelTarget == cid || (ctxIsSlot && ArrangeSelectedSlotId() == cid));
+            if (MenuParts::Item(L("Clip Settings"), T("Double-click"), inspectorOnThis))
+            {
+               gArrangeClipSettingsPanelOpen = true;
+               gArrangeSettingsPanelTarget = cid;
+               gArrangeRowSel.clear();
+               gArrangeRowSelAnchor = 0;
+            }
+            };
             if (ctxSelIds.size() > 1)
             {
                // Multi-clip selection: an intentionally minimal menu. Every
@@ -215,19 +231,6 @@ namespace app
                   ArrangeToggleEnabledSelection();
             }
             MenuParts::Separator();
-            // Values (fades, gain, pan, pitch, tempo, opacity, grade) live in the Clip Settings inspector, never in
-            // this menu: menus hold verbs (lint: no sliders inside a menu).
-            // Checked while the inspector shows this clip: the Session's inspector follows the selected slot.
-            const bool inspectorOnThis = gArrangeClipSettingsPanelOpen &&
-               (gArrangeSettingsPanelTarget == cid || (ctxIsSlot && ArrangeSelectedSlotId() == cid));
-            if (MenuParts::Item(L("Clip Settings"), T("Double-click"), inspectorOnThis))
-            {
-               gArrangeClipSettingsPanelOpen = true;
-               gArrangeSettingsPanelTarget = cid;
-               gArrangeRowSel.clear();
-               gArrangeRowSelAnchor = 0;
-            }
-
             if (ctxSelectionSingleType && ctxLaneType != Arrange::kLaneAudio && MenuParts::SubMenu(L("Blend Mode")))
             {
                // How this clip lays over the lanes below it. Applies to every
@@ -360,6 +363,11 @@ namespace app
             DrawArrangeSessionSlotPlaceItem(cid);
             MenuParts::Separator();
             DrawArrangeSessionSlotDeleteItem(cid);
+            }
+            if (ctxSelIds.size() <= 1)
+            {
+               MenuParts::Separator();
+               drawClipSettingsRow();
             }
          }
          MenuParts::EndPopup();
