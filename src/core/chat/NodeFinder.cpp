@@ -63,7 +63,7 @@ namespace chat
             { "mic", { "microphone", "input" } }, { "spacious", { "reverb", "room" } }, { "space", { "reverb" } },
             { "ambience", { "reverb" } }, { "crunchy", { "distortion", "saturation", "bitcrush" } },
             { "dirty", { "distortion", "saturation" } }, { "gritty", { "distortion", "saturation" } },
-            { "distort", { "distortion", "saturation", "displace", "liquify" } }, { "louder", { "gain", "volume" } },
+            { "distort", { "distortion", "saturation", "displace", "liquify", "drive", "saturator" } }, { "louder", { "gain", "volume" } },
             { "quieter", { "gain", "volume" } }, { "loud", { "gain" } }, { "projector", { "projection", "output" } }, { "display", { "output", "window" } }, { "monitor", { "output" } }, { "phone", { "osc" } }, { "ipad", { "osc" } }, { "tablet", { "osc" } },
             { "gradient", { "ramp" } }, { "app", { "syphon", "ndi" } }, { "apps", { "syphon", "ndi" } }, { "knob", { "macro" } },
             { "wobble", { "lfo", "oscillation" } }, { "sway", { "lfo" } }, { "mix", { "mixer", "blend" } },
@@ -75,6 +75,10 @@ namespace chat
             { "key", { "scale", "snap" } }, { "scale", { "key", "snap" } }, { "render", { "render" } },
             { "webcam", { "camera", "video" } }, { "code", { "sketch", "javascript", "kernel", "glsl" } },
             { "p5", { "sketch" } }, { "processing", { "sketch" } }, { "shader", { "glsl", "kernel", "pixel" } }, { "beat", { "drum", "rhythm" } }, { "chop", { "slice", "slices" } },
+            // Everyday words from tests/chat/find_plain.tsv: what a non-musician or non-designer says for a node.
+            { "thicker", { "chorus", "unison", "thicken" } }, { "trim", { "crop" } }, { "colours", { "color", "adjustments" } },
+            { "colors", { "color", "adjustments" } }, { "wobbly", { "wobble", "liquify", "displace" } },
+            { "soften", { "blur", "gaussian" } },
             // Musician words no card uses (tests/chat/find_glossary.tsv).
             { "lush", { "reverb", "chorus", "wavetable" } }, { "pad", { "wavetable", "analog", "reverb" } },
             { "pads", { "wavetable", "analog", "reverb" } }, { "supersaw", { "analog", "unison", "detune" } },
