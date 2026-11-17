@@ -849,7 +849,7 @@ namespace app
       { I18N_KEY("3D View"), I18N_KEY("Pivot / Orientation"), "Period / Comma", I18N_KEY("Open the pivot point or the transform orientation menu") },
       { I18N_KEY("3D View"), I18N_KEY("Local View"), "/", I18N_KEY("Show only the selection (Keypad / too); press again to show everything") },
       { I18N_KEY("3D View"), I18N_KEY("Sidebar"), "N", I18N_KEY("Show or hide the side panel") },
-      { I18N_KEY("3D View"), I18N_KEY("Overlays"), MODKEY "+`", I18N_KEY("Show or hide the overlays (over the 3D View this key does not open the Terminal)") },
+      { I18N_KEY("3D View"), I18N_KEY("Overlays"), "Ctrl+`", I18N_KEY("Show or hide the overlays (over the 3D View this key does not open the Terminal)") },
       { I18N_KEY("3D View"), I18N_KEY("X-ray / Overlays"), "Alt+Z / Shift+Alt+Z", I18N_KEY("See through surfaces in Solid; show or hide the overlays") },
       { I18N_KEY("3D View"), I18N_KEY("Follow / Clear Follow"), MODKEY "+P / Alt+P", I18N_KEY("The selected items follow the active one (Blender's parent), or stop following") },
       { I18N_KEY("3D View"), I18N_KEY("Copy Transforms"), MODKEY "+L", I18N_KEY("The selected items take the active item's location, rotation and scale") },
@@ -869,7 +869,7 @@ namespace app
       { I18N_KEY("3D View"), I18N_KEY("Render"), "F12 / " MODKEY "+F12", I18N_KEY("Render a still from the scene camera, or render the camera for its set duration") },
 
       // Terminal (right rail). The app keys are Cmd on macOS, Ctrl+Shift elsewhere, so plain Ctrl reaches the shell.
-      { I18N_KEY("Terminal"), I18N_KEY("Terminal"), MODKEY "+`", I18N_KEY("Open the Terminal in the right rail, move the keyboard to it, or close it") },
+      { I18N_KEY("Terminal"), I18N_KEY("Terminal"), "Ctrl+`", I18N_KEY("Open the Terminal in the right rail, move the keyboard to it, or close it. Physical Ctrl on every system") },
       { I18N_KEY("Terminal"), I18N_KEY("Copy / Paste"), TERMKEY "+C / " TERMKEY "+V", I18N_KEY("Copy the selected text, or paste into the shell") },
       { I18N_KEY("Terminal"), I18N_KEY("Find in Terminal"), TERMKEY "+F", I18N_KEY("Search the terminal's text") },
       { I18N_KEY("Terminal"), I18N_KEY("New / Close Tab"), TERMKEY "+T / " TERMKEY "+W", I18N_KEY("Open a new terminal tab, or close this one") },
