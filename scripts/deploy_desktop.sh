@@ -6,15 +6,24 @@
 # liked best - an old v0.5.0 Codex build - and fixed bugs looked unfixed. Unregistering the others is the only lever;
 # no files are touched. Renamed copies (Infinite Debug.app, Infinite-dev.app) count too. Launching any other build registers it again, so this runs on every deploy.
 #
-# Usage: scripts/deploy_desktop.sh [path/to/Infinite.app]   (default build/Infinite.app)
+# Usage: scripts/deploy_desktop.sh [--dev] [path/to/Infinite.app]   (default build/Infinite.app)
 # Exit: 0 deployed and claimed, 1 Infinite is running (quit it first), 2 no build, 3 another copy still opens .inf
 set -u
+ALLOW_DEV=0
+if [ "${1:-}" = "--dev" ]; then
+  ALLOW_DEV=1
+  shift
+fi
 SRC="${1:-build/Infinite.app}"
 DST="$HOME/Desktop/Infinite.app"
 LS=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 [ -d "$SRC" ] || { echo "no build at $SRC"; exit 2; }
-# Never put a dev/debug build on the Desktop: it shows debug-only menu items and is slower.
-python3 "$(dirname "$0")/check_release_binary.py" "$SRC" || exit 2
+if [ "$ALLOW_DEV" -eq 1 ]; then
+  echo "note: deploying dev build (--dev); run a release build before shipping"
+else
+  # Never put a dev/debug build on the Desktop without --dev: it shows debug-only menu items and is slower.
+  python3 "$(dirname "$0")/check_release_binary.py" "$SRC" || exit 2
+fi
 if pgrep -x Infinite >/dev/null; then echo "Infinite is running - quit it, then rerun"; exit 1; fi
 rm -rf "$DST" && cp -R "$SRC" "$DST"
 "$LS" -dump 2>/dev/null | grep -E '^path: .*/Infinite[^/]*\.app ' | sed -E 's/^path: +//; s/ \(0x[0-9a-f]+\)$//' | sort -u |
