@@ -1519,32 +1519,35 @@ namespace
          }
          MenuParts::EndPopup();
       }
+      // The free strip, then Pin and Pop Out pinned at the right end like every panel's view toggles.
       FormParts::Inline(0.0f, tok::space_1);
-      if (Page* fp = Front())
-      {
-         // Pin: the front page stays put when the canvas selection changes.
-         if (IconTile::Draw("##fpPin", IconsInfinite::Lock, IconsInfinite::Lock, fp->pinned, ChipButton::Height()))
-            fp->pinned = !fp->pinned;
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", fp->pinned ? T("Unpin page") : T("Pin page"));
-         FormParts::Inline(0.0f, tok::space_1);
-      }
-      if (IconTile::Draw("##fpMax", IconsInfinite::PopOut, IconsInfinite::PopOut, gFieldPatcherMaximised, ChipButton::Height()))
-         gFieldPatcherMaximised = !gFieldPatcherMaximised;
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Maximise (Esc returns)"));
-      // The free strip to the right: right-click for the dock switch.
-      FormParts::Inline(0.0f, tok::space_1);
-      const float freeW = ImGui::GetContentRegionAvail().x;
+      const float tile = ChipButton::Height();
+      Page* fp = Front();
+      const float tailW = (fp != nullptr ? tile + tok::space_1 : 0.0f) + tile;
+      const float freeW = ImGui::GetContentRegionAvail().x - tailW - tok::space_1;
       if (freeW > 8.0f)
       {
-         ImGui::InvisibleButton("##fpStripFree", ImVec2(freeW, ChipButton::Height()));
+         ImGui::InvisibleButton("##fpStripFree", ImVec2(freeW, tile));
          if (MenuParts::BeginContextItem("##fpStripMenu"))
          {
             DockItem();
             MenuParts::EndPopup();
          }
+         FormParts::Inline(0.0f, tok::space_1);
       }
+      if (fp != nullptr)
+      {
+         // Pin: the front page stays put when the canvas selection changes.
+         if (IconTile::Draw("##fpPin", IconsInfinite::Lock, IconsInfinite::Lock, fp->pinned, tile))
+            fp->pinned = !fp->pinned;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", fp->pinned ? T("Unpin page") : T("Pin page"));
+         FormParts::Inline(0.0f, tok::space_1);
+      }
+      if (IconTile::Draw("##fpMax", IconsInfinite::PopOut, IconsInfinite::PopOut, gFieldPatcherMaximised, tile))
+         gFieldPatcherMaximised = !gFieldPatcherMaximised;
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Maximise (Esc returns)"));
    }
 
    void DrawFooter(Page& p, Host& h)
