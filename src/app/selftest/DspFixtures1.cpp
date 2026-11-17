@@ -268,6 +268,29 @@ bool RunGainFixture()
       all &= shapeOk;
    }
 
+   // 5) Perf helpers: the LFO polynomial matches sinf/cosf, and the dB memo is
+   //    bit-identical to DbToLinear across repeats, changes and a NaN start.
+   {
+      float worst = 0.0f;
+      for (float p = -3.0f; p < 3.0f; p += 0.00137f)
+      {
+         const float ref = sinf(2.0f * (float)M_PI * p);
+         worst = std::max(worst, fabsf(DspMath::FastSinCycles(p) - ref));
+         worst = std::max(worst, fabsf(DspMath::FastSinCycles(p + 0.25f) - cosf(2.0f * (float)M_PI * p)));
+      }
+      const bool sinOk = worst < 1e-4f;
+      printf("DSPTEST fast sine vs sinf/cosf: max diff %.2e (< 1e-4)  %s\n", worst, sinOk ? "OK" : "FAIL");
+      all &= sinOk;
+
+      DspMath::DbLinCache cache;
+      bool memoOk = true;
+      const float dbs[] = { 0.0f, 0.0f, -6.0f, -6.0f, -6.0f, 12.5f, -96.0f, 0.0f };
+      for (float db : dbs)
+         memoOk &= cache.Get(db) == DspMath::DbToLinear(db);
+      printf("DSPTEST dB->linear memo bit-identical  %s\n", memoOk ? "OK" : "FAIL");
+      all &= memoOk;
+   }
+
    return all;
 }
 
