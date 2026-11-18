@@ -293,7 +293,7 @@ void RunView3DEditTest(int f)
          st.second();
    if (rel == seq.at)
    {
-      float v[4];
+      float v[4] = {};
       auto near0 = [](float x) { return std::abs(x) < 1e-4f; };
       bool parsed = Nums(cap[0].op, "move ", v, 3);
       Check("G then Z moves along the vertical only", parsed && near0(v[0]) && near0(v[2]) && std::abs(v[1]) > 1e-3f);
