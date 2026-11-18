@@ -29,7 +29,7 @@ await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 const problems = [];
 const report = (pg, sz, kind, msg) => problems.push(`${pg} [${sz}] ${kind}: ${msg}`);
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'] });
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', protocolTimeout: 300000, args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'] });
 const pages = pageList(process.argv.slice(2));
 
 /* in page: text/control boxes that sit over a canvas */

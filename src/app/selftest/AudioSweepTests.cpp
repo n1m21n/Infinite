@@ -341,14 +341,16 @@ namespace AudioParamSweep
       {
          AudioBuffer bufs[1 + Rig::kRigBuses];
          AudioBuffer* ptrs[1 + Rig::kRigBuses];
+         float* busChans[1 + Rig::kRigBuses][2]; // outlives the loop: bufs[b].channels points here
          bufs[0] = out;
          ptrs[0] = &bufs[0];
          for (int b = 1; b < outputs; b++)
          {
-            float* chans[2] = { rig.busL[b - 1], rig.busR[b - 1] };
+            busChans[b][0] = rig.busL[b - 1];
+            busChans[b][1] = rig.busR[b - 1];
             std::fill(rig.busL[b - 1], rig.busL[b - 1] + numFrames, 0.0f);
             std::fill(rig.busR[b - 1], rig.busR[b - 1] + numFrames, 0.0f);
-            bufs[b].channels = chans;
+            bufs[b].channels = busChans[b];
             bufs[b].numChannels = 2;
             bufs[b].numFrames = numFrames;
             ptrs[b] = &bufs[b];
