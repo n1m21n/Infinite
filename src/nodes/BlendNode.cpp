@@ -1,4 +1,5 @@
 #include "BlendNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 
@@ -86,12 +87,12 @@ void BlendNode::CookIfNeeded(int frameId)
 
    GLUtil::RunShaderPass(mOut, mProgram, [this, texA, texB]()
    {
-      GLint locA = glGetUniformLocation(mProgram, "uTexA");
-      GLint locB = glGetUniformLocation(mProgram, "uTexB");
-      GLint locMode = glGetUniformLocation(mProgram, "uMode");
-      GLint locMix = glGetUniformLocation(mProgram, "uMix");
-      GLint locLinear = glGetUniformLocation(mProgram, "uLinear");
-      GLint locW3C = glGetUniformLocation(mProgram, "uW3C");
+      GLint locA = GLUtil::UniformLoc(mProgram, "uTexA");
+      GLint locB = GLUtil::UniformLoc(mProgram, "uTexB");
+      GLint locMode = GLUtil::UniformLoc(mProgram, "uMode");
+      GLint locMix = GLUtil::UniformLoc(mProgram, "uMix");
+      GLint locLinear = GLUtil::UniformLoc(mProgram, "uLinear");
+      GLint locW3C = GLUtil::UniformLoc(mProgram, "uW3C");
 
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, texA);

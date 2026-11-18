@@ -1,4 +1,5 @@
 #include "RampNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -125,17 +126,17 @@ void RampNode::CookIfNeeded(int frameId)
 
    GLUtil::RunShaderPass(mOut, mProgram, [&]()
    {
-      glUniform1i(glGetUniformLocation(mProgram, "uType"), type);
-      glUniform1i(glGetUniformLocation(mProgram, "uRepeat"), repeat);
-      glUniform1f(glGetUniformLocation(mProgram, "uAngle"), angle * (float)M_PI / 180.0f);
-      glUniform2f(glGetUniformLocation(mProgram, "uCenter"), centerX, centerY);
-      glUniform1f(glGetUniformLocation(mProgram, "uScale"), scale);
-      glUniform1f(glGetUniformLocation(mProgram, "uOffset"), offset);
-      glUniform1f(glGetUniformLocation(mProgram, "uGamma"), gamma);
-      glUniform1f(glGetUniformLocation(mProgram, "uDither"), dither);
-      glUniform1i(glGetUniformLocation(mProgram, "uStopCount"), count);
-      glUniform1fv(glGetUniformLocation(mProgram, "uStopPos"), kStops, pos);
-      glUniform3fv(glGetUniformLocation(mProgram, "uStopColor"), kStops, col);
-      glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uType"), type);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uRepeat"), repeat);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAngle"), angle * (float)M_PI / 180.0f);
+      glUniform2f(GLUtil::UniformLoc(mProgram, "uCenter"), centerX, centerY);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uScale"), scale);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uOffset"), offset);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uGamma"), gamma);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uDither"), dither);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uStopCount"), count);
+      glUniform1fv(GLUtil::UniformLoc(mProgram, "uStopPos"), kStops, pos);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uStopColor"), kStops, col);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
    });
 }

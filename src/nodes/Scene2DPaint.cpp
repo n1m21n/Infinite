@@ -1,6 +1,7 @@
 // Scene 2D paint: paint-layer surfaces and their tiles, pixel masks, the
 // document selection, bucket, gradient and pick. Plan: internal/plans/2d-view (Block B).
 #include "Scene2DNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -813,31 +814,31 @@ void Scene2DNode::ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, s.fbo.tex);
-      glUniform1i(glGetUniformLocation(prog, "uSurf"), 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uSurf"), 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, coverage);
-      glUniform1i(glGetUniformLocation(prog, "uCov"), 1);
+      glUniform1i(GLUtil::UniformLoc(prog, "uCov"), 1);
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, sel);
-      glUniform1i(glGetUniformLocation(prog, "uSel"), 2);
+      glUniform1i(GLUtil::UniformLoc(prog, "uSel"), 2);
       glActiveTexture(GL_TEXTURE0);
-      glUniform1i(glGetUniformLocation(prog, "uHasCov"), coverage != 0 ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uHasSel"), sel != 0 ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uOp"), kind == -3 ? 3 : kind == -2 ? 2 : kind < 0 ? 1 : 0);
-      glUniform2f(glGetUniformLocation(prog, "uSurfSize"), (float)sw, (float)sh);
-      glUniform2f(glGetUniformLocation(prog, "uBox"), bw, bh);
-      glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
-      glUniform3f(glGetUniformLocation(prog, "uMA"), m[0], m[1], m[2]);
-      glUniform3f(glGetUniformLocation(prog, "uMB"), m[3], m[4], m[5]);
-      glUniform4fv(glGetUniformLocation(prog, "uColA"), 1, colA != nullptr ? colA : zero);
-      glUniform4fv(glGetUniformLocation(prog, "uColB"), 1, colB != nullptr ? colB : zero);
-      glUniform1i(glGetUniformLocation(prog, "uKind"), std::max(0, kind));
-      glUniform2f(glGetUniformLocation(prog, "uP0"), p0 != nullptr ? p0[0] : 0.0f, p0 != nullptr ? p0[1] : 0.0f);
-      glUniform2f(glGetUniformLocation(prog, "uP1"), p1 != nullptr ? p1[0] : 1.0f, p1 != nullptr ? p1[1] : 1.0f);
-      glUniform1f(glGetUniformLocation(prog, "uOpacity"), std::clamp(opacity, 0.0f, 1.0f));
-      glUniform1i(glGetUniformLocation(prog, "uLock"), (l.lock & kLockAlpha) != 0 ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uExtend"), mGradExtend);
-      glUniform1i(glGetUniformLocation(prog, "uDither"), mGradDither ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHasCov"), coverage != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHasSel"), sel != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uOp"), kind == -3 ? 3 : kind == -2 ? 2 : kind < 0 ? 1 : 0);
+      glUniform2f(GLUtil::UniformLoc(prog, "uSurfSize"), (float)sw, (float)sh);
+      glUniform2f(GLUtil::UniformLoc(prog, "uBox"), bw, bh);
+      glUniform2f(GLUtil::UniformLoc(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
+      glUniform3f(GLUtil::UniformLoc(prog, "uMA"), m[0], m[1], m[2]);
+      glUniform3f(GLUtil::UniformLoc(prog, "uMB"), m[3], m[4], m[5]);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uColA"), 1, colA != nullptr ? colA : zero);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uColB"), 1, colB != nullptr ? colB : zero);
+      glUniform1i(GLUtil::UniformLoc(prog, "uKind"), std::max(0, kind));
+      glUniform2f(GLUtil::UniformLoc(prog, "uP0"), p0 != nullptr ? p0[0] : 0.0f, p0 != nullptr ? p0[1] : 0.0f);
+      glUniform2f(GLUtil::UniformLoc(prog, "uP1"), p1 != nullptr ? p1[0] : 1.0f, p1 != nullptr ? p1[1] : 1.0f);
+      glUniform1f(GLUtil::UniformLoc(prog, "uOpacity"), std::clamp(opacity, 0.0f, 1.0f));
+      glUniform1i(GLUtil::UniformLoc(prog, "uLock"), (l.lock & kLockAlpha) != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uExtend"), mGradExtend);
+      glUniform1i(GLUtil::UniformLoc(prog, "uDither"), mGradDither ? 1 : 0);
    });
    GLint prevRead = 0;
    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
@@ -1744,6 +1745,7 @@ void Scene2DNode::UploadSelection()
          rgba[i * 4 + 3] = 255;
       }
    WriteRect(mSelTex, 0, 0, W, H, rgba.data());
+   mSelTexGen++;
 }
 
 unsigned Scene2DNode::SelectionTexture()
@@ -1768,16 +1770,21 @@ unsigned Scene2DNode::SelectionOverlay(float time, bool quick)
       return 0;
    const bool live = mStroke.Active() && mPaintTarget == 2;
    const unsigned sel = live ? mStroke.DisplayTexture(mSelTex) : mSelTex.tex;
+   if (quick && !live && mSelOverlayQuick && mSelOverlaySrc == sel && mSelOverlayGen == mSelTexGen && mSelOverlay.tex != 0)
+      return mSelOverlay.tex;
    const unsigned prog = mAntsProgram;
    GLUtil::RunShaderPass(mSelOverlay, prog, [&]()
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, sel);
-      glUniform1i(glGetUniformLocation(prog, "uSel"), 0);
-      glUniform2f(glGetUniformLocation(prog, "uPx"), 1.0f / (float)mDoc.w, 1.0f / (float)mDoc.h);
-      glUniform1f(glGetUniformLocation(prog, "uTime"), time);
-      glUniform1i(glGetUniformLocation(prog, "uQuick"), quick ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uSel"), 0);
+      glUniform2f(GLUtil::UniformLoc(prog, "uPx"), 1.0f / (float)mDoc.w, 1.0f / (float)mDoc.h);
+      glUniform1f(GLUtil::UniformLoc(prog, "uTime"), time);
+      glUniform1i(GLUtil::UniformLoc(prog, "uQuick"), quick ? 1 : 0);
    });
+   mSelOverlayQuick = quick && !live;
+   mSelOverlaySrc = sel;
+   mSelOverlayGen = mSelTexGen;
    return mSelOverlay.tex;
 }
 
@@ -2194,9 +2201,9 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const f
       const GLint filt = nearest ? GL_NEAREST : GL_LINEAR;
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filt);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filt);
-      glUniform1i(glGetUniformLocation(prog, "uSrc"), 0);
-      glUniform2fv(glGetUniformLocation(prog, "uD"), 16, d);
-      glUniform4fv(glGetUniformLocation(prog, "uR"), 1, box);
+      glUniform1i(GLUtil::UniformLoc(prog, "uSrc"), 0);
+      glUniform2fv(GLUtil::UniformLoc(prog, "uD"), 16, d);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uR"), 1, box);
    });
    if (nearest)
    {

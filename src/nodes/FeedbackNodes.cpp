@@ -1,4 +1,5 @@
 #include "FeedbackNodes.h"
+#include "GLUtil.h"
 #include "core/SpawnSeed.h"
 
 #include "gl3.h"
@@ -58,7 +59,7 @@ void FeedbackNode::CookIfNeeded(int frameId)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, srcTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSrc"), 0);
    });
 
    mWrite = 1 - mWrite;
@@ -160,17 +161,17 @@ void TrailsNode::CookIfNeeded(int frameId)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, srcTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSrc"), 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, prevTex != 0 ? prevTex : srcTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uPrev"), 1);
-      glUniform1f(glGetUniformLocation(mProgram, "uDecay"), decay);
-      glUniform1f(glGetUniformLocation(mProgram, "uZoom"), zoom);
-      glUniform1f(glGetUniformLocation(mProgram, "uRotate"), rotate * (float)M_PI / 180.0f);
-      glUniform2f(glGetUniformLocation(mProgram, "uDrift"), driftX, driftY);
-      glUniform1f(glGetUniformLocation(mProgram, "uHueShift"), hueShift);
-      glUniform1i(glGetUniformLocation(mProgram, "uBlend"), blendMode);
-      glUniform1i(glGetUniformLocation(mProgram, "uClear"), clearNow ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uPrev"), 1);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uDecay"), decay);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uZoom"), zoom);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uRotate"), rotate * (float)M_PI / 180.0f);
+      glUniform2f(GLUtil::UniformLoc(mProgram, "uDrift"), driftX, driftY);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uHueShift"), hueShift);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uBlend"), blendMode);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uClear"), clearNow ? 1 : 0);
    });
 
    mFront = back;
@@ -306,7 +307,7 @@ void ReactionDiffusionNode::Seed(int w, int h)
    const float seedValue = (float)SpawnSeed::Next(SpawnSeed::ReactionDiffusion) * 7.13f;
    GLUtil::RunShaderPass(mState[mFront], mSeedProgram, [this, seedValue]()
    {
-      glUniform1f(glGetUniformLocation(mSeedProgram, "uSeed"), seedValue);
+      glUniform1f(GLUtil::UniformLoc(mSeedProgram, "uSeed"), seedValue);
    });
    mNeedsSeed = false;
 }
@@ -353,17 +354,17 @@ void ReactionDiffusionNode::CookIfNeeded(int frameId)
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, stateTex);
-         glUniform1i(glGetUniformLocation(mSimProgram, "uState"), 0);
+         glUniform1i(GLUtil::UniformLoc(mSimProgram, "uState"), 0);
          glActiveTexture(GL_TEXTURE1);
          glBindTexture(GL_TEXTURE_2D, srcTex != 0 ? srcTex : stateTex);
-         glUniform1i(glGetUniformLocation(mSimProgram, "uSrc"), 1);
-         glUniform1i(glGetUniformLocation(mSimProgram, "uHasSrc"), srcTex != 0 ? 1 : 0);
-         glUniform2f(glGetUniformLocation(mSimProgram, "uTexel"), 1.0f / w, 1.0f / h);
-         glUniform1f(glGetUniformLocation(mSimProgram, "uFeed"), feed);
-         glUniform1f(glGetUniformLocation(mSimProgram, "uKill"), kill);
-         glUniform1f(glGetUniformLocation(mSimProgram, "uDa"), diffuseA);
-         glUniform1f(glGetUniformLocation(mSimProgram, "uDb"), diffuseB);
-         glUniform1f(glGetUniformLocation(mSimProgram, "uSourceInfluence"), sourceInfluence);
+         glUniform1i(GLUtil::UniformLoc(mSimProgram, "uSrc"), 1);
+         glUniform1i(GLUtil::UniformLoc(mSimProgram, "uHasSrc"), srcTex != 0 ? 1 : 0);
+         glUniform2f(GLUtil::UniformLoc(mSimProgram, "uTexel"), 1.0f / w, 1.0f / h);
+         glUniform1f(GLUtil::UniformLoc(mSimProgram, "uFeed"), feed);
+         glUniform1f(GLUtil::UniformLoc(mSimProgram, "uKill"), kill);
+         glUniform1f(GLUtil::UniformLoc(mSimProgram, "uDa"), diffuseA);
+         glUniform1f(GLUtil::UniformLoc(mSimProgram, "uDb"), diffuseB);
+         glUniform1f(GLUtil::UniformLoc(mSimProgram, "uSourceInfluence"), sourceInfluence);
       });
       mFront = back;
    }
@@ -373,8 +374,8 @@ void ReactionDiffusionNode::CookIfNeeded(int frameId)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, stateTex);
-      glUniform1i(glGetUniformLocation(mDrawProgram, "uState"), 0);
-      glUniform3f(glGetUniformLocation(mDrawProgram, "uLow"), lowColor[0], lowColor[1], lowColor[2]);
-      glUniform3f(glGetUniformLocation(mDrawProgram, "uHigh"), highColor[0], highColor[1], highColor[2]);
+      glUniform1i(GLUtil::UniformLoc(mDrawProgram, "uState"), 0);
+      glUniform3f(GLUtil::UniformLoc(mDrawProgram, "uLow"), lowColor[0], lowColor[1], lowColor[2]);
+      glUniform3f(GLUtil::UniformLoc(mDrawProgram, "uHigh"), highColor[0], highColor[1], highColor[2]);
    });
 }

@@ -1,4 +1,5 @@
 #include "OpticalFlowNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -130,7 +131,7 @@ namespace
    {
       glActiveTexture(GL_TEXTURE0 + unit);
       glBindTexture(GL_TEXTURE_2D, tex);
-      glUniform1i(glGetUniformLocation(prog, name), unit);
+      glUniform1i(GLUtil::UniformLoc(prog, name), unit);
    }
 }
 
@@ -252,8 +253,8 @@ void OpticalFlowNode::CookIfNeeded(int frameId)
             GLUtil::RunShaderPass(dst, mProgBox, [&]()
             {
                Bind(mProgBox, 0, GLUtil::FboTexture(src), "uSrc");
-               glUniform2i(glGetUniformLocation(mProgBox, "uStep"), sx, sy);
-               glUniform1i(glGetUniformLocation(mProgBox, "uR"), R);
+               glUniform2i(GLUtil::UniformLoc(mProgBox, "uStep"), sx, sy);
+               glUniform1i(GLUtil::UniformLoc(mProgBox, "uR"), R);
             });
          };
 
@@ -262,7 +263,7 @@ void OpticalFlowNode::CookIfNeeded(int frameId)
          GLUtil::RunShaderPass(mWorkX[l], mProgGrad, [&]()
          {
             Bind(mProgGrad, 0, prevTex, "uPrev");
-            glUniform2f(glGetUniformLocation(mProgGrad, "uTexel"), tx, ty);
+            glUniform2f(GLUtil::UniformLoc(mProgGrad, "uTexel"), tx, ty);
          });
          box(mWorkY[l], mWorkX[l], 1, 0);
          box(mTensor[l], mWorkY[l], 0, 1);
@@ -284,9 +285,9 @@ void OpticalFlowNode::CookIfNeeded(int frameId)
                Bind(mProgResid, 0, prevTex, "uPrev");
                Bind(mProgResid, 1, curTex, "uCur");
                Bind(mProgResid, 2, guessTex, "uGuess");
-               glUniform2f(glGetUniformLocation(mProgResid, "uGuessScale"), gsx, gsy);
-               glUniform1i(glGetUniformLocation(mProgResid, "uUseGuess"), useGuess ? 1 : 0);
-               glUniform2f(glGetUniformLocation(mProgResid, "uTexel"), tx, ty);
+               glUniform2f(GLUtil::UniformLoc(mProgResid, "uGuessScale"), gsx, gsy);
+               glUniform1i(GLUtil::UniformLoc(mProgResid, "uUseGuess"), useGuess ? 1 : 0);
+               glUniform2f(GLUtil::UniformLoc(mProgResid, "uTexel"), tx, ty);
             });
             box(mWorkY[l], mWorkX[l], 1, 0);
             box(mWorkX[l], mWorkY[l], 0, 1);
@@ -297,9 +298,9 @@ void OpticalFlowNode::CookIfNeeded(int frameId)
                Bind(mProgSolve, 0, GLUtil::FboTexture(mTensor[l]), "uTensor");
                Bind(mProgSolve, 1, GLUtil::FboTexture(mWorkX[l]), "uB");
                Bind(mProgSolve, 2, guessTex, "uGuess");
-               glUniform2f(glGetUniformLocation(mProgSolve, "uGuessScale"), gsx, gsy);
-               glUniform1i(glGetUniformLocation(mProgSolve, "uUseGuess"), useGuess ? 1 : 0);
-               glUniform1f(glGetUniformLocation(mProgSolve, "uEps"), epsPerTap * (float)((2 * R + 1) * (2 * R + 1)));
+               glUniform2f(GLUtil::UniformLoc(mProgSolve, "uGuessScale"), gsx, gsy);
+               glUniform1i(GLUtil::UniformLoc(mProgSolve, "uUseGuess"), useGuess ? 1 : 0);
+               glUniform1f(GLUtil::UniformLoc(mProgSolve, "uEps"), epsPerTap * (float)((2 * R + 1) * (2 * R + 1)));
             });
             cur = dst;
          }
@@ -319,8 +320,8 @@ void OpticalFlowNode::CookIfNeeded(int frameId)
    GLUtil::RunShaderPass(mOut, mProgOut, [&]()
    {
       Bind(mProgOut, 0, flowTex, "uFlow");
-      glUniform1f(glGetUniformLocation(mProgOut, "uPix"), pix);
-      glUniform1i(glGetUniformLocation(mProgOut, "uView"), view == 1 ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgOut, "uPix"), pix);
+      glUniform1i(GLUtil::UniformLoc(mProgOut, "uView"), view == 1 ? 1 : 0);
    });
 
    mCur = 1 - mCur;

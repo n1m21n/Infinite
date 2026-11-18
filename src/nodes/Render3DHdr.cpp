@@ -14,6 +14,7 @@
 // background) keeps its exact colour: it is not tonemapped and does not bloom
 // itself, though bloom from the scene spills over it.
 #include "Geometry3DNodes.h"
+#include "GLUtil.h"
 #include "Render3DTonemap.h"
 
 #include "gl3.h"
@@ -118,7 +119,7 @@ namespace
    {
       glActiveTexture(GL_TEXTURE0 + unit);
       glBindTexture(GL_TEXTURE_2D, tex);
-      glUniform1i(glGetUniformLocation(prog, name), unit);
+      glUniform1i(GLUtil::UniformLoc(prog, name), unit);
    }
 }
 
@@ -186,16 +187,16 @@ void Render3DNode::RunHdr(unsigned int colorTex, unsigned int depthTex, int w, i
          GLUtil::RunShaderPass(mBloomDown[0], mProgBloomPre, [&]() {
             Bind(mProgBloomPre, 0, colorTex, "uSrc");
             Bind(mProgBloomPre, 1, depthTex, "uDepth");
-            glUniform2f(glGetUniformLocation(mProgBloomPre, "uTexel"), 1.0f / (float)w, 1.0f / (float)h);
-            glUniform1i(glGetUniformLocation(mProgBloomPre, "uKeepBg"), keepBg);
-            glUniform1f(glGetUniformLocation(mProgBloomPre, "uThreshold"), threshold);
+            glUniform2f(GLUtil::UniformLoc(mProgBloomPre, "uTexel"), 1.0f / (float)w, 1.0f / (float)h);
+            glUniform1i(GLUtil::UniformLoc(mProgBloomPre, "uKeepBg"), keepBg);
+            glUniform1f(GLUtil::UniformLoc(mProgBloomPre, "uThreshold"), threshold);
          });
          for (int i = 1; i < levels; i++)
          {
             const GLUtil::Fbo& src = mBloomDown[i - 1];
             GLUtil::RunShaderPass(mBloomDown[i], mProgBloomDown, [&]() {
                Bind(mProgBloomDown, 0, GLUtil::FboTexture(src), "uSrc");
-               glUniform2f(glGetUniformLocation(mProgBloomDown, "uTexel"), 1.0f / (float)src.w, 1.0f / (float)src.h);
+               glUniform2f(GLUtil::UniformLoc(mProgBloomDown, "uTexel"), 1.0f / (float)src.w, 1.0f / (float)src.h);
             });
          }
          // Radius 0 keeps the finest level (a tight glow), 1 lets the widest through.
@@ -207,8 +208,8 @@ void Render3DNode::RunHdr(unsigned int colorTex, unsigned int depthTex, int w, i
             GLUtil::RunShaderPass(mBloomUp[i], mProgBloomUp, [&]() {
                Bind(mProgBloomUp, 0, GLUtil::FboTexture(mBloomDown[i]), "uCur");
                Bind(mProgBloomUp, 1, below, "uBelow");
-               glUniform2f(glGetUniformLocation(mProgBloomUp, "uTexel"), 1.0f / (float)belowW, 1.0f / (float)belowH);
-               glUniform1f(glGetUniformLocation(mProgBloomUp, "uMix"), mixAmt);
+               glUniform2f(GLUtil::UniformLoc(mProgBloomUp, "uTexel"), 1.0f / (float)belowW, 1.0f / (float)belowH);
+               glUniform1f(GLUtil::UniformLoc(mProgBloomUp, "uMix"), mixAmt);
             });
             below = GLUtil::FboTexture(mBloomUp[i]);
             belowW = mBloomUp[i].w;
@@ -223,9 +224,9 @@ void Render3DNode::RunHdr(unsigned int colorTex, unsigned int depthTex, int w, i
       Bind(mProgHdr, 0, colorTex, "uColor");
       Bind(mProgHdr, 1, depthTex, "uDepth");
       Bind(mProgHdr, 2, bloomTex, "uBloom");
-      glUniform1f(glGetUniformLocation(mProgHdr, "uBloomAmount"), bloomAmount);
-      glUniform1i(glGetUniformLocation(mProgHdr, "uTonemap"), std::clamp(tonemap, 0, (int)TonemapNames().size() - 1));
-      glUniform1i(glGetUniformLocation(mProgHdr, "uKeepBg"), keepBg);
+      glUniform1f(GLUtil::UniformLoc(mProgHdr, "uBloomAmount"), bloomAmount);
+      glUniform1i(GLUtil::UniformLoc(mProgHdr, "uTonemap"), std::clamp(tonemap, 0, (int)TonemapNames().size() - 1));
+      glUniform1i(GLUtil::UniformLoc(mProgHdr, "uKeepBg"), keepBg);
    });
    glActiveTexture(GL_TEXTURE0);
 

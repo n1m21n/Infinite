@@ -1,4 +1,5 @@
 #include "Render3DPathTrace.h"
+#include "GLUtil.h"
 #include "field/MaterialRegistry.h"
 
 #include <algorithm>
@@ -1788,13 +1789,13 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, prevTex);
-         glUniform1i(glGetUniformLocation(mProgTrace, "uPrevAccum"), 0);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uPrevAccum"), 0);
 
          auto bindBuf = [&](int unit, unsigned int tex, const char* name)
          {
             glActiveTexture(GL_TEXTURE0 + unit);
             glBindTexture(GL_TEXTURE_BUFFER, tex);
-            glUniform1i(glGetUniformLocation(mProgTrace, name), unit);
+            glUniform1i(GLUtil::UniformLoc(mProgTrace, name), unit);
          };
          bindBuf(1, mTlasNodesBuf.tex, "uTlasNodes");
          bindBuf(2, mTlasInstBuf.tex, "uTlasInstances");
@@ -1805,50 +1806,50 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
          bindBuf(8, mBlasUvsBuf.tex, "uBlasUvs");
          glActiveTexture(GL_TEXTURE9);
          glBindTexture(GL_TEXTURE_2D, mAtlas.tex);
-         glUniform1i(glGetUniformLocation(mProgTrace, "uAtlas"), 9);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uAtlas"), 9);
 
-         glUniform1i(glGetUniformLocation(mProgTrace, "uSampleIndex"), curSample);
-         glUniform1f(glGetUniformLocation(mProgTrace, "uFldTime"), mFldTime);
-         glUniform1i(glGetUniformLocation(mProgTrace, "uMaxBounces"), maxBounces);
-         glUniform1i(glGetUniformLocation(mProgTrace, "uHasTlas"), mSceneUploaded ? 1 : 0);
-         glUniform2f(glGetUniformLocation(mProgTrace, "uResolution"), (float)width, (float)height);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uSampleIndex"), curSample);
+         glUniform1f(GLUtil::UniformLoc(mProgTrace, "uFldTime"), mFldTime);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uMaxBounces"), maxBounces);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uHasTlas"), mSceneUploaded ? 1 : 0);
+         glUniform2f(GLUtil::UniformLoc(mProgTrace, "uResolution"), (float)width, (float)height);
 
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uCamEye"), 1, mCamEye);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uCamForward"), 1, mCamForward);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uCamRight"), 1, mCamRight);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uCamUp"), 1, mCamUp);
-         glUniform1f(glGetUniformLocation(mProgTrace, "uTanHalfFovY"), mTanHalfFovY);
-         glUniform1f(glGetUniformLocation(mProgTrace, "uAspect"), mAspect);
-         glUniform1f(glGetUniformLocation(mProgTrace, "uOrthoHalfH"), mOrthoHalfH);
-         glUniform1f(glGetUniformLocation(mProgTrace, "uLensRadius"), mLensRadius);
-         glUniform1f(glGetUniformLocation(mProgTrace, "uFocusDist"), mFocusDist);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uBokeh"), 1, mBokeh);
-         glUniform1i(glGetUniformLocation(mProgTrace, "uProbeMode"), mProbeMode ? 1 : 0);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uProbeLo"), 1, mProbeLo);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uProbeStep"), 1, mProbeStep);
-         glUniform3iv(glGetUniformLocation(mProgTrace, "uProbeDims"), 1, mProbeDims);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uWorldColor"), 1, mWorldColor);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uCamEye"), 1, mCamEye);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uCamForward"), 1, mCamForward);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uCamRight"), 1, mCamRight);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uCamUp"), 1, mCamUp);
+         glUniform1f(GLUtil::UniformLoc(mProgTrace, "uTanHalfFovY"), mTanHalfFovY);
+         glUniform1f(GLUtil::UniformLoc(mProgTrace, "uAspect"), mAspect);
+         glUniform1f(GLUtil::UniformLoc(mProgTrace, "uOrthoHalfH"), mOrthoHalfH);
+         glUniform1f(GLUtil::UniformLoc(mProgTrace, "uLensRadius"), mLensRadius);
+         glUniform1f(GLUtil::UniformLoc(mProgTrace, "uFocusDist"), mFocusDist);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uBokeh"), 1, mBokeh);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uProbeMode"), mProbeMode ? 1 : 0);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uProbeLo"), 1, mProbeLo);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uProbeStep"), 1, mProbeStep);
+         glUniform3iv(GLUtil::UniformLoc(mProgTrace, "uProbeDims"), 1, mProbeDims);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uWorldColor"), 1, mWorldColor);
          glActiveTexture(GL_TEXTURE7);
          glBindTexture(GL_TEXTURE_2D, mEnvTex);
-         glUniform1i(glGetUniformLocation(mProgTrace, "uEnvMap"), 7);
-         glUniform1i(glGetUniformLocation(mProgTrace, "uEnvMode"), mEnvTex != 0 ? 2 : mEnvGradient ? 1 : 0);
-         glUniform1f(glGetUniformLocation(mProgTrace, "uEnvRotation"), mEnvRotation);
-         glUniform1f(glGetUniformLocation(mProgTrace, "uEnvIntensity"), mEnvIntensity);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uEnvSky"), 1, mEnvSky);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uEnvHorizon"), 1, mEnvHorizon);
-         glUniform3fv(glGetUniformLocation(mProgTrace, "uEnvGround"), 1, mEnvGround);
-         glUniform1i(glGetUniformLocation(mProgTrace, "uEnvAsBg"), mEnvAsBg ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uEnvMap"), 7);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uEnvMode"), mEnvTex != 0 ? 2 : mEnvGradient ? 1 : 0);
+         glUniform1f(GLUtil::UniformLoc(mProgTrace, "uEnvRotation"), mEnvRotation);
+         glUniform1f(GLUtil::UniformLoc(mProgTrace, "uEnvIntensity"), mEnvIntensity);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uEnvSky"), 1, mEnvSky);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uEnvHorizon"), 1, mEnvHorizon);
+         glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uEnvGround"), 1, mEnvGround);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uEnvAsBg"), mEnvAsBg ? 1 : 0);
 
-         glUniform1i(glGetUniformLocation(mProgTrace, "uLightCount"), lightCount);
+         glUniform1i(GLUtil::UniformLoc(mProgTrace, "uLightCount"), lightCount);
          if (lightCount > 0)
          {
-            glUniform1iv(glGetUniformLocation(mProgTrace, "uLightType"), lightCount, lTypes);
-            glUniform3fv(glGetUniformLocation(mProgTrace, "uLightPos"), lightCount, lPos);
-            glUniform3fv(glGetUniformLocation(mProgTrace, "uLightAim"), lightCount, lAim);
-            glUniform3fv(glGetUniformLocation(mProgTrace, "uLightColor"), lightCount, lCol);
-            glUniform2fv(glGetUniformLocation(mProgTrace, "uLightArea"), lightCount, lArea);
-            glUniform3fv(glGetUniformLocation(mProgTrace, "uLightSpot"), lightCount, lSpot);
-            glUniform3fv(glGetUniformLocation(mProgTrace, "uLightTerms"), lightCount, lTerms);
+            glUniform1iv(GLUtil::UniformLoc(mProgTrace, "uLightType"), lightCount, lTypes);
+            glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uLightPos"), lightCount, lPos);
+            glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uLightAim"), lightCount, lAim);
+            glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uLightColor"), lightCount, lCol);
+            glUniform2fv(GLUtil::UniformLoc(mProgTrace, "uLightArea"), lightCount, lArea);
+            glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uLightSpot"), lightCount, lSpot);
+            glUniform3fv(GLUtil::UniformLoc(mProgTrace, "uLightTerms"), lightCount, lTerms);
          }
       });
 
@@ -1944,11 +1945,11 @@ void Render3DPathTrace::ResolveDisplay()
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, accumTex);
-      glUniform1i(glGetUniformLocation(mProgDisplay, "uAccum"), 0);
-      glUniform1f(glGetUniformLocation(mProgDisplay, "uExposure"), exposure);
-      glUniform1i(glGetUniformLocation(mProgDisplay, "uTonemap"), tonemap);
-      glUniform3fv(glGetUniformLocation(mProgDisplay, "uBgColor"), 1, mBgColor);
-      glUniform1f(glGetUniformLocation(mProgDisplay, "uBgOpacity"), mBgOpacity);
+      glUniform1i(GLUtil::UniformLoc(mProgDisplay, "uAccum"), 0);
+      glUniform1f(GLUtil::UniformLoc(mProgDisplay, "uExposure"), exposure);
+      glUniform1i(GLUtil::UniformLoc(mProgDisplay, "uTonemap"), tonemap);
+      glUniform3fv(GLUtil::UniformLoc(mProgDisplay, "uBgColor"), 1, mBgColor);
+      glUniform1f(GLUtil::UniformLoc(mProgDisplay, "uBgOpacity"), mBgOpacity);
    });
    glActiveTexture(GL_TEXTURE0);
    glBindTexture(GL_TEXTURE_2D, 0);

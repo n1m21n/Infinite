@@ -1,4 +1,5 @@
 #include "Scene3DNode.h"
+#include "GLUtil.h"
 
 #include <algorithm>
 #include <array>
@@ -1326,10 +1327,10 @@ unsigned int Scene3DNode::Composite(unsigned int sceneTex, int w, int h, unsigne
    {
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, backdrop);
-      glUniform1i(glGetUniformLocation(mCompositeProgram, "uBack"), 1);
+      glUniform1i(GLUtil::UniformLoc(mCompositeProgram, "uBack"), 1);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, sceneTex);
-      glUniform1i(glGetUniformLocation(mCompositeProgram, "uScene"), 0);
+      glUniform1i(GLUtil::UniformLoc(mCompositeProgram, "uScene"), 0);
    });
    return out.tex;
 }
@@ -1362,9 +1363,9 @@ unsigned int Scene3DNode::Border(unsigned int sceneTex, int w, int h)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, sceneTex);
-      glUniform1i(glGetUniformLocation(mBorderProgram, "uScene"), 0);
-      glUniform4f(glGetUniformLocation(mBorderProgram, "uRegion"), x0, y0, x1, y1);
-      glUniform1i(glGetUniformLocation(mBorderProgram, "uCrop"), settings.crop ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mBorderProgram, "uScene"), 0);
+      glUniform4f(GLUtil::UniformLoc(mBorderProgram, "uRegion"), x0, y0, x1, y1);
+      glUniform1i(GLUtil::UniformLoc(mBorderProgram, "uCrop"), settings.crop ? 1 : 0);
    });
    mOutW = ow;
    mOutH = oh;
@@ -1516,17 +1517,17 @@ unsigned int Scene3DNode::Finish(unsigned int sceneTex, int w, int h, int frameI
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, sceneTex);
-      glUniform1i(glGetUniformLocation(mFinishProgram, "uScene"), 0);
+      glUniform1i(GLUtil::UniformLoc(mFinishProgram, "uScene"), 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, stamped ? mStampTex : 0);
-      glUniform1i(glGetUniformLocation(mFinishProgram, "uStamp"), 1);
+      glUniform1i(GLUtil::UniformLoc(mFinishProgram, "uStamp"), 1);
       glActiveTexture(GL_TEXTURE0);
-      glUniform2f(glGetUniformLocation(mFinishProgram, "uTexel"), 1.0f / w, 1.0f / h);
-      glUniform1f(glGetUniformLocation(mFinishProgram, "uFilter"), st.filterSize);
-      glUniform1f(glGetUniformLocation(mFinishProgram, "uGamma"), st.gamma);
-      glUniform1f(glGetUniformLocation(mFinishProgram, "uDither"), st.dither);
-      glUniform1i(glGetUniformLocation(mFinishProgram, "uLook"), st.look);
-      glUniform1i(glGetUniformLocation(mFinishProgram, "uStamped"), stamped ? 1 : 0);
+      glUniform2f(GLUtil::UniformLoc(mFinishProgram, "uTexel"), 1.0f / w, 1.0f / h);
+      glUniform1f(GLUtil::UniformLoc(mFinishProgram, "uFilter"), st.filterSize);
+      glUniform1f(GLUtil::UniformLoc(mFinishProgram, "uGamma"), st.gamma);
+      glUniform1f(GLUtil::UniformLoc(mFinishProgram, "uDither"), st.dither);
+      glUniform1i(GLUtil::UniformLoc(mFinishProgram, "uLook"), st.look);
+      glUniform1i(GLUtil::UniformLoc(mFinishProgram, "uStamped"), stamped ? 1 : 0);
    });
    return mFinishFbo.tex;
 }
@@ -1802,44 +1803,44 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          on = back->front ? 2 : 1;
          glActiveTexture(GL_TEXTURE2);
          glBindTexture(GL_TEXTURE_2D, pic.tex);
-         glUniform1i(glGetUniformLocation(mGridProgram, "uPicture"), 2);
-         glUniform4fv(glGetUniformLocation(mGridProgram, "uFrame"), 1, v.frame);
-         glUniform4f(glGetUniformLocation(mGridProgram, "uPictureHalf"), hx, hy, 1.0f / fa, std::clamp(back->alpha, 0.0f, 1.0f));
-         glUniform4f(glGetUniformLocation(mGridProgram, "uPictureMove"), back->offset[0], back->offset[1],
+         glUniform1i(GLUtil::UniformLoc(mGridProgram, "uPicture"), 2);
+         glUniform4fv(GLUtil::UniformLoc(mGridProgram, "uFrame"), 1, v.frame);
+         glUniform4f(GLUtil::UniformLoc(mGridProgram, "uPictureHalf"), hx, hy, 1.0f / fa, std::clamp(back->alpha, 0.0f, 1.0f));
+         glUniform4f(GLUtil::UniformLoc(mGridProgram, "uPictureMove"), back->offset[0], back->offset[1],
                      back->rotation * 3.14159265f / 180.0f, back->scale);
-         glUniform2f(glGetUniformLocation(mGridProgram, "uPictureFlip"), back->flipX ? 1.0f : 0.0f, back->flipY ? 1.0f : 0.0f);
+         glUniform2f(GLUtil::UniformLoc(mGridProgram, "uPictureFlip"), back->flipX ? 1.0f : 0.0f, back->flipY ? 1.0f : 0.0f);
       }
-      glUniform1i(glGetUniformLocation(mGridProgram, "uPictureOn"), on);
-      glUniform1i(glGetUniformLocation(mGridProgram, "uPictureWire"), wire || !mEditor->DepthValid() ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mGridProgram, "uPictureOn"), on);
+      glUniform1i(GLUtil::UniformLoc(mGridProgram, "uPictureWire"), wire || !mEditor->DepthValid() ? 1 : 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, mEditor->DepthTexture());
-      glUniform1i(glGetUniformLocation(mGridProgram, "uDepth"), 1);
+      glUniform1i(GLUtil::UniformLoc(mGridProgram, "uDepth"), 1);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, sceneTex);
-      glUniform1i(glGetUniformLocation(mGridProgram, "uScene"), 0);
-      glUniformMatrix4fv(glGetUniformLocation(mGridProgram, "uInv"), 1, GL_FALSE, inv.m);
-      glUniformMatrix4fv(glGetUniformLocation(mGridProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
-      glUniform3fv(glGetUniformLocation(mGridProgram, "uEye"), 1, v.eye);
-      glUniform1i(glGetUniformLocation(mGridProgram, "uAxis"), v.gridAxis);
-      glUniform1i(glGetUniformLocation(mGridProgram, "uDraw"), v.grid && mEditor->DepthValid() ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mGridProgram, "uDist"), v.gridDist);
-      glUniform4f(glGetUniformLocation(mGridProgram, "uGridOpt"), std::max(0.001f, settings.gridScale), (float)std::clamp(settings.gridSubdiv, 2, 100),
+      glUniform1i(GLUtil::UniformLoc(mGridProgram, "uScene"), 0);
+      glUniformMatrix4fv(GLUtil::UniformLoc(mGridProgram, "uInv"), 1, GL_FALSE, inv.m);
+      glUniformMatrix4fv(GLUtil::UniformLoc(mGridProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+      glUniform3fv(GLUtil::UniformLoc(mGridProgram, "uEye"), 1, v.eye);
+      glUniform1i(GLUtil::UniformLoc(mGridProgram, "uAxis"), v.gridAxis);
+      glUniform1i(GLUtil::UniformLoc(mGridProgram, "uDraw"), v.grid && mEditor->DepthValid() ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mGridProgram, "uDist"), v.gridDist);
+      glUniform4f(GLUtil::UniformLoc(mGridProgram, "uGridOpt"), std::max(0.001f, settings.gridScale), (float)std::clamp(settings.gridSubdiv, 2, 100),
                   std::clamp(settings.gridLines, 1, 200) / 10.0f, 0.0f);
       // World axes: X, then the vertical one (shown as Z), then depth (shown as Y).
-      glUniform3f(glGetUniformLocation(mGridProgram, "uAxisOn"), settings.axisX ? 1.0f : 0.0f, settings.axisZ ? 1.0f : 0.0f, settings.axisY ? 1.0f : 0.0f);
+      glUniform3f(GLUtil::UniformLoc(mGridProgram, "uAxisOn"), settings.axisX ? 1.0f : 0.0f, settings.axisZ ? 1.0f : 0.0f, settings.axisY ? 1.0f : 0.0f);
       const bool ortho = v.proj.m[15] != 0.0f;
       const float pn = ortho ? 0.0f : v.proj.m[14] / (v.proj.m[10] - 1.0f), pf = ortho ? 1.0f : v.proj.m[14] / (v.proj.m[10] + 1.0f);
-      glUniform3f(glGetUniformLocation(mGridProgram, "uNearFar"), pn, pf, ortho ? 1.0f : 0.0f);
+      glUniform3f(GLUtil::UniformLoc(mGridProgram, "uNearFar"), pn, pf, ortho ? 1.0f : 0.0f);
       const bool outline = settings.outline && v.shading == Shading::Solid && mEditor->DepthValid();
-      glUniform4f(glGetUniformLocation(mGridProgram, "uOutline"), settings.outlineColor[0], settings.outlineColor[1], settings.outlineColor[2], outline ? 1.0f : 0.0f);
+      glUniform4f(GLUtil::UniformLoc(mGridProgram, "uOutline"), settings.outlineColor[0], settings.outlineColor[1], settings.outlineColor[2], outline ? 1.0f : 0.0f);
       const bool wireOn = !wire && mEditorWire != nullptr && mEditorWire->GetOutputTexture() != 0 && (v.xray || v.wireOver);
-      glUniform1i(glGetUniformLocation(mGridProgram, "uWireMode"), !wireOn ? 0 : v.xray && v.shading == Shading::Solid ? 2 : 1);
+      glUniform1i(GLUtil::UniformLoc(mGridProgram, "uWireMode"), !wireOn ? 0 : v.xray && v.shading == Shading::Solid ? 2 : 1);
       glActiveTexture(GL_TEXTURE3);
       glBindTexture(GL_TEXTURE_2D, wireOn ? mEditorWire->GetOutputTexture() : 0);
-      glUniform1i(glGetUniformLocation(mGridProgram, "uWire"), 3);
+      glUniform1i(GLUtil::UniformLoc(mGridProgram, "uWire"), 3);
       glActiveTexture(GL_TEXTURE4);
       glBindTexture(GL_TEXTURE_2D, wireOn && mEditorWire->DepthValid() ? mEditorWire->DepthTexture() : mEditor->DepthTexture());
-      glUniform1i(glGetUniformLocation(mGridProgram, "uWireDepth"), 4);
+      glUniform1i(GLUtil::UniformLoc(mGridProgram, "uWireDepth"), 4);
       glActiveTexture(GL_TEXTURE0);
    });
    return mGridFbo.tex;

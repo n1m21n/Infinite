@@ -1,4 +1,5 @@
 #include "ShapeNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -211,21 +212,21 @@ void ShapeNode::CookIfNeeded(int frameId)
    NodeWorkCounter()++;
    GLUtil::RunShaderPass(mOut, mProgram, [this]()
    {
-      glUniform1i(glGetUniformLocation(mProgram, "uShape"), shapeType);
-      glUniform2f(glGetUniformLocation(mProgram, "uSize"), sizeX, sizeY);
-      glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
-      glUniform1f(glGetUniformLocation(mProgram, "uCornerRadius"), cornerRadius);
-      glUniform1i(glGetUniformLocation(mProgram, "uSides"), sides);
-      glUniform1f(glGetUniformLocation(mProgram, "uInnerRatio"), innerRatio);
-      glUniform1f(glGetUniformLocation(mProgram, "uRotation"), rotation * (float)M_PI / 180.0f);
-      glUniform2f(glGetUniformLocation(mProgram, "uPos"), posX, posY);
-      glUniform3f(glGetUniformLocation(mProgram, "uFillColor"), fillColor[0], fillColor[1], fillColor[2]);
-      glUniform1f(glGetUniformLocation(mProgram, "uFillOpacity"), fillOpacity);
-      glUniform1f(glGetUniformLocation(mProgram, "uStrokeWidth"), strokeWidth);
-      glUniform3f(glGetUniformLocation(mProgram, "uStrokeColor"), strokeColor[0], strokeColor[1], strokeColor[2]);
-      glUniform1f(glGetUniformLocation(mProgram, "uFeather"), feather);
-      glUniform3f(glGetUniformLocation(mProgram, "uBgColor"), bgColor[0], bgColor[1], bgColor[2]);
-      glUniform1f(glGetUniformLocation(mProgram, "uBgOpacity"), bgOpacity);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uShape"), shapeType);
+      glUniform2f(GLUtil::UniformLoc(mProgram, "uSize"), sizeX, sizeY);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uCornerRadius"), cornerRadius);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSides"), sides);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uInnerRatio"), innerRatio);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uRotation"), rotation * (float)M_PI / 180.0f);
+      glUniform2f(GLUtil::UniformLoc(mProgram, "uPos"), posX, posY);
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uFillColor"), fillColor[0], fillColor[1], fillColor[2]);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uFillOpacity"), fillOpacity);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uStrokeWidth"), strokeWidth);
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uStrokeColor"), strokeColor[0], strokeColor[1], strokeColor[2]);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uFeather"), feather);
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uBgColor"), bgColor[0], bgColor[1], bgColor[2]);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBgOpacity"), bgOpacity);
    });
    mBuiltParams = std::move(params);
    mHasBuilt = true;

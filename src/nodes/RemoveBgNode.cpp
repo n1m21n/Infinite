@@ -1,4 +1,5 @@
 #include "RemoveBgNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -268,17 +269,17 @@ void RemoveBgNode::CookIfNeeded(int frameId)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, colorTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSrc"), 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, mMaskTex != 0 ? mMaskTex : srcTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uMask"), 1);
-      glUniform1i(glGetUniformLocation(mProgram, "uHasMask"), mMaskTex != 0 ? 1 : 0);
-      glUniform2f(glGetUniformLocation(mProgram, "uTexel"), 1.0f / w, 1.0f / h);
-      glUniform1i(glGetUniformLocation(mProgram, "uOutputMode"), outputMode);
-      glUniform1f(glGetUniformLocation(mProgram, "uFeather"), feather);
-      glUniform1f(glGetUniformLocation(mProgram, "uThreshold"), threshold);
-      glUniform1f(glGetUniformLocation(mProgram, "uContrast"), contrast);
-      glUniform3f(glGetUniformLocation(mProgram, "uBgColor"), bgColor[0], bgColor[1], bgColor[2]);
-      glUniform1f(glGetUniformLocation(mProgram, "uBgOpacity"), bgOpacity);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uMask"), 1);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uHasMask"), mMaskTex != 0 ? 1 : 0);
+      glUniform2f(GLUtil::UniformLoc(mProgram, "uTexel"), 1.0f / w, 1.0f / h);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uOutputMode"), outputMode);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uFeather"), feather);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uThreshold"), threshold);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uContrast"), contrast);
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uBgColor"), bgColor[0], bgColor[1], bgColor[2]);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBgOpacity"), bgOpacity);
    });
 }

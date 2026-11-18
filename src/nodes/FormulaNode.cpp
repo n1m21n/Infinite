@@ -1,4 +1,5 @@
 #include "FormulaNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -572,12 +573,12 @@ void FormulaNode::CookIfNeeded(int frameId)
 
    GLUtil::RunShaderPass(mOut, mProgram, [this]()
    {
-      glUniform1f(glGetUniformLocation(mProgram, "uTime"), mClock);
-      glUniform1f(glGetUniformLocation(mProgram, "uA"), knobA);
-      glUniform1f(glGetUniformLocation(mProgram, "uB"), knobB);
-      glUniform1f(glGetUniformLocation(mProgram, "uC"), knobC);
-      glUniform1f(glGetUniformLocation(mProgram, "uD"), knobD);
-      glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uTime"), mClock);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uA"), knobA);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uB"), knobB);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uC"), knobC);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uD"), knobD);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
    });
 }
 
@@ -781,14 +782,14 @@ void FormulaNode::CookShadertoy(int frameId)
    {
       GLUtil::RunShaderPass(target, program, [&]()
       {
-         glUniform3f(glGetUniformLocation(program, "iResolution"), (float)w, (float)h, 1.0f);
-         glUniform1f(glGetUniformLocation(program, "iTime"), mClock);
-         glUniform1f(glGetUniformLocation(program, "iTimeDelta"), delta);
-         glUniform1f(glGetUniformLocation(program, "iFrameRate"), delta > 0.0f ? 1.0f / delta : 60.0f);
-         glUniform1i(glGetUniformLocation(program, "iFrame"), mFrame);
-         glUniform4f(glGetUniformLocation(program, "iMouse"), mouse[0], mouse[1], mouse[2], mouse[3]);
-         glUniform4f(glGetUniformLocation(program, "iDate"), date[0], date[1], date[2], date[3]);
-         glUniform1f(glGetUniformLocation(program, "iSampleRate"), 48000.0f);
+         glUniform3f(GLUtil::UniformLoc(program, "iResolution"), (float)w, (float)h, 1.0f);
+         glUniform1f(GLUtil::UniformLoc(program, "iTime"), mClock);
+         glUniform1f(GLUtil::UniformLoc(program, "iTimeDelta"), delta);
+         glUniform1f(GLUtil::UniformLoc(program, "iFrameRate"), delta > 0.0f ? 1.0f / delta : 60.0f);
+         glUniform1i(GLUtil::UniformLoc(program, "iFrame"), mFrame);
+         glUniform4f(GLUtil::UniformLoc(program, "iMouse"), mouse[0], mouse[1], mouse[2], mouse[3]);
+         glUniform4f(GLUtil::UniformLoc(program, "iDate"), date[0], date[1], date[2], date[3]);
+         glUniform1f(GLUtil::UniformLoc(program, "iSampleRate"), 48000.0f);
          static const char* kSamplers[kChannels] = { "iChannel0", "iChannel1", "iChannel2", "iChannel3" };
          float res[kChannels * 3];
          for (int c = 0; c < kChannels; c++)
@@ -807,11 +808,11 @@ void FormulaNode::CookShadertoy(int frameId)
             }
             glActiveTexture(GL_TEXTURE0 + c);
             glBindTexture(GL_TEXTURE_2D, tex);
-            glUniform1i(glGetUniformLocation(program, kSamplers[c]), c);
+            glUniform1i(GLUtil::UniformLoc(program, kSamplers[c]), c);
          }
-         glUniform3fv(glGetUniformLocation(program, "iChannelResolution"), kChannels, res);
+         glUniform3fv(GLUtil::UniformLoc(program, "iChannelResolution"), kChannels, res);
          for (int i = 0; i < (int)mKnobs.size(); i++)
-            glUniform1f(glGetUniformLocation(program, mKnobs[(size_t)i].name.c_str()), stKnob[i]);
+            glUniform1f(GLUtil::UniformLoc(program, mKnobs[(size_t)i].name.c_str()), stKnob[i]);
       });
       glActiveTexture(GL_TEXTURE0);
    };
