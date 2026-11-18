@@ -196,10 +196,14 @@ int SliceSet::SplitAt(int64_t frame, int64_t minGap)
    const int i = IndexAt(frame);
    if (frame - slices[(size_t)i].start < minGap || EndOf(i) - frame < minGap)
       return -1;
-   // The new slice starts clean: the one it was cut from keeps its settings (its fades included).
+   // The new slice carries the settings of the one it was cut from (gain, pan, pitch, stretch, filter ...), so a cut
+   // never undoes an edit; the fade in stays with the first piece and the fade out with the last.
    Slice s;
    s.id = nextId++;
    s.start = frame;
+   s.p = slices[(size_t)i].p;
+   s.p.fadeInMs = 0.0f;
+   slices[(size_t)i].p.fadeOutMs = 0.0f;
    slices.insert(slices.begin() + i + 1, s);
    mHandEdited = true;
    return i + 1;
