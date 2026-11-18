@@ -47,7 +47,8 @@ def table(head, rows):
 
 
 def page(*parts):
-    return '<div style="break-before:page"></div>' + "".join(parts)
+    # sections flow one after another; a forced page break per section left pages 90% blank (Mixer, Drums, Field Patcher were three lines each)
+    return '<div style="margin-top:26px;break-inside:auto"><style>h1,h2,h3{break-after:avoid}figure{break-inside:avoid}</style></div>' + "".join(parts)
 
 
 def shot(name, caption, box=None, width="100%"):
