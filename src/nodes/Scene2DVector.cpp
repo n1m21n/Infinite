@@ -1685,6 +1685,75 @@ int Scene2DNode::MergeLayers(const std::vector<int>& ids, int frameId)
    return nid;
 }
 
+bool Scene2DNode::StampLayerInto(int from, int into, int frameId)
+{
+   Layers();
+   const Layer* d0 = FindConst(into);
+   Layer* f = FindLayer(from);
+   if (d0 == nullptr || f == nullptr || from == into || d0->kind != Kind::Paint || (d0->lock & (kLockPixels | kLockAll)) != 0)
+      return false;
+   // Drawn plain: the source's masks, styles and effects still apply to it once it is back in the source.
+   f->effects.clear();
+   for (Fx& x : f->fx)
+      x.on = false;
+   f->pmaskOn = f->vmaskOn = false;
+   f->maskUid = 0;
+   f->relief = false;
+   std::vector<uint8_t> pic;
+   const int W = mDoc.w, H = mDoc.h;
+   if (!RenderLayerAlone(from, frameId, pic) || pic.size() != (size_t)W * H * 4)
+      return false;
+   std::vector<uint8_t> px;
+   int w = 0, h = 0;
+   if (!ReadPaint(into, px, w, h) || px.size() != (size_t)w * h * 4)
+      return false;
+   const Layer dst = *FindConst(into);
+   // Each of the layer's pixels reads the piece where it lands in the document (bilinear, premultiplied), Normal over.
+   auto texel = [&](int x, int y, float out[4]) {
+      if (x < 0 || y < 0 || x >= W || y >= H)
+         return;
+      const uint8_t* s = &pic[((size_t)y * W + x) * 4];
+      const float a = s[3] / 255.0f;
+      out[0] = s[0] * a, out[1] = s[1] * a, out[2] = s[2] * a, out[3] = a;
+   };
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+      {
+         float dx, dy;
+         BoxToDoc(dst, x + 0.5f, (float)(h - 1 - y) + 0.5f, dx, dy);   // surface rows run bottom first
+         dx -= 0.5f;
+         dy -= 0.5f;
+         const int x0 = (int)std::floor(dx), y0 = (int)std::floor(dy);
+         if (x0 < -1 || y0 < -1 || x0 >= W || y0 >= H)
+            continue;
+         const float fx = dx - x0, fy = dy - y0;
+         float c[4][4] = {};
+         texel(x0, y0, c[0]);
+         texel(x0 + 1, y0, c[1]);
+         texel(x0, y0 + 1, c[2]);
+         texel(x0 + 1, y0 + 1, c[3]);
+         float s[4];
+         for (int k = 0; k < 4; k++)
+            s[k] = (c[0][k] * (1 - fx) + c[1][k] * fx) * (1 - fy) + (c[2][k] * (1 - fx) + c[3][k] * fx) * fy;
+         if (s[3] <= 0.5f / 255.0f)
+            continue;
+         uint8_t* p = &px[((size_t)y * w + x) * 4];
+         const float da = p[3] / 255.0f, oa = s[3] + da * (1.0f - s[3]);
+         for (int k = 0; k < 3; k++)
+            p[k] = (uint8_t)std::clamp(std::lround((s[k] + p[k] * da * (1.0f - s[3])) / oa), 0L, 255L);
+         p[3] = (uint8_t)std::clamp(std::lround(oa * 255.0f), 0L, 255L);
+      }
+   std::vector<uint8_t> top((size_t)w * h * 4);
+   for (int y = 0; y < h; y++)
+      std::memcpy(&top[(size_t)y * w * 4], &px[(size_t)(h - 1 - y) * w * 4], (size_t)w * 4);
+   bool anyPixel = false;
+   std::vector<std::string> keys = TilesOfPicture(top, w, h, anyPixel);
+   FindLayer(into)->tiles = std::move(keys);
+   RemoveLayer(from);
+   Commit();
+   return true;
+}
+
 unsigned Scene2DNode::VectorTexture(int id)
 {
    Layers();

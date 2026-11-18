@@ -2118,6 +2118,81 @@ namespace
       return nid;
    }
 
+   // Photoshop: with a marquee on one paint layer, Move, Free Transform, Flip and Rotate take the selected pixels
+   // only. They are lifted into a floating layer (the cut leaves a hole), transformed, and put back down into the
+   // layer when the action ends; the marquee follows them. Put down unmoved, the layer gets its own pixels back.
+   struct Float
+   {
+      int id = 0, src = 0;
+      Layer at;                          // the floating layer as it was lifted
+      std::vector<std::string> tiles;    // the source's pixels before the cut
+      std::vector<uint8_t> sel;          // the marquee before the move
+   } sFloat;
+
+   bool CanLift(Scene2DNode* doc)
+   {
+      if (sFloat.id != 0 || sSel.size() != 1 || !SelectionActsOnPixels(doc))
+         return false;
+      const Layer* a = Active(doc);
+      return a != nullptr && a->kind == Kind::Paint && !a->is3d && Movable(*a) &&
+             (a->lock & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) == 0;
+   }
+
+   // Call after the action's undo checkpoint. False: nothing lifted, the action takes whole layers.
+   bool LiftSelection(Scene2DNode* doc)
+   {
+      if (!CanLift(doc))
+         return false;
+      const Layer* a = Active(doc);
+      Float f;
+      f.src = a->id;
+      f.tiles = a->tiles;
+      f.sel = doc->SelectionPixels();
+      f.id = SelectionToLayer(doc, true);
+      if (f.id == 0)
+         return false;
+      f.at = *doc->FindLayer(f.id);
+      sFloat = std::move(f);
+      SelectOnly(sFloat.id);
+      return true;
+   }
+
+   void DropFloat(Scene2DNode* doc)
+   {
+      if (sFloat.id == 0)
+         return;
+      const Float f = std::move(sFloat);
+      sFloat = Float();
+      const Layer* fl = doc->FindLayer(f.id);
+      Layer* sl = doc->FindLayer(f.src);
+      if (fl == nullptr || sl == nullptr)
+         return;
+      float m0[6], m1[6];
+      doc->LayerMatrix(f.at, m0);
+      doc->LayerMatrix(*fl, m1);
+      bool moved = fl->warpOn != f.at.warpOn;
+      for (int k = 0; k < 6; k++)
+         moved |= std::fabs(m0[k] - m1[k]) > 1e-4f;
+      for (int k = 0; k < 8 && fl->warpOn; k++)
+         moved |= fl->warp[k] != f.at.warp[k];
+      if (!moved)
+      {
+         sl->tiles = f.tiles;
+         doc->RemoveLayer(f.id);
+         doc->Commit();
+      }
+      else
+      {
+         const Layer after = *fl;
+         static int sDropFrame = 1 << 23;
+         if (doc->StampLayerInto(f.id, f.src, ++sDropFrame))
+            doc->CarrySelection(f.sel, f.at, after);
+      }
+      if (doc->FindLayer(f.src) != nullptr)
+         SelectOnly(f.src);
+      Touch();
+   }
+
    // Esc during a drag puts everything back and drops the drag's undo step.
    // Free transform (Cmd/Ctrl+T): every move, scale and rotate drag until Enter is one undo step, and Esc puts
    // the layers back as they were when it began.
@@ -2138,16 +2213,28 @@ namespace
    void BeginFreeTransform(Scene2DNode* doc)
    {
       sFreeT = FreeTransform();
+      const size_t undo0 = gUndoStack.size();
+      const bool lift = CanLift(doc);
+      if (lift)
+      {
+         PushUndoCheckpoint("Free transform");
+         if (!LiftSelection(doc))
+         {
+            gUndoStack.resize(undo0);
+            return;
+         }
+      }
       for (int id : MovingIds(doc))
          if (const Layer* l = doc->FindLayer(id))
             sFreeT.before.push_back(*l);
       if (sFreeT.before.empty())
          return;
       sFreeT.doc = doc;
-      sFreeT.undo0 = gUndoStack.size();
+      sFreeT.undo0 = undo0;
       sFreeT.prevTool = sTool;
       sFreeMode = kFreeAny;
-      PushUndoCheckpoint("Free transform");
+      if (!lift)
+         PushUndoCheckpoint("Free transform");
       sTool = kMove;
    }
 
@@ -2163,10 +2250,13 @@ namespace
          for (const Layer& b : sFreeT.before)
             if (Layer* l = doc->FindLayer(b.id))
                *l = b;
+         DropFloat(doc);   // back where it was lifted: the layer gets its own pixels back
          while (sFreeT.undo0 != (size_t)-1 && gUndoStack.size() > sFreeT.undo0)
             gUndoStack.pop_back();
          Touch();
       }
+      else
+         DropFloat(doc);
       sTool = sFreeT.prevTool;
       sFreeMode = kFreeAny;
       sFreeT = FreeTransform();
@@ -3926,11 +4016,20 @@ namespace
 
    void FlipSelection(Scene2DNode* doc, bool vertical)
    {
+      const bool lift = !FreeTransformOn(doc) && CanLift(doc);
+      if (lift)
+      {
+         PushUndoCheckpoint(vertical ? "Flip vertical" : "Flip horizontal");
+         LiftSelection(doc);
+      }
       float lo[2], hi[2];
       if (!PivotBounds(doc, lo, hi))
+      {
+         DropFloat(doc);
          return;
+      }
       const float px = (lo[0] + hi[0]) * 0.5f, py = (lo[1] + hi[1]) * 0.5f;
-      if (!FreeTransformOn(doc))
+      if (!FreeTransformOn(doc) && !lift)
          PushUndoCheckpoint(vertical ? "Flip vertical" : "Flip horizontal");
       for (int id : MovingIds(doc))
          if (Layer* l = doc->FindLayer(id); l != nullptr && Flippable(*l))
@@ -3953,16 +4052,27 @@ namespace
             l->x += (vertical ? cx : 2.0f * px - cx) - nx;
             l->y += (vertical ? 2.0f * py - cy : cy) - ny;
          }
+      if (lift)
+         DropFloat(doc);
       Touch();
    }
 
    void TurnSelection(Scene2DNode* doc, float deg)
    {
+      const bool lift = !FreeTransformOn(doc) && CanLift(doc);
+      if (lift)
+      {
+         PushUndoCheckpoint("Rotate selection");
+         LiftSelection(doc);
+      }
       float lo[2], hi[2];
       if (!PivotBounds(doc, lo, hi))
+      {
+         DropFloat(doc);
          return;
+      }
       const ImVec2 pivot((lo[0] + hi[0]) * 0.5f, (lo[1] + hi[1]) * 0.5f);
-      if (!FreeTransformOn(doc))
+      if (!FreeTransformOn(doc) && !lift)
          PushUndoCheckpoint("Rotate layers");
       for (int id : MovingIds(doc))
          if (Layer* l = doc->FindLayer(id); l != nullptr && Flippable(*l))
@@ -3981,6 +4091,8 @@ namespace
                }
             }
          }
+      if (lift)
+         DropFloat(doc);
       Touch();
    }
 
@@ -6495,6 +6607,17 @@ namespace
                BeginOp(doc, 6, mouse, "Move guide");
                sOp.guideAxis = guideAxis;
                sOp.guideIndex = hoverGuide;
+            }
+            else if (!(io.KeyCtrl || io.KeySuper) && !FreeTransformOn(doc) && doc->HasSelection() &&
+                     doc->SelectionAt((int)std::floor(sMouseDoc.x), (int)std::floor(sMouseDoc.y)) > 0.0f && CanLift(doc))
+            {
+               // Inside the marquee: the selected pixels move, a hole is left (Photoshop's Move with a selection).
+               const size_t undo0 = gUndoStack.size();
+               PushUndoCheckpoint("Move selection");
+               if (LiftSelection(doc))
+                  BeginOp(doc, 1, mouse, nullptr);
+               else
+                  gUndoStack.resize(undo0);
             }
             else
             {
@@ -11994,6 +12117,9 @@ namespace
          ActionButton::RowNext();
          DrawSide(doc, sideW);
       }
+      // A lifted selection goes back down once its drag or free transform is over.
+      if (sFloat.id != 0 && sOp.kind == 0 && !FreeTransformOn(doc))
+         DropFloat(doc);
       if (sDirty)
          doc->Commit();
       TakeDroppedFiles(doc);

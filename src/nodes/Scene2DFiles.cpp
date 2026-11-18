@@ -661,6 +661,27 @@ bool Scene2DNode::SelectLayerPixels(int id, int op, int frameId)
    return true;
 }
 
+void Scene2DNode::CarrySelection(const std::vector<uint8_t>& was, const Layer& before, const Layer& after)
+{
+   const int w = mDoc.w, h = mDoc.h;
+   if (was.size() != (size_t)w * h)
+      return;
+   mSel.assign((size_t)w * h, 0);
+   for (int y = 0; y < h; y++)   // bottom row first, like the selection
+      for (int x = 0; x < w; x++)
+      {
+         float bx, by, sx, sy;
+         DocToBox(after, x + 0.5f, (float)(h - 1 - y) + 0.5f, bx, by);
+         BoxToDoc(before, bx, by, sx, sy);
+         const int ix = (int)std::floor(sx), iy = (int)std::floor(sy);
+         if (ix >= 0 && iy >= 0 && ix < w && iy < h)
+            mSel[(size_t)y * w + x] = was[(size_t)(h - 1 - iy) * w + ix];
+      }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+   StoreSelection();
+}
+
 bool Scene2DNode::PictureUnder(int id, int effect, int frameId, std::vector<uint8_t>& rgba)
 {
    const Layer* l = FindConst(id);

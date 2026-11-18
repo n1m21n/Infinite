@@ -471,6 +471,9 @@ public:
    bool VisibleBounds(const std::vector<int>& set, int frameId, float lo[2], float hi[2]);
    // Photoshop's Cmd-click on a layer thumbnail: what the layer shows (masks included) becomes the selection, by op.
    bool SelectLayerPixels(int id, int op, int frameId);
+   // The selection `was` (bottom row first) carried along by a layer moving from `before` to `after`: the marquee
+   // follows the pixels it lifted.
+   void CarrySelection(const std::vector<uint8_t>& was, const Layer& before, const Layer& after);
 
    // Document edits that keep every layer's picture where it is.
    void CanvasSize(int w, int h, int anchor);   // anchor 0..8, row major from top left
@@ -601,6 +604,10 @@ public:
    // Sibling layers drawn together become one Normal paint layer in the lowest one's place (Merge Down / Visible,
    // Flatten); hidden ones in the set are dropped. The new id, 0 when it cannot (layers at different levels).
    int MergeLayers(const std::vector<int>& ids, int frameId);
+   // A lifted piece put back down (Photoshop's floating selection): `from` drawn plain (no masks, styles or effects,
+   // Normal, full strength) into paint layer `into`'s own pixels, then removed. `into` keeps its place, mask, blend
+   // and effects. False (nothing changed) when `into` is not an unlocked paint layer.
+   bool StampLayerInto(int from, int into, int frameId);
    int AddTextLayer(const std::string& text, float x, float y, float boxW, int above = 0);
    // Document px <-> the layer's box px.
    void DocToBox(const Layer& l, float x, float y, float& bx, float& by);
