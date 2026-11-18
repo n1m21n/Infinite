@@ -241,7 +241,7 @@ namespace app
                      const ImU32 dim = lit ? tok::U32(tok::pal::c_FFFFFFBE) : (isLight ? tok::U32(tok::pal::c_5F6982FF) : tok::U32(tok::pal::c_969EB4FF));
                      dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 1.0f, mx.y - 1.0f), true);
                      const float lh = AudioLabelFontSize();
-                     char num[8];
+                     char num[16];
                      snprintf(num, sizeof(num), "%d", pad + 1);
                      AudioLabelText(dl, ImVec2(mn.x + 5.0f, mn.y + 3.0f), ink, num);
                      if (isLoaded)

@@ -2009,14 +2009,16 @@ namespace
          if (srcLen > 0 && (size_t)j < g.warped.size())
          {
             SliceParams& p = s.doc.slices[(size_t)j].p;
-            const double want = (g.WAt(io.MousePos.x) - g.warped[(size_t)j]) / (double)srcLen;
+            // The border lands on the grid as heard when the magnet is on (Shift is this drag's own key, so it does not flip the snap).
+            const double edge = (double)GridFrame(g.WAt(io.MousePos.x));
+            const double want = (edge - g.warped[(size_t)j]) / (double)srcLen;
             p.lengthRatio = Mould((float)std::clamp(want, 0.25, 4.0));
             p.fitToGrid = false;
             if (p.stretchMode < 2)
                p.stretchMode = 3; // tonal: the length changes, the pitch does not
             s.dirty = true;
             // The playhead rides the border being dragged (as a DAW's warp marker does), so the edge is where it sits.
-            s.headFrame = (double)s.doc.EndOf(j);
+            s.headFrame = g.warped[(size_t)j] + (double)srcLen * (double)p.lengthRatio; // the ruler is in heard time
          }
       }
       if (active && s.dragKind == 5 && s.dragIndex >= 0 && s.dragIndex < s.doc.Count())

@@ -1685,7 +1685,7 @@ namespace app
          // sliders above (and every saved modulation binding on them) keep
          // their ordinals; 300..317 sit between the float ordinals (< ~60)
          // and kDiscreteParamBase (400).
-         char accentName[24], levelName[24];
+         char accentName[40], levelName[40];
          snprintf(accentName, sizeof(accentName), "lane %d accent", lane + 1);
          snprintf(levelName, sizeof(levelName), "lane %d accent vol", lane + 1);
          AudioSlider("accent", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%+.1f st", half, nullptr,
@@ -2686,7 +2686,7 @@ namespace app
                      // All text in the pad is the size of a slider's label
                      // (AudioLabelText): number and mode tag on top, name below.
                      const float lh = AudioLabelFontSize();
-                     char num[8];
+                     char num[16];
                      snprintf(num, sizeof(num), "%d", pad + 1);
                      AudioLabelText(dl, ImVec2(mn.x + 5.0f, mn.y + 3.0f), ink, num);
                      // Mode tag; a synced pad also shows its division ("loop 1/8").

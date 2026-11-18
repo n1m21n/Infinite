@@ -1747,12 +1747,12 @@ void FrameTest_CHAINFUZZTEST(int frameId, GLFWwindow* window)
             // Build twice from the same seed - determinism check.
             GeometryNode headA; std::vector<std::unique_ptr<Link>> linksA;
             IGeometrySource* tailA = buildChain(seed, length, headA, linksA, false);
-            if (auto* n = dynamic_cast<INode*>(tailA)) n->CookIfNeeded(frame); frame++;
+            if (auto* n = dynamic_cast<INode*>(tailA)) { n->CookIfNeeded(frame); } frame++;
             const Mesh meshA = tailA->GetMesh();
 
             GeometryNode headB; std::vector<std::unique_ptr<Link>> linksB;
             IGeometrySource* tailB = buildChain(seed, length, headB, linksB, false);
-            if (auto* n = dynamic_cast<INode*>(tailB)) n->CookIfNeeded(frame); frame++;
+            if (auto* n = dynamic_cast<INode*>(tailB)) { n->CookIfNeeded(frame); } frame++;
             const Mesh meshB = tailB->GetMesh();
 
             bool deterministic = meshA.vertices.size() == meshB.vertices.size() &&
@@ -1816,7 +1816,7 @@ void FrameTest_CHAINFUZZTEST(int frameId, GLFWwindow* window)
                   upstream = link->AsSource();
                   linksC.push_back(std::move(link));
                }
-               if (auto* n = dynamic_cast<INode*>(upstream)) n->CookIfNeeded(frame); frame++;
+               if (auto* n = dynamic_cast<INode*>(upstream)) { n->CookIfNeeded(frame); } frame++;
                const Mesh coloured = upstream->GetMesh();
                // A SetColorNode anywhere in the chain legitimately overwrites
                // the head's colour with its own - that's its job, not a bug -
@@ -3070,7 +3070,10 @@ void FrameTest_LEGACYLOADTEST(int frameId, GLFWwindow* window)
          out << "infinite-patch 1\n" << rev;
          int i = 1;
          for (const auto& t : types)
-            out << "node " << i++ << " " << t.first << " " << t.second << "\n  pos " << i * 300 << " 0\n" << flags << "end\n";
+         {
+            const int at = i++;
+            out << "node " << at << " " << t.first << " " << t.second << "\n  pos " << i * 300 << " 0\n" << flags << "end\n";
+         }
       }
       LoadPatchFrom(path);
       int bad = 0;
