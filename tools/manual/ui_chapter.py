@@ -553,7 +553,8 @@ def html_chapter(P):
                   fig("panel_fieldpatcher", "Field Patcher: boxes wired into a Field Pixel program, with the generated code beside the canvas.", width="100%")))
 
     b.append(page("<h2>Curve Editor</h2>",
-                  "<p>The Curve Editor (<code>curveeditor</code>) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.</p>"))
+                  "<p>The Curve Editor (<code>curveeditor</code>) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.</p>",
+                  fig("panel_curve", "Curve Editor: an MSEG curve drawn on the grid, with the tools on the left and the Source, Time and Loop cards on the right.", width="100%")))
 
     b.append(page("<h2>Canvas Link</h2>",
                   "<p>Canvas Link is the one way a panel takes a node from the canvas. Piano Roll pages, 2D layer sources, 3D View objects and Session clips each show a link field: "

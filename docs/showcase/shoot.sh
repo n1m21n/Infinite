@@ -54,7 +54,7 @@ EOF
 c studio set "text=$(cat "$TMP/studio.txt")" >/dev/null || true
 c session scene 1 >/dev/null || true  # starts the audio engine and plays scene "Groove"
 
-closeall() { for p in samplestudio pianoroll modmatrix perf view3d view2d mixer drums fieldpatcher timeline session terminal; do c panel $p close >/dev/null 2>&1 || true; done; c view params off >/dev/null; }
+closeall() { for p in samplestudio pianoroll modmatrix perf view3d view2d curveeditor mixer drums fieldpatcher timeline session terminal; do c panel $p close >/dev/null 2>&1 || true; done; c view params off >/dev/null; }
 
 # keep <name>: the app saves its own backbuffer (INFINITE_SHOT_REQUEST), so this works off-screen and with the
 # screen locked; then shrink with sips in 160 px steps until under 1.5 MB.
@@ -100,6 +100,7 @@ for s in $SHOTS; do
    drums)         c session scene 1 >/dev/null; c panel drums open top >/dev/null; sleep 3 ;;
    2d-view)       c select ${SEL2D:-3} >/dev/null; c panel view2d open top >/dev/null; sleep 5 ;;
    field-patcher) c select FieldPixel >/dev/null; c view fit >/dev/null; c panel fieldpatcher open fill >/dev/null; sleep 4 ;;
+   curve-editor)  c panel curveeditor open top >/dev/null; sleep 4 ;;
    *) echo "unknown shot $s"; continue ;;
    esac
    keep "$s"
