@@ -1439,7 +1439,7 @@ namespace app
    void DrawPredictiveNotesBody(GraphNode& gn, PredictiveNotesNode* n)
    {
       const float conf = n->Confidence01();
-      char stat[32];
+      char stat[128];
       if (n->IsLearning() && n->Dropped() > 0)
          snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars (%d dropped)", n->NotesCaptured(), n->BarsCaptured(), n->Dropped());
       else if (n->IsLearning())

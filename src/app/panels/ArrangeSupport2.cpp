@@ -56,7 +56,7 @@ namespace app
    {
       long long bar, beat, six;
       ArrangeSplitBBT(t, bar, beat, six);
-      char buf[32];
+      char buf[80];
       snprintf(buf, sizeof(buf), "%lld.%lld.%lld", bar, beat, six);
       return buf;
    }

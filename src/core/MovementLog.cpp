@@ -767,7 +767,7 @@ void Start(const std::string& customDir)
    localtime_r(&tt, &tmVal);
 #endif
 
-   char fname[32];
+   char fname[128];
    std::snprintf(fname, sizeof(fname), "%04d%02d%02d-%02d%02d%02d.mlog",
                  tmVal.tm_year + 1900, tmVal.tm_mon + 1, tmVal.tm_mday,
                  tmVal.tm_hour, tmVal.tm_min, tmVal.tm_sec);
