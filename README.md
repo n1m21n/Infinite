@@ -11,7 +11,9 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [<img src="https://trendshift.io/api/badge/trendshift/repositories/187223/daily?language=C%2B%2B" alt="n1m21n%2FInfinite | Trendshift" width="250" height="55"/>](https://trendshift.io/repositories/187223?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-187223)
 
-**Infinite is a Free, open-source audiovisual workstation made by Naman Soni (n1m21n).** Visuals, music and code live on one node canvas, on **macOS**, **Windows** and **Linux**, in English, Spanish, German, Chinese, Japanese and Russian. GPU image and video compositing, procedural 3D geometry and physics, and a modular synth rack with AU and VST3 plugin hosting all patch into each other through one modulation graph. Most nodes do one fixed thing; **Field**, Infinite's own programming language, lets you write what a node does instead.
+**Infinite is a free, open-source node-based audiovisual workstation for macOS, Windows and Linux.** Build real-time visuals, music and interactive art on one node canvas: GPU image and video compositing, procedural 3D with a path-traced renderer, a modular synth rack with VST3 and AU plugin hosting, a 2D layer editor, Session and Timeline arrangement, and MIDI, OSC, Syphon, Spout and NDI I/O. It also runs headless from the command line and exposes an MCP server for AI coding agents. Everything patches into everything through one modulation graph, in English, Spanish, German, Chinese, Japanese and Russian. **Field**, Infinite's own programming language, lets you write what a node does instead of only wiring fixed ones.
+
+*Use it for VJing and live visuals, generative art, music production, motion graphics, shader and creative coding, and audio-reactive 3D. A free alternative in the spirit of TouchDesigner, VCV Rack, Max/MSP, Bitwig's Grid and VVVV, with a DAW-style Timeline and Session built in.*
 
 ![Infinite 2.0 with several panels open around the node canvas](docs/screenshots/v2/hero-panels.png)
 
@@ -28,6 +30,18 @@ Always the newest release. All files, checksums and release notes are on the [Re
 ## Start here
 
 New to Infinite? Watch the full walkthrough on YouTube: **[Infinite video walkthrough and tutorial](https://www.youtube.com/watch?v=vXRjrDhSq24&t=1421s)**.
+
+### What's new in 2.0
+
+- **2D View**: a layered, non-destructive compositor with paint, vector and text layers, 28 adjustments, layer styles, Photoshop-style shortcuts and layered PSD and ORA import and export.
+- **Real-time 3D**: Render 3D moves onto a Metal engine with a path tracer, richer materials, fog, sky and more light types.
+- **Field Patcher and Spectral Field**: edit Field kernels as boxes and wires, synced with code.
+- **Mixer and Drums**: a hardware-desk Mixer and Drum Sequencer, with a Session view that follows the Timeline.
+- **Mod Matrix and Performance**: every modulation in one table, and a surface of knobs, faders and pads for playing a patch live.
+- **Headless, CLI and MCP**: a wider `infinite` command, headless rendering and 12 MCP tools.
+- **Free updates for life**: every future version is a free update.
+
+Full list: [v2.0 release notes](docs/release/v2.0-notes.md).
 
 ### Templates and the Showcase
 
