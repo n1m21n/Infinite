@@ -81,6 +81,8 @@ Note sequencers, arpeggiator, chorder, quantizer and MIDI in and out on one side
 
 ### Node library
 
+<p align="center"><img src="docs/screenshots/v2/library.png" alt="The Library panel: modules, Field, samples, media and plugins, searchable" width="35%"></p>
+
 Infinite has **372 node types** on macOS (377 are registered; five internal types are hidden from the spawn menu):
 
 | Domain | Key nodes |
@@ -105,13 +107,13 @@ Panels dock to the edges of the node canvas and open from the rail or a key; eve
 
 ### 2D View
 
-<img src="docs/screenshots/v2/2d-view.png" alt="2D View compositing layers, masks, tools and node outputs" width="100%">
+<img src="docs/screenshots/v2/2d-view.webp" alt="2D View compositing layers, masks, tools and node outputs" width="100%">
 
 A non-destructive 2D layer and node compositor (Shift + 2). Stack seven layer kinds (`Node`, `Fill`, `Group`, `Paint`, `Vector`, `Text` and `Adjust`, plus After-Effects-style 3D card layers) across 39 tools (Move, Marquee, Lasso, Magic Wand, Selection Brush, Healing, Brush, Clone Stamp, Eraser, Gradient, Pen, Shape, Text and more), 32 blend modes (and four legacy modes kept for older patches), 28 adjustment layers (with `Drive A..D` modulation), 10 layer styles and a drag-to-reorder Smart Filter stack of 18 GPU node effects. Live `Node` layers keep animating from the graph, and PSD and ORA files import and export with layers intact. Free Transform (Cmd+T) moves, scales and turns the selected layers as one step. Merge Down and Merge Layers (Cmd+E), Merge Visible (Cmd+Shift+E) and Flatten Image merge layers the way Photoshop does, in one undo step. A layer's source can be a Canvas Link pick: choose a node from the list, or click it on the canvas.
 
 ### 3D View
 
-<img src="docs/screenshots/v2/3d-view.png" alt="3D View composing node outputs into one scene" width="100%">
+<img src="docs/screenshots/v2/3d-view.webp" alt="3D View composing node outputs into one scene" width="100%">
 
 The final stage of a 3D patch (Shift + 3). Right-click a 3D node, add it to the view, arrange objects, look through a camera and render a still or animation. It follows Blender's keymap (`G`/`R`/`S` with axis locks, `1`/`3`/`7` views, `0` camera, `Tab` Edit Mode, `Ctrl/Cmd+Tab` Pose and Sculpt modes) and includes 6 light types with Kelvin temperature and light linking, Principled BSDF PBR materials with 10 texture maps, HDRI world lighting, depth of field, ambient occlusion, bloom, ACES/AgX colour management and Raster, Path trace and Metal Live engines.
 
@@ -125,33 +127,32 @@ A docked visual box-and-wire editor for the Field language (Shift + F, or the **
 
 | Mixer | Drum Sequencer |
 |---|---|
-| <img src="docs/screenshots/v2/mixer.png" alt="Hardware-desk Mixer with graphite channel strips, knurled pots and LED meters" width="100%"> | <img src="docs/screenshots/v2/drums.png" alt="Hardware-desk Drum Sequencer with lit step keys, trig conditions and waveform inspector" width="100%"> |
+| <img src="docs/screenshots/v2/mixer.webp" alt="Hardware-desk Mixer with graphite channel strips, knurled pots and LED meters" width="100%"> | <img src="docs/screenshots/v2/drums.webp" alt="Hardware-desk Drum Sequencer with lit step keys, trig conditions and waveform inspector" width="100%"> |
 | A hardware-desk mixer with graphite channel strips, colour caps, scribble strips, knurled trim and pan pots, M/S/phase buttons, LED meters and a Master bus with LUFS/true-peak readouts. | An 8-lane step sequencer in the same desk vocabulary: velocity-lit step keys, trig conditions, probability, nudge, FILL, per-lane length, reverse, filter, live audition and groove-matched kits from your own sample library. |
 
 ### Sample Studio
 
-<img src="docs/screenshots/v2/sample-studio.png" alt="Sample Studio slicing a waveform" width="100%">
+<img src="docs/screenshots/v2/sample-studio.webp" alt="Sample Studio editing a take beside the Mod Matrix and Session view" width="100%">
 
 A self-contained sample editor (Shift + W). Open a file, drop one in, record from the audio input, or generate a take. Zoom the waveform, cut it into slices by transients, grid or equal parts, and give each slice its own gain, pan, pitch, fine tune, stretch, fades, shape, colour, mute and solo. Editing never touches the canvas. When it sounds right, Convert puts it on the canvas as a node that plays it (a generated take can also come back as the patch that made it); Export writes the whole edit or each slice to WAV, FLAC or MP3. Studio work is saved in the patch.
 
 ### Piano Roll
 
-<img src="docs/screenshots/v2/piano-roll.png" alt="Piano Roll with notes in a scale" width="100%">
+<img src="docs/screenshots/v2/piano-roll.webp" alt="Piano Roll with notes in a scale beside an MSEG" width="100%">
 
 A note editor (Shift + R) for MIDI lanes on the Timeline, played by the Piano Roll node. Draw, erase, select and quantise notes, snap to the project's scale (in-scale lanes are coloured), and transform them with Humanize, Strum, Legato, Chop to Grid, Velocity Ramp, Reverse, Invert and half or double speed. Record from a MIDI input, import a `.mid` file, or press Generate (G) to write notes in the page's key. The page takes the node it plays through Canvas Link, the same pick that 2D layers and session clips use.
 
 ### Session and Timeline
 
-| Session | Timeline |
-|---|---|
-| <img src="docs/screenshots/v2/session-clips.png" alt="Session view with scenes of clips" width="100%"> | <img src="docs/screenshots/v2/timeline.png" alt="Timeline arrangement with audio and video tracks" width="100%"> |
-| A clip launcher for live sets (Shift + S): audio and video clips in scenes, launch quantize (1 bar by default), Trigger and Gate launch modes, follow actions and "Then Play Next Scene". Record writes your performance into the Timeline, and Render Take renders that span, audio and video, to a folder. A clip's source can be picked with Canvas Link, as on the Piano Roll and in 2D layers. | The arrangement (Shift + T): clips on tracks against the same BPM transport, a blade tool, track groups, markers, loop and snap, drag-and-drop media import, live waveforms and video thumbnails, and a render queue. |
+<img src="docs/screenshots/v2/performance-session.webp" alt="Session view of clips and scenes beside the Performance panel in Edit mode" width="100%">
+
+**Session.** A clip launcher for live sets (Shift + S): audio and video clips in scenes, launch quantize (1 bar by default), Trigger and Gate launch modes, follow actions and "Then Play Next Scene". Record writes your performance into the Timeline, and Render Take renders that span, audio and video, to a folder. A clip's source can be picked with Canvas Link, as on the Piano Roll and in 2D layers.
+
+**Timeline.** The arrangement (Shift + T): clips on tracks against the same BPM transport, a blade tool, track groups, markers, loop and snap, drag-and-drop media import, live waveforms and video thumbnails, and a render queue.
 
 ### Mod Matrix and Performance
 
-<img src="docs/screenshots/v2/mod-matrix-rows.png" alt="Mod Matrix rows: LFOs, Random and Audio to CV driving wavetable position, filter, delay feedback and Field Modifier amount, each with range, curve and live signal" width="100%">
-
-<p align="center"><img src="docs/screenshots/v2/performance-showcase.png" alt="The Showcase Performance page: labelled knobs, faders, an XY pad, selector and step gate" width="60%"></p>
+<img src="docs/screenshots/v2/mod-matrix-timeline.webp" alt="Mod Matrix rows driving parameters, with the node graph and Timeline" width="100%">
 
 The Mod Matrix (Shift + M) lists every modulation in the patch in one table: source, destination, range, curve and invert, with each source's live signal. The Performance panel (Shift + P) is a surface for playing a patch: pages of knobs, faders, XY pads, toggles, triggers, radio selectors and step gates, each assigned to any parameter, with MIDI learn and a response curve per control. Edit mode lays it out; Perform mode plays it.
 
@@ -233,6 +234,8 @@ infinite code docs field            # code: new, check, watch, docs, examples fo
 With no app running, every verb that takes a `.inf` file runs headless. `infinite context` prints a short brief of the open patch and `infinite guide` the full reference.
 
 ### Agents and MCP
+
+<img src="docs/screenshots/v2/chat.webp" alt="The Chat panel: asking agents about a node, with the patch on the canvas" width="100%">
 
 For AI coding assistants there is an MCP server, [`tools/npm/infinite-engine`](tools/npm/infinite-engine) (npm: `infinite-engine`), and a Claude plugin described in [`tools/mcp/README.md`](tools/mcp/README.md).
 
