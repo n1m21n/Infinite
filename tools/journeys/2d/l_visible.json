@@ -1,0 +1,22 @@
+{
+ "id": "l_visible",
+ "title": "Layer eye button hides layer",
+ "ref": "Photoshop layer visibility",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0"
+ ],
+ "steps": [
+  {
+   "click": "##eye",
+   "nth": 0
+  }
+ ],
+ "expect": [
+  "px 200 150 ~= 1 1 1"
+ ]
+}

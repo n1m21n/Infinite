@@ -29,6 +29,12 @@ AREAS = [
     ('text', 'Type'), ('type_', 'Type'), ('vector', 'Vector and pen'), ('pen', 'Vector and pen'), ('shape', 'Vector and pen'),
     ('history', 'Undo'), ('undo', 'Undo'), ('move', 'Transform'), ('align', 'Transform'), ('guide', 'View'), ('zoom', 'View'),
     ('view', 'View'), ('adjust', 'Adjustments'),
+    # After the rest, so files above keep their areas: the compositor and command suites the first pass skipped.
+    ('float_cmds', 'Transform'), ('distort_cmds', 'Transform'), ('edit_cmds', 'Edit'), ('edit_menu', 'Edit'),
+    ('path_edit', 'Vector and pen'), ('path_delete', 'Vector and pen'), ('sampler_cmds', 'Clone and heal'),
+    ('select_extra', 'Selection'), ('rasterize_style', 'Layer styles'), ('fx_visibility', 'Layer styles'),
+    ('fx_mode', 'Layer styles'), ('effects', 'Layer styles'), ('blend_if', 'Compositing'), ('hidden_target', 'Layers and groups'),
+    ('stamp_cmds', 'Layers and groups'), ('symmetry_cmds', 'Paint'), ('compose', 'Compositing'),
 ]
 # Rules about limits a few-user app does not need now (feedback: scale to user base).
 NOISE = re.compile(r'budget|gigapixel|oversized|allocation|alloc_|cmyk|hdr|float|16bit|bit_depth|indexed|lab_|profile|cms|'

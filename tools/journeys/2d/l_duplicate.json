@@ -1,0 +1,21 @@
+{
+ "id": "l_duplicate",
+ "title": "Duplicate icon copies active layer",
+ "ref": "Photoshop duplicate layer",
+ "ref_steps": 1,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0"
+ ],
+ "steps": [
+  {
+   "click": "##v2ddup"
+  }
+ ],
+ "expect": [
+  "layers == 3"
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "id": "g_blend",
+ "title": "Group Multiply blend multiplies group over green",
+ "ref": "Photoshop group blend mode",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 0 1 0",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0",
+  "group G T"
+ ],
+ "steps": [
+  {
+   "click": "##v2dblend"
+  },
+  {
+   "click": "Multiply"
+  }
+ ],
+ "expect": [
+  "px 200 150 ~= 0 0 0"
+ ]
+}

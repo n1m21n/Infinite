@@ -1,0 +1,31 @@
+{
+ "id": "l_lock_pixels",
+ "title": "Lock image pixels blocks Brush strokes",
+ "ref": "Photoshop lock pixels",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0",
+  "tool Brush",
+  "fg 0 0 1"
+ ],
+ "steps": [
+  {
+   "click": "##lk1"
+  },
+  {
+   "drag": [
+    150,
+    150,
+    250,
+    150
+   ]
+  }
+ ],
+ "expect": [
+  "px 200 150 ~= 1 0 0"
+ ]
+}
