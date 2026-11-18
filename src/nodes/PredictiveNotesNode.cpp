@@ -872,7 +872,7 @@ namespace
    bool InCMajor(int n)
    {
       static const bool k[12] = { 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1 };
-      return k[n % 12];
+      return k[((n % 12) + 12) % 12];
    }
 
    std::vector<Event> LoopEvents(int periods)

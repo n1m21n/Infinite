@@ -574,7 +574,9 @@ namespace
             std::vector<float> x;
             rig.On(s.note, vel[k]);
             rig.Run((int)(0.5 * sr), x);
-            std::vector<float> seg(x.begin() + (long)(0.25 * sr), x.end());
+            const size_t segOff = std::min(x.size(), (size_t)(0.25 * sr));
+            std::vector<float> seg;
+            seg.assign(x.data() + segOff, x.data() + x.size());
             rms[k] = Rms(seg);
          }
          printf("SYNTHAUDIT VEL   %-15s vel 0.5 %+.1f dB | vel 0.25 %+.1f dB re vel 1\n", s.name,

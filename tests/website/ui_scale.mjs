@@ -37,6 +37,7 @@ const OVER_FN = () => {
   const out = [];
   const vis = (e) => { for (let n = e; n && n !== document.body; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden' || +c.opacity < 0.05) return false; } return true; };
   document.querySelectorAll('canvas').forEach((cv, ci) => {
+    if (cv.id === 'bird') return;   // the perched mascot: decorative, aria-hidden, click-through, sits on text on purpose
     const r = cv.getBoundingClientRect(); if (r.width < 80 || r.height < 80 || !vis(cv)) return;
     if (r.bottom < 0 || r.top > innerHeight) return;
     if (r.width >= innerWidth * 0.95 && r.height >= innerHeight * 0.9) return;   // a full-screen backdrop (home hero) is meant to sit behind the text

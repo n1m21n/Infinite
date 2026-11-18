@@ -1129,7 +1129,7 @@ namespace
    // Resources/drumkits/infinite-basic folder, which moves when the app is
    // reinstalled elsewhere (or a patch travels to another machine). Returns
    // where the same file would be in the current kit folder, or "" when `path`
-   // is not a bundled-kit path or no kit folder is set. Splits on both / and \
+   // is not a bundled-kit path or no kit folder is set. Splits on both / and backslash
    // because the saved path may come from another OS.
    std::string StaleKitRetryPath(const std::string& path)
    {
