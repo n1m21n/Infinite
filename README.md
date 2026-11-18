@@ -119,7 +119,7 @@ The final stage of a 3D patch (Shift + 3). Right-click a 3D node, add it to the 
 
 ### Field Patcher
 
-<img src="docs/screenshots/v2/field-patcher.png" alt="Field Patcher editing a Field node as boxes and wires synced with code" width="100%">
+<img src="docs/screenshots/v2/field-patcher.webp" alt="Field Patcher editing a Field Pixel kernel as boxes and wires, synced with its code and live preview" width="100%">
 
 A docked visual box-and-wire editor for the Field language (Shift + F, or the **Boxes** button on any Field node). Edit `Field Notes`, `Field Primitive`, `Field Modulator`, `Field Modifier`, `Field Pixel` and `Field Effect` nodes visually across 10 box families (`Sources`, `Arithmetic`, `Range`, `Waves`, `Logic`, `Time & memory`, `Random`, `Geometry`, `Music`, `Inlets / outlets`) and 20 built-in starters, with two-way sync to the `Code` tab and scratch pages saved in the patch.
 
