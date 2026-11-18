@@ -754,7 +754,7 @@ namespace app
             const int s = base + c;
             const float x0 = g.X(c);
             const bool inPat = s < maxLen, now = s == play, beat = s % 4 == 0;
-            char num[4];
+            char num[16];
             snprintf(num, sizeof num, "%d", s + 1);
             const float rfs = tok::type_caption;
             const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(rfs, FLT_MAX, 0.0f, num);
