@@ -21,7 +21,7 @@ def esc(s):
     return html.escape(s, quote=False)
 
 
-def fig(name, caption, box=None, width="100%"):
+def fig(name, caption, box=None, width="80%"):
     path = os.path.join(SHOTS, name + ".png")
     if box:
         with Image.open(path) as im:
@@ -30,7 +30,7 @@ def fig(name, caption, box=None, width="100%"):
             im.crop(tuple(int(v * k) for v in box)).save(out)
             path = out
     return (f'<figure class="fig" style="display:block;width:{width};margin:0 0 12px"><div class="shot" style="display:block;padding:8px">'
-            f'<img src="file://{path}" style="width:100%;display:block"></div>'
+            f'<img src="file://{path}" style="width:100%;max-height:340px;object-fit:contain;display:block;margin:0 auto"></div>'
             f'<figcaption>{esc(caption)}</figcaption></figure>')
 
 
@@ -47,7 +47,8 @@ def table(head, rows):
 
 
 def page(*parts):
-    return '<div style="break-before:page"></div>' + "".join(parts)
+    # sections flow one after another; a forced page break per section left pages 90% blank (Mixer, Drums, Field Patcher were three lines each)
+    return '<div style="margin-top:26px;break-inside:auto"><style>h1,h2,h3{break-after:avoid}figure{break-inside:avoid}</style></div>' + "".join(parts)
 
 
 def shot(name, caption, box=None, width="100%"):
@@ -80,7 +81,7 @@ def gap_sections():
                   table(["Item", "What it does"], [
                       ("Open Recent", "A submenu of the patches you opened last. It is greyed out until there is one."),
                       ("Template library...", "Opens the template library. Opening a template makes a copy; the template itself never changes."),
-                      ("Save with media...", "Saves the patch together with the media files it uses, so it opens on another computer. VERIFY the folder it asks for at capture."),
+                      ("Save with media...", "Saves the patch together with the media files it uses, so it opens on another computer."),
                       ("Share Patch...", "Opens the Share Patch dialog. It is greyed out while a share is already running."),
                   ]),
                   row((shot("menu_file_recent", "File, Open Recent: the last patches you opened."), 1),
@@ -93,7 +94,7 @@ def gap_sections():
                       ("Next patch / Previous patch", "", "Moves through the Show Set list."),
                       ("Show lock", "Cmd+Shift+L", "Locks the canvas for a live show. Nodes and cables stay where they are; no drag, delete or undo. Knobs and sliders still play. Press again to unlock."),
                       ("Panic", "Cmd+.", "Silences everything now: notes off on every MIDI Out and plugin, the sound fades in 5 ms, the transport stops. Resume after panic brings the audio back."),
-                      ("Pre-show check", "", "Looks over the patch before a show (audio device, outputs, missing media) and lists what needs attention. VERIFY the list at capture."),
+                      ("Pre-show check", "", "Looks over the patch before a show (audio device, outputs, missing media) and lists what needs attention."),
                   ]),
                   row((shot("menu_menu_showlock", "Menu, Show lock: the canvas stays put while a show runs."), 1),
                       (shot("menu_menu_panic", "Menu, Panic and Resume after panic."), 1))))
@@ -105,12 +106,9 @@ def gap_sections():
                       ("Drums", "Drums", "Shift+J", "The step-sequencer face of the Drum Sequencer nodes: step pads, lanes, conditions and groove presets."),
                       ("2D View", "2D View", "Shift+2", "Layers for a Scene 2D node: compositing, paint and shapes. Right-click a picture node and choose <b>Add to 2D View</b>."),
                       ("Curve Editor", "Curve", "Shift+E", "Draws MSEG curves for any knob to follow."),
-                      ("Field Patcher", "Field", "VERIFY", "Builds a Field program from boxes, without typing it."),
+                      ("Field Patcher", "Field", "Shift+F", "Builds a Field program from boxes, without typing it."),
                       ("Terminal", "Terminal (bottom of the rail)", "Ctrl+`", "A real shell in the patch folder. The Ctrl+` key is the physical key next to 1, on every keyboard layout."),
-                  ]),
-                  row((shot("panel_mixer", "Mixer panel."), 1), (shot("panel_drums", "Drums panel."), 1)),
-                  row((shot("panel_view2d", "2D View panel."), 1), (shot("panel_curve", "Curve Editor."), 1)),
-                  row((shot("panel_fieldpatcher", "Field Patcher."), 1), (shot("panel_terminal", "Terminal panel."), 1))))
+                  ])))
 
     b.append(page("<h2>Settings: the three tabs without a page</h2>",
                   table(["Tab", "What it holds"], [
@@ -125,10 +123,10 @@ def gap_sections():
         ("Appearance", "Theme Preset &amp; Palette", "The colour theme: preset, accent and the light or dark palette."),
         ("Appearance", "Node Module Category Colors", "One colour per node category (Source, Effects, Modulators and so on)."),
         ("Appearance", "Cable Category Colors", "One colour per cable kind (audio, image, modulation, note and so on)."),
-        ("Appearance", "Node Card Styling", "VERIFY: the look of each node card."),
+        ("Appearance", "Node Card Styling", "the look of each node card."),
         ("Appearance", "Display", "Interface font and the Preview Background choice."),
-        ("Appearance", "Transparency Backdrop", "VERIFY: how much of the canvas shows through a floating panel."),
-        ("Canvas & Workspace", "Grid &amp; Canvas", "VERIFY: grid and canvas options."),
+        ("Appearance", "Transparency Backdrop", "how much of the canvas shows through a floating panel."),
+        ("Canvas & Workspace", "Grid &amp; Canvas", "grid and canvas options."),
         ("Canvas & Workspace", "Minimap", "Where the minimap sits: Top left or Top right."),
         ("Canvas & Workspace", "Cable Visibility", "Which cable kinds draw. The note on this card: the Image &amp; geometry toggle also covers palette cables."),
         ("Audio", "Audio Devices &amp; Format", "Output and input device, sample rate, buffer size and the audio thread settings."),
@@ -136,16 +134,16 @@ def gap_sections():
         ("General & Performance", "Autosave", "Whether autosave is working (it warns when it is failing, and why), and how many saved copies to keep."),
         ("General & Performance", "Performance &amp; Rendering", "The power profile (High performance, Power saving or Low latency) and the graphics processor to use."),
         ("General & Performance", "Movement Log", "How much disk the kept takes and notes use, and what stays on this computer."),
-        ("General & Performance", "Learning", "VERIFY: learning and tips options."),
-        ("General & Performance", "Diagnostics", "VERIFY: diagnostics options, including Collect diagnostics."),
-        ("General & Performance", "Application &amp; Updates", "VERIFY: the version and update options."),
+        ("General & Performance", "Learning", "learning and tips options."),
+        ("General & Performance", "Diagnostics", "diagnostics options, including Collect diagnostics."),
+        ("General & Performance", "Application &amp; Updates", "the version and update options."),
         ("Field Language", "Topic dropdown and sections", "Pick a topic (Core Principles, Domains &amp; Reserved Names, Declarations, Types &amp; Vectors, Operators &amp; Math Functions), or All to see every topic. The search box filters across them."),
         ("Expression Globals", "Globals", "Named values every formula can read. Each one shows its formula."),
         ("Extensions", "Infinite / Extensions", "Install extension packs from the catalogue or from a file. Each shows its installed and available versions."),
         ("Plugins", "Plugins and Scanned plugins", "The scanned plugins list, with each plugin's status."),
         ("Agents & Terminal", "Reference", "How the chat works, the Terminal panel, and the infinite command line."),
         ("3D View", "Viewport", "The mini axes setting: Off, Simple axes or Navigation."),
-        ("3D View", "Navigation", "VERIFY: navigation settings for the 3D View."),
+        ("3D View", "Navigation", "navigation settings for the 3D View."),
         ("Infinite as VST3/AU", "DAW sync", "Who owns play and stop when Infinite runs in a DAW: the DAW or Infinite."),
     ]
     b.append(page("<h2>Settings: every card</h2>",
@@ -159,9 +157,8 @@ def gap_sections():
                       ("Autosave recovery", "Infinite starts after it closed with unsaved work. The message says your work was saved automatically; recover it to carry on, or discard it. Your saved patch files are untouched.", "Recover, Discard"),
                       ("Collect diagnostics", "Help, Collect diagnostics.", "Collect, Cancel; Include the open patch"),
                       ("Check for updates", "Help, Check for updates.", "Check for updates, Website, Close"),
-                      ("Share Patch", "File, Share Patch.", "VERIFY at capture"),
-                      ("Pre-show check", "Menu, Pre-show check.", "VERIFY at capture"),
-                      ("Terminal quit", "You close the Terminal while a command is still running.", "VERIFY at capture"),
+                      ("Share Patch", "File, Share Patch. Asks for a name, an optional author and one line about the patch; file paths are removed and media is not included.", "Choose folder and share"),
+                      ("Program still running", "You quit while a program is still running in the Terminal. Quitting ends it.", "Quit Anyway, Keep Working"),
                   ]),
                   row((shot("dialog_unsaved", "Unsaved changes."), 1), (shot("dialog_recover", "Autosave recovery."), 1)),
                   row((shot("dialog_check_updates", "Check for updates."), 1), (shot("dialog_share_patch", "Share Patch."), 1))))
@@ -535,24 +532,29 @@ def html_chapter(P):
                   "Right-click any picture node and choose <b>Add to 2D View</b>, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). "
                   "Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. "
                   "<b>Free Transform</b> (Cmd+T) moves, scales and turns the selected layers as one step. <b>Merge Down</b> and <b>Merge Layers</b> (Cmd+E), <b>Merge Visible</b> (Cmd+Shift+E) and <b>Flatten Image</b> merge layers the way Photoshop does, in one undo step. "
-                  "Docks bottom, right, left, top or fill; driven from the CLI with <code>infinite view2d</code>.</p>"))
+                  "Docks bottom, right, left, top or fill; driven from the CLI with <code>infinite view2d</code>.</p>",
+                  fig("panel_view2d", "2D View: the Scene 2D document with its layer stack on the right and the tool rail on the left.", width="100%")))
 
     b.append(page("<h2>Mixer panel</h2>",
                   "<p>The Mixer panel (<code>mixer</code>) is a hardware-style mixing desk for Mixer and audio channels. "
                   "It shares the standard page strip and 7-row page menu (<code>Cmd+R</code> renames a page), and provides channel strips with faders, scribble strips, LED meters, mute/solo, sends, inserts, groups and a master section with mono/dim and snapshots. "
-                  "Right-click a Mixer node and choose <b>Open in Mixer panel</b>, or open it from the rail.</p>"))
+                  "Right-click a Mixer node and choose <b>Open in Mixer panel</b>, or open it from the rail.</p>",
+                  fig("panel_mixer", "Mixer panel: channel strips with trim, pan, mute/solo, fader and meter, and the master section on the right.", width="100%")))
 
     b.append(page("<h2>Drums panel</h2>",
                   "<p>The Drums panel (<code>drums</code>) is the hardware step-sequencer face for <b>Drum Sequencer</b> nodes. "
                   "It shares the page strip and 7-row page menu, and provides step pads lit by velocity, lane strips with length/reverse/filter, trig conditions, probability, nudge, FILL key, and groove library presets. "
-                  "Right-click a Drum Sequencer node and choose <b>Open in Drum panel</b>, or dock it bottom or top.</p>"))
+                  "Right-click a Drum Sequencer node and choose <b>Open in Drum panel</b>, or dock it bottom or top.</p>",
+                  fig("panel_drums", "Drums panel: velocity-lit step pads per lane, with the Lane and Sound cards on the right.", width="100%")))
 
     b.append(page("<h2>Field Patcher</h2>",
                   "<p>The Field Patcher (<code>fieldpatcher</code>) is a visual node-box editor for building Field programs without writing code by hand. "
-                  "It includes pages (saved in the patch), a box canvas, a node pick menu, an inspector, starter templates and Value mode.</p>"))
+                  "It includes pages (saved in the patch), a box canvas, a node pick menu, an inspector, starter templates and Value mode.</p>",
+                  fig("panel_fieldpatcher", "Field Patcher: boxes wired into a Field Pixel program, with the generated code beside the canvas.", width="100%")))
 
     b.append(page("<h2>Curve Editor</h2>",
-                  "<p>The Curve Editor (<code>curveeditor</code>) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.</p>"))
+                  "<p>The Curve Editor (<code>curveeditor</code>) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.</p>",
+                  fig("panel_curve", "Curve Editor: an MSEG curve drawn on the grid, with the tools on the left and the Source, Time and Loop cards on the right.", width="100%")))
 
     b.append(page("<h2>Canvas Link</h2>",
                   "<p>Canvas Link is the one way a panel takes a node from the canvas. Piano Roll pages, 2D layer sources, 3D View objects and Session clips each show a link field: "

@@ -1,5 +1,15 @@
 {
- "app": "/private/tmp/claude-501/shotrun/Infinite.app",
+ "app": "/Users/namansoni/Infinite/worktrees/rel-integ/build-dev/Infinite.app",
+ "captions": {
+  "node/Source/Video In/c": "The warning chip shows until camera permission is granted; this is the first-run state.",
+  "node/Source/Video In/o": "The warning chip shows until camera permission is granted; this is the first-run state."
+ },
+ "exceptions": {
+  "3D/Difference": "Red outline on the open state with two wired inputs. See known-issues.",
+  "3D/Instance on Points": "Red outline on the open state (closed also flagged in one run). See known-issues.",
+  "3D/Intersect": "Red error outline with both inputs wired (sphere and cube feeds). Also red when unwired. Kept as honest state; see docs/release/known-issues-2.0.md.",
+  "3D/Union": "Same as Intersect: red outline wired and unwired. See known-issues."
+ },
  "shots": {
   "dialog/about": {
    "category": "-",
@@ -6696,34 +6706,34 @@
   "node/Modulators/Audio Analyze/c": {
    "category": "Modulators",
    "framed": "docs/shots/framed/node_Modulators_Audio_Analyze_c.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "Audio Analyze",
    "pdf": "docs/shots/framed/node_Modulators_Audio_Analyze_c.pdf.jpg",
    "raw": "docs/shots/raw/Modulators__Audio_Analyze__c.png",
    "source_px": [
-    888,
-    1308
+    1127,
+    1743
    ],
    "state": "c",
    "theme": "dark",
-   "width": 1044
+   "width": 1335
   },
   "node/Modulators/Audio Analyze/o": {
    "category": "Modulators",
    "framed": "docs/shots/framed/node_Modulators_Audio_Analyze_o.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "Audio Analyze",
    "pdf": "docs/shots/framed/node_Modulators_Audio_Analyze_o.pdf.jpg",
    "raw": "docs/shots/raw/Modulators__Audio_Analyze__o.png",
    "source_px": [
-    888,
-    1308
+    1127,
+    1743
    ],
    "state": "o",
    "theme": "dark",
-   "width": 1044
+   "width": 1335
   },
   "node/Modulators/Audio File/c": {
    "category": "Modulators",
@@ -7144,34 +7154,34 @@
   "node/Modulators/LFO/c": {
    "category": "Modulators",
    "framed": "docs/shots/framed/node_Modulators_LFO_c.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "LFO",
    "pdf": "docs/shots/framed/node_Modulators_LFO_c.pdf.jpg",
    "raw": "docs/shots/raw/Modulators__LFO__c.png",
    "source_px": [
-    1164,
-    1308
+    1549,
+    1743
    ],
    "state": "c",
    "theme": "dark",
-   "width": 1320
+   "width": 1757
   },
   "node/Modulators/LFO/o": {
    "category": "Modulators",
    "framed": "docs/shots/framed/node_Modulators_LFO_o.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "LFO",
    "pdf": "docs/shots/framed/node_Modulators_LFO_o.pdf.jpg",
    "raw": "docs/shots/raw/Modulators__LFO__o.png",
    "source_px": [
-    648,
-    1308
+    853,
+    1743
    ],
    "state": "o",
    "theme": "dark",
-   "width": 804
+   "width": 1061
   },
   "node/Modulators/MIDI CC/c": {
    "category": "Modulators",
@@ -7784,34 +7794,34 @@
   "node/Notes/Arpeggiator/c": {
    "category": "Notes",
    "framed": "docs/shots/framed/node_Notes_Arpeggiator_c.png",
-   "height": 1472,
+   "height": 1961,
    "kind": "node",
    "name": "Arpeggiator",
    "pdf": "docs/shots/framed/node_Notes_Arpeggiator_c.pdf.jpg",
    "raw": "docs/shots/raw/Notes__Arpeggiator__c.png",
    "source_px": [
-    1660,
-    1274
+    2217,
+    1695
    ],
    "state": "c",
    "theme": "dark",
-   "width": 1858
+   "width": 2483
   },
   "node/Notes/Arpeggiator/o": {
    "category": "Notes",
    "framed": "docs/shots/framed/node_Notes_Arpeggiator_o.png",
-   "height": 1472,
+   "height": 1961,
    "kind": "node",
    "name": "Arpeggiator",
    "pdf": "docs/shots/framed/node_Notes_Arpeggiator_o.pdf.jpg",
    "raw": "docs/shots/raw/Notes__Arpeggiator__o.png",
    "source_px": [
-    1660,
-    1274
+    2217,
+    1695
    ],
    "state": "o",
    "theme": "dark",
-   "width": 1858
+   "width": 2483
   },
   "node/Notes/Bouncing Balls/c": {
    "category": "Notes",
@@ -8264,34 +8274,34 @@
   "node/Notes/Note Sequencer/c": {
    "category": "Notes",
    "framed": "docs/shots/framed/node_Notes_Note_Sequencer_c.png",
-   "height": 1466,
+   "height": 1951,
    "kind": "node",
    "name": "Note Sequencer",
    "pdf": "docs/shots/framed/node_Notes_Note_Sequencer_c.pdf.jpg",
    "raw": "docs/shots/raw/Notes__Note_Sequencer__c.png",
    "source_px": [
-    1350,
-    1304
+    1799,
+    1737
    ],
    "state": "c",
    "theme": "dark",
-   "width": 1512
+   "width": 2013
   },
   "node/Notes/Note Sequencer/o": {
    "category": "Notes",
    "framed": "docs/shots/framed/node_Notes_Note_Sequencer_o.png",
-   "height": 1466,
+   "height": 1951,
    "kind": "node",
    "name": "Note Sequencer",
    "pdf": "docs/shots/framed/node_Notes_Note_Sequencer_o.pdf.jpg",
    "raw": "docs/shots/raw/Notes__Note_Sequencer__o.png",
    "source_px": [
-    1350,
-    1304
+    1799,
+    1737
    ],
    "state": "o",
    "theme": "dark",
-   "width": 1512
+   "width": 2013
   },
   "node/Notes/Note Stack/c": {
    "category": "Notes",
@@ -10664,34 +10674,34 @@
   "node/Synths/Analog/c": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Analog_c.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "Analog",
    "pdf": "docs/shots/framed/node_Synths_Analog_c.pdf.jpg",
    "raw": "docs/shots/raw/Synths__Analog__c.png",
    "source_px": [
-    692,
-    1308
+    911,
+    1743
    ],
    "state": "c",
    "theme": "dark",
-   "width": 848
+   "width": 1119
   },
   "node/Synths/Analog/o": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Analog_o.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "Analog",
    "pdf": "docs/shots/framed/node_Synths_Analog_o.pdf.jpg",
    "raw": "docs/shots/raw/Synths__Analog__o.png",
    "source_px": [
-    692,
-    1308
+    911,
+    1743
    ],
    "state": "o",
    "theme": "dark",
-   "width": 848
+   "width": 1119
   },
   "node/Synths/Drum Sequencer/c": {
    "category": "Synths",
@@ -10824,34 +10834,34 @@
   "node/Synths/Generate Samples/c": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Generate_Samples_c.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "Generate Samples",
    "pdf": "docs/shots/framed/node_Synths_Generate_Samples_c.pdf.jpg",
    "raw": "docs/shots/raw/Synths__Generate_Samples__c.png",
    "source_px": [
-    1186,
-    1308
+    1579,
+    1743
    ],
    "state": "c",
    "theme": "dark",
-   "width": 1342
+   "width": 1787
   },
   "node/Synths/Generate Samples/o": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Generate_Samples_o.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "Generate Samples",
    "pdf": "docs/shots/framed/node_Synths_Generate_Samples_o.pdf.jpg",
    "raw": "docs/shots/raw/Synths__Generate_Samples__o.png",
    "source_px": [
-    1186,
-    1308
+    1579,
+    1743
    ],
    "state": "o",
    "theme": "dark",
-   "width": 1342
+   "width": 1787
   },
   "node/Synths/Grain Molder/c": {
    "category": "Synths",
@@ -10888,34 +10898,34 @@
   "node/Synths/Granular/c": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Granular_c.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "Granular",
    "pdf": "docs/shots/framed/node_Synths_Granular_c.pdf.jpg",
    "raw": "docs/shots/raw/Synths__Granular__c.png",
    "source_px": [
-    1164,
-    1308
+    1547,
+    1743
    ],
    "state": "c",
    "theme": "dark",
-   "width": 1320
+   "width": 1755
   },
   "node/Synths/Granular/o": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Granular_o.png",
-   "height": 1464,
+   "height": 1951,
    "kind": "node",
    "name": "Granular",
    "pdf": "docs/shots/framed/node_Synths_Granular_o.pdf.jpg",
    "raw": "docs/shots/raw/Synths__Granular__o.png",
    "source_px": [
-    1164,
-    1308
+    1547,
+    1743
    ],
    "state": "o",
    "theme": "dark",
-   "width": 1320
+   "width": 1755
   },
   "node/Synths/Looper/c": {
    "category": "Synths",
@@ -11144,34 +11154,34 @@
   "node/Synths/Piano/c": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Piano_c.png",
-   "height": 1466,
+   "height": 1955,
    "kind": "node",
    "name": "Piano",
    "pdf": "docs/shots/framed/node_Synths_Piano_c.pdf.jpg",
    "raw": "docs/shots/raw/Synths__Piano__c.png",
    "source_px": [
-    1428,
-    1296
+    1905,
+    1727
    ],
    "state": "c",
    "theme": "dark",
-   "width": 1598
+   "width": 2133
   },
   "node/Synths/Piano/o": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Piano_o.png",
-   "height": 1466,
+   "height": 1955,
    "kind": "node",
    "name": "Piano",
    "pdf": "docs/shots/framed/node_Synths_Piano_o.pdf.jpg",
    "raw": "docs/shots/raw/Synths__Piano__o.png",
    "source_px": [
-    1428,
-    1296
+    1905,
+    1727
    ],
    "state": "o",
    "theme": "dark",
-   "width": 1598
+   "width": 2133
   },
   "node/Synths/Sampler/c": {
    "category": "Synths",
@@ -12074,15 +12084,5 @@
    "width": 4238
   }
  },
- "version": "2.0.0",
- "exceptions": {
-  "3D/Intersect": "Red error outline with both inputs wired (sphere and cube feeds). Also red when unwired. Kept as honest state; see docs/release/known-issues-2.0.md.",
-  "3D/Union": "Same as Intersect: red outline wired and unwired. See known-issues.",
-  "3D/Difference": "Red outline on the open state with two wired inputs. See known-issues.",
-  "3D/Instance on Points": "Red outline on the open state (closed also flagged in one run). See known-issues."
- },
- "captions": {
-  "node/Source/Video In/c": "The warning chip shows until camera permission is granted; this is the first-run state.",
-  "node/Source/Video In/o": "The warning chip shows until camera permission is granted; this is the first-run state."
- }
+ "version": "2.0.0"
 }

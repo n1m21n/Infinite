@@ -40,6 +40,8 @@ SCENES = {
     "mod-matrix":      {"INFINITE_OPENPANELS": "dark,modmatrix"},
     "performance":     {"INFINITE_OPENPANELS": "dark,perfdemo"},
     "arrange":         {"INFINITE_OPENPANELS": "dark,arrangedemo"},
+    "3d-view":          {"INFINITE_LOADPATCH": SHOWCASE, "INFINITE_OPENPANELS": "dark,view3d"},
+    "mixer":           {"INFINITE_LOADPATCH": SHOWCASE, "INFINITE_OPENPANELS": "dark,mixer"},
     "settings":        {"INFINITE_OPENPANELS": "dark,settingswin,settingsgeneral"},
     "gallery-dark":    {"INFINITE_UIGALLERY": "dark"},
     "gallery-light":   {"INFINITE_UIGALLERY": "light"},

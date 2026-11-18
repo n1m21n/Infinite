@@ -1,6 +1,6 @@
 # v1.0 (beta) README shots
 
-All nine images in `docs/screenshots/v1/` come from `infinite-v1-showcase.inf` in this folder. `shoot.sh` reproduces them: run `docs/showcase/shoot.sh` for all of them, or `docs/showcase/shoot.sh timeline terminal` for some.
+All nine images in `docs/screenshots/v2/` come from `infinite-v1-showcase.inf` in this folder. `shoot.sh` reproduces them: run `docs/showcase/shoot.sh` for all of them, or `docs/showcase/shoot.sh timeline terminal` for some.
 
 ## The patch
 

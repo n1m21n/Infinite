@@ -16,7 +16,7 @@ This skill is a router. It does not copy the content it points to.
 | Need | Owner |
 |---|---|
 | Categories A-L, severity, entry/exit, phases, roles, per-category checks and tools | `docs/release/PROTOCOL.md` |
-| This release's pass bars, known issues, waivers, pending decisions | `docs/release/<version>.md` (v0.6: `docs/release/v0.6.md`) |
+| This release's pass bars, known issues, waivers, pending decisions | `docs/release/<version>.md` (latest: `docs/release/v2.0.md`) |
 | Report format for one finding | `docs/release/BUG_TEMPLATE.md` |
 | Run sheet for one release | `docs/release/CHECKLIST_TEMPLATE.md` copied to `docs/release/checklists/<version>.md` |
 | Which tools exist / are not built | `docs/release/TOOLS.md` |
@@ -30,7 +30,7 @@ If this skill and `PROTOCOL.md` disagree, `PROTOCOL.md` wins; if the protocol an
 
 ## Procedure
 
-1. **Start a release.** Copy the structure of `docs/release/v0.6.md` to `docs/release/<version>.md`; do step 0 (reconcile the gate with the protocol) and write the result there. Copy `CHECKLIST_TEMPLATE.md` to `docs/release/checklists/<version>.md`.
+1. **Start a release.** Copy the structure of `docs/release/v2.0.md` to `docs/release/<version>.md`; do step 0 (reconcile the gate with the protocol) and write the result there. Copy `CHECKLIST_TEMPLATE.md` to `docs/release/checklists/<version>.md`.
 2. **Entry.** Check the six entry criteria in PROTOCOL.md section 4. Load known issues into the tracker: `python3 tools/release/findings.py new --version <v> ...`.
 3. **P1.** `tools/release/run_gate.sh --phase P1` (static checks, no build, no app launch). `--list` first shows what would run.
 4. **P2.** Confirm one build only: `pgrep -fl "cmake --build|make|clang"` shows nothing, the candidate binary is built (the runner never builds). Then `tools/release/run_gate.sh --phase P2`. It is serial and slow; run it in the background and wait for the notification (do not poll).

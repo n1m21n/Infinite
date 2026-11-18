@@ -171,6 +171,8 @@ namespace
       std::string parseError;
       bool placeAll = true;      // push every box position into the editor next frame
       bool navigate = true;
+      bool autoFit = true;       // refit while the panel resizes (it opens animated, or maximises), until the user moves the view
+      float fitW = 0.0f, fitH = 0.0f;
          // the tab's name when the user renamed it (node pages: a label, the node keeps its own)
       bool hoverItem = false;    // last frame: the pointer was over a box, pin or wire (so a left drag is not a pan)
       bool panLeft = false;      // a left drag that began on empty canvas pans it
@@ -994,6 +996,22 @@ namespace
          {
             ed::NavigateToContent(0.0f);
             p.navigate = false;
+            p.fitW = size.x;
+            p.fitH = size.y;
+         }
+      }
+      else if (p.autoFit)
+      {
+         // The first fit sees the panel at whatever height it has then (it opens animated, or the user maximises it).
+         // Fit again when the canvas size changes, until the user pans or zooms.
+         if (ImGui::IsWindowHovered() && (ImGui::GetIO().MouseWheel != 0.0f || ImGui::GetIO().MouseWheelH != 0.0f || p.panLeft ||
+                                          ImGui::IsMouseDown(ImGuiMouseButton_Right) || ImGui::IsMouseDown(ImGuiMouseButton_Middle)))
+            p.autoFit = false;
+         else if (std::fabs(size.x - p.fitW) > 2.0f || std::fabs(size.y - p.fitH) > 2.0f)
+         {
+            ed::NavigateToContent(0.0f);
+            p.fitW = size.x;
+            p.fitH = size.y;
          }
       }
 
