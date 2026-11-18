@@ -384,6 +384,44 @@ def convert_markdown_manual(
             i += 1
             continue
 
+        if line.strip().startswith("![") and "](shot:" in line:
+            m = re.match(r"^!\[([^\]]*)\]\(shot:([^)]+)\)\s*$", line.strip())
+            if m:
+                cap, name = m.group(1).strip(), m.group(2).strip()
+                imgs = shots.find(name)[:1]
+                if imgs:
+                    tid, path, _, _ = imgs[0]
+                    webp_rel, ww, wh = ensure_webp(path, f"nodes/{slugify(tid)}.webp", max_w=420, max_h=600)
+                    fig_id = slugger.take(f"fig-{tid}")
+                    out.append(
+                        f'<figure class="man-fig" id="{fig_id}">'
+                        f'<img src="../../{webp_rel}" width="{ww}" height="{wh}" alt="{esc(cap or tid)} node in Infinite." loading="lazy" decoding="async">'
+                        f'<figcaption>{esc(cap or tid)} {anchor_btn(fig_id, cap or tid)}</figcaption></figure>'
+                    )
+                i += 1
+                continue
+
+        if "{{shot:" in line:
+            shot_matches = re.findall(r"\{\{shot:[^|}]+\|([^}]+)\}\}", line)
+            if shot_matches:
+                figs = []
+                for name in shot_matches:
+                    imgs = shots.find(name.strip())[:1]
+                    if imgs:
+                        tid, path, _, _ = imgs[0]
+                        webp_rel, ww, wh = ensure_webp(path, f"nodes/{slugify(tid)}.webp", max_w=320, max_h=450)
+                        fig_id = slugger.take(f"fig-{tid}")
+                        cap = f"{tid}: node in Infinite."
+                        figs.append(
+                            f'<figure class="man-fig" id="{fig_id}" style="display:inline-block;margin:0 12px 12px 0;vertical-align:top">'
+                            f'<img src="../../{webp_rel}" width="{ww}" height="{wh}" alt="{esc(tid)} node in Infinite." loading="lazy" decoding="async">'
+                            f'<figcaption>{esc(cap)} {anchor_btn(fig_id, cap)}</figcaption></figure>'
+                        )
+                if figs:
+                    out.append(f'<div class="man-shot-row">{"".join(figs)}</div>')
+                i += 1
+                continue
+
         if line.startswith("```"):
             lang = line[3:].strip()
             buf = []
@@ -602,9 +640,14 @@ def build_node_manual_body(slugger: UniqueSlugger, exact_nodes: dict[str, str]) 
         gal_parts.append('<div class="man-gallery-grid">')
         for tid, path, _, _ in sorted(cats[cat], key=lambda x: x[0].lower()):
             webp_rel, ww, wh = ensure_webp(path, f"nodes/{slugify(tid)}.webp", max_w=280, max_h=300)
-            target_id = exact_nodes.get(tid, f"node-{slugify(tid)}")
+            cand_id = f"node-{slugify(tid)}"
+            cell_id_attr = ""
+            if cand_id not in slugger.used:
+                slugger.used.add(cand_id)
+                cell_id_attr = f' id="{cand_id}"'
+            target_id = exact_nodes.get(tid, cand_id)
             gal_parts.append(
-                f'<a class="gal-cell" href="#{target_id}">'
+                f'<a class="gal-cell"{cell_id_attr} href="#{target_id}">'
                 f'<img src="../{webp_rel}" width="{ww}" height="{wh}" alt="{esc(tid)} node in Infinite." loading="lazy" decoding="async">'
                 f'<span class="gal-nm">{esc(tid)}</span></a>'
             )
@@ -1181,6 +1224,7 @@ def main():
         "manual/field/index.html": extract_ids(fl_html),
     }
     verify_slug_stability(slug_map, args.update_slugs)
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "website", "check_links.py"), "--internal-only"], check=True)
 
 
 if __name__ == "__main__":

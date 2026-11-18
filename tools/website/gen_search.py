@@ -34,6 +34,7 @@ def kind_of(rel):
     if rel.startswith("library/"): return "Library"
     if rel.startswith("nodes/") and rel != "nodes/index.html": return "Node"
     if rel.startswith("embeds/"): return "Embed"
+    if rel.startswith("manual/"): return "Doc"
     return "Page"
 
 
@@ -54,15 +55,28 @@ def page_entry(rel):
     code = " ".join(strip(c) for c in re.findall(r"<pre\b.*?</pre>", b, flags=re.S | re.I))
     heads = [strip(x) for x in re.findall(r"<h[1-3]\b[^>]*>(.*?)</h[1-3]>", b, flags=re.S | re.I)]
     sections = []
-    for m in re.finditer(r'<h([23])\b[^>]*\bid="([^"]+)"[^>]*>(.*?)</h\1>', b, flags=re.S | re.I):
-        st = strip(m.group(3))
-        if st and len(st) < 90: sections.append([st, m.group(2)])
+    for m in re.finditer(r'<h([234])\b[^>]*\bid="([^"]+)"[^>]*>(.*?)</h\1>', b, flags=re.S | re.I):
+        st = strip(m.group(3)).rstrip(" #")
+        sec_id = m.group(2)[:-2] if m.group(2).endswith("-h") else m.group(2)
+        if st and len(st) < 90: sections.append([st, sec_id])
     text = strip(b)
     k = kind_of(rel)
     cap = TEXT_CAP[k]
     parts = " . ".join(dict.fromkeys(x for x in heads if x))
     body_txt = (parts + " . " + text)[:cap]
-    entries = [[title, rel, k, desc[:240], body_txt, sections[:12]]]
+    sec_cap = 60 if rel.startswith("manual/") else 12
+    url_rel = rel[:-10] if rel.startswith("manual/") and rel.endswith("index.html") else rel
+    entries = [[title, url_rel, k, desc[:240], body_txt, sections[:sec_cap]]]
+    if rel.startswith("manual/"):
+        for m in re.finditer(r'<(?:section|article)\b[^>]*\bid="([^"]+)"[^>]*>(.*?)</(?:section|article)>', b, flags=re.S | re.I):
+            aid, inner = m.group(1), m.group(2)
+            hm = re.search(r"<h([234])\b[^>]*>(.*?)</h\1>", inner, flags=re.S | re.I)
+            if not hm:
+                continue
+            htxt = strip(hm.group(2)).rstrip(" #")
+            if not htxt:
+                continue
+            entries.append([f"{title}: {htxt}", f"{url_rel}#{aid}", "Doc", "", strip(inner)[:300], []])
     if code and k != "Embed":
         entries.append([title + ": code", rel, "Code", "", code[:TEXT_CAP["Code"]], []])
     return entries

@@ -43,6 +43,7 @@ GROUPS = [
     ]),
     ("learn", "Learn", [
         ("index.html#learn", "Get started", "Make a first sound and picture"),
+        ("manual/", "Manual", "Node reference, headless CLI and Field"),
         ("philosophy.html", "Philosophy", "Why Infinite is built this way"),
         ("chat.html", "Agents &amp; terminal", "Talk to your patch with an agent"),
         ("blog/", "Blog", "Guides and how things work"),
@@ -58,13 +59,13 @@ FOOTER_COLS = [
         ("library.html", "Library"), ("samples/", "Sample generator"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"),
     ]),
     ("Learn", [
-        ("index.html#learn", "Get started"), ("philosophy.html", "Philosophy"), ("chat.html", "Agents &amp; terminal"), ("blog/", "Blog"),
+        ("index.html#learn", "Get started"), ("manual/", "Manual"), ("philosophy.html", "Philosophy"), ("chat.html", "Agents &amp; terminal"), ("blog/", "Blog"),
         ("buy.html", "Buy the plugin"),
     ]),
-    ("Docs", [   # PDFs in website/assets
-        ("assets/Infinite_Node_Reference_Manual.pdf", "Node reference"),
-        ("assets/Field_Language_Manual.pdf", "Field language"),
-        ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide"),
+    ("Docs", [
+        ("manual/", "Node reference"),
+        ("manual/field/", "Field language"),
+        ("manual/headless/", "Headless guide"),
         ("benchmarks.html", "Benchmarks"),
         ("assets/Infinite_Benchmark_Report.pdf", "Benchmark report"),
     ]),
@@ -123,7 +124,7 @@ def is_current(path, rel):
 
 NAV_ICON = {"artists.html": "family-compositing", "musicians.html": "family-notes", "vjs.html": "perform", "creative-coders.html": "edit",
             "developers.html": "cube", "library.html": "library", "artworks.html": "viewport", "embeds/": "grid-dots", "nodes/": "cube", "extensions.html": "pointer", "chat.html": "chat",
-            "benchmarks.html": "range", "samples/": "range", "index.html#learn": "play", "philosophy.html": "loop", "blog/": "pencil"}
+            "benchmarks.html": "range", "samples/": "range", "index.html#learn": "play", "manual/": "library", "philosophy.html": "loop", "blog/": "pencil"}
 
 
 def nav_icon(path):
