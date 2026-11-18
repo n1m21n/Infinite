@@ -11,6 +11,15 @@
 #include <climits>
 #include <limits>
 
+// Mixer console fixture sizes. File scope, not static constexpr in the test block: MSVC 19.4x
+// crashes (C1001) when lambdas in that block use block-scope static constexpr arrays bounds.
+namespace
+{
+constexpr int kMixFxBlock = 64;
+constexpr int kMixFxBlocks = 40;
+constexpr int kMixFxN = kMixFxBlock * kMixFxBlocks;
+}
+
 namespace app
 {
 namespace
@@ -800,22 +809,19 @@ bool RunEffectMixAndLimiterFixture()
    // solo-safe and pan law, and a default strip still mixes exactly as before.
    // Inputs are a short phrase (two notes, an attack and a decay), not a held tone.
    {
-      static constexpr int kBlock = 64;
-      static constexpr int kBlocks = 40;
-      static constexpr int kN = kBlock * kBlocks;
       const double sr = 48000.0;
       auto phrase = [&](int slot, int i, int ch) {
          const double t = (double)i / sr;
-         const double f = 110.0 * (1.0 + 0.25 * (slot % 7)) * (i < kN / 2 ? 1.0 : 1.5);
-         const double env = std::min(1.0, t * 200.0) * std::exp(-3.0 * std::fmod(t, (double)kN / 2.0 / sr));
+         const double f = 110.0 * (1.0 + 0.25 * (slot % 7)) * (i < kMixFxN / 2 ? 1.0 : 1.5);
+         const double env = std::min(1.0, t * 200.0) * std::exp(-3.0 * std::fmod(t, (double)kMixFxN / 2.0 / sr));
          return (float)(0.4 * env * std::sin(2.0 * M_PI * f * t + 0.3 * ch + slot));
       };
       // Runs a mixer over the phrase on `used` slots; returns interleaved L/R.
       auto run = [&](MixerNode& m, int used, auto&& input) {
          m.CookIfNeeded(1);
          AudioNode* an = m.GetAudioNode();
-         an->PrepareToPlay(sr, kBlock);
-         std::vector<std::vector<float>> in((size_t)used * 2, std::vector<float>(kBlock));
+         an->PrepareToPlay(sr, kMixFxBlock);
+         std::vector<std::vector<float>> in((size_t)used * 2, std::vector<float>(kMixFxBlock));
          std::vector<float*> ptrs((size_t)used * 2);
          std::vector<AudioBuffer> bufs((size_t)used);
          std::vector<const AudioBuffer*> ins((size_t)used);
@@ -825,24 +831,24 @@ bool RunEffectMixAndLimiterFixture()
             ptrs[(size_t)s * 2 + 1] = in[(size_t)s * 2 + 1].data();
             bufs[(size_t)s].channels = &ptrs[(size_t)s * 2];
             bufs[(size_t)s].numChannels = 2;
-            bufs[(size_t)s].numFrames = kBlock;
+            bufs[(size_t)s].numFrames = kMixFxBlock;
             ins[(size_t)s] = &bufs[(size_t)s];
          }
-         float l[kBlock], r[kBlock];
+         float l[kMixFxBlock], r[kMixFxBlock];
          float* po[2] = { l, r };
          AudioBuffer bo;
          bo.channels = po;
          bo.numChannels = 2;
-         bo.numFrames = kBlock;
+         bo.numFrames = kMixFxBlock;
          std::vector<float> out;
-         for (int b = 0; b < kBlocks; b++)
+         for (int b = 0; b < kMixFxBlocks; b++)
          {
             for (int s = 0; s < used; s++)
-               for (int i = 0; i < kBlock; i++)
+               for (int i = 0; i < kMixFxBlock; i++)
                   for (int ch = 0; ch < 2; ch++)
-                     in[(size_t)s * 2 + ch][(size_t)i] = input(s, b * kBlock + i, ch);
+                     in[(size_t)s * 2 + ch][(size_t)i] = input(s, b * kMixFxBlock + i, ch);
             an->ProcessBlock(ins.data(), used, bo);
-            for (int i = 0; i < kBlock; i++)
+            for (int i = 0; i < kMixFxBlock; i++)
             {
                out.push_back(l[i]);
                out.push_back(r[i]);
@@ -871,7 +877,7 @@ bool RunEffectMixAndLimiterFixture()
          }
          const std::vector<float> got = run(m, 3, phrase);
          std::vector<float> want;
-         for (int i = 0; i < kN; i++)
+         for (int i = 0; i < kMixFxN; i++)
             for (int ch = 0; ch < 2; ch++)
             {
                float sum = 0.0f;
