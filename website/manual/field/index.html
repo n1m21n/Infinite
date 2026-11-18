@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="paper">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script src="../../theme.js?v=2"></script>
+  <title>Infinite Field Language Manual | Infinite</title>
+  <meta name="description" content="Write custom DSP, shaders, and geometry kernels in Infinite&#x27;s Field language across five execution domains.">
+  <link rel="canonical" href="https://infinitedevices.org/manual/field/">
+  <meta property="og:title" content="Infinite Field Language Manual | Infinite">
+  <meta property="og:description" content="Write custom DSP, shaders, and geometry kernels in Infinite&#x27;s Field language across five execution domains.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/manual/hero-field.webp">
+  <meta property="og:url" content="https://infinitedevices.org/manual/field/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Infinite Field Language Manual | Infinite">
+  <meta name="twitter:description" content="Write custom DSP, shaders, and geometry kernels in Infinite&#x27;s Field language across five execution domains.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/manual/hero-field.webp">
+  <link rel="alternate" type="text/plain" href="../../llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+.skip-link{position:absolute;left:-9999px;top:0;background:var(--accent-ink);color:var(--on-accent);padding:10px 16px;border-radius:999px;font-weight:600;z-index:200}
+.skip-link:focus{left:16px;top:16px}
+.man-shell{max-width:1240px;margin:0 auto;padding:24px 16px 64px;display:grid;grid-template-columns:260px minmax(0,1fr);gap:32px;align-items:start}
+@media(max-width:960px){.man-shell{grid-template-columns:minmax(0,1fr);gap:16px}}
+.man-toc{position:sticky;top:84px;max-height:calc(100vh - 104px);overflow-y:auto;background:var(--surface-1);border-radius:var(--r-md,24px);padding:18px;box-shadow:var(--shadow-1)}
+@media(max-width:960px){.man-toc{position:static;max-height:none}}
+.man-main{min-width:0}
+.man-hero{background:var(--surface-1);border-radius:var(--r-lg,24px);padding:28px;margin-bottom:24px;box-shadow:var(--shadow-1);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center}
+@media(max-width:720px){.man-hero{grid-template-columns:minmax(0,1fr);padding:20px}}
+.man-hero h1{margin:6px 0 12px;font-size:clamp(2rem,4vw,3.2rem);line-height:1.05;letter-spacing:-0.035em}
+</style>
+  <link rel="stylesheet" href="../../brand.css?v=07695caf">
+  <link rel="stylesheet" href="../../style.css?v=779b2f0d">
+  <link rel="stylesheet" href="../../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../../system.css?v=23625436">
+  <link rel="stylesheet" href="../../scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="../../search.css?v=96e10ca3">
+  <link rel="stylesheet" href="../../manual.css?v=8aee433b">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Infinite Field Language Manual | Infinite", "description": "Write custom DSP, shaders, and geometry kernels in Infinite's Field language across five execution domains.", "url": "https://infinitedevices.org/manual/field/", "image": "https://infinitedevices.org/assets/manual/hero-field.webp", "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/"}, "datePublished": "2026-10-17", "dateModified": "2026-10-17", "version": "2.0.0", "inLanguage": "en", "isAccessibleForFree": true, "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "mainEntityOfPage": "https://infinitedevices.org/manual/field/"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Manual", "item": "https://infinitedevices.org/manual/"}, {"@type": "ListItem", "position": 3, "name": "Field Manual", "item": "https://infinitedevices.org/manual/field/"}]}</script>
+</head>
+<body class="manual-page">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="../../index.html" class="brand" aria-label="Infinite home">
+        <img src="../../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+      <button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span class="search-label">Search</span></button>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="../../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="../../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="../../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="../../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="../../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="../../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="../../samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
+          <a href="../../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="../../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="../../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+          <a href="../../plugin.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="../../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="../../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="../../chat.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
+          <a href="../../blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+        </div>
+      </div>
+      <a href="../../plugin.html">Plugin</a>
+      <a class="btn btn-primary nav-sheet-cta" href="../../index.html#setup">Download Infinite</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn share-btn" aria-label="Share this page" title="Share"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg></button>
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn" aria-label="GitHub repository" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="../../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="man-shell" id="top">
+    <aside class="man-toc" aria-label="Manual contents">
+      <details class="toc-details" open>
+        <summary class="toc-summary">Contents</summary>
+        <nav aria-label="Table of contents">
+          <ol class="toc-list"><li><a href="#overview">What Field is</a></li><li><a href="#1-what-field-is-and-why-it-exists">1. What Field is, and why it exists</a></li><li><a href="#2-the-five-domains">2. The five domains</a><ul class="toc-sub"><li><a href="#the-domain-lattice">The domain lattice</a></li><li><a href="#which-node-hosts-which-domain">Which node hosts which domain</a></li></ul></li><li><a href="#3-core-syntax">3. Core syntax</a><ul class="toc-sub"><li><a href="#bare-names-no-sigil">Bare names, no sigil</a></li><li><a href="#types-and-swizzles">Types and swizzles</a></li><li><a href="#operators-comments-and-broadcast">Operators, comments and broadcast</a></li><li><a href="#branching-with-if">Branching with if()</a></li></ul></li><li><a href="#4-declarations-attrib-param-state">4. Declarations: attrib, param, state</a><ul class="toc-sub"><li><a href="#attrib-a-value-that-lives-per-element">attrib: a value that lives per element</a></li><li><a href="#param-a-value-that-becomes-a-ui-knob">param: a value that becomes a UI knob</a></li><li><a href="#state-this-frame-reads-last-frame-s-value">state: this frame reads last frame&#x27;s value</a></li></ul></li><li><a href="#5-reserved-words-per-domain">5. Reserved words per domain</a></li><li><a href="#6-domain-transfer-operators">6. Domain transfer operators</a><ul class="toc-sub"><li><a href="#domain-transfer-examples">Domain transfer examples</a></li></ul></li><li><a href="#7-randomness">7. Randomness</a><ul class="toc-sub"><li><a href="#rand-min-max-speed-seed">rand(min, max, speed, seed)</a></li><li><a href="#noise-and-sh">noise and sh</a></li></ul></li><li><a href="#8-building-a-device">8. Building a device</a><ul class="toc-sub"><li><a href="#1-single-node-dynamic-pins">1. Single-node dynamic pins</a></li><li><a href="#2-field-graph-bundle-instrument-mode">2. Field Graph bundle (&quot;Instrument Mode&quot;)</a></li></ul></li><li><a href="#9-field-node-reference">9. Field node reference</a></li><li><a href="#10-device-faceplate">10. Device faceplate</a><ul class="toc-sub"><li><a href="#what-the-faceplate-gives-you">What the faceplate gives you</a></li></ul></li><li><a href="#11-saving-and-sharing-devices-infdev">11. Saving and sharing devices: .infdev</a><ul class="toc-sub"><li><a href="#saving-loading-sharing">Saving, loading, sharing</a></li></ul></li><li><a href="#12-common-mistakes-and-quick-reference">12. Common mistakes and quick reference</a><ul class="toc-sub"><li><a href="#quick-reference">Quick reference</a></li></ul></li><li><a href="#13-what-is-new-since-v1">13. What is new since v1</a><ul class="toc-sub"><li><a href="#13-1-offset-reads-of-pixel-state-a-uv-d">13.1 Offset reads of pixel state: A(uv + d)</a></li><li><a href="#13-2-element-neighbour-reads-x-at-k">13.2 Element neighbour reads: X.at(k)</a></li><li><a href="#13-3-state-tables-state-float-name-n">13.3 State tables: state float name[N]</a></li><li><a href="#13-4-declared-audio-and-image-inputs">13.4 Declared audio and image inputs</a></li><li><a href="#13-5-note-history-in-frame-noteon-notepitch-notevel">13.5 Note history in frame: noteOn, notePitch, noteVel</a></li><li><a href="#13-6-field-notes-beat-notenum-tick-deg-rand-note">13.6 Field Notes: beat, noteNum, tick, deg, rand, note</a></li><li><a href="#13-7-fixes-that-change-what-old-kernels-read">13.7 Fixes that change what old kernels read</a></li></ul></li></ol>
+        </nav>
+      </details>
+      <a class="back-top" href="#top">&uarr; Back to top</a>
+    </aside>
+
+    <main class="man-main" id="main-content">
+      <article>
+        <header class="man-hero">
+          <div>
+            <div class="man-kicker">Manual / Field Language</div>
+            <h1>The Field Language Manual</h1>
+            <p class="man-lead">Everything you need to write real Field kernels and build custom devices across graph, frame, element, pixel, and sample domains.</p>
+            <div class="man-hero-actions">
+              <a class="btn btn-primary" href="../../assets/Field_Language_Manual.pdf" download>Download PDF</a>
+              <a class="btn btn-ghost" href="../">Node Reference Manual</a><a class="btn btn-ghost" href="../headless/">Headless User Guide</a>
+            </div>
+          </div>
+          <img class="man-hero-art" src="../../assets/manual/hero-field.webp" width="1100" height="825" alt="3D render of the Infinite Field Pixel programmable shader node." decoding="async">
+        </header>
+        <section class="man-chapter" id="overview"><h2>What Field is <a class="anchor-link" href="#overview" aria-label="Copy link to What Field is" data-anchor="#overview">#</a></h2><p>Everything you need to write real Field kernels and build real devices: the domains, the syntax, the declarations, and the six node types that host them. Every code example is self-contained Field code you can paste into the matching Field node.</p><nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#1-what-field-is-and-why-it-exists">1. What Field is, and why it exists &rarr;</a></nav></section>
+<section class="man-chapter" id="1-what-field-is-and-why-it-exists" aria-labelledby="1-what-field-is-and-why-it-exists-h">
+<h2 id="1-what-field-is-and-why-it-exists-h">1. What Field is, and why it exists <a class="anchor-link" href="#1-what-field-is-and-why-it-exists" aria-label="Copy link to 1. What Field is, and why it exists" data-anchor="#1-what-field-is-and-why-it-exists">#</a></h2>
+<p>Infinite is a node-based audiovisual workstation: you build patches by wiring boxes together on a canvas. Most boxes do one fixed thing. Field is different. It is a small text language that lets you write what a box does, instead of picking from a menu.</p>
+<p>The one idea underneath all of Field is the <strong>kernel</strong>: a short body of code run once per element of some domain, automatically, forever. Write <code>col = vec3(uv.x, uv.y, 0.5)</code> and it runs once per pixel, 60 times a second, on the GPU: a shader. Write <code>P.y += sin(P.x * 4.0 + t) * 0.2</code> and it runs once per point in a mesh: a geometry deformer. Write <code>out = in * 0.5</code> and it runs once per audio sample: a DSP effect. You never say where it runs; Field infers that from which identifiers your code touches.</p>
+<p>Every example in this manual is valid, runnable Field code written against the six node types that ship in Infinite today. Chapter 13 covers the language additions that landed after v1.</p>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#overview">&larr; What Field is</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#2-the-five-domains">2. The five domains &rarr;</a></nav></section>
+<section class="man-chapter" id="2-the-five-domains" aria-labelledby="2-the-five-domains-h">
+<h2 id="2-the-five-domains-h">2. The five domains <a class="anchor-link" href="#2-the-five-domains" aria-label="Copy link to 2. The five domains" data-anchor="#2-the-five-domains">#</a></h2>
+<p>A domain is &quot;what counts as one element.&quot; Four of the five map to real Field node types. The fifth, <code>frame</code>, has no node of its own.</p>
+<div class="table-wrap" id="tbl-domain"><table><caption>Domain reference <a class="anchor-link" href="#tbl-domain" aria-label="Copy link to Domain reference" data-anchor="#tbl-domain">#</a></caption><thead><tr><th scope="col">Domain</th><th scope="col">Runs</th><th scope="col">Hosted by</th><th scope="col">Produces</th></tr></thead><tbody><tr><th scope="row">graph</th><td>once, at edit time</td><td><a class="node-ref" href="../#node-field-graph">Field Graph</a></td><td>mounts and wires other real Infinite nodes</td></tr><tr><th scope="row">frame</th><td>once per rendered frame (about 60 a second)</td><td>hoisted inside any of the other four, for shared values</td><td>one value shared across all elements that frame</td></tr><tr><th scope="row">element</th><td>once per point or vertex per frame</td><td><a class="node-ref" href="../#node-field-modifier">Field Modifier</a>, <a class="node-ref" href="../#node-field-primitive">Field Primitive</a></td><td>mesh or point-cloud geometry and per-point colour</td></tr><tr><th scope="row">pixel</th><td>once per pixel per frame, on the GPU</td><td>Field Pixel</td><td>a 2D texture</td></tr><tr><th scope="row">sample</th><td>once per audio sample per voice (48,000 a second)</td><td><a class="node-ref" href="../#node-field-effect">Field Effect</a>, <a class="node-ref" href="../#node-field-synth">Field Synth</a></td><td>an audio signal</td></tr></tbody></table></div>
+<h3 id="the-domain-lattice">The domain lattice <a class="anchor-link" href="#the-domain-lattice" aria-label="Copy link to The domain lattice" data-anchor="#the-domain-lattice">#</a></h3>
+<p>This is the shape that governs what can see what. <code>element</code>, <code>pixel</code> and <code>sample</code> are mutually incomparable peers: an element kernel cannot read a pixel or sample value directly, in either direction. The only way to move a value between them is up through <code>frame</code> and back down (Chapter 6).</p>
+<pre><code>              graph
+                |
+              frame
+          /     |      \
+   element    pixel    sample</code></pre>
+<h3 id="which-node-hosts-which-domain">Which node hosts which domain <a class="anchor-link" href="#which-node-hosts-which-domain" aria-label="Copy link to Which node hosts which domain" data-anchor="#which-node-hosts-which-domain">#</a></h3>
+<ul><li>Element kernels live in the <strong><a class="node-ref" href="../#node-field-modifier">Field Modifier</a></strong> node (deforms geometry already on the canvas) or the <strong><a class="node-ref" href="../#node-field-primitive">Field Primitive</a></strong> node (generates points from nothing).</li><li>Pixel kernels live in the <strong>Field Pixel</strong> node.</li><li>Sample kernels live in the <strong><a class="node-ref" href="../#node-field-effect">Field Effect</a></strong> node (an <code>in</code> pin to process) or the <strong><a class="node-ref" href="../#node-field-synth">Field Synth</a></strong> node (note-driven <code>freq</code> and <code>gate</code>, no <code>in</code> pin).</li><li>Graph kernels live in the <strong><a class="node-ref" href="../#node-field-graph">Field Graph</a></strong> node.</li></ul>
+<p>See Chapter 9 for what each of the six nodes does.</p>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#1-what-field-is-and-why-it-exists">&larr; 1. What Field is, and why it exists</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#3-core-syntax">3. Core syntax &rarr;</a></nav></section>
+<section class="man-chapter" id="3-core-syntax" aria-labelledby="3-core-syntax-h">
+<h2 id="3-core-syntax-h">3. Core syntax <a class="anchor-link" href="#3-core-syntax" aria-label="Copy link to 3. Core syntax" data-anchor="#3-core-syntax">#</a></h2>
+<p>Field reads like a small C-family language. Here is everything that is not obvious from that alone.</p>
+<h3 id="bare-names-no-sigil">Bare names, no sigil <a class="anchor-link" href="#bare-names-no-sigil" aria-label="Copy link to Bare names, no sigil" data-anchor="#bare-names-no-sigil">#</a></h3>
+<p>Every identifier, whether a reserved name like <code>P</code>, <code>uv</code>, <code>in</code>, <code>out</code> or your own <code>param</code>, <code>state</code> and <code>attrib</code> names, is written bare, exactly like a normal variable. Unlike Houdini VEX&#x27;s <code>@P</code> style, Field has no sigil at all.</p>
+<pre><code>P.y += sin(P.x * 4.0 + t) * 0.2</code></pre>
+<h3 id="types-and-swizzles">Types and swizzles <a class="anchor-link" href="#types-and-swizzles" aria-label="Copy link to Types and swizzles" data-anchor="#types-and-swizzles">#</a></h3>
+<p>The type keywords are <code>float</code>, <code>int</code>, <code>bool</code>, <code>vec2</code>, <code>vec3</code>, <code>vec4</code>. There is no string type inside a kernel body. Swizzles work like GLSL: <code>.x .y .z .w</code> and <code>.r .g .b .a</code>, one to four letters. The two letter sets do not mix in one swizzle (<code>.xg</code> is not valid; use <code>.xy</code> or <code>.rg</code>).</p>
+<h3 id="operators-comments-and-broadcast">Operators, comments and broadcast <a class="anchor-link" href="#operators-comments-and-broadcast" aria-label="Copy link to Operators, comments and broadcast" data-anchor="#operators-comments-and-broadcast">#</a></h3>
+<ul><li>Arithmetic is <code>+ - * / %</code>, comparison is <code>&lt; &lt;= &gt; &gt;= == !=</code>, boolean is <code>&amp;&amp; || !</code>, and <code>^</code> is exponentiation (<code>a ^ b</code> is <code>pow(a, b)</code>), not XOR. There are no bitwise operators.</li><li><code>//</code> starts a line comment.</li><li>A scalar auto-broadcasts against a vector: <code>P += 0.1</code> adds to every component, with no <code>vec3(0.1, 0.1, 0.1)</code> needed.</li></ul>
+<h3 id="branching-with-if">Branching with if() <a class="anchor-link" href="#branching-with-if" aria-label="Copy link to Branching with if()" data-anchor="#branching-with-if">#</a></h3>
+<p><code>if(cond, a, b)</code> is a function: a ternary that always returns a value, not an if/else statement. In pixel kernels it lowers to a GLSL <code>mix()</code>, so both branches are evaluated on the GPU every time. In element and sample kernels (CPU, one path per element or voice) it is ordinary, cheap control flow.</p>
+<pre><code>hit = if(P.y &gt; threshold, 1.0, 0.0)</code></pre>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#2-the-five-domains">&larr; 2. The five domains</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#4-declarations-attrib-param-state">4. Declarations: attrib, param, state &rarr;</a></nav></section>
+<section class="man-chapter" id="4-declarations-attrib-param-state" aria-labelledby="4-declarations-attrib-param-state-h">
+<h2 id="4-declarations-attrib-param-state-h">4. Declarations: attrib, param, state <a class="anchor-link" href="#4-declarations-attrib-param-state" aria-label="Copy link to 4. Declarations: attrib, param, state" data-anchor="#4-declarations-attrib-param-state">#</a></h2>
+<p>Three keywords cover everything a kernel needs to remember or expose: a per-element scratch value, a UI knob, and a value that reads back one cycle late.</p>
+<h3 id="attrib-a-value-that-lives-per-element">attrib: a value that lives per element <a class="anchor-link" href="#attrib-a-value-that-lives-per-element" aria-label="Copy link to attrib: a value that lives per element" data-anchor="#attrib-a-value-that-lives-per-element">#</a></h3>
+<p>Declares a per-element scratch value, initialized once. Whatever you assign into it that frame is what the rest of the kernel body sees. Element domain only.</p>
+<pre><code>attrib float heat = 0
+heat = (P.y + 1.0) * 0.5
+Cd = vec3(heat, 0.2, 1.0 - heat)</code></pre>
+<p>An element attribute ramp driving vertex colour.</p>
+<h3 id="param-a-value-that-becomes-a-ui-knob">param: a value that becomes a UI knob <a class="anchor-link" href="#param-a-value-that-becomes-a-ui-knob" aria-label="Copy link to param: a value that becomes a UI knob" data-anchor="#param-a-value-that-becomes-a-ui-knob">#</a></h3>
+<p><code>param &lt;type&gt; &lt;name&gt; = &lt;default&gt; [&lt;lo&gt;, &lt;hi&gt;]</code> declares a real, modulatable knob. It shows up on the node&#x27;s faceplate, can be dragged, automated and cabled to a modulator.</p>
+<pre><code>param float speed = 2.0 [0.1, 10.0]</code></pre>
+<p><strong>Punctuation:</strong> in pixel kernels every statement ends with a semicolon (<code>param float speed = 2.0 [0.1, 10.0];</code>). In element and sample kernels, statements are newline-terminated with no semicolon.</p>
+<h3 id="state-this-frame-reads-last-frame-s-value">state: this frame reads last frame&#x27;s value <a class="anchor-link" href="#state-this-frame-reads-last-frame-s-value" aria-label="Copy link to state: this frame reads last frame&#x27;s value" data-anchor="#state-this-frame-reads-last-frame-s-value">#</a></h3>
+<pre><code>state float y = 0
+y = y * 0.999 + in * 0.1
+out = y</code></pre>
+<p>A one-pole recursive smoother in the sample domain. <code>state</code> declares a cell read as its value from the previous evaluation; whatever you assign becomes what the next evaluation sees, which is why <code>y = y * 0.999 + ...</code> is legal and not an infinite loop. It is the only way to loop a value back inside a kernel. State survives hot-reload (editing the code does not reset an unrelated filter) and saves with the patch.</p>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#3-core-syntax">&larr; 3. Core syntax</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#5-reserved-words-per-domain">5. Reserved words per domain &rarr;</a></nav></section>
+<section class="man-chapter" id="5-reserved-words-per-domain" aria-labelledby="5-reserved-words-per-domain-h">
+<h2 id="5-reserved-words-per-domain-h">5. Reserved words per domain <a class="anchor-link" href="#5-reserved-words-per-domain" aria-label="Copy link to 5. Reserved words per domain" data-anchor="#5-reserved-words-per-domain">#</a></h2>
+<p>Each domain seeds identifiers that already mean something. Redeclaring one with <code>attrib</code>, <code>param</code> or <code>state</code> is a compile error, not a warning.</p>
+<div class="table-wrap" id="tbl-domain-2"><table><caption>Domain reference <a class="anchor-link" href="#tbl-domain-2" aria-label="Copy link to Domain reference" data-anchor="#tbl-domain-2">#</a></caption><thead><tr><th scope="col">Domain</th><th scope="col">Reserved names</th><th scope="col">Notes</th></tr></thead><tbody><tr><th scope="row">element</th><td><code>P N Cd i count t dt age</code></td><td><code>i</code> is the element index: pick another name for your own loop variable</td></tr><tr><th scope="row">pixel</th><td><code>uv col t dt frame age res aspect</code></td><td>never redeclare <code>uv</code> or <code>col</code></td></tr><tr><th scope="row">sample</th><td><code>in out sr freq gate noteOn notePitch noteVel</code></td><td><code>freq</code> and <code>gate</code> are the current voice&#x27;s note frequency and note-on state</td></tr><tr><th scope="row">graph</th><td>(none)</td><td>a one-shot script; uses <code>emit</code>, <code>connect</code>, <code>set</code>, <code>place</code> instead (Chapter 8)</td></tr></tbody></table></div>
+<p><code>pi</code> is only available in a pure frame-domain expression. Inside element and pixel kernels, write out the numeric constant longhand: <code>3.14159265</code>.</p>
+<pre><code>p = uv * 3.14159265;</code></pre>
+<p>Nodal pattern coordinate scaling.</p>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#4-declarations-attrib-param-state">&larr; 4. Declarations: attrib, param, state</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#6-domain-transfer-operators">6. Domain transfer operators &rarr;</a></nav></section>
+<section class="man-chapter" id="6-domain-transfer-operators" aria-labelledby="6-domain-transfer-operators-h">
+<h2 id="6-domain-transfer-operators-h">6. Domain transfer operators <a class="anchor-link" href="#6-domain-transfer-operators" aria-label="Copy link to 6. Domain transfer operators" data-anchor="#6-domain-transfer-operators">#</a></h2>
+<p>Since element, pixel and sample cannot see each other directly, Field gives you explicit operators to move data across, always by way of <code>frame</code>.</p>
+<div class="table-wrap" id="tbl-operator"><table><caption>Operator reference <a class="anchor-link" href="#tbl-operator" aria-label="Copy link to Operator reference" data-anchor="#tbl-operator">#</a></caption><thead><tr><th scope="col">Operator</th><th scope="col">Direction</th><th scope="col">How you write it</th></tr></thead><tbody><tr><th scope="row">reduce</th><td>many (one domain) to one (frame)</td><td><code>reduce.rms(...)</code>, <code>reduce.max(...)</code>, and so on</td></tr><tr><th scope="row">broadcast</th><td>one (frame) to many (any domain)</td><td>nothing: assign a frame-hoisted value and it broadcasts automatically</td></tr><tr><th scope="row">map</th><td>one per element, within a domain</td><td>a language construct for per-element transforms</td></tr><tr><th scope="row">resample, downsample</th><td>rate-changing crossings</td><td>for the rarer case where you need a different rate, not just a different domain</td></tr></tbody></table></div>
+<h3 id="domain-transfer-examples">Domain transfer examples <a class="anchor-link" href="#domain-transfer-examples" aria-label="Copy link to Domain transfer examples" data-anchor="#domain-transfer-examples">#</a></h3>
+<pre><code>// element domain: a per-element hit, reduced to one frame-rate value
+hit = if(P.y &gt; threshold, 1.0, 0.0)
+output frame float chime = reduce.max(hit)</code></pre>
+<p>A boundary sensor: a per-element crossing reduced to frame.</p>
+<pre><code>// sample domain: the audio buffer&#x27;s RMS in a band, reduced to one value
+output frame float bass = reduce.rms(in, 20.0, 160.0)</code></pre>
+<p>Audio band energy reduced to frame.</p>
+<p><code>reduce</code> ships with <code>sum</code>, <code>mean</code>, <code>rms</code>, <code>rmsBandLimited</code>, <code>min</code> and <code>max</code>. Going the other direction needs no keyword: reading a param that is fed by a frame-rate value elsewhere broadcasts to every pixel, element or sample for free, because a param read is already a per-domain broadcast.</p>
+<p><code>reduce</code> is a frame-rate operator. It works from inside an element or sample kernel to collapse many values into one. It is not available inside a pixel kernel; an aggregate of pixel data has to arrive as a value computed elsewhere and passed in.</p>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#5-reserved-words-per-domain">&larr; 5. Reserved words per domain</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#7-randomness">7. Randomness &rarr;</a></nav></section>
+<section class="man-chapter" id="7-randomness" aria-labelledby="7-randomness-h">
+<h2 id="7-randomness-h">7. Randomness <a class="anchor-link" href="#7-randomness" aria-label="Copy link to 7. Randomness" data-anchor="#7-randomness">#</a></h2>
+<p><code>rand</code>, <code>noise</code> and <code>sh</code> are pure functions of their arguments: same inputs, same output, always, so a kernel stays deterministic and re-runnable. There is no hidden global RNG state to seed or reset.</p>
+<h3 id="rand-min-max-speed-seed">rand(min, max, speed, seed) <a class="anchor-link" href="#rand-min-max-speed-seed" aria-label="Copy link to rand(min, max, speed, seed)" data-anchor="#rand-min-max-speed-seed">#</a></h3>
+<p>Takes 0 to 4 arguments; fewer arguments fall back to sane defaults.</p>
+<pre><code>n = rand(0, 1, 2.0, 0)
+P += N * (n - 0.5) * 0.2</code></pre>
+<p>Normal displacement using smooth noise: 0 to 1, speed 2.0, seed 0.</p>
+<h3 id="noise-and-sh">noise and sh <a class="anchor-link" href="#noise-and-sh" aria-label="Copy link to noise and sh" data-anchor="#noise-and-sh">#</a></h3>
+<p><code>noise</code> and <code>sh</code> follow the same pure-function pattern as <code>rand</code>, taking 0 to 4 arguments. Reach for <code>rand</code> first for most device work; use <code>noise</code> or <code>sh</code> when you want a smoother or shaped variant and want to compare results by ear or eye.</p>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#6-domain-transfer-operators">&larr; 6. Domain transfer operators</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#8-building-a-device">8. Building a device &rarr;</a></nav></section>
+<section class="man-chapter" id="8-building-a-device" aria-labelledby="8-building-a-device-h">
+<h2 id="8-building-a-device-h">8. Building a device <a class="anchor-link" href="#8-building-a-device" aria-label="Copy link to 8. Building a device" data-anchor="#8-building-a-device">#</a></h2>
+<p>There are two ways to bundle Field kernels into something that behaves like one reusable device, rather than a single raw kernel box.</p>
+<h3 id="1-single-node-dynamic-pins">1. Single-node dynamic pins <a class="anchor-link" href="#1-single-node-dynamic-pins" aria-label="Copy link to 1. Single-node dynamic pins" data-anchor="#1-single-node-dynamic-pins">#</a></h3>
+<p>Any element, pixel or sample kernel can declare extra pins right in its code (up to 16 combined input and output pins per kernel):</p>
+<pre><code>output frame float glow = abs(sin(t * speed))</code></pre>
+<p>This creates a real extra pin on the canvas node that can be wired with a cable, saves and loads with the patch, and survives undo. It is the cheapest way to add a second domain&#x27;s worth of I/O to a device that is really one native node&#x27;s behaviour.</p>
+<p><strong>What a declared output pin carries today:</strong> a fixed value of 0. For a value that genuinely reaches another node right now, read it off one of the node&#x27;s built-in toggle outputs instead: <code>rms</code> on <a class="node-ref" href="../#node-field-effect">Field Effect</a> and <a class="node-ref" href="../#node-field-synth">Field Synth</a>, <code>publish</code> on <a class="node-ref" href="../#node-field-modifier">Field Modifier</a> and <a class="node-ref" href="../#node-field-primitive">Field Primitive</a>, or <code>state</code> on Field Pixel. Use a hand-declared output pin when you want the pin present and wired for later, and one of the three toggles when you need the value live today.</p>
+<h3 id="2-field-graph-bundle-instrument-mode">2. Field Graph bundle (&quot;Instrument Mode&quot;) <a class="anchor-link" href="#2-field-graph-bundle-instrument-mode" aria-label="Copy link to 2. Field Graph bundle (&quot;Instrument Mode&quot;)" data-anchor="#2-field-graph-bundle-instrument-mode">#</a></h3>
+<p>For a device needing more than one kernel body, a <a class="node-ref" href="../#node-field-graph">Field Graph</a> node runs its code once, at edit time, using four functions to mount and wire real Infinite nodes for you:</p>
+<pre><code>emit(&quot;Type Name&quot;, k0, k1, ...) -&gt; handle
+connect(srcHandle, srcSlot, dstHandle, dstSlot)
+set(handle, &quot;paramName&quot;, value)
+place(handle, x, y)</code></pre>
+<p>Live params on the graph node&#x27;s own knobs forward into the emitted nodes, and the bundle&#x27;s texture and audio pins forward correctly out to the rest of your patch. Toggle Instrument Mode to collapse the bundle into one box, or Unpack to Canvas to show the emitted nodes separately and rewire them by hand.</p>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#7-randomness">&larr; 7. Randomness</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#9-field-node-reference">9. Field node reference &rarr;</a></nav></section>
+<section class="man-chapter" id="9-field-node-reference" aria-labelledby="9-field-node-reference-h">
+<h2 id="9-field-node-reference-h">9. Field node reference <a class="anchor-link" href="#9-field-node-reference" aria-label="Copy link to 9. Field node reference" data-anchor="#9-field-node-reference">#</a></h2>
+<p>Field is exposed to the user as six node types, each hosting one domain&#x27;s kernel. All six compile the same source-text grammar covered in Chapters 1 to 8; the only thing that changes is which reserved names are in scope and which backend the kernel is compiled to.</p>
+<div class="table-wrap" id="tbl-node"><table><caption>Node reference <a class="anchor-link" href="#tbl-node" aria-label="Copy link to Node reference" data-anchor="#tbl-node">#</a></caption><thead><tr><th scope="col">Node</th><th scope="col">Domain</th><th scope="col">What it does</th></tr></thead><tbody><tr><th scope="row"><a class="node-ref" href="../#node-field-modifier">Field Modifier</a></th><td>element</td><td>Runs a per-vertex kernel over geometry already on the canvas, modifying <code>P</code>, <code>N</code>, <code>uv</code>, <code>Cd</code> and custom attributes.</td></tr><tr><th scope="row"><a class="node-ref" href="../#node-field-primitive">Field Primitive</a></th><td>element</td><td>Generates procedural point geometry from scratch, with no input required, using a per-element kernel (Circle, Spiral, Grid Lattice, Fibonacci Sphere, <a class="node-ref" href="../#node-helix">Helix</a> and <a class="node-ref" href="../#node-torus-knot">Torus Knot</a> presets as starting points).</td></tr><tr><th scope="row"><a class="node-ref" href="../#node-field-effect">Field Effect</a></th><td>sample</td><td>Runs a kernel once per audio sample, on the audio thread. <code>in</code> is the audio input pin, <code>state</code> declares per-voice memory, <code>param</code> exposes a knob, and <code>reduce.rms(in, loHz, hiHz)</code> publishes a band-limited RMS reading once per block.</td></tr><tr><th scope="row"><a class="node-ref" href="../#node-field-synth">Field Synth</a></th><td>sample</td><td>A polyphonic, note-driven synthesizer using the same sample-domain compiler as <a class="node-ref" href="../#node-field-effect">Field Effect</a>, but with <code>freq</code> and <code>gate</code> in place of an <code>in</code> pin: a self-contained voice, no upstream audio required.</td></tr><tr><th scope="row">Field Pixel</th><td>pixel</td><td>Runs a kernel once per pixel, compiled to GLSL. <code>uv</code>, <code>col</code> and <code>res</code> are the reserved names; a <code>state</code> cell declared <code>[wrap]</code> plus an offset read like <code>A(uv + d)</code> supports feedback and stencils.</td></tr><tr><th scope="row"><a class="node-ref" href="../#node-field-graph">Field Graph</a></th><td>graph</td><td>Runs a kernel once, at edit time, to build part of the patch itself: <code>emit</code>, <code>connect</code>, <code>set</code> and <code>place</code> spawn and wire real Infinite nodes. See Chapter 8.</td></tr></tbody></table></div>
+<p>Pick the node by domain first, then by role: element splits into modify (<a class="node-ref" href="../#node-field-modifier">Field Modifier</a>) and generate (<a class="node-ref" href="../#node-field-primitive">Field Primitive</a>); sample splits into process (<a class="node-ref" href="../#node-field-effect">Field Effect</a>, has an <code>in</code> pin) and generate (<a class="node-ref" href="../#node-field-synth">Field Synth</a>, note-driven). Pixel and graph each have one node.</p>
+<figure class="man-fig" id="fig-field-modifier"><img src="../../assets/manual/nodes/field-modifier.webp" width="240" height="600" alt="Field Modifier, element domain node in Infinite." loading="lazy" decoding="async"><figcaption>Field Modifier, element domain <a class="anchor-link" href="#fig-field-modifier" aria-label="Copy link to Field Modifier, element domain" data-anchor="#fig-field-modifier">#</a></figcaption></figure>
+<figure class="man-fig" id="fig-field-primitive"><img src="../../assets/manual/nodes/field-primitive.webp" width="221" height="600" alt="Field Primitive, element domain node in Infinite." loading="lazy" decoding="async"><figcaption>Field Primitive, element domain <a class="anchor-link" href="#fig-field-primitive" aria-label="Copy link to Field Primitive, element domain" data-anchor="#fig-field-primitive">#</a></figcaption></figure>
+<figure class="man-fig" id="fig-fieldpixel"><img src="../../assets/manual/nodes/fieldpixel.webp" width="283" height="600" alt="Field Pixel, pixel domain node in Infinite." loading="lazy" decoding="async"><figcaption>Field Pixel, pixel domain <a class="anchor-link" href="#fig-fieldpixel" aria-label="Copy link to Field Pixel, pixel domain" data-anchor="#fig-fieldpixel">#</a></figcaption></figure>
+<figure class="man-fig" id="fig-field-effect"><img src="../../assets/manual/nodes/field-effect.webp" width="315" height="600" alt="Field Effect, sample domain node in Infinite." loading="lazy" decoding="async"><figcaption>Field Effect, sample domain <a class="anchor-link" href="#fig-field-effect" aria-label="Copy link to Field Effect, sample domain" data-anchor="#fig-field-effect">#</a></figcaption></figure>
+<figure class="man-fig" id="fig-field-synth"><img src="../../assets/manual/nodes/field-synth.webp" width="265" height="600" alt="Field Synth, sample domain node in Infinite." loading="lazy" decoding="async"><figcaption>Field Synth, sample domain <a class="anchor-link" href="#fig-field-synth" aria-label="Copy link to Field Synth, sample domain" data-anchor="#fig-field-synth">#</a></figcaption></figure>
+<p>These screenshots come from the app itself (<code>scripts/screenshot_all_nodes.py</code>), so they match the build this manual was made for. <a class="node-ref" href="../#node-field-graph">Field Graph</a> is created from the <a class="node-ref" href="../#node-field-primitive">Field Primitive</a>&#x27;s graph mode and has no spawn-menu entry of its own.</p>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#8-building-a-device">&larr; 8. Building a device</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#10-device-faceplate">10. Device faceplate &rarr;</a></nav></section>
+<section class="man-chapter" id="10-device-faceplate" aria-labelledby="10-device-faceplate-h">
+<h2 id="10-device-faceplate-h">10. Device faceplate <a class="anchor-link" href="#10-device-faceplate" aria-label="Copy link to 10. Device faceplate" data-anchor="#10-device-faceplate">#</a></h2>
+<p>Every Field node has two views: a compact body on the canvas, and a separate editor window for the code.</p>
+<ul><li>The <strong>compact node body</strong> shows the auto-generated param knobs, notice text and an &quot;Edit Field...&quot; button. No source code is visible here.</li><li>The <strong>floating editor window</strong>, opened by &quot;Edit Field...&quot;, is where you read and write the kernel&#x27;s text, inspect compilation status and see a live preview.</li></ul>
+<h3 id="what-the-faceplate-gives-you">What the faceplate gives you <a class="anchor-link" href="#what-the-faceplate-gives-you" aria-label="Copy link to What the faceplate gives you" data-anchor="#what-the-faceplate-gives-you">#</a></h3>
+<ul><li>Knob rows laid out on Infinite&#x27;s standard grid, so a Field node&#x27;s knobs look and behave like every other node&#x27;s, even with a variable-length, user-authored param list.</li><li>An inline preview in the compact body: a live texture thumbnail on Field Pixel, a live scope on <a class="node-ref" href="../#node-field-effect">Field Effect</a> and <a class="node-ref" href="../#node-field-synth">Field Synth</a>, and a mini-viewport on <a class="node-ref" href="../#node-field-modifier">Field Modifier</a> and <a class="node-ref" href="../#node-field-primitive">Field Primitive</a>.</li><li>Device save, import and export controls inside the editor window, so you can manage device files without closing the code view.</li></ul>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#9-field-node-reference">&larr; 9. Field node reference</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#11-saving-and-sharing-devices-infdev">11. Saving and sharing devices: .infdev &rarr;</a></nav></section>
+<section class="man-chapter" id="11-saving-and-sharing-devices-infdev" aria-labelledby="11-saving-and-sharing-devices-infdev-h">
+<h2 id="11-saving-and-sharing-devices-infdev-h">11. Saving and sharing devices: .infdev <a class="anchor-link" href="#11-saving-and-sharing-devices-infdev" aria-label="Copy link to 11. Saving and sharing devices: .infdev" data-anchor="#11-saving-and-sharing-devices-infdev">#</a></h2>
+<p>Field devices save and load through a portable file format: plain JSON.</p>
+<pre><code>{
+    &quot;format&quot;: &quot;infdev&quot;,
+    &quot;version&quot;: 1,
+    &quot;meta&quot;: {
+        &quot;name&quot;: &quot;My Device&quot;,
+        &quot;author&quot;: &quot;you&quot;,
+        &quot;description&quot;: &quot;optional&quot;,
+        &quot;domain&quot;: &quot;element&quot;
+    },
+    &quot;device&quot;: {
+        &quot;code&quot;: &quot;param float amp = 0.8 [0.0, 3.0]\n...&quot;,
+        &quot;params&quot;: { &quot;amp&quot;: 0.8 },
+        &quot;nodeSettings&quot;: { &quot;maxElements&quot;: 65536, &quot;generateCount&quot;: 64 }
+    }
+}</code></pre>
+<p><code>nodeSettings</code> differs per domain: a <a class="node-ref" href="../#node-field-primitive">Field Primitive</a> device carries <code>maxElements</code> and, when it has no upstream input, <code>generateCount</code>.</p>
+<h3 id="saving-loading-sharing">Saving, loading, sharing <a class="anchor-link" href="#saving-loading-sharing" aria-label="Copy link to Saving, loading, sharing" data-anchor="#saving-loading-sharing">#</a></h3>
+<ul><li>Use the Devices dropdown plus Save, Export and Import on the node body to save a device or load one someone sent you.</li><li>Drag an <code>.infdev</code> file onto the matching node type to load it directly.</li><li>You can hand-author or hand-edit an <code>.infdev</code> file in a text editor. It is JSON with a <code>code</code> string field, as long as that field stays valid Field for the domain declared in <code>meta</code>.</li></ul>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#10-device-faceplate">&larr; 10. Device faceplate</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#12-common-mistakes-and-quick-reference">12. Common mistakes and quick reference &rarr;</a></nav></section>
+<section class="man-chapter" id="12-common-mistakes-and-quick-reference" aria-labelledby="12-common-mistakes-and-quick-reference-h">
+<h2 id="12-common-mistakes-and-quick-reference-h">12. Common mistakes and quick reference <a class="anchor-link" href="#12-common-mistakes-and-quick-reference" aria-label="Copy link to 12. Common mistakes and quick reference" data-anchor="#12-common-mistakes-and-quick-reference">#</a></h2>
+<p>The wrong and right pairs a fresh session, human or AI, hits first.</p>
+<div class="table-wrap" id="tbl-wrong"><table><caption>Wrong reference <a class="anchor-link" href="#tbl-wrong" aria-label="Copy link to Wrong reference" data-anchor="#tbl-wrong">#</a></caption><thead><tr><th scope="col">Wrong</th><th scope="col">Why</th><th scope="col">Right</th></tr></thead><tbody><tr><th scope="row"><code>@P.y += 0.1</code></th><td>Field has no sigil</td><td><code>P.y += 0.1</code></td></tr><tr><th scope="row"><code>param int voices = 8</code></th><td>param only accepts float</td><td><code>param float voices = 8.0</code></td></tr><tr><th scope="row">using <code>i</code> as your own loop variable in element</th><td><code>i</code> is the reserved element index</td><td>use a different name, for example <code>k</code></td></tr><tr><th scope="row"><code>col = vec3(uv.x, uv.y, 0.5)</code></th><td>pixel statements need a semicolon</td><td><code>col = vec3(uv.x, uv.y, 0.5);</code></td></tr><tr><th scope="row"><code>x = pi * 2.0</code></th><td><code>pi</code> only works in a frame expression</td><td><code>x = 3.14159265 * 2.0</code></td></tr><tr><th scope="row"><code>n = rand(t, seed)</code></th><td>the real signature is <code>rand(min, max, speed, seed)</code></td><td><code>n = rand(0, 1, 2.0, seed)</code></td></tr><tr><th scope="row">wiring a declared output pin expecting a live value</th><td>it carries a fixed 0 today</td><td>use the node&#x27;s rms, publish or state toggle instead</td></tr><tr><th scope="row"><code>.xg</code> swizzle</th><td>cannot mix xyzw and rgba letter sets</td><td><code>.xy</code> or <code>.rg</code>, not mixed</td></tr><tr><th scope="row">redeclaring <code>P</code>, <code>uv</code>, <code>in</code>, <code>out</code></th><td>shadowing a reserved name is a compile error</td><td>pick a different name</td></tr><tr><th scope="row">expecting an element value inside a pixel kernel</th><td>element, pixel and sample cannot see each other directly</td><td>reduce to frame, then broadcast, explicitly</td></tr></tbody></table></div>
+<h3 id="quick-reference">Quick reference <a class="anchor-link" href="#quick-reference" aria-label="Copy link to Quick reference" data-anchor="#quick-reference">#</a></h3>
+<ul><li><strong>Type keywords:</strong> <code>float int bool vec2 vec3 vec4</code></li><li><strong>Arithmetic:</strong> <code>+ - * / %</code> and <code>^</code> for power. <strong>Comparison:</strong> <code>&lt; &lt;= &gt; &gt;= == !=</code>. <strong>Boolean:</strong> <code>&amp;&amp; || !</code>. <strong>Compound assign:</strong> <code>+= -= *= /=</code></li><li><strong>Swizzles:</strong> <code>.x .y .z .w</code> or <code>.r .g .b .a</code>, one to four letters, not mixed</li><li><strong>One-argument functions:</strong> <code>sin cos tan abs floor ceil round sign exp sqrt log fract length normalize</code></li><li><strong>Two-argument functions:</strong> <code>min max mod fmod pow step distance dot cross atan2</code></li><li><strong>Three-argument functions:</strong> <code>clamp lerp mix smoothstep if</code></li><li><strong>Zero to four arguments:</strong> <code>rand noise sh</code></li></ul>
+<div class="table-wrap" id="tbl-domain-3"><table><caption>Domain reference <a class="anchor-link" href="#tbl-domain-3" aria-label="Copy link to Domain reference" data-anchor="#tbl-domain-3">#</a></caption><thead><tr><th scope="col">Domain</th><th scope="col">Reserved</th><th scope="col">Node(s)</th></tr></thead><tbody><tr><th scope="row">element</th><td><code>P N Cd i count t dt age</code></td><td><a class="node-ref" href="../#node-field-modifier">Field Modifier</a>, <a class="node-ref" href="../#node-field-primitive">Field Primitive</a></td></tr><tr><th scope="row">pixel</th><td><code>uv col t dt frame age res aspect</code></td><td>Field Pixel</td></tr><tr><th scope="row">sample</th><td><code>in out sr freq gate noteOn notePitch noteVel</code></td><td><a class="node-ref" href="../#node-field-effect">Field Effect</a>, <a class="node-ref" href="../#node-field-synth">Field Synth</a></td></tr><tr><th scope="row">graph</th><td>none (uses <code>emit</code>, <code>connect</code>, <code>set</code>, <code>place</code>)</td><td><a class="node-ref" href="../#node-field-graph">Field Graph</a></td></tr></tbody></table></div>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#11-saving-and-sharing-devices-infdev">&larr; 11. Saving and sharing devices: .infdev</a><a class="chap-top" href="#top">&uarr; Top</a><a class="chap-next" href="#13-what-is-new-since-v1">13. What is new since v1 &rarr;</a></nav></section>
+<section class="man-chapter" id="13-what-is-new-since-v1" aria-labelledby="13-what-is-new-since-v1-h">
+<h2 id="13-what-is-new-since-v1-h">13. What is new since v1 <a class="anchor-link" href="#13-what-is-new-since-v1" aria-label="Copy link to 13. What is new since v1" data-anchor="#13-what-is-new-since-v1">#</a></h2>
+<p>This manual describes Field v1 as shipped in v0.3.0 in Chapters 1 to 12. Six language additions landed after it. None of them changes how an existing kernel behaves; each one makes something writable that needed C++ before.</p>
+<h3 id="13-1-offset-reads-of-pixel-state-a-uv-d">13.1 Offset reads of pixel state: A(uv + d) <a class="anchor-link" href="#13-1-offset-reads-of-pixel-state-a-uv-d" aria-label="Copy link to 13.1 Offset reads of pixel state: A(uv + d)" data-anchor="#13-1-offset-reads-of-pixel-state-a-uv-d">#</a></h3>
+<p>In a pixel kernel a state cell can be read at a coordinate, not only where the pixel is. Bare <code>A</code> is sugar for <code>A(uv)</code>. This is what makes reaction-diffusion, advection and every flow effect writable as Field text.</p>
+<pre><code>state float A = 1 [wrap]; // default boundary is clamp
+d = 1.0 / res; // one texel
+lapA = A(uv + vec2(d.x, 0.0)) + A(uv - vec2(d.x, 0.0))
+     + A(uv + vec2(0.0, d.y)) + A(uv - vec2(0.0, d.y)) - 4.0 * A;
+first = 1.0 - step(0.5, age); // 1.0 on the first cook only</code></pre>
+<div class="table-wrap" id="tbl-boundary"><table><caption>Boundary reference <a class="anchor-link" href="#tbl-boundary" aria-label="Copy link to Boundary reference" data-anchor="#tbl-boundary">#</a></caption><thead><tr><th scope="col">Boundary</th><th scope="col">Meaning</th></tr></thead><tbody><tr><th scope="row">(default) clamp</th><td>reads past the edge repeat the edge texel</td></tr><tr><th scope="row"><code>[wrap]</code></th><td>the texture wraps around</td></tr><tr><th scope="row"><code>[border]</code></th><td>reads past the edge return the cell&#x27;s declared initial value</td></tr></tbody></table></div>
+<p>Offset reads of a frame, element or sample cell are refused: those cells have no spatial extent. A kernel with any offset read keeps its state in a 32-bit float bank; without one it stays 16-bit.</p>
+<p><code>age</code> is a reserved name in pixel and element: the number of cooks since the node&#x27;s state was cleared. Use it for a one-shot seed (<code>1.0 - step(0.5, age)</code> is 1 on the first cook only). <code>frame</code> cannot do this, because it is the global cook counter and is already large when a node spawns.</p>
+<h3 id="13-2-element-neighbour-reads-x-at-k">13.2 Element neighbour reads: X.at(k) <a class="anchor-link" href="#13-2-element-neighbour-reads-x-at-k" aria-label="Copy link to 13.2 Element neighbour reads: X.at(k)" data-anchor="#13-2-element-neighbour-reads-x-at-k">#</a></h3>
+<p>In an element kernel, <code>X.at(k)</code> reads element <code>k</code>&#x27;s <code>X</code>, where <code>X</code> is <code>P</code>, <code>N</code>, <code>uv</code>, <code>Cd</code>, a declared attribute, or an element state cell.</p>
+<pre><code>a = P.at(i - 1)
+b = P.at(i + 1)
+localAvg = (a + b + P) * 0.3333333
+dev = P - localAvg // how far this point sits from its neighbours</code></pre>
+<p>The read always sees the cook&#x27;s input: the incoming mesh for an attribute, the previous cook&#x27;s value for a state cell. It never sees a value written earlier in the same loop, so the result does not depend on element order. Indices clamp to <code>[0, count-1]</code>, so element 0 asking for <code>i - 1</code> sees itself. <code>.at()</code> on a param or frame value is refused (it holds one value for the whole mesh).</p>
+<p>Element simulations must keep positions in <code>state</code>, not <code>P</code>, because <code>P</code> is refilled from the incoming mesh every cook. The Verlet Rope and Buckling Ribbon presets are written this way.</p>
+<h3 id="13-3-state-tables-state-float-name-n">13.3 State tables: state float name[N] <a class="anchor-link" href="#13-3-state-tables-state-float-name-n" aria-label="Copy link to 13.3 State tables: state float name[N]" data-anchor="#13-3-state-tables-state-float-name-n">#</a></h3>
+<p>A bounded array in frame and sample kernels. <code>name[k]</code> reads, <code>name[k] = v</code> writes, and <code>k</code> is any expression, clamped to <code>[0, N-1]</code> (clamp, not wrap, not an error, the same rule as <code>.at()</code>).</p>
+<pre><code>state float buf[12000] = 0.0
+state float wpos = 0.0
+readVal = buf[(wpos - 4800.0 + 24000.0) % 12000.0]
+buf[wpos % 12000.0] = in
+wpos = (wpos + 1.0) % 12000.0 // a delay line built from a table</code></pre>
+<p>Tables are not available in element or pixel. Their total size is capped at compile time, the same way <code>delay()</code>&#x27;s budget is, so an oversized table is a compile error rather than a silent truncation.</p>
+<h3 id="13-4-declared-audio-and-image-inputs">13.4 Declared audio and image inputs <a class="anchor-link" href="#13-4-declared-audio-and-image-inputs" aria-label="Copy link to 13.4 Declared audio and image inputs" data-anchor="#13-4-declared-audio-and-image-inputs">#</a></h3>
+<p>A <a class="node-ref" href="../#node-field-effect">Field Effect</a> or <a class="node-ref" href="../#node-field-synth">Field Synth</a> kernel can declare extra audio inputs. Each declaration creates a real, connectable audio pin on the node, one per name:</p>
+<pre><code>input sample audio sidechain
+out = in * (1.0 - abs(sidechain)) // duck by the second input</code></pre>
+<p>On <a class="node-ref" href="../#node-field-effect">Field Effect</a> the declared inputs follow the native <code>in</code> pin; on <a class="node-ref" href="../#node-field-synth">Field Synth</a> they follow notes and <code>in</code>. <code>input sample float name</code> is still collected but is not bound to a signal. In a Field Pixel kernel, <code>input pixel image name</code> reads the connected texture (previously it read black). One declared image input is wired; a second is rejected at compile time.</p>
+<h3 id="13-5-note-history-in-frame-noteon-notepitch-notevel">13.5 Note history in frame: noteOn, notePitch, noteVel <a class="anchor-link" href="#13-5-note-history-in-frame-noteon-notepitch-notevel" aria-label="Copy link to 13.5 Note history in frame: noteOn, notePitch, noteVel" data-anchor="#13-5-note-history-in-frame-noteon-notepitch-notevel">#</a></h3>
+<div class="table-wrap" id="tbl-name"><table><caption>Name reference <a class="anchor-link" href="#tbl-name" aria-label="Copy link to Name reference" data-anchor="#tbl-name">#</a></caption><thead><tr><th scope="col">Name</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row"><code>noteOn</code></th><td>1.0 only on the sample a note-on registers (an edge, unlike <code>gate</code>, which is held); 0.0 otherwise</td></tr><tr><th scope="row"><code>notePitch</code></th><td>frequency in Hz of the most recent note (same convention as <code>freq</code>); holds after note-off</td></tr><tr><th scope="row"><code>noteVel</code></th><td>velocity 0 to 1 of the most recent note; holds after note-off</td></tr></tbody></table></div>
+<p>These are one shared snapshot per node, like <code>in</code> and <code>sr</code>, not per voice like <code>freq</code> and <code>gate</code>. They are reserved names everywhere (you cannot declare a param, state cell or assignment with them) but read as an inert 0.0 in any node without a note input.</p>
+<pre><code>state float env = 0.0
+env = if(noteOn &gt; 0.5, noteVel, env * 0.999) // jump to the velocity, then decay</code></pre>
+<h3 id="13-6-field-notes-beat-notenum-tick-deg-rand-note">13.6 Field Notes: beat, noteNum, tick, deg, rand, note <a class="anchor-link" href="#13-6-field-notes-beat-notenum-tick-deg-rand-note" aria-label="Copy link to 13.6 Field Notes: beat, noteNum, tick, deg, rand, note" data-anchor="#13-6-field-notes-beat-notenum-tick-deg-rand-note">#</a></h3>
+<div class="table-wrap" id="tbl-name-2"><table><caption>Name reference <a class="anchor-link" href="#tbl-name-2" aria-label="Copy link to Name reference" data-anchor="#tbl-name-2">#</a></caption><thead><tr><th scope="col">Name</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row"><code>beat</code></th><td>the transport position in beats</td></tr><tr><th scope="row"><code>noteNum</code></th><td>MIDI note number of the incoming note (reads 0.0 with no note input)</td></tr><tr><th scope="row"><code>tick(div)</code></th><td>1.0 for the one sample where the beat crosses a multiple of <code>div</code> (in beats, for example <code>1/16</code>), else 0.0</td></tr><tr><th scope="row"><code>deg(d)</code></th><td>MIDI note for scale degree <code>d</code> under the node&#x27;s Root and Scale; degree 0 at root C is middle C (60)</td></tr><tr><th scope="row"><code>rand()</code></th><td>a random number from 0 to 1; only valid in a <a class="node-ref" href="../#node-field-notes">Field Notes</a> node</td></tr><tr><th scope="row"><code>note(pitch, vel, len)</code></th><td>inside an <code>if</code>, sends a note out; <code>len</code> is in beats, 0 holds as long as the incoming note</td></tr></tbody></table></div>
+<p>These names are reserved, so you cannot declare a param, state cell or assignment with them.</p>
+<pre><code>if (tick(1/8) &gt; 0.5) {
+    note(deg(floor(rand() * 7)), 0.8, 1/8) // a random scale degree on every eighth
+}</code></pre>
+<h3 id="13-7-fixes-that-change-what-old-kernels-read">13.7 Fixes that change what old kernels read <a class="anchor-link" href="#13-7-fixes-that-change-what-old-kernels-read" aria-label="Copy link to 13.7 Fixes that change what old kernels read" data-anchor="#13-7-fixes-that-change-what-old-kernels-read">#</a></h3>
+<ul><li><code>reduce.&lt;op&gt;(x)</code> over a plain element-domain local used to return 0.0 always; it now returns the real reduction of this cook&#x27;s values.</li><li><code>length</code>, <code>normalize</code>, <code>distance</code>, <code>dot</code> and <code>cross</code> now work in element kernels (they read 0.0 before, so <code>length(P)</code> was zero for every vertex).</li><li><code>res</code> and <code>aspect</code> are no longer hoisted into the CPU prologue, where they evaluated to 0; a texel size such as <code>1.0 / res</code> is now correct.</li><li>Vector literals are no longer mistaken for scalars by the constant folder.</li></ul>
+<p>Presets added since v1 include Gray-Scott reaction-diffusion and a flow and advection pair (Pixel), Verlet Rope and Buckling Ribbon (Element), and the pixel illusion, nature and <a class="node-ref" href="../#node-field-effect">Field Effect</a> and Synth libraries.</p>
+<nav class="chap-nav" aria-label="Chapter navigation"><a class="chap-prev" href="#12-common-mistakes-and-quick-reference">&larr; 12. Common mistakes and quick reference</a><a class="chap-top" href="#top">&uarr; Top</a></nav></section>
+        <nav class="man-pager" aria-label="Other Infinite manuals">
+          <a class="btn btn-ghost" href="#top">&uarr; Back to top</a>
+          <a class="btn btn-ghost" href="../">Node Reference Manual</a><a class="btn btn-ghost" href="../headless/">Headless User Guide</a>
+        </nav>
+        <div class="man-ext-links"><a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Release notes</a><a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub repository</a><a href="https://www.npmjs.com/package/infinite-engine" target="_blank" rel="noopener">npm package</a><a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a><a href="https://github.com/n1m21n/Infinite/blob/main/LICENSE" target="_blank" rel="noopener">MIT / GPLv3 licences</a></div>
+      </article>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="../../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <div class="signup-row">
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="../../signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="../../artists.html">Artists</a>
+          <a href="../../musicians.html">Musicians</a>
+          <a href="../../vjs.html">VJs</a>
+          <a href="../../creative-coders.html">Creative coders</a>
+          <a href="../../developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="../../library.html">Library</a>
+          <a href="../../samples/">Sample generator</a>
+          <a href="../../artworks.html">Art gallery</a>
+          <a href="../../nodes/">Nodes</a>
+          <a href="../../embeds/">Embeds</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="../../index.html#learn">Get started</a>
+          <a href="../../philosophy.html">Philosophy</a>
+          <a href="../../chat.html">Agents &amp; terminal</a>
+          <a href="../../blog/">Blog</a>
+          <a href="../../buy.html">Buy the plugin</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="../../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
+          <a href="../../assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
+          <a href="../../assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="../../benchmarks.html">Benchmarks</a>
+          <a href="../../assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting). <a href="../../terms.html">Terms</a> · <a href="../../refund.html">Refunds</a> · <a href="../../privacy.html">Privacy</a></p>
+    </div>
+  </footer>
+  <script src="../../site.js?v=21"></script>
+  <script src="../../search.js?v=d89de447"></script>
+  <script>
+  (function(){
+    if (window.innerWidth <= 960) {
+      var d = document.querySelector('.toc-details');
+      if (d) d.removeAttribute('open');
+    }
+    document.addEventListener('click', function(e) {
+      var a = e.target.closest && e.target.closest('.anchor-link');
+      if (!a) return;
+      var url = location.href.split('#')[0] + a.getAttribute('href');
+      if (navigator.clipboard) navigator.clipboard.writeText(url).catch(function(){});
+    });
+  })();
+  </script>
+</body>
+</html>
