@@ -10,8 +10,9 @@ on:
         description: Build run to take the artifacts from
         required: true
       mac_run_id:
-        description: macos-installers run that built Infinite.dmg and Infinite.pkg (artifact Infinite-macos-installers)
-        required: true
+        description: macos-installers run (leave empty if macOS installers are already uploaded to the release)
+        required: false
+        default: ""
       tag:
         description: Release tag (the release may still be a draft)
         required: true
@@ -37,10 +38,12 @@ jobs:
                    ui-golden-macos ui-golden-windows ui-golden-linux; do
             gh run download "${{ inputs.run_id }}" -n "$a" -D "dl/$a" || echo "no artifact $a"
           done
-          # The macOS installers come from their own run, not the Build run.
-          gh run download "${{ inputs.mac_run_id }}" -n Infinite-macos-installers -D dl/Infinite-macos-installers
-          test -s dl/Infinite-macos-installers/Infinite.dmg
-          test -s dl/Infinite-macos-installers/Infinite.pkg
+          # The macOS installers come from their own run when provided.
+          if [ -n "${{ inputs.mac_run_id }}" ]; then
+            gh run download "${{ inputs.mac_run_id }}" -n Infinite-macos-installers -D dl/Infinite-macos-installers
+            test -s dl/Infinite-macos-installers/Infinite.dmg
+            test -s dl/Infinite-macos-installers/Infinite.pkg
+          fi
       - name: Compare UI goldens across platforms
         run: |
           pip install --quiet pillow || python3 -m pip install --quiet pillow
@@ -63,12 +66,17 @@ jobs:
           done
       - name: Upload to the release
         run: |
-          gh release upload "${{ inputs.tag }}" Infinite-windows-x64.zip Infinite-windows-ARM64.zip \
-            dl/Infinite-macos-installers/Infinite.dmg \
-            dl/Infinite-macos-installers/Infinite.pkg \
-            dl/Infinite-x86_64.AppImage/Infinite-x86_64.AppImage \
-            dl/Infinite-Setup-windows-x64/Infinite-Setup-windows-x64.exe \
-            dl/Infinite-linux-x86_64.tar.gz/Infinite-linux-x86_64.tar.gz --clobber
+          ASSETS=(
+            Infinite-windows-x64.zip
+            Infinite-windows-ARM64.zip
+            dl/Infinite-x86_64.AppImage/Infinite-x86_64.AppImage
+            dl/Infinite-Setup-windows-x64/Infinite-Setup-windows-x64.exe
+            dl/Infinite-linux-x86_64.tar.gz/Infinite-linux-x86_64.tar.gz
+          )
+          if [ -n "${{ inputs.mac_run_id }}" ]; then
+            ASSETS+=(dl/Infinite-macos-installers/Infinite.dmg dl/Infinite-macos-installers/Infinite.pkg)
+          fi
+          gh release upload "${{ inputs.tag }}" "${ASSETS[@]}" --clobber
           # Best-effort preview builds: attach when built.
           for opt in Infinite-Setup-windows-ARM64/Infinite-Setup-windows-ARM64.exe \
                      Infinite-aarch64.AppImage/Infinite-aarch64.AppImage \
