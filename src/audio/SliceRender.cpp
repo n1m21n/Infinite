@@ -349,9 +349,10 @@ void RenderSlice(const SourceAudio& src, const SliceSet& set, int index, bool wi
       Stretch(l, r, sr, total, semis, p.stretchMode == 3);
    }
    body = std::clamp<int64_t>(body, 0, (int64_t)l.size());
-   // The slice keeps its place and span: stretched longer, it is cut at its end (what runs on fades out as the
-   // tail); shorter, the rest of the span is silence, or the Fill loop.
-   if (body < srcBody)
+   // Stretch Off keeps the slice's place and span: longer is cut at its end (what runs on fades out as the tail);
+   // shorter, the rest of the span is silence, or the Fill loop. The stretch modes ripple instead: the slice takes
+   // its stretched length and the slices after it move with its border, as a warp marker does.
+   if (p.stretchMode == 0 && body < srcBody)
    {
       l.resize((size_t)body);
       r.resize((size_t)body);
@@ -373,7 +374,8 @@ void RenderSlice(const SourceAudio& src, const SliceSet& set, int index, bool wi
          }
       }
    }
-   body = srcBody;
+   if (p.stretchMode == 0)
+      body = srcBody;
    if (!withTail)
    {
       l.resize((size_t)body);

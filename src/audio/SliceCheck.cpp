@@ -130,9 +130,10 @@ int main()
    half.slices[1].p.lengthRatio = 0.5f;
    RenderSliceSet(src, half, &cache, nullptr, r2);
    {
-      const size_t a1 = (size_t)half.slices[1].start, b1 = (size_t)half.EndOf(1), m1 = (a1 + b1) / 2;
-      Check(r2.l.size() == src.l.size() && Rms(r2.l, a1 + 200, m1 - 400) > 0.01 && Rms(r2.l, m1 + 400, b1 - 400) < 1e-6,
-            "beats stretch to half plays in the first half of its span; the rest is silence, the length stays");
+      const int64_t want = src.Frames() - (half.EndOf(1) - half.slices[1].start) / 2;
+      const size_t a1 = (size_t)half.slices[1].start, m1 = a1 + (size_t)(half.EndOf(1) - half.slices[1].start) / 2;
+      Check(std::llabs((int64_t)r2.l.size() - want) <= 2 && Rms(r2.l, a1 + 200, m1 - 400) > 0.01,
+            "beats stretch to half ripples: the slice plays through in half the time and the slices after it move up");
    }
 
    SliceSet up = plain;

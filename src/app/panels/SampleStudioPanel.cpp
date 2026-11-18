@@ -1437,7 +1437,11 @@ namespace
             src.push_back((double)s.doc.slices[(size_t)i].start);
             warped.push_back(at);
             const auto it = ratio.find(s.doc.slices[(size_t)i].id);
-            at += (double)(s.doc.EndOf(i) - s.doc.slices[(size_t)i].start) * (it != ratio.end() ? std::clamp(it->second, 0.01, 100.0) : 1.0);
+            double rt = it != ratio.end() ? std::clamp(it->second, 0.01, 100.0) : 1.0;
+            const SliceParams& sp = s.doc.slices[(size_t)i].p;
+            if (sp.stretchMode >= 1 && !sp.fitToGrid) // the stretch modes ripple: the border follows the edit at once, not a render later
+               rt = std::clamp((double)sp.lengthRatio, 0.25, 4.0);
+            at += (double)(s.doc.EndOf(i) - s.doc.slices[(size_t)i].start) * rt;
          }
          src.push_back((double)s.doc.endFrame);
          warped.push_back(at);
