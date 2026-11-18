@@ -165,9 +165,18 @@ namespace Platform
    int GpuPreference();
    void SetGpuPreference(int preference);
 
-   // The pen's pressure (0..1) on the last press or drag in `window`, or -1 when
-   // the last pointer was a mouse or the OS gives no pressure (Linux). Callers
-   // treat -1 as full pressure. The hook installs itself on the first call.
+   // The pen's full sample (pressure, tilt, rotation, timestamp) on the last press or drag
+   // in `window`; pressure is -1 and active is false when the last pointer was a mouse or Linux stub.
+   struct PenSample
+   {
+      float pressure = -1.0f;   // 0..1, or -1 when mouse
+      float tiltX = 0.0f;       // -1..1
+      float tiltY = 0.0f;       // -1..1
+      float rotation = 0.0f;    // degrees 0..360
+      double timestamp = 0.0;   // seconds
+      bool active = false;
+   };
+   PenSample PenNowSample(GLFWwindow* window);
    float PenPressure(GLFWwindow* window);
 
    // Reports a fatal startup failure through every channel a user might
@@ -1672,6 +1681,9 @@ namespace Platform
    // else as RGBA8 rows top-down with its size; false when the clipboard holds no picture.
    std::vector<std::string> ClipboardFiles();
    bool ClipboardImage(std::vector<unsigned char>& outPng, std::vector<unsigned char>& outRgba, int& outW, int& outH);
+   // Puts a picture on the system clipboard (PNG bytes; Windows also gets a CF_DIB from the RGBA8 top-down rows), so
+   // other apps paste it. False when the clipboard refused it.
+   bool SetClipboardImage(const std::vector<unsigned char>& png, const std::vector<unsigned char>& rgba, int w, int h);
 
    // Which app double-clicking a patch launches, against this running copy. Several copies of Infinite on one
    // machine (an old download, a build folder) share one identity, and the OS picks among them by version number

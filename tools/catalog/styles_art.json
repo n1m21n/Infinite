@@ -1822,6 +1822,145 @@
         "Birefringent magenta, chartreuse, amber-gold, and slate-blue crystalline extinction",
         "Fragment Mono & Azeret Mono petrographic atlas typography"
       ]
+    },
+    {
+      "id": "jacquard_bauhaus_weave",
+      "taxonomy": "new",
+      "name": "Jacquard Loom & Bauhaus Warp-Weft Weaving",
+      "palette": [
+        "#DFD3BA",
+        "#1E1D1B",
+        "#CE3B2A",
+        "#D7AE86"
+      ],
+      "sources": [
+        "Sketch2D"
+      ],
+      "fx": [
+        "grain"
+      ],
+      "comp": [
+        "gradientmap"
+      ],
+      "ban": [
+        "bloom",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "minimal_techno",
+        "ethio_jazz_organ"
+      ],
+      "refs": [
+        "Anni Albers 1926 Design for a Jacquard Weaving and 1939 Chemnitz punchcard chains",
+        "Unbleached linen parchment, charcoal ink, vermilion terracotta, raw ochre",
+        "Compagnon & Space Mono architectural textile grid typography"
+      ]
+    },
+    {
+      "id": "sashimono_kumiko_joinery",
+      "taxonomy": "new",
+      "name": "Sashimono & Kumiko Timber Lattice Joinery",
+      "palette": [
+        "#1D1712",
+        "#C79E74",
+        "#F5F2EB",
+        "#8B5A2B"
+      ],
+      "sources": [
+        "Sketch3D"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [
+        "gradientmap"
+      ],
+      "ban": [
+        "pixelate",
+        "dither"
+      ],
+      "motion": 0.3,
+      "pairs": [
+        "koto_glass_minimalism",
+        "microtonal_ambient"
+      ],
+      "refs": [
+        "1921 Kumiko-Zaiku backlit hinoki cypress latticework and nail-free Kigumi joinery",
+        "Warm hinoki wood, shoji ivory backlight, deep cedar shadow",
+        "Shin Go & Sohne Mono architectural woodwork typography"
+      ]
+    },
+    {
+      "id": "haeckel_radiolaria_silica",
+      "taxonomy": "new",
+      "name": "Ernst Haeckel Radiolaria & Silica Skeletons",
+      "palette": [
+        "#F8F5EC",
+        "#B82925",
+        "#D9B643",
+        "#231A16"
+      ],
+      "sources": [
+        "FieldPixel"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [
+        "gradientmap"
+      ],
+      "ban": [
+        "dither",
+        "pixelate"
+      ],
+      "motion": 0.5,
+      "pairs": [
+        "microtonal_ambient",
+        "spectral_dub_chamber"
+      ],
+      "refs": [
+        "Ernst Haeckel Kunstformen der Natur Radiolaria Discoidea lithographs",
+        "Ivory plate, carmine vermilion, sulfur ochre, sepia ink",
+        "Basteleur & EB Garamond natural-history plate typography"
+      ]
+    },
+    {
+      "id": "lichtenberg_dielectric",
+      "taxonomy": "new",
+      "name": "Lichtenberg Dielectric Breakdown & Corona",
+      "palette": [
+        "#0A0B0D",
+        "#EAECEF",
+        "#9BA4B0",
+        "#5C7699"
+      ],
+      "sources": [
+        "FieldPixel"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [
+        "gradientmap"
+      ],
+      "ban": [
+        "dither",
+        "pixelate"
+      ],
+      "motion": 0.65,
+      "pairs": [
+        "spectral_dub_chamber",
+        "glitch"
+      ],
+      "refs": [
+        "High-voltage dielectric breakdown dendritic fractals in cast acrylic",
+        "Obsidian acrylic, high-voltage silver-white, cold quartz",
+        "Karrik & JetBrains Mono high-voltage lab typography"
+      ]
     }
   ]
 }

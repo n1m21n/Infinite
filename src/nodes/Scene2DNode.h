@@ -380,6 +380,20 @@ public:
       return mDoc;
    }
    Layer* FindLayer(int id);
+   // A layer's own locks with every enclosing group's: a locked group locks what is inside (Photoshop).
+   unsigned EffectiveLock(const Layer& l)
+   {
+      unsigned lock = l.lock;
+      for (int p = l.parent, guard = 0; p != 0 && guard < 64; guard++)
+      {
+         const Layer* g = FindLayer(p);
+         if (g == nullptr)
+            break;
+         lock |= g->lock;
+         p = g->parent;
+      }
+      return lock;
+   }
    static const char* LayerFieldName(int field);           // "Opacity", "Shadow size"
    static float* LayerFieldPtr(Layer& l, int field);
    static bool LayerFieldApplies(const Layer& l, int field); // the field means something on this layer kind
@@ -388,7 +402,7 @@ public:
    int SlotFor(int layer, int field, bool make);
    // A new layer above `above` (0: top of the document), inside the same parent.
    Layer& AddLayer(Kind kind, uint64_t uid, int above = 0);
-   void RemoveLayer(int id);         // a group takes its children with it
+   void RemoveLayer(int id, bool settleClips = true);   // a group takes its children with it; false: a scratch layer goes
    void Commit();                    // call after changing a Layer or the Document
 
    // Tree helpers. Order in Layers() is bottom to top; children follow the
@@ -398,7 +412,7 @@ public:
    int Depth(int id);
    // Moves `id` to sit just above `target` (or below when `below`), taking
    // target's parent; into = put it inside the group `target` at the top.
-   void MoveLayer(int id, int target, bool below, bool into = false);
+   void MoveLayer(int id, int target, bool below, bool into = false, bool settleClips = true);
    int GroupLayers(const std::vector<int>& ids);   // returns the new group's id
    void Ungroup(int group);
    int Duplicate(int id);
@@ -466,6 +480,15 @@ public:
    bool RenderBelow(int id, int frameId, std::vector<uint8_t>& rgba);
    // Only these layers (and what they hold) drawn as they look, the groups holding them passed through.
    bool RenderSet(const std::vector<int>& set, int frameId, std::vector<uint8_t>& rgba);
+   // The box (document px) of what these layers show as they look: masks, crops and empty pixels left out. False
+   // when nothing shows.
+   bool VisibleBounds(const std::vector<int>& set, int frameId, float lo[2], float hi[2]);
+   // Photoshop's Cmd-click on a layer thumbnail: what the layer shows (masks included) becomes the selection, by op.
+   bool SelectLayerPixels(int id, int op, int frameId);
+   bool SelectMaskPixels(int id, int op);   // the pixel mask as the selection
+   // The selection `was` (bottom row first) carried along by a layer moving from `before` to `after`: the marquee
+   // follows the pixels it lifted.
+   void CarrySelection(const std::vector<uint8_t>& was, const Layer& before, const Layer& after);
 
    // Document edits that keep every layer's picture where it is.
    void CanvasSize(int w, int h, int anchor);   // anchor 0..8, row major from top left
@@ -488,6 +511,8 @@ public:
    // Points are document pixels. EndPaint stores the touched tiles and commits.
    bool BeginPaint(int id, int target, const BrushEngine::Brush& b, float x, float y, float pressure);
    void PaintTo(float x, float y, float pressure);
+   void SetPaintMeta(float tiltX, float tiltY, float rotDeg, double timestamp) { mStroke.SetPenMeta(tiltX, tiltY, rotDeg, timestamp); }
+   void PaintTick(float dt) { mStroke.Tick(dt); }
    // The brush may be moving (a modulator on its size / opacity / flow): the stroke follows it from the next dab.
    void PaintFollow(const BrushEngine::Brush& b);
    void EndPaint();
@@ -569,7 +594,8 @@ public:
    // document: its size, then every layer as a paint layer with name, opacity, blend, visibility, clipping,
    // groups and (PSD) pixel masks. Saving cooks first; non-paint layers go out drawn alone. Adjustment layers stay out.
    bool LoadPsd(const std::vector<uint8_t>& bytes, std::string* err = nullptr);
-   bool SavePsd(std::vector<uint8_t>& out, int frameId);
+   // note (optional): what Photoshop will not get live (adjustments left out, gradients and styles as pixels).
+   bool SavePsd(std::vector<uint8_t>& out, int frameId, std::string* note = nullptr);
    bool LoadOra(const std::vector<uint8_t>& bytes, std::string* err = nullptr);
    bool SaveOra(std::vector<uint8_t>& out, int frameId);
    // One layer drawn alone on transparent at full opacity and Normal, rows top-down (after a cook).
@@ -596,6 +622,10 @@ public:
    // Sibling layers drawn together become one Normal paint layer in the lowest one's place (Merge Down / Visible,
    // Flatten); hidden ones in the set are dropped. The new id, 0 when it cannot (layers at different levels).
    int MergeLayers(const std::vector<int>& ids, int frameId);
+   // A lifted piece put back down (Photoshop's floating selection): `from` drawn plain (no masks, styles or effects,
+   // Normal, full strength) into paint layer `into`'s own pixels, then removed. `into` keeps its place, mask, blend
+   // and effects. False (nothing changed) when `into` is not an unlocked paint layer.
+   bool StampLayerInto(int from, int into, int frameId);
    int AddTextLayer(const std::string& text, float x, float y, float boxW, int above = 0);
    // Document px <-> the layer's box px.
    void DocToBox(const Layer& l, float x, float y, float& bx, float& by);
@@ -618,15 +648,60 @@ public:
 
    // Selection: one per document, document-sized, kept in the doc text (undo and save carry it).
    enum SelOp { kSelNew = 0, kSelAdd, kSelSub, kSelIntersect };
-   void SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse);
-   void SelectPolygon(const std::vector<float>& xy, int op, float feather);
+   void SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse, bool aa = false);
+   void SelectPolygon(const std::vector<float>& xy, int op, float feather, bool aa = false);   // aa: 1 px coverage edge (Photoshop's Anti-alias)
    void SelectWand(float x, float y, int tolerance, bool contiguous, int op, bool sampleAll, int layerId);
    void SelectAll();
    void Deselect();
    void InvertSelection();
+   void ShiftSelection(float dx, float dy);   // the marquee moves by whole pixels
    // 0 expand, 1 contract, 2 smooth (rounds corners, drops specks), 3 border (a ring px wide on the edge).
    void ModifySelection(int op, int px);   // 0 expand, 1 contract, 2 smooth, 3 border, 4 feather (soft edges)
    bool HasSelection() const { return mSelAny; }
+   // A text layer's auto name: its first line with any text, cut to at most `maxBytes` on a UTF-8 character
+   // boundary; `cut` says whether it was shortened. Empty when the text has no visible line.
+   static std::string TextName(const std::string& text, size_t maxBytes, bool* cut = nullptr)
+   {
+      size_t at = 0;
+      std::string line;
+      while (at <= text.size())
+      {
+         const size_t nl = text.find('\n', at);
+         line = text.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
+         if (line.find_first_not_of(" \t\r") != std::string::npos || nl == std::string::npos)
+            break;
+         at = nl + 1;
+      }
+      if (line.find_first_not_of(" \t\r") == std::string::npos)
+         line.clear();
+      if (cut != nullptr)
+         *cut = line.size() > maxBytes;
+      if (line.size() > maxBytes)
+      {
+         size_t n = maxBytes;
+         while (n > 0 && ((unsigned char)line[n] & 0xC0) == 0x80)   // never split a multi-byte character
+            n--;
+         line.resize(n);
+      }
+      return line;
+   }
+   // Photoshop's duplicate names: "Layer" -> "Layer copy" -> "Layer copy 2" -> "Layer copy 3".
+   static std::string CopyName(const std::string& name)
+   {
+      const std::string tag = " copy";
+      if (name.size() >= tag.size() && name.compare(name.size() - tag.size(), tag.size(), tag) == 0)
+         return name + " 2";
+      const size_t sp = name.find_last_of(' ');
+      if (sp != std::string::npos && sp + 1 < name.size() && sp >= tag.size() &&
+          name.compare(sp - tag.size(), tag.size(), tag) == 0 &&
+          name.find_first_not_of("0123456789", sp + 1) == std::string::npos && name.size() - sp - 1 < 9)
+         return name.substr(0, sp + 1) + std::to_string(std::stoi(name.substr(sp + 1)) + 1);
+      return name + tag;
+   }
+   // The selection as the CPU holds it (document px, bottom row first, 0..255), and whether a selection-brush stroke
+   // is live on the GPU (then the CPU copy is behind until the stroke ends).
+   const std::vector<uint8_t>& SelectionPixels() const { return mSel; }
+   bool SelectionStrokeLive() const { return mStroke.Active() && mPaintTarget == 2; }
    // Delete / fill: the selected pixels of a paint layer (all of it with no selection) cleared, or covered with a colour.
    bool ClearPixels(int id);
    bool FillPixels(int id, const float rgb[3], float opacity);
@@ -675,6 +750,8 @@ public:
    // Milliseconds of the last cook, for the status bar.
    float CookMs() const { return mCookMs; }
 
+   // A pixel layer from top-down RGBA at (x, y), under `parent` or above layer `above`; its id.
+   int AddFileLayer(int parent, const std::string& name, int x, int y, int w, int h, const std::vector<uint8_t>& rgba, int above = 0);
 private:
    void Parse();
    void Serialize();
@@ -751,7 +828,6 @@ private:
    void SyncSurfaces();
    void StoreTiles(Surface& s, std::vector<std::string>& keys, const int dirty[4]);
    void ResetForFile(int w, int h);
-   int AddFileLayer(int parent, const std::string& name, int x, int y, int w, int h, const std::vector<uint8_t>& rgba);
    bool DocToSurface(const Layer& l, int target, float x, float y, float& sx, float& sy, float& scale);
    std::vector<std::array<float, 6>> SurfaceMirrors(const Layer& l, int target);
    bool EnsurePaintShaders();
@@ -795,6 +871,19 @@ private:
    SelStore mSelStore;
    std::vector<SelStore> mSelSaved;
    void StoreSelection();
+   // The document changed size: the selection moves by (dx, dy) into a w x h frame (Canvas Size, Crop), or goes.
+   void ReframeSelection(int w, int h, int dx, int dy);
+   void ReleaseOrphanClips();
+   // Clip groups follow layers as they are added, moved and deleted (Photoshop, measured in PhotoCraft
+   // clip_group.rs): read before the move, settled after.
+   struct ClipsBefore
+   {
+      std::vector<int> moving, clipped, left;
+      std::vector<std::pair<int, std::vector<int>>> groups;
+   };
+   std::vector<int> ClipGroupOf(int id);
+   ClipsBefore ReadClips(const std::vector<int>& moving);
+   void SettleClips(const std::vector<int>& placed, const ClipsBefore& before);
    void RestoreSelection();
    bool mSelAny = false, mSelDirty = false;
    GLUtil::Fbo mSelTex, mSelOverlay, mSelScratch, mCloneSrc;

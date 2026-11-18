@@ -293,6 +293,7 @@ namespace Platform
    bool GpuPreferenceSupported() { return false; }
    int GpuPreference() { return 0; }
    void SetGpuPreference(int) {}
+   PenSample PenNowSample(GLFWwindow*) { return {}; }
    float PenPressure(GLFWwindow*) { return -1.0f; }
 
    void ShowFatalError(const std::string& title, const std::string& message)
@@ -658,6 +659,24 @@ namespace Platform
       if (outPng.size() < 8 || !std::equal(kSig, kSig + 8, outPng.begin()))
          outPng.clear();
       return !outPng.empty();
+   }
+
+   bool SetClipboardImage(const std::vector<unsigned char>& png, const std::vector<unsigned char>& rgba, int w, int h)
+   {
+      (void)rgba, (void)w, (void)h;
+      if (png.empty())
+         return false;
+      ScopedHostEnvironment hostEnv;
+      const bool onWayland = std::getenv("WAYLAND_DISPLAY") != nullptr && CheckExecutableOnPath("wl-copy");
+      const char* cmd = onWayland ? "wl-copy --type image/png 2>/dev/null"
+                                  : (CheckExecutableOnPath("xclip") ? "xclip -selection clipboard -t image/png -i 2>/dev/null" : nullptr);
+      if (cmd == nullptr)
+         return false;
+      FILE* f = popen(cmd, "w");
+      if (f == nullptr)
+         return false;
+      const bool wrote = fwrite(png.data(), 1, png.size(), f) == png.size();
+      return pclose(f) == 0 && wrote;
    }
 
    void RevealInFileManager(const std::string& path)

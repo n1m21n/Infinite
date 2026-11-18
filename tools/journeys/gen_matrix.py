@@ -111,9 +111,80 @@ def cell(tool, kind):
 TOOLS = ["marquee", "wand", "copy", "cut", "brush", "eraser", "fill", "pick", "blur", "heal", "meshwarp", "move"]
 
 
+def layer_group_journeys():
+    """Layer and group setting journeys written as l_<setting>.json and g_<setting>.json."""
+    out = []
+    # Layer settings over white Back + red T (active)
+    base_l = ["doc 400 300", "layer paint Back", "rect 0 0 400 300 " + WHITE,
+              "layer paint T", "rect 100 75 300 225 " + RED]
+    base_green_l = ["doc 400 300", "layer paint Back", "rect 0 0 400 300 0 1 0",
+                    "layer paint T", "rect 100 75 300 225 " + RED]
+    out += [
+        ("l_opacity", "Layer opacity slider lowers layer strength", "Photoshop layer opacity",
+         base_l, [{"click": "##v2dopacity", "at": [0.5, 0.5]}],
+         ["px 200 150 != 1.00 0.00 0.00", "px 200 150 != 1.00 1.00 1.00"]),
+        ("l_fill", "Layer fill slider lowers interior fill", "Photoshop layer fill",
+         base_l, [{"click": "##v2dfill", "at": [0.5, 0.5]}],
+         ["px 200 150 != 1.00 0.00 0.00", "px 200 150 != 1.00 1.00 1.00"]),
+        ("l_blend", "Layer blend Multiply multiplies over green base", "Photoshop blend mode",
+         base_green_l, [{"click": "##v2dblend"}, {"click": "Multiply"}],
+         ["px 200 150 ~= 0 0 0"]),
+        ("l_visible", "Layer eye button hides layer", "Photoshop layer visibility",
+         base_l, [{"click": "##eye", "nth": 0}],
+         ["px 200 150 ~= " + WHITE]),
+        ("l_lock_pixels", "Lock image pixels blocks Brush strokes", "Photoshop lock pixels",
+         base_l + ["tool Brush", "fg " + BLUE],
+         [{"click": "##lk1"}, {"drag": [150, 150, 250, 150]}],
+         ["px 200 150 ~= " + RED]),
+        ("l_lock_alpha", "Lock transparent pixels paints only inside T", "Photoshop lock transparency",
+         base_l + ["tool Brush", "fg " + BLUE],
+         [{"click": "##lk0"}, {"drag": [50, 150, 250, 150]}],
+         ["px 50 150 ~= " + WHITE, "px 200 150 ~= " + BLUE]),
+        ("l_lock_pos", "Lock position blocks Move drags", "Photoshop lock position",
+         base_l + ["tool Move"],
+         [{"click": "##lk2"}, {"drag": [200, 150, 200, 250]}],
+         ["px 200 150 ~= " + RED]),
+        ("l_mask", "Add layer mask hides painted area with black", "Photoshop add layer mask",
+         base_l + ["tool Brush", "fg 0 0 0"],
+         [{"click": "##v2dmask"}, {"drag": [150, 150, 250, 150]}],
+         ["px 200 150 ~= " + WHITE]),
+        ("l_duplicate", "Duplicate icon copies active layer", "Photoshop duplicate layer",
+         base_l, [{"click": "##v2ddup"}],
+         ["layers == 3"]),
+        ("l_delete", "Delete icon removes active layer", "Photoshop delete layer",
+         base_l, [{"click": "##v2ddel"}],
+         ["layers == 1", "kind T == gone"]),
+    ]
+
+    # Group settings over Back + red T inside group G (active)
+    base_g = ["doc 400 300", "layer paint Back", "rect 0 0 400 300 " + WHITE,
+              "layer paint T", "rect 100 75 300 225 " + RED, "group G T"]
+    base_green_g = ["doc 400 300", "layer paint Back", "rect 0 0 400 300 0 1 0",
+                    "layer paint T", "rect 100 75 300 225 " + RED, "group G T"]
+    out += [
+        ("g_opacity", "Group opacity slider attenuates children", "Photoshop group opacity",
+         base_g, [{"click": "##v2dopacity", "at": [0.5, 0.5]}],
+         ["px 200 150 != 1.00 0.00 0.00", "px 200 150 != 1.00 1.00 1.00"]),
+        ("g_blend", "Group Multiply blend multiplies group over green", "Photoshop group blend mode",
+         base_green_g, [{"click": "##v2dblend"}, {"click": "Multiply"}],
+         ["px 200 150 ~= 0 0 0"]),
+        ("g_visible", "Group eye button hides all children", "Photoshop group visibility",
+         base_g, [{"click": "##eye", "nth": 0}],
+         ["px 200 150 ~= " + WHITE]),
+        ("g_lock_all", "Lock all blocks Move on active group", "Photoshop lock group",
+         base_g + ["tool Move"],
+         [{"click": "##lk3"}, {"drag": [200, 150, 200, 250]}],
+         ["px 200 150 ~= " + RED]),
+        ("g_ungroup", "Cmd+Shift+G ungroups G keeping child T", "Photoshop ungroup",
+         base_g, [{"key": "cmd+shift+g"}],
+         ["layers == 2", "kind G == gone", "px 200 150 ~= " + RED]),
+    ]
+    return out
+
+
 def main():
     for f in os.listdir(OUT):
-        if f.startswith("m_") and f.endswith(".json"):
+        if (f.startswith("m_") or f.startswith("l_") or f.startswith("g_")) and f.endswith(".json"):
             os.remove(os.path.join(OUT, f))
     n = 0
     for tool in TOOLS:
@@ -127,7 +198,14 @@ def main():
             with open(os.path.join(OUT, j["id"] + ".json"), "w") as fh:
                 json.dump(j, fh, indent=1)
             n += 1
-    print("wrote %d cells" % n)
+    ng = 0
+    for jid, title, ref, setup, steps, expect in layer_group_journeys():
+        j = {"id": jid, "title": title, "ref": ref, "ref_steps": len(steps),
+             "setup": setup, "steps": steps, "expect": expect}
+        with open(os.path.join(OUT, jid + ".json"), "w") as fh:
+            json.dump(j, fh, indent=1)
+        ng += 1
+    print("wrote %d cells + %d layer/group journeys" % (n, ng))
 
 
 if __name__ == "__main__":

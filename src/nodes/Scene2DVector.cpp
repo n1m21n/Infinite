@@ -80,6 +80,48 @@ namespace
          xy.push_back(cx + std::cos(a) * rx * k);
          xy.push_back(cy + std::sin(a) * ry * k);
       }
+      // Corner radius (Photoshop's polygon/star Radius): each corner becomes a circular arc tangent to both
+      // sides, the tangent run capped at half the shorter side so neighbouring arcs never cross.
+      if (s.radius <= 0.0f)
+         return;
+      const std::vector<float> v = xy;
+      xy.clear();
+      for (int i = 0; i < n; i++)
+      {
+         const float px = v[((i + n - 1) % n) * 2], py = v[((i + n - 1) % n) * 2 + 1];
+         const float qx = v[i * 2], qy = v[i * 2 + 1];
+         const float nx = v[((i + 1) % n) * 2], ny = v[((i + 1) % n) * 2 + 1];
+         float ux = px - qx, uy = py - qy, wx = nx - qx, wy = ny - qy;
+         const float lu = std::hypot(ux, uy), lw = std::hypot(wx, wy);
+         if (lu < 1e-4f || lw < 1e-4f)
+         {
+            xy.insert(xy.end(), { qx, qy });
+            continue;
+         }
+         ux /= lu, uy /= lu, wx /= lw, wy /= lw;
+         const float half = 0.5f * std::acos(std::clamp(ux * wx + uy * wy, -1.0f, 1.0f));
+         if (half < 1e-3f || half > kPi * 0.5f - 1e-3f)
+         {
+            xy.insert(xy.end(), { qx, qy });
+            continue;
+         }
+         const float t = std::min(s.radius / std::tan(half), 0.5f * std::min(lu, lw));
+         const float r = t * std::tan(half), dc = r / std::sin(half);
+         float bx = ux + wx, by = uy + wy;
+         const float lb = std::hypot(bx, by);
+         bx /= lb, by /= lb;
+         const float ox = qx + bx * dc, oy = qy + by * dc;
+         const float sx = qx + ux * t, sy = qy + uy * t, ex = qx + wx * t, ey = qy + wy * t;
+         float a0 = std::atan2(sy - oy, sx - ox), a1 = std::atan2(ey - oy, ex - ox), d = a1 - a0;
+         while (d > kPi) d -= 2.0f * kPi;
+         while (d < -kPi) d += 2.0f * kPi;
+         const int steps = std::clamp((int)std::ceil(std::fabs(d) * r / 2.0f), 2, 24);
+         for (int k = 0; k <= steps; k++)
+         {
+            const float a = a0 + d * (float)k / (float)steps;
+            xy.insert(xy.end(), { ox + std::cos(a) * r, oy + std::sin(a) * r });
+         }
+      }
    }
 
    void Cubic(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, int steps, std::vector<float>& out)
@@ -1562,7 +1604,7 @@ bool Scene2DNode::RasterizeLayer(int id)
          keys[i] = TileStore::Put(tile.data(), tw, th);
    }
    if (l->name.empty())
-      l->name = l->kind == Kind::Text ? l->text.substr(0, 24) : std::string();
+      l->name = l->kind == Kind::Text ? TextName(l->text, 24) : std::string();
    l->kind = Kind::Paint;
    l->pw = w;
    l->ph = h;
@@ -1668,22 +1710,197 @@ int Scene2DNode::MergeLayers(const std::vector<int>& ids, int frameId)
       }
    if (lowest == 0)
       return 0;
-   std::vector<uint8_t> top;
-   if (!RenderSet(set, frameId, top))
-      return 0;
-   if (top.size() != (size_t)mDoc.w * mDoc.h * 4)
+   const int W = mDoc.w, H = mDoc.h;
+   // Pixels past the canvas are kept (PhotoCraft #5067): the frame is the canvas grown to every merged layer's box
+   // (plus room for strokes and glows), rendered a canvas-sized tile at a time with the layers shifted under it.
+   // A fill in the set covers the whole document, so it keeps the canvas frame.
+   float lo[2] = { 0, 0 }, hi[2] = { (float)W, (float)H };
+   bool fill = false;
+   {
+      std::vector<int> todo = set;
+      while (!todo.empty())
+      {
+         const int id = todo.back();
+         todo.pop_back();
+         const Layer* l = FindConst(id);
+         if (l == nullptr || !l->visible)
+            continue;
+         if (l->kind == Kind::Group)
+         {
+            for (int c : ChildrenOf(id))
+               todo.push_back(c);
+            continue;
+         }
+         fill = fill || l->kind == Kind::Fill;
+         if (l->kind == Kind::Fill || l->kind == Kind::Adjust)
+            continue;
+         float c[8];
+         if (!Corners(*l, c))
+            continue;
+         const float pad = (l->kind == Kind::Paint && !l->HasEffects() && !l->AnyFx()) ? 0.0f : 64.0f;
+         for (int k = 0; k < 4; k++)
+         {
+            lo[0] = std::min(lo[0], c[k * 2] - pad), hi[0] = std::max(hi[0], c[k * 2] + pad);
+            lo[1] = std::min(lo[1], c[k * 2 + 1] - pad), hi[1] = std::max(hi[1], c[k * 2 + 1] + pad);
+         }
+      }
+   }
+   int ox = 0, oy = 0, bw = W, bh = H;
+   if (!fill)
+   {
+      ox = (int)std::ceil(std::max(0.0f, -lo[0]));
+      oy = (int)std::ceil(std::max(0.0f, -lo[1]));
+      bw = std::min(GLUtil::kMaxTargetSide, ox + std::max(W, (int)std::ceil(hi[0])));
+      bh = std::min(GLUtil::kMaxTargetSide, oy + std::max(H, (int)std::ceil(hi[1])));
+      if (bw - ox < W || bh - oy < H)   // too big to hold: the canvas alone
+         ox = oy = 0, bw = W, bh = H;
+   }
+   // The lowest layer's blend stays on the result (PhotoCraft merge_down): it is drawn Normal into the merge, so a
+   // Multiply base keeps multiplying what is under it instead of turning into a Normal copy of how it looked.
+   Layer* low = FindLayer(lowest);
+   const int lowBlend = low->kind == Kind::Group ? 0 : low->blend;
+   const int keepBlend = low->blend;
+   if (lowBlend != 0)
+      low->blend = 0;
+   std::vector<uint8_t> big((size_t)bw * bh * 4, 0);
+   bool ok = true;
+   for (int ty = 0; ty < bh && ok; ty += H)
+      for (int tx = 0; tx < bw && ok; tx += W)
+      {
+         const float dx = (float)(ox - tx), dy = (float)(oy - ty);   // document point p lands at p + (ox, oy) - (tx, ty)
+         const bool shift = dx != 0.0f || dy != 0.0f;
+         std::vector<Layer> keep;
+         if (shift)
+         {
+            keep = mLayers;
+            for (Layer& l : mLayers)
+               if (l.kind != Kind::Fill && l.kind != Kind::Group && l.kind != Kind::Adjust)
+                  l.x += dx, l.y += dy;
+         }
+         std::vector<uint8_t> top;
+         ok = RenderSet(set, frameId + (ty / H) * 64 + tx / W, top) && top.size() == (size_t)W * H * 4;
+         if (shift)
+            mLayers = keep;
+         for (int y = 0; ok && y < H && ty + y < bh; y++)
+         {
+            const int n = std::min(W, bw - tx);
+            std::memcpy(&big[((size_t)(ty + y) * bw + tx) * 4], &top[(size_t)y * W * 4], (size_t)n * 4);
+         }
+      }
+   if (FindLayer(lowest) != nullptr)
+      FindLayer(lowest)->blend = keepBlend;
+   if (!ok)
       return 0;
    bool anyPixel = false;
-   std::vector<std::string> keys = TilesOfPicture(top, mDoc.w, mDoc.h, anyPixel);
+   std::vector<std::string> keys = TilesOfPicture(big, bw, bh, anyPixel);
    const std::string name = FindConst(lowest)->name;
    Layer& nl = AddLayer(Kind::Paint, 0, lowest);
+   nl.pw = bw;
+   nl.ph = bh;
+   nl.x = (float)-ox + bw * 0.5f;
+   nl.y = (float)-oy + bh * 0.5f;
    nl.tiles = std::move(keys);
    nl.name = name;
+   nl.blend = lowBlend;
    const int nid = nl.id;
    for (int s : set)
       RemoveLayer(s);
    Commit();
    return nid;
+}
+
+bool Scene2DNode::StampLayerInto(int from, int into, int frameId)
+{
+   Layers();
+   const Layer* d0 = FindConst(into);
+   Layer* f = FindLayer(from);
+   if (d0 == nullptr || f == nullptr || from == into || d0->kind != Kind::Paint || (d0->lock & (kLockPixels | kLockAll)) != 0)
+      return false;
+   // Drawn plain: the source's masks, styles and effects still apply to it once it is back in the source.
+   f->effects.clear();
+   for (Fx& x : f->fx)
+      x.on = false;
+   for (auto& m : f->fxMore)
+      m.second.on = false;
+   f->pmaskOn = f->vmaskOn = false;
+   f->maskUid = 0;
+   f->relief = false;
+   f->fill = 1.0f;
+   std::fill(f->bifT, f->bifT + 4, 0.0f), f->bifT[2] = f->bifT[3] = 1.0f;
+   std::fill(f->bifU, f->bifU + 4, 0.0f), f->bifU[2] = f->bifU[3] = 1.0f;
+   const int W = mDoc.w, H = mDoc.h;
+   // A paint piece is read from its own pixels, so what was dragged or turned past the canvas edge is kept; any
+   // other layer is drawn alone into the document first.
+   std::vector<uint8_t> pic;
+   int pw = W, ph = H;
+   float fbw = 1, fbh = 1;
+   const bool own = f->kind == Kind::Paint && ReadPaint(from, pic, pw, ph) && pic.size() == (size_t)pw * ph * 4 &&
+                    LayerBox(*f, fbw, fbh);
+   if (!own)
+   {
+      pw = W, ph = H;
+      if (!RenderLayerAlone(from, frameId, pic) || pic.size() != (size_t)W * H * 4)
+         return false;
+   }
+   std::vector<uint8_t> px;
+   int w = 0, h = 0;
+   if (!ReadPaint(into, px, w, h) || px.size() != (size_t)w * h * 4)
+      return false;
+   const Layer dst = *FindConst(into);
+   const Layer piece = *FindConst(from);
+   float bw = (float)w, bh = (float)h;
+   LayerBox(dst, bw, bh);
+   // Each of the layer's pixels reads the piece where it lands (bilinear, premultiplied), Normal over.
+   auto texel = [&](int x, int y, float out[4]) {   // y top down
+      if (x < 0 || y < 0 || x >= pw || y >= ph)
+         return;
+      const uint8_t* s = &pic[((size_t)(own ? ph - 1 - y : y) * pw + x) * 4];   // paint surfaces run bottom first
+      const float a = s[3] / 255.0f;
+      out[0] = s[0] * a, out[1] = s[1] * a, out[2] = s[2] * a, out[3] = a;
+   };
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+      {
+         float dx, dy;
+         BoxToDoc(dst, (x + 0.5f) * bw / (float)w, ((float)(h - 1 - y) + 0.5f) * bh / (float)h, dx, dy);   // surface rows run bottom first
+         if (own)
+         {
+            float qx, qy;
+            DocToBox(piece, dx, dy, qx, qy);
+            dx = qx * (float)pw / std::max(1e-6f, fbw);
+            dy = qy * (float)ph / std::max(1e-6f, fbh);
+         }
+         dx -= 0.5f;
+         dy -= 0.5f;
+         const int x0 = (int)std::floor(dx), y0 = (int)std::floor(dy);
+         if (x0 < -1 || y0 < -1 || x0 >= pw || y0 >= ph)
+            continue;
+         const float fx = dx - x0, fy = dy - y0;
+         float c[4][4] = {};
+         texel(x0, y0, c[0]);
+         texel(x0 + 1, y0, c[1]);
+         texel(x0, y0 + 1, c[2]);
+         texel(x0 + 1, y0 + 1, c[3]);
+         float s[4];
+         for (int k = 0; k < 4; k++)
+            s[k] = (c[0][k] * (1 - fx) + c[1][k] * fx) * (1 - fy) + (c[2][k] * (1 - fx) + c[3][k] * fx) * fy;
+         if (s[3] <= 0.5f / 255.0f)
+            continue;
+         uint8_t* p = &px[((size_t)y * w + x) * 4];
+         const float da = p[3] / 255.0f, oa = s[3] + da * (1.0f - s[3]);
+         for (int k = 0; k < 3; k++)
+            p[k] = (uint8_t)std::clamp(std::lround((s[k] + p[k] * da * (1.0f - s[3])) / oa), 0L, 255L);
+         p[3] = (uint8_t)std::clamp(std::lround(oa * 255.0f), 0L, 255L);
+      }
+   std::vector<uint8_t> top((size_t)w * h * 4);
+   for (int y = 0; y < h; y++)
+      std::memcpy(&top[(size_t)y * w * 4], &px[(size_t)(h - 1 - y) * w * 4], (size_t)w * 4);
+   bool anyPixel = false;
+   std::vector<std::string> keys = TilesOfPicture(top, w, h, anyPixel);
+   FindLayer(into)->tiles = std::move(keys);
+   RemoveLayer(from, false);
+   Commit();
+   return true;
 }
 
 unsigned Scene2DNode::VectorTexture(int id)

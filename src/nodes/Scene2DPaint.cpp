@@ -476,10 +476,11 @@ bool Scene2DNode::HealRegion(std::vector<uint8_t>& px, int w, int h, const std::
 namespace
 {
 
-   // Box blur, three times: close to a gaussian of the same radius.
+   // Box blur, three times: close to a gaussian with sigma = radius (Photoshop's feather; PhotoCraft
+   // feather_sigma). Three passes of half-width r give sigma^2 = r (r + 1).
    void Feather(std::vector<uint8_t>& a, int w, int h, float radius)
    {
-      const int r = (int)std::lround(radius / 1.7f);
+      const int r = (int)std::lround((std::sqrt(1.0f + 4.0f * radius * radius) - 1.0f) * 0.5f);
       if (r < 1)
          return;
       std::vector<float> buf(a.begin(), a.end()), tmp(buf.size());
@@ -518,6 +519,8 @@ namespace
    // sky goes in one click at 20 % as it does there. The per-channel test it replaces stopped far short.
    bool Near(const uint8_t* a, const uint8_t* b, int tol)
    {
+      if (a[3] == 0 && b[3] == 0)
+         return true;   // two clear pixels are the same, whatever RGB they hide (Photoshop, PhotoCraft)
       int d2 = 0;
       for (int c = 0; c < 4; c++)
       {
@@ -528,8 +531,63 @@ namespace
       return (float)d2 <= r * r;
    }
 
+   // Squared Euclidean distance to the nearest seed (Felzenszwalb & Huttenlocher), in place over a w x h grid:
+   // seeds hold 0, the rest a large value.
+   void Edt1(const float* f, float* d, int* v, float* z, int n)
+   {
+      int k = 0;
+      v[0] = 0;
+      z[0] = -1e20f;
+      z[1] = 1e20f;
+      for (int q = 1; q < n; q++)
+      {
+         float s = ((f[q] + (float)q * q) - (f[v[k]] + (float)v[k] * v[k])) / (2.0f * q - 2.0f * v[k]);
+         while (s <= z[k])
+         {
+            k--;
+            s = ((f[q] + (float)q * q) - (f[v[k]] + (float)v[k] * v[k])) / (2.0f * q - 2.0f * v[k]);
+         }
+         k++;
+         v[k] = q;
+         z[k] = s;
+         z[k + 1] = 1e20f;
+      }
+      k = 0;
+      for (int q = 0; q < n; q++)
+      {
+         while (z[k + 1] < q)
+            k++;
+         d[q] = (float)(q - v[k]) * (q - v[k]) + f[v[k]];
+      }
+   }
+   std::vector<float> Edt2(const std::vector<uint8_t>& seed, int w, int h)
+   {
+      const float kInf = 1e18f;
+      std::vector<float> g((size_t)w * h);
+      for (size_t i = 0; i < g.size(); i++)
+         g[i] = seed[i] ? 0.0f : kInf;
+      const int n = std::max(w, h);
+      std::vector<float> f(n), d(n), z(n + 1);
+      std::vector<int> v(n);
+      for (int x = 0; x < w; x++)
+      {
+         for (int y = 0; y < h; y++) f[y] = g[(size_t)y * w + x];
+         Edt1(f.data(), d.data(), v.data(), z.data(), h);
+         for (int y = 0; y < h; y++) g[(size_t)y * w + x] = d[y];
+      }
+      for (int y = 0; y < h; y++)
+      {
+         std::copy(&g[(size_t)y * w], &g[(size_t)y * w] + w, f.begin());
+         Edt1(f.data(), d.data(), v.data(), z.data(), w);
+         std::copy(d.begin(), d.begin() + w, &g[(size_t)y * w]);
+      }
+      return g;
+   }
+
    float SeedDist(const uint8_t* a, const uint8_t* b)
    {
+      if (a[3] == 0 && b[3] == 0)
+         return 0.0f;
       int d2 = 0;
       for (int c = 0; c < 4; c++)
       {
@@ -668,6 +726,41 @@ bool Scene2DNode::MaskFromSelection(int id)
    StoreTiles(it->second, l->mtiles, all);
    l = FindLayer(id);
    Commit();
+   return true;
+}
+
+// Cmd-click on a mask thumbnail: the mask's grey, through the layer's box, as the selection (Photoshop's load mask).
+bool Scene2DNode::SelectMaskPixels(int id, int op)
+{
+   SyncSurfaces();
+   const Layer* l = FindConst(id);
+   auto it = mMasks.find(id);
+   if (l == nullptr || !l->HasPixelMask() || it == mMasks.end() || it->second.fbo.fbo == 0)
+      return false;
+   const int mw = l->mw, mh = l->mh;
+   std::vector<uint8_t> m;
+   ReadRect(it->second.fbo, 0, 0, mw, mh, m);
+   float bw = 1, bh = 1;
+   if (!LayerBox(*l, bw, bh))
+      return false;
+   const Layer box = *l;
+   const int w = mDoc.w, h = mDoc.h;
+   if (mSel.size() != (size_t)w * h)
+      mSel.assign((size_t)w * h, 0);
+   for (int y = 0; y < h; y++)   // document rows top-down; the selection keeps the bottom row first
+      for (int x = 0; x < w; x++)
+      {
+         float bx = 0, by = 0;
+         DocToBox(box, x + 0.5f, y + 0.5f, bx, by);
+         const int ix = (int)std::floor(bx * mw / bw), iy = (int)std::floor(mh - by * mh / bh);
+         const int a = ix >= 0 && iy >= 0 && ix < mw && iy < mh ? m[((size_t)iy * mw + ix) * 4] : 0;
+         uint8_t& v = mSel[(size_t)(h - 1 - y) * w + x];
+         v = (uint8_t)(op == kSelAdd ? std::max<int>(v, a) : op == kSelSub ? std::max(0, v - a)
+                                   : op == kSelIntersect ? std::min<int>(v, a) : a);
+      }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+   StoreSelection();
    return true;
 }
 
@@ -822,21 +915,7 @@ void Scene2DNode::ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned
       glBindTexture(GL_TEXTURE_2D, sel);
       glUniform1i(GLUtil::UniformLoc(prog, "uSel"), 2);
       glActiveTexture(GL_TEXTURE0);
-      glUniform1i(GLUtil::UniformLoc(prog, "uHasCov"), coverage != 0 ? 1 : 0);
-      glUniform1i(GLUtil::UniformLoc(prog, "uHasSel"), sel != 0 ? 1 : 0);
-      glUniform1i(GLUtil::UniformLoc(prog, "uOp"), kind == -3 ? 3 : kind == -2 ? 2 : kind < 0 ? 1 : 0);
-      glUniform2f(GLUtil::UniformLoc(prog, "uSurfSize"), (float)sw, (float)sh);
-      glUniform2f(GLUtil::UniformLoc(prog, "uBox"), bw, bh);
-      glUniform2f(GLUtil::UniformLoc(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
-      glUniform3f(GLUtil::UniformLoc(prog, "uMA"), m[0], m[1], m[2]);
-      glUniform3f(GLUtil::UniformLoc(prog, "uMB"), m[3], m[4], m[5]);
-      glUniform4fv(GLUtil::UniformLoc(prog, "uColA"), 1, colA != nullptr ? colA : zero);
-      glUniform4fv(GLUtil::UniformLoc(prog, "uColB"), 1, colB != nullptr ? colB : zero);
-      glUniform1i(GLUtil::UniformLoc(prog, "uKind"), std::max(0, kind));
-      glUniform2f(GLUtil::UniformLoc(prog, "uP0"), p0 != nullptr ? p0[0] : 0.0f, p0 != nullptr ? p0[1] : 0.0f);
-      glUniform2f(GLUtil::UniformLoc(prog, "uP1"), p1 != nullptr ? p1[0] : 1.0f, p1 != nullptr ? p1[1] : 1.0f);
-      glUniform1f(GLUtil::UniformLoc(prog, "uOpacity"), std::clamp(opacity, 0.0f, 1.0f));
-      glUniform1i(GLUtil::UniformLoc(prog, "uLock"), (l.lock & kLockAlpha) != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uLock"), (EffectiveLock(l) & kLockAlpha) != 0 ? 1 : 0);
       glUniform1i(GLUtil::UniformLoc(prog, "uExtend"), mGradExtend);
       glUniform1i(GLUtil::UniformLoc(prog, "uDither"), mGradDither ? 1 : 0);
    });
@@ -878,7 +957,7 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
    }
    else
    {
-      if (l == nullptr || (l->lock & (kLockPixels | kLockAll)) != 0)
+      if (l == nullptr || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
          return false;
       if (target == 0 && l->kind != Kind::Paint)
          return false;
@@ -891,7 +970,7 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
          return false;
       surf = &it->second.fbo;
       if (target == 0)
-         brush.lockAlpha = brush.lockAlpha || (l->lock & kLockAlpha) != 0;
+         brush.lockAlpha = brush.lockAlpha || ((EffectiveLock(*l) & kLockAlpha) != 0 && brush.mode != BrushEngine::kBgErase);   // the background eraser ignores it (Photoshop)
    }
    if (target != 0)
    {
@@ -1093,11 +1172,11 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
 {
    Layers();
    Layer* l = FindLayer(id);
-   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0 || !EnsurePaintShaders())
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0 || !EnsurePaintShaders())
       return false;
    SyncSurfaces();
    auto it = mSurfaces.find(id);
-   if (it == mSurfaces.end() || mOut.fbo == 0)
+   if (it == mSurfaces.end())
       return false;
    const int W = mDoc.w, H = mDoc.h;
    // The region is found in the document: from the picture, or from the layer drawn alone.
@@ -1107,7 +1186,11 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
    const bool aligned = std::fabs(m[0] - 1) < 1e-4f && std::fabs(m[4] - 1) < 1e-4f && std::fabs(m[1]) < 1e-4f &&
                         std::fabs(m[3]) < 1e-4f && std::fabs(m[2]) < 1e-3f && std::fabs(m[5]) < 1e-3f && l->pw == W && l->ph == H;
    if (sampleAll || !aligned)
+   {
+      if (mOut.fbo == 0)
+         return false;   // nothing composed yet to sample
       ReadRect(mOut, 0, 0, W, H, px);
+   }
    else
       ReadRect(it->second.fbo, 0, 0, W, H, px);
    std::vector<uint8_t> region;
@@ -1115,6 +1198,15 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
    MatchRegion(px, W, H, (int)std::floor(x), H - 1 - (int)std::floor(y), tolerance, contiguous, region);
    if (std::none_of(region.begin(), region.end(), [](uint8_t v) { return v != 0; }))
       return false;
+   // A region the selection hides wholly changes nothing (and so is no undo step).
+   if (mSelAny && mSel.size() == region.size())
+   {
+      bool meets = false;
+      for (size_t i = 0; i < region.size() && !meets; i++)
+         meets = region[i] != 0 && mSel[i] != 0;
+      if (!meets)
+         return false;
+   }
    GLUtil::Fbo cov;
    if (!GLUtil::EnsureFbo(cov, W, H, GL_RGBA8, "Scene2DBucket"))
       return false;
@@ -1137,7 +1229,7 @@ bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const
 {
    Layers();
    Layer* l = FindLayer(id);
-   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0 || !EnsurePaintShaders())
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0 || !EnsurePaintShaders())
       return false;
    SyncSurfaces();
    auto it = mSurfaces.find(id);
@@ -1160,7 +1252,7 @@ bool Scene2DNode::ClearPixels(int id)
 {
    Layers();
    Layer* l = FindLayer(id);
-   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll | kLockAlpha)) != 0 || !EnsurePaintShaders())
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll | kLockAlpha)) != 0 || !EnsurePaintShaders())
       return false;
    SyncSurfaces();
    auto it = mSurfaces.find(id);
@@ -1178,7 +1270,7 @@ bool Scene2DNode::FillPixels(int id, const float rgb[3], float opacity)
 {
    Layers();
    Layer* l = FindLayer(id);
-   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0 || !EnsurePaintShaders())
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0 || !EnsurePaintShaders())
       return false;
    SyncSurfaces();
    auto it = mSurfaces.find(id);
@@ -1486,42 +1578,71 @@ bool Scene2DNode::ReadPaint(int id, std::vector<uint8_t>& rgba, int& w, int& h)
 namespace
 {
    // Even-odd scanline fill of a polygon given in document px (y down), into a bottom-row-first buffer.
-   void FillPolygon(const std::vector<float>& xy, int w, int h, std::vector<uint8_t>& out)
+   // aa: four sub-scanlines per row, each span weighed by how much of a pixel it covers, so the edge is one pixel of coverage.
+   void FillPolygon(const std::vector<float>& xy, int w, int h, std::vector<uint8_t>& out, bool aa = false)
    {
       out.assign((size_t)w * h, 0);
       const size_t n = xy.size() / 2;
       if (n < 3)
          return;
-      std::vector<float> xs;
+      std::vector<float> xs, acc(aa ? (size_t)w : 0);
+      const int subs = aa ? 4 : 1;
       for (int y = 0; y < h; y++)
       {
-         const float cy = (float)y + 0.5f;
-         xs.clear();
-         for (size_t i = 0; i < n; i++)
-         {
-            const float x0 = xy[i * 2], y0 = xy[i * 2 + 1];
-            const float x1 = xy[((i + 1) % n) * 2], y1 = xy[((i + 1) % n) * 2 + 1];
-            if ((y0 <= cy && y1 > cy) || (y1 <= cy && y0 > cy))
-               xs.push_back(x0 + (cy - y0) / (y1 - y0) * (x1 - x0));
-         }
-         std::sort(xs.begin(), xs.end());
          uint8_t* row = &out[(size_t)(h - 1 - y) * w];
-         for (size_t k = 0; k + 1 < xs.size(); k += 2)
+         if (aa)
+            std::fill(acc.begin(), acc.end(), 0.0f);
+         for (int s = 0; s < subs; s++)
          {
-            const int a = std::clamp((int)std::lround(xs[k]), 0, w), b = std::clamp((int)std::lround(xs[k + 1]), 0, w);
-            if (b > a)
-               std::memset(row + a, 255, (size_t)(b - a));
+            const float cy = (float)y + ((float)s + 0.5f) / (float)subs;
+            xs.clear();
+            for (size_t i = 0; i < n; i++)
+            {
+               const float x0 = xy[i * 2], y0 = xy[i * 2 + 1];
+               const float x1 = xy[((i + 1) % n) * 2], y1 = xy[((i + 1) % n) * 2 + 1];
+               if ((y0 <= cy && y1 > cy) || (y1 <= cy && y0 > cy))
+                  xs.push_back(x0 + (cy - y0) / (y1 - y0) * (x1 - x0));
+            }
+            std::sort(xs.begin(), xs.end());
+            for (size_t k = 0; k + 1 < xs.size(); k += 2)
+            {
+               if (!aa)
+               {
+                  const int a = std::clamp((int)std::lround(xs[k]), 0, w), b = std::clamp((int)std::lround(xs[k + 1]), 0, w);
+                  if (b > a)
+                     std::memset(row + a, 255, (size_t)(b - a));
+                  continue;
+               }
+               const float xa = std::clamp(xs[k], 0.0f, (float)w), xb = std::clamp(xs[k + 1], 0.0f, (float)w);
+               if (xb <= xa)
+                  continue;
+               const int ia = (int)xa, ib = std::min((int)xb, w - 1);
+               const float wt = 1.0f / (float)subs;
+               if (ia == ib)
+               {
+                  acc[ia] += (xb - xa) * wt;
+                  continue;
+               }
+               acc[ia] += ((float)(ia + 1) - xa) * wt;
+               for (int x = ia + 1; x < ib; x++)
+                  acc[x] += wt;
+               if (ib < w)
+                  acc[ib] += (xb - (float)ib) * wt;
+            }
          }
+         if (aa)
+            for (int x = 0; x < w; x++)
+               row[x] = (uint8_t)std::lround(std::clamp(acc[x], 0.0f, 1.0f) * 255.0f);
       }
    }
 }
 
-void Scene2DNode::SelectPolygon(const std::vector<float>& xy, int op, float feather)
+void Scene2DNode::SelectPolygon(const std::vector<float>& xy, int op, float feather, bool aa)
 {
    Layers();
    const int W = mDoc.w, H = mDoc.h;
    std::vector<uint8_t> t;
-   FillPolygon(xy, W, H, t);
+   FillPolygon(xy, W, H, t, aa);
    if (feather > 0.5f)
       Feather(t, W, H, feather);
    if (mSel.size() != t.size())
@@ -1540,7 +1661,7 @@ void Scene2DNode::SelectPolygon(const std::vector<float>& xy, int op, float feat
    StoreSelection();
 }
 
-void Scene2DNode::SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse)
+void Scene2DNode::SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse, bool aa)
 {
    if (x1 < x0) std::swap(x0, x1);
    if (y1 < y0) std::swap(y0, y1);
@@ -1557,7 +1678,7 @@ void Scene2DNode::SelectRect(float x0, float y0, float x1, float y1, int op, flo
    }
    else
       xy = { x0, y0, x1, y0, x1, y1, x0, y1 };
-   SelectPolygon(xy, op, feather);
+   SelectPolygon(xy, op, feather, aa && ellipse);   // Photoshop's Anti-alias only softens the ellipse
 }
 
 void Scene2DNode::SelectWand(float x, float y, int tolerance, bool contiguous, int op, bool sampleAll, int layerId)
@@ -1609,6 +1730,43 @@ void Scene2DNode::Deselect()
    StoreSelection();
 }
 
+void Scene2DNode::ReframeSelection(int w, int h, int dx, int dy)
+{
+   if (!mSelAny || mSel.size() != (size_t)mDoc.w * mDoc.h)
+   {
+      mSel.clear();
+      mSelAny = false;
+      mSelDirty = true;
+      return;
+   }
+   std::vector<uint8_t> out((size_t)w * h, 0);
+   for (int r = 0; r < h; r++)   // rows bottom first, like the selection
+   {
+      const int sy = (h - 1 - r) - dy;   // the document row it came from, top down
+      if (sy < 0 || sy >= mDoc.h)
+         continue;
+      const int sr = mDoc.h - 1 - sy;
+      for (int x = 0; x < w; x++)
+      {
+         const int sx = x - dx;
+         if (sx >= 0 && sx < mDoc.w)
+            out[(size_t)r * w + x] = mSel[(size_t)sr * mDoc.w + sx];
+      }
+   }
+   mSel = std::move(out);
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   if (!mSelAny)
+      mSel.clear();
+   mSelDirty = true;
+}
+
+void Scene2DNode::ShiftSelection(float dx, float dy)
+{
+   Layers();
+   ReframeSelection(mDoc.w, mDoc.h, (int)std::lround(dx), (int)std::lround(dy));
+   StoreSelection();
+}
+
 void Scene2DNode::InvertSelection()
 {
    Layers();
@@ -1626,31 +1784,20 @@ void Scene2DNode::ModifySelection(int op, int px)
    const int w = mDoc.w, h = mDoc.h, r = std::clamp(px, 1, 100);
    if (!mSelAny || mSel.size() != (size_t)w * h)
       return;
-   // Separable max (grow) or min (shrink) over a (2rr+1) square, a pass per axis.
-   auto morph = [&](const std::vector<uint8_t>& src, bool grow, int rr) {
-      std::vector<uint8_t> tmp(src.size()), dst(src.size());
-      for (int y = 0; y < h; y++)
-         for (int x = 0; x < w; x++)
-         {
-            uint8_t v = grow ? 0 : 255;
-            for (int k = std::max(0, x - rr); k <= std::min(w - 1, x + rr); k++)
-               v = grow ? std::max(v, src[(size_t)y * w + k]) : std::min(v, src[(size_t)y * w + k]);
-            tmp[(size_t)y * w + x] = v;
-         }
-      for (int y = 0; y < h; y++)
-         for (int x = 0; x < w; x++)
-         {
-            uint8_t v = grow ? 0 : 255;
-            for (int k = std::max(0, y - rr); k <= std::min(h - 1, y + rr); k++)
-               v = grow ? std::max(v, tmp[(size_t)k * w + x]) : std::min(v, tmp[(size_t)k * w + x]);
-            dst[(size_t)y * w + x] = v;
-         }
-      return dst;
-   };
-   if (op == 0)
-      mSel = morph(mSel, true, r);
-   else if (op == 1)
-      mSel = morph(mSel, false, r);
+   // Expand / Contract by true distance (PhotoCraft morphology on an EDT): a square grows round corners and
+   // diagonals reach r, not r * sqrt(2). Canvas edges are not seeds.
+   if (op == 0 || op == 1)
+   {
+      std::vector<uint8_t> seed(mSel.size());
+      for (size_t i = 0; i < mSel.size(); i++)
+         seed[i] = op == 0 ? mSel[i] >= 128 : mSel[i] < 128;
+      const std::vector<float> d2 = Edt2(seed, w, h);
+      const float rr = (float)r * r;
+      for (size_t i = 0; i < mSel.size(); i++)
+         mSel[i] = op == 0 ? (d2[i] <= rr ? 255 : 0) : (d2[i] > rr ? 255 : 0);
+   }
+   else if (op == 5)
+      Feather(mSel, w, h, (float)r);   // Select > Modify > Feather: a Gaussian with sigma = radius (Photoshop)
    else if (op == 2 || op == 4)
    {
       // Box blur (running sums, a pass per axis) then a hard cut at half: corners round, specks under r go.
@@ -1682,11 +1829,18 @@ void Scene2DNode::ModifySelection(int op, int px)
    }
    else
    {
-      // A ring r wide straddling the edge: grown by half, minus shrunk by half.
-      const int half = std::max(1, r / 2);
-      const std::vector<uint8_t> out = morph(mSel, true, half), in = morph(mSel, false, half);
+      // A ring r wide straddling the edge, by true distance (round, as Expand / Contract): pixels within half
+      // of the edge on either side.
+      const float half = std::max(1.0f, (float)r * 0.5f), hh = half * half;
+      std::vector<uint8_t> inSeed(mSel.size()), outSeed(mSel.size());
       for (size_t i = 0; i < mSel.size(); i++)
-         mSel[i] = (uint8_t)(out[i] * (255 - in[i]) / 255);
+      {
+         inSeed[i] = mSel[i] >= 128;
+         outSeed[i] = mSel[i] < 128;
+      }
+      const std::vector<float> dIn = Edt2(inSeed, w, h), dOut = Edt2(outSeed, w, h);
+      for (size_t i = 0; i < mSel.size(); i++)
+         mSel[i] = (inSeed[i] ? dOut[i] <= hh : dIn[i] <= hh) ? 255 : 0;
    }
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
@@ -1856,7 +2010,7 @@ bool Scene2DNode::PatchSelection(int id, float dx, float dy, bool selIsSource, b
 {
    Layers();
    Layer* l = FindLayer(id);
-   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0 || !mSelAny)
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0 || !mSelAny)
       return false;
    SyncSurfaces();
    auto it = mSurfaces.find(id);
@@ -1907,7 +2061,7 @@ bool Scene2DNode::Blemish(int id, float x, float y, float radius)
 {
    Layers();
    Layer* l = FindLayer(id);
-   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0)
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
       return false;
    SyncSurfaces();
    auto it = mSurfaces.find(id);
@@ -2153,7 +2307,7 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const f
 {
    Layers();
    Layer* l = FindLayer(id);
-   if (l == nullptr || l->kind != Kind::Paint || (l->lock & (kLockPixels | kLockAll)) != 0 || from.size() != l->tiles.size())
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0 || from.size() != l->tiles.size())
       return false;
    SyncSurfaces();
    auto it = mSurfaces.find(id);

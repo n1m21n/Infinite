@@ -3357,6 +3357,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "ethio-jazz-farfisa-vibrato-synth",
+      "name": "Ethio-Jazz Farfisa Vibrato Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "1970s Addis Ababa transistor organ synthesizer with 4-drawbar harmonic bank, key-click transient, diode saturation, and dual-rate vibrato.",
+      "price": 0,
+      "preview": "assets/templates/ethio-jazz-farfisa-vibrato-synth.webp",
+      "file": "assets/templates/ethio-jazz-farfisa-vibrato-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "ethio-jazz-tizita-reed-horn-synth",
+      "name": "Ethio-Jazz Tizita Reed Horn Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Expressive Ethio-jazz brass-reed solo synthesizer with wavefolded mouth-pressure excitation and dual formant horn resonator.",
+      "price": 0,
+      "preview": "assets/templates/ethio-jazz-tizita-reed-horn-synth.webp",
+      "file": "assets/templates/ethio-jazz-tizita-reed-horn-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "spectral-dub-binaural-allpass-fx",
+      "name": "Spectral Dub Binaural Allpass FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Deep dub chamber processor with 4-stage dispersed allpass cascade, cross-coupled resonant bandpass feedback, and warm transformer saturation.",
+      "price": 0,
+      "preview": "assets/templates/spectral-dub-binaural-allpass-fx.webp",
+      "file": "assets/templates/spectral-dub-binaural-allpass-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "spectral-dub-tape-resonator-fx",
+      "name": "Spectral Dub Tape Resonator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "King Tubby inspired dual-head tape resonator with capstan wow-flutter drift, resonant SVF dub sweep, and oxide hysteresis warmth.",
+      "price": 0,
+      "preview": "assets/templates/spectral-dub-tape-resonator-fx.webp",
+      "file": "assets/templates/spectral-dub-tape-resonator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
   "count": 205

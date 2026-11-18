@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Haeckel Radiolaria Spicule Corona",
+    "author": "Infinite",
+    "description": "Dark-field optical microscopy of a spherical Polycyttaria radiolarian silica shell with concentric geodesic pore rings and radiating axopodia.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float shellRad = 0.48 [0.25, 0.72];\nparam float ringFreq = 24.0 [10.0, 42.0];\nparam float axopodia = 32.0 [12.0, 56.0];\nparam float glow = 0.85 [0.2, 1.4];\nparam float twist = 0.35 [0.0, 1.2];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\na = atan2(p.y, p.x);\n\n# Geodesic silica shell with concentric hexagonal pores\nshell = smoothstep(shellRad + 0.04, shellRad - 0.06, r);\nhexA = sin(r * ringFreq - t * 0.7) * cos(a * 12.0 + sin(r * 8.0));\nhexB = cos(r * ringFreq * 0.5 + a * 6.0);\npores = smoothstep(-0.1, 0.4, hexA * 0.65 + hexB * 0.35);\n\n# Radiating undulating axopodia filaments\nwaveA = a + twist * sin(r * 6.0 - t * 1.1) * 0.14;\nfilaments = pow(abs(cos(waveA * axopodia * 0.5)), 10.0);\ncoronaFade = smoothstep(1.05, shellRad * 0.7, r) * (1.0 - smoothstep(shellRad, shellRad - 0.12, r));\n\ncDark = vec3(0.067, 0.059, 0.071);\ncCarmine = vec3(0.761, 0.216, 0.180);\ncOchre = vec3(0.910, 0.745, 0.310);\ncIvory = vec3(0.973, 0.957, 0.910);\n\ninner = mix(cCarmine, cOchre, clamp(pores * 0.85, 0.0, 1.0));\ncol = mix(cDark, inner * glow, shell);\ncol = mix(col, cIvory, shell * (1.0 - pores) * 0.38);\ncol = col + mix(cOchre, cIvory, 0.55) * filaments * coronaFade * glow * 0.92;\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "shellRad": 0.48,
+      "ringFreq": 24.0,
+      "axopodia": 32.0,
+      "glow": 0.85,
+      "twist": 0.35
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

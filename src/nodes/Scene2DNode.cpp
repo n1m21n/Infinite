@@ -701,6 +701,7 @@ namespace
          "uniform vec4 uColA;\n"
          "uniform vec4 uColB;\n"
          "uniform int uLinear;\n"
+         "uniform int uHead;\n"   // headroom on: light above 1.0 survives the adjustment (Photoshop 32-bit)
          "uniform vec4 uLevels;\n"
          "uniform float uLut[64];\n"
          "uniform float uLutC[192];\n"
@@ -713,6 +714,46 @@ namespace
          "float Lut(float v) { float f = clamp(v, 0.0, 1.0) * 63.0; int i = min(int(f), 62); return mix(uLut[i], uLut[i + 1], f - float(i)); }\n"
          "vec3 Disp(vec4 c) { return uLinear == 1 ? SrgbEncode(max(c.rgb, 0.0)) : c.rgb; }\n"
          "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
+         // Photoshop's Threshold and Gradient Map grey: 0.30 R + 0.59 G + 0.11 B
+         "float LumaPs(vec3 c) { return dot(c, vec3(0.30, 0.59, 0.11)); }\n"
+         // Levels' midtone gamma as Photoshop (PhotoCraft adjust/tone.rs levels_gamma, MIT/Apache-2.0): u^(1/g), but
+         // above 1 a toe a*u - b*u^2.2 of slope 2^g that meets the power curve with the same value and slope.
+         "float LevelsGamma1(float u, float g) {\n"
+         "   float c = 1.0 / g;\n"
+         "   if (u <= 0.0) return 0.0;\n"
+         "   if (g <= 1.0) return pow(u, c);\n"
+         "   float a = exp2(g), q = 2.2;\n"
+         "   float u1 = pow((1.0 - c / q) / (a * (1.0 - 1.0 / q)), 1.0 / (1.0 - c));\n"
+         "   if (u >= u1 || u1 <= 0.0) return pow(u, c);\n"
+         "   float b = (a * u1 - pow(u1, c)) / pow(u1, q);\n"
+         "   if (isinf(b) || isnan(b)) return pow(u, c);\n"
+         "   return a * u - b * pow(u, q);\n"
+         "}\n"
+         // Photoshop's Vibrance on a linear pixel (PhotoCraft adjust/color.rs vibrance_lin, MIT/Apache-2.0): an HSV
+         // change that keeps the hue; above 0 a fitted saturation boost, damped on reds and skin.
+         "vec3 VibranceLin(vec3 c, float v) {\n"
+         "   float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));\n"
+         "   if (mx <= 0.0 || mx - mn <= 1e-9 || v == 0.0) return c;\n"
+         "   float t = 1.0 - mn / mx;\n"
+         "   float shape = t * (1.0 - t) * (2.0 - t + t * t) * mx * max(1.0 - mx, 0.0);\n"
+         "   float t2, v2;\n"
+         "   if (v < 0.0) {\n"
+         "      float a = -v;\n"
+         "      t2 = t * (1.0 - a / 4.0) * (1.0 - a + a * t * (1.0 + t) / 2.0); v2 = mx - a * shape;\n"
+         "   } else {\n"
+         "      float d = mx - mn, h;\n"
+         "      if (mx == c.r) h = mod((c.g - c.b) / d, 6.0); else if (mx == c.g) h = (c.b - c.r) / d + 2.0; else h = (c.r - c.g) / d + 4.0;\n"
+         "      h *= 60.0;\n"
+         "      float w = h <= 30.0 ? 1.0 : h < 45.0 ? (45.0 - h) / 15.0 : h < 300.0 ? 0.0 : (h - 300.0) / 60.0;\n"
+         "      float a = v * (1.0 - w) + 0.64 * pow(v, 1.6) * w;\n"
+         "      float boost = (0.5001 * a + 0.0887 * a * a) * pow(t, 0.4374) * pow(1.0 - t, 0.7573)\n"
+         "                  * exp((-0.8113 + 0.5154 * a + 2.8026 * (1.0 - t)) * max(1.0 - mx, 0.0));\n"
+         "      t2 = min(t * (1.0 + boost), 1.0); v2 = mx + v / 4.0 * shape;\n"
+         "   }\n"
+         "   float m2 = v2 * (1.0 - t2), k = (v2 - m2) / (mx - mn);\n"
+         "   return m2 + (c - mn) * k;\n"
+         "}\n"
+         "vec3 LevelsGamma(vec3 u, float g) { return vec3(LevelsGamma1(u.r, g), LevelsGamma1(u.g, g), LevelsGamma1(u.b, g)); }\n"
          "float LutC(int ch, float v) { float f = clamp(v, 0.0, 1.0) * 63.0; int i = min(int(f), 62); return mix(uLutC[ch * 64 + i], uLutC[ch * 64 + i + 1], f - float(i)); }\n"
          "float Hue(vec3 c) { float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), d = mx - mn;\n"
          "   if (d < 1e-5) return 0.0;\n"
@@ -749,7 +790,7 @@ namespace
          "      float t = (float(kBayer[ip.y * 4 + ip.x]) + 0.5) / 16.0;\n"
          "      c = floor(c * (n - 1.0) + t) / (n - 1.0);\n"
          "   } else if (uType == 3) {\n"
-         "      c = vec3(step(uAmt, Luma(c)));\n"
+         "      c = vec3(step(uAmt, LumaPs(c)));\n"
          "   } else if (uType == 5) {\n"
          "      float n = max(2.0, floor(uAmt + 0.5));\n"
          "      c = floor(c * n) / (n - 1.0);\n"
@@ -757,23 +798,29 @@ namespace
          "   } else if (uType == 6) {\n"
          "      c = c + uAmt;\n"
          "   } else if (uType == 7) {\n"
-         "      float k = uAmt >= 0.0 ? 1.0 / max(1e-3, 1.0 - uAmt) : 1.0 + uAmt;\n"
-         "      c = (c - 0.5) * k + 0.5;\n"
+         // Photoshop's modern Contrast (PhotoCraft adjust/tone.rs modern_contrast, MIT/Apache-2.0, measured within
+         // 0.5/255): a symmetric Hermite S-curve through 0, 0.5 and 1, end slope 1 - c/128, centre slope 1 + c/128.
+         // The amount -1..1 is Photoshop's -50..100.
+         "      float k = (uAmt >= 0.0 ? uAmt * 100.0 : uAmt * 50.0) / 128.0, ed = 1.0 - k, md = 1.0 + k;\n"
+         "      vec3 v = clamp(c, 0.0, 1.0), lo = step(v, vec3(0.5)), t = mix((1.0 - v) * 2.0, v * 2.0, lo);\n"
+         "      vec3 t2 = t * t, t3 = t2 * t;\n"
+         "      vec3 h = ed * 0.5 * (t3 - 2.0 * t2 + t) + (3.0 * t2 - 2.0 * t3) * 0.5 + md * 0.5 * (t3 - t2);\n"
+         "      c = mix(1.0 - h, h, lo);\n"
          "   } else if (uType == 8) {\n"
-         "      float a = radians(uAmt);\n"
-         "      vec3 k = vec3(0.57735);\n"
-         "      c = c * cos(a) + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cos(a));\n"
+         // HSL hue shift: lightness and saturation (so max and min) stay, as in Photoshop
+         "      float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));\n"
+         "      c = mn + (mx - mn) * HueRgb(Hue(c) * 360.0 + uAmt);\n"
          "   } else if (uType == 9) {\n"
          "      c = mix(vec3(Luma(c)), c, uAmt);\n"
          "   } else if (uType == 10) {\n"
          "      vec3 l = uLinear == 1 ? max(src.rgb, 0.0) : SrgbDecode(c);\n"
          "      l *= exp2(uAmt);\n"
-         "      c = SrgbEncode(clamp(l, 0.0, 1.0));\n"
+         "      c = SrgbEncode(uHead == 1 ? l : clamp(l, 0.0, 1.0));\n"
          "   } else if (uType == 11) {\n"
          "      c = mix(c, 1.0 - c, uAmt);\n"
          "   } else if (uType == 12) {\n"
          "      c = clamp((c - uLevels.x) / max(uLevels.y - uLevels.x, 1e-3), 0.0, 1.0);\n"
-         "      c = pow(c, vec3(1.0 / max(uAmt, 0.01)));\n"
+         "      c = LevelsGamma(c, max(uAmt, 0.01));\n"
          "      c = mix(vec3(uLevels.z), vec3(uLevels.w), c);\n"
          "      for (int i = 0; i < 3; i++) {\n"
          "         vec4 L = uLvCh[i];\n"
@@ -783,15 +830,28 @@ namespace
          "      vec3 m = vec3(Lut(c.r), Lut(c.g), Lut(c.b));\n"
          "      m = vec3(LutC(0, m.r), LutC(1, m.g), LutC(2, m.b));\n"
          "      c = mix(c, m, uAmt);\n"
-         "   } else if (uType == 14) {\n"   // colour balance: shift shadows, mids and highlights, keep the lightness
-         "      float l = Luma(c);\n"
-         "      float ws = 1.0 - smoothstep(0.0, 0.5, l), wh = smoothstep(0.5, 1.0, l), wm = max(0.0, 1.0 - ws - wh);\n"
-         "      vec3 sh = ws * vec3(uP[0], uP[1], uP[2]) + wm * vec3(uP[3], uP[4], uP[5]) + wh * vec3(uP[6], uP[7], uP[8]);\n"
-         "      vec3 n = clamp(c + sh * 0.4 * uAmt, 0.0, 1.0);\n"
-         "      c = n + (l - Luma(n));\n"
-         "   } else if (uType == 15) {\n"   // vibrance: dull colours gain most, grey and strong ones stay
-         "      float k = uAmt >= 0.0 ? 1.0 + uAmt * (1.0 - Sat(c)) * 1.5 : 1.0 + uAmt;\n"
-         "      c = mix(vec3(Luma(c)), c, k);\n"
+         "   } else if (uType == 14) {\n"   // colour balance: Photoshop's, Preserve Luminosity on (PhotoCraft color_balance_channel):
+         "      vec3 S = vec3(uP[0], uP[1], uP[2]) * 100.0, M = vec3(uP[3], uP[4], uP[5]) * 100.0, T = vec3(uP[6], uP[7], uP[8]) * 100.0;\n"
+         "      float smax = max(S.r, max(S.g, S.b)), tmin = min(T.r, min(T.g, T.b)), mmid = (max(M.r, max(M.g, M.b)) + min(M.r, min(M.g, M.b))) * 0.5;\n"
+         "      vec3 o = c;\n"   // the three tones fold into one Levels per channel: black, white, midtone gamma
+         "      for (int i = 0; i < 3; i++) {\n"
+         "         float b = (smax - S[i]) / 255.0, w = 1.0 - (T[i] - tmin) / 255.0;\n"
+         "         float g = exp2((M[i] - mmid) / 100.0), e = 1.0 / max(g, 0.01), v = clamp(c[i], 0.0, 1.0);\n"
+         "         if (v >= w) { o[i] = 1.0; continue; }\n"
+         "         if (v <= b) { o[i] = 0.0; continue; }\n"
+         "         float u = (v - b) / (w - b);\n"
+         "         o[i] = pow(u, e);\n"
+         "         if (g > 1.0) {\n"   // a gamma over 1 starts at slope 2^gamma and joins the power curve in a Hermite
+         "            float s0 = exp2(g), u0 = min(2.0 * pow(s0, 1.0 / (e - 1.0)), 1.0);\n"
+         "            if (u0 > 0.0 && u < u0) {\n"
+         "               float t = u / u0, t2 = t * t, t3 = t2 * t, p = pow(u0, e), d = e * pow(u0, e - 1.0);\n"
+         "               o[i] = clamp((t3 - 2.0 * t2 + t) * u0 * s0 + (3.0 * t2 - 2.0 * t3) * p + (t3 - t2) * u0 * d, 0.0, 1.0);\n"
+         "            }\n"
+         "         }\n"
+         "      }\n"
+         "      c = mix(c, o, uAmt);\n"
+         "   } else if (uType == 15) {\n"   // vibrance: Photoshop's, measured (PhotoCraft vibrance_lin, MIT/Apache-2.0)
+         "      c = SrgbEncode(VibranceLin(SrgbDecode(clamp(c, 0.0, 1.0)), clamp(uAmt, -1.0, 1.0)));\n"
          "   } else if (uType == 16) {\n"   // selective colour: CMYK nudges per hue family, whites, neutrals, blacks
          "      float h = Hue(c), s = Sat(c), l = Luma(c);\n"
          "      float w[9];\n"
@@ -809,15 +869,27 @@ namespace
          "      if (uP[9] > 0.5) m = vec3(m.r);\n"
          "      c = mix(c, m, uAmt);\n"
          "   } else if (uType == 18) {\n"   // black & white: each hue family's weight sets how light it turns
-         "      float h = Hue(c), s = Sat(c);\n"
-         "      float k = 0.0, wsum = 0.0;\n"
-         "      for (int i = 0; i < 6; i++) { float wi = HueW(h, i); k += wi * uP[i]; wsum += wi; }\n"
-         "      float g = Luma(c) + s * (k / max(wsum, 1e-3) - 0.5) * 0.8;\n"
+         // Photoshop's grey (PhotoCraft black_white_gray): smallest channel + weighted secondary (mid - min) and
+         // primary (max - mid) parts; weights reds, yellows, greens, cyans, blues, magentas.
+         "      float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), md = c.r + c.g + c.b - mx - mn;\n"
+         "      int pr = (c.r >= c.g && c.r >= c.b) ? 0 : (c.g >= c.b ? 2 : 4);\n"
+         "      int se = (c.b <= c.r && c.b <= c.g) ? 1 : (c.r <= c.g ? 3 : 5);\n"
+         "      float g = mn + (md - mn) * uP[se] + (mx - md) * uP[pr];\n"
          "      c = mix(c, vec3(g), uAmt);\n"
          "   } else if (uType == 19) {\n"   // photo filter: through a coloured glass, lightness kept if asked
-         "      float l = Luma(c);\n"
-         "      vec3 n = c * mix(vec3(1.0), uColA.rgb, uAmt);\n"
-         "      if (uP[0] > 0.5) n *= l / max(Luma(n), 1e-3);\n"
+         // Photoshop's (PhotoCraft photo_filter_matrix): the pixel's D50 XYZ times the filter's, relative to white,
+         // in linear light; Preserve Luminosity puts the encoded luminosity back as the Luminosity blend does.
+         "      const mat3 toX = mat3(0.4360747, 0.2225045, 0.0139322, 0.3850649, 0.7168786, 0.0971045, 0.1430804, 0.0606169, 0.7141733);\n"
+         "      const mat3 toR = mat3(3.1338561, -0.9787684, 0.0719453, -1.6168667, 1.9161415, -0.2289914, -0.4906146, 0.0334540, 1.4052427);\n"
+         "      vec3 fx = toX * SrgbDecode(clamp(uColA.rgb, 0.0, 1.0));\n"
+         "      vec3 s = 1.0 - uAmt + uAmt * fx / vec3(0.9642, 1.0, 0.8251);\n"
+         "      vec3 n = SrgbEncode(clamp(toR * (s * (toX * SrgbDecode(clamp(c, 0.0, 1.0)))), 0.0, 1.0));\n"
+         "      if (uP[0] > 0.5) {\n"
+         "         n += LumaPs(c) - LumaPs(n);\n"
+         "         float L = LumaPs(n), lo = min(n.r, min(n.g, n.b)), hi = max(n.r, max(n.g, n.b));\n"
+         "         if (lo < 0.0) n = L + (n - L) * L / max(L - lo, 1e-6);\n"
+         "         if (hi > 1.0) n = L + (n - L) * (1.0 - L) / max(hi - L, 1e-6);\n"
+         "      }\n"
          "      c = n;\n"
          "   } else if (uType == 20) {\n"   // shadows / highlights: lift what sits in dark surroundings, calm the bright
          "      float b = texture(uBlurL, vUv).r;\n"
@@ -868,8 +940,8 @@ namespace
          "      vec3 h = (204.0 - 73.0 * k) / 255.0 * u / (u + ap);\n"
          "      c = mix(c, pow(clamp(h, 0.0, 1.0), vec3(max(uP[1], 0.01))), uAmt);\n"
          "   }\n"
-         "   if (uType == 4 || uMap == 1) c = mix(uColA.rgb, uColB.rgb, clamp(Luma(c), 0.0, 1.0));\n"
-         "   c = clamp(c, 0.0, 1.0);\n"
+         "   if (uType == 4 || uMap == 1) c = mix(uColA.rgb, uColB.rgb, clamp(LumaPs(c), 0.0, 1.0));\n"
+         "   c = uHead == 1 && uLinear == 1 ? max(c, 0.0) : clamp(c, 0.0, 1.0);\n"
          "   fragColor = vec4(uLinear == 1 ? SrgbDecode(c) : c, src.a);\n"
          "}\n";
       return src;
@@ -1049,14 +1121,112 @@ Scene2DNode::Layer& Scene2DNode::AddLayer(Kind kind, uint64_t uid, int above)
    return *FindLayer(l.id);
 }
 
-void Scene2DNode::RemoveLayer(int id)
+// Clipped layers clip to the nearest unclipped layer below them in the same parent; one with none is let go.
+void Scene2DNode::ReleaseOrphanClips()
+{
+   std::vector<int> based;   // parents whose children have a base so far, walking bottom up
+   for (Layer& l : mLayers)
+   {
+      const bool hasBase = std::find(based.begin(), based.end(), l.parent) != based.end();
+      if (l.clip && !hasBase)
+         l.clip = false;
+      if (!l.clip && !hasBase)
+         based.push_back(l.parent);
+   }
+}
+
+std::vector<int> Scene2DNode::ClipGroupOf(int id)
+{
+   const Layer* l = FindConst(id);
+   if (l == nullptr)
+      return {};
+   const std::vector<int> kids = ChildrenOf(l->parent);
+   const long idx = std::find(kids.begin(), kids.end(), id) - kids.begin();
+   long base = -1;
+   for (long i = idx; i >= 0 && base < 0; i--)
+      if (!FindConst(kids[i])->clip)
+         base = i;
+   if (base < 0)
+      return {};
+   std::vector<int> g{ kids[base] };
+   for (long i = base + 1; i < (long)kids.size() && FindConst(kids[i])->clip; i++)
+      g.push_back(kids[i]);
+   return g.size() > 1 ? g : std::vector<int>{};
+}
+
+Scene2DNode::ClipsBefore Scene2DNode::ReadClips(const std::vector<int>& moving)
+{
+   ClipsBefore b;
+   b.moving = moving;
+   for (int id : moving)
+   {
+      const Layer* l = FindConst(id);
+      if (l == nullptr)
+         continue;
+      if (l->clip)
+         b.clipped.push_back(id);
+      std::vector<int> g = ClipGroupOf(id);
+      if (g.empty())
+         continue;
+      if (g.front() == id)   // a base: the layers clipped to it lose it unless they move too
+         for (size_t k = 1; k < g.size(); k++)
+            if (std::find(moving.begin(), moving.end(), g[k]) == moving.end())
+               b.left.push_back(g[k]);
+      b.groups.emplace_back(id, std::move(g));
+   }
+   return b;
+}
+
+void Scene2DNode::SettleClips(const std::vector<int>& placed, const ClipsBefore& before)
+{
+   // Topmost first, so a run of placed layers joins together.
+   std::vector<std::pair<int, int>> order;   // stack index, id
+   for (int id : placed)
+      for (int i = 0; i < (int)mLayers.size(); i++)
+         if (mLayers[i].id == id)
+            order.emplace_back(i, id);
+   std::sort(order.rbegin(), order.rend());
+   for (const auto& [at, id] : order)
+   {
+      (void)at;
+      static const std::vector<int> kNone;
+      const std::vector<int>* group = &kNone;
+      for (const auto& g : before.groups)
+         if (g.first == id)
+            group = &g.second;
+      auto in = [](const std::vector<int>& v, int x) { return std::find(v.begin(), v.end(), x) != v.end(); };
+      const std::vector<int> kids = ChildrenOf(FindConst(id)->parent);
+      const long k = std::find(kids.begin(), kids.end(), id) - kids.begin();
+      const Layer* hi = k + 1 < (long)kids.size() ? FindConst(kids[k + 1]) : nullptr;
+      const Layer* lo = k > 0 ? FindConst(kids[k - 1]) : nullptr;
+      // 1. It joins the clip group it lands in: the layer above its slot is clipped (and not travelling with it).
+      const bool joins = hi != nullptr && hi->clip && !(in(before.moving, hi->id) && in(*group, hi->id));
+      // 2. A clipped layer stays clipped while it still sits on a clip group.
+      const bool stays = in(before.clipped, id) && lo != nullptr && (lo->clip || in(*group, lo->id));
+      FindLayer(id)->clip = joins || stays;
+   }
+   // 3. The layers that lost their base are let go; 4. so is a clipped run with nothing below it.
+   for (int id : before.left)
+      if (std::find(placed.begin(), placed.end(), id) == placed.end())
+         if (Layer* l = FindLayer(id))
+            l->clip = false;
+   ReleaseOrphanClips();
+}
+
+void Scene2DNode::RemoveLayer(int id, bool settleClips)
 {
    Layers();
+   const ClipsBefore before = settleClips ? ReadClips({ id }) : ClipsBefore();
+   for (int c : before.left)
+      if (Layer* l = FindLayer(c))
+         l->clip = false;   // deleting a base lets its clipped layers go (Photoshop)
    mLayers.erase(std::remove_if(mLayers.begin(), mLayers.end(), [&](const Layer& l) { return IsInside(l.id, id); }),
                  mLayers.end());
    // Modulator slots of removed layers go too.
    mDoc.slots.erase(std::remove_if(mDoc.slots.begin(), mDoc.slots.end(), [&](const ModSlot& m) { return FindConst(m.layer) == nullptr; }),
                     mDoc.slots.end());
+   if (settleClips)
+      ReleaseOrphanClips();
    Commit();
 }
 
@@ -1093,11 +1263,12 @@ int Scene2DNode::Depth(int id)
    return d;
 }
 
-void Scene2DNode::MoveLayer(int id, int target, bool below, bool into)
+void Scene2DNode::MoveLayer(int id, int target, bool below, bool into, bool settleClips)
 {
    Layers();
    if (id == target || FindConst(id) == nullptr || FindConst(target) == nullptr || IsInside(target, id))
       return;
+   const ClipsBefore before = settleClips ? ReadClips({ id }) : ClipsBefore();
    // Pull out the moving layer and everything under it, in order.
    std::vector<Layer> moving, rest;
    for (const Layer& l : mLayers)
@@ -1124,6 +1295,8 @@ void Scene2DNode::MoveLayer(int id, int target, bool below, bool into)
    }
    moving[0].parent = newParent;
    mLayers.insert(mLayers.begin() + at, moving.begin(), moving.end());
+   if (settleClips)
+      SettleClips({ id }, before);
    Commit();
 }
 
@@ -1148,6 +1321,7 @@ int Scene2DNode::GroupLayers(const std::vector<int>& ids)
    for (const Layer& l : mLayers)
       if (std::find(ids.begin(), ids.end(), l.id) != ids.end())
          order.push_back(l.id);
+   std::vector<int> tops;
    for (int id : order)
    {
       bool parentPicked = false;
@@ -1155,8 +1329,15 @@ int Scene2DNode::GroupLayers(const std::vector<int>& ids)
          if (other != id && IsInside(id, other))
             parentPicked = true;
       if (!parentPicked)
-         MoveLayer(id, gid, false, true);
+         tops.push_back(id);
    }
+   const ClipsBefore before = ReadClips(tops);
+   for (int id : tops)
+      MoveLayer(id, gid, false, true, false);
+   SettleClips(tops, before);
+   g = FindLayer(gid);
+   g->clip = false;
+   g->open = false;   // Group from Layers starts collapsed (Photoshop)
    Commit();
    return gid;
 }
@@ -1198,7 +1379,7 @@ int Scene2DNode::Duplicate(int id)
          if (c.parent == r.first)
             c.parent = r.second;
    if (!copies.empty() && !copies[0].name.empty())
-      copies[0].name += " copy";
+      copies[0].name = CopyName(copies[0].name);
    mLayers.insert(mLayers.begin() + last + 1, copies.begin(), copies.end());
    Commit();
    return copies.empty() ? 0 : copies[0].id;
@@ -1235,7 +1416,7 @@ std::vector<int> Scene2DNode::PasteLayers(const std::vector<Layer>& clip, int ab
    }
    int parentOfPaste = 0;
    if (const Layer* a = FindConst(above))
-      parentOfPaste = a->parent;
+      parentOfPaste = (a->kind == Kind::Group && a->open) ? a->id : a->parent;   // into an open group, on top
    for (Layer& c : copies)
    {
       bool inside = false;
@@ -1487,9 +1668,10 @@ void Scene2DNode::CanvasSize(int w, int h, int anchor)
    }
    for (float& g : mDoc.guidesX) g += dx;
    for (float& g : mDoc.guidesY) g += dy;
+   ReframeSelection(0, 0, 0, 0);   // a new canvas drops the selection (Photoshop, PhotoCraft)
    mDoc.w = w;
    mDoc.h = h;
-   Commit();
+   StoreSelection();   // commits
 }
 
 void Scene2DNode::ImageSize(int w, int h)
@@ -1508,9 +1690,10 @@ void Scene2DNode::ImageSize(int w, int h)
    }
    for (float& g : mDoc.guidesX) g *= kx;
    for (float& g : mDoc.guidesY) g *= ky;
+   ReframeSelection(0, 0, 0, 0);   // resampling drops the selection (Photoshop, PhotoCraft)
    mDoc.w = w;
    mDoc.h = h;
-   Commit();
+   StoreSelection();   // commits
 }
 
 void Scene2DNode::CropTo(float x0, float y0, float x1, float y1)
@@ -1528,9 +1711,10 @@ void Scene2DNode::CropTo(float x0, float y0, float x1, float y1)
    }
    for (float& g : mDoc.guidesX) g -= x0;
    for (float& g : mDoc.guidesY) g -= y0;
+   ReframeSelection(0, 0, 0, 0);   // cropping drops the selection (Photoshop, PhotoCraft)
    mDoc.w = w;
    mDoc.h = h;
-   Commit();
+   StoreSelection();   // commits
 }
 
 // ---- saved text ---------------------------------------------------------
@@ -2651,15 +2835,33 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    }
    if (l.kind == Kind::Group)
    {
-      const bool isolate = l.blend != kPassThrough || a.mask != 0 || l.opacity < 0.999f || clipMode;
-      if (!isolate)
+      // Photoshop (PhotoCraft composite.rs): a Pass Through group below 100% fill or with Blend If renders isolated,
+      // like Normal; otherwise its children land straight in the backdrop, and opacity or a mask mixes that result
+      // back over what was below, so adjustments inside still see the layers beneath the group.
+      const bool pass = l.blend == kPassThrough && !clipMode && l.fill >= 0.999f && a.bif == nullptr;
+      if (pass && a.mask == 0 && l.opacity * opacityMul >= 0.999f)
       {
-         DrawList(l.id, depth, frameId, opacityMul * l.fill);
+         DrawList(l.id, depth, frameId, 1.0f);
          return;
       }
+      Pair& below = PairAt(depth);
       Pair& sub = PairAt(depth + 1);
-      const float clear[4] = { 0, 0, 0, 0 };
-      Clear(sub, clear);
+      if (pass)
+      {
+         GLint prevR = 0, prevD = 0;
+         glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevR);
+         glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevD);
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, below.f[below.cur].fbo);
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sub.f[sub.cur].fbo);
+         glBlitFramebuffer(0, 0, mDoc.w, mDoc.h, 0, 0, mDoc.w, mDoc.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, prevR);
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevD);
+      }
+      else
+      {
+         const float clear[4] = { 0, 0, 0, 0 };
+         Clear(sub, clear);
+      }
       DrawList(l.id, depth + 1, frameId, 1.0f);
       a.tex = PairAt(depth + 1).Tex();
       a.texW = mDoc.w;
@@ -2667,7 +2869,7 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       a.box[0] = (float)mDoc.w;
       a.box[1] = (float)mDoc.h;
       a.srgb = false;   // already in working space
-      a.opacity = l.opacity * opacityMul;
+      a.opacity = l.opacity * l.fill * opacityMul;   // a group has no fill of its own: fill dims it like opacity
       Pass(depth, a);
       return;
    }
@@ -2955,6 +3157,7 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       glUniform4fv(GLUtil::UniformLoc(prog, "uColA"), 1, l.colorA);
       glUniform4fv(GLUtil::UniformLoc(prog, "uColB"), 1, l.colorB);
       glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), mDoc.linear ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHead"), mDoc.headroom ? 1 : 0);
       glUniform4fv(GLUtil::UniformLoc(prog, "uLevels"), 1, l.levels);
       float lut[64];
       CurveLut(l.curve, lut, 64);

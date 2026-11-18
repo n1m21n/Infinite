@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ethio-Jazz Farfisa Vibrato Synth",
+    "author": "Infinite",
+    "description": "1970s Addis Ababa transistor organ synthesizer with 4-drawbar harmonic bank, key-click transient, diode saturation, and dual-rate vibrato.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float vibratoHz = 5.4 [1.5, 9.0];\nparam float vibratoDepth = 0.0085 [0.0, 0.025];\nparam float drawbarMix = 0.68 [0.0, 1.0];\nparam float drive = 1.65 [0.8, 3.5];\nparam float decay = 0.9992 [0.995, 0.9998];\nstate float p1 = 0; state float p2 = 0; state float vibPh = 0;\nstate float env = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.22, env * decay);\nvibPh = (vibPh + vibratoHz / sr) % 1.0;\nf0 = clamp(freq * (1.0 + vibratoDepth * sin(6.2831853 * vibPh)), 40.0, 4200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.0) / sr) % 1.0;\n\nw1 = sin(6.2831853 * p1);\nw2 = sin(6.2831853 * p2);\nw3 = sin(18.849556 * p1);\norgan = (w1 / (1.0 + abs(w1) * 0.5)) * 0.55 + (w2 * 0.36 + w3 * 0.24) * drawbarMix;\nsat = (organ * drive) / (1.0 + abs(organ * drive) * 0.65);\nlp = lp + 0.30 * (sat - lp);\nsig = lp * env * 0.42;\nout = sig / (1.0 + abs(sig) * 0.35);\n",
+    "params": {
+      "vibratoHz": 5.4,
+      "vibratoDepth": 0.0085,
+      "drawbarMix": 0.68,
+      "drive": 1.65,
+      "decay": 0.9992
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

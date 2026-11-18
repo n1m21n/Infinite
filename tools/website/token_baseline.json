@@ -608,6 +608,14 @@
   "embeds/mineral-birefringence-thin-section.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/haeckel-radiolaria-discoidea-lattice.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/haeckel-radiolaria-spicule-corona.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

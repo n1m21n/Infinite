@@ -415,7 +415,19 @@ def build_layers():
                 stale.append("%s/%s -> %s" % (area, n, t))
             (matched if t else missing).append(n)
         rows.append({"area": area, "affinity": names, "matched": matched, "missing": missing})
-    return {"rows": rows, "stale": stale, "extra": LAYER_EXTRA}
+    # Wiring: a mapped setting whose model field has a UI / save / engine gap (field_wiring_audit.py) is not parity.
+    unwired = []
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "parity"))
+        import field_wiring_audit
+        wiring = {r[0].split(".", 1)[1]: r for r in field_wiring_audit.audit()[0]}
+        for (area, n), f in sorted(LAYER_SAME.items()):
+            r = wiring.get(f)
+            if r and r[4] != "ok" and not r[5]:
+                unwired.append("%s/%s -> %s (%s)" % (area, n, f, r[4]))
+    except Exception as e:   # the audit is a cross-check; its failure is reported, not fatal
+        unwired.append("wiring audit failed: %s" % e)
+    return {"rows": rows, "stale": stale, "extra": LAYER_EXTRA, "unwired": unwired}
 
 
 def report_layers(d):
@@ -426,6 +438,8 @@ def report_layers(d):
     for r in d["rows"]:
         L.append("| %s | %d/%d | %s |" % (r["area"], len(r["matched"]), len(r["affinity"]), ", ".join(r["missing"]) or "-"))
     L += ["", "2D View only: " + ", ".join(d["extra"])]
+    if d.get("unwired"):
+        L += ["", "UNWIRED layer mappings (field_wiring_audit.py gap): " + ", ".join(d["unwired"])]
     if d["stale"]:
         L += ["", "STALE layer mappings (not in Scene2DNode.h or View2DPanel.cpp): " + ", ".join(d["stale"])]
     return "\n".join(L)
@@ -452,7 +466,7 @@ def main():
     with open(os.path.join(OUT, "inventory.json"), "w") as f:
         json.dump(d, f, indent=1)
     print(md)
-    return 1 if d["stale"] or d["layers"]["stale"] else 0
+    return 1 if d["stale"] or d["layers"]["stale"] or d["layers"]["unwired"] else 0
 
 
 if __name__ == "__main__":

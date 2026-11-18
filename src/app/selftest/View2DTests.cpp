@@ -1274,6 +1274,60 @@ void RunView2DTest()
       const float e[3] = { 10.0f, 5.0f, 20.0f };
       Check("B8: no prediction from a still pen or one time", !BrushEngine::Stroke::Predict(b, e, 8.0f, 100.0f, to)
                                                               && !BrushEngine::Stroke::Predict(a, a, 8.0f, 100.0f, to));
+
+      // Phase 5 brush feel: Hard round defaults, OneEuro smoothing, catch-up toggle, tilt dynamics, airbrush tick.
+      Check("Phase5: Hard round starts with pressureSize off and <=5% spacing",
+            !BrushEngine::Presets()[5].brush.pressureSize && BrushEngine::Presets()[5].brush.spacing <= 0.055f);
+      BrushEngine::Brush euro = pen;
+      euro.smoothing = 0.85f;
+      euro.oneEuro = true;
+      const int wEuro = Wobble(Shaky(euro));
+      Check("Phase5: OneEuro smoothing reduces shaky wobble", wEuro * 3 < wRaw);
+
+      BrushEngine::Brush noCatch = pen;
+      noCatch.stabiliser = 12;
+      noCatch.catchUp = false;
+      const std::vector<float> shortEnd = Shaky(noCatch);
+      Check("Phase5: catchUp=false stops short of the pen lift", !Lit(shortEnd, 279, 100));
+
+      while (!pic.Layers().empty())
+         pic.Layers().pop_back();
+      pic.Commit();
+      const int tiltL = pic.AddPaintLayer();
+      BrushEngine::Brush tilted = BrushEngine::Presets()[5].brush;
+      tilted.size = 12.0f;
+      tilted.tiltSize = true;
+      tilted.tiltRound = true;
+      tilted.color[0] = tilted.color[1] = tilted.color[2] = 1.0f;
+      pic.SetPaintMeta(0.9f, 0.0f, 0.0f, 1.0);
+      pic.BeginPaint(tiltL, 0, tilted, 150.0f, 100.0f, 1.0f);
+      pic.EndPaint();
+      Cook(&pic);
+      std::vector<float> tiltPx((size_t)300 * 200 * 4);
+      glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
+      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, tiltPx.data());
+      glBindTexture(GL_TEXTURE_2D, 0);
+      Check("Phase5: tiltSize widens a tilted dab beyond flat radius", Lit(tiltPx, 159, 100));
+
+      BrushEngine::Brush air = BrushEngine::Presets()[4].brush;
+      Check("Phase5: Soft airbrush has airbrushRate > 0", air.airbrushRate > 0.0f);
+      while (!pic.Layers().empty())
+         pic.Layers().pop_back();
+      pic.Commit();
+      const int airL = pic.AddPaintLayer();
+      air.size = 24.0f;
+      air.pressureOpacity = false;
+      air.opacity = 1.0f;
+      air.flow = 0.1f;
+      air.color[0] = air.color[1] = air.color[2] = 1.0f;
+      pic.BeginPaint(airL, 0, air, 150.0f, 100.0f, 1.0f);
+      Cook(&pic);
+      const float air0 = Pixel(&pic, 150, 100)[0];
+      pic.PaintTick(0.15f);
+      Cook(&pic);
+      const float air1 = Pixel(&pic, 150, 100)[0];
+      pic.EndPaint();
+      Check("Phase5: airbrush Tick builds up paint while held still", air1 > air0 + 0.05f);
    }
 
    // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----
@@ -1998,6 +2052,118 @@ void RunView2DTest()
          printf("  M3b below cache vs full redraw: worst difference %.6f\n", worstCache);
          Check("M3b: below cache matches a full redraw", worstCache < 2e-3);
          Check("M3b: an upper-layer edit is faster than a bottom one", topMs < median && midMs < median);
+      }
+
+      // Phase 4: Layer & Group setting-delta sweep (each compositing setting must change pixels; label/noExport keep comp identical).
+      {
+         auto Grab = [&](Scene2DNode& pic)
+         {
+            Cook(&pic);
+            const int w = pic.GetOutputWidth(), h = pic.GetOutputHeight();
+            std::vector<float> px((size_t)w * h * 4);
+            glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+            glBindTexture(GL_TEXTURE_2D, 0);
+            return px;
+         };
+         auto MaxDiff = [](const std::vector<float>& a, const std::vector<float>& b)
+         {
+            float d = 0.0f;
+            for (size_t i = 0; i < a.size() && i < b.size(); i++)
+               d = std::max(d, std::fabs(a[i] - b[i]));
+            return d;
+         };
+
+         // 1) Layer setting delta sweep
+         {
+            Scene2DNode pic;
+            NewPic(pic, 400, 300);
+            pic.Doc().linear = false;
+            Card(pic, 200, 150, 160, 160, 0.2f, 0.4f, 0.8f);
+            const int topId = Card(pic, 200, 150, 220, 90, 0.9f, 0.3f, 0.1f);
+            const std::vector<float> basePx = Grab(pic);
+
+            auto Delta = [&](const char* name, std::function<void(Layer&)> fn, float minD, bool wantChange)
+            {
+               Layer orig = *pic.FindLayer(topId);
+               fn(*pic.FindLayer(topId));
+               pic.Commit();
+               const float d = MaxDiff(basePx, Grab(pic));
+               Check((std::string("Delta layer ") + name).c_str(), wantChange ? (d > minD) : (d < 1e-5f));
+               *pic.FindLayer(topId) = orig;
+               pic.Commit();
+            };
+
+            Delta("opacity", [](Layer& l) { l.opacity = 0.5f; }, 0.05f, true);
+            Delta("fill", [](Layer& l) { l.fill = 0.5f; }, 0.05f, true);
+            Delta("blend", [](Layer& l) { l.blend = 2; }, 0.05f, true);
+            Delta("visible", [](Layer& l) { l.visible = false; }, 0.05f, true);
+            Delta("clip", [](Layer& l) { l.clip = true; }, 0.05f, true);
+            Delta("bifT", [](Layer& l) { l.bifT[0] = 0.9f; l.bifT[1] = 0.95f; }, 0.05f, true);
+            Delta("bifU", [](Layer& l) { l.bifU[0] = 0.9f; l.bifU[1] = 0.95f; }, 0.05f, true);
+            Delta("fx on", [](Layer& l) {
+               auto& s = l.fx[Scene2DNode::kFxShadow];
+               s.on = true; s.size = 12.0f; s.dist = 10.0f; s.c[3] = 0.9f;
+            }, 0.05f, true);
+            Delta("label unchanged", [](Layer& l) { l.label = 3; }, 0.0f, false);
+            Delta("noExport unchanged", [](Layer& l) { l.noExport = true; }, 0.0f, false);
+
+            // blendGamma: compare 1.0 vs 2.2 at 50% opacity
+            pic.FindLayer(topId)->opacity = 0.5f;
+            pic.FindLayer(topId)->blendGamma = 1.0f;
+            pic.Commit();
+            const std::vector<float> g1 = Grab(pic);
+            pic.FindLayer(topId)->blendGamma = 2.2f;
+            pic.Commit();
+            Check("Delta layer blendGamma", MaxDiff(g1, Grab(pic)) > 0.01f);
+         }
+
+         // 2) Group setting delta sweep
+         {
+            Scene2DNode pic;
+            NewPic(pic, 400, 300);
+            pic.Doc().linear = false;
+            Card(pic, 200, 150, 260, 220, 0.2f, 0.5f, 0.8f);
+            const int c1 = Card(pic, 200, 150, 120, 100, 0.9f, 0.2f, 0.2f);
+            Layer& adj = pic.AddLayer(Kind::Adjust, 0, c1);
+            adj.adjType = Scene2DNode::kAdjInvert;
+            adj.adjAmt = adj.adjTo = 1.0f;
+            const int gid = pic.GroupLayers({ c1, adj.id });
+            Check("Delta group setup", gid != 0);
+            if (gid != 0)
+            {
+               const std::vector<float> basePx = Grab(pic);
+               auto DeltaG = [&](const char* name, std::function<void(Layer&)> fn, float minD, bool wantChange)
+               {
+                  Layer orig = *pic.FindLayer(gid);
+                  fn(*pic.FindLayer(gid));
+                  pic.Commit();
+                  const float d = MaxDiff(basePx, Grab(pic));
+                  Check((std::string("Delta group ") + name).c_str(), wantChange ? (d > minD) : (d < 1e-5f));
+                  *pic.FindLayer(gid) = orig;
+                  pic.Commit();
+               };
+               DeltaG("opacity", [](Layer& l) { l.opacity = 0.5f; }, 0.05f, true);
+               DeltaG("blend (PassThrough vs Normal)", [](Layer& l) { l.blend = 0; }, 0.05f, true);
+               DeltaG("visible", [](Layer& l) { l.visible = false; }, 0.05f, true);
+               DeltaG("bifT", [](Layer& l) { l.bifT[0] = 0.9f; l.bifT[1] = 0.95f; }, 0.05f, true);
+               DeltaG("bifU", [](Layer& l) { l.bifU[0] = 0.9f; l.bifU[1] = 0.95f; }, 0.05f, true);
+               DeltaG("fx on", [](Layer& l) {
+                  auto& s = l.fx[Scene2DNode::kFxShadow];
+                  s.on = true; s.size = 12.0f; s.dist = 10.0f; s.c[3] = 0.9f;
+               }, 0.05f, true);
+               DeltaG("label unchanged", [](Layer& l) { l.label = 4; }, 0.0f, false);
+               DeltaG("noExport unchanged", [](Layer& l) { l.noExport = true; }, 0.0f, false);
+
+               pic.FindLayer(gid)->opacity = 0.5f;
+               pic.FindLayer(gid)->blendGamma = 1.0f;
+               pic.Commit();
+               const std::vector<float> g1 = Grab(pic);
+               pic.FindLayer(gid)->blendGamma = 2.2f;
+               pic.Commit();
+               Check("Delta group blendGamma", MaxDiff(g1, Grab(pic)) > 0.01f);
+            }
+         }
       }
    }
 

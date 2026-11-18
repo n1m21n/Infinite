@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spectral Dub Tape Resonator FX",
+    "author": "Infinite",
+    "description": "King Tubby inspired dual-head tape resonator with capstan wow-flutter drift, resonant SVF dub sweep, and oxide hysteresis warmth.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float sweepHz = 0.85 [0.1, 4.0];\nparam float cutoffHz = 1650.0 [220.0, 4800.0];\nparam float res = 0.54 [0.1, 0.85];\nparam float oxideDrive = 1.55 [0.7, 3.0];\nparam float mix = 0.86 [0.0, 1.0];\nstate float ph = 0; state float bp = 0; state float lp = 0;\nstate float hyst = 0; state float s1 = 0; state float s2 = 0;\n\nph = (ph + sweepHz / sr) % 1.0;\nwow = sin(6.2831853 * ph) * 0.42 + sin(6.2831853 * ph * 2.7) * 0.18;\nmodHz = clamp(cutoffHz * (0.62 + 0.38 * wow), 140.0, 6200.0);\ng = clamp(2.0 * sin(3.14159265 * modHz / sr), 0.02, 0.88);\nq = 1.12 - res * 0.88;\n\n# Oxide magnetic hysteresis\ndrIn = in * oxideDrive;\nhyst = hyst + 0.14 * ((drIn / (1.0 + abs(drIn) * 0.75)) - hyst);\ndriveSig = hyst * 0.72 + in * 0.28;\n\nbp = bp + g * (driveSig - lp - q * bp);\nlp = lp + g * bp;\nfilt = lp * 0.74 + bp * 0.42;\n\n# Dual-head tape dispersion allpass\ny1 = -0.58 * filt + s1; s1 = filt + 0.58 * y1;\ny2 = -0.58 * y1 + s2; s2 = y1 + 0.58 * y2;\nwet = (filt * 0.55 + y2 * 0.55);\nsat = wet / (1.0 + abs(wet) * 0.35);\nout = (in * (1.0 - mix) + sat * mix) * 0.86;\n",
+    "params": {
+      "sweepHz": 0.85,
+      "cutoffHz": 1650.0,
+      "res": 0.54,
+      "oxideDrive": 1.55,
+      "mix": 0.86
+    }
+  }
+}

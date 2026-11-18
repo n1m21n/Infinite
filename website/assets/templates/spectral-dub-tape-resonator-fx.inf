@@ -1,0 +1,77 @@
+infinite-patch 1
+# Spectral Dub Tape Resonator FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 42
+  i note1 42
+  i note2 49
+  i note3 42
+  i note4 45
+  i note5 42
+  i note6 54
+  i note7 42
+  i note8 42
+  i note9 47
+  i note10 49
+  i note11 42
+  i note12 45
+  i note13 49
+  i note14 52
+  i note15 42
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2400.0
+  f resonance 0.25
+  f decay 0.45
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float sweepHz = 0.85 [0.1, 4.0];\nparam float cutoffHz = 1650.0 [220.0, 4800.0];\nparam float res = 0.54 [0.1, 0.85];\nparam float oxideDrive = 1.55 [0.7, 3.0];\nparam float mix = 0.86 [0.0, 1.0];\nstate float ph = 0; state float bp = 0; state float lp = 0;\nstate float hyst = 0; state float s1 = 0; state float s2 = 0;\n\nph = (ph + sweepHz / sr) % 1.0;\nwow = sin(6.2831853 * ph) * 0.42 + sin(6.2831853 * ph * 2.7) * 0.18;\nmodHz = clamp(cutoffHz * (0.62 + 0.38 * wow), 140.0, 6200.0);\ng = clamp(2.0 * sin(3.14159265 * modHz / sr), 0.02, 0.88);\nq = 1.12 - res * 0.88;\n\n# Oxide magnetic hysteresis\ndrIn = in * oxideDrive;\nhyst = hyst + 0.14 * ((drIn / (1.0 + abs(drIn) * 0.75)) - hyst);\ndriveSig = hyst * 0.72 + in * 0.28;\n\nbp = bp + g * (driveSig - lp - q * bp);\nlp = lp + g * bp;\nfilt = lp * 0.74 + bp * 0.42;\n\n# Dual-head tape dispersion allpass\ny1 = -0.58 * filt + s1; s1 = filt + 0.58 * y1;\ny2 = -0.58 * y1 + s2; s2 = y1 + 0.58 * y2;\nwet = (filt * 0.55 + y2 * 0.55);\nsat = wet / (1.0 + abs(wet) * 0.35);\nout = (in * (1.0 - mix) + sat * mix) * 0.86;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.16 0.22 0.28
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Spectral Dub Tape Resonator FX. King Tubby inspired dual-head tape resonator with capstan wow-flutter drift, resonant SVF dub sweep, and oxide hysteresis warmth.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

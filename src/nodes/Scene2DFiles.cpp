@@ -615,6 +615,74 @@ bool Scene2DNode::RenderSet(const std::vector<int>& set, int frameId, std::vecto
    return rgba.size() == (size_t)mDoc.w * mDoc.h * 4;
 }
 
+bool Scene2DNode::VisibleBounds(const std::vector<int>& set, int frameId, float lo[2], float hi[2])
+{
+   std::vector<uint8_t> px;
+   if (set.empty() || !RenderSet(set, frameId, px))
+      return false;
+   const int w = mDoc.w, h = mDoc.h;
+   int x0 = w, y0 = h, x1 = -1, y1 = -1;
+   for (int y = 0; y < h; y++)   // top-down rows
+   {
+      const uint8_t* row = &px[(size_t)y * w * 4];
+      for (int x = 0; x < w; x++)
+         if (row[x * 4 + 3] > 8)
+         {
+            x0 = std::min(x0, x);
+            x1 = std::max(x1, x);
+            y0 = std::min(y0, y);
+            y1 = std::max(y1, y);
+         }
+   }
+   if (x1 < x0)
+      return false;
+   lo[0] = (float)x0, lo[1] = (float)y0, hi[0] = (float)(x1 + 1), hi[1] = (float)(y1 + 1);
+   return true;
+}
+
+bool Scene2DNode::SelectLayerPixels(int id, int op, int frameId)
+{
+   std::vector<uint8_t> px;
+   if (FindConst(id) == nullptr || !RenderSet({ id }, frameId, px))
+      return false;
+   const int w = mDoc.w, h = mDoc.h;
+   if (mSel.size() != (size_t)w * h)
+      mSel.assign((size_t)w * h, 0);
+   for (int y = 0; y < h; y++)   // px top-down, the selection bottom row first
+      for (int x = 0; x < w; x++)
+      {
+         const int a = px[((size_t)y * w + x) * 4 + 3];
+         uint8_t& v = mSel[(size_t)(h - 1 - y) * w + x];
+         v = (uint8_t)(op == kSelAdd ? std::max<int>(v, a) : op == kSelSub ? std::max(0, v - a)
+                                   : op == kSelIntersect ? std::min<int>(v, a) : a);
+      }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+   StoreSelection();
+   return true;
+}
+
+void Scene2DNode::CarrySelection(const std::vector<uint8_t>& was, const Layer& before, const Layer& after)
+{
+   const int w = mDoc.w, h = mDoc.h;
+   if (was.size() != (size_t)w * h)
+      return;
+   mSel.assign((size_t)w * h, 0);
+   for (int y = 0; y < h; y++)   // bottom row first, like the selection
+      for (int x = 0; x < w; x++)
+      {
+         float bx, by, sx, sy;
+         DocToBox(after, x + 0.5f, (float)(h - 1 - y) + 0.5f, bx, by);
+         BoxToDoc(before, bx, by, sx, sy);
+         const int ix = (int)std::floor(sx), iy = (int)std::floor(sy);
+         if (ix >= 0 && iy >= 0 && ix < w && iy < h)
+            mSel[(size_t)y * w + x] = was[(size_t)(h - 1 - iy) * w + ix];
+      }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+   StoreSelection();
+}
+
 bool Scene2DNode::PictureUnder(int id, int effect, int frameId, std::vector<uint8_t>& rgba)
 {
    const Layer* l = FindConst(id);
@@ -712,10 +780,11 @@ void Scene2DNode::ResetForFile(int w, int h)
    Commit();
 }
 
-int Scene2DNode::AddFileLayer(int parent, const std::string& name, int x, int y, int w, int h, const std::vector<uint8_t>& rgba)
+int Scene2DNode::AddFileLayer(int parent, const std::string& name, int x, int y, int w, int h, const std::vector<uint8_t>& rgba, int above)
 {
-   Layer& l = AddLayer(Kind::Paint, 0, 0);
-   l.parent = parent;
+   Layer& l = AddLayer(Kind::Paint, 0, above);
+   if (above == 0)
+      l.parent = parent;
    l.name = name;
    if (w > 0 && h > 0 && rgba.size() >= (size_t)w * h * 4)
    {
@@ -1003,7 +1072,7 @@ bool Scene2DNode::LoadPsd(const std::vector<uint8_t>& bytes, std::string* err)
    return true;
 }
 
-bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
+bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId, std::string* note)
 {
    Layers();
    struct ExportScope { bool was = sExport; ExportScope() { sExport = true; } ~ExportScope() { sExport = was; } } exporting;
@@ -1027,17 +1096,29 @@ bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
       std::string name;
       int blend = 0, opacity = 255, section = 0;
       bool visible = true, clip = false, open = true;
+      bool solid = false;   // a solid fill layer: written as a live Photoshop fill (SoCo) over its pixels
+      float rgb[3] = { 0, 0, 0 };
       FilePixels px;
    };
    std::vector<Out> outs;
+   int nAdjust = 0, nBaked = 0;
    auto alone = [this](int id, int f, std::vector<uint8_t>& px) { return RenderLayerAlone(id, f, px); };
    std::function<void(int)> walk = [&](int parent)
    {
       for (size_t i = 0; i < mLayers.size(); i++)
       {
          const Layer l = mLayers[i];
-         if (l.parent != parent || l.kind == Kind::Adjust || l.noExport)
+         if (l.parent != parent || l.noExport)
             continue;
+         if (l.kind == Kind::Adjust)
+         {
+            nAdjust++;
+            continue;
+         }
+         bool styled = false;
+         for (const Fx& f : l.fx)
+            styled = styled || f.on;
+         nBaked += styled || !l.fxMore.empty() || (l.kind == Kind::Fill && l.fillType != 0);
          if (l.kind == Kind::Group)
          {
             Out end;
@@ -1060,6 +1141,9 @@ bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
          o.opacity = (int)std::lround(std::clamp(l.opacity, 0.0f, 1.0f) * 255.0f);
          o.visible = l.visible;
          o.clip = l.clip;
+         o.solid = l.kind == Kind::Fill && l.fillType == 0;
+         for (int c = 0; c < 3; c++)
+            o.rgb[c] = std::clamp(l.colorA[c], 0.0f, 1.0f) * 255.0f;
          GrabLayer(*this, l, frameId, true, o.px, alone);
          outs.push_back(std::move(o));
       }
@@ -1132,6 +1216,29 @@ bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
       wr.U32((uint32_t)u.size());
       for (uint16_t c : u) wr.U16(c);
       wr.Fill(lu, 4);
+      if (o.solid)
+      {
+         // SoCo: version 16, then a descriptor { 'Clr ': Objc RGBC { 'Rd  ', 'Grn ', 'Bl  ': doub } }.
+         auto dbl = [&](double v) { uint64_t b; std::memcpy(&b, &v, 8); wr.U32((uint32_t)(b >> 32)); wr.U32((uint32_t)b); };
+         auto key = [&](const char* k) { wr.U32(0); wr.Tag(k); };
+         auto head = [&](const char* cls, uint32_t n) { wr.U32(1); wr.U16(0); key(cls); wr.U32(n); };
+         wr.Tag("8BIM");
+         wr.Tag("SoCo");
+         const size_t sc = wr.Mark();
+         wr.U32(16);
+         head("null", 1);
+         key("Clr ");
+         wr.Tag("Objc");
+         head("RGBC", 3);
+         const char* ch[3] = { "Rd  ", "Grn ", "Bl  " };
+         for (int c = 0; c < 3; c++)
+         {
+            key(ch[c]);
+            wr.Tag("doub");
+            dbl(o.rgb[c]);
+         }
+         wr.Fill(sc, 2);
+      }
       if (o.section != 0)
       {
          wr.Tag("8BIM");
@@ -1159,6 +1266,14 @@ bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
       }
    }
    wr.Fill(li, 4);
+   if (note != nullptr)
+   {
+      note->clear();
+      if (nAdjust > 0)
+         *note = std::to_string(nAdjust) + (nAdjust == 1 ? " adjustment left out" : " adjustments left out");
+      if (nBaked > 0)
+         *note += (note->empty() ? "" : ", ") + std::to_string(nBaked) + (nBaked == 1 ? " layer as pixels" : " layers as pixels");
+   }
    wr.U32(0);   // global layer mask info
    wr.Fill(lm);
 

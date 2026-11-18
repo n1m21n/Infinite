@@ -377,21 +377,34 @@ namespace Platform
    int GpuPreference() { return 0; }
    void SetGpuPreference(int) {}
 
-   float PenPressure(GLFWwindow*)
+   PenSample PenNowSample(GLFWwindow*)
    {
-      static float sPressure = -1.0f;
+      static PenSample sSample;
       static id sMonitor = nil;
       if (sMonitor == nil)
       {
          NSEventMask mask = NSEventMaskLeftMouseDown | NSEventMaskLeftMouseDragged | NSEventMaskTabletPoint;
          sMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:mask handler:^NSEvent*(NSEvent* e) {
             bool tablet = e.type == NSEventTypeTabletPoint || e.subtype == NSEventSubtypeTabletPoint;
-            sPressure = tablet ? (float)e.pressure : -1.0f;
+            sSample.active = tablet;
+            sSample.pressure = tablet ? (float)e.pressure : -1.0f;
+            if (tablet)
+            {
+               NSPoint tilt = e.tilt;
+               sSample.tiltX = (float)tilt.x;
+               sSample.tiltY = (float)tilt.y;
+               sSample.rotation = (float)e.rotation;
+            }
+            else
+               sSample.tiltX = sSample.tiltY = sSample.rotation = 0.0f;
+            sSample.timestamp = (double)e.timestamp;
             return e;
          }];
       }
-      return sPressure;
+      return sSample;
    }
+
+   float PenPressure(GLFWwindow* window) { return PenNowSample(window).pressure; }
 
    void ShowFatalError(const std::string& title, const std::string& message)
    {
@@ -8808,6 +8821,20 @@ namespace Platform
             return false;
          outPng.assign((const unsigned char*)png.bytes, (const unsigned char*)png.bytes + png.length);
          return !outPng.empty();
+      }
+   }
+
+   bool SetClipboardImage(const std::vector<unsigned char>& png, const std::vector<unsigned char>& rgba, int w, int h)
+   {
+      (void)rgba, (void)w, (void)h;
+      if (png.empty())
+         return false;
+      @autoreleasepool
+      {
+         NSPasteboard* pb = [NSPasteboard generalPasteboard];
+         [pb clearContents];
+         NSData* data = [NSData dataWithBytes:png.data() length:png.size()];
+         return [pb setData:data forType:NSPasteboardTypePNG] == YES;
       }
    }
 

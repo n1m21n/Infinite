@@ -1,0 +1,30 @@
+{
+ "id": "l_lock_pos",
+ "title": "Lock position blocks Move drags",
+ "ref": "Photoshop lock position",
+ "ref_steps": 2,
+ "setup": [
+  "doc 400 300",
+  "layer paint Back",
+  "rect 0 0 400 300 1 1 1",
+  "layer paint T",
+  "rect 100 75 300 225 1 0 0",
+  "tool Move"
+ ],
+ "steps": [
+  {
+   "click": "##lk2"
+  },
+  {
+   "drag": [
+    200,
+    150,
+    200,
+    250
+   ]
+  }
+ ],
+ "expect": [
+  "px 200 150 ~= 1 0 0"
+ ]
+}

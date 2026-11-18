@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ethio-Jazz Tizita Reed Horn Synth",
+    "author": "Infinite",
+    "description": "Expressive Ethio-jazz brass-reed solo synthesizer with wavefolded mouth-pressure excitation and dual formant horn resonator.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float fold = 2.4 [1.0, 5.0];\nparam float formantHz = 680.0 [260.0, 1600.0];\nparam float breath = 0.42 [0.0, 1.0];\nparam float vibratoHz = 4.8 [1.0, 8.0];\nparam float decay = 0.9991 [0.995, 0.9998];\nstate float ph = 0; state float vibPh = 0; state float env = 0;\nstate float bp1 = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.08, env * decay);\nvibPh = (vibPh + vibratoHz / sr) % 1.0;\nf0 = clamp(freq * (1.0 + 0.006 * sin(6.2831853 * vibPh)), 45.0, 3200.0);\nph = (ph + f0 / sr) % 1.0;\n\nexc = sin(6.2831853 * ph) * (1.0 + fold * env) + breath * 0.35 * sin(12.56637 * ph);\nreed = sin(exc * 1.35) + 0.28 * (exc / (1.0 + abs(exc)));\n\ng1 = clamp(2.0 * sin(3.14159265 * formantHz / sr), 0.02, 0.85);\nbp1 = bp1 + g1 * (reed - lp1 - 0.48 * bp1);\nlp1 = lp1 + g1 * bp1;\n\nsig = (reed * 0.36 + bp1 * 0.72) * env * 0.44;\nout = sig / (1.0 + abs(sig) * 0.40);\n",
+    "params": {
+      "fold": 2.4,
+      "formantHz": 680.0,
+      "breath": 0.42,
+      "vibratoHz": 4.8,
+      "decay": 0.9991
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
