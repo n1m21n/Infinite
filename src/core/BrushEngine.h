@@ -123,6 +123,13 @@ namespace BrushEngine
       float angleJitter = 0.0f;    // 0..1 of a half turn, per dab
       float roundJitter = 0.0f;    // 0..1 (shape jitter), per dab
       float scatterY = -1.0f;      // across-stroke scatter, of the diameter; -1 = the same as jitter
+      bool oneEuro = false;        // adaptive speed-aware smoothing (OneEuro filter) when smoothing > 0
+      bool catchUp = true;         // smoothed/stabilised stroke catches up to the pen when lifted
+      float pressureCurve = 1.0f;  // 0.25..3.0 gamma on tablet pressure
+      bool tiltSize = false;       // stylus tilt widens stroke
+      bool tiltAngle = false;      // stylus tilt azimuth turns tip
+      bool tiltRound = false;      // stylus tilt flattens tip roundness
+      float airbrushRate = 0.0f;   // 0..1 continuous dab build-up while pointer stays still
    };
 
    struct Preset
@@ -144,6 +151,16 @@ namespace BrushEngine
       // limiting where paint lands.
       void Begin(const GLUtil::Fbo& surface, const Brush& b, float x, float y, float pressure, unsigned selection = 0);
       void MoveTo(float x, float y, float pressure);
+      // Optional per-sample pen dynamics (tilt -1..1, barrel rotation deg, event timestamp sec).
+      void SetPenMeta(float tiltX, float tiltY, float rotDeg, double timestamp)
+      {
+         mTiltX = tiltX;
+         mTiltY = tiltY;
+         mPenRot = rotDeg;
+         mPenTime = timestamp;
+      }
+      // Airbrush continuous time-based build-up when pointer is held still.
+      void Tick(float dt);
       // Where the pen will be `aheadMs` after sample b, carried on from sample a ({x, y, ms} each), at most
       // maxPx past b. False when the two samples give no direction or speed.
       static bool Predict(const float a[3], const float b[3], float aheadMs, float maxPx, float out[2]);
@@ -230,5 +247,11 @@ namespace BrushEngine
       void UpdateCarry(const Pending& q, float r);
       bool mDisplayStale = true;
       bool mFinal = false;                        // the merge that lands (End), not the live display
+      float mTiltX = 0.0f, mTiltY = 0.0f, mPenRot = 0.0f;
+      double mPenTime = 0.0, mEuroLastTime = -1.0;
+      struct EuroAxis { float x = 0.0f, dx = 0.0f; bool init = false; };
+      EuroAxis mEuroX, mEuroY, mEuroP;
+      float mAirAccum = 0.0f;
+      float ApplyPressureCurve(float p) const;
    };
 }

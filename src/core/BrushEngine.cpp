@@ -224,6 +224,10 @@ namespace BrushEngine
          "      base = clamp(col, 0.0, 1.0);\n"
          "   }\n"
          "   a = clamp(a, 0.0, 1.0) * uFlow;\n"
+         "   if (a > 1e-4) {\n"
+         "      float d = (h1(fc + uSeed) + h1(fc * 1.37 + uSeed + 7.3) - 1.0) / 255.0;\n"
+         "      a = clamp(a + d, 0.0, 1.0);\n"
+         "   }\n"
          "   fragColor = vec4(base * a, a);\n"
          "}\n";
 
@@ -614,22 +618,25 @@ namespace BrushEngine
          b.pencil = true;
          b.pressureSize = false;
          add("Basic", "Pencil", b);
-         b = Make(kRound, 6, 0.9f, 1, 1, 0.08f);
+         b = Make(kRound, 6, 0.9f, 1, 1, 0.05f);
          b.smoothing = 0.3f;
          add("Basic", "Ink", b);
-         b = Make(kHardRound, 2, 1, 1, 1, 0.08f);
+         b = Make(kHardRound, 2, 1, 1, 1, 0.05f);
          b.pressureSize = false;
          b.smoothing = 0.2f;
          add("Basic", "Fine liner", b);
-         b = Make(kRound, 24, 0.7f, 0.6f, 1, 0.1f);
+         b = Make(kRound, 24, 0.7f, 0.6f, 1, 0.05f);
          b.pressureSize = false;
          add("Basic", "Marker", b);
-         b = Make(kSoftRound, 120, 0, 1, 0.08f, 0.1f);
+         b = Make(kSoftRound, 120, 0, 1, 0.08f, 0.05f);
          b.pressureSize = false;
          b.pressureOpacity = true;
+         b.airbrushRate = 0.5f;
          add("Basic", "Soft airbrush", b);
-         add("Basic", "Hard round", Make(kRound, 30, 1, 1, 1, 0.12f));
-         b = Make(kRound, 40, 0.9f, 1, 1, 0.06f);
+         b = Make(kRound, 30, 1, 1, 1, 0.05f);
+         b.pressureSize = false;
+         add("Basic", "Hard round", b);
+         b = Make(kRound, 40, 0.9f, 1, 1, 0.05f);
          b.roundness = 0.2f;
          b.angle = 45.0f;
          add("Basic", "Flat", b);
@@ -681,10 +688,10 @@ namespace BrushEngine
          b.pressureSize = false;
          add("Texture", "Cloth", b);
          // Eraser
-         b = Make(kSoftRound, 60, 0, 1, 0.5f, 0.1f);
+         b = Make(kSoftRound, 60, 0, 1, 0.5f, 0.05f);
          b.mode = kErase;
          add("Eraser", "Eraser soft", b);
-         b = Make(kRound, 30, 1, 1, 1, 0.1f);
+         b = Make(kRound, 30, 1, 1, 1, 0.05f);
          b.mode = kErase;
          b.pressureSize = false;
          add("Eraser", "Eraser hard", b);
@@ -925,11 +932,16 @@ namespace BrushEngine
       mQueue.clear();
       sStrokeSeed = sStrokeSeed * 1664525u + 1013904223u;
       mRng = sStrokeSeed | 1u;
-      const float p = pressure < 0.0f ? 1.0f : pressure;
+      const float p = ApplyPressureCurve(pressure);
       mLastX = mPenX = x;
       mLastY = mPenY = y;
       mLastP = mPenP = p;
       mStab.assign(1, { x, y, p });
+      mEuroX = { x, 0.0f, true };
+      mEuroY = { y, 0.0f, true };
+      mEuroP = { p, 0.0f, true };
+      mEuroLastTime = mPenTime;
+      mAirAccum = 0.0f;
       mCarry = 0.0f;
       mDabX = x;
       mDabY = y;
@@ -958,7 +970,9 @@ namespace BrushEngine
          x += (Rand(mRng) - 0.5f) * mBrush.jitter * mBrush.size;
          y += (Rand(mRng) - 0.5f) * sy * mBrush.size;
       }
-      const float p = pressure < 0.0f ? 1.0f : std::clamp(pressure, 0.0f, 1.0f);
+      const float tiltMag = std::min(1.0f, std::hypot(mTiltX, mTiltY));
+      const float tiltAz = std::atan2(mTiltY, mTiltX);
+      const float p = ApplyPressureCurve(pressure);
       mDist += std::hypot(x - mPrevX, y - mPrevY);
       const float fx = mPrevX, fy = mPrevY;
       mPrevX = x;
@@ -966,6 +980,8 @@ namespace BrushEngine
       // Per-dab dynamics, drawn here so mirrored copies match their original.
       const Brush& b = mBrush;
       mSize = b.sizeJitter > 0.0f ? 1.0f - Rand(mRng) * std::clamp(b.sizeJitter, 0.0f, 1.0f) : 1.0f;
+      if (b.tiltSize)
+         mSize *= 1.0f + 1.5f * tiltMag;
       if (b.taperIn > 0.0f)
          mSize *= std::clamp(mDist / b.taperIn, 0.05f, 1.0f);
       mFlow = b.opacityJitter > 0.0f ? 1.0f - Rand(mRng) * std::clamp(b.opacityJitter, 0.0f, 1.0f) : 1.0f;
@@ -973,7 +989,12 @@ namespace BrushEngine
          mFlow *= 1.0f - Rand(mRng) * std::clamp(b.accumJitter, 0.0f, 1.0f);
       mHard = b.hardJitter > 0.0f ? 1.0f - Rand(mRng) * std::clamp(b.hardJitter, 0.0f, 1.0f) : 1.0f;
       mRot = b.angleJitter > 0.0f ? (Rand(mRng) - 0.5f) * 6.2831853f * std::clamp(b.angleJitter, 0.0f, 1.0f) : 0.0f;
+      if (b.tiltAngle && tiltMag > 0.05f)
+         mRot += tiltAz;
+      mRot += mPenRot * (3.14159265f / 180.0f);
       mRound = b.roundJitter > 0.0f ? 1.0f - Rand(mRng) * std::clamp(b.roundJitter, 0.0f, 0.95f) : 1.0f;
+      if (b.tiltRound)
+         mRound = std::max(0.05f, mRound * (1.0f - 0.75f * tiltMag));
       if (b.hueJitter > 0.0f || b.satJitter > 0.0f || b.valJitter > 0.0f)
       {
          const float dh = (Rand(mRng) - 0.5f) * b.hueJitter, ds = (Rand(mRng) - 0.5f) * 2.0f * b.satJitter, dv = (Rand(mRng) - 0.5f) * 2.0f * b.valJitter;
@@ -992,7 +1013,8 @@ namespace BrushEngine
       Pending q{ x, y, p, seed, dir, mDist, mSize, mFlow, mHard, mRot, mRound, { mRgb[0], mRgb[1], mRgb[2] }, fx, fy };
       mQueue.push_back(q);
       // A drop pushes paint out to five radii; a comb's tines drag a little past its width.
-      const float r = (mBrush.mode == kDrop ? 2.5f * mBrush.size : mBrush.mode == kComb || mBrush.mode == kPush ? 0.75f * mBrush.size : 0.5f * mBrush.size) + 2.0f;
+      const float sz = mBrush.size * std::max(1.0f, mSize);
+      const float r = (mBrush.mode == kDrop ? 2.5f * sz : mBrush.mode == kComb || mBrush.mode == kPush ? 0.75f * sz : 0.5f * sz) + 2.0f;
       if (!mAny)
       {
          mDirty[0] = x - r;
@@ -1032,17 +1054,53 @@ namespace BrushEngine
       mLastP = pressure;
    }
 
+   float Stroke::ApplyPressureCurve(float pressure) const
+   {
+      if (pressure < 0.0f)
+         return 1.0f;
+      const float g = std::clamp(mBrush.pressureCurve, 0.25f, 3.0f);
+      return std::pow(std::clamp(pressure, 0.0f, 1.0f), g);
+   }
+
    void Stroke::MoveTo(float x, float y, float pressure)
    {
       if (!mActive)
          return;
-      const float p = pressure < 0.0f ? 1.0f : pressure;
+      const float p = ApplyPressureCurve(pressure);
       mPenX = x;
       mPenY = y;
       mPenP = p;
       if (mBrush.stabiliser > 0)
       {
          StabWalk(x, y, p);
+         return;
+      }
+      if (mBrush.smoothing > 0.0f && mBrush.oneEuro)
+      {
+         const float dt = mEuroLastTime > 0.0 && mPenTime > mEuroLastTime
+                             ? std::clamp((float)(mPenTime - mEuroLastTime), 1e-4f, 0.25f)
+                             : (1.0f / 120.0f);
+         mEuroLastTime = mPenTime;
+         const float s = std::clamp(mBrush.smoothing, 0.0f, 0.99f);
+         const float minCut = std::max(0.4f, 14.0f * (1.0f - s));
+         const float beta = 0.015f;
+         auto step = [&](EuroAxis& st, float v, float fcMul)
+         {
+            if (!st.init) { st = { v, 0.0f, true }; return v; }
+            auto alpha = [&](float fc)
+            {
+               const float tau = 1.0f / (6.2831853f * fc);
+               return 1.0f / (1.0f + tau / dt);
+            };
+            const float d = (v - st.x) / dt;
+            const float ad = alpha(1.0f);
+            st.dx += ad * (d - st.dx);
+            const float fc = minCut * fcMul + beta * std::fabs(st.dx);
+            const float ax = alpha(fc);
+            st.x += ax * (v - st.x);
+            return st.x;
+         };
+         Walk(step(mEuroX, x, 1.0f), step(mEuroY, y, 1.0f), std::clamp(step(mEuroP, p, 1.5f), 0.0f, 1.0f));
          return;
       }
       if (mBrush.smoothing > 0.0f)
@@ -1058,6 +1116,22 @@ namespace BrushEngine
          return;
       }
       Walk(x, y, p);
+   }
+
+   void Stroke::Tick(float dt)
+   {
+      if (!mActive || mBrush.airbrushRate <= 0.0f || DirectMode(mBrush.mode) || dt <= 0.0f)
+         return;
+      const float rate = 4.0f + std::clamp(mBrush.airbrushRate, 0.0f, 1.0f) * 36.0f;
+      mAirAccum += std::min(dt, 0.25f) * rate;
+      int guard = 0;
+      while (mAirAccum >= 1.0f && guard++ < 8)
+      {
+         Dab(mLastX, mLastY, mLastP, Rand(mRng) * 100.0f);
+         mAirAccum -= 1.0f;
+      }
+      if (guard > 0)
+         mDisplayStale = true;
    }
 
    // The stabiliser: the brush goes to a weighted average of the last N pen samples, newer ones weighing more
@@ -1447,13 +1521,16 @@ namespace BrushEngine
       dirty[0] = dirty[1] = dirty[2] = dirty[3] = 0;
       if (!mActive)
          return;
-      // A smoothed stroke catches up to where the pen let go: the stabiliser by feeding the last pen point
-      // until every sample in the window is it, the string by walking straight there.
-      if (mBrush.stabiliser > 0)
-         for (int k = 0; k < std::clamp(mBrush.stabiliser, 1, 64); k++)
-            StabWalk(mPenX, mPenY, mPenP);
-      else if (mBrush.smoothing > 0.0f)
-         Walk(mPenX, mPenY, mPenP);
+      // A smoothed stroke catches up to where the pen let go when catchUp is on: the stabiliser by feeding
+      // the last pen point until every sample in the window is it, smoothing/string by walking straight there.
+      if (mBrush.catchUp)
+      {
+         if (mBrush.stabiliser > 0)
+            for (int k = 0; k < std::clamp(mBrush.stabiliser, 1, 64); k++)
+               StabWalk(mPenX, mPenY, mPenP);
+         else if (mBrush.smoothing > 0.0f)
+            Walk(mPenX, mPenY, mPenP);
+      }
       mEnding = true;
       Flush();
       mActive = false;
