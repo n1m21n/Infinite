@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 
 // Band-limited wavetable bank shared by every Wavetable node.
 //
