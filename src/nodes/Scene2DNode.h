@@ -798,6 +798,9 @@ private:
    void RestoreSelection();
    bool mSelAny = false, mSelDirty = false;
    GLUtil::Fbo mSelTex, mSelOverlay, mSelScratch, mCloneSrc;
+   unsigned long long mSelTexGen = 0, mSelOverlayGen = 0;
+   unsigned mSelOverlaySrc = 0;
+   bool mSelOverlayQuick = false;
    GLUtil::Fbo mBrushFrozen[3];   // node brush sources as they were when the stroke started
    GLUtil::Fbo mEff[2];           // effect stack ping-pong, document size
    unsigned mEffMixProgram = 0, mLutTex = 0;

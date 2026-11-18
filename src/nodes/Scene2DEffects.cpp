@@ -2,6 +2,7 @@
 // adjustments and stack-owned nodes, each with its own opacity and blend, then the stack's mask, before the
 // layer blends with what is under it. Also the colour lookup (.cube) and Shadows / Highlights helpers.
 #include "Scene2DNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -355,17 +356,17 @@ bool Scene2DNode::EffMix(int ping, unsigned base, unsigned fx, unsigned mask, fl
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, base);
-      glUniform1i(glGetUniformLocation(prog, "uBase"), 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uBase"), 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, fx);
-      glUniform1i(glGetUniformLocation(prog, "uFx"), 1);
+      glUniform1i(GLUtil::UniformLoc(prog, "uFx"), 1);
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, mask);
-      glUniform1i(glGetUniformLocation(prog, "uMask"), 2);
-      glUniform1i(glGetUniformLocation(prog, "uHasMask"), mask != 0 ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uBlend"), blend);
-      glUniform1i(glGetUniformLocation(prog, "uToMask"), toMask ? 1 : 0);
-      glUniform1f(glGetUniformLocation(prog, "uOpacity"), opacity);
+      glUniform1i(GLUtil::UniformLoc(prog, "uMask"), 2);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHasMask"), mask != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uBlend"), blend);
+      glUniform1i(GLUtil::UniformLoc(prog, "uToMask"), toMask ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(prog, "uOpacity"), opacity);
       glActiveTexture(GL_TEXTURE0);
    });
    return true;
@@ -519,11 +520,11 @@ unsigned Scene2DNode::BlurLuma(unsigned src, float radius)
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, in);
-         glUniform1i(glGetUniformLocation(prog, "uSrc"), 0);
-         glUniform2f(glGetUniformLocation(prog, "uDir"), pass == 0 ? 1.0f / mDoc.w : 0.0f, pass == 0 ? 0.0f : 1.0f / mDoc.h);
-         glUniform1f(glGetUniformLocation(prog, "uSigma"), std::max(0.5f, radius * 0.5f));
-         glUniform1i(glGetUniformLocation(prog, "uFirst"), pass == 0 ? 1 : 0);
-         glUniform1i(glGetUniformLocation(prog, "uLinear"), mDoc.linear ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(prog, "uSrc"), 0);
+         glUniform2f(GLUtil::UniformLoc(prog, "uDir"), pass == 0 ? 1.0f / mDoc.w : 0.0f, pass == 0 ? 0.0f : 1.0f / mDoc.h);
+         glUniform1f(GLUtil::UniformLoc(prog, "uSigma"), std::max(0.5f, radius * 0.5f));
+         glUniform1i(GLUtil::UniformLoc(prog, "uFirst"), pass == 0 ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), mDoc.linear ? 1 : 0);
       });
    }
    return mShBlur[1].tex;

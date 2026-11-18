@@ -170,6 +170,8 @@ namespace BrushEngine
       // Live node sources: the next dabs read these textures (0 = built in).
       void SetSources(unsigned tip, unsigned grain, int grainW, int grainH, unsigned color)
       {
+         if (mBrush.grainTex != grain || mBrush.grainTexW != grainW || mBrush.grainTexH != grainH)
+            mMergeFullDirty = true;
          mBrush.tipTex = tip;
          mBrush.grainTex = grain;
          mBrush.grainTexW = grainW;
@@ -178,6 +180,8 @@ namespace BrushEngine
       }
       void Follow(float size, float opacity, float flow)
       {
+         if (size != mBrush.size || opacity != mBrush.opacity)
+            mMergeFullDirty = true;
          mBrush.size = size;
          mBrush.opacity = opacity;
          mBrush.flow = flow;
@@ -197,7 +201,7 @@ namespace BrushEngine
       void SmudgeDab(const Pending& q, float r, float strength);
       void WarpDab(const Pending& q, float r, float strength);
       void Walk(float x, float y, float pressure);
-      void Merge(const GLUtil::Fbo& surface, const GLUtil::Fbo& out);
+      void Merge(const GLUtil::Fbo& surface, const GLUtil::Fbo& out, const int* scissor = nullptr);
       bool EnsurePrograms();
 
       Brush mBrush;
@@ -219,6 +223,9 @@ namespace BrushEngine
       unsigned mSelection = 0;
       float mDirty[4] = { 0, 0, 0, 0 };
       bool mAny = false;
+      int mFrameDirty[4] = { 0, 0, 0, 0 };
+      bool mFrameAny = false;
+      bool mMergeFullDirty = false;
       std::vector<Pending> mQueue;
       std::vector<std::array<float, 6>> mMirrors;
       void Queue(float x, float y, float p, float seed, float dir, float fx, float fy);

@@ -8,6 +8,7 @@
 // Coming in, every pixel layer becomes a paint layer.
 
 #include <fstream>
+#include "GLUtil.h"
 #include <iterator>
 #include "Scene2DNode.h"
 #include "gl3.h"
@@ -459,8 +460,8 @@ namespace
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, acc);
-         glUniform1i(glGetUniformLocation(prog, "uAcc"), 0);
-         glUniform1i(glGetUniformLocation(prog, "uLinear"), linear ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(prog, "uAcc"), 0);
+         glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), linear ? 1 : 0);
          GLUtil::SetImageHeadroom(prog, headroom);
       });
       rgba.assign((size_t)w * h * 4, 0);

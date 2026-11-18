@@ -1,6 +1,7 @@
 // Scene 2D, Block D: 3D cards in a comp camera (After Effects model), distort,
 // layer fx, blend if and painting symmetry. Plan: internal/plans/2d-view §9.9.
 #include "Scene2DNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -913,12 +914,12 @@ bool Scene2DNode::GeometryRender(const Layer& l, unsigned& color, unsigned& dept
                {
                   glActiveTexture(GL_TEXTURE1);
                   glBindTexture(GL_TEXTURE_2D, skin);
-                  glUniform1i(glGetUniformLocation(prog, "uSkin"), 1);
+                  glUniform1i(GLUtil::UniformLoc(prog, "uSkin"), 1);
                   glActiveTexture(GL_TEXTURE0);
                   glBindTexture(GL_TEXTURE_2D, base);
-                  glUniform1i(glGetUniformLocation(prog, "uBase"), 0);
-                  glUniform1i(glGetUniformLocation(prog, "uHasBase"), base != 0 ? 1 : 0);
-                  glUniform3fv(glGetUniformLocation(prog, "uColor"), 1, mat.color);
+                  glUniform1i(GLUtil::UniformLoc(prog, "uBase"), 0);
+                  glUniform1i(GLUtil::UniformLoc(prog, "uHasBase"), base != 0 ? 1 : 0);
+                  glUniform3fv(GLUtil::UniformLoc(prog, "uColor"), 1, mat.color);
                });
             }
             g.proxy.base = geo;
@@ -1364,12 +1365,12 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
             const unsigned prog = mBlurProgram;
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, src);
-            glUniform1i(glGetUniformLocation(prog, "uSrc"), 0);
-            glUniform2f(glGetUniformLocation(prog, "uDir"), pass == 0 ? 1.0f / W : 0.0f, pass == 0 ? 0.0f : 1.0f / H);
-            glUniform4f(glGetUniformLocation(prog, "uSigma"), s4[0], s4[1], s4[2], s4[3]);
-            glUniform1i(glGetUniformLocation(prog, "uTaps"), tapsB);
-            glUniform1f(glGetUniformLocation(prog, "uStride"), strideB);
-            glUniform1i(glGetUniformLocation(prog, "uFirst"), pass == 0 ? 1 : 0);
+            glUniform1i(GLUtil::UniformLoc(prog, "uSrc"), 0);
+            glUniform2f(GLUtil::UniformLoc(prog, "uDir"), pass == 0 ? 1.0f / W : 0.0f, pass == 0 ? 0.0f : 1.0f / H);
+            glUniform4f(GLUtil::UniformLoc(prog, "uSigma"), s4[0], s4[1], s4[2], s4[3]);
+            glUniform1i(GLUtil::UniformLoc(prog, "uTaps"), tapsB);
+            glUniform1f(GLUtil::UniformLoc(prog, "uStride"), strideB);
+            glUniform1i(GLUtil::UniformLoc(prog, "uFirst"), pass == 0 ? 1 : 0);
          });
       }
    };
@@ -1392,43 +1393,43 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
    const bool lin = mDoc.linear;
    auto col = [&](const Fx& f, const char* name)
    {
-      glUniform4f(glGetUniformLocation(mFxProgram, name), ToWorking(f.c[0], lin), ToWorking(f.c[1], lin), ToWorking(f.c[2], lin),
+      glUniform4f(GLUtil::UniformLoc(mFxProgram, name), ToWorking(f.c[0], lin), ToWorking(f.c[1], lin), ToWorking(f.c[2], lin),
                   std::clamp(f.c[3], 0.0f, 1.0f));
    };
    // Light from `angle` (90 = from the top) throws the shadow the other way; uv is y up.
    auto off = [&](const Fx& f, const char* name)
    {
       const float a = f.angle * kD2R;
-      glUniform2f(glGetUniformLocation(mFxProgram, name), -std::cos(a) * f.dist / W, -std::sin(a) * f.dist / H);
+      glUniform2f(GLUtil::UniformLoc(mFxProgram, name), -std::cos(a) * f.dist / W, -std::sin(a) * f.dist / H);
    };
    GLUtil::RunShaderPass(outFbo, mFxProgram, [&]()
    {
       const unsigned prog = mFxProgram;
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, L);
-      glUniform1i(glGetUniformLocation(prog, "uL"), 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uL"), 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, mFxBlur[1].tex);
-      glUniform1i(glGetUniformLocation(prog, "uB"), 1);
+      glUniform1i(GLUtil::UniformLoc(prog, "uB"), 1);
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, two ? mFxBlur2[1].tex : mFxBlur[1].tex);
-      glUniform1i(glGetUniformLocation(prog, "uB2"), 2);
+      glUniform1i(GLUtil::UniformLoc(prog, "uB2"), 2);
       glActiveTexture(GL_TEXTURE0);
-      glUniform1i(glGetUniformLocation(prog, "uIgOn"), ig.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uBvOn"), bv.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uGrOn"), gr.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uSaOn"), sa.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uPaOn"), pa.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uPaKind"), std::clamp(pa.pattern, 0, kFxPatternCount - 1));
-      glUniform1i(glGetUniformLocation(prog, "uBvMat"), std::clamp(bv.material, -1, 3));
-      glUniform1f(glGetUniformLocation(prog, "uPaScale"), std::max(2.0f, pa.size));
-      glUniform1f(glGetUniformLocation(prog, "uPaAngle"), pa.angle * kD2R);
+      glUniform1i(GLUtil::UniformLoc(prog, "uIgOn"), ig.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uBvOn"), bv.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uGrOn"), gr.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uSaOn"), sa.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uPaOn"), pa.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uPaKind"), std::clamp(pa.pattern, 0, kFxPatternCount - 1));
+      glUniform1i(GLUtil::UniformLoc(prog, "uBvMat"), std::clamp(bv.material, -1, 3));
+      glUniform1f(GLUtil::UniformLoc(prog, "uPaScale"), std::max(2.0f, pa.size));
+      glUniform1f(GLUtil::UniformLoc(prog, "uPaAngle"), pa.angle * kD2R);
       col(sa, "uSaC");
       col(pa, "uPaA");
       off(sa, "uSaOff");
       auto contourU = [&](const Fx& f, const char* name)
       {
-         glUniform4f(glGetUniformLocation(prog, name), f.contour[0], f.contour[1], f.contour[2], f.contour[3]);
+         glUniform4f(GLUtil::UniformLoc(prog, name), f.contour[0], f.contour[1], f.contour[2], f.contour[3]);
       };
       contourU(sh, "uShK");
       contourU(gl, "uGlK");
@@ -1439,34 +1440,34 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       col(gr, "uGrA");
       auto col2 = [&](const Fx& f, const char* name)
       {
-         glUniform4f(glGetUniformLocation(mFxProgram, name), ToWorking(f.c2[0], lin), ToWorking(f.c2[1], lin), ToWorking(f.c2[2], lin),
+         glUniform4f(GLUtil::UniformLoc(mFxProgram, name), ToWorking(f.c2[0], lin), ToWorking(f.c2[1], lin), ToWorking(f.c2[2], lin),
                      std::clamp(f.c2[3], 0.0f, 1.0f));
       };
       col2(bv, "uBvLo");
       col2(gr, "uGrB");
       StopUniforms(prog, gr.stops, ToWorking, lin);
       col2(pa, "uPaB");
-      glUniform1f(glGetUniformLocation(prog, "uIgSpread"), std::clamp(ig.spread, 0.0f, 1.0f));
+      glUniform1f(GLUtil::UniformLoc(prog, "uIgSpread"), std::clamp(ig.spread, 0.0f, 1.0f));
       // Bevel: height slope scaled by its size and depth; light from `angle`, 30 degrees up. uv is y up.
-      glUniform1f(glGetUniformLocation(prog, "uBvDepth"), std::max(0.5f, bv.size) * std::clamp(bv.dist, 0.0f, 1000.0f) * 0.04f);
+      glUniform1f(GLUtil::UniformLoc(prog, "uBvDepth"), std::max(0.5f, bv.size) * std::clamp(bv.dist, 0.0f, 1000.0f) * 0.04f);
       {
          const float a = bv.angle * kD2R, el = 30.0f * kD2R;
-         glUniform3f(glGetUniformLocation(prog, "uBvLight"), std::cos(a) * std::cos(el), std::sin(a) * std::cos(el), std::sin(el));
+         glUniform3f(GLUtil::UniformLoc(prog, "uBvLight"), std::cos(a) * std::cos(el), std::sin(a) * std::cos(el), std::sin(el));
       }
       {
          // Gradient overlay: start colour where the angle points away from, across the document.
          const float a = gr.angle * kD2R;
          const float dx = std::cos(a), dy = std::sin(a);
          const float span = std::abs(dx) + std::abs(dy);
-         glUniform2f(glGetUniformLocation(prog, "uGrDir"), dx / span * 2.0f * 0.5f, dy / span * 2.0f * 0.5f);
+         glUniform2f(GLUtil::UniformLoc(prog, "uGrDir"), dx / span * 2.0f * 0.5f, dy / span * 2.0f * 0.5f);
       }
-      glUniform2f(glGetUniformLocation(prog, "uDoc"), (float)W, (float)H);
-      glUniform1i(glGetUniformLocation(prog, "uShOn"), sh.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uInOn"), in.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uGlOn"), gl.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uStOn"), st.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uOvOn"), ov.on ? 1 : 0);
-      glUniform1i(glGetUniformLocation(prog, "uStPos"), std::clamp(st.pos, 0, 2));
+      glUniform2f(GLUtil::UniformLoc(prog, "uDoc"), (float)W, (float)H);
+      glUniform1i(GLUtil::UniformLoc(prog, "uShOn"), sh.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uInOn"), in.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uGlOn"), gl.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uStOn"), st.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uOvOn"), ov.on ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uStPos"), std::clamp(st.pos, 0, 2));
       col(sh, "uShC");
       col(in, "uInC");
       col(gl, "uGlC");
@@ -1474,11 +1475,11 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       col(ov, "uOvC");
       off(sh, "uShOff");
       off(in, "uInOff");
-      glUniform1f(glGetUniformLocation(prog, "uShSpread"), std::clamp(sh.spread, 0.0f, 1.0f));
-      glUniform1f(glGetUniformLocation(prog, "uInSpread"), std::clamp(in.spread, 0.0f, 1.0f));
-      glUniform1f(glGetUniformLocation(prog, "uGlSpread"), std::clamp(gl.spread, 0.0f, 1.0f));
-      glUniform1f(glGetUniformLocation(prog, "uStSize"), std::clamp(st.size, 0.0f, 250.0f));
-      glUniform1f(glGetUniformLocation(prog, "uFill"), std::clamp(fillV, 0.0f, 1.0f));
+      glUniform1f(GLUtil::UniformLoc(prog, "uShSpread"), std::clamp(sh.spread, 0.0f, 1.0f));
+      glUniform1f(GLUtil::UniformLoc(prog, "uInSpread"), std::clamp(in.spread, 0.0f, 1.0f));
+      glUniform1f(GLUtil::UniformLoc(prog, "uGlSpread"), std::clamp(gl.spread, 0.0f, 1.0f));
+      glUniform1f(GLUtil::UniformLoc(prog, "uStSize"), std::clamp(st.size, 0.0f, 250.0f));
+      glUniform1f(GLUtil::UniformLoc(prog, "uFill"), std::clamp(fillV, 0.0f, 1.0f));
    });
    return true;
    };
@@ -1505,10 +1506,10 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
             const unsigned prog = mFxCombineProgram;
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, bottom);
-            glUniform1i(glGetUniformLocation(prog, "uBottom"), 1);
+            glUniform1i(GLUtil::UniformLoc(prog, "uBottom"), 1);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, top);
-            glUniform1i(glGetUniformLocation(prog, "uTop"), 0);
+            glUniform1i(GLUtil::UniformLoc(prog, "uTop"), 0);
          });
          outTex = mFxMore[ping].tex;
          ping ^= 1;

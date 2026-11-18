@@ -1,4 +1,5 @@
 #include "GenerativeNodes.h"
+#include "GLUtil.h"
 #include "BenchReport.h"
 
 #include "gl3.h"
@@ -321,7 +322,7 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
       // upstream node, and changing its filter would silently turn off the
       // mipmapping that the 3D surface path sets up on the same handle.
       glBindTexture(GL_TEXTURE_2D, tex);
-      glUniform1i(glGetUniformLocation(mProgram, "uTex"), 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uTex"), 0);
    });
    mCookN = n;
    mCookKey = key;
@@ -493,18 +494,18 @@ bool ImageToPointsNode::BuildGpuPoints(int n)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, mSmall.tex);
-      glUniform1i(glGetUniformLocation(mGpuProgram, "uSmall"), 0);
-      glUniform1f(glGetUniformLocation(mGpuProgram, "uN"), (float)n);
-      glUniform1f(glGetUniformLocation(mGpuProgram, "uWidth"), width);
-      glUniform1f(glGetUniformLocation(mGpuProgram, "uHeight"), height);
-      glUniform1f(glGetUniformLocation(mGpuProgram, "uDepthScale"), depthScale);
-      glUniform1f(glGetUniformLocation(mGpuProgram, "uPointSize"), pointSize);
-      glUniform1f(glGetUniformLocation(mGpuProgram, "uThreshold"), threshold);
-      glUniform1f(glGetUniformLocation(mGpuProgram, "uSizeFromLuma"), sizeFromLuma);
-      glUniform1f(glGetUniformLocation(mGpuProgram, "uBaseSize"), baseSize);
-      glUniform1i(glGetUniformLocation(mGpuProgram, "uDepthSource"), depthSource);
-      glUniform1i(glGetUniformLocation(mGpuProgram, "uUseImageColor"), useImageColor ? 1 : 0);
-      glUniform3fv(glGetUniformLocation(mGpuProgram, "uTint"), 1, tint);
+      glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uSmall"), 0);
+      glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uN"), (float)n);
+      glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uWidth"), width);
+      glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uHeight"), height);
+      glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uDepthScale"), depthScale);
+      glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uPointSize"), pointSize);
+      glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uThreshold"), threshold);
+      glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uSizeFromLuma"), sizeFromLuma);
+      glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uBaseSize"), baseSize);
+      glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uDepthSource"), depthSource);
+      glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uUseImageColor"), useImageColor ? 1 : 0);
+      glUniform3fv(GLUtil::UniformLoc(mGpuProgram, "uTint"), 1, tint);
    });
    if (query)
    {

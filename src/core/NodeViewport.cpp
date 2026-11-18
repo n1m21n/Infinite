@@ -1029,12 +1029,12 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
       glBindTexture(GL_TEXTURE_2D, gpuPoints->posTex);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, gpuPoints->colorTex);
-      glUniform1i(glGetUniformLocation(gpuPointProgram, "uPointPos"), 0);
-      glUniform1i(glGetUniformLocation(gpuPointProgram, "uPointColor"), 1);
-      glUniform1i(glGetUniformLocation(gpuPointProgram, "uPointTexW"), gpuPoints->texW);
-      glUniformMatrix4fv(glGetUniformLocation(gpuPointProgram, "uPointMatrix"), 1, GL_FALSE, pointMatrix.m);
-      glUniformMatrix4fv(glGetUniformLocation(gpuPointProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
-      glUniform1f(glGetUniformLocation(gpuPointProgram, "uPointSize"), 6.0f); // as the CPU path below
+      glUniform1i(GLUtil::UniformLoc(gpuPointProgram, "uPointPos"), 0);
+      glUniform1i(GLUtil::UniformLoc(gpuPointProgram, "uPointColor"), 1);
+      glUniform1i(GLUtil::UniformLoc(gpuPointProgram, "uPointTexW"), gpuPoints->texW);
+      glUniformMatrix4fv(GLUtil::UniformLoc(gpuPointProgram, "uPointMatrix"), 1, GL_FALSE, pointMatrix.m);
+      glUniformMatrix4fv(GLUtil::UniformLoc(gpuPointProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+      glUniform1f(GLUtil::UniformLoc(gpuPointProgram, "uPointSize"), 6.0f); // as the CPU path below
       glEnable(GL_PROGRAM_POINT_SIZE);
       glBindVertexArray(mGpuPointVao);
       glDrawArrays(GL_POINTS, 0, gpuPoints->count);
@@ -1049,11 +1049,11 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    else if (usePointCloud)
    {
       glUseProgram(pointProgram);
-      glUniformMatrix4fv(glGetUniformLocation(pointProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+      glUniformMatrix4fv(GLUtil::UniformLoc(pointProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
       // Fixed screen-space size rather than deriving one from mDistance/fov:
       // this is a thumbnail, not a size-accurate preview, and a fixed size
       // keeps the cloud legible whether it's zoomed in or auto-framed wide.
-      glUniform1f(glGetUniformLocation(pointProgram, "uPointSize"), 6.0f);
+      glUniform1f(GLUtil::UniformLoc(pointProgram, "uPointSize"), 6.0f);
       glEnable(GL_PROGRAM_POINT_SIZE);
       glBindVertexArray(mPointVao);
       glDrawArrays(GL_POINTS, 0, mPointCount);
@@ -1064,30 +1064,30 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    else
    {
    glUseProgram(program);
-   glUniformMatrix4fv(glGetUniformLocation(program, "uModel"), 1, GL_FALSE, model.m);
-   glUniformMatrix4fv(glGetUniformLocation(program, "uViewProj"), 1, GL_FALSE, viewProj.m);
-   glUniformMatrix3fv(glGetUniformLocation(program, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
-   glUniform3fv(glGetUniformLocation(program, "uBaseColor"), 1, material.color);
-   glUniform3fv(glGetUniformLocation(program, "uCamPos"), 1, eye);
+   glUniformMatrix4fv(GLUtil::UniformLoc(program, "uModel"), 1, GL_FALSE, model.m);
+   glUniformMatrix4fv(GLUtil::UniformLoc(program, "uViewProj"), 1, GL_FALSE, viewProj.m);
+   glUniformMatrix3fv(GLUtil::UniformLoc(program, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
+   glUniform3fv(GLUtil::UniformLoc(program, "uBaseColor"), 1, material.color);
+   glUniform3fv(GLUtil::UniformLoc(program, "uCamPos"), 1, eye);
    const float lightDir[3] = { 0.4f, 0.85f, 0.35f };
-   glUniform3fv(glGetUniformLocation(program, "uLightDir"), 1, lightDir);
-   glUniform1i(glGetUniformLocation(program, "uInstanced"), instanced ? 1 : 0);
-   glUniform1i(glGetUniformLocation(program, "uHasVertexColor"), mHasVertexColor ? 1 : 0);
+   glUniform3fv(GLUtil::UniformLoc(program, "uLightDir"), 1, lightDir);
+   glUniform1i(GLUtil::UniformLoc(program, "uInstanced"), instanced ? 1 : 0);
+   glUniform1i(GLUtil::UniformLoc(program, "uHasVertexColor"), mHasVertexColor ? 1 : 0);
    glActiveTexture(GL_TEXTURE0);
    glBindTexture(GL_TEXTURE_2D, surfaceTexture != 0 ? surfaceTexture : WhiteTexture());
-   glUniform1i(glGetUniformLocation(program, "uTexture"), 0);
-   glUniform1i(glGetUniformLocation(program, "uHasTexture"), surfaceTexture != 0 ? 1 : 0);
+   glUniform1i(GLUtil::UniformLoc(program, "uTexture"), 0);
+   glUniform1i(GLUtil::UniformLoc(program, "uHasTexture"), surfaceTexture != 0 ? 1 : 0);
    glActiveTexture(GL_TEXTURE5);
    glBindTexture(GL_TEXTURE_2D, mPaintTex != 0 ? mPaintTex : WhiteTexture());
-   glUniform1i(glGetUniformLocation(program, "uPaint"), 5);
-   glUniform1i(glGetUniformLocation(program, "uHasPaint"), mPaintTex != 0 ? 1 : 0);
+   glUniform1i(GLUtil::UniformLoc(program, "uPaint"), 5);
+   glUniform1i(GLUtil::UniformLoc(program, "uHasPaint"), mPaintTex != 0 ? 1 : 0);
    glActiveTexture(GL_TEXTURE0);
 
    // A stamp with its own face selection keeps the CPU matrices: the overlay
    // below reads them through aInstance.
    const GpuPoints* gpuInstances =
       (instanced && mesh.faceMask.empty()) ? ResolveGpuInstances(geo, instancer) : nullptr;
-   glUniform1i(glGetUniformLocation(program, "uGpuPoints"), gpuInstances != nullptr ? 1 : 0);
+   glUniform1i(GLUtil::UniformLoc(program, "uGpuPoints"), gpuInstances != nullptr ? 1 : 0);
 
    glBindVertexArray(mVao);
    if (gpuInstances != nullptr)
@@ -1105,13 +1105,13 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, gpuInstances->posTex);
       glActiveTexture(GL_TEXTURE0);
-      glUniform1i(glGetUniformLocation(program, "uPointPos"), 1);
-      glUniform1i(glGetUniformLocation(program, "uPointTexW"), gpuInstances->texW);
-      glUniformMatrix4fv(glGetUniformLocation(program, "uPointModel"), 1, GL_FALSE, gpuInstances->pointMatrix.m);
-      glUniform1f(glGetUniformLocation(program, "uPointSizeScale"), instancer->GpuInstanceSizeScale());
-      glUniformMatrix4fv(glGetUniformLocation(program, "uInstanceGroup"), 1, GL_FALSE, instanceGroupMatrix.m);
+      glUniform1i(GLUtil::UniformLoc(program, "uPointPos"), 1);
+      glUniform1i(GLUtil::UniformLoc(program, "uPointTexW"), gpuInstances->texW);
+      glUniformMatrix4fv(GLUtil::UniformLoc(program, "uPointModel"), 1, GL_FALSE, gpuInstances->pointMatrix.m);
+      glUniform1f(GLUtil::UniformLoc(program, "uPointSizeScale"), instancer->GpuInstanceSizeScale());
+      glUniformMatrix4fv(GLUtil::UniformLoc(program, "uInstanceGroup"), 1, GL_FALSE, instanceGroupMatrix.m);
       const Mat4 shapeModel = instancer->GpuInstanceShapeModel();
-      glUniformMatrix4fv(glGetUniformLocation(program, "uShapeModel"), 1, GL_FALSE, shapeModel.m);
+      glUniformMatrix4fv(GLUtil::UniformLoc(program, "uShapeModel"), 1, GL_FALSE, shapeModel.m);
       mInstanceCount = gpuInstances->count;
       glDrawElementsInstanced(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, nullptr,
                               (GLsizei)mInstanceCount);
@@ -1217,12 +1217,12 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
       if (mSelIndexCount > 0)
       {
          glUseProgram(selectionProgram);
-         glUniformMatrix4fv(glGetUniformLocation(selectionProgram, "uModel"), 1, GL_FALSE, model.m);
-         glUniformMatrix4fv(glGetUniformLocation(selectionProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+         glUniformMatrix4fv(GLUtil::UniformLoc(selectionProgram, "uModel"), 1, GL_FALSE, model.m);
+         glUniformMatrix4fv(GLUtil::UniformLoc(selectionProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
          const float selColor[3] = { 1.0f, 0.42f, 0.12f };
-         glUniform3fv(glGetUniformLocation(selectionProgram, "uColor"), 1, selColor);
-         glUniform1f(glGetUniformLocation(selectionProgram, "uOpacity"), 0.55f);
-         glUniform1i(glGetUniformLocation(selectionProgram, "uInstanced"), instanced ? 1 : 0);
+         glUniform3fv(GLUtil::UniformLoc(selectionProgram, "uColor"), 1, selColor);
+         glUniform1f(GLUtil::UniformLoc(selectionProgram, "uOpacity"), 0.55f);
+         glUniform1i(GLUtil::UniformLoc(selectionProgram, "uInstanced"), instanced ? 1 : 0);
 
          glDepthFunc(GL_LEQUAL);
          glEnable(GL_POLYGON_OFFSET_FILL);

@@ -726,7 +726,8 @@ namespace
 
    void Upload(unsigned& tex, int& tw, int& th, int w, int h, const std::vector<uint8_t>& topFirst)
    {
-      std::vector<uint8_t> flipped(topFirst.size());
+      thread_local std::vector<uint8_t> flipped;
+      flipped.resize(topFirst.size());
       const size_t stride = (size_t)w * 4;
       for (int y = 0; y < h; y++)
          std::memcpy(&flipped[(size_t)y * stride], &topFirst[(size_t)(h - 1 - y) * stride], stride);

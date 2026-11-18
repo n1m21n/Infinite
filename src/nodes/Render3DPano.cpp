@@ -17,6 +17,7 @@
 // With HDR on, the faces are drawn untonemapped and the bloom/tonemap finish
 // runs once on the unwrapped picture, so it has no seams at the cube's edges.
 #include "Geometry3DNodes.h"
+#include "GLUtil.h"
 
 #include "core/Transport.h"
 #include "gl3.h"
@@ -231,7 +232,7 @@ void Render3DNode::CookPano(int frameId)
       GLUtil::RunShaderPass(face, mProgCubeCopy, [&]() {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, mColorTex);
-         glUniform1i(glGetUniformLocation(mProgCubeCopy, "uSrc"), 0);
+         glUniform1i(GLUtil::UniformLoc(mProgCubeCopy, "uSrc"), 0);
       });
       if (hdrOn && mDepthTex != 0)
       {
@@ -241,7 +242,7 @@ void Render3DNode::CookPano(int frameId)
          GLUtil::RunShaderPass(face, mProgCubeCopy, [&]() {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, mDepthTex);
-            glUniform1i(glGetUniformLocation(mProgCubeCopy, "uSrc"), 0);
+            glUniform1i(GLUtil::UniformLoc(mProgCubeCopy, "uSrc"), 0);
          });
       }
    }
@@ -256,14 +257,14 @@ void Render3DNode::CookPano(int frameId)
       GLUtil::RunShaderPass(out, mProgPano, [&]() {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_CUBE_MAP, cube);
-         glUniform1i(glGetUniformLocation(mProgPano, "uCube"), 0);
-         glUniform1i(glGetUniformLocation(mProgPano, "uLayout"), layout);
-         glUniform1i(glGetUniformLocation(mProgPano, "uDepth"), depthMode);
-         glUniform2f(glGetUniformLocation(mProgPano, "uSize"), (float)w, (float)h);
-         glUniform1f(glGetUniformLocation(mProgPano, "uDome"), dome);
-         glUniform1f(glGetUniformLocation(mProgPano, "uTilt"), std::clamp(domeTilt, 0.0f, 90.0f));
-         glUniform1i(glGetUniformLocation(mProgPano, "uLens"), fisheyeLens);
-         glUniform4f(glGetUniformLocation(mProgPano, "uLatLon"), std::clamp(latMin, -latCap, latCap), std::clamp(latMax, -latCap, latCap),
+         glUniform1i(GLUtil::UniformLoc(mProgPano, "uCube"), 0);
+         glUniform1i(GLUtil::UniformLoc(mProgPano, "uLayout"), layout);
+         glUniform1i(GLUtil::UniformLoc(mProgPano, "uDepth"), depthMode);
+         glUniform2f(GLUtil::UniformLoc(mProgPano, "uSize"), (float)w, (float)h);
+         glUniform1f(GLUtil::UniformLoc(mProgPano, "uDome"), dome);
+         glUniform1f(GLUtil::UniformLoc(mProgPano, "uTilt"), std::clamp(domeTilt, 0.0f, 90.0f));
+         glUniform1i(GLUtil::UniformLoc(mProgPano, "uLens"), fisheyeLens);
+         glUniform4f(GLUtil::UniformLoc(mProgPano, "uLatLon"), std::clamp(latMin, -latCap, latCap), std::clamp(latMax, -latCap, latCap),
                      std::clamp(lonMin, -180.0f, 180.0f), std::clamp(lonMax, -180.0f, 180.0f));
       });
       glBindTexture(GL_TEXTURE_CUBE_MAP, 0);

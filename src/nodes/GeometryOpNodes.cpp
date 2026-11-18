@@ -791,8 +791,8 @@ const GpuPoints* GeometryOpNode::GetGpuPoints()
       mGpuBuiltRevision = mPointCloudRevision;
       mGpuBuiltValid = GpuPointsGL::RunPointPass(mGpuTarget, mGpuPoints, *src, mTwistProgram, [&]()
       {
-         glUniform1f(glGetUniformLocation(mTwistProgram, "uAngle"), angle);
-         glUniform1i(glGetUniformLocation(mTwistProgram, "uAxis"), ax);
+         glUniform1f(GLUtil::UniformLoc(mTwistProgram, "uAngle"), angle);
+         glUniform1i(GLUtil::UniformLoc(mTwistProgram, "uAxis"), ax);
       }, "Twist_GpuPoints");
       if (!mGpuBuiltValid)
          return nullptr;
@@ -1272,22 +1272,22 @@ const GpuPoints* DisplacementNode::GetGpuPoints()
       {
          glActiveTexture(GL_TEXTURE2);
          glBindTexture(GL_TEXTURE_2D, hasTex ? mTexTex : 0);
-         glUniform1i(glGetUniformLocation(mGpuProgram, "uTex"), 2);
-         glUniform2i(glGetUniformLocation(mGpuProgram, "uTexSize"), mTexTexW, mTexTexH);
-         glUniform1i(glGetUniformLocation(mGpuProgram, "uHasTex"), hasTex ? 1 : 0);
-         glUniform1i(glGetUniformLocation(mGpuProgram, "uMode"), mode);
-         glUniform1f(glGetUniformLocation(mGpuProgram, "uStrength"), strength);
-         glUniform1f(glGetUniformLocation(mGpuProgram, "uMidlevel"), midlevel);
-         glUniform1i(glGetUniformLocation(mGpuProgram, "uSource"), source == kNoise ? 1 : 0);
-         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnType"), noiseType);
-         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnFreq"), frequency);
-         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnW"), mNoiseW);
-         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnOctaves"), octaves);
-         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnRough"), noiseRoughness);
-         glUniform1ui(glGetUniformLocation(mGpuProgram, "uDnSeed"), (unsigned int)seed);
-         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnMode"), mode);
-         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnStrength"), strength);
-         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnAffects"), affects);
+         glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uTex"), 2);
+         glUniform2i(GLUtil::UniformLoc(mGpuProgram, "uTexSize"), mTexTexW, mTexTexH);
+         glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uHasTex"), hasTex ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uMode"), mode);
+         glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uStrength"), strength);
+         glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uMidlevel"), midlevel);
+         glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uSource"), source == kNoise ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uDnType"), noiseType);
+         glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uDnFreq"), frequency);
+         glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uDnW"), mNoiseW);
+         glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uDnOctaves"), octaves);
+         glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uDnRough"), noiseRoughness);
+         glUniform1ui(GLUtil::UniformLoc(mGpuProgram, "uDnSeed"), (unsigned int)seed);
+         glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uDnMode"), mode);
+         glUniform1f(GLUtil::UniformLoc(mGpuProgram, "uDnStrength"), strength);
+         glUniform1i(GLUtil::UniformLoc(mGpuProgram, "uDnAffects"), affects);
       }, "Displacement_GpuPoints");
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, 0);

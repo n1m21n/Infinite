@@ -1,4 +1,5 @@
 #include "PredictiveColoringNode.h"
+#include "GLUtil.h"
 #include "platform/AppPaths.h"
 
 #include "Transport.h"
@@ -350,7 +351,7 @@ void PredictiveColoringNode::AnalyzeInput(unsigned int srcTex, double t)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, srcTex);
-      glUniform1i(glGetUniformLocation(mDownsampleProgram, "uSrc"), 0);
+      glUniform1i(GLUtil::UniformLoc(mDownsampleProgram, "uSrc"), 0);
    });
 
    mPixels.assign((size_t)size * size * 4, 0);
@@ -510,24 +511,24 @@ void PredictiveColoringNode::CookIfNeeded(int frameId)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, srcTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 0);
-      glUniform1f(glGetUniformLocation(mProgram, "uMix"), mix);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSrc"), 0);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMix"), mix);
 
-      glUniform3f(glGetUniformLocation(mProgram, "uRgbGain"),
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uRgbGain"),
                   mCurrentParams.rgbGainR, mCurrentParams.rgbGainG, mCurrentParams.rgbGainB);
-      glUniform1f(glGetUniformLocation(mProgram, "uExposure"), mCurrentParams.exposure);
-      glUniform1f(glGetUniformLocation(mProgram, "uBlackPoint"), mCurrentParams.blackPoint);
-      glUniform1f(glGetUniformLocation(mProgram, "uWhitePoint"), mCurrentParams.whitePoint);
-      glUniform1f(glGetUniformLocation(mProgram, "uContrast"), mCurrentParams.contrast);
-      glUniform1f(glGetUniformLocation(mProgram, "uPivot"), mCurrentParams.pivot);
-      glUniform1f(glGetUniformLocation(mProgram, "uHighlights"), mCurrentParams.highlights);
-      glUniform1f(glGetUniformLocation(mProgram, "uShadows"), mCurrentParams.shadows);
-      glUniform1f(glGetUniformLocation(mProgram, "uMidtones"), mCurrentParams.midtones);
-      glUniform1f(glGetUniformLocation(mProgram, "uWhites"), mCurrentParams.whites);
-      glUniform1f(glGetUniformLocation(mProgram, "uBlacks"), mCurrentParams.blacks);
-      glUniform1f(glGetUniformLocation(mProgram, "uSaturation"), mCurrentParams.saturation);
-      glUniform1f(glGetUniformLocation(mProgram, "uVibrance"), mCurrentParams.vibrance);
-      glUniform1f(glGetUniformLocation(mProgram, "uHueShift"), mCurrentParams.hueShift);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uExposure"), mCurrentParams.exposure);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBlackPoint"), mCurrentParams.blackPoint);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uWhitePoint"), mCurrentParams.whitePoint);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uContrast"), mCurrentParams.contrast);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uPivot"), mCurrentParams.pivot);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uHighlights"), mCurrentParams.highlights);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uShadows"), mCurrentParams.shadows);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMidtones"), mCurrentParams.midtones);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uWhites"), mCurrentParams.whites);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBlacks"), mCurrentParams.blacks);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSaturation"), mCurrentParams.saturation);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uVibrance"), mCurrentParams.vibrance);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uHueShift"), mCurrentParams.hueShift);
    });
 }
 

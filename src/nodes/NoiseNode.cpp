@@ -1,4 +1,5 @@
 #include "NoiseNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -200,20 +201,20 @@ void NoiseNode::CookIfNeeded(int frameId)
    NodeWorkCounter()++;
    GLUtil::RunShaderPass(mOut, mProgram, [this, time]()
    {
-      glUniform1i(glGetUniformLocation(mProgram, "uType"), noiseType);
-      glUniform1f(glGetUniformLocation(mProgram, "uScale"), scale);
-      glUniform1f(glGetUniformLocation(mProgram, "uOctaves"), octaves);
-      glUniform1f(glGetUniformLocation(mProgram, "uLacunarity"), lacunarity);
-      glUniform1f(glGetUniformLocation(mProgram, "uGain"), gain);
-      glUniform1f(glGetUniformLocation(mProgram, "uWarp"), warp);
-      glUniform1f(glGetUniformLocation(mProgram, "uTime"), time);
-      glUniform1f(glGetUniformLocation(mProgram, "uContrast"), contrast);
-      glUniform1f(glGetUniformLocation(mProgram, "uBrightness"), brightness);
-      glUniform1f(glGetUniformLocation(mProgram, "uSeed"), seed);
-      glUniform1i(glGetUniformLocation(mProgram, "uColorNoise"), colorNoise ? 1 : 0);
-      glUniform3f(glGetUniformLocation(mProgram, "uLowColor"), lowColor[0], lowColor[1], lowColor[2]);
-      glUniform3f(glGetUniformLocation(mProgram, "uHighColor"), highColor[0], highColor[1], highColor[2]);
-      glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uType"), noiseType);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uScale"), scale);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uOctaves"), octaves);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uLacunarity"), lacunarity);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uGain"), gain);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uWarp"), warp);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uTime"), time);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uContrast"), contrast);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uBrightness"), brightness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSeed"), seed);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uColorNoise"), colorNoise ? 1 : 0);
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uLowColor"), lowColor[0], lowColor[1], lowColor[2]);
+      glUniform3f(GLUtil::UniformLoc(mProgram, "uHighColor"), highColor[0], highColor[1], highColor[2]);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
    });
    mBuiltParams = std::move(params);
    mBuiltTime = time;

@@ -1,4 +1,5 @@
 #include "ResynthNode.h"
+#include "GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -349,21 +350,21 @@ void ResynthNode::RunGeneration(unsigned int srcTex, int w, int h)
    {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, prevTex != 0 ? prevTex : srcTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uPrev"), 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uPrev"), 0);
 
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, srcTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 1);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSrc"), 1);
 
-      glUniform2f(glGetUniformLocation(mProgram, "uTexelSize"), 1.0f / w, 1.0f / h);
-      glUniform1i(glGetUniformLocation(mProgram, "uFirst"), first ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mProgram, "uChaos"), chaos);
-      glUniform1f(glGetUniformLocation(mProgram, "uMutation"), mutation);
-      glUniform1f(glGetUniformLocation(mProgram, "uFeedback"), feedback);
-      glUniform1f(glGetUniformLocation(mProgram, "uSourcePull"), sourcePull);
-      glUniform1f(glGetUniformLocation(mProgram, "uGeneration"), (float)mGeneration);
-      glUniform1f(glGetUniformLocation(mProgram, "uSeed"), seed);
-      glUniform1fv(glGetUniformLocation(mProgram, "uAmt"), kEffectCount, blended);
+      glUniform2f(GLUtil::UniformLoc(mProgram, "uTexelSize"), 1.0f / w, 1.0f / h);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uFirst"), first ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uChaos"), chaos);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMutation"), mutation);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uFeedback"), feedback);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSourcePull"), sourcePull);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uGeneration"), (float)mGeneration);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSeed"), seed);
+      glUniform1fv(GLUtil::UniformLoc(mProgram, "uAmt"), kEffectCount, blended);
    });
 
    mFront = back;
