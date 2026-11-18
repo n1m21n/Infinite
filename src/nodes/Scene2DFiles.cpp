@@ -779,10 +779,11 @@ void Scene2DNode::ResetForFile(int w, int h)
    Commit();
 }
 
-int Scene2DNode::AddFileLayer(int parent, const std::string& name, int x, int y, int w, int h, const std::vector<uint8_t>& rgba)
+int Scene2DNode::AddFileLayer(int parent, const std::string& name, int x, int y, int w, int h, const std::vector<uint8_t>& rgba, int above)
 {
-   Layer& l = AddLayer(Kind::Paint, 0, 0);
-   l.parent = parent;
+   Layer& l = AddLayer(Kind::Paint, 0, above);
+   if (above == 0)
+      l.parent = parent;
    l.name = name;
    if (w > 0 && h > 0 && rgba.size() >= (size_t)w * h * 4)
    {
@@ -1070,7 +1071,7 @@ bool Scene2DNode::LoadPsd(const std::vector<uint8_t>& bytes, std::string* err)
    return true;
 }
 
-bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
+bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId, std::string* note)
 {
    Layers();
    struct ExportScope { bool was = sExport; ExportScope() { sExport = true; } ~ExportScope() { sExport = was; } } exporting;
@@ -1094,17 +1095,29 @@ bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
       std::string name;
       int blend = 0, opacity = 255, section = 0;
       bool visible = true, clip = false, open = true;
+      bool solid = false;   // a solid fill layer: written as a live Photoshop fill (SoCo) over its pixels
+      float rgb[3] = { 0, 0, 0 };
       FilePixels px;
    };
    std::vector<Out> outs;
+   int nAdjust = 0, nBaked = 0;
    auto alone = [this](int id, int f, std::vector<uint8_t>& px) { return RenderLayerAlone(id, f, px); };
    std::function<void(int)> walk = [&](int parent)
    {
       for (size_t i = 0; i < mLayers.size(); i++)
       {
          const Layer l = mLayers[i];
-         if (l.parent != parent || l.kind == Kind::Adjust || l.noExport)
+         if (l.parent != parent || l.noExport)
             continue;
+         if (l.kind == Kind::Adjust)
+         {
+            nAdjust++;
+            continue;
+         }
+         bool styled = false;
+         for (const Fx& f : l.fx)
+            styled = styled || f.on;
+         nBaked += styled || !l.fxMore.empty() || (l.kind == Kind::Fill && l.fillType != 0);
          if (l.kind == Kind::Group)
          {
             Out end;
@@ -1127,6 +1140,9 @@ bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
          o.opacity = (int)std::lround(std::clamp(l.opacity, 0.0f, 1.0f) * 255.0f);
          o.visible = l.visible;
          o.clip = l.clip;
+         o.solid = l.kind == Kind::Fill && l.fillType == 0;
+         for (int c = 0; c < 3; c++)
+            o.rgb[c] = std::clamp(l.colorA[c], 0.0f, 1.0f) * 255.0f;
          GrabLayer(*this, l, frameId, true, o.px, alone);
          outs.push_back(std::move(o));
       }
@@ -1199,6 +1215,29 @@ bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
       wr.U32((uint32_t)u.size());
       for (uint16_t c : u) wr.U16(c);
       wr.Fill(lu, 4);
+      if (o.solid)
+      {
+         // SoCo: version 16, then a descriptor { 'Clr ': Objc RGBC { 'Rd  ', 'Grn ', 'Bl  ': doub } }.
+         auto dbl = [&](double v) { uint64_t b; std::memcpy(&b, &v, 8); wr.U32((uint32_t)(b >> 32)); wr.U32((uint32_t)b); };
+         auto key = [&](const char* k) { wr.U32(0); wr.Tag(k); };
+         auto head = [&](const char* cls, uint32_t n) { wr.U32(1); wr.U16(0); key(cls); wr.U32(n); };
+         wr.Tag("8BIM");
+         wr.Tag("SoCo");
+         const size_t sc = wr.Mark();
+         wr.U32(16);
+         head("null", 1);
+         key("Clr ");
+         wr.Tag("Objc");
+         head("RGBC", 3);
+         const char* ch[3] = { "Rd  ", "Grn ", "Bl  " };
+         for (int c = 0; c < 3; c++)
+         {
+            key(ch[c]);
+            wr.Tag("doub");
+            dbl(o.rgb[c]);
+         }
+         wr.Fill(sc, 2);
+      }
       if (o.section != 0)
       {
          wr.Tag("8BIM");
@@ -1226,6 +1265,14 @@ bool Scene2DNode::SavePsd(std::vector<uint8_t>& out, int frameId)
       }
    }
    wr.Fill(li, 4);
+   if (note != nullptr)
+   {
+      note->clear();
+      if (nAdjust > 0)
+         *note = std::to_string(nAdjust) + (nAdjust == 1 ? " adjustment left out" : " adjustments left out");
+      if (nBaked > 0)
+         *note += (note->empty() ? "" : ", ") + std::to_string(nBaked) + (nBaked == 1 ? " layer as pixels" : " layers as pixels");
+   }
    wr.U32(0);   // global layer mask info
    wr.Fill(lm);
 
