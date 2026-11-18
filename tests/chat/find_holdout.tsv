@@ -13,7 +13,7 @@ cut out the person	Remove Background|Pose Track
 turn my photo into dots	Image to Points|Dither
 make a terrain	Displacement|Noise|Ocean Surface
 loop my guitar live	Looper|Audio In
-a pad sound that evolves	Wavetable Synth|Spectral Synth|Granular
+a pad sound that evolves	Wavetable Synth|Wavetable|Spectral Synth|Granular
 bitcrusher	Bitcrush
 mirror the image	Mirror Tile|Kaleidoscope
 control it from my phone	OSC Receive

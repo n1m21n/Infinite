@@ -3914,7 +3914,7 @@ namespace
          }
       if (segs.size() >= kMaxSegs)
          return false;
-      const ImU32 white = IM_COL32(255, 255, 255, 255), black = IM_COL32(0, 0, 0, 255);
+      const ImU32 white = tok::U32(tok::canvas_ink), black = tok::U32(tok::canvas_shade);
       constexpr float kDash = 4.0f;
       const float march = std::fmod((float)ImGui::GetTime() * 16.0f, kDash * 2.0f);
       for (const Seg& sg : segs)
@@ -6018,13 +6018,6 @@ namespace
                FreeTransformOn(doc) ? EndFreeTransform(doc, true) : BeginFreeTransform(doc);
             if (any)
                TransformSubMenu(doc);
-            if (any && MenuParts::Item(T("Delete"), "Delete"))
-            {
-               if (SelectionActsOnPixels(doc))
-                  ClearOrFill(doc, 0);
-               else
-                  sPending.what = Pending::Delete;
-            }
             MenuParts::Separator();
             // What the active layer is decides what else is offered: pixels, image, text, shapes, group, fill or adjustment.
             if (Layer* k = Active(doc))
@@ -6492,7 +6485,7 @@ namespace
          const float r = 6.0f, a0 = -2.6f, a1 = 1.2f;
          for (int pass = 0; pass < 2; pass++)
          {
-            const ImU32 col = pass == 0 ? IM_COL32(0, 0, 0, 200) : IM_COL32(255, 255, 255, 255);
+            const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, 200) : tok::U32(tok::canvas_ink);
             const float th = pass == 0 ? 3.5f : 1.5f;
             dl->PathArcTo(c, r, a0, a1, 14);
             dl->PathStroke(col, 0, th);
@@ -9955,9 +9948,9 @@ namespace
                sRename = id;
                std::snprintf(sRenameBuf, sizeof(sRenameBuf), "%s", LayerName(*l).c_str());
             }
+            if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
             if (MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
             if (MenuParts::Item(T("Copy Merged"), Sc("Shift+Ctrl+C"))) sPending.what = Pending::CopyMerged;
-            if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
             if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
             if (MenuParts::Item(l->kind == Kind::Group ? T("Duplicate Group") : T("Duplicate Layer"), Sc("Ctrl+J")))
                sPending.what = Pending::Duplicate;

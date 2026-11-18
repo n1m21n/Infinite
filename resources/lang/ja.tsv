@@ -3715,3 +3715,26 @@ Drag: move the cut; Shift-drag: stretch the slice; double-click: remove it	ド�
 Click: place the playhead; double-click: a new slice here	クリック:再生ヘッドを置く、ダブルクリック:ここに新しいスライス
 Copy Scene	シーンをコピー
 Paste Scene	シーンを貼り付け
+Adaptive smooth	適応スムージング
+Airbrush	エアブラシ
+Anchor depth	アンカー深度
+Black to	黒の上限
+Blend If	ブレンド条件
+Catch up	追従キャッチアップ
+Copy Merged	結合部分をコピー
+Crop to Selection	選択範囲で切り抜き
+Driven on canvas	キャンバス上で駆動
+Flatten Group	グループを統合
+Orient	向き
+Pen & tilt	ペンと傾き
+Response	レスポンス
+Select Layer Pixels	レイヤーのピクセルを選択
+Sort 3D with outside	外部と3Dソート
+Stamp Visible	表示レイヤーをスタンプ
+This layer	このレイヤー
+Tilt angle	傾き角度
+Tilt flatness	傾き扁平率
+Tilt size	傾きサイズ
+Trim Transparent Edges	透明な端をトリミング
+Underlying	下のレイヤー
+White from	白の下限
