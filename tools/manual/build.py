@@ -221,6 +221,7 @@ def main():
     shutil.copy(joined, OUT_WEB)
     shutil.copy(joined, OUT_KIT)
     print("wrote", OUT, "and copies in website/assets and press_kit/manuals")
+    subprocess.run([sys.executable, os.path.join(HERE, "build_html.py")], check=True)
 
 
 if __name__ == "__main__":

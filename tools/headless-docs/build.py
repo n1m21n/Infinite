@@ -60,6 +60,7 @@ def main():
         parts.append(pdf)
     subprocess.run(["pdfunite"] + parts + [OUT], check=True)
     print("wrote", OUT)
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "manual", "build_html.py")], check=True)
 
 
 main()
