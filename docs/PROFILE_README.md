@@ -46,7 +46,7 @@
 
 <div align="center">
   <a href="https://github.com/n1m21n/Infinite">
-    <img src="https://raw.githubusercontent.com/n1m21n/Infinite/main/docs/screenshots/v1/hero-panels.png" alt="Infinite v1.0 with several panels open around the node canvas" width="100%" />
+    <img src="https://raw.githubusercontent.com/n1m21n/Infinite/main/docs/screenshots/v2/hero-panels.png" alt="Infinite v1.0 with several panels open around the node canvas" width="100%" />
   </a>
   <p>
     <a href="https://github.com/n1m21n/Infinite/releases/latest"><strong>Download</strong></a> ·

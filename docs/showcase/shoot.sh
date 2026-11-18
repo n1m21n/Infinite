@@ -2,7 +2,7 @@
 # Shoot the v1.0 (beta) README screenshots from docs/showcase/infinite-v1-showcase.inf.
 # Usage: docs/showcase/shoot.sh [shot ...]   (no arguments = all nine shots)
 #   APP=/path/to/Infinite.app/Contents/MacOS/Infinite   the dev app to drive (default below)
-# Writes docs/screenshots/v1/<shot>.png, each window-only, 2x Retina, under 1.5 MB.
+# Writes docs/screenshots/v2/<shot>.png, each window-only, 2x Retina, under 1.5 MB.
 # Runs one off-screen Infinite instance on port 7790 and quits it at the end; the app saves its own frames.
 set -e
 REPO=$(cd "$(dirname "$0")/../.." && pwd)

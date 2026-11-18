@@ -69,13 +69,13 @@ Procedural meshes, imports (USD, OBJ, PLY, STL, glTF), booleans, Voronoi and Del
 
 ### Sound
 
-![Piano, Analog, Granular and Generate Samples nodes](docs/screenshots/v1/gallery-sound.png)
+![Piano, Analog, Granular and Generate Samples nodes](docs/screenshots/v2/gallery-sound.png)
 
 A sample-accurate, pull-based audio graph on the same BPM transport as the pictures. Synths and physical models (Analog, FM, Wavetable, Metallic, String, **Piano**, **Wind**, Granular, PaulStretch, Molder, Sampler, Slicer, 8-track Drum Sequencer, Looper), a full effects rack, AU and VST3 plugin hosting with native windows and modulatable parameters, and **Generate Samples**, a player whose sample is made rather than loaded: pick one of 60 music styles and a part (all, synths, pads, plucks, percussion or drums), press generate, and a loop of 1, 2, 4 or 8 bars is rendered from Infinite's own instruments. It saves as a recipe, not as audio.
 
 ### Notes and control
 
-![LFO, Audio Analyze, Arpeggiator and Note Sequencer nodes](docs/screenshots/v1/gallery-control.png)
+![LFO, Audio Analyze, Arpeggiator and Note Sequencer nodes](docs/screenshots/v2/gallery-control.png)
 
 Note sequencers, arpeggiator, chorder, quantizer and MIDI in and out on one side; LFOs, envelopes, random, pattern CV, audio analysis (8-band FFT, onsets), image analysis and camera tracking on the other. Any source can drive any parameter: a shader control, a 3D transform, a synth knob or a hosted plugin's parameter.
 
@@ -157,7 +157,7 @@ The Mod Matrix (Shift + M) lists every modulation in the patch in one table: sou
 
 ### Terminal and the `infinite` command
 
-<img src="docs/screenshots/v1/terminal.png" alt="The Terminal panel running the infinite command" width="100%">
+<img src="docs/screenshots/v2/terminal.png" alt="The Terminal panel running the infinite command" width="100%">
 
 A real terminal inside Infinite (Ctrl + \`), docked on any side, running your own shell and your own tools, coding agents included. No agent ships with Infinite.
 
@@ -201,7 +201,7 @@ That is the one idea underneath the language: a **kernel**, run once per element
 Any element, pixel or sample kernel can declare **dynamic pins** in its code, adding real, cable-wireable, save-safe inputs and outputs without touching C++. Finished devices (kernel, params and presets) save and share as portable `.field` files. The full reference is in the [Field Language Manual](Field_Language_Manual.pdf).
 
 <p align="center">
-  <img src="docs/screenshots/v1/field-editor.png" alt="The Field Pixel editor beside its node" width="100%">
+  <img src="docs/screenshots/v2/field-editor.png" alt="The Field Pixel editor beside its node" width="100%">
 </p>
 
 

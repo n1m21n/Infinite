@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes docs/screenshots/v1/gallery-<name>.png for the README: a row of the manuals' own retina node shots
+"""Writes docs/screenshots/v2/gallery-<name>.png for the README: a row of the manuals' own retina node shots
 (docs/shots/raw/<Category>__<Node>__o.png, gitignored, so pass --shots when the checkout has none), each trimmed to
 the node, tall ones cut to their top section, on the canvas colour.
     python3 tools/readme/node_gallery.py [--shots path/to/docs/shots/raw]
