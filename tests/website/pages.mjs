@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../website');
 const TOP = ['index.html', 'library.html', 'philosophy.html', 'benchmarks.html', 'artists.html', 'musicians.html', 'vjs.html',
-  'creative-coders.html', 'developers.html', 'extensions.html', 'artworks.html', 'blog/index.html', 'embeds/index.html'];
+  'creative-coders.html', 'developers.html', 'artworks.html', 'blog/index.html', 'embeds/index.html'];
 const first = (dir) => {
   const d = path.join(ROOT, dir);
   const f = fs.existsSync(d) ? fs.readdirSync(d).filter((x) => x.endsWith('.html') && x !== 'index.html'

@@ -4028,7 +4028,10 @@ public:
             if (!dup)
                notes[n++] = pick;
          }
-         std::sort(notes, notes + n);
+         // Insertion sort: n <= kMaxChordNotes, and std::sort trips gcc -Warray-bounds here.
+         for (int i = 1; i < n; i++)
+            for (int j = i; j > 0 && notes[j - 1] > notes[j]; j--)
+               std::swap(notes[j - 1], notes[j]);
          mLastChordSizeReadout.store(n, std::memory_order_relaxed);
 
          // Alternate down- and up-strums, like a hand on a guitar or keys.

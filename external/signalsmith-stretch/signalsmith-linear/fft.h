@@ -1072,7 +1072,7 @@ struct RealFFT {
 						};
 					}
 				} else if (!canUseTime) {
-					std::memcpy(tmpTime.data(), time, sizeof(Complex)*hSize);
+					std::memcpy((void *)tmpTime.data(), time, sizeof(Complex)*hSize);
 				}
 			} else if (step < complexFft.steps()) {
 				complexFft.fft(step, canUseTime ? (const Complex *)time : tmpTime.data(), tmpFreq.data());

@@ -127,7 +127,7 @@
 .mx-knob output { font: 500 var(--size-micro-mono)/1 'Geist Mono', ui-monospace, monospace; color: rgba(238, 241, 250, 0.7); }
 .mx-rack.live .mx-arc { filter: drop-shadow(0 0 6px rgba(167, 177, 255, 0.7)); }
 @media (min-width: 900px) { .mx-rack { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; padding: 24px; gap: 32px; } .mx-top { flex-direction: column; align-items: stretch; } .mx-scope { height: 96px; } .mx-play { justify-content: center; } .mx-dial { width: 76px; height: 76px; } }
-@media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); } .mx-dial { width: 72px; height: 72px; } .mx-rack { padding: 14px; } }
+@media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); font-size: 0.875rem; } .mx-dial { width: 72px; height: 72px; } .mx-rack { padding: 14px; } }
 
 /* phones: the Download button goes; the Gallery/Guide icon stays in the same row as the bubbles */
 @media (max-width: 899px) {
@@ -315,7 +315,7 @@ html .ax-main .ax-ttl, html .ax-main .ax-bento-l { font-size: var(--size-micro-m
 /* Sample generator preview: the live glowing blob, framed like a media card */
 .ax-blobframe { position: relative; border-radius: var(--web-card-radius, 20px); overflow: hidden; background: var(--midnight-950, #0d1020); height: 470px; }
 .ax-blobframe iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
-.ax-blobgo { display: inline-block; margin-top: 12px; padding: 8px 14px; border-radius: 999px; background: rgb(255 255 255 / 0.12); color: var(--midnight-50, var(--ink)); font: 500 0.8rem/1 'Geist', system-ui, sans-serif; text-decoration: none; }
+.ax-blobgo { display: inline-flex; align-items: center; box-sizing: border-box; min-height: var(--ctl-h, 40px); margin-top: 12px; padding: 0 14px; border-radius: 999px; background: rgb(255 255 255 / 0.12); color: var(--midnight-50, var(--ink)); font: 500 0.8rem/1 'Geist', system-ui, sans-serif; text-decoration: none; }
 .ax-blobgo:hover { background: rgb(255 255 255 / 0.22); }
 
 /* Made in Infinite: one grid of equal cards, picture on top, name under it */

@@ -37,7 +37,7 @@ namespace Hrtf
          mTaps = set != nullptr ? set->taps : 0;
          mGlide = 1.0f - std::exp(-1.0f / (0.008f * (float)sampleRate));
          mHistLen = 1;
-         while (mHistLen < mTaps + 1)
+         while (mHistLen < (unsigned)mTaps + 1u)
             mHistLen <<= 1;
          mHist.assign((size_t)mHistLen * 2, 0.0f);
          for (int e = 0; e < 2; e++)

@@ -165,6 +165,15 @@
       "fix": "Re-run the job once; if it repeats, check the URL and its pinned hash",
       "preflight": "none",
       "blocking": false
+    },
+    {
+      "id": "website-ui-scale",
+      "class": "website",
+      "log": "\\[(phone|desktop)\\] scale: .*\\(want \\d+-\\d+\\)",
+      "cause": "A website control or label is outside the device sizes website/scale.css sets (often a page that does not load scale.css)",
+      "fix": "Load scale.css on that page (generated pages: in the generator too) or size the control with --btn-h / --ctl-h; then tools/website/bust_css.py",
+      "preflight": "cd tests/website && node ui_scale.mjs <page.html>",
+      "blocking": true
     }
   ]
 }

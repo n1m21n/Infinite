@@ -93,7 +93,7 @@ public:
    // Reads Factor() samples from `os`, returns one base-rate sample.
    float Down(int ch, const float* os)
    {
-      float a[kMaxFactor];
+      float a[kMaxFactor] = {};
       std::copy(os, os + mFactor, a);
       int n = mFactor;
       for (int s = mStages - 1; s >= 0; s--)

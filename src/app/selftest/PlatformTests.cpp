@@ -643,7 +643,7 @@ int RunAsioTest()
    {
       const int type = types[t];
       check(AsioCore::SampleTypeSupported(type), "format reported supported");
-      std::vector<uint8_t> raw((size_t)257 * AsioCore::BytesPerSample(type) + 8, 0);
+      std::vector<uint8_t> raw((size_t)257 * 8 + 8, 0); // 8 = widest sample (float64); a fixed size keeps gcc -Warray-bounds quiet
       float back[257];
       AsioCore::FromFloat(type, src, raw.data(), 257);
       AsioCore::ToFloat(type, raw.data(), back, 257);

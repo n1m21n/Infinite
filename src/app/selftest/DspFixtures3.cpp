@@ -3453,7 +3453,7 @@ static bool RunLooperFixture()
    // 6) compensation: a click that arrives at press+F lands F - comp frames into
    //    the loop, so it plays comp frames earlier than an uncompensated take.
    {
-      constexpr int clickAt = 2000;
+      static constexpr int clickAt = 2000;
       auto clickFeed = [](int i) { return i == clickAt ? 0.9f : 0.0f; };
       int onset[2] = { -1, -1 };
       const int comps[2] = { 0, 480 };
@@ -3561,7 +3561,7 @@ static bool RunLooperFixture()
       transport.SetPlaying(true);
       transport.Rewind();
       transport.NotifyAudioEngineStarted((double)kSr);
-      constexpr int bar = 96000;
+      static constexpr int bar = 96000;
       auto n = MakeLooper(MusicTime::k1Bar + 1, true, 0);
       auto feed = [](int i) { return i == bar + 100 ? 0.9f : 0.0f; };
       Run(*n, 0, 100 * kBlock, feed, true, &cook);
@@ -3588,7 +3588,7 @@ static bool RunLooperFixture()
    //     on that line (the click before the press comes from the pre-roll),
    //     is one bar long and on the grid; pressed 300 ms late, it arms.
    {
-      constexpr int bar = 96000;
+      static constexpr int bar = 96000;
       for (int k = 0; k < 2; k++)
       {
          transport.SetPlaying(true);

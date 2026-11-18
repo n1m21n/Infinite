@@ -113,6 +113,7 @@ def page(i, embeds=frozenset()):
     .meta{{color:var(--mute);font-size:14px}}
     .btn{{margin:12px 12px 0 0}}   /* the look comes from neumo.css */
   </style>
+  <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body>
