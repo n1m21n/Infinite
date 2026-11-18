@@ -293,8 +293,9 @@ namespace CanvasLink
    bool PickChip(const char* id, const Spec& spec)
    {
       const bool armed = Armed(spec.owner.c_str());
-      UiAudit::NoteKind("toggle", Label(Verb::Pick));
-      if (!PanelKit::IconChip(id, Glyph(Verb::Pick), armed, armed ? ArmedLabel(spec).c_str() : Label(Verb::Pick)))
+      const bool hit = PanelKit::IconChip(id, Glyph(Verb::Pick), armed, armed ? ArmedLabel(spec).c_str() : Label(Verb::Pick));
+      UiAudit::NoteKind("toggle", Label(Verb::Pick)); // after the chip, so the note lands on the chip and not on the field before it
+      if (!hit)
          return false;
       if (armed)
          Cancel();
@@ -330,6 +331,7 @@ namespace CanvasLink
       const bool live = uid != 0 && FindNodeByUid(uid) != nullptr;
       ImGui::BeginDisabled(!live);
       const bool clicked = PanelKit::IconChip(id, Glyph(Verb::Show), false, Label(Verb::Show));
+      UiAudit::NoteKind("toggle", Label(Verb::Show));
       ImGui::EndDisabled();
       if (clicked && live)
          Show(uid);
