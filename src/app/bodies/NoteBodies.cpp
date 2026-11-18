@@ -250,7 +250,7 @@ namespace app
             AudioKnobRow row(count, faderH);
             for (int i = 0; i < count; i++)
             {
-               char label[8];
+               char label[16];
                snprintf(label, sizeof(label), "%d", i + 1);
                row.Fader(label, &n->gainDb[i], -60.0f, 12.0f, "%.1f dB", faderH, /*dbTaper=*/true);
             }
@@ -299,7 +299,7 @@ namespace app
             AudioKnobRow row(count, panDia);
             for (int i = 0; i < count; i++)
             {
-               char label[8];
+               char label[16];
                snprintf(label, sizeof(label), "pan %d", i + 1);
                row.Knob(label, &n->pan[i], -1.0f, 1.0f, "%.2f", panDia);
             }
@@ -1439,7 +1439,7 @@ namespace app
    void DrawPredictiveNotesBody(GraphNode& gn, PredictiveNotesNode* n)
    {
       const float conf = n->Confidence01();
-      char stat[64];
+      char stat[32];
       if (n->IsLearning() && n->Dropped() > 0)
          snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars (%d dropped)", n->NotesCaptured(), n->BarsCaptured(), n->Dropped());
       else if (n->IsLearning())
@@ -2014,7 +2014,7 @@ namespace app
             }
 
             // ---- Step number label below each column (Pattern-style) ----
-            char label[8];
+            char label[16];
             snprintf(label, sizeof(label), "%d", i + 1);
             // Cap at the ambient UI font size and only shrink below it once a
             // column gets too narrow to fit a number at that size - the old
@@ -2528,7 +2528,7 @@ namespace app
          const int v = startVoice + i;
          const float cx = x0 + (float)i * cellW + cellW * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, y0));
-         char label[24];
+         char label[32];
          snprintf(label, sizeof(label), "%d##stackEn%d", v + 1, v);
          bool en = n->enabled[v];
          if (AudioToggleButton(label, &en, btnW))

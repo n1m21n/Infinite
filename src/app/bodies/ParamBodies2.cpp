@@ -875,7 +875,7 @@ namespace app
       {
          const int idx = order[rank];
          ImGui::PushID(idx + 20000);
-         char label[16];
+         char label[32];
          snprintf(label, sizeof(label), "stop %d", rank + 1);
          ColorSwatch(label, n->stopColor[idx], n);
          ImGui::SameLine(size - 18.0f);

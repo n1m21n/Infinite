@@ -1147,7 +1147,7 @@ namespace app
          }
 
          // Step number label below column
-         char label[8];
+         char label[16];
          snprintf(label, sizeof(label), "%d", i + 1);
          const float labelFontSize = count <= 8 ? ImGui::GetFontSize()
                                                  : std::clamp(cellW * 0.95f, 8.0f, ImGui::GetFontSize());

@@ -111,7 +111,7 @@ namespace InfinitePlugin
 
    std::string FreeSlotName(int32 i)
    {
-      char name[16];
+      char name[32];
       std::snprintf(name, sizeof name, "Unused %02d", i + 1);
       return name;
    }

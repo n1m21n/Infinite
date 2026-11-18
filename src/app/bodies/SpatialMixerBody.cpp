@@ -181,7 +181,7 @@ namespace app
             dl->AddCircle(d, r + 2.0f + lvl * 4.0f, DotColor(s, 0.5f), 24, 2.0f);
          dl->AddCircleFilled(d, r, DotColor(s, silent ? 0.25f : 1.0f), 24);
          dl->AddCircle(d, r, light ? tok::U32(tok::pal::c_00000078) : tok::U32(tok::pal::c_FFFFFF78), 24, 1.0f);
-         char lab[4];
+         char lab[16];
          snprintf(lab, sizeof(lab), "%d", s + 1);
          const ImVec2 ts = ImGui::CalcTextSize(lab);
          dl->AddText(ImVec2(d.x - ts.x * 0.5f, d.y - ts.y * 0.5f), tok::U32(tok::pal::c_000000DC), lab);

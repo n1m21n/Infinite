@@ -206,7 +206,7 @@ namespace DeskParts
       dl->AddRectFilled(p, q, Role(tok::desk_scribble_bg), 3.0f);
       dl->AddRectFilled(ImVec2(p.x + 1, p.y + 1), ImVec2(p.x + 5, q.y - 1), Tint(col, 0.95f, 255), 2.0f, ImDrawFlags_RoundCornersLeft);
       dl->AddRect(p, q, Ink(34), 3.0f);
-      char num[8];
+      char num[16];
       snprintf(num, sizeof(num), "%d", number);
       const float nfs = ImGui::GetFontSize() * 0.78f;
       const float cy = (p.y + q.y) * 0.5f;

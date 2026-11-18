@@ -246,7 +246,7 @@ namespace app
       {
          if (ss.followAction == Arrange::kFollowNone)
             return;
-         char num[8];
+         char num[16];
          snprintf(num, sizeof(num), "%d", ss.followBars);
          const ImVec2 ns = ImGui::CalcTextSize(num);
          const float gx = rightCentre.x - ns.x - 9.0f;

@@ -626,7 +626,7 @@ namespace
             const long long frame = std::llround(f);
             if (frame > 0 && frame % fps == 0) // whole seconds read as timecode
             {
-               char tc[24];
+               char tc[32];
                std::snprintf(tc, sizeof tc, "%lld:%02lld", frame / fps / 60, (frame / fps) % 60);
                return std::string(tc);
             }

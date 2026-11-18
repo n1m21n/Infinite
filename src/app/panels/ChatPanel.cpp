@@ -2942,7 +2942,7 @@ namespace app
          }
          // Length (or where it is, while it plays) in a pill at the bottom right.
          const int secs = (int)std::lround(playing ? std::fmod(ImGui::GetTime() - v->started, std::max(0.001, v->seconds)) : v->seconds);
-         char dur[16];
+         char dur[32];
          std::snprintf(dur, sizeof dur, "%d:%02d", secs / 60, secs % 60);
          const ImVec2 ds = ImGui::CalcTextSize(dur);
          const ImVec2 d1(end.x - tok::space_2, end.y - tok::space_2), d0(d1.x - ds.x - 2.0f * tok::space_1 - 2.0f, d1.y - ds.y - 4.0f);

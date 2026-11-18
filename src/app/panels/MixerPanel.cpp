@@ -987,7 +987,7 @@ namespace app
             clicked = false;
          if (hovered)
             dl->AddRect(p, q, Ink(70), 3.0f);
-         char num[8];
+         char num[16];
          snprintf(num, sizeof(num), "%d", number);
          const float nfs = UiType::Px(UiType::Size::Caption);
          if (number > 0)

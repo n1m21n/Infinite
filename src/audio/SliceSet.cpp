@@ -25,7 +25,7 @@ namespace
       {
          if (c == ' ' || c == '%' || c == '=' || c == '\n' || c == '\r' || c == '\t')
          {
-            char b[4];
+            char b[16];
             snprintf(b, sizeof(b), "%%%02X", (unsigned char)c);
             o += b;
          }

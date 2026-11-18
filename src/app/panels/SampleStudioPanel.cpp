@@ -1092,7 +1092,7 @@ namespace
          RenderSlice(*s.src, s.doc, i, false, l, r, body);
          if (l.empty())
             continue;
-         char num[8];
+         char num[16];
          snprintf(num, sizeof(num), "%02d", i + 1);
          const std::string name = base + "-" + num + (s.doc.slices[(size_t)i].name.empty() ? "" : "-" + FileSafe(s.doc.slices[(size_t)i].name));
          const std::string path = folder.empty() ? AudioRecordings::GenerateFilePath(name, "wav") : folder + "/" + name + ".wav";
@@ -3428,7 +3428,7 @@ namespace
       {
          if (c == ' ' || c == '%' || c == '=' || c == '\n' || c == '\r' || c == '\t')
          {
-            char b[4];
+            char b[16];
             snprintf(b, sizeof(b), "%%%02X", (unsigned char)c);
             o += b;
          }
