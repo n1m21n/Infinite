@@ -30,76 +30,61 @@ DESC = "Complete Infinite release notes from v0.1 to v2.0.0: 2D and 3D views, Ti
 
 PAGE_CSS = """
   <style>
-    .rel-wrap { max-width: 1120px; margin: 0 auto; padding: 120px var(--ui-sp-4, 16px) 80px; display: grid; gap: 40px; }
-    .rel-head { display: grid; gap: 16px; max-width: 760px; }
-    .rel-head h1 { margin: 0; font-size: var(--size-h1); font-weight: 800; letter-spacing: -0.035em; line-height: 1.05; }
-    .rel-head h1 em { font-style: italic; color: var(--accent-ink); font-family: var(--font-hand, "Caveat", cursive); font-weight: 700; font-size: 1.08em; }
-    .rel-lead { margin: 0; max-width: 62ch; color: var(--muted); font-size: var(--size-body); line-height: 1.65; }
-    .rel-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    /* Page sheet: tokens only (WEBSITE_SYSTEM.md). Cards are surface-1 + shadow-1, no outline; Ember appears once. */
+    .rel-wrap { --wrap: var(--web-max); display: grid; gap: var(--web-section-tight); padding-block: calc(var(--web-header) + var(--web-section-tight)) var(--web-section); }
+    .rel-head { display: grid; gap: var(--web-stack-l); max-width: 760px; }
+    .rel-head h1 { margin: 0; font: var(--type-h1); letter-spacing: var(--track-h1); text-wrap: balance; }
+    .rel-head h1 em { font-family: var(--font-hand); font-style: normal; font-weight: 600; color: var(--accent-ink); letter-spacing: 0; }
+    .rel-lead { margin: 0; max-width: var(--web-measure); font: var(--type-lead); letter-spacing: var(--track-lead); color: var(--ink-2); text-wrap: pretty; }
+    .rel-actions { display: flex; flex-wrap: wrap; gap: var(--web-stack-m); align-items: center; }
 
-    .rel-layout { display: grid; gap: 24px; align-items: start; }
+    .rel-layout { display: grid; gap: var(--web-stack-xl); align-items: start; }
     .rel-rail { display: none; }
-    .rel-mobilebar { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
-    .rel-select { flex: 1; min-width: 0; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); background: var(--card); color: var(--ink); font: 500 0.9375rem/1 var(--font-sans); }
-    .rel-toggle { min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); background: transparent; color: var(--ink2, var(--muted)); font: 500 0.875rem/1 var(--font-sans); cursor: pointer; white-space: nowrap; }
-    .rel-toggle:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
+    .rel-mobilebar { display: flex; gap: var(--web-stack-m); align-items: center; }
+    .rel-select { flex: 1; min-width: 0; min-height: var(--web-control); padding: 0 var(--web-control-pad); border: 0; border-radius: var(--r-pill); background: var(--surface-2); box-shadow: var(--shadow-1); color: var(--ink); font: 500 var(--size-caption)/1 var(--font-sans); }
 
-    .rel-list { display: grid; gap: 12px; min-width: 0; }
-    .rel-era-title { margin: 28px 0 4px; display: flex; align-items: baseline; gap: 12px; font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); scroll-margin-top: 96px; }
+    .rel-list { display: grid; gap: var(--web-gutter); min-width: 0; }
+    .rel-era-title { margin: var(--web-stack-xl) 0 0; scroll-margin-top: calc(var(--web-header) + 24px); }
     .rel-era-title:first-child { margin-top: 0; }
-    .rel-era-title::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--ink) 12%, transparent); }
 
-    .rel-entry { scroll-margin-top: 96px; padding: 0; border-radius: var(--r-card, 20px); background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); transition: border-color 125ms; }
-    .rel-entry:hover { border-color: color-mix(in srgb, var(--ink) 24%, transparent); }
-    .rel-entry.is-latest { border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }
-    .rel-entry[open] { border-color: color-mix(in srgb, var(--ink) 20%, transparent); }
-    .rel-entry.is-latest[open] { border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }
-
-    .rel-sum { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; padding: 18px 24px; border-radius: inherit; }
+    .rel-entry { position: relative; scroll-margin-top: calc(var(--web-header) + 24px); padding: 0; border-radius: var(--web-card-radius); background: var(--surface-1); box-shadow: var(--shadow-1); transition: transform var(--spring-soft-ms) var(--spring-soft), box-shadow var(--dur-medium) var(--ease-out); }
+    @media (hover: hover) { .rel-entry:not([open]):hover { transform: translateY(-2px); box-shadow: var(--shadow-2); } }
+    .rel-sum { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: var(--web-stack-s) var(--web-stack-l); align-items: center; padding: var(--web-card-pad); border-radius: inherit; }
     .rel-sum::-webkit-details-marker { display: none; }
-    .rel-sum:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
-    .rel-entry-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
-    .rel-sum h2 { margin: 0; font-size: var(--size-h2, 1.5rem); font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
-    .rel-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--r-pill, 999px); background: color-mix(in srgb, var(--accent-ink) 18%, transparent); color: var(--accent-ink); font-family: var(--font-mono); font-size: 0.75rem; }
-    .rel-date { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted); }
-    .rel-chev { grid-column: 2; grid-row: 1; width: 20px; height: 20px; color: var(--muted); transition: transform 150ms; }
+    .rel-sum:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+    .rel-entry-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--web-stack-s) var(--web-stack-m); min-width: 0; }
+    .rel-sum h2 { margin: 0; font: 650 var(--size-h3)/1.2 var(--font-sans); letter-spacing: var(--track-h3); }
+    .rel-badge .dot { background: var(--accent); }
+    .rel-date { font: 500 var(--size-micro-mono)/1.35 var(--font-mono); letter-spacing: var(--track-micro-mono); color: var(--ink-3); }
+    .rel-chev { grid-column: 2; grid-row: 1; width: var(--web-icon); height: var(--web-icon); color: var(--ink-3); transition: transform var(--dur-small) var(--ease-out); }
     .rel-entry[open] .rel-chev { transform: rotate(180deg); }
-    .rel-tease { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 0.9375rem; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .rel-tease { grid-column: 1 / -1; margin: 0; max-width: var(--web-measure); color: var(--ink-2); font-size: var(--size-caption); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .rel-entry[open] .rel-tease { display: none; }
 
-    .rel-body { display: grid; gap: 12px; margin: 0 24px; padding: 20px 0 24px; border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
-    .rel-links { display: flex; flex-wrap: wrap; gap: 16px; font-family: var(--font-mono); font-size: 0.8125rem; }
-    .rel-links a { color: var(--accent-ink); text-decoration: none; }
-    .rel-links a:hover { text-decoration: underline; }
-    .rel-body h3 { margin: 8px 0 0; font-size: var(--size-h3, 1.125rem); font-weight: 700; letter-spacing: -0.015em; color: var(--ink); }
-    .rel-body h4 { margin: 4px 0 0; font-size: 1rem; font-weight: 600; color: var(--ink); }
-    .rel-body p, .rel-body li { margin: 0; color: var(--ink2, var(--muted)); font-size: 0.9375rem; line-height: 1.65; }
-    .rel-body strong { color: var(--ink); font-weight: 600; }
-    .rel-body a { color: var(--accent-ink); }
-    .rel-body ul { margin: 0; padding-left: 1.35em; display: grid; gap: 8px; }
-    .rel-body li > ul { margin-top: 8px; }
-    .rel-body code { font-family: var(--font-mono); font-size: 0.875em; padding: 2px 6px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); word-break: break-word; }
     .rel-entry:not([open]) .rel-body { display: none; }
+    .rel-body { display: grid; gap: var(--web-stack-m); padding: 0 var(--web-card-pad) var(--web-card-pad); }
+    .rel-body > * { max-width: var(--web-measure); }
+    .rel-links { display: flex; flex-wrap: wrap; gap: var(--web-stack-m); }
+    .rel-body h3 { margin: var(--web-stack-m) 0 0; font: 650 var(--size-lead)/1.25 var(--font-sans); letter-spacing: var(--track-h3); color: var(--ink); }
+    .rel-body h4 { margin: var(--web-stack-s) 0 0; font: 650 var(--size-body)/1.3 var(--font-sans); color: var(--ink); }
+    .rel-body p, .rel-body li { margin: 0; color: var(--ink-2); font-size: var(--size-body); line-height: 1.55; text-wrap: pretty; }
+    .rel-body strong { color: var(--ink); font-weight: 600; }
+    .rel-body a { color: var(--signal); text-underline-offset: 3px; }
+    .rel-body ul { margin: 0; padding-left: 1.3em; display: grid; gap: var(--web-stack-s); }
+    .rel-body li > ul { margin-top: var(--web-stack-s); }
+    .rel-body code { font-family: var(--font-mono); padding: 2px 6px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); word-break: break-word; }
 
-    @media (min-width: 960px) {
-      .rel-layout { grid-template-columns: 210px minmax(0, 1fr); gap: 48px; }
+    @media (min-width: 1025px) {
+      .rel-layout { grid-template-columns: 200px minmax(0, 1fr); gap: var(--web-margin); }
       .rel-mobilebar { display: none; }
-      .rel-rail { display: block; position: sticky; top: 96px; max-height: calc(100vh - 120px); overflow: auto; padding-right: 8px; scrollbar-width: thin; }
-      .rel-rail-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-      .rel-rail-label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-      .rel-rail-top .rel-toggle { min-height: 32px; padding: 0 12px; font-size: 0.8125rem; }
-      .rel-rail-group { margin: 0 0 14px; }
-      .rel-rail-era { display: block; margin: 0 0 4px; padding: 4px 10px; font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+      .rel-rail { display: grid; gap: var(--web-stack-l); position: sticky; top: calc(var(--web-header) + 24px); max-height: calc(100vh - var(--web-header) - 48px); overflow: auto; scrollbar-width: thin; padding: 4px; margin: -4px; }
+      .rel-rail-top { display: flex; align-items: center; justify-content: space-between; gap: var(--web-stack-m); }
+      .rel-rail-group { display: grid; gap: 2px; }
+      .rel-rail-era { margin: 0 0 var(--web-stack-s) 12px; text-decoration: none; }
       .rel-rail-era:hover { color: var(--ink); }
-      .rel-rail a.rel-ver { display: block; padding: 5px 10px; border-left: 2px solid color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink2, var(--muted)); text-decoration: none; font-family: var(--font-mono); font-size: 0.8125rem; transition: color 125ms, border-color 125ms, background 125ms; }
-      .rel-rail a.rel-ver:hover { color: var(--ink); border-left-color: color-mix(in srgb, var(--ink) 40%, transparent); }
-      .rel-rail a.rel-ver[aria-current="true"] { color: var(--ink); border-left-color: var(--accent-ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
-    }
-    @media (max-width: 640px) {
-      .rel-wrap { padding: 104px 16px 64px; gap: 28px; }
-      .rel-sum { padding: 16px; }
-      .rel-body { margin: 0 16px; }
-      .rel-body { padding-bottom: 16px; }
+      .rel-rail a.rel-ver { padding: 5px 12px; border-radius: var(--r-pill); color: var(--ink-2); text-decoration: none; font: 500 var(--size-caption)/1.3 var(--font-mono); transition: color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out); }
+      .rel-rail a.rel-ver:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); }
+      .rel-rail a.rel-ver[aria-current="true"] { background: var(--ink); color: var(--ground); }
     }
     @media (prefers-reduced-motion: reduce) { .rel-chev, .rel-entry { transition: none; } }
   </style>"""
@@ -282,7 +267,7 @@ def card_title(r: dict, subtitle: str) -> str:
     tag = r["tag"]
     name = r["name"]
     if subtitle:
-        return f"Infinite {tag} — {subtitle}"
+        return f"Infinite {tag}: {subtitle}"
     if name.startswith("Infinite "):
         return name
     return f"Infinite {tag}"
@@ -318,7 +303,7 @@ def build_html() -> str:
     sel = []
     for e, rs in groups:
         lab = html.escape(era_labels[e])
-        rail.append(f'<div class="rel-rail-group"><a class="rel-rail-era" href="#era-{e}">{lab}</a>'
+        rail.append(f'<div class="rel-rail-group"><a class="rel-rail-era folio" href="#era-{e}">{lab}</a>'
                     + "".join(f'<a class="rel-ver" href="#{html.escape(r["tag"])}">{html.escape(r["tag"])}</a>' for r in rs)
                     + '</div>')
         sel.append(f'<optgroup label="{lab}">'
@@ -341,7 +326,7 @@ def build_html() -> str:
     cards = []
     for e, rs in groups:
         n = len(rs)
-        cards.append(f'      <div class="rel-era-title" id="era-{e}">{html.escape(era_labels[e])} &middot; {n} release{"s" if n != 1 else ""}</div>')
+        cards.append(f'      <div class="rel-era-title folio" id="era-{e}">{html.escape(era_labels[e])} &middot; {n} release{"s" if n != 1 else ""}</div>')
         for r in rs:
             idx = releases.index(r)
             tag = r["tag"]
@@ -349,7 +334,7 @@ def build_html() -> str:
             heading = card_title(r, subtitle)
             body_html = md_to_html(body_md)
             latest_cls = " is-latest" if idx == 0 else ""
-            badge = '<span class="rel-badge">Latest</span>' if idx == 0 else ""
+            badge = '<span class="rel-badge sys-chip"><span class="dot"></span>Latest</span>' if idx == 0 else ""
             open_attr = " open" if idx < 2 else ""
             date_str = fmt_date(r["published_at"])
             date_iso = r["published_at"][:10]
@@ -367,7 +352,7 @@ def build_html() -> str:
           {chev}{tz_html}
         </summary>
         <div class="rel-body">
-          <div class="rel-links"><a href="{gh_url}" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#{tag_esc}">Permalink</a></div>
+          <div class="rel-links"><a class="sys-ctl" href="{gh_url}" target="_blank" rel="noopener">GitHub release</a><a class="sys-ctl" href="#{tag_esc}">Permalink</a></div>
 {body_html}
         </div>
       </details>""")
@@ -426,10 +411,10 @@ def build_html() -> str:
   {chrome.header_html("releases.html")}
 
   <main>
-    <div class="rel-wrap">
+    <div class="rel-wrap container">
       <header class="rel-head">
         <h1 class="perch">Release <em>notes</em></h1>
-        <p class="rel-lead">Every Infinite release from {html.escape(releases[-1]["tag"])} ({html.escape(fmt_date(releases[-1]["published_at"]))}) through {html.escape(releases[0]["tag"])} ({html.escape(fmt_date(releases[0]["published_at"]))}) — {len(releases)} versions covering the standalone DAW, VST3 &amp; AU plugin, 2D and 3D views, Timeline, Field, audio DSP, headless CLI, and MCP.</p>
+        <p class="rel-lead">{len(releases)} versions since {html.escape(releases[-1]["tag"])}, from the first standalone build to the plugin, Timeline, Field and 3D.</p>
         <div class="rel-actions">
           <a href="index.html#download" class="btn btn-primary btn-sm">Download {html.escape(releases[0]["tag"])}</a>
           <a href="plugin.html" class="btn btn-ghost btn-sm">VST3 &amp; AU plugin</a>
@@ -439,12 +424,12 @@ def build_html() -> str:
 
       <div class="rel-layout">
         <aside class="rel-rail" aria-label="Jump to version">
-          <div class="rel-rail-top"><span class="rel-rail-label">Versions</span><button type="button" class="rel-toggle" data-toggle>Expand all</button></div>
+          <div class="rel-rail-top"><span class="folio">Versions</span><button type="button" class="sys-ctl" data-toggle>Expand all</button></div>
           {"".join(rail)}
         </aside>
         <div class="rel-mobilebar">
           <select class="rel-select" aria-label="Jump to version"><option value="">Jump to version&hellip;</option>{"".join(sel)}</select>
-          <button type="button" class="rel-toggle" data-toggle>Expand all</button>
+          <button type="button" class="sys-ctl" data-toggle>Expand all</button>
         </div>
         <section class="rel-list" aria-label="All releases">
 {chr(10).join(cards)}
