@@ -93,7 +93,7 @@ def layout(path):
         if len(f) < 15 or f[2] != "image":
             continue
         pg, w, h, xppi, yppi, size = int(f[0]), int(f[3]), int(f[4]), float(f[12]), float(f[13]), f[14]
-        if pg > 1 and xppi and (w / xppi * 72 > 612 * 0.70 or h / yppi * 72 > 792 * 0.45) and w < 2400:
+        if pg > 1 and xppi and (w / xppi * 72 > 612 * 0.70 or h / yppi * 72 > 792 * 0.45) and w < 1600:  # 1600 px or more stays sharp across a full page (about 230 ppi); smaller ones were upscaled
             big.append(pg)
         seen[(pg, f[10])].append((w, h))   # the same object id drawn twice on one page
     for (pg, oid), v in seen.items():

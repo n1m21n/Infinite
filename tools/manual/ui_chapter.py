@@ -34,6 +34,17 @@ def fig(name, caption, box=None, width="80%"):
             f'<figcaption>{esc(caption)}</figcaption></figure>')
 
 
+OWN = os.path.join(ROOT, "docs", "screenshots", "v2")
+
+
+def own(name, caption, width="100%", max_h=420):
+    """One of the owner's 2.0 screenshots (docs/screenshots/v2), shown whole, never cropped."""
+    path = next(os.path.join(OWN, name + e) for e in (".webp", ".png") if os.path.exists(os.path.join(OWN, name + e)))
+    return (f'<figure class="fig" style="display:block;width:{width};margin:0 0 12px"><div class="shot" style="display:block;padding:8px">'
+            f'<img src="file://{path}" style="width:100%;max-height:{max_h}px;object-fit:contain;display:block;margin:0 auto"></div>'
+            f'<figcaption>{esc(caption)}</figcaption></figure>')
+
+
 def row(*figs):
     return '<div style="display:flex;gap:12px;align-items:flex-start">' + "".join(
         f'<div style="flex:{w}">{f}</div>' for f, w in figs) + "</div>"
@@ -173,7 +184,7 @@ def html_chapter(P):
     b.append(page("<h2>Library panel</h2>",
                   "<p>The top button of the panel rail opens the library: every node, sample, media file and plugin you can drop on the canvas. "
                   "Click an entry, or drag it onto the canvas.</p>",
-                  row((fig("panel_library_big", "Library, Modules tab: search box, Sort, order toggle, Filter, then the alphabetical list.", box=(1190, 40, 1600, 1000)), 1),
+                  row((own("library", "Library, Modules tab: search box, Sort, order toggle, Filter, then the alphabetical list."), 1),
                       (table(["Element", "What it does"], [
                           ("Tabs", "Modules (every node type), Field (Field-language nodes and examples), Samples and Media (your own files), Plugins (VST3 and AU instruments and effects)."),
                           ("Search", "Filters the list as you type."),
@@ -192,6 +203,7 @@ def html_chapter(P):
     b.append(page("<h2>Modulation Matrix</h2>",
                   "<p>Every modulation in the patch in one table: which source drives which parameter, and how. Drag the splitter above the panel to make it taller. "
                   "The table is shown in two halves so each column is readable.</p>",
+                  own("mod-matrix-timeline", "The Mod Matrix docked under the node graph, with the Timeline below it."),
                   fig("panel_modmatrix_big", "Left half: Source, Destination, Parameter, Value, Confidence.", box=(0, 790, 820, 1000)),
                   fig("panel_modmatrix_big", "Right half: Lo, Hi, Inv, Curve, Signal and the delete button.", box=(800, 790, 1600, 1000)),
                   table(["Column", "What it means"], [
@@ -329,7 +341,7 @@ def html_chapter(P):
                   "It is the Terminal panel's chat face: the Terminal opens to it, and the Terminal button in its toolbar switches to a plain shell and back. "
                   "Short commands (add, connect, remove, bypass, undo, modulate, set) run at once inside Infinite with no agent. Anything else goes to the agent you picked, "
                   "which changes the open patch through the <code>infinite</code> command, so every change is listed on a card and can be undone.</p>",
-                  fig("chat_changes", "The Chat panel: the agents card, a reply with its change card (live knobs for what changed) and the written list.", box=(1000, 50, 1560, 990), width="50%"),
+                  own("chat", "The Chat panel beside the canvas: name a node with @, pick an agent, and each reply says what it looked at."),
                   "<h3>First run</h3>"
                   "<p>The first time, the Chat panel walks you from a new computer to your first result, one card at a time. You need nothing installed and no terminal.</p>",
                   table(["Card", "What happens"], [
@@ -429,15 +441,15 @@ def html_chapter(P):
 
     b.append(page("<h2>Sound panels: Session, Sample Studio, Piano Roll</h2>",
                   "<p>Three more strips dock along the bottom. Each has its own toolbar; right-click the toolbar for its dock position.</p>",
-                  fig("panel_session", "Session: tracks across, scenes down. Click a clip to launch it, click a scene name to launch the row. The playing scene is outlined.", box=(0, 700, 1600, 1000)),
-                  fig("panel_studio", "Sample Studio: a take cut into eight slices. Toolbar: open, play, input, Bars/Time/Samples, tools, Slice, Generate, Export, Convert. The Sample card on the right sets pitch, speed and fades.", box=(0, 680, 1600, 1000)),
-                  fig("panel_pianoroll", "Piano Roll: pages of notes over the keyboard, with record input, quantise, Fx and Generate in the toolbar.", box=(0, 750, 1600, 1000))))
+                  own("performance-session", "Session: tracks across, scenes down, beside the Performance panel in Edit Mode. Click a clip to launch it, click a scene name to launch the row."),
+                  own("sample-studio", "Sample Studio with the Mod Matrix and Session. Toolbar: open, play, input, Bars/Time/Samples, tools, Slice, Generate, Export, Convert."),
+                  own("piano-roll", "Piano Roll: notes over the keyboard, with record input, quantise, Fx and Generate in the toolbar; an MSEG curve beside it.")))
 
     b.append(page("<h2>3D View</h2>",
                   "<p>The 3D View shows the scene the 3D nodes build. The toolbar holds add, select, move, rotate and scale, the pivot and orientation choices and the view toggles. "
                   "Drag the axis gizmo at the top right to orbit; the four buttons at the bottom right zoom, pan, fly the camera and lock it. "
                   "The Scene list at the right lists every object; the eye hides one. Viewport habits (orbit, zoom, gizmo sizes, mini axes) live in Settings &gt; 3D View (<code>settings/3d-view</code>).</p>",
-                  fig("panel_view3d", "3D View docked at the bottom with the Scene list open.", box=(0, 610, 1600, 1000))))
+                  own("3d-view", "3D View with the Scene list open.")))
 
     b.append(page("<h2>2D View</h2>",
                   "<p>The 2D View (<code>view2d</code>) is a layered 2D canvas backed by a <b>Scene 2D</b> node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. "
@@ -445,24 +457,24 @@ def html_chapter(P):
                   "Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. "
                   "<b>Free Transform</b> (Cmd+T) moves, scales and turns the selected layers as one step. <b>Merge Down</b> and <b>Merge Layers</b> (Cmd+E), <b>Merge Visible</b> (Cmd+Shift+E) and <b>Flatten Image</b> merge layers the way Photoshop does, in one undo step. "
                   "Docks bottom, right, left, top or fill; driven from the CLI with <code>infinite view2d</code>.</p>",
-                  fig("panel_view2d", "2D View: the Scene 2D document with its layer stack on the right and the tool rail on the left.", width="100%")))
+                  own("2d-view", "2D View: the Scene 2D document with its layer stack on the right and the tool rail on the left.")))
 
     b.append(page("<h2>Mixer panel</h2>",
                   "<p>The Mixer panel (<code>mixer</code>) is a hardware-style mixing desk for Mixer and audio channels. "
                   "It shares the standard page strip and 7-row page menu (<code>Cmd+R</code> renames a page), and provides channel strips with faders, scribble strips, LED meters, mute/solo, sends, inserts, groups and a master section with mono/dim and snapshots. "
                   "Right-click a Mixer node and choose <b>Open in Mixer panel</b>, or open it from the rail.</p>",
-                  fig("panel_mixer", "Mixer panel: channel strips with trim, pan, mute/solo, fader and meter, and the master section on the right.", width="100%")))
+                  own("mixer", "Mixer panel: channel strips with trim, pan, mute/solo, fader and meter, and the master section.")))
 
     b.append(page("<h2>Drums panel</h2>",
                   "<p>The Drums panel (<code>drums</code>) is the hardware step-sequencer face for <b>Drum Sequencer</b> nodes. "
                   "It shares the page strip and 7-row page menu, and provides step pads lit by velocity, lane strips with length/reverse/filter, trig conditions, probability, nudge, FILL key, and groove library presets. "
                   "Right-click a Drum Sequencer node and choose <b>Open in Drum panel</b>, or dock it bottom or top.</p>",
-                  fig("panel_drums", "Drums panel: velocity-lit step pads per lane, with the Lane and Sound cards on the right.", width="100%")))
+                  own("drums", "Drums panel: velocity-lit step pads per lane, with the Lane and Sound cards.")))
 
     b.append(page("<h2>Field Patcher</h2>",
                   "<p>The Field Patcher (<code>fieldpatcher</code>) is a visual node-box editor for building Field programs without writing code by hand. "
                   "It includes pages (saved in the patch), a box canvas, a node pick menu, an inspector, starter templates and Value mode.</p>",
-                  fig("panel_fieldpatcher", "Field Patcher: boxes wired into a Field Pixel program, with the generated code beside the canvas.", width="100%")))
+                  own("field-patcher", "Field Patcher: boxes wired into a Field Pixel program (Modulo Grid), with the Field pixel editor, the code and the live preview.")))
 
     b.append(page("<h2>Curve Editor</h2>",
                   "<p>The Curve Editor (<code>curveeditor</code>) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.</p>",
