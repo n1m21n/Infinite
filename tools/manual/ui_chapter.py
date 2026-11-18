@@ -21,7 +21,7 @@ def esc(s):
     return html.escape(s, quote=False)
 
 
-def fig(name, caption, box=None, width="100%"):
+def fig(name, caption, box=None, width="80%"):
     path = os.path.join(SHOTS, name + ".png")
     if box:
         with Image.open(path) as im:
@@ -30,7 +30,18 @@ def fig(name, caption, box=None, width="100%"):
             im.crop(tuple(int(v * k) for v in box)).save(out)
             path = out
     return (f'<figure class="fig" style="display:block;width:{width};margin:0 0 12px"><div class="shot" style="display:block;padding:8px">'
-            f'<img src="file://{path}" style="width:100%;display:block"></div>'
+            f'<img src="file://{path}" style="width:100%;max-height:340px;object-fit:contain;display:block;margin:0 auto"></div>'
+            f'<figcaption>{esc(caption)}</figcaption></figure>')
+
+
+OWN = os.path.join(ROOT, "docs", "screenshots", "v2")
+
+
+def own(name, caption, width="100%", max_h=420):
+    """One of the owner's 2.0 screenshots (docs/screenshots/v2), shown whole, never cropped."""
+    path = next(os.path.join(OWN, name + e) for e in (".webp", ".png") if os.path.exists(os.path.join(OWN, name + e)))
+    return (f'<figure class="fig" style="display:block;width:{width};margin:0 0 12px"><div class="shot" style="display:block;padding:8px">'
+            f'<img src="file://{path}" style="width:100%;max-height:{max_h}px;object-fit:contain;display:block;margin:0 auto"></div>'
             f'<figcaption>{esc(caption)}</figcaption></figure>')
 
 
@@ -47,17 +58,96 @@ def table(head, rows):
 
 
 def page(*parts):
-    return '<div style="break-before:page"></div>' + "".join(parts)
+    # sections flow one after another; a forced page break per section left pages 90% blank (Mixer, Drums, Field Patcher were three lines each)
+    return '<div style="margin-top:26px;break-inside:auto"><style>h1,h2,h3{break-after:avoid}figure{break-inside:avoid}</style></div>' + "".join(parts)
+
+
+def shot(name, caption, box=None, width="100%"):
+    """A figure when its capture exists, else nothing: the text of a gap section is ready before its shot is taken,
+    and the shot appears in the next build once tools/manual/ui_shots_offscreen.py (or capture.py) writes it."""
+    return fig(name, caption, box=box, width=width) if os.path.exists(os.path.join(SHOTS, name + ".png")) else ""
+
+
+def gap_sections():
+    """Chapter 29 gaps found by tools/manual/coverage (docs/release/manual-coverage-2.0.md): the six panels with no page,
+    the three settings tabs, every settings card and the dialogs. Menus, dropdowns and right-click menus are left out
+    on purpose (2.0): the app labels them and they change too often to keep pictures of. Text is drafted from the source labels and tooltips; items marked VERIFY are
+    checked against their capture when it lands (see docs/release/shot-plan-2.0.json)."""
+    b = []
+    b.append(page("<h2>Panels you have not met yet</h2>",
+                  "<p>Six panels open from the rail or from Menu, Panels. Each one edits a kind of node, so each one is opened from that node too.</p>",
+                  table(["Panel", "Rail tile", "Shortcut", "Use it for"], [
+                      ("Mixer", "Mixer", "Shift+L", "Every Mixer node as a console. Right-click a Mixer node and choose <b>Open in Mixer panel</b>."),
+                      ("Drums", "Drums", "Shift+J", "The step-sequencer face of the Drum Sequencer nodes: step pads, lanes, conditions and groove presets."),
+                      ("2D View", "2D View", "Shift+2", "Layers for a Scene 2D node: compositing, paint and shapes. Right-click a picture node and choose <b>Add to 2D View</b>."),
+                      ("Curve Editor", "Curve", "Shift+E", "Draws MSEG curves for any knob to follow."),
+                      ("Field Patcher", "Field", "Shift+F", "Builds a Field program from boxes, without typing it."),
+                      ("Terminal", "Terminal (bottom of the rail)", "Ctrl+`", "A real shell in the patch folder. The Ctrl+` key is the physical key next to 1, on every keyboard layout."),
+                  ])))
+
+    b.append(page("<h2>Settings: the three tabs without a page</h2>",
+                  table(["Tab", "What it holds"], [
+                      ("Infinite as VST3/AU", "Plugin mode. The DAW sync section says who owns play and stop when Infinite runs inside a DAW. The plugin install section shows the status of the VST3 or AU plugin, with Install, Reinstall, Reveal and Uninstall."),
+                      ("3D View", "Viewport defaults for the 3D View: the mini axes (Off, Simple axes, Navigation) and the navigation settings, saved as your default for every new scene."),
+                      ("Keys", "The keyboard shortcut table. Find a command, see its key, and change it. Same list as Help, All shortcuts."),
+                  ]),
+                  row((shot("settings_infinite_as_vst3_au", "Infinite as VST3/AU: DAW sync and plugin install."), 1), (shot("settings_3d_view", "3D View settings."), 1)),
+                  row((shot("settings_keys", "Keys: the shortcut table."), 1), ("", 1))))
+
+    cards = [
+        ("Appearance", "Theme Preset &amp; Palette", "The colour theme: preset, accent and the light or dark palette."),
+        ("Appearance", "Node Module Category Colors", "One colour per node category (Source, Effects, Modulators and so on)."),
+        ("Appearance", "Cable Category Colors", "One colour per cable kind (audio, image, modulation, note and so on)."),
+        ("Appearance", "Node Card Styling", "the look of each node card."),
+        ("Appearance", "Display", "Interface font and the Preview Background choice."),
+        ("Appearance", "Transparency Backdrop", "how much of the canvas shows through a floating panel."),
+        ("Canvas & Workspace", "Grid &amp; Canvas", "grid and canvas options."),
+        ("Canvas & Workspace", "Minimap", "Where the minimap sits: Top left or Top right."),
+        ("Canvas & Workspace", "Cable Visibility", "Which cable kinds draw. The note on this card: the Image &amp; geometry toggle also covers palette cables."),
+        ("Audio", "Audio Devices &amp; Format", "Output and input device, sample rate, buffer size and the audio thread settings."),
+        ("Audio", "MIDI Inputs", "Which MIDI devices feed Infinite. Shows No MIDI inputs connected when none are."),
+        ("General & Performance", "Autosave", "Whether autosave is working (it warns when it is failing, and why), and how many saved copies to keep."),
+        ("General & Performance", "Performance &amp; Rendering", "The power profile (High performance, Power saving or Low latency) and the graphics processor to use."),
+        ("General & Performance", "Movement Log", "How much disk the kept takes and notes use, and what stays on this computer."),
+        ("General & Performance", "Learning", "learning and tips options."),
+        ("General & Performance", "Diagnostics", "diagnostics options, including Collect diagnostics."),
+        ("General & Performance", "Application &amp; Updates", "the version and update options."),
+        ("Field Language", "Topic dropdown and sections", "Pick a topic (Core Principles, Domains &amp; Reserved Names, Declarations, Types &amp; Vectors, Operators &amp; Math Functions), or All to see every topic. The search box filters across them."),
+        ("Expression Globals", "Globals", "Named values every formula can read. Each one shows its formula."),
+        ("Extensions", "Infinite / Extensions", "Install extension packs from the catalogue or from a file. Each shows its installed and available versions."),
+        ("Plugins", "Plugins and Scanned plugins", "The scanned plugins list, with each plugin's status."),
+        ("Agents & Terminal", "Reference", "How the chat works, the Terminal panel, and the infinite command line."),
+        ("3D View", "Viewport", "The mini axes setting: Off, Simple axes or Navigation."),
+        ("3D View", "Navigation", "navigation settings for the 3D View."),
+        ("Infinite as VST3/AU", "DAW sync", "Who owns play and stop when Infinite runs in a DAW: the DAW or Infinite."),
+    ]
+    b.append(page("<h2>Settings: every card</h2>",
+                  "<p>Each card is one group of settings on a Settings page. The card names are the headings you see in the window. "
+                  "Settings save as you change them; there is no Save button.</p>",
+                  table(["Page", "Card", "What it controls"], [(t, c, x) for t, c, x in cards])))
+    b.append(page("<h2>Dialogs</h2>",
+                  "<p>A dialog stops everything else until you answer it. Each one has a clear primary button and a Cancel.</p>",
+                  table(["Dialog", "When it appears", "Buttons"], [
+                      ("Unsaved changes", "You open, create or quit while the patch has unsaved changes. The title is Unsaved changes; the question is Save before closing?", "Save, Don't Save, Cancel"),
+                      ("Autosave recovery", "Infinite starts after it closed with unsaved work. The message says your work was saved automatically; recover it to carry on, or discard it. Your saved patch files are untouched.", "Recover, Discard"),
+                      ("Collect diagnostics", "Help, Collect diagnostics.", "Collect, Cancel; Include the open patch"),
+                      ("Check for updates", "Help, Check for updates.", "Check for updates, Website, Close"),
+                      ("Share Patch", "File, Share Patch. Asks for a name, an optional author and one line about the patch; file paths are removed and media is not included.", "Choose folder and share"),
+                      ("Program still running", "You quit while a program is still running in the Terminal. Quitting ends it.", "Quit Anyway, Keep Working"),
+                  ]),
+                  row((shot("dialog_unsaved", "Unsaved changes."), 1), (shot("dialog_recover", "Autosave recovery."), 1)),
+                  row((shot("dialog_check_updates", "Check for updates."), 1), (shot("dialog_share_patch", "Share Patch."), 1))))
+    return b
 
 
 def html_chapter(P):
     b = []
     b.append('<div class="kick">Chapter</div><div class="hand" style="font-size:40px;line-height:1">Twenty-nine</div>'
-             '<h1>Using the App: Panels, Menus &amp; Settings</h1>'
-             '<p class="lead">Everything around the nodes: the panels on the right, the strips along the bottom, the right-click menus, '
-             'the dropdowns and the settings. Every picture here is a real screenshot of the app, taken by a script.</p>')
+             '<h1>Using the App: Panels &amp; Settings</h1>'
+             '<p class="lead">Everything around the nodes: the panels on the right, the strips along the bottom and the settings. '
+             'Every picture here is a real screenshot of the app, taken by a script.</p>')
     b.append("<p>These are the questions people ask most: what does the library do, what is the modulation matrix, how do I build a "
-             "performance page, how do clips and tracks work, what is in the right-click menu. Each section shows the panel big, "
+             "performance page, how do clips and tracks work. Each section shows the panel big, "
              "then explains every column, icon and control in it.</p>")
 
     b.append("<h2>The window at a glance</h2>")
@@ -91,16 +181,10 @@ def html_chapter(P):
                      ("Settings (bottom)", "The Settings window."),
                  ]), 12)))
 
-    b.append(page("<h2>Menus</h2>", "<p>The three menus at the top left. File handles patches, Edit handles undo and clipboard, "
-                  "Menu holds the windows, help and the show/set tools.</p>",
-                  row((fig("menu_file", "File", box=(0, 0, 400, 400)), 1), (fig("menu_edit", "Edit", box=(0, 0, 400, 410)), 1)),
-                  row((fig("menu_menu", "Menu", box=(0, 0, 520, 350)), 1),
-                      (fig("menu_panels", "Menu, Panels: open any panel and set where it docks.", box=(0, 0, 620, 350)), 1))))
-
     b.append(page("<h2>Library panel</h2>",
                   "<p>The top button of the panel rail opens the library: every node, sample, media file and plugin you can drop on the canvas. "
                   "Click an entry, or drag it onto the canvas.</p>",
-                  row((fig("panel_library_big", "Library, Modules tab: search box, Sort, order toggle, Filter, then the alphabetical list.", box=(1190, 40, 1600, 1000)), 1),
+                  row((own("library", "Library, Modules tab: search box, Sort, order toggle, Filter, then the alphabetical list."), 1),
                       (table(["Element", "What it does"], [
                           ("Tabs", "Modules (every node type), Field (Field-language nodes and examples), Samples and Media (your own files), Plugins (VST3 and AU instruments and effects)."),
                           ("Search", "Filters the list as you type."),
@@ -108,20 +192,18 @@ def html_chapter(P):
                           ("Filter", "Narrows the list by category, for example only effects or only synths."),
                           ("List", "Click to add at the centre of the view, or drag to a spot. Star an entry to make it a favourite."),
                       ]), 1)),
-                  row((fig("library_sort_dropdown", "Sort dropdown", box=(1190, 40, 1600, 560)), 1),
-                      (fig("library_filter_dropdown", "Filter dropdown", box=(1190, 40, 1600, 560)), 1)),
                   row((fig("library_field", "Field tab", box=(1190, 40, 1600, 1000)), 1),
                       (fig("library_plugins", "Plugins tab", box=(1190, 40, 1600, 1000)), 1))))
 
     b.append(page("<h2>Viewport panel</h2>",
                   "<p>A live preview of any image node, next to the canvas. Right-click a node and choose <b>Open in viewport panel</b> (or select it and press Shift+V). "
                   "Each card follows its node in real time and has a close button at its top right. Add several cards to watch different stages of a chain at once.</p>",
-                  row((fig("panel_viewport_cards", "No cards yet: the panel says how to add one.", box=(1230, 40, 1600, 1000)), 1),
-                      (fig("rc_node", "Right-click a node for its menu.", box=(300, 300, 620, 520)), 2))))
+                  fig("panel_viewport_cards", "No cards yet: the panel says how to add one.", box=(1230, 40, 1600, 1000), width="40%")))
 
     b.append(page("<h2>Modulation Matrix</h2>",
                   "<p>Every modulation in the patch in one table: which source drives which parameter, and how. Drag the splitter above the panel to make it taller. "
                   "The table is shown in two halves so each column is readable.</p>",
+                  own("mod-matrix-timeline", "The Mod Matrix docked under the node graph, with the Timeline below it."),
                   fig("panel_modmatrix_big", "Left half: Source, Destination, Parameter, Value, Confidence.", box=(0, 790, 820, 1000)),
                   fig("panel_modmatrix_big", "Right half: Lo, Hi, Inv, Curve, Signal and the delete button.", box=(800, 790, 1600, 1000)),
                   table(["Column", "What it means"], [
@@ -145,11 +227,10 @@ def html_chapter(P):
                       (fig("perf_edit", "Edit Mode: knobs, faders, number boxes and a slider on the Showcase page.", box=(1190, 60, 1555, 440)), 2)),
                   table(["Toolbar", "What it does"], [
                       ("Edit Mode / Perform", "Edit Mode lets you add, move, resize and rename controls. Perform locks the layout so a stray drag cannot move anything."),
-                      ("+ Add Control", "Opens the control list below and places the chosen control on the next free cell."),
+                      ("+ Add Control", "Lists the ten control types below and places the chosen control on the next free cell."),
                       ("Page tabs, +", "Pages group controls into screens (here one page, Showcase). The + button adds a page."),
                   ]),
-                  row((fig("perf_add_control", "+ Add Control menu: ten control types, with their grid size in brackets.", box=(1190, 60, 1580, 440)), 1),
-                      (table(["Control", "Use it for"], [
+                  (table(["Control (grid size)", "Use it for"], [
                           ("Knob (1x1)", "Any single parameter."),
                           ("Vertical Fader (1x2)", "Levels and mixes."),
                           ("Horizontal Slider (2x1)", "Long throws, crossfades."),
@@ -160,17 +241,9 @@ def html_chapter(P):
                           ("Radio Selector (2x1)", "Pick one of several steps, 1 to 8."),
                           ("Bipolar Pan Knob (1x1)", "Centre-detent knob for pan or detune."),
                           ("Step Gate Ribbon (3x1)", "Eight on/off steps for a gate pattern."),
-                      ]), 1)),
-                  row((fig("perf_control_menu2", "Right-click a control: Rename, Type, Assign Parameter, Clear Destination, MIDI CC Learn, Color Tint.", box=(1190, 60, 1555, 440)), 1),
-                      (fig("perf_perform", "The same page in Perform mode: the toolbar shrinks to Perform and the page tabs.", box=(1190, 60, 1555, 440)), 1),
-                      (table(["Right-click item", "What it does"], [
-                      ("Rename", "Change the label shown on the control."),
-                      ("Type", "Swap the control for another type without losing its assignment."),
-                      ("Assign Parameter...", "Bind the control to a node parameter, then move the control to move the parameter. The current target is shown greyed below it."),
-                      ("Clear Destination", "Unbinds the control."),
-                      ("MIDI CC Learn", "Move a knob on your MIDI controller to bind it to this control."),
-                      ("Color Tint", "Colour-code the control so groups are easy to find on stage."),
-                  ]), 2))))
+                      ])),
+                  fig("perf_perform", "The same page in Perform mode: the toolbar shrinks to Perform and the page tabs.", box=(1190, 60, 1555, 440), width="60%"),
+                  "<p>Right-click a control to rename it, change its type, assign or clear its parameter, learn a MIDI CC or tint it.</p>"))
 
     b.append(page("<h2>Arrangement panel</h2>",
                   "<p>The timeline. It sequences clips of nodes over time so a patch becomes a piece with a start and an end. "
@@ -183,45 +256,28 @@ def html_chapter(P):
                       ("Play / Pause (Space)", "Plays the timeline from the playhead."),
                       ("Return to Start (Enter)", "Jumps the playhead to the beginning."),
                       ("Bars / Time", "Switches the ruler between bars and beats and minutes and seconds."),
-                      ("Tool (arrow)", "Selects the editing tool. See the dropdown below."),
+                      ("Tool (arrow)", "Selects the editing tool: Select (A), Range Selection (R), Trim (T), Pencil (P), Cut (B), Hand (H) or Zoom (Z)."),
                       ("Snap (magnet)", "Clip edges snap to the grid when on."),
-                      ("1/4 (grid division)", "How fine the snap grid is. See the dropdown below."),
+                      ("1/4 (grid division)", "How fine the snap grid is: Off, 1 bar, 1/2, 1/4, 1/8 or 1/16, each with a triplet."),
                       ("Loop", "Turns the loop region on or off. Shift-drag on the ruler to set the region."),
                       ("Flag (M)", "Drops a marker at the playhead."),
                       ("Row height", "Resets any resized tracks back to the default height."),
                       ("Render", "Renders the timeline to a video file (or a WAV when it holds only audio)."),
                       ("Audio", "Lets the timeline drive audio as well as picture."),
                       ("Pencil", "Opens or closes the Inspector."),
-                  ]),
-                  row((fig("tl_tool_dropdown", "Tool dropdown: Select (A), Range Selection (R), Trim (T), Pencil / Draw Clip (P), Cut (B), Hand (H), Zoom (Z).", box=(230, 60, 620, 270)), 1),
-                      (fig("tl_grid_dropdown", "Snap grid dropdown: Off, 1 bar, 1/2, 1/4, 1/8, 1/16, each with a triplet (T).", box=(230, 60, 620, 330)), 1))))
+                  ])))
 
     b.append(page("<h2>Tracks, clips and the inspector</h2>",
                   "<h3>Adding tracks</h3><p>Click <b>+ Add Track</b> and choose Video Track or Audio Track. Audio tracks also carry <b>S</b> (solo), <b>M</b> (mute), a pan knob and a level knob; "
                   "video tracks carry an opacity slider.</p>",
-                  fig("tl_add_track_menu", "+ Add Track offers Video Track and Audio Track.", box=(340, 140, 700, 310), width="60%"),
                   "<h3>Adding a clip</h3><p>Right-click an empty spot on a track and choose <b>Add Clip</b>. The menu shows the bar and beat it will land on, snapped to the grid. "
                   "A clip with no node yet is shown hatched.</p>",
-                  fig("tl_lane_menu", "Right-click a lane: Add Clip at the clicked bar and beat.", box=(340, 140, 900, 270), width="70%"),
                   "<h3>Assigning a clip to a node</h3><p>Three ways: right-click a node on the canvas and choose <b>Add to Timeline</b> (creates an assigned clip at the playhead), "
-                  "choose <b>Assign Node...</b> in the clip's right-click menu, or use <b>Assign Different Node...</b> in the inspector. "
+                  "choose <b>Assign Node...</b> in the clip's right-click menu, or use <b>Reassign...</b> in the inspector. "
                   "An assigned clip takes the node's name and a thumbnail, and the viewport monitor shows its output as the playhead crosses it.",
                   fig("tl_clip_selected", "The Stage clip selected (outlined); the monitor on the left shows the timeline output.", box=(0, 60, 1290, 560), width="72%")))
 
-    b.append(page("<h3>Right-clicking a clip</h3>",
-                  row((fig("tl_clip_menu", "The clip menu.", box=(500, 130, 1000, 520)), 1),
-                      (table(["Item", "What it does"], [
-                          ("Rename (Cmd+R)", "Names the clip."),
-                          ("Active", "Tick to play the clip; untick to mute it without deleting (it turns hatched)."),
-                          ("Fade In / Fade Out", "Fade length in milliseconds."),
-                          ("Opacity", "Clip brightness against what is beneath it."),
-                          ("Compositing", "Blend mode used to combine this clip with lower tracks."),
-                          ("Color Grade", "A submenu of colour-grade adjustments for the clip."),
-                          ("Color Tint", "Colour of the clip block on the timeline."),
-                          ("Assign Node...", "Pick the node this clip plays."),
-                          ("Group (Cmd+G) / Ungroup (Cmd+Shift+G)", "Treat several clips as one block you can move together."),
-                          ("Delete (Backspace)", "Removes the clip."),
-                      ]), 1)),
+    b.append(page("<p>Right-click a clip to rename it, mute it (untick Active), set fades, opacity, blend mode, colour grade and tint, assign its node, group it or delete it.</p>",
                   "<h3>The Inspector</h3><p>The pencil icon opens a side panel for whatever is selected. Select a clip and it shows the clip; select a track and it shows the track.</p>",
                   row((fig("tl_clip_selected", "Video Clip: name, Active, Timing & Position, Compositing & Video, Color Tint, Source Node.", box=(1290, 100, 1545, 860)), 1),
                       (fig("tl_track_selected", "Video Track: name, Active, opacity, Track Tint, Duplicate, Delete.", box=(1290, 100, 1545, 520)), 1),
@@ -232,7 +288,7 @@ def html_chapter(P):
                       ("Blend / Opacity / Bright / Contrast / Sat", "How the clip composites over tracks beneath it."),
                       ("Color Tint", "The swatches colour the clip block."),
                       ("Source Node", "The node and node type the clip plays."),
-                      ("Assign Different Node... / Clear Source", "Swap the node or make the clip unassigned again."),
+                      ("Reassign... / Clear Source", "Swap the node or make the clip unassigned again."),
                   ]), 3))))
 
     b.append(page("<h3>Selecting several clips and grouping</h3>",
@@ -240,8 +296,7 @@ def html_chapter(P):
                   "Clips grouped with Group (Cmd+G) move as one.</p>",
                   "<h3>Grouping tracks</h3><p>Right-click a track name. <b>Convert to Group</b> wraps the track in a collapsible folder so a whole stack of tracks can be folded away. "
                   "The same menu adds and renames tracks, deletes them, and offers <b>Render Track</b> to export just that track.</p>",
-                  row((fig("tl_track_menu", "Track menu.", box=(340, 130, 640, 330)), 1),
-                      (fig("tl_track_group", "After Convert to Group: Group 2 (1) holds Stage.", box=(340, 100, 1290, 260)), 2)),
+                  fig("tl_track_group", "After Convert to Group: Group 2 (1) holds Stage.", box=(340, 100, 1290, 260), width="70%"),
                   "<h3>Rendering</h3><p><b>Render</b> opens the Render Timeline popup: the span (whole arrangement, loop, markers or a custom range), the video size and rate, "
                   "and the output name, folder and format.</p>",
                   fig("tl_render", "Render Timeline popup.", box=(1250, 70, 1600, 520), width="45%")))
@@ -256,29 +311,13 @@ def html_chapter(P):
                           ("Edit timeline", "A change in the arrangement."),
                       ]), 1))))
 
-    b.append(page("<h2>Right-click menus and the Add Node palette</h2>",
-                  "<p>Right-click does different things depending on what is under the cursor.</p>",
-                  row((fig("rc_node", "On an audio node: bypass, duplicate, add to Timeline or Session, help, delete. Image nodes add viewport and window items.", box=(300, 300, 620, 520)), 1),
-                      (table(["Node menu item", "What it does"], [
-                          ("Bypass Node (B)", "Passes the input straight through."),
-                          ("Duplicate (Cmd+D)", "Copies the node and its settings."),
-                          ("Hide params", "Hides the node's parameter controls so it takes less room on the canvas."),
-                          ("Open in viewport panel", "Adds a live card to the Viewport panel."),
-                          ("Add to Timeline", "Creates an assigned clip in the Arrangement."),
-                          ("Add to Session", "Puts the node in a Session slot."),
-                          ("Open in new window", "Pops the node's output into its own window."),
-                          ("Reference in chat", "Opens the chat with the node named in the message."),
-                          ("Help", "Opens this node's help."),
-                          ("Delete Node (Backspace)", "Removes it and its cables."),
-                      ]), 1)),
+    b.append(page("<h2>Adding nodes</h2>",
                   "<p>Right-click empty canvas, or press Shift+N, to open the <b>Add node</b> palette. Type to search, or walk the categories "
-                  "(source, compositing, effects, 3d, notes, synths, audio effects, modulators, prediction, macros, utility). "
-                  "The arrow means a submenu.</p>",
-                  row((fig("rc_canvas_palette", "The Add node palette.", box=(400, 430, 720, 790)), 1),
-                      (fig("rc_palette_submenu", "Hover a category to see its nodes: compositing shown.", box=(880, 500, 1360, 1000)), 1))))
+                  "(source, compositing, effects, 3d, notes, synths, audio effects, modulators, prediction, macros, utility).</p>",
+                  fig("rc_canvas_palette", "The Add node palette.", box=(400, 430, 720, 790), width="45%")))
 
     b.extend((page("<h2>Settings</h2>",
-                  "<p>The gear at the bottom of the rail (or Cmd+0) opens Settings. It has nine pages.</p>",
+                  "<p>The gear at the bottom of the rail (or Cmd+0) opens Settings. It has twelve pages, down the left: Appearance, Canvas &amp; Workspace, Audio, General &amp; Performance, Field Language, Expression Globals, Extensions, Plugins, Agents &amp; Terminal, Infinite as VST3/AU, 3D View and Keys.</p>",
                   row((fig("settings_appearance", "Appearance", box=(410, 200, 1190, 805)), 1), (fig("settings_canvas", "Canvas & Workspace", box=(410, 200, 1190, 805)), 1)),
                   row((fig("settings_audio", "Audio", box=(410, 200, 1190, 805)), 1), (fig("settings_general", "General & Performance", box=(410, 200, 1190, 805)), 1)),
                   row((fig("settings_field", "Field Language", box=(410, 200, 1190, 805)), 1), (fig("settings_globals", "Expression Globals", box=(410, 200, 1190, 805)), 1))),
@@ -302,7 +341,7 @@ def html_chapter(P):
                   "It is the Terminal panel's chat face: the Terminal opens to it, and the Terminal button in its toolbar switches to a plain shell and back. "
                   "Short commands (add, connect, remove, bypass, undo, modulate, set) run at once inside Infinite with no agent. Anything else goes to the agent you picked, "
                   "which changes the open patch through the <code>infinite</code> command, so every change is listed on a card and can be undone.</p>",
-                  fig("chat_changes", "The Chat panel: the agents card, a reply with its change card (live knobs for what changed) and the written list.", box=(1000, 50, 1560, 990), width="50%"),
+                  own("chat", "The Chat panel beside the canvas: name a node with @, pick an agent, and each reply says what it looked at."),
                   "<h3>First run</h3>"
                   "<p>The first time, the Chat panel walks you from a new computer to your first result, one card at a time. You need nothing installed and no terminal.</p>",
                   table(["Card", "What happens"], [
@@ -402,15 +441,48 @@ def html_chapter(P):
 
     b.append(page("<h2>Sound panels: Session, Sample Studio, Piano Roll</h2>",
                   "<p>Three more strips dock along the bottom. Each has its own toolbar; right-click the toolbar for its dock position.</p>",
-                  fig("panel_session", "Session: tracks across, scenes down. Click a clip to launch it, click a scene name to launch the row. The playing scene is outlined.", box=(0, 700, 1600, 1000)),
-                  fig("panel_studio", "Sample Studio: a take cut into eight slices. Toolbar: open, play, input, Bars/Time/Samples, tools, Slice, Generate, Export, Convert. The Sample card on the right sets pitch, speed and fades.", box=(0, 680, 1600, 1000)),
-                  fig("panel_pianoroll", "Piano Roll: pages of notes over the keyboard, with record input, quantise, Fx and Generate in the toolbar.", box=(0, 750, 1600, 1000))))
+                  own("performance-session", "Session: tracks across, scenes down, beside the Performance panel in Edit Mode. Click a clip to launch it, click a scene name to launch the row."),
+                  own("sample-studio", "Sample Studio with the Mod Matrix and Session. Toolbar: open, play, input, Bars/Time/Samples, tools, Slice, Generate, Export, Convert."),
+                  own("piano-roll", "Piano Roll: notes over the keyboard, with record input, quantise, Fx and Generate in the toolbar; an MSEG curve beside it.")))
 
     b.append(page("<h2>3D View</h2>",
                   "<p>The 3D View shows the scene the 3D nodes build. The toolbar holds add, select, move, rotate and scale, the pivot and orientation choices and the view toggles. "
                   "Drag the axis gizmo at the top right to orbit; the four buttons at the bottom right zoom, pan, fly the camera and lock it. "
-                  "The Scene list at the right lists every object; the eye hides one.</p>",
-                  fig("panel_view3d", "3D View docked at the bottom with the Scene list open.", box=(0, 610, 1600, 1000))))
+                  "The Scene list at the right lists every object; the eye hides one. Viewport habits (orbit, zoom, gizmo sizes, mini axes) live in Settings &gt; 3D View (<code>settings/3d-view</code>).</p>",
+                  own("3d-view", "3D View with the Scene list open.")))
+
+    b.append(page("<h2>2D View</h2>",
+                  "<p>The 2D View (<code>view2d</code>) is a layered 2D canvas backed by a <b>Scene 2D</b> node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. "
+                  "Right-click any picture node and choose <b>Add to 2D View</b>, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). "
+                  "Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. "
+                  "<b>Free Transform</b> (Cmd+T) moves, scales and turns the selected layers as one step. <b>Merge Down</b> and <b>Merge Layers</b> (Cmd+E), <b>Merge Visible</b> (Cmd+Shift+E) and <b>Flatten Image</b> merge layers the way Photoshop does, in one undo step. "
+                  "Docks bottom, right, left, top or fill; driven from the CLI with <code>infinite view2d</code>.</p>",
+                  own("2d-view", "2D View: the Scene 2D document with its layer stack on the right and the tool rail on the left.")))
+
+    b.append(page("<h2>Mixer panel</h2>",
+                  "<p>The Mixer panel (<code>mixer</code>) is a hardware-style mixing desk for Mixer and audio channels. "
+                  "It shares the standard page strip and 7-row page menu (<code>Cmd+R</code> renames a page), and provides channel strips with faders, scribble strips, LED meters, mute/solo, sends, inserts, groups and a master section with mono/dim and snapshots. "
+                  "Right-click a Mixer node and choose <b>Open in Mixer panel</b>, or open it from the rail.</p>",
+                  own("mixer", "Mixer panel: channel strips with trim, pan, mute/solo, fader and meter, and the master section.")))
+
+    b.append(page("<h2>Drums panel</h2>",
+                  "<p>The Drums panel (<code>drums</code>) is the hardware step-sequencer face for <b>Drum Sequencer</b> nodes. "
+                  "It shares the page strip and 7-row page menu, and provides step pads lit by velocity, lane strips with length/reverse/filter, trig conditions, probability, nudge, FILL key, and groove library presets. "
+                  "Right-click a Drum Sequencer node and choose <b>Open in Drum panel</b>, or dock it bottom or top.</p>",
+                  own("drums", "Drums panel: velocity-lit step pads per lane, with the Lane and Sound cards.")))
+
+    b.append(page("<h2>Field Patcher</h2>",
+                  "<p>The Field Patcher (<code>fieldpatcher</code>) is a visual node-box editor for building Field programs without writing code by hand. "
+                  "It includes pages (saved in the patch), a box canvas, a node pick menu, an inspector, starter templates and Value mode.</p>",
+                  own("field-patcher", "Field Patcher: boxes wired into a Field Pixel program (Modulo Grid), with the Field pixel editor, the code and the live preview.")))
+
+    b.append(page("<h2>Curve Editor</h2>",
+                  "<p>The Curve Editor (<code>curveeditor</code>) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.</p>",
+                  fig("panel_curve", "Curve Editor: an MSEG curve drawn on the grid, with the tools on the left and the Source, Time and Loop cards on the right.", width="100%")))
+
+    b.append(page("<h2>Canvas Link</h2>",
+                  "<p>Canvas Link is the one way a panel takes a node from the canvas. Piano Roll pages, 2D layer sources, 3D View objects and Session clips each show a link field: "
+                  "choose the node from the list, or press <b>Pick</b> and click it on the canvas. While a pick is armed the canvas dims the nodes that cannot be picked and rings the one under the pointer. Esc cancels.</p>"))
 
     b.append(page("<h2>Windows and dialogs</h2>",
                   row((fig("window_shortcuts", "All Shortcuts (Menu, All shortcuts): filter box, then every shortcut by group.", box=(440, 240, 1130, 750)), 1),
@@ -418,6 +490,7 @@ def html_chapter(P):
                   row((fig("window_templates", "Template library (File, Template library): opens a copy; the original never changes.", box=(410, 205, 1160, 770)), 1),
                       (fig("dialog_about", "About Infinite: version, build, credits, licence links.", box=(560, 230, 1040, 740)), 1))))
 
+    b.extend(gap_sections())
     b.append(page("<h2>Take your own screenshots</h2>",
                   "<p>Every picture in this guide was made by script, so you can regenerate them after an update or make your own for a tutorial.</p>",
                   table(["Tool", "What it does"], [
