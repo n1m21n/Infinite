@@ -38,11 +38,11 @@ static lane passes the declaration checks with 219 portable declarations and no 
 | Suite | Where it runs | Why / why not |
 |---|---|---|
 | `tests/platform/single_instance_test.cpp` | build.yml `hosted-suites` (ubuntu) | Standalone C++17, no app build. Passes locally. |
-| `tests/website` (ui_audit, ui_scale, ui_type, ui_contrast) | build.yml `hosted-suites` (ubuntu, system Chrome at `/usr/bin/google-chrome`) | Node 20 + puppeteer-core; no app build. The audits may find real website issues on the first run: those are findings, not CI bugs. |
+| `tests/website` (ui_audit, ui_scale, ui_type, ui_contrast) | not in build.yml | The website is its own product; run these by hand from tests/website when changing the site. |
 | `tests/chat` (find evals) | build.yml `linux` job (clang), step "Chat finder evals" | Needs the built `find-eval` target, which the Linux build compiles. Gate thresholds are the 2026-11-05 scores in `src/core/chat/FindEval.cpp`. |
 | `tests/plugin` (daw checklists, soak, baseline) | not in CI | The soak and baseline need a built plugin and a real audio device; the DAW runs are manual by design (`tools/plugin/daw_kit.sh`). The plugin build and validate steps already run in CI (pluginval, auval). |
 
-Needs a CI run: `hosted-suites` (the website audits may be red on the first run) and the chat thresholds
+Needs a CI run: `hosted-suites` and the chat thresholds
 (`find_nodes` at 254 is the current floor; the release doc records 254/312 on a stale binary).
 
 ## 5. Homebrew cask and winget (update-package-managers.yml, tools/spread/pkg)

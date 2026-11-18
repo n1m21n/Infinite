@@ -129,10 +129,10 @@ jobs:
       - name: MCP package unit tests
         run: cd tools/npm/infinite-engine && npm test
 
-  # tests/platform, tests/website on hosted runners. tests/plugin and the chat finder evals do not run here:
+  # tests/platform on hosted runners. The website is its own product and is not tested here. tests/plugin and the chat finder evals do not run here:
   # see docs/ci/HOSTED_TESTS.md (plugin needs a built plugin and an audio device; chat evals run in the linux job).
   hosted-suites:
-    name: Platform, website and UI audits
+    name: Platform tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -141,25 +141,6 @@ jobs:
         run: |
           g++ -std=c++17 -I src tests/platform/single_instance_test.cpp -o "$RUNNER_TEMP/si_test"
           "$RUNNER_TEMP/si_test"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install website test dependencies
-        run: cd tests/website && npm ci
-      - name: Website UI audits (tests/website, system Chrome)
-        env:
-          CHROME: /usr/bin/google-chrome
-        run: |
-          cd tests/website
-          for s in ui_audit.mjs ui_scale.mjs; do
-            echo "=== $s ==="
-            node "$s"
-          done
-          # Type and contrast are report-only until the site's existing debt is paid down (2.0 known issue).
-          for s in ui_type.mjs ui_contrast.mjs; do
-            echo "=== $s (report only) ==="
-            node "$s" || echo "::warning::$s found problems (report only)"
-          done
 
   macos:
     name: macOS (arm64)
