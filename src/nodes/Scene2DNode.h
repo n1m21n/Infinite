@@ -507,6 +507,8 @@ public:
    // The selection made into the layer's pixel mask (all shown without one).
    bool MaskFromSelection(int id);
    void RemovePixelMask(int id);
+   // Runs on-device subject matting on layer `id` and writes the result as its pixel mask.
+   bool RemoveBackgroundMask(int id, int frameId, std::string* outError = nullptr);
    // Painting on a layer (target 0) or its pixel mask (1) or the quick mask (2).
    // Points are document pixels. EndPaint stores the touched tiles and commits.
    bool BeginPaint(int id, int target, const BrushEngine::Brush& b, float x, float y, float pressure);

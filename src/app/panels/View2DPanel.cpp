@@ -11311,32 +11311,27 @@ namespace
       }
    }
 
-   // Removes the background on `layerId` via an attached Remove Background effect (reusing any existing one).
+   // Removes the background directly on `layerId` as a layer pixel mask (no canvas node spawned).
    void RemoveBackgroundOnLayer(Scene2DNode* doc, int layerId)
    {
-      Layer* l = doc->FindLayer(layerId);
-      if (l == nullptr)
+      if (doc == nullptr || doc->FindLayer(layerId) == nullptr)
          return;
-      for (Scene2DNode::Effect& e : l->effects)
+      static int sRemoveBgFrame = 8500000;
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint("Remove Background");
+      std::string err;
+      if (doc->RemoveBackgroundMask(layerId, ++sRemoveBgFrame, &err))
       {
-         if (e.uid == 0)
-            continue;
-         if (GraphNode* gn = FindNodeByUid(e.uid))
-            if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn->node.get()))
-            {
-               PushUndoCheckpoint("Remove Background");
-               e.on = true;
-               rbg->RequestMask();
-               Touch();
-               return;
-            }
+         Touch();
+         gPatchDirty = true;
+         return;
       }
-      for (int k = 0; k < (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0])); k++)
-         if (std::strcmp(kNodeEffects[k].type, "Remove Background") == 0)
-         {
-            AddNodeEffect(doc, layerId, k);
-            return;
-         }
+      gUndoStack.resize(undo0);
+      if (!err.empty())
+      {
+         sExportNote = err;
+         sExportNoteT = ImGui::GetTime();
+      }
    }
 
    // Adds, moves and removes effects after the rows are drawn (adding spawns nodes, which can move gNodes).
@@ -15020,6 +15015,65 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->RemoveLayer(emptyGrp);
          doc->Commit();
       }
+
+      // Image right-click Remove Background: cuts out subject directly into the layer's pixel mask without spawning any node.
+      {
+         const int sz = 256, cx = sz / 2, cy = sz / 2, r = sz * 3 / 8;
+         std::vector<uint8_t> img((size_t)sz * sz * 4, 255);
+         for (int y = 0; y < sz; y++)
+            for (int x = 0; x < sz; x++)
+            {
+               const int dx = x - cx, dy = y - cy;
+               uint8_t* p = &img[((size_t)y * sz + x) * 4];
+               if (dx * dx + dy * dy <= r * r)
+               {
+                  const float nx = (float)dx / (float)r, ny = (float)dy / (float)r;
+                  const float shade = std::clamp(1.0f - 0.6f * (nx * 0.3f + ny * 0.3f + 0.5f * (nx * nx + ny * ny)), 0.25f, 1.0f);
+                  p[0] = (uint8_t)(220 * shade);
+                  p[1] = (uint8_t)(140 * shade);
+                  p[2] = (uint8_t)(30 * shade);
+               }
+               else
+               {
+                  p[0] = p[1] = p[2] = 90;
+               }
+               p[3] = 255;
+            }
+         const size_t nodesBefore = gNodes.size();
+         const int pid = doc->AddFileLayer(0, "Flower", ((int)W - sz) / 2, ((int)H - sz) / 2, sz, sz, img, 0);
+         doc->Commit();
+         SelectOnly(pid);
+         sExportNote.clear();
+         sPending.what = Pending::RemoveBg;
+         RunPending(doc);
+         expect("Remove Background on 2D image spawns no node", gNodes.size() == nodesBefore);
+         const Layer* pl = doc->FindLayer(pid);
+         if (pl != nullptr && pl->HasPixelMask())
+         {
+            expect("Remove Background enables layer pixel mask", pl->pmaskOn && pl->mw == sz && pl->mh == sz);
+            std::vector<uint8_t> alone;
+            static int rbgFrame = 8600000;
+            const bool rendered = doc->RenderLayerAlone(pid, ++rbgFrame, alone);
+            const int midX = (int)W / 2, midY = (int)H / 2;
+            const int c0x = ((int)W - sz) / 2 + 2, c0y = ((int)H - sz) / 2 + 2;
+            const uint8_t centerA = rendered ? alone[((size_t)midY * (int)W + midX) * 4 + 3] : 0;
+            const uint8_t cornerA = rendered ? alone[((size_t)c0y * (int)W + c0x) * 4 + 3] : 255;
+            expect("Remove Background keeps subject center opaque and clears background corners", centerA > 180 && cornerA < 128);
+            PushUndoCheckpoint("Unrelated layer");
+            const int extra = doc->AddPaintLayer();
+            doc->Commit();
+            (void)extra;
+            Undo();
+            doc = FindDoc();
+            const Layer* afterUndo = doc != nullptr ? doc->FindLayer(pid) : nullptr;
+            expect("Remove Background layer mask survives global Undo", afterUndo != nullptr && afterUndo->HasPixelMask() && afterUndo->pmaskOn);
+         }
+         if (doc != nullptr && doc->FindLayer(pid) != nullptr)
+         {
+            doc->RemoveLayer(pid);
+            doc->Commit();
+         }
+      }
    }
    return fails;
 }
@@ -16226,6 +16280,6 @@ int View2DAffinityAb(const char* dir)
 }
 
 // MENUALIVETEST: the layer clipboard is state a person sees (Paste lights up), but the patch does not hold it.
-std::string View2DTestFingerprint() { return "v2dclip:" + std::to_string(sClip.size()); }
-void View2DTestReset() { sClip.clear(); }
+std::string View2DTestFingerprint() { return "v2dclip:" + std::to_string(sClip.size()) + ":" + sExportNote; }
+void View2DTestReset() { sClip.clear(); sExportNote.clear(); }
 } // namespace app

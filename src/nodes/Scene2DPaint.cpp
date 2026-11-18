@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "TileStore.h"
+#include "platform/Platform.h"
 
 namespace
 {
@@ -725,6 +726,100 @@ bool Scene2DNode::MaskFromSelection(int id)
    const int all[4] = { 0, 0, l->mw, l->mh };
    StoreTiles(it->second, l->mtiles, all);
    l = FindLayer(id);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::RemoveBackgroundMask(int id, int frameId, std::string* outError)
+{
+   auto fail = [&](const std::string& msg)
+   {
+      if (outError != nullptr)
+         *outError = msg;
+      return false;
+   };
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind == Kind::Group)
+      return fail("No image layer selected");
+
+   int w = 0, h = 0;
+   std::vector<uint8_t> pixels;
+   if (l->kind == Kind::Paint)
+   {
+      SyncSurfaces();
+      auto it = mSurfaces.find(id);
+      if (it == mSurfaces.end() || it->second.fbo.fbo == 0 || l->pw <= 0 || l->ph <= 0)
+         return fail("Empty image layer");
+      w = l->pw;
+      h = l->ph;
+      ReadRect(it->second.fbo, 0, 0, w, h, pixels);
+   }
+   else if (l->kind == Kind::Node)
+   {
+      INode* src = Source(*l);
+      if (src == nullptr)
+         return fail("Missing layer source");
+      src->CookIfNeeded(frameId);
+      const unsigned tex = src->GetOutputTexture();
+      w = src->GetOutputWidth();
+      h = src->GetOutputHeight();
+      if (tex == 0 || w <= 0 || h <= 0)
+         return fail("Layer has no picture");
+      pixels.assign((size_t)w * (size_t)h * 4, 0);
+      GLint prev = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prev);
+      GLuint fbo = 0;
+      glGenFramebuffers(1, &fbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+      glPixelStorei(GL_PACK_ALIGNMENT, 4);
+      glBindFramebuffer(GL_FRAMEBUFFER, prev);
+      glDeleteFramebuffers(1, &fbo);
+   }
+   else
+   {
+      return fail("Select an image or node layer");
+   }
+
+   std::vector<uint8_t> mask;
+   std::string err;
+   if (!Platform::SubjectMask(pixels, w, h, Platform::MattingMode::Subject, mask, err))
+      return fail(err.empty() ? "Background removal failed" : err);
+   if (mask.size() != (size_t)w * (size_t)h)
+      return fail("Invalid subject mask");
+
+   l = FindLayer(id);
+   if (l == nullptr)
+      return fail("Layer gone");
+   l->mw = w;
+   l->mh = h;
+   l->mtiles.assign((size_t)Cols(w) * Cols(h), "-");
+   l->pmaskOn = true;
+   if (mLayers.size() == 1 && mDoc.background == 0)
+      mDoc.background = 3; // reveal transparent cutout on single-layer white canvas
+   Commit();
+   SyncSurfaces();
+
+   auto itMask = mMasks.find(id);
+   l = FindLayer(id);
+   if (l == nullptr || itMask == mMasks.end() || itMask->second.fbo.fbo == 0)
+      return fail("Could not create layer mask");
+
+   std::vector<uint8_t> rgbaMask((size_t)w * (size_t)h * 4, 255);
+   for (size_t i = 0; i < mask.size(); i++)
+   {
+      const uint8_t v = mask[i];
+      rgbaMask[i * 4 + 0] = v;
+      rgbaMask[i * 4 + 1] = v;
+      rgbaMask[i * 4 + 2] = v;
+      rgbaMask[i * 4 + 3] = 255;
+   }
+   WriteRect(itMask->second.fbo, 0, 0, w, h, rgbaMask.data());
+   const int all[4] = { 0, 0, w, h };
+   StoreTiles(itMask->second, l->mtiles, all);
    Commit();
    return true;
 }
