@@ -126,6 +126,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Nodes](https://infinitedevices.org/nodes/): every node in the palette, one page each with its inputs, outputs, controls and a downloadable patch
 - [Embeds](https://infinitedevices.org/embeds/): audio-reactive WebGL visuals to put on any page with one iframe
 - [Download](https://github.com/n1m21n/Infinite/releases/latest): installers for macOS, Windows and Linux
+- [Release notes](https://infinitedevices.org/releases.html): complete changelog across every version of Infinite from v0.1 through v2.0.0
 - [Source code](https://github.com/n1m21n/Infinite): MIT licensed
 - [Discord](https://discord.gg/GMeQTyJqkH): community and support
 - [YouTube](https://www.youtube.com/channel/UCpuCUMODr4utnpa162CkIug): tutorials and films

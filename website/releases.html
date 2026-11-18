@@ -1,0 +1,2670 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="midnight">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#151930">
+  <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
+  <script src="theme.js?v=2"></script>
+  <title>Infinite Release Notes: v0.1 to v2.0.0 | Infinite</title>
+  <meta name="description" content="Complete Infinite release notes from v0.1 to v2.0.0: 2D and 3D views, Timeline, Session, Field, audio DSP, plugins, headless CLI, and MCP.">
+  <link rel="canonical" href="https://infinitedevices.org/releases.html">
+  <meta property="og:title" content="Infinite Release Notes: v0.1 to v2.0.0 | Infinite">
+  <meta property="og:description" content="Complete Infinite release notes from v0.1 to v2.0.0: 2D and 3D views, Timeline, Session, Field, audio DSP, plugins, headless CLI, and MCP.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/og/home.jpg">
+  <meta property="og:url" content="https://infinitedevices.org/releases.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Infinite Release Notes: v0.1 to v2.0.0 | Infinite">
+  <meta name="twitter:description" content="Complete Infinite release notes from v0.1 to v2.0.0: 2D and 3D views, Timeline, Session, Field, audio DSP, plugins, headless CLI, and MCP.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/og/home.jpg">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite Release Notes", "url": "https://infinitedevices.org/releases.html", "description": "Complete Infinite release notes from v0.1 to v2.0.0: 2D and 3D views, Timeline, Session, Field, audio DSP, plugins, headless CLI, and MCP.", "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "softwareVersion": "2.0.0"}}</script>
+  <link rel="alternate" type="text/plain" href="llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="brand.css?v=07695caf">
+  <link rel="stylesheet" href="style.css?v=6ea1c79e">
+  <link rel="stylesheet" href="glass.css?v=c25dae44">
+  <link rel="stylesheet" href="blog.css?v=823c9183">
+  <link rel="stylesheet" href="audience.css?v=f73df30a">
+
+  <style>
+    .rel-wrap { max-width: 920px; margin: 0 auto; padding: 120px var(--ui-sp-4, 16px) 80px; display: grid; gap: 32px; }
+    .rel-head { display: grid; gap: 16px; }
+    .rel-head h1 { margin: 0; font-size: var(--size-h1); font-weight: 800; letter-spacing: -0.035em; line-height: 1.05; }
+    .rel-head h1 em { font-style: italic; color: var(--accent-ink); font-family: var(--font-hand, "Caveat", cursive); font-weight: 700; font-size: 1.08em; }
+    .rel-lead { margin: 0; max-width: 62ch; color: var(--muted); font-size: var(--size-body); line-height: 1.65; }
+    .rel-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+    .rel-controls { display: grid; gap: 12px; padding: 16px; border-radius: var(--r-card, 20px); background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
+    .rel-eras { display: flex; flex-wrap: wrap; gap: 8px; }
+    .rel-era { min-height: 36px; padding: 0 16px; border-radius: var(--r-pill, 999px); border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); background: transparent; color: var(--ink2, var(--muted)); font: 500 0.875rem/1 var(--font-sans); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background-color 167ms var(--ease-out), color 167ms var(--ease-out), border-color 167ms var(--ease-out); }
+    .rel-era:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
+    .rel-era[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+    .rel-era .rel-cnt { font-family: var(--font-mono); font-size: 0.75rem; opacity: 0.72; }
+
+    .rel-jump { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .rel-jump-label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+    .rel-pill { padding: 4px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink2, var(--muted)); text-decoration: none; font-family: var(--font-mono); font-size: 0.8125rem; transition: color 125ms var(--ease-out), border-color 125ms var(--ease-out), background-color 125ms var(--ease-out); }
+    .rel-pill:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 28%, transparent); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+
+    .rel-list { display: grid; gap: 24px; }
+    .rel-card { scroll-margin-top: 96px; display: grid; gap: 16px; padding: 24px; border-radius: var(--r-card, 20px); background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
+    .rel-card[hidden] { display: none; }
+    .rel-card.is-latest { border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }
+
+    .rel-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
+    .rel-card-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    .rel-card-head h2 { margin: 0; font-size: var(--size-h2, 1.5rem); font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
+    .rel-card-head h2 a { color: inherit; text-decoration: none; }
+    .rel-card-head h2 a:hover { color: var(--accent-ink); }
+    .rel-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--r-pill, 999px); background: color-mix(in srgb, var(--accent-ink) 18%, transparent); color: var(--accent-ink); font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+    .rel-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted); }
+    .rel-meta a { color: var(--accent-ink); text-decoration: none; }
+    .rel-meta a:hover { text-decoration: underline; }
+
+    .rel-body { display: grid; gap: 12px; }
+    .rel-body h3 { margin: 8px 0 0; font-size: var(--size-h3, 1.125rem); font-weight: 700; letter-spacing: -0.015em; color: var(--ink); }
+    .rel-body h4 { margin: 4px 0 0; font-size: 1rem; font-weight: 600; color: var(--ink); }
+    .rel-body p, .rel-body li { margin: 0; color: var(--ink2, var(--muted)); font-size: 0.9375rem; line-height: 1.65; }
+    .rel-body strong { color: var(--ink); font-weight: 600; }
+    .rel-body a { color: var(--accent-ink); }
+    .rel-body ul { margin: 0; padding-left: 1.35em; display: grid; gap: 8px; }
+    .rel-body li > ul { margin-top: 8px; }
+    .rel-body code { font-family: var(--font-mono); font-size: 0.875em; padding: 2px 6px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); word-break: break-word; }
+
+    @media (max-width: 640px) {
+      .rel-wrap { padding: 104px 16px 64px; gap: 24px; }
+      .rel-card { padding: 16px; }
+    }
+  </style>
+  <link rel="stylesheet" href="system.css?v=23625436">
+  <link rel="stylesheet" href="scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="neumo.css?v=2d967bf3">
+  <link rel="stylesheet" href="search.css?v=96e10ca3">
+</head>
+<body class="blog-page">
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="index.html" class="brand" aria-label="Infinite home">
+        <img src="assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+      <button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span class="search-label">Search</span></button>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
+          <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+          <a href="plugin.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
+        </div>
+      </div>
+      <div class="nav-group" data-current>
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="manual/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Manual</span></a>
+          <a href="philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="chat.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
+          <a href="blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 16.45l.8-3.6L13 4.15a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.1 15.65Z"/><path d="M11.5 5.65l2.8 2.8"/></svg><span>Blog</span></a>
+          <a href="releases.html" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10a6.5 6.5 0 1 0 2-4.7"/><path d="M3.5 3.8v3.4h3.4"/><path d="M10 6.6V10l2.4 1.6"/></svg><span>Release notes</span></a>
+        </div>
+      </div>
+      <a href="plugin.html">Plugin</a>
+      <a class="btn btn-primary nav-sheet-cta" href="index.html#setup">Download Infinite</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn share-btn" aria-label="Share this page" title="Share"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg></button>
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn" aria-label="GitHub repository" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="rel-wrap">
+      <header class="rel-head">
+        <h1 class="perch">Release <em>notes</em></h1>
+        <p class="rel-lead">Every Infinite release from v0.1 (16 August 2026) through v2.0.0 (18 November 2026) — 34 versions covering the standalone DAW, VST3 &amp; AU plugin, 2D and 3D views, Timeline, Field, audio DSP, headless CLI, and MCP.</p>
+        <div class="rel-actions">
+          <a href="index.html#download" class="btn btn-primary btn-sm">Download v2.0.0</a>
+          <a href="plugin.html" class="btn btn-ghost btn-sm">VST3 &amp; AU plugin</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">GitHub Releases</a>
+        </div>
+      </header>
+
+      <section class="rel-controls" aria-label="Filter and jump to releases">
+        <div class="rel-eras" role="group" aria-label="Filter by release series">
+                    <button type="button" class="rel-era" data-era="all" aria-pressed="true">All <span class="rel-cnt">34</span></button>
+          <button type="button" class="rel-era" data-era="v2" aria-pressed="false">v2.0 <span class="rel-cnt">1</span></button>
+          <button type="button" class="rel-era" data-era="v1" aria-pressed="false">v1.x <span class="rel-cnt">3</span></button>
+          <button type="button" class="rel-era" data-era="v0.6" aria-pressed="false">v0.6.x <span class="rel-cnt">3</span></button>
+          <button type="button" class="rel-era" data-era="v0.5" aria-pressed="false">v0.5 <span class="rel-cnt">1</span></button>
+          <button type="button" class="rel-era" data-era="v0.4" aria-pressed="false">v0.4.x <span class="rel-cnt">9</span></button>
+          <button type="button" class="rel-era" data-era="v0.3" aria-pressed="false">v0.3.x <span class="rel-cnt">6</span></button>
+          <button type="button" class="rel-era" data-era="v0.1-v0.2" aria-pressed="false">v0.1 – v0.2 <span class="rel-cnt">11</span></button>
+        </div>
+        <div class="rel-jump" aria-label="Jump to version">
+          <span class="rel-jump-label">Jump to:</span>
+          <a class="rel-pill" href="#v2.0.0">v2.0.0</a><a class="rel-pill" href="#v1.2.0">v1.2.0</a><a class="rel-pill" href="#v1.1.0">v1.1.0</a><a class="rel-pill" href="#v1.0.0">v1.0.0</a><a class="rel-pill" href="#v0.6.6">v0.6.6</a><a class="rel-pill" href="#v0.6.5">v0.6.5</a><a class="rel-pill" href="#v0.6.0">v0.6.0</a><a class="rel-pill" href="#v0.5.0">v0.5.0</a><a class="rel-pill" href="#v0.4.7">v0.4.7</a><a class="rel-pill" href="#v0.4.6">v0.4.6</a><a class="rel-pill" href="#v0.4.5">v0.4.5</a><a class="rel-pill" href="#v0.4.4">v0.4.4</a><a class="rel-pill" href="#v0.4.3">v0.4.3</a><a class="rel-pill" href="#v0.4.25">v0.4.25</a><a class="rel-pill" href="#v0.4.2">v0.4.2</a><a class="rel-pill" href="#v0.4.1">v0.4.1</a><a class="rel-pill" href="#v0.4.0">v0.4.0</a><a class="rel-pill" href="#v0.3.5">v0.3.5</a><a class="rel-pill" href="#v0.3.4">v0.3.4</a><a class="rel-pill" href="#v0.3.3">v0.3.3</a><a class="rel-pill" href="#v0.3.2">v0.3.2</a><a class="rel-pill" href="#v0.3.1">v0.3.1</a><a class="rel-pill" href="#v0.3.0">v0.3.0</a><a class="rel-pill" href="#v0.2.76">v0.2.76</a><a class="rel-pill" href="#v0.2.75">v0.2.75</a><a class="rel-pill" href="#v0.2.7">v0.2.7</a><a class="rel-pill" href="#v0.2.6">v0.2.6</a><a class="rel-pill" href="#v0.2.5">v0.2.5</a><a class="rel-pill" href="#v0.2.4">v0.2.4</a><a class="rel-pill" href="#v0.2.3">v0.2.3</a><a class="rel-pill" href="#v0.2.2">v0.2.2</a><a class="rel-pill" href="#v0.2.1">v0.2.1</a><a class="rel-pill" href="#v0.2-preview">v0.2-preview</a><a class="rel-pill" href="#v0.1">v0.1</a>
+        </div>
+      </section>
+
+      <section class="rel-list" aria-label="All releases">
+      <article class="rel-card is-latest" id="v2.0.0" data-era="v2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v2.0.0-h"><a href="#v2.0.0">Infinite v2.0.0</a></h2>
+            <span class="rel-badge">Latest</span>
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-11-18">18 November 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v2.0.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<p>Infinite 2.0 adds a 2D View for painting, layered compositing and adjustments, and it moves Render 3D onto a real-time Metal engine with a path tracer, richer materials, fog, sky and more lights. It adds a Field Patcher, a Spectral Field node, a Mixer and a hardware-style Drums panel, and a Session view that follows the Timeline. The release also widens the command line, headless and MCP surface, cleans up menus and shortcuts across panels, and changes the default save extension to .inf on every platform.</p>
+<h3>Timeline</h3>
+<ul>
+<li>Predictive Rhythm and Predictive Notes start from the block start and land on the next bar after a jump or loop lap; they learn looped takes in order.
+</li>
+<li>Predictive Quantize runs on its own clock and resets after a long gap; the step clock stays idle while stopped.
+</li>
+<li>The loop band is clipped to the visible timeline, and bars count from 1.
+</li>
+<li>The drum sequencer plays the step under a jump.
+</li>
+<li>The Timeline export can run headless from the command line (<code>--render --timeline</code>).
+</li>
+</ul>
+<h3>Session</h3>
+<ul>
+<li>The Session top bar matches the Timeline: Render Take, Audio, and the inspector toggle pinned right.
+</li>
+<li>Session clips, scenes and drum lanes share one cell height.
+</li>
+<li>Session clip menus hold their actions; values stay in Clip Settings.
+</li>
+<li>Session clips take their source from the same Canvas Link pick as Piano Roll and 2D layers.
+</li>
+</ul>
+<h3>2D View</h3>
+<ul>
+<li>A new Scene 2D node and 2D View panel: a layered document with paint, vector, text and 3D layers, rendered as a node output.
+</li>
+<li>Paint: a brush engine shared with the Draw node, paint layers, pixel masks, selection, bucket, gradient, eyedropper, stabiliser, and material brushes. Brush tip, grain and colour can come from a canvas node.
+</li>
+<li>Retouch brushes: clone, heal, blur, sharpen, dodge and burn.
+</li>
+<li>Vector and text layers: pen, node, shape and text tools; font search and preview; bold, italic, underline, all caps, justify, strike, kerning and baseline shift; Convert to shapes.
+</li>
+<li>Layer effects: shadow, glow, overlay, stroke, inner glow, bevel and gradient overlay, in an effects stack that drags to reorder.
+</li>
+<li>Adjustments: brightness, contrast, hue, saturation, exposure, invert, levels, curves, white balance, split toning, recolour, pixelate, halftone, dither, threshold, gradient map and posterize.
+</li>
+<li>3D layers: real 3D layers in the document, and paint on 3D object surfaces.
+</li>
+<li>Transform: free transform, canvas rotate, liquify, distort, skew and perspective; scale with a lock; group scale and rotate.
+</li>
+<li>Selection: expand, contract, smooth and border; antialiased magic wand and bucket edges.
+</li>
+<li>Merge Down, Merge Layers (Cmd+E), Merge Visible (Cmd+Shift+E) and Flatten Image.
+</li>
+<li>Layered PSD and ORA files open and save.
+</li>
+<li>A canvas node can be added as a layer; media and Library items can be dropped on the canvas.
+</li>
+<li>Layer numbers take modulators, and the brush follows them.
+</li>
+<li>Faster redraws: plain layers composite in one batch, and an edit redraws only its layer and the ones above it. Brush latency is checked at 1080p, and tile PNGs encode off the main thread.
+</li>
+<li>Photoshop-style shortcuts in the 2D View.
+</li>
+<li>Redrawn tool icons, including the nib pen, bulb eyedropper, quick mask and selection operations.
+</li>
+<li>Left, Right and Fill docks for the 2D and 3D Views.
+</li>
+<li>An essentials-only tool strip with a tool picker window; the strip can be rearranged.
+</li>
+<li>Layer copy, cut and paste; a canvas context menu; soft zoom with a typed zoom row.
+</li>
+<li>The layer list scrolls, supports marquee selection and hits layers by their pixels.
+</li>
+<li>Size presets, scale percent with a lock, and render format rows.
+</li>
+<li>Gradient fills on vector shapes; conical, bitmap, mesh and noise fills; stroke miter, phase, arrowheads and pressure.
+</li>
+<li>Layer shear, blend gamma and antialiasing; tool settings for gradient extend and dither, crop darken and reveal, selection brush add and subtract, and shape radius.
+</li>
+<li>Pixel tools work on image layers, with the magic wand rule matched to Affinity.
+</li>
+<li>The group eraser and retouch tools act on every paint layer in a group in one undo step.
+</li>
+</ul>
+<h3>3D View</h3>
+<ul>
+<li>Render 3D&#x27;s Engine dropdown offers Live and Live + settle. Live draws in real time; settle refines to a path-traced still once the scene is still.
+</li>
+<li>The Metal live engine (macOS) adds ray-traced shadows and reflections, global illumination with a denoiser, and up to 64 lights.
+</li>
+<li>A progressive Metal path tracer with area lights and GGX materials. The commit measures it at 7.3 times faster per sample than the older GL tracer.
+</li>
+<li>Materials: material layers with masks, parallax occlusion with self-shadow, true displacement in settle, curvature and cavity wear, dirt, dust and edge-wear recipes, eight surface recipes as Material presets, sheen fibre direction, hair, fur, subsurface and translucency, thin film, and exact Fresnel with multiscatter.
+</li>
+<li>Shading nodes (Coord, Mapping, Checker, Noise, Voronoi, Gradient, Brick, Image, Bump, Normal Map, Fresnel, Layer Weight, Geometry) and value nodes (Math, Vector Math, Mix, Ramp, Map Range, Separate, Combine, Curves) compose into one material program. They sit in a new Shader category.
+</li>
+<li>Sketch can drive a material map, and Sketch 3D mask() can drive a material attribute.
+</li>
+<li>Light and air: a fog box with sun shafts, a physical sky on the HDRI node, and HDRI importance sampling on by default.
+</li>
+<li>Camera and post: motion blur, cat-eye lens, lens distortion, chromatic aberration, depth-of-field bokeh, bloom, and AgX, Reinhard and Neutral tonemaps.
+</li>
+<li>Render passes as Render 3D outputs: depth, normal, albedo, mask and id.
+</li>
+<li>glTF KHR material extensions and texture transforms reach the Material.
+</li>
+<li>Instanced batches with GPU culling and point LOD; Instance on Points uses the cloud transform and jitter.
+</li>
+<li>MetalFX temporal upscale for interactive live frames at 67 percent. Exports stay native.
+</li>
+<li>A failed engine pipeline shows as an error on the Render 3D node.
+</li>
+<li>View and panel: Target X/Y/Z, background offset and grid axes on one row each; a background colour behind an HDRI world; Text 3D position, rotation, scale and spin can be keyed; Select Linked; Paste Transform greys out when nothing is copied.
+</li>
+<li>Pose Mode and Sculpt Mode are Ctrl+Tab. Pose Mode greys out without a rig.
+</li>
+<li>Viewport habits moved to Settings &gt; 3D View.
+</li>
+<li>The settle path denoiser, and export warm-ups that share one sun shadow mask.
+</li>
+<li>Hair and fur: strand-to-strand shadows; live glitter path, settle coat and cutout shadows.
+</li>
+<li>Live draws flat meshes two-sided, and the live and settled pictures match each other and Cycles at night.
+</li>
+<li>Live: a ray-free variant for frames without a top-level acceleration structure, and a pure-live path that takes the HDRI sun out of its own map copy.
+</li>
+<li>Field material programs get live knobs, and a shade texture can be written as Field Pixel code.
+</li>
+</ul>
+<h3>Node canvas and panels</h3>
+<ul>
+<li>Dropping a cable dims the nodes that do not fit and ranks the suggestions.
+</li>
+<li>Any parameter can be reset to its default.
+</li>
+<li>Cables inside a group&#x27;s box can be hovered, selected and deleted; a node dropped on a cable is no longer pulled into a group it lands in.
+</li>
+<li>Right-click menus are filled in: Cut on the canvas and Timeline, track Duplicate and Rename, and Curve Editor copy and paste of points.
+</li>
+<li>Field Patcher: a box editor with drag-pan, copy, paste, duplicate and delete, a scrolling pick list, tab rename, dock switching, and twelve more starters. Pin and Pop Out sit at the right end of its strip.
+</li>
+<li>Settings &gt; Keys shows the same shortcut table the keys use.
+</li>
+<li>Panel key tips match what the keys do; Cmd+R renames the page in Curve Editor, Field Patcher and Performance; empty states use one phrase.
+</li>
+<li>Patches cook faster when they have many cables, modulators and expressions.
+</li>
+<li>Canvas Link: one shared pick for Piano Roll, 2D layer sources and Session clips.
+</li>
+<li>One page strip for Drums, Mixer, Piano Roll, Performance and Curve Editor; the same seven-row page menu in every panel; Cmd+R renames a page in Curve Editor, Field Patcher and Performance.
+</li>
+<li>Pages save their order and colour; New Patch resets the Performance pages.
+</li>
+<li>Right-click reaches every panel&#x27;s menu, and right-click rows that did nothing now act or grey out.
+</li>
+<li>Help lists the page and panel keys it had missed.
+</li>
+<li>Sketch gains textFont, textAlign and fract.
+</li>
+<li>Patches open in landscape layout by default.
+</li>
+<li>Controls, chips and list rows share one 24 pt height, with three type sizes, two corner radii and one row gap of 3 everywhere.
+</li>
+<li>Help and node display names agree; shortcuts respect the focused panel.
+</li>
+<li>Sample Studio: Shift-drag stretches a slice and later slices ripple with it; the stretch border snaps to the grid with the magnet on; a cut slice keeps the settings of the one it came from; Space, Shift+D and Paste at Playhead work in the editor, and clicking a slice is silent.
+</li>
+<li>Piano Roll: a slimmer clip header; right-click on it opens the clip menu, where Duplicate and Delete act on clips.
+</li>
+<li>Context menus share one order across panels, with Settings as the last row under Delete.
+</li>
+</ul>
+<h3>Field</h3>
+<ul>
+<li>Spectral Field node: a Field kernel runs per bin (<code>input bin</code>) on an STFT engine with a phase vocoder.
+</li>
+<li>Field Patcher panel: a box graph with pages, a canvas, a pick menu, an inspector, search, templates, starters and a Value mode. Sugar boxes expand and reopen as the box. Scratch pages are saved in the patch.
+</li>
+<li>Field Pixel programs can drive materials (Material domain) in Render 3D, including material layers.
+</li>
+<li>Field Notes: scratch pages with a value or pulse outlet export to Field Notes behind the publish-scalar toggle.
+</li>
+<li>New noise built-ins in Field: noise3, noise4, fbm, voronoi3, wave, brick, checker, gradient and white.
+</li>
+</ul>
+<h3>Audio and DSP</h3>
+<ul>
+<li>Generate Samples gains new music styles: five distinct styles, then microtonal ambient, prepared piano, Berlin School, UK dub steppers, and four more.
+</li>
+<li>Lower CPU on the audio thread: dB-to-linear is memoised on settled gain knobs; Chorus, Flanger, Phaser and Frequency Shifter use a polynomial LFO sine; Wavetable Shaper hoists its lookups; dry processing is skipped at full mix.
+</li>
+</ul>
+<h3>Mixer and Drums</h3>
+<ul>
+<li>Mixer panel: 32 strips with trim, polarity, solo-safe and a pan law; five docks; a console with pages, groups and master; Mixer Audio mode (Shift+L); Open in Mixer panel from the node.
+</li>
+<li>Mixer sends and returns; inserts on strips and on the master; master loudness; snapshots; mono and dim; a render column and Render All.
+</li>
+<li>Mixer hardware-desk look that follows the theme.
+</li>
+<li>Drums panel: the hardware face of the Drum Sequencer with lanes, a Step page, a FILL key, an LCD, per-lane length, reverse and filter. Two-tier Drumazon layout. One undo step per trim drag.
+</li>
+<li>Drum Sequencer: trig conditions, probability, nudge, FILL, per-lane length, reverse and filter. Audition fires a lane without starting the transport.
+</li>
+<li>Drum kits per groove, built from the user&#x27;s own sample library.
+</li>
+<li>Mixer and Drums share a chip header, flat wells, and docked card styling; the Drums panel has its own rail icon.
+</li>
+<li>The Mixer empty state offers New Mixer.
+</li>
+</ul>
+<h3>Terminal, CLI, headless and MCP</h3>
+<ul>
+<li>CLI: <code>--frame</code> with <code>--batch</code>; alpha kept with <code>--size</code>; <code>--render --timeline</code>; view2d RPC and CLI commands.
+</li>
+<li>CLI and RPC verbs: <code>view2d-add</code>; Timeline clip copy, paste, split at playhead, duplicate, inspect and marker colour; <code>node drum</code> and <code>node mixer</code> for the Drums and Mixer panel menus.
+</li>
+<li>Headless jobs are isolated and deterministic; headless runs wait for sample analysis.
+</li>
+<li>RPC: bind_mod, unbind_mod and set_expr accept more argument forms; the transport loop action; per-parameter reset; cook time and fps over RPC; a bad field returns an error.
+</li>
+<li>Agents: a propose-agent gate validates schema and code, with rollback.
+</li>
+<li>Chat: a built-in OpenAI-compatible custom agent; <code>/model</code> shorthands; the agy model list is parsed and its errors shown.
+</li>
+<li>MCP picture tools: compare frames, find a knob, and inspect node effects; colour nodes are included.
+</li>
+<li>OSC: recursive bundles, T/F/d/h type tags, and <code>*</code> and <code>?</code> address matching.
+</li>
+<li>The command-line reference, headless docs and AI skills were regenerated for the new panels and verbs.
+</li>
+<li>Prediction nodes (Drift, Moves, Predictive Notes, Rhythm, Quantize, Coloring, Velocity) carry a <code>profile_dependent</code> flag in node descriptions, because headless runs do not load their learned profiles.
+</li>
+</ul>
+<h3>Plugins</h3>
+<ul>
+<li>Plugin nodes declare that they are machine-dependent: the plugin must be installed on that machine.
+</li>
+<li>On the website, the plugin and the free-app buttons sit under Download in the hero. The footer and mobile dock no longer link to the plugin page.
+</li>
+</ul>
+<h3>Platform, Windows and Linux</h3>
+<ul>
+<li>Windows: the VC++ runtime DLLs are bundled next to Infinite.exe, including the rest of the runtime family.
+</li>
+<li>Windows and Linux: CJK and symbol fallback fonts.
+</li>
+<li>Saved patches use <code>.inf</code> on every platform. <code>.infinite</code> still opens as a read-only alias.
+</li>
+<li>Convert to shapes keeps the font&#x27;s Bezier curves on macOS and Linux.
+</li>
+<li>Pen pressure is read per OS.
+</li>
+<li>macOS Audio In captures through a low-latency AUHAL input unit instead of a 1024-frame tap.
+</li>
+<li>File opens go through one path helper on every platform.
+</li>
+<li>Windows and Linux UI golden images run in CI; CI also runs the worker tests and the MCP engine smoke test.
+</li>
+</ul>
+<h3>Website and docs</h3>
+<ul>
+<li>Home page: hero showcase slideshow, FAQs, and Wikidata linking; Screens on the audience pages.
+</li>
+<li>Manuals: a Chat panel chapter; a Field Patcher chapter; refreshed 2D View, 3D View, Field Patcher, Mixer and Drums pages.
+</li>
+<li>Library: new templates (soap-film, kinetic moire, basalt diffuser, Berlin School and spectral dub); library thumbnails redrawn to brand book v2.1; the sample generator embed sized to its content.
+</li>
+<li>The RSS feed carries full article text for syndication; the embed Share button is fixed.
+</li>
+<li>Nocturne: an endless piano in a walkable landscape, with an output compressor and limiter.
+</li>
+<li>The plugin and buy pages are indexable and in the sitemap, with social tags.
+</li>
+<li>Website performance work on Core Web Vitals and the hero&#x27;s LCP.
+</li>
+<li>Blog posts: wave terrain synthesis; Delaunay triangulation and Voronoi geometry; modal synthesis and metallic percussion; the Spectral Field phase vocoder; binaural HRTF spatial mixing; lock-free audio visualisers; OpenGL 4.1 path tracing and AgX; out-of-process VST3 and AU plugin IPC; image-to-sound spectrogram additive synthesis.
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Help tooltips inside nodes no longer blank node rows.
+</li>
+<li>The node editor no longer aborts when a right-click lands during a panel splitter change.
+</li>
+<li>The 3D View no longer crashes drawing a scene before its first sync.
+</li>
+<li>Image export no longer turns paint tiles upside down.
+</li>
+<li>Non-finite inputs are sanitised in the peak limiter and the spatial master.
+</li>
+<li>Held notes release when a note source changes or is deleted.
+</li>
+<li>Predictive timing: Vmpc seek-back fixed.
+</li>
+<li>Render 3D: grazing-angle sun glint, and thin glass and water are no longer stepped over by settle rays.
+</li>
+<li>Mixer M/S state fixed; drum rows keep their size.
+</li>
+<li>Pages: New Patch resets the Performance pages.
+</li>
+<li>Shift+N and Space respect panel focus; Ctrl or Cmd paste works for Chat attachments.
+</li>
+<li>Undo and save gaps in Curve Editor, Field Patcher and Performance closed.
+</li>
+<li>OSC bundle decoding fixed.
+</li>
+<li>Chat surfaces agy errors.
+</li>
+<li>Cmd+0, Cmd+= and Cmd+- zoom the 2D or 3D View under the pointer instead of changing the UI scale.
+</li>
+<li>Video In scans devices once instead of every frame.
+</li>
+<li>Resynthesize drops its dead mode menu; its loop path appears once a path exists.
+</li>
+<li>An empty text font falls back to the default sans.
+</li>
+<li>Swatch popovers close on pick, and 2D View strips align to whole pixels.
+</li>
+<li>Render 3D: a lone object no longer shows a lighter inset on its faces (the GI probe grid now reaches past the subject).
+</li>
+<li>Cables: a plain picture is refused on a Shade field pin instead of connecting and doing nothing.
+</li>
+</ul>
+<h3>Upgrading from 1.x</h3>
+<ul>
+<li>Save extension: patches save as <code>.inf</code> on every platform. <code>.infinite</code> files still open.
+</li>
+<li>Default changes that alter how old patches render or play:
+<ul>
+<li>Render 3D: HDRI importance sampling is on by default; settled pictures can differ from 1.2.0.
+</li>
+<li>Render 3D settle: adaptive stop is on by default at 0.05, and settle uses new Sobol samples and ray offsets. Settled pixels change even when the patch is unchanged.
+</li>
+<li>Render 3D: sheen and tonemap are computed from one source, and Fresnel and multiscatter gain are exact on raster and live. Expect small shading differences.
+</li>
+<li>Shortcuts: Cmd+0, Cmd+=, Cmd+- zoom the View under the pointer; Pose and Sculpt Mode are Ctrl+Tab; Cmd+E merges layers; Cmd+R renames pages only in Curve Editor, Field Patcher and Performance.
+</li>
+<li>Plugin nodes declare machine-dependent and inactive parameters; a plugin must be installed on the machine that opens the patch.
+</li>
+</ul>
+</li>
+<li>Opening files: the patch header is <code>infinite-patch 1</code> in both 1.2.0 and 2.0 (<code>kVersion</code> in <code>src/core/Patch.cpp</code> is unchanged). 2.0 reads 1.x patches. The loader ignores lines it does not know, so a 1.2.0 build does not reject a 2.0 file on version grounds. Whether a 1.2.0 build loads 2.0-only node types (Scene 2D, Spectral Field, Mixer, Drums, Field Patcher pages) correctly is untested.
+</li>
+<li>Whether 1.2.0 shows or opens <code>.inf</code> files in its file dialog is untested.
+</li>
+</ul>
+<h3>Known issues</h3>
+<ul>
+<li>Live engine: a commit records a known gap in the grazing-angle sun glint. A later commit (6dc0f44f) adds a glint fix; no commit records whether the gap is closed.
+</li>
+<li>Three render goldens differ slightly from their baselines (3D render shading by about 1/255; voice spread +1.3 dB; envelope per voice +1.05 dB). Not bisected; fix planned for 2.0.1. Details in docs/release/known-issues-2.0.md.
+</li>
+<li>Convert to shapes on Windows gives a thinned outline, not the font&#x27;s Bezier curves.
+</li>
+<li>The Vulkan backend is not in this build (<code>INFINITE_VULKAN</code> is OFF by default). The Render 3D live and settle engines are Metal, so the commits do not confirm them on Windows or Linux.
+</li>
+</ul>
+<p>Credit line for the notes: Infinite, by Naman Soni (n1m21n), <a href="https://infinitedevices.org" target="_blank" rel="noopener">https://infinitedevices.org</a>.</p>
+        </div>
+      </article>
+      <article class="rel-card" id="v1.2.0" data-era="v1">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v1.2.0-h"><a href="#v1.2.0">Infinite v1.2.0</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-11-09">9 November 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v1.2.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<p>Infinite 1.2 runs inside your DAW. <strong>Infinite Instrument</strong> and <strong>Infinite FX</strong> are VST3 plugins on macOS, Windows and Linux, and Audio Units on macOS, with your whole patch saved in the DAW project. The plugin is paid: $149 one time, $99 at launch, for two computers, with every update for life. The standalone app stays free and open source, and this release brings it fixes too.</p>
+<h3>Infinite as a plugin</h3>
+<ul>
+<li><strong>Two plugins from one app:</strong> Infinite Instrument takes the track&#x27;s MIDI, Infinite FX processes the track&#x27;s audio. Each opens the full Infinite editor inside the DAW
+</li>
+<li><strong>Saved with your project:</strong> the patch, its settings and its host automation come back when the project reopens, even before the engine starts
+</li>
+<li><strong>Host automation:</strong> right-click any knob or parameter and choose <strong>Host automation</strong>. It appears in the DAW under the node&#x27;s own name. Up to 128 per instance, and none show until you bind one
+</li>
+<li><strong>DAW sync (Settings):</strong> choose whether the DAW or Infinite owns tempo, playhead and loop. Play and stop always follow the DAW
+</li>
+<li><strong>MIDI from the DAW:</strong> the track&#x27;s MIDI reaches every MIDI node, and CC bindings learned on hardware follow it; Sample Studio records the DAW track
+</li>
+<li><strong>Pop out:</strong> move the editor into its own window, and back. Projector windows open on real displays from inside the DAW
+</li>
+<li><strong>Safe when things go wrong:</strong> if the engine crashes or hangs, the DAW keeps running, the plugin goes silent and <strong>Restart</strong> brings back the patch that was on screen
+</li>
+<li><strong>Inside a DAW, Infinite hides what does not belong there:</strong> audio device settings, its own play and rewind, updates, offline renders and recording
+</li>
+<li><strong>Licence:</strong> paste the key from your email once and it works offline in every DAW on that computer
+</li>
+<li><strong>Installers:</strong> <code>Infinite.pkg</code> on macOS and <code>Infinite-Setup-windows-x64.exe</code> on Windows let you tick the app, VST3 and AU; on Linux, <code>install.sh</code> does the same with no sudo. <strong>Settings &gt; Infinite as VST3/AU</strong> in the app copies or updates the plugins too
+</li>
+</ul>
+<h3>Curve Editor</h3>
+<ul>
+<li><strong>A docked panel for drawing curves:</strong> open it from the rail or with <strong>Shift+E</strong>. Every curve is an MSEG page, and you can dock the panel on any side
+</li>
+<li><strong>Draw, then assign:</strong> draw a curve, press <strong>Assign</strong> and click any knob in the patch, sound, picture or 3D. One curve can drive many knobs, each with its own range
+</li>
+<li><strong>Tools:</strong> select, pan, pen with bezier handles, freehand draw, line, stamp, bend, eraser, transform and smooth, plus reverse, invert, mirror, simplify, humanize and quantise
+</li>
+<li><strong>Shapes:</strong> waves, gates and rhythms, envelopes, risers, drops and sidechain pumps, random, and 38 motion easings (Penner, CSS, Material). Save your own
+</li>
+<li><strong>Type a formula:</strong> write <code>f(t)</code>, see it as a curve right away, and <strong>Bake</strong> it into editable points
+</li>
+<li><strong>Record a move:</strong> arm Record, then move a MIDI CC or a knob. The take becomes a short editable curve instead of a raw recording
+</li>
+<li><strong>Time:</strong> set the length in beats, seconds or frames, with grid, snap and quantise. Play it once, looped or ping-pong, and crop to a loop section
+</li>
+<li><strong>3D motion:</strong> bezier keys with Blender&#x27;s handle types, and Position, Rotation and Scale groups that fill three linked curves for a 3D node. Frame-exact at 24, 30 and 60 fps
+</li>
+<li><strong>Your old patches:</strong> existing MSEG nodes open and sound the same
+</li>
+</ul>
+<h3>App</h3>
+<ul>
+<li><strong>Output window:</strong> a <strong>Transparent window</strong> toggle, so OBS window capture can key it (#26)
+</li>
+<li><strong>Wiring:</strong> a node added from a dragged pin is wired to it, and search lists only nodes that fit that pin (#48, #52)
+</li>
+<li><strong>Stutter:</strong> every repeat edge is faded, so loops and mutes no longer click (#51)
+</li>
+<li><strong>Shadertoy:</strong> pasted <code>#version</code> and <code>#extension</code> lines no longer break the compile (#50)
+</li>
+<li><strong>Modulator meter:</strong> samples on wall-clock time and restarts cleanly after being off-screen (#49)
+</li>
+<li><strong>Agents:</strong> stage-by-stage setup check-ins per agent and OS, verified install folders, and the API-key step as the agent&#x27;s own terminal command (#47)
+</li>
+<li><strong>Linux file dialogs:</strong> kdialog on KDE, and GTK4 zenity dialogs forced to cairo so they draw (#45)
+</li>
+<li><strong>Memory:</strong> patches without a Wavetable no longer grow by about 1 MB a minute
+</li>
+<li><strong>Terminal:</strong> <code>infinite node &lt;node&gt; window transparent</code>
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v1.1.0" data-era="v1">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v1.1.0-h"><a href="#v1.1.0">Infinite v1.1.0</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-11-05">5 November 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v1.1.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<p>Infinite 1.1 turns the 3D View into a full workspace: Edit Mode, Pose mode, sculpting, baking, rigging, materials and a path-trace engine, with five new nodes. It also adds a Chat panel that works with your own Claude, ChatGPT or Gemini, and native ASIO audio on Windows.</p>
+<h3>3D View</h3>
+<ul>
+<li><strong>Edit Mode (Tab):</strong> select, move, rotate, scale, extrude, inset and delete on a mesh, kept by an Edit Mesh node so the edit replays on the input. G, R and S take X, Y and Z (Z is vertical, as in object mode) and Shift+axis locks to a plane, with a readout in the displayed axis order. Edits keep their meaning when the input mesh is refined
+</li>
+<li><strong>Pose mode</strong> with weight paint, and a Material tab that edits the selected object&#x27;s Material and its maps, with a live preview ball
+</li>
+<li><strong>Shading and overlays:</strong> Solid view with object colour, X-ray (Alt+Z) and a wireframe overlay, per-item shadow casting, flat meshes drawn on both sides, and a grid that depth-tests correctly: it no longer bleeds through meshes, and the mesh wins where it meets the floor
+</li>
+<li><strong>Render passes:</strong> mist (with a range display on the camera), object index and cavity; motion blur; a camera background image; a render region; a render-time stamp and a Finish for renders
+</li>
+<li><strong>Cameras and lenses:</strong> cylindrical 360 and custom fisheye lenses, camera sensor presets, and leaving camera view returns you to the view you had before
+</li>
+<li><strong>Selecting and moving:</strong> circle select, trackball rotate, persistent rulers, continuous grab, centre view to mouse, Alt-drag box select in the outliner, outliner reorder, filters and keyboard walk, and Shift+double-click on empty space to glide the pivot back to the 3D cursor
+</li>
+<li><strong>Placing things:</strong> drop a model file into the view, turn any 2D output into a textured picture plane, motion-modulated placements and Follow, and a right-click menu that changes with what you click
+</li>
+<li><strong>Units, preferences and operators</strong> for transform, snap, placement and the object, select and view operators, with the parity checked row by row against Blender&#x27;s 3D View. The nav and edit axes are self-tested
+</li>
+<li><strong>Trackpad:</strong> Shift pans, Ctrl or Cmd zooms and plain scroll orbits, undoing macOS&#x27;s Shift scroll swap
+</li>
+<li>Edit Mesh, Sculpt and Armature cards have an Open in 3D View button; the scene list uses item keys instead of action buttons
+</li>
+</ul>
+<h3>New nodes</h3>
+<ul>
+<li><strong>Sculpt:</strong> brushes with strengths and spacing fitted to Blender&#x27;s own (draw, inflate, flatten, pinch, crease), symmetry that follows the displayed axes, any 2D node as the brush image, and strokes whose dabs land on the surface where the stroke began
+</li>
+<li><strong>Bake:</strong> a normal map from a sculpt
+</li>
+<li><strong>UV Project:</strong> projects UVs onto any mesh
+</li>
+<li><strong>Edit Mesh:</strong> the Edit Mode operations as a node; it passes its input through when bypassed
+</li>
+<li><strong>Armature:</strong> bends any geometry with a bone chain, with weight paint
+</li>
+</ul>
+<h3>Rigging and models</h3>
+<ul>
+<li>Skinned glTF clips and morphs in Model 3D, fitted to the rest pose, with IK driven by 3D View items
+</li>
+<li>glTF import: one part per material, file textures right side up, and spec-gloss materials read (diffuse map, roughness from glossiness, specular from F0)
+</li>
+<li>Text 3D: even caps and banded walls, so sculpts and modifiers stop tearing letters
+</li>
+</ul>
+<h3>Materials and Render 3D</h3>
+<ul>
+<li><strong>Path-trace engine:</strong> a progressive path tracer with a BVH, with clearcoat, sheen, glass (IOR, rough transmission), specular level, depth of field matching the raster&#x27;s blur, material texture maps (albedo, roughness, metallic, normal or bump, emission, clear coat, sheen, transmission), opacity with an alpha cutoff and opacity map, and refinement in frame-budget strips. Choose it from the Engine dropdown on the Render tab; raster-only rows go grey under it. Use it for scenes that rely on global illumination
+</li>
+<li><strong>Raster:</strong> soft area-light shadows that follow the light&#x27;s size, a floor bounce, Blender&#x27;s spot-light cone falloff, light falloff, Ambient, diffuse and specular, the exact sRGB curve instead of gamma 2.2, and a sheen visibility term
+</li>
+<li><strong>Materials:</strong> 12 measured Material presets, opacity and transmission maps, a Load map field that spawns a cabled Image Source, and images that can be dropped onto a Material. Controls the path tracer ignores are greyed
+</li>
+<li>Render 3D has balanced columns and a node-wide show more or show less
+</li>
+</ul>
+<h3>Physics and modelling</h3>
+<ul>
+<li><strong>Cloth:</strong> bending, a collider mesh input with Coulomb friction (0 to 10), real-world gravity that pulls every mass the same, and a draped-over-a-ball check. Cloth no longer bypasses: it has two inputs, so an old patch with a bypassed Cloth behaves differently
+</li>
+<li><strong>Rigid Bodies:</strong> a box uses the piece&#x27;s own axes, with warm-started contacts
+</li>
+<li><strong>Subdivide</strong> is Catmull-Clark on recovered quads, to the limit surface, and faster. <strong>Twist</strong> on Y turns the same way as X and Z
+</li>
+<li>Sculpting is incremental, and a 3D bench measures the slow paths
+</li>
+</ul>
+<h3>Chat</h3>
+<ul>
+<li>A Chat panel where you talk to your own Claude, ChatGPT or Gemini. Infinite ships no agent: Settings &gt; Agents installs and signs in the ones you choose, and a first-run flow guides someone who has never used a terminal. A missing Node is said once, with its real reason
+</li>
+<li>Type <code>@</code> to name a node, <code>/</code> for commands, <code>@gemini</code> or <code>@chatgpt</code> to switch agent; one model picker for all agents; queue messages while an agent works
+</li>
+<li>Pictures, files, audio, video and animated gifs in the thread; paste pictures and files; code opens in a side pane
+</li>
+<li>A change card shows what the agent changed, with live knobs and the agent&#x27;s value as a dot (double-click to put it back)
+</li>
+<li>Agents can find nodes by plain words, import files, generate samples and MIDI, and link every settings page
+</li>
+<li>Pop the chat out into a floating window; token use per turn and in Settings
+</li>
+<li>Node menu: Reference in chat
+</li>
+<li>Every chat string is translated into Spanish, German, Chinese, Japanese and Russian
+</li>
+</ul>
+<h3>Windows audio</h3>
+<ul>
+<li>Native ASIO: choose ASIO as the output mode in Settings &gt; Audio, pick your interface&#x27;s driver and play at buffer sizes down to 32 frames, with a round-trip latency readout. If the driver is missing or will not start, Infinite keeps playing on WASAPI and says why. Thanks to Ricardo Palmieri, whose fork set the behaviour
+</li>
+</ul>
+<h3>Interface</h3>
+<ul>
+<li>Inactive params read as inactive in every node; the output window is opaque with a checkerboard behind a transparent background
+</li>
+<li>New nodes land on a free spot, chained left to right, never on top of each other
+</li>
+<li>Snap to grid applies only after a node drag, and only to the dragged nodes
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Sketch text falls back to CJK fonts
+</li>
+<li>The Piano Roll plays notes on the loop start after a wrap
+</li>
+<li>Dropdowns close on the first Esc; wide knob captions and dropdown values end in an ellipsis
+</li>
+<li>Linux: the 3D View grid keeps a depth margin of at least four depth steps, so software GL no longer lets it through; the video decoder is drained at the end of a file so the last frames arrive
+</li>
+</ul>
+<p>Made with Infinite, by Naman Soni (n1m21n), <a href="https://infinitedevices.org" target="_blank" rel="noopener">https://infinitedevices.org</a>.</p>
+        </div>
+      </article>
+      <article class="rel-card" id="v1.0.0" data-era="v1">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v1.0.0-h"><a href="#v1.0.0">Infinite v1.0.0</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-10-31">31 October 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v1.0.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<p>Infinite 1.0 adds a Terminal, a 3D View for composing a final scene, a Piano Roll, a Sample Studio, three new instrument nodes and a Settings window you can navigate by section. Midi Notes now lets you choose which MIDI device it listens to.</p>
+<h3>Terminal</h3>
+<ul>
+<li>A real terminal in the right rail, dockable at the bottom, right, left or top, with a Windows (ConPTY) host and a warning before an update restart ends a running program
+</li>
+<li>An <code>infinite</code> command with a verb for every panel, command and setting; expert <code>code</code> tools for Field, Sketch, GLSL and formulas; patch generation from the terminal
+</li>
+<li>Follows the light theme and tells programs its colours
+</li>
+<li>Settings &gt; Terminal covers the command, the headless engine and the AI skill files. Infinite ships no coding agent; use your own
+</li>
+</ul>
+<h3>3D View</h3>
+<ul>
+<li>Compose node outputs into one scene and render a camera for a chosen duration. Arranging never writes back to the node; cameras and lights are the nodes you already have
+</li>
+<li>Right-click a 3D node and choose Add to 3D View. Scenes stay off the canvas until you Convert to node
+</li>
+<li>Camera view, f-stop, render, output, light and object settings, and a starter scene example
+</li>
+<li>Shadow contact, glass highlights, area lights and world reflections are fixed; sloped floors no longer show AO striping
+</li>
+</ul>
+<h3>Piano Roll</h3>
+<ul>
+<li>A Piano Roll panel that docks at the bottom or top like the Timeline: MIDI lanes, clips, notes, quantise, scale-snap colours, per-clip colours and <code>.mid</code> import
+</li>
+<li>Record from a MIDI input (notes appear on key-down in one growing clip), and Generate notes from the Generate Samples engine
+</li>
+<li>A Piano Roll node plays its linked MIDI lane; Open in Piano Roll from a MIDI File node
+</li>
+<li>A loop-region toggle in the toolbar, matching the Timeline; Shift+D and Ctrl+D copies continue to the right instead of overwriting the first copy
+</li>
+</ul>
+<h3>Sample Studio</h3>
+<ul>
+<li>A Sample Studio panel (Shift+W) for slicing and shaping: waveform, slices with per-slice edits, tempo follow, loop, ping-pong, reverse, export and Convert to node or patch
+</li>
+<li>Record from the audio input, and generate a loop on demand
+</li>
+</ul>
+<h3>New instruments</h3>
+<ul>
+<li>Piano: a physically modelled piano with Rhodes and Wurlitzer models
+</li>
+<li>Wind: clarinet, sax, flute and brass
+</li>
+<li>String: guitar, harp, violin and cello bodies, pick hardness, bow pressure and bow noise; new factory presets for String, Piano and Wind
+</li>
+</ul>
+<h3>Generate Samples</h3>
+<ul>
+<li>Real instruments in the full mix, a chord bank learned from real songs, genre grooves with struck toms and percussion ensembles, designed voices and bass types, and birds, water and leaves among the textures
+</li>
+<li>A role critic checks each generated part and redraws one that does not fit
+</li>
+</ul>
+<h3>MIDI</h3>
+<ul>
+<li>Midi Notes has an input device dropdown (saved by name, falls back to all inputs when the device is unplugged) and Learn: play a key and the node takes that key&#x27;s device and channel
+</li>
+<li>Midi Notes works on a freshly added node, before it is patched
+</li>
+<li>Settings &gt; Audio &gt; MIDI Inputs lists every connected controller
+</li>
+</ul>
+<h3>Settings, shortcuts and languages</h3>
+<ul>
+<li>Settings has a vertical section list, a Plugins section with scan controls and the scanned list, and a Terminal page
+</li>
+<li>The Shortcuts window lists every real key, one card per section
+</li>
+<li>Spanish, German, Chinese, Japanese and Russian are filled in for every interface string
+</li>
+</ul>
+<h3>Templates</h3>
+<ul>
+<li>The Templates window has a Starters tier (3 to 6 nodes, one idea each) and a Showcase tier, led by the Infinite v1 showcase
+</li>
+</ul>
+<h3>Learning</h3>
+<ul>
+<li>Local learning keeps takes with their outcomes, MIDI and patches on your machine. Settings has an off switch and Forget me. Nothing leaves your computer
+</li>
+</ul>
+<h3>Headless</h3>
+<ul>
+<li><code>--plugin-params</code> reports each parameter&#x27;s current value, <code>--plugin-state</code> returns a plugin&#x27;s saved state, and <code>--audio-summary --batch</code> measures many patches in one process
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Windows: VST3 plugin paths stay UTF-8, an exception during a scan no longer ends the app, and every scan is logged (issue #44)
+</li>
+<li>Sample Studio: the wave past the end marker no longer turns into a solid block
+</li>
+<li>Param bodies: status and hint lines wrap at the node&#x27;s width
+</li>
+<li>Particle System: a max particles value under 256 no longer leaves the system with no particles
+</li>
+<li>Electric piano: moving the pickup knob no longer clicks
+</li>
+<li>Chinese and Japanese text no longer shows missing glyphs
+</li>
+<li>Mod Matrix shows its empty helper; the non-working Use as 3D View world menu item is gone
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.6.6" data-era="v0.6">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.6.6-h"><a href="#v0.6.6">Infinite v0.6.6</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-10-24">24 October 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.6.6" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<p>v0.6.6 fixes Infinite not opening for some Windows users and takes a first step on Windows VST3 scanning, which is still an open issue. It also lets you reorder the Session grid by dragging.</p>
+<h3>Fixes</h3>
+<ul>
+<li>Windows: Infinite no longer fails to open when its saved sample or media list cannot be read. A bad entry in the cached index is skipped, and the folders are rescanned on request
+</li>
+<li>Windows VST3 scanning: a new &quot;VST3 scanning&quot; setting in the Plugins panel (Separate process or Within Infinite) for machines where the separate scanner cannot run; Infinite falls back on its own and says so
+</li>
+<li>Windows VST3 scanning: a plugin that crashes while it is being unloaded is no longer blocklisted, and one that dies during a batch scan gets a second try on its own before it is blocklisted. These are known causes, not the whole problem
+</li>
+</ul>
+<h3>Session view</h3>
+<ul>
+<li>Drag a scene or a track header to reorder it; the launch schedule follows the clips
+</li>
+<li>Delete Track in a track&#x27;s right-click menu
+</li>
+</ul>
+<h3>Settings</h3>
+<ul>
+<li>Settings &gt; General &amp; Performance shows which GPU Infinite is using. On Windows, &quot;Graphics processor&quot; lets you pick the integrated or the discrete GPU for computers that have both; it applies the next time Infinite starts
+</li>
+</ul>
+<h3>Updates</h3>
+<ul>
+<li>The Downloading dialog shows the Infinite mark drawing itself as the update arrives
+</li>
+</ul>
+<h3>Help wanted: Windows VST3 scanning</h3>
+<p>Some Windows machines still reject plugins that load fine elsewhere. If Infinite blocklists a plugin of yours, please open an issue at <a href="https://github.com/n1m21n/Infinite/issues" target="_blank" rel="noopener">https://github.com/n1m21n/Infinite/issues</a> with:</p>
+<ul>
+<li>the plugin name, vendor and version
+</li>
+<li>your Windows version
+</li>
+<li>the exit code from running the scanner on that one plugin: <code>infinite-vst3-scanner.exe --batch &quot;&lt;path to the .vst3&gt;&quot;</code>, then <code>$LASTEXITCODE</code> in PowerShell (a crash shows as a large negative or hexadecimal number)
+</li>
+</ul>
+<p>That tells us which plugins fail and where, so the fix targets real cases instead of guesses.</p>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.6.5" data-era="v0.6">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.6.5-h"><a href="#v0.6.5">Infinite v0.6.5</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-10-24">24 October 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.6.5" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<p>v0.6.5 adds a Session view for launching clips live, GPU points that scale to a million particles, new 3D outputs, and a long list of fixes that make bad files and bad values safe.</p>
+<h3>Session view</h3>
+<ul>
+<li>Session is its own panel (rail icon, Shift+S) with a Timeline-style toolbar, a monitor and a launch inspector
+</li>
+<li>A grid of clips and scenes: per-clip loop, loop length, launch quantize and launch mode; per-scene quantize and keep-tracks-playing
+</li>
+<li>Assign a canvas node to a slot, Add to Session from the canvas, Send Scene to Timeline, drag clips between cells, drop files from Finder onto cells
+</li>
+<li>Record takes, click to stop, follow scenes, Stop All on <code>.</code>
+</li>
+<li>The Timeline monitor plays only the Timeline&#x27;s own clips; the Session monitor shows only in Session mode
+</li>
+<li>Groups are blocks: every group gets a power button, and a group can be one section of a live Show Set with one GO, one quantize and one fade
+</li>
+</ul>
+<h3>GPU points</h3>
+<ul>
+<li>Image to Points, Mesh to Points, Transform, Twist, Displacement and Field Modifier work on points on the GPU; Instance on Points builds its copies in the vertex shader
+</li>
+<li>Particle System simulates on the GPU (up to 1M particles) with a new emit pin and parameters
+</li>
+<li>Point Trails: a ring of past positions per point, drawn as tapered, fading prisms
+</li>
+<li>Feedback 3D: a one-frame geometry delay with a loop pin; it reseeds when the transport rewinds, holds while paused, and recovers from non-finite geometry
+</li>
+<li>Model 3D reads .ply point clouds; Displacement gets a Noise source; Field Modifier gets point presets (Limit to Box, Project onto Shape) and a life attribute
+</li>
+<li>Opaque mesh draws use a program with discard compiled out, which is faster on tile GPUs
+</li>
+</ul>
+<h3>3D and visuals</h3>
+<ul>
+<li>Render 3D: 360 / dome output (Equirect 360, Cubemap 3x2, Fisheye dome)
+</li>
+<li>Render 3D: HDR finish with bloom, plus AgX and Neutral tonemaps
+</li>
+<li>Shadertoy is its own node: paste a shader from shadertoy.com and it runs (Formula stays an expression node)
+</li>
+<li>Five new themes (Infinite Midnight, Deep, Ember, Mist, Paper); Ember is the default
+</li>
+</ul>
+<h3>Sound and notes</h3>
+<ul>
+<li>VMPC: a 16-pad video player; the soundtrack decodes off the UI thread
+</li>
+<li>Drum Sequencer imports .mid patterns (drop a file or use the &quot;My grooves&quot; folder)
+</li>
+<li>Chorder: progression mode (pick the exact chords in the global key) and clearer knob names
+</li>
+<li>Quantized restart on Arpeggiator, Note Sequencer and MIDI File
+</li>
+<li>MIDI File: Global Scale snaps its notes to the project key
+</li>
+<li>Keyboard: <code>-</code> and <code>=</code> step the octave; Shift+letter no longer plays
+</li>
+<li>Analog FM: bounded depth keeps pitch centred
+</li>
+<li>Waveforms share one peak cache and trim widget, with play cursors
+</li>
+<li>Sample library: browse folders with a breadcrumb and drag a folder in as a kit
+</li>
+</ul>
+<h3>Files and safety</h3>
+<ul>
+<li>File &gt; Save with media copies every file a patch reads next to it, saved relative; saving again into the same folder works
+</li>
+<li>Help &gt; Collect diagnostics writes one zip of system info, logs, settings and recent crash reports, with your home folder redacted
+</li>
+<li>OSC and RPC edits respect the Show lock, including load and new patch
+</li>
+<li>Loading a patch clamps parameters to their ranges, drops out-of-range links and refuses malformed model, HAP, AIFF and glTF files; NaN and infinity never reach a parameter, and a kernel that outputs NaN is reset
+</li>
+<li>Windows: native ASIO driver support, pick an ASIO driver in Settings (falls back to WASAPI if none is installed)
+</li>
+<li>Windows: files with non-ASCII paths open and save; a plugin scanner that cannot run no longer blocklists your plugins; Video In close never hangs
+</li>
+<li>Fixes: Point Trails no longer reads back the whole GPU buffer each frame, GPU emit speed along normals, Render 3D 360 frees its cube targets when you go back to Perspective, Chorder and Drum import edge cases, and the Session progress ring follows loop length
+</li>
+<li>Translations: German, Spanish, Chinese, Japanese and Russian cover every UI string
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.6.0" data-era="v0.6">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.6.0-h"><a href="#v0.6.0">Infinite v0.6.0</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-10-17">17 October 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.6.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<p>v0.6 is a quality release: audio that measures right, a faster first run, a deeper set of synths and effects, and a larger 3D and compositing toolbox.</p>
+<h3>Sound: correctness first</h3>
+<ul>
+<li>Offline export (Output Record and Render, Timeline) drops the graph&#x27;s PDC latency, so a bounce lands on the same instants as live playback; Drive and Limiter bounces start on the dry click
+</li>
+<li>The master says when it clips: Audio Out shows <code>last take clipped, +x dB over</code>, and the Output node&#x27;s status line and Timeline renders name the worst peak
+</li>
+<li>Inserting an effect leaves loudness alone; Drive and Wavetable Shaper delay 5 samples instead of 73
+</li>
+<li>Drive uses 8x half-band oversampling with ADAA and an 8 Hz DC blocker at every rate; Bitcrush has true bit depth and a TPDF dither switch; Dynamics has a sidechain high-pass
+</li>
+<li>Analog is cleaner and in tune: narrow-band oscillators and a 4x drive and filter keep aliasing under -80 dB, and voice 0 is the tuning reference so default patches play in tune
+</li>
+<li>Fixes: Metallic mallet noise runs on a fixed 48 kHz clock; Bitcrush hold clock lands on the same instants at every rate; Audio Filter envelope depth glides over 20 ms; Field Synth default no longer aliases; EQ keeps ramped biquad denominators inside the stable range; resonant shelf and peak EQs match their targets more closely
+</li>
+<li>Audio analysis is read before modulation bindings, not after
+</li>
+<li>Timeline stretch is transient-aware
+</li>
+<li>Smoother modulation: parameters ramp linearly between stamped frame values, the frame clock is interpolated between audio callbacks, and a destination&#x27;s first value lands instead of ramping up from zero
+</li>
+</ul>
+<h3>Sound: new instruments and effects</h3>
+<ul>
+<li>Add FM (Synths): a 4-operator FM synth with 11 algorithms, ratio or fixed frequency, a level and envelope per operator and feedback on operator 4
+</li>
+<li>Add String (Synths): a plucked, bowed or struck waveguide string on a modal body, in tune to 1 cent
+</li>
+<li>Add Partials (Synths): play any sample as resynthesised partials with pitch, formant, partial count and morph
+</li>
+<li>Add Saturator (effect): three saturation stages (tube, tape, diode, fold, rectify, crush), each with its own amount, wired serial, parallel, mid-side, 3-band or feedback, with 8 presets
+</li>
+<li>Add a reverb whose room you design or load, and a shape you draw that plays over time
+</li>
+<li>Splitter splits into up to four Linkwitz-Riley bands that add back up flat
+</li>
+<li>Dynamics gets clean, bus, opto and FET styles (the analog switch is now called warm)
+</li>
+<li>Delay&#x27;s tape mode gets wow, flutter, saturation and diffusion, plus two presets (Worn Cassette, Tape Wash)
+</li>
+<li>Filters add ladder, MS-20 and diode models that sing at the cutoff
+</li>
+<li>Field gets phase shaping (bend, pinch, mirror, skew, formant), and Wavetable warps share those shapes
+</li>
+<li>Add 79 factory presets for the synths and core effects
+</li>
+<li>Analog runs four voices per SIMD lane (about a third of the CPU for chords) and Wavetable caches its per-sample math; the audio graph runs on every core with bit-identical results to one thread
+</li>
+</ul>
+<h3>Modulation per note</h3>
+<ul>
+<li>LFO, Random and MSEG get a &quot;per voice&quot; switch: cabled into an Analog or Wavetable knob, each note gets its own copy, started at its note-on
+</li>
+<li>Envelope gets hold, a curve per stage and a &quot;per voice&quot; switch
+</li>
+<li>Add Voice Spread: each note of a chord gets its own value by its place among the held keys
+</li>
+<li>Add Note Expression: with MIDI Notes in MPE mode, each voice follows its own finger&#x27;s pressure or slide
+</li>
+<li>One note output feeds up to 64 consumers (W_NOTE_FANOUT past that)
+</li>
+<li>LFO, Random, Smooth, Envelope and CV to Pitch use new maths; patches saved earlier keep the old behaviour
+</li>
+</ul>
+<h3>First run and live use</h3>
+<ul>
+<li>First sound in three steps, and a dropped sample plays in one
+</li>
+<li>The Timeline gets the keys DAWs and editors share; arrangement clips get per-clip speed and reverse
+</li>
+<li>Show set: step through patches live, switch on the bar, with audio tail and projector hold; bar-quantized pause and restart
+</li>
+<li>Show safety: a show lock, a latching panic, a pre-show check and a 4 s quit watchdog
+</li>
+<li>OSC control API: set, query and listen to any parameter; create, delete and connect nodes
+</li>
+<li>Plugins that crashed the app are isolated or left out next time; plugins with a sidechain input get a sidechain pin
+</li>
+<li>Patches and Field devices are saved beside the file and renamed over it, so a crash mid-save cannot damage the old copy
+</li>
+<li>Adding a node no longer recompiles an already-compiled shader, so adding nodes stops hitching
+</li>
+<li>Every community patch passes the strict validator
+</li>
+<li>Add Share Patch: one <code>.infshare</code> file with the cleaned patch, thumbnail, preview video and info
+</li>
+<li>Add a Library category for AI skills, with a Patch Authoring skill
+</li>
+</ul>
+<h3>3D and compositing</h3>
+<ul>
+<li>Add Optical Flow (Compositing): pyramidal Lucas-Kanade on the GPU, flow as an RG texture
+</li>
+<li>Add Time Machine (Compositing): per-pixel delay from a grey map over a 60-frame ring
+</li>
+<li>Add Fluid (Compositing): GPU stable fluids with multigrid pressure, vorticity, obstacles, a force input and a built-in stirrer
+</li>
+<li>Add Volume (Compositing): ray-marched fog, smoke and cloud over an image, using the Render 3D camera and depth, with its own camera when none is connected
+</li>
+<li>Add Rigid Bodies (3D): box, sphere and convex-hull colliders, ground, walls and a kick
+</li>
+<li>Add L-System (3D): axiom, rules, angle and generations to a tube mesh and a followable curve
+</li>
+<li>Add Sweep and Revolve (3D): a profile along a path, and a curve about an axis; both watertight with outward winding
+</li>
+<li>Add Proximity Lines (3D): neighbour links as a thin prism mesh, 2.9 ms at 100k points
+</li>
+<li>Render 3D gets ambient occlusion, depth of field, offline supersampling and 16-bit float output
+</li>
+<li>The particle system is about 30 times faster on every OS with the same results
+</li>
+<li>Long node bodies (Volume, Rigid Bodies, Particle System) fold their lower sections behind show more / show less; folded parameters keep their modulation
+</li>
+<li>Booleans stop at a polygon budget (refused over 250k polygons) instead of running for minutes
+</li>
+<li>Subdivide drops weld-degenerate triangles at sphere poles; Group 3D, Layer Stack fit, translucent instances and sample-folder fixes from the v0.5 Discord reports
+</li>
+</ul>
+<h3>Colour, images and filters</h3>
+<ul>
+<li>Overlay, Soft Light, Hard Light and Hard Mix follow the W3C formulas
+</li>
+<li>Curves is an exact straight line by default, drawn through a 1024-entry lookup; Lookup keeps exact ends and uses tetrahedral interpolation
+</li>
+<li>Saturation uses Rec.709 weights; ASC CDL is supported
+</li>
+<li>Gaussian and box blurs convert once to premultiplied linear light; Bloom&#x27;s bright pass runs once per pixel (Box blur GPU cost +77% to +20%, Bloom +26% to +16%)
+</li>
+</ul>
+<h3>Headless and tooling</h3>
+<ul>
+<li><code>--audio-summary --timeline</code> plays the arrangement&#x27;s audio lanes
+</li>
+<li><code>--validate</code>, <code>--explain</code> and the render modes report Field compile errors as <code>E_FIELD_COMPILE</code>, and validate compiles Formula and Equation formulas, expressions and globs
+</li>
+<li><code>W_PLUGIN_NOT_LOADED</code>, a plugins status block and <code>--plugin-params</code>
+</li>
+<li>Frame renders hold the clock at zero from the first tick, so history nodes such as Time Machine render the same every run
+</li>
+<li>Headless runs no longer read or write the learned prediction profiles, so a render does not depend on, or change, your Predictive Quantize / Velocity / Notes / Rhythm data
+</li>
+<li>Measurement audits for effects, synths, notes, modulators, geometry and compositing run in the hygiene driver and gate the release
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Fix Primitives (Sphere, Cylinder, Cone, Pyramid, Prism, Torus Knot, Helix, Supershape, Arrow) winding inward; flat normals no longer collapse to zero
+</li>
+<li>Fix history jumping forward piling nodes on the origin
+</li>
+<li>Fix a Smooth spring and other smoothing states after frame hitches; fix the Feedback header describing the wrong delay
+</li>
+<li>Light-theme text and hint text on text fields keep 4.5:1 contrast
+</li>
+<li>Delay, Envelope, FM and Mixer controls line up on one grid
+</li>
+</ul>
+<h3>Changes to existing patches</h3>
+<ul>
+<li>Blend modes Overlay, Soft Light, Hard Light and Hard Mix use the W3C maths for new nodes; saved patches keep the old modes
+</li>
+<li>Curves keeps the old spline in saved patches; new Curves nodes are an exact straight line
+</li>
+<li>Primitive meshes wind outward; saved patches keep the old winding
+</li>
+<li>Analog sounds different: aliasing is lower, the oscillator mix is AC-coupled, and default patches are in tune
+</li>
+<li>The LFO, Random, Smooth, Envelope and CV to Pitch maths changed for new nodes; saved patches keep the old maths
+</li>
+<li>Drive and Wavetable Shaper report 5 samples of latency, not 73
+</li>
+<li>Mixer channels is a plain stepper with no modulation pin
+</li>
+</ul>
+<h3>Known limits</h3>
+<ul>
+<li>Fluid, Instance, Cycle Shaper aliasing and Analog FM are measured misses we accepted for this release
+</li>
+<li>Three saturation stages in series alias at -46 dB
+</li>
+<li>The Plugin editor GL context guard (R282) is in but not yet verified on Windows
+</li>
+<li>Headless renders of a patch with Field Notes and any modulation cable can differ slightly between runs (about 0.1 dB in loudness in the case we measured); Field Notes alone is repeatable
+</li>
+<li>Hardware controller testing for MPE is still a follow-up; the tests use injected MIDI bytes
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.5.0" data-era="v0.5">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.5.0-h"><a href="#v0.5.0">Infinite v0.5.0</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-10-10">10 October 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.5.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<h3>Interface</h3>
+<ul>
+<li>Every node body follows one layout: parameter names sit inside the control, sliders and button rows span the full body width, values carry their units (Hz, ms, dB), and each node has one status line in the same style
+</li>
+<li>Empty nodes say what they need: Image, Video, Video In, Syphon, NDI, Slideshow and sequencers show a centred hint or caption instead of a blank preview
+</li>
+<li>Camera, light and particle previews draw a gizmo; scopes, curve editors, colour ramp handles and delay echoes stay inside their frames
+</li>
+<li>Analyse nodes (Hand Track, Image Analyze, Audio Analyze, Geometry Table) show slider-style output meters with live values in the body
+</li>
+<li>Axis controls are a segmented X/Y/Z switch; short choices select with one click
+</li>
+<li>Dropdowns, the modulation menu and every popup stay the same size on screen at any canvas zoom, with a capped width and shorter rows
+</li>
+<li>Zoomed far out, nodes collapse their parameters to keep the canvas readable; pins and bindings stay where they are
+</li>
+<li>A compact top bar: File, Edit and Menu share one compact group, the logo opens About, transport and Start Audio sit either side of BPM, and an available update shows as an icon. Settings moves to a gear on the right rail
+</li>
+<li>The cable delete button sits at the middle of the cable, scales with zoom, is undoable, and has a short grace period so it does not vanish as you reach for it
+</li>
+<li>Settings, the Field and Formula editors, and the Sketch editors share one window style; dialogs are tighter
+</li>
+<li>Colour swatches look the same everywhere (Settings, the theme preset strip, markers)
+</li>
+<li>Light theme contrast fixes, one tooltip delay and width, and a Reduce motion setting
+</li>
+<li>Add an Undo History panel (Shift+U) with labelled steps and click to jump
+</li>
+<li>Add Cmd/Ctrl+F find over the canvas (title, type, comment text, parameter names), with matches ringed on the canvas and minimap
+</li>
+<li>Add 15 starter templates under File &gt; New from template
+</li>
+<li>Copy and paste nodes between patches as text, in one undo step
+</li>
+<li>Errors and warnings show on the node with a relink action; patch load and save, audio device and autosave problems use one notice style; Help gains Copy system info and Reveal logs
+</li>
+<li>Add a Cook times overlay (Menu &gt; Cook times, off by default) and a Settings switch for the launch update check; the canvas grid is now off by default
+</li>
+<li>Add a two-step first-run text and an About build line with links
+</li>
+<li>The macOS DMG has a background image and a laid-out Finder window
+</li>
+</ul>
+<h3>New nodes and improvements</h3>
+<ul>
+<li>Add Sketch (Sources): write a JavaScript <code>draw(t)</code> that paints a canvas, with 17 presets, an editor window and SVG import (drop or paste an SVG; <code>svgDraw</code>, <code>svgSet</code>, <code>svgText</code>, <code>svgBox</code>)
+</li>
+<li>Add Sketch 3D (3D): a JavaScript script builds a mesh (box, sphere, cylinder, cone, torus, plane, tube, <code>beginShape</code>) with 6 presets
+</li>
+<li>Add Field Notes (Notes): a note node whose body is a Field script, with a note-out pin and presets
+</li>
+<li>Add MIDI Out (Utility): send notes and CC to a hardware or virtual port on macOS, Windows and Linux, with a Panic button; hanging notes are released on delete, stop and device change
+</li>
+<li>Add Spatial Mixer (Utility): a binaural 3D mixer for headphones. Each input has azimuth, elevation, distance and width, with a measured HRTF, room, bass mono, limiter and LUFS meter, and 24-bit export; head tracking through supported headphones on macOS
+</li>
+<li>Add Hand Track, Face Track and Pose Track: camera or image to modulators (landmarks, gestures), with a live landmark overlay and mirror, smoothing and hold. They need the Tracking pack from Settings &gt; Extensions
+</li>
+<li>Add Delaunay Mesh and Voronoi Cells (3D), Curve Ops (resample, simplify, smooth, offset) and a quadric Decimate op
+</li>
+<li>Add Dither (Compositing): Bayer 2/4/8 and noise patterns with levels and mix
+</li>
+<li>Add gradient Perlin and Simplex (single and fBm) to Noise
+</li>
+<li>Color Ramp interpolates in Oklab and OKLCh; Palette swatches are gamut-mapped by chroma reduction
+</li>
+<li>Smooth has Per frame, Time and Spring modes; new nodes default to Per frame
+</li>
+<li>Add Game of Life and Smooth Life to the Field Pixel presets
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Fix Sketch scripts crashing the app when drawing at top level, and block SVGs from reading local files
+</li>
+<li>Fix a Smooth spring turning permanently NaN after a frame hitch
+</li>
+<li>Fix Spatial Mixer losing cables on load when a patch was saved with an empty input slot
+</li>
+<li>Fix quitting during an extension download hanging, and tracking nodes keeping a stale pose after the input is unplugged
+</li>
+<li>Fix Linux MIDI Out leaving notes held when a node is closed, and Windows loading the tracking runtime from a non-ASCII path
+</li>
+<li>Fix Reduce motion and Cook times not being remembered between launches
+</li>
+</ul>
+<h3>Changes to know about</h3>
+<ul>
+<li>Palette colours that fall outside the display range are now reduced in chroma instead of clipped, so some palettes look slightly different
+</li>
+<li><code>beat</code> and <code>noteNum</code> are now reserved names in Field programs; a program that used either as its own variable name must rename it
+</li>
+<li>Ocean and Audio Ribbon orientation changed; re-check patches that use them
+</li>
+<li>Spatial Mixer head tracking works on macOS only
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.4.7" data-era="v0.4">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.4.7-h"><a href="#v0.4.7">Infinite v0.4.7</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-10-07">7 October 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.7" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add NDI In and NDI Out (Utility) to send and receive video over the network; the NDI runtime is not bundled and the node says so when it is missing. NDI® is a registered trademark of Vizrt NDI AB.
+</li>
+<li>Add MIDI File (Synths): plays a <code>.mid</code> on the transport with transpose, loop, speed and a piano-roll preview
+</li>
+<li>Add MPE input to MIDI Notes, plus Note Pressure and Note Slide controllers; pitch bend and channel aftertouch are now MIDI-learnable
+</li>
+<li>Add Key-Snap (Effects): polyphonic scale snap with glide
+</li>
+<li>Add Spectrum Slide (Effects): a two-input spectral morph
+</li>
+<li>Add Shape Resonator (Synths): rings the vibration modes of a geometry input
+</li>
+<li>Drum Sequencer: 32 steps, a 141-groove library with A/B/C slots, per-lane accent pitch and a bundled kit (groove table from Ricardo Palmieri&#x27;s fork, PR #24)
+</li>
+<li>Looper: the loop saves with the patch, REC snaps to the grid, and Undo steps back one layer at a time
+</li>
+<li>Group 3D carries more than four objects into Render 3D; Material gains a texture-alpha switch; Shape outputs straight alpha
+</li>
+<li>Output window has a transparent framebuffer, so node alpha shows with no checkerboard (#26)
+</li>
+<li>Add full keyboard-only navigation of the canvas and node parameters
+</li>
+<li>Add a Language setting (beta): English, Español, Deutsch, 中文, 日本語, Русский; node and parameter names stay in English
+</li>
+<li>Add an interface font choice (Inter or Atkinson Hyperlegible), 4.5:1 text contrast in every theme, and Cmd/Ctrl +/- interface scaling
+</li>
+<li>Dropdowns over 12 items get a search box, and node search treats hyphen and underscore as a space
+</li>
+<li>Fix File &gt; New leaving the old sound playing, and a start-up race on the audio thread
+</li>
+<li>Fix plugin-node races and two stack-lifetime bugs in Molder and Audio Plugin
+</li>
+<li>Fix Windows timeline render (<code>.mov</code>, Desktop folder, non-ASCII paths) and Windows/Linux resource paths; the Windows package now ships <code>Resources/</code>
+</li>
+<li>Add <code>--frame --repeat N</code> for headless multi-pass renders; CI gains ASan/UBSan and clang-tidy jobs
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.4.6" data-era="v0.4">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.4.6-h"><a href="#v0.4.6">Infinite v0.4.6</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-10-01">1 October 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.6" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add a headless engine: <code>--render</code> writes a movie, <code>--frame</code> writes stills, with status JSON and exit codes for scripts (Windows and Linux too; Linux needs <code>xvfb-run</code>)
+</li>
+<li>Add <code>--frames-dir</code>, <code>--node</code> and <code>--codec prores4444</code> (macOS) for frame sequences, tapping any node, and alpha movies
+</li>
+<li>Add <code>--audio-summary</code>, <code>--stems</code>, <code>--notes</code> and <code>--note-map</code> for measuring and driving a patch&#x27;s audio
+</li>
+<li>Add <code>--contact-sheet</code>, <code>--explain</code>, <code>--describe</code> and a strict <code>--validate</code> to inspect a patch before rendering
+</li>
+<li>Add <code>--set &lt;node&gt;.&lt;param&gt;=&lt;value&gt;</code> for per-shot parameter overrides
+</li>
+<li>Running app: live reload when the patch file changes, live validator warnings on nodes, an RPC, and <code>infinite open &lt;patch&gt;</code> on Windows and Linux
+</li>
+<li>Add a patch-authoring skill and a Headless User Guide (PDF)
+</li>
+<li>Add Looper (Synths): record a self-ending take, then loop, dub and clear, with latency compensation
+</li>
+<li>Add MPC (Synths): a 16-pad sample player on notes 36 to 51 with One shot, Gate and Loop modes
+</li>
+<li>Add Sampler fade in/out, MIDI learn on any parameter (right-click), a Metronome click in the top bar, an audio round-trip latency readout, and Windows low-latency output
+</li>
+<li>Fit gains X/Y offset; video loop wrap works when the duration is unknown; Macro Trigger fires Looper buttons and MPC pads
+</li>
+<li>Fix interface scaling on high-DPI monitors (Windows and Linux); UI Scale no longer needs a restart
+</li>
+<li>Fix Render 3D translucency, Join colour handling, and several geometry nodes dropping curves or point size
+</li>
+<li>Fix the device mix counting a signal twice when it goes to both Audio Out and an Output
+</li>
+<li>Fix saving in the Linux AppImage (#25), the macOS recorder finishing late, and patch files with a BOM or Windows line endings
+</li>
+<li>Website v2, refreshed Node Reference Manual, and a Field Language &quot;What&#x27;s new since v1&quot; addendum
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.4.5" data-era="v0.4">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.4.5-h"><a href="#v0.4.5">Infinite v0.4.5</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-26">26 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.5" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add an Audio Meter node (Utility): stereo L/R bars on a shared -60 to +3 dBFS scale with RMS inside peak, a peak-hold line, and a per-channel max-peak readout that turns red at 0 dBFS. Audio passes through unchanged, so it can hang off any cable as a tap; click to clear holds and clip. Bars drop to zero within 100 ms of the audio stopping.
+</li>
+<li>Fix VST3 plugins with sidechain inputs or aux outputs (most compressors, Kontakt) rendering from their left channel only: every bus is now negotiated, main buses get stereo, and the note input bus is activated so strict plugins receive notes. macOS, Windows and Linux.
+</li>
+<li>Fix VST3 scanning silently dropping every plugin after a slow one: the scan timeout is now per plugin instead of one deadline for the whole batch, and a crash or hang is blamed on the plugin that caused it rather than the next one in the list. macOS, Windows and Linux.
+</li>
+<li>Fix Shift-drag gesture loops stepping only every 30 frames when their node is off screen (including renders and recordings taken while zoomed in), and freezing on a node with its eye closed. Performance-panel writes to off-screen or collapsed extra targets are no longer lost.
+</li>
+<li>Fix the Windows build failing to link (DXGI), which could leave a release without Windows binaries.
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.4.4" data-era="v0.4">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.4.4-h"><a href="#v0.4.4">Infinite v0.4.4</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-25">25 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.4" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add Predictive Quantize (Prediction): a groove quantizer that learns your timing as you play
+</li>
+<li>Add Predictive Velocity (Prediction): remaps notes onto your own loud/soft shape
+</li>
+<li>Add Predictive Rhythm (Prediction): learns a repeating pattern anchored on a root note
+</li>
+<li>Add Predictive Coloring (Prediction): grades incoming frames toward looks you have taught it
+</li>
+<li>Predictive nodes show a confidence badge; duplicating a Learn-based node now starts the copy fresh
+</li>
+<li>Drift (Predictive LFO) gains <code>depth</code>; Moves / Predictive Macro keep their history across restarts
+</li>
+<li>Dropping an audio file on empty canvas asks which node to load it into
+</li>
+<li>Right-click a modulated knob &gt; View in Modulation Matrix; the xrun indicator now counts real dropouts
+</li>
+<li>Projectors hold a steady 60 fps during a live set (missed frames 12% to 0%)
+</li>
+<li>The canvas holds 60 fps while panning big patches (frame time down 79-89% on 300-400 node patches)
+</li>
+<li>Lower audio CPU on heavy patches: faster Reverb, worst case 53-61% down to 40-45%
+</li>
+<li>Faster video playback on macOS (four 4K clips in real time), two-pass blurs and glow (about 4x less GPU time), and a roughly 6x cheaper Ocean
+</li>
+<li>Fix stuck notes when rewiring note cables during playback, and a Drum Sequencer crash when swapping a lane&#x27;s sample
+</li>
+<li>Fix MIDI bindings lost on relaunch (macOS) and a silent start when the saved output device is gone
+</li>
+<li>Modulation no longer creates undo entries or marks the patch dirty
+</li>
+<li>Exported movies get exact frames from video clips (0 dropped frames, sub-millisecond drift)
+</li>
+<li>Fix an HDRI background seam; Windows Syphon/Spout Out no longer claims a receiver is connected; remove the quantise option from Note Capturer
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.4.3" data-era="v0.4">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.4.3-h"><a href="#v0.4.3">Infinite v0.4.3</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-21">21 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.3" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add auto-instance numbering (e.g. &quot;#2&quot;) to the Modulation Matrix and canvas node headers when multiple nodes share the same title
+</li>
+<li>Remove the comb band types from the EQ node
+</li>
+<li>Give the Comb filter node&#x27;s resonance a mapping that produces an actually audible comb
+</li>
+<li>Fix the cutoff knob being greyed out on the comb filter types
+</li>
+<li>Add a loop crossfade to the Sampler so the loop wrap seam stops clicking
+</li>
+<li>Calibrate the Metallic strike to its measured peak so level stops depending on pitch, material and decay
+</li>
+<li>Normalise the Metallic modal bank so a strike peaks at its velocity
+</li>
+<li>Analog: make spread a real stereo width and detune an honest total width
+</li>
+<li>Fix the Analog sub oscillator emitting DC instead of a sub-octave tone
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.4.25" data-era="v0.4">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.4.25-h"><a href="#v0.4.25">Infinite v0.4.25</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-20">20 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.25" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<h3>Features</h3>
+<ul>
+<li><strong>CV Recorder</strong> (Modulators): patch in any modulator, hit <strong>Rec</strong>, then hit it again to stop — the take loops back automatically. <code>speed</code> sets the playback rate (changes glide smoothly), <code>low</code>/<code>high</code> set the output range, and takes are timed in beats and saved with the patch.
+</li>
+<li><strong>Velocity to CV</strong> (Modulators): turns note velocity into a 0..1 modulator, with an adjustable velocity range (<code>low</code>/<code>high</code>).
+</li>
+<li><strong>Note nodes no longer need Start Audio.</strong> Random Note, the sequencers, Note to CV and Velocity to CV keep running and driving modulation with the audio engine off (synths still need it to make sound), and they no longer need an Audio Out in the patch.
+</li>
+<li><strong>Note to CV, Velocity to CV and CV Recorder look and edit like the other modulators</strong>, with the yellow live graph and a parameter panel.
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Fixed <strong>Predictive Modulator</strong> bindings showing amber like a regular modulator; they now read green like the rest of the Prediction category (knob, cable, Modulation Matrix and preview).
+</li>
+<li><strong>Predictive LFO and Predictive Macro can only drive parameters</strong> — cabling them into another node is refused everywhere, and the refused drop now says why.
+</li>
+<li>Modulator value meters use a fixed 0..1 axis, so a flat or slow signal no longer looks like it is jumping around.
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.4.2" data-era="v0.4">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.4.2-h"><a href="#v0.4.2">Infinite v0.4.2</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-20">20 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.2" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add a Prediction category that learns how you move: Predictive LFO, Predictive Modulator, Predictive Notes and Predictive Macro; Shift-grab takes a control back instantly
+</li>
+<li>Add per-clip modulation bypass on the timeline, and Make Unique for clips that share a source
+</li>
+<li>Modulation Matrix shows category dots and live sparklines
+</li>
+<li>Add CV Recorder and Velocity to CV (Modulators); note nodes no longer need Start Audio
+</li>
+<li>Analog synth gets a tuning header matching Oscillator and Wavetable, and a Comb filter type
+</li>
+<li>Better Random Note and Chorder algorithms; Chorder&#x27;s rate uses the standard musical divisions
+</li>
+<li>Fix Transform and other geometry operators dropping point clouds and curves
+</li>
+<li>Fix timeline clip trim leaving the source offset out of sync, and clip inspector fields not typing in their own units
+</li>
+<li>Fix 3D text glyph holes self-intersecting and Spout receive showing black on GPUs without interop
+</li>
+<li>Fix MIDI CC from 14-bit controllers (e.g. Pioneer DDJ-FLX4) jumping erratically
+</li>
+<li>Fix double-click-to-type on sliders and knobs snapping to a rounded value or stealing keystrokes
+</li>
+<li>Fix Video In crashing on Windows at a fixed resolution, and a Linux build error that broke the AppImage
+</li>
+<li>Predictive Modulator bindings now read green; Predictive LFO and Macro can only drive parameters, and a refused cable says why
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.4.1" data-era="v0.4">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.4.1-h"><a href="#v0.4.1">Infinite v0.4.1</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-18">18 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.1" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<h3>Features</h3>
+<ul>
+<li><strong>Analog synth</strong> — a new virtual-analog polyphonic synth node with per-oscillator tune (fine/semi/octave), FM depth, more waveforms, and multiple filter modes including a new ZDF ladder filter. Pulse width now shapes every waveform, and the filter visualizer is replaced by an interactive ADSR curve panel.
+</li>
+<li><strong>New timeline tools</strong> — a tool selector for Select, Trim, Range Selection, Blade, Zoom, Hand, and Pencil, each with its own shortcut, tooltip, and icon.
+</li>
+<li><strong>Curve shaping for modulation</strong> — drag to shape the response of any wired modulator, expression, or gesture recording, with presets and full undo/save support.
+</li>
+<li><strong>Depth Projection node</strong> — unprojects a depth map into a point cloud or mesh (perspective, planar, radial, or cylindrical).
+</li>
+<li><strong>Render 3D multi-pass output</strong> — color, depth, normals, and position passes.
+</li>
+<li><strong>Reverb rebuilt for hall-scale lushness</strong> — 16 delay lines (was 8), wider delay times, 4-stage stereo diffusion, and always-on delay modulation.
+</li>
+<li><strong>Phaser resonant feedback</strong> and a Flanger whose feedback now darkens naturally.
+</li>
+<li>Three new Field Pixel presets: spiral illusion, bouncing boxes, and organic liquid.
+</li>
+<li>Viewport panel layout now persists between sessions.
+</li>
+<li>Website: simpler download button, fixed specs-grid symmetry, and nav icons for GitHub, Discord, and YouTube.
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Bypass overhaul: nodes with 2+ inputs can no longer be bypassed (synths are the exception — bypass means silence), and stale bypass state is fixed on Curve, Audio Ribbon, Field Primitive, Range to Range, Smoothing, Mod Depth, Envelope, Arpeggiator, Field Effect, and Image to Points.
+</li>
+<li>Fixed clip color tint rendering dimmer than the picked swatch.
+</li>
+<li>Fixed top-dock shortcuts and context menus not routing focus correctly.
+</li>
+<li>Fixed gesture recording capturing no motion when shift-dragging while the transport is paused.
+</li>
+<li>Fixed FM depth&#x27;s range exceeding what the knob could reach.
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.4.0" data-era="v0.4">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.4.0-h"><a href="#v0.4.0">Infinite v0.4.0</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-16">16 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<h3>Features</h3>
+<ul>
+<li><strong>Arrangement Timeline is now a complete editor.</strong> Lay out and edit clips on a real timeline synced to your project&#x27;s tempo: split clips with the blade tool, group and collapse tracks, multi-select and drag groups of clips at once, snap to a grid, add markers, and loop or seek by beat.
+</li>
+<li><strong>Live waveforms and video thumbnails</strong> on the timeline, updating as you scrub instead of showing a stale cached preview.
+</li>
+<li><strong>A render/export queue</strong> — pick an exact range to render, queue up multiple exports, and keep working while they run in the background without interrupting playback.
+</li>
+<li><strong>Drag and drop media straight onto the timeline</strong> to add it.
+</li>
+<li><strong>Better time-stretching for samples</strong>, fixing pitch artifacts and drift between what you see in the waveform and what actually plays back.
+</li>
+<li><strong>Smarter sample BPM handling</strong> — BPM is auto-detected and remembered per clip, and clip length stays consistent whether or not &quot;Sync to Tempo&quot; is on.
+</li>
+<li>Clip opacity, fades, pitch-sync, and pan; the mix strip (Solo/Mute/Pan/Gain/Opacity) is back on the track header.
+</li>
+<li><strong>Infinite is now available on Linux</strong> as a real, downloadable app for the first time — see &quot;Linux&quot; below.
+</li>
+<li>Shift-drag Q on the EQ curve for finer control.
+</li>
+<li>&quot;Install AI Skill&quot; buttons in Settings for Field Language and Expression Globals, to hand to any AI coding assistant.
+</li>
+<li>A new Keyboard node for notes.
+</li>
+<li>UV wrap mode (clamp/repeat/mirror) on Material.
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Fixed clips retriggering unexpectedly, and text fields losing focus unexpectedly while typing in the arrangement view.
+</li>
+<li>Fixed drag-and-drop from Finder landing in the wrong place instead of the timeline.
+</li>
+<li>Fixed stuttering while scrubbing the timeline, sample/track playback glitches, and color issues in exported video.
+</li>
+<li>Fixed a crash generating certain meshes with Metaballs on Intel Macs.
+</li>
+<li>Fixed a crash opening the search panel.
+</li>
+<li>Fixed Windows display scaling issues and added a manual UI Scale override for when it still looks off.
+</li>
+<li>Fixed the VST3 plugin scanner incorrectly hiding valid plugins on macOS.
+</li>
+<li>Fixed a crash when removing a VST3 plugin search folder.
+</li>
+<li>Fixed modulated integer sliders sometimes overwriting your recorded automation.
+</li>
+<li>Fixed issues with Note Stack&#x27;s semitone offsets and the Wavetable Shaper&#x27;s table dropdown.
+</li>
+<li>Cleaned up the right-click menu on performance-matrix controls to remove options that didn&#x27;t apply there.
+</li>
+</ul>
+<h3>Linux</h3>
+<p><strong>Infinite ships on Linux for the first time</strong>, as a single downloadable file (<code>Infinite-x86_64.AppImage</code>) — no installer, no extra packages to install first.</p>
+<p>It&#x27;s been tested on Ubuntu 22.04, Ubuntu 24.04, Debian 12, Fedora, and Arch Linux, covering plugin hosting (VST3, with plugin windows), audio and MIDI, video and camera, and background removal.</p>
+<p><strong>Please note:</strong> this is an early-access build. It&#x27;s been thoroughly tested in automated environments, but hasn&#x27;t yet been through a round of real-world use on real hardware — different GPUs, audio interfaces, MIDI controllers, and desktop setups. A native Wayland desktop session hasn&#x27;t been verified yet either (X11 is). If you run into issues, please report them on <a href="https://github.com/n1m21n/Infinite/issues/14" target="_blank" rel="noopener">GitHub issue #14</a> — that feedback is exactly what this release needs.</p>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.3.5" data-era="v0.3">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.3.5-h"><a href="#v0.3.5">Infinite v0.3.5</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-10">10 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.5" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Fix the node preview thumbnail losing its checkerboard backdrop for transparent content
+</li>
+<li>Turn &#x27;Set Alpha&#x27; into a two-input tool that masks alpha using a second input&#x27;s grayscale value
+</li>
+<li>Scope the node-editor preset search box to Field-node and Wavetable presets, so it no longer surfaces unrelated presets
+</li>
+<li>Fix search popup rows (Suggested vs. typed-query) rendering inconsistently; widen the popup window
+</li>
+<li>Fix Join Geometry silently discarding per-input vertex colour by default; colour is now always preserved on merge
+</li>
+<li>Rename the &#x27;Set Color&#x27; node to &#x27;Set Vertex Color&#x27; to avoid confusion with the Material node&#x27;s albedo colour
+</li>
+<li>Fix Instance/Distribute/Particle-style point-cloud producers fabricating a fake mesh just to satisfy mesh consumers, which was the root cause of the Join Geometry colour bug
+</li>
+<li>Fix Null3D, Material, Mapping, and Cloth silently dropping a point cloud or curve riding alongside a mesh on the same cable
+</li>
+<li>Fix Particle nodes not reporting that they carry vertex colour
+</li>
+<li>Fix stale material/mapping caches on Join Geometry and Mesh to Points when only an upstream material or mapping changed
+</li>
+<li>Add a cook-time warning when a node receives geometry of the wrong kind (e.g. a mesh consumer fed a curve)
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.3.4" data-era="v0.3">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.3.4-h"><a href="#v0.3.4">Infinite v0.3.4</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-09">9 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.4" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Surface skipped VST2 plugins in the plugin scan results
+</li>
+<li>Add Explode by Loose Parts (connected components) to the 3D Explode operator
+</li>
+<li>Add Anti-Erase blend mode as the exact complement of Erase
+</li>
+<li>Add Blender-style numpad view hotkeys (1/3/7/0, Ctrl+1/3/7) to the viewport
+</li>
+<li>Add a pivot point option to the Transform geometry operator
+</li>
+<li>Add alpha/opacity operator modules to the Compositing category
+</li>
+<li>Fix Instance on Points dropping mesh point colours
+</li>
+<li>Fix Join Geometry&#x27;s vertex-colour merge losing per-input colour
+</li>
+<li>Fix blend compositing to weight the result by backdrop alpha and correct output-alpha compositing
+</li>
+<li>Fix Smooth Normals to weld duplicate vertices before accumulating normals
+</li>
+<li>Fix Recalculate Normals&#x27; flip option not actually reversing winding order
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.3.3" data-era="v0.3">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.3.3-h"><a href="#v0.3.3">Infinite v0.3.3</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-08">8 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.3" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Rework Field&#x27;s noise generator and fix its downstream synth gain staging; rebuild Piano, Bell, and foliage presets on the corrected noise
+</li>
+<li>Fix diamond/quartz facet math, foliage shape, and ship detail in Field geometry presets
+</li>
+<li>Add 12 new Field presets across Element (Modifiers) and Effect (audio) domains
+</li>
+<li>Stop Field&#x27;s constant folder from mistaking vector literals for scalars
+</li>
+<li>Wire Field Pixel&#x27;s declared image inputs to a real texture
+</li>
+<li>Add a Field mode to the search panel and expand the preset library across all categories
+</li>
+<li>Comment node: hover-to-edit text, corner-drag resizing (without grid-snap jitter), and a font-size menu
+</li>
+<li>Add menu-triggered gesture recording and expression range remapping for param widgets
+</li>
+<li>Add favorite/star, sorting, filtering, and right-click context menus across all four browser panel modes
+</li>
+<li>Fix Macro XY default pad display and Macro Slider/Bipolar expressions and recording
+</li>
+<li>Fix video export stalling when an audio input cable is connected on macOS
+</li>
+<li>Fix Video In opening the wrong camera, or none, when no device is chosen
+</li>
+<li>Bundle the Inter UI font and Lucide icon font app-wide, fixing a Windows font gap
+</li>
+<li>Sweep of node UI polish: headers, display recesses, footers, faders, list rows, and toolbar/tab layout across all node categories
+</li>
+<li>Unify panel, dialog, and dock styling — consistent borders, corner rounding, seams, and accent emphasis across floating and docked windows
+</li>
+<li>Fix AudioSliderFloat contrast and theming across modulated, expression-bound, and recording states
+</li>
+<li>Fix light-mode contrast regressions, a stale category dropdown, and Nord theme&#x27;s low-contrast dim text
+</li>
+<li>Fix Performance Matrix edit mode (NumBox double box, Bipolar knob drag, Toggle size, light-mode black boxes) and card overflow/tooltip on element labels
+</li>
+<li>Fix a crash on click in the Item Picker; hide debug-only UI tools from Release builds
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.3.2" data-era="v0.3">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.3.2-h"><a href="#v0.3.2">Infinite v0.3.2</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-06">6 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.2" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<h3>Features</h3>
+<ul>
+<li><strong>Shift-drag gesture recording</strong> for Macro Knob and Slider nodes: hold Shift while dragging a knob/slider to record the motion as a playable modulation pattern, with checkpoint-style recording and a static value to deactivate playback; the knob turns red while recording or replaying, and the recording now survives undo/redo, duplicate, and copy/paste
+</li>
+<li>Audio Filter: response-curve visualizer now shows a live spectrum analyzer alongside the curve
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Audio EQ: each of the five bands now has its own independent freq/Q/gain and filter-type binding — previously all bands shared one param slot, so a gesture recording or modulator bound to one band would silently follow whichever band was selected instead
+</li>
+<li>Fixed a scale-quantization bug where a note could leak out of the selected key after clamping
+</li>
+<li>Audio Filter: caching GL uniform locations instead of re-querying them every cook cut a 400-node filter chain from ~70ms to ~41ms per frame (~40% faster)
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.3.1" data-era="v0.3">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.3.1-h"><a href="#v0.3.1">Infinite v0.3.1</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-05">5 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.1" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<h3>Features</h3>
+<ul>
+<li>Curated preset library across all four Field nodes: <strong>Field Pixel</strong> gets Eye, Sunset/Landscape, Cat, Robot, Nebula/Galaxy, Liquid Marble, Quasicrystal Kaleidoscope, and Voronoi Cells; <strong>Field Primitive</strong> gets five nature scenes (Pine Tree, Mushroom, Flower, Pinecone, Rocket); <strong>Field Synth</strong> gets Analog 808 Bass Drum, West Coast Wavefolder, and Modal Percussion; <strong>Field Sample</strong> gets Warm Tape Echo, Optical Tremolo &amp; Drive, and Stutter Freeze Looper; <strong>Field Modifier</strong> gets Vortex Swirl &amp; Strain Glow and Organic Breathing Harmonic
+</li>
+<li>Field language: note history (<code>noteOn</code>/<code>notePitch</code>/<code>noteVel</code>) now readable from every domain, not just sample — element/pixel/graph kernels can read the most recent note event
+</li>
+<li>Field language: declared audio inputs (<code>input sample audio &lt;name&gt;</code>) — Field Sample and Field Synth kernels can request extra real audio input pins beyond the built-in <code>in</code>
+</li>
+<li>Field language: state tables
+</li>
+<li>Field language: element neighbour reads — <code>X.at(k)</code> reads another element&#x27;s position/normal/color/attribute/state, enabling mesh-relative effects
+</li>
+<li>Field language: offset reads of pixel state cells — <code>A(uv + d)</code> reads a neighboring pixel&#x27;s simulation state, enabling reaction-diffusion, advection, and flow effects written directly in Field text
+</li>
+<li>Device files (save/export) now use the <code>.field</code> extension
+</li>
+<li>New midnight blue app icon; Settings gained a Field Language &amp; Expression Globals section
+</li>
+<li>Wave Terrain node: viewport now shows the baked wavetable stack instead of the old texture/orbit overlay
+</li>
+<li>Dynamics node: transfer-curve visualizer now shows live compressor feedback
+</li>
+<li>New Slideshow source node
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Field Modifier (element domain): <code>reduce.&lt;op&gt;(x)</code> over a plain local read no longer returns 0
+</li>
+<li>FieldSynthNode: fixed a shared delay-buffer bug affecting multiple simultaneous polyphonic voices
+</li>
+<li>Dynamics node: removed a stray threshold text label overlapping the transfer curve
+</li>
+<li>Fixed broken Field Language example patches and a canvas/dialog drag-focus bug
+</li>
+<li>Top bar alignment fix
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.3.0" data-era="v0.3">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.3.0-h"><a href="#v0.3.0">Infinite v0.3.0</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-04">4 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<h3>Features</h3>
+<ul>
+<li><strong>Slicer node</strong> — new sample-chopping synth with onset detection and grid-slice modes, crossthrough and per-slice attack controls
+</li>
+<li><strong>Field language: dynamic pins</strong> across all four node types (fixed per-type menus, declaration syntax, compiler IR, node/UI/save-format wiring, FieldGraphNode support)
+</li>
+<li><strong>Field language: graph domain</strong> — declarative graph reconciliation via FieldGraphNode
+</li>
+<li><strong>Field language: sample domain</strong> — register-machine kernel, per-sample per-voice
+</li>
+<li><strong>Field language: pixel, element, and vector support</strong>, params, and state cells
+</li>
+<li><strong>FieldGraphNode encapsulation</strong> (&quot;Instrument Mode&quot;) plus &quot;Unpack to Canvas&quot;
+</li>
+<li><strong>FieldSynthNode and FieldPrimitiveNode</strong>, with a device catalog of presets across sample/element/pixel/graph domains
+</li>
+<li><strong>.infdev portable device file format</strong> (save/load/export/import)
+</li>
+<li>Device faceplate polish for Field node bodies, with loaded-preset name shown on the device button
+</li>
+<li>Audio In: input channel/device selection, with device names and category headers in the dropdown
+</li>
+<li>TouchDesigner-style glTF/GLB drag-and-drop model import
+</li>
+<li>Transform node: Crop X/Y, rotation shown in degrees
+</li>
+<li>Video node: modulatable start/end trim positions
+</li>
+<li>Standardized rhythmic divisions/quantization (4 bars to 1/32) across all nodes
+</li>
+<li>Top bar transport polish: draggable BPM, double-click text entry, symmetrical spacing
+</li>
+</ul>
+<h3>Fixes</h3>
+<ul>
+<li>Field presets: eliminated NaN/inf events across synth and effect presets
+</li>
+<li>Field synth compiler ops and params overhauled; sample effects replaced; solid 3D primitive topologies added
+</li>
+<li>FIELDPIXELTEST if-lowering fix (mix() search from SSA body)
+</li>
+<li>FIELDGRAPHTEST fixture fix (illegal int param type, reserved loop var)
+</li>
+<li>Drum Sequencer: sample trim settings no longer reset on undo/reload; Windows path separators supported
+</li>
+<li>Field node UX: excluded FieldSampleNode from generic audio body; fixed Place() clearing needsPosition too early
+</li>
+<li>Viewport panel no longer loses node cards after Undo/Redo
+</li>
+<li>Windows: fixed video loop freezing after one play-through
+</li>
+<li>Sequencer step-number label font size clamped (was only floored)
+</li>
+<li>Granular node: start/end trim sliders made full width, then unified to half-width side-by-side
+</li>
+<li>rand/noise/sh reseeded as proper hash functions (note: old patches using them will render differently)
+</li>
+</ul>
+<h3>Docs</h3>
+<ul>
+<li>New <a href="https://github.com/n1m21n/Infinite/blob/main/Field_Language_Manual.pdf" target="_blank" rel="noopener">Field Language Manual</a> covering domains, syntax, declarations, dynamic pins, .infdev, and all six Field node types
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2.76" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2.76-h"><a href="#v0.2.76">Infinite v0.2.76</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-02">2 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.76" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Fix Windows exports where file-based audio sources never made it into the recorded movie&#x27;s audio track.
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2.75" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2.75-h"><a href="#v0.2.75">Infinite v0.2.75</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-09-01">1 September 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.75" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Fix double-multiplied instance color darkening on point clouds with an image color source
+</li>
+<li>Remove EQ&#x27;s output section (output gain + mix knobs) entirely
+</li>
+<li>Flanger: add spread knob, move sync dropdown to match Chorus/Phaser
+</li>
+<li>Redesign Chorus and Phaser bodies into a symmetric 3-3-3 grid; close trailing space under the sync row and improve global param-field contrast
+</li>
+<li>Audio Filter: fix the real FPS-drop root cause, throttle visualizer recompute, and redesign the LFO-driven output overlay
+</li>
+<li>Note Filter: fix all-blue scale mismatch, add a real piano visualizer, mute the Snapped (in-range, off-scale) key color, remove arrows, and fix keyboard scale highlighting
+</li>
+<li>Note Capturer: add global-scale playback toggle and loop control to the grid, close trailing empty space below the loop checkbox
+</li>
+<li>Unify waveform naming across Oscillator/Ring Mod/Tremolo/Cycle Shaper
+</li>
+<li>Migrate filter-mode dropdown strings to one canonical spelling
+</li>
+<li>Random Note Generator: symmetrical 4-cell grid + groove (swing) control
+</li>
+<li>Ring Mod: move wave dropdown to the leftmost cell
+</li>
+<li>Tremolo: selector column left, 2x2 knob block right
+</li>
+<li>Resonator Bank: move analog off the knob grid, add damp param
+</li>
+<li>Wavetable Shaper: fix 3+4 knob grid to 4+4, add stereo control
+</li>
+<li>Close trailing empty space below Pitch Shift/Ring Mod analog checkbox rows and add a small header-row gap to trailing analog-checkbox rows
+</li>
+<li>Centre modulation-dot pins on their controls and grid-align trailing toggles
+</li>
+<li>Quiet checkbox/dropdown chrome in dark mode
+</li>
+<li>Add musical (logarithmic/skew) knob tapers across attack, decay, release, glide, strum, delay time, frequency-shifter, stereo-bass, and granular density/grain/size knobs, plus a console-style fader taper for the mixer - dragging and modulating these now follows a real analog-style curve instead of linear 0..1
+</li>
+<li>Reverb: rework the damping filter to a true exponential cutoff curve, so the damping knob sounds musically graduated instead of linear
+</li>
+<li>Add a new Note Switcher node - cycles between up to 4 connected note inputs on a synced or free interval, or manually
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2.7" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2.7-h"><a href="#v0.2.7">Infinite v0.2.7</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-08-31">31 August 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.7" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add a unified Settings panel (Cmd+0) with Appearance, Canvas &amp; Workspace, Audio, and General &amp; Performance tabs, replacing scattered prefs
+</li>
+<li>Add Appearance settings: per-category node color overrides, per-cable-type color overrides, and node card opacity/rounding, for both light and dark themes
+</li>
+<li>Persist Canvas &amp; Workspace (grid/minimap/cable visibility), Audio (device/sample rate/buffer/oversample), and General (target FPS, vsync) settings across restarts; saved audio device/format now applies automatically on launch
+</li>
+<li>Add MIDI Learn support to Performance Mode
+</li>
+<li>Add discrete per-lane audio outputs to the Drum Sequencer node and standardize its audio UI controls
+</li>
+<li>Fix Distribute Points on Faces and Points to Vertices getting stuck on stale cached geometry when an upstream Instance on Points node&#x27;s transforms, group matrix, or instance count changed — both nodes now realize instanced transforms into their output instead of only tracking the base mesh
+</li>
+<li>Fix cross-voice glide/portamento retriggering across Oscillator, Wavetable, Wave Terrain, Equation Synth, and Metallic nodes so a new note glides from the last-played pitch instead of resetting
+</li>
+<li>Fix note-on click artifact in Oscillator and Wavetable nodes
+</li>
+<li>Fix Metallic node&#x27;s decay knob so it delivers the ring time it actually displays, with tighter high-frequency mode damping
+</li>
+<li>Fix Curves node&#x27;s LUT going stale while the curve is being dragged
+</li>
+<li>Fix Poisson Disk scatter tanking frame rate on Distribute Points on Faces
+</li>
+<li>Windows: fix VST3 plugin scan hang/coverage, COM apartment mismatch, and Remove Background node labels
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2.6" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2.6-h"><a href="#v0.2.6">Infinite v0.2.6</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-08-30">30 August 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.6" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add Offline Render to export visuals and audio non-realtime with sample-accurate A/V synchronization and zero dropped frames regardless of patch complexity or system load
+</li>
+<li>Decouple visual frame cooking from audio synthesis clocks during offline render, keeping frame timestamps strictly aligned with audio blocks
+</li>
+<li>Add automatic refusal detection for offline render when a patch contains real-time hardware sources (such as camera or microphone inputs)
+</li>
+<li>Streamline the offline render dialog with a responsive frame progress counter and clean cancellation handling without encoder deadlocks
+</li>
+<li>Redesign Note Sequencer with an overhauled step grid, refined lane controls, and double-click gate toggling
+</li>
+<li>Redesign Pattern modulator with an interactive drag-paint bar grid, step glide, and bipolar display mode
+</li>
+<li>Add a modulatable position parameter and interactive waveform scrub control to PaulStretch for real-time grain navigation
+</li>
+<li>Persist transport settings (BPM, time signature, key, and scale) across saved patch files
+</li>
+<li>Make video recording finalization asynchronous on Output nodes to eliminate UI freezing when stopping takes
+</li>
+<li>Fix stereo-pair channel corruption in the audio capture ring buffer during overflow or odd-sized reads
+</li>
+<li>Fix plugin parameter popups vanishing on right-click or when editing modulation ranges
+</li>
+<li>Fix Performance Matrix assign-mode hover hit-testing and bounding shape calculations
+</li>
+<li>Windows: decode video on a dedicated background thread with hardware acceleration (Media Foundation H.264/HEVC), eliminating frame rate drops and CPU bottlenecks in Video nodes
+</li>
+<li>Windows: synchronize offline render stepping with the background video decode thread
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2.5" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2.5-h"><a href="#v0.2.5">Infinite v0.2.5</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-08-30">30 August 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.5" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Fix a crash on the real-time audio thread (EXC_BAD_ACCESS) that could hit when undoing while removing/replacing nodes — e.g. around the drum sequencer and its samples — where a retired node&#x27;s audio object could be freed before the audio thread had actually finished a block that still referenced it
+</li>
+<li>Widen Mixer from a fixed 8 inputs to a configurable count up to 12
+</li>
+<li>Fix mp3 playback (and any file whose decoded sample rate differs from the audio device&#x27;s) running at the wrong speed/pitch, and fix the resulting position/progress-bar readout
+</li>
+<li>Fix multiple audio nodes shown side by side sharing UI state due to an ImGui ID scoping bug in the audio column layout
+</li>
+<li>Fix the macOS recorder silently dropping padded frames during export, which could shorten or desync an exported movie
+</li>
+<li>Fix the macOS recorder permanently abandoning frames under CPU pressure during export instead of waiting for the encoder, which caused lasting A/V desync in the finished movie
+</li>
+<li>Fix exported video drifting out of sync with live audio over the course of a take, and a crash that could occur while measuring it
+</li>
+<li>Fix autosave failing silently on an unwritable settings directory, with no indication until a crash lost unsaved work
+</li>
+<li>Fix upgrading macOS users silently losing their theme and recents when settings moved to a new location
+</li>
+<li>Windows: fix MIDI clock sync never working
+</li>
+<li>Windows: fix Audio Analyze driving visuals from the wrong frequency bands and without smoothing
+</li>
+<li>Windows: fix dropped MIDI notes when 2 or more controllers are connected at once
+</li>
+<li>Windows: fix text rendering at the wrong size, with incorrect letter spacing and tessellation
+</li>
+<li>Windows: fix camera frames shearing at unaligned resolutions
+</li>
+</ul>
+<h3>Changelog</h3>
+<h4>2026-08-30</h4>
+<ul>
+<li>Fix plugin param vanishing on right-click and modulation range edit
+</li>
+<li>Add asset decode cache so undo/redo respawn skips re-decoding files (Part B)
+</li>
+<li>Fix undo/redo and delete stalls on large patches (Part A)
+</li>
+<li>Skip RECEXPORTTEST gating on GitHub&#x27;s macOS CI runner
+</li>
+<li>Fail INFINITE_RECEXPORTTEST fast when the encoder wedges
+</li>
+<li>Bump website&#x27;s displayed version to v0.2.5
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2.4" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2.4-h"><a href="#v0.2.4">Infinite v0.2.4</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-08-29">29 August 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.4" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add the Performance Matrix (Shift+P): a dockable grid of controls you build from your own patch, so you can play a piece without touching the canvas — bind any parameter to a control, arrange it in Edit mode, then switch to Perform
+</li>
+<li>Performance Matrix ships ten control types: knob, vertical fader, horizontal slider, toggle, XY pad, momentary trigger, digital number box, radio selector, bipolar pan knob, and step gate ribbon
+</li>
+<li>One Performance Matrix control can drive several parameters at once, and an XY pad drives an independent set on each axis; right-click any parameter on a node to send it straight to the matrix
+</li>
+<li>Performance Matrix supports multiple pages (rename, duplicate, reorder), per-control colour tints and custom labels, select/copy/paste, and docking bottom, right, left or top — the whole surface saves and loads with the patch
+</li>
+<li>Add nine Macro nodes — Knob, Slider, Bipolar Knob, XY, Toggle, Trigger, NumBox, Radio Selector, Step Gate — in a new Macros category, so the same controls can live on the canvas as modulation sources
+</li>
+<li>Add Grain Molder, a sampler that slices audio into grains and rearranges them along a continuous blend between their original order and their level, brightness, or a random ranking
+</li>
+<li>Add three audio effects: Resonator Bank, Cycle Shaper, and Spec Blur
+</li>
+<li>Add cable visibility toggles — hide image and geometry, audio and note, or modulation cables independently, or all at once — so a patch stays readable while you perform
+</li>
+<li>Extend node bypass to audio, note, and 3D geometry nodes, add Bypass selection for bypassing several nodes at once, and fix 3D geometry sources ignoring bypass
+</li>
+<li>Add Shift+V to toggle the viewport panel
+</li>
+<li>Raise video export quality substantially on both platforms; the previous bitrate visibly mushed pixel art, flat colour fields, and fine generative detail
+</li>
+<li>Fix the app freezing at 100% CPU on any patch containing a Wavetable node — its two engines shared one internal control slot, which also meant modulating one engine&#x27;s table, octave, semitone, filter, or warp silently drove the other&#x27;s
+</li>
+<li>Fix closing a projector window corrupting other nodes&#x27; previews on the canvas
+</li>
+<li>Fix Performance Matrix page names containing spaces being split apart when a patch is reloaded
+</li>
+<li>Fix a repeated warning from 3D point cloud rendering flooding the log
+</li>
+<li>Windows: fix exported video coming out vertically mirrored
+</li>
+<li>Windows: fix projector and output windows rendering as a blank dark rectangle
+</li>
+<li>Windows: fix a fullscreen projector overhanging the bottom-right of the display
+</li>
+<li>Windows: fix point cloud sprites drawing far larger than intended, which could hard-reset the graphics driver on dense scenes
+</li>
+<li>Windows: add audio support for devices that negotiate a PCM rather than float mix format
+</li>
+<li>Windows: fix a use-after-free on the audio thread when the input device changes while an Audio In node is live, and a handle leak on every capture restart
+</li>
+<li>Windows: write a crash report and a rolling log to the app support folder when the app dies
+</li>
+<li>Windows: disable the sample rate and buffer size settings, which shared-mode audio has never been able to apply, with a tooltip pointing at Sound settings
+</li>
+<li>Update the website with a tutorial video, a decluttered navigation bar, and new typography
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2.3" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2.3-h"><a href="#v0.2.3">Infinite v0.2.3</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-08-27">27 August 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.3" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Fix modulation, expressions, and palette bindings freezing on a node when its params panel is collapsed
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2.2" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2.2-h"><a href="#v0.2.2">Infinite v0.2.2</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-08-27">27 August 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.2" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add analog character mode (vintage hardware modeling vs. pure digital) to Dynamics, Delay, Reverb, Pitch Shift, Chorus, Flanger, Phaser, Bitcrush, Ring Mod, and Frequency Shifter
+</li>
+<li>Fix Ctrl+S/O/N not working on Windows; shortcut labels now show &quot;Ctrl&quot; on Windows instead of &quot;Cmd&quot;
+</li>
+<li>Add nested category submenus and drop targets for AudioFile/Model/Video/Image nodes in the node spawner
+</li>
+<li>Improve Windows application icon and taskbar process grouping
+</li>
+<li>Fix Sampler position drag to track continuously; fix Sampler position dropped on copy/paste
+</li>
+<li>Enhance EQ filter types and slopes; add a shortcuts reference modal and other UI/menu improvements
+</li>
+<li>Enhance Sampler polyphonic playhead and controls
+</li>
+<li>Fix VST3/AU plugin note input being silently dropped
+</li>
+<li>Update website soundtrack
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2.1" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2.1-h"><a href="#v0.2.1">Infinite v0.2.1</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-08-26">26 August 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.1" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add Windows Spout2 GPU texture sharing (Syphon In/Out equivalent) for Resolume, TouchDesigner, OBS, and Notch
+</li>
+<li>Add AI background removal on Windows via DirectML + ONNX Runtime
+</li>
+<li>Add native Windows ARM64 support (Snapdragon X and other ARM laptops)
+</li>
+<li>Add Media Foundation video decoding for high-res MP4/M4V playback and cache seeking on Windows
+</li>
+<li>Add Geometry Table node to sample 3D geometry into modulator outputs (vertex, scatter, or contour sampling)
+</li>
+<li>Add instance-domain selection to transform and delete individual scattered 3D instances
+</li>
+<li>Add a dockable Modulation Matrix panel for managing every active modulation binding in one place
+</li>
+<li>Add asynchronous movie recording so H.264 export no longer stalls the GUI or render frame rate
+</li>
+<li>Add synchronized audio playback to Video Source nodes
+</li>
+<li>Add a unified sort and filter strip across all browser panel modes
+</li>
+<li>Add an in-app update checker modal
+</li>
+<li>Add session autosave and crash recovery
+</li>
+<li>Fix output/fullscreen preview windows vanishing behind the main editor on secondary displays
+</li>
+<li>Fix video playback cache seeking, multi-channel audio decoding, and recorder thread sync
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.2-preview" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.2-preview-h"><a href="#v0.2-preview">Infinite v0.2-preview</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-08-23">23 August 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2-preview" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<ul>
+<li>Add a full native Windows port — WASAPI audio, WinMM MIDI, Media Foundation video, GDI+ typography, statically linked with no external dependencies
+</li>
+<li>Add a crash-isolated, out-of-process VST3 scanner on Windows
+</li>
+<li>Add Molder spectral resynthesis node and Linear Through-Zero FM
+</li>
+<li>Add Equation Oscillator — Desmos-style formula-driven oscillator with real-time FFT mip-mapped wavetables
+</li>
+<li>Add Plugin Delay Compensation for automatic latency alignment across the graph
+</li>
+<li>Add live frequency graticules and spectrum overlays to EQ and Audio Filter nodes
+</li>
+<li>Add Audio Color Ramp node for real-time spectral color mapping
+</li>
+<li>Add Draw Node stroke/stamp persistence across save and load
+</li>
+<li>Fix node wiring dropped on duplicate/copy-paste of node groups
+</li>
+<li>Add Video In node for webcam capture and Syphon In/Out GPU streaming on macOS
+</li>
+<li>Add unsaved-changes guard before creating, opening, or loading patches
+</li>
+</ul>
+        </div>
+      </article>
+      <article class="rel-card" id="v0.1" data-era="v0.1-v0.2">
+        <div class="rel-card-head">
+          <div class="rel-card-title-row">
+            <h2 id="v0.1-h"><a href="#v0.1">Infinite v0.1 — Realtime Modular Visual &amp; Audio Synthesizer</a></h2>
+            
+          </div>
+          <div class="rel-meta">
+            <time datetime="2026-08-16">16 August 2026</time>
+            <span>&middot;</span>
+            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.1" target="_blank" rel="noopener">GitHub release &rarr;</a>
+          </div>
+        </div>
+        <div class="rel-body">
+<p>A realtime modular node-based environment for visual synthesis, 3D geometry generation, and audio sound design, connecting sound and visuals over a unified signal graph.</p>
+<ul>
+<li>80+ real-time 2D/3D shader and generation nodes, including reaction-diffusion and feedback loops
+</li>
+<li>Parametric 3D geometry — procedural meshes, point clouds, particle systems, PBR lighting, custom camera rigs
+</li>
+<li>Audio-reactive vertex displacement, wave terrain generators, and image-to-point transforms
+</li>
+<li>Multi-paradigm synthesis — wavetable, physical modeling, granular, drum sequencers, PaulStretch time-stretching
+</li>
+<li>15+ built-in DSP effects — Reverb, Chorus, Phaser, Delay, Dynamics, Distortion, Parametric EQ
+</li>
+<li>Native AU and VST3 plugin hosting
+</li>
+<li>Full MIDI I/O, hardware clock sync, and parameter mapping
+</li>
+<li>Route any audio signal, envelope, LFO, or curve to modulate visuals, or drive audio from 3D positions and image luminance
+</li>
+<li>High-performance node canvas with live cable signals, color coding, and draggable sub-patching
+</li>
+</ul>
+<p>macOS 11.0 Big Sur or later (Apple Silicon &amp; Intel). First launch: right-click <code>Infinite.app</code> → Open → Open.</p>
+        </div>
+      </article>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <div class="signup-row">
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="artists.html">Artists</a>
+          <a href="musicians.html">Musicians</a>
+          <a href="vjs.html">VJs</a>
+          <a href="creative-coders.html">Creative coders</a>
+          <a href="developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="library.html">Library</a>
+          <a href="samples/">Sample generator</a>
+          <a href="artworks.html">Art gallery</a>
+          <a href="nodes/">Nodes</a>
+          <a href="embeds/">Embeds</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="index.html#learn">Get started</a>
+          <a href="manual/">Manual</a>
+          <a href="philosophy.html">Philosophy</a>
+          <a href="chat.html">Agents &amp; terminal</a>
+          <a href="blog/">Blog</a>
+          <a href="buy.html">Buy the plugin</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="manual/">Node reference</a>
+          <a href="manual/field/">Field language</a>
+          <a href="manual/headless/">Headless guide</a>
+          <a href="benchmarks.html">Benchmarks</a>
+          <a href="assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="releases.html">Release notes</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting). <a href="terms.html">Terms</a> · <a href="refund.html">Refunds</a> · <a href="privacy.html">Privacy</a></p>
+    </div>
+  </footer>
+  <script src="site.js?v=21" defer></script>
+  
+  <script>
+    (function () {
+      var buttons = Array.from(document.querySelectorAll('.rel-era'));
+      var cards = Array.from(document.querySelectorAll('.rel-card'));
+      function applyEra(era) {
+        buttons.forEach(function (btn) {
+          btn.setAttribute('aria-pressed', btn.getAttribute('data-era') === era ? 'true' : 'false');
+        });
+        cards.forEach(function (card) {
+          card.hidden = era !== 'all' && card.getAttribute('data-era') !== era;
+        });
+      }
+      buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          applyEra(btn.getAttribute('data-era'));
+        });
+      });
+      if (window.location.hash) {
+        var target = document.getElementById(window.location.hash.slice(1));
+        if (target && target.classList.contains('rel-card')) {
+          applyEra('all');
+        }
+      }
+    })();
+  </script>
+<nav class="dock" id="dock" aria-label="Main">
+  <div class="dock-bar">
+    <span class="dock-thumb" aria-hidden="true"></span>
+    <a class="dock-stop" href="index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+    <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" data-current aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+    <a href="artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+    <a href="musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+    <a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+    <a href="creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+    <a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+    <a href="library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+    <a href="samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Sample generator</span></a>
+    <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+    <a href="nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+    <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+    <a href="plugin.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg><span>Plugin</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+    <a href="index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+    <a href="manual/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Manual</span></a>
+    <a href="philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="chat.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
+    <a href="blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 16.45l.8-3.6L13 4.15a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.1 15.65Z"/><path d="M11.5 5.65l2.8 2.8"/></svg><span>Blog</span></a>
+    <a href="releases.html" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10a6.5 6.5 0 1 0 2-4.7"/><path d="M3.5 3.8v3.4h3.4"/><path d="M10 6.6V10l2.4 1.6"/></svg><span>Release notes</span></a>
+  </div>
+</nav>
+  <script src="search.js?v=d89de447" defer></script>
+  <script src="share.js?v=ad5e5392" defer></script>
+  <script src="bird.js?v=a4ec7f42" defer></script>
+</body>
+</html>

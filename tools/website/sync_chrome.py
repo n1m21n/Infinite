@@ -47,6 +47,7 @@ GROUPS = [
         ("philosophy.html", "Philosophy", "Why Infinite is built this way"),
         ("chat.html", "Agents &amp; terminal", "Talk to your patch with an agent"),
         ("blog/", "Blog", "Guides and how things work"),
+        ("releases.html", "Release notes", "Every version from v0.1 to v2.0.0"),
     ]),
 ]
 
@@ -70,7 +71,7 @@ FOOTER_COLS = [
         ("assets/Infinite_Benchmark_Report.pdf", "Benchmark report"),
     ]),
     ("Open source", [
-        (GH, "GitHub"), (GH + "/releases", "Releases"), (GH + "/tree/main/tools/mcp", "MCP server"),
+        (GH, "GitHub"), ("releases.html", "Release notes"), (GH + "/releases", "Releases"), (GH + "/tree/main/tools/mcp", "MCP server"),
         (GH + "/tree/main/tools/python_sdk", "Python SDK"),
         ("https://discord.gg/GMeQTyJqkH", "Discord"), ("https://paypal.me/namansoniii", "Donate"),
     ]),
@@ -124,7 +125,7 @@ def is_current(path, rel):
 
 NAV_ICON = {"artists.html": "family-compositing", "musicians.html": "family-notes", "vjs.html": "perform", "creative-coders.html": "edit",
             "developers.html": "cube", "library.html": "library", "artworks.html": "viewport", "embeds/": "grid-dots", "nodes/": "cube", "extensions.html": "pointer", "chat.html": "chat",
-            "benchmarks.html": "range", "samples/": "range", "index.html#learn": "play", "manual/": "library", "philosophy.html": "loop", "blog/": "pencil"}
+            "benchmarks.html": "range", "samples/": "range", "index.html#learn": "play", "manual/": "library", "philosophy.html": "loop", "blog/": "pencil", "releases.html": "history"}
 
 
 def nav_icon(path):
