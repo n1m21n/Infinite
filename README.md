@@ -15,7 +15,7 @@
 
 *Use it for VJing and live visuals, generative art, music production, motion graphics, shader and creative coding, and audio-reactive 3D. A free alternative in the spirit of TouchDesigner, VCV Rack, Max/MSP, Bitwig's Grid and VVVV, with a DAW-style Timeline and Session built in.*
 
-![Infinite 2.0 with several panels open around the node canvas](docs/screenshots/v2/hero-panels.png)
+![Infinite with several panels open around the node canvas](docs/screenshots/v1/hero-panels.png)
 
 ---
 
