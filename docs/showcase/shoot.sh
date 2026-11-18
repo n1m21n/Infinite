@@ -33,7 +33,7 @@ c() { INFINITE_CONTROL_PORT=$PORT INFINITE_CONTROL_TOKEN=$(cat "$TMP/tok") "$APP
 cleanup() {
    c quit >/dev/null 2>&1 || true; sleep 2; kill "$PID" 2>/dev/null || true
    [ -f "$TMP/token.bak" ] && cp "$TMP/token.bak" "$TOKFILE"
-   cp "$TMP/app.log" /private/tmp/claude-501/-Users-namansoni-Infinite-repo/4f14c8bb-2830-4e26-b493-469197e65438/scratchpad/app.log 2>/dev/null; rm -rf "$TMP"
+   mkdir -p "$REPO/.proof" && cp "$TMP/app.log" "$REPO/.proof/shoot-app.log" 2>/dev/null; rm -rf "$TMP"
 }
 trap cleanup EXIT
 
@@ -56,6 +56,36 @@ c session scene 1 >/dev/null || true  # starts the audio engine and plays scene 
 
 closeall() { for p in samplestudio pianoroll modmatrix perf view3d view2d curveeditor mixer drums fieldpatcher timeline session terminal; do c panel $p close >/dev/null 2>&1 || true; done; c view params off >/dev/null; }
 
+
+# Content checks: a shot is kept only when the thing it shows is really there (no empty states).
+# status and graph are JSON; explain is text with one "  Type (index)" header per node.
+loaded() { c status 2>/dev/null | python3 -c "import sys,json; n=json.load(sys.stdin)['nodes']; print('nodes:', n); sys.exit(0 if n>=35 else 1)"; }
+has_types() { c explain 2>/dev/null | python3 -c "import sys,re; t={m.group(1) for m in re.finditer(r'^  (.+?) \\(\\d+\\)$', sys.stdin.read(), re.M)}; m=[x for x in sys.argv[1:] if x not in t]; print('missing types:', m or 'none'); sys.exit(1 if m else 0)" "$@"; }
+has_mods() { c graph 2>/dev/null | python3 -c "import sys,json; n=len(json.load(sys.stdin)['modulation']); print('modulations:', n); sys.exit(0 if n>0 else 1)"; }
+has_clips() { c graph 2>/dev/null | python3 -c "import sys,json; n=sum(len(s.get('clips',[])) for s in json.load(sys.stdin)['streams']); print('clips:', n); sys.exit(0 if n>0 else 1)"; }
+has_perf() { c perf 2>/dev/null | python3 -c "import sys,json; n=len(json.load(sys.stdin).get('controls',[])); print('bound controls:', n); sys.exit(0 if n>0 else 1)"; }
+verify() {
+   case $1 in
+   node-graph|3d-view|session-clips|timeline|piano-roll|sample-studio|drums|mixer|2d-view|field-patcher|terminal|hero-panels|curve-editor|field-editor)
+      loaded || return 1 ;;
+   esac
+   case $1 in
+   mod-matrix)            loaded && has_mods ;;
+   performance)           has_perf ;;
+   hero-panels)           loaded && has_perf && has_mods ;;
+   session-clips|timeline) has_clips ;;
+   piano-roll)            has_types "Piano Roll" ;;
+   sample-studio)         has_types "Sampler" ;;
+   mixer)                 has_types "Mixer" ;;
+   drums)                 has_types "Drum Sequencer" ;;
+   3d-view)               has_types "3D View" ;;
+   2d-view)               has_types "2D View" ;;
+   field-patcher|field-editor|curve-editor) has_types "FieldPixel" ;;
+   *)                     true ;;
+   esac
+}
+# keep <name> is only called after verify <name> passed; a failed check prints FAIL and writes nothing.
+
 # keep <name>: the app saves its own backbuffer (INFINITE_SHOT_REQUEST), so this works off-screen and with the
 # screen locked; then shrink with sips in 160 px steps until under 1.5 MB.
 keep() {
@@ -69,6 +99,8 @@ keep() {
    done
    echo "$1: $(sips -g pixelWidth "$OUT/$1.png" | tail -1 | awk '{print $2}') px, $(stat -f %z "$OUT/$1.png") bytes"
 }
+
+loaded || { echo "FAIL: patch did not load in the app"; exit 1; }
 
 for s in $SHOTS; do
    closeall
@@ -104,5 +136,5 @@ for s in $SHOTS; do
    field-editor)  c select FieldPixel >/dev/null; c panel fieldpatcher open top >/dev/null; sleep 4 ;;
    *) echo "unknown shot $s"; continue ;;
    esac
-   keep "$s"
+   if verify "$s"; then keep "$s"; else sleep 3; if verify "$s"; then keep "$s"; else echo "FAIL $s: content missing, not kept"; fi; fi
 done
