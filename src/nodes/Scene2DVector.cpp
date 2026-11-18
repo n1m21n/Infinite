@@ -1717,7 +1717,10 @@ int Scene2DNode::MergeLayers(const std::vector<int>& ids, int frameId)
    float lo[2] = { 0, 0 }, hi[2] = { (float)W, (float)H };
    bool fill = false;
    {
-      std::vector<int> todo = set;
+      std::vector<int> todo;
+      todo.reserve(set.size());
+      for (int id : set)
+         todo.push_back(id);
       while (!todo.empty())
       {
          const int id = todo.back();

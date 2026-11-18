@@ -879,6 +879,87 @@ jobs:
           path: artifacts-linux/Infinite-linux-x86_64.tar.gz
           if-no-files-found: error
 
+  # Preview ARM64 Linux release build (issue #76): uses the same ubuntu-22.04 glibc 2.35
+  # floor on GitHub's standard ARM64 runner and package-appimage.sh's pinned aarch64 tools.
+  linux-appimage-arm64:
+    name: Linux AppImage (aarch64)
+    needs: detect
+    if: needs.detect.outputs.has_linux == 'true'
+    runs-on: ubuntu-22.04-arm
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: sudo tools/linux/deps-apt.sh
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: linux-appimage-arm64-${{ github.ref }}
+          restore-keys: |
+            linux-appimage-arm64-
+
+      - name: Build (Release, Clang)
+        run: |
+          export CC_FAMILY=clang
+          tools/linux/build.sh
+
+      - name: Assert no direct OpenGL library linkage
+        run: |
+          if ldd build-linux/Infinite | grep -E "libOpenGL|libGL\.so|libGLX|libEGL"; then
+            echo "ERROR: Infinite must NOT link libOpenGL/libGL/libGLX/libEGL directly (see audacity#12093)" >&2
+            exit 1
+          fi
+          echo "OK: no disallowed GL libraries linked directly."
+
+      - name: Plugin bundles
+        run: |
+          export CC=clang CXX=clang++
+          tools/plugin/build_bundles.sh dist-plugins --build build-dist-plugin --jobs 2
+
+      - name: Package AppImage
+        run: INFINITE_PLUGINS_DIR="$PWD/dist-plugins" tools/linux/package-appimage.sh build-linux artifacts-linux
+
+      - name: Verify AppImage runtime has no libfuse dependency
+        run: |
+          head -c 4194304 artifacts-linux/Infinite-aarch64.AppImage > /tmp/runtime-head
+          if command -v ldd >/dev/null 2>&1 && file /tmp/runtime-head | grep -qi ELF; then
+            if ldd /tmp/runtime-head 2>/dev/null | grep -qi libfuse; then
+              echo "ERROR: embedded AppImage runtime links libfuse.so.2 - not the static type2-runtime" >&2
+              exit 1
+            fi
+          fi
+          echo "OK: no libfuse.so.2 dependency in the embedded runtime."
+
+      - name: Upload Infinite-aarch64.AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-aarch64.AppImage
+          path: artifacts-linux/Infinite-aarch64.AppImage
+          if-no-files-found: error
+
+      - name: Installer tarball
+        run: |
+          D=Infinite-linux-aarch64
+          mkdir -p "$D"
+          cp artifacts-linux/Infinite-aarch64.AppImage tools/installer/linux/install.sh "$D/"
+          cp art/brand/logo/linux/infinite-512.png "$D/infinite.png"
+          python3 tools/installer/terms_page.py website/terms.html "$D/TERMS.txt" --text
+          tar -czf artifacts-linux/Infinite-linux-aarch64.tar.gz "$D"
+          export HOME="$PWD/installer-home" XDG_DATA_HOME="$PWD/installer-home/.local/share"
+          mkdir -p "$HOME" && (cd "$D" && ./install.sh --yes)
+          test -d "$HOME/.vst3/Infinite FX.vst3" && test -x "$XDG_DATA_HOME/infinite/Infinite.AppImage"
+
+      - name: Upload Linux ARM64 installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-linux-aarch64.tar.gz
+          path: artifacts-linux/Infinite-linux-aarch64.tar.gz
+          if-no-files-found: error
+
   # Phase 5 task 5.3 (L3 smoke, validation.md's "L3" section): runs the
   # x86_64 AppImage built above inside real distro base images it was never
   # compiled on, to catch what an Ubuntu-22.04-only build can never prove -

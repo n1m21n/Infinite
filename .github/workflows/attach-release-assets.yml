@@ -32,7 +32,8 @@ jobs:
         run: |
           mkdir dl
           for a in Infinite-windows-x64 Infinite-windows-ARM64 Infinite-x86_64.AppImage \
-                   Infinite-Setup-windows-x64 Infinite-Setup-windows-ARM64 Infinite-linux-x86_64.tar.gz \
+                   Infinite-aarch64.AppImage Infinite-Setup-windows-x64 Infinite-Setup-windows-ARM64 \
+                   Infinite-linux-x86_64.tar.gz Infinite-linux-aarch64.tar.gz \
                    ui-golden-macos ui-golden-windows ui-golden-linux; do
             gh run download "${{ inputs.run_id }}" -n "$a" -D "dl/$a" || echo "no artifact $a"
           done
@@ -68,7 +69,11 @@ jobs:
             dl/Infinite-x86_64.AppImage/Infinite-x86_64.AppImage \
             dl/Infinite-Setup-windows-x64/Infinite-Setup-windows-x64.exe \
             dl/Infinite-linux-x86_64.tar.gz/Infinite-linux-x86_64.tar.gz --clobber
-          # ARM64 is best-effort in the Build run; attach its installer when it was built.
-          if [ -f dl/Infinite-Setup-windows-ARM64/Infinite-Setup-windows-ARM64.exe ]; then
-            gh release upload "${{ inputs.tag }}" dl/Infinite-Setup-windows-ARM64/Infinite-Setup-windows-ARM64.exe --clobber
-          fi
+          # Best-effort preview builds: attach when built.
+          for opt in Infinite-Setup-windows-ARM64/Infinite-Setup-windows-ARM64.exe \
+                     Infinite-aarch64.AppImage/Infinite-aarch64.AppImage \
+                     Infinite-linux-aarch64.tar.gz/Infinite-linux-aarch64.tar.gz; do
+            if [ -f "dl/$opt" ]; then
+              gh release upload "${{ inputs.tag }}" "dl/$opt" --clobber
+            fi
+          done

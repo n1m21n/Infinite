@@ -1032,7 +1032,7 @@ void RunView2DTest()
             void Text(const char*, std::string&) override {}
             void Color(const char*, float*) override {}
          } set;
-         set.to = 6.0f;
+         set.to = 2.0f;
          blur->VisitParams(set);
          Scene2DNode::Effect e;
          e.uid = blurUid;
@@ -1047,7 +1047,7 @@ void RunView2DTest()
          Cook(&pic);
          Cook(&pic);
          const unsigned long long d1 = pic.mEffDraws;
-         set.to = 14.0f;
+         set.to = 8.0f;
          blur->VisitParams(set);
          Cook(&pic);
          const unsigned long long d2 = pic.mEffDraws;
