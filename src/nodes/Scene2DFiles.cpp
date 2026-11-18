@@ -614,6 +614,53 @@ bool Scene2DNode::RenderSet(const std::vector<int>& set, int frameId, std::vecto
    return rgba.size() == (size_t)mDoc.w * mDoc.h * 4;
 }
 
+bool Scene2DNode::VisibleBounds(const std::vector<int>& set, int frameId, float lo[2], float hi[2])
+{
+   std::vector<uint8_t> px;
+   if (set.empty() || !RenderSet(set, frameId, px))
+      return false;
+   const int w = mDoc.w, h = mDoc.h;
+   int x0 = w, y0 = h, x1 = -1, y1 = -1;
+   for (int y = 0; y < h; y++)   // top-down rows
+   {
+      const uint8_t* row = &px[(size_t)y * w * 4];
+      for (int x = 0; x < w; x++)
+         if (row[x * 4 + 3] > 8)
+         {
+            x0 = std::min(x0, x);
+            x1 = std::max(x1, x);
+            y0 = std::min(y0, y);
+            y1 = std::max(y1, y);
+         }
+   }
+   if (x1 < x0)
+      return false;
+   lo[0] = (float)x0, lo[1] = (float)y0, hi[0] = (float)(x1 + 1), hi[1] = (float)(y1 + 1);
+   return true;
+}
+
+bool Scene2DNode::SelectLayerPixels(int id, int op, int frameId)
+{
+   std::vector<uint8_t> px;
+   if (FindConst(id) == nullptr || !RenderSet({ id }, frameId, px))
+      return false;
+   const int w = mDoc.w, h = mDoc.h;
+   if (mSel.size() != (size_t)w * h)
+      mSel.assign((size_t)w * h, 0);
+   for (int y = 0; y < h; y++)   // px top-down, the selection bottom row first
+      for (int x = 0; x < w; x++)
+      {
+         const int a = px[((size_t)y * w + x) * 4 + 3];
+         uint8_t& v = mSel[(size_t)(h - 1 - y) * w + x];
+         v = (uint8_t)(op == kSelAdd ? std::max<int>(v, a) : op == kSelSub ? std::max(0, v - a)
+                                   : op == kSelIntersect ? std::min<int>(v, a) : a);
+      }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+   StoreSelection();
+   return true;
+}
+
 bool Scene2DNode::PictureUnder(int id, int effect, int frameId, std::vector<uint8_t>& rgba)
 {
    const Layer* l = FindConst(id);

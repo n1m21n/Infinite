@@ -466,6 +466,11 @@ public:
    bool RenderBelow(int id, int frameId, std::vector<uint8_t>& rgba);
    // Only these layers (and what they hold) drawn as they look, the groups holding them passed through.
    bool RenderSet(const std::vector<int>& set, int frameId, std::vector<uint8_t>& rgba);
+   // The box (document px) of what these layers show as they look: masks, crops and empty pixels left out. False
+   // when nothing shows.
+   bool VisibleBounds(const std::vector<int>& set, int frameId, float lo[2], float hi[2]);
+   // Photoshop's Cmd-click on a layer thumbnail: what the layer shows (masks included) becomes the selection, by op.
+   bool SelectLayerPixels(int id, int op, int frameId);
 
    // Document edits that keep every layer's picture where it is.
    void CanvasSize(int w, int h, int anchor);   // anchor 0..8, row major from top left
@@ -627,6 +632,10 @@ public:
    // 0 expand, 1 contract, 2 smooth (rounds corners, drops specks), 3 border (a ring px wide on the edge).
    void ModifySelection(int op, int px);   // 0 expand, 1 contract, 2 smooth, 3 border, 4 feather (soft edges)
    bool HasSelection() const { return mSelAny; }
+   // The selection as the CPU holds it (document px, bottom row first, 0..255), and whether a selection-brush stroke
+   // is live on the GPU (then the CPU copy is behind until the stroke ends).
+   const std::vector<uint8_t>& SelectionPixels() const { return mSel; }
+   bool SelectionStrokeLive() const { return mStroke.Active() && mPaintTarget == 2; }
    // Delete / fill: the selected pixels of a paint layer (all of it with no selection) cleared, or covered with a colour.
    bool ClearPixels(int id);
    bool FillPixels(int id, const float rgb[3], float opacity);

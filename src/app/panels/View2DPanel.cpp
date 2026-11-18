@@ -255,7 +255,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -3558,6 +3558,90 @@ namespace
    // What the transform box frames, in the layer's own box px: x0, y0, x1, y1. A paint layer's box is its painted
    // pixels (transparent ones don't count, as in Photoshop), so a small cut-out on a big layer gets a small box. Any
    // other layer, or an empty / warped / 3D / cropped one, is its whole box. Kept per layer and tiles (reads back).
+   // Marching ants drawn on the screen, 1 px at any zoom (Photoshop, Affinity): the selection's edge in the visible part
+   // of the document, joined into runs, drawn white with black dashes that march. False when the texture overlay
+   // should draw instead (zoomed out, a live selection-brush stroke, or an edge too busy to draw as lines).
+   // Menu actions defined further down, used by the canvas menu.
+   void TransformSubMenu(Scene2DNode* doc);
+   void CropToSelection(Scene2DNode* doc);
+   void TrimDocument(Scene2DNode* doc);
+   void SelectLayerPixels(Scene2DNode* doc, int id, int op);
+
+   bool DrawScreenAnts(ImDrawList* dl, Scene2DNode* doc)
+   {
+      if (sZoom < 1.5f || doc->quickMask || doc->SelectionStrokeLive())
+         return false;
+      const auto& d = doc->Doc();
+      const std::vector<uint8_t>& sel = doc->SelectionPixels();
+      if (sel.size() != (size_t)d.w * d.h)
+         return false;
+      const ImVec2 c0 = ToDoc(doc, sViewMn), c1 = ToDoc(doc, sViewMx), c2 = ToDoc(doc, ImVec2(sViewMn.x, sViewMx.y)),
+                   c3 = ToDoc(doc, ImVec2(sViewMx.x, sViewMn.y));
+      const int x0 = std::max(0, (int)std::floor(std::min({ c0.x, c1.x, c2.x, c3.x })) - 1);
+      const int x1 = std::min(d.w, (int)std::ceil(std::max({ c0.x, c1.x, c2.x, c3.x })) + 1);
+      const int y0 = std::max(0, (int)std::floor(std::min({ c0.y, c1.y, c2.y, c3.y })) - 1);
+      const int y1 = std::min(d.h, (int)std::ceil(std::max({ c0.y, c1.y, c2.y, c3.y })) + 1);
+      if (x1 <= x0 || y1 <= y0)
+         return true;
+      // in(x, y): document px, y from the top; outside the document counts as unselected.
+      auto in = [&](int x, int y) {
+         return x >= 0 && y >= 0 && x < d.w && y < d.h && sel[(size_t)(d.h - 1 - y) * d.w + x] >= 128;
+      };
+      struct Seg { float ax, ay, bx, by; };
+      static std::vector<Seg> segs;
+      segs.clear();
+      constexpr size_t kMaxSegs = 40000;
+      for (int y = y0; y <= y1 && segs.size() < kMaxSegs; y++)   // horizontal edges, between rows y-1 and y
+         for (int x = x0; x < x1;)
+         {
+            if (in(x, y - 1) == in(x, y))
+            {
+               x++;
+               continue;
+            }
+            const int s0 = x;
+            while (x < x1 && in(x, y - 1) != in(x, y))
+               x++;
+            segs.push_back({ (float)s0, (float)y, (float)x, (float)y });
+         }
+      for (int x = x0; x <= x1 && segs.size() < kMaxSegs; x++)   // vertical edges, between columns x-1 and x
+         for (int y = y0; y < y1;)
+         {
+            if (in(x - 1, y) == in(x, y))
+            {
+               y++;
+               continue;
+            }
+            const int s0 = y;
+            while (y < y1 && in(x - 1, y) != in(x, y))
+               y++;
+            segs.push_back({ (float)x, (float)s0, (float)x, (float)y });
+         }
+      if (segs.size() >= kMaxSegs)
+         return false;
+      const ImU32 white = IM_COL32(255, 255, 255, 255), black = IM_COL32(0, 0, 0, 255);
+      constexpr float kDash = 4.0f;
+      const float march = std::fmod((float)ImGui::GetTime() * 16.0f, kDash * 2.0f);
+      for (const Seg& sg : segs)
+      {
+         const ImVec2 a = ToScreen(doc, sg.ax, sg.ay), b = ToScreen(doc, sg.bx, sg.by);
+         dl->AddLine(a, b, white, 1.0f);
+         const float len = std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+         if (len < 0.5f)
+            continue;
+         const ImVec2 u((b.x - a.x) / len, (b.y - a.y) / len);
+         // The dash phase follows the screen position, so runs that meet keep one pattern.
+         float t = -std::fmod(a.x + a.y + march, kDash * 2.0f);
+         for (; t < len; t += kDash * 2.0f)
+         {
+            const float t0 = std::max(0.0f, t), t1 = std::min(len, t + kDash);
+            if (t1 > t0)
+               dl->AddLine(ImVec2(a.x + u.x * t0, a.y + u.y * t0), ImVec2(a.x + u.x * t1, a.y + u.y * t1), black, 1.0f);
+         }
+      }
+      return true;
+   }
+
    void ContentRect(Scene2DNode* doc, const Layer& l, float r[4])
    {
       float bw = 1, bh = 1;
@@ -3801,10 +3885,49 @@ namespace
    // with its x (or y) scale negated and its angle negated; pulled corners mirror with it.
    bool Flippable(const Layer& l) { return l.kind != Kind::Group && l.kind != Kind::Fill && l.kind != Kind::Adjust; }
 
+   // Flip and quarter turns pivot on what the selection shows (Photoshop's transform box): a cut-out eye on a
+   // document-sized layer, or a photo masked down to an eye, turns about the eye, not the whole layer.
+   // Flip and turn pivot on what the layers hold (their content boxes, groups through their layers), not their
+   // document-sized boxes: a cut-out eye flips where it is. Unclipped by the canvas, so two flips land back.
+   bool PivotBounds(Scene2DNode* doc, float lo[2], float hi[2])
+   {
+      if (FreeTransformOn(doc))
+         return SelBounds(doc, lo, hi);
+      lo[0] = lo[1] = 1e30f;
+      hi[0] = hi[1] = -1e30f;
+      bool any = false;
+      std::vector<int> todo(sSel.begin(), sSel.end());
+      while (!todo.empty())
+      {
+         const int id = todo.back();
+         todo.pop_back();
+         const Layer* l = doc->FindLayer(id);
+         if (l == nullptr)
+            continue;
+         if (l->kind == Kind::Group)
+         {
+            for (int k : doc->ChildrenOf(id))
+               todo.push_back(k);
+            continue;
+         }
+         if (l->kind == Kind::Fill || l->kind == Kind::Adjust)
+            continue;
+         float c[8];
+         ContentCorners(doc, *l, c);
+         for (int k = 0; k < 4; k++)
+         {
+            lo[0] = std::min(lo[0], c[k * 2]), hi[0] = std::max(hi[0], c[k * 2]);
+            lo[1] = std::min(lo[1], c[k * 2 + 1]), hi[1] = std::max(hi[1], c[k * 2 + 1]);
+         }
+         any = true;
+      }
+      return any ? true : SelBounds(doc, lo, hi);
+   }
+
    void FlipSelection(Scene2DNode* doc, bool vertical)
    {
       float lo[2], hi[2];
-      if (!SelBounds(doc, lo, hi))
+      if (!PivotBounds(doc, lo, hi))
          return;
       const float px = (lo[0] + hi[0]) * 0.5f, py = (lo[1] + hi[1]) * 0.5f;
       if (!FreeTransformOn(doc))
@@ -3836,7 +3959,7 @@ namespace
    void TurnSelection(Scene2DNode* doc, float deg)
    {
       float lo[2], hi[2];
-      if (!SelBounds(doc, lo, hi))
+      if (!PivotBounds(doc, lo, hi))
          return;
       const ImVec2 pivot((lo[0] + hi[0]) * 0.5f, (lo[1] + hi[1]) * 0.5f);
       if (!FreeTransformOn(doc))
@@ -5562,6 +5685,8 @@ namespace
                }
             if (any && MenuParts::Item(T("Free Transform"), Sc("Ctrl+T"), FreeTransformOn(doc)))
                FreeTransformOn(doc) ? EndFreeTransform(doc, true) : BeginFreeTransform(doc);
+            if (any)
+               TransformSubMenu(doc);
             if (any && MenuParts::Item(T("Delete"), "Delete"))
             {
                if (SelectionActsOnPixels(doc))
@@ -5587,6 +5712,7 @@ namespace
                      SelStep("Invert selection");
                      doc->InvertSelection();
                   }
+                  if (MenuParts::Item(T("Crop to Selection"))) CropToSelection(doc);
                }
                // One Fill.. row: it fills the selection, or a pixel layer whole (tool-layer-matrix.md).
                if ((doc->HasSelection() || k->kind == Kind::Paint) && MenuParts::Item(T("Fill..."), "Shift+F5")) sFillAsk = true;
@@ -5613,6 +5739,8 @@ namespace
                      break;
                   case Kind::Group:
                      if (MenuParts::Item(T("Ungroup"), Sc("Shift+Ctrl+G"))) sPending.what = Pending::Ungroup;
+                     if (MenuParts::Item(T("Flatten Group"))) sPending.what = Pending::FlattenGroup;
+                     if (MenuParts::Item(T("Select Layer Pixels"))) SelectLayerPixels(doc, k->id, Scene2DNode::kSelNew);
                      break;
                   case Kind::Fill:
                   case Kind::Adjust:
@@ -5654,6 +5782,7 @@ namespace
                   if (l.parent == 0)
                      sSel.push_back(l.id);
             }
+            if (MenuParts::Item(T("Trim Transparent Edges"))) TrimDocument(doc);
             if (MenuParts::Item(T("Fit on Screen"), Sc("Ctrl+0"))) FitView(doc);
             if (MenuParts::Item(T("Actual Pixels"), Sc("Ctrl+1")))
             {
@@ -5738,7 +5867,7 @@ namespace
          }
       }
       // The selection's marching ants, or the red quick mask, over the picture.
-      if (doc->HasSelection() || doc->quickMask)
+      if ((doc->HasSelection() || doc->quickMask) && !(doc->HasSelection() && DrawScreenAnts(dl, doc)))
          if (const unsigned ants = doc->SelectionOverlay((float)ImGui::GetTime(), doc->quickMask))
             dl->AddImageQuad((ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       if (ViewTurned())
@@ -6013,6 +6142,28 @@ namespace
          else if (hoverGuide >= 0)
             ImGui::SetMouseCursor(guideAxis == 0 ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
       }
+      // Just outside a corner turns the layer: a curved-arrow badge says so (ImGui has no rotate cursor).
+      if (hovered && !panTool && ((sOp.kind == 0 && hoverHandle == 8) || sOp.kind == 3 || sOp.kind == 21))
+      {
+         const ImVec2 c(mouse.x + 16.0f, mouse.y + 16.0f);
+         const float r = 6.0f, a0 = -2.6f, a1 = 1.2f;
+         for (int pass = 0; pass < 2; pass++)
+         {
+            const ImU32 col = pass == 0 ? IM_COL32(0, 0, 0, 200) : IM_COL32(255, 255, 255, 255);
+            const float th = pass == 0 ? 3.5f : 1.5f;
+            dl->PathArcTo(c, r, a0, a1, 14);
+            dl->PathStroke(col, 0, th);
+            const ImVec2 tip(c.x + r * std::cos(a1), c.y + r * std::sin(a1));
+            const ImVec2 tan(-std::sin(a1), std::cos(a1));   // the way the arc runs at its end
+            const ImVec2 nrm(std::cos(a1), std::sin(a1));
+            const ImVec2 p1(tip.x - tan.x * 4.0f + nrm.x * 3.0f, tip.y - tan.y * 4.0f + nrm.y * 3.0f);
+            const ImVec2 p2(tip.x - tan.x * 4.0f - nrm.x * 3.0f, tip.y - tan.y * 4.0f - nrm.y * 3.0f);
+            if (pass == 0)
+               dl->AddTriangleFilled(ImVec2(tip.x + tan.x * 1.5f, tip.y + tan.y * 1.5f), p1, p2, col);
+            else
+               dl->AddTriangleFilled(tip, p1, p2, col);
+         }
+      }
       if (hovered && !panTool && hoverHandle < 0 && hoverGuide < 0 && sGizmoHot < 0 && !BrushTool(sTool))
       {
          dl->PushClipRect(sViewMn, sViewMx, true);
@@ -6120,6 +6271,15 @@ namespace
             sCloneSrc = sMouseDoc;
             sHaveCloneSrc = true;
             sCloneOffsetSet = false;
+            // A source off the active layer's pixels (a cut-out eye, a fresh empty layer) has nothing to copy on that
+            // layer alone: the source turns to All layers, so the stroke takes what is seen there.
+            if (const Layer* a = Active(doc); a != nullptr && !sCloneAll && !doc->IsObjectLayer(*a))
+            {
+               float c[8];
+               ContentCorners(doc, *a, c);
+               if (a->kind != Kind::Paint || !InQuad(c, sMouseDoc))
+                  sCloneAll = true;
+            }
          }
          else if (sTool == kPick || ((sTool == kBrush || sTool == kFill) && io.KeyAlt))
          {
@@ -8624,6 +8784,60 @@ namespace
 
    bool FreeTransformOne(Scene2DNode* doc) { const Layer* a = Active(doc); return a != nullptr && sSel.size() == 1 && Flippable(*a) && !a->is3d; }
 
+   // Transform as one submenu on both right-click menus (Photoshop's Edit > Transform): turn or flip without
+   // starting Free Transform first. Groups turn and flip with everything in them.
+   void TransformSubMenu(Scene2DNode* doc)
+   {
+      const Layer* a = Active(doc);
+      const bool can = a != nullptr && !sSel.empty() && (Flippable(*a) || a->kind == Kind::Group);
+      if (!MenuParts::SubMenu(T("Transform"), can))
+         return;
+      if (MenuParts::Item(T("Free Transform"), Sc("Ctrl+T"))) BeginFreeTransform(doc);
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Rotate 90° Clockwise"))) TurnSelection(doc, 90.0f);
+      if (MenuParts::Item(T("Rotate 90° Counter Clockwise"))) TurnSelection(doc, -90.0f);
+      if (MenuParts::Item(T("Rotate 180°"))) TurnSelection(doc, 180.0f);
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Flip Horizontal"))) FlipSelection(doc, false);
+      if (MenuParts::Item(T("Flip Vertical"))) FlipSelection(doc, true);
+      ImGui::EndMenu();
+   }
+
+   // Document crops from a menu: to the selection's box, or Trim to what the layers show (transparent edges cut).
+   void CropToSelection(Scene2DNode* doc)
+   {
+      float lo[2], hi[2];
+      if (!doc->SelectionBounds(lo, hi))
+         return;
+      PushUndoCheckpoint("Crop to selection");
+      doc->CropTo(lo[0], lo[1], hi[0], hi[1]);
+      sNeedFit = true;
+      Touch();
+   }
+
+   void TrimDocument(Scene2DNode* doc)
+   {
+      static int sTrimFrame = 1 << 27;
+      float lo[2], hi[2];
+      if (!doc->VisibleBounds(doc->ChildrenOf(0), ++sTrimFrame, lo, hi))
+         return;
+      const auto& d = doc->Doc();
+      if (lo[0] <= 0 && lo[1] <= 0 && hi[0] >= d.w && hi[1] >= d.h)
+         return;
+      PushUndoCheckpoint("Trim");
+      doc->CropTo(lo[0], lo[1], hi[0], hi[1]);
+      sNeedFit = true;
+      Touch();
+   }
+
+   // Cmd-click a layer thumbnail (Photoshop): its pixels become the selection; Shift adds, Alt takes away.
+   void SelectLayerPixels(Scene2DNode* doc, int id, int op)
+   {
+      static int sSelPxFrame = 1 << 28;
+      SelStep("Select layer pixels");
+      doc->SelectLayerPixels(id, op, ++sSelPxFrame);
+   }
+
    void FreeTransformMenu(Scene2DNode* doc)
    {
       const bool pulls = FreeTransformOne(doc) && CanWarp(doc);
@@ -8766,8 +8980,11 @@ namespace
          if (ImGui::IsItemClicked())
             sAutoSelect = !sAutoSelect;
          gap();
+         // The 3D gizmo's modes: only with a 3D layer active. Greyed on a flat layer they read as a 2D Rotate that
+         // will not turn on; a flat layer turns from just outside a corner handle, or in Free Transform.
+         if (a != nullptr && a->is3d)
          {
-            ImGui::BeginDisabled(a == nullptr || !a->is3d);
+            ImGui::BeginDisabled(false);
             static const char* kModes[3] = { "Move##v2dgz0", "Rotate##v2dgz1", "Scale##v2dgz2" };
             static const char* kModeTip[3] = { "Move along X, Y or Z", "Rotate about X, Y or Z", "Scale the card" };
             for (int i = 0; i < 3; i++)
@@ -9063,10 +9280,19 @@ namespace
          DrawChecker(dl, p, ImVec2(p.x + sz.x, p.y + sz.y));
          const unsigned ptex = doc->PaintTexture(l.id);
          const float pw = (float)std::max(1, l.pw), ph = (float)std::max(1, l.ph);
-         const float k = std::min(sz.x / pw, sz.y / ph);
-         const ImVec2 c(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), h(pw * k * 0.5f, ph * k * 0.5f);
+         // Cropped to what the layer holds (Affinity, Procreate): a small cut-out fills the thumbnail instead of
+         // sitting as a speck in a document-sized square. A little margin keeps its edge off the frame.
+         float r[4];
+         ContentRect(doc, l, r);
+         const float m = std::max(r[2] - r[0], r[3] - r[1]) * 0.06f;
+         r[0] = std::max(0.0f, r[0] - m), r[1] = std::max(0.0f, r[1] - m);
+         r[2] = std::min(pw, r[2] + m), r[3] = std::min(ph, r[3] + m);
+         const float cw = std::max(1.0f, r[2] - r[0]), ch = std::max(1.0f, r[3] - r[1]);
+         const float k = std::min(sz.x / cw, sz.y / ch);
+         const ImVec2 c(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), h(cw * k * 0.5f, ch * k * 0.5f);
          if (ptex != 0)
-            dl->AddImage((ImTextureID)(intptr_t)ptex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
+            dl->AddImage((ImTextureID)(intptr_t)ptex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y),
+                         ImVec2(r[0] / pw, 1.0f - r[1] / ph), ImVec2(r[2] / pw, 1.0f - r[3] / ph));
          return;
       }
       if (l.kind == Kind::Vector || l.kind == Kind::Text)
@@ -9172,6 +9398,10 @@ namespace
          const bool aimMask = hasMask && sEditMask && Active(doc) == l;
          const ImVec2 tsz(28, rowH - 4);
          DrawThumb(dl, doc, *l, ImVec2(x, p.y + 2), tsz);
+         if ((io.KeySuper || io.KeyCtrl) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() &&
+             ImGui::IsMouseHoveringRect(ImVec2(x, p.y + 2), ImVec2(x + tsz.x, p.y + 2 + tsz.y)) &&
+             l->kind != Kind::Fill && l->kind != Kind::Adjust)
+            SelectLayerPixels(doc, id, io.KeyShift ? Scene2DNode::kSelAdd : io.KeyAlt ? Scene2DNode::kSelSub : Scene2DNode::kSelNew);
          if (hasMask)
          {
             ImGui::SetCursorScreenPos(ImVec2(x, p.y + 2));
@@ -9299,13 +9529,19 @@ namespace
             if (MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
             if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
             if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"), false, !sClip.empty())) sPending.what = Pending::Paste;
-            if (MenuParts::Item(T("Duplicate Layer"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
+            if (MenuParts::Item(l->kind == Kind::Group ? T("Duplicate Group") : T("Duplicate Layer"), Sc("Ctrl+J")))
+               sPending.what = Pending::Duplicate;
+            TransformSubMenu(doc);
+            if (l->kind != Kind::Fill && l->kind != Kind::Adjust && MenuParts::Item(T("Select Layer Pixels")))
+               SelectLayerPixels(doc, id, Scene2DNode::kSelNew);
             MenuParts::Separator();
             // Photoshop's merges: the picture as it looks, into one pixel layer.
             if (sSel.size() > 1 ? MenuParts::Item(T("Merge Layers"), Sc("Ctrl+E"))
                                 : MenuParts::Item(T("Merge Down"), Sc("Ctrl+E"), false, LayerUnder(doc, id) != 0))
                sPending.what = Pending::MergeDown;
             if (MenuParts::Item(T("Merge Visible"), Sc("Shift+Ctrl+E"))) sPending.what = Pending::MergeVisible;
+            // A group flattens alone: its layers become one pixel layer, every other layer and group stays as it is.
+            if (l->kind == Kind::Group && MenuParts::Item(T("Flatten Group"), nullptr)) sPending.what = Pending::FlattenGroup;
             if (MenuParts::Item(T("Flatten Image"), nullptr)) sPending.what = Pending::Flatten;
             MenuParts::Separator();
             if (MenuParts::Item(T("Group Layers"), Sc("Ctrl+G"))) sPending.what = Pending::Group;
@@ -11347,6 +11583,17 @@ namespace
                sSel = kids;
             }
          break;
+      case Pending::FlattenGroup:
+         if (Layer* a = Active(doc))
+            if (a->kind == Kind::Group)
+            {
+               static int sFlatGroupFrame = 1 << 25;
+               PushUndoCheckpoint("Flatten group");
+               if (const int nid = doc->MergeLayers({ a->id }, ++sFlatGroupFrame))
+                  SelectOnly(nid);
+               Touch();
+            }
+         break;
       case Pending::MergeDown:
       case Pending::MergeVisible:
       case Pending::Flatten:
@@ -12419,11 +12666,17 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       EndFreeTransform(doc, true);
       expect("ending it goes back to the brush", sTool == kBrush);
       float c0[8], c1[8];
-      corners(c0);
+      // A cut-out flips in place: the pivot is what the layer shows, not its whole (document-sized) box.
+      static int sTestFrame = 1 << 24;
+      float v0lo[2], v0hi[2], v1lo[2], v1hi[2];
+      const bool seen0 = doc->VisibleBounds({ id }, ++sTestFrame, v0lo, v0hi);
+      corners(c0);   // after the render: a node layer's box is the document until its source has a size
       FlipSelection(doc, false);
       corners(c1);
-      expect("Flip Horizontal mirrors the box about its middle",
-             near(c1[0], c0[2]) && near(c1[1], c0[3]) && near(c1[2], c0[0]) && near(c1[3], c0[1]));
+      const bool seen1 = doc->VisibleBounds({ id }, ++sTestFrame, v1lo, v1hi);
+      expect("Flip Horizontal mirrors the layer where its pixels are",
+             seen0 && seen1 && std::fabs(v0lo[0] - v1lo[0]) < 1.5f && std::fabs(v0hi[0] - v1hi[0]) < 1.5f
+                && std::fabs(v0lo[1] - v1lo[1]) < 1.5f && std::fabs(v0hi[1] - v1hi[1]) < 1.5f && near(c1[1], c0[3]));
       FlipSelection(doc, false);
       FlipSelection(doc, true);
       FlipSelection(doc, true);
@@ -12576,6 +12829,47 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->Ungroup(g);
       }
       expect("a click on empty paint picks neither paint layer", empty != a && empty != b);
+   }
+   // Flatten Group flattens that group alone; Select Layer Pixels takes what a layer shows; a cut-out flips in place.
+   {
+      const size_t n0 = doc->Layers().size();
+      const int a = doc->AddPaintLayer();
+      stroke(a, W * 0.2f, H * 0.2f, W * 0.25f, H * 0.2f);
+      const int b = doc->AddPaintLayer();
+      stroke(b, W * 0.3f, H * 0.3f, W * 0.35f, H * 0.3f);
+      const int c = doc->AddPaintLayer();
+      stroke(c, W * 0.6f, H * 0.7f, W * 0.7f, H * 0.7f);
+      doc->Commit();
+      const int g = doc->GroupLayers({ a, b });
+      doc->Commit();
+      SelectOnly(g);
+      sPending.what = Pending::FlattenGroup;
+      RunPending(doc);
+      doc->Commit();
+      const Layer* flat = Active(doc);
+      const int flatId = flat != nullptr ? flat->id : 0;
+      expect("Flatten Group makes one pixel layer of the group", flat != nullptr && flat->kind == Kind::Paint && doc->FindLayer(g) == nullptr
+                                                                  && doc->FindLayer(a) == nullptr && doc->FindLayer(b) == nullptr);
+      expect("Flatten Group leaves the other layers alone", doc->FindLayer(c) != nullptr && doc->Layers().size() == n0 + 2);
+      static int sTestFrame2 = 1 << 23;
+      float vlo[2], vhi[2], slo[2], shi[2];
+      const bool seen = doc->VisibleBounds({ c }, ++sTestFrame2, vlo, vhi);
+      SelectOnly(c);
+      SelectLayerPixels(doc, c, Scene2DNode::kSelNew);
+      expect("Select Layer Pixels selects what the layer shows", seen && doc->SelectionBounds(slo, shi)
+                                                                 && std::fabs(slo[0] - vlo[0]) < 2.0f && std::fabs(shi[0] - vhi[0]) < 2.0f
+                                                                 && std::fabs(slo[1] - vlo[1]) < 2.0f && std::fabs(shi[1] - vhi[1]) < 2.0f);
+      doc->Deselect();
+      FlipSelection(doc, false);
+      doc->Commit();
+      float flo[2], fhi[2];
+      const bool seenF = doc->VisibleBounds({ c }, ++sTestFrame2, flo, fhi);
+      expect("a cut-out on a full-size layer flips where it is", seen && seenF && std::fabs(flo[0] - vlo[0]) < 2.0f && std::fabs(fhi[0] - vhi[0]) < 2.0f);
+      if (flatId != 0)
+         doc->RemoveLayer(flatId);
+      doc->RemoveLayer(c);
+      doc->Commit();
+      sSel.clear();
    }
    // Pixel-accurate hit on a 3D object: the box corner misses the sphere, the centre hits it.
    {
