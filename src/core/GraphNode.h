@@ -54,7 +54,7 @@ struct GraphNode
    // the render cost, and NodeViewport::Render already skips redrawing when
    // nothing changed, so an idle viewport is cheap. Still a per-node toggle
    // (via ViewportToggle/context menu) for anyone who wants to turn it off.
-   bool showMiniViewport = true;
+   bool showMiniViewport = false; // fork: was true; off for new nodes (patches store it explicitly)
    // Audio nodes only (see docs/plans/audio/audio-node-ui-system.md §1):
    // Tier 1 params sit in an always-visible compact grid, so "params visible
    // at all" (showParams, above - unused by audio nodes) and "showing the

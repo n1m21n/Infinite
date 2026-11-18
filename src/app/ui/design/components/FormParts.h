@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "core/TablerIcons.h"
 #include "app/ui/design/UiType.h"
@@ -152,7 +153,7 @@ namespace FormParts
       if (open)
          MenuParts::BeginContent();
       else if (cut && ImGui::IsItemHovered())
-         ImGui::SetTooltip("%s", preview);
+         app::NodeTip("%s", preview);
       return open;
    }
    inline void EndCombo()

@@ -573,6 +573,12 @@ namespace app
    {
       start = std::max<Arrange::Tick>(0, start);
       end = std::max(end, start);
+      // fork: an enabled loop of zero length is the "the loop button does nothing" state - the model
+      // says on, Transport::SetLoop then drops it (span > 0 is required), so playback runs straight
+      // past the loop point. Every caller (toggle, ruler drag, load, RPC) lands here, so the floor
+      // belongs here; ArrangePanel's own release guard uses the same 1/64.
+      if (enabled && end - start < Arrange::kPPQ / 16)
+         end = start + Arrange::kPPQ / 16;
       Arrange::LoopRange& loop = gArrange.settings.loop;
       if (loop.enabled == enabled && loop.start == start && loop.end == end)
          return;

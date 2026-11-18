@@ -6,6 +6,7 @@
 #include <type_traits>
 #include "imgui_internal.h"
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 #include "app/selftest/UiAudit.h"
 
 namespace FieldWell
@@ -216,7 +217,7 @@ namespace FieldWell
          const ImVec2 p = ImGui::GetCursorScreenPos();
          if (ImGui::InvisibleButton("##sw", ImVec2(d, d))) clicked = i;
          const bool hov = ImGui::IsItemHovered();
-         if (hov && names != nullptr) ImGui::SetTooltip("%s", names[i]);
+         if (hov && names != nullptr) app::NodeTip("%s", names[i]);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(p.x + d * 0.5f, p.y + d * 0.5f);
          dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), cols[i], 48);

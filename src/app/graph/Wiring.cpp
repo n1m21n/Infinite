@@ -1,5 +1,6 @@
 // Cable / slot compatibility, connect, schema probe, cluster links, spawn (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/graph/PortProbeCache.h"
 
 namespace app
 {
@@ -1543,52 +1544,13 @@ namespace app
       if (srcNode == nullptr)
          return result;
 
-      const bool srcIsModulator =
-         dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr ||
-         (srcNode->node->OutputCount() > 0 && srcNode->node->ModulatorOutput(0) != nullptr);
-      auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode->node.get());
-      auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode->node.get());
-      if (srcGeometry != nullptr && !srcGeometry->IsGeometryOutputIndex(srcOutputIndex))
-         srcGeometry = nullptr;
-      auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
-      auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
-      const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
-      auto* srcAudioSource = dynamic_cast<IAudioSource*>(srcNode->node.get());
-      const bool srcIsAudioNode = srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
-      const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
-      // A Predictive LFO / Macro drives parameters only, so nothing in the
-      // catalogue is a legal drop target for it - suggesting anything here
-      // would offer a link IsInputSlotCompatible then refuses.
-      const bool srcIsPredictor = dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
-
+      // fork: answered from the per-type port cache (PortProbeCache.cpp) - no node is constructed per drop.
+      // A Predictive LFO / Macro (kSrcPredictor) drives parameters only, so nothing is a legal drop target for it.
+      const uint16_t kind = SrcKindOfOutput(srcNode, srcOutputIndex);
       for (const std::string& category : NodeFactory::Instance().GetCategories())
-      {
          for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
-         {
-            if (!IsUserSpawnable(name))
-               continue;
-
-            GraphNode probe;
-            probe.node.reset(NodeFactory::Instance().MakeNode(name));
-            if (!probe.node)
-               continue;
-
-            const int slotCount = InputCountFor(probe);
-            bool compatible = false;
-            for (int slot = 0; slot < slotCount; ++slot)
-            {
-               if (IsInputSlotCompatible(&probe, slot, srcIsModulator, srcPalette, srcGeometry,
-                                          srcCamera, srcLight, srcIsEnvironment,
-                                          srcIsAudioNode, srcIsNoteSource, srcIsPredictor))
-               {
-                  compatible = true;
-                  break;
-               }
-            }
-            if (compatible)
+            if (IsUserSpawnable(name) && TypeAcceptsKind(name, kind))
                result.emplace_back(name, category);
-         }
-      }
       return result;
    }
 

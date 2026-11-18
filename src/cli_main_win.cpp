@@ -44,7 +44,7 @@ int main()
    std::wstring dir(self, n);
    const size_t slash = dir.find_last_of(L"\\/");
    dir = slash == std::wstring::npos ? std::wstring() : dir.substr(0, slash + 1);
-   const std::wstring target = dir + L"Infinite.exe";
+   const std::wstring target = dir + L"InfiniteTU.exe"  /* fork: */;
 
    // Everything after argv[0] in the raw command line, untouched, so quoting
    // reaches the child exactly as the caller wrote it.
@@ -94,7 +94,7 @@ int main()
    PROCESS_INFORMATION pi = {};
    if (!CreateProcessW(target.c_str(), cmdBuf.data(), nullptr, nullptr, inherit, 0, nullptr, nullptr, &si, &pi))
    {
-      std::fprintf(stderr, "Infinite.com: cannot start Infinite.exe next to it (error %lu)\n", GetLastError());
+      std::fprintf(stderr, "InfiniteTU.com: cannot start InfiniteTU.exe next to it (error %lu)\n", GetLastError());
       return 127;
    }
    CloseHandle(pi.hThread);

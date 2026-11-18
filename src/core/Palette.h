@@ -78,6 +78,7 @@ public:
 
    // Colours registered during the current frame's node drawing.
    void ClearFrameColors() { mFrameColors.clear(); }
+   void TruncateFrameColors(size_t n) { if (n < mFrameColors.size()) mFrameColors.resize(n); } // fork: inspector
    void RegisterColor(const ColorRef& ref) { mFrameColors.push_back(ref); }
    const std::vector<ColorRef>& FrameColors() const { return mFrameColors; }
 

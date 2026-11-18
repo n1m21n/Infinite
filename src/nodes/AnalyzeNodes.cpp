@@ -274,12 +274,10 @@ void ImageAnalyzeNode::Analyze()
       glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 0);
    });
 
-   mPixels.assign((size_t)size * size * 4, 0);
    GLint prevFbo = 0;
    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
    glBindFramebuffer(GL_FRAMEBUFFER, mSmallFbo);
-   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-   glReadPixels(0, 0, size, size, GL_RGBA, GL_UNSIGNED_BYTE, mPixels.data());
+   mPboRead.Read(size, mPixels); // fork: async PBO readback, 1-frame latency
    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
 
    const bool haveHistory = mPrevPixels.size() == mPixels.size();

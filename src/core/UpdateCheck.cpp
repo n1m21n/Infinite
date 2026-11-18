@@ -264,7 +264,7 @@ namespace
 
 void Start()
 {
-   if (getenv("INFINITE_NO_UPDATE_CHECK") != nullptr || getenv("IMAGERESYNTH_SELFTEST") != nullptr)
+   if (true /* fork: updates would pull the official build over Infinite TU */ || getenv("INFINITE_NO_UPDATE_CHECK") != nullptr || getenv("IMAGERESYNTH_SELFTEST") != nullptr)
    {
       // Resolve synchronously rather than leaving GetStatus() at Idle - a
       // modal driven off it must not spin on "Checking..." forever, and the

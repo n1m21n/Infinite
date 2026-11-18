@@ -209,7 +209,7 @@ namespace Platform
       const char* home = getenv("HOME");
       if (home == nullptr)
          return std::string();
-      std::string dir = std::string(home) + "/Library/Application Support/Infinite";
+      std::string dir = std::string(home) + "/Library/Application Support/InfiniteTU";  // fork:
       if (getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
          dir += "/plugin_drag_test";
       mkdir(dir.c_str(), 0755);

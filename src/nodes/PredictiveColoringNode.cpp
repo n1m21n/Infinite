@@ -353,12 +353,10 @@ void PredictiveColoringNode::AnalyzeInput(unsigned int srcTex, double t)
       glUniform1i(glGetUniformLocation(mDownsampleProgram, "uSrc"), 0);
    });
 
-   mPixels.assign((size_t)size * size * 4, 0);
    GLint prevFbo = 0;
    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
    glBindFramebuffer(GL_FRAMEBUFFER, mDownsampleFbo);
-   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-   glReadPixels(0, 0, size, size, GL_RGBA, GL_UNSIGNED_BYTE, mPixels.data());
+   mPboRead.Read(size, mPixels); // fork: async PBO readback, 1-frame latency
    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
 
    mLiveHist.Clear();

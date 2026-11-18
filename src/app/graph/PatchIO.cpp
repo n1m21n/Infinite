@@ -1,4 +1,5 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector
 #include <algorithm>
 #include "app/AppShared.h"
 #include "app/panels/CurveEditorPanel.h"
@@ -63,7 +64,11 @@ namespace app
          Patch::NodeRecord rec;
          rec.index = gn.index;
          rec.uid = gn.uid;
-         rec.category = gn.category;
+         // fork: never write a node whose category is empty - "node 14  Set Vertex Color" saves a
+         // double space the loader turns into category "Set" / type "Vertex Color" and skips. The
+         // type name is the identity that survives; resolve the category from it as every other
+         // spawn path does (Wiring.cpp SchemaProbe, ChatPanel's add).
+         rec.category = !gn.category.empty() ? gn.category : NodeFactory::Instance().CategoryOf(gn.typeName);
          rec.typeName = gn.typeName;
          // The cached live position, not the spawn position: the node has almost
          // certainly been dragged since it was created. Read from the cache
@@ -291,6 +296,8 @@ namespace app
          gMetronomeVolume = std::clamp((float)atof(line.c_str()), 0.0f, 1.0f);
       if (std::getline(file, line) && !line.empty())
          gMetronomeAccent = (line != "0");
+      if (std::getline(file, line) && !line.empty()) // fork: preview quality
+         gPreviewQuality = std::clamp(atoi(line.c_str()), 0, 2);
    }
 
 
@@ -303,7 +310,8 @@ namespace app
       file << (gAutosaveEnabled ? "1" : "0") << "\n" << gAutosaveSeconds << "\n"
            << gTargetFps << "\n" << (gVsync ? "1" : "0") << "\n"
            << (gCheckerboardBackdrop ? "1" : "0") << "\n"
-           << gMetronomeVolume << "\n" << (gMetronomeAccent ? "1" : "0") << "\n";
+           << gMetronomeVolume << "\n" << (gMetronomeAccent ? "1" : "0") << "\n"
+           << gPreviewQuality << "\n"; // fork
    }
 
 
@@ -369,6 +377,8 @@ namespace app
             gViewportPanelWidth = std::max(kViewportPanelMinWidth, std::strtof(val.c_str(), nullptr));
          else if (key == "panelViewportH")
             gViewportPanelHeight = std::max(kViewportPanelMinHeight, std::strtof(val.c_str(), nullptr));
+         else if (InspectorLoadSetting(key, val)) // fork: inspector
+            ;
          else if (key == "panelMatrixOpen")
             gModMatrixOpen = (val != "0");
          else if (key == "panelMatrixDock")
@@ -458,6 +468,7 @@ namespace app
       file << "panelViewportDock=" << gViewportPanelDock << "\n";
       file << "panelViewportW=" << gViewportPanelWidth << "\n";
       file << "panelViewportH=" << gViewportPanelHeight << "\n";
+      InspectorSaveSettings(file); // fork: inspector
       file << "panelMatrixOpen=" << (gModMatrixOpen ? 1 : 0) << "\n";
       file << "panelMatrixDock=" << gModMatrixDock << "\n";
       file << "panelMatrixW=" << gModMatrixWidth << "\n";
@@ -503,6 +514,7 @@ namespace app
                     gSampleStudioDock, gPianoRollDock, gTerminalDock,
                     gViewportPanelWidth, gViewportPanelHeight, gModMatrixWidth, gModMatrixHeight, gPerfPanelWidth,
                     gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight, gPianoRollHeight, gTerminalHeight, gTerminalWidth);
+      std::snprintf(buf + strlen(buf), sizeof buf - strlen(buf), "|%llu", (unsigned long long)InspectorLayoutHash()); // fork
       static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
       static std::string sSeen = buf;
       static double sSeenAt = 0.0;

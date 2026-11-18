@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include <unordered_set>
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -7,6 +8,7 @@
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "app/graph/PortProbeCache.h"
 #include "app/panels/CurveEditorPanel.h"
 
 namespace app
@@ -253,8 +255,41 @@ void DrawPopupsB(FrameCtx& fc)
                                       gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
          ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       }
+      WarmPortProbeCache(3.0);   // fork: fill the port cache a few ms per frame after startup
       if (MenuParts::BeginPopup("search"))
       {
+         // fork: while a cable is being dropped, node types that cannot take it are drawn at ~30% alpha (still
+         // clickable: the node is then created without a connection). A modulator cable is exempt - nearly every
+         // node accepts it through a parameter pin, so the "Suggested" set would dim almost everything wrongly.
+         static std::unordered_set<std::string> sCompatible;
+         static std::size_t sCompatKey = 0;
+         static bool sDimIncompatible = false;
+         {
+            std::size_t key = (std::size_t)(gLinkDragSourcePin + 2) * 1000003u + gLinkDragSuggestions.size();
+            if (!gLinkDragSuggestions.empty())
+               key ^= std::hash<std::string>()(gLinkDragSuggestions.front().first) * 31u ^
+                      std::hash<std::string>()(gLinkDragSuggestions.back().first);
+            if (key != sCompatKey)
+            {
+               sCompatKey = key;
+               sCompatible.clear();
+               for (const auto& t : gLinkDragSuggestions)
+                  sCompatible.insert(t.first);
+               bool modulatorSource = false;
+               if (gLinkDragSourcePin >= 0 && GraphNode::IsOutputPin(gLinkDragSourcePin))
+               {
+                  GraphNode* src = FindNodeByIndex(GraphNode::NodeIndexFromPin(gLinkDragSourcePin));
+                  if (src != nullptr && src->node)
+                     modulatorSource = dynamic_cast<IModulator*>(src->node.get()) != nullptr ||
+                                       ModulatorForOutput(src->node.get(),
+                                                          GraphNode::OutputIndexFromPin(gLinkDragSourcePin)) != nullptr;
+               }
+               sDimIncompatible = gLinkDragSourcePin >= 0 && !sCompatible.empty() && !modulatorSource;
+            }
+         }
+         const auto isDimmed = [&](const std::string& name) {
+            return sDimIncompatible && sCompatible.find(name) == sCompatible.end();
+         };
          searchPopupCentered = false;
          searchPopupOpen = true;
          // Shift+N pressed again while the picker was up - see searchRequestClose.
@@ -329,7 +364,13 @@ void DrawPopupsB(FrameCtx& fc)
                      if (!IsUserSpawnable(name))
                         continue;
                      ++shown;
-                     if (MenuParts::Item(DisplayName(name).c_str()))
+                     const bool dimmed = isDimmed(name);   // fork
+                     if (dimmed)
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.3f);
+                     const bool picked = MenuParts::Item(DisplayName(name).c_str());
+                     if (dimmed)
+                        ImGui::PopStyleVar();
+                     if (picked)
                      {
                         spawnName = name;
                         spawnCategory = category;
@@ -341,13 +382,22 @@ void DrawPopupsB(FrameCtx& fc)
          }
          else
          {
+            // fork: matches first, compatible ones ahead of the rest (stable, so each group keeps its order)
+            std::vector<const std::pair<std::string, std::string>*> matches;
             for (const auto& t : allTypes)
             {
                std::string hay = DisplayName(t.first) + " " + DisplayName(t.second);
                if (I18n::CurrentLanguage() != "en")
                   hay += " " + NodeSearchHaystack(t.first, t.second);
-               if (!NodeSearchMatches(hay, q))
-                  continue;
+               if (NodeSearchMatches(hay, q))
+                  matches.push_back(&t);
+            }
+            if (sDimIncompatible)
+               std::stable_partition(matches.begin(), matches.end(),
+                                     [&](const auto* t) { return !isDimmed(t->first); });
+            for (const auto* tp : matches)
+            {
+               const auto& t = *tp;
                ++shown;
                const std::string title = DisplayName(t.first);
                const std::string category = DisplayName(t.second);
@@ -355,7 +405,12 @@ void DrawPopupsB(FrameCtx& fc)
                // row id comes from the label, so the type name keeps each row's id unique.
                ImGui::PushID(t.first.c_str());
                ImGui::PushID(t.second.c_str());
+               const bool dimmed = isDimmed(t.first);
+               if (dimmed)
+                  ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.3f);
                bool activate = MenuParts::Item(title.c_str(), category.c_str());
+               if (dimmed)
+                  ImGui::PopStyleVar();
                ImGui::PopID();
                ImGui::PopID();
                if (shown == 1 && pickFirst)

@@ -223,7 +223,7 @@ namespace License
          return env;
 #if defined(_WIN32)
       if (std::string appdata; AppPaths::GetEnvUtf8("APPDATA", appdata) && !appdata.empty())
-         return (AppPaths::FsPath(appdata) / "Infinite").u8string();
+         return (AppPaths::FsPath(appdata) / ForkIdentity::kDataDirName).u8string();  // fork:
       return std::string();
 #else
       // The account's real home, not $HOME: a sandboxed host points $HOME into its container.
@@ -235,11 +235,11 @@ namespace License
       if (home.empty())
          return std::string();
 #if defined(__APPLE__)
-      return home + "/Library/Application Support/Infinite";
+      return home + "/Library/Application Support/InfiniteTU";  // fork:
 #else
       if (const char* xdg = getenv("XDG_CONFIG_HOME"); xdg && *xdg)
-         return std::string(xdg) + "/infinite";
-      return home + "/.config/infinite";
+         return std::string(xdg) + "/infinitetu";  // fork:
+      return home + "/.config/infinitetu";  // fork:
 #endif
 #endif
    }

@@ -446,6 +446,24 @@ namespace PatchSchema
          const TypeSchema* t = env.schema(n.typeName);
          if (t == nullptr)
          {
+            // fork: a category-less header ("node 14  Set Vertex Color", written by builds before the
+            // writer was fixed) makes the reader split the line as category "Set" + type "Vertex
+            // Color", and the node is silently dropped as an unknown type. The real type is the
+            // captured word followed by what was read; accept it when that name really exists.
+            const std::string joined = !n.category.empty() && n.category.find(' ') == std::string::npos
+                                          ? n.category + " " + n.typeName
+                                          : std::string();
+            const TypeSchema* fixed = joined.empty() ? nullptr : env.schema(joined);
+            if (fixed != nullptr)
+            {
+               errors.push_back(Make("E_MISSING_CATEGORY",
+                                     "node line has no category: 'node 14  Set Vertex Color' reads back as category 'Set' "
+                                     "and type 'Vertex Color', so the node would be dropped (it is really '" + joined +
+                                        "'). Write it as 'node 14 3D " + joined + "'",
+                                     n.line, n.index,
+                                     "save the patch again with this build, which always writes the category"));
+               continue;
+            }
             errors.push_back(Make("E_UNKNOWN_TYPE", "unknown node type '" + n.typeName + "'", n.line, n.index,
                                   "did you mean: " + Join(Nearest(n.typeName, env.allTypes, 3))));
             continue;

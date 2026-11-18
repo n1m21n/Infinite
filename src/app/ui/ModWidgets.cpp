@@ -1,4 +1,5 @@
 // Modulatable sliders, knobs, faders, toggles, pins (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector pin wrappers
 #include "app/selftest/UiAudit.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
@@ -146,8 +147,8 @@ namespace app
 
       ImGui::PushID(paramIndex + 5000);
 
-      ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      insp::BeginPin(pinId, ed::PinKind::Input);
+      insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float box = tok::pin_box;
       // Centred on the slider track's frame height, same fix and same
@@ -168,7 +169,7 @@ namespace app
                     : PinDot::State::Idle,
                     isLight);
       ExpandPinHit(c, p.x + box);
-      ed::EndPin();
+      insp::EndPin();
       GraphNode* curGn = FindNodeByIndex(nodeIndex);
       // rowMin starts after the pin box + its SameLine gap, not at the pin
       // itself - see the matching comment on DrawDiscreteParamPin's push.
@@ -1519,14 +1520,14 @@ namespace app
          const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - 8.0f);
          const ImVec2 pinTL(pinX, cellOrigin.y + (diameter - box) * 0.5f);  // centred on the knob (node-ui-pillars P2)
          ImGui::SetCursorScreenPos(pinTL);
-         ed::BeginPin(pinId, ed::PinKind::Input);
-         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+         insp::BeginPin(pinId, ed::PinKind::Input);
+         insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
          ImGui::Dummy(ImVec2(box, box));
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(pinTL.x + box * 0.5f, pinTL.y + box * 0.5f);
          PinDot::Param(dl, c, pinState, IsThemeLight());
          ExpandPinHit(c, pinTL.x + box);
-         ed::EndPin();
+         insp::EndPin();
          gPinAnchors[pinId] = c;
          GraphNode* curGn = FindNodeByIndex(nodeIndex);
          ParamPinScreenInfo pinInfo{ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
@@ -1634,8 +1635,8 @@ namespace app
       ImGui::PushID(label);
       ImGui::PushID(colorIndex + 9000);
 
-      ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      insp::BeginPin(pinId, ed::PinKind::Input);
+      insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 rowStart = ImGui::GetCursorScreenPos();
       const float box = tok::pin_box;
       // centred on the face, like every param pin (P2)
@@ -1646,7 +1647,7 @@ namespace app
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       PinDot::Swatch(dl, c, isBound, IsThemeLight());
       ExpandPinHit(c, p.x + box);
-      ed::EndPin();
+      insp::EndPin();
       ImGui::SetCursorScreenPos(ImVec2(rowStart.x + box + 4.0f, rowStart.y));
 
       char boundCaption[96];
@@ -1704,10 +1705,10 @@ namespace app
       auto stub = [&](int pinId)
       {
          ImGui::SetCursorScreenPos(ImVec2(anchor.x - 0.5f, anchor.y - 0.5f));
-         ed::BeginPin(pinId, ed::PinKind::Input);
-         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+         insp::BeginPin(pinId, ed::PinKind::Input);
+         insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
          ImGui::Dummy(ImVec2(1.0f, 1.0f));
-         ed::EndPin();
+         insp::EndPin();
       };
 
       if (colors)
@@ -1927,8 +1928,8 @@ namespace app
    // the visible dot; connecting used to require pixel-perfect aim.
    void DrawPin(int pinId, ed::PinKind kind, const char* label, bool labelFirst)
    {
-      ed::BeginPin(pinId, kind);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      insp::BeginPin(pinId, kind);
+      insp::PinPivotAlignment(ImVec2(0.5f, 0.5f));
 
       if (labelFirst && label != nullptr && label[0] != '\0')
       {
@@ -1952,6 +1953,6 @@ namespace app
          ImGui::SameLine(0.0f, 4.0f);
          ImGui::TextDisabled("%s", label);
       }
-      ed::EndPin();
+      insp::EndPin();
    }
 }

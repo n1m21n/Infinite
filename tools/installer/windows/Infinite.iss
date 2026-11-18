@@ -18,14 +18,14 @@
 #endif
 
 [Setup]
-AppId={{6E1F3C2A-9B4D-4F7E-A1C5-3D8B2F6E9A01}
-AppName=Infinite
+AppId={{B7D2A0C4-5E19-4C83-9F6A-71E4D0A2C8F3}
+AppName=Infinite TU
 AppVersion={#Version}
-AppVerName=Infinite {#Version}
+AppVerName=Infinite TU {#Version}
 AppPublisher=Infinite Devices
 AppPublisherURL=https://infinitedevices.org
 AppSupportURL=https://infinitedevices.org/download.html
-DefaultDirName={localappdata}\Programs\Infinite
+DefaultDirName={localappdata}\Programs\InfiniteTU
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -40,10 +40,10 @@ WizardStyle=modern
 WizardImageFile={#Art}\wizard.bmp
 WizardSmallImageFile={#Art}\wizard-small.bmp
 SetupIconFile=..\..\..\art\brand\logo\windows\Infinite.ico
-UninstallDisplayIcon={app}\Infinite.exe
+UninstallDisplayIcon={app}\InfiniteTU.exe
 LicenseFile={#Terms}
 OutputDir={#Out}
-OutputBaseFilename=Infinite-Setup-windows-{#Arch}
+OutputBaseFilename=InfiniteTU-Setup-windows-{#Arch}
 Compression=lzma2/max
 SolidCompression=yes
 CloseApplications=yes
@@ -55,29 +55,23 @@ Name: "custom"; Description: "Choose"; Flags: iscustom
 
 [Components]
 Name: "app"; Description: "Infinite app"; Types: full custom
-Name: "vst3"; Description: "VST3 (Infinite Instrument, Infinite FX)"; Types: full custom
 
 [Files]
 Source: "{#Src}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{userprograms}\Infinite"; Filename: "{app}\Infinite.exe"; Components: app
-Name: "{userdesktop}\Infinite"; Filename: "{app}\Infinite.exe"; Components: app
+Name: "{userprograms}\Infinite TU"; Filename: "{app}\InfiniteTU.exe"; Components: app
+Name: "{userdesktop}\Infinite TU"; Filename: "{app}\InfiniteTU.exe"; Components: app
 
 [Run]
-Filename: "{app}\Infinite.com"; Parameters: "--install-plugins vst3"; Components: vst3; \
-  StatusMsg: "Adding the plugins to your VST3 folder..."; Flags: runhidden waituntilterminated
-Filename: "{app}\Infinite.exe"; Description: "Open Infinite"; Components: app; \
+Filename: "{app}\InfiniteTU.exe"; Description: "Open Infinite TU"; Components: app; \
   Flags: postinstall nowait skipifsilent unchecked
 
-[UninstallRun]
-Filename: "{app}\Infinite.com"; Parameters: "--uninstall-plugins"; RunOnceId: "RemovePlugins"; Flags: runhidden waituntilterminated
-
 [Messages]
-WelcomeLabel1=Infinite
+WelcomeLabel1=Infinite TU (fork)
 WelcomeLabel2=A visual instrument and effect for your DAW, and the standalone app.%n%nNext you choose what to install. Everything installs for your user account, so no admin rights are needed.
 SelectComponentsLabel2=Infinite app is the standalone app. VST3 adds Infinite Instrument and Infinite FX for your DAW.
-FinishedHeadingLabel=Infinite is installed
+FinishedHeadingLabel=Infinite TU is installed
 ; steps:begin (tools/installer/sync_steps.py)
 FinishedLabelNoIcons=Next:%n%n1. Open your DAW and rescan plugins.%n%n2. Add Infinite Instrument to an instrument track, or Infinite FX to an audio track, and open it.%n%n3. The licence screen opens. Copy the key from your email and click Paste key.%n%n4. Play a few notes.%n%nIf your DAW does not find Infinite, add %LOCALAPPDATA%\Programs\Common\VST3 to its VST3 folders.
 FinishedLabel=Next:%n%n1. Open your DAW and rescan plugins.%n%n2. Add Infinite Instrument to an instrument track, or Infinite FX to an audio track, and open it.%n%n3. The licence screen opens. Copy the key from your email and click Paste key.%n%n4. Play a few notes.%n%nIf your DAW does not find Infinite, add %LOCALAPPDATA%\Programs\Common\VST3 to its VST3 folders.

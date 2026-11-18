@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/InspectorPanel.h" // fork: inspector
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/SectionCard.h"
@@ -378,6 +379,13 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SameLine(0.0f, 0.0f);
          DrawViewportPanelDocked("##viewportpanel_right", ImVec2(gViewportPanelWidth, graphHeight));
+      }
+
+      // fork: right-docked inspector, first after the canvas
+      if (gInspectorOpen && gInspectorDock == 1)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         DrawInspectorDocked("##inspector_right", ImVec2(gInspectorWidth, graphHeight));
       }
 
       // Right-docked matrix panel

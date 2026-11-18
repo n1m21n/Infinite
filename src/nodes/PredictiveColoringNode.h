@@ -1,4 +1,5 @@
 #pragma once
+#include "core/PboReadback.h" // fork
 
 #include <string>
 #include <vector>
@@ -81,6 +82,7 @@ private:
    bool mDownsampleShaderTried = false;
    int mSampleSize = 64;
    std::vector<unsigned char> mPixels;
+   PboReadback mPboRead; // fork
 
    double mLastSampleSeconds = -1.0;
    double mLastFitSeconds = -1.0;

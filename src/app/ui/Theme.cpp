@@ -1,4 +1,5 @@
 // Theme: colours, scope palette, panel/button/dropdown styles, ApplyTheme (moved verbatim from main.cpp).
+#include "app/panels/InspectorPanel.h" // fork: inspector pin wrappers
 #include "app/AppShared.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/TokenColors.h"
@@ -356,7 +357,7 @@ namespace app
    void ExpandPinHit(const ImVec2& c, float boxRight)
    {
       const float kMin = 20.0f;
-      ed::PinRect(ImVec2(std::min(c.x - kMin * 0.5f, boxRight - kMin), c.y - kMin * 0.5f),
+      insp::PinRect(ImVec2(std::min(c.x - kMin * 0.5f, boxRight - kMin), c.y - kMin * 0.5f),
                   ImVec2(boxRight, c.y + kMin * 0.5f));
    }
 

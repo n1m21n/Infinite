@@ -7,6 +7,7 @@
 
 #include "INode.h"
 #include "Modulation.h"
+#include "OscPortHub.h"
 
 // A UDP OSC listener exposed as a modulator: the last float value received
 // at `address` on `port`, remapped through low/high the same way LFONode's
@@ -14,11 +15,9 @@
 // zero output texture and the editor draws a value meter instead of a
 // preview).
 //
-// One background thread per instance runs a blocking recvfrom loop; see the
-// .cpp for the stop-flag/socket-close teardown that lets RemoveNodeByIndex's
-// retire-then-destroy pattern (main.cpp) take a receive thread out cleanly
-// without yanking a socket out from under it mid-recvfrom.
-class OscReceiveNode : public INode, public IModulator
+// The socket and receive thread are shared per port (OscPortHub), so several
+// nodes can listen on one port, each with its own address.
+class OscReceiveNode : public INode, public IModulator, public OscPortListener
 {
 public:
    static INode* Create() { return new OscReceiveNode(); }
@@ -33,27 +32,39 @@ public:
    float Value01() override;
 
    int port = 9000;
-   std::string address = "/infinite/param1";
+   std::string address = "/infinite/param1"; // exact, or with '*' / '?' wildcards
+   int argIndex = 0;                         // which argument carries the value
    float low = 0.0f;
    float high = 1.0f;
 
    void VisitParams(ParamVisitor& v) override;
+
+   // OSC learn: the next numeric message that arrives on `port` fills `address`.
+   void StartLearn() { mLearning = true; }
+   void CancelLearn() { mLearning = false; }
+   bool IsLearning() const { return mLearning.load(); }
+   // Empty when listening fine, else why the port could not be opened.
+   std::string BindError() const { std::lock_guard<std::mutex> l(mFilterMutex); return mBindError; }
+
+   void OnOscMessage(const OscMessage::Message& msg) override;
 
 private:
    void RestartListenerIfNeeded();
    void StopListener();
 
    std::atomic<float> mLastValue{ 0.5f };
-   std::thread mThread;
-   std::atomic<bool> mStop{ false };
-   int mSocket = -1;
+   std::atomic<bool> mLearning{ false };
    int mBoundPort = -1;
+   int mRetryCountdown = 0;
+   int mLastBoundTry = -1;
 
-   // The receive thread reads this to filter incoming packets by address;
-   // guarded because the UI can edit `address` on the main thread while the
-   // thread is running.
-   std::mutex mFilterMutex;
+   // The hub thread reads the filter; guarded because the UI can edit
+   // `address` on the main thread while messages are arriving.
+   mutable std::mutex mFilterMutex;
    std::string mAddressFilter;
+   int mArgIndexShared = 0;
+   std::string mLearnedAddress; // set by the hub thread, applied in Value01()
+   std::string mBindError;
    std::string mLastAddress; // main-thread-only: last value mAddressFilter was synced from
 };
 

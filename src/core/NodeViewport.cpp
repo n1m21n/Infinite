@@ -2,7 +2,9 @@
 
 #include "gl3.h"
 #include "BenchReport.h"
+#include "PreviewQuality.h" // fork
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 
@@ -564,6 +566,16 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
 {
    if (geo == nullptr)
       return 0;
+   // fork: animated inputs (LFO-driven meshes, animated textures) invalidate the cache every frame.
+   // Throttle BEFORE touching the mesh: asking a GeometryOpNode for its mesh here would itself
+   // trigger a chain rebuild (a second one per frame, since modulators move between UI and cook).
+   // Interval = max(50 ms, 20 x last redraw cost), at most 1 s. Size change, forced redraw and camera
+   // movement are never delayed.
+   const double nowT = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+   if (!ForkLegacyMode() && !forceRedraw && mHasRendered && w == mWidth && h == mHeight && mLastRenderTime >= 0.0 &&
+       cam.azimuth == mLastAzimuth && cam.elevation == mLastElevation && mDistance == mLastDistance &&
+       nowT >= mLastRenderTime && nowT - mLastRenderTime < std::min(1.0, std::max(0.05, 20.0 * mLastRenderCost)))
+      return mColorTex;
    // A Group 3D has no mesh of its own - preview the children it carries.
    if (geo->GroupChildCount() > 0)
    {
@@ -655,6 +667,13 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
                             textureChanged || w != mWidth || h != mHeight;
    if (!needsRedraw)
       return mColorTex;
+   // fork: cost guard for the adaptive throttle at the top of Render().
+   struct CostGuard
+   {
+      double& out; double t0;
+      ~CostGuard() { out = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count() - t0; }
+   } costGuard{ mLastRenderCost, nowT };
+   mLastRenderTime = nowT;
 
    // Compiled once for the process and shared read-only by every viewport -
    // not per instance, so N nodes with viewports open cost one compile total.

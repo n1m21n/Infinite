@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/panels/InspectorPanel.h" // fork: inspector
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/frame/FrameCtx.h"
@@ -39,6 +40,8 @@ int DrawFloating(FrameCtx& fc)
          DrawViewportPanelFloating();
       if (gModMatrixOpen && gModMatrixDock == kDockFloating)
          DrawModMatrixFloating();
+      if (gInspectorOpen && gInspectorDock == kDockFloating) // fork: inspector
+         DrawInspectorFloating();
       if (gPerfPanelOpen && gPerfPanelDock == kDockFloating)
          DrawPerfPanelFloating();
 

@@ -8,7 +8,7 @@
 
 namespace chat
 {
-   enum class AgentKind { Claude, Codex, Antigravity };
+   enum class AgentKind { Claude, Codex, Antigravity, Custom };  // fork: Custom = Codex CLI on an OpenAI-compatible endpoint (Providers.h)
 
    // Tokens one turn used, as its CLI reports them (0 when it does not): input read fresh, input read
    // from the prompt cache (about a tenth of the price), output, and the cost when the CLI gives one.
@@ -51,6 +51,7 @@ namespace chat
       bool folderAccess = false;
       std::vector<std::string> folders;   // more folders from Settings, read (and edited with folderAccess)
       std::vector<std::string> commands;  // commands allowed besides `infinite`
+      std::string customBaseUrl, customKeyEnv;  // fork: the Custom provider's endpoint and key variable name
    };
 
    // What would have let a denied step run: a command to allow ("ffprobe"), or a folder to open to agents.

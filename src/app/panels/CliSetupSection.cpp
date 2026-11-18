@@ -24,6 +24,8 @@
 
 namespace app
 {
+   void DrawConnectAgentForm();  // fork: ConnectAgentForm.cpp
+   void DrawCustomAgentForm();  // fork: CustomAgentForm.cpp
    namespace
    {
       std::string ReadFile(const std::string& path)
@@ -166,6 +168,9 @@ namespace app
          }
          ImGui::PopID();
       }
+
+      DrawCustomAgentForm();  // fork
+      DrawConnectAgentForm();  // fork
 
       // What each agent used through the chat, so a long chat's cost is never a surprise. Cached input is read
       // again on every step of a turn and costs about a tenth of fresh input.

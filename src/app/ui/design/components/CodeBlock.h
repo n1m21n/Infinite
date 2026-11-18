@@ -5,6 +5,7 @@
 #include <string>
 #include "imgui.h"
 #include "app/AppShared.h"
+#include "app/ui/NodeTip.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/GlyphToggle.h"
@@ -47,7 +48,7 @@ namespace CodeBlock
          tip = sCopied == ImGui::GetItemID() && ImGui::GetTime() - sCopiedAt < 1.5 ? I18n::T("Copied") : I18n::T("Copy");
       ImGui::EndChild();
       if (tip != nullptr)
-         ImGui::SetTooltip("%s", tip);
+         app::NodeTip("%s", tip);
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(2);
       ImGui::Spacing();

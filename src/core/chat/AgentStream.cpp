@@ -1,4 +1,5 @@
 #include "AgentStream.h"
+#include "Providers.h"  // fork
 
 #include <algorithm>
 #include <cctype>
@@ -194,7 +195,7 @@ namespace chat
          return;  // anything the CLI prints that is not an event
       if (mKind == AgentKind::Claude)
          Claude(j, out);
-      else if (mKind == AgentKind::Codex)
+      else if (mKind == AgentKind::Codex || mKind == AgentKind::Custom)
          Codex(j, out);
       else
          Antigravity(j, mReply, out);
@@ -276,10 +277,10 @@ namespace chat
       return f;
    }
 
-   std::vector<std::string> AgentArgs(AgentKind kind, const std::string& prompt, const std::string& session, bool resume,
-                                      const std::vector<std::string>& dirs, const TurnOptions& options)
+   // fork: the three per-CLI builders, reached through the provider table (Providers.cpp).
+   std::vector<std::string> ArgsAntigravity(const std::string& prompt, const std::string& session, bool resume,
+                                            const std::vector<std::string>& dirs, const TurnOptions& options)
    {
-      if (kind == AgentKind::Antigravity)
       {
          // No system-prompt flag: the note leads the first message. The prompt follows -p directly.
          std::vector<std::string> a = { "agy", "--output-format", "stream-json", "--settings", AgySettings(options.commands) };
@@ -296,7 +297,12 @@ namespace chat
          a.insert(a.end(), { "-p", resume ? prompt : std::string("[") + kChatNote + "]\n\n" + prompt });
          return a;
       }
-      if (kind == AgentKind::Codex)
+   }
+
+   std::vector<std::string> ArgsCodex(const std::string& prompt, const std::string& session, bool resume,
+                                      const std::vector<std::string>& dirs, const TurnOptions& options)
+   {
+      (void)dirs;
       {
          // Codex reads anywhere in its default sandbox; the paths in the prompt are enough.
          std::vector<std::string> a = { "codex", "exec", "--json" };
@@ -313,6 +319,11 @@ namespace chat
          a.push_back(prompt);
          return a;
       }
+   }
+
+   std::vector<std::string> ArgsClaude(const std::string& prompt, const std::string& session, bool resume,
+                                       const std::vector<std::string>& dirs, const TurnOptions& options)
+   {
       // --allowedTools and --add-dir take several values, so another option follows each and `--` ends options.
       std::vector<std::string> a = { "claude", "-p" };
       if (!options.model.empty())
@@ -341,6 +352,13 @@ namespace chat
       return a;
    }
 
+   std::vector<std::string> AgentArgs(AgentKind kind, const std::string& prompt, const std::string& session, bool resume,
+                                      const std::vector<std::string>& dirs, const TurnOptions& options)
+   {
+      const ProviderDef* p = FindProvider(kind);
+      return (p != nullptr ? p->argv : &ArgsClaude)(prompt, session, resume, dirs, options);
+   }
+
    bool LostSession(const std::string& text)
    {
       std::string low = text;
@@ -355,6 +373,6 @@ namespace chat
    {
       if (kind == AgentKind::Antigravity)
          return "agy --conversation " + session;
-      return kind == AgentKind::Codex ? "codex resume " + session : "claude --resume " + session;
+      return kind == AgentKind::Codex || kind == AgentKind::Custom ? "codex resume " + session : "claude --resume " + session;
    }
 }

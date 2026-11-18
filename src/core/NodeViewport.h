@@ -27,6 +27,7 @@ public:
    // between a node's inline mini-viewport and its viewport-panel card so
    // the two agree, but never shared across different nodes) - this instance
    // only reads it and tracks the value it last rendered.
+   unsigned int LastColorTexture() const { return mHasRendered ? mColorTex : 0; } // fork
    unsigned int Render(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h,
                        bool forceRedraw = false);
 
@@ -179,4 +180,6 @@ private:
    // preset switch from a no-op. See IGeometrySource::SurfaceTextureRevision().
    unsigned long long mLastSurfaceTextureRevision = 0;
    bool mHasRendered = false;
+   double mLastRenderCost = 0.0;  // fork: seconds the last redraw took (adaptive throttle)
+   double mLastRenderTime = -1.0; // fork: ~20 Hz redraw throttle
 };

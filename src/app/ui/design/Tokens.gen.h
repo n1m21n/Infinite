@@ -43,77 +43,226 @@ namespace tok
    struct Rgbaf { float r, g, b, a; };
    struct Pair8 { Rgba8 dark, light; };
    struct Pairf { Rgbaf dark, light; };
-   constexpr Pair8 scope_bg = { {11, 12, 16, 255}, {236, 240, 248, 255} };
-   constexpr Pair8 scope_border = { {64, 68, 84, 255}, {185, 192, 208, 255} };
-   constexpr Pair8 scope_grid = { {255, 255, 255, 26}, {208, 215, 228, 255} };
-   constexpr Pair8 scope_midline = { {255, 255, 255, 46}, {178, 186, 204, 255} };
-   constexpr Pair8 scope_text = { {120, 128, 150, 255}, {70, 78, 96, 255} };
-   constexpr Pair8 backdrop_base = { {18, 18, 24, 255}, {238, 240, 246, 255} };
-   constexpr Pair8 backdrop_check = { {30, 30, 38, 255}, {220, 224, 232, 255} };
-   constexpr Pair8 curvebox_bg = { {22, 24, 32, 255}, {235, 238, 246, 255} };
-   constexpr Pair8 curvebox_bg_hover = { {32, 35, 45, 255}, {225, 230, 240, 255} };
-   constexpr Pair8 curvebox_border = { {45, 48, 62, 255}, {195, 205, 220, 255} };
-   constexpr Pair8 curvebox_border_hover = { {70, 75, 95, 255}, {160, 175, 200, 255} };
-   constexpr Pair8 curvebox_border_active = { {80, 160, 255, 255}, {35, 115, 225, 255} };
-   constexpr Pair8 curvebox_ref = { {70, 75, 95, 120}, {170, 180, 195, 120} };
-   constexpr Pair8 curve_active = { {80, 180, 255, 255}, {20, 120, 240, 255} };
-   constexpr Pair8 curve_bent = { {70, 200, 230, 255}, {30, 140, 210, 255} };
-   constexpr Pair8 curve_idle = { {150, 160, 180, 200}, {85, 95, 115, 235} };
-   constexpr Pair8 curve_dot_bent = { {80, 200, 255, 255}, {20, 120, 240, 255} };
-   constexpr Pair8 curve_dot_idle = { {140, 150, 170, 255}, {120, 130, 150, 255} };
-   constexpr Pair8 curve_live = { {255, 180, 50, 255}, {215, 80, 15, 255} };
-   constexpr Pair8 curve_live_ring = { {20, 20, 26, 255}, {255, 255, 255, 255} };
-   constexpr Pair8 curve_value_text = { {160, 168, 185, 220}, {70, 78, 96, 255} };
-   constexpr Pair8 sparkline_bg = { {20, 22, 28, 200}, {235, 238, 246, 200} };
-   constexpr Pair8 sparkline_border = { {40, 44, 56, 255}, {200, 205, 215, 255} };
-   constexpr Pair8 pin_idle = { {130, 138, 162, 255}, {120, 126, 146, 255} };
-   constexpr Pair8 pin_mod = { {255, 190, 90, 255}, {185, 100, 5, 255} };
-   constexpr Pair8 pin_expr = { {170, 130, 255, 255}, {130, 80, 230, 255} };
-   constexpr Pair8 pin_pred = { {110, 215, 140, 255}, {30, 150, 70, 255} };
-   constexpr Pair8 pin_cable = { {150, 190, 255, 255}, {50, 120, 240, 255} };
-   constexpr Pair8 pin_cable_pred = { {34, 197, 94, 255}, {22, 163, 74, 255} };
-   constexpr Pair8 pin_edge = { {20, 22, 30, 255}, {40, 48, 65, 255} };
-   constexpr Pair8 pin_well = { {18, 19, 25, 255}, {240, 243, 250, 255} };
-   constexpr Pair8 pin_colour = { {95, 100, 120, 255}, {95, 100, 120, 255} };
-   constexpr Pair8 pin_colour_bound = { {130, 220, 190, 255}, {130, 220, 190, 255} };
-   constexpr Pair8 action_record = { {190, 52, 52, 255}, {190, 52, 52, 255} };
-   constexpr Pair8 action_learn = { {217, 140, 26, 255}, {185, 105, 0, 255} };
-   constexpr Pair8 action_go = { {46, 170, 74, 255}, {38, 140, 62, 255} };
-   constexpr Pair8 action_solo = { {217, 166, 38, 255}, {165, 115, 0, 255} };
-   constexpr Pair8 badge_favorite = { {255, 205, 45, 255}, {170, 118, 0, 255} };
-   constexpr Pair8 terminal_bg = { {14, 15, 19, 255}, {250, 251, 253, 255} };
-   constexpr Pair8 terminal_fg = { {220, 222, 228, 255}, {36, 40, 50, 255} };
-   constexpr Pair8 terminal_cursor = { {228, 230, 236, 255}, {50, 54, 66, 255} };
-   constexpr Pair8 terminal_selection = { {58, 84, 130, 255}, {190, 210, 245, 255} };
-   constexpr Pair8 terminal_match = { {150, 118, 40, 255}, {245, 222, 150, 255} };
-   constexpr Pair8 terminal_ansi0 = { {28, 30, 36, 255}, {36, 41, 47, 255} };
-   constexpr Pair8 terminal_ansi1 = { {229, 99, 107, 255}, {207, 34, 46, 255} };
-   constexpr Pair8 terminal_ansi2 = { {108, 192, 139, 255}, {17, 110, 56, 255} };
-   constexpr Pair8 terminal_ansi3 = { {227, 184, 102, 255}, {149, 97, 0, 255} };
-   constexpr Pair8 terminal_ansi4 = { {110, 168, 255, 255}, {9, 105, 218, 255} };
-   constexpr Pair8 terminal_ansi5 = { {197, 138, 249, 255}, {130, 80, 223, 255} };
-   constexpr Pair8 terminal_ansi6 = { {94, 196, 207, 255}, {27, 124, 131, 255} };
-   constexpr Pair8 terminal_ansi7 = { {200, 204, 212, 255}, {110, 119, 129, 255} };
-   constexpr Pair8 terminal_ansi8 = { {92, 99, 112, 255}, {87, 96, 106, 255} };
-   constexpr Pair8 terminal_ansi9 = { {255, 123, 130, 255}, {164, 14, 38, 255} };
-   constexpr Pair8 terminal_ansi10 = { {134, 217, 164, 255}, {26, 127, 55, 255} };
-   constexpr Pair8 terminal_ansi11 = { {242, 207, 133, 255}, {99, 60, 1, 255} };
-   constexpr Pair8 terminal_ansi12 = { {143, 188, 255, 255}, {5, 80, 174, 255} };
-   constexpr Pair8 terminal_ansi13 = { {214, 166, 255, 255}, {98, 57, 178, 255} };
-   constexpr Pair8 terminal_ansi14 = { {127, 219, 228, 255}, {18, 100, 110, 255} };
-   constexpr Pair8 terminal_ansi15 = { {242, 244, 248, 255}, {140, 149, 159, 255} };
-   constexpr Rgba8 transparent = {0, 0, 0, 0};
-   constexpr Rgba8 record = {239, 68, 68, 255};
-   constexpr Rgba8 danger_hover = {230, 60, 60, 255};
-   constexpr Rgba8 prediction = {34, 197, 94, 255};
-   constexpr Rgba8 modulation = {234, 179, 8, 255};
-   constexpr Rgba8 modulation_row = {234, 179, 8, 60};
-   constexpr Rgba8 inert = {110, 110, 120, 255};
-   constexpr Rgba8 expression = {168, 85, 247, 255};
-   constexpr Pairf dropdown_fill = { {0.16f, 0.18f, 0.24f, 1.0f}, {0.86f, 0.88f, 0.94f, 1.0f} };
-   constexpr Pairf dropdown_hover = { {0.28f, 0.31f, 0.42f, 1.0f}, {0.8f, 0.84f, 0.92f, 1.0f} };
-   constexpr Pairf dropdown_active = { {0.35f, 0.39f, 0.52f, 1.0f}, {0.74f, 0.78f, 0.88f, 1.0f} };
-   constexpr Pairf dropdown_text = { {0.9f, 0.93f, 0.98f, 1.0f}, {0.15f, 0.18f, 0.24f, 1.0f} };
+   inline const Pair8 d_scope_bg = { {11, 12, 16, 255}, {236, 240, 248, 255} };
+   inline Pair8 scope_bg = d_scope_bg;
+   inline const Pair8 d_scope_border = { {64, 68, 84, 255}, {185, 192, 208, 255} };
+   inline Pair8 scope_border = d_scope_border;
+   inline const Pair8 d_scope_grid = { {255, 255, 255, 26}, {208, 215, 228, 255} };
+   inline Pair8 scope_grid = d_scope_grid;
+   inline const Pair8 d_scope_midline = { {255, 255, 255, 46}, {178, 186, 204, 255} };
+   inline Pair8 scope_midline = d_scope_midline;
+   inline const Pair8 d_scope_text = { {120, 128, 150, 255}, {70, 78, 96, 255} };
+   inline Pair8 scope_text = d_scope_text;
+   inline const Pair8 d_backdrop_base = { {18, 18, 24, 255}, {238, 240, 246, 255} };
+   inline Pair8 backdrop_base = d_backdrop_base;
+   inline const Pair8 d_backdrop_check = { {30, 30, 38, 255}, {220, 224, 232, 255} };
+   inline Pair8 backdrop_check = d_backdrop_check;
+   inline const Pair8 d_curvebox_bg = { {22, 24, 32, 255}, {235, 238, 246, 255} };
+   inline Pair8 curvebox_bg = d_curvebox_bg;
+   inline const Pair8 d_curvebox_bg_hover = { {32, 35, 45, 255}, {225, 230, 240, 255} };
+   inline Pair8 curvebox_bg_hover = d_curvebox_bg_hover;
+   inline const Pair8 d_curvebox_border = { {45, 48, 62, 255}, {195, 205, 220, 255} };
+   inline Pair8 curvebox_border = d_curvebox_border;
+   inline const Pair8 d_curvebox_border_hover = { {70, 75, 95, 255}, {160, 175, 200, 255} };
+   inline Pair8 curvebox_border_hover = d_curvebox_border_hover;
+   inline const Pair8 d_curvebox_border_active = { {80, 160, 255, 255}, {35, 115, 225, 255} };
+   inline Pair8 curvebox_border_active = d_curvebox_border_active;
+   inline const Pair8 d_curvebox_ref = { {70, 75, 95, 120}, {170, 180, 195, 120} };
+   inline Pair8 curvebox_ref = d_curvebox_ref;
+   inline const Pair8 d_curve_active = { {80, 180, 255, 255}, {20, 120, 240, 255} };
+   inline Pair8 curve_active = d_curve_active;
+   inline const Pair8 d_curve_bent = { {70, 200, 230, 255}, {30, 140, 210, 255} };
+   inline Pair8 curve_bent = d_curve_bent;
+   inline const Pair8 d_curve_idle = { {150, 160, 180, 200}, {85, 95, 115, 235} };
+   inline Pair8 curve_idle = d_curve_idle;
+   inline const Pair8 d_curve_dot_bent = { {80, 200, 255, 255}, {20, 120, 240, 255} };
+   inline Pair8 curve_dot_bent = d_curve_dot_bent;
+   inline const Pair8 d_curve_dot_idle = { {140, 150, 170, 255}, {120, 130, 150, 255} };
+   inline Pair8 curve_dot_idle = d_curve_dot_idle;
+   inline const Pair8 d_curve_live = { {255, 180, 50, 255}, {215, 80, 15, 255} };
+   inline Pair8 curve_live = d_curve_live;
+   inline const Pair8 d_curve_live_ring = { {20, 20, 26, 255}, {255, 255, 255, 255} };
+   inline Pair8 curve_live_ring = d_curve_live_ring;
+   inline const Pair8 d_curve_value_text = { {160, 168, 185, 220}, {70, 78, 96, 255} };
+   inline Pair8 curve_value_text = d_curve_value_text;
+   inline const Pair8 d_sparkline_bg = { {20, 22, 28, 200}, {235, 238, 246, 200} };
+   inline Pair8 sparkline_bg = d_sparkline_bg;
+   inline const Pair8 d_sparkline_border = { {40, 44, 56, 255}, {200, 205, 215, 255} };
+   inline Pair8 sparkline_border = d_sparkline_border;
+   inline const Pair8 d_pin_idle = { {130, 138, 162, 255}, {120, 126, 146, 255} };
+   inline Pair8 pin_idle = d_pin_idle;
+   inline const Pair8 d_pin_mod = { {255, 190, 90, 255}, {185, 100, 5, 255} };
+   inline Pair8 pin_mod = d_pin_mod;
+   inline const Pair8 d_pin_expr = { {170, 130, 255, 255}, {130, 80, 230, 255} };
+   inline Pair8 pin_expr = d_pin_expr;
+   inline const Pair8 d_pin_pred = { {110, 215, 140, 255}, {30, 150, 70, 255} };
+   inline Pair8 pin_pred = d_pin_pred;
+   inline const Pair8 d_pin_cable = { {150, 190, 255, 255}, {50, 120, 240, 255} };
+   inline Pair8 pin_cable = d_pin_cable;
+   inline const Pair8 d_pin_cable_pred = { {34, 197, 94, 255}, {22, 163, 74, 255} };
+   inline Pair8 pin_cable_pred = d_pin_cable_pred;
+   inline const Pair8 d_pin_edge = { {20, 22, 30, 255}, {40, 48, 65, 255} };
+   inline Pair8 pin_edge = d_pin_edge;
+   inline const Pair8 d_pin_well = { {18, 19, 25, 255}, {240, 243, 250, 255} };
+   inline Pair8 pin_well = d_pin_well;
+   inline const Pair8 d_pin_colour = { {95, 100, 120, 255}, {95, 100, 120, 255} };
+   inline Pair8 pin_colour = d_pin_colour;
+   inline const Pair8 d_pin_colour_bound = { {130, 220, 190, 255}, {130, 220, 190, 255} };
+   inline Pair8 pin_colour_bound = d_pin_colour_bound;
+   inline const Pair8 d_action_record = { {190, 52, 52, 255}, {190, 52, 52, 255} };
+   inline Pair8 action_record = d_action_record;
+   inline const Pair8 d_action_learn = { {217, 140, 26, 255}, {185, 105, 0, 255} };
+   inline Pair8 action_learn = d_action_learn;
+   inline const Pair8 d_action_go = { {46, 170, 74, 255}, {38, 140, 62, 255} };
+   inline Pair8 action_go = d_action_go;
+   inline const Pair8 d_action_solo = { {217, 166, 38, 255}, {165, 115, 0, 255} };
+   inline Pair8 action_solo = d_action_solo;
+   inline const Pair8 d_badge_favorite = { {255, 205, 45, 255}, {170, 118, 0, 255} };
+   inline Pair8 badge_favorite = d_badge_favorite;
+   inline const Pair8 d_terminal_bg = { {14, 15, 19, 255}, {250, 251, 253, 255} };
+   inline Pair8 terminal_bg = d_terminal_bg;
+   inline const Pair8 d_terminal_fg = { {220, 222, 228, 255}, {36, 40, 50, 255} };
+   inline Pair8 terminal_fg = d_terminal_fg;
+   inline const Pair8 d_terminal_cursor = { {228, 230, 236, 255}, {50, 54, 66, 255} };
+   inline Pair8 terminal_cursor = d_terminal_cursor;
+   inline const Pair8 d_terminal_selection = { {58, 84, 130, 255}, {190, 210, 245, 255} };
+   inline Pair8 terminal_selection = d_terminal_selection;
+   inline const Pair8 d_terminal_match = { {150, 118, 40, 255}, {245, 222, 150, 255} };
+   inline Pair8 terminal_match = d_terminal_match;
+   inline const Pair8 d_terminal_ansi0 = { {28, 30, 36, 255}, {36, 41, 47, 255} };
+   inline Pair8 terminal_ansi0 = d_terminal_ansi0;
+   inline const Pair8 d_terminal_ansi1 = { {229, 99, 107, 255}, {207, 34, 46, 255} };
+   inline Pair8 terminal_ansi1 = d_terminal_ansi1;
+   inline const Pair8 d_terminal_ansi2 = { {108, 192, 139, 255}, {17, 110, 56, 255} };
+   inline Pair8 terminal_ansi2 = d_terminal_ansi2;
+   inline const Pair8 d_terminal_ansi3 = { {227, 184, 102, 255}, {149, 97, 0, 255} };
+   inline Pair8 terminal_ansi3 = d_terminal_ansi3;
+   inline const Pair8 d_terminal_ansi4 = { {110, 168, 255, 255}, {9, 105, 218, 255} };
+   inline Pair8 terminal_ansi4 = d_terminal_ansi4;
+   inline const Pair8 d_terminal_ansi5 = { {197, 138, 249, 255}, {130, 80, 223, 255} };
+   inline Pair8 terminal_ansi5 = d_terminal_ansi5;
+   inline const Pair8 d_terminal_ansi6 = { {94, 196, 207, 255}, {27, 124, 131, 255} };
+   inline Pair8 terminal_ansi6 = d_terminal_ansi6;
+   inline const Pair8 d_terminal_ansi7 = { {200, 204, 212, 255}, {110, 119, 129, 255} };
+   inline Pair8 terminal_ansi7 = d_terminal_ansi7;
+   inline const Pair8 d_terminal_ansi8 = { {92, 99, 112, 255}, {87, 96, 106, 255} };
+   inline Pair8 terminal_ansi8 = d_terminal_ansi8;
+   inline const Pair8 d_terminal_ansi9 = { {255, 123, 130, 255}, {164, 14, 38, 255} };
+   inline Pair8 terminal_ansi9 = d_terminal_ansi9;
+   inline const Pair8 d_terminal_ansi10 = { {134, 217, 164, 255}, {26, 127, 55, 255} };
+   inline Pair8 terminal_ansi10 = d_terminal_ansi10;
+   inline const Pair8 d_terminal_ansi11 = { {242, 207, 133, 255}, {99, 60, 1, 255} };
+   inline Pair8 terminal_ansi11 = d_terminal_ansi11;
+   inline const Pair8 d_terminal_ansi12 = { {143, 188, 255, 255}, {5, 80, 174, 255} };
+   inline Pair8 terminal_ansi12 = d_terminal_ansi12;
+   inline const Pair8 d_terminal_ansi13 = { {214, 166, 255, 255}, {98, 57, 178, 255} };
+   inline Pair8 terminal_ansi13 = d_terminal_ansi13;
+   inline const Pair8 d_terminal_ansi14 = { {127, 219, 228, 255}, {18, 100, 110, 255} };
+   inline Pair8 terminal_ansi14 = d_terminal_ansi14;
+   inline const Pair8 d_terminal_ansi15 = { {242, 244, 248, 255}, {140, 149, 159, 255} };
+   inline Pair8 terminal_ansi15 = d_terminal_ansi15;
+   inline const Rgba8 d_transparent = {0, 0, 0, 0};
+   inline Rgba8 transparent = d_transparent;
+   inline const Rgba8 d_record = {239, 68, 68, 255};
+   inline Rgba8 record = d_record;
+   inline const Rgba8 d_danger_hover = {230, 60, 60, 255};
+   inline Rgba8 danger_hover = d_danger_hover;
+   inline const Rgba8 d_prediction = {34, 197, 94, 255};
+   inline Rgba8 prediction = d_prediction;
+   inline const Rgba8 d_modulation = {234, 179, 8, 255};
+   inline Rgba8 modulation = d_modulation;
+   inline const Rgba8 d_modulation_row = {234, 179, 8, 60};
+   inline Rgba8 modulation_row = d_modulation_row;
+   inline const Rgba8 d_inert = {110, 110, 120, 255};
+   inline Rgba8 inert = d_inert;
+   inline const Rgba8 d_expression = {168, 85, 247, 255};
+   inline Rgba8 expression = d_expression;
+   inline const Pairf d_dropdown_fill = { {0.16f, 0.18f, 0.24f, 1.0f}, {0.86f, 0.88f, 0.94f, 1.0f} };
+   inline Pairf dropdown_fill = d_dropdown_fill;
+   inline const Pairf d_dropdown_hover = { {0.28f, 0.31f, 0.42f, 1.0f}, {0.8f, 0.84f, 0.92f, 1.0f} };
+   inline Pairf dropdown_hover = d_dropdown_hover;
+   inline const Pairf d_dropdown_active = { {0.35f, 0.39f, 0.52f, 1.0f}, {0.74f, 0.78f, 0.88f, 1.0f} };
+   inline Pairf dropdown_active = d_dropdown_active;
+   inline const Pairf d_dropdown_text = { {0.9f, 0.93f, 0.98f, 1.0f}, {0.15f, 0.18f, 0.24f, 1.0f} };
+   inline Pairf dropdown_text = d_dropdown_text;
+
+   enum class ColorKind { Pair8, Rgba8, Pairf };
+   struct ColorToken { const char* name; ColorKind kind; void* value; const void* def; };
+   inline const ColorToken kColorTokens[] = {
+      { "scope.bg", ColorKind::Pair8, &scope_bg, &d_scope_bg },
+      { "scope.border", ColorKind::Pair8, &scope_border, &d_scope_border },
+      { "scope.grid", ColorKind::Pair8, &scope_grid, &d_scope_grid },
+      { "scope.midline", ColorKind::Pair8, &scope_midline, &d_scope_midline },
+      { "scope.text", ColorKind::Pair8, &scope_text, &d_scope_text },
+      { "backdrop.base", ColorKind::Pair8, &backdrop_base, &d_backdrop_base },
+      { "backdrop.check", ColorKind::Pair8, &backdrop_check, &d_backdrop_check },
+      { "curvebox.bg", ColorKind::Pair8, &curvebox_bg, &d_curvebox_bg },
+      { "curvebox.bg_hover", ColorKind::Pair8, &curvebox_bg_hover, &d_curvebox_bg_hover },
+      { "curvebox.border", ColorKind::Pair8, &curvebox_border, &d_curvebox_border },
+      { "curvebox.border_hover", ColorKind::Pair8, &curvebox_border_hover, &d_curvebox_border_hover },
+      { "curvebox.border_active", ColorKind::Pair8, &curvebox_border_active, &d_curvebox_border_active },
+      { "curvebox.ref", ColorKind::Pair8, &curvebox_ref, &d_curvebox_ref },
+      { "curve.active", ColorKind::Pair8, &curve_active, &d_curve_active },
+      { "curve.bent", ColorKind::Pair8, &curve_bent, &d_curve_bent },
+      { "curve.idle", ColorKind::Pair8, &curve_idle, &d_curve_idle },
+      { "curve.dot_bent", ColorKind::Pair8, &curve_dot_bent, &d_curve_dot_bent },
+      { "curve.dot_idle", ColorKind::Pair8, &curve_dot_idle, &d_curve_dot_idle },
+      { "curve.live", ColorKind::Pair8, &curve_live, &d_curve_live },
+      { "curve.live_ring", ColorKind::Pair8, &curve_live_ring, &d_curve_live_ring },
+      { "curve.value_text", ColorKind::Pair8, &curve_value_text, &d_curve_value_text },
+      { "sparkline.bg", ColorKind::Pair8, &sparkline_bg, &d_sparkline_bg },
+      { "sparkline.border", ColorKind::Pair8, &sparkline_border, &d_sparkline_border },
+      { "pin.idle", ColorKind::Pair8, &pin_idle, &d_pin_idle },
+      { "pin.mod", ColorKind::Pair8, &pin_mod, &d_pin_mod },
+      { "pin.expr", ColorKind::Pair8, &pin_expr, &d_pin_expr },
+      { "pin.pred", ColorKind::Pair8, &pin_pred, &d_pin_pred },
+      { "pin.cable", ColorKind::Pair8, &pin_cable, &d_pin_cable },
+      { "pin.cable_pred", ColorKind::Pair8, &pin_cable_pred, &d_pin_cable_pred },
+      { "pin.edge", ColorKind::Pair8, &pin_edge, &d_pin_edge },
+      { "pin.well", ColorKind::Pair8, &pin_well, &d_pin_well },
+      { "pin.colour", ColorKind::Pair8, &pin_colour, &d_pin_colour },
+      { "pin.colour_bound", ColorKind::Pair8, &pin_colour_bound, &d_pin_colour_bound },
+      { "action.record", ColorKind::Pair8, &action_record, &d_action_record },
+      { "action.learn", ColorKind::Pair8, &action_learn, &d_action_learn },
+      { "action.go", ColorKind::Pair8, &action_go, &d_action_go },
+      { "action.solo", ColorKind::Pair8, &action_solo, &d_action_solo },
+      { "badge.favorite", ColorKind::Pair8, &badge_favorite, &d_badge_favorite },
+      { "terminal.bg", ColorKind::Pair8, &terminal_bg, &d_terminal_bg },
+      { "terminal.fg", ColorKind::Pair8, &terminal_fg, &d_terminal_fg },
+      { "terminal.cursor", ColorKind::Pair8, &terminal_cursor, &d_terminal_cursor },
+      { "terminal.selection", ColorKind::Pair8, &terminal_selection, &d_terminal_selection },
+      { "terminal.match", ColorKind::Pair8, &terminal_match, &d_terminal_match },
+      { "terminal.ansi0", ColorKind::Pair8, &terminal_ansi0, &d_terminal_ansi0 },
+      { "terminal.ansi1", ColorKind::Pair8, &terminal_ansi1, &d_terminal_ansi1 },
+      { "terminal.ansi2", ColorKind::Pair8, &terminal_ansi2, &d_terminal_ansi2 },
+      { "terminal.ansi3", ColorKind::Pair8, &terminal_ansi3, &d_terminal_ansi3 },
+      { "terminal.ansi4", ColorKind::Pair8, &terminal_ansi4, &d_terminal_ansi4 },
+      { "terminal.ansi5", ColorKind::Pair8, &terminal_ansi5, &d_terminal_ansi5 },
+      { "terminal.ansi6", ColorKind::Pair8, &terminal_ansi6, &d_terminal_ansi6 },
+      { "terminal.ansi7", ColorKind::Pair8, &terminal_ansi7, &d_terminal_ansi7 },
+      { "terminal.ansi8", ColorKind::Pair8, &terminal_ansi8, &d_terminal_ansi8 },
+      { "terminal.ansi9", ColorKind::Pair8, &terminal_ansi9, &d_terminal_ansi9 },
+      { "terminal.ansi10", ColorKind::Pair8, &terminal_ansi10, &d_terminal_ansi10 },
+      { "terminal.ansi11", ColorKind::Pair8, &terminal_ansi11, &d_terminal_ansi11 },
+      { "terminal.ansi12", ColorKind::Pair8, &terminal_ansi12, &d_terminal_ansi12 },
+      { "terminal.ansi13", ColorKind::Pair8, &terminal_ansi13, &d_terminal_ansi13 },
+      { "terminal.ansi14", ColorKind::Pair8, &terminal_ansi14, &d_terminal_ansi14 },
+      { "terminal.ansi15", ColorKind::Pair8, &terminal_ansi15, &d_terminal_ansi15 },
+      { "transparent", ColorKind::Rgba8, &transparent, &d_transparent },
+      { "record", ColorKind::Rgba8, &record, &d_record },
+      { "danger_hover", ColorKind::Rgba8, &danger_hover, &d_danger_hover },
+      { "prediction", ColorKind::Rgba8, &prediction, &d_prediction },
+      { "modulation", ColorKind::Rgba8, &modulation, &d_modulation },
+      { "modulation_row", ColorKind::Rgba8, &modulation_row, &d_modulation_row },
+      { "inert", ColorKind::Rgba8, &inert, &d_inert },
+      { "expression", ColorKind::Rgba8, &expression, &d_expression },
+      { "dropdown.fill", ColorKind::Pairf, &dropdown_fill, &d_dropdown_fill },
+      { "dropdown.hover", ColorKind::Pairf, &dropdown_hover, &d_dropdown_hover },
+      { "dropdown.active", ColorKind::Pairf, &dropdown_active, &d_dropdown_active },
+      { "dropdown.text", ColorKind::Pairf, &dropdown_text, &d_dropdown_text },
+   };
+   inline constexpr int kColorTokenCount = 71;
+
    constexpr float accent_hover = 0.36f;
    constexpr float accent_selected = 0.6f;
    constexpr float accent_pressed = 0.78f;
