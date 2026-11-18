@@ -187,7 +187,7 @@ jobs:
       - name: Audio Unit validation (auval)
         run: |
           cmake -S src/plugin/shell -B build-plugin -DCMAKE_BUILD_TYPE=Release -DINFINITE_LICENSE_TEST_KEY=ON
-          cmake --build build-plugin --config Release --target InfiniteInstrument_au InfiniteFX_au -j3
+          cmake --build build-plugin --config Release --target InfiniteInstrument_au InfiniteFX_au plugin_test_license -j3
           if ! ls -d build-plugin/AU/*.component >/dev/null 2>&1; then
             echo "SKIP: no Audio Unit component was built; auval not run"
             exit 0
