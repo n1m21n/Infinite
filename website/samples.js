@@ -455,7 +455,7 @@
 
   // The blob: a soft shape that breathes while idle, churns while the engine works and follows the loop's spectrum while it plays.
   var bcv = document.getElementById('smp-blob'), bctx = null;
-  var ac = null, an = null, bin = null, src = null, lvl = [], N = 96, bt = 0, accent = '#e8745a', frame = 0, energy = 0;
+  var ac = null, an = null, bin = null, src = null, lvl = [], N = 96, bt = 0, accent = '#ff6b35', frame = 0, energy = 0;
   for (var li = 0; li < N; li++) lvl.push(0);
   function wakeAudio() {
     var AC = window.AudioContext || window.webkitAudioContext;

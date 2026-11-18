@@ -127,7 +127,7 @@
 .mx-knob output { font: 500 var(--size-micro-mono)/1 'Geist Mono', ui-monospace, monospace; color: rgba(238, 241, 250, 0.7); }
 .mx-rack.live .mx-arc { filter: drop-shadow(0 0 6px rgba(167, 177, 255, 0.7)); }
 @media (min-width: 900px) { .mx-rack { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; padding: 24px; gap: 32px; } .mx-top { flex-direction: column; align-items: stretch; } .mx-scope { height: 96px; } .mx-play { justify-content: center; } .mx-dial { width: 76px; height: 76px; } }
-@media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); } .mx-dial { width: 72px; height: 72px; } .mx-rack { padding: 14px; } }
+@media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); font-size: 0.875rem; } .mx-dial { width: 72px; height: 72px; } .mx-rack { padding: 14px; } }
 
 /* phones: the Download button goes; the Gallery/Guide icon stays in the same row as the bubbles */
 @media (max-width: 899px) {
@@ -310,19 +310,19 @@ html .ax-main .ax-ttl, html .ax-main .ax-bento-l { font-size: var(--size-micro-m
 .aud-shots { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
 .aud-shot { margin: 0; border-radius: var(--web-card-radius, 20px); overflow: hidden; background: var(--midnight-950, #0d1020); }
 .aud-shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; }
-.aud-shot figcaption { padding: 12px 16px 14px; color: var(--midnight-50, #eef0fa); font-size: 0.9rem; opacity: 0.85; }
+.aud-shot figcaption { padding: 12px 16px 14px; color: var(--midnight-50, var(--ink)); font-size: 0.9rem; opacity: 0.85; }
 
 /* Sample generator preview: the live glowing blob, framed like a media card */
 .ax-blobframe { position: relative; border-radius: var(--web-card-radius, 20px); overflow: hidden; background: var(--midnight-950, #0d1020); height: 470px; }
 .ax-blobframe iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
-.ax-blobgo { display: inline-block; margin-top: 12px; padding: 8px 14px; border-radius: 999px; background: rgb(255 255 255 / 0.12); color: var(--midnight-50, #eef0fa); font: 500 0.8rem/1 'Geist', system-ui, sans-serif; text-decoration: none; }
+.ax-blobgo { display: inline-flex; align-items: center; box-sizing: border-box; min-height: var(--ctl-h, 40px); margin-top: 12px; padding: 0 14px; border-radius: 999px; background: rgb(255 255 255 / 0.12); color: var(--midnight-50, var(--ink)); font: 500 0.8rem/1 'Geist', system-ui, sans-serif; text-decoration: none; }
 .ax-blobgo:hover { background: rgb(255 255 255 / 0.22); }
 
 /* Made in Infinite: one grid of equal cards, picture on top, name under it */
 .mi-grid, .sw-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .mi-card, .sw-card { display: flex; flex-direction: column; padding: 8px 8px 0; border-radius: var(--web-card-radius, 20px); overflow: hidden; text-decoration: none; color: var(--nm-ink); background: var(--nm-up); transition: transform var(--dur-medium, .25s) var(--ease-out, ease), box-shadow var(--dur-medium, .25s) var(--ease-out, ease); }
 .mi-card:hover, .sw-card:hover { transform: translateY(-3px); box-shadow: var(--nm-raise), var(--shadow-2); }
-.mi-card:focus-visible, .sw-card:focus-visible { outline: 3px solid var(--signal, #e8745a); outline-offset: 3px; }
+.mi-card:focus-visible, .sw-card:focus-visible { outline: 3px solid var(--signal, var(--accent)); outline-offset: 3px; }
 .mi-card img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--r-md); background: var(--midnight-950, #0d1020); }
 .mi-t { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 10px 14px; font: 600 var(--size-body, 1rem)/1.2 'Geist', system-ui, sans-serif; }
 .mi-t svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: .55; transition: transform .2s, opacity .2s; }
@@ -332,10 +332,10 @@ html .ax-main .ax-ttl, html .ax-main .ax-bento-l { font-size: var(--size-micro-m
 .sw-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sw-card img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--r-md); background: var(--midnight-950, #0d1020); }
 .sw-t { display: flex; align-items: center; gap: 10px; padding: 12px 10px 14px; font: 600 var(--size-body, 1rem)/1.2 'Geist', system-ui, sans-serif; }
-.sw-t .ic, .sw-t svg { width: 18px; height: 18px; flex: none; color: var(--signal, #e8745a); }
+.sw-t .ic, .sw-t svg { width: 18px; height: 18px; flex: none; color: var(--signal, var(--accent)); }
 @media (max-width: 900px) { .mi-grid, .sw-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .mi-t, .sw-t { padding: 10px 8px 12px; } }
 @media (prefers-reduced-motion: reduce) { .mi-card, .sw-card, .mi-t svg { transition: none; } .mi-card:hover, .sw-card:hover { transform: none; } }
 
 /* Piano card: one wide card, picture on top */
 .pn-card img { display: block; width: 100%; height: auto; aspect-ratio: 21 / 9; object-fit: cover; background: var(--midnight-950, #0d1020); }
-.pn-card .mi-t .ic { width: 18px; height: 18px; color: var(--signal, #e8745a); }
+.pn-card .mi-t .ic { width: 18px; height: 18px; color: var(--signal, var(--accent)); }

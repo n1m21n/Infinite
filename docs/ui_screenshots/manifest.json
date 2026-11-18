@@ -1,0 +1,291 @@
+{
+ "shots": {
+  "app_overview": {
+   "app": "",
+   "file": "app_overview.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "dialog_about": {
+   "app": "",
+   "file": "dialog_about.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "library_field": {
+   "app": "",
+   "file": "library_field.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "library_filter_dropdown": {
+   "app": "",
+   "file": "library_filter_dropdown.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "library_plugins": {
+   "app": "",
+   "file": "library_plugins.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "library_sort_dropdown": {
+   "app": "",
+   "file": "library_sort_dropdown.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "menu_edit": {
+   "app": "",
+   "file": "menu_edit.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "menu_file": {
+   "app": "",
+   "file": "menu_file.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "menu_menu": {
+   "app": "",
+   "file": "menu_menu.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "menu_panels": {
+   "app": "",
+   "file": "menu_panels.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "menu_show_set": {
+   "app": "",
+   "file": "menu_show_set.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_history_big": {
+   "app": "",
+   "file": "panel_history_big.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_library_big": {
+   "app": "",
+   "file": "panel_library_big.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_modmatrix_big": {
+   "app": "",
+   "file": "panel_modmatrix_big.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_perf": {
+   "app": "",
+   "file": "panel_perf.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_pianoroll": {
+   "app": "",
+   "file": "panel_pianoroll.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_session": {
+   "app": "",
+   "file": "panel_session.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_studio": {
+   "app": "",
+   "file": "panel_studio.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_timeline": {
+   "app": "",
+   "file": "panel_timeline.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_view3d": {
+   "app": "",
+   "file": "panel_view3d.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "panel_viewport_cards": {
+   "app": "",
+   "file": "panel_viewport_cards.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "rc_canvas_palette": {
+   "app": "",
+   "file": "rc_canvas_palette.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "rc_node": {
+   "app": "",
+   "file": "rc_node.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "rc_palette_submenu": {
+   "app": "",
+   "file": "rc_palette_submenu.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "settings_appearance": {
+   "app": "",
+   "file": "settings_appearance.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "settings_audio": {
+   "app": "",
+   "file": "settings_audio.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "settings_canvas": {
+   "app": "",
+   "file": "settings_canvas.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "settings_extensions": {
+   "app": "",
+   "file": "settings_extensions.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "settings_field": {
+   "app": "",
+   "file": "settings_field.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "settings_general": {
+   "app": "",
+   "file": "settings_general.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "settings_globals": {
+   "app": "",
+   "file": "settings_globals.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "settings_plugins": {
+   "app": "",
+   "file": "settings_plugins.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "settings_terminal": {
+   "app": "",
+   "file": "settings_terminal.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "transport": {
+   "app": "",
+   "file": "transport.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "v3d_camera": {
+   "app": "",
+   "file": "v3d_camera.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "v3d_output": {
+   "app": "",
+   "file": "v3d_output.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "v3d_render": {
+   "app": "",
+   "file": "v3d_render.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "window_help": {
+   "app": "",
+   "file": "window_help.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "window_settings": {
+   "app": "",
+   "file": "window_settings.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "window_shortcuts": {
+   "app": "",
+   "file": "window_shortcuts.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  },
+  "window_templates": {
+   "app": "",
+   "file": "window_templates.png",
+   "height": 2000,
+   "kind": "ui",
+   "width": 3200
+  }
+ }
+}

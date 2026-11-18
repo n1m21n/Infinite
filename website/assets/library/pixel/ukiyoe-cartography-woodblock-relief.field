@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ukiyo-e Cartography Woodblock Relief",
+    "author": "Infinite",
+    "description": "Layered Edo-era archipelago elevation strata with woodblock grain, directional relief, and vermilion cartographic markers.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float strataCount = 10.0 [4.0, 20.0];\nparam float islandScale = 2.4 [1.0, 5.0];\nparam float grainAmt = 0.045 [0.0, 0.12];\nparam float ringDensity = 12.0 [4.0, 24.0];\nparam float contrast = 1.08 [0.8, 1.4];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\ncIndigo = vec3(0.114, 0.208, 0.341);\ncCeladon = vec3(0.659, 0.855, 0.863);\ncPaper = vec3(0.945, 0.933, 0.890);\ncSeal = vec3(0.902, 0.224, 0.275);\n\ngrain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * grainAmt;\n\nr = length(p);\nnr = max(r, 0.001);\nnx = p.x / nr;\nny = p.y / nr;\n\n# Archipelago elevation field\nelev = exp(-r * r * 1.4) + 0.35 * sin(p.x * islandScale + t * 0.2) * cos(p.y * islandScale - t * 0.15);\nstepped = floor(elev * strataCount) / strataCount;\ncontour = 1.0 - smoothstep(0.04, 0.11, abs(fract(elev * strataCount) - 0.5));\n\n# 8-point compass meridian rays\ncrossAxis = min(abs(nx), abs(ny));\ndiagAxis = abs(abs(nx) - abs(ny)) * 0.7071;\nmeridian = 1.0 - smoothstep(0.015, 0.035, min(crossAxis, diagAxis));\n\nbaseCol = mix(cPaper, cCeladon, clamp(stepped * 1.1, 0.0, 1.0));\nbaseCol = mix(baseCol, cIndigo, contour * 0.85);\nbaseCol = mix(baseCol, cIndigo, meridian * 0.25);\n\n# Vermilion summit ring\nsummitRing = 1.0 - smoothstep(0.012, 0.028, abs(r - 0.24));\nbaseCol = mix(baseCol, cSeal, summitRing * 0.9);\n\ncol = clamp((baseCol + grain) * contrast, 0.0, 1.0);\n",
+    "params": {
+      "strataCount": 10.0,
+      "islandScale": 2.4,
+      "grainAmt": 0.045,
+      "ringDensity": 12.0,
+      "contrast": 1.08
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

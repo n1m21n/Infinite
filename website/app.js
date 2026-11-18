@@ -35,7 +35,7 @@ function initCosmos() {
       pulseOffset: Math.random() * Math.PI * 2,
       vx: (Math.random() - 0.5) * 0.15,
       vy: (Math.random() - 0.5) * 0.15,
-      color: ['#2b2621', '#b53700', '#d9430e', '#4d7c67', '#6b6b99'][Math.floor(Math.random() * 5)]
+      color: ['#20263f', '#b53700', '#d9430e', '#5a6180', '#5a6180'][Math.floor(Math.random() * 5)]
     });
   }
 
@@ -46,7 +46,7 @@ function initCosmos() {
       radius: Math.random() * 200 + 180,
       vx: (Math.random() - 0.5) * 0.08,
       vy: (Math.random() - 0.5) * 0.08,
-      color: ['rgba(181, 55, 0, 0.035)', 'rgba(217, 67, 14, 0.035)', 'rgba(77, 124, 103, 0.035)', 'rgba(107, 107, 153, 0.035)'][i % 4]
+      color: ['rgba(181, 55, 0, 0.035)', 'rgba(217, 67, 14, 0.035)', 'rgba(90, 97, 128, 0.035)', 'rgba(90, 97, 128, 0.035)'][i % 4]
     });
   }
 }
@@ -158,13 +158,13 @@ let cachedCanvasRect = null;
 const NETWORK_ITEMS = [
   { id: 'sound', label: 'Sound', color: '#b53700', bg: 'rgba(181, 55, 0, 0.12)', dtX: 0.12, dtY: 0.26, mbX: 0.20, mbY: 0.15 },
   { id: 'music', label: 'Music', color: '#d9430e', bg: 'rgba(217, 67, 14, 0.12)', dtX: 0.12, dtY: 0.74, mbX: 0.20, mbY: 0.38 },
-  { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.31, dtY: 0.32, mbX: 0.80, mbY: 0.38 },
+  { id: 'physics', label: 'Physics', color: '#5a6180', bg: 'rgba(90, 97, 128, 0.12)', dtX: 0.31, dtY: 0.32, mbX: 0.80, mbY: 0.38 },
   { id: 'math', label: 'Math', color: '#b53700', bg: 'rgba(181, 55, 0, 0.12)', dtX: 0.31, dtY: 0.70, mbX: 0.50, mbY: 0.52 },
-  { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.50, dtY: 0.46, mbX: 0.20, mbY: 0.70 },
-  { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.69, dtY: 0.70, mbX: 0.22, mbY: 0.88 },
+  { id: 'art', label: 'Art', color: '#ff6b35', bg: 'rgba(255, 107, 53, 0.12)', dtX: 0.50, dtY: 0.46, mbX: 0.20, mbY: 0.70 },
+  { id: 'motion', label: 'Motion', color: '#4a54d6', bg: 'rgba(74, 84, 214, 0.12)', dtX: 0.69, dtY: 0.70, mbX: 0.22, mbY: 0.88 },
   { id: 'light', label: 'Light', color: '#d9430e', bg: 'rgba(217, 67, 14, 0.12)', dtX: 0.69, dtY: 0.32, mbX: 0.80, mbY: 0.70 },
-  { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.88, dtY: 0.26, mbX: 0.80, mbY: 0.15 },
-  { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.88, dtY: 0.74, mbX: 0.78, mbY: 0.88 }
+  { id: 'geometry', label: 'Geometry', color: '#5a6180', bg: 'rgba(90, 97, 128, 0.12)', dtX: 0.88, dtY: 0.26, mbX: 0.80, mbY: 0.15 },
+  { id: 'color', label: 'Color', color: '#5a6180', bg: 'rgba(90, 97, 128, 0.12)', dtX: 0.88, dtY: 0.74, mbX: 0.78, mbY: 0.88 }
 ];
 
 function updateNatureCanvasRect() {
@@ -552,7 +552,7 @@ function animateNatureBranches(timestamp) {
       natureCtx.strokeStyle = hoveredNode.color;
       natureCtx.globalAlpha = edge.currentAlpha;
     } else {
-      natureCtx.strokeStyle = `rgba(60, 50, 40, ${edge.currentAlpha})`;
+      natureCtx.strokeStyle = `rgba(42, 48, 82, ${edge.currentAlpha})`;
       natureCtx.globalAlpha = 1.0;
     }
     natureCtx.lineWidth = lineWidth;
@@ -825,7 +825,7 @@ function initWaves2DFallback(canvas) {
   function draw() {
     t += 0.03;
     const w = canvas.width, h = canvas.height, dpr = window.devicePixelRatio || 1;
-    ctx.fillStyle = '#0f1218';
+    ctx.fillStyle = '#0d1020';
     ctx.fillRect(0, 0, w, h);
     ctx.lineWidth = 1.2 * dpr;
     for (let y = 0; y < h; y += 8 * dpr) {
@@ -894,7 +894,7 @@ function initWavetableAnimation() {
     }
     currentPos += (targetPos - currentPos) * 0.12;
 
-    ctx.fillStyle = '#0f1218';
+    ctx.fillStyle = '#0d1020';
     ctx.fillRect(0, 0, w, h);
 
     const frames = 12;
@@ -939,8 +939,8 @@ function initWavetableAnimation() {
         ctx.lineTo(ox + sliceWidth, oy);
         ctx.closePath();
         const grad = ctx.createLinearGradient(ox, oy - 28 * dpr, ox, oy);
-        grad.addColorStop(0, `rgba(224, 122, 95, ${0.35 * (1.0 - distFromActive)})`);
-        grad.addColorStop(1, 'rgba(224, 122, 95, 0.0)');
+        grad.addColorStop(0, `rgba(255, 107, 53, ${0.35 * (1.0 - distFromActive)})`);
+        grad.addColorStop(1, 'rgba(255, 107, 53, 0.0)');
         ctx.fillStyle = grad;
         ctx.fill();
       }
@@ -948,10 +948,10 @@ function initWavetableAnimation() {
       // Draw Slice Stroke
       ctx.beginPath();
       if (isActive) {
-        ctx.strokeStyle = `rgba(224, 122, 95, ${0.95 - distFromActive * 0.2})`;
+        ctx.strokeStyle = `rgba(255, 107, 53, ${0.95 - distFromActive * 0.2})`;
         ctx.lineWidth = (2.6 - distFromActive * 1.0) * dpr;
       } else {
-        ctx.strokeStyle = `rgba(233, 196, 106, ${proximityAlpha * 0.45})`;
+        ctx.strokeStyle = `rgba(216, 213, 229, ${proximityAlpha * 0.45})`;
         ctx.lineWidth = 1.1 * dpr;
       }
 
@@ -973,13 +973,13 @@ function initWavetableAnimation() {
     const activeOx = w * 0.14 + (activeFrameFloat - frames / 2) * (5 * dpr);
     ctx.beginPath();
     ctx.arc(activeOx + sliceWidth + 10 * dpr, activeOy, 3.5 * dpr, 0, Math.PI * 2);
-    ctx.fillStyle = '#e07a5f';
+    ctx.fillStyle = '#ff6b35';
     ctx.fill();
 
     // Subtle Position Notch Bar on Left
     ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
     ctx.fillRect(w * 0.06, h * 0.25, 2 * dpr, h * 0.5);
-    ctx.fillStyle = '#e07a5f';
+    ctx.fillStyle = '#ff6b35';
     ctx.fillRect(w * 0.05, h * 0.25 + currentPos * (h * 0.5 - 6 * dpr), 4 * dpr, 6 * dpr);
   }
 
@@ -1221,7 +1221,7 @@ function initCanvas3DCube(canvas) {
     }
 
     const w = canvas.width, h = canvas.height, dpr = window.devicePixelRatio || 1;
-    ctx.fillStyle = '#0f1218';
+    ctx.fillStyle = '#0d1020';
     ctx.fillRect(0, 0, w, h);
 
     const projected = cubeVertices.map(v => {
@@ -1234,7 +1234,7 @@ function initCanvas3DCube(canvas) {
     });
 
     ctx.lineWidth = 1.4 * dpr;
-    ctx.strokeStyle = '#e9c46a';
+    ctx.strokeStyle = '#d8d5e5';
     cubeEdges.forEach(([i, j]) => {
       ctx.beginPath();
       ctx.moveTo(projected[i].x, projected[i].y);
@@ -1245,7 +1245,7 @@ function initCanvas3DCube(canvas) {
     projected.forEach(p => {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 2.5 * dpr, 0, Math.PI * 2);
-      ctx.fillStyle = '#e07a5f';
+      ctx.fillStyle = '#ff6b35';
       ctx.fill();
     });
   }
@@ -1269,10 +1269,10 @@ function initKnobsAnimation() {
   resize();
 
   const knobs = [
-    { id: 0, relX: 0.25, relY: 0.36, val: 0.65, baseSpeed: 1.0, color: '#e07a5f', isDragging: false },
-    { id: 1, relX: 0.75, relY: 0.36, val: 0.35, baseSpeed: -1.3, color: '#f4a261', isDragging: false },
-    { id: 2, relX: 0.32, relY: 0.72, val: 0.80, baseSpeed: 0.8, color: '#81b29a', isDragging: false },
-    { id: 3, relX: 0.72, relY: 0.72, val: 0.50, baseSpeed: -0.9, color: '#b8b8d1', isDragging: false }
+    { id: 0, relX: 0.25, relY: 0.36, val: 0.65, baseSpeed: 1.0, color: '#ff6b35', isDragging: false },
+    { id: 1, relX: 0.75, relY: 0.36, val: 0.35, baseSpeed: -1.3, color: '#ff6b35', isDragging: false },
+    { id: 2, relX: 0.32, relY: 0.72, val: 0.80, baseSpeed: 0.8, color: '#a3aacb', isDragging: false },
+    { id: 3, relX: 0.72, relY: 0.72, val: 0.50, baseSpeed: -0.9, color: '#c4c1d9', isDragging: false }
   ];
 
   let activeKnob = null;
@@ -1338,7 +1338,7 @@ function initKnobsAnimation() {
     const h = canvas.height;
     const dpr = window.devicePixelRatio || 1;
 
-    ctx.fillStyle = '#0f1218';
+    ctx.fillStyle = '#0d1020';
     ctx.fillRect(0, 0, w, h);
 
     const positions = knobs.map(k => ({
@@ -1353,14 +1353,14 @@ function initKnobsAnimation() {
     // Cable 1: Top left to Top right
     ctx.lineWidth = 2.0 * dpr;
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(244, 162, 97, 0.45)';
+    ctx.strokeStyle = 'rgba(255, 107, 53, 0.45)';
     ctx.moveTo(positions[0].x, positions[0].y);
     ctx.bezierCurveTo(w * 0.5, h * 0.1, w * 0.5, h * 0.58, positions[1].x, positions[1].y);
     ctx.stroke();
 
     // Cable 2: Bottom left to Bottom right
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(129, 178, 154, 0.45)';
+    ctx.strokeStyle = 'rgba(163, 170, 203, 0.45)';
     ctx.moveTo(positions[2].x, positions[2].y);
     ctx.bezierCurveTo(w * 0.44, h * 0.94, w * 0.62, h * 0.94, positions[3].x, positions[3].y);
     ctx.stroke();
@@ -1423,7 +1423,7 @@ function initKnobsAnimation() {
       // Knob Body Outer Bezel
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = k.isDragging ? '#262d38' : '#1b2029';
+      ctx.fillStyle = k.isDragging ? '#20263f' : '#1a1f36';
       ctx.fill();
       ctx.strokeStyle = k.isDragging ? k.color : 'rgba(255, 255, 255, 0.12)';
       ctx.lineWidth = 1.5 * dpr;
@@ -1432,7 +1432,7 @@ function initKnobsAnimation() {
       // Knob Inner Disc
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, r * 0.75, 0, Math.PI * 2);
-      ctx.fillStyle = '#141820';
+      ctx.fillStyle = '#12152a';
       ctx.fill();
 
       // Indicator Needle Dot & Pointer
@@ -1565,7 +1565,7 @@ function initMinimalAudioPlayer() {
   }
 
   // unplayed bars take the text colour at low alpha, so they read in both modes
-  let idleKey = '', idleFill = 'rgba(128,128,128,0.3)';
+  let idleKey = '', idleFill = 'rgba(136, 144, 177,0.3)';
   function idleInk() {
     const mode = document.documentElement.getAttribute('data-mode') || '';
     if (mode !== idleKey) {

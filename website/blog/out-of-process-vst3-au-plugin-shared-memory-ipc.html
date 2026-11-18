@@ -35,7 +35,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css?v=07695caf">
-  <link rel="stylesheet" href="../style.css?v=3ac517c3">
+  <link rel="stylesheet" href="../style.css?v=779b2f0d">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
@@ -96,7 +96,7 @@
           <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
           <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
           <a href="../chat.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
-          <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+          <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 16.45l.8-3.6L13 4.15a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.1 15.65Z"/><path d="M11.5 5.65l2.8 2.8"/></svg><span>Blog</span></a>
         </div>
       </div>
       <a href="../plugin.html">Plugin</a>
@@ -140,7 +140,7 @@
         <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#why-modular-audiovisual-engines-clash-with-daw-hosts">Why modular audiovisual engines clash with DAW hosts</a></li><li><a href="#shared-memory-audio-and-midi-transport">Shared-memory audio and MIDI transport</a></li><li><a href="#avoiding-ableton-s-64-parameter-clutter">Avoiding Ableton&#x27;s 64-parameter clutter</a></li><li><a href="#triple-buffered-gpu-pixel-transport-for-the-ui">Triple-buffered GPU pixel transport for the UI</a></li><li><a href="#honest-limits-of-the-current-architecture">Honest limits of the current architecture</a></li></ol></details>
         <div class="prose">
 <p>An out-of-process VST3 plugin keeps a modular audio-visual engine from crashing or stalling the host DAW. Recent open-source audio releases, from cross-platform CLAP/VST3/AU sample libraries like Floe to Rust-based workstations like Transit and browser AudioWorklet experiments, show how much engineering effort goes into keeping plugin hosts stable while running rich DSP and custom interfaces.</p>
-<p>When a plugin only runs a few biquad filters and draws sliders with a CPU canvas, living inside the DAW's address space is straightforward. When the plugin is an entire modular workstation with 351 nodes, 23 synthesisers, 29 audio effects, live GLSL shaders, and a 3D renderer, running in-process creates two immediate hazards: GPU context collisions with the host windowing system, and audio thread stalls if a dynamic graph or shader compilation hiccups.</p>
+<p>When a plugin only runs a few biquad filters and draws sliders with a CPU canvas, living inside the DAW's address space is straightforward. When the plugin is an entire modular workstation with 372 nodes, live GLSL shaders, and a 3D renderer, running in-process creates two immediate hazards: GPU context collisions with the host windowing system, and audio thread stalls if a dynamic graph or shader compilation hiccups.</p>
 <p>The <a href="https://infinitedevices.org/plugin.html">Infinite VST3 and AU plugin</a> solves both problems by splitting the plugin into two OS processes: a minimal native shell loaded by the DAW, and a separate engine process that runs the node graph, DSP, and GPU rendering.</p>
 <h2 id="why-modular-audiovisual-engines-clash-with-daw-hosts">Why modular audiovisual engines clash with DAW hosts</h2>
 <p>Inside a host such as Ableton Live, Logic Pro, or Reaper, every loaded plugin shares the host process's OpenGL or Metal state, heap allocator, and UI event loop. A single uncaught driver quirk in a 3D node or a heavy <code>GLSL</code> fragment pass can bring down the entire session, taking unsaved tracks with it.</p>
@@ -161,7 +161,7 @@
 <h2 id="honest-limits-of-the-current-architecture">Honest limits of the current architecture</h2>
 <p>This split design brings real trade-offs that are worth stating plainly:</p>
 <ul><li><strong>One-block latency</strong>: the lookahead buffer adds <code>maxBlock</code> samples of latency (reported to the DAW for plugin delay compensation). At 48 kHz and 256 samples, that is 5.33 ms.</li><li><strong>Format coverage</strong>: the plugin ships as VST3 and AU on macOS, and VST3 on Windows and Linux. AAX (Pro Tools) is not supported.</li><li><strong>Readback bandwidth</strong>: when the embedded plugin window is open at high DPI, copying BGRA frames over shared memory uses extra memory bandwidth compared to native single-process rendering, though closing the editor or popping out the window removes it.</li></ul>
-<p>All 351 nodes, 142 factory presets, and full standalone parity are available in the <a href="https://infinitedevices.org/plugin.html">Infinite VST3 and AU plugin</a>, and you can inspect our real-time DSP and frame-rate measurements on the <a href="https://infinitedevices.org/benchmarks.html">Infinite benchmarks page</a>.</p>
+<p>All 372 nodes, 142 factory presets, and full standalone parity are available in the <a href="https://infinitedevices.org/plugin.html">Infinite VST3 and AU plugin</a>, and you can inspect our real-time DSP and frame-rate measurements on the <a href="https://infinitedevices.org/benchmarks.html">Infinite benchmarks page</a>.</p>
         </div>
         <aside class="post-cta" aria-label="Try Infinite">
           <p class="hand">your turn</p>
@@ -169,7 +169,7 @@
           <p>Infinite is free and open source for macOS, Windows and Linux. Start from a template in the Library, or read how the nodes fit together.</p>
           <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="../library.html">Browse the Library</a></p>
         </aside>
-        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="dsp-without-juce.html"><span class="mono">Product</span><b>writing audio dsp without juce: notes from infinite</b></a><a class="rel-card" href="modulate-vst3-plugins-with-visuals-and-lfos.html"><span class="mono">Creative</span><b>Modulate any VST3 or AU plugin with LFOs, audio and visuals</b></a><a class="rel-card" href="hardware-midi-and-controller-mapping-in-infinite.html"><span class="mono">Product</span><b>Hardware MIDI and controller mapping in Infinite</b></a></div></section>
+        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="dsp-without-juce.html"><span class="mono">Product</span><b>writing audio dsp without juce: notes from infinite</b></a><a class="rel-card" href="modulate-vst3-plugins-with-visuals-and-lfos.html"><span class="mono">Creative</span><b>Modulate any VST3 or AU plugin with LFOs, audio and visuals</b></a><a class="rel-card" href="field-patcher-visual-box-and-wire-dsp-shader-editor.html"><span class="mono">Product</span><b>Field Patcher: a visual DSP and shader patcher for Field</b></a></div></section>
       </div>
     </article>
   </main>
@@ -275,7 +275,7 @@
     <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
     <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
     <a href="../chat.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 2.5V14H4.5A1.5 1.5 0 0 1 3 12.5V6a1.5 1.5 0 0 1 1.5-1.5z"/></svg><span>Agents &amp; terminal</span></a>
-    <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+    <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 16.45l.8-3.6L13 4.15a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.1 15.65Z"/><path d="M11.5 5.65l2.8 2.8"/></svg><span>Blog</span></a>
   </div>
 </nav>
   <script src="../search.js?v=d89de447" defer></script>

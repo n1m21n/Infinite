@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#151930">
+  <title>Soap Film Interference Marangoni Swirl | Infinite</title>
+  <meta name="description" content="Audio-reactive thin-film soap bubble Marangoni swirl visualizer. Bass drives fluid convection, mid shifts spectral thickness, and high sharpens iridescent fringes.">
+  <link rel="canonical" href="https://infinitedevices.org/embeds/soap-film-interference-marangoni-swirl.html">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Soap Film Interference Marangoni Swirl">
+  <meta property="og:description" content="Audio-reactive thin-film soap bubble Marangoni swirl visualizer. Bass drives fluid convection, mid shifts spectral thickness, and high sharpens iridescent fringes.">
+  <meta property="og:url" content="https://infinitedevices.org/embeds/soap-film-interference-marangoni-swirl.html">
+  <meta property="og:image" content="https://infinitedevices.org/assets/og/embed-soap-film-interference-marangoni-swirl.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <style>
+    :root { --ground: #151930; --glass: rgba(32, 38, 63, 0.78); --ink: #EEF1FA; --ember: #FF6B35; --signal: #A7B1FF; --shadow: rgba(4, 5, 14, 0.45); }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ground); font-family: Geist, system-ui, -apple-system, sans-serif; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .badge, .btn {
+      position: absolute; bottom: 14px; z-index: 10; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px;
+      border-radius: 999px; background: var(--glass); color: var(--ink); font-size: 11.5px; font-weight: 500; text-decoration: none;
+      -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5); box-shadow: 0 6px 16px var(--shadow);
+      transition: transform 0.18s ease-out, background-color 0.18s ease-out;
+    }
+    .badge { right: 14px; width: 44px; padding: 0; justify-content: center; }
+    .badge-icon { width: 16px; height: 16px; border-radius: 50%; background: linear-gradient(135deg, var(--ember), var(--signal)); }
+    .controls { position: absolute; left: 14px; bottom: 14px; z-index: 10; }
+    .controls .btn { position: static; border: 0; cursor: pointer; font-family: inherit; min-height: 44px; width: 44px; padding: 0; justify-content: center; }
+    .badge:hover, .btn:hover { transform: translateY(-2px); background: rgba(52, 59, 94, 0.9); }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .fallback { color: var(--ink); padding: 24px; font-size: 13.5px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 class="sr-only">Soap Film Interference Marangoni Swirl</h1>
+    <canvas id="gl" role="img" aria-label="Soap Film Interference Marangoni Swirl, an audio-reactive visual"></canvas>
+
+    <div class="controls">
+      <button class="btn" id="btn-audio" type="button" aria-label="Enable microphone" title="Enable microphone">mic</button>
+      <button class="btn" id="btn-share" type="button" aria-label="Share" title="Share">share</button>
+    </div>
+
+    <a href="https://infinitedevices.org/" target="_blank" rel="noopener" class="badge" title="Infinite">
+      <span class="badge-icon" aria-hidden="true"></span>
+      <span class="sr-only">made in infinite</span>
+    </a>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("gl");
+    const gl = canvas.getContext("webgl");
+    if (!gl) { document.body.innerHTML = '<p class="fallback">WebGL required.</p>'; }
+
+    const vsSource = `
+      attribute vec2 position;
+      void main() {
+        gl_Position = vec4(position, 0.0, 1.0);
+      }
+    `;
+
+    const fsSource = `
+precision highp float;
+uniform vec2 res;
+uniform float aspect;
+uniform float t;
+uniform float audio_bass;
+uniform float audio_mid;
+uniform float audio_high;
+
+uniform float audio_bass;
+uniform float audio_mid;
+uniform float audio_high;
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / res;
+  vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;
+
+  float b = audio_bass * 0.75;
+  float m = audio_mid * 0.75;
+  float h = audio_high * 0.75;
+
+  float r = length(p);
+  float tt = t * 0.45;
+  float warp = 1.65 + b * 1.1;
+  float wx = sin(p.y * 3.1 + tt * 1.1) + 0.55 * cos(p.x * 4.7 - tt * 0.8);
+  float wy = cos(p.x * 3.4 - tt * 0.9) + 0.55 * sin(p.y * 4.3 + tt * 1.2);
+  vec2 q = p + vec2(wx, wy) * 0.26 * warp;
+
+  float eddy = sin(q.x * 4.2 + q.y * 3.1 + tt) * 0.5 + cos(length(q) * 6.5 - tt * 1.4) * 0.5;
+  float drain = clamp(0.55 + 0.35 * (1.0 - uv.y) + eddy * 0.45, 0.0, 2.5);
+  float phase = drain * (2.40 + m * 1.4) * 3.14159;
+
+  vec3 irid = vec3(
+    0.5 + 0.5 * cos(phase + 0.0),
+    0.5 + 0.5 * cos(phase + 2.094),
+    0.5 + 0.5 * cos(phase + 4.188)
+  );
+  irid = vec3(irid.x * 0.95 + 0.08, irid.y * 0.78 + 0.06, irid.z * 0.88 + 0.12);
+
+  vec3 cObsidian = vec3(0.071, 0.063, 0.055);
+  vec3 cGold = vec3(0.902, 0.612, 0.173);
+  vec3 cTeal = vec3(0.298, 0.722, 0.831);
+
+  float meniscus = 0.92 + b * 0.05;
+  float aperture = smoothstep(meniscus, meniscus - 0.18, r);
+  float rim = exp(-abs(r - (meniscus - 0.09)) * 22.0) * (0.75 + h * 0.45);
+  vec3 tint = mix(cGold, cTeal, clamp(irid.z, 0.0, 1.0));
+  vec3 filmCol = mix(irid, tint, 0.38) * (1.15 + h * 0.35);
+
+  vec3 col = mix(cObsidian, filmCol, aperture * 0.92);
+  col += vec3(0.95, 0.86, 0.72) * rim * 0.55;
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}
+`;
+
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      return shader;
+    }
+    const program = gl.createProgram();
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const posLoc = gl.getAttribLocation(program, "position");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const uRes = gl.getUniformLocation(program, "res");
+    const uAspect = gl.getUniformLocation(program, "aspect");
+    const uTime = gl.getUniformLocation(program, "t");
+    const uBass = gl.getUniformLocation(program, "audio_bass");
+    const uMid = gl.getUniformLocation(program, "audio_mid");
+    const uHigh = gl.getUniformLocation(program, "audio_high");
+
+    let audioCtx, analyser, dataArray;
+    let bass = 0.0, mid = 0.0, high = 0.0;
+
+    document.getElementById("btn-audio").onclick = async () => {
+      if (audioCtx) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        document.getElementById("btn-audio").innerText = "Microphone on";
+      } catch (e) {
+        document.getElementById("btn-audio").innerText = "Microphone blocked";
+      }
+    };
+
+    document.getElementById("btn-share").onclick = async () => {
+      if (navigator.share) {
+        try { await navigator.share({ title: document.title, url: location.href }); } catch (_) {}
+      } else {
+        try { await navigator.clipboard.writeText(location.href); } catch (_) {}
+      }
+    };
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    const startTime = performance.now();
+    function render() {
+      const now = (performance.now() - startTime) * 0.001;
+      if (analyser && dataArray) {
+        analyser.getByteFrequencyData(dataArray);
+        let b = 0, m = 0, h = 0;
+        for (let i = 0; i < 6; i++) b += dataArray[i];
+        for (let i = 6; i < 32; i++) m += dataArray[i];
+        for (let i = 32; i < 96; i++) h += dataArray[i];
+        bass = bass * 0.8 + (b / (6 * 255)) * 0.2;
+        mid = mid * 0.8 + (m / (26 * 255)) * 0.2;
+        high = high * 0.8 + (h / (64 * 255)) * 0.2;
+      } else {
+        bass = 0.25 + 0.15 * Math.sin(now * 1.7);
+        mid = 0.22 + 0.12 * Math.cos(now * 1.1);
+        high = 0.18 + 0.10 * Math.sin(now * 2.3);
+      }
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uAspect, canvas.width / Math.max(1, canvas.height));
+      gl.uniform1f(uTime, now);
+      gl.uniform1f(uBass, bass);
+      gl.uniform1f(uMid, mid);
+      gl.uniform1f(uHigh, high);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      requestAnimationFrame(render);
+    }
+    render();
+  </script>
+</body>
+</html>

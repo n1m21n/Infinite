@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid House 303 Resonant Filter FX",
+    "author": "Infinite",
+    "description": "Sweeping resonant diode-style lowpass filter with soft waveshaped drive and LFO cutoff modulation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float cutoff = 950.0 [180.0, 4200.0];\nparam float resonance = 0.55 [0.0, 0.85];\nparam float lfoRate = 0.65 [0.1, 4.0];\nparam float drive = 1.6 [0.5, 4.0];\nparam float mix = 0.80 [0.0, 1.0];\nstate float lfo = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\nlfo = (lfo + lfoRate / sr) % 1.0;\nmod = 1.0 + 0.55 * sin(6.2831853 * lfo);\nfCut = clamp((cutoff * mod) / sr * 3.14, 0.02, 0.45);\n\nfb = clamp(lp2 * resonance * 1.35, -0.95, 0.95);\ndriven = in * drive - fb;\nsat = driven / (1.0 + abs(driven));\n\nlp1 = lp1 + fCut * (sat - lp1);\nlp2 = lp2 + fCut * (lp1 - lp2);\n\nout = clamp(in * (1.0 - mix) + lp2 * mix * 1.15, -0.92, 0.92);\n",
+    "params": {
+      "cutoff": 950.0,
+      "resonance": 0.55,
+      "lfoRate": 0.65,
+      "drive": 1.6,
+      "mix": 0.8
+    }
+  }
+}

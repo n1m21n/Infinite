@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ukiyo-e Cartography Isobar Waves",
+    "author": "Infinite",
+    "description": "Woodblock-inspired topographical wave contours in Prussian indigo and celadon mist over warm rice paper with a vermilion seal accent.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float contourFreq = 14.0 [6.0, 28.0];\nparam float waveAmp = 0.16 [0.04, 0.35];\nparam float paperGrain = 0.04 [0.0, 0.12];\nparam float sealRadius = 0.11 [0.05, 0.22];\nparam float contrast = 1.06 [0.8, 1.4];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\n# Ukiyo-e palette: Indigo (#1d3557), Celadon (#a8dadc), Rice paper (#f1faee), Vermilion (#e63946)\ncIndigo = vec3(0.114, 0.208, 0.341);\ncCeladon = vec3(0.659, 0.855, 0.863);\ncPaper = vec3(0.945, 0.933, 0.890);\ncSeal = vec3(0.902, 0.224, 0.275);\n\n# Rice paper grain\ngrain = (fract(sin(dot(uv * res, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * paperGrain;\n\n# Topographical wave heightfield\nw1 = sin(p.x * 2.8 + t * 0.4) * cos(p.y * 2.4 - t * 0.25) * waveAmp;\nw2 = sin((p.x + p.y) * 4.2 - t * 0.3) * (waveAmp * 0.45);\nh = p.y * 0.5 + w1 + w2;\n\n# Woodblock contour bands\niso = abs(fract(h * contourFreq) - 0.5);\nlineMask = 1.0 - smoothstep(0.06, 0.14, iso);\nmistMask = smoothstep(-0.25, 0.35, h);\n\nbaseCol = mix(cCeladon, cPaper, mistMask);\nbaseCol = mix(baseCol, cIndigo, lineMask * 0.88);\n\n# Red hanko cartographer seal in upper right\nsealPos = p - vec2(0.58, 0.56);\nsealBox = max(abs(sealPos.x), abs(sealPos.y));\ninSeal = 1.0 - smoothstep(sealRadius - 0.01, sealRadius + 0.01, sealBox);\nbaseCol = mix(baseCol, cSeal, inSeal * 0.92);\n\ncol = clamp((baseCol + grain) * contrast, 0.0, 1.0);\n",
+    "params": {
+      "contourFreq": 14.0,
+      "waveAmp": 0.16,
+      "paperGrain": 0.04,
+      "sealRadius": 0.11,
+      "contrast": 1.06
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

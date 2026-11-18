@@ -1,0 +1,17 @@
+infinite-patch 1
+rev 2
+# Bake: a starting patch for the Bake node
+node 1 3D Bake
+  id node
+  pos 520 300
+end
+node 2 3D Cube
+  id in0
+  pos 0 300
+end
+node 3 Utility Output
+  id out
+  pos 1080 300
+end
+geo node 0 in0
+cable out 0 node

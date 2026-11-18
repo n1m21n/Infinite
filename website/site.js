@@ -17,7 +17,7 @@
   const CAT = {
     Source: '#4ADE80', '3D': '#38BDF8', Compositing: '#818CF8', Effects: '#FACC15',
     Modulators: '#A3E635', Prediction: '#22D388', Macros: '#FC963C', Utility: '#A3A9BA',
-    Notes: '#4CD964', Synths: '#6992F6', AudioEffects: '#53C7E3'
+    Notes: '#4CD964', Synths: '#6992F6', AudioEffects: '#53C7E3', Shader: '#F472B6'
   };
   const CAT_LABEL = { AudioEffects: 'Audio FX' };
   const catLabel = (c) => CAT_LABEL[c] || c;
@@ -630,7 +630,7 @@
   }
 
   /* ------------------------------------------------------------ node ticker tapes */
-  const CAT_IC = {"Source": "<circle cx=\"6.5\" cy=\"10\" r=\"1.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M10.5 6.5a5 5 0 0 1 0 7M13.5 4a8.6 8.6 0 0 1 0 12\"/>", "3D": "<path d=\"M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z\"/><path d=\"M3.8 6.7 10 10.05 16.2 6.7M10 10.05V16.9\"/>", "Compositing": "<rect x=\"3.5\" y=\"3.5\" width=\"9\" height=\"9\" rx=\"2\"/><rect x=\"7.5\" y=\"7.5\" width=\"9\" height=\"9\" rx=\"2\"/>", "Effects": "<path d=\"M10 3 11.7 8.3 17 10 11.7 11.7 10 17 8.3 11.7 3 10 8.3 8.3Z\"/>", "Modulators": "<path d=\"M3.2 10c1.8-5.5 3.2-5.5 4.4 0s2.8 5.5 4.4 0 3.2-5.5 4.4 0\"/>", "Prediction": "<path d=\"M3.5 14.5c2.5 0 3-4 5.5-4.5\"/><path d=\"M11.5 8.4 13 7.8\" stroke-dasharray=\"0.1 3\"/><circle cx=\"15.9\" cy=\"6.2\" r=\"1.7\" fill=\"currentColor\" stroke=\"none\"/>", "Macros": "<circle cx=\"10\" cy=\"10\" r=\"6.5\"/><path d=\"M10 10 13 5.6\"/>", "Utility": "<path d=\"M3.5 6h7M14.5 6h2M3.5 14h2M9.5 14h7\"/><circle cx=\"12.5\" cy=\"6\" r=\"1.9\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"7.5\" cy=\"14\" r=\"1.9\" fill=\"currentColor\" stroke=\"none\"/>", "Notes": "<path d=\"M8.5 14.5V4.5l7-1.5v10\"/><circle cx=\"6.5\" cy=\"14.5\" r=\"2\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"13.5\" cy=\"13\" r=\"2\" fill=\"currentColor\" stroke=\"none\"/>", "Synths": "<rect x=\"3\" y=\"5\" width=\"14\" height=\"10\" rx=\"2\"/><path d=\"M7.7 5v10M12.3 5v10\"/><path d=\"M7.7 10h0M12.3 10h0\" stroke=\"none\"/>", "AudioEffects": "<path d=\"M4 8v4M7 5v10M10 3v14M13 6v8M16 8.5v3\"/>"};
+  const CAT_IC = {"Shader": "<rect x=\"4.5\" y=\"4.5\" width=\"11\" height=\"11\" rx=\"2\"/><path d=\"M4.5 10h11\"/>", "Source": "<circle cx=\"6.5\" cy=\"10\" r=\"1.9\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M10.5 6.5a5 5 0 0 1 0 7M13.5 4a8.6 8.6 0 0 1 0 12\"/>", "3D": "<path d=\"M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z\"/><path d=\"M3.8 6.7 10 10.05 16.2 6.7M10 10.05V16.9\"/>", "Compositing": "<rect x=\"3.5\" y=\"3.5\" width=\"9\" height=\"9\" rx=\"2\"/><rect x=\"7.5\" y=\"7.5\" width=\"9\" height=\"9\" rx=\"2\"/>", "Effects": "<path d=\"M10 3 11.7 8.3 17 10 11.7 11.7 10 17 8.3 11.7 3 10 8.3 8.3Z\"/>", "Modulators": "<path d=\"M3.2 10c1.8-5.5 3.2-5.5 4.4 0s2.8 5.5 4.4 0 3.2-5.5 4.4 0\"/>", "Prediction": "<path d=\"M3.5 14.5c2.5 0 3-4 5.5-4.5\"/><path d=\"M11.5 8.4 13 7.8\" stroke-dasharray=\"0.1 3\"/><circle cx=\"15.9\" cy=\"6.2\" r=\"1.7\" fill=\"currentColor\" stroke=\"none\"/>", "Macros": "<circle cx=\"10\" cy=\"10\" r=\"6.5\"/><path d=\"M10 10 13 5.6\"/>", "Utility": "<path d=\"M3.5 6h7M14.5 6h2M3.5 14h2M9.5 14h7\"/><circle cx=\"12.5\" cy=\"6\" r=\"1.9\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"7.5\" cy=\"14\" r=\"1.9\" fill=\"currentColor\" stroke=\"none\"/>", "Notes": "<path d=\"M8.5 14.5V4.5l7-1.5v10\"/><circle cx=\"6.5\" cy=\"14.5\" r=\"2\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"13.5\" cy=\"13\" r=\"2\" fill=\"currentColor\" stroke=\"none\"/>", "Synths": "<rect x=\"3\" y=\"5\" width=\"14\" height=\"10\" rx=\"2\"/><path d=\"M7.7 5v10M12.3 5v10\"/><path d=\"M7.7 10h0M12.3 10h0\" stroke=\"none\"/>", "AudioEffects": "<path d=\"M4 8v4M7 5v10M10 3v14M13 6v8M16 8.5v3\"/>"};
   let nodeIndex = null, nodeIndexLoad = null;
   function loadNodeIndex() {
     if (nodeIndex) return Promise.resolve(nodeIndex);
@@ -662,7 +662,7 @@
     const wrap = $('#tickers');
     const count = $('#node-count');
     if (!wrap || typeof NODE_LIBRARY === 'undefined') return;
-    if (count) count.textContent = NODE_LIBRARY.length;
+    if (count) count.textContent = 372; // every node type in the engine (src/core/chat/NodeVocab.gen.h), not the marquee list length
     // one tape per family of the canvas: visuals, sound, control
     const TAPES = [
       ['ticker-1', ['Source', 'Compositing', 'Effects', '3D']],

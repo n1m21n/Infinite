@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Soap Film Interference Lamellar Rings",
+    "author": "Infinite",
+    "description": "Multi-vortex dipole drainage field producing concentric lamellar interference rings around a Newton-black film core.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float rings = 5.5 [2.0, 10.0];\nparam float dipole = 0.42 [0.1, 0.8];\nparam float contrast = 1.35 [0.6, 2.2];\nparam float blackCore = 0.22 [0.05, 0.45];\nparam float speed = 0.38 [0.05, 1.2];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\ntt = t * speed;\n\nc1 = vec2(cos(tt * 0.7), sin(tt * 0.5)) * dipole;\nc2 = vec2(-cos(tt * 0.6), -sin(tt * 0.8)) * dipole;\nd1 = length(p - c1);\nd2 = length(p - c2);\n\n# Lamellar thickness contours from twin drainage vortices\nthick = d1 * 0.65 + d2 * 0.65 + 0.14 * sin(atan2(p.y, p.x) * 3.0 + tt * 1.3);\nphase = thick * rings * 3.14159;\n\nrWave = 0.5 + 0.5 * sin(phase + 0.2);\ngWave = 0.5 + 0.5 * sin(phase + 2.3);\nbWave = 0.5 + 0.5 * sin(phase + 4.4);\nbands = pow(vec3(rWave, gWave, bWave), vec3(contrast, contrast, contrast));\n\n# Newton-black drained film center and outer obsidian vignette\ncoreMask = smoothstep(blackCore, blackCore + 0.28, min(d1, d2));\nouterMask = smoothstep(1.08, 0.25, length(p));\n\ncObsidian = vec3(0.065, 0.058, 0.055);\ncViolet = vec3(0.310, 0.169, 0.420);\ncAmber = vec3(0.902, 0.612, 0.173);\n\nfilm = mix(cViolet, cAmber, bands.x * 0.65 + bands.y * 0.35);\nfilm = mix(film, bands, 0.52);\n\ncol = mix(cObsidian, film, coreMask * outerMask);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "rings": 5.5,
+      "dipole": 0.42,
+      "contrast": 1.35,
+      "blackCore": 0.22,
+      "speed": 0.38
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>Infinite — Vertical Presentation Deck</title>
-  <meta name="description" content="A visual overview of Infinite, the real-time node-based audiovisual workstation for macOS, Windows and Linux.">
+  <title>Infinite: 2D, 3D, music and code on one canvas</title>
+  <meta name="description" content="A visual overview of Infinite: 2D View layer compositing, Blender-keymap 3D scenes, Field Patcher, hardware-desk Mixer and VST3 hosting.">
   <link rel="canonical" href="https://infinitedevices.org/slides.html">
   <meta property="og:title" content="Infinite — Presentation Deck">
   <meta property="og:description" content="A visual overview of Infinite, the real-time node-based audiovisual workstation.">
@@ -28,7 +28,7 @@
   <!-- Direct Website Stylesheet -->
   <link rel="stylesheet" href="brand.css?v=07695caf">
   <script src="theme.js?v=1"></script>
-  <link rel="stylesheet" href="style.css?v=3ac517c3">
+  <link rel="stylesheet" href="style.css?v=779b2f0d">
 
   <style>
     /* ==========================================================================
@@ -312,7 +312,7 @@
       height: 220px;
       border-radius: 10px;
       overflow: hidden;
-      background: #111;
+      background: #0D1020;
     }
     .deck-cap-grid .cap-canvas-box canvas {
       width: 100%;
@@ -810,7 +810,7 @@
               <div class="deck-dl-specs">
                 <div class="deck-dl-spec-box">
                   <div class="deck-dl-spec-label">Version</div>
-                  <div class="deck-dl-spec-val">v0.2.1</div>
+                  <div class="deck-dl-spec-val">v2.0.0</div>
                 </div>
                 <div class="deck-dl-spec-box">
                   <div class="deck-dl-spec-label">Compatibility</div>
@@ -879,13 +879,13 @@
     const NETWORK_ITEMS = [
       { id: 'sound', label: 'Sound', color: '#b53700', bg: 'rgba(181, 55, 0, 0.12)', dtX: 0.15, dtY: 0.22 },
       { id: 'music', label: 'Music', color: '#d9430e', bg: 'rgba(217, 67, 14, 0.12)', dtX: 0.15, dtY: 0.78 },
-      { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.34, dtY: 0.30 },
+      { id: 'physics', label: 'Physics', color: 'var(--ink-3)', bg: 'rgba(90, 97, 128, 0.12)', dtX: 0.34, dtY: 0.30 },
       { id: 'math', label: 'Math', color: '#b53700', bg: 'rgba(181, 55, 0, 0.12)', dtX: 0.38, dtY: 0.75 },
-      { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.54, dtY: 0.20 },
-      { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.58, dtY: 0.80 },
+      { id: 'art', label: 'Art', color: 'var(--accent)', bg: 'rgba(255, 107, 53, 0.12)', dtX: 0.54, dtY: 0.20 },
+      { id: 'motion', label: 'Motion', color: 'var(--signal)', bg: 'rgba(74, 84, 214, 0.12)', dtX: 0.58, dtY: 0.80 },
       { id: 'light', label: 'Light', color: '#d9430e', bg: 'rgba(217, 67, 14, 0.12)', dtX: 0.72, dtY: 0.32 },
-      { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.86, dtY: 0.22 },
-      { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.85, dtY: 0.78 }
+      { id: 'geometry', label: 'Geometry', color: 'var(--ink-3)', bg: 'rgba(90, 97, 128, 0.12)', dtX: 0.86, dtY: 0.22 },
+      { id: 'color', label: 'Color', color: 'var(--ink-3)', bg: 'rgba(90, 97, 128, 0.12)', dtX: 0.85, dtY: 0.78 }
     ];
 
     const NETWORK_CONNECTIONS = [
@@ -933,7 +933,7 @@
         natureCtx.beginPath();
         natureCtx.moveTo(edge.src.x, edge.src.y);
         natureCtx.lineTo(edge.dst.x, edge.dst.y);
-        natureCtx.strokeStyle = 'rgba(60, 50, 40, 0.16)';
+        natureCtx.strokeStyle = 'rgba(42, 48, 82, 0.16)';
         natureCtx.lineWidth = 2 * dpr;
         natureCtx.stroke();
       });
@@ -995,7 +995,7 @@
       if (c1) {
         c1.width = 440; c1.height = 220;
         const ctx = c1.getContext('2d');
-        ctx.fillStyle = '#0f1218'; ctx.fillRect(0, 0, 440, 220);
+        ctx.fillStyle = 'var(--deep)'; ctx.fillRect(0, 0, 440, 220);
         for (let y = 20; y < 220; y += 12) {
           ctx.beginPath();
           for (let x = 0; x < 440; x += 4) {
@@ -1013,7 +1013,7 @@
       if (c2) {
         c2.width = 440; c2.height = 220;
         const ctx = c2.getContext('2d');
-        ctx.fillStyle = '#121016'; ctx.fillRect(0, 0, 440, 220);
+        ctx.fillStyle = 'var(--deep)'; ctx.fillRect(0, 0, 440, 220);
         for (let layer = 0; layer < 12; layer++) {
           const lY = 40 + layer * 13;
           const lX = 50 + layer * 8;
@@ -1035,7 +1035,7 @@
       if (c3) {
         c3.width = 440; c3.height = 220;
         const ctx = c3.getContext('2d');
-        ctx.fillStyle = '#0e141a'; ctx.fillRect(0, 0, 440, 220);
+        ctx.fillStyle = 'var(--deep)'; ctx.fillRect(0, 0, 440, 220);
         const cx = 220, cy = 110;
         for (let i = 0; i < 90; i++) {
           const angle = i * 0.15;
@@ -1044,11 +1044,11 @@
           const py = cy + Math.sin(angle) * r * 0.7;
           ctx.beginPath();
           ctx.arc(px, py, 1.8, 0, Math.PI * 2);
-          ctx.fillStyle = i % 2 === 0 ? '#6b6b99' : '#8888cc';
+          ctx.fillStyle = i % 2 === 0 ? 'var(--ink-3)' : 'var(--ink-3)';
           ctx.fill();
         }
         // Center 3D Wireframe Cube
-        ctx.strokeStyle = '#a5a5e0';
+        ctx.strokeStyle = 'var(--ink-2)';
         ctx.lineWidth = 1.8;
         ctx.strokeRect(cx - 30, cy - 30, 60, 60);
         ctx.strokeRect(cx - 18, cy - 42, 60, 60);
@@ -1065,26 +1065,26 @@
       if (c4) {
         c4.width = 440; c4.height = 220;
         const ctx = c4.getContext('2d');
-        ctx.fillStyle = '#0f1713'; ctx.fillRect(0, 0, 440, 220);
+        ctx.fillStyle = 'var(--deep)'; ctx.fillRect(0, 0, 440, 220);
         const knobXs = [70, 170, 270, 370];
         knobXs.forEach((kx, i) => {
           ctx.beginPath();
           ctx.arc(kx, 110, 28, 0, Math.PI * 2);
-          ctx.fillStyle = '#1e2d25'; ctx.fill();
-          ctx.strokeStyle = '#4d7c67'; ctx.lineWidth = 2.5; ctx.stroke();
+          ctx.fillStyle = 'var(--surface-1)'; ctx.fill();
+          ctx.strokeStyle = 'var(--ink-3)'; ctx.lineWidth = 2.5; ctx.stroke();
 
           // Indicator
           const a = -Math.PI * 0.8 + i * 0.9;
           ctx.beginPath();
           ctx.moveTo(kx, 110);
           ctx.lineTo(kx + Math.cos(a) * 24, 110 + Math.sin(a) * 24);
-          ctx.strokeStyle = '#6ee7b7'; ctx.lineWidth = 3; ctx.stroke();
+          ctx.strokeStyle = 'var(--line)'; ctx.lineWidth = 3; ctx.stroke();
         });
         // Cable connecting them
         ctx.beginPath();
         ctx.moveTo(70, 110);
         ctx.bezierCurveTo(120, 180, 220, 40, 270, 110);
-        ctx.strokeStyle = '#4d7c67'; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.strokeStyle = 'var(--ink-3)'; ctx.lineWidth = 2.5; ctx.stroke();
       }
     }
 

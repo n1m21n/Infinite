@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Soap Film Interference Marangoni Swirl",
+    "author": "Infinite",
+    "description": "Domain-warped Marangoni fluid film with spectral thin-film optical phase interference, amber gold, cerulean, and violet bands.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float warp = 1.65 [0.4, 3.2];\nparam float thickness = 2.40 [0.8, 5.0];\nparam float meniscus = 0.92 [0.5, 1.2];\nparam float shimmer = 1.15 [0.5, 2.0];\nparam float speed = 0.45 [0.05, 1.5];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\na = atan2(p.y, p.x);\n\n# Marangoni domain-warped fluid velocity field\ntt = t * speed;\nwx = sin(p.y * 3.1 + tt * 1.1) + 0.55 * cos(p.x * 4.7 - tt * 0.8);\nwy = cos(p.x * 3.4 - tt * 0.9) + 0.55 * sin(p.y * 4.3 + tt * 1.2);\nq = p + vec2(wx, wy) * 0.26 * warp;\n\n# Gravity-drained film thickness profile + convective eddies\neddy = sin(q.x * 4.2 + q.y * 3.1 + tt) * 0.5 + cos(length(q) * 6.5 - tt * 1.4) * 0.5;\ndrain = clamp(0.55 + 0.35 * (1.0 - uv.y) + eddy * 0.45, 0.0, 2.5);\nphase = drain * thickness * 3.14159;\n\n# Thin-film spectral interference (gold-amber, cerulean, violet)\nspecR = 0.5 + 0.5 * cos(phase + 0.0);\nspecG = 0.5 + 0.5 * cos(phase + 2.094);\nspecB = 0.5 + 0.5 * cos(phase + 4.188);\nirid = vec3(specR * 0.95 + 0.08, specG * 0.78 + 0.06, specB * 0.88 + 0.12);\n\ncObsidian = vec3(0.071, 0.063, 0.055);\ncGold = vec3(0.902, 0.612, 0.173);\ncTeal = vec3(0.298, 0.722, 0.831);\n\naperture = smoothstep(meniscus, meniscus - 0.18, r);\nrim = exp(-abs(r - (meniscus - 0.09)) * 22.0) * 0.75;\ntint = mix(cGold, cTeal, clamp(specB, 0.0, 1.0));\nfilmCol = mix(irid, tint, 0.38) * shimmer;\n\ncol = mix(cObsidian, filmCol, aperture * 0.92);\ncol = col + vec3(0.95, 0.86, 0.72) * rim * 0.55;\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "warp": 1.65,
+      "thickness": 2.4,
+      "meniscus": 0.92,
+      "shimmer": 1.15,
+      "speed": 0.45
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

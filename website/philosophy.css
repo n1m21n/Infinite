@@ -10,8 +10,8 @@
 .ph-loop { width: 0; height: 0; }
 .ph-edges { inset: 0; width: 100%; height: 100%; }
 .ph-lines line { stroke: color-mix(in srgb, var(--signal-300) 55%, transparent); stroke-width: 1.5; stroke-linecap: round; transition: stroke var(--dur-fast, 188ms), stroke-width var(--dur-fast, 188ms); }
-.ph-lines line.on { stroke: #FFB394; stroke-width: 2.5; }
-.ph-flow { fill: #FFB394; filter: drop-shadow(0 0 8px var(--ember-400)); }
+.ph-lines line.on { stroke: var(--line); stroke-width: 2.5; }
+.ph-flow { fill: var(--line); filter: drop-shadow(0 0 8px var(--ember-400)); }
 .ph-mark { fill: none; stroke: url(#phg); stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
 .ph-ball { opacity: 0; filter: drop-shadow(0 3px 4px rgba(181, 55, 0, 0.35)); }
 .ph-bubbles { position: absolute; inset: 0; }
@@ -58,7 +58,7 @@
 .ph-cap.is-on { opacity: 1; transform: none; }
 .ph-cap h2 { margin: 0 0 8px; font: 800 var(--fs-h2)/1.1 Geist, system-ui, sans-serif; letter-spacing: -0.03em; color: var(--ink); }
 .ph-cap p { margin: 0 auto; max-width: 46ch; font: 400 clamp(0.875rem, 0.8rem + 0.3vw, 1rem)/1.5 Geist, system-ui, sans-serif; color: color-mix(in srgb, var(--ink) 74%, transparent); }
-.ph-lobe { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; font: 700 1.5rem/1 Caveat, cursive; color: #FFB394; transition: opacity var(--dur-medium, 333ms); }
+.ph-lobe { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; font: 700 1.5rem/1 Caveat, cursive; color: var(--line); transition: opacity var(--dur-medium, 333ms); }
 .ph-lobe-b { color: #A9CDF1; }
 .ph[data-s="4"] .ph-lobe { opacity: 1; }
 .ph-after { background: var(--ground); color: var(--ink); padding: clamp(48px, 8vw, 96px) 24px; display: grid; gap: clamp(40px, 6vw, 72px); justify-items: center; }
@@ -88,10 +88,10 @@
 .ph-caps { top: calc(var(--header-h, 60px) + 96px); }
 /* light modes: the scene follows the page tokens */
 :root[data-mode="paper"] .ph-lines line, :root[data-mode="mist"] .ph-lines line { stroke: color-mix(in srgb, var(--ink) 28%, transparent); }
-:root[data-mode="paper"] .ph-lines line.on, :root[data-mode="mist"] .ph-lines line.on, :root[data-mode="paper"] .ph-flow, :root[data-mode="mist"] .ph-flow { stroke: var(--accent, #E2531C); fill: var(--accent, #E2531C); }
+:root[data-mode="paper"] .ph-lines line.on, :root[data-mode="mist"] .ph-lines line.on, :root[data-mode="paper"] .ph-flow, :root[data-mode="mist"] .ph-flow { stroke: var(--accent, var(--accent)); fill: var(--accent, var(--accent)); }
 :root[data-mode="paper"] .ph-lines line.on, :root[data-mode="mist"] .ph-lines line.on { fill: none; }
 :root[data-mode="paper"] .ph-glow, :root[data-mode="mist"] .ph-glow { opacity: 0.35; }
-:root[data-mode="paper"] .ph-lobe, :root[data-mode="mist"] .ph-lobe { color: var(--accent, #E2531C); }
+:root[data-mode="paper"] .ph-lobe, :root[data-mode="mist"] .ph-lobe { color: var(--accent, var(--accent)); }
 :root[data-mode="paper"] .ph-lobe-b, :root[data-mode="mist"] .ph-lobe-b { color: var(--ink2); }
 :root[data-mode="paper"] .ph-prin .ic, :root[data-mode="mist"] .ph-prin .ic, :root[data-mode="mist"] .pw .ic { color: var(--ink2); }
 
