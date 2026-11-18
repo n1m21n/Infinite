@@ -21,7 +21,7 @@ put text on screen	Text
 spinning cube	Geometry Primitives|Rounded Cube
 load a 3d model	Model 3D
 particles falling like snow	Particle System
-ocean waves	Ocean Surface
+ocean waves	Ocean
 a flag waving in the wind	Cloth Simulation
 color correct the video	Color Adjustments|Curves|LUT
 make it black and white	Color Adjustments
@@ -58,7 +58,7 @@ pan sound around the room	Spatial Mixer
 slideshow of photos	Slideshow
 voronoi cells	Voronoi Cells
 grow a tree	L-System
-metallic bell sound	Metallic Resonator|Shape Resonator
+metallic bell sound	Metallic|Resonator Bank|Shape Resonator
 plucked string	String
 smooth out jittery values	Smoothing
 noise texture	Noise
