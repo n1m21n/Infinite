@@ -528,14 +528,18 @@ namespace app
                   gArrange.revision++;
                   gPatchDirty = true;
                }
+               else if (params.contains("dock") && panel.dock == &gFieldPatcherDock && params.value("dock", std::string()) == "fill")
+                  gFieldPatcherMaximised = true;   // Fill: the patcher takes the whole window, as its maximise button does
                else if (params.contains("dock"))
                {
+                  if (panel.dock == &gFieldPatcherDock)
+                     gFieldPatcherMaximised = false;
                   const bool view = panel.dock == &gView2DDock || panel.dock == &gView3DDock;
                   const std::string side = params.value("dock", std::string());
                   const int code = view && side == "fill" ? 4 : DockCode(side);   // Fill: the view takes the canvas's place
                   if (panel.dock == nullptr || code < 0 || (!panel.fourSides && code != 0 && code != 3))
                   {
-                     outError = name + (view ? " docks bottom, right, left, top or fill" : panel.fourSides ? " docks bottom, right, left or top" : panel.dock ? " docks bottom or top" : " has no dock position");
+                     outError = name + (view ? " docks bottom, right, left, top or fill" : panel.fourSides ? " docks bottom, right, left or top" : panel.dock ? (panel.dock == &gFieldPatcherDock ? " docks bottom, top or fill" : " docks bottom or top") : " has no dock position");
                      return true;
                   }
                   if (view)

@@ -1652,7 +1652,7 @@ map, and the visual, sound and film crafts.
          {
             if (word == "open" || word == "close")
                params["open"] = word == "open";
-            else if (word == "bottom" || word == "right" || word == "left" || word == "top")
+            else if (word == "bottom" || word == "right" || word == "left" || word == "top" || word == "fill")
                params["dock"] = word;
             else
                params["name"] = word;

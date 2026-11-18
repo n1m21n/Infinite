@@ -7,11 +7,12 @@
 set -e
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 SHOW=$REPO/docs/showcase
-PATCH=$SHOW/infinite-v1-showcase.inf
-OUT=$REPO/docs/screenshots/v1
+PATCH=${PATCH:-$SHOW/infinite-v1-showcase.inf}
+OUT=${OUT:-$REPO/docs/screenshots/v1}   # OUT=docs/screenshots/v2 for 2.0 captures
+PORT=${PORT:-7790}
 APP=${APP:-$HOME/Infinite/infinte-base/build-dev/Infinite.app/Contents/MacOS/Infinite}
 TMP=$(mktemp -d)
-TOKFILE="$HOME/Library/Application Support/Infinite/control_token"
+TOKFILE="${SHOT_HOME:-$HOME}/Library/Application Support/Infinite/control_token"
 SHOTS=${*:-"node-graph 3d-view mod-matrix session-clips timeline piano-roll hero-panels sample-studio terminal"}
 mkdir -p "$OUT"
 
@@ -22,13 +23,13 @@ done
 
 # 3. Launch. Keep a copy of the shared control token: other sessions may overwrite it.
 [ -f "$TOKFILE" ] && cp "$TOKFILE" "$TMP/token.bak"
-INFINITE_NO_SINGLE_INSTANCE=1 INFINITE_CONTROL_PORT=7790 INFINITE_NOSPLASH=1 INFINITE_NO_UPDATE_CHECK=1 INFINITE_HIDE_TELEMETRY=1 \
+INFINITE_NO_SINGLE_INSTANCE=1 INFINITE_CONTROL_PORT=$PORT HOME="${SHOT_HOME:-$HOME}" INFINITE_NOSPLASH=1 INFINITE_NO_UPDATE_CHECK=1 INFINITE_HIDE_TELEMETRY=1 \
    IMAGERESYNTH_SCREENSHOT="$TMP/unused.png" INFINITE_SCREENSHOT_FRAME=999999999 INFINITE_SHOT_REQUEST="$TMP/req" \
    "$APP" "$PATCH" > "$TMP/app.log" 2>&1 &
 PID=$!
 sleep 15
 cp "$TOKFILE" "$TMP/tok"
-c() { INFINITE_CONTROL_PORT=7790 INFINITE_CONTROL_TOKEN=$(cat "$TMP/tok") "$APP" --cli "$@"; }
+c() { INFINITE_CONTROL_PORT=$PORT INFINITE_CONTROL_TOKEN=$(cat "$TMP/tok") "$APP" --cli "$@"; }
 cleanup() {
    c quit >/dev/null 2>&1 || true; sleep 2; kill "$PID" 2>/dev/null || true
    [ -f "$TMP/token.bak" ] && cp "$TMP/token.bak" "$TOKFILE"
@@ -50,10 +51,10 @@ slice id=6 s=122030 col=8 n=65
 slice id=7 s=146436 col=1 n=66
 slice id=8 s=170842 col=4 n=67
 EOF
-c studio set "text=$(cat "$TMP/studio.txt")" >/dev/null
-c session scene 1 >/dev/null   # starts the audio engine and plays scene "Groove"
+c studio set "text=$(cat "$TMP/studio.txt")" >/dev/null || true
+c session scene 1 >/dev/null || true  # starts the audio engine and plays scene "Groove"
 
-closeall() { for p in samplestudio pianoroll modmatrix perf view3d timeline session terminal; do c panel $p close >/dev/null 2>&1 || true; done; c view params off >/dev/null; }
+closeall() { for p in samplestudio pianoroll modmatrix perf view3d view2d mixer drums fieldpatcher timeline session terminal; do c panel $p close >/dev/null 2>&1 || true; done; c view params off >/dev/null; }
 
 # keep <name>: the app saves its own backbuffer (INFINITE_SHOT_REQUEST), so this works off-screen and with the
 # screen locked; then shrink with sips in 160 px steps until under 1.5 MB.
@@ -85,7 +86,8 @@ for s in $SHOTS; do
                   c panel perf open right >/dev/null; c panel view3d open bottom >/dev/null
                   c view fit >/dev/null; sleep 4 ;;
    sample-studio) c panel samplestudio open top >/dev/null; c view fit >/dev/null; sleep 4 ;;
-   terminal)      c panel terminal open right >/dev/null; c view fit >/dev/null; sleep 3
+   terminal)      c panel terminal open right >/dev/null; c view fit >/dev/null; sleep 8
+                  n=0; until c term send " " >/dev/null 2>&1 || [ $n -ge 20 ]; do sleep 2; n=$((n+1)); done
                   c term send "PROMPT='%1~ %% '; cd '$SHOW'; clear
 " >/dev/null; sleep 1
                   c term send "infinite explain | grep ' mod ' | sed -E 's/^ +mod //; s/ out 0, absolute, depth 1, range/ /'
@@ -94,6 +96,10 @@ for s in $SHOTS; do
 " >/dev/null; sleep 2
                   c term send "infinite perf | jq -r '.controls[] | \"\\(.label) -> node \\(.node)\"'
 " >/dev/null; sleep 3 ;;
+   mixer)         c session scene 2 >/dev/null; c panel mixer open bottom >/dev/null; c view fit >/dev/null; sleep 3 ;;
+   drums)         c session scene 1 >/dev/null; c panel drums open top >/dev/null; sleep 3 ;;
+   2d-view)       c select ${SEL2D:-3} >/dev/null; c panel view2d open top >/dev/null; sleep 5 ;;
+   field-patcher) c select FieldPixel >/dev/null; c view fit >/dev/null; c panel fieldpatcher open fill >/dev/null; sleep 4 ;;
    *) echo "unknown shot $s"; continue ;;
    esac
    keep "$s"
