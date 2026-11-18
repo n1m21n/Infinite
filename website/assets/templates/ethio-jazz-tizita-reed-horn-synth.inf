@@ -1,0 +1,68 @@
+infinite-patch 1
+# Ethio-Jazz Tizita Reed Horn Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 51
+  i note1 54
+  i note2 56
+  i note3 58
+  i note4 61
+  i note5 58
+  i note6 56
+  i note7 54
+  i note8 51
+  i note9 58
+  i note10 61
+  i note11 63
+  i note12 61
+  i note13 58
+  i note14 56
+  i note15 54
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float fold = 2.4 [1.0, 5.0];\nparam float formantHz = 680.0 [260.0, 1600.0];\nparam float breath = 0.42 [0.0, 1.0];\nparam float vibratoHz = 4.8 [1.0, 8.0];\nparam float decay = 0.9991 [0.995, 0.9998];\nstate float ph = 0; state float vibPh = 0; state float env = 0;\nstate float bp1 = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.08, env * decay);\nvibPh = (vibPh + vibratoHz / sr) % 1.0;\nf0 = clamp(freq * (1.0 + 0.006 * sin(6.2831853 * vibPh)), 45.0, 3200.0);\nph = (ph + f0 / sr) % 1.0;\n\nexc = sin(6.2831853 * ph) * (1.0 + fold * env) + breath * 0.35 * sin(12.56637 * ph);\nreed = sin(exc * 1.35) + 0.28 * (exc / (1.0 + abs(exc)));\n\ng1 = clamp(2.0 * sin(3.14159265 * formantHz / sr), 0.02, 0.85);\nbp1 = bp1 + g1 * (reed - lp1 - 0.48 * bp1);\nlp1 = lp1 + g1 * bp1;\n\nsig = (reed * 0.36 + bp1 * 0.72) * env * 0.44;\nout = sig / (1.0 + abs(sig) * 0.40);\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.18 0.14
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Ethio-Jazz Tizita Reed Horn Synth. Expressive Ethio-jazz brass-reed solo synthesizer with wavefolded mouth-pressure excitation and dual formant horn resonator.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

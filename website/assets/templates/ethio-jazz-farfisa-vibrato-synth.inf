@@ -1,0 +1,68 @@
+infinite-patch 1
+# Ethio-Jazz Farfisa Vibrato Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 51
+  i note1 54
+  i note2 56
+  i note3 58
+  i note4 61
+  i note5 58
+  i note6 56
+  i note7 54
+  i note8 51
+  i note9 58
+  i note10 61
+  i note11 63
+  i note12 61
+  i note13 58
+  i note14 56
+  i note15 54
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float vibratoHz = 5.4 [1.5, 9.0];\nparam float vibratoDepth = 0.0085 [0.0, 0.025];\nparam float drawbarMix = 0.68 [0.0, 1.0];\nparam float drive = 1.65 [0.8, 3.5];\nparam float decay = 0.9992 [0.995, 0.9998];\nstate float p1 = 0; state float p2 = 0; state float vibPh = 0;\nstate float env = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.22, env * decay);\nvibPh = (vibPh + vibratoHz / sr) % 1.0;\nf0 = clamp(freq * (1.0 + vibratoDepth * sin(6.2831853 * vibPh)), 40.0, 4200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.0) / sr) % 1.0;\n\nw1 = sin(6.2831853 * p1);\nw2 = sin(6.2831853 * p2);\nw3 = sin(18.849556 * p1);\norgan = (w1 / (1.0 + abs(w1) * 0.5)) * 0.55 + (w2 * 0.36 + w3 * 0.24) * drawbarMix;\nsat = (organ * drive) / (1.0 + abs(organ * drive) * 0.65);\nlp = lp + 0.30 * (sat - lp);\nsig = lp * env * 0.42;\nout = sig / (1.0 + abs(sig) * 0.35);\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.18 0.14
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Ethio-Jazz Farfisa Vibrato Synth. 1970s Addis Ababa transistor organ synthesizer with 4-drawbar harmonic bank, key-click transient, diode saturation, and dual-rate vibrato.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

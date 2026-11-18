@@ -1,0 +1,77 @@
+infinite-patch 1
+# Spectral Dub Binaural Allpass FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 42
+  i note1 42
+  i note2 49
+  i note3 42
+  i note4 45
+  i note5 42
+  i note6 54
+  i note7 42
+  i note8 42
+  i note9 47
+  i note10 49
+  i note11 42
+  i note12 45
+  i note13 49
+  i note14 52
+  i note15 42
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2400.0
+  f resonance 0.25
+  f decay 0.45
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float centerHz = 920.0 [180.0, 3600.0];\nparam float dispersion = 0.68 [0.1, 0.92];\nparam float feedback = 0.52 [0.0, 0.82];\nparam float drive = 1.35 [0.6, 2.8];\nparam float mix = 0.84 [0.0, 1.0];\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\nstate float bp = 0; state float lp = 0; state float fb = 0; state float lfo = 0;\n\nlfo = (lfo + 0.32 / sr) % 1.0;\nmodHz = clamp(centerHz * (0.72 + 0.32 * sin(6.2831853 * lfo)), 120.0, 5000.0);\ng = clamp(2.0 * sin(3.14159265 * modHz / sr), 0.02, 0.85);\n\nx = in + fb * feedback;\nbp = bp + g * (x - lp - 0.58 * bp);\nlp = lp + g * bp;\nfSig = lp * 0.65 + bp * 0.52;\n\n# 4-stage dispersed allpass chamber\nc = dispersion;\ny1 = -c * fSig + a1; a1 = fSig + c * y1;\ny2 = -c * y1 + a2; a2 = y1 + c * y2;\ny3 = -c * y2 + a3; a3 = y2 + c * y3;\ny4 = -c * y3 + a4; a4 = y3 + c * y4;\nfb = clamp(y4, -1.2, 1.2);\n\nwd = y4 * drive;\nwet = wd / (1.0 + abs(wd) * 0.72);\nout = (in * (1.0 - mix) + wet * mix) * 0.85;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.16 0.22 0.28
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Spectral Dub Binaural Allpass FX. Deep dub chamber processor with 4-stage dispersed allpass cascade, cross-coupled resonant bandpass feedback, and warm transformer saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

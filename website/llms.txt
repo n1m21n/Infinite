@@ -349,6 +349,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Prepared Piano Bolt Harmonic Synth](https://infinitedevices.org/library/prepared-piano-bolt-harmonic-synth.html): Prepared piano modal synthesizer with metallic bolt-on-string inharmonicity, rubber-damper transient, and cast-iron frame tail. (file: https://infinitedevices.org/assets/templates/prepared-piano-bolt-harmonic-synth.inf)
 - [Shoegaze Chorus Wall Ensemble FX](https://infinitedevices.org/library/shoegaze-chorus-wall-ensemble-fx.html): Multi-voice quadrature BBD chorus and pre-verb smear wall with modulated allpass dispersion and warm tape saturation. (file: https://infinitedevices.org/assets/templates/shoegaze-chorus-wall-ensemble-fx.inf)
 - [UK Dub Steppers Spring Filter FX](https://infinitedevices.org/library/uk-dub-steppers-spring-filter-fx.html): Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation. (file: https://infinitedevices.org/assets/templates/uk-dub-steppers-spring-filter-fx.inf)
+- [Ethio-Jazz Farfisa Vibrato Synth](https://infinitedevices.org/library/ethio-jazz-farfisa-vibrato-synth.html): 1970s Addis Ababa transistor organ synthesizer with 4-drawbar harmonic bank, key-click transient, diode saturation, and dual-rate vibrato. (file: https://infinitedevices.org/assets/templates/ethio-jazz-farfisa-vibrato-synth.inf)
+- [Ethio-Jazz Tizita Reed Horn Synth](https://infinitedevices.org/library/ethio-jazz-tizita-reed-horn-synth.html): Expressive Ethio-jazz brass-reed solo synthesizer with wavefolded mouth-pressure excitation and dual formant horn resonator. (file: https://infinitedevices.org/assets/templates/ethio-jazz-tizita-reed-horn-synth.inf)
+- [Spectral Dub Binaural Allpass FX](https://infinitedevices.org/library/spectral-dub-binaural-allpass-fx.html): Deep dub chamber processor with 4-stage dispersed allpass cascade, cross-coupled resonant bandpass feedback, and warm transformer saturation. (file: https://infinitedevices.org/assets/templates/spectral-dub-binaural-allpass-fx.inf)
+- [Spectral Dub Tape Resonator FX](https://infinitedevices.org/library/spectral-dub-tape-resonator-fx.html): King Tubby inspired dual-head tape resonator with capstan wow-flutter drift, resonant SVF dub sweep, and oxide hysteresis warmth. (file: https://infinitedevices.org/assets/templates/spectral-dub-tape-resonator-fx.inf)
 
 ## Library: Community
 
@@ -772,7 +776,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 131 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 133 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -789,4 +793,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 116 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 118 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

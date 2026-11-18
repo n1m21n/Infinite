@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Haeckel Radiolaria Discoidea Lattice",
+    "author": "Infinite",
+    "description": "Ernst Haeckel Kunstformen der Natur Radiolaria Discoidea lithograph with cruciform silica arms, honeycomb pore rings, and radiating marginal spicules.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float arms = 4.0 [3.0, 8.0];\nparam float poreScale = 18.0 [8.0, 32.0];\nparam float spiculeLen = 0.42 [0.15, 0.8];\nparam float inkContrast = 1.25 [0.6, 2.0];\nparam float breathe = 0.30 [0.0, 0.8];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\na = atan2(p.y, p.x);\n\n# Cruciform radial symmetry field\narmWave = abs(cos(a * arms * 0.5 + 0.08 * sin(t * 0.8 + r * 4.0)));\narmShape = pow(armWave, 3.2) * 0.68 + 0.28;\nbodyMask = smoothstep(armShape + 0.06, armShape - 0.04, r);\n\n# Silica honeycomb pore lattice\npores = sin(p.x * poreScale + sin(p.y * poreScale * 0.5)) * cos(p.y * poreScale - sin(p.x * poreScale * 0.5));\nporeRings = cos(r * poreScale * 1.4 - t * breathe * 2.0);\nfenestration = smoothstep(-0.15, 0.35, pores * 0.65 + poreRings * 0.35);\n\n# Marginal radiating spicules\nspicules = pow(abs(cos(a * 24.0 + sin(r * 10.0 - t * 0.5))), 12.0);\nspiculeMask = smoothstep(armShape + spiculeLen, armShape - 0.02, r) * (1.0 - smoothstep(armShape, armShape - 0.08, r));\n\ncIvory = vec3(0.973, 0.961, 0.925);\ncOchre = vec3(0.851, 0.714, 0.263);\ncCarmine = vec3(0.722, 0.161, 0.145);\ncSepia = vec3(0.137, 0.102, 0.086);\n\ncoreGrad = smoothstep(0.42, 0.04, r);\norgCol = mix(cOchre, cCarmine, clamp(coreGrad * 0.9 + (1.0 - fenestration) * 0.45, 0.0, 1.0));\ncol = mix(cIvory, orgCol, bodyMask * 0.92);\ncol = mix(col, cSepia, bodyMask * (1.0 - fenestration) * 0.68 * inkContrast);\ncol = mix(col, cSepia, spiculeMask * spicules * 0.88);\n# Subtle outer plate ring border\nringLine = smoothstep(0.012, 0.0, abs(r - 0.92));\ncol = mix(col, cSepia, ringLine * 0.35);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "arms": 4.0,
+      "poreScale": 18.0,
+      "spiculeLen": 0.42,
+      "inkContrast": 1.25,
+      "breathe": 0.3
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

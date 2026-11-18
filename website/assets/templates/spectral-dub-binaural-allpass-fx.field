@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spectral Dub Binaural Allpass FX",
+    "author": "Infinite",
+    "description": "Deep dub chamber processor with 4-stage dispersed allpass cascade, cross-coupled resonant bandpass feedback, and warm transformer saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float centerHz = 920.0 [180.0, 3600.0];\nparam float dispersion = 0.68 [0.1, 0.92];\nparam float feedback = 0.52 [0.0, 0.82];\nparam float drive = 1.35 [0.6, 2.8];\nparam float mix = 0.84 [0.0, 1.0];\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\nstate float bp = 0; state float lp = 0; state float fb = 0; state float lfo = 0;\n\nlfo = (lfo + 0.32 / sr) % 1.0;\nmodHz = clamp(centerHz * (0.72 + 0.32 * sin(6.2831853 * lfo)), 120.0, 5000.0);\ng = clamp(2.0 * sin(3.14159265 * modHz / sr), 0.02, 0.85);\n\nx = in + fb * feedback;\nbp = bp + g * (x - lp - 0.58 * bp);\nlp = lp + g * bp;\nfSig = lp * 0.65 + bp * 0.52;\n\n# 4-stage dispersed allpass chamber\nc = dispersion;\ny1 = -c * fSig + a1; a1 = fSig + c * y1;\ny2 = -c * y1 + a2; a2 = y1 + c * y2;\ny3 = -c * y2 + a3; a3 = y2 + c * y3;\ny4 = -c * y3 + a4; a4 = y3 + c * y4;\nfb = clamp(y4, -1.2, 1.2);\n\nwd = y4 * drive;\nwet = wd / (1.0 + abs(wd) * 0.72);\nout = (in * (1.0 - mix) + wet * mix) * 0.85;\n",
+    "params": {
+      "centerHz": 920.0,
+      "dispersion": 0.68,
+      "feedback": 0.52,
+      "drive": 1.35,
+      "mix": 0.84
+    }
+  }
+}
