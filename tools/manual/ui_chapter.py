@@ -21,7 +21,7 @@ def esc(s):
     return html.escape(s, quote=False)
 
 
-def fig(name, caption, box=None, width="100%"):
+def fig(name, caption, box=None, width="80%"):
     path = os.path.join(SHOTS, name + ".png")
     if box:
         with Image.open(path) as im:
@@ -30,7 +30,7 @@ def fig(name, caption, box=None, width="100%"):
             im.crop(tuple(int(v * k) for v in box)).save(out)
             path = out
     return (f'<figure class="fig" style="display:block;width:{width};margin:0 0 12px"><div class="shot" style="display:block;padding:8px">'
-            f'<img src="file://{path}" style="width:100%;display:block"></div>'
+            f'<img src="file://{path}" style="width:100%;max-height:340px;object-fit:contain;display:block;margin:0 auto"></div>'
             f'<figcaption>{esc(caption)}</figcaption></figure>')
 
 

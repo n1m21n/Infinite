@@ -28,8 +28,8 @@ def main():
     main_html = P.convert("## " + body, sections, "Chapter")
     cover = P.cover("AUDIOVISUAL NODE WORKSTATION", "The", "Field", "Language Manual",
                     "Everything you need to write real Field kernels and build real devices: the domains, the syntax, "
-                    "the declarations, and the six node types that host them.",
-                    [("Covers", "Field v1 and v1.1"), ("Style", "direct, example-driven"),
+                    "the declarations, and the node types that host them.",
+                    [("Covers", "Field 2.0"), ("Style", "direct, example-driven"),
                      ("Audience", "device builders and AI assistants")], P.LOGO_TILE, art="node_field_pixel")
     cover = cover.rstrip()[:-len("</div>")] + """<div class="panel" style="position:absolute;left:0;right:0;bottom:0">
       <div class="kick">One primitive, five domains</div>
