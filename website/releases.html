@@ -34,41 +34,47 @@
   <link rel="stylesheet" href="audience.css?v=f73df30a">
 
   <style>
-    .rel-wrap { max-width: 920px; margin: 0 auto; padding: 120px var(--ui-sp-4, 16px) 80px; display: grid; gap: 32px; }
-    .rel-head { display: grid; gap: 16px; }
+    .rel-wrap { max-width: 1120px; margin: 0 auto; padding: 120px var(--ui-sp-4, 16px) 80px; display: grid; gap: 40px; }
+    .rel-head { display: grid; gap: 16px; max-width: 760px; }
     .rel-head h1 { margin: 0; font-size: var(--size-h1); font-weight: 800; letter-spacing: -0.035em; line-height: 1.05; }
     .rel-head h1 em { font-style: italic; color: var(--accent-ink); font-family: var(--font-hand, "Caveat", cursive); font-weight: 700; font-size: 1.08em; }
     .rel-lead { margin: 0; max-width: 62ch; color: var(--muted); font-size: var(--size-body); line-height: 1.65; }
     .rel-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 
-    .rel-controls { display: grid; gap: 12px; padding: 16px; border-radius: var(--r-card, 20px); background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
-    .rel-eras { display: flex; flex-wrap: wrap; gap: 8px; }
-    .rel-era { min-height: 36px; padding: 0 16px; border-radius: var(--r-pill, 999px); border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); background: transparent; color: var(--ink2, var(--muted)); font: 500 0.875rem/1 var(--font-sans); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background-color 167ms var(--ease-out), color 167ms var(--ease-out), border-color 167ms var(--ease-out); }
-    .rel-era:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
-    .rel-era[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-    .rel-era .rel-cnt { font-family: var(--font-mono); font-size: 0.75rem; opacity: 0.72; }
+    .rel-layout { display: grid; gap: 24px; align-items: start; }
+    .rel-rail { display: none; }
+    .rel-mobilebar { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+    .rel-select { flex: 1; min-width: 0; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); background: var(--card); color: var(--ink); font: 500 0.9375rem/1 var(--font-sans); }
+    .rel-toggle { min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); background: transparent; color: var(--ink2, var(--muted)); font: 500 0.875rem/1 var(--font-sans); cursor: pointer; white-space: nowrap; }
+    .rel-toggle:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
 
-    .rel-jump { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .rel-jump-label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
-    .rel-pill { padding: 4px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink2, var(--muted)); text-decoration: none; font-family: var(--font-mono); font-size: 0.8125rem; transition: color 125ms var(--ease-out), border-color 125ms var(--ease-out), background-color 125ms var(--ease-out); }
-    .rel-pill:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 28%, transparent); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+    .rel-list { display: grid; gap: 12px; min-width: 0; }
+    .rel-era-title { margin: 28px 0 4px; display: flex; align-items: baseline; gap: 12px; font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); scroll-margin-top: 96px; }
+    .rel-era-title:first-child { margin-top: 0; }
+    .rel-era-title::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--ink) 12%, transparent); }
 
-    .rel-list { display: grid; gap: 24px; }
-    .rel-card { scroll-margin-top: 96px; display: grid; gap: 16px; padding: 24px; border-radius: var(--r-card, 20px); background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
-    .rel-card[hidden] { display: none; }
-    .rel-card.is-latest { border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }
+    .rel-entry { scroll-margin-top: 96px; padding: 0; border-radius: var(--r-card, 20px); background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); transition: border-color 125ms; }
+    .rel-entry:hover { border-color: color-mix(in srgb, var(--ink) 24%, transparent); }
+    .rel-entry.is-latest { border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }
+    .rel-entry[open] { border-color: color-mix(in srgb, var(--ink) 20%, transparent); }
+    .rel-entry.is-latest[open] { border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }
 
-    .rel-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
-    .rel-card-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-    .rel-card-head h2 { margin: 0; font-size: var(--size-h2, 1.5rem); font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
-    .rel-card-head h2 a { color: inherit; text-decoration: none; }
-    .rel-card-head h2 a:hover { color: var(--accent-ink); }
-    .rel-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--r-pill, 999px); background: color-mix(in srgb, var(--accent-ink) 18%, transparent); color: var(--accent-ink); font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-    .rel-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted); }
-    .rel-meta a { color: var(--accent-ink); text-decoration: none; }
-    .rel-meta a:hover { text-decoration: underline; }
+    .rel-sum { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; padding: 18px 24px; border-radius: inherit; }
+    .rel-sum::-webkit-details-marker { display: none; }
+    .rel-sum:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+    .rel-entry-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+    .rel-sum h2 { margin: 0; font-size: var(--size-h2, 1.5rem); font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
+    .rel-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--r-pill, 999px); background: color-mix(in srgb, var(--accent-ink) 18%, transparent); color: var(--accent-ink); font-family: var(--font-mono); font-size: 0.75rem; }
+    .rel-date { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted); }
+    .rel-chev { grid-column: 2; grid-row: 1; width: 20px; height: 20px; color: var(--muted); transition: transform 150ms; }
+    .rel-entry[open] .rel-chev { transform: rotate(180deg); }
+    .rel-tease { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 0.9375rem; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .rel-entry[open] .rel-tease { display: none; }
 
-    .rel-body { display: grid; gap: 12px; }
+    .rel-body { display: grid; gap: 12px; margin: 0 24px; padding: 20px 0 24px; border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
+    .rel-links { display: flex; flex-wrap: wrap; gap: 16px; font-family: var(--font-mono); font-size: 0.8125rem; }
+    .rel-links a { color: var(--accent-ink); text-decoration: none; }
+    .rel-links a:hover { text-decoration: underline; }
     .rel-body h3 { margin: 8px 0 0; font-size: var(--size-h3, 1.125rem); font-weight: 700; letter-spacing: -0.015em; color: var(--ink); }
     .rel-body h4 { margin: 4px 0 0; font-size: 1rem; font-weight: 600; color: var(--ink); }
     .rel-body p, .rel-body li { margin: 0; color: var(--ink2, var(--muted)); font-size: 0.9375rem; line-height: 1.65; }
@@ -77,11 +83,29 @@
     .rel-body ul { margin: 0; padding-left: 1.35em; display: grid; gap: 8px; }
     .rel-body li > ul { margin-top: 8px; }
     .rel-body code { font-family: var(--font-mono); font-size: 0.875em; padding: 2px 6px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); word-break: break-word; }
+    .rel-entry:not([open]) .rel-body { display: none; }
 
-    @media (max-width: 640px) {
-      .rel-wrap { padding: 104px 16px 64px; gap: 24px; }
-      .rel-card { padding: 16px; }
+    @media (min-width: 960px) {
+      .rel-layout { grid-template-columns: 210px minmax(0, 1fr); gap: 48px; }
+      .rel-mobilebar { display: none; }
+      .rel-rail { display: block; position: sticky; top: 96px; max-height: calc(100vh - 120px); overflow: auto; padding-right: 8px; scrollbar-width: thin; }
+      .rel-rail-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+      .rel-rail-label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+      .rel-rail-top .rel-toggle { min-height: 32px; padding: 0 12px; font-size: 0.8125rem; }
+      .rel-rail-group { margin: 0 0 14px; }
+      .rel-rail-era { display: block; margin: 0 0 4px; padding: 4px 10px; font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+      .rel-rail-era:hover { color: var(--ink); }
+      .rel-rail a.rel-ver { display: block; padding: 5px 10px; border-left: 2px solid color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink2, var(--muted)); text-decoration: none; font-family: var(--font-mono); font-size: 0.8125rem; transition: color 125ms, border-color 125ms, background 125ms; }
+      .rel-rail a.rel-ver:hover { color: var(--ink); border-left-color: color-mix(in srgb, var(--ink) 40%, transparent); }
+      .rel-rail a.rel-ver[aria-current="true"] { color: var(--ink); border-left-color: var(--accent-ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
     }
+    @media (max-width: 640px) {
+      .rel-wrap { padding: 104px 16px 64px; gap: 28px; }
+      .rel-sum { padding: 16px; }
+      .rel-body { margin: 0 16px; }
+      .rel-body { padding-bottom: 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .rel-chev, .rel-entry { transition: none; } }
   </style>
   <link rel="stylesheet" href="system.css?v=23625436">
   <link rel="stylesheet" href="scale.css?v=f0c66d50">
@@ -172,37 +196,29 @@
         </div>
       </header>
 
-      <section class="rel-controls" aria-label="Filter and jump to releases">
-        <div class="rel-eras" role="group" aria-label="Filter by release series">
-                    <button type="button" class="rel-era" data-era="all" aria-pressed="true">All <span class="rel-cnt">34</span></button>
-          <button type="button" class="rel-era" data-era="v2" aria-pressed="false">v2.0 <span class="rel-cnt">1</span></button>
-          <button type="button" class="rel-era" data-era="v1" aria-pressed="false">v1.x <span class="rel-cnt">3</span></button>
-          <button type="button" class="rel-era" data-era="v0.6" aria-pressed="false">v0.6.x <span class="rel-cnt">3</span></button>
-          <button type="button" class="rel-era" data-era="v0.5" aria-pressed="false">v0.5 <span class="rel-cnt">1</span></button>
-          <button type="button" class="rel-era" data-era="v0.4" aria-pressed="false">v0.4.x <span class="rel-cnt">9</span></button>
-          <button type="button" class="rel-era" data-era="v0.3" aria-pressed="false">v0.3.x <span class="rel-cnt">6</span></button>
-          <button type="button" class="rel-era" data-era="v0.1-v0.2" aria-pressed="false">v0.1 – v0.2 <span class="rel-cnt">11</span></button>
+      <div class="rel-layout">
+        <aside class="rel-rail" aria-label="Jump to version">
+          <div class="rel-rail-top"><span class="rel-rail-label">Versions</span><button type="button" class="rel-toggle" data-toggle>Expand all</button></div>
+          <div class="rel-rail-group"><a class="rel-rail-era" href="#era-v2">v2.0</a><a class="rel-ver" href="#v2.0.0">v2.0.0</a></div><div class="rel-rail-group"><a class="rel-rail-era" href="#era-v1">v1.x</a><a class="rel-ver" href="#v1.2.0">v1.2.0</a><a class="rel-ver" href="#v1.1.0">v1.1.0</a><a class="rel-ver" href="#v1.0.0">v1.0.0</a></div><div class="rel-rail-group"><a class="rel-rail-era" href="#era-v0.6">v0.6.x</a><a class="rel-ver" href="#v0.6.6">v0.6.6</a><a class="rel-ver" href="#v0.6.5">v0.6.5</a><a class="rel-ver" href="#v0.6.0">v0.6.0</a></div><div class="rel-rail-group"><a class="rel-rail-era" href="#era-v0.5">v0.5</a><a class="rel-ver" href="#v0.5.0">v0.5.0</a></div><div class="rel-rail-group"><a class="rel-rail-era" href="#era-v0.4">v0.4.x</a><a class="rel-ver" href="#v0.4.7">v0.4.7</a><a class="rel-ver" href="#v0.4.6">v0.4.6</a><a class="rel-ver" href="#v0.4.5">v0.4.5</a><a class="rel-ver" href="#v0.4.4">v0.4.4</a><a class="rel-ver" href="#v0.4.3">v0.4.3</a><a class="rel-ver" href="#v0.4.25">v0.4.25</a><a class="rel-ver" href="#v0.4.2">v0.4.2</a><a class="rel-ver" href="#v0.4.1">v0.4.1</a><a class="rel-ver" href="#v0.4.0">v0.4.0</a></div><div class="rel-rail-group"><a class="rel-rail-era" href="#era-v0.3">v0.3.x</a><a class="rel-ver" href="#v0.3.5">v0.3.5</a><a class="rel-ver" href="#v0.3.4">v0.3.4</a><a class="rel-ver" href="#v0.3.3">v0.3.3</a><a class="rel-ver" href="#v0.3.2">v0.3.2</a><a class="rel-ver" href="#v0.3.1">v0.3.1</a><a class="rel-ver" href="#v0.3.0">v0.3.0</a></div><div class="rel-rail-group"><a class="rel-rail-era" href="#era-v0.1-v0.2">v0.1 – v0.2</a><a class="rel-ver" href="#v0.2.76">v0.2.76</a><a class="rel-ver" href="#v0.2.75">v0.2.75</a><a class="rel-ver" href="#v0.2.7">v0.2.7</a><a class="rel-ver" href="#v0.2.6">v0.2.6</a><a class="rel-ver" href="#v0.2.5">v0.2.5</a><a class="rel-ver" href="#v0.2.4">v0.2.4</a><a class="rel-ver" href="#v0.2.3">v0.2.3</a><a class="rel-ver" href="#v0.2.2">v0.2.2</a><a class="rel-ver" href="#v0.2.1">v0.2.1</a><a class="rel-ver" href="#v0.2-preview">v0.2-preview</a><a class="rel-ver" href="#v0.1">v0.1</a></div>
+        </aside>
+        <div class="rel-mobilebar">
+          <select class="rel-select" aria-label="Jump to version"><option value="">Jump to version&hellip;</option><optgroup label="v2.0"><option value="v2.0.0">v2.0.0</option></optgroup><optgroup label="v1.x"><option value="v1.2.0">v1.2.0</option><option value="v1.1.0">v1.1.0</option><option value="v1.0.0">v1.0.0</option></optgroup><optgroup label="v0.6.x"><option value="v0.6.6">v0.6.6</option><option value="v0.6.5">v0.6.5</option><option value="v0.6.0">v0.6.0</option></optgroup><optgroup label="v0.5"><option value="v0.5.0">v0.5.0</option></optgroup><optgroup label="v0.4.x"><option value="v0.4.7">v0.4.7</option><option value="v0.4.6">v0.4.6</option><option value="v0.4.5">v0.4.5</option><option value="v0.4.4">v0.4.4</option><option value="v0.4.3">v0.4.3</option><option value="v0.4.25">v0.4.25</option><option value="v0.4.2">v0.4.2</option><option value="v0.4.1">v0.4.1</option><option value="v0.4.0">v0.4.0</option></optgroup><optgroup label="v0.3.x"><option value="v0.3.5">v0.3.5</option><option value="v0.3.4">v0.3.4</option><option value="v0.3.3">v0.3.3</option><option value="v0.3.2">v0.3.2</option><option value="v0.3.1">v0.3.1</option><option value="v0.3.0">v0.3.0</option></optgroup><optgroup label="v0.1 – v0.2"><option value="v0.2.76">v0.2.76</option><option value="v0.2.75">v0.2.75</option><option value="v0.2.7">v0.2.7</option><option value="v0.2.6">v0.2.6</option><option value="v0.2.5">v0.2.5</option><option value="v0.2.4">v0.2.4</option><option value="v0.2.3">v0.2.3</option><option value="v0.2.2">v0.2.2</option><option value="v0.2.1">v0.2.1</option><option value="v0.2-preview">v0.2-preview</option><option value="v0.1">v0.1</option></optgroup></select>
+          <button type="button" class="rel-toggle" data-toggle>Expand all</button>
         </div>
-        <div class="rel-jump" aria-label="Jump to version">
-          <span class="rel-jump-label">Jump to:</span>
-          <a class="rel-pill" href="#v2.0.0">v2.0.0</a><a class="rel-pill" href="#v1.2.0">v1.2.0</a><a class="rel-pill" href="#v1.1.0">v1.1.0</a><a class="rel-pill" href="#v1.0.0">v1.0.0</a><a class="rel-pill" href="#v0.6.6">v0.6.6</a><a class="rel-pill" href="#v0.6.5">v0.6.5</a><a class="rel-pill" href="#v0.6.0">v0.6.0</a><a class="rel-pill" href="#v0.5.0">v0.5.0</a><a class="rel-pill" href="#v0.4.7">v0.4.7</a><a class="rel-pill" href="#v0.4.6">v0.4.6</a><a class="rel-pill" href="#v0.4.5">v0.4.5</a><a class="rel-pill" href="#v0.4.4">v0.4.4</a><a class="rel-pill" href="#v0.4.3">v0.4.3</a><a class="rel-pill" href="#v0.4.25">v0.4.25</a><a class="rel-pill" href="#v0.4.2">v0.4.2</a><a class="rel-pill" href="#v0.4.1">v0.4.1</a><a class="rel-pill" href="#v0.4.0">v0.4.0</a><a class="rel-pill" href="#v0.3.5">v0.3.5</a><a class="rel-pill" href="#v0.3.4">v0.3.4</a><a class="rel-pill" href="#v0.3.3">v0.3.3</a><a class="rel-pill" href="#v0.3.2">v0.3.2</a><a class="rel-pill" href="#v0.3.1">v0.3.1</a><a class="rel-pill" href="#v0.3.0">v0.3.0</a><a class="rel-pill" href="#v0.2.76">v0.2.76</a><a class="rel-pill" href="#v0.2.75">v0.2.75</a><a class="rel-pill" href="#v0.2.7">v0.2.7</a><a class="rel-pill" href="#v0.2.6">v0.2.6</a><a class="rel-pill" href="#v0.2.5">v0.2.5</a><a class="rel-pill" href="#v0.2.4">v0.2.4</a><a class="rel-pill" href="#v0.2.3">v0.2.3</a><a class="rel-pill" href="#v0.2.2">v0.2.2</a><a class="rel-pill" href="#v0.2.1">v0.2.1</a><a class="rel-pill" href="#v0.2-preview">v0.2-preview</a><a class="rel-pill" href="#v0.1">v0.1</a>
-        </div>
-      </section>
-
-      <section class="rel-list" aria-label="All releases">
-      <article class="rel-card is-latest" id="v2.0.0" data-era="v2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v2.0.0-h"><a href="#v2.0.0">Infinite v2.0.0</a></h2>
+        <section class="rel-list" aria-label="All releases">
+      <div class="rel-era-title" id="era-v2">v2.0 &middot; 1 release</div>
+      <details class="rel-entry is-latest" id="v2.0.0" data-era="v2" open>
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v2.0.0-h">Infinite v2.0.0</h2>
             <span class="rel-badge">Latest</span>
+            <time class="rel-date" datetime="2026-11-18">18 November 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-11-18">18 November 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v2.0.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Infinite 2.0 adds a 2D View for painting, layered compositing and adjustments, and it moves Render 3D onto a real-time Metal engine with a path tracer, richer materials, fog, sky and more lights. It adds a Field…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v2.0.0" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v2.0.0">Permalink</a></div>
 <p>Infinite 2.0 adds a 2D View for painting, layered compositing and adjustments, and it moves Render 3D onto a real-time Metal engine with a path tracer, richer materials, fog, sky and more lights. It adds a Field Patcher, a Spectral Field node, a Mixer and a hardware-style Drums panel, and a Session view that follows the Timeline. The release also widens the command line, headless and MCP surface, cleans up menus and shortcuts across panels, and changes the default save extension to .inf on every platform.</p>
 <h3>Timeline</h3>
 <ul>
@@ -557,20 +573,20 @@
 </ul>
 <p>Credit line for the notes: Infinite, by Naman Soni (n1m21n), <a href="https://infinitedevices.org" target="_blank" rel="noopener">https://infinitedevices.org</a>.</p>
         </div>
-      </article>
-      <article class="rel-card" id="v1.2.0" data-era="v1">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v1.2.0-h"><a href="#v1.2.0">Infinite v1.2.0</a></h2>
+      </details>
+      <div class="rel-era-title" id="era-v1">v1.x &middot; 3 releases</div>
+      <details class="rel-entry" id="v1.2.0" data-era="v1" open>
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v1.2.0-h">Infinite v1.2.0</h2>
             
+            <time class="rel-date" datetime="2026-11-09">9 November 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-11-09">9 November 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v1.2.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Infinite 1.2 runs inside your DAW. Infinite Instrument and Infinite FX are VST3 plugins on macOS, Windows and Linux, and Audio Units on macOS, with your whole patch saved in the DAW project. The plugin is paid: $149 one…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v1.2.0" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v1.2.0">Permalink</a></div>
 <p>Infinite 1.2 runs inside your DAW. <strong>Infinite Instrument</strong> and <strong>Infinite FX</strong> are VST3 plugins on macOS, Windows and Linux, and Audio Units on macOS, with your whole patch saved in the DAW project. The plugin is paid: $149 one time, $99 at launch, for two computers, with every update for life. The standalone app stays free and open source, and this release brings it fixes too.</p>
 <h3>Infinite as a plugin</h3>
 <ul>
@@ -638,20 +654,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v1.1.0" data-era="v1">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v1.1.0-h"><a href="#v1.1.0">Infinite v1.1.0</a></h2>
+      </details>
+      <details class="rel-entry" id="v1.1.0" data-era="v1">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v1.1.0-h">Infinite v1.1.0</h2>
             
+            <time class="rel-date" datetime="2026-11-05">5 November 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-11-05">5 November 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v1.1.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Infinite 1.1 turns the 3D View into a full workspace: Edit Mode, Pose mode, sculpting, baking, rigging, materials and a path-trace engine, with five new nodes. It also adds a Chat panel that works with your own Claude,…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v1.1.0" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v1.1.0">Permalink</a></div>
 <p>Infinite 1.1 turns the 3D View into a full workspace: Edit Mode, Pose mode, sculpting, baking, rigging, materials and a path-trace engine, with five new nodes. It also adds a Chat panel that works with your own Claude, ChatGPT or Gemini, and native ASIO audio on Windows.</p>
 <h3>3D View</h3>
 <ul>
@@ -766,20 +781,19 @@
 </ul>
 <p>Made with Infinite, by Naman Soni (n1m21n), <a href="https://infinitedevices.org" target="_blank" rel="noopener">https://infinitedevices.org</a>.</p>
         </div>
-      </article>
-      <article class="rel-card" id="v1.0.0" data-era="v1">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v1.0.0-h"><a href="#v1.0.0">Infinite v1.0.0</a></h2>
+      </details>
+      <details class="rel-entry" id="v1.0.0" data-era="v1">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v1.0.0-h">Infinite v1.0.0</h2>
             
+            <time class="rel-date" datetime="2026-10-31">31 October 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-10-31">31 October 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v1.0.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Infinite 1.0 adds a Terminal, a 3D View for composing a final scene, a Piano Roll, a Sample Studio, three new instrument nodes and a Settings window you can navigate by section. Midi Notes now lets you choose which MIDI…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v1.0.0" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v1.0.0">Permalink</a></div>
 <p>Infinite 1.0 adds a Terminal, a 3D View for composing a final scene, a Piano Roll, a Sample Studio, three new instrument nodes and a Settings window you can navigate by section. Midi Notes now lets you choose which MIDI device it listens to.</p>
 <h3>Terminal</h3>
 <ul>
@@ -888,20 +902,20 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.6.6" data-era="v0.6">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.6.6-h"><a href="#v0.6.6">Infinite v0.6.6</a></h2>
+      </details>
+      <div class="rel-era-title" id="era-v0.6">v0.6.x &middot; 3 releases</div>
+      <details class="rel-entry" id="v0.6.6" data-era="v0.6">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.6.6-h">Infinite v0.6.6</h2>
             
+            <time class="rel-date" datetime="2026-10-24">24 October 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-10-24">24 October 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.6.6" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">v0.6.6 fixes Infinite not opening for some Windows users and takes a first step on Windows VST3 scanning, which is still an open issue. It also lets you reorder the Session grid by dragging.</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.6.6" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.6.6">Permalink</a></div>
 <p>v0.6.6 fixes Infinite not opening for some Windows users and takes a first step on Windows VST3 scanning, which is still an open issue. It also lets you reorder the Session grid by dragging.</p>
 <h3>Fixes</h3>
 <ul>
@@ -941,20 +955,19 @@
 </ul>
 <p>That tells us which plugins fail and where, so the fix targets real cases instead of guesses.</p>
         </div>
-      </article>
-      <article class="rel-card" id="v0.6.5" data-era="v0.6">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.6.5-h"><a href="#v0.6.5">Infinite v0.6.5</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.6.5" data-era="v0.6">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.6.5-h">Infinite v0.6.5</h2>
             
+            <time class="rel-date" datetime="2026-10-24">24 October 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-10-24">24 October 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.6.5" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">v0.6.5 adds a Session view for launching clips live, GPU points that scale to a million particles, new 3D outputs, and a long list of fixes that make bad files and bad values safe.</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.6.5" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.6.5">Permalink</a></div>
 <p>v0.6.5 adds a Session view for launching clips live, GPU points that scale to a million particles, new 3D outputs, and a long list of fixes that make bad files and bad values safe.</p>
 <h3>Session view</h3>
 <ul>
@@ -1038,20 +1051,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.6.0" data-era="v0.6">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.6.0-h"><a href="#v0.6.0">Infinite v0.6.0</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.6.0" data-era="v0.6">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.6.0-h">Infinite v0.6.0</h2>
             
+            <time class="rel-date" datetime="2026-10-17">17 October 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-10-17">17 October 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.6.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">v0.6 is a quality release: audio that measures right, a faster first run, a deeper set of synths and effects, and a larger 3D and compositing toolbox.</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.6.0" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.6.0">Permalink</a></div>
 <p>v0.6 is a quality release: audio that measures right, a faster first run, a deeper set of synths and effects, and a larger 3D and compositing toolbox.</p>
 <h3>Sound: correctness first</h3>
 <ul>
@@ -1240,20 +1252,20 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.5.0" data-era="v0.5">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.5.0-h"><a href="#v0.5.0">Infinite v0.5.0</a></h2>
+      </details>
+      <div class="rel-era-title" id="era-v0.5">v0.5 &middot; 1 release</div>
+      <details class="rel-entry" id="v0.5.0" data-era="v0.5">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.5.0-h">Infinite v0.5.0</h2>
             
+            <time class="rel-date" datetime="2026-10-10">10 October 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-10-10">10 October 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.5.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Every node body follows one layout: parameter names sit inside the control, sliders and button rows span the full body width, values carry their units (Hz, ms, dB), and each node has one status line in the same style</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.5.0" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.5.0">Permalink</a></div>
 <h3>Interface</h3>
 <ul>
 <li>Every node body follows one layout: parameter names sit inside the control, sliders and button rows span the full body width, values carry their units (Hz, ms, dB), and each node has one status line in the same style
@@ -1351,20 +1363,20 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.4.7" data-era="v0.4">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.4.7-h"><a href="#v0.4.7">Infinite v0.4.7</a></h2>
+      </details>
+      <div class="rel-era-title" id="era-v0.4">v0.4.x &middot; 9 releases</div>
+      <details class="rel-entry" id="v0.4.7" data-era="v0.4">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.4.7-h">Infinite v0.4.7</h2>
             
+            <time class="rel-date" datetime="2026-10-07">7 October 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-10-07">7 October 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.7" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add NDI In and NDI Out (Utility) to send and receive video over the network; the NDI runtime is not bundled and the node says so when it is missing. NDI® is a registered trademark of Vizrt NDI AB.</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.7" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.4.7">Permalink</a></div>
 <ul>
 <li>Add NDI In and NDI Out (Utility) to send and receive video over the network; the NDI runtime is not bundled and the node says so when it is missing. NDI® is a registered trademark of Vizrt NDI AB.
 </li>
@@ -1404,20 +1416,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.4.6" data-era="v0.4">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.4.6-h"><a href="#v0.4.6">Infinite v0.4.6</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.4.6" data-era="v0.4">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.4.6-h">Infinite v0.4.6</h2>
             
+            <time class="rel-date" datetime="2026-10-01">1 October 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-10-01">1 October 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.6" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add a headless engine: --render writes a movie, --frame writes stills, with status JSON and exit codes for scripts (Windows and Linux too; Linux needs xvfb-run)</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.6" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.4.6">Permalink</a></div>
 <ul>
 <li>Add a headless engine: <code>--render</code> writes a movie, <code>--frame</code> writes stills, with status JSON and exit codes for scripts (Windows and Linux too; Linux needs <code>xvfb-run</code>)
 </li>
@@ -1453,20 +1464,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.4.5" data-era="v0.4">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.4.5-h"><a href="#v0.4.5">Infinite v0.4.5</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.4.5" data-era="v0.4">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.4.5-h">Infinite v0.4.5</h2>
             
+            <time class="rel-date" datetime="2026-09-26">26 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-26">26 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.5" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add an Audio Meter node (Utility): stereo L/R bars on a shared -60 to +3 dBFS scale with RMS inside peak, a peak-hold line, and a per-channel max-peak readout that turns red at 0 dBFS. Audio passes through unchanged, so…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.5" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.4.5">Permalink</a></div>
 <ul>
 <li>Add an Audio Meter node (Utility): stereo L/R bars on a shared -60 to +3 dBFS scale with RMS inside peak, a peak-hold line, and a per-channel max-peak readout that turns red at 0 dBFS. Audio passes through unchanged, so it can hang off any cable as a tap; click to clear holds and clip. Bars drop to zero within 100 ms of the audio stopping.
 </li>
@@ -1480,20 +1490,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.4.4" data-era="v0.4">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.4.4-h"><a href="#v0.4.4">Infinite v0.4.4</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.4.4" data-era="v0.4">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.4.4-h">Infinite v0.4.4</h2>
             
+            <time class="rel-date" datetime="2026-09-25">25 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-25">25 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.4" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add Predictive Quantize (Prediction): a groove quantizer that learns your timing as you play</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.4" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.4.4">Permalink</a></div>
 <ul>
 <li>Add Predictive Quantize (Prediction): a groove quantizer that learns your timing as you play
 </li>
@@ -1531,20 +1540,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.4.3" data-era="v0.4">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.4.3-h"><a href="#v0.4.3">Infinite v0.4.3</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.4.3" data-era="v0.4">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.4.3-h">Infinite v0.4.3</h2>
             
+            <time class="rel-date" datetime="2026-09-21">21 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-21">21 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.3" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add auto-instance numbering (e.g. &quot;#2&quot;) to the Modulation Matrix and canvas node headers when multiple nodes share the same title</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.3" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.4.3">Permalink</a></div>
 <ul>
 <li>Add auto-instance numbering (e.g. &quot;#2&quot;) to the Modulation Matrix and canvas node headers when multiple nodes share the same title
 </li>
@@ -1566,20 +1574,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.4.25" data-era="v0.4">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.4.25-h"><a href="#v0.4.25">Infinite v0.4.25</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.4.25" data-era="v0.4">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.4.25-h">Infinite v0.4.25</h2>
             
+            <time class="rel-date" datetime="2026-09-20">20 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-20">20 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.25" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">CV Recorder (Modulators): patch in any modulator, hit Rec, then hit it again to stop — the take loops back automatically. speed sets the playback rate (changes glide smoothly), low/high set the output range, and takes…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.25" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.4.25">Permalink</a></div>
 <h3>Features</h3>
 <ul>
 <li><strong>CV Recorder</strong> (Modulators): patch in any modulator, hit <strong>Rec</strong>, then hit it again to stop — the take loops back automatically. <code>speed</code> sets the playback rate (changes glide smoothly), <code>low</code>/<code>high</code> set the output range, and takes are timed in beats and saved with the patch.
@@ -1601,20 +1608,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.4.2" data-era="v0.4">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.4.2-h"><a href="#v0.4.2">Infinite v0.4.2</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.4.2" data-era="v0.4">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.4.2-h">Infinite v0.4.2</h2>
             
+            <time class="rel-date" datetime="2026-09-20">20 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-20">20 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.2" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add a Prediction category that learns how you move: Predictive LFO, Predictive Modulator, Predictive Notes and Predictive Macro; Shift-grab takes a control back instantly</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.2" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.4.2">Permalink</a></div>
 <ul>
 <li>Add a Prediction category that learns how you move: Predictive LFO, Predictive Modulator, Predictive Notes and Predictive Macro; Shift-grab takes a control back instantly
 </li>
@@ -1644,20 +1650,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.4.1" data-era="v0.4">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.4.1-h"><a href="#v0.4.1">Infinite v0.4.1</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.4.1" data-era="v0.4">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.4.1-h">Infinite v0.4.1</h2>
             
+            <time class="rel-date" datetime="2026-09-18">18 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-18">18 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.1" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Analog synth — a new virtual-analog polyphonic synth node with per-oscillator tune (fine/semi/octave), FM depth, more waveforms, and multiple filter modes including a new ZDF ladder filter. Pulse width now shapes every…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.1" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.4.1">Permalink</a></div>
 <h3>Features</h3>
 <ul>
 <li><strong>Analog synth</strong> — a new virtual-analog polyphonic synth node with per-oscillator tune (fine/semi/octave), FM depth, more waveforms, and multiple filter modes including a new ZDF ladder filter. Pulse width now shapes every waveform, and the filter visualizer is replaced by an interactive ADSR curve panel.
@@ -1695,20 +1700,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.4.0" data-era="v0.4">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.4.0-h"><a href="#v0.4.0">Infinite v0.4.0</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.4.0" data-era="v0.4">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.4.0-h">Infinite v0.4.0</h2>
             
+            <time class="rel-date" datetime="2026-09-16">16 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-16">16 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Infinite ships on Linux for the first time, as a single downloadable file (Infinite-x86_64.AppImage) — no installer, no extra packages to install first.</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.4.0" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.4.0">Permalink</a></div>
 <h3>Features</h3>
 <ul>
 <li><strong>Arrangement Timeline is now a complete editor.</strong> Lay out and edit clips on a real timeline synced to your project&#x27;s tempo: split clips with the blade tool, group and collapse tracks, multi-select and drag groups of clips at once, snap to a grid, add markers, and loop or seek by beat.
@@ -1766,20 +1770,20 @@
 <p>It&#x27;s been tested on Ubuntu 22.04, Ubuntu 24.04, Debian 12, Fedora, and Arch Linux, covering plugin hosting (VST3, with plugin windows), audio and MIDI, video and camera, and background removal.</p>
 <p><strong>Please note:</strong> this is an early-access build. It&#x27;s been thoroughly tested in automated environments, but hasn&#x27;t yet been through a round of real-world use on real hardware — different GPUs, audio interfaces, MIDI controllers, and desktop setups. A native Wayland desktop session hasn&#x27;t been verified yet either (X11 is). If you run into issues, please report them on <a href="https://github.com/n1m21n/Infinite/issues/14" target="_blank" rel="noopener">GitHub issue #14</a> — that feedback is exactly what this release needs.</p>
         </div>
-      </article>
-      <article class="rel-card" id="v0.3.5" data-era="v0.3">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.3.5-h"><a href="#v0.3.5">Infinite v0.3.5</a></h2>
+      </details>
+      <div class="rel-era-title" id="era-v0.3">v0.3.x &middot; 6 releases</div>
+      <details class="rel-entry" id="v0.3.5" data-era="v0.3">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.3.5-h">Infinite v0.3.5</h2>
             
+            <time class="rel-date" datetime="2026-09-10">10 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-10">10 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.5" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Fix the node preview thumbnail losing its checkerboard backdrop for transparent content</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.5" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.3.5">Permalink</a></div>
 <ul>
 <li>Fix the node preview thumbnail losing its checkerboard backdrop for transparent content
 </li>
@@ -1805,20 +1809,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.3.4" data-era="v0.3">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.3.4-h"><a href="#v0.3.4">Infinite v0.3.4</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.3.4" data-era="v0.3">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.3.4-h">Infinite v0.3.4</h2>
             
+            <time class="rel-date" datetime="2026-09-09">9 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-09">9 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.4" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Surface skipped VST2 plugins in the plugin scan results</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.4" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.3.4">Permalink</a></div>
 <ul>
 <li>Surface skipped VST2 plugins in the plugin scan results
 </li>
@@ -1844,20 +1847,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.3.3" data-era="v0.3">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.3.3-h"><a href="#v0.3.3">Infinite v0.3.3</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.3.3" data-era="v0.3">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.3.3-h">Infinite v0.3.3</h2>
             
+            <time class="rel-date" datetime="2026-09-08">8 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-08">8 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.3" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Rework Field&#x27;s noise generator and fix its downstream synth gain staging; rebuild Piano, Bell, and foliage presets on the corrected noise</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.3" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.3.3">Permalink</a></div>
 <ul>
 <li>Rework Field&#x27;s noise generator and fix its downstream synth gain staging; rebuild Piano, Bell, and foliage presets on the corrected noise
 </li>
@@ -1899,20 +1901,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.3.2" data-era="v0.3">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.3.2-h"><a href="#v0.3.2">Infinite v0.3.2</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.3.2" data-era="v0.3">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.3.2-h">Infinite v0.3.2</h2>
             
+            <time class="rel-date" datetime="2026-09-06">6 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-06">6 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.2" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Shift-drag gesture recording for Macro Knob and Slider nodes: hold Shift while dragging a knob/slider to record the motion as a playable modulation pattern, with checkpoint-style recording and a static value to…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.2" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.3.2">Permalink</a></div>
 <h3>Features</h3>
 <ul>
 <li><strong>Shift-drag gesture recording</strong> for Macro Knob and Slider nodes: hold Shift while dragging a knob/slider to record the motion as a playable modulation pattern, with checkpoint-style recording and a static value to deactivate playback; the knob turns red while recording or replaying, and the recording now survives undo/redo, duplicate, and copy/paste
@@ -1930,20 +1931,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.3.1" data-era="v0.3">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.3.1-h"><a href="#v0.3.1">Infinite v0.3.1</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.3.1" data-era="v0.3">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.3.1-h">Infinite v0.3.1</h2>
             
+            <time class="rel-date" datetime="2026-09-05">5 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-05">5 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.1" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Curated preset library across all four Field nodes: Field Pixel gets Eye, Sunset/Landscape, Cat, Robot, Nebula/Galaxy, Liquid Marble, Quasicrystal Kaleidoscope, and Voronoi Cells; Field Primitive gets five nature scenes…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.1" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.3.1">Permalink</a></div>
 <h3>Features</h3>
 <ul>
 <li>Curated preset library across all four Field nodes: <strong>Field Pixel</strong> gets Eye, Sunset/Landscape, Cat, Robot, Nebula/Galaxy, Liquid Marble, Quasicrystal Kaleidoscope, and Voronoi Cells; <strong>Field Primitive</strong> gets five nature scenes (Pine Tree, Mushroom, Flower, Pinecone, Rocket); <strong>Field Synth</strong> gets Analog 808 Bass Drum, West Coast Wavefolder, and Modal Percussion; <strong>Field Sample</strong> gets Warm Tape Echo, Optical Tremolo &amp; Drive, and Stutter Freeze Looper; <strong>Field Modifier</strong> gets Vortex Swirl &amp; Strain Glow and Organic Breathing Harmonic
@@ -1983,20 +1983,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.3.0" data-era="v0.3">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.3.0-h"><a href="#v0.3.0">Infinite v0.3.0</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.3.0" data-era="v0.3">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.3.0-h">Infinite v0.3.0</h2>
             
+            <time class="rel-date" datetime="2026-09-04">4 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-04">4 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.0" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Slicer node — new sample-chopping synth with onset detection and grid-slice modes, crossthrough and per-slice attack controls</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.3.0" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.3.0">Permalink</a></div>
 <h3>Features</h3>
 <ul>
 <li><strong>Slicer node</strong> — new sample-chopping synth with onset detection and grid-slice modes, crossthrough and per-slice attack controls
@@ -2061,39 +2060,38 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2.76" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2.76-h"><a href="#v0.2.76">Infinite v0.2.76</a></h2>
+      </details>
+      <div class="rel-era-title" id="era-v0.1-v0.2">v0.1 – v0.2 &middot; 11 releases</div>
+      <details class="rel-entry" id="v0.2.76" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2.76-h">Infinite v0.2.76</h2>
             
+            <time class="rel-date" datetime="2026-09-02">2 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-02">2 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.76" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Fix Windows exports where file-based audio sources never made it into the recorded movie&#x27;s audio track.</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.76" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2.76">Permalink</a></div>
 <ul>
 <li>Fix Windows exports where file-based audio sources never made it into the recorded movie&#x27;s audio track.
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2.75" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2.75-h"><a href="#v0.2.75">Infinite v0.2.75</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.2.75" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2.75-h">Infinite v0.2.75</h2>
             
+            <time class="rel-date" datetime="2026-09-01">1 September 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-09-01">1 September 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.75" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Fix double-multiplied instance color darkening on point clouds with an image color source</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.75" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2.75">Permalink</a></div>
 <ul>
 <li>Fix double-multiplied instance color darkening on point clouds with an image color source
 </li>
@@ -2137,20 +2135,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2.7" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2.7-h"><a href="#v0.2.7">Infinite v0.2.7</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.2.7" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2.7-h">Infinite v0.2.7</h2>
             
+            <time class="rel-date" datetime="2026-08-31">31 August 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-08-31">31 August 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.7" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add a unified Settings panel (Cmd+0) with Appearance, Canvas &amp; Workspace, Audio, and General &amp; Performance tabs, replacing scattered prefs</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.7" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2.7">Permalink</a></div>
 <ul>
 <li>Add a unified Settings panel (Cmd+0) with Appearance, Canvas &amp; Workspace, Audio, and General &amp; Performance tabs, replacing scattered prefs
 </li>
@@ -2178,20 +2175,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2.6" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2.6-h"><a href="#v0.2.6">Infinite v0.2.6</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.2.6" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2.6-h">Infinite v0.2.6</h2>
             
+            <time class="rel-date" datetime="2026-08-30">30 August 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-08-30">30 August 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.6" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add Offline Render to export visuals and audio non-realtime with sample-accurate A/V synchronization and zero dropped frames regardless of patch complexity or system load</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.6" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2.6">Permalink</a></div>
 <ul>
 <li>Add Offline Render to export visuals and audio non-realtime with sample-accurate A/V synchronization and zero dropped frames regardless of patch complexity or system load
 </li>
@@ -2223,20 +2219,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2.5" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2.5-h"><a href="#v0.2.5">Infinite v0.2.5</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.2.5" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2.5-h">Infinite v0.2.5</h2>
             
+            <time class="rel-date" datetime="2026-08-30">30 August 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-08-30">30 August 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.5" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Fix a crash on the real-time audio thread (EXC_BAD_ACCESS) that could hit when undoing while removing/replacing nodes — e.g. around the drum sequencer and its samples — where a retired node&#x27;s audio object could be freed…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.5" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2.5">Permalink</a></div>
 <ul>
 <li>Fix a crash on the real-time audio thread (EXC_BAD_ACCESS) that could hit when undoing while removing/replacing nodes — e.g. around the drum sequencer and its samples — where a retired node&#x27;s audio object could be freed before the audio thread had actually finished a block that still referenced it
 </li>
@@ -2284,20 +2279,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2.4" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2.4-h"><a href="#v0.2.4">Infinite v0.2.4</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.2.4" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2.4-h">Infinite v0.2.4</h2>
             
+            <time class="rel-date" datetime="2026-08-29">29 August 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-08-29">29 August 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.4" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add the Performance Matrix (Shift+P): a dockable grid of controls you build from your own patch, so you can play a piece without touching the canvas — bind any parameter to a control, arrange it in Edit mode, then…</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.4" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2.4">Permalink</a></div>
 <ul>
 <li>Add the Performance Matrix (Shift+P): a dockable grid of controls you build from your own patch, so you can play a piece without touching the canvas — bind any parameter to a control, arrange it in Edit mode, then switch to Perform
 </li>
@@ -2349,39 +2343,37 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2.3" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2.3-h"><a href="#v0.2.3">Infinite v0.2.3</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.2.3" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2.3-h">Infinite v0.2.3</h2>
             
+            <time class="rel-date" datetime="2026-08-27">27 August 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-08-27">27 August 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.3" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Fix modulation, expressions, and palette bindings freezing on a node when its params panel is collapsed</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.3" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2.3">Permalink</a></div>
 <ul>
 <li>Fix modulation, expressions, and palette bindings freezing on a node when its params panel is collapsed
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2.2" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2.2-h"><a href="#v0.2.2">Infinite v0.2.2</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.2.2" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2.2-h">Infinite v0.2.2</h2>
             
+            <time class="rel-date" datetime="2026-08-27">27 August 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-08-27">27 August 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.2" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add analog character mode (vintage hardware modeling vs. pure digital) to Dynamics, Delay, Reverb, Pitch Shift, Chorus, Flanger, Phaser, Bitcrush, Ring Mod, and Frequency Shifter</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.2" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2.2">Permalink</a></div>
 <ul>
 <li>Add analog character mode (vintage hardware modeling vs. pure digital) to Dynamics, Delay, Reverb, Pitch Shift, Chorus, Flanger, Phaser, Bitcrush, Ring Mod, and Frequency Shifter
 </li>
@@ -2403,20 +2395,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2.1" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2.1-h"><a href="#v0.2.1">Infinite v0.2.1</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.2.1" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2.1-h">Infinite v0.2.1</h2>
             
+            <time class="rel-date" datetime="2026-08-26">26 August 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-08-26">26 August 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.1" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add Windows Spout2 GPU texture sharing (Syphon In/Out equivalent) for Resolume, TouchDesigner, OBS, and Notch</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2.1" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2.1">Permalink</a></div>
 <ul>
 <li>Add Windows Spout2 GPU texture sharing (Syphon In/Out equivalent) for Resolume, TouchDesigner, OBS, and Notch
 </li>
@@ -2448,20 +2439,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.2-preview" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.2-preview-h"><a href="#v0.2-preview">Infinite v0.2-preview</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.2-preview" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.2-preview-h">Infinite v0.2-preview</h2>
             
+            <time class="rel-date" datetime="2026-08-23">23 August 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-08-23">23 August 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2-preview" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">Add a full native Windows port — WASAPI audio, WinMM MIDI, Media Foundation video, GDI+ typography, statically linked with no external dependencies</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.2-preview" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.2-preview">Permalink</a></div>
 <ul>
 <li>Add a full native Windows port — WASAPI audio, WinMM MIDI, Media Foundation video, GDI+ typography, statically linked with no external dependencies
 </li>
@@ -2487,20 +2477,19 @@
 </li>
 </ul>
         </div>
-      </article>
-      <article class="rel-card" id="v0.1" data-era="v0.1-v0.2">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="v0.1-h"><a href="#v0.1">Infinite v0.1 — Realtime Modular Visual &amp; Audio Synthesizer</a></h2>
+      </details>
+      <details class="rel-entry" id="v0.1" data-era="v0.1-v0.2">
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="v0.1-h">Infinite v0.1 — Realtime Modular Visual &amp; Audio Synthesizer</h2>
             
+            <time class="rel-date" datetime="2026-08-16">16 August 2026</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="2026-08-16">16 August 2026</time>
-            <span>&middot;</span>
-            <a href="https://github.com/n1m21n/Infinite/releases/tag/v0.1" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          <svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+          <p class="rel-tease">A realtime modular node-based environment for visual synthesis, 3D geometry generation, and audio sound design, connecting sound and visuals over a unified signal graph.</p>
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="https://github.com/n1m21n/Infinite/releases/tag/v0.1" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#v0.1">Permalink</a></div>
 <p>A realtime modular node-based environment for visual synthesis, 3D geometry generation, and audio sound design, connecting sound and visuals over a unified signal graph.</p>
 <ul>
 <li>80+ real-time 2D/3D shader and generation nodes, including reaction-diffusion and feedback loops
@@ -2524,8 +2513,9 @@
 </ul>
 <p>macOS 11.0 Big Sur or later (Apple Silicon &amp; Intel). First launch: right-click <code>Infinite.app</code> → Open → Open.</p>
         </div>
-      </article>
-      </section>
+      </details>
+        </section>
+      </div>
     </div>
   </main>
 
@@ -2607,27 +2597,51 @@
   
   <script>
     (function () {
-      var buttons = Array.from(document.querySelectorAll('.rel-era'));
-      var cards = Array.from(document.querySelectorAll('.rel-card'));
-      function applyEra(era) {
-        buttons.forEach(function (btn) {
-          btn.setAttribute('aria-pressed', btn.getAttribute('data-era') === era ? 'true' : 'false');
-        });
-        cards.forEach(function (card) {
-          card.hidden = era !== 'all' && card.getAttribute('data-era') !== era;
-        });
+      var cards = Array.from(document.querySelectorAll('.rel-entry'));
+      var toggles = Array.from(document.querySelectorAll('[data-toggle]'));
+      var vers = Array.from(document.querySelectorAll('.rel-ver'));
+      var select = document.querySelector('.rel-select');
+      function setLabel() {
+        var all = cards.every(function (c) { return c.open; });
+        toggles.forEach(function (t) { t.textContent = all ? 'Collapse all' : 'Expand all'; });
       }
-      buttons.forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          applyEra(btn.getAttribute('data-era'));
+      toggles.forEach(function (t) {
+        t.addEventListener('click', function () {
+          var all = cards.every(function (c) { return c.open; });
+          cards.forEach(function (c) { c.open = !all; });
+          setLabel();
         });
       });
-      if (window.location.hash) {
-        var target = document.getElementById(window.location.hash.slice(1));
-        if (target && target.classList.contains('rel-card')) {
-          applyEra('all');
+      cards.forEach(function (c) { c.addEventListener('toggle', setLabel); });
+      function openHash() {
+        var id = decodeURIComponent(location.hash.slice(1));
+        if (!id) return;
+        var el = document.getElementById(id);
+        if (el && el.classList.contains('rel-entry')) {
+          el.open = true;
+          el.scrollIntoView();
         }
       }
+      window.addEventListener('hashchange', openHash);
+      if (select) select.addEventListener('change', function () {
+        if (select.value) location.hash = select.value;
+      });
+      if ('IntersectionObserver' in window) {
+        var current = null;
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) {
+            if (!en.isIntersecting) return;
+            current = en.target.id;
+            vers.forEach(function (a) {
+              a.setAttribute('aria-current', a.getAttribute('href') === '#' + current ? 'true' : 'false');
+            });
+            if (select && document.activeElement !== select) select.value = current;
+          });
+        }, { rootMargin: '-15% 0px -75% 0px' });
+        cards.forEach(function (c) { io.observe(c); });
+      }
+      setLabel();
+      openHash();
     })();
   </script>
 <nav class="dock" id="dock" aria-label="Main">

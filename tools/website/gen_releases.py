@@ -30,41 +30,47 @@ DESC = "Complete Infinite release notes from v0.1 to v2.0.0: 2D and 3D views, Ti
 
 PAGE_CSS = """
   <style>
-    .rel-wrap { max-width: 920px; margin: 0 auto; padding: 120px var(--ui-sp-4, 16px) 80px; display: grid; gap: 32px; }
-    .rel-head { display: grid; gap: 16px; }
+    .rel-wrap { max-width: 1120px; margin: 0 auto; padding: 120px var(--ui-sp-4, 16px) 80px; display: grid; gap: 40px; }
+    .rel-head { display: grid; gap: 16px; max-width: 760px; }
     .rel-head h1 { margin: 0; font-size: var(--size-h1); font-weight: 800; letter-spacing: -0.035em; line-height: 1.05; }
     .rel-head h1 em { font-style: italic; color: var(--accent-ink); font-family: var(--font-hand, "Caveat", cursive); font-weight: 700; font-size: 1.08em; }
     .rel-lead { margin: 0; max-width: 62ch; color: var(--muted); font-size: var(--size-body); line-height: 1.65; }
     .rel-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 
-    .rel-controls { display: grid; gap: 12px; padding: 16px; border-radius: var(--r-card, 20px); background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
-    .rel-eras { display: flex; flex-wrap: wrap; gap: 8px; }
-    .rel-era { min-height: 36px; padding: 0 16px; border-radius: var(--r-pill, 999px); border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); background: transparent; color: var(--ink2, var(--muted)); font: 500 0.875rem/1 var(--font-sans); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background-color 167ms var(--ease-out), color 167ms var(--ease-out), border-color 167ms var(--ease-out); }
-    .rel-era:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
-    .rel-era[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-    .rel-era .rel-cnt { font-family: var(--font-mono); font-size: 0.75rem; opacity: 0.72; }
+    .rel-layout { display: grid; gap: 24px; align-items: start; }
+    .rel-rail { display: none; }
+    .rel-mobilebar { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+    .rel-select { flex: 1; min-width: 0; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); background: var(--card); color: var(--ink); font: 500 0.9375rem/1 var(--font-sans); }
+    .rel-toggle { min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); background: transparent; color: var(--ink2, var(--muted)); font: 500 0.875rem/1 var(--font-sans); cursor: pointer; white-space: nowrap; }
+    .rel-toggle:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
 
-    .rel-jump { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .rel-jump-label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
-    .rel-pill { padding: 4px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink2, var(--muted)); text-decoration: none; font-family: var(--font-mono); font-size: 0.8125rem; transition: color 125ms var(--ease-out), border-color 125ms var(--ease-out), background-color 125ms var(--ease-out); }
-    .rel-pill:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 28%, transparent); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+    .rel-list { display: grid; gap: 12px; min-width: 0; }
+    .rel-era-title { margin: 28px 0 4px; display: flex; align-items: baseline; gap: 12px; font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); scroll-margin-top: 96px; }
+    .rel-era-title:first-child { margin-top: 0; }
+    .rel-era-title::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--ink) 12%, transparent); }
 
-    .rel-list { display: grid; gap: 24px; }
-    .rel-card { scroll-margin-top: 96px; display: grid; gap: 16px; padding: 24px; border-radius: var(--r-card, 20px); background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
-    .rel-card[hidden] { display: none; }
-    .rel-card.is-latest { border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }
+    .rel-entry { scroll-margin-top: 96px; padding: 0; border-radius: var(--r-card, 20px); background: var(--card); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); transition: border-color 125ms; }
+    .rel-entry:hover { border-color: color-mix(in srgb, var(--ink) 24%, transparent); }
+    .rel-entry.is-latest { border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }
+    .rel-entry[open] { border-color: color-mix(in srgb, var(--ink) 20%, transparent); }
+    .rel-entry.is-latest[open] { border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }
 
-    .rel-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
-    .rel-card-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-    .rel-card-head h2 { margin: 0; font-size: var(--size-h2, 1.5rem); font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
-    .rel-card-head h2 a { color: inherit; text-decoration: none; }
-    .rel-card-head h2 a:hover { color: var(--accent-ink); }
-    .rel-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--r-pill, 999px); background: color-mix(in srgb, var(--accent-ink) 18%, transparent); color: var(--accent-ink); font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-    .rel-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted); }
-    .rel-meta a { color: var(--accent-ink); text-decoration: none; }
-    .rel-meta a:hover { text-decoration: underline; }
+    .rel-sum { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; padding: 18px 24px; border-radius: inherit; }
+    .rel-sum::-webkit-details-marker { display: none; }
+    .rel-sum:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+    .rel-entry-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+    .rel-sum h2 { margin: 0; font-size: var(--size-h2, 1.5rem); font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
+    .rel-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--r-pill, 999px); background: color-mix(in srgb, var(--accent-ink) 18%, transparent); color: var(--accent-ink); font-family: var(--font-mono); font-size: 0.75rem; }
+    .rel-date { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted); }
+    .rel-chev { grid-column: 2; grid-row: 1; width: 20px; height: 20px; color: var(--muted); transition: transform 150ms; }
+    .rel-entry[open] .rel-chev { transform: rotate(180deg); }
+    .rel-tease { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 0.9375rem; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .rel-entry[open] .rel-tease { display: none; }
 
-    .rel-body { display: grid; gap: 12px; }
+    .rel-body { display: grid; gap: 12px; margin: 0 24px; padding: 20px 0 24px; border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
+    .rel-links { display: flex; flex-wrap: wrap; gap: 16px; font-family: var(--font-mono); font-size: 0.8125rem; }
+    .rel-links a { color: var(--accent-ink); text-decoration: none; }
+    .rel-links a:hover { text-decoration: underline; }
     .rel-body h3 { margin: 8px 0 0; font-size: var(--size-h3, 1.125rem); font-weight: 700; letter-spacing: -0.015em; color: var(--ink); }
     .rel-body h4 { margin: 4px 0 0; font-size: 1rem; font-weight: 600; color: var(--ink); }
     .rel-body p, .rel-body li { margin: 0; color: var(--ink2, var(--muted)); font-size: 0.9375rem; line-height: 1.65; }
@@ -73,11 +79,29 @@ PAGE_CSS = """
     .rel-body ul { margin: 0; padding-left: 1.35em; display: grid; gap: 8px; }
     .rel-body li > ul { margin-top: 8px; }
     .rel-body code { font-family: var(--font-mono); font-size: 0.875em; padding: 2px 6px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); word-break: break-word; }
+    .rel-entry:not([open]) .rel-body { display: none; }
 
-    @media (max-width: 640px) {
-      .rel-wrap { padding: 104px 16px 64px; gap: 24px; }
-      .rel-card { padding: 16px; }
+    @media (min-width: 960px) {
+      .rel-layout { grid-template-columns: 210px minmax(0, 1fr); gap: 48px; }
+      .rel-mobilebar { display: none; }
+      .rel-rail { display: block; position: sticky; top: 96px; max-height: calc(100vh - 120px); overflow: auto; padding-right: 8px; scrollbar-width: thin; }
+      .rel-rail-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+      .rel-rail-label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+      .rel-rail-top .rel-toggle { min-height: 32px; padding: 0 12px; font-size: 0.8125rem; }
+      .rel-rail-group { margin: 0 0 14px; }
+      .rel-rail-era { display: block; margin: 0 0 4px; padding: 4px 10px; font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+      .rel-rail-era:hover { color: var(--ink); }
+      .rel-rail a.rel-ver { display: block; padding: 5px 10px; border-left: 2px solid color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink2, var(--muted)); text-decoration: none; font-family: var(--font-mono); font-size: 0.8125rem; transition: color 125ms, border-color 125ms, background 125ms; }
+      .rel-rail a.rel-ver:hover { color: var(--ink); border-left-color: color-mix(in srgb, var(--ink) 40%, transparent); }
+      .rel-rail a.rel-ver[aria-current="true"] { color: var(--ink); border-left-color: var(--accent-ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
     }
+    @media (max-width: 640px) {
+      .rel-wrap { padding: 104px 16px 64px; gap: 28px; }
+      .rel-sum { padding: 16px; }
+      .rel-body { margin: 0 16px; }
+      .rel-body { padding-bottom: 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .rel-chev, .rel-entry { transition: none; } }
   </style>"""
 
 
@@ -281,50 +305,72 @@ def build_html() -> str:
     for r in releases:
         counts[era_of(r["tag"])] += 1
 
-    era_btns = []
-    for k, label in era_defs:
-        if k != "all" and counts[k] == 0:
-            continue
-        pressed = "true" if k == "all" else "false"
-        era_btns.append(
-            f'<button type="button" class="rel-era" data-era="{k}" aria-pressed="{pressed}">'
-            f'{html.escape(label)} <span class="rel-cnt">{counts[k]}</span></button>'
-        )
+    era_labels = dict(era_defs)
+    era_labels["v2"] = "v2.0"
+    groups = []  # (era, [releases]) in release order
+    for r in releases:
+        e = era_of(r["tag"])
+        if not groups or groups[-1][0] != e:
+            groups.append((e, []))
+        groups[-1][1].append(r)
 
-    jump_pills = [
-        f'<a class="rel-pill" href="#{html.escape(r["tag"])}">{html.escape(r["tag"])}</a>'
-        for r in releases
-    ]
+    rail = []
+    sel = []
+    for e, rs in groups:
+        lab = html.escape(era_labels[e])
+        rail.append(f'<div class="rel-rail-group"><a class="rel-rail-era" href="#era-{e}">{lab}</a>'
+                    + "".join(f'<a class="rel-ver" href="#{html.escape(r["tag"])}">{html.escape(r["tag"])}</a>' for r in rs)
+                    + '</div>')
+        sel.append(f'<optgroup label="{lab}">'
+                   + "".join(f'<option value="{html.escape(r["tag"])}">{html.escape(r["tag"])}</option>' for r in rs)
+                   + '</optgroup>')
+
+    chev = ('<svg class="rel-chev" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" '
+            'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>')
+
+    def teaser(body_html: str) -> str:
+        m = re.search(r"<p>(.*?)</p>", body_html, re.S) or re.search(r"<li>(.*?)</li>", body_html, re.S)
+        if not m:
+            return ""
+        t = html.unescape(re.sub(r"<[^>]+>", "", m.group(1))).strip()
+        t = re.sub(r"\s+", " ", t)
+        if len(t) > 220:
+            t = t[:220].rsplit(" ", 1)[0] + "\u2026"
+        return html.escape(t)
 
     cards = []
-    for idx, r in enumerate(releases):
-        tag = r["tag"]
-        era = era_of(tag)
-        body_md, subtitle = strip_leading_title(r["body"], tag)
-        heading = card_title(r, subtitle)
-        body_html = md_to_html(body_md)
-        latest_cls = " is-latest" if idx == 0 else ""
-        badge = '<span class="rel-badge">Latest</span>' if idx == 0 else ""
-        date_str = fmt_date(r["published_at"])
-        date_iso = r["published_at"][:10]
-        gh_url = html.escape(r["url"], quote=True)
-        tag_esc = html.escape(tag)
-        cards.append(f"""      <article class="rel-card{latest_cls}" id="{tag_esc}" data-era="{era}">
-        <div class="rel-card-head">
-          <div class="rel-card-title-row">
-            <h2 id="{tag_esc}-h"><a href="#{tag_esc}">{html.escape(heading)}</a></h2>
+    for e, rs in groups:
+        n = len(rs)
+        cards.append(f'      <div class="rel-era-title" id="era-{e}">{html.escape(era_labels[e])} &middot; {n} release{"s" if n != 1 else ""}</div>')
+        for r in rs:
+            idx = releases.index(r)
+            tag = r["tag"]
+            body_md, subtitle = strip_leading_title(r["body"], tag)
+            heading = card_title(r, subtitle)
+            body_html = md_to_html(body_md)
+            latest_cls = " is-latest" if idx == 0 else ""
+            badge = '<span class="rel-badge">Latest</span>' if idx == 0 else ""
+            open_attr = " open" if idx < 2 else ""
+            date_str = fmt_date(r["published_at"])
+            date_iso = r["published_at"][:10]
+            gh_url = html.escape(r["url"], quote=True)
+            tag_esc = html.escape(tag)
+            tz = teaser(body_html)
+            tz_html = f'\n          <p class="rel-tease">{tz}</p>' if tz else ""
+            cards.append(f"""      <details class="rel-entry{latest_cls}" id="{tag_esc}" data-era="{e}"{open_attr}>
+        <summary class="rel-sum">
+          <div class="rel-entry-title-row">
+            <h2 id="{tag_esc}-h">{html.escape(heading)}</h2>
             {badge}
+            <time class="rel-date" datetime="{date_iso}">{html.escape(date_str)}</time>
           </div>
-          <div class="rel-meta">
-            <time datetime="{date_iso}">{html.escape(date_str)}</time>
-            <span>&middot;</span>
-            <a href="{gh_url}" target="_blank" rel="noopener">GitHub release &rarr;</a>
-          </div>
-        </div>
+          {chev}{tz_html}
+        </summary>
         <div class="rel-body">
+          <div class="rel-links"><a href="{gh_url}" target="_blank" rel="noopener">GitHub release &rarr;</a><a href="#{tag_esc}">Permalink</a></div>
 {body_html}
         </div>
-      </article>""")
+      </details>""")
 
     json_ld = json.dumps({
         "@context": "https://schema.org",
@@ -391,19 +437,19 @@ def build_html() -> str:
         </div>
       </header>
 
-      <section class="rel-controls" aria-label="Filter and jump to releases">
-        <div class="rel-eras" role="group" aria-label="Filter by release series">
-          {chr(10).join("          " + b for b in era_btns)}
+      <div class="rel-layout">
+        <aside class="rel-rail" aria-label="Jump to version">
+          <div class="rel-rail-top"><span class="rel-rail-label">Versions</span><button type="button" class="rel-toggle" data-toggle>Expand all</button></div>
+          {"".join(rail)}
+        </aside>
+        <div class="rel-mobilebar">
+          <select class="rel-select" aria-label="Jump to version"><option value="">Jump to version&hellip;</option>{"".join(sel)}</select>
+          <button type="button" class="rel-toggle" data-toggle>Expand all</button>
         </div>
-        <div class="rel-jump" aria-label="Jump to version">
-          <span class="rel-jump-label">Jump to:</span>
-          {"".join(jump_pills)}
-        </div>
-      </section>
-
-      <section class="rel-list" aria-label="All releases">
+        <section class="rel-list" aria-label="All releases">
 {chr(10).join(cards)}
-      </section>
+        </section>
+      </div>
     </div>
   </main>
 
@@ -415,27 +461,51 @@ def build_html() -> str:
   <script src="bird.js?v={chrome.BIRD_VERSION}" defer></script>
   <script>
     (function () {{
-      var buttons = Array.from(document.querySelectorAll('.rel-era'));
-      var cards = Array.from(document.querySelectorAll('.rel-card'));
-      function applyEra(era) {{
-        buttons.forEach(function (btn) {{
-          btn.setAttribute('aria-pressed', btn.getAttribute('data-era') === era ? 'true' : 'false');
-        }});
-        cards.forEach(function (card) {{
-          card.hidden = era !== 'all' && card.getAttribute('data-era') !== era;
-        }});
+      var cards = Array.from(document.querySelectorAll('.rel-entry'));
+      var toggles = Array.from(document.querySelectorAll('[data-toggle]'));
+      var vers = Array.from(document.querySelectorAll('.rel-ver'));
+      var select = document.querySelector('.rel-select');
+      function setLabel() {{
+        var all = cards.every(function (c) {{ return c.open; }});
+        toggles.forEach(function (t) {{ t.textContent = all ? 'Collapse all' : 'Expand all'; }});
       }}
-      buttons.forEach(function (btn) {{
-        btn.addEventListener('click', function () {{
-          applyEra(btn.getAttribute('data-era'));
+      toggles.forEach(function (t) {{
+        t.addEventListener('click', function () {{
+          var all = cards.every(function (c) {{ return c.open; }});
+          cards.forEach(function (c) {{ c.open = !all; }});
+          setLabel();
         }});
       }});
-      if (window.location.hash) {{
-        var target = document.getElementById(window.location.hash.slice(1));
-        if (target && target.classList.contains('rel-card')) {{
-          applyEra('all');
+      cards.forEach(function (c) {{ c.addEventListener('toggle', setLabel); }});
+      function openHash() {{
+        var id = decodeURIComponent(location.hash.slice(1));
+        if (!id) return;
+        var el = document.getElementById(id);
+        if (el && el.classList.contains('rel-entry')) {{
+          el.open = true;
+          el.scrollIntoView();
         }}
       }}
+      window.addEventListener('hashchange', openHash);
+      if (select) select.addEventListener('change', function () {{
+        if (select.value) location.hash = select.value;
+      }});
+      if ('IntersectionObserver' in window) {{
+        var current = null;
+        var io = new IntersectionObserver(function (entries) {{
+          entries.forEach(function (en) {{
+            if (!en.isIntersecting) return;
+            current = en.target.id;
+            vers.forEach(function (a) {{
+              a.setAttribute('aria-current', a.getAttribute('href') === '#' + current ? 'true' : 'false');
+            }});
+            if (select && document.activeElement !== select) select.value = current;
+          }});
+        }}, {{ rootMargin: '-15% 0px -75% 0px' }});
+        cards.forEach(function (c) {{ io.observe(c); }});
+      }}
+      setLabel();
+      openHash();
     }})();
   </script>
 </body>
