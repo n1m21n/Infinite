@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Scene 2D node: controls, inputs and a free patch</title>
-  <meta name="description" content="Scene 2D is a compositing node: it layers, masks and routes pictures. A free compositing node in Infinite, with its controls and an example patch.">
+  <meta name="description" content="The 2D View&#x27;s document: a page that stacks node outputs, shapes, text, paint and groups into one picture at the document&#x27;s size.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/scene-2d.html">
   <meta property="og:title" content="Scene 2D node: controls, inputs and a free patch">
-  <meta property="og:description" content="Scene 2D is a compositing node: it layers, masks and routes pictures. A free compositing node in Infinite, with its controls and an example patch.">
+  <meta property="og:description" content="The 2D View&#x27;s document: a page that stacks node outputs, shapes, text, paint and groups into one picture at the document&#x27;s size.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/scene-2d.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/scene-2d.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Scene 2D node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Scene 2D is a compositing node: it layers, masks and routes pictures. A free compositing node in Infinite, with its controls and an example patch.">
+  <meta name="twitter:description" content="The 2D View&#x27;s document: a page that stacks node outputs, shapes, text, paint and groups into one picture at the document&#x27;s size.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/scene-2d.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Scene 2D node: controls, inputs and a free patch", "description": "Scene 2D is a compositing node: it layers, masks and routes pictures. A free compositing node in Infinite, with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/scene-2d.html", "image": "https://infinitedevices.org/assets/nodes/hd/scene-2d.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Compositing", "mainEntityOfPage": "https://infinitedevices.org/nodes/scene-2d.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Scene 2D node: controls, inputs and a free patch", "description": "The 2D View's document: a page that stacks node outputs, shapes, text, paint and groups into one picture at the document's size.", "url": "https://infinitedevices.org/nodes/scene-2d.html", "image": "https://infinitedevices.org/assets/nodes/hd/scene-2d.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Compositing", "mainEntityOfPage": "https://infinitedevices.org/nodes/scene-2d.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Scene 2D", "item": "https://infinitedevices.org/nodes/scene-2d.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Scene 2D Node", "description": "Scene 2D is a compositing node: it layers, masks and routes pictures. A free compositing node in Infinite, with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/scene-2d.webp", "category": "Compositing", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/scene-2d.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Scene 2D Node", "description": "The 2D View's document: a page that stacks node outputs, shapes, text, paint and groups into one picture at the document's size.", "image": "https://infinitedevices.org/assets/nodes/hd/scene-2d.webp", "category": "Compositing", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/scene-2d.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -117,14 +117,14 @@
         <header class="post-head">
           <p class="post-kicker mono np-cat" style="--cat:#818CF8">Compositing node</p>
           <h1>Scene 2D</h1>
-          <p class="post-lede">Scene 2D is a compositing node: it layers, masks and routes pictures. It has no input and gives picture out. Its controls include drive a, drive b, drive c, drive d.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/scene-2d.inf" download>Download the patch</a><a class="btn btn-ghost" href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Read it in the Field Guide</a></p>
+          <p class="post-lede">The 2D View&#x27;s document: a page that stacks node outputs, shapes, text, paint and groups into one picture at the document&#x27;s size. Right-click a node with a picture and choose Add to 2D View, then arrange it in the 2D View panel: move, crop, scale, rotate, paint, draw vector paths and type text. Layers have blend modes, opacity, masks and clipping. Four Drive sliders (A to D) can be modulated. Everyday use: a layout or poster canvas, an artboard for a patch. Also called a 2D composition or a canvas.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/scene-2d.inf" download>Download the patch</a><a class="btn btn-ghost" href="../manual/#node-scene-2d">Read in the manual</a></p>
         </header>
         <figure class="np-shot" style="--cat:#818CF8"><img src="../assets/nodes/hd/scene-2d.webp" alt="The Scene 2D node in Infinite, showing its controls and output." width="521" height="720" decoding="async"></figure>
         <div class="prose">
           <h2 id="what">What it does</h2>
           <p>Scene 2D is a compositing node: it layers, masks and routes pictures. It has no input and gives picture out, so it starts a chain.</p>
-          
+          <h2 id="try-it">Try it</h2><p>Add a video and a drawn shape to the 2D View, clip the video to the shape and send the page to an Output.</p><p class="np-chain" aria-label="A chain that uses this node"><a class="np-step" href="video.html">Video</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="scene-2d.html">Scene 2D</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="output.html">Output</a></p>
           <h2 id="io">Inputs and outputs</h2>
           <div class="np-io"><div><h3>Inputs</h3><ul class="np-ports"><li>None. It starts a chain.</li></ul></div><div><h3>Outputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> out</li></ul></div></div>
           <h2 id="controls">Controls</h2><p>Every control with a range can be driven by a modulator, a note, an audio level or a sketch.</p><div class="np-table"><table><thead><tr><th scope="col">Control</th><th scope="col">Range or options</th><th scope="col">Default</th></tr></thead><tbody><tr><th scope="row">Drive A</th><td>0 to 1</td><td>0</td></tr><tr><th scope="row">Drive B</th><td>0 to 1</td><td>0</td></tr><tr><th scope="row">Drive C</th><td>0 to 1</td><td>0</td></tr><tr><th scope="row">Drive D</th><td>0 to 1</td><td>0</td></tr></tbody></table></div>

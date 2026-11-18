@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Shadertoy node: controls, inputs and a free patch</title>
-  <meta name="description" content="Shadertoy is a source node: it makes a picture from nothing, so it sits at the start of a visual chain. A free Infinite node with a patch.">
+  <meta name="description" content="Runs a shader pasted from shadertoy.com as it is: the mainImage code, Buffers A to D and the Common tab, all live. A free Infinite node with a patch.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/shadertoy.html">
   <meta property="og:title" content="Shadertoy node: controls, inputs and a free patch">
-  <meta property="og:description" content="Shadertoy is a source node: it makes a picture from nothing, so it sits at the start of a visual chain. A free Infinite node with a patch.">
+  <meta property="og:description" content="Runs a shader pasted from shadertoy.com as it is: the mainImage code, Buffers A to D and the Common tab, all live. A free Infinite node with a patch.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/shadertoy.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/shadertoy.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Shadertoy node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Shadertoy is a source node: it makes a picture from nothing, so it sits at the start of a visual chain. A free Infinite node with a patch.">
+  <meta name="twitter:description" content="Runs a shader pasted from shadertoy.com as it is: the mainImage code, Buffers A to D and the Common tab, all live. A free Infinite node with a patch.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/shadertoy.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Shadertoy node: controls, inputs and a free patch", "description": "Shadertoy is a source node: it makes a picture from nothing, so it sits at the start of a visual chain. A free Infinite node with a patch.", "url": "https://infinitedevices.org/nodes/shadertoy.html", "image": "https://infinitedevices.org/assets/nodes/hd/shadertoy.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Source", "mainEntityOfPage": "https://infinitedevices.org/nodes/shadertoy.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Shadertoy node: controls, inputs and a free patch", "description": "Runs a shader pasted from shadertoy.com as it is: the mainImage code, Buffers A to D and the Common tab, all live. A free Infinite node with a patch.", "url": "https://infinitedevices.org/nodes/shadertoy.html", "image": "https://infinitedevices.org/assets/nodes/hd/shadertoy.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Source", "mainEntityOfPage": "https://infinitedevices.org/nodes/shadertoy.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Shadertoy", "item": "https://infinitedevices.org/nodes/shadertoy.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Shadertoy Node", "description": "Shadertoy is a source node: it makes a picture from nothing, so it sits at the start of a visual chain. A free Infinite node with a patch.", "image": "https://infinitedevices.org/assets/nodes/hd/shadertoy.webp", "category": "Source", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/shadertoy.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Shadertoy Node", "description": "Runs a shader pasted from shadertoy.com as it is: the mainImage code, Buffers A to D and the Common tab, all live. A free Infinite node with a patch.", "image": "https://infinitedevices.org/assets/nodes/hd/shadertoy.webp", "category": "Source", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/shadertoy.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -117,14 +117,14 @@
         <header class="post-head">
           <p class="post-kicker mono np-cat" style="--cat:#4ADE80">Source node</p>
           <h1>Shadertoy</h1>
-          <p class="post-lede">Shadertoy is a source node: it makes a picture from nothing, so it sits at the start of a visual chain. It takes picture in and gives picture out. Its controls include width, height, animate, buffers.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/shadertoy.inf" download>Download the patch</a><a class="btn btn-ghost" href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Read it in the Field Guide</a></p>
+          <p class="post-lede">Runs a shader pasted from shadertoy.com as it is: the mainImage code, Buffers A to D and the Common tab, all live. iChannel0 to iChannel3 are image inputs for feeding pictures in, and an unwired channel reads its buffer. Each &#x27;uniform float name; // lo..hi&#x27; line in the shader becomes a knob you can modulate, so a shader&#x27;s own controls work like any other dial. Also called a GLSL shader, a fragment shader or a shader toy: the way to bring generative code art into a patch.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/shadertoy.inf" download>Download the patch</a><a class="btn btn-ghost" href="../manual/#node-shadertoy">Read in the manual</a></p>
         </header>
         <figure class="np-shot" style="--cat:#4ADE80"><img src="../assets/nodes/hd/shadertoy.webp" alt="The Shadertoy node in Infinite, showing its inputs, controls and outputs." width="444" height="720" decoding="async"></figure>
         <div class="prose">
           <h2 id="what">What it does</h2>
           <p>Shadertoy is a source node: it makes a picture from nothing, so it sits at the start of a visual chain. It takes picture in and gives picture out.</p>
-          
+          <h2 id="try-it">Try it</h2><p>Paste a fractal shader and wire an LFO into one of its uniform knobs so it zooms on the beat.</p><p class="np-chain" aria-label="A chain that uses this node"><a class="np-step" href="shadertoy.html">Shadertoy</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="bloom.html">Bloom</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="output.html">Output</a></p>
           <h2 id="io">Inputs and outputs</h2>
           <div class="np-io"><div><h3>Inputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> iChannel0</li><li><span class="np-kind" data-kind="picture">picture</span> iChannel1</li><li><span class="np-kind" data-kind="picture">picture</span> iChannel2</li><li><span class="np-kind" data-kind="picture">picture</span> iChannel3</li></ul></div><div><h3>Outputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> out</li></ul></div></div>
           <h2 id="controls">Controls</h2><p>Every control with a range can be driven by a modulator, a note, an audio level or a sketch.</p><div class="np-table"><table><thead><tr><th scope="col">Control</th><th scope="col">Range or options</th><th scope="col">Default</th></tr></thead><tbody><tr><th scope="row">width</th><td>16 to 4096</td><td>1024</td></tr><tr><th scope="row">height</th><td>16 to 4096</td><td>1024</td></tr><tr><th scope="row">animate</th><td>on or off</td><td>on</td></tr><tr><th scope="row">buffers</th><td>no buffers, buffer A, buffers A + B, buffers A - D</td><td>0</td></tr></tbody></table></div>

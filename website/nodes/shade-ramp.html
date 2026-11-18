@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Shade Ramp node: controls, inputs and a free patch</title>
-  <meta name="description" content="Shade Ramp is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.">
+  <meta name="description" content="A colour ramp of 2 to 8 stops (default 2), read at Factor (0 to 1). A free shader node in Infinite, with its controls and an example patch.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/shade-ramp.html">
   <meta property="og:title" content="Shade Ramp node: controls, inputs and a free patch">
-  <meta property="og:description" content="Shade Ramp is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.">
+  <meta property="og:description" content="A colour ramp of 2 to 8 stops (default 2), read at Factor (0 to 1). A free shader node in Infinite, with its controls and an example patch.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/shade-ramp.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/shade-ramp.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Shade Ramp node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Shade Ramp is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.">
+  <meta name="twitter:description" content="A colour ramp of 2 to 8 stops (default 2), read at Factor (0 to 1). A free shader node in Infinite, with its controls and an example patch.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/shade-ramp.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Shade Ramp node: controls, inputs and a free patch", "description": "Shade Ramp is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/shade-ramp.html", "image": "https://infinitedevices.org/assets/nodes/hd/shade-ramp.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Shader", "mainEntityOfPage": "https://infinitedevices.org/nodes/shade-ramp.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Shade Ramp node: controls, inputs and a free patch", "description": "A colour ramp of 2 to 8 stops (default 2), read at Factor (0 to 1). A free shader node in Infinite, with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/shade-ramp.html", "image": "https://infinitedevices.org/assets/nodes/hd/shade-ramp.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Shader", "mainEntityOfPage": "https://infinitedevices.org/nodes/shade-ramp.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Shade Ramp", "item": "https://infinitedevices.org/nodes/shade-ramp.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Shade Ramp Node", "description": "Shade Ramp is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/shade-ramp.webp", "category": "Shader", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/shade-ramp.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Shade Ramp Node", "description": "A colour ramp of 2 to 8 stops (default 2), read at Factor (0 to 1). A free shader node in Infinite, with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/shade-ramp.webp", "category": "Shader", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/shade-ramp.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -117,34 +117,18 @@
         <header class="post-head">
           <p class="post-kicker mono np-cat" style="--cat:#F472B6">Shader node</p>
           <h1>Shade Ramp</h1>
-          <p class="post-lede">Shade Ramp is a shader node: it works out how a surface looks, from light, normals and textures. It takes picture in and gives picture out. Its controls include interpolation, stops, factor, pos0.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/shade-ramp.inf" download>Download the patch</a><a class="btn btn-ghost" href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Read it in the Field Guide</a></p>
+          <p class="post-lede">A colour ramp of 2 to 8 stops (default 2), read at Factor (0 to 1). Interpolation is Linear, Ease, Constant or B-Spline, and each stop has its own position and colour. Below the first stop and above the last, the end colours hold. Everyday use: remap a grey value to a palette, like a gradient map or a heat map. Also called a colour gradient or a colour ramp.</p>
+          <p class="cta-row"><a class="btn btn-ghost" href="../manual/#node-shade-ramp">Read in the manual</a></p>
         </header>
         <figure class="np-shot" style="--cat:#F472B6"><img src="../assets/nodes/hd/shade-ramp.webp" alt="The Shade Ramp node in Infinite, showing its inputs, controls and outputs." width="476" height="720" decoding="async"></figure>
         <div class="prose">
           <h2 id="what">What it does</h2>
           <p>Shade Ramp is a shader node: it works out how a surface looks, from light, normals and textures. It takes picture in and gives picture out.</p>
-          
+          <h2 id="try-it">Try it</h2><p>Wire a Shade Gradient into Factor and build a three-stop ramp from black through red to white.</p><p class="np-chain" aria-label="A chain that uses this node"><a class="np-step" href="shade-gradient.html">Shade Gradient</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="shade-ramp.html">Shade Ramp</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="material.html">Material</a></p>
           <h2 id="io">Inputs and outputs</h2>
           <div class="np-io"><div><h3>Inputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> factor</li></ul></div><div><h3>Outputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> out</li></ul></div></div>
           <h2 id="controls">Controls</h2><p>Every control with a range can be driven by a modulator, a note, an audio level or a sketch.</p><div class="np-table"><table><thead><tr><th scope="col">Control</th><th scope="col">Range or options</th><th scope="col">Default</th></tr></thead><tbody><tr><th scope="row">interpolation</th><td>Linear, Ease, Constant, B-Spline</td><td>0</td></tr><tr><th scope="row">stops</th><td>2 to 8</td><td>2</td></tr><tr><th scope="row">factor</th><td>0 to 1</td><td>0.5</td></tr><tr><th scope="row">pos0</th><td>0 to 1</td><td>0</td></tr><tr><th scope="row">pos1</th><td>0 to 1</td><td>1</td></tr></tbody></table></div>
-          <h2 id="patch">Example patch</h2><p>This patch wires Shade Ramp to what it needs and shows the result. Download it, then use File, Open in Infinite, or read it here: it is plain text.</p><pre><code>infinite-patch 1
-rev 2
-# Shade Ramp: a starting patch for the Shade Ramp node
-node 1 Shader Shade Ramp
-  id node
-  pos 520 300
-end
-node 2 Source Ramp
-  id in0
-  pos 0 300
-end
-node 3 Utility Output
-  id out
-  pos 1080 300
-end
-cable node 0 in0
-cable out 0 node</code></pre>
+          
         </div>
         <aside class="post-cta" aria-label="Try Infinite">
           <p class="hand">your turn</p>

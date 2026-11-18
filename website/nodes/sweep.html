@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Sweep node: controls, inputs and a free patch</title>
-  <meta name="description" content="Sweep is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.">
+  <meta name="description" content="Carries a profile shape along a path curve to make a surface: pipes, rails, rims, cables and ribbons. A free Infinite node with a patch.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/sweep.html">
   <meta property="og:title" content="Sweep node: controls, inputs and a free patch">
-  <meta property="og:description" content="Sweep is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.">
+  <meta property="og:description" content="Carries a profile shape along a path curve to make a surface: pipes, rails, rims, cables and ribbons. A free Infinite node with a patch.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/sweep.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/sweep.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Sweep node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Sweep is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.">
+  <meta name="twitter:description" content="Carries a profile shape along a path curve to make a surface: pipes, rails, rims, cables and ribbons. A free Infinite node with a patch.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/sweep.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Sweep node: controls, inputs and a free patch", "description": "Sweep is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/sweep.html", "image": "https://infinitedevices.org/assets/nodes/hd/sweep.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "3D", "mainEntityOfPage": "https://infinitedevices.org/nodes/sweep.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Sweep node: controls, inputs and a free patch", "description": "Carries a profile shape along a path curve to make a surface: pipes, rails, rims, cables and ribbons. A free Infinite node with a patch.", "url": "https://infinitedevices.org/nodes/sweep.html", "image": "https://infinitedevices.org/assets/nodes/hd/sweep.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "3D", "mainEntityOfPage": "https://infinitedevices.org/nodes/sweep.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Sweep", "item": "https://infinitedevices.org/nodes/sweep.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Sweep Node", "description": "Sweep is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/sweep.webp", "category": "3D", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/sweep.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Sweep Node", "description": "Carries a profile shape along a path curve to make a surface: pipes, rails, rims, cables and ribbons. A free Infinite node with a patch.", "image": "https://infinitedevices.org/assets/nodes/hd/sweep.webp", "category": "3D", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/sweep.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -117,14 +117,14 @@
         <header class="post-head">
           <p class="post-kicker mono np-cat" style="--cat:#38BDF8">3D node</p>
           <h1>Sweep</h1>
-          <p class="post-lede">Sweep is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. It takes 3D shape in and gives 3D shape out. Its controls include start scale, end scale, twist, caps.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/sweep.inf" download>Download the patch</a><a class="btn btn-ghost" href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Read it in the Field Guide</a></p>
+          <p class="post-lede">Carries a profile shape along a path curve to make a surface: pipes, rails, rims, cables and ribbons. Patch the profile into the first input and the route into the second. With no profile it sweeps a round one, so a path alone gives a tube (Profile Radius 0.002 to 2, default 0.1; Profile Sides 3 to 64, default 12). Start Scale and End Scale (0 to 4) taper it, Twist (-1080 to 1080) turns it along the way, and Caps closes the ends of a closed profile on an open path. Everyday use: a pipe, cable or neon tube along a drawn curve. Also called extrude along a path.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/sweep.inf" download>Download the patch</a><a class="btn btn-ghost" href="../manual/#node-sweep">Read in the manual</a></p>
         </header>
         <figure class="np-shot" style="--cat:#38BDF8"><img src="../assets/nodes/hd/sweep.webp" alt="The Sweep node in Infinite, showing its inputs, controls and outputs." width="476" height="720" decoding="async"></figure>
         <div class="prose">
           <h2 id="what">What it does</h2>
           <p>Sweep is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. It takes 3D shape in and gives 3D shape out.</p>
-          
+          <h2 id="try-it">Try it</h2><p>Draw a curve, sweep a tube with End Scale 0 and get a wire that fades to a point.</p><p class="np-chain" aria-label="A chain that uses this node"><a class="np-step" href="sweep.html">Sweep</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="render-3d.html">Render 3D</a></p>
           <h2 id="io">Inputs and outputs</h2>
           <div class="np-io"><div><h3>Inputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="3D shape">3D shape</span> profile</li><li><span class="np-kind" data-kind="3D shape">3D shape</span> path</li></ul></div><div><h3>Outputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="3D shape">3D shape</span> out</li></ul></div></div>
           <h2 id="controls">Controls</h2><p>Every control with a range can be driven by a modulator, a note, an audio level or a sketch.</p><div class="np-table"><table><thead><tr><th scope="col">Control</th><th scope="col">Range or options</th><th scope="col">Default</th></tr></thead><tbody><tr><th scope="row">start scale</th><td>0 to 4</td><td>1</td></tr><tr><th scope="row">end scale</th><td>0 to 4</td><td>1</td></tr><tr><th scope="row">twist</th><td>-1080 to 1080</td><td>0</td></tr><tr><th scope="row">caps</th><td>on or off</td><td>on</td></tr><tr><th scope="row">profile radius</th><td>0.002 to 2</td><td>0.100000001</td></tr><tr><th scope="row">profile sides</th><td>3 to 64</td><td>12</td></tr></tbody></table></div>

@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Shade Math node: controls, inputs and a free patch</title>
-  <meta name="description" content="Shade Math is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.">
+  <meta name="description" content="Scalar maths on A, B and C: add, subtract, multiply, divide, power, logarithm, roots, absolute value, min and max, comparisons, smooth min and max, rounding.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/shade-math.html">
   <meta property="og:title" content="Shade Math node: controls, inputs and a free patch">
-  <meta property="og:description" content="Shade Math is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.">
+  <meta property="og:description" content="Scalar maths on A, B and C: add, subtract, multiply, divide, power, logarithm, roots, absolute value, min and max, comparisons, smooth min and max, rounding.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/shade-math.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/shade-math.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Shade Math node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Shade Math is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.">
+  <meta name="twitter:description" content="Scalar maths on A, B and C: add, subtract, multiply, divide, power, logarithm, roots, absolute value, min and max, comparisons, smooth min and max, rounding.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/shade-math.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Shade Math node: controls, inputs and a free patch", "description": "Shade Math is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/shade-math.html", "image": "https://infinitedevices.org/assets/nodes/hd/shade-math.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Shader", "mainEntityOfPage": "https://infinitedevices.org/nodes/shade-math.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Shade Math node: controls, inputs and a free patch", "description": "Scalar maths on A, B and C: add, subtract, multiply, divide, power, logarithm, roots, absolute value, min and max, comparisons, smooth min and max, rounding.", "url": "https://infinitedevices.org/nodes/shade-math.html", "image": "https://infinitedevices.org/assets/nodes/hd/shade-math.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Shader", "mainEntityOfPage": "https://infinitedevices.org/nodes/shade-math.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Shade Math", "item": "https://infinitedevices.org/nodes/shade-math.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Shade Math Node", "description": "Shade Math is a shader node: it works out how a surface looks, from light, normals and textures. A free Infinite node with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/shade-math.webp", "category": "Shader", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/shade-math.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Shade Math Node", "description": "Scalar maths on A, B and C: add, subtract, multiply, divide, power, logarithm, roots, absolute value, min and max, comparisons, smooth min and max, rounding.", "image": "https://infinitedevices.org/assets/nodes/hd/shade-math.webp", "category": "Shader", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/shade-math.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -117,44 +117,18 @@
         <header class="post-head">
           <p class="post-kicker mono np-cat" style="--cat:#F472B6">Shader node</p>
           <h1>Shade Math</h1>
-          <p class="post-lede">Shade Math is a shader node: it works out how a surface looks, from light, normals and textures. It takes picture in and gives picture out. Its controls include op, a, b, clamp.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/shade-math.inf" download>Download the patch</a><a class="btn btn-ghost" href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Read it in the Field Guide</a></p>
+          <p class="post-lede">Scalar maths on A, B and C: add, subtract, multiply, divide, power, logarithm, roots, absolute value, min and max, comparisons, smooth min and max, rounding, modulo, wrap, snap, ping-pong, sine, cosine, tangent and their inverses, hyperbolic functions, and degree-to-radian conversion. Only the operands the operation reads are shown. A and B (-10 to 10, default 0.5), C (default 0). Clamp limits the result to 0 to 1. Everyday use: turn one number into another, like scaling a value or wrapping an angle. Also called a calculator.</p>
+          <p class="cta-row"><a class="btn btn-ghost" href="../manual/#node-shade-math">Read in the manual</a></p>
         </header>
         <figure class="np-shot" style="--cat:#F472B6"><img src="../assets/nodes/hd/shade-math.webp" alt="The Shade Math node in Infinite, showing its inputs, controls and outputs." width="476" height="720" decoding="async"></figure>
         <div class="prose">
           <h2 id="what">What it does</h2>
           <p>Shade Math is a shader node: it works out how a surface looks, from light, normals and textures. It takes picture in and gives picture out.</p>
-          
+          <h2 id="try-it">Try it</h2><p>Set Operation to Wrap and feed a ramp into A for a repeating stripe.</p><p class="np-chain" aria-label="A chain that uses this node"><a class="np-step" href="shade-coord.html">Shade Coord</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="shade-math.html">Shade Math</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="shade-mix.html">Shade Mix</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="material.html">Material</a></p>
           <h2 id="io">Inputs and outputs</h2>
           <div class="np-io"><div><h3>Inputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> a</li><li><span class="np-kind" data-kind="picture">picture</span> b</li><li><span class="np-kind" data-kind="picture">picture</span> c</li></ul></div><div><h3>Outputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> out</li></ul></div></div>
           <h2 id="controls">Controls</h2><p>Every control with a range can be driven by a modulator, a note, an audio level or a sketch.</p><div class="np-table"><table><thead><tr><th scope="col">Control</th><th scope="col">Range or options</th><th scope="col">Default</th></tr></thead><tbody><tr><th scope="row">op</th><td>Add, Subtract, Multiply, Divide, Multiply Add, Power, Logarithm, Square Root …</td><td>0</td></tr><tr><th scope="row">a</th><td>-10 to 10</td><td>0.5</td></tr><tr><th scope="row">b</th><td>-10 to 10</td><td>0.5</td></tr><tr><th scope="row">clamp</th><td>on or off</td><td>off</td></tr></tbody></table></div>
-          <h2 id="patch">Example patch</h2><p>This patch wires Shade Math to what it needs and shows the result. Download it, then use File, Open in Infinite, or read it here: it is plain text.</p><pre><code>infinite-patch 1
-rev 2
-# Shade Math: a starting patch for the Shade Math node
-node 1 Shader Shade Math
-  id node
-  pos 520 300
-end
-node 2 Source Ramp
-  id in0
-  pos 0 220
-end
-node 3 Source Ramp
-  id in1
-  pos 0 510
-end
-node 4 Source Ramp
-  id in2
-  pos 0 800
-end
-node 5 Utility Output
-  id out
-  pos 1080 300
-end
-cable node 0 in0
-cable node 1 in1
-cable node 2 in2
-cable out 0 node</code></pre>
+          
         </div>
         <aside class="post-cta" aria-label="Try Infinite">
           <p class="hand">your turn</p>

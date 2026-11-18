@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Ocean node: controls, inputs and a free patch</title>
-  <meta name="description" content="Ocean is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.">
+  <meta name="description" content="A simulated ocean surface mesh built from Gerstner-style waves. A free 3d node in Infinite, with its controls and an example patch.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/ocean.html">
   <meta property="og:title" content="Ocean node: controls, inputs and a free patch">
-  <meta property="og:description" content="Ocean is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.">
+  <meta property="og:description" content="A simulated ocean surface mesh built from Gerstner-style waves. A free 3d node in Infinite, with its controls and an example patch.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/ocean.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/ocean.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Ocean node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Ocean is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.">
+  <meta name="twitter:description" content="A simulated ocean surface mesh built from Gerstner-style waves. A free 3d node in Infinite, with its controls and an example patch.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/ocean.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Ocean node: controls, inputs and a free patch", "description": "Ocean is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/ocean.html", "image": "https://infinitedevices.org/assets/nodes/hd/ocean.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "3D", "mainEntityOfPage": "https://infinitedevices.org/nodes/ocean.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Ocean node: controls, inputs and a free patch", "description": "A simulated ocean surface mesh built from Gerstner-style waves. A free 3d node in Infinite, with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/ocean.html", "image": "https://infinitedevices.org/assets/nodes/hd/ocean.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "3D", "mainEntityOfPage": "https://infinitedevices.org/nodes/ocean.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Ocean", "item": "https://infinitedevices.org/nodes/ocean.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Ocean Node", "description": "Ocean is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/ocean.webp", "category": "3D", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/ocean.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Ocean Node", "description": "A simulated ocean surface mesh built from Gerstner-style waves. A free 3d node in Infinite, with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/ocean.webp", "category": "3D", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/ocean.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -117,14 +117,14 @@
         <header class="post-head">
           <p class="post-kicker mono np-cat" style="--cat:#38BDF8">3D node</p>
           <h1>Ocean</h1>
-          <p class="post-lede">Ocean is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. It takes picture in and gives 3D shape out. Its controls include resolution, size, amplitude, wavelength.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/ocean.inf" download>Download the patch</a><a class="btn btn-ghost" href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Read it in the Field Guide</a></p>
+          <p class="post-lede">A simulated ocean surface mesh built from Gerstner-style waves. Resolution (8 to 300, default 96) sets the grid and Size (0.5 to 20, default 4) its footprint. Amplitude (0 to 1, default 0.12) is the wave height, Wavelength (0.1 to 8, default 2) the spacing, Steepness (0 to 2) how peaked the crests get, and Choppiness (0 to 2) how far they pinch. Direction (degrees, default 34.4) is the heading, Octaves (1 to 8, default 4) layers finer swell on top, Speed (-3 to 3) sets how fast it moves, and Horizon (1 to 100) how far the surface reaches. Everyday use: a sea or lake behind a boat in a 3D scene. Also called water, waves or a sea surface.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/ocean.inf" download>Download the patch</a><a class="btn btn-ghost" href="../manual/#node-ocean">Read in the manual</a></p>
         </header>
         <figure class="np-shot" style="--cat:#38BDF8"><img src="../assets/nodes/hd/ocean.webp" alt="The Ocean node in Infinite, showing its inputs, controls and outputs." width="476" height="720" decoding="async"></figure>
         <div class="prose">
           <h2 id="what">What it does</h2>
           <p>Ocean is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. It takes picture in and gives 3D shape out.</p>
-          
+          <h2 id="try-it">Try it</h2><p>Raise Octaves to 6 and Steepness to 1.4 for a choppy sea under a sky.</p><p class="np-chain" aria-label="A chain that uses this node"><a class="np-step" href="ocean.html">Ocean</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="render-3d.html">Render 3D</a></p>
           <h2 id="io">Inputs and outputs</h2>
           <div class="np-io"><div><h3>Inputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> texture</li></ul></div><div><h3>Outputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="3D shape">3D shape</span> out</li></ul></div></div>
           <h2 id="controls">Controls</h2><p>Every control with a range can be driven by a modulator, a note, an audio level or a sketch.</p><div class="np-table"><table><thead><tr><th scope="col">Control</th><th scope="col">Range or options</th><th scope="col">Default</th></tr></thead><tbody><tr><th scope="row">resolution</th><td>8 to 300</td><td>96</td></tr><tr><th scope="row">size</th><td>0.5 to 20</td><td>4</td></tr><tr><th scope="row">amplitude</th><td>0 to 1</td><td>0.119999997</td></tr><tr><th scope="row">wavelength</th><td>0.1 to 8</td><td>2</td></tr><tr><th scope="row">steepness</th><td>0 to 2</td><td>1</td></tr><tr><th scope="row">direction</th><td>-180 to 180</td><td>34.3774986</td></tr><tr><th scope="row">choppiness</th><td>0 to 2</td><td>1</td></tr><tr><th scope="row">octaves</th><td>1 to 8</td><td>4</td></tr><tr><th scope="row">speed</th><td>-3 to 3</td><td>1</td></tr><tr><th scope="row">horizon</th><td>1 to 100</td><td>1</td></tr></tbody></table></div>

@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Difference node: controls, inputs and a free patch</title>
-  <meta name="description" content="Difference is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.">
+  <meta name="description" content="Boolean difference: subtracts every input after the first from the first, like a cookie cutter. A free Infinite node with its controls and an example patch.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/difference.html">
   <meta property="og:title" content="Difference node: controls, inputs and a free patch">
-  <meta property="og:description" content="Difference is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.">
+  <meta property="og:description" content="Boolean difference: subtracts every input after the first from the first, like a cookie cutter. A free Infinite node with its controls and an example patch.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/difference.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/difference.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Difference node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Difference is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.">
+  <meta name="twitter:description" content="Boolean difference: subtracts every input after the first from the first, like a cookie cutter. A free Infinite node with its controls and an example patch.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/difference.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Difference node: controls, inputs and a free patch", "description": "Difference is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/difference.html", "image": "https://infinitedevices.org/assets/nodes/hd/difference.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "3D", "mainEntityOfPage": "https://infinitedevices.org/nodes/difference.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Difference node: controls, inputs and a free patch", "description": "Boolean difference: subtracts every input after the first from the first, like a cookie cutter. A free Infinite node with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/difference.html", "image": "https://infinitedevices.org/assets/nodes/hd/difference.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "3D", "mainEntityOfPage": "https://infinitedevices.org/nodes/difference.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Difference", "item": "https://infinitedevices.org/nodes/difference.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Difference Node", "description": "Difference is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. A free Infinite node with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/difference.webp", "category": "3D", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/difference.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Difference Node", "description": "Boolean difference: subtracts every input after the first from the first, like a cookie cutter. A free Infinite node with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/difference.webp", "category": "3D", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/difference.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -117,14 +117,14 @@
         <header class="post-head">
           <p class="post-kicker mono np-cat" style="--cat:#38BDF8">3D node</p>
           <h1>Difference</h1>
-          <p class="post-lede">Difference is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. It takes 3D shape in and gives 3D shape out. Its controls include mode, material from input.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/difference.inf" download>Download the patch</a><a class="btn btn-ghost" href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Read it in the Field Guide</a></p>
+          <p class="post-lede">Boolean difference: subtracts every input after the first from the first, like a cookie cutter. It opens on the Difference mode of the same boolean node. Needs closed, manifold input. Material From picks the material. Everyday use: cut a hole or a shape out of a solid, such as drilling through a block. Also called a boolean subtract or a cut.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/difference.inf" download>Download the patch</a><a class="btn btn-ghost" href="../manual/#node-difference">Read in the manual</a></p>
         </header>
         <figure class="np-shot" style="--cat:#38BDF8"><img src="../assets/nodes/hd/difference.webp" alt="The Difference node in Infinite, showing its inputs, controls and outputs." width="620" height="720" decoding="async"></figure>
         <div class="prose">
           <h2 id="what">What it does</h2>
           <p>Difference is a 3D node: it builds, changes or lights geometry that Render 3D turns into a picture. It takes 3D shape in and gives 3D shape out.</p>
-          
+          <h2 id="try-it">Try it</h2><p>Subtract a sphere from a cube for a scooped block.</p><p class="np-chain" aria-label="A chain that uses this node"><a class="np-step" href="cube.html">Cube</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="sphere.html">Sphere</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="difference.html">Difference</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="render-3d.html">Render 3D</a></p>
           <h2 id="io">Inputs and outputs</h2>
           <div class="np-io"><div><h3>Inputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="3D shape">3D shape</span> geo A</li><li><span class="np-kind" data-kind="3D shape">3D shape</span> geo B</li><li><span class="np-kind" data-kind="3D shape">3D shape</span> geo C</li><li><span class="np-kind" data-kind="3D shape">3D shape</span> geo D</li></ul></div><div><h3>Outputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="3D shape">3D shape</span> out</li></ul></div></div>
           <h2 id="controls">Controls</h2><p>Every control with a range can be driven by a modulator, a note, an audio level or a sketch.</p><div class="np-table"><table><thead><tr><th scope="col">Control</th><th scope="col">Range or options</th><th scope="col">Default</th></tr></thead><tbody><tr><th scope="row">mode</th><td>Merge, Union, Intersect, Difference</td><td>3</td></tr><tr><th scope="row">material from input</th><td>0 to 3</td><td>0</td></tr></tbody></table></div>

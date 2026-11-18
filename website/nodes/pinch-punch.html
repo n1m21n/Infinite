@@ -7,17 +7,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Pinch Punch node: controls, inputs and a free patch</title>
-  <meta name="description" content="Three separate optical-warp nodes: Twirl spins a vortex around a center point, Pinch/Punch magnifies or implodes like a lens, and Ripple sends concentric water.">
+  <meta name="description" content="Pulls pixels toward a centre point (pinch) or pushes them outward (punch). A free effects node in Infinite, with its controls and an example patch.">
   <link rel="canonical" href="https://infinitedevices.org/nodes/pinch-punch.html">
   <meta property="og:title" content="Pinch Punch node: controls, inputs and a free patch">
-  <meta property="og:description" content="Three separate optical-warp nodes: Twirl spins a vortex around a center point, Pinch/Punch magnifies or implodes like a lens, and Ripple sends concentric water.">
+  <meta property="og:description" content="Pulls pixels toward a centre point (pinch) or pushes them outward (punch). A free effects node in Infinite, with its controls and an example patch.">
   <meta property="og:image" content="https://infinitedevices.org/assets/nodes/hd/pinchpunch.webp">
   <meta property="og:url" content="https://infinitedevices.org/nodes/pinch-punch.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Pinch Punch node: controls, inputs and a free patch">
-  <meta name="twitter:description" content="Three separate optical-warp nodes: Twirl spins a vortex around a center point, Pinch/Punch magnifies or implodes like a lens, and Ripple sends concentric water.">
+  <meta name="twitter:description" content="Pulls pixels toward a centre point (pinch) or pushes them outward (punch). A free effects node in Infinite, with its controls and an example patch.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/nodes/hd/pinchpunch.webp">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -31,9 +31,9 @@
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Pinch Punch node: controls, inputs and a free patch", "description": "Three separate optical-warp nodes: Twirl spins a vortex around a center point, Pinch/Punch magnifies or implodes like a lens, and Ripple sends concentric water.", "url": "https://infinitedevices.org/nodes/pinch-punch.html", "image": "https://infinitedevices.org/assets/nodes/hd/pinchpunch.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Effects", "mainEntityOfPage": "https://infinitedevices.org/nodes/pinch-punch.html"}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Pinch Punch node: controls, inputs and a free patch", "description": "Pulls pixels toward a centre point (pinch) or pushes them outward (punch). A free effects node in Infinite, with its controls and an example patch.", "url": "https://infinitedevices.org/nodes/pinch-punch.html", "image": "https://infinitedevices.org/assets/nodes/hd/pinchpunch.webp", "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": "https://infinitedevices.org/", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux"}, "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"}, "inLanguage": "en", "isAccessibleForFree": true, "articleSection": "Effects", "mainEntityOfPage": "https://infinitedevices.org/nodes/pinch-punch.html"}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": "https://infinitedevices.org/nodes/"}, {"@type": "ListItem", "position": 3, "name": "Pinch Punch", "item": "https://infinitedevices.org/nodes/pinch-punch.html"}]}</script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Pinch Punch Node", "description": "Three separate optical-warp nodes: Twirl spins a vortex around a center point, Pinch/Punch magnifies or implodes like a lens, and Ripple sends concentric water.", "image": "https://infinitedevices.org/assets/nodes/hd/pinchpunch.webp", "category": "Effects", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/pinch-punch.html"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Pinch Punch Node", "description": "Pulls pixels toward a centre point (pinch) or pushes them outward (punch). A free effects node in Infinite, with its controls and an example patch.", "image": "https://infinitedevices.org/assets/nodes/hd/pinchpunch.webp", "category": "Effects", "brand": {"@type": "Brand", "name": "Infinite"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://infinitedevices.org/nodes/pinch-punch.html"}}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
@@ -117,14 +117,14 @@
         <header class="post-head">
           <p class="post-kicker mono np-cat" style="--cat:#FACC15">Effects node</p>
           <h1>Pinch Punch</h1>
-          <p class="post-lede">Three separate optical-warp nodes: Twirl spins a vortex around a center point, Pinch/Punch magnifies or implodes like a lens, and Ripple sends concentric water rings out from a point. Chain any of them together for compound warps.</p>
-          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/pinch-punch.inf" download>Download the patch</a><a class="btn btn-ghost" href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Read it in the Field Guide</a></p>
+          <p class="post-lede">Pulls pixels toward a centre point (pinch) or pushes them outward (punch). Amount below 1 pinches inward and above 1 punches outward; the default 1.5 punches. Radius (0.05 to 1) sets the reach, and Center X and Center Y set where it sits. Everyday use: a bulge or a fisheye-style lens warp. Also called a bulge, a pinch or a magnifying lens.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../assets/nodes/patches/pinch-punch.inf" download>Download the patch</a><a class="btn btn-ghost" href="../manual/#node-pinchpunch">Read in the manual</a></p>
         </header>
         <figure class="np-shot" style="--cat:#FACC15"><img src="../assets/nodes/hd/pinchpunch.webp" alt="The Pinch Punch node in Infinite, showing its inputs, controls and outputs." width="476" height="720" decoding="async"></figure>
         <div class="prose">
           <h2 id="what">What it does</h2>
           <p>Pinch Punch is an image effect: it changes the picture that flows through it. It takes picture in and gives picture out.</p>
-          <h2 id="try-it">Try it</h2><p>Map your Macro XY trackpad to Twirl&#x27;s angle and &quot;paint&quot; the swirl live during a performance.</p><p class="np-chain" aria-label="A chain that uses this node"><span class="np-step">XY Motion Pad</span><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="twirl.html">Twirl (Angle)</a><span class="np-arrow" aria-hidden="true">&rarr;</span><span class="np-step">Live Video</span></p>
+          <h2 id="try-it">Try it</h2><p>Animate Amount between 0.5 and 2 with an LFO for a bulge that pulses in the middle of a face.</p><p class="np-chain" aria-label="A chain that uses this node"><a class="np-step" href="video.html">Video</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="pinch-punch.html">pinchpunch</a><span class="np-arrow" aria-hidden="true">&rarr;</span><a class="np-step" href="output.html">Output</a></p>
           <h2 id="io">Inputs and outputs</h2>
           <div class="np-io"><div><h3>Inputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> input</li></ul></div><div><h3>Outputs</h3><ul class="np-ports"><li><span class="np-kind" data-kind="picture">picture</span> out</li></ul></div></div>
           <h2 id="controls">Controls</h2><p>Every control with a range can be driven by a modulator, a note, an audio level or a sketch.</p><div class="np-table"><table><thead><tr><th scope="col">Control</th><th scope="col">Range or options</th><th scope="col">Default</th></tr></thead><tbody><tr><th scope="row">amount</th><td>0.1 to 4</td><td>1.5</td></tr><tr><th scope="row">radius</th><td>0.05 to 1</td><td>0.5</td></tr><tr><th scope="row">center x</th><td>0 to 1</td><td>0.5</td></tr><tr><th scope="row">center y</th><td>0 to 1</td><td>0.5</td></tr></tbody></table></div>
