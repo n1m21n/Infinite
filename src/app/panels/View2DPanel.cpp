@@ -153,6 +153,8 @@ namespace
    bool sCloneAll = false;         // clone / heal: copy from the whole picture
    bool sGradReverse = false;      // gradient runs background to foreground
    double sCloneAsk = -10.0;       // clone stamp pressed without a source: a canvas note says how to set one
+   std::string sExportNote;         // after a PSD export: what Photoshop gets as pixels or not at all
+   double sExportNoteT = -10.0;
    double sGroupPickAsk = -10.0;   // eraser/retouch on an empty/locked group: a canvas note says "Pick a layer"
    struct GroupStrokePt { float x = 0.0f, y = 0.0f, p = 1.0f; };
    std::vector<int> sGroupStrokeIds;
@@ -255,7 +257,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -385,16 +387,58 @@ namespace
          return std::string(T("Vector")) + " " + std::to_string(l.id);
       if (l.kind == Kind::Text)
       {
-         std::string first = l.text.substr(0, l.text.find('\n'));
-         if (first.size() > 28)
-            first = first.substr(0, 28) + "...";
+         bool cut = false;
+         std::string first = Scene2DNode::TextName(l.text, 28, &cut);
+         if (cut)
+            first += "...";
          return first.empty() ? std::string(T("Text")) + " " + std::to_string(l.id) : first;
       }
       GraphNode* gn = FindNodeByUid(l.uid);
       return gn != nullptr ? gn->typeName + " " + std::to_string(gn->index) : std::string(T("source missing"));
    }
 
-   bool Movable(const Layer& l) { return (l.lock & (Scene2DNode::kLockPosition | Scene2DNode::kLockAll)) == 0; }
+   // A layer's locks with its groups' locks: a locked group locks every layer in it (Photoshop).
+   // A document's text with its live selection dropped (saved selections stay): a duplicate starts with none.
+   std::string DocTextWithoutSelection(const std::string& text)
+   {
+      std::string out;
+      size_t at = 0;
+      while (at < text.size())
+      {
+         size_t nl = text.find('\n', at);
+         nl = nl == std::string::npos ? text.size() : nl + 1;
+         if (text.compare(at, 4, "sel ") != 0)
+            out.append(text, at, nl - at);
+         at = nl;
+      }
+      return out;
+   }
+
+   // A lock chip's click. Locking image pixels clears the transparency lock and holds it off while on (Photoshop).
+   unsigned ToggledLock(unsigned lock, unsigned bit)
+   {
+      if (bit == Scene2DNode::kLockAlpha && (lock & Scene2DNode::kLockPixels) != 0)
+         return lock;
+      lock ^= bit;
+      if (bit == Scene2DNode::kLockPixels && (lock & Scene2DNode::kLockPixels) != 0)
+         lock &= ~(unsigned)Scene2DNode::kLockAlpha;
+      return lock;
+   }
+
+   int LockOf(Scene2DNode* doc, const Layer& l)
+   {
+      int lock = l.lock;
+      for (int p = l.parent, guard = 0; p != 0 && guard < 64; guard++)
+      {
+         const Layer* g = doc->FindLayer(p);
+         if (g == nullptr)
+            break;
+         lock |= g->lock;
+         p = g->parent;
+      }
+      return lock;
+   }
+   bool Movable(Scene2DNode* doc, const Layer& l) { return (LockOf(doc, l) & (Scene2DNode::kLockPosition | Scene2DNode::kLockAll)) == 0; }
 
    // ---- view mapping ----------------------------------------------------
 
@@ -534,7 +578,7 @@ namespace
       {
          const Layer& l = layers[i];
          if ((l.kind != Kind::Node && l.kind != Kind::Paint && l.kind != Kind::Vector && l.kind != Kind::Text) || !doc->Shown(l) ||
-             (l.lock & Scene2DNode::kLockAll) != 0)
+             (LockOf(doc, l) & Scene2DNode::kLockAll) != 0)
             continue;
          if (l.kind == Kind::Vector)
          {
@@ -544,7 +588,8 @@ namespace
             for (const Scene2DNode::Shape& s : l.shapes)
             {
                float lo[2], hi[2];
-               if (Scene2DNode::ShapeBounds(s, lo, hi) && bx >= lo[0] && bx <= hi[0] && by >= lo[1] && by <= hi[1])
+               if (Scene2DNode::ShapeBounds(s, lo, hi) && bx >= lo[0] && bx <= hi[0] && by >= lo[1] && by <= hi[1] &&
+                   (s.type == Scene2DNode::Shape::kSvg || Scene2DNode::ShapeHit(s, bx, by, 2.0f)))
                   return l.id;
             }
             continue;
@@ -631,7 +676,7 @@ namespace
       for (const Layer& l : doc->Layers())
       {
          if (l.kind == Kind::Group || l.kind == Kind::Fill || l.kind == Kind::Adjust || !doc->Shown(l) ||
-             (l.lock & Scene2DNode::kLockAll) != 0)
+             (LockOf(doc, l) & Scene2DNode::kLockAll) != 0)
             continue;
          float lo[2], hi[2];
          if (PickBox(doc, l, lo, hi) && hi[0] >= x0 && lo[0] <= x1 && hi[1] >= y0 && lo[1] <= y1 && !Selected(l.id))
@@ -665,7 +710,7 @@ namespace
       std::vector<int> out;
       for (const Layer& l : doc->Layers())
       {
-         if (l.kind == Kind::Group || !Movable(l))
+         if (l.kind == Kind::Group || !Movable(doc, l))
             continue;
          for (int id : sSel)
             if (doc->IsInside(l.id, id))
@@ -721,7 +766,7 @@ namespace
    // Any pixel with alpha in [lo, hi] (document px) of this layer's own picture.
    bool InkIn(Scene2DNode* doc, const Layer& l, float lo[2], float hi[2])
    {
-      if (!InkKind(l) || !doc->Shown(l) || (l.lock & Scene2DNode::kLockAll) != 0)
+      if (!InkKind(l) || !doc->Shown(l) || (LockOf(doc, l) & Scene2DNode::kLockAll) != 0)
          return false;
       // Cheap rejects before reading pixels back: an empty paint layer, a vector layer with no shape near.
       if (l.kind == Kind::Paint && std::all_of(l.tiles.begin(), l.tiles.end(), [](const std::string& k) { return k == "-"; }))
@@ -785,8 +830,30 @@ namespace
          sSel.push_back(id);
    }
 
+   bool CanLift(Scene2DNode* doc);
+   bool LiftSelection(Scene2DNode* doc);
+
    void Nudge(Scene2DNode* doc, float dx, float dy)
    {
+      // With a marquee on a paint layer the arrows move the selected pixels, as a drag does (Photoshop;
+      // PhotoCraft nudging_away_and_back_keeps_the_moved_pixels_selection). It goes down at the frame's end.
+      if (CanLift(doc))
+      {
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint("Nudge selection");
+         if (!LiftSelection(doc))
+            gUndoStack.resize(undo0);
+         else
+         {
+            if (Layer* f = doc->FindLayer(sSel.front()))
+            {
+               f->x += dx;
+               f->y += dy;
+            }
+            Touch();
+            return;
+         }
+      }
       std::vector<int> ids = MovingIds(doc);
       if (ids.empty())
          return;
@@ -839,7 +906,7 @@ namespace
          const float have = side == 0 ? a[axis] : side == 1 ? (a[axis] + b[axis]) * 0.5f : b[axis];
          const float d = want - have;
          for (Layer& l : doc->Layers())
-            if (l.kind != Kind::Group && Movable(l) && doc->IsInside(l.id, id))
+            if (l.kind != Kind::Group && Movable(doc, l) && doc->IsInside(l.id, id))
                (axis == 0 ? l.x : l.y) += d;
       }
       Touch();
@@ -864,7 +931,7 @@ namespace
       {
          const float d = first + step * (float)i - order[i].first;
          for (Layer& l : doc->Layers())
-            if (l.kind != Kind::Group && Movable(l) && doc->IsInside(l.id, order[i].second))
+            if (l.kind != Kind::Group && Movable(doc, l) && doc->IsInside(l.id, order[i].second))
                (axis == 0 ? l.x : l.y) += d;
       }
       Touch();
@@ -876,31 +943,79 @@ namespace
          return;
       PushUndoCheckpoint("Delete layer");
       for (int id : std::vector<int>(sSel))
-         if (doc->FindLayer(id) != nullptr)
+         if (const Layer* l = doc->FindLayer(id))
+         {
+            // A deleted clip base releases the layers clipped to it (Photoshop), not hands them to the next one down.
+            if (!l->clip)
+            {
+               const std::vector<int> kids = doc->ChildrenOf(l->parent);
+               for (auto it = std::find(kids.begin(), kids.end(), id) + 1; it < kids.end(); ++it)
+               {
+                  Layer* up = doc->FindLayer(*it);
+                  if (up == nullptr || !up->clip)
+                     break;
+                  if (std::find(sSel.begin(), sSel.end(), *it) == sSel.end())
+                     up->clip = false;
+               }
+            }
             doc->RemoveLayer(id);
+         }
       sSel.clear();
+   }
+
+   // A new layer goes above the active one; with an open group active it goes inside the group, on top
+   // (Photoshop). AddLayer already places it past the group's children, so only its parent changes.
+   int NewAbove(Scene2DNode* doc)
+   {
+      const Layer* a = Active(doc);
+      return a != nullptr ? a->id : 0;
+   }
+
+   // Call right after a layer was added above NewAbove(doc), before the active layer changes.
+   Layer& PlaceNew(Scene2DNode* doc, int id)
+   {
+      const Layer* a = Active(doc);
+      const int into = a != nullptr && a->kind == Kind::Group && a->open ? a->id : 0;
+      if (into != 0)
+         doc->FindLayer(id)->parent = into;
+      // It joins the clip group it lands in: clipped when the layer just above its slot is (Photoshop; PhotoCraft
+      // new_layer_joins_the_group_it_lands_in: "B C*" with C active gives "B C* N").
+      const std::vector<int> kids = doc->ChildrenOf(doc->FindLayer(id)->parent);
+      const auto at = std::find(kids.begin(), kids.end(), id) - kids.begin();
+      const Layer* over = at + 1 < (long)kids.size() ? doc->FindLayer(kids[at + 1]) : nullptr;
+      Layer& l = *doc->FindLayer(id);
+      l.clip = over != nullptr && over->clip;
+      return l;
+   }
+
+   Layer& NewLayerAt(Scene2DNode* doc, Kind kind, uint64_t uid)
+   {
+      return PlaceNew(doc, doc->AddLayer(kind, uid, NewAbove(doc)).id);
    }
 
    void AddPaint(Scene2DNode* doc)
    {
       PushUndoCheckpoint("New layer");
-      Layer* a = Active(doc);
-      SelectOnly(doc->AddPaintLayer(a != nullptr && a->kind != Kind::Group ? a->id : 0));
+      const int id = NewLayerAt(doc, Kind::Paint, 0).id;
+      doc->Commit();
+      SelectOnly(id);
    }
 
    void AddFill(Scene2DNode* doc)
    {
       PushUndoCheckpoint("New fill layer");
-      Layer* a = Active(doc);
-      Layer& l = doc->AddLayer(Kind::Fill, 0, a != nullptr ? a->id : 0);
-      SelectOnly(l.id);
+      const int id = NewLayerAt(doc, Kind::Fill, 0).id;
+      doc->Commit();
+      // A marquee masks the new fill to it, as it does a new adjustment (Photoshop).
+      if (doc->HasSelection() && !doc->quickMask && doc->MaskFromSelection(id))
+         doc->Deselect();   // the selection went into the mask: it is dropped (Photoshop, PhotoCraft #1250)
+      SelectOnly(id);
    }
 
    void AddAdjust(Scene2DNode* doc, int type)
    {
       PushUndoCheckpoint("New adjustment layer");
-      Layer* a = Active(doc);
-      Layer& l = doc->AddLayer(Kind::Adjust, 0, a != nullptr ? a->id : 0);
+      Layer& l = NewLayerAt(doc, Kind::Adjust, 0);
       l.adjType = std::clamp(type, 0, Scene2DNode::kAdjCount - 1);
       l.adjAmt = l.adjTo = Scene2DNode::AdjDefault(l.adjType);
       if (l.adjType == Scene2DNode::kAdjGradientMap)
@@ -911,8 +1026,8 @@ namespace
       }
       const int id = l.id;
       doc->Commit();
-      if (doc->HasSelection())
-         doc->MaskFromSelection(id);
+      if (doc->HasSelection() && !doc->quickMask && doc->MaskFromSelection(id))
+         doc->Deselect();   // the selection went into the mask: it is dropped (Photoshop, PhotoCraft #1250)
       SelectOnly(id);
    }
 
@@ -922,8 +1037,7 @@ namespace
       GraphNode* gn = FindNodeByUid(uid);
       if (gn == nullptr || !View2DCanAdd(*gn))
          return 0;
-      Layer* a = Active(doc);
-      Layer& l = doc->AddLayer(Kind::Node, uid, a != nullptr && a->kind != Kind::Group ? a->id : 0);
+      Layer& l = NewLayerAt(doc, Kind::Node, uid);
       l.is3d = Is3DNode(gn->node.get());
       if (at != nullptr)
       {
@@ -1126,19 +1240,17 @@ namespace
          return;
       if (sModNext.driven)
          ImGui::EndDisabled();
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      // Modulation lives on the Graph Canvas (the Scene 2D node); the 2D View only shows that a field is driven.
+      // A click on a driven field jumps to its node.
+      if (sModNext.driven && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
       {
-         Scene2DNode* doc = FindDoc();
-         const int ni = DocNodeIndex();
-         const int slot = sModNext.slot >= 0 ? (ni >= 0 ? sModNext.slot : -1)
-                          : doc != nullptr && ni >= 0 ? doc->SlotFor(sModNext.layer, sModNext.field, true) : -1;
-         if (slot >= 0)
-         {
-            gModBindingMenuNode = ni;
-            gModBindingMenuParam = slot;
-            gOpenModBindingMenu = true;
-            gParamRightClickConsumedThisFrame = true;
-         }
+         ImGui::SetTooltip("%s", T("Driven on canvas"));
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            if (const int ni = DocNodeIndex(); ni >= 0)
+            {
+               gRequestSelectNodeIndex = ni;
+               gRequestFitViewNodeIndex = ni;
+            }
       }
       sModNext = {};
    }
@@ -2082,14 +2194,14 @@ namespace
          const int dup = doc->Duplicate(src);
          nid = dup > 0 ? doc->RasterizeNodeLayer(dup, ++sCopyFrame) : 0;
          if (nid == 0 && dup > 0)
-            doc->RemoveLayer(dup);
+            doc->RemoveLayer(dup, false);
       }
       else
       {
          nid = doc->Duplicate(src);
          if (nid > 0 && !doc->RasterizeLayer(nid))
          {
-            doc->RemoveLayer(nid);
+            doc->RemoveLayer(nid, false);
             nid = 0;
          }
       }
@@ -2127,6 +2239,7 @@ namespace
       Layer at;                          // the floating layer as it was lifted
       std::vector<std::string> tiles;    // the source's pixels before the cut
       std::vector<uint8_t> sel;          // the marquee before the move
+      uint64_t docUid = 0;               // the document it floats in
    } sFloat;
 
    bool CanLift(Scene2DNode* doc)
@@ -2134,8 +2247,8 @@ namespace
       if (sFloat.id != 0 || sSel.size() != 1 || !SelectionActsOnPixels(doc))
          return false;
       const Layer* a = Active(doc);
-      return a != nullptr && a->kind == Kind::Paint && !a->is3d && Movable(*a) &&
-             (a->lock & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) == 0;
+      return a != nullptr && a->kind == Kind::Paint && !a->is3d && Movable(doc, *a) &&
+             (LockOf(doc, *a) & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) == 0;
    }
 
    // Call after the action's undo checkpoint. False: nothing lifted, the action takes whole layers.
@@ -2148,10 +2261,26 @@ namespace
       f.src = a->id;
       f.tiles = a->tiles;
       f.sel = doc->SelectionPixels();
+      // A transparency lock does not stop the pixels floating (PhotoCraft locked_for_float): the cut is let
+      // through it, then the locks go back as they were.
+      std::vector<std::pair<int, unsigned>> held;
+      for (int id = a->id, guard = 0; id != 0 && guard < 64; guard++)
+      {
+         Layer* l = doc->FindLayer(id);
+         if (l == nullptr)
+            break;
+         held.emplace_back(id, l->lock);
+         l->lock &= ~(unsigned)Scene2DNode::kLockAlpha;
+         id = l->parent;
+      }
       f.id = SelectionToLayer(doc, true);
+      for (const auto& [id, lock] : held)
+         if (Layer* l = doc->FindLayer(id))
+            l->lock = lock;
       if (f.id == 0)
          return false;
       f.at = *doc->FindLayer(f.id);
+      f.docUid = sDocUid;
       sFloat = std::move(f);
       SelectOnly(sFloat.id);
       return true;
@@ -2178,7 +2307,7 @@ namespace
       if (!moved)
       {
          sl->tiles = f.tiles;
-         doc->RemoveLayer(f.id);
+         doc->RemoveLayer(f.id, false);
          doc->Commit();
       }
       else
@@ -2228,7 +2357,12 @@ namespace
          if (const Layer* l = doc->FindLayer(id))
             sFreeT.before.push_back(*l);
       if (sFreeT.before.empty())
+      {
+         DropFloat(doc);
+         if (lift)
+            gUndoStack.resize(undo0);
          return;
+      }
       sFreeT.doc = doc;
       sFreeT.undo0 = undo0;
       sFreeT.prevTool = sTool;
@@ -2323,6 +2457,8 @@ namespace
       }
       if (cmd && !shift && key(ImGuiKey_J)) sPending.what = Pending::Duplicate;
       if (cmd && !alt && key(ImGuiKey_E)) sPending.what = shift ? Pending::MergeVisible : Pending::MergeDown;
+      if (cmd && alt && key(ImGuiKey_E)) sPending.what = shift ? Pending::StampVisible : Pending::StampDown;
+      if (cmd && shift && !alt && key(ImGuiKey_C)) sPending.what = Pending::CopyMerged;
       if (cmd && shift && key(ImGuiKey_J) && SelectionActsOnPixels(doc))
       {
          PushUndoCheckpoint("Layer via cut");
@@ -2363,9 +2499,20 @@ namespace
    bool sPanelHovered = false;   // pointer anywhere over the 2D View (side panel included)
    bool gView2DTestCmd = false;
 
+   // Spring-loaded tools (Photoshop): a tool key held past a tap and let go puts back the tool there was.
+   ImGuiKey sSpringKey = ImGuiKey_None;
+   int sSpringPrev = 0;
+   double sSpringT = 0.0;
+
    void HandleKeys(Scene2DNode* doc, bool hovered)
    {
       const ImGuiIO& io = ImGui::GetIO();
+      if (sSpringKey != ImGuiKey_None && !ImGui::IsKeyDown(sSpringKey) && sOp.kind == 0)
+      {
+         if (ImGui::GetTime() - sSpringT > 0.35)
+            sTool = sSpringPrev;
+         sSpringKey = ImGuiKey_None;
+      }
       if ((!hovered && (!sPanelHovered || ImGui::IsAnyItemActive())) || ImGui::GetIO().WantTextInput)
          return;
       gView2DClaimedKeys = true;
@@ -2381,6 +2528,18 @@ namespace
       // Plain letters only: Shift+letter belongs to the app (Shift+R Piano Roll, Shift+E Curve Editor, Shift+J Drums).
       if (!cmd && !alt && !shift)
       {
+         const int toolWas = sTool;
+         struct Spring { int was; ~Spring() {
+            if (sTool == was)
+               return;
+            for (int k = ImGuiKey_A; k <= ImGuiKey_Z; k++)
+               if (ImGui::IsKeyPressed((ImGuiKey)k, false))
+               {
+                  sSpringKey = (ImGuiKey)k;
+                  sSpringPrev = was;
+                  sSpringT = ImGui::GetTime();
+               }
+         } } spring{ toolWas };
          if (key(ImGuiKey_V)) sTool = kMove;
          if (key(ImGuiKey_C)) sTool = kCrop;
          if (key(ImGuiKey_H)) sTool = kHand;
@@ -2494,7 +2653,7 @@ namespace
             static const ImGuiKey kDigits[10] = { ImGuiKey_1, ImGuiKey_2, ImGuiKey_3, ImGuiKey_4, ImGuiKey_5,
                                                   ImGuiKey_6, ImGuiKey_7, ImGuiKey_8, ImGuiKey_9, ImGuiKey_0 };
             for (int i = 0; i < 10; i++)
-               if (key(kDigits[i]) && (a->lock & Scene2DNode::kLockAll) == 0)
+               if (key(kDigits[i]) && (LockOf(doc, *a) & Scene2DNode::kLockAll) == 0)
                {
                   PushUndoCheckpoint("Layer opacity");
                   a->opacity = (i + 1) / 10.0f;
@@ -2575,6 +2734,16 @@ namespace
       i("grainMode", b.grainMode); i("dualTip", b.dualTip); f("dualScale", &b.dualScale, 1); f("dualScatter", &b.dualScatter, 1);
       i("colorAlong", b.colorAlong); f("colorB", b.colorB, 3); f("colorPeriod", &b.colorPeriod, 1); f("wet", &b.wet, 1);
       f("refill", &b.refill, 1);
+      // Retouch and dab settings (the wiring audit found them unsaved: a preset lost them on reload).
+      f("sourceRotate", &b.sourceRotate, 1); f("sourceScale", &b.sourceScale, 1); bo("sourceFlipX", b.sourceFlipX);
+      bo("sourceFlipY", b.sourceFlipY); i("sourceBlend", b.sourceBlend); bo("protectHue", b.protectHue);
+      i("sharpMode", b.sharpMode); i("spongeMode", b.spongeMode); f("keyTolerance", &b.keyTolerance, 1);
+      bo("wetEdges", b.wetEdges); bo("autoClean", b.autoClean); f("accumulation", &b.accumulation, 1);
+      f("accumJitter", &b.accumJitter, 1); f("hardJitter", &b.hardJitter, 1); f("angleJitter", &b.angleJitter, 1);
+      f("roundJitter", &b.roundJitter, 1); f("scatterY", &b.scatterY, 1);
+      bo("oneEuro", b.oneEuro); bo("catchUp", b.catchUp); f("pressureCurve", &b.pressureCurve, 1);
+      bo("tiltSize", b.tiltSize); bo("tiltAngle", b.tiltAngle); bo("tiltRound", b.tiltRound);
+      f("airbrushRate", &b.airbrushRate, 1);
    }
    std::string BrushText()
    {
@@ -2729,10 +2898,12 @@ namespace
       return sTool == kEraser ? sEraser : sBrush;
    }
 
-   float PenNow()
+   float PenNow(Scene2DNode* doc = nullptr)
    {
-      const float p = Platform::PenPressure(glfwGetCurrentContext());
-      return p < 0.0f ? 1.0f : std::max(0.02f, p);
+      const Platform::PenSample s = Platform::PenNowSample(glfwGetCurrentContext());
+      if (doc != nullptr)
+         doc->SetPaintMeta(s.tiltX, s.tiltY, s.rotation, s.timestamp > 0.0 ? s.timestamp : ImGui::GetTime());
+      return s.pressure < 0.0f ? 1.0f : std::max(0.02f, s.pressure);
    }
 
    int SelOpFor(const ImGuiIO& io)
@@ -2797,7 +2968,7 @@ namespace
       const Layer* a = Active(doc);
       if (a == nullptr || (a->kind != Kind::Paint && !(sEditMask && a->HasPixelMask())))
          return false;
-      return !doc->Shown(*a) || (!sEditMask && (a->lock & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) != 0);
+      return !doc->Shown(*a) || (!sEditMask && (LockOf(doc, *a) & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) != 0);
    }
 
    int sRasterAsk = 0;             // the text or vector layer a pixel tool was tried on
@@ -3045,6 +3216,30 @@ namespace
       }
    }
 
+   // The Eraser on a layer with locked transparency cannot take alpha away: it paints the background colour
+   // (Photoshop; PhotoCraft erase_locked). The Background Eraser still erases.
+   BrushEngine::Brush EraseLocked(Scene2DNode* doc, int id, int target, BrushEngine::Brush b)
+   {
+      const Layer* l = doc->FindLayer(id);
+      if (target == 0 && sTool == kEraser && b.mode == BrushEngine::kErase && l != nullptr &&
+          (b.lockAlpha || (LockOf(doc, *l) & Scene2DNode::kLockAlpha) != 0))
+      {
+         b.mode = BrushEngine::kNormal;
+         std::copy(sBg, sBg + 3, b.color);
+      }
+      return b;
+   }
+
+   // Patch release. Destination mode: the selection goes with the patch (PhotoCraft #12119); Source mode keeps it.
+   bool PatchApply(Scene2DNode* doc, int id, float dx, float dy)
+   {
+      if (!doc->PatchSelection(id, dx, dy, sPatchSrc, sPatchClear))
+         return false;
+      if (sPatchSrc)
+         doc->ShiftSelection(dx, dy);
+      return true;
+   }
+
    void BeginStroke(Scene2DNode* doc, ImVec2 at, bool line)
    {
       // Healing with no Alt-click source yet mends from around the stroke (spot healing); the clone stamp still
@@ -3085,7 +3280,7 @@ namespace
          b.color[0] = b.color[1] = b.color[2] = 1.0f;
          if (!sSelBrushSoft)
             b.hardness = 1.0f;
-         if (!doc->BeginPaint(-1, 2, b, at.x, at.y, PenNow()))
+         if (!doc->BeginPaint(-1, 2, b, at.x, at.y, PenNow(doc)))
             return;
          sOp = Op();
          sOp.kind = 7;
@@ -3109,7 +3304,7 @@ namespace
             std::vector<int> targets;
             for (const Layer& l : doc->Layers())
                if (l.kind == Kind::Paint && doc->IsInside(l.id, a->id) && doc->Shown(l) &&
-                   (l.lock & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) == 0)
+                   (LockOf(doc, l) & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) == 0)
                   targets.push_back(l.id);
             if (targets.empty())
             {
@@ -3141,8 +3336,8 @@ namespace
                b.sampleAll = sCloneAll;
             }
             const ImVec2 from = line && sHaveLast ? sLastPaint : at;
-            const float pen = PenNow();
-            if (!doc->BeginPaint(targets[0], 0, b, from.x, from.y, pen))
+            const float pen = PenNow(doc);
+            if (!doc->BeginPaint(targets[0], 0, EraseLocked(doc, targets[0], 0, b), from.x, from.y, pen))
                return;
             sOp = Op();
             sOp.kind = 7;
@@ -3170,7 +3365,7 @@ namespace
             BrushEngine::Brush b = ToolBrush();
             b.mode = BrushEngine::kNormal;
             b.color[0] = b.color[1] = b.color[2] = 0.0f;
-            if (!doc->BeginPaint(a->id, 1, b, at.x, at.y, PenNow()))
+            if (!doc->BeginPaint(a->id, 1, b, at.x, at.y, PenNow(doc)))
                return;
             sOp = Op();
             sOp.kind = 7;
@@ -3237,7 +3432,7 @@ namespace
                if (sBrushHue != 0.0f)
                   HueTurn(b.color, sBrushHue);
                const ImVec2 from = line && sHaveLast ? sLastPaint : at;
-               if (!doc->BeginPaint(nid, 0, b, from.x, from.y, PenNow()))
+               if (!doc->BeginPaint(nid, 0, b, from.x, from.y, PenNow(doc)))
                   return;
                sOp = Op();
                sOp.kind = 7;
@@ -3263,8 +3458,9 @@ namespace
       std::copy(sFg, sFg + 3, b.color);
       if (sTool == kBrush && sBrushHue != 0.0f)
          HueTurn(b.color, sBrushHue);
+      b = EraseLocked(doc, id, target, b);
       const ImVec2 from = line && sHaveLast ? sLastPaint : at;
-      if (!doc->BeginPaint(id, target, b, from.x, from.y, PenNow()))
+      if (!doc->BeginPaint(id, target, b, from.x, from.y, PenNow(doc)))
          return;
       if (painter && !BrushEngine::LiquifyMode(b.mode))
          NoteColourUsed(sFg);
@@ -3272,7 +3468,7 @@ namespace
       sOp.kind = 7;
       sOp.docStart = at;
       if (line && sHaveLast)
-         doc->PaintTo(at.x, at.y, PenNow());
+         doc->PaintTo(at.x, at.y, PenNow(doc));
    }
 
    void EndStroke(Scene2DNode* doc)
@@ -3284,7 +3480,7 @@ namespace
       {
          for (int gid : sGroupStrokeIds)
          {
-            if (doc->BeginPaint(gid, 0, sGroupStrokeBrush, sGroupStrokePts[0].x, sGroupStrokePts[0].y, sGroupStrokePts[0].p))
+            if (doc->BeginPaint(gid, 0, EraseLocked(doc, gid, 0, sGroupStrokeBrush), sGroupStrokePts[0].x, sGroupStrokePts[0].y, sGroupStrokePts[0].p))
             {
                for (size_t i = 1; i < sGroupStrokePts.size(); ++i)
                   doc->PaintTo(sGroupStrokePts[i].x, sGroupStrokePts[i].y, sGroupStrokePts[i].p);
@@ -3302,6 +3498,7 @@ namespace
    {
       if (PaintRefused(doc))
          return;
+      const size_t undo0 = gUndoStack.size();
       PushUndoCheckpoint("Fill");
       // The matrix: on a shape the bucket sets its fill, on text its colour (the live layer stays live).
       if (Layer* a = Active(doc); a != nullptr && !doc->quickMask && !sEditMask)
@@ -3322,7 +3519,8 @@ namespace
             for (int i = (int)a->shapes.size() - 1; i >= 0; i--)
             {
                float lo[2], hi[2];
-               if (Scene2DNode::ShapeBounds(a->shapes[i], lo, hi) && bx >= lo[0] && bx <= hi[0] && by >= lo[1] && by <= hi[1])
+               if (Scene2DNode::ShapeBounds(a->shapes[i], lo, hi) && bx >= lo[0] && bx <= hi[0] && by >= lo[1] && by <= hi[1] &&
+                   (a->shapes[i].type == Scene2DNode::Shape::kSvg || Scene2DNode::ShapeHit(a->shapes[i], bx, by, 0.0f)))
                {
                   Scene2DNode::Shape& sh = a->shapes[i];
                   sh.fillOn = true;
@@ -3353,18 +3551,25 @@ namespace
          {
             doc->RemoveLayer(id);
             SelectOnly(wasId);
+            gUndoStack.resize(undo0);   // nothing landed: no step
          }
          Touch();
          return;
       }
+      bool landed = false;
       if (target == 2)
       {
          // Quick mask: the bucket fills the mask, the foreground's lightness as the amount (black masks, white selects).
-         doc->BucketSelection(at.x, at.y, 1.0f - (sFg[0] + sFg[1] + sFg[2]) / 3.0f < 0.5f ? 1.0f : 0.0f, sTolerance, sContiguous);
+         landed = doc->BucketSelection(at.x, at.y, 1.0f - (sFg[0] + sFg[1] + sFg[2]) / 3.0f < 0.5f ? 1.0f : 0.0f, sTolerance, sContiguous);
          Touch();
       }
       else if (id > 0 && target == 0)
-         doc->Bucket(id, at.x, at.y, sFg, 1.0f, sTolerance, sContiguous, sAllLayers);
+         landed = doc->Bucket(id, at.x, at.y, sFg, 1.0f, sTolerance, sContiguous, sAllLayers);
+      if (!landed)
+      {
+         gUndoStack.resize(undo0);   // off the layer, or hidden by the selection: no step
+         return;
+      }
       NoteColourUsed(sFg);
    }
 
@@ -3392,7 +3597,7 @@ namespace
       if (sPoly.size() >= 6)
       {
          SelStep("Lasso");
-         doc->SelectPolygon(sPoly, sPolyOp, sFeather);
+         doc->SelectPolygon(sPoly, sPolyOp, sFeather, true);
          TargetSelection(doc);
       }
       sPoly.clear();
@@ -3876,7 +4081,7 @@ namespace
       for (const Layer* up = doc->FindLayer(id); up != nullptr && up->parent != 0;)
       {
          up = doc->FindLayer(up->parent);
-         if (up != nullptr && up->kind == Kind::Group && Movable(*up))
+         if (up != nullptr && up->kind == Kind::Group && Movable(doc, *up))
             out = up->id;
       }
       return out;
@@ -3981,6 +4186,9 @@ namespace
    // document-sized boxes: a cut-out eye flips where it is. Unclipped by the canvas, so two flips land back.
    bool PivotBounds(Scene2DNode* doc, float lo[2], float hi[2])
    {
+      // Lifted pixels turn about the marquee's own box (PhotoCraft: the transform frame is the selection bounds).
+      if (sFloat.id != 0 && !FreeTransformOn(doc) && doc->SelectionBounds(lo, hi))
+         return true;
       if (FreeTransformOn(doc))
          return SelBounds(doc, lo, hi);
       lo[0] = lo[1] = 1e30f;
@@ -4016,11 +4224,14 @@ namespace
 
    void FlipSelection(Scene2DNode* doc, bool vertical)
    {
-      const bool lift = !FreeTransformOn(doc) && CanLift(doc);
+      bool lift = !FreeTransformOn(doc) && CanLift(doc);
       if (lift)
       {
+         const size_t undo0 = gUndoStack.size();
          PushUndoCheckpoint(vertical ? "Flip vertical" : "Flip horizontal");
-         LiftSelection(doc);
+         lift = LiftSelection(doc);
+         if (!lift)
+            gUndoStack.resize(undo0);   // nothing lifted: the whole layer turns, under its own step
       }
       float lo[2], hi[2];
       if (!PivotBounds(doc, lo, hi))
@@ -4059,11 +4270,14 @@ namespace
 
    void TurnSelection(Scene2DNode* doc, float deg)
    {
-      const bool lift = !FreeTransformOn(doc) && CanLift(doc);
+      bool lift = !FreeTransformOn(doc) && CanLift(doc);
       if (lift)
       {
+         const size_t undo0 = gUndoStack.size();
          PushUndoCheckpoint("Rotate selection");
-         LiftSelection(doc);
+         lift = LiftSelection(doc);
+         if (!lift)
+            gUndoStack.resize(undo0);   // nothing lifted: the whole layer turns, under its own step
       }
       float lo[2], hi[2];
       if (!PivotBounds(doc, lo, hi))
@@ -4342,6 +4556,12 @@ namespace
          const ImVec2 at(ImGui::GetIO().MousePos.x + 14.0f, ImGui::GetIO().MousePos.y + 14.0f);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
+      }
+      if (ImGui::GetTime() - sExportNoteT < 5.0 && !sExportNote.empty())
+      {
+         const ImVec2 at(sViewMn.x + 12.0f, sViewMn.y + 12.0f);
+         dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, sExportNote.c_str());
+         dl->AddText(at, ink, sExportNote.c_str());
       }
       if (ImGui::GetTime() - sGroupPickAsk < 2.5)
       {
@@ -5093,7 +5313,7 @@ namespace
       Layer* a = Active(doc);
       if (Items(a) != nullptr)
          return a;
-      const int id = doc->AddVectorLayer(a != nullptr && a->kind != Kind::Group ? a->id : 0);
+      const int id = PlaceNew(doc, doc->AddVectorLayer(NewAbove(doc))).id;
       SelectOnly(id);
       sVecTarget = 0;
       sItem = -1;
@@ -5563,9 +5783,7 @@ namespace
       const bool box = std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) > 6.0f;
       const float x = box ? std::min(sOp.docStart.x, sMouseDoc.x) : sOp.docStart.x;
       const float y = box ? std::min(sOp.docStart.y, sMouseDoc.y) : sOp.docStart.y;
-      Layer* a = Active(doc);
-      const int id = doc->AddTextLayer("", x, y, box ? std::fabs(sMouseDoc.x - sOp.docStart.x) : 0.0f,
-                                       a != nullptr && a->kind != Kind::Group ? a->id : 0);
+      const int id = PlaceNew(doc, doc->AddTextLayer("", x, y, box ? std::fabs(sMouseDoc.x - sOp.docStart.x) : 0.0f, NewAbove(doc))).id;
       if (Layer* l = doc->FindLayer(id))
       {
          l->font = sFont;
@@ -5786,7 +6004,8 @@ namespace
             const bool any = !sSel.empty();
             if (any && MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
             if (any && MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
-            if (!sClip.empty() && MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
+            if (any && MenuParts::Item(T("Copy Merged"), Sc("Shift+Ctrl+C"))) sPending.what = Pending::CopyMerged;
+            if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
             if (any && MenuParts::Item(T("Duplicate"), Sc("Ctrl+J"))) sPending.what = Pending::Duplicate;
             if (SelectionActsOnPixels(doc))
                if (MenuParts::Item(T("Layer via Cut"), Sc("Shift+Ctrl+J")))
@@ -6034,7 +6253,7 @@ namespace
       sMouseDoc = ToDoc(doc, mouse);
       Layer* active = Active(doc);
       const bool canTransform = sTool == kMove && active != nullptr && active->kind != Kind::Group && active->kind != Kind::Fill && active->kind != Kind::Adjust && sSel.size() == 1 &&
-                                Movable(*active) && doc->Shown(*active);
+                                Movable(doc, *active) && doc->Shown(*active);
 
       // Outlines: each selected layer, then the active one's handles.
       if (sTool == kMove)
@@ -6198,6 +6417,7 @@ namespace
       HandleKeys(doc, hovered);
       const bool space = hovered && ImGui::IsKeyDown(ImGuiKey_Space) && !io.WantTextInput;
       const bool panTool = sTool == kHand || space;
+      const bool sizeDragHint = BrushTool(sTool) && io.KeyAlt && (io.KeyCtrl || io.KeySuper);
       // Two fingers never pan: they zoom, softly, about the pointer (a pinch arrives as Ctrl + wheel and zooms a
       // little faster). Panning is the Hand tool, Space-drag, middle-drag, or Shift + wheel.
       if (hovered && (io.MouseWheel != 0.0f || io.MouseWheelH != 0.0f))
@@ -6302,16 +6522,36 @@ namespace
          sPenN = 0;
       else if (sTool == kBrush && !sSurfaceStroke)
          DrawPredicted(doc, dl);
-      if (hovered && !panTool && BrushTool(sTool) && !io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7))
+      if (hovered && !panTool && BrushTool(sTool) && ((!io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7)) || sOp.kind == 28 ||
+                                                      (sizeDragHint && sOp.kind == 0)))
       {
          dl->PushClipRect(sViewMn, sViewMx, true);
-         DrawBrushCursor(dl, mouse);
+         DrawBrushCursor(dl, sOp.kind == 28 ? sOp.start : mouse);
          dl->PopClipRect();
       }
 
       const bool inRulerTop = d.rulers && mouse.y < mn.y + kRuler && mouse.x > mn.x + kRuler;
       const bool inRulerLeft = d.rulers && mouse.x < mn.x + kRuler && mouse.y > mn.y + kRuler;
-      if (hovered && space && io.KeyShift && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      const bool sizeDrag = BrushTool(sTool) && io.KeyAlt && (io.KeyCtrl || io.KeySuper) && !space;
+      if (hovered && space && !io.KeyShift && (io.KeyCtrl || io.KeySuper || io.KeyAlt) && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      {
+         // Cmd + Space (or Alt + Space) drag scrubs the zoom about the press; a click steps in (Alt: out).
+         sOp = Op();
+         sOp.kind = 19;
+         sOp.start = mouse;
+         sOp.zoom0 = sZoom;
+         sOp.pan0 = sPan;
+      }
+      else if (hovered && sizeDrag && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      {
+         // Ctrl + Opt drag on a brush: across sets the size, up and down the hardness (Photoshop's HUD resize).
+         sOp = Op();
+         sOp.kind = 28;
+         sOp.start = mouse;
+         sOp.hx = ToolBrush().size;
+         sOp.hy = ToolBrush().hardness;
+      }
+      else if (hovered && space && io.KeyShift && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
       {
          // Shift + Space drag turns the view about its centre (Krita's key; R is Blur / Sharpen here).
          BeginOp(doc, 22, mouse, nullptr);
@@ -6688,6 +6928,12 @@ namespace
          }
          else if (sOp.kind == 4)
             sPan = ImVec2(sOp.pan0.x + mouse.x - sOp.start.x, sOp.pan0.y + mouse.y - sOp.start.y);
+         else if (sOp.kind == 28)
+         {
+            BrushEngine::Brush& b = ToolBrush();
+            b.size = std::clamp(sOp.hx + (mouse.x - sOp.start.x) * 2.0f / std::max(0.05f, sZoom), 1.0f, 1000.0f);
+            b.hardness = std::clamp(sOp.hy - (mouse.y - sOp.start.y) * 0.005f, 0.0f, 1.0f);
+         }
          else if (sOp.kind == 22)
          {
             const ImVec2 vc((sViewMn.x + sViewMx.x) * 0.5f, (sViewMn.y + sViewMx.y) * 0.5f);
@@ -6715,8 +6961,9 @@ namespace
             {
                if (sTool == kBrush)
                   doc->PaintFollow(sBrush);
-               const float pen = PenNow();
+               const float pen = PenNow(doc);
                doc->PaintTo(sMouseDoc.x, sMouseDoc.y, pen);
+               doc->PaintTick(ImGui::GetIO().DeltaTime);
                if (!sGroupStrokeIds.empty())
                   sGroupStrokePts.push_back({ sMouseDoc.x, sMouseDoc.y, pen });
                NotePenSample(sMouseDoc);
@@ -6809,8 +7056,9 @@ namespace
                Layer* al = Active(doc);
                if (al != nullptr && al->kind == Kind::Paint)
                {
-                  PushUndoCheckpoint("Patch");
-                  doc->PatchSelection(al->id, sMouseDoc.x - sOp.docStart.x, sMouseDoc.y - sOp.docStart.y, sPatchSrc, sPatchClear);
+                  PushUndoCheckpoint("Patch selection");
+                  const float pdx = sMouseDoc.x - sOp.docStart.x, pdy = sMouseDoc.y - sOp.docStart.y;
+                  PatchApply(doc, al->id, pdx, pdy);
                   Touch();
                }
             }
@@ -6836,7 +7084,7 @@ namespace
                {
                   const ImVec2 e = MarqueeEnd(sOp.docStart, sMouseDoc), s0 = MarqueeStart(sOp.docStart, e);
                   SelStep("Marquee");
-                  doc->SelectRect(s0.x, s0.y, e.x, e.y, sOp.selOp, sMarqueeAA ? std::max(sFeather, 1.0f) : sFeather, sMarqueeShape == 1);
+                  doc->SelectRect(s0.x, s0.y, e.x, e.y, sOp.selOp, sFeather, sMarqueeShape == 1, sMarqueeAA);
                   TargetSelection(doc);
                }
             }
@@ -6845,7 +7093,7 @@ namespace
                if (sOp.path.size() >= 6)
                {
                   SelStep("Lasso");
-                  doc->SelectPolygon(sOp.path, sOp.selOp, sFeather);
+                  doc->SelectPolygon(sOp.path, sOp.selOp, sFeather, true);
                   TargetSelection(doc);
                }
                else if (sOp.selOp == Scene2DNode::kSelNew && doc->HasSelection())
@@ -6923,16 +7171,17 @@ namespace
       BarDivider();
       ImGui::BeginDisabled(!doc->HasSelection());
       BarSlider("##v2dselmod", &sSelModPx, 1.0f, 100.0f, "%.0f px", kWellL);
-      static const char* kOps[4] = { "Expand##v2dsm0", "Contract##v2dsm1", "Smooth##v2dsm2", "Border##v2dsm3" };
-      static const char* kUndo[4] = { "Expand selection", "Contract selection", "Smooth selection", "Border selection" };
-      for (int i = 0; i < 4; i++)
+      static const char* kOps[5] = { "Expand##v2dsm0", "Contract##v2dsm1", "Smooth##v2dsm2", "Border##v2dsm3", "Feather##v2dsm5" };
+      static const char* kUndo[5] = { "Expand selection", "Contract selection", "Smooth selection", "Border selection", "Feather selection" };
+      static const int kOp[5] = { 0, 1, 2, 3, 5 };
+      for (int i = 0; i < 5; i++)
       {
          if (i > 0)
             FormParts::Inline(0.0f, tok::space_1);
          if (TextChip(L(kOps[i]), false, nullptr))
          {
             PushUndoCheckpoint(kUndo[i]);
-            doc->ModifySelection(i, (int)std::lround(sSelModPx));
+            doc->ModifySelection(kOp[i], (int)std::lround(sSelModPx));
             Touch();
          }
       }
@@ -7336,11 +7585,15 @@ namespace
             MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
             b.stabiliser = (int)std::lround(stab);
             MoreCheck(T("Wet edges"), &b.wetEdges);
-            MoreHeader(T("Pen pressure"));
+            MoreHeader(T("Pen & tilt"));
             {
                Pairs g;
                MoreCheck(T("Size"), &b.pressureSize);
                MoreCheck(T("Opacity"), &b.pressureOpacity);
+               MoreSlider(T("Response"), &b.pressureCurve, 0.25f, 3.0f, "%.2f");
+               MoreCheck(T("Tilt size"), &b.tiltSize);
+               MoreCheck(T("Tilt angle"), &b.tiltAngle);
+               MoreCheck(T("Tilt flatness"), &b.tiltRound);
             }
          });
       }
@@ -7440,6 +7693,9 @@ namespace
                MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
                b.stabiliser = (int)std::lround(stab);
                MorePct(T("Accumulation"), &b.accumulation, 0.0f, 100.0f);
+               MoreSlider(T("Airbrush"), &b.airbrushRate, 0.0f, 1.0f, "%.2f");
+               MoreCheck(T("Adaptive smooth"), &b.oneEuro);
+               MoreCheck(T("Catch up"), &b.catchUp);
                MoreCheck(T("Follow stroke"), &b.follow);
                MoreCheck(T("Wet edges"), &b.wetEdges);
             }
@@ -7471,11 +7727,15 @@ namespace
                }
                ImGui::PopID();
             }
-            MoreHeader(T("Pen pressure"));
+            MoreHeader(T("Pen & tilt"));
             {
                Pairs g;
                MoreCheck(T("Size"), &b.pressureSize);
                MoreCheck(T("Opacity"), &b.pressureOpacity);
+               MoreSlider(T("Response"), &b.pressureCurve, 0.25f, 3.0f, "%.2f");
+               MoreCheck(T("Tilt size"), &b.tiltSize);
+               MoreCheck(T("Tilt angle"), &b.tiltAngle);
+               MoreCheck(T("Tilt flatness"), &b.tiltRound);
             }
             MoreHeader(T("Paint"));
             if (brush)
@@ -7961,7 +8221,7 @@ namespace
       const bool rect = picked != nullptr ? picked->type == Shape::kRect : sShapeKind <= 1;
       const bool poly = picked != nullptr ? (picked->type == Shape::kPolygon || picked->type == Shape::kStar) : (sShapeKind == 3 || sShapeKind == 4);
       const bool star = picked != nullptr ? picked->type == Shape::kStar : sShapeKind == 4;
-      if (rect && (picked != nullptr || sTool == kShape))
+      if ((rect || poly) && (picked != nullptr || sTool == kShape))
       {
          gap();
          ImGui::SetNextItemWidth(kWellL);
@@ -7984,8 +8244,8 @@ namespace
          if (TextChip(L("Absolute##v2dvrabs"), sRadiusAbs, T("Radius in px, not a percentage of the shape")))
             sRadiusAbs = !sRadiusAbs;
          next();
-         // Each corner on its own: radius (blank follows Radius) and type.
-         if (IconChip("##v2dvcorners", IconsInfinite::StrokeStyle, false, T("Corners")))
+         // Each corner on its own (rectangles): radius (blank follows Radius) and type.
+         if (rect && IconChip("##v2dvcorners", IconsInfinite::StrokeStyle, false, T("Corners")))
             ImGui::OpenPopup("##v2dvcornpop");
          if (MenuParts::BeginPopup("##v2dvcornpop"))
          {
@@ -9456,8 +9716,12 @@ namespace
       return n;
    }
 
+   int sEyeDrag = -1;   // a drag down the eye column: 1 shows, 0 hides what it crosses, -1 none
+
    void DrawLayerRows(Scene2DNode* doc, int parent, int depth, float w)
    {
+      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         sEyeDrag = -1;
       std::vector<int> kids = doc->ChildrenOf(parent);
       ImGuiIO& io = ImGui::GetIO();
       for (int k = (int)kids.size() - 1; k >= 0; k--)
@@ -9477,7 +9741,9 @@ namespace
             dl->AddRectFilled(ImVec2(p.x, p.y + 3), ImVec2(p.x + 3, p.y + rowH - 3), kLabelCol[l->label]);
          // Eye: Alt-click shows only this one.
          ImGui::SetCursorScreenPos(ImVec2(p.x + 4, p.y + (rowH - 18) * 0.5f));
-         if (ImGui::InvisibleButton("##eye", ImVec2(18, 18)))
+         // A press flips the eye; dragging on down the column sets every eye it crosses the same way (Photoshop).
+         ImGui::InvisibleButton("##eye", ImVec2(18, 18));
+         if (ImGui::IsItemActivated())
          {
             if (io.KeyAlt)
                doc->soloLayer = doc->soloLayer == id ? 0 : id;
@@ -9485,8 +9751,15 @@ namespace
             {
                PushUndoCheckpoint(l->visible ? "Hide layer" : "Show layer");
                l->visible = !l->visible;
+               sEyeDrag = l->visible ? 1 : 0;
                Touch();
             }
+         }
+         else if (sEyeDrag >= 0 && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+                  ImGui::IsMouseHoveringRect(ImVec2(p.x + 4, p.y), ImVec2(p.x + 22, p.y + rowH)) && l->visible != (sEyeDrag == 1))
+         {
+            l->visible = sEyeDrag == 1;
+            Touch();
          }
          glyph::Draw(dl, ImVec2(p.x + 13, p.y + rowH * 0.5f), tok::icon_control,
                      ImGui::GetColorU32(l->visible ? ImGuiCol_Text : ImGuiCol_TextDisabled), l->visible ? IconsInfinite::Eye : IconsInfinite::EyeOff);
@@ -9553,7 +9826,13 @@ namespace
             ImGui::SetCursorScreenPos(m0);
             if (ImGui::InvisibleButton("##mthumb", tsz))
             {
-               if (io.KeyShift)
+               if (io.KeySuper || io.KeyCtrl)
+               {
+                  // Cmd-click loads the mask as the selection (Shift adds, Alt subtracts).
+                  SelStep("Load mask as selection");
+                  doc->SelectMaskPixels(id, io.KeyShift ? Scene2DNode::kSelAdd : io.KeyAlt ? Scene2DNode::kSelSub : Scene2DNode::kSelNew);
+               }
+               else if (io.KeyShift)
                {
                   PushUndoCheckpoint(l->pmaskOn ? "Turn mask off" : "Turn mask on");
                   l->pmaskOn = !l->pmaskOn;
@@ -9631,7 +9910,18 @@ namespace
             if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2D_LAYER"))
             {
                const int moving = *(const int*)pl->Data;
-               if (moving != id && !doc->IsInside(id, moving))
+               if (io.KeyAlt && !(into && doc->IsInside(id, moving)))
+               {
+                  // Alt-drop copies: the duplicate lands where the drop says, the original stays (Photoshop).
+                  PushUndoCheckpoint("Duplicate layer");
+                  const int dup = doc->Duplicate(moving);
+                  if (dup != 0 && dup != id)
+                  {
+                     doc->MoveLayer(dup, id, below, into);
+                     SelectOnly(dup);
+                  }
+               }
+               else if (moving != id && !doc->IsInside(id, moving))
                {
                   PushUndoCheckpoint("Move layer");
                   doc->MoveLayer(moving, id, below, into);
@@ -9650,8 +9940,9 @@ namespace
             if (!Selected(id))
                SelectOnly(id);
             if (MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
+            if (MenuParts::Item(T("Copy Merged"), Sc("Shift+Ctrl+C"))) sPending.what = Pending::CopyMerged;
             if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
-            if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"), false, !sClip.empty())) sPending.what = Pending::Paste;
+            if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
             if (MenuParts::Item(l->kind == Kind::Group ? T("Duplicate Group") : T("Duplicate Layer"), Sc("Ctrl+J")))
                sPending.what = Pending::Duplicate;
             TransformSubMenu(doc);
@@ -9663,6 +9954,7 @@ namespace
                                 : MenuParts::Item(T("Merge Down"), Sc("Ctrl+E"), false, LayerUnder(doc, id) != 0))
                sPending.what = Pending::MergeDown;
             if (MenuParts::Item(T("Merge Visible"), Sc("Shift+Ctrl+E"))) sPending.what = Pending::MergeVisible;
+            if (MenuParts::Item(T("Stamp Visible"), Sc("Shift+Alt+Ctrl+E"))) sPending.what = Pending::StampVisible;
             // A group flattens alone: its layers become one pixel layer, every other layer and group stays as it is.
             if (l->kind == Kind::Group && MenuParts::Item(T("Flatten Group"), nullptr)) sPending.what = Pending::FlattenGroup;
             if (MenuParts::Item(T("Flatten Image"), nullptr)) sPending.what = Pending::Flatten;
@@ -9828,11 +10120,19 @@ namespace
          for (auto& lk : kLocks)
          {
             FormParts::Inline(0.0f, tok::space_1);
-            if (IconChip(lk.id, lk.glyph, (a->lock & lk.bit) != 0, T(lk.tip)))
+            const bool heldOff = ToggledLock(a->lock, lk.bit) == a->lock;   // transparency under a pixel lock
+            ImGui::BeginDisabled(heldOff);
+            const bool hit = IconChip(lk.id, lk.glyph, (a->lock & lk.bit) != 0, T(lk.tip));
+            ImGui::EndDisabled();
+            if (hit)
             {
-               PushUndoCheckpoint("Lock layer");
-               a->lock ^= lk.bit;
-               Touch();
+               const unsigned next = ToggledLock(a->lock, lk.bit);
+               if (next != a->lock)
+               {
+                  PushUndoCheckpoint("Lock layer");
+                  a->lock = next;
+                  Touch();
+               }
             }
          }
          ImGui::PopStyleVar(2);
@@ -9983,6 +10283,33 @@ namespace
          bool inExport = !l->noExport;
          if (BoolRow(T("In export"), &inExport))
             l->noExport = !inExport;
+      }
+      if (l->kind == Kind::Group && l->blend == Scene2DNode::kPassThrough)
+         BoolRow(T("Sort 3D with outside"), &l->collapse);
+      if (l->kind != Kind::Adjust)
+      {
+         // Blend If (grey): black from-to and white from-to, for this layer and for what is under it.
+         SectionCard::Begin(T("Blend If"));
+         for (int side = 0; side < 2; side++)
+         {
+            float* b = side == 0 ? l->bifT : l->bifU;
+            ImGui::PushID(side);
+            FieldLabel(side == 0 ? T("This layer") : T("Underlying"));
+            {
+               Pairs g;
+               SliderRow(T("Black"), &b[0], 0.0f, 1.0f, "%.2f");
+               SliderRow(T("Black to"), &b[1], 0.0f, 1.0f, "%.2f");
+            }
+            {
+               Pairs g;
+               SliderRow(T("White from"), &b[2], 0.0f, 1.0f, "%.2f");
+               SliderRow(T("White"), &b[3], 0.0f, 1.0f, "%.2f");
+            }
+            b[1] = std::max(b[1], b[0]);
+            b[2] = std::max(b[2], b[1]);
+            b[3] = std::max(b[3], b[2]);
+            ImGui::PopID();
+         }
       }
       if (l->kind == Kind::Paint)
       {
@@ -10255,6 +10582,9 @@ namespace
             const char* const fmts[3] = { "X %.0f°", "Y %.0f°", "Z %.0f°" };
             const int mf[3] = { Scene2DNode::kLfRotX, Scene2DNode::kLfRotY, Scene2DNode::kLfAngle };
             DragMulti(T("Rotate"), rot, fmts, 3, 0.5f, -360.0f, 360.0f, l, mf);
+            float* const ori[3] = { &l->orient[0], &l->orient[1], &l->orient[2] };
+            DragMulti(T("Orient"), ori, fmts, 3, 0.5f, -360.0f, 360.0f);
+            DragRow(T("Anchor depth"), &l->az, 1.0f, "%.0f px");
          }
          else
          {
@@ -10419,13 +10749,120 @@ namespace
    struct EffAdd { int layer = 0; int native = -1; int node = -1; uint64_t doc = 0; } sEffAdd;
    struct EffOp { int layer = 0; int index = -1; int op = 0; uint64_t doc = 0; int to = -1; } sEffOp;   // 1 up, 2 down, 3 delete, 4 move to `to`
 
-   // Spawns an entry's node (hidden) and its recipe helper (on the canvas, wired into the second input); 0 on failure.
+   // The shown top-level layers, bottom to top.
+   std::vector<int> VisibleTop(Scene2DNode* doc)
+   {
+      std::vector<int> ids;
+      for (int c : doc->ChildrenOf(0))
+         if (const Layer* l = doc->FindLayer(c))
+            if (doc->Shown(*l))
+               ids.push_back(c);
+      return ids;
+   }
+
+   // A new pixel layer holding `set` drawn as one picture (optionally cut to the selection), above `above`
+   // (0: on top). 0 when nothing shows.
+   int MergedLayer(Scene2DNode* doc, const std::vector<int>& set, bool cutToSelection, int above)
+   {
+      static int sStampFrame = 1 << 25;
+      std::vector<uint8_t> rgba;
+      const int W = doc->Doc().w, H = doc->Doc().h;
+      if (set.empty() || !doc->RenderSet(set, ++sStampFrame, rgba) || rgba.size() < (size_t)W * H * 4)
+         return 0;
+      if (cutToSelection && doc->HasSelection())
+      {
+         const std::vector<uint8_t>& m = doc->SelectionPixels();
+         if (m.size() == (size_t)W * H)
+            for (size_t i = 0; i < m.size(); i++)
+               rgba[i * 4 + 3] = (uint8_t)(rgba[i * 4 + 3] * m[i] / 255);
+      }
+      bool any = false;
+      for (size_t i = 3; i < rgba.size() && !any; i += 4)
+         any = rgba[i] != 0;
+      if (!any)
+         return 0;
+      const int nid = doc->AddFileLayer(0, above != 0 ? "Stamp" : "Merged", 0, 0, W, H, rgba, above);
+      doc->Commit();
+      return nid;
+   }
+
+   // What this view last put on the system clipboard, so a paste of our own copy keeps its place and layers.
+   size_t sOsClipHash = 0;
+
+   // A pixel layer's picture onto the system clipboard as a PNG cropped to what shows, so other apps paste it.
+   // Never during self-tests (the user's clipboard is not ours to change).
+   void ClipToOs(Scene2DNode* doc, const std::vector<int>& set)
+   {
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr || std::getenv("INFINITE_SELFTEST") != nullptr)
+         return;
+      static int sClipFrame = 1 << 26;
+      std::vector<uint8_t> rgba;
+      const int W = doc->Doc().w, H = doc->Doc().h;
+      if (!doc->RenderSet(set, ++sClipFrame, rgba) || rgba.size() < (size_t)W * H * 4)
+         return;
+      int x0 = W, y0 = H, x1 = -1, y1 = -1;
+      for (int y = 0; y < H; y++)
+         for (int x = 0; x < W; x++)
+            if (rgba[((size_t)y * W + x) * 4 + 3] != 0)
+               x0 = std::min(x0, x), y0 = std::min(y0, y), x1 = std::max(x1, x), y1 = std::max(y1, y);
+      if (x1 < x0)
+         return;
+      const int w = x1 - x0 + 1, h = y1 - y0 + 1;
+      std::vector<uint8_t> crop((size_t)w * h * 4);
+      for (int y = 0; y < h; y++)
+         std::memcpy(&crop[(size_t)y * w * 4], &rgba[((size_t)(y0 + y) * W + x0) * 4], (size_t)w * 4);
+      std::vector<uint8_t> png;
+      stbi_write_png_to_func([](void* ctx, void* data, int size) {
+         auto* out = static_cast<std::vector<uint8_t>*>(ctx);
+         out->insert(out->end(), (uint8_t*)data, (uint8_t*)data + size);
+      }, &png, w, h, 4, crop.data(), w * 4);
+      if (Platform::SetClipboardImage(png, crop, w, h))
+         sOsClipHash = std::hash<std::string>()(std::string(png.begin(), png.end()));
+   }
+
+   // A picture another app copied pastes as a new pixel layer, centred (Photoshop). False when the clipboard holds
+   // no picture, or holds the one this view put there (then the layer clip pastes, in place).
+   bool PasteFromOs(Scene2DNode* doc)
+   {
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr || std::getenv("INFINITE_SELFTEST") != nullptr)
+         return false;
+      std::vector<unsigned char> png, rgba;
+      int w = 0, h = 0;
+      if (!Platform::ClipboardImage(png, rgba, w, h))
+         return false;
+      if (!png.empty())
+      {
+         if (std::hash<std::string>()(std::string(png.begin(), png.end())) == sOsClipHash && !sClip.empty())
+            return false;
+         int ch = 0;
+         unsigned char* img = stbi_load_from_memory(png.data(), (int)png.size(), &w, &h, &ch, 4);
+         if (img == nullptr)
+            return false;
+         rgba.assign(img, img + (size_t)w * h * 4);
+         stbi_image_free(img);
+      }
+      if (w <= 0 || h <= 0 || rgba.size() < (size_t)w * h * 4)
+         return false;
+      Layer* a = Active(doc);
+      PushUndoCheckpoint("Paste");
+      const int x = (doc->Doc().w - w) / 2, y = (doc->Doc().h - h) / 2;
+      const int nid = doc->AddFileLayer(0, "Pasted", x, y, w, h, rgba, a != nullptr ? a->id : 0);
+      doc->Commit();
+      SelectOnly(nid);
+      Touch();
+      return true;
+   }
+
+   // Spawns an entry's node and its recipe helper on the canvas, beside the document's node (the helper wired into
+   // the second input); 0 on failure. Nothing the 2D View makes runs hidden.
    uint64_t SpawnEffectNode(const NodeEffectEntry& ne, float x, float y)
    {
+      if (x == 0.0f && y == 0.0f)
+         if (GraphNode* host = DocGraphNode())
+            x = host->liveX - 300.0f, y = host->liveY + 200.0f;
       GraphNode* gn = SpawnNode(ne.type, ne.category, x, y);   // checkpoints the undo itself
       if (gn == nullptr)
          return 0;
-      gn->hiddenFromCanvas = true;
       const uint64_t uid = gn->uid;
       if (ne.helper != nullptr)
          if (GraphNode* h = SpawnNode(ne.helper, ne.helperCat, x - 260.0f, y))   // can move gNodes: find the effect again
@@ -10796,7 +11233,7 @@ namespace
                         if (gn->node)
                            gn->node->VisitParams(ps->second);
                   e.uid = uid;
-                  e.shown = false;
+                  e.shown = true;
                   keep.push_back(e);
                }
          (void)type;
@@ -10841,6 +11278,7 @@ namespace
                {
                   e.uid = uid;
                   e.entry = ne.label;
+                  e.shown = true;
                   e.animated = ne.animated;
                   e.toMask = ne.toMask;
                   if (Layer* again = doc->FindLayer(sEffAdd.layer))
@@ -11639,8 +12077,7 @@ namespace
       case Pending::DuplicateDoc:
       {
          PushUndoCheckpoint("Duplicate document");
-         const std::string text = doc->DocText();
-         MakeDoc(at.x, at.y + 300.0f, text);
+         MakeDoc(at.x, at.y + 300.0f, DocTextWithoutSelection(doc->DocText()));
          break;
       }
       case Pending::DeleteDoc: DeleteDoc(doc); break;
@@ -11693,7 +12130,11 @@ namespace
          if (!sSel.empty())
          {
             PushUndoCheckpoint("Group layers");
-            SelectOnly(doc->GroupLayers(sSel));
+            const int g = doc->GroupLayers(sSel);
+            if (Layer* gl = doc->FindLayer(g))
+               gl->open = false;   // Group from Layers starts collapsed, as in Photoshop
+            doc->Commit();
+            SelectOnly(g);
          }
          break;
       case Pending::Ungroup:
@@ -11711,9 +12152,12 @@ namespace
             if (a->kind == Kind::Group)
             {
                static int sFlatGroupFrame = 1 << 25;
+               const size_t undo0 = gUndoStack.size();
                PushUndoCheckpoint("Flatten group");
                if (const int nid = doc->MergeLayers({ a->id }, ++sFlatGroupFrame))
                   SelectOnly(nid);
+               else
+                  gUndoStack.resize(undo0);
                Touch();
             }
          break;
@@ -11742,9 +12186,12 @@ namespace
          if (ids.empty())
             break;
          static int sMergeFrame = 1 << 24;
+         const size_t undo0 = gUndoStack.size();
          PushUndoCheckpoint(todo.what == Pending::Flatten ? "Flatten image" : todo.what == Pending::MergeVisible ? "Merge visible" : "Merge layers");
          if (const int nid = doc->MergeLayers(ids, ++sMergeFrame))
             SelectOnly(nid);
+         else
+            gUndoStack.resize(undo0);   // a refused merge is no step
          Touch();
          break;
       }
@@ -11771,6 +12218,7 @@ namespace
             const int src = Active(doc)->id;
             if (const int nid = SelectionToLayer(doc, cut))
             {
+               ClipToOs(doc, { nid });
                sClip = doc->CopyLayers({ nid });
                sPasteCount = -1;   // pixels paste in place first, like Affinity and Photoshop
                doc->RemoveLayer(nid);
@@ -11785,7 +12233,34 @@ namespace
                DeleteSelected(doc);
          }
          break;
+      case Pending::CopyMerged:
+         // Every shown layer as one picture, cut to the selection: a pixel clip that pastes in place (Photoshop).
+         if (const int nid = MergedLayer(doc, VisibleTop(doc), true, 0))
+         {
+            ClipToOs(doc, { nid });
+            sClip = doc->CopyLayers({ nid });
+            sPasteCount = -1;
+            doc->RemoveLayer(nid);
+            doc->Commit();
+         }
+         break;
+      case Pending::StampVisible:
+      case Pending::StampDown:
+      {
+         // Stamp: the shown layers (or the selected ones) merged into a new layer above the active one; they stay.
+         Layer* a = Active(doc);
+         const std::vector<int> set = todo.what == Pending::StampVisible ? VisibleTop(doc) : sSel;
+         if (set.empty() || a == nullptr)
+            break;
+         PushUndoCheckpoint(todo.what == Pending::StampVisible ? "Stamp visible" : "Stamp layers");
+         if (const int nid = MergedLayer(doc, set, false, a->id))
+            SelectOnly(nid);
+         Touch();
+         break;
+      }
       case Pending::Paste:
+         if (PasteFromOs(doc))
+            break;
          if (!sClip.empty())
          {
             PushUndoCheckpoint("Paste layer");
@@ -11832,8 +12307,7 @@ namespace
       case Pending::AddVector:
       {
          PushUndoCheckpoint("New vector layer");
-         Layer* a = Active(doc);
-         SelectOnly(doc->AddVectorLayer(a != nullptr && a->kind != Kind::Group ? a->id : 0));
+         SelectOnly(PlaceNew(doc, doc->AddVectorLayer(NewAbove(doc))).id);
          sVecTarget = 0;
          if (!VectorTool(sTool))
             sTool = kPen;
@@ -11956,7 +12430,13 @@ namespace
          return;
       static int frame = 6000000;
       std::vector<uint8_t> bytes;
-      const bool ok = std::strcmp(ext, "ora") == 0 ? doc->SaveOra(bytes, ++frame) : doc->SavePsd(bytes, ++frame);
+      std::string note;
+      const bool ok = std::strcmp(ext, "ora") == 0 ? doc->SaveOra(bytes, ++frame) : doc->SavePsd(bytes, ++frame, &note);
+      if (ok && !note.empty())
+      {
+         sExportNote = "PSD: " + note;
+         sExportNoteT = ImGui::GetTime();
+      }
       std::ofstream out(std::filesystem::u8path(path), std::ios::binary);
       if (!ok || !out.write((const char*)bytes.data(), (std::streamsize)bytes.size()))
          fprintf(stderr, "[2D View] could not write %s\n", path.c_str());
@@ -11964,8 +12444,8 @@ namespace
          sLastRender = path;
    }
 
-   // Files dropped on the 2D View: each one spawns its source node (the same node types the canvas
-   // drop makes) off-canvas and lands as a layer centred on the drop point. Returns the layers added.
+   // Files dropped on the 2D View: a still image becomes a pixel layer; a live source (video, model) spawns its
+   // node, visible on the canvas, and lands as a layer centred on the drop point. Returns the layers added.
    int DropFiles(Scene2DNode* doc, const std::vector<std::string>& files, ImVec2 docPt)
    {
       static const std::vector<std::string> kModels = { "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc" };
@@ -11978,10 +12458,9 @@ namespace
       PushUndoCheckpoint("Drop into 2D View");
       gSuppressUndoCheckpoints = true;
       int added = 0;
-      auto place = [&](GraphNode* gn) {
+      auto place = [&](GraphNode* gn) {   // a live source (video, model) stays a visible node on the canvas
          if (gn == nullptr)
             return;
-         gn->hiddenFromCanvas = true;
          const ImVec2 at(docPt.x + 24.0f * (float)added, docPt.y + 24.0f * (float)added);
          if (AddNodeLayer(doc, gn->uid, &at) != 0)
             added++;
@@ -12023,10 +12502,29 @@ namespace
          }
          else if (HasExtension(path, MediaExtensions::Image()))
          {
-            GraphNode* gn = SpawnNode("Image Source", "Source", spot.x, spot.y);
-            if (gn != nullptr)
-               static_cast<ImageSourceNode*>(gn->node.get())->Load(path);
-            place(gn);
+            // A still image is pixels: it lands as a native pixel layer, centred on the drop point.
+            int w = 0, h = 0, ch = 0;
+            std::vector<unsigned char> bytes;
+            if (std::ifstream f(AppPaths::FsPath(path), std::ios::binary); f)
+               bytes.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+            if (unsigned char* img = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &w, &h, &ch, 4))
+            {
+               const std::vector<uint8_t> rgba(img, img + (size_t)w * h * 4);
+               stbi_image_free(img);
+               const size_t slash = path.find_last_of("/\\");
+               std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+               if (const size_t dot = name.rfind('.'); dot != std::string::npos && dot > 0)
+                  name.resize(dot);
+               const int x = (int)std::lround(docPt.x + 24.0f * (float)added) - w / 2;
+               const int y = (int)std::lround(docPt.y + 24.0f * (float)added) - h / 2;
+               Layer* a = Active(doc);
+               if (const int nid = doc->AddFileLayer(0, name, x, y, w, h, rgba, a != nullptr ? a->id : 0))
+               {
+                  doc->Commit();
+                  SelectOnly(nid);
+                  added++;
+               }
+            }
          }
          // Anything else (audio, patches, plugins) has no picture to put on a layer.
       }
@@ -12117,7 +12615,23 @@ namespace
          ActionButton::RowNext();
          DrawSide(doc, sideW);
       }
+      // The clone source is a point in one document: another document coming up drops it (Alt-click again there).
+      static uint64_t cloneDoc = sDocUid;
+      if (cloneDoc != sDocUid)
+      {
+         cloneDoc = sDocUid;
+         sHaveCloneSrc = sCloneOffsetSet = false;
+      }
       // A lifted selection goes back down once its drag or free transform is over.
+      if (sFloat.id != 0 && sFloat.docUid != sDocUid)
+      {
+         // Another document came up while a piece floated: it goes down where it was shown, in its own document.
+         GraphNode* g = FindNodeByUid(sFloat.docUid);
+         if (auto* od = g != nullptr ? dynamic_cast<Scene2DNode*>(g->node.get()) : nullptr)
+            DropFloat(od);
+         sFloat = Float();
+         sOp = Op();
+      }
       if (sFloat.id != 0 && sOp.kind == 0 && !FreeTransformOn(doc))
          DropFloat(doc);
       if (sDirty)
@@ -12144,8 +12658,7 @@ static bool ImportSvgInto(Scene2DNode* doc, const std::string& path)
    const std::string svg((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
    PushUndoCheckpoint("Import SVG");
    doc->Layers();
-   Layer* a = Active(doc);
-   const int id = doc->AddVectorLayer(a != nullptr && a->kind != Kind::Group ? a->id : 0);
+   const int id = PlaceNew(doc, doc->AddVectorLayer(NewAbove(doc))).id;
    if (!doc->ImportSvg(id, svg))
    {
       doc->RemoveLayer(id);
@@ -12580,7 +13093,7 @@ namespace
          else if (how == "invert")
             doc->InvertSelection();
          else if (how == "expand" || how == "contract" || how == "smooth" || how == "border")
-            doc->ModifySelection(how == "expand" ? 0 : how == "contract" ? 1 : how == "smooth" ? 2 : 3, std::clamp(c.value("px", 4), 1, 100));
+            doc->ModifySelection(how == "expand" ? 0 : how == "contract" ? 1 : how == "smooth" ? 2 : how == "feather" ? 5 : 3, std::clamp(c.value("px", 4), 1, 100));
          else
          {
             const json& r = c["rect"];
@@ -12977,6 +13490,27 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("Flatten Group makes one pixel layer of the group", flat != nullptr && flat->kind == Kind::Paint && doc->FindLayer(g) == nullptr
                                                                   && doc->FindLayer(a) == nullptr && doc->FindLayer(b) == nullptr);
       expect("Flatten Group leaves the other layers alone", doc->FindLayer(c) != nullptr && doc->Layers().size() == n0 + 2);
+      // Stamp Visible and Copy Merged (Photoshop): one picture of what shows; the layers stay.
+      {
+         const size_t before = doc->Layers().size();
+         SelectOnly(c);
+         sPending.what = Pending::StampVisible;
+         RunPending(doc);
+         doc->Commit();
+         const Layer* st = Active(doc);
+         expect("Stamp Visible adds one pixel layer above the active one", doc->Layers().size() == before + 1 && st != nullptr &&
+                                                                             st->kind == Kind::Paint && st->name == "Stamp" &&
+                                                                             doc->FindLayer(c) != nullptr);
+         if (st != nullptr && st->id != c)
+            doc->RemoveLayer(st->id);
+         doc->Commit();
+         SelectOnly(c);
+         sClip.clear();
+         sPending.what = Pending::CopyMerged;
+         RunPending(doc);
+         expect("Copy Merged fills the clip and leaves the layers alone", !sClip.empty() && doc->Layers().size() == before);
+         sClip.clear();
+      }
       static int sTestFrame2 = 1 << 23;
       float vlo[2], vhi[2], slo[2], shi[2];
       const bool seen = doc->VisibleBounds({ c }, ++sTestFrame2, vlo, vhi);
@@ -12996,6 +13530,567 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       doc->RemoveLayer(c);
       doc->Commit();
       sSel.clear();
+   }
+   // A marquee on a paint layer: Free Transform, Flip and Rotate take the selected pixels only (lift, move, stamp
+   // back); Esc puts them back; the marquee follows; the whole action is one undo step.
+   {
+      static int sLiftFrame = 1 << 22;
+      const float red[3] = { 1, 0, 0 };
+      const int p = doc->AddPaintLayer();
+      doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+      doc->FillPixels(p, red, 1.0f);
+      doc->SelectRect(300, 100, 400, 200, Scene2DNode::kSelNew, 0, false);
+      doc->FillPixels(p, red, 1.0f);
+      doc->Commit();
+      SelectOnly(p);
+      const size_t n0 = doc->Layers().size();
+      const std::vector<std::string> tiles0 = doc->FindLayer(p)->tiles;
+      auto bounds = [&](float lo[2], float hi[2]) { return doc->VisibleBounds({ p }, ++sLiftFrame, lo, hi); };
+      float lo[2], hi[2];
+      // Free transform, move 50 right, Enter.
+      doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+      BeginFreeTransform(doc);
+      const bool lifted = sFloat.id != 0 && sFloat.src == p;
+      if (Layer* f = sFloat.id != 0 ? doc->FindLayer(sFloat.id) : nullptr)
+         f->x += 50.0f;
+      EndFreeTransform(doc, true);
+      doc->Commit();
+      const Layer* act = Active(doc);
+      const bool b1 = bounds(lo, hi);
+      float slo[2], shi[2];
+      const bool s1 = doc->SelectionBounds(slo, shi);
+      expect("lift: free transform with a marquee lifts the selected pixels", lifted);
+      expect("lift: moved pixels land in the layer (150..400)", b1 && std::fabs(lo[0] - 150) < 2 && std::fabs(hi[0] - 400) < 2);
+      expect("lift: no extra layer, the source stays active", doc->Layers().size() == n0 && act != nullptr && act->id == p);
+      expect("lift: the marquee follows the pixels (150..250)", s1 && std::fabs(slo[0] - 150) < 2 && std::fabs(shi[0] - 250) < 2);
+      // Same, then Esc: nothing changes.
+      doc->FindLayer(p)->tiles = tiles0;
+      doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+      doc->Commit();
+      BeginFreeTransform(doc);
+      if (Layer* f = sFloat.id != 0 ? doc->FindLayer(sFloat.id) : nullptr)
+         f->x += 50.0f;
+      EndFreeTransform(doc, false);
+      doc->Commit();
+      expect("lift: Esc puts the pixels back, no extra layer", doc->FindLayer(p) != nullptr && doc->FindLayer(p)->tiles == tiles0 &&
+                                                                doc->Layers().size() == n0 && sFloat.id == 0);
+      // Flip Horizontal with a marquee 100..300 over A: A lands at 200..300, B stays.
+      doc->SelectRect(100, 100, 300, 200, Scene2DNode::kSelNew, 0, false);
+      SelectOnly(p);
+      FlipSelection(doc, false);
+      doc->Commit();
+      const bool b2 = bounds(lo, hi);
+      expect("lift: flip with a marquee flips inside it (A -> 200..300)", b2 && std::fabs(lo[0] - 200) < 2 && std::fabs(hi[0] - 400) < 2 &&
+                                                                         doc->Layers().size() == n0);
+      // Rotate 90 with a marquee: one undo step brings it all back.
+      doc->FindLayer(p)->tiles = tiles0;
+      doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+      SelectOnly(p);
+      doc->Commit();
+      const std::string t0 = doc->DocText();
+      const size_t u0 = gUndoStack.size();
+      TurnSelection(doc, 90.0f);
+      doc->Commit();
+      const bool changed = doc->DocText() != t0;
+      expect("lift: rotate with a marquee is one undo step", changed && gUndoStack.size() == u0 + 1 && doc->Layers().size() == n0);
+      Undo();
+      doc = FindDoc();
+      expect("lift: one undo after rotate brings it all back", doc != nullptr && doc->DocText() == t0);
+      if (doc == nullptr)
+         return fails;
+      doc->Deselect();
+      doc->RemoveLayer(p);
+      doc->Commit();
+      sSel.clear();
+   }
+   // Parity fixes against PhotoCraft's rules (2026-11-18): one check per fixed bug.
+   {
+      static int sParFrame = 1 << 21;
+      const int W = doc->Doc().w, H = doc->Doc().h;
+      const float red[3] = { 1, 0, 0 }, green[3] = { 0, 1, 0 };
+      auto pixel = [&](const std::vector<int>& set, int x, int y, uint8_t out[4]) {
+         std::vector<uint8_t> rgba;
+         if (!doc->RenderSet(set, ++sParFrame, rgba) || rgba.size() < (size_t)W * H * 4)
+            return false;
+         std::copy_n(&rgba[((size_t)y * W + x) * 4], 4, out);
+         return true;
+      };
+      auto undoBack = [&]() {
+         Undo();
+         doc = FindDoc();
+         return doc != nullptr;
+      };
+      auto about = [](float a, float b) { return std::fabs(a - b) < 2.0f; };
+      float lo[2], hi[2];
+      // Bug 1: Canvas Size, Crop and Image Size all drop the selection; undo brings it back.
+      doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+      doc->Commit();
+      PushUndoCheckpoint("test canvas size");
+      doc->CanvasSize(W + 100, H, 4);
+      expect("parity: canvas size drops the selection", !doc->HasSelection());
+      if (!undoBack())
+         return fails;
+      PushUndoCheckpoint("test crop");
+      doc->CropTo(50, 0, (float)W, (float)H);
+      expect("parity: crop drops the selection", !doc->HasSelection());
+      if (!undoBack())
+         return fails;
+      PushUndoCheckpoint("test image size");
+      doc->ImageSize(W / 2, H / 2);
+      expect("parity: image size drops the selection", !doc->HasSelection());
+      if (!undoBack())
+         return fails;
+      expect("parity: undo brings size and selection back", doc->Doc().w == W && doc->Doc().h == H && doc->HasSelection());
+      // Bug 14: a bucket region the selection hides wholly adds no undo step and changes nothing.
+      {
+         const int p = doc->AddPaintLayer();
+         doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(p, red, 1.0f);
+         doc->SelectRect(0, 0, 50, 50, Scene2DNode::kSelNew, 0, false);
+         doc->Commit();
+         SelectOnly(p);
+         const auto keepTool = sTool;
+         const int keepTol = sTolerance;
+         const bool keepAll = sAllLayers, keepCont = sContiguous;
+         sTolerance = 0;
+         sAllLayers = false;
+         sContiguous = true;
+         const std::vector<std::string> t0 = doc->FindLayer(p)->tiles;
+         const size_t u0 = gUndoStack.size();
+         FillAt(doc, ImVec2(150, 150));
+         expect("parity: a bucket region outside the selection adds no undo step", gUndoStack.size() == u0 && doc->FindLayer(p)->tiles == t0);
+         // Bug 12: transparent pixels match each other whatever colour they hide. Erase the red square
+         // (alpha 0, colour kept), then a bucket on the clear part floods through it.
+         doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+         doc->ClearPixels(p);
+         doc->Deselect();
+         doc->Commit();
+         doc->Bucket(p, 10, 10, green, 1.0f, 0, true, false);
+         uint8_t c[4] = {};
+         expect("parity: a bucket floods through erased pixels", pixel({ p }, 150, 150, c) && c[1] > 200 && c[0] < 40 && c[3] > 200);
+         sTool = keepTool;
+         sTolerance = keepTol;
+         sAllLayers = keepAll;
+         sContiguous = keepCont;
+         doc->RemoveLayer(p);
+         doc->Commit();
+      }
+      // Bug 11: Feather is a Gaussian with sigma = radius; Expand is round (Euclidean), not square.
+      {
+         doc->SelectRect(100, 100, 300, 300, Scene2DNode::kSelNew, 0, false);
+         doc->ModifySelection(5, 10);
+         const float in = doc->SelectionAt(110, 200), out = doc->SelectionAt(90, 200);
+         expect("parity: feather spreads one radius as one sigma (0.84 / 0.16)", in > 0.76f && in < 0.92f && out > 0.08f && out < 0.24f);
+         doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+         doc->ModifySelection(0, 10);
+         expect("parity: expand rounds the corners", doc->SelectionAt(205, 205) > 0.5f && doc->SelectionAt(208, 208) < 0.5f &&
+                                                      doc->SelectionAt(208, 150) > 0.5f);
+         doc->Deselect();
+         doc->Commit();
+      }
+      // Bug 8: Patch in Destination mode ("selection is source") moves the marquee with the pixels.
+      {
+         const int p = doc->AddPaintLayer();
+         doc->SelectRect(0, 0, (float)W, (float)H, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(p, green, 1.0f);
+         doc->SelectRect(100, 100, 150, 150, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(p, red, 1.0f);
+         doc->Commit();
+         const bool keepSrc = sPatchSrc, keepClear = sPatchClear;
+         sPatchSrc = true;
+         sPatchClear = false;
+         const bool ok = PatchApply(doc, p, 100.0f, 0.0f);
+         expect("parity: patch destination mode moves the marquee (200..250)", ok && doc->SelectionBounds(lo, hi) && about(lo[0], 200) && about(hi[0], 250));
+         sPatchSrc = false;
+         doc->SelectRect(100, 100, 150, 150, Scene2DNode::kSelNew, 0, false);
+         const bool ok2 = PatchApply(doc, p, 100.0f, 0.0f);
+         expect("parity: patch source mode keeps the marquee", ok2 && doc->SelectionBounds(lo, hi) && about(lo[0], 100));
+         sPatchSrc = keepSrc;
+         sPatchClear = keepClear;
+         doc->Deselect();
+         doc->RemoveLayer(p);
+         doc->Commit();
+      }
+      // Bug 7: the Eraser on a transparency-locked layer paints the background colour.
+      {
+         const int p = doc->AddPaintLayer();
+         doc->FindLayer(p)->lock = Scene2DNode::kLockAlpha;
+         const auto keepTool = sTool;
+         sTool = kEraser;
+         BrushEngine::Brush b;
+         b.mode = BrushEngine::kErase;
+         const BrushEngine::Brush e = EraseLocked(doc, p, 0, b);
+         doc->FindLayer(p)->lock = 0;
+         const BrushEngine::Brush f = EraseLocked(doc, p, 0, b);
+         sTool = keepTool;
+         expect("parity: eraser on a transparency lock paints the background colour",
+                e.mode == BrushEngine::kNormal && e.color[0] == sBg[0] && e.color[1] == sBg[1] && e.color[2] == sBg[2]);
+         expect("parity: eraser without the lock still erases", f.mode == BrushEngine::kErase);
+         doc->RemoveLayer(p);
+         doc->Commit();
+      }
+      // Bugs 2, 5, 6: group locks reach inside; a new layer goes inside an open group; clipping is inherited and
+      // released when its base goes.
+      {
+         const int a = doc->AddPaintLayer();
+         const int g = doc->GroupLayers({ a });
+         doc->FindLayer(g)->lock = Scene2DNode::kLockAll;
+         doc->Commit();
+         const Layer* al = doc->FindLayer(a);
+         expect("parity: a locked group locks what is inside", al != nullptr && (LockOf(doc, *al) & Scene2DNode::kLockAll) != 0 && !Movable(doc, *al));
+         doc->FindLayer(g)->lock = 0;
+         doc->FindLayer(g)->open = true;
+         doc->Commit();
+         SelectOnly(g);
+         sPending.what = Pending::AddPaint;
+         RunPending(doc);
+         const Layer* n = Active(doc);
+         const int nid = n != nullptr ? n->id : 0;
+         expect("parity: a new layer goes inside an open group", n != nullptr && n->parent == g);
+         int mid = 0, top = 0;
+         if (nid != 0)
+         {
+            // PhotoCraft new_layer_joins_the_group_it_lands_in: "a nid*" + new with a active -> "a N* nid*";
+            // with the top clipped layer active -> "... nid* M", M unclipped.
+            doc->FindLayer(nid)->clip = true;
+            doc->Commit();
+            SelectOnly(a);
+            sPending.what = Pending::AddPaint;
+            RunPending(doc);
+            const Layer* m = Active(doc);
+            mid = m != nullptr && m->id != a ? m->id : 0;
+            expect("parity: a new layer under a clipped one joins its clip group", mid != 0 && doc->FindLayer(mid)->clip);
+            SelectOnly(nid);
+            sPending.what = Pending::AddPaint;
+            RunPending(doc);
+            const Layer* t = Active(doc);
+            top = t != nullptr && t->id != nid ? t->id : 0;
+            expect("parity: a new layer above the top of a clip group stays unclipped", top != 0 && !doc->FindLayer(top)->clip);
+            SelectOnly(a);
+            DeleteSelected(doc);
+            const Layer* nl = doc->FindLayer(nid);
+            const Layer* ml = mid != 0 ? doc->FindLayer(mid) : nullptr;
+            expect("parity: deleting a clip base releases its clipped layers", nl != nullptr && ml != nullptr && !nl->clip && !ml->clip);
+            // Model rules, as PhotoCraft arrange_joins_and_leaves_groups: "B C* U", C forward -> "B U C".
+            const int B = doc->AddPaintLayer(), C = doc->AddPaintLayer(B), U = doc->AddPaintLayer(C);
+            doc->FindLayer(C)->clip = true;
+            doc->MoveLayer(C, U, false);
+            expect("parity: a clipped layer moved off its group is let go", !doc->FindLayer(C)->clip);
+            // Grouping a base with its clipped layer keeps the clip inside the new group.
+            doc->MoveLayer(C, B, false);
+            doc->FindLayer(C)->clip = true;
+            const int G2 = doc->GroupLayers({ B, C });
+            expect("parity: grouping a clip group keeps it", G2 != 0 && doc->FindLayer(C)->clip && !doc->FindLayer(B)->clip);
+            // A clipped layer left with nothing below it is let go.
+            doc->RemoveLayer(B);
+            expect("parity: deleting a base releases the layer clipped to it", doc->FindLayer(C) != nullptr && !doc->FindLayer(C)->clip);
+            for (int id : { G2, U })
+               if (doc->FindLayer(id) != nullptr)
+                  doc->RemoveLayer(id);
+            doc->Commit();
+         }
+         for (int id : { top, mid, nid, a, g })
+            if (id != 0 && doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         doc->Commit();
+         sSel.clear();
+      }
+      // Bug 9: a fill layer made with a selection is masked by it.
+      {
+         doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+         doc->Commit();
+         sPending.what = Pending::AddFill;
+         RunPending(doc);
+         const Layer* f = Active(doc);
+         expect("parity: a fill layer takes the selection as its mask", f != nullptr && f->kind == Kind::Fill && f->HasPixelMask());
+         expect("parity: the selection is dropped once it is the mask", !doc->HasSelection());
+         if (f != nullptr && f->kind == Kind::Fill)
+            doc->RemoveLayer(f->id);
+         doc->Deselect();
+         doc->Commit();
+         sSel.clear();
+      }
+      // Bugs 3, 4: Merge keeps the lower layer's blend and the pixels past the canvas.
+      {
+         const int a = doc->AddPaintLayer();
+         doc->FillPixels(a, red, 1.0f);
+         const int b = doc->AddPaintLayer(a);
+         doc->FillPixels(b, green, 1.0f);
+         doc->FindLayer(a)->blend = 2;
+         doc->FindLayer(b)->x += (float)W * 0.5f;   // half of it off the right edge
+         doc->Commit();
+         const int m = doc->MergeLayers({ a, b }, ++sParFrame);
+         const Layer* ml = doc->FindLayer(m);
+         expect("parity: merge keeps the lower layer's blend", ml != nullptr && ml->blend == 2);
+         expect("parity: merge keeps pixels past the canvas", ml != nullptr && ml->pw >= W + W / 2 - 2);
+         if (ml != nullptr)
+            doc->RemoveLayer(m);
+         for (int id : { a, b })
+            if (doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         doc->Commit();
+         sSel.clear();
+      }
+      // Bug 13: Threshold weighs 0.30/0.59/0.11 (green 0.59 sits under 0.65); Hue turns the HSL hue (red +60 = yellow).
+      {
+         const int p = doc->AddPaintLayer();
+         doc->FillPixels(p, green, 1.0f);
+         Layer& t = doc->AddLayer(Kind::Adjust, 0, p);
+         t.adjType = Scene2DNode::kAdjThreshold;
+         t.adjAmt = t.adjTo = 0.65f;
+         const int tid = t.id;
+         doc->Commit();
+         uint8_t c[4] = {};
+         expect("parity: threshold uses Photoshop's grey (green is dark at 0.65)", pixel({ p, tid }, 10, 10, c) && c[1] < 40);
+         doc->RemoveLayer(tid);
+         doc->FillPixels(p, red, 1.0f);
+         Layer& h = doc->AddLayer(Kind::Adjust, 0, p);
+         h.adjType = Scene2DNode::kAdjHue;
+         h.adjAmt = h.adjTo = 60.0f;
+         const int hid = h.id;
+         doc->Commit();
+         expect("parity: hue +60 turns red into yellow", pixel({ p, hid }, 10, 10, c) && c[0] > 240 && c[1] > 240 && c[2] < 15);
+         doc->RemoveLayer(hid);
+         // Contrast and Levels follow Photoshop's measured curves (PhotoCraft compose tests): contrast +50 takes 64 to
+         // 52 and 192 to 204; Levels gamma 2.0 takes 32 to 90 (the shadow toe) and 128 to 181.
+         auto toneAt = [&](int type, float amt, int in) {
+            const float g[3] = { in / 255.0f, in / 255.0f, in / 255.0f };
+            doc->FillPixels(p, g, 1.0f);
+            Layer& a = doc->AddLayer(Kind::Adjust, 0, p);
+            a.adjType = type;
+            a.adjAmt = a.adjTo = amt;
+            const int aid = a.id;
+            doc->Commit();
+            uint8_t o[4] = {};
+            const int got = pixel({ p, aid }, 10, 10, o) ? o[1] : -1;
+            doc->RemoveLayer(aid);
+            doc->Commit();
+            return got;
+         };
+         const int c64 = toneAt(Scene2DNode::kAdjContrast, 0.5f, 64), c192 = toneAt(Scene2DNode::kAdjContrast, 0.5f, 192);
+         expect("parity: contrast +50 follows Photoshop's S-curve", std::abs(c64 - 52) <= 3 && std::abs(c192 - 204) <= 3);
+         const int l32 = toneAt(Scene2DNode::kAdjLevels, 2.0f, 32), l128 = toneAt(Scene2DNode::kAdjLevels, 2.0f, 128);
+         expect("parity: levels gamma 2 has Photoshop's shadow toe", std::abs(l32 - 90) <= 4 && std::abs(l128 - 181) <= 4);
+         // Black & White, Photoshop's defaults: red reads 102 (reds 40%), yellow 153 (yellows 60%).
+         auto bwOf = [&](const float col[3]) {
+            doc->FillPixels(p, col, 1.0f);
+            Layer& a = doc->AddLayer(Kind::Adjust, 0, p);
+            a.adjType = Scene2DNode::kAdjBlackWhite;
+            a.adjAmt = a.adjTo = 1.0f;
+            a.adjP = Scene2DNode::AdjParamDefault(Scene2DNode::kAdjBlackWhite);
+            const int aid = a.id;
+            doc->Commit();
+            uint8_t o[4] = {};
+            const int got = pixel({ p, aid }, 10, 10, o) ? o[0] : -1;
+            doc->RemoveLayer(aid);
+            doc->Commit();
+            return got;
+         };
+         const float yel[3] = { 1.0f, 1.0f, 0.0f };
+         const int bwr = bwOf(red), bwy = bwOf(yel);
+         expect("parity: black & white weighs red 40% and yellow 60%", std::abs(bwr - 102) <= 3 && std::abs(bwy - 153) <= 3);
+         // Colour Overlay ignores Fill but not Opacity (PhotoCraft color_overlay_ignores_fill_opacity_but_not_opacity).
+         {
+            doc->FillPixels(p, red, 1.0f);
+            Layer* pl = doc->FindLayer(p);
+            pl->fx[Scene2DNode::kFxOverlay] = Scene2DNode::FxDefault(Scene2DNode::kFxOverlay);
+            pl->fx[Scene2DNode::kFxOverlay].on = true;
+            const float gc[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
+            std::copy(gc, gc + 4, pl->fx[Scene2DNode::kFxOverlay].c);
+            pl->fill = 0.0f;
+            doc->Commit();
+            uint8_t o[4] = {};
+            expect("parity: colour overlay shows at fill 0", pixel({ p }, 10, 10, o) && o[1] > 240 && o[0] < 15);
+            pl = doc->FindLayer(p);
+            pl->fx[Scene2DNode::kFxOverlay].on = false;
+            pl->fill = 1.0f;
+            doc->Commit();
+         }
+         // Colour Balance, Preserve Luminosity: shadows red +50 blue +50 on grey 128 reads 128/97/128 in Photoshop.
+         const float grey[3] = { 128.0f / 255.0f, 128.0f / 255.0f, 128.0f / 255.0f };
+         doc->FillPixels(p, grey, 1.0f);
+         Layer& cb = doc->AddLayer(Kind::Adjust, 0, p);
+         cb.adjType = Scene2DNode::kAdjColorBalance;
+         cb.adjAmt = cb.adjTo = 1.0f;
+         cb.adjP.assign(9, 0.0f);
+         cb.adjP[0] = cb.adjP[2] = 0.5f;
+         const int cbid = cb.id;
+         doc->Commit();
+         expect("parity: colour balance matches Photoshop (shadows R+50 B+50 on grey)",
+                pixel({ p, cbid }, 10, 10, c) && std::abs(c[0] - 128) <= 3 && std::abs(c[1] - 97) <= 3 && std::abs(c[2] - 128) <= 3);
+         doc->RemoveLayer(cbid);
+         doc->RemoveLayer(p);
+         doc->Commit();
+      }
+      // Anti-alias: an ellipse marquee's edge is about one pixel of coverage, not a 6 px blur; the rectangle stays crisp.
+      {
+         doc->SelectRect(100.3f, 100.3f, 300.7f, 200.7f, Scene2DNode::kSelNew, 0, true, true);
+         const std::vector<uint8_t>& m = doc->SelectionPixels();
+         const int rowY = H - 1 - 150;
+         int soft = 0;
+         for (int x = 60; x < 340 && !m.empty(); x++)
+         {
+            const uint8_t v = m[(size_t)rowY * W + x];
+            soft += v > 0 && v < 255;
+         }
+         expect("parity: an anti-aliased ellipse has a one-pixel edge", soft >= 1 && soft <= 4);
+         doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false, true);
+         const std::vector<uint8_t>& r = doc->SelectionPixels();
+         int rsoft = 0;
+         for (uint8_t v : r)
+            rsoft += v > 0 && v < 255;
+         expect("parity: an anti-aliased rectangle stays crisp", rsoft == 0);
+         // Border is a ring by true distance: round outside the corners, not a square window.
+         doc->SelectRect(100, 100, 300, 300, Scene2DNode::kSelNew, 0, false);
+         doc->ModifySelection(3, 20);
+         expect("parity: border is round at the corners",
+                doc->SelectionAt(94, 94) > 0.5f && doc->SelectionAt(91, 91) < 0.5f && doc->SelectionAt(200, 95) > 0.5f &&
+                    doc->SelectionAt(200, 200) < 0.5f);
+         doc->Deselect();
+      }
+      // Polygon and star take a corner radius (Photoshop): the diamond's top tip is cut round.
+      {
+         Layer& vl = doc->AddLayer(Kind::Vector, 0, 0);
+         const int vid = vl.id;
+         Scene2DNode::Shape s;
+         s.type = Scene2DNode::Shape::kPolygon;
+         s.sides = 4;
+         s.x0 = s.y0 = 100;
+         s.x1 = s.y1 = 300;
+         s.fillC[0] = 1.0f;
+         vl.shapes.push_back(s);
+         doc->Commit();
+         uint8_t a0[4] = {}, a1[4] = {}, m[4] = {};
+         const bool sharp = pixel({ vid }, 200, 104, a0) && a0[3] > 128;
+         if (Layer* vv = doc->FindLayer(vid))
+            vv->shapes[0].radius = 40.0f;
+         doc->Commit();
+         expect("parity: a polygon's corner radius rounds its tips",
+                sharp && pixel({ vid }, 200, 104, a1) && a1[3] < 64 && pixel({ vid }, 200, 200, m) && m[3] > 200);
+         doc->RemoveLayer(vid);
+         doc->Commit();
+      }
+      // Pass Through at 50%: an Invert inside still sees the red below, so red mixes with cyan to grey (Photoshop).
+      {
+         const int p = doc->AddPaintLayer();
+         doc->FillPixels(p, red, 1.0f);
+         Layer& inv = doc->AddLayer(Kind::Adjust, 0, p);
+         inv.adjType = Scene2DNode::kAdjInvert;
+         inv.adjAmt = inv.adjTo = 1.0f;
+         const int iid = inv.id;
+         const int g = doc->GroupLayers({ iid });
+         if (Layer* gl = doc->FindLayer(g))
+         {
+            gl->blend = Scene2DNode::kPassThrough;
+            gl->opacity = 0.5f;
+         }
+         doc->Commit();
+         uint8_t c[4] = {};
+         // The mix happens in the document's blend space: linear light by default (0.5 -> 188), gamma as Photoshop (128).
+         const bool keepLinear = doc->Doc().linear;
+         doc->Doc().linear = false;
+         doc->Commit();
+         expect("parity: a 50% pass-through group's adjustment still sees below",
+                g != 0 && pixel({ p, g }, 10, 10, c) && std::abs(c[0] - 128) <= 6 && std::abs(c[1] - 128) <= 6 && std::abs(c[2] - 128) <= 6);
+         doc->Doc().linear = true;
+         doc->Commit();
+         expect("panel: a 50% pass-through group mixes in linear light (188)",
+                pixel({ p, g }, 10, 10, c) && std::abs(c[0] - 188) <= 6 && std::abs(c[1] - 188) <= 6 && std::abs(c[2] - 188) <= 6);
+         doc->Doc().linear = keepLinear;
+         doc->Commit();
+         // A locked group locks what is in it: no fill reaches a layer inside.
+         const int q = doc->AddPaintLayer();
+         const int lg = doc->GroupLayers({ q });
+         if (Layer* gl = doc->FindLayer(lg))
+            gl->lock = Scene2DNode::kLockAll;
+         expect("parity: a locked group's layer takes no fill", lg != 0 && !doc->FillPixels(q, red, 1.0f));
+         for (int id : { lg, g, p })
+            if (doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         doc->Commit();
+         sSel.clear();
+      }
+      // Transparency lock does not stop a lift; the arrows lift and move the selected pixels.
+      {
+         const int p = doc->AddPaintLayer();
+         doc->FillPixels(p, red, 1.0f);
+         doc->FindLayer(p)->lock = Scene2DNode::kLockAlpha;
+         doc->SelectRect(100, 0, 200, (float)H, Scene2DNode::kSelNew, 0, false);
+         doc->Commit();
+         SelectOnly(p);
+         const size_t n0 = doc->Layers().size();
+         Nudge(doc, 30, 0);
+         const bool lifted = sFloat.id != 0;
+         DropFloat(doc);
+         doc->Commit();
+         expect("parity: an alpha-locked layer's selection lifts and nudges", lifted && doc->Layers().size() == n0);
+         float slo[2], shi[2];
+         expect("parity: the marquee moves with the nudged pixels", doc->SelectionBounds(slo, shi) && std::fabs(slo[0] - 130) < 2);
+         doc->Deselect();
+         doc->Commit();
+         // The Background Eraser erases through the transparency lock (PhotoCraft: as on an unlocked layer).
+         const int tool0 = sTool;
+         sTool = kBgErase;
+         SelectOnly(p);
+         BrushEngine::Brush& br = ToolBrush();
+         const BrushEngine::Brush br0 = br;
+         br.size = 40.0f;
+         br.hardness = 1.0f;
+         br.opacity = br.flow = 1.0f;
+         br.pressureSize = br.pressureOpacity = false;
+         sHaveLast = false;
+         const float yy = (float)(H / 2);
+         BeginStroke(doc, ImVec2(400, yy), false);
+         const bool painting = doc->Painting();
+         for (int i = 1; i <= 32 && painting; i++)
+            doc->PaintTo(400.0f + 100.0f * i / 32.0f, yy, 1.0f);
+         if (painting)
+            EndStroke(doc);
+         doc->Commit();
+         uint8_t e[4] = {};
+         expect("parity: background eraser ignores the transparency lock", painting && pixel({ p }, 450, H / 2, e) && e[3] < 40);
+         br = br0;
+         sTool = tool0;
+         doc->RemoveLayer(p);
+         doc->Commit();
+         sSel.clear();
+      }
+      // Bug 15: copy names, the pixel lock, text names, Duplicate Document, Group from Layers.
+      expect("parity: copy names number up", Scene2DNode::CopyName("Layer") == "Layer copy" && Scene2DNode::CopyName("Layer copy") == "Layer copy 2" &&
+                                                 Scene2DNode::CopyName("Layer copy 2") == "Layer copy 3");
+      expect("parity: locking pixels clears and holds off the transparency lock",
+             ToggledLock(Scene2DNode::kLockAlpha, Scene2DNode::kLockPixels) == Scene2DNode::kLockPixels &&
+             ToggledLock(Scene2DNode::kLockPixels, Scene2DNode::kLockAlpha) == Scene2DNode::kLockPixels);
+      {
+         bool cut = false;
+         const std::string utf = Scene2DNode::TextName("\n  \n\xC3\xA9\xC3\xA9\xC3\xA9", 5, &cut);   // three e-acute, 6 bytes
+         expect("parity: text names skip blank lines and cut on a character", Scene2DNode::TextName("\n\nHello\nWorld", 28) == "Hello" &&
+                                                                                 utf == "\xC3\xA9\xC3\xA9" && cut);
+      }
+      doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+      doc->Commit();
+      {
+         const std::string dup = DocTextWithoutSelection(doc->DocText());
+         expect("parity: a duplicated document starts with no selection", doc->DocText().find("\nsel ") != std::string::npos &&
+                                                                           dup.find("\nsel ") == std::string::npos);
+      }
+      doc->Deselect();
+      doc->Commit();
+      {
+         const int a = doc->AddPaintLayer();
+         sSel = { a };
+         sPending.what = Pending::Group;
+         RunPending(doc);
+         const Layer* g = Active(doc);
+         expect("parity: group from layers starts collapsed", g != nullptr && g->kind == Kind::Group && !g->open);
+         const int gid = g != nullptr ? g->id : 0;
+         if (doc->FindLayer(a) != nullptr)
+            doc->RemoveLayer(a);
+         if (gid != 0 && doc->FindLayer(gid) != nullptr)
+            doc->RemoveLayer(gid);
+         doc->Commit();
+         sSel.clear();
+      }
    }
    // Pixel-accurate hit on a 3D object: the box corner misses the sphere, the centre hits it.
    {
@@ -13196,7 +14291,9 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       size_t n = doc->Layers().size();
       expect("a dropped picture is one layer", DropFiles(doc, { png }, at) == 1 && doc->Layers().size() == n + 1);
       const Layer* pl = Active(doc);
-      expect("it sits at the drop point and is not 3D", pl != nullptr && pl->kind == Kind::Node && pl->x == at.x && pl->y == at.y && !pl->is3d);
+      expect("it is a pixel layer centred on the drop point", pl != nullptr && pl->kind == Kind::Paint && std::fabs(pl->x - at.x) <= 1.0f &&
+                                                             std::fabs(pl->y - at.y) <= 1.0f && !pl->is3d);
+      expect("no node is spawned for a dropped picture", pl != nullptr && pl->uid == 0);
       n = doc->Layers().size();
       expect("a dropped SVG is one vector layer", DropFiles(doc, { svg }, at) == 1 && doc->Layers().size() == n + 1 && Active(doc)->kind == Kind::Vector);
       n = doc->Layers().size();
@@ -13205,6 +14302,7 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       size_t nodes = gNodes.size();
       DropFiles(doc, { mp4 }, at);
       expect("a dropped video spawns a Video node", gNodes.size() == nodes + 1 && gNodes.back().typeName == "Video");
+      expect("the Video node is on the canvas", !gNodes.empty() && !gNodes.back().hiddenFromCanvas);
       n = doc->Layers().size();
       expect("an audio file adds nothing", DropFiles(doc, { put("d.wav", "RIFF") }, at) == 0 && doc->Layers().size() == n);
       fs::remove_all(dir);
@@ -14563,8 +15661,7 @@ void View2DAddNode(GraphNode& gn)
    if (doc == nullptr)
       return;
    gView2DOpen = true;
-   Layer* a = Active(doc);
-   Layer& l = doc->AddLayer(Kind::Node, uid, a != nullptr && a->kind != Kind::Group ? a->id : 0);
+   Layer& l = NewLayerAt(doc, Kind::Node, uid);
    GraphNode* added = FindNodeByUid(uid);
    l.is3d = added != nullptr && Is3DNode(added->node.get());
    if (l.is3d)
