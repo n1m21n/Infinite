@@ -111,7 +111,7 @@ A non-destructive 2D layer and node compositor (Shift + 2). Stack seven layer ki
 
 ### 3D View
 
-<img src="docs/screenshots/v1/3d-view.png" alt="3D View composing node outputs into one scene" width="100%">
+<img src="docs/screenshots/v2/3d-view.png" alt="3D View composing node outputs into one scene" width="100%">
 
 The final stage of a 3D patch (Shift + 3). Right-click a 3D node, add it to the view, arrange objects, look through a camera and render a still or animation. It follows Blender's keymap (`G`/`R`/`S` with axis locks, `1`/`3`/`7` views, `0` camera, `Tab` Edit Mode, `Ctrl/Cmd+Tab` Pose and Sculpt modes) and includes 6 light types with Kelvin temperature and light linking, Principled BSDF PBR materials with 10 texture maps, HDRI world lighting, depth of field, ambient occlusion, bloom, ACES/AgX colour management and Raster, Path trace and Metal Live engines.
 
@@ -125,7 +125,7 @@ A docked visual box-and-wire editor for the Field language (Shift + F, or the **
 
 | Mixer | Drum Sequencer |
 |---|---|
-| <img src="docs/screenshots/v1/mixer.png" alt="Hardware-desk Mixer with graphite channel strips, knurled pots and LED meters" width="100%"> | <img src="docs/screenshots/v1/drums.png" alt="Hardware-desk Drum Sequencer with lit step keys, trig conditions and waveform inspector" width="100%"> |
+| <img src="docs/screenshots/v2/mixer.png" alt="Hardware-desk Mixer with graphite channel strips, knurled pots and LED meters" width="100%"> | <img src="docs/screenshots/v1/drums.png" alt="Hardware-desk Drum Sequencer with lit step keys, trig conditions and waveform inspector" width="100%"> |
 | A hardware-desk mixer with graphite channel strips, colour caps, scribble strips, knurled trim and pan pots, M/S/phase buttons, LED meters and a Master bus with LUFS/true-peak readouts. | An 8-lane step sequencer in the same desk vocabulary: velocity-lit step keys, trig conditions, probability, nudge, FILL, per-lane length, reverse, filter, live audition and groove-matched kits from your own sample library. |
 
 ### Sample Studio
