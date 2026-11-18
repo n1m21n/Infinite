@@ -2,12 +2,34 @@
 
 Render pictures, video and sound from a text file, with no window and no mouse. The headless engine is the same Infinite you already have, driven from the command line. Anything a patch can do in the app (3D, Field kernels, modulation, synths, effects) works here, and the output is deterministic: the same patch gives the same frames and the same samples.
 
+Who this guide is for:
+
+| You are | Use |
+|---|---|
+| Writing scripts, batch jobs or a render pipeline | The command line (section 4) |
+| Working in Infinite's Terminal panel | The `infinite` command (section 4.5) |
+| Connecting an AI agent (Claude Desktop, Cursor, Windsurf) | The MCP server from npm (section 4.6) |
+
+All three drive the same engine and read the same `.inf` files.
+
+New in 2.0:
+
+| Change | What it means |
+|---|---|
+| `--render --timeline` | Export the Timeline arrangement headless, not only the canvas graph |
+| `--frame --batch jobs.json` | Many frame renders in one process |
+| `--size` keeps alpha | Resized frames keep their transparency |
+| Isolated jobs | Each headless job runs on its own and gives the same result every time |
+| Sample analysis | Headless runs wait until samples are analysed before rendering |
+| New `infinite` verbs | `view2d-add`, Timeline clip copy, paste, split, duplicate and inspect, marker colour, `node drum`, `node mixer` |
+| MCP picture tools | `infinite_compare_frames`, `infinite_find_knob`, `infinite_node_effects` |
+
 ## 1. What you need
 
 | Need | Detail |
 |---|---|
 | The Infinite app | There is no separate package. The executable inside the app is the command-line tool. |
-| A graphics driver | Frames are drawn by the real GPU pipeline, so a machine with working OpenGL is required. |
+| A graphics driver | Frames are drawn by the real GPU pipeline, so a working GPU driver is required. |
 | Linux only: a virtual display | Run every render as `xvfb-run -a Infinite ...`. Without it you get `E_NO_DISPLAY`. |
 | A text editor | Patches are plain text files ending in `.inf`. |
 
@@ -146,7 +168,7 @@ The **last line printed** is always one JSON object with these fields: `ok`, `mo
 | 5 | Rendering failed |
 | 6 | Timeout. Raise `--timeout` |
 
-## 4.5 The `infinite` command
+### 4.5 The `infinite` command
 
 Inside Infinite's Terminal panel, `infinite` is on the PATH. A verb goes to the running app, or to the
 headless flags above when you give it a `.inf` file. `infinite` alone lists every verb; `infinite context`
@@ -182,6 +204,45 @@ and the node keeps its last good code.
 
 `patch check file.inf` runs loads, reachable, picture and sound in order and stops at the first failure. Add
 `--want moving-picture,sound` to fail a still picture, or a silent or clipping patch.
+
+### 4.6 AI agents: the MCP server
+
+The npm package `infinite-engine` connects Infinite to AI apps through the Model Context Protocol. It needs the Infinite app
+installed; it finds it through `INFINITE_BIN`, the usual install folders, or `PATH`.
+
+```
+npx -y infinite-engine init
+```
+
+`init` adds Infinite to Claude Desktop, Cursor and Windsurf if they are installed, keeps other servers in each config,
+and saves the old file next to it as `.infinite-backup`. Use `--dry-run` to see the plan, `--only claude|cursor|windsurf`
+to pick one app, and `npx -y infinite-engine status` to check the install. Restart the app afterwards.
+
+To configure by hand, add this to the app's `mcp.json` (on Windows, Claude Desktop needs
+`"command": "cmd", "args": ["/c", "npx", "-y", "infinite-engine", "serve"]`):
+
+```
+{ "mcpServers": { "infinite": { "command": "npx", "args": ["-y", "infinite-engine", "serve"] } } }
+```
+
+| Tool | What it does |
+|---|---|
+| `infinite_validate_patch` | Validate a patch with the real compiler: code, line, node and hint per issue |
+| `infinite_render_video` | Export an mp4 from a patch |
+| `infinite_render_field_pixel` | Render a Field pixel kernel to frames |
+| `infinite_render_field_primitive` | Render a parametric surface written as Field equations |
+| `infinite_render_field_modifier` | Deform a mesh with a Field displacement expression |
+| `infinite_render_sketch3d` | Render 3D geometry written in JavaScript to a PNG |
+| `infinite_synthesize_field_synth` | Make a WAV from a per-sample Field synth kernel |
+| `infinite_synthesize_field_notes` | Generate note sequences and Euclidean rhythms into audio |
+| `infinite_process_field_effect` | Run audio through a Field filter, reverb or distortion kernel |
+| `infinite_compare_frames` | Say in plain words whether two pictures match |
+| `infinite_find_knob` | Find which node and control give a wanted picture change, from measured renders |
+| `infinite_node_effects` | Measured table of what each effect and colour node, and each of its controls, does |
+
+Every result carries a credit line in an `attribution` field; nothing is written into your files. A second, Python MCP
+server (`tools/mcp` in the source, with tools such as `infinite_render_frame` and `infinite_audio_summary`) maps one tool
+to each headless command above. Both call the same engine; the developers page on infinitedevices.org covers it.
 
 ## 5. The patch file format
 
@@ -279,6 +340,7 @@ Not reachable from the CLI: selecting elements with the mouse in Edit Mode, draw
 | `E_NO_DISPLAY` (Linux) | Run under `xvfb-run -a` |
 | It validates but looks wrong | Run `--explain` and compare to what you meant |
 | Something moves too far or too little | A `mod` range is absolute. Check `lo` and `hi` |
+| A Prediction node (Drift, Moves, Predictive Notes, Rhythm, Quantize, Coloring, Velocity) sounds plainer than in the app | Headless runs do not load learned profiles; `--describe` marks these nodes `profile_dependent` |
 
 ## 9. Good practice
 
@@ -289,23 +351,13 @@ Not reachable from the CLI: selecting elements with the mouse in Edit Mode, draw
 - Quote the command line when a patch lives in a folder with spaces.
 - The output is deterministic, so a patch that renders correctly once renders the same way again. Frame renders hold the clock at zero from the first tick, so history nodes such as Time Machine render the same every run, and headless runs never read or write the learned prediction profiles. One known exception: a patch with Field Notes and any modulation cable can differ slightly between audio runs (about 0.1 dB in loudness in the case we measured).
 
-## 10. Documentation screenshots
-
-Headless renders pictures of a patch, but the nodes themselves (their panels, knobs and dropdowns) can only be photographed in the real app. Infinite ships a screenshot tool for that, so the manuals always match the build. It launches the app, drives it over the local control port, and saves one PNG per node at 2x.
-
-| Want | Run |
-|---|---|
-| One node | `python3 scripts/node_screenshot.py "Wavetable"` |
-| Every node type | `python3 scripts/screenshot_all_nodes.py --out docs/node_screenshots --settle-seconds 0.6` |
-
-Both need a Mac that is unlocked and awake, because the app must have a real window; they write the control token to `~/Library/Application Support/Infinite/control_token`. The Node Field Guide pulls its pictures from `docs/node_screenshots/`, and the brand screenshot standard (2x, real values, no personal paths) is in `docs/brand/BRAND.md` section 10.1.
-
-## 11. Where to go next
+## 10. Where to go next
 
 | Want | Look at |
 |---|---|
 | Every node and its controls | `Infinite --describe`, and the Node Reference Manual PDF |
-| The exact file format | `docs/reference/patch-format.md` |
-| What can be wired to what | `docs/reference/connection-rules.md` |
-| Starter patches | `assets/examples/authoring/` |
-| Field (the expression language) | The Field language skill documents under `.claude/skills/field-language/` |
+| The exact file format | [patch-format.md](https://github.com/n1m21n/Infinite/blob/main/docs/reference/patch-format.md) on GitHub |
+| What can be wired to what | [connection-rules.md](https://github.com/n1m21n/Infinite/blob/main/docs/reference/connection-rules.md) on GitHub |
+| Starter patches | [assets/examples/authoring](https://github.com/n1m21n/Infinite/tree/main/assets/examples/authoring) on GitHub |
+| Field (the expression language) | The Field Language Manual (PDF, infinitedevices.org) |
+| AI agents | `npx -y infinite-engine init`, and the developers page on infinitedevices.org |
