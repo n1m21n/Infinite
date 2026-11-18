@@ -374,15 +374,18 @@ def build():
     shots_ok = shots(items)
     bad = []
     for it in items:
-        txt = build_patch(it["t"], it["name"])
-        ok, why = validate(txt) if txt else (False, "no patch")
-        it["patch"] = txt if ok else None
-        if ok:
-            open(os.path.join(W, "assets/nodes/patches", it["slug"] + ".inf"), "w", encoding="utf-8").write(txt)
+        p = os.path.join(W, "assets/nodes/patches", it["slug"] + ".inf")
+        if not os.path.exists(BIN) and os.path.exists(p):
+            it["patch"] = open(p, encoding="utf-8").read()
         else:
-            bad.append((it["name"], why))
-            p = os.path.join(W, "assets/nodes/patches", it["slug"] + ".inf")
-            if os.path.exists(p): os.remove(p)
+            txt = build_patch(it["t"], it["name"])
+            ok, why = validate(txt) if txt else (False, "no patch")
+            it["patch"] = txt if ok else None
+            if ok:
+                open(p, "w", encoding="utf-8").write(txt)
+            else:
+                bad.append((it["name"], why))
+                if os.path.exists(p): os.remove(p)
         it["page"] = None
         if pages_txt and it["card"]:
             key = re.sub(r"\s+", " ", it["card"][1])[:50]
@@ -497,6 +500,17 @@ def head(title, desc, url, image, ld, rel="nodes/x.html", bodyclass="blog-page b
 """
 
 
+import build_html as _manual_html  # noqa
+_, _MANUAL_NORM = _manual_html.build_node_registry()
+
+
+def _manual_anchor(it):
+    for cand in (it["name"], it["type"], CARD_ALIAS.get(NORM(it["name"]), ""), CARD_ALIAS.get(NORM(it["type"]), "")):
+        if cand and NORM(cand) in _MANUAL_NORM:
+            return _MANUAL_NORM[NORM(cand)]
+    return "node-" + it["slug"]
+
+
 def page(it, items, bynorm):
     import sync_chrome as chrome
     rel = "nodes/%s.html" % it["slug"]
@@ -542,8 +556,8 @@ def page(it, items, bynorm):
     actions = []
     if it["patch"]:
         actions.append('<a class="btn btn-primary" href="../assets/nodes/patches/%s.inf" download>Download the patch</a>' % it["slug"])
-    pdf = "../assets/Infinite_Node_Reference_Manual.pdf" + ("#page=%d" % it["page"] if it["page"] else "")
-    actions.append('<a class="btn btn-ghost" href="%s" target="_blank" rel="noopener">Read it in the Field Guide</a>' % pdf)
+    manual_href = "../manual/#%s" % _manual_anchor(it)
+    actions.append('<a class="btn btn-ghost" href="%s">Read in the manual</a>' % manual_href)
     ins = "".join('<li><span class="np-kind" data-kind="%s">%s</span> %s</li>' % (e(w), e(w), e(lab)) for w, lab in kind_words(t["inputs"])) or "<li>None. It starts a chain.</li>"
     outs = "".join('<li><span class="np-kind" data-kind="%s">%s</span> %s</li>' % (e(w), e(w), e(lab)) for w, lab in kind_words(t["outputs"])) or "<li>None. It ends a chain.</li>"
     rows = "".join("<tr><th scope=\"row\">%s</th><td>%s</td><td>%s</td></tr>" % (e(a), e(b), e(c)) for a, b, c in it["ctr"])
