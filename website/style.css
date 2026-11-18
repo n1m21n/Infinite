@@ -782,6 +782,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 /* --------------------------------------------------------------------------
    Footer: the loop frame
    -------------------------------------------------------------------------- */
+main { padding-bottom: clamp(32px, 4vw, 48px); }   /* the page breathes before the footer */
 .site-footer { position: relative; z-index: 1; margin-top: clamp(56px, 7vw, 96px); padding: clamp(48px, 6vw, 64px) 0 calc(32px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); }
 .footer-top { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .footer-line {
@@ -1078,6 +1079,6 @@ p.mono { font-size: 0.84375rem; }
 .faq-arrow { width: 20px; height: 20px; flex-shrink: 0; color: var(--ink2); transition: transform var(--dur-small) var(--ease-out); }
 .faq-item[open] .faq-arrow { transform: rotate(180deg); }
 .faq-answer { padding: 0 20px 16px; color: var(--ink2); font-size: var(--fs-small); line-height: 1.55; }
-.faq-answer p { margin: 0; }
+.faq-answer p { margin: 0; max-width: 56ch; }   /* long-line measure: about 70 characters a line */
 
 .product-shot.is-wide { object-fit: contain; background: var(--midnight-950, #0d1020); }

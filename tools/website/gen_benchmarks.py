@@ -637,7 +637,7 @@ def page(body, n):
     head = re.sub(r'(twitter:image" content=")[^"]*', lambda m: m.group(1) + BASE + "assets/og-image.jpg", head)
     head = head.replace('  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n', "")
     head = re.sub(r'  <script type="application/ld\+json">.*?</script>\n', "", head, flags=re.S)   # the template's own JSON-LD
-    head = head.replace("extensions.css?v=4f22d1ae", "benchmarks.css?v=c060dbfd")
+    head = head.replace("extensions.css?v=4f22d1ae", "benchmarks.css?v=a2d56c8f")
     head += f'  <link rel="alternate" type="application/json" href="assets/benchmarks.json" title="Benchmark data">\n  <link rel="alternate" type="application/pdf" href="assets/{PDF_NAME}" title="Benchmark report (PDF)">\n'
     head += f'  <script type="application/ld+json">\n{jsonld(n)}\n  </script>\n'
     nav_start = rest.index("<body")
