@@ -42,6 +42,7 @@
 #include "../common/SubjectMaskOnnx.h"
 
 #include <algorithm>
+#include <cstring>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -1130,6 +1131,51 @@ namespace Platform
       return out;
    }
 
+   bool SetClipboardImage(const std::vector<unsigned char>& png, const std::vector<unsigned char>& rgba, int w, int h)
+   {
+      if (!OpenClipboard(nullptr))
+         return false;
+      EmptyClipboard();
+      bool any = false;
+      // "PNG" keeps alpha for apps that read it; CF_DIB (32-bit, top-down) for the rest.
+      if (!png.empty())
+         if (HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE, png.size()))
+         {
+            std::memcpy(GlobalLock(g), png.data(), png.size());
+            GlobalUnlock(g);
+            if (SetClipboardData(RegisterClipboardFormatW(L"PNG"), g) != nullptr)
+               any = true;
+            else
+               GlobalFree(g);
+         }
+      if (w > 0 && h > 0 && rgba.size() >= (size_t)w * h * 4)
+      {
+         const size_t bytes = sizeof(BITMAPINFOHEADER) + (size_t)w * h * 4;
+         if (HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE, bytes))
+         {
+            unsigned char* p = (unsigned char*)GlobalLock(g);
+            BITMAPINFOHEADER bi = {};
+            bi.biSize = sizeof(bi);
+            bi.biWidth = w;
+            bi.biHeight = -h;
+            bi.biPlanes = 1;
+            bi.biBitCount = 32;
+            bi.biCompression = BI_RGB;
+            std::memcpy(p, &bi, sizeof(bi));
+            unsigned char* d = p + sizeof(bi);
+            for (size_t i = 0; i < (size_t)w * h; i++)
+               d[i * 4] = rgba[i * 4 + 2], d[i * 4 + 1] = rgba[i * 4 + 1], d[i * 4 + 2] = rgba[i * 4], d[i * 4 + 3] = rgba[i * 4 + 3];
+            GlobalUnlock(g);
+            if (SetClipboardData(CF_DIB, g) != nullptr)
+               any = true;
+            else
+               GlobalFree(g);
+         }
+      }
+      CloseClipboard();
+      return any;
+   }
+
    bool ClipboardImage(std::vector<unsigned char>& outPng, std::vector<unsigned char>& outRgba, int& outW, int& outH)
    {
       outPng.clear(), outRgba.clear(), outW = outH = 0;
@@ -1760,10 +1806,10 @@ namespace Platform
    namespace
    {
       WNDPROC sPenPrevProc = nullptr;
-      float sPenPressure = -1.0f;
+      PenSample sPenSample;
 
       // Pen input reaches the window as WM_POINTER* before Windows turns it
-      // into mouse messages, so read the pressure here and pass everything on.
+      // into mouse messages, so read the pen sample here and pass everything on.
       LRESULT CALLBACK PenProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
       {
          if (msg == WM_POINTERDOWN || msg == WM_POINTERUPDATE)
@@ -1773,27 +1819,36 @@ namespace Platform
             if (GetPointerType(id, &type) && type == PT_PEN)
             {
                POINTER_PEN_INFO info = {};
-               if (GetPointerPenInfo(id, &info) && (info.penMask & PEN_MASK_PRESSURE))
-                  sPenPressure = info.pressure / 1024.0f;
+               if (GetPointerPenInfo(id, &info))
+               {
+                  sPenSample.active = true;
+                  sPenSample.pressure = (info.penMask & PEN_MASK_PRESSURE) ? (info.pressure / 1024.0f) : 1.0f;
+                  sPenSample.tiltX = (info.penMask & PEN_MASK_TILT_X) ? std::clamp(info.tiltX / 90.0f, -1.0f, 1.0f) : 0.0f;
+                  sPenSample.tiltY = (info.penMask & PEN_MASK_TILT_Y) ? std::clamp(info.tiltY / 90.0f, -1.0f, 1.0f) : 0.0f;
+                  sPenSample.rotation = (info.penMask & PEN_MASK_ROTATION) ? (float)info.rotation : 0.0f;
+                  sPenSample.timestamp = info.pointerInfo.dwTime != 0 ? (double)info.pointerInfo.dwTime * 0.001 : (double)GetTickCount64() * 0.001;
+               }
             }
             else
-               sPenPressure = -1.0f;
+               sPenSample = PenSample{};
          }
          return CallWindowProcW(sPenPrevProc, hwnd, msg, wp, lp);
       }
    }
 
-   float PenPressure(GLFWwindow* window)
+   PenSample PenNowSample(GLFWwindow* window)
    {
       static HWND sHooked = nullptr;
       HWND hwnd = window ? glfwGetWin32Window(window) : nullptr;
-      if (hwnd && hwnd != sHooked && sHooked == nullptr)
+      if (hwnd && hwnd != sHooked && sPenPrevProc == nullptr)
       {
          sPenPrevProc = (WNDPROC)SetWindowLongPtrW(hwnd, GWLP_WNDPROC, (LONG_PTR)PenProc);
          sHooked = hwnd;
       }
-      return sPenPressure;
+      return sPenSample;
    }
+
+   float PenPressure(GLFWwindow* window) { return PenNowSample(window).pressure; }
 
    bool GpuPreferenceSupported() { return true; }
 
