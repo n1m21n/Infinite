@@ -598,7 +598,7 @@ bool RunEffectMixAndLimiterFixture()
          for (float bits : { 1.0f, 4.0f, 8.0f })
          {
             auto node = makeCrush(bits, 0.0f);
-            const int n = 1 << 16;
+            static constexpr int n = 1 << 16;
             std::vector<std::vector<float>> out;
             DelayTest::RunSamples(*node, n, 1, [](int i, int) { return -1.0f + 2.0f * (float)i / (float)n; }, &out);
             std::vector<float> v = out[0];
@@ -800,9 +800,9 @@ bool RunEffectMixAndLimiterFixture()
    // solo-safe and pan law, and a default strip still mixes exactly as before.
    // Inputs are a short phrase (two notes, an attack and a decay), not a held tone.
    {
-      constexpr int kBlock = 64;
-      constexpr int kBlocks = 40;
-      constexpr int kN = kBlock * kBlocks;
+      static constexpr int kBlock = 64;
+      static constexpr int kBlocks = 40;
+      static constexpr int kN = kBlock * kBlocks;
       const double sr = 48000.0;
       auto phrase = [&](int slot, int i, int ch) {
          const double t = (double)i / sr;

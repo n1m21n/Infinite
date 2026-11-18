@@ -32,7 +32,7 @@ def main():
     sections = []
     main_html = convert("## " + body, sections)
     try:
-        ver = subprocess.run([os.path.join(ROOT, "build/Infinite.app/Contents/MacOS/Infinite"), "--version"],
+        ver = subprocess.run([os.environ.get("INFINITE_APP", os.path.join(ROOT, "build/Infinite.app/Contents/MacOS/Infinite")), "--version"],
                              capture_output=True, text=True).stdout.strip().splitlines()[-1:] or [""]
     except OSError:                       # no local build (cloud container): keep the version already printed in the guide
         ver = ["v0.6.0"]

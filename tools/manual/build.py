@@ -153,7 +153,7 @@ def front_html():
     assert cover.endswith("</div>")
     cover = cover[:-len("</div>")] + legend + "</div>"
     rows = [(i, t, d) for i, (t, d) in enumerate(OLD_CHAPTERS, 1)] + [(c["n"], c["title"], NEW_BLURBS[c["n"]]) for c in NEW_CHAPTERS]
-    rows += [(CHAPTER_COUNT + 1, "Using the App: Panels, Menus & Settings", "dropdowns, panels, shortcuts, settings, with screenshots"),
+    rows += [(CHAPTER_COUNT + 1, "Using the App: Panels & Settings", "panels, shortcuts and settings, with screenshots"),
              (CHAPTER_COUNT + 2, "Gallery: Every Node", "all node types in one picture index")]
 
     def li(r):

@@ -6,7 +6,7 @@ Sources, all in the repository:
   engine   tools/website/data/node_types.json   the engine's own `Infinite --describe` (category, inputs, outputs, controls with ranges).
                                                 Refresh with: python3 tools/website/gen_nodes.py --refresh
   words    tools/manual/cards_base.json, cards.py, cards_v06.py   the Node Field Guide's text: description, try-it, chain.
-           tools/website/data/pdf_cards.json    cards only the PDF has (audio effects, 3D basics), read from assets/The_Node_Field_Guide.pdf.
+           tools/website/data/pdf_cards.json    cards only the PDF has (audio effects, 3D basics), read from assets/Infinite_Node_Reference_Manual.pdf.
   picture  docs/node_screenshots/*.png          zoomed captures of the node in the running app, shrunk to webp.
   list     website/nodes.js                      NODE_LIBRARY, the names in the marquee.
 Each patch is built from the node's own inputs and outputs (a source for every input, a sink for the output) and must pass the engine's
@@ -108,7 +108,7 @@ def guide_cards():
 
 def refresh_pdf_cards():
     """Cards only the PDF has: a node name on its own line with its description under it (the audio effects and 3D basics chapters)."""
-    txt = subprocess.run(["pdftotext", "-layout", os.path.join(W, "assets/The_Node_Field_Guide.pdf"), "-"], capture_output=True, text=True, check=True).stdout.split("\n")
+    txt = subprocess.run(["pdftotext", "-layout", os.path.join(W, "assets/Infinite_Node_Reference_Manual.pdf"), "-"], capture_output=True, text=True, check=True).stdout.split("\n")
     want = {NORM(n) for n, _ in library()}
     have = set(guide_cards())
     found, chapter = {}, ""
@@ -331,10 +331,10 @@ def fallback_desc(name, t, ctr):
 
 
 def pdf_pages():
-    """{normalised node name: page} for The_Node_Field_Guide.pdf, found by the description text."""
+    """{normalised node name: page} for Infinite_Node_Reference_Manual.pdf, found by the description text."""
     pages = {}
     try:
-        txt = subprocess.run(["pdftotext", "-layout", os.path.join(W, "assets/The_Node_Field_Guide.pdf"), "-"], capture_output=True, text=True, check=True).stdout.split("\f")
+        txt = subprocess.run(["pdftotext", "-layout", os.path.join(W, "assets/Infinite_Node_Reference_Manual.pdf"), "-"], capture_output=True, text=True, check=True).stdout.split("\f")
     except Exception:
         return pages
     return [re.sub(r"\s+", " ", t) for t in txt]
@@ -542,7 +542,7 @@ def page(it, items, bynorm):
     actions = []
     if it["patch"]:
         actions.append('<a class="btn btn-primary" href="../assets/nodes/patches/%s.inf" download>Download the patch</a>' % it["slug"])
-    pdf = "../assets/The_Node_Field_Guide.pdf" + ("#page=%d" % it["page"] if it["page"] else "")
+    pdf = "../assets/Infinite_Node_Reference_Manual.pdf" + ("#page=%d" % it["page"] if it["page"] else "")
     actions.append('<a class="btn btn-ghost" href="%s" target="_blank" rel="noopener">Read it in the Field Guide</a>' % pdf)
     ins = "".join('<li><span class="np-kind" data-kind="%s">%s</span> %s</li>' % (e(w), e(w), e(lab)) for w, lab in kind_words(t["inputs"])) or "<li>None. It starts a chain.</li>"
     outs = "".join('<li><span class="np-kind" data-kind="%s">%s</span> %s</li>' % (e(w), e(w), e(lab)) for w, lab in kind_words(t["outputs"])) or "<li>None. It ends a chain.</li>"
