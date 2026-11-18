@@ -7,13 +7,13 @@ Needs PIL."""
 import os, sys
 from PIL import Image, ImageChops
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-OUT = os.path.join(ROOT, "docs", "screenshots", "v1")
+OUT = os.path.join(ROOT, "docs", "screenshots", "v2")
 BG = (21, 25, 48)
 GALLERY = {
     "sound": ["Synths__Piano", "Synths__Analog", "Synths__Granular", "Synths__Generate_Samples"],
     "control": ["Modulators__LFO", "Modulators__Audio_Analyze", "Notes__Arpeggiator", "Notes__Note_Sequencer"],
 }
-H, GAP, PAD = 400, 24, 24
+H, GAP, PAD = 900, 40, 40
 
 def trim(im):
     bg = im.getpixel((2, 2))

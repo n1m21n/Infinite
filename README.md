@@ -200,9 +200,6 @@ That is the one idea underneath the language: a **kernel**, run once per element
 
 Any element, pixel or sample kernel can declare **dynamic pins** in its code, adding real, cable-wireable, save-safe inputs and outputs without touching C++. Finished devices (kernel, params and presets) save and share as portable `.field` files. The full reference is in the [Field Language Manual](Field_Language_Manual.pdf).
 
-<p align="center">
-  <img src="docs/screenshots/v2/field-editor.png" alt="The Field Pixel editor beside its node" width="100%">
-</p>
 
 
 Field is not the only way to write code in Infinite. **Sketch** draws images with JavaScript (with SVG animation), **Sketch 3D** builds meshes with JavaScript, the **GLSL Formula** node is a live shader editor, and **expressions** (`infinite expr`) drive any parameter from a formula. `infinite code new | check | watch | docs | examples` writes and checks all of them against the real compilers.

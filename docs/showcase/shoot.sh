@@ -86,7 +86,7 @@ for s in $SHOTS; do
                   c panel perf open right >/dev/null; c panel view3d open bottom >/dev/null
                   c view fit >/dev/null; sleep 4 ;;
    sample-studio) c panel samplestudio open top >/dev/null; c view fit >/dev/null; sleep 4 ;;
-   terminal)      c panel terminal open right >/dev/null; c view fit >/dev/null; sleep 8
+   terminal)      c panel terminal open right >/dev/null; c term open >/dev/null 2>&1 || true; c view fit >/dev/null; sleep 8
                   n=0; until c term send " " >/dev/null 2>&1 || [ $n -ge 20 ]; do sleep 2; n=$((n+1)); done
                   c term send "PROMPT='%1~ %% '; cd '$SHOW'; clear
 " >/dev/null; sleep 1
@@ -101,6 +101,7 @@ for s in $SHOTS; do
    2d-view)       c select ${SEL2D:-3} >/dev/null; c panel view2d open top >/dev/null; sleep 5 ;;
    field-patcher) c select FieldPixel >/dev/null; c view fit >/dev/null; c panel fieldpatcher open fill >/dev/null; sleep 4 ;;
    curve-editor)  c panel curveeditor open top >/dev/null; sleep 4 ;;
+   field-editor)  c select FieldPixel >/dev/null; c panel fieldpatcher open top >/dev/null; sleep 4 ;;
    *) echo "unknown shot $s"; continue ;;
    esac
    keep "$s"
