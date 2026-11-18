@@ -3596,7 +3596,7 @@ Tools on the strip	Werkzeuge am Kanal
 Tracking	Tracking
 Turn its sends off first.	Zuerst die Sends ausschalten.
 Turn on	Einschalten
-Turn the canvas, or turn it back upright; a two-finger turn on a trackpad works too	Canvas drehen oder wieder aufrichten; eine Zweifinger-Drehung auf dem Trackpad funktioniert ebenfalls
+Turn the canvas, or turn it back upright	Canvas drehen oder wieder aufrichten
 Turn this layer into pixels so the tool can work on it	Diese Ebene in Pixel umwandeln, damit das Werkzeug damit arbeiten kann
 Underline	Unterstreichen
 Underline colour	Unterstreichfarbe
@@ -3738,3 +3738,4 @@ Tilt size	Neigungsgröße
 Trim Transparent Edges	Transparente Ränder zuschneiden
 Underlying	Darunterliegende Ebene
 White from	Weiß ab
+Remove Background	Hintergrund entfernen

@@ -3596,7 +3596,7 @@ Tools on the strip	Инструменты на канале
 Tracking	Трекинг
 Turn its sends off first.	Сначала выключите его send'ы.
 Turn on	Включить
-Turn the canvas, or turn it back upright; a two-finger turn on a trackpad works too	Поворот холста или возврат в исходное положение; работает и поворот двумя пальцами на трекпаде
+Turn the canvas, or turn it back upright	Поворот холста или возврат в исходное положение
 Turn this layer into pixels so the tool can work on it	Превратить этот слой в пиксели, чтобы инструмент мог с ним работать
 Underline	Подчёркивание
 Underline colour	Цвет подчёркивания
@@ -3738,3 +3738,4 @@ Tilt size	Размер от наклона
 Trim Transparent Edges	Обрезать прозрачные края
 Underlying	Нижний слой
 White from	Белый от
+Remove Background	Удалить фон

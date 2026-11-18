@@ -25,6 +25,9 @@ jobs:
           ref: ${{ inputs.ref }}
           submodules: recursive
 
+      - name: Install Pillow for installer art
+        run: python3 -m pip install --quiet --break-system-packages pillow || python3 -m pip install --quiet pillow
+
       - name: Build DMG and PKG
         run: ./package.sh
 

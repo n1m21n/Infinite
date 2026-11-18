@@ -435,7 +435,10 @@ namespace app
                      [n](int i) { n->outputMode = i; });
 
       if (ActionButton::Draw("Remove Background", ImVec2(kPreviewSize, 0)))
+      {
+         PushUndoCheckpoint("Remove Background");
          n->RequestMask();
+      }
 
       PushTextWrapWidth(kPreviewSize);
       ImGui::TextDisabled("%s", n->Status().c_str());

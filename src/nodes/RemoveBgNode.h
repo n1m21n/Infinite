@@ -44,9 +44,13 @@ public:
    ImageCable& Input() { return mInput; }
    INode* BypassSource() override { return mInput.GetSource(); }
 
-   void RequestMask() { mNeedsMask = true; }
+   void RequestMask() { maskActive = true; mNeedsMask = true; }
+   // Patch load, undo/redo, and copy/paste reconstruct nodes without GL textures;
+   // re-request the mask automatically whenever one was previously applied.
+   void ReloadDerived() { if (maskActive && mMaskTex == 0 && !mMaskInFlight) mNeedsMask = true; }
    const std::string& Status() const { return mStatus; }
    bool HasMask() const { return mMaskTex != 0; }
+   bool NeedsMask() const { return mNeedsMask; }
 
    int mode = 0;         // 0 = subject, 1 = person
    int outputMode = 0;   // 0 = cutout, 1 = mask only, 2 = background only
@@ -57,6 +61,7 @@ public:
    float refreshFrames = 30.0f;   // recompute every N rendered frames (fps-based, not BPM)
    float bgColor[3] = { 0.0f, 0.0f, 0.0f };
    float bgOpacity = 0.0f;
+   bool maskActive = false;       // true once Remove Background has been triggered (persists across undo/reload)
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -65,6 +70,7 @@ public:
       v.Float("contrast", contrast);
       v.Bool("autoRefresh", autoRefresh); v.Float("refreshFrames", refreshFrames);
       v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
+      v.Bool("maskActive", maskActive);
    }
 
 private:
@@ -86,12 +92,14 @@ private:
       std::vector<unsigned char> mask;
       std::vector<unsigned char> pixels;
       int width = 0, height = 0;
+      Platform::MattingMode mode = Platform::MattingMode::Subject;
       uint64_t serial = 0;
       bool ok = false;
       std::string error;
    };
 
    bool EnsureShader();
+   void UploadMaskAndPaired(const unsigned char* mask, const unsigned char* pixels, int w, int h);
    void SubmitMaskRequest(unsigned int srcTex, int w, int h);
    void PollMaskResult();
    void EnsureWorkerStarted();

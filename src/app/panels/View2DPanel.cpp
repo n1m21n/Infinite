@@ -257,7 +257,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, RemoveBg, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -6083,6 +6083,8 @@ namespace
                      sPending.what = doc->HasSelection() ? Pending::MaskFromSel : Pending::AddMask;
                   if (k->HasPixelMask() && MenuParts::Item(T("Delete Layer Mask"))) sPending.what = Pending::RemoveMask;
                }
+               if ((k->kind == Kind::Paint || k->kind == Kind::Node) && MenuParts::Item(T("Remove Background")))
+                  sPending.what = Pending::RemoveBg;
                MenuParts::Separator();
             }
             NodeChoiceMenu(T("Add Node as Layer"), doc, Pending::AddNode, 0);
@@ -6422,30 +6424,41 @@ namespace
       const bool space = hovered && ImGui::IsKeyDown(ImGuiKey_Space) && !io.WantTextInput;
       const bool panTool = sTool == kHand || space;
       const bool sizeDragHint = BrushTool(sTool) && io.KeyAlt && (io.KeyCtrl || io.KeySuper);
-      // Two fingers never pan: they zoom, softly, about the pointer (a pinch arrives as Ctrl + wheel and zooms a
-      // little faster). Panning is the Hand tool, Space-drag, middle-drag, or Shift + wheel.
+      // Trackpad pinch zooms around the pointer cleanly; two-finger rotation is disabled so pinching never tilts the
+      // canvas. On macOS, two-finger scroll pans 1:1 (Ctrl/Cmd/Alt + wheel zooms). Hand tool, Space-drag, middle-drag,
+      // and Shift + wheel pan on every OS.
+      const double pinchDelta = TrackpadPinchThisFrame();
+      if (hovered && std::fabs(pinchDelta) > 0.0005 && sOp.kind == 0)
+         ZoomAt(doc, (float)std::clamp(1.0 + pinchDelta, 0.25, 4.0), mouse);
       if (hovered && (io.MouseWheel != 0.0f || io.MouseWheelH != 0.0f))
       {
+         const bool modZoom = io.KeyCtrl || io.KeySuper || io.KeyAlt;
+#ifdef __APPLE__
+         if (modZoom)
+         {
+            sZoomVel += io.MouseWheel * 0.10f;
+            sZoomAt = mouse;
+         }
+         else if (io.KeyShift)
+         {
+            sPan.x += (io.MouseWheelH + io.MouseWheel) * 12.0f;
+         }
+         else
+         {
+            sPan.x += io.MouseWheelH * 10.0f;
+            sPan.y += io.MouseWheel * 10.0f;
+         }
+#else
          if (io.KeyShift)
          {
             sPan.x += (io.MouseWheelH + io.MouseWheel) * 12.0f;
          }
          else
          {
-            const bool pinch = io.KeyCtrl || io.KeySuper || io.KeyAlt;
-            sZoomVel += io.MouseWheel * (pinch ? 0.10f : 0.045f);
+            sZoomVel += io.MouseWheel * (modZoom ? 0.10f : 0.045f);
             sZoomAt = mouse;
          }
-      }
-      {
-         // A two-finger turn on the trackpad turns the view about the pointer. Drained every frame so a turn made
-         // elsewhere never lands here later.
-         static int sRotFrame = -2;
-         const double turn = Platform::PollTrackpadRotationDelta();
-         const bool fresh = sRotFrame == ImGui::GetFrameCount() - 1;
-         sRotFrame = ImGui::GetFrameCount();
-         if (hovered && fresh && turn != 0.0 && sOp.kind == 0)
-            TurnViewAbout(doc, -(float)turn * 3.14159265f / 180.0f, mouse);
+#endif
       }
       if (std::fabs(sZoomVel) > 0.0005f)
       {
@@ -6894,11 +6907,16 @@ namespace
                   sSel.clear();
                if (hit == 0)
                {
-                  // Dragging over empty canvas rubber-bands layers; Shift adds to the selection.
-                  BeginOp(doc, 17, mouse, nullptr);
-                  sOp.docStart = sMouseDoc;
-                  sOp.selOp = io.KeyShift ? 1 : 0;
-                  sOp.before.clear();
+                  // With no layers to select, dragging moves the canvas; otherwise dragging empty canvas rubber-bands.
+                  if (doc->Layers().empty())
+                     BeginOp(doc, 4, mouse, nullptr);
+                  else
+                  {
+                     BeginOp(doc, 17, mouse, nullptr);
+                     sOp.docStart = sMouseDoc;
+                     sOp.selOp = io.KeyShift ? 1 : 0;
+                     sOp.before.clear();
+                  }
                }
                else if (!sSel.empty())
                   BeginOp(doc, 1, mouse, "Move layer");
@@ -10004,6 +10022,8 @@ namespace
             if (l->kind == Kind::Vector && MenuParts::Item(T("Convert to Sketch Node"), nullptr)) sPending.what = Pending::ToSketch;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Shapes"), nullptr)) sPending.what = Pending::ToShapes;
+            if ((l->kind == Kind::Paint || l->kind == Kind::Node) && MenuParts::Item(T("Remove Background"), nullptr))
+               sPending.what = Pending::RemoveBg;
             if (MenuParts::Item(T("Layer as Output"), nullptr, l->output)) sPending.what = Pending::LayerOutput;
             if (doc->CanTakeBelow(*l) && MenuParts::Item(T("Effect on Below"), nullptr, l->below)) sPending.what = Pending::LayerBelow;
             if (l->warpOn && MenuParts::Item(T("Reset Distort"), nullptr))
@@ -10926,7 +10946,11 @@ namespace
             Touch();
          UndoOnActivate("Effect");
       }
-      void Bool(const char* name, bool& v) override { BoolRow(ParamLabel(name).c_str(), &v); }
+      void Bool(const char* name, bool& v) override
+      {
+         if (std::strcmp(name, "maskActive") != 0)
+            BoolRow(ParamLabel(name).c_str(), &v);
+      }
       void Text(const char*, std::string&) override {}
       void Color(const char* name, float rgb[3]) override
       {
@@ -11052,6 +11076,17 @@ namespace
       }
       EffParamRows rows;
       gn->node->VisitParams(rows);
+      if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn->node.get()))
+      {
+         if (ActionButton::Draw((std::string(T("Remove Background")) + base + "rbg").c_str(), ImVec2(-1.0f, 0.0f),
+                                ActionButton::Kind::Plain))
+         {
+            PushUndoCheckpoint("Remove Background");
+            rbg->RequestMask();
+            Touch();
+         }
+         ImGui::TextDisabled("%s", rbg->Status().c_str());
+      }
       if (ActionButton::Draw((std::string(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show)) + base + "show").c_str(), ImVec2(-1.0f, 0.0f),
                              ActionButton::Kind::Plain))
       {
@@ -11248,6 +11283,62 @@ namespace
       Touch();
    }
 
+   // Attaches a node effect from `kNodeEffects` to `layerId` and triggers it immediately if applicable.
+   void AddNodeEffect(Scene2DNode* doc, int layerId, int nodeIdx)
+   {
+      if (nodeIdx < 0 || nodeIdx >= (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0])))
+         return;
+      const NodeEffectEntry& ne = kNodeEffects[nodeIdx];
+      GraphNode* host = nullptr;
+      for (GraphNode& gn : gNodes)
+         if (gn.node.get() == doc)
+            host = &gn;
+      const float x = host != nullptr ? host->liveX - 300.0f : 0.0f, y = host != nullptr ? host->liveY + 200.0f : 0.0f;
+      if (const uint64_t uid = SpawnEffectNode(ne, x, y))
+      {
+         Scene2DNode::Effect e;
+         e.uid = uid;
+         e.entry = ne.label;
+         e.shown = true;
+         e.animated = ne.animated;
+         e.toMask = ne.toMask;
+         if (GraphNode* spawnedGn = FindNodeByUid(uid))
+            if (auto* rbg = dynamic_cast<RemoveBgNode*>(spawnedGn->node.get()))
+               rbg->RequestMask();
+         if (Layer* again = doc->FindLayer(layerId))
+            again->effects.push_back(e);
+         Touch();
+      }
+   }
+
+   // Removes the background on `layerId` via an attached Remove Background effect (reusing any existing one).
+   void RemoveBackgroundOnLayer(Scene2DNode* doc, int layerId)
+   {
+      Layer* l = doc->FindLayer(layerId);
+      if (l == nullptr)
+         return;
+      for (Scene2DNode::Effect& e : l->effects)
+      {
+         if (e.uid == 0)
+            continue;
+         if (GraphNode* gn = FindNodeByUid(e.uid))
+            if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn->node.get()))
+            {
+               PushUndoCheckpoint("Remove Background");
+               e.on = true;
+               rbg->RequestMask();
+               Touch();
+               return;
+            }
+      }
+      for (int k = 0; k < (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0])); k++)
+         if (std::strcmp(kNodeEffects[k].type, "Remove Background") == 0)
+         {
+            AddNodeEffect(doc, layerId, k);
+            return;
+         }
+   }
+
    // Adds, moves and removes effects after the rows are drawn (adding spawns nodes, which can move gNodes).
    void ApplyEffectEdits(Scene2DNode* doc)
    {
@@ -11255,9 +11346,9 @@ namespace
       if (sEffAdd.layer != 0 && sEffAdd.doc == sDocUid)
          if (Layer* l = doc->FindLayer(sEffAdd.layer))
          {
-            S::Effect e;
             if (sEffAdd.native >= 0)
             {
+               S::Effect e;
                e.adjType = sEffAdd.native;
                e.adjAmt = S::AdjDefault(e.adjType);
                e.adjP = S::AdjParamDefault(e.adjType);
@@ -11272,23 +11363,7 @@ namespace
             }
             else if (sEffAdd.node >= 0)
             {
-               const NodeEffectEntry& ne = kNodeEffects[sEffAdd.node];
-               GraphNode* host = nullptr;
-               for (GraphNode& gn : gNodes)
-                  if (gn.node.get() == doc)
-                     host = &gn;
-               const float x = host != nullptr ? host->liveX - 300.0f : 0.0f, y = host != nullptr ? host->liveY + 200.0f : 0.0f;
-               if (const uint64_t uid = SpawnEffectNode(ne, x, y))
-               {
-                  e.uid = uid;
-                  e.entry = ne.label;
-                  e.shown = true;
-                  e.animated = ne.animated;
-                  e.toMask = ne.toMask;
-                  if (Layer* again = doc->FindLayer(sEffAdd.layer))
-                     again->effects.push_back(e);
-                  Touch();
-               }
+               AddNodeEffect(doc, sEffAdd.layer, sEffAdd.node);
             }
          }
       sEffAdd = {};
@@ -12302,6 +12377,11 @@ namespace
             doc->RemovePixelMask(a->id);
             sEditMask = false;
          }
+         break;
+      case Pending::RemoveBg:
+         if (Layer* a = Active(doc))
+            if (a->kind == Kind::Paint || a->kind == Kind::Node)
+               RemoveBackgroundOnLayer(doc, a->id);
          break;
       case Pending::ToDraw:
          if (Layer* a = Active(doc))

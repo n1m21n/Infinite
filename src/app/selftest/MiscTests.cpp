@@ -16,6 +16,7 @@
 #include "miniz.h"
 #include "core/MediaCollect.h"
 #include "nodes/FormulaNode.h"
+#include "nodes/RemoveBgNode.h"
 #include "audio/AudioNode.h"
 #include "audio/MusicTime.h"
 #include "core/Transport.h"
@@ -3380,8 +3381,30 @@ int RunRemoveBgTest()
       ok = ok && allCornersBelow;
    }
 
+   // Undo anywhere in the app rebuilds the graph via ApplyPatchData; maskActive must
+   // survive and ReloadDerivedState must re-arm mNeedsMask automatically.
+   NewPatch();
+   GraphNode* rbgGn = SpawnNode("Remove Background", "Compositing", 0.0f, 0.0f);
+   auto* rbgBefore = rbgGn != nullptr ? dynamic_cast<RemoveBgNode*>(rbgGn->node.get()) : nullptr;
+   bool undoOk = rbgBefore != nullptr && !rbgBefore->maskActive && !rbgBefore->NeedsMask();
+   if (rbgBefore != nullptr)
+   {
+      rbgBefore->RequestMask();
+      PushUndoCheckpoint("Later action");
+      SpawnNode("Null", "Compositing", 200.0f, 0.0f);
+      Undo();
+      RemoveBgNode* rbgAfter = nullptr;
+      for (GraphNode& gn : gNodes)
+         if (auto* p = dynamic_cast<RemoveBgNode*>(gn.node.get()))
+            rbgAfter = p;
+      undoOk = undoOk && rbgAfter != nullptr && rbgAfter->maskActive && rbgAfter->NeedsMask();
+   }
+   NewPatch();
+   printf("REMOVEBG undo persistence: %s\n", undoOk ? "OK" : "FAIL");
+   ok = ok && undoOk;
+
    printf("%s\n", ok ? "REMOVEBGTEST OK" : "REMOVEBGTEST FAIL");
-   return 0;
+   return ok ? 0 : 1;
 }
 
 // ======================================================= INFINITE_NETWORKTEST

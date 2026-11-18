@@ -611,7 +611,10 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return RunAutosaveMarkerTest();
 
    if (getenv("INFINITE_REMOVEBGTEST") != nullptr)
+   {
+      RegisterNodes();
       return RunRemoveBgTest();
+   }
 
    if (getenv("INFINITE_NETWORKTEST") != nullptr)
       return RunNetworkTest();

@@ -3596,7 +3596,7 @@ Tools on the strip	Herramientas en la pista
 Tracking	Seguimiento
 Turn its sends off first.	Desactiva antes sus envíos.
 Turn on	Activar
-Turn the canvas, or turn it back upright; a two-finger turn on a trackpad works too	Gira el lienzo o devuélvelo a su posición; el giro con dos dedos en el trackpad también funciona
+Turn the canvas, or turn it back upright	Gira el lienzo o devuélvelo a su posición
 Turn this layer into pixels so the tool can work on it	Convierte esta capa en píxeles para que la herramienta pueda trabajar en ella
 Underline	Subrayado
 Underline colour	Color del subrayado
@@ -3738,3 +3738,4 @@ Tilt size	Tamaño por inclinación
 Trim Transparent Edges	Recortar bordes transparentes
 Underlying	Capa subyacente
 White from	Blanco desde
+Remove Background	Quitar fondo

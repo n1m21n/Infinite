@@ -3596,7 +3596,7 @@ Tools on the strip	ストリップのツール
 Tracking	トラッキング
 Turn its sends off first.	先にセンドをオフにしてください。
 Turn on	オンにする
-Turn the canvas, or turn it back upright; a two-finger turn on a trackpad works too	旋转画布，或将其转回正向；触控板双指旋转也可用
+Turn the canvas, or turn it back upright	キャンバスを回転、または元に戻す
 Turn this layer into pixels so the tool can work on it	このレイヤーをピクセルに変換してツールで編集できるようにします
 Underline	下線
 Underline colour	下線の色
@@ -3738,3 +3738,4 @@ Tilt size	傾きサイズ
 Trim Transparent Edges	透明な端をトリミング
 Underlying	下のレイヤー
 White from	白の下限
+Remove Background	背景を削除

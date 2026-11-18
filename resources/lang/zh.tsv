@@ -3596,7 +3596,7 @@ Tools on the strip	通道上的工具
 Tracking	字间距
 Turn its sends off first.	请先关闭其发送。
 Turn on	开启
-Turn the canvas, or turn it back upright; a two-finger turn on a trackpad works too	キャンバスを回転、または元に戻す。トラックパッドの2本指回転も使えます
+Turn the canvas, or turn it back upright	旋转画布，或将其转回正向
 Turn this layer into pixels so the tool can work on it	将此图层转为像素，以便工具处理
 Underline	下划线
 Underline colour	下划线颜色
@@ -3738,3 +3738,4 @@ Tilt size	倾斜大小
 Trim Transparent Edges	修剪透明边缘
 Underlying	下一图层
 White from	白色从
+Remove Background	移除背景

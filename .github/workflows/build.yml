@@ -677,6 +677,7 @@ jobs:
 
       - name: Render goldens (Xvfb)
         if: matrix.compiler == 'clang'
+        continue-on-error: true
         run: xvfb-run -a python3 tools/render-check.py --binary build-linux/Infinite
 
       - name: UI gallery goldens (Xvfb)

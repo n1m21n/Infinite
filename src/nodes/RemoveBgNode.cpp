@@ -3,6 +3,7 @@
 
 #include "gl3.h"
 #include <algorithm>
+#include <cstring>
 #include <mutex>
 
 #include "Platform.h"
@@ -10,6 +11,82 @@
 namespace
 {
    const std::vector<std::string> kOutputModeNames = { "Cutout", "Mask only", "Background only" };
+
+   // Small process-wide cache of recent masks keyed by exact RGBA pixels, size,
+   // and detection mode. Every global Undo/Redo rebuilds the node graph from
+   // scratch via ApplyPatchData(), so hitting this cache lets ReloadDerived()
+   // re-upload the mask on the very first cook without re-running segmentation
+   // or flickering unmasked frames.
+   struct CachedMaskEntry
+   {
+      uint64_t hash = 0;
+      int width = 0, height = 0;
+      Platform::MattingMode mode = Platform::MattingMode::Subject;
+      std::vector<unsigned char> mask;
+   };
+   constexpr size_t kMaxMaskCacheEntries = 8;
+   std::mutex gMaskCacheMutex;
+   std::vector<CachedMaskEntry> gMaskCache;
+
+   uint64_t HashMaskInputs(const std::vector<unsigned char>& pixels, int w, int h, Platform::MattingMode mode)
+   {
+      uint64_t hash = 14695981039346656037ull;
+      auto mix = [&](uint64_t v)
+      {
+         hash ^= v;
+         hash *= 1099511628211ull;
+      };
+      mix((uint64_t)w);
+      mix((uint64_t)h);
+      mix((uint64_t)mode);
+      const size_t n = pixels.size();
+      const unsigned char* p = pixels.data();
+      size_t i = 0;
+      for (; i + 8 <= n; i += 8)
+      {
+         uint64_t chunk = 0;
+         std::memcpy(&chunk, p + i, 8);
+         mix(chunk);
+      }
+      for (; i < n; i++)
+         mix(p[i]);
+      return hash;
+   }
+
+   bool LookupCachedMask(uint64_t hash, int w, int h, Platform::MattingMode mode, std::vector<unsigned char>& outMask)
+   {
+      std::lock_guard<std::mutex> lock(gMaskCacheMutex);
+      for (size_t i = gMaskCache.size(); i > 0; i--)
+      {
+         const CachedMaskEntry& e = gMaskCache[i - 1];
+         if (e.hash == hash && e.width == w && e.height == h && e.mode == mode &&
+             e.mask.size() == (size_t)w * (size_t)h)
+         {
+            outMask = e.mask;
+            return true;
+         }
+      }
+      return false;
+   }
+
+   void StoreCachedMask(uint64_t hash, int w, int h, Platform::MattingMode mode, const std::vector<unsigned char>& mask)
+   {
+      if (w <= 0 || h <= 0 || mask.size() != (size_t)w * (size_t)h)
+         return;
+      std::lock_guard<std::mutex> lock(gMaskCacheMutex);
+      for (size_t i = 0; i < gMaskCache.size(); i++)
+      {
+         if (gMaskCache[i].hash == hash && gMaskCache[i].width == w &&
+             gMaskCache[i].height == h && gMaskCache[i].mode == mode)
+         {
+            gMaskCache[i].mask = mask;
+            return;
+         }
+      }
+      if (gMaskCache.size() >= kMaxMaskCacheEntries)
+         gMaskCache.erase(gMaskCache.begin());
+      gMaskCache.push_back({ hash, w, h, mode, mask });
+   }
 
    const char* kFragSrc =
       "#version 150\n"
@@ -114,6 +191,7 @@ void RemoveBgNode::WorkerThreadMain()
       FrameResult result;
       result.width = req.width;
       result.height = req.height;
+      result.mode = req.mode;
       result.serial = req.serial;
       result.pixels = req.pixels; // paired with the mask below, regardless of outcome
 
@@ -127,10 +205,38 @@ void RemoveBgNode::WorkerThreadMain()
    }
 }
 
+void RemoveBgNode::UploadMaskAndPaired(const unsigned char* mask, const unsigned char* pixels, int w, int h)
+{
+   if (mMaskTex == 0)
+      glGenTextures(1, &mMaskTex);
+   glBindTexture(GL_TEXTURE_2D, mMaskTex);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, mask);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glBindTexture(GL_TEXTURE_2D, 0);
+
+   // The frame the mask was computed from, uploaded the same raw way as the
+   // mask itself so the two stay in the same UV convention - composited
+   // together below instead of the (possibly newer) live source frame.
+   if (mPairedSrcTex == 0)
+      glGenTextures(1, &mPairedSrcTex);
+   glBindTexture(GL_TEXTURE_2D, mPairedSrcTex);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glBindTexture(GL_TEXTURE_2D, 0);
+
+   mStatus = "mask ready";
+}
+
 void RemoveBgNode::SubmitMaskRequest(unsigned int srcTex, int w, int h)
 {
-   EnsureWorkerStarted();
-
    // Read the source back off the GPU so the worker can see it - this part
    // must stay on the render thread, since only it may touch GL objects.
    std::vector<unsigned char> pixels((size_t)w * h * 4);
@@ -145,11 +251,23 @@ void RemoveBgNode::SubmitMaskRequest(unsigned int srcTex, int w, int h)
    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
    glDeleteFramebuffers(1, &fbo);
 
+   const Platform::MattingMode reqMode = (mode == 1) ? Platform::MattingMode::Person : Platform::MattingMode::Subject;
+   const uint64_t cacheHash = HashMaskInputs(pixels, w, h, reqMode);
+   std::vector<unsigned char> cachedMask;
+   if (LookupCachedMask(cacheHash, w, h, reqMode, cachedMask))
+   {
+      UploadMaskAndPaired(cachedMask.data(), pixels.data(), w, h);
+      mMaskInFlight = false;
+      return;
+   }
+
+   EnsureWorkerStarted();
+
    FrameRequest req;
    req.pixels = std::move(pixels);
    req.width = w;
    req.height = h;
-   req.mode = (mode == 1) ? Platform::MattingMode::Person : Platform::MattingMode::Subject;
+   req.mode = reqMode;
    req.serial = mNextSerial++;
 
    {
@@ -189,32 +307,9 @@ void RemoveBgNode::PollMaskResult()
       return;
    }
 
-   if (mMaskTex == 0)
-      glGenTextures(1, &mMaskTex);
-   glBindTexture(GL_TEXTURE_2D, mMaskTex);
-   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, result.width, result.height, 0, GL_RED, GL_UNSIGNED_BYTE, result.mask.data());
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-   glBindTexture(GL_TEXTURE_2D, 0);
-
-   // The frame the mask was computed from, uploaded the same raw way as the
-   // mask itself so the two stay in the same UV convention - composited
-   // together below instead of the (possibly newer) live source frame.
-   if (mPairedSrcTex == 0)
-      glGenTextures(1, &mPairedSrcTex);
-   glBindTexture(GL_TEXTURE_2D, mPairedSrcTex);
-   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, result.width, result.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, result.pixels.data());
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-   glBindTexture(GL_TEXTURE_2D, 0);
-
-   mStatus = "mask ready";
+   StoreCachedMask(HashMaskInputs(result.pixels, result.width, result.height, result.mode),
+                   result.width, result.height, result.mode, result.mask);
+   UploadMaskAndPaired(result.mask.data(), result.pixels.data(), result.width, result.height);
 }
 
 void RemoveBgNode::CookIfNeeded(int frameId)
