@@ -13,15 +13,15 @@
   <meta name="theme-color" content="#151930">
   <script src="../theme.js?v=1"></script>
   <title>Free 3D Text &amp; Logo Loop Maker | Infinite</title>
-  <meta name="description" content="Free browser 3D text and logo loop maker. Type text or drop an SVG, pick Chrome, Glass, Neon, or Gold materials, and export 3D loops, PNGs, or .inf patches.">
+  <meta name="description" content="Free browser 3D text and logo loop maker. Extrude text or SVG/PNG logos with Chrome, Glass, Gold or Holographic materials and export seamless video loops or transparent PNGs.">
   <link rel="canonical" href="https://infinitedevices.org/3d/">
   <meta property="og:title" content="Free 3D Text &amp; Logo Loop Maker | Infinite">
-  <meta property="og:description" content="Create spinning 3D text and SVG logo loops in your browser — no 3D skills required.">
+  <meta property="og:description" content="Create spinning 3D text and logo loops in your browser. Export seamless video, transparent PNGs or .inf scenes.">
   <meta property="og:url" content="https://infinitedevices.org/3d/">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://infinitedevices.org/assets/og/samples.jpg">
   <meta name="twitter:card" content="summary_large_image">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Infinite 3D Text and Logo Loop Maker","url":"https://infinitedevices.org/3d/","applicationCategory":"MultimediaApplication","operatingSystem":"Any (runs in the browser)","description":"Free browser 3D text and SVG logo loop maker with Chrome, Iridescent Glass, Neon, Matte, and Gold materials. Export video loops, PNG frames, and .inf patches.","author":{"@type":"Person","name":"Naman Soni","alternateName":"n1m21n"},"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@type":"WebSite","name":"Infinite","url":"https://infinitedevices.org/"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Infinite 3D Text and Logo Loop Maker","url":"https://infinitedevices.org/3d/","applicationCategory":"MultimediaApplication","operatingSystem":"Any (runs in the browser)","description":"Free browser 3D text and SVG logo loop maker with studio-lit Chrome, Glass, Gold, Holographic, Neon and Matte materials. Export seamless 60 fps loops, transparent PNGs and .inf patches.","author":{"@type":"Person","name":"Naman Soni","alternateName":"n1m21n"},"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@type":"WebSite","name":"Infinite","url":"https://infinitedevices.org/"}}</script>
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
@@ -37,10 +37,11 @@
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
   <link rel="stylesheet" href="../search.css?v=96e10ca3">
-  <link rel="stylesheet" href="../studio-tools.css">
+  <link rel="stylesheet" href="../studio-tools.css?v=5">
 </head>
 <body>
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
   <header class="site-header" id="site-header">
     <div class="container nav-container">
       <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
@@ -62,14 +63,11 @@
             <a href="../developers.html"><span>Developers</span></a>
           </div>
         </div>
-        <div class="nav-group" data-current>
+        <div class="nav-group">
           <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
           <div class="nav-menu" id="nav-menu-explore">
             <a href="../library.html"><span>Library</span></a>
             <a href="../samples/"><span>Sample generator</span></a>
-            <a href="../visualizer/"><span>Music visualizer</span></a>
-            <a href="../3d/" aria-current="page"><span>3D loop maker</span></a>
-            <a href="../sfx/"><span>SFX maker</span></a>
             <a href="../artworks.html"><span>Art gallery</span></a>
             <a href="../nodes/"><span>Nodes</span></a>
             <a href="../embeds/"><span>Embeds</span></a>
@@ -87,110 +85,131 @@
           </div>
         </div>
       </nav>
+      <div class="nav-actions">
+        <button type="button" class="icon-btn share-btn" aria-label="Share this page" title="Share"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg></button>
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
     </div>
   </header>
 
-  <main class="st-wrap">
-    <div class="st-head">
-      <p class="st-kicker">Browser Studio · Zero 3D Skills Needed</p>
-      <h1 class="st-title">3D Text &amp; Logo Loop Maker</h1>
-      <p class="st-sub">Type any text or drop an SVG logo, pick a material and motion preset, or click <strong>Generate</strong>. Export seamless video loops, transparent PNGs, or an Infinite <code>.inf</code> 3D scene.</p>
-    </div>
+  <main>
+    <section class="section lib-hero">
+      <div class="container st-wrap">
+        <header class="st-head">
+          <span class="blog-hand hand">spin</span>
+          <h1 class="slab deck-title">3D loop maker</h1>
+        </header>
 
-    <div class="st-grid">
-      <section class="st-stage-card" aria-label="3D preview">
-        <div class="st-stage-box" id="stage-box" data-aspect="16:9">
-          <canvas id="c3d" class="st-canvas" width="1280" height="720"></canvas>
-        </div>
-        <div class="st-bar">
-          <div class="st-row">
-            <button type="button" class="st-btn is-primary" id="btn-gen">Generate style</button>
-            <button type="button" class="st-btn" id="btn-clear-svg" hidden>Use text instead</button>
+        <section class="st-card" aria-label="3D text and logo maker">
+          <div class="st-input-bar" id="drop-logo">
+            <input type="text" class="st-input" id="txt-input" value="INFINITE" maxlength="20" placeholder="Type anything..." aria-label="3D text">
+            <label class="st-btn is-icon" for="svg-file" title="Upload SVG or PNG logo" aria-label="Upload SVG or PNG logo">
+              <input type="file" id="svg-file" accept=".svg,image/svg+xml,image/png" hidden>
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13V4M6.5 7.5 10 4l3.5 3.5M4 15.5h12"/></svg>
+            </label>
+            <button type="button" class="st-btn is-icon" id="btn-clear-svg" title="Back to text" aria-label="Back to text" hidden>
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"/></svg>
+            </button>
           </div>
-          <div class="st-row">
-            <button type="button" class="st-btn" id="btn-rec">Record loop</button>
-            <button type="button" class="st-btn" id="btn-png">PNG</button>
-            <button type="button" class="st-btn" id="btn-inf">.inf patch</button>
-          </div>
-        </div>
-        <p class="st-status" id="st-status">Live 3D preview — edit text, drop an SVG, or click Generate style.</p>
-      </section>
+          <span id="svg-label" hidden></span>
 
-      <aside class="st-panel" aria-label="3D controls">
-        <div class="st-ctrl">
-          <div class="st-label"><span>Your text</span></div>
-          <input type="text" class="st-input" id="txt-input" value="INFINITE" maxlength="24">
-        </div>
-
-        <label class="st-drop" for="svg-file">
-          <input type="file" id="svg-file" accept=".svg,image/svg+xml,image/png" hidden>
-          <span id="svg-label">Or drop an SVG / PNG logo here to extrude in 3D</span>
-        </label>
-
-        <div class="st-ctrl">
-          <div class="st-label"><span>Material</span></div>
-          <div class="st-chips" id="mat-chips">
+          <div class="st-picks" id="mat-chips" aria-label="Material">
             <button type="button" class="st-chip is-active" data-mat="chrome">Chrome</button>
-            <button type="button" class="st-chip" data-mat="glass">Iridescent Glass</button>
+            <button type="button" class="st-chip" data-mat="glass">Glass</button>
+            <button type="button" class="st-chip" data-mat="gold">Gold</button>
+            <button type="button" class="st-chip" data-mat="holo">Holo</button>
             <button type="button" class="st-chip" data-mat="neon">Neon</button>
-            <button type="button" class="st-chip" data-mat="matte">Matte Ceramic</button>
-            <button type="button" class="st-chip" data-mat="gold">Brushed Gold</button>
+            <button type="button" class="st-chip" data-mat="matte">Matte</button>
           </div>
-        </div>
 
-        <div class="st-ctrl">
-          <div class="st-label"><span>Motion</span></div>
-          <div class="st-chips" id="mot-chips">
-            <button type="button" class="st-chip is-active" data-mot="orbit">Orbit Spin</button>
-            <button type="button" class="st-chip" data-mot="float">Gentle Float</button>
-            <button type="button" class="st-chip" data-mot="pulse">Beat Pulse</button>
-            <button type="button" class="st-chip" data-mot="pendulum">Pendulum</button>
+          <div class="st-stage" id="stage-box" data-aspect="16:9">
+            <span class="st-badge" id="hud-3d" hidden><span class="st-badge-dot" aria-hidden="true"></span><span id="hud-3d-text"></span></span>
+            <span id="hud-3d-meta" hidden></span>
+            <canvas id="c3d" class="st-canvas is-orbit" width="1280" height="720"></canvas>
           </div>
-        </div>
 
-        <div class="st-ctrl">
-          <div class="st-label"><span>Background</span></div>
-          <div class="st-chips" id="bg-chips">
-            <button type="button" class="st-chip is-active" data-bg="midnight">Midnight Studio</button>
-            <button type="button" class="st-chip" data-bg="grid">Neon Grid</button>
-            <button type="button" class="st-chip" data-bg="grad">Soft Gradient</button>
-            <button type="button" class="st-chip" data-bg="clear">Transparent</button>
+          <div class="st-bar">
+            <button type="button" class="st-btn is-primary" id="btn-gen" title="Random style">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v2.5M10 14.5V17M3 10h2.5M14.5 10H17M5.2 5.2l1.8 1.8M13 13l1.8 1.8M14.8 5.2 13 7M7 13l-1.8 1.8"/></svg>
+              <span>Surprise</span>
+            </button>
+            <button type="button" class="st-btn" id="btn-rec" title="Record seamless video loop">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="10" cy="10" r="4.5"/></svg>
+              <span>Record</span>
+            </button>
+            <button type="button" class="st-btn" id="btn-png" title="Save PNG">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="14" height="11" rx="2"/><circle cx="7.5" cy="8.5" r="1.2"/><path d="m17 13-4-4-6 6"/></svg>
+              <span>PNG</span>
+            </button>
+            <button type="button" class="st-btn" id="btn-inf" title="Download Infinite scene">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="10" r="2.2"/><circle cx="14.5" cy="10" r="2.2"/><path d="M7.7 10h4.6"/></svg>
+              <span>.inf</span>
+            </button>
           </div>
-        </div>
 
-        <div class="st-ctrl">
-          <div class="st-label"><span>Format / Aspect ratio</span></div>
-          <div class="st-chips" id="aspect-chips">
-            <button type="button" class="st-chip is-active" data-aspect="16:9">16:9 YouTube</button>
-            <button type="button" class="st-chip" data-aspect="9:16">9:16 Reels / TikTok</button>
-            <button type="button" class="st-chip" data-aspect="1:1">1:1 Square</button>
+          <div class="st-picks" id="mot-chips" aria-label="Motion">
+            <button type="button" class="st-chip is-active" data-mot="orbit">Spin</button>
+            <button type="button" class="st-chip" data-mot="float">Float</button>
+            <button type="button" class="st-chip" data-mot="pulse">Pulse</button>
+            <button type="button" class="st-chip" data-mot="pendulum">Swing</button>
+            <button type="button" class="st-chip" data-mot="tilt">Tilt</button>
+            <span class="st-sep" aria-hidden="true"></span>
+            <span id="bg-chips" class="st-picks" style="gap: 6px;">
+              <button type="button" class="st-chip is-active" data-bg="midnight">Dark</button>
+              <button type="button" class="st-chip" data-bg="paper">Light</button>
+              <button type="button" class="st-chip" data-bg="grid">Grid</button>
+              <button type="button" class="st-chip" data-bg="clear">Clear</button>
+            </span>
           </div>
-        </div>
 
-        <div class="st-ctrl">
-          <div class="st-label"><span>3D Depth</span><span class="st-val" id="val-depth">18</span></div>
-          <input type="range" class="st-range" id="ctrl-depth" min="4" max="36" step="1" value="18">
-        </div>
+          <details class="st-more">
+            <summary>More</summary>
+            <div class="st-more-body">
+              <div class="st-picks" id="font-chips" aria-label="Font">
+                <button type="button" class="st-chip is-active" data-font="sans">Sans</button>
+                <button type="button" class="st-chip" data-font="serif">Serif</button>
+                <button type="button" class="st-chip" data-font="mono">Mono</button>
+                <button type="button" class="st-chip" data-font="italic">Italic</button>
+                <span class="st-sep" aria-hidden="true"></span>
+                <span id="aspect-chips" class="st-picks" style="gap: 6px;">
+                  <button type="button" class="st-chip is-active" data-aspect="16:9">16:9</button>
+                  <button type="button" class="st-chip" data-aspect="9:16">9:16</button>
+                  <button type="button" class="st-chip" data-aspect="1:1">1:1</button>
+                </span>
+              </div>
+              <div class="st-strip">
+                <div class="st-ctrl">
+                  <div class="st-label"><span>Depth</span><span class="st-val" id="val-depth">0.55</span></div>
+                  <input type="range" class="st-range" id="ctrl-depth" min="0.12" max="1.25" step="0.02" value="0.55">
+                </div>
+                <div class="st-ctrl">
+                  <div class="st-label"><span>Bevel</span><span class="st-val" id="val-bevel">0.08</span></div>
+                  <input type="range" class="st-range" id="ctrl-bevel" min="0.0" max="0.18" step="0.005" value="0.08">
+                </div>
+                <div class="st-ctrl">
+                  <div class="st-label"><span>Speed</span><span class="st-val" id="val-speed">1.00x</span></div>
+                  <input type="range" class="st-range" id="ctrl-speed" min="0.25" max="2.5" step="0.05" value="1.00">
+                </div>
+              </div>
+            </div>
+          </details>
 
-        <div class="st-ctrl">
-          <div class="st-label"><span>Loop speed</span><span class="st-val" id="val-speed">1.00</span></div>
-          <input type="range" class="st-range" id="ctrl-speed" min="0.2" max="2.5" step="0.05" value="1.00">
-        </div>
-      </aside>
-    </div>
+          <p id="st-status" hidden></p>
+        </section>
 
-    <div class="st-cta">
-      <p><strong>Need PBR materials, path tracing &amp; real-time 3D lighting?</strong> Open your <code>.inf</code> scene in Infinite's 3D View.</p>
-      <div class="st-row">
-        <a href="https://github.com/n1m21n/Infinite/releases/latest" class="st-btn is-primary" target="_blank" rel="noopener">Download Infinite</a>
-        <a href="../visualizer/" class="st-btn">Try Music Visualizer</a>
-        <a href="../sfx/" class="st-btn">Try SFX Maker</a>
+        <div class="st-foot-note">
+          <p><b>Open in Infinite.</b> Export .inf for path tracing, 3D cameras and 4K video.</p>
+          <a href="https://github.com/n1m21n/Infinite/releases/latest" class="st-btn is-primary" target="_blank" rel="noopener">Download</a>
+        </div>
       </div>
-    </div>
+    </section>
   </main>
 
   <footer class="site-footer">
     <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
       <div class="footer-grid">
         <div class="footer-col">
           <p class="footer-h">Infinite</p>
@@ -227,271 +246,42 @@
     </div>
   </footer>
 
+  <nav class="dock" id="dock" aria-label="Main">
+    <div class="dock-bar">
+      <span class="dock-thumb" aria-hidden="true"></span>
+      <a class="dock-stop" href="../index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+      <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+      <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+      <button type="button" class="dock-stop" data-group="learn" aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+      <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+    </div>
+    <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+      <a href="../artists.html"><span>Artists</span></a>
+      <a href="../musicians.html"><span>Musicians</span></a>
+      <a href="../vjs.html"><span>VJs</span></a>
+      <a href="../creative-coders.html"><span>Creative coders</span></a>
+      <a href="../developers.html"><span>Developers</span></a>
+    </div>
+    <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+      <a href="../library.html"><span>Library</span></a>
+      <a href="../samples/"><span>Sample generator</span></a>
+      <a href="../artworks.html"><span>Art gallery</span></a>
+      <a href="../nodes/"><span>Nodes</span></a>
+      <a href="../embeds/"><span>Embeds</span></a>
+      <a href="../plugin.html"><span>Plugin</span></a>
+    </div>
+    <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+      <a href="../index.html#learn"><span>Get started</span></a>
+      <a href="../manual/"><span>Manual</span></a>
+      <a href="../philosophy.html"><span>Philosophy</span></a>
+      <a href="../chat.html"><span>Agents &amp; terminal</span></a>
+      <a href="../blog/"><span>Blog</span></a>
+    </div>
+  </nav>
+
   <script src="../site.js?v=21" defer></script>
   <script src="../search.js?v=d89de447" defer></script>
-  <script>
-  /* brand-lint: off */
-  (function () {
-    const canvas = document.getElementById("c3d");
-    const ctx = canvas.getContext("2d");
-    const stageBox = document.getElementById("stage-box");
-    const statusEl = document.getElementById("st-status");
-
-    const state = {
-      text: "INFINITE",
-      mat: "chrome",
-      mot: "orbit",
-      bg: "midnight",
-      aspect: "16:9",
-      depth: 18,
-      speed: 1.0,
-      svgImg: null
-    };
-
-    const MATS = {
-      chrome: { front: ["#ffffff", "#8ea2c8", "#1d263b", "#dbe6ff"], side: "#3a4b6e", glow: "rgba(120,175,255,0.35)" },
-      glass:  { front: ["#b8f2ff", "#ff9be8", "#5e6bff", "#ffffff"], side: "#2f436e", glow: "rgba(130,220,255,0.45)" },
-      neon:   { front: ["#ffffff", "#58f2ff", "#ff47c2", "#b3f9ff"], side: "#1b2c4f", glow: "rgba(88,242,255,0.75)" },
-      matte:  { front: ["#f4f2ed", "#d8d3c8", "#b3aca0", "#ffffff"], side: "#7a756c", glow: "rgba(255,255,255,0.12)" },
-      gold:   { front: ["#fff3b0", "#f4b942", "#8f5b14", "#ffe993"], side: "#6b410d", glow: "rgba(255,200,80,0.4)" }
-    };
-
-    document.getElementById("txt-input").addEventListener("input", e => {
-      state.text = e.target.value || "INFINITE";
-    });
-
-    const svgInput = document.getElementById("svg-file");
-    const clearSvgBtn = document.getElementById("btn-clear-svg");
-    function loadLogo(file) {
-      if (!file) return;
-      const img = new Image();
-      img.onload = () => {
-        state.svgImg = img;
-        clearSvgBtn.hidden = false;
-        document.getElementById("svg-label").textContent = "Loaded logo: " + file.name;
-        statusEl.textContent = "Extruding " + file.name + " in 3D.";
-      };
-      img.src = URL.createObjectURL(file);
-    }
-    svgInput.addEventListener("change", () => loadLogo(svgInput.files[0]));
-    clearSvgBtn.addEventListener("click", () => {
-      state.svgImg = null;
-      clearSvgBtn.hidden = true;
-      document.getElementById("svg-label").textContent = "Or drop an SVG / PNG logo here to extrude in 3D";
-    });
-
-    function bindChips(id, attr, cb) {
-      const box = document.getElementById(id);
-      box.querySelectorAll(".st-chip").forEach(btn => {
-        btn.addEventListener("click", () => {
-          box.querySelectorAll(".st-chip").forEach(b => b.classList.remove("is-active"));
-          btn.classList.add("is-active");
-          cb(btn.getAttribute(attr));
-        });
-      });
-    }
-
-    bindChips("mat-chips", "data-mat", v => { state.mat = v; });
-    bindChips("mot-chips", "data-mot", v => { state.mot = v; });
-    bindChips("bg-chips", "data-bg", v => { state.bg = v; });
-    bindChips("aspect-chips", "data-aspect", v => {
-      state.aspect = v;
-      stageBox.setAttribute("data-aspect", v);
-      if (v === "16:9") { canvas.width = 1280; canvas.height = 720; }
-      else if (v === "9:16") { canvas.width = 720; canvas.height = 1280; }
-      else { canvas.width = 1080; canvas.height = 1080; }
-    });
-
-    document.getElementById("ctrl-depth").addEventListener("input", e => {
-      state.depth = parseInt(e.target.value, 10);
-      document.getElementById("val-depth").textContent = state.depth;
-    });
-    document.getElementById("ctrl-speed").addEventListener("input", e => {
-      state.speed = parseFloat(e.target.value);
-      document.getElementById("val-speed").textContent = state.speed.toFixed(2);
-    });
-
-    document.getElementById("btn-gen").addEventListener("click", () => {
-      const mats = Object.keys(MATS);
-      const mots = ["orbit", "float", "pulse", "pendulum"];
-      const bgs = ["midnight", "grid", "grad"];
-      state.mat = mats[Math.floor(Math.random() * mats.length)];
-      state.mot = mots[Math.floor(Math.random() * mots.length)];
-      state.bg  = bgs[Math.floor(Math.random() * bgs.length)];
-      state.depth = 10 + Math.floor(Math.random() * 22);
-      document.querySelectorAll("#mat-chips .st-chip").forEach(b => b.classList.toggle("is-active", b.dataset.mat === state.mat));
-      document.querySelectorAll("#mot-chips .st-chip").forEach(b => b.classList.toggle("is-active", b.dataset.mot === state.mot));
-      document.querySelectorAll("#bg-chips .st-chip").forEach(b => b.classList.toggle("is-active", b.dataset.bg === state.bg));
-      document.getElementById("ctrl-depth").value = state.depth;
-      document.getElementById("val-depth").textContent = state.depth;
-      statusEl.textContent = "Generated: " + state.mat + " / " + state.mot + " / " + state.bg + ".";
-    });
-
-    // Export
-    let recorder, chunks = [];
-    const recBtn = document.getElementById("btn-rec");
-    recBtn.addEventListener("click", () => {
-      if (recorder && recorder.state === "recording") {
-        recorder.stop();
-        recBtn.textContent = "Record loop";
-        recBtn.classList.remove("is-active");
-        return;
-      }
-      chunks = [];
-      const stream = canvas.captureStream(30);
-      recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm" });
-      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "infinite-3d-loop-" + state.aspect.replace(":", "x") + ".webm";
-        a.click();
-        statusEl.textContent = "3D loop video exported.";
-      };
-      recorder.start();
-      recBtn.textContent = "Stop & save";
-      recBtn.classList.add("is-active");
-      statusEl.textContent = "Recording 3D loop... click Stop & save when ready.";
-    });
-
-    document.getElementById("btn-png").addEventListener("click", () => {
-      const a = document.createElement("a");
-      a.href = canvas.toDataURL("image/png");
-      a.download = "infinite-3d.png";
-      a.click();
-    });
-
-    document.getElementById("btn-inf").addEventListener("click", () => {
-      const patch = [
-        "# Made with Infinite (https://infinitedevices.org), by Naman Soni (n1m21n)",
-        "infinite-patch 1",
-        "node 1 Visuals Sketch3D",
-        "  id mesh",
-        "  s text \"" + state.text.replace(/"/g, "") + "\"",
-        "  s material \"" + state.mat + "\"",
-        "  s motion \"" + state.mot + "\"",
-        "  f uDepth " + state.depth,
-        "  f uSpeed " + state.speed,
-        "end",
-        "node 2 Output Video Out",
-        "  id out",
-        "end",
-        "cable 1 1 2 1",
-        ""
-      ].join("\n");
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob([patch], { type: "text/plain" }));
-      a.download = "infinite-3d-loop.inf";
-      a.click();
-      statusEl.textContent = "Downloaded infinite-3d-loop.inf.";
-    });
-
-    function drawBg(w, h, t) {
-      if (state.bg === "clear") { ctx.clearRect(0, 0, w, h); return; }
-      if (state.bg === "midnight") {
-        const g = ctx.createRadialGradient(w * 0.5, h * 0.45, 20, w * 0.5, h * 0.5, Math.max(w, h) * 0.7);
-        g.addColorStop(0, "#1d2647");
-        g.addColorStop(1, "#090c18");
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, w, h);
-      } else if (state.bg === "grad") {
-        const g = ctx.createLinearGradient(0, 0, w, h);
-        g.addColorStop(0, "#191233");
-        g.addColorStop(0.5, "#112442");
-        g.addColorStop(1, "#2a1230");
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, w, h);
-      } else {
-        ctx.fillStyle = "#080b16";
-        ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = "rgba(90, 150, 255, 0.16)";
-        ctx.lineWidth = 1;
-        const horizon = h * 0.62;
-        for (let i = -12; i <= 12; i++) {
-          ctx.beginPath();
-          ctx.moveTo(w * 0.5 + i * 32, horizon);
-          ctx.lineTo(w * 0.5 + i * 210, h);
-          ctx.stroke();
-        }
-        for (let j = 0; j < 10; j++) {
-          const p = ((j / 10) + (t * 0.25) % 0.1);
-          const y = horizon + Math.pow(p, 2.2) * (h - horizon);
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(w, y);
-          ctx.stroke();
-        }
-      }
-    }
-
-    function render(now) {
-      const t = now * 0.001 * state.speed;
-      const w = canvas.width, h = canvas.height;
-      drawBg(w, h, t);
-
-      let yaw = 0, pitch = 0, bob = 0, scale = 1;
-      if (state.mot === "orbit") { yaw = t * 1.1; pitch = Math.sin(t * 0.8) * 0.18; }
-      else if (state.mot === "float") { yaw = Math.sin(t * 0.9) * 0.35; bob = Math.sin(t * 1.8) * 18; }
-      else if (state.mot === "pulse") { yaw = Math.sin(t * 0.6) * 0.25; scale = 1 + 0.08 * Math.pow(Math.max(0, Math.sin(t * 4.0)), 4); }
-      else { yaw = Math.sin(t * 1.5) * 0.65; pitch = Math.cos(t * 1.5) * 0.12; }
-
-      const cx = w * 0.5, cy = h * 0.5 + bob;
-      const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
-      const sx = Math.max(0.18, Math.abs(cosY)) * scale;
-      const skewY = sinY * 0.18;
-      const m = MATS[state.mat];
-      const layers = state.depth;
-      const dx = -sinY * 2.2;
-      const dy = Math.sin(pitch) * 1.4 + 0.6;
-
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.transform(sx, skewY, 0, scale, 0, 0);
-
-      const fontSize = Math.min(w, h) * 0.2;
-      ctx.font = "800 " + fontSize + "px 'Geist', system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      for (let i = layers; i >= 1; i--) {
-        ctx.save();
-        ctx.translate(i * dx, i * dy);
-        if (state.svgImg) {
-          ctx.globalAlpha = 0.22;
-          const sz = Math.min(w, h) * 0.48;
-          ctx.drawImage(state.svgImg, -sz * 0.5, -sz * 0.5, sz, sz);
-        } else {
-          ctx.fillStyle = m.side;
-          ctx.fillText(state.text, 0, 0);
-        }
-        ctx.restore();
-      }
-
-      ctx.shadowColor = m.glow;
-      ctx.shadowBlur = state.mat === "neon" ? 36 : 18;
-      if (state.svgImg) {
-        const sz = Math.min(w, h) * 0.48;
-        ctx.drawImage(state.svgImg, -sz * 0.5, -sz * 0.5, sz, sz);
-      } else {
-        const grad = ctx.createLinearGradient(-fontSize * 1.5, -fontSize * 0.6, fontSize * 1.5, fontSize * 0.6);
-        grad.addColorStop(0, m.front[0]);
-        grad.addColorStop(0.38, m.front[1]);
-        grad.addColorStop(0.72, m.front[2]);
-        grad.addColorStop(1, m.front[3]);
-        ctx.fillStyle = grad;
-        ctx.fillText(state.text, 0, 0);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "rgba(255,255,255,0.42)";
-        ctx.strokeText(state.text, 0, 0);
-      }
-      ctx.restore();
-
-      requestAnimationFrame(render);
-    }
-    requestAnimationFrame(render);
-  })();
-  /* brand-lint: on */
-  </script>
+  <script src="../share.js?v=ad5e5392" defer></script>
+  <script type="module" src="studio-3d.js?v=3"></script>
 </body>
 </html>

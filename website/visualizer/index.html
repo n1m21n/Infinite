@@ -13,15 +13,15 @@
   <meta name="theme-color" content="#151930">
   <script src="../theme.js?v=1"></script>
   <title>Free Online Music Visualizer &amp; Audio-Reactive Art Generator | Infinite</title>
-  <meta name="description" content="Free online music visualizer and procedural WebGL art generator. Drop any MP3 or WAV, click Generate, and export 16:9, 9:16, or 1:1 video and .inf patches.">
+  <meta name="description" content="Free online music visualizer and procedural WebGL art generator. Drop any MP3 or WAV, generate a beat, and export 60 fps 16:9, 9:16 or 1:1 video and .inf patches.">
   <link rel="canonical" href="https://infinitedevices.org/visualizer/">
   <meta property="og:title" content="Free Online Music Visualizer | Infinite">
-  <meta property="og:description" content="Turn any song into audio-reactive WebGL art in your browser. Export video for YouTube, Reels &amp; TikTok, or download the .inf patch.">
+  <meta property="og:description" content="Turn any song into audio-reactive WebGL art in your browser. Export 60 fps video or download the .inf patch.">
   <meta property="og:url" content="https://infinitedevices.org/visualizer/">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://infinitedevices.org/assets/og/samples.jpg">
   <meta name="twitter:card" content="summary_large_image">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Infinite Audio-Reactive Visualizer","url":"https://infinitedevices.org/visualizer/","applicationCategory":"MultimediaApplication","operatingSystem":"Any (runs in the browser)","description":"Free online music visualizer and procedural WebGL visual generator. Upload audio or use the built-in synth loop, generate artistic styles, and export video or .inf patches.","author":{"@type":"Person","name":"Naman Soni","alternateName":"n1m21n"},"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@type":"WebSite","name":"Infinite","url":"https://infinitedevices.org/"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Infinite Audio-Reactive Visualizer","url":"https://infinitedevices.org/visualizer/","applicationCategory":"MultimediaApplication","operatingSystem":"Any (runs in the browser)","description":"Free online music visualizer and procedural WebGL shader generator with live beat generation. Export 60 fps video or .inf patches.","author":{"@type":"Person","name":"Naman Soni","alternateName":"n1m21n"},"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@type":"WebSite","name":"Infinite","url":"https://infinitedevices.org/"}}</script>
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
@@ -37,10 +37,11 @@
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
   <link rel="stylesheet" href="../search.css?v=96e10ca3">
-  <link rel="stylesheet" href="../studio-tools.css">
+  <link rel="stylesheet" href="../studio-tools.css?v=5">
 </head>
 <body>
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
   <header class="site-header" id="site-header">
     <div class="container nav-container">
       <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
@@ -62,14 +63,11 @@
             <a href="../developers.html"><span>Developers</span></a>
           </div>
         </div>
-        <div class="nav-group" data-current>
+        <div class="nav-group">
           <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
           <div class="nav-menu" id="nav-menu-explore">
             <a href="../library.html"><span>Library</span></a>
             <a href="../samples/"><span>Sample generator</span></a>
-            <a href="../visualizer/" aria-current="page"><span>Music visualizer</span></a>
-            <a href="../3d/"><span>3D loop maker</span></a>
-            <a href="../sfx/"><span>SFX maker</span></a>
             <a href="../artworks.html"><span>Art gallery</span></a>
             <a href="../nodes/"><span>Nodes</span></a>
             <a href="../embeds/"><span>Embeds</span></a>
@@ -87,108 +85,135 @@
           </div>
         </div>
       </nav>
+      <div class="nav-actions">
+        <button type="button" class="icon-btn share-btn" aria-label="Share this page" title="Share"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg></button>
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
     </div>
   </header>
 
-  <main class="st-wrap">
-    <div class="st-head">
-      <p class="st-kicker">Browser Studio · No Install Needed</p>
-      <h1 class="st-title">Audio-Reactive Music Visualizer</h1>
-      <p class="st-sub">Drop any MP3 or WAV, play the built-in synth loop, or click <strong>Generate</strong> to invent new shader worlds. Export video for YouTube, Reels, or TikTok — or download the <code>.inf</code> patch to go deeper in Infinite.</p>
-    </div>
+  <main>
+    <section class="section lib-hero">
+      <div class="container st-wrap">
+        <header class="st-head">
+          <span class="blog-hand hand">watch</span>
+          <h1 class="slab deck-title">Music visualizer</h1>
+        </header>
 
-    <div class="st-grid">
-      <section class="st-stage-card" aria-label="Visualizer canvas">
-        <div class="st-stage-box" id="stage-box" data-aspect="16:9">
-          <canvas id="viz-canvas" class="st-canvas" width="1280" height="720"></canvas>
-        </div>
-        <div class="st-bar">
-          <div class="st-row">
-            <button type="button" class="st-btn is-primary" id="btn-generate">Generate visual</button>
-            <button type="button" class="st-btn" id="btn-demo">Play demo loop</button>
-            <button type="button" class="st-btn" id="btn-mic">Use mic</button>
+        <section class="st-card" id="drop-audio" aria-label="Music visualizer">
+          <div class="st-picks" id="style-chips" aria-label="Style">
+            <button type="button" class="st-chip is-active" data-style="0">Eclipse</button>
+            <button type="button" class="st-chip" data-style="1">Chrome</button>
+            <button type="button" class="st-chip" data-style="2">Caustics</button>
+            <button type="button" class="st-chip" data-style="3">Julia</button>
+            <button type="button" class="st-chip" data-style="4">Voronoi</button>
+            <button type="button" class="st-chip" data-style="5">Gasket</button>
+            <button type="button" class="st-chip" data-style="6">Kaleido</button>
+            <button type="button" class="st-chip" data-style="7">Dither</button>
           </div>
-          <div class="st-row">
-            <button type="button" class="st-btn" id="btn-rec">Record video</button>
-            <button type="button" class="st-btn" id="btn-png">PNG</button>
-            <button type="button" class="st-btn" id="btn-inf">.inf patch</button>
+
+          <div class="st-stage" id="stage-box" data-aspect="16:9">
+            <span class="st-badge" id="viz-hud" hidden><span class="st-badge-dot" aria-hidden="true"></span><span id="viz-hud-text"></span></span>
+            <span id="viz-hud-meta" hidden></span>
+            <span class="st-meters" id="viz-meters" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            <canvas id="viz-canvas" class="st-canvas" width="1280" height="720"></canvas>
           </div>
-        </div>
-        <p class="st-status" id="viz-status">Ready — click Play demo loop, drop an audio file, or Generate a new visual.</p>
-      </section>
 
-      <aside class="st-panel" aria-label="Controls">
-        <label class="st-drop" for="audio-file">
-          <input type="file" id="audio-file" accept="audio/*" hidden>
-          <span id="file-label">Drop MP3 / WAV / OGG here, or click to choose audio</span>
-        </label>
-
-        <div class="st-ctrl">
-          <div class="st-label"><span>Artistic style</span></div>
-          <div class="st-chips" id="style-chips">
-            <button type="button" class="st-chip is-active" data-style="0">Iridescent Eclipse</button>
-            <button type="button" class="st-chip" data-style="1">Cyber Tunnel</button>
-            <button type="button" class="st-chip" data-style="2">Liquid Glass</button>
-            <button type="button" class="st-chip" data-style="3">Harmonic Lattice</button>
-            <button type="button" class="st-chip" data-style="4">Dither Brutalist</button>
-            <button type="button" class="st-chip" data-style="5">Solar Nebula</button>
+          <div class="st-bar">
+            <button type="button" class="st-btn is-primary" id="btn-generate" title="New visual">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v2.5M10 14.5V17M3 10h2.5M14.5 10H17M5.2 5.2l1.8 1.8M13 13l1.8 1.8M14.8 5.2 13 7M7 13l-1.8 1.8"/></svg>
+              <span>Surprise</span>
+            </button>
+            <button type="button" class="st-btn" id="btn-demo" title="Generate a beat">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg>
+              <span>Beat</span>
+            </button>
+            <label class="st-btn is-icon" for="audio-file" title="Upload audio (MP3, WAV, OGG)" aria-label="Upload audio">
+              <input type="file" id="audio-file" accept="audio/*" hidden>
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13V4M6.5 7.5 10 4l3.5 3.5M4 15.5h12"/></svg>
+            </label>
+            <label class="st-btn is-icon" for="img-file" title="Upload image for audio-reactive effects" aria-label="Upload image">
+              <input type="file" id="img-file" accept="image/*" hidden>
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="14" height="11" rx="2"/><circle cx="7.5" cy="8.5" r="1.2"/><path d="m17 13-4-4-6 6"/></svg>
+            </label>
+            <button type="button" class="st-btn is-icon" id="btn-clear-img" title="Remove image" aria-label="Remove image" hidden>
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"/></svg>
+            </button>
+            <span id="file-label" hidden></span>
+            <button type="button" class="st-btn is-icon" id="btn-mic" aria-label="Microphone" title="Microphone">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7.5" y="3" width="5" height="8.5" rx="2.5"/><path d="M4.5 10a5.5 5.5 0 0 0 11 0M10 15.5V18"/></svg>
+            </button>
+            <span class="st-sep" aria-hidden="true"></span>
+            <button type="button" class="st-btn" id="btn-rec" title="Record video">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="10" cy="10" r="4.5"/></svg>
+              <span>Record</span>
+            </button>
+            <button type="button" class="st-btn is-icon" id="btn-png" aria-label="Save PNG" title="Save PNG">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6.5 9.5 10 13l3.5-3.5M4 15.5h12"/></svg>
+            </button>
+            <button type="button" class="st-btn" id="btn-inf" title="Download Infinite patch">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="10" r="2.2"/><circle cx="14.5" cy="10" r="2.2"/><path d="M7.7 10h4.6"/></svg>
+              <span>.inf</span>
+            </button>
+            <button type="button" class="st-btn is-icon" id="btn-fs" aria-label="Full screen" title="Full screen">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4"/></svg>
+            </button>
           </div>
-        </div>
 
-        <div class="st-ctrl">
-          <div class="st-label"><span>Mood palette</span></div>
-          <div class="st-chips" id="pal-chips">
-            <button type="button" class="st-chip is-active" data-pal="0">Midnight Neon</button>
-            <button type="button" class="st-chip" data-pal="1">Electric Dusk</button>
-            <button type="button" class="st-chip" data-pal="2">Monochrome</button>
-            <button type="button" class="st-chip" data-pal="3">Solar Gold</button>
-            <button type="button" class="st-chip" data-pal="4">Acid Emerald</button>
+          <div class="st-picks" id="pal-chips" aria-label="Palette">
+            <button type="button" class="st-chip is-active" data-pal="0">Ember</button>
+            <button type="button" class="st-chip" data-pal="1">Dusk</button>
+            <button type="button" class="st-chip" data-pal="2">Silver</button>
+            <button type="button" class="st-chip" data-pal="3">Gold</button>
+            <button type="button" class="st-chip" data-pal="4">Emerald</button>
+            <span class="st-sep" aria-hidden="true"></span>
+            <span id="aspect-chips" class="st-picks" style="gap: 6px;">
+              <button type="button" class="st-chip is-active" data-aspect="16:9">16:9</button>
+              <button type="button" class="st-chip" data-aspect="9:16">9:16</button>
+              <button type="button" class="st-chip" data-aspect="1:1">1:1</button>
+            </span>
           </div>
-        </div>
 
-        <div class="st-ctrl">
-          <div class="st-label"><span>Format / Aspect ratio</span></div>
-          <div class="st-chips" id="aspect-chips">
-            <button type="button" class="st-chip is-active" data-aspect="16:9">16:9 YouTube</button>
-            <button type="button" class="st-chip" data-aspect="9:16">9:16 Reels / TikTok</button>
-            <button type="button" class="st-chip" data-aspect="1:1">1:1 Square</button>
-          </div>
-        </div>
+          <details class="st-more">
+            <summary>More</summary>
+            <div class="st-more-body">
+              <div class="st-strip">
+                <div class="st-ctrl">
+                  <div class="st-label"><span>React</span><span class="st-val" id="val-react">1.25</span></div>
+                  <input type="range" class="st-range" id="ctrl-react" min="0.2" max="2.5" step="0.05" value="1.25">
+                </div>
+                <div class="st-ctrl">
+                  <div class="st-label"><span>Speed</span><span class="st-val" id="val-speed">1.00</span></div>
+                  <input type="range" class="st-range" id="ctrl-speed" min="0.2" max="2.5" step="0.05" value="1.00">
+                </div>
+                <div class="st-ctrl">
+                  <div class="st-label"><span>Detail</span><span class="st-val" id="val-comp">0.60</span></div>
+                  <input type="range" class="st-range" id="ctrl-comp" min="0.1" max="1.0" step="0.02" value="0.60">
+                </div>
+                <div class="st-ctrl">
+                  <div class="st-label"><span>Glow</span><span class="st-val" id="val-glow">0.65</span></div>
+                  <input type="range" class="st-range" id="ctrl-glow" min="0.0" max="1.0" step="0.02" value="0.65">
+                </div>
+              </div>
+            </div>
+          </details>
 
-        <div class="st-ctrl">
-          <div class="st-label"><span>Reactivity</span><span class="st-val" id="val-react">1.25</span></div>
-          <input type="range" class="st-range" id="ctrl-react" min="0.2" max="2.5" step="0.05" value="1.25">
-        </div>
+          <p id="viz-status" hidden></p>
+        </section>
 
-        <div class="st-ctrl">
-          <div class="st-label"><span>Motion speed</span><span class="st-val" id="val-speed">1.00</span></div>
-          <input type="range" class="st-range" id="ctrl-speed" min="0.2" max="2.5" step="0.05" value="1.00">
+        <div class="st-foot-note">
+          <p><b>Open in Infinite.</b> Export .inf for 4K 60 fps rendering, synths and 3D cameras.</p>
+          <a href="https://github.com/n1m21n/Infinite/releases/latest" class="st-btn is-primary" target="_blank" rel="noopener">Download</a>
         </div>
-
-        <div class="st-ctrl">
-          <div class="st-label"><span>Detail &amp; complexity</span><span class="st-val" id="val-comp">0.55</span></div>
-          <input type="range" class="st-range" id="ctrl-comp" min="0.1" max="1.0" step="0.02" value="0.55">
-        </div>
-
-        <div class="st-ctrl">
-          <div class="st-label"><span>Glow &amp; grain</span><span class="st-val" id="val-glow">0.60</span></div>
-          <input type="range" class="st-range" id="ctrl-glow" min="0.0" max="1.0" step="0.02" value="0.60">
-        </div>
-      </aside>
-    </div>
-
-    <div class="st-cta">
-      <p><strong>Want 4K 60fps rendering, VST3 synths &amp; 3D cameras?</strong> Download the free Infinite desktop app and open your exported <code>.inf</code> patch.</p>
-      <div class="st-row">
-        <a href="https://github.com/n1m21n/Infinite/releases/latest" class="st-btn is-primary" target="_blank" rel="noopener">Download Infinite</a>
-        <a href="../3d/" class="st-btn">Try 3D Loop Maker</a>
-        <a href="../samples/" class="st-btn">Try Sample Generator</a>
       </div>
-    </div>
+    </section>
   </main>
 
   <footer class="site-footer">
     <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
       <div class="footer-grid">
         <div class="footer-col">
           <p class="footer-h">Infinite</p>
@@ -225,377 +250,42 @@
     </div>
   </footer>
 
+  <nav class="dock" id="dock" aria-label="Main">
+    <div class="dock-bar">
+      <span class="dock-thumb" aria-hidden="true"></span>
+      <a class="dock-stop" href="../index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+      <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+      <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+      <button type="button" class="dock-stop" data-group="learn" aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+      <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+    </div>
+    <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+      <a href="../artists.html"><span>Artists</span></a>
+      <a href="../musicians.html"><span>Musicians</span></a>
+      <a href="../vjs.html"><span>VJs</span></a>
+      <a href="../creative-coders.html"><span>Creative coders</span></a>
+      <a href="../developers.html"><span>Developers</span></a>
+    </div>
+    <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+      <a href="../library.html"><span>Library</span></a>
+      <a href="../samples/"><span>Sample generator</span></a>
+      <a href="../artworks.html"><span>Art gallery</span></a>
+      <a href="../nodes/"><span>Nodes</span></a>
+      <a href="../embeds/"><span>Embeds</span></a>
+      <a href="../plugin.html"><span>Plugin</span></a>
+    </div>
+    <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+      <a href="../index.html#learn"><span>Get started</span></a>
+      <a href="../manual/"><span>Manual</span></a>
+      <a href="../philosophy.html"><span>Philosophy</span></a>
+      <a href="../chat.html"><span>Agents &amp; terminal</span></a>
+      <a href="../blog/"><span>Blog</span></a>
+    </div>
+  </nav>
+
   <script src="../site.js?v=21" defer></script>
   <script src="../search.js?v=d89de447" defer></script>
-  <script>
-  (function () {
-    const canvas = document.getElementById("viz-canvas");
-    const stageBox = document.getElementById("stage-box");
-    const statusEl = document.getElementById("viz-status");
-    const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true, antialias: true });
-
-    const state = {
-      style: 0,
-      pal: 0,
-      seed: 1.37,
-      react: 1.25,
-      speed: 1.0,
-      comp: 0.55,
-      glow: 0.60,
-      aspect: "16:9",
-      bass: 0.15,
-      mid: 0.12,
-      high: 0.10,
-    };
-
-    const PALETTES = [
-      [[0.04, 0.06, 0.14], [0.22, 0.56, 1.0], [0.95, 0.25, 0.72]],
-      [[0.06, 0.04, 0.12], [1.0, 0.42, 0.24], [0.46, 0.28, 0.96]],
-      [[0.04, 0.04, 0.05], [0.85, 0.88, 0.94], [0.45, 0.48, 0.55]],
-      [[0.07, 0.05, 0.03], [1.0, 0.78, 0.28], [0.96, 0.36, 0.18]],
-      [[0.03, 0.08, 0.07], [0.16, 0.92, 0.64], [0.35, 0.72, 1.0]]
-    ];
-
-    const VS = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
-    const FS = `
-      precision highp float;
-      uniform vec2 u_res;
-      uniform float u_time, u_bass, u_mid, u_high, u_seed, u_comp, u_glow;
-      uniform int u_style;
-      uniform vec3 u_c0, u_c1, u_c2;
-
-      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
-      float noise(vec2 p){
-        vec2 i = floor(p), f = fract(p);
-        f = f*f*(3.0-2.0*f);
-        return mix(mix(hash(i), hash(i+vec2(1,0)), f.x),
-                   mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
-      }
-      mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
-
-      void main(){
-        vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / min(u_res.x, u_res.y);
-        float t = u_time;
-        float r = length(uv);
-        float a = atan(uv.y, uv.x);
-        vec3 col = u_c0;
-        float k = 3.0 + u_comp * 9.0;
-
-        if (u_style == 0) {
-          float ring = abs(r - (0.32 + 0.12 * u_bass + 0.04 * sin(a * floor(k) + t * 2.0 + u_seed)));
-          float glow = (0.018 + 0.04 * u_glow) / (ring + 0.008);
-          float halo = smoothstep(0.65, 0.15, r) * (0.25 + 0.8 * u_mid);
-          vec3 irid = mix(u_c1, u_c2, 0.5 + 0.5 * sin(a * 2.0 + t + u_high * 4.0));
-          col += irid * glow * 0.65 + u_c1 * halo * 0.35;
-        } else if (u_style == 1) {
-          float z = 0.35 / (r + 0.04) + t * (1.2 + u_bass * 1.6);
-          float rings = smoothstep(0.35, 0.95, sin(z * k + u_seed));
-          float rays = pow(0.5 + 0.5 * cos(a * floor(k * 1.5) + t * 0.7), 4.0);
-          col += mix(u_c1, u_c2, rings) * (rings * 0.75 + rays * (0.35 + u_high)) * smoothstep(0.02, 0.45, r);
-        } else if (u_style == 2) {
-          vec2 p = uv * (2.0 + u_comp * 3.0);
-          for (int i = 0; i < 4; i++) {
-            p += 0.28 * sin(p.yx * (1.6 + float(i) * 0.4) + t + u_seed + u_mid * 2.5);
-          }
-          float f = 0.5 + 0.5 * sin(p.x * 2.5 + p.y * 2.0);
-          float spec = pow(f, 3.0 + (1.0 - u_glow) * 4.0) * (0.7 + u_bass * 1.2);
-          col = mix(u_c0, mix(u_c1, u_c2, f), 0.75) + vec3(spec * 0.55);
-        } else if (u_style == 3) {
-          vec2 q = rot(t * 0.15 + u_seed) * uv * (4.0 + u_comp * 8.0);
-          vec2 g = abs(fract(q) - 0.5);
-          float d = min(g.x, g.y);
-          float pulse = 0.06 + 0.14 * u_bass;
-          float line = smoothstep(pulse, 0.0, d);
-          float wave = 0.5 + 0.5 * sin(r * 14.0 - t * 3.0 + u_mid * 5.0);
-          col += mix(u_c1, u_c2, wave) * line * (0.8 + u_high);
-        } else if (u_style == 4) {
-          vec2 q = floor(gl_FragCoord.xy / (3.0 + (1.0 - u_comp) * 4.0));
-          float bayer = mod(q.x * 3.0 + q.y * 5.0, 8.0) / 8.0;
-          float field = sin(uv.x * k + t) * cos(uv.y * k - t * 0.8) + (0.45 - r) + u_bass * 0.55;
-          float bit = step(bayer, smoothstep(-0.3, 0.7, field));
-          col = mix(u_c0, mix(u_c1, u_c2, 0.5 + 0.5 * sin(t + u_mid * 3.0)), bit);
-        } else {
-          vec2 p = uv * (2.2 + u_comp * 3.0);
-          float n = noise(p + t * 0.35 + u_seed) + 0.5 * noise(p * 2.3 - t * 0.5);
-          float rib = exp(-abs(n - 0.75 - 0.15 * sin(r * 6.0 - t)) * (6.0 + u_bass * 5.0));
-          col += mix(u_c1, u_c2, n * 0.7) * rib * (1.2 + u_glow);
-        }
-
-        float grain = (hash(gl_FragCoord.xy + fract(t) * 100.0) - 0.5) * 0.06 * u_glow;
-        col = clamp(col + grain, 0.0, 1.0);
-        gl_FragColor = vec4(col, 1.0);
-      }
-    `;
-
-    function compile(type, src) {
-      const s = gl.createShader(type);
-      gl.shaderSource(s, src);
-      gl.compileShader(s);
-      return s;
-    }
-
-    let prog, loc = {};
-    if (gl) {
-      prog = gl.createProgram();
-      gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
-      gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
-      gl.linkProgram(prog);
-      gl.useProgram(prog);
-      const buf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-      const pLoc = gl.getAttribLocation(prog, "p");
-      gl.enableVertexAttribArray(pLoc);
-      gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
-      ["u_res","u_time","u_bass","u_mid","u_high","u_seed","u_comp","u_glow","u_style","u_c0","u_c1","u_c2"].forEach(k => {
-        loc[k] = gl.getUniformLocation(prog, k);
-      });
-    }
-
-    // WebAudio graph
-    let actx, analyser, destNode, freqData, audioEl, mediaSrc, micStream, demoTimer, demoPlaying = false;
-    function ensureAudio() {
-      if (!actx) {
-        actx = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = actx.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.82;
-        freqData = new Uint8Array(analyser.frequencyBinCount);
-        destNode = actx.createMediaStreamDestination();
-        analyser.connect(actx.destination);
-        analyser.connect(destNode);
-      }
-      if (actx.state === "suspended") actx.resume();
-    }
-
-    function stopAllAudio() {
-      if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
-      demoPlaying = false;
-      document.getElementById("btn-demo").textContent = "Play demo loop";
-      if (audioEl) { audioEl.pause(); }
-      if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-    }
-
-    function playDemoLoop() {
-      ensureAudio();
-      if (demoPlaying) { stopAllAudio(); statusEl.textContent = "Demo paused."; return; }
-      stopAllAudio();
-      demoPlaying = true;
-      document.getElementById("btn-demo").textContent = "Stop demo";
-      statusEl.textContent = "Playing built-in synth loop — visuals reacting live.";
-      let step = 0;
-      const notes = [110, 110, 146.83, 130.81, 98, 98, 130.81, 164.81];
-      function tick() {
-        if (!demoPlaying) return;
-        const now = actx.currentTime;
-        if (step % 2 === 0) {
-          const osc = actx.createOscillator(), g = actx.createGain();
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(125, now);
-          osc.frequency.exponentialRampToValueAtTime(38, now + 0.14);
-          g.gain.setValueAtTime(0.6, now);
-          g.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-          osc.connect(g); g.connect(analyser);
-          osc.start(now); osc.stop(now + 0.24);
-        }
-        const bass = actx.createOscillator(), bf = actx.createBiquadFilter(), bg = actx.createGain();
-        bass.type = "sawtooth";
-        bass.frequency.setValueAtTime(notes[step % notes.length], now);
-        bf.type = "lowpass";
-        bf.frequency.setValueAtTime(step % 4 === 0 ? 1100 : 520, now);
-        bg.gain.setValueAtTime(0.22, now);
-        bg.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-        bass.connect(bf); bf.connect(bg); bg.connect(analyser);
-        bass.start(now); bass.stop(now + 0.22);
-        step++;
-      }
-      tick();
-      demoTimer = setInterval(tick, 220);
-    }
-
-    document.getElementById("btn-demo").addEventListener("click", playDemoLoop);
-
-    document.getElementById("btn-mic").addEventListener("click", async () => {
-      try {
-        ensureAudio();
-        stopAllAudio();
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const src = actx.createMediaStreamSource(micStream);
-        src.connect(analyser);
-        statusEl.textContent = "Microphone live — speak or play music near your mic.";
-      } catch (e) {
-        statusEl.textContent = "Microphone permission declined.";
-      }
-    });
-
-    function loadAudioFile(file) {
-      if (!file) return;
-      ensureAudio();
-      stopAllAudio();
-      if (!audioEl) {
-        audioEl = new Audio();
-        audioEl.loop = true;
-        mediaSrc = actx.createMediaElementSource(audioEl);
-        mediaSrc.connect(analyser);
-      }
-      audioEl.src = URL.createObjectURL(file);
-      audioEl.play();
-      document.getElementById("file-label").textContent = "Loaded: " + file.name;
-      statusEl.textContent = "Playing " + file.name + " — ready to record video or export .inf.";
-    }
-
-    const fileInput = document.getElementById("audio-file");
-    fileInput.addEventListener("change", () => loadAudioFile(fileInput.files[0]));
-    const dropEl = document.querySelector(".st-drop");
-    dropEl.addEventListener("dragover", e => { e.preventDefault(); });
-    dropEl.addEventListener("drop", e => { e.preventDefault(); loadAudioFile(e.dataTransfer.files[0]); });
-
-    function setChips(containerId, attr, cb) {
-      const box = document.getElementById(containerId);
-      box.querySelectorAll(".st-chip").forEach(btn => {
-        btn.addEventListener("click", () => {
-          box.querySelectorAll(".st-chip").forEach(b => b.classList.remove("is-active"));
-          btn.classList.add("is-active");
-          cb(btn.getAttribute(attr), btn);
-        });
-      });
-    }
-
-    setChips("style-chips", "data-style", v => { state.style = parseInt(v, 10); });
-    setChips("pal-chips", "data-pal", v => { state.pal = parseInt(v, 10); });
-    setChips("aspect-chips", "data-aspect", v => {
-      state.aspect = v;
-      stageBox.setAttribute("data-aspect", v);
-      if (v === "16:9") { canvas.width = 1280; canvas.height = 720; }
-      else if (v === "9:16") { canvas.width = 720; canvas.height = 1280; }
-      else { canvas.width = 1080; canvas.height = 1080; }
-    });
-
-    [["ctrl-react","val-react","react"],["ctrl-speed","val-speed","speed"],["ctrl-comp","val-comp","comp"],["ctrl-glow","val-glow","glow"]].forEach(([id, vid, key]) => {
-      const el = document.getElementById(id), vEl = document.getElementById(vid);
-      el.addEventListener("input", () => { state[key] = parseFloat(el.value); vEl.textContent = state[key].toFixed(2); });
-    });
-
-    document.getElementById("btn-generate").addEventListener("click", () => {
-      state.style = Math.floor(Math.random() * 6);
-      state.pal = Math.floor(Math.random() * 5);
-      state.seed = +(Math.random() * 20).toFixed(2);
-      state.comp = +(0.25 + Math.random() * 0.7).toFixed(2);
-      state.glow = +(0.3 + Math.random() * 0.65).toFixed(2);
-      document.querySelectorAll("#style-chips .st-chip").forEach((b, i) => b.classList.toggle("is-active", i === state.style));
-      document.querySelectorAll("#pal-chips .st-chip").forEach((b, i) => b.classList.toggle("is-active", i === state.pal));
-      document.getElementById("ctrl-comp").value = state.comp;
-      document.getElementById("val-comp").textContent = state.comp.toFixed(2);
-      document.getElementById("ctrl-glow").value = state.glow;
-      document.getElementById("val-glow").textContent = state.glow.toFixed(2);
-      statusEl.textContent = "Generated new visual seed #" + state.seed + ".";
-    });
-
-    // Video recording
-    let recorder, chunks = [];
-    const recBtn = document.getElementById("btn-rec");
-    recBtn.addEventListener("click", () => {
-      if (recorder && recorder.state === "recording") {
-        recorder.stop();
-        recBtn.textContent = "Record video";
-        recBtn.classList.remove("is-active");
-        return;
-      }
-      ensureAudio();
-      const stream = canvas.captureStream(30);
-      if (destNode && destNode.stream.getAudioTracks().length) {
-        destNode.stream.getAudioTracks().forEach(t => stream.addTrack(t));
-      }
-      chunks = [];
-      recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm" });
-      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "infinite-visualizer-" + state.aspect.replace(":", "x") + ".webm";
-        a.click();
-        statusEl.textContent = "Video exported (" + (blob.size / 1024 / 1024).toFixed(2) + " MB).";
-      };
-      recorder.start();
-      recBtn.textContent = "Stop & save";
-      recBtn.classList.add("is-active");
-      statusEl.textContent = "Recording canvas + audio... click Stop & save when done.";
-    });
-
-    document.getElementById("btn-png").addEventListener("click", () => {
-      const a = document.createElement("a");
-      a.href = canvas.toDataURL("image/png");
-      a.download = "infinite-visual.png";
-      a.click();
-    });
-
-    document.getElementById("btn-inf").addEventListener("click", () => {
-      const patch = [
-        "# Made with Infinite (https://infinitedevices.org), by Naman Soni (n1m21n)",
-        "infinite-patch 1",
-        "node 1 Audio Audio In",
-        "  id audio",
-        "end",
-        "node 2 Visuals Field Pixel",
-        "  id visual",
-        "  f uReact " + state.react,
-        "  f uSpeed " + state.speed,
-        "  f uComplexity " + state.comp,
-        "  f uSeed " + state.seed,
-        "end",
-        "node 3 Output Video Out",
-        "  id out",
-        "end",
-        "cable 1 1 2 1",
-        "cable 2 1 3 1",
-        ""
-      ].join("\n");
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob([patch], { type: "text/plain" }));
-      a.download = "infinite-visualizer.inf";
-      a.click();
-      statusEl.textContent = "Downloaded infinite-visualizer.inf — open it in Infinite.";
-    });
-
-    let simT = 0;
-    function frame(now) {
-      simT = now * 0.001 * state.speed;
-      if (analyser && freqData) {
-        analyser.getByteFrequencyData(freqData);
-        let b = 0, m = 0, h = 0;
-        for (let i = 0; i < 10; i++) b += freqData[i];
-        for (let i = 10; i < 42; i++) m += freqData[i];
-        for (let i = 42; i < 100; i++) h += freqData[i];
-        state.bass += ((b / (10 * 255)) * state.react - state.bass) * 0.25;
-        state.mid  += ((m / (32 * 255)) * state.react - state.mid)  * 0.22;
-        state.high += ((h / (58 * 255)) * state.react - state.high) * 0.22;
-      } else {
-        state.bass = 0.18 + 0.12 * Math.sin(simT * 2.4);
-        state.mid  = 0.14 + 0.08 * Math.cos(simT * 1.7);
-        state.high = 0.10 + 0.06 * Math.sin(simT * 3.9);
-      }
-      if (gl && prog) {
-        gl.viewport(0, 0, canvas.width, canvas.height);
-        const pal = PALETTES[state.pal];
-        gl.uniform2f(loc.u_res, canvas.width, canvas.height);
-        gl.uniform1f(loc.u_time, simT);
-        gl.uniform1f(loc.u_bass, state.bass);
-        gl.uniform1f(loc.u_mid, state.mid);
-        gl.uniform1f(loc.u_high, state.high);
-        gl.uniform1f(loc.u_seed, state.seed);
-        gl.uniform1f(loc.u_comp, state.comp);
-        gl.uniform1f(loc.u_glow, state.glow);
-        gl.uniform1i(loc.u_style, state.style);
-        gl.uniform3fv(loc.u_c0, pal[0]);
-        gl.uniform3fv(loc.u_c1, pal[1]);
-        gl.uniform3fv(loc.u_c2, pal[2]);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      }
-      requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-  })();
-  </script>
+  <script src="../share.js?v=ad5e5392" defer></script>
+  <script src="viz-app.js?v=3" defer></script>
 </body>
 </html>
