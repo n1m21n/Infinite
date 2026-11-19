@@ -168,7 +168,7 @@ To be filled after each block, linked to §6 and §7.
 |---|---|---|---|---|---|---|
 | Baseline | 1/1 subject | n/a (avg only) | fail (same mandala) | synthetic only | fail (weights) | n/a |
 | A | PhysioNet 72.5% (avg-only 57%) · GIPSA 100% (90%) · HEROIC Muse 50% (37.5%) | **fail as written** (best region beats avg 26–50%); reframed: per-person LDA beats avg in 73% HEROIC / 88% PhysioNet sessions | not run (Block B) | real data in selftest [7] | **pass**: weights learned per person at calibration | not measured |
-| B | — | — | proxy: **0.92** with the state strip · raw image 0.74 · raw audio 0.86 (126 pairs); human blind run **pending owner** | — | **pass**: image z-scored on own eyes-open calibration, audio on own baseline amplitude | not measured |
+| B | — | — | proxy: **0.92** with the state strip · raw image 0.74 · raw audio 0.86 (126 pairs); human blind run **10/10 pass** (picture only, strip-led) | — | **pass**: image z-scored on own eyes-open calibration, audio on own baseline amplitude | not measured |
 | C | | | | | | |
 
 ### Block A detail (2026-11-19)
@@ -210,7 +210,8 @@ M3 2AFC proxy (last 10 s open vs last 10 s closed, same session; observer = brig
 | Audio pin | 0.857 |
 | State strip (calibrated score) | **0.92** |
 
-Blind set for the human run: `~/Infinite/datasets/eeg/m3_blind/` (sheet.png + 20 wavs, seed 7);
+Human run (owner, 2026-11-19, picture only, read the top strip first): **10 / 10 → M3 pass.**
+Blind set: `~/Infinite/datasets/eeg/m3_blind/` (sheet.png + 20 wavs, seed 7);
 key kept apart in `~/Infinite/datasets/eeg/m3_key.json`. Mirror: `tools/bci/direct_pins.py`.
 
 ## 11. Critique
@@ -233,7 +234,8 @@ key kept apart in `~/Infinite/datasets/eeg/m3_key.json`. Mirror: `tools/bci/dire
 - **Uncommitted work is a risk.** The whole branch lives in the working tree.
 - **Block B: the raw Muse spectrogram is not readable by eye** (0.74). M3 only passes through the
   calibrated strip, so M3 really measures the Block A classifier, drawn. Audio is the better raw channel.
-- **Block B: M3 is unproven until a human runs it.** I know the key; my reading doesn't count.
+- **Block B: M3 passed 10/10 on the picture alone, but the owner was told to read the strip first.**
+  That proves the strip reads at a glance; it does not prove the raw spectrogram or the sound do.
 - **Block B: Hilbert adds 125 ms** to the audio pin; fine for drones, too slow for rhythm.
 - **Block B: Geometry pin deferred to Block C**, where the starter patch shows whether it earns a pin.
 - **Block B: Python mirror skips artifact blanking**, as in Block A.
@@ -245,8 +247,7 @@ key kept apart in `~/Infinite/datasets/eeg/m3_key.json`. Mirror: `tools/bci/dire
 3. Download the validation data (PhysioNet R01/R02 × 109 ≈ 270 MB, HEROIC 86 MB, GIPSA 105 MB,
    EEG-Eyeblinks): needs a yes.
 4. Block A in Python (`batch_validate.py`), then C++ per-region DSP + wPLI. One build at the end of the block.
-5. Block B pins, then render proof sheets and run the M3 blind test. **Done except the human run:**
-   owner opens `m3_blind/sheet.png` + wavs, picks the eyes-closed clip per pair, checked against `m3_key.json`.
+5. Block B pins, then render proof sheets and run the M3 blind test. **Done:** M3 10/10 by the owner.
 6. Block C starter patch; then Muse hardware when available. Ship / iterate / abandon decided here.
 
 ---
