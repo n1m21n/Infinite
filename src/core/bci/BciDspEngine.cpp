@@ -192,6 +192,16 @@ void BciDspEngine::Reset(double sampleRateHz)
    mFeatEmaInit = false;
    std::fill(std::begin(mRegionAlpha), std::end(mRegionAlpha), 0.0f);
    mStateScore = 0.0f;
+   mImgInit = false;
+   mImgSeq = 0;
+   std::fill(std::begin(mImgCol), std::end(mImgCol), 0.5f);
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      std::fill(std::begin(mAudLine[c]), std::end(mAudLine[c]), 0.0);
+      mAudPrevPhase[c] = 0.0;
+      mAudRunAmp[c] = 1.0;
+   }
+   mAudHead = 0;
 
    RebuildFilters();
 }
@@ -229,6 +239,23 @@ void BciDspEngine::RebuildFilters()
    }
    mBrowHp.Reset(); mBrowHp.SetHighPass(mSampleRate, 30.0);
    mBrowLp.Reset(); mBrowLp.SetLowPass(mSampleRate, 75.0);
+
+   // Audio pin: 4th-order Butterworth high-pass 2 Hz + low-pass 40 Hz (Q 0.5412, 1.3066),
+   // Hamming-windowed ideal Hilbert transformer h[n] = 2 / (pi n) for odd n.
+   static constexpr double kButterQ[2] = { 0.54119610, 1.30656296 };
+   for (int c = 0; c < kChannelCount; ++c)
+      for (int k = 0; k < 2; ++k)
+      {
+         mAudHp[c][k].Reset(); mAudHp[c][k].SetHighPass(mSampleRate, 2.0, kButterQ[k]);
+         mAudLp[c][k].Reset(); mAudLp[c][k].SetLowPass(mSampleRate, 40.0, kButterQ[k]);
+      }
+   const int mid = (kHilbertTaps - 1) / 2;
+   for (int i = 0; i < kHilbertTaps; ++i)
+   {
+      const int n = i - mid;
+      const double w = 0.54 - 0.46 * std::cos(kTwoPi * i / (double)(kHilbertTaps - 1));
+      mHilbertH[i] = (n % 2 != 0) ? w * 2.0 / (3.14159265358979323846 * n) : 0.0;
+   }
 }
 
 void BciDspEngine::StartCalibration()
@@ -250,6 +277,13 @@ void BciDspEngine::StartCalibration()
    mCalibFeatClosed.reserve(perPhase);
    for (int c = 0; c < kChannelCount; ++c)
       mCalibChanSamples[c].reserve((size_t)(kCalibPhaseSec * mSampleRate) + 64);
+   mCalibImgOpen.clear();
+   mCalibImgOpen.reserve(perPhase);
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      mCalibAudAmp[c].clear();
+      mCalibAudAmp[c].reserve((size_t)(kCalibPhaseSec * mSampleRate) + 64);
+   }
 }
 
 void BciDspEngine::CancelCalibration()
@@ -290,8 +324,19 @@ bool BciDspEngine::SaveProfile(const std::string& path) const
        << "  \"stateW\": [";
    for (int k = 0; k < kStateFeatureCount; ++k)
       oss << (k ? ", " : "") << mProfile.stateW[k];
-   oss << "]\n"
-       << "}\n";
+   oss << "],\n"
+       << "  \"directValid\": " << (mProfile.directValid ? "true" : "false") << ",\n";
+   auto writeArr = [&](const char* key, const float* v, int n, bool last)
+   {
+      oss << "  \"" << key << "\": [";
+      for (int k = 0; k < n; ++k)
+         oss << (k ? ", " : "") << v[k];
+      oss << (last ? "]\n" : "],\n");
+   };
+   writeArr("audAmp", mProfile.audAmp, kChannelCount, false);
+   writeArr("imgMed", mProfile.imgMed, kImageColumnSize, false);
+   writeArr("imgMad", mProfile.imgMad, kImageColumnSize, true);
+   oss << "}\n";
 
    std::string err;
    return AppPaths::WriteFileAtomic(target, oss.str(), err);
@@ -354,6 +399,30 @@ bool BciDspEngine::LoadProfile(const std::string& path)
       }
       prof.stateValid = ok;
    }
+   auto parseArr = [&](const char* key, float* out, int n) -> bool
+   {
+      const std::string pat = std::string("\"") + key + "\": [";
+      const size_t at = content.find(pat);
+      if (at == std::string::npos)
+         return false;
+      const char* cur = content.c_str() + at + pat.size();
+      for (int k = 0; k < n; ++k)
+      {
+         while (*cur == ' ' || *cur == ',' || *cur == '\n')
+            ++cur;
+         char* end = nullptr;
+         const double v = std::strtod(cur, &end);
+         if (end == cur || !std::isfinite(v))
+            return false;
+         out[k] = (float)v;
+         cur = end;
+      }
+      return true;
+   };
+   if (content.find("\"directValid\": true") != std::string::npos)
+      prof.directValid = parseArr("audAmp", prof.audAmp, kChannelCount) &&
+                         parseArr("imgMed", prof.imgMed, kImageColumnSize) &&
+                         parseArr("imgMad", prof.imgMad, kImageColumnSize);
    mProfile = prof;
    return true;
 }
@@ -406,6 +475,7 @@ void BciDspEngine::FinishCalibration()
       mProfile.baselineBeta = sumB / (float)mCalibOpenBeta.size();
    }
 
+   FinishDirectBaselines();
    mProfile.stateValid = FitStateWeights();
    mStateCalibFailed = !mProfile.stateValid;
    mCalibFeatOpen.clear();
@@ -570,6 +640,7 @@ void BciDspEngine::ComputeWelchCorticalPsd()
    mFaaRaw = mFaaRaw * 0.7f + faa * 0.3f;
 
    UpdateStateFeatures(chanPsd, binHz);
+   UpdateImageColumn(chanPsd, binHz);
 
    // Calibration accumulation
    if (mCalibPhase == CalibrationPhase::EyesClosed)
@@ -708,6 +779,98 @@ bool BciDspEngine::FitStateWeights()
    return true;
 }
 
+void BciDspEngine::UpdateImageColumn(const double (&chanPsd)[kChannelCount][48], double binHz)
+{
+   const double hopSec = 12.0 / std::max(64.0, mSampleRate);
+   const double a = mImgInit ? 1.0 - std::exp(-hopSec / kImageTauSec) : 1.0;
+   const double ab = mImgInit ? 1.0 - std::exp(-hopSec / kBaselineTauSec) : 1.0;
+   for (int c = 0; c < kChannelCount; ++c)
+      for (int k = 0; k < kImageBins; ++k)
+      {
+         // bin k = (k + 1) Hz; with a 256-point window at 256 Hz that is FFT bin k + 1
+         const int b = std::clamp((int)std::lround((k + 1) / binHz), 1, 47);
+         const int i = c * kImageBins + k;
+         const double lp = std::log10(std::max(1e-12, chanPsd[c][b] * (double)(kFftSize * kFftSize)));
+         mImgLog[i] += a * (lp - mImgLog[i]);
+         mImgRunMean[i] += ab * (mImgLog[i] - mImgRunMean[i]);
+         mImgRunDev[i] += ab * (std::fabs(mImgLog[i] - mImgRunMean[i]) * 1.2533 - mImgRunDev[i]);
+         if (!mImgInit)
+            mImgRunDev[i] = 0.3;
+         const double med = mProfile.directValid ? mProfile.imgMed[i] : mImgRunMean[i];
+         const double mad = mProfile.directValid ? mProfile.imgMad[i] : mImgRunDev[i];
+         const double z = (mImgLog[i] - med) / std::max(1e-3, mad);
+         mImgCol[i] = (float)std::clamp((z + 3.0) / 6.0, 0.0, 1.0);
+      }
+   mImgInit = true;
+
+   if (mCalibPhase == CalibrationPhase::EyesOpen && mCalibElapsedSec >= kCalibSettleSec)
+   {
+      std::array<float, kImageColumnSize> v{};
+      for (int i = 0; i < kImageColumnSize; ++i)
+         v[(size_t)i] = (float)mImgLog[i];
+      mCalibImgOpen.push_back(v);
+   }
+}
+
+void BciDspEngine::StepAudify(const double (&clean)[kChannelCount])
+{
+   AudifyFrame fr;
+   const int mid = (kHilbertTaps - 1) / 2;
+   const double ab = 1.0 - std::exp(-1.0 / (kBaselineTauSec * std::max(64.0, mSampleRate)));
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      double x = clean[c];
+      for (int k = 0; k < 2; ++k)
+         x = mAudLp[c][k].Step(mAudHp[c][k].Step(x));
+      mAudLine[c][mAudHead] = x;
+      double im = 0.0;
+      for (int t = 1; t < kHilbertTaps; t += 2) // odd taps only (even taps are zero)
+         im += mHilbertH[t] * mAudLine[c][(mAudHead - t + kHilbertTaps) % kHilbertTaps];
+      const double re = mAudLine[c][(mAudHead - mid + kHilbertTaps) % kHilbertTaps];
+      const double amp = std::hypot(re, im);
+      const double ph = std::atan2(im, re);
+      double dph = ph - mAudPrevPhase[c];
+      dph -= kTwoPi * std::floor((dph + 3.14159265358979323846) / kTwoPi);
+      mAudPrevPhase[c] = ph;
+      mAudRunAmp[c] += ab * (amp - mAudRunAmp[c]);
+      if (mCalibPhase == CalibrationPhase::EyesOpen && mCalibElapsedSec >= kCalibSettleSec)
+         mCalibAudAmp[c].push_back((float)amp);
+      const double base = mProfile.directValid ? mProfile.audAmp[c] : mAudRunAmp[c];
+      fr.amp[c] = (float)(amp / std::max(1e-3, base));
+      fr.dphase[c] = (float)dph;
+   }
+   mAudHead = (mAudHead + 1) % kHilbertTaps;
+   mAudify.push_back(fr);
+}
+
+void BciDspEngine::FinishDirectBaselines()
+{
+   const size_t n = mCalibImgOpen.size();
+   bool ok = n >= 32;
+   for (int c = 0; c < kChannelCount; ++c)
+      ok = ok && mCalibAudAmp[c].size() >= 256;
+   if (ok)
+   {
+      std::vector<float> col(n), dev(n);
+      for (int i = 0; i < kImageColumnSize; ++i)
+      {
+         for (size_t j = 0; j < n; ++j)
+            col[j] = mCalibImgOpen[j][(size_t)i];
+         const float med = MedianOf(col);
+         for (size_t j = 0; j < n; ++j)
+            dev[j] = std::fabs(col[j] - med);
+         mProfile.imgMed[i] = med;
+         mProfile.imgMad[i] = std::max(1e-3f, 1.4826f * MedianOf(dev));
+      }
+      for (int c = 0; c < kChannelCount; ++c)
+         mProfile.audAmp[c] = std::max(1e-3f, MedianOf(mCalibAudAmp[c]));
+   }
+   mProfile.directValid = ok;
+   mCalibImgOpen.clear();
+   for (auto& v : mCalibAudAmp)
+      v.clear();
+}
+
 void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24[kOutputPinCount], TelemetrySnapshot& outTelemetry)
 {
    if (!frames || count <= 0)
@@ -724,6 +887,7 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
    const double resSin = std::sin(iafOmega);
    const double resDecay = 0.965; // ~150 ms coherent integration
 
+   mAudify.clear();
    for (int i = 0; i < count; ++i)
    {
       const SampleFrame& f = frames[i];
@@ -762,6 +926,8 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
          mResRe[c] = resDecay * (rPrev * resCos - iPrev * resSin) + (1.0 - resDecay) * x;
          mResIm[c] = resDecay * (rPrev * resSin + iPrev * resCos);
       }
+
+      StepAudify(clean);
 
       // Inter-hemispheric PLV across AF7<->AF8 and TP9<->TP10
       auto phaseDiffUnit = [&](int a, int b, double& outRe, double& outIm)
@@ -863,6 +1029,7 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
          mSamplesSincePsd = 0;
          if (!mArtifactBlanking || mStreamTimeSec >= mArtifactHoldUntilSec)
             ComputeWelchCorticalPsd();
+         ++mImgSeq; // the Image pin scrolls at a constant rate; a blanked update repeats the last column
       }
 
       // Trace buffer decimated 2:1 (128 Hz view -> 1.0 second window)
@@ -1002,5 +1169,8 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
    outTelemetry.stateCalibrated = mProfile.stateValid;
    outTelemetry.stateCalibFailed = mStateCalibFailed;
    outTelemetry.eyesClosedScore = mProfile.stateValid ? mStateScore : 0.0f;
+   std::copy(std::begin(mImgCol), std::end(mImgCol), outTelemetry.imageCol);
+   outTelemetry.imageState = mProfile.stateValid ? mStateScore : -1.0f;
+   outTelemetry.imageSeq = mImgSeq;
 }
 }

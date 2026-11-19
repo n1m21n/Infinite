@@ -3,14 +3,30 @@
 #include "core/Transport.h"
 #include "core/bci/BciDspEngine.h"
 #include "core/bci/BciRuntime.h"
+#include "audio/AudioNode.h"
+#include "gl3.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 
 namespace
 {
    const char* kHexDigits = "0123456789abcdef";
+
+   // Inferno-like map, same anchors as tools/bci/direct_pins.py
+   void InfernoRgb(float v, uint8_t* rgb)
+   {
+      static const float kCm[8][3] = { { 0, 0, 4 }, { 40, 11, 84 }, { 101, 21, 110 }, { 159, 42, 99 },
+                                       { 212, 72, 66 }, { 245, 125, 21 }, { 250, 193, 39 }, { 252, 255, 164 } };
+      const float x = std::clamp(v, 0.0f, 1.0f) * 7.0f;
+      const int i = std::min(6, (int)x);
+      const float t = x - (float)i;
+      for (int k = 0; k < 3; ++k)
+         rgb[k] = (uint8_t)std::lround((1.0f - t) * kCm[i][k] + t * kCm[i + 1][k]);
+   }
 
    int HexNibble(char c)
    {
@@ -20,6 +36,91 @@ namespace
       return -1;
    }
 }
+
+// Audio half of Brain Source: plays the worker's audified EEG frames. Each channel is an
+// oscillator whose phase advances 32x the EEG phase and whose level follows the EEG amplitude
+// (over its eyes-open baseline), so 10 Hz alpha sounds at 320 Hz. AF7 + TP9 left, AF8 + TP10 right.
+class BrainAudioNode : public AudioNode
+{
+public:
+   static constexpr int kCap = 2048; // 8 s of EEG at 256 Hz
+
+   // Worker thread only (single producer).
+   void Push(const Bci::AudifyFrame* f, int n, double eegRateHz)
+   {
+      mEegRate.store(eegRateHz, std::memory_order_relaxed);
+      unsigned w = mWrite.load(std::memory_order_relaxed);
+      const unsigned r = mRead.load(std::memory_order_acquire);
+      for (int i = 0; i < n && w - r < (unsigned)kCap; ++i, ++w)
+         mRing[w % kCap] = f[i];
+      mWrite.store(w, std::memory_order_release);
+   }
+
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override { mSr = sampleRate > 0.0 ? sampleRate : 48000.0; }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& out) override
+   {
+      const double step = mEegRate.load(std::memory_order_relaxed) / mSr;
+      for (int i = 0; i < out.numFrames; ++i)
+      {
+         mPos += step;
+         while (mPos >= 1.0)
+         {
+            mPos -= 1.0;
+            Advance();
+         }
+         float v[Bci::kChannelCount];
+         for (int c = 0; c < Bci::kChannelCount; ++c)
+         {
+            const float a = mPrev.amp[c] + (mCur.amp[c] - mPrev.amp[c]) * (float)mPos;
+            mOsc[c] += Bci::kAudifyMult * (double)mCur.dphase[c] * step;
+            if (mOsc[c] > 1e6)
+               mOsc[c] = std::fmod(mOsc[c], 6.283185307179586);
+            v[c] = std::tanh(0.5f * a) * (float)std::cos(mOsc[c]);
+         }
+         const float l = 0.35f * (v[0] + v[2]);
+         const float r = 0.35f * (v[1] + v[3]);
+         if (out.numChannels >= 2)
+         {
+            out.channels[0][i] = l;
+            out.channels[1][i] = r;
+            for (int ch = 2; ch < out.numChannels; ++ch)
+               out.channels[ch][i] = 0.0f;
+         }
+         else if (out.numChannels == 1)
+            out.channels[0][i] = 0.5f * (l + r);
+      }
+   }
+
+private:
+   void Advance()
+   {
+      unsigned r = mRead.load(std::memory_order_relaxed);
+      const unsigned w = mWrite.load(std::memory_order_acquire);
+      if (w - r > 128) // more than 0.5 s behind: drop to ~1/8 s of lag
+         r = w - 32;
+      mPrev = mCur;
+      if (r != w)
+      {
+         mCur = mRing[r % kCap];
+         ++r;
+      }
+      else
+      {
+         for (int c = 0; c < Bci::kChannelCount; ++c)
+            mCur.amp[c] *= 0.98f; // starved (source stopped): fade out instead of holding a tone
+      }
+      mRead.store(r, std::memory_order_release);
+   }
+
+   std::array<Bci::AudifyFrame, kCap> mRing{};
+   std::atomic<unsigned> mWrite{ 0 }, mRead{ 0 };
+   std::atomic<double> mEegRate{ Bci::kSampleRateHz };
+   double mSr = 48000.0;
+   double mPos = 0.0;
+   double mOsc[Bci::kChannelCount] = {};
+   Bci::AudifyFrame mPrev, mCur;
+};
 
 const std::vector<std::string>& BrainSourceNode::DeviceNames()
 {
@@ -56,6 +157,7 @@ const std::vector<std::string>& BrainSourceNode::BlinkModeNames()
 }
 
 BrainSourceNode::BrainSourceNode()
+   : mAudio(std::make_unique<BrainAudioNode>())
 {
    for (int i = 0; i < kOutputCount; ++i)
    {
@@ -69,6 +171,66 @@ BrainSourceNode::BrainSourceNode()
 BrainSourceNode::~BrainSourceNode()
 {
    StopWorker();
+   if (mTexture != 0)
+      glDeleteTextures(1, &mTexture);
+}
+
+AudioNode* BrainSourceNode::GetAudioNode()
+{
+   return mAudio.get();
+}
+
+void BrainSourceNode::CopyImagePixels(std::vector<uint8_t>& out) const
+{
+   std::lock_guard<std::mutex> lk(mPixMu);
+   out = mPixels;
+}
+
+void BrainSourceNode::FeedDirect(const Bci::TelemetrySnapshot& snap, unsigned& lastImgSeq,
+                                 const std::vector<Bci::AudifyFrame>& frames, double eegRateHz)
+{
+   const int newCols = std::min(4, (int)(snap.imageSeq - lastImgSeq));
+   for (int k = 0; k < newCols; ++k)
+      AppendImageColumn(snap);
+   lastImgSeq = snap.imageSeq;
+   if (!frames.empty())
+      mAudio->Push(frames.data(), (int)frames.size(), eegRateHz);
+}
+
+void BrainSourceNode::AppendImageColumn(const Bci::TelemetrySnapshot& snap)
+{
+   std::lock_guard<std::mutex> lk(mPixMu);
+   if (mPixels.empty())
+      mPixels.assign((size_t)kImgW * kImgH * 4, 0);
+   // scroll one column left
+   for (int y = 0; y < kImgH; ++y)
+   {
+      uint8_t* row = mPixels.data() + (size_t)y * kImgW * 4;
+      std::memmove(row, row + 4, (size_t)(kImgW - 1) * 4);
+   }
+   auto put = [&](int y, const uint8_t* rgb)
+   {
+      uint8_t* p = mPixels.data() + ((size_t)y * kImgW + (kImgW - 1)) * 4;
+      p[0] = rgb[0]; p[1] = rgb[1]; p[2] = rgb[2]; p[3] = 255;
+   };
+   uint8_t rgb[3];
+   const uint8_t grey[3] = { 96, 96, 96 }, gap[3] = { 0, 0, 0 };
+   if (snap.imageState >= 0.0f)
+      InfernoRgb(snap.imageState, rgb);
+   for (int y = 0; y < kImgStrip; ++y)
+      put(y, snap.imageState >= 0.0f ? rgb : grey);
+   int y = kImgStrip;
+   for (int c = 0; c < Bci::kChannelCount; ++c)
+   {
+      for (int g = 0; g < kImgGap; ++g)
+         put(y++, gap);
+      for (int k = Bci::kImageBins - 1; k >= 0; --k) // 40 Hz at the top of each row, 1 Hz at the bottom
+      {
+         InfernoRgb(snap.imageCol[c * Bci::kImageBins + k], rgb);
+         put(y++, rgb);
+      }
+   }
+   ++mPixRevision;
 }
 
 const char* BrainSourceNode::OutputLabel(int index) const
@@ -99,6 +261,10 @@ const char* BrainSourceNode::OutputLabel(int index) const
       "jaw R",
       "heart"
    };
+   if (index == kImagePin)
+      return "image";
+   if (index == kAudioPin)
+      return "audio";
    if (index < 0 || index >= kOutputCount)
       return "out";
    return kLabels[index];
@@ -273,6 +439,34 @@ void BrainSourceNode::CookIfNeeded(int frameId)
    for (int i = 0; i < kOutputCount; ++i)
       vals[i] = Value(i);
    Bci::PublishBrainGlobals(vals, !bypassed);
+
+   // Image pin upload (GL thread): only when the worker added a column.
+   std::vector<uint8_t> flipped;
+   {
+      std::lock_guard<std::mutex> lk(mPixMu);
+      if (mPixRevision == mUploadedRevision || mPixels.empty())
+         return;
+      mUploadedRevision = mPixRevision;
+      flipped.resize(mPixels.size());
+      const size_t rowBytes = (size_t)kImgW * 4;
+      for (int y = 0; y < kImgH; ++y) // GL row 0 is the bottom
+         std::copy_n(mPixels.data() + (size_t)y * rowBytes, rowBytes, flipped.data() + (size_t)(kImgH - 1 - y) * rowBytes);
+   }
+   if (mTexture == 0)
+   {
+      glGenTextures(1, &mTexture);
+      glBindTexture(GL_TEXTURE_2D, mTexture);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kImgW, kImgH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+   }
+   glBindTexture(GL_TEXTURE_2D, mTexture);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kImgW, kImgH, GL_RGBA, GL_UNSIGNED_BYTE, flipped.data());
+   glBindTexture(GL_TEXTURE_2D, 0);
+   ++mTexRevision;
 }
 
 void BrainSourceNode::GetTelemetry(Bci::TelemetrySnapshot& out) const
@@ -334,6 +528,7 @@ void BrainSourceNode::WorkerLoop()
    std::vector<Bci::SampleFrame> batch;
    Bci::TelemetrySnapshot snap;
    float pins[kOutputCount] = {};
+   unsigned lastImgSeq = 0;
 
    for (;;)
    {
@@ -425,6 +620,8 @@ void BrainSourceNode::WorkerLoop()
          }
          for (int i = 0; i < kOutputCount; ++i)
             mPublished[i].store(std::clamp(pins[i], 0.0f, 1.0f), std::memory_order_relaxed);
+
+         FeedDirect(snap, lastImgSeq, dsp.Audify(), runtime.SampleRateHz());
       }
    }
 

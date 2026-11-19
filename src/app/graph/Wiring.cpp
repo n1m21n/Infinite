@@ -1578,7 +1578,7 @@ namespace app
 
       const bool srcIsModulator =
          dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr ||
-         (srcNode->node->OutputCount() > 0 && srcNode->node->ModulatorOutput(0) != nullptr);
+         (srcOutputIndex >= 0 && srcOutputIndex < srcNode->node->OutputCount() && srcNode->node->ModulatorOutput(srcOutputIndex) != nullptr);
       auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode->node.get());
       auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode->node.get());
       if (srcGeometry != nullptr && !srcGeometry->IsGeometryOutputIndex(srcOutputIndex))

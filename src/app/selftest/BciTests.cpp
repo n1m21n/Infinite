@@ -14,6 +14,7 @@
 #include "nodes/BrainSourceNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "platform/AppPaths.h"
+#include "audio/AudioNode.h"
 
 #include <cmath>
 #include <cstdio>
@@ -551,6 +552,70 @@ bool RunBciSelftest()
             ck.Expect(acc > 0.6, "Calibrated state: held-out eyes-closed accuracy above 60%");
          }
       }
+   }
+
+   // 8. Direct pins: a 10 Hz sine on every channel. Audio: the engine's phase step is 2*pi*10/256 per sample and
+   //    the audio pin plays it at 32x (320 Hz, counted by zero crossings). Image: columns arrive and change pixels.
+   {
+      Bci::BciDspEngine dsp;
+      dsp.Reset(256.0);
+      dsp.SetStartleGuard(false);
+      dsp.SetArtifactBlanking(false);
+      dsp.SetPersistProfile(false);
+      dsp.SetProfile(Bci::CalibrationProfile{});
+      BrainSourceNode node;
+      std::vector<Bci::SampleFrame> batch(12);
+      Bci::TelemetrySnapshot snap{};
+      float pins[Bci::kOutputPinCount] = {};
+      unsigned lastSeq = 0;
+      double dphSum = 0.0;
+      int dphN = 0;
+      std::vector<uint8_t> px0, px1;
+      const double kTwoPi = 6.283185307179586;
+      for (int i = 0, t = 0; i < 8 * 256 / 12; ++i)
+      {
+         for (auto& f : batch)
+         {
+            const float v = 40.0f * (float)std::sin(kTwoPi * 10.0 * (double)t++ / 256.0);
+            for (float& c : f.ch)
+               c = v;
+         }
+         dsp.Process(batch.data(), (int)batch.size(), pins, snap);
+         if (i > 4 * 256 / 12)
+            for (const auto& a : dsp.Audify())
+            {
+               dphSum += a.dphase[0];
+               ++dphN;
+            }
+         node.FeedDirect(snap, lastSeq, dsp.Audify(), 256.0);
+         if (i == 4 * 256 / 12)
+            node.CopyImagePixels(px0);
+      }
+      node.CopyImagePixels(px1);
+      const double dph = dphN > 0 ? dphSum / dphN : 0.0;
+      const double want = kTwoPi * 10.0 / 256.0;
+
+      AudioNode* an = node.GetAudioNode();
+      const int sr = 48000, n = sr / 10; // 0.1 s: inside the ~32 frames left after the catch-up skip
+      std::vector<float> l(n), r(n);
+      float* chans[2] = { l.data(), r.data() };
+      AudioBuffer out{ chans, 2, n };
+      an->PrepareToPlay(sr, n);
+      an->ProcessBlock(nullptr, 0, out);
+      int zc = 0;
+      float peak = 0.0f;
+      for (int i = 1; i < n; ++i)
+      {
+         zc += (l[i - 1] < 0.0f) != (l[i] < 0.0f) ? 1 : 0;
+         peak = std::max(peak, std::fabs(l[i]));
+      }
+      const double hz = zc / 2.0 / ((double)n / sr);
+      std::printf("  [8] DIRECT_PINS dphase=%.4f (want %.4f) audio=%.1f Hz peak=%.3f imageSeq=%u px=%zu changed=%d\n",
+                  dph, want, hz, peak, snap.imageSeq, px1.size(), px0 != px1 ? 1 : 0);
+      ck.Expect(std::fabs(dph - want) < 0.05 * want, "Direct audio: engine phase step matches a 10 Hz input");
+      ck.Expect(hz > 300.0 && hz < 340.0 && peak > 0.05f, "Direct audio: 10 Hz EEG plays at ~320 Hz");
+      ck.Expect(px1.size() == (size_t)BrainSourceNode::kImgW * BrainSourceNode::kImgH * 4 && px0 != px1,
+                "Direct image: columns scroll in and change pixels");
    }
 
    std::printf("BCI_SELFTEST: passed=%d failed=%d %s\n",

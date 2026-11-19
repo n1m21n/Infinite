@@ -484,7 +484,10 @@ namespace app
    // the node's bottom row; these are the readout, so the pins carry no bars of their own.
    void DrawOutputMeters(INode* node, float colW, int cols, float gutter)
    {
-      const int count = node->OutputCount();
+      // Meters are for modulator pins only: trailing image/audio pins (Brain Source) are left out.
+      int count = node->OutputCount();
+      while (count > 0 && node->ModulatorOutput(count - 1) == nullptr && count > 1)
+         --count;
       cols = std::max(1, cols);
       const int rows = (count + cols - 1) / cols;
       const ImVec2 origin = ImGui::GetCursorScreenPos();

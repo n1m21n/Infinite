@@ -16,6 +16,19 @@ namespace Bci
    // Per-person eyes-closed state: 4 bands (4-8, 8-10, 10-12, 12-30 Hz) x 4 channels of
    // log10(band / 2-40 Hz total), index band * 4 + channel. Validated in tools/bci/calib_ab.py.
    constexpr int kStateFeatureCount = 16;
+   // Direct Image pin: 4 rows (AF7 AF8 TP9 TP10) x 40 bins (1..40 Hz), one column per PSD update.
+   // Mirrored in tools/bci/direct_pins.py.
+   constexpr int kImageBins = 40;
+   constexpr int kImageColumnSize = kChannelCount * kImageBins;
+   // Direct Audio pin: each channel's analytic signal, frequency x kAudifyMult (10 Hz alpha -> 320 Hz).
+   constexpr double kAudifyMult = 32.0;
+
+   // One EEG sample of the audified stream: amplitude / baseline amplitude, phase step (rad).
+   struct AudifyFrame
+   {
+      float amp[kChannelCount] = {};
+      float dphase[kChannelCount] = {};
+   };
 
    enum class BoardKind : int
    {
@@ -88,6 +101,11 @@ namespace Bci
       float stateW[kStateFeatureCount] = {};
       float stateBias = 0.0f;
       float stateScale = 1.0f;
+      // Eyes-open baselines for the direct pins (median / MAD of the open phase).
+      bool directValid = false;
+      float imgMed[kImageColumnSize] = {};
+      float imgMad[kImageColumnSize] = {};
+      float audAmp[kChannelCount] = { 1.0f, 1.0f, 1.0f, 1.0f };
    };
 
    struct TelemetrySnapshot
@@ -103,6 +121,9 @@ namespace Bci
       float eyesClosedScore = 0.0f;          // calibrated 0..1 (0.5 = boundary); 0 until calibrated
       bool stateCalibrated = false;
       bool stateCalibFailed = false;         // last calibration ended without a fit (too few clean updates)
+      float imageCol[kImageColumnSize] = {}; // latest Image pin column, 0..1 (z -3..+3), bin 0 = 1 Hz
+      float imageState = -1.0f;              // eyes-closed score for the strip, -1 until calibrated
+      unsigned imageSeq = 0;                 // +1 per column (every 12 samples)
       float alphaPhaseRad = 0.0f;
       float latent[4] = { 0.5f, 0.5f, 0.5f, 0.5f }; // Arousal, Valence, Entropy, Coherence
       float blinkFlash = 0.0f;

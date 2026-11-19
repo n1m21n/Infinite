@@ -38,6 +38,8 @@ namespace Bci
 
       // Processes a batch of raw samples and updates `outPins24` (0..1 clamped) and `outTelemetry`.
       void Process(const SampleFrame* frames, int count, float outPins24[kOutputPinCount], TelemetrySnapshot& outTelemetry);
+      // Audified frames produced by the last Process call (one per input sample).
+      const std::vector<AudifyFrame>& Audify() const { return mAudify; }
 
    private:
       struct Biquad
@@ -71,6 +73,9 @@ namespace Bci
       void FinishCalibration();
       void UpdateStateFeatures(const double (&chanPsd)[kChannelCount][48], double binHz);
       bool FitStateWeights();
+      void UpdateImageColumn(const double (&chanPsd)[kChannelCount][48], double binHz);
+      void StepAudify(const double (&clean)[kChannelCount]);
+      void FinishDirectBaselines();
 
       double mSampleRate = kSampleRateHz;
       double mStreamTimeSec = 0.0;
@@ -153,6 +158,29 @@ namespace Bci
       bool mStateCalibFailed = false;
       std::vector<std::array<float, kStateFeatureCount>> mCalibFeatOpen;
       std::vector<std::array<float, kStateFeatureCount>> mCalibFeatClosed;
+
+      // Direct Image pin: log power EMA (tau 0.5 s), running baseline until calibrated
+      static constexpr double kImageTauSec = 0.5;
+      static constexpr double kBaselineTauSec = 30.0;
+      double mImgLog[kImageColumnSize] = {};
+      double mImgRunMean[kImageColumnSize] = {};
+      double mImgRunDev[kImageColumnSize] = {};
+      bool mImgInit = false;
+      float mImgCol[kImageColumnSize] = {};
+      unsigned mImgSeq = 0;
+      std::vector<std::array<float, kImageColumnSize>> mCalibImgOpen;
+
+      // Direct Audio pin: 2-40 Hz band-pass, 65-tap windowed FIR Hilbert (32 samples delay)
+      static constexpr int kHilbertTaps = 65;
+      double mHilbertH[kHilbertTaps] = {};
+      Biquad mAudHp[kChannelCount][2];
+      Biquad mAudLp[kChannelCount][2];
+      double mAudLine[kChannelCount][kHilbertTaps] = {};
+      int mAudHead = 0;
+      double mAudPrevPhase[kChannelCount] = {};
+      double mAudRunAmp[kChannelCount] = { 1.0, 1.0, 1.0, 1.0 };
+      std::vector<float> mCalibAudAmp[kChannelCount];
+      std::vector<AudifyFrame> mAudify;
 
       // Calibration accumulator (30 s open + 30 s closed; first 4 s of each phase not used for
       // the state weights while the eyes settle and the EMA catches up)
