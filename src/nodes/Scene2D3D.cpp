@@ -628,6 +628,7 @@ namespace
       void ObjectColor(float c[3]) const override { base->ObjectColor(c); }
       bool CastsShadow() const override { return base->CastsShadow(); }
       unsigned int LightMask() const override { return base->LightMask(); }
+      unsigned int ShadowMask() const override { return base->ShadowMask(); }
    };
 
    const char* kSkinBakeFrag = R"(#version 150

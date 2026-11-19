@@ -203,11 +203,11 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
 uint pcg(uint v);
 float rnd(thread uint& s);
 struct RInst;
-float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax);
+float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax, int li = -1);
 // thru (row 5.2): the receiver is a strand, so other strands pass light (see shadowT); inst may be null when false.
-float sunVis(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 ld, float angleDeg, float2 pix)
+float sunVis(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 ld, float angleDeg, float2 pix, int li = -1)
 {
-   if (angleDeg <= 0.0) return shadowT(tlas, inst, thru, o, ld, 1e4);
+   if (angleDeg <= 0.0) return shadowT(tlas, inst, thru, o, ld, 1e4, li);
    const float tr = tan(angleDeg * 0.5 * 0.017453292);
    const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
    const float3 ay = cross(ld, ax);
@@ -219,32 +219,38 @@ float sunVis(instance_acceleration_structure tlas, constant RInst* inst, bool th
    for (int i = 0; i < 4; i++)
    {
       const float an = rot + float(i) * 1.5707963;
-      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * (0.9 * tr)), 1e4);
+      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * (0.9 * tr)), 1e4, li);
    }
    if (v == 0.0 || v == 4.0) return v * 0.25;
    for (int i = 0; i < 12; i++)
    {
       const float an = rot + 0.7853982 + float(i) * 2.399963, r = sqrt((float(i) + rnd(s)) / 12.0) * tr;
-      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4);
+      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4, li);
    }
    return v / 16.0;
 }
 struct RInst { ulong vb; ulong ib; ulong uvb; ulong wr; float4x4 normalM; MatRec mat; }; // the rays' view: mesh buffers + the same record (base times the albedo map's mean on GI rays)
+// Row 4.2 shadow linking: li >= 0 only for a light some object lets through (color.w -1); that object's bit li is set.
+inline bool noShadowBy(constant RInst* inst, uint id, int li) { return li >= 0 && li < 32 && ((as_type<uint>(inst[id].mat.noShadow) >> uint(li)) & 1u) != 0u; }
+inline int shLink(constant LightU& L, int i) { return L.color.w < -0.5 ? i : -1; }
 // Row 5.2: a shadow ray's visibility. Light reaching a strand passes the other strands by exp(-0.7) each, re-traced
 // from every strand hit up to 4 (FINISH_PLAN 6.12; the forward scatter of Zinke's dual scattering, which Cycles gets
 // from many bounces through bright fibres); a strand still blocks fully what lies under it (skin, floor), as in Cycles.
-float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax)
+float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax, int li)
 {
    if (!occluded(tlas, o, d, tmax)) return 1.0;
-   if (!thru) return 0.0;
+   if (!thru && li < 0) return 0.0;
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
    float T = 1.0, t0 = 0.0;
-   for (int k = 0; k < 4; k++)
+   for (int k = 0, s = 0; k < 4 && s < 8; s++)
    {
       ray r(o, d, t0, tmax);
       intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1);
       if (h.type != intersection_type::triangle) return T;
+      if (noShadowBy(inst, h.instance_id, li)) { t0 = h.distance + 1e-4; continue; } // this object lets the light through
+      if (!thru) return 0.0;
+      k++;
       constant RInst& I = inst[h.instance_id];
       if (I.mat.strandFrom < 0.5 || float(h.primitive_id) < I.mat.strandFrom - 1.0) return 0.0;
       T *= 0.49658530; // exp(-0.7)
@@ -254,15 +260,15 @@ float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool t
 }
 // A strand's sun: one ray per pixel in the disc (hashed per pixel and frame), through shadowT; the 16-ray penumbra
 // search times a 4-hit re-trace over every hair pixel is what the live frame cannot afford (FINISH_PLAN 6.12).
-float sunVisStrand(instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 ld, float angleDeg, float2 pix, float frame)
+float sunVisStrand(instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 ld, float angleDeg, float2 pix, float frame, int li = -1)
 {
-   if (angleDeg <= 0.0) return shadowT(tlas, inst, true, o, ld, 1e4);
+   if (angleDeg <= 0.0) return shadowT(tlas, inst, true, o, ld, 1e4, li);
    const float tr = tan(angleDeg * 0.5 * 0.017453292);
    const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
    const float3 ay = cross(ld, ax);
    uint sd = pcg(uint(pix.x) * 7919u + 104729u * uint(pix.y) + 31u * uint(frame));
    const float an = 6.2831853 * rnd(sd), r = sqrt(rnd(sd)) * tr;
-   return shadowT(tlas, inst, true, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4);
+   return shadowT(tlas, inst, true, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4, li);
 }
 float3 cosineDir(float3 n, float u1, float u2);
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
@@ -359,7 +365,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       if (atten > 0.0)
       {
          const float tm = (type == 1 || type == 4 || type == 5) ? max(length(L.vec.xyz - p) - 0.01, 0.0) : 1e4;
-         if (L.color.w < 0.5 && occluded(tlas, p + n * f.shQ.w, ld, tm)) atten *= (1.0 - f.shP.w);
+         if (L.color.w < 0.5 && shadowT(tlas, inst, false, p + n * f.shQ.w, ld, tm, shLink(L, i)) < 0.5) atten *= (1.0 - f.shP.w);
       }
       diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x * lw;
    }
@@ -655,7 +661,7 @@ float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
    return pw.xyz / pw.w;
 }
 fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
-                       constant RTArgs& rtArgs [[buffer(3)]], depth2d<float> dt [[texture(0)]])
+                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* instInfo [[buffer(4)]], depth2d<float> dt [[texture(0)]])
 {
    VisOut o; o.v = float4(1.0); o.d = -1.0; o.fg = float4(0.0, 0.0, 0.0, 1.0);
    const int W = int(u.info.x), H = int(u.info.y);
@@ -694,7 +700,7 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
                const int type = int(L.vec.w);
                if (type != 0 && type != 2) continue;
                const float3 ld = normalize(L.vec.xyz);
-               if (L.color.w < 0.5 && occluded(rtArgs.tlas, p, ld, 1e4)) continue;
+               if (L.color.w < 0.5 && shadowT(rtArgs.tlas, instInfo, false, p, ld, 1e4, shLink(L, i)) < 0.5) continue;
                const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, 1e4);
                In += dk * Tv * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, ld, ss)) * hgPhase(dot(ld, vd), u.fog.y) * L.color.xyz * L.terms.x;
             }
@@ -728,8 +734,8 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       float3 ld; float tmax = 1e4;
       if (type == 1 || type == 4) { const float3 tl = L.vec.xyz - p; const float dist = length(tl); ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0); }
       else ld = normalize(L.vec.xyz);
-      if (type == 1 || type == 4) { if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) o.v[ch] = 0.0; }
-      else o.v[ch] = sunVis(rtArgs.tlas, nullptr, false, p + n * f.shQ.w, ld, (type == 0 || type == 2) ? L.spot.x : 0.0, float2(px));
+      if (type == 1 || type == 4) { if (shadowT(rtArgs.tlas, instInfo, false, p + n * f.shQ.w, ld, tmax, shLink(L, i)) < 0.5) o.v[ch] = 0.0; }
+      else o.v[ch] = sunVis(rtArgs.tlas, instInfo, false, p + n * f.shQ.w, ld, (type == 0 || type == 2) ? L.spot.x : 0.0, float2(px), shLink(L, i));
       if (u.fog.x > 0.0) { const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, tmax); o.v[ch] *= exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, p, ld, ss)); } // row 5.4: the light crosses the fog
    }
    return o;
@@ -976,7 +982,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             const float cl = dot(-ld, L.aim.xyz);
             float e = lightFalloff(dist, L.terms.z) * max(cl, 0.0) * areaSpreadK(L.spot.y, cl) * (hairM ? 1.0 : max(dot(n, ld), 0.0));
             if (L.terms.w > 0.0 && dist > L.terms.w) e = 0.0;
-            if (e > 0.0 && rtSh && L.color.w < 0.5 && occluded(rtArgs.tlas, in.wp + (dot(n, ld) < 0.0 ? -n : n) * f.shQ.w, ld, max(dist - 0.01, 0.0))) e *= 1.0 - f.shP.w;
+            if (e > 0.0 && rtSh && L.color.w < 0.5 && shadowT(rtArgs.tlas, instInfo, false, in.wp + (dot(n, ld) < 0.0 ? -n : n) * f.shQ.w, ld, max(dist - 0.01, 0.0), shLink(L, i)) < 0.5) e *= 1.0 - f.shP.w;
             areaE += e * 0.125;
          }
          if (areaE <= 0.0) continue;
@@ -1032,10 +1038,10 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             if (vis < 0.0)
             {
                if (type == 1 || type == 4)
-                  vis = shadowT(rtArgs.tlas, instInfo, strandPx, in.wp + nS * f.shQ.w, lightDir, max(length(L.vec.xyz - in.wp) - 0.01, 0.0));
+                  vis = shadowT(rtArgs.tlas, instInfo, strandPx, in.wp + nS * f.shQ.w, lightDir, max(length(L.vec.xyz - in.wp) - 0.01, 0.0), shLink(L, i));
                else
-                  vis = strandPx ? sunVisStrand(rtArgs.tlas, instInfo, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy, f.gi.z)
-                                 : sunVis(rtArgs.tlas, instInfo, false, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy);
+                  vis = strandPx ? sunVisStrand(rtArgs.tlas, instInfo, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy, f.gi.z, shLink(L, i))
+                                 : sunVis(rtArgs.tlas, instInfo, false, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy, shLink(L, i));
             }
             shadow = mix(1.0 - f.shP.w, 1.0, vis);
          }
@@ -1428,7 +1434,7 @@ float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float roug
 // Settle's shadow ray: it passes cut-outs and see-through surfaces as the camera ray does (opacity and the opacity
 // map against the cutoff, or by chance below 1), so a leaf's holes let light through as in Cycles.
 bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, array<texture2d<float>, 16> maps,
-                   float3 o, float3 d, float tmax, float eps, thread uint& seed)
+                   float3 o, float3 d, float tmax, float eps, thread uint& seed, int li = -1)
 {
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
@@ -1438,6 +1444,12 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
       intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1); // bit 0: shadow casters
       if (h.type != intersection_type::triangle) return false;
       constant RInst& I = inst[h.instance_id];
+      if (noShadowBy(inst, h.instance_id, li)) // row 4.2: shadow linking, this object lets the light through
+      {
+         o += d * (h.distance + eps); tmax -= h.distance + eps;
+         if (tmax <= 0.0) return false;
+         continue;
+      }
       float alpha = 1.0 - I.mat.clear;
       if (I.mat.mapOpacity > 0.5)
       {
@@ -1472,8 +1484,9 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
 // Settle's next-event pick: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
 // weighted by the count and the chance of taking this branch. pL > 0: an emitter, its solid-angle pdf.
 void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* ems, int nEm, float pEm, int count, float3 p, thread Lds& seed,
-                 thread float3& ld, thread float3& Le, thread float& tmax, thread float& pL, thread float2& lterms, float unlit)
+                 thread float3& ld, thread float3& Le, thread float& tmax, thread float& pL, thread float2& lterms, float unlit, thread int& lix)
 {
+   lix = -1;
    if (nEm > 0 && rnd(seed) < pEm)
    {
       const float r = rnd(seed);
@@ -1541,6 +1554,7 @@ void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* em
       Le = Lt.color.xyz * atten * (float(count) / max(1.0 - pEm, 1e-3));
       lterms = Lt.terms.xy;
       if (Lt.color.w > 0.5) pL = -2.0; // a light set to cast no shadow
+      if (Lt.color.w < -0.5) lix = li; // row 4.2: some objects let it through
    }
 }
 // Translucency's lobes: the specular on the lit side, the diffuse share passed through to the far side (cosine there).
@@ -1698,11 +1712,11 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             const float3 pm = o + d * s;
             if (b == 0) { cov = 1.0; alb0 = u.fogC.xyz; n0 = -d; dist0 = s; }
             T *= u.fogC.xyz;
-            float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
-            ptPickLight(f, LL, ems, nEm, pEm, int(f.fld.y + 0.5), pm, qs, ld, Le, tmax, pL, lterms, 0.0);
+            float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0); int lix = -1;
+            ptPickLight(f, LL, ems, nEm, pEm, int(f.fld.y + 0.5), pm, qs, ld, Le, tmax, pL, lterms, 0.0, lix);
             if (any(Le > 0.0))
             {
-               if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, pm, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, pm, ld, tmax, f.shQ.w, seed, lix)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                const float ph = hgPhase(dot(ld, d), u.fog.y);
                L += T * ph * Le * lterms.x * fogTr(u, pm, ld, tmax) * (pL > 0.0 ? pL / max(pL * pL + ph * ph, 1e-20) : 1.0);
             }
@@ -1963,8 +1977,8 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       // next-event estimation: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
       // weighted by the count and the chance of taking this branch (unbiased). Both branches only set up the sample;
       // one shadow ray and one BSDF evaluation below serve either (keeps the kernel small).
-      float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
-      ptPickLight(f, LL, ems, nEm, pEm, count, p, qs, ld, Le, tmax, pL, lterms, I.mat.unlit);
+      float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0); int lix = -1;
+      ptPickLight(f, LL, ems, nEm, pEm, count, p, qs, ld, Le, tmax, pL, lterms, I.mat.unlit, lix);
       // Hair: one place across the fibre per hit (the paper's integral over h), the same for the light and the bounce.
       const float hH = hairM ? rnd(qs) * 2.0 - 1.0 : 0.0;
       const float hBm = clamp(I.mat.roughness, 0.02, 1.0), hBn = -I.mat.hairRadialNeg;
@@ -1972,7 +1986,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       {
          // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
          // emitters are surfaces, fully blocked.
-         if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(p, dot(ns, ld) < 0.0 ? -ns : ns), ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(p, dot(ns, ld) < 0.0 ? -ns : ns), ld, tmax, f.shQ.w, seed, lix)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          Le *= fogTr(u, p, ld, tmax);
          float pB = 0.0;
          float3 fe = hairM ? hairBsdf(V, ld, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, pB) * lterms.x
@@ -2105,12 +2119,12 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             }
             if (!out) break;
             T *= min(Tw, float3(8.0));
-            float3 eld = float3(0.0, 1.0, 0.0), eLe = float3(0.0); float etm = 0.0, epL = -1.0; float2 elt = float2(1.0);
-            ptPickLight(f, LL, ems, nEm, pEm, count, q, qs, eld, eLe, etm, epL, elt, I.mat.unlit);
+            float3 eld = float3(0.0, 1.0, 0.0), eLe = float3(0.0); float etm = 0.0, epL = -1.0; float2 elt = float2(1.0); int elix = -1;
+            ptPickLight(f, LL, ems, nEm, pEm, count, q, qs, eld, eLe, etm, epL, elt, I.mat.unlit, elix);
             const float ec = dot(no, eld);
             if (ec > 1e-5 && any(eLe > 0.0))
             {
-               if (epL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(q, no), eld, etm, f.shQ.w, seed)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (epL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(q, no), eld, etm, f.shQ.w, seed, elix)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                const float epB = ec / 3.14159265;
                L += T * (epB * elt.x) * eLe * (epL > 0.0 ? epL / max(epL * epL + epB * epB, 1e-20) : 1.0);
             }
@@ -2476,7 +2490,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
 
    using namespace rr;
    struct RInstH { uint64_t vb, ib, uvb, wr; float normalM[16]; R3dMatH mat; };
-   static_assert(sizeof(RInstH) == 464, "RInst layout as the shader's");
+   static_assert(sizeof(RInstH) == 480, "RInst layout as the shader's");
 
    class MetalRaster final : public RasterRenderer
    {
@@ -2742,7 +2756,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             const engine::Instance& a = fr.instances[i];
             size_t j = i + 1;
             if (RayClusterable(a))
-               while (j < n && fr.instances[j].copyGroup == a.copyGroup && fr.instances[j].mesh == a.mesh && fr.instances[j].castShadow == a.castShadow && fr.instances[j].unlitMask == a.unlitMask &&
+               while (j < n && fr.instances[j].copyGroup == a.copyGroup && fr.instances[j].mesh == a.mesh && fr.instances[j].castShadow == a.castShadow && fr.instances[j].unlitMask == a.unlitMask && fr.instances[j].noShadowMask == a.noShadowMask &&
                       RayClusterable(fr.instances[j]) && std::memcmp(fr.instances[j].baseSrgb, a.baseSrgb, sizeof(a.baseSrgb)) == 0 &&
                       fr.instances[j].metallic == a.metallic && fr.instances[j].roughness == a.roughness)
                   j++;
@@ -3292,6 +3306,12 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          const bool prepass = rt && sHalfSh >= 0 && mDsEq && EnsureInv();
          float invVP[16];
          const bool mask = prepass && sHalfSh > 0 && mVisPso && Inv4(fr.viewProj, invVP);
+         std::vector<RInstH> info = RayInfo(fr, haveTlas, [&](const engine::Instance& in, R3dMatH& m) {
+            FillMatRays(in, m);
+            if (in.mapAlbedo >= 0 && in.mapAlbedo < engine::kMaxTextures) // the rays see the map's mean colour
+               for (int k = 0; k < 3; k++) m.base[k] *= mMapMean[in.mapAlbedo][k];
+         });
+         id<MTLBuffer> infoBuf = InfoBuffer(info);
          if (prepass)
          {
             MTLRenderPassDescriptor* zp = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -3357,6 +3377,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [ve setFragmentBytes:&vu length:sizeof(vu) atIndex:0];
             [ve setFragmentBytes:&f length:sizeof(f) atIndex:1];
             [ve setFragmentBuffer:mArgBuf offset:0 atIndex:3];
+            [ve setFragmentBuffer:infoBuf offset:0 atIndex:4]; // row 4.2: shadow linking
             [ve setFragmentTexture:mDepth atIndex:0];
             [ve useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             for (id<MTLAccelerationStructure> b in mBlas) [ve useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
@@ -3425,12 +3446,6 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setFragmentBytes:&f length:sizeof(f) atIndex:1];
          [enc setFragmentBuffer:mLightBuf offset:0 atIndex:6];
          [enc setFragmentBuffer:mClusterBuf offset:0 atIndex:7];
-         std::vector<RInstH> info = RayInfo(fr, haveTlas, [&](const engine::Instance& in, R3dMatH& m) {
-            FillMatRays(in, m);
-            if (in.mapAlbedo >= 0 && in.mapAlbedo < engine::kMaxTextures) // the rays see the map's mean colour
-               for (int k = 0; k < 3; k++) m.base[k] *= mMapMean[in.mapAlbedo][k];
-         });
-         id<MTLBuffer> infoBuf = InfoBuffer(info);
          [enc setFragmentBuffer:infoBuf offset:0 atIndex:4];
          [enc setFragmentTexture:mEnvBound atIndex:9];
          BindMaps(enc);
@@ -4112,8 +4127,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setVertexBuffer:mInstBuf offset:0 atIndex:10];
          for (const auto& r : mRuns)
          {
-            if (!fr.instances[r.first].castShadow)
-               continue;
+            if (!fr.instances[r.first].castShadow || (fr.instances[r.first].noShadowMask & 1u))
+               continue; // row 4.2: an object linked out of light 0's shadow
             const Gpu& g = mMeshes[fr.instances[r.first].mesh];
             [enc setVertexBuffer:g.vb offset:0 atIndex:0];
             [enc setVertexBytes:&r.first length:4 atIndex:11];

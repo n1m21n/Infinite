@@ -18,6 +18,7 @@
 //   strandFrom   - row 5.2: a Fur mesh's first strand triangle + 1 (0 none); light reaching a strand passes other strands
 //   objRand      - row 7.2: Shade Geometry's per-copy random (G.y in a material program)
 //   unlit        - row 4.2 light linking: the bits (as a uint) of the frame's lights 0..31 this object ignores
+//   noShadow     - row 4.2 shadow linking: the bits (as a uint) of the lights 0..31 this object does not block; spare3..5 pad
 //   emTri        - rays: the instance's first emissive triangle for next-event estimation, -1 none
 #define R3D_MAT_FIELDS(F3, F1) \
    F3(base) F1(metallic) F1(roughness) F1(transmission) F1(ior) \
@@ -35,7 +36,8 @@
    F1(fimg0) F1(fimg1) F1(fimg2) F1(fimg3) \
    F1(p0) F1(p1) F1(p2) F1(p3) F1(p4) F1(p5) F1(p6) F1(p7) \
    F1(p8) F1(p9) F1(p10) F1(p11) F1(p12) F1(p13) F1(p14) F1(p15) \
-   F1(sheenDir) F1(strandFrom) F1(objRand) F1(unlit)
+   F1(sheenDir) F1(strandFrom) F1(objRand) F1(unlit) \
+   F1(noShadow) F1(spare3) F1(spare4) F1(spare5)
 
 #define R3D_MAT_MSL_F3(n) "packed_float3 " #n "; "
 #define R3D_MAT_MSL_F1(n) "float " #n "; "
@@ -44,4 +46,4 @@
 #define R3D_MAT_C_F3(n) float n[3];
 #define R3D_MAT_C_F1(n) float n;
 struct R3dMatH { R3D_MAT_FIELDS(R3D_MAT_C_F3, R3D_MAT_C_F1) };
-static_assert(sizeof(R3dMatH) == 368, "MatRec: 92 floats (keep a multiple of 16 bytes)");
+static_assert(sizeof(R3dMatH) == 384, "MatRec: 96 floats (keep a multiple of 16 bytes)");

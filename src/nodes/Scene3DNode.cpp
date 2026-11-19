@@ -123,14 +123,15 @@ class Scene3DNode::Placed : public IGeometrySource
 public:
    IGeometrySource* src = nullptr;
    Mat4 place;
-   unsigned int lightMask = ~0u;
+   unsigned int lightMask = ~0u, shadowMask = ~0u;
    int passIndex = 0;
    float color[3] = { 1.0f, 1.0f, 1.0f };
    bool casts = true;
    std::vector<std::unique_ptr<Placed>> children;
 
-   void Update(IGeometrySource* source, const Mat4& placement, unsigned int mask, int index, const float* rgb, bool castsShadow = true)
+   void Update(IGeometrySource* source, const Mat4& placement, unsigned int mask, int index, const float* rgb, bool castsShadow = true, unsigned int smask = ~0u)
    {
+      shadowMask = smask;
       casts = castsShadow;
       src = source;
       place = placement;
@@ -143,7 +144,7 @@ public:
       {
          if (!children[i])
             children[i] = std::make_unique<Placed>();
-         children[i]->Update(src->GroupChild(i), placement, mask, index, rgb, castsShadow);
+         children[i]->Update(src->GroupChild(i), placement, mask, index, rgb, castsShadow, smask);
       }
    }
 
@@ -161,6 +162,7 @@ public:
    int GroupChildCount() const override { return (int)children.size(); }
    IGeometrySource* GroupChild(int index) const override { return children[index].get(); }
    unsigned int LightMask() const override { return lightMask; }
+   unsigned int ShadowMask() const override { return shadowMask; }
    int PassIndex() const override { return passIndex; }
    void ObjectColor(float c[3]) const override { std::copy(color, color + 3, c); }
    bool CastsShadow() const override { return casts; }
@@ -595,6 +597,12 @@ void Scene3DNode::Serialize()
          o << "label " << it.id << " " << it.name << "\n";
       if (!it.render)
          o << "itemx " << it.id << " 0\n";
+      if (!it.unshadow.empty())
+      {
+         o << "shadowx " << it.id;
+         for (uint64_t u : it.unshadow) o << " " << u;
+         o << "\n";
+      }
       if (it.group != 0)
          o << "group " << it.id << " " << it.group << "\n";
       if (it.lock != 0)
@@ -714,7 +722,7 @@ void Scene3DNode::Parse()
          });
       else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
                key == "delta" || key == "pass" || key == "ocolor" || key == "shadowoff" || key == "backdrop" || key == "lookx" || key == "show" ||
-               key == "motion" || key == "follow" || key == "ik" || key == "picturelit")
+               key == "motion" || key == "follow" || key == "ik" || key == "picturelit" || key == "shadowx")
       {
          int id = 0;
          l >> id;
@@ -754,6 +762,12 @@ void Scene3DNode::Parse()
             l >> it->passIndex;
          else if (key == "shadowoff")
             it->castShadow = false;
+         else if (key == "shadowx")
+         {
+            it->unshadow.clear();
+            uint64_t u = 0;
+            while (l >> u) it->unshadow.push_back(u);
+         }
          else if (key == "picturelit")
             it->pictureLit = true;
          else if (key == "ocolor")
@@ -1176,18 +1190,23 @@ void Scene3DNode::Sync(int frameId)
       // this scene's own output gets last frame's (the cook is stamped before it syncs), never a loop.
       if (auto it2 = mPictureSources.find(it.id); it2 != mPictureSources.end())
          it2->second->Update(node, it.pictureLit);
-      unsigned int mask = ~0u;
+      unsigned int mask = ~0u, smask = ~0u;
       for (size_t i = 0; i < lightOrder.size() && i < 32; i++) // per-item unlit lists cover the first 32 lights
+      {
          if (std::find(it.unlit.begin(), it.unlit.end(), lightOrder[i]) != it.unlit.end())
             mask &= ~(1u << i);
+         if (std::find(it.unshadow.begin(), it.unshadow.end(), lightOrder[i]) != it.unshadow.end())
+            smask &= ~(1u << i);
+      }
       std::unique_ptr<Placed>& placed = mPlaced[it.id];
       if (!placed)
          placed = std::make_unique<Placed>();
-      placed->Update(source, Placement(it), mask, it.passIndex, it.color, it.castShadow);
+      placed->Update(source, Placement(it), mask, it.passIndex, it.color, it.castShadow, smask);
       mRoot->draws.push_back(placed.get());
       if (it.render)
          mOutRoot->draws.push_back(placed.get());
       marks.push_back((float)(mask & 0xffffu));
+      marks.push_back((float)(smask & 0xffffu));
    }
    mRender.geometry[0] = mOutRoot.get();
    mRender.camera = nullptr;

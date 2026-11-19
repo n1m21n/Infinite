@@ -84,6 +84,8 @@ namespace engine
       float objRand = 0.0f;
       // Row 4.2 light linking: bit i set = frame light i (0..31) does not light this object (Scene 3D's per-item list).
       uint32_t unlitMask = 0;
+      // Row 4.2 shadow linking: bit i set = this object does not block frame light i (0..31).
+      uint32_t noShadowMask = 0;
    };
 
    // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the

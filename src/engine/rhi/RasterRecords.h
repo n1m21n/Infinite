@@ -38,7 +38,7 @@ namespace rr
 
    // The material record (Render3DMaterial.h) as the shader's InstU / RInst carry it.
    struct InstU { float model[16], normalM[16]; R3dMatH mat; };
-   static_assert(sizeof(InstU) == 496, "InstU layout as the shaders'");
+   static_assert(sizeof(InstU) == 512, "InstU layout as the shaders'");
    inline void Lin3x(const float* c, float* o) { for (int i = 0; i < 3; i++) o[i] = ToLin(c[i]); }
    // The surface the GI and reflection rays see: base, metal, roughness, ior, emission (no maps, sheen or hair).
    inline void FillMatRays(const engine::Instance& in, R3dMatH& m)
@@ -52,6 +52,7 @@ namespace rr
       m.strandFrom = (float)(in.strandFrom + 1); // row 5.2: the shadow rays tell strands from solids
       m.objRand = in.objRand;                    // row 7.2: Shade Geometry's random
       std::memcpy(&m.unlit, &in.unlitMask, 4);   // row 4.2: light linking, the bits as they are
+      std::memcpy(&m.noShadow, &in.noShadowMask, 4); // row 4.2: shadow linking
    }
    // The whole material, encoded so all zeros is the plain material (see Render3DMaterial.h).
    inline void FillMat(const engine::Instance& in, R3dMatH& m)
@@ -128,6 +129,8 @@ namespace rr
       f.envm[0] = (envMap ? 1.0f : 0.0f) + (envMap && fr.envBackground ? 2.0f : 0.0f);
       f.envm[1] = fr.envRotationRad; f.envm[2] = fr.envMaxLod; f.envm[3] = fr.envBaseLod;
       int visCh = 0;
+      uint32_t passMask = 0; // row 4.2: lights some object lets through (shadow linking)
+      for (const engine::Instance& in : fr.instances) passMask |= in.noShadowMask;
       for (int i = 0; i < n; i++)
       {
          const engine::Light& l = fr.lights[i];
@@ -140,6 +143,7 @@ namespace rr
             if (visCh < 4 && i < 8) o.aim[3] = (float)visCh++;
          Lin3(l.colorSrgb, o.color, l.intensity);
          o.color[3] = l.castShadow ? 0.0f : 1.0f; // 1: this light is never blocked
+         if (l.castShadow && i < 32 && ((passMask >> i) & 1u)) o.color[3] = -1.0f; // -1: blocked, but some objects pass it (row 4.2)
          o.terms[0] = l.diffuse; o.terms[1] = l.specular; o.terms[2] = l.falloff; o.terms[3] = l.cutoff;
          o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra; o.spot[2] = l.areaW; o.spot[3] = l.areaH;
          if (l.type == engine::LightType::Area) { o.spot[0] = float(l.areaShape); o.spot[1] = l.areaSpread; } // area: shape, spread

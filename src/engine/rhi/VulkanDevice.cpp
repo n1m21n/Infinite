@@ -1094,7 +1094,7 @@ namespace
          vkCmdPushConstants(cb, mLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
          for (const auto& r : mRuns)
          {
-            if (!fr.instances[r.first].castShadow)
+            if (!fr.instances[r.first].castShadow || (fr.instances[r.first].noShadowMask & 1u)) // row 4.2: shadow linking
                continue;
             const Gpu& g = mMeshes[(size_t)fr.instances[r.first].mesh];
             if (!g.count)

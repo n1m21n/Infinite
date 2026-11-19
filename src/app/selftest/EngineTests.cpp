@@ -1841,6 +1841,50 @@ bool RunEngineTest()
          const float ok = (b[1] < 0.6f * b[0] && std::fabs(fl[1] - fl[0]) < 0.1f * std::max(fl[0], 0.05f)) ? 1.0f : 0.0f;
          check(ok > 0.5f, (std::string("light linking: an unlinked object loses the light, the rest keep it (") + names[mode] + ")").c_str(), ok, 1.0f);
       }
+      // Row 4.2 shadow linking: the same ball under a shadowing sun. Linked out of the sun's shadow ("Blocks" off),
+      // the floor where its shadow fell comes back lit and the ball itself keeps its light, on R, L and T.
+      struct Blocker : GeometryNode { unsigned int smask = ~0u; unsigned int ShadowMask() const override { return smask; } };
+      Blocker sb;
+      sb.shape = ball.shape; sb.posX = 0.2f; sb.color[0] = sb.color[1] = sb.color[2] = 0.85f; sb.metallic = 0.0f; sb.roughness = 0.6f;
+      Render3DNode::Rig sr = lr;
+      sr.lights.clear();
+      Render3DNode::RigLight sun;
+      sun.type = 2; sun.vec[0] = 0.5f; sun.vec[1] = 1.0f; sun.vec[2] = 0.4f; sun.intensity = 3.0f; sun.castShadow = true;
+      sr.lights.push_back(sun);
+      const float shadowPt[3] = { -0.425f, -1.25f, -0.5f }; // the ball's centre along the sun onto the floor
+      const size_t ks = pix(shadowPt);
+      for (int mode = 0; mode < 3; mode++)
+      {
+         float b[2] = {}, sh[2] = {};
+         for (int un = 0; un < 2; un++)
+         {
+            sb.smask = un ? ~1u : ~0u;
+            Render3DNode q;
+            q.geometry[0] = &floorG; q.geometry[1] = &sb;
+            q.width = (float)S; q.height = (float)S; q.samples = 0; q.hdr = false; q.tonemap = 1; q.shadowsEnabled = true;
+            q.rig = &sr;
+            q.liveEngine = mode > 0; q.liveEngineFeatures = mode == 2 ? 15 : 7; q.ptSamples = 32; q.ptBounces = 4;
+            // First cook uploads meshes before shadow bounds exist; nudge exposure so the next cook draws again.
+            q.CookIfNeeded(++fnum); q.exposure = 1.001f; q.CookIfNeeded(++fnum); q.exposure = 1.0f;
+            for (int i = 0; i < (mode == 2 ? 12 : 1); i++) q.CookIfNeeded(++fnum);
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratch, q.GetOutputTexture(), q.GetOutputWidth(), q.GetOutputHeight(), px);
+            b[un] = lum(px, kb); sh[un] = lum(px, ks);
+            if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))
+               if (FILE* fo = fopen((std::string(dir) + "/shadowlink_" + names[mode] + std::to_string(un) + ".ppm").c_str(), "wb"))
+               {
+                  fprintf(fo, "P6\n%d %d\n255\n", S, S);
+                  for (int y = S - 1; y >= 0; y--)
+                     for (int x = 0; x < S; x++)
+                        for (int c = 0; c < 3; c++)
+                           fputc((int)std::lround(std::clamp(px.size() > ((size_t)y * S + x) * 4 + c ? px[((size_t)y * S + x) * 4 + c] : 0.0f, 0.0f, 1.0f) * 255.0f), fo);
+                  fclose(fo);
+               }
+         }
+         printf("  shadow link %s: shadow %.3f -> %.3f, ball %.3f -> %.3f\n", names[mode], sh[0], sh[1], b[0], b[1]);
+         const float ok = (sh[1] > 1.5f * sh[0] && std::fabs(b[1] - b[0]) < 0.15f * std::max(b[0], 0.05f)) ? 1.0f : 0.0f;
+         check(ok > 0.5f, (std::string("shadow linking: an object linked out casts no shadow, keeps its light (") + names[mode] + ")").c_str(), ok, 1.0f);
+      }
    }
    if (const char* l64 = getenv("INFINITE_ENGINETEST_LIGHTS64"))
    {

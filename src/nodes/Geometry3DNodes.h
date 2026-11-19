@@ -291,6 +291,8 @@ public:
    // Which of the render's lights reach this source, one bit per light. All of
    // them by default; only the 3D View's placed sources narrow it.
    virtual unsigned int LightMask() const { return ~0u; }
+   // Which of the render's lights this source blocks (shadow linking), one bit per light; all by default.
+   virtual unsigned int ShadowMask() const { return ~0u; }
 
    // The number this source writes into Render 3D's Object Index pass. 0 by
    // default, as in Blender; the 3D View's placed sources carry their own.

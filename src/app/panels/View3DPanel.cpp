@@ -6523,6 +6523,36 @@ namespace
       }
    }
 
+   // Shadow linking (row 4.2): the lights this item blocks; unchecked, that light passes through it.
+   void DrawBlocks(Scene3DNode* scene, Item* item)
+   {
+      bool header = false;
+      for (const Item& other : scene->Items())
+      {
+         if (scene->ItemKind(other) != Kind::Light)
+            continue;
+         if (!header)
+            if (!Card(T("Blocks")))
+               return;
+         header = true;
+         ImGui::PushID(other.id);
+         auto found = std::find(item->unshadow.begin(), item->unshadow.end(), other.uid);
+         bool blocks = found == item->unshadow.end();
+         if (CheckBox::Box("##blocks", &blocks))
+         {
+            PushUndoCheckpoint("Shadow linking");
+            if (blocks)
+               item->unshadow.erase(found);
+            else
+               item->unshadow.push_back(other.uid);
+            scene->Commit();
+         }
+         ActionButton::RowNext();
+         ImGui::TextUnformatted(ItemName(other).c_str());
+         ImGui::PopID();
+      }
+   }
+
    float RenderAspect(Scene3DNode* scene)
    {
       return std::max(1.0f, scene->renderW) / std::max(1.0f, scene->renderH);
@@ -7012,6 +7042,8 @@ namespace
       GraphNode* gn = FindNodeByUid(item->uid);
       if (scene->ItemKind(*item) == Kind::Geometry || (scene->ItemKind(*item) == Kind::Picture && item->pictureLit))
          DrawLitBy(scene, item);
+      if (scene->ItemKind(*item) == Kind::Geometry && item->castShadow)
+         DrawBlocks(scene, item);
       if (gn != nullptr && ActionButton::Draw(L("Go to node"), ImVec2(availW, 0)))
       {
          gRequestSelectNodeIndex = gn->index;

@@ -528,6 +528,7 @@ bool Render3DNode::CookEngine(int frameId)
       in.mesh = (int)i;
       in.castShadow = src->CastsShadow();
       in.unlitMask = (rig != nullptr && rig->hasLights) ? ~src->LightMask() : 0u; // row 4.2: bits in the rig's light order
+      in.noShadowMask = (rig != nullptr && rig->hasLights) ? ~src->ShadowMask() : 0u;
       const Material mat = src->GetMaterial();
       for (int k = 0; k < 3; k++)
          in.baseSrgb[k] = mat.color[k];
@@ -925,7 +926,7 @@ bool Render3DNode::CookEngine(int frameId)
       mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
       mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.strandFrom, 4); mix(&in.subsurface, 20); mix(&in.iridescence, 12);
       { const int cs = in.castShadow ? 1 : 0; mix(&cs, 4); }
-      mix(&in.unlitMask, 4); // row 4.2: light linking
+      mix(&in.unlitMask, 4); mix(&in.noShadowMask, 4); // row 4.2: light and shadow linking
       mix(&in.fieldProgram, 4); mix(in.fieldParams, 64);
    }
    if (fieldUsesTime) mix(&fr.fieldTime, 4); // a program that reads t never settles

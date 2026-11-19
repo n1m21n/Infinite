@@ -159,12 +159,15 @@ vec3 ptEvalT(vec3 n, vec3 V, vec3 L, vec3 base, float metal, float rough, vec3 f
    pdf = p.y * (-nL) / 3.14159265;
    return (vec3(1.0) - Fv) * (1.0 - metal) * base * (w.x / 3.14159265) * (-nL);
 }
-bool occludedAlpha(vec3 o, vec3 d, float tmax, float eps, inout uint seed)
+// Row 4.2 shadow linking: li >= 0 only for a light some object lets through; that object's bit li is set.
+bool noShadowBy(uint id, int li) { return li >= 0 && li < 32 && ((floatBitsToUint(inst[id].mat.noShadow) >> uint(li)) & 1u) != 0u; }
+bool occludedAlpha(vec3 o, vec3 d, float tmax, float eps, inout uint seed, int li)
 {
    for (int k = 0; k < 16; k++)
    {
       Hit h;
       if (!trace(o, d, tmax, true, h)) return false;
+      if (noShadowBy(h.inst, li)) { o += d * (h.t + eps); tmax -= h.t + eps; if (tmax <= 0.0) return false; continue; }
       float alpha = 1.0 - inst[h.inst].mat.clear;
       float mo = inst[h.inst].mat.mapOpacity;
       if (mo > 0.5)
@@ -203,8 +206,9 @@ float iesK(int count, float row, vec3 axis, vec3 d)
 }
 // Row 4.2 light linking: light i does not light an object whose record has bit i of `unlit` set (lights 0..31).
 bool unlitBy(float unlit, int i) { return i < 32 && ((floatBitsToUint(unlit) >> uint(i)) & 1u) != 0u; }
-void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout vec3 ld, inout vec3 Le, inout float tmax, inout float pL, inout vec2 lterms, float unlit)
+void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout vec3 ld, inout vec3 Le, inout float tmax, inout float pL, inout vec2 lterms, float unlit, inout int lix)
 {
+   lix = -1;
    if (nEm > 0 && rnd(seed) < pEm)
    {
       float r = rnd(seed);
@@ -270,6 +274,7 @@ void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout v
       Le = Lt.color.xyz * atten * (float(count) / max(1.0 - pEm, 1e-3));
       lterms = Lt.terms.xy;
       if (Lt.color.w > 0.5) pL = -2.0;
+      if (Lt.color.w < -0.5) lix = li;
    }
 }
 vec3 envPick(vec2 u, out float pdf)
@@ -452,11 +457,11 @@ void main()
             vec3 pm = o + d * s;
             if (b == 0) { cov = 1.0; alb0 = pu.fogC.xyz; n0 = -d; dist0 = s; }
             T *= pu.fogC.xyz;
-            vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0);
-            ptPickLight(nEm, pEm, count, pm, seed, ld, Le, tmax, pL, lterms, 0.0);
+            vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0); int lix = -1;
+            ptPickLight(nEm, pEm, count, pm, seed, ld, Le, tmax, pL, lterms, 0.0, lix);
             if (anyPos(Le))
             {
-               if (pL > -1.5 && occludedAlpha(pm, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (pL > -1.5 && occludedAlpha(pm, ld, tmax, f.shQ.w, seed, lix)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                float ph = hgPhase(dot(ld, d), pu.fog.y);
                L += T * ph * Le * lterms.x * fogTr(pm, ld, tmax) * (pL > 0.0 ? pL / max(pL * pL + ph * ph, 1e-20) : 1.0);
             }
@@ -606,15 +611,15 @@ void main()
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w;
       for (int i = 0; i < count; i++)
          if (int(LL[i].vec.w) == 3 && !unlitBy(inst[iid].mat.unlit, i)) L += T * base * (1.0 - metal) * LL[i].color.xyz * LL[i].terms.x;
-      vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0);
-      ptPickLight(nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms, inst[iid].mat.unlit);
+      vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0); int lix = -1;
+      ptPickLight(nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms, inst[iid].mat.unlit, lix);
       float hH = hairM ? rnd(seed) * 2.0 - 1.0 : 0.0;
       float hBm = clamp(inst[iid].mat.roughness, 0.02, 1.0), hBn = -inst[iid].mat.hairRadialNeg;
       vec3 hSig = inst[iid].mat.hairSigma; float hShift = inst[iid].mat.hairShift, mIor = inst[iid].mat.ior;
       float ccRough = clamp(inst[iid].mat.coatRoughness, 0.02, 1.0);
       if ((hairM || (dot(n, ld) > 1e-5 && dot(ns, ld) > 0.0) || (dm == 2 && dot(n, ld) < -1e-5 && dot(ns, ld) < 0.0)) && anyPos(Le))
       {
-         if (pL > -1.5 && occludedAlpha(p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         if (pL > -1.5 && occludedAlpha(p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed, lix)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          Le *= fogTr(p, ld, tmax);
          float pB = 0.0;
          vec3 fe;
@@ -657,7 +662,7 @@ void main()
                fe = fe * (1.0 - cP) + (eL > 0.0 ? vec3(ccW * coatSpec(cnH, nDotV, max(eL, 1e-4), cvH, ccRough) * eL) : vec3(0.0));
                pBm = cP * (eL > 0.0 ? distGGX(cnH, ccRough) * cnH / (4.0 * cvH) : 0.0) + (1.0 - cP) * pB;
             }
-            if (anyPos(fe) && !occludedAlpha(p + (dot(ns, ed) < 0.0 ? -ns : ns) * f.shQ.w, ed, 1e4, f.shQ.w, seed))
+            if (anyPos(fe) && !occludedAlpha(p + (dot(ns, ed) < 0.0 ? -ns : ns) * f.shQ.w, ed, 1e4, f.shQ.w, seed, -1))
                L += T * fe * sampleEnv(ed, 0.0) * fogTr(p, ed, 1e4) * (pE / max(pE * pE + pBm * pBm, 1e-20));
          }
       }
@@ -726,12 +731,12 @@ void main()
             }
             if (!wout) break;
             T *= min(Tw, vec3(8.0));
-            vec3 eld = vec3(0.0, 1.0, 0.0), eLe = vec3(0.0); float etm = 0.0, epL = -1.0; vec2 elt = vec2(1.0);
-            ptPickLight(nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt, inst[iid].mat.unlit);
+            vec3 eld = vec3(0.0, 1.0, 0.0), eLe = vec3(0.0); float etm = 0.0, epL = -1.0; vec2 elt = vec2(1.0); int elix = -1;
+            ptPickLight(nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt, inst[iid].mat.unlit, elix);
             float ec = dot(no, eld);
             if (ec > 1e-5 && anyPos(eLe))
             {
-               if (epL > -1.5 && occludedAlpha(q + no * f.shQ.w, eld, etm, f.shQ.w, seed)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (epL > -1.5 && occludedAlpha(q + no * f.shQ.w, eld, etm, f.shQ.w, seed, elix)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                float epB = ec / 3.14159265;
                L += T * (epB * elt.x) * eLe * (epL > 0.0 ? epL / max(epL * epL + epB * epB, 1e-20) : 1.0);
             }
