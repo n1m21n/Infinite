@@ -131,7 +131,7 @@ every step; keep a change only if it measures better.
 
 | # | Step | Source | Gate | Kind |
 |---|---|---|---|---|
-| 5.1 | Weathering presets on layers: dust in cavities, rust at edges, wet below a line (Field Modifier writes masks) | REALISM R9 | one case each | content |
+| 5.1 | Weathering presets on layers: dust in cavities, rust at edges, wet below a line (Field Modifier writes masks) | REALISM R9 | one case each | done 2026-11-19: Rust + Wet Material recipes join Edge Wear / Dirt / Dust (row 4.5); weather_rust settle .037, weather_wet .037; snow and moss open |
 | 5.2 | Fibre sheen, car-paint flakes | REALISM R5, R11 | their cases | **owner** |
 | 5.3 | Scanned-set drop import, albedo library, stochastic tiling | REALISM R6–R8 | drop builds the same Material as by hand | **owner** |
 | 5.4 | Skin | REALISM R10 | skin case | enh |

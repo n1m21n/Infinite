@@ -316,6 +316,24 @@ def _wear_groove():
                         for x, r in ((1.2, "Edge Wear"), (0.0, "Dirt"), (-1.2, "Dust"))]}
 
 
+def _weather_rust():
+    # Row 5.1: Rust on the monkey (sharp brow and ear rims, grooves round the eyes). Truth rebuilds the recipe from
+    # Cycles' pointiness and local AO; its noise is Blender's own. No low-poly cube: with 8 corner vertices Cycles'
+    # pointiness calls the whole cube an edge, a mesh-density difference, not the recipe's.
+    return {"size": SMALL, "camera": {"fov": 34, "azimuth": 90, "elevation": 25, "distance": 5.0, "target": [0, 0, 0.6]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 70, "elevation": 45}], "world": {"color": [0.35, 0.35, 0.35]},
+            "objects": [{"shape": "monkey", "scale": 0.6, "location": [0, 0, 0.6], "material": {"recipe": "Rust"}}]}
+
+
+def _weather_wet():
+    # Row 5.1: Wet on a stone pillar and a monkey standing on the floor: soaked and glossy below 0.4 m, dry above.
+    return {"size": SMALL, "camera": {"fov": 36, "azimuth": 90, "elevation": 20, "distance": 5.0, "target": [0, 0, 0.6]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 60, "elevation": 35}], "world": {"color": [0.35, 0.35, 0.35]},
+            "objects": [GREY_FLOOR,
+                        {"shape": "cube", "scale": [0.3, 0.3, 0.6], "location": [-0.6, 0, 0.6], "material": {"recipe": "Wet"}},
+                        {"shape": "monkey", "scale": 0.5, "location": [0.6, 0, 0.5], "material": {"recipe": "Wet"}}]}
+
+
 def _sketch3d_two_tone():
     # Row 3.3: a Sketch 3D cube whose top half is tagged mask(1); a material Field program reads it as attr and paints
     # the two halves. Truth splits Cycles' cube at the same height.
@@ -444,6 +462,8 @@ CASES.update({
     "geom_monkey": _monkey(),
     "wear_masks": _wear_masks(),
     "wear_groove": _wear_groove(),
+    "weather_rust": _weather_rust(),
+    "weather_wet": _weather_wet(),
     "sketch3d_two_tone": _sketch3d_two_tone(),
     "suede_dir": _suede_dir(),
     "recipes_near": _recipes(3.6),
