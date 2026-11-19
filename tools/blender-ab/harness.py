@@ -57,6 +57,10 @@ def light_lines(l):
         w, h = l.get("size", (1, 1))
         out += ["  f areaWidth %g" % w, "  f areaHeight %g" % h, "  b normalize 1",
                 "  f shadowRadius %g" % (max(w, h) / 2)]
+        if l.get("shape") == "disc":
+            out.append("  i areaShape 1")
+        if "spread" in l:
+            out.append("  f areaSpread %g" % l["spread"])
     out.append("  i shadowRes 1")
     return out
 

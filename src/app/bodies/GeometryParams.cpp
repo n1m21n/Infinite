@@ -2458,6 +2458,9 @@ namespace app
       ImGui::BeginDisabled(n->type != 5);
       ModSlider("width", &n->areaWidth, 0.05f, 10.0f);
       ModSlider("height", &n->areaHeight, 0.05f, 10.0f);
+      { static const std::vector<std::string> kShapes = { "Rectangle", "Disc" };
+        DropdownButton("shape", kShapes, n->areaShape, [n](int i) { n->areaShape = i; }); }
+      ModSlider("spread", &n->areaSpread, 1.0f, 180.0f, "%.0f\xC2\xB0");
       ImGui::EndDisabled();
       ColorSwatch("colour", n->color, n);
       ModCheckbox("temperature", &n->useTemperature);

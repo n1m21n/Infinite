@@ -102,7 +102,7 @@ vec3 sampleEnv(vec3 dir, float rough)
    vec3 env = mix(lower, f.sky.xyz, smoothstep(0.5, 1.0, t));
    return mix(env, f.horizon.xyz, rough * rough) * f.params.z;
 }
-)" R3D_SHARED_SRC R3D_BSDF_SRC R3D_FRESNEL_SRC R3D_THINFILM_SRC R3D_TONEMAP_SRC R3D_SRGB_SRC R3D_SHEEN_GLSL R"(
+)" R3D_SHARED_SRC R3D_AREA_SRC R3D_BSDF_SRC R3D_FRESNEL_SRC R3D_THINFILM_SRC R3D_TONEMAP_SRC R3D_SRGB_SRC R3D_SHEEN_GLSL R"(
 #define SSS_K 4.0
 vec3 iridGain(float w, float ior, float thick, float nV, vec3 f0) { return w > 0.0 ? thinFilmGain(nV, ior, thick, f0, w) : vec3(1.0); }
 #define R3D_G2(nv, nl, r) ggxG2(nv, nl, r)
@@ -357,9 +357,11 @@ void main()
          for (int si = 0; si < 8; si++)
          {
             float jx = (float(si & 3) + rnd(ars)) * 0.25, jy = (float(si >> 2) + rnd(ars)) * 0.5;
-            vec3 tl = L.vec.xyz + aR * ((jx - 0.5) * L.spot.z) + aU * ((jy - 0.5) * L.spot.w) - vWp;
+            vec3 ao = areaOffset(L.spot.x, jx, jy);
+            vec3 tl = L.vec.xyz + aR * (ao.x * L.spot.z) + aU * (ao.y * L.spot.w) - vWp;
             float dist = length(tl); vec3 ld = tl / max(dist, 1e-4);
-            float e = lightFalloff(dist, L.terms.z) * max(dot(-ld, L.aim.xyz), 0.0) * max(dot(n, ld), 0.0);
+            float cl = dot(-ld, L.aim.xyz);
+            float e = lightFalloff(dist, L.terms.z) * max(cl, 0.0) * areaSpreadK(L.spot.y, cl) * max(dot(n, ld), 0.0);
             if (L.terms.w > 0.0 && dist > L.terms.w) e = 0.0;
             areaE += e * 0.125;
          }

@@ -39,3 +39,27 @@
    "   return 0.5 * (rs * rs + rp * rp);\n" \
    "}\n" \
    "float ptG1(float x, float a) { return 2.0 * x / (x + sqrt(a * a + (1.0 - a * a) * x * x)); }\n"
+
+// Area light shape and spread (PLAN.md row 4.2), for every engine that samples or shades a panel.
+// areaOffset: a point on the panel in units of its width and height (-0.5..0.5) from (u1, u2) in [0, 1).
+// shape 0 = rectangle (uniform); 1 = disc or ellipse, Shirley and Chiu's concentric map (1997), uniform by area.
+// areaSpreadK: Cycles' soft-box spread (kernel/light/area.h, Apache-2.0): max(tan A - tan theta, 0) / (tan A - A),
+// A = half the spread, theta the angle off the panel's axis, so the light gives the same power at every spread.
+// It multiplies the panel's own cosine. 180 degrees (the default) is a plain one-sided panel.
+#define R3D_AREA_SRC \
+   "vec3 areaOffset(float shape, float u1, float u2) {\n" \
+   "   if (shape < 0.5) return vec3(u1 - 0.5, u2 - 0.5, 0.0);\n" \
+   "   float a = 2.0 * u1 - 1.0, b = 2.0 * u2 - 1.0;\n" \
+   "   if (a == 0.0 && b == 0.0) return vec3(0.0);\n" \
+   "   float r = b, phi = 1.5707963 - 0.78539816 * (a / b);\n" \
+   "   if (abs(a) > abs(b)) { r = a; phi = 0.78539816 * (b / a); }\n" \
+   "   return vec3(0.5 * r * cos(phi), 0.5 * r * sin(phi), 0.0);\n" \
+   "}\n" \
+   "float areaSpreadK(float spreadDeg, float cosL) {\n" \
+   "   if (spreadDeg >= 179.5) return 1.0;\n" \
+   "   if (cosL <= 0.0) return 0.0;\n" \
+   "   float ha = max(spreadDeg, 1.0) * 0.0087266463;\n" \
+   "   float tha = tan(ha);\n" \
+   "   float k = ha > 0.05 ? 1.0 / (tha - ha) : 3.0 / (ha * ha * ha);\n" \
+   "   return max((tha - sqrt(max(1.0 - cosL * cosL, 0.0)) / cosL) * k, 0.0);\n" \
+   "}\n"

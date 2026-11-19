@@ -757,6 +757,7 @@ bool Render3DNode::CookEngine(int frameId)
       e.diffuse = l.diffuse; e.specular = l.specular; e.cutoff = l.cutoff;
       e.castShadow = l.castShadow;
       e.areaW = std::max(0.001f, l.areaW); e.areaH = std::max(0.001f, l.areaH);
+      e.areaShape = l.areaShape; e.areaSpread = l.areaSpread;
       // A sun's disc from the light's shadow softness, as GL sizes its shadow (0.526 degrees, the real sun, at 1).
       if (e.type == engine::LightType::Directional || e.type == engine::LightType::Sun) e.sunAngleDeg = 0.526f * std::max(0.0f, l.shadowSoft);
       fr.lights.push_back(e);

@@ -110,3 +110,4 @@ Read:
 - carpet_pile: 0.4 fps live and 1.2 Msamples/s settle; a ray-structure problem, not a shading one. build ms spread 55 %, not trusted.
 - Cycles ms/spp column is from default bounces (before matching); the equal columns use 8.
 - Open: carpet_pile equal (settle ref alone ~8 min at 960x540), run when the laptop is free.
+- 2026-11-19 row 4.2: area Disc/Ellipse shape + Spread (Cycles formula) in raster, live, settle, Vulkan mirror; GL PT frozen (disc = rectangle). FLIP vs Blender: light_disc raster .085 / live .031 / settle .027; light_spread .171 / .104 / .047 (raster averages spread over a 3x3 panel grid). light_area unchanged (.085, baseline .0891).

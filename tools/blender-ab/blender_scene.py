@@ -673,7 +673,8 @@ for i, l in enumerate(scene.get("lights", [])):
     if kind == "SUN":
         ld.angle = math.radians(l.get("angle", 0.5))
     elif kind == "AREA":
-        ld.shape = 'RECTANGLE'; ld.size, ld.size_y = l.get("size", (1, 1))
+        ld.shape = 'ELLIPSE' if l.get("shape") == "disc" else 'RECTANGLE'; ld.size, ld.size_y = l.get("size", (1, 1))
+        ld.spread = math.radians(l.get("spread", 180))
     else:
         ld.shadow_soft_size = l.get("radius", 0.1)
     if kind == "SPOT":

@@ -141,6 +141,7 @@ namespace rr
          o.color[3] = l.castShadow ? 0.0f : 1.0f; // 1: this light is never blocked
          o.terms[0] = l.diffuse; o.terms[1] = l.specular; o.terms[2] = l.falloff; o.terms[3] = l.cutoff;
          o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra; o.spot[2] = l.areaW; o.spot[3] = l.areaH;
+         if (l.type == engine::LightType::Area) { o.spot[0] = float(l.areaShape); o.spot[1] = l.areaSpread; } // area: shape, spread
          if (l.type == engine::LightType::Directional || l.type == engine::LightType::Sun) o.spot[0] = l.sunAngleDeg; // the disc, for these
          if (i < 8) f.lights[i] = o;
       }

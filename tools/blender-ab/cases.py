@@ -148,6 +148,11 @@ CASES = {
     "light_spot": _lit({"type": "spot", "power": 600, "azimuth": 30, "elevation": 60, "distance": 3,
                         "spot_angle": 25, "blend": 0.3, "radius": 0.1}),
     "light_area": _lit({"type": "area", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "size": [1, 1]}),
+    # Row 4.2 (PLAN.md): a disc panel, then a rectangle with its emission held to a 40 degree spread (Cycles' soft box).
+    "light_disc": _lit({"type": "area", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "size": [1.4, 0.8],
+                        "shape": "disc"}),
+    "light_spread": _lit({"type": "area", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "size": [1.5, 1.5],
+                          "spread": 40}),
     # No lamp: the world colour alone lights everything.
     "world_grey": {"camera": CAMERA, "lights": [], "world": {"color": [0.5, 0.5, 0.5]},
                    "objects": [GREY_FLOOR, _ball(-0.6, 0, 0.45, base_color=[0.8, 0.8, 0.8], roughness=0.5),

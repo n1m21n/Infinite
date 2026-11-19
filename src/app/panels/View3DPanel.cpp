@@ -4656,13 +4656,19 @@ namespace
       if (type == 5)
       {
          const float hw = light->areaWidth * 0.5f, hh = light->areaHeight * 0.5f;
-         const float xs[4] = { -hw, hw, hw, -hw }, ys[4] = { -hh, -hh, hh, hh };
-         float c[4][3];
-         for (int i = 0; i < 4; i++)
+         // The outline: four corners, or 32 points round the ellipse a disc light fills.
+         const int nPts = light->areaShape == 1 ? 32 : 4;
+         float c[32][3];
+         for (int i = 0; i < nPts; i++)
+         {
+            float x, y;
+            if (nPts == 4) { x = (i == 1 || i == 2) ? hw : -hw; y = i < 2 ? -hh : hh; }
+            else { const float a = 6.2831853f * float(i) / float(nPts); x = std::cos(a) * hw; y = std::sin(a) * hh; }
             for (int k = 0; k < 3; k++)
-               c[i][k] = p[k] + u[k] * xs[i] + v[k] * ys[i];
-         for (int i = 0; i < 4; i++)
-            Line3D(dl, c[i], c[(i + 1) % 4], col, 1.5f);
+               c[i][k] = p[k] + u[k] * x + v[k] * y;
+         }
+         for (int i = 0; i < nPts; i++)
+            Line3D(dl, c[i], c[(i + 1) % nPts], col, 1.5f);
       }
       if (type == 1 || type == 4 || type == 5)
       {
@@ -6447,6 +6453,8 @@ namespace
       {
          FloatRow(T("Width"), &light->areaWidth, 0.05f, 20.0f, "%.2f");
          FloatRow(T("Height"), &light->areaHeight, 0.05f, 20.0f, "%.2f");
+         ComboRow(T("Shape"), &light->areaShape, std::vector<std::string>{ T("Rectangle"), T("Disc") }, "Light shape");
+         FloatRow(T("Spread"), &light->areaSpread, 1.0f, 180.0f, "%.0f");
          BoolRow(T("Normalize"), &light->normalize);
       }
       if (light->type == 1 || light->type == 4 || light->type == 5)

@@ -117,6 +117,7 @@ namespace engine
       float intensity = 1.0f;
       float spotAngleDeg = 45.0f, spotPenumbra = 0.2f;
       float areaW = 1.0f, areaH = 1.0f; // area: a rectangle facing aim; traced as one, lit live from its centre
+      int areaShape = 0; float areaSpread = 180.0f; // area: 0 rectangle / 1 disc; emission spread in degrees
       float diffuse = 1.0f, specular = 1.0f;
       float falloff = 1.0f; // k of 1 / (1 + d^2 k); negative = inverse square
       float cutoff = 0.0f;  // 0 = none

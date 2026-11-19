@@ -122,7 +122,7 @@ every step; keep a change only if it measures better.
 | # | Step | Source | Gate | Kind |
 |---|---|---|---|---|
 | 4.1 | Volumes: homogeneous in settle, then live/raster, then grids (Field Pixel 3D density) | DESIGN G1 | three volume cases at the path gates | **owner** |
-| 4.2 | Light shapes, IES profiles, light linking | DESIGN G8 | one case each | **owner** |
+| 4.2 | Light shapes, IES profiles, light linking | DESIGN G8 | one case each | shapes + spread done 2026-11-19 (light_disc, light_spread); IES, linking open |
 | 4.3 | Sky + atmosphere | REALISM R15 | sky cases ≤ 0.05 settle | **owner** |
 | 4.4 | Caustics in settle | DESIGN G3 | caustic cases ≤ 0.08 | fix |
 | 4.5 | Micro-displacement in settle | REALISM R4 | `tex_perforated` settle ≤ 0.05 | enh |

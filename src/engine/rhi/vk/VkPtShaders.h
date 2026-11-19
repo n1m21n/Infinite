@@ -47,7 +47,7 @@ layout(std430, set = 1, binding = 18) buffer HistB { uint hist[64]; };
 const char* kTrace = R"(
 #define HAIR_ATAN2(y, x) atan(y, x)
 #define HAIR_OUT out float
-)" R3D_HAIR_SRC R"(
+)" R3D_HAIR_SRC R3D_AREA_SRC R"(
 #define SSS_D 1.0
 struct Hit { float t; uint inst; uint prim; vec2 bc; };
 vec2 slab(vec3 lo, vec3 hi, vec3 o, vec3 inv, float tmax)
@@ -218,7 +218,9 @@ void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout v
             vec3 rgt = cross(vec3(0.0, 1.0, 0.0), Lt.aim.xyz);
             rgt = dot(rgt, rgt) < 1e-4 ? vec3(1.0, 0.0, 0.0) : normalize(rgt);
             vec3 upv = cross(Lt.aim.xyz, rgt);
-            lp += rgt * ((rnd(seed) - 0.5) * Lt.spot.z) + upv * ((rnd(seed) - 0.5) * Lt.spot.w);
+            float u1 = rnd(seed), u2 = rnd(seed);
+            vec3 ao = areaOffset(Lt.spot.x, u1, u2);
+            lp += rgt * (ao.x * Lt.spot.z) + upv * (ao.y * Lt.spot.w);
          }
          vec3 tl = lp - p; float dist = length(tl);
          ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
@@ -232,7 +234,7 @@ void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout v
             if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
             atten *= sa;
          }
-         if (type == 5) atten *= max(dot(-ld, Lt.aim.xyz), 0.0);
+         if (type == 5) { float cl = dot(-ld, Lt.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(Lt.spot.y, cl); }
       }
       else
       {

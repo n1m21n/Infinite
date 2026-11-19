@@ -663,6 +663,7 @@ public:
       float intensity = 1.0f;
       int type = 0;
       float spotAngle = 45.0f, spotPenumbra = 0.2f, areaW = 1.0f, areaH = 1.0f;
+      int areaShape = 0; float areaSpread = 180.0f; // area: 0 rectangle / 1 disc; emission spread in degrees
       float aim[3] = { 0, -1, 0 };       // where a spot or area light points
       float diffuse = 1.0f, specular = 1.0f, transmission = 1.0f;
       float falloff = 0.25f;             // distance falloff; negative = hard (no soft core)

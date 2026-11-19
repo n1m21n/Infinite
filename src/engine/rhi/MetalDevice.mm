@@ -159,7 +159,7 @@ float3 sampleEnv(constant FrameU& f, texture2d<float> et, float3 dir, float roug
    const float3 env = mix(lower, f.sky.xyz, smoothstep(0.5, 1.0, t));
    return mix(env, f.horizon.xyz, rough * rough) * f.params.z;
 }
-)" R3D_SHARED_SRC R3D_BSDF_SRC R3D_FRESNEL_SRC R3D_THINFILM_SRC R"(
+)" R3D_SHARED_SRC R3D_AREA_SRC R3D_BSDF_SRC R3D_FRESNEL_SRC R3D_THINFILM_SRC R"(
 // Thin film over the specular lobes (Render3DThinFilm.h, shared with GL): a gain on the lobe, at the view angle.
 float3 iridGain(float w, float ior, float thick, float nV, float3 f0)
 {
@@ -350,7 +350,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
             const float cosOuter = cos(L.spot.x * 0.017453292);
             atten *= cosCur > cosOuter ? 1.0 : 0.0;
          }
-         if (type == 5) atten *= max(dot(-ld, L.aim.xyz), 0.0);
+         if (type == 5) { const float cl = dot(-ld, L.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(L.spot.y, cl); }
       }
       else ld = normalize(L.vec.xyz);
       if (atten > 0.0)
@@ -920,9 +920,11 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          for (int si = 0; si < 8; si++)
          {
             const float jx = (float(si & 3) + rnd(ars)) * 0.25, jy = (float(si >> 2) + rnd(ars)) * 0.5;
-            const float3 tl = L.vec.xyz + aR * ((jx - 0.5) * L.spot.z) + aU * ((jy - 0.5) * L.spot.w) - in.wp;
+            const float3 ao = areaOffset(L.spot.x, jx, jy);
+            const float3 tl = L.vec.xyz + aR * (ao.x * L.spot.z) + aU * (ao.y * L.spot.w) - in.wp;
             const float dist = length(tl); const float3 ld = tl / max(dist, 1e-4);
-            float e = lightFalloff(dist, L.terms.z) * max(dot(-ld, L.aim.xyz), 0.0) * (hairM ? 1.0 : max(dot(n, ld), 0.0));
+            const float cl = dot(-ld, L.aim.xyz);
+            float e = lightFalloff(dist, L.terms.z) * max(cl, 0.0) * areaSpreadK(L.spot.y, cl) * (hairM ? 1.0 : max(dot(n, ld), 0.0));
             if (L.terms.w > 0.0 && dist > L.terms.w) e = 0.0;
             if (e > 0.0 && rtSh && L.color.w < 0.5 && occluded(rtArgs.tlas, in.wp + (dot(n, ld) < 0.0 ? -n : n) * f.shQ.w, ld, max(dist - 0.01, 0.0))) e *= 1.0 - f.shP.w;
             areaE += e * 0.125;
@@ -1453,7 +1455,9 @@ void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* em
             float3 rgt = cross(float3(0.0, 1.0, 0.0), Lt.aim.xyz);
             rgt = dot(rgt, rgt) < 1e-4 ? float3(1.0, 0.0, 0.0) : normalize(rgt);
             const float3 upv = cross(Lt.aim.xyz, rgt);
-            lp += rgt * ((rnd(seed) - 0.5) * Lt.spot.z) + upv * ((rnd(seed) - 0.5) * Lt.spot.w);
+            const float u1 = rnd(seed), u2 = rnd(seed);
+            const float3 ao = areaOffset(Lt.spot.x, u1, u2);
+            lp += rgt * (ao.x * Lt.spot.z) + upv * (ao.y * Lt.spot.w);
          }
          const float3 tl = lp - p; const float dist = length(tl);
          ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
@@ -1467,7 +1471,7 @@ void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* em
             if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
             atten *= sa;
          }
-         if (type == 5) atten *= max(dot(-ld, Lt.aim.xyz), 0.0);
+         if (type == 5) { const float cl = dot(-ld, Lt.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(Lt.spot.y, cl); }
       }
       else
       {

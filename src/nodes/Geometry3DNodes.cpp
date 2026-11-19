@@ -6,6 +6,7 @@
 #include "Render3DFresnel.h"
 #include "Render3DAb.h"
 #include "Render3DHair.h"
+#include "Render3DShared.h"
 #include "ColorSpace.h"
 
 #include "gl3.h"
@@ -532,6 +533,7 @@ namespace
       "   if (k >= 0.0) return 1.0 / (1.0 + dist * dist * k);\n"
       "   return min(1.0 / max(dist * dist * -k, 1e-4), 20.0);\n"
       "}\n"
+      R3D_AREA_SRC
       "uniform int uLightCount;\n"
       "uniform int uLightMask;\n"
       "uniform vec3 uAmbient;\n"
@@ -1245,7 +1247,10 @@ namespace
       "         float tHit = dot(lp - vWorldPos, fwd) / min(rf, -0.05);\n"
       "         vec3 hit = vWorldPos + refl * max(tHit, 0.0);\n"
       "         vec3 rel = hit - lp;\n"
-      "         vec3 nearP = lp + rgt * clamp(dot(rel, rgt), -half2.x, half2.x) + upv * clamp(dot(rel, upv), -half2.y, half2.y);\n"
+      "         vec2 q = clamp(vec2(dot(rel, rgt), dot(rel, upv)), -half2, half2);\n"
+      // Area shape 1 (packed in the spot-angle slot): a disc or ellipse, so the nearest point is held inside it.
+      "         if (uLightSpotAngle[i] > 0.5) { vec2 e = q / half2; float el = length(e); if (el > 1.0) q /= el; }\n"
+      "         vec3 nearP = lp + rgt * q.x + upv * q.y;\n"
       "         lightDir = normalize(nearP - vWorldPos);\n"
       // The highlight comes from that point; the diffuse comes from the panel as a whole. Shading
       // it from the moving point printed the rectangle's clamp lines across floors and spheres.
@@ -1254,6 +1259,17 @@ namespace
       "         shadeDir = toCentre / max(dist, 1e-4);\n"
       "         attenuation = lightFalloff(dist, uLightTerms[i].w);\n"
       "         attenuation *= clamp(dot(-shadeDir, fwd) * 4.0, 0.0, 1.0);\n"
+      // Spread: every point of the panel casts its own cone, so average it over a 3x3 grid of the panel.
+      "         if (uLightSpotPenumbra[i] < 179.5) {\n"
+      "            float ks = 0.0;\n"
+      "            for (int gy = -1; gy <= 1; ++gy) for (int gx = -1; gx <= 1; ++gx) {\n"
+      "               vec2 g = vec2(float(gx), float(gy)) * 0.6667 * half2;\n"
+      "               if (uLightSpotAngle[i] > 0.5 && gx != 0 && gy != 0) g *= 0.7071;\n"
+      "               vec3 dp = normalize(vWorldPos - (lp + rgt * g.x + upv * g.y));\n"
+      "               ks += areaSpreadK(uLightSpotPenumbra[i], dot(dp, fwd));\n"
+      "            }\n"
+      "            attenuation *= ks / 9.0;\n"
+      "         }\n"
       "         if (uLightCutoff[i] > 0.0 && dist > uLightCutoff[i]) attenuation = 0.0;\n"
       "      } else if (uLightType[i] == 1 || uLightType[i] == 4) {\n"
       "         vec3 toLight = uLightDir[i] - vWorldPos;\n"
@@ -1648,13 +1664,16 @@ void Render3DNode::RigLight::From(const LightNode& n)
    }
    type = n.type;
    // Unnormalized, an area light gives out more the bigger it is (1 x 1 = as normalized).
-   intensity = n.intensity * ((type == 5 && !n.normalize) ? std::max(0.01f, n.areaWidth * n.areaHeight) : 1.0f);
+   // A disc covers pi/4 of its width x height box.
+   intensity = n.intensity * ((type == 5 && !n.normalize) ? std::max(0.01f, n.areaWidth * n.areaHeight * (n.areaShape == 1 ? 0.78539816f : 1.0f)) : 1.0f);
    intensity *= std::exp2(n.exposure);
    cutoff = n.useCutoff ? std::max(0.001f, n.cutoffDistance) : 0.0f;
    spotAngle = n.spotAngle;
    spotPenumbra = n.spotPenumbra;
    areaW = n.areaWidth;
    areaH = n.areaHeight;
+   areaShape = n.areaShape == 1 ? 1 : 0;
+   areaSpread = std::clamp(n.areaSpread, 1.0f, 180.0f);
    diffuse = n.diffuse;
    specular = n.specular;
    transmission = n.transmission;
@@ -2737,8 +2756,9 @@ void Render3DNode::CookOnce(int frameId)
          }
          lightPower[lightCount] = l.intensity;
          lightTypes[lightCount] = l.type;
-         lightSpotAngle[lightCount] = l.spotAngle;
-         lightSpotPenumbra[lightCount] = l.spotPenumbra;
+         // An area light carries its shape and spread in the spot slots (as the GPU light record does).
+         lightSpotAngle[lightCount] = l.type == 5 ? float(l.areaShape) : l.spotAngle;
+         lightSpotPenumbra[lightCount] = l.type == 5 ? l.areaSpread : l.spotPenumbra;
          lightArea[lightCount * 2 + 0] = std::max(0.01f, l.areaW);
          lightArea[lightCount * 2 + 1] = std::max(0.01f, l.areaH);
          const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
@@ -2766,8 +2786,9 @@ void Render3DNode::CookOnce(int frameId)
       std::memcpy(&lightCols[lightCount * 3], l.color, sizeof(l.color));
       lightPower[lightCount] = l.intensity;
       lightTypes[lightCount] = l.type;
-      lightSpotAngle[lightCount] = l.spotAngle;
-      lightSpotPenumbra[lightCount] = l.spotPenumbra;
+      // An area light carries its shape and spread in the spot slots (as the GPU light record does).
+      lightSpotAngle[lightCount] = l.type == 5 ? float(l.areaShape) : l.spotAngle;
+      lightSpotPenumbra[lightCount] = l.type == 5 ? l.areaSpread : l.spotPenumbra;
       lightArea[lightCount * 2 + 0] = std::max(0.01f, l.areaW);
       lightArea[lightCount * 2 + 1] = std::max(0.01f, l.areaH);
       const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
