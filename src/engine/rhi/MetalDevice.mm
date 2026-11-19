@@ -660,16 +660,44 @@ float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
    const float4 pw = u.invVP * float4(ndc, z * 2.0 - 1.0, 1.0);
    return pw.xyz / pw.w;
 }
+// Row 5.6: in an even box, sigma x the integral over one step [pa, pb] (length st, view optical depth odA at pa) of
+// exp(-(view depth + kb x depth toward the light along ld)), both depths taken as linear over the step.
+float fogSeg(constant VisU& u, float sig, float st, float odA, float3 pa, float3 pb, float3 ld, float kb = 1.0)
+{
+   const float2 sa = boxSpan(u.fogLo.xyz, u.fogHi.xyz, pa, ld, 1e4), sb = boxSpan(u.fogLo.xyz, u.fogHi.xyz, pb, ld, 1e4);
+   const float Da = kb * sig * max(sa.y - sa.x, 0.0), Db = kb * sig * max(sb.y - sb.x, 0.0);
+   const float m = sig + (Db - Da) / max(st, 1e-6);
+   return sig * exp(-(odA + Da)) * (abs(m * st) > 1e-4 ? (1.0 - exp(-m * st)) / m : st);
+}
+// Row 5.6: the share of the light the fog scatters that scatters again before it leaves the box (one scattering
+// order to the next): albedo x (1 - exp(-sigma D)), D the box's mean chord 4V/S (a wide slab keeps its sideways
+// light, a small box loses it; a puff's mean density about a fifth of its peak). Grey: the albedo's mean.
+float fogKeep(constant VisU& u)
+{
+   const float3 e = max(u.fogHi.xyz - u.fogLo.xyz, float3(1e-3));
+   const float D = 2.0 * e.x * e.y * e.z / (e.x * e.y + e.y * e.z + e.z * e.x);
+   return dot(u.fogC.xyz, float3(1.0 / 3.0)) * (1.0 - exp(-u.fog.x * mix(1.0, 0.2, u.fog.z) * D));
+}
 // Row 5.6: light scattered toward -d by the fog along o + d t over the span sp (jittered stratified steps), before the
-// albedo, sigma x step and multiple-scattering gain: sun, point, spot and area lights (falloff, cone, area facing as
-// the surface shading; IES not) through the fog to the light, plus the skylight from above. shadows: one RT shadow
-// ray a light a step (the shafts); without, geometry does not block.
+// albedo: sun, point, spot and area lights (falloff, cone, area facing as the surface shading; IES not) through the
+// fog to the light, plus the skylight from above. A light's multiple scattering as three octaves (Wrenninge's
+// approximation): octave n has the extinction toward the light and the phase's g each scaled by 1/2^n, so light that
+// has scattered again goes deeper into the fog and leaves more evenly, and weighs r^n, r the share of scattered
+// light the box keeps (fogKeep); the last octave carries the series' tail. Still only where the light reaches (a
+// closed room's shaft does not flood the room). shadows: one RT shadow ray a light a step (the shafts);
+// without, geometry does not block.
 float3 fogInScatter(constant VisU& u, constant FrameU& f, constant RTArgs& rtArgs, constant RInst* instInfo, float3 o, float3 d,
                     float2 sp, int steps, float jit, bool shadows, thread float& od)
 {
    const float sig = u.fog.x, st = (sp.y - sp.x) / float(steps);
    const float3 amb = f.horizon.xyz * f.params.z;
-   float3 In = float3(0.0); od = 0.0;
+   // An even box: the sun's and the sky's light along each step is integrated exactly (the view's and the light's
+   // optical depth both run linearly over the step), so only the shadow test is a point sample: no step noise where
+   // nothing casts a shadow (open haze, the sky behind it).
+   const bool even = u.fog.z <= 0.0;
+   const float r = fogKeep(u);
+   const float ow[3] = { 1.0, r, r * r / max(1.0 - r, 0.05) };
+   float3 In = float3(0.0), Ia = float3(0.0); od = 0.0;
    for (int k = 0; k < 8; k++)
    {
       if (k >= steps) break;
@@ -679,9 +707,16 @@ float3 fogInScatter(constant VisU& u, constant FrameU& f, constant RTArgs& rtArg
       const float Tv = exp(-(od + sig * dk * jit * st));
       od += sig * dk * st;
       if (dk <= 0.0) continue;
+      const float3 pa = o + d * (sp.x + float(k) * st), pb = pa + d * st;
+      const float odA = sig * float(k) * st;
       // Skylight scattered in (row 4.1): the world's horizon colour, through the fog above this point.
-      In += dk * Tv * amb * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, float3(0.0, 1.0, 0.0),
-                                         boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, float3(0.0, 1.0, 0.0), 1e4)));
+      if (even) Ia += amb * fogSeg(u, sig, st, odA, pa, pb, float3(0.0, 1.0, 0.0));
+      else
+      {
+         const float3 a = dk * Tv * amb * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, float3(0.0, 1.0, 0.0),
+                                                   boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, float3(0.0, 1.0, 0.0), 1e4)));
+         In += a;
+      }
       for (int i = 0; i < 8 && i < int(f.params.w); i++)
       {
          constant LightU& L = f.lights[i];
@@ -707,18 +742,25 @@ float3 fogInScatter(constant VisU& u, constant FrameU& f, constant RTArgs& rtArg
          else ld = normalize(L.vec.xyz);
          if (atten <= 0.0) continue;
          if (shadows && L.color.w < 0.5 && shadowT(rtArgs.tlas, instInfo, false, p, ld, tmax, shLink(L, i)) < 0.5) continue;
+         if (even && (type == 0 || type == 2))
+         {
+            for (int n = 0; n < 3; n++)
+            {
+               const float kb = exp2(-float(n));
+               Ia += ow[n] * fogSeg(u, sig, st, odA, pa, pb, ld, kb) * hgPhase(dot(ld, d), u.fog.y * kb) * L.color.xyz * L.terms.x;
+            }
+            continue;
+         }
          const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, tmax);
-         In += dk * Tv * atten * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, ld, ss)) * hgPhase(dot(ld, d), u.fog.y) * L.color.xyz * L.terms.x;
+         const float Dl = fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, ld, ss);
+         for (int n = 0; n < 3; n++)
+         {
+            const float kb = exp2(-float(n));
+            In += ow[n] * dk * Tv * atten * exp(-kb * Dl) * hgPhase(dot(ld, d), u.fog.y * kb) * L.color.xyz * L.terms.x;
+         }
       }
    }
-   return In * (sig * st);
-}
-// Multiple scattering (row 4.1), the geometric series of the albedo over the light kept inside the box's smallest
-// extent (a puff's mean density about a fifth of its peak): 1 / (1 - a (1 - exp(-sigma D))).
-float3 fogMs(constant VisU& u)
-{
-   const float3 ext = u.fogHi.xyz - u.fogLo.xyz;
-   return 1.0 / (1.0 - u.fogC.xyz * (1.0 - exp(-u.fog.x * mix(1.0, 0.2, u.fog.z) * min(ext.x, min(ext.y, ext.z)))));
+   return In * (sig * st) + Ia;
 }
 fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                        constant RTArgs& rtArgs [[buffer(3)]], constant RInst* instInfo [[buffer(4)]], depth2d<float> dt [[texture(0)]])
@@ -742,7 +784,7 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       {
          float od;
          const float3 In = fogInScatter(u, f, rtArgs, instInfo, e, vd, sp, 8, jit, true, od);
-         o.fg = float4(In * u.fogC.xyz * fogMs(u), exp(-(u.fog.z > 0.0 ? od : u.fog.x * (sp.y - sp.x))));
+         o.fg = float4(In * u.fogC.xyz, exp(-(u.fog.z > 0.0 ? od : u.fog.x * (sp.y - sp.x))));
       }
    }
    if (dt.read(uint2(px)) >= 1.0) return o;
@@ -763,7 +805,7 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       // the sun off most of its fog); r_fs
       // adds base x this as diffuse ambient. Steps stop 4 mean free paths out, where nothing more comes back.
       const float3 tx = abs(n.y) < 0.99 ? normalize(cross(n, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0), ty = cross(n, tx);
-      float3 Lf = float3(0.0);
+      float3 Lf = float3(0.0); float Ts = 0.0;
       for (int r = 0; r < 4; r++)
       {
          const float u1 = fract((float(r) + jit) * 0.25 + 0.37 * jit), u2 = fract(float(r) * 0.61803399 + jit);
@@ -771,12 +813,14 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
          const float3 rd = normalize(tx * (rr * cos(ph)) + ty * (rr * sin(ph)) + n * sqrt(max(1.0 - u1, 0.0)));
          const float3 ro = p + n * f.shQ.w;
          float2 sp = boxSpan(u.fogLo.xyz, u.fogHi.xyz, ro, rd, 1e4);
+         // The sky through the whole box; a direction that meets geometry brings its bounce from close by, undimmed.
+         Ts += occluded(rtArgs.tlas, ro, rd, 1e4) ? 1.0 : exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, ro, rd, sp));
          sp.y = min(sp.y, sp.x + 4.0 / u.fog.x);
          if (sp.y <= sp.x) continue;
          float od;
-         Lf += fogInScatter(u, f, rtArgs, instInfo, ro, rd, sp, 4, fract(jit + 0.5 * float(r)), true, od);
+         Lf += fogInScatter(u, f, rtArgs, instInfo, ro, rd, sp, 4, fract(jit + 0.5 * float(r)), true, od) * u.fogC.xyz;
       }
-      o.fe = float4(Lf * 0.25 * u.fogC.xyz * fogMs(u), 1.0);
+      o.fe = float4(Lf * 0.25, Ts * 0.25); // a: how much of the sky's light reaches the surface through the fog
    }
    const int count = int(f.params.w);
    for (int i = 0; i < 8; i++)
@@ -815,6 +859,23 @@ float upVis(texture2d<float> vt, texture2d<float> vd, float2 pos, float dist, in
       }
    return (ws < 0.2 || hi - lo > 0.5) ? -1.0 : acc / ws; // a shadow edge between the texels: trace this pixel
 
+}
+// Row 5.6: a half-res fog texel set (vis_fs) at a full-res pixel `dist` from the eye, a 3x3 box against its noise
+// that takes only texels on the same surface (distance within 5%): a sphere's fog does not bleed onto the floor
+// behind it as a halo. With none alike, the nearest texel.
+float4 fogTap(texture2d<float> t, texture2d<float> vd, float2 pos, float dist)
+{
+   const int2 q = int2(pos) / 2, fs = int2(t.get_width(), t.get_height());
+   float4 a = float4(0.0); float ws = 0.0;
+   for (int j = -1; j <= 1; j++)
+      for (int i = -1; i <= 1; i++)
+      {
+         const uint2 c = uint2(clamp(q + int2(i, j), int2(0), fs - 1));
+         const float dq = vd.read(c).x;
+         if (dq < 0.0 || abs(dq - dist) > 0.05 * dist) continue;
+         a += t.read(c); ws += 1.0;
+      }
+   return ws > 0.0 ? a / ws : t.read(uint2(clamp(q, int2(0), fs - 1)));
 }
 #ifndef SSS_K
 #define SSS_K 4.0
@@ -1127,9 +1188,12 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    }
    if (!(f.gi.x > 0.5)) col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal); // fake bounce only without real GI
    // GI and traced reflections run in tr_fs at half res; this pass writes their demodulated weights instead.
-   const float3 irradiance = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0;
+   // Row 5.6: the fog's light on this surface (vis_fs, half res, its 3x3 box against noise) and how much of the
+   // sky still gets through the fog to it (a), which dims the environment's own light here: fog replaces sky.
+   const float4 fogE = visE.get_width() > 1 ? fogTap(visE, visD, in.pos.xy, distance(in.wp, f.eye.xyz)) : float4(0.0, 0.0, 0.0, 1.0);
+   const float3 irradiance = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0 * fogE.a;
    const float3 fAmb = fresnelRough(nDotV, f0, rough) * iridK;
-   const float3 envRefl = sampleEnv(f, et, reflect(-viewDir, n), rough) * fAmb * (aoV * ccAt * shV);
+   const float3 envRefl = sampleEnv(f, et, reflect(-viewDir, n), rough) * fAmb * (aoV * ccAt * shV) * fogE.a;
    const bool reflOn = (int(f.shQ.z + 0.5) & 2) != 0 && rough < 0.55;
    const float envKeep = reflOn ? smoothstep(0.3, 0.55, rough) : 1.0; // the env share of the reflection; the rest is traced
    const bool giOn = f.gi.x > 0.5;
@@ -1179,15 +1243,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       if (dot(rd, rd) < 1e-6) rd = reflect(-viewDir, n);
       col = mix(col, sampleEnv(f, et, rd, 0.0) * mix(float3(1.0), base, 0.4) * (float3(1.0) - fAmb), trans);
    }
-   if (visE.get_width() > 1)
-   {
-      // Row 5.6: the fog's light on this surface (vis_fs, half res, 3x3 box against its noise), as diffuse ambient.
-      const int2 q = int2(in.pos.xy) / 2, fs = int2(visE.get_width(), visE.get_height());
-      float3 a = float3(0.0);
-      for (int j = -1; j <= 1; j++)
-         for (int i = -1; i <= 1; i++) a += visE.read(uint2(clamp(q + int2(i, j), int2(0), fs - 1))).rgb;
-      col += (float3(1.0) - fresnelRough(nDotV, f0, rough) * iridK) * (1.0 - metal) * base * (a / 9.0) * aoV;
-   }
+   col += (float3(1.0) - fresnelRough(nDotV, f0, rough) * iridK) * (1.0 - metal) * base * fogE.rgb * aoV; // as diffuse ambient
    col = col * ccAt + coatCol + (ccW > 0.0 ? sampleEnv(f, et, reflect(-viewDir, n), ccR) * (ccW * ccFv) : float3(0.0));
    col += float3(m.mat.emission) * emMap;
 #if FLD_MAT_ANY
@@ -1198,11 +1254,8 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    float3 fogIn = float3(0.0); float fogT = 1.0;
    if (visF.get_width() > 1)
    {
-      const int2 q = int2(in.pos.xy) / 2, fs = int2(visF.get_width(), visF.get_height());
-      float4 a = float4(0.0);
-      for (int j = -1; j <= 1; j++)
-         for (int i = -1; i <= 1; i++) a += visF.read(uint2(clamp(q + int2(i, j), int2(0), fs - 1)));
-      a /= 9.0; fogIn = a.rgb; fogT = a.a;
+      const float4 a = fogTap(visF, visD, in.pos.xy, distance(in.wp, f.eye.xyz));
+      fogIn = a.rgb; fogT = a.a;
    }
    FOut o;
    if (!kMrt)
@@ -1217,7 +1270,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    o.c0 = float4(((col + (giOn ? float3(0.0) : envRefl * envKeep)) * fogT + fogIn) * f.params.x, 1.0);
    o.c1 = float4(giOn ? (((float3(1.0) - fAmb) * (1.0 - metal) * base * opaque + fAmb * envKeep) * shV + shAmb * opaque) * f.gi.y * f.params.x * (aoV * ccAt) : float3(0.0), rough); // GI weight
    o.c2 = float4(fAmb * (1.0 - envKeep) * f.params.x * (aoV * ccAt * shV), reflOn ? 1.0 : 0.0); // traced-reflection weight
-   o.c1.rgb *= fogT; o.c2.rgb *= fogT;
+   o.c1.rgb *= fogT * fogE.a; o.c2.rgb *= fogT * fogE.a; // the traced GI and reflections see the env through the fog too
    o.c3 = float4(n, length(in.wp - f.eye.xyz));
    return o;
 }
