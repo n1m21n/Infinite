@@ -396,7 +396,9 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             pts = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "pts_%d.glb" % i),
                                           "  b normalize 0", "  b recenter 0"])
             inst = node("3D", "Instance on Points", ["  i pointMode 0", "  i maxPoints %d" % len(o["instances"]),
-                                                      "  f instanceScale 1", "  b inheritMaterial 0"] + material_lines(m, sheen=False))
+                                                      "  f instanceScale 1", "  b inheritMaterial 0",
+                                                      "  b alignToNormal 0", "  f rotationRandom 0", "  f scaleRandom 0"]
+                                + material_lines(m, sheen=False))   # Blender's copies: unrotated, one size
             wires.append("geo %d points %d" % (inst, pts))
             wires.append("geo %d shape %d" % (inst, model))
             geos.append(inst)
@@ -654,6 +656,9 @@ def score(case_dir, name="", scene=None, sfx=""):
            "luma_err": round(float(np.abs(li - lt).mean()), 4)}
     if scene and name.startswith("furnace"):
         out["furnace"] = furnace_metric(scene, lt, li)
+    if scene and scene.get("photo"):   # row 5.6: a photo case also gets the alignment-free photo statistics
+        from photo_match import photo_match
+        out["photo"] = photo_match(truth, inf)
     return out
 
 
@@ -841,7 +846,7 @@ def main():
     os.environ.setdefault("SHOE_GLB", os.path.expanduser("~/Infinite/shoe-dl/MaterialsVariantsShoe.glb"))
     for name in names:
         scene = dict(CASES[name]); d = os.path.join(os.path.abspath(a.out), name)
-        if any(o["shape"] == "model" and not os.path.exists(asset_file(o)) for o in scene["objects"]):
+        if any(o["shape"] in ("model", "file") and not os.path.exists(asset_file(o)) for o in scene["objects"]):
             print("skip %s: model file missing" % name)
             continue
         os.makedirs(d, exist_ok=True)
@@ -850,7 +855,7 @@ def main():
         text = json.dumps(scene, sort_keys=True, indent=1)
         # The truth is reused while the scene, Blender's script and the asset files are unchanged.
         # Infinite-only keys (supersample) leave Blender's truth alone.
-        btext = json.dumps({k: v for k, v in scene.items() if k != "supersample"}, sort_keys=True, indent=1)
+        btext = json.dumps({k: v for k, v in scene.items() if k not in ("supersample", "photo")}, sort_keys=True, indent=1)
         h = hashlib.sha1((btext + BLENDER_TRUTH_VERSION).encode()).hexdigest()
         hp = os.path.join(d, "scene.hash")
         frames = scene.get("frames")

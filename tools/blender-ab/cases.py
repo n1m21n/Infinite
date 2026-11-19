@@ -833,3 +833,86 @@ def _caustic_pool():
 
 CASES["caustic_glass_sphere"] = _caustic_glass_sphere()
 CASES["caustic_pool"] = _caustic_pool()
+
+
+# Row 5.6 (REALISM sections 2 and 5): photo cases, each a scene rebuilt the way a photo of it is taken, scored
+# against Cycles by FLIP and by the alignment-free photo statistics (photo_match.py), so the owner's own photo of
+# the same subject can be scored the same way when there is one. Shoe and room are the owner's photos (REALISM
+# section 2, the bed); hand and street are rebuilt from the common photograph of each.
+def _at(x, y, z):
+    """A light at a point (Blender Z up): the azimuth / elevation / distance the cases use (0 = +X, 90 = -Y)."""
+    import math
+    return {"azimuth": math.degrees(math.atan2(-y, x)), "elevation": math.degrees(math.atan2(z, math.hypot(x, y))),
+            "distance": math.sqrt(x * x + y * y + z * z)}
+
+
+def _photo_hand():
+    # A relaxed hand resting palm down on a wooden table (hand_build.py: metaball bones, joint creases, nails),
+    # soft window light from the side and a low warm sun from behind the wrist that rims the fingers and glows
+    # red through their edges. Skin: the skin_head lobes at a real hand's scale (red travels ~1 cm).
+    skin = {"base_color": [0.78, 0.53, 0.43], "roughness": 0.5, "subsurface": 1.0, "subsurface_color": [1.0, 0.35, 0.2],
+            "subsurface_radius": 0.05, "coat": 0.25, "coat_roughness": 0.35}
+    return {"size": [640, 480], "samples": 256, "view": "AgX", "photo": True,
+            "camera": {"fov": 30, "azimuth": -62, "elevation": 30, "distance": 0.48, "target": [-0.01, 0.04, 0.02],
+                       "fstop": 4.0, "focus": 0.48},
+            "lights": [dict({"type": "area", "power": 18, "size": [0.9, 0.9]}, **_at(1.1, -0.1, 0.7)),
+                       {"type": "sun", "power": 3.5, "azimuth": 115, "elevation": 14, "color": [1.0, 0.72, 0.5]}],
+            "world": {"color": [0.05, 0.055, 0.065]},
+            "objects": [{"shape": "plane", "scale": 1.2,
+                         "material": {"base_color": [1, 1, 1], "roughness": 0.45, "maps": {"albedo": "wood"}, "uv_scale": 3.0}},
+                        {"shape": "file", "asset": "hand/hand.glb", "material": skin},
+                        {"shape": "file", "asset": "hand/nails.glb",
+                         "material": {"base_color": [0.86, 0.66, 0.62], "roughness": 0.3, "coat": 0.6, "coat_roughness": 0.1}}]}
+
+
+def _photo_street():
+    # A city street at night after rain, from the kerb looking down the road: wet asphalt that mirrors the lamps,
+    # brick facades with lit and dark windows, sodium street lamps receding, a shop front and a blue neon strip,
+    # a little haze so the lamps bloom. Three real lights (the two nearest lamps and the shop) plus emissive meshes,
+    # which the path tracers take as light too.
+    road = {"base_color": [0.035, 0.035, 0.04], "roughness": 0.12}
+    walk = {"base_color": [0.22, 0.21, 0.2], "roughness": 0.35}
+    brick = {"base_color": [0.16, 0.08, 0.06], "roughness": 0.85}
+    iron = {"base_color": [0.05, 0.05, 0.05], "metallic": 1.0, "roughness": 0.45}
+    sodium = [1.0, 0.62, 0.3]
+    lit, dark = [], []
+    for side in (-1, 1):
+        for k, x in enumerate(range(-6, 16, 2)):
+            for f, z in enumerate((3.6, 5.8, 8.0)):
+                (lit if (k * 7 + f * 3 + (side > 0)) % 5 in (0, 2) else dark).append([x + 0.0, side * 5.38, z])   # proud of the wall face (y = 5.4)
+    lamps = [(x, side * 3.7) for x in (-2.0, 5.0, 12.0) for side in (-1, 1)]
+    objs = [{"shape": "plane", "scale": 20, "material": road},
+            {"shape": "cube", "scale": [12, 0.8, 0.08], "location": [4, 4.6, 0.08], "material": walk},
+            {"shape": "cube", "scale": [12, 0.8, 0.08], "location": [4, -4.6, 0.08], "material": walk},
+            {"shape": "cube", "scale": [12, 0.4, 5.0], "location": [4, 5.8, 5.0], "material": brick},
+            {"shape": "cube", "scale": [12, 0.4, 5.0], "location": [4, -5.8, 5.0], "material": brick},
+            {"shape": "cube", "scale": [0.6, 0.04, 0.8], "location": [0, 0, 0], "instances": lit,
+             "material": {"base_color": [0, 0, 0], "emission": [1.0, 0.75, 0.45], "emission_strength": 2.5}},
+            {"shape": "cube", "scale": [0.6, 0.04, 0.8], "location": [0, 0, 0], "instances": dark,
+             "material": {"base_color": [0.02, 0.025, 0.03], "roughness": 0.05}},
+            # shop front on the right, ground floor, and a neon strip above the left one
+            {"shape": "cube", "scale": [2.2, 0.04, 1.1], "location": [3.0, -5.42, 1.4],
+             "material": {"base_color": [0, 0, 0], "emission": [1.0, 0.9, 0.75], "emission_strength": 6.0}},
+            {"shape": "cube", "scale": [1.8, 0.05, 0.05], "location": [7.0, 5.40, 2.7],
+             "material": {"base_color": [0, 0, 0], "emission": [0.15, 0.45, 1.0], "emission_strength": 30.0}}]
+    for x, y in lamps:
+        objs += [{"shape": "cube", "scale": [0.06, 0.06, 2.4], "location": [x, y, 2.4], "material": iron},
+                 {"shape": "cube", "scale": [0.22, 0.14, 0.06], "location": [x, y * 0.92, 4.85],
+                  "material": {"base_color": [0, 0, 0], "emission": sodium, "emission_strength": 60.0}}]
+    return {"size": [768, 432], "samples": 512, "view": "AgX", "photo": True,
+            "camera": {"fov": 55, "azimuth": 172, "elevation": 4, "distance": 9.0, "target": [2.0, -1.0, 1.0]},
+            "lights": [dict({"type": "spot", "power": 900, "spot_angle": 120, "blend": 0.6, "color": sodium, "radius": 0.15},
+                            **_at(-2.0, 3.4, 4.75)),
+                       dict({"type": "spot", "power": 900, "spot_angle": 120, "blend": 0.6, "color": sodium, "radius": 0.15},
+                            **_at(5.0, -3.4, 4.75)),
+                       dict({"type": "area", "power": 120, "size": [3.5, 1.5], "color": [1.0, 0.9, 0.75]},
+                            **_at(3.0, -4.6, 1.4))],
+            "world": {"color": [0.004, 0.006, 0.012]},
+            "fog": {"density": 0.006, "color": [0.9, 0.9, 0.95], "g": 0.6, "box": [[-10, -6, 0.0], [20, 6, 9.0]]},
+            "objects": objs}
+
+
+CASES["photo_shoe"] = dict(_ref_shoe(), photo=True)
+CASES["photo_room"] = dict(_bed(), photo=True)
+CASES["photo_hand"] = _photo_hand()
+CASES["photo_street"] = _photo_street()

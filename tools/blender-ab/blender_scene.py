@@ -412,6 +412,18 @@ for i, o in enumerate(scene["objects"]):
         bpy.ops.mesh.primitive_monkey_add(size=2)
         bpy.ops.object.modifier_add(type='SUBSURF'); bpy.ops.object.modifier_apply(modifier="Subdivision")
         bpy.ops.object.shade_smooth()
+    elif shape == "file":   # row 5.6: a mesh built once into assets/ (hand_build.py), shaded by the case's material
+        before = set(bpy.data.objects)
+        bpy.ops.import_scene.gltf(filepath=os.path.join(ASSETS, o["asset"]))
+        new = [x for x in bpy.data.objects if x not in before and x.type == 'MESH']
+        for x in bpy.context.scene.objects:
+            x.select_set(x in new)
+        bpy.context.view_layer.objects.active = new[0]
+        bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        if len(new) > 1:
+            bpy.ops.object.join()
+        bpy.context.active_object.data.materials.clear()
     elif shape == "mesh":   # judge_table: verts, faces and per-corner uvs straight from the case, smooth shaded
         me = bpy.data.meshes.new("mesh%d" % i)
         me.from_pydata(o["verts"], [], o["faces"])
