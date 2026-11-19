@@ -261,9 +261,12 @@ def main():
         "```html", gen_embeds.snippet(emb[0]), "```", ""
     ]
 
-    header_section = [
+    title_section = [
         "# Infinite", "",
-        "> Infinite is a free, open-source DAW for visuals, music and code on one infinite canvas. Wire shaders, 3D geometry, synths and modulation together in real time. It runs on macOS, Windows and Linux.", "",
+        "> Infinite is a free, open-source DAW for visuals, music and code on one infinite canvas. Wire shaders, 3D geometry, synths and modulation together in real time. It runs on macOS, Windows and Linux.", ""
+    ]
+
+    credit_section = [
         "## Credit", "",
         "Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend it, please credit it as: " + '"Infinite, by Naman Soni (n1m21n), https://infinitedevices.org".', "",
         "### How credit travels", "",
@@ -322,8 +325,8 @@ def main():
         "- `.field`: a Field device (a small program for a Field node). Import it into a Field Pixel node, or copy its code.", ""
     ]
 
-    # llms.txt: Curated concise index
-    L_summary = header_section + agent_section + start_here
+    # llms.txt: Curated concise index (capabilities & agent install first)
+    L_summary = title_section + agent_section + start_here + credit_section
     for c in ("Templates", "Community", "AI Skills", "Extensions"):
         if c in byc:
             L_summary += [f"## Library: {c}", ""] + [f"- [{i['name']}]({i['page']}): {i['description']} (file: {i['file']})" for i in byc[c]] + [""]
@@ -340,7 +343,7 @@ def main():
     ]
 
     # llms-full.txt: Full uncompressed encyclopedia
-    L_full = header_section + agent_section + start_here
+    L_full = title_section + agent_section + start_here + credit_section
     for c, v in byc.items():
         L_full += [f"## Library: {c}", ""] + [f"- [{i['name']}]({i['page']}): {i['description']} (file: {i['file']})" for i in v] + [""]
     L_full += ["## Nodes", ""] + gen_nodes.llms_lines() + [""]
