@@ -13,13 +13,46 @@
 set -u
 
 REPO="$HOME/infinte"
-PRO_HOST="Namans-MacBook-Pro-366.local"
-AIR_HOST="Namans-MacBook-Air.local"
+PRO_HOST="Namans-MacBook-Pro-955.local"
+AIR_HOST="Namans-MacBook-Air-6.local"
 MEM_REL=".claude/projects/-Users-namansoni-infinte/memory"
 
+resolve_peer_host() {
+  local fallback="$1" pattern="$2" inst="" resolved=""
+  if dscacheutil -q host -a name "$fallback" 2>/dev/null | grep -q 'ip_address'; then
+    echo "$fallback"; return 0
+  fi
+  inst=$(python3 -c '
+import subprocess, re, sys
+p = subprocess.Popen(["dns-sd", "-B", "_ssh._tcp", "local."], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+try:
+    p.wait(timeout=2.5)
+except subprocess.TimeoutExpired:
+    p.terminate()
+out = p.stdout.read() if p.stdout else ""
+for line in out.splitlines():
+    if "Add" in line and re.search(sys.argv[1], line, re.I):
+        print(line.split("_ssh._tcp.")[-1].strip()); break
+' "$pattern")
+  if [ -n "$inst" ]; then
+    resolved=$(python3 -c '
+import subprocess, re, sys
+p = subprocess.Popen(["dns-sd", "-L", sys.argv[1], "_ssh._tcp", "local."], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+try:
+    p.wait(timeout=2.5)
+except subprocess.TimeoutExpired:
+    p.terminate()
+out = p.stdout.read() if p.stdout else ""
+m = re.search(r"can be reached at ([^: ]+\.local)\.", out)
+if m: print(m.group(1))
+' "$inst")
+  fi
+  echo "${resolved:-$fallback}"
+}
+
 case "$(hostname -s)" in
-  Namans-MacBook-Pro*) PEER=air; PEER_HOST="$AIR_HOST" ;;
-  Namans-MacBook-Air*) PEER=pro; PEER_HOST="$PRO_HOST" ;;
+  Namans-MacBook-Pro*) PEER=air; PEER_HOST=$(resolve_peer_host "$AIR_HOST" "MacBook Air") ;;
+  Namans-MacBook-Air*) PEER=pro; PEER_HOST=$(resolve_peer_host "$PRO_HOST" "MacBook Pro") ;;
   *) echo "unknown laptop: $(hostname -s)" >&2; exit 1 ;;
 esac
 SSH_OPTS="-o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=5 -i $HOME/.ssh/id_ed25519"
