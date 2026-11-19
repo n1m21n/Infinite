@@ -125,7 +125,7 @@ every step; keep a change only if it measures better.
 | 4.2 | Light shapes, IES profiles, light linking | DESIGN G8 | one case each | shapes + spread done 2026-11-19 (light_disc, light_spread); IES done 2026-11-19 (light_ies); linking + shadow linking done 2026-11-19 (self-test, R/L/T) |
 | 4.3 | Sky + atmosphere | REALISM R15 | sky cases ≤ 0.05 settle | **owner** |
 | 4.4 | Caustics in settle | DESIGN G3 | caustic cases ≤ 0.08 | done 2026-11-19: photon pass into a hash grid (caustic_glass_sphere .045, caustic_pool .076); live/raster none by design |
-| 4.5 | Micro-displacement in settle | REALISM R4 | `tex_perforated` settle ≤ 0.05 | enh |
+| 4.5 | Micro-displacement in settle | REALISM R4 | `tex_perforated` settle ≤ 0.05 | done (built as old row 4.3: bump map tessellated into the BLAS); re-measured 2026-11-19 settle 0.031 |
 
 ### Phase 5: worlds and content
 
