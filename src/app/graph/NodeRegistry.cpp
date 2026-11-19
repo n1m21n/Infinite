@@ -206,6 +206,8 @@ namespace app
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
       REGISTER_NODE(MathNode, Math, "Modulators");
       REGISTER_NODE(CompareNode, Compare, "Modulators");
+      REGISTER_NODE(LogicGateNode, Logic Gate, "Modulators");
+      REGISTER_NODE(BrainSourceNode, Brain Source, "Modulators");
       REGISTER_NODE(RangeToRangeNode, Range to Range, "Modulators");
       REGISTER_NODE(SmoothNode, Smoothing, "Modulators");
       REGISTER_NODE(InvertNode, Invert, "Modulators");
@@ -217,6 +219,7 @@ namespace app
       REGISTER_NODE(DriftNode, Drift, "Prediction");
       REGISTER_NODE(MovesNode, Moves, "Prediction");
       REGISTER_NODE(PredictiveModulatorNode, Predictive Modulator, "Prediction");
+      REGISTER_NODE(BrainSculptNode, Brain Sculpt, "Prediction");
       REGISTER_NODE(PredictiveColoringNode, Predictive Coloring, "Prediction");
       REGISTER_NODE(CVToPitchNode, CV to Pitch, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Macros");

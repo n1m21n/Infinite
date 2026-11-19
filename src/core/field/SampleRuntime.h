@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SampleProgram.h"
+#include "core/bci/BciTypes.h"
 #include "../../audio/DspMath.h"
 #include "../../audio/MusicTime.h"
 #include "../../audio/PhaseShape.h"
@@ -177,6 +178,7 @@ namespace Field
             case SampleOp::LoadNoteVel: regs[ins.dst] = in.noteVel; break;
             case SampleOp::LoadNoteNum: regs[ins.dst] = in.noteNum; break;
             case SampleOp::LoadBeat: regs[ins.dst] = (float)in.beat; break;
+            case SampleOp::LoadBrain: regs[ins.dst] = Bci::ReadBrainGlobal((int)ins.imm); break;
             case SampleOp::Tick:
             {
                const double div = (double)regs[ins.a];

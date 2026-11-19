@@ -40,6 +40,7 @@ bool RunIoAudit(); // selftest/IoAudit.cpp
 bool RunGeoAudit(); // selftest/GeoAudit.cpp
 bool GeoAuditWantsGl(); // selftest/GeoAudit.cpp: the section list names DISP
 bool RunCompAudit(); // selftest/CompAudit.cpp
+bool RunBciSelftest(); // selftest/BciTests.cpp
 // Resolves the main window's DPI + the manual slider into UiScale::Current(), hands the point
 // scale to the GLFW backend and (re)bakes the font atlas at the resulting physical size. Safe
 // to call again between frames: the atlas is rebuilt from scratch and, when the GL renderer
@@ -753,6 +754,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // render vs realtime, frame-rate dependence (selftest/ModAudit.cpp).
    if (getenv("INFINITE_MODAUDIT") != nullptr)
       return RunModAudit() ? 0 : 1;
+   if (getenv("INFINITE_BCI_SELFTEST") != nullptr)
+      return RunBciSelftest() ? 0 : 1;
    // Synth audit: pitch, aliasing, level, rate, determinism, CPU (selftest/SynthAudit.cpp).
    if (getenv("INFINITE_SYNTHAUDIT") != nullptr)
       return RunSynthAudit() ? 0 : 1;

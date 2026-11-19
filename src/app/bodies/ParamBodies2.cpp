@@ -1077,6 +1077,155 @@ namespace app
    }
 
 
+   void DrawBrainSourceBody(BrainSourceNode* n, int /*nodeIndex*/)
+   {
+      Bci::TelemetrySnapshot snap;
+      n->GetTelemetry(snap);
+
+      const float w = kPreviewSize;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const float pillH = 16.0f;
+      const float scopeH = 68.0f;
+      const float totalH = pillH + 4.0f + scopeH;
+      ImGui::Dummy(ImVec2(w, totalH));
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      // 1. 4-Electrode Contact Quality Pill Bar (TP9 | AF7 | AF8 | TP10)
+      static constexpr const char* kPillNames[4] = { "TP9", "AF7", "AF8", "TP10" };
+      static constexpr int kChanMap[4] = { 2, 0, 1, 3 };
+      const float pillGap = 4.0f;
+      const float pillW = (w - pillGap * 3.0f) * 0.25f;
+      for (int p = 0; p < 4; ++p)
+      {
+         const float q = snap.contactQuality[kChanMap[p]];
+         const ImVec2 p0(origin.x + p * (pillW + pillGap), origin.y);
+         const ImVec2 p1(p0.x + pillW, p0.y + pillH);
+         ImU32 fillCol = tok::U32(tok::pal::c_22C55EFF);
+         if (q < 0.40f)
+            fillCol = tok::U32(tok::pal::c_EF4444FF);
+         else if (q < 0.75f)
+            fillCol = tok::U32(tok::pal::c_FFBE5AFF);
+         dl->AddRectFilled(p0, p1, tok::U32(tok::pal::c_FFFFFF12), 3.0f);
+         dl->AddRectFilled(p0, ImVec2(p0.x + pillW * std::clamp(q, 0.05f, 1.0f), p1.y),
+                           (fillCol & 0x00FFFFFFu) | 0x55000000u, 3.0f);
+         const ImVec2 ts = ImGui::CalcTextSize(kPillNames[p]);
+         dl->AddText(ImVec2(p0.x + (pillW - ts.x) * 0.5f, p0.y + (pillH - ts.y) * 0.5f),
+                     ImGui::GetColorU32(ImGuiCol_Text), kPillNames[p]);
+      }
+
+      // 2. Dual-Layer Live Micro-Scope (Top: frontal/temporal traces; Bottom: 5 cortical bands)
+      const ImVec2 sTl(origin.x, origin.y + pillH + 4.0f);
+      const ImVec2 sBr(origin.x + w, sTl.y + scopeH);
+      AudioViz::Fill(dl, sTl, sBr);
+      dl->PushClipRect(sTl, sBr, true);
+
+      const float traceTop = sTl.y + 4.0f;
+      const float traceH = 34.0f;
+      const float midY = traceTop + traceH * 0.5f;
+      const ImU32 frontCol = tok::U32(tok::pal::c_22C55EFF);
+      const ImU32 tempCol = tok::U32(tok::pal::c_FFBE5AFF);
+      for (int i = 1; i < Bci::kTraceSamples; ++i)
+      {
+         const float x0 = sTl.x + 4.0f + ((float)(i - 1) / (float)(Bci::kTraceSamples - 1)) * (w - 8.0f);
+         const float x1 = sTl.x + 4.0f + ((float)i / (float)(Bci::kTraceSamples - 1)) * (w - 8.0f);
+         const float y0f = midY - std::clamp(snap.traceFrontal[i - 1], -1.0f, 1.0f) * (traceH * 0.45f);
+         const float y1f = midY - std::clamp(snap.traceFrontal[i], -1.0f, 1.0f) * (traceH * 0.45f);
+         const float y0t = midY - std::clamp(snap.traceTemporal[i - 1], -1.0f, 1.0f) * (traceH * 0.45f);
+         const float y1t = midY - std::clamp(snap.traceTemporal[i], -1.0f, 1.0f) * (traceH * 0.45f);
+         dl->AddLine(ImVec2(x0, y0t), ImVec2(x1, y1t), (tempCol & 0x00FFFFFFu) | 0x99000000u, 1.1f);
+         dl->AddLine(ImVec2(x0, y0f), ImVec2(x1, y1f), frontCol, 1.4f);
+      }
+
+      // Flash badge when Blink / Wink / Jaw fires
+      if (snap.blinkFlash > 0.15f || snap.jawLFlash > 0.15f || snap.jawRFlash > 0.15f || snap.winkFlash > 0.15f)
+      {
+         const char* tag = snap.blinkFlash > 0.15f ? "BLINK"
+                         : (snap.jawLFlash > 0.15f ? "JAW L"
+                         : (snap.jawRFlash > 0.15f ? "JAW R" : "WINK"));
+         dl->AddText(ImVec2(sTl.x + 6.0f, sTl.y + 3.0f), tok::U32(tok::pal::c_FFBE5AFF), tag);
+      }
+
+      // Bottom 5 detrended cortical band bars (d, t, a, b, g) + 1/f slope readout
+      const float barAreaTop = traceTop + traceH + 4.0f;
+      const float barAreaH = (sBr.y - 4.0f) - barAreaTop;
+      const float bw = (w - 64.0f) / 5.0f;
+      for (int b = 0; b < Bci::kBandCount; ++b)
+      {
+         const float p = std::clamp(snap.bandPower[b], 0.0f, 1.0f);
+         const float bx0 = sTl.x + 4.0f + (float)b * bw;
+         const float bx1 = bx0 + bw - 3.0f;
+         const float by1 = sBr.y - 4.0f;
+         const float by0 = by1 - std::max(2.0f, p * barAreaH);
+         dl->AddRectFilled(ImVec2(bx0, by0), ImVec2(bx1, by1),
+                           b == 2 ? frontCol : tempCol, 2.0f);
+      }
+      char slopeBuf[32];
+      snprintf(slopeBuf, sizeof(slopeBuf), "1/f^%.1f", snap.aperiodicSlope);
+      dl->AddText(ImVec2(sBr.x - 54.0f, barAreaTop + 4.0f), ImGui::GetColorU32(ImGuiCol_TextDisabled), slopeBuf);
+      dl->PopClipRect();
+      AudioViz::Border(dl, sTl, sBr);
+
+      // 3. Action row: Calibrate 15s + Rec Take + Synthetic Gesture triggers
+      const float btnW = (w - 4.0f) * 0.5f;
+      if (ActionButton::Draw(snap.calibrating ? "Cancel Cal##bciCal" : "Calibrate 15s##bciCal", ImVec2(btnW, 0)))
+      {
+         if (snap.calibrating) n->CancelCalibration();
+         else n->StartCalibration();
+      }
+      ImGui::SameLine(0.0f, 4.0f);
+      const char* recLabel = n->IsRecordingTake() ? "Stop Take##bciRec" : (n->HasTake() ? "Re-Record##bciRec" : "Rec Take##bciRec");
+      if (ActionButton::Draw(recLabel, ImVec2(btnW, 0)))
+      {
+         if (n->IsRecordingTake()) n->StopRecordingTake();
+         else n->StartRecordingTake();
+      }
+
+      if (snap.calibrating)
+      {
+         const char* phaseStr = (snap.calibPhase == Bci::CalibrationPhase::EyesOpen) ? "Eyes Open" : "Eyes Closed";
+         ImGui::TextDisabled("Calibrating (%s): %.0f%%", phaseStr, snap.calibProgress * 100.0f);
+      }
+
+      if (n->device == BrainSourceNode::kDeviceSynthetic)
+      {
+         const float gBtnW = (w - 12.0f) * 0.25f;
+         if (ActionButton::Draw("Blink##bciB", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::Blink);
+         ImGui::SameLine(0.0f, 4.0f);
+         if (ActionButton::Draw("Wink L##bciWL", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::WinkLeft);
+         ImGui::SameLine(0.0f, 4.0f);
+         if (ActionButton::Draw("Jaw L##bciJL", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::JawLeft);
+         ImGui::SameLine(0.0f, 4.0f);
+         if (ActionButton::Draw("Jaw R##bciJR", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::JawRight);
+      }
+   }
+
+
+   void DrawBrainSourceParams(BrainSourceNode* n)
+   {
+      const float colW = kParamWidth;
+      const float gutter = 16.0f;
+      if (n->PackMissing())
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", T("Install the BCI pack: Settings > Extensions (synthetic fallback active)"));
+      else
+         ImGui::TextDisabled("%s", n->Status().c_str());
+
+      NodeSeparator("acquisition", colW * 2 + gutter);
+      DropdownButton("device", BrainSourceNode::DeviceNames(), n->device, [n](int i) { PushUndoCheckpoint(); n->device = i; });
+      DropdownButton("synthetic preset", BrainSourceNode::PresetNames(), n->syntheticPreset, [n](int i) { PushUndoCheckpoint(); n->syntheticPreset = i; });
+      DropdownButton("blink filter", BrainSourceNode::BlinkModeNames(), n->blinkMode, [n](int i) { PushUndoCheckpoint(); n->blinkMode = i; });
+      ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f, "%.2f", colW);
+      ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f", colW);
+      ModCheckbox("artifact blanking", &n->artifactBlanking);
+      ModCheckbox("startle guard", &n->startleGuard);
+      ImGui::BeginDisabled(!n->HasTake() && !gParamRegisterOnly);
+      ModCheckbox("play baked take", &n->playTake);
+      ImGui::EndDisabled();
+
+      NodeSeparator("24 neural & somatic outputs", colW * 2 + gutter);
+      DrawOutputMeters(n, colW, 2, gutter);
+   }
+
+
    void DrawNullModulatorParams(NullModulatorNode* n)
    {
       if (!n->input)

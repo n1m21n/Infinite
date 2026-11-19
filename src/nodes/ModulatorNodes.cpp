@@ -1448,3 +1448,220 @@ float AudioToCVNode::RawEnvelope() const
 {
    return mAudioNode ? mAudioNode->RawEnvelope() : 0.0f;
 }
+
+// ---------------------------------------------------------------- Logic Gate
+
+const std::vector<std::string>& LogicGateNode::OpNames()
+{
+   static const std::vector<std::string> names = {
+      "Schmitt Gate",
+      "Rising Edge",
+      "Toggle (T-FF)",
+      "SR Latch",
+      "AND",
+      "OR",
+      "XOR",
+      "NAND",
+      "NOR",
+      "NOT"
+   };
+   return names;
+}
+
+const std::vector<std::string>& LogicGateNode::QuantizeNames()
+{
+   static const std::vector<std::string> names = {
+      "Immediate",
+      "1/16 Beat",
+      "1/8 Beat",
+      "1/4 Beat",
+      "1/2 Beat",
+      "1 Bar"
+   };
+   return names;
+}
+
+const char* LogicGateNode::InputLabel(int slot) const
+{
+   if (slot == 0) return "in A";
+   if (slot == 1) return "in B";
+   if (slot == 2) return "presence";
+   return nullptr;
+}
+
+float LogicGateNode::HoldProgress01() const
+{
+   const double req = std::max(0.0, (double)holdMs * 0.001);
+   if (req <= 1e-6)
+      return mSchmittA ? 1.0f : 0.0f;
+   if (mSchmittA)
+      return 1.0f;
+   return std::clamp((float)(mDwellA / req), 0.0f, 1.0f);
+}
+
+double LogicGateNode::QuantizePeriodBeats() const
+{
+   switch (quantize)
+   {
+      case kQuantSixteenth: return 0.25;
+      case kQuantEighth:    return 0.5;
+      case kQuantQuarter:   return 1.0;
+      case kQuantHalf:      return 2.0;
+      case kQuantBar:       return (double)std::max(1, Transport::Instance().TimeSigNumerator());
+      default:              return 0.0;
+   }
+}
+
+bool LogicGateNode::StepSchmitt(float val, bool& state, double& dwellSec, double dt, float hi, float lo, double reqHoldSec)
+{
+   if (!state)
+   {
+      if (val >= hi)
+      {
+         dwellSec += dt;
+         if (dwellSec >= reqHoldSec)
+         {
+            state = true;
+            dwellSec = reqHoldSec;
+         }
+      }
+      else
+      {
+         dwellSec = 0.0;
+      }
+   }
+   else
+   {
+      if (val <= lo)
+      {
+         state = false;
+         dwellSec = 0.0;
+      }
+   }
+   return state;
+}
+
+float LogicGateNode::Value01()
+{
+   const float inA = std::clamp(inputA ? inputA->Value01() : constantA, 0.0f, 1.0f);
+   const float inB = std::clamp(inputB ? inputB->Value01() : constantB, 0.0f, 1.0f);
+   if (bypassed)
+      return inA;
+
+   const Transport& tr = Transport::Instance();
+   const double nowSec = tr.Seconds();
+   const double nowBeats = tr.Beats();
+
+   // Idempotency rule: multiple Value01() calls on the same tick return the exact cached output.
+   if (mInit && nowSec == mLastSec && nowBeats == mLastBeats)
+      return mOutVal;
+
+   double dt = mInit ? (nowSec - mLastSec) : 0.0;
+   if (dt < 0.0 || dt > 1.0)
+   {
+      // Seek backwards or long gap: reset temporal accumulators cleanly
+      dt = 0.0;
+      mDwellA = 0.0;
+      mDwellB = 0.0;
+      mPulseRemainSec = 0.0;
+      mRefracRemainSec = 0.0;
+      mArmedEdge = false;
+   }
+
+   const double prevBeats = mInit ? mLastBeats : nowBeats;
+   mLastSec = nowSec;
+   mLastBeats = nowBeats;
+   mInit = true;
+
+   mLastInA = inA;
+   mLastInB = inB;
+
+   const float hi = std::clamp(std::max(highThresh, lowThresh + 0.005f), 0.0f, 1.0f);
+   const float lo = std::clamp(std::min(lowThresh, hi - 0.005f), 0.0f, 1.0f);
+   const double reqHoldSec = std::max(0.0, (double)holdMs * 0.001);
+
+   // Presence safety interlock: if presence pin is patched and below minPresence,
+   // freeze Toggle/Latch states and suppress triggers.
+   const bool presenceOk = (presenceIn == nullptr) || (presenceIn->Value01() >= minPresence);
+   if (!presenceOk)
+   {
+      mDwellA = 0.0;
+      mDwellB = 0.0;
+      mPulseRemainSec = 0.0;
+      mArmedEdge = false;
+      mPrevGateA = false;
+      if (op == kOpToggle)
+         mOutVal = mToggleState ? 1.0f : 0.0f;
+      else if (op == kOpSRLatch)
+         mOutVal = mLatchState ? 1.0f : 0.0f;
+      else
+         mOutVal = 0.0f;
+      return mOutVal;
+   }
+
+   mPulseRemainSec = std::max(0.0, mPulseRemainSec - dt);
+   mRefracRemainSec = std::max(0.0, mRefracRemainSec - dt);
+
+   const bool gateA = StepSchmitt(inA, mSchmittA, mDwellA, dt, hi, lo, reqHoldSec);
+   const bool gateB = StepSchmitt(inB, mSchmittB, mDwellB, dt, hi, lo, reqHoldSec);
+
+   const bool rawRising = gateA && !mPrevGateA;
+   mPrevGateA = gateA;
+
+   bool fireTrigger = false;
+   const double qPeriod = QuantizePeriodBeats();
+   if (qPeriod > 0.0)
+   {
+      if (rawRising && mRefracRemainSec <= 0.0)
+         mArmedEdge = true;
+      const bool gridCrossed = (nowBeats > prevBeats) &&
+                               (std::floor(nowBeats / qPeriod) > std::floor(prevBeats / qPeriod));
+      if (mArmedEdge && gridCrossed)
+      {
+         fireTrigger = true;
+         mArmedEdge = false;
+         mRefracRemainSec = std::max(0.0, (double)refractoryMs * 0.001);
+      }
+   }
+   else if (rawRising && mRefracRemainSec <= 0.0)
+   {
+      fireTrigger = true;
+      mRefracRemainSec = std::max(0.0, (double)refractoryMs * 0.001);
+   }
+
+   if (fireTrigger)
+      mPulseRemainSec = std::max(0.001, (double)pulseMs * 0.001);
+
+   bool outBool = false;
+   switch (op)
+   {
+      case kOpSchmittGate:
+         outBool = gateA;
+         break;
+      case kOpRisingEdge:
+         outBool = (mPulseRemainSec > 0.0);
+         break;
+      case kOpToggle:
+         if (fireTrigger)
+            mToggleState = !mToggleState;
+         outBool = mToggleState;
+         break;
+      case kOpSRLatch:
+         if (gateA)
+            mLatchState = true;
+         if (gateB)
+            mLatchState = false;
+         outBool = mLatchState;
+         break;
+      case kOpAnd:  outBool = gateA && gateB; break;
+      case kOpOr:   outBool = gateA || gateB; break;
+      case kOpXor:  outBool = gateA != gateB; break;
+      case kOpNand: outBool = !(gateA && gateB); break;
+      case kOpNor:  outBool = !(gateA || gateB); break;
+      case kOpNot:  outBool = !gateA; break;
+      default:      outBool = gateA; break;
+   }
+
+   mOutVal = outBool ? 1.0f : 0.0f;
+   return mOutVal;
+}

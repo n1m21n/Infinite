@@ -1,6 +1,7 @@
 #include "FieldVM.h"
 #include "FieldRandom.h"
 #include "FieldNoise.h"
+#include "core/bci/BciTypes.h"
 #include "../../audio/PhaseShape.h"
 
 #include <algorithm>
@@ -249,6 +250,11 @@ namespace Field
                         regs[inst.dst].v[0] = (double)it->second;
                         found = true;
                      }
+                  }
+                  if (!found && name.rfind("brain.", 0) == 0 && Bci::IsBrainGlobalField(name.substr(6)))
+                  {
+                     regs[inst.dst].v[0] = (double)Bci::ReadBrainGlobal(name);
+                     found = true;
                   }
                   if (!found)
                   {

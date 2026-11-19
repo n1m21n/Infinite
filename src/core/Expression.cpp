@@ -1,4 +1,5 @@
 #include "Expression.h"
+#include "bci/BciTypes.h"
 #include "field/FieldProgramCache.h"
 #include "field/FieldVM.h"
 
@@ -80,7 +81,8 @@ namespace Expression
             continue;
          const std::string& name = inst.stringData;
          if (name == "t" || name == "pi" || (siblings != nullptr && siblings->count(name)) ||
-             (globals != nullptr && globals->count(name)))
+             (globals != nullptr && globals->count(name)) ||
+             (name.rfind("brain.", 0) == 0 && Bci::IsBrainGlobalField(name.substr(6))))
             continue;
          outError = "unknown identifier '" + name + "'";
          return false;

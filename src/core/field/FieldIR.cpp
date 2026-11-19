@@ -3,6 +3,7 @@
 #include "FieldSwizzle.h"
 #include "FieldCycles.h"
 #include "ExprGlobals.h"
+#include "core/bci/BciTypes.h"
 #include "../../audio/PhaseShape.h"
 
 #include <cctype>
@@ -332,6 +333,21 @@ namespace Field
                {
                   const std::string& baseName = std::static_pointer_cast<AstIdent>(acc->base)->name;
                   const VarSymbol* baseSym = scope.Find(baseName);
+                  if (baseName == "brain" && !baseSym)
+                  {
+                     if (!Bci::IsBrainGlobalField(acc->field))
+                     {
+                        error.severity = Severity::Error;
+                        error.span = acc->span;
+                        error.message = "unknown brain symbol 'brain." + acc->field + "'";
+                        return nullptr;
+                     }
+                     auto ir = std::make_shared<IRNode>(IRKind::Variable, acc->span);
+                     ir->varName = "brain." + acc->field;
+                     ir->type = FieldType(DataType::Float, 1);
+                     ir->domain = Domain::Frame;
+                     return ir;
+                  }
                   if (baseSym && baseSym->isStructuralGeometry)
                   {
                      FieldType fieldType;

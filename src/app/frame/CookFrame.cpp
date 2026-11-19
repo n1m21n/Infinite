@@ -2,6 +2,7 @@
 // Per-frame modulation + palette application (runtime code that sat among the fixtures in main.cpp).
 #include "app/graph/LearningLog.h"
 #include "app/AppShared.h"
+#include "core/bci/BciTypes.h"
 #include "audio/VoiceMod.h"
 #include "plugin/engine/HostAudio.h"
 
@@ -422,6 +423,19 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    // gMachineDrivenModNodes below): a macro knob with an LFO wired into it is not a hand.
    gMachineDrivenModNodesPrev.swap(gMachineDrivenModNodes);
    gMachineDrivenModNodes.clear();
+   for (GraphNode& gn : gNodes)
+   {
+      if (auto* bs = dynamic_cast<BrainSourceNode*>(gn.node.get()))
+         bs->CookIfNeeded(frameId);
+   }
+   {
+      static float sPrevMasterPeak = 0.0f;
+      const float peakNow = AudioEngine::Instance().BlockPeakCeil();
+      const float delta = peakNow - sPrevMasterPeak;
+      sPrevMasterPeak = peakNow;
+      if (delta > 0.25f)
+         Bci::NotifyOutputTransient(delta, 0.0f);
+   }
    ExprGlobals::EvaluateAll(t);
    const std::map<std::string, float>& globals = ExprGlobals::Values();
    for (const ParamRef& ref : modulation.FrameParams())

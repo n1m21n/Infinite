@@ -1224,6 +1224,127 @@ namespace app
    }
 
 
+   void DrawLogicGateBody(LogicGateNode* n, int nodeIndex)
+   {
+      const bool isLight = IsThemeLight();
+      const float val = n->Value01();
+      const float inA = n->LastInputA();
+      const float hi = std::clamp(std::max(n->highThresh, n->lowThresh + 0.005f), 0.0f, 1.0f);
+      const float lo = std::clamp(std::min(n->lowThresh, hi - 0.005f), 0.0f, 1.0f);
+
+      static std::map<int, std::vector<float>> sGateInHist;
+      static std::map<int, double> sGateLastT;
+      std::vector<float>& hist = sGateInHist[nodeIndex];
+      const double now = ImGui::GetTime();
+      double& last = sGateLastT[nodeIndex];
+      if (hist.empty() || now - last > 0.25 || now < last)
+      {
+         hist.assign(1, inA);
+         last = now;
+      }
+      else
+      {
+         constexpr double kStep = 1.0 / 60.0;
+         int steps = 0;
+         for (; last + kStep <= now && steps < 4; last += kStep, ++steps)
+            hist.push_back(inA);
+         if (steps == 4)
+            last = now;
+      }
+      while (hist.size() > 140)
+         hist.erase(hist.begin());
+
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const float w = kPreviewSize;
+      const float h = 76.0f;
+      const float pad = 6.0f;
+      const float innerW = w - 2.0f * pad;
+      const float innerH = h - 2.0f * pad;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImGui::Dummy(ImVec2(w, h));
+      const ImVec2 br(origin.x + w, origin.y + h);
+      AudioViz::Fill(dl, origin, br);
+
+      auto yOf = [&](float v) { return origin.y + pad + innerH * (1.0f - std::clamp(v, 0.0f, 1.0f)); };
+
+      // Schmitt hysteresis thresholds (highThresh & lowThresh)
+      const float yHi = yOf(hi);
+      const float yLo = yOf(lo);
+      dl->AddRectFilled(ImVec2(origin.x + pad, yHi), ImVec2(origin.x + w - pad, yLo),
+                        isLight ? tok::U32(tok::pal::c_00000014) : tok::U32(tok::pal::c_FFFFFF0A));
+      dl->AddLine(ImVec2(origin.x + pad, yHi), ImVec2(origin.x + w - pad, yHi),
+                  tok::U32(tok::pal::c_22C55EFF), 1.0f);
+      dl->AddLine(ImVec2(origin.x + pad, yLo), ImVec2(origin.x + w - pad, yLo),
+                  tok::U32(tok::pal::c_FFBE5AFF), 1.0f);
+
+      // Live input A curve
+      const ImU32 curveCol = isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_FFBE5AFF);
+      for (size_t i = 1; i < hist.size(); ++i)
+      {
+         const float x0 = origin.x + pad + ((float)(i - 1) / 139.0f) * innerW;
+         const float x1 = origin.x + pad + ((float)i / 139.0f) * innerW;
+         dl->AddLine(ImVec2(x0, yOf(hist[i - 1])), ImVec2(x1, yOf(hist[i])), curveCol, 1.6f);
+      }
+
+      // Hold dwell bar + output state LED in top-right
+      const float hold01 = n->HoldProgress01();
+      const float barW = 44.0f;
+      const ImVec2 barTl(origin.x + pad, origin.y + pad);
+      const ImVec2 barBr(barTl.x + barW, barTl.y + 4.0f);
+      dl->AddRectFilled(barTl, barBr, tok::U32(tok::pal::c_FFFFFF18), 2.0f);
+      if (hold01 > 0.01f)
+         dl->AddRectFilled(barTl, ImVec2(barTl.x + barW * hold01, barBr.y), tok::U32(tok::pal::c_22C55EFF), 2.0f);
+
+      const bool high = val > 0.5f;
+      const ImVec2 ledPos(origin.x + w - pad - 6.0f, origin.y + pad + 6.0f);
+      dl->AddCircleFilled(ledPos, 5.0f, high ? tok::U32(tok::pal::c_22C55EFF) : tok::U32(tok::pal::c_FFFFFF18));
+      AudioViz::Border(dl, origin, br);
+   }
+
+
+   void DrawLogicGateParams(LogicGateNode* n)
+   {
+      DropdownButton("operation", LogicGateNode::OpNames(), n->op, [n](int i) { PushUndoCheckpoint(); n->op = i; });
+      DropdownButton("quantize", LogicGateNode::QuantizeNames(), n->quantize, [n](int i) { PushUndoCheckpoint(); n->quantize = i; });
+      if (n->inputA == nullptr)
+         ModSlider("in A (no cable)", &n->constantA, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("in A: patched");
+      if (n->inputB == nullptr)
+         ModSlider("in B (no cable)", &n->constantB, 0.0f, 1.0f);
+      else
+         ImGui::TextDisabled("in B: patched");
+
+      ModSlider("high thresh", &n->highThresh, 0.05f, 0.99f);
+      ModSlider("low thresh", &n->lowThresh, 0.01f, 0.95f);
+      ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f");
+      const bool needsPulse = (n->op == LogicGateNode::kOpRisingEdge);
+      const bool needsRefrac = (n->op == LogicGateNode::kOpRisingEdge || n->op == LogicGateNode::kOpToggle);
+      ImGui::BeginDisabled(!needsPulse && !gParamRegisterOnly);
+      ModSlider("pulse ms", &n->pulseMs, 10.0f, 500.0f, "%.0f");
+      ImGui::EndDisabled();
+      ImGui::BeginDisabled(!needsRefrac && !gParamRegisterOnly);
+      ModSlider("refractory ms", &n->refractoryMs, 0.0f, 1000.0f, "%.0f");
+      ImGui::EndDisabled();
+      ModSlider("min presence", &n->minPresence, 0.0f, 0.9f);
+   }
+
+
+   void DrawBrainSculptParams(BrainSculptNode* n)
+   {
+      ImGui::TextDisabled("Shift-grab any wired knob to bind state");
+      ImGui::TextDisabled("%d anchors across %d params", n->TotalAnchorCount(), n->BoundParamCount());
+      if (ActionButton::Draw("Clear Anchors##brainSculptClear", ImVec2(kPreviewSize, 0)))
+      {
+         PushUndoCheckpoint();
+         n->ClearAnchors();
+      }
+      ModSlider("kernel width", &n->sigma, 0.08f, 1.2f);
+      ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f);
+      ModSlider("regularization", &n->regularization, 0.0f, 0.5f);
+   }
+
+
    void DrawRangeToRangeParams(RangeToRangeNode* n)
    {
       if (n->input == nullptr)
