@@ -649,6 +649,68 @@ bool RunBciSelftest()
       ck.Expect(meanUs < 2000.0, "M6: mean engine update under 2 ms");
    }
 
+   // 10. Prompted-blink calibration: 5 negative 200 uV blinks (OpenBCI-like polarity) on AF7/AF8 during the
+   //     Blinks phase set sign -1 and the blink size; afterwards a cued-size blink fires in Intentional mode
+   //     and a small natural one (70 uV) does not. A phase with no blinks leaves the profile uncalibrated.
+   {
+      auto run = [&](bool withBlinks, Bci::BciDspEngine& dsp, std::vector<double> later, double laterUv)
+      {
+         dsp.Reset(256.0);
+         dsp.SetPersistProfile(false);
+         dsp.SetProfile(Bci::CalibrationProfile{});
+         dsp.SetStartleGuard(false);
+         dsp.SetBlinkMode(Bci::BlinkMode::IntentionalOrDouble);
+         std::vector<double> cues = { 5.0, 7.0, 9.0, 11.0, 13.0 };
+         unsigned rng = 12345u;
+         std::vector<Bci::SampleFrame> batch(12);
+         float pins[Bci::kOutputPinCount] = {};
+         Bci::TelemetrySnapshot snap{};
+         int fires = 0;
+         bool prev = false;
+         const int total = 24 * 256;
+         for (int i = 0; i < total; i += 12)
+         {
+            if (i / 12 == 4 * 256 / 12) // batch starting near 4 s (1024 is not a multiple of 12)
+               dsp.StartBlinkCalibration(12.0);
+            for (int k = 0; k < 12; ++k)
+            {
+               const double t = (i + k) / 256.0;
+               double eog = 0.0;
+               for (double c : cues)
+                  if (withBlinks)
+                     eog -= 200.0 * std::exp(-0.5 * std::pow((t - c) / 0.05, 2.0));
+               for (double c : later)
+                  eog -= laterUv * std::exp(-0.5 * std::pow((t - c) / 0.05, 2.0));
+               for (int ch = 0; ch < Bci::kChannelCount; ++ch)
+               {
+                  rng = rng * 1664525u + 1013904223u;
+                  batch[k].ch[ch] = (float)(((rng >> 8) / 16777216.0 - 0.5) * 20.0 + (ch < 2 ? eog : 0.0));
+               }
+            }
+            dsp.Process(batch.data(), 12, pins, snap);
+            const bool on = pins[BrainSourceNode::kBlink] > 0.5f;
+            if (on && !prev && i > 17 * 256)
+               ++fires;
+            prev = on;
+         }
+         return fires;
+      };
+      Bci::BciDspEngine dsp;
+      const int bigFires = run(true, dsp, { 19.0, 21.0 }, 200.0);
+      const auto& pr = dsp.Profile();
+      std::printf("  [10] BLINK_CALIB valid=%d sign=%+.0f median=%.0f uV width=%.0f ms; cued-size fires %d/2\n",
+                  pr.blinkValid ? 1 : 0, pr.blinkSign, pr.medianBlinkUv, pr.blinkWidthMs, bigFires);
+      ck.Expect(pr.blinkValid && pr.blinkSign < 0.0f, "Blink calibration: learns negative polarity from cued blinks");
+      ck.Expect(pr.medianBlinkUv > 140.0f && pr.medianBlinkUv < 260.0f, "Blink calibration: blink size near 200 uV");
+      ck.Expect(bigFires == 2, "Blink calibration: cued-size blinks fire in Intentional mode");
+      Bci::BciDspEngine dsp2;
+      const int smallFires = run(true, dsp2, { 19.0, 21.0 }, 70.0);
+      ck.Expect(smallFires == 0, "Blink calibration: small natural blinks do not fire");
+      Bci::BciDspEngine dsp3;
+      run(false, dsp3, {}, 0.0);
+      ck.Expect(!dsp3.Profile().blinkValid, "Blink calibration: no blinks, no fit");
+   }
+
    std::printf("BCI_SELFTEST: passed=%d failed=%d %s\n",
                ck.passed, ck.failed, ck.failed == 0 ? "OK" : "FAIL");
    return ck.failed == 0;

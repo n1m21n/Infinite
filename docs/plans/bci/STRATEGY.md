@@ -169,7 +169,7 @@ To be filled after each block, linked to §6 and §7.
 | Baseline | 1/1 subject | n/a (avg only) | fail (same mandala) | synthetic only | fail (weights) | n/a |
 | A | PhysioNet 72.5% (avg-only 57%) · GIPSA 100% (90%) · HEROIC Muse 50% (37.5%) | **fail as written** (best region beats avg 26–50%); reframed: per-person LDA beats avg in 73% HEROIC / 88% PhysioNet sessions | not run (Block B) | real data in selftest [7] | **pass**: weights learned per person at calibration | not measured |
 | B | — | — | proxy: **0.92** with the state strip · raw image 0.74 · raw audio 0.86 (126 pairs); human blind run **10/10 pass** (picture only, strip-led) | — | **pass**: image z-scored on own eyes-open calibration, audio on own baseline amplitude | not measured |
-| C | — | — | starter on synthetic: calm alpha luma 0.41 vs focus 0.13–0.16, −13.6 vs −24.2 LUFS | **fail**: best (All blinks) hit 87–91%, 1.7–2.7 false/min; default Intentional 33–71% hit (see C detail) | pass (no new weights; Brain Sculpt learns by example) | **pass**: 0.10 ms mean, 0.19 ms worst per update (bar 2 ms) |
+| C | — | — | starter on synthetic: calm alpha luma 0.41 vs focus 0.13–0.16, −13.6 vs −24.2 LUFS | **fail**: with cued-blink calibration, All blinks hit 90–98% at 1.1–2.2 false/min; Intentional 61–78% at 0.6–1.8 (see C detail) | pass (no new weights; Brain Sculpt learns by example) | **pass**: 0.10 ms mean, 0.19 ms worst per update (bar 2 ms) |
 
 ### Block A detail (2026-11-19)
 
@@ -248,7 +248,9 @@ A hit is a Blink-pin edge within −0.25..+0.75 s of a label. Any other edge is 
 | Before (positive pulses only) | All blinks | 0.80 / 2.1 | 0.76 / 3.8 | 0.62 / 2.1 |
 | Before, sign flipped by hand | All blinks | 0.92 / 3.6 | 0.98 / 2.5 | 0.88 / 1.2 |
 | **Now** (polarity vote + hysteresis) | All blinks | 0.87 / 2.7 | 0.91 / 2.4 | 0.89 / 1.7 |
-| **Now** | Intentional (default) | 0.71 / 1.8 | 0.41 / 0.7 | 0.33 / 1.0 |
+| Polarity vote, no calibration | Intentional (default) | 0.71 / 1.8 | 0.41 / 0.7 | 0.33 / 1.0 |
+| **Cued-blink calibration** | All blinks | 0.90 / 2.2 | 0.98 / 1.6 | 0.94 / 1.1 |
+| **Cued-blink calibration** | Intentional (default) | 0.78 / 1.8 | 0.61 / 0.6 | 0.66 / 0.7 |
 
 Bar: hit ≥ 0.95, false ≤ 1/min. **Fail** in every set and mode.
 
@@ -262,6 +264,14 @@ Engine changes kept:
 Selftest after the change: 351 passed, 0 failed.
 
 Tried and dropped: skew-sign polarity (it swings on some people) and a 40% exit (more misses).
+
+**Cued-blink calibration** (added after the first M4 run). Calibration gains a third phase, "Blink 5 times"
+(12 s), after eyes open / closed. The largest blink-shaped pulses in it (40–350 ms wide at half height,
+0.3 s apart) set the sign (majority of up to 8), the blink size and the width (median of 5). Once set,
+polarity stops voting and the size stops adapting. Threshold = 0.5 × size (min 30 µV); Intentional fires on
+≥ 0.8 × size, ≥ 0.8 × width, or a double blink. Replay: each person's first 5 labelled blinks are the
+phase (`blink_m4.py --cal`), scored after it. Helps every set (Intentional VR 0.33 → 0.66) but still fails.
+Two tuning rounds, then stopped. Selftest [10] BLINK_CALIB: 356 passed, 0 failed.
 
 ## 11. Critique
 
@@ -295,6 +305,9 @@ Tried and dropped: skew-sign polarity (it swings on some people) and a 40% exit 
   (135 µV median) fits nobody in particular.
 - **M4 as written mixes two jobs.** A toggle should fire on deliberate blinks and ignore natural ones,
   but the VV/VR labels are natural blinks. The fair test is EEG-IO (cued blinks) in Intentional mode.
+- **Cued calibration halves the gap, not closes it.** Natural blinks overlap cued ones in size and width,
+  so a single-blink toggle can't separate them on amplitude alone. A double blink is the likelier toggle
+  gesture, but no labelled double-blink data exists to score it.
 - **Block C: nothing has touched a real headset.** Ship / iterate / abandon can't be decided before that.
 
 ## 12. Next steps
@@ -309,7 +322,8 @@ Tried and dropped: skew-sign polarity (it swings on some people) and a 40% exit 
    ship / iterate / abandon waits for a Muse session.
 7. M4 fix: add a prompted-blink step to calibration (5 blinks on cue) that sets each person's blink
    threshold, width and polarity. Then re-score EEG-IO in Intentional mode, using each person's first
-   5 cued blinks as the calibration. Bar unchanged.
+   5 cued blinks as the calibration. Bar unchanged. **Done:** helps (Intentional IO 0.71 → 0.78,
+   VR 0.33 → 0.66) but still fails. Next: score a double-blink toggle on a Muse session with cued doubles.
 
 ---
 

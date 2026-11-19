@@ -288,6 +288,83 @@ void BciDspEngine::StartCalibration()
    }
 }
 
+void BciDspEngine::StartBlinkCalibration(double seconds)
+{
+   mCalibPhase = CalibrationPhase::Blinks;
+   mCalibElapsedSec = 0.0;
+   mBlinkPhaseLen = std::max(2.0, seconds);
+   mCalibBlinkSig.clear();
+   mCalibBlinkSig.reserve((size_t)(mBlinkPhaseLen * mSampleRate) + 64);
+}
+
+// The largest blink-shaped pulses of the Blinks phase (0.3 s apart, 40..350 ms at half height) give
+// the polarity (majority of up to 8) and the size and width (median of up to 5 of that sign). Fewer than 3 clear same-sign pulses (no blinks, a dead lead): keep the previous blink settings.
+void BciDspEngine::FinishBlinkCalibration()
+{
+   const std::vector<float>& s = mCalibBlinkSig;
+   const size_t n = s.size();
+   if (n > 16)
+   {
+      const float med = MedianOf(s);
+      std::vector<float> dev(n);
+      for (size_t i = 0; i < n; ++i)
+         dev[i] = std::fabs(s[i] - med);
+      const float floorUv = std::max(50.0f, 5.0f * 1.4826f * MedianOf(dev));
+      std::vector<size_t> order(n);
+      std::iota(order.begin(), order.end(), (size_t)0);
+      std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return std::fabs(s[a]) > std::fabs(s[b]); });
+      const size_t gap = (size_t)(0.3 * mSampleRate);
+      // Width at half the pulse's own height: blinks are 40..350 ms, eye movements and drift are wider.
+      auto halfWidthMs = [&](size_t p)
+      {
+         const float h = 0.5f * s[p];
+         size_t a = p, b = p;
+         while (a > 0 && s[a - 1] * h > h * h)
+            --a;
+         while (b + 1 < n && s[b + 1] * h > h * h)
+            ++b;
+         return (float)((b - a + 1) * 1000.0 / mSampleRate);
+      };
+      std::vector<size_t> cand; // up to 8 blink-shaped pulses, largest first, 0.3 s apart
+      for (size_t i : order)
+      {
+         if (cand.size() == 8 || std::fabs(s[i]) < floorUv)
+            break;
+         bool clear = true;
+         for (size_t p : cand)
+            clear = clear && (i > p ? i - p : p - i) >= gap;
+         if (!clear)
+            continue;
+         const float wMs = halfWidthMs(i);
+         if (wMs >= 40.0f && wMs <= 350.0f)
+            cand.push_back(i);
+      }
+      int vote = 0;
+      for (size_t p : cand)
+         vote += s[p] > 0.0f ? 1 : -1;
+      const float sign = vote >= 0 ? 1.0f : -1.0f;
+      std::vector<float> amps, widths;
+      for (size_t p : cand)
+         if (s[p] * sign > 0.0f && amps.size() < 5)
+         {
+            amps.push_back(s[p] * sign);
+            widths.push_back(halfWidthMs(p));
+         }
+      if (amps.size() >= 3)
+      {
+         mProfile.medianBlinkUv = std::clamp(MedianOf(amps), 60.0f, 400.0f);
+         mProfile.blinkWidthMs = std::clamp(MedianOf(widths), 40.0f, 600.0f);
+         mProfile.blinkSign = sign;
+         mProfile.blinkValid = true;
+         mBlinkSign = sign;
+      }
+   }
+   mCalibBlinkSig.clear();
+   mCalibPhase = CalibrationPhase::Complete;
+   if (mPersistProfile)
+      SaveProfile();
+}
+
 void BciDspEngine::CancelCalibration()
 {
    mCalibPhase = CalibrationPhase::Idle;
@@ -313,6 +390,9 @@ bool BciDspEngine::SaveProfile(const std::string& path) const
        << "  \"valid\": " << (mProfile.valid ? "true" : "false") << ",\n"
        << "  \"iafHz\": " << mProfile.iafHz << ",\n"
        << "  \"medianBlinkUv\": " << mProfile.medianBlinkUv << ",\n"
+       << "  \"blinkValid\": " << (mProfile.blinkValid ? "true" : "false") << ",\n"
+       << "  \"blinkSign\": " << mProfile.blinkSign << ",\n"
+       << "  \"blinkWidthMs\": " << mProfile.blinkWidthMs << ",\n"
        << "  \"medianJawUv\": " << mProfile.medianJawUv << ",\n"
        << "  \"baselineArousal\": " << mProfile.baselineArousal << ",\n"
        << "  \"baselineAlpha\": " << mProfile.baselineAlpha << ",\n"
@@ -378,6 +458,9 @@ bool BciDspEngine::LoadProfile(const std::string& path)
    prof.iafHz = std::clamp(parseFloat("iafHz", 10.0f), 7.5f, 13.0f);
    prof.medianBlinkUv = std::clamp(parseFloat("medianBlinkUv", 135.0f), 60.0f, 400.0f);
    prof.medianJawUv = std::clamp(parseFloat("medianJawUv", 42.0f), 15.0f, 200.0f);
+   prof.blinkValid = content.find("\"blinkValid\": true") != std::string::npos;
+   prof.blinkSign = parseFloat("blinkSign", 1.0f) < 0.0f ? -1.0f : 1.0f;
+   prof.blinkWidthMs = std::clamp(parseFloat("blinkWidthMs", 150.0f), 40.0f, 600.0f);
    prof.baselineArousal = std::clamp(parseFloat("baselineArousal", 0.0f), -2.0f, 2.0f);
    prof.baselineAlpha = std::clamp(parseFloat("baselineAlpha", 0.35f), 0.05f, 0.95f);
    prof.baselineTheta = std::clamp(parseFloat("baselineTheta", 0.25f), 0.05f, 0.95f);
@@ -484,9 +567,9 @@ void BciDspEngine::FinishCalibration()
    mCalibFeatClosed.clear();
 
    mProfile.valid = true;
-   mCalibPhase = CalibrationPhase::Complete;
    if (mPersistProfile)
       SaveProfile();
+   StartBlinkCalibration(kBlinkPhaseSec);
 }
 
 void BciDspEngine::ComputeWelchCorticalPsd()
@@ -912,6 +995,12 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
          if (mCalibElapsedSec >= kCalibPhaseSec)
             FinishCalibration();
       }
+      else if (mCalibPhase == CalibrationPhase::Blinks)
+      {
+         mCalibElapsedSec += dt;
+         if (mCalibElapsedSec >= mBlinkPhaseLen)
+            FinishBlinkCalibration();
+      }
 
       // 1. Preprocessing (0.5 Hz DC HP + 50/60 Hz Notch)
       double clean[kChannelCount];
@@ -957,6 +1046,11 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       // Blink polarity depends on headset and reference (Muse vs OpenBCI). Vote with the time spent past
       // the blink threshold on each side (tau 60 s): blinks are the large, frequent, one-sided pulses,
       // eye movements and drift split both ways. Flip only when the other side leads 1.5 : 1.
+      if (mCalibPhase == CalibrationPhase::Blinks)
+         mCalibBlinkSig.push_back((float)sBlinkRaw);
+      if (mProfile.blinkValid)
+         mBlinkSign = mProfile.blinkSign; // set by the prompted blinks
+      else
       {
          const float th = std::max(55.0f, 0.55f * mProfile.medianBlinkUv);
          const double decay = std::exp(-dt / 60.0);
@@ -983,7 +1077,9 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       const float browRms = (float)std::sqrt(std::max(0.0, mBrowRmsSq));
 
       // Blink Pulse Width & Amplitude Discrimination (Gap 1: Reflex vs Intentional)
-      const float blinkThreshUv = std::max(55.0f, 0.55f * mProfile.medianBlinkUv);
+      // Calibrated: half the person's cued blink. Otherwise a population default.
+      const float blinkThreshUv = mProfile.blinkValid ? std::max(30.0f, 0.5f * mProfile.medianBlinkUv)
+                                                      : std::max(55.0f, 0.55f * mProfile.medianBlinkUv);
       // Hysteresis: a pulse ends below 70 % of the threshold, so one blink that dips mid-way is not
       // split in two (the second half would read as a double blink).
       if (sBlink > blinkThreshUv || (mBlinkInPulse && sBlink > 0.7f * blinkThreshUv))
@@ -1011,7 +1107,10 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       {
          const float widthMs = (float)(mBlinkPulseSamples * dt * 1000.0);
          const bool isDouble = (mStreamTimeSec - mLastBlinkEndSec) < 0.38;
-         const bool isIntentional = (widthMs >= 135.0f) || (mBlinkPeakUv >= 1.35f * mProfile.medianBlinkUv) || isDouble;
+         // Calibrated: a blink as big or as long as the cued ones is deliberate. Otherwise fixed rules.
+         const bool isIntentional = mProfile.blinkValid
+            ? (mBlinkPeakUv >= 0.8f * mProfile.medianBlinkUv || widthMs >= 0.8f * mProfile.blinkWidthMs || isDouble)
+            : ((widthMs >= 135.0f) || (mBlinkPeakUv >= 1.35f * mProfile.medianBlinkUv) || isDouble);
          const bool allowFire = (mBlinkMode == BlinkMode::AllBlinks) || isIntentional;
 
          if (allowFire && !startleActive && mStreamTimeSec >= mBlinkRefractoryUntilSec)
@@ -1022,7 +1121,7 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
             batchBlinkFired = true;
          }
          // Update median blink baseline gently on vegetative blinks
-         if (widthMs >= 45.0f && widthMs < 130.0f)
+         if (!mProfile.blinkValid && widthMs >= 45.0f && widthMs < 130.0f)
             mProfile.medianBlinkUv = mProfile.medianBlinkUv * 0.9f + mBlinkPeakUv * 0.1f;
 
          mLastBlinkEndSec = mStreamTimeSec;
@@ -1179,7 +1278,8 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
    outTelemetry.startleMasked = startleActive;
    outTelemetry.calibrating = IsCalibrating();
    outTelemetry.calibPhase = mCalibPhase;
-   outTelemetry.calibProgress = IsCalibrating() ? Clamp01((float)(mCalibElapsedSec / kCalibPhaseSec)) : 0.0f;
+   const double phaseLen = mCalibPhase == CalibrationPhase::Blinks ? mBlinkPhaseLen : kCalibPhaseSec;
+   outTelemetry.calibProgress = IsCalibrating() ? Clamp01((float)(mCalibElapsedSec / phaseLen)) : 0.0f;
    outTelemetry.sampleRateHz = mSampleRate;
    for (int c = 0; c < kChannelCount; ++c)
       outTelemetry.regionAlpha[c] = mRegionAlpha[c];

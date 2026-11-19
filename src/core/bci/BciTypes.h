@@ -73,6 +73,7 @@ namespace Bci
       Idle = 0,
       EyesOpen,
       EyesClosed,
+      Blinks, // "blink 5 times": sets the person's blink size, width and polarity
       Complete
    };
 
@@ -91,6 +92,11 @@ namespace Bci
       float chanMean[kChannelCount] = { 0.0f, 0.0f, 0.0f, 0.0f };
       float chanMad[kChannelCount] = { 12.0f, 12.0f, 12.0f, 12.0f };
       float medianBlinkUv = 135.0f;
+      // Prompted-blink calibration (CalibrationPhase::Blinks). When valid, medianBlinkUv is the median
+      // cued blink and the blink polarity is fixed instead of voted.
+      bool blinkValid = false;
+      float blinkSign = 1.0f;
+      float blinkWidthMs = 150.0f;
       float medianJawUv = 42.0f;
       float baselineArousal = 0.0f;
       float baselineAlpha = 0.35f;

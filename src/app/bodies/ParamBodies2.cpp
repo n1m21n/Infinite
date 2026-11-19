@@ -1165,9 +1165,9 @@ namespace app
       dl->PopClipRect();
       AudioViz::Border(dl, sTl, sBr);
 
-      // 3. Action row: Calibrate 15s + Rec Take + Synthetic Gesture triggers
+      // 3. Action row: Calibrate (30 s open, 30 s closed, 12 s blinks) + Rec Take + Synthetic Gesture triggers
       const float btnW = (w - 4.0f) * 0.5f;
-      if (ActionButton::Draw(snap.calibrating ? "Cancel Cal##bciCal" : "Calibrate 15s##bciCal", ImVec2(btnW, 0)))
+      if (ActionButton::Draw(snap.calibrating ? "Cancel Cal##bciCal" : "Calibrate##bciCal", ImVec2(btnW, 0)))
       {
          if (snap.calibrating) n->CancelCalibration();
          else n->StartCalibration();
@@ -1182,8 +1182,10 @@ namespace app
 
       if (snap.calibrating)
       {
-         const char* phaseStr = (snap.calibPhase == Bci::CalibrationPhase::EyesOpen) ? "Eyes Open" : "Eyes Closed";
-         ImGui::TextDisabled("Calibrating (%s): %.0f%%", phaseStr, snap.calibProgress * 100.0f);
+         const char* phaseStr = snap.calibPhase == Bci::CalibrationPhase::EyesOpen     ? "Eyes open"
+                                : snap.calibPhase == Bci::CalibrationPhase::EyesClosed ? "Eyes closed"
+                                                                                       : "Blink 5 times";
+         ImGui::TextDisabled("%s: %.0f%%", phaseStr, snap.calibProgress * 100.0f);
       }
 
       if (n->device == BrainSourceNode::kDeviceSynthetic)

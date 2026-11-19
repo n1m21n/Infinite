@@ -28,7 +28,14 @@ namespace Bci
       // Gap 6: Calibration & profile persistence
       void StartCalibration();
       void CancelCalibration();
-      bool IsCalibrating() const { return mCalibPhase == CalibrationPhase::EyesOpen || mCalibPhase == CalibrationPhase::EyesClosed; }
+      // The last calibration phase on its own (also run by StartCalibration after eyes closed).
+      void StartBlinkCalibration(double seconds = kBlinkPhaseSec);
+      bool IsCalibrating() const
+      {
+         return mCalibPhase == CalibrationPhase::EyesOpen || mCalibPhase == CalibrationPhase::EyesClosed ||
+                mCalibPhase == CalibrationPhase::Blinks;
+      }
+      static constexpr double kBlinkPhaseSec = 12.0;
       const CalibrationProfile& Profile() const { return mProfile; }
       void SetProfile(const CalibrationProfile& prof) { mProfile = prof; }
       void SetPersistProfile(bool persist) { mPersistProfile = persist; } // false: calibration never writes disk (tests)
@@ -71,6 +78,7 @@ namespace Bci
       void RebuildFilters();
       void ComputeWelchCorticalPsd();
       void FinishCalibration();
+      void FinishBlinkCalibration();
       void UpdateStateFeatures(const double (&chanPsd)[kChannelCount][48], double binHz);
       bool FitStateWeights();
       void UpdateImageColumn(const double (&chanPsd)[kChannelCount][48], double binHz);
@@ -190,6 +198,8 @@ namespace Bci
       static constexpr double kCalibSettleSec = 4.0;
       CalibrationPhase mCalibPhase = CalibrationPhase::Idle;
       double mCalibElapsedSec = 0.0;
+      double mBlinkPhaseLen = kBlinkPhaseSec;
+      std::vector<float> mCalibBlinkSig; // blink-band signal (signed) during the Blinks phase
       CalibrationProfile mProfile;
       std::vector<float> mCalibChanSamples[kChannelCount];
       std::vector<float> mCalibClosedAlphaBins;
