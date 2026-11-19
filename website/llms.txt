@@ -86,6 +86,9 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [UTCP Protocol Manual](https://infinitedevices.org/utcp.json): Universal Tool Calling Protocol specification for autonomous AI agents without MCP daemons
 - [Library](https://infinitedevices.org/library.html): free templates, community patches and Field devices to download
 - [Free unlimited samples](https://infinitedevices.org/samples/): generate drum loops, kicks, snares, hats, bass, keys, pads and textures in the browser in any key and scale, and download them as wav and inf, free for commercial use with credit
+- [Free online music visualizer](https://infinitedevices.org/visualizer/): turn any MP3/WAV or built-in synth loop into audio-reactive WebGL art in 16:9, 9:16, or 1:1, with a Generate button and video + .inf export
+- [Free 3D text & logo loop maker](https://infinitedevices.org/3d/): type text or drop an SVG logo, pick Chrome, Glass, Neon, Matte, or Gold materials, and export 3D loops, PNGs, or .inf patches in the browser
+- [Free SFX & ambient soundscape maker](https://infinitedevices.org/sfx/): generate game sound effects (laser, coin, jump, explosion, click) and ambient soundscapes (rain, cyber hum, lo-fi pad) in the browser and download .wav and .inf
 - [Extensions](https://infinitedevices.org/library.html#extensions): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
 - [Library catalog (JSON)](https://infinitedevices.org/assets/library/catalog.json): every library item with description, category and file URL
 - [Benchmarks](https://infinitedevices.org/benchmarks.html): measured CPU, latency, memory and video quality for Infinite against Ableton Live, Bitwig, Logic, Vital, VCV Rack, Blender, TouchDesigner and more, with method and limits stated

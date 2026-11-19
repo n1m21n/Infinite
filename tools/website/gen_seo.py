@@ -178,7 +178,7 @@ def main():
         posts = []
     blog_pages = [("blog/", 0.8)] + [("blog/" + q["slug"] + ".html", 0.7) for q in posts if "slug" in q]
     embed_pages = [("embeds/" + i["slug"] + ".html", 0.7) for i in json.load(open(os.path.join(W, "embeds/embeds.json")))["items"]]
-    pages = [("", 1.0), ("manual/", 0.9), ("manual/headless/", 0.8), ("manual/field/", 0.8), ("library.html", 0.8), ("samples/", 0.9), ("piano/", 0.7)] + blog_pages + embed_pages + [("plugin.html", 0.9), ("buy.html", 0.9), ("releases.html", 0.7), ("developers.html", 0.7), ("chat.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("privacy.html", 0.3), ("refund.html", 0.3), ("terms.html", 0.3), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3), ("llms.txt", 0.6), ("llms-full.txt", 0.5)]
+    pages = [("", 1.0), ("manual/", 0.9), ("manual/headless/", 0.8), ("manual/field/", 0.8), ("library.html", 0.8), ("samples/", 0.9), ("visualizer/", 0.9), ("3d/", 0.9), ("sfx/", 0.9), ("piano/", 0.7)] + blog_pages + embed_pages + [("plugin.html", 0.9), ("buy.html", 0.9), ("releases.html", 0.7), ("developers.html", 0.7), ("chat.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("privacy.html", 0.3), ("refund.html", 0.3), ("terms.html", 0.3), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3), ("llms.txt", 0.6), ("llms-full.txt", 0.5)]
     seen = set(); urls = []
     for u, pr in pages + [(f"library/{i['id']}.html", 0.5) for i in its] + [(u, 0.8 if u == "nodes/" else 0.5) for u in gen_nodes.sitemap_paths()]:
         if u not in seen:   # one <loc> per page: the same page can come from more than one list
@@ -297,6 +297,9 @@ def main():
         f"- [UTCP Protocol Manual]({BASE}utcp.json): Universal Tool Calling Protocol specification for autonomous AI agents without MCP daemons",
         f"- [Library]({BASE}library.html): free templates, community patches and Field devices to download",
         f"- [Free unlimited samples]({BASE}samples/): generate drum loops, kicks, snares, hats, bass, keys, pads and textures in the browser in any key and scale, and download them as wav and inf, free for commercial use with credit",
+        f"- [Free online music visualizer]({BASE}visualizer/): turn any MP3/WAV or built-in synth loop into audio-reactive WebGL art in 16:9, 9:16, or 1:1, with a Generate button and video + .inf export",
+        f"- [Free 3D text & logo loop maker]({BASE}3d/): type text or drop an SVG logo, pick Chrome, Glass, Neon, Matte, or Gold materials, and export 3D loops, PNGs, or .inf patches in the browser",
+        f"- [Free SFX & ambient soundscape maker]({BASE}sfx/): generate game sound effects (laser, coin, jump, explosion, click) and ambient soundscapes (rain, cyber hum, lo-fi pad) in the browser and download .wav and .inf",
         f"- [Extensions]({BASE}library.html#extensions): optional packs (hand, face and pose tracking), installed live from Settings, Extensions",
         f"- [Library catalog (JSON)]({BASE}assets/library/catalog.json): every library item with description, category and file URL",
         f"- [Benchmarks]({BASE}benchmarks.html): measured CPU, latency, memory and video quality for Infinite against Ableton Live, Bitwig, Logic, Vital, VCV Rack, Blender, TouchDesigner and more, with method and limits stated",

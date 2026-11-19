@@ -1,0 +1,210 @@
+/* Shared layout for browser-native Infinite studio tools (/visualizer/, /3d/, /sfx/) */
+.st-wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: clamp(28px, 4vw, 52px) clamp(16px, 3vw, 28px) 84px;
+}
+.st-head {
+  max-width: 720px;
+  margin-bottom: 24px;
+}
+.st-kicker {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 8px;
+}
+.st-title {
+  font-size: clamp(28px, 4.2vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  margin: 0 0 12px;
+}
+.st-sub {
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+}
+.st-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .st-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.st-stage-card,
+.st-panel {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: var(--r);
+  padding: 18px;
+}
+.st-stage-box {
+  position: relative;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--hair);
+  border-radius: calc(var(--r) - 4px);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+.st-stage-box[data-aspect="16:9"] { aspect-ratio: 16 / 9; }
+.st-stage-box[data-aspect="9:16"] { aspect-ratio: 9 / 16; max-height: 540px; margin: 0 auto; }
+.st-stage-box[data-aspect="1:1"] { aspect-ratio: 1 / 1; max-height: 520px; margin: 0 auto; }
+.st-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.st-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+.st-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.st-btn {
+  appearance: none;
+  border: 1px solid var(--hair);
+  background: var(--bg);
+  color: var(--ink);
+  font: 500 13px/1 var(--sans, inherit);
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  transition: border-color 0.15s, background-color 0.15s, transform 0.12s;
+}
+.st-btn:hover {
+  border-color: var(--accent);
+}
+.st-btn.is-primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.st-btn.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.st-btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.st-ctrl {
+  margin-bottom: 14px;
+}
+.st-ctrl:last-child {
+  margin-bottom: 0;
+}
+.st-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+.st-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+.st-input,
+.st-select {
+  width: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 14px;
+}
+.st-range {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.st-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.st-chip {
+  appearance: none;
+  border: 1px solid var(--hair);
+  background: var(--bg);
+  color: var(--muted);
+  font: 500 12px/1 var(--sans, inherit);
+  padding: 7px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.st-chip.is-active {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.st-drop {
+  border: 1px dashed var(--hair);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  margin-bottom: 14px;
+}
+.st-drop:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.st-status {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 10px;
+  min-height: 18px;
+}
+.st-cta {
+  margin-top: 24px;
+  padding: 18px 20px;
+  border-radius: var(--r);
+  border: 1px solid var(--hair);
+  background: var(--surface);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+.st-cta p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.st-cta strong {
+  color: var(--ink);
+}
