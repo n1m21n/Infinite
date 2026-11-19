@@ -15,6 +15,8 @@
 
 #include "gl3.h"
 #include "engine/Scene.h"
+#include "engine/Ies.h"
+#include "platform/AppPaths.h"
 #include "engine/rhi/Rhi.h"
 #include <algorithm>
 #include <chrono>
@@ -746,6 +748,7 @@ bool Render3DNode::CookEngine(int frameId)
    }
 
    // Lights: rig, then light nodes, then the built-in one.
+   std::vector<const std::vector<float>*> iesUsed;
    auto addLight = [&](const RigLight& l)
    {
       if ((int)fr.lights.size() >= engine::kMaxLights)
@@ -758,6 +761,15 @@ bool Render3DNode::CookEngine(int frameId)
       e.castShadow = l.castShadow;
       e.areaW = std::max(0.001f, l.areaW); e.areaH = std::max(0.001f, l.areaH);
       e.areaShape = l.areaShape; e.areaSpread = l.areaSpread;
+      // Row 4.2: an IES profile, its table appended to the frame's (one copy per file).
+      if (!l.ies.empty() && (e.type == engine::LightType::Point || e.type == engine::LightType::Spot))
+         if (auto tab = engine::LoadIes(AppPaths::FsPath(l.ies)))
+         {
+            int row = -1;
+            for (size_t k = 0; k < iesUsed.size(); k++) if (iesUsed[k] == tab.get()) row = (int)k;
+            if (row < 0) { row = (int)iesUsed.size(); iesUsed.push_back(tab.get()); fr.ies.insert(fr.ies.end(), tab->begin(), tab->end()); }
+            e.iesRow = row;
+         }
       // A sun's disc from the light's shadow softness, as GL sizes its shadow (0.526 degrees, the real sun, at 1).
       if (e.type == engine::LightType::Directional || e.type == engine::LightType::Sun) e.sunAngleDeg = 0.526f * std::max(0.0f, l.shadowSoft);
       fr.lights.push_back(e);
@@ -900,7 +912,7 @@ bool Render3DNode::CookEngine(int frameId)
    };
    mix(fr.viewProj, 64); mix(&fr.lensRadius, 8); mix(fr.bokeh, 12); mix(&fr.lensCatEye, 12); mix(&fr.bloom, 12); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
    mix(&fr.envRev, 8); mix(&fr.envRotationRad, 4); mix(&fr.envBackground, 1);
-   mix(&fr.fogDensity, 12); // density, anisotropy, falloff mix(fr.fogColor, 36);
+   mix(&fr.fogDensity, 12); mix(fr.fogColor, 36); // density, anisotropy, falloff; colour, box
    for (size_t ii = 0; ii < fr.instances.size(); ii++)
    {
       const engine::Instance& in = fr.instances[ii];
@@ -916,7 +928,13 @@ bool Render3DNode::CookEngine(int frameId)
    }
    if (fieldUsesTime) mix(&fr.fieldTime, 4); // a program that reads t never settles
    for (const engine::TextureData& t : fr.textures) mix(&t.key, 8);
-   for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); const int cs = l.castShadow ? 1 : 0; mix(&cs, 4); }
+   for (const engine::Light& l : fr.lights)
+   {
+      mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); const int cs = l.castShadow ? 1 : 0; mix(&cs, 4);
+      mix(&l.spotAngleDeg, 16); mix(&l.areaShape, 4); mix(&l.areaSpread, 4); mix(&l.diffuse, 8); mix(&l.falloff, 8);
+      mix(&l.sunAngleDeg, 4); mix(&l.iesRow, 4); { const int ty = (int)l.type; mix(&ty, 4); }
+   }
+   if (!fr.ies.empty()) mix(fr.ies.data(), fr.ies.size() * sizeof(float));
    const bool changed = hsh != E.sceneHash;
    E.sceneHash = hsh;
    if (changed || meshesChanged) E.upReset = true;

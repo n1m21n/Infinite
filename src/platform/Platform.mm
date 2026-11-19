@@ -486,6 +486,30 @@ namespace Platform
       }
    }
 
+   std::string OpenIesDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Open IES profile"];
+         if (@available(macOS 11.0, *))
+         {
+            UTType* t = [UTType typeWithFilenameExtension:@"ies"];
+            if (t != nil)
+               [panel setAllowedContentTypes:@[ t ]];
+         }
+         if (PanelRunModal(panel) != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         if (url == nil)
+            return std::string();
+         return std::string([[url path] UTF8String]);
+      }
+   }
+
    bool LoadImageFloatRGB(const std::string& path, std::vector<float>& outPixels,
                           int& outWidth, int& outHeight, std::string& outError)
    {

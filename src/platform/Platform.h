@@ -121,6 +121,8 @@ namespace Platform
    // do not recognise .hdr, so this needs its own panel rather than reusing
    // OpenImageDialog - the same reason OpenModelDialog is separate from it.
    std::string OpenHdrDialog();
+   // Native open panel for an IES photometric profile (.ies), for the Light node.
+   std::string OpenIesDialog();
 
    // Decodes anything ImageIO can open (notably .exr, which macOS has read
    // natively since Ventura) into linear float RGB, via a CGBitmapContext in

@@ -123,6 +123,7 @@ namespace engine
       float cutoff = 0.0f;  // 0 = none
       bool castShadow = true; // false: this light is never blocked
       float sunAngleDeg = 0.0f; // directional / sun: degrees across its disc (0 = a point); softens its highlight and settled shadow
+      int iesRow = -1;          // point / spot: its IES table in Frame::ies (row of kIesRow floats, Ies.h); -1 = none
    };
 
    // One shadow-casting light (the first), a depth map fitted to the scene bounds. Spot and directional/sun only.
@@ -142,6 +143,7 @@ namespace engine
       std::vector<TextureData> textures; // up to kMaxTextures; maps past that fall back to the plain material
       std::vector<InstanceBatch> batches;
       std::vector<Light> lights; // up to kMaxLights
+      std::vector<float> ies;    // the lights' IES tables, kIesRow floats each (Ies.h), indexed by Light::iesRow
       float viewProj[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }; // GL clip space, z in -1..1
       float eye[3] = { 0, 0, 5 };
       float exposure = 1.0f;

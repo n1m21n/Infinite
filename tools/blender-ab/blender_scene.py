@@ -680,6 +680,12 @@ for i, l in enumerate(scene.get("lights", [])):
     if kind == "SPOT":
         ld.spot_size = math.radians(2 * l["spot_angle"])  # Blender: full cone angle
         ld.spot_blend = l.get("blend", 0.2)
+    if kind in ("POINT", "SPOT") and l.get("ies"):
+        # Row 4.2: the profile through an IES Texture into the light's emission strength.
+        ld.use_nodes = True
+        ies = ld.node_tree.nodes.new("ShaderNodeTexIES"); ies.mode = 'EXTERNAL'; ies.filepath = os.path.join(ASSETS, l["ies"])
+        em = next(n for n in ld.node_tree.nodes if n.type == "EMISSION")
+        ld.node_tree.links.new(ies.outputs[0], em.inputs["Strength"])
     lo = bpy.data.objects.new("l%d" % i, ld); sc.collection.objects.link(lo)
     lo.location = spherical(l["azimuth"], l["elevation"], l.get("distance", 10))
     aim(lo, (0, 0, 0))

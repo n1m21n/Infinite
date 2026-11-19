@@ -37,3 +37,8 @@ Notice: "Materials Variants Shoe", from the Khronos glTF-Sample-Assets, licensed
 (https://creativecommons.org/licenses/by/4.0/); the Khronos model page credits Shopify (2020) as the author
 (only `LICENSE.md` is on disk, so check the page's README before publishing). The licence excludes logos and
 associated trademarks. Any published picture of this case carries this credit line.
+
+## IES profile (case `light_ies`)
+
+`ies_batwing.ies` is synthetic, written for the A/B (row 4.2): a type C batwing, 0-90 degrees vertical, brightest
+near 45 degrees, half again as bright toward horizontal 0 as at 180, so both angles are checked. No licence needed.

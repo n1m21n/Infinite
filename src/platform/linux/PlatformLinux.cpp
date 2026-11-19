@@ -354,6 +354,16 @@ namespace Platform
       return res ? std::string(res) : std::string();
    }
 
+   std::string OpenIesDialog()
+   {
+      if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
+      EnsureDialogBackendChecked();
+      const char* const filterPatterns[] = { "*.ies" };
+      const char* res = tinyfd_openFileDialog("Choose IES profile", "", 1, filterPatterns, "IES profiles (*.ies)", 0);
+      return res ? std::string(res) : std::string();
+   }
+
    std::string OpenModelDialog()
    {
       if (IsHeadlessOrExitAfter()) return "";

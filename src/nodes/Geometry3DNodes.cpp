@@ -1,4 +1,6 @@
 #include "Geometry3DNodes.h"
+#include "engine/Ies.h"
+#include "platform/AppPaths.h"
 #include "Render3DTonemap.h"
 #include "Render3DSheen.h"
 #include "Render3DThinFilm.h"
@@ -560,6 +562,9 @@ namespace
       "uniform vec2 uLightArea[64];\n"
       "uniform vec4 uLightTerms[64];\n"   // diffuse, specular, transmission, falloff (< 0: hard)
       "uniform float uLightCutoff[64];\n"  // no light past this distance; 0 = none
+      // Row 4.2: point / spot keep an IES row + 1 in uLightArea.y (0 = none): four profiles x 32 vertical samples
+      // (0..180 degrees off the aim), azimuth-averaged, four to a vec4.
+      "uniform vec4 uIesTab[32];\n"
       "float lightFalloff(float dist, float k) {\n"
       "   if (k >= 0.0) return 1.0 / (1.0 + dist * dist * k);\n"
       "   return min(1.0 / max(dist * dist * -k, 1e-4), 20.0);\n"
@@ -1343,6 +1348,12 @@ namespace
       "            if (smoothW > 0.0) spotAtten *= smoothstep(0.0, smoothW, cosCur - cosOuter);\n"
       "            attenuation *= spotAtten;\n"
       "         }\n"
+      "         if (uLightArea[i].y > 0.5) {\n"
+      "            int ir = (int(uLightArea[i].y + 0.5) - 1) * 32;\n"
+      "            float th = acos(clamp(dot(-lightDir, uLightAim[i]), -1.0, 1.0)) * (31.0 / 3.14159265);\n"
+      "            int v0 = min(int(th), 30), k0 = ir + v0, k1 = k0 + 1;\n"
+      "            attenuation *= max(mix(uIesTab[k0 >> 2][k0 & 3], uIesTab[k1 >> 2][k1 & 3], th - float(v0)), 0.0);\n"
+      "         }\n"
       "      } else {\n"
       "         lightDir = normalize(uLightDir[i]);\n"
       "      }\n"
@@ -1783,6 +1794,7 @@ void Render3DNode::RigLight::From(const LightNode& n)
    shadowSoft = std::max(0.0f, n.shadowRadius) / 0.25f * std::max(0.0f, n.shadowFilter);
    shadowRes = n.shadowRes;
    shadowClip = n.shadowClip;
+   ies = (type == 1 || type == 4) ? n.iesFile : std::string();
 }
 const std::vector<std::string>& Render3DNode::SpriteShapeNames() { return kSpriteShapeNames; }
 const std::vector<std::string>& Render3DNode::SpriteSizeModeNames() { return kSpriteSizeModeNames; }
@@ -2833,6 +2845,25 @@ void Render3DNode::CookOnce(int frameId)
    float lightArea[kMaxLights * 2];
    float lightTerms[kMaxLights * 4];
    float lightCutoff[kMaxLights] = {};
+   float iesTab[128] = {};
+   std::vector<const std::vector<float>*> iesRows;
+   // Row 4.2: a light's IES profile, azimuth-averaged into one of four 32-sample rows.
+   auto iesSlot = [&](const RigLight& l) -> float
+   {
+      if (l.ies.empty() || !(l.type == 1 || l.type == 4)) return 0.0f;
+      auto tab = engine::LoadIes(AppPaths::FsPath(l.ies));
+      if (!tab) return 0.0f;
+      for (size_t k = 0; k < iesRows.size(); k++) if (iesRows[k] == tab.get()) return float(k + 1);
+      if (iesRows.size() >= 4) return 0.0f;
+      const size_t r = iesRows.size(); iesRows.push_back(tab.get());
+      for (int v = 0; v < engine::kIesV; v++)
+      {
+         float sum = 0.0f;
+         for (int h = 0; h < engine::kIesH; h++) sum += (*tab)[(size_t)(h * engine::kIesV + v)];
+         iesTab[r * 32 + (size_t)v] = sum / (float)engine::kIesH;
+      }
+      return float(r + 1);
+   };
    RigLight caster;   // the first light's shadow settings; the built-in light keeps the defaults
    for (int i = 0; i < kMaxLights; i++)
    {
@@ -2865,6 +2896,7 @@ void Render3DNode::CookOnce(int frameId)
          const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
          std::memcpy(&lightTerms[lightCount * 4], terms, sizeof(terms));
          lightCutoff[lightCount] = l.cutoff;
+         if (l.type == 1 || l.type == 4) lightArea[lightCount * 2 + 1] = iesSlot(l);
          if (lightCount == 0)
             caster = l;
          lightCount++;
@@ -2895,6 +2927,7 @@ void Render3DNode::CookOnce(int frameId)
       const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
       std::memcpy(&lightTerms[lightCount * 4], terms, sizeof(terms));
       lightCutoff[lightCount] = l.cutoff;
+      if (l.type == 1 || l.type == 4) lightArea[lightCount * 2 + 1] = iesSlot(l);
       if (lightCount == 0)
          caster = l;
       lightCount++;
@@ -3235,6 +3268,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform2fv(GLUtil::UniformLoc(mProgram, "uLightArea"), kMaxLights, lightArea);
       glUniform4fv(GLUtil::UniformLoc(mProgram, "uLightTerms"), kMaxLights, lightTerms);
       glUniform1fv(GLUtil::UniformLoc(mProgram, "uLightCutoff"), kMaxLights, lightCutoff);
+      glUniform4fv(GLUtil::UniformLoc(mProgram, "uIesTab"), 32, iesTab);
       glUniform1i(GLUtil::UniformLoc(mProgram, "uLightCount"), lightCount);
       glUniform1f(GLUtil::UniformLoc(mProgram, "uFldTime"), (float)Transport::Instance().Seconds());
       const float rigAmbient[3] = { ambientColor[0] + (rig != nullptr ? rig->ambient[0] : 0.0f),

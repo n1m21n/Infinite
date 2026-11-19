@@ -53,6 +53,8 @@ def light_lines(l):
         out.append("  f shadowRadius %g" % l.get("radius", 0.1))
     if t == "spot":
         out += ["  f spotAngle %g" % l["spot_angle"], "  f spotPenumbra %g" % l.get("blend", 0.2)]
+    if t in ("point", "spot") and l.get("ies"):
+        out.append("  s iesFile %s" % os.path.join(ASSETS, l["ies"]))
     if t == "area":
         w, h = l.get("size", (1, 1))
         out += ["  f areaWidth %g" % w, "  f areaHeight %g" % h, "  b normalize 1",

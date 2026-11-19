@@ -755,6 +755,24 @@ float upVis(texture2d<float> vt, texture2d<float> vd, float2 pos, float dist, in
 #ifndef SSS_K
 #define SSS_K 4.0
 #endif
+// Row 4.2: a point or spot light's IES factor toward d (unit, from the light), its table (engine/Ies.h: 32 vertical x
+// 16 horizontal, [h * 32 + v]) at row - 1 after the `count` lights in LL; row 0 = none. Vertical 0 = along the aim;
+// horizontal as Cycles on a light Blender points with track-to (-Z at the target, Y up): 0 = -(aim x right), the side
+// away from world up, 90 = right = cross(up, aim) (measured on Blender 5.2).
+float iesK(constant LightU* LL, int count, float row, float3 axis, float3 d)
+{
+   if (row < 0.5) return 1.0;
+   constant float* T = (constant float*)(LL + count) + (int(row + 0.5) - 1) * 512;
+   const float th = acos(clamp(dot(d, axis), -1.0, 1.0)) * (31.0 / 3.14159265);
+   float3 r = cross(float3(0.0, 1.0, 0.0), axis);
+   r = dot(r, r) < 1e-4 ? float3(1.0, 0.0, 0.0) : normalize(r);
+   float ph = atan2(dot(d, r), -dot(d, cross(axis, r))) * (16.0 / 6.28318531);
+   if (ph < 0.0) ph += 16.0;
+   const int v0 = min(int(th), 30), h0 = int(ph) & 15, h1 = (h0 + 1) & 15;
+   const float fv = th - float(v0), fh = ph - floor(ph);
+   const float a = mix(T[h0 * 32 + v0], T[h0 * 32 + v0 + 1], fv), b = mix(T[h1 * 32 + v0], T[h1 * 32 + v0 + 1], fv);
+   return max(mix(a, b, fh), 0.0);
+}
 #ifndef SSS_D
 #define SSS_D 1.0
 #endif
@@ -976,6 +994,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
             atten *= sa;
          }
+         if (type != 5) atten *= iesK(LL, int(f.fld.y + 0.5), L.spot.w, L.aim.xyz, -lightDir);
          if (atten <= 0.0 && type != 5) continue; // out of reach (cutoff, cone): every term below is scaled by it
       }
       else lightDir = normalize(L.vec.xyz);
@@ -1500,6 +1519,7 @@ void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* em
             atten *= sa;
          }
          if (type == 5) { const float cl = dot(-ld, Lt.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(Lt.spot.y, cl); }
+         else atten *= iesK(LL, count, Lt.spot.w, Lt.aim.xyz, -ld);
       }
       else
       {

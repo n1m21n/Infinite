@@ -143,7 +143,15 @@ namespace rr
          o.spot[0] = l.spotAngleDeg; o.spot[1] = l.spotPenumbra; o.spot[2] = l.areaW; o.spot[3] = l.areaH;
          if (l.type == engine::LightType::Area) { o.spot[0] = float(l.areaShape); o.spot[1] = l.areaSpread; } // area: shape, spread
          if (l.type == engine::LightType::Directional || l.type == engine::LightType::Sun) o.spot[0] = l.sunAngleDeg; // the disc, for these
+         // Row 4.2: point / spot keep their IES row + 1 in spot.w (0 = none); the tables follow the lights in `all`.
+         if (l.type == engine::LightType::Point || l.type == engine::LightType::Spot) o.spot[3] = l.iesRow >= 0 ? float(l.iesRow + 1) : 0.0f;
          if (i < 8) f.lights[i] = o;
+      }
+      if (n > 0 && !fr.ies.empty())
+      {
+         const size_t per = sizeof(LightU) / sizeof(float), extra = (fr.ies.size() + per - 1) / per;
+         all.resize((size_t)n + extra, LightU{});
+         std::memcpy(&all[(size_t)n], fr.ies.data(), fr.ies.size() * sizeof(float));
       }
    }
    // The instance records (dst, one per instance) and the draw runs: consecutive copies of one mesh with one

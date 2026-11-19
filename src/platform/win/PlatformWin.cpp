@@ -458,6 +458,12 @@ namespace Platform
                            false, std::string(), err);
    }
 
+   std::string OpenIesDialog()
+   {
+      std::string err;
+      return RunOpenDialog(L"Choose IES profile", { { L"IES profiles", L"*.ies" } }, false, std::string(), err);
+   }
+
    std::string OpenModelDialog()
    {
       std::string err;

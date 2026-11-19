@@ -185,6 +185,22 @@ bool occludedAlpha(vec3 o, vec3 d, float tmax, float eps, inout uint seed)
    }
    return true;
 }
+// Row 4.2 (MetalDevice.mm iesK): a point or spot light's IES factor, its table after the `count` lights in LL.
+float iesF(int k) { LightU r = LL[k / 20]; int c = k % 20; vec4 q = c < 4 ? r.vec : c < 8 ? r.aim : c < 12 ? r.color : c < 16 ? r.terms : r.spot; return q[c & 3]; }
+float iesK(int count, float row, vec3 axis, vec3 d)
+{
+   if (row < 0.5) return 1.0;
+   int base = count * 20 + (int(row + 0.5) - 1) * 512;
+   float th = acos(clamp(dot(d, axis), -1.0, 1.0)) * (31.0 / 3.14159265);
+   vec3 r = cross(vec3(0.0, 1.0, 0.0), axis);
+   r = dot(r, r) < 1e-4 ? vec3(1.0, 0.0, 0.0) : normalize(r);
+   float ph = atan(dot(d, r), -dot(d, cross(axis, r))) * (16.0 / 6.28318531);
+   if (ph < 0.0) ph += 16.0;
+   int v0 = min(int(th), 30), h0 = int(ph) & 15, h1 = (h0 + 1) & 15;
+   float fv = th - float(v0), fh = ph - floor(ph);
+   float a = mix(iesF(base + h0 * 32 + v0), iesF(base + h0 * 32 + v0 + 1), fv), b = mix(iesF(base + h1 * 32 + v0), iesF(base + h1 * 32 + v0 + 1), fv);
+   return max(mix(a, b, fh), 0.0);
+}
 void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout vec3 ld, inout vec3 Le, inout float tmax, inout float pL, inout vec2 lterms)
 {
    if (nEm > 0 && rnd(seed) < pEm)
@@ -235,6 +251,7 @@ void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout v
             atten *= sa;
          }
          if (type == 5) { float cl = dot(-ld, Lt.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(Lt.spot.y, cl); }
+         else atten *= iesK(count, Lt.spot.w, Lt.aim.xyz, -ld);
       }
       else
       {

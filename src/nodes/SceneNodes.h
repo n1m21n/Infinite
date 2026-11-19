@@ -112,6 +112,7 @@ public:
    bool useCutoff = false;         // point, spot, area: no light at all past `cutoffDistance`
    float cutoffDistance = 40.0f;
    bool showCone = false;          // spot: the 3D View draws its whole cone, out to the target or the cutoff
+   std::string iesFile;            // point, spot: an IES photometric profile (.ies) shaping where the light goes
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -122,7 +123,7 @@ public:
       v.Float("orbitPerBeat", orbitPerBeat);
       v.Float("areaWidth", areaWidth); v.Float("areaHeight", areaHeight);
       v.Bool("normalize", normalize);
-      v.Int("areaShape", areaShape); v.Float("areaSpread", areaSpread);
+      v.Int("areaShape", areaShape); v.Float("areaSpread", areaSpread); v.Text("iesFile", iesFile);
       v.Float("diffuse", diffuse); v.Float("specular", specular); v.Float("transmission", transmission);
       v.Bool("softFalloff", softFalloff);
       v.Bool("castShadow", castShadow); v.Float("shadowRadius", shadowRadius);

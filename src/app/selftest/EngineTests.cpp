@@ -3,6 +3,7 @@
 #include "app/AppShared.h"
 #include "engine/rhi/Rhi.h"
 #include "engine/MusicRig.h"
+#include "engine/Ies.h"
 #include "core/field/FieldLex.h"
 #include "core/field/FieldParse.h"
 #include "core/field/GlslBackend.h"
@@ -1202,6 +1203,25 @@ bool RunEngineTest()
          nm.ShadeInput(1)->Connect(&flat);
          if (run("Normal Map strength pin", nm, [](int, int) { return V{ 0.0, 0.0, 1.0 }; })) ok++;
          check(ok == 3, "Shade knob pins: wired colour, scale and strength override the knobs", (double)ok, 3.0);
+      }
+
+      // Row 4.2 IES: a quadrant-symmetric type C file (vertical 0..90, horizontal 0 and 90) becomes the 32 x 16 table:
+      // straight down 10 cd, 90 degrees 0, past 90 zero, horizontal 90 = 270 by the symmetry, 45 between the two planes.
+      {
+         std::vector<float> t;
+         const bool parsed = engine::ParseIes("IESNA:LM-63-2002\nTILT=NONE\n1 -1 2 2 2 1 1 0 0 0\n1 1 0\n0 90\n0 90\n5 0 3 0\n", t);
+         const float k = 2.0f * engine::kIesScale; // the multiplier, 2
+         int ok = 0;
+         if (parsed && (int)t.size() == engine::kIesRow)
+         {
+            auto at = [&](int h, int v) { return t[(size_t)(h * engine::kIesV + v)] / k; };
+            ok += std::fabs(at(0, 0) - 5.0f) < 1e-3f;           // horizontal 0, straight along the aim
+            ok += std::fabs(at(4, 0) - 3.0f) < 1e-3f;           // horizontal 90
+            ok += std::fabs(at(12, 0) - 3.0f) < 1e-3f;          // 270 mirrors 90
+            ok += std::fabs(at(2, 0) - 4.0f) < 1e-3f;           // 45: halfway
+            ok += at(0, 20) == 0.0f;                             // past 90 vertical: dark
+         }
+         check(ok == 5, "IES profile: LM-63 type C parsed to the table, symmetry and range kept", (double)ok, 5.0);
       }
 
       // Shade Ramp: 4 known stops, 25 factors from -0.076 to 1.076

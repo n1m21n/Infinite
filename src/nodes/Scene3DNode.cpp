@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <chrono>
 #include <cmath>
 #include "core/Transport.h"
@@ -1217,6 +1218,7 @@ void Scene3DNode::Sync(int frameId)
       stamp.push_back(l.spotAngle); stamp.push_back(l.spotPenumbra);
       stamp.push_back(l.areaW); stamp.push_back(l.areaH);
       stamp.push_back((float)l.areaShape); stamp.push_back(l.areaSpread);
+      stamp.push_back((float)(std::hash<std::string>{}(l.ies) & 0xffffffu)); // its IES file (row 4.2)
       stamp.insert(stamp.end(), l.aim, l.aim + 3);
       stamp.insert(stamp.end(), { l.intensity, l.diffuse, l.specular, l.transmission, l.falloff,
                                   l.castShadow ? 1.0f : 0.0f, l.shadowSoft, (float)l.shadowRes, l.shadowClip, l.cutoff });

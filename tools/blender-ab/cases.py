@@ -147,6 +147,8 @@ CASES = {
     "light_point": _lit({"type": "point", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "radius": 0.1}),
     "light_spot": _lit({"type": "spot", "power": 600, "azimuth": 30, "elevation": 60, "distance": 3,
                         "spot_angle": 25, "blend": 0.3, "radius": 0.1}),
+    "light_ies": _lit({"type": "point", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "radius": 0.1,
+                       "ies": "ies_batwing.ies"}),
     "light_area": _lit({"type": "area", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "size": [1, 1]}),
     # Row 4.2 (PLAN.md): a disc panel, then a rectangle with its emission held to a 40 degree spread (Cycles' soft box).
     "light_disc": _lit({"type": "area", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "size": [1.4, 0.8],

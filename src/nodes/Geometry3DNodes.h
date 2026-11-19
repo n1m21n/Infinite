@@ -672,6 +672,7 @@ public:
       int shadowRes = 0;                 // 0 = the look's quality, else 1024 / 2048 / 4096
       float shadowClip = 0.05f;
       float cutoff = 0.0f;               // point, spot, area: no light past this distance; 0 = none
+      std::string ies;                   // point, spot: an IES profile file (row 4.2); empty = none
       // Everything above that the light node sets, from its params.
       void From(const class LightNode& n);
    };

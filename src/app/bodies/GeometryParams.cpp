@@ -4,6 +4,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -2461,6 +2462,23 @@ namespace app
       { static const std::vector<std::string> kShapes = { "Rectangle", "Disc" };
         DropdownButton("shape", kShapes, n->areaShape, [n](int i) { n->areaShape = i; }); }
       ModSlider("spread", &n->areaSpread, 1.0f, 180.0f, "%.0f\xC2\xB0");
+      ImGui::EndDisabled();
+      // Row 4.2: point and spot take an IES profile; the button names the file once one is set.
+      ImGui::BeginDisabled(!(n->type == 1 || n->type == 4));
+      {
+         const bool has = !n->iesFile.empty();
+         const std::string label = has ? AppPaths::FsPath(n->iesFile).filename().u8string() : std::string("IES profile...");
+         if (ActionButton::Draw(label.c_str(), ImVec2(has ? kPreviewSize * 0.7f : kPreviewSize, 0)))
+         {
+            const std::string path = Platform::OpenIesDialog();
+            if (!path.empty()) { PushUndoCheckpoint(); n->iesFile = path; }
+         }
+         if (has)
+         {
+            ImGui::SameLine();
+            if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * 0.28f, 0))) { PushUndoCheckpoint(); n->iesFile.clear(); }
+         }
+      }
       ImGui::EndDisabled();
       ColorSwatch("colour", n->color, n);
       ModCheckbox("temperature", &n->useTemperature);
