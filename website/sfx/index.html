@@ -103,8 +103,6 @@
         </header>
 
         <section class="st-card" aria-label="Sound effects generator">
-          <div class="st-picks" id="preset-chips"></div>
-
           <div class="st-stage" data-aspect="16:9">
             <span class="st-badge" id="sfx-hud"><span class="st-badge-dot" aria-hidden="true"></span><span id="sfx-hud-text">Ready</span></span>
             <span id="sfx-hud-meta" hidden></span>
@@ -179,14 +177,6 @@
             <div class="st-more-body">
               <div class="st-strip">
                 <div class="st-ctrl">
-                  <div class="st-label"><span>Type</span></div>
-                  <select class="st-select" id="sel-part" aria-label="Sound type"></select>
-                </div>
-                <div class="st-ctrl">
-                  <div class="st-label"><span>Style</span></div>
-                  <select class="st-select" id="sel-style" aria-label="Sound style"></select>
-                </div>
-                <div class="st-ctrl">
                   <div class="st-label"><span>Length</span></div>
                   <div class="st-picks" id="bars-chips" style="justify-content: flex-start;">
                     <button type="button" class="st-chip" data-bars="1">1</button>
@@ -197,11 +187,6 @@
                 </div>
               </div>
             </div>
-          </details>
-
-          <details class="st-more" id="sfx-patch-card" hidden>
-            <summary><span>Patch</span><span class="st-val" id="sfx-patch-meta"></span></summary>
-            <div class="st-patch-scroll" id="sfx-patch-svg-host"></div>
           </details>
 
           <p id="sfx-status" hidden></p>

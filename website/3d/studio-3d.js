@@ -671,7 +671,7 @@ function bindChips(id, attr, cb) {
 }
 
 bindChips('font-chips', 'data-font', (v) => { state.font = v; rebuildGeometry(); });
-bindChips('mat-chips', 'data-mat', (v) => { state.mat = v; applyMaterial(); });
+$('sel-mat').addEventListener('change', (e) => { state.mat = e.target.value; applyMaterial(); });
 bindChips('mot-chips', 'data-mot', (v) => { state.mot = v; });
 bindChips('bg-chips', 'data-bg', (v) => { state.bg = v; applyBackground(); });
 bindChips('aspect-chips', 'data-aspect', (v) => { state.aspect = v; applyAspect(); });
@@ -718,7 +718,7 @@ $('btn-gen').addEventListener('click', () => {
   state.depth = +(0.3 + Math.random() * 0.7).toFixed(2);
   state.bevel = +(0.04 + Math.random() * 0.1).toFixed(2);
 
-  document.querySelectorAll('#mat-chips .st-chip').forEach((b) => b.classList.toggle('is-active', b.dataset.mat === state.mat));
+  $('sel-mat').value = state.mat;
   document.querySelectorAll('#mot-chips .st-chip').forEach((b) => b.classList.toggle('is-active', b.dataset.mot === state.mot));
   document.querySelectorAll('#bg-chips .st-chip').forEach((b) => b.classList.toggle('is-active', b.dataset.bg === state.bg));
   $('ctrl-depth').value = state.depth; $('val-depth').textContent = state.depth.toFixed(2); setSliderFill($('ctrl-depth'));

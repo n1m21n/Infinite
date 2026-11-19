@@ -377,33 +377,30 @@
   aspect-ratio: 16 / 10;
   width: 100%;
   border-radius: var(--web-media-radius);
+  border: 1px solid var(--hair);
   overflow: hidden;
   touch-action: none;
   cursor: crosshair;
-  background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 56%),
-    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--cat-prediction) 22%, transparent), transparent 56%),
-    radial-gradient(circle at 0% 100%, color-mix(in srgb, var(--signal) 28%, transparent), transparent 56%),
-    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--cat-compositing) 28%, transparent), transparent 56%),
-    var(--deep);
+  background: var(--surface-2);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--ground) 55%, transparent);
 }
 
 .st-pad::before,
 .st-pad::after {
   content: "";
   position: absolute;
-  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  background: var(--hair);
   pointer-events: none;
 }
 
-.st-pad::before { left: 50%; top: 12%; bottom: 12%; width: 1px; }
-.st-pad::after  { top: 50%; left: 12%; right: 12%; height: 1px; }
+.st-pad::before { left: 50%; top: 10%; bottom: 10%; width: 1px; }
+.st-pad::after  { top: 50%; left: 10%; right: 10%; height: 1px; }
 
 .st-pad-q {
   position: absolute;
   font-family: var(--font-mono);
   font-size: var(--size-micro-mono);
-  color: color-mix(in srgb, var(--ink) 62%, transparent);
+  color: var(--ink-3);
   pointer-events: none;
 }
 
@@ -414,13 +411,14 @@
 
 .st-pad-dot {
   position: absolute;
-  width: 24px;
-  height: 24px;
-  margin: -12px 0 0 -12px;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
   border-radius: 50%;
   pointer-events: none;
-  background: radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--ink) 95%, transparent), color-mix(in srgb, var(--accent) 75%, transparent) 68%);
-  box-shadow: 0 0 0 2px var(--surface-1), 0 0 18px 3px color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent);
+  border: 2px solid var(--surface-1);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--ground) 50%, transparent);
   transition: transform var(--dur-micro) var(--ease-out);
 }
 

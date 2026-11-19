@@ -128,7 +128,6 @@
     setBusy(true, 'Loading...');
     return askWorker({ cmd: 'info' }).then((info) => {
       engineInfo = info;
-      populateSelectors();
       return info;
     });
   }
@@ -144,17 +143,6 @@
     return Math.floor(Math.random() * engineInfo.styles.length);
   }
 
-  function populateSelectors() {
-    const styleSel = $('sel-style');
-    styleSel.innerHTML = '<option value="-1">Auto (preset engine)</option>' +
-      engineInfo.styles.map((s, i) => `<option value="${i}">${niceStyle(s)}</option>`).join('');
-
-    const partSel = $('sel-part');
-    partSel.innerHTML = PARTS.map(([idx, name]) =>
-      `<option value="${idx}"${idx === state.part ? ' selected' : ''}>${name}</option>`
-    ).join('');
-  }
-
   function setBusy(busy, text) {
     genBtn.disabled = busy;
     hudPill.classList.toggle('is-busy', busy);
@@ -162,18 +150,15 @@
   }
 
   function buildJob(pinned) {
-    const presetObj = PRESETS.find((p) => p.id === state.preset) || PRESETS[0];
-    let styleIdx = state.styleIdx;
+    let styleIdx = styleIdxByNames(['neurofunk', 'psytrance', 'idm']);
     if (pinned && take) {
       styleIdx = take.styleIdx;
-    } else if (styleIdx < 0) {
-      styleIdx = styleIdxByNames(presetObj.styles);
     }
     const seed = (pinned && take) ? take.seed : Math.floor(Math.random() * 99999) + 1;
     return {
       cmd: 'run',
       style: styleIdx,
-      part: state.part,
+      part: 7,
       seed: seed,
       bars: state.bars,
       key: -1,
@@ -225,16 +210,15 @@
       takes.unshift(newTake);
       if (takes.length > 10) takes.pop();
       renderTakes();
-      renderPatchGraph(newTake.graph);
       updateTrimUI();
-      hudText.textContent = `${newTake.styleName} · ${(newTake.frames / newTake.rate).toFixed(1)}s`;
+      hudText.textContent = `#${newTake.n} · ${(newTake.frames / newTake.rate).toFixed(1)}s`;
       if (autoPlay || playing) {
         swapAudio(prev, autoPlay);
       } else {
         drawWaveform();
       }
     }).catch(() => {
-      hudText.textContent = take ? take.styleName : 'Try again';
+      hudText.textContent = take ? `#${take.n} · ${(take.frames / take.rate).toFixed(1)}s` : 'Try again';
     }).finally(() => {
       inflight = false;
       if (queued) {
@@ -646,7 +630,7 @@
     if (!takes.length) { strip.hidden = true; return; }
     strip.hidden = false;
     strip.innerHTML = takes.map((t, idx) =>
-      `<button type="button" class="st-take${t === take ? ' is-active' : ''}" data-take="${idx}">#${t.n} ${t.styleName}</button>`
+      `<button type="button" class="st-take${t === take ? ' is-active' : ''}" data-take="${idx}">#${t.n} · ${(t.frames / t.rate).toFixed(1)}s</button>`
     ).join('');
     strip.querySelectorAll('.st-take').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -656,9 +640,8 @@
         take = picked;
         state.trimA = 0; state.trimB = 1;
         renderTakes();
-        renderPatchGraph(take.graph);
         updateTrimUI();
-        hudText.textContent = `WASM · ${take.styleName} · #${take.seed}`;
+        hudText.textContent = `#${take.n} · ${(take.frames / take.rate).toFixed(1)}s`;
         hudMeta.textContent = `${(take.frames / take.rate).toFixed(2)}s · ${take.rate / 1000} kHz`;
         swapAudio(prev, true);
       });
@@ -696,32 +679,6 @@
   }
 
   // ---------------- UI wiring ----------------
-  const presetBox = $('preset-chips');
-  presetBox.innerHTML = PRESETS.map((p, i) =>
-    `<button type="button" class="st-chip${i === 0 ? ' is-active' : ''}" data-preset="${p.id}">${p.label}</button>`
-  ).join('');
-
-  presetBox.querySelectorAll('.st-chip').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      presetBox.querySelectorAll('.st-chip').forEach((b) => b.classList.remove('is-active'));
-      btn.classList.add('is-active');
-      const p = PRESETS.find((x) => x.id === btn.dataset.preset);
-      if (!p) return;
-      state.preset = p.id;
-      state.part = p.part;
-      state.bars = p.bars;
-      state.styleIdx = -1;
-      state.tone = p.tone;
-      state.energy = p.energy;
-      state.space = p.space;
-      state.mood = p.mood;
-      state.variation = p.variation;
-      state.loop = p.loop;
-      syncControlsToState();
-      generate(true);
-    });
-  });
-
   function setSliderFill(el) {
     if (!el) return;
     const min = parseFloat(el.min) || 0, max = parseFloat(el.max) || 1, v = parseFloat(el.value);
@@ -738,8 +695,6 @@
     setSliderFill($('ctrl-tone'));
     setSliderFill($('ctrl-space'));
     setSliderFill($('ctrl-var'));
-    if ($('sel-style').options.length) $('sel-style').value = String(state.styleIdx);
-    if ($('sel-part').options.length) $('sel-part').value = String(state.part);
     document.querySelectorAll('#bars-chips .st-chip').forEach((b) =>
       b.classList.toggle('is-active', +b.dataset.bars === state.bars)
     );
@@ -757,16 +712,6 @@
       clearTimeout(sliderTimer);
       sliderTimer = setTimeout(reshape, 110);
     });
-  });
-
-  $('sel-style').addEventListener('change', (e) => {
-    state.styleIdx = parseInt(e.target.value, 10);
-    generate(true);
-  });
-
-  $('sel-part').addEventListener('change', (e) => {
-    state.part = parseInt(e.target.value, 10);
-    generate(true);
   });
 
   document.querySelectorAll('#bars-chips .st-chip').forEach((btn) => {
@@ -812,7 +757,7 @@
     const blob = encodeStereoWav(take);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `infinite-sfx-${take.styleName.replace(/\s+/g, '-')}-${take.seed}.wav`;
+    a.download = `infinite-sfx-${take.n}-${take.seed}.wav`;
     a.click();
     statusEl.textContent = `Downloaded 48 kHz stereo WAV (${(blob.size / 1024).toFixed(0)} KB).`;
   });
@@ -821,9 +766,9 @@
     if (!take || !take.patch) { generate(false); return; }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([take.patch], { type: 'text/plain' }));
-    a.download = `infinite-sfx-${take.styleName.replace(/\s+/g, '-')}-${take.seed}.inf`;
+    a.download = `infinite-sfx-${take.n}-${take.seed}.inf`;
     a.click();
-    statusEl.textContent = `Downloaded real Infinite patch (${Object.keys(take.graph.nodes).length} nodes) — open directly in Infinite.`;
+    statusEl.textContent = `Downloaded Infinite patch — open directly in Infinite.`;
   });
 
   window.addEventListener('keydown', (e) => {

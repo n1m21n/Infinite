@@ -115,13 +115,15 @@
           </div>
           <span id="svg-label" hidden></span>
 
-          <div class="st-picks" id="mat-chips" aria-label="Material">
-            <button type="button" class="st-chip is-active" data-mat="chrome">Chrome</button>
-            <button type="button" class="st-chip" data-mat="glass">Glass</button>
-            <button type="button" class="st-chip" data-mat="gold">Gold</button>
-            <button type="button" class="st-chip" data-mat="holo">Holo</button>
-            <button type="button" class="st-chip" data-mat="neon">Neon</button>
-            <button type="button" class="st-chip" data-mat="matte">Matte</button>
+          <div class="st-picks">
+            <select class="st-select" id="sel-mat" aria-label="Style" style="width:auto;min-width:160px;">
+              <option value="chrome" selected>Chrome</option>
+              <option value="glass">Glass</option>
+              <option value="gold">Gold</option>
+              <option value="holo">Holo</option>
+              <option value="neon">Neon</option>
+              <option value="matte">Matte</option>
+            </select>
           </div>
 
           <div class="st-stage" id="stage-box" data-aspect="16:9">

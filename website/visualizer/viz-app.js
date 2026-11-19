@@ -680,7 +680,7 @@
     });
   }
 
-  setChips('style-chips', 'data-style', (v) => { state.style = parseInt(v, 10); });
+  $('sel-style').addEventListener('change', (e) => { state.style = parseInt(e.target.value, 10); });
   setChips('pal-chips', 'data-pal', (v) => { state.pal = parseInt(v, 10); });
   setChips('aspect-chips', 'data-aspect', (v) => {
     state.aspect = v;
@@ -707,7 +707,7 @@
     state.seed = +(Math.random() * 20).toFixed(2);
     state.comp = +(0.30 + Math.random() * 0.65).toFixed(2);
     state.glow = +(0.35 + Math.random() * 0.60).toFixed(2);
-    document.querySelectorAll('#style-chips .st-chip').forEach((b, i) => b.classList.toggle('is-active', i === state.style));
+    $('sel-style').value = String(state.style);
     document.querySelectorAll('#pal-chips .st-chip').forEach((b, i) => b.classList.toggle('is-active', i === state.pal));
     $('ctrl-comp').value = state.comp; $('val-comp').textContent = state.comp.toFixed(2); setSliderFill($('ctrl-comp'));
     $('ctrl-glow').value = state.glow; $('val-glow').textContent = state.glow.toFixed(2); setSliderFill($('ctrl-glow'));
