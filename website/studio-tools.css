@@ -455,13 +455,18 @@
 .st-trim-handle::after {
   content: "";
   position: absolute;
-  left: 6px;
-  top: 14px;
-  bottom: 14px;
-  width: 3px;
+  left: 7px;
+  top: 16px;
+  bottom: 16px;
+  width: 2px;
   border-radius: 999px;
+  background: color-mix(in srgb, var(--signal) 42%, transparent);
+  transition: background-color var(--dur-micro) var(--ease-out);
+}
+
+.st-trim-handle:hover::after,
+.st-trim-handle:focus-visible::after {
   background: var(--ink);
-  box-shadow: 0 0 0 1px var(--ground);
 }
 
 .st-playhead {
@@ -571,3 +576,91 @@
 .st-foot-note b { color: var(--ink); }
 
 [hidden] { display: none !important; }
+
+/* Mobile optimization for all three studio pages (different layout & dimensions from desktop) */
+@media (max-width: 720px) {
+  .st-wrap {
+    padding-bottom: 92px;
+  }
+
+  .st-head {
+    margin: var(--space-1) 0 var(--space-3);
+  }
+
+  .st-card {
+    padding: var(--space-3);
+    gap: var(--space-3);
+    border-radius: var(--web-media-radius);
+  }
+
+  .st-picks {
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .st-picks .st-select {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .st-stage {
+    min-height: 170px;
+  }
+
+  .st-stage[data-aspect="9:16"],
+  .st-stage[data-aspect="1:1"] {
+    width: 100%;
+    max-width: 340px;
+    max-height: 56svh;
+  }
+
+  .st-bar {
+    gap: 6px;
+  }
+
+  .st-sep {
+    display: none;
+  }
+
+  .st-btn {
+    min-height: 40px;
+    padding: 0 14px;
+  }
+
+  .st-btn.is-icon {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .st-sfx-tune {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-3);
+  }
+
+  .st-pad {
+    aspect-ratio: 16 / 9;
+    max-height: 180px;
+  }
+
+  .st-strip {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-2);
+  }
+
+  .st-takes {
+    justify-content: flex-start;
+  }
+
+  .st-foot-note {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    padding: var(--space-3);
+    margin-top: var(--space-4);
+  }
+
+  .st-foot-note .st-btn {
+    justify-content: center;
+  }
+}

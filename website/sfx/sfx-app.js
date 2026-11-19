@@ -399,7 +399,7 @@
       for (let i = 0; i < bins; i++) {
         const mag = freqData[i] / 255;
         const bh = mag * h * 0.44;
-        ctx.fillStyle = i < 12 ? 'rgba(255, 107, 53, 0.14)' : 'rgba(167, 177, 255, 0.11)';
+        ctx.fillStyle = 'rgba(167, 177, 255, 0.12)';
         ctx.fillRect(i * bw, h * 0.5 - bh, bw - 1, bh * 2);
       }
     }
@@ -437,10 +437,9 @@
       const hL = Math.max(1.5 * dpr, peakL * amp);
       const hR = Math.max(1.5 * dpr, peakR * amp);
 
-      ctx.fillStyle = inTrim ? signal : 'rgba(136, 144, 177, 0.28)';
+      ctx.fillStyle = inTrim ? signal : 'rgba(136, 144, 177, 0.26)';
       ctx.fillRect(x, mid - hL, bw, hL);
-      ctx.fillStyle = inTrim ? accent : 'rgba(136, 144, 177, 0.22)';
-      ctx.globalAlpha = inTrim ? 0.78 : 0.4;
+      ctx.globalAlpha = inTrim ? 0.62 : 0.24;
       ctx.fillRect(x, mid, bw, hR);
       ctx.globalAlpha = 1;
     }
