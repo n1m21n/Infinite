@@ -736,6 +736,10 @@ if fog:
     # Row 5.3 truth: a homogeneous medium in a box, extinction = density, scattered share = colour, HG g:
     # Volume Scatter (colour x density) plus Volume Absorption ((1 - colour) x density).
     (x0, y0, z0), (x1, y1, z1) = fog["box"]
+    # Row 5.6: pull the box's faces in a hair. A face lying on a floor or wall breaks Cycles' volume stack (photo_shoe's
+    # floor rendered a quarter as bright); Infinite's box test does not care, so only the truth's mesh moves.
+    e = 0.002 * min(x1 - x0, y1 - y0, z1 - z0)
+    x0, y0, z0, x1, y1, z1 = x0 + e, y0 + e, z0 + e, x1 - e, y1 - e, z1 - e
     bpy.ops.mesh.primitive_cube_add(size=2, location=((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
     fo = bpy.context.active_object; fo.scale = ((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2)
     fm = bpy.data.materials.new("fog"); fm.use_nodes = True; fnt = fm.node_tree
