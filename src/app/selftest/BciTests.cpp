@@ -16,6 +16,7 @@
 #include "platform/AppPaths.h"
 #include "audio/AudioNode.h"
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -616,6 +617,36 @@ bool RunBciSelftest()
       ck.Expect(hz > 300.0 && hz < 340.0 && peak > 0.05f, "Direct audio: 10 Hz EEG plays at ~320 Hz");
       ck.Expect(px1.size() == (size_t)BrainSourceNode::kImgW * BrainSourceNode::kImgH * 4 && px0 != px1,
                 "Direct image: columns scroll in and change pixels");
+   }
+
+   // 9. M6: cost of one engine update (12 samples = one PSD/state/image/audify step), synthetic CalmAlpha, 60 s.
+   {
+      Bci::SyntheticCortex cortex;
+      cortex.SetAutoDemoGestures(false);
+      Bci::BciDspEngine dsp;
+      dsp.Reset(256.0);
+      dsp.SetPersistProfile(false);
+      Bci::TelemetrySnapshot snap{};
+      float pins[Bci::kOutputPinCount] = {};
+      std::vector<Bci::SampleFrame> batch;
+      double worstUs = 0.0, totalUs = 0.0;
+      int n = 0;
+      for (int i = 0; i < 60 * 256 / 12; ++i)
+      {
+         cortex.Generate(12, 256.0, batch);
+         const auto t0 = std::chrono::steady_clock::now();
+         dsp.Process(batch.data(), (int)batch.size(), pins, snap);
+         const double us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count();
+         if (i >= 256 / 12) // skip the first second (allocations, filter warm-up)
+         {
+            totalUs += us;
+            worstUs = std::max(worstUs, us);
+            ++n;
+         }
+      }
+      const double meanUs = n > 0 ? totalUs / n : 0.0;
+      std::printf("  [9] DSP_COST mean=%.1f us worst=%.1f us per update (%d updates)\n", meanUs, worstUs, n);
+      ck.Expect(meanUs < 2000.0, "M6: mean engine update under 2 ms");
    }
 
    std::printf("BCI_SELFTEST: passed=%d failed=%d %s\n",

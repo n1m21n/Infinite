@@ -169,7 +169,7 @@ To be filled after each block, linked to §6 and §7.
 | Baseline | 1/1 subject | n/a (avg only) | fail (same mandala) | synthetic only | fail (weights) | n/a |
 | A | PhysioNet 72.5% (avg-only 57%) · GIPSA 100% (90%) · HEROIC Muse 50% (37.5%) | **fail as written** (best region beats avg 26–50%); reframed: per-person LDA beats avg in 73% HEROIC / 88% PhysioNet sessions | not run (Block B) | real data in selftest [7] | **pass**: weights learned per person at calibration | not measured |
 | B | — | — | proxy: **0.92** with the state strip · raw image 0.74 · raw audio 0.86 (126 pairs); human blind run **10/10 pass** (picture only, strip-led) | — | **pass**: image z-scored on own eyes-open calibration, audio on own baseline amplitude | not measured |
-| C | | | | | | |
+| C | — | — | starter on synthetic: calm alpha luma 0.41 vs focus 0.13–0.16, −13.6 vs −24.2 LUFS | **not run**: EEG-Eyeblinks not downloaded (needs a yes) | pass (no new weights; Brain Sculpt learns by example) | **pass**: 0.10 ms mean, 0.19 ms worst per update (bar 2 ms) |
 
 ### Block A detail (2026-11-19)
 
@@ -214,6 +214,29 @@ Human run (owner, 2026-11-19, picture only, read the top strip first): **10 / 10
 Blind set: `~/Infinite/datasets/eeg/m3_blind/` (sheet.png + 20 wavs, seed 7);
 key kept apart in `~/Infinite/datasets/eeg/m3_key.json`. Mirror: `tools/bci/direct_pins.py`.
 
+### Block C detail (2026-11-19)
+
+Starter patch `assets/examples/bci_alpha_bell.inf` (validates strict, laid out, commented):
+
+```
+ Brain Source ─ alpha ──► bloom intensity, Gain swell (−30..−6 dB)
+      │  ├─ blink ─► Logic Gate (toggle) ─► spectrogram overlay on/off
+      │  ├─ alpha ─► Brain Sculpt ─► bloom radius (learns your mapping)
+      │  ├─ image ─► transform ─► Blend (screen) ─► Output
+      │  └─ audio ─► Reverb ─► Gain ─────────────► Output audio
+ FieldPixel bell (ring + core follow brain.alpha) ─► bloom ─┘
+```
+
+Proof (synthetic presets, headless): `proof/alpha_bell_calm.png` vs `proof/alpha_bell_focus.png`.
+
+| Preset | Mean luma at 2 / 5 / 8 s | Loudness | Loudest band |
+|---|---|---|---|
+| CalmAlpha | 0.12 / 0.41 / 0.42 | −13.6 LUFS, peak −3.4 dBTP | 369 Hz |
+| DeepFocus | 0.08 / 0.13 / 0.16 | −24.2 LUFS | 568 Hz |
+
+Decisions: no Geometry pin (the starter didn't need one; revisit if a 3D patch asks).
+Muse hardware pass: no headset here, so not run.
+
 ## 11. Critique
 
 - **The "breakthrough" claim is cut down to honest size.** The research rules out decoding attention
@@ -239,6 +262,10 @@ key kept apart in `~/Infinite/datasets/eeg/m3_key.json`. Mirror: `tools/bci/dire
 - **Block B: Hilbert adds 125 ms** to the audio pin; fine for drones, too slow for rhythm.
 - **Block B: Geometry pin deferred to Block C**, where the starter patch shows whether it earns a pin.
 - **Block B: Python mirror skips artifact blanking**, as in Block A.
+- **Block C: the proof is synthetic.** The worker runs on wall-clock time, so a headless render of a
+  CSV replay isn't locked to render time; real-data proof stays in selftests [7] and the M3 sheet.
+- **Block C: M4 (blink) is still unmeasured.** It needs the EEG-Eyeblinks download.
+- **Block C: nothing has touched a real headset.** Ship / iterate / abandon can't be decided before that.
 
 ## 12. Next steps
 
@@ -248,7 +275,8 @@ key kept apart in `~/Infinite/datasets/eeg/m3_key.json`. Mirror: `tools/bci/dire
    EEG-Eyeblinks): needs a yes.
 4. Block A in Python (`batch_validate.py`), then C++ per-region DSP + wPLI. One build at the end of the block.
 5. Block B pins, then render proof sheets and run the M3 blind test. **Done:** M3 10/10 by the owner.
-6. Block C starter patch; then Muse hardware when available. Ship / iterate / abandon decided here.
+6. Block C starter patch: **done** (`bci_alpha_bell.inf`, M6 pass). Open: M4 needs the EEG-Eyeblinks
+   download (a yes); ship / iterate / abandon waits for a Muse session.
 
 ---
 

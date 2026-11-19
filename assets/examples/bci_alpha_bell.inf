@@ -1,0 +1,95 @@
+infinite-patch 1
+# Alpha Bell: close your eyes and the bell blooms and sings. Blink to show or hide the raw spectrogram.
+# Calibrate once (Brain Source > Calibrate) so "alpha" becomes your own eyes-closed score.
+# band Picture
+node 1 Compositing Comment
+  pos -580 0
+  s text Picture: the bell grows with alpha; the spectrogram pin sits on top when blink-toggled on
+  f width 420
+  f height 60
+end
+node 2 Modulators Brain Source
+  id brain
+  pos 0 1782
+end
+node 3 Compositing Comment
+  pos 0 0
+  s text Bell: ring radius and core glow follow brain.alpha
+  f width 300
+  f height 50
+end
+node 4 Source FieldPixel
+  id bell
+  pos 0 86
+  f width 1024
+  f height 1024
+  s code p = (uv - 0.5) * aspect;\nr = length(p);\na = brain.alpha;\nring = exp(-pow((r - (0.10 + 0.26 * a)) * 16.0, 2.0));\ncore = exp(-r * r * (70.0 - 55.0 * a));\ncol = vec3(1.0, 0.62, 0.30) * (ring * (0.25 + 0.9 * a) + core * a * 1.3) + vec3(0.02, 0.02, 0.05);
+end
+node 5 Effects bloom
+  id glow
+  pos 500 0
+  f uThreshold 0.35
+end
+node 6 Compositing transform
+  id mirror
+  pos 500 350
+  f uTranslateY -0.62
+  f uScaleY 0.3
+end
+node 7 Compositing Blend
+  id overlay
+  pos 940 0
+  i mode Screen
+  f mix 0
+end
+node 8 Utility Output
+  id out
+  pos 1380 0
+  b includeAudio 1
+end
+node 9 Compositing Comment
+  pos 0 850
+  s text Sound: Brain Source audio pin (EEG x32, 10 Hz alpha = 320 Hz), louder as alpha rises
+  f width 420
+  f height 60
+end
+node 10 AudioEffects Reverb
+  id room
+  pos 0 946
+  f mix 0.45
+  f size 0.8
+  f decay 6
+end
+node 11 Utility Gain
+  id swell
+  pos 620 946
+end
+node 12 Compositing Comment
+  pos 0 1686
+  s text Blink toggles the spectrogram; Brain Sculpt learns your own mapping (shift-grab) for the glow radius
+  f width 460
+  f height 60
+end
+node 13 Modulators Logic Gate
+  id blinkToggle
+  pos 410 1782
+  i op Toggle (T-FF)
+end
+node 14 Prediction Brain Sculpt
+  id sculpt
+  pos 820 1782
+end
+cable glow 0 bell
+cable mirror 0 brain image
+cable overlay 0 glow
+cable overlay 1 mirror
+cable out 0 overlay
+aud room 0 brain audio
+aud swell 0 room
+aud out 1 swell
+geo blinkToggle 0 brain blink
+geo sculpt 0 brain alpha
+mod glow uIntensity brain alpha 0 1 0.5 0.6 2.2
+mod glow uRadius sculpt 0 0 1 0.5 2 10
+mod swell gainDb brain alpha 0 1 0.5 -30 -6
+mod overlay mix blinkToggle 0 0 1 0.5 0 0.8
