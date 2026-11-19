@@ -661,7 +661,7 @@ float fogDepth(float3 lo, float3 hi, float fall, float sig, float3 o, float3 d, 
    return sig * acc * st;
 }
 struct VisU { float4x4 invVP; float4 info; float4 fog; float4 fogC; float4 fogLo; float4 fogHi; }; // info: full width, height; fog as PtU's
-struct VisOut { float4 v [[color(0)]]; float d [[color(1)]]; float4 fg [[color(2)]]; float4 fe [[color(3)]]; }; // fg: fog in-scatter (rgb) and transmittance (a) along the view; fe: the fog's light on the surface (mean radiance over its hemisphere)
+struct VisOut { float4 v [[color(0)]]; float2 d [[color(1)]]; float4 fg [[color(2)]]; float4 fe [[color(3)]]; }; // fg: fog in-scatter (rgb) and transmittance (a) along the view; fe: the fog's light on the surface (mean radiance over its hemisphere)
 float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
 {
    const float z = dt.read(uint2(px));
@@ -774,7 +774,7 @@ float3 fogInScatter(constant VisU& u, constant FrameU& f, constant RTArgs& rtArg
 fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                        constant RTArgs& rtArgs [[buffer(3)]], constant RInst* instInfo [[buffer(4)]], depth2d<float> dt [[texture(0)]])
 {
-   VisOut o; o.v = float4(1.0); o.d = -1.0; o.fg = float4(0.0, 0.0, 0.0, 1.0); o.fe = float4(0.0);
+   VisOut o; o.v = float4(1.0); o.d = float2(-1.0, 0.0); o.fg = float4(0.0, 0.0, 0.0, 1.0); o.fe = float4(0.0);
    const int W = int(u.info.x), H = int(u.info.y);
    const int2 px = int2(in.pos.xy) * 2;
    if (px.x >= W || px.y >= H) return o;
@@ -806,7 +806,7 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
    float3 n = cross(dx, dy);
    n = dot(n, n) > 1e-20 ? normalize(n) : normalize(f.eye.xyz - p);
    if (dot(n, f.eye.xyz - p) < 0.0) n = -n;
-   o.d = distance(p, f.eye.xyz);
+   o.d = float2(distance(p, f.eye.xyz), 0.0);
    if (u.fog.x > 0.0)
    {
       // Row 5.6: the fog's own light on this surface (the light it scatters back, a slab of haze lighting the ground
@@ -822,16 +822,17 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
          const float3 rd = normalize(tx * (rr * cos(ph)) + ty * (rr * sin(ph)) + n * sqrt(max(1.0 - u1, 0.0)));
          const float3 ro = p + n * f.shQ.w;
          float2 sp = boxSpan(u.fogLo.xyz, u.fogHi.xyz, ro, rd, 1e4);
-         // The fog only up to the first surface this way (a ball next to the floor hides the fog behind it). The sky
-         // through the whole box; a direction that meets geometry brings its bounce from close by (the GI), undimmed.
+         // The fog only up to the first surface this way (a ball next to the floor hides the fog behind it).
          const float th = hitDist(rtArgs.tlas, ro, rd, 1e4);
-         Ts += th < 1e4 ? 1.0 : exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, ro, rd, sp));
+         // The sky through the whole box; a surface's bounce (the GI) through the fog between it and here.
+         Ts += exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, ro, rd, float2(sp.x, min(sp.y, th))));
+         if (th < 1e4) o.d.y += 0.25;
          sp.y = min(min(sp.y, th), sp.x + 4.0 / u.fog.x);
          if (sp.y <= sp.x) continue;
          float od;
          Lf += fogInScatter(u, f, rtArgs, instInfo, ro, rd, sp, 4, fract(jit + 0.5 * float(r)), true, od) * u.fogC.xyz;
       }
-      o.fe = float4(Lf * 0.25, Ts * 0.25); // a: how much of the sky's light reaches the surface through the fog
+      o.fe = float4(Lf * 0.25, Ts * 0.25); // a: how much of the sky's and the bounce's light reaches the surface; d.y: the share of rays that met geometry
    }
    const int count = int(f.params.w);
    for (int i = 0; i < 8; i++)
@@ -873,20 +874,30 @@ float upVis(texture2d<float> vt, texture2d<float> vd, float2 pos, float dist, in
 }
 // Row 5.6: a half-res fog texel set (vis_fs) at a full-res pixel `dist` from the eye, a 3x3 box against its noise
 // that takes only texels on the same surface (distance within 5%): a sphere's fog does not bleed onto the floor
-// behind it as a halo. With none alike, the nearest texel.
-float4 fogTap(texture2d<float> t, texture2d<float> vd, float2 pos, float dist)
+// behind it as a halo. With none alike, the nearest texel. The box is a tent centred on this pixel's own spot in
+// the half-res grid (radius 1.5 texels), so two neighbouring pixels do not share one box: no 2-pixel stair steps
+// along a shaft's edge.
+float4 fogTap(texture2d<float> t, texture2d<float> vd, float2 pos, float dist, thread float& bs)
 {
-   const int2 q = int2(pos) / 2, fs = int2(t.get_width(), t.get_height());
+   const float2 c = pos * 0.5 - 0.5;
+   const int2 q0 = int2(floor(c)) - 1, fs = int2(t.get_width(), t.get_height());
    float4 a = float4(0.0); float ws = 0.0;
-   for (int j = -1; j <= 1; j++)
-      for (int i = -1; i <= 1; i++)
+   for (int j = 0; j < 4; j++)
+      for (int i = 0; i < 4; i++)
       {
-         const uint2 c = uint2(clamp(q + int2(i, j), int2(0), fs - 1));
-         const float dq = vd.read(c).x;
-         if (dq < 0.0 || abs(dq - dist) > 0.05 * dist) continue;
-         a += t.read(c); ws += 1.0;
+         const int2 qi = q0 + int2(i, j);
+         const float2 dd = abs(float2(qi) - c);
+         const float w = max(1.5 - dd.x, 0.0) * max(1.5 - dd.y, 0.0);
+         if (w <= 0.0) continue;
+         const uint2 cc = uint2(clamp(qi, int2(0), fs - 1));
+         const float2 dq = vd.read(cc).xy;
+         if (dq.x < 0.0 || abs(dq.x - dist) > 0.05 * dist) continue;
+         a += w * t.read(cc); bs += w * dq.y; ws += w;
       }
-   return ws > 0.0 ? a / ws : t.read(uint2(clamp(q, int2(0), fs - 1)));
+   if (ws > 0.0) { bs /= ws; return a / ws; }
+   const uint2 c0 = uint2(clamp(int2(pos) / 2, int2(0), fs - 1));
+   bs = vd.read(c0).y;
+   return t.read(c0);
 }
 #ifndef SSS_K
 #define SSS_K 4.0
@@ -1201,7 +1212,8 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    // GI and traced reflections run in tr_fs at half res; this pass writes their demodulated weights instead.
    // Row 5.6: the fog's light on this surface (vis_fs, half res, its 3x3 box against noise) and how much of the
    // sky still gets through the fog to it (a), which dims the environment's own light here: fog replaces sky.
-   const float4 fogE = visE.get_width() > 1 ? fogTap(visE, visD, in.pos.xy, distance(in.wp, f.eye.xyz)) : float4(0.0, 0.0, 0.0, 1.0);
+   float fogB = 0.0; // the share of this surface's hemisphere that is geometry (vis_fs)
+   const float4 fogE = visE.get_width() > 1 ? fogTap(visE, visD, in.pos.xy, distance(in.wp, f.eye.xyz), fogB) : float4(0.0, 0.0, 0.0, 1.0);
    const float3 irradiance = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0 * fogE.a;
    const float3 fAmb = fresnelRough(nDotV, f0, rough) * iridK;
    const float3 envRefl = sampleEnv(f, et, reflect(-viewDir, n), rough) * fAmb * (aoV * ccAt * shV) * fogE.a;
@@ -1265,7 +1277,8 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    float3 fogIn = float3(0.0); float fogT = 1.0;
    if (visF.get_width() > 1)
    {
-      const float4 a = fogTap(visF, visD, in.pos.xy, distance(in.wp, f.eye.xyz));
+      float bs = 0.0;
+      const float4 a = fogTap(visF, visD, in.pos.xy, distance(in.wp, f.eye.xyz), bs);
       fogIn = a.rgb; fogT = a.a;
    }
    FOut o;
@@ -1282,6 +1295,11 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    o.c1 = float4(giOn ? (((float3(1.0) - fAmb) * (1.0 - metal) * base * opaque + fAmb * envKeep) * shV + shAmb * opaque) * f.gi.y * f.params.x * (aoV * ccAt) : float3(0.0), rough); // GI weight
    o.c2 = float4(fAmb * (1.0 - envKeep) * f.params.x * (aoV * ccAt * shV), reflOn ? 1.0 : 0.0); // traced-reflection weight
    o.c1.rgb *= fogT * fogE.a; o.c2.rgb *= fogT * fogE.a; // the traced GI and reflections see the env through the fog too
+   // The fog along the view scatters the room's bounce light too (vis_fs scatters only the lights and the sky): the
+   // GI at this surface stands in for the field the view ray crosses, an even isotropic field (the phase integrates to
+   // 1, so in-scatter = albedo x (1 - T)), through the fog it crossed (fogE.a), and only its share from geometry
+   // (fogB): the sky's share is already in vis_fs, and open haze would count it twice.
+   if (giOn && visF.get_width() > 1) o.c1.rgb += f.ambient.w * (1.0 - fogT) * fogE.a * fogB * f.gi.y * f.params.x;
    o.c3 = float4(n, length(in.wp - f.eye.xyz));
    return o;
 }
@@ -3561,6 +3579,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             EnsureShadowTex(4);
          const bool giOn = fr.gi && haveTlas;
          f.gi[0] = giOn ? 1.0f : 0.0f; f.gi[1] = fr.giStrength; f.gi[2] = (float)fr.frameIndex; f.gi[3] = (float)fr.giRays;
+         f.ambient[3] = (fr.fogColor[0] + fr.fogColor[1] + fr.fogColor[2]) / 3.0f; // the fog's mean albedo (r_fs)
          f.shQ[2] = (rt ? 1.0f : 0.0f) + (rtRefl ? 2.0f : 0.0f); f.shQ[3] = fr.rayBias;
          if (rt) { f.shP[1] = 0; f.shP[0] = 0; f.shP[3] = fr.shadow.strength; }
          // RT shadows: a depth-only prepass (the shaded pass then runs once per pixel), then the half-res shadow mask
@@ -4546,7 +4565,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                vd.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
                vd.fragmentFunction = [mLib newFunctionWithName:@"vis_fs"];
                vd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA8Unorm;
-               vd.colorAttachments[1].pixelFormat = MTLPixelFormatR32Float;
+               vd.colorAttachments[1].pixelFormat = MTLPixelFormatRG32Float;
                vd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
                vd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA16Float; // row 5.6: fog fill
                mVisPso = [mDev newRenderPipelineStateWithDescriptor:vd error:&err];
@@ -4763,7 +4782,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          d.pixelFormat = MTLPixelFormatRGBA16Float; d.width = (w + 1) / 2; d.height = (h + 1) / 2;
          mTr[0] = [mDev newTextureWithDescriptor:d]; mTr[1] = [mDev newTextureWithDescriptor:d];
          d.pixelFormat = MTLPixelFormatRGBA8Unorm; mVis = [mDev newTextureWithDescriptor:d];
-         d.pixelFormat = MTLPixelFormatR32Float; mVisD = [mDev newTextureWithDescriptor:d];
+         d.pixelFormat = MTLPixelFormatRG32Float; mVisD = [mDev newTextureWithDescriptor:d];
          d.pixelFormat = MTLPixelFormatRGBA16Float; mVisF = [mDev newTextureWithDescriptor:d]; mVisE = [mDev newTextureWithDescriptor:d];
          mHistValid = false; mRValid = false;
          return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1] && mNz && mAt[0] && mAt[1] && mTr[0] && mTr[1] && mVis && mVisD && mVisF && mVisE;

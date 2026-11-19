@@ -121,7 +121,7 @@ every step; keep a change only if it measures better.
 
 | # | Step | Source | Gate | Kind |
 |---|---|---|---|---|
-| 4.1 | Volumes: homogeneous in settle, then live/raster, then grids (Field Pixel 3D density) | DESIGN G1 | three volume cases at the path gates | shaped fog (falloff) + raster fog + multi-scatter gain done 2026-11-19; settle haze 0.062 and live shaft/haze over gate; grids open |
+| 4.1 | Volumes: homogeneous in settle, then live/raster, then grids (Field Pixel 3D density) | DESIGN G1 | three volume cases at the path gates | shaped fog (falloff) + raster fog + multi-scatter gain done 2026-11-19; settle haze 0.062; live fog scatters the room's bounce light 2026-11-20 (shaft .123, haze .146, both under the 0.15 live gate); grids open (Volume 3D output: owner) |
 | 4.2 | Light shapes, IES profiles, light linking | DESIGN G8 | one case each | shapes + spread done 2026-11-19 (light_disc, light_spread); IES done 2026-11-19 (light_ies); linking + shadow linking done 2026-11-19 (self-test, R/L/T) |
 | 4.3 | Sky + atmosphere | REALISM R15 | sky cases ≤ 0.05 settle | **owner** |
 | 4.4 | Caustics in settle | DESIGN G3 | caustic cases ≤ 0.08 | done 2026-11-19: photon pass into a hash grid (caustic_glass_sphere .045, caustic_pool .076); live/raster none by design |
