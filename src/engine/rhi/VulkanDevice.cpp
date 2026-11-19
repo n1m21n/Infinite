@@ -26,6 +26,7 @@
 
 #include "vkshaders/bg_frag.h"
 #include "vkshaders/bg_vert.h"
+#include "vkshaders/caus_comp.h"
 #include "vkshaders/dnatrous_comp.h"
 #include "vkshaders/dnprep_comp.h"
 #include "vkshaders/pt_comp.h"
@@ -745,6 +746,34 @@ namespace
          if (!PtBuf(mPtUB, &pu, sizeof(pu)))
             return false;
          std::memset(mHistB.map, 0, 64 * sizeof(uint32_t));
+         // Row 4.4: caustics, as MetalRaster::PathTrace: the glass's world bounds aim the photons and size the cells.
+         float cLo[3] = { 1e30f, 1e30f, 1e30f }, cHi[3] = { -1e30f, -1e30f, -1e30f };
+         bool glass = false;
+         for (const engine::Instance& in : fr.instances)
+         {
+            if (in.transmission <= 0.0f || in.mesh < 0 || in.mesh >= (int)mCpu.size())
+               continue;
+            const std::vector<float>& vp = mCpu[(size_t)in.mesh].pn; // pos + normal, stride 6
+            for (size_t v = 0; v + 5 < vp.size(); v += 6)
+               for (int a = 0; a < 3; a++)
+               {
+                  const float w = in.model[a] * vp[v] + in.model[4 + a] * vp[v + 1] + in.model[8 + a] * vp[v + 2] + in.model[12 + a];
+                  cLo[a] = std::min(cLo[a], w); cHi[a] = std::max(cHi[a], w);
+               }
+            glass = cLo[0] <= cHi[0];
+         }
+         const bool caus = glass && f.fld[1] > 0.5f && mCausPso;
+         FramePush cpc = {};
+         if (caus)
+         {
+            float rad = 0.0f;
+            for (int a = 0; a < 3; a++) { cpc.clr[a] = 0.5f * (cLo[a] + cHi[a]); rad += (cHi[a] - cLo[a]) * (cHi[a] - cLo[a]); }
+            cpc.clr[3] = 0.5f * std::sqrt(rad) * 1.02f;
+            cpc.bg[0] = cpc.clr[3] / 48.0f; cpc.bg[1] = 256.0f * 256.0f; cpc.bg[3] = f.fld[1];
+            pu.em[3] = cpc.bg[0];
+            if (!PtBuf(mPtUB, &pu, sizeof(pu)))
+               return false;
+         }
          PtWriteSet(envLight);
 
          VkCommandBuffer cb = C.Begin();
@@ -762,6 +791,19 @@ namespace
          vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, mPtPso);
          for (int s = 0; s < std::max(1, spp); s++)
          {
+            if (caus)
+            {
+               vkCmdFillBuffer(cb, mCausB.buf, 0, VK_WHOLE_SIZE, 0);
+               VkMemoryBarrier fb = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+               fb.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; fb.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+               vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &fb, 0, nullptr, 0, nullptr);
+               vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, mCausPso);
+               cpc.bg[2] = (float)mPtN;
+               vkCmdPushConstants(cb, mPtLayout, pcs, 0, sizeof(cpc), &cpc);
+               vkCmdDispatch(cb, 32, 32, 1);
+               barrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+               vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, mPtPso);
+            }
             pc.bg[0] = (float)mPtN; pc.bg[1] = (float)(mPtFrame++);
             vkCmdPushConstants(cb, mPtLayout, pcs, 0, sizeof(pc), &pc);
             vkCmdDispatch(cb, gx, gy, 1);
@@ -1504,19 +1546,19 @@ namespace
          if (!mPtSetLayout)
          {
             const VkShaderStageFlags cf = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-            VkDescriptorSetLayoutBinding b[19] = {};
-            for (uint32_t i = 0; i < 19; i++)
+            VkDescriptorSetLayoutBinding b[20] = {};
+            for (uint32_t i = 0; i < 20; i++)
             {
                b[i].binding = i; b[i].descriptorCount = 1; b[i].stageFlags = cf;
-               b[i].descriptorType = i <= 8 || i == 18 ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+               b[i].descriptorType = i <= 8 || i >= 18 ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
                                      : i <= 10       ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
                                                      : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
             }
             VkDescriptorSetLayoutCreateInfo li = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-            li.bindingCount = 19; li.pBindings = b;
+            li.bindingCount = 20; li.pBindings = b;
             if (vkCreateDescriptorSetLayout(C.dev, &li, nullptr, &mPtSetLayout) != VK_SUCCESS)
                return false;
-            const VkDescriptorPoolSize ps[3] = { { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 }, { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2 },
+            const VkDescriptorPoolSize ps[3] = { { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 11 }, { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2 },
                                                  { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 7 } };
             VkDescriptorPoolCreateInfo pi = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
             pi.maxSets = 1; pi.poolSizeCount = 3; pi.pPoolSizes = ps;
@@ -1532,7 +1574,8 @@ namespace
             pl.setLayoutCount = 2; pl.pSetLayouts = two; pl.pushConstantRangeCount = 1; pl.pPushConstantRanges = &pr;
             if (vkCreatePipelineLayout(C.dev, &pl, nullptr, &mPtLayout) != VK_SUCCESS)
                return false;
-            if (!MakeBuf(C, 64 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mHistB))
+            if (!MakeBuf(C, 64 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mHistB) ||
+                !MakeBuf(C, (VkDeviceSize)(1u << 19) * 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, mCausB))
                return false;
             const float zero = 0.0f;
             if (!MakeImg(C, 1, 1, VK_FORMAT_R32_SFLOAT, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, mCdfDummy) ||
@@ -1542,6 +1585,7 @@ namespace
          if (!mPtPso) { VkShaderModule m = Module(C, kVkPtComp, sizeof(kVkPtComp)); mPtPso = Compute(m); vkDestroyShaderModule(C.dev, m, nullptr); }
          if (!mDnPrepPso) { VkShaderModule m = Module(C, kVkDnprepComp, sizeof(kVkDnprepComp)); mDnPrepPso = Compute(m); vkDestroyShaderModule(C.dev, m, nullptr); }
          if (!mDnAtrousPso) { VkShaderModule m = Module(C, kVkDnatrousComp, sizeof(kVkDnatrousComp)); mDnAtrousPso = Compute(m); vkDestroyShaderModule(C.dev, m, nullptr); }
+         if (!mCausPso) { VkShaderModule m = Module(C, kVkCausComp, sizeof(kVkCausComp)); mCausPso = Compute(m); vkDestroyShaderModule(C.dev, m, nullptr); } // row 4.4; none = no caustics
          if (!mPtResPso[fi])
          {
             VkShaderModule bv = Module(C, kVkBgVert, sizeof(kVkBgVert)), rf = Module(C, kVkPtresFrag, sizeof(kVkPtresFrag));
@@ -1561,31 +1605,32 @@ namespace
       void PtWriteSet(bool envLight)
       {
          const Buf* bufs[9] = { &mPtUB, &mLightB, &mEmB, &mBaseB, &mTriB, &mNodeB, &mVtxB, &mIdxB, &mUvB };
-         VkDescriptorBufferInfo bi[10];
+         VkDescriptorBufferInfo bi[11];
          for (int i = 0; i < 9; i++) bi[i] = { bufs[i]->buf, 0, VK_WHOLE_SIZE };
          bi[9] = { mHistB.buf, 0, VK_WHOLE_SIZE };
+         bi[10] = { mCausB.buf, 0, VK_WHOLE_SIZE };
          VkDescriptorImageInfo si[2] = { { VK_NULL_HANDLE, (envLight ? mCdf : mCdfDummy).view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
                                          { VK_NULL_HANDLE, mELut.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL } };
          VkDescriptorImageInfo ii[7];
          for (int i = 0; i < 7; i++) ii[i] = { VK_NULL_HANDLE, mPtImg[i].view, VK_IMAGE_LAYOUT_GENERAL };
-         VkWriteDescriptorSet w[19] = {};
-         for (uint32_t i = 0; i < 19; i++)
+         VkWriteDescriptorSet w[20] = {};
+         for (uint32_t i = 0; i < 20; i++)
          {
             w[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET; w[i].dstSet = mPtSet; w[i].dstBinding = i; w[i].descriptorCount = 1;
             if (i <= 8) { w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; w[i].pBufferInfo = &bi[i]; }
-            else if (i == 18) { w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; w[i].pBufferInfo = &bi[9]; }
+            else if (i >= 18) { w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; w[i].pBufferInfo = &bi[i - 9]; }
             else if (i <= 10) { w[i].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE; w[i].pImageInfo = &si[i - 9]; }
             else { w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; w[i].pImageInfo = &ii[i - 11]; }
          }
-         vkUpdateDescriptorSets(mC->dev, 19, w, 0, nullptr);
+         vkUpdateDescriptorSets(mC->dev, 20, w, 0, nullptr);
       }
       void PtFree()
       {
          const Ctx& C = *mC;
-         for (Buf* b : { &mPtUB, &mLightB, &mEmB, &mBaseB, &mTriB, &mNodeB, &mVtxB, &mIdxB, &mUvB, &mHistB }) FreeBuf(C, *b);
+         for (Buf* b : { &mPtUB, &mLightB, &mEmB, &mBaseB, &mTriB, &mNodeB, &mVtxB, &mIdxB, &mUvB, &mHistB, &mCausB }) FreeBuf(C, *b);
          for (Img& m : mPtImg) FreeImg(C, m);
          FreeImg(C, mCdf); FreeImg(C, mCdfDummy); FreeImg(C, mELut);
-         for (VkPipeline p : { mPtPso, mDnPrepPso, mDnAtrousPso, mPtResPso[0], mPtResPso[1] })
+         for (VkPipeline p : { mPtPso, mDnPrepPso, mDnAtrousPso, mCausPso, mPtResPso[0], mPtResPso[1] })
             if (p) vkDestroyPipeline(C.dev, p, nullptr);
          if (mPtLayout) vkDestroyPipelineLayout(C.dev, mPtLayout, nullptr);
          if (mPtPool) vkDestroyDescriptorPool(C.dev, mPtPool, nullptr);
@@ -1597,8 +1642,8 @@ namespace
       VkDescriptorPool mPtPool = VK_NULL_HANDLE;
       VkDescriptorSet mPtSet = VK_NULL_HANDLE;
       VkPipelineLayout mPtLayout = VK_NULL_HANDLE;
-      VkPipeline mPtPso = VK_NULL_HANDLE, mDnPrepPso = VK_NULL_HANDLE, mDnAtrousPso = VK_NULL_HANDLE, mPtResPso[2] = {};
-      Buf mPtUB, mLightB, mEmB, mBaseB, mTriB, mNodeB, mVtxB, mIdxB, mUvB, mHistB;
+      VkPipeline mPtPso = VK_NULL_HANDLE, mDnPrepPso = VK_NULL_HANDLE, mDnAtrousPso = VK_NULL_HANDLE, mCausPso = VK_NULL_HANDLE, mPtResPso[2] = {};
+      Buf mPtUB, mLightB, mEmB, mBaseB, mTriB, mNodeB, mVtxB, mIdxB, mUvB, mHistB, mCausB;
       Img mPtImg[7]; // acc, aux, gd, dnC0, dnC1, dnG, dnA (set 1, bindings 11..17)
       Img mCdf, mCdfDummy, mELut;
       unsigned long long mCdfRev = ~0ull - 1;

@@ -762,3 +762,42 @@ from judge_table import judge_table
 CASES["judge_table"] = judge_table("flaws")
 CASES["judge_table_base"] = judge_table("base")
 CASES["judge_table_clay"] = judge_table("clay")
+
+
+# Row 4.4: caustics in settle. A clear glass ball on a white floor under a sun (its shadow holds the focused spot),
+# and a pool: a wavy water sheet over the floor, the sun's light gathered into a net of bright lines below it.
+# Truth: Cycles with shadow caustics (MNEE) on, glass as caster, everything else as receiver.
+WHITE_FLOOR = {"shape": "plane", "scale": 6, "material": {"base_color": [0.8, 0.8, 0.8], "roughness": 0.8}}
+
+
+def _caustic_glass_sphere():
+    return {"camera": {"fov": 40, "azimuth": 70, "elevation": 35, "distance": 2.6, "target": [-0.25, 0.08, 0.2]},
+            "lights": [{"type": "sun", "power": 4, "azimuth": 20, "elevation": 45}],
+            "world": {"color": [0.03, 0.03, 0.035]}, "size": (256, 256), "samples": 1024, "caustics": True,
+            "objects": [WHITE_FLOOR, _ball(0.0, 0.0, 0.45, base_color=[1, 1, 1], transmission=1.0, roughness=0.0, ior=1.45)]}
+
+
+def _caustic_pool():
+    import math
+    n, half, h = 96, 1.0, 0.3
+    verts, faces = [], []
+    for j in range(n + 1):
+        for i in range(n + 1):
+            x, y = -half + 2 * half * i / n, -half + 2 * half * j / n
+            z = h + 0.012 * (math.sin(14 * x + 1.3) * math.cos(11 * y) + 0.7 * math.sin(9 * x - 13 * y + 0.4)
+                             + 0.5 * math.cos(17 * y + 6 * x))
+            verts.append([x, y, z])
+    for j in range(n):
+        for i in range(n):
+            a = j * (n + 1) + i
+            faces.append([a, a + 1, a + n + 2, a + n + 1])
+    water = {"shape": "mesh", "verts": verts, "faces": faces,
+             "material": {"base_color": [1, 1, 1], "transmission": 1.0, "roughness": 0.0, "ior": 1.33}}
+    return {"camera": {"fov": 40, "azimuth": 60, "elevation": 55, "distance": 3.2, "target": [0, 0, 0.1]},
+            "lights": [{"type": "sun", "power": 1.5, "azimuth": 30, "elevation": 60}],
+            "world": {"color": [0.03, 0.03, 0.035]}, "size": (256, 256), "samples": 1024, "caustics": True,
+            "objects": [WHITE_FLOOR, water]}
+
+
+CASES["caustic_glass_sphere"] = _caustic_glass_sphere()
+CASES["caustic_pool"] = _caustic_pool()

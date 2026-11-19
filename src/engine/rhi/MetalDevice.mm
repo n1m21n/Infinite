@@ -1625,9 +1625,127 @@ float3 hgSample(float3 w, float g, float u1, float u2)
    const float3 t = normalize(cross(w, abs(w.y) < 0.99 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0)));
    return normalize(t * (st * cos(ph)) + cross(w, t) * (st * sin(ph)) + w * c);
 }
+// Row 4.4: caustics in settle. Light reaching a surface through glass (a sun through a ball, through water) is
+// carried by photons: each settle pass sends kCausN of them from every shadow-casting light at the glass's bounding
+// disc, through its reflections and refractions, onto the first other surface, where their irradiance lands in a hash
+// grid. Settle reads it at each diffuse hit (the camera's straight shadow ray stays blocked, as before). Cells are
+// squares of side h in the plane across the surface's main axis (bins of 4h along it, keyed by axis and side), so a
+// floor at any height keeps its photons, and the stored value is already irradiance (flux x |n axis| / h^2).
+constant uint kCausCells = 1u << 19;
+uint causKey(float3 p, float3 n, float h, float2 jit)
+{
+   const float3 an = abs(n);
+   const int a = an.x >= an.y && an.x >= an.z ? 0 : (an.y >= an.z ? 1 : 2);
+   const int ua = a == 0 ? 1 : 0, va = a == 2 ? 1 : 2;
+   const int3 c = int3(int(floor(p[ua] / h + jit.x)), int(floor(p[va] / h + jit.y)), int(floor(p[a] / (4.0 * h) + 0.5)));
+   const uint side = uint(a) * 2u + (n[a] < 0.0 ? 1u : 0u);
+   return pcg(uint(c.x) * 73856093u ^ pcg(uint(c.y) * 19349663u ^ pcg(uint(c.z) * 83492791u + side))) | 1u;
+}
+float causAxisCos(float3 n) { const float3 an = abs(n); return max(an.x, max(an.y, an.z)); }
+float3 causGet(const device uint* g, uint key)
+{
+   uint s = pcg(key ^ 0x9e3779b9u) & (kCausCells - 1u);
+   for (int t = 0; t < 8; t++, s = (s + 1u) & (kCausCells - 1u))
+   {
+      const uint k = g[s * 4u];
+      if (k == key) return float3(g[s * 4u + 1u], g[s * 4u + 2u], g[s * 4u + 3u]) * (1.0 / 4096.0);
+      if (k == 0u) break;
+   }
+   return float3(0.0);
+}
+void causAdd(device atomic_uint* g, uint key, float3 e)
+{
+   uint s = pcg(key ^ 0x9e3779b9u) & (kCausCells - 1u);
+   for (int t = 0; t < 8; t++, s = (s + 1u) & (kCausCells - 1u))
+   {
+      uint k = atomic_load_explicit(&g[s * 4u], memory_order_relaxed);
+      for (int r = 0; r < 4 && k == 0u; r++)
+      {
+         uint ex = 0u;
+         if (atomic_compare_exchange_weak_explicit(&g[s * 4u], &ex, key, memory_order_relaxed, memory_order_relaxed)) k = key;
+         else k = ex;
+      }
+      if (k != key) continue;
+      const uint3 q = uint3(clamp(e * 4096.0, float3(0.0), float3(16777216.0)));
+      for (int c = 0; c < 3; c++) if (q[c] > 0u) atomic_fetch_add_explicit(&g[s * 4u + 1u + uint(c)], q[c], memory_order_relaxed);
+      return;
+   }
+}
+// c: the glass's bounding sphere (centre, radius); info: x cell side h, y photons per pass, z pass index, w light count
+struct CausU { float4 c; float4 info; };
+fragment float4 caus_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant CausU& u [[buffer(0)]],
+                        constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], constant LightU* LL [[buffer(6)]],
+                        device atomic_uint* grid [[buffer(7)]])
+{
+   const uint2 px = uint2(in.pos.xy);
+   const uint id = px.x + 256u * px.y;
+   Lds qs = { uint(u.info.z), pcg(id * 747796405u + 1u), 0u, 0u, pcg(id ^ pcg(uint(u.info.z) * 2654435761u + 7u)) };
+   const int count = int(u.info.w);
+   if (count <= 0) return float4(0.0);
+   const int li = min(int(rnd(qs) * float(count)), count - 1);
+   constant LightU& Lt = LL[li];
+   const int type = int(Lt.vec.w);
+   if (type == 3 || Lt.color.w > 0.5) return float4(0.0); // ambient, or a light whose shadows are off (glass already lets it through)
+   const float3 axis = (type == 1 || type == 4 || type == 5) ? normalize(Lt.vec.xyz - u.c.xyz) : normalize(Lt.vec.xyz);
+   const float3 ax = abs(axis.y) < 0.99 ? normalize(cross(axis, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0), ay = cross(axis, ax);
+   const float rr = u.c.w * sqrt(rnd(qs)), ph = 6.28318530718 * rnd(qs);
+   const float3 xd = u.c.xyz + (ax * cos(ph) + ay * sin(ph)) * rr;
+   float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0); int lix = -1;
+   ldsEvent(qs);
+   ptPickLight(f, LL + li, nullptr, 0, 0.0, 1, xd, qs, ld, Le, tmax, pL, lterms, 0.0, lix);
+   if (!any(Le > 0.0)) return float4(0.0);
+   // Flux through this photon's share of the disc: irradiance across the light direction x the disc's slant x area.
+   float3 T = Le * lterms.x * max(dot(ld, axis), 0.0) * (3.14159265 * u.c.w * u.c.w) * float(count) / u.info.y;
+   float3 o = xd + ld * min(tmax, 100.0), d = -ld;
+   bool spec = false;
+   intersector<triangle_data, instancing> it;
+   it.assume_geometry_type(geometry_type::triangle);
+   for (int b = 0; b < 8; b++)
+   {
+      ldsEvent(qs);
+      intersection_result<triangle_data, instancing> h = it.intersect(ray(o, d, 0.0, 1e4), rtArgs.tlas, 1);
+      if (h.type != intersection_type::triangle) break;
+      constant RInst& I = inst[h.instance_id];
+      const device uint* ib = reinterpret_cast<const device uint*>(I.ib);
+      const device float* vb = reinterpret_cast<const device float*>(I.vb);
+      const uint3 ix = uint3(ib[h.primitive_id * 3], ib[h.primitive_id * 3 + 1], ib[h.primitive_id * 3 + 2]);
+      const float2 bc = h.triangle_barycentric_coord;
+      const float3 w3 = float3(1.0 - bc.x - bc.y, bc.x, bc.y);
+      const float3 nl = float3(vb[ix.x * 6 + 3], vb[ix.x * 6 + 4], vb[ix.x * 6 + 5]) * w3.x
+                      + float3(vb[ix.y * 6 + 3], vb[ix.y * 6 + 4], vb[ix.y * 6 + 5]) * w3.y
+                      + float3(vb[ix.z * 6 + 3], vb[ix.z * 6 + 4], vb[ix.z * 6 + 5]) * w3.z;
+      float3 n = normalize((I.normalM * float4(nl, 0.0)).xyz);
+      const bool backHit = dot(n, d) > 0.0;
+      if (backHit) n = -n;
+      const float3 p = o + d * h.distance;
+      if (noShadowBy(inst, h.instance_id, shLink(Lt, li))) { o = offRay(p, -n); continue; } // row 4.2: passes this light
+      const float glW = clamp(I.mat.transmission, 0.0, 1.0) * (1.0 - clamp(I.mat.metallic, 0.0, 1.0));
+      if (glW > 0.0 && rnd(qs) < glW)
+      {
+         const float ta = max(0.002, clamp(I.mat.roughness, 0.0, 1.0) * clamp(I.mat.roughness, 0.0, 1.0));
+         const float3 V = -d, Hm = ggxSampleH(n, ta, rnd(qs), rnd(qs));
+         const float cosI = dot(V, Hm);
+         if (cosI <= 1e-5) break;
+         const float ior = max(I.mat.ior, 1.0001), eta = backHit ? ior : 1.0 / ior;
+         float3 nd; bool thru = false;
+         if (rnd(qs) < ptFd(cosI, eta)) { nd = reflect(d, Hm); if (dot(n, nd) <= 0.0) break; }
+         // Refraction also takes eta^2: the adjoint of the camera side's glass, which (as Cycles') leaves radiance's
+         // 1/eta^2 out, so photons and camera paths agree; a closed body's two crossings cancel it.
+         else { nd = refract(d, Hm, eta); if (dot(nd, nd) < 1e-6 || dot(n, nd) >= 0.0) break; T *= float3(I.mat.base) * (eta * eta); thru = true; }
+         const float gV = max(abs(dot(n, V)), 1e-4), gL = max(abs(dot(n, nd)), 1e-4), gH = max(dot(n, Hm), 1e-4);
+         T *= min(cosI * ptG1(gV, ta) * ptG1(gL, ta) / (gV * gH), 4.0);
+         o = offRay(p, thru ? -n : n); d = normalize(nd); spec = true;
+         continue;
+      }
+      if (I.mat.clear > 0.0 && rnd(qs) < I.mat.clear) { o = offRay(p, -n); continue; } // see-through surfaces pass it
+      if (spec) causAdd(grid, causKey(p, n, u.info.x, float2(0.0)), T * causAxisCos(n) / (u.info.x * u.info.x));
+      break;
+   }
+   return float4(0.0);
+}
 fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
-                      constant LightU* LL [[buffer(6)]],
+                      constant LightU* LL [[buffer(6)]], const device uint* caus [[buffer(7)]],
                       texture2d<float> prev [[texture(0)]], texture2d<float> prevAux [[texture(1)]], texture2d<float> prevGd [[texture(2)]],
                       texture2d<float> ecdf [[texture(3)]],
                       texture2d<float> eLut [[texture(8)]], texture2d<float> et [[texture(9)]],
@@ -1968,6 +2086,12 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          }
          o = offRay(p, thru ? -ns : ns); d = normalize(nd);
          continue;
+      }
+      if (u.em.w > 0.0 && metal < 1.0 && !hairM)
+      {
+         // Row 4.4: caustics, the photons' irradiance here (read through a jittered cell, a box blur over the passes).
+         const float3 Ec = causGet(caus, causKey(p, ns, u.em.w, float2(rnd(qs), rnd(qs)) - 0.5));
+         if (any(Ec > 0.0)) L += T * (float3(1.0) - ptF(nDotV, f0)) * (1.0 - metal) * base * (1.0 / 3.14159265) * Ec;
       }
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w; // Render 3D's rim, as the raster, so settling keeps the look
       for (int i = 0; i < int(f.fld.y + 0.5); i++) // ambient lights: the raster's flat, unshadowed fill, so settling keeps it
@@ -2555,7 +2679,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          mSrc = src;
          mFieldLibBuilds++;
          mPso = nil; mFmt = MTLPixelFormatInvalid;
-         mPtPso = nil; mPtResPso = nil; mPtFmt = MTLPixelFormatInvalid;
+         mPtPso = nil; mPtResPso = nil; mPtFmt = MTLPixelFormatInvalid; mCausPso = nil;
          mDofPso = nil;
          mInvTried = false; mPrePso = nil; mPsoRunInv = nil; mPsoRunDirInv = nil;
       }
@@ -3214,6 +3338,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       id<MTLTexture> mEnvTex = nil, mEnvDummy = nil, mEnvBound = nil, mEnvCdf = nil;
       unsigned long long mEnvRev = ~0ull;
       id<MTLBuffer> mInfoBuf = nil, mEmBuf = nil;
+      id<MTLRenderPipelineState> mCausPso = nil; id<MTLBuffer> mCausBuf = nil; id<MTLTexture> mCausTgt = nil; // row 4.4
       id<MTLRenderPipelineState> mBgPsoMrt = nil, mBgPsoDir = nil;
       id<MTLDepthStencilState> mDsBg = nil;
       void FillFrame(FrameU& f, const engine::Frame& fr)
@@ -3865,9 +3990,64 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             mEmBuf = [mDev newBufferWithLength:emLen * 2 options:MTLResourceStorageModeShared];
          if (!ems.empty()) std::memcpy(mEmBuf.contents, ems.data(), ems.size() * sizeof(EmTriH));
          id<MTLBuffer> infoBuf = InfoBuffer(info);
+         // Row 4.4: caustics. The glass's world bounds (every instance with transmission) aim the photons and size
+         // the grid's cell; no glass, no photon pass.
+         float cLo[3] = { 1e30f, 1e30f, 1e30f }, cHi[3] = { -1e30f, -1e30f, -1e30f };
+         bool glass = false;
+         for (const engine::Instance& in : fr.instances)
+         {
+            if (in.transmission <= 0.0f || in.mesh < 0 || in.mesh >= (int)mMeshes.size())
+               continue;
+            const Gpu& g = mMeshes[in.mesh];
+            for (int k = 0; k < 8; k++)
+            {
+               const float c[3] = { (k & 1) ? g.hi[0] : g.lo[0], (k & 2) ? g.hi[1] : g.lo[1], (k & 4) ? g.hi[2] : g.lo[2] };
+               for (int a = 0; a < 3; a++)
+               {
+                  const float w = in.model[a] * c[0] + in.model[4 + a] * c[1] + in.model[8 + a] * c[2] + in.model[12 + a];
+                  cLo[a] = std::min(cLo[a], w); cHi[a] = std::max(cHi[a], w);
+               }
+            }
+            glass = true;
+         }
+         const bool caus = glass && f.fld[1] > 0.5f && CausPipeline();
+         float cU[8] = {};
+         if (caus)
+         {
+            float rad = 0.0f;
+            for (int a = 0; a < 3; a++) { cU[a] = 0.5f * (cLo[a] + cHi[a]); rad += (cHi[a] - cLo[a]) * (cHi[a] - cLo[a]); }
+            cU[3] = 0.5f * std::sqrt(rad) * 1.02f;
+            cU[4] = cU[3] / 48.0f; cU[5] = (float)(kCausSide * kCausSide); cU[7] = f.fld[1];
+         }
          for (int s = 0; s < std::max(1, spp); s++)
          {
             const int cur = 1 - mPtCur;
+            if (caus)
+            {
+               id<MTLBlitCommandEncoder> bl = [cb blitCommandEncoder];
+               [bl fillBuffer:mCausBuf range:NSMakeRange(0, mCausBuf.length) value:0];
+               [bl endEncoding];
+               MTLRenderPassDescriptor* cp = [MTLRenderPassDescriptor renderPassDescriptor];
+               cp.colorAttachments[0].texture = mCausTgt;
+               cp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+               cp.colorAttachments[0].storeAction = MTLStoreActionDontCare;
+               id<MTLRenderCommandEncoder> ce = [cb renderCommandEncoderWithDescriptor:cp];
+               [ce setRenderPipelineState:mCausPso];
+               cU[6] = (float)mPtN;
+               [ce setFragmentBytes:cU length:sizeof(cU) atIndex:0];
+               [ce setFragmentBytes:&f length:sizeof(f) atIndex:1];
+               [ce setFragmentBuffer:mArgBuf offset:0 atIndex:3];
+               [ce setFragmentBuffer:infoBuf offset:0 atIndex:4];
+               [ce setFragmentBuffer:mLightBuf offset:0 atIndex:6];
+               [ce setFragmentBuffer:mCausBuf offset:0 atIndex:7];
+               [ce useResource:mCausBuf usage:MTLResourceUsageRead | MTLResourceUsageWrite stages:MTLRenderStageFragment];
+               [ce useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               for (const Gpu& g : mMeshes) { [ce useResource:g.RV() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [ce useResource:g.RI() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RU()) [ce useResource:g.RU() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RW()) [ce useResource:g.RW() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
+               for (id<MTLAccelerationStructure> b in mBlas) [ce useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               UseClusters(ce);
+               [ce drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+               [ce endEncoding];
+            }
             MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
             id<MTLTexture> outs[3] = { mPtAcc[cur], mPtAux[cur], mPtGd[cur] };
             for (int k = 0; k < 3; k++)
@@ -3888,13 +4068,14 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             std::memcpy(pu.invVP, inv, 64);
             pu.info[0] = (float)mPtN; pu.info[1] = (float)std::max(1, bounces); pu.info[2] = (float)(mPtFrame++); pu.info[3] = (float)img.Width();
             const bool envLight = mEnvCdf && mEnvBound == mEnvTex; // the HDRI can be sampled as a light
-            pu.em[0] = (float)ems.size(); pu.em[1] = pEm; pu.em[2] = envLight ? 1.0f : 0.0f; pu.em[3] = 0.0f;
+            pu.em[0] = (float)ems.size(); pu.em[1] = pEm; pu.em[2] = envLight ? 1.0f : 0.0f; pu.em[3] = caus ? cU[4] : 0.0f;
             [e setFragmentBytes:&pu length:sizeof(pu) atIndex:0];
             [e setFragmentBytes:&f length:sizeof(f) atIndex:1];
             [e setFragmentBuffer:mArgBuf offset:0 atIndex:3];
             [e setFragmentBuffer:infoBuf offset:0 atIndex:4];
             [e setFragmentBuffer:mEmBuf offset:0 atIndex:5];
             [e setFragmentBuffer:mLightBuf offset:0 atIndex:6];
+            [e setFragmentBuffer:caus ? mCausBuf : mEmBuf offset:0 atIndex:7];
             [e setFragmentTexture:ELut() atIndex:8];
             [e setFragmentTexture:mEnvBound atIndex:9];
             [e setFragmentTexture:mPtAcc[mPtCur] atIndex:0];
@@ -3994,6 +4175,25 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [ce memoryBarrierWithScope:MTLBarrierScopeBuffers];
          }
          [ce endEncoding];
+      }
+      static constexpr int kCausSide = 256; // photons per settle pass: kCausSide^2
+      bool CausPipeline()
+      {
+         if (mCausPso && mCausBuf && mCausTgt)
+            return true;
+         NSError* err = nil;
+         MTLRenderPipelineDescriptor* a = [MTLRenderPipelineDescriptor new];
+         a.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
+         a.fragmentFunction = [mLib newFunctionWithName:@"caus_fs"];
+         a.colorAttachments[0].pixelFormat = MTLPixelFormatR8Unorm;
+         a.colorAttachments[0].writeMask = MTLColorWriteMaskNone;
+         mCausPso = [mDev newRenderPipelineStateWithDescriptor:a error:&err];
+         if (!mCausPso) { EngineFail(@"caustics pipeline", err); return false; }
+         mCausBuf = [mDev newBufferWithLength:(NSUInteger)(1u << 19) * 16 options:MTLResourceStorageModePrivate];
+         MTLTextureDescriptor* td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm width:kCausSide height:kCausSide mipmapped:NO];
+         td.usage = MTLTextureUsageRenderTarget; td.storageMode = MTLStorageModePrivate;
+         mCausTgt = [mDev newTextureWithDescriptor:td];
+         return mCausBuf && mCausTgt;
       }
       bool PtPipeline(MTLPixelFormat fmt)
       {

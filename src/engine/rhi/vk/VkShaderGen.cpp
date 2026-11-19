@@ -496,6 +496,7 @@ int main(int argc, char** argv)
    // Row 9.4: the path tracer (compute, with the fragment library for the maps and the environment).
    const std::string comp = kHead + kFragLib + vkpt::kBind;
    const bool okPt = Put(d, "pt.comp", comp + vkpt::kTrace + vkpt::kPtMain) && Put(d, "dnprep.comp", comp + vkpt::kDnPrep) &&
-                     Put(d, "dnatrous.comp", comp + vkpt::kDnAtrous) && Put(d, "ptres.frag", frag + vkpt::kBind + vkpt::kPtRes);
+                     Put(d, "dnatrous.comp", comp + vkpt::kDnAtrous) &&
+                     Put(d, "caus.comp", comp + vkpt::kTrace + vkpt::kCausMain) && Put(d, "ptres.frag", frag + vkpt::kBind + vkpt::kPtRes);
    return ok && okPt ? 0 : 1;
 }

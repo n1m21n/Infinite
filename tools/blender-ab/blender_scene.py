@@ -428,6 +428,9 @@ for i, o in enumerate(scene["objects"]):
         dm.strength = dz; dm.mid_level = 1.0
 
     m = o.get("material", {})
+    if scene.get("caustics"):   # row 4.4 truth: Cycles' shadow caustics (MNEE), glass casts, everything else receives
+        ob.cycles.is_caustics_caster = m.get("transmission", 0.0) > 0.0
+        ob.cycles.is_caustics_receiver = m.get("transmission", 0.0) <= 0.0
     mat = bpy.data.materials.new("m%d" % i); mat.use_nodes = True
     p = next(n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
     p.inputs["Base Color"].default_value = (*m.get("base_color", (0.8, 0.8, 0.8)), 1)
@@ -670,6 +673,7 @@ for i, l in enumerate(scene.get("lights", [])):
     ld.color = l.get("color", (1, 1, 1))
     ld.energy = l["power"]  # W (W/m^2 for a sun)
     ld.use_shadow = True
+    ld.cycles.is_caustics_light = bool(scene.get("caustics"))
     if kind == "SUN":
         ld.angle = math.radians(l.get("angle", 0.5))
     elif kind == "AREA":
