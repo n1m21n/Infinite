@@ -197,6 +197,15 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1); // bit 0: shadow casters
    return h.type == intersection_type::triangle;
 }
+// Row 5.6: distance to the nearest shadow caster along o + d t, tmax when none.
+float hitDist(instance_acceleration_structure tlas, float3 o, float3 d, float tmax)
+{
+   intersector<triangle_data, instancing> it;
+   it.assume_geometry_type(geometry_type::triangle);
+   ray r(o, d, 0.0, tmax);
+   intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1);
+   return h.type == intersection_type::triangle ? h.distance : tmax;
+}
 // A sun's shadow as its disc (angleDeg across, as settle's cone and Cycles' sun angle): four probe rays first; only
 // where they disagree (the penumbra) twelve more on a golden-angle spiral, turned and jittered per
 // pixel by a hash so the thin sampling reads as fine grain, not bands. 0 = fully blocked, 1 = open.
@@ -813,9 +822,11 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
          const float3 rd = normalize(tx * (rr * cos(ph)) + ty * (rr * sin(ph)) + n * sqrt(max(1.0 - u1, 0.0)));
          const float3 ro = p + n * f.shQ.w;
          float2 sp = boxSpan(u.fogLo.xyz, u.fogHi.xyz, ro, rd, 1e4);
-         // The sky through the whole box; a direction that meets geometry brings its bounce from close by, undimmed.
-         Ts += occluded(rtArgs.tlas, ro, rd, 1e4) ? 1.0 : exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, ro, rd, sp));
-         sp.y = min(sp.y, sp.x + 4.0 / u.fog.x);
+         // The fog only up to the first surface this way (a ball next to the floor hides the fog behind it). The sky
+         // through the whole box; a direction that meets geometry brings its bounce from close by (the GI), undimmed.
+         const float th = hitDist(rtArgs.tlas, ro, rd, 1e4);
+         Ts += th < 1e4 ? 1.0 : exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, ro, rd, sp));
+         sp.y = min(min(sp.y, th), sp.x + 4.0 / u.fog.x);
          if (sp.y <= sp.x) continue;
          float od;
          Lf += fogInScatter(u, f, rtArgs, instInfo, ro, rd, sp, 4, fract(jit + 0.5 * float(r)), true, od) * u.fogC.xyz;
