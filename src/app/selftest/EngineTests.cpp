@@ -1179,6 +1179,31 @@ bool RunEngineTest()
          check(ok == total, "2.5 R/L: Shade Mix, float, vector and 30 colour modes match BlendModes", (double)ok, (double)total);
       }
 
+      // Knob pins: a wired Shade node takes over Checker's colours and scale and Normal Map's strength.
+      {
+         Probe pa("vec3(0.03 + 0.9 * uv.x, 0.07 + 0.8 * uv.y, 0.35)"), pb("vec3(0.07 + 0.8 * uv.y, 0.6, 0.03 + 0.9 * uv.x)");
+         Probe half("vec3(0.5)"), s3("vec3(3.0)"), s1("vec3(1.0)"), flat("vec3(0.0)");
+         auto pA = [&](int x, int y) { return V{ 0.03 + 0.9 * U(x), 0.07 + 0.8 * U(y), 0.35 }; };
+         auto pB = [&](int x, int y) { return V{ 0.07 + 0.8 * U(y), 0.6, 0.03 + 0.9 * U(x) }; };
+         int ok = 0;
+         ShadeCheckerNode odd, even; // 0.5 * 3 = 1.5 per axis: floor sum 3, odd, colour 1; 0.5 * 1: sum 0, colour 2
+         for (ShadeCheckerNode* c : { &odd, &even })
+         {
+            c->ShadeInput(0)->Connect(&half);
+            c->ShadeInput(1)->Connect(&pa);
+            c->ShadeInput(2)->Connect(&pb);
+         }
+         odd.ShadeInput(3)->Connect(&s3);
+         even.ShadeInput(3)->Connect(&s1);
+         if (run("Checker pins odd", odd, pA)) ok++;
+         if (run("Checker pins even", even, pB)) ok++;
+         ShadeNormalMapNode nm; // strength 0 through its pin: flat whatever the map
+         nm.ShadeInput(0)->Connect(&pa);
+         nm.ShadeInput(1)->Connect(&flat);
+         if (run("Normal Map strength pin", nm, [](int, int) { return V{ 0.0, 0.0, 1.0 }; })) ok++;
+         check(ok == 3, "Shade knob pins: wired colour, scale and strength override the knobs", (double)ok, 3.0);
+      }
+
       // Shade Ramp: 4 known stops, 25 factors from -0.076 to 1.076
       {
          Probe pt("vec3(-0.1 + 1.2 * (uv.x + floor(uv.y * 5.0)) / 5.0)");
