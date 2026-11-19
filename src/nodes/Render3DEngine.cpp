@@ -1070,15 +1070,21 @@ bool Render3DNode::CookEngine(int frameId)
       if (!liveRender(nullptr))
          return false;
    }
+   mLastGpuBytes = E.raster->GpuBytes();
+   mLastTriangles = 0;
+   mLastDrawCalls = fr.instances.size(); // one TLAS instance each (the raster's batching aside)
+   for (const engine::Instance& in : fr.instances)
+      if (in.mesh >= 0 && in.mesh < (int)mDraw.size())
+         mLastTriangles += mDraw[(size_t)in.mesh]->GetMesh().indices.size() / 3;
    // Export steps the counter by the warm-up count, so print every exported frame there.
    const bool profNow = sProf && ((E.frame % 30) == 0 || offline);
    if (profNow)
    {
       const auto tp3 = std::chrono::steady_clock::now();
       auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
-      std::fprintf(stderr, "ENGINE_PROF warmGpu=%.1f meshes=%.2f (changed %d, %zu tris) build=%.2f render=%.2f inst=%zu env=%dx%d lod=%.0f bg=%d conn=%d\n",
+      std::fprintf(stderr, "ENGINE_PROF warmGpu=%.1f meshes=%.2f (changed %d, %zu tris) build=%.2f render=%.2f inst=%zu env=%dx%d lod=%.0f bg=%d conn=%d gpuMB=%.0f\n",
                    E.profWarmGpu, ms(tp0, tp1), changedMeshes, changedTris, ms(tp1, tp2), ms(tp2, tp3), fr.instances.size(), fr.envW, fr.envH,
-                   fr.envBaseLod, (int)fr.envBackground, (int)envInput.IsConnected());
+                   fr.envBaseLod, (int)fr.envBackground, (int)envInput.IsConnected(), (double)mLastGpuBytes / 1048576.0);
       E.profWarmGpu = 0.0;
    }
 

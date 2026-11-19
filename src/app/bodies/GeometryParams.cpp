@@ -2617,12 +2617,15 @@ namespace app
       const int connected = (int)n->FlattenedGeometry().size();
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
       ImGui::SameLine(0.0f, 16.0f);
-      ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
+      if (n->LastGpuBytes() > 0)
+         ImGui::TextDisabled("%zu triangles in %zu draw calls, %.0f MB GPU", n->LastTriangleCount(), n->LastDrawCalls(), (double)n->LastGpuBytes() / 1048576.0);
+      else
+         ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
       {
          // The count changes every frame; pad to a fixed worst-case width so the node body doesn't resize with the digits.
          const ImVec2 textMin = ImGui::GetItemRectMin();
          const ImVec2 textSize = ImGui::GetItemRectSize();
-         const float fixedW = ImGui::CalcTextSize("00000000 triangles in 000 draw calls").x;
+         const float fixedW = ImGui::CalcTextSize(n->LastGpuBytes() > 0 ? "00000000 triangles in 000 draw calls, 0000 MB GPU" : "00000000 triangles in 000 draw calls").x;
          if (textSize.x < fixedW)
          {
             ImGui::SetCursorScreenPos(ImVec2(textMin.x + textSize.x, textMin.y));

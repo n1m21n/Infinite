@@ -2695,6 +2695,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       int mFieldLibBuilds = 0;
    public:
       int FieldLibraryBuilds() const override { return mFieldLibBuilds; }
+      size_t GpuBytes() const override { return (size_t)mDev.currentAllocatedSize; }
    private:
       // tvb/tib/tuvb/tcount: the rays' mesh (row 4.3, a displaced copy), nil when the rays see the drawn one.
       struct Gpu

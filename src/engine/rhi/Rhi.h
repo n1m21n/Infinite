@@ -54,6 +54,8 @@ namespace rhi
       virtual bool Upscale(SharedImage& /*low*/, SharedImage& /*out*/, float /*jx*/, float /*jy*/, bool /*reset*/) { return false; }
       // Times the shader was rebuilt for a new set of Field material programs (Frame::fieldMslKey).
       virtual int FieldLibraryBuilds() const { return 0; }
+      // REALISM R18: bytes this renderer's GPU device has allocated now (meshes, BVHs, textures, targets), 0 = unknown.
+      virtual size_t GpuBytes() const { return 0; }
    };
 
    class Device

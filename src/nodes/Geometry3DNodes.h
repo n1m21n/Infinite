@@ -721,6 +721,7 @@ public:
 
    size_t LastTriangleCount() const { return mLastTriangles; }
    size_t LastDrawCalls() const { return mLastDrawCalls; }
+   size_t LastGpuBytes() const { return mLastGpuBytes; } // engine path's device allocation (R18), 0 = none
    // Slots that had to re-upload this frame; 0 means everything came from cache.
    size_t LastUploads() const { return mLastUploads; }
 
@@ -1297,6 +1298,7 @@ private:
    float mLastFillClamp = 1.0f;
    size_t mLastTriangles = 0;
    size_t mLastDrawCalls = 0;
+   size_t mLastGpuBytes = 0;
    size_t mLastUploads = 0;
    bool mHasSceneBuilt = false;
    SceneSignature mSceneBuilt;
