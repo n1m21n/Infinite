@@ -82,6 +82,8 @@ namespace engine
       // but model, normalMatrix and objRand is the same across them. objRand: Shade Geometry's per-object random, 0..1.
       int copyGroup = -1;
       float objRand = 0.0f;
+      // Row 4.2 light linking: bit i set = frame light i (0..31) does not light this object (Scene 3D's per-item list).
+      uint32_t unlitMask = 0;
    };
 
    // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the

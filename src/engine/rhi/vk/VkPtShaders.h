@@ -201,7 +201,9 @@ float iesK(int count, float row, vec3 axis, vec3 d)
    float a = mix(iesF(base + h0 * 32 + v0), iesF(base + h0 * 32 + v0 + 1), fv), b = mix(iesF(base + h1 * 32 + v0), iesF(base + h1 * 32 + v0 + 1), fv);
    return max(mix(a, b, fh), 0.0);
 }
-void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout vec3 ld, inout vec3 Le, inout float tmax, inout float pL, inout vec2 lterms)
+// Row 4.2 light linking: light i does not light an object whose record has bit i of `unlit` set (lights 0..31).
+bool unlitBy(float unlit, int i) { return i < 32 && ((floatBitsToUint(unlit) >> uint(i)) & 1u) != 0u; }
+void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout vec3 ld, inout vec3 Le, inout float tmax, inout float pL, inout vec2 lterms, float unlit)
 {
    if (nEm > 0 && rnd(seed) < pEm)
    {
@@ -222,9 +224,10 @@ void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout v
    }
    else if (count > 0)
    {
-      LightU Lt = LL[min(int(rnd(seed) * float(count)), count - 1)];
+      int li = min(int(rnd(seed) * float(count)), count - 1);
+      LightU Lt = LL[li];
       int type = int(Lt.vec.w);
-      float atten = type == 3 ? 0.0 : 1.0;
+      float atten = (type == 3 || unlitBy(unlit, li)) ? 0.0 : 1.0;
       tmax = 1e4;
       if (type == 1 || type == 4 || type == 5)
       {
@@ -450,7 +453,7 @@ void main()
             if (b == 0) { cov = 1.0; alb0 = pu.fogC.xyz; n0 = -d; dist0 = s; }
             T *= pu.fogC.xyz;
             vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0);
-            ptPickLight(nEm, pEm, count, pm, seed, ld, Le, tmax, pL, lterms);
+            ptPickLight(nEm, pEm, count, pm, seed, ld, Le, tmax, pL, lterms, 0.0);
             if (anyPos(Le))
             {
                if (pL > -1.5 && occludedAlpha(pm, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
@@ -602,9 +605,9 @@ void main()
       }
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w;
       for (int i = 0; i < count; i++)
-         if (int(LL[i].vec.w) == 3) L += T * base * (1.0 - metal) * LL[i].color.xyz * LL[i].terms.x;
+         if (int(LL[i].vec.w) == 3 && !unlitBy(inst[iid].mat.unlit, i)) L += T * base * (1.0 - metal) * LL[i].color.xyz * LL[i].terms.x;
       vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0);
-      ptPickLight(nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms);
+      ptPickLight(nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms, inst[iid].mat.unlit);
       float hH = hairM ? rnd(seed) * 2.0 - 1.0 : 0.0;
       float hBm = clamp(inst[iid].mat.roughness, 0.02, 1.0), hBn = -inst[iid].mat.hairRadialNeg;
       vec3 hSig = inst[iid].mat.hairSigma; float hShift = inst[iid].mat.hairShift, mIor = inst[iid].mat.ior;
@@ -724,7 +727,7 @@ void main()
             if (!wout) break;
             T *= min(Tw, vec3(8.0));
             vec3 eld = vec3(0.0, 1.0, 0.0), eLe = vec3(0.0); float etm = 0.0, epL = -1.0; vec2 elt = vec2(1.0);
-            ptPickLight(nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt);
+            ptPickLight(nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt, inst[iid].mat.unlit);
             float ec = dot(no, eld);
             if (ec > 1e-5 && anyPos(eLe))
             {

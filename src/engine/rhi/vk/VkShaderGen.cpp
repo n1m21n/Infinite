@@ -344,6 +344,7 @@ void main()
       if (i >= count) break;
       LightU L = f.lights[i];
       int type = int(L.vec.w);
+      if (i < 32 && ((floatBitsToUint(m.unlit) >> uint(i)) & 1u) != 0u) continue; // row 4.2: light linking
       vec3 radiance0 = L.color.xyz;
       if (type == 3) { col += base * (1.0 - metal) * radiance0 * L.terms.x; continue; }
       float areaE = -1.0;

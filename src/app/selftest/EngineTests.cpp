@@ -1794,6 +1794,54 @@ bool RunEngineTest()
       check(ssum / (double)settled.size() < 0.08, "settled picture stays close to the raster", ssum / (double)settled.size(), 0.08);
       r.liveEngine = false;
    }
+
+   {
+      // Row 4.2 light linking: Scene 3D's per-item "unlit" list reaches the GPU engines as a mask on the object's
+      // record. One point light over a white ball on the floor: with the ball unlinked, the ball keeps only the world's
+      // fill and the floor keeps its light, on R (GL), L (live) and T (settle).
+      struct Linked : GeometryNode { unsigned int mask = ~0u; unsigned int LightMask() const override { return mask; } };
+      Linked ball;
+      ball.shape = ShapeIndex("Sphere"); ball.posX = 0.2f; ball.color[0] = ball.color[1] = ball.color[2] = 0.85f; ball.metallic = 0.0f; ball.roughness = 0.6f;
+      const int S = 128;
+      Render3DNode::Rig lr = rig;
+      lr.proj = Mat4::Perspective(45.0f * 3.14159265f / 180.0f, 1.0f, 0.05f, 100.0f);
+      lr.lights.clear();
+      Render3DNode::RigLight pl;
+      pl.type = 1; pl.vec[0] = 0.6f; pl.vec[1] = 2.4f; pl.vec[2] = 1.8f; pl.intensity = 18.0f; pl.falloff = -1.0f; pl.castShadow = false;
+      lr.lights.push_back(pl);
+      const Mat4 vp = Mat4::Multiply(lr.proj, view);
+      auto pix = [&](const float w[3]) {
+         const float* m = vp.m;
+         const float x = m[0] * w[0] + m[4] * w[1] + m[8] * w[2] + m[12], y = m[1] * w[0] + m[5] * w[1] + m[9] * w[2] + m[13];
+         const float c = m[3] * w[0] + m[7] * w[1] + m[11] * w[2] + m[15];
+         const int px = std::clamp((int)((x / c * 0.5f + 0.5f) * S), 0, S - 1), py = std::clamp((int)((y / c * 0.5f + 0.5f) * S), 0, S - 1);
+         return (size_t)py * S + (size_t)px;
+      };
+      const float ballFront[3] = { 0.2f, 0.0f, 0.0f }, floorPt[3] = { -1.2f, -1.2f, 1.4f };
+      const size_t kb = pix(ballFront), kf = pix(floorPt);
+      auto lum = [&](const std::vector<float>& px, size_t k) { return px.size() > k * 4 + 2 ? (px[k * 4] + px[k * 4 + 1] + px[k * 4 + 2]) / 3.0f : 0.0f; };
+      const char* names[3] = { "R", "L", "T" };
+      for (int mode = 0; mode < 3; mode++)
+      {
+         float b[2] = {}, fl[2] = {};
+         for (int un = 0; un < 2; un++)
+         {
+            ball.mask = un ? ~1u : ~0u;
+            Render3DNode q;
+            q.geometry[0] = &floorG; q.geometry[1] = &ball;
+            q.width = (float)S; q.height = (float)S; q.samples = 0; q.hdr = false; q.tonemap = 1;
+            q.rig = &lr;
+            q.liveEngine = mode > 0; q.liveEngineFeatures = mode == 2 ? 15 : 7; q.ptSamples = 32; q.ptBounces = 4;
+            for (int i = 0; i < (mode == 2 ? 14 : 2); i++) q.CookIfNeeded(++fnum);
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratch, q.GetOutputTexture(), q.GetOutputWidth(), q.GetOutputHeight(), px);
+            b[un] = lum(px, kb); fl[un] = lum(px, kf);
+         }
+         printf("  light link %s: ball %.3f -> %.3f, floor %.3f -> %.3f\n", names[mode], b[0], b[1], fl[0], fl[1]);
+         const float ok = (b[1] < 0.6f * b[0] && std::fabs(fl[1] - fl[0]) < 0.1f * std::max(fl[0], 0.05f)) ? 1.0f : 0.0f;
+         check(ok > 0.5f, (std::string("light linking: an unlinked object loses the light, the rest keep it (") + names[mode] + ")").c_str(), ok, 1.0f);
+      }
+   }
    if (const char* l64 = getenv("INFINITE_ENGINETEST_LIGHTS64"))
    {
       // Row 5.6, case lights_64: the same objects under 64 small point lights (an 8 x 8 grid, each with a cutoff),

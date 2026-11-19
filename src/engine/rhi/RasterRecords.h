@@ -51,6 +51,7 @@ namespace rr
       std::memcpy(&m.p0, in.fieldParams, sizeof(in.fieldParams)); // row 3.4: knobs live, no relink
       m.strandFrom = (float)(in.strandFrom + 1); // row 5.2: the shadow rays tell strands from solids
       m.objRand = in.objRand;                    // row 7.2: Shade Geometry's random
+      std::memcpy(&m.unlit, &in.unlitMask, 4);   // row 4.2: light linking, the bits as they are
    }
    // The whole material, encoded so all zeros is the plain material (see Render3DMaterial.h).
    inline void FillMat(const engine::Instance& in, R3dMatH& m)
