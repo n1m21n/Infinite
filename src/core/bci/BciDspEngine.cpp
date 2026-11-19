@@ -175,6 +175,8 @@ void BciDspEngine::Reset(double sampleRateHz)
    mLastBlinkEndSec = -10.0;
    mBlinkLatchUntilSec = -10.0;
    mBlinkRefractoryUntilSec = -10.0;
+   mBlinkVotePos = mBlinkVoteNeg = 0.0;
+   mBlinkSign = 1.0;
    mArtifactHoldUntilSec = -10.0;
    mBlinkFlash = mWinkFlash = mJawLFlash = mJawRFlash = 0.0f;
    mJawRmsSq[0] = mJawRmsSq[1] = 0.0;
@@ -951,7 +953,19 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       const double frontalCommon = 0.5 * (clean[0] + clean[1]);
       const double frontalDiff = clean[0] - clean[1];
       // `clean` already has 0.5 Hz DC high-pass; low-pass at 8 Hz preserves intentional blink width
-      const double sBlink = mBlinkLp.Step(frontalCommon);
+      const double sBlinkRaw = mBlinkLp.Step(frontalCommon);
+      // Blink polarity depends on headset and reference (Muse vs OpenBCI). Vote with the time spent past
+      // the blink threshold on each side (tau 60 s): blinks are the large, frequent, one-sided pulses,
+      // eye movements and drift split both ways. Flip only when the other side leads 1.5 : 1.
+      {
+         const float th = std::max(55.0f, 0.55f * mProfile.medianBlinkUv);
+         const double decay = std::exp(-dt / 60.0);
+         mBlinkVotePos = mBlinkVotePos * decay + (sBlinkRaw > th ? dt : 0.0);
+         mBlinkVoteNeg = mBlinkVoteNeg * decay + (sBlinkRaw < -th ? dt : 0.0);
+         if (mBlinkSign > 0 ? mBlinkVoteNeg > 1.5 * mBlinkVotePos + 0.05 : mBlinkVotePos > 1.5 * mBlinkVoteNeg + 0.05)
+            mBlinkSign = -mBlinkSign;
+      }
+      const double sBlink = mBlinkSign * sBlinkRaw;
       const double sSaccade = mSaccadeLp.Step(mSaccadeHp.Step(frontalDiff));
 
       const double jawL = mJawLp[0].Step(mJawHp[0].Step(clean[2]));
@@ -970,7 +984,9 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
 
       // Blink Pulse Width & Amplitude Discrimination (Gap 1: Reflex vs Intentional)
       const float blinkThreshUv = std::max(55.0f, 0.55f * mProfile.medianBlinkUv);
-      if (sBlink > blinkThreshUv)
+      // Hysteresis: a pulse ends below 70 % of the threshold, so one blink that dips mid-way is not
+      // split in two (the second half would read as a double blink).
+      if (sBlink > blinkThreshUv || (mBlinkInPulse && sBlink > 0.7f * blinkThreshUv))
       {
          if (!mBlinkInPulse)
          {
@@ -987,7 +1003,8 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
                batchBlinkFired = true;
             }
          }
-         ++mBlinkPulseSamples;
+         if (sBlink > blinkThreshUv)
+            ++mBlinkPulseSamples; // width = time above the threshold, as before
          mBlinkPeakUv = std::max(mBlinkPeakUv, (float)sBlink);
       }
       else if (mBlinkInPulse)

@@ -119,6 +119,8 @@ namespace Bci
       double mLastBlinkEndSec = -10.0;
       double mBlinkLatchUntilSec = -10.0;
       double mBlinkRefractoryUntilSec = -10.0;
+      double mBlinkVotePos = 0.0, mBlinkVoteNeg = 0.0; // decayed seconds past threshold per side
+      double mBlinkSign = 1.0;               // learned blink polarity
       double mArtifactHoldUntilSec = -10.0;
 
       // Flashes for UI micro-scope

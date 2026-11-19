@@ -169,7 +169,7 @@ To be filled after each block, linked to §6 and §7.
 | Baseline | 1/1 subject | n/a (avg only) | fail (same mandala) | synthetic only | fail (weights) | n/a |
 | A | PhysioNet 72.5% (avg-only 57%) · GIPSA 100% (90%) · HEROIC Muse 50% (37.5%) | **fail as written** (best region beats avg 26–50%); reframed: per-person LDA beats avg in 73% HEROIC / 88% PhysioNet sessions | not run (Block B) | real data in selftest [7] | **pass**: weights learned per person at calibration | not measured |
 | B | — | — | proxy: **0.92** with the state strip · raw image 0.74 · raw audio 0.86 (126 pairs); human blind run **10/10 pass** (picture only, strip-led) | — | **pass**: image z-scored on own eyes-open calibration, audio on own baseline amplitude | not measured |
-| C | — | — | starter on synthetic: calm alpha luma 0.41 vs focus 0.13–0.16, −13.6 vs −24.2 LUFS | **not run**: EEG-Eyeblinks not downloaded (needs a yes) | pass (no new weights; Brain Sculpt learns by example) | **pass**: 0.10 ms mean, 0.19 ms worst per update (bar 2 ms) |
+| C | — | — | starter on synthetic: calm alpha luma 0.41 vs focus 0.13–0.16, −13.6 vs −24.2 LUFS | **fail**: best (All blinks) hit 87–91%, 1.7–2.7 false/min; default Intentional 33–71% hit (see C detail) | pass (no new weights; Brain Sculpt learns by example) | **pass**: 0.10 ms mean, 0.19 ms worst per update (bar 2 ms) |
 
 ### Block A detail (2026-11-19)
 
@@ -237,6 +237,32 @@ Proof (synthetic presets, headless): `proof/alpha_bell_calm.png` vs `proof/alpha
 Decisions: no Geometry pin (the starter didn't need one; revisit if a 3D patch asks).
 Muse hardware pass: no headset here, so not run.
 
+**M4: blink → toggle** (2026-11-19). EEG-EyeBlinks (Agarwal & Sivakumar 2019): OpenBCI Fp1/Fp2 at 250 Hz,
+fed in as AF7/AF8. EEG-IO = 20 people, stimulus-cued blinks; VV / VR = 13 people each, natural blinks
+while watching a video or reading. The replay goes through the real `BciDspEngine`, compiled
+standalone (`tools/bci/blink_replay.cpp`, scored by `tools/bci/blink_m4.py`, about 20 s, no app build).
+A hit is a Blink-pin edge within −0.25..+0.75 s of a label. Any other edge is a false toggle.
+
+| Engine | Mode | IO hit / false/min | VV | VR |
+|---|---|---|---|---|
+| Before (positive pulses only) | All blinks | 0.80 / 2.1 | 0.76 / 3.8 | 0.62 / 2.1 |
+| Before, sign flipped by hand | All blinks | 0.92 / 3.6 | 0.98 / 2.5 | 0.88 / 1.2 |
+| **Now** (polarity vote + hysteresis) | All blinks | 0.87 / 2.7 | 0.91 / 2.4 | 0.89 / 1.7 |
+| **Now** | Intentional (default) | 0.71 / 1.8 | 0.41 / 0.7 | 0.33 / 1.0 |
+
+Bar: hit ≥ 0.95, false ≤ 1/min. **Fail** in every set and mode.
+
+Engine changes kept:
+1. **Blink polarity is learned.** It is a vote on the time spent past the threshold on each side, tau 60 s.
+   Blinks are negative in this OpenBCI data; the old detector only saw positive pulses.
+2. **Hysteresis.** A pulse now ends at 70% of the threshold. Before, one blink that dipped mid-way
+   fired twice through the double-blink rule; most false toggles were these extra fires within a
+   second of a real blink.
+
+Selftest after the change: 351 passed, 0 failed.
+
+Tried and dropped: skew-sign polarity (it swings on some people) and a 40% exit (more misses).
+
 ## 11. Critique
 
 - **The "breakthrough" claim is cut down to honest size.** The research rules out decoding attention
@@ -264,7 +290,11 @@ Muse hardware pass: no headset here, so not run.
 - **Block B: Python mirror skips artifact blanking**, as in Block A.
 - **Block C: the proof is synthetic.** The worker runs on wall-clock time, so a headless render of a
   CSV replay isn't locked to render time; real-data proof stays in selftests [7] and the M3 sheet.
-- **Block C: M4 (blink) is still unmeasured.** It needs the EEG-Eyeblinks download.
+- **Block C: M4 fails.** Blinks fire, but 1–3 false toggles a minute make a toggle unusable.
+  Most are second fires near a real blink, or eye movements. The fixed default threshold
+  (135 µV median) fits nobody in particular.
+- **M4 as written mixes two jobs.** A toggle should fire on deliberate blinks and ignore natural ones,
+  but the VV/VR labels are natural blinks. The fair test is EEG-IO (cued blinks) in Intentional mode.
 - **Block C: nothing has touched a real headset.** Ship / iterate / abandon can't be decided before that.
 
 ## 12. Next steps
@@ -276,7 +306,10 @@ Muse hardware pass: no headset here, so not run.
 4. Block A in Python (`batch_validate.py`), then C++ per-region DSP + wPLI. One build at the end of the block.
 5. Block B pins, then render proof sheets and run the M3 blind test. **Done:** M3 10/10 by the owner.
 6. Block C starter patch: **done** (`bci_alpha_bell.inf`, M6 pass). Open: M4 needs the EEG-Eyeblinks
-   download (a yes); ship / iterate / abandon waits for a Muse session.
+   ship / iterate / abandon waits for a Muse session.
+7. M4 fix: add a prompted-blink step to calibration (5 blinks on cue) that sets each person's blink
+   threshold, width and polarity. Then re-score EEG-IO in Intentional mode, using each person's first
+   5 cued blinks as the calibration. Bar unchanged.
 
 ---
 
