@@ -13,6 +13,9 @@ namespace Bci
    constexpr int kTraceSamples = 128;
    constexpr int kOutputPinCount = 24;
    constexpr double kSampleRateHz = 256.0;
+   // Per-person eyes-closed state: 4 bands (4-8, 8-10, 10-12, 12-30 Hz) x 4 channels of
+   // log10(band / 2-40 Hz total), index band * 4 + channel. Validated in tools/bci/calib_ab.py.
+   constexpr int kStateFeatureCount = 16;
 
    enum class BoardKind : int
    {
@@ -80,6 +83,11 @@ namespace Bci
       float baselineAlpha = 0.35f;
       float baselineTheta = 0.25f;
       float baselineBeta = 0.25f;
+      // Shrinkage-LDA weights fitted at calibration (eyes closed vs open), see FitStateWeights.
+      bool stateValid = false;
+      float stateW[kStateFeatureCount] = {};
+      float stateBias = 0.0f;
+      float stateScale = 1.0f;
    };
 
    struct TelemetrySnapshot
@@ -91,6 +99,10 @@ namespace Bci
       float aperiodicSlope = 1.5f;
       float aperiodicOffset = 1.0f;
       float iafHz = 10.0f;
+      float regionAlpha[kChannelCount] = {}; // 8-12 Hz share of 2-40 Hz power, AF7 AF8 TP9 TP10
+      float eyesClosedScore = 0.0f;          // calibrated 0..1 (0.5 = boundary); 0 until calibrated
+      bool stateCalibrated = false;
+      bool stateCalibFailed = false;         // last calibration ended without a fit (too few clean updates)
       float alphaPhaseRad = 0.0f;
       float latent[4] = { 0.5f, 0.5f, 0.5f, 0.5f }; // Arousal, Valence, Entropy, Coherence
       float blinkFlash = 0.0f;

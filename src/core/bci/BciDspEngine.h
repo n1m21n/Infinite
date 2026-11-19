@@ -31,6 +31,7 @@ namespace Bci
       bool IsCalibrating() const { return mCalibPhase == CalibrationPhase::EyesOpen || mCalibPhase == CalibrationPhase::EyesClosed; }
       const CalibrationProfile& Profile() const { return mProfile; }
       void SetProfile(const CalibrationProfile& prof) { mProfile = prof; }
+      void SetPersistProfile(bool persist) { mPersistProfile = persist; } // false: calibration never writes disk (tests)
       static std::string DefaultProfilePath();
       bool SaveProfile(const std::string& path = "") const;
       bool LoadProfile(const std::string& path = "");
@@ -68,12 +69,15 @@ namespace Bci
       void RebuildFilters();
       void ComputeWelchCorticalPsd();
       void FinishCalibration();
+      void UpdateStateFeatures(const double (&chanPsd)[kChannelCount][48], double binHz);
+      bool FitStateWeights();
 
       double mSampleRate = kSampleRateHz;
       double mStreamTimeSec = 0.0;
       float mSmoothing = 0.45f;
       bool mArtifactBlanking = true;
       bool mStartleGuard = true;
+      bool mPersistProfile = true;
       BlinkMode mBlinkMode = BlinkMode::IntentionalOrDouble;
 
       // Per-channel preprocessing filters
@@ -140,7 +144,20 @@ namespace Bci
       float mTraceTemporal[kTraceSamples] = {};
       int mTraceDecim = 0;
 
-      // Calibration accumulator (7.5s open + 7.5s closed)
+      // Per-person eyes-closed state (per-channel relative band powers, EMA tau 3 s)
+      static constexpr double kStateTauSec = 3.0;
+      double mFeatEma[kStateFeatureCount] = {};
+      bool mFeatEmaInit = false;
+      float mRegionAlpha[kChannelCount] = {};
+      float mStateScore = 0.0f;
+      bool mStateCalibFailed = false;
+      std::vector<std::array<float, kStateFeatureCount>> mCalibFeatOpen;
+      std::vector<std::array<float, kStateFeatureCount>> mCalibFeatClosed;
+
+      // Calibration accumulator (30 s open + 30 s closed; first 4 s of each phase not used for
+      // the state weights while the eyes settle and the EMA catches up)
+      static constexpr double kCalibPhaseSec = 30.0;
+      static constexpr double kCalibSettleSec = 4.0;
       CalibrationPhase mCalibPhase = CalibrationPhase::Idle;
       double mCalibElapsedSec = 0.0;
       CalibrationProfile mProfile;

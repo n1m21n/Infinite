@@ -38,6 +38,7 @@ namespace Bci
       bool LoadCsv(const std::string& path, std::string& outErr);
       void ClearCsv();
       bool HasCsv() const { return !mCsvFrames.empty(); }
+      size_t CsvFrameCount() const { return mCsvFrames.size(); }
 
       // Generates `count` frames at `sampleRateHz` into `outFrames`.
       void Generate(int count, double sampleRateHz, std::vector<SampleFrame>& outFrames);

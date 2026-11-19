@@ -188,6 +188,10 @@ void BciDspEngine::Reset(double sampleRateHz)
       mResRe[c] = mResIm[c] = 0.0;
    for (auto& e : mEuro)
       e = EuroState{};
+   std::fill(std::begin(mFeatEma), std::end(mFeatEma), 0.0);
+   mFeatEmaInit = false;
+   std::fill(std::begin(mRegionAlpha), std::end(mRegionAlpha), 0.0f);
+   mStateScore = 0.0f;
 
    RebuildFilters();
 }
@@ -230,6 +234,7 @@ void BciDspEngine::RebuildFilters()
 void BciDspEngine::StartCalibration()
 {
    mCalibPhase = CalibrationPhase::EyesOpen;
+   mStateCalibFailed = false;
    mCalibElapsedSec = 0.0;
    for (int c = 0; c < kChannelCount; ++c)
       mCalibChanSamples[c].clear();
@@ -238,6 +243,13 @@ void BciDspEngine::StartCalibration()
    mCalibOpenBeta.clear();
    mCalibAlphaBinsAccumCount = 0;
    mCalibClosedPsdAccum.fill(0.0);
+   mCalibFeatOpen.clear();
+   mCalibFeatClosed.clear();
+   const size_t perPhase = (size_t)(kCalibPhaseSec * mSampleRate / 12.0) + 8;
+   mCalibFeatOpen.reserve(perPhase);
+   mCalibFeatClosed.reserve(perPhase);
+   for (int c = 0; c < kChannelCount; ++c)
+      mCalibChanSamples[c].reserve((size_t)(kCalibPhaseSec * mSampleRate) + 64);
 }
 
 void BciDspEngine::CancelCalibration()
@@ -271,7 +283,14 @@ bool BciDspEngine::SaveProfile(const std::string& path) const
        << "  \"baselineTheta\": " << mProfile.baselineTheta << ",\n"
        << "  \"baselineBeta\": " << mProfile.baselineBeta << ",\n"
        << "  \"chanMad\": [" << mProfile.chanMad[0] << ", " << mProfile.chanMad[1]
-       << ", " << mProfile.chanMad[2] << ", " << mProfile.chanMad[3] << "]\n"
+       << ", " << mProfile.chanMad[2] << ", " << mProfile.chanMad[3] << "],\n"
+       << "  \"stateValid\": " << (mProfile.stateValid ? "true" : "false") << ",\n"
+       << "  \"stateBias\": " << mProfile.stateBias << ",\n"
+       << "  \"stateScale\": " << mProfile.stateScale << ",\n"
+       << "  \"stateW\": [";
+   for (int k = 0; k < kStateFeatureCount; ++k)
+      oss << (k ? ", " : "") << mProfile.stateW[k];
+   oss << "]\n"
        << "}\n";
 
    std::string err;
@@ -316,6 +335,25 @@ bool BciDspEngine::LoadProfile(const std::string& path)
    prof.baselineAlpha = std::clamp(parseFloat("baselineAlpha", 0.35f), 0.05f, 0.95f);
    prof.baselineTheta = std::clamp(parseFloat("baselineTheta", 0.25f), 0.05f, 0.95f);
    prof.baselineBeta = std::clamp(parseFloat("baselineBeta", 0.25f), 0.05f, 0.95f);
+   if (content.find("\"stateValid\": true") != std::string::npos)
+   {
+      const size_t at = content.find("\"stateW\": [");
+      prof.stateBias = parseFloat("stateBias", 0.0f);
+      prof.stateScale = parseFloat("stateScale", 1.0f);
+      bool ok = at != std::string::npos && std::isfinite(prof.stateBias) && prof.stateScale > 1e-6f;
+      const char* cur = ok ? content.c_str() + at + 10 : nullptr;
+      for (int k = 0; ok && k < kStateFeatureCount; ++k)
+      {
+         while (*cur == ' ' || *cur == ',' || *cur == '\n')
+            ++cur;
+         char* end = nullptr;
+         const double v = std::strtod(cur, &end);
+         ok = end != cur && std::isfinite(v);
+         prof.stateW[k] = (float)v;
+         cur = end;
+      }
+      prof.stateValid = ok;
+   }
    mProfile = prof;
    return true;
 }
@@ -368,9 +406,15 @@ void BciDspEngine::FinishCalibration()
       mProfile.baselineBeta = sumB / (float)mCalibOpenBeta.size();
    }
 
+   mProfile.stateValid = FitStateWeights();
+   mStateCalibFailed = !mProfile.stateValid;
+   mCalibFeatOpen.clear();
+   mCalibFeatClosed.clear();
+
    mProfile.valid = true;
    mCalibPhase = CalibrationPhase::Complete;
-   SaveProfile();
+   if (mPersistProfile)
+      SaveProfile();
 }
 
 void BciDspEngine::ComputeWelchCorticalPsd()
@@ -379,6 +423,7 @@ void BciDspEngine::ComputeWelchCorticalPsd()
    std::array<double, 48> avgPsd{};
    std::array<double, 48> psdAf7{};
    std::array<double, 48> psdAf8{};
+   double chanPsd[kChannelCount][48] = {};
 
    const int maxBin = std::min(47, kFftSize / 2 - 1);
    const double binHz = mSampleRate / (double)kFftSize;
@@ -403,6 +448,7 @@ void BciDspEngine::ComputeWelchCorticalPsd()
          avgPsd[(size_t)b] += p * 0.25;
          if (c == 0) psdAf7[(size_t)b] = p;
          if (c == 1) psdAf8[(size_t)b] = p;
+         chanPsd[c][b] = p;
          const double hz = b * binHz;
          if (hz >= 1.0 && hz <= 42.0)
             bandPowerSum += p;
@@ -523,6 +569,8 @@ void BciDspEngine::ComputeWelchCorticalPsd()
    const float faa = (float)(std::log(alphaAf8) - std::log(alphaAf7));
    mFaaRaw = mFaaRaw * 0.7f + faa * 0.3f;
 
+   UpdateStateFeatures(chanPsd, binHz);
+
    // Calibration accumulation
    if (mCalibPhase == CalibrationPhase::EyesClosed)
    {
@@ -535,6 +583,129 @@ void BciDspEngine::ComputeWelchCorticalPsd()
       mCalibOpenAlpha.push_back(mBands[2]);
       mCalibOpenBeta.push_back(mBands[3]);
    }
+}
+
+void BciDspEngine::UpdateStateFeatures(const double (&chanPsd)[kChannelCount][48], double binHz)
+{
+   // Bands as half-open [lo, hi) Hz, total 2..40 Hz inclusive: the same bins tools/bci/calib_ab.py uses.
+   static constexpr double kLo[4] = { 4.0, 8.0, 10.0, 12.0 };
+   static constexpr double kHi[4] = { 8.0, 10.0, 12.0, 30.0 };
+   double feat[kStateFeatureCount] = {};
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      double tot = 0.0, band[4] = {};
+      for (int b = 1; b < 48; ++b)
+      {
+         const double hz = b * binHz;
+         if (hz >= 2.0 && hz <= 40.0)
+            tot += chanPsd[c][b];
+         for (int k = 0; k < 4; ++k)
+            if (hz >= kLo[k] && hz < kHi[k])
+               band[k] += chanPsd[c][b];
+      }
+      for (int k = 0; k < 4; ++k)
+         feat[k * kChannelCount + c] = std::log10(std::max(1e-12, band[k]) / std::max(1e-12, tot));
+   }
+
+   const double hopSec = 12.0 / std::max(64.0, mSampleRate);
+   const double a = mFeatEmaInit ? 1.0 - std::exp(-hopSec / kStateTauSec) : 1.0;
+   mFeatEmaInit = true;
+   for (int k = 0; k < kStateFeatureCount; ++k)
+      mFeatEma[k] += a * (feat[k] - mFeatEma[k]);
+
+   for (int c = 0; c < kChannelCount; ++c)
+      mRegionAlpha[c] = (float)(std::pow(10.0, mFeatEma[1 * kChannelCount + c]) +
+                                std::pow(10.0, mFeatEma[2 * kChannelCount + c]));
+
+   if (mProfile.stateValid)
+   {
+      double proj = 0.0;
+      for (int k = 0; k < kStateFeatureCount; ++k)
+         proj += mProfile.stateW[k] * mFeatEma[k];
+      const double z = (proj - mProfile.stateBias) / std::max(1e-6f, mProfile.stateScale);
+      mStateScore = (float)(1.0 / (1.0 + std::exp(-std::clamp(z, -20.0, 20.0))));
+   }
+
+   if ((mCalibPhase == CalibrationPhase::EyesOpen || mCalibPhase == CalibrationPhase::EyesClosed) &&
+       mCalibElapsedSec >= kCalibSettleSec)
+   {
+      std::array<float, kStateFeatureCount> v{};
+      for (int k = 0; k < kStateFeatureCount; ++k)
+         v[(size_t)k] = (float)mFeatEma[k];
+      (mCalibPhase == CalibrationPhase::EyesOpen ? mCalibFeatOpen : mCalibFeatClosed).push_back(v);
+   }
+}
+
+bool BciDspEngine::FitStateWeights()
+{
+   // Shrinkage LDA (shrink 0.3 toward a scaled identity), closed = positive class.
+   constexpr int n = kStateFeatureCount;
+   const size_t n1 = mCalibFeatClosed.size(), n0 = mCalibFeatOpen.size();
+   if (n1 < 20 || n0 < 20)
+      return false;
+   double mu1[n] = {}, mu0[n] = {};
+   for (const auto& v : mCalibFeatClosed)
+      for (int k = 0; k < n; ++k) mu1[k] += v[(size_t)k] / (double)n1;
+   for (const auto& v : mCalibFeatOpen)
+      for (int k = 0; k < n; ++k) mu0[k] += v[(size_t)k] / (double)n0;
+   double S[n][n] = {};
+   auto addCov = [&](const std::vector<std::array<float, n>>& set, const double* mu)
+   {
+      for (const auto& v : set)
+         for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+               S[i][j] += (v[(size_t)i] - mu[i]) * (v[(size_t)j] - mu[j]);
+   };
+   addCov(mCalibFeatClosed, mu1);
+   addCov(mCalibFeatOpen, mu0);
+   double tr = 0.0;
+   for (int i = 0; i < n; ++i)
+      for (int j = 0; j < n; ++j)
+         S[i][j] /= (double)(n1 + n0 - 1);
+   for (int i = 0; i < n; ++i)
+      tr += S[i][i];
+   constexpr double kShrink = 0.3;
+   double A[n][n + 1];
+   for (int i = 0; i < n; ++i)
+   {
+      for (int j = 0; j < n; ++j)
+         A[i][j] = (1.0 - kShrink) * S[i][j] + (i == j ? kShrink * tr / n : 0.0);
+      A[i][n] = mu1[i] - mu0[i];
+   }
+   for (int col = 0; col < n; ++col) // Gaussian elimination, partial pivoting
+   {
+      int piv = col;
+      for (int r = col + 1; r < n; ++r)
+         if (std::fabs(A[r][col]) > std::fabs(A[piv][col]))
+            piv = r;
+      if (std::fabs(A[piv][col]) < 1e-12)
+         return false;
+      if (piv != col)
+         for (int j = 0; j <= n; ++j)
+            std::swap(A[col][j], A[piv][j]);
+      for (int r = 0; r < n; ++r)
+      {
+         if (r == col)
+            continue;
+         const double fct = A[r][col] / A[col][col];
+         for (int j = col; j <= n; ++j)
+            A[r][j] -= fct * A[col][j];
+      }
+   }
+   double w[n], mid = 0.0, gap = 0.0;
+   for (int i = 0; i < n; ++i)
+   {
+      w[i] = A[i][n] / A[i][i];
+      mid += w[i] * 0.5 * (mu1[i] + mu0[i]);
+      gap += w[i] * (mu1[i] - mu0[i]);
+   }
+   if (!(gap > 1e-9) || !std::isfinite(gap))
+      return false;
+   for (int i = 0; i < n; ++i)
+      mProfile.stateW[i] = (float)w[i];
+   mProfile.stateBias = (float)mid;
+   mProfile.stateScale = (float)(gap / 4.0); // class means land at z = +-2 (score 0.88 / 0.12)
+   return true;
 }
 
 void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24[kOutputPinCount], TelemetrySnapshot& outTelemetry)
@@ -563,7 +734,7 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
          mCalibElapsedSec += dt;
          for (int c = 0; c < kChannelCount; ++c)
             mCalibChanSamples[c].push_back(f.ch[c]);
-         if (mCalibElapsedSec >= 7.5)
+         if (mCalibElapsedSec >= kCalibPhaseSec)
          {
             mCalibPhase = CalibrationPhase::EyesClosed;
             mCalibElapsedSec = 0.0;
@@ -572,7 +743,7 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       else if (mCalibPhase == CalibrationPhase::EyesClosed)
       {
          mCalibElapsedSec += dt;
-         if (mCalibElapsedSec >= 7.5)
+         if (mCalibElapsedSec >= kCalibPhaseSec)
             FinishCalibration();
       }
 
@@ -775,7 +946,7 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       mRawPins[12] = Clamp01(alpha * (1.0f - imuNorm) * (1.0f - emgCombined));                  // kStillness
       mRawPins[13] = delta;
       mRawPins[14] = theta;
-      mRawPins[15] = alpha;
+      mRawPins[15] = mProfile.stateValid ? mStateScore : alpha; // calibrated: this person's eyes-closed state
       mRawPins[16] = beta;
       mRawPins[17] = gamma;
       mRawPins[18] = blinkPin;                                                                  // kBlink (discrete)
@@ -824,7 +995,12 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
    outTelemetry.startleMasked = startleActive;
    outTelemetry.calibrating = IsCalibrating();
    outTelemetry.calibPhase = mCalibPhase;
-   outTelemetry.calibProgress = IsCalibrating() ? Clamp01((float)(mCalibElapsedSec / 7.5)) : 0.0f;
+   outTelemetry.calibProgress = IsCalibrating() ? Clamp01((float)(mCalibElapsedSec / kCalibPhaseSec)) : 0.0f;
    outTelemetry.sampleRateHz = mSampleRate;
+   for (int c = 0; c < kChannelCount; ++c)
+      outTelemetry.regionAlpha[c] = mRegionAlpha[c];
+   outTelemetry.stateCalibrated = mProfile.stateValid;
+   outTelemetry.stateCalibFailed = mStateCalibFailed;
+   outTelemetry.eyesClosedScore = mProfile.stateValid ? mStateScore : 0.0f;
 }
 }

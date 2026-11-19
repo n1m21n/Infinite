@@ -495,6 +495,64 @@ bool RunBciSelftest()
       }
    }
 
+   // 7. Calibrated eyes-closed state on real EEG (INFINITE_BCI_STATE_OPEN / _CLOSED, 4-col 256 Hz CSVs).
+   //    Same protocol as tools/bci/state_mirror.py: calibrate on the first 30 s of each file, score the
+   //    rest after a 6 s settle. Prints STATE_ENGINE acc=... for the C++ <-> Python comparison.
+   if (const char* sOpen = std::getenv("INFINITE_BCI_STATE_OPEN"))
+   {
+      const char* sClosed = std::getenv("INFINITE_BCI_STATE_CLOSED");
+      Bci::SyntheticCortex ro, rc;
+      std::string e1, e2;
+      const bool loaded = sClosed && ro.LoadCsv(sOpen, e1) && rc.LoadCsv(sClosed, e2);
+      ck.Expect(loaded, "Calibrated state: open/closed CSVs load");
+      if (loaded)
+      {
+         Bci::BciDspEngine dsp;
+         dsp.Reset(256.0);
+         dsp.SetStartleGuard(false);
+         dsp.SetPersistProfile(false);
+         dsp.SetProfile(Bci::CalibrationProfile{});
+         std::vector<Bci::SampleFrame> batch;
+         Bci::TelemetrySnapshot snap{};
+         float pins[Bci::kOutputPinCount] = {};
+         auto feed = [&](Bci::SyntheticCortex& src, int frames, int scoreFrom, int wantClosed, int& hits, int& n)
+         {
+            for (int done = 0; done < frames; done += 12)
+            {
+               const int k = std::min(12, frames - done);
+               src.Generate(k, 256.0, batch);
+               dsp.Process(batch.data(), (int)batch.size(), pins, snap);
+               if (wantClosed >= 0 && done >= scoreFrom)
+               {
+                  hits += ((snap.eyesClosedScore > 0.5f) == (wantClosed == 1)) ? 1 : 0;
+                  ++n;
+               }
+            }
+         };
+         const int cal = 30 * 256, settle = 6 * 256;
+         int hits = 0, n = 0;
+         dsp.StartCalibration();
+         feed(ro, cal, 0, -1, hits, n);
+         feed(rc, cal + 64, 0, -1, hits, n); // + a few frames so the closed phase completes
+         if (!dsp.Profile().stateValid)
+            std::printf("  [7] STATE_ENGINE no fit (calib failed flag=%d): too few clean updates, likely a bad lead\n",
+                        snap.stateCalibFailed ? 1 : 0);
+         ck.Expect(dsp.Profile().stateValid || snap.stateCalibFailed,
+                   "Calibrated state: fits, or reports the failure (never silent)");
+         const int restO = (int)ro.CsvFrameCount() - cal, restC = (int)rc.CsvFrameCount() - cal - 64;
+         ck.Expect(restO > settle && restC > settle, "Calibrated state: files longer than 36 s");
+         if (dsp.Profile().stateValid && restO > settle && restC > settle)
+         {
+            feed(ro, restO, settle, 0, hits, n);
+            feed(rc, restC, settle, 1, hits, n);
+            const double acc = n > 0 ? (double)hits / n : 0.0;
+            std::printf("  [7] STATE_ENGINE acc=%.3f updates=%d  region alpha AF7 %.3f AF8 %.3f TP9 %.3f TP10 %.3f\n",
+                        acc, n, snap.regionAlpha[0], snap.regionAlpha[1], snap.regionAlpha[2], snap.regionAlpha[3]);
+            ck.Expect(acc > 0.6, "Calibrated state: held-out eyes-closed accuracy above 60%");
+         }
+      }
+   }
+
    std::printf("BCI_SELFTEST: passed=%d failed=%d %s\n",
                ck.passed, ck.failed, ck.failed == 0 ? "OK" : "FAIL");
    return ck.failed == 0;

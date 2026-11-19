@@ -419,7 +419,8 @@ void BrainSourceNode::WorkerLoop()
          snap.packMissing = runtime.IsPackMissing();
          {
             std::lock_guard<std::mutex> tlk(mTelemetryMu);
-            std::snprintf(snap.statusText, sizeof(snap.statusText), "%s", mStatus.c_str());
+            std::snprintf(snap.statusText, sizeof(snap.statusText), "%s",
+                          snap.stateCalibFailed ? "calibration: no clean signal, check contact" : mStatus.c_str());
             mTelemetry = snap;
          }
          for (int i = 0; i < kOutputCount; ++i)

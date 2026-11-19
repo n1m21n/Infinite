@@ -167,9 +167,27 @@ To be filled after each block, linked to §6 and §7.
 | Block | M1 | M2 | M3 | M4 | M5 | M6 |
 |---|---|---|---|---|---|---|
 | Baseline | 1/1 subject | n/a (avg only) | fail (same mandala) | synthetic only | fail (weights) | n/a |
-| A | | | | | | |
+| A | PhysioNet 72.5% (avg-only 57%) · GIPSA 100% (90%) · HEROIC Muse 50% (37.5%) | **fail as written** (best region beats avg 26–50%); reframed: per-person LDA beats avg in 73% HEROIC / 88% PhysioNet sessions | not run (Block B) | real data in selftest [7] | **pass**: weights learned per person at calibration | not measured |
 | B | | | | | | |
 | C | | | | | | |
+
+### Block A detail (2026-11-19)
+
+Eyes-closed vs open, median held-out accuracy (split halves, 6 s smoothing):
+
+| Data | Subjects | Averaged alpha | Per-person LDA | ≥80% avg → LDA |
+|---|---|---|---|---|
+| HEROIC (real Muse 2) | 64 sessions | 0.683 | 0.885 | 33% → 69% |
+| GIPSA (gel) | 20 | 0.917 | 1.000 | 65% → 100% |
+| PhysioNet (gel) | 91 of 109 | 0.606 | 1.000 | 26% → 86% |
+
+Engine (C++) path on HEROIC, 30 s eyes-open + 30 s eyes-closed calibration, τ 3 s:
+mirror mean 0.805, ≥80% in 52% of sessions. C++ matches the Python mirror within 1.4 points
+on 7 of 8 sessions (sub001-remote differs by 7.8: blanking/filters are not mirrored).
+Cross-day (HEROIC, day-1 weights on later sessions): avg 0.50, LDA 0.75, LDA + median re-centre 0.855.
+
+Tools: `tools/bci/batch_validate.py` (M1/M2, wPLI), `calib_ab.py` (avg vs LDA, cross-day),
+`state_mirror.py` (C++ mirror). Engine: 16 features → shrinkage LDA → pin 15 once calibrated.
 
 ## 11. Critique
 
@@ -182,6 +200,12 @@ To be filled after each block, linked to §6 and §7.
   signals. Keep them, but stop extending them until T1/T3 prove out.
 - **Single-session learning is unproven.** No Muse alpha-neurofeedback effect size exists. M3 tests
   readability, not learning; learning needs a real user and a headset.
+- **Block A: Muse is far weaker than gel.** Same pipeline: HEROIC M1 50% vs GIPSA 100%.
+  Without calibration the Muse signal is close to a coin flip for half of people.
+- **Block A: cross-day re-centre assumes 50/50 open/closed.** A user who keeps eyes open drifts the median.
+- **Block A: one bad lead blocks calibration.** Artifact blanking is global, so a dead AF7 (HEROIC sub003)
+  stops every update. The node now says so; per-channel blanking is the real fix.
+- **Block A: the `alpha` pin changes meaning once calibrated** (raw alpha → eyes-closed score 0..1).
 - **Uncommitted work is a risk.** The whole branch lives in the working tree.
 
 ## 12. Next steps
