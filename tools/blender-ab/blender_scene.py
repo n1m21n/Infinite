@@ -699,10 +699,20 @@ if fog:
     vs.inputs["Color"].default_value = (*fog["color"], 1); vs.inputs["Density"].default_value = fog["density"]
     vs.inputs["Anisotropy"].default_value = fog.get("g", 0.0)
     va.inputs["Color"].default_value = (*fog["color"], 1); va.inputs["Density"].default_value = fog["density"]
+    if fog.get("falloff", 0.0) > 0.0:
+        # Row 4.1: density x mix(1, spherical gradient on the box's object coordinates (-1..1), falloff), as fogShape.
+        tc = fnt.nodes.new("ShaderNodeTexCoord"); gr = fnt.nodes.new("ShaderNodeTexGradient"); gr.gradient_type = 'SPHERICAL'
+        fnt.links.new(tc.outputs["Object"], gr.inputs["Vector"])
+        mp = fnt.nodes.new("ShaderNodeMath"); mp.operation = 'MULTIPLY_ADD'
+        fnt.links.new(gr.outputs["Fac"], mp.inputs[0]); mp.inputs[1].default_value = fog["falloff"]
+        mp.inputs[2].default_value = 1.0 - fog["falloff"]
+        md = fnt.nodes.new("ShaderNodeMath"); md.operation = 'MULTIPLY'
+        fnt.links.new(mp.outputs[0], md.inputs[0]); md.inputs[1].default_value = fog["density"]
+        fnt.links.new(md.outputs[0], vs.inputs["Density"]); fnt.links.new(md.outputs[0], va.inputs["Density"])
     add = fnt.nodes.new("ShaderNodeAddShader")
     fnt.links.new(vs.outputs[0], add.inputs[0]); fnt.links.new(va.outputs[0], add.inputs[1])
     fnt.links.new(add.outputs[0], fout.inputs["Volume"])
-    try: fm.cycles.homogeneous_volume = True
+    try: fm.cycles.homogeneous_volume = fog.get("falloff", 0.0) <= 0.0
     except Exception: pass
     fo.data.materials.append(fm)
     sc.cycles.volume_bounces = 8

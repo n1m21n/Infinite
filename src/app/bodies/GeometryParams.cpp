@@ -2887,6 +2887,7 @@ namespace app
       {
          ColorSwatch("fog colour", n->fogColor, n);
          ModSlider("fog anisotropy", &n->fogAnisotropy, -0.95f, 0.95f, "%.2f", colW);
+         ModSlider("fog falloff", &n->fogFalloff, 0.0f, 1.0f, "%.2f", colW);
          ImGui::SetNextItemWidth(colW); ImGui::DragFloat3("fog min", n->fogMin, 0.05f, -1000.0f, 1000.0f, "%.2f");
          ImGui::SetNextItemWidth(colW); ImGui::DragFloat3("fog max", n->fogMax, 0.05f, -1000.0f, 1000.0f, "%.2f");
       }

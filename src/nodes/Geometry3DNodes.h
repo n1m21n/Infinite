@@ -838,6 +838,7 @@ public:
    float fogDensity = 0.0f;
    float fogColor[3] = { 0.9f, 0.9f, 0.9f };
    float fogAnisotropy = 0.0f;
+   float fogFalloff = 0.0f; // row 4.1: 0 fills the box evenly, 1 thins it to a soft puff toward the faces
    float fogMin[3] = { -1000.0f, -1000.0f, -1000.0f }, fogMax[3] = { 1000.0f, 1000.0f, 1000.0f };
    float dofRotation = 0.0f;
    float dofRatio = 1.0f;
@@ -911,7 +912,7 @@ public:
       v.Float("dofAperture", dofAperture); v.Float("focusDistance", focusDistance);
       v.Int("dofBlades", dofBlades); v.Float("dofRotation", dofRotation); v.Float("dofRatio", dofRatio);
       v.Float("dofCatEye", dofCatEye); v.Float("lensDistortion", lensDistortion); v.Float("lensCA", lensCA);
-      v.Float("fogDensity", fogDensity); v.Color("fogColor", fogColor); v.Float("fogAnisotropy", fogAnisotropy);
+      v.Float("fogDensity", fogDensity); v.Color("fogColor", fogColor); v.Float("fogAnisotropy", fogAnisotropy); v.Float("fogFalloff", fogFalloff);
       v.Float("fogMinX", fogMin[0]); v.Float("fogMinY", fogMin[1]); v.Float("fogMinZ", fogMin[2]);
       v.Float("fogMaxX", fogMax[0]); v.Float("fogMaxY", fogMax[1]); v.Float("fogMaxZ", fogMax[2]);
       v.Bool("floatOutput", floatOutput); v.Int("supersample", supersample);

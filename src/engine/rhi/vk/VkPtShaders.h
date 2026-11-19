@@ -286,11 +286,26 @@ vec2 boxSpan(vec3 lo, vec3 hi, vec3 o, vec3 d, float tmax)
    return vec2(max(max(l.x, l.y), max(l.z, 0.0)), min(min(h.x, h.y), min(h.z, tmax)));
 }
 vec2 fogSpan(vec3 o, vec3 d, float tmax) { return boxSpan(pu.fogLo.xyz, pu.fogHi.xyz, o, d, tmax); }
+// Row 4.1 (mirrors MetalDevice.mm): the medium's shape, and the optical depth through it.
+float fogShape(vec3 p)
+{
+   if (pu.fog.z <= 0.0) return 1.0;
+   vec3 c = 0.5 * (pu.fogLo.xyz + pu.fogHi.xyz), h = max(0.5 * (pu.fogHi.xyz - pu.fogLo.xyz), vec3(1e-4));
+   return mix(1.0, max(1.0 - length((p - c) / h), 0.0), pu.fog.z);
+}
+float fogDepth(vec3 o, vec3 d, vec2 s)
+{
+   float len = max(s.y - s.x, 0.0);
+   if (pu.fog.z <= 0.0 || len <= 0.0) return pu.fog.x * len;
+   float st = len / 16.0, acc = 0.0;
+   for (int k = 0; k < 16; k++) acc += fogShape(o + d * (s.x + (float(k) + 0.5) * st));
+   return pu.fog.x * acc * st;
+}
 float fogTr(vec3 o, vec3 d, float tmax)
 {
    if (pu.fog.x <= 0.0) return 1.0;
    vec2 s = fogSpan(o, d, tmax);
-   return exp(-pu.fog.x * max(s.y - s.x, 0.0));
+   return exp(-fogDepth(o, d, s));
 }
 vec3 hgSample(vec3 w, float g, float u1, float u2)
 {
@@ -406,6 +421,12 @@ void main()
       {
          vec2 sp = fogSpan(o, d, hitAny ? h.t : 1e4);
          float s = sp.x - log(max(1.0 - rnd(seed), 1e-12)) / pu.fog.x;
+         if (pu.fog.z > 0.0)
+            for (int g = 0; g < 64 && sp.y > sp.x && s < sp.y; g++)
+            {
+               if (rnd(seed) < fogShape(o + d * s)) break;
+               s -= log(max(1.0 - rnd(seed), 1e-12)) / pu.fog.x;
+            }
          if (sp.y > sp.x && s < sp.y)
          {
             vec3 pm = o + d * s;

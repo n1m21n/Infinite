@@ -734,7 +734,7 @@ bool Render3DNode::CookEngine(int frameId)
       // a glass wall or a water drop a few millimetres thick is not stepped over; never more than the old fixed 3 mm.
       fr.rayBias = std::clamp(fr.focusDist * 1e-4f, 1e-5f, 0.003f);
       fr.dofAperture = ortho ? 0.0f : std::max(0.0f, dofAperture);
-      fr.fogDensity = std::max(0.0f, fogDensity); fr.fogAnisotropy = std::clamp(fogAnisotropy, -0.95f, 0.95f);
+      fr.fogDensity = std::max(0.0f, fogDensity); fr.fogAnisotropy = std::clamp(fogAnisotropy, -0.95f, 0.95f); fr.fogFalloff = std::clamp(fogFalloff, 0.0f, 1.0f);
       for (int k = 0; k < 3; k++) { fr.fogColor[k] = ColorSpace::SrgbToLinear(std::clamp(fogColor[k], 0.0f, 1.0f)); fr.fogMin[k] = fogMin[k]; fr.fogMax[k] = fogMax[k]; }
       fr.bokeh[0] = dofBlades >= 3 ? (float)std::min(dofBlades, 16) : 0.0f;
       fr.bokeh[1] = dofRotation * 3.14159265f / 180.0f;
@@ -900,7 +900,7 @@ bool Render3DNode::CookEngine(int frameId)
    };
    mix(fr.viewProj, 64); mix(&fr.lensRadius, 8); mix(fr.bokeh, 12); mix(&fr.lensCatEye, 12); mix(&fr.bloom, 12); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
    mix(&fr.envRev, 8); mix(&fr.envRotationRad, 4); mix(&fr.envBackground, 1);
-   mix(&fr.fogDensity, 8); mix(fr.fogColor, 36);
+   mix(&fr.fogDensity, 12); // density, anisotropy, falloff mix(fr.fogColor, 36);
    for (size_t ii = 0; ii < fr.instances.size(); ii++)
    {
       const engine::Instance& in = fr.instances[ii];

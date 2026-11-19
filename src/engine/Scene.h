@@ -176,7 +176,7 @@ namespace engine
       // blades (below 3 round), their turn in radians, tall/wide ratio, as Render 3D's lens. 0 radius = pinhole.
       float lensRadius = 0.0f, focusDist = 4.0f;
       // Row 5.3: one homogeneous medium in the box fogMin..fogMax (settle only): extinction per unit, scattered share, HG g.
-      float fogDensity = 0.0f, fogAnisotropy = 0.0f;
+      float fogDensity = 0.0f, fogAnisotropy = 0.0f, fogFalloff = 0.0f; // row 4.1: falloff 0 even box .. 1 soft puff
       float fogColor[3] = { 0.9f, 0.9f, 0.9f }, fogMin[3] = { -1000, -1000, -1000 }, fogMax[3] = { 1000, 1000, 1000 };
       float dofAperture = 0.0f; // live: Render 3D's depth blur, a circle of dofAperture x 24 px across 1080 rows at |d - focus| / d
       float bokeh[3] = { 0.0f, 0.0f, 1.0f };

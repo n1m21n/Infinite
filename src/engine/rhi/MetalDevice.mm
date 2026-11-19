@@ -625,6 +625,23 @@ float2 boxSpan(float3 lo, float3 hi, float3 o, float3 d, float tmax)
    const float3 l = min(a, c), h = max(a, c);
    return float2(max(max(l.x, l.y), max(l.z, 0.0)), min(min(h.x, h.y), min(h.z, tmax)));
 }
+// Row 4.1: the medium's shape. fall 0 fills the box evenly; 1 is a soft puff, density falling linearly from the box's
+// centre to nothing on the ellipsoid inside its faces (Blender's spherical Gradient on the box's object coordinates).
+float fogShape(float3 lo, float3 hi, float fall, float3 p)
+{
+   if (fall <= 0.0) return 1.0;
+   const float3 c = 0.5 * (lo + hi), h = max(0.5 * (hi - lo), float3(1e-4));
+   return mix(1.0, max(1.0 - length((p - c) / h), 0.0), fall);
+}
+// Optical depth along o + d t over the span s, sig the peak extinction: exact for an even box, else 16 midpoints.
+float fogDepth(float3 lo, float3 hi, float fall, float sig, float3 o, float3 d, float2 s)
+{
+   const float len = max(s.y - s.x, 0.0);
+   if (fall <= 0.0 || len <= 0.0) return sig * len;
+   const float st = len / 16.0; float acc = 0.0;
+   for (int k = 0; k < 16; k++) acc += fogShape(lo, hi, fall, o + d * (s.x + (float(k) + 0.5) * st));
+   return sig * acc * st;
+}
 struct VisU { float4x4 invVP; float4 info; float4 fog; float4 fogC; float4 fogLo; float4 fogHi; }; // info: full width, height; fog as PtU's
 struct VisOut { float4 v [[color(0)]]; float d [[color(1)]]; float4 fg [[color(2)]]; }; // fg: fog in-scatter (rgb) and transmittance (a) along the view
 float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
@@ -655,12 +672,19 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       {
          const float sig = u.fog.x, st = (sp.y - sp.x) / 8.0;
          const float jit = fract(52.9829189 * fract(0.06711056 * float(px.x) + 0.00583715 * float(px.y)) + 0.61803399 * f.gi.z);
-         float3 In = float3(0.0);
+         float3 In = float3(0.0); float od = 0.0;
+         const float3 amb = f.horizon.xyz * f.params.z;
          for (int k = 0; k < 8; k++)
          {
             const float t = sp.x + (float(k) + jit) * st;
             const float3 p = e + vd * t;
-            const float Tv = exp(-sig * (t - sp.x));
+            const float dk = fogShape(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, p); // row 4.1: density here, 1 in an even box
+            const float Tv = exp(-(od + sig * dk * jit * st));
+            od += sig * dk * st;
+            if (dk <= 0.0) continue;
+            // Skylight scattered in (row 4.1): the world's horizon colour, through the fog above this point.
+            In += dk * Tv * amb * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, float3(0.0, 1.0, 0.0),
+                                               boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, float3(0.0, 1.0, 0.0), 1e4)));
             for (int i = 0; i < 8 && i < int(f.params.w); i++)
             {
                constant LightU& L = f.lights[i];
@@ -669,10 +693,14 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
                const float3 ld = normalize(L.vec.xyz);
                if (L.color.w < 0.5 && occluded(rtArgs.tlas, p, ld, 1e4)) continue;
                const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, 1e4);
-               In += Tv * exp(-sig * max(ss.y - ss.x, 0.0)) * hgPhase(dot(ld, vd), u.fog.y) * L.color.xyz * L.terms.x;
+               In += dk * Tv * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, ld, ss)) * hgPhase(dot(ld, vd), u.fog.y) * L.color.xyz * L.terms.x;
             }
          }
-         o.fg = float4(In * (sig * st) * u.fogC.xyz, exp(-sig * (sp.y - sp.x)));
+         // Multiple scattering (row 4.1), the geometric series of the albedo over the light kept inside the box's
+         // smallest extent (a puff's mean density about a fifth of its peak): 1 / (1 - a (1 - exp(-sigma D))).
+         const float3 ext = u.fogHi.xyz - u.fogLo.xyz;
+         const float3 ms = 1.0 / (1.0 - u.fogC.xyz * (1.0 - exp(-sig * mix(1.0, 0.2, u.fog.z) * min(ext.x, min(ext.y, ext.z)))));
+         o.fg = float4(In * (sig * st) * u.fogC.xyz * ms, exp(-(u.fog.z > 0.0 ? od : sig * (sp.y - sp.x))));
       }
    }
    if (dt.read(uint2(px)) >= 1.0) return o;
@@ -699,7 +727,7 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       else ld = normalize(L.vec.xyz);
       if (type == 1 || type == 4) { if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) o.v[ch] = 0.0; }
       else o.v[ch] = sunVis(rtArgs.tlas, nullptr, false, p + n * f.shQ.w, ld, (type == 0 || type == 2) ? L.spot.x : 0.0, float2(px));
-      if (u.fog.x > 0.0) { const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, tmax); o.v[ch] *= exp(-u.fog.x * max(ss.y - ss.x, 0.0)); } // row 5.4: the light crosses the fog
+      if (u.fog.x > 0.0) { const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, tmax); o.v[ch] *= exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, p, ld, ss)); } // row 5.4: the light crosses the fog
    }
    return o;
 }
@@ -1547,7 +1575,7 @@ float fogTr(constant PtU& u, float3 o, float3 d, float tmax)
 {
    if (u.fog.x <= 0.0) return 1.0;
    const float2 s = fogSpan(u, o, d, tmax);
-   return exp(-u.fog.x * max(s.y - s.x, 0.0));
+   return exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, o, d, s));
 }
 float3 hgSample(float3 w, float g, float u1, float u2)
 {
@@ -1631,7 +1659,15 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          // Row 5.3: free flight through the medium (one extinction for all channels, so the weight is the albedo).
          // A scatter takes one light sample with the phase function, then the path goes on along a phase sample.
          const float2 sp = fogSpan(u, o, d, h.type == intersection_type::triangle ? h.distance : 1e4);
-         const float s = sp.x - log(max(1.0 - rnd(qs), 1e-12)) / u.fog.x;
+         float s = sp.x - log(max(1.0 - rnd(qs), 1e-12)) / u.fog.x;
+         // Row 4.1: a shaped medium is delta tracked (Woodcock) against the peak: a tentative collision is real with
+         // the chance density / peak, else the flight goes on. An even box keeps the plain free flight.
+         if (u.fog.z > 0.0)
+            for (int g = 0; g < 64 && sp.y > sp.x && s < sp.y; g++)
+            {
+               if (rnd(qs) < fogShape(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, o + d * s)) break;
+               s -= log(max(1.0 - rnd(qs), 1e-12)) / u.fog.x;
+            }
          if (sp.y > sp.x && s < sp.y)
          {
             const float3 pm = o + d * s;
@@ -3290,7 +3326,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             struct { float invVP[16]; float info[4]; float fog[4], fogC[4], fogLo[4], fogHi[4]; } vu = {};
             std::memcpy(vu.invVP, invVP, 64);
             vu.info[0] = (float)img.Width(); vu.info[1] = (float)img.Height();
-            vu.fog[0] = fr.fogDensity; vu.fog[1] = fr.fogAnisotropy;
+            vu.fog[0] = fr.fogDensity; vu.fog[1] = fr.fogAnisotropy; vu.fog[2] = fr.fogFalloff;
             for (int k = 0; k < 3; k++) { vu.fogC[k] = fr.fogColor[k]; vu.fogLo[k] = fr.fogMin[k]; vu.fogHi[k] = fr.fogMax[k]; }
             [ve setRenderPipelineState:mVisPso];
             [ve setFragmentBytes:&vu length:sizeof(vu) atIndex:0];
@@ -3803,7 +3839,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
             [e setRenderPipelineState:mPtPso];
             struct { float invVP[16]; float info[4]; float em[4]; float lens[4], lr[4], lu[4], lf[4], fog[4], fogC[4], fogLo[4], fogHi[4]; } pu;
-            pu.fog[0] = fr.fogDensity; pu.fog[1] = fr.fogAnisotropy; pu.fog[2] = pu.fog[3] = 0.0f;
+            pu.fog[0] = fr.fogDensity; pu.fog[1] = fr.fogAnisotropy; pu.fog[2] = fr.fogFalloff; pu.fog[3] = 0.0f;
             for (int k = 0; k < 3; k++) { pu.fogC[k] = fr.fogColor[k]; pu.fogLo[k] = fr.fogMin[k]; pu.fogHi[k] = fr.fogMax[k]; }
             pu.fogLo[3] = pu.fogHi[3] = 0.0f;
             pu.lens[0] = fr.lensRadius; pu.lens[1] = fr.focusDist; pu.lens[2] = fr.bokeh[0]; pu.lens[3] = fr.bokeh[1];

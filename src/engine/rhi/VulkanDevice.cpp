@@ -734,7 +734,7 @@ namespace
             return false;
 
          struct PtUH { float invVP[16]; float info[4]; float em[4]; float lens[4], lr[4], lu[4], lf[4], fog[4], fogC[4], fogLo[4], fogHi[4]; } pu = {};
-         pu.fog[0] = fr.fogDensity; pu.fog[1] = fr.fogAnisotropy;
+         pu.fog[0] = fr.fogDensity; pu.fog[1] = fr.fogAnisotropy; pu.fog[2] = fr.fogFalloff;
          for (int k = 0; k < 3; k++) { pu.fogC[k] = fr.fogColor[k]; pu.fogLo[k] = fr.fogMin[k]; pu.fogHi[k] = fr.fogMax[k]; }
          pu.lens[0] = fr.lensRadius; pu.lens[1] = fr.focusDist; pu.lens[2] = fr.bokeh[0]; pu.lens[3] = fr.bokeh[1];
          for (int k = 0; k < 3; k++) { pu.lr[k] = fr.camRight[k]; pu.lu[k] = fr.camUp[k]; pu.lf[k] = fr.camFwd[k]; }

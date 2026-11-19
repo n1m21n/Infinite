@@ -636,6 +636,31 @@ def _vol_shaft():
 CASES["vol_shaft"] = _vol_shaft()
 
 
+# Row 4.1: a lit smoke puff (density falls from the box centre to nothing at its faces) with a ball behind it under a
+# low sun, so the puff's own shadow falls across the floor; and haze filling a wide outdoor box over a floor of balls.
+def _vol_smoke():
+    return {"camera": {"fov": 40, "azimuth": 70, "elevation": 12, "distance": 4.2, "target": [0, 0, 0.7]},
+            "lights": [{"type": "sun", "power": 5, "azimuth": 150, "elevation": 30}],
+            "world": {"color": [0.03, 0.035, 0.045]}, "size": (256, 256),
+            "fog": {"density": 3.0, "color": [0.85, 0.85, 0.85], "g": 0.2, "falloff": 1.0,
+                    "box": [[-0.6, -0.6, 0.15], [0.6, 0.6, 1.35]]},
+            "objects": [GREY_FLOOR, _ball(-0.9, 0.9, 0.35, base_color=[0.8, 0.2, 0.1], roughness=0.5)]}
+
+
+def _vol_world_haze():
+    balls = [_ball(x, y, 0.3, base_color=[0.75, 0.75, 0.75], roughness=0.5)
+             for x, y in ((-1.2, 1.5), (0.0, 0.0), (1.2, -1.5), (-0.6, -3.0), (0.8, 3.0))]
+    return {"camera": {"fov": 45, "azimuth": 0, "elevation": 18, "distance": 5.0, "target": [0, 0, 0.3]},
+            "lights": [{"type": "sun", "power": 4, "azimuth": 120, "elevation": 40}],
+            "world": {"color": [0.25, 0.3, 0.38]}, "size": (256, 256),
+            "fog": {"density": 0.12, "color": [0.95, 0.95, 0.95], "g": 0.5, "box": [[-20, -20, 0.0], [20, 20, 6.0]]},
+            "objects": [GREY_FLOOR] + balls}
+
+
+CASES["vol_smoke"] = _vol_smoke()
+CASES["vol_world_haze"] = _vol_world_haze()
+
+
 # Row 5.5: the physical sky alone (Preetham) against Blender's Preetham sky texture. Sky azimuth 0 = +X, -90 = +Y
 # (in front of an azimuth-90 camera); the camera looks a little up so the horizon sits low in the frame.
 def _sky(elev, az, turb):
