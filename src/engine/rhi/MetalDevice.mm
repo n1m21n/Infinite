@@ -652,7 +652,7 @@ float fogDepth(float3 lo, float3 hi, float fall, float sig, float3 o, float3 d, 
    return sig * acc * st;
 }
 struct VisU { float4x4 invVP; float4 info; float4 fog; float4 fogC; float4 fogLo; float4 fogHi; }; // info: full width, height; fog as PtU's
-struct VisOut { float4 v [[color(0)]]; float d [[color(1)]]; float4 fg [[color(2)]]; }; // fg: fog in-scatter (rgb) and transmittance (a) along the view
+struct VisOut { float4 v [[color(0)]]; float d [[color(1)]]; float4 fg [[color(2)]]; float4 fe [[color(3)]]; }; // fg: fog in-scatter (rgb) and transmittance (a) along the view; fe: the fog's light on the surface (mean radiance over its hemisphere)
 float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
 {
    const float z = dt.read(uint2(px));
@@ -660,17 +660,78 @@ float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
    const float4 pw = u.invVP * float4(ndc, z * 2.0 - 1.0, 1.0);
    return pw.xyz / pw.w;
 }
+// Row 5.6: light scattered toward -d by the fog along o + d t over the span sp (jittered stratified steps), before the
+// albedo, sigma x step and multiple-scattering gain: sun, point, spot and area lights (falloff, cone, area facing as
+// the surface shading; IES not) through the fog to the light, plus the skylight from above. shadows: one RT shadow
+// ray a light a step (the shafts); without, geometry does not block.
+float3 fogInScatter(constant VisU& u, constant FrameU& f, constant RTArgs& rtArgs, constant RInst* instInfo, float3 o, float3 d,
+                    float2 sp, int steps, float jit, bool shadows, thread float& od)
+{
+   const float sig = u.fog.x, st = (sp.y - sp.x) / float(steps);
+   const float3 amb = f.horizon.xyz * f.params.z;
+   float3 In = float3(0.0); od = 0.0;
+   for (int k = 0; k < 8; k++)
+   {
+      if (k >= steps) break;
+      const float t = sp.x + (float(k) + jit) * st;
+      const float3 p = o + d * t;
+      const float dk = fogShape(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, p); // row 4.1: density here, 1 in an even box
+      const float Tv = exp(-(od + sig * dk * jit * st));
+      od += sig * dk * st;
+      if (dk <= 0.0) continue;
+      // Skylight scattered in (row 4.1): the world's horizon colour, through the fog above this point.
+      In += dk * Tv * amb * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, float3(0.0, 1.0, 0.0),
+                                         boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, float3(0.0, 1.0, 0.0), 1e4)));
+      for (int i = 0; i < 8 && i < int(f.params.w); i++)
+      {
+         constant LightU& L = f.lights[i];
+         const int type = int(L.vec.w);
+         if (type == 3 || L.aim.w < -1.5) continue;
+         float3 ld; float tmax = 1e4, atten = 1.0;
+         if (type == 1 || type == 4 || type == 5)
+         {
+            const float3 tl = L.vec.xyz - p; const float dist = length(tl);
+            ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
+            atten = lightFalloff(dist, L.terms.z);
+            if (L.terms.w > 0.0 && dist > L.terms.w) atten = 0.0;
+            if (type == 4)
+            {
+               const float cosCur = dot(-ld, L.aim.xyz), cosOuter = cos(L.spot.x * 0.017453292);
+               const float smoothW = (1.0 - cosOuter) * L.spot.y;
+               float sa = cosCur > cosOuter ? cosCur : 0.0;
+               if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
+               atten *= sa;
+            }
+            if (type == 5) { const float cl = dot(-ld, L.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(L.spot.y, cl); }
+         }
+         else ld = normalize(L.vec.xyz);
+         if (atten <= 0.0) continue;
+         if (shadows && L.color.w < 0.5 && shadowT(rtArgs.tlas, instInfo, false, p, ld, tmax, shLink(L, i)) < 0.5) continue;
+         const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, tmax);
+         In += dk * Tv * atten * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, ld, ss)) * hgPhase(dot(ld, d), u.fog.y) * L.color.xyz * L.terms.x;
+      }
+   }
+   return In * (sig * st);
+}
+// Multiple scattering (row 4.1), the geometric series of the albedo over the light kept inside the box's smallest
+// extent (a puff's mean density about a fifth of its peak): 1 / (1 - a (1 - exp(-sigma D))).
+float3 fogMs(constant VisU& u)
+{
+   const float3 ext = u.fogHi.xyz - u.fogLo.xyz;
+   return 1.0 / (1.0 - u.fogC.xyz * (1.0 - exp(-u.fog.x * mix(1.0, 0.2, u.fog.z) * min(ext.x, min(ext.y, ext.z)))));
+}
 fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
                        constant RTArgs& rtArgs [[buffer(3)]], constant RInst* instInfo [[buffer(4)]], depth2d<float> dt [[texture(0)]])
 {
-   VisOut o; o.v = float4(1.0); o.d = -1.0; o.fg = float4(0.0, 0.0, 0.0, 1.0);
+   VisOut o; o.v = float4(1.0); o.d = -1.0; o.fg = float4(0.0, 0.0, 0.0, 1.0); o.fe = float4(0.0);
    const int W = int(u.info.x), H = int(u.info.y);
    const int2 px = int2(in.pos.xy) * 2;
    if (px.x >= W || px.y >= H) return o;
+   const float jit = fract(52.9829189 * fract(0.06711056 * float(px.x) + 0.00583715 * float(px.y)) + 0.61803399 * f.gi.z);
    if (u.fog.x > 0.0)
    {
-      // Row 5.4: single scattering of the sun along the view through the fog box, 8 jittered steps, one RT shadow
-      // ray each (the shaft); the sun's own path through the fog dims it. r_fs blends this as col * a + rgb.
+      // Row 5.4: single scattering along the view through the fog box, 8 jittered steps, one RT shadow ray a light
+      // each (the shafts); each light's own path through the fog dims it. r_fs blends this as col * a + rgb.
       const float z = dt.read(uint2(px));
       const float3 e = f.eye.xyz;
       const float2 ndc = float2(2.0 * (float(px.x) + 0.5) / u.info.x - 1.0, 2.0 * (float(px.y) + 0.5) / u.info.y - 1.0);
@@ -679,37 +740,9 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       const float2 sp = boxSpan(u.fogLo.xyz, u.fogHi.xyz, e, vd, z >= 1.0 ? 1e4 : distance(visWp(u, dt, px), e));
       if (sp.y > sp.x)
       {
-         const float sig = u.fog.x, st = (sp.y - sp.x) / 8.0;
-         const float jit = fract(52.9829189 * fract(0.06711056 * float(px.x) + 0.00583715 * float(px.y)) + 0.61803399 * f.gi.z);
-         float3 In = float3(0.0); float od = 0.0;
-         const float3 amb = f.horizon.xyz * f.params.z;
-         for (int k = 0; k < 8; k++)
-         {
-            const float t = sp.x + (float(k) + jit) * st;
-            const float3 p = e + vd * t;
-            const float dk = fogShape(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, p); // row 4.1: density here, 1 in an even box
-            const float Tv = exp(-(od + sig * dk * jit * st));
-            od += sig * dk * st;
-            if (dk <= 0.0) continue;
-            // Skylight scattered in (row 4.1): the world's horizon colour, through the fog above this point.
-            In += dk * Tv * amb * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, float3(0.0, 1.0, 0.0),
-                                               boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, float3(0.0, 1.0, 0.0), 1e4)));
-            for (int i = 0; i < 8 && i < int(f.params.w); i++)
-            {
-               constant LightU& L = f.lights[i];
-               const int type = int(L.vec.w);
-               if (type != 0 && type != 2) continue;
-               const float3 ld = normalize(L.vec.xyz);
-               if (L.color.w < 0.5 && shadowT(rtArgs.tlas, instInfo, false, p, ld, 1e4, shLink(L, i)) < 0.5) continue;
-               const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, 1e4);
-               In += dk * Tv * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, ld, ss)) * hgPhase(dot(ld, vd), u.fog.y) * L.color.xyz * L.terms.x;
-            }
-         }
-         // Multiple scattering (row 4.1), the geometric series of the albedo over the light kept inside the box's
-         // smallest extent (a puff's mean density about a fifth of its peak): 1 / (1 - a (1 - exp(-sigma D))).
-         const float3 ext = u.fogHi.xyz - u.fogLo.xyz;
-         const float3 ms = 1.0 / (1.0 - u.fogC.xyz * (1.0 - exp(-sig * mix(1.0, 0.2, u.fog.z) * min(ext.x, min(ext.y, ext.z)))));
-         o.fg = float4(In * (sig * st) * u.fogC.xyz * ms, exp(-(u.fog.z > 0.0 ? od : sig * (sp.y - sp.x))));
+         float od;
+         const float3 In = fogInScatter(u, f, rtArgs, instInfo, e, vd, sp, 8, jit, true, od);
+         o.fg = float4(In * u.fogC.xyz * fogMs(u), exp(-(u.fog.z > 0.0 ? od : u.fog.x * (sp.y - sp.x))));
       }
    }
    if (dt.read(uint2(px)) >= 1.0) return o;
@@ -723,6 +756,28 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
    n = dot(n, n) > 1e-20 ? normalize(n) : normalize(f.eye.xyz - p);
    if (dot(n, f.eye.xyz - p) < 0.0) n = -n;
    o.d = distance(p, f.eye.xyz);
+   if (u.fog.x > 0.0)
+   {
+      // Row 5.6: the fog's own light on this surface (the light it scatters back, a slab of haze lighting the ground
+      // under it): 4 cosine-weighted rays over the hemisphere, 4 steps each through the box, shadowed (a closed room's walls keep
+      // the sun off most of its fog); r_fs
+      // adds base x this as diffuse ambient. Steps stop 4 mean free paths out, where nothing more comes back.
+      const float3 tx = abs(n.y) < 0.99 ? normalize(cross(n, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0), ty = cross(n, tx);
+      float3 Lf = float3(0.0);
+      for (int r = 0; r < 4; r++)
+      {
+         const float u1 = fract((float(r) + jit) * 0.25 + 0.37 * jit), u2 = fract(float(r) * 0.61803399 + jit);
+         const float rr = sqrt(u1), ph = 6.2831853 * u2;
+         const float3 rd = normalize(tx * (rr * cos(ph)) + ty * (rr * sin(ph)) + n * sqrt(max(1.0 - u1, 0.0)));
+         const float3 ro = p + n * f.shQ.w;
+         float2 sp = boxSpan(u.fogLo.xyz, u.fogHi.xyz, ro, rd, 1e4);
+         sp.y = min(sp.y, sp.x + 4.0 / u.fog.x);
+         if (sp.y <= sp.x) continue;
+         float od;
+         Lf += fogInScatter(u, f, rtArgs, instInfo, ro, rd, sp, 4, fract(jit + 0.5 * float(r)), true, od);
+      }
+      o.fe = float4(Lf * 0.25 * u.fogC.xyz * fogMs(u), 1.0);
+   }
    const int count = int(f.params.w);
    for (int i = 0; i < 8; i++)
    {
@@ -789,7 +844,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
                      depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
                      constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]],
                      texture2d<float> visT [[texture(7)]], texture2d<float> visD [[texture(8)]], texture2d<float> visF [[texture(6)]],
-                     array<texture2d<float>, 16> maps [[texture(10)]], uint prim [[primitive_id]],
+                     array<texture2d<float>, 16> maps [[texture(10)]], uint prim [[primitive_id]], texture2d<float> visE [[texture(26)]],
                      constant LightU* LL [[buffer(6)]], constant uint* CL [[buffer(7)]], bool frontF [[front_facing]])
 {
    float3 n = normalize(in.n);
@@ -1123,6 +1178,15 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       float3 rd = refract(-viewDir, n, 1.0 / max(m.mat.ior, 1.0001));
       if (dot(rd, rd) < 1e-6) rd = reflect(-viewDir, n);
       col = mix(col, sampleEnv(f, et, rd, 0.0) * mix(float3(1.0), base, 0.4) * (float3(1.0) - fAmb), trans);
+   }
+   if (visE.get_width() > 1)
+   {
+      // Row 5.6: the fog's light on this surface (vis_fs, half res, 3x3 box against its noise), as diffuse ambient.
+      const int2 q = int2(in.pos.xy) / 2, fs = int2(visE.get_width(), visE.get_height());
+      float3 a = float3(0.0);
+      for (int j = -1; j <= 1; j++)
+         for (int i = -1; i <= 1; i++) a += visE.read(uint2(clamp(q + int2(i, j), int2(0), fs - 1))).rgb;
+      col += (float3(1.0) - fresnelRough(nDotV, f0, rough) * iridK) * (1.0 - metal) * base * (a / 9.0) * aoV;
    }
    col = col * ccAt + coatCol + (ccW > 0.0 ? sampleEnv(f, et, reflect(-viewDir, n), ccR) * (ccW * ccFv) : float3(0.0));
    col += float3(m.mat.emission) * emMap;
@@ -3502,6 +3566,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             vp.colorAttachments[2].texture = mVisF;
             vp.colorAttachments[2].loadAction = MTLLoadActionDontCare;
             vp.colorAttachments[2].storeAction = MTLStoreActionStore;
+            vp.colorAttachments[3].texture = mVisE;
+            vp.colorAttachments[3].loadAction = MTLLoadActionDontCare;
+            vp.colorAttachments[3].storeAction = MTLStoreActionStore;
             id<MTLRenderCommandEncoder> ve = [cb renderCommandEncoderWithDescriptor:vp];
             struct { float invVP[16]; float info[4]; float fog[4], fogC[4], fogLo[4], fogHi[4]; } vu = {};
             std::memcpy(vu.invVP, invVP, 64);
@@ -3587,6 +3654,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setFragmentTexture:mVis atIndex:7];
          [enc setFragmentTexture:mVisD atIndex:8];
          [enc setFragmentTexture:(mask && fr.fogDensity > 0.0f) ? mVisF : FogNone() atIndex:6]; // row 5.4: 1x1 = no fog
+         [enc setFragmentTexture:(mask && fr.fogDensity > 0.0f) ? mVisE : FogNone() atIndex:26];
          const bool envBg = fr.envBackground && (int(f.envm[0]) & 2) != 0, fogBg = !envBg && mask && fr.fogDensity > 0.0f;
          if ((envBg || fogBg) && mBgPsoMrt && mBgPsoDir)
          {
@@ -4416,6 +4484,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                vd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA8Unorm;
                vd.colorAttachments[1].pixelFormat = MTLPixelFormatR32Float;
                vd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
+               vd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA16Float; // row 5.6: fog fill
                mVisPso = [mDev newRenderPipelineStateWithDescriptor:vd error:&err];
                if (!mVisPso) EngineFail(@"shadow mask pipeline", err);
             }
@@ -4554,7 +4623,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       bool mVisValid = false; int mVisW = 0, mVisH = 0; // mVis holds the last Render's mask at this size
       id<MTLTexture> mVis = nil, mVisD = nil; // half-res RT shadow mask (4 lights) and its distance guide
-      id<MTLTexture> mVisF = nil, mFogNone = nil; // row 5.4: half-res fog (in-scatter, transmittance); 1x1 stand-in when off
+      id<MTLTexture> mVisF = nil, mVisE = nil, mFogNone = nil; // mVisE (row 5.6): the fog's fill on surfaces
+      // row 5.4: half-res fog (in-scatter, transmittance); 1x1 stand-in when off
       id<MTLTexture> FogNone()
       {
          if (!mFogNone)
@@ -4630,9 +4700,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          mTr[0] = [mDev newTextureWithDescriptor:d]; mTr[1] = [mDev newTextureWithDescriptor:d];
          d.pixelFormat = MTLPixelFormatRGBA8Unorm; mVis = [mDev newTextureWithDescriptor:d];
          d.pixelFormat = MTLPixelFormatR32Float; mVisD = [mDev newTextureWithDescriptor:d];
-         d.pixelFormat = MTLPixelFormatRGBA16Float; mVisF = [mDev newTextureWithDescriptor:d];
+         d.pixelFormat = MTLPixelFormatRGBA16Float; mVisF = [mDev newTextureWithDescriptor:d]; mVisE = [mDev newTextureWithDescriptor:d];
          mHistValid = false; mRValid = false;
-         return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1] && mNz && mAt[0] && mAt[1] && mTr[0] && mTr[1] && mVis && mVisD && mVisF;
+         return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1] && mNz && mAt[0] && mAt[1] && mTr[0] && mTr[1] && mVis && mVisD && mVisF && mVisE;
       }
       MTLPixelFormat mFmt = MTLPixelFormatInvalid;
       std::vector<Gpu> mMeshes;
