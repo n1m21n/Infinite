@@ -2202,7 +2202,16 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             const float3 A = clamp(base, 0.0, 0.999);
             const float3 qa = 4.09712 + 4.20863 * A - sqrt(9.59217 + 41.6808 * A + 17.7126 * A * A);
             const float3 alb = 1.0 - qa * qa;
-            float3 wp = offRay(p, -ns), wd = cosineDir(-ns, rnd(qs), rnd(qs));
+            // Entry as Cycles' Random Walk (subsurface_entry_bounce): the incoming ray refracted at the IOR through a
+            // GGX microfacet of alpha = roughness^2, not a cosine; a draw that would leave the surface ends the path.
+            float3 wd;
+            {
+               const float3 Hm = ggxSampleH(ns, max(0.002, rough * rough), rnd(qs), rnd(qs));
+               const float ci = dot(V, Hm), ne = 1.0 / clamp(I.mat.ior, 1.01, 3.8);
+               wd = ci > 0.0 ? -ne * V + (ne * ci - sqrt(max(1.0 - ne * ne * (1.0 - ci * ci), 1e-14))) * Hm : ns;
+               if (dot(ns, wd) >= 0.0) break;
+            }
+            float3 wp = offRay(p, -ns);
             bool out = false; float3 q = p, no = ns;
             for (int s = 0; s < 256 && !out; s++)
             {

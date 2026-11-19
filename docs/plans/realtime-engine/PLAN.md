@@ -134,7 +134,7 @@ every step; keep a change only if it measures better.
 | 5.1 | Weathering presets on layers: dust in cavities, rust at edges, wet below a line (Field Modifier writes masks) | REALISM R9 | one case each | done 2026-11-19: Rust + Wet Material recipes join Edge Wear / Dirt / Dust (row 4.5); weather_rust settle .037, weather_wet .037; snow and moss open |
 | 5.2 | Fibre sheen, car-paint flakes | REALISM R5, R11 | their cases | **owner** |
 | 5.3 | Scanned-set drop import, albedo library, stochastic tiling | REALISM R6–R8 | drop builds the same Material as by hand | **owner** |
-| 5.4 | Skin | REALISM R10 | skin case | enh |
+| 5.4 | Skin | REALISM R10 | skin case | done 2026-11-19: settle random walk now enters as Cycles' Random Walk (incoming ray refracted at the IOR through a GGX microfacet, alpha = roughness^2) instead of a cosine; skin_head settle .078 -> .047, mat_subsurface .074 -> .069; coat second lobe already matched (no-SSS .022); live .123 / raster .127 pass but keep the wrap look (no ear glow) until G5 |
 | 5.5 | Vegetation and cities by rules (Sketch 3D, Field Primitive scatter, instances) | REALISM R12, R18 | memory and frame budgets | enh |
 | 5.6 | Photo cases: the shoe, a hand, a sunlit room, a street at night | REALISM §2, §5 | photo match per case | content |
 | 5.7 | R5–R7 after Milestone 1: per-copy colour, splats, sound through the same BVH | README 12 | go/no-go after the demo | **owner** |

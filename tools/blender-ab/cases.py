@@ -334,6 +334,17 @@ def _weather_wet():
                         {"shape": "monkey", "scale": 0.5, "location": [0.6, 0, 0.5], "material": {"recipe": "Wet"}}]}
 
 
+def _skin_head():
+    # Row 5.4: skin on the monkey head, sun from behind and to the side so the thin ears and the brow rims glow red
+    # (red travels farthest in skin: Cycles' skin radius 1 / 0.35 / 0.2, scaled to this head's size), an oily coat as
+    # the second specular lobe. Monkey 1.6 m wide vs a 0.18 m head: radius 0.08 m stands for skin's ~1 cm.
+    skin = {"base_color": [0.80, 0.52, 0.42], "roughness": 0.45, "subsurface": 1.0, "subsurface_color": [1.0, 0.35, 0.2],
+            "subsurface_radius": 0.4, "coat": 0.3, "coat_roughness": 0.3}
+    return {"size": SMALL, "camera": {"fov": 34, "azimuth": 70, "elevation": 10, "distance": 2.6, "target": [0, 0, 0.6]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 230, "elevation": 25}], "world": {"color": [0.25, 0.25, 0.25]},
+            "objects": [{"shape": "monkey", "scale": 0.6, "location": [0, 0, 0.6], "material": skin}]}
+
+
 def _sketch3d_two_tone():
     # Row 3.3: a Sketch 3D cube whose top half is tagged mask(1); a material Field program reads it as attr and paints
     # the two halves. Truth splits Cycles' cube at the same height.
@@ -464,6 +475,7 @@ CASES.update({
     "wear_groove": _wear_groove(),
     "weather_rust": _weather_rust(),
     "weather_wet": _weather_wet(),
+    "skin_head": _skin_head(),
     "sketch3d_two_tone": _sketch3d_two_tone(),
     "suede_dir": _suede_dir(),
     "recipes_near": _recipes(3.6),

@@ -744,7 +744,11 @@ void main()
             vec3 A = clamp(base, 0.0, 0.999);
             vec3 qa = 4.09712 + 4.20863 * A - sqrt(9.59217 + 41.6808 * A + 17.7126 * A * A);
             vec3 alb = 1.0 - qa * qa;
-            vec3 wp = p - ns * f.shQ.w, wd = cosineDir(-ns, rnd(seed), rnd(seed));
+            vec3 eH = ggxSampleH(ns, max(0.002, rough * rough), rnd(seed), rnd(seed));
+            float eci = dot(V, eH), ene = 1.0 / clamp(inst[iid].mat.ior, 1.01, 3.8);
+            vec3 wd = eci > 0.0 ? -ene * V + (ene * eci - sqrt(max(1.0 - ene * ene * (1.0 - eci * eci), 1e-14))) * eH : ns;
+            if (dot(ns, wd) >= 0.0) break;
+            vec3 wp = p - ns * f.shQ.w;
             bool wout = false; vec3 q = p, no = ns;
             for (int s = 0; s < 256 && !wout; s++)
             {
