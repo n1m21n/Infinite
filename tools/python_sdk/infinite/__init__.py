@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Union
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-__version__ = "0.6.0"
+__version__ = "2.0.0"
 __author__ = "Naman Soni (n1m21n)"
 __homepage__ = "https://infinitedevices.org"
 __credit__ = "Infinite, by Naman Soni (https://infinitedevices.org)"

@@ -6,7 +6,7 @@ README = os.path.join(HERE, "README.md")
 
 setup(
     name="infinite-daw",
-    version="0.6.0",
+    version="2.0.0",
     description="Headless GLSL shader compiler, audio-reactive video renderer, and modular synthesizer for Python and AI agents by Naman Soni",
     long_description=open(README, encoding="utf-8").read() if os.path.exists(README) else "",
     long_description_content_type="text/markdown",
