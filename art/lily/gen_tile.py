@@ -342,4 +342,7 @@ if __name__ == "__main__":
     size = tuple(int(x) for x in a.size.split("x")) if a.size else ((640, 480) if a.probe else (1920, 1440))
     spp = a.spp or (64 if a.probe else 256)
     open(a.out, "w").write(build(a.probe, tuple(float(x) for x in a.view.split(",")), size, spp))
+    import subprocess   # lay the nodes out left to right so the patch opens tidy in the app
+    subprocess.run([sys.executable, os.path.join(HERE, "..", "..", "tools", "patch-layout.py"), a.out],
+                   check=True, stdout=subprocess.DEVNULL)
     print(a.out)
