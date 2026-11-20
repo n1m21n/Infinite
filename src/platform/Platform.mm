@@ -324,9 +324,11 @@ namespace Platform
    // default action back, the faulting instruction runs again on return, and
    // the process dies exactly as it would have, report included. Nothing is
    // caught or resumed.
-   static void PluginCrashSignal(int)
+   static void PluginCrashSignal(int sig)
    {
       PluginCrashGuard::NoteCrash();
+      if (gCrashHook != nullptr)
+         gCrashHook(sig);
    }
 
    void InstallCrashHandler()

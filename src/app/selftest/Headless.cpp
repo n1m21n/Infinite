@@ -5,6 +5,11 @@
 #include "core/MovementStats.h"
 #include "core/CoverageFlush.h"
 #include <atomic>
+#ifndef _WIN32
+#include <cxxabi.h>
+#include <execinfo.h>
+#include <unistd.h>
+#endif
 #include <chrono>
 #include <functional>
 #include <thread>
@@ -855,6 +860,50 @@ static void ResetForNextJob()
    Transport::Instance().SetOfflineVideoTime(0.0);
 }
 
+// What the headless job was doing, for the crash hook: a fatal signal prints one status line (E_CRASH) and a
+// demangled backtrace instead of dying silently, so an agent sees which stage and which code fell over.
+static char sCrashPatch[512] = "";
+static char sCrashStage[160] = "starting";
+static void NoteCrashPatch(const std::string& patch)
+{
+   std::snprintf(sCrashPatch, sizeof(sCrashPatch), "%s", patch.c_str());
+}
+#ifndef _WIN32
+static void HeadlessCrashHook(int sig)
+{
+   char line[1024];
+   const int n = std::snprintf(line, sizeof(line),
+                               "\n{\"ok\":false,\"mode\":\"crash\",\"patch\":\"%s\",\"errors\":[{\"code\":\"E_CRASH\",\"message\":\"signal %d while %s\","
+                               "\"hint\":\"the backtrace is on stderr; the innermost Infinite frame names the node or renderer\"}]}\n",
+                               sCrashPatch, sig, sCrashStage);
+   if (n > 0)
+      (void)!write(STDOUT_FILENO, line, std::min<size_t>((size_t)n, sizeof(line) - 1));
+   // The process is dying anyway; demangling is worth its small risk here.
+   void* frames[48];
+   const int count = backtrace(frames, 48);
+   char** syms = backtrace_symbols(frames, count);
+   (void)!write(STDERR_FILENO, "Infinite headless crash backtrace:\n", 35);
+   for (int i = 1; syms != nullptr && i < count; i++)
+   {
+      // macOS: "3   Infinite   0x0000 _ZN3Foo3barEv + 12"; Linux: "path(_ZN3Foo3barEv+0x12) [0x...]".
+      std::string s = syms[i], name;
+      size_t b = s.find(" _Z"), e = std::string::npos;
+      if (b != std::string::npos) { b++; e = s.find(' ', b); }
+      else if ((b = s.find("(_Z")) != std::string::npos) { b++; e = s.find('+', b); }
+      if (b != std::string::npos)
+      {
+         int status = 0;
+         char* d = abi::__cxa_demangle(s.substr(b, e == std::string::npos ? std::string::npos : e - b).c_str(), nullptr, nullptr, &status);
+         if (status == 0 && d != nullptr)
+            s = s.substr(0, b) + d + (e == std::string::npos ? "" : s.substr(e));
+         std::free(d);
+      }
+      s += "\n";
+      (void)!write(STDERR_FILENO, s.c_str(), s.size());
+   }
+}
+#endif
+
 void HeadlessTick(int& frameId, GLFWwindow* window)
 {
    enum class Phase { Warm, Running, Frames, NodeRender, Audio, TimelineRender, Done };
@@ -941,8 +990,17 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
    if (sPhase == Phase::Done || !HeadlessJobActive() || job.mode == Headless::Mode::Version ||
        glfwWindowShouldClose(window))
       return;
+   {
+      static const char* kPhaseNames[] = { "warming up", "running", "rendering frames", "rendering the node", "measuring audio",
+                                           "rendering the timeline", "finishing" };
+      std::snprintf(sCrashStage, sizeof(sCrashStage), "%s", kPhaseNames[(int)sPhase]);
+   }
    if (sWall < 0.0)
    {
+      NoteCrashPatch(job.patch);
+#ifndef _WIN32
+      Platform::gCrashHook = HeadlessCrashHook;
+#endif
       sWall = glfwGetTime();
       sStatus.mode = job.mode == Headless::Mode::Render     ? "render"
                      : job.mode == Headless::Mode::Describe ? "describe"
@@ -2238,6 +2296,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
             sNextFrame = 0;
             sPhase = Phase::Warm;
             ResetForNextJob();
+            NoteCrashPatch(b.patch);
             LoadPatchFrom(b.patch);
             return;
          }
@@ -2459,6 +2518,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
             SpawnSeed::ResetAll(); // the Audio phase seeks to job.start itself
             gNextNodeUid = 1;
             MovementStats::Live() = StatsAtStart();
+            NoteCrashPatch(b.patch);
             LoadPatchFrom(b.patch);
             return;
          }
