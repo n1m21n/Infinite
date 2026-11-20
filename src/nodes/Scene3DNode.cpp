@@ -842,6 +842,15 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Float("dofRatio", mRender.dofRatio);
    v.Color("ambient", mRender.ambientColor);
    v.Float("envIntensity", mRender.envIntensity);
+   // The same look keys Render 3D has, so a scene built in the composer keeps its fog, rim and default light.
+   v.Float("fogDensity", mRender.fogDensity);
+   v.Color("fogColor", mRender.fogColor);
+   v.Float("fogAnisotropy", mRender.fogAnisotropy);
+   v.Float("fogFalloff", mRender.fogFalloff);
+   v.Float("fogMinX", mRender.fogMin[0]); v.Float("fogMinY", mRender.fogMin[1]); v.Float("fogMinZ", mRender.fogMin[2]);
+   v.Float("fogMaxX", mRender.fogMax[0]); v.Float("fogMaxY", mRender.fogMax[1]); v.Float("fogMaxZ", mRender.fogMax[2]);
+   v.Float("rim", mRender.rimIntensity);
+   v.Float("lightIntensity", mRender.lightIntensity);
    v.Bool("floatOutput", mRender.floatOutput);
    v.Int("renderPass", mRender.renderPass);
    v.Float("mistStart", mRender.mistStart);

@@ -88,7 +88,7 @@ FLOOR = 0.8
 H = 0.5               # room height above the tile
 WIN_Y = (0.25, 0.41)  # window slot in the +X wall, heights above the tile
 WIN_Z = (-0.12, 0.16)
-COMPOSER = bool(os.environ.get("LILY_COMPOSER"))   # build the scene in a 3D View (needs the fog keys on 3D View)
+COMPOSER = not os.environ.get("LILY_RENDER3D")   # the scene lives in a 3D View; LILY_RENDER3D=1 for the old cable-wired Render 3D
 SUN, SKY, FOG = 12.0, 0.6, 0.25   # sun past the slider cap of 5 (values in a file are not clamped)
 
 
@@ -332,7 +332,7 @@ def build(probe, view, size, spp):
         uids = {ref: 1000 + i for i, (ref, _) in enumerate(refs, 1)}
         drop = ("envSky", "envHorizon", "envGround", "bg ", "tonemap")   # world sky comes from the composer; tonemap is a number here
         p.node("3D", "3D View", "render", *[l.strip() for l in look if not any(k in l for k in drop)],
-               "i tonemap 3", "i engine 1", "s scene " + "\\n".join(sc))
+               "i tonemap 3", "s scene " + "\\n".join(sc))
         p.node("Utility", "Output", "out")
         p.wire("cable out 0 render")
         txt = p.text()

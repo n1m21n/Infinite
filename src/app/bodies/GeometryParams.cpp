@@ -1,4 +1,6 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
+#include <algorithm>
+#include <cmath>
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -8,6 +10,15 @@
 
 namespace app
 {
+   // Log taper for controls that span macro (sub-millimetre) to room scale: equal travel per decade.
+   static float LogPosToValue(float pos01, float minV, float maxV)
+   {
+      return minV * std::pow(maxV / minV, std::clamp(pos01, 0.0f, 1.0f));
+   }
+   static float LogValueToPos(float value, float minV, float maxV)
+   {
+      return std::log(std::max(value, minV) / minV) / std::log(maxV / minV);
+   }
    inline const std::vector<std::string> kAxisXYZ = { "x", "y", "z" };
 
    // The pose and IK sections every rigged node shows (Model 3D, Armature):
@@ -1314,7 +1325,7 @@ namespace app
    void DrawDistributePointsOnFacesParams(DistributePointsOnFacesNode* n)
    {
       ImGui::TextDisabled("%zu points", n->PointCount());
-      ModSlider("density", &n->density, 1.0f, 500.0f);
+      ModSlider("density", &n->density, 1.0f, 20000.0f, "%.0f", kParamWidth, false, 0.0f, LogPosToValue, LogValueToPos);
       DropdownButton("method", DistributePointsOnFacesNode::MethodNames(), n->method,
                      [n](int i) { n->method = i; });
       if (n->method == MeshOps::kDistributePoisson)
@@ -1850,7 +1861,7 @@ namespace app
             ModSlider("smooth", &n->smooth, 0.0f, 2.0f);
             break;
          case GeometryOpNode::kSolidify:
-            ModSlider("thickness", &n->thickness, 0.001f, 0.5f);
+            ModSlider("thickness", &n->thickness, 0.0001f, 0.5f, "%.4f", kParamWidth, false, 0.0f, LogPosToValue, LogValueToPos);
             ModCheckbox("keep original", &n->keepOriginal);
             break;
          case GeometryOpNode::kExtrude:
@@ -2370,7 +2381,7 @@ namespace app
       DropdownButton("points from", InstanceOnPointsNode::SourceNames(), n->pointMode,
                      [n](int i) { n->pointMode = i; });
       ModSliderInt("max points", &n->maxPoints, 1, 20000);
-      ModSlider("scale", &n->instanceScale, 0.005f, 1.0f);
+      ModSlider("scale", &n->instanceScale, 0.0005f, 1.0f, "%.4f", kParamWidth, false, 0.0f, LogPosToValue, LogValueToPos);
       ModSlider("scale random", &n->scaleRandom, 0.0f, 1.0f);
       ModSlider("rotation random", &n->rotationRandom, 0.0f, 1.0f);
       ModSlider("normal offset", &n->normalOffset, -0.5f, 0.5f);
@@ -2913,7 +2924,7 @@ namespace app
          ImGui::SetNextItemWidth(colW); ImGui::DragFloat3("fog max", n->fogMax, 0.05f, -1000.0f, 1000.0f, "%.2f");
       }
       ImGui::BeginDisabled(n->PanoActive()); // a panorama has no focal plane
-      ModSlider("depth of field", &n->dofAperture, 0.0f, 4.0f, "%.3f", colW);
+      ModSlider("depth of field", &n->dofAperture, 0.0f, 16.0f, "%.3f", colW);   // 16: a 100 mm macro at f/2.8
       ImGui::EndDisabled();
       hideBegin(8, 0, {});   // focus distance, aperture x3, cat eye, distortion, CA, offline supersample
       ImGui::BeginDisabled(n->dofAperture <= 0.0f || n->PanoActive());

@@ -3437,8 +3437,12 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       bool MakeGpu(const engine::MeshData& m, Gpu& g)
       {
-         g.vb = [mDev newBufferWithBytes:m.posNormal.data() length:std::max<size_t>(m.posNormal.size() * 4, 4) options:MTLResourceStorageModeShared];
-         g.ib = [mDev newBufferWithBytes:m.indices.data() length:std::max<size_t>(m.indices.size() * 4, 4) options:MTLResourceStorageModeShared];
+         // An empty mesh (a 3D View item whose node gives no geometry) still gets a 4-byte buffer, never a read of null.
+         static const uint32_t kZero[1] = { 0 };
+         g.vb = [mDev newBufferWithBytes:m.posNormal.empty() ? (const void*)kZero : m.posNormal.data()
+                                  length:std::max<size_t>(m.posNormal.size() * 4, 4) options:MTLResourceStorageModeShared];
+         g.ib = [mDev newBufferWithBytes:m.indices.empty() ? (const void*)kZero : m.indices.data()
+                                  length:std::max<size_t>(m.indices.size() * 4, 4) options:MTLResourceStorageModeShared];
          g.uvb = UvBuffer(m);
          g.wb = WearBuffer(m.wear, m.posNormal.size() / 6);
          g.count = (NSUInteger)m.indices.size();

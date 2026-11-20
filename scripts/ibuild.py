@@ -53,12 +53,22 @@ def machine():
     return avail, swap, load, os.cpu_count() or 4
 
 
+def pressure():
+    """The kernel's live memory pressure: 1 normal, 2 warn, 4 critical. Swap *used* is not this: macOS keeps
+    swap allocated long after the pressure is gone, so a calm machine can show 6 GB of it until a reboot."""
+    try:
+        return int(sh(["sysctl", "-n", "kern.memorystatus_vm_pressure_level"]).strip() or 1)
+    except ValueError:
+        return 1
+
+
 def pick_jobs(mode):
     avail, swap, load, ncpu = machine()
     _, _, per_job, cap = MODES[mode]
     j = min(cap, ncpu - 2, int(avail // per_job))
-    if swap > 4096: j = min(j, 2)           # already swapping: go gentle
-    if swap > 8192: j = 1
+    p = pressure()
+    if p >= 2 or swap > 4096: j = min(j, 2)   # under pressure, or swap left over from it: go gentle
+    if p >= 4: j = 1
     if load > ncpu * 1.5: j = min(j, 2)     # something else is hammering the CPU
     return max(1, j)
 
@@ -165,7 +175,8 @@ def stale_count(path, target):
 
 def cmd_status(a):
     avail, swap, load, ncpu = machine()
-    print(f"cores {ncpu} | avail RAM ~{avail:.0f} MB | swap used {swap:.0f} MB | load {load:.1f}")
+    p = pressure()
+    print(f"cores {ncpu} | avail RAM ~{avail:.0f} MB | swap used {swap:.0f} MB | pressure {p} | load {load:.1f}")
     for m in MODES:
         print(f"  recommended -j for {m:8s}: {pick_jobs(m)}")
     h = lock_holder()
@@ -173,7 +184,7 @@ def cmd_status(a):
     ob = other_builds()
     print("other build processes:", *(ob or ["none"]), sep="\n  ")
     print("ccache:", "yes" if shutil.which("ccache") else "NO (brew install ccache: worktrees recompile everything without it)")
-    if swap > 4096 or load > ncpu * 1.5:
+    if p >= 2 or load > ncpu * 1.5:
         print("VERDICT: machine is stressed. Do not start a build; wait or stop what is running.")
 
 
