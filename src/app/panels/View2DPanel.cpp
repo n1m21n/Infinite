@@ -10903,7 +10903,8 @@ namespace
          break;
       case Pending::Copy:
       case Pending::Cut:
-         TargetSelection(doc);   // the layer under the selection, whatever was active
+         // The layer the user picked is the one copied. A new selection already picked the layer it covers; re-targeting
+         // here made a leftover selection copy the same top layer's pixels again whatever layer was picked since.
          if (SelectionActsOnPixels(doc))
          {
             const bool cut = todo.what == Pending::Cut;
