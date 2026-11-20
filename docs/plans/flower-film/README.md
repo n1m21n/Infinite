@@ -169,6 +169,7 @@ Roadblocks found while building (to fix in the engine, in this order):
 | 6 | Plane `rotX/Y/Z` are radians, Transform's are degrees: `rotX -90` on a Plane tilts it 26.6 deg | one unit (degrees) on every node, or the validator names the unit |
 | 7 | Distribute Points on Faces gives a point cloud that Transform drops and Instance's `cloud` slot draws nothing from | insert Points to Vertices, wire into `points` with `pointMode 0` (done); Transform/Instance should take clouds |
 | 8 | Macro scale is below the slider ranges: Solidify min 1 mm, Distribute density max 500/m2, instanceScale min 5 mm | tepals built 3x and scaled 1/3 (done); widen the ranges in GeometryParams.cpp |
+| 10 | Values in a patch file are not clamped to the slider range (sun 12 renders brighter than 5), so probes need no rebuild; the UI could not reach them | dofAperture to 16, Distribute density to 20000, Solidify to 0.1 mm and instanceScale to 0.5 mm with a log taper, in GeometryParams.cpp: written, not built yet (machine in swap) |
 | 9 | Mapping between a Plane and its Material hides a FieldPixel albedo in settle (grey floor) | tile inside the kernel (`u = fract(uv * 4)`, done); fix Mapping's UV pass-through |
 
 Shots (section 9) stay as planned. First moving test: 4 s of beat 2 (one note -> one tepal) at 640 x 480, 64 samples, checked as a still sheet, not a film.
