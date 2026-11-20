@@ -472,6 +472,23 @@ namespace app
    }
 
 
+   void DrawGroup3DParams(Group3DNode* n)
+   {
+      ModSlider("move x", &n->offsetX, -3.0f, 3.0f);
+      ModSlider("move y", &n->offsetY, -3.0f, 3.0f);
+      ModSlider("move z", &n->offsetZ, -3.0f, 3.0f);
+      ModSlider("rotate x", &n->rotX, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("rotate y", &n->rotY, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("rotate z", &n->rotZ, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("scale", &n->scale, 0.05f, 4.0f);
+      ImGui::BeginDisabled(n->rotX == 0.0f && n->rotY == 0.0f && n->rotZ == 0.0f && n->scale == 1.0f && !gParamRegisterOnly);
+      ModSlider("pivot x", &n->pivotX, -3.0f, 3.0f);
+      ModSlider("pivot y", &n->pivotY, -3.0f, 3.0f);
+      ModSlider("pivot z", &n->pivotZ, -3.0f, 3.0f);
+      ImGui::EndDisabled();
+   }
+
+
    void DrawSwitcher3DParams(Switcher3DNode* n)
    {
       ImGui::BeginDisabled(n->manual && !gParamRegisterOnly);   // manual pins the slot; the clock is unused

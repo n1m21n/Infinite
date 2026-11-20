@@ -1099,6 +1099,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawEditMeshParams(n);
                else if (auto* n = dynamic_cast<Switcher3DNode*>(gn.node.get()))
                   DrawSwitcher3DParams(n);
+               else if (auto* n = dynamic_cast<Group3DNode*>(gn.node.get()))
+                  DrawGroup3DParams(n);
                else if (auto* n = dynamic_cast<CameraNode*>(gn.node.get()))
                   DrawCameraParams(n);
                else if (auto* n = dynamic_cast<LightNode*>(gn.node.get()))

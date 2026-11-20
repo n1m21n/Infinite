@@ -4256,6 +4256,7 @@ void DrawMetaBallParams(MetaBallNode* n);
 void DrawJoinGeometryParams(JoinGeometryNode* n);
 
 void DrawSwitcher3DParams(Switcher3DNode* n);
+void DrawGroup3DParams(Group3DNode* n);
 
 void DrawWrapParams(WrapNode* n);
 
