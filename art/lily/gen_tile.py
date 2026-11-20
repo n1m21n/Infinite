@@ -88,6 +88,7 @@ FLOOR = 0.8
 H = 0.5               # room height above the tile
 WIN_Y = (0.25, 0.41)  # window slot in the +X wall, heights above the tile
 WIN_Z = (-0.12, 0.16)
+COMPOSER = bool(os.environ.get("LILY_COMPOSER"))   # build the scene in a 3D View (needs the fog keys on 3D View)
 SUN, SKY, FOG = 12.0, 0.6, 0.25   # sun past the slider cap of 5 (values in a file are not clamped)
 
 
@@ -320,6 +321,24 @@ def build(probe, view, size, spp):
            "f fogMaxX %g" % hf, "f fogMaxY %g" % (ty + H), "f fogMaxZ %g" % hf,
            "i ptSamples %d" % spp, "i ptBounces 8", "i supersample 1",
            "f dofAperture %.4f" % (dof if not os.environ.get("LILY_NO_DOF") else 0), "f focusDistance %.3f" % focus, "i dofBlades 6")
+    if COMPOSER:
+        # The scene lives in a 3D View: four groups, the camera and the sun are items placed without cables,
+        # so the panel shows and edits the whole set. Same look keys as the Render 3D below.
+        look = [l for l in p.nodes.pop().split("\n")[2:-1]]
+        refs = [(tep, "Petals"), (centre, "Stamens"), (room, "Room"), (dew, "Dew"), ("cam", "Camera"), ("sun", "Sun")]
+        sc = ["next %d" % (len(refs) + 1), "camera 5", "world 0 0 0 0 0 1 0"]
+        for i, (ref, label) in enumerate(refs, 1):
+            sc += ["item %d %d 0 0 0 0 0 0 1 1 1 1" % (i, 1000 + i), "label %d %s" % (i, label)]
+        uids = {ref: 1000 + i for i, (ref, _) in enumerate(refs, 1)}
+        drop = ("envSky", "envHorizon", "envGround", "bg ", "tonemap")   # world sky comes from the composer; tonemap is a number here
+        p.node("3D", "3D View", "render", *[l.strip() for l in look if not any(k in l for k in drop)],
+               "i tonemap 3", "i engine 1", "s scene " + "\\n".join(sc))
+        p.node("Utility", "Output", "out")
+        p.wire("cable out 0 render")
+        txt = p.text()
+        for ref, u in uids.items():
+            txt = txt.replace("  id %s\n" % ref, "  id %s\n  uid %d\n" % (ref, u), 1)
+        return txt
     p.node("Utility", "Output", "out")
     p.wire("geo render geo_a %s" % tep)
     p.wire("geo render geo_b %s" % centre)
