@@ -111,6 +111,31 @@ WATER = ("c color 1 1 1", "f metallic 0", "f roughness 0.02", "f specular 0.5", 
          "f transmissionRoughness 0")
 
 
+KEEP_FROM = None   # set in main: the tile.inf being replaced, so moves made in the 3D View survive a regenerate
+
+
+def kept_scene(path):
+    """Item transforms (by label) and the world line from an existing patch's 3D View scene."""
+    if not path or not os.path.exists(path):
+        return {}, None
+    for line in open(path):
+        line = line.strip()
+        if not line.startswith("s scene "):
+            continue
+        rows = line[len("s scene "):].split("\\n")
+        items, labels, world = {}, {}, None
+        for r in rows:
+            f = r.split()
+            if f[:1] == ["item"] and len(f) >= 13:
+                items[f[1]] = " ".join(f[3:13])
+            elif f[:1] == ["label"] and len(f) >= 3:
+                labels[f[1]] = " ".join(f[2:])
+            elif f[:1] == ["world"]:
+                world = r.strip()
+        return {labels[i]: t for i, t in items.items() if i in labels}, world
+    return {}, None
+
+
 def build(probe, view, size, spp):
     rnd = random.Random(7)
     p = G.Patch()
@@ -326,9 +351,10 @@ def build(probe, view, size, spp):
         # so the panel shows and edits the whole set. Same look keys as the Render 3D below.
         look = [l for l in p.nodes.pop().split("\n")[2:-1]]
         refs = [(tep, "Petals"), (centre, "Stamens"), (room, "Room"), (dew, "Dew"), ("cam", "Camera"), ("sun", "Sun")]
-        sc = ["next %d" % (len(refs) + 1), "camera 5", "world 0 0 0 0 0 1 0"]
+        kept, world = kept_scene(KEEP_FROM)
+        sc = ["next %d" % (len(refs) + 1), "camera 5", world or "world 0 0 0 0 0 1 0"]
         for i, (ref, label) in enumerate(refs, 1):
-            sc += ["item %d %d 0 0 0 0 0 0 1 1 1 1" % (i, 1000 + i), "label %d %s" % (i, label)]
+            sc += ["item %d %d %s" % (i, 1000 + i, kept.get(label, "0 0 0 0 0 0 1 1 1 1")), "label %d %s" % (i, label)]
         uids = {ref: 1000 + i for i, (ref, _) in enumerate(refs, 1)}
         drop = ("envSky", "envHorizon", "envGround", "bg ", "tonemap")   # world sky comes from the composer; tonemap is a number here
         p.node("3D", "3D View", "render", *[l.strip() for l in look if not any(k in l for k in drop)],
@@ -357,10 +383,13 @@ if __name__ == "__main__":
     ap.add_argument("--size", default="")
     ap.add_argument("--spp", type=int, default=0)
     ap.add_argument("--out", default=os.path.join(HERE, "tile.inf"))
+    ap.add_argument("--fresh", action="store_true", help="drop 3D View moves saved in --out")
     a = ap.parse_args()
+    KEEP_FROM = None if a.fresh else a.out
     size = tuple(int(x) for x in a.size.split("x")) if a.size else ((640, 480) if a.probe else (1920, 1440))
     spp = a.spp or (64 if a.probe else 256)
-    open(a.out, "w").write(build(a.probe, tuple(float(x) for x in a.view.split(",")), size, spp))
+    text = build(a.probe, tuple(float(x) for x in a.view.split(",")), size, spp)   # reads a.out first
+    open(a.out, "w").write(text)
     import subprocess   # lay the nodes out left to right so the patch opens tidy in the app
     subprocess.run([sys.executable, os.path.join(HERE, "..", "..", "tools", "patch-layout.py"), a.out],
                    check=True, stdout=subprocess.DEVNULL)
