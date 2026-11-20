@@ -43,7 +43,15 @@ TEPAL_BUMP = "; ".join([
 # wave in the glaze, a fine craze network, recessed grout.
 # Ref 1's colour: deep cobalt that fades a little toward the margin, a narrow crisp white rim, navy spots.
 TEPAL_MAP = (G.TEPAL_MAP
-             .replace("smoothstep(0.52 + w, 0.86 + w,", "smoothstep(0.70 + w, 0.78 + w,")
+             # The rim is not an outline: thin near the base, wider and wobbling toward the tip, feathered into
+             # the blue by streaks that run along the veins (ref 1).
+             .replace("w = 0.035 * sin(s * 19.0) + 0.02 * sin(s * 37.0 + 1.3)",
+                      "w = 0.04 * sin(s * 6.0 + 1.1) + 0.02 * sin(s * 17.0 + 0.4) + 0.08 * (1.0 - smoothstep(0.1, 0.5, s))")
+             .replace("streak = 0.09 * sin(uv.x * 95.0 + 2.0 * sin(s * 7.0)) * sin(uv.x * 23.0 + 1.7)",
+                      "streak = 0.12 * pow(abs(sin(uv.x * 70.0 + 3.0 * sin(s * 11.0))), 3.0) * sin(uv.x * 19.0 + s * 5.0)")
+             .replace("smoothstep(0.52 + w, 0.86 + w, a + streak + 0.3 * smoothstep(0.7, 1.0, s))",
+                      "smoothstep(0.84 + w, 0.93 + w, a + streak + 0.3 * smoothstep(0.65, 1.0, s))")
+             .replace("vec3(0.94, 0.95, 1.0), rim", "vec3(0.97, 0.98, 1.0), rim")
              .replace("vec3(0.13, 0.16, 0.72), vec3(0.40, 0.46, 0.95)", "vec3(0.05, 0.07, 0.62), vec3(0.20, 0.26, 0.92)")
              .replace("vec3(0.30, 0.34, 0.86), smoothstep(0.6, 1.0, s) * 0.5", "vec3(0.16, 0.20, 0.80), smoothstep(0.6, 1.0, s) * 0.4")
              .replace("vec3(0.04, 0.04, 0.22), dot1 * 0.9", "vec3(0.02, 0.02, 0.16), dot1 * 0.95")
@@ -78,9 +86,9 @@ TILE_H = "; ".join([
 TILES_ACROSS = 4      # the floor is 0.8 m: 0.2 m tiles
 FLOOR = 0.8
 H = 0.5               # room height above the tile
-WIN_Y = (0.19, 0.33)  # window slot in the +X wall, heights above the tile
+WIN_Y = (0.25, 0.41)  # window slot in the +X wall, heights above the tile
 WIN_Z = (-0.12, 0.16)
-SUN, SKY, FOG = 12.0, 0.4, 0.25   # sun past the slider cap of 5 (values in a file are not clamped)
+SUN, SKY, FOG = 12.0, 0.6, 0.25   # sun past the slider cap of 5 (values in a file are not clamped)
 
 
 def rot_x(p, deg):
@@ -125,7 +133,7 @@ def build(probe, view, size, spp):
     low = []   # world points of the tilted flower, to sit the tile under it
 
     # Tepals: Plane cage -> Edit Mesh -> Subdivide -> Solidify (0.35 mm) -> Transform (place + tilt) -> Material.
-    p.node("Source", "FieldPixel", "tepalMap", "f width 1024", "f height 2048", "b animate 0", "s code " + TEPAL_MAP)
+    p.node("Source", "FieldPixel", "tepalMap", "f width 1024", "f height 2048", "b animate 0", "s code " + (TEPAL_MAP if not os.environ.get("LILY_RED") else os.environ.get("LILY_RED")))
     p.node("Source", "FieldPixel", "tepalBump", "f width 1024", "f height 2048", "b animate 0", "s code " + TEPAL_BUMP)
     tepals, dew_src = [], []
     for n_ in range(6):
@@ -153,9 +161,9 @@ def build(probe, view, size, spp):
                  "f offsetY %g" % (oy * math.cos(math.radians(TILT))), "f offsetZ %g" % (oy * math.sin(math.radians(TILT))))
         p.node("3D", "Transform", t, *place)
         p.wire("geo %s 0 %s" % (e, c)); p.wire("geo %s 0 %s" % (sb, e)); p.wire("geo %s 0 %s" % (so, sb))
-        p.wire("geo %s 0 %s" % (t, so))
+        p.wire("geo %s 0 %s" % (t, sb if os.environ.get("LILY_NO_SOLID") else so))
         tepals.append(mat("tepalMat%d" % n_, t, "c color 1 1 1", "f metallic 0", "f roughness 0.28", "f specular 0.6",
-                          "f translucency 0.7", "f sheen 0.15", "c sheenColor 1 1 1", "f sheenRoughness 0.25",
+                          "f translucency 0.3", "f sheen 0.15", "c sheenColor 1 1 1", "f sheenRoughness 0.25",
                           "b normalBump 1", "f normalStrength 1.0"))
         p.wire("cable tepalMat%d albedo tepalMap" % n_)
         p.wire("cable tepalMat%d normal tepalBump" % n_)
@@ -300,7 +308,7 @@ def build(probe, view, size, spp):
     p.node("3D", "Light", "sun", "i type Directional", "f azimuth 0", "f elevation 31", "c color 1 0.92 0.8",
            "f intensity %g" % SUN, "i shadowRes 1")
     w, h = size
-    fstop, focus = 5.6, view[2]
+    fstop, focus = 8.0, view[2]
     mm = 36.0 / (2.0 * math.tan(math.radians(view[3]) * 0.5))
     dof = mm * mm / (fstop * (focus * 1000.0 - mm)) / 36.0 * 45.0
     p.node("3D", "Render 3D", "render", "f width %d" % w, "f height %d" % h, "i tonemap AgX", "f exposure %g" % view[4],
@@ -311,7 +319,7 @@ def build(probe, view, size, spp):
            "f fogMinX %g" % -hf, "f fogMinY %g" % ty, "f fogMinZ %g" % -hf,
            "f fogMaxX %g" % hf, "f fogMaxY %g" % (ty + H), "f fogMaxZ %g" % hf,
            "i ptSamples %d" % spp, "i ptBounces 8", "i supersample 1",
-           "f dofAperture %.4f" % dof, "f focusDistance %.3f" % focus, "i dofBlades 6")
+           "f dofAperture %.4f" % (dof if not os.environ.get("LILY_NO_DOF") else 0), "f focusDistance %.3f" % focus, "i dofBlades 6")
     p.node("Utility", "Output", "out")
     p.wire("geo render geo_a %s" % tep)
     p.wire("geo render geo_b %s" % centre)
