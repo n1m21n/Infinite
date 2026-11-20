@@ -6,6 +6,7 @@
 #include "core/CoverageFlush.h"
 #include <atomic>
 #ifndef _WIN32
+#include <csignal>
 #include <cxxabi.h>
 #include <execinfo.h>
 #include <unistd.h>
@@ -901,6 +902,10 @@ static void HeadlessCrashHook(int sig)
       s += "\n";
       (void)!write(STDERR_FILENO, s.c_str(), s.size());
    }
+   // A headless run must end here: returning from the handler would let a sent or async
+   // signal resume a half-dead render that never exits. Default action = die with the signal.
+   std::signal(sig, SIG_DFL);
+   raise(sig);
 }
 #endif
 
