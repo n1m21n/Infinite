@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "Geometry3DNodes.h"
@@ -123,11 +124,16 @@ public:
    bool caps = true;
    float profileRadius = 0.1f;
    int profileSides = 12;
+   // Taper along the path, "s0 s1 s2 ..." spread evenly from start to end and
+   // multiplied into start/end scale; empty = no taper. A petal is a flat
+   // profile swept with "0 0.7 1 0.8 0".
+   std::string scales;
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("startScale", startScale); v.Float("endScale", endScale); v.Float("twist", twist);
       v.Bool("caps", caps); v.Float("profileRadius", profileRadius); v.Int("profileSides", profileSides);
+      v.Text("scales", scales);
    }
 
 protected:
@@ -137,7 +143,8 @@ protected:
    {
       out[0] = startScale; out[1] = endScale; out[2] = twist; out[3] = caps ? 1.0 : 0.0;
       out[4] = profileRadius; out[5] = profileSides;
-      return 6;
+      out[6] = (double)(std::hash<std::string>{}(scales) & 0xFFFFFFFFFFFFull);
+      return 7;
    }
    Mesh Build() override;
 };

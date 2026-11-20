@@ -346,9 +346,11 @@ namespace MeshOps
    // offsets along the path's carried frame (parallel transport, so it does not spin where
    // the path bends), scaled from startScale to endScale and twisted `twistDegrees` in
    // total. A closed profile on an open path is closed with flat end caps when `caps` is
-   // set; on a closed path the result is a watertight ring.
+   // set; on a closed path the result is a watertight ring. `scaleCurve`, when it holds
+   // two or more values, is a taper spread evenly along the path's length (linear between
+   // values) and multiplies the start/end scale - Blender's taper curve.
    Mesh Sweep(const Polyline& profile, const Polyline& path, float startScale, float endScale,
-              float twistDegrees, bool caps);
+              float twistDegrees, bool caps, const std::vector<float>* scaleCurve = nullptr);
 
    // Turns closed 2D contours into an extruded solid. Contours wound
    // anticlockwise are treated as outlines and clockwise ones as holes, so the
