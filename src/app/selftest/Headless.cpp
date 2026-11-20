@@ -1,4 +1,5 @@
 // Headless jobs: ExplainLive, ParamKeyJoiner, HeadlessTick (moved verbatim from main.cpp).
+#include "engine/rhi/Rhi.h"
 #include "app/AppShared.h"
 #include "core/SpawnSeed.h"
 #include "core/MovementStats.h"
@@ -2146,6 +2147,15 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
                               ColorStats::FrameSummaryJsonFields(fs) + "}";
                char when[32];
                std::snprintf(when, sizeof(when), "%.6g", sTimes[sNextTime]);
+               // A failed GPU command (timeout under memory pressure, lost device) leaves a black or half-drawn
+               // frame that looks like a scene problem; report it as the render failure it is.
+               static int sGpuErrorsSeen = 0;
+               if (rhi::gGpuErrors.load() != sGpuErrorsSeen)
+               {
+                  sGpuErrorsSeen = rhi::gGpuErrors.load();
+                  sStatus.errors.push_back({ "E_GPU", std::string("the GPU failed while drawing the frame at ") + when + " s (" + rhi::gGpuLastError + ")",
+                                             0, sOutIndex, "close other GPU-heavy apps or lower the size / samples, then render again" });
+               }
                if (fs.blackPercent >= 100.0)
                   sStatus.warnings.push_back({ "W_BLACK_FRAME", std::string("the frame at ") + when + " s is entirely black",
                                                0, sOutIndex, "check that something visible reaches the Output at that time" });

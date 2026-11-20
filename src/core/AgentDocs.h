@@ -2005,12 +2005,12 @@ Chain: Cube -> Sphere -> Difference -> Render 3D
 )AGENTDOC";
 
    inline const char* kUiGuide =
-R"AGENTDOC(# Using the App: Panels, Menus & Settings
+R"AGENTDOC(# Using the App: Panels & Settings
 
 Every panel, menu, column, button and dropdown of the app, from the manual's Using the App chapter. Act through verbs, not clicks: `infinite panel <name|settings/place>` opens a panel or a Settings page, `infinite settings [key [value]]` reads and changes settings, and timeline, session, notes, perf, studio, view3d-add and node cover what the panels' buttons do. `infinite docs panels` names the verb for each panel.
 
-Everything around the nodes: the panels on the right, the strips along the bottom, the right-click menus, the dropdowns and the settings. Every picture here is a real screenshot of the app, taken by a script.
-These are the questions people ask most: what does the library do, what is the modulation matrix, how do I build a performance page, how do clips and tracks work, what is in the right-click menu. Each section shows the panel big, then explains every column, icon and control in it.
+Everything around the nodes: the panels on the right, the strips along the bottom and the settings. Every picture here is a real screenshot of the app, taken by a script.
+These are the questions people ask most: what does the library do, what is the modulation matrix, how do I build a performance page, how do clips and tracks work. Each section shows the panel big, then explains every column, icon and control in it.
 
 ## The window at a glance
 Picture: The whole window: menus and transport on top, the node canvas in the middle, the panel rail down the right edge.
@@ -2039,36 +2039,28 @@ Picture: Bottom.
 - **Terminal**: A real shell inside the app, with the infinite command.
 - **History (bottom)**: Every edit, newest first.
 - **Settings (bottom)**: The Settings window.
-
-## Menus
-The three menus at the top left. File handles patches, Edit handles undo and clipboard, Menu holds the windows, help and the show/set tools.
-Picture: File
-Picture: Edit
-Picture: Menu
-Picture: Menu, Panels: open any panel and set where it docks.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Library panel
 The top button of the panel rail opens the library: every node, sample, media file and plugin you can drop on the canvas. Click an entry, or drag it onto the canvas.
-Picture: Library, Modules tab: search box, Sort, order toggle, Filter, then the alphabetical list.
-
+Library, Modules tab: search box, Sort, order toggle, Filter, then the alphabetical list.
 - **Tabs**: Modules (every node type), Field (Field-language nodes and examples), Samples and Media (your own files), Plugins (VST3 and AU instruments and effects).
 - **Search**: Filters the list as you type.
 - **Sort**: Orders the list: favourites first, alphabetical and so on. The button beside it flips ascending and descending.
 - **Filter**: Narrows the list by category, for example only effects or only synths.
 - **List**: Click to add at the centre of the view, or drag to a spot. Star an entry to make it a favourite.
-Picture: Sort dropdown
-Picture: Filter dropdown
 Picture: Field tab
 Picture: Plugins tab
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Viewport panel
 A live preview of any image node, next to the canvas. Right-click a node and choose **Open in viewport panel** (or select it and press Shift+V). Each card follows its node in real time and has a close button at its top right. Add several cards to watch different stages of a chain at once.
 Picture: No cards yet: the panel says how to add one.
-Picture: Right-click a node for its menu.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Modulation Matrix
 Every modulation in the patch in one table: which source drives which parameter, and how. Drag the splitter above the panel to make it taller. The table is shown in two halves so each column is readable.
-Picture: Left half: Source, Destination, Parameter, Value, Confidence.
+The Mod Matrix docked under the node graph, with the Timeline below it.Picture: Left half: Source, Destination, Parameter, Value, Confidence.
 Picture: Right half: Lo, Hi, Inv, Curve, Signal and the delete button.
 
 - **Colour bar**: The cable colour of the source, so you can match a row to the cable on the canvas.
@@ -2082,6 +2074,7 @@ Picture: Right half: Lo, Hi, Inv, Curve, Signal and the delete button.
 - **Curve**: The response curve between source and parameter, drawn as a small graph.
 - **Signal**: A tiny live scope of the incoming signal, so you can see it moving.
 - **x**: Removes the route. The cable on the canvas disappears with it.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Performance panel
 Build your own control surface from knobs, faders, pads and switches, then play it live. It opens in **Edit Mode**; switch off Edit Mode (the button then reads **Perform**) to lock the layout and play it. Drag the splitter up for more room.
@@ -2089,9 +2082,8 @@ Picture: The Performance panel docked at the right, in Edit Mode, with the showc
 Picture: Edit Mode: knobs, faders, number boxes and a slider on the Showcase page.
 
 - **Edit Mode / Perform**: Edit Mode lets you add, move, resize and rename controls. Perform locks the layout so a stray drag cannot move anything.
-- **+ Add Control**: Opens the control list below and places the chosen control on the next free cell.
+- **+ Add Control**: Lists the ten control types below and places the chosen control on the next free cell.
 - **Page tabs, +**: Pages group controls into screens (here one page, Showcase). The + button adds a page.
-Picture: + Add Control menu: ten control types, with their grid size in brackets.
 
 - **Knob (1x1)**: Any single parameter.
 - **Vertical Fader (1x2)**: Levels and mixes.
@@ -2103,15 +2095,9 @@ Picture: + Add Control menu: ten control types, with their grid size in brackets
 - **Radio Selector (2x1)**: Pick one of several steps, 1 to 8.
 - **Bipolar Pan Knob (1x1)**: Centre-detent knob for pan or detune.
 - **Step Gate Ribbon (3x1)**: Eight on/off steps for a gate pattern.
-Picture: Right-click a control: Rename, Type, Assign Parameter, Clear Destination, MIDI CC Learn, Color Tint.
 Picture: The same page in Perform mode: the toolbar shrinks to Perform and the page tabs.
-
-- **Rename**: Change the label shown on the control.
-- **Type**: Swap the control for another type without losing its assignment.
-- **Assign Parameter...**: Bind the control to a node parameter, then move the control to move the parameter. The current target is shown greyed below it.
-- **Clear Destination**: Unbinds the control.
-- **MIDI CC Learn**: Move a knob on your MIDI controller to bind it to this control.
-- **Color Tint**: Colour-code the control so groups are easy to find on stage.
+Right-click a control to rename it, change its type, assign or clear its parameter, learn a MIDI CC or tint it.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Arrangement panel
 The timeline. It sequences clips of nodes over time so a patch becomes a piece with a start and an end. Each icon in the toolbar is explained below; hover any of them in the app for its tooltip.
@@ -2123,44 +2109,28 @@ Picture: Right end of the toolbar: Render, Audio and the Inspector pencil.
 - **Play / Pause (Space)**: Plays the timeline from the playhead.
 - **Return to Start (Enter)**: Jumps the playhead to the beginning.
 - **Bars / Time**: Switches the ruler between bars and beats and minutes and seconds.
-- **Tool (arrow)**: Selects the editing tool. See the dropdown below.
+- **Tool (arrow)**: Selects the editing tool: Select (A), Range Selection (R), Trim (T), Pencil (P), Cut (B), Hand (H) or Zoom (Z).
 - **Snap (magnet)**: Clip edges snap to the grid when on.
-- **1/4 (grid division)**: How fine the snap grid is. See the dropdown below.
+- **1/4 (grid division)**: How fine the snap grid is: Off, 1 bar, 1/2, 1/4, 1/8 or 1/16, each with a triplet.
 - **Loop**: Turns the loop region on or off. Shift-drag on the ruler to set the region.
 - **Flag (M)**: Drops a marker at the playhead.
 - **Row height**: Resets any resized tracks back to the default height.
 - **Render**: Renders the timeline to a video file (or a WAV when it holds only audio).
 - **Audio**: Lets the timeline drive audio as well as picture.
 - **Pencil**: Opens or closes the Inspector.
-Picture: Tool dropdown: Select (A), Range Selection (R), Trim (T), Pencil / Draw Clip (P), Cut (B), Hand (H), Zoom (Z).
-Picture: Snap grid dropdown: Off, 1 bar, 1/2, 1/4, 1/8, 1/16, each with a triplet (T).
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Tracks, clips and the inspector
 
 ### Adding tracks
 Click **+ Add Track** and choose Video Track or Audio Track. Audio tracks also carry **S** (solo), **M** (mute), a pan knob and a level knob; video tracks carry an opacity slider.
-Picture: + Add Track offers Video Track and Audio Track.
 
 ### Adding a clip
 Right-click an empty spot on a track and choose **Add Clip**. The menu shows the bar and beat it will land on, snapped to the grid. A clip with no node yet is shown hatched.
-Picture: Right-click a lane: Add Clip at the clicked bar and beat.
 
 ### Assigning a clip to a node
 Three ways: right-click a node on the canvas and choose **Add to Timeline** (creates an assigned clip at the playhead), choose **Assign Node...** in the clip's right-click menu, or use **Reassign...** in the inspector. An assigned clip takes the node's name and a thumbnail, and the viewport monitor shows its output as the playhead crosses it.Picture: The Stage clip selected (outlined); the monitor on the left shows the timeline output.
-
-### Right-clicking a clip
-Picture: The clip menu.
-
-- **Rename (Cmd+R)**: Names the clip.
-- **Active**: Tick to play the clip; untick to mute it without deleting (it turns hatched).
-- **Fade In / Fade Out**: Fade length in milliseconds.
-- **Opacity**: Clip brightness against what is beneath it.
-- **Compositing**: Blend mode used to combine this clip with lower tracks.
-- **Color Grade**: A submenu of colour-grade adjustments for the clip.
-- **Color Tint**: Colour of the clip block on the timeline.
-- **Assign Node...**: Pick the node this clip plays.
-- **Group (Cmd+G) / Ungroup (Cmd+Shift+G)**: Treat several clips as one block you can move together.
-- **Delete (Backspace)**: Removes the clip.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}Right-click a clip to rename it, mute it (untick Active), set fades, opacity, blend mode, colour grade and tint, assign its node, group it or delete it.
 
 ### The Inspector
 The pencil icon opens a side panel for whatever is selected. Select a clip and it shows the clip; select a track and it shows the track.
@@ -2170,71 +2140,62 @@ Picture: Video Track: name, Active, opacity, Track Tint, Duplicate, Delete.
 - **Name / Active**: Rename and enable or disable the clip or track.
 - **Start / Length**: Exact position and duration in bars.beats.ticks. Type a value for sample-accurate placement.
 - **Fade In / Fade Out**: Edge fades in milliseconds.
-)AGENTDOC"
-R"AGENTDOC(- **Blend / Opacity / Bright / Contrast / Sat**: How the clip composites over tracks beneath it.
+- **Blend / Opacity / Bright / Contrast / Sat**: How the clip composites over tracks beneath it.
 - **Color Tint**: The swatches colour the clip block.
 - **Source Node**: The node and node type the clip plays.
 - **Reassign... / Clear Source**: Swap the node or make the clip unassigned again.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ### Selecting several clips and grouping
 To move or colour several clips at once, press **R** for the Range Selection tool and drag a box over them, then press **A** to return to Select. Clips grouped with Group (Cmd+G) move as one.
 
 ### Grouping tracks
 Right-click a track name. **Convert to Group** wraps the track in a collapsible folder so a whole stack of tracks can be folded away. The same menu adds and renames tracks, deletes them, and offers **Render Track** to export just that track.
-Picture: Track menu.
 Picture: After Convert to Group: Group 2 (1) holds Stage.
 
 ### Rendering
 **Render** opens the Render Timeline popup: the span (whole arrangement, loop, markers or a custom range), the video size and rate, and the output name, folder and format.
 Picture: Render Timeline popup.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## History panel
 Every edit you make is listed, newest at the top. Click any line to jump the patch back (or forward) to that moment; edits after it are kept until you make a new change.
-Picture: History before the first edit.
+)AGENTDOC"
+R"AGENTDOC(Picture: History before the first edit.
 
 - **Start**: The patch as it was loaded.
 - **Bypass**: A node was bypassed or enabled.
 - **Edit 2 settings**: Two or more parameters changed together.
 - **Edit timeline**: A change in the arrangement.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
-## Right-click menus and the Add Node palette
-Right-click does different things depending on what is under the cursor.
-Picture: On an audio node: bypass, duplicate, add to Timeline or Session, help, delete. Image nodes add viewport and window items.
-
-- **Bypass Node (B)**: Passes the input straight through.
-- **Duplicate (Cmd+D)**: Copies the node and its settings.
-- **Hide params**: Hides the node's parameter controls so it takes less room on the canvas.
-- **Open in viewport panel**: Adds a live card to the Viewport panel.
-- **Add to Timeline**: Creates an assigned clip in the Arrangement.
-- **Add to Session**: Puts the node in a Session slot.
-- **Open in new window**: Pops the node's output into its own window.
-- **Reference in chat**: Opens the chat with the node named in the message.
-- **Help**: Opens this node's help.
-- **Delete Node (Backspace)**: Removes it and its cables.
-Right-click empty canvas, or press Shift+N, to open the **Add node** palette. Type to search, or walk the categories (source, compositing, effects, 3d, notes, synths, audio effects, modulators, prediction, macros, utility). The arrow means a submenu.
+## Adding nodes
+Right-click empty canvas, or press Shift+N, to open the **Add node** palette. Type to search, or walk the categories (source, compositing, effects, 3d, notes, synths, audio effects, modulators, prediction, macros, utility).
 Picture: The Add node palette.
-Picture: Hover a category to see its nodes: compositing shown.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Settings
-The gear at the bottom of the rail (or Cmd+0) opens Settings. It has nine pages.
+The gear at the bottom of the rail (or Cmd+0) opens Settings. It has twelve pages, down the left: Appearance, Canvas & Workspace, Audio, General & Performance, Field Language, Expression Globals, Extensions, Plugins, Agents & Terminal, Infinite as VST3/AU, 3D View and Keys.
 Picture: Appearance
 Picture: Canvas & Workspace
 Picture: Audio
 Picture: General & Performance
 Picture: Field Language
 Picture: Expression Globals
-Picture: Extensions: install extension packs.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}Picture: Extensions: install extension packs.
 Picture: Plugins: VST3 folders and every scanned plugin.
 Picture: Agents & Terminal: each agent with its status and button, models, folders and saved chats.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Settings: Command line & agents
 The Agents & Terminal page of Settings has one section, **Agents**: a row per coding agent (Claude, ChatGPT, Gemini) with its status and the button that moves it on, the model each answers with, what each has used, the folders and commands agents may use, and the saved chats. The Chat chapter below explains every row.
 Setting up an agent runs a short script in the background (the Chat panel shows its progress; Settings can also run it in a Terminal tab). It puts the `infinite` command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, fetches the Infinite MCP server and registers it with the agent. When Node.js is missing it is downloaded from nodejs.org into Infinite's own folder (`~/.infinite/node` on macOS and Linux, `%LOCALAPPDATA%\Infinite\node` on Windows) and checked against nodejs.org's published checksums: no Homebrew, no winget, no administrator password. Each step checks first and is skipped when it is already done, so the button doubles as a repair. Only Linux may need your password, for a missing system package; the card then says so and opens a terminal to type it. Infinite never asks for or stores an API key: the agent's own login runs in the browser. Nothing is installed until you press a button.
 Setup is one time. It survives quitting, restarting and updating Infinite: the `infinite` command is a small launcher that finds the current Infinite, and the agent's registration points at that launcher. Each time Infinite starts it quietly checks the steps. If everything holds, nothing shows. If something broke (Infinite moved, the agent was uninstalled, the line was removed from your shell profile), a **Connection** row appears naming the step, with a **Repair** button that reruns only that step.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Chat
 The Chat panel is how you talk to Infinite. Say what you want and the patch changes while you watch. It is the Terminal panel's chat face: the Terminal opens to it, and the Terminal button in its toolbar switches to a plain shell and back. Short commands (add, connect, remove, bypass, undo, modulate, set) run at once inside Infinite with no agent. Anything else goes to the agent you picked, which changes the open patch through the `infinite` command, so every change is listed on a card and can be undone.
-Picture: The Chat panel: the agents card, a reply with its change card (live knobs for what changed) and the written list.
+The Chat panel beside the canvas: name a node with @, pick an agent, and each reply says what it looked at.
 
 ### First run
 The first time, the Chat panel walks you from a new computer to your first result, one card at a time. You need nothing installed and no terminal.
@@ -2284,8 +2245,7 @@ Infinite talks to three coding agents. The chat names them by what people call t
 - **/help**: What the chat can do, with a button per command.
 - **/shortcuts, /manuals, /languages, /about**: Answered by Infinite at once: the shortcut list, the three manuals, the built-in code languages, what Infinite is.
 - **/website, /github**: Open the website or the repository.
-)AGENTDOC"
-R"AGENTDOC(- **/agent <name>**: Switch to a connected agent by name: `/agent claude`. The model picker does the same by choosing one of its models.
+- **/agent <name>**: Switch to a connected agent by name: `/agent claude`. The model picker does the same by choosing one of its models.
 - **/model <name>**: Switch the model, for example `/model opus`.
 - **/new**: Start a new chat.
 - **/undo**: Undo the last change.
@@ -2301,7 +2261,8 @@ Press **+** (Attach files) or drop files on the panel: audio, video, images, GIF
 Pictures show as thumbnails in your message and in replies; click one to open it **full size** over the app, fitted to the window. A click or Esc closes it. Videos play in a card and stop when scrolled off screen. GIFs animate; a GIF over 16 MB shows its first frame only. Audio shows a player with a waveform, a folder button (Show in folder) and a waveform button.
 
 ### Change cards
-After each turn the chat lists what the agent did: **Looked at the patch** for a read-only turn, or **Made 3 changes** with one line per change (old → new). The card shows only this turn's changes, never the whole history. Node names and parameter names on it are links: click a node to select it and bring it into view, click a parameter to jump to that control. A name whose node is gone shows as plain text.
+)AGENTDOC"
+R"AGENTDOC(After each turn the chat lists what the agent did: **Looked at the patch** for a read-only turn, or **Made 3 changes** with one line per change (old → new). The card shows only this turn's changes, never the whole history. Node names and parameter names on it are links: click a node to select it and bring it into view, click a parameter to jump to that control. A name whose node is gone shows as plain text.
 Parameters the agent changed appear as **live knobs** on the card, only the ones that matter for the change. Turn a knob and the patch follows as you play; the agent's value stays as a dot on the track, and a double-click puts the knob back on it. **Undo** on the card reverts the whole turn; a changed line that has been undone reads Undone.
 An audio file the agent made shows as an audio card. **Open in a Sampler** (the waveform button) puts that file into a new Sampler node on the canvas, ready to play. **Show in folder** reveals the file.
 
@@ -2322,47 +2283,114 @@ Under an agent's name on each reply, a faint **count of tokens** shows what that
 
 ### Floating windows
 Chat, the Viewport, the Modulation Matrix and the Performance panel can leave the dock and float. Right-click the panel's toolbar (or use its dock menu) and choose **Floating Window** after Bottom, Right, Left and Top. The panel opens in its own window over the stage that you move and resize like Settings or Shortcuts; its X closes it. The chat's toolbar also has **Pop out**, which becomes **Dock** while it floats. Choosing any dock position puts the panel back.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Sound panels: Session, Sample Studio, Piano Roll
 Three more strips dock along the bottom. Each has its own toolbar; right-click the toolbar for its dock position.
-Picture: Session: tracks across, scenes down. Click a clip to launch it, click a scene name to launch the row. The playing scene is outlined.
-Picture: Sample Studio: a take cut into eight slices. Toolbar: open, play, input, Bars/Time/Samples, tools, Slice, Generate, Export, Convert. The Sample card on the right sets pitch, speed and fades.
-Picture: Piano Roll: pages of notes over the keyboard, with record input, quantise, Fx and Generate in the toolbar.
+Session: tracks across, scenes down, beside the Performance panel in Edit Mode. Click a clip to launch it, click a scene name to launch the row.Sample Studio with the Mod Matrix and Session. Toolbar: open, play, input, Bars/Time/Samples, tools, Slice, Generate, Export, Convert.Piano Roll: notes over the keyboard, with record input, quantise, Fx and Generate in the toolbar; an MSEG curve beside it.h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## 3D View
 The 3D View shows the scene the 3D nodes build. The toolbar holds add, select, move, rotate and scale, the pivot and orientation choices and the view toggles. Drag the axis gizmo at the top right to orbit; the four buttons at the bottom right zoom, pan, fly the camera and lock it. The Scene list at the right lists every object; the eye hides one. Viewport habits (orbit, zoom, gizmo sizes, mini axes) live in Settings > 3D View (`settings/3d-view`).
-Picture: 3D View docked at the bottom with the Scene list open.
+3D View with the Scene list open.h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## 2D View
 The 2D View (`view2d`) is a layered 2D canvas backed by a **Scene 2D** node: compositing, paint, vector paths, live shapes, text and 3D layers in one document. Right-click any picture node and choose **Add to 2D View**, or open it from the rail. Tools include move (V), crop (C), pan (H), zoom (Z), brush (B), selection tools (M, L, W), pen (P), shapes (U), path edit (A) and text (T). Layers support blend modes, opacity, masks, clipping, effect layers (drag to reorder) and groups. **Free Transform** (Cmd+T) moves, scales and turns the selected layers as one step. **Merge Down** and **Merge Layers** (Cmd+E), **Merge Visible** (Cmd+Shift+E) and **Flatten Image** merge layers the way Photoshop does, in one undo step. Docks bottom, right, left, top or fill; driven from the CLI with `infinite view2d`.
+2D View: the Scene 2D document with its layer stack on the right and the tool rail on the left.h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Mixer panel
 The Mixer panel (`mixer`) is a hardware-style mixing desk for Mixer and audio channels. It shares the standard page strip and 7-row page menu (`Cmd+R` renames a page), and provides channel strips with faders, scribble strips, LED meters, mute/solo, sends, inserts, groups and a master section with mono/dim and snapshots. Right-click a Mixer node and choose **Open in Mixer panel**, or open it from the rail.
+Mixer panel: channel strips with trim, pan, mute/solo, fader and meter, and the master section.h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Drums panel
 The Drums panel (`drums`) is the hardware step-sequencer face for **Drum Sequencer** nodes. It shares the page strip and 7-row page menu, and provides step pads lit by velocity, lane strips with length/reverse/filter, trig conditions, probability, nudge, FILL key, and groove library presets. Right-click a Drum Sequencer node and choose **Open in Drum panel**, or dock it bottom or top.
+Drums panel: velocity-lit step pads per lane, with the Lane and Sound cards.h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Field Patcher
 The Field Patcher (`fieldpatcher`) is a visual node-box editor for building Field programs without writing code by hand. It includes pages (saved in the patch), a box canvas, a node pick menu, an inspector, starter templates and Value mode.
+Field Patcher: boxes wired into a Field Pixel program (Modulo Grid), with the Field pixel editor, the code and the live preview.h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Curve Editor
 The Curve Editor (`curveeditor`) lets you draw, record and assign multi-segment (MSEG) modulation curves to any knob, with pages managed through the shared page strip and 7-row page menu.
+Picture: Curve Editor: an MSEG curve drawn on the grid, with the tools on the left and the Source, Time and Loop cards on the right.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Canvas Link
 Canvas Link is the one way a panel takes a node from the canvas. Piano Roll pages, 2D layer sources, 3D View objects and Session clips each show a link field: choose the node from the list, or press **Pick** and click it on the canvas. While a pick is armed the canvas dims the nodes that cannot be picked and rings the one under the pointer. Esc cancels.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 ## Windows and dialogs
 Picture: All Shortcuts (Menu, All shortcuts): filter box, then every shortcut by group.
 Picture: Help and module reference: getting started, controls, then every node.
 Picture: Template library (File, Template library): opens a copy; the original never changes.
 Picture: About Infinite: version, build, credits, licence links.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
+
+## Panels you have not met yet
+Six panels open from the rail or from Menu, Panels. Each one edits a kind of node, so each one is opened from that node too.
+
+- **Mixer**: MixerShift+LEvery Mixer node as a console. Right-click a Mixer node and choose **Open in Mixer panel**.
+- **Drums**: DrumsShift+JThe step-sequencer face of the Drum Sequencer nodes: step pads, lanes, conditions and groove presets.
+- **2D View**: 2D ViewShift+2Layers for a Scene 2D node: compositing, paint and shapes. Right-click a picture node and choose **Add to 2D View**.
+- **Curve Editor**: CurveShift+EDraws MSEG curves for any knob to follow.
+- **Field Patcher**: FieldShift+FBuilds a Field program from boxes, without typing it.
+- **Terminal**: Terminal (bottom of the rail)Ctrl+`A real shell in the patch folder. The Ctrl+` key is the physical key next to 1, on every keyboard layout.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
+
+## Settings: the three tabs without a page
+
+- **Infinite as VST3/AU**: Plugin mode. The DAW sync section says who owns play and stop when Infinite runs inside a DAW. The plugin install section shows the status of the VST3 or AU plugin, with Install, Reinstall, Reveal and Uninstall.
+- **3D View**: Viewport defaults for the 3D View: the mini axes (Off, Simple axes, Navigation) and the navigation settings, saved as your default for every new scene.
+- **Keys**: The keyboard shortcut table. Find a command, see its key, and change it. Same list as Help, All shortcuts.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
+
+## Settings: every card
+Each card is one group of settings on a Settings page. The card names are the headings you see in the window. Settings save as you change them; there is no Save button.
+
+- **Appearance**: Theme Preset & PaletteThe colour theme: preset, accent and the light or dark palette.
+- **Appearance**: Node Module Category ColorsOne colour per node category (Source, Effects, Modulators and so on).
+- **Appearance**: Cable Category ColorsOne colour per cable kind (audio, image, modulation, note and so on).
+- **Appearance**: Node Card Stylingthe look of each node card.
+- **Appearance**: DisplayInterface font and the Preview Background choice.
+- **Appearance**: Transparency Backdrophow much of the canvas shows through a floating panel.
+- **Canvas & Workspace**: Grid & Canvasgrid and canvas options.
+- **Canvas & Workspace**: MinimapWhere the minimap sits: Top left or Top right.
+- **Canvas & Workspace**: Cable VisibilityWhich cable kinds draw. The note on this card: the Image & geometry toggle also covers palette cables.
+- **Audio**: Audio Devices & FormatOutput and input device, sample rate, buffer size and the audio thread settings.
+- **Audio**: MIDI InputsWhich MIDI devices feed Infinite. Shows No MIDI inputs connected when none are.
+- **General & Performance**: AutosaveWhether autosave is working (it warns when it is failing, and why), and how many saved copies to keep.
+- **General & Performance**: Performance & RenderingThe power profile (High performance, Power saving or Low latency) and the graphics processor to use.
+- **General & Performance**: Movement LogHow much disk the kept takes and notes use, and what stays on this computer.
+- **General & Performance**: Learninglearning and tips options.
+- **General & Performance**: Diagnosticsdiagnostics options, including Collect diagnostics.
+- **General & Performance**: Application & Updatesthe version and update options.
+- **Field Language**: Topic dropdown and sectionsPick a topic (Core Principles, Domains & Reserved Names, Declarations, Types & Vectors, Operators & Math Functions), or All to see every topic. The search box filters across them.
+- **Expression Globals**: GlobalsNamed values every formula can read. Each one shows its formula.
+)AGENTDOC"
+R"AGENTDOC(- **Extensions**: Infinite / ExtensionsInstall extension packs from the catalogue or from a file. Each shows its installed and available versions.
+- **Plugins**: Plugins and Scanned pluginsThe scanned plugins list, with each plugin's status.
+- **Agents & Terminal**: ReferenceHow the chat works, the Terminal panel, and the infinite command line.
+- **3D View**: ViewportThe mini axes setting: Off, Simple axes or Navigation.
+- **3D View**: Navigationnavigation settings for the 3D View.
+- **Infinite as VST3/AU**: DAW syncWho owns play and stop when Infinite runs in a DAW: the DAW or Infinite.
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
+
+## Dialogs
+A dialog stops everything else until you answer it. Each one has a clear primary button and a Cancel.
+
+- **Unsaved changes**: You open, create or quit while the patch has unsaved changes. The title is Unsaved changes; the question is Save before closing?Save, Don't Save, Cancel
+- **Autosave recovery**: Infinite starts after it closed with unsaved work. The message says your work was saved automatically; recover it to carry on, or discard it. Your saved patch files are untouched.Recover, Discard
+- **Collect diagnostics**: Help, Collect diagnostics.Collect, Cancel; Include the open patch
+- **Check for updates**: Help, Check for updates.Check for updates, Website, Close
+- **Share Patch**: File, Share Patch. Asks for a name, an optional author and one line about the patch; file paths are removed and media is not included.Choose folder and share
+- **Program still running**: You quit while a program is still running in the Terminal. Quitting ends it.Quit Anyway, Keep Working
+h1,h2,h3{break-after:avoid}figure{break-inside:avoid}
 
 )AGENTDOC";
 
    inline const char* kFieldManual =
 R"AGENTDOC(# The Field Language Manual
 
-Everything you need to write real Field kernels and build real devices: the domains, the syntax, the declarations, and the six node types that host them. Every code example is self-contained Field code you can paste into the matching Field node.
+Everything you need to write real Field kernels and build real devices: the domains, the syntax, the declarations, and the node types that host them. Every code example is self-contained Field code you can paste into the matching Field node.
 
 ## 1. What Field is, and why it exists
 
@@ -2370,7 +2398,7 @@ Infinite is a node-based audiovisual workstation: you build patches by wiring bo
 
 The one idea underneath all of Field is the **kernel**: a short body of code run once per element of some domain, automatically, forever. Write `col = vec3(uv.x, uv.y, 0.5)` and it runs once per pixel, 60 times a second, on the GPU: a shader. Write `P.y += sin(P.x * 4.0 + t) * 0.2` and it runs once per point in a mesh: a geometry deformer. Write `out = in * 0.5` and it runs once per audio sample: a DSP effect. You never say where it runs; Field infers that from which identifiers your code touches.
 
-Every example in this manual is valid, runnable Field code written against the six node types that ship in Infinite today. Chapter 13 covers the language additions that landed after v1.
+Every example in this manual is valid, runnable Field code written against the node types that ship in Infinite today. Chapter 13 covers the language additions that landed after v1.
 
 ## 2. The five domains
 
@@ -2403,7 +2431,7 @@ This is the shape that governs what can see what. `element`, `pixel` and `sample
 - Sample kernels live in the **Field Effect** node (an `in` pin to process) or the **Field Synth** node (note-driven `freq` and `gate`, no `in` pin).
 - Graph kernels live in the **Field Graph** node.
 
-See Chapter 9 for what each of the six nodes does.
+See Chapter 9 for what each of the first six nodes does; Chapter 15 covers the seventh, Spectral Field.
 
 ## 3. Core syntax
 
@@ -2572,15 +2600,15 @@ Live params on the graph node's own knobs forward into the emitted nodes, and th
 
 ## 9. Field node reference
 
-Field is exposed to the user as six node types, each hosting one domain's kernel. All six compile the same source-text grammar covered in Chapters 1 to 8; the only thing that changes is which reserved names are in scope and which backend the kernel is compiled to.
+Field is exposed to the user as seven node types, each hosting one domain's kernel (Chapter 15 covers the seventh, Spectral Field). All of them compile the same source-text grammar covered in Chapters 1 to 8; the only thing that changes is which reserved names are in scope and which backend the kernel is compiled to.
 
 | Node | Domain | What it does |
 |---|---|---|
 | Field Modifier | element | Runs a per-vertex kernel over geometry already on the canvas, modifying `P`, `N`, `uv`, `Cd` and custom attributes. |
 | Field Primitive | element | Generates procedural point geometry from scratch, with no input required, using a per-element kernel (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix and Torus Knot presets as starting points). |
-| Field Effect | sample | Runs a kernel once per audio sample, on the audio thread. `in` is the audio input pin, `state` declares per-voice memory, `param` exposes a knob, and `reduce.rms(in, loHz, hiHz)` publishes a band-limited RMS reading once per block. |
 )AGENTDOC"
-R"AGENTDOC(| Field Synth | sample | A polyphonic, note-driven synthesizer using the same sample-domain compiler as Field Effect, but with `freq` and `gate` in place of an `in` pin: a self-contained voice, no upstream audio required. |
+R"AGENTDOC(| Field Effect | sample | Runs a kernel once per audio sample, on the audio thread. `in` is the audio input pin, `state` declares per-voice memory, `param` exposes a knob, and `reduce.rms(in, loHz, hiHz)` publishes a band-limited RMS reading once per block. |
+| Field Synth | sample | A polyphonic, note-driven synthesizer using the same sample-domain compiler as Field Effect, but with `freq` and `gate` in place of an `in` pin: a self-contained voice, no upstream audio required. |
 | Field Pixel | pixel | Runs a kernel once per pixel, compiled to GLSL. `uv`, `col` and `res` are the reserved names; a `state` cell declared `[wrap]` plus an offset read like `A(uv + d)` supports feedback and stencils. |
 | Field Graph | graph | Runs a kernel once, at edit time, to build part of the patch itself: `emit`, `connect`, `set` and `place` spawn and wire real Infinite nodes. See Chapter 8. |
 
@@ -2787,20 +2815,20 @@ Presets added since v1 include Gray-Scott reaction-diffusion and a flow and adve
 ## 14. Patching Field
 
 The Field Patcher shows a Field program as boxes and wires. The code stays the program: every box you add, wire you
-draw or number you drag is written back into the node's code, compiled, and kept as one undo step. Open the code and
+)AGENTDOC"
+R"AGENTDOC(draw or number you drag is written back into the node's code, compiled, and kept as one undo step. Open the code and
 the boxes side by side and either one can be edited.
 
 ```
  Canvas: [Field Notes 1]  [Field Primitive 2]
               |                 |
-)AGENTDOC"
-R"AGENTDOC(              v   select one    v
+              v   select one    v
  +-- Field Patcher -----------------------------------------------+
- | ♪ Field Notes 1 | ✦ Field Primitive 2 | ◌ Scratch 1 | + | ⤢     |
+ | Field Notes 1 | Field Primitive 2 | Scratch 1 | + |       |
  | rail | box canvas                          | Code | Box         |
- |  ●   |  [time]--->[*]--->[floor]--->[...]  | step = floor(t*4)  |
- |  ●   |                                     | ...                |
- | Field Primitive  ✓   9 boxes                                    |
+ |  o   |  [time]--->[*]--->[floor]--->[...]  | step = floor(t*4)  |
+ |  o   |                                     | ...                |
+ | Field Primitive  (ok)   9 boxes                                    |
  +----------------------------------------------------------------+
 ```
 
@@ -2816,7 +2844,7 @@ R"AGENTDOC(              v   select one    v
 ### 14.2 Pages
 
 One page per node. Right-click a page to pin it (it then stays in front whatever you select), close it, move it, or
-delete the node. A **scratch page** (+) belongs to no node yet. When it has an outlet, the footer offers **⤓** to place
+delete the node. A **scratch page** (+) belongs to no node yet. When it has an outlet, the footer offers **the down-arrow icon** to place
 it as a node:
 
 | The page has | It becomes |
@@ -2850,6 +2878,34 @@ publish = 0 + (sin(t * 2) - -1) / (1 - -1) * (1 - 0) // Breathing light: 0..1, w
 
 A broken program never silences the node: it keeps playing its last good program and the footer shows the error.
 Fix it in the boxes or the code and it takes over again.
+
+## 15. Spectral Field
+
+Spectral Field is the seventh node that hosts Field. It runs a kernel once per frequency bin: audio goes in, is cut into a spectrum by an STFT, your kernel runs on every bin, and the result is turned back into sound with a phase vocoder. The domain is **bin**, so a kernel that only touches bin identifiers compiles here and nowhere else.
+
+### 15.1 What the kernel can read and write
+
+| Name | Direction | Meaning |
+|---|---|---|
+| `bin` | read | index of this bin |
+| `bins` | read | number of bins in the frame |
+| `binhz` | read | centre frequency of this bin, in Hz |
+| `hop`, `sr` | read | hop size in samples, and the sample rate |
+| `mag`, `phase`, `freq` | read and write | the bin's magnitude, phase and true frequency; they start as the analysis values and behave like locals |
+| `mag.at(k)` | read | the magnitude of another bin `k` |
+| `state` | read and write | per-bin memory that survives from frame to frame (16 cells at most) |
+
+Writing `mag` alone is the normal case: the phase vocoder keeps the phase coherent. Writing `phase` or `freq` switches to raw mode, which resynthesises with the phase you wrote.
+
+The starter kernel that ships in the node is a low-pass built from these names: it scales `mag` by whether `binhz` is under the Cutoff control.
+
+### 15.2 Controls and cross-synthesis
+
+- **Size** is the frame length, 512 to 8192 (default 2048). A larger frame gives finer frequency detail and a longer latency; the latency is one Size.
+- **Cutoff** (20 to 20000 Hz, default 2000) and **Mix** are exposed on the node. The starter kernel is the low-pass above.
+- Declare a second audio input with `input bin audio B` and the kernel can read its spectrum as `B.mag.at(k)`, which is how you build a vocoder or a cross-synthesis effect.
+
+Everyday uses: a custom EQ, a spectral filter, a robot-voice effect. Try it first with the starter kernel: drop Size to 512 and sweep Cutoff for a fast, tight filter.
 )AGENTDOC";
 
    inline const char* kHeadlessGuide =
@@ -2857,12 +2913,34 @@ R"AGENTDOC(# Infinite Headless Engine: User Guide
 
 Render pictures, video and sound from a text file, with no window and no mouse. The headless engine is the same Infinite you already have, driven from the command line. Anything a patch can do in the app (3D, Field kernels, modulation, synths, effects) works here, and the output is deterministic: the same patch gives the same frames and the same samples.
 
+Who this guide is for:
+
+| You are | Use |
+|---|---|
+| Writing scripts, batch jobs or a render pipeline | The command line (section 4) |
+| Working in Infinite's Terminal panel | The `infinite` command (section 4.5) |
+| Connecting an AI agent (Claude Desktop, Cursor, Windsurf) | The MCP server from npm (section 4.6) |
+
+All three drive the same engine and read the same `.inf` files.
+
+New in 2.0:
+
+| Change | What it means |
+|---|---|
+| `--render --timeline` | Export the Timeline arrangement headless, not only the canvas graph |
+| `--frame --batch jobs.json` | Many frame renders in one process |
+| `--size` keeps alpha | Resized frames keep their transparency |
+| Isolated jobs | Each headless job runs on its own and gives the same result every time |
+| Sample analysis | Headless runs wait until samples are analysed before rendering |
+| New `infinite` verbs | `view2d-add`, Timeline clip copy, paste, split, duplicate and inspect, marker colour, `node drum`, `node mixer` |
+| MCP picture tools | `infinite_compare_frames`, `infinite_find_knob`, `infinite_node_effects` |
+
 ## 1. What you need
 
 | Need | Detail |
 |---|---|
 | The Infinite app | There is no separate package. The executable inside the app is the command-line tool. |
-| A graphics driver | Frames are drawn by the real GPU pipeline, so a machine with working OpenGL is required. |
+| A graphics driver | Frames are drawn by the real GPU pipeline, so a working GPU driver is required. |
 | Linux only: a virtual display | Run every render as `xvfb-run -a Infinite ...`. Without it you get `E_NO_DISPLAY`. |
 | A text editor | Patches are plain text files ending in `.inf`. |
 
@@ -3001,7 +3079,7 @@ The **last line printed** is always one JSON object with these fields: `ok`, `mo
 | 5 | Rendering failed |
 | 6 | Timeout. Raise `--timeout` |
 
-## 4.5 The `infinite` command
+### 4.5 The `infinite` command
 
 Inside Infinite's Terminal panel, `infinite` is on the PATH. A verb goes to the running app, or to the
 headless flags above when you give it a `.inf` file. `infinite` alone lists every verb; `infinite context`
@@ -3027,7 +3105,8 @@ prints the open patch, the selection and any code errors in one answer.
 | Watch | `watch` prints a JSON line for each change |
 | Terminal | `term open`, `list`, `read`, `send`, `run` |
 
-A `<node>` is an index, `selected`, or a title or type only one node has. Exit codes match 4.4, plus 7: no
+)AGENTDOC"
+R"AGENTDOC(A `<node>` is an index, `selected`, or a title or type only one node has. Exit codes match 4.4, plus 7: no
 running app answered. Each terminal is tied to its own app, so two running apps do not cross.
 
 `code check` runs the real compiler and answers `{ok, errors: [{code, message, line, col, hint}]}`, with
@@ -3038,6 +3117,45 @@ and the node keeps its last good code.
 `patch check file.inf` runs loads, reachable, picture and sound in order and stops at the first failure. Add
 `--want moving-picture,sound` to fail a still picture, or a silent or clipping patch.
 
+### 4.6 AI agents: the MCP server
+
+The npm package `infinite-engine` connects Infinite to AI apps through the Model Context Protocol. It needs the Infinite app
+installed; it finds it through `INFINITE_BIN`, the usual install folders, or `PATH`.
+
+```
+npx -y infinite-engine init
+```
+
+`init` adds Infinite to Claude Desktop, Cursor and Windsurf if they are installed, keeps other servers in each config,
+and saves the old file next to it as `.infinite-backup`. Use `--dry-run` to see the plan, `--only claude|cursor|windsurf`
+to pick one app, and `npx -y infinite-engine status` to check the install. Restart the app afterwards.
+
+To configure by hand, add this to the app's `mcp.json` (on Windows, Claude Desktop needs
+`"command": "cmd", "args": ["/c", "npx", "-y", "infinite-engine", "serve"]`):
+
+```
+{ "mcpServers": { "infinite": { "command": "npx", "args": ["-y", "infinite-engine", "serve"] } } }
+```
+
+| Tool | What it does |
+|---|---|
+| `infinite_validate_patch` | Validate a patch with the real compiler: code, line, node and hint per issue |
+| `infinite_render_video` | Export an mp4 from a patch |
+| `infinite_render_field_pixel` | Render a Field pixel kernel to frames |
+| `infinite_render_field_primitive` | Render a parametric surface written as Field equations |
+| `infinite_render_field_modifier` | Deform a mesh with a Field displacement expression |
+| `infinite_render_sketch3d` | Render 3D geometry written in JavaScript to a PNG |
+| `infinite_synthesize_field_synth` | Make a WAV from a per-sample Field synth kernel |
+| `infinite_synthesize_field_notes` | Generate note sequences and Euclidean rhythms into audio |
+| `infinite_process_field_effect` | Run audio through a Field filter, reverb or distortion kernel |
+| `infinite_compare_frames` | Say in plain words whether two pictures match |
+| `infinite_find_knob` | Find which node and control give a wanted picture change, from measured renders |
+| `infinite_node_effects` | Measured table of what each effect and colour node, and each of its controls, does |
+
+Every result carries a credit line in an `attribution` field; nothing is written into your files. A second, Python MCP
+server (`tools/mcp` in the source, with tools such as `infinite_render_frame` and `infinite_audio_summary`) maps one tool
+to each headless command above. Both call the same engine; the developers page on infinitedevices.org covers it.
+
 ## 5. The patch file format
 
 A patch is a line-based text file. The first line is `infinite-patch 1`. Blank lines and lines starting with `#` are ignored.
@@ -3047,8 +3165,7 @@ node <index> <category> <type name>
   id <word>                 optional name you can use instead of the index
   f <key> <float>           a number
   i <key> <int or option>   a whole number or dropdown choice (i shapeType Star)
-)AGENTDOC"
-R"AGENTDOC(  b <key> <0 or 1>          on/off
+  b <key> <0 or 1>          on/off
   c <key> <r> <g> <b>       a colour, each 0 to 1
   s <key> <text>            text, to the end of the line
 end
@@ -3116,6 +3233,10 @@ Three ways, from simplest to most flexible.
 
 Write each control with its real tag; `--describe "<type>"` shows it, and `--validate` warns `W_TYPE_MISMATCH` when you guess wrong.
 
+Rotations come in two units: primitives (Plane, Cube, ...) take radians (`f rotX -1.5708`), Transform and Camera take degrees (`f rotX -90`). `--validate` says which when a value is out of range, and warns `W_ROTATION_UNITS` for a radian-looking value on a degrees control.
+
+To look at a 3D patch quickly, `python3 tools/look.py` renders sheets in one process: `passes` (colour, normals, albedo, light = colour / albedo, object id), `crop X Y W H --scale S` (renders only that region, sharper, by narrowing the camera; `--verify` compares it with the full frame), `sweep node.key V1 V2 ...` and `ab`.
+
 Not reachable from the CLI: selecting elements with the mouse in Edit Mode, drawing sculpt strokes, and the 3D View editor's scene items, gizmos and overlays (a bare 3D View node renders its empty stage). The re-runnable check for everything in this section is `python3 tools/headless-docs/check_release_areas.py`.
 
 ## 8. Troubleshooting
@@ -3135,6 +3256,8 @@ Not reachable from the CLI: selecting elements with the mouse in Edit Mode, draw
 | `E_NO_DISPLAY` (Linux) | Run under `xvfb-run -a` |
 | It validates but looks wrong | Run `--explain` and compare to what you meant |
 | Something moves too far or too little | A `mod` range is absolute. Check `lo` and `hi` |
+)AGENTDOC"
+R"AGENTDOC(| A Prediction node (Drift, Moves, Predictive Notes, Rhythm, Quantize, Coloring, Velocity) sounds plainer than in the app | Headless runs do not load learned profiles; `--describe` marks these nodes `profile_dependent` |
 
 ## 9. Good practice
 
@@ -3145,26 +3268,16 @@ Not reachable from the CLI: selecting elements with the mouse in Edit Mode, draw
 - Quote the command line when a patch lives in a folder with spaces.
 - The output is deterministic, so a patch that renders correctly once renders the same way again. Frame renders hold the clock at zero from the first tick, so history nodes such as Time Machine render the same every run, and headless runs never read or write the learned prediction profiles. One known exception: a patch with Field Notes and any modulation cable can differ slightly between audio runs (about 0.1 dB in loudness in the case we measured).
 
-## 10. Documentation screenshots
-
-Headless renders pictures of a patch, but the nodes themselves (their panels, knobs and dropdowns) can only be photographed in the real app. Infinite ships a screenshot tool for that, so the manuals always match the build. It launches the app, drives it over the local control port, and saves one PNG per node at 2x.
-
-| Want | Run |
-|---|---|
-| One node | `python3 scripts/node_screenshot.py "Wavetable"` |
-| Every node type | `python3 scripts/screenshot_all_nodes.py --out docs/node_screenshots --settle-seconds 0.6` |
-
-Both need a Mac that is unlocked and awake, because the app must have a real window; they write the control token to `~/Library/Application Support/Infinite/control_token`. The Node Field Guide pulls its pictures from `docs/node_screenshots/`, and the brand screenshot standard (2x, real values, no personal paths) is in `docs/brand/BRAND.md` section 10.1.
-
-## 11. Where to go next
+## 10. Where to go next
 
 | Want | Look at |
 |---|---|
 | Every node and its controls | `Infinite --describe`, and the Node Reference Manual PDF |
-| The exact file format | `docs/reference/patch-format.md` |
-| What can be wired to what | `docs/reference/connection-rules.md` |
-| Starter patches | `assets/examples/authoring/` |
-| Field (the expression language) | The Field language skill documents under `.claude/skills/field-language/` |
+| The exact file format | [patch-format.md](https://github.com/n1m21n/Infinite/blob/main/docs/reference/patch-format.md) on GitHub |
+| What can be wired to what | [connection-rules.md](https://github.com/n1m21n/Infinite/blob/main/docs/reference/connection-rules.md) on GitHub |
+| Starter patches | [assets/examples/authoring](https://github.com/n1m21n/Infinite/tree/main/assets/examples/authoring) on GitHub |
+| Field (the expression language) | The Field Language Manual (PDF, infinitedevices.org) |
+| AI agents | `npx -y infinite-engine init`, and the developers page on infinitedevices.org |
 )AGENTDOC";
 
    inline const char* kConnectionRules =

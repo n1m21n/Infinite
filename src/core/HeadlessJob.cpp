@@ -560,7 +560,8 @@ namespace Headless
       // checked to give zero hits (docs/fix-briefs/headless-engine.md 3.1b); the corpus in
       // this repo is one file, which is not enough to promote it.
       return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED" || code == "W_OUT_OF_RANGE" ||
-             code == "W_OVERRIDDEN_BY_MODULATION" || code == "W_UNMAPPED_EVENT" || code == "W_NOTE_PAN_IGNORED" || code == "W_CLIPPING" || code == "W_SILENT" || code == "W_BLACK_FRAME";
+             code == "W_OVERRIDDEN_BY_MODULATION" || code == "W_UNMAPPED_EVENT" || code == "W_NOTE_PAN_IGNORED" || code == "W_CLIPPING" || code == "W_SILENT" || code == "W_BLACK_FRAME" ||
+             code == "W_SCENE_EMPTY";   // a bare 3D View stage is a valid start
    }
 
    void PromoteWarnings(std::vector<Issue>& warnings, std::vector<Issue>& errors)

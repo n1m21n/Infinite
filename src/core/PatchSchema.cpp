@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -501,10 +502,26 @@ namespace PatchSchema
                {
                   const double v = std::atof(n.params[i].second.c_str());
                   const double slack = 1e-4 * (c->maxValue - c->minValue);
+                  // Rotations come in two units: primitives run -pi..pi (radians), Transform and
+                  // the camera -180..180 (degrees). Say which, since that is the usual cause.
+                  const bool isRot = key.rfind("rot", 0) == 0;
+                  const bool radiansControl = isRot && std::fabs(c->maxValue - 3.14159) < 0.01;
+                  const bool degreesControl = isRot && std::fabs(c->maxValue - 180.0) < 0.5;
                   if (v < c->minValue - slack || v > c->maxValue + slack)
                      warnings.push_back(Make("W_OUT_OF_RANGE",
                                              "'" + key + "' is " + n.params[i].second + " but its control runs " + Num(c->minValue) + ".." + Num(c->maxValue),
-                                             line, n.index, "the node clamps it; use a value inside the range"));
+                                             line, n.index,
+                                             radiansControl ? "this rotation is in radians (90 degrees = 1.5708)"
+                                                            : "the node clamps it; use a value inside the range"));
+                  else if (degreesControl && v != 0.0)
+                  {
+                     // 1.5708 on a degrees control is almost always a radian written by mistake.
+                     const double q = std::fabs(v) / (3.14159265 / 4.0);
+                     if (std::fabs(v) <= 6.3 && std::fabs(q - std::round(q)) < 0.002)
+                        warnings.push_back(Make("W_ROTATION_UNITS",
+                                                "'" + key + "' is " + n.params[i].second + ", which looks like radians, but this rotation is in degrees",
+                                                line, n.index, "write " + Num(v * 180.0 / 3.14159265) + " for that angle"));
+                  }
                }
             }
             if (found != nullptr && found->kind != kind)
@@ -513,6 +530,56 @@ namespace PatchSchema
                                           " reads it as " + ParamKindName(found->kind),
                                        line, n.index, std::string("write it with the '") + found->kind + "' tag"));
          }
+      }
+
+      // A 3D View draws only the nodes its scene lists, by uid. An empty scene renders an empty stage,
+      // and an item whose uid no node carries silently drops out of the picture.
+      for (const Patch::NodeRecord& n : data.nodes)
+      {
+         if (n.typeName != "3D View")
+            continue;
+         std::string scene;
+         for (const auto& kv : n.params)
+            if (kv.first == "s scene")
+               scene = kv.second;
+         int items = 0;
+         std::set<unsigned long long> itemIds;
+         unsigned long long cameraItem = 0;
+         size_t at = 0;
+         while (at <= scene.size())
+         {
+            size_t end = scene.find("\\n", at);
+            if (end == std::string::npos)
+               end = scene.size();
+            std::istringstream ls(scene.substr(at, end - at));
+            std::string word;
+            ls >> word;
+            unsigned long long id = 0, uid = 0;
+            if (word == "camera")
+               ls >> cameraItem;   // an item id, not a uid
+            else if (word == "item" || word == "world")
+            {
+               if (word == "item")
+               {
+                  ls >> id;
+                  itemIds.insert(id);
+                  items++;
+               }
+               ls >> uid;
+               if (uid != 0 && uidSeen.count(uid) == 0)
+                  warnings.push_back(Make("W_SCENE_MISSING_NODE",
+                                          "the 3D View's scene lists " + word + " uid " + std::to_string(uid) + ", which no node carries",
+                                          n.line, n.index, "add `uid " + std::to_string(uid) + "` after the referenced node's id line"));
+            }
+            at = end + 2;
+         }
+         if (cameraItem != 0 && itemIds.count(cameraItem) == 0)
+            warnings.push_back(Make("W_SCENE_MISSING_NODE",
+                                    "the 3D View's camera is item " + std::to_string(cameraItem) + ", which the scene does not list",
+                                    n.line, n.index, "point `camera` at the id of the camera's item line"));
+         if (items == 0)
+            warnings.push_back(Make("W_SCENE_EMPTY", "the 3D View's scene has no items, so it renders an empty stage", n.line, n.index,
+                                    "list each node to draw with `item <id> <uid> px py pz rx ry rz sx sy sz 1` in `s scene`"));
       }
 
       // Edges for reachability and cycle checks: from -> to (data flows from -> to).

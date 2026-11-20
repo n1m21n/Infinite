@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #import <Metal/Metal.h>
 #import <IOSurface/IOSurface.h>
@@ -31,6 +32,17 @@ namespace rhi
    namespace
    {
       std::string gLastError;
+      // Blocks until the GPU is done with `cb`; a failed buffer is counted and logged, never silent.
+      void WaitChecked(id<MTLCommandBuffer> cb, const char* where)
+      {
+         [cb waitUntilCompleted];
+         if (cb.status != MTLCommandBufferStatusError)
+            return;
+         NSError* e = cb.error;
+         gGpuLastError = std::string(where) + ": " + (e != nil ? e.localizedDescription.UTF8String : "command buffer failed");
+         gGpuErrors++;
+         std::fprintf(stderr, "Infinite: GPU error in %s\n", gGpuLastError.c_str());
+      }
       // Compile macros plus the active A/B switches (Render3DAb.h).
       NSDictionary* AbMacros(NSDictionary* base)
       {
@@ -2752,7 +2764,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
          [enc endEncoding];
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          return cb.status == MTLCommandBufferStatusCompleted;
       }
 
@@ -2894,7 +2906,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          }
          [ae endEncoding];
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          return cb.status == MTLCommandBufferStatusCompleted;
       }
       static void HMix(uint64_t& h, const void* p, size_t n)
@@ -2992,7 +3004,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             }
          }
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          return cb.status == MTLCommandBufferStatusCompleted;
       }
       // Instances change every frame; the instance structure is rebuilt in the frame's command buffer, only when
@@ -3287,7 +3299,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [be generateMipmapsForTexture:mEnvTex];
             [be endEncoding];
             [cb commit];
-            [cb waitUntilCompleted];
+            WaitChecked(cb, __func__);
             mEnvRev = fr.envRev;
             BuildEnvCdf(fr);
          }
@@ -3492,7 +3504,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [ae buildAccelerationStructure:as descriptor:ad scratchBuffer:scratch scratchBufferOffset:0];
          [ae endEncoding];
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          return as;
       }
       id<MTLTexture> mEnvTex = nil, mEnvDummy = nil, mEnvBound = nil, mEnvCdf = nil;
@@ -3554,7 +3566,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             id<MTLCommandBuffer> cb = [mQueue commandBuffer];
             [fx encodeToCommandBuffer:cb];
             [cb commit];
-            [cb waitUntilCompleted];
+            WaitChecked(cb, __func__);
             return cb.status == MTLCommandBufferStatusCompleted;
          }
          return false;
@@ -3934,7 +3946,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          DepthOfField(cb, img, fr, fmt);
          Bloom(cb, img, fr, fmt);
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          if (gpuMs)
             *gpuMs = (cb.GPUEndTime - cb.GPUStartTime) * 1000.0;
          return cb.status == MTLCommandBufferStatusCompleted;
@@ -4273,7 +4285,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [e endEncoding];
          Bloom(cb, img, fr, img.Tex().pixelFormat);
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          if (gpuMs) *gpuMs = (cb.GPUEndTime - cb.GPUStartTime) * 1000.0;
          mPtNoise = -1.0f;
          if (dn && mDnHist && cb.status == MTLCommandBufferStatusCompleted)
@@ -4888,7 +4900,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [enc endEncoding];
             [cb commit];
-            [cb waitUntilCompleted];
+            WaitChecked(cb, __func__);
             if (cb.status != MTLCommandBufferStatusCompleted)
             {
                err = "Metal command buffer failed";

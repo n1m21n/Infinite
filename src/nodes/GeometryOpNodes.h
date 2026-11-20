@@ -78,6 +78,9 @@ public:
    {
       auto* node = new GeometryOpNode();
       node->op = operation;
+      // offsetX's 0.6 is Array's spacing; a fresh Transform should not move anything.
+      if (operation == kTransform || operation == kTransformSelected)
+         node->offsetX = 0.0f;
       return node;
    }
    static const std::vector<std::string>& OpNames();

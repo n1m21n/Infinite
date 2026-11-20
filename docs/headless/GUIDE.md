@@ -321,6 +321,10 @@ Three ways, from simplest to most flexible.
 
 Write each control with its real tag; `--describe "<type>"` shows it, and `--validate` warns `W_TYPE_MISMATCH` when you guess wrong.
 
+Rotations come in two units: primitives (Plane, Cube, ...) take radians (`f rotX -1.5708`), Transform and Camera take degrees (`f rotX -90`). `--validate` says which when a value is out of range, and warns `W_ROTATION_UNITS` for a radian-looking value on a degrees control.
+
+To look at a 3D patch quickly, `python3 tools/look.py` renders sheets in one process: `passes` (colour, normals, albedo, light = colour / albedo, object id), `crop X Y W H --scale S` (renders only that region, sharper, by narrowing the camera; `--verify` compares it with the full frame), `sweep node.key V1 V2 ...` and `ab`.
+
 Not reachable from the CLI: selecting elements with the mouse in Edit Mode, drawing sculpt strokes, and the 3D View editor's scene items, gizmos and overlays (a bare 3D View node renders its empty stage). The re-runnable check for everything in this section is `python3 tools/headless-docs/check_release_areas.py`.
 
 ## 8. Troubleshooting
