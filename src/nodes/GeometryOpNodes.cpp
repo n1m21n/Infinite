@@ -1530,8 +1530,12 @@ void InstanceOnPointsNode::Rebuild()
    mScaleJitter.clear();
    mPosesValid = false;
 
+   // A scatter (Distribute Points, a Transform of one) wired into `points` is used as it is: its cloud stands in
+   // for vertices, so no Points to Vertices is needed in between.
+   const bool pointsAreCloud = cloudSource == nullptr && pointSource != nullptr && !pointSource->GetMesh().HasGeometry() &&
+                               pointSource->GetPointCloud() != nullptr;
    mCookWarning = DescribeGeometryMismatch(cloudSource, GeometryRequirement::kCloud);
-   if (mCookWarning.empty() && cloudSource == nullptr)
+   if (mCookWarning.empty() && cloudSource == nullptr && !pointsAreCloud)
       mCookWarning = DescribeGeometryMismatch(
          pointSource, pointMode == 0 ? GeometryRequirement::kMeshVertices : GeometryRequirement::kMeshSurface);
 
@@ -1560,20 +1564,50 @@ void InstanceOnPointsNode::Rebuild()
       return;
 
    const Mesh& srcLocal = pointSource->GetMesh();
-   // HasGeometry(), not Empty(): a vertices-only mesh (Points to Vertices'
-   // output) has no faces/edges to sample in modes 1/2, but pointMode 0
-   // (vertices) works directly off vertex positions and doesn't touch
-   // indices at all - see MeshOps::ToPoints.
-   if (!srcLocal.HasGeometry())
-      return;
-
    // Points are sampled from the source's own space, so its object-level
    // transform (move/rotate/scale the Helix, say) has to be applied before
    // sampling or it never reaches the instances scattered on it.
    const Mat4 pointModel = pointSource->GetModelMatrix();
-   const Mesh src = MeshOps::Transform(srcLocal, pointModel);
-
-   const std::vector<MeshPoint> points = MeshOps::ToPoints(src, pointMode, maxPoints);
+   std::vector<MeshPoint> points;
+   if (pointsAreCloud)
+   {
+      // Every live particle is a point, whatever pointMode says: a cloud has no edges or faces to sample.
+      const std::vector<Particle>& cloud = *pointSource->GetPointCloud();
+      float nm[9];
+      pointModel.NormalMatrix(nm);
+      const Mat4& m = pointModel;
+      for (const Particle& q : cloud)
+      {
+         if (!q.alive)
+            continue;
+         if (maxPoints > 0 && (int)points.size() >= maxPoints)
+            break;
+         MeshPoint mp;
+         mp.px = m.m[0] * q.px + m.m[4] * q.py + m.m[8] * q.pz + m.m[12];
+         mp.py = m.m[1] * q.px + m.m[5] * q.py + m.m[9] * q.pz + m.m[13];
+         mp.pz = m.m[2] * q.px + m.m[6] * q.py + m.m[10] * q.pz + m.m[14];
+         float nx = nm[0] * q.nx + nm[3] * q.ny + nm[6] * q.nz, ny = nm[1] * q.nx + nm[4] * q.ny + nm[7] * q.nz,
+               nz = nm[2] * q.nx + nm[5] * q.ny + nm[8] * q.nz;
+         const float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+         if (len > 1e-6f) { nx /= len; ny /= len; nz /= len; }
+         mp.nx = nx; mp.ny = ny; mp.nz = nz;
+         mp.scale = q.scale;
+         mp.index = (int)points.size();
+         mp.r = q.r; mp.g = q.g; mp.b = q.b;
+         points.push_back(mp);
+      }
+   }
+   else
+   {
+      // HasGeometry(), not Empty(): a vertices-only mesh (Points to Vertices'
+      // output) has no faces/edges to sample in modes 1/2, but pointMode 0
+      // (vertices) works directly off vertex positions and doesn't touch
+      // indices at all - see MeshOps::ToPoints.
+      if (!srcLocal.HasGeometry())
+         return;
+      const Mesh src = MeshOps::Transform(srcLocal, pointModel);
+      points = MeshOps::ToPoints(src, pointMode, maxPoints);
+   }
    mPoses.reserve(points.size());
    mScaleJitter.reserve(points.size());
    mColors.reserve(points.size() * 3);
@@ -1626,7 +1660,9 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    // Select or Transform Selected upstream can change which vertices move,
    // or where they end up, without changing how many there are.
    const unsigned long long cloudRevision = cloudSource ? cloudSource->PointCloudRevision() : 0;
-   const unsigned long long pointRevision = pointSource ? pointSource->MeshRevision() : 0;
+   // A cloud wired into `points` moves with no mesh revision (a Transform upstream), so its own stamp counts too.
+   const unsigned long long pointRevision =
+      pointSource ? pointSource->MeshRevision() ^ (pointSource->PointCloudRevision() * 0x9E3779B97F4A7C15ull) : 0;
    const unsigned long long shapeRevision = instanceShape ? instanceShape->MeshRevision() : 0;
    // Neither source bumps a revision for a pure transform edit (GetModelMatrix
    // is evaluated live, including per-frame animation like spin/beat), so the
