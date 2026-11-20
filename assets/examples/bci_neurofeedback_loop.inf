@@ -1,0 +1,45 @@
+infinite-patch 1
+# Closed-Loop Alpha & Inter-Hemispheric Coherence Neurofeedback + Brain Sculpt
+node 1 Modulators Brain Source
+  id brain
+  pos 0 400
+  i device 0
+  i syntheticPreset 0
+  f smoothing 0.65
+end
+node 2 Prediction Brain Sculpt
+  id sculpt
+  pos 420 540
+  f sigma 0.35
+  f smoothing 0.40
+end
+node 3 Modulators Logic Gate
+  id calmGate
+  pos 420 260
+  i op 0
+  f highThresh 0.60
+  f lowThresh 0.42
+  f holdMs 250
+end
+node 4 Source FieldPixel
+  id feedbackField
+  pos 840 400
+  f width 720
+  f height 720
+  s code p = (uv - 0.5) * aspect;\nr = length(p);\na = atan2(p.y, p.x);\nfolds = mix(3.0, 12.0, brain.coherence);\nk = 0.05 + 0.35 * brain.smoothness;\npattern = cos(r * 16.0 - t * (0.4 + 2.0 * brain.tension) + sin(a * floor(folds)) * (1.2 - 0.9 * brain.stillness));\ncrystal = smoothstep(0.0, k, abs(pattern));\ncol = mix(vec3(0.12, 0.75, 0.55), vec3(0.92, 0.45, 0.25), brain.tension) * (1.0 - crystal * 0.85);
+end
+node 5 Effects bloom
+  id glow
+  pos 1220 400
+end
+node 6 Utility Output
+  id out
+  pos 1580 400
+end
+geo sculpt 0 brain 1
+geo calmGate 0 brain 6
+geo calmGate 2 brain 0
+cable glow 0 feedbackField
+mod glow 1 sculpt 0 0 1 1.4
+mod glow 2 calmGate 0 0 1 4.0
+cable out 0 glow

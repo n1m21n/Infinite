@@ -198,6 +198,8 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/HandTrackNode.h"
 #include "nodes/FaceTrackNode.h"
 #include "nodes/PoseTrackNode.h"
+#include "nodes/BrainSourceNode.h"
+#include "nodes/BrainSculptNode.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/FieldElementNode.h"

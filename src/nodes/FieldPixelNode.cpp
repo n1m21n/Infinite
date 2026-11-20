@@ -1,4 +1,5 @@
 #include "FieldPixelNode.h"
+#include "core/bci/BciTypes.h"
 #include "field/MaterialRegistry.h"
 #include "field/FieldLex.h"
 #include "field/FieldParse.h"
@@ -30,6 +31,8 @@ namespace
                if (p.isDeclared && p.name == node->varName)
                   return (double)p.value;
             }
+            if (node->varName.rfind("brain.", 0) == 0)
+               return (double)Bci::ReadBrainGlobal(node->varName);
             auto it = env.find(node->varName);
             if (it != env.end()) return it->second;
             return 0.0;
@@ -1429,6 +1432,10 @@ void FieldPixelNode::CookIfNeeded(int frameId)
             // of trusting positional alignment between two unrelated arrays.
             if (const Field::ParamEntry* p = mParamTable.Find(slot.varName))
                glUniform1f(loc, p->value);
+         }
+         else if (slot.varName.rfind("brain.", 0) == 0)
+         {
+            glUniform1f(loc, Bci::ReadBrainGlobal(slot.varName));
          }
       }
 

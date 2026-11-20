@@ -3132,6 +3132,11 @@ void DrawColorRampParams(ColorRampNode* n);
 
 void DrawImageAnalyzeParams(ImageAnalyzeNode* n);
 void DrawTrackParams(TrackNodeBase* n);
+void DrawBrainSourceBody(BrainSourceNode* n, int nodeIndex);
+void DrawBrainSourceParams(BrainSourceNode* n);
+void DrawLogicGateBody(LogicGateNode* n, int nodeIndex);
+void DrawLogicGateParams(LogicGateNode* n);
+void DrawBrainSculptParams(BrainSculptNode* n);
 
 void DrawNullModulatorParams(NullModulatorNode* n);
 

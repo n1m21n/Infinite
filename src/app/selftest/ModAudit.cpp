@@ -57,6 +57,8 @@
 #include "nodes/PathNode.h"
 #include "nodes/PredictionNodes.h"
 #include "nodes/PredictiveModulatorNode.h"
+#include "nodes/BrainSourceNode.h"
+#include "nodes/BrainSculptNode.h"
 #include "nodes/GeometryTableNode.h"
 
 #include <chrono>
@@ -1377,7 +1379,8 @@ namespace
    {
       const Registered all[] = {
          Reg<LFONode>("LFO"), Reg<ConstantNode>("Constant"), Reg<RandomNode>("Random"), Reg<PatternNode>("Pattern"),
-         Reg<MathNode>("Math"), Reg<CompareNode>("Compare"), Reg<RangeToRangeNode>("Range to Range", false),
+         Reg<MathNode>("Math"), Reg<CompareNode>("Compare"), Reg<LogicGateNode>("Logic Gate"), Reg<RangeToRangeNode>("Range to Range", false),
+         Reg<BrainSourceNode>("Brain Source"), Reg<BrainSculptNode>("Brain Sculpt"),
          Reg<SmoothNode>("Smooth"), Reg<CVRecorderNode>("CV Recorder"), Reg<ModDepthNode>("Mod Depth"),
          Reg<EnvelopeNode>("Envelope"), Reg<CVToPitchNode>("CV to Pitch"), Reg<NullModulatorNode>("Null"),
          Reg<InvertNode>("Invert", false), Reg<ModCurveNode>("Mod Curve"), Reg<MSEGNode>("MSEG"), Reg<VoiceSpreadNode>("Voice Spread"), Reg<NoteExpressionNode>("Note Expression"), Reg<AudioToCVNode>("Audio to CV"),

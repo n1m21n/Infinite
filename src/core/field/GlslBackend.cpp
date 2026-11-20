@@ -236,6 +236,11 @@ namespace Field
                   return "src";
                }
 
+               if (name.rfind("brain.", 0) == 0)
+               {
+                  return "fld_brain_" + name.substr(6);
+               }
+
                return "fld_v_" + name;
             }
 
@@ -661,6 +666,55 @@ namespace Field
             ctx.paramNames.insert(p.name);
          }
          ctx.EmitLine("");
+      }
+
+      // 7a. Brain global uniforms (only emitted when referenced in the pixel body)
+      {
+         std::vector<std::string> brainVars;
+         std::unordered_set<std::string> seenBrain;
+         auto collectBrain = [&](const auto& self, const IRNodePtr& node) -> void
+         {
+            if (!node) return;
+            if (node->kind == IRKind::Variable && node->varName.rfind("brain.", 0) == 0)
+            {
+               if (seenBrain.insert(node->varName).second)
+                  brainVars.push_back(node->varName);
+            }
+            for (const auto& c : node->children)
+               self(self, c);
+         };
+         auto collectStmt = [&](const auto& self, const IRStmtPtr& s) -> void
+         {
+            if (!s) return;
+            if (s->rvalueExpr) collectBrain(collectBrain, s->rvalueExpr);
+            if (s->expr) collectBrain(collectBrain, s->expr);
+            if (s->ifCond) collectBrain(collectBrain, s->ifCond);
+            if (s->forInit) self(self, s->forInit);
+            if (s->forCond) collectBrain(collectBrain, s->forCond);
+            if (s->forStep) self(self, s->forStep);
+            for (const auto& b : s->thenStmts) self(self, b);
+            for (const auto& b : s->elseStmts) self(self, b);
+            for (const auto& b : s->forBody) self(self, b);
+         };
+         for (const auto& s : program.pixelBody)
+            collectStmt(collectStmt, s);
+
+         if (!brainVars.empty())
+         {
+            ctx.EmitLine("// ---- live BCI brain.* uniforms ----");
+            for (const auto& bv : brainVars)
+            {
+               const std::string uName = "fld_brain_" + bv.substr(6);
+               ctx.EmitLine("uniform float " + uName + ";");
+               UniformSlot slot;
+               slot.name = uName;
+               slot.varName = bv;
+               slot.type = FieldType(DataType::Float, 1);
+               slot.domain = Domain::Frame;
+               result.uniforms.push_back(slot);
+            }
+            ctx.EmitLine("");
+         }
       }
 
       // 7b. Declared `image` inputs alias the existing fld_srcTex/`src` path

@@ -225,6 +225,7 @@ namespace Field
                if (hit != ctx.hoistedMap.end()) return "fld_h" + std::to_string(hit->second);
                if (ctx.paramNames.count(name)) return "fld_p_" + name;
                if (ctx.imageInputNames.count(name)) return "src";
+               if (name.rfind("brain.", 0) == 0) return "0.0";
                return "fld_v_" + name;
             }
 

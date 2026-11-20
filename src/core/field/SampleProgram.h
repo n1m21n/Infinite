@@ -76,6 +76,7 @@ namespace Field
       LoadNoteVel,   // dst = noteVel  (Step 26: most-recently-registered note's velocity, 0..1)
       LoadNoteNum,   // dst = noteNum  (Field Notes: the note's MIDI number 0..127, holds after note-off)
       LoadBeat,      // dst = beat  (Field Notes: transport position in beats at this sample, float view of the double clock)
+      LoadBrain,     // dst = Bci::ReadBrainGlobal((int)imm) (lock-free atomic read of brain.* neural global)
       Tick,          // dst = tick(div:a)  (1.0 on the one sample where the beat clock crosses a multiple of div beats)
       Deg,           // dst = deg(d:a)  (MIDI note of scale degree a under the node's Root/Scale)
       Rand,          // dst = rand()  (uniform 0..1 from the node's audio-thread generator)

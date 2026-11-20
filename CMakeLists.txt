@@ -598,6 +598,7 @@ set(COMMON_SOURCES
     src/app/selftest/AliasTests.cpp
     src/app/selftest/FxAudit.cpp
     src/app/selftest/ModAudit.cpp
+    src/app/selftest/BciTests.cpp
     src/app/selftest/PresetTests.cpp
     src/app/selftest/SynthAudit.cpp
     src/app/selftest/NoteAudit.cpp
@@ -736,6 +737,10 @@ set(COMMON_SOURCES
     src/core/tracking/HandTracker.cpp
     src/core/tracking/FaceTracker.cpp
     src/core/tracking/PoseTracker.cpp
+    src/core/bci/BciTypes.cpp
+    src/core/bci/SyntheticCortex.cpp
+    src/core/bci/BciDspEngine.cpp
+    src/core/bci/BciRuntime.cpp
     src/nodes/TrackNodeBase.cpp
     src/nodes/HandTrackNode.cpp
     src/nodes/FaceTrackNode.cpp
@@ -799,6 +804,8 @@ set(COMMON_SOURCES
     src/nodes/VideoSourceNode.cpp
     src/nodes/VideoInNode.cpp
     src/nodes/ModulatorNodes.cpp
+    src/nodes/BrainSourceNode.cpp
+    src/nodes/BrainSculptNode.cpp
     src/nodes/PredictionNodes.cpp
     src/nodes/PredictiveNotesNode.cpp
     src/nodes/PredictiveColoringNode.cpp
@@ -1124,6 +1131,7 @@ add_executable(field-preset-check
     src/core/field/ElementStore.cpp
     src/core/field/FieldRandom.cpp
     src/core/field/FieldState.cpp
+    src/core/bci/BciTypes.cpp
 )
 target_include_directories(field-preset-check PRIVATE src src/core)
 
@@ -1151,6 +1159,7 @@ add_executable(field-patcher-check
     src/core/field/FieldNoise.cpp
     src/core/field/FieldRandom.cpp
     src/core/field/FieldState.cpp
+    src/core/bci/BciTypes.cpp
 )
 target_include_directories(field-patcher-check PRIVATE src src/core ${CMAKE_BINARY_DIR}/generated)
 set(FIELD_PATCHER_PRESET_SOURCES

@@ -1,0 +1,72 @@
+infinite-patch 1
+# Mind & Micro-Gesture Symphonic Patch (BCI + Micro-Muscular + Field Audiovisual Synthesis)
+node 1 Modulators Brain Source
+  id brain
+  pos 0 420
+  i device 0
+  i syntheticPreset 0
+  i blinkMode 0
+  f smoothing 0.45
+  b artifactBlanking 1
+  b startleGuard 1
+end
+node 2 Modulators Logic Gate
+  id blinkToggle
+  pos 420 520
+  i op 2
+  i quantize 2
+  f highThresh 0.50
+  f lowThresh 0.25
+  f holdMs 15
+  f minPresence 0.40
+end
+node 3 Modulators Logic Gate
+  id jawTrigger
+  pos 420 260
+  i op 1
+  i quantize 1
+  f highThresh 0.55
+  f lowThresh 0.35
+  f holdMs 10
+  f pulseMs 45
+  f refractoryMs 140
+end
+node 4 Source FieldPixel
+  id visuals
+  pos 860 440
+  f width 720
+  f height 720
+  s code p = (uv - 0.5) * aspect;\nr = length(p);\nang = atan2(p.y, p.x);\nsym = mix(1.0, 6.0, brain.coherence);\nwave = sin(r * (14.0 + 18.0 * brain.arousal) - t * (1.5 + 3.0 * brain.motion) + cos(ang * floor(sym)) * (0.4 + 1.8 * brain.tension));\nglow = (1.0 - smoothstep(-0.35, 0.35, wave)) * (0.55 + 0.45 * brain.smoothness);\ncalmCol = vec3(0.16, 0.42, 0.85);\nfocusCol = vec3(0.95, 0.55, 0.18);\ncol = mix(calmCol, focusCol, brain.valence) * glow + vec3(0.9, 0.95, 1.0) * brain.blink * 0.35;
+end
+node 5 Effects bloom
+  id glow
+  pos 1240 440
+end
+node 6 Notes Field Notes
+  id notes
+  pos 860 120
+  s code state float step = 0\nif (tick(1/8) > 0.5) {\n   dens = 0.35 + 0.65 * brain.density\n   if (rand() < dens || brain.jaw > 0.55) {\n      degIdx = floor(brain.arousal * 5.0 + rand() * 3.0)\n      vel = 0.55 + 0.40 * brain.surge\n      note(deg(degIdx), vel, 1/8)\n   }\n   step = (step + 1) % 16\n}
+end
+node 7 Synths Field Synth
+  id synth
+  pos 1240 120
+  s code state float ph = 0\nstate float env = 0\ntarget = gate\nenv += (target - env) * (0.002 + 0.015 * (1.0 - brain.smoothness))\nph = (ph + freq / sr) % 1.0\nmodIdx = 0.5 + 4.0 * brain.tension\ncarrier = sin(6.28318 * ph + modIdx * sin(6.28318 * ph * 2.0))\nout = carrier * env * 0.32
+end
+node 8 Utility Audio Out
+  id speaker
+  pos 1600 120
+end
+node 9 Utility Output
+  id out
+  pos 1600 440
+end
+geo blinkToggle 0 brain 18
+geo blinkToggle 2 brain 0
+geo jawTrigger 0 brain 22
+geo jawTrigger 2 brain 0
+cable glow 0 visuals
+mod glow 0 blinkToggle 0 0 1 0.6
+mod glow 1 jawTrigger 0 0 1 1.4
+note synth 0 notes
+aud speaker 0 synth
+cable out 0 glow

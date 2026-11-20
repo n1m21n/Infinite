@@ -1,0 +1,71 @@
+infinite-patch 1
+# sEMG Micro-Muscular Jaw & Brow Percussive Articulation
+node 1 Modulators Brain Source
+  id brain
+  pos 0 360
+  i device 0
+  i syntheticPreset 3
+  i blinkMode 0
+  f smoothing 0.35
+end
+node 2 Modulators Logic Gate
+  id jawLeftGate
+  pos 420 520
+  i op 1
+  i quantize 0
+  f highThresh 0.55
+  f lowThresh 0.35
+  f holdMs 10
+  f pulseMs 45
+  f refractoryMs 120
+end
+node 3 Modulators Logic Gate
+  id jawRightGate
+  pos 420 220
+  i op 1
+  i quantize 0
+  f highThresh 0.55
+  f lowThresh 0.35
+  f holdMs 10
+  f pulseMs 45
+  f refractoryMs 120
+end
+node 4 Notes Field Notes
+  id percNotes
+  pos 840 160
+  s code state float prevL = 0\nstate float prevR = 0\njl = brain.jaw_left > 0.55\njr = brain.jaw_right > 0.55\nif (jl > 0.5 && prevL < 0.5) {\n   note(deg(0), 0.95, 1/8)\n}\nif (jr > 0.5 && prevR < 0.5) {\n   note(deg(4), 0.85, 1/16)\n}\nprevL = jl\nprevR = jr
+end
+node 5 Synths Field Synth
+  id percSynth
+  pos 1200 160
+  s code state float ph = 0\nstate float env = 0\nif (gate > 0.5) {\n   env = min(1.0, env + 0.08)\n} else {\n   env *= 0.9985\n}\nsweep = freq * (1.0 + 2.5 * env * (0.4 + brain.brow))\nph = (ph + sweep / sr) % 1.0\ndrv = sin(6.28318 * ph) * (1.0 + 3.0 * brain.brow)\nout = (drv / (1.0 + abs(drv))) * env * 0.4
+end
+node 6 Source FieldPixel
+  id impactViz
+  pos 840 440
+  f width 720
+  f height 720
+  s code p = (uv - 0.5) * aspect;\ndL = length(p - vec2(-0.28, 0.0));\ndR = length(p - vec2(0.28, 0.0));\nringL = exp(-abs(dL - 0.25 * brain.jaw_left) * 28.0) * (0.25 + brain.jaw_left);\nringR = exp(-abs(dR - 0.25 * brain.jaw_right) * 28.0) * (0.25 + brain.jaw_right);\ncol = vec3(0.95, 0.35, 0.22) * ringL + vec3(0.20, 0.78, 0.95) * ringR + vec3(0.06, 0.07, 0.09);
+end
+node 7 Effects bloom
+  id glow
+  pos 1200 440
+end
+node 8 Utility Audio Out
+  id speaker
+  pos 1560 160
+end
+node 9 Utility Output
+  id out
+  pos 1560 440
+end
+geo jawLeftGate 0 brain 21
+geo jawLeftGate 2 brain 0
+geo jawRightGate 0 brain 22
+geo jawRightGate 2 brain 0
+cable glow 0 impactViz
+mod glow 1 jawLeftGate 0 0 1 1.4
+mod glow 2 jawRightGate 0 0 1 4.0
+note percSynth 0 percNotes
+aud speaker 0 percSynth
+cable out 0 glow

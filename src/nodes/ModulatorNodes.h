@@ -1013,3 +1013,115 @@ private:
    std::unique_ptr<AudioAudioToCVNode> mAudioNode;
    int mLastCookFrame = -1;
 };
+
+// Hysteretic logic automaton for noisy biological & continuous CV signals:
+// Schmitt-trigger hysteresis, dwell-time hold filtering, refractory cooldown,
+// monostable Rising Edge pulses, Toggle (T-FF), SR Latch, 2-input Boolean gates,
+// electrode Presence safety interlock, and Transport beat-grid quantization.
+class LogicGateNode : public INode, public IModulator
+{
+public:
+   enum Op
+   {
+      kOpSchmittGate = 0,
+      kOpRisingEdge,
+      kOpToggle,
+      kOpSRLatch,
+      kOpAnd,
+      kOpOr,
+      kOpXor,
+      kOpNand,
+      kOpNor,
+      kOpNot
+   };
+
+   enum QuantizeDiv
+   {
+      kQuantImmediate = 0,
+      kQuantSixteenth,
+      kQuantEighth,
+      kQuantQuarter,
+      kQuantHalf,
+      kQuantBar
+   };
+
+   static INode* Create() { return new LogicGateNode(); }
+   static const std::vector<std::string>& OpNames();
+   static const std::vector<std::string>& QuantizeNames();
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   const char* InputLabel(int slot) const override;
+
+   float Value01() override;
+
+   INode* BypassSource() override { return dynamic_cast<INode*>(inputA); }
+   IModulator* inputA = nullptr;
+   IModulator* inputB = nullptr;
+   IModulator* presenceIn = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override
+   {
+      if (slot == 0) return &inputA;
+      if (slot == 1) return &inputB;
+      if (slot == 2) return &presenceIn;
+      return nullptr;
+   }
+   int ModulatorInputCount() const override { return 3; }
+
+   // Telemetry for DrawLogicGateBody
+   float LastInputA() const { return mLastInA; }
+   float LastInputB() const { return mLastInB; }
+   float LastOutput() const { return mOutVal; }
+   float HoldProgress01() const;
+
+   int op = kOpSchmittGate;
+   int quantize = kQuantImmediate;
+   float constantA = 0.5f;
+   float constantB = 0.5f;
+   float highThresh = 0.65f;
+   float lowThresh = 0.45f;
+   float holdMs = 40.0f;
+   float pulseMs = 45.0f;
+   float refractoryMs = 150.0f;
+   float minPresence = 0.40f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("op", op);
+      v.Int("quantize", quantize);
+      v.Float("constantA", constantA);
+      v.Float("constantB", constantB);
+      v.Float("highThresh", highThresh);
+      v.Float("lowThresh", lowThresh);
+      v.Float("holdMs", holdMs);
+      v.Float("pulseMs", pulseMs);
+      v.Float("refractoryMs", refractoryMs);
+      v.Float("minPresence", minPresence);
+   }
+
+private:
+   bool StepSchmitt(float val, bool& state, double& dwellSec, double dt, float hi, float lo, double reqHoldSec);
+   double QuantizePeriodBeats() const;
+
+   bool mInit = false;
+   double mLastSec = -1.0;
+   double mLastBeats = -1.0;
+
+   bool mSchmittA = false;
+   bool mSchmittB = false;
+   double mDwellA = 0.0;
+   double mDwellB = 0.0;
+
+   bool mPrevGateA = false;
+   bool mToggleState = false;
+   bool mLatchState = false;
+   bool mArmedEdge = false;
+   double mPulseRemainSec = 0.0;
+   double mRefracRemainSec = 0.0;
+
+   float mLastInA = 0.5f;
+   float mLastInB = 0.5f;
+   float mOutVal = 0.0f;
+};

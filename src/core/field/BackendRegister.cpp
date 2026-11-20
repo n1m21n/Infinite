@@ -3,6 +3,7 @@
 #include "FieldAst.h"
 #include "FieldLex.h"
 #include "FieldParse.h"
+#include "core/bci/BciTypes.h"
 #include "../../audio/PhaseShape.h"
 
 #include <unordered_map>
@@ -589,6 +590,20 @@ namespace Field
             case AstKind::Access:
             {
                auto* acc = static_cast<AstAccess*>(node.get());
+               if (acc->base && acc->base->kind == AstKind::Ident &&
+                   static_cast<AstIdent*>(acc->base.get())->name == "brain" &&
+                   scope.find("brain") == scope.end())
+               {
+                  const int brainId = Bci::FindBrainGlobalId(acc->field);
+                  if (brainId < 0)
+                  {
+                     ctx.Fail("unknown brain symbol 'brain." + acc->field + "'", node->span);
+                     return 0;
+                  }
+                  uint8_t dst = ctx.AllocReg(node->span);
+                  ctx.Emit(SampleOp::LoadBrain, dst, 0, 0, 0, (float)brainId, node->span);
+                  return dst;
+               }
                if (ctx.spectralHost && acc->base && acc->base->kind == AstKind::Ident &&
                    !ctx.specInputName.empty() &&
                    static_cast<AstIdent*>(acc->base.get())->name == ctx.specInputName)

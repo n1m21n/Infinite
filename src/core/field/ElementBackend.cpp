@@ -3,6 +3,7 @@
 #include "FieldNoise.h"
 #include "FieldState.h"
 #include "ReduceOps.h"
+#include "core/bci/BciTypes.h"
 #include "../../audio/PhaseShape.h"
 
 #include <cmath>
@@ -1172,6 +1173,11 @@ namespace Field
          {
             auto it = env.siblings->find(name);
             if (it != env.siblings->end()) { outValue = (double)it->second; return true; }
+         }
+         if (name.rfind("brain.", 0) == 0 && Bci::IsBrainGlobalField(name.substr(6)))
+         {
+            outValue = (double)Bci::ReadBrainGlobal(name);
+            return true;
          }
          outValue = 0.0;
          return false;

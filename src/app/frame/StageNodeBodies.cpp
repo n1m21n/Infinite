@@ -417,6 +417,14 @@ void DrawNodeBodies(FrameCtx& fc)
             // it as the node's output. DrawDriftMeter draws the same box with every line in it.
             DrawDriftMeter(dynamic_cast<DriftNode*>(gn.node.get()), gn.index);
          }
+         else if (auto* brainSrc = dynamic_cast<BrainSourceNode*>(gn.node.get()))
+         {
+            DrawBrainSourceBody(brainSrc, gn.index);
+         }
+         else if (auto* logicGate = dynamic_cast<LogicGateNode*>(gn.node.get()))
+         {
+            DrawLogicGateBody(logicGate, gn.index);
+         }
          else if (!isAudioBody && dynamic_cast<IModulator*>(gn.node.get()) != nullptr)
          {
             // Audio/note nodes are excluded here even when they implement
@@ -895,6 +903,12 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawMathParams(n);
             else if (auto* n = dynamic_cast<CompareNode*>(gn.node.get()))
                DrawCompareParams(n);
+            else if (auto* n = dynamic_cast<LogicGateNode*>(gn.node.get()))
+               DrawLogicGateParams(n);
+            else if (auto* n = dynamic_cast<BrainSourceNode*>(gn.node.get()))
+               DrawBrainSourceParams(n);
+            else if (auto* n = dynamic_cast<BrainSculptNode*>(gn.node.get()))
+               DrawBrainSculptParams(n);
             else if (auto* n = dynamic_cast<RangeToRangeNode*>(gn.node.get()))
                DrawRangeToRangeParams(n);
             else if (auto* n = dynamic_cast<SmoothNode*>(gn.node.get()))

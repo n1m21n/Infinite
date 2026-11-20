@@ -314,7 +314,7 @@ static void WriteBody(std::ostream& file, const Data& data)
    for (const CableRecord& c : data.geometry)
       file << "geo " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const CableRecord& c : data.audio)
-      file << "aud " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
+      file << "aud " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const CableRecord& c : data.notes)
       file << "note " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const ModRecord& m : data.modulation)
@@ -841,16 +841,13 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          c.line = lineNo;
          ReadRef(in, c.dstIndex, c.dstRef, outData.hasNamedRefs) && ReadRef(in, c.dstSlot, c.slotRef, outData.hasNamedRefs) &&
             ReadRef(in, c.srcIndex, c.srcRef, outData.hasNamedRefs);
+         // srcOutput is a later addition (Note Router, then audio on a later pin: Video Source,
+         // Brain Source); missing on older patches, where >>'s failed-extraction behaviour leaves it 0.
+         ReadRef(in, c.srcOutput, c.outRef, outData.hasNamedRefs);
          if (tag == "aud")
             outData.audio.push_back(c);
          else
-         {
-            // srcOutput is a later addition (Note Router); missing on older
-            // patches, where >>'s failed-extraction behaviour leaves it 0 -
-            // every note source but Router only ever has output 0 anyway.
-            ReadRef(in, c.srcOutput, c.outRef, outData.hasNamedRefs);
             outData.notes.push_back(c);
-         }
       }
       else if (tag == "mod")
       {
