@@ -116,7 +116,8 @@ A patch can validate and still be the wrong patch, which is why step 4 exists.
 | `--validate patch.inf [--for-render] [--lenient] [--json file]` | Check the file loads; report every problem |
 | `--explain patch.inf [--json] [--all] [--lenient]` | Print the built graph: nodes, non-default controls, wires, modulation ranges, world bounding boxes of geometry. `--all` lists every control |
 | `--frame patch.inf T[,T...] out.png or dir/` | Still images at the given times in seconds. Several times need a folder |
-| `--frame --batch jobs.json` | Run multiple frame renders in one process (`[{patch, t, out, size, node, ...}]`) |
+| `--frame patch.inf T out/ --batch list.txt` | More frame renders in one process: one `patch<TAB>out/` line per job (absolute paths); each job also writes `<out>.json` |
+| `--frame ... --batch queue.txt --serve` | A warm session: keeps reading lines appended to the queue and renders each in the same process; a `quit` line ends it, 10 idle minutes too. `tools/warm.py` drives it |
 | `--frames-dir patch.inf out_dir --duration S` | A numbered PNG sequence. Options: `--start S`, `--fps N`, `--alpha`, `--depth 8 or 16` |
 | `--render patch.inf out.mp4 or out.mov` | A video with audio |
 | `--audio-summary patch.inf out.json` | The sound as numbers: loudness, peaks, clipping, silence, spectrum, tempo guess |
@@ -145,7 +146,8 @@ A patch can validate and still be the wrong patch, which is why step 4 exists.
 | `--timeline` | render, audio-summary | Render or measure the Timeline arrangement instead of the canvas graph alone |
 | `--plugin-params` | render, audio-summary | List every loaded plugin's parameters (address, name, real range, default) in the `plugins` block of the result |
 | `--plugin-state` | render, audio-summary | Include plugin state blobs in the result |
-| `--batch jobs.json` | frame, audio-summary | Run a JSON array of frame or audio-summary jobs in one process |
+| `--batch list.txt` | frame, audio-summary | More jobs in one process, one tab-separated `patch<TAB>out[<TAB>out.wav]` line each |
+| `--serve` | frame with --batch | Keep the process up and render lines appended to the list; `--timeout` applies to each job |
 | `--repeat 1-8` | frame | Repeat the frame render N times (determinism / warmup check) |
 | `--contact-sheet sheet.png` | frame | One image holding every requested frame |
 | `--png-level 0-9` | frame, frames-dir | PNG compression |

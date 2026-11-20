@@ -648,5 +648,23 @@ python3 "$ROOT/tools/determinism-check.py" "$PATCH" --binary "$BIN" --times 0,1 
 # D19: every clickable action has a terminal verb, or a stated reason not to.
 python3 "$ROOT/tools/terminal/parity.py" --summary >/dev/null; check "terminal parity" $?
 
+# --serve: a warm session renders jobs appended to the queue after it started, then quits on "quit".
+Q="$OUT/serve_queue.txt"; : > "$Q"
+"$BIN" --frame "$PATCH" 0 "$OUT/s0/" --batch "$Q" --serve --timeout 120 > "$OUT/serve.log" 2>&1 &
+SPID=$!
+for _ in $(seq 1 600); do [ -s "$OUT/s0.json" ] && break; sleep 0.1; done
+[ -s "$OUT/s0.json" ]; check "serve: first job leaves its json" $?
+sleep 1; kill -0 $SPID 2>/dev/null; check "serve: session stays up with an empty queue" $?
+printf '%s\t%s\n' "$PATCH" "$OUT/s1/" >> "$Q"
+printf '%s\t%s\n' "$OUT/missing.inf" "$OUT/s2/" >> "$Q"
+for _ in $(seq 1 600); do [ -s "$OUT/s2.json" ] && break; sleep 0.1; done
+[ "$(json_file "$OUT/s1.json" "d['ok'] and len(d['frame_stats'])==1 and 'elapsed_ms' in d")" = "True" ]; check "serve: appended job renders in the same process" $?
+[ "$(json_file "$OUT/s2.json" "d['errors'][0]['code']")" = "E_LOAD" ]; check "serve: a bad line reports E_LOAD and the session goes on" $?
+printf 'quit\n' >> "$Q"
+for _ in $(seq 1 100); do kill -0 $SPID 2>/dev/null || break; sleep 0.1; done
+! kill -0 $SPID 2>/dev/null; check "serve: quit ends the session" $?
+wait $SPID; check "serve: exit 0 after quit" $?
+"$BIN" --frame "$PATCH" 0 "$OUT/s9/" --serve >/dev/null 2>&1; [ $? = 2 ]; check "serve without --batch is a usage error" $?
+
 rm -rf "$OUT"
 exit $fail

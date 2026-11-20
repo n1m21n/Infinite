@@ -331,6 +331,8 @@ namespace Headless
                return true;
             job.batch = v;
          }
+         else if (a == "--serve" && job.mode == Mode::Frame)
+            job.serve = true;
          else if ((a == "--notes" || a == "--note-map" || a == "--stems" || a == "--stems-dir") && job.mode == Mode::AudioSummary)
          {
             const char* v = next(a.c_str());
@@ -527,6 +529,11 @@ namespace Headless
       if (job.mode == Mode::Render && !job.node.empty() && job.duration <= 0.0)
       {
          usageError = "--render --node needs --duration S (there is no Output to take the length from)";
+         return true;
+      }
+      if (job.serve && job.batch.empty())
+      {
+         usageError = "--serve needs --batch <queue.txt>: the file new jobs are appended to";
          return true;
       }
       if (!job.geometry.empty() && job.node.empty())

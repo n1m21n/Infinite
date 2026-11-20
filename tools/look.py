@@ -11,12 +11,21 @@
       One render per value, labelled with mean luma and saturation.
   look.py ab PATCH_A PATCH_B   |   look.py ab PATCH --set node.key=V [--set ...]
       Side by side plus a x4 difference image and the mean difference.
+  look.py turn PATCH [--views 6] [--elev 0] [--pass color] [--cam ID]
+      Turntable: the camera orbits its target in VIEWS even steps from its own azimuth
+      (--elev E1,E2 adds rows at those elevation offsets, degrees). One labelled sheet.
+
+Renders go to a running warm session (tools/warm.py start) when its size, time and engine
+match; otherwise one process renders every variant (--batch). Unset INFINITE_LIVE_ENGINE for a
+fast raster look.
 
 Common: --set node.key=V (applied to every variant), --size WxH, --time T, --out DIR,
 --bin PATH. Pass INFINITE_LIVE_ENGINE etc. in the environment as usual.
 Prints one JSON summary line; the sheet path is in it.
 """
 import argparse, json, math, os, re, subprocess, sys, tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import warm
 from PIL import Image, ImageDraw, ImageChops, ImageStat
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -116,6 +125,16 @@ def render_all(binp, variants, outdir, t, size):
         pf = os.path.join(outdir, f"{name}.inf")
         open(pf, "w").write(p.text())
         jobs.append((name, pf, os.path.join(outdir, name) + "/"))
+    if warm.matches(size, t) and warm.info()["bin"] == binp:
+        imgs, errs = {}, []
+        for name, pf, od in jobs:
+            r = warm.submit(pf, od)
+            errs += r.get("errors", [])
+            pngs = sorted(f for f in os.listdir(od) if f.endswith(".png")) if os.path.isdir(od) else []
+            imgs[name] = Image.open(os.path.join(od, pngs[0])).convert("RGB") if pngs else None
+        if all(v is None for v in imgs.values()):
+            sys.exit(f"look: render failed in the warm session: {errs[:2]}")
+        return imgs, json.dumps({"warm": True, "errors": errs})
     cmd = [binp, "--frame", jobs[0][1], str(t), jobs[0][2], "--lenient"]
     if size: cmd += ["--size", size]
     if len(jobs) > 1:
@@ -191,13 +210,17 @@ def crop_patch(patch, binp, cam, rnd, x0, y0, cw, ch, scale):
 # ---------- commands ----------
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["passes", "crop", "sweep", "ab"])
+    ap.add_argument("cmd", choices=["passes", "crop", "sweep", "ab", "turn"])
     ap.add_argument("args", nargs="*")
     ap.add_argument("--set", action="append", default=[])
     ap.add_argument("--passes", default="color,normal,albedo,light,id")
     ap.add_argument("--scale", type=float, default=2.0)
     ap.add_argument("--verify", action="store_true")
     ap.add_argument("--size")
+    ap.add_argument("--views", type=int, default=6)
+    ap.add_argument("--elev", default="0")
+    ap.add_argument("--pass", dest="rpass", default="color")
+    ap.add_argument("--cam")
     ap.add_argument("--time", default="0")
     ap.add_argument("--out")
     ap.add_argument("--bin", default=BIN_DEFAULT)
@@ -277,6 +300,30 @@ def main():
         res["stats"] = {"A": stats(A), "B": stats(B)}
         res["sheet"] = sheet([("A", A), ("B", B), (f"diff x4  mean {res['mean_diff']}", diff.point(lambda v: min(255, v * 4)))],
                              os.path.join(out, "ab.png"), cols=3)
+    elif a.cmd == "turn":
+        cam = base.find(a.cam) if a.cam else base.first(("Camera",))
+        cam = cam[3] or base.lines[cam[0]].split()[1]
+        az0 = float(base.get(cam, "azimuth", ["34.3775"])[0])
+        el0 = float(base.get(cam, "elevation", ["22.9183"])[0])
+        elevs = [float(e) for e in a.elev.split(",")]
+        variants, labels = [], []
+        for r, de in enumerate(elevs):
+            for k in range(a.views):
+                p = Patch(base.text())
+                az = (az0 + 360.0 * k / a.views) % 360.0
+                el = max(-89.0, min(89.0, el0 + de))
+                p.set(cam, "azimuth", f"{az:.4f}", "f")
+                p.set(cam, "elevation", f"{el:.4f}", "f")
+                if a.rpass != "color":
+                    p.set(rnd, "renderPass", PASSES[a.rpass], "i")
+                variants.append((f"r{r}v{k}", p)); labels.append(f"az {az:.0f}  el {el:.0f}")
+        import time as _t
+        t0 = _t.time()
+        imgs, status = render_all(a.bin, variants, out, a.time, a.size)
+        res["seconds"] = round(_t.time() - t0, 2)
+        res["warm"] = status.startswith('{"warm"')
+        res["sheet"] = sheet([(l, imgs.get(n)) for (n, _), l in zip(variants, labels)], os.path.join(out, "turn.png"),
+                             cols=min(a.views, 6))
     print(json.dumps(res))
 
 
