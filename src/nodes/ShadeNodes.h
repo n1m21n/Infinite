@@ -122,9 +122,14 @@ public:
    float scale = 5.0f;
    bool IsColour() const override { return true; }
    std::string Emit(ShadeBuild& b) const override;
-   int ShadeInputCount() const override { return 1; }
-   ImageCable* ShadeInput(int i) override { return i == 0 ? &mVector : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "vector" : nullptr; }
+   // Pins after the first override the knob of the same name while wired (appended, so old patches keep their slots).
+   int ShadeInputCount() const override { return 4; }
+   ImageCable* ShadeInput(int i) override { return i >= 0 && i < 4 ? &mIn[i] : nullptr; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* k[] = { "vector", "colour 1", "colour 2", "scale" };
+      return slot >= 0 && slot < 4 ? k[slot] : nullptr;
+   }
    void VisitParams(ParamVisitor& v) override
    {
       v.Color("color1", color1);
@@ -133,7 +138,7 @@ public:
    }
 
 private:
-   ImageCable mVector;
+   ImageCable mIn[4];
 };
 
 // Shade Noise (row 2.4): fbm of the 2.1 gradient noise. detail = extra octaves, roughness = gain per octave,
@@ -151,9 +156,14 @@ public:
    float distortion = 0.0f;
    bool IsColour() const override { return true; }
    std::string Emit(ShadeBuild& b) const override;
-   int ShadeInputCount() const override { return 1; }
-   ImageCable* ShadeInput(int i) override { return i == 0 ? &mVector : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "vector" : nullptr; }
+   // Pins after the first override the knob of the same name while wired (appended, so old patches keep their slots).
+   int ShadeInputCount() const override { return 4; }
+   ImageCable* ShadeInput(int i) override { return i >= 0 && i < 4 ? &mIn[i] : nullptr; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* k[] = { "vector", "scale", "roughness", "distortion" };
+      return slot >= 0 && slot < 4 ? k[slot] : nullptr;
+   }
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("output", output);
@@ -164,7 +174,7 @@ public:
    }
 
 private:
-   ImageCable mVector;
+   ImageCable mIn[4];
 };
 
 // Shade Voronoi (row 2.4): the 2.1 cell noise. Distance (F1), Second (F2), Edge (F2 - F1), Cell (grey per cell),
@@ -179,9 +189,14 @@ public:
    float scale = 5.0f;
    bool IsColour() const override { return true; }
    std::string Emit(ShadeBuild& b) const override;
-   int ShadeInputCount() const override { return 1; }
-   ImageCable* ShadeInput(int i) override { return i == 0 ? &mVector : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "vector" : nullptr; }
+   // Pins after the first override the knob of the same name while wired (appended, so old patches keep their slots).
+   int ShadeInputCount() const override { return 2; }
+   ImageCable* ShadeInput(int i) override { return i >= 0 && i < 2 ? &mIn[i] : nullptr; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* k[] = { "vector", "scale" };
+      return slot >= 0 && slot < 2 ? k[slot] : nullptr;
+   }
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("output", output);
@@ -189,7 +204,7 @@ public:
    }
 
 private:
-   ImageCable mVector;
+   ImageCable mIn[2];
 };
 
 // Shade Gradient (row 2.4): a grey ramp of the coordinate. Linear to Radial are Blender's Gradient Texture types;
@@ -235,9 +250,14 @@ public:
    float tint = 1.0f;
    bool IsColour() const override { return true; }
    std::string Emit(ShadeBuild& b) const override;
-   int ShadeInputCount() const override { return 1; }
-   ImageCable* ShadeInput(int i) override { return i == 0 ? &mVector : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "vector" : nullptr; }
+   // Pins after the first override the knob of the same name while wired (appended, so old patches keep their slots).
+   int ShadeInputCount() const override { return 5; }
+   ImageCable* ShadeInput(int i) override { return i >= 0 && i < 5 ? &mIn[i] : nullptr; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* k[] = { "vector", "colour 1", "colour 2", "mortar", "scale" };
+      return slot >= 0 && slot < 5 ? k[slot] : nullptr;
+   }
    void VisitParams(ParamVisitor& v) override
    {
       v.Color("color1", color1);
@@ -252,7 +272,7 @@ public:
    }
 
 private:
-   ImageCable mVector;
+   ImageCable mIn[5];
 };
 
 // Shade Image (row 2.4): any image cable as a texture, filtered with mips. Flat reads it at vector.xy (unwired: UV);
@@ -531,9 +551,14 @@ public:
    float distance = 0.1f;
    bool invert = false;
    std::string Emit(ShadeBuild& b) const override;
-   int ShadeInputCount() const override { return 2; }
-   ImageCable* ShadeInput(int i) override { return i == 0 ? &mHeight : i == 1 ? &mNormal : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "height" : slot == 1 ? "normal" : nullptr; }
+   // Pins after the first override the knob of the same name while wired (appended, so old patches keep their slots).
+   int ShadeInputCount() const override { return 4; }
+   ImageCable* ShadeInput(int i) override { return i >= 0 && i < 4 ? &mIn[i] : nullptr; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* k[] = { "height", "normal", "strength", "distance" };
+      return slot >= 0 && slot < 4 ? k[slot] : nullptr;
+   }
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("strength", strength);
@@ -542,7 +567,7 @@ public:
    }
 
 private:
-   ImageCable mHeight, mNormal;
+   ImageCable mIn[4];
 };
 
 // Shade Normal Map: a tangent-space normal map colour (wire a Shade Image set to Data) as a tangent-space normal for
@@ -553,13 +578,18 @@ public:
    static INode* Create() { return new ShadeNormalMapNode(); }
    float strength = 1.0f;
    std::string Emit(ShadeBuild& b) const override;
-   int ShadeInputCount() const override { return 1; }
-   ImageCable* ShadeInput(int i) override { return i == 0 ? &mColour : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "colour" : nullptr; }
+   // Pins after the first override the knob of the same name while wired (appended, so old patches keep their slots).
+   int ShadeInputCount() const override { return 2; }
+   ImageCable* ShadeInput(int i) override { return i >= 0 && i < 2 ? &mIn[i] : nullptr; }
+   const char* InputLabel(int slot) const override
+   {
+      static const char* k[] = { "colour", "strength" };
+      return slot >= 0 && slot < 2 ? k[slot] : nullptr;
+   }
    void VisitParams(ParamVisitor& v) override { v.Float("strength", strength); }
 
 private:
-   ImageCable mColour;
+   ImageCable mIn[2];
 };
 
 // Shade Fresnel: how much a dielectric of this IOR reflects at the view angle (0 facing, 1 grazing).

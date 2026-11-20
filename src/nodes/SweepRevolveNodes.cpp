@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace
 {
@@ -116,5 +117,17 @@ Mesh SweepNode::Build()
       round.closed = true;
       shape = &round;
    }
-   return MeshOps::Sweep(*shape, *way, startScale, endScale, twist, caps);
+   std::vector<float> taper;
+   {
+      const char* p = scales.c_str();
+      while (*p && taper.size() < 256)
+      {
+         char* end = nullptr;
+         const float f = std::strtof(p, &end);
+         if (end == p) { p++; continue; }
+         taper.push_back(std::isfinite(f) ? std::max(0.0f, f) : 1.0f);
+         p = end;
+      }
+   }
+   return MeshOps::Sweep(*shape, *way, startScale, endScale, twist, caps, &taper);
 }

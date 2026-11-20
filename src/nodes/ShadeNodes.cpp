@@ -133,13 +133,27 @@ std::string ShadeMappingNode::Emit(ShadeBuild& b) const
    return b.NewVar(this, e);
 }
 
+namespace
+{
+   // A knob a pin can override: the wired node's x (or its vector), else the knob's own value inline.
+   std::string PinScalar(ShadeBuild& b, const ImageCable& c, float own)
+   {
+      const std::string v = b.Input(c, "");
+      return v.empty() ? "(" + F(own) + ")" : v + ".x";
+   }
+   std::string PinColour(ShadeBuild& b, const ImageCable& c, const float srgb[3])
+   {
+      const std::string v = b.Input(c, "");
+      return v.empty() ? V3(SrgbToLinear(srgb[0]), SrgbToLinear(srgb[1]), SrgbToLinear(srgb[2])) : v;
+   }
+}
+
 std::string ShadeCheckerNode::Emit(ShadeBuild& b) const
 {
-   const std::string in = b.Input(mVector, b.Generated());
-   const std::string c1 = V3(SrgbToLinear(color1[0]), SrgbToLinear(color1[1]), SrgbToLinear(color1[2]));
-   const std::string c2 = V3(SrgbToLinear(color2[0]), SrgbToLinear(color2[1]), SrgbToLinear(color2[2]));
+   const std::string in = b.Input(mIn[0], b.Generated());
+   const std::string c1 = PinColour(b, mIn[1], color1), c2 = PinColour(b, mIn[2], color2);
    // checker() is 1 where floor(x) + floor(y) + floor(z) is odd: color1 there.
-   return b.NewVar(this, "mix(" + c2 + ", " + c1 + ", checker(" + in + " * " + F(scale) + "))");
+   return b.NewVar(this, "mix(" + c2 + ", " + c1 + ", checker(" + in + " * " + PinScalar(b, mIn[3], scale) + "))");
 }
 
 const std::vector<std::string>& ShadeNoiseNode::OutputNames()
@@ -150,12 +164,16 @@ const std::vector<std::string>& ShadeNoiseNode::OutputNames()
 
 std::string ShadeNoiseNode::Emit(ShadeBuild& b) const
 {
-   const std::string in = b.Input(mVector, b.Generated());
-   std::string p = b.NewVar(this, in + " * " + F(scale));
-   if (std::fabs(distortion) > 1e-6f)
+   const std::string in = b.Input(mIn[0], b.Generated());
+   std::string p = b.NewVar(this, in + " * " + PinScalar(b, mIn[1], scale));
+   // detail stays a knob: it is the octave count, fixed when the program is written
+   const bool distWired = mIn[3].IsConnected();
+   if (distWired || std::fabs(distortion) > 1e-6f)
       p = b.NewVar(this, p + " + vec3(noise3(" + p + " + vec3(13.5, 7.25, 3.75)), noise3(" + p +
-                            " + vec3(-5.5, 21.75, 9.25)), noise3(" + p + " + vec3(31.25, -11.5, 17.75))) * " + F(distortion));
-   const std::string tail = ", " + F(std::floor(std::max(detail, 0.0f)) + 1.0f) + ", 2.0, " + F(std::min(std::max(roughness, 0.0f), 1.0f)) + ")";
+                            " + vec3(-5.5, 21.75, 9.25)), noise3(" + p + " + vec3(31.25, -11.5, 17.75))) * " + PinScalar(b, mIn[3], distortion));
+   const std::string rough = mIn[2].IsConnected() ? "clamp(" + PinScalar(b, mIn[2], roughness) + ", 0.0, 1.0)"
+                                                  : F(std::min(std::max(roughness, 0.0f), 1.0f));
+   const std::string tail = ", " + F(std::floor(std::max(detail, 0.0f)) + 1.0f) + ", 2.0, " + rough + ")";
    auto value = [&](const std::string& at) { return "clamp(0.5 + 0.5 * fbm(" + at + tail + ", 0.0, 1.0)"; };
    if (output == kColour)
       return b.NewVar(this, "vec3(" + value(p) + ", " + value(p + " + vec3(47.5, 19.25, -23.75)") + ", " +
@@ -172,8 +190,8 @@ const std::vector<std::string>& ShadeVoronoiNode::OutputNames()
 
 std::string ShadeVoronoiNode::Emit(ShadeBuild& b) const
 {
-   const std::string in = b.Input(mVector, b.Generated());
-   const std::string c = b.NewVar(this, "voronoi3(" + in + " * " + F(scale) + ")");
+   const std::string in = b.Input(mIn[0], b.Generated());
+   const std::string c = b.NewVar(this, "voronoi3(" + in + " * " + PinScalar(b, mIn[1], scale) + ")");
    std::string v;
    switch (output)
    {
@@ -236,12 +254,11 @@ std::string ShadeGradientNode::Emit(ShadeBuild& b) const
 
 std::string ShadeBrickNode::Emit(ShadeBuild& b) const
 {
-   const std::string in = b.Input(mVector, b.Generated());
+   const std::string in = b.Input(mIn[0], b.Generated());
    const float w = std::max(width, 1e-3f), h = std::max(height, 1e-3f);
-   const std::string c1 = V3(SrgbToLinear(color1[0]), SrgbToLinear(color1[1]), SrgbToLinear(color1[2]));
-   const std::string c2 = V3(SrgbToLinear(color2[0]), SrgbToLinear(color2[1]), SrgbToLinear(color2[2]));
-   const std::string cm = V3(SrgbToLinear(mortarColor[0]), SrgbToLinear(mortarColor[1]), SrgbToLinear(mortarColor[2]));
-   const std::string p = b.NewVar(this, in + " * " + F(scale));
+   const std::string c1 = PinColour(b, mIn[1], color1), c2 = PinColour(b, mIn[2], color2);
+   const std::string cm = PinColour(b, mIn[3], mortarColor);
+   const std::string p = b.NewVar(this, in + " * " + PinScalar(b, mIn[4], scale));
    const std::string row = b.NewVar(this, "floor(" + p + ".y * " + F(1.0f / h) + ")");
    // every second row shifts by offset bricks; the row at 0 is a shifted one (measured on Cycles' brick texture)
    const std::string x = b.NewVar(this, p + ".x + " + F(w * offset) + " * mod(" + row + " + 1.0, 2.0)");
@@ -825,17 +842,24 @@ std::string ShadeCurvesNode::Emit(ShadeBuild& sb) const
 
 std::string ShadeBumpNode::Emit(ShadeBuild& b) const
 {
-   const std::string h = b.Input(mHeight, "");
-   if (!h.empty()) b.heights.push_back(h + ".x * " + FP(strength * distance * (invert ? -1.0f : 1.0f)));
-   return Vector(b, mNormal, "vec3(0.0, 0.0, 1.0)");
+   const std::string h = b.Input(mIn[0], "");
+   if (!h.empty())
+   {
+      if (mIn[2].IsConnected() || mIn[3].IsConnected())
+         b.heights.push_back(h + ".x * " + Scalar(b, mIn[2], strength) + " * " + Scalar(b, mIn[3], distance) + " * " + FP(invert ? -1.0f : 1.0f));
+      else
+         b.heights.push_back(h + ".x * " + FP(strength * distance * (invert ? -1.0f : 1.0f)));
+   }
+   return Vector(b, mIn[1], "vec3(0.0, 0.0, 1.0)");
 }
 
 std::string ShadeNormalMapNode::Emit(ShadeBuild& b) const
 {
    // Blender's strength: the normal leans from flat towards the map, N + (map - N) * strength, then unit length.
-   const std::string c = Vector(b, mColour, "vec3(0.5, 0.5, 1.0)");
+   const std::string c = Vector(b, mIn[0], "vec3(0.5, 0.5, 1.0)");
    const std::string t = Local(b, c + " * 2.0 - vec3(1.0)");
-   const std::string s = FP(strength);
+   // inline, never a local: a constant local would be hoisted out of a Pixel program
+   const std::string s = mIn[1].IsConnected() ? "(" + Scalar(b, mIn[1], strength) + ")" : FP(strength);
    return b.NewVar(this, "normalize(vec3(" + t + ".x * " + s + ", " + t + ".y * " + s + ", 1.0 + (" + t + ".z - 1.0) * " + s + "))");
 }
 

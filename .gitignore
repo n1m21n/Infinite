@@ -64,6 +64,7 @@ glyph-sheet.png
 /ui-audit/
 /crawl/
 tools/blender-ab/assets/bed/
+tools/blender-ab/assets/hand/
 
 # 2D View audit output and per-machine golden shots (tools/ui/golden_view2d.py)
 ui-audit-view2d/

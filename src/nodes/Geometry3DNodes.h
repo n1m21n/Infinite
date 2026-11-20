@@ -291,6 +291,8 @@ public:
    // Which of the render's lights reach this source, one bit per light. All of
    // them by default; only the 3D View's placed sources narrow it.
    virtual unsigned int LightMask() const { return ~0u; }
+   // Which of the render's lights this source blocks (shadow linking), one bit per light; all by default.
+   virtual unsigned int ShadowMask() const { return ~0u; }
 
    // The number this source writes into Render 3D's Object Index pass. 0 by
    // default, as in Blender; the 3D View's placed sources carry their own.
@@ -663,6 +665,7 @@ public:
       float intensity = 1.0f;
       int type = 0;
       float spotAngle = 45.0f, spotPenumbra = 0.2f, areaW = 1.0f, areaH = 1.0f;
+      int areaShape = 0; float areaSpread = 180.0f; // area: 0 rectangle / 1 disc; emission spread in degrees
       float aim[3] = { 0, -1, 0 };       // where a spot or area light points
       float diffuse = 1.0f, specular = 1.0f, transmission = 1.0f;
       float falloff = 0.25f;             // distance falloff; negative = hard (no soft core)
@@ -671,6 +674,7 @@ public:
       int shadowRes = 0;                 // 0 = the look's quality, else 1024 / 2048 / 4096
       float shadowClip = 0.05f;
       float cutoff = 0.0f;               // point, spot, area: no light past this distance; 0 = none
+      std::string ies;                   // point, spot: an IES profile file (row 4.2); empty = none
       // Everything above that the light node sets, from its params.
       void From(const class LightNode& n);
    };
@@ -717,6 +721,7 @@ public:
 
    size_t LastTriangleCount() const { return mLastTriangles; }
    size_t LastDrawCalls() const { return mLastDrawCalls; }
+   size_t LastGpuBytes() const { return mLastGpuBytes; } // engine path's device allocation (R18), 0 = none
    // Slots that had to re-upload this frame; 0 means everything came from cache.
    size_t LastUploads() const { return mLastUploads; }
 
@@ -837,6 +842,7 @@ public:
    float fogDensity = 0.0f;
    float fogColor[3] = { 0.9f, 0.9f, 0.9f };
    float fogAnisotropy = 0.0f;
+   float fogFalloff = 0.0f; // row 4.1: 0 fills the box evenly, 1 thins it to a soft puff toward the faces
    float fogMin[3] = { -1000.0f, -1000.0f, -1000.0f }, fogMax[3] = { 1000.0f, 1000.0f, 1000.0f };
    float dofRotation = 0.0f;
    float dofRatio = 1.0f;
@@ -910,7 +916,7 @@ public:
       v.Float("dofAperture", dofAperture); v.Float("focusDistance", focusDistance);
       v.Int("dofBlades", dofBlades); v.Float("dofRotation", dofRotation); v.Float("dofRatio", dofRatio);
       v.Float("dofCatEye", dofCatEye); v.Float("lensDistortion", lensDistortion); v.Float("lensCA", lensCA);
-      v.Float("fogDensity", fogDensity); v.Color("fogColor", fogColor); v.Float("fogAnisotropy", fogAnisotropy);
+      v.Float("fogDensity", fogDensity); v.Color("fogColor", fogColor); v.Float("fogAnisotropy", fogAnisotropy); v.Float("fogFalloff", fogFalloff);
       v.Float("fogMinX", fogMin[0]); v.Float("fogMinY", fogMin[1]); v.Float("fogMinZ", fogMin[2]);
       v.Float("fogMaxX", fogMax[0]); v.Float("fogMaxY", fogMax[1]); v.Float("fogMaxZ", fogMax[2]);
       v.Bool("floatOutput", floatOutput); v.Int("supersample", supersample);
@@ -1292,6 +1298,7 @@ private:
    float mLastFillClamp = 1.0f;
    size_t mLastTriangles = 0;
    size_t mLastDrawCalls = 0;
+   size_t mLastGpuBytes = 0;
    size_t mLastUploads = 0;
    bool mHasSceneBuilt = false;
    SceneSignature mSceneBuilt;

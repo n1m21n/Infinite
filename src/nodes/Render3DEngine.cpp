@@ -15,6 +15,8 @@
 
 #include "gl3.h"
 #include "engine/Scene.h"
+#include "engine/Ies.h"
+#include "platform/AppPaths.h"
 #include "engine/rhi/Rhi.h"
 #include <algorithm>
 #include <chrono>
@@ -525,6 +527,8 @@ bool Render3DNode::CookEngine(int frameId)
       engine::Instance in;
       in.mesh = (int)i;
       in.castShadow = src->CastsShadow();
+      in.unlitMask = (rig != nullptr && rig->hasLights) ? ~src->LightMask() : 0u; // row 4.2: bits in the rig's light order
+      in.noShadowMask = (rig != nullptr && rig->hasLights) ? ~src->ShadowMask() : 0u;
       const Material mat = src->GetMaterial();
       for (int k = 0; k < 3; k++)
          in.baseSrgb[k] = mat.color[k];
@@ -734,7 +738,7 @@ bool Render3DNode::CookEngine(int frameId)
       // a glass wall or a water drop a few millimetres thick is not stepped over; never more than the old fixed 3 mm.
       fr.rayBias = std::clamp(fr.focusDist * 1e-4f, 1e-5f, 0.003f);
       fr.dofAperture = ortho ? 0.0f : std::max(0.0f, dofAperture);
-      fr.fogDensity = std::max(0.0f, fogDensity); fr.fogAnisotropy = std::clamp(fogAnisotropy, -0.95f, 0.95f);
+      fr.fogDensity = std::max(0.0f, fogDensity); fr.fogAnisotropy = std::clamp(fogAnisotropy, -0.95f, 0.95f); fr.fogFalloff = std::clamp(fogFalloff, 0.0f, 1.0f);
       for (int k = 0; k < 3; k++) { fr.fogColor[k] = ColorSpace::SrgbToLinear(std::clamp(fogColor[k], 0.0f, 1.0f)); fr.fogMin[k] = fogMin[k]; fr.fogMax[k] = fogMax[k]; }
       fr.bokeh[0] = dofBlades >= 3 ? (float)std::min(dofBlades, 16) : 0.0f;
       fr.bokeh[1] = dofRotation * 3.14159265f / 180.0f;
@@ -746,6 +750,7 @@ bool Render3DNode::CookEngine(int frameId)
    }
 
    // Lights: rig, then light nodes, then the built-in one.
+   std::vector<const std::vector<float>*> iesUsed;
    auto addLight = [&](const RigLight& l)
    {
       if ((int)fr.lights.size() >= engine::kMaxLights)
@@ -757,6 +762,16 @@ bool Render3DNode::CookEngine(int frameId)
       e.diffuse = l.diffuse; e.specular = l.specular; e.cutoff = l.cutoff;
       e.castShadow = l.castShadow;
       e.areaW = std::max(0.001f, l.areaW); e.areaH = std::max(0.001f, l.areaH);
+      e.areaShape = l.areaShape; e.areaSpread = l.areaSpread;
+      // Row 4.2: an IES profile, its table appended to the frame's (one copy per file).
+      if (!l.ies.empty() && (e.type == engine::LightType::Point || e.type == engine::LightType::Spot))
+         if (auto tab = engine::LoadIes(AppPaths::FsPath(l.ies)))
+         {
+            int row = -1;
+            for (size_t k = 0; k < iesUsed.size(); k++) if (iesUsed[k] == tab.get()) row = (int)k;
+            if (row < 0) { row = (int)iesUsed.size(); iesUsed.push_back(tab.get()); fr.ies.insert(fr.ies.end(), tab->begin(), tab->end()); }
+            e.iesRow = row;
+         }
       // A sun's disc from the light's shadow softness, as GL sizes its shadow (0.526 degrees, the real sun, at 1).
       if (e.type == engine::LightType::Directional || e.type == engine::LightType::Sun) e.sunAngleDeg = 0.526f * std::max(0.0f, l.shadowSoft);
       fr.lights.push_back(e);
@@ -899,7 +914,7 @@ bool Render3DNode::CookEngine(int frameId)
    };
    mix(fr.viewProj, 64); mix(&fr.lensRadius, 8); mix(fr.bokeh, 12); mix(&fr.lensCatEye, 12); mix(&fr.bloom, 12); mix(&fr.exposure, 4); mix(fr.ambientSrgb, 12); mix(fr.clearSrgb, 12); mix(&fr.envIntensity, 4);
    mix(&fr.envRev, 8); mix(&fr.envRotationRad, 4); mix(&fr.envBackground, 1);
-   mix(&fr.fogDensity, 8); mix(fr.fogColor, 36);
+   mix(&fr.fogDensity, 12); mix(fr.fogColor, 36); // density, anisotropy, falloff; colour, box
    for (size_t ii = 0; ii < fr.instances.size(); ii++)
    {
       const engine::Instance& in = fr.instances[ii];
@@ -911,11 +926,18 @@ bool Render3DNode::CookEngine(int frameId)
       mix(&in.mapAo, 24); mix(&in.clearcoat, 4 * 7); mix(&in.mapSpace, 4); mix(in.mapScale, 4 * 9); mix(&in.triplanar, 8); mix(in.objLo, 24);
       mix(in.hairSigma, 20); mix(&in.hairFrom, 4); mix(&in.strandFrom, 4); mix(&in.subsurface, 20); mix(&in.iridescence, 12);
       { const int cs = in.castShadow ? 1 : 0; mix(&cs, 4); }
+      mix(&in.unlitMask, 4); mix(&in.noShadowMask, 4); // row 4.2: light and shadow linking
       mix(&in.fieldProgram, 4); mix(in.fieldParams, 64);
    }
    if (fieldUsesTime) mix(&fr.fieldTime, 4); // a program that reads t never settles
    for (const engine::TextureData& t : fr.textures) mix(&t.key, 8);
-   for (const engine::Light& l : fr.lights) { mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); const int cs = l.castShadow ? 1 : 0; mix(&cs, 4); }
+   for (const engine::Light& l : fr.lights)
+   {
+      mix(l.vec, 12); mix(l.colorSrgb, 12); mix(&l.intensity, 4); mix(l.aim, 12); const int cs = l.castShadow ? 1 : 0; mix(&cs, 4);
+      mix(&l.spotAngleDeg, 16); mix(&l.areaShape, 4); mix(&l.areaSpread, 4); mix(&l.diffuse, 8); mix(&l.falloff, 8);
+      mix(&l.sunAngleDeg, 4); mix(&l.iesRow, 4); { const int ty = (int)l.type; mix(&ty, 4); }
+   }
+   if (!fr.ies.empty()) mix(fr.ies.data(), fr.ies.size() * sizeof(float));
    const bool changed = hsh != E.sceneHash;
    E.sceneHash = hsh;
    if (changed || meshesChanged) E.upReset = true;
@@ -1048,15 +1070,21 @@ bool Render3DNode::CookEngine(int frameId)
       if (!liveRender(nullptr))
          return false;
    }
+   mLastGpuBytes = E.raster->GpuBytes();
+   mLastTriangles = 0;
+   mLastDrawCalls = fr.instances.size(); // one TLAS instance each (the raster's batching aside)
+   for (const engine::Instance& in : fr.instances)
+      if (in.mesh >= 0 && in.mesh < (int)mDraw.size())
+         mLastTriangles += mDraw[(size_t)in.mesh]->GetMesh().indices.size() / 3;
    // Export steps the counter by the warm-up count, so print every exported frame there.
    const bool profNow = sProf && ((E.frame % 30) == 0 || offline);
    if (profNow)
    {
       const auto tp3 = std::chrono::steady_clock::now();
       auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
-      std::fprintf(stderr, "ENGINE_PROF warmGpu=%.1f meshes=%.2f (changed %d, %zu tris) build=%.2f render=%.2f inst=%zu env=%dx%d lod=%.0f bg=%d conn=%d\n",
+      std::fprintf(stderr, "ENGINE_PROF warmGpu=%.1f meshes=%.2f (changed %d, %zu tris) build=%.2f render=%.2f inst=%zu env=%dx%d lod=%.0f bg=%d conn=%d gpuMB=%.0f\n",
                    E.profWarmGpu, ms(tp0, tp1), changedMeshes, changedTris, ms(tp1, tp2), ms(tp2, tp3), fr.instances.size(), fr.envW, fr.envH,
-                   fr.envBaseLod, (int)fr.envBackground, (int)envInput.IsConnected());
+                   fr.envBaseLod, (int)fr.envBackground, (int)envInput.IsConnected(), (double)mLastGpuBytes / 1048576.0);
       E.profWarmGpu = 0.0;
    }
 

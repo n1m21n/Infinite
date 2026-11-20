@@ -8,7 +8,9 @@
 // Set 1 (compute + fragment): 0 PtU, 1 lights, 2 emissive triangles, 3 per instance {first index, has uv},
 // 4 BVH triangles (3 vec4: v0 + instance, e1 + primitive, e2 + flags), 5 BVH nodes (2 vec4: lo + left / first,
 // hi + count, 0 = interior with children left, left + 1), 6 vertices (pos, normal), 7 indices (already global),
-// 8 uvs (per global vertex), 9 env CDF, 10 E LUT, 11-13 acc / aux / gd, 14-17 denoiser images, 18 histogram.
+// 8 uvs (per global vertex), 9 env CDF, 10 E LUT, 11-13 acc / aux / gd, 14-17 denoiser images, 18 histogram,
+// 19 the caustic photon grid (row 4.4; caus.comp fills it, pt.comp reads it). caus.comp's push constants: clr = the
+// glass's bounding sphere, bg = (cell side, photons a pass, pass index, light count).
 // Push constants (kHead's PC): pt: bg = (prior samples, frame); denoise: bg = (step, sigL, source); resolve:
 // bg = (samples, tonemap, exposure, denoised), clr = (clear sRGB, denoised image index).
 // Not ported (logged in AUTORUN.md): Field material programs, motion blur, instance clusters / batches, bloom.
@@ -42,12 +44,13 @@ layout(set = 1, binding = 15, rgba32f) uniform image2D dnC1;
 layout(set = 1, binding = 16, rgba32f) uniform image2D dnG;
 layout(set = 1, binding = 17, rgba32f) uniform image2D dnA;
 layout(std430, set = 1, binding = 18) buffer HistB { uint hist[64]; };
+layout(std430, set = 1, binding = 19) buffer CausB { uint caus[]; }; // row 4.4: the photon grid, 4 uints a cell
 )";
 
 const char* kTrace = R"(
 #define HAIR_ATAN2(y, x) atan(y, x)
 #define HAIR_OUT out float
-)" R3D_HAIR_SRC R"(
+)" R3D_HAIR_SRC R"( // areaOffset comes from kFragLib, which every compute shader already carries
 #define SSS_D 1.0
 struct Hit { float t; uint inst; uint prim; vec2 bc; };
 vec2 slab(vec3 lo, vec3 hi, vec3 o, vec3 inv, float tmax)
@@ -159,12 +162,15 @@ vec3 ptEvalT(vec3 n, vec3 V, vec3 L, vec3 base, float metal, float rough, vec3 f
    pdf = p.y * (-nL) / 3.14159265;
    return (vec3(1.0) - Fv) * (1.0 - metal) * base * (w.x / 3.14159265) * (-nL);
 }
-bool occludedAlpha(vec3 o, vec3 d, float tmax, float eps, inout uint seed)
+// Row 4.2 shadow linking: li >= 0 only for a light some object lets through; that object's bit li is set.
+bool noShadowBy(uint id, int li) { return li >= 0 && li < 32 && ((floatBitsToUint(inst[id].mat.noShadow) >> uint(li)) & 1u) != 0u; }
+bool occludedAlpha(vec3 o, vec3 d, float tmax, float eps, inout uint seed, int li)
 {
    for (int k = 0; k < 16; k++)
    {
       Hit h;
       if (!trace(o, d, tmax, true, h)) return false;
+      if (noShadowBy(h.inst, li)) { o += d * (h.t + eps); tmax -= h.t + eps; if (tmax <= 0.0) return false; continue; }
       float alpha = 1.0 - inst[h.inst].mat.clear;
       float mo = inst[h.inst].mat.mapOpacity;
       if (mo > 0.5)
@@ -185,8 +191,28 @@ bool occludedAlpha(vec3 o, vec3 d, float tmax, float eps, inout uint seed)
    }
    return true;
 }
-void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout vec3 ld, inout vec3 Le, inout float tmax, inout float pL, inout vec2 lterms)
+// Row 4.2 (MetalDevice.mm iesK): a point or spot light's IES factor, its table after the `count` lights in LL.
+float iesF(int k) { LightU r = LL[k / 20]; int c = k % 20; vec4 q = c < 4 ? r.vec : c < 8 ? r.aim : c < 12 ? r.color : c < 16 ? r.terms : r.spot; return q[c & 3]; }
+float iesK(int count, float row, vec3 axis, vec3 d)
 {
+   if (row < 0.5) return 1.0;
+   int base = count * 20 + (int(row + 0.5) - 1) * 512;
+   float th = acos(clamp(dot(d, axis), -1.0, 1.0)) * (31.0 / 3.14159265);
+   vec3 r = cross(vec3(0.0, 1.0, 0.0), axis);
+   r = dot(r, r) < 1e-4 ? vec3(1.0, 0.0, 0.0) : normalize(r);
+   float ph = atan(dot(d, r), -dot(d, cross(axis, r))) * (16.0 / 6.28318531);
+   if (ph < 0.0) ph += 16.0;
+   int v0 = min(int(th), 30), h0 = int(ph) & 15, h1 = (h0 + 1) & 15;
+   float fv = th - float(v0), fh = ph - floor(ph);
+   float a = mix(iesF(base + h0 * 32 + v0), iesF(base + h0 * 32 + v0 + 1), fv), b = mix(iesF(base + h1 * 32 + v0), iesF(base + h1 * 32 + v0 + 1), fv);
+   return max(mix(a, b, fh), 0.0);
+}
+// Row 4.2 light linking: light i does not light an object whose record has bit i of `unlit` set (lights 0..31).
+bool unlitBy(float unlit, int i) { return i < 32 && ((floatBitsToUint(unlit) >> uint(i)) & 1u) != 0u; }
+int gPickLi = -1; // row 4.4: caus.comp fixes the light it shoots from
+void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout vec3 ld, inout vec3 Le, inout float tmax, inout float pL, inout vec2 lterms, float unlit, inout int lix)
+{
+   lix = -1;
    if (nEm > 0 && rnd(seed) < pEm)
    {
       float r = rnd(seed);
@@ -206,9 +232,11 @@ void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout v
    }
    else if (count > 0)
    {
-      LightU Lt = LL[min(int(rnd(seed) * float(count)), count - 1)];
+      int li = min(int(rnd(seed) * float(count)), count - 1);
+      if (gPickLi >= 0) li = gPickLi;
+      LightU Lt = LL[li];
       int type = int(Lt.vec.w);
-      float atten = type == 3 ? 0.0 : 1.0;
+      float atten = (type == 3 || unlitBy(unlit, li)) ? 0.0 : 1.0;
       tmax = 1e4;
       if (type == 1 || type == 4 || type == 5)
       {
@@ -218,7 +246,9 @@ void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout v
             vec3 rgt = cross(vec3(0.0, 1.0, 0.0), Lt.aim.xyz);
             rgt = dot(rgt, rgt) < 1e-4 ? vec3(1.0, 0.0, 0.0) : normalize(rgt);
             vec3 upv = cross(Lt.aim.xyz, rgt);
-            lp += rgt * ((rnd(seed) - 0.5) * Lt.spot.z) + upv * ((rnd(seed) - 0.5) * Lt.spot.w);
+            float u1 = rnd(seed), u2 = rnd(seed);
+            vec3 ao = areaOffset(Lt.spot.x, u1, u2);
+            lp += rgt * (ao.x * Lt.spot.z) + upv * (ao.y * Lt.spot.w);
          }
          vec3 tl = lp - p; float dist = length(tl);
          ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
@@ -232,7 +262,8 @@ void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout v
             if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
             atten *= sa;
          }
-         if (type == 5) atten *= max(dot(-ld, Lt.aim.xyz), 0.0);
+         if (type == 5) { float cl = dot(-ld, Lt.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(Lt.spot.y, cl); }
+         else atten *= iesK(count, Lt.spot.w, Lt.aim.xyz, -ld);
       }
       else
       {
@@ -248,6 +279,7 @@ void ptPickLight(int nEm, float pEm, int count, vec3 p, inout uint seed, inout v
       Le = Lt.color.xyz * atten * (float(count) / max(1.0 - pEm, 1e-3));
       lterms = Lt.terms.xy;
       if (Lt.color.w > 0.5) pL = -2.0;
+      if (Lt.color.w < -0.5) lix = li;
    }
 }
 vec3 envPick(vec2 u, out float pdf)
@@ -284,11 +316,26 @@ vec2 boxSpan(vec3 lo, vec3 hi, vec3 o, vec3 d, float tmax)
    return vec2(max(max(l.x, l.y), max(l.z, 0.0)), min(min(h.x, h.y), min(h.z, tmax)));
 }
 vec2 fogSpan(vec3 o, vec3 d, float tmax) { return boxSpan(pu.fogLo.xyz, pu.fogHi.xyz, o, d, tmax); }
+// Row 4.1 (mirrors MetalDevice.mm): the medium's shape, and the optical depth through it.
+float fogShape(vec3 p)
+{
+   if (pu.fog.z <= 0.0) return 1.0;
+   vec3 c = 0.5 * (pu.fogLo.xyz + pu.fogHi.xyz), h = max(0.5 * (pu.fogHi.xyz - pu.fogLo.xyz), vec3(1e-4));
+   return mix(1.0, max(1.0 - length((p - c) / h), 0.0), pu.fog.z);
+}
+float fogDepth(vec3 o, vec3 d, vec2 s)
+{
+   float len = max(s.y - s.x, 0.0);
+   if (pu.fog.z <= 0.0 || len <= 0.0) return pu.fog.x * len;
+   float st = len / 16.0, acc = 0.0;
+   for (int k = 0; k < 16; k++) acc += fogShape(o + d * (s.x + (float(k) + 0.5) * st));
+   return pu.fog.x * acc * st;
+}
 float fogTr(vec3 o, vec3 d, float tmax)
 {
    if (pu.fog.x <= 0.0) return 1.0;
    vec2 s = fogSpan(o, d, tmax);
-   return exp(-pu.fog.x * max(s.y - s.x, 0.0));
+   return exp(-fogDepth(o, d, s));
 }
 vec3 hgSample(vec3 w, float g, float u1, float u2)
 {
@@ -338,6 +385,41 @@ void roulette(int b, inout vec3 T, inout uint seed, inout bool dead)
    float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95);
    if (rnd(seed) > q) { dead = true; return; }
    T /= q;
+}
+// Row 4.4: MetalDevice.mm's photon grid (causKey / causGet / causAdd), the same cells and fixed point.
+const uint kCausCells = 1u << 19;
+uint causKey(vec3 p, vec3 n, float h, vec2 jit)
+{
+   vec3 an = abs(n);
+   int a = an.x >= an.y && an.x >= an.z ? 0 : (an.y >= an.z ? 1 : 2);
+   int ua = a == 0 ? 1 : 0, va = a == 2 ? 1 : 2;
+   ivec3 c = ivec3(int(floor(p[ua] / h + jit.x)), int(floor(p[va] / h + jit.y)), int(floor(p[a] / (4.0 * h) + 0.5)));
+   uint side = uint(a) * 2u + (n[a] < 0.0 ? 1u : 0u);
+   return pcg(uint(c.x) * 73856093u ^ pcg(uint(c.y) * 19349663u ^ pcg(uint(c.z) * 83492791u + side))) | 1u;
+}
+float causAxisCos(vec3 n) { vec3 an = abs(n); return max(an.x, max(an.y, an.z)); }
+vec3 causGet(uint key)
+{
+   uint s = pcg(key ^ 0x9e3779b9u) & (kCausCells - 1u);
+   for (int t = 0; t < 8; t++, s = (s + 1u) & (kCausCells - 1u))
+   {
+      uint k = caus[s * 4u];
+      if (k == key) return vec3(caus[s * 4u + 1u], caus[s * 4u + 2u], caus[s * 4u + 3u]) * (1.0 / 4096.0);
+      if (k == 0u) break;
+   }
+   return vec3(0.0);
+}
+void causAdd(uint key, vec3 e)
+{
+   uint s = pcg(key ^ 0x9e3779b9u) & (kCausCells - 1u);
+   for (int t = 0; t < 8; t++, s = (s + 1u) & (kCausCells - 1u))
+   {
+      uint k = atomicCompSwap(caus[s * 4u], 0u, key);
+      if (k != 0u && k != key) continue;
+      uvec3 q = uvec3(clamp(e * 4096.0, vec3(0.0), vec3(16777216.0)));
+      for (int c = 0; c < 3; c++) if (q[c] > 0u) atomicAdd(caus[s * 4u + 1u + uint(c)], q[c]);
+      return;
+   }
 }
 )";
 
@@ -404,16 +486,22 @@ void main()
       {
          vec2 sp = fogSpan(o, d, hitAny ? h.t : 1e4);
          float s = sp.x - log(max(1.0 - rnd(seed), 1e-12)) / pu.fog.x;
+         if (pu.fog.z > 0.0)
+            for (int g = 0; g < 64 && sp.y > sp.x && s < sp.y; g++)
+            {
+               if (rnd(seed) < fogShape(o + d * s)) break;
+               s -= log(max(1.0 - rnd(seed), 1e-12)) / pu.fog.x;
+            }
          if (sp.y > sp.x && s < sp.y)
          {
             vec3 pm = o + d * s;
             if (b == 0) { cov = 1.0; alb0 = pu.fogC.xyz; n0 = -d; dist0 = s; }
             T *= pu.fogC.xyz;
-            vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0);
-            ptPickLight(nEm, pEm, count, pm, seed, ld, Le, tmax, pL, lterms);
+            vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0); int lix = -1;
+            ptPickLight(nEm, pEm, count, pm, seed, ld, Le, tmax, pL, lterms, 0.0, lix);
             if (anyPos(Le))
             {
-               if (pL > -1.5 && occludedAlpha(pm, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (pL > -1.5 && occludedAlpha(pm, ld, tmax, f.shQ.w, seed, lix)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                float ph = hgPhase(dot(ld, d), pu.fog.y);
                L += T * ph * Le * lterms.x * fogTr(pm, ld, tmax) * (pL > 0.0 ? pL / max(pL * pL + ph * ph, 1e-20) : 1.0);
             }
@@ -560,18 +648,23 @@ void main()
          o = p + (thru ? -ns : ns) * f.shQ.w; d = normalize(nd);
          continue;
       }
+      if (pu.em.w > 0.0 && metal < 1.0 && !hairM)
+      {
+         vec3 Ec = causGet(causKey(p, ns, pu.em.w, vec2(rnd(seed), rnd(seed)) - 0.5)); // row 4.4: the photons' irradiance
+         if (anyPos(Ec)) L += T * (vec3(1.0) - ptF(nDotV, f0)) * (1.0 - metal) * base * (1.0 / 3.14159265) * Ec;
+      }
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w;
       for (int i = 0; i < count; i++)
-         if (int(LL[i].vec.w) == 3) L += T * base * (1.0 - metal) * LL[i].color.xyz * LL[i].terms.x;
-      vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0);
-      ptPickLight(nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms);
+         if (int(LL[i].vec.w) == 3 && !unlitBy(inst[iid].mat.unlit, i)) L += T * base * (1.0 - metal) * LL[i].color.xyz * LL[i].terms.x;
+      vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0); int lix = -1;
+      ptPickLight(nEm, pEm, count, p, seed, ld, Le, tmax, pL, lterms, inst[iid].mat.unlit, lix);
       float hH = hairM ? rnd(seed) * 2.0 - 1.0 : 0.0;
       float hBm = clamp(inst[iid].mat.roughness, 0.02, 1.0), hBn = -inst[iid].mat.hairRadialNeg;
       vec3 hSig = inst[iid].mat.hairSigma; float hShift = inst[iid].mat.hairShift, mIor = inst[iid].mat.ior;
       float ccRough = clamp(inst[iid].mat.coatRoughness, 0.02, 1.0);
       if ((hairM || (dot(n, ld) > 1e-5 && dot(ns, ld) > 0.0) || (dm == 2 && dot(n, ld) < -1e-5 && dot(ns, ld) < 0.0)) && anyPos(Le))
       {
-         if (pL > -1.5 && occludedAlpha(p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         if (pL > -1.5 && occludedAlpha(p + (dot(ns, ld) < 0.0 ? -ns : ns) * f.shQ.w, ld, tmax, f.shQ.w, seed, lix)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          Le *= fogTr(p, ld, tmax);
          float pB = 0.0;
          vec3 fe;
@@ -614,7 +707,7 @@ void main()
                fe = fe * (1.0 - cP) + (eL > 0.0 ? vec3(ccW * coatSpec(cnH, nDotV, max(eL, 1e-4), cvH, ccRough) * eL) : vec3(0.0));
                pBm = cP * (eL > 0.0 ? distGGX(cnH, ccRough) * cnH / (4.0 * cvH) : 0.0) + (1.0 - cP) * pB;
             }
-            if (anyPos(fe) && !occludedAlpha(p + (dot(ns, ed) < 0.0 ? -ns : ns) * f.shQ.w, ed, 1e4, f.shQ.w, seed))
+            if (anyPos(fe) && !occludedAlpha(p + (dot(ns, ed) < 0.0 ? -ns : ns) * f.shQ.w, ed, 1e4, f.shQ.w, seed, -1))
                L += T * fe * sampleEnv(ed, 0.0) * fogTr(p, ed, 1e4) * (pE / max(pE * pE + pBm * pBm, 1e-20));
          }
       }
@@ -651,7 +744,11 @@ void main()
             vec3 A = clamp(base, 0.0, 0.999);
             vec3 qa = 4.09712 + 4.20863 * A - sqrt(9.59217 + 41.6808 * A + 17.7126 * A * A);
             vec3 alb = 1.0 - qa * qa;
-            vec3 wp = p - ns * f.shQ.w, wd = cosineDir(-ns, rnd(seed), rnd(seed));
+            vec3 eH = ggxSampleH(ns, max(0.002, rough * rough), rnd(seed), rnd(seed));
+            float eci = dot(V, eH), ene = 1.0 / clamp(inst[iid].mat.ior, 1.01, 3.8);
+            vec3 wd = eci > 0.0 ? -ene * V + (ene * eci - sqrt(max(1.0 - ene * ene * (1.0 - eci * eci), 1e-14))) * eH : ns;
+            if (dot(ns, wd) >= 0.0) break;
+            vec3 wp = p - ns * f.shQ.w;
             bool wout = false; vec3 q = p, no = ns;
             for (int s = 0; s < 256 && !wout; s++)
             {
@@ -683,12 +780,12 @@ void main()
             }
             if (!wout) break;
             T *= min(Tw, vec3(8.0));
-            vec3 eld = vec3(0.0, 1.0, 0.0), eLe = vec3(0.0); float etm = 0.0, epL = -1.0; vec2 elt = vec2(1.0);
-            ptPickLight(nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt);
+            vec3 eld = vec3(0.0, 1.0, 0.0), eLe = vec3(0.0); float etm = 0.0, epL = -1.0; vec2 elt = vec2(1.0); int elix = -1;
+            ptPickLight(nEm, pEm, count, q, seed, eld, eLe, etm, epL, elt, inst[iid].mat.unlit, elix);
             float ec = dot(no, eld);
             if (ec > 1e-5 && anyPos(eLe))
             {
-               if (epL > -1.5 && occludedAlpha(q + no * f.shQ.w, eld, etm, f.shQ.w, seed)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (epL > -1.5 && occludedAlpha(q + no * f.shQ.w, eld, etm, f.shQ.w, seed, elix)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                float epB = ec / 3.14159265;
                L += T * (epB * elt.x) * eLe * (epL > 0.0 ? epL / max(epL * epL + epB * epB, 1e-20) : 1.0);
             }
@@ -745,6 +842,70 @@ void main()
    imageStore(accI, px, (add ? imageLoad(accI, px) : vec4(0.0)) + vec4(L, cov));
    imageStore(auxI, px, (add ? imageLoad(auxI, px) : vec4(0.0)) + vec4(alb0 * cov, cov > 0.0 ? lum * lum : 0.0));
    imageStore(gdI, px, (add ? imageLoad(gdI, px) : vec4(0.0)) + vec4(n0 * cov, dist0 * cov));
+}
+)";
+
+// caus_fs as a compute kernel (row 4.4): one photon a thread, 256 x 256 a pass, from a light toward the glass's
+// bounding disc, through its reflections and refractions, into the grid at the first other surface.
+const char* kCausMain = R"(
+layout(local_size_x = 8, local_size_y = 8) in;
+void main()
+{
+   uvec2 px = gl_GlobalInvocationID.xy;
+   uint id = px.x + 256u * px.y;
+   uint seed = pcg(id * 747796405u + 1u) ^ pcg(uint(pc.bg.z) * 2654435761u + 7u);
+   int count = int(pc.bg.w + 0.5);
+   if (count <= 0) return;
+   int li = min(int(rnd(seed) * float(count)), count - 1);
+   LightU Lt = LL[li];
+   int type = int(Lt.vec.w);
+   if (type == 3 || Lt.color.w > 0.5) return;
+   vec4 c = pc.clr;
+   vec3 axis = (type == 1 || type == 4 || type == 5) ? normalize(Lt.vec.xyz - c.xyz) : normalize(Lt.vec.xyz);
+   vec3 ax = abs(axis.y) < 0.99 ? normalize(cross(axis, vec3(0.0, 1.0, 0.0))) : vec3(1.0, 0.0, 0.0), ay = cross(axis, ax);
+   float rr = c.w * sqrt(rnd(seed)), ph = 6.28318530718 * rnd(seed);
+   vec3 xd = c.xyz + (ax * cos(ph) + ay * sin(ph)) * rr;
+   vec3 ld = vec3(0.0, 1.0, 0.0), Le = vec3(0.0); float tmax = 0.0, pL = -1.0; vec2 lterms = vec2(1.0); int lix = -1;
+   gPickLi = li;
+   ptPickLight(0, 0.0, count, xd, seed, ld, Le, tmax, pL, lterms, 0.0, lix);
+   if (!anyPos(Le)) return;
+   float h = pc.bg.x;
+   vec3 T = Le / float(count) * lterms.x * max(dot(ld, axis), 0.0) * (3.14159265 * c.w * c.w) * float(count) / pc.bg.y;
+   vec3 o = xd + ld * min(tmax, 100.0), d = -ld;
+   bool spec = false;
+   for (int b = 0; b < 8; b++)
+   {
+      Hit hh;
+      if (!trace(o, d, 1e4, false, hh)) break;
+      uint iid = hh.inst;
+      uvec3 ix = triIx(iid, hh.prim);
+      vec3 w3 = vec3(1.0 - hh.bc.x - hh.bc.y, hh.bc.x, hh.bc.y);
+      vec3 n = normalize((inst[iid].normalM * vec4(vN(ix.x) * w3.x + vN(ix.y) * w3.y + vN(ix.z) * w3.z, 0.0)).xyz);
+      bool backHit = dot(n, d) > 0.0;
+      if (backHit) n = -n;
+      vec3 p = o + d * hh.t;
+      if (noShadowBy(iid, Lt.color.w < -0.5 ? li : -1)) { o = p - n * f.shQ.w; continue; }
+      float metal = clamp(inst[iid].mat.metallic, 0.0, 1.0);
+      float glW = clamp(inst[iid].mat.transmission, 0.0, 1.0) * (1.0 - metal);
+      if (glW > 0.0 && rnd(seed) < glW)
+      {
+         float rgh = clamp(inst[iid].mat.roughness, 0.0, 1.0), ta = max(0.002, rgh * rgh);
+         vec3 V = -d, Hm = ggxSampleH(n, ta, rnd(seed), rnd(seed));
+         float cosI = dot(V, Hm);
+         if (cosI <= 1e-5) break;
+         float ior = max(inst[iid].mat.ior, 1.0001), eta = backHit ? ior : 1.0 / ior;
+         vec3 nd; bool thru = false;
+         if (rnd(seed) < ptFd(cosI, eta)) { nd = reflect(d, Hm); if (dot(n, nd) <= 0.0) break; }
+         else { nd = refract(d, Hm, eta); if (dot(nd, nd) < 1e-6 || dot(n, nd) >= 0.0) break; T *= inst[iid].mat.base * (eta * eta); thru = true; }
+         float gV = max(abs(dot(n, V)), 1e-4), gL = max(abs(dot(n, nd)), 1e-4), gH = max(dot(n, Hm), 1e-4);
+         T *= min(cosI * ptG1(gV, ta) * ptG1(gL, ta) / (gV * gH), 4.0);
+         o = p + (thru ? -n : n) * f.shQ.w; d = normalize(nd); spec = true;
+         continue;
+      }
+      if (inst[iid].mat.clear > 0.0 && rnd(seed) < inst[iid].mat.clear) { o = p - n * f.shQ.w; continue; }
+      if (spec) causAdd(causKey(p, n, h, vec2(0.0)), T * causAxisCos(n) / (h * h));
+      break;
+   }
 }
 )";
 

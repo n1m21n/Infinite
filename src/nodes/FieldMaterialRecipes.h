@@ -46,6 +46,35 @@ dust = vec3(0.60, 0.57, 0.52);
 base = mix(surface, dust, d);
 roughness = mix(0.3, 1.0, d);)FLD")
 
+// ---- row 5.1: weathering ----
+
+FLD_RECIPE("Rust", R"FLD(# Rust: bare steel corrodes first at sharp edges (curvature) and in damp cavities, patchy by fbm;
+# the scale is a rough orange-brown oxide, no longer metal.
+param float amount = 1.0 [0.0, 1.0];
+param float edge = 4.0 [0.0, 20.0];
+param float spread = 6.0 [0.5, 16.0];
+param float scale = 10.0 [1.0, 40.0];
+n = fbm(P * scale, 4.0, 2.0, 0.5) * 0.5 + 0.5;
+e = clamp((curvature - edge) / 4.0, 0.0, 1.0);
+c = clamp(cavity * spread, 0.0, 1.0);
+r = clamp(max(e, c) * (0.3 + n) * 1.5, 0.0, 1.0) * amount;
+steel = vec3(0.56, 0.56, 0.55);
+oxide = vec3(0.30, 0.11, 0.04);
+base = mix(steel, oxide, r);
+metallic = 1.0 - r;
+roughness = mix(0.35, 0.85, r);)FLD")
+
+FLD_RECIPE("Wet", R"FLD(# Wet: water soaks a porous surface up to a line (object height, metres), wicking higher in cavities;
+# wet stone darkens and the water film turns it glossy.
+param float level = 0.4 [-2.0, 4.0];
+param float band = 0.05 [0.005, 0.5];
+param float fill = 0.5 [0.0, 2.0];
+h = P.y - cavity * fill;
+w = 1.0 - smoothstep(level - band, level + band, h);
+dry = vec3(0.55, 0.45, 0.35);
+base = dry * mix(1.0, 0.45, w);
+roughness = mix(0.8, 0.05, w);)FLD")
+
 // ---- row 3.5: surfaces. Each REALISM line is the measured range the defaults sit in. P is object space, metres. ----
 
 FLD_RECIPE("Leather", R"FLD(# Leather: pebble grain = voronoi crackle (creases between cells) + fbm (hide variation).

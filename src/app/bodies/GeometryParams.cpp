@@ -1,12 +1,24 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
+#include <algorithm>
+#include <cmath>
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
+   // Log taper for controls that span macro (sub-millimetre) to room scale: equal travel per decade.
+   static float LogPosToValue(float pos01, float minV, float maxV)
+   {
+      return minV * std::pow(maxV / minV, std::clamp(pos01, 0.0f, 1.0f));
+   }
+   static float LogValueToPos(float value, float minV, float maxV)
+   {
+      return std::log(std::max(value, minV) / minV) / std::log(maxV / minV);
+   }
    inline const std::vector<std::string> kAxisXYZ = { "x", "y", "z" };
 
    // The pose and IK sections every rigged node shows (Model 3D, Armature):
@@ -457,6 +469,23 @@ namespace app
       // picked from an input rather than authored here, since editing colour
       // and shading now lives on the dedicated Material node.
       ModSliderInt("material from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
+   }
+
+
+   void DrawGroup3DParams(Group3DNode* n)
+   {
+      ModSlider("move x", &n->offsetX, -3.0f, 3.0f);
+      ModSlider("move y", &n->offsetY, -3.0f, 3.0f);
+      ModSlider("move z", &n->offsetZ, -3.0f, 3.0f);
+      ModSlider("rotate x", &n->rotX, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("rotate y", &n->rotY, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("rotate z", &n->rotZ, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("scale", &n->scale, 0.05f, 4.0f);
+      ImGui::BeginDisabled(n->rotX == 0.0f && n->rotY == 0.0f && n->rotZ == 0.0f && n->scale == 1.0f && !gParamRegisterOnly);
+      ModSlider("pivot x", &n->pivotX, -3.0f, 3.0f);
+      ModSlider("pivot y", &n->pivotY, -3.0f, 3.0f);
+      ModSlider("pivot z", &n->pivotZ, -3.0f, 3.0f);
+      ImGui::EndDisabled();
    }
 
 
@@ -1313,7 +1342,7 @@ namespace app
    void DrawDistributePointsOnFacesParams(DistributePointsOnFacesNode* n)
    {
       ImGui::TextDisabled("%zu points", n->PointCount());
-      ModSlider("density", &n->density, 1.0f, 500.0f);
+      ModSlider("density", &n->density, 1.0f, 20000.0f, "%.0f", kParamWidth, false, 0.0f, LogPosToValue, LogValueToPos);
       DropdownButton("method", DistributePointsOnFacesNode::MethodNames(), n->method,
                      [n](int i) { n->method = i; });
       if (n->method == MeshOps::kDistributePoisson)
@@ -1849,7 +1878,7 @@ namespace app
             ModSlider("smooth", &n->smooth, 0.0f, 2.0f);
             break;
          case GeometryOpNode::kSolidify:
-            ModSlider("thickness", &n->thickness, 0.001f, 0.5f);
+            ModSlider("thickness", &n->thickness, 0.0001f, 0.5f, "%.4f", kParamWidth, false, 0.0f, LogPosToValue, LogValueToPos);
             ModCheckbox("keep original", &n->keepOriginal);
             break;
          case GeometryOpNode::kExtrude:
@@ -2369,7 +2398,7 @@ namespace app
       DropdownButton("points from", InstanceOnPointsNode::SourceNames(), n->pointMode,
                      [n](int i) { n->pointMode = i; });
       ModSliderInt("max points", &n->maxPoints, 1, 20000);
-      ModSlider("scale", &n->instanceScale, 0.005f, 1.0f);
+      ModSlider("scale", &n->instanceScale, 0.0005f, 1.0f, "%.4f", kParamWidth, false, 0.0f, LogPosToValue, LogValueToPos);
       ModSlider("scale random", &n->scaleRandom, 0.0f, 1.0f);
       ModSlider("rotation random", &n->rotationRandom, 0.0f, 1.0f);
       ModSlider("normal offset", &n->normalOffset, -0.5f, 0.5f);
@@ -2458,6 +2487,26 @@ namespace app
       ImGui::BeginDisabled(n->type != 5);
       ModSlider("width", &n->areaWidth, 0.05f, 10.0f);
       ModSlider("height", &n->areaHeight, 0.05f, 10.0f);
+      { static const std::vector<std::string> kShapes = { "Rectangle", "Disc" };
+        DropdownButton("shape", kShapes, n->areaShape, [n](int i) { n->areaShape = i; }); }
+      ModSlider("spread", &n->areaSpread, 1.0f, 180.0f, "%.0f\xC2\xB0");
+      ImGui::EndDisabled();
+      // Row 4.2: point and spot take an IES profile; the button names the file once one is set.
+      ImGui::BeginDisabled(!(n->type == 1 || n->type == 4));
+      {
+         const bool has = !n->iesFile.empty();
+         const std::string label = has ? AppPaths::FsPath(n->iesFile).filename().u8string() : std::string("IES profile...");
+         if (ActionButton::Draw(label.c_str(), ImVec2(has ? kPreviewSize * 0.7f : kPreviewSize, 0)))
+         {
+            const std::string path = Platform::OpenIesDialog();
+            if (!path.empty()) { PushUndoCheckpoint(); n->iesFile = path; }
+         }
+         if (has)
+         {
+            ImGui::SameLine();
+            if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * 0.28f, 0))) { PushUndoCheckpoint(); n->iesFile.clear(); }
+         }
+      }
       ImGui::EndDisabled();
       ColorSwatch("colour", n->color, n);
       ModCheckbox("temperature", &n->useTemperature);
@@ -2596,12 +2645,15 @@ namespace app
       const int connected = (int)n->FlattenedGeometry().size();
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
       ImGui::SameLine(0.0f, 16.0f);
-      ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
+      if (n->LastGpuBytes() > 0)
+         ImGui::TextDisabled("%zu triangles in %zu draw calls, %.0f MB GPU", n->LastTriangleCount(), n->LastDrawCalls(), (double)n->LastGpuBytes() / 1048576.0);
+      else
+         ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
       {
          // The count changes every frame; pad to a fixed worst-case width so the node body doesn't resize with the digits.
          const ImVec2 textMin = ImGui::GetItemRectMin();
          const ImVec2 textSize = ImGui::GetItemRectSize();
-         const float fixedW = ImGui::CalcTextSize("00000000 triangles in 000 draw calls").x;
+         const float fixedW = ImGui::CalcTextSize(n->LastGpuBytes() > 0 ? "00000000 triangles in 000 draw calls, 0000 MB GPU" : "00000000 triangles in 000 draw calls").x;
          if (textSize.x < fixedW)
          {
             ImGui::SetCursorScreenPos(ImVec2(textMin.x + textSize.x, textMin.y));
@@ -2884,11 +2936,12 @@ namespace app
       {
          ColorSwatch("fog colour", n->fogColor, n);
          ModSlider("fog anisotropy", &n->fogAnisotropy, -0.95f, 0.95f, "%.2f", colW);
+         ModSlider("fog falloff", &n->fogFalloff, 0.0f, 1.0f, "%.2f", colW);
          ImGui::SetNextItemWidth(colW); ImGui::DragFloat3("fog min", n->fogMin, 0.05f, -1000.0f, 1000.0f, "%.2f");
          ImGui::SetNextItemWidth(colW); ImGui::DragFloat3("fog max", n->fogMax, 0.05f, -1000.0f, 1000.0f, "%.2f");
       }
       ImGui::BeginDisabled(n->PanoActive()); // a panorama has no focal plane
-      ModSlider("depth of field", &n->dofAperture, 0.0f, 4.0f, "%.3f", colW);
+      ModSlider("depth of field", &n->dofAperture, 0.0f, 16.0f, "%.3f", colW);   // 16: a 100 mm macro at f/2.8
       ImGui::EndDisabled();
       hideBegin(8, 0, {});   // focus distance, aperture x3, cat eye, distortion, CA, offline supersample
       ImGui::BeginDisabled(n->dofAperture <= 0.0f || n->PanoActive());

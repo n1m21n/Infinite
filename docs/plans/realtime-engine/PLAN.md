@@ -121,22 +121,22 @@ every step; keep a change only if it measures better.
 
 | # | Step | Source | Gate | Kind |
 |---|---|---|---|---|
-| 4.1 | Volumes: homogeneous in settle, then live/raster, then grids (Field Pixel 3D density) | DESIGN G1 | three volume cases at the path gates | **owner** |
-| 4.2 | Light shapes, IES profiles, light linking | DESIGN G8 | one case each | **owner** |
+| 4.1 | Volumes: homogeneous in settle, then live/raster, then grids (Field Pixel 3D density) | DESIGN G1 | three volume cases at the path gates | shaped fog (falloff) + raster fog + multi-scatter gain done 2026-11-19; settle haze 0.062; live fog scatters the room's bounce light 2026-11-20 (shaft .123, haze .146, both under the 0.15 live gate); grids open (Volume 3D output: owner) |
+| 4.2 | Light shapes, IES profiles, light linking | DESIGN G8 | one case each | shapes + spread done 2026-11-19 (light_disc, light_spread); IES done 2026-11-19 (light_ies); linking + shadow linking done 2026-11-19 (self-test, R/L/T) |
 | 4.3 | Sky + atmosphere | REALISM R15 | sky cases ≤ 0.05 settle | **owner** |
-| 4.4 | Caustics in settle | DESIGN G3 | caustic cases ≤ 0.08 | fix |
-| 4.5 | Micro-displacement in settle | REALISM R4 | `tex_perforated` settle ≤ 0.05 | enh |
+| 4.4 | Caustics in settle | DESIGN G3 | caustic cases ≤ 0.08 | done 2026-11-19: photon pass into a hash grid (caustic_glass_sphere .045, caustic_pool .076); live/raster none by design |
+| 4.5 | Micro-displacement in settle | REALISM R4 | `tex_perforated` settle ≤ 0.05 | done (built as old row 4.3: bump map tessellated into the BLAS); re-measured 2026-11-19 settle 0.031 |
 
 ### Phase 5: worlds and content
 
 | # | Step | Source | Gate | Kind |
 |---|---|---|---|---|
-| 5.1 | Weathering presets on layers: dust in cavities, rust at edges, wet below a line (Field Modifier writes masks) | REALISM R9 | one case each | content |
+| 5.1 | Weathering presets on layers: dust in cavities, rust at edges, wet below a line (Field Modifier writes masks) | REALISM R9 | one case each | done 2026-11-19: Rust + Wet Material recipes join Edge Wear / Dirt / Dust (row 4.5); weather_rust settle .037, weather_wet .037; snow and moss open |
 | 5.2 | Fibre sheen, car-paint flakes | REALISM R5, R11 | their cases | **owner** |
 | 5.3 | Scanned-set drop import, albedo library, stochastic tiling | REALISM R6–R8 | drop builds the same Material as by hand | **owner** |
-| 5.4 | Skin | REALISM R10 | skin case | enh |
-| 5.5 | Vegetation and cities by rules (Sketch 3D, Field Primitive scatter, instances) | REALISM R12, R18 | memory and frame budgets | enh |
-| 5.6 | Photo cases: the shoe, a hand, a sunlit room, a street at night | REALISM §2, §5 | photo match per case | content |
+| 5.4 | Skin | REALISM R10 | skin case | done 2026-11-19: settle random walk now enters as Cycles' Random Walk (incoming ray refracted at the IOR through a GGX microfacet, alpha = roughness^2) instead of a cosine; skin_head settle .078 -> .047, mat_subsurface .074 -> .069; coat second lobe already matched (no-SSS .022); live .123 / raster .127 pass but keep the wrap look (no ear glow) until G5 |
+| 5.5 | Vegetation and cities by rules (Sketch 3D, Field Primitive scatter, instances) | REALISM R12, R18 | memory and frame budgets | done 2026-11-19 (memory gate met; live frame open): Sketch 3D "City block" preset, Render 3D readout of triangles, instances and Metal GPU MB, tools/scale-budget. 1080p M2: city live 55 ms / 448 MB, forest (1,601 trees, 21 M tris) live 637 ms / 453 MB, settle 16 spp 1.8 s / 9.6 s at 519 / 524 MB, all far under the 8 GB GPU share. Mesh LOD tried and dropped: -6 % for 0.015 picture change; the forest cost is rays through overlapping tree bounds (scales with pixels), so it goes to SPEED_PLAN S2.3 |
+| 5.6 | Photo cases: the shoe, a hand, a sunlit room, a street at night | REALISM §2, §5 | photo match per case | done 2026-11-19 (all four met in settle): tools/blender-ab/photo_match.py (contrast, histogram, 1-16 px detail, per quadrant), photo_shoe / photo_hand / photo_room / photo_street cases, hand_build.py. Settle FLIP / photo distance: shoe .037 / .078, hand .081 / .087, room .073 / .049, street .140 / .218. The shoe's old .41 was the Cycles truth: a fog box face lying on the floor breaks Cycles' volume stack; the truth now pulls the box in by 0.2 % |
 | 5.7 | R5–R7 after Milestone 1: per-copy colour, splats, sound through the same BVH | README 12 | go/no-go after the demo | **owner** |
 
 ---

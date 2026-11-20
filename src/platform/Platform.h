@@ -121,6 +121,8 @@ namespace Platform
    // do not recognise .hdr, so this needs its own panel rather than reusing
    // OpenImageDialog - the same reason OpenModelDialog is separate from it.
    std::string OpenHdrDialog();
+   // Native open panel for an IES photometric profile (.ies), for the Light node.
+   std::string OpenIesDialog();
 
    // Decodes anything ImageIO can open (notably .exr, which macOS has read
    // natively since Ventura) into linear float RGB, via a CGBitmapContext in
@@ -144,6 +146,8 @@ namespace Platform
    // to a report. Call once, early in main(), after argv-only setup. No-op
    // on macOS.
    void InstallCrashHandler();
+   // Called first from the fatal-signal handler when set (headless jobs set it to print what they were doing).
+   inline void (*gCrashHook)(int sig) = nullptr;
 
    // Appends one line (a trailing newline is added) to a rolling
    // AppPaths::AppSupportDir() + "/log.txt", so a user who hits a startup

@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #import <Metal/Metal.h>
 #import <IOSurface/IOSurface.h>
@@ -31,6 +32,17 @@ namespace rhi
    namespace
    {
       std::string gLastError;
+      // Blocks until the GPU is done with `cb`; a failed buffer is counted and logged, never silent.
+      void WaitChecked(id<MTLCommandBuffer> cb, const char* where)
+      {
+         [cb waitUntilCompleted];
+         if (cb.status != MTLCommandBufferStatusError)
+            return;
+         NSError* e = cb.error;
+         gGpuLastError = std::string(where) + ": " + (e != nil ? e.localizedDescription.UTF8String : "command buffer failed");
+         gGpuErrors++;
+         std::fprintf(stderr, "Infinite: GPU error in %s\n", gGpuLastError.c_str());
+      }
       // Compile macros plus the active A/B switches (Render3DAb.h).
       NSDictionary* AbMacros(NSDictionary* base)
       {
@@ -124,6 +136,8 @@ struct FrameU
 #define FLD_MAT_ANY 0
 #endif
 struct InstU { float4x4 model; float4x4 normalM; MatRec mat; }; // the material: Render3DMaterial.h (all zeros = plain)
+// Row 4.2 light linking: light i does not light an object whose record has bit i of `unlit` set (lights 0..31).
+inline bool unlitBy(float unlit, int i) { return i < 32 && ((as_type<uint>(unlit) >> uint(i)) & 1u) != 0u; }
 // INV_POS: the second, invariant compile used by the depth prepass and the shaded runs after it (exact same depth);
 // plain raster keeps the faster non-invariant build.
 #ifdef INV_POS
@@ -159,7 +173,7 @@ float3 sampleEnv(constant FrameU& f, texture2d<float> et, float3 dir, float roug
    const float3 env = mix(lower, f.sky.xyz, smoothstep(0.5, 1.0, t));
    return mix(env, f.horizon.xyz, rough * rough) * f.params.z;
 }
-)" R3D_SHARED_SRC R3D_BSDF_SRC R3D_FRESNEL_SRC R3D_THINFILM_SRC R"(
+)" R3D_SHARED_SRC R3D_AREA_SRC R3D_BSDF_SRC R3D_FRESNEL_SRC R3D_THINFILM_SRC R"(
 // Thin film over the specular lobes (Render3DThinFilm.h, shared with GL): a gain on the lobe, at the view angle.
 float3 iridGain(float w, float ior, float thick, float nV, float3 f0)
 {
@@ -195,17 +209,26 @@ bool occluded(instance_acceleration_structure tlas, float3 o, float3 d, float tm
    intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1); // bit 0: shadow casters
    return h.type == intersection_type::triangle;
 }
+// Row 5.6: distance to the nearest shadow caster along o + d t, tmax when none.
+float hitDist(instance_acceleration_structure tlas, float3 o, float3 d, float tmax)
+{
+   intersector<triangle_data, instancing> it;
+   it.assume_geometry_type(geometry_type::triangle);
+   ray r(o, d, 0.0, tmax);
+   intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1);
+   return h.type == intersection_type::triangle ? h.distance : tmax;
+}
 // A sun's shadow as its disc (angleDeg across, as settle's cone and Cycles' sun angle): four probe rays first; only
 // where they disagree (the penumbra) twelve more on a golden-angle spiral, turned and jittered per
 // pixel by a hash so the thin sampling reads as fine grain, not bands. 0 = fully blocked, 1 = open.
 uint pcg(uint v);
 float rnd(thread uint& s);
 struct RInst;
-float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax);
+float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax, int li = -1);
 // thru (row 5.2): the receiver is a strand, so other strands pass light (see shadowT); inst may be null when false.
-float sunVis(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 ld, float angleDeg, float2 pix)
+float sunVis(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 ld, float angleDeg, float2 pix, int li = -1)
 {
-   if (angleDeg <= 0.0) return shadowT(tlas, inst, thru, o, ld, 1e4);
+   if (angleDeg <= 0.0) return shadowT(tlas, inst, thru, o, ld, 1e4, li);
    const float tr = tan(angleDeg * 0.5 * 0.017453292);
    const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
    const float3 ay = cross(ld, ax);
@@ -217,32 +240,38 @@ float sunVis(instance_acceleration_structure tlas, constant RInst* inst, bool th
    for (int i = 0; i < 4; i++)
    {
       const float an = rot + float(i) * 1.5707963;
-      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * (0.9 * tr)), 1e4);
+      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * (0.9 * tr)), 1e4, li);
    }
    if (v == 0.0 || v == 4.0) return v * 0.25;
    for (int i = 0; i < 12; i++)
    {
       const float an = rot + 0.7853982 + float(i) * 2.399963, r = sqrt((float(i) + rnd(s)) / 12.0) * tr;
-      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4);
+      v += shadowT(tlas, inst, thru, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4, li);
    }
    return v / 16.0;
 }
 struct RInst { ulong vb; ulong ib; ulong uvb; ulong wr; float4x4 normalM; MatRec mat; }; // the rays' view: mesh buffers + the same record (base times the albedo map's mean on GI rays)
+// Row 4.2 shadow linking: li >= 0 only for a light some object lets through (color.w -1); that object's bit li is set.
+inline bool noShadowBy(constant RInst* inst, uint id, int li) { return li >= 0 && li < 32 && ((as_type<uint>(inst[id].mat.noShadow) >> uint(li)) & 1u) != 0u; }
+inline int shLink(constant LightU& L, int i) { return L.color.w < -0.5 ? i : -1; }
 // Row 5.2: a shadow ray's visibility. Light reaching a strand passes the other strands by exp(-0.7) each, re-traced
 // from every strand hit up to 4 (FINISH_PLAN 6.12; the forward scatter of Zinke's dual scattering, which Cycles gets
 // from many bounces through bright fibres); a strand still blocks fully what lies under it (skin, floor), as in Cycles.
-float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax)
+float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool thru, float3 o, float3 d, float tmax, int li)
 {
    if (!occluded(tlas, o, d, tmax)) return 1.0;
-   if (!thru) return 0.0;
+   if (!thru && li < 0) return 0.0;
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
    float T = 1.0, t0 = 0.0;
-   for (int k = 0; k < 4; k++)
+   for (int k = 0, s = 0; k < 4 && s < 8; s++)
    {
       ray r(o, d, t0, tmax);
       intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1);
       if (h.type != intersection_type::triangle) return T;
+      if (noShadowBy(inst, h.instance_id, li)) { t0 = h.distance + 1e-4; continue; } // this object lets the light through
+      if (!thru) return 0.0;
+      k++;
       constant RInst& I = inst[h.instance_id];
       if (I.mat.strandFrom < 0.5 || float(h.primitive_id) < I.mat.strandFrom - 1.0) return 0.0;
       T *= 0.49658530; // exp(-0.7)
@@ -252,15 +281,15 @@ float shadowT(instance_acceleration_structure tlas, constant RInst* inst, bool t
 }
 // A strand's sun: one ray per pixel in the disc (hashed per pixel and frame), through shadowT; the 16-ray penumbra
 // search times a 4-hit re-trace over every hair pixel is what the live frame cannot afford (FINISH_PLAN 6.12).
-float sunVisStrand(instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 ld, float angleDeg, float2 pix, float frame)
+float sunVisStrand(instance_acceleration_structure tlas, constant RInst* inst, float3 o, float3 ld, float angleDeg, float2 pix, float frame, int li = -1)
 {
-   if (angleDeg <= 0.0) return shadowT(tlas, inst, true, o, ld, 1e4);
+   if (angleDeg <= 0.0) return shadowT(tlas, inst, true, o, ld, 1e4, li);
    const float tr = tan(angleDeg * 0.5 * 0.017453292);
    const float3 ax = abs(ld.y) < 0.99 ? normalize(cross(ld, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0);
    const float3 ay = cross(ld, ax);
    uint sd = pcg(uint(pix.x) * 7919u + 104729u * uint(pix.y) + 31u * uint(frame));
    const float an = 6.2831853 * rnd(sd), r = sqrt(rnd(sd)) * tr;
-   return shadowT(tlas, inst, true, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4);
+   return shadowT(tlas, inst, true, o, normalize(ld + (ax * cos(an) + ay * sin(an)) * r), 1e4, li);
 }
 float3 cosineDir(float3 n, float u1, float u2);
 // One hit: closest hit -> vertex normal, Lambert from every light (RT shadowed), ambient, env spec. Miss -> env.
@@ -336,6 +365,7 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
       if (i >= i1 || i >= count) break;
       constant LightU& L = f.lights[i];
       const int type = int(L.vec.w);
+      if (unlitBy(I.mat.unlit, i)) continue;
       if (type == 3) { diff += L.color.xyz * L.terms.x * 3.14159265 * lw; continue; }
       float3 ld; float atten = 1.0;
       if (type == 1 || type == 4 || type == 5)
@@ -350,13 +380,13 @@ float3 shadeHit(constant FrameU& f, texture2d<float> et, instance_acceleration_s
             const float cosOuter = cos(L.spot.x * 0.017453292);
             atten *= cosCur > cosOuter ? 1.0 : 0.0;
          }
-         if (type == 5) atten *= max(dot(-ld, L.aim.xyz), 0.0);
+         if (type == 5) { const float cl = dot(-ld, L.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(L.spot.y, cl); }
       }
       else ld = normalize(L.vec.xyz);
       if (atten > 0.0)
       {
          const float tm = (type == 1 || type == 4 || type == 5) ? max(length(L.vec.xyz - p) - 0.01, 0.0) : 1e4;
-         if (L.color.w < 0.5 && occluded(tlas, p + n * f.shQ.w, ld, tm)) atten *= (1.0 - f.shP.w);
+         if (L.color.w < 0.5 && shadowT(tlas, inst, false, p + n * f.shQ.w, ld, tm, shLink(L, i)) < 0.5) atten *= (1.0 - f.shP.w);
       }
       diff += L.color.xyz * atten * max(dot(n, ld), 0.0) * L.terms.x * lw;
    }
@@ -625,8 +655,25 @@ float2 boxSpan(float3 lo, float3 hi, float3 o, float3 d, float tmax)
    const float3 l = min(a, c), h = max(a, c);
    return float2(max(max(l.x, l.y), max(l.z, 0.0)), min(min(h.x, h.y), min(h.z, tmax)));
 }
+// Row 4.1: the medium's shape. fall 0 fills the box evenly; 1 is a soft puff, density falling linearly from the box's
+// centre to nothing on the ellipsoid inside its faces (Blender's spherical Gradient on the box's object coordinates).
+float fogShape(float3 lo, float3 hi, float fall, float3 p)
+{
+   if (fall <= 0.0) return 1.0;
+   const float3 c = 0.5 * (lo + hi), h = max(0.5 * (hi - lo), float3(1e-4));
+   return mix(1.0, max(1.0 - length((p - c) / h), 0.0), fall);
+}
+// Optical depth along o + d t over the span s, sig the peak extinction: exact for an even box, else 16 midpoints.
+float fogDepth(float3 lo, float3 hi, float fall, float sig, float3 o, float3 d, float2 s)
+{
+   const float len = max(s.y - s.x, 0.0);
+   if (fall <= 0.0 || len <= 0.0) return sig * len;
+   const float st = len / 16.0; float acc = 0.0;
+   for (int k = 0; k < 16; k++) acc += fogShape(lo, hi, fall, o + d * (s.x + (float(k) + 0.5) * st));
+   return sig * acc * st;
+}
 struct VisU { float4x4 invVP; float4 info; float4 fog; float4 fogC; float4 fogLo; float4 fogHi; }; // info: full width, height; fog as PtU's
-struct VisOut { float4 v [[color(0)]]; float d [[color(1)]]; float4 fg [[color(2)]]; }; // fg: fog in-scatter (rgb) and transmittance (a) along the view
+struct VisOut { float4 v [[color(0)]]; float2 d [[color(1)]]; float4 fg [[color(2)]]; float4 fe [[color(3)]]; }; // fg: fog in-scatter (rgb) and transmittance (a) along the view; fe: the fog's light on the surface (mean radiance over its hemisphere)
 float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
 {
    const float z = dt.read(uint2(px));
@@ -634,17 +681,120 @@ float3 visWp(constant VisU& u, depth2d<float> dt, int2 px)
    const float4 pw = u.invVP * float4(ndc, z * 2.0 - 1.0, 1.0);
    return pw.xyz / pw.w;
 }
-fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
-                       constant RTArgs& rtArgs [[buffer(3)]], depth2d<float> dt [[texture(0)]])
+// Row 5.6: in an even box, sigma x the integral over one step [pa, pb] (length st, view optical depth odA at pa) of
+// exp(-(view depth + kb x depth toward the light along ld)), both depths taken as linear over the step.
+float fogSeg(constant VisU& u, float sig, float st, float odA, float3 pa, float3 pb, float3 ld, float kb = 1.0)
 {
-   VisOut o; o.v = float4(1.0); o.d = -1.0; o.fg = float4(0.0, 0.0, 0.0, 1.0);
+   const float2 sa = boxSpan(u.fogLo.xyz, u.fogHi.xyz, pa, ld, 1e4), sb = boxSpan(u.fogLo.xyz, u.fogHi.xyz, pb, ld, 1e4);
+   const float Da = kb * sig * max(sa.y - sa.x, 0.0), Db = kb * sig * max(sb.y - sb.x, 0.0);
+   const float m = sig + (Db - Da) / max(st, 1e-6);
+   return sig * exp(-(odA + Da)) * (abs(m * st) > 1e-4 ? (1.0 - exp(-m * st)) / m : st);
+}
+// Row 5.6: the share of the light the fog scatters that scatters again before it leaves the box (one scattering
+// order to the next): albedo x (1 - exp(-sigma D)), D the box's mean chord 4V/S (a wide slab keeps its sideways
+// light, a small box loses it; a puff's mean density about a fifth of its peak). Grey: the albedo's mean.
+float fogKeep(constant VisU& u)
+{
+   const float3 e = max(u.fogHi.xyz - u.fogLo.xyz, float3(1e-3));
+   const float D = 2.0 * e.x * e.y * e.z / (e.x * e.y + e.y * e.z + e.z * e.x);
+   return dot(u.fogC.xyz, float3(1.0 / 3.0)) * (1.0 - exp(-u.fog.x * mix(1.0, 0.2, u.fog.z) * D));
+}
+// Row 5.6: light scattered toward -d by the fog along o + d t over the span sp (jittered stratified steps), before the
+// albedo: sun, point, spot and area lights (falloff, cone, area facing as the surface shading; IES not) through the
+// fog to the light, plus the skylight from above. A light's multiple scattering as three octaves (Wrenninge's
+// approximation): octave n has the extinction toward the light and the phase's g each scaled by 1/2^n, so light that
+// has scattered again goes deeper into the fog and leaves more evenly, and weighs r^n, r the share of scattered
+// light the box keeps (fogKeep); the last octave carries the series' tail. Still only where the light reaches (a
+// closed room's shaft does not flood the room). shadows: one RT shadow ray a light a step (the shafts);
+// without, geometry does not block.
+float3 fogInScatter(constant VisU& u, constant FrameU& f, constant RTArgs& rtArgs, constant RInst* instInfo, float3 o, float3 d,
+                    float2 sp, int steps, float jit, bool shadows, thread float& od)
+{
+   const float sig = u.fog.x, st = (sp.y - sp.x) / float(steps);
+   const float3 amb = f.horizon.xyz * f.params.z;
+   // An even box: the sun's and the sky's light along each step is integrated exactly (the view's and the light's
+   // optical depth both run linearly over the step), so only the shadow test is a point sample: no step noise where
+   // nothing casts a shadow (open haze, the sky behind it).
+   const bool even = u.fog.z <= 0.0;
+   const float r = fogKeep(u);
+   const float ow[3] = { 1.0, r, r * r / max(1.0 - r, 0.05) };
+   float3 In = float3(0.0), Ia = float3(0.0); od = 0.0;
+   for (int k = 0; k < 8; k++)
+   {
+      if (k >= steps) break;
+      const float t = sp.x + (float(k) + jit) * st;
+      const float3 p = o + d * t;
+      const float dk = fogShape(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, p); // row 4.1: density here, 1 in an even box
+      const float Tv = exp(-(od + sig * dk * jit * st));
+      od += sig * dk * st;
+      if (dk <= 0.0) continue;
+      const float3 pa = o + d * (sp.x + float(k) * st), pb = pa + d * st;
+      const float odA = sig * float(k) * st;
+      // Skylight scattered in (row 4.1): the world's horizon colour, through the fog above this point.
+      if (even) Ia += amb * fogSeg(u, sig, st, odA, pa, pb, float3(0.0, 1.0, 0.0));
+      else
+      {
+         const float3 a = dk * Tv * amb * exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, float3(0.0, 1.0, 0.0),
+                                                   boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, float3(0.0, 1.0, 0.0), 1e4)));
+         In += a;
+      }
+      for (int i = 0; i < 8 && i < int(f.params.w); i++)
+      {
+         constant LightU& L = f.lights[i];
+         const int type = int(L.vec.w);
+         if (type == 3 || L.aim.w < -1.5) continue;
+         float3 ld; float tmax = 1e4, atten = 1.0;
+         if (type == 1 || type == 4 || type == 5)
+         {
+            const float3 tl = L.vec.xyz - p; const float dist = length(tl);
+            ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
+            atten = lightFalloff(dist, L.terms.z);
+            if (L.terms.w > 0.0 && dist > L.terms.w) atten = 0.0;
+            if (type == 4)
+            {
+               const float cosCur = dot(-ld, L.aim.xyz), cosOuter = cos(L.spot.x * 0.017453292);
+               const float smoothW = (1.0 - cosOuter) * L.spot.y;
+               float sa = cosCur > cosOuter ? cosCur : 0.0;
+               if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
+               atten *= sa;
+            }
+            if (type == 5) { const float cl = dot(-ld, L.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(L.spot.y, cl); }
+         }
+         else ld = normalize(L.vec.xyz);
+         if (atten <= 0.0) continue;
+         if (shadows && L.color.w < 0.5 && shadowT(rtArgs.tlas, instInfo, false, p, ld, tmax, shLink(L, i)) < 0.5) continue;
+         if (even && (type == 0 || type == 2))
+         {
+            for (int n = 0; n < 3; n++)
+            {
+               const float kb = exp2(-float(n));
+               Ia += ow[n] * fogSeg(u, sig, st, odA, pa, pb, ld, kb) * hgPhase(dot(ld, d), u.fog.y * kb) * L.color.xyz * L.terms.x;
+            }
+            continue;
+         }
+         const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, tmax);
+         const float Dl = fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, sig, p, ld, ss);
+         for (int n = 0; n < 3; n++)
+         {
+            const float kb = exp2(-float(n));
+            In += ow[n] * dk * Tv * atten * exp(-kb * Dl) * hgPhase(dot(ld, d), u.fog.y * kb) * L.color.xyz * L.terms.x;
+         }
+      }
+   }
+   return In * (sig * st) + Ia;
+}
+fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], constant FrameU& f [[buffer(1)]],
+                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* instInfo [[buffer(4)]], depth2d<float> dt [[texture(0)]])
+{
+   VisOut o; o.v = float4(1.0); o.d = float2(-1.0, 0.0); o.fg = float4(0.0, 0.0, 0.0, 1.0); o.fe = float4(0.0);
    const int W = int(u.info.x), H = int(u.info.y);
    const int2 px = int2(in.pos.xy) * 2;
    if (px.x >= W || px.y >= H) return o;
+   const float jit = fract(52.9829189 * fract(0.06711056 * float(px.x) + 0.00583715 * float(px.y)) + 0.61803399 * f.gi.z);
    if (u.fog.x > 0.0)
    {
-      // Row 5.4: single scattering of the sun along the view through the fog box, 8 jittered steps, one RT shadow
-      // ray each (the shaft); the sun's own path through the fog dims it. r_fs blends this as col * a + rgb.
+      // Row 5.4: single scattering along the view through the fog box, 8 jittered steps, one RT shadow ray a light
+      // each (the shafts); each light's own path through the fog dims it. r_fs blends this as col * a + rgb.
       const float z = dt.read(uint2(px));
       const float3 e = f.eye.xyz;
       const float2 ndc = float2(2.0 * (float(px.x) + 0.5) / u.info.x - 1.0, 2.0 * (float(px.y) + 0.5) / u.info.y - 1.0);
@@ -653,26 +803,9 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       const float2 sp = boxSpan(u.fogLo.xyz, u.fogHi.xyz, e, vd, z >= 1.0 ? 1e4 : distance(visWp(u, dt, px), e));
       if (sp.y > sp.x)
       {
-         const float sig = u.fog.x, st = (sp.y - sp.x) / 8.0;
-         const float jit = fract(52.9829189 * fract(0.06711056 * float(px.x) + 0.00583715 * float(px.y)) + 0.61803399 * f.gi.z);
-         float3 In = float3(0.0);
-         for (int k = 0; k < 8; k++)
-         {
-            const float t = sp.x + (float(k) + jit) * st;
-            const float3 p = e + vd * t;
-            const float Tv = exp(-sig * (t - sp.x));
-            for (int i = 0; i < 8 && i < int(f.params.w); i++)
-            {
-               constant LightU& L = f.lights[i];
-               const int type = int(L.vec.w);
-               if (type != 0 && type != 2) continue;
-               const float3 ld = normalize(L.vec.xyz);
-               if (L.color.w < 0.5 && occluded(rtArgs.tlas, p, ld, 1e4)) continue;
-               const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, 1e4);
-               In += Tv * exp(-sig * max(ss.y - ss.x, 0.0)) * hgPhase(dot(ld, vd), u.fog.y) * L.color.xyz * L.terms.x;
-            }
-         }
-         o.fg = float4(In * (sig * st) * u.fogC.xyz, exp(-sig * (sp.y - sp.x)));
+         float od;
+         const float3 In = fogInScatter(u, f, rtArgs, instInfo, e, vd, sp, 8, jit, true, od);
+         o.fg = float4(In * u.fogC.xyz, exp(-(u.fog.z > 0.0 ? od : u.fog.x * (sp.y - sp.x))));
       }
    }
    if (dt.read(uint2(px)) >= 1.0) return o;
@@ -685,7 +818,34 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
    float3 n = cross(dx, dy);
    n = dot(n, n) > 1e-20 ? normalize(n) : normalize(f.eye.xyz - p);
    if (dot(n, f.eye.xyz - p) < 0.0) n = -n;
-   o.d = distance(p, f.eye.xyz);
+   o.d = float2(distance(p, f.eye.xyz), 0.0);
+   if (u.fog.x > 0.0)
+   {
+      // Row 5.6: the fog's own light on this surface (the light it scatters back, a slab of haze lighting the ground
+      // under it): 4 cosine-weighted rays over the hemisphere, 4 steps each through the box, shadowed (a closed room's walls keep
+      // the sun off most of its fog); r_fs
+      // adds base x this as diffuse ambient. Steps stop 4 mean free paths out, where nothing more comes back.
+      const float3 tx = abs(n.y) < 0.99 ? normalize(cross(n, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0), ty = cross(n, tx);
+      float3 Lf = float3(0.0); float Ts = 0.0;
+      for (int r = 0; r < 4; r++)
+      {
+         const float u1 = fract((float(r) + jit) * 0.25 + 0.37 * jit), u2 = fract(float(r) * 0.61803399 + jit);
+         const float rr = sqrt(u1), ph = 6.2831853 * u2;
+         const float3 rd = normalize(tx * (rr * cos(ph)) + ty * (rr * sin(ph)) + n * sqrt(max(1.0 - u1, 0.0)));
+         const float3 ro = p + n * f.shQ.w;
+         float2 sp = boxSpan(u.fogLo.xyz, u.fogHi.xyz, ro, rd, 1e4);
+         // The fog only up to the first surface this way (a ball next to the floor hides the fog behind it).
+         const float th = hitDist(rtArgs.tlas, ro, rd, 1e4);
+         // The sky through the whole box; a surface's bounce (the GI) through the fog between it and here.
+         Ts += exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, ro, rd, float2(sp.x, min(sp.y, th))));
+         if (th < 1e4) o.d.y += 0.25;
+         sp.y = min(min(sp.y, th), sp.x + 4.0 / u.fog.x);
+         if (sp.y <= sp.x) continue;
+         float od;
+         Lf += fogInScatter(u, f, rtArgs, instInfo, ro, rd, sp, 4, fract(jit + 0.5 * float(r)), true, od) * u.fogC.xyz;
+      }
+      o.fe = float4(Lf * 0.25, Ts * 0.25); // a: how much of the sky's and the bounce's light reaches the surface; d.y: the share of rays that met geometry
+   }
    const int count = int(f.params.w);
    for (int i = 0; i < 8; i++)
    {
@@ -697,9 +857,9 @@ fragment VisOut vis_fs(SkyOut in [[stage_in]], constant VisU& u [[buffer(0)]], c
       float3 ld; float tmax = 1e4;
       if (type == 1 || type == 4) { const float3 tl = L.vec.xyz - p; const float dist = length(tl); ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0); }
       else ld = normalize(L.vec.xyz);
-      if (type == 1 || type == 4) { if (occluded(rtArgs.tlas, p + n * f.shQ.w, ld, tmax)) o.v[ch] = 0.0; }
-      else o.v[ch] = sunVis(rtArgs.tlas, nullptr, false, p + n * f.shQ.w, ld, (type == 0 || type == 2) ? L.spot.x : 0.0, float2(px));
-      if (u.fog.x > 0.0) { const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, tmax); o.v[ch] *= exp(-u.fog.x * max(ss.y - ss.x, 0.0)); } // row 5.4: the light crosses the fog
+      if (type == 1 || type == 4) { if (shadowT(rtArgs.tlas, instInfo, false, p + n * f.shQ.w, ld, tmax, shLink(L, i)) < 0.5) o.v[ch] = 0.0; }
+      else o.v[ch] = sunVis(rtArgs.tlas, instInfo, false, p + n * f.shQ.w, ld, (type == 0 || type == 2) ? L.spot.x : 0.0, float2(px), shLink(L, i));
+      if (u.fog.x > 0.0) { const float2 ss = boxSpan(u.fogLo.xyz, u.fogHi.xyz, p, ld, tmax); o.v[ch] *= exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, p, ld, ss)); } // row 5.4: the light crosses the fog
    }
    return o;
 }
@@ -724,9 +884,54 @@ float upVis(texture2d<float> vt, texture2d<float> vd, float2 pos, float dist, in
    return (ws < 0.2 || hi - lo > 0.5) ? -1.0 : acc / ws; // a shadow edge between the texels: trace this pixel
 
 }
+// Row 5.6: a half-res fog texel set (vis_fs) at a full-res pixel `dist` from the eye, a 3x3 box against its noise
+// that takes only texels on the same surface (distance within 5%): a sphere's fog does not bleed onto the floor
+// behind it as a halo. With none alike, the nearest texel. The box is a tent centred on this pixel's own spot in
+// the half-res grid (radius 1.5 texels), so two neighbouring pixels do not share one box: no 2-pixel stair steps
+// along a shaft's edge.
+float4 fogTap(texture2d<float> t, texture2d<float> vd, float2 pos, float dist, thread float& bs)
+{
+   const float2 c = pos * 0.5 - 0.5;
+   const int2 q0 = int2(floor(c)) - 1, fs = int2(t.get_width(), t.get_height());
+   float4 a = float4(0.0); float ws = 0.0;
+   for (int j = 0; j < 4; j++)
+      for (int i = 0; i < 4; i++)
+      {
+         const int2 qi = q0 + int2(i, j);
+         const float2 dd = abs(float2(qi) - c);
+         const float w = max(1.5 - dd.x, 0.0) * max(1.5 - dd.y, 0.0);
+         if (w <= 0.0) continue;
+         const uint2 cc = uint2(clamp(qi, int2(0), fs - 1));
+         const float2 dq = vd.read(cc).xy;
+         if (dq.x < 0.0 || abs(dq.x - dist) > 0.05 * dist) continue;
+         a += w * t.read(cc); bs += w * dq.y; ws += w;
+      }
+   if (ws > 0.0) { bs /= ws; return a / ws; }
+   const uint2 c0 = uint2(clamp(int2(pos) / 2, int2(0), fs - 1));
+   bs = vd.read(c0).y;
+   return t.read(c0);
+}
 #ifndef SSS_K
 #define SSS_K 4.0
 #endif
+// Row 4.2: a point or spot light's IES factor toward d (unit, from the light), its table (engine/Ies.h: 32 vertical x
+// 16 horizontal, [h * 32 + v]) at row - 1 after the `count` lights in LL; row 0 = none. Vertical 0 = along the aim;
+// horizontal as Cycles on a light Blender points with track-to (-Z at the target, Y up): 0 = -(aim x right), the side
+// away from world up, 90 = right = cross(up, aim) (measured on Blender 5.2).
+float iesK(constant LightU* LL, int count, float row, float3 axis, float3 d)
+{
+   if (row < 0.5) return 1.0;
+   constant float* T = (constant float*)(LL + count) + (int(row + 0.5) - 1) * 512;
+   const float th = acos(clamp(dot(d, axis), -1.0, 1.0)) * (31.0 / 3.14159265);
+   float3 r = cross(float3(0.0, 1.0, 0.0), axis);
+   r = dot(r, r) < 1e-4 ? float3(1.0, 0.0, 0.0) : normalize(r);
+   float ph = atan2(dot(d, r), -dot(d, cross(axis, r))) * (16.0 / 6.28318531);
+   if (ph < 0.0) ph += 16.0;
+   const int v0 = min(int(th), 30), h0 = int(ph) & 15, h1 = (h0 + 1) & 15;
+   const float fv = th - float(v0), fh = ph - floor(ph);
+   const float a = mix(T[h0 * 32 + v0], T[h0 * 32 + v0 + 1], fv), b = mix(T[h1 * 32 + v0], T[h1 * 32 + v0 + 1], fv);
+   return max(mix(a, b, fh), 0.0);
+}
 #ifndef SSS_D
 #define SSS_D 1.0
 #endif
@@ -734,7 +939,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
                      depth2d<float> sm [[texture(0)]], constant RTArgs& rtArgs [[buffer(3)]],
                      constant RInst* instInfo [[buffer(4)]], texture2d<float> et [[texture(9)]],
                      texture2d<float> visT [[texture(7)]], texture2d<float> visD [[texture(8)]], texture2d<float> visF [[texture(6)]],
-                     array<texture2d<float>, 16> maps [[texture(10)]], uint prim [[primitive_id]],
+                     array<texture2d<float>, 16> maps [[texture(10)]], uint prim [[primitive_id]], texture2d<float> visE [[texture(26)]],
                      constant LightU* LL [[buffer(6)]], constant uint* CL [[buffer(7)]], bool frontF [[front_facing]])
 {
    float3 n = normalize(in.n);
@@ -903,6 +1108,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       const int i = clu ? int(CL[cBase + uint(k)]) : k;
       constant LightU& L = clu ? LL[i] : f.lights[i];
       const int type = int(L.vec.w);
+      if (unlitBy(m.mat.unlit, i)) continue;
       const float3 radiance0 = L.color.xyz; // linear * intensity
       if (type == 3) { col += base * (1.0 - metal) * radiance0 * L.terms.x; continue; }
       // Area lights: a small visibility loop over 8 stratified points on the rectangle (rotated per pixel and
@@ -920,11 +1126,13 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
          for (int si = 0; si < 8; si++)
          {
             const float jx = (float(si & 3) + rnd(ars)) * 0.25, jy = (float(si >> 2) + rnd(ars)) * 0.5;
-            const float3 tl = L.vec.xyz + aR * ((jx - 0.5) * L.spot.z) + aU * ((jy - 0.5) * L.spot.w) - in.wp;
+            const float3 ao = areaOffset(L.spot.x, jx, jy);
+            const float3 tl = L.vec.xyz + aR * (ao.x * L.spot.z) + aU * (ao.y * L.spot.w) - in.wp;
             const float dist = length(tl); const float3 ld = tl / max(dist, 1e-4);
-            float e = lightFalloff(dist, L.terms.z) * max(dot(-ld, L.aim.xyz), 0.0) * (hairM ? 1.0 : max(dot(n, ld), 0.0));
+            const float cl = dot(-ld, L.aim.xyz);
+            float e = lightFalloff(dist, L.terms.z) * max(cl, 0.0) * areaSpreadK(L.spot.y, cl) * (hairM ? 1.0 : max(dot(n, ld), 0.0));
             if (L.terms.w > 0.0 && dist > L.terms.w) e = 0.0;
-            if (e > 0.0 && rtSh && L.color.w < 0.5 && occluded(rtArgs.tlas, in.wp + (dot(n, ld) < 0.0 ? -n : n) * f.shQ.w, ld, max(dist - 0.01, 0.0))) e *= 1.0 - f.shP.w;
+            if (e > 0.0 && rtSh && L.color.w < 0.5 && shadowT(rtArgs.tlas, instInfo, false, in.wp + (dot(n, ld) < 0.0 ? -n : n) * f.shQ.w, ld, max(dist - 0.01, 0.0), shLink(L, i)) < 0.5) e *= 1.0 - f.shP.w;
             areaE += e * 0.125;
          }
          if (areaE <= 0.0) continue;
@@ -946,6 +1154,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
             atten *= sa;
          }
+         if (type != 5) atten *= iesK(LL, int(f.fld.y + 0.5), L.spot.w, L.aim.xyz, -lightDir);
          if (atten <= 0.0 && type != 5) continue; // out of reach (cutoff, cone): every term below is scaled by it
       }
       else lightDir = normalize(L.vec.xyz);
@@ -979,10 +1188,10 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
             if (vis < 0.0)
             {
                if (type == 1 || type == 4)
-                  vis = shadowT(rtArgs.tlas, instInfo, strandPx, in.wp + nS * f.shQ.w, lightDir, max(length(L.vec.xyz - in.wp) - 0.01, 0.0));
+                  vis = shadowT(rtArgs.tlas, instInfo, strandPx, in.wp + nS * f.shQ.w, lightDir, max(length(L.vec.xyz - in.wp) - 0.01, 0.0), shLink(L, i));
                else
-                  vis = strandPx ? sunVisStrand(rtArgs.tlas, instInfo, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy, f.gi.z)
-                                 : sunVis(rtArgs.tlas, instInfo, false, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy);
+                  vis = strandPx ? sunVisStrand(rtArgs.tlas, instInfo, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy, f.gi.z, shLink(L, i))
+                                 : sunVis(rtArgs.tlas, instInfo, false, in.wp + nS * f.shQ.w, lightDir, (type == 0 || type == 2) ? L.spot.x : 0.0, in.pos.xy, shLink(L, i));
             }
             shadow = mix(1.0 - f.shP.w, 1.0, vis);
          }
@@ -1013,9 +1222,13 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    }
    if (!(f.gi.x > 0.5)) col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal); // fake bounce only without real GI
    // GI and traced reflections run in tr_fs at half res; this pass writes their demodulated weights instead.
-   const float3 irradiance = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0;
+   // Row 5.6: the fog's light on this surface (vis_fs, half res, its 3x3 box against noise) and how much of the
+   // sky still gets through the fog to it (a), which dims the environment's own light here: fog replaces sky.
+   float fogB = 0.0; // the share of this surface's hemisphere that is geometry (vis_fs)
+   const float4 fogE = visE.get_width() > 1 ? fogTap(visE, visD, in.pos.xy, distance(in.wp, f.eye.xyz), fogB) : float4(0.0, 0.0, 0.0, 1.0);
+   const float3 irradiance = sampleEnv(f, et, n, 1.0) * f.ambient.xyz * 3.0 * fogE.a;
    const float3 fAmb = fresnelRough(nDotV, f0, rough) * iridK;
-   const float3 envRefl = sampleEnv(f, et, reflect(-viewDir, n), rough) * fAmb * (aoV * ccAt * shV);
+   const float3 envRefl = sampleEnv(f, et, reflect(-viewDir, n), rough) * fAmb * (aoV * ccAt * shV) * fogE.a;
    const bool reflOn = (int(f.shQ.z + 0.5) & 2) != 0 && rough < 0.55;
    const float envKeep = reflOn ? smoothstep(0.3, 0.55, rough) : 1.0; // the env share of the reflection; the rest is traced
    const bool giOn = f.gi.x > 0.5;
@@ -1065,6 +1278,7 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
       if (dot(rd, rd) < 1e-6) rd = reflect(-viewDir, n);
       col = mix(col, sampleEnv(f, et, rd, 0.0) * mix(float3(1.0), base, 0.4) * (float3(1.0) - fAmb), trans);
    }
+   col += (float3(1.0) - fresnelRough(nDotV, f0, rough) * iridK) * (1.0 - metal) * base * fogE.rgb * aoV; // as diffuse ambient
    col = col * ccAt + coatCol + (ccW > 0.0 ? sampleEnv(f, et, reflect(-viewDir, n), ccR) * (ccW * ccFv) : float3(0.0));
    col += float3(m.mat.emission) * emMap;
 #if FLD_MAT_ANY
@@ -1075,11 +1289,9 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    float3 fogIn = float3(0.0); float fogT = 1.0;
    if (visF.get_width() > 1)
    {
-      const int2 q = int2(in.pos.xy) / 2, fs = int2(visF.get_width(), visF.get_height());
-      float4 a = float4(0.0);
-      for (int j = -1; j <= 1; j++)
-         for (int i = -1; i <= 1; i++) a += visF.read(uint2(clamp(q + int2(i, j), int2(0), fs - 1)));
-      a /= 9.0; fogIn = a.rgb; fogT = a.a;
+      float bs = 0.0;
+      const float4 a = fogTap(visF, visD, in.pos.xy, distance(in.wp, f.eye.xyz), bs);
+      fogIn = a.rgb; fogT = a.a;
    }
    FOut o;
    if (!kMrt)
@@ -1094,7 +1306,12 @@ fragment FOut r_fs(VOut in [[stage_in]], constant FrameU& f [[buffer(1)]], const
    o.c0 = float4(((col + (giOn ? float3(0.0) : envRefl * envKeep)) * fogT + fogIn) * f.params.x, 1.0);
    o.c1 = float4(giOn ? (((float3(1.0) - fAmb) * (1.0 - metal) * base * opaque + fAmb * envKeep) * shV + shAmb * opaque) * f.gi.y * f.params.x * (aoV * ccAt) : float3(0.0), rough); // GI weight
    o.c2 = float4(fAmb * (1.0 - envKeep) * f.params.x * (aoV * ccAt * shV), reflOn ? 1.0 : 0.0); // traced-reflection weight
-   o.c1.rgb *= fogT; o.c2.rgb *= fogT;
+   o.c1.rgb *= fogT * fogE.a; o.c2.rgb *= fogT * fogE.a; // the traced GI and reflections see the env through the fog too
+   // The fog along the view scatters the room's bounce light too (vis_fs scatters only the lights and the sky): the
+   // GI at this surface stands in for the field the view ray crosses, an even isotropic field (the phase integrates to
+   // 1, so in-scatter = albedo x (1 - T)), through the fog it crossed (fogE.a), and only its share from geometry
+   // (fogB): the sky's share is already in vis_fs, and open haze would count it twice.
+   if (giOn && visF.get_width() > 1) o.c1.rgb += f.ambient.w * (1.0 - fogT) * fogE.a * fogB * f.gi.y * f.params.x;
    o.c3 = float4(n, length(in.wp - f.eye.xyz));
    return o;
 }
@@ -1375,7 +1592,7 @@ float3 ptEval(float3 n, float3 V, float3 L, float3 base, float metal, float roug
 // Settle's shadow ray: it passes cut-outs and see-through surfaces as the camera ray does (opacity and the opacity
 // map against the cutoff, or by chance below 1), so a leaf's holes let light through as in Cycles.
 bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, array<texture2d<float>, 16> maps,
-                   float3 o, float3 d, float tmax, float eps, thread uint& seed)
+                   float3 o, float3 d, float tmax, float eps, thread uint& seed, int li = -1)
 {
    intersector<triangle_data, instancing> it;
    it.assume_geometry_type(geometry_type::triangle);
@@ -1385,6 +1602,12 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
       intersection_result<triangle_data, instancing> h = it.intersect(r, tlas, 1); // bit 0: shadow casters
       if (h.type != intersection_type::triangle) return false;
       constant RInst& I = inst[h.instance_id];
+      if (noShadowBy(inst, h.instance_id, li)) // row 4.2: shadow linking, this object lets the light through
+      {
+         o += d * (h.distance + eps); tmax -= h.distance + eps;
+         if (tmax <= 0.0) return false;
+         continue;
+      }
       float alpha = 1.0 - I.mat.clear;
       if (I.mat.mapOpacity > 0.5)
       {
@@ -1419,8 +1642,9 @@ bool occludedAlpha(instance_acceleration_structure tlas, constant RInst* inst, a
 // Settle's next-event pick: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
 // weighted by the count and the chance of taking this branch. pL > 0: an emitter, its solid-angle pdf.
 void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* ems, int nEm, float pEm, int count, float3 p, thread Lds& seed,
-                 thread float3& ld, thread float3& Le, thread float& tmax, thread float& pL, thread float2& lterms)
+                 thread float3& ld, thread float3& Le, thread float& tmax, thread float& pL, thread float2& lterms, float unlit, thread int& lix)
 {
+   lix = -1;
    if (nEm > 0 && rnd(seed) < pEm)
    {
       const float r = rnd(seed);
@@ -1440,9 +1664,10 @@ void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* em
    }
    else if (count > 0)
    {
-      constant LightU& Lt = LL[min(int(rnd(seed) * float(count)), count - 1)]; // row 5.6: all N lights
+      const int li = min(int(rnd(seed) * float(count)), count - 1);
+      constant LightU& Lt = LL[li]; // row 5.6: all N lights
       const int type = int(Lt.vec.w);
-      float atten = type == 3 ? 0.0 : 1.0; // ambient arrives through the bounces
+      float atten = (type == 3 || unlitBy(unlit, li)) ? 0.0 : 1.0; // ambient arrives through the bounces; row 4.2: linking
       tmax = 1e4;
       if (type == 1 || type == 4 || type == 5)
       {
@@ -1453,7 +1678,9 @@ void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* em
             float3 rgt = cross(float3(0.0, 1.0, 0.0), Lt.aim.xyz);
             rgt = dot(rgt, rgt) < 1e-4 ? float3(1.0, 0.0, 0.0) : normalize(rgt);
             const float3 upv = cross(Lt.aim.xyz, rgt);
-            lp += rgt * ((rnd(seed) - 0.5) * Lt.spot.z) + upv * ((rnd(seed) - 0.5) * Lt.spot.w);
+            const float u1 = rnd(seed), u2 = rnd(seed);
+            const float3 ao = areaOffset(Lt.spot.x, u1, u2);
+            lp += rgt * (ao.x * Lt.spot.z) + upv * (ao.y * Lt.spot.w);
          }
          const float3 tl = lp - p; const float dist = length(tl);
          ld = tl / max(dist, 1e-4); tmax = max(dist - 0.01, 0.0);
@@ -1467,7 +1694,8 @@ void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* em
             if (smoothW > 0.0) sa *= smoothstep(0.0, smoothW, cosCur - cosOuter);
             atten *= sa;
          }
-         if (type == 5) atten *= max(dot(-ld, Lt.aim.xyz), 0.0);
+         if (type == 5) { const float cl = dot(-ld, Lt.aim.xyz); atten *= max(cl, 0.0) * areaSpreadK(Lt.spot.y, cl); }
+         else atten *= iesK(LL, count, Lt.spot.w, Lt.aim.xyz, -ld);
       }
       else
       {
@@ -1484,6 +1712,7 @@ void ptPickLight(constant FrameU& f, constant LightU* LL, const device EmTri* em
       Le = Lt.color.xyz * atten * (float(count) / max(1.0 - pEm, 1e-3));
       lterms = Lt.terms.xy;
       if (Lt.color.w > 0.5) pL = -2.0; // a light set to cast no shadow
+      if (Lt.color.w < -0.5) lix = li; // row 4.2: some objects let it through
    }
 }
 // Translucency's lobes: the specular on the lit side, the diffuse share passed through to the far side (cosine there).
@@ -1543,7 +1772,7 @@ float fogTr(constant PtU& u, float3 o, float3 d, float tmax)
 {
    if (u.fog.x <= 0.0) return 1.0;
    const float2 s = fogSpan(u, o, d, tmax);
-   return exp(-u.fog.x * max(s.y - s.x, 0.0));
+   return exp(-fogDepth(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, u.fog.x, o, d, s));
 }
 float3 hgSample(float3 w, float g, float u1, float u2)
 {
@@ -1554,9 +1783,127 @@ float3 hgSample(float3 w, float g, float u1, float u2)
    const float3 t = normalize(cross(w, abs(w.y) < 0.99 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0)));
    return normalize(t * (st * cos(ph)) + cross(w, t) * (st * sin(ph)) + w * c);
 }
+// Row 4.4: caustics in settle. Light reaching a surface through glass (a sun through a ball, through water) is
+// carried by photons: each settle pass sends kCausN of them from every shadow-casting light at the glass's bounding
+// disc, through its reflections and refractions, onto the first other surface, where their irradiance lands in a hash
+// grid. Settle reads it at each diffuse hit (the camera's straight shadow ray stays blocked, as before). Cells are
+// squares of side h in the plane across the surface's main axis (bins of 4h along it, keyed by axis and side), so a
+// floor at any height keeps its photons, and the stored value is already irradiance (flux x |n axis| / h^2).
+constant uint kCausCells = 1u << 19;
+uint causKey(float3 p, float3 n, float h, float2 jit)
+{
+   const float3 an = abs(n);
+   const int a = an.x >= an.y && an.x >= an.z ? 0 : (an.y >= an.z ? 1 : 2);
+   const int ua = a == 0 ? 1 : 0, va = a == 2 ? 1 : 2;
+   const int3 c = int3(int(floor(p[ua] / h + jit.x)), int(floor(p[va] / h + jit.y)), int(floor(p[a] / (4.0 * h) + 0.5)));
+   const uint side = uint(a) * 2u + (n[a] < 0.0 ? 1u : 0u);
+   return pcg(uint(c.x) * 73856093u ^ pcg(uint(c.y) * 19349663u ^ pcg(uint(c.z) * 83492791u + side))) | 1u;
+}
+float causAxisCos(float3 n) { const float3 an = abs(n); return max(an.x, max(an.y, an.z)); }
+float3 causGet(const device uint* g, uint key)
+{
+   uint s = pcg(key ^ 0x9e3779b9u) & (kCausCells - 1u);
+   for (int t = 0; t < 8; t++, s = (s + 1u) & (kCausCells - 1u))
+   {
+      const uint k = g[s * 4u];
+      if (k == key) return float3(g[s * 4u + 1u], g[s * 4u + 2u], g[s * 4u + 3u]) * (1.0 / 4096.0);
+      if (k == 0u) break;
+   }
+   return float3(0.0);
+}
+void causAdd(device atomic_uint* g, uint key, float3 e)
+{
+   uint s = pcg(key ^ 0x9e3779b9u) & (kCausCells - 1u);
+   for (int t = 0; t < 8; t++, s = (s + 1u) & (kCausCells - 1u))
+   {
+      uint k = atomic_load_explicit(&g[s * 4u], memory_order_relaxed);
+      for (int r = 0; r < 4 && k == 0u; r++)
+      {
+         uint ex = 0u;
+         if (atomic_compare_exchange_weak_explicit(&g[s * 4u], &ex, key, memory_order_relaxed, memory_order_relaxed)) k = key;
+         else k = ex;
+      }
+      if (k != key) continue;
+      const uint3 q = uint3(clamp(e * 4096.0, float3(0.0), float3(16777216.0)));
+      for (int c = 0; c < 3; c++) if (q[c] > 0u) atomic_fetch_add_explicit(&g[s * 4u + 1u + uint(c)], q[c], memory_order_relaxed);
+      return;
+   }
+}
+// c: the glass's bounding sphere (centre, radius); info: x cell side h, y photons per pass, z pass index, w light count
+struct CausU { float4 c; float4 info; };
+fragment float4 caus_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant CausU& u [[buffer(0)]],
+                        constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], constant LightU* LL [[buffer(6)]],
+                        device atomic_uint* grid [[buffer(7)]])
+{
+   const uint2 px = uint2(in.pos.xy);
+   const uint id = px.x + 256u * px.y;
+   Lds qs = { uint(u.info.z), pcg(id * 747796405u + 1u), 0u, 0u, pcg(id ^ pcg(uint(u.info.z) * 2654435761u + 7u)) };
+   const int count = int(u.info.w);
+   if (count <= 0) return float4(0.0);
+   const int li = min(int(rnd(qs) * float(count)), count - 1);
+   constant LightU& Lt = LL[li];
+   const int type = int(Lt.vec.w);
+   if (type == 3 || Lt.color.w > 0.5) return float4(0.0); // ambient, or a light whose shadows are off (glass already lets it through)
+   const float3 axis = (type == 1 || type == 4 || type == 5) ? normalize(Lt.vec.xyz - u.c.xyz) : normalize(Lt.vec.xyz);
+   const float3 ax = abs(axis.y) < 0.99 ? normalize(cross(axis, float3(0.0, 1.0, 0.0))) : float3(1.0, 0.0, 0.0), ay = cross(axis, ax);
+   const float rr = u.c.w * sqrt(rnd(qs)), ph = 6.28318530718 * rnd(qs);
+   const float3 xd = u.c.xyz + (ax * cos(ph) + ay * sin(ph)) * rr;
+   float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0); int lix = -1;
+   ldsEvent(qs);
+   ptPickLight(f, LL + li, nullptr, 0, 0.0, 1, xd, qs, ld, Le, tmax, pL, lterms, 0.0, lix);
+   if (!any(Le > 0.0)) return float4(0.0);
+   // Flux through this photon's share of the disc: irradiance across the light direction x the disc's slant x area.
+   float3 T = Le * lterms.x * max(dot(ld, axis), 0.0) * (3.14159265 * u.c.w * u.c.w) * float(count) / u.info.y;
+   float3 o = xd + ld * min(tmax, 100.0), d = -ld;
+   bool spec = false;
+   intersector<triangle_data, instancing> it;
+   it.assume_geometry_type(geometry_type::triangle);
+   for (int b = 0; b < 8; b++)
+   {
+      ldsEvent(qs);
+      intersection_result<triangle_data, instancing> h = it.intersect(ray(o, d, 0.0, 1e4), rtArgs.tlas, 1);
+      if (h.type != intersection_type::triangle) break;
+      constant RInst& I = inst[h.instance_id];
+      const device uint* ib = reinterpret_cast<const device uint*>(I.ib);
+      const device float* vb = reinterpret_cast<const device float*>(I.vb);
+      const uint3 ix = uint3(ib[h.primitive_id * 3], ib[h.primitive_id * 3 + 1], ib[h.primitive_id * 3 + 2]);
+      const float2 bc = h.triangle_barycentric_coord;
+      const float3 w3 = float3(1.0 - bc.x - bc.y, bc.x, bc.y);
+      const float3 nl = float3(vb[ix.x * 6 + 3], vb[ix.x * 6 + 4], vb[ix.x * 6 + 5]) * w3.x
+                      + float3(vb[ix.y * 6 + 3], vb[ix.y * 6 + 4], vb[ix.y * 6 + 5]) * w3.y
+                      + float3(vb[ix.z * 6 + 3], vb[ix.z * 6 + 4], vb[ix.z * 6 + 5]) * w3.z;
+      float3 n = normalize((I.normalM * float4(nl, 0.0)).xyz);
+      const bool backHit = dot(n, d) > 0.0;
+      if (backHit) n = -n;
+      const float3 p = o + d * h.distance;
+      if (noShadowBy(inst, h.instance_id, shLink(Lt, li))) { o = offRay(p, -n); continue; } // row 4.2: passes this light
+      const float glW = clamp(I.mat.transmission, 0.0, 1.0) * (1.0 - clamp(I.mat.metallic, 0.0, 1.0));
+      if (glW > 0.0 && rnd(qs) < glW)
+      {
+         const float ta = max(0.002, clamp(I.mat.roughness, 0.0, 1.0) * clamp(I.mat.roughness, 0.0, 1.0));
+         const float3 V = -d, Hm = ggxSampleH(n, ta, rnd(qs), rnd(qs));
+         const float cosI = dot(V, Hm);
+         if (cosI <= 1e-5) break;
+         const float ior = max(I.mat.ior, 1.0001), eta = backHit ? ior : 1.0 / ior;
+         float3 nd; bool thru = false;
+         if (rnd(qs) < ptFd(cosI, eta)) { nd = reflect(d, Hm); if (dot(n, nd) <= 0.0) break; }
+         // Refraction also takes eta^2: the adjoint of the camera side's glass, which (as Cycles') leaves radiance's
+         // 1/eta^2 out, so photons and camera paths agree; a closed body's two crossings cancel it.
+         else { nd = refract(d, Hm, eta); if (dot(nd, nd) < 1e-6 || dot(n, nd) >= 0.0) break; T *= float3(I.mat.base) * (eta * eta); thru = true; }
+         const float gV = max(abs(dot(n, V)), 1e-4), gL = max(abs(dot(n, nd)), 1e-4), gH = max(dot(n, Hm), 1e-4);
+         T *= min(cosI * ptG1(gV, ta) * ptG1(gL, ta) / (gV * gH), 4.0);
+         o = offRay(p, thru ? -n : n); d = normalize(nd); spec = true;
+         continue;
+      }
+      if (I.mat.clear > 0.0 && rnd(qs) < I.mat.clear) { o = offRay(p, -n); continue; } // see-through surfaces pass it
+      if (spec) causAdd(grid, causKey(p, n, u.info.x, float2(0.0)), T * causAxisCos(n) / (u.info.x * u.info.x));
+      break;
+   }
+   return float4(0.0);
+}
 fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], constant PtU& u [[buffer(0)]],
                       constant RTArgs& rtArgs [[buffer(3)]], constant RInst* inst [[buffer(4)]], const device EmTri* ems [[buffer(5)]],
-                      constant LightU* LL [[buffer(6)]],
+                      constant LightU* LL [[buffer(6)]], const device uint* caus [[buffer(7)]],
                       texture2d<float> prev [[texture(0)]], texture2d<float> prevAux [[texture(1)]], texture2d<float> prevGd [[texture(2)]],
                       texture2d<float> ecdf [[texture(3)]],
                       texture2d<float> eLut [[texture(8)]], texture2d<float> et [[texture(9)]],
@@ -1627,17 +1974,25 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          // Row 5.3: free flight through the medium (one extinction for all channels, so the weight is the albedo).
          // A scatter takes one light sample with the phase function, then the path goes on along a phase sample.
          const float2 sp = fogSpan(u, o, d, h.type == intersection_type::triangle ? h.distance : 1e4);
-         const float s = sp.x - log(max(1.0 - rnd(qs), 1e-12)) / u.fog.x;
+         float s = sp.x - log(max(1.0 - rnd(qs), 1e-12)) / u.fog.x;
+         // Row 4.1: a shaped medium is delta tracked (Woodcock) against the peak: a tentative collision is real with
+         // the chance density / peak, else the flight goes on. An even box keeps the plain free flight.
+         if (u.fog.z > 0.0)
+            for (int g = 0; g < 64 && sp.y > sp.x && s < sp.y; g++)
+            {
+               if (rnd(qs) < fogShape(u.fogLo.xyz, u.fogHi.xyz, u.fog.z, o + d * s)) break;
+               s -= log(max(1.0 - rnd(qs), 1e-12)) / u.fog.x;
+            }
          if (sp.y > sp.x && s < sp.y)
          {
             const float3 pm = o + d * s;
             if (b == 0) { cov = 1.0; alb0 = u.fogC.xyz; n0 = -d; dist0 = s; }
             T *= u.fogC.xyz;
-            float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
-            ptPickLight(f, LL, ems, nEm, pEm, int(f.fld.y + 0.5), pm, qs, ld, Le, tmax, pL, lterms);
+            float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0); int lix = -1;
+            ptPickLight(f, LL, ems, nEm, pEm, int(f.fld.y + 0.5), pm, qs, ld, Le, tmax, pL, lterms, 0.0, lix);
             if (any(Le > 0.0))
             {
-               if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, pm, ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, pm, ld, tmax, f.shQ.w, seed, lix)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                const float ph = hgPhase(dot(ld, d), u.fog.y);
                L += T * ph * Le * lterms.x * fogTr(u, pm, ld, tmax) * (pL > 0.0 ? pL / max(pL * pL + ph * ph, 1e-20) : 1.0);
             }
@@ -1890,16 +2245,22 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
          o = offRay(p, thru ? -ns : ns); d = normalize(nd);
          continue;
       }
+      if (u.em.w > 0.0 && metal < 1.0 && !hairM)
+      {
+         // Row 4.4: caustics, the photons' irradiance here (read through a jittered cell, a box blur over the passes).
+         const float3 Ec = causGet(caus, causKey(p, ns, u.em.w, float2(rnd(qs), rnd(qs)) - 0.5));
+         if (any(Ec > 0.0)) L += T * (float3(1.0) - ptF(nDotV, f0)) * (1.0 - metal) * base * (1.0 / 3.14159265) * Ec;
+      }
       if (b == 0) L += base * pow(1.0 - nDotV, 3.0) * f.eye.w; // Render 3D's rim, as the raster, so settling keeps the look
       for (int i = 0; i < int(f.fld.y + 0.5); i++) // ambient lights: the raster's flat, unshadowed fill, so settling keeps it
-         if (int(LL[i].vec.w) == 3) L += T * base * (1.0 - metal) * LL[i].color.xyz * LL[i].terms.x;
+         if (int(LL[i].vec.w) == 3 && !unlitBy(I.mat.unlit, i)) L += T * base * (1.0 - metal) * LL[i].color.xyz * LL[i].terms.x;
       // direct light, the same model as the raster
       const int count = int(f.fld.y + 0.5);
       // next-event estimation: an emissive triangle (chance pEm, picked by power) or one light, picked uniformly and
       // weighted by the count and the chance of taking this branch (unbiased). Both branches only set up the sample;
       // one shadow ray and one BSDF evaluation below serve either (keeps the kernel small).
-      float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0);
-      ptPickLight(f, LL, ems, nEm, pEm, count, p, qs, ld, Le, tmax, pL, lterms);
+      float3 ld = float3(0.0, 1.0, 0.0), Le = float3(0.0); float tmax = 0.0, pL = -1.0; float2 lterms = float2(1.0); int lix = -1;
+      ptPickLight(f, LL, ems, nEm, pEm, count, p, qs, ld, Le, tmax, pL, lterms, I.mat.unlit, lix);
       // Hair: one place across the fibre per hit (the paper's integral over h), the same for the light and the bounce.
       const float hH = hairM ? rnd(qs) * 2.0 - 1.0 : 0.0;
       const float hBm = clamp(I.mat.roughness, 0.02, 1.0), hBn = -I.mat.hairRadialNeg;
@@ -1907,7 +2268,7 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
       {
          // Lights keep the live picture's shadow strength, so settling does not darken shadows the user already sees;
          // emitters are surfaces, fully blocked.
-         if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(p, dot(ns, ld) < 0.0 ? -ns : ns), ld, tmax, f.shQ.w, seed)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+         if (pL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(p, dot(ns, ld) < 0.0 ? -ns : ns), ld, tmax, f.shQ.w, seed, lix)) Le *= pL > 0.0 ? 0.0 : 1.0 - f.shP.w;
          Le *= fogTr(u, p, ld, tmax);
          float pB = 0.0;
          float3 fe = hairM ? hairBsdf(V, ld, hT, float3(I.mat.hairSigma), hBm, hBn, I.mat.hairShift, I.mat.ior, hH, pB) * lterms.x
@@ -1999,7 +2360,16 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             const float3 A = clamp(base, 0.0, 0.999);
             const float3 qa = 4.09712 + 4.20863 * A - sqrt(9.59217 + 41.6808 * A + 17.7126 * A * A);
             const float3 alb = 1.0 - qa * qa;
-            float3 wp = offRay(p, -ns), wd = cosineDir(-ns, rnd(qs), rnd(qs));
+            // Entry as Cycles' Random Walk (subsurface_entry_bounce): the incoming ray refracted at the IOR through a
+            // GGX microfacet of alpha = roughness^2, not a cosine; a draw that would leave the surface ends the path.
+            float3 wd;
+            {
+               const float3 Hm = ggxSampleH(ns, max(0.002, rough * rough), rnd(qs), rnd(qs));
+               const float ci = dot(V, Hm), ne = 1.0 / clamp(I.mat.ior, 1.01, 3.8);
+               wd = ci > 0.0 ? -ne * V + (ne * ci - sqrt(max(1.0 - ne * ne * (1.0 - ci * ci), 1e-14))) * Hm : ns;
+               if (dot(ns, wd) >= 0.0) break;
+            }
+            float3 wp = offRay(p, -ns);
             bool out = false; float3 q = p, no = ns;
             for (int s = 0; s < 256 && !out; s++)
             {
@@ -2040,12 +2410,12 @@ fragment PtOut pt_fs(SkyOut in [[stage_in]], constant FrameU& f [[buffer(1)]], c
             }
             if (!out) break;
             T *= min(Tw, float3(8.0));
-            float3 eld = float3(0.0, 1.0, 0.0), eLe = float3(0.0); float etm = 0.0, epL = -1.0; float2 elt = float2(1.0);
-            ptPickLight(f, LL, ems, nEm, pEm, count, q, qs, eld, eLe, etm, epL, elt);
+            float3 eld = float3(0.0, 1.0, 0.0), eLe = float3(0.0); float etm = 0.0, epL = -1.0; float2 elt = float2(1.0); int elix = -1;
+            ptPickLight(f, LL, ems, nEm, pEm, count, q, qs, eld, eLe, etm, epL, elt, I.mat.unlit, elix);
             const float ec = dot(no, eld);
             if (ec > 1e-5 && any(eLe > 0.0))
             {
-               if (epL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(q, no), eld, etm, f.shQ.w, seed)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
+               if (epL > -1.5 && occludedAlpha(rtArgs.tlas, inst, maps, offRay(q, no), eld, etm, f.shQ.w, seed, elix)) eLe *= epL > 0.0 ? 0.0 : 1.0 - f.shP.w;
                const float epB = ec / 3.14159265;
                L += T * (epB * elt.x) * eLe * (epL > 0.0 ? epL / max(epL * epL + epB * epB, 1e-20) : 1.0);
             }
@@ -2394,7 +2764,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
          [enc endEncoding];
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          return cb.status == MTLCommandBufferStatusCompleted;
       }
 
@@ -2411,7 +2781,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
 
    using namespace rr;
    struct RInstH { uint64_t vb, ib, uvb, wr; float normalM[16]; R3dMatH mat; };
-   static_assert(sizeof(RInstH) == 464, "RInst layout as the shader's");
+   static_assert(sizeof(RInstH) == 480, "RInst layout as the shader's");
 
    class MetalRaster final : public RasterRenderer
    {
@@ -2476,13 +2846,14 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          mSrc = src;
          mFieldLibBuilds++;
          mPso = nil; mFmt = MTLPixelFormatInvalid;
-         mPtPso = nil; mPtResPso = nil; mPtFmt = MTLPixelFormatInvalid;
+         mPtPso = nil; mPtResPso = nil; mPtFmt = MTLPixelFormatInvalid; mCausPso = nil;
          mDofPso = nil;
          mInvTried = false; mPrePso = nil; mPsoRunInv = nil; mPsoRunDirInv = nil;
       }
       int mFieldLibBuilds = 0;
    public:
       int FieldLibraryBuilds() const override { return mFieldLibBuilds; }
+      size_t GpuBytes() const override { return (size_t)mDev.currentAllocatedSize; }
    private:
       // tvb/tib/tuvb/tcount: the rays' mesh (row 4.3, a displaced copy), nil when the rays see the drawn one.
       struct Gpu
@@ -2535,7 +2906,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          }
          [ae endEncoding];
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          return cb.status == MTLCommandBufferStatusCompleted;
       }
       static void HMix(uint64_t& h, const void* p, size_t n)
@@ -2633,7 +3004,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             }
          }
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          return cb.status == MTLCommandBufferStatusCompleted;
       }
       // Instances change every frame; the instance structure is rebuilt in the frame's command buffer, only when
@@ -2677,7 +3048,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             const engine::Instance& a = fr.instances[i];
             size_t j = i + 1;
             if (RayClusterable(a))
-               while (j < n && fr.instances[j].copyGroup == a.copyGroup && fr.instances[j].mesh == a.mesh && fr.instances[j].castShadow == a.castShadow &&
+               while (j < n && fr.instances[j].copyGroup == a.copyGroup && fr.instances[j].mesh == a.mesh && fr.instances[j].castShadow == a.castShadow && fr.instances[j].unlitMask == a.unlitMask && fr.instances[j].noShadowMask == a.noShadowMask &&
                       RayClusterable(fr.instances[j]) && std::memcmp(fr.instances[j].baseSrgb, a.baseSrgb, sizeof(a.baseSrgb)) == 0 &&
                       fr.instances[j].metallic == a.metallic && fr.instances[j].roughness == a.roughness)
                   j++;
@@ -2928,7 +3299,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [be generateMipmapsForTexture:mEnvTex];
             [be endEncoding];
             [cb commit];
-            [cb waitUntilCompleted];
+            WaitChecked(cb, __func__);
             mEnvRev = fr.envRev;
             BuildEnvCdf(fr);
          }
@@ -3078,8 +3449,12 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       bool MakeGpu(const engine::MeshData& m, Gpu& g)
       {
-         g.vb = [mDev newBufferWithBytes:m.posNormal.data() length:std::max<size_t>(m.posNormal.size() * 4, 4) options:MTLResourceStorageModeShared];
-         g.ib = [mDev newBufferWithBytes:m.indices.data() length:std::max<size_t>(m.indices.size() * 4, 4) options:MTLResourceStorageModeShared];
+         // An empty mesh (a 3D View item whose node gives no geometry) still gets a 4-byte buffer, never a read of null.
+         static const uint32_t kZero[1] = { 0 };
+         g.vb = [mDev newBufferWithBytes:m.posNormal.empty() ? (const void*)kZero : m.posNormal.data()
+                                  length:std::max<size_t>(m.posNormal.size() * 4, 4) options:MTLResourceStorageModeShared];
+         g.ib = [mDev newBufferWithBytes:m.indices.empty() ? (const void*)kZero : m.indices.data()
+                                  length:std::max<size_t>(m.indices.size() * 4, 4) options:MTLResourceStorageModeShared];
          g.uvb = UvBuffer(m);
          g.wb = WearBuffer(m.wear, m.posNormal.size() / 6);
          g.count = (NSUInteger)m.indices.size();
@@ -3129,12 +3504,13 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [ae buildAccelerationStructure:as descriptor:ad scratchBuffer:scratch scratchBufferOffset:0];
          [ae endEncoding];
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          return as;
       }
       id<MTLTexture> mEnvTex = nil, mEnvDummy = nil, mEnvBound = nil, mEnvCdf = nil;
       unsigned long long mEnvRev = ~0ull;
       id<MTLBuffer> mInfoBuf = nil, mEmBuf = nil;
+      id<MTLRenderPipelineState> mCausPso = nil; id<MTLBuffer> mCausBuf = nil; id<MTLTexture> mCausTgt = nil; // row 4.4
       id<MTLRenderPipelineState> mBgPsoMrt = nil, mBgPsoDir = nil;
       id<MTLDepthStencilState> mDsBg = nil;
       void FillFrame(FrameU& f, const engine::Frame& fr)
@@ -3190,7 +3566,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             id<MTLCommandBuffer> cb = [mQueue commandBuffer];
             [fx encodeToCommandBuffer:cb];
             [cb commit];
-            [cb waitUntilCompleted];
+            WaitChecked(cb, __func__);
             return cb.status == MTLCommandBufferStatusCompleted;
          }
          return false;
@@ -3219,6 +3595,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             EnsureShadowTex(4);
          const bool giOn = fr.gi && haveTlas;
          f.gi[0] = giOn ? 1.0f : 0.0f; f.gi[1] = fr.giStrength; f.gi[2] = (float)fr.frameIndex; f.gi[3] = (float)fr.giRays;
+         f.ambient[3] = (fr.fogColor[0] + fr.fogColor[1] + fr.fogColor[2]) / 3.0f; // the fog's mean albedo (r_fs)
          f.shQ[2] = (rt ? 1.0f : 0.0f) + (rtRefl ? 2.0f : 0.0f); f.shQ[3] = fr.rayBias;
          if (rt) { f.shP[1] = 0; f.shP[0] = 0; f.shP[3] = fr.shadow.strength; }
          // RT shadows: a depth-only prepass (the shaded pass then runs once per pixel), then the half-res shadow mask
@@ -3227,6 +3604,12 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          const bool prepass = rt && sHalfSh >= 0 && mDsEq && EnsureInv();
          float invVP[16];
          const bool mask = prepass && sHalfSh > 0 && mVisPso && Inv4(fr.viewProj, invVP);
+         std::vector<RInstH> info = RayInfo(fr, haveTlas, [&](const engine::Instance& in, R3dMatH& m) {
+            FillMatRays(in, m);
+            if (in.mapAlbedo >= 0 && in.mapAlbedo < engine::kMaxTextures) // the rays see the map's mean colour
+               for (int k = 0; k < 3; k++) m.base[k] *= mMapMean[in.mapAlbedo][k];
+         });
+         id<MTLBuffer> infoBuf = InfoBuffer(info);
          if (prepass)
          {
             MTLRenderPassDescriptor* zp = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -3282,16 +3665,20 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             vp.colorAttachments[2].texture = mVisF;
             vp.colorAttachments[2].loadAction = MTLLoadActionDontCare;
             vp.colorAttachments[2].storeAction = MTLStoreActionStore;
+            vp.colorAttachments[3].texture = mVisE;
+            vp.colorAttachments[3].loadAction = MTLLoadActionDontCare;
+            vp.colorAttachments[3].storeAction = MTLStoreActionStore;
             id<MTLRenderCommandEncoder> ve = [cb renderCommandEncoderWithDescriptor:vp];
             struct { float invVP[16]; float info[4]; float fog[4], fogC[4], fogLo[4], fogHi[4]; } vu = {};
             std::memcpy(vu.invVP, invVP, 64);
             vu.info[0] = (float)img.Width(); vu.info[1] = (float)img.Height();
-            vu.fog[0] = fr.fogDensity; vu.fog[1] = fr.fogAnisotropy;
+            vu.fog[0] = fr.fogDensity; vu.fog[1] = fr.fogAnisotropy; vu.fog[2] = fr.fogFalloff;
             for (int k = 0; k < 3; k++) { vu.fogC[k] = fr.fogColor[k]; vu.fogLo[k] = fr.fogMin[k]; vu.fogHi[k] = fr.fogMax[k]; }
             [ve setRenderPipelineState:mVisPso];
             [ve setFragmentBytes:&vu length:sizeof(vu) atIndex:0];
             [ve setFragmentBytes:&f length:sizeof(f) atIndex:1];
             [ve setFragmentBuffer:mArgBuf offset:0 atIndex:3];
+            [ve setFragmentBuffer:infoBuf offset:0 atIndex:4]; // row 4.2: shadow linking
             [ve setFragmentTexture:mDepth atIndex:0];
             [ve useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
             for (id<MTLAccelerationStructure> b in mBlas) [ve useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
@@ -3360,18 +3747,13 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setFragmentBytes:&f length:sizeof(f) atIndex:1];
          [enc setFragmentBuffer:mLightBuf offset:0 atIndex:6];
          [enc setFragmentBuffer:mClusterBuf offset:0 atIndex:7];
-         std::vector<RInstH> info = RayInfo(fr, haveTlas, [&](const engine::Instance& in, R3dMatH& m) {
-            FillMatRays(in, m);
-            if (in.mapAlbedo >= 0 && in.mapAlbedo < engine::kMaxTextures) // the rays see the map's mean colour
-               for (int k = 0; k < 3; k++) m.base[k] *= mMapMean[in.mapAlbedo][k];
-         });
-         id<MTLBuffer> infoBuf = InfoBuffer(info);
          [enc setFragmentBuffer:infoBuf offset:0 atIndex:4];
          [enc setFragmentTexture:mEnvBound atIndex:9];
          BindMaps(enc);
          [enc setFragmentTexture:mVis atIndex:7];
          [enc setFragmentTexture:mVisD atIndex:8];
          [enc setFragmentTexture:(mask && fr.fogDensity > 0.0f) ? mVisF : FogNone() atIndex:6]; // row 5.4: 1x1 = no fog
+         [enc setFragmentTexture:(mask && fr.fogDensity > 0.0f) ? mVisE : FogNone() atIndex:26];
          const bool envBg = fr.envBackground && (int(f.envm[0]) & 2) != 0, fogBg = !envBg && mask && fr.fogDensity > 0.0f;
          if ((envBg || fogBg) && mBgPsoMrt && mBgPsoDir)
          {
@@ -3564,7 +3946,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          DepthOfField(cb, img, fr, fmt);
          Bloom(cb, img, fr, fmt);
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          if (gpuMs)
             *gpuMs = (cb.GPUEndTime - cb.GPUStartTime) * 1000.0;
          return cb.status == MTLCommandBufferStatusCompleted;
@@ -3785,9 +4167,64 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             mEmBuf = [mDev newBufferWithLength:emLen * 2 options:MTLResourceStorageModeShared];
          if (!ems.empty()) std::memcpy(mEmBuf.contents, ems.data(), ems.size() * sizeof(EmTriH));
          id<MTLBuffer> infoBuf = InfoBuffer(info);
+         // Row 4.4: caustics. The glass's world bounds (every instance with transmission) aim the photons and size
+         // the grid's cell; no glass, no photon pass.
+         float cLo[3] = { 1e30f, 1e30f, 1e30f }, cHi[3] = { -1e30f, -1e30f, -1e30f };
+         bool glass = false;
+         for (const engine::Instance& in : fr.instances)
+         {
+            if (in.transmission <= 0.0f || in.mesh < 0 || in.mesh >= (int)mMeshes.size())
+               continue;
+            const Gpu& g = mMeshes[in.mesh];
+            for (int k = 0; k < 8; k++)
+            {
+               const float c[3] = { (k & 1) ? g.hi[0] : g.lo[0], (k & 2) ? g.hi[1] : g.lo[1], (k & 4) ? g.hi[2] : g.lo[2] };
+               for (int a = 0; a < 3; a++)
+               {
+                  const float w = in.model[a] * c[0] + in.model[4 + a] * c[1] + in.model[8 + a] * c[2] + in.model[12 + a];
+                  cLo[a] = std::min(cLo[a], w); cHi[a] = std::max(cHi[a], w);
+               }
+            }
+            glass = true;
+         }
+         const bool caus = glass && f.fld[1] > 0.5f && CausPipeline();
+         float cU[8] = {};
+         if (caus)
+         {
+            float rad = 0.0f;
+            for (int a = 0; a < 3; a++) { cU[a] = 0.5f * (cLo[a] + cHi[a]); rad += (cHi[a] - cLo[a]) * (cHi[a] - cLo[a]); }
+            cU[3] = 0.5f * std::sqrt(rad) * 1.02f;
+            cU[4] = cU[3] / 48.0f; cU[5] = (float)(kCausSide * kCausSide); cU[7] = f.fld[1];
+         }
          for (int s = 0; s < std::max(1, spp); s++)
          {
             const int cur = 1 - mPtCur;
+            if (caus)
+            {
+               id<MTLBlitCommandEncoder> bl = [cb blitCommandEncoder];
+               [bl fillBuffer:mCausBuf range:NSMakeRange(0, mCausBuf.length) value:0];
+               [bl endEncoding];
+               MTLRenderPassDescriptor* cp = [MTLRenderPassDescriptor renderPassDescriptor];
+               cp.colorAttachments[0].texture = mCausTgt;
+               cp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+               cp.colorAttachments[0].storeAction = MTLStoreActionDontCare;
+               id<MTLRenderCommandEncoder> ce = [cb renderCommandEncoderWithDescriptor:cp];
+               [ce setRenderPipelineState:mCausPso];
+               cU[6] = (float)mPtN;
+               [ce setFragmentBytes:cU length:sizeof(cU) atIndex:0];
+               [ce setFragmentBytes:&f length:sizeof(f) atIndex:1];
+               [ce setFragmentBuffer:mArgBuf offset:0 atIndex:3];
+               [ce setFragmentBuffer:infoBuf offset:0 atIndex:4];
+               [ce setFragmentBuffer:mLightBuf offset:0 atIndex:6];
+               [ce setFragmentBuffer:mCausBuf offset:0 atIndex:7];
+               [ce useResource:mCausBuf usage:MTLResourceUsageRead | MTLResourceUsageWrite stages:MTLRenderStageFragment];
+               [ce useResource:mTlas usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               for (const Gpu& g : mMeshes) { [ce useResource:g.RV() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; [ce useResource:g.RI() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RU()) [ce useResource:g.RU() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; if (g.RW()) [ce useResource:g.RW() usage:MTLResourceUsageRead stages:MTLRenderStageFragment]; }
+               for (id<MTLAccelerationStructure> b in mBlas) [ce useResource:b usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+               UseClusters(ce);
+               [ce drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+               [ce endEncoding];
+            }
             MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
             id<MTLTexture> outs[3] = { mPtAcc[cur], mPtAux[cur], mPtGd[cur] };
             for (int k = 0; k < 3; k++)
@@ -3799,7 +4236,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
             [e setRenderPipelineState:mPtPso];
             struct { float invVP[16]; float info[4]; float em[4]; float lens[4], lr[4], lu[4], lf[4], fog[4], fogC[4], fogLo[4], fogHi[4]; } pu;
-            pu.fog[0] = fr.fogDensity; pu.fog[1] = fr.fogAnisotropy; pu.fog[2] = pu.fog[3] = 0.0f;
+            pu.fog[0] = fr.fogDensity; pu.fog[1] = fr.fogAnisotropy; pu.fog[2] = fr.fogFalloff; pu.fog[3] = 0.0f;
             for (int k = 0; k < 3; k++) { pu.fogC[k] = fr.fogColor[k]; pu.fogLo[k] = fr.fogMin[k]; pu.fogHi[k] = fr.fogMax[k]; }
             pu.fogLo[3] = pu.fogHi[3] = 0.0f;
             pu.lens[0] = fr.lensRadius; pu.lens[1] = fr.focusDist; pu.lens[2] = fr.bokeh[0]; pu.lens[3] = fr.bokeh[1];
@@ -3808,13 +4245,14 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             std::memcpy(pu.invVP, inv, 64);
             pu.info[0] = (float)mPtN; pu.info[1] = (float)std::max(1, bounces); pu.info[2] = (float)(mPtFrame++); pu.info[3] = (float)img.Width();
             const bool envLight = mEnvCdf && mEnvBound == mEnvTex; // the HDRI can be sampled as a light
-            pu.em[0] = (float)ems.size(); pu.em[1] = pEm; pu.em[2] = envLight ? 1.0f : 0.0f; pu.em[3] = 0.0f;
+            pu.em[0] = (float)ems.size(); pu.em[1] = pEm; pu.em[2] = envLight ? 1.0f : 0.0f; pu.em[3] = caus ? cU[4] : 0.0f;
             [e setFragmentBytes:&pu length:sizeof(pu) atIndex:0];
             [e setFragmentBytes:&f length:sizeof(f) atIndex:1];
             [e setFragmentBuffer:mArgBuf offset:0 atIndex:3];
             [e setFragmentBuffer:infoBuf offset:0 atIndex:4];
             [e setFragmentBuffer:mEmBuf offset:0 atIndex:5];
             [e setFragmentBuffer:mLightBuf offset:0 atIndex:6];
+            [e setFragmentBuffer:caus ? mCausBuf : mEmBuf offset:0 atIndex:7];
             [e setFragmentTexture:ELut() atIndex:8];
             [e setFragmentTexture:mEnvBound atIndex:9];
             [e setFragmentTexture:mPtAcc[mPtCur] atIndex:0];
@@ -3847,7 +4285,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [e endEncoding];
          Bloom(cb, img, fr, img.Tex().pixelFormat);
          [cb commit];
-         [cb waitUntilCompleted];
+         WaitChecked(cb, __func__);
          if (gpuMs) *gpuMs = (cb.GPUEndTime - cb.GPUStartTime) * 1000.0;
          mPtNoise = -1.0f;
          if (dn && mDnHist && cb.status == MTLCommandBufferStatusCompleted)
@@ -3914,6 +4352,25 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [ce memoryBarrierWithScope:MTLBarrierScopeBuffers];
          }
          [ce endEncoding];
+      }
+      static constexpr int kCausSide = 256; // photons per settle pass: kCausSide^2
+      bool CausPipeline()
+      {
+         if (mCausPso && mCausBuf && mCausTgt)
+            return true;
+         NSError* err = nil;
+         MTLRenderPipelineDescriptor* a = [MTLRenderPipelineDescriptor new];
+         a.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
+         a.fragmentFunction = [mLib newFunctionWithName:@"caus_fs"];
+         a.colorAttachments[0].pixelFormat = MTLPixelFormatR8Unorm;
+         a.colorAttachments[0].writeMask = MTLColorWriteMaskNone;
+         mCausPso = [mDev newRenderPipelineStateWithDescriptor:a error:&err];
+         if (!mCausPso) { EngineFail(@"caustics pipeline", err); return false; }
+         mCausBuf = [mDev newBufferWithLength:(NSUInteger)(1u << 19) * 16 options:MTLResourceStorageModePrivate];
+         MTLTextureDescriptor* td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm width:kCausSide height:kCausSide mipmapped:NO];
+         td.usage = MTLTextureUsageRenderTarget; td.storageMode = MTLStorageModePrivate;
+         mCausTgt = [mDev newTextureWithDescriptor:td];
+         return mCausBuf && mCausTgt;
       }
       bool PtPipeline(MTLPixelFormat fmt)
       {
@@ -4047,8 +4504,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          [enc setVertexBuffer:mInstBuf offset:0 atIndex:10];
          for (const auto& r : mRuns)
          {
-            if (!fr.instances[r.first].castShadow)
-               continue;
+            if (!fr.instances[r.first].castShadow || (fr.instances[r.first].noShadowMask & 1u))
+               continue; // row 4.2: an object linked out of light 0's shadow
             const Gpu& g = mMeshes[fr.instances[r.first].mesh];
             [enc setVertexBuffer:g.vb offset:0 atIndex:0];
             [enc setVertexBytes:&r.first length:4 atIndex:11];
@@ -4124,8 +4581,9 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
                vd.vertexFunction = [mLib newFunctionWithName:@"sky_vs"];
                vd.fragmentFunction = [mLib newFunctionWithName:@"vis_fs"];
                vd.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA8Unorm;
-               vd.colorAttachments[1].pixelFormat = MTLPixelFormatR32Float;
+               vd.colorAttachments[1].pixelFormat = MTLPixelFormatRG32Float;
                vd.colorAttachments[2].pixelFormat = MTLPixelFormatRGBA16Float;
+               vd.colorAttachments[3].pixelFormat = MTLPixelFormatRGBA16Float; // row 5.6: fog fill
                mVisPso = [mDev newRenderPipelineStateWithDescriptor:vd error:&err];
                if (!mVisPso) EngineFail(@"shadow mask pipeline", err);
             }
@@ -4264,7 +4722,8 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       bool mVisValid = false; int mVisW = 0, mVisH = 0; // mVis holds the last Render's mask at this size
       id<MTLTexture> mVis = nil, mVisD = nil; // half-res RT shadow mask (4 lights) and its distance guide
-      id<MTLTexture> mVisF = nil, mFogNone = nil; // row 5.4: half-res fog (in-scatter, transmittance); 1x1 stand-in when off
+      id<MTLTexture> mVisF = nil, mVisE = nil, mFogNone = nil; // mVisE (row 5.6): the fog's fill on surfaces
+      // row 5.4: half-res fog (in-scatter, transmittance); 1x1 stand-in when off
       id<MTLTexture> FogNone()
       {
          if (!mFogNone)
@@ -4339,10 +4798,10 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
          d.pixelFormat = MTLPixelFormatRGBA16Float; d.width = (w + 1) / 2; d.height = (h + 1) / 2;
          mTr[0] = [mDev newTextureWithDescriptor:d]; mTr[1] = [mDev newTextureWithDescriptor:d];
          d.pixelFormat = MTLPixelFormatRGBA8Unorm; mVis = [mDev newTextureWithDescriptor:d];
-         d.pixelFormat = MTLPixelFormatR32Float; mVisD = [mDev newTextureWithDescriptor:d];
-         d.pixelFormat = MTLPixelFormatRGBA16Float; mVisF = [mDev newTextureWithDescriptor:d];
+         d.pixelFormat = MTLPixelFormatRG32Float; mVisD = [mDev newTextureWithDescriptor:d];
+         d.pixelFormat = MTLPixelFormatRGBA16Float; mVisF = [mDev newTextureWithDescriptor:d]; mVisE = [mDev newTextureWithDescriptor:d];
          mHistValid = false; mRValid = false;
-         return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1] && mNz && mAt[0] && mAt[1] && mTr[0] && mTr[1] && mVis && mVisD && mVisF;
+         return mHdr && mGiT && mHist[0] && mHist[1] && mRefl && mRHist[0] && mRHist[1] && mNz && mAt[0] && mAt[1] && mTr[0] && mTr[1] && mVis && mVisD && mVisF && mVisE;
       }
       MTLPixelFormat mFmt = MTLPixelFormatInvalid;
       std::vector<Gpu> mMeshes;
@@ -4441,7 +4900,7 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [enc endEncoding];
             [cb commit];
-            [cb waitUntilCompleted];
+            WaitChecked(cb, __func__);
             if (cb.status != MTLCommandBufferStatusCompleted)
             {
                err = "Metal command buffer failed";

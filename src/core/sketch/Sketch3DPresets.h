@@ -85,6 +85,40 @@ function draw(t) {
   branch(0.7, depth, t);
 }
 )"},
+{"City block", R"(// A city by rules: blocks of lots between streets, towers taller toward the centre.
+param("blocks", 4, 1, 8);
+param("lots", 3, 1, 5);
+param("height", 1.6, 0.2, 4);
+param("setback", 0.5, 0, 1);
+
+function building(w, d, h) {
+  fill(hsl(0.08 + 0.06 * random(), 0.12, 0.45 + 0.25 * random()));
+  box(w, h, d);
+  if (h > 0.6 && random() < setback) {
+    const h2 = h * random(0.2, 0.5);
+    push(); translate(0, h / 2 + h2 / 2, 0); box(w * 0.7, h2, d * 0.7); pop();
+  }
+  push(); translate(0, h / 2 + 0.02, 0); fill(0.3, 0.3, 0.32); box(w * 0.3, 0.04, d * 0.3); pop();
+}
+
+function draw(t) {
+  const street = 0.12, bw = 3 / blocks, lw = (bw - street) / lots;
+  push(); translate(0, -0.5, 0); rotateX(-TAU / 4); fill(0.2, 0.2, 0.22); plane(3.4, 3.4); pop();
+  for (let bi = 0; bi < blocks; bi++)
+    for (let bj = 0; bj < blocks; bj++)
+      for (let i = 0; i < lots; i++)
+        for (let j = 0; j < lots; j++) {
+          const x = -1.5 + bi * bw + street / 2 + (i + 0.5) * lw;
+          const z = -1.5 + bj * bw + street / 2 + (j + 0.5) * lw;
+          const c = Math.max(0, 1 - Math.sqrt(x * x + z * z) / 2);
+          const h = 0.08 + height * (0.15 + c * c) * (0.4 + 0.6 * noise(x * 2, z * 2, 0));
+          push();
+          translate(x, -0.5 + h / 2, z);
+          building(lw * 0.82, lw * 0.82, h);
+          pop();
+        }
+}
+)"},
 {"Torus knot", R"(// A torus knot from many short tubes.
 param("p", 2, 1, 7);
 param("q", 3, 1, 7);

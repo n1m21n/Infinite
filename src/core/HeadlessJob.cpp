@@ -331,6 +331,8 @@ namespace Headless
                return true;
             job.batch = v;
          }
+         else if (a == "--serve" && job.mode == Mode::Frame)
+            job.serve = true;
          else if ((a == "--notes" || a == "--note-map" || a == "--stems" || a == "--stems-dir") && job.mode == Mode::AudioSummary)
          {
             const char* v = next(a.c_str());
@@ -529,6 +531,11 @@ namespace Headless
          usageError = "--render --node needs --duration S (there is no Output to take the length from)";
          return true;
       }
+      if (job.serve && job.batch.empty())
+      {
+         usageError = "--serve needs --batch <queue.txt>: the file new jobs are appended to";
+         return true;
+      }
       if (!job.geometry.empty() && job.node.empty())
       {
          usageError = "--geometry needs --node <index>: the 3D node whose geometry to write";
@@ -560,7 +567,8 @@ namespace Headless
       // checked to give zero hits (docs/fix-briefs/headless-engine.md 3.1b); the corpus in
       // this repo is one file, which is not enough to promote it.
       return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED" || code == "W_OUT_OF_RANGE" ||
-             code == "W_OVERRIDDEN_BY_MODULATION" || code == "W_UNMAPPED_EVENT" || code == "W_NOTE_PAN_IGNORED" || code == "W_CLIPPING" || code == "W_SILENT" || code == "W_BLACK_FRAME";
+             code == "W_OVERRIDDEN_BY_MODULATION" || code == "W_UNMAPPED_EVENT" || code == "W_NOTE_PAN_IGNORED" || code == "W_CLIPPING" || code == "W_SILENT" || code == "W_BLACK_FRAME" ||
+             code == "W_SCENE_EMPTY";   // a bare 3D View stage is a valid start
    }
 
    void PromoteWarnings(std::vector<Issue>& warnings, std::vector<Issue>& errors)

@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 constexpr int CurveNode::kMaxPoints;
+constexpr int CurveNode::kMaxTextPoints;
 
 namespace
 {
@@ -21,6 +23,28 @@ namespace
    }
 }
 
+// Reads "x y z x y z ..." (commas allowed). Returns the flat list when it
+// holds two or more whole points, else empty so the preset is used. Capped
+// so a pasted list cannot build an enormous tube.
+std::vector<float> CurveNode::ParsePoints(const std::string& text)
+{
+   std::vector<float> v;
+   const char* p = text.c_str();
+   while (*p && v.size() < (size_t)kMaxTextPoints * 3)
+   {
+      if (*p == ',' || *p == ' ' || *p == '\t') { p++; continue; }
+      char* end = nullptr;
+      const float f = std::strtof(p, &end);
+      if (end == p) { p++; continue; }
+      v.push_back(std::isfinite(f) ? f : 0.0f);
+      p = end;
+   }
+   v.resize(v.size() / 3 * 3);
+   if (v.size() < 6)
+      v.clear();
+   return v;
+}
+
 const std::vector<std::string>& CurveNode::KindNames() { return kKindNames; }
 const std::vector<std::string>& CurveNode::PresetNames() { return kPresetNames; }
 
@@ -30,11 +54,11 @@ void CurveNode::RebuildIfNeeded()
        mBuiltSegments == segments && mBuiltClosed == closed && mBuiltSpread == spread &&
        mBuiltHeight == height && mBuiltTwist == twist && mBuiltSeed == seed &&
        mBuiltRadius == radius && mBuiltSides == sides && mBuiltTaper == taper &&
-       !mLine.Empty())
+       mBuiltPoints == points && !mLine.Empty())
       return;
 
-   const int count = std::max(2, std::min(pointCount, kMaxPoints));
-   std::vector<float> control;
+   std::vector<float> control = ParsePoints(points);
+   const int count = control.empty() ? std::max(2, std::min(pointCount, kMaxPoints)) : 0;
    control.reserve((size_t)count * 3);
 
    const float twistRad = twist * 3.14159265f / 180.0f;
@@ -84,6 +108,7 @@ void CurveNode::RebuildIfNeeded()
    mBuiltSegments = segments; mBuiltClosed = closed; mBuiltSpread = spread;
    mBuiltHeight = height; mBuiltTwist = twist; mBuiltSeed = seed;
    mBuiltRadius = radius; mBuiltSides = sides; mBuiltTaper = taper;
+   mBuiltPoints = points;
    mRevision = NextMeshRevision();
 }
 

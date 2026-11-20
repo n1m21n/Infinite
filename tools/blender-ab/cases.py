@@ -147,7 +147,14 @@ CASES = {
     "light_point": _lit({"type": "point", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "radius": 0.1}),
     "light_spot": _lit({"type": "spot", "power": 600, "azimuth": 30, "elevation": 60, "distance": 3,
                         "spot_angle": 25, "blend": 0.3, "radius": 0.1}),
+    "light_ies": _lit({"type": "point", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "radius": 0.1,
+                       "ies": "ies_batwing.ies"}),
     "light_area": _lit({"type": "area", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "size": [1, 1]}),
+    # Row 4.2 (PLAN.md): a disc panel, then a rectangle with its emission held to a 40 degree spread (Cycles' soft box).
+    "light_disc": _lit({"type": "area", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "size": [1.4, 0.8],
+                        "shape": "disc"}),
+    "light_spread": _lit({"type": "area", "power": 300, "azimuth": 30, "elevation": 50, "distance": 3, "size": [1.5, 1.5],
+                          "spread": 40}),
     # No lamp: the world colour alone lights everything.
     "world_grey": {"camera": CAMERA, "lights": [], "world": {"color": [0.5, 0.5, 0.5]},
                    "objects": [GREY_FLOOR, _ball(-0.6, 0, 0.45, base_color=[0.8, 0.8, 0.8], roughness=0.5),
@@ -309,6 +316,35 @@ def _wear_groove():
                         for x, r in ((1.2, "Edge Wear"), (0.0, "Dirt"), (-1.2, "Dust"))]}
 
 
+def _weather_rust():
+    # Row 5.1: Rust on the monkey (sharp brow and ear rims, grooves round the eyes). Truth rebuilds the recipe from
+    # Cycles' pointiness and local AO; its noise is Blender's own. No low-poly cube: with 8 corner vertices Cycles'
+    # pointiness calls the whole cube an edge, a mesh-density difference, not the recipe's.
+    return {"size": SMALL, "camera": {"fov": 34, "azimuth": 90, "elevation": 25, "distance": 5.0, "target": [0, 0, 0.6]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 70, "elevation": 45}], "world": {"color": [0.35, 0.35, 0.35]},
+            "objects": [{"shape": "monkey", "scale": 0.6, "location": [0, 0, 0.6], "material": {"recipe": "Rust"}}]}
+
+
+def _weather_wet():
+    # Row 5.1: Wet on a stone pillar and a monkey standing on the floor: soaked and glossy below 0.4 m, dry above.
+    return {"size": SMALL, "camera": {"fov": 36, "azimuth": 90, "elevation": 20, "distance": 5.0, "target": [0, 0, 0.6]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 60, "elevation": 35}], "world": {"color": [0.35, 0.35, 0.35]},
+            "objects": [GREY_FLOOR,
+                        {"shape": "cube", "scale": [0.3, 0.3, 0.6], "location": [-0.6, 0, 0.6], "material": {"recipe": "Wet"}},
+                        {"shape": "monkey", "scale": 0.5, "location": [0.6, 0, 0.5], "material": {"recipe": "Wet"}}]}
+
+
+def _skin_head():
+    # Row 5.4: skin on the monkey head, sun from behind and to the side so the thin ears and the brow rims glow red
+    # (red travels farthest in skin: Cycles' skin radius 1 / 0.35 / 0.2, scaled to this head's size), an oily coat as
+    # the second specular lobe. Monkey 1.6 m wide vs a 0.18 m head: radius 0.08 m stands for skin's ~1 cm.
+    skin = {"base_color": [0.80, 0.52, 0.42], "roughness": 0.45, "subsurface": 1.0, "subsurface_color": [1.0, 0.35, 0.2],
+            "subsurface_radius": 0.4, "coat": 0.3, "coat_roughness": 0.3}
+    return {"size": SMALL, "camera": {"fov": 34, "azimuth": 70, "elevation": 10, "distance": 2.6, "target": [0, 0, 0.6]},
+            "lights": [{"type": "sun", "power": 3, "azimuth": 230, "elevation": 25}], "world": {"color": [0.25, 0.25, 0.25]},
+            "objects": [{"shape": "monkey", "scale": 0.6, "location": [0, 0, 0.6], "material": skin}]}
+
+
 def _sketch3d_two_tone():
     # Row 3.3: a Sketch 3D cube whose top half is tagged mask(1); a material Field program reads it as attr and paints
     # the two halves. Truth splits Cycles' cube at the same height.
@@ -437,6 +473,9 @@ CASES.update({
     "geom_monkey": _monkey(),
     "wear_masks": _wear_masks(),
     "wear_groove": _wear_groove(),
+    "weather_rust": _weather_rust(),
+    "weather_wet": _weather_wet(),
+    "skin_head": _skin_head(),
     "sketch3d_two_tone": _sketch3d_two_tone(),
     "suede_dir": _suede_dir(),
     "recipes_near": _recipes(3.6),
@@ -631,6 +670,31 @@ def _vol_shaft():
 CASES["vol_shaft"] = _vol_shaft()
 
 
+# Row 4.1: a lit smoke puff (density falls from the box centre to nothing at its faces) with a ball behind it under a
+# low sun, so the puff's own shadow falls across the floor; and haze filling a wide outdoor box over a floor of balls.
+def _vol_smoke():
+    return {"camera": {"fov": 40, "azimuth": 70, "elevation": 12, "distance": 4.2, "target": [0, 0, 0.7]},
+            "lights": [{"type": "sun", "power": 5, "azimuth": 150, "elevation": 30}],
+            "world": {"color": [0.03, 0.035, 0.045]}, "size": (256, 256),
+            "fog": {"density": 3.0, "color": [0.85, 0.85, 0.85], "g": 0.2, "falloff": 1.0,
+                    "box": [[-0.6, -0.6, 0.15], [0.6, 0.6, 1.35]]},
+            "objects": [GREY_FLOOR, _ball(-0.9, 0.9, 0.35, base_color=[0.8, 0.2, 0.1], roughness=0.5)]}
+
+
+def _vol_world_haze():
+    balls = [_ball(x, y, 0.3, base_color=[0.75, 0.75, 0.75], roughness=0.5)
+             for x, y in ((-1.2, 1.5), (0.0, 0.0), (1.2, -1.5), (-0.6, -3.0), (0.8, 3.0))]
+    return {"camera": {"fov": 45, "azimuth": 0, "elevation": 18, "distance": 5.0, "target": [0, 0, 0.3]},
+            "lights": [{"type": "sun", "power": 4, "azimuth": 120, "elevation": 40}],
+            "world": {"color": [0.25, 0.3, 0.38]}, "size": (256, 256),
+            "fog": {"density": 0.12, "color": [0.95, 0.95, 0.95], "g": 0.5, "box": [[-20, -20, 0.0], [20, 20, 6.0]]},
+            "objects": [GREY_FLOOR] + balls}
+
+
+CASES["vol_smoke"] = _vol_smoke()
+CASES["vol_world_haze"] = _vol_world_haze()
+
+
 # Row 5.5: the physical sky alone (Preetham) against Blender's Preetham sky texture. Sky azimuth 0 = +X, -90 = +Y
 # (in front of an azimuth-90 camera); the camera looks a little up so the horizon sits low in the frame.
 def _sky(elev, az, turb):
@@ -730,3 +794,125 @@ from judge_table import judge_table
 CASES["judge_table"] = judge_table("flaws")
 CASES["judge_table_base"] = judge_table("base")
 CASES["judge_table_clay"] = judge_table("clay")
+
+
+# Row 4.4: caustics in settle. A clear glass ball on a white floor under a sun (its shadow holds the focused spot),
+# and a pool: a wavy water sheet over the floor, the sun's light gathered into a net of bright lines below it.
+# Truth: Cycles with shadow caustics (MNEE) on, glass as caster, everything else as receiver.
+WHITE_FLOOR = {"shape": "plane", "scale": 6, "material": {"base_color": [0.8, 0.8, 0.8], "roughness": 0.8}}
+
+
+def _caustic_glass_sphere():
+    return {"camera": {"fov": 40, "azimuth": 70, "elevation": 35, "distance": 2.6, "target": [-0.25, 0.08, 0.2]},
+            "lights": [{"type": "sun", "power": 4, "azimuth": 20, "elevation": 45}],
+            "world": {"color": [0.03, 0.03, 0.035]}, "size": (256, 256), "samples": 1024, "caustics": True,
+            "objects": [WHITE_FLOOR, _ball(0.0, 0.0, 0.45, base_color=[1, 1, 1], transmission=1.0, roughness=0.0, ior=1.45)]}
+
+
+def _caustic_pool():
+    import math
+    n, half, h = 96, 1.0, 0.3
+    verts, faces = [], []
+    for j in range(n + 1):
+        for i in range(n + 1):
+            x, y = -half + 2 * half * i / n, -half + 2 * half * j / n
+            z = h + 0.012 * (math.sin(14 * x + 1.3) * math.cos(11 * y) + 0.7 * math.sin(9 * x - 13 * y + 0.4)
+                             + 0.5 * math.cos(17 * y + 6 * x))
+            verts.append([x, y, z])
+    for j in range(n):
+        for i in range(n):
+            a = j * (n + 1) + i
+            faces.append([a, a + 1, a + n + 2, a + n + 1])
+    water = {"shape": "mesh", "verts": verts, "faces": faces,
+             "material": {"base_color": [1, 1, 1], "transmission": 1.0, "roughness": 0.0, "ior": 1.33}}
+    return {"camera": {"fov": 40, "azimuth": 60, "elevation": 55, "distance": 3.2, "target": [0, 0, 0.1]},
+            "lights": [{"type": "sun", "power": 1.5, "azimuth": 30, "elevation": 60}],
+            "world": {"color": [0.03, 0.03, 0.035]}, "size": (256, 256), "samples": 1024, "caustics": True,
+            "objects": [WHITE_FLOOR, water]}
+
+
+CASES["caustic_glass_sphere"] = _caustic_glass_sphere()
+CASES["caustic_pool"] = _caustic_pool()
+
+
+# Row 5.6 (REALISM sections 2 and 5): photo cases, each a scene rebuilt the way a photo of it is taken, scored
+# against Cycles by FLIP and by the alignment-free photo statistics (photo_match.py), so the owner's own photo of
+# the same subject can be scored the same way when there is one. Shoe and room are the owner's photos (REALISM
+# section 2, the bed); hand and street are rebuilt from the common photograph of each.
+def _at(x, y, z):
+    """A light at a point (Blender Z up): the azimuth / elevation / distance the cases use (0 = +X, 90 = -Y)."""
+    import math
+    return {"azimuth": math.degrees(math.atan2(-y, x)), "elevation": math.degrees(math.atan2(z, math.hypot(x, y))),
+            "distance": math.sqrt(x * x + y * y + z * z)}
+
+
+def _photo_hand():
+    # A relaxed hand resting palm down on a wooden table (hand_build.py: metaball bones, joint creases, nails),
+    # soft window light from the side and a low warm sun from behind the wrist that rims the fingers and glows
+    # red through their edges. Skin: the skin_head lobes at a real hand's scale (red travels ~1 cm).
+    skin = {"base_color": [0.78, 0.53, 0.43], "roughness": 0.5, "subsurface": 1.0, "subsurface_color": [1.0, 0.35, 0.2],
+            "subsurface_radius": 0.05, "coat": 0.25, "coat_roughness": 0.35}
+    return {"size": [640, 480], "samples": 256, "view": "AgX", "photo": True,
+            "camera": {"fov": 30, "azimuth": -62, "elevation": 30, "distance": 0.48, "target": [-0.01, 0.04, 0.02],
+                       "fstop": 4.0, "focus": 0.48},
+            "lights": [dict({"type": "area", "power": 18, "size": [0.9, 0.9]}, **_at(1.1, -0.1, 0.7)),
+                       {"type": "sun", "power": 3.5, "azimuth": 115, "elevation": 14, "color": [1.0, 0.72, 0.5]}],
+            "world": {"color": [0.05, 0.055, 0.065]},
+            "objects": [{"shape": "plane", "scale": 1.2,
+                         "material": {"base_color": [1, 1, 1], "roughness": 0.45, "maps": {"albedo": "wood"}, "uv_scale": 3.0}},
+                        {"shape": "file", "asset": "hand/hand.glb", "material": skin},
+                        {"shape": "file", "asset": "hand/nails.glb",
+                         "material": {"base_color": [0.86, 0.66, 0.62], "roughness": 0.3, "coat": 0.6, "coat_roughness": 0.1}}]}
+
+
+def _photo_street():
+    # A city street at night after rain, from the kerb looking down the road: wet asphalt that mirrors the lamps,
+    # brick facades with lit and dark windows, sodium street lamps receding, a shop front and a blue neon strip,
+    # a little haze so the lamps bloom. Three real lights (the two nearest lamps and the shop) plus emissive meshes,
+    # which the path tracers take as light too.
+    road = {"base_color": [0.035, 0.035, 0.04], "roughness": 0.12}
+    walk = {"base_color": [0.22, 0.21, 0.2], "roughness": 0.35}
+    brick = {"base_color": [0.16, 0.08, 0.06], "roughness": 0.85}
+    iron = {"base_color": [0.05, 0.05, 0.05], "metallic": 1.0, "roughness": 0.45}
+    sodium = [1.0, 0.62, 0.3]
+    lit, dark = [], []
+    for side in (-1, 1):
+        for k, x in enumerate(range(-6, 16, 2)):
+            for f, z in enumerate((3.6, 5.8, 8.0)):
+                (lit if (k * 7 + f * 3 + (side > 0)) % 5 in (0, 2) else dark).append([x + 0.0, side * 5.38, z])   # proud of the wall face (y = 5.4)
+    lamps = [(x, side * 3.7) for x in (-2.0, 5.0, 12.0) for side in (-1, 1)]
+    objs = [{"shape": "plane", "scale": 20, "material": road},
+            {"shape": "cube", "scale": [12, 0.8, 0.08], "location": [4, 4.6, 0.08], "material": walk},
+            {"shape": "cube", "scale": [12, 0.8, 0.08], "location": [4, -4.6, 0.08], "material": walk},
+            {"shape": "cube", "scale": [12, 0.4, 5.0], "location": [4, 5.8, 5.0], "material": brick},
+            {"shape": "cube", "scale": [12, 0.4, 5.0], "location": [4, -5.8, 5.0], "material": brick},
+            {"shape": "cube", "scale": [0.6, 0.04, 0.8], "location": [0, 0, 0], "instances": lit,
+             "material": {"base_color": [0, 0, 0], "emission": [1.0, 0.75, 0.45], "emission_strength": 2.5}},
+            {"shape": "cube", "scale": [0.6, 0.04, 0.8], "location": [0, 0, 0], "instances": dark,
+             "material": {"base_color": [0.02, 0.025, 0.03], "roughness": 0.05}},
+            # shop front on the right, ground floor, and a neon strip above the left one
+            {"shape": "cube", "scale": [2.2, 0.04, 1.1], "location": [3.0, -5.42, 1.4],
+             "material": {"base_color": [0, 0, 0], "emission": [1.0, 0.9, 0.75], "emission_strength": 6.0}},
+            {"shape": "cube", "scale": [1.8, 0.05, 0.05], "location": [7.0, 5.40, 2.7],
+             "material": {"base_color": [0, 0, 0], "emission": [0.15, 0.45, 1.0], "emission_strength": 30.0}}]
+    for x, y in lamps:
+        objs += [{"shape": "cube", "scale": [0.06, 0.06, 2.4], "location": [x, y, 2.4], "material": iron},
+                 {"shape": "cube", "scale": [0.22, 0.14, 0.06], "location": [x, y * 0.92, 4.85],
+                  "material": {"base_color": [0, 0, 0], "emission": sodium, "emission_strength": 60.0}}]
+    return {"size": [768, 432], "samples": 512, "view": "AgX", "photo": True,
+            "camera": {"fov": 55, "azimuth": 172, "elevation": 4, "distance": 9.0, "target": [2.0, -1.0, 1.0]},
+            "lights": [dict({"type": "spot", "power": 900, "spot_angle": 120, "blend": 0.6, "color": sodium, "radius": 0.15},
+                            **_at(-2.0, 3.4, 4.75)),
+                       dict({"type": "spot", "power": 900, "spot_angle": 120, "blend": 0.6, "color": sodium, "radius": 0.15},
+                            **_at(5.0, -3.4, 4.75)),
+                       dict({"type": "area", "power": 120, "size": [3.5, 1.5], "color": [1.0, 0.9, 0.75]},
+                            **_at(3.0, -4.6, 1.4))],
+            "world": {"color": [0.004, 0.006, 0.012]},
+            "fog": {"density": 0.006, "color": [0.9, 0.9, 0.95], "g": 0.6, "box": [[-10, -6, 0.0], [20, 6, 9.0]]},
+            "objects": objs}
+
+
+CASES["photo_shoe"] = dict(_ref_shoe(), photo=True)
+CASES["photo_room"] = dict(_bed(), photo=True)
+CASES["photo_hand"] = _photo_hand()
+CASES["photo_street"] = _photo_street()

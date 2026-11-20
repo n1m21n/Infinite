@@ -324,9 +324,11 @@ namespace Platform
    // default action back, the faulting instruction runs again on return, and
    // the process dies exactly as it would have, report included. Nothing is
    // caught or resumed.
-   static void PluginCrashSignal(int)
+   static void PluginCrashSignal(int sig)
    {
       PluginCrashGuard::NoteCrash();
+      if (gCrashHook != nullptr)
+         gCrashHook(sig);
    }
 
    void InstallCrashHandler()
@@ -477,6 +479,30 @@ namespace Platform
                [panel setAllowedContentTypes:types];
          }
 
+         if (PanelRunModal(panel) != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         if (url == nil)
+            return std::string();
+         return std::string([[url path] UTF8String]);
+      }
+   }
+
+   std::string OpenIesDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Open IES profile"];
+         if (@available(macOS 11.0, *))
+         {
+            UTType* t = [UTType typeWithFilenameExtension:@"ies"];
+            if (t != nil)
+               [panel setAllowedContentTypes:@[ t ]];
+         }
          if (PanelRunModal(panel) != NSModalResponseOK)
             return std::string();
          NSURL* url = [[panel URLs] firstObject];

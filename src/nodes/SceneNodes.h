@@ -95,6 +95,8 @@ public:
    float areaWidth = 1.0f;
    float areaHeight = 1.0f;
    bool normalize = true;          // area: off, a bigger panel gives more light
+   int areaShape = 0;              // area: 0 rectangle, 1 disc (an ellipse when width and height differ)
+   float areaSpread = 180.0f;      // area: degrees the emission fans out over; 180 = every direction (a bare panel)
    // How much of each kind of shading this light does, 1 = all of it.
    float diffuse = 1.0f, specular = 1.0f, transmission = 1.0f;
    bool softFalloff = true;        // point, spot, area: no blow-up close to the light
@@ -110,6 +112,7 @@ public:
    bool useCutoff = false;         // point, spot, area: no light at all past `cutoffDistance`
    float cutoffDistance = 40.0f;
    bool showCone = false;          // spot: the 3D View draws its whole cone, out to the target or the cutoff
+   std::string iesFile;            // point, spot: an IES photometric profile (.ies) shaping where the light goes
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -120,6 +123,7 @@ public:
       v.Float("orbitPerBeat", orbitPerBeat);
       v.Float("areaWidth", areaWidth); v.Float("areaHeight", areaHeight);
       v.Bool("normalize", normalize);
+      v.Int("areaShape", areaShape); v.Float("areaSpread", areaSpread); v.Text("iesFile", iesFile);
       v.Float("diffuse", diffuse); v.Float("specular", specular); v.Float("transmission", transmission);
       v.Bool("softFalloff", softFalloff);
       v.Bool("castShadow", castShadow); v.Float("shadowRadius", shadowRadius);

@@ -3,6 +3,7 @@
 #include "app/AppShared.h"
 #include "engine/rhi/Rhi.h"
 #include "engine/MusicRig.h"
+#include "engine/Ies.h"
 #include "core/field/FieldLex.h"
 #include "core/field/FieldParse.h"
 #include "core/field/GlslBackend.h"
@@ -1179,6 +1180,50 @@ bool RunEngineTest()
          check(ok == total, "2.5 R/L: Shade Mix, float, vector and 30 colour modes match BlendModes", (double)ok, (double)total);
       }
 
+      // Knob pins: a wired Shade node takes over Checker's colours and scale and Normal Map's strength.
+      {
+         Probe pa("vec3(0.03 + 0.9 * uv.x, 0.07 + 0.8 * uv.y, 0.35)"), pb("vec3(0.07 + 0.8 * uv.y, 0.6, 0.03 + 0.9 * uv.x)");
+         Probe half("vec3(0.5)"), s3("vec3(3.0)"), s1("vec3(1.0)"), flat("vec3(0.0)");
+         auto pA = [&](int x, int y) { return V{ 0.03 + 0.9 * U(x), 0.07 + 0.8 * U(y), 0.35 }; };
+         auto pB = [&](int x, int y) { return V{ 0.07 + 0.8 * U(y), 0.6, 0.03 + 0.9 * U(x) }; };
+         int ok = 0;
+         ShadeCheckerNode odd, even; // 0.5 * 3 = 1.5 per axis: floor sum 3, odd, colour 1; 0.5 * 1: sum 0, colour 2
+         for (ShadeCheckerNode* c : { &odd, &even })
+         {
+            c->ShadeInput(0)->Connect(&half);
+            c->ShadeInput(1)->Connect(&pa);
+            c->ShadeInput(2)->Connect(&pb);
+         }
+         odd.ShadeInput(3)->Connect(&s3);
+         even.ShadeInput(3)->Connect(&s1);
+         if (run("Checker pins odd", odd, pA)) ok++;
+         if (run("Checker pins even", even, pB)) ok++;
+         ShadeNormalMapNode nm; // strength 0 through its pin: flat whatever the map
+         nm.ShadeInput(0)->Connect(&pa);
+         nm.ShadeInput(1)->Connect(&flat);
+         if (run("Normal Map strength pin", nm, [](int, int) { return V{ 0.0, 0.0, 1.0 }; })) ok++;
+         check(ok == 3, "Shade knob pins: wired colour, scale and strength override the knobs", (double)ok, 3.0);
+      }
+
+      // Row 4.2 IES: a quadrant-symmetric type C file (vertical 0..90, horizontal 0 and 90) becomes the 32 x 16 table:
+      // straight down 10 cd, 90 degrees 0, past 90 zero, horizontal 90 = 270 by the symmetry, 45 between the two planes.
+      {
+         std::vector<float> t;
+         const bool parsed = engine::ParseIes("IESNA:LM-63-2002\nTILT=NONE\n1 -1 2 2 2 1 1 0 0 0\n1 1 0\n0 90\n0 90\n5 0 3 0\n", t);
+         const float k = 2.0f * engine::kIesScale; // the multiplier, 2
+         int ok = 0;
+         if (parsed && (int)t.size() == engine::kIesRow)
+         {
+            auto at = [&](int h, int v) { return t[(size_t)(h * engine::kIesV + v)] / k; };
+            ok += std::fabs(at(0, 0) - 5.0f) < 1e-3f;           // horizontal 0, straight along the aim
+            ok += std::fabs(at(4, 0) - 3.0f) < 1e-3f;           // horizontal 90
+            ok += std::fabs(at(12, 0) - 3.0f) < 1e-3f;          // 270 mirrors 90
+            ok += std::fabs(at(2, 0) - 4.0f) < 1e-3f;           // 45: halfway
+            ok += at(0, 20) == 0.0f;                             // past 90 vertical: dark
+         }
+         check(ok == 5, "IES profile: LM-63 type C parsed to the table, symmetry and range kept", (double)ok, 5.0);
+      }
+
       // Shade Ramp: 4 known stops, 25 factors from -0.076 to 1.076
       {
          Probe pt("vec3(-0.1 + 1.2 * (uv.x + floor(uv.y * 5.0)) / 5.0)");
@@ -1748,6 +1793,98 @@ bool RunEngineTest()
       printf("  settled vs raster MAE %.4f, mean %.4f\n", ssum / (double)settled.size(), lum / (double)settled.size());
       check(ssum / (double)settled.size() < 0.08, "settled picture stays close to the raster", ssum / (double)settled.size(), 0.08);
       r.liveEngine = false;
+   }
+
+   {
+      // Row 4.2 light linking: Scene 3D's per-item "unlit" list reaches the GPU engines as a mask on the object's
+      // record. One point light over a white ball on the floor: with the ball unlinked, the ball keeps only the world's
+      // fill and the floor keeps its light, on R (GL), L (live) and T (settle).
+      struct Linked : GeometryNode { unsigned int mask = ~0u; unsigned int LightMask() const override { return mask; } };
+      Linked ball;
+      ball.shape = ShapeIndex("Sphere"); ball.posX = 0.2f; ball.color[0] = ball.color[1] = ball.color[2] = 0.85f; ball.metallic = 0.0f; ball.roughness = 0.6f;
+      const int S = 128;
+      Render3DNode::Rig lr = rig;
+      lr.proj = Mat4::Perspective(45.0f * 3.14159265f / 180.0f, 1.0f, 0.05f, 100.0f);
+      lr.lights.clear();
+      Render3DNode::RigLight pl;
+      pl.type = 1; pl.vec[0] = 0.6f; pl.vec[1] = 2.4f; pl.vec[2] = 1.8f; pl.intensity = 18.0f; pl.falloff = -1.0f; pl.castShadow = false;
+      lr.lights.push_back(pl);
+      const Mat4 vp = Mat4::Multiply(lr.proj, view);
+      auto pix = [&](const float w[3]) {
+         const float* m = vp.m;
+         const float x = m[0] * w[0] + m[4] * w[1] + m[8] * w[2] + m[12], y = m[1] * w[0] + m[5] * w[1] + m[9] * w[2] + m[13];
+         const float c = m[3] * w[0] + m[7] * w[1] + m[11] * w[2] + m[15];
+         const int px = std::clamp((int)((x / c * 0.5f + 0.5f) * S), 0, S - 1), py = std::clamp((int)((y / c * 0.5f + 0.5f) * S), 0, S - 1);
+         return (size_t)py * S + (size_t)px;
+      };
+      const float ballFront[3] = { 0.2f, 0.0f, 0.0f }, floorPt[3] = { -1.2f, -1.2f, 1.4f };
+      const size_t kb = pix(ballFront), kf = pix(floorPt);
+      auto lum = [&](const std::vector<float>& px, size_t k) { return px.size() > k * 4 + 2 ? (px[k * 4] + px[k * 4 + 1] + px[k * 4 + 2]) / 3.0f : 0.0f; };
+      const char* names[3] = { "R", "L", "T" };
+      for (int mode = 0; mode < 3; mode++)
+      {
+         float b[2] = {}, fl[2] = {};
+         for (int un = 0; un < 2; un++)
+         {
+            ball.mask = un ? ~1u : ~0u;
+            Render3DNode q;
+            q.geometry[0] = &floorG; q.geometry[1] = &ball;
+            q.width = (float)S; q.height = (float)S; q.samples = 0; q.hdr = false; q.tonemap = 1;
+            q.rig = &lr;
+            q.liveEngine = mode > 0; q.liveEngineFeatures = mode == 2 ? 15 : 7; q.ptSamples = 32; q.ptBounces = 4;
+            for (int i = 0; i < (mode == 2 ? 14 : 2); i++) q.CookIfNeeded(++fnum);
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratch, q.GetOutputTexture(), q.GetOutputWidth(), q.GetOutputHeight(), px);
+            b[un] = lum(px, kb); fl[un] = lum(px, kf);
+         }
+         printf("  light link %s: ball %.3f -> %.3f, floor %.3f -> %.3f\n", names[mode], b[0], b[1], fl[0], fl[1]);
+         const float ok = (b[1] < 0.6f * b[0] && std::fabs(fl[1] - fl[0]) < 0.1f * std::max(fl[0], 0.05f)) ? 1.0f : 0.0f;
+         check(ok > 0.5f, (std::string("light linking: an unlinked object loses the light, the rest keep it (") + names[mode] + ")").c_str(), ok, 1.0f);
+      }
+      // Row 4.2 shadow linking: the same ball under a shadowing sun. Linked out of the sun's shadow ("Blocks" off),
+      // the floor where its shadow fell comes back lit and the ball itself keeps its light, on R, L and T.
+      struct Blocker : GeometryNode { unsigned int smask = ~0u; unsigned int ShadowMask() const override { return smask; } };
+      Blocker sb;
+      sb.shape = ball.shape; sb.posX = 0.2f; sb.color[0] = sb.color[1] = sb.color[2] = 0.85f; sb.metallic = 0.0f; sb.roughness = 0.6f;
+      Render3DNode::Rig sr = lr;
+      sr.lights.clear();
+      Render3DNode::RigLight sun;
+      sun.type = 2; sun.vec[0] = 0.5f; sun.vec[1] = 1.0f; sun.vec[2] = 0.4f; sun.intensity = 3.0f; sun.castShadow = true;
+      sr.lights.push_back(sun);
+      const float shadowPt[3] = { -0.425f, -1.25f, -0.5f }; // the ball's centre along the sun onto the floor
+      const size_t ks = pix(shadowPt);
+      for (int mode = 0; mode < 3; mode++)
+      {
+         float b[2] = {}, sh[2] = {};
+         for (int un = 0; un < 2; un++)
+         {
+            sb.smask = un ? ~1u : ~0u;
+            Render3DNode q;
+            q.geometry[0] = &floorG; q.geometry[1] = &sb;
+            q.width = (float)S; q.height = (float)S; q.samples = 0; q.hdr = false; q.tonemap = 1; q.shadowsEnabled = true;
+            q.rig = &sr;
+            q.liveEngine = mode > 0; q.liveEngineFeatures = mode == 2 ? 15 : 7; q.ptSamples = 32; q.ptBounces = 4;
+            // First cook uploads meshes before shadow bounds exist; nudge exposure so the next cook draws again.
+            q.CookIfNeeded(++fnum); q.exposure = 1.001f; q.CookIfNeeded(++fnum); q.exposure = 1.0f;
+            for (int i = 0; i < (mode == 2 ? 12 : 1); i++) q.CookIfNeeded(++fnum);
+            std::vector<float> px;
+            GLUtil::ReadTexturePixels(scratch, q.GetOutputTexture(), q.GetOutputWidth(), q.GetOutputHeight(), px);
+            b[un] = lum(px, kb); sh[un] = lum(px, ks);
+            if (const char* dir = getenv("INFINITE_ENGINETEST_DUMP"))
+               if (FILE* fo = fopen((std::string(dir) + "/shadowlink_" + names[mode] + std::to_string(un) + ".ppm").c_str(), "wb"))
+               {
+                  fprintf(fo, "P6\n%d %d\n255\n", S, S);
+                  for (int y = S - 1; y >= 0; y--)
+                     for (int x = 0; x < S; x++)
+                        for (int c = 0; c < 3; c++)
+                           fputc((int)std::lround(std::clamp(px.size() > ((size_t)y * S + x) * 4 + c ? px[((size_t)y * S + x) * 4 + c] : 0.0f, 0.0f, 1.0f) * 255.0f), fo);
+                  fclose(fo);
+               }
+         }
+         printf("  shadow link %s: shadow %.3f -> %.3f, ball %.3f -> %.3f\n", names[mode], sh[0], sh[1], b[0], b[1]);
+         const float ok = (sh[1] > 1.5f * sh[0] && std::fabs(b[1] - b[0]) < 0.15f * std::max(b[0], 0.05f)) ? 1.0f : 0.0f;
+         check(ok > 0.5f, (std::string("shadow linking: an object linked out casts no shadow, keeps its light (") + names[mode] + ")").c_str(), ok, 1.0f);
+      }
    }
    if (const char* l64 = getenv("INFINITE_ENGINETEST_LIGHTS64"))
    {

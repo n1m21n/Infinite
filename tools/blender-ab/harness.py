@@ -53,10 +53,16 @@ def light_lines(l):
         out.append("  f shadowRadius %g" % l.get("radius", 0.1))
     if t == "spot":
         out += ["  f spotAngle %g" % l["spot_angle"], "  f spotPenumbra %g" % l.get("blend", 0.2)]
+    if t in ("point", "spot") and l.get("ies"):
+        out.append("  s iesFile %s" % os.path.join(ASSETS, l["ies"]))
     if t == "area":
         w, h = l.get("size", (1, 1))
         out += ["  f areaWidth %g" % w, "  f areaHeight %g" % h, "  b normalize 1",
                 "  f shadowRadius %g" % (max(w, h) / 2)]
+        if l.get("shape") == "disc":
+            out.append("  i areaShape 1")
+        if "spread" in l:
+            out.append("  f areaSpread %g" % l["spread"])
     out.append("  i shadowRes 1")
     return out
 
@@ -390,7 +396,9 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
             pts = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "pts_%d.glb" % i),
                                           "  b normalize 0", "  b recenter 0"])
             inst = node("3D", "Instance on Points", ["  i pointMode 0", "  i maxPoints %d" % len(o["instances"]),
-                                                      "  f instanceScale 1", "  b inheritMaterial 0"] + material_lines(m, sheen=False))
+                                                      "  f instanceScale 1", "  b inheritMaterial 0",
+                                                      "  b alignToNormal 0", "  f rotationRandom 0", "  f scaleRandom 0"]
+                                + material_lines(m, sheen=False))   # Blender's copies: unrotated, one size
             wires.append("geo %d points %d" % (inst, pts))
             wires.append("geo %d shape %d" % (inst, model))
             geos.append(inst)
@@ -563,7 +571,7 @@ def to_patch(scene, case, frame=None, engine="raster", pt_samples=256, pt_bounce
         # Row 5.3: Blender's box (Z up) in Infinite's Y-up world: (x, y, z) -> (x, z, -y).
         (x0, y0, z0), (x1, y1, z1) = fog["box"]
         extra += ["  f fogDensity %g" % fog["density"], "  c fogColor %g %g %g" % tuple(srgb(fog["color"])),
-                  "  f fogAnisotropy %g" % fog.get("g", 0.0),
+                  "  f fogAnisotropy %g" % fog.get("g", 0.0), "  f fogFalloff %g" % fog.get("falloff", 0.0),
                   "  f fogMinX %g" % x0, "  f fogMinY %g" % z0, "  f fogMinZ %g" % -y1,
                   "  f fogMaxX %g" % x1, "  f fogMaxY %g" % z1, "  f fogMaxZ %g" % -y0]
     render = node("3D", "Render 3D", extra + [
@@ -648,6 +656,9 @@ def score(case_dir, name="", scene=None, sfx=""):
            "luma_err": round(float(np.abs(li - lt).mean()), 4)}
     if scene and name.startswith("furnace"):
         out["furnace"] = furnace_metric(scene, lt, li)
+    if scene and scene.get("photo"):   # row 5.6: a photo case also gets the alignment-free photo statistics
+        from photo_match import photo_match
+        out["photo"] = photo_match(truth, inf)
     return out
 
 
@@ -835,7 +846,7 @@ def main():
     os.environ.setdefault("SHOE_GLB", os.path.expanduser("~/Infinite/shoe-dl/MaterialsVariantsShoe.glb"))
     for name in names:
         scene = dict(CASES[name]); d = os.path.join(os.path.abspath(a.out), name)
-        if any(o["shape"] == "model" and not os.path.exists(asset_file(o)) for o in scene["objects"]):
+        if any(o["shape"] in ("model", "file") and not os.path.exists(asset_file(o)) for o in scene["objects"]):
             print("skip %s: model file missing" % name)
             continue
         os.makedirs(d, exist_ok=True)
@@ -844,7 +855,7 @@ def main():
         text = json.dumps(scene, sort_keys=True, indent=1)
         # The truth is reused while the scene, Blender's script and the asset files are unchanged.
         # Infinite-only keys (supersample) leave Blender's truth alone.
-        btext = json.dumps({k: v for k, v in scene.items() if k != "supersample"}, sort_keys=True, indent=1)
+        btext = json.dumps({k: v for k, v in scene.items() if k not in ("supersample", "photo")}, sort_keys=True, indent=1)
         h = hashlib.sha1((btext + BLENDER_TRUTH_VERSION).encode()).hexdigest()
         hp = os.path.join(d, "scene.hash")
         frames = scene.get("frames")

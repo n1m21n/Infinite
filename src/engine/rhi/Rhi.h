@@ -3,6 +3,7 @@
 // Metal first (MetalDevice.mm), Vulkan at R6; elsewhere CreateDevice() returns null and the GL renderer stays.
 // Kept to the few objects the engine needs, so each backend is buildable and testable on its own.
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -11,6 +12,11 @@
 
 namespace rhi
 {
+   // GPU command failures (a timeout under memory pressure, a lost device). Each backend counts them, so a
+   // headless render fails loudly instead of handing back a black or half-drawn frame.
+   inline std::atomic<int> gGpuErrors { 0 };
+   inline std::string gGpuLastError;
+
    enum class Format
    {
       RGBA8,  // 8-bit, sRGB-encoded by the caller
@@ -54,6 +60,8 @@ namespace rhi
       virtual bool Upscale(SharedImage& /*low*/, SharedImage& /*out*/, float /*jx*/, float /*jy*/, bool /*reset*/) { return false; }
       // Times the shader was rebuilt for a new set of Field material programs (Frame::fieldMslKey).
       virtual int FieldLibraryBuilds() const { return 0; }
+      // REALISM R18: bytes this renderer's GPU device has allocated now (meshes, BVHs, textures, targets), 0 = unknown.
+      virtual size_t GpuBytes() const { return 0; }
    };
 
    class Device

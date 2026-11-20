@@ -1,4 +1,6 @@
 #include "Geometry3DNodes.h"
+#include "engine/Ies.h"
+#include "platform/AppPaths.h"
 #include "Render3DTonemap.h"
 #include "Render3DSheen.h"
 #include "Render3DThinFilm.h"
@@ -6,6 +8,7 @@
 #include "Render3DFresnel.h"
 #include "Render3DAb.h"
 #include "Render3DHair.h"
+#include "Render3DShared.h"
 #include "ColorSpace.h"
 
 #include "gl3.h"
@@ -270,6 +273,11 @@ namespace
       "uniform float uExposure;\n"
       "uniform int uTonemap;\n"
       "uniform float uBgOpacity;\n"
+      "uniform vec4 uFog;\n"
+      "uniform vec3 uFogLo;\n"
+      "uniform vec3 uFogHi;\n"
+      "uniform vec3 uFogColor;\n"
+      "uniform vec4 uPlainBg;\n"   // w = 1: the plain clear colour (rgb, sRGB) behind fog instead of the world
       R3D_SRGB_SRC
       R3D_TONEMAP_SRC
       "vec2 dirToEquirect(vec3 d, float rot) {\n"
@@ -303,14 +311,40 @@ namespace
       "   vec4 worldH = uInvViewProj * vec4(vNdc, 1.0, 1.0);\n"
       "   vec3 worldPos = worldH.xyz / worldH.w;\n"
       "   vec3 dir = normalize(worldPos - uCamPos);\n"
-      "   vec3 col;\n"
-      "   if (uHasEnvMap == 1) {\n"
+      "   vec3 col = vec3(0.0);\n"
+      "   if (uPlainBg.w > 0.5) {\n"
+      "   } else if (uHasEnvMap == 1) {\n"
       "      col = sampleEquirectSeamSafe(uEnvMap, dirToEquirect(dir, uEnvRotation)) * uEnvIntensity;\n"
       "   } else {\n"
       "      float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);\n"
       "      vec3 lower = mix(toLinear(uEnvGround), toLinear(uEnvHorizon), smoothstep(0.0, 0.5, t));\n"
       "      col = mix(lower, toLinear(uEnvSky), smoothstep(0.5, 1.0, t)) * uEnvIntensity;\n"
       "   }\n"
+      // Fog in front of the sky (row 4.1): its depth along the view through the box, lit by the world's horizon colour.
+      "   float fogT = 1.0; vec3 fogS = vec3(0.0);\n"
+      "   if (uFog.x > 0.0) {\n"
+      "      vec3 inv = 1.0 / mix(dir, vec3(1e-12), lessThan(abs(dir), vec3(1e-12)));\n"
+      "      vec3 ta = (uFogLo - uCamPos) * inv, tb = (uFogHi - uCamPos) * inv;\n"
+      "      vec3 tn = min(ta, tb), tf = max(ta, tb);\n"
+      "      float t0 = max(max(tn.x, tn.y), max(tn.z, 0.0)), t1 = min(min(tf.x, tf.y), tf.z);\n"
+      "      if (t1 > t0) {\n"
+      "         float od = 0.0, st = (t1 - t0) / 12.0;\n"
+      "         vec3 c = 0.5 * (uFogLo + uFogHi), h = max(0.5 * (uFogHi - uFogLo), vec3(1e-4));\n"
+      "         for (int k = 0; k < 12; k++) {\n"
+      "            vec3 p = uCamPos + dir * (t0 + (float(k) + 0.5) * st);\n"
+      "            od += uFog.x * st * (uFog.z > 0.0 ? mix(1.0, max(1.0 - length((p - c) / h), 0.0), uFog.z) : 1.0);\n"
+      "         }\n"
+      "         fogT = exp(-od);\n"
+      "         vec3 fe = uFogHi - uFogLo;\n"
+      "         vec3 ms = 1.0 / (1.0 - uFogColor * (1.0 - exp(-uFog.x * mix(1.0, 0.2, uFog.z) * min(fe.x, min(fe.y, fe.z)))));\n"
+      "         fogS = (1.0 - fogT) * toLinear(uEnvHorizon) * uEnvIntensity * uFogColor * ms;\n"
+      "      }\n"
+      "   }\n"
+      "   if (uPlainBg.w > 0.5) {\n"
+      "      fragColor = vec4(toSrgb(toLinear(uPlainBg.rgb) * fogT + toneMap(fogS * uExposure, uTonemap)), uBgOpacity);\n"
+      "      return;\n"
+      "   }\n"
+      "   col = col * fogT + fogS;\n"
       "   col *= uExposure;\n"
       "   col = toneMap(col, uTonemap);\n"
       "   fragColor = vec4(toSrgb(col), uBgOpacity);\n"
@@ -528,10 +562,14 @@ namespace
       "uniform vec2 uLightArea[64];\n"
       "uniform vec4 uLightTerms[64];\n"   // diffuse, specular, transmission, falloff (< 0: hard)
       "uniform float uLightCutoff[64];\n"  // no light past this distance; 0 = none
+      // Row 4.2: point / spot keep an IES row + 1 in uLightArea.y (0 = none): four profiles x 32 vertical samples
+      // (0..180 degrees off the aim), azimuth-averaged, four to a vec4.
+      "uniform vec4 uIesTab[32];\n"
       "float lightFalloff(float dist, float k) {\n"
       "   if (k >= 0.0) return 1.0 / (1.0 + dist * dist * k);\n"
       "   return min(1.0 / max(dist * dist * -k, 1e-4), 20.0);\n"
       "}\n"
+      R3D_AREA_SRC
       "uniform int uLightCount;\n"
       "uniform int uLightMask;\n"
       "uniform vec3 uAmbient;\n"
@@ -609,6 +647,13 @@ namespace
       "uniform float uEnvRotation;\n"
       "uniform float uEnvMaxLod;\n"
       "uniform sampler2DShadow uShadowMap;\n"
+      "uniform mat4 uLightViewProj;\n"
+      // Fog (row 4.1): x peak extinction per unit (0 off), y HG g, z falloff (0 even box .. 1 soft puff); the box and
+      // the scattered share (linear).
+      "uniform vec4 uFog;\n"
+      "uniform vec3 uFogLo;\n"
+      "uniform vec3 uFogHi;\n"
+      "uniform vec3 uFogColor;\n"
       "uniform int uShadowsOn;\n"
       "uniform int uShadowLight;\n"
       "uniform float uShadowBias;\n"
@@ -621,6 +666,23 @@ namespace
       "uniform int uIsSprite;\n"
       "uniform int uSpriteShape;\n" // 0 circle, 1 square
       "\n"
+      "float fogShapeGL(vec3 p) {\n"
+      "   if (uFog.z <= 0.0) return 1.0;\n"
+      "   vec3 c = 0.5 * (uFogLo + uFogHi), h = max(0.5 * (uFogHi - uFogLo), vec3(1e-4));\n"
+      "   return mix(1.0, max(1.0 - length((p - c) / h), 0.0), uFog.z);\n"
+      "}\n"
+      // Optical depth from p toward the light (direction ld, up to tmax) through the fog box, 6 midpoints.
+      "float fogLightOD(vec3 p, vec3 ld, float tmax) {\n"
+      "   vec3 li = 1.0 / mix(ld, vec3(1e-12), lessThan(abs(ld), vec3(1e-12)));\n"
+      "   vec3 la = (uFogLo - p) * li, lb = (uFogHi - p) * li;\n"
+      "   vec3 n0 = min(la, lb), f0 = max(la, lb);\n"
+      "   float a = max(max(n0.x, n0.y), max(n0.z, 0.0)), b = min(min(f0.x, f0.y), min(f0.z, tmax));\n"
+      "   if (b <= a) return 0.0;\n"
+      "   if (uFog.z <= 0.0) return uFog.x * (b - a);\n"
+      "   float ls = (b - a) / 6.0, acc = 0.0;\n"
+      "   for (int j = 0; j < 6; j++) acc += fogShapeGL(p + ld * (a + (float(j) + 0.5) * ls));\n"
+      "   return uFog.x * acc * ls;\n"
+      "}\n"
       "vec2 gShadowDzDuv = vec2(0.0);\n"   // set at the top of main(), where derivatives are defined
       "float shadowFactor(vec3 normal, vec3 lightDir) {\n"
       "   if (uShadowsOn == 0) return 1.0;\n"
@@ -1245,7 +1307,10 @@ namespace
       "         float tHit = dot(lp - vWorldPos, fwd) / min(rf, -0.05);\n"
       "         vec3 hit = vWorldPos + refl * max(tHit, 0.0);\n"
       "         vec3 rel = hit - lp;\n"
-      "         vec3 nearP = lp + rgt * clamp(dot(rel, rgt), -half2.x, half2.x) + upv * clamp(dot(rel, upv), -half2.y, half2.y);\n"
+      "         vec2 q = clamp(vec2(dot(rel, rgt), dot(rel, upv)), -half2, half2);\n"
+      // Area shape 1 (packed in the spot-angle slot): a disc or ellipse, so the nearest point is held inside it.
+      "         if (uLightSpotAngle[i] > 0.5) { vec2 e = q / half2; float el = length(e); if (el > 1.0) q /= el; }\n"
+      "         vec3 nearP = lp + rgt * q.x + upv * q.y;\n"
       "         lightDir = normalize(nearP - vWorldPos);\n"
       // The highlight comes from that point; the diffuse comes from the panel as a whole. Shading
       // it from the moving point printed the rectangle's clamp lines across floors and spheres.
@@ -1254,6 +1319,17 @@ namespace
       "         shadeDir = toCentre / max(dist, 1e-4);\n"
       "         attenuation = lightFalloff(dist, uLightTerms[i].w);\n"
       "         attenuation *= clamp(dot(-shadeDir, fwd) * 4.0, 0.0, 1.0);\n"
+      // Spread: every point of the panel casts its own cone, so average it over a 3x3 grid of the panel.
+      "         if (uLightSpotPenumbra[i] < 179.5) {\n"
+      "            float ks = 0.0;\n"
+      "            for (int gy = -1; gy <= 1; ++gy) for (int gx = -1; gx <= 1; ++gx) {\n"
+      "               vec2 g = vec2(float(gx), float(gy)) * 0.6667 * half2;\n"
+      "               if (uLightSpotAngle[i] > 0.5 && gx != 0 && gy != 0) g *= 0.7071;\n"
+      "               vec3 dp = normalize(vWorldPos - (lp + rgt * g.x + upv * g.y));\n"
+      "               ks += areaSpreadK(uLightSpotPenumbra[i], dot(dp, fwd));\n"
+      "            }\n"
+      "            attenuation *= ks / 9.0;\n"
+      "         }\n"
       "         if (uLightCutoff[i] > 0.0 && dist > uLightCutoff[i]) attenuation = 0.0;\n"
       "      } else if (uLightType[i] == 1 || uLightType[i] == 4) {\n"
       "         vec3 toLight = uLightDir[i] - vWorldPos;\n"
@@ -1272,9 +1348,17 @@ namespace
       "            if (smoothW > 0.0) spotAtten *= smoothstep(0.0, smoothW, cosCur - cosOuter);\n"
       "            attenuation *= spotAtten;\n"
       "         }\n"
+      "         if (uLightArea[i].y > 0.5) {\n"
+      "            int ir = (int(uLightArea[i].y + 0.5) - 1) * 32;\n"
+      "            float th = acos(clamp(dot(-lightDir, uLightAim[i]), -1.0, 1.0)) * (31.0 / 3.14159265);\n"
+      "            int v0 = min(int(th), 30), k0 = ir + v0, k1 = k0 + 1;\n"
+      "            attenuation *= max(mix(uIesTab[k0 >> 2][k0 & 3], uIesTab[k1 >> 2][k1 & 3], th - float(v0)), 0.0);\n"
+      "         }\n"
       "      } else {\n"
       "         lightDir = normalize(uLightDir[i]);\n"
       "      }\n"
+      // Fog (row 4.1): light reaching the surface crosses the medium (a sun all the way, a lamp up to itself).
+      "      if (uFog.x > 0.0) attenuation *= exp(-fogLightOD(vWorldPos, lightDir, (uLightType[i] == 0 || uLightType[i] == 2) ? 1e4 : length(uLightDir[i] - vWorldPos)));\n"
       "      vec3 halfway = normalize(lightDir + viewDir);\n"
       "      if (uLightType[i] != 5) shadeDir = lightDir;\n"
       "      float nDotL;\n"
@@ -1377,6 +1461,50 @@ namespace
       "   col += base * pow(1.0 - nDotV, 3.0) * uRim;\n"
       "   col += emiss;\n"
       "\n"
+      // Fog (row 4.1): single scattering of the sun along the view through the box, 12 jittered steps; at each the
+      // sun's shadow map gives the shaft and its own path through the medium dims it. Same shape as Metal's fogShape.
+      "   if (uFog.x > 0.0) {\n"
+      "      vec3 fd = vWorldPos - uCamPos; float fl = length(fd); fd /= max(fl, 1e-6);\n"
+      "      vec3 inv = 1.0 / mix(fd, vec3(1e-12), lessThan(abs(fd), vec3(1e-12)));\n"
+      "      vec3 ta = (uFogLo - uCamPos) * inv, tb = (uFogHi - uCamPos) * inv;\n"
+      "      vec3 tn = min(ta, tb), tf = max(ta, tb);\n"
+      "      float t0 = max(max(tn.x, tn.y), max(tn.z, 0.0)), t1 = min(min(tf.x, tf.y), min(tf.z, fl));\n"
+      "      if (t1 > t0) {\n"
+      "         float st = (t1 - t0) / 12.0;\n"
+      "         float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n"
+      "         float od = 0.0; vec3 fin = vec3(0.0);\n"
+      "         for (int k = 0; k < 12; k++) {\n"
+      "            vec3 p = uCamPos + fd * (t0 + (float(k) + jit) * st);\n"
+      "            float dk = fogShapeGL(p);\n"
+      "            float Tv = exp(-(od + uFog.x * dk * jit * st));\n"
+      "            od += uFog.x * dk * st;\n"
+      "            if (dk <= 0.0) continue;\n"
+      // Skylight scattered in: the world's blurred zenith (horizon colour for a gradient world), dimmed by the fog above.
+      "            fin += dk * Tv * sampleEnv(vec3(0.0, 1.0, 0.0), 1.0) * exp(-fogLightOD(p, vec3(0.0, 1.0, 0.0), 1e4));\n"
+      "            for (int i = 0; i < 8; i++) {\n"
+      "               if (i >= uLightCount) break;\n"
+      "               if (uLightType[i] != 0 && uLightType[i] != 2) continue;\n"
+      "               vec3 ld = normalize(uLightDir[i]);\n"
+      "               float vis = 1.0;\n"
+      "               if (i == uShadowLight && uShadowsOn != 0) {\n"
+      "                  vec4 lp = uLightViewProj * vec4(p, 1.0);\n"
+      "                  vec3 pr = lp.xyz / max(lp.w, 1e-6) * 0.5 + 0.5;\n"
+      "                  if (pr.z <= 1.0 && all(greaterThanEqual(pr.xy, vec2(0.0))) && all(lessThanEqual(pr.xy, vec2(1.0))))\n"
+      "                     vis = mix(1.0, texture(uShadowMap, vec3(pr.xy, pr.z - uShadowBias)), uShadowStrength);\n"
+      "               }\n"
+      "               if (vis <= 0.0) continue;\n"
+
+      "               float g = uFog.y, c = dot(ld, fd);\n"
+      "               float ph = (1.0 - g * g) / (12.5663706 * pow(max(1.0 + g * g - 2.0 * g * c, 1e-4), 1.5));\n"
+      "               fin += dk * Tv * vis * exp(-fogLightOD(p, ld, 1e4)) * ph * toLinear(uLightColor[i]) * uLightIntensity[i];\n"
+      "            }\n"
+      "         }\n"
+      // Multiple scattering, as Metal's vis pass: 1 / (1 - a (1 - exp(-sigma D))), D the box's smallest extent.
+      "         vec3 fe = uFogHi - uFogLo;\n"
+      "         vec3 ms = 1.0 / (1.0 - uFogColor * (1.0 - exp(-uFog.x * mix(1.0, 0.2, uFog.z) * min(fe.x, min(fe.y, fe.z)))));\n"
+      "         col = col * exp(-od) + fin * (uFog.x * st) * uFogColor * ms;\n"
+      "      }\n"
+      "   }\n"
       "   col = toneDisplay(col * uExposure);\n"
       "   col = toSrgb(col) + ditherOffset();\n"
       "\n"
@@ -1648,13 +1776,16 @@ void Render3DNode::RigLight::From(const LightNode& n)
    }
    type = n.type;
    // Unnormalized, an area light gives out more the bigger it is (1 x 1 = as normalized).
-   intensity = n.intensity * ((type == 5 && !n.normalize) ? std::max(0.01f, n.areaWidth * n.areaHeight) : 1.0f);
+   // A disc covers pi/4 of its width x height box.
+   intensity = n.intensity * ((type == 5 && !n.normalize) ? std::max(0.01f, n.areaWidth * n.areaHeight * (n.areaShape == 1 ? 0.78539816f : 1.0f)) : 1.0f);
    intensity *= std::exp2(n.exposure);
    cutoff = n.useCutoff ? std::max(0.001f, n.cutoffDistance) : 0.0f;
    spotAngle = n.spotAngle;
    spotPenumbra = n.spotPenumbra;
    areaW = n.areaWidth;
    areaH = n.areaHeight;
+   areaShape = n.areaShape == 1 ? 1 : 0;
+   areaSpread = std::clamp(n.areaSpread, 1.0f, 180.0f);
    diffuse = n.diffuse;
    specular = n.specular;
    transmission = n.transmission;
@@ -1663,6 +1794,7 @@ void Render3DNode::RigLight::From(const LightNode& n)
    shadowSoft = std::max(0.0f, n.shadowRadius) / 0.25f * std::max(0.0f, n.shadowFilter);
    shadowRes = n.shadowRes;
    shadowClip = n.shadowClip;
+   ies = (type == 1 || type == 4) ? n.iesFile : std::string();
 }
 const std::vector<std::string>& Render3DNode::SpriteShapeNames() { return kSpriteShapeNames; }
 const std::vector<std::string>& Render3DNode::SpriteSizeModeNames() { return kSpriteSizeModeNames; }
@@ -2713,6 +2845,25 @@ void Render3DNode::CookOnce(int frameId)
    float lightArea[kMaxLights * 2];
    float lightTerms[kMaxLights * 4];
    float lightCutoff[kMaxLights] = {};
+   float iesTab[128] = {};
+   std::vector<const std::vector<float>*> iesRows;
+   // Row 4.2: a light's IES profile, azimuth-averaged into one of four 32-sample rows.
+   auto iesSlot = [&](const RigLight& l) -> float
+   {
+      if (l.ies.empty() || !(l.type == 1 || l.type == 4)) return 0.0f;
+      auto tab = engine::LoadIes(AppPaths::FsPath(l.ies));
+      if (!tab) return 0.0f;
+      for (size_t k = 0; k < iesRows.size(); k++) if (iesRows[k] == tab.get()) return float(k + 1);
+      if (iesRows.size() >= 4) return 0.0f;
+      const size_t r = iesRows.size(); iesRows.push_back(tab.get());
+      for (int v = 0; v < engine::kIesV; v++)
+      {
+         float sum = 0.0f;
+         for (int h = 0; h < engine::kIesH; h++) sum += (*tab)[(size_t)(h * engine::kIesV + v)];
+         iesTab[r * 32 + (size_t)v] = sum / (float)engine::kIesH;
+      }
+      return float(r + 1);
+   };
    RigLight caster;   // the first light's shadow settings; the built-in light keeps the defaults
    for (int i = 0; i < kMaxLights; i++)
    {
@@ -2737,13 +2888,15 @@ void Render3DNode::CookOnce(int frameId)
          }
          lightPower[lightCount] = l.intensity;
          lightTypes[lightCount] = l.type;
-         lightSpotAngle[lightCount] = l.spotAngle;
-         lightSpotPenumbra[lightCount] = l.spotPenumbra;
+         // An area light carries its shape and spread in the spot slots (as the GPU light record does).
+         lightSpotAngle[lightCount] = l.type == 5 ? float(l.areaShape) : l.spotAngle;
+         lightSpotPenumbra[lightCount] = l.type == 5 ? l.areaSpread : l.spotPenumbra;
          lightArea[lightCount * 2 + 0] = std::max(0.01f, l.areaW);
          lightArea[lightCount * 2 + 1] = std::max(0.01f, l.areaH);
          const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
          std::memcpy(&lightTerms[lightCount * 4], terms, sizeof(terms));
          lightCutoff[lightCount] = l.cutoff;
+         if (l.type == 1 || l.type == 4) lightArea[lightCount * 2 + 1] = iesSlot(l);
          if (lightCount == 0)
             caster = l;
          lightCount++;
@@ -2766,13 +2919,15 @@ void Render3DNode::CookOnce(int frameId)
       std::memcpy(&lightCols[lightCount * 3], l.color, sizeof(l.color));
       lightPower[lightCount] = l.intensity;
       lightTypes[lightCount] = l.type;
-      lightSpotAngle[lightCount] = l.spotAngle;
-      lightSpotPenumbra[lightCount] = l.spotPenumbra;
+      // An area light carries its shape and spread in the spot slots (as the GPU light record does).
+      lightSpotAngle[lightCount] = l.type == 5 ? float(l.areaShape) : l.spotAngle;
+      lightSpotPenumbra[lightCount] = l.type == 5 ? l.areaSpread : l.spotPenumbra;
       lightArea[lightCount * 2 + 0] = std::max(0.01f, l.areaW);
       lightArea[lightCount * 2 + 1] = std::max(0.01f, l.areaH);
       const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
       std::memcpy(&lightTerms[lightCount * 4], terms, sizeof(terms));
       lightCutoff[lightCount] = l.cutoff;
+      if (l.type == 1 || l.type == 4) lightArea[lightCount * 2 + 1] = iesSlot(l);
       if (lightCount == 0)
          caster = l;
       lightCount++;
@@ -2930,7 +3085,8 @@ void Render3DNode::CookOnce(int frameId)
          for (int i = 0; i < (int)mDraw.size(); i++)
          {
             IGeometrySource* source = mDraw[i];
-            if (source == nullptr || mGpu[i].vao == 0 || mGpu[i].indexCount == 0 || !source->CastsShadow())
+            if (source == nullptr || mGpu[i].vao == 0 || mGpu[i].indexCount == 0 || !source->CastsShadow() ||
+                (ci < 32 && ((source->ShadowMask() >> ci) & 1u) == 0)) // row 4.2: shadow linking
                continue;
             glBindVertexArray(mGpu[i].vao);
             const Mat4 model = source->GetModelMatrix();
@@ -3011,7 +3167,9 @@ void Render3DNode::CookOnce(int frameId)
    // follows simply paints over it in the usual way.
    // A data pass keeps its own clear value; the Environment pass always shows the world,
    // the gradient one when no HDRI is patched in.
-   mEnvBgDrawn = ((hasEnvMap && envAsBackground && renderPass == 0) || renderPass == 10) && !mVelocityPass;
+   // Row 4.1: with fog on, the plain clear colour is drawn by the same shader so the fog lies in front of it too.
+   const bool fogPlainBg = renderPass == 0 && fogDensity > 0.0f && !(hasEnvMap && envAsBackground);
+   mEnvBgDrawn = ((hasEnvMap && envAsBackground && renderPass == 0) || renderPass == 10 || fogPlainBg) && !mVelocityPass;
    if (mEnvBgDrawn && EnsureEnvBgShader())
    {
       if (mEnvBgVao == 0)
@@ -3032,6 +3190,15 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1i(GLUtil::UniformLoc(mEnvBgProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
       glUniform1f(GLUtil::UniformLoc(mEnvBgProgram, "uEnvRotation"), envRotationRad);
       glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uEnvSky"), 1, envSky);
+      {
+         float fc[3];
+         for (int k = 0; k < 3; k++) fc[k] = ColorSpace::SrgbToLinear(std::clamp(fogColor[k], 0.0f, 1.0f));
+         glUniform4f(GLUtil::UniformLoc(mEnvBgProgram, "uFog"), std::max(0.0f, fogDensity), 0.0f, std::clamp(fogFalloff, 0.0f, 1.0f), 0.0f);
+         glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uFogLo"), 1, fogMin);
+         glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uFogHi"), 1, fogMax);
+         glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uFogColor"), 1, fc);
+         glUniform4f(GLUtil::UniformLoc(mEnvBgProgram, "uPlainBg"), bgColor[0], bgColor[1], bgColor[2], fogPlainBg ? 1.0f : 0.0f);
+      }
       glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uEnvHorizon"), 1, envHorizon);
       glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uEnvGround"), 1, envGround);
       glUniform1f(GLUtil::UniformLoc(mEnvBgProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
@@ -3102,6 +3269,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform2fv(GLUtil::UniformLoc(mProgram, "uLightArea"), kMaxLights, lightArea);
       glUniform4fv(GLUtil::UniformLoc(mProgram, "uLightTerms"), kMaxLights, lightTerms);
       glUniform1fv(GLUtil::UniformLoc(mProgram, "uLightCutoff"), kMaxLights, lightCutoff);
+      glUniform4fv(GLUtil::UniformLoc(mProgram, "uIesTab"), 32, iesTab);
       glUniform1i(GLUtil::UniformLoc(mProgram, "uLightCount"), lightCount);
       glUniform1f(GLUtil::UniformLoc(mProgram, "uFldTime"), (float)Transport::Instance().Seconds());
       const float rigAmbient[3] = { ambientColor[0] + (rig != nullptr ? rig->ambient[0] : 0.0f),
@@ -3140,6 +3308,16 @@ void Render3DNode::CookOnce(int frameId)
          glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uPrevViewProj"), 1, GL_FALSE, mPrevViewProj.m);
       }
       glUniform1f(GLUtil::UniformLoc(mProgram, "uMistStart"), mistStart);
+      {
+         // Fog (row 4.1): the same medium the Metal engines trace.
+         float fc[3];
+         for (int k = 0; k < 3; k++) fc[k] = ColorSpace::SrgbToLinear(std::clamp(fogColor[k], 0.0f, 1.0f));
+         glUniform4f(GLUtil::UniformLoc(mProgram, "uFog"), std::max(0.0f, fogDensity), std::clamp(fogAnisotropy, -0.95f, 0.95f),
+                     std::clamp(fogFalloff, 0.0f, 1.0f), 0.0f);
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uFogLo"), 1, fogMin);
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uFogHi"), 1, fogMax);
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uFogColor"), 1, fc);
+      }
       glUniform1f(GLUtil::UniformLoc(mProgram, "uMistDepth"), mistDepth);
       glUniform1f(GLUtil::UniformLoc(mProgram, "uMistFalloff"), mistFalloff == 1 ? 1.0f : mistFalloff == 2 ? 0.5f : 2.0f);
       glUniform1f(GLUtil::UniformLoc(mProgram, "uMistIntensity"), mistIntensity);

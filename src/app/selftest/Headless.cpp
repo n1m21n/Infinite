@@ -1,11 +1,20 @@
 // Headless jobs: ExplainLive, ParamKeyJoiner, HeadlessTick (moved verbatim from main.cpp).
+#include "engine/rhi/Rhi.h"
 #include "app/AppShared.h"
 #include "core/SpawnSeed.h"
 #include "core/MovementStats.h"
 #include "core/CoverageFlush.h"
 #include <atomic>
+#ifndef _WIN32
+#include <csignal>
+#include <cxxabi.h>
+#include <execinfo.h>
+#include <unistd.h>
+#endif
 #include <chrono>
 #include <functional>
+#include <fstream>
+#include <sstream>
 #include <thread>
 
 namespace
@@ -854,6 +863,54 @@ static void ResetForNextJob()
    Transport::Instance().SetOfflineVideoTime(0.0);
 }
 
+// What the headless job was doing, for the crash hook: a fatal signal prints one status line (E_CRASH) and a
+// demangled backtrace instead of dying silently, so an agent sees which stage and which code fell over.
+static char sCrashPatch[512] = "";
+static char sCrashStage[160] = "starting";
+static void NoteCrashPatch(const std::string& patch)
+{
+   std::snprintf(sCrashPatch, sizeof(sCrashPatch), "%s", patch.c_str());
+}
+#ifndef _WIN32
+static void HeadlessCrashHook(int sig)
+{
+   char line[1024];
+   const int n = std::snprintf(line, sizeof(line),
+                               "\n{\"ok\":false,\"mode\":\"crash\",\"patch\":\"%s\",\"errors\":[{\"code\":\"E_CRASH\",\"message\":\"signal %d while %s\","
+                               "\"hint\":\"the backtrace is on stderr; the innermost Infinite frame names the node or renderer\"}]}\n",
+                               sCrashPatch, sig, sCrashStage);
+   if (n > 0)
+      (void)!write(STDOUT_FILENO, line, std::min<size_t>((size_t)n, sizeof(line) - 1));
+   // The process is dying anyway; demangling is worth its small risk here.
+   void* frames[48];
+   const int count = backtrace(frames, 48);
+   char** syms = backtrace_symbols(frames, count);
+   (void)!write(STDERR_FILENO, "Infinite headless crash backtrace:\n", 35);
+   for (int i = 1; syms != nullptr && i < count; i++)
+   {
+      // macOS: "3   Infinite   0x0000 _ZN3Foo3barEv + 12"; Linux: "path(_ZN3Foo3barEv+0x12) [0x...]".
+      std::string s = syms[i], name;
+      size_t b = s.find(" _Z"), e = std::string::npos;
+      if (b != std::string::npos) { b++; e = s.find(' ', b); }
+      else if ((b = s.find("(_Z")) != std::string::npos) { b++; e = s.find('+', b); }
+      if (b != std::string::npos)
+      {
+         int status = 0;
+         char* d = abi::__cxa_demangle(s.substr(b, e == std::string::npos ? std::string::npos : e - b).c_str(), nullptr, nullptr, &status);
+         if (status == 0 && d != nullptr)
+            s = s.substr(0, b) + d + (e == std::string::npos ? "" : s.substr(e));
+         std::free(d);
+      }
+      s += "\n";
+      (void)!write(STDERR_FILENO, s.c_str(), s.size());
+   }
+   // A headless run must end here: returning from the handler would let a sent or async
+   // signal resume a half-dead render that never exits. Default action = die with the signal.
+   std::signal(sig, SIG_DFL);
+   raise(sig);
+}
+#endif
+
 void HeadlessTick(int& frameId, GLFWwindow* window)
 {
    enum class Phase { Warm, Running, Frames, NodeRender, Audio, TimelineRender, Done };
@@ -914,13 +971,31 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
    static std::vector<BatchJob> sBatch; // --batch: the jobs after the first, read when the first one is done
    static size_t sBatchNext = 0;
    static bool sBatchRead = false;
+   static std::streamoff sBatchOffset = 0; // --serve: where the last read of the list stopped (whole lines only)
+   static bool sServeQuit = false;         // --serve: a "quit" line was read
+   static double sServeIdleSince = -1.0;   // --serve: when the list last ran dry
+   static bool sSidecarWritten = false;    // --frame --batch: this job's <out>.json is out (the finish tick can repeat)
    // --batch: one job per line, "patch<TAB>out[<TAB>out.wav]"; false when the list cannot be opened.
+   // Reads from where the last call stopped; a last line without its newline is left for the next read
+   // (a writer may be half way through it).
    auto readBatch = [&]() -> bool
    {
-      std::ifstream in(gHeadlessJob.batch);
+      std::ifstream in(gHeadlessJob.batch, std::ios::binary);
       if (!in)
          return false;
-      for (std::string line; std::getline(in, line);)
+      in.seekg(0, std::ios::end);
+      const std::streamoff size = in.tellg();
+      if (size < sBatchOffset)
+         sBatchOffset = 0; // the list was rewritten from scratch
+      in.seekg(sBatchOffset);
+      std::string chunk((size_t)(size - sBatchOffset), '\0');
+      in.read(chunk.data(), (std::streamsize)chunk.size());
+      const size_t lastNl = chunk.rfind('\n');
+      if (lastNl == std::string::npos)
+         return true;
+      sBatchOffset += (std::streamoff)(lastNl + 1);
+      std::istringstream lines(chunk.substr(0, lastNl + 1));
+      for (std::string line; std::getline(lines, line);)
       {
          if (!line.empty() && line.back() == '\r')
             line.pop_back();
@@ -930,7 +1005,9 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
             b = std::min(line.find('\t', a), line.size());
             col.push_back(line.substr(a, b - a));
          }
-         if (col.size() >= 2 && !col[0].empty() && !col[1].empty())
+         if (col.size() == 1 && col[0] == "quit")
+            sServeQuit = true;
+         else if (col.size() >= 2 && !col[0].empty() && !col[1].empty())
             sBatch.push_back({ col[0], col[1], col.size() > 2 ? col[2] : std::string() });
       }
       return true;
@@ -940,8 +1017,17 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
    if (sPhase == Phase::Done || !HeadlessJobActive() || job.mode == Headless::Mode::Version ||
        glfwWindowShouldClose(window))
       return;
+   {
+      static const char* kPhaseNames[] = { "warming up", "running", "rendering frames", "rendering the node", "measuring audio",
+                                           "rendering the timeline", "finishing" };
+      std::snprintf(sCrashStage, sizeof(sCrashStage), "%s", kPhaseNames[(int)sPhase]);
+   }
    if (sWall < 0.0)
    {
+      NoteCrashPatch(job.patch);
+#ifndef _WIN32
+      Platform::gCrashHook = HeadlessCrashHook;
+#endif
       sWall = glfwGetTime();
       sStatus.mode = job.mode == Headless::Mode::Render     ? "render"
                      : job.mode == Headless::Mode::Describe ? "describe"
@@ -955,7 +1041,8 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       sStatus.patch = job.patch;
       sStatus.out = job.out;
       sStatus.fps = job.fps;
-      StartHeadlessWatchdog(job, sStatus);
+      if (!job.serve) // a warm session lives until "quit" or idle; --timeout is checked per job below
+         StartHeadlessWatchdog(job, sStatus);
    }
    auto fail = [&](const char* code, const std::string& msg, int node = -1)
    {
@@ -964,7 +1051,10 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       HeadlessFinish(window, sStatus, sWall);
    };
 
-   if (glfwGetTime() - sWall > job.timeoutSec)
+   static double sJobWall = -1.0; // --serve: when the current job started (the session's own start is sWall)
+   if (sJobWall < 0.0)
+      sJobWall = sWall;
+   if (glfwGetTime() - sJobWall > job.timeoutSec && sServeIdleSince < 0.0)
    {
       if (gOfflineRender.active && gOfflineRender.node != nullptr)
          gOfflineRender.node->RequestFinishOfflineRender(true);
@@ -2146,6 +2236,15 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
                               ColorStats::FrameSummaryJsonFields(fs) + "}";
                char when[32];
                std::snprintf(when, sizeof(when), "%.6g", sTimes[sNextTime]);
+               // A failed GPU command (timeout under memory pressure, lost device) leaves a black or half-drawn
+               // frame that looks like a scene problem; report it as the render failure it is.
+               static int sGpuErrorsSeen = 0;
+               if (rhi::gGpuErrors.load() != sGpuErrorsSeen)
+               {
+                  sGpuErrorsSeen = rhi::gGpuErrors.load();
+                  sStatus.errors.push_back({ "E_GPU", std::string("the GPU failed while drawing the frame at ") + when + " s (" + rhi::gGpuLastError + ")",
+                                             0, sOutIndex, "close other GPU-heavy apps or lower the size / samples, then render again" });
+               }
                if (fs.blackPercent >= 100.0)
                   sStatus.warnings.push_back({ "W_BLACK_FRAME", std::string("the frame at ") + when + " s is entirely black",
                                                0, sOutIndex, "check that something visible reaches the Output at that time" });
@@ -2195,11 +2294,27 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
                std::fclose(f);
             }
          };
-         sidecar(job.out, "{\"ok\":true,\"patch\":\"" + Headless::JsonEscape(job.patch) + "\",\"frame_stats\":[" + sFrameStats + "]}\n");
-         if (!sBatchRead)
+         if (!sSidecarWritten)
          {
+            sSidecarWritten = true;
+            std::string errs;
+            if (job.serve)
+            {
+               // A served job reports its own errors (E_GPU, W_BLACK_FRAME, ...) here: there is no status line per job.
+               for (const Headless::Issue& e : sStatus.errors)
+                  errs += std::string(errs.empty() ? "" : ",") + "{\"code\":\"" + e.code + "\",\"message\":\"" + Headless::JsonEscape(e.message) + "\"}";
+               char ms[48];
+               std::snprintf(ms, sizeof(ms), ",\"elapsed_ms\":%lld", (long long)((glfwGetTime() - sJobWall) * 1000.0));
+               errs = std::string(ms) + ",\"errors\":[" + errs + "]";
+               sStatus.errors.clear();
+            }
+            sidecar(job.out, "{\"ok\":true,\"patch\":\"" + Headless::JsonEscape(job.patch) + "\",\"frame_stats\":[" + sFrameStats + "]" + errs + "}\n");
+         }
+         if (!sBatchRead || (job.serve && sBatchNext >= sBatch.size() && !sServeQuit))
+         {
+            const bool first = !sBatchRead;
             sBatchRead = true;
-            if (!readBatch())
+            if (!readBatch() && first)
                return fail("E_USAGE", "--batch: could not read " + job.batch);
          }
          while (sBatchNext < sBatch.size())
@@ -2227,11 +2342,27 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
             sNextTime = 0;
             sNextFrame = 0;
             sPhase = Phase::Warm;
+            sSidecarWritten = false;
+            sServeIdleSince = -1.0;
+            sJobWall = glfwGetTime();
             ResetForNextJob();
+            NoteCrashPatch(b.patch);
             LoadPatchFrom(b.patch);
             return;
          }
-         sStatus.extraJson.push_back("\"batch_jobs\":" + std::to_string(sBatch.size() + 1));
+         if (job.serve && !sServeQuit)
+         {
+            // Nothing queued: wait for the next line without spinning a core. Ten idle minutes end the
+            // session, so a forgotten one does not hold the GPU.
+            if (sServeIdleSince < 0.0)
+               sServeIdleSince = glfwGetTime();
+            if (glfwGetTime() - sServeIdleSince < 600.0)
+            {
+               std::this_thread::sleep_for(std::chrono::milliseconds(50));
+               return;
+            }
+         }
+         sStatus.extraJson.push_back("\"batch_jobs\":" + std::to_string(sBatchNext + 1));
       }
       if (sPngWriter != nullptr)
       {
@@ -2449,6 +2580,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
             SpawnSeed::ResetAll(); // the Audio phase seeks to job.start itself
             gNextNodeUid = 1;
             MovementStats::Live() = StatsAtStart();
+            NoteCrashPatch(b.patch);
             LoadPatchFrom(b.patch);
             return;
          }

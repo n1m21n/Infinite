@@ -240,7 +240,7 @@ def import_model(o, i):
 def add_recipe(mat, p, ob, name):
     """The FieldMaterialRecipes.h recipe `name` as Cycles nodes. curvature = (pointiness - 0.5) * 125 (the row 4.4
     calibration), cavity = 1 - local AO at 5 % of the radius, N.y = world Z, fbm = Noise Texture (its own pattern)."""
-    if name not in ("Edge Wear", "Dirt", "Dust"):   # row 3.5 surfaces have no Cycles rebuild: owner review only
+    if name not in ("Edge Wear", "Dirt", "Dust", "Rust", "Wet"):   # row 3.5 surfaces have no Cycles rebuild: owner review only
         return
     import re
     hdr = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src", "nodes", "FieldMaterialRecipes.h")).read()
@@ -265,7 +265,32 @@ def add_recipe(mat, p, ob, name):
         nt.links.new(f, mx.inputs["Factor"]); nt.links.new(mx.outputs[2], sock)
     def mixf(a, b, f, sock):
         nt.links.new(math('ADD', a, math('MULTIPLY', f, b - a)), sock)
+    def cavity():   # 1 - local AO at 5 % of the object's radius, as the per-vertex bake
+        vs = [v.co for v in ob.data.vertices]
+        lo = [min(v[k] for v in vs) for k in range(3)]; hi = [max(v[k] for v in vs) for k in range(3)]
+        mid = [(lo[k] + hi[k]) / 2 for k in range(3)]
+        rad = max(sum((v[k] - mid[k]) ** 2 for k in range(3)) for v in vs) ** 0.5
+        ao = nt.nodes.new("ShaderNodeAmbientOcclusion"); ao.samples = 16; ao.only_local = True
+        ao.inputs["Distance"].default_value = 0.05 * rad
+        return math('SUBTRACT', 1.0, ao.outputs["AO"])
     ge = nt.nodes.new("ShaderNodeNewGeometry")
+    if name == "Rust":   # row 5.1
+        curv = math('MULTIPLY', math('SUBTRACT', ge.outputs["Pointiness"], 0.5), 125.0)
+        e = math('DIVIDE', math('SUBTRACT', curv, k["edge"]), 4.0, clamp=True)
+        c = math('MULTIPLY', cavity(), k["spread"], clamp=True)
+        r = math('MULTIPLY', math('MULTIPLY', math('MAXIMUM', e, c), math('MULTIPLY', math('ADD', noise(k["scale"], 4), 0.3), 1.5), clamp=True), k["amount"])
+        mixc((0.56, 0.56, 0.55), (0.30, 0.11, 0.04), r, p.inputs["Base Color"])
+        nt.links.new(math('SUBTRACT', 1.0, r), p.inputs["Metallic"]); mixf(0.35, 0.85, r, p.inputs["Roughness"])
+        return
+    if name == "Wet":    # row 5.1: P.y is Blender's object Z (the mesh is baked to world)
+        tc = nt.nodes.new("ShaderNodeTexCoord"); sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(tc.outputs["Object"], sep.inputs[0])
+        h = math('SUBTRACT', sep.outputs["Z"], math('MULTIPLY', cavity(), k["fill"]))
+        mr = nt.nodes.new("ShaderNodeMapRange"); mr.interpolation_type = 'SMOOTHSTEP'
+        mr.inputs[1].default_value, mr.inputs[2].default_value = k["level"] - k["band"], k["level"] + k["band"]
+        nt.links.new(h, mr.inputs[0]); w = math('SUBTRACT', 1.0, mr.outputs[0])
+        mixc((0.55, 0.45, 0.35), (0.55 * 0.45, 0.45 * 0.45, 0.35 * 0.45), w, p.inputs["Base Color"]); mixf(0.8, 0.05, w, p.inputs["Roughness"])
+        return
     if name == "Edge Wear":
         curv = math('MULTIPLY', math('SUBTRACT', ge.outputs["Pointiness"], 0.5), 125.0)
         n = math('SUBTRACT', noise(k["scale"], 4), 0.5)
@@ -387,6 +412,18 @@ for i, o in enumerate(scene["objects"]):
         bpy.ops.mesh.primitive_monkey_add(size=2)
         bpy.ops.object.modifier_add(type='SUBSURF'); bpy.ops.object.modifier_apply(modifier="Subdivision")
         bpy.ops.object.shade_smooth()
+    elif shape == "file":   # row 5.6: a mesh built once into assets/ (hand_build.py), shaded by the case's material
+        before = set(bpy.data.objects)
+        bpy.ops.import_scene.gltf(filepath=os.path.join(ASSETS, o["asset"]))
+        new = [x for x in bpy.data.objects if x not in before and x.type == 'MESH']
+        for x in bpy.context.scene.objects:
+            x.select_set(x in new)
+        bpy.context.view_layer.objects.active = new[0]
+        bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        if len(new) > 1:
+            bpy.ops.object.join()
+        bpy.context.active_object.data.materials.clear()
     elif shape == "mesh":   # judge_table: verts, faces and per-corner uvs straight from the case, smooth shaded
         me = bpy.data.meshes.new("mesh%d" % i)
         me.from_pydata(o["verts"], [], o["faces"])
@@ -428,6 +465,9 @@ for i, o in enumerate(scene["objects"]):
         dm.strength = dz; dm.mid_level = 1.0
 
     m = o.get("material", {})
+    if scene.get("caustics"):   # row 4.4 truth: Cycles' shadow caustics (MNEE), glass casts, everything else receives
+        ob.cycles.is_caustics_caster = m.get("transmission", 0.0) > 0.0
+        ob.cycles.is_caustics_receiver = m.get("transmission", 0.0) <= 0.0
     mat = bpy.data.materials.new("m%d" % i); mat.use_nodes = True
     p = next(n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
     p.inputs["Base Color"].default_value = (*m.get("base_color", (0.8, 0.8, 0.8)), 1)
@@ -670,15 +710,23 @@ for i, l in enumerate(scene.get("lights", [])):
     ld.color = l.get("color", (1, 1, 1))
     ld.energy = l["power"]  # W (W/m^2 for a sun)
     ld.use_shadow = True
+    ld.cycles.is_caustics_light = bool(scene.get("caustics"))
     if kind == "SUN":
         ld.angle = math.radians(l.get("angle", 0.5))
     elif kind == "AREA":
-        ld.shape = 'RECTANGLE'; ld.size, ld.size_y = l.get("size", (1, 1))
+        ld.shape = 'ELLIPSE' if l.get("shape") == "disc" else 'RECTANGLE'; ld.size, ld.size_y = l.get("size", (1, 1))
+        ld.spread = math.radians(l.get("spread", 180))
     else:
         ld.shadow_soft_size = l.get("radius", 0.1)
     if kind == "SPOT":
         ld.spot_size = math.radians(2 * l["spot_angle"])  # Blender: full cone angle
         ld.spot_blend = l.get("blend", 0.2)
+    if kind in ("POINT", "SPOT") and l.get("ies"):
+        # Row 4.2: the profile through an IES Texture into the light's emission strength.
+        ld.use_nodes = True
+        ies = ld.node_tree.nodes.new("ShaderNodeTexIES"); ies.mode = 'EXTERNAL'; ies.filepath = os.path.join(ASSETS, l["ies"])
+        em = next(n for n in ld.node_tree.nodes if n.type == "EMISSION")
+        ld.node_tree.links.new(ies.outputs[0], em.inputs["Strength"])
     lo = bpy.data.objects.new("l%d" % i, ld); sc.collection.objects.link(lo)
     lo.location = spherical(l["azimuth"], l["elevation"], l.get("distance", 10))
     aim(lo, (0, 0, 0))
@@ -688,6 +736,10 @@ if fog:
     # Row 5.3 truth: a homogeneous medium in a box, extinction = density, scattered share = colour, HG g:
     # Volume Scatter (colour x density) plus Volume Absorption ((1 - colour) x density).
     (x0, y0, z0), (x1, y1, z1) = fog["box"]
+    # Row 5.6: pull the box's faces in a hair. A face lying on a floor or wall breaks Cycles' volume stack (photo_shoe's
+    # floor rendered a quarter as bright); Infinite's box test does not care, so only the truth's mesh moves.
+    e = 0.002 * min(x1 - x0, y1 - y0, z1 - z0)
+    x0, y0, z0, x1, y1, z1 = x0 + e, y0 + e, z0 + e, x1 - e, y1 - e, z1 - e
     bpy.ops.mesh.primitive_cube_add(size=2, location=((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
     fo = bpy.context.active_object; fo.scale = ((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2)
     fm = bpy.data.materials.new("fog"); fm.use_nodes = True; fnt = fm.node_tree
@@ -698,10 +750,20 @@ if fog:
     vs.inputs["Color"].default_value = (*fog["color"], 1); vs.inputs["Density"].default_value = fog["density"]
     vs.inputs["Anisotropy"].default_value = fog.get("g", 0.0)
     va.inputs["Color"].default_value = (*fog["color"], 1); va.inputs["Density"].default_value = fog["density"]
+    if fog.get("falloff", 0.0) > 0.0:
+        # Row 4.1: density x mix(1, spherical gradient on the box's object coordinates (-1..1), falloff), as fogShape.
+        tc = fnt.nodes.new("ShaderNodeTexCoord"); gr = fnt.nodes.new("ShaderNodeTexGradient"); gr.gradient_type = 'SPHERICAL'
+        fnt.links.new(tc.outputs["Object"], gr.inputs["Vector"])
+        mp = fnt.nodes.new("ShaderNodeMath"); mp.operation = 'MULTIPLY_ADD'
+        fnt.links.new(gr.outputs["Fac"], mp.inputs[0]); mp.inputs[1].default_value = fog["falloff"]
+        mp.inputs[2].default_value = 1.0 - fog["falloff"]
+        md = fnt.nodes.new("ShaderNodeMath"); md.operation = 'MULTIPLY'
+        fnt.links.new(mp.outputs[0], md.inputs[0]); md.inputs[1].default_value = fog["density"]
+        fnt.links.new(md.outputs[0], vs.inputs["Density"]); fnt.links.new(md.outputs[0], va.inputs["Density"])
     add = fnt.nodes.new("ShaderNodeAddShader")
     fnt.links.new(vs.outputs[0], add.inputs[0]); fnt.links.new(va.outputs[0], add.inputs[1])
     fnt.links.new(add.outputs[0], fout.inputs["Volume"])
-    try: fm.cycles.homogeneous_volume = True
+    try: fm.cycles.homogeneous_volume = fog.get("falloff", 0.0) <= 0.0
     except Exception: pass
     fo.data.materials.append(fm)
     sc.cycles.volume_bounces = 8

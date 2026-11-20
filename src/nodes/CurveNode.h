@@ -15,6 +15,8 @@ class CurveNode : public INode, public IGeometrySource
 {
 public:
    static const int kMaxPoints = 8;
+   static const int kMaxTextPoints = 512;
+   static std::vector<float> ParsePoints(const std::string& text);
 
    static INode* Create() { return new CurveNode(); }
    static const std::vector<std::string>& KindNames();
@@ -42,6 +44,10 @@ public:
    int kind = 0;          // catmull-rom / bezier / b-spline / linear
    int preset = 0;        // starting arrangement of the control points
    int pointCount = 5;
+   // Hand-placed control points, "x y z x y z ...". When it holds two or more
+   // points it replaces the preset (and pointCount), so a patch can draw any
+   // path - a filament, a stem - the way a Blender curve is drawn.
+   std::string points;
    int segments = 16;
    bool closed = false;
 
@@ -90,6 +96,7 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("kind", kind); v.Int("preset", preset); v.Int("pointCount", pointCount);
+      v.Text("points", points);
       v.Int("segments", segments); v.Bool("closed", closed);
       v.Float("spread", spread); v.Float("height", height);
       v.Float("twist", twist); v.Float("seed", seed);
@@ -122,5 +129,6 @@ private:
    bool mBuiltClosed = false;
    float mBuiltSpread = -1, mBuiltHeight = -999, mBuiltTwist = -999, mBuiltSeed = -999;
    float mBuiltRadius = -1, mBuiltTaper = -1;
+   std::string mBuiltPoints;
    int mLastCookFrame = -1;
 };

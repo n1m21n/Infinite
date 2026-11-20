@@ -412,7 +412,7 @@ namespace MeshOps
    }
 
    Mesh Sweep(const Polyline& profile, const Polyline& path, float startScale, float endScale,
-              float twistDegrees, bool caps)
+              float twistDegrees, bool caps, const std::vector<float>* scaleCurve)
    {
       bool profileClosed = false, pathClosed = false;
       const std::vector<V3> prof = CleanPoints(profile, profileClosed);
@@ -499,13 +499,22 @@ namespace MeshOps
          const double f = pathClosed ? (double)i / (double)R : (double)i / (double)(R - 1);
          const double scale = pathClosed ? (double)startScale
                                          : (double)startScale + ((double)endScale - (double)startScale) * (along[(size_t)i] / total);
+         double taper = 1.0;
+         if (scaleCurve != nullptr && scaleCurve->size() >= 2)
+         {
+            const size_t last = scaleCurve->size() - 1;
+            const double u = (pathClosed ? f : along[(size_t)i] / total) * (double)last;
+            const size_t a = std::min((size_t)std::max(0.0, std::floor(u)), last - 1);
+            const double w = std::clamp(u - (double)a, 0.0, 1.0);
+            taper = (double)(*scaleCurve)[a] * (1.0 - w) + (double)(*scaleCurve)[a + 1] * w;
+         }
          const double turn = twist * f - holonomy * f;
          const V3& t = tangent[(size_t)i];
          const V3 b0 = Cross(t, n[(size_t)i]);
          const V3 nn = RotateFrame(n[(size_t)i], b0, turn, false);
          const V3 bb = RotateFrame(n[(size_t)i], b0, turn, true);
          for (int k = 0; k < C; k++)
-            g.At(i, k) = way[(size_t)i] + (nn * lx[(size_t)k] + bb * ly[(size_t)k]) * scale;
+            g.At(i, k) = way[(size_t)i] + (nn * lx[(size_t)k] + bb * ly[(size_t)k]) * (scale * taper);
       }
       return BuildMesh(g, caps);
    }

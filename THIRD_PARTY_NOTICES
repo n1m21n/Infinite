@@ -251,3 +251,13 @@ these are part of this repository.
 MoltenVK: Copyright (c) The Brenwill Workshop Ltd. Vulkan headers: Copyright (c)
 The Khronos Group Inc. Both licensed under the Apache License, Version 2.0
 (https://www.apache.org/licenses/LICENSE-2.0).
+
+Blender Cycles (formulas adapted in the 3D engine)
+---------------------------------------------------
+
+The area-light spread falloff in `src/nodes/Render3DShared.h` (`areaSpreadK`)
+follows the one in Cycles' `kernel/light/area.h`. It is written fresh from that
+formula; no Cycles source file is part of this repository.
+
+Copyright (c) Blender Foundation. Licensed under the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0).

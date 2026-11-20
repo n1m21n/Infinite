@@ -73,6 +73,7 @@
 #include "nodes/SceneNodes.h"
 #include "nodes/DelaunayNodes.h"
 #include "nodes/GeometryOpNodes.h"
+#include "nodes/Group3DNode.h"
 #include "nodes/OceanNode.h"
 #include "nodes/PointDistributionNodes.h"
 #include "nodes/UtilityNodes.h"
@@ -1670,6 +1671,86 @@ namespace
          if (st.nonFinite > 0 || st.badIndex > 0)
          {
             f.Flag("DEGEN", "Sweep path doubling back", "non-finite or bad index", 0);
+            ok = false;
+         }
+      }
+      // Hand-placed Curve points replace the preset; a short or broken list falls back.
+      {
+         CurveNode c;
+         c.kind = 3; // linear, so the ends are the first and last control points
+         c.points = "0 0 0, 1 0 0, 1 1 0";
+         const Polyline& l = c.GetPolyline();
+         const size_t n = l.points.size();
+         const bool ends = n >= 6 && l.points[0] == 0.0f && l.points[1] == 0.0f &&
+                           std::fabs(l.points[n - 3] - 1.0f) < 1e-5f && std::fabs(l.points[n - 2] - 1.0f) < 1e-5f;
+         if (!ends)
+         {
+            f.Flag("CURVE", "Curve points", "ends do not match the control points", (float)n);
+            ok = false;
+         }
+         c.points = "1 2 nan x";
+         if (c.GetPolyline().Empty())
+         {
+            f.Flag("CURVE", "Curve points", "a broken list left no curve (expected the preset)", 0);
+            ok = false;
+         }
+      }
+      // Sweep taper: "0 1 0" pinches both ends to a point and keeps the middle at full width.
+      {
+         CurveNode c;
+         c.kind = 3;
+         c.points = "0 0 0 0 0 0.5 0 0 1";
+         SweepNode s;
+         s.path = &c;
+         s.profileRadius = 0.1f;
+         s.caps = false;
+         s.scales = "0 1 0";
+         const Mesh& m = s.GetMesh();
+         float endR = 0.0f, midR = 0.0f;
+         for (const Vertex& v : m.vertices)
+         {
+            const float r = std::sqrt(v.px * v.px + v.py * v.py);
+            if (std::fabs(v.pz) < 1e-4f || std::fabs(v.pz - 1.0f) < 1e-4f)
+               endR = std::max(endR, r);
+            if (std::fabs(v.pz - 0.5f) < 1e-4f)
+               midR = std::max(midR, r);
+         }
+         if (m.vertices.empty() || endR > 1e-4f || std::fabs(midR - 0.1f) > 1e-3f)
+         {
+            f.Flag("CURVE", "Sweep taper", "end/mid radius wrong (mid)", midR);
+            ok = false;
+         }
+      }
+      // Group 3D's own move/rotate/scale reaches every child as drawn, and the bake
+      // follows; at the defaults the children are handed out as they are.
+      {
+         CurveNode a;
+         a.kind = 3;
+         a.points = "0 0 0 0 0 1";
+         Group3DNode inner, outer;
+         inner.inputs[0] = &a;
+         outer.inputs[0] = &inner;
+         if (outer.GroupChild(0) != &inner)
+         {
+            f.Flag("GROUP", "Group 3D identity", "default group wrapped its child", 0);
+            ok = false;
+         }
+         outer.offsetX = 2.0f;
+         inner.rotY = 90.0f;   // inner turns the curve onto x, outer moves it
+         IGeometrySource* leaf = outer.GroupChild(0)->GroupChild(0);
+         const Mat4 m = leaf != nullptr ? leaf->GetModelMatrix() : Mat4::Identity();
+         const float endX = m.m[0] * 0.0f + m.m[4] * 0.0f + m.m[8] * 1.0f + m.m[12];
+         if (leaf == nullptr || leaf->PassthroughSource() == nullptr || std::fabs(endX - 3.0f) > 1e-4f)
+         {
+            f.Flag("GROUP", "Group 3D matrix", "nested move+rotate wrong (end x)", endX);
+            ok = false;
+         }
+         float bakeMaxX = -1e9f;
+         for (const Vertex& v : outer.GetMesh().vertices)
+            bakeMaxX = std::max(bakeMaxX, v.px);
+         if (std::fabs(bakeMaxX - 3.0f) > 0.1f)
+         {
+            f.Flag("GROUP", "Group 3D bake", "bake ignores the group matrix (max x)", bakeMaxX);
             ok = false;
          }
       }

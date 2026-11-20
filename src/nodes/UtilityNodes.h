@@ -394,9 +394,10 @@ public:
    // Normal slot holds a height map (grayscale), not a tangent-space normal.
    bool normalBump = false;
    // How the albedo/roughness/metallic/normal/ao/emission/clearcoat/sheen
-   // maps sample outside 0..1 UV - 0=Clamp (smear edge pixel, matches every
-   // saved patch before this param existed), 1=Repeat, 2=Mirror.
-   int wrapMode = 0;
+   // maps sample outside 0..1 UV - 0=Clamp (smear edge pixel), 1=Repeat, 2=Mirror.
+   // Repeat by default, as Blender's image textures: a Mapping scale > 1 tiles the map instead of
+   // smearing its edge pixel over the rest of the surface.
+   int wrapMode = 1;
    static const std::vector<std::string>& WrapModeNames()
    {
       static const std::vector<std::string> kNames = { "clamp", "repeat", "mirror" };

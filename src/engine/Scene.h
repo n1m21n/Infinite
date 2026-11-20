@@ -82,6 +82,10 @@ namespace engine
       // but model, normalMatrix and objRand is the same across them. objRand: Shade Geometry's per-object random, 0..1.
       int copyGroup = -1;
       float objRand = 0.0f;
+      // Row 4.2 light linking: bit i set = frame light i (0..31) does not light this object (Scene 3D's per-item list).
+      uint32_t unlitMask = 0;
+      // Row 4.2 shadow linking: bit i set = this object does not block frame light i (0..31).
+      uint32_t noShadowMask = 0;
    };
 
    // RGBA8 pixels of a material map (row 0 = GL's first row). key changes when the pixels do; the backend keeps the
@@ -117,11 +121,13 @@ namespace engine
       float intensity = 1.0f;
       float spotAngleDeg = 45.0f, spotPenumbra = 0.2f;
       float areaW = 1.0f, areaH = 1.0f; // area: a rectangle facing aim; traced as one, lit live from its centre
+      int areaShape = 0; float areaSpread = 180.0f; // area: 0 rectangle / 1 disc; emission spread in degrees
       float diffuse = 1.0f, specular = 1.0f;
       float falloff = 1.0f; // k of 1 / (1 + d^2 k); negative = inverse square
       float cutoff = 0.0f;  // 0 = none
       bool castShadow = true; // false: this light is never blocked
       float sunAngleDeg = 0.0f; // directional / sun: degrees across its disc (0 = a point); softens its highlight and settled shadow
+      int iesRow = -1;          // point / spot: its IES table in Frame::ies (row of kIesRow floats, Ies.h); -1 = none
    };
 
    // One shadow-casting light (the first), a depth map fitted to the scene bounds. Spot and directional/sun only.
@@ -141,6 +147,7 @@ namespace engine
       std::vector<TextureData> textures; // up to kMaxTextures; maps past that fall back to the plain material
       std::vector<InstanceBatch> batches;
       std::vector<Light> lights; // up to kMaxLights
+      std::vector<float> ies;    // the lights' IES tables, kIesRow floats each (Ies.h), indexed by Light::iesRow
       float viewProj[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }; // GL clip space, z in -1..1
       float eye[3] = { 0, 0, 5 };
       float exposure = 1.0f;
@@ -175,7 +182,7 @@ namespace engine
       // blades (below 3 round), their turn in radians, tall/wide ratio, as Render 3D's lens. 0 radius = pinhole.
       float lensRadius = 0.0f, focusDist = 4.0f;
       // Row 5.3: one homogeneous medium in the box fogMin..fogMax (settle only): extinction per unit, scattered share, HG g.
-      float fogDensity = 0.0f, fogAnisotropy = 0.0f;
+      float fogDensity = 0.0f, fogAnisotropy = 0.0f, fogFalloff = 0.0f; // row 4.1: falloff 0 even box .. 1 soft puff
       float fogColor[3] = { 0.9f, 0.9f, 0.9f }, fogMin[3] = { -1000, -1000, -1000 }, fogMax[3] = { 1000, 1000, 1000 };
       float dofAperture = 0.0f; // live: Render 3D's depth blur, a circle of dofAperture x 24 px across 1080 rows at |d - focus| / d
       float bokeh[3] = { 0.0f, 0.0f, 1.0f };

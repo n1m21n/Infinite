@@ -116,7 +116,8 @@ A patch can validate and still be the wrong patch, which is why step 4 exists.
 | `--validate patch.inf [--for-render] [--lenient] [--json file]` | Check the file loads; report every problem |
 | `--explain patch.inf [--json] [--all] [--lenient]` | Print the built graph: nodes, non-default controls, wires, modulation ranges, world bounding boxes of geometry. `--all` lists every control |
 | `--frame patch.inf T[,T...] out.png or dir/` | Still images at the given times in seconds. Several times need a folder |
-| `--frame --batch jobs.json` | Run multiple frame renders in one process (`[{patch, t, out, size, node, ...}]`) |
+| `--frame patch.inf T out/ --batch list.txt` | More frame renders in one process: one `patch<TAB>out/` line per job (absolute paths); each job also writes `<out>.json` |
+| `--frame ... --batch queue.txt --serve` | A warm session: keeps reading lines appended to the queue and renders each in the same process; a `quit` line ends it, 10 idle minutes too. `tools/warm.py` drives it |
 | `--frames-dir patch.inf out_dir --duration S` | A numbered PNG sequence. Options: `--start S`, `--fps N`, `--alpha`, `--depth 8 or 16` |
 | `--render patch.inf out.mp4 or out.mov` | A video with audio |
 | `--audio-summary patch.inf out.json` | The sound as numbers: loudness, peaks, clipping, silence, spectrum, tempo guess |
@@ -145,7 +146,8 @@ A patch can validate and still be the wrong patch, which is why step 4 exists.
 | `--timeline` | render, audio-summary | Render or measure the Timeline arrangement instead of the canvas graph alone |
 | `--plugin-params` | render, audio-summary | List every loaded plugin's parameters (address, name, real range, default) in the `plugins` block of the result |
 | `--plugin-state` | render, audio-summary | Include plugin state blobs in the result |
-| `--batch jobs.json` | frame, audio-summary | Run a JSON array of frame or audio-summary jobs in one process |
+| `--batch list.txt` | frame, audio-summary | More jobs in one process, one tab-separated `patch<TAB>out[<TAB>out.wav]` line each |
+| `--serve` | frame with --batch | Keep the process up and render lines appended to the list; `--timeout` applies to each job |
 | `--repeat 1-8` | frame | Repeat the frame render N times (determinism / warmup check) |
 | `--contact-sheet sheet.png` | frame | One image holding every requested frame |
 | `--png-level 0-9` | frame, frames-dir | PNG compression |
@@ -320,6 +322,10 @@ Three ways, from simplest to most flexible.
 | Light, HDRI, Camera | `geo r3 5 light`, `geo r3 4 camera`, `cable r3 8 hdri` | An HDRI is an environment: it uses a `cable` line, not `geo`. Light `useTemperature`, `useCutoff`; Camera `shiftX`, `sensorFit` |
 
 Write each control with its real tag; `--describe "<type>"` shows it, and `--validate` warns `W_TYPE_MISMATCH` when you guess wrong.
+
+Rotations come in two units: primitives (Plane, Cube, ...) take radians (`f rotX -1.5708`), Transform and Camera take degrees (`f rotX -90`). `--validate` says which when a value is out of range, and warns `W_ROTATION_UNITS` for a radian-looking value on a degrees control.
+
+To look at a 3D patch quickly, `python3 tools/look.py` renders sheets in one process: `passes` (colour, normals, albedo, light = colour / albedo, object id), `crop X Y W H --scale S` (renders only that region, sharper, by narrowing the camera; `--verify` compares it with the full frame), `sweep node.key V1 V2 ...` and `ab`.
 
 Not reachable from the CLI: selecting elements with the mouse in Edit Mode, drawing sculpt strokes, and the 3D View editor's scene items, gizmos and overlays (a bare 3D View node renders its empty stage). The re-runnable check for everything in this section is `python3 tools/headless-docs/check_release_areas.py`.
 
