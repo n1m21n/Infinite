@@ -89,7 +89,7 @@ def page(i, embeds=frozenset()):
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#151930">
   <script src="../theme.js?v=1"></script>
-  <link rel="stylesheet" href="../brand.css?v=07695caf">
+  <link rel="stylesheet" href="../brand.css?v=7b069b32">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
   <title>{e(t)}</title>
   <meta name="description" content="{e(meta_desc(d))}">
@@ -113,7 +113,7 @@ def page(i, embeds=frozenset()):
     .meta{{color:var(--mute);font-size:14px}}
     .btn{{margin:12px 12px 0 0}}   /* the look comes from neumo.css */
   </style>
-  <link rel="stylesheet" href="../scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="../scale.css?v=0fc401be">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body>

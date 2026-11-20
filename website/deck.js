@@ -42,6 +42,7 @@
         var th = d * (m ? 0.24 : 0.155);               // radians per card
         var R = m ? 380 : 660;
         tx = Math.sin(th) * R;
+        if (m) tx = clamp(tx, -fanReach, fanReach);   // phones: the outer cards stay on screen, none is cut off at the edge
         ty = (1 - Math.cos(th)) * R * 0.9 - (ab < 1 ? (1 - ab) * 14 : 0);
         rz = th * 57.2958;
         tz = -ab * 18;
@@ -69,8 +70,16 @@
       return { tx: tx, ty: ty, tz: tz, rz: rz, ry: ry, sc: sc, op: op, dim: dim, ab: ab, s: s };
     }
 
+    var fanReach = 0;   // phones: how far a card may sit from the centre and still be fully on screen (set once per paint)
+    function measureFan() {
+      var list = cards(), r = grid.getBoundingClientRect(), cx = r.left + r.width / 2;
+      var cw = (list[0] && list[0].offsetWidth) || 244;
+      fanReach = Math.max(0, Math.min(cx - cw / 2 - 28, window.innerWidth - cx - cw / 2 - 28));
+    }
+
     function paint() {
       var list = cards(), n = list.length;
+      if (coarse() && mode === 'fan') measureFan();
       stage.setAttribute('data-deck-mode', mode);
       if (mode === 'grid' || !n) {
         list.forEach(function (c) {

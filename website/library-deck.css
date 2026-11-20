@@ -156,3 +156,4 @@
 .lib-card .lib-card-title b { display: block; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lib-card .lib-card-title span { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 400 var(--size-micro-mono)/1.4 var(--font-sans); letter-spacing: 0; opacity: 0.74; text-wrap: pretty; }
 .lib-stage[data-deck-mode="grid"] .lib-card:not([data-bento="big"]) .lib-card-title span { -webkit-line-clamp: 1; line-clamp: 1; }
+@media (max-width: 639px) { .lib-card .lib-card-title span { font-size: 0.875rem; line-height: 1.4; } }   /* phones: card copy is body text, 14px floor */

@@ -240,8 +240,8 @@ def build_gallery(items):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../brand.css?v=07695caf">
-  <link rel="stylesheet" href="../style.css?v=779b2f0d">
+  <link rel="stylesheet" href="../brand.css?v=7b069b32">
+  <link rel="stylesheet" href="../style.css?v=6aac68de">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../reels.css?v=3382b0f9">

@@ -45,9 +45,9 @@ p code, li code, td code, pre code { font-size: max(var(--web-floor), 0.875em) !
 html:not([data-mode="midnight"]) .ax-main .ax-bub.on, html:not([data-mode="midnight"]) .ax-main .pr-tile[aria-checked="true"], html:not([data-mode="midnight"]) .ax-main .ax-lab .pad.live { color: #EEF1FA; }
 .ax-main .ax-lab .pads { background: var(--nm-down); box-shadow: var(--nm-pocket); gap: 6px; padding: 5px; }   /* the pads sit in a pocket */
 .ax-main .ax-lab .pad.queued { background: var(--nm-down); box-shadow: var(--nm-pocket); animation: none; }
-.ax-main .ax-cta .btn { background: linear-gradient(160deg, #ff9a70 0%, #ee6a3a 58%, #d4532a 100%); color: #fff; border: 0; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), inset 0 -3px 5px rgb(120 30 5 / 0.35), 0 0 0 1px rgb(255 255 255 / 0.12), 4px 8px 16px rgb(4 5 14 / 0.45); }
-.ax-main .ax-cta .btn:hover { transform: translateY(-1px); background: linear-gradient(160deg, #ffa57e 0%, #f1703f 58%, #d9582f 100%); }
-.ax-main .ax-cta .btn:active { background: linear-gradient(160deg, #d4532a, #e5622f); box-shadow: inset 3px 5px 10px rgb(90 20 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.08); }
+.ax-main .ax-cta .btn { background: linear-gradient(160deg, #d33e00 0%, #ce4412 58%, #c54d27 100%); color: #fff; border: 0; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), inset 0 -3px 5px rgb(120 30 5 / 0.35), 0 0 0 1px rgb(255 255 255 / 0.12), 4px 8px 16px rgb(4 5 14 / 0.45); }
+.ax-main .ax-cta .btn:hover { transform: translateY(-1px); background: linear-gradient(160deg, #d33e00 0%, #ce4412 58%, #c54d27 100%); }
+.ax-main .ax-cta .btn:active { background: linear-gradient(160deg, #c54d27, #c84a19); box-shadow: inset 3px 5px 10px rgb(90 20 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.08); }
 .ax-main .ax-nodes figcaption { box-shadow: var(--nm-raise); background: var(--nm-up); }
 @media (prefers-reduced-motion: reduce) { .ax-main .ax-bub, .ax-main .ax-ghost, .ax-main .pr-tile, .ax-main .ax-lab .pad { transition: none; } }
 /* brand-lint: on */
