@@ -159,17 +159,21 @@ Score: one MIDI File plays a Sine synth drone (A1) and a soft bell/pluck line, a
 
 Roadblocks found while building (to fix in the engine, in this order):
 
-| # | Roadblock | Fix |
-|---|---|---|
-| 1 | Transform on a Group 3D bakes the group into one mesh and drops the per-part materials, so the whole flower cannot sway as one | Group 3D gets a whole-group matrix (posX/Y/Z, rotX/Y/Z, pivot), applied to every child as Render 3D draws it; `mod`-able |
-| 2 | Curve has presets only, no control points, so filaments and style are Cylinder cages edited ring by ring (works, but slow to write by hand) | Curve keeps a point list (`s points x y z ...`), so Curve + Sweep is the Blender route |
-| 3 | `dofAperture` tops out at 4; a 100 mm lens at 0.62 m and f/5.6 needs about 10.7 | raise the control range to match real macro blur |
-| 4 | Settle cost: 1280 x 960 at 64 samples takes 54 s on the M2 (GPU bound, CPU idle). A frame started while another settle holds the GPU comes back black in 1 s, with no error | film frames at 1280 x 960, 64 samples + denoise (about 1 min a frame: 30 s of film is 15 h, so beats are rendered on ask only); `--frame` should fail loudly on a black settle frame |
-| 5 | Transform defaults `offsetX` to 0.6 m: a Transform written for rotation only throws the part out of frame | write `offsetX 0` (done in the generator); worth a lint hint |
-| 6 | Plane `rotX/Y/Z` are radians, Transform's are degrees: `rotX -90` on a Plane tilts it 26.6 deg | one unit (degrees) on every node, or the validator names the unit |
-| 7 | Distribute Points on Faces gives a point cloud that Transform drops and Instance's `cloud` slot draws nothing from | insert Points to Vertices, wire into `points` with `pointMode 0` (done); Transform/Instance should take clouds |
-| 8 | Macro scale is below the slider ranges: Solidify min 1 mm, Distribute density max 500/m2, instanceScale min 5 mm | tepals built 3x and scaled 1/3 (done); widen the ranges in GeometryParams.cpp |
-| 10 | Values in a patch file are not clamped to the slider range (sun 12 renders brighter than 5), so probes need no rebuild; the UI could not reach them | dofAperture to 16, Distribute density to 20000, Solidify to 0.1 mm and instanceScale to 0.5 mm with a log taper, in GeometryParams.cpp: written, not built yet (machine in swap) |
-| 9 | Mapping between a Plane and its Material hides a FieldPixel albedo in settle (grey floor) | tile inside the kernel (`u = fract(uv * 4)`, done); fix Mapping's UV pass-through |
+| # | Roadblock | Fix | Status |
+|---|---|---|---|
+| 1 | Transform on a Group 3D bakes the group into one mesh and drops the per-part materials, so the whole flower cannot sway as one | Group 3D gets a whole-group matrix | fixed: Group 3D `offsetX/Y/Z`, `rotX/Y/Z` (degrees), `scale`, `pivotX/Y/Z`, applied to every child as drawn, materials kept, `mod`-able |
+| 2 | Curve has presets only, no control points | Curve keeps a point list | fixed: Curve `s points x y z, ...` replaces the preset; Sweep `s scales 0 0.7 1 0.8 0` is the taper along the path, so a petal is a flat profile swept along a spine |
+| 3 | `dofAperture` tops out at 4; a 100 mm lens at 0.62 m and f/5.6 needs about 10.7 | raise the control range | fixed: range 0-16 |
+| 4 | Settle cost: 1280 x 960 at 64 samples takes 54 s on the M2. A frame started while another settle holds the GPU comes back black in 1 s, with no error | `--frame` fails loudly | partly: a failed Metal command buffer is now `E_GPU` in the status line; a crash is `E_CRASH` with the patch and stage; render cost unchanged |
+| 5 | Transform defaults `offsetX` to 0.6 m (Array's spacing) | Transform starts at 0 | fixed: a fresh Transform / Transform Selected has `offsetX 0` |
+| 6 | Plane `rotX/Y/Z` are radians, Transform's are degrees | the validator names the unit | fixed: `W_OUT_OF_RANGE` says "radians (90 degrees = 1.5708)"; `W_ROTATION_UNITS` flags a radian-looking value on a degrees control |
+| 7 | Distribute Points on Faces gives a point cloud that Instance on Points' `points` slot ignored | Instance takes clouds | fixed: a cloud in `points` instances one shape per particle (Transform already passed clouds) |
+| 8 | Macro scale is below the slider ranges | widen the ranges | fixed: Distribute density to 20000, Solidify to 0.1 mm, instanceScale to 0.5 mm (log taper) |
+| 9 | Mapping between a Plane and its Material hides a FieldPixel albedo (grey floor) | Mapping tiles | fixed: the texture was clamped; Material `wrapMode` now defaults to Repeat, as in Blender |
+| 10 | Values in a patch file are not clamped to the slider range | keep it (probes need no rebuild) | by design |
+| 11 | A 3D View scene item can point at a node that is not there, and the scene renders empty with no warning | the validator checks the scene | fixed: `W_SCENE_MISSING_NODE`, `W_SCENE_EMPTY` (advisory) |
+| 12 | Regenerating `tile.inf` threw away moves made in the 3D View | the generator reads them back | fixed: `gen_tile.py` keeps item transforms by label; `--fresh` resets |
+
+Tools: `tools/look.py` renders passes, crops (exact camera maths), sweeps and A/B sheets in one process.
 
 Shots (section 9) stay as planned. First moving test: 4 s of beat 2 (one note -> one tepal) at 640 x 480, 64 samples, checked as a still sheet, not a film.

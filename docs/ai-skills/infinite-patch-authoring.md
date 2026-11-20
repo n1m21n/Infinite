@@ -142,7 +142,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `3D View` | none | out:image | 62 | bypass |
+| `3D View` | none | out:image | 74 | bypass |
 | `Armature` | in:geometry, path:geometry | out:geometry | 86 |  |
 | `Array` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Arrow 3D` | texture:image | out:geometry | 52 | bypass |
@@ -155,7 +155,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Cloth` | geo:geometry, collider:geometry | out:geometry | 41 |  |
 | `Cone` | texture:image | out:geometry | 52 | bypass |
 | `Cube` | texture:image | out:geometry | 52 | bypass |
-| `Curve` | none | out:geometry | 32 | bypass |
+| `Curve` | none | out:geometry | 33 | bypass |
 | `Curve Ops` | curve:geometry | out:geometry | 9 | bypass |
 | `Cylinder` | texture:image | out:geometry | 52 | bypass |
 | `Decimate` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
@@ -179,7 +179,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Fur` | geo:geometry, guide:geometry | out:geometry | 89 |  |
 | `Gear 3D` | texture:image | out:geometry | 52 | bypass |
 | `Geometry` | texture:image | out:geometry | 52 | bypass |
-| `Group 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, geo_e:geometry, geo_f:geometry, geo_g:geometry, geo_h:geometry | out:geometry | 0 |  |
+| `Group 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, geo_e:geometry, geo_f:geometry, geo_g:geometry, geo_h:geometry | out:geometry | 10 |  |
 | `HDRI` | none | out:environment | 12 | bypass |
 | `Helix` | texture:image | out:geometry | 52 | bypass |
 | `Icosphere` | texture:image | out:geometry | 52 | bypass |
@@ -190,7 +190,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Join Geometry` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Klein Bottle` | texture:image | out:geometry | 52 | bypass |
 | `L-System` | none | out:geometry | 21 | bypass |
-| `Light` | none | out:light | 30 | bypass |
+| `Light` | none | out:light | 31 | bypass |
 | `Mapping` | geo:geometry | out:geometry | 12 | bypass |
 | `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image, opacity:image, transmission:image, field:image, layer:geometry, mask:image | out:geometry | 42 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
@@ -212,7 +212,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Prism` | texture:image | out:geometry | 52 | bypass |
 | `Proximity Lines` | points:geometry | out:geometry | 12 | bypass |
 | `Pyramid` | texture:image | out:geometry | 52 | bypass |
-| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 101 |  |
+| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 102 |  |
 | `Resynthesize 3D` | geo:geometry | out:geometry | 13 | bypass |
 | `Revolve` | profile:geometry | out:geometry | 4 | bypass |
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
@@ -228,7 +228,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Star 3D` | texture:image | out:geometry | 52 | bypass |
 | `Subdivide` | geo:geometry, guide:geometry | out:geometry | 89 | bypass |
 | `Supershape` | texture:image | out:geometry | 52 | bypass |
-| `Sweep` | profile:geometry, path:geometry | out:geometry | 6 |  |
+| `Sweep` | profile:geometry, path:geometry | out:geometry | 7 |  |
 | `Switcher 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 5 |  |
 | `Tetrahedron` | texture:image | out:geometry | 52 | bypass |
 | `Text 3D` | texture:image | out:geometry | 29 | bypass |
