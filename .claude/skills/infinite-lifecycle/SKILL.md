@@ -97,7 +97,7 @@ flowchart TD
 | Audio DSP or engine | `audio-pipeline-sweep` + `param-truth-audit` (+ `rhythmic-quantization-standard` for sync) |
 | Timeline / arrange | `timeline-arrangement-architecture` |
 | Platform code | `windows-parity` + `linux-parity` (+ `prior-art-scout` if the cause is outside our code) |
-| Architecture choice | `semi-brain` → `codebase-lenses` → `infinite-planner` |
+| Architecture choice | `codebase-lenses` → `infinite-planner` |
 | Perf | `docs/plans/perf/README.md` → `run-infinite-hygiene` (efficient routes) |
 | Patch (.inf) | `infinite-patch-authoring` |
 | Film / video | `film-studio` (→ `motion-film` for Infinite films) |
@@ -126,7 +126,7 @@ flowchart LR
     end
     subgraph L3["LANE 3 · MAJOR"]
         direction TB
-        c0["1 · pillar + licence"] --> c1["2 · baseline / re-survey"] --> c2["3 · all lenses + semi-brain + plan doc"]
+        c0["1 · pillar + licence"] --> c1["2 · baseline / re-survey"] --> c2["3 · all lenses + plan doc"]
         c2 --> c3["4 · branch per ask"] --> c4["5 · multi-file + 3 platforms"] --> c5["6-7 · content, manual, i18n"]
         c5 --> c6["8 · four standards + invariant audit"] --> c7["9 · --full + ab.sh + render-check"] --> c8["10 · verify-gate → merge"]
     end
@@ -213,7 +213,7 @@ A failed test is a code problem (5) unless the test proves the design wrong (3).
 |---|---|---|---|---|
 | 1 | Strategy | Maps to a pillar P1-P8 and to the release goal; no copyleft source read | Park in `parked-ideas.md` | `docs/plans/re-survey/README.md`, AGENTS invariant 1, `BRAND.md` |
 | 2 | Research & baseline | Baseline repeats on a quiet machine | Re-run 2 | `run-infinite-hygiene` (efficient routes), `tools/re-survey/` |
-| 3 | Plan | Every lens marked Primary / Touched / Clear, coupling rules applied | Re-open 3 | `codebase-lenses`, `codebase-navigation`, `semi-brain`, `infinite-planner` |
+| 3 | Plan | Every lens marked Primary / Touched / Clear, coupling rules applied | Re-open 3 | `codebase-lenses`, `codebase-navigation`, `infinite-planner` |
 | 4 | Set up | One ask per branch, its own worktree | Split the ask | `git-branch-workflow` |
 | 5 | Code | Two-object node split kept, `ParamRef`s registered, all three `Platform::` sides | 5; or 3 if the design can't hold | `new-*-node`, `field-*`, `windows-parity`, `linux-parity` |
 | 6 | Content | Presets, templates and library build | 6 | `field-*-presets`, `tools/library/`, `tools/templates/` |
@@ -222,7 +222,7 @@ A failed test is a code problem (5) unless the test proves the design wrong (3).
 | 9 | Test & perf | Driver tier for the lane passes; goldens match; touched perf paths no worse; known-failure lists didn't grow | 5 (fail), 3 (perf), 2 (baseline drift) | `run-infinite-hygiene`, `tools/render-check.py`, `scripts/bench/ab.sh` |
 | 10 | Merge | `verify-gate` read; `git add` explicit paths only; merged to main = **closed** | Clean the diff | `git-branch-workflow`, `verify-gate` |
 | 11 | Release | Owner asked; CI green on 3 platforms; notes match code = **shipped** | `ci-failure-triage` → 5; or fix notes | `ship-infinite`, `release-notes-audit` |
-| 12 | Measure quality | Every escaped fix has a named leaking gate and a regression test | Rule loop for the leaking gate | section 9, `semi-brain`, memory |
+| 12 | Measure quality | Every escaped fix has a named leaking gate and a regression test | Rule loop for the leaking gate | section 9, memory |
 
 **Bugs are not a stage.** They enter at the front door (section 2), get the nine questions from
 `bug-blast-radius`, and run a lane like any other ask.
@@ -300,7 +300,7 @@ flowchart TD
     Eval -- no --> Kind{"Feature or rule?"}
 
     Kind -- feature --> F1["Revert (git revert the merge)"] --> F2["Remove dead state:<br/>pins, uniforms, save keys, help rows"]
-    F2 --> F3["Scrub draft release notes"] --> F4["Log why: parked-ideas.md + semi-brain"]
+    F2 --> F3["Scrub draft release notes"] --> F4["Log why: parked-ideas.md"]
 
     Kind -- rule --> R1{"Superseded or<br/>duplicated?"}
     R1 -- yes --> R2["Agent retires it, says so in the commit"]

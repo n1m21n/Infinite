@@ -60,7 +60,6 @@ Tools must stay **MIT-clean** (no GPL code pasted in), **three-platform aware** 
 | Panel density (row pitch, per-row, height) | `tools/design/density_lint.py` (needs `tools/ui-audit/run.py --view2d`; see its header) |
 | i18n extract/lint | `tools/i18n/` |
 | Linux build + Xvfb rig | `tools/linux/` |
-| Architecture recall | `tools/semi-brain/` (`semi-brain`) |
 | Templates / drum kit / HRTF generation | `tools/templates/`, `tools/make-drumkit.py`, `tools/spatial/` |
 | Brand book, tokens, contrast gate | `tools/brand/build_brand_book.py` (values only in `docs/brand/brand.json`) |
 | Logo files (SVG/PNG/favicon/icns/ico) from the formula; icon drift | `tools/brand/build_logo.py [--check] [--install]` |

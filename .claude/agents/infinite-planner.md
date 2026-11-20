@@ -42,7 +42,6 @@ request if you were called without it):
 - **Timeline / Arrangement** (`src/arrange/`, the Arrange panel) → `timeline-arrangement-architecture`.
 - **Field presets** → `field-pixel-presets` / `field-modifier-presets`.
 - **A new or changed param/control** → `param-truth-audit` for the DSP-vs-UI check.
-- **Architecture choice** (fix-in-place vs rewrite, new invariant) → `semi-brain`.
 - If none of these obviously apply, say so in your report rather than guessing — a plan
   built on the wrong domain skill is worse than one that admits it skipped this step.
 

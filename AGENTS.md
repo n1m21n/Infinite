@@ -62,7 +62,6 @@ One owner per topic: if two files seem to disagree, the skill named in this tabl
 | `write-fix-brief` | Process | Turn a bug report / findings / idea into a verified implementation prompt |
 | `invariant-interaction-audit` | Process | Before shipping any guarantee: can a sibling control or call site undo it |
 | `infinite-code-review` | Process | Review code against Infinite's four standards |
-| `semi-brain` | Process | Query the distilled brain before non-trivial architecture calls |
 | `prior-art-scout` | Process | Search peer repos and public fixes for platform/audio/packaging problems |
 | `infinite-lifecycle` | Process | The map: product/build/rule loops, 12 stages + gates, lanes with done checks, who decides, rule precedence |
 | `git-branch-workflow` | Process | Branch-per-feature workflow for this repo |

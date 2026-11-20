@@ -2,7 +2,7 @@ build/
 build-*/
 dist/
 *.dmg
-!website/assets/*.dmg
+# website/assets/Infinite.dmg is no longer tracked: the site links to the latest GitHub Release
 !website/*.dmg
 
 # editor/runtime state written next to the app
