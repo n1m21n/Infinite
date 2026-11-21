@@ -186,13 +186,17 @@ def lint_project(project_dir):
     else:
         artifact = ""
 
-    # Every script the docs point at must exist, at every status.
+    # Every script the docs point at must exist, at every status, in the
+    # project or at the repo root (e.g. `scripts/ibuild.py`).
     # A line may name a script that does not exist yet only if it says "planned".
+    repo_root = os.path.dirname(os.path.abspath(project_dir))
+    while repo_root != os.path.dirname(repo_root) and not os.path.exists(os.path.join(repo_root, ".git")):
+        repo_root = os.path.dirname(repo_root)
     for line in (readme + "\n" + artifact).splitlines():
         if "planned" in line.lower():
             continue
         for ref in SCRIPT_REF_RE.findall(line):
-            if not os.path.isfile(os.path.join(project_dir, ref)):
+            if not any(os.path.isfile(os.path.join(d, ref)) for d in (project_dir, repo_root)):
                 errors.append(f"{rel_dir}: names `{ref}` but the file does not exist (mark the line 'planned')")
 
     data_dir = os.path.join(project_dir, "data")
