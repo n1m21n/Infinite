@@ -1,0 +1,4 @@
+FIELDRATE audio tanh3-1x.f32 16384 samples, alias -12.6 dB
+FIELDRATE audio tanh3-fixed8x.f32 16384 samples, alias -46.1 dB
+FIELDRATE audio tanh3-staged.f32 16384 samples, alias -43.0 dB
+FIELDRATE audio tanh3-32x.f32 16384 samples, alias -136.0 dB

@@ -6,7 +6,7 @@
   "cpu": "Apple M2, 8 cores, 8 GB RAM",
   "compiler": "Apple clang version 21.0.0 (clang-2100.4.1.1)",
   "build_flags": "scripts/ibuild.py build --mode dev (CMake Debug, arm64). Cost bench: clang++ -std=c++20 -O2",
-  "command": "docs/research/aliasing-aware-field/scripts/run_all.sh (phase 2 cost line INFINITE_FIELDRATE_COST=0,3.5,11,23,47,10,23,49)",
+  "command": "docs/research/aliasing-aware-field/scripts/run_all.sh (phase 2 cost line INFINITE_FIELDRATE_COST=0,3.5,11,23,47,10,23,49). Cost repeats: scripts/cost_repeats.py <10 runs of tools/field_rate_cost_bench.cpp>. Audio: INFINITE_FIELDRATE_AUDIO=<dir> with the H2 run, then scripts/make_audio.py",
   "seed": 0,
   "seed_note": "No RNG: the stimulus is a fixed sine, analysis and renders are deterministic.",
   "outputs": [
@@ -15,6 +15,12 @@
     "phase2-h2-run.log",
     "phase2-tanh3-dump.log",
     "phase2-run1-debugcost-oldscoring.csv",
-    "phase2-run1-debugcost-oldscoring.log"
+    "phase2-run1-debugcost-oldscoring.log",
+    "phase2-cost-bench.log",
+    "phase2-cost-repeats.csv",
+    "phase2-cost-repeats/run-01.log \u2026 run-10.log",
+    "phase2-audio/renders.log",
+    "phase2-audio/tanh3-{1x,fixed8x,staged,32x}.f32",
+    "phase2-audio/tanh3-{1x,fixed8x,staged,32x}.wav"
   ]
 }

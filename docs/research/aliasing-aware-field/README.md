@@ -81,6 +81,7 @@ A useful by-product: for jump-class ops, oversampling is close to hopeless (8x b
 | 1. Predict | The analysis pass over `SampleProgram` after `CompileBlock` (called at `src/core/field/BackendRegister.cpp:1415`), printing predictions, with no runtime change. Test H1. | Compiler, report only | Go or kill on H1 |
 | 2. Execute | Rate regions in `RunSampleProgram` (`SampleRuntime.h:161`) using `MinPhaseOversampler`: per-voice oversampler state, scaled `sr`, and the latency reported. Test H2. | Audio path | Go or kill on H2; gated Field cases in the ratchet |
 | 3. Loops (stretch) | Bandwidth inside `state`/`delay` feedback (a fixed point with widening, using loop gain), then the choice between ADAA and oversampling. This opens problem 2, zero-delay loops. | Compiler | Second paper or a documented limit |
+| 4. Held-out and foundations | Independent held-out sets, simple-rule baselines, the H2 break-even cost, and soundness lemmas for the bound (section 13). Pre-registered 2026-11-21. | Test code and corpus only | H1 confirmed or not on kernels the author did not choose; a proved scope for the bound |
 
 Phases 0 and 1 are where the research claim is won or lost; they are small and safe.
 
@@ -326,6 +327,19 @@ effects: held-out coverage is 2 of 18. Field Synth presets were not run (no `in`
 Each change was made because a measured plan disagreed with its prediction, never to move the
 saving. The bar was fixed before run 1.
 
+**Cost-model spread (added after the verdict).** The verdict used one run of the cost bench. The
+bench was then run 10 more times, 15 s apart (`data/phase2-cost-bench.log`), and the H2 rig re-run
+under each measured line (`scripts/cost_repeats.py`, `data/phase2-cost-repeats.csv`). Aggregate
+saving: mean 15.8%, 95% CI 15.6 to 15.9 (Student t, n = 10), range 15.3 to 15.9%; the staged tanh x3
+plan beat fixed 8x in 0 of 10 runs. The repeated lines measured a cheaper instruction
+(about 2.7 ns, against 3.5 in the verdict line) and cheaper 2x crossings, which moves the saving
+down, not up. The verdict line is kept as the pre-registered result; the CI is the honest spread.
+Every value is well under the 25% bar, so the kill stands either way.
+
+**Listening clips.** One steady-state period of each tanh x3 render (1x, fixed 8x, staged, 32x)
+is in `data/phase2-audio/` as float32 (`INFINITE_FIELDRATE_AUDIO=<dir>`), with 2 s WAVs made by
+`scripts/make_audio.py` (-18 dBFS peak, 10 ms fades). Measured alias: -12.6, -46.1, -43.0, -136.0 dB.
+
 **Threats to validity.**
 - *Internal.* Costs come from an isolated -O2 microbenchmark, not from the app's audio thread;
   the interpreter's real per-instruction cost depends on the op mix. A cheaper resampler would
@@ -333,7 +347,7 @@ saving. The bar was fixed before run 1.
   cheaper and crossings relatively dearer, which lowers the saving.
 - *External.* The corpus is hand-built (plus 2 accepted held-out presets). Long real kernels, where
   one nonlinearity sits inside lots of linear code, would save more; the app's presets are short.
-- *Construct.* Equal measured alias uses one tone at 1 kHz, 0.5 amplitude, and a -80 dB target.
+- *Construct.* Equal measured alias uses one tone at 5 kHz, 0.5 amplitude, and a -80 dB target.
   The corner sweep shows the factor depends on the stimulus.
 
 **Provenance.** Machine: Apple M2, 8 GB, macOS 27.2.1. Build: `scripts/ibuild.py build --mode dev`
@@ -367,11 +381,64 @@ H2 is killed on the calibration corpus already, so its held-out run would not ch
 - **Construct.** For memoryless kernels driven by the rig's own tone, the phase-1 prediction is exact
   by construction (sampling the ideal periodic signal), so H1's bar is cleared trivially for them.
   The informative evidence is feedback, linear state around a nonlinearity, accumulators and the
-  extrapolated jump tail (section 9). Alias is measured with one tone (5 kHz, or 1 kHz for phase 2)
+  extrapolated jump tail (section 9). Alias is measured with one tone (5 kHz)
   at one amplitude; the corner sweep (section 10) shows the needed factor moves with the stimulus.
-  The rig's metric counts modulation sidebands and limit cycles as aliasing (Moog).
+  The rig's metric counts modulation sidebands and limit cycles as aliasing (Moog). Kernels with a float32 phase accumulator
+  cannot measure below about -100 dB (the accumulator's rounding is itself inharmonic); memoryless
+  and filter kernels measure down to about -138 dB.
 - **Internal.** H2's CPU is a cost model (ns per base sample from an isolated -O2 microbenchmark),
   not measured audio-thread time; run 1 used Debug-build costs and is reported, not used for the
-  verdict. Float32 phase accumulators floor the rig at about -100 dB. One machine (Apple M2).
+  verdict. One machine (Apple M2).
 - **External.** One author wrote the corpus. Held-out coverage is 2 of 18 presets. Kernels are
   short; long kernels with one nonlinearity inside much linear code would favour staging more.
+
+## 13. Phase 4 pre-registration: held-out sets and foundations (2026-11-21)
+
+Written before any phase-4 kernel exists. Section 11 left H1 *not confirmed*: the corpus has one
+author, and memoryless kernels are exact by construction (section 12). Phase 4 tests H1 on kernels the
+author did not choose and asks whether the analysis beats trivial rules.
+
+**Freeze.** The analysis (`src/core/field/AliasAnalysis.{h,cpp}` and `RatePlan.{h,cpp}`) is frozen at the commit that adds this
+section. Each held-out set is committed under `corpus/heldout/<set>/` before it is scored, so the
+history shows it was not tuned against. Changing the analysis after scoring needs a new dated entry
+here and a rescore of every set.
+
+**Sets.**
+- **L, literature (primary, ≥ 30 kernels).** Nonlinearities and nonlinear filters taken from published
+  papers and textbooks the author has opened (waveshapers, clippers, wavefolders, saturating ladders and
+  similar), written as Field kernels with one citation each. Equations only; no source code.
+- **G, generated (primary, ≥ 200 kernels).** Random kernels from Field's sample-rate grammar, seed
+  20261121, by a generator committed before it is run. At least half must contain `state` or `delay`,
+  so memoryless kernels cannot dominate.
+- **P, permissive code (optional).** Nonlinearities from MIT/BSD/ISC/Apache/zlib-licensed projects,
+  ported with the licence notice kept. No copyleft source.
+- **A, blind LLM (supplementary).** Kernels written by a model from another vendor, given only the
+  Field syntax and the task "musical distortion and synthesis kernels", never the analysis. Reported
+  separately and never counted toward *confirmed*.
+
+**Scoring.** The same rig, tone (5 kHz, amplitude 0.5) and -80 dB target as phases 0 to 2. A kernel the rig
+declines (no periodic steady state, or reads state tables) is listed with its reason; coverage is a
+reported number, never a silent drop. All bars apply to the *informative* in-scope kernels (not
+memoryless), per set.
+
+**Hypotheses.**
+- **H1b, the prediction generalises.** On L and on G separately: Spearman ρ ≥ 0.8 between predicted and
+  measured alias, and median absolute error ≤ 10 dB. **Kill:** either set misses either bar; H1 stays
+  *not confirmed* and the paper says so. If fewer than half of L is in scope, the claim is scoped to
+  the in-scope class by name.
+- **H3, it beats simple rules.** The analysis picks the minimal factor that meets the target on ≥ 80%
+  of informative kernels in L ∪ G, and strictly more often than either baseline: rule A, "8x if the
+  kernel has any nonlinear op, else 1x"; rule B, a lookup from smoothness class to the class's median
+  factor in phase 0. **Kill:** a baseline matches or beats it; then the contribution is the
+  measurement rig, not the analysis.
+- **Bound soundness (phase 4c).** For each class the lemmas cover, the prediction is claimed as an upper
+  bound on alias, not only a ranking. Lemma targets: a polynomial of degree n multiplies bandwidth by
+  at most n; a kink (abs, clip) gives harmonics falling as 1/k²; an analytic map such as tanh on a
+  bounded input gives geometric decay with a stated rate. Each lemma is checked symbolically in
+  `proofs/`, with its float32 caveats. Any held-out kernel in a covered class that measures more than
+  3 dB above its predicted alias is a counterexample and is reported.
+
+**Descriptive (not a hypothesis).** The H2 break-even: the resampler-pair cost, in interpreter
+instructions, at which the aggregate saving of section 10 would reach 25%. This turns the kill into a
+condition that holds on other machines, resamplers or a compiled backend.
+

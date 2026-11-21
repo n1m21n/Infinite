@@ -1609,6 +1609,7 @@ bool RunFieldRatePlanTest()
          sanityBad++;
       const double costW = Field::WholeCost(prog, wholeF, cm);
       double dbS = 0.0, devS = 0.0, costEff = costW;
+      std::vector<float> ys; // the staged render, kept for the audio dump
       std::string planText = "(none)";
       if (planned)
       {
@@ -1636,7 +1637,7 @@ bool RunFieldRatePlanTest()
                          ins.c, ins.imm);
             }
          }
-         const std::vector<float> ys = RenderPlanned(plan.segs, c, &sSec);
+         ys = RenderPlanned(plan.segs, c, &sSec);
          dbS = ys.empty() ? 0.0 : Measure(ys, c.fundBin).aliasDb;
          devS = ys.empty() ? 0.0 : DeviationDb(ys, ref, c.fundBin);
          if (plan.meetsTarget && !ys.empty() && dbS <= -80.0)
@@ -1671,6 +1672,25 @@ bool RunFieldRatePlanTest()
          chainBeats8 = stagedOk && (db8 > -80.0 || plan.cost < cost8);
          printf("FIELDRATE tanh x3 vs fixed 8x: 8x cost %.0f, alias %.1f dB; staged cost %.0f, alias %.1f dB  %s\n",
                 cost8, db8, planned ? plan.cost : 0.0, dbS, chainBeats8 ? "staged beats 8x" : "staged does not beat 8x");
+         // INFINITE_FIELDRATE_AUDIO=<dir>: the four renders as raw float32 mono at 48 kHz (one steady-state
+         // period of kN samples each, after warm-up), for the listening examples in the lab note.
+         if (const char* dir = getenv("INFINITE_FIELDRATE_AUDIO"); dir != nullptr && *dir != 0)
+         {
+            const std::vector<float> y1 = RenderFieldAt(c, 1, err);
+            const std::pair<const char*, const std::vector<float>*> clips[] = {
+               { "tanh3-1x", &y1 }, { "tanh3-fixed8x", &y8 }, { "tanh3-staged", &ys }, { "tanh3-32x", &ref } };
+            for (const auto& [name, y] : clips)
+            {
+               const std::string path = std::string(dir) + "/" + name + ".f32";
+               if (FILE* f = fopen(path.c_str(), "wb"))
+               {
+                  fwrite(y->data(), sizeof(float), y->size(), f);
+                  fclose(f);
+                  printf("FIELDRATE audio %s %zu samples, alias %.1f dB\n", path.c_str(), y->size(),
+                         y->empty() ? 0.0 : Measure(*y, c.fundBin).aliasDb);
+               }
+            }
+         }
       }
       fflush(stdout);
    }
