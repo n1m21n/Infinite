@@ -5,7 +5,7 @@
 #include <vector>
 
 // Aliasing analysis for compiled Field sample programs (phase 1 of
-// docs/plans/aliasing-aware-field). Report only: nothing here changes how
+// docs/research/aliasing-aware-field). Report only: nothing here changes how
 // a kernel runs.
 //
 // Method (periodic harmonic balance). Driven by one tone of frequency f0,

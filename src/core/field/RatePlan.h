@@ -6,7 +6,7 @@
 #include <vector>
 
 // Per-segment oversampling plans for Field sample programs (phase 2 of
-// docs/plans/aliasing-aware-field). Main thread only; nothing here runs on
+// docs/research/aliasing-aware-field). Main thread only; nothing here runs on
 // the audio thread yet: phase 2a executes plans offline in the alias rig.
 //
 // A plan cuts the program into contiguous segments, each run at its own

@@ -701,7 +701,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_OVERSAMPLETEST") != nullptr)
       return RunOversampleTest() ? 0 : 1;
    // Field kernels' aliasing against oversampling factor, the ground truth
-   // for docs/plans/aliasing-aware-field (phase 0). Report only.
+   // for docs/research/aliasing-aware-field (phase 0). Report only.
    if (getenv("INFINITE_FIELDALIASTEST") != nullptr)
       return RunFieldAliasTest() ? 0 : 1;
    // Per-segment oversampling plans against the whole kernel (phase 2a, H2).

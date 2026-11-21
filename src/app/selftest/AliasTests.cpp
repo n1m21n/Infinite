@@ -687,7 +687,7 @@ bool RunOversampleTest()
    printf("OVERSAMPLETEST %s\n", all ? "OK" : "FAIL");
    return all;
 }
-// INFINITE_FIELDALIASTEST: phase 0 of docs/plans/aliasing-aware-field.
+// INFINITE_FIELDALIASTEST: phase 0 of docs/research/aliasing-aware-field.
 // Ground truth for an aliasing-aware Field compiler: each kernel in a
 // corpus is rendered by the real Field Effect node at F x 48 kHz
 // (F = 1, 2, 4, 8, 16, 32), decimated back to 48 kHz with the same
@@ -1113,7 +1113,7 @@ bool RunFieldAliasTest()
    printf("FIELDALIAS %s\n", all ? "OK" : "FAIL");
    return all;
 }
-// INFINITE_FIELDRATEPLAN: phase 2a of docs/plans/aliasing-aware-field (H2).
+// INFINITE_FIELDRATEPLAN: phase 2a of docs/research/aliasing-aware-field (H2).
 // Each nonlinear corpus kernel is split into segments at its own
 // oversampling factors (Field::ChooseRatePlan) and run offline by a
 // multi-rate executor: values crossing a cut go down to 48 kHz and up again

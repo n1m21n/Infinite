@@ -1,4 +1,4 @@
-// Field rate-plan cost model at -O2 (docs/plans/aliasing-aware-field, phase 2a).
+// Field rate-plan cost model at -O2 (docs/research/aliasing-aware-field, phase 2a).
 // The self-test calibrates in whatever build runs it (Debug in dev), where the
 // min-phase resampler is ~10x slower than shipped but the interpreter only ~2x,
 // which over-charges every cut. This times the same two things optimised:

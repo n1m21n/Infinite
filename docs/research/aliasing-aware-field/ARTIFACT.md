@@ -1,0 +1,36 @@
+# Artifact Evaluation & Reproducibility: Aliasing-aware Field
+
+Follows **ACM Artifact Review and Badging v1.1**. Badges sought: Artifacts Available, Results Reproduced.
+
+## 1. Provenance
+- **Git Commit SHA:** `cb85f93235ffc3b8885efd846e176da8dca6ce3c` (reproduces every output; first-run commits per file in `data/provenance.json`)
+- **Archival DOI (on release):** none yet; no paper submitted
+- **OS / Hardware:** macOS 27.2.1 arm64, Apple M2, 8 GB RAM
+- **Toolchain & Build Flags:** Apple clang 21.0.0; app built with `python3 scripts/ibuild.py build --mode dev` (CMake Debug, arm64); cost bench `clang++ -std=c++20 -O2`
+- **Determinism / Seeds:** no RNG. The stimulus is a fixed sine; the analysis and every render are deterministic, so re-runs match to float rounding.
+
+## 2. Quick Verification ("Kick the Tires", under a minute)
+```bash
+./scripts/kick-the-tires.sh
+```
+Runs phase 0 and 1 (47 kernels at 1x to 32x, with predictions) and writes `data-rerun/phase1-predictions.csv`.
+
+## 3. Full Reproduction (a few minutes)
+```bash
+./scripts/run_all.sh
+```
+Writes every dataset under `data-rerun/` (never over `data/`) and prints the H2 verdict lines. The H2 cost line is passed in; `tools/field_rate_cost_bench.cpp` re-measures it on another machine (the command is in `run_all.sh`).
+
+## 4. Claim-to-Artifact Matrix
+
+| Claim | Command | Raw data | Runtime | Tolerance |
+|---|---|---|---|---|
+| Phase 0: slope per doubling by smoothness class; factor each kernel needs; shipping presets alias at 1x (section 8) | `scripts/kick-the-tires.sh` | `data/phase0-baseline.csv` (columns `alias_db` of `data/phase1-predictions.csv`) | ~20 s | ±0.1 dB per row |
+| H1 on the calibration corpus: Spearman ρ 0.994, median abs error 0.0 dB, factor exact 43/43 (section 9) | `scripts/kick-the-tires.sh` | `data/phase1-predictions.csv` | ~20 s | ρ ±0.002; factors exact |
+| H2 killed: aggregate saving 17.4%, median 19.5% (section 10) | `scripts/run_all.sh` | `data/phase2-h2-run.log` | a few minutes | ±0.5 percentage points at the same cost line |
+| tanh x3: staged -43.0 dB vs fixed 8x -46.1 dB; ideal resamplers -74.0 dB (section 10) | `scripts/run_all.sh` (dump on) | `data/phase2-tanh3-dump.log` | included | ±0.5 dB |
+| Corner sweep: factor changes on 31 of 38 kernels (section 10) | `scripts/run_all.sh` | `data/phase2-run1-debugcost-oldscoring.log` (`FIELDRATE corner` lines) | included | exact |
+| Held-out: 2 of 18 presets accepted, worst error 0.1 dB (section 11) | `scripts/run_all.sh` | `data/phase2-run1-debugcost-oldscoring.log` (`FIELDRATE held` lines) | included | exact counts, ±0.1 dB |
+| Run 1 history (Debug costs, old scoring: 0.8%) | not reproducible at this commit (scoring since replaced); kept as recorded | `data/phase2-run1-debugcost-oldscoring.{log,csv}` | - | - |
+
+The corner sweep and held-out sections do not depend on the cost model or the plan scoring, so their run-1 output still stands; `run_all.sh` regenerates them.

@@ -1,19 +1,34 @@
-# Aliasing-aware compilation for Field (research plan)
+---
+title: "Aliasing-aware compilation for Field"
+slug: "aliasing-aware-field"
+status: "killed"
+owner: "namansoni"
+date: "2026-11-21"
+prior_art: "docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md"
+commit_sha: "cb85f93235ffc3b8885efd846e176da8dca6ce3c"
+---
 
-Status: **phase 2a done 2026-11-21: H2 FAILS** (17.4% saving, bar 25%; section 10). Phase 1: H1 holds (section 9). Phase 0: section 8. Phase 2b (live audio path) not started and not planned while H2 stands killed.
-Prior art: `docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md`.
+# Aliasing-aware compilation for Field
+
+Status: **killed on H2, 2026-11-21.** Per-subgraph oversampling saved 17.4% of CPU against a
+pre-registered bar of 25% (section 10). H1 (the analysis predicts alias) holds **on the hand-built
+calibration corpus**; it is not confirmed, because held-out coverage is 2 of 18 presets (section 11).
+Phase 0: section 8. Phase 2b (live audio path) not started. Threats to validity: section 12.
+Reproduction: `ARTIFACT.md`. Prior art: `docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md`.
+Hypotheses were first committed in d38d29b7, before phase 0 ran (c0c39088).
 
 ## 1. The problem
 
 Nonlinear audio code (products, powers, `abs`, `clamp`, `floor`, comparisons, phase shapes) creates
 harmonics above Nyquist that fold back as inharmonic aliasing. Today every tool, Infinite included,
 fixes this by hand: a person picks an oversampling factor per node (Drive, Saturator 8x; Ring Mod 4x).
-That choice does not compose. Infinite's own rig shows it (`src/app/selftest/AliasTests.cpp:255-275`):
+That choice does not compose. Infinite's own rig shows it (`src/app/selftest/AliasTests.cpp:264-285`,
+gates set about 5 dB under what each case measured on 2026-10-14):
 
-| Case | Alias below 20 kHz |
+| Case | Rig gate, alias below 20 kHz |
 |---|---|
-| Saturator, one stage at 50%, 8x + ADAA | about -118 dB |
-| Same, three stages in series in one 8x domain | **-41 dB** |
+| Saturator, one stage at 50%, 8x + ADAA | -118 dB |
+| Same, three stages in series in one 8x domain | **-41 dB** (measured -46 dB, per the rig's comment) |
 | One stage inside the feedback routing | -69 dB |
 
 Field makes it worse. Users write arbitrary nonlinear kernels, and the Field sample path has no
@@ -24,8 +39,9 @@ oversampling, ADAA or band-limited oscillator at all.
 Can a compiler pass predict, from the program alone, how much each part of a kernel widens the
 spectrum, and then pick the cheapest oversampling factor per subgraph that meets an aliasing
 target? The prior-art scan found the ingredients scattered (the polynomial degree rule, Faust's
-amplitude interval analysis, a 1998 CCRMA abstract, a graphics compiler that bandlimits shaders),
-but no system that combines them for audio. The scan was not exhaustive.
+amplitude interval analysis, a 1998 CCRMA abstract; a graphics compiler that bandlimits shaders was
+found only in a search listing and not read), but no system that combines them for audio. The scan was not
+exhaustive.
 
 ## 3. The idea
 
@@ -62,7 +78,7 @@ A useful by-product: for jump-class ops, oversampling is close to hopeless (8x b
 | Phase | What | Changes the app? | Ends with |
 |---|---|---|---|
 | 0. Measure | Add Field Effect and Field Synth cases to `AliasTests.cpp`, plus an offline oracle that renders a kernel at 16x/32x to get "true" alias. Build the kernel corpus. | Test code only | Baseline numbers per kernel |
-| 1. Predict | The analysis pass over `SampleProgram` after `CompileBlock` (`src/core/field/BackendRegister.cpp:1400`), printing predictions, with no runtime change. Test H1. | Compiler, report only | Go or kill on H1 |
+| 1. Predict | The analysis pass over `SampleProgram` after `CompileBlock` (called at `src/core/field/BackendRegister.cpp:1415`), printing predictions, with no runtime change. Test H1. | Compiler, report only | Go or kill on H1 |
 | 2. Execute | Rate regions in `RunSampleProgram` (`SampleRuntime.h:161`) using `MinPhaseOversampler`: per-voice oversampler state, scaled `sr`, and the latency reported. Test H2. | Audio path | Go or kill on H2; gated Field cases in the ratchet |
 | 3. Loops (stretch) | Bandwidth inside `state`/`delay` feedback (a fixed point with widening, using loop gain), then the choice between ADAA and oversampling. This opens problem 2, zero-delay loops. | Compiler | Second paper or a documented limit |
 
@@ -85,7 +101,7 @@ Phases 0 and 1 are where the research claim is won or lost; they are small and s
 - A DAFx paper (submissions usually open in spring), from phases 0 to 2.
 - A user feature in Field: kernels that alias less without anyone choosing a factor, plus a
   compile-time note when a kernel will alias and why.
-- Clean-room: all ideas come from papers and discussions. No copyleft source was opened.
+- Clean-room: all ideas come from papers and discussions. No other project's source code was opened.
 
 ## 8. Phase 0 results (2026-11-21)
 
@@ -141,7 +157,7 @@ from the node's start-up preset, see section 9. The CSV now holds the corrected 
 
 ## 9. Phase 1 results (2026-11-21)
 
-**H1 holds.** Over 43 predicted nonlinear kernels x 6 factors (258 points, both sides floored at
+**H1 holds on the calibration corpus** (not confirmed: see section 11). Over 43 predicted nonlinear kernels x 6 factors (258 points, both sides floored at
 -100 dB): Spearman rho **0.994** (bar 0.8), median absolute error **0.0 dB** (bar 10), p90 0.1 dB.
 The factor each kernel needs for -80 dB is predicted exactly for 43 of 43. One kernel (Moog) gets no
 prediction, by design (below). Raw numbers: `data/phase1-predictions.csv`. Same command as phase 0;
@@ -332,3 +348,30 @@ is not started. What survives and is worth shipping, if the owner wants it: the 
 compile-time **whole-kernel** factor suggestion for Field Effect, planned at the worst corner of a
 declared input range, plus the preset-param bug fix found in phase 1. Phase 3 (loops) is
 independent of H2 and stays open.
+
+## 11. Held-out validation
+
+The standard (docs/RESEARCH_STANDARD.md section 3) allows a hand-built corpus for calibration only.
+Held-out kernels run so far: 18 Field Effect presets that the corpus did not include
+(`data/phase2-run1-debugcost-oldscoring.log`, lines starting `FIELDRATE held`).
+- 2 accepted (Sidechain Ducker, Noise Gate): factor predicted exactly, worst error 0.1 dB.
+- 16 declined by design: 7 read state tables; the rest have no periodic steady state under a steady
+  tone (modulated or time-varying effects, sample-and-hold).
+- Not run: Field Synth presets (no `in`), community kernels.
+
+So H1 is **not confirmed**: 2 held-out kernels cannot carry a claim about Field kernels in general.
+H2 is killed on the calibration corpus already, so its held-out run would not change the verdict.
+
+## 12. Threats to validity
+
+- **Construct.** For memoryless kernels driven by the rig's own tone, the phase-1 prediction is exact
+  by construction (sampling the ideal periodic signal), so H1's bar is cleared trivially for them.
+  The informative evidence is feedback, linear state around a nonlinearity, accumulators and the
+  extrapolated jump tail (section 9). Alias is measured with one tone (5 kHz, or 1 kHz for phase 2)
+  at one amplitude; the corner sweep (section 10) shows the needed factor moves with the stimulus.
+  The rig's metric counts modulation sidebands and limit cycles as aliasing (Moog).
+- **Internal.** H2's CPU is a cost model (ns per base sample from an isolated -O2 microbenchmark),
+  not measured audio-thread time; run 1 used Debug-build costs and is reported, not used for the
+  verdict. Float32 phase accumulators floor the rig at about -100 dB. One machine (Apple M2).
+- **External.** One author wrote the corpus. Held-out coverage is 2 of 18 presets. Kernels are
+  short; long kernels with one nonlinearity inside much linear code would favour staging more.
