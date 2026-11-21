@@ -33,6 +33,7 @@
 #include "field/RatePlan.h"
 #include "field/SampleRuntime.h"
 #include <chrono>
+#include <complex>
 #include <filesystem>
 #include <cstring>
 #include <functional>
@@ -1938,6 +1939,551 @@ bool RunFieldHeldOutTest()
    }
    fclose(csv);
    printf("FIELDHELDOUT %zu files: %d scored, %d declined or failed\n", files.size(), scored, declined);
+   return true;
+}
+
+// Phase 6 real-input scoring (docs/research/aliasing-aware-field/README.md
+// section 17). INFINITE_FIELDREAL=<heldout dir>, INFINITE_FIELDREAL_CLIPS=
+// <dir of clip kernels>, INFINITE_FIELDREAL_MODE = clips | check | measure |
+// p1, INFINITE_FIELDREAL_CSV=<file>; optional INFINITE_FIELDREAL_LIST (lines
+// "<set>/<label>"), INFINITE_FIELDREAL_SHARD ("i/n") and
+// INFINITE_FIELDREAL_WAVDIR (clips mode). The oracle: the clip ideally
+// upsampled 64x; for factor F the test is the kernel at F x 48 kHz on every
+// (64/F)-th fine sample, the reference 64/F interleaved copies of it, both
+// band-limited to 20 kHz. Test code only.
+namespace
+{
+   using cplx = std::complex<double>;
+   constexpr int kRealN = 16384;         // clip length at 48 kHz
+   constexpr int kRealUp = 64;           // oracle rate, x 48 kHz
+   constexpr int kRealFine = kRealN * kRealUp;
+   constexpr int kRealBand = 6826;       // bins at or below 20 kHz (2.93 Hz each)
+   constexpr int kRealFade = 480;        // 10 ms raised-cosine fades
+   constexpr int kRealWin = 4800, kRealHop = 2400;
+
+   void FftD(std::vector<cplx>& a, bool inverse)
+   {
+      const size_t n = a.size();
+      static std::map<size_t, std::vector<cplx>> twiddles; // e^{-2 pi i k / n}, k < n / 2
+      std::vector<cplx>& tw = twiddles[n];
+      if (tw.size() != n / 2)
+      {
+         tw.resize(n / 2);
+         for (size_t k = 0; k < n / 2; k++)
+            tw[k] = std::polar(1.0, -2.0 * M_PI * (double)k / (double)n);
+      }
+      for (size_t i = 1, j = 0; i < n; i++)
+      {
+         size_t bit = n >> 1;
+         for (; j & bit; bit >>= 1)
+            j ^= bit;
+         j ^= bit;
+         if (i < j)
+            std::swap(a[i], a[j]);
+      }
+      for (size_t len = 2; len <= n; len <<= 1)
+      {
+         const size_t stride = n / len, half = len / 2;
+         for (size_t i = 0; i < n; i += len)
+            for (size_t k = 0; k < half; k++)
+            {
+               const cplx w = inverse ? std::conj(tw[k * stride]) : tw[k * stride];
+               const cplx u = a[i + k], v = a[i + k + half] * w;
+               a[i + k] = u + v;
+               a[i + k + half] = u - v;
+            }
+      }
+   }
+
+   // M independent instances of one kernel (state, delay lines), run the way
+   // FieldSampleNode runs it: params at defaults, output NaN -> 0, clamped.
+   struct KernelBank
+   {
+      const Field::SampleProgram& prog;
+      int dsize = 1;
+      std::vector<float> cur, next, dbuf, params;
+      std::vector<int> cursors;
+      float regs[Field::kSampleMaxRegs] = {};
+      KernelBank(const Field::SampleProgram& p, int copies) : prog(p)
+      {
+         for (const auto& dl : p.delays)
+            dsize = std::max(dsize, dl.bufferOffset + dl.length);
+         const int k = Field::kSampleMaxStateCells;
+         cur.assign((size_t)copies * k, 0.0f);
+         for (int c = 0; c < copies; c++)
+            for (size_t i = 0; i < p.state.size() && i < (size_t)k; i++)
+               cur[(size_t)c * k + i] = p.state[i].initialValue;
+         next = cur;
+         dbuf.assign((size_t)copies * dsize, 0.0f);
+         cursors.assign((size_t)copies * Field::kSampleMaxDelayLines, 0);
+         params.assign(Field::kSampleMaxParams, 0.0f);
+         for (size_t i = 0; i < p.params.size() && i < (size_t)Field::kSampleMaxParams; i++)
+            params[i] = p.params[i].defaultValue;
+      }
+      float Run(int c, float in, float sr, double n)
+      {
+         const int k = Field::kSampleMaxStateCells;
+         Field::SampleRuntimeInput rin;
+         rin.in = in;
+         rin.sr = sr;
+         rin.n = (float)n;
+         rin.paramVals = params.data();
+         float* sc = cur.data() + (size_t)c * k;
+         float* sn = next.data() + (size_t)c * k;
+         rin.stateCur = sc;
+         rin.stateNext = sn;
+         rin.delayBuf = dbuf.data() + (size_t)c * dsize;
+         rin.delayCursors = cursors.data() + (size_t)c * Field::kSampleMaxDelayLines;
+         float y = Field::RunSampleProgram(prog, rin, regs);
+         std::memcpy(sc, sn, sizeof(float) * std::min(prog.state.size(), (size_t)k));
+         if (std::isnan(y) || std::isinf(y))
+            y = 0.0f;
+         return std::clamp(y, -4.0f, 4.0f);
+      }
+   };
+
+   bool ReadText(const std::filesystem::path& p, std::string& out)
+   {
+      FILE* fp = fopen(p.string().c_str(), "rb");
+      if (fp == nullptr)
+         return false;
+      char buf[4096];
+      size_t n;
+      out.clear();
+      while ((n = fread(buf, 1, sizeof(buf), fp)) > 0)
+         out.append(buf, n);
+      fclose(fp);
+      return true;
+   }
+
+   // A clip kernel rendered at 48 kHz (in = 0), faded and scaled to peak 1.
+   bool RenderClip(const std::string& code, std::vector<double>& x, std::string& err)
+   {
+      Field::SampleProgram prog;
+      Field::FieldError ferr;
+      if (!Field::CompileSampleProgram(code, nullptr, prog, ferr))
+         return err = ferr.message, false;
+      KernelBank bank(prog, 1);
+      x.assign(kRealN, 0.0);
+      for (int i = 0; i < kRealN; i++)
+         x[(size_t)i] = bank.Run(0, 0.0f, (float)kRate, (double)i);
+      double peak = 0.0;
+      for (int i = 0; i < kRealN; i++)
+      {
+         double w = 1.0;
+         if (i < kRealFade)
+            w = 0.5 - 0.5 * std::cos(M_PI * (double)i / (double)kRealFade);
+         else if (i >= kRealN - kRealFade)
+            w = 0.5 - 0.5 * std::cos(M_PI * (double)(kRealN - 1 - i) / (double)kRealFade);
+         x[(size_t)i] *= w;
+         peak = std::max(peak, std::fabs(x[(size_t)i]));
+      }
+      if (peak <= 0.0)
+         return err = "silent clip", false;
+      for (double& v : x)
+         v /= peak;
+      return true;
+   }
+
+   // Ideal (periodic) 64x upsampling, 2^14 -> 2^20 points.
+   std::vector<float> Upsample64(const std::vector<double>& x)
+   {
+      std::vector<cplx> a(kRealN), b(kRealFine, cplx(0.0, 0.0));
+      for (int i = 0; i < kRealN; i++)
+         a[(size_t)i] = x[(size_t)i];
+      FftD(a, false);
+      for (int k = 0; k < kRealN / 2; k++)
+         b[(size_t)k] = a[(size_t)k];
+      for (int k = 1; k < kRealN / 2; k++)
+         b[(size_t)(kRealFine - k)] = a[(size_t)(kRealN - k)];
+      b[(size_t)(kRealN / 2)] = 0.5 * a[(size_t)(kRealN / 2)];
+      b[(size_t)(kRealFine - kRealN / 2)] = 0.5 * a[(size_t)(kRealN / 2)];
+      FftD(b, true);
+      std::vector<float> y(kRealFine);
+      for (int i = 0; i < kRealFine; i++)
+         y[(size_t)i] = (float)(b[(size_t)i].real() / (double)kRealN);
+      return y;
+   }
+
+   // The 64x fine output, ideally low-passed at 20 kHz and taken on the 48 kHz
+   // grid, for the reference (all fine samples) and the test (every m-th):
+   // one 2^14-point FFT per polyphase phase r, combined with e^{-2 pi i b r / 2^20}.
+   void BandTo48(const std::vector<double>& fine, int m, std::vector<double>& ref48, std::vector<double>& test48)
+   {
+      static std::vector<cplx> rot; // e^{-2 pi i b r / 2^20}, [r][b]
+      if (rot.empty())
+      {
+         rot.resize((size_t)kRealUp * (kRealBand + 1));
+         for (int r = 0; r < kRealUp; r++)
+            for (int b = 0; b <= kRealBand; b++)
+               rot[(size_t)r * (kRealBand + 1) + (size_t)b] =
+                  std::polar(1.0, -2.0 * M_PI * (double)b * (double)r / (double)kRealFine);
+      }
+      std::vector<cplx> a(kRealN), y((size_t)kRealBand + 1, cplx(0.0, 0.0)), t = y;
+      for (int r = 0; r < kRealUp; r++)
+      {
+         for (int i = 0; i < kRealN; i++)
+            a[(size_t)i] = fine[(size_t)i * kRealUp + (size_t)r];
+         FftD(a, false);
+         const bool inTest = r % m == 0;
+         for (int b = 0; b <= kRealBand; b++)
+         {
+            const cplx v = a[(size_t)b] * rot[(size_t)r * (kRealBand + 1) + (size_t)b];
+            y[(size_t)b] += v;
+            if (inTest)
+               t[(size_t)b] += v;
+         }
+      }
+      auto back = [&](const std::vector<cplx>& spec, double scale, std::vector<double>& out) {
+         std::vector<cplx> c(kRealN, cplx(0.0, 0.0));
+         c[0] = spec[0] * scale;
+         for (int b = 1; b <= kRealBand; b++)
+         {
+            c[(size_t)b] = spec[(size_t)b] * scale;
+            c[(size_t)(kRealN - b)] = std::conj(c[(size_t)b]);
+         }
+         FftD(c, true);
+         out.resize(kRealN);
+         for (int i = 0; i < kRealN; i++)
+            out[(size_t)i] = c[(size_t)i].real();
+      };
+      back(y, 1.0 / (double)kRealFine, ref48);
+      back(t, (double)m / (double)kRealFine, test48);
+   }
+
+   // Worst 100 ms window of error over reference power, among windows within
+   // 30 dB of the loudest. NaN when the reference is silent.
+   double WorstWindowDb(const std::vector<double>& t, const std::vector<double>& r)
+   {
+      std::vector<double> ew, rw;
+      for (int s = 0; s + kRealWin <= kRealN; s += kRealHop)
+      {
+         double e = 0.0, p = 0.0;
+         for (int i = s; i < s + kRealWin; i++)
+         {
+            const double d = t[(size_t)i] - r[(size_t)i];
+            e += d * d;
+            p += r[(size_t)i] * r[(size_t)i];
+         }
+         ew.push_back(e);
+         rw.push_back(p);
+      }
+      const double pmax = *std::max_element(rw.begin(), rw.end());
+      if (!(pmax > 1e-20))
+         return std::nan("");
+      double worst = -400.0;
+      for (size_t w = 0; w < ew.size(); w++)
+         if (rw[w] >= 1e-3 * pmax)
+            worst = std::max(worst, 10.0 * std::log10(std::max(ew[w], 1e-40) / rw[w]));
+      return worst;
+   }
+
+   // Alias of one kernel on one upsampled clip at each of the six factors.
+   bool MeasureReal(const Field::SampleProgram& prog, const std::vector<float>& x64, double* db)
+   {
+      std::vector<double> fine(kRealFine);
+      for (int k = 0; k < 6; k++)
+      {
+         const int f = kFieldFactors[k], m = kRealUp / f;
+         KernelBank bank(prog, m);
+         const float sr = (float)(kRate * f);
+         // Two periods; the second is the periodic steady state. (A copy that
+         // starts between base samples would otherwise miss the input's
+         // inter-sample past.)
+         for (int n = 0; n < 2 * kRealFine; n++)
+         {
+            const float y = bank.Run(n % m, x64[(size_t)(n % kRealFine)], sr, (double)(n / m));
+            if (n >= kRealFine)
+               fine[(size_t)(n - kRealFine)] = y;
+         }
+         std::vector<double> ref48, test48;
+         BandTo48(fine, m, ref48, test48);
+         db[k] = WorstWindowDb(test48, ref48);
+         if (std::isnan(db[k]))
+            return false;
+      }
+      return true;
+   }
+
+   bool WriteWavF32(const std::string& path, const std::vector<double>& x, int rate)
+   {
+      FILE* fp = fopen(path.c_str(), "wb");
+      if (fp == nullptr)
+         return false;
+      auto u32 = [&](uint32_t v) { fwrite(&v, 4, 1, fp); };
+      auto u16 = [&](uint16_t v) { fwrite(&v, 2, 1, fp); };
+      const uint32_t bytes = (uint32_t)(x.size() * 4);
+      fwrite("RIFF", 1, 4, fp);
+      u32(36 + bytes);
+      fwrite("WAVEfmt ", 1, 8, fp);
+      u32(16);
+      u16(3);
+      u16(1);
+      u32((uint32_t)rate);
+      u32((uint32_t)rate * 4);
+      u16(4);
+      u16(32);
+      fwrite("data", 1, 4, fp);
+      u32(bytes);
+      for (double v : x)
+      {
+         const float f = (float)v;
+         fwrite(&f, 4, 1, fp);
+      }
+      fclose(fp);
+      return true;
+   }
+
+   int FactorRank(int f) { return f == 0 ? 64 : f; }
+
+   // PredictFactor with an explicit analysis grid (P1's low tones need more
+   // points per period).
+   int PredictFactorGrid(const Field::SampleProgram& prog, double f0, float amp, int gridLog2, std::string& why)
+   {
+      Field::AliasContext ctx;
+      ctx.f0Hz = f0;
+      ctx.inAmplitude = amp;
+      ctx.usesInput = true;
+      ctx.gridLog2 = gridLog2;
+      double db[6];
+      for (int k = 0; k < 6; k++)
+      {
+         Field::AliasSpectrum spec;
+         if (!Field::AnalyzePeriodicSpectrum(prog, ctx, kRate * kFieldFactors[k], spec))
+            return why = spec.status, -1;
+         db[k] = Field::PredictAliasDb(spec, f0, kRate, kFieldFactors[k], kAudibleHz, (double)kLobe * kRate / (double)kN);
+      }
+      return FactorNeeded(db);
+   }
+
+   struct RealClip
+   {
+      std::string name;
+      std::vector<double> x;  // 48 kHz, peak = level
+      std::vector<float> x64; // ideal 64x
+   };
+}
+
+bool RunFieldRealTest()
+{
+   const char* dir = getenv("INFINITE_FIELDREAL");
+   const char* clipDir = getenv("INFINITE_FIELDREAL_CLIPS");
+   const char* mode = getenv("INFINITE_FIELDREAL_MODE");
+   const char* csvPath = getenv("INFINITE_FIELDREAL_CSV");
+   if (dir == nullptr || clipDir == nullptr || mode == nullptr)
+   {
+      printf("FIELDREAL needs INFINITE_FIELDREAL, INFINITE_FIELDREAL_CLIPS and INFINITE_FIELDREAL_MODE\n");
+      return false;
+   }
+   const std::string md = mode;
+   const auto t0 = std::chrono::steady_clock::now();
+   auto secs = [&] { return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); };
+
+   // Clips: <source>-hi (peak 0.9) and <source>-lo (peak 0.25).
+   std::vector<RealClip> clips;
+   if (md != "p1")
+   {
+      std::vector<std::filesystem::path> cf;
+      std::error_code ec;
+      for (const auto& f : std::filesystem::directory_iterator(clipDir, ec))
+         if (f.path().extension() == ".field")
+            cf.push_back(f.path());
+      std::sort(cf.begin(), cf.end());
+      for (const auto& p : cf)
+      {
+         std::string code, err;
+         std::vector<double> x;
+         if (!ReadText(p, code) || !RenderClip(code, x, err))
+         {
+            printf("FIELDREAL clip %s failed: %s\n", p.stem().string().c_str(), err.c_str());
+            return false;
+         }
+         for (int lv = 0; lv < 2; lv++)
+         {
+            RealClip c;
+            c.name = p.stem().string() + (lv == 0 ? "-hi" : "-lo");
+            const double level = lv == 0 ? 0.9 : 0.25;
+            c.x = x;
+            for (double& v : c.x)
+               v *= level;
+            if (md == "check" || md == "measure")
+               c.x64 = Upsample64(c.x);
+            clips.push_back(std::move(c));
+         }
+      }
+      printf("FIELDREAL %zu clips ready (%.1f s)\n", clips.size(), secs());
+   }
+
+   if (md == "clips")
+   {
+      const char* wavDir = getenv("INFINITE_FIELDREAL_WAVDIR");
+      for (const auto& c : clips)
+      {
+         double peak = 0.0, pw = 0.0;
+         for (double v : c.x)
+            peak = std::max(peak, std::fabs(v)), pw += v * v;
+         printf("FIELDREAL clip %-10s peak %.3f rms %.1f dBFS\n", c.name.c_str(), peak,
+                10.0 * std::log10(pw / (double)c.x.size()));
+         if (wavDir != nullptr && !WriteWavF32(std::string(wavDir) + "/" + c.name + ".wav", c.x, (int)kRate))
+            return false;
+      }
+      return true;
+   }
+
+   if (md == "check")
+   {
+      // Linear kernels must measure at the float floor on every clip.
+      const char* codes[2] = { "out = in * 0.5\n", "state float z = 0\nz = z + 0.2 * (in - z)\nout = z\n" };
+      const char* names[2] = { "gain", "one-pole" };
+      bool pass = true;
+      for (int ci = 0; ci < 2; ci++)
+      {
+         const char* code = codes[ci];
+         Field::SampleProgram prog;
+         Field::FieldError ferr;
+         if (!Field::CompileSampleProgram(code, nullptr, prog, ferr))
+            return false;
+         for (const auto& c : clips)
+         {
+            double db[6];
+            const bool ok = MeasureReal(prog, c.x64, db);
+            double worst = -400.0;
+            for (double v : db)
+               worst = std::max(worst, v);
+            pass = pass && ok && worst <= -120.0;
+            printf("FIELDREAL check %-10s %-9s worst %.1f dB %s (%.1f s)\n", c.name.c_str(), names[ci], worst,
+                   ok && worst <= -120.0 ? "ok" : "FAIL", secs());
+         }
+      }
+      printf("FIELDREAL check %s (%.1f s)\n", pass ? "PASS" : "FAIL", secs());
+      return pass;
+   }
+
+   if (csvPath == nullptr)
+   {
+      printf("FIELDREAL %s needs INFINITE_FIELDREAL_CSV\n", md.c_str());
+      return false;
+   }
+   // Kernels: the list file if given, else every <dir>/<set>/*.field.
+   std::vector<std::string> names;
+   if (const char* list = getenv("INFINITE_FIELDREAL_LIST"))
+   {
+      std::string text;
+      if (!ReadText(list, text))
+         return false;
+      size_t a = 0;
+      while (a < text.size())
+      {
+         size_t b = text.find('\n', a);
+         if (b == std::string::npos)
+            b = text.size();
+         std::string line = text.substr(a, b - a);
+         while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
+            line.pop_back();
+         if (!line.empty())
+            names.push_back(line);
+         a = b + 1;
+      }
+   }
+   else
+   {
+      std::error_code ec;
+      for (const auto& set : std::filesystem::directory_iterator(dir, ec))
+         if (set.is_directory())
+            for (const auto& f : std::filesystem::directory_iterator(set.path(), ec))
+               if (f.path().extension() == ".field")
+                  names.push_back(set.path().filename().string() + "/" + f.path().stem().string());
+      std::sort(names.begin(), names.end());
+   }
+   int shardI = 0, shardN = 1;
+   if (const char* sh = getenv("INFINITE_FIELDREAL_SHARD"))
+      if (sscanf(sh, "%d/%d", &shardI, &shardN) != 2 || shardN < 1)
+         shardI = 0, shardN = 1;
+
+   FILE* csv = fopen(csvPath, "w");
+   if (csv == nullptr)
+      return false;
+   if (md == "measure")
+      fprintf(csv, "set,label,clip,status,meas_1,meas_2,meas_4,meas_8,meas_16,meas_32,factor_meas\n");
+   else if (md == "p1")
+      fprintf(csv, "set,label,status,reason,p1_factor,p1_worst_tone\n");
+   int done = 0;
+   for (size_t ki = 0; ki < names.size(); ki++)
+   {
+      if ((int)(ki % (size_t)shardN) != shardI)
+         continue;
+      const std::string& nm = names[ki];
+      const size_t slash = nm.find('/');
+      const std::string set = nm.substr(0, slash), label = nm.substr(slash + 1);
+      std::string code;
+      Field::SampleProgram prog;
+      Field::FieldError ferr;
+      if (!ReadText(std::filesystem::path(dir) / set / (label + ".field"), code) ||
+          !Field::CompileSampleProgram(code, nullptr, prog, ferr))
+      {
+         printf("FIELDREAL %s does not load\n", nm.c_str());
+         continue;
+      }
+      if (md == "measure")
+      {
+         for (const auto& c : clips)
+         {
+            double db[6];
+            const bool ok = MeasureReal(prog, c.x64, db);
+            const int fm = ok ? FactorNeeded(db) : -1;
+            fprintf(csv, "%s,\"%s\",%s,%s", set.c_str(), label.c_str(), c.name.c_str(), ok ? "ok" : "silent");
+            for (int k = 0; k < 6; k++)
+               ok ? fprintf(csv, ",%.2f", db[k]) : fprintf(csv, ",");
+            ok ? fprintf(csv, ",%d\n", fm) : fprintf(csv, ",\n");
+            if (ok)
+               printf("FIELDREAL %s/%-12s %-9s %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f | %s\n", set.c_str(), label.c_str(),
+                      c.name.c_str(), db[0], db[1], db[2], db[3], db[4], db[5],
+                      fm == 0 ? ">32" : std::to_string(fm).c_str());
+            else
+               printf("FIELDREAL %s/%-12s %-9s silent\n", set.c_str(), label.c_str(), c.name.c_str());
+         }
+      }
+      else if (md == "p1")
+      {
+         const double tones[7] = { 100.0, 300.0, 1000.0, 3000.0, 5001.0, 10000.0, 15000.0 };
+         const float amps[3] = { 0.25f, 0.5f, 0.9f };
+         int best = -1;
+         std::string worst, why;
+         bool ok = true;
+         for (double f0 : tones)
+            for (float a : amps)
+            {
+               if (!ok)
+                  break;
+               const int g = std::clamp(13 + (int)std::lround(std::log2(5001.0 / f0)), 13, 17);
+               const int fp = PredictFactorGrid(prog, f0, a, g, why);
+               if (fp < 0)
+               {
+                  ok = false;
+                  break;
+               }
+               if (FactorRank(fp) > FactorRank(best < 0 ? 1 : best) || best < 0)
+               {
+                  best = fp;
+                  char b[64];
+                  snprintf(b, sizeof(b), "%g Hz at %.2f", f0, a);
+                  worst = b;
+               }
+            }
+         for (char& ch : why)
+            if (ch == '"' || ch == '\n')
+               ch = '\'';
+         fprintf(csv, "%s,\"%s\",%s,\"%s\",%s,\"%s\"\n", set.c_str(), label.c_str(), ok ? "ok" : "declined",
+                 ok ? "" : why.c_str(), ok ? std::to_string(best).c_str() : "", ok ? worst.c_str() : "");
+         printf("FIELDREAL p1 %s/%-12s %s\n", set.c_str(), label.c_str(),
+                ok ? (std::to_string(best) + " (" + worst + ")").c_str() : ("declined: " + why).c_str());
+      }
+      fflush(csv);
+      fflush(stdout);
+      done++;
+   }
+   fclose(csv);
+   printf("FIELDREAL %s: %d kernels (%.1f s)\n", md.c_str(), done, secs());
    return true;
 }
 }
