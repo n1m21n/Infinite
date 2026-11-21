@@ -1,7 +1,9 @@
 """Research lint: validate docs/research/<slug>/ projects against docs/RESEARCH_STANDARD.md.
 
 What: checks required structure, frontmatter, pre-registered hypotheses/kill criteria,
-threats to validity, ARTIFACT.md matrix, and data/provenance.json schema & outputs.
+threats to validity, ARTIFACT.md matrix, scripts the docs name, held-out validation
+behind any "confirmed" claim, and data/provenance.json schema & outputs.
+It checks structure, not truth: a reviewer still reads each claim against its data.
 Why: keeps Lane R research reproducible and prevents unpinned or un-falsifiable claims
 from being published.
 
@@ -34,6 +36,8 @@ VALID_STATUSES = {
 }
 ADVANCED_STATUSES = {"measuring", "validated", "published"}
 SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
+SCRIPT_REF_RE = re.compile(r"(?<![A-Za-z0-9_/])(?:\./)?(scripts/[A-Za-z0-9_.-]+\.(?:sh|py))")
+DATA_EXTS = (".csv", ".json", ".log", ".txt", ".tsv")
 PLACEHOLDER_RE = re.compile(
     r"<(?:Research Title|slug|name|YYYY-MM-DD|pinned-sha-when-measured|full-40-char-sha|"
     r"zenodo-doi-or-pending|e\.g\.,[^>]+|compiler[^>]+|global RNG seed[^>]+)>")
@@ -160,6 +164,13 @@ def lint_project(project_dir):
     if "validity" not in headings and "caveat" not in headings:
         errors.append(f"{rel_dir}/README.md: missing Threats to Validity / Caveats section")
 
+    # A hypothesis is confirmed only after held-out validation (standard section 3).
+    has_held_out = "held-out" in headings or "held out" in headings
+    if status in ("validated", "published") and not has_held_out:
+        errors.append(f"{rel_dir}/README.md: status '{status}' requires a Held-out validation section")
+    if re.search(r"\bconfirmed\b", body, re.IGNORECASE) and not has_held_out:
+        errors.append(f"{rel_dir}/README.md: says 'confirmed' but has no Held-out validation section")
+
     if "seen in search only" in readme.lower():
         errors.append(
             f"{rel_dir}/README.md: contains 'Seen in search only' marker — do not cite unverified sources"
@@ -169,17 +180,28 @@ def lint_project(project_dir):
         artifact = open(artifact_path, encoding="utf-8").read()
         if "|---" not in artifact and "| ---" not in artifact:
             errors.append(f"{rel_dir}/ARTIFACT.md: missing Claim-to-Artifact Matrix table")
-        if status in ADVANCED_STATUSES:
+        if status in ADVANCED_STATUSES or status == "killed":
             for m in PLACEHOLDER_RE.finditer(artifact):
                 errors.append(f"{rel_dir}/ARTIFACT.md: unfilled placeholder {m.group(0)}")
+    else:
+        artifact = ""
+
+    # Every script the docs point at must exist, at every status.
+    # A line may name a script that does not exist yet only if it says "planned".
+    for line in (readme + "\n" + artifact).splitlines():
+        if "planned" in line.lower():
+            continue
+        for ref in SCRIPT_REF_RE.findall(line):
+            if not os.path.isfile(os.path.join(project_dir, ref)):
+                errors.append(f"{rel_dir}: names `{ref}` but the file does not exist (mark the line 'planned')")
 
     data_dir = os.path.join(project_dir, "data")
     prov_path = os.path.join(data_dir, "provenance.json")
     has_data_files = os.path.isdir(data_dir) and any(
-        f != "provenance.json" and f.endswith((".csv", ".json"))
+        f != "provenance.json" and not f.endswith(".schema.json") and f.endswith(DATA_EXTS)
         for f in os.listdir(data_dir)
     )
-    if has_data_files or status in ADVANCED_STATUSES:
+    if has_data_files or status in ADVANCED_STATUSES or status == "killed":
         if not os.path.isfile(prov_path):
             errors.append(f"{rel_dir}/data/provenance.json: missing provenance record")
         else:

@@ -17,7 +17,7 @@ Runs `INFINITE_SPECTRALFIELDTEST=1` headless checks (identity round-trip, zero-a
 
 ## 3. Full Reproduction
 ```bash
-./scripts/run_all.sh
+./scripts/run_all.sh   # planned: not written yet (Phase 0)
 ```
 
 ## 4. Claim-to-Artifact Matrix

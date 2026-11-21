@@ -67,7 +67,7 @@ Every published claim must be backed by `ARTIFACT.md` and `data/provenance.json`
 - **Two-Script Entry:**
   - `scripts/kick-the-tires.sh` (<5 minutes): verifies build, environment, and 1–2 smoke cases.
   - `scripts/run_all.sh`: reproduces the full dataset and all figures/tables.
-- **Automated Gate:** Run `python3 tools/research/research_lint.py` (passes with exit `0` when frontmatter, hypotheses/kill criteria, `ARTIFACT.md`, and `data/provenance.json` are valid).
+- **Automated Gate:** Run `python3 tools/research/research_lint.py` (exit `0` when frontmatter, hypotheses/kill criteria, `ARTIFACT.md`, the scripts it names, `data/provenance.json`, and the held-out and threats sections are present and consistent with the status). The lint checks structure, not truth: a reviewer still reads every claim against its data before a note is published. Lint the template itself with `--check-template`.
 
 ---
 
@@ -79,12 +79,14 @@ Infinite publishes research in **two synchronized forms**:
    - Compiled with the target venue's official LaTeX template (e.g., **DAFx** 2-column, max 8 pages, `IEEEbib.bst`), with static vector figures and an Artifact Appendix.
    - Preprints archived on **arXiv** (`cs.SD` / `eess.AS`); artifacts archived on **Zenodo** with a persistent DOI.
 2. **Interactive Web Lab Note (`website/research/<slug>.html`):**
-   - Rendered in Infinite's site design (`data-mode="midnight"`, `TechArticle` JSON-LD, KaTeX math, `<link rel="alternate" type="application/json">` pointing to `data/`).
+   - Built on the `website/blog/` page shell (same header, footer and mode toggle). Colours and modes follow `docs/brand/BRAND.md` section 2.2, which puts reading pages on **Paper**; where the site and the brand book disagree, the brand book wins (AGENTS.md rule 4). Run `tools/brand/brand_lint.py` on the page before it ships.
+   - `TechArticle` JSON-LD and KaTeX math. `docs/` is not served by the website, so copy the note's raw files from `docs/research/<slug>/data/` to `website/research/<slug>/data/` (unchanged, provenance included) and point `<link rel="alternate" type="application/json">` and every "raw data" link there.
    - Includes **interactive audio/visual demos** (A/B players, parameter sliders, or `embeds/`), collapsible proof drawers, explicit caveats, and links to the pinned commit SHA / PDF / DOI.
 
 ---
 
 ## 6. Clean-Room & Citation Integrity
 
-- Never open, read, grep, or cite copyleft/GPL source code (Kronos, Cmajor, SuperCollider, BespokeSynth).
+- Licensing follows AGENTS.md rule 1 (owner decision 2026-11-15): open-source code of any licence, GPL/AGPL included, may be opened and read to understand a technique, but never copied, pasted or transcribed. Describe the behaviour in your own words first, close the source, then write fresh code. Permissive code (MIT/BSD/ISC/Apache-2.0/zlib) may be ported only with its licence notice kept. Keep clones outside the repo.
+- What a research **paper or web note cites** is narrower: published papers, abstracts, documentation and public discussions. Do not cite source files of other projects as evidence.
 - In `docs/prior-art/`, mark every source explicitly as `OPENED` or `Seen in search only (do not cite as verified)`.
