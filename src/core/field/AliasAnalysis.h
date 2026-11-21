@@ -47,6 +47,9 @@ namespace Field
       std::vector<int> inputRegs;
       std::vector<std::vector<double>> inputWaves;
       std::vector<int> captureRegs;
+      // Phase 6 (README section 17): when not empty, `in` at grid point j is
+      // inWave[j] instead of the sine (size 1 << gridLog2, one period of f0).
+      std::vector<double> inWave;
    };
 
    struct AliasSpectrum
@@ -83,4 +86,11 @@ namespace Field
    // dB re the fundamental. A decimator back to baseRate is taken as ideal.
    double PredictAliasDb(const AliasSpectrum& s, double f0Hz, double baseRate, int factor, double audibleHz,
                          double harmonicTolHz);
+
+   // Phase 6, for a multi-tone `in` whose tones are all harmonics of f0:
+   // power of every output harmonic above fs / 2 (fs = factor * baseRate)
+   // that folds to `audibleHz` or below, over the output power at or below
+   // `audibleHz`, in dB. Folded lines land on harmonics, so none is excluded;
+   // lines are summed in power, not in phase.
+   double PredictFoldedDb(const AliasSpectrum& s, double f0Hz, double baseRate, int factor, double audibleHz);
 }

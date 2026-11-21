@@ -319,11 +319,15 @@ namespace Field
          if (ctx.inputRegs[i] < 0 || ctx.inputRegs[i] >= kSampleMaxRegs || ctx.inputWaves.size() <= i ||
              ctx.inputWaves[i].size() != ((size_t)1 << ctx.gridLog2))
             return out.status = "bad segment input", false;
+      if (!ctx.inWave.empty() && ctx.inWave.size() != n)
+         return out.status = "bad input wave", false;
       out.captured.assign(ctx.captureRegs.size(), std::vector<double>((size_t)1 << ctx.gridLog2));
 
       std::vector<float> in(n);
       for (size_t j = 0; j < n; j++)
-         in[j] = ctx.usesInput ? ctx.inAmplitude * (float)std::sin(2.0 * M_PI * (double)j / (double)n) : 0.0f;
+         in[j] = !ctx.usesInput ? 0.0f
+                 : !ctx.inWave.empty() ? (float)ctx.inWave[j]
+                                       : ctx.inAmplitude * (float)std::sin(2.0 * M_PI * (double)j / (double)n);
 
       // State on the grid: s[c][j]. Delayed copies sd, next values g.
       std::vector<std::vector<double>> s((size_t)k, std::vector<double>(n));
@@ -644,5 +648,43 @@ namespace Field
          }
       }
       return 10.0 * std::log10(std::max(alias, 1e-30) / fund);
+   }
+
+   double PredictFoldedDb(const AliasSpectrum& s, double f0Hz, double baseRate, int factor, double audibleHz)
+   {
+      if (!s.ok || s.power.size() < 2)
+         return 0.0;
+      const double fs = baseRate * (double)factor;
+      double alias = 0.0, ref = 0.0;
+      auto add = [&](double h, double p) {
+         const double f = h * f0Hz;
+         if (f <= audibleHz)
+         {
+            ref += p;
+            return;
+         }
+         if (f <= 0.5 * fs)
+            return; // in band at fs, above the audible band: low-passed away
+         double r = std::fmod(f, fs);
+         if (r > 0.5 * fs)
+            r = fs - r;
+         if (r <= audibleHz)
+            alias += p;
+      };
+      const size_t hTop = s.power.size() - 1;
+      for (size_t h = 0; h <= hTop; h++)
+         add((double)h, s.power[h]);
+      if (s.tailDensity > 0.0)
+      {
+         const double hMax = std::min(4194304.0, std::ceil(512.0 * fs / f0Hz));
+         for (double h = (double)hTop + 1.0; h <= hMax; h += 1.0)
+         {
+            const double p = s.tailDensity * std::pow(h / s.tailRef, -s.tailExp);
+            if (p < 1e-20 * std::max(ref, 1e-300))
+               break;
+            add(h, p);
+         }
+      }
+      return 10.0 * std::log10(std::max(alias, 1e-30) / std::max(ref, 1e-30));
    }
 }

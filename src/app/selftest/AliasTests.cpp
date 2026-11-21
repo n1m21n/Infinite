@@ -2256,11 +2256,53 @@ namespace
       return FactorNeeded(db);
    }
 
+   constexpr double kMultiF0 = 46.875; // 48000 / 1024
+   constexpr int kMultiGrid = 16;
+   constexpr int kMultiTones = 511;
+
+   // P6's test signal for one clip (README section 17): harmonic h of 46.875 Hz
+   // carries the clip's power in FFT bins 16h - 8 .. 16h + 7, Schroeder phase,
+   // the whole period scaled to the clip's peak.
+   std::vector<double> MultisineFor(const std::vector<double>& x)
+   {
+      std::vector<cplx> a(kRealN);
+      double peak = 0.0;
+      for (int i = 0; i < kRealN; i++)
+      {
+         a[(size_t)i] = x[(size_t)i];
+         peak = std::max(peak, std::fabs(x[(size_t)i]));
+      }
+      FftD(a, false);
+      const size_t n = (size_t)1 << kMultiGrid;
+      std::vector<cplx> w(n, cplx(0.0, 0.0));
+      for (int h = 1; h <= kMultiTones; h++)
+      {
+         double p = 0.0;
+         for (int b = 16 * h - 8; b <= 16 * h + 7; b++)
+            p += std::norm(a[(size_t)b]);
+         const double ph = -M_PI * (double)h * (double)(h - 1) / (double)kMultiTones;
+         w[(size_t)h] = std::polar(std::sqrt(p), ph);
+         w[n - (size_t)h] = std::conj(w[(size_t)h]);
+      }
+      FftD(w, true);
+      std::vector<double> y(n);
+      double wp = 0.0;
+      for (size_t j = 0; j < n; j++)
+      {
+         y[j] = w[j].real();
+         wp = std::max(wp, std::fabs(y[j]));
+      }
+      for (double& v : y)
+         v *= wp > 0.0 ? peak / wp : 0.0;
+      return y;
+   }
+
    struct RealClip
    {
       std::string name;
       std::vector<double> x;  // 48 kHz, peak = level
       std::vector<float> x64; // ideal 64x
+      std::vector<double> multi; // P6's multisine, one period on the analysis grid
    };
 }
 
@@ -2308,6 +2350,8 @@ bool RunFieldRealTest()
                v *= level;
             if (md == "check" || md == "measure")
                c.x64 = Upsample64(c.x);
+            if (md == "p6")
+               c.multi = MultisineFor(c.x);
             clips.push_back(std::move(c));
          }
       }
@@ -2407,6 +2451,8 @@ bool RunFieldRealTest()
       fprintf(csv, "set,label,clip,status,meas_1,meas_2,meas_4,meas_8,meas_16,meas_32,factor_meas\n");
    else if (md == "p1")
       fprintf(csv, "set,label,status,reason,p1_factor,p1_worst_tone\n");
+   else if (md == "p6")
+      fprintf(csv, "set,label,clip,status,reason,pred_1,pred_2,pred_4,pred_8,pred_16,pred_32,factor_p6\n");
    int done = 0;
    for (size_t ki = 0; ki < names.size(); ki++)
    {
@@ -2441,6 +2487,44 @@ bool RunFieldRealTest()
                       fm == 0 ? ">32" : std::to_string(fm).c_str());
             else
                printf("FIELDREAL %s/%-12s %-9s silent\n", set.c_str(), label.c_str(), c.name.c_str());
+         }
+      }
+      else if (md == "p6")
+      {
+         for (const auto& c : clips)
+         {
+            Field::AliasContext ctx;
+            ctx.f0Hz = kMultiF0;
+            ctx.usesInput = true;
+            ctx.gridLog2 = kMultiGrid;
+            ctx.inWave = c.multi;
+            double db[6];
+            std::string why;
+            bool ok = true;
+            for (int k = 0; k < 6 && ok; k++)
+            {
+               Field::AliasSpectrum spec;
+               ok = Field::AnalyzePeriodicSpectrum(prog, ctx, kRate * kFieldFactors[k], spec);
+               if (!ok)
+                  why = spec.status;
+               else
+                  db[k] = Field::PredictFoldedDb(spec, kMultiF0, kRate, kFieldFactors[k], kAudibleHz);
+            }
+            const int fp = ok ? FactorNeeded(db) : -1;
+            for (char& ch : why)
+               if (ch == '"' || ch == '\n')
+                  ch = '\'';
+            fprintf(csv, "%s,\"%s\",%s,%s,\"%s\"", set.c_str(), label.c_str(), c.name.c_str(), ok ? "ok" : "declined",
+                    why.c_str());
+            for (int k = 0; k < 6; k++)
+               ok ? fprintf(csv, ",%.2f", db[k]) : fprintf(csv, ",");
+            ok ? fprintf(csv, ",%d\n", fp) : fprintf(csv, ",\n");
+            if (ok)
+               printf("FIELDREAL p6 %s/%-12s %-9s %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f | %s (%.1f s)\n", set.c_str(),
+                      label.c_str(), c.name.c_str(), db[0], db[1], db[2], db[3], db[4], db[5],
+                      fp == 0 ? ">32" : std::to_string(fp).c_str(), secs());
+            else
+               printf("FIELDREAL p6 %s/%-12s %-9s declined: %s\n", set.c_str(), label.c_str(), c.name.c_str(), why.c_str());
          }
       }
       else if (md == "p1")
