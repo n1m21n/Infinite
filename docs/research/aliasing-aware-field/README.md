@@ -5,7 +5,7 @@ status: "killed"
 owner: "namansoni"
 date: "2026-11-21"
 prior_art: "docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md"
-commit_sha: "b5da3a78db82b924f000db3d0af62c30228e37b5"
+commit_sha: "d370e296ff2d26a2d01d1afb283d9546c797de0b"
 ---
 
 # Aliasing-aware compilation for Field
@@ -18,7 +18,7 @@ each and the analysis picks the exact factor on 174 of 174 informative kernels a
 nonlinear" and 37 for a class lookup (H3). **Delay lines are in scope since phase 5, 2026-11-21** (section 16): the pass now treats `delay(x, N)`
 as a periodic cell shifted by N samples, scores 94 of 97 delay kernels in L, G and a new blind set D (H4
 passes), and changes no phase-4 result. **Real input fails H5, 2026-11-21** (section 18): a multisine built from each clip is enough on 71.0% of 1764 kernel-clip pairs against a bar of 90%, and today's one-tone predictor is short on 15.5%. The scope of every confirmed result is a steady tone; 3 of 32 literature kernels are still
-declined (no periodic steady state). Soundness lemmas (phase 4c) not started. Phase 0: section 8. Phase 2b (live audio path) not started. Threats to validity: section 12.
+declined (no periodic steady state). Phase 7 (loudest-window multisine, H6) was pre-registered and its confirmation clips measured, then closed unrun on 2026-11-22 (section 19). Soundness lemmas (phase 4c) not started. Phase 0: section 8. Phase 2b (live audio path) not started. Threats to validity: section 12.
 Reproduction: `ARTIFACT.md`. Prior art: `docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md`.
 Hypotheses were first committed in d38d29b7, before phase 0 ran (c0c39088).
 
@@ -89,6 +89,7 @@ A useful by-product: for jump-class ops, oversampling is close to hopeless (8x b
 | 4. Held-out and foundations | Independent held-out sets, simple-rule baselines, the H2 break-even cost, and soundness lemmas for the bound (section 13). Pre-registered 2026-11-21. | Test code and corpus only | **4a, 4b done (section 14):** H1b passes on L and G, H3 passes, break-even below 0.09 instructions. 4c (lemmas), sets P and A not run |
 | 5. Delay lines | `delay(x, N)` as a periodic cell with lag N; blind set D (section 15). Pre-registered 2026-11-21. | Analysis pass only | **Done (section 16):** H4 passes, 94 of 97 delay kernels scored, no regression |
 | 6. Real input | 12 real clips, an interleaved-copy oracle, and a multisine predictor (P6) built from each clip (section 17). Pre-registered 2026-11-21. | Analysis pass (optional input wave) and test code | **Done (section 18):** H5 fails, P6 enough on 71.0% (bar 90%), today's predictor short on 15.5% |
+| 7. Loudest window | P7: a multisine from each clip's 3 loudest windows, on 12 new confirmation clips (section 19). Pre-registered 2026-11-21. | Test code only | **Closed unrun 2026-11-22:** clips measured, rows unscored |
 
 Phases 0 and 1 are where the research claim is won or lost; they are small and safe.
 
@@ -788,6 +789,18 @@ are brighter and louder than their average; it is short by one octave on 384 of 
 **Cost.** Measuring the new clips about 35 minutes wall (8 shards in two rounds of 4); P7 about three
 times P6's 28 s per kernel, about 1 hour per clip set on 4 shards.
 
+**Note before any P7 row (2026-11-21).** P6 on the confirmation clips took about 8 s per pair, against
+2.3 s on phase 6's clips, which put P7 near 4 hours. Two shortcuts that leave every P7 factor unchanged:
+each window tries factors in ascending order and stops at the first at or below −80 dB, and once a window
+says "none" the remaining windows are skipped. One consequence: a decline at a factor or window that is
+no longer evaluated is not seen, so a few pairs may score P7 where the full run would have fallen back to
+P0. The count of declines is reported as before.
+
 **Order.** This section; the confirmation clip kernels and WAVs; their measurement and P0/P6 rows; the P7
 code in `AliasTests.cpp`; P7 rows on both clip sets; `scripts/score_real.py` extended for P7. Changing P7
 after its confirmation rows exist needs another dated entry and a rescore.
+
+**Closed without P7 (2026-11-22).** The owner closed the study here. P7 was not built or run, so H6 is
+not tested and nothing in this section is a result. The confirmation clips (a0c4cf49) and their measured
+need and P6 rows (`data/phase7-{measure,p6}.csv`, 1764 pairs each) are committed unscored; nobody has read
+them, so they stay a clean confirmation set for anyone who runs P7 later.
