@@ -76,7 +76,7 @@
             <span class="pill">272 + 97 held-out kernels</span>
           </div>
           <h2><a href="aliasing-aware-field.html" style="color:inherit;text-decoration:none;">Aliasing-aware compilation for Field</a></h2>
-          <p>Can a compiler predict how much nonlinear audio code aliases and pick the cheapest oversampling factor per subgraph? Steady-state harmonic prediction confirms H1 (Spearman &rho; = 0.94&ndash;1.00 across 272 held-out and 97 delay kernels). Per-subgraph oversampling (H2) is killed—with live A/B audio renders showing why real half-band resamplers leak energy across staged cuts.</p>
+          <p>Can a compiler predict how much nonlinear audio code aliases and pick the cheapest oversampling factor per subgraph? Steady-state harmonic prediction confirms H1 (Spearman &rho; = 0.94&ndash;1.00 across 272 held-out and 97 delay kernels). Per-subgraph oversampling (H2) is killed—with live A/B audio renders showing why real half-band resamplers leak energy across staged cuts. On real music (H5, 1764 kernel-clip pairs against an exact oracle) steady-tone prediction fails: no tested predictor is both safe and cheap.</p>
           <div class="bm-actions">
             <a class="btn btn-primary btn-sm" href="aliasing-aware-field.html">Read report &amp; listen</a>
             <a class="btn btn-ghost btn-sm" href="aliasing-aware-field.pdf">PDF</a>
