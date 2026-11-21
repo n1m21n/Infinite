@@ -1,6 +1,6 @@
 # Aliasing-aware compilation for Field (research plan)
 
-Status: **phase 0 done 2026-11-21** (results in section 8). Phase 1 not started.
+Status: **phase 1 done 2026-11-21: H1 holds** (results in section 9; phase 0 in section 8). Phase 2 not started.
 Prior art: `docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md`.
 
 ## 1. The problem
@@ -126,13 +126,92 @@ should not oversample. It should report the cause and point to BLEP/ADAA (phase 
 premise of H2.
 
 **6. The shipping presets alias audibly today.** At 1x: Tube Overdrive -35 dB, Soft Saturation
--33, Analog Tape Saturator -35, Wavefolder -22. Tube, Soft and Tape need 8x for -80 dB, Wavefolder 32x.
+-35, Analog Tape Saturator -37, Wavefolder -22. Tube, Soft and Tape need 8x for -80 dB, Wavefolder 32x.
+(Corrected in phase 1: the first run measured Soft Saturation, Tape and Moog with knob values left over
+from the node's start-up preset, see section 9. The CSV now holds the corrected run.)
 
 **Caveats found on the way**
 - Float32 phase accumulators have a floor of about -101 dB (the sine-oscillator control), and pinch
   flattens at -90 dB. Targets below about -95 dB are limited by precision, not aliasing.
-- Moog 4-Pole Ladder reads -22 dB at both 1x and 2x, then jumps to -60 dB at 4x. That looks like
+- Moog 4-Pole Ladder reads -29 dB at both 1x and 2x, then jumps to -67 dB at 4x. That looks like
   resonance or a limit cycle at an inharmonic frequency, which the metric counts as aliasing. Treat
-  it as suspect until it has been checked.
+  it as suspect until it has been checked (phase 1's analysis also calls it unstable, section 9).
 - The corpus is hand-built by one person (me). For H1, phase 1 must also predict kernels written by
   other people (more presets, community devices) to avoid fitting the analysis to its own test set.
+
+## 9. Phase 1 results (2026-11-21)
+
+**H1 holds.** Over 43 predicted nonlinear kernels x 6 factors (258 points, both sides floored at
+-100 dB): Spearman rho **0.994** (bar 0.8), median absolute error **0.0 dB** (bar 10), p90 0.1 dB.
+The factor each kernel needs for -80 dB is predicted exactly for 43 of 43. One kernel (Moog) gets no
+prediction, by design (below). Raw numbers: `data/phase1-predictions.csv`. Same command as phase 0;
+predictions print under each measured row.
+
+| Class | n | median abs error | p90 |
+|---|---|---|---|
+| poly, analytic, kink, chain, feedback, preset | 204 | 0.0 dB | 0.0 dB |
+| jump | 24 | 0.1 dB | 0.3 dB |
+| osc | 30 | 0.1 dB | 5.7 dB |
+
+**What was built, and how it differs from section 3.** `src/core/field/AliasAnalysis.{h,cpp}`,
+report only, called from the rig. It does not implement the interval/degree/decay-class algebra of
+section 3. Instead it uses the exact domain that algebra approximates: a kernel driven by one tone
+produces a periodic signal, so the pass computes that periodic steady state on a grid of one input
+period (8192 points), using the real interpreter. From the grid spectrum it folds every harmonic
+analytically, for every factor, in closed form. In more detail:
+- State cells are solved as a periodic fixed point. The one-sample delay is applied as an exact
+  phase shift per harmonic, and a Newton step is preconditioned with the mean Jacobian. Linear
+  filters converge in 1 to 2 iterations and nonlinear feedback in 5 to 15.
+- Phase accumulators are recognised: the self-Jacobian is 1, and a ramp locked to f0 is checked to
+  be a fixed point.
+- Above the grid's usable band, a power law fitted to the top two octave bands extrapolates the
+  tail. This is what makes jumps at 32x come out within 0.6 dB.
+- The pass declines kernels whose output is not a function of the input phase: delay lines,
+  tables, `n`, rand, beat clock, declared inputs. It also declines feedback with no stable periodic
+  solution.
+
+**Read the result honestly.**
+- For memoryless kernels driven by the rig's own tone, the prediction is exact by construction:
+  sampling at fs samples the ideal periodic signal. The bar was set for an approximate analysis,
+  and it is cleared trivially here. The informative parts are these:
+  - feedback (3 kernels, 0.0 dB error);
+  - linear state around a nonlinearity (Tube, Tape: 0.0 to 0.5 dB);
+  - accumulator oscillators;
+  - the extrapolated tail for jumps (0.1 to 0.6 dB at 32x).
+- The osc p90 of 5.7 dB is the measurement floor, not the model. Float32 phase accumulators put a
+  floor of about -100 dB on the rig (pinch flattens at -90 dB), so where the prediction goes below
+  that floor, the measurement cannot follow.
+- Moog 4-Pole Ladder: declined as "periodic solution unstable (loop radius 1.004)". The rig shows
+  -29 dB at both 1x and 2x, which aliasing alone does not do. Both point to a limit cycle at the
+  preset's defaults. This has not been confirmed by rendering with no input.
+- The pass knows the stimulus: one sine, its amplitude, its frequency. A compiler does not. This is
+  the gap that matters for phase 2. The factor choice must hold over an input amplitude range and
+  a frequency range, so the pass has to be run at the worst corners, or bounded by the section-3
+  algebra using this pass as its oracle. H1 as written does not test this.
+- The corpus is still hand-built. Held-out kernels written by other people have not been run yet.
+
+**Cost.** Analysis used 4.6 M program runs (6.7 s in a Debug build) for all 47 kernels at 6 rates.
+Rendering and measuring the same thing took 91 M runs (16.7 s). A memoryless kernel costs 8192 runs
+per rate. Memoryless kernels without `sr` need only one rate (not yet exploited). That is about 1/120
+of one 32x render of the rig's length, the compile-time-measurement baseline. Stateful kernels cost
+1 to 15 times more.
+
+**A bug the analysis found in the rig, and probably in the app.** Soft Saturation and Tape were
+predicted about 2 dB cleaner than measured. A literal `drive = 2.5` matched exactly, and a declared
+`param float drive = 2.5` did not. A probe showed the kernel received 3.0. The cause:
+- `FieldSampleNode` is born on preset 0 (Tube Overdrive, `drive = 3.0`).
+- `Apply()` keeps a param's value across recompiles by name (`ParamTable::Reconcile`).
+- So any later kernel that declares `drive` inherits 3.0.
+
+The rig now resets each declared param to its default after `Apply()`. Phase-0 numbers for Soft
+Saturation, Tape and Moog were corrected, and every other row reproduced to the hundredth of a dB.
+The app's preset picker (`LoadPreset`: code, then `Apply()`) goes through the same path. So picking
+a Field preset probably keeps any same-named knob values from the previous kernel instead of
+loading the preset's own values. Not fixed here; it needs a separate check.
+
+**Decision: go to phase 2**, with two changes to its plan:
+- run the pass at the corners of an input amplitude and frequency range rather than at one tone;
+- use the per-register periodic signals the pass already computes to attribute aliasing to
+  subgraphs, which is the input H2 needs.
+
+Before phase 2 claims anything, run held-out kernels (community devices, Field Synth presets).

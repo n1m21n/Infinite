@@ -28,6 +28,10 @@
 #include "audio/dsp/PortableFft.h"
 #include "nodes/AnalogNode.h"
 #include "nodes/FieldSampleNode.h"
+#include "field/AliasAnalysis.h"
+#include "field/BackendRegister.h"
+#include <chrono>
+#include <map>
 #include "nodes/WavetableNode.h"
 
 namespace app
@@ -715,6 +719,13 @@ namespace
          err = node.LastError();
          return {};
       }
+      // Apply() keeps a param's value across recompiles by name, and the
+      // node is born on preset 0 (Tube Overdrive: drive 3.0, tone 4000), so
+      // a kernel declaring `drive = 2.5` would run at 3.0. Every kernel here
+      // is measured at its own declared defaults.
+      for (Field::ParamEntry& p : node.GetParamTable().Params())
+         if (p.isDeclared)
+            p.value = p.defaultValue;
       const double rate = kRate * (double)factor;
       constexpr int kBlock = 256;
       AudioNode* an = node.GetAudioNode();
@@ -897,6 +908,69 @@ namespace
    }
 }
 
+namespace
+{
+   // H1 scoring helpers (phase 1).
+   std::vector<double> AverageRanks(const std::vector<double>& v)
+   {
+      std::vector<size_t> idx(v.size());
+      for (size_t i = 0; i < idx.size(); i++)
+         idx[i] = i;
+      std::sort(idx.begin(), idx.end(), [&](size_t a, size_t b) { return v[a] < v[b]; });
+      std::vector<double> r(v.size());
+      for (size_t i = 0; i < idx.size();)
+      {
+         size_t j = i;
+         while (j + 1 < idx.size() && v[idx[j + 1]] == v[idx[i]])
+            j++;
+         for (size_t k = i; k <= j; k++)
+            r[idx[k]] = 0.5 * (double)(i + j);
+         i = j + 1;
+      }
+      return r;
+   }
+
+   double Spearman(const std::vector<double>& a, const std::vector<double>& b)
+   {
+      const std::vector<double> ra = AverageRanks(a), rb = AverageRanks(b);
+      const double n = (double)a.size();
+      double ma = 0.0, mb = 0.0;
+      for (size_t i = 0; i < a.size(); i++)
+      {
+         ma += ra[i] / n;
+         mb += rb[i] / n;
+      }
+      double sab = 0.0, saa = 0.0, sbb = 0.0;
+      for (size_t i = 0; i < a.size(); i++)
+      {
+         sab += (ra[i] - ma) * (rb[i] - mb);
+         saa += (ra[i] - ma) * (ra[i] - ma);
+         sbb += (rb[i] - mb) * (rb[i] - mb);
+      }
+      return (saa > 0.0 && sbb > 0.0) ? sab / std::sqrt(saa * sbb) : 0.0;
+   }
+
+   double Median(std::vector<double> v)
+   {
+      if (v.empty())
+         return 0.0;
+      std::sort(v.begin(), v.end());
+      const size_t m = v.size() / 2;
+      return v.size() % 2 ? v[m] : 0.5 * (v[m - 1] + v[m]);
+   }
+
+   // Smallest factor reaching -80 dB, or 0 for "never" within 32x.
+   int FactorNeeded(const double* db)
+   {
+      for (int k = 0; k < 6; k++)
+         if (db[k] <= -80.0)
+            return kFieldFactors[k];
+      return 0;
+   }
+
+   constexpr double kScoreFloorDb = -100.0; // = kControlDb: below it is "clean"
+}
+
 bool RunFieldAliasTest()
 {
    const std::vector<FieldAliasCase> corpus = FieldAliasCorpus();
@@ -905,20 +979,38 @@ bool RunFieldAliasTest()
    {
       csv = fopen(path, "w");
       if (csv != nullptr)
-         fprintf(csv, "label,class,factor,alias_db,harmonics_db\n");
+         fprintf(csv, "label,class,factor,alias_db,harmonics_db,predicted_db,status,iterations,evaluations\n");
    }
    bool all = true;
    printf("FIELDALIAS %zu kernels, alias<20k dB re fundamental at F x 48 kHz then decimated\n", corpus.size());
    printf("FIELDALIAS %-34s %-9s %7s %7s %7s %7s %7s %7s\n", "kernel", "class", "1x", "2x", "4x", "8x", "16x",
           "32x");
+   std::vector<double> allMeas, allPred;
+   std::map<std::string, std::vector<double>> errByClass;
+   int factorAgree = 0, factorWithin1 = 0, factorKernels = 0, unpredicted = 0;
+   double renderSec = 0.0, analyzeSec = 0.0;
+   long long analyzeEvals = 0, renderEvals = 0;
    for (const FieldAliasCase& c : corpus)
    {
-      double db[6] = {};
-      bool ok = true;
-      std::string err;
+      double db[6] = {}, pred[6] = {};
+      bool ok = true, predOk = true;
+      std::string err, why;
+      Field::SampleProgram prog;
+      Field::FieldError ferr;
+      const bool compiled = Field::CompileSampleProgram(c.code, nullptr, prog, ferr);
+      Field::AliasContext ctx;
+      ctx.f0Hz = (double)c.fundBin * kRate / (double)kN;
+      ctx.inAmplitude = kAmplitude;
+      ctx.usesInput = c.usesInput;
+      int iters[6] = {};
+      long long evals[6] = {};
       for (int k = 0; k < 6 && ok; k++)
       {
+         const auto t0 = std::chrono::steady_clock::now();
          const std::vector<float> x = RenderFieldAt(c, kFieldFactors[k], err);
+         const auto t1 = std::chrono::steady_clock::now();
+         renderSec += std::chrono::duration<double>(t1 - t0).count();
+         renderEvals += (long long)(0.3 * kRate + kN) * kFieldFactors[k];
          if (x.empty())
          {
             ok = false;
@@ -926,9 +1018,26 @@ bool RunFieldAliasTest()
          }
          const AliasMeasurement m = Measure(x, c.fundBin);
          db[k] = m.aliasDb;
+
+         Field::AliasSpectrum spec;
+         const auto t2 = std::chrono::steady_clock::now();
+         const bool got = compiled && Field::AnalyzePeriodicSpectrum(prog, ctx, kRate * kFieldFactors[k], spec);
+         analyzeSec += std::chrono::duration<double>(std::chrono::steady_clock::now() - t2).count();
+         analyzeEvals += spec.evaluations;
+         iters[k] = spec.iterations;
+         evals[k] = spec.evaluations;
+         if (got)
+            pred[k] = Field::PredictAliasDb(spec, ctx.f0Hz, kRate, kFieldFactors[k], kAudibleHz,
+                                            (double)kLobe * kRate / (double)kN);
+         else
+         {
+            predOk = false;
+            why = compiled ? spec.status : ferr.message;
+         }
          if (csv != nullptr)
-            fprintf(csv, "\"%s\",%s,%d,%.2f,%.2f\n", c.label.c_str(), c.klass.c_str(), kFieldFactors[k], m.aliasDb,
-                    m.harmonicDb);
+            fprintf(csv, "\"%s\",%s,%d,%.2f,%.2f,%.2f,\"%s\",%d,%lld\n", c.label.c_str(), c.klass.c_str(),
+                    kFieldFactors[k], m.aliasDb, m.harmonicDb, got ? pred[k] : 0.0, got ? "ok" : spec.status.c_str(),
+                    spec.iterations, spec.evaluations);
       }
       if (!ok)
       {
@@ -945,10 +1054,57 @@ bool RunFieldAliasTest()
       }
       printf("FIELDALIAS %-34s %-9s %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f  %s\n", c.label.c_str(), c.klass.c_str(),
              db[0], db[1], db[2], db[3], db[4], db[5], verdict);
+      if (predOk)
+      {
+         printf("FIELDALIAS %-34s %-9s %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f  predicted, %d-%d iter\n", "",
+                "", pred[0], pred[1], pred[2], pred[3], pred[4], pred[5], *std::min_element(iters, iters + 6),
+                *std::max_element(iters, iters + 6));
+         if (c.klass != "linear")
+         {
+            for (int k = 0; k < 6; k++)
+            {
+               const double mm = std::max(db[k], kScoreFloorDb), pp = std::max(pred[k], kScoreFloorDb);
+               allMeas.push_back(mm);
+               allPred.push_back(pp);
+               errByClass[c.klass].push_back(std::fabs(mm - pp));
+               errByClass["(all)"].push_back(std::fabs(mm - pp));
+            }
+            const int fm = FactorNeeded(db), fp = FactorNeeded(pred);
+            factorKernels++;
+            factorAgree += fm == fp;
+            auto step = [](int f) { return f == 0 ? 6 : (int)std::lround(std::log2((double)f)); };
+            factorWithin1 += std::abs(step(fm) - step(fp)) <= 1;
+         }
+      }
+      else
+      {
+         printf("FIELDALIAS %-34s %-9s no prediction: %s\n", "", "", why.c_str());
+         if (c.klass != "linear")
+            unpredicted++;
+      }
       fflush(stdout);
    }
    if (csv != nullptr)
       fclose(csv);
+
+   // H1: rank agreement and error over nonlinear kernels x factors, both
+   // floored at kScoreFloorDb.
+   const double rho = Spearman(allMeas, allPred);
+   printf("FIELDALIAS H1 %zu points (%d nonlinear kernels predicted, %d not): Spearman rho %.3f (>= 0.8), "
+          "median |error| %.1f dB (<= 10)  %s\n",
+          allMeas.size(), factorKernels, unpredicted, rho, Median(errByClass["(all)"]),
+          (rho >= 0.8 && Median(errByClass["(all)"]) <= 10.0) ? "H1 HOLDS" : "H1 FAILS");
+   for (const auto& [klass, errs] : errByClass)
+   {
+      std::vector<double> sorted = errs;
+      std::sort(sorted.begin(), sorted.end());
+      printf("FIELDALIAS H1 class %-9s n=%3zu median |err| %5.1f dB, p90 %5.1f dB\n", klass.c_str(), errs.size(),
+             Median(errs), sorted[(size_t)(0.9 * (double)(sorted.size() - 1))]);
+   }
+   printf("FIELDALIAS H1 factor for -80 dB: %d/%d exact, %d/%d within one doubling\n", factorAgree, factorKernels,
+          factorWithin1, factorKernels);
+   printf("FIELDALIAS cost: render+measure %.1f s (%lld program runs), analysis %.2f s (%lld program runs)\n",
+          renderSec, renderEvals, analyzeSec, analyzeEvals);
    printf("FIELDALIAS %s\n", all ? "OK" : "FAIL");
    return all;
 }

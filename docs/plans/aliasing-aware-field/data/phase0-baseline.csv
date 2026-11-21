@@ -251,18 +251,18 @@ label,class,factor,alias_db,harmonics_db
 "preset Tube Overdrive",preset,8,-88.54,-16.38
 "preset Tube Overdrive",preset,16,-106.51,-16.33
 "preset Tube Overdrive",preset,32,-121.85,-16.30
-"preset Soft Saturation",preset,1,-33.16,-17.35
-"preset Soft Saturation",preset,2,-52.72,-17.35
-"preset Soft Saturation",preset,4,-69.89,-17.35
-"preset Soft Saturation",preset,8,-88.08,-17.35
-"preset Soft Saturation",preset,16,-106.51,-17.35
-"preset Soft Saturation",preset,32,-124.42,-17.35
-"preset Analog Tape Saturator",preset,1,-35.15,-12.82
-"preset Analog Tape Saturator",preset,2,-49.57,-12.33
-"preset Analog Tape Saturator",preset,4,-71.50,-12.10
-"preset Analog Tape Saturator",preset,8,-85.52,-12.00
-"preset Analog Tape Saturator",preset,16,-107.05,-11.95
-"preset Analog Tape Saturator",preset,32,-120.37,-11.93
+"preset Soft Saturation",preset,1,-34.93,-18.26
+"preset Soft Saturation",preset,2,-54.95,-18.26
+"preset Soft Saturation",preset,4,-72.25,-18.26
+"preset Soft Saturation",preset,8,-90.48,-18.26
+"preset Soft Saturation",preset,16,-108.91,-18.26
+"preset Soft Saturation",preset,32,-126.66,-18.26
+"preset Analog Tape Saturator",preset,1,-36.90,-13.30
+"preset Analog Tape Saturator",preset,2,-51.12,-12.84
+"preset Analog Tape Saturator",preset,4,-73.76,-12.63
+"preset Analog Tape Saturator",preset,8,-87.30,-12.54
+"preset Analog Tape Saturator",preset,16,-109.32,-12.49
+"preset Analog Tape Saturator",preset,32,-121.78,-12.48
 "preset Bass Ribbon Driver",preset,1,-137.87,-155.61
 "preset Bass Ribbon Driver",preset,2,-137.90,-154.13
 "preset Bass Ribbon Driver",preset,4,-138.06,-154.06
@@ -275,9 +275,9 @@ label,class,factor,alias_db,harmonics_db
 "preset Wavefolder",preset,8,-61.73,-7.60
 "preset Wavefolder",preset,16,-73.63,-7.60
 "preset Wavefolder",preset,32,-86.07,-7.60
-"preset Moog 4-Pole Ladder Filter",preset,1,-22.43,-57.06
-"preset Moog 4-Pole Ladder Filter",preset,2,-22.36,-60.98
-"preset Moog 4-Pole Ladder Filter",preset,4,-60.00,-61.93
-"preset Moog 4-Pole Ladder Filter",preset,8,-61.34,-62.17
-"preset Moog 4-Pole Ladder Filter",preset,16,-84.31,-62.23
-"preset Moog 4-Pole Ladder Filter",preset,32,-97.22,-61.73
+"preset Moog 4-Pole Ladder Filter",preset,1,-29.01,-62.11
+"preset Moog 4-Pole Ladder Filter",preset,2,-29.03,-66.03
+"preset Moog 4-Pole Ladder Filter",preset,4,-66.81,-66.98
+"preset Moog 4-Pole Ladder Filter",preset,8,-68.29,-67.22
+"preset Moog 4-Pole Ladder Filter",preset,16,-87.20,-67.28
+"preset Moog 4-Pole Ladder Filter",preset,32,-99.71,-66.78
