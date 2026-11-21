@@ -30,7 +30,12 @@
 #include "nodes/FieldSampleNode.h"
 #include "field/AliasAnalysis.h"
 #include "field/BackendRegister.h"
+#include "field/RatePlan.h"
+#include "field/SampleRuntime.h"
 #include <chrono>
+#include <cstring>
+#include <functional>
+#include <set>
 #include <map>
 #include "nodes/WavetableNode.h"
 
@@ -1106,6 +1111,697 @@ bool RunFieldAliasTest()
    printf("FIELDALIAS cost: render+measure %.1f s (%lld program runs), analysis %.2f s (%lld program runs)\n",
           renderSec, renderEvals, analyzeSec, analyzeEvals);
    printf("FIELDALIAS %s\n", all ? "OK" : "FAIL");
+   return all;
+}
+// INFINITE_FIELDRATEPLAN: phase 2a of docs/plans/aliasing-aware-field (H2).
+// Each nonlinear corpus kernel is split into segments at its own
+// oversampling factors (Field::ChooseRatePlan) and run offline by a
+// multi-rate executor: values crossing a cut go down to 48 kHz and up again
+// through the effects' min-phase chain. Its measured alias, timbre and
+// calibrated cost are set against the whole kernel at the single factor the
+// phase-1 analysis predicts. Also: the factor at the corners of an input
+// amplitude x frequency range, and held-out Field Effect presets. Report
+// only; nothing here touches the live audio path.
+namespace
+{
+   // Between the base rate and F x 48 kHz, F = 1..32, up to 8 channels
+   // (16, 32: a cascade through 8 x 48 kHz, as RenderFieldAt).
+   struct PlanResampler
+   {
+      int factor = 1, preFactor = 1;
+      std::unique_ptr<MinPhaseOversampler> pre, post;
+      float mid[8] = {};
+
+      void Prepare(int f)
+      {
+         factor = f;
+         if (f > 8)
+         {
+            preFactor = f / 8;
+            pre = std::make_unique<MinPhaseOversampler>();
+            pre->Prepare(preFactor, kRate * 8.0);
+            post = std::make_unique<MinPhaseOversampler>();
+            post->Prepare(8, kRate);
+         }
+         else if (f > 1)
+         {
+            post = std::make_unique<MinPhaseOversampler>();
+            post->Prepare(f, kRate);
+         }
+      }
+
+      float Down(int ch, const float* hi)
+      {
+         if (factor == 1)
+            return hi[0];
+         if (pre)
+         {
+            for (int i = 0; i < 8; i++)
+               mid[i] = pre->Down(ch, hi + i * preFactor);
+            return post->Down(ch, mid);
+         }
+         return post->Down(ch, hi);
+      }
+
+      void Up(int ch, float x, float* hi)
+      {
+         if (factor == 1)
+         {
+            hi[0] = x;
+            return;
+         }
+         if (pre)
+         {
+            post->Up(ch, x, mid);
+            for (int i = 0; i < 8; i++)
+               pre->Up(ch, mid[i], hi + i * preFactor);
+            return;
+         }
+         post->Up(ch, x, hi);
+      }
+   };
+
+   // Runs a segmented program (segment 0 driven by the ideal tone at its own
+   // rate, as the node rig does) and returns kN base-rate samples after
+   // warm-up. Params at their declared defaults.
+   std::vector<float> RenderPlanned(const std::vector<Field::RateSegment>& segs, const FieldAliasCase& c,
+                                    double* seconds)
+   {
+      const int m = (int)segs.size();
+      struct SegRt
+      {
+         std::vector<float> cur, next, params;
+         float regs[Field::kSampleMaxRegs] = {};
+         PlanResampler up, down;
+         std::vector<std::vector<float>> hiIn, hiOut;
+         std::vector<float> baseOut;
+         std::vector<int> fromPrev; // inRegs[i] = previous segment's outRegs[fromPrev[i]]
+      };
+      std::vector<SegRt> rt((size_t)m);
+      PlanResampler dec;
+      for (int s = 0; s < m; s++)
+      {
+         const Field::RateSegment& seg = segs[(size_t)s];
+         SegRt& r = rt[(size_t)s];
+         for (const auto& st : seg.prog.state)
+            r.cur.push_back(st.initialValue);
+         r.cur.resize(std::max<size_t>(r.cur.size(), 1));
+         r.next = r.cur;
+         for (const auto& p : seg.prog.params)
+            r.params.push_back(p.defaultValue);
+         r.params.resize(std::max<size_t>(r.params.size(), 1));
+         const int k = seg.factor;
+         if (s > 0)
+         {
+            const Field::RateSegment& prev = segs[(size_t)s - 1];
+            for (int reg : seg.inRegs)
+            {
+               const auto at = std::find(prev.outRegs.begin(), prev.outRegs.end(), reg);
+               if (at == prev.outRegs.end())
+                  return {};
+               r.fromPrev.push_back((int)(at - prev.outRegs.begin()));
+            }
+            r.up.Prepare(k);
+         }
+         if (s < m - 1)
+            r.down.Prepare(k);
+         r.hiIn.assign(seg.inRegs.size(), std::vector<float>((size_t)k));
+         r.hiOut.assign(s < m - 1 ? seg.outRegs.size() : 1, std::vector<float>((size_t)k));
+         r.baseOut.assign(seg.outRegs.size(), 0.0f);
+      }
+      dec.Prepare(segs.back().factor);
+
+      const int warm = (int)(0.3 * kRate);
+      const int total = warm + kN;
+      std::vector<float> out;
+      out.reserve((size_t)total);
+      const auto t0 = std::chrono::steady_clock::now();
+      for (long long n = 0; n < total; n++)
+      {
+         for (int s = 0; s < m; s++)
+         {
+            const Field::RateSegment& seg = segs[(size_t)s];
+            SegRt& r = rt[(size_t)s];
+            const int k = seg.factor;
+            for (size_t i = 0; i < seg.inRegs.size(); i++)
+            {
+               const float x = rt[(size_t)s - 1].baseOut[(size_t)r.fromPrev[i]];
+               r.up.Up((int)i, x, r.hiIn[i].data());
+            }
+            const double omega = 2.0 * M_PI * (double)c.fundBin / (double)kN / (double)k;
+            Field::SampleRuntimeInput rin;
+            rin.sr = (float)(kRate * k);
+            rin.paramVals = r.params.data();
+            rin.stateCur = r.cur.data();
+            rin.stateNext = r.next.data();
+            for (int j = 0; j < k; j++)
+            {
+               for (size_t i = 0; i < seg.inRegs.size(); i++)
+                  r.regs[seg.inRegs[i]] = r.hiIn[i][(size_t)j];
+               rin.in = (s == 0 && c.usesInput) ? kAmplitude * (float)std::sin(omega * (double)(n * k + j)) : 0.0f;
+               float y = Field::RunSampleProgram(seg.prog, rin, r.regs);
+               if (!r.cur.empty())
+                  std::memcpy(r.cur.data(), r.next.data(), r.cur.size() * sizeof(float));
+               if (s == m - 1)
+               {
+                  if (std::isnan(y) || std::isinf(y))
+                     y = 0.0f;
+                  r.hiOut[0][(size_t)j] = std::clamp(y, -4.0f, 4.0f);
+               }
+               else
+                  for (size_t o = 0; o < seg.outRegs.size(); o++)
+                     r.hiOut[o][(size_t)j] = r.regs[seg.outRegs[o]];
+            }
+            if (s == m - 1)
+               out.push_back(dec.Down(0, r.hiOut[0].data()));
+            else
+               for (size_t o = 0; o < seg.outRegs.size(); o++)
+                  r.baseOut[o] = r.down.Down((int)o, r.hiOut[o].data());
+         }
+      }
+      if (seconds != nullptr)
+         *seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+      return std::vector<float>(out.begin() + warm, out.end());
+   }
+
+   // One period of a periodic wave (length n1) at another length n2, every
+   // bin at or above the base Nyquist (kN / 2 on the base grid) removed: an
+   // ideal trip down to the base rate and up again.
+   std::vector<float> IdealResample(const std::vector<float>& x, int n2)
+   {
+      const int n1 = (int)x.size();
+      const int l1 = (int)std::lround(std::log2((double)n1)), l2 = (int)std::lround(std::log2((double)n2));
+      PortableFft::RealFft fft;
+      fft.Prepare(std::max(l1, l2));
+      std::vector<float> re1((size_t)n1 / 2), im1((size_t)n1 / 2);
+      fft.Forward(x.data(), l1, re1.data(), im1.data());
+      std::vector<float> re2((size_t)n2 / 2, 0.0f), im2((size_t)n2 / 2, 0.0f);
+      re2[0] = 0.5f * re1[0];
+      for (int k = 1; k < kN / 2 && k < n1 / 2 && k < n2 / 2; k++)
+      {
+         re2[(size_t)k] = 0.5f * re1[(size_t)k];
+         im2[(size_t)k] = 0.5f * im1[(size_t)k];
+      }
+      std::vector<float> y((size_t)n2);
+      fft.Inverse(re2.data(), im2.data(), l2, y.data());
+      for (float& v : y)
+         v /= (float)n1;
+      return y;
+   }
+
+   // RenderPlanned with ideal resamplers: each segment runs two periods of
+   // the tone (the first warms its state) and passes one period on through
+   // IdealResample. Separates resampler error from analysis error.
+   std::vector<float> RenderPlannedIdeal(const std::vector<Field::RateSegment>& segs, const FieldAliasCase& c)
+   {
+      std::vector<std::vector<float>> waves; // previous segment's outRegs, one period at its rate
+      for (size_t s = 0; s < segs.size(); s++)
+      {
+         const Field::RateSegment& seg = segs[s];
+         const int k = seg.factor, period = k * kN;
+         std::vector<std::vector<float>> in;
+         for (int reg : seg.inRegs)
+         {
+            const auto at = std::find(segs[s - 1].outRegs.begin(), segs[s - 1].outRegs.end(), reg);
+            if (at == segs[s - 1].outRegs.end())
+               return {};
+            in.push_back(IdealResample(waves[(size_t)(at - segs[s - 1].outRegs.begin())], period));
+         }
+         std::vector<float> cur, next, params;
+         for (const auto& st : seg.prog.state)
+            cur.push_back(st.initialValue);
+         cur.resize(std::max<size_t>(cur.size(), 1));
+         next = cur;
+         for (const auto& p : seg.prog.params)
+            params.push_back(p.defaultValue);
+         params.resize(std::max<size_t>(params.size(), 1));
+         float regs[Field::kSampleMaxRegs] = {};
+         const bool last = s + 1 == segs.size();
+         std::vector<std::vector<float>> out(last ? 1 : seg.outRegs.size(), std::vector<float>((size_t)period));
+         const double omega = 2.0 * M_PI * (double)c.fundBin / (double)kN / (double)k;
+         Field::SampleRuntimeInput rin;
+         rin.sr = (float)(kRate * k);
+         rin.paramVals = params.data();
+         rin.stateCur = cur.data();
+         rin.stateNext = next.data();
+         for (int n = 0; n < 2 * period; n++)
+         {
+            const int j = n % period;
+            for (size_t i = 0; i < in.size(); i++)
+               regs[seg.inRegs[i]] = in[i][(size_t)j];
+            rin.in = (s == 0 && c.usesInput) ? kAmplitude * (float)std::sin(omega * (double)j) : 0.0f;
+            float y = Field::RunSampleProgram(seg.prog, rin, regs);
+            std::memcpy(cur.data(), next.data(), cur.size() * sizeof(float));
+            if (n < period)
+               continue;
+            if (last)
+               out[0][(size_t)j] = std::isfinite(y) ? std::clamp(y, -4.0f, 4.0f) : 0.0f;
+            else
+               for (size_t o = 0; o < seg.outRegs.size(); o++)
+                  out[o][(size_t)j] = regs[seg.outRegs[o]];
+         }
+         waves = std::move(out);
+      }
+      return IdealResample(waves[0], kN);
+   }
+
+   // In-band harmonic amplitudes (h f0 < 20 kHz), power summed over the
+   // window's main lobe.
+   std::vector<double> HarmonicAmps(const std::vector<float>& x, int fundBin)
+   {
+      std::vector<float> windowed((size_t)kN);
+      for (int i = 0; i < kN; i++)
+      {
+         const double t = 2.0 * M_PI * (double)i / (double)kN;
+         const double w = 0.35875 - 0.48829 * std::cos(t) + 0.14128 * std::cos(2.0 * t) - 0.01168 * std::cos(3.0 * t);
+         windowed[(size_t)i] = (float)(x[(size_t)i] * w);
+      }
+      PortableFft::RealFft fft;
+      fft.Prepare(kLog2N);
+      std::vector<float> re((size_t)kN / 2), im((size_t)kN / 2);
+      fft.Forward(windowed.data(), kLog2N, re.data(), im.data());
+      std::vector<double> a;
+      for (int h = 1; (double)(h * fundBin) * kRate / (double)kN < kAudibleHz; h++)
+      {
+         double p = 0.0;
+         for (int d = -kLobe; d <= kLobe; d++)
+         {
+            const int k = h * fundBin + d;
+            if (k > 0 && k < kN / 2)
+               p += (double)re[(size_t)k] * re[(size_t)k] + (double)im[(size_t)k] * im[(size_t)k];
+         }
+         a.push_back(std::sqrt(p));
+      }
+      return a;
+   }
+
+   // Timbre change against a reference: in-band harmonic amplitude error
+   // energy re the reference fundamental, dB.
+   double DeviationDb(const std::vector<float>& x, const std::vector<float>& ref, int fundBin)
+   {
+      const std::vector<double> a = HarmonicAmps(x, fundBin), r = HarmonicAmps(ref, fundBin);
+      double e = 0.0;
+      for (size_t h = 0; h < a.size() && h < r.size(); h++)
+         e += (a[h] - r[h]) * (a[h] - r[h]);
+      return 10.0 * std::log10(std::max(e, 1e-30) / std::max(r.empty() ? 0.0 : r[0] * r[0], 1e-30));
+   }
+
+   // Smallest factor whose predicted alias reaches -80 dB: 0 = none within
+   // 32x, -1 = no prediction (why set).
+   int PredictFactor(const Field::SampleProgram& prog, double f0, float amp, bool usesInput, double* pred,
+                     std::string& why)
+   {
+      Field::AliasContext ctx;
+      ctx.f0Hz = f0;
+      ctx.inAmplitude = amp;
+      ctx.usesInput = usesInput;
+      double local[6];
+      double* db = pred != nullptr ? pred : local;
+      for (int k = 0; k < 6; k++)
+      {
+         Field::AliasSpectrum spec;
+         if (!Field::AnalyzePeriodicSpectrum(prog, ctx, kRate * kFieldFactors[k], spec))
+         {
+            why = spec.status;
+            return -1;
+         }
+         db[k] = Field::PredictAliasDb(spec, f0, kRate, kFieldFactors[k], kAudibleHz, (double)kLobe * kRate / (double)kN);
+      }
+      return FactorNeeded(db);
+   }
+
+   double NsPerCall(const std::function<void()>& f, int calls)
+   {
+      const auto t0 = std::chrono::steady_clock::now();
+      for (int i = 0; i < calls; i++)
+         f();
+      return 1e9 * std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() / (double)calls;
+   }
+
+   // Cost per base sample, ns, measured on this build.
+   Field::RateCostModel CalibrateCost()
+   {
+      Field::RateCostModel m;
+      Field::SampleProgram shortP, longP;
+      Field::FieldError err;
+      Field::CompileSampleProgram("out = in * 0.7\n", nullptr, shortP, err);
+      std::string lc = "x = in * 0.5\n";
+      for (int i = 0; i < 24; i++)
+         lc += "x = x - x * x * x / 3.0\n";
+      lc += "out = x\n";
+      Field::CompileSampleProgram(lc, nullptr, longP, err);
+      float regs[Field::kSampleMaxRegs] = {};
+      float st[1] = {}, pv[1] = {};
+      Field::SampleRuntimeInput rin;
+      rin.sr = (float)kRate;
+      rin.stateCur = st;
+      rin.stateNext = st;
+      rin.paramVals = pv;
+      volatile float sink = 0.0f;
+      auto timeProg = [&](const Field::SampleProgram& p) {
+         return NsPerCall([&] {
+            rin.in += 1e-6f;
+            sink = sink + Field::RunSampleProgram(p, rin, regs);
+         }, 400000);
+      };
+      timeProg(longP);
+      const double ts = timeProg(shortP), tl = timeProg(longP);
+      const double ns = (double)shortP.code.size(), nl = (double)longP.code.size();
+      m.instr = std::max(0.0, (tl - ts) / (nl - ns));
+      m.run = std::max(0.0, ts - m.instr * ns);
+      double up[4] = {}, down[4] = {};
+      for (int fi = 1; fi <= 3; fi++)
+      {
+         const int k = 1 << fi;
+         MinPhaseOversampler os;
+         os.Prepare(k, kRate);
+         float hi[8] = {};
+         float x = 0.1f;
+         up[fi] = NsPerCall([&] {
+            x = -x;
+            os.Up(0, x, hi);
+         }, 200000);
+         down[fi] = NsPerCall([&] { sink = sink + os.Down(0, hi); }, 200000);
+      }
+      for (int fi = 0; fi < 4; fi++)
+      {
+         m.up[fi] = up[fi];
+         m.down[fi] = down[fi];
+      }
+      m.up[4] = up[3] + 8.0 * up[1];
+      m.up[5] = up[3] + 8.0 * up[2];
+      m.down[4] = down[3] + 8.0 * down[1];
+      m.down[5] = down[3] + 8.0 * down[2];
+      return m;
+   }
+
+   std::string PlanText(const Field::RatePlan& p)
+   {
+      std::string s;
+      for (size_t i = 0; i < p.segs.size(); i++)
+      {
+         if (i > 0)
+            s += "|";
+         s += std::to_string(p.segs[i].factor) + "x" + std::to_string(p.segs[i].end - p.segs[i].first);
+      }
+      return s;
+   }
+}
+
+bool RunFieldRatePlanTest()
+{
+   const std::vector<FieldAliasCase> corpus = FieldAliasCorpus();
+   FILE* csv = nullptr;
+   if (const char* path = getenv("INFINITE_FIELDRATEPLAN_CSV"))
+   {
+      csv = fopen(path, "w");
+      if (csv != nullptr)
+         fprintf(csv, "section,label,class,whole_factor,whole_cost,plan,plan_cost,eff_cost,saving,node_db,whole_db,"
+                      "staged_db,staged_pred_db,dev_whole_db,dev_staged_db,whole_ms,staged_ms\n");
+   }
+   // Costs measured in this build (Debug in dev), unless
+   // INFINITE_FIELDRATE_COST gives -O2 figures from
+   // tools/field_rate_cost_bench.cpp: run,instr,up2,up4,up8,down2,down4,down8.
+   Field::RateCostModel cm = CalibrateCost();
+   const char* costSource = "measured in this build";
+   if (const char* env = getenv("INFINITE_FIELDRATE_COST"))
+   {
+      double v[8];
+      if (sscanf(env, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7]) == 8)
+      {
+         cm.run = std::max(0.0, v[0]);
+         cm.instr = v[1];
+         for (int fi = 1; fi <= 3; fi++)
+         {
+            cm.up[fi] = v[1 + fi];
+            cm.down[fi] = v[4 + fi];
+         }
+         cm.up[4] = cm.up[3] + 8.0 * cm.up[1];
+         cm.up[5] = cm.up[3] + 8.0 * cm.up[2];
+         cm.down[4] = cm.down[3] + 8.0 * cm.down[1];
+         cm.down[5] = cm.down[3] + 8.0 * cm.down[2];
+         costSource = "INFINITE_FIELDRATE_COST";
+      }
+   }
+   printf("FIELDRATE cost model (ns per base sample, %s): run %.1f, per instr %.2f, up 2/4/8/16/32 "
+          "%.0f/%.0f/%.0f/%.0f/%.0f, down %.0f/%.0f/%.0f/%.0f/%.0f\n",
+          costSource, cm.run, cm.instr, cm.up[1], cm.up[2], cm.up[3], cm.up[4], cm.up[5], cm.down[1], cm.down[2], cm.down[3],
+          cm.down[4], cm.down[5]);
+   printf("FIELDRATE %-30s %-8s %5s %8s %-22s %8s %7s %7s %7s %7s %6s %6s %7s %7s\n", "kernel", "class", "whole",
+          "cost", "plan", "cost", "saving", "node", "whole", "staged", "devW", "devS", "ms W", "ms S");
+   bool all = true;
+   double sumWhole = 0.0, sumEff = 0.0;
+   std::vector<double> savings;
+   int included = 0, skipped = 0, planMissed = 0, sanityBad = 0;
+   bool chainBeats8 = false, chainSeen = false;
+   const double tolHz = (double)kLobe * kRate / (double)kN;
+   for (const FieldAliasCase& c : corpus)
+   {
+      if (c.klass == "linear")
+         continue;
+      Field::SampleProgram prog;
+      Field::FieldError ferr;
+      if (!Field::CompileSampleProgram(c.code, nullptr, prog, ferr))
+         continue;
+      const double f0 = (double)c.fundBin * kRate / (double)kN;
+      std::string why;
+      double pred[6];
+      const int wholeF = PredictFactor(prog, f0, kAmplitude, c.usesInput, pred, why);
+      if (wholeF < 2)
+      {
+         printf("FIELDRATE %-30s %-8s skipped: %s\n", c.label.c_str(), c.klass.c_str(),
+                wholeF < 0 ? why.c_str() : wholeF == 0 ? "no factor within 32x" : "clean at 1x");
+         skipped++;
+         continue;
+      }
+      Field::RatePlanOptions opt;
+      opt.f0Hz = f0;
+      opt.inAmplitude = kAmplitude;
+      opt.usesInput = c.usesInput;
+      opt.audibleHz = kAudibleHz;
+      opt.harmonicTolHz = tolHz;
+      opt.cost = cm;
+      Field::RatePlan plan;
+      Field::RatePlanReport rep;
+      const auto tp = std::chrono::steady_clock::now();
+      const bool planned = Field::ChooseRatePlan(prog, opt, plan, rep);
+      const double planSec = std::chrono::duration<double>(std::chrono::steady_clock::now() - tp).count();
+
+      Field::SampleProgram prepared;
+      int inReg = -1;
+      std::vector<Field::RateSegment> whole;
+      Field::PrepareForSplit(prog, prepared, inReg, why);
+      Field::SplitProgram(prepared, {}, whole, why);
+      whole[0].factor = wholeF;
+      double wSec = 0.0, sSec = 0.0;
+      const std::vector<float> yw = RenderPlanned(whole, c, &wSec);
+      std::string err;
+      const std::vector<float> yn = RenderFieldAt(c, wholeF, err);
+      const std::vector<float> ref = RenderFieldAt(c, 32, err);
+      if (yw.empty() || yn.empty() || ref.empty())
+      {
+         printf("FIELDRATE %-30s render failed  FAIL\n", c.label.c_str());
+         all = false;
+         continue;
+      }
+      const double dbW = Measure(yw, c.fundBin).aliasDb, dbN = Measure(yn, c.fundBin).aliasDb;
+      if (std::fabs(dbW - dbN) > 3.0 && std::max(dbW, dbN) > -100.0)
+         sanityBad++;
+      const double costW = Field::WholeCost(prog, wholeF, cm);
+      double dbS = 0.0, devS = 0.0, costEff = costW;
+      std::string planText = "(none)";
+      if (planned)
+      {
+         planText = PlanText(plan);
+         // INFINITE_FIELDRATE_DUMP=<kernel label>: the plan's segments.
+         if (const char* dump = getenv("INFINITE_FIELDRATE_DUMP"); dump != nullptr && c.label == dump)
+         {
+            const std::vector<float> yi = RenderPlannedIdeal(plan.segs, c);
+            const std::vector<float> wi = RenderPlannedIdeal(whole, c);
+            printf("FIELDRATE dump ideal resamplers: plan %.1f dB, whole at %dx %.1f dB\n",
+                   yi.empty() ? 0.0 : Measure(yi, c.fundBin).aliasDb, wholeF,
+                   wi.empty() ? 0.0 : Measure(wi, c.fundBin).aliasDb);
+            for (size_t si = 0; si < plan.segs.size(); si++)
+            {
+               const Field::RateSegment& sg = plan.segs[si];
+               printf("FIELDRATE dump seg %zu at %dx, [%d,%d) in:", si, sg.factor, sg.first, sg.end);
+               for (int r : sg.inRegs)
+                  printf(" r%d", r);
+               printf(" out:");
+               for (int r : sg.outRegs)
+                  printf(" r%d", r);
+               printf(" pred %.1f dB\n", plan.segDb[si]);
+               for (const Field::SampleInstr& ins : sg.prog.code)
+                  printf("FIELDRATE dump    op %2d r%d <- r%d r%d r%d imm %g\n", (int)ins.op, ins.dst, ins.a, ins.b,
+                         ins.c, ins.imm);
+            }
+         }
+         const std::vector<float> ys = RenderPlanned(plan.segs, c, &sSec);
+         dbS = ys.empty() ? 0.0 : Measure(ys, c.fundBin).aliasDb;
+         devS = ys.empty() ? 0.0 : DeviationDb(ys, ref, c.fundBin);
+         if (plan.meetsTarget && !ys.empty() && dbS <= -80.0)
+            costEff = std::min(plan.cost, costW);
+         else
+            planMissed++;
+      }
+      else
+         planMissed++;
+      const double devW = DeviationDb(yw, ref, c.fundBin);
+      const double saving = 1.0 - costEff / costW;
+      included++;
+      sumWhole += costW;
+      sumEff += costEff;
+      savings.push_back(saving);
+      printf("FIELDRATE %-30s %-8s %4dx %8.0f %-22s %8.0f %6.0f%% %7.1f %7.1f %7.1f %6.1f %6.1f %7.0f %7.0f  "
+             "pred %.1f, %d cands, %d sets, %.2f s%s\n",
+             c.label.c_str(), c.klass.c_str(), wholeF, costW, planText.c_str(), planned ? plan.cost : 0.0,
+             100.0 * saving, dbN, dbW, dbS, devW, devS, 1e3 * wSec, 1e3 * sSec, planned ? plan.predictedDb : 0.0,
+             rep.candidates, rep.cutSets, planSec, planned && !plan.meetsTarget ? ", plan misses target" : "");
+      if (csv != nullptr)
+         fprintf(csv, "h2,\"%s\",%s,%d,%.1f,%s,%.1f,%.1f,%.4f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f\n",
+                 c.label.c_str(), c.klass.c_str(), wholeF, costW, planText.c_str(), planned ? plan.cost : 0.0, costEff,
+                 saving, dbN, dbW, dbS, planned ? plan.predictedDb : 0.0, devW, devS, 1e3 * wSec, 1e3 * sSec);
+      if (c.label == "tanh x3 chain drive 4")
+      {
+         chainSeen = true;
+         const double cost8 = Field::WholeCost(prog, 8, cm);
+         const std::vector<float> y8 = RenderFieldAt(c, 8, err);
+         const double db8 = y8.empty() ? 0.0 : Measure(y8, c.fundBin).aliasDb;
+         const bool stagedOk = planned && dbS <= -80.0;
+         chainBeats8 = stagedOk && (db8 > -80.0 || plan.cost < cost8);
+         printf("FIELDRATE tanh x3 vs fixed 8x: 8x cost %.0f, alias %.1f dB; staged cost %.0f, alias %.1f dB  %s\n",
+                cost8, db8, planned ? plan.cost : 0.0, dbS, chainBeats8 ? "staged beats 8x" : "staged does not beat 8x");
+      }
+      fflush(stdout);
+   }
+   const double agg = sumWhole > 0.0 ? 1.0 - sumEff / sumWhole : 0.0;
+   printf("FIELDRATE H2 %d kernels (%d skipped, %d plans fell back to whole), executor vs node at the whole factor "
+          "off by > 3 dB on %d\n",
+          included, skipped, planMissed, sanityBad);
+   const bool h2 = agg >= 0.25 && (!chainSeen || chainBeats8);
+   printf("FIELDRATE H2 aggregate saving %.1f%% (>= 25%%), median per kernel %.1f%%, tanh x3 %s  %s\n", 100.0 * agg,
+          100.0 * Median(savings), chainBeats8 ? "beats 8x" : "does not beat 8x", h2 ? "H2 HOLDS" : "H2 FAILS");
+
+   // Corner sweep: the whole-kernel factor at input amplitude x frequency
+   // corners (prediction only). Free-running oscillators have no input.
+   printf("FIELDRATE corners: factor at amp 0.25/0.5/1.0 x f0 0.5/1/2 x 5 kHz (row = amp)\n");
+   int cornerKernels = 0, cornerChanged = 0, cornerWorse = 0;
+   for (const FieldAliasCase& c : corpus)
+   {
+      if (c.klass == "linear" || !c.usesInput)
+         continue;
+      Field::SampleProgram prog;
+      Field::FieldError ferr;
+      if (!Field::CompileSampleProgram(c.code, nullptr, prog, ferr))
+         continue;
+      const double f0 = (double)c.fundBin * kRate / (double)kN;
+      std::string why;
+      const int nominal = PredictFactor(prog, f0, kAmplitude, true, nullptr, why);
+      if (nominal < 0)
+         continue;
+      auto rank = [](int f) { return f == 0 ? 64 : f; };
+      std::string cells;
+      int worst = nominal;
+      bool changed = false, failed = false;
+      for (float amp : { 0.25f, 0.5f, 1.0f })
+         for (double mul : { 0.5, 1.0, 2.0 })
+         {
+            const int f = PredictFactor(prog, f0 * mul, amp, true, nullptr, why);
+            if (f < 0)
+               failed = true;
+            char b[8];
+            snprintf(b, sizeof(b), "%3s", f < 0 ? "?" : f == 0 ? ">32" : std::to_string(f).c_str());
+            cells += b;
+            cells += mul == 2.0 ? "  " : " ";
+            if (f >= 0)
+            {
+               changed |= f != nominal;
+               if (rank(f) > rank(worst))
+                  worst = f;
+            }
+         }
+      cornerKernels++;
+      cornerChanged += changed;
+      cornerWorse += rank(worst) > rank(nominal);
+      printf("FIELDRATE corner %-30s nominal %3s  %s worst %3s%s\n", c.label.c_str(),
+             nominal == 0 ? ">32" : std::to_string(nominal).c_str(), cells.c_str(),
+             worst == 0 ? ">32" : std::to_string(worst).c_str(), failed ? "  (some corners unpredicted)" : "");
+      fflush(stdout);
+   }
+   printf("FIELDRATE corners: %d kernels, factor changes somewhere on %d, worst corner needs more than nominal on %d\n",
+          cornerKernels, cornerChanged, cornerWorse);
+
+   // Held-out: every Field Effect preset not in the corpus. Field Synth
+   // presets are note-driven and out of scope here.
+   std::set<std::string> inCorpus;
+   for (const FieldAliasCase& c : corpus)
+      if (c.klass == "preset")
+         inCorpus.insert(c.label.substr(7));
+   int heldAccepted = 0, heldDeclined = 0, heldExact = 0;
+   std::vector<double> heldErr;
+   for (const auto& p : FieldSampleNode::Presets())
+   {
+      if (inCorpus.count(p.name) != 0)
+         continue;
+      FieldAliasCase c;
+      c.label = std::string("held ") + p.name;
+      c.klass = "held";
+      c.code = p.code;
+      Field::SampleProgram prog;
+      Field::FieldError ferr;
+      if (!Field::CompileSampleProgram(c.code, nullptr, prog, ferr))
+      {
+         printf("FIELDRATE held %-34s declined: does not compile (%s)\n", p.name, ferr.message.c_str());
+         heldDeclined++;
+         continue;
+      }
+      std::string why;
+      double pred[6];
+      const int fp = PredictFactor(prog, (double)kFundBin * kRate / (double)kN, kAmplitude, true, pred, why);
+      if (fp < 0)
+      {
+         printf("FIELDRATE held %-34s declined: %s\n", p.name, why.c_str());
+         heldDeclined++;
+         continue;
+      }
+      double db[6];
+      std::string err;
+      bool ok = true;
+      for (int k = 0; k < 6 && ok; k++)
+      {
+         const std::vector<float> x = RenderFieldAt(c, kFieldFactors[k], err);
+         ok = !x.empty();
+         if (ok)
+            db[k] = Measure(x, c.fundBin).aliasDb;
+      }
+      if (!ok)
+      {
+         printf("FIELDRATE held %-34s render failed: %s\n", p.name, err.c_str());
+         continue;
+      }
+      heldAccepted++;
+      const int fm = FactorNeeded(db);
+      heldExact += fm == fp;
+      double worstErr = 0.0;
+      for (int k = 0; k < 6; k++)
+      {
+         const double e = std::fabs(std::max(db[k], kScoreFloorDb) - std::max(pred[k], kScoreFloorDb));
+         heldErr.push_back(e);
+         worstErr = std::max(worstErr, e);
+      }
+      printf("FIELDRATE held %-34s meas %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f | pred %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f"
+             " | factor %s/%s, worst err %.1f dB\n",
+             p.name, db[0], db[1], db[2], db[3], db[4], db[5], pred[0], pred[1], pred[2], pred[3], pred[4], pred[5],
+             fm == 0 ? ">32" : std::to_string(fm).c_str(), fp == 0 ? ">32" : std::to_string(fp).c_str(), worstErr);
+      if (csv != nullptr)
+         fprintf(csv, "held,\"%s\",held,%d,,,,,,%.2f,,,%.2f,,,,\n", p.name, fp, db[2], pred[2]);
+      fflush(stdout);
+   }
+   printf("FIELDRATE held-out: %d accepted (factor exact %d/%d, median |err| %.1f dB), %d declined\n", heldAccepted,
+          heldExact, heldAccepted, Median(heldErr), heldDeclined);
+   if (csv != nullptr)
+      fclose(csv);
+   printf("FIELDRATE %s\n", all ? "OK" : "FAIL");
    return all;
 }
 }

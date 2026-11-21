@@ -115,12 +115,17 @@ namespace Field
                params[i] = p.params[i].defaultValue;
          }
 
-         // stateDelayed: K values; nextOut: K values. Returns output.
-         double Run(float in, const double* stateDelayed, double* nextOut)
+         const AliasContext* ctx = nullptr;
+
+         // Grid point j; stateDelayed: K values; nextOut: K values. Returns output.
+         double Run(size_t j, float in, const double* stateDelayed, double* nextOut)
          {
             const int k = (int)prog.state.size();
             for (int i = 0; i < k; i++)
                cur[i] = next[i] = (float)stateDelayed[i];
+            if (ctx != nullptr)
+               for (size_t i = 0; i < ctx->inputRegs.size(); i++)
+                  regs[ctx->inputRegs[i]] = (float)ctx->inputWaves[i][j];
             SampleRuntimeInput rin;
             rin.in = in;
             rin.sr = sr;
@@ -247,6 +252,12 @@ namespace Field
 
       Runner run(prog);
       run.sr = (float)sampleRate;
+      run.ctx = &ctx;
+      for (size_t i = 0; i < ctx.inputRegs.size(); i++)
+         if (ctx.inputRegs[i] < 0 || ctx.inputRegs[i] >= kSampleMaxRegs || ctx.inputWaves.size() <= i ||
+             ctx.inputWaves[i].size() != ((size_t)1 << ctx.gridLog2))
+            return out.status = "bad segment input", false;
+      out.captured.assign(ctx.captureRegs.size(), std::vector<double>((size_t)1 << ctx.gridLog2));
 
       std::vector<float> in(n);
       for (size_t j = 0; j < n; j++)
@@ -282,9 +293,11 @@ namespace Field
          {
             for (int c = 0; c < k; c++)
                st[(size_t)c] = sd[(size_t)c][j];
-            y[j] = run.Run(in[j], st.data(), nx.data());
+            y[j] = run.Run(j, in[j], st.data(), nx.data());
             for (int c = 0; c < k; c++)
                g[(size_t)c][j] = nx[(size_t)c];
+            for (size_t r = 0; r < ctx.captureRegs.size(); r++)
+               out.captured[r][j] = run.regs[ctx.captureRegs[r]];
          }
       };
       // Grid-mean Jacobian d next_c / d delayed_l over a subset of points.
@@ -296,12 +309,12 @@ namespace Field
          {
             for (int c = 0; c < k; c++)
                st[(size_t)c] = sd[(size_t)c][j];
-            run.Run(in[j], st.data(), nx0.data());
+            run.Run(j, in[j], st.data(), nx0.data());
             for (int l = 0; l < k; l++)
             {
                const double d = 1e-3 * (1.0 + std::fabs(st[(size_t)l]));
                st[(size_t)l] += d;
-               run.Run(in[j], st.data(), nx1.data());
+               run.Run(j, in[j], st.data(), nx1.data());
                st[(size_t)l] -= d;
                for (int c = 0; c < k; c++)
                   m[(size_t)(c * k + l)] += std::clamp((nx1[(size_t)c] - nx0[(size_t)c]) / d, -10.0, 10.0);
@@ -476,7 +489,14 @@ namespace Field
          evalAll();
       }
 
-      // Output spectrum on the grid.
+      out.evaluations = run.evals;
+      SpectrumFromWave(y, out);
+      return true;
+   }
+
+   void SpectrumFromWave(const std::vector<double>& y, AliasSpectrum& out)
+   {
+      const size_t n = y.size();
       std::vector<cd> a(n);
       for (size_t j = 0; j < n; j++)
          a[j] = y[j];
@@ -488,6 +508,9 @@ namespace Field
          out.power[h] = std::norm(2.0 * a[h] / (double)n);
 
       // Tail past hTop: P(h) ~ h^-q from the octave bands [H/8,H/4) and [H/2,H).
+      out.tailDensity = 0.0;
+      out.tailExp = 0.0;
+      out.tailRef = 1.0;
       double e1 = 0.0, e2 = 0.0;
       for (size_t h = hTop / 8; h < hTop / 4; h++)
          e1 += out.power[h];
@@ -501,10 +524,23 @@ namespace Field
          out.tailDensity = e2 / (double)(hTop / 2);
          out.tailRef = 0.75 * (double)hTop;
       }
-      out.evaluations = run.evals;
       out.ok = true;
       out.status = "ok";
-      return true;
+   }
+
+   void BandLimitWave(std::vector<double>& y, double maxHarmonic)
+   {
+      const size_t n = y.size();
+      std::vector<cd> a(n);
+      for (size_t j = 0; j < n; j++)
+         a[j] = y[j];
+      Fft(a, false);
+      for (size_t b = 0; b < n; b++)
+         if (std::abs((double)Harm(b, n)) > maxHarmonic)
+            a[b] = 0.0;
+      Fft(a, true);
+      for (size_t j = 0; j < n; j++)
+         y[j] = a[j].real() / (double)n;
    }
 
    double PredictAliasDb(const AliasSpectrum& s, double f0Hz, double baseRate, int factor, double audibleHz,

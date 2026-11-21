@@ -1,6 +1,6 @@
 # Aliasing-aware compilation for Field (research plan)
 
-Status: **phase 1 done 2026-11-21: H1 holds** (results in section 9; phase 0 in section 8). Phase 2 not started.
+Status: **phase 2a done 2026-11-21: H2 FAILS** (17.4% saving, bar 25%; section 10). Phase 1: H1 holds (section 9). Phase 0: section 8. Phase 2b (live audio path) not started and not planned while H2 stands killed.
 Prior art: `docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md`.
 
 ## 1. The problem
@@ -215,3 +215,120 @@ loading the preset's own values. Not fixed here; it needs a separate check.
   subgraphs, which is the input H2 needs.
 
 Before phase 2 claims anything, run held-out kernels (community devices, Field Synth presets).
+
+## 10. Phase 2a results (2026-11-21)
+
+**H2 fails. The kill criterion applies.** Choosing the oversampling factor per segment saves
+**17.4%** of CPU in aggregate over 28 kernels (bar: 25%), median 19.5% per kernel. On the
+three-stage tanh chain the staged plan does **not** beat a fixed 8x. Per section 4, this means
+whole-kernel oversampling at the factor phase 1 predicts is the shippable result, and the
+per-subgraph claim is not made.
+
+**What was built (phase 2a: offline, no audio-path change).**
+- `src/core/field/RatePlan.{h,cpp}`: splits a compiled `SampleProgram` into contiguous segments
+  at cuts next to nonlinear ops (at most 3 cuts, at most 2 values crossing, no state cell across a
+  cut). Each segment runs at 1, 2, 4, 8, 16 or 32x. Values that cross a cut go down to the base rate
+  and up again through `MinPhaseOversampler` (16x and 32x as a cascade through 8x). Block constants
+  are recomputed in each segment; `in` is read once and crosses like any value.
+- The chooser scores a plan by the alias of each segment, analysed with the phase-1 pass on its
+  band-limited input waveform. Each crossing's alias is referred to the output by the mean-square
+  sensitivity of the output to that value (central difference through the analysis), and the
+  segments are summed as powers. It takes the cheapest plan predicted at -80 dB or below.
+- `AliasAnalysis` gained input/capture registers, `SpectrumFromWave` and `BandLimitWave`.
+- The rig (`INFINITE_FIELDRATEPLAN=1`, `src/app/selftest/AliasTests.cpp`) runs every plan through
+  real resamplers, measures it, and counts its cost only if the **measured** alias meets -80 dB;
+  otherwise the kernel is charged the whole-kernel cost. This keeps a mispredicted plan from
+  earning a saving.
+- Cost model, in ns per base sample, from `tools/field_rate_cost_bench.cpp` built at -O2 (best of
+  5): 3.5 per instruction; up 2/4/8x 11/23/47, down 10/23/49; 16x and 32x derived from the cascade.
+  The Debug build's own timings over-charge resamplers about 10x against the interpreter's 2x, so
+  they are not used for the verdict (run history below).
+
+**Results (`data/phase2-h2-run.log`).** 44 kernels; 16 skipped (clean at 1x, or no factor within
+32x reaches -80 dB). Savings by class:
+
+| Class | kernels | typical plan | saving |
+|---|---|---|---|
+| analytic (tanh, sin fold) | 6 | 1x stage, 2–4x around the nonlinearity, 1x tail | 21–47% |
+| kink (rational, abs, max, hard clip) | 7 | same shape at 8–32x | 7–37% |
+| poly (d7) | 1 | 1x / 2x / 1x | 9% |
+| osc | 3 | the oscillator at full factor, 1x tail | 9–18% |
+| presets | 4 | Soft Saturation 32%, Wavefolder 47%, Tube and Tape 0% (no legal cut) | 0–47% |
+| feedback | 3 | no cut outside the loop | 0% |
+| chain (poly d9, d27, clip then cubic, tanh x3) | 4 | 1x / 2x / 1x; tanh x3 below | 24, 19, 16, 0% |
+
+Savings exist wherever a cheap linear stage surrounds one nonlinearity: the linear stage runs at
+1x. But a resampler pair costs as much as 6 to 14 instructions at the factor in question, and most
+Field kernels are short. The fixed cost of crossing eats most of what staging saves.
+
+**The tanh x3 chain, and why the planner was wrong about it.** The whole kernel needs 32x (cost
+4272). The planner chose 2x | 4x | 8x | 1x (cost 597), predicted -80.5 dB; it measures -43.0 dB, so
+it is charged the whole cost. A fixed 8x measures -46.1 dB at cost 1048. Diagnosis
+(`INFINITE_FIELDRATE_DUMP`, `data/phase2-tanh3-dump.log`):
+- The cuts sit just before each stage's `exp`. The value crossing them is 8·tanh(4x): close to a
+  square wave of amplitude 8, with large harmonics right up to the base Nyquist.
+- Rendering the same plan with **ideal** resamplers (FFT brickwall at the base Nyquist) measures
+  -74.0 dB. So about 31 of the 37 dB gap comes from the real half-band chain. Its transition band
+  and images pass energy around 20–28 kHz that the analysis assumed removed. The next `exp` folds it.
+  The remaining 6.5 dB is the analysis itself.
+- On the 27 other planned kernels, staged measurement matched prediction to within a few dB,
+  because their crossing values are not wideband at high level.
+- Fix, not done: model each crossing with the resampler's measured response instead of an ideal
+  low-pass. On a harmonic grid this is exact, because the images of harmonics of f0 are harmonics of
+  f0 too. It would make the chain plans honest. It would raise their factors and so would not
+  raise the saving.
+
+**Staging changes the sound of chains.** Band-limiting between stages removes ultrasonic
+content that a later stage would have folded back in-band *harmonically*. Against the node's 32x
+render, the staged poly d9 / d27 chains deviate by -46 / -45 dB in in-band harmonic amplitude, and
+tanh x3 by -33 dB. Whole-kernel oversampling at any factor deviates by under -140 dB. Neither is
+"wrong" (the 32x render is itself one choice of what the chain means), but staging is not
+transparent, and a user would hear the difference on chains.
+
+**The planner must hold over an input range (the phase-1 decision).** At input amplitude
+0.25/0.5/1.0 × f0 0.5/1/2/5 kHz, the needed factor changes somewhere for 31 of 38 kernels, and the
+worst corner needs more than the nominal tone for 29. A compiler that picks a factor from one tone
+under-oversamples most kernels. Any shipped version must plan at the worst corner of a declared
+input range.
+
+**Held-out kernels (the phase-1 decision).** 18 of the app's Field Effect presets that the
+corpus did not include: 2 accepted (Sidechain Ducker, Noise Gate), factor predicted exactly, worst
+error 0.1 dB. 16 declined: 7 read state tables, and the rest have no periodic steady state under a
+steady tone (modulated or time-varying effects, Bitcrusher's sample-and-hold). Dynamic Auto-Wah
+just misses: residual 2.1e-6. Declining is correct for these, but it means the pass covers few real
+effects: held-out coverage is 2 of 18. Field Synth presets were not run (no `in`).
+
+**Run history, reported in full.**
+1. Debug-build cost model, alias scored relative to each value's own fundamental: saving 0.8%
+   (`data/phase2-run1-debugcost-oldscoring.{log,csv}`). Plans with a nonlinearity at 1x were
+   badly mispredicted (abs mix predicted -151 dB, measured -33): abs(in) has no fundamental, so a
+   relative score is meaningless.
+2. Output-referred, sensitivity-weighted absolute scoring; factors extended to 32x; -O2 cost
+   model: 17.4% (the verdict run).
+3. Plus a sign-domain check (reject a cut where band-limiting makes a one-signed value cross zero):
+   no plan changed, same 17.4%. It stays in as a guard.
+Each change was made because a measured plan disagreed with its prediction, never to move the
+saving. The bar was fixed before run 1.
+
+**Threats to validity.**
+- *Internal.* Costs come from an isolated -O2 microbenchmark, not from the app's audio thread;
+  the interpreter's real per-instruction cost depends on the op mix. A cheaper resampler would
+  raise the saving; how far was not measured. The interpreter is a scalar register VM; a compiled backend would make instructions
+  cheaper and crossings relatively dearer, which lowers the saving.
+- *External.* The corpus is hand-built (plus 2 accepted held-out presets). Long real kernels, where
+  one nonlinearity sits inside lots of linear code, would save more; the app's presets are short.
+- *Construct.* Equal measured alias uses one tone at 1 kHz, 0.5 amplitude, and a -80 dB target.
+  The corner sweep shows the factor depends on the stimulus.
+
+**Provenance.** Machine: Apple M2, 8 GB, macOS 27.2.1. Build: `scripts/ibuild.py build --mode dev`
+(Debug, arm64) in `worktrees/aliasing-aware-field`; parent commit 8820229c, results from the commit
+that adds this section. Command:
+`INFINITE_FIELDRATEPLAN=1 INFINITE_FIELDRATE_COST=0,3.5,11,23,47,10,23,49 ./build-dev/Infinite.app/Contents/MacOS/Infinite`.
+Cost line: `clang++ -std=c++20 -O2 -Isrc -Isrc/core -o /tmp/rate_cost_bench tools/field_rate_cost_bench.cpp`.
+The analysis and renders are deterministic (no RNG).
+
+**Decision.** Kill the per-subgraph claim (H2). Phase 2b (rate regions on the live audio path)
+is not started. What survives and is worth shipping, if the owner wants it: the phase-1 pass as a
+compile-time **whole-kernel** factor suggestion for Field Effect, planned at the worst corner of a
+declared input range, plus the preset-param bug fix found in phase 1. Phase 3 (loops) is
+independent of H2 and stays open.

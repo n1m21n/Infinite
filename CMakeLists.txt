@@ -704,6 +704,7 @@ set(COMMON_SOURCES
     src/core/field/ReduceOps.cpp
     src/core/field/BackendRegister.cpp
     src/core/field/AliasAnalysis.cpp
+    src/core/field/RatePlan.cpp
     src/core/field/FieldGraphKernel.cpp
     src/core/field/FieldGraphReconciler.cpp
     src/core/field/FieldGraphOwnership.cpp

@@ -38,6 +38,13 @@ namespace Field
       float inAmplitude = 0.5f; // `in` = inAmplitude * sin(phase)
       bool usesInput = true;    // false: `in` = 0, f0 comes from an accumulator
       int gridLog2 = 13;        // grid points per input period
+      // Segment analysis (phase 2 rate planning): registers set from a
+      // periodic waveform before every run, one sample per grid point
+      // (inputWaves[i].size() == 1 << gridLog2), and registers whose
+      // periodic waveform is returned in AliasSpectrum::captured.
+      std::vector<int> inputRegs;
+      std::vector<std::vector<double>> inputWaves;
+      std::vector<int> captureRegs;
    };
 
    struct AliasSpectrum
@@ -53,12 +60,21 @@ namespace Field
       long long evaluations = 0;     // program runs spent
       int accumulators = 0;          // state cells recognised as phase accumulators
       double loopRadius = 0.0;       // spectral radius of the mean state Jacobian (< 1: stable)
+      std::vector<std::vector<double>> captured; // one grid waveform per AliasContext::captureRegs
    };
 
    // Periodic steady state and harmonic spectrum of `prog`'s output at
    // sample rate `sampleRate`, params at their defaults.
    bool AnalyzePeriodicSpectrum(const SampleProgram& prog, const AliasContext& ctx, double sampleRate,
                                 AliasSpectrum& out);
+
+   // Harmonic power and tail of one periodic grid waveform (what
+   // AnalyzePeriodicSpectrum does with the output). Fills power/tail*, sets ok.
+   void SpectrumFromWave(const std::vector<double>& y, AliasSpectrum& out);
+
+   // Zeroes every harmonic above maxHarmonic of a periodic grid waveform
+   // (an ideal low-pass: what a trip through the base rate leaves).
+   void BandLimitWave(std::vector<double>& y, double maxHarmonic);
 
    // Energy of components that fold below `audibleHz` at fs = factor *
    // baseRate and do not sit within `harmonicTolHz` of a harmonic of f0, in
