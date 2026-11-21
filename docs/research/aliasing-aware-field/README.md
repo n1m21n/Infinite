@@ -17,7 +17,7 @@ sets the author did not tune against (L, 32 literature kernels; G, 240 generated
 each and the analysis picks the exact factor on 174 of 174 informative kernels against 8 for "8x if
 nonlinear" and 37 for a class lookup (H3). **Delay lines are in scope since phase 5, 2026-11-21** (section 16): the pass now treats `delay(x, N)`
 as a periodic cell shifted by N samples, scores 94 of 97 delay kernels in L, G and a new blind set D (H4
-passes), and changes no phase-4 result. The scope is a steady tone; 3 of 32 literature kernels are still
+passes), and changes no phase-4 result. **Real input fails H5, 2026-11-21** (section 18): a multisine built from each clip is enough on 71.0% of 1764 kernel-clip pairs against a bar of 90%, and today's one-tone predictor is short on 15.5%. The scope of every confirmed result is a steady tone; 3 of 32 literature kernels are still
 declined (no periodic steady state). Soundness lemmas (phase 4c) not started. Phase 0: section 8. Phase 2b (live audio path) not started. Threats to validity: section 12.
 Reproduction: `ARTIFACT.md`. Prior art: `docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md`.
 Hypotheses were first committed in d38d29b7, before phase 0 ran (c0c39088).
@@ -88,6 +88,7 @@ A useful by-product: for jump-class ops, oversampling is close to hopeless (8x b
 | 3. Loops (stretch) | Bandwidth inside `state`/`delay` feedback (a fixed point with widening, using loop gain), then the choice between ADAA and oversampling. This opens problem 2, zero-delay loops. | Compiler | Second paper or a documented limit |
 | 4. Held-out and foundations | Independent held-out sets, simple-rule baselines, the H2 break-even cost, and soundness lemmas for the bound (section 13). Pre-registered 2026-11-21. | Test code and corpus only | **4a, 4b done (section 14):** H1b passes on L and G, H3 passes, break-even below 0.09 instructions. 4c (lemmas), sets P and A not run |
 | 5. Delay lines | `delay(x, N)` as a periodic cell with lag N; blind set D (section 15). Pre-registered 2026-11-21. | Analysis pass only | **Done (section 16):** H4 passes, 94 of 97 delay kernels scored, no regression |
+| 6. Real input | 12 real clips, an interleaved-copy oracle, and a multisine predictor (P6) built from each clip (section 17). Pre-registered 2026-11-21. | Analysis pass (optional input wave) and test code | **Done (section 18):** H5 fails, P6 enough on 71.0% (bar 90%), today's predictor short on 15.5% |
 
 Phases 0 and 1 are where the research claim is won or lost; they are small and safe.
 
@@ -692,3 +693,52 @@ reason. It replaces the quiet-copy subtraction.
 `AliasTests.cpp`) and the P0, rule A and P1 rows, recorded once, then the multisine change in
 `AliasAnalysis.*` and the P6 rows, then `scripts/score_real.py`. Changing the oracle or P6 after the P6 rows
 exist needs another dated entry here and a rescore.
+
+## 18. Phase 6 results: real input (2026-11-21)
+
+Run as pre-registered in section 17, in its order: baseline rows committed in 6d472d0d before any
+multisine code was built, then the P6 change and rows in d370e296. One dev build; `INFINITE_FIELDREAL`
+in 4 to 8 shards. Raw: `data/phase6-{measure,p1,p6}.csv`; score: `data/phase6-score.log` from
+`scripts/score_real.py`.
+
+**Subsample.** The full set (327 nonlinear `ok` kernels × 12 clips) projected to 4.1 CPU-hours, over the
+3-hour limit in section 17, so its subsample rule applied: all of L (29), 60 of G (seed 20261123) and all
+of D (58), 147 kernels, 1764 pairs. No pair was silent.
+
+**Measured need.** 1x 282, 2x 289, 4x 188, 8x 160, 16x 132, 32x 110, none within 32x 603. A third of
+real-input pairs cannot reach −80 dB at 32x; on one steady tone the same kernels needed far less. The need
+also moves with the clip: one kernel (l-26, Parker ADAA hard clip) needs 1x on quiet chords and 16x on
+loud noise.
+
+**H5 fails, not killed.**
+
+| Predictor | Pairs | Enough | Exact |
+|---|---|---|---|
+| P0 (today, one 5001 Hz tone) | 1764 | 84.5% | 47.9% |
+| Rule A (8x) | 1764 | 52.1% | 9.1% |
+| P1 (loudest of 21 tones) | 1680 | 98.6% | 39.9% |
+| **P6 (multisine)** | 1764 | **71.0%** (bar 90%, kill < 70%) | **67.2%** (bar 70%) |
+
+- Enough: FAIL (71.0% < 90%). Exact: FAIL (67.2% < 70%). Better than P0: FAIL (1253 vs 1490 pairs).
+  P6 clears the kill line by 1 point.
+- P6 is the most exact predictor but too often one step short: of its 511 short pairs, 384 are one
+  octave short, 70 two, 41 three or more. Worst: d-045 on quiet bass, P6 1x against a need of 32x
+  (+69 dB over the bar).
+- By source, P6 is enough on chords 93.9% and noise 86.4%, but bass 45.9% and pluck 58.8%: the clips whose
+  loudest 100 ms carries much more energy than their average. P6 is built from the whole clip's power
+  spectrum, the metric is the worst window; this is the likely cause, not tested.
+- By set: L 56.3%, G 79.0%, D 70.8% enough. 41 pairs fell back to P0 (no periodic steady state).
+- **P1 is not an answer either.** Its 98.6% is mostly refusal: it says "none within 32x" for 89 of the 140
+  kernels it scores, and on the 609 pairs where both need and P1 are finite it spends 8380 factor units
+  against a need of 2670, 3.1 times. It is still short on 24 pairs, all on loud clips (mostly noise-hi).
+- CPU on the 1142 pairs where need and P6 are finite: P6 6623, need 8132, P0 16002, rule A 9136 (sum of
+  factors). P6 under-spends; that is the shortfall above.
+
+**What this means.** H1 (section 14) stays confirmed for its scope, a steady tone. It does not carry over
+to real input: no predictor here is both safe and cheap. P0, the one in the repo today, is short on 15.5%
+of real-input pairs. Open next: a P6 built from the loudest window instead of the whole clip
+(a new pre-registration, not a change to this one).
+
+**Erratum to section 17.** "`gridLog2` 16 (harmonics to 3.07 MHz)" is wrong: `SpectrumFromWave` keeps
+explicit lines up to n/4, so 16384 × 46.875 Hz = 768 kHz; the tail model covers the rest, as in every
+earlier phase.
