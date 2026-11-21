@@ -151,7 +151,7 @@ logic, stop and re-enter at Lane 2 stage 3. Never finish a grown task on the sma
 | F Film | Video, reel, thumbnail | `film-studio` → `motion-film` / `node-tutorial-film` | Owner signed off the sheets; one master rendered only when asked; intermediates cleaned, sheets kept |
 | P Patch | Build or fix an `.inf` | `infinite-patch-authoring` | Patch checks and renders headless; explained in one paragraph |
 | B Brand | Website, social, docs surface | `docs/brand/BRAND.md` | `tools/brand/brand_lint.py` passes; values from `brand.json` |
-| R Research | Study, survey, explainer | `docs/plans/re-survey/README.md`, research workflow template | Findings in a plan doc with sources; every claim measured or cited; next step settled |
+| R Research | Study, survey, explainer | `research-standard` (`docs/RESEARCH_STANDARD.md`, `docs/research/_template/`) | `python3 tools/research/research_lint.py` passes; pre-registered H1/H2, reproducible `ARTIFACT.md` + `data/`, held-out check, Threats to Validity, and next step settled |
 
 **Not on any lane:** a release. Merged is *closed*; released is *shipped*; only the owner starts a
 release.

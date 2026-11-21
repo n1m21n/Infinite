@@ -46,6 +46,7 @@ GROUPS = [
         ("manual/", "Manual", "Node reference, headless CLI and Field"),
         ("philosophy.html", "Philosophy", "Why Infinite is built this way"),
         ("chat.html", "Agents &amp; terminal", "Talk to your patch with an agent"),
+        ("research/", "Research", "Technical reports and open problems"),
         ("blog/", "Blog", "Guides and how things work"),
         ("releases.html", "Release notes", "Every version from v0.1 to v2.0.0"),
     ]),
@@ -60,7 +61,7 @@ FOOTER_COLS = [
         ("library.html", "Library"), ("samples/", "Sample generator"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"),
     ]),
     ("Learn", [
-        ("index.html#learn", "Get started"), ("manual/", "Manual"), ("philosophy.html", "Philosophy"), ("chat.html", "Agents &amp; terminal"), ("blog/", "Blog"),
+        ("index.html#learn", "Get started"), ("manual/", "Manual"), ("philosophy.html", "Philosophy"), ("chat.html", "Agents &amp; terminal"), ("research/", "Research"), ("blog/", "Blog"),
         ("buy.html", "Buy the plugin"),
     ]),
     ("Docs", [
@@ -125,7 +126,7 @@ def is_current(path, rel):
 
 NAV_ICON = {"artists.html": "family-compositing", "musicians.html": "family-notes", "vjs.html": "perform", "creative-coders.html": "edit",
             "developers.html": "cube", "library.html": "library", "artworks.html": "viewport", "embeds/": "grid-dots", "nodes/": "cube", "extensions.html": "pointer", "chat.html": "chat",
-            "benchmarks.html": "range", "samples/": "range", "index.html#learn": "play", "manual/": "library", "philosophy.html": "loop", "blog/": "pencil", "releases.html": "history"}
+            "benchmarks.html": "range", "samples/": "range", "index.html#learn": "play", "manual/": "library", "philosophy.html": "loop", "research/": "range", "blog/": "pencil", "releases.html": "history"}
 
 
 def nav_icon(path):

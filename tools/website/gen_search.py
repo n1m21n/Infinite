@@ -14,7 +14,7 @@ W = os.path.join(ROOT, "website")
 OUT = os.path.join(W, "search-index.json")
 SKIP_DIRS = {"vendor", "assets", "node_modules"}
 SKIP_FILES = {"404.html", "slides.html", "artworks.html", "system.html"}
-TEXT_CAP = {"Blog": 4000, "Library": 1800, "Node": 1200, "Page": 3000, "Embed": 600, "Doc": 1000, "Code": 1200}
+TEXT_CAP = {"Blog": 4000, "Research": 4000, "Library": 1800, "Node": 1200, "Page": 3000, "Embed": 600, "Doc": 1000, "Code": 1200}
 
 
 def strip(s):
@@ -31,6 +31,7 @@ def meta(h, name):
 
 def kind_of(rel):
     if rel.startswith("blog/") and rel != "blog/index.html": return "Blog"
+    if rel.startswith("research/"): return "Research"
     if rel.startswith("library/"): return "Library"
     if rel.startswith("nodes/") and rel != "nodes/index.html": return "Node"
     if rel.startswith("embeds/"): return "Embed"
