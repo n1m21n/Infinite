@@ -37,7 +37,7 @@
   <link rel="stylesheet" href="../brand.css">
   <link rel="stylesheet" href="../style.css">
   <link rel="stylesheet" href="../glass.css">
-  <link rel="stylesheet" href="../blog.css">
+  <link rel="stylesheet" href="../benchmarks.css">
   <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -47,102 +47,92 @@
   </script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite Research", "url": "https://infinitedevices.org/research/", "description": "Pre-registered technical reports, empirical DSP benchmarks, reproducible artifacts, and open compiler and physics problems from Infinite.", "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/"}, "mainEntity": {"@type": "ItemList", "numberOfItems": 1, "itemListElement": [{"@type": "ListItem", "position": 1, "url": "https://infinitedevices.org/research/aliasing-aware-field.html", "name": "Aliasing-aware compilation for Field"}]}}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Research", "item": "https://infinitedevices.org/research/"}]}</script>
-  <style>
-.ri-wrap { max-width: 920px; margin: 0 auto; padding: 48px 20px 80px; }
-.ri-kicker { font: 500 0.75rem 'Geist Mono', ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin: 0 0 10px; }
-.ri-head h1 { font-size: clamp(2rem, 4vw, 2.75rem); line-height: 1.1; margin: 0 0 14px; letter-spacing: -0.025em; }
-.ri-lead { font-size: 1.0625rem; line-height: 1.6; color: var(--ink-2); max-width: 64ch; margin: 0 0 36px; }
-.ri-sec { margin-top: 48px; }
-.ri-sec > h2 { font: 500 0.75rem 'Geist Mono', ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.ri-card { display: block; padding: 24px; border: 1px solid var(--line); border-radius: var(--radius-media); background: var(--surface); text-decoration: none; color: inherit; transition: border-color var(--dur-micro) ease, transform var(--dur-micro) ease; margin-bottom: 16px; }
-.ri-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-.ri-meta { display: flex; flex-wrap: wrap; gap: 10px 18px; font: 500 0.75rem 'Geist Mono', ui-monospace, monospace; color: var(--ink-3); margin-bottom: 10px; }
-.ri-badge { color: var(--accent); }
-.ri-card h3 { font-size: 1.35rem; line-height: 1.25; margin: 0 0 10px; color: var(--ink); }
-.ri-card p { font-size: 0.96875rem; line-height: 1.6; color: var(--ink-2); margin: 0 0 14px; }
-.ri-links { display: flex; flex-wrap: wrap; gap: 14px; font: 500 0.8125rem 'Geist Mono', ui-monospace, monospace; color: var(--ink-2); }
-.ri-links a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-.ri-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-.ri-mini { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-chip); background: var(--surface); }
-.ri-mini h3 { font-size: 1rem; margin: 0 0 6px; color: var(--ink); }
-.ri-mini p { font-size: 0.875rem; line-height: 1.55; color: var(--ink-2); margin: 0 0 10px; }
-.ri-mini a { font: 500 0.8125rem 'Geist Mono', ui-monospace, monospace; color: var(--accent); text-decoration: none; }
-.ri-mini a:hover { text-decoration: underline; }
-  </style>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=0fc401be">
   <link rel="stylesheet" href="../neumo.css?v=2d967bf3">
   <link rel="stylesheet" href="../search.css?v=96e10ca3">
 </head>
-<body class="blog-page">
+<body class="benchmarks-page">
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <header class="site-header" id="site-header"></header>
 
-  <main class="ri-wrap">
-    <header class="ri-head">
-      <p class="ri-kicker">Infinite Research</p>
-      <h1>Technical reports, proofs &amp; open problems</h1>
-      <p class="ri-lead">Pre-registered studies, reproducible benchmarks, and honest negative results from building Infinite's audio, visual, and Field compiler engines. Every published claim links to pinned code, raw CSVs, and provenance.</p>
-    </header>
+  <main>
+    <section class="section lib-hero bm-hero">
+      <div class="container bm-wrap">
+        <h1 class="slab">Research</h1>
+        <p class="bm-spec mono">Pre-registered studies · Pinned commits · Raw CSVs &amp; audio</p>
+        <p class="lead">Empirical studies, compiler proofs, and honest negative results from building Infinite's audio, visual, and Field engines.</p>
+        <div class="bm-actions">
+          <a class="btn btn-primary" href="aliasing-aware-field.html">Read Report 1</a>
+          <a class="btn btn-ghost" href="../benchmarks.html">Engine benchmarks</a>
+          <a class="btn btn-ghost" href="https://github.com/n1m21n/Infinite/blob/main/docs/RESEARCH_STANDARD.md" target="_blank" rel="noopener">Standard</a>
+        </div>
 
-    <section class="ri-sec" aria-labelledby="reports-heading">
-      <h2 id="reports-heading">Technical Reports</h2>
+        <div class="kick chap">Technical Report 1 · 2026-11-21</div>
+        <article class="bm-card">
+          <div class="chips" style="margin-bottom:12px;">
+            <span class="pill">H1 confirmed within scope</span>
+            <span class="pill">H2 killed (15.8%&ndash;17.4% vs 25% bar)</span>
+            <span class="pill">272 + 97 held-out kernels</span>
+          </div>
+          <h2><a href="aliasing-aware-field.html" style="color:inherit;text-decoration:none;">Aliasing-aware compilation for Field</a></h2>
+          <p>Can a compiler predict how much nonlinear audio code aliases and pick the cheapest oversampling factor per subgraph? Steady-state harmonic prediction confirms H1 (Spearman &rho; = 0.94&ndash;1.00 across 272 held-out and 97 delay kernels). Per-subgraph oversampling (H2) is killed—with live A/B audio renders showing why real half-band resamplers leak energy across staged cuts.</p>
+          <div class="bm-actions">
+            <a class="btn btn-primary btn-sm" href="aliasing-aware-field.html">Read report &amp; listen</a>
+            <a class="btn btn-ghost btn-sm" href="aliasing-aware-field.pdf">PDF</a>
+            <a class="btn btn-ghost btn-sm" href="aliasing-aware-field/data/provenance.json">Provenance JSON</a>
+            <a class="btn btn-ghost btn-sm" href="https://github.com/n1m21n/Infinite/tree/b5da3a78db82b924f000db3d0af62c30228e37b5/docs/research/aliasing-aware-field" target="_blank" rel="noopener">Code &amp; data</a>
+          </div>
+        </article>
 
-      <article class="ri-card">
-        <div class="ri-meta">
-          <span>Report 1</span>
-          <span>2026-11-21</span>
-          <span class="ri-badge">H1 confirmed within scope · H2 killed</span>
+        <div class="kick chap">Benchmarks &amp; Architecture Notes</div>
+        <div class="bm-cards">
+          <div class="bm-card">
+            <h3>Infinite Engine Benchmarks</h3>
+            <p>Head-to-head real-time audio, GPU rendering, startup, and memory measurements with downloadable JSON and PDF report.</p>
+            <div class="bm-actions">
+              <a class="btn btn-ghost btn-sm" href="../benchmarks.html">View benchmarks</a>
+            </div>
+          </div>
+          <div class="bm-card">
+            <h3>Out-of-process VST3 &amp; AU IPC</h3>
+            <p>Lock-free shared-memory ring and slot protocol isolating third-party plugins from the audio engine with bounded real-time timeouts.</p>
+            <div class="bm-actions">
+              <a class="btn btn-ghost btn-sm" href="../blog/out-of-process-vst3-au-plugin-shared-memory-ipc.html">Read note</a>
+            </div>
+          </div>
+          <div class="bm-card">
+            <h3>Spectral Field &amp; Modal DSP</h3>
+            <p>Real-time STFT bin-kernel VM in Spectral Field and live Laplacian eigenmode solving in ShapeResonator.</p>
+            <div class="bm-actions">
+              <a class="btn btn-ghost btn-sm" href="../blog/spectral-field-real-time-stft-phase-vocoder-kernels.html">Read note</a>
+            </div>
+          </div>
         </div>
-        <h3><a href="aliasing-aware-field.html" style="color:inherit;text-decoration:none;">Aliasing-aware compilation for Field</a></h3>
-        <p>Can a compiler predict how much nonlinear audio code aliases and pick the cheapest oversampling factor per subgraph? Across 47 calibration kernels, 272 held-out kernels, and 97 delay kernels, steady-state harmonic prediction confirms H1 (Spearman &rho; = 0.94&ndash;1.00). Per-subgraph oversampling (H2) is killed at 15.8%&ndash;17.4% CPU saving against a 25% bar—with live A/B audio renders showing why real half-band resamplers leak energy across staged cuts.</p>
-        <div class="ri-links">
-          <a href="aliasing-aware-field.html">Read report &amp; listen</a>
-          <a href="aliasing-aware-field.pdf">PDF</a>
-          <a href="aliasing-aware-field/data/provenance.json">Provenance JSON</a>
-          <a href="https://github.com/n1m21n/Infinite/tree/b5da3a78db82b924f000db3d0af62c30228e37b5/docs/research/aliasing-aware-field" rel="noopener">Code &amp; data</a>
-        </div>
-      </article>
-    </section>
 
-    <section class="ri-sec" aria-labelledby="notes-heading">
-      <h2 id="notes-heading">Benchmarks &amp; Architecture Notes</h2>
-      <div class="ri-grid">
-        <div class="ri-mini">
-          <h3>Infinite Engine Benchmarks</h3>
-          <p>Head-to-head real-time audio, GPU rendering, startup, and memory measurements with downloadable JSON and PDF report.</p>
-          <a href="../benchmarks.html">View benchmarks &rarr;</a>
-        </div>
-        <div class="ri-mini">
-          <h3>Out-of-process VST3 &amp; AU IPC</h3>
-          <p>Lock-free shared-memory ring and slot protocol isolating third-party plugins from the audio engine with bounded real-time timeouts.</p>
-          <a href="../blog/out-of-process-vst3-au-plugin-shared-memory-ipc.html">Read architecture note &rarr;</a>
-        </div>
-        <div class="ri-mini">
-          <h3>Live 3D Modal &amp; Spectral DSP</h3>
-          <p>Real-time STFT bin-kernel VM in Spectral Field and live Laplacian eigenmode solving in ShapeResonator.</p>
-          <a href="../blog/spectral-field-real-time-stft-phase-vocoder-kernels.html">Read Spectral Field note &rarr;</a>
-        </div>
-      </div>
-    </section>
-
-    <section class="ri-sec" aria-labelledby="open-heading">
-      <h2 id="open-heading">Active &amp; Open Problems</h2>
-      <div class="ri-grid">
-        <div class="ri-mini">
-          <h3>Spectral Field Formal Evaluation</h3>
-          <p>Pre-registered benchmarks for identity round-trip SNR, zero-alloc audio-thread execution, and Laroche&ndash;Dolson phase locking across FFT sizes 512&ndash;8192.</p>
-          <a href="https://github.com/n1m21n/Infinite/tree/main/docs/research/spectral-field" rel="noopener">Pre-registration &rarr;</a>
-        </div>
-        <div class="ri-mini">
-          <h3>Automatic Zero-Delay Feedback (ZDF)</h3>
-          <p>Detecting zero-delay cycles in arbitrary user-patched Field graphs and compiling linear/nonlinear implicit solvers automatically.</p>
-          <a href="aliasing-aware-field.html#discussion">Context in Report 1 &rarr;</a>
-        </div>
-        <div class="ri-mini">
-          <h3>Online Langevin + DMD Modulation</h3>
-          <p>Zero-training-wait <i>O</i>(1) parameter-manifold learning from live 10 Hz telemetry with entropy anti-collapse gating on human performance sessions.</p>
-          <a href="../philosophy.html">System philosophy &rarr;</a>
+        <div class="kick chap">Active &amp; Open Problems</div>
+        <div class="bm-cards">
+          <div class="bm-card">
+            <h3>Spectral Field Evaluation</h3>
+            <p>Pre-registered benchmarks for identity round-trip SNR, zero-alloc audio-thread execution, and Laroche&ndash;Dolson phase locking across FFT sizes 512&ndash;8192.</p>
+            <div class="bm-actions">
+              <a class="btn btn-ghost btn-sm" href="https://github.com/n1m21n/Infinite/tree/main/docs/research/spectral-field" target="_blank" rel="noopener">Pre-registration</a>
+            </div>
+          </div>
+          <div class="bm-card">
+            <h3>Automatic Zero-Delay Feedback</h3>
+            <p>Detecting zero-delay cycles in arbitrary user-patched Field graphs and compiling linear and nonlinear implicit solvers automatically.</p>
+            <div class="bm-actions">
+              <a class="btn btn-ghost btn-sm" href="aliasing-aware-field.html#discussion">Context in Report 1</a>
+            </div>
+          </div>
+          <div class="bm-card">
+            <h3>Online Langevin + DMD</h3>
+            <p>Zero-training-wait <i>O</i>(1) parameter-manifold learning from live 10 Hz telemetry with entropy anti-collapse gating on human performance sessions.</p>
+            <div class="bm-actions">
+              <a class="btn btn-ghost btn-sm" href="../philosophy.html">Philosophy</a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
