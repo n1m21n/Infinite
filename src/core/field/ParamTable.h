@@ -37,7 +37,16 @@ namespace Field
    public:
       ParamTable() = default;
 
+      // Keeps a same-named param's value across a recompile, so editing a
+      // kernel's code never moves the knobs the user already set.
       void Reconcile(const std::vector<DeclaredParam>& declared, int nodeIndex, std::string& outNotice);
+
+      // Sets every declared param back to the default its code declares.
+      // Picking a preset or loading a device file calls this after a
+      // successful Apply(): a new preset starts at its own declared values,
+      // not at the values of whatever kernel was loaded before it. Ids and
+      // modulation bindings are untouched. A plain recompile never calls it.
+      void ResetDeclaredToDefaults();
 
       void VisitParams(ParamVisitor& v);
 

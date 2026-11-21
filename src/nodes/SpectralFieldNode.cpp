@@ -212,7 +212,8 @@ void SpectralFieldNode::LoadPreset(int index)
    {
       presetIndex = index;
       code = presets[index].code;
-      Apply();
+      if (Apply())
+         mParamTable.ResetDeclaredToDefaults(); // a preset starts at its own declared values
    }
 }
 
@@ -230,7 +231,8 @@ Field::DeviceFile SpectralFieldNode::ToDeviceFile() const
 void SpectralFieldNode::LoadDeviceFile(const Field::DeviceFile& device)
 {
    code = device.code;
-   Apply();
+   if (Apply())
+      mParamTable.ResetDeclaredToDefaults(); // params the file omits start at their defaults
    for (const auto& kv : device.params)
       if (Field::ParamEntry* p = mParamTable.Find(kv.first))
          p->value = kv.second;

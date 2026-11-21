@@ -2976,6 +2976,48 @@ void FrameTest_FIELDPIXELTEST(int frameId, GLFWwindow* window)
             printf("[FIELDPIXELTEST] Assertion 30 (Camera FX at 1920x1080, %d presets): %s\n", count, pass && count == 6 ? "OK" : "FAIL");
          }
 
+         // 31. Picking a preset starts every declared param at that preset's
+         //     own default, not at a same-named param's value from the kernel
+         //     loaded before it (Reconcile keeps values across a recompile;
+         //     LoadPreset resets them). Mirrors FIELDPARAMTEST section 7 for
+         //     the one Field node whose Apply needs GL.
+         {
+            FieldPixelNode px;
+            bool pass = true;
+            int shared = 0, compiled = 0;
+            const int count = (int)FieldPixelNode::PresetNames().size();
+            for (int j = 0; j < count; ++j)
+            {
+               std::vector<std::string> before;
+               for (auto& p : px.GetParamTable().Params())
+               {
+                  if (!p.isDeclared)
+                     continue;
+                  p.value = (p.defaultValue != p.maxValue) ? p.maxValue : p.minValue;
+                  before.push_back(p.name);
+               }
+               px.LoadPreset(j);
+               if (!px.LastError().empty())
+                  continue;
+               ++compiled;
+               for (const auto& p : px.GetParamTable().Params())
+               {
+                  if (!p.isDeclared)
+                     continue;
+                  if (std::find(before.begin(), before.end(), p.name) != before.end())
+                     ++shared;
+                  if (std::abs(p.value - p.defaultValue) > 1e-6f)
+                  {
+                     printf("[FIELDPIXELTEST] preset %d '%s': param '%s' = %g, preset declares %g\n", j,
+                            FieldPixelNode::PresetNames()[j].c_str(), p.name.c_str(), p.value, p.defaultValue);
+                     pass = false;
+                  }
+               }
+            }
+            printf("[FIELDPIXELTEST] Assertion 31 (Preset Pick Resets Declared Params, %d presets, %d same-name carries): %s\n",
+                   compiled, shared, pass && shared > 0 ? "OK" : "FAIL");
+         }
+
          printf("[FIELDPIXELTEST] Test suite complete.\n");
       }
 }

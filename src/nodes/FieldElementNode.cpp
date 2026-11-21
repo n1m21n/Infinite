@@ -461,7 +461,8 @@ void FieldElementNode::LoadPreset(int index)
    {
       presetIndex = index;
       code = presets[index].code;
-      Apply();
+      if (Apply())
+         mParamTable.ResetDeclaredToDefaults(); // a preset starts at its own declared values
    }
 }
 
@@ -492,7 +493,8 @@ void FieldElementNode::LoadDeviceFile(const Field::DeviceFile& device)
    auto itGen = device.nodeSettings.find("generateCount");
    if (itGen != device.nodeSettings.end())
       generateCount = (int)std::clamp(itGen->second, 1.0, (double)kMaxFieldElements);
-   Apply();
+   if (Apply())
+      mParamTable.ResetDeclaredToDefaults(); // params the file omits start at their defaults
    // Param values are matched by name against whatever the freshly-compiled
    // program actually declared - a name the target's code doesn't declare
    // is silently skipped (Find returns nullptr), never phantom-added.

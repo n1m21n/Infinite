@@ -2501,6 +2501,136 @@ int RunFieldParamTest()
       fflush(stdout);
    }
 
+   // ------------------------------------------------------------
+   // SECTION 7: picking a preset starts every declared param at that
+   // preset's own declared default. Reconcile keeps a same-named param's
+   // value across a recompile (so a code edit never moves the user's knobs),
+   // and LoadPreset used to be just code = ...; Apply(), so a preset that
+   // shared a name with the previous kernel inherited its value: a
+   // FieldSampleNode born on Tube Overdrive (drive = 3.0) kept drive = 3.0
+   // after picking Soft Saturation (drive = 2.5). Every preset of every
+   // ParamTable node is loaded with each knob pushed off its default first.
+   // Field Pixel needs a GL context to Apply, so FIELDPIXELTEST covers it.
+   // ------------------------------------------------------------
+   {
+      bool secOk = true;
+      int sharedNameChecks = 0;
+      auto sweep = [&](auto& node, const char* typeName) {
+         const int count = (int)std::decay_t<decltype(node)>::PresetNames().size();
+         for (int j = 0; j < count; ++j)
+         {
+            // Push every declared knob away from its default, as a user would.
+            std::vector<std::string> before;
+            for (auto& p : node.GetParamTable().Params())
+            {
+               if (!p.isDeclared)
+                  continue;
+               p.value = (p.defaultValue != p.maxValue) ? p.maxValue : p.minValue;
+               before.push_back(p.name);
+            }
+            node.LoadPreset(j);
+            if (!node.LastError().empty())
+            {
+               printf("Section7: NOTE - %s preset %d did not compile headless (%s), skipped\n", typeName, j,
+                      node.LastError().c_str());
+               continue;
+            }
+            for (const auto& p : node.GetParamTable().Params())
+            {
+               if (!p.isDeclared)
+                  continue;
+               if (std::find(before.begin(), before.end(), p.name) != before.end())
+                  ++sharedNameChecks;
+               if (std::abs(p.value - p.defaultValue) > 1e-6f)
+               {
+                  printf("Section7: FAIL - %s preset %d '%s': param '%s' = %g, preset declares %g\n", typeName, j,
+                         node.PresetNames()[j].c_str(), p.name.c_str(), p.value, p.defaultValue);
+                  secOk = false;
+               }
+            }
+         }
+      };
+
+      // The case the alias rig measured, by name.
+      {
+         FieldSampleNode fs; // born on Presets()[0], Tube Overdrive
+         const auto& names = FieldSampleNode::PresetNames();
+         const int soft = (int)(std::find(names.begin(), names.end(), std::string("Soft Saturation")) - names.begin());
+         const auto* drive0 = fs.GetParamTable().Find("drive");
+         if (soft >= (int)names.size() || drive0 == nullptr || std::abs(drive0->value - 3.0f) > 1e-6f)
+         {
+            printf("Section7: FAIL - setup: Soft Saturation preset or Tube Overdrive drive = 3.0 not found\n");
+            secOk = false;
+         }
+         else
+         {
+            fs.LoadPreset(soft);
+            const auto* drive = fs.GetParamTable().Find("drive");
+            if (drive == nullptr || std::abs(drive->value - 2.5f) > 1e-6f)
+            {
+               printf("Section7: FAIL - Tube Overdrive -> Soft Saturation left drive = %g, expected 2.5\n",
+                      drive ? drive->value : -1.0f);
+               secOk = false;
+            }
+         }
+
+         // Editing and recompiling the same kernel still keeps the knob.
+         if (Field::ParamEntry* d = fs.GetParamTable().Find("drive"))
+         {
+            d->value = 5.0f;
+            fs.code += "\n# edited\n";
+            const bool ok = fs.Apply();
+            const auto* d2 = fs.GetParamTable().Find("drive");
+            if (!ok || d2 == nullptr || std::abs(d2->value - 5.0f) > 1e-6f)
+            {
+               printf("Section7: FAIL - a recompile of the same kernel moved drive off the user's 5.0 (got %g)\n",
+                      d2 ? d2->value : -1.0f);
+               secOk = false;
+            }
+         }
+
+         // A device file that omits a declared param starts it at its default.
+         {
+            Field::DeviceFile dev;
+            dev.domain = "sample";
+            dev.code = "param float drive = 2.0 [1.0, 6.0]\nparam float mix = 0.5 [0.0, 1.0]\nout = in * drive * mix\n";
+            dev.params["mix"] = 0.25;
+            if (Field::ParamEntry* d = fs.GetParamTable().Find("drive"))
+               d->value = 6.0f;
+            fs.LoadDeviceFile(dev);
+            const auto* d = fs.GetParamTable().Find("drive");
+            const auto* m = fs.GetParamTable().Find("mix");
+            if (!fs.LastError().empty() || d == nullptr || m == nullptr || std::abs(d->value - 2.0f) > 1e-6f ||
+                std::abs(m->value - 0.25f) > 1e-6f)
+            {
+               printf("Section7: FAIL - device load: drive = %g (want 2.0), mix = %g (want 0.25) %s\n",
+                      d ? d->value : -1.0f, m ? m->value : -1.0f, fs.LastError().c_str());
+               secOk = false;
+            }
+         }
+      }
+
+      { FieldSampleNode n;    sweep(n, "Field Sample"); }
+      { FieldSynthNode n;     sweep(n, "Field Synth"); }
+      { FieldElementNode n;   sweep(n, "Field Element"); }
+      { FieldPrimitiveNode n; sweep(n, "Field Primitive"); }
+      { FieldGraphNode n;     sweep(n, "Field Graph"); }
+      { FieldNotesNode n;     sweep(n, "Field Notes"); }
+      { SpectralFieldNode n;  sweep(n, "Spectral Field"); }
+      { SketchNode n;         sweep(n, "Sketch"); }
+      { Sketch3DNode n;       sweep(n, "Sketch 3D"); }
+
+      if (sharedNameChecks == 0)
+      {
+         printf("Section7: FAIL - no preset shared a param name with the one before it; the sweep proved nothing\n");
+         secOk = false;
+      }
+      printf("Section7: %d same-name param carries checked\n", sharedNameChecks);
+      if (secOk) printf("SECTION 7 (Preset Pick Resets Declared Params): OK\n");
+      else { printf("SECTION 7 (Preset Pick Resets Declared Params): FAIL\n"); allOk = false; }
+      fflush(stdout);
+   }
+
    printf("INFINITE_FIELDPARAMTEST: %s\n", allOk ? "OK" : "FAIL");
    fflush(stdout);
    return allOk ? 0 : 1;
