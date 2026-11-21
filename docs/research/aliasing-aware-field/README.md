@@ -5,7 +5,7 @@ status: "killed"
 owner: "namansoni"
 date: "2026-11-21"
 prior_art: "docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md"
-commit_sha: "cb85f93235ffc3b8885efd846e176da8dca6ce3c"
+commit_sha: "fd6c55ca09ab7805b819ae5a569a1ab62aa44d3b"
 ---
 
 # Aliasing-aware compilation for Field
@@ -399,7 +399,7 @@ author, and memoryless kernels are exact by construction (section 12). Phase 4 t
 author did not choose and asks whether the analysis beats trivial rules.
 
 **Freeze.** The analysis (`src/core/field/AliasAnalysis.{h,cpp}` and `RatePlan.{h,cpp}`) is frozen at the commit that adds this
-section. Each held-out set is committed under `corpus/heldout/<set>/` before it is scored, so the
+section (fd6c55ca). Each held-out set is committed under `corpus/heldout/<set>/` before it is scored, so the
 history shows it was not tuned against. Changing the analysis after scoring needs a new dated entry
 here and a rescore of every set.
 

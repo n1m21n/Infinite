@@ -1,6 +1,6 @@
 {
-  "commit_sha": "cb85f93235ffc3b8885efd846e176da8dca6ce3c",
-  "commit_note": "Code that reproduces every output. Outputs were first produced at: phase0-baseline.csv c0c39088dc1eb3132f58dbc9427fffb413ecf09b (re-run with corrected param reset at 8820229c), phase1-predictions.csv 8820229c5ff5ff26b5dd2324cb6c36e77d063f93, phase2-* the working tree committed as cb85f932.",
+  "commit_sha": "fd6c55ca09ab7805b819ae5a569a1ab62aa44d3b",
+  "commit_note": "Code that reproduces every output. Outputs were first produced at: phase0-baseline.csv c0c39088dc1eb3132f58dbc9427fffb413ecf09b (re-run with corrected param reset at 8820229c), phase1-predictions.csv 8820229c5ff5ff26b5dd2324cb6c36e77d063f93, phase2-* the working tree committed as cb85f932. Cost repeats and audio clips: fd6c55ca.",
   "timestamp_utc": "2026-11-21T03:13:04Z",
   "os": "macOS 27.2.1 arm64",
   "cpu": "Apple M2, 8 cores, 8 GB RAM",
