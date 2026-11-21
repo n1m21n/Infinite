@@ -11,9 +11,13 @@ commit_sha: "fd6c55ca09ab7805b819ae5a569a1ab62aa44d3b"
 # Aliasing-aware compilation for Field
 
 Status: **killed on H2, 2026-11-21.** Per-subgraph oversampling saved 17.4% of CPU against a
-pre-registered bar of 25% (section 10). H1 (the analysis predicts alias) holds **on the hand-built
-calibration corpus**; it is not confirmed, because held-out coverage is 2 of 18 presets (section 11).
-Phase 0: section 8. Phase 2b (live audio path) not started. Threats to validity: section 12.
+pre-registered bar of 25% (section 10); break-even needs a resampler pair under 0.09 interpreter
+instructions (section 14). **H1 is confirmed within its scope, 2026-11-21** (section 14): on two held-out
+sets the author did not tune against (L, 32 literature kernels; G, 240 generated kernels), H1b passes on
+each and the analysis picks the exact factor on 174 of 174 informative kernels against 8 for "8x if
+nonlinear" and 37 for a class lookup (H3). The scope is a steady tone and kernels with no delay lines:
+14 of 32 literature kernels, including every ADAA kernel, were not scored. Soundness lemmas (phase 4c)
+not started. Phase 0: section 8. Phase 2b (live audio path) not started. Threats to validity: section 12.
 Reproduction: `ARTIFACT.md`. Prior art: `docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md`.
 Hypotheses were first committed in d38d29b7, before phase 0 ran (c0c39088).
 
@@ -81,7 +85,7 @@ A useful by-product: for jump-class ops, oversampling is close to hopeless (8x b
 | 1. Predict | The analysis pass over `SampleProgram` after `CompileBlock` (called at `src/core/field/BackendRegister.cpp:1415`), printing predictions, with no runtime change. Test H1. | Compiler, report only | Go or kill on H1 |
 | 2. Execute | Rate regions in `RunSampleProgram` (`SampleRuntime.h:161`) using `MinPhaseOversampler`: per-voice oversampler state, scaled `sr`, and the latency reported. Test H2. | Audio path | Go or kill on H2; gated Field cases in the ratchet |
 | 3. Loops (stretch) | Bandwidth inside `state`/`delay` feedback (a fixed point with widening, using loop gain), then the choice between ADAA and oversampling. This opens problem 2, zero-delay loops. | Compiler | Second paper or a documented limit |
-| 4. Held-out and foundations | Independent held-out sets, simple-rule baselines, the H2 break-even cost, and soundness lemmas for the bound (section 13). Pre-registered 2026-11-21. | Test code and corpus only | H1 confirmed or not on kernels the author did not choose; a proved scope for the bound |
+| 4. Held-out and foundations | Independent held-out sets, simple-rule baselines, the H2 break-even cost, and soundness lemmas for the bound (section 13). Pre-registered 2026-11-21. | Test code and corpus only | **4a, 4b done (section 14):** H1b passes on L and G, H3 passes, break-even below 0.09 instructions. 4c (lemmas), sets P and A not run |
 
 Phases 0 and 1 are where the research claim is won or lost; they are small and safe.
 
@@ -376,6 +380,9 @@ Held-out kernels run so far: 18 Field Effect presets that the corpus did not inc
 So H1 is **not confirmed**: 2 held-out kernels cannot carry a claim about Field kernels in general.
 H2 is killed on the calibration corpus already, so its held-out run would not change the verdict.
 
+**Superseded by phase 4 (section 14):** 272 held-out kernels in two pre-registered sets, 233 scored.
+H1 is now confirmed for kernels the pass accepts.
+
 ## 12. Threats to validity
 
 - **Construct.** For memoryless kernels driven by the rig's own tone, the phase-1 prediction is exact
@@ -389,7 +396,10 @@ H2 is killed on the calibration corpus already, so its held-out run would not ch
 - **Internal.** H2's CPU is a cost model (ns per base sample from an isolated -O2 microbenchmark),
   not measured audio-thread time; run 1 used Debug-build costs and is reported, not used for the
   verdict. One machine (Apple M2).
-- **External.** One author wrote the corpus. Held-out coverage is 2 of 18 presets. Kernels are
+- **External.** One author wrote the calibration corpus; phase 4 adds 272 held-out kernels (section 14),
+  but L was still written by the same person (from papers, without looking at the analysis or data), and
+  G comes from a grammar the author wrote. Kernels with delay lines are declined, so ADAA and most
+  pedal circuits are outside the confirmed scope. Kernels are
   short; long kernels with one nonlinearity inside much linear code would favour staging more.
 
 ## 13. Phase 4 pre-registration: held-out sets and foundations (2026-11-21)
@@ -442,3 +452,65 @@ memoryless), per set.
 instructions, at which the aggregate saving of section 10 would reach 25%. This turns the kill into a
 condition that holds on other machines, resamplers or a compiled backend.
 
+
+## 14. Phase 4 results (2026-11-21)
+
+Analysis frozen at fd6c55ca (unchanged). G and the scorer were committed in 001ad1f0 and L in c5a84260,
+both before any scoring. One run of `INFINITE_FIELDHELDOUT` on a dev build of c5a84260, then
+`scripts/score_heldout.py`. Raw: `data/phase4-heldout.{csv,log}`, `data/phase4-scored.csv`, `data/phase4-score.log`.
+
+**Coverage.** 272 kernels, 233 scored, 39 declined.
+
+| Set | Kernels | Scored | Declined: delay lines | Declined: no periodic steady state | Memoryless (reported only) | Informative |
+|---|---|---|---|---|---|---|
+| L, literature | 32 | 18 (56%) | 12 | 2 (l-14, l-15: semi-implicit diode clippers, loop radius 1.9) | 11 | 7 |
+| G, generated | 240 | 215 (90%) | 25 | 0 | 48 | 167 |
+
+L not scored: l-12, 13 (Yeh pedals), 14, 15 (diode clippers), 16 (pre-filter), 20 to 22 (Timoney
+configurations), 26 to 31 (every ADAA kernel). More than half of L is in scope, so the pre-registered
+scoping rule does not fire; the claim is still stated for kernels without delay lines, because that is
+what was tested. The 7 informative L kernels are the state-only filters: Buchla 259 filtered, three
+Huovilainen ladders, two Chamberlin SVFs, Parker's Moog-like ladder.
+
+**H1b passes on both sets.**
+
+| Set | n informative | Spearman ρ (bar 0.8) | median abs error (bar 10 dB) | Verdict |
+|---|---|---|---|---|
+| L | 7 | 1.000 | 0.0 dB | PASS |
+| G | 167 | 0.994 | 0.0 dB | PASS |
+
+Memoryless, reported only: L n=11, ρ 1.000, 0.0 dB; G n=48, ρ 0.961, 0.1 dB.
+
+**H3 passes.** Exact minimal factor for −80 dB on L ∪ G informative (n=174): the analysis 174 (100%),
+rule A ("8x if nonlinear") 8 (5%), rule B (class → phase-0 median factor; poly 1, analytic 2, kink 16,
+jump none, feedback 2) 37 (21%). 68 of the 174 never reach −80 dB within 32x (runaway or limit-cycling
+feedback in G), and both sides say "none". Without them: analysis 106 of 106, rule A 8, rule B 9.
+
+**Large errors are all on kernels that never get clean.** 34 informative kernels have a per-kernel median
+error over 10 dB; every one of them has measured factor "none". 29 of them predict an absurd +2840 to
++2992 dB (a diverging steady-state solve that was not declined), as do 12 memoryless G kernels. They rank correctly and pick the right
+factor ("none"), but their dB values mean nothing, and the median hides them.
+
+**Bound soundness: no claim.** 86 nonlinear kernels measure more than 3 dB above prediction at some
+factor. In every case the measurement sits at the rig's float32 floor: none is above −125.9 dB, against
+a floor of about −138 dB (section 12) and a target of −80 dB. No lemma was written (phase 4c not started),
+so no class is covered and none of these counts as a counterexample by the pre-registered rule.
+
+**Break-even (descriptive).** `scripts/break_even.py` scales the resampler costs by s
+(`data/phase4-break-even.csv`). The aggregate saving reaches 25% only between s = 0 and s = 0.0156,
+where a 2x pair costs 0.09 interpreter instructions; at s = 0 (free crossings) it is 25.1%. The three-stage
+tanh chain never beats a fixed 8x at any s. H2's kill therefore holds on any plausible machine or
+resampler: a crossing would have to cost less than about 1/10 of one interpreter instruction.
+
+**What this does and does not show.**
+- It shows the steady-state predictor generalises from the author's corpus to 233 kernels the author
+  did not tune against, and that it does far better than either simple rule at choosing a factor.
+- It does not show the analysis is cheap or approximate: it runs the real interpreter on one period
+  (section 9), so it is closer to an exact solver for a single steady tone than to the interval algebra
+  of section 3.
+- The stimulus is one tone at one amplitude; the corner sweep (section 10) showed the needed factor moves
+  with the stimulus.
+- Delay lines (and so ADAA, which needs the previous input) are declined. A delay of N samples is a phase
+  shift of a periodic signal, so this looks fixable, but the analysis is frozen; changing it needs a new
+  dated entry and a rescore (section 13).
+- Not run: sets P (permissive code) and A (blind LLM), and the phase-4c lemmas.

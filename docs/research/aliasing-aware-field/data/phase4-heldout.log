@@ -1,0 +1,273 @@
+FIELDHELDOUT G/g-001                              meas  -98.6 -139.1 -137.9 -138.5 -139.1 -139.0 | pred  -98.6 -155.7 -158.5 -161.2 -164.4 -167.4 | factor 1/1
+FIELDHELDOUT G/g-002                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-003                              meas  -30.8  -46.4  -57.9  -69.4  -81.2  -93.3 | pred  -30.8  -46.4  -57.9  -69.4  -81.2  -93.3 | factor 16/16
+FIELDHELDOUT G/g-004                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-005                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-006                              meas    6.3    0.2   -7.4  -10.6  -16.8  -23.0 | pred    6.3    0.2   -7.4  -10.6  -16.7  -22.8 | factor >32/>32
+FIELDHELDOUT G/g-007                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-008                              meas  -28.5  -33.2  -36.6  -38.7  -48.5  -54.9 | pred  -28.5  -33.1  -36.5  -38.7  -48.2  -54.5 | factor >32/>32
+FIELDHELDOUT G/g-009                              meas  -34.4  -55.2  -73.2  -91.9 -110.6 -128.3 | pred  -34.4  -55.2  -73.2  -91.9 -110.6 -128.9 | factor 8/8
+FIELDHELDOUT G/g-010                              meas   77.6  105.8  101.6   93.9   82.8   70.2 | pred 2979.1 2971.4 2961.9 2949.9 2939.5 2926.9 | factor >32/>32
+FIELDHELDOUT G/g-011                              meas   -9.6  -15.6  -21.1  -26.4  -31.5  -36.5 | pred   -9.3  -15.4  -20.6  -25.4  -29.9  -33.9 | factor >32/>32
+FIELDHELDOUT G/g-012                              meas   64.5   96.7   76.6   72.3   63.9   55.1 | pred 2974.8 2971.3 2955.9 2951.0 2939.3 2931.2 | factor >32/>32
+FIELDHELDOUT G/g-013                              meas  -43.9  -57.1  -70.5  -84.2  -99.0 -114.7 | pred  -43.9  -57.1  -70.5  -84.2  -99.1 -114.7 | factor 8/8
+FIELDHELDOUT G/g-014                              meas   -0.0   -7.6  -15.3  -21.0  -26.3  -31.9 | pred   -0.0   -7.6  -15.3  -21.1  -26.5  -32.2 | factor >32/>32
+FIELDHELDOUT G/g-015                              meas  -93.9 -137.6 -137.7 -137.9 -138.1 -137.5 | pred  -93.9 -151.6 -153.9 -157.7 -160.0 -163.2 | factor 1/1
+FIELDHELDOUT G/g-016                              meas   66.0   77.9   74.4   70.6   62.9   54.3 | pred  209.1  198.2  188.6  179.7  170.9  162.2 | factor >32/>32
+FIELDHELDOUT G/g-017                              meas -136.6 -138.1 -137.5 -138.6 -138.3 -138.4 | pred -147.8 -150.8 -153.6 -157.3 -160.3 -164.4 | factor 1/1
+FIELDHELDOUT G/g-018                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-019                              meas  -34.5  -42.9  -46.9  -53.4  -61.8  -68.1 | pred  -34.4  -42.9  -46.9  -53.4  -61.9  -68.4 | factor >32/>32
+FIELDHELDOUT G/g-020                              meas   86.6  113.3  104.3   94.8   81.2   70.8 | pred  146.3  137.2  126.2  111.6  105.8   94.5 | factor >32/>32
+FIELDHELDOUT G/g-021                              meas   12.1    3.1   -1.3   -6.6  -12.4  -16.2 | pred   12.1    3.1   -1.3   -6.7  -12.4  -16.3 | factor >32/>32
+FIELDHELDOUT G/g-022                              meas -107.0 -137.2 -138.2 -137.5 -137.8 -138.2 | pred -106.8 -144.3 -147.7 -153.2 -156.3 -159.3 | factor 1/1
+FIELDHELDOUT G/g-023                              meas -135.1 -137.2 -136.9 -138.9 -138.0 -138.1 | pred -138.3 -142.2 -144.1 -146.3 -149.7 -155.4 | factor 1/1
+FIELDHELDOUT G/g-024                              meas -136.6 -137.2 -137.9 -137.7 -136.8 -137.9 | pred -147.7 -153.3 -157.3 -159.4 -160.6 -166.4 | factor 1/1
+FIELDHELDOUT G/g-025                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-026                              meas  -29.8  -40.3  -52.0  -64.2  -76.9  -89.0 | pred  -29.8  -40.3  -52.0  -64.2  -76.9  -89.0 | factor 32/32
+FIELDHELDOUT G/g-027                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-028                              meas  124.0   36.5   22.8   29.1   25.0   25.8 | pred 2971.0 2888.1 2862.0 2859.6 2856.9 2854.6 | factor >32/>32
+FIELDHELDOUT G/g-029                              meas  -50.2  -69.4  -86.4 -104.2 -122.3 -135.9 | pred  -50.2  -69.4  -86.4 -104.2 -122.4 -140.5 | factor 4/4
+FIELDHELDOUT G/g-030                              meas -132.8 -137.8 -138.2 -137.9 -137.0 -138.4 | pred -133.4 -144.6 -151.1 -154.6 -157.2 -162.4 | factor 1/1
+FIELDHELDOUT G/g-031                              meas   84.8  108.7  104.4   96.6   81.5   70.9 | pred 2984.5 2968.0 2961.4 2948.4 2933.2 2922.7 | factor >32/>32
+FIELDHELDOUT G/g-032                              meas  -24.5  -40.7  -52.8  -64.7  -77.0  -89.4 | pred  -24.5  -40.7  -52.8  -64.7  -77.0  -89.4 | factor 32/32
+FIELDHELDOUT G/g-033                              meas  -62.6 -137.9 -137.6 -138.3 -138.2 -138.0 | pred  -62.6 -151.0 -154.5 -158.4 -161.2 -162.0 | factor 2/2
+FIELDHELDOUT G/g-034                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-035                              meas -133.8  -49.7  -59.3  -70.8  -82.4  -93.9 | pred -142.8  -49.7  -59.3  -70.8  -82.4  -93.9 | factor 1/1
+FIELDHELDOUT G/g-036                              meas  -24.7  -38.9  -50.6  -62.5  -74.7  -88.5 | pred  -24.7  -38.9  -50.6  -62.5  -74.7  -88.4 | factor 32/32
+FIELDHELDOUT G/g-037                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-038                              meas   86.8  120.5  104.9   94.6   81.1   69.7 | pred 2965.6 2947.6 2935.5 2923.3 2911.2 2899.0 | factor >32/>32
+FIELDHELDOUT G/g-039                              meas  -22.4  -41.1  -51.9  -64.3  -76.2  -88.4 | pred  -22.4  -41.1  -51.9  -64.3  -76.2  -88.4 | factor 32/32
+FIELDHELDOUT G/g-040                              meas   87.3  114.0  106.1   93.6   85.0   70.1 | pred 2951.2 2939.8 2928.9 2917.6 2905.8 2893.8 | factor >32/>32
+FIELDHELDOUT G/g-041                              meas   90.3   31.8   31.9   36.8   33.5   35.3 | pred 2921.6 2849.5 2847.3 2845.2 2842.4 2839.6 | factor >32/>32
+FIELDHELDOUT G/g-042                              meas  -65.0 -110.4 -137.9 -137.0 -137.4 -138.5 | pred  -65.0 -110.6 -153.5 -156.2 -158.9 -161.9 | factor 2/2
+FIELDHELDOUT G/g-043                              meas   -4.0   -6.5  -11.1  -18.0  -24.9  -33.4 | pred   -4.0   -6.4  -11.1  -18.0  -24.9  -32.7 | factor >32/>32
+FIELDHELDOUT G/g-044                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-045                              meas  -68.0 -112.2 -137.1 -137.3 -137.7 -137.9 | pred  -68.0 -112.4 -152.6 -154.5 -157.6 -161.1 | factor 2/2
+FIELDHELDOUT G/g-046                              meas   -7.2  -13.6  -19.4  -25.5  -31.6  -37.6 | pred   -7.2  -13.6  -19.4  -25.4  -31.5  -37.4 | factor >32/>32
+FIELDHELDOUT G/g-047                              meas   53.2   57.7   62.3   52.6   47.4   38.1 | pred   72.2   64.3   61.2   51.0   48.0   39.1 | factor >32/>32
+FIELDHELDOUT G/g-048                              meas    2.1   -9.9  -17.1  -23.5  -29.6  -35.7 | pred    2.1   -9.9  -17.1  -23.4  -29.5  -35.5 | factor >32/>32
+FIELDHELDOUT G/g-049                              meas -135.5 -137.1 -138.0 -137.9 -137.3 -138.4 | pred -139.5 -144.8 -151.1 -153.4 -155.9 -159.1 | factor 1/1
+FIELDHELDOUT G/g-050                              meas  -41.0  -51.5  -68.4  -81.8  -95.1 -108.9 | pred  -41.0  -51.5  -68.4  -81.8  -95.1 -108.9 | factor 8/8
+FIELDHELDOUT G/g-051                              meas   12.5    7.6    1.7   -1.8   -4.7   -9.1 | pred   12.1    7.7    1.9   -1.6   -4.4   -8.9 | factor >32/>32
+FIELDHELDOUT G/g-052                              meas  -20.6  -30.8  -41.3  -53.0  -65.2  -77.2 | pred  -20.6  -30.8  -41.3  -53.0  -65.2  -77.2 | factor >32/>32
+FIELDHELDOUT G/g-053                              meas -129.7 -135.5 -137.0 -137.3 -137.8 -137.6 | pred -131.5 -139.0 -144.7 -149.2 -152.5 -155.4 | factor 1/1
+FIELDHELDOUT G/g-054                              meas  -13.5  -40.0  -61.1  -76.4  -92.5 -109.0 | pred  -13.5  -40.0  -61.1  -76.4  -92.5 -109.0 | factor 16/16
+FIELDHELDOUT G/g-055                              meas  -99.1 -138.5 -138.5 -138.2 -138.7 -138.3 | pred  -99.1 -146.9 -148.9 -150.7 -153.6 -155.6 | factor 1/1
+FIELDHELDOUT G/g-056                              meas   55.0   74.6   75.9   71.6   64.0   53.9 | pred  198.5  194.8  190.2  180.9  172.1  162.1 | factor >32/>32
+FIELDHELDOUT G/g-057                              meas  -60.4  -74.6  -93.5 -110.0 -126.8 -136.9 | pred  -60.5  -74.6  -93.5 -110.0 -127.0 -143.4 | factor 4/4
+FIELDHELDOUT G/g-058                              meas  -20.7  -23.5  -31.5  -35.9  -41.4  -49.9 | pred  -20.7  -23.5  -31.5  -35.9  -41.4  -50.1 | factor >32/>32
+FIELDHELDOUT G/g-059                              meas  -46.5  -64.9  -81.6  -99.7 -118.2 -134.4 | pred  -46.5  -64.9  -81.6  -99.7 -118.2 -136.4 | factor 4/4
+FIELDHELDOUT G/g-060                              meas  -72.3 -136.5 -137.7 -138.0 -137.6 -137.9 | pred  -72.3 -143.8 -146.2 -148.3 -151.3 -153.6 | factor 2/2
+FIELDHELDOUT G/g-061                              meas  -48.8  -66.0  -82.3 -100.2 -118.5 -134.8 | pred  -48.8  -66.0  -82.3 -100.2 -118.5 -136.6 | factor 4/4
+FIELDHELDOUT G/g-062                              meas  -14.7  -23.2  -36.2  -45.4  -68.1  -75.4 | pred  -14.7  -23.2  -36.2  -45.4  -68.1  -75.4 | factor >32/>32
+FIELDHELDOUT G/g-063                              meas  -39.4  -45.2  -54.8  -66.1  -78.1  -90.1 | pred  -39.4  -45.2  -54.8  -66.1  -78.0  -90.1 | factor 32/32
+FIELDHELDOUT G/g-064                              meas   91.7  113.0  107.0   95.2   93.6   67.7 | pred  147.8  143.9  128.6  115.5   95.2   87.4 | factor >32/>32
+FIELDHELDOUT G/g-065                              meas  -28.2  -34.3  -36.5  -42.6  -45.4  -54.7 | pred  -28.3  -34.3  -36.5  -42.6  -45.3  -55.1 | factor >32/>32
+FIELDHELDOUT G/g-066                              meas  -30.7  -33.8  -36.4  -37.9  -46.0  -53.8 | pred  -30.7  -33.8  -36.4  -38.0  -46.0  -53.6 | factor >32/>32
+FIELDHELDOUT G/g-067                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-068                              meas -128.0 -133.9 -137.0 -137.0 -137.7 -137.9 | pred -129.5 -136.8 -143.8 -148.0 -151.4 -154.2 | factor 1/1
+FIELDHELDOUT G/g-069                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-070                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-071                              meas  -25.6  -35.4  -45.3  -50.2  -52.3  -59.1 | pred  -25.6  -35.4  -45.2  -50.1  -52.1  -59.1 | factor >32/>32
+FIELDHELDOUT G/g-072                              meas -115.8 -136.9 -137.1 -137.3 -137.3 -137.8 | pred -114.9 -145.1 -151.6 -154.0 -154.8 -157.9 | factor 1/1
+FIELDHELDOUT G/g-073                              meas  -21.3  -23.1  -30.1  -37.9  -40.6  -47.8 | pred  -21.3  -23.1  -30.0  -37.9  -40.5  -47.8 | factor >32/>32
+FIELDHELDOUT G/g-074                              meas  -29.7  -62.2 -107.9 -137.8 -137.3 -137.8 | pred  -29.7  -62.2 -107.9 -148.0 -150.2 -153.0 | factor 4/4
+FIELDHELDOUT G/g-075                              meas   26.4   23.9   21.0   18.6    3.4   -1.0 | pred   27.3   24.2   21.4   19.1    3.7   -0.7 | factor >32/>32
+FIELDHELDOUT G/g-076                              meas   86.1  108.7  102.2   95.3   82.1   71.0 | pred 2976.0 2962.4 2949.9 2938.1 2926.1 2914.1 | factor >32/>32
+FIELDHELDOUT G/g-077                              meas  -66.7 -136.3 -136.9 -136.8 -136.5 -136.7 | pred  -66.7 -146.3 -151.7 -153.7 -156.6 -160.4 | factor 2/2
+FIELDHELDOUT G/g-078                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-079                              meas   67.3   23.5   27.1   27.9   21.1   21.7 | pred 2874.2 2827.3 2826.1 2824.0 2821.3 2817.7 | factor >32/>32
+FIELDHELDOUT G/g-080                              meas  -96.1 -137.7 -137.1 -138.3 -137.8 -137.8 | pred  -96.1 -152.8 -155.7 -159.3 -162.8 -166.7 | factor 1/1
+FIELDHELDOUT G/g-081                              meas   -2.3   -8.3  -15.1  -21.5  -27.3  -33.3 | pred   -2.3   -8.3  -15.1  -21.5  -27.2  -33.1 | factor >32/>32
+FIELDHELDOUT G/g-082                              meas   91.6  112.4  102.3   98.5   78.8   69.4 | pred 2960.2 2946.7 2934.4 2922.6 2910.7 2898.6 | factor >32/>32
+FIELDHELDOUT G/g-083                              meas   65.4   90.5   79.4   74.2   67.2   57.0 | pred 2969.5 2960.9 2952.7 2944.3 2935.6 2926.4 | factor >32/>32
+FIELDHELDOUT G/g-084                              meas   67.6   82.9   80.5   71.4   61.7   55.5 | pred 2966.3 2957.5 2949.2 2940.7 2931.8 2922.8 | factor >32/>32
+FIELDHELDOUT G/g-085                              meas  -16.1  -24.3  -33.0  -38.9  -44.0  -49.4 | pred  -16.1  -24.3  -33.0  -38.9  -44.1  -49.7 | factor >32/>32
+FIELDHELDOUT G/g-086                              meas  153.2  131.5   87.7   28.5   27.6   25.5 | pred 2986.7 2964.9 2920.3 2854.8 2846.7 2843.5 | factor >32/>32
+FIELDHELDOUT G/g-087                              meas  -98.3 -137.6 -138.2 -137.9 -138.6 -138.1 | pred  -98.4 -144.9 -148.1 -150.6 -153.4 -155.7 | factor 1/1
+FIELDHELDOUT G/g-088                              meas -127.2 -133.9 -136.4 -137.6 -136.9 -137.7 | pred -128.8 -137.3 -141.6 -145.6 -148.3 -151.7 | factor 1/1
+FIELDHELDOUT G/g-089                              meas  -51.6  -69.5  -85.0 -102.6 -120.9 -135.1 | pred  -51.6  -69.5  -85.0 -102.6 -121.0 -139.0 | factor 4/4
+FIELDHELDOUT G/g-090                              meas -137.3  -53.9  -56.3  -67.5  -78.3  -90.5 | pred -145.1  -53.9  -56.3  -67.5  -78.3  -90.5 | factor 1/1
+FIELDHELDOUT G/g-091                              meas  -10.5  -24.6  -37.3  -49.2  -61.1  -73.2 | pred  -10.5  -24.6  -37.3  -49.2  -61.1  -73.2 | factor >32/>32
+FIELDHELDOUT G/g-092                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-093                              meas -137.0 -137.9 -137.3 -137.4 -138.2 -138.4 | pred -141.6 -145.4 -150.7 -153.7 -155.9 -157.3 | factor 1/1
+FIELDHELDOUT G/g-094                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-095                              meas -138.0 -137.7 -138.4 -138.6 -137.7 -138.5 | pred -151.1 -154.3 -157.6 -161.0 -163.8 -167.3 | factor 1/1
+FIELDHELDOUT G/g-096                              meas   22.7   21.9   22.6   20.6   19.1   23.8 | pred  562.7  560.5  558.3  555.8  553.2  550.6 | factor >32/>32
+FIELDHELDOUT G/g-097                              meas  126.3   91.4   65.3   39.0   26.2   25.6 | pred  139.9  119.6   85.5   48.5   33.5   25.8 | factor >32/>32
+FIELDHELDOUT G/g-098                              meas  -55.3  -73.3  -91.6 -108.9 -126.3 -137.5 | pred  -55.3  -73.3  -91.6 -108.9 -126.6 -144.2 | factor 4/4
+FIELDHELDOUT G/g-099                              meas  -54.3  -92.3 -137.3 -137.8 -137.7 -137.9 | pred  -54.3  -92.2 -146.8 -148.7 -151.4 -154.5 | factor 2/2
+FIELDHELDOUT G/g-100                              meas  -79.5 -137.3 -138.0 -138.8 -138.6 -138.5 | pred  -79.5 -146.3 -152.9 -156.0 -159.6 -163.2 | factor 2/2
+FIELDHELDOUT G/g-101                              meas   66.0   77.9   74.4   70.6   62.9   54.3 | pred  209.1  198.2  188.6  179.7  170.9  162.2 | factor >32/>32
+FIELDHELDOUT G/g-102                              meas  -37.8  -47.0  -54.7  -65.9  -77.8  -89.3 | pred  -37.8  -47.0  -54.7  -65.9  -77.8  -89.3 | factor 32/32
+FIELDHELDOUT G/g-103                              meas  -30.1  -33.0  -35.9  -37.7  -46.3  -51.3 | pred  -30.1  -33.1  -35.9  -37.7  -46.3  -51.2 | factor >32/>32
+FIELDHELDOUT G/g-104                              meas -126.7 -137.3 -138.3 -137.2 -137.9 -138.3 | pred -126.4 -145.4 -151.7 -156.7 -158.4 -161.5 | factor 1/1
+FIELDHELDOUT G/g-105                              meas   29.4   28.5   22.4   21.1   22.2   22.2 | pred 2840.2 2840.0 2838.8 2835.8 2833.7 2830.1 | factor >32/>32
+FIELDHELDOUT G/g-106                              meas -134.5 -136.0 -136.2 -137.8 -137.3 -138.1 | pred -137.3 -140.9 -143.1 -145.7 -148.5 -151.3 | factor 1/1
+FIELDHELDOUT G/g-107                              meas  -23.1  -40.8  -51.2  -62.3  -73.2  -84.4 | pred  -23.1  -40.8  -51.2  -62.3  -73.2  -84.4 | factor 32/32
+FIELDHELDOUT G/g-108                              meas  -29.9  -46.8  -63.6  -80.7  -98.4 -116.3 | pred  -29.9  -46.8  -63.6  -80.7  -98.4 -116.4 | factor 8/8
+FIELDHELDOUT G/g-109                              meas  -23.6  -30.1  -38.4  -46.4  -50.6  -58.4 | pred  -23.6  -30.1  -38.4  -46.1  -50.5  -57.6 | factor >32/>32
+FIELDHELDOUT G/g-110                              meas   -3.0   -9.0  -12.4  -20.1  -26.0  -31.9 | pred   -3.0   -9.0  -12.3  -20.0  -25.8  -31.6 | factor >32/>32
+FIELDHELDOUT G/g-111                              meas  -33.4  -36.5  -39.8  -43.1  -48.5  -54.5 | pred  -33.4  -36.5  -39.8  -43.1  -48.5  -54.5 | factor >32/>32
+FIELDHELDOUT G/g-112                              meas   87.3  114.2   98.4  103.9   80.8   67.5 | pred 2971.9 2955.6 2941.6 2932.9 2918.7 2908.1 | factor >32/>32
+FIELDHELDOUT G/g-113                              meas  -33.2  -49.5  -63.3  -78.0  -93.3 -108.8 | pred  -33.2  -49.5  -63.3  -78.0  -93.3 -108.8 | factor 16/16
+FIELDHELDOUT G/g-114                              meas  -24.0  -34.8  -50.0  -55.3  -65.6  -82.6 | pred  -24.0  -34.8  -50.0  -55.3  -65.6  -82.6 | factor 32/32
+FIELDHELDOUT G/g-115                              meas  -37.6  -58.1  -73.9  -88.5 -101.5 -113.5 | pred  -37.6  -58.1  -73.9  -88.5 -101.5 -113.6 | factor 8/8
+FIELDHELDOUT G/g-116                              meas   88.2  109.2  101.4   92.9   79.7   69.4 | pred  363.6  348.4  335.5  323.5  311.6  299.5 | factor >32/>32
+FIELDHELDOUT G/g-117                              meas  -42.6  -71.2  -90.5 -109.5 -127.8 -137.8 | pred  -42.6  -71.2  -90.5 -109.5 -128.2 -146.3 | factor 4/4
+FIELDHELDOUT G/g-118                              meas  -52.9  -73.9  -91.2 -109.1 -127.1 -137.2 | pred  -52.9  -73.9  -91.2 -109.2 -127.5 -145.5 | factor 4/4
+FIELDHELDOUT G/g-119                              meas -110.8 -137.2 -138.3 -138.1 -138.4 -138.8 | pred -110.7 -147.7 -149.9 -152.7 -155.0 -156.3 | factor 1/1
+FIELDHELDOUT G/g-120                              meas -135.2 -137.3 -137.8 -137.5 -137.3 -138.1 | pred -138.7 -148.7 -152.7 -155.1 -157.3 -161.8 | factor 1/1
+FIELDHELDOUT G/g-121                              meas  -26.4  -41.9  -53.9  -65.9  -78.0  -90.1 | pred  -26.4  -41.9  -53.9  -65.9  -78.0  -90.1 | factor 32/32
+FIELDHELDOUT G/g-122                              meas -131.4 -136.6 -137.2 -138.1 -138.0 -138.4 | pred -132.6 -142.8 -146.2 -150.5 -152.4 -154.9 | factor 1/1
+FIELDHELDOUT G/g-123                              meas   25.1   20.9   18.7   27.6   20.2   19.1 | pred 2840.6 2839.3 2837.2 2834.4 2832.1 2829.2 | factor >32/>32
+FIELDHELDOUT G/g-124                              meas -111.3 -138.1 -138.0 -138.6 -137.7 -138.3 | pred -111.4 -153.0 -156.2 -158.4 -161.5 -166.6 | factor 1/1
+FIELDHELDOUT G/g-125                              meas  -25.5  -36.9  -47.5  -58.9  -71.5  -83.1 | pred  -25.5  -36.9  -47.5  -58.9  -71.5  -83.1 | factor 32/32
+FIELDHELDOUT G/g-126                              meas   62.1   67.2   60.3   48.4   43.6   42.3 | pred 2990.1 2973.4 2967.1 2955.4 2950.1 2948.1 | factor >32/>32
+FIELDHELDOUT G/g-127                              meas  -30.2  -33.7  -38.4  -40.8  -50.7  -55.7 | pred  -30.2  -33.6  -38.4  -40.8  -50.6  -55.2 | factor >32/>32
+FIELDHELDOUT G/g-128                              meas   36.7   27.9   28.4   26.8   23.1   20.2 | pred 2867.6 2851.6 2850.1 2847.4 2844.7 2841.5 | factor >32/>32
+FIELDHELDOUT G/g-129                              meas  -89.3 -118.0 -138.0 -137.6 -137.6 -138.0 | pred  -89.3 -117.3 -148.4 -152.4 -154.4 -158.3 | factor 1/1
+FIELDHELDOUT G/g-130                              meas   57.1   48.1   41.7   48.0   41.3   38.8 | pred 2987.6 2964.7 2958.5 2952.4 2949.0 2949.3 | factor >32/>32
+FIELDHELDOUT G/g-131                              meas    1.6   -7.6  -18.3  -27.9  -40.0  -53.0 | pred    1.6   -7.6  -18.3  -27.9  -40.0  -53.0 | factor >32/>32
+FIELDHELDOUT G/g-132                              meas -126.6 -134.2 -136.0 -137.5 -136.9 -137.5 | pred -133.9 -145.7 -156.1 -159.7 -162.3 -167.3 | factor 1/1
+FIELDHELDOUT G/g-133                              meas   -8.0   -9.7   -9.1   -3.8  -14.1  -15.9 | pred   -8.0   -9.7   -9.1   -3.7  -14.0  -15.6 | factor >32/>32
+FIELDHELDOUT G/g-134                              meas -132.4 -138.7 -138.4 -138.3 -138.0 -138.5 | pred -134.0 -153.1 -155.8 -158.0 -162.8 -165.8 | factor 1/1
+FIELDHELDOUT G/g-135                              meas   64.9   91.3   78.1   75.5   66.6   56.0 | pred  164.0  155.7  139.1  133.5  123.9  110.8 | factor >32/>32
+FIELDHELDOUT G/g-136                              meas  -51.6  -72.8  -90.3 -108.6 -126.8 -137.2 | pred  -51.6  -72.8  -90.3 -108.6 -127.1 -145.2 | factor 4/4
+FIELDHELDOUT G/g-137                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-138                              meas  -20.7  -35.8  -47.5  -59.1  -72.4  -83.5 | pred  -20.7  -35.8  -47.5  -59.1  -72.4  -83.5 | factor 32/32
+FIELDHELDOUT G/g-139                              meas   85.7  107.0  100.8   92.5   81.1   72.4 | pred 2950.7 2940.6 2933.1 2923.2 2912.8 2901.6 | factor >32/>32
+FIELDHELDOUT G/g-140                              meas  -28.3  -33.8  -38.6  -43.0  -51.1  -54.7 | pred  -28.3  -33.7  -38.6  -42.9  -50.9  -54.5 | factor >32/>32
+FIELDHELDOUT G/g-141                              meas  108.7   24.5   18.1   27.0   22.5   20.4 | pred 2937.0 2845.4 2842.9 2840.7 2838.2 2836.1 | factor >32/>32
+FIELDHELDOUT G/g-142                              meas -131.1 -134.6 -136.4 -136.8 -137.9 -137.7 | pred -133.0 -139.2 -143.3 -146.0 -148.4 -152.0 | factor 1/1
+FIELDHELDOUT G/g-143                              meas -136.4 -137.0 -138.2 -137.0 -137.6 -138.4 | pred -141.9 -146.2 -150.2 -151.8 -154.4 -156.2 | factor 1/1
+FIELDHELDOUT G/g-144                              meas   82.1  106.4  101.5   96.1   81.3   70.8 | pred 2970.2 2960.9 2950.9 2940.2 2928.6 2916.7 | factor >32/>32
+FIELDHELDOUT G/g-145                              meas  -31.3  -44.8  -56.1  -67.6  -79.6  -92.1 | pred  -31.3  -44.8  -56.1  -67.6  -79.6  -92.1 | factor 32/32
+FIELDHELDOUT G/g-146                              meas   87.8  109.8  101.9   93.0   81.6   69.2 | pred 2967.7 2952.9 2940.1 2928.1 2916.2 2904.1 | factor >32/>32
+FIELDHELDOUT G/g-147                              meas   30.5   57.0   53.1   50.8   43.2   39.6 | pred 2864.2 2975.7 2969.8 2963.3 2957.3 2951.5 | factor >32/>32
+FIELDHELDOUT G/g-148                              meas -119.2 -137.4 -137.7 -137.6 -136.8 -137.5 | pred -119.2 -154.6 -158.8 -158.2 -159.6 -163.1 | factor 1/1
+FIELDHELDOUT G/g-149                              meas   -4.6  -11.9  -18.7  -24.1  -29.4  -35.1 | pred   -4.6  -11.9  -18.7  -24.1  -29.5  -35.4 | factor >32/>32
+FIELDHELDOUT G/g-150                              meas  -53.2  -72.4  -89.3 -107.3 -125.5 -137.5 | pred  -53.2  -72.4  -89.3 -107.3 -125.7 -143.8 | factor 4/4
+FIELDHELDOUT G/g-151                              meas   87.4  109.6  102.0   95.4   82.1   72.8 | pred 2971.1 2956.6 2943.8 2931.9 2919.9 2907.9 | factor >32/>32
+FIELDHELDOUT G/g-152                              meas -130.3 -137.2 -138.1 -137.9 -138.1 -138.3 | pred -131.4 -147.3 -153.2 -156.1 -158.9 -162.2 | factor 1/1
+FIELDHELDOUT G/g-153                              meas  147.0  108.8   41.0   35.4   36.0   34.2 | pred 2970.1 2932.7 2866.1 2841.8 2838.5 2836.3 | factor >32/>32
+FIELDHELDOUT G/g-154                              meas   84.6  109.7  102.5   89.8   75.6   70.7 | pred 2952.1 2941.0 2930.0 2918.3 2906.2 2895.5 | factor >32/>32
+FIELDHELDOUT G/g-155                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-156                              meas   89.8  113.6  102.6   97.5   84.4   68.4 | pred 2975.6 2955.8 2943.7 2931.5 2919.3 2907.8 | factor >32/>32
+FIELDHELDOUT G/g-157                              meas  -79.8 -138.2 -137.4 -137.5 -137.0 -137.5 | pred  -79.8 -152.7 -155.1 -159.0 -160.3 -166.3 | factor 2/2
+FIELDHELDOUT G/g-158                              meas  -31.7  -39.9  -48.3  -59.7  -71.5  -83.5 | pred  -31.7  -39.9  -48.3  -59.6  -71.5  -83.5 | factor 32/32
+FIELDHELDOUT G/g-159                              meas  -93.3 -138.0 -138.6 -138.7 -138.7 -138.3 | pred  -93.3 -154.2 -157.4 -159.7 -162.3 -169.9 | factor 1/1
+FIELDHELDOUT G/g-160                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-161                              meas  -71.3 -137.8 -138.1 -138.0 -137.7 -137.5 | pred  -71.3 -145.1 -147.4 -149.7 -152.3 -155.1 | factor 2/2
+FIELDHELDOUT G/g-162                              meas   -5.2   -8.1  -11.6  -17.2  -25.5  -29.0 | pred   -5.3   -8.1  -11.6  -17.1  -25.3  -29.0 | factor >32/>32
+FIELDHELDOUT G/g-163                              meas   86.4  112.4  106.3   97.8   81.7   69.5 | pred 2977.3 2964.7 2952.8 2941.2 2929.3 2917.3 | factor >32/>32
+FIELDHELDOUT G/g-164                              meas  -34.5  -46.6  -57.8  -76.1  -84.1  -97.2 | pred  -34.5  -46.6  -57.8  -76.1  -84.1  -97.2 | factor 16/16
+FIELDHELDOUT G/g-165                              meas  -37.9  -55.7  -70.3  -85.5 -100.9 -115.9 | pred  -37.9  -55.7  -70.3  -85.5 -100.9 -115.9 | factor 8/8
+FIELDHELDOUT G/g-166                              meas  133.5   22.2   21.4   21.0   19.5   19.2 | pred 2972.5 2849.4 2847.3 2844.8 2842.6 2839.7 | factor >32/>32
+FIELDHELDOUT G/g-167                              meas   -4.7    5.2  -16.9  -10.6  -17.1  -22.9 | pred   -4.7    5.2  -16.9  -10.5  -17.0  -22.7 | factor >32/>32
+FIELDHELDOUT G/g-168                              meas -135.3 -136.8 -136.8 -137.1 -137.8 -137.3 | pred -140.3 -142.3 -144.7 -147.0 -150.7 -154.0 | factor 1/1
+FIELDHELDOUT G/g-169                              meas  -68.4 -137.2 -138.1 -137.2 -137.6 -138.2 | pred  -68.4 -144.6 -151.0 -154.3 -155.4 -159.9 | factor 2/2
+FIELDHELDOUT G/g-170                              meas   67.5   78.4   70.6   67.2   60.7   53.4 | pred  168.8  160.9  159.4  154.2  140.3  142.9 | factor >32/>32
+FIELDHELDOUT G/g-171                              meas   88.4  110.6  101.7   92.4   82.1   67.2 | pred  146.6  131.2  118.3  106.4   94.4   82.4 | factor >32/>32
+FIELDHELDOUT G/g-172                              meas   83.8  114.1  102.0   91.2   80.9   67.1 | pred 2965.0 2957.6 2951.7 2941.0 2929.7 2918.0 | factor >32/>32
+FIELDHELDOUT G/g-173                              meas  -72.2 -128.8 -137.5 -137.8 -138.0 -137.6 | pred  -72.2 -130.7 -154.1 -156.7 -159.8 -163.6 | factor 2/2
+FIELDHELDOUT G/g-174                              meas  -80.5 -136.0 -137.1 -137.1 -138.0 -138.2 | pred  -80.5 -131.2 -145.2 -149.2 -152.7 -154.7 | factor 1/1
+FIELDHELDOUT G/g-175                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-176                              meas  -46.0  -67.5  -85.1 -103.4 -121.8 -136.3 | pred  -46.0  -67.5  -85.1 -103.4 -121.9 -139.9 | factor 4/4
+FIELDHELDOUT G/g-177                              meas  -89.0 -138.1 -137.4 -137.9 -138.6 -138.2 | pred  -88.9 -149.9 -151.7 -153.8 -157.0 -160.4 | factor 1/1
+FIELDHELDOUT G/g-178                              meas -137.3 -137.0 -137.5 -137.9 -138.5 -137.8 | pred -144.7 -148.3 -149.3 -150.9 -153.2 -158.8 | factor 1/1
+FIELDHELDOUT G/g-179                              meas   62.6   76.0   73.6   70.3   62.8   54.3 | pred 2964.4 2957.0 2949.2 2941.1 2932.5 2923.8 | factor >32/>32
+FIELDHELDOUT G/g-180                              meas -135.8  -48.7  -58.0  -67.7  -80.7  -92.0 | pred -140.6  -48.7  -58.0  -67.7  -80.7  -92.0 | factor 1/1
+FIELDHELDOUT G/g-181                              meas   -3.9   -8.2  -15.2  -21.2  -26.2  -33.2 | pred   -4.0   -8.1  -15.2  -21.1  -26.2  -32.7 | factor >32/>32
+FIELDHELDOUT G/g-182                              meas   44.7   54.4   52.5   50.0   44.7   40.2 | pred 2976.5 2973.1 2968.4 2963.0 2957.0 2952.1 | factor >32/>32
+FIELDHELDOUT G/g-183                              meas -137.7 -137.4 -138.2 -138.9 -138.6 -138.7 | pred -145.4 -152.2 -156.2 -160.0 -162.0 -166.0 | factor 1/1
+FIELDHELDOUT G/g-184                              meas  -32.0  -45.3  -54.4  -65.8  -75.2  -89.4 | pred  -32.0  -45.3  -54.4  -65.8  -75.2  -89.4 | factor 32/32
+FIELDHELDOUT G/g-185                              meas  -45.9  -65.8  -83.9 -101.3 -119.0 -134.4 | pred  -45.9  -65.8  -83.9 -101.3 -119.1 -136.9 | factor 4/4
+FIELDHELDOUT G/g-186                              meas   44.1   31.0   31.4   34.9   29.8   30.4 | pred 2867.2 2838.5 2836.5 2834.3 2831.9 2828.9 | factor >32/>32
+FIELDHELDOUT G/g-187                              meas -138.0 -138.1 -138.1 -137.7 -137.9 -137.3 | pred -144.3 -146.2 -148.0 -150.2 -152.6 -154.3 | factor 1/1
+FIELDHELDOUT G/g-188                              meas   -2.5   -5.3  -11.0  -16.8  -23.3  -31.5 | pred   -2.5   -5.2  -11.0  -16.8  -23.3  -31.4 | factor >32/>32
+FIELDHELDOUT G/g-189                              meas -101.4 -136.7 -137.3 -137.8 -138.5 -138.7 | pred -101.4 -143.2 -146.2 -150.3 -152.2 -154.2 | factor 1/1
+FIELDHELDOUT G/g-190                              meas  -95.7 -138.5 -138.7 -138.6 -138.5 -137.9 | pred  -95.7 -156.0 -158.7 -161.4 -163.5 -167.8 | factor 1/1
+FIELDHELDOUT G/g-191                              meas   88.2  108.8  102.2   92.8   81.2   71.3 | pred  363.6  348.4  335.5  323.5  311.6  299.5 | factor >32/>32
+FIELDHELDOUT G/g-192                              meas  -44.0  -58.1  -73.7  -89.6 -106.6 -124.0 | pred  -44.0  -58.1  -73.7  -89.6 -106.6 -124.2 | factor 8/8
+FIELDHELDOUT G/g-193                              meas -134.3 -136.2 -137.6 -137.7 -137.9 -137.5 | pred -136.9 -142.3 -144.4 -147.1 -149.3 -151.2 | factor 1/1
+FIELDHELDOUT G/g-194                              meas  -17.5   -2.3  -33.6  -49.5  -57.9  -66.7 | pred  -17.5   -2.3  -33.6  -49.5  -57.9  -66.7 | factor >32/>32
+FIELDHELDOUT G/g-195                              meas   42.2   22.1   20.4   20.7   20.2   23.4 | pred 2866.5 2842.6 2846.8 2846.2 2841.1 2839.3 | factor >32/>32
+FIELDHELDOUT G/g-196                              meas  -66.8 -137.3 -137.5 -137.5 -138.4 -137.6 | pred  -66.8 -153.9 -157.2 -160.5 -162.8 -167.5 | factor 2/2
+FIELDHELDOUT G/g-197                              meas -123.9 -137.5 -138.4 -138.5 -138.8 -138.5 | pred -124.8 -152.3 -155.1 -158.6 -162.0 -163.3 | factor 1/1
+FIELDHELDOUT G/g-198                              meas   -8.2   -9.8  -14.8  -16.8  -23.2  -29.1 | pred   -8.2   -9.8  -14.7  -16.7  -23.1  -28.8 | factor >32/>32
+FIELDHELDOUT G/g-199                              meas -129.0 -135.7 -137.6 -137.5 -137.9 -137.9 | pred -129.9 -140.1 -143.8 -147.1 -149.3 -152.2 | factor 1/1
+FIELDHELDOUT G/g-200                              meas   64.6   88.9   77.6   70.1   62.2   53.8 | pred 2970.4 2959.0 2949.5 2940.5 2931.7 2922.9 | factor >32/>32
+FIELDHELDOUT G/g-201                              meas  -15.8 -125.1 -125.9 -127.0 -127.7 -127.0 | pred  -15.8 -127.5 -129.7 -132.0 -134.9 -137.8 | factor 2/2
+FIELDHELDOUT G/g-202                              meas  -33.6  -76.2 -137.5 -137.8 -137.9 -137.9 | pred  -33.6  -76.2 -149.8 -152.8 -155.2 -158.0 | factor 4/4
+FIELDHELDOUT G/g-203                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-204                              meas  -92.7 -136.4 -137.7 -138.0 -137.9 -138.5 | pred  -92.6 -141.3 -145.4 -146.0 -147.8 -150.9 | factor 1/1
+FIELDHELDOUT G/g-205                              meas  -51.0  -71.1  -88.3 -106.3 -124.4 -137.0 | pred  -51.0  -71.1  -88.3 -106.3 -124.6 -142.7 | factor 4/4
+FIELDHELDOUT G/g-206                              meas   -6.2  -12.5  -18.3  -24.4  -30.5  -36.5 | pred   -6.2  -12.5  -18.3  -24.3  -30.4  -36.3 | factor >32/>32
+FIELDHELDOUT G/g-207                              meas  -33.5  -40.4  -43.6  -47.2  -49.3  -58.1 | pred  -33.5  -40.4  -43.5  -47.3  -49.3  -58.2 | factor >32/>32
+FIELDHELDOUT G/g-208                              meas    7.3    3.8   -2.3  -10.2  -15.0  -22.6 | pred    7.3    3.8   -2.3  -10.3  -15.2  -23.4 | factor >32/>32
+FIELDHELDOUT G/g-209                              meas -104.7 -137.2 -138.8 -138.1 -138.1 -138.1 | pred -104.7 -144.8 -150.9 -154.3 -156.4 -160.2 | factor 1/1
+FIELDHELDOUT G/g-210                              meas  -87.0 -137.4 -137.0 -138.2 -138.8 -138.2 | pred  -87.0 -145.7 -152.1 -155.1 -157.7 -162.4 | factor 1/1
+FIELDHELDOUT G/g-211                              meas  -24.5  -38.9  -49.3  -61.0  -73.6  -86.6 | pred  -24.5  -38.9  -49.3  -61.0  -73.6  -86.6 | factor 32/32
+FIELDHELDOUT G/g-212                              meas   83.9  107.4  101.3   95.5   82.8   72.1 | pred 2966.0 2954.9 2943.7 2932.4 2920.6 2908.6 | factor >32/>32
+FIELDHELDOUT G/g-213                              meas  -48.7  -61.7  -76.9  -92.2 -109.0 -126.2 | pred  -48.7  -61.7  -76.9  -92.2 -109.0 -126.6 | factor 8/8
+FIELDHELDOUT G/g-214                              meas    3.6   -3.3   -8.5  -14.3  -18.5  -23.5 | pred    3.6   -3.3   -8.6  -14.4  -18.6  -23.7 | factor >32/>32
+FIELDHELDOUT G/g-215                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-216                              meas   18.8   11.6    3.3   -0.6   -6.6  -13.5 | pred   18.8   11.6    3.4   -0.5   -6.5  -13.1 | factor >32/>32
+FIELDHELDOUT G/g-217                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-218                              meas  -16.9  -22.9  -28.6  -36.8  -38.8  -45.0 | pred  -16.9  -22.9  -28.5  -36.7  -38.7  -44.9 | factor >32/>32
+FIELDHELDOUT G/g-219                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-220                              meas   84.1  107.4  101.0   94.5   81.1   70.4 | pred 2960.6 2950.0 2939.6 2928.6 2917.1 2905.1 | factor >32/>32
+FIELDHELDOUT G/g-221                              meas  -19.1  -29.6  -39.9  -51.2  -64.8  -74.7 | pred  -19.1  -29.6  -39.9  -51.2  -64.8  -74.8 | factor >32/>32
+FIELDHELDOUT G/g-222                              meas  -27.9  -34.4  -36.3  -39.8  -46.7  -54.1 | pred  -27.9  -34.4  -36.3  -39.8  -46.6  -53.8 | factor >32/>32
+FIELDHELDOUT G/g-223                              meas -137.5  -45.7  -54.8  -65.9  -77.4  -89.0 | pred -144.3  -45.7  -54.8  -65.9  -77.4  -89.0 | factor 1/1
+FIELDHELDOUT G/g-224                              meas  -28.4  -41.1  -50.5  -61.5  -73.5  -87.5 | pred  -28.4  -41.1  -50.5  -61.5  -73.5  -87.5 | factor 32/32
+FIELDHELDOUT G/g-225                              meas -123.4 -130.4 -134.8 -137.0 -137.5 -138.4 | pred -124.3 -131.3 -136.5 -140.2 -143.0 -146.0 | factor 1/1
+FIELDHELDOUT G/g-226                              meas   -5.0  -11.4  -13.5  -22.2  -24.1  -29.8 | pred   -5.0  -11.4  -13.5  -22.2  -24.3  -30.0 | factor >32/>32
+FIELDHELDOUT G/g-227                              meas  -26.8  -36.3  -49.1  -59.8  -67.2  -86.1 | pred  -26.8  -36.3  -49.1  -59.8  -67.2  -86.1 | factor 32/32
+FIELDHELDOUT G/g-228                              meas -131.0 -135.7 -136.7 -137.1 -138.3 -138.2 | pred -132.4 -139.0 -142.1 -144.5 -147.4 -150.1 | factor 1/1
+FIELDHELDOUT G/g-229                              meas -136.4 -137.6 -137.5 -137.8 -138.1 -137.6 | pred -141.0 -146.3 -151.2 -153.0 -155.7 -156.5 | factor 1/1
+FIELDHELDOUT G/g-230                              meas  -23.5  -37.9  -44.1  -47.5  -50.2  -56.6 | pred  -23.5  -38.0  -44.0  -47.5  -50.2  -57.0 | factor >32/>32
+FIELDHELDOUT G/g-231                              meas  -30.1  -49.7  -67.1  -85.4 -103.9 -121.9 | pred  -30.1  -49.7  -67.1  -85.4 -103.9 -122.0 | factor 8/8
+FIELDHELDOUT G/g-232                              meas  -69.3 -136.7 -138.1 -137.7 -138.4 -138.4 | pred  -69.3 -149.2 -152.5 -155.6 -158.0 -161.2 | factor 2/2
+FIELDHELDOUT G/g-233                              meas    8.6    2.6   -7.1  -13.7  -19.4  -24.6 | pred    8.6    2.6   -7.1  -13.8  -19.5  -25.0 | factor >32/>32
+FIELDHELDOUT G/g-234                              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT G/g-235                              meas   89.3  117.7  104.8   88.2   76.3   65.8 | pred 2958.5 2950.6 2940.0 2927.9 2916.4 2904.3 | factor >32/>32
+FIELDHELDOUT G/g-236                              meas  -20.9  -24.9  -28.3  -30.9  -35.3  -43.6 | pred  -21.0  -24.9  -28.2  -30.7  -35.0  -43.2 | factor >32/>32
+FIELDHELDOUT G/g-237                              meas  -27.0  -30.3  -34.7  -40.7  -43.6  -53.1 | pred  -27.0  -30.3  -34.7  -40.7  -43.5  -52.7 | factor >32/>32
+FIELDHELDOUT G/g-238                              meas -106.9 -137.5 -138.3 -138.5 -137.8 -138.2 | pred -106.6 -150.1 -152.9 -155.9 -158.2 -160.9 | factor 1/1
+FIELDHELDOUT G/g-239                              meas  158.7   93.3   29.8   29.9   26.1   27.4 | pred 2991.8 2928.6 2857.8 2855.8 2852.7 2849.7 | factor >32/>32
+FIELDHELDOUT G/g-240                              meas -137.6 -137.4 -138.0 -137.9 -137.4 -137.4 | pred -143.7 -150.2 -154.1 -156.4 -159.8 -162.3 | factor 1/1
+FIELDHELDOUT L/l-01-enderby-sine-clip             meas  -45.3  -62.4  -80.7  -99.0 -117.8 -133.8 | pred  -45.3  -62.4  -80.7  -99.0 -117.9 -135.6 | factor 4/4
+FIELDHELDOUT L/l-02-enderby-exp2-clip             meas  -36.0  -58.6  -74.7  -92.3 -111.2 -128.5 | pred  -36.0  -58.6  -74.7  -92.3 -111.2 -129.0 | factor 8/8
+FIELDHELDOUT L/l-03-enderby-exp5-clip             meas  -19.3  -37.9  -55.3  -73.5  -92.0 -110.0 | pred  -19.3  -37.9  -55.3  -73.5  -92.0 -110.1 | factor 16/16
+FIELDHELDOUT L/l-04-enderby-tsq-clip              meas  -35.1  -59.5  -74.5  -91.2 -110.0 -132.6 | pred  -35.1  -59.5  -74.5  -91.2 -110.0 -134.7 | factor 8/8
+FIELDHELDOUT L/l-05-enderby-cubic-clip            meas  -43.4  -60.6  -79.1  -97.3 -116.1 -132.2 | pred  -43.4  -60.6  -79.1  -97.3 -116.1 -133.9 | factor 8/8
+FIELDHELDOUT L/l-06-enderby-reciprocal-clip       meas  -17.5  -28.8  -40.7  -55.3  -72.1  -89.6 | pred  -17.5  -28.8  -40.7  -55.3  -72.1  -89.6 | factor 32/32
+FIELDHELDOUT L/l-07-smith-cubic-soft-clip         meas -124.3 -125.4 -128.8 -130.8 -133.4 -134.8 | pred -121.9 -123.9 -126.1 -128.4 -131.0 -133.6 | factor 1/1
+FIELDHELDOUT L/l-08-smith-hard-clip               meas  -31.3  -47.4  -58.2  -70.6  -82.5  -95.0 | pred  -31.3  -47.4  -58.2  -70.6  -82.5  -95.0 | factor 16/16
+FIELDHELDOUT L/l-09-buchla259-static              meas   27.6    7.6    6.2  -13.0  -23.3  -32.5 | pred   27.6    7.6    6.2  -13.0  -23.3  -32.5 | factor >32/>32
+FIELDHELDOUT L/l-10-buchla259-filtered            meas   22.0    5.6    3.9  -14.8  -23.6  -33.1 | pred   22.0    5.6    3.9  -14.8  -23.6  -33.1 | factor >32/>32
+FIELDHELDOUT L/l-11-yeh-rational-sat              meas  -39.1  -71.6 -102.3 -129.5 -138.1 -138.0 | pred  -39.1  -71.6 -102.3 -130.2 -157.4 -168.0 | factor 4/4
+FIELDHELDOUT L/l-12-yeh-distortion-pedal          declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-13-yeh-overdrive-pedal           declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-14-yeh-diode-be-semiimplicit     declined: no periodic steady state after 40 iterations (residual 0.0024, loop radius 1.933)
+FIELDHELDOUT L/l-15-yeh-diode-tr-semiimplicit     declined: no periodic steady state after 40 iterations (residual 0.028, loop radius 1.839)
+FIELDHELDOUT L/l-16-yeh-prefilter-static          declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-17-huovilainen-ladder-1k         meas  -48.7  -70.7 -110.9 -135.6 -136.6 -137.9 | pred  -48.7  -70.7 -110.9 -139.3 -143.0 -151.0 | factor 4/4
+FIELDHELDOUT L/l-18-huovilainen-ladder-3k-reso    meas  -48.4  -77.5 -134.6 -137.1 -138.6 -138.8 | pred  -48.4  -77.5 -137.8 -149.2 -152.7 -154.4 | factor 4/4
+FIELDHELDOUT L/l-19-huovilainen-single-stage      meas  -57.6  -82.2 -113.9 -133.2 -136.9 -137.0 | pred  -57.6  -82.2 -114.0 -135.7 -146.6 -147.2 | factor 2/2
+FIELDHELDOUT L/l-20-timoney-config1               declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-21-timoney-config2               declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-22-timoney-config3               declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-23-timoney-exp-static            meas  -25.3  -44.6  -61.8  -80.1  -98.5 -116.5 | pred  -25.3  -44.6  -61.8  -80.1  -98.5 -116.6 | factor 8/8
+FIELDHELDOUT L/l-24-dattorro-chamberlin-clipped   meas -121.1 -130.9 -136.0 -136.9 -136.4 -137.9 | pred -121.6 -131.4 -140.9 -141.7 -140.8 -150.9 | factor 1/1
+FIELDHELDOUT L/l-25-dattorro-chamberlin-cascade   meas  -22.3  -58.4  -89.6  -96.8 -113.4 -131.6 | pred  -22.3  -58.4  -89.6  -96.8 -113.4 -132.9 | factor 4/4
+FIELDHELDOUT L/l-26-parker-adaa-hardclip          declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-27-parker-adaa-linear-hardclip   declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-28-parker-adaa-lowpass           declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-29-adaa-smith-cubic              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-30-adaa-enderby-reciprocal       declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-31-adaa-timoney-exp              declined: delay lines (output is not a function of the input phase alone)
+FIELDHELDOUT L/l-32-parker-moog-like              meas  -51.8  -80.1 -128.0 -136.7 -138.5 -137.6 | pred  -51.8  -80.1 -128.4 -144.6 -150.9 -155.3 | factor 2/2
+FIELDHELDOUT 272 files: 233 scored, 39 declined or failed

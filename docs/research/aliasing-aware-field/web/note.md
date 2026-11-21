@@ -1,10 +1,10 @@
 ---
-description: "Can a compiler pick the oversampling factor for nonlinear audio code? A pre-registered study in Infinite's Field language: the alias prediction works on our test corpus, and per-subgraph oversampling missed its bar."
+description: "Can a compiler pick the oversampling factor for nonlinear audio code? A pre-registered study in Infinite's Field language: the alias prediction holds on 233 held-out kernels and beats simple rules, and per-subgraph oversampling missed its bar."
 seo_title: "Aliasing-aware compilation for Field | Infinite Research"
 keywords: "aliasing, oversampling, DSP compiler, nonlinear audio, anti-aliasing, Field, negative result"
 series: "Infinite Research · Technical Report 1"
-version: "1.0"
-abstract: "Nonlinear audio code aliases, and the usual remedy, oversampling, is chosen by hand and does not compose: in our rig one saturator at 8x stays below −118 dB of alias, three in series measure −46 dB. We asked whether a compiler can choose the factor itself. Before measuring, we pre-registered two hypotheses with kill criteria: (H1) a static analysis predicts alias well enough to rank kernels (Spearman ρ ≥ 0.8) and (H2) choosing the factor per subgraph saves at least 25% of CPU against oversampling the whole kernel at the factor it needs. On a corpus of 47 kernels in Infinite's Field language, alias falls by about 6(k+1) dB per doubling of the rate, where k is the number of continuous derivatives, so kernels with jumps cannot be fixed by oversampling at all. A periodic steady-state analysis predicts alias with ρ = 0.994 and names the needed factor exactly for 43 of 43 kernels, but it is exact by construction for memoryless kernels and covered only 2 of 18 held-out presets, so H1 is not confirmed. H2 is killed: per-segment plans saved 17.4%, and on the motivating three-saturator chain the plan measured −43.0 dB against a predicted −80.5 dB, worse than a fixed 8x. Real half-band resamplers pass energy that the next stage folds back. What survives is a compile-time suggestion of one whole-kernel factor."
+version: "1.1"
+abstract: "Nonlinear audio code aliases, and the usual remedy, oversampling, is chosen by hand and does not compose: in our rig one saturator at 8x stays below −118 dB of alias, three in series measure −46 dB. We asked whether a compiler can choose the factor itself. Before measuring, we pre-registered two hypotheses with kill criteria: (H1) a static analysis predicts alias well enough to rank kernels (Spearman ρ ≥ 0.8) and (H2) choosing the factor per subgraph saves at least 25% of CPU against oversampling the whole kernel at the factor it needs. On a corpus of 47 kernels in Infinite's Field language, alias falls by about 6(k+1) dB per doubling of the rate, where k is the number of continuous derivatives, so kernels with jumps cannot be fixed by oversampling at all. A periodic steady-state analysis predicts alias with ρ = 0.994 and names the needed factor exactly for 43 of 43 kernels, but it is exact by construction for memoryless kernels. A pre-registered held-out test on 272 kernels the author did not tune against (32 from the literature, 240 generated) confirms H1 within its scope: on the 174 informative kernels scored, ρ is 1.000 and 0.994 on the two sets, and the exact factor is chosen for 174 of 174, against 8 for “8x if nonlinear” and 37 for a lookup by smoothness class. The scope is a steady tone and kernels without delay lines; 14 of the 32 literature kernels, including every ADAA kernel, were declined. H2 is killed: per-segment plans saved 17.4%, and would reach the bar only if a resampler pair cost under 0.09 interpreter instructions; and on the motivating three-saturator chain the plan measured −43.0 dB against a predicted −80.5 dB, worse than a fixed 8x. Real half-band resamplers pass energy that the next stage folds back. What survives is a compile-time suggestion of one whole-kernel factor."
 ---
 ## Introduction
 
@@ -12,7 +12,7 @@ Nonlinear audio code (a `tanh`, a `clamp`, an `abs`, a product of two signals) c
 
 In Infinite, a person picks the factor per node; the Drive and Saturator nodes run at 8x. That choice does not compose. In our rig one Saturator stage at 8x (with ADAA) stays below −118 dB of alias, while three of the same stages in series, in one 8x domain, measure −46 dB. Field, Infinite's language for user-written kernels, makes this worse: its kernels are arbitrary code and its sample path has no oversampling at all.
 
-This report asks whether a compiler can read a kernel, predict how much it aliases at each factor, and choose the cheapest factor per part of the kernel that meets a target. The target throughout is −80 dB below 20 kHz, the one Infinite's Analog node uses. Our contributions are a measured smoothness law for alias against rate on a corpus of 47 kernels (Section 4.1), a periodic steady-state alias predictor and its evaluation (Section 4.2), and a negative result for per-subgraph rate choice with its cause (Section 4.3). The data, scripts and every figure's source are public (Section 9).
+This report asks whether a compiler can read a kernel, predict how much it aliases at each factor, and choose the cheapest factor per part of the kernel that meets a target. The target throughout is −80 dB below 20 kHz, the one Infinite's Analog node uses. Our contributions are a measured smoothness law for alias against rate on a corpus of 47 kernels (Section 4.1), a periodic steady-state alias predictor and its evaluation (Section 4.2), and a negative result for per-subgraph rate choice with its cause (Section 4.4). The data, scripts and every figure's source are public (Section 9).
 
 ## Pre-registered hypotheses
 
@@ -25,7 +25,7 @@ Both hypotheses, with the numbers that would kill them, were committed to the re
 <tr><td>H2</td><td>Choosing the factor per subgraph pays.</td><td>At equal measured alias, ≥ 25% less CPU than oversampling the whole kernel at the factor it needs, and it beats a fixed 8x on composed chains.</td><td>saving &lt; 25%</td></tr>
 </tbody></table></div>
 
-No hypothesis is reported as confirmed without held-out validation; the corpus was written by the author of the analysis.
+No hypothesis is reported as confirmed without held-out validation; the corpus was written by the author of the analysis. After the corpus results, two more were pre-registered with the analysis frozen: H1b (H1's bars, met separately on two held-out sets) and H3 (the analysis picks the needed factor more often than two simple rules); Section 4.3.
 
 ## Method
 
@@ -47,7 +47,7 @@ For a kernel with no memory driven by the rig's own tone, this prediction is exa
 
 The planner cuts a compiled kernel into at most four segments next to its nonlinear operations (at most three cuts, at most two values crossing each cut). Each segment runs at its own factor, 1x to 32x, and each crossing value goes down to the base rate and back up through Infinite's resampler. Plans are scored with the phase-1 analysis, weighted by how sensitive the output is to each crossing value, and the cheapest plan predicted at −80 dB or below is chosen. Every chosen plan is then rendered through the real resamplers, and **a plan only earns its saving if its measured alias meets the target**; otherwise the kernel is charged the whole-kernel cost.
 
-CPU is a cost model, not a timing of the app's audio thread: nanoseconds per base-rate sample for one interpreter instruction, and for an up- and a down-sampler at each factor, from an isolated −O2 microbenchmark (best of five trials). The verdict run used one measurement of that model. To give the saving a spread, the model was re-measured in {{cost_n}} independent runs and the rig re-run under each (Section 4.3).
+CPU is a cost model, not a timing of the app's audio thread: nanoseconds per base-rate sample for one interpreter instruction, and for an up- and a down-sampler at each factor, from an isolated −O2 microbenchmark (best of five trials). The verdict run used one measurement of that model. To give the saving a spread, the model was re-measured in {{cost_n}} independent runs and the rig re-run under each (Section 4.4).
 
 ## Results
 
@@ -67,17 +67,32 @@ How smooth the nonlinearity is sets the slope ([[fig:slopes]]). Alias falls by a
 
 Over 43 predicted kernels at six factors, the rank correlation is ρ = **0.994** (bar 0.8), the median absolute error **0.0 dB** (bar 10), and the needed factor is predicted exactly for **43 of 43** kernels ([[fig:scatter]]). The analysis costs about 4.6 M interpreter runs for the whole corpus, against 91 M for rendering every factor.
 
-This number is weaker than it looks, for three reasons. First, the bar was set for an approximate analysis and is cleared trivially by the memoryless kernels, which are exact by construction. On the informative cases the error is still small: feedback (3 kernels) 0.0 dB, linear filters around a nonlinearity 0.0 to 0.5 dB, and the extrapolated tail for jumps 0.1 to 0.6 dB at 32x ([[fig:explorer]]). Second, the pass knows the stimulus exactly and a compiler does not: sweeping input amplitude (0.25, 0.5, 1.0) and frequency (0.5 to 5 kHz) changed the needed factor for 31 of 38 kernels, 29 of them upward. A shipped version would have to plan at the worst corner of a declared input range. Third, the corpus was written by one person. On 18 shipping Field Effect presets that were not in it, the pass accepted 2 (factor exact, worst error 0.1 dB) and declined 16: 7 read state tables, the rest have no periodic steady state under a steady tone. Two of eighteen cannot carry a general claim. **H1 is not confirmed.**
+This number is weaker than it looks, for three reasons. First, the bar was set for an approximate analysis and is cleared trivially by the memoryless kernels, which are exact by construction. On the informative cases the error is still small: feedback (3 kernels) 0.0 dB, linear filters around a nonlinearity 0.0 to 0.5 dB, and the extrapolated tail for jumps 0.1 to 0.6 dB at 32x ([[fig:explorer]]). Second, the pass knows the stimulus exactly and a compiler does not: sweeping input amplitude (0.25, 0.5, 1.0) and frequency (0.5 to 5 kHz) changed the needed factor for 31 of 38 kernels, 29 of them upward. A shipped version would have to plan at the worst corner of a declared input range. Third, the corpus was written by one person. On 18 shipping Field Effect presets that were not in it, the pass accepted 2 (factor exact, worst error 0.1 dB) and declined 16: 7 read state tables, the rest have no periodic steady state under a steady tone. Two of eighteen cannot carry a general claim, so H1 was not confirmed on this corpus alone; Section 4.3 reports the held-out test.
 
 <div data-fig="explorer"></div>
 
 The analysis also found a bug. Two presets came out 2 dB cleaner than measured; their `drive` knob held 3.0, not its declared 2.5, because when Field recompiles a parameter keeps its value by name, so a kernel inherits any same-named knob from the one before. Picking a preset in the app goes through the same path. The data uses corrected values; the app fix is not yet released.
 
+### Held-out validation
+
+After the corpus results, and with the analysis frozen, we pre-registered a second test (H1b, H3) and committed two held-out sets before scoring them. **L** has 32 kernels written from equations in nine papers and textbooks (waveshapers, diode and pedal models, ladder and state-variable filters, ADAA clippers), without looking at the analysis or the data. **G** has 240 kernels drawn from Field's sample-rate grammar with a fixed seed, at least half with `state` or `delay`. H1b asks for ρ ≥ 0.8 and a median error ≤ 10 dB on each set's informative (stateful) kernels; H3 asks the analysis to pick the exact factor on at least 80% of them and more often than two simple rules: A, “8x if the kernel has any nonlinear operation”, and B, the median factor of the kernel's smoothness class in the corpus.
+
+<div class="table-wrap"><table>
+<thead><tr><th>Set</th><th>Kernels</th><th>Scored</th><th>Informative</th><th>ρ (bar 0.8)</th><th>Median error (bar 10 dB)</th><th>H1b</th></tr></thead>
+<tbody>
+<tr><td>L, literature</td><td>32</td><td>18</td><td>7</td><td>1.000</td><td>0.0 dB</td><td>pass</td></tr>
+<tr><td>G, generated</td><td>240</td><td>215</td><td>167</td><td>0.994</td><td>0.0 dB</td><td>pass</td></tr>
+</tbody></table></div>
+
+**H1b and H3 pass.** The analysis picks the exact factor for 174 of 174 informative kernels; rule A for 8 and rule B for 37. Sixty-eight of these kernels never reach −80 dB within 32x (runaway feedback in G) and both sides say so; without them the count is 106 of 106 against 8 and 9. Every kernel with a median error above 10 dB is one of those that never gets clean, and 29 of them predict meaningless values near +2900 dB from a diverging solve that should have been declined. Where measured alias exceeds the prediction by more than 3 dB, the measurement is at the rig's float32 floor (never above −125.9 dB).
+
+Coverage is the limit. The pass declines kernels with delay lines, so 12 literature kernels (every ADAA kernel, the pedal circuits, Timoney's configurations) and 25 generated ones were not scored; two semi-implicit diode clippers had no periodic steady state. The seven informative literature kernels are all state-only filters. **H1 is confirmed for single-tone input and kernels without delay lines**, not for Field kernels in general. A delay of N samples is a phase shift of a periodic signal, so the gap looks closable, but closing it means changing the frozen analysis and rescoring.
+
 ### Per-segment oversampling
 
 <div data-fig="h2"></div>
 
-**H2 fails.** The aggregate saving is 17.4% (median 19.5% per kernel) against a 25% bar ([[fig:h2]]). Re-measuring the cost model in {{cost_n}} independent runs and re-running the rig under each gives {{cost_mean}}% (95% CI {{cost_lo}} to {{cost_hi}}), also below the bar ([[fig:costs]]). The repeats measured a cheaper interpreter instruction (about 2.7 ns, against 3.5 ns in the verdict line), which lowers the saving; the verdict line is kept as the pre-registered result. Staging pays where a cheap linear stage surrounds one nonlinearity, because the linear part runs at 1x. But a resampler pair costs as much as 6 to 14 interpreter instructions at the same factor, and most Field kernels are short; the fixed cost of each crossing eats most of what staging saves.
+**H2 fails.** The aggregate saving is 17.4% (median 19.5% per kernel) against a 25% bar ([[fig:h2]]). Re-measuring the cost model in {{cost_n}} independent runs and re-running the rig under each gives {{cost_mean}}% (95% CI {{cost_lo}} to {{cost_hi}}), also below the bar ([[fig:costs]]). Scaling every resampler cost down by a factor s, the saving reaches 25% only below s = 0.0156, where a 2x pair costs 0.09 interpreter instructions; the three-stage chain never beats a fixed 8x at any s. The repeats measured a cheaper interpreter instruction (about 2.7 ns, against 3.5 ns in the verdict line), which lowers the saving; the verdict line is kept as the pre-registered result. Staging pays where a cheap linear stage surrounds one nonlinearity, because the linear part runs at 1x. But a resampler pair costs as much as 6 to 14 interpreter instructions at the same factor, and most Field kernels are short; the fixed cost of each crossing eats most of what staging saves.
 
 <div data-fig="costs"></div>
 
@@ -89,13 +104,13 @@ Staging also changes the sound of chains. Band-limiting between stages removes u
 
 ## Discussion
 
-The per-subgraph claim is dropped, and the planned next phase (rate regions on the live audio path) will not start. What is worth shipping is the simpler result: the phase-1 pass as a compile-time suggestion of one **whole-kernel** factor for Field Effect, planned at the worst corner of a declared input range, with a plain message when a kernel contains a jump that oversampling cannot fix. Two things would change the H2 verdict: much cheaper crossings (a resampler costing a few instructions), or much longer kernels with one nonlinearity inside a lot of linear code. Feedback loops, where bandwidth circulates through `state` and `delay`, are a separate question and remain open.
+The per-subgraph claim is dropped, and the planned next phase (rate regions on the live audio path) will not start. What is worth shipping is the simpler result: the phase-1 pass as a compile-time suggestion of one **whole-kernel** factor for Field Effect, planned at the worst corner of a declared input range, with a plain message when a kernel contains a jump that oversampling cannot fix. Two things would change the H2 verdict: much cheaper crossings (the break-even is a 2x resampler pair under 0.09 interpreter instructions, under 2% of today's 6), or much longer kernels with one nonlinearity inside a lot of linear code. Feedback loops, where bandwidth circulates through `state` and `delay`, are a separate question and remain open.
 
 ## Threats to validity
 
 - **Construct.** Alias is measured with one tone at one amplitude, and the needed factor moves with the stimulus (Section 4.2). The metric counts modulation sidebands and limit cycles as alias; the Moog ladder preset reads −29 dB at 1x and 2x for that reason and was excluded. Kernels with a float32 phase accumulator (the naive oscillators) cannot measure below about −100 dB, because the accumulator's rounding is itself inharmonic; memoryless and filter kernels measure down to about −138 dB. Predictions and measurements are both floored at −100 dB for scoring.
 - **Internal.** H2's CPU figures come from a cost model, not from timing the audio thread. A cheaper resampler would raise the saving; a compiled backend would make instructions cheaper and crossings relatively dearer, which would lower it. The cost model's spread across runs is reported ([[fig:costs]]); the model itself was measured on one machine (Apple M2).
-- **External.** One author wrote the corpus, and held-out coverage is 2 of 18 presets. Kernels are short.
+- **External.** One author wrote the corpus and the literature set (from papers, blind to the analysis), and the generated set comes from a grammar the same author wrote. Delay-line kernels, including ADAA, are outside the tested scope. Kernels are short.
 
 ## Related work
 
@@ -103,7 +118,7 @@ ADAA [@parker2016; @bilbao2017] and its extensions [@holters2020; @mikkonen2025;
 
 ## Conclusion
 
-A compiler can predict how much simple nonlinear audio code aliases, and the rate at which alias falls is set by smoothness. Splitting a kernel across rates does not pay with real resamplers at Field's kernel sizes. The useful product is one factor per kernel, chosen at compile time, with a warning when no factor will do.
+A compiler can predict how much nonlinear audio code without delay lines aliases under a steady tone, and on held-out kernels it chooses the factor far better than simple rules; and the rate at which alias falls is set by smoothness. Splitting a kernel across rates does not pay with real resamplers at Field's kernel sizes. The useful product is one factor per kernel, chosen at compile time, with a warning when no factor will do.
 
 ## Reproducibility
 
