@@ -742,3 +742,52 @@ of real-input pairs. Open next: a P6 built from the loudest window instead of th
 **Erratum to section 17.** "`gridLog2` 16 (harmonics to 3.07 MHz)" is wrong: `SpectrumFromWave` keeps
 explicit lines up to n/4, so 16384 × 46.875 Hz = 768 kHz; the tail model covers the rest, as in every
 earlier phase.
+
+## 19. Phase 7 pre-registration: loudest-window multisine (2026-11-21)
+
+Written after phase 6 was scored and signed off by the owner on 2026-11-21, before any phase 7 clip or code exists. The method below was chosen after seeing phase 6's misses, so a result
+on phase 6's own clips cannot confirm it. Confirmation is on 12 new clips committed before any kernel is
+scored on them.
+
+**Goal.** A predictor that keeps real input clean: enough on ≥ 90% of kernel-clip pairs.
+
+**Problem.** P6 (section 17) builds one multisine from the whole clip's power spectrum. The oracle scores
+the worst 100 ms window. P6 is short most on bass (45.9% enough) and pluck (58.8%), whose loudest windows
+are brighter and louder than their average; it is short by one octave on 384 of its 511 misses.
+
+**Scope.**
+- Kernels: the same 147 as phase 6 (`data-rerun/phase6/kernels.txt`, seed 20261123).
+- Development clips: phase 6's 12. Reported, not a bar.
+- Confirmation clips: 12 new ones, six sources at the same two levels (peak 0.9 and 0.25), same length
+  (16384 samples), fades and rendering as section 17, in `corpus/clips7/*.field`: a kick-heavy loop
+  (different pattern and tuning from phase 6's drums), a sub bass (sine plus a soft square near 55 Hz), an
+  organ chord (four square-ish voices, a different chord), a vibrato saw lead (1 to 3 kHz), a hat roll
+  (filtered chaotic-map noise, short hits) and an FM bell. Written and committed, with their WAVs, before
+  any measurement on them.
+- The oracle, metric, −80 dB bar and factor set are unchanged from section 17.
+
+**P7, the loudest-window multisine.**
+- Split the clip into 100 ms windows (4800 samples, hop 2400), the same windows the metric uses.
+- Take the 3 windows with the highest input power.
+- For each, taper it with a Hann window, zero-pad it to 16384 samples and build a multisine exactly as P6
+  does (harmonic h = 1..511 of 46.875 Hz gets the power in bins 16h − 8 .. 16h + 7, Schroeder phase), scaled
+  so its peak equals that window's peak.
+- Predict each with the P6 analysis (`gridLog2` 16, `PredictFoldedDb`). P7's factor is the largest of the
+  three, "none" ranking highest. A pair the analysis declines on any window falls back to P0's factor and is
+  counted.
+- P6 and P0 are also scored on the confirmation clips, as baselines.
+
+**H6, P7 predicts new real input.** On the confirmation pairs:
+- **Enough:** P7 ≥ the needed factor on ≥ 90% of pairs.
+- **Exact:** P7 = the needed factor on ≥ 70% of pairs.
+- **Better than today:** P7 is enough on strictly more pairs than P0.
+- **Kill** if P7 is enough on under 70% of pairs.
+- Reported, not bars: the same on the development clips; per source and level; short pairs with dB over;
+  CPU against need.
+
+**Cost.** Measuring the new clips about 35 minutes wall (8 shards in two rounds of 4); P7 about three
+times P6's 28 s per kernel, about 1 hour per clip set on 4 shards.
+
+**Order.** This section; the confirmation clip kernels and WAVs; their measurement and P0/P6 rows; the P7
+code in `AliasTests.cpp`; P7 rows on both clip sets; `scripts/score_real.py` extended for P7. Changing P7
+after its confirmation rows exist needs another dated entry and a rescore.
