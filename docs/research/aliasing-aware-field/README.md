@@ -608,3 +608,82 @@ a blind set of 60, with no change to anything scored before. It does not show be
 (non-sinusoidal) input, it does not cover implicit (zero-delay) circuits, and its handling of unbounded
 outputs is a decision without a number.
 
+
+## 17. Phase 6 pre-registration: real input (2026-11-21)
+
+Written after phase 5 was scored and before any phase 6 clip, rig or analysis code exists. Sections 1 to 7
+of this phase were signed off by the owner on 2026-11-21; the measurement method below was changed once
+after sign-off and before any data, as recorded under "Change after sign-off".
+
+**Goal.** Find out whether the factor the analysis picks keeps real music clean, not just a test tone.
+
+**Problem.** Every result so far drives the kernel with one steady 5001 Hz tone at 0.5. Real input has
+chords, hits and sweeps, which intermodulate inside a nonlinearity, and its level and pitch move. The
+needed factor already changes with tone level and pitch on 31 of 38 phase 1 kernels.
+
+**Scope.**
+- Kernels: every kernel in L, G and D that phase 5 scored (status `ok`) and that has a nonlinear op
+  (`is_nonlinear` in `scripts/score_heldout.py`); linear kernels do not alias and are left out, as in every
+  earlier phase. If the full run is projected past 3 hours of compute on the M2, a seeded subsample
+  (seed 20261123) of all of L plus 60 kernels each from G and D is used instead, and the report says so.
+- Input: 12 clips, six sources at two levels, made by Infinite's own Field interpreter from committed
+  kernels in `corpus/clips/*.field` (no downloaded recordings, so no licences). Sources: drums (kick, snare
+  and hats), bass (a saw-like line), chords (a three-note pad), pluck (a decaying arpeggio), sweep (a sine
+  sweep 40 Hz to 18 kHz) and noise burst (a chaotic-map noise with a fast envelope). Levels: peak 0.9
+  (−0.9 dBFS) and peak 0.25 (−12 dBFS). Each clip is 16384 samples at 48 kHz (0.34 s, not the 1 s first
+  proposed: 64 × 16384 = 2^20 is the largest real FFT `PortableFft` supports) and fades in and out over
+  10 ms with a raised cosine, so its periodic extension has no step. The clip kernels and the rendered
+  WAVs are committed with this section's follow-up commit, before any kernel is scored on them.
+- Out of scope, as before: Field Synth, implicit (zero-delay) circuits, tables, `rand`.
+
+**How alias is measured on a clip (the oracle).**
+- The clip is upsampled 64x ideally (periodic FFT zero-padding, 2^14 → 2^20 points).
+- For factor F, the test is the kernel at sr = F · 48 kHz on every (64/F)-th fine sample, starting at 0:
+  exactly what an ideal F-times oversampler would feed it. The reference is M = 64/F interleaved copies of
+  the same kernel, each with its own state and delay lines, copy k running at the same sr on fine samples
+  k, k + M, k + 2M, and so on. Interleaved, they give the F-rate system's output at 64 × 48 kHz, where its
+  aliases sit back at their true frequencies (up to 1.536 MHz).
+- Test and reference are band-limited to 20 kHz (FFT, ideal low-pass) and compared on the 48 kHz grid.
+  For a linear kernel the two agree to float precision; for a nonlinear one the difference is the alias
+  that folds below 20 kHz.
+- Alias in dB = the worst, over 100 ms windows (4800 samples, hop 2400), of error power over reference
+  power in the window, counting only windows whose reference power is within 30 dB of the loudest window.
+- Needed factor = the smallest F in {1, 2, 4, 8, 16, 32} with alias ≤ −80 dB; "0" = none.
+- Rig check before scoring: `out = in * 0.5` and a one-pole low-pass must measure ≤ −120 dB on every clip.
+
+**Change after sign-off (before any data).** The signed-off text measured error as the 1x render minus a
+32x render brought down to 48 kHz, minus the same difference for a very quiet copy of the clip (to remove
+the part caused by a filter sounding slightly different at another rate), and reported kernels where that
+rate difference alone exceeded −80 dB. The interleaved reference above compares each factor with the same
+system at the same rate, so there is no rate difference to subtract and no kernel is unmeasurable for that
+reason. It replaces the quiet-copy subtraction.
+
+**Predictors (all fixed before scoring).**
+- **P0, today's predictor (baseline):** `factor_pred` from `data/phase5-heldout.csv`, one 5001 Hz tone at
+  0.5, the same factor for every clip.
+- **Rule A (baseline):** 8x for every kernel here (all are nonlinear).
+- **P1, loudest single tone (reported, not a bar):** the largest factor `PredictFactor` gives over tones
+  of 100, 300, 1000, 3000, 5001, 10000 and 15000 Hz at 0.25, 0.5 and 0.9, "none" ranking highest; per
+  kernel, not per clip. Grid `gridLog2` = 13 + round(log2(5001 / f0)), held to 13..17.
+- **P6, the multisine (H5's predictor):** per clip, a periodic test signal on f0 = 46.875 Hz (48000/1024),
+  so every grid harmonic is a whole 48 kHz bin group: harmonic h = 1..511 gets the clip's power in FFT bins
+  16h − 8 .. 16h + 7 of its 16384-point spectrum, Schroeder phase −π h (h − 1) / 511, and the whole
+  waveform is scaled so its peak equals the clip's peak. The analysis runs with this waveform as `in`
+  (a new optional `AliasContext` field; the sine path is unchanged), `gridLog2` 16 (harmonics to
+  3.07 MHz) and its usual tail model. Predicted alias at F = power of every output harmonic above F · 24 kHz
+  that folds to 20 kHz or below, over the output power at or below 20 kHz; harmonics are summed in power,
+  not in phase. P6's factor is the smallest F at or below −80 dB, "0" = none. A pair the analysis declines
+  falls back to P0's factor and is counted and reported.
+
+**H5, the multisine predicts real input.**
+- **Enough:** P6's factor ≥ the needed factor ("0" ≥ everything) on ≥ 90% of kernel-clip pairs.
+- **Exact:** P6's factor = the needed factor on ≥ 70% of pairs.
+- **Better than today:** P6 is enough on strictly more pairs than P0.
+- **Kill** if P6 is enough on under 70% of pairs.
+- Reported, not bars: the same counts for P0, rule A and P1, per source and per level; pairs where P6 is
+  short, with by how many dB; the CPU P6 would spend against the measured need.
+
+**Order.** This section, then the clip kernels and WAVs, then the rig (`INFINITE_FIELDREAL` in
+`AliasTests.cpp`) and the P0, rule A and P1 rows, recorded once, then the multisine change in
+`AliasAnalysis.*` and the P6 rows, then `scripts/score_real.py`. Changing the oracle or P6 after the P6 rows
+exist needs another dated entry here and a rescore.
