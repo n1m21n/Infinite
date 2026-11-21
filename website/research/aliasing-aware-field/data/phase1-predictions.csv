@@ -1,0 +1,283 @@
+label,class,factor,alias_db,harmonics_db,predicted_db,status,iterations,evaluations
+"linear gain",linear,1,-137.71,-152.96,-152.93,"ok",0,8192
+"linear gain",linear,2,-138.66,-156.44,-156.00,"ok",0,8192
+"linear gain",linear,4,-138.72,-153.89,-159.33,"ok",0,8192
+"linear gain",linear,8,-138.58,-155.43,-162.20,"ok",0,8192
+"linear gain",linear,16,-138.08,-154.49,-164.14,"ok",0,8192
+"linear gain",linear,32,-138.54,-154.07,-166.84,"ok",0,8192
+"one-pole lowpass",linear,1,-138.00,-155.92,-149.45,"ok",1,18432
+"one-pole lowpass",linear,2,-137.48,-155.66,-153.54,"ok",1,18432
+"one-pole lowpass",linear,4,-137.11,-153.16,-157.61,"ok",1,18432
+"one-pole lowpass",linear,8,-138.35,-153.69,-161.79,"ok",1,18432
+"one-pole lowpass",linear,16,-138.32,-157.56,-163.66,"ok",1,18432
+"one-pole lowpass",linear,32,-137.93,-155.21,-166.29,"ok",1,18432
+"poly d2 a0.5",poly,1,-138.07,-15.05,-152.76,"ok",0,8192
+"poly d2 a0.5",poly,2,-138.50,-15.05,-155.49,"ok",0,8192
+"poly d2 a0.5",poly,4,-137.79,-15.05,-158.65,"ok",0,8192
+"poly d2 a0.5",poly,8,-138.64,-15.05,-161.45,"ok",0,8192
+"poly d2 a0.5",poly,16,-138.62,-15.05,-164.41,"ok",0,8192
+"poly d2 a0.5",poly,32,-138.76,-15.05,-167.47,"ok",0,8192
+"poly d2 a1",poly,1,-136.98,-9.03,-152.02,"ok",0,8192
+"poly d2 a1",poly,2,-137.46,-9.03,-154.83,"ok",0,8192
+"poly d2 a1",poly,4,-137.93,-9.03,-157.88,"ok",0,8192
+"poly d2 a1",poly,8,-137.43,-9.03,-160.95,"ok",0,8192
+"poly d2 a1",poly,16,-138.30,-9.03,-164.39,"ok",0,8192
+"poly d2 a1",poly,32,-137.60,-9.03,-169.72,"ok",0,8192
+"poly d3 cubic clip drive 1",poly,1,-137.93,-33.06,-154.63,"ok",0,8192
+"poly d3 cubic clip drive 1",poly,2,-138.20,-33.06,-157.36,"ok",0,8192
+"poly d3 cubic clip drive 1",poly,4,-137.91,-33.06,-160.23,"ok",0,8192
+"poly d3 cubic clip drive 1",poly,8,-138.42,-33.06,-163.18,"ok",0,8192
+"poly d3 cubic clip drive 1",poly,16,-138.87,-33.06,-166.34,"ok",0,8192
+"poly d3 cubic clip drive 1",poly,32,-138.77,-33.06,-170.92,"ok",0,8192
+"poly d3 cubic clip drive 2",poly,1,-137.44,-19.08,-152.61,"ok",0,8192
+"poly d3 cubic clip drive 2",poly,2,-137.84,-19.08,-155.38,"ok",0,8192
+"poly d3 cubic clip drive 2",poly,4,-137.88,-19.08,-158.65,"ok",0,8192
+"poly d3 cubic clip drive 2",poly,8,-137.91,-19.08,-161.85,"ok",0,8192
+"poly d3 cubic clip drive 2",poly,16,-137.90,-19.08,-165.33,"ok",0,8192
+"poly d3 cubic clip drive 2",poly,32,-137.65,-19.08,-168.29,"ok",0,8192
+"poly d5",poly,1,-138.09,-33.73,-152.08,"ok",0,8192
+"poly d5",poly,2,-138.68,-33.73,-155.10,"ok",0,8192
+"poly d5",poly,4,-137.62,-33.73,-158.26,"ok",0,8192
+"poly d5",poly,8,-137.80,-33.73,-161.35,"ok",0,8192
+"poly d5",poly,16,-138.29,-33.73,-163.89,"ok",0,8192
+"poly d5",poly,32,-138.25,-33.73,-166.96,"ok",0,8192
+"poly d7",poly,1,-71.03,-44.59,-71.03,"ok",0,8192
+"poly d7",poly,2,-137.27,-44.59,-154.25,"ok",0,8192
+"poly d7",poly,4,-138.04,-44.59,-157.12,"ok",0,8192
+"poly d7",poly,8,-138.16,-44.59,-160.30,"ok",0,8192
+"poly d7",poly,16,-138.12,-44.59,-162.78,"ok",0,8192
+"poly d7",poly,32,-138.43,-44.59,-167.31,"ok",0,8192
+"poly d9 cubic of cubic",chain,1,-69.30,-21.27,-69.30,"ok",0,8192
+"poly d9 cubic of cubic",chain,2,-138.07,-21.27,-154.05,"ok",0,8192
+"poly d9 cubic of cubic",chain,4,-138.02,-21.27,-156.90,"ok",0,8192
+"poly d9 cubic of cubic",chain,8,-138.13,-21.27,-159.87,"ok",0,8192
+"poly d9 cubic of cubic",chain,16,-137.65,-21.27,-162.50,"ok",0,8192
+"poly d9 cubic of cubic",chain,32,-138.47,-21.27,-166.31,"ok",0,8192
+"poly d27 cubic x3",chain,1,-56.78,-19.27,-56.78,"ok",0,8192
+"poly d27 cubic x3",chain,2,-137.93,-19.27,-154.09,"ok",0,8192
+"poly d27 cubic x3",chain,4,-138.07,-19.27,-156.93,"ok",0,8192
+"poly d27 cubic x3",chain,8,-138.13,-19.27,-160.20,"ok",0,8192
+"poly d27 cubic x3",chain,16,-138.20,-19.27,-162.61,"ok",0,8192
+"poly d27 cubic x3",chain,32,-138.51,-19.27,-167.38,"ok",0,8192
+"tanh drive 1",analytic,1,-98.98,-34.15,-98.99,"ok",0,8192
+"tanh drive 1",analytic,2,-138.04,-34.15,-151.73,"ok",0,8192
+"tanh drive 1",analytic,4,-137.59,-34.15,-154.55,"ok",0,8192
+"tanh drive 1",analytic,8,-138.07,-34.15,-157.60,"ok",0,8192
+"tanh drive 1",analytic,16,-138.37,-34.15,-160.18,"ok",0,8192
+"tanh drive 1",analytic,32,-138.84,-34.15,-163.40,"ok",0,8192
+"tanh drive 2",analytic,1,-66.50,-23.50,-66.50,"ok",0,8192
+"tanh drive 2",analytic,2,-137.94,-23.50,-152.83,"ok",0,8192
+"tanh drive 2",analytic,4,-137.81,-23.50,-156.51,"ok",0,8192
+"tanh drive 2",analytic,8,-137.81,-23.50,-159.40,"ok",0,8192
+"tanh drive 2",analytic,16,-137.63,-23.50,-161.81,"ok",0,8192
+"tanh drive 2",analytic,32,-137.89,-23.50,-165.71,"ok",0,8192
+"tanh drive 4",analytic,1,-40.63,-15.45,-40.63,"ok",0,8192
+"tanh drive 4",analytic,2,-103.28,-15.45,-103.28,"ok",0,8192
+"tanh drive 4",analytic,4,-137.87,-15.45,-158.56,"ok",0,8192
+"tanh drive 4",analytic,8,-137.38,-15.45,-162.78,"ok",0,8192
+"tanh drive 4",analytic,16,-138.29,-15.45,-165.80,"ok",0,8192
+"tanh drive 4",analytic,32,-138.38,-15.45,-169.85,"ok",0,8192
+"tanh drive 8",analytic,1,-24.66,-11.31,-24.66,"ok",0,8192
+"tanh drive 8",analytic,2,-58.02,-11.31,-58.02,"ok",0,8192
+"tanh drive 8",analytic,4,-117.90,-11.31,-117.95,"ok",0,8192
+"tanh drive 8",analytic,8,-137.63,-11.31,-162.38,"ok",0,8192
+"tanh drive 8",analytic,16,-137.82,-11.31,-165.30,"ok",0,8192
+"tanh drive 8",analytic,32,-138.21,-11.31,-169.48,"ok",0,8192
+"sin fold drive 1",analytic,1,-84.48,-18.29,-84.48,"ok",0,8192
+"sin fold drive 1",analytic,2,-137.33,-18.29,-158.45,"ok",0,8192
+"sin fold drive 1",analytic,4,-138.62,-18.29,-161.71,"ok",0,8192
+"sin fold drive 1",analytic,8,-137.72,-18.29,-164.98,"ok",0,8192
+"sin fold drive 1",analytic,16,-137.51,-18.29,-168.12,"ok",0,8192
+"sin fold drive 1",analytic,32,-138.23,-18.29,-171.19,"ok",0,8192
+"sin fold drive 2",analytic,1,-38.40,1.38,-38.40,"ok",0,8192
+"sin fold drive 2",analytic,2,-133.67,1.38,-139.75,"ok",0,8192
+"sin fold drive 2",analytic,4,-134.07,1.38,-141.84,"ok",0,8192
+"sin fold drive 2",analytic,8,-134.59,1.38,-144.14,"ok",0,8192
+"sin fold drive 2",analytic,16,-134.59,1.38,-146.78,"ok",0,8192
+"sin fold drive 2",analytic,32,-134.98,1.38,-148.91,"ok",0,8192
+"sin fold drive 4",analytic,1,-2.45,-17.26,-2.45,"ok",0,8192
+"sin fold drive 4",analytic,2,-113.27,-17.26,-113.30,"ok",0,8192
+"sin fold drive 4",analytic,4,-131.97,-17.26,-134.20,"ok",0,8192
+"sin fold drive 4",analytic,8,-132.87,-17.26,-136.68,"ok",0,8192
+"sin fold drive 4",analytic,16,-133.50,-17.26,-139.23,"ok",0,8192
+"sin fold drive 4",analytic,32,-133.88,-17.26,-141.55,"ok",0,8192
+"sin fold drive 8",analytic,1,8.87,-4.08,8.87,"ok",0,8192
+"sin fold drive 8",analytic,2,-23.67,-4.08,-23.67,"ok",0,8192
+"sin fold drive 8",analytic,4,-123.95,-4.08,-125.76,"ok",0,8192
+"sin fold drive 8",analytic,8,-125.13,-4.08,-128.07,"ok",0,8192
+"sin fold drive 8",analytic,16,-126.00,-4.08,-130.72,"ok",0,8192
+"sin fold drive 8",analytic,32,-126.43,-4.08,-133.37,"ok",0,8192
+"rational x/(1+|x|) drive 2",kink,1,-37.16,-19.45,-37.16,"ok",0,8192
+"rational x/(1+|x|) drive 2",kink,2,-57.66,-19.45,-57.66,"ok",0,8192
+"rational x/(1+|x|) drive 2",kink,4,-75.06,-19.45,-75.06,"ok",0,8192
+"rational x/(1+|x|) drive 2",kink,8,-93.33,-19.45,-93.33,"ok",0,8192
+"rational x/(1+|x|) drive 2",kink,16,-111.76,-19.45,-111.77,"ok",0,8192
+"rational x/(1+|x|) drive 2",kink,32,-129.18,-19.45,-129.85,"ok",0,8192
+"rational x/(1+|x|) drive 8",kink,1,-24.82,-13.58,-24.82,"ok",0,8192
+"rational x/(1+|x|) drive 8",kink,2,-40.93,-13.58,-40.93,"ok",0,8192
+"rational x/(1+|x|) drive 8",kink,4,-56.63,-13.58,-56.63,"ok",0,8192
+"rational x/(1+|x|) drive 8",kink,8,-74.24,-13.58,-74.24,"ok",0,8192
+"rational x/(1+|x|) drive 8",kink,16,-92.49,-13.58,-92.49,"ok",0,8192
+"rational x/(1+|x|) drive 8",kink,32,-110.51,-13.58,-110.52,"ok",0,8192
+"abs mix",kink,1,-32.90,-8.29,-32.90,"ok",0,8192
+"abs mix",kink,2,-48.13,-8.29,-48.13,"ok",0,8192
+"abs mix",kink,4,-61.04,-8.29,-61.04,"ok",0,8192
+"abs mix",kink,8,-72.97,-8.29,-72.97,"ok",0,8192
+"abs mix",kink,16,-84.94,-8.29,-84.93,"ok",0,8192
+"abs mix",kink,32,-97.04,-8.29,-96.98,"ok",0,8192
+"half-wave max",kink,1,-32.90,-8.29,-32.90,"ok",0,8192
+"half-wave max",kink,2,-48.13,-8.29,-48.13,"ok",0,8192
+"half-wave max",kink,4,-61.04,-8.29,-61.04,"ok",0,8192
+"half-wave max",kink,8,-72.97,-8.29,-72.97,"ok",0,8192
+"half-wave max",kink,16,-84.94,-8.29,-84.93,"ok",0,8192
+"half-wave max",kink,32,-97.04,-8.29,-96.98,"ok",0,8192
+"hard clip drive 1",kink,1,-38.47,-21.74,-38.47,"ok",0,8192
+"hard clip drive 1",kink,2,-50.78,-21.74,-50.78,"ok",0,8192
+"hard clip drive 1",kink,4,-61.09,-21.74,-61.09,"ok",0,8192
+"hard clip drive 1",kink,8,-72.37,-21.74,-72.37,"ok",0,8192
+"hard clip drive 1",kink,16,-84.73,-21.74,-84.71,"ok",0,8192
+"hard clip drive 1",kink,32,-98.48,-21.74,-98.41,"ok",0,8192
+"hard clip drive 2",kink,1,-29.70,-11.57,-29.70,"ok",0,8192
+"hard clip drive 2",kink,2,-40.35,-11.57,-40.35,"ok",0,8192
+"hard clip drive 2",kink,4,-51.88,-11.57,-51.88,"ok",0,8192
+"hard clip drive 2",kink,8,-64.13,-11.57,-64.13,"ok",0,8192
+"hard clip drive 2",kink,16,-76.73,-11.57,-76.73,"ok",0,8192
+"hard clip drive 2",kink,32,-88.93,-11.57,-88.95,"ok",0,8192
+"hard clip drive 4",kink,1,-18.08,-10.02,-18.08,"ok",0,8192
+"hard clip drive 4",kink,2,-34.92,-10.02,-34.92,"ok",0,8192
+"hard clip drive 4",kink,4,-44.21,-10.02,-44.21,"ok",0,8192
+"hard clip drive 4",kink,8,-59.99,-10.02,-59.99,"ok",0,8192
+"hard clip drive 4",kink,16,-72.24,-10.02,-72.25,"ok",0,8192
+"hard clip drive 4",kink,32,-82.03,-10.02,-82.05,"ok",0,8192
+"hard clip drive 8",kink,1,-14.18,-9.66,-14.18,"ok",0,8192
+"hard clip drive 8",kink,2,-25.95,-9.66,-25.95,"ok",0,8192
+"hard clip drive 8",kink,4,-40.97,-9.66,-40.97,"ok",0,8192
+"hard clip drive 8",kink,8,-49.63,-9.66,-49.63,"ok",0,8192
+"hard clip drive 8",kink,16,-69.44,-9.66,-69.45,"ok",0,8192
+"hard clip drive 8",kink,32,-77.72,-9.66,-77.75,"ok",0,8192
+"quantize 4 steps",jump,1,-15.45,-33.73,-15.46,"ok",0,8192
+"quantize 4 steps",jump,2,-21.63,-33.75,-21.62,"ok",0,8192
+"quantize 4 steps",jump,4,-27.34,-33.74,-27.32,"ok",0,8192
+"quantize 4 steps",jump,8,-33.21,-33.73,-33.17,"ok",0,8192
+"quantize 4 steps",jump,16,-42.32,-33.73,-42.16,"ok",0,8192
+"quantize 4 steps",jump,32,-45.90,-33.73,-45.64,"ok",0,8192
+"quantize 16 steps",jump,1,-26.80,-47.25,-26.80,"ok",0,8192
+"quantize 16 steps",jump,2,-30.36,-47.26,-30.36,"ok",0,8192
+"quantize 16 steps",jump,4,-33.15,-47.23,-33.12,"ok",0,8192
+"quantize 16 steps",jump,8,-40.16,-47.26,-40.04,"ok",0,8192
+"quantize 16 steps",jump,16,-46.02,-47.27,-45.77,"ok",0,8192
+"quantize 16 steps",jump,32,-50.00,-47.27,-49.54,"ok",0,8192
+"comparator square + dry",jump,1,-16.29,-14.58,-16.29,"ok",0,8192
+"comparator square + dry",jump,2,-22.61,-14.58,-22.60,"ok",0,8192
+"comparator square + dry",jump,4,-28.44,-14.58,-28.42,"ok",0,8192
+"comparator square + dry",jump,8,-34.50,-14.58,-34.45,"ok",0,8192
+"comparator square + dry",jump,16,-40.59,-14.58,-40.49,"ok",0,8192
+"comparator square + dry",jump,32,-46.61,-14.58,-46.40,"ok",0,8192
+"wrap fold mod",jump,1,-6.38,-4.67,-6.36,"ok",0,8192
+"wrap fold mod",jump,2,-12.57,-4.68,-12.63,"ok",0,8192
+"wrap fold mod",jump,4,-18.29,-4.68,-18.39,"ok",0,8192
+"wrap fold mod",jump,8,-24.11,-4.68,-24.28,"ok",0,8192
+"wrap fold mod",jump,16,-29.79,-4.68,-30.05,"ok",0,8192
+"wrap fold mod",jump,32,-35.12,-4.68,-35.50,"ok",0,8192
+"tanh x3 chain drive 4",chain,1,-12.58,-9.58,-12.58,"ok",0,8192
+"tanh x3 chain drive 4",chain,2,-20.67,-9.58,-20.67,"ok",0,8192
+"tanh x3 chain drive 4",chain,4,-30.08,-9.58,-30.08,"ok",0,8192
+"tanh x3 chain drive 4",chain,8,-46.09,-9.58,-46.09,"ok",0,8192
+"tanh x3 chain drive 4",chain,16,-77.73,-9.58,-77.73,"ok",0,8192
+"tanh x3 chain drive 4",chain,32,-135.96,-9.58,-140.03,"ok",0,8192
+"clip then cubic",chain,1,-43.36,-13.09,-43.36,"ok",0,8192
+"clip then cubic",chain,2,-60.57,-13.09,-60.57,"ok",0,8192
+"clip then cubic",chain,4,-79.06,-13.09,-79.06,"ok",0,8192
+"clip then cubic",chain,8,-97.27,-13.09,-97.27,"ok",0,8192
+"clip then cubic",chain,16,-116.11,-13.09,-116.13,"ok",0,8192
+"clip then cubic",chain,32,-132.28,-13.09,-133.86,"ok",0,8192
+"tanh feedback 0.3",feedback,1,-64.97,-21.72,-64.97,"ok",5,55296
+"tanh feedback 0.3",feedback,2,-135.64,-19.74,-139.70,"ok",5,55296
+"tanh feedback 0.3",feedback,4,-138.86,-18.94,-156.14,"ok",6,64512
+"tanh feedback 0.3",feedback,8,-138.88,-18.69,-159.58,"ok",6,64512
+"tanh feedback 0.3",feedback,16,-138.10,-18.62,-162.82,"ok",6,64512
+"tanh feedback 0.3",feedback,32,-137.62,-18.60,-165.89,"ok",6,64512
+"tanh feedback 0.7",feedback,1,-59.19,-20.18,-59.19,"ok",8,82944
+"tanh feedback 0.7",feedback,2,-102.53,-16.39,-102.53,"ok",8,82944
+"tanh feedback 0.7",feedback,4,-137.81,-14.73,-150.73,"ok",8,82944
+"tanh feedback 0.7",feedback,8,-137.94,-14.01,-159.76,"ok",9,92160
+"tanh feedback 0.7",feedback,16,-138.64,-13.72,-162.25,"ok",12,119808
+"tanh feedback 0.7",feedback,32,-137.39,-13.62,-164.44,"ok",15,147456
+"clip feedback 0.5",feedback,1,-27.35,-13.25,-27.35,"ok",9,92160
+"clip feedback 0.5",feedback,2,-38.74,-11.85,-38.74,"ok",9,92160
+"clip feedback 0.5",feedback,4,-49.27,-11.15,-49.27,"ok",9,92160
+"clip feedback 0.5",feedback,8,-61.29,-10.82,-61.29,"ok",11,110592
+"clip feedback 0.5",feedback,16,-75.19,-10.69,-75.19,"ok",13,129024
+"clip feedback 0.5",feedback,32,-86.74,-10.65,-86.73,"ok",13,129024
+"osc sine 1.75k",linear,1,-101.40,-128.63,-143.01,"ok",0,17408
+"osc sine 1.75k",linear,2,-101.35,-124.02,-151.45,"ok",0,17408
+"osc sine 1.75k",linear,4,-101.46,-118.06,-153.72,"ok",0,17408
+"osc sine 1.75k",linear,8,-101.24,-111.99,-154.66,"ok",0,17408
+"osc sine 1.75k",linear,16,-101.13,-116.57,-160.77,"ok",0,17408
+"osc sine 1.75k",linear,32,-101.08,-120.39,-166.88,"ok",0,17408
+"osc naive saw 1.75k",osc,1,-12.62,-2.43,-12.64,"ok",0,17408
+"osc naive saw 1.75k",osc,2,-18.90,-2.43,-18.88,"ok",0,17408
+"osc naive saw 1.75k",osc,4,-25.02,-2.43,-24.97,"ok",0,17408
+"osc naive saw 1.75k",osc,8,-31.06,-2.43,-31.01,"ok",0,17408
+"osc naive saw 1.75k",osc,16,-37.09,-2.43,-36.78,"ok",0,17408
+"osc naive saw 1.75k",osc,32,-43.10,-2.43,-42.54,"ok",0,17408
+"osc naive square 1.75k",osc,1,-15.53,-7.03,-15.55,"ok",0,17408
+"osc naive square 1.75k",osc,2,-22.02,-7.03,-22.00,"ok",0,17408
+"osc naive square 1.75k",osc,4,-27.91,-7.03,-27.88,"ok",0,17408
+"osc naive square 1.75k",osc,8,-33.99,-7.03,-34.04,"ok",0,17408
+"osc naive square 1.75k",osc,16,-40.19,-7.03,-39.88,"ok",0,17408
+"osc naive square 1.75k",osc,32,-46.04,-7.03,-45.41,"ok",0,17408
+"osc naive triangle 1.75k",osc,1,-44.07,-18.35,-44.07,"ok",0,17408
+"osc naive triangle 1.75k",osc,2,-58.28,-18.35,-58.28,"ok",0,17408
+"osc naive triangle 1.75k",osc,4,-70.36,-18.35,-70.37,"ok",0,17408
+"osc naive triangle 1.75k",osc,8,-82.48,-18.35,-82.80,"ok",0,17408
+"osc naive triangle 1.75k",osc,16,-93.85,-18.35,-94.79,"ok",0,17408
+"osc naive triangle 1.75k",osc,32,-99.53,-18.35,-106.15,"ok",0,17408
+"osc sine pm (ph^3) 1.75k",osc,1,-37.53,-1.98,-37.53,"ok",0,17408
+"osc sine pm (ph^3) 1.75k",osc,2,-51.30,-1.99,-51.30,"ok",0,17408
+"osc sine pm (ph^3) 1.75k",osc,4,-63.81,-1.98,-63.82,"ok",0,17408
+"osc sine pm (ph^3) 1.75k",osc,8,-75.92,-1.99,-76.09,"ok",0,17408
+"osc sine pm (ph^3) 1.75k",osc,16,-87.24,-1.99,-87.89,"ok",0,17408
+"osc sine pm (ph^3) 1.75k",osc,32,-93.87,-1.99,-99.61,"ok",0,17408
+"osc pinch 100% 1.75k",osc,1,-50.40,2.53,-50.40,"ok",0,17408
+"osc pinch 100% 1.75k",osc,2,-73.58,2.53,-73.67,"ok",0,17408
+"osc pinch 100% 1.75k",osc,4,-88.69,2.53,-93.00,"ok",0,17408
+"osc pinch 100% 1.75k",osc,8,-90.44,2.53,-111.45,"ok",0,17408
+"osc pinch 100% 1.75k",osc,16,-90.38,2.53,-129.40,"ok",0,17408
+"osc pinch 100% 1.75k",osc,32,-90.33,2.53,-144.17,"ok",0,17408
+"preset Tube Overdrive",preset,1,-34.85,-17.05,-34.85,"ok",1,18432
+"preset Tube Overdrive",preset,2,-51.74,-16.69,-51.74,"ok",1,18432
+"preset Tube Overdrive",preset,4,-70.11,-16.48,-70.11,"ok",1,18432
+"preset Tube Overdrive",preset,8,-88.54,-16.38,-88.54,"ok",1,18432
+"preset Tube Overdrive",preset,16,-106.51,-16.33,-106.51,"ok",1,18432
+"preset Tube Overdrive",preset,32,-121.85,-16.30,-122.30,"ok",1,26624
+"preset Soft Saturation",preset,1,-34.93,-18.26,-34.93,"ok",0,8192
+"preset Soft Saturation",preset,2,-54.95,-18.26,-54.95,"ok",0,8192
+"preset Soft Saturation",preset,4,-72.25,-18.26,-72.25,"ok",0,8192
+"preset Soft Saturation",preset,8,-90.48,-18.26,-90.48,"ok",0,8192
+"preset Soft Saturation",preset,16,-108.91,-18.26,-108.92,"ok",0,8192
+"preset Soft Saturation",preset,32,-126.66,-18.26,-127.01,"ok",0,8192
+"preset Analog Tape Saturator",preset,1,-36.90,-13.30,-36.90,"ok",2,37376
+"preset Analog Tape Saturator",preset,2,-51.12,-12.84,-51.12,"ok",2,37376
+"preset Analog Tape Saturator",preset,4,-73.76,-12.63,-73.76,"ok",2,37376
+"preset Analog Tape Saturator",preset,8,-87.30,-12.54,-87.29,"ok",2,37376
+"preset Analog Tape Saturator",preset,16,-109.32,-12.49,-109.28,"ok",2,37376
+"preset Analog Tape Saturator",preset,32,-121.78,-12.48,-121.93,"ok",2,37376
+"preset Bass Ribbon Driver",preset,1,-137.87,-155.61,-153.20,"ok",1,26624
+"preset Bass Ribbon Driver",preset,2,-137.90,-154.13,-156.09,"ok",1,26624
+"preset Bass Ribbon Driver",preset,4,-138.06,-154.06,-159.02,"ok",1,26624
+"preset Bass Ribbon Driver",preset,8,-138.06,-153.48,-162.09,"ok",1,26624
+"preset Bass Ribbon Driver",preset,16,-138.13,-151.95,-164.05,"ok",1,26624
+"preset Bass Ribbon Driver",preset,32,-137.90,-155.73,-169.52,"ok",1,26624
+"preset Wavefolder",preset,1,-22.43,-7.60,-22.43,"ok",0,8192
+"preset Wavefolder",preset,2,-38.53,-7.60,-38.53,"ok",0,8192
+"preset Wavefolder",preset,4,-49.31,-7.60,-49.31,"ok",0,8192
+"preset Wavefolder",preset,8,-61.73,-7.60,-61.72,"ok",0,8192
+"preset Wavefolder",preset,16,-73.63,-7.60,-73.64,"ok",0,8192
+"preset Wavefolder",preset,32,-86.07,-7.60,-86.19,"ok",0,8192
+"preset Moog 4-Pole Ladder Filter",preset,1,-29.01,-62.11,-29.01,"ok",2,32256
+"preset Moog 4-Pole Ladder Filter",preset,2,-29.03,-66.03,-29.03,"ok",2,32256
+"preset Moog 4-Pole Ladder Filter",preset,4,-66.81,-66.98,0.00,"periodic solution is unstable (loop radius 1.005): self-oscillation",1,21504
+"preset Moog 4-Pole Ladder Filter",preset,8,-68.29,-67.22,0.00,"periodic solution is unstable (loop radius 1.006): self-oscillation",1,21504
+"preset Moog 4-Pole Ladder Filter",preset,16,-87.20,-67.28,0.00,"periodic solution is unstable (loop radius 1.004): self-oscillation",1,21504
+"preset Moog 4-Pole Ladder Filter",preset,32,-99.71,-66.78,0.00,"periodic solution is unstable (loop radius 1.004): self-oscillation",1,21504
