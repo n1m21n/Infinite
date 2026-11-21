@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 121, shape memoryless
+x = in * 3.066
+out = min(x, -0.09788) * 0.5

@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 071, shape memoryless
+x = in * 3.362
+out = (ceil(tan(clamp(x, -1.2, 1.2)) * 13.41) / 13.41) * 0.5

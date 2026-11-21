@@ -1,0 +1,4 @@
+# G set, seed 20261121, kernel 215, shape comb
+x = in * 2.501
+w = tan(clamp(x, -1.2, 1.2))
+out = (w + 0.2908 * delay(w, 29)) * 0.5

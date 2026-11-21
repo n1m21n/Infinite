@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 119, shape fb
+state float y = 0
+u = in * 0.9533 + y * -0.3805
+y = clamp(u - u * u * u / 3.0, -1.0, 1.0)
+out = (y * 1.615) * 0.5

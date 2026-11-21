@@ -25,6 +25,7 @@ extern bool gShotNodeMenu; // frame/StagePopupsA.cpp: review shots open the firs
 bool RunOversampleTest(); // selftest/AliasTests.cpp
 bool RunFieldAliasTest(); // selftest/AliasTests.cpp
 bool RunFieldRatePlanTest(); // selftest/AliasTests.cpp
+bool RunFieldHeldOutTest(); // selftest/AliasTests.cpp
 bool RunPitchTest(); // selftest/PitchTests.cpp
 bool RunLearningLogTest(); // selftest/GenSampleTests.cpp
 bool RunGenSampleTest(); // selftest/GenSampleTests.cpp
@@ -707,6 +708,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // Per-segment oversampling plans against the whole kernel (phase 2a, H2).
    if (getenv("INFINITE_FIELDRATEPLAN") != nullptr)
       return RunFieldRatePlanTest() ? 0 : 1;
+   // Phase 4: score a folder of held-out kernels (same rig, frozen analysis).
+   if (getenv("INFINITE_FIELDHELDOUT") != nullptr)
+      return RunFieldHeldOutTest() ? 0 : 1;
 
    // Pitch Shifter quality: purity, chord, unity null, transients (selftest/PitchTests.cpp).
    if (getenv("INFINITE_PITCHTEST") != nullptr)

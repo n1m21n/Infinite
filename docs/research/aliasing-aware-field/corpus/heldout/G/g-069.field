@@ -1,0 +1,4 @@
+# G set, seed 20261121, kernel 069, shape comb
+x = in * 0.9897
+w = log(1.0 + abs((((ceil((x * 0.8748) * 5.064) / 5.064) + 8.0) % 1.0 - 0.5)))
+out = (w + -0.6371 * delay(w, 29)) * 0.5

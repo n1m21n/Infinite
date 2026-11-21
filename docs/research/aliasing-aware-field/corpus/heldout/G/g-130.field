@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 130, shape fb
+state float y = 0
+u = in * 1.786 + y * 0.4596
+y = clamp(u, -1.015, 1.015)
+out = (ceil(cos((y * 1.291) * 3.531) * 9.397) / 9.397) * 0.5

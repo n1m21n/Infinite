@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 156, shape memoryless
+x = in * 1.676
+out = min(cos((x * 2.526) * 1.411), 0.1573) * 0.5

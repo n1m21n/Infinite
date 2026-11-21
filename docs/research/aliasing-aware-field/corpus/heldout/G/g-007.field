@@ -1,0 +1,4 @@
+# G set, seed 20261121, kernel 007, shape comb
+x = in * 1.276
+w = log(1.0 + abs(((exp(clamp(x, -6.0, 6.0)) - 1.0) + if((x * 2.057) > 0.2334, (x * 1.731), x) * 0.9942)))
+out = (w + -0.6127 * delay(w, 3)) * 0.5

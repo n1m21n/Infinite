@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 191, shape memoryless
+x = in * 1.365
+out = sqrt(abs((x * (x * 2.021)))) * 0.5

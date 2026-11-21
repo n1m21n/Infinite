@@ -33,6 +33,7 @@
 #include "field/RatePlan.h"
 #include "field/SampleRuntime.h"
 #include <chrono>
+#include <filesystem>
 #include <cstring>
 #include <functional>
 #include <set>
@@ -1823,5 +1824,120 @@ bool RunFieldRatePlanTest()
       fclose(csv);
    printf("FIELDRATE %s\n", all ? "OK" : "FAIL");
    return all;
+}
+
+// Phase 4 held-out scoring (docs/research/aliasing-aware-field/README.md
+// section 13). INFINITE_FIELDHELDOUT=<dir> scores every <dir>/<set>/*.field
+// file: the same compile, PredictFactor, 1x-32x render and Measure as the
+// FIELDRATE held-out presets above, one CSV row per kernel to
+// INFINITE_FIELDHELDOUT_CSV. Kernels are in-driven Field Effect code; a
+// kernel that does not compile or that the analysis declines is a row with
+// its reason, never a silent drop. Test code only: the analysis is frozen.
+bool RunFieldHeldOutTest()
+{
+   const char* dir = getenv("INFINITE_FIELDHELDOUT");
+   const char* csvPath = getenv("INFINITE_FIELDHELDOUT_CSV");
+   if (dir == nullptr || csvPath == nullptr)
+   {
+      printf("FIELDHELDOUT needs INFINITE_FIELDHELDOUT=<dir> and INFINITE_FIELDHELDOUT_CSV=<file>\n");
+      return false;
+   }
+   FILE* csv = fopen(csvPath, "w");
+   if (csv == nullptr)
+      return false;
+   fprintf(csv, "set,label,status,reason,memoryless,meas_1,meas_2,meas_4,meas_8,meas_16,meas_32,"
+                "pred_1,pred_2,pred_4,pred_8,pred_16,pred_32,factor_meas,factor_pred\n");
+   std::vector<std::filesystem::path> files;
+   std::error_code ec;
+   for (const auto& set : std::filesystem::directory_iterator(dir, ec))
+      if (set.is_directory())
+         for (const auto& f : std::filesystem::directory_iterator(set.path(), ec))
+            if (f.path().extension() == ".field")
+               files.push_back(f.path());
+   std::sort(files.begin(), files.end());
+   auto quote = [](std::string v) {
+      for (char& ch : v)
+         if (ch == '"' || ch == '\n' || ch == '\r')
+            ch = '\'';
+      return "\"" + v + "\"";
+   };
+   int scored = 0, declined = 0;
+   for (const auto& path : files)
+   {
+      FILE* fp = fopen(path.string().c_str(), "rb");
+      if (fp == nullptr)
+         continue;
+      std::string code;
+      char buf[4096];
+      size_t n;
+      while ((n = fread(buf, 1, sizeof(buf), fp)) > 0)
+         code.append(buf, n);
+      fclose(fp);
+      const std::string set = path.parent_path().filename().string(), label = path.stem().string();
+      FieldAliasCase c;
+      c.label = label;
+      c.klass = "heldout";
+      c.code = code;
+      auto row = [&](const char* status, const std::string& reason, int memoryless, const double* db,
+                     const double* pred, int fm, int fpred) {
+         fprintf(csv, "%s,%s,%s,%s,%s", set.c_str(), quote(label).c_str(), status, quote(reason).c_str(),
+                 memoryless < 0 ? "" : (memoryless ? "1" : "0"));
+         for (int k = 0; k < 6; k++)
+            db != nullptr ? fprintf(csv, ",%.2f", db[k]) : fprintf(csv, ",");
+         for (int k = 0; k < 6; k++)
+            pred != nullptr ? fprintf(csv, ",%.2f", pred[k]) : fprintf(csv, ",");
+         fm >= 0 ? fprintf(csv, ",%d", fm) : fprintf(csv, ",");
+         fpred >= 0 ? fprintf(csv, ",%d\n", fpred) : fprintf(csv, ",\n");
+      };
+      Field::SampleProgram prog;
+      Field::FieldError ferr;
+      if (!Field::CompileSampleProgram(code, nullptr, prog, ferr))
+      {
+         printf("FIELDHELDOUT %s/%-34s declined: does not compile (%s)\n", set.c_str(), label.c_str(),
+                ferr.message.c_str());
+         row("compile", ferr.message, -1, nullptr, nullptr, -1, -1);
+         declined++;
+         continue;
+      }
+      const int memoryless = prog.state.empty() && prog.delays.empty() && prog.tables.empty() ? 1 : 0;
+      std::string why;
+      double pred[6];
+      const int fpred = PredictFactor(prog, (double)kFundBin * kRate / (double)kN, kAmplitude, true, pred, why);
+      if (fpred < 0)
+      {
+         printf("FIELDHELDOUT %s/%-34s declined: %s\n", set.c_str(), label.c_str(), why.c_str());
+         row("declined", why, memoryless, nullptr, nullptr, -1, -1);
+         declined++;
+         continue;
+      }
+      double db[6];
+      std::string err;
+      bool ok = true;
+      for (int k = 0; k < 6 && ok; k++)
+      {
+         const std::vector<float> x = RenderFieldAt(c, kFieldFactors[k], err);
+         ok = !x.empty();
+         if (ok)
+            db[k] = Measure(x, c.fundBin).aliasDb;
+      }
+      if (!ok)
+      {
+         printf("FIELDHELDOUT %s/%-34s render failed: %s\n", set.c_str(), label.c_str(), err.c_str());
+         row("render", err, memoryless, nullptr, pred, -1, fpred);
+         declined++;
+         continue;
+      }
+      const int fm = FactorNeeded(db);
+      row("ok", "", memoryless, db, pred, fm, fpred);
+      scored++;
+      printf("FIELDHELDOUT %s/%-34s meas %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f | pred %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f"
+             " | factor %s/%s\n",
+             set.c_str(), label.c_str(), db[0], db[1], db[2], db[3], db[4], db[5], pred[0], pred[1], pred[2], pred[3],
+             pred[4], pred[5], fm == 0 ? ">32" : std::to_string(fm).c_str(), fpred == 0 ? ">32" : std::to_string(fpred).c_str());
+      fflush(stdout);
+   }
+   fclose(csv);
+   printf("FIELDHELDOUT %zu files: %d scored, %d declined or failed\n", files.size(), scored, declined);
+   return true;
 }
 }

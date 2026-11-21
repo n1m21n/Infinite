@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 109, shape pre
+state float z = 0
+z = z + 0.3377 * (in - z)
+x = z * 2.299
+out = ((floor(x * 9.119) / 9.119) + (floor(x * 4.63) / 4.63) * 0.8076) * 0.5

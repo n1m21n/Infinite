@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 028, shape fb
+state float y = 0
+u = in * 2.356 + y * 0.3599
+y = sin(u)
+out = ((y * 2.707) * (y * 2.63)) * 0.5

@@ -1,0 +1,4 @@
+# G set, seed 20261121, kernel 044, shape comb
+x = in * 3.103
+w = if((x * 2.366) > -0.008506, (x * 1.477), x)
+out = (w + 0.4571 * delay(w, 13)) * 0.5

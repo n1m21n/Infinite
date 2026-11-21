@@ -1,0 +1,9 @@
+# G set, seed 20261121, kernel 015, shape mixed
+state float a = 0
+state float y = 0
+state float z = 0
+a = a + 0.6262 * (in - a)
+u = a * 2.264 + y * -0.4871
+y = sin(u)
+z = z + 0.5772 * (y - z)
+out = z * 0.5

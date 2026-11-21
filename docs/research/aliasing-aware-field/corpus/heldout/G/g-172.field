@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 172, shape post
+x = in * 2.086
+state float z = 0
+z = z + 0.1614 * ((tan(clamp(tan(clamp(x, -1.2, 1.2)), -1.2, 1.2)) * x) - z)
+out = z * 0.5

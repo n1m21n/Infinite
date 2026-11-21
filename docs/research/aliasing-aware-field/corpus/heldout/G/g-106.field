@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 106, shape memoryless
+x = in * 0.5653
+out = (exp(clamp(clamp(x, -0.5949, 0.5949), -6.0, 6.0)) - 1.0) * 0.5

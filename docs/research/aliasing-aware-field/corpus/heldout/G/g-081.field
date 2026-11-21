@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 081, shape memoryless
+x = in * 1.323
+out = if(mix((1.0 - 2.0 / (exp(clamp(2.0 * x, -12.0, 12.0)) + 1.0)), x, 0.7354) > -0.127, sin(min((x * 2.169), 0.07186) * 2.829), sqrt(abs((exp(clamp(x, -6.0, 6.0)) - 1.0)))) * 0.5

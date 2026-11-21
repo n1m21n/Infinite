@@ -1,0 +1,4 @@
+# G set, seed 20261121, kernel 137, shape comb
+x = in * 2.599
+w = sin(sin(x * 2.916) * 2.463)
+out = (w + 0.6711 * delay(w, 29)) * 0.5

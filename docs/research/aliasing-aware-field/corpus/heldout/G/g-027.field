@@ -1,0 +1,4 @@
+# G set, seed 20261121, kernel 027, shape comb
+x = in * 1.468
+w = (1.0 - 2.0 / (exp(clamp(2.0 * x, -12.0, 12.0)) + 1.0))
+out = (w + 0.6354 * delay(w, 61)) * 0.5

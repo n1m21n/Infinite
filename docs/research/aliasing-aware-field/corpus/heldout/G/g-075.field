@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 075, shape post
+x = in * 3.791
+state float z = 0
+z = z + 0.3863 * (sin(((floor((x * 2.401) * 7.75) / 7.75) * (x * 2.711)) * 3.202) - z)
+out = z * 0.5

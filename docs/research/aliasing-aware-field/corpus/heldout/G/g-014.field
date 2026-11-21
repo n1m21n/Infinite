@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 014, shape post
+x = in * 1.545
+state float z = 0
+z = z + 0.162 * (((clamp(x, -0.3531, 0.3531) + 8.0) % 1.0 - 0.5) - z)
+out = z * 0.5

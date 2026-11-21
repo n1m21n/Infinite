@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 116, shape memoryless
+x = in * 1.294
+out = abs(mix((x * 0.5185), x, 0.3712)) * 0.5

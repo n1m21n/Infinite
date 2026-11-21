@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 138, shape fb
+state float y = 0
+u = in * 1.586 + y * 0.1839
+y = clamp(u, -0.5815, 0.5815)
+out = min((y * 2.549), -0.2616) * 0.5

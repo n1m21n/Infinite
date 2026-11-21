@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 117, shape fb
+state float y = 0
+u = in * 1.497 + y * -0.8426
+y = (u / (1.0 + abs(u)))
+out = y * 0.5
