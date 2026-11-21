@@ -1,0 +1,10 @@
+# L set, kernel 13. Yeh, Abel and Smith, DAFx-07 ("Simplified, physically-informed models"), section 4.2, eqs. (20)-(23):
+# the overdrive clipping stage. In = Vi s / (R1 (s + wz)), wz = 1/(R1 Cz) (720 Hz highpass, bilinear at 48 kHz);
+# V across the diode-limited feedback impedance taken as the static curve of eq. (19) (n = 2.5, 0.6 V drop) applied to
+# R2 In with R2 = 51k + D 500k, D = 0.5 (R2/R1 = 64.0); Vo = V + Vi (eq. 23). Tone and output stages omitted.
+state float h = 0
+vi = in * 0.2
+h = 0.954968 * (vi - delay(vi, 1)) + 0.909936 * h
+w = 64.0 * h / 0.6
+v = 0.6 * w / ((1.0 + (abs(w) ^ 2.5)) ^ 0.4)
+out = (v + vi) * 0.8

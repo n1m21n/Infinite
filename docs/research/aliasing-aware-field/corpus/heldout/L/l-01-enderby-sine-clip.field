@@ -1,0 +1,5 @@
+# L set, kernel 01. Enderby and Baracskai, DAFx-12, eq. (2): sinusoidal soft clipping.
+# y = sgn(x) for |x| > 2/3, sin(3 pi x / 4) otherwise.
+x = in * 2.0
+y = if(abs(x) > 0.6667, if(x < 0, -1.0, 1.0), sin(2.3562 * x))
+out = y * 0.5

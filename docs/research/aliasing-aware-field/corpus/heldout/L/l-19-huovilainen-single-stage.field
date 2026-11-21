@@ -1,0 +1,7 @@
+# L set, kernel 19. Huovilainen, DAFx-04, eq. (22): one non-linear one-pole stage, y += g (tanh(x) - tanh(y)),
+# Fc = 2 kHz, Fs = 48 kHz -> g = 0.230329 (eq. 21). tanh replaced by Yeh, Abel and Smith eq. (19), n = 2.5.
+state float y = 0
+x = in * 3.0
+ty = y / ((1.0 + (abs(y) ^ 2.5)) ^ 0.4)
+y = y + 0.230329 * (x / ((1.0 + (abs(x) ^ 2.5)) ^ 0.4) - ty)
+out = y * 0.8

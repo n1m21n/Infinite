@@ -1,0 +1,13 @@
+# L set, kernel 30. Parker, Zavalishin and Le Bivic, DAFx-16, eqs. (9)-(10) applied to Enderby and Baracskai's
+# reciprocal soft clipper (DAFx-12 eq. 6), f = sgn(x)(1 - 1/(30|x| + 1)). Antiderivative worked from the curve:
+# F0 = |x| - ln(30|x| + 1)/30 (F0(0) = 0).
+x = in * 1.0
+x1 = delay(x, 1)
+p = abs(x) - log(30.0 * abs(x) + 1.0) / 30.0
+q = abs(x1) - log(30.0 * abs(x1) + 1.0) / 30.0
+m = 0.5 * (x + x1)
+fm = if(m < 0, -1.0, 1.0) * (1.0 - 1.0 / (abs(30.0 * m) + 1.0))
+d = x - x1
+safe = if(abs(d) < 0.00001, 1.0, d)
+y = if(abs(d) < 0.00001, fm, (p - q) / safe)
+out = y * 0.5

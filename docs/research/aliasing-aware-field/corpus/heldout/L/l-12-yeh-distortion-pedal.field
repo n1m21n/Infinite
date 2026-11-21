@@ -1,0 +1,29 @@
+# L set, kernel 12. Yeh, Abel and Smith, DAFx-07 ("Simplified, physically-informed models"), the "Distortion"
+# pedal chain of their Fig. 2, all bilinear at fs = 48 kHz (their eqs. (4)-(9)):
+#   BJT stage eq. (15), s^2 / ((s + 2 pi 3)(s + 2 pi 600)), with the 36 dB band gain they report;
+#   op-amp gain stage eq. (16) with D = 0.5, then the op amp's hard clip at Vdd/2 = 4.5 V (section 3.3);
+#   diode clipper as the static curve of eq. (19), n = 2.5, scaled to the 0.6 V diode drop of their Fig. 9;
+#   tone stage (section 3.5): first-order highpass at 1.16 kHz and lowpass at 320 Hz, weighted 0.5 / 0.5
+#   (the paper gives the corners; the 0.5 weights for the tone knob at mid are this kernel's choice).
+state float b1 = 0
+state float b2 = 0
+state float o1 = 0
+state float o2 = 0
+state float hp = 0
+state float lp = 0
+state float d1 = 0
+vi = in * 0.2
+b = 0.962025 * (vi - 2.0 * delay(vi, 1) + delay(vi, 2)) + 1.924035 * b1 - 0.924065 * b2
+b2 = b1
+b1 = b
+g = 63.0 * b
+o = 1.415410 * g - 1.090528 * delay(g, 1) - 0.324536 * delay(g, 2) + 1.090528 * o1 - 0.090874 * o2
+o2 = o1
+o1 = o
+c = clamp(o, -4.5, 4.5)
+w = c / 0.6
+d = 0.6 * w / ((1.0 + (abs(w) ^ 2.5)) ^ 0.4)
+hp = 0.929436 * (d - d1) + 0.858871 * hp
+lp = 0.020514 * (d + d1) + 0.958971 * lp
+d1 = d
+out = (0.5 * hp + 0.5 * lp) * 0.8

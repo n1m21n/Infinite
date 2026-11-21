@@ -1,0 +1,5 @@
+# L set, kernel 11. Yeh, Abel and Smith, DAFx-07 ("Simplified, physically-informed models"), eq. (19), n = 2.5:
+# x / (1 + |x|^n)^(1/n), their approximation to the diode clipper's DC curve.
+x = in * 4.0
+y = x / ((1.0 + (abs(x) ^ 2.5)) ^ 0.4)
+out = y * 0.5

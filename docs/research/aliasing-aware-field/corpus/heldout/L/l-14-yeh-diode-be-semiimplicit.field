@@ -1,0 +1,15 @@
+# L set, kernel 14. Yeh, Abel and Smith, DAFx-07 ("Simulation of the diode limiter"), eq. (2) solved by backward Euler
+# (eq. 6) with one Newton iteration from the previous state (their semi-implicit method, section 2.1.7):
+#   T f(v) = (T/RC)(Vi - v) - (2 Is T / C) sinh(v / Vt),  v[n] = v[n-1] + T f(v[n-1]) / (1 - T f'(v[n-1])).
+# R = 2.2k, C = 0.01 uF (their Fig. 1), fs = 48 kHz: T/RC = 0.946970. Is = 2.52 nA and Vt = 45.3 mV are not given in
+# the paper; they are assumed values for a 1N914-class diode (2 Is T / C = 1.05e-5, 1/Vt = 22.075).
+# float32 guard: sinh/cosh arguments clamped to +-40.
+state float v = 0
+vi = in * 4.0
+u = clamp(v * 22.075, -40.0, 40.0)
+e = exp(u)
+sh = 0.5 * (e - 1.0 / e)
+ch = 0.5 * (e + 1.0 / e)
+tf = 0.946970 * (vi - v) - 0.0000105 * sh
+v = v + tf / (1.0 + 0.946970 + 0.00023179 * ch)
+out = v * 0.4

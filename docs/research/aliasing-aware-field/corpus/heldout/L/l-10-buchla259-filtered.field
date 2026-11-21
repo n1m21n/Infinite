@@ -1,0 +1,17 @@
+# L set, kernel 10. Esqueda, Pontynen, Valimaki and Parker, DAFx-17, eqs. (13)-(18) and (19)-(21): the Buchla 259
+# folder followed by its one-pole lowpass (fc = 1/(2 pi R_F2 C) = 1.33 kHz), bilinear transform at fs = 48 kHz:
+# b0 = b1 = wcT / (2 + wcT) = 0.079872, a1 = (wcT - 2) / (wcT + 2) = -0.840256.
+state float u1 = 0
+state float yl = 0
+v = in * 10.0
+s = if(v < 0, -1.0, 1.0)
+a = abs(v)
+v1 = if(a > 0.6, 0.8333 * v - 0.5 * s, 0.0)
+v2 = if(a > 2.994, 0.3768 * v - 1.1281 * s, 0.0)
+v3 = if(a > 5.46, 0.2829 * v - 1.5446 * s, 0.0)
+v4 = if(a > 1.8, 0.5743 * v - 1.0338 * s, 0.0)
+v5 = if(a > 4.08, 0.2673 * v - 1.0907 * s, 0.0)
+u = -12.0 * v1 - 27.777 * v2 - 21.428 * v3 + 17.647 * v4 + 36.363 * v5 + 5.0 * v
+yl = 0.079872 * (u + u1) + 0.840256 * yl
+u1 = u
+out = yl * 0.15

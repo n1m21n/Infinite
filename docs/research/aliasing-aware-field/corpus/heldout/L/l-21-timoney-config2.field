@@ -1,0 +1,8 @@
+# L set, kernel 21. Timoney and Lazzarini, Forum Acusticum 2011: configuration 2 (filter, then saturation, inside the
+# feedback loop). Saturation eq. (2) (A = 1, c = 3), filter eq. (6) with eq. (7) g = 0.122340 (1 kHz), beta = 0.5.
+state float y = 0
+state float f = 0
+u = in * 2.0 - 0.5 * y
+f = 0.122340 * (0.769231 * u + 0.230769 * delay(u, 1)) + 0.877660 * f
+y = if(f < 0, -1.0, 1.0) * (1.0 - exp(-3.0 * abs(f)))
+out = y * 0.8

@@ -1,0 +1,12 @@
+# L set, kernel 09. Esqueda, Pontynen, Valimaki and Parker, DAFx-17, eqs. (13)-(18): Buchla 259 timbre circuit,
+# five folding cells and the summing stage, without the output filter. Input in volts: 0.5 -> 5 V peak (their Fig. 4b).
+v = in * 10.0
+s = if(v < 0, -1.0, 1.0)
+a = abs(v)
+v1 = if(a > 0.6, 0.8333 * v - 0.5 * s, 0.0)
+v2 = if(a > 2.994, 0.3768 * v - 1.1281 * s, 0.0)
+v3 = if(a > 5.46, 0.2829 * v - 1.5446 * s, 0.0)
+v4 = if(a > 1.8, 0.5743 * v - 1.0338 * s, 0.0)
+v5 = if(a > 4.08, 0.2673 * v - 1.0907 * s, 0.0)
+vo = -12.0 * v1 - 27.777 * v2 - 21.428 * v3 + 17.647 * v4 + 36.363 * v5 + 5.0 * v
+out = vo * 0.1

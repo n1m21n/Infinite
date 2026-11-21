@@ -1,0 +1,4 @@
+# L set, kernel 08. Smith, Physical Audio Signal Processing (CCRMA), "Hard Clipping".
+# f(x) = -1 for x <= -1, x for -1 <= x <= 1, 1 for x >= 1.
+x = in * 3.0
+out = clamp(x, -1.0, 1.0) * 0.5

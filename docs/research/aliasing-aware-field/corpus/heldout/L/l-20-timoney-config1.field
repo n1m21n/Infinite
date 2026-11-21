@@ -1,0 +1,9 @@
+# L set, kernel 20. Timoney and Lazzarini, Forum Acusticum 2011: configuration 1 (saturation before the filter, unit-
+# delay feedback beta). Saturation eq. (2), g(x) = sgn(x) A (1 - exp(-c |x|)), A = 1, c = 3. Filter eq. (6),
+# H(z) = g (a + b z^-1) / (1 - (1 - g) z^-1), a = 1/1.3, b = 0.3/1.3, with g from the polynomial eq. (7) for
+# wc = 2 pi 1 kHz / 48 kHz: g = 0.122340. beta = 0.5.
+state float y = 0
+u = in * 2.0 - 0.5 * y
+s = if(u < 0, -1.0, 1.0) * (1.0 - exp(-3.0 * abs(u)))
+y = 0.122340 * (0.769231 * s + 0.230769 * delay(s, 1)) + 0.877660 * y
+out = y * 0.8

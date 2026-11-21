@@ -1,0 +1,12 @@
+# L set, kernel 15. Yeh, Abel and Smith, DAFx-07 ("Simulation of the diode limiter"), eq. (2) solved by the
+# trapezoidal rule (eq. 7) with one Newton iteration from the previous state (section 2.1.7):
+#   v[n] = v[n-1] + T f(v[n-1]) / (1 - (T/2) f'(v[n-1])).  Constants as kernel 14 (Is, Vt assumed).
+state float v = 0
+vi = in * 4.0
+u = clamp(v * 22.075, -40.0, 40.0)
+e = exp(u)
+sh = 0.5 * (e - 1.0 / e)
+ch = 0.5 * (e + 1.0 / e)
+tf = 0.946970 * (vi - v) - 0.0000105 * sh
+v = v + tf / (1.0 + 0.5 * (0.946970 + 0.00023179 * ch))
+out = v * 0.4
