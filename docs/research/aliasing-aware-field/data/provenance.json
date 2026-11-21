@@ -1,14 +1,14 @@
 {
   "commit_sha": "fd6c55ca09ab7805b819ae5a569a1ab62aa44d3b",
-  "commit_note": "Code that reproduces every output. Outputs were first produced at: phase0-baseline.csv c0c39088dc1eb3132f58dbc9427fffb413ecf09b (re-run with corrected param reset at 8820229c), phase1-predictions.csv 8820229c5ff5ff26b5dd2324cb6c36e77d063f93, phase2-* the working tree committed as cb85f932. Cost repeats and audio clips: fd6c55ca. Phase 4: G, scorer and hook 001ad1f0; L c5a84260 (both committed before scoring); held-out run and break-even on a dev build of c5a84260, analysis unchanged since fd6c55ca.",
+  "commit_note": "Code that reproduces every output. Outputs were first produced at: phase0-baseline.csv c0c39088dc1eb3132f58dbc9427fffb413ecf09b (re-run with corrected param reset at 8820229c), phase1-predictions.csv 8820229c5ff5ff26b5dd2324cb6c36e77d063f93, phase2-* the working tree committed as cb85f932. Cost repeats and audio clips: fd6c55ca. Phase 4: G, scorer and hook 001ad1f0; L c5a84260 (both committed before scoring); held-out run and break-even on a dev build of c5a84260, analysis unchanged since fd6c55ca. Phase 5: set D, generator and scorer H4 extension 35adec8b (before the analysis change); delay-line analysis change and run in the commit that adds data/phase5-*.",
   "timestamp_utc": "2026-11-21T03:13:04Z",
   "os": "macOS 27.2.1 arm64",
   "cpu": "Apple M2, 8 cores, 8 GB RAM",
   "compiler": "Apple clang version 21.0.0 (clang-2100.4.1.1)",
   "build_flags": "scripts/ibuild.py build --mode dev (CMake Debug, arm64). Cost bench: clang++ -std=c++20 -O2",
-  "command": "docs/research/aliasing-aware-field/scripts/run_all.sh (phase 2 cost line INFINITE_FIELDRATE_COST=0,3.5,11,23,47,10,23,49). Cost repeats: scripts/cost_repeats.py <10 runs of tools/field_rate_cost_bench.cpp>. Audio: INFINITE_FIELDRATE_AUDIO=<dir> with the H2 run, then scripts/make_audio.py. Phase 4: INFINITE_FIELDHELDOUT=<study>/corpus/heldout INFINITE_FIELDHELDOUT_CSV=<csv>, then scripts/score_heldout.py <csv>; break-even: scripts/break_even.py",
+  "command": "docs/research/aliasing-aware-field/scripts/run_all.sh (phase 2 cost line INFINITE_FIELDRATE_COST=0,3.5,11,23,47,10,23,49). Cost repeats: scripts/cost_repeats.py <10 runs of tools/field_rate_cost_bench.cpp>. Audio: INFINITE_FIELDRATE_AUDIO=<dir> with the H2 run, then scripts/make_audio.py. Phase 4: INFINITE_FIELDHELDOUT=<study>/corpus/heldout INFINITE_FIELDHELDOUT_CSV=<csv>, then scripts/score_heldout.py <csv>; break-even: scripts/break_even.py. Phase 5: same hook and scorer on corpus/heldout (L, G, D) with data-rerun/phase5-heldout.csv",
   "seed": 0,
-  "seed_note": "No RNG: the stimulus is a fixed sine, analysis and renders are deterministic. Set G was generated with seed 20261121 (committed generator).",
+  "seed_note": "No RNG: the stimulus is a fixed sine, analysis and renders are deterministic. Set G was generated with seed 20261121 (committed generator). Set D was generated with seed 20261122 (scripts/gen_heldout_d.py).",
   "outputs": [
     "phase0-baseline.csv",
     "phase1-predictions.csv",
@@ -18,7 +18,7 @@
     "phase2-run1-debugcost-oldscoring.log",
     "phase2-cost-bench.log",
     "phase2-cost-repeats.csv",
-    "phase2-cost-repeats/run-01.log \u2026 run-10.log",
+    "phase2-cost-repeats/run-01.log … run-10.log",
     "phase2-audio/renders.log",
     "phase2-audio/tanh3-{1x,fixed8x,staged,32x}.f32",
     "phase2-audio/tanh3-{1x,fixed8x,staged,32x}.wav",
@@ -28,6 +28,10 @@
     "phase4-score.log",
     "phase4-break-even.csv",
     "phase4-break-even.stdout.log",
-    "phase4-break-even/s-{0.0000,0.0156,0.0312,0.0625,0.1250,0.2500,0.5000,1.0000}.log"
+    "phase4-break-even/s-{0.0000,0.0156,0.0312,0.0625,0.1250,0.2500,0.5000,1.0000}.log",
+    "phase5-heldout.csv",
+    "phase5-heldout.log",
+    "phase5-scored.csv",
+    "phase5-score.log"
   ]
 }

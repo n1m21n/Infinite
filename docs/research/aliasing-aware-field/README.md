@@ -15,9 +15,10 @@ pre-registered bar of 25% (section 10); break-even needs a resampler pair under 
 instructions (section 14). **H1 is confirmed within its scope, 2026-11-21** (section 14): on two held-out
 sets the author did not tune against (L, 32 literature kernels; G, 240 generated kernels), H1b passes on
 each and the analysis picks the exact factor on 174 of 174 informative kernels against 8 for "8x if
-nonlinear" and 37 for a class lookup (H3). The scope is a steady tone and kernels with no delay lines:
-14 of 32 literature kernels, including every ADAA kernel, were not scored. Soundness lemmas (phase 4c)
-not started. Phase 0: section 8. Phase 2b (live audio path) not started. Threats to validity: section 12.
+nonlinear" and 37 for a class lookup (H3). **Delay lines are in scope since phase 5, 2026-11-21** (section 16): the pass now treats `delay(x, N)`
+as a periodic cell shifted by N samples, scores 94 of 97 delay kernels in L, G and a new blind set D (H4
+passes), and changes no phase-4 result. The scope is a steady tone; 3 of 32 literature kernels are still
+declined (no periodic steady state). Soundness lemmas (phase 4c) not started. Phase 0: section 8. Phase 2b (live audio path) not started. Threats to validity: section 12.
 Reproduction: `ARTIFACT.md`. Prior art: `docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md`.
 Hypotheses were first committed in d38d29b7, before phase 0 ran (c0c39088).
 
@@ -86,6 +87,7 @@ A useful by-product: for jump-class ops, oversampling is close to hopeless (8x b
 | 2. Execute | Rate regions in `RunSampleProgram` (`SampleRuntime.h:161`) using `MinPhaseOversampler`: per-voice oversampler state, scaled `sr`, and the latency reported. Test H2. | Audio path | Go or kill on H2; gated Field cases in the ratchet |
 | 3. Loops (stretch) | Bandwidth inside `state`/`delay` feedback (a fixed point with widening, using loop gain), then the choice between ADAA and oversampling. This opens problem 2, zero-delay loops. | Compiler | Second paper or a documented limit |
 | 4. Held-out and foundations | Independent held-out sets, simple-rule baselines, the H2 break-even cost, and soundness lemmas for the bound (section 13). Pre-registered 2026-11-21. | Test code and corpus only | **4a, 4b done (section 14):** H1b passes on L and G, H3 passes, break-even below 0.09 instructions. 4c (lemmas), sets P and A not run |
+| 5. Delay lines | `delay(x, N)` as a periodic cell with lag N; blind set D (section 15). Pre-registered 2026-11-21. | Analysis pass only | **Done (section 16):** H4 passes, 94 of 97 delay kernels scored, no regression |
 
 Phases 0 and 1 are where the research claim is won or lost; they are small and safe.
 
@@ -398,8 +400,9 @@ H1 is now confirmed for kernels the pass accepts.
   verdict. One machine (Apple M2).
 - **External.** One author wrote the calibration corpus; phase 4 adds 272 held-out kernels (section 14),
   but L was still written by the same person (from papers, without looking at the analysis or data), and
-  G comes from a grammar the author wrote. Kernels with delay lines are declined, so ADAA and most
-  pedal circuits are outside the confirmed scope. Kernels are
+  G comes from a grammar the author wrote. Since phase 5 delay lines are in scope (section 16); D comes from a
+  grammar the same author wrote, and 3 literature kernels (a Yeh pedal and two semi-implicit diode
+  clippers) are still declined. Kernels are
   short; long kernels with one nonlinearity inside much linear code would favour staging more.
 
 ## 13. Phase 4 pre-registration: held-out sets and foundations (2026-11-21)
@@ -550,3 +553,58 @@ guards; lengths 1 to 480. Committed with this section, before the analysis chang
 **Scoring.** Same rig, tone and target. `scripts/score_heldout.py` (extended in this commit) prints H4;
 H1b and H3 for L and G are reprinted on the same numbers. Changing the analysis again after scoring needs
 another dated entry here and a rescore.
+
+## 16. Phase 5 results: delay lines (2026-11-21)
+
+The change pre-registered in section 15, in `src/core/field/AliasAnalysis.cpp` only. Each `delay(x, N)`
+is lowered to a store into a new periodic cell and a load from it, with lag N; the cell's value on the
+grid is its input shifted by N·φ, and Newton uses the shift e^{-i h N φ} per cell. Only lag-1 cells can
+be phase accumulators. Programs without delays take the old path. D was committed in 35adec8b before the
+change. One run of `INFINITE_FIELDHELDOUT` over L, G and D on a dev build, then
+`scripts/score_heldout.py`. Raw: `data/phase5-heldout.{csv,log}`, `data/phase5-scored.csv`, `data/phase5-score.log`.
+
+**H4 passes.**
+
+| Delay kernels | Total | Scored | Informative n | Spearman ρ (bar 0.8) | median abs error (bar 10 dB) | Verdict |
+|---|---|---|---|---|---|---|
+| L | 12 | 11 | 11 | 0.937 | 0.0 dB | PASS |
+| G | 25 | 25 | 25 | 0.991 | 0.0 dB | PASS |
+| D | 60 | 58 | 58 | 0.988 | 0.0 dB | PASS |
+| Pooled | 97 | 94 (97%; bar 80%, kill < 50%) | 94 | | | PASS |
+
+Exact minimal factor on the pooled delay kernels: the analysis 93 of 94 (99%), rule A 9, rule B 38. PASS.
+
+**No regression.** All 233 kernels scored in phase 4 give the same predicted dB (±0.01) and factor; the
+calibration corpus prediction file is byte-identical to `data/phase1-predictions.csv`.
+
+**Reprinted on the same run** (L and G, all kernels): L 29 of 32 scored, informative n=18, ρ 0.963;
+G 240 of 240, n=192, ρ 0.994; both median 0.0 dB, PASS. H3 on L ∪ G informative (n=210): analysis 209
+(100%), rule A 13, rule B 44, PASS. Every ADAA kernel in L (l-26 to l-31) is now scored.
+
+**Not scored (5).** All "no periodic steady state": l-12 (Yeh distortion pedal, loop radius 1.09), l-14
+and l-15 (semi-implicit diode clippers, 1.93 and 1.84; already declined in phase 4), d-038 and d-054.
+The three L kernels are implicit circuits solved with a one-step update; this is the zero-delay-loop
+problem, not a delay-line one.
+
+**The one factor miss is conservative.** l-27 (Parker's first-order ADAA hard clip) measures factor 4;
+the analysis predicts it never reaches −80 dB, plateauing near −72 dB from 4x up while the measurement
+falls to −117 dB. It would oversample too much or warn wrongly, never too little. Not investigated:
+the analysis is frozen.
+
+**Blow-ups still predict absurd dB.** 18 delay kernels (12 in D, 6 in G) have outputs that grow
+without bound: measured "alias" reaches +25 to +143 dB and the prediction +800 to +2992 dB. In every one
+both sides say factor "none", so the decision is right and the dB values mean nothing; in all, 63 of 327
+scored kernels are like this (45 in phase 4). They count as scored under the pre-registered rule. Without
+them delay coverage would be 76 of 97 (78%), just under the 80% bar; a pass that declined unbounded
+outputs would be more honest than one that prints +2992 dB.
+
+**Bound soundness: still no claim.** 108 kernels measure more than 3 dB above prediction at some factor.
+105 sit at the rig's float32 floor (worst −121.1 dB). Three are above it, all with delays and all below the
+−80 dB target, so no factor changes: d-053 (+6.9 dB at −103.8 dB), g-137 (+9.2 dB at −123.0 dB) and
+l-29, Smith's cubic ADAA (+5.3 dB at −88.2 dB, 4x). No lemma covers these classes (phase 4c not started).
+
+**What this shows.** The same steady-state solve covers delay lines and ADAA, on 94 kernels including
+a blind set of 60, with no change to anything scored before. It does not show behaviour under real
+(non-sinusoidal) input, it does not cover implicit (zero-delay) circuits, and its handling of unbounded
+outputs is a decision without a number.
+

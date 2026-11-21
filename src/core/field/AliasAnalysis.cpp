@@ -73,8 +73,6 @@ namespace Field
 
       bool Unsupported(const SampleProgram& prog, std::string& why)
       {
-         if (!prog.delays.empty())
-            return why = "delay lines (output is not a function of the input phase alone)", true;
          if (!prog.tables.empty())
             return why = "state tables", true;
          for (const SampleInstr& ins : prog.code)
@@ -196,13 +194,14 @@ namespace Field
          return std::exp((logScale + std::log(std::max(norm, 1e-300))) / 64.0);
       }
 
-      // Solve (I - M e^{-i h phi}) x = r for a k x k system in place.
-      bool SolveShifted(const std::vector<double>& m, int k, cd rot, std::vector<cd>& x)
+      // Solve (I - M D) x = r for a k x k system in place, D = diag(rot): column
+      // l is shifted by its own cell's lag, e^{-i h lag_l phi} (phase 5).
+      bool SolveShifted(const std::vector<double>& m, int k, const std::vector<cd>& rot, std::vector<cd>& x)
       {
          std::vector<cd> a((size_t)(k * k));
          for (int i = 0; i < k; i++)
             for (int j = 0; j < k; j++)
-               a[(size_t)(i * k + j)] = (i == j ? cd(1.0, 0.0) : cd(0.0, 0.0)) - m[(size_t)(i * k + j)] * rot;
+               a[(size_t)(i * k + j)] = (i == j ? cd(1.0, 0.0) : cd(0.0, 0.0)) - m[(size_t)(i * k + j)] * rot[(size_t)j];
          for (int c = 0; c < k; c++)
          {
             int piv = c;
@@ -235,6 +234,55 @@ namespace Field
       }
    }
 
+   namespace
+   {
+      // Phase 5 (README section 15): a delay line is one more periodic cell with
+      // lag N. Each Delay op becomes StoreState(cell, src) then LoadState(dst,
+      // cell); the store writes next and the load reads the delayed value, so
+      // dst == src is safe. lag gets 1 per state cell and N per delay line.
+      bool LowerDelays(const SampleProgram& prog, SampleProgram& low, std::vector<int>& lag, std::string& why)
+      {
+         const int k0 = (int)prog.state.size();
+         if (k0 + (int)prog.delays.size() > kSampleMaxStateCells)
+            return why = "too many state cells and delay lines for the analysis", false;
+         low = prog;
+         low.delays.clear();
+         lag.assign((size_t)k0, 1);
+         for (const SampleDelayLine& dl : prog.delays)
+         {
+            SampleStateInit init;
+            init.name = "__delay";
+            low.state.push_back(init);
+            lag.push_back(std::max(1, dl.length));
+         }
+         low.code.clear();
+         for (const SampleInstr& ins : prog.code)
+         {
+            if (ins.op != SampleOp::Delay)
+            {
+               low.code.push_back(ins);
+               continue;
+            }
+            if ((int)ins.a >= (int)prog.delays.size())
+               return why = "bad delay line index", false;
+            SampleInstr st;
+            st.op = SampleOp::StoreState;
+            st.a = (uint8_t)(k0 + ins.a);
+            st.b = ins.b;
+            SampleInstr ld;
+            ld.op = SampleOp::LoadState;
+            ld.dst = ins.dst;
+            ld.a = (uint8_t)(k0 + ins.a);
+            low.code.push_back(st);
+            low.code.push_back(ld);
+         }
+         return true;
+      }
+
+      bool AnalyzeCells(const SampleProgram& prog, const std::vector<int>& lag, const AliasContext& ctx,
+                        double sampleRate, AliasSpectrum& out);
+   }
+
    bool AnalyzePeriodicSpectrum(const SampleProgram& prog, const AliasContext& ctx, double sampleRate,
                                 AliasSpectrum& out)
    {
@@ -244,6 +292,20 @@ namespace Field
          return out.status = "program not compiled", false;
       if (Unsupported(prog, out.status))
          return false;
+      if (prog.delays.empty())
+         return AnalyzeCells(prog, std::vector<int>((size_t)prog.state.size(), 1), ctx, sampleRate, out);
+      SampleProgram low;
+      std::vector<int> lag;
+      if (!LowerDelays(prog, low, lag, out.status))
+         return false;
+      return AnalyzeCells(low, lag, ctx, sampleRate, out);
+   }
+
+   namespace
+   {
+   bool AnalyzeCells(const SampleProgram& prog, const std::vector<int>& lag, const AliasContext& ctx,
+                     double sampleRate, AliasSpectrum& out)
+   {
 
       const size_t n = (size_t)1 << ctx.gridLog2;
       const int k = (int)prog.state.size();
@@ -284,7 +346,7 @@ namespace Field
                }
             }
             else
-               DelayPeriodic(s[(size_t)c], phi, sd[(size_t)c]);
+               DelayPeriodic(s[(size_t)c], phi * (double)lag[(size_t)c], sd[(size_t)c]);
          }
       };
       auto evalAll = [&]() {
@@ -333,7 +395,7 @@ namespace Field
          meanJacobian(m);
          for (int c = 0; c < k; c++)
          {
-            bool acc = std::fabs(m[(size_t)(c * k + c)] - 1.0) < 1e-2;
+            bool acc = lag[(size_t)c] == 1 && std::fabs(m[(size_t)(c * k + c)] - 1.0) < 1e-2;
             for (int l = 0; l < k && acc; l++)
                if (l != c && std::fabs(m[(size_t)(c * k + l)]) > 1e-3)
                   acc = false;
@@ -411,11 +473,15 @@ namespace Field
                   rh[(size_t)a][j] = g[(size_t)c][j] - s[(size_t)c][j];
                Fft(rh[(size_t)a], false);
             }
-            std::vector<cd> x((size_t)kf);
+            std::vector<cd> x((size_t)kf), rot((size_t)kf);
             for (size_t b = 0; b < n; b++)
             {
                const double h = (double)Harm(b, n);
-               const cd rot(std::cos(h * phi), -std::sin(h * phi));
+               for (int a = 0; a < kf; a++)
+               {
+                  const double hp = h * (phi * (double)lag[(size_t)freeIdx[(size_t)a]]);
+                  rot[(size_t)a] = cd(std::cos(hp), -std::sin(hp));
+               }
                for (int a = 0; a < kf; a++)
                   x[(size_t)a] = rh[(size_t)a][b];
                if (!SolveShifted(mf, kf, rot, x))
@@ -492,6 +558,7 @@ namespace Field
       out.evaluations = run.evals;
       SpectrumFromWave(y, out);
       return true;
+   }
    }
 
    void SpectrumFromWave(const std::vector<double>& y, AliasSpectrum& out)

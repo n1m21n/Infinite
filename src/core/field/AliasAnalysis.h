@@ -19,6 +19,8 @@
 //     linear filters in one step;
 //   - phase accumulators (self-Jacobian 1) are recognised by checking that
 //     a ramp locked to f0 is a fixed point.
+//   - delay lines, delay(x, N): one more cell with lag N instead of 1, the
+//     same exact shift exp(-i h N 2pi f0 / fs) (phase 5, README section 15).
 // The grid spectrum gives the ideal (alias-free) harmonics up to H; past H
 // a power law fitted to the top two octave bands extrapolates the tail.
 // Sampling at fs folds harmonic h to |h f0 mod fs| (reflected), so the
@@ -27,7 +29,7 @@
 //
 // The program runs on the real interpreter (RunSampleProgram), so every op
 // has its runtime meaning. Programs whose output is not a function of the
-// input phase (sample counter, delay lines, tables, rand, beat clock, note
+// input phase (sample counter, tables, rand, beat clock, note
 // emit, declared inputs) are reported unsupported, as are feedback loops
 // with no periodic steady state (self-oscillation, chaos).
 namespace Field
