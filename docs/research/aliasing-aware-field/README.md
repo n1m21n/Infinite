@@ -650,6 +650,11 @@ needed factor already changes with tone level and pitch on 31 of 38 phase 1 kern
   power in the window, counting only windows whose reference power is within 30 dB of the loudest window.
 - Needed factor = the smallest F in {1, 2, 4, 8, 16, 32} with alias ≤ −80 dB; "0" = none.
 - Rig check before scoring: `out = in * 0.5` and a one-pole low-pass must measure ≤ −120 dB on every clip.
+- Oracle detail fixed at the rig check, before any kernel data: every copy runs over one whole period
+  first and is measured on the second, so all copies are in the periodic steady state. Without it, a copy
+  that starts between base samples misses the input's inter-sample past, and the one-pole measured −70 dB on
+  the noise clip, all of it in the first 10 ms. With it, the check gives −151 to −160 dB (gain) and −143 to
+  −148 dB (one-pole) on all 12 clips.
 
 **Change after sign-off (before any data).** The signed-off text measured error as the 1x render minus a
 32x render brought down to 48 kHz, minus the same difference for a very quiet copy of the clip (to remove

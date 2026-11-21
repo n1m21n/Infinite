@@ -1,0 +1,9 @@
+# Phase 6 clip: noise burst. Logistic-map noise in two bursts, fast attack and exponential decay.
+state float tc = 0
+state float r = 0.2718
+tc = tc + 1.0 / sr
+r = 3.99 * r * (1.0 - r)
+nz = r * 2.0 - 1.0
+tb = tc % 0.16
+env = (1.0 - exp(-tb * 400.0)) * exp(-tb * 25.0)
+out = nz * env

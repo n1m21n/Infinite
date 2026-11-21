@@ -1,0 +1,7 @@
+# Phase 6 clip: sweep. A sine from 40 Hz to 18 kHz, exponential in time over the 0.34 s clip.
+state float tc = 0
+state float p = 0
+tc = tc + 1.0 / sr
+f = 40.0 * exp(tc * 17.95)
+p = (p + f / sr) % 1.0
+out = sin(6.28318 * p)
