@@ -899,6 +899,16 @@ namespace Platform
 #include "platform/linux/HostEnvironmentLinux.h"
 #include "tinyfiledialogs.h"
 
+namespace
+{
+   // A real folder for the dialog to open in (empty default breaks zenity, #78).
+   std::string HomeStart()
+   {
+      const char* home = std::getenv("HOME");
+      return (home && home[0] != '\0') ? std::string(home) + "/" : std::string("/");
+   }
+}
+
 namespace Platform
 {
    std::string OpenAudioDialog()
@@ -914,7 +924,7 @@ namespace Platform
       };
       const char* res = tinyfd_openFileDialog(
          "Choose Audio File",
-         "",
+         HomeStart().c_str(),
          (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
          filterPatterns,
          "Audio files (*.wav, *.aif, *.aiff, *.mp3, *.flac)",
@@ -939,7 +949,7 @@ namespace Platform
       for (const std::string& p : patterns)
          ptrs.push_back(p.c_str());
       // Several files come back joined by '|'.
-      const char* res = tinyfd_openFileDialog(title != nullptr ? title : "Attach files", "", (int)ptrs.size(), ptrs.data(), "Files Infinite opens", 1);
+      const char* res = tinyfd_openFileDialog(title != nullptr ? title : "Attach files", HomeStart().c_str(), (int)ptrs.size(), ptrs.data(), "Files Infinite opens", 1);
       if (res == nullptr)
          return out;
       std::string all = res;
