@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 060, shape predel
+x = in * 1.798
+xd = delay(x, 29)
+out = tan(clamp((x ^ 2.0), -1.2, 1.2)) * 0.5

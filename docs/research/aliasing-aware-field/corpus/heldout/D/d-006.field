@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 006, shape predel
+x = in * 2.743
+xd = delay(x, 480)
+out = ((xd * (x * 1.284)) ^ 3.0) * 0.5

@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 056, shape combff
+x = in * 3.439
+w = sqrt(abs(x))
+out = (w + -0.1459 * delay(w, 61)) * 0.5

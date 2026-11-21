@@ -514,3 +514,39 @@ resampler: a crossing would have to cost less than about 1/10 of one interpreter
   shift of a periodic signal, so this looks fixable, but the analysis is frozen; changing it needs a new
   dated entry and a rescore (section 13).
 - Not run: sets P (permissive code) and A (blind LLM), and the phase-4c lemmas.
+
+## 15. Phase 5 pre-registration: delay-line coverage (2026-11-21)
+
+Written after phase 4 was scored and before the analysis changes. Signed off by the owner on 2026-11-21.
+This is the dated entry section 13 requires for changing the frozen analysis.
+
+**Problem.** The pass declines every kernel with `delay(x, N)` (section 14): 37 of 272 held-out kernels,
+including every ADAA kernel in L. Their alias was never measured, because the hook only renders kernels the
+pass accepts, so their results are still unseen.
+
+**Change (scope).** Only `src/core/field/AliasAnalysis.cpp`. A delay line becomes one more periodic cell
+whose lag is N samples instead of state's 1: its value on the grid is its input's periodic signal shifted by
+N·φ, the same exact band-limited shift state already uses, and the Newton step uses a per-cell shift
+e^{-i h N φ}. Programs without delay lines run the existing code path unchanged. Tables, `n`, `rand`,
+the beat clock and declared inputs stay declined. `RatePlan.*` is not changed; H2 is not rescored, because
+its corpus has no delay lines.
+
+**New set D (blind).** 60 kernels from `scripts/gen_heldout_d.py`, seed 20261122, every one with a delay
+line: feed-forward combs, a delayed input inside a nonlinearity, feedback closed through `delay(y, N)`,
+the first-order ADAA shape, and two delays around a nonlinearity with a one-pole. G's grammar and
+guards; lengths 1 to 480. Committed with this section, before the analysis change and before scoring.
+
+**Baseline (fixed, phase 4 at d3f1e2bc).** Delay coverage 0 of 37; every number in section 14.
+
+**H4, delay lines are predicted as well as state.**
+- Coverage: at least 80% of the delay kernels in L, G and D are scored. **Kill** under 50%.
+- On the informative delay kernels of L, G and D separately: Spearman ρ ≥ 0.8 and median absolute error
+  ≤ 10 dB (H1b's bars).
+- On the pooled delay kernels: the exact minimal factor on ≥ 80%, and strictly more often than rule A and
+  rule B (H3's rule).
+- **No regression:** every kernel scored in phase 4 and every calibration kernel gets the same predicted dB
+  (±0.01) and factor.
+
+**Scoring.** Same rig, tone and target. `scripts/score_heldout.py` (extended in this commit) prints H4;
+H1b and H3 for L and G are reprinted on the same numbers. Changing the analysis again after scoring needs
+another dated entry here and a rescore.

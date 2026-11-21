@@ -15,6 +15,9 @@ Rules (fixed before scoring, README section 13):
      source, worst first: feedback (a state cell assigned from an expression with a nonlinear op that reads the cell)
      > jump (floor ceil % if comparisons) > kink (abs clamp min max) > analytic (exp log sqrt sin cos tan, division)
      > poly (^, or a product of two signals).
+Phase 5 (README section 15) adds H4 on the kernels that use delay(x, N): coverage over every delay kernel in L, G and D
+      (>= 80% scored; kill under 50%), H1b's bars on the informative delay kernels of L, G and D separately, and H3's
+      rule on the pooled delay kernels. The per-kernel CSV is named after the input (phaseN-heldout -> phaseN-scored).
 Usage: python3 scripts/score_heldout.py <heldout csv> [corpus dir]
 """
 import csv, os, re, statistics, sys
@@ -170,11 +173,16 @@ def main():
         code = strip(open(os.path.join(corpus, r["set"], r["label"] + ".field"), encoding="utf-8").read())
         s = sets.setdefault(r["set"], {"n": 0, "ok": 0, "declined": {}, "rows": []})
         s["n"] += 1
+        has_delay = "delay(" in code
+        s.setdefault("delay_n", 0)
+        s.setdefault("delay_ok", 0)
+        s["delay_n"] += int(has_delay)
         if r["status"] != "ok":
             key = r["status"] + ": " + re.sub(r"[\d.]+", "#", r["reason"])[:60]
             s["declined"][key] = s["declined"].get(key, 0) + 1
             continue
         s["ok"] += 1
+        s["delay_ok"] += int(has_delay)
         meas = [float(r[f"meas_{f}"]) for f in FACTORS]
         pred = [float(r[f"pred_{f}"]) for f in FACTORS]
         nl = is_nonlinear(code)
@@ -184,7 +192,7 @@ def main():
         fb = table.get(k, 8) if nl else 1
         fb = 0 if fb == 64 else fb
         over = max(m - p for m, p in zip(meas, pred))
-        e = {"set": r["set"], "label": r["label"], "class": k, "memoryless": r["memoryless"], "nonlinear": int(nl),
+        e = {"set": r["set"], "label": r["label"], "class": k, "memoryless": r["memoryless"], "nonlinear": int(nl), "has_delay": int(has_delay),
              "factor_meas": fm, "factor_pred": fp, "rule_a": fa, "rule_b": fb,
              "median_abs_err": round(statistics.median(abs(max(m, FLOOR) - max(p, FLOOR)) for m, p in zip(meas, pred)), 2),
              "max_meas_over_pred_db": round(over, 2), "meas": meas, "pred": pred}
@@ -230,13 +238,43 @@ def main():
         print(f"  {e['set']}/{e['label']:<28} {e['class']:<9} +{e['max_meas_over_pred_db']:.1f} dB")
     print(f"\nH1b on the primary sets: {'PASS' if primary_pass else 'FAIL'}")
 
+    dn = sum(s.get("delay_n", 0) for k, s in sets.items() if k in ("L", "G", "D"))
+    if dn:
+        dok = sum(s.get("delay_ok", 0) for k, s in sets.items() if k in ("L", "G", "D"))
+        cov = dok / dn
+        print(f"\nH4 (delay lines): coverage {dok} of {dn} delay kernels in L, G, D ({100 * cov:.0f}%; bar 80%, kill < 50%)"
+              f"  {'PASS' if cov >= 0.8 else ('KILL' if cov < 0.5 else 'FAIL')}")
+        h4 = cov >= 0.8
+        for name in ("L", "G", "D"):
+            if name not in sets:
+                continue
+            es = [e for e in sets[name]["rows"] if e["nonlinear"] and e["has_delay"] and e["memoryless"] == "0"]
+            rho, med, n = h1(es)
+            ok = n > 0 and rho >= 0.8 and med <= 10.0
+            h4 &= ok
+            print(f"  {name}-delay: {sets[name].get('delay_ok', 0)} of {sets[name].get('delay_n', 0)} scored; informative n={n},"
+                  f" rho {rho:.3f} (>= 0.8), median |err| {med:.1f} dB (<= 10)  {'PASS' if ok else 'FAIL'}")
+        dpool = [e for e in out_rows if e["set"] in ("L", "G", "D") and e["nonlinear"] and e["has_delay"]
+                 and e["memoryless"] == "0"]
+        if dpool:
+            n = len(dpool)
+            hit = lambda key: sum(e[key] == e["factor_meas"] for e in dpool)
+            an, ra, rb = hit("factor_pred"), hit("rule_a"), hit("rule_b")
+            ok = an / n >= 0.8 and an > ra and an > rb
+            h4 &= ok
+            print(f"  H3 rule on delay kernels (n={n}): analysis {an} ({100 * an / n:.0f}%), rule A {ra}, rule B {rb}"
+                  f"  {'PASS' if ok else 'FAIL'}")
+        print(f"H4: {'PASS' if h4 else 'FAIL'}")
+
     out = os.environ.get("OUT") or os.path.join(ROOT, "data-rerun")
     os.makedirs(out, exist_ok=True)
     keys = [k for k in out_rows[0] if k not in ("meas", "pred")] if out_rows else []
-    with open(os.path.join(out, "phase4-scored.csv"), "w", newline="", encoding="utf-8") as f:
+    name = os.path.basename(sys.argv[1]).replace("heldout", "scored")
+    name = name if name != os.path.basename(sys.argv[1]) else "phase4-scored.csv"
+    with open(os.path.join(out, name), "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
         w.writeheader(); w.writerows(out_rows)
-    print("wrote", os.path.join(out, "phase4-scored.csv"))
+    print("wrote", os.path.join(out, name))
 
 
 if __name__ == "__main__":

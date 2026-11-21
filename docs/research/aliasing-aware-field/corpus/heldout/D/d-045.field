@@ -1,0 +1,9 @@
+# D set, seed 20261122, kernel 045, shape adaa
+x = in * 0.8131
+fx = abs(((x * 2.374) ^ 3.0))
+x1 = delay(x, 1)
+f1 = delay(fx, 1)
+dx = x - x1
+m = (x + x1) * 0.5
+gm = clamp(m, -0.879, 0.879)
+out = if(abs(dx) < 0.01, gm, (fx - f1) / if(abs(dx) < 0.01, 1.0, dx)) * 0.5
