@@ -1,0 +1,24 @@
+name: Website lint
+
+# The main build ignores website/** (see build.yml), so nothing was checking the site. These are the brand and
+# token ratchets: colours, font sizes, radii, durations and typefaces may only go down. Cheap: python only.
+on:
+  push:
+    branches: [main, 'feature/**', 'bugfix/**']
+    paths: ['website/**', 'docs/brand/**', 'tools/brand/**', 'tools/website/**']
+  pull_request:
+    paths: ['website/**', 'docs/brand/**', 'tools/brand/**', 'tools/website/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  website-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Brand colours (ratchet)
+        run: python3 tools/brand/brand_lint.py
+      - name: Tokens and typefaces (ratchet; only Geist, Geist Mono, Caveat)
+        run: python3 tools/website/token_lint.py

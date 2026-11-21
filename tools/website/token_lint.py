@@ -12,6 +12,8 @@ which define the tokens, are exempt):
   radius      border-radius in px other than 0, 50% and 999px, instead of var(--r-*) / var(--web-*-radius)
   duration    a transition or animation time in ms/s other than the brand durations (docs/brand/brand.json motion)
   hex         a #hex colour (brand_lint.py judges whether it is on-brand; here any literal counts)
+  font-family a typeface that is not Geist, Geist Mono or Caveat (or a system/generic fallback): in font-family, in
+              the quoted families of a font shorthand, and in Google Fonts <link> URLs (WEBSITE_SYSTEM.md, Typography)
 Generated library/*.html pages share a template and count once, as their worst page.
 """
 from __future__ import annotations
@@ -29,6 +31,26 @@ FONT = re.compile(r"(?<![-\w])font\s*:\s*([^;}{]+)")
 RAD = re.compile(r"border(?:-(?:top|bottom)-(?:left|right))?-radius\s*:\s*([^;}{]+)")
 TIME = re.compile(r"(?:transition|animation)(?:-duration|-delay)?\s*:\s*([^;}{]+)")
 HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
+
+
+# Brand families (WEBSITE_SYSTEM.md): Geist reads, Geist Mono holds values, Caveat is one human word. The rest are
+# system fallbacks that sit behind them. Any other name is an off-brand typeface.
+OK_FAMILIES = {"geist", "geist mono", "caveat", "inherit", "initial", "unset", "system-ui", "-apple-system",
+               "blinkmacsystemfont", "segoe ui", "roboto", "helvetica", "helvetica neue", "arial", "sans-serif",
+               "serif", "monospace", "cursive", "ui-monospace", "ui-sans-serif", "menlo", "monaco", "consolas",
+               "sfmono-regular", "sf mono", "courier new", "emoji", "math"}
+FAMILY = re.compile(r"font-family\s*:\s*([^;}{]+)")
+GFONT = re.compile(r"fonts\.googleapis\.com/css2?\?([^\"'>\s]+)")
+
+
+def bad_families(names):
+    out = []
+    for n in names:
+        n = n.strip().strip("'\"").strip()
+        if not n or n.startswith("var(") or n.lower() in OK_FAMILIES:
+            continue
+        out.append(n)
+    return out
 
 
 def raw_font(v):
@@ -68,6 +90,7 @@ def css_sources():
             continue
         s = open(f, encoding="utf-8", errors="ignore").read()
         css = "\n".join(re.findall(r"<style[^>]*>(.*?)</style>", s, re.S))
+        css += "\n" + "\n".join(re.findall(r"<link[^>]*fonts\.googleapis\.com[^>]*>", s))
         if css.strip():
             yield rel, css
 
@@ -83,6 +106,16 @@ def scan(css):
         for m in FONT.finditer(line):
             if font_shorthand_size(m.group(1)):
                 hits.append(("font-size", i, m.group(0).strip()[:60]))
+        for m in FAMILY.finditer(line):
+            for n in bad_families(re.split(r",(?![^(]*\))", re.sub(r"!important", "", m.group(1)))):
+                hits.append(("font-family", i, "font-family: " + n))
+        for m in FONT.finditer(line):
+            for n in bad_families(re.findall(r"'[^']+'|\"[^\"]+\"", m.group(1))):
+                hits.append(("font-family", i, "font: " + n))
+        for m in GFONT.finditer(line):
+            for fam in re.findall(r"family=([^:&]+)", m.group(1)):
+                for n in bad_families([fam.replace("+", " ")]):
+                    hits.append(("font-family", i, "Google Fonts: " + n))
         for m in RAD.finditer(line):
             if raw_radius(m.group(1)):
                 hits.append(("radius", i, m.group(0).strip()))

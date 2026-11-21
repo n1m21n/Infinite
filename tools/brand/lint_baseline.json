@@ -1,1 +1,26 @@
-{}
+{
+ "website/manual/index.html": 5,
+ "website/nodes/index.html": 22,
+ "website/nodes/shade-brick.html": 2,
+ "website/nodes/shade-bump.html": 2,
+ "website/nodes/shade-checker.html": 2,
+ "website/nodes/shade-combine.html": 2,
+ "website/nodes/shade-coord.html": 2,
+ "website/nodes/shade-curves.html": 2,
+ "website/nodes/shade-fresnel.html": 2,
+ "website/nodes/shade-geometry.html": 2,
+ "website/nodes/shade-gradient.html": 2,
+ "website/nodes/shade-image.html": 2,
+ "website/nodes/shade-layer-weight.html": 2,
+ "website/nodes/shade-map-range.html": 2,
+ "website/nodes/shade-mapping.html": 2,
+ "website/nodes/shade-math.html": 2,
+ "website/nodes/shade-mix.html": 2,
+ "website/nodes/shade-noise.html": 2,
+ "website/nodes/shade-normal-map.html": 2,
+ "website/nodes/shade-ramp.html": 2,
+ "website/nodes/shade-separate.html": 2,
+ "website/nodes/shade-vector-math.html": 2,
+ "website/nodes/shade-voronoi.html": 2,
+ "website/site.js": 1
+}

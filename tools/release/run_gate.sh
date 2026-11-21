@@ -52,6 +52,7 @@ STEPS=(
   "parity-static|J|P1|yes|no|every Platform:: function has three sides|bash $SW/pillar-parity-audit/static-checks.sh"
   "data-ledger|G|P1|yes|no|no dataset unused or stale|python3 tools/re-survey/data_ledger.py lint"
   "brand-lint|L|P1|yes|no|brand colours on brand surfaces|python3 tools/brand/brand_lint.py"
+  "token-lint|L|P1|yes|no|website font sizes, radii, durations and typefaces on tokens|python3 tools/website/token_lint.py"
   "version-gate|L|P1|yes|no|version above every published one (needs gh/network; ERROR if it cannot read)|python3 scripts/release_version_gate.py"
   "findings-selftest|L|P1|yes|no|the findings tracker's own self-test|python3 tools/release/findings.py --self-test"
   # ---- P2: serial, launches the app ----

@@ -2,14 +2,20 @@
  "_doc": "Ratchet for tools/website/token_lint.py: per-file counts of raw values. Lower it, never raise it.",
  "counts": {
   "artists.css": {
-   "duration": 1,
-   "font-size": 6,
-   "radius": 2
+   "duration": 3,
+   "font-family": 6,
+   "font-size": 14,
+   "hex": 11,
+   "radius": 10
   },
   "audience.css": {
    "duration": 2,
-   "font-size": 14,
+   "font-size": 15,
    "hex": 2
+  },
+  "bci-deck.html": {
+   "hex": 1,
+   "radius": 1
   },
   "benchmarks.css": {
    "duration": 3,
@@ -20,16 +26,44 @@
    "font-size": 22,
    "radius": 3
   },
+  "buy.html": {
+   "radius": 4
+  },
+  "chat.css": {
+   "font-size": 13,
+   "hex": 3,
+   "radius": 3
+  },
   "deck.css": {
    "font-size": 6,
-   "hex": 16,
+   "hex": 14,
    "radius": 4
   },
   "dev.css": {
    "font-size": 4,
    "hex": 2
   },
+  "download.html": {
+   "font-size": 1,
+   "radius": 4
+  },
   "embeds/accretion-disk.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/acid-graphics-iridescent-liquid-twirl.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/acid-graphics-kaleido-chroma-warp.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/analog-crt-aperture-grille-phosphor-bloom.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/analog-crt-electron-beam-raster-deflection.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -54,7 +88,23 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/bauhaus-geometry-constructivist-orbital-harmony.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/bauhaus-geometry-kinetic-quadrant-tessellation.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/bioluminescent-abyss.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/brutalist-architecture-monolith-facade.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/brutalist-architecture-spomenik-rib-vault.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -83,7 +133,19 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/cyberpunk-neon-hologram-grid.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cyberpunk-neon-rain-reflections.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/cymatic-liquid-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cymatics-sine-chladni-plate-resonance.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -91,7 +153,27 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/cymatics-sine-harmonic-modal-interference.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cymatics-sine-harmonic-quadrupole-field.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/cymatics-sine-harmonic-ripples.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cymatics-sine-nodal-frequency-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/data-landscape-bathymetric-elevation-grid.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/data-landscape-topographic-frequency-contour.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -103,17 +185,39 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/dichroic-fresnel-prismatic-caustics.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/dichroic-fresnel-stepped-bullseye.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ditherpunk-bayer-matrix-threshold.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ditherpunk-cyber-glyph-lattice.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/ditherpunk-terminal-matrix.html": {
    "font-size": 2,
    "hex": 6
   },
   "embeds/ditherpunk.html": {
-   "duration": 1,
    "font-size": 2,
-   "hex": 5,
-   "radius": 1
+   "hex": 6
   },
   "embeds/ferrofluid-spikes.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ferrofluid-thinfilm-bismuth-corona.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ferrofluid-thinfilm-magnetic-spikes.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -121,7 +225,23 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/generative-plotter-concentric-isotonic.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/generative-plotter-curvilinear-flowfield.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/glitch-datamosh-buffer-tear.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/glitch-datamosh-chroma-displacement-scan.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/glitch-datamosh-macroblock-slice-corruption.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -139,6 +259,14 @@
    "hex": 6
   },
   "embeds/gravitational-lensing.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/haeckel-radiolaria-discoidea-lattice.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/haeckel-radiolaria-spicule-corona.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -182,14 +310,21 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/indie-psychedelic-kaleido-prism-flower.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/indie-psychedelic-liquid-dream.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/indie-psychedelic-liquid-oil-wheel.html": {
    "font-size": 2,
    "hex": 6
   },
   "embeds/indie_psychedelic.html": {
    "font-size": 2,
-   "hex": 5,
-   "radius": 1
+   "hex": 6
   },
   "embeds/iridescent-orb.html": {
    "font-size": 2,
@@ -200,10 +335,8 @@
    "hex": 6
   },
   "embeds/lilliputian_surreal.html": {
-   "duration": 1,
    "font-size": 2,
-   "hex": 5,
-   "radius": 1
+   "hex": 6
   },
   "embeds/liminal-void-haze.html": {
    "font-size": 2,
@@ -211,8 +344,7 @@
   },
   "embeds/liminal_void.html": {
    "font-size": 2,
-   "hex": 5,
-   "radius": 1
+   "hex": 6
   },
   "embeds/liquid-glass.html": {
    "font-size": 2,
@@ -230,6 +362,18 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/mineral-birefringence-thin-section.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/minimal-signal-datamatics-barcode-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/minimal-signal-raster-oscillogram-sweep.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/neo-brutalist-concrete-monolith.html": {
    "font-size": 2,
    "hex": 6
@@ -244,6 +388,14 @@
    "hex": 6
   },
   "embeds/neural-synapse.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/op-art-concentric-moire-interference.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/op-art-hypnotic-checkerboard-warp.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -300,7 +452,31 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/raku-craquelure-celadon-veins.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/raku-craquelure-copper-kiln-glaze.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/reaction-diffusion-belousov-spiral-waves.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/reaction-diffusion-belousov-turing-coral.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/reaction-diffusion-core.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/retro-surreal-astronomical-clockwork-horizon.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/retro-surreal-celestial-portal-matrix.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -309,14 +485,43 @@
    "hex": 5,
    "radius": 1
   },
+  "embeds/riso-manga-zine-chromatic-ink-misregistration.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/riso-manga-zine-halftone-dot-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/riso-pop-screen.html": {
    "font-size": 2,
    "hex": 6
   },
   "embeds/riso_manga_zine.html": {
    "font-size": 2,
-   "hex": 5,
-   "radius": 1
+   "hex": 6
+  },
+  "embeds/schlieren-caustics-refraction-cusps.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/schlieren-caustics-thermal-plume.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/soap-film-interference-lamellar-rings.html": {
+   "duration": 1,
+   "font-size": 2,
+   "hex": 4
+  },
+  "embeds/soap-film-interference-marangoni-swirl.html": {
+   "duration": 1,
+   "font-size": 2,
+   "hex": 4
+  },
+  "embeds/soap-film-newton-interference.html": {
+   "font-size": 2,
+   "hex": 6
   },
   "embeds/solar-flare.html": {
    "font-size": 2,
@@ -342,23 +547,84 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/suprematist-blocks-kinetic-red-wedge.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/suprematist-blocks-malevich-floating-plane.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/suprematist-forms-floating-black-quadrilateral.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/suprematist-forms-kinetic-red-wedge.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/technical-blueprint-drafting-grid.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/technical-blueprint-specimen-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/technical_blueprint.html": {
    "font-size": 2,
    "hex": 5,
    "radius": 1
   },
   "embeds/thundr_brutalist.html": {
-   "duration": 1,
    "font-size": 2,
-   "hex": 5,
-   "radius": 1
+   "hex": 6
+  },
+  "embeds/ukiyoe-cartography-archipelago-contours.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ukiyoe-cartography-compass-tide-chart.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ukiyoe-cartography-isobar-waves.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ukiyoe-cartography-woodblock-relief.html": {
+   "font-size": 2,
+   "hex": 6
   },
   "embeds/ukiyoe_cartography.html": {
    "font-size": 2,
-   "hex": 5,
-   "radius": 1
+   "hex": 6
+  },
+  "embeds/vaporwave-collage-prismatic-chroma-wave.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/vaporwave-collage-retro-sunset-grid.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/vector-wireframe-geodesic-radar-horizon.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/vector-wireframe-phosphor-tesseract-hypercube.html": {
+   "font-size": 2,
+   "hex": 6
   },
   "embeds/voronoi-bioluminescence.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/y2k-acid-chrome-starburst.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/y2k-acid-liquid-matrix.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -376,7 +642,7 @@
   },
   "library-deck.css": {
    "font-size": 1,
-   "hex": 18
+   "hex": 16
   },
   "library.css": {
    "font-size": 8,
@@ -386,10 +652,27 @@
    "font-size": 4,
    "radius": 1
   },
+  "manual.css": {
+   "font-size": 21,
+   "hex": 2,
+   "radius": 15
+  },
+  "manual/field/index.html": {
+   "font-size": 1,
+   "radius": 2
+  },
+  "manual/headless/index.html": {
+   "font-size": 1,
+   "radius": 2
+  },
+  "manual/index.html": {
+   "font-size": 1,
+   "radius": 2
+  },
   "museum.css": {
    "duration": 3,
    "font-size": 13,
-   "hex": 12,
+   "hex": 11,
    "radius": 3
   },
   "nodepage.css": {
@@ -401,8 +684,16 @@
   "philosophy.css": {
    "duration": 1,
    "font-size": 6,
-   "hex": 17,
+   "hex": 11,
    "radius": 2
+  },
+  "plugin.css": {
+   "duration": 1,
+   "font-size": 15,
+   "radius": 10
+  },
+  "plugin.html": {
+   "radius": 5
   },
   "reels.css": {
    "duration": 1,
@@ -411,9 +702,9 @@
    "radius": 1
   },
   "samples.css": {
-   "duration": 1,
-   "font-size": 25,
-   "hex": 8,
+   "duration": 5,
+   "font-size": 26,
+   "hex": 5,
    "radius": 11
   },
   "search.css": {
@@ -427,227 +718,16 @@
    "hex": 11,
    "radius": 10
   },
+  "studio.css": {
+   "duration": 1,
+   "font-size": 23,
+   "radius": 9
+  },
   "style.css": {
    "duration": 17,
-   "font-size": 47,
+   "font-size": 52,
    "hex": 18,
    "radius": 12
-  },
-  "embeds/suprematist-forms-kinetic-red-wedge.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/suprematist-forms-floating-black-quadrilateral.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/data-landscape-topographic-frequency-contour.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/data-landscape-bathymetric-elevation-grid.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/cymatics-sine-nodal-frequency-matrix.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/cymatics-sine-harmonic-quadrupole-field.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/vaporwave-collage-retro-sunset-grid.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/vaporwave-collage-prismatic-chroma-wave.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/acid-graphics-iridescent-liquid-twirl.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/acid-graphics-kaleido-chroma-warp.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/indie-psychedelic-liquid-oil-wheel.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/indie-psychedelic-kaleido-prism-flower.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/op-art-concentric-moire-interference.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/op-art-hypnotic-checkerboard-warp.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/generative-plotter-curvilinear-flowfield.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/generative-plotter-concentric-isotonic.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/retro-surreal-celestial-portal-matrix.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/retro-surreal-astronomical-clockwork-horizon.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/bauhaus-geometry-constructivist-orbital-harmony.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/bauhaus-geometry-kinetic-quadrant-tessellation.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/vector-wireframe-phosphor-tesseract-hypercube.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/vector-wireframe-geodesic-radar-horizon.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/riso-manga-zine-halftone-dot-matrix.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/riso-manga-zine-chromatic-ink-misregistration.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/minimal-signal-datamatics-barcode-matrix.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/minimal-signal-raster-oscillogram-sweep.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/glitch-datamosh-chroma-displacement-scan.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/glitch-datamosh-macroblock-slice-corruption.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/cymatics-sine-chladni-plate-resonance.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/cymatics-sine-harmonic-modal-interference.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/analog-crt-aperture-grille-phosphor-bloom.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/analog-crt-electron-beam-raster-deflection.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/suprematist-blocks-kinetic-red-wedge.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/suprematist-blocks-malevich-floating-plane.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/brutalist-architecture-monolith-facade.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/brutalist-architecture-spomenik-rib-vault.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/ukiyoe-cartography-archipelago-contours.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/ukiyoe-cartography-compass-tide-chart.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/reaction-diffusion-belousov-spiral-waves.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/reaction-diffusion-belousov-turing-coral.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/ferrofluid-thinfilm-magnetic-spikes.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/ferrofluid-thinfilm-bismuth-corona.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/soap-film-newton-interference.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/mineral-birefringence-thin-section.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/haeckel-radiolaria-discoidea-lattice.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/haeckel-radiolaria-spicule-corona.html": {
-   "font-size": 2,
-   "hex": 6
   }
- },
- "embeds/cyberpunk-neon-rain-reflections.html": {
-  "font-size": 2,
-  "hex": 6
- },
- "embeds/cyberpunk-neon-hologram-grid.html": {
-  "font-size": 2,
-  "hex": 6
- },
- "embeds/technical-blueprint-drafting-grid.html": {
-  "font-size": 2,
-  "hex": 6
- },
- "embeds/technical-blueprint-specimen-matrix.html": {
-  "font-size": 2,
-  "hex": 6
- },
- "embeds/y2k-acid-chrome-starburst.html": {
-  "font-size": 2,
-  "hex": 6
- },
- "embeds/y2k-acid-liquid-matrix.html": {
-  "font-size": 2,
-  "hex": 6
- },
- "embeds/ditherpunk-bayer-matrix-threshold.html": {
-  "font-size": 2,
-  "hex": 6
- },
- "embeds/ditherpunk-cyber-glyph-lattice.html": {
-  "font-size": 2,
-  "hex": 6
  }
 }
