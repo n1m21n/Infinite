@@ -3,7 +3,7 @@
 Follows **ACM Artifact Review and Badging v1.1**. Badges sought: Artifacts Available, Results Reproduced.
 
 ## 1. Provenance
-- **Git Commit SHA:** `cb85f93235ffc3b8885efd846e176da8dca6ce3c` (reproduces every output; first-run commits per file in `data/provenance.json`)
+- **Git Commit SHA:** `b5da3a78db82b924f000db3d0af62c30228e37b5` (reproduces every output; first-run commits per file in `data/provenance.json`)
 - **Archival DOI (on release):** none yet; no paper submitted
 - **OS / Hardware:** macOS 27.2.1 arm64, Apple M2, 8 GB RAM
 - **Toolchain & Build Flags:** Apple clang 21.0.0; app built with `python3 scripts/ibuild.py build --mode dev` (CMake Debug, arm64); cost bench `clang++ -std=c++20 -O2`

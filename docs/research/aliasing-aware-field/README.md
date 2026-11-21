@@ -5,7 +5,7 @@ status: "killed"
 owner: "namansoni"
 date: "2026-11-21"
 prior_art: "docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md"
-commit_sha: "fd6c55ca09ab7805b819ae5a569a1ab62aa44d3b"
+commit_sha: "b5da3a78db82b924f000db3d0af62c30228e37b5"
 ---
 
 # Aliasing-aware compilation for Field

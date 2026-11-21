@@ -1,5 +1,5 @@
 {
-  "commit_sha": "fd6c55ca09ab7805b819ae5a569a1ab62aa44d3b",
+  "commit_sha": "b5da3a78db82b924f000db3d0af62c30228e37b5",
   "commit_note": "Code that reproduces every output. Outputs were first produced at: phase0-baseline.csv c0c39088dc1eb3132f58dbc9427fffb413ecf09b (re-run with corrected param reset at 8820229c), phase1-predictions.csv 8820229c5ff5ff26b5dd2324cb6c36e77d063f93, phase2-* the working tree committed as cb85f932. Cost repeats and audio clips: fd6c55ca. Phase 4: G, scorer and hook 001ad1f0; L c5a84260 (both committed before scoring); held-out run and break-even on a dev build of c5a84260, analysis unchanged since fd6c55ca. Phase 5: set D, generator and scorer H4 extension 35adec8b (before the analysis change); delay-line analysis change and run in the commit that adds data/phase5-*.",
   "timestamp_utc": "2026-11-21T03:13:04Z",
   "os": "macOS 27.2.1 arm64",
