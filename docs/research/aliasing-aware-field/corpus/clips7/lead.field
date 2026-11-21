@@ -1,0 +1,8 @@
+# Phase 7 clip: vibrato saw lead. Glides 1 kHz to 3 kHz and back, 7 Hz vibrato of 2%.
+state float tc = 0
+state float p = 0
+tc = tc + 1.0 / sr
+g = 0.5 - 0.5 * cos(6.28318 * tc / 0.34)
+f = (1000.0 + 2000.0 * g) * (1.0 + 0.02 * sin(6.28318 * 7.0 * tc))
+p = (p + f / sr) % 1.0
+out = 2.0 * p - 1.0

@@ -1,0 +1,13 @@
+# Phase 7 clip: kick-heavy loop. Kicks at 0, 0.09 and 0.2 s of a 0.27 s bar, a low tom between.
+state float tc = 0
+state float kp = 0
+state float mp = 0
+tc = tc + 1.0 / sr
+bar = tc % 0.27
+tk = if(bar < 0.09, bar, if(bar < 0.2, bar - 0.09, bar - 0.2))
+kp = kp + (42.0 + 180.0 * exp(-tk * 60.0)) / sr
+kick = sin(6.28318 * kp) * exp(-tk * 11.0)
+tt = (tc + 0.135) % 0.27
+mp = mp + (95.0 + 60.0 * exp(-tt * 30.0)) / sr
+tom = sin(6.28318 * mp) * exp(-tt * 18.0)
+out = kick + tom * 0.5
