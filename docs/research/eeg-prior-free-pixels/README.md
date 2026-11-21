@@ -1,7 +1,7 @@
 ---
 title: "How much real pixel information is in scalp EEG? Prior-free grid decoding, then physical sonification"
 slug: "eeg-prior-free-pixels"
-status: "phase-0-framing"
+status: "pre-registered"
 owner: "namansoni"
 date: "2026-11-22"
 prior_art: "Section 2 of this README (owner-checked list)"
@@ -10,7 +10,7 @@ commit_sha: "pending-measurement"
 
 # How much real pixel information is in scalp EEG?
 
-Sections 1-7 are written for sign-off. Sections 8-12 stay empty until the owner signs off. Nothing has been downloaded, trained or run.
+Sections 1-7 signed off by the owner on 2026-11-22 with all six recommended decisions (D1-D6). They are locked by this commit, before any data was downloaded.
 
 ## 1. Goal
 
