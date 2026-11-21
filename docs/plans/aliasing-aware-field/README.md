@@ -1,6 +1,6 @@
 # Aliasing-aware compilation for Field (research plan)
 
-Status: **plan, waiting for owner sign-off.** Nothing is built. Read-only scoping done 2026-11-21.
+Status: **phase 0 done 2026-11-21** (results in section 8). Phase 1 not started.
 Prior art: `docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md`.
 
 ## 1. The problem
@@ -86,3 +86,53 @@ Phases 0 and 1 are where the research claim is won or lost; they are small and s
 - A user feature in Field: kernels that alias less without anyone choosing a factor, plus a
   compile-time note when a kernel will alias and why.
 - Clean-room: all ideas come from papers and discussions. No copyleft source was opened.
+
+## 8. Phase 0 results (2026-11-21)
+
+Run: `INFINITE_FIELDALIASTEST=1 INFINITE_FIELDALIAS_CSV=<file> Infinite` (about 20 s, dev build).
+Corpus: 47 kernels in `src/app/selftest/AliasTests.cpp` (`FieldAliasCorpus`), each rendered by the
+real Field Effect node at F x 48 kHz, F in {1, 2, 4, 8, 16, 32}, decimated with the min-phase chain,
+measured with the rig's metric (5 kHz tone at -6 dBFS; oscillators at 1.75 kHz). Raw numbers:
+`data/phase0-baseline.csv`. Controls (linear gain, one-pole, sine oscillator) read clean.
+
+**1. Smoothness order predicts the slope almost exactly.** Alias falls by about 6·(k+1) dB per
+doubling of F, where k is how many derivatives the nonlinearity keeps continuous:
+
+| Class | Example | Measured dB per doubling | Law |
+|---|---|---|---|
+| jump (k = -1) | floor quantise, comparator, `%` wrap, naive saw/square | 4.9 to 6.1 | 6 |
+| kink (k = 0) | `abs`, `max`, hard clip, naive triangle, wrapped phase into `sin` | 11.8 to 12.9 | 12 |
+| C1 (k = 1) | `x / (1 + abs(x))` | 17.4 to 17.9 | 18 |
+| analytic | tanh, sin folder | a cliff: falls to the floor once F clears a drive-dependent bandwidth | - |
+
+So the "decay class" fact in section 3 is not a guess any more: it can be read off the program's
+operations, and it sets the slope. The level at 1x depends on drive, which is what the amplitude
+interval is for.
+
+**2. The degree rule is right about where aliasing starts and pessimistic about how much.** At a 5 kHz
+tone, degree 5 reaches 25 kHz, which folds above 20 kHz, and it measures clean. Degree 7 folds to 13 kHz
+and reads -71 dB. A chain of three cubics (degree 27) is clean at 2x, though the degree bound asks for
+4x, because the high-order terms carry little energy. Phase 1 needs magnitudes, not only degree.
+
+**3. Composition is the real problem, as in the Saturator.** A tanh at drive 4 needs 4x for -80 dB.
+Three such stages in series need 32x (-46 dB at 8x).
+
+**4. Oversampling cannot fix jumps.** All 4 jump kernels and the naive saw and square stay above -80 dB
+even at 32x (best -50 dB). 7 of 44 nonlinear kernels never reach the target. For these the compiler
+should not oversample. It should report the cause and point to BLEP/ADAA (phase 3).
+
+**5. The factor each kernel needs for -80 dB varies widely:** 1x: 8, 2x: 9, 4x: 3, 8x: 6, 16x: 6,
+32x: 5, never: 7. A single global factor would waste CPU on most kernels or fail the rest. This is the
+premise of H2.
+
+**6. The shipping presets alias audibly today.** At 1x: Tube Overdrive -35 dB, Soft Saturation
+-33, Analog Tape Saturator -35, Wavefolder -22. Tube, Soft and Tape need 8x for -80 dB, Wavefolder 32x.
+
+**Caveats found on the way**
+- Float32 phase accumulators have a floor of about -101 dB (the sine-oscillator control), and pinch
+  flattens at -90 dB. Targets below about -95 dB are limited by precision, not aliasing.
+- Moog 4-Pole Ladder reads -22 dB at both 1x and 2x, then jumps to -60 dB at 4x. That looks like
+  resonance or a limit cycle at an inharmonic frequency, which the metric counts as aliasing. Treat
+  it as suspect until it has been checked.
+- The corpus is hand-built by one person (me). For H1, phase 1 must also predict kernels written by
+  other people (more presets, community devices) to avoid fitting the analysis to its own test set.

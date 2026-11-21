@@ -27,6 +27,7 @@
 #include "audio/dsp/MinPhaseOversampler.h"
 #include "audio/dsp/PortableFft.h"
 #include "nodes/AnalogNode.h"
+#include "nodes/FieldSampleNode.h"
 #include "nodes/WavetableNode.h"
 
 namespace app
@@ -675,6 +676,280 @@ bool RunOversampleTest()
              pass ? "OK" : "FAIL");
    }
    printf("OVERSAMPLETEST %s\n", all ? "OK" : "FAIL");
+   return all;
+}
+// INFINITE_FIELDALIASTEST: phase 0 of docs/plans/aliasing-aware-field.
+// Ground truth for an aliasing-aware Field compiler: each kernel in a
+// corpus is rendered by the real Field Effect node at F x 48 kHz
+// (F = 1, 2, 4, 8, 16, 32), decimated back to 48 kHz with the same
+// minimum-phase half-band chain the effects use, and measured with the
+// rig's metric above. The curve alias(F) per kernel is what a static
+// analysis has to predict (H1) and what a per-subgraph factor choice is
+// costed against (H2). Report only, no gates, except the linear control.
+//
+// The kernel sees sr = F x 48 kHz, so sr-relative code (oscillators, the
+// presets' tone filters) means the same thing at every factor. Kernels whose
+// behaviour is counted in samples (a sample-and-hold decimator) are left
+// out: oversampling changes what they do, not only how they alias.
+namespace
+{
+   struct FieldAliasCase
+   {
+      std::string label;
+      std::string klass; // linear, poly, kink, jump, analytic, chain, feedback, osc, preset
+      std::string code;
+      int fundBin = kFundBin;
+      bool usesInput = true;
+   };
+
+   constexpr int kFieldFactors[] = { 1, 2, 4, 8, 16, 32 };
+
+   // Renders `code` at factor x kRate and returns kN base-rate samples after
+   // warm-up, or an empty vector with `err` set.
+   std::vector<float> RenderFieldAt(const FieldAliasCase& c, int factor, std::string& err)
+   {
+      FieldSampleNode node;
+      node.code = c.code;
+      if (!node.Apply())
+      {
+         err = node.LastError();
+         return {};
+      }
+      const double rate = kRate * (double)factor;
+      constexpr int kBlock = 256;
+      AudioNode* an = node.GetAudioNode();
+      an->PrepareToPlay(rate, kBlock);
+      node.CookIfNeeded(1);
+
+      // Decimator: one min-phase chain for F <= 8; for 16 and 32 a 2x or 4x
+      // chain at 8 x 48 kHz first, then the 8x chain.
+      std::unique_ptr<MinPhaseOversampler> pre, post;
+      int preFactor = 1, postFactor = factor;
+      if (factor > 8)
+      {
+         preFactor = factor / 8;
+         postFactor = 8;
+         pre = std::make_unique<MinPhaseOversampler>();
+         pre->Prepare(preFactor, kRate * 8.0);
+      }
+      if (postFactor > 1)
+      {
+         post = std::make_unique<MinPhaseOversampler>();
+         post->Prepare(postFactor, kRate);
+      }
+
+      const double omega = 2.0 * M_PI * (double)c.fundBin / (double)kN / (double)factor;
+      const int warm = (int)(0.3 * kRate);
+      const int baseTotal = warm + kN;
+      const long long hiTotal = (long long)baseTotal * factor;
+
+      std::vector<float> inData(kBlock), outData(kBlock);
+      float* inChans[1] = { inData.data() };
+      float* outChans[1] = { outData.data() };
+      AudioBuffer inBuf;
+      inBuf.channels = inChans;
+      inBuf.numChannels = 1;
+      inBuf.numFrames = kBlock;
+      AudioBuffer outBuf;
+      outBuf.channels = outChans;
+      outBuf.numChannels = 1;
+      outBuf.numFrames = kBlock;
+      const AudioBuffer* inputs[1] = { &inBuf };
+
+      std::vector<float> base;
+      base.reserve((size_t)baseTotal);
+      std::vector<float> hiFrame((size_t)factor), midFrame(8);
+      int hiFill = 0, midFill = 0;
+      for (long long done = 0; done < hiTotal; done += kBlock)
+      {
+         for (int i = 0; i < kBlock; i++)
+            inData[(size_t)i] = c.usesInput ? kAmplitude * (float)std::sin(omega * (double)(done + i)) : 0.0f;
+         an->ProcessBlock(inputs, 1, outBuf);
+         for (int i = 0; i < kBlock; i++)
+         {
+            const float y = outData[(size_t)i];
+            if (factor == 1)
+            {
+               base.push_back(y);
+               continue;
+            }
+            if (pre)
+            {
+               hiFrame[(size_t)hiFill++] = y;
+               if (hiFill < preFactor)
+                  continue;
+               hiFill = 0;
+               midFrame[(size_t)midFill++] = pre->Down(0, hiFrame.data());
+               if (midFill < 8)
+                  continue;
+               midFill = 0;
+               base.push_back(post->Down(0, midFrame.data()));
+            }
+            else
+            {
+               hiFrame[(size_t)hiFill++] = y;
+               if (hiFill < postFactor)
+                  continue;
+               hiFill = 0;
+               base.push_back(post->Down(0, hiFrame.data()));
+            }
+         }
+      }
+      if ((int)base.size() < baseTotal)
+      {
+         err = "short render";
+         return {};
+      }
+      return std::vector<float>(base.begin() + warm, base.begin() + warm + kN);
+   }
+
+   std::vector<FieldAliasCase> FieldAliasCorpus()
+   {
+      std::vector<FieldAliasCase> cs;
+      auto add = [&](std::string label, std::string klass, std::string code) {
+         cs.push_back({ std::move(label), std::move(klass), std::move(code) });
+      };
+      auto g = [](double v) {
+         char b[32];
+         snprintf(b, sizeof(b), "%.4g", v);
+         return std::string(b);
+      };
+
+      add("linear gain", "linear", "out = in * 0.7\n");
+      add("one-pole lowpass", "linear", "state float y = 0\ny = y + 0.2 * (in - y)\nout = y\n");
+
+      // Polynomials: degree d spreads a tone to d x f0.
+      for (double a : { 0.5, 1.0 })
+         add("poly d2 a" + g(a), "poly", "out = in + " + g(a) + " * in * in\n");
+      for (double d : { 1.0, 2.0 })
+         add("poly d3 cubic clip drive " + g(d), "poly",
+             "x = in * " + g(d) + "\nout = x - x * x * x / 3.0\n");
+      add("poly d5", "poly", "x = in * 1.5\nout = x - (x ^ 5.0) * 0.2\n");
+      add("poly d7", "poly", "x = in * 1.5\nout = x - (x ^ 7.0) * 0.1\n");
+      add("poly d9 cubic of cubic", "chain",
+          "x = in * 1.5\ny = x - x * x * x / 3.0\nout = y - y * y * y / 3.0\n");
+      add("poly d27 cubic x3", "chain",
+          "x = in * 1.5\ny = x - x * x * x / 3.0\nz = y - y * y * y / 3.0\nout = z - z * z * z / 3.0\n");
+
+      // Analytic, not polynomial: tanh (via exp), sin folder, rational clip.
+      for (double d : { 1.0, 2.0, 4.0, 8.0 })
+         add("tanh drive " + g(d), "analytic",
+             "x = in * " + g(d) + "\ne = exp(2.0 * x)\nout = (e - 1.0) / (e + 1.0) * 0.5\n");
+      for (double d : { 1.0, 2.0, 4.0, 8.0 })
+         add("sin fold drive " + g(d), "analytic", "out = sin(in * " + g(d) + " * 3.14159) * 0.5\n");
+      for (double d : { 2.0, 8.0 })
+         add("rational x/(1+|x|) drive " + g(d), "kink",
+             "x = in * " + g(d) + "\nout = x / (1.0 + abs(x)) * 0.5\n");
+
+      // Kinks: continuous value, discontinuous slope.
+      add("abs mix", "kink", "out = in + 0.5 * abs(in)\n");
+      add("half-wave max", "kink", "out = in * 0.5 + max(in, 0.0)\n");
+      for (double d : { 1.0, 2.0, 4.0, 8.0 })
+         add("hard clip drive " + g(d), "kink",
+             "out = clamp(in * " + g(d) + ", -0.4, 0.4)\n");
+
+      // Jumps: discontinuous value.
+      for (double s : { 4.0, 16.0 })
+         add("quantize " + g(s) + " steps", "jump", "out = floor(in * " + g(s) + " + 0.5) / " + g(s) + "\n");
+      add("comparator square + dry", "jump", "out = in * 0.5 + if(in > 0.0, 0.25, -0.25)\n");
+      add("wrap fold mod", "jump", "x = in * 2.0 + 4.0\nout = (x % 1.0) - 0.5\n");
+
+      // Chains of analytic stages: the Saturator three-stage case in Field.
+      add("tanh x3 chain drive 4", "chain",
+          "x = in * 4.0\ne1 = exp(2.0 * x)\ny1 = (e1 - 1.0) / (e1 + 1.0) * 4.0\n"
+          "e2 = exp(2.0 * y1)\ny2 = (e2 - 1.0) / (e2 + 1.0) * 4.0\n"
+          "e3 = exp(2.0 * y2)\nout = (e3 - 1.0) / (e3 + 1.0) * 0.5\n");
+      add("clip then cubic", "chain",
+          "x = clamp(in * 3.0, -1.0, 1.0)\nout = (x - x * x * x / 3.0) * 0.5\n");
+
+      // Nonlinearity inside state feedback.
+      for (double fb : { 0.3, 0.7 })
+         add("tanh feedback " + g(fb), "feedback",
+             "state float y = 0\nx = in * 2.0 + y * " + g(fb) + "\ne = exp(2.0 * x)\n"
+             "y = (e - 1.0) / (e + 1.0)\nout = y * 0.5\n");
+      add("clip feedback 0.5", "feedback",
+          "state float y = 0\ny = clamp(in * 2.0 + y * 0.5, -0.6, 0.6)\nout = y\n");
+
+      // Free-running oscillators (no input): naive phase accumulators.
+      auto osc = [&](std::string label, std::string klass, std::string body) {
+         FieldAliasCase c;
+         c.label = std::move(label);
+         c.klass = std::move(klass);
+         c.code = "state float ph = 0\nph = ph + 1748.84765625 / sr\nph = ph - floor(ph)\n" + body;
+         c.fundBin = 597;
+         c.usesInput = false;
+         cs.push_back(std::move(c));
+      };
+      osc("osc sine 1.75k", "linear", "out = sin(ph * 6.2831853) * 0.5\n");
+      osc("osc naive saw 1.75k", "osc", "out = (ph * 2.0 - 1.0) * 0.5\n");
+      osc("osc naive square 1.75k", "osc", "out = if(ph < 0.5, 0.5, -0.5)\n");
+      osc("osc naive triangle 1.75k", "osc", "out = (abs(ph * 4.0 - 2.0) - 1.0) * 0.5\n");
+      osc("osc sine pm (ph^3) 1.75k", "osc", "out = sin(ph * ph * ph * 6.2831853) * 0.5\n");
+      osc("osc pinch 100% 1.75k", "osc", "out = sin(pinch(ph, 1.0) * 6.2831853) * 0.5\n");
+
+      // Shipping presets with a static nonlinearity, at their defaults.
+      for (const char* name : { "Tube Overdrive", "Soft Saturation", "Analog Tape Saturator", "Bass Ribbon Driver",
+                                "Wavefolder", "Moog 4-Pole Ladder Filter" })
+         for (const auto& p : FieldSampleNode::Presets())
+            if (std::string(p.name) == name)
+               add(std::string("preset ") + name, "preset", p.code);
+      return cs;
+   }
+}
+
+bool RunFieldAliasTest()
+{
+   const std::vector<FieldAliasCase> corpus = FieldAliasCorpus();
+   FILE* csv = nullptr;
+   if (const char* path = getenv("INFINITE_FIELDALIAS_CSV"))
+   {
+      csv = fopen(path, "w");
+      if (csv != nullptr)
+         fprintf(csv, "label,class,factor,alias_db,harmonics_db\n");
+   }
+   bool all = true;
+   printf("FIELDALIAS %zu kernels, alias<20k dB re fundamental at F x 48 kHz then decimated\n", corpus.size());
+   printf("FIELDALIAS %-34s %-9s %7s %7s %7s %7s %7s %7s\n", "kernel", "class", "1x", "2x", "4x", "8x", "16x",
+          "32x");
+   for (const FieldAliasCase& c : corpus)
+   {
+      double db[6] = {};
+      bool ok = true;
+      std::string err;
+      for (int k = 0; k < 6 && ok; k++)
+      {
+         const std::vector<float> x = RenderFieldAt(c, kFieldFactors[k], err);
+         if (x.empty())
+         {
+            ok = false;
+            break;
+         }
+         const AliasMeasurement m = Measure(x, c.fundBin);
+         db[k] = m.aliasDb;
+         if (csv != nullptr)
+            fprintf(csv, "\"%s\",%s,%d,%.2f,%.2f\n", c.label.c_str(), c.klass.c_str(), kFieldFactors[k], m.aliasDb,
+                    m.harmonicDb);
+      }
+      if (!ok)
+      {
+         printf("FIELDALIAS %-34s could not render: %s  FAIL\n", c.label.c_str(), err.c_str());
+         all = false;
+         continue;
+      }
+      const char* verdict = "";
+      if (c.klass == "linear")
+      {
+         const bool clean = db[0] <= kControlDb;
+         verdict = clean ? "control OK" : "control FAIL";
+         all &= clean;
+      }
+      printf("FIELDALIAS %-34s %-9s %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f  %s\n", c.label.c_str(), c.klass.c_str(),
+             db[0], db[1], db[2], db[3], db[4], db[5], verdict);
+      fflush(stdout);
+   }
+   if (csv != nullptr)
+      fclose(csv);
+   printf("FIELDALIAS %s\n", all ? "OK" : "FAIL");
    return all;
 }
 }

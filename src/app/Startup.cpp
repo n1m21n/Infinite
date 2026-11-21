@@ -23,6 +23,7 @@ namespace app
 bool RunAliasTest(); // selftest/AliasTests.cpp
 extern bool gShotNodeMenu; // frame/StagePopupsA.cpp: review shots open the first node's menu
 bool RunOversampleTest(); // selftest/AliasTests.cpp
+bool RunFieldAliasTest(); // selftest/AliasTests.cpp
 bool RunPitchTest(); // selftest/PitchTests.cpp
 bool RunLearningLogTest(); // selftest/GenSampleTests.cpp
 bool RunGenSampleTest(); // selftest/GenSampleTests.cpp
@@ -698,6 +699,10 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return RunAliasTest() ? 0 : 1;
    if (getenv("INFINITE_OVERSAMPLETEST") != nullptr)
       return RunOversampleTest() ? 0 : 1;
+   // Field kernels' aliasing against oversampling factor, the ground truth
+   // for docs/plans/aliasing-aware-field (phase 0). Report only.
+   if (getenv("INFINITE_FIELDALIASTEST") != nullptr)
+      return RunFieldAliasTest() ? 0 : 1;
 
    // Pitch Shifter quality: purity, chord, unity null, transients (selftest/PitchTests.cpp).
    if (getenv("INFINITE_PITCHTEST") != nullptr)
