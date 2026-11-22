@@ -1,0 +1,6 @@
+FIELDALIAS H1 class poly      n= 36 median |err|   0.0 dB, p90   0.0 dB
+FIELDALIAS H1 class preset    n= 30 median |err|   0.0 dB, p90   0.0 dB
+FIELDALIAS H1 factor for -80 dB: 43/43 exact, 43/43 within one doubling
+FIELDALIAS cost: render+measure 19.9 s (91151424 program runs), analysis 6.88 s (4634624 program runs)
+FIELDALIAS OK
+wrote /Users/namansoni/Infinite/worktrees/aliasing-aware-field/docs/research/aliasing-aware-field/data-rerun/phase1-predictions.csv
