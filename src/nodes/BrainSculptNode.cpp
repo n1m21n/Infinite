@@ -76,6 +76,8 @@ void BrainSculptNode::Tick(int frameId, double dt)
 
 float BrainSculptNode::ValuePos01For(const ParamKey& k, float curPos)
 {
+   if (bypassed)
+      return input ? std::clamp(input->Value01(), 0.0f, 1.0f) : std::clamp(curPos, 0.0f, 1.0f);
    auto it = mAnchors.find(k);
    if (it == mAnchors.end() || it->second.empty())
       return std::clamp(curPos, 0.0f, 1.0f);
@@ -97,6 +99,8 @@ void BrainSculptNode::OnGrab(const ParamKey& /*k*/)
 
 void BrainSculptNode::OnRelease(const ParamKey& k, float pos, float /*velPerSec*/)
 {
+   if (bypassed)
+      return;   // a bypassed node does not learn
    Anchor a;
    a.z = CurrentLatent();
    a.targetPos01 = std::clamp(pos, 0.0f, 1.0f);

@@ -36,7 +36,15 @@ public:
    IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    int ModulatorInputCount() const override { return 1; }
 
-   float Value01() override { return mSummaryValue; }
+   // Bypassed, Brain Sculpt is a plain wire: the brain signal leaves unchanged
+   // and no bound knob is sculpted (ValuePos01For) or taught (OnRelease).
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
+   float Value01() override
+   {
+      if (bypassed)
+         return input ? input->Value01() : 0.5f;
+      return mSummaryValue;
+   }
 
    // IPredictor interface
    void Tick(int frameId, double dt) override;

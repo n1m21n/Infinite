@@ -389,6 +389,22 @@ bool RunBciSelftest()
       ck.Expect(predCalm < 0.30f && predFocus > 0.70f,
                 "Breakthrough 1: BrainSculptNode RBF interpolates Shift-grabbed states");
 
+      // Bypassed, Brain Sculpt is a wire: its brain input passes straight
+      // through, no knob is sculpted and a Shift-grab teaches nothing.
+      {
+         struct ConstMod : IModulator { float v = 0.3f; float Value01() override { return v; } } brain;
+         sculpt.input = &brain;
+         sculpt.bypassed = true;
+         const int anchorsBefore = sculpt.TotalAnchorCount();
+         sculpt.OnRelease(pk, 0.99f, 0.0f);
+         ck.Expect(sculpt.BypassSource() == nullptr && std::fabs(sculpt.Value01() - 0.3f) < 1e-6f &&
+                      std::fabs(sculpt.ValuePos01For(pk, 0.5f) - 0.3f) < 1e-6f &&
+                      sculpt.TotalAnchorCount() == anchorsBefore,
+                   "Brain Sculpt bypassed passes its brain input through and learns nothing");
+         sculpt.bypassed = false;
+         sculpt.input = nullptr;
+      }
+
       // Gap 5: brain.* Expression & Field Pixel + Sample compilation
       float exprVal = 0.0f;
       std::string err;
