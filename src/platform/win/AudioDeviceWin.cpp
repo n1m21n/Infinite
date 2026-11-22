@@ -1185,6 +1185,14 @@ namespace Platform
    // addendum A1). No device needed, so unlike the rest of this file this is
    // actually CI-reachable - wired into main.cpp's env-var test dispatch as
    // INFINITE_AUDIOPCMTEST alongside the other INFINITE_*TEST fixtures.
+   bool AudioInputRingSelfTest()
+   {
+      // The live-input ring this checks is macOS's (src/platform/Platform.mm); this platform's
+      // capture ring keeps its existing reader. Trivially true so the dispatch stays one call site.
+      printf("AUDIOINRINGTEST OK (macOS only)\n");
+      return true;
+   }
+
    bool AudioPcmConversionSelfTest()
    {
       constexpr int kFrames = 8;
@@ -2471,7 +2479,8 @@ namespace Platform
    }
 
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels,
-                             uint64_t& readerCursor, int channelOffset, bool isMono, int* outFrames)
+                             uint64_t& readerCursor, int channelOffset, bool isMono, int* outFrames,
+                             bool /*keepLive*/)
    {
       if (outFrames != nullptr)
          *outFrames = 0;

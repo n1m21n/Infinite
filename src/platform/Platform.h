@@ -620,6 +620,13 @@ namespace Platform
    // fixtures. Trivially true on macOS, which never negotiates PCM here.
    bool AudioPcmConversionSelfTest();
 
+   // Headless check of the live-input ring (INFINITE_AUDIOINRINGTEST): simulates the capture clock
+   // against the render clock and measures how long each sample waits before Audio In plays it -
+   // the old 1024-frame tap against per-cycle capture - plus flat latency under clock drift and
+   // gap-free reads for a recorder. Prints "AUDIOINRINGTEST OK"/"FAIL". macOS only (the ring lives
+   // in Platform.mm); Windows and Linux return true.
+   bool AudioInputRingSelfTest();
+
    // ---- audio device recovery (config-change / sleep-wake) ----
    // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md.
    //
@@ -753,10 +760,14 @@ namespace Platform
    //           when false, reads stereo pair (channelOffset and channelOffset + 1).
    // `outFrames`: when set, receives how many real frames were read (the rest
    // were zero-filled). A recorder must use this, not the return value.
+   // `keepLive`: a live monitor (Audio In) sets this so the reader stays one capture cycle behind
+   // the input and jumps forward if it drifts further back, keeping latency flat. A recorder leaves
+   // it off so it never skips audio. Applied on macOS; Windows and Linux accept it and keep their
+   // existing behaviour for now.
    // Audio-thread safe: lock-free, no allocation.
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels,
                              uint64_t& readerCursor, int channelOffset = 0, bool isMono = false,
-                             int* outFrames = nullptr);
+                             int* outFrames = nullptr, bool keepLive = false);
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels);
 
    // ---- audio plugin hosting -----------------------------------------------

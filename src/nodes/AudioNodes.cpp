@@ -1118,7 +1118,8 @@ public:
       // before the main thread has cooked the node.
       const int bus = Platform::PluginModeActive() ? (mSource.load(std::memory_order_relaxed) == AudioInputNode::kSourceHostSidechain ? 1 : 0) : -1;
       const int captured = bus >= 0 ? PluginEngine::ReadHostInput(bus, chans, frames, channelOffset, isMono)
-                                    : Platform::AudioInputCaptureRead(chans, frames, 2, mReaderCursor, channelOffset, isMono);
+                                    : Platform::AudioInputCaptureRead(chans, frames, 2, mReaderCursor, channelOffset, isMono,
+                                                                    nullptr, /*keepLive=*/true);
 
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)

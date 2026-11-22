@@ -4831,34 +4831,48 @@ namespace Platform
       {
          float entries[kInputRingCapacity] {};
          std::atomic<uint64_t> writeCount { 0 };
+         // Frames in the producer's most recent write: one capture IO cycle. A live reader keeps this
+         // much in hand so the next cycle lands before it runs dry.
+         std::atomic<uint32_t> lastChunk { 0 };
 
          void Write(const float* samples, int count)
          {
             uint64_t w = writeCount.load(std::memory_order_relaxed);
             for (int i = 0; i < count; i++)
                entries[(w + i) % kInputRingCapacity] = samples[i];
+            lastChunk.store((uint32_t)count, std::memory_order_relaxed);
             writeCount.store(w + count, std::memory_order_release);
          }
 
-         int Read(uint64_t& readerCursor, float* out, int numFrames)
+         // Where a reader asking for numFrames should start. A first read, a reader past the write
+         // head, or one that fell further behind than the ring holds lands on the live edge. A live
+         // reader (keepLive) starts one capture cycle behind the edge and, if it ever falls more than
+         // twice that far behind (input clock faster than the render clock, a late cycle, a device
+         // hiccup), jumps back to it: monitoring latency stays one block + one cycle instead of
+         // growing until the ring wraps. A recorder (keepLive off) never skips audio it can still read.
+         uint64_t Resolve(uint64_t cursor, uint64_t w, int numFrames, bool keepLive) const
          {
-            const uint64_t w = writeCount.load(std::memory_order_acquire);
-            if (w == 0)
-               return 0;
+            const uint64_t chunk = std::max<uint64_t>(lastChunk.load(std::memory_order_relaxed), 1);
+            const uint64_t cushion = (uint64_t)numFrames + (keepLive ? chunk : 0);
+            const bool lost = cursor == 0 || cursor > w || (w - cursor) > kInputRingCapacity;
+            const bool drifted = keepLive && !lost && (w - cursor) > 2 * cushion;
+            if (lost || drifted)
+               cursor = (w >= cushion) ? (w - cushion) : 0;
+            return cursor;
+         }
 
-            if (readerCursor == 0 || readerCursor > w || (w - readerCursor) > kInputRingCapacity)
-               readerCursor = (w >= (uint64_t)numFrames) ? (w - numFrames) : 0;
-
-            const int available = (int)std::min((uint64_t)numFrames, w - readerCursor);
+         int ReadAt(uint64_t cursor, uint64_t w, float* out, int numFrames) const
+         {
+            const int available = (int)std::min((uint64_t)numFrames, w > cursor ? w - cursor : 0);
             for (int i = 0; i < available; i++)
-               out[i] = entries[(readerCursor + i) % kInputRingCapacity];
-            readerCursor += available;
+               out[i] = entries[(cursor + i) % kInputRingCapacity];
             return available;
          }
 
          void Clear()
          {
             writeCount.store(0, std::memory_order_relaxed);
+            lastChunk.store(0, std::memory_order_relaxed);
          }
       };
 
@@ -5180,8 +5194,109 @@ namespace Platform
 
    bool AudioInputCaptureIsRunning() { return gInputTapInstalled; }
 
+   bool AudioInputRingSelfTest()
+   {
+      // Time is in samples. Every `period` samples the capture side delivers the `chunk` samples
+      // captured since its last delivery; the render side reads `block` samples per callback at a
+      // fixed phase. A sample captured at time c and read at time t waited t - c.
+      struct Result { double meanWait = 0, maxWait = 0; int starved = 0; uint64_t maxBacklog = 0; bool gapless = true; };
+      static InputRing ring; // 128 KB: off the stack
+      auto run = [&](int chunk, int block, double inPerOut, bool keepLive, int cycles, int readEvery) -> Result {
+         ring.Clear();
+         Result r;
+         std::vector<float> src(chunk + 8), out(block);
+         uint64_t cursor = 0, captured = 0, expectNext = 0, waitCount = 0;
+         double waitSum = 0.0, capPos = 0.0;
+         const int horizon = cycles * block;
+         int nextRead = block / 2; // render callback phase: half a block after the first capture
+         for (int t = 1; t <= horizon; t++)
+         {
+            capPos += inPerOut; // capture clock relative to render clock
+            if (capPos - (double)captured >= (double)chunk)
+            {
+               for (int i = 0; i < chunk; i++)
+                  src[i] = (float)(captured + i); // each sample carries its capture index
+               ring.Write(src.data(), chunk);
+               captured += chunk;
+            }
+            if (t == nextRead)
+            {
+               nextRead += block * readEvery;
+               const uint64_t w = ring.writeCount.load();
+               if (w == 0)
+                  continue;
+               const uint64_t c = ring.Resolve(cursor, w, block, keepLive);
+               if (cursor != 0 && c != cursor)
+                  r.gapless = r.gapless && keepLive; // only a live reader may jump
+               r.maxBacklog = std::max(r.maxBacklog, w - c);
+               const int got = ring.ReadAt(c, w, out.data(), block);
+               if (got < block && t > 8 * (chunk + block))
+                  r.starved++;
+               for (int i = 0; i < got; i++)
+               {
+                  const uint64_t idx = (uint64_t)out[i];
+                  if (!keepLive && expectNext != 0 && i == 0 && idx != expectNext)
+                     r.gapless = false;
+                  // Sample idx was captured at render time idx / inPerOut; it is played i samples
+                  // into this callback.
+                  const double wait = (double)t + (double)i - (double)idx / inPerOut;
+                  if (t > 8 * (chunk + block))
+                  {
+                     waitSum += wait;
+                     waitCount++;
+                     r.maxWait = std::max(r.maxWait, wait);
+                  }
+               }
+               if (got > 0)
+                  expectNext = (uint64_t)out[got - 1] + 1;
+               cursor = c + (uint64_t)got;
+            }
+         }
+         r.meanWait = waitCount ? waitSum / (double)waitCount : 0.0;
+         return r;
+      };
+
+      const double sr = 48000.0;
+      const auto ms = [&](double frames) { return frames * 1000.0 / sr; };
+      bool ok = true;
+      for (int block : { 64, 128, 256 })
+      {
+         // Old: 1024-frame tap, reader snapping to the edge (keepLive off reproduces it exactly).
+         const Result oldR = run(1024, block, 1.0, false, 4000, 1);
+         // New: capture cycle the same size as the render buffer.
+         const Result newR = run(block, block, 1.0, true, 4000, 1);
+         const double gain = ms(oldR.meanWait - newR.meanWait);
+         const bool pass = newR.starved == 0 && newR.meanWait <= 2.0 * block + 1.0 && gain > 0.0;
+         ok = ok && pass;
+         printf("AUDIOINRINGTEST block=%d old_wait_ms=%.2f new_wait_ms=%.2f (max %.2f) saved_ms=%.2f starved=%d %s\n",
+                block, ms(oldR.meanWait), ms(newR.meanWait), ms(newR.maxWait), gain, newR.starved, pass ? "ok" : "FAIL");
+      }
+      // A capture clock 0.5% fast for a long run: the live reader's backlog must stay bounded.
+      {
+         const Result fast = run(256, 256, 1.005, true, 40000, 1);
+         const bool pass = fast.maxBacklog <= 4 * (256 + 256) + 256 && fast.maxWait <= 4.0 * 512;
+         ok = ok && pass;
+         printf("AUDIOINRINGTEST drift+0.5%% max_backlog=%llu max_wait_ms=%.2f %s\n",
+                (unsigned long long)fast.maxBacklog, ms(fast.maxWait), pass ? "ok" : "FAIL");
+         const Result slow = run(256, 256, 0.995, true, 40000, 1);
+         const bool passSlow = slow.maxBacklog <= 4 * (256 + 256) + 256;
+         ok = ok && passSlow;
+         printf("AUDIOINRINGTEST drift-0.5%% max_backlog=%llu %s\n", (unsigned long long)slow.maxBacklog, passSlow ? "ok" : "FAIL");
+      }
+      // A recorder (Sample Studio: 4096-frame reads, called every few blocks) never skips audio.
+      {
+         const Result rec = run(256, 4096, 1.0, false, 400, 1);
+         ok = ok && rec.gapless;
+         printf("AUDIOINRINGTEST recorder gapless=%d %s\n", rec.gapless ? 1 : 0, rec.gapless ? "ok" : "FAIL");
+      }
+      printf("AUDIOINRINGTEST %s\n", ok ? "OK" : "FAIL");
+      ring.Clear();
+      return ok;
+   }
+
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels,
-                             uint64_t& readerCursor, int channelOffset, bool isMono, int* outFrames)
+                             uint64_t& readerCursor, int channelOffset, bool isMono, int* outFrames,
+                             bool keepLive)
    {
       if (outFrames != nullptr)
          *outFrames = 0;
@@ -5192,37 +5307,40 @@ namespace Platform
       if (availableChannels <= 0)
          return 0;
 
-      if (isMono)
+      const int ch0 = std::clamp(channelOffset, 0, availableChannels - 1);
+      const int ch1 = isMono ? ch0 : ((channelOffset + 1 < availableChannels) ? (channelOffset + 1) : ch0);
+      // One cursor for both channels, resolved once against the head both rings have reached (the
+      // producer writes channel by channel), so a pair never ends up a cycle apart.
+      const uint64_t w = std::min(gInputRing[ch0].writeCount.load(std::memory_order_acquire),
+                                  gInputRing[ch1].writeCount.load(std::memory_order_acquire));
+      if (w == 0)
       {
-         const int ch = std::clamp(channelOffset, 0, availableChannels - 1);
-         const int got = gInputRing[ch].Read(readerCursor, outChannels[0], numFrames);
-         for (int i = got; i < numFrames; i++)
-            outChannels[0][i] = 0.0f;
-         if (maxChannels > 1)
-            std::copy(outChannels[0], outChannels[0] + numFrames, outChannels[1]);
-         if (outFrames != nullptr)
-            *outFrames = got;
-         return got > 0 ? 1 : 0;
+         for (int c = 0; c < std::min(maxChannels, 2); c++)
+            std::fill(outChannels[c], outChannels[c] + numFrames, 0.0f);
+         return 0;
       }
-      else
-      {
-         const int ch0 = std::clamp(channelOffset, 0, availableChannels - 1);
-         const int ch1 = (channelOffset + 1 < availableChannels) ? (channelOffset + 1) : ch0;
-         uint64_t cursorCopy = readerCursor;
-         const int got0 = gInputRing[ch0].Read(readerCursor, outChannels[0], numFrames);
-         for (int i = got0; i < numFrames; i++)
-            outChannels[0][i] = 0.0f;
+      const uint64_t cursor = gInputRing[ch0].Resolve(readerCursor, w, numFrames, keepLive);
 
-         if (maxChannels > 1)
+      const int got = gInputRing[ch0].ReadAt(cursor, w, outChannels[0], numFrames);
+      for (int i = got; i < numFrames; i++)
+         outChannels[0][i] = 0.0f;
+      if (maxChannels > 1)
+      {
+         if (ch1 == ch0)
+            std::copy(outChannels[0], outChannels[0] + numFrames, outChannels[1]);
+         else
          {
-            const int got1 = gInputRing[ch1].Read(cursorCopy, outChannels[1], numFrames);
-            for (int i = got1; i < numFrames; i++)
+            gInputRing[ch1].ReadAt(cursor, w, outChannels[1], got);
+            for (int i = got; i < numFrames; i++)
                outChannels[1][i] = 0.0f;
          }
-         if (outFrames != nullptr)
-            *outFrames = got0;
-         return (got0 > 0) ? (ch0 != ch1 ? 2 : 1) : 0;
       }
+      readerCursor = cursor + (uint64_t)got;
+      if (outFrames != nullptr)
+         *outFrames = got;
+      if (got <= 0)
+         return 0;
+      return (!isMono && ch0 != ch1) ? 2 : 1;
    }
 
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels)

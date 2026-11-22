@@ -500,6 +500,14 @@ namespace Platform
    // AudioDeviceLinux.cpp before Phase 2. They live in a separate TU-local
    // block below, kept exactly as they were.
 
+   bool AudioInputRingSelfTest()
+   {
+      // The live-input ring this checks is macOS's (src/platform/Platform.mm); this platform's
+      // capture ring keeps its existing reader. Trivially true so the dispatch stays one call site.
+      printf("AUDIOINRINGTEST OK (macOS only)\n");
+      return true;
+   }
+
    bool AudioPcmConversionSelfTest()
    {
       // miniaudio negotiates ma_format_f32 directly and does its own
@@ -818,7 +826,8 @@ namespace Platform
    }
 
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels,
-                             uint64_t& readerCursor, int channelOffset, bool isMono, int* outFrames)
+                             uint64_t& readerCursor, int channelOffset, bool isMono, int* outFrames,
+                             bool /*keepLive*/)
    {
       if (outFrames != nullptr)
          *outFrames = 0;
