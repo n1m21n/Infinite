@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Lichtenberg Acrylic Tree Breakdown",
+    "author": "Infinite",
+    "description": "High-voltage Lichtenberg dendritic breakdown tree frozen in cast obsidian acrylic with multi-octave domain-warped plasma filaments.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float branchScale = 4.2 [1.5, 9.0];\nparam float ridgeSharp = 1.35 [0.5, 2.5];\nparam float warpGain = 0.65 [0.1, 1.4];\nparam float coronaGlow = 1.25 [0.4, 2.2];\nparam float drift = 0.25 [0.0, 0.8];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\na = atan2(p.y, p.x);\n\n# Polar-dendritic warp coordinate so filaments branch outward from bottom/center electrode\nq = vec2(p.x * branchScale, (p.y + 1.05) * branchScale * 0.72);\nw1 = vec2(sin(q.y * 1.3 + t * drift), cos(q.x * 1.1 - t * drift * 0.8)) * warpGain;\nqw = q + w1;\n\n# 4-octave unrolled ridge FBM for dendritic lightning forks\nn1 = abs(sin(qw.x * 1.4 + cos(qw.y * 1.6)) * cos(qw.y * 1.3 - sin(qw.x * 1.1)));\nn2 = abs(sin(qw.x * 2.9 + n1 * 2.4 + t * 0.3) * cos(qw.y * 2.7 - n1 * 2.1));\nn3 = abs(sin(qw.x * 5.8 - n2 * 2.2) * cos(qw.y * 5.4 + n2 * 2.0));\nn4 = abs(sin(qw.x * 11.4 + n3 * 1.9) * cos(qw.y * 10.8 - n3 * 1.7));\n\nf1 = exp(-n1 * 6.5 * ridgeSharp);\nf2 = exp(-n2 * 7.5 * ridgeSharp) * 0.85;\nf3 = exp(-n3 * 8.5 * ridgeSharp) * 0.65;\nf4 = exp(-n4 * 9.5 * ridgeSharp) * 0.45;\n\nradialMask = smoothstep(1.35, 0.05, length(vec2(p.x * 0.85, p.y + 0.35)));\ntrunk = exp(-abs(p.x + 0.14 * sin(p.y * 3.2 + t * 0.4)) * 7.0) * smoothstep(-1.1, 0.6, p.y);\nfilaments = (f1 * 0.45 + f2 * 0.55 + f3 * 0.45 + f4 * 0.35 + trunk * 0.55) * radialMask;\n\ncObsidian = vec3(0.016, 0.027, 0.078);\ncCobalt = vec3(0.055, 0.310, 0.847);\ncIce = vec3(0.400, 0.780, 1.000);\ncCore = vec3(0.902, 0.969, 1.000);\n\nglow = clamp(filaments * coronaGlow, 0.0, 2.5);\ncol = cObsidian;\ncol = mix(col, cCobalt, smoothstep(0.08, 0.55, glow));\ncol = mix(col, cIce, smoothstep(0.45, 1.05, glow));\ncol = mix(col, cCore, smoothstep(0.95, 1.65, glow));\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "branchScale": 4.2,
+      "ridgeSharp": 1.35,
+      "warpGain": 0.65,
+      "coronaGlow": 1.25,
+      "drift": 0.25
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

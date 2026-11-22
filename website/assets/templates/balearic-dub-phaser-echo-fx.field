@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Balearic Dub Phaser Echo FX",
+    "author": "Infinite",
+    "description": "Balearic sunset dub 4-stage allpass phaser and resonant bandpass echo chamber with slow LFO sweep and warm console saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float sweepHz = 0.28 [0.05, 2.4];\nparam float depth = 0.72 [0.1, 0.92];\nparam float resHz = 780.0 [200.0, 3200.0];\nparam float feedback = 0.48 [0.0, 0.82];\nparam float mix = 0.82 [0.0, 1.0];\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\nstate float bp = 0; state float lp = 0; state float fb = 0; state float lfo = 0;\n\nlfo = (lfo + sweepHz / sr) % 1.0;\nc = clamp(0.45 + 0.42 * depth * sin(6.2831853 * lfo), 0.08, 0.90);\nx = in + fb * feedback;\ny1 = -c * x + a1; a1 = x + c * y1;\ny2 = -c * y1 + a2; a2 = y1 + c * y2;\ny3 = -c * y2 + a3; a3 = y2 + c * y3;\ny4 = -c * y3 + a4; a4 = y3 + c * y4;\n\ng = clamp(2.0 * sin(3.14159265 * resHz / sr), 0.02, 0.82);\nbp = bp + g * (y4 - lp - 0.55 * bp);\nlp = lp + g * bp;\nfb = clamp(bp * 0.65 + y4 * 0.35, -1.1, 1.1);\n\nwet = (y4 * 0.65 + bp * 0.45) / (1.0 + abs(y4) * 0.55);\nout = (in * (1.0 - mix) + wet * mix) * 0.84;\n",
+    "params": {
+      "sweepHz": 0.28,
+      "depth": 0.72,
+      "resHz": 780.0,
+      "feedback": 0.48,
+      "mix": 0.82
+    }
+  }
+}

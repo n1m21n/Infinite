@@ -3423,6 +3423,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "kora-calabash-harp-synth",
+      "name": "Kora Calabash Harp Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "West African 21-string kora physical-plucked synthesizer with nylon harmonic decay, sympathetic bridge rattle, and calabash gourd body resonance.",
+      "price": 0,
+      "preview": "assets/templates/kora-calabash-harp-synth.webp",
+      "file": "assets/templates/kora-calabash-harp-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "kora-polyrhythm-kalimba-bell-synth",
+      "name": "Kora Polyrhythm Kalimba Bell Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Inharmonic metallic tine and wooden soundboard synthesizer with wavefolded overtone shimmer and evolving LFO timbre drift.",
+      "price": 0,
+      "preview": "assets/templates/kora-polyrhythm-kalimba-bell-synth.webp",
+      "file": "assets/templates/kora-polyrhythm-kalimba-bell-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "cumbia-rebajada-tape-slow-fx",
+      "name": "Cumbia Rebajada Tape Slow FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Monterrey cumbia rebajada varispeed tape processor with capstan flutter drift, wooly oxide low-pass saturation, and warm spring feedback.",
+      "price": 0,
+      "preview": "assets/templates/cumbia-rebajada-tape-slow-fx.webp",
+      "file": "assets/templates/cumbia-rebajada-tape-slow-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "balearic-dub-phaser-echo-fx",
+      "name": "Balearic Dub Phaser Echo FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Balearic sunset dub 4-stage allpass phaser and resonant bandpass echo chamber with slow LFO sweep and warm console saturation.",
+      "price": 0,
+      "preview": "assets/templates/balearic-dub-phaser-echo-fx.webp",
+      "file": "assets/templates/balearic-dub-phaser-echo-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
   "count": 205

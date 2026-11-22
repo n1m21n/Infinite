@@ -357,6 +357,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Ethio-Jazz Tizita Reed Horn Synth](https://infinitedevices.org/library/ethio-jazz-tizita-reed-horn-synth.html): Expressive Ethio-jazz brass-reed solo synthesizer with wavefolded mouth-pressure excitation and dual formant horn resonator. (file: https://infinitedevices.org/assets/templates/ethio-jazz-tizita-reed-horn-synth.inf)
 - [Spectral Dub Binaural Allpass FX](https://infinitedevices.org/library/spectral-dub-binaural-allpass-fx.html): Deep dub chamber processor with 4-stage dispersed allpass cascade, cross-coupled resonant bandpass feedback, and warm transformer saturation. (file: https://infinitedevices.org/assets/templates/spectral-dub-binaural-allpass-fx.inf)
 - [Spectral Dub Tape Resonator FX](https://infinitedevices.org/library/spectral-dub-tape-resonator-fx.html): King Tubby inspired dual-head tape resonator with capstan wow-flutter drift, resonant SVF dub sweep, and oxide hysteresis warmth. (file: https://infinitedevices.org/assets/templates/spectral-dub-tape-resonator-fx.inf)
+- [Kora Calabash Harp Synth](https://infinitedevices.org/library/kora-calabash-harp-synth.html): West African 21-string kora physical-plucked synthesizer with nylon harmonic decay, sympathetic bridge rattle, and calabash gourd body resonance. (file: https://infinitedevices.org/assets/templates/kora-calabash-harp-synth.inf)
+- [Kora Polyrhythm Kalimba Bell Synth](https://infinitedevices.org/library/kora-polyrhythm-kalimba-bell-synth.html): Inharmonic metallic tine and wooden soundboard synthesizer with wavefolded overtone shimmer and evolving LFO timbre drift. (file: https://infinitedevices.org/assets/templates/kora-polyrhythm-kalimba-bell-synth.inf)
+- [Cumbia Rebajada Tape Slow FX](https://infinitedevices.org/library/cumbia-rebajada-tape-slow-fx.html): Monterrey cumbia rebajada varispeed tape processor with capstan flutter drift, wooly oxide low-pass saturation, and warm spring feedback. (file: https://infinitedevices.org/assets/templates/cumbia-rebajada-tape-slow-fx.inf)
+- [Balearic Dub Phaser Echo FX](https://infinitedevices.org/library/balearic-dub-phaser-echo-fx.html): Balearic sunset dub 4-stage allpass phaser and resonant bandpass echo chamber with slow LFO sweep and warm console saturation. (file: https://infinitedevices.org/assets/templates/balearic-dub-phaser-echo-fx.inf)
 
 ## Library: Community
 
@@ -605,6 +609,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Mineral Birefringence Thin Section](https://infinitedevices.org/library/mineral-birefringence-thin-section.html): Cross-polarized petrographic microscopy of Voronoi crystal domains with Michel-Levy interference bands and analyzer rotation. (file: https://infinitedevices.org/assets/library/pixel/mineral-birefringence-thin-section.field)
 - [Haeckel Radiolaria Discoidea Lattice](https://infinitedevices.org/library/haeckel-radiolaria-discoidea-lattice.html): Ernst Haeckel Kunstformen der Natur Radiolaria Discoidea lithograph with cruciform silica arms, honeycomb pore rings, and radiating marginal spicules. (file: https://infinitedevices.org/assets/library/pixel/haeckel-radiolaria-discoidea-lattice.field)
 - [Haeckel Radiolaria Spicule Corona](https://infinitedevices.org/library/haeckel-radiolaria-spicule-corona.html): Dark-field optical microscopy of a spherical Polycyttaria radiolarian silica shell with concentric geodesic pore rings and radiating axopodia. (file: https://infinitedevices.org/assets/library/pixel/haeckel-radiolaria-spicule-corona.field)
+- [Lichtenberg Acrylic Tree Breakdown](https://infinitedevices.org/library/lichtenberg-acrylic-tree-breakdown.html): High-voltage Lichtenberg dendritic breakdown tree frozen in cast obsidian acrylic with multi-octave domain-warped plasma filaments. (file: https://infinitedevices.org/assets/library/pixel/lichtenberg-acrylic-tree-breakdown.field)
+- [Lichtenberg Corona Arc Lattice](https://infinitedevices.org/library/lichtenberg-corona-arc-lattice.html): Radial dielectric corona discharge and Voronoi-fractured quartz insulator arcs radiating from a central high-voltage electrode. (file: https://infinitedevices.org/assets/library/pixel/lichtenberg-corona-arc-lattice.field)
 
 ## Library: Sketch
 
@@ -722,6 +728,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Hilma Svanen Orbital Diagram](https://infinitedevices.org/library/hilma-svanen-orbital-diagram.html): Hilma af Klint spiritualist geometric plate with vermilion ground, split-hemisphere colour wheels, and fine compass construction arcs. (file: https://infinitedevices.org/assets/library/sketch/hilma-svanen-orbital-diagram.js)
 - [Jacquard Bauhaus Warp-Weft Grid](https://infinitedevices.org/library/jacquard-bauhaus-warp-weft-grid.html): Anni Albers inspired Bauhaus Jacquard weaving draft with stepped terracotta, charcoal, ochre, and slate warp-weft bands on ruled linen parchment. (file: https://infinitedevices.org/assets/library/sketch/jacquard-bauhaus-warp-weft-grid.js)
 - [Jacquard Punchcard Binary Matrix](https://infinitedevices.org/library/jacquard-punchcard-binary-matrix.html): 1939 Jacquard loom perforated pasteboard punchcard chain with registration eyelets, laced fold seams, and algorithmic twill-weave hole matrix. (file: https://infinitedevices.org/assets/library/sketch/jacquard-punchcard-binary-matrix.js)
+- [Penrose Rhombus Aperiodic Grid](https://infinitedevices.org/library/penrose-rhombus-aperiodic-grid.html): Five-fold Penrose P3 thick and thin rhombus tiling with inscribed golden-ratio Ammann construction lines and architectural calibration ring. (file: https://infinitedevices.org/assets/library/sketch/penrose-rhombus-aperiodic-grid.js)
+- [Penrose Sun-Star Quasicrystal](https://infinitedevices.org/library/penrose-sun-star-quasicrystal.html): Ten-fold Penrose P2 kite-and-dart deflation rosette in crimson and forest teal with Conway golden matching-rule rib lines. (file: https://infinitedevices.org/assets/library/sketch/penrose-sun-star-quasicrystal.js)
 
 ## Library: Sketch 3D
 
@@ -834,6 +842,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Gaudi Catenary Paraboloid Vault 3D](https://infinitedevices.org/library/gaudi-catenary-paraboloid-vault-3d.html): Antoni Gaudi hanging-chain catenary colonnade and branching hyperboloid vault ribs in warm limestone and terracotta. (file: https://infinitedevices.org/assets/library/sketch/gaudi-catenary-paraboloid-vault-3d.js)
 - [Sashimono Kumiko Asanoha Screen 3D](https://infinitedevices.org/library/sashimono-kumiko-asanoha-screen-3d.html): Backlit Japanese Kumiko Asanoha timber lattice screen in warm hinoki cypress with chamfered joinery ribs and shoji paper ground. (file: https://infinitedevices.org/assets/library/sketch/sashimono-kumiko-asanoha-screen-3d.js)
 - [Sashimono Kigumi Cantilever Tower 3D](https://infinitedevices.org/library/sashimono-kigumi-cantilever-tower-3d.html): Nail-free Japanese Kigumi interlocking mortise-and-tenon timber tower with stepped cross-braced cantilevers and brass locking dowels. (file: https://infinitedevices.org/assets/library/sketch/sashimono-kigumi-cantilever-tower-3d.js)
+- [Dieste Gaussian Brick Vault 3D](https://infinitedevices.org/library/dieste-gaussian-brick-vault-3d.html): Eladio Dieste inspired double-curved Gaussian ceramic brick vault with rhythmic mortar arch ribs and dark masonry buttress piers. (file: https://infinitedevices.org/assets/library/sketch/dieste-gaussian-brick-vault-3d.js)
+- [Dieste Ruled Conoid Wall 3D](https://infinitedevices.org/library/dieste-ruled-conoid-wall-3d.html): Sinusoidal ruled-surface structural brick wall sweeping from an undulating ground curve to a straight reinforced lintel with clerestory slits. (file: https://infinitedevices.org/assets/library/sketch/dieste-ruled-conoid-wall-3d.js)
 
 ## Library: Synths
 
@@ -946,6 +956,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Prepared Piano Bolt Harmonic Synth](https://infinitedevices.org/library/prepared-piano-bolt-harmonic-synth.html): Prepared piano modal synthesizer with metallic bolt-on-string inharmonicity, rubber-damper transient, and cast-iron frame tail. (file: https://infinitedevices.org/assets/templates/prepared-piano-bolt-harmonic-synth.inf)
 - [Ethio-Jazz Farfisa Vibrato Synth](https://infinitedevices.org/library/ethio-jazz-farfisa-vibrato-synth.html): 1970s Addis Ababa transistor organ synthesizer with 4-drawbar harmonic bank, key-click transient, diode saturation, and dual-rate vibrato. (file: https://infinitedevices.org/assets/templates/ethio-jazz-farfisa-vibrato-synth.inf)
 - [Ethio-Jazz Tizita Reed Horn Synth](https://infinitedevices.org/library/ethio-jazz-tizita-reed-horn-synth.html): Expressive Ethio-jazz brass-reed solo synthesizer with wavefolded mouth-pressure excitation and dual formant horn resonator. (file: https://infinitedevices.org/assets/templates/ethio-jazz-tizita-reed-horn-synth.inf)
+- [Kora Calabash Harp Synth](https://infinitedevices.org/library/kora-calabash-harp-synth.html): West African 21-string kora physical-plucked synthesizer with nylon harmonic decay, sympathetic bridge rattle, and calabash gourd body resonance. (file: https://infinitedevices.org/assets/templates/kora-calabash-harp-synth.inf)
+- [Kora Polyrhythm Kalimba Bell Synth](https://infinitedevices.org/library/kora-polyrhythm-kalimba-bell-synth.html): Inharmonic metallic tine and wooden soundboard synthesizer with wavefolded overtone shimmer and evolving LFO timbre drift. (file: https://infinitedevices.org/assets/templates/kora-polyrhythm-kalimba-bell-synth.inf)
 
 ## Library: Audio Effects
 
@@ -1061,6 +1073,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [UK Dub Steppers Spring Filter FX](https://infinitedevices.org/library/uk-dub-steppers-spring-filter-fx.html): Rhythmic resonant SVF lowpass and spring-tank allpass dispersion processor with dub preamp saturation. (file: https://infinitedevices.org/assets/templates/uk-dub-steppers-spring-filter-fx.inf)
 - [Spectral Dub Binaural Allpass FX](https://infinitedevices.org/library/spectral-dub-binaural-allpass-fx.html): Deep dub chamber processor with 4-stage dispersed allpass cascade, cross-coupled resonant bandpass feedback, and warm transformer saturation. (file: https://infinitedevices.org/assets/templates/spectral-dub-binaural-allpass-fx.inf)
 - [Spectral Dub Tape Resonator FX](https://infinitedevices.org/library/spectral-dub-tape-resonator-fx.html): King Tubby inspired dual-head tape resonator with capstan wow-flutter drift, resonant SVF dub sweep, and oxide hysteresis warmth. (file: https://infinitedevices.org/assets/templates/spectral-dub-tape-resonator-fx.inf)
+- [Cumbia Rebajada Tape Slow FX](https://infinitedevices.org/library/cumbia-rebajada-tape-slow-fx.html): Monterrey cumbia rebajada varispeed tape processor with capstan flutter drift, wooly oxide low-pass saturation, and warm spring feedback. (file: https://infinitedevices.org/assets/templates/cumbia-rebajada-tape-slow-fx.inf)
+- [Balearic Dub Phaser Echo FX](https://infinitedevices.org/library/balearic-dub-phaser-echo-fx.html): Balearic sunset dub 4-stage allpass phaser and resonant bandpass echo chamber with slow LFO sweep and warm console saturation. (file: https://infinitedevices.org/assets/templates/balearic-dub-phaser-echo-fx.inf)
 
 ## Nodes
 
@@ -1437,7 +1451,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 133 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 135 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1571,3 +1585,5 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Mineral Birefringence Thin Section](https://infinitedevices.org/embeds/mineral-birefringence-thin-section.html): Audio-reactive cross-polarized mineral thin-section birefringence and Michel-Levy interference.
 - [Haeckel Radiolaria Discoidea Lattice](https://infinitedevices.org/embeds/haeckel-radiolaria-discoidea-lattice.html): Audio-reactive Haeckel Radiolaria lithograph visualizer. Bass pulses the cruciform silica skeleton, mids breathe through the honeycomb pore rings, and highs shimmer along the marginal spicules.
 - [Haeckel Radiolaria Spicule Corona](https://infinitedevices.org/embeds/haeckel-radiolaria-spicule-corona.html): Audio-reactive dark-field Radiolaria microscopy visualizer. Bass expands the geodesic silica capsule, mids ripple the concentric pore lattice, and highs illuminate the radiating axopodia.
+- [Lichtenberg Acrylic Tree Breakdown](https://infinitedevices.org/embeds/lichtenberg-acrylic-tree-breakdown.html): High-voltage Lichtenberg dendritic breakdown tree frozen in cast obsidian acrylic with audio-reactive plasma filaments.
+- [Lichtenberg Corona Arc Lattice](https://infinitedevices.org/embeds/lichtenberg-corona-arc-lattice.html): Radial dielectric corona discharge and fractured quartz insulator arcs pulsing with audio-reactive high-voltage shimmer.

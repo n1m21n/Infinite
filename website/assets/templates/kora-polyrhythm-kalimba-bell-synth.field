@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Kora Polyrhythm Kalimba Bell Synth",
+    "author": "Infinite",
+    "description": "Inharmonic metallic tine and wooden soundboard synthesizer with wavefolded overtone shimmer and evolving LFO timbre drift.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float tineRatio = 2.756 [1.5, 4.5];\nparam float fold = 1.85 [0.5, 4.0];\nparam float woodHz = 1100.0 [320.0, 3200.0];\nparam float decay = 0.9993 [0.995, 0.9998];\nparam float lfoHz = 0.45 [0.05, 3.0];\nstate float p1 = 0; state float p2 = 0; state float lfo = 0;\nstate float env = 0; state float envAtk = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.32, env * decay);\nenvAtk = if(gate > 0.5, envAtk + (1.0 - envAtk) * 0.50, envAtk * 0.9975);\nlfo = (lfo + lfoHz / sr) % 1.0;\nf0 = clamp(freq, 45.0, 4200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * tineRatio) / sr) % 1.0;\n\nfmDepth = (1.1 + 0.55 * sin(6.2831853 * lfo)) * envAtk;\ntine = sin(6.2831853 * p1 + fmDepth * sin(6.2831853 * p2));\nfolded = sin(tine * fold * (0.65 + 0.45 * env));\nraw = (tine * 0.55 + folded * 0.45) * env;\n\ng = clamp(2.0 * sin(3.14159265 * woodHz / sr), 0.03, 0.82);\nlp = lp + g * (raw - lp);\nsig = lp * 0.78 + raw * 0.22;\nout = clamp((sig * 0.72) / (1.0 + abs(sig) * 0.42), -0.95, 0.95);\n",
+    "params": {
+      "tineRatio": 2.756,
+      "fold": 1.85,
+      "woodHz": 1100.0,
+      "decay": 0.9993,
+      "lfoHz": 0.45
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

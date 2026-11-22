@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Kora Calabash Harp Synth",
+    "author": "Infinite",
+    "description": "West African 21-string kora physical-plucked synthesizer with nylon harmonic decay, sympathetic bridge rattle, and calabash gourd body resonance.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float pluckBright = 2.4 [0.6, 5.0];\nparam float calabashHz = 340.0 [140.0, 900.0];\nparam float nyenyemo = 0.28 [0.0, 0.8];\nparam float decay = 0.9994 [0.996, 0.9998];\nparam float drive = 1.45 [0.7, 3.0];\nstate float p1 = 0; state float p2 = 0;\nstate float env = 0; state float lp = 0; state float bp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.35, env * decay);\nf0 = clamp(freq, 45.0, 4200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.004) / sr) % 1.0;\n\nmod = sin(6.2831853 * p2) * pluckBright * env;\nstr = sin(6.2831853 * p1 + mod) * 0.68 + sin(12.56637 * p1) * nyenyemo * env;\nraw = str * env;\n\ng = clamp(2.0 * sin(3.14159265 * calabashHz / sr), 0.02, 0.72);\nbp = bp + g * (raw - lp - 0.62 * bp);\nlp = lp + g * bp;\nbody = raw * 0.70 + bp * 0.48 + lp * 0.24;\nsig = body * drive;\nout = (sig / (1.0 + abs(sig) * 0.58)) * 0.55;\n",
+    "params": {
+      "pluckBright": 2.4,
+      "calabashHz": 340.0,
+      "nyenyemo": 0.28,
+      "decay": 0.9994,
+      "drive": 1.45
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

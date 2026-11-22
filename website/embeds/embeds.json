@@ -665,6 +665,16 @@
       "slug": "haeckel-radiolaria-spicule-corona",
       "title": "Haeckel Radiolaria Spicule Corona",
       "description": "Audio-reactive dark-field Radiolaria microscopy visualizer. Bass expands the geodesic silica capsule, mids ripple the concentric pore lattice, and highs illuminate the radiating axopodia."
+    },
+    {
+      "slug": "lichtenberg-acrylic-tree-breakdown",
+      "title": "Lichtenberg Acrylic Tree Breakdown",
+      "description": "High-voltage Lichtenberg dendritic breakdown tree frozen in cast obsidian acrylic with audio-reactive plasma filaments."
+    },
+    {
+      "slug": "lichtenberg-corona-arc-lattice",
+      "title": "Lichtenberg Corona Arc Lattice",
+      "description": "Radial dielectric corona discharge and fractured quartz insulator arcs pulsing with audio-reactive high-voltage shimmer."
     }
   ]
 }

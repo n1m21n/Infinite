@@ -92,8 +92,6 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Extensions](https://infinitedevices.org/library.html#extensions): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
 - [Library catalog (JSON)](https://infinitedevices.org/assets/library/catalog.json): every library item with description, category and file URL
 - [Benchmarks](https://infinitedevices.org/benchmarks.html): measured CPU, latency, memory and video quality for Infinite against Ableton Live, Bitwig, Logic, Vital, VCV Rack, Blender, TouchDesigner and more, with method and limits stated
-- [Research](https://infinitedevices.org/research/): pre-registered technical reports, empirical DSP studies, reproducible artifacts and open problems
-- [Aliasing-aware compilation for Field](https://infinitedevices.org/research/aliasing-aware-field.html): technical report 1 — pre-registered study of static alias prediction (H1 confirmed within steady-tone scope across 272 held-out + 97 delay kernels) and per-subgraph oversampling (H2 killed at 15.8%–17.4% saving), with PDF, raw CSVs and A/B audio renders
 - [Benchmark Report (PDF)](https://infinitedevices.org/assets/Infinite_Benchmark_Report.pdf): the same report as a branded PDF
 - [Benchmark data (JSON)](https://infinitedevices.org/assets/benchmarks.json): machine-readable results for the same tests
 - [Blog](https://infinitedevices.org/blog/): guides on audio-reactive visuals, headless rendering, Field language, plugin modulation and motion tracking (feed: https://infinitedevices.org/blog/feed.xml)
@@ -359,6 +357,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Ethio-Jazz Tizita Reed Horn Synth](https://infinitedevices.org/library/ethio-jazz-tizita-reed-horn-synth.html): Expressive Ethio-jazz brass-reed solo synthesizer with wavefolded mouth-pressure excitation and dual formant horn resonator. (file: https://infinitedevices.org/assets/templates/ethio-jazz-tizita-reed-horn-synth.inf)
 - [Spectral Dub Binaural Allpass FX](https://infinitedevices.org/library/spectral-dub-binaural-allpass-fx.html): Deep dub chamber processor with 4-stage dispersed allpass cascade, cross-coupled resonant bandpass feedback, and warm transformer saturation. (file: https://infinitedevices.org/assets/templates/spectral-dub-binaural-allpass-fx.inf)
 - [Spectral Dub Tape Resonator FX](https://infinitedevices.org/library/spectral-dub-tape-resonator-fx.html): King Tubby inspired dual-head tape resonator with capstan wow-flutter drift, resonant SVF dub sweep, and oxide hysteresis warmth. (file: https://infinitedevices.org/assets/templates/spectral-dub-tape-resonator-fx.inf)
+- [Kora Calabash Harp Synth](https://infinitedevices.org/library/kora-calabash-harp-synth.html): West African 21-string kora physical-plucked synthesizer with nylon harmonic decay, sympathetic bridge rattle, and calabash gourd body resonance. (file: https://infinitedevices.org/assets/templates/kora-calabash-harp-synth.inf)
+- [Kora Polyrhythm Kalimba Bell Synth](https://infinitedevices.org/library/kora-polyrhythm-kalimba-bell-synth.html): Inharmonic metallic tine and wooden soundboard synthesizer with wavefolded overtone shimmer and evolving LFO timbre drift. (file: https://infinitedevices.org/assets/templates/kora-polyrhythm-kalimba-bell-synth.inf)
+- [Cumbia Rebajada Tape Slow FX](https://infinitedevices.org/library/cumbia-rebajada-tape-slow-fx.html): Monterrey cumbia rebajada varispeed tape processor with capstan flutter drift, wooly oxide low-pass saturation, and warm spring feedback. (file: https://infinitedevices.org/assets/templates/cumbia-rebajada-tape-slow-fx.inf)
+- [Balearic Dub Phaser Echo FX](https://infinitedevices.org/library/balearic-dub-phaser-echo-fx.html): Balearic sunset dub 4-stage allpass phaser and resonant bandpass echo chamber with slow LFO sweep and warm console saturation. (file: https://infinitedevices.org/assets/templates/balearic-dub-phaser-echo-fx.inf)
 
 ## Library: Community
 
@@ -782,7 +784,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 133 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 135 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -799,4 +801,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 118 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 120 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

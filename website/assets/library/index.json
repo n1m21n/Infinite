@@ -11474,6 +11474,223 @@
       "file": "assets/library/pixel/haeckel-radiolaria-spicule-corona.field",
       "preview": "assets/library/previews/haeckel-radiolaria-spicule-corona.jpg",
       "bytes": 1843
+    },
+    {
+      "id": "penrose-rhombus-aperiodic-grid",
+      "name": "Penrose Rhombus Aperiodic Grid",
+      "kind": "Generator",
+      "tags": [
+        "penrose",
+        "quasicrystal",
+        "aperiodic",
+        "tiling",
+        "geometry",
+        "sketch"
+      ],
+      "description": "Five-fold Penrose P3 thick and thin rhombus tiling with inscribed golden-ratio Ammann construction lines and architectural calibration ring.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/penrose-rhombus-aperiodic-grid.js",
+      "preview": "assets/library/previews/penrose-rhombus-aperiodic-grid.jpg",
+      "bytes": 3785
+    },
+    {
+      "id": "penrose-sun-star-quasicrystal",
+      "name": "Penrose Sun-Star Quasicrystal",
+      "kind": "Generator",
+      "tags": [
+        "penrose",
+        "kite",
+        "dart",
+        "quasicrystal",
+        "symmetry",
+        "sketch"
+      ],
+      "description": "Ten-fold Penrose P2 kite-and-dart deflation rosette in crimson and forest teal with Conway golden matching-rule rib lines.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/penrose-sun-star-quasicrystal.js",
+      "preview": "assets/library/previews/penrose-sun-star-quasicrystal.jpg",
+      "bytes": 3385
+    },
+    {
+      "id": "dieste-gaussian-brick-vault-3d",
+      "name": "Dieste Gaussian Brick Vault 3D",
+      "kind": "Generator",
+      "tags": [
+        "dieste",
+        "brick",
+        "vault",
+        "catenary",
+        "architecture",
+        "3d"
+      ],
+      "description": "Eladio Dieste inspired double-curved Gaussian ceramic brick vault with rhythmic mortar arch ribs and dark masonry buttress piers.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/dieste-gaussian-brick-vault-3d.js",
+      "preview": "assets/library/previews/dieste-gaussian-brick-vault-3d.jpg",
+      "bytes": 2636
+    },
+    {
+      "id": "dieste-ruled-conoid-wall-3d",
+      "name": "Dieste Ruled Conoid Wall 3D",
+      "kind": "Generator",
+      "tags": [
+        "dieste",
+        "ruled-surface",
+        "masonry",
+        "conoid",
+        "architecture",
+        "3d"
+      ],
+      "description": "Sinusoidal ruled-surface structural brick wall sweeping from an undulating ground curve to a straight reinforced lintel with clerestory slits.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/dieste-ruled-conoid-wall-3d.js",
+      "preview": "assets/library/previews/dieste-ruled-conoid-wall-3d.jpg",
+      "bytes": 2145
+    },
+    {
+      "id": "kora-calabash-harp-synth",
+      "name": "Kora Calabash Harp Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "kora",
+        "harp",
+        "calabash",
+        "plucked",
+        "audio",
+        "dsp"
+      ],
+      "description": "West African 21-string kora physical-plucked synthesizer with nylon harmonic decay, sympathetic bridge rattle, and calabash gourd body resonance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/kora-calabash-harp-synth.inf",
+      "preview": "assets/library/previews/kora-calabash-harp-synth.jpg",
+      "bytes": 1946
+    },
+    {
+      "id": "kora-polyrhythm-kalimba-bell-synth",
+      "name": "Kora Polyrhythm Kalimba Bell Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "kalimba",
+        "kora",
+        "polyrhythm",
+        "bell",
+        "fm",
+        "audio",
+        "dsp"
+      ],
+      "description": "Inharmonic metallic tine and wooden soundboard synthesizer with wavefolded overtone shimmer and evolving LFO timbre drift.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/kora-polyrhythm-kalimba-bell-synth.inf",
+      "preview": "assets/library/previews/kora-polyrhythm-kalimba-bell-synth.jpg",
+      "bytes": 2092
+    },
+    {
+      "id": "cumbia-rebajada-tape-slow-fx",
+      "name": "Cumbia Rebajada Tape Slow FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "cumbia",
+        "rebajada",
+        "tape",
+        "flutter",
+        "audio",
+        "dsp"
+      ],
+      "description": "Monterrey cumbia rebajada varispeed tape processor with capstan flutter drift, wooly oxide low-pass saturation, and warm spring feedback.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/cumbia-rebajada-tape-slow-fx.inf",
+      "preview": "assets/library/previews/cumbia-rebajada-tape-slow-fx.jpg",
+      "bytes": 1992
+    },
+    {
+      "id": "balearic-dub-phaser-echo-fx",
+      "name": "Balearic Dub Phaser Echo FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "balearic",
+        "dub",
+        "phaser",
+        "allpass",
+        "audio",
+        "dsp"
+      ],
+      "description": "Balearic sunset dub 4-stage allpass phaser and resonant bandpass echo chamber with slow LFO sweep and warm console saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/balearic-dub-phaser-echo-fx.inf",
+      "preview": "assets/library/previews/balearic-dub-phaser-echo-fx.jpg",
+      "bytes": 2112
+    },
+    {
+      "id": "lichtenberg-acrylic-tree-breakdown",
+      "name": "Lichtenberg Acrylic Tree Breakdown",
+      "kind": "Generator",
+      "tags": [
+        "lichtenberg",
+        "dielectric",
+        "plasma",
+        "fractal",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "High-voltage Lichtenberg dendritic breakdown tree frozen in cast obsidian acrylic with multi-octave domain-warped plasma filaments.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/lichtenberg-acrylic-tree-breakdown.field",
+      "preview": "assets/library/previews/lichtenberg-acrylic-tree-breakdown.jpg",
+      "bytes": 2341
+    },
+    {
+      "id": "lichtenberg-corona-arc-lattice",
+      "name": "Lichtenberg Corona Arc Lattice",
+      "kind": "Generator",
+      "tags": [
+        "lichtenberg",
+        "corona",
+        "discharge",
+        "arc",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Radial dielectric corona discharge and Voronoi-fractured quartz insulator arcs radiating from a central high-voltage electrode.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/lichtenberg-corona-arc-lattice.field",
+      "preview": "assets/library/previews/lichtenberg-corona-arc-lattice.jpg",
+      "bytes": 2057
     }
   ],
   "count": 550

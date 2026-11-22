@@ -1961,6 +1961,73 @@
         "Obsidian acrylic, high-voltage silver-white, cold quartz",
         "Karrik & JetBrains Mono high-voltage lab typography"
       ]
+    },
+    {
+      "id": "penrose_aperiodic_tiling",
+      "taxonomy": "new",
+      "name": "Penrose Aperiodic Rhombus Tiling & Quasicrystal",
+      "palette": [
+        "#1A1D20",
+        "#E2E4E1",
+        "#B5B93A",
+        "#6E7378"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette",
+        "grain"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "kora_polyrhythm",
+        "marimba_phase_minimalism"
+      ],
+      "refs": [
+        "Queen Mary University Mathematical Sciences Penrose P3 facade",
+        "DASA Penrose kite-dart quasicrystal subdivision",
+        "Steps-Mono & Geist Mono architectural diagram typography"
+      ]
+    },
+    {
+      "id": "dieste_gaussian_brick_vault",
+      "taxonomy": "new",
+      "name": "Eladio Dieste Ruled-Surface & Gaussian Brick Vault",
+      "palette": [
+        "#1F1612",
+        "#A84B2A",
+        "#D9CBB8",
+        "#78331B"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "dither",
+        "pixelate"
+      ],
+      "motion": 0.3,
+      "pairs": [
+        "microtonal_ambient",
+        "chamber_winds"
+      ],
+      "refs": [
+        "Eladio Dieste Iglesia Cristo Obrero Atlantida ruled brick shell",
+        "Reinforced ceramic Gaussian vaulting & rhythmic clerestory slits",
+        "Sporting Grotesque & VTF Grotesk structural monograph typography"
+      ]
     }
   ]
 }
