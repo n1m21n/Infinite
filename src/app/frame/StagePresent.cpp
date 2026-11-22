@@ -1,5 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "plugin/engine/HostAudio.h"
+#include "plugin/engine/PluginView.h"
 
 namespace app
 {
@@ -74,7 +76,20 @@ void DrawPresent(FrameCtx& fc)
       // projector window paces the loop to its display's refresh. Skipped for
       // a headless job (--validate, --audio-summary, --frame...): its phases
       // count ticks, not seconds, so pacing only made every bot call wait.
-      if (gTargetFps > 0 && !gVsync && !FrameClockActive() && !HeadlessJobActive())
+      // DAW plugin engine with its editor closed: the window is hidden, so a vsynced swap returns at
+      // once and the loop would spin a core per instance. Sleep to the frame budget instead (60 fps,
+      // or the Target FPS if lower): modulation still publishes every frame, the core stays free.
+      // An offline bounce's slot lock paces itself on the audio thread's park requests: no sleep
+      // while it runs, and a request arriving mid-sleep ends the sleep.
+      const bool pluginHidden = Platform::PluginModeActive() && !PluginView::Open() && !PluginView::Popped();
+      if (pluginHidden && PluginEngine::SlotFramePublishes() && !FrameClockActive() && !HeadlessJobActive())
+      {
+         const int fps = gTargetFps > 0 ? std::min(gTargetFps, 60) : 60;
+         const double deadline = gFrameStart + 1.0 / (double)fps;
+         while (glfwGetTime() < deadline && !PluginEngine::ParkPending())
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+      else if (gTargetFps > 0 && !gVsync && !FrameClockActive() && !HeadlessJobActive())
       {
          const double budget = 1.0 / (double)gTargetFps;
          const double deadline = gFrameStart + budget;

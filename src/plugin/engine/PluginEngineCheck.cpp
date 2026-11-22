@@ -8,6 +8,11 @@
 // transport jump seen when the host relocates, and a clean quit. Prints PASS/FAIL per check;
 // exit code 0 only when all pass.
 #include "plugin/engine/HostAudio.h"
+#include <algorithm>
+#if defined(__APPLE__)
+#include <libproc.h>
+#include <sys/resource.h>
+#endif
 #include "plugin/ipc/PluginIpc.h"
 #include "platform/common/Ipc.h"
 
@@ -25,6 +30,17 @@ namespace
    constexpr double kRate = 48000.0;
    constexpr uint32_t kBlock = 512;
    int gFails = 0;
+
+   double FootprintMb(int64_t pid)
+   {
+#if defined(__APPLE__)
+      rusage_info_v2 ri {};
+      if (proc_pid_rusage((int)pid, RUSAGE_INFO_V2, (rusage_info_t*)&ri) == 0)
+         return (double)ri.ri_phys_footprint / (1024.0 * 1024.0);
+#endif
+      (void)pid;
+      return -1.0;
+   }
 
    void Check(bool ok, const char* what, const std::string& detail = std::string())
    {
@@ -129,7 +145,8 @@ namespace
    }
 
    bool RunBlocks(Engine& e, uint32_t blocks, const std::vector<float>* in,
-                  const std::vector<std::vector<PluginIpc::Event>>& events, uint32_t jumpAt, HostRun* run)
+                  const std::vector<std::vector<PluginIpc::Event>>& events, uint32_t jumpAt, HostRun* run,
+                  uint32_t flags = PluginIpc::kOffline)
    {
       std::vector<float> l(kBlock), r(kBlock), il(kBlock), ir(kBlock);
       for (uint32_t b = 0; b < blocks; b++)
@@ -145,7 +162,7 @@ namespace
          a.out = outs;
          a.numOut = 2;
          a.frames = kBlock;
-         a.flags = PluginIpc::kOffline;
+         a.flags = flags;
          a.transport = HostTransport(b, jumpAt);
          if (b < events.size() && !events[b].empty())
          {
@@ -280,16 +297,66 @@ namespace
       std::snprintf(d, sizeof(d), "max sample diff %.2e, rms %.4f vs %.4f", maxDiff, ra, rb);
       Check(ra > 0.0 && std::fabs(ra - rb) / ra < 0.01, "repeat: same offline render twice gives the same sound", d);
    }
+
+   // --idle N: one instrument engine with no editor open, fed real-time-paced host blocks for N
+   // seconds. Prints the engine's physical footprint (resident + compressed + swapped, what
+   // Activity Monitor shows) once a second: the per-instance cost a DAW project pays (vst-au 2.7, M-9).
+   int RunIdle(const std::string& exe, const std::string& dir, int seconds)
+   {
+      Engine e;
+      std::string err;
+      const auto tStart = std::chrono::steady_clock::now();
+      if (!e.Start(exe, dir + "/instrument.inf", false, err))
+      {
+         std::printf("IDLE FAIL engine start: %s\n", err.c_str());
+         Ipc::ChildKill(&e.child);
+         return 1;
+      }
+      const double readyMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count();
+      std::printf("IDLE ready_ms=%.0f\n", readyMs);
+      const auto blockDur = std::chrono::duration<double>((double)kBlock / kRate);
+      const uint32_t total = (uint32_t)(seconds * kRate / kBlock);
+      const uint32_t perSec = (uint32_t)(kRate / kBlock);
+      double peak = 0.0, last = 0.0;
+      HostRun scratch;
+      auto next = std::chrono::steady_clock::now();
+      for (uint32_t b = 0; b < total; b++)
+      {
+         if (!RunBlocks(e, 1, nullptr, {}, ~0u, &scratch, 0u))
+         {
+            std::printf("IDLE FAIL block %u\n", b);
+            Ipc::ChildKill(&e.child);
+            return 1;
+         }
+         scratch.outL.clear();
+         scratch.outR.clear();
+         if (b % perSec == perSec - 1)
+         {
+            last = FootprintMb(e.child.pid);
+            peak = std::max(peak, last);
+            std::printf("IDLE t=%us footprint_mb=%.1f\n", (b + 1) / perSec, last);
+            std::fflush(stdout);
+         }
+         next += std::chrono::duration_cast<std::chrono::steady_clock::duration>(blockDur);
+         std::this_thread::sleep_until(next);
+      }
+      uint64_t jumps = 0;
+      const bool quit = e.Quit(&jumps);
+      std::printf("IDLE %s ready_ms=%.0f peak_mb=%.1f final_mb=%.1f\n", quit ? "OK" : "FAIL(quit)", readyMs, peak, last);
+      return quit ? 0 : 1;
+   }
 }
 
 int main(int argc, char** argv)
 {
    if (argc < 3)
    {
-      std::fprintf(stderr, "usage: plugin_engine_check <Infinite binary> <tests/plugin dir>\n");
+      std::fprintf(stderr, "usage: plugin_engine_check <Infinite binary> <tests/plugin dir> [--idle SECONDS]\n");
       return 2;
    }
    const std::string exe = argv[1], dir = argv[2];
+   if (argc >= 5 && std::string(argv[3]) == "--idle")
+      return RunIdle(exe, dir, std::max(1, std::atoi(argv[4])));
    CheckFx(exe, dir);
    CheckInstrument(exe, dir);
    std::printf("%s (%d failed)\n", gFails == 0 ? "ALL PASS" : "FAILURES", gFails);

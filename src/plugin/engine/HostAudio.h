@@ -123,6 +123,8 @@ namespace PluginEngine
    // Main thread: false on a frame that must not publish a new ramp stamp (offline lock running,
    // this frame not served), so the served frame's stamp is the one the audio thread uses.
    bool SlotFramePublishes();
+   // Main thread: the audio thread is parked on a frame (offline lock), so the frame loop must not sleep.
+   bool ParkPending();
    // Grid points served / park timeouts (tests, stats file).
    uint64_t SlotParks();
    // Main thread: the name last sent for a slot ("" = no Macro on it), for the top bar's Slots list.

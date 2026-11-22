@@ -604,6 +604,11 @@ namespace PluginEngine
 
    bool SlotFramePublishes() { return gFramesSinceServed > 2; }
 
+   bool ParkPending()
+   {
+      return gActive.load() && gParkReq.load(std::memory_order_acquire) > gParkAck.load(std::memory_order_acquire);
+   }
+
    bool SendToShell(uint32_t type, const void* data, size_t size, int timeoutMs)
    {
       return gActive.load() && gSide.Messages().Send(type, 0, data, size, timeoutMs);
