@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Serge Chaotic Resonator Synth",
+    "author": "Infinite",
+    "description": "Cross-coupled inharmonic FM and wavefolding driving a tuned state-variable bandpass ping resonator.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float crossFm = 1.9 [0.0, 4.5];\nparam float pingHz = 520.0 [180.0, 1600.0];\nparam float damp = 0.42 [0.15, 0.85];\nparam float decay = 0.9992 [0.996, 0.9997];\nparam float drive = 1.4 [0.6, 2.8];\nstate float p1 = 0; state float p2 = 0;\nstate float env = 0; state float bp = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.32, env * decay);\nf0 = clamp(freq, 45.0, 4000.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.414) / sr) % 1.0;\n\nw2 = sin(6.2831853 * p2);\nw1 = sin(6.2831853 * p1 + w2 * crossFm * env);\nfolded = sin(w1 * 2.6) * env;\n\ng = clamp(2.0 * sin(3.14159265 * pingHz / sr), 0.02, 0.74);\nbp = bp + g * (folded - lp - damp * bp);\nlp = lp + g * bp;\nsig = (folded * 0.45 + bp * 0.72) * drive;\nout = (sig / (1.0 + abs(sig) * 0.56)) * 0.54;\n",
+    "params": {
+      "crossFm": 1.9,
+      "pingHz": 520.0,
+      "damp": 0.42,
+      "decay": 0.9992,
+      "drive": 1.4
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

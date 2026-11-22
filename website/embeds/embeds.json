@@ -675,6 +675,16 @@
       "slug": "lichtenberg-corona-arc-lattice",
       "title": "Lichtenberg Corona Arc Lattice",
       "description": "Radial dielectric corona discharge and fractured quartz insulator arcs pulsing with audio-reactive high-voltage shimmer."
+    },
+    {
+      "slug": "kelvin-helmholtz-shear-billows",
+      "title": "Kelvin-Helmholtz Shear Billows",
+      "description": "Stratified fluid shear layer curling into breaking Kelvin-Helmholtz vortex billows with audio-reactive crest curl."
+    },
+    {
+      "slug": "kuroshio-karman-vortex-street",
+      "title": "Kuroshio Karman Vortex Street",
+      "description": "Alternating counter-rotating Karman vortex street eddies and dye streamlines driven by bass, mid, and high audio bands."
     }
   ]
 }

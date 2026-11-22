@@ -2028,6 +2028,106 @@
         "Reinforced ceramic Gaussian vaulting & rhythmic clerestory slits",
         "Sporting Grotesque & VTF Grotesk structural monograph typography"
       ]
+    },
+    {
+      "id": "guilloche_rose_engine",
+      "taxonomy": "new",
+      "name": "Rose Engine Guilloche & Epitrochoid Horology",
+      "palette": [
+        "#141923",
+        "#D9DEE3",
+        "#C5A76E",
+        "#6F7B8A"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "dither",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "west_coast_wavefolder",
+        "koto_glass_minimalism"
+      ],
+      "refs": [
+        "Derek Pratt engine-turned silver watch dial clous de Paris & panier",
+        "Breguet rose-engine rosette cam epitrochoid phase interference",
+        "Velvetyne Grotesk & Steps Mono horological chapter-ring typography"
+      ]
+    },
+    {
+      "id": "frei_otto_tensile_net",
+      "taxonomy": "new",
+      "name": "Frei Otto Tensile Cable-Net & Anticlastic Saddle",
+      "palette": [
+        "#182028",
+        "#D7D3CA",
+        "#6E94B8",
+        "#3B4652"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "dither",
+        "pixelate"
+      ],
+      "motion": 0.3,
+      "pairs": [
+        "bode_comb_resonator",
+        "microtonal_ambient"
+      ],
+      "refs": [
+        "Frei Otto Munich Olympic Stadium steel cable-net & acrylic membrane",
+        "Anticlastic hyperbolic saddle form-finding & tapering steel masts",
+        "Terminal Grotesque & VG5000 structural blueprint typography"
+      ]
+    },
+    {
+      "id": "kelvin_helmholtz_vortex",
+      "taxonomy": "new",
+      "name": "Kelvin-Helmholtz Shear Vortex & Stratified Billows",
+      "palette": [
+        "#0F1722",
+        "#9EC4DB",
+        "#E8E2D5",
+        "#35536E"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.45,
+      "pairs": [
+        "west_coast_wavefolder",
+        "bode_comb_resonator"
+      ],
+      "refs": [
+        "Antarctic Kelvin-Helmholtz atmospheric shear wave instability billows",
+        "Stratified fluid vorticity curls & counter-rotating eddy advection",
+        "Steps Mono & Collletttivo grotesque oceanographic chart typography"
+      ]
     }
   ]
 }

@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Buchla Wavefolder LPG Synth",
+    "author": "Infinite",
+    "description": "West-Coast complex dual-oscillator FM into an asymmetric multi-stage sine wavefolder and vactrol low-pass gate.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float fmIndex = 1.65 [0.0, 4.5];\nparam float foldDrive = 2.8 [1.0, 6.0];\nparam float symmetry = 0.22 [-0.6, 0.6];\nparam float vactrol = 0.9993 [0.997, 0.9998];\nparam float drive = 1.35 [0.6, 2.8];\nstate float p1 = 0; state float p2 = 0;\nstate float lpg = 0; state float lp = 0;\n\nlpg = if(gate > 0.5, lpg + (1.0 - lpg) * 0.28, lpg * vactrol);\nf0 = clamp(freq, 40.0, 4200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 1.503) / sr) % 1.0;\n\nmod = sin(6.2831853 * p2) * fmIndex * (0.35 + 0.65 * lpg);\ncarrier = sin(6.2831853 * p1 + mod) + symmetry;\nfolded = sin(carrier * foldDrive * (0.45 + 0.75 * lpg));\nfolded2 = sin(folded * 1.75 + carrier * 0.45);\n\ncutHz = clamp(180.0 + lpg * lpg * 4200.0, 80.0, 9000.0);\ng = clamp(2.0 * sin(3.14159265 * cutHz / sr), 0.015, 0.78);\nlp = lp + g * (folded2 * lpg - lp);\nsig = lp * drive;\nout = (sig / (1.0 + abs(sig) * 0.55)) * 0.52;\n",
+    "params": {
+      "fmIndex": 1.65,
+      "foldDrive": 2.8,
+      "symmetry": 0.22,
+      "vactrol": 0.9993,
+      "drive": 1.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -3489,6 +3489,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "buchla-wavefolder-lpg-synth",
+      "name": "Buchla Wavefolder LPG Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "West-Coast complex dual-oscillator FM into an asymmetric multi-stage sine wavefolder and vactrol low-pass gate.",
+      "price": 0,
+      "preview": "assets/templates/buchla-wavefolder-lpg-synth.webp",
+      "file": "assets/templates/buchla-wavefolder-lpg-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "serge-chaotic-resonator-synth",
+      "name": "Serge Chaotic Resonator Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Cross-coupled inharmonic FM and wavefolding driving a tuned state-variable bandpass ping resonator.",
+      "price": 0,
+      "preview": "assets/templates/serge-chaotic-resonator-synth.webp",
+      "file": "assets/templates/serge-chaotic-resonator-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "bode-comb-dispersion-fx",
+      "name": "Bode Comb Dispersion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Four-stage allpass phase dispersion network feeding a swept comb resonator and tape-saturated feedback loop.",
+      "price": 0,
+      "preview": "assets/templates/bode-comb-dispersion-fx.webp",
+      "file": "assets/templates/bode-comb-dispersion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "oliveros-expanded-resonator-fx",
+      "name": "Oliveros Expanded Resonator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Deep-listening allpass dispersion and drifting formant bandpass chamber with soft console saturation.",
+      "price": 0,
+      "preview": "assets/templates/oliveros-expanded-resonator-fx.webp",
+      "file": "assets/templates/oliveros-expanded-resonator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
   "count": 205

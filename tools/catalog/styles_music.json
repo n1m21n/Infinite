@@ -4026,6 +4026,153 @@
       "groove": 0.88,
       "fill": 0.7,
       "gain": -7.5
+    },
+    {
+      "id": "west_coast_wavefolder",
+      "family": "experimental",
+      "bpm": [
+        108,
+        124
+      ],
+      "swing": 0.04,
+      "scale": [
+        3,
+        6,
+        9
+      ],
+      "drums": {
+        "kick": "x.....x...x.....",
+        "snare": "",
+        "chat": "..o.x...o..x.o..",
+        "ohat": "",
+        "clap": "",
+        "tom": "...o......o..o..",
+        "htom": "x.....o.......o.",
+        "bell": "....o.......x..."
+      },
+      "bass": "0..4.0.6..2.0.5.",
+      "fx": [
+        "Wavefolder",
+        "Delay",
+        "Reverb",
+        "EQ"
+      ],
+      "synth": [
+        "FM",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.15,
+      "mod": 0.72,
+      "refs": [
+        "Buchla 259 complex waveform generator & 292 quad low-pass gate",
+        "Serge wavefolder asymmetric harmonic folding & vactrol plucks"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 3.0,
+        "strum": 28,
+        "human": 12
+      },
+      "notefx": [
+        "Note Echo",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "FM",
+          "Wavetable"
+        ],
+        "density": 0.55,
+        "octave": 2,
+        "gate": 36,
+        "gain": -8.5,
+        "rate": 0.25,
+        "range": 10
+      },
+      "groove": 0.74,
+      "fill": 0.45,
+      "gain": -8.0
+    },
+    {
+      "id": "bode_comb_resonator",
+      "family": "experimental",
+      "bpm": [
+        94,
+        112
+      ],
+      "swing": 0.0,
+      "scale": [
+        1,
+        5,
+        11
+      ],
+      "drums": {
+        "kick": "x.......x..o....",
+        "snare": "....o.......x...",
+        "chat": "x.o.x.o.x.o.x.ox",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": "..o.......o....."
+      },
+      "bass": "0...3...5...2...",
+      "fx": [
+        "Comb Filter",
+        "Phaser",
+        "Delay",
+        "Saturator",
+        "Reverb"
+      ],
+      "synth": [
+        "Modal",
+        "String",
+        "FM"
+      ],
+      "ban": [
+        "Gate"
+      ],
+      "glitch": 0.1,
+      "mod": 0.64,
+      "refs": [
+        "Harald Bode frequency shifter metallic dispersion & tuned comb arrays",
+        "Pauline Oliveros expanded instrument system stereo resonator space"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 35,
+        "human": 10
+      },
+      "notefx": [
+        "Note Strum",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Modal",
+          "FM"
+        ],
+        "density": 0.48,
+        "octave": 2,
+        "gate": 52,
+        "gain": -9.0,
+        "rate": 0.5,
+        "range": 9
+      },
+      "groove": 0.62,
+      "fill": 0.35,
+      "gain": -8.5
     }
   ]
 }

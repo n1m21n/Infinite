@@ -361,6 +361,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kora Polyrhythm Kalimba Bell Synth](https://infinitedevices.org/library/kora-polyrhythm-kalimba-bell-synth.html): Inharmonic metallic tine and wooden soundboard synthesizer with wavefolded overtone shimmer and evolving LFO timbre drift. (file: https://infinitedevices.org/assets/templates/kora-polyrhythm-kalimba-bell-synth.inf)
 - [Cumbia Rebajada Tape Slow FX](https://infinitedevices.org/library/cumbia-rebajada-tape-slow-fx.html): Monterrey cumbia rebajada varispeed tape processor with capstan flutter drift, wooly oxide low-pass saturation, and warm spring feedback. (file: https://infinitedevices.org/assets/templates/cumbia-rebajada-tape-slow-fx.inf)
 - [Balearic Dub Phaser Echo FX](https://infinitedevices.org/library/balearic-dub-phaser-echo-fx.html): Balearic sunset dub 4-stage allpass phaser and resonant bandpass echo chamber with slow LFO sweep and warm console saturation. (file: https://infinitedevices.org/assets/templates/balearic-dub-phaser-echo-fx.inf)
+- [Buchla Wavefolder LPG Synth](https://infinitedevices.org/library/buchla-wavefolder-lpg-synth.html): West-Coast complex dual-oscillator FM into an asymmetric multi-stage sine wavefolder and vactrol low-pass gate. (file: https://infinitedevices.org/assets/templates/buchla-wavefolder-lpg-synth.inf)
+- [Serge Chaotic Resonator Synth](https://infinitedevices.org/library/serge-chaotic-resonator-synth.html): Cross-coupled inharmonic FM and wavefolding driving a tuned state-variable bandpass ping resonator. (file: https://infinitedevices.org/assets/templates/serge-chaotic-resonator-synth.inf)
+- [Bode Comb Dispersion FX](https://infinitedevices.org/library/bode-comb-dispersion-fx.html): Four-stage allpass phase dispersion network feeding a swept comb resonator and tape-saturated feedback loop. (file: https://infinitedevices.org/assets/templates/bode-comb-dispersion-fx.inf)
+- [Oliveros Expanded Resonator FX](https://infinitedevices.org/library/oliveros-expanded-resonator-fx.html): Deep-listening allpass dispersion and drifting formant bandpass chamber with soft console saturation. (file: https://infinitedevices.org/assets/templates/oliveros-expanded-resonator-fx.inf)
 
 ## Library: Community
 
@@ -784,7 +788,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 135 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 137 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -801,4 +805,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 120 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 122 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

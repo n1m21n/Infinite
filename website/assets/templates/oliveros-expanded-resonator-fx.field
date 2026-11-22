@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Oliveros Expanded Resonator FX",
+    "author": "Infinite",
+    "description": "Deep-listening allpass dispersion and drifting formant bandpass chamber with soft console saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float formantHz = 540.0 [160.0, 2200.0];\nparam float driftHz = 0.22 [0.04, 1.8];\nparam float smear = 0.68 [0.1, 0.9];\nparam float regen = 0.42 [0.0, 0.76];\nparam float mix = 0.78 [0.0, 1.0];\nstate float a1 = 0; state float a2 = 0; state float a3 = 0;\nstate float bp = 0; state float lp = 0; state float fb = 0; state float lfo = 0;\n\nlfo = (lfo + driftHz / sr) % 1.0;\nc = clamp(smear + 0.16 * sin(6.2831853 * lfo), 0.1, 0.88);\nx = in + fb * regen;\ny1 = -c * x + a1; a1 = x + c * y1;\ny2 = -c * y1 + a2; a2 = y1 + c * y2;\ny3 = -c * y2 + a3; a3 = y2 + c * y3;\n\nf0 = clamp(formantHz * (1.0 + 0.28 * sin(6.2831853 * lfo)), 120.0, 3600.0);\ng = clamp(2.0 * sin(3.14159265 * f0 / sr), 0.02, 0.78);\nbp = bp + g * (y3 - lp - 0.52 * bp);\nlp = lp + g * bp;\nfb = clamp(bp * 0.62 + lp * 0.28, -1.0, 1.0);\n\nwet = (y3 * 0.52 + bp * 0.55 + lp * 0.25) / (1.0 + abs(y3) * 0.48);\nout = (in * (1.0 - mix) + wet * mix) * 0.82;\n",
+    "params": {
+      "formantHz": 540.0,
+      "driftHz": 0.22,
+      "smear": 0.68,
+      "regen": 0.42,
+      "mix": 0.78
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Bode Comb Dispersion FX",
+    "author": "Infinite",
+    "description": "Four-stage allpass phase dispersion network feeding a swept comb resonator and tape-saturated feedback loop.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float dispCoeff = 0.62 [0.1, 0.88];\nparam float lfoHz = 0.35 [0.05, 2.8];\nparam float combHz = 620.0 [160.0, 2400.0];\nparam float feedback = 0.44 [0.0, 0.78];\nparam float mix = 0.80 [0.0, 1.0];\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\nstate float bp = 0; state float lp = 0; state float fb = 0; state float lfo = 0;\n\nlfo = (lfo + lfoHz / sr) % 1.0;\nc = clamp(dispCoeff + 0.24 * sin(6.2831853 * lfo), 0.08, 0.90);\nx = in + fb * feedback;\ny1 = -c * x + a1; a1 = x + c * y1;\ny2 = -c * y1 + a2; a2 = y1 + c * y2;\ny3 = -c * y2 + a3; a3 = y2 + c * y3;\ny4 = -c * y3 + a4; a4 = y3 + c * y4;\n\nfSweep = clamp(combHz * (1.0 + 0.35 * cos(6.2831853 * lfo)), 120.0, 4200.0);\ng = clamp(2.0 * sin(3.14159265 * fSweep / sr), 0.02, 0.80);\nbp = bp + g * (y4 - lp - 0.42 * bp);\nlp = lp + g * bp;\nfb = clamp(y4 * 0.45 + bp * 0.55, -1.1, 1.1);\n\nwet = (y4 * 0.58 + bp * 0.52) / (1.0 + abs(y4) * 0.52);\nout = (in * (1.0 - mix) + wet * mix) * 0.82;\n",
+    "params": {
+      "dispCoeff": 0.62,
+      "lfoHz": 0.35,
+      "combHz": 620.0,
+      "feedback": 0.44,
+      "mix": 0.80
+    }
+  }
+}

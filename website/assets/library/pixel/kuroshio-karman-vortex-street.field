@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Kuroshio Karman Vortex Street",
+    "author": "Infinite",
+    "description": "Alternating counter-rotating Karman vortex street eddies shedding behind a submerged obstacle with stratified dye streamlines.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float streetFreq = 3.4 [1.5, 6.5];\nparam float eddySpin = 1.65 [0.4, 3.2];\nparam float wakeWidth = 0.42 [0.18, 0.85];\nparam float dyeSharp = 1.8 [0.6, 3.5];\nparam float flowSpeed = 0.32 [0.0, 0.9];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\n# Staggered alternating vortex street along x\nxFlow = p.x * streetFreq - t * flowSpeed * 1.4;\nyOff = 0.24 * sin(xFlow * 0.85);\n\n# Upper and lower staggered eddy rows with opposite circulation\ne1x = (xFlow % 2.0) - 1.0;\ne1y = (p.y - wakeWidth * 0.55 - yOff * 0.3) * 2.2;\nr1 = length(vec2(e1x, e1y)) + 0.08;\nswirl1 = eddySpin * exp(-r1 * r1 * 2.4) / r1;\n\ne2x = ((xFlow + 1.0) % 2.0) - 1.0;\ne2y = (p.y + wakeWidth * 0.55 - yOff * 0.3) * 2.2;\nr2 = length(vec2(e2x, e2y)) + 0.08;\nswirl2 = -eddySpin * exp(-r2 * r2 * 2.4) / r2;\n\n# Streamfunction advection & dye filament bands\npsi = p.y * 2.6 + (swirl1 + swirl2) * 0.32 + 0.15 * sin(xFlow * 1.7 + p.y * 3.1);\ndye = abs(sin(psi * 4.2 + 0.5 * cos(xFlow * 2.4 + psi * 1.6)));\nfilament = exp(-dye * 3.2 * dyeSharp);\ncoreGlow = exp(-r1 * r1 * 4.5) * 0.7 + exp(-r2 * r2 * 4.5) * 0.7;\n\ncAbyss = vec3(0.055, 0.086, 0.129);\ncPelagic = vec3(0.184, 0.310, 0.420);\ncGlacial = vec3(0.608, 0.765, 0.855);\ncFoam = vec3(0.914, 0.890, 0.839);\n\ncol = mix(cAbyss, cPelagic, smoothstep(0.10, 0.78, filament + coreGlow * 0.3));\ncol = mix(col, cGlacial, smoothstep(0.32, 0.88, filament));\ncol = mix(col, cFoam, smoothstep(0.68, 1.05, filament * 0.85 + coreGlow * 0.55));\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "streetFreq": 3.4,
+      "eddySpin": 1.65,
+      "wakeWidth": 0.42,
+      "dyeSharp": 1.8,
+      "flowSpeed": 0.32
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

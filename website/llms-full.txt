@@ -361,6 +361,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kora Polyrhythm Kalimba Bell Synth](https://infinitedevices.org/library/kora-polyrhythm-kalimba-bell-synth.html): Inharmonic metallic tine and wooden soundboard synthesizer with wavefolded overtone shimmer and evolving LFO timbre drift. (file: https://infinitedevices.org/assets/templates/kora-polyrhythm-kalimba-bell-synth.inf)
 - [Cumbia Rebajada Tape Slow FX](https://infinitedevices.org/library/cumbia-rebajada-tape-slow-fx.html): Monterrey cumbia rebajada varispeed tape processor with capstan flutter drift, wooly oxide low-pass saturation, and warm spring feedback. (file: https://infinitedevices.org/assets/templates/cumbia-rebajada-tape-slow-fx.inf)
 - [Balearic Dub Phaser Echo FX](https://infinitedevices.org/library/balearic-dub-phaser-echo-fx.html): Balearic sunset dub 4-stage allpass phaser and resonant bandpass echo chamber with slow LFO sweep and warm console saturation. (file: https://infinitedevices.org/assets/templates/balearic-dub-phaser-echo-fx.inf)
+- [Buchla Wavefolder LPG Synth](https://infinitedevices.org/library/buchla-wavefolder-lpg-synth.html): West-Coast complex dual-oscillator FM into an asymmetric multi-stage sine wavefolder and vactrol low-pass gate. (file: https://infinitedevices.org/assets/templates/buchla-wavefolder-lpg-synth.inf)
+- [Serge Chaotic Resonator Synth](https://infinitedevices.org/library/serge-chaotic-resonator-synth.html): Cross-coupled inharmonic FM and wavefolding driving a tuned state-variable bandpass ping resonator. (file: https://infinitedevices.org/assets/templates/serge-chaotic-resonator-synth.inf)
+- [Bode Comb Dispersion FX](https://infinitedevices.org/library/bode-comb-dispersion-fx.html): Four-stage allpass phase dispersion network feeding a swept comb resonator and tape-saturated feedback loop. (file: https://infinitedevices.org/assets/templates/bode-comb-dispersion-fx.inf)
+- [Oliveros Expanded Resonator FX](https://infinitedevices.org/library/oliveros-expanded-resonator-fx.html): Deep-listening allpass dispersion and drifting formant bandpass chamber with soft console saturation. (file: https://infinitedevices.org/assets/templates/oliveros-expanded-resonator-fx.inf)
 
 ## Library: Community
 
@@ -611,6 +615,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Haeckel Radiolaria Spicule Corona](https://infinitedevices.org/library/haeckel-radiolaria-spicule-corona.html): Dark-field optical microscopy of a spherical Polycyttaria radiolarian silica shell with concentric geodesic pore rings and radiating axopodia. (file: https://infinitedevices.org/assets/library/pixel/haeckel-radiolaria-spicule-corona.field)
 - [Lichtenberg Acrylic Tree Breakdown](https://infinitedevices.org/library/lichtenberg-acrylic-tree-breakdown.html): High-voltage Lichtenberg dendritic breakdown tree frozen in cast obsidian acrylic with multi-octave domain-warped plasma filaments. (file: https://infinitedevices.org/assets/library/pixel/lichtenberg-acrylic-tree-breakdown.field)
 - [Lichtenberg Corona Arc Lattice](https://infinitedevices.org/library/lichtenberg-corona-arc-lattice.html): Radial dielectric corona discharge and Voronoi-fractured quartz insulator arcs radiating from a central high-voltage electrode. (file: https://infinitedevices.org/assets/library/pixel/lichtenberg-corona-arc-lattice.field)
+- [Kelvin-Helmholtz Shear Billows](https://infinitedevices.org/library/kelvin-helmholtz-shear-billows.html): Stratified fluid shear layer curling into breaking Kelvin-Helmholtz vortex billows with multi-octave vorticity advection. (file: https://infinitedevices.org/assets/library/pixel/kelvin-helmholtz-shear-billows.field)
+- [Kuroshio Karman Vortex Street](https://infinitedevices.org/library/kuroshio-karman-vortex-street.html): Alternating counter-rotating Karman vortex street eddies shedding behind a submerged obstacle with stratified dye streamlines. (file: https://infinitedevices.org/assets/library/pixel/kuroshio-karman-vortex-street.field)
 
 ## Library: Sketch
 
@@ -730,6 +736,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Jacquard Punchcard Binary Matrix](https://infinitedevices.org/library/jacquard-punchcard-binary-matrix.html): 1939 Jacquard loom perforated pasteboard punchcard chain with registration eyelets, laced fold seams, and algorithmic twill-weave hole matrix. (file: https://infinitedevices.org/assets/library/sketch/jacquard-punchcard-binary-matrix.js)
 - [Penrose Rhombus Aperiodic Grid](https://infinitedevices.org/library/penrose-rhombus-aperiodic-grid.html): Five-fold Penrose P3 thick and thin rhombus tiling with inscribed golden-ratio Ammann construction lines and architectural calibration ring. (file: https://infinitedevices.org/assets/library/sketch/penrose-rhombus-aperiodic-grid.js)
 - [Penrose Sun-Star Quasicrystal](https://infinitedevices.org/library/penrose-sun-star-quasicrystal.html): Ten-fold Penrose P2 kite-and-dart deflation rosette in crimson and forest teal with Conway golden matching-rule rib lines. (file: https://infinitedevices.org/assets/library/sketch/penrose-sun-star-quasicrystal.js)
+- [Guilloche Breguet Rosette Dial](https://infinitedevices.org/library/guilloche-breguet-rosette-dial.html): Engine-turned sterling watch dial with multi-lobed epitrochoid rosette guilloche, railway minute track, and recessed small-seconds subdial. (file: https://infinitedevices.org/assets/library/sketch/guilloche-breguet-rosette-dial.js)
+- [Guilloche Panier Basketweave Matrix](https://infinitedevices.org/library/guilloche-panier-basketweave-matrix.html): Rose-engine panier basketweave interference pattern with crossed sinusoidal hairlines and twin sunray cartouche apertures. (file: https://infinitedevices.org/assets/library/sketch/guilloche-panier-basketweave-matrix.js)
 
 ## Library: Sketch 3D
 
@@ -844,6 +852,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Sashimono Kigumi Cantilever Tower 3D](https://infinitedevices.org/library/sashimono-kigumi-cantilever-tower-3d.html): Nail-free Japanese Kigumi interlocking mortise-and-tenon timber tower with stepped cross-braced cantilevers and brass locking dowels. (file: https://infinitedevices.org/assets/library/sketch/sashimono-kigumi-cantilever-tower-3d.js)
 - [Dieste Gaussian Brick Vault 3D](https://infinitedevices.org/library/dieste-gaussian-brick-vault-3d.html): Eladio Dieste inspired double-curved Gaussian ceramic brick vault with rhythmic mortar arch ribs and dark masonry buttress piers. (file: https://infinitedevices.org/assets/library/sketch/dieste-gaussian-brick-vault-3d.js)
 - [Dieste Ruled Conoid Wall 3D](https://infinitedevices.org/library/dieste-ruled-conoid-wall-3d.html): Sinusoidal ruled-surface structural brick wall sweeping from an undulating ground curve to a straight reinforced lintel with clerestory slits. (file: https://infinitedevices.org/assets/library/sketch/dieste-ruled-conoid-wall-3d.js)
+- [Frei Otto Anticlastic Saddle 3D](https://infinitedevices.org/library/frei-otto-anticlastic-saddle-3d.html): Hyperbolic paraboloid steel cable-net canopy suspended from four tapering compression masts with translucent membrane tiles. (file: https://infinitedevices.org/assets/library/sketch/frei-otto-anticlastic-saddle-3d.js)
+- [Frei Otto Mannheim Lattice Shell 3D](https://infinitedevices.org/library/frei-otto-mannheim-lattice-shell-3d.html): Form-found inverted catenary timber-and-steel gridshell dome with doubly curved ribs and central compression oculus. (file: https://infinitedevices.org/assets/library/sketch/frei-otto-mannheim-lattice-shell-3d.js)
 
 ## Library: Synths
 
@@ -958,6 +968,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Ethio-Jazz Tizita Reed Horn Synth](https://infinitedevices.org/library/ethio-jazz-tizita-reed-horn-synth.html): Expressive Ethio-jazz brass-reed solo synthesizer with wavefolded mouth-pressure excitation and dual formant horn resonator. (file: https://infinitedevices.org/assets/templates/ethio-jazz-tizita-reed-horn-synth.inf)
 - [Kora Calabash Harp Synth](https://infinitedevices.org/library/kora-calabash-harp-synth.html): West African 21-string kora physical-plucked synthesizer with nylon harmonic decay, sympathetic bridge rattle, and calabash gourd body resonance. (file: https://infinitedevices.org/assets/templates/kora-calabash-harp-synth.inf)
 - [Kora Polyrhythm Kalimba Bell Synth](https://infinitedevices.org/library/kora-polyrhythm-kalimba-bell-synth.html): Inharmonic metallic tine and wooden soundboard synthesizer with wavefolded overtone shimmer and evolving LFO timbre drift. (file: https://infinitedevices.org/assets/templates/kora-polyrhythm-kalimba-bell-synth.inf)
+- [Buchla Wavefolder LPG Synth](https://infinitedevices.org/library/buchla-wavefolder-lpg-synth.html): West-Coast complex dual-oscillator FM into an asymmetric multi-stage sine wavefolder and vactrol low-pass gate. (file: https://infinitedevices.org/assets/templates/buchla-wavefolder-lpg-synth.inf)
+- [Serge Chaotic Resonator Synth](https://infinitedevices.org/library/serge-chaotic-resonator-synth.html): Cross-coupled inharmonic FM and wavefolding driving a tuned state-variable bandpass ping resonator. (file: https://infinitedevices.org/assets/templates/serge-chaotic-resonator-synth.inf)
 
 ## Library: Audio Effects
 
@@ -1075,6 +1087,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Spectral Dub Tape Resonator FX](https://infinitedevices.org/library/spectral-dub-tape-resonator-fx.html): King Tubby inspired dual-head tape resonator with capstan wow-flutter drift, resonant SVF dub sweep, and oxide hysteresis warmth. (file: https://infinitedevices.org/assets/templates/spectral-dub-tape-resonator-fx.inf)
 - [Cumbia Rebajada Tape Slow FX](https://infinitedevices.org/library/cumbia-rebajada-tape-slow-fx.html): Monterrey cumbia rebajada varispeed tape processor with capstan flutter drift, wooly oxide low-pass saturation, and warm spring feedback. (file: https://infinitedevices.org/assets/templates/cumbia-rebajada-tape-slow-fx.inf)
 - [Balearic Dub Phaser Echo FX](https://infinitedevices.org/library/balearic-dub-phaser-echo-fx.html): Balearic sunset dub 4-stage allpass phaser and resonant bandpass echo chamber with slow LFO sweep and warm console saturation. (file: https://infinitedevices.org/assets/templates/balearic-dub-phaser-echo-fx.inf)
+- [Bode Comb Dispersion FX](https://infinitedevices.org/library/bode-comb-dispersion-fx.html): Four-stage allpass phase dispersion network feeding a swept comb resonator and tape-saturated feedback loop. (file: https://infinitedevices.org/assets/templates/bode-comb-dispersion-fx.inf)
+- [Oliveros Expanded Resonator FX](https://infinitedevices.org/library/oliveros-expanded-resonator-fx.html): Deep-listening allpass dispersion and drifting formant bandpass chamber with soft console saturation. (file: https://infinitedevices.org/assets/templates/oliveros-expanded-resonator-fx.inf)
 
 ## Nodes
 
@@ -1451,7 +1465,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 135 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 137 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1587,3 +1601,5 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Haeckel Radiolaria Spicule Corona](https://infinitedevices.org/embeds/haeckel-radiolaria-spicule-corona.html): Audio-reactive dark-field Radiolaria microscopy visualizer. Bass expands the geodesic silica capsule, mids ripple the concentric pore lattice, and highs illuminate the radiating axopodia.
 - [Lichtenberg Acrylic Tree Breakdown](https://infinitedevices.org/embeds/lichtenberg-acrylic-tree-breakdown.html): High-voltage Lichtenberg dendritic breakdown tree frozen in cast obsidian acrylic with audio-reactive plasma filaments.
 - [Lichtenberg Corona Arc Lattice](https://infinitedevices.org/embeds/lichtenberg-corona-arc-lattice.html): Radial dielectric corona discharge and fractured quartz insulator arcs pulsing with audio-reactive high-voltage shimmer.
+- [Kelvin-Helmholtz Shear Billows](https://infinitedevices.org/embeds/kelvin-helmholtz-shear-billows.html): Stratified fluid shear layer curling into breaking Kelvin-Helmholtz vortex billows with audio-reactive crest curl.
+- [Kuroshio Karman Vortex Street](https://infinitedevices.org/embeds/kuroshio-karman-vortex-street.html): Alternating counter-rotating Karman vortex street eddies and dye streamlines driven by bass, mid, and high audio bands.
