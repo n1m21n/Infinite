@@ -100,25 +100,58 @@ Since we didn't have a live headset on hand during this build, we downloaded 4 r
 
 ## Part 2: Slide-by-slide presenter script
 
-### Slide 01 — Title
-- **Say (simple):** Infinite is an open-source audiovisual workstation I built — like a modular synth and visualiser in one app. This talk is about plugging a brainwave headband into it as a signal source: what already works, what failed honestly, and where I need your neuroscience advice.
+### Slide 01: About me
+- **Say (simple):** I'm Naman. Three things pull me: how the mind works, making things, and sound. Infinite is the one canvas where all three meet, and this project adds the brain as a live signal.
+- **Go deeper (only if asked):** I'm a creative technologist: dance 2017 to 2020, drawing from 2019, 3D art and augmented reality from 2020, electronic music from 2023, founded Infinite Devices in 2026. I'm not a trained neuroscientist, hence your advice.
 
-### Slide 02 — One patch plays music, visuals and 3D live
-- **Say (simple):** This is Infinite. You wire boxes called nodes — oscillators, filters, shaders, 3D lights — and one patch plays music and draws visuals live.
-- **Go deeper (if asked):** 353 node types today, written in C++, free and open source on macOS, Windows, and Linux.
+> Slides 02 onward below are the old 20-slide script. They are replaced one by one as the new deck is approved.
 
-### Slide 03 — Inspiration
-- **Say (simple):** Two inspirations: in 1965 Alvin Lucier made brainwaves physically vibrate gongs and snare drums; in 2023 musician Benn Jordan patched a consumer EEG band into modular synths. Infinite is built for exactly that kind of patching, with visuals and personal calibration built in.
+### Slide 02: About Infinite
+- **Say (simple):** Infinite connects nodes with cables to make sound, images and 3D. I put them on one canvas because sound, image and geometry are not separate things, they are one connected whole, like nature. Next I want body signals as instruments: tiny muscle movements, heart rate from an Apple Watch, and brain signals from EEG.
+- **Go deeper (only if asked):** It is for musicians, VJs, creative coders, visual artists and experimenters. 372 node types, open source (MIT), macOS, Windows and Linux. Field is its own small language for writing what a node does. It also runs from the command line and has MCP tools for AI agents.
 
-### Slide 04 — Swap an LFO for a brain signal
-- **Say (simple):** Here is the whole idea in one picture. On the left an LFO gently wobbles a visual shader. Infinite doesn't care where a `0` to `1` control signal comes from — swap the LFO for your brain, and the picture breathes with you.
+### Slide 03: Inspiration
+- **Say (simple):** Two people did this before me. In 1965 Alvin Lucier used his own brainwaves to shake speakers touching a gong and drums. In 2023 Benn Jordan wore a consumer EEG headband and let his focus and stress control synth sounds. Infinite is built for exactly this kind of patching.
+- **Go deeper (only if asked):** Lucier's piece is "Music for Solo Performer" and relied on calm, eyes-closed alpha waves. Check Benn Jordan's exact headband and software before presenting; the slide describes it from his video.
 
-### Slide 05 — Skip mood guesses
-- **Say (simple):** Our first version averaged all 4 sensors into "mood" scores and drove a preset flower. Research showed mood scores on 4 dry sensors aren't reliable, and averaging erased the best signal behind the ears. Now we keep all 4 sensors separate and hand raw signals straight to the patch.
-- **Go deeper (if asked):** Brain Sculpt lets you hold Shift and grab any knob while relaxed or focused to teach your own mapping by example, instead of using hardcoded weights.
+### Slide 04: Everything is numbers
+- **Say (simple):** Under the hood, all three are just numbers. Music is a wave that repeats, and how fast it repeats, in Hz, is the pitch. A picture is a grid of tiny dots, each a mix of red, green and blue. A 3D shape is points in space, each with an x, y and z. A brain headset gives numbers too (tiny voltages). Infinite turns them into 0 to 1 signals that can drive the wave, the pixels and the points.
+- **Go deeper (only if asked):** 440 Hz is the note A. Each colour channel is 0 to 255 (or 0 to 1). Because everything is numbers, one can control another, which is what the nodes on the next slide do.
 
-### Slide 06 — Eight building blocks
-- **Say (simple):** Instead of guessing emotions, we turn brain voltage into Infinite's eight basic building blocks — pixels, pitch, modulation knobs, triggers, switches, relationships, 3D points, and time. Five are already built and tested.
+### Slide 05: Swap the LFO for a brain
+- **Say (simple):** A control signal is a number from 0 to 1 that keeps changing, and a cable carries it to a knob. Today an LFO, a simple repeating wave, moves this picture. Swap the LFO for brain signals and the same cable lets your brain move a picture, a sound or a 3D shape. The Brain Source node does that, turning a headset's raw brain voltage into 24 of these signals.
+- **Go deeper (only if asked):** Brain Source reads Bluetooth headsets through BrainFlow, replays CSV recordings, or runs a synthetic test signal. Pins carry band powers and similar features; raw microvolts are also available.
+
+### Slide 06: Inside the Brain node
+- **Say (simple):** Four steps. The headset gives 4 sensor streams, 256 numbers a second each. The node removes mains hum and slow drift, splits what is left into five brain rhythms plus blink and jaw detectors, and outputs 24 signals from 0 to 1 plus a picture and a sound. A Muse 2 only has 4 dry sensors, so we keep what they show reliably: calm (alpha), blinks, jaw and brow. With no headset, a built-in simulator makes fake brain waves, and four public datasets give real recordings. Automatic checks test each step.
+- **Go deeper (only if asked):** Sensors AF7, AF8 (forehead) and TP9, TP10 (behind ears). Rhythms: delta, theta, alpha, beta, gamma. The simulator (SyntheticCortex) has calm, deep focus, theta dream and gesture presets with 1/f background, blink, gaze and jaw bursts. Self-test checks: calm vs focus, jaw left vs right, reflex vs deliberate blink, calibration, and real PhysioNet eyes open vs closed. One engine update costs about 0.10 ms.
+
+### Slide 07: The headband and its outputs
+
+**Say (simple):** "This is the headband from above. Two sensors sit on the forehead, two sit behind the ears. They feed the Brain node, which gives 24 signals. The grey ones are old mood-style pins that I do not trust on a Muse. At the bottom are every setting of the node."
+
+**Go deeper (only if asked):** The 24 pins are presence, heart, five rhythms (delta to gamma), blink, gaze left/right, brow, jaw left/right, plus 12 old mood-style pins kept so old patches still load. Image and audio pins sit on top. Settings: device, synthetic preset (calm, focus, dream, micro-gesture), blink filter, smoothing, hold ms, artifact blanking, startle guard, play baked take, calibrate.
+
+### Slide 08: Where the data comes from
+- **Say (simple):** Fake brains for testing, real brains for proof. On the left is our built-in simulator with four presets so we can test code anytime without a headset. On the right are four public EEG datasets: two hospital gel-cap datasets for a clean baseline, one real dry Muse 2 dataset (HEROIC, 14 to 15 people across multiple days), and one blink dataset with over 2,300 labelled blinks.
+- **Go deeper (only if asked):** PhysioNet eegmmidb (109 people, 64-channel gel cap, R01/R02 eyes open/closed); GIPSA (20 people, 16-channel gel cap); HEROIC (14–15 people, 64 sessions on a real Muse 2); EEG-EyeBlinks (46 people on OpenBCI forehead channels across cued blinks, video, and reading).
+
+### Slide 09: Experiment 1: gel cap vs Muse
+- **Say (simple):** A hospital gel cap uses 16 to 64 wet sensors, while a Muse 2 uses 4 dry metal pads. When we ran both through the exact same code, closing your eyes on a gel cap raised alpha 2.25x on the forehead and 3.59x behind the ears. On a dry Muse 2, the forehead barely moved, and behind the ears rose 1.44x, less than half as strong. That is why a one-size-fits-all rule fails on Muse.
+- **Go deeper (only if asked):** GIPSA (20 subjects, gel cap): median eyes-closed/open alpha prominence ratio is 2.14x (AF7), 2.36x (AF8), 3.04x (TP9), 3.95x (TP10), 3.59x (EARS combined). HEROIC (64 sessions, dry Muse 2): forehead stays near 1.0x and behind-the-ears median is 1.44x.
+
+### Slide 10: Experiment 2: the 72-second calibration
+- **Say (simple):** Personal calibration makes a cheap dry headband actually work. It is a 72-second sound check before you play: 30 seconds eyes open, 30 seconds eyes closed, and 12 seconds blinking 5 times. It fits you, not an average person. On one public Muse 2 dataset, a single fixed rule scored 68% and dropped to a 50% coin flip on a later day. Personal calibration jumped to 88.5% same day, and held 85.5% on a later day.
+- **Go deeper (only if asked):** Shrinkage LDA (shrink = 0.3) on 16 log-band features (4 bands x 4 sensors), split-half validation, 6 s smoothing (dropping smoothing to 2 s lowers accuracy to 73.7%). Cross-day 85.5% re-centres the midpoint using the unlabelled median of the new session.
+
+### Slide 11: Visual results: from calibrated data to sound & picture
+- **Say (simple):** Here is how the calibrated data turns into actual sound and picture. The 72-second profile turns raw headband waves into a steady 0 to 1 calm score. Cables carry that number straight into Infinite's bell shader and synth. When you are calm with your eyes closed, the ring glows bright and the sound swells. When you focus, it dims and quiets down.
+- **Go deeper (only if asked):** Headless test renders of `assets/examples/bci_alpha_bell.inf` at `t = 5.00 s`: CalmAlpha reaches `0.41` mean luma and `-13.6 LUFS` (`369 Hz` peak); DeepFocus stays at `0.13` luma and `-24.2 LUFS`. Blinks toggle the raw `256 x 180` spectrogram overlay; the `audio` pin speeds brainwaves up `32x` so `10 Hz` alpha becomes a `320 Hz` tone.
+- **Live CSV demo (optional right after Slide 11):** Open `build-dev/Infinite.app` → `bci_alpha_bell.inf` → set `Brain Source` `device` to `CSV Replay` and paste `/Users/namansoni/Infinite/datasets/eeg/heroic_csv/demo_muse2_open_closed.csv`. First 30 s (eyes open) stays dim & quiet; at 30–60 s (eyes closed) the bell blooms bright and the `320 Hz` brainwave tone swells.
+
+### Slide 12: Help needed: research, headsets & next steps
+- **Say (simple):** This is where I would love your advice. First, which papers and other approaches should we look at for cleaning 4-channel dry EEG? Second, which university labs, researchers, or grants are working on similar creative BCI problems? Third, how should we source headsets cheaply for a small pilot—is a ~$250 Muse 2 enough, or is there a lab loan or cheaper path? And finally, is 1.12 s reaction lag (82% accuracy) fast enough for a live instrument, and what ethics and consent steps do we need for a 3-to-5 person pilot?
+- **Go deeper (only if asked):** Infinite already supports Muse 2/S (`~$250`) and OpenBCI Cyton/Ganglion (`~$600–$1,200`) via BrainFlow. Double-blink switching (0.0/min median false triggers during reading) and 1-bad-sensor calibration fallback are already built and verified (`BCI_SELFTEST: passed=370 failed=0`). Pilot plan: 3 to 5 people, 15 minutes each.
 
 ### Slide 07 — Alpha Bell starter instrument
 - **Say (simple):** Here is our starter patch, Alpha Bell. When you close your eyes and calm alpha waves rise, the ring glows bright and the sound swells. When you open your eyes and focus, it dims and quiets down. Blinks toggle the raw spectrogram overlay.

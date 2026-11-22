@@ -169,15 +169,31 @@ void BciDspEngine::Reset(double sampleRateHz)
    std::fill(std::begin(mTraceTemporal), std::end(mTraceTemporal), 0.0f);
    mTraceDecim = 0;
 
+   mBlinkDcInit = false;
+   mBlinkDcPrevIn = mBlinkDcPrevOut = 0.0;
+   mBlinkDiffDcPrevIn = mBlinkDiffDcPrevOut = 0.0;
    mBlinkInPulse = false;
    mBlinkPulseSamples = 0;
    mBlinkPeakUv = 0.0f;
+   mBlinkDiffPeakUv = 0.0f;
+   mBlinkStartTimeSec = -10.0;
+   mBlinkPeakTimeSec = -10.0;
+   mBlinkValleyUv = 0.0;
+   mPrevValidBlinkPeakSec = -10.0;
+   mPrevValidBlinkEndSec = -10.0;
+   mPrevValidBlinkPeakUv = 0.0f;
    mLastBlinkEndSec = -10.0;
    mBlinkLatchUntilSec = -10.0;
    mBlinkRefractoryUntilSec = -10.0;
    mBlinkVotePos = mBlinkVoteNeg = 0.0;
    mBlinkSign = 1.0;
    mArtifactHoldUntilSec = -10.0;
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      mContactQuality[c] = 1.0f;
+      mCalibChanQualitySum[c] = 0.0;
+   }
+   mCalibChanQualityCount = 0;
    mBlinkFlash = mWinkFlash = mJawLFlash = mJawRFlash = 0.0f;
    mJawRmsSq[0] = mJawRmsSq[1] = 0.0;
    mBrowRmsSq = 0.0;
@@ -231,6 +247,7 @@ void BciDspEngine::RebuildFilters()
 
    mBlinkHp.Reset(); mBlinkHp.SetHighPass(mSampleRate, 1.0);
    mBlinkLp.Reset(); mBlinkLp.SetLowPass(mSampleRate, 8.0);
+   mBlinkDiffLp.Reset(); mBlinkDiffLp.SetLowPass(mSampleRate, 8.0);
    mSaccadeHp.Reset(); mSaccadeHp.SetHighPass(mSampleRate, 0.6);
    mSaccadeLp.Reset(); mSaccadeLp.SetLowPass(mSampleRate, 8.0);
 
@@ -274,6 +291,9 @@ void BciDspEngine::StartCalibration()
    mCalibClosedPsdAccum.fill(0.0);
    mCalibFeatOpen.clear();
    mCalibFeatClosed.clear();
+   for (int c = 0; c < kChannelCount; ++c)
+      mCalibChanQualitySum[c] = 0.0;
+   mCalibChanQualityCount = 0;
    const size_t perPhase = (size_t)(kCalibPhaseSec * mSampleRate / 12.0) + 8;
    mCalibFeatOpen.reserve(perPhase);
    mCalibFeatClosed.reserve(perPhase);
@@ -313,7 +333,7 @@ void BciDspEngine::FinishBlinkCalibration()
       std::vector<size_t> order(n);
       std::iota(order.begin(), order.end(), (size_t)0);
       std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return std::fabs(s[a]) > std::fabs(s[b]); });
-      const size_t gap = (size_t)(0.3 * mSampleRate);
+      const size_t gap = (size_t)(0.8 * mSampleRate); // 0.8 s excludes each blink's own rebound
       // Width at half the pulse's own height: blinks are 40..350 ms, eye movements and drift are wider.
       auto halfWidthMs = [&](size_t p)
       {
@@ -401,6 +421,7 @@ bool BciDspEngine::SaveProfile(const std::string& path) const
        << "  \"chanMad\": [" << mProfile.chanMad[0] << ", " << mProfile.chanMad[1]
        << ", " << mProfile.chanMad[2] << ", " << mProfile.chanMad[3] << "],\n"
        << "  \"stateValid\": " << (mProfile.stateValid ? "true" : "false") << ",\n"
+       << "  \"stateChanMask\": " << (int)mProfile.stateChanMask << ",\n"
        << "  \"stateBias\": " << mProfile.stateBias << ",\n"
        << "  \"stateScale\": " << mProfile.stateScale << ",\n"
        << "  \"stateW\": [";
@@ -470,6 +491,7 @@ bool BciDspEngine::LoadProfile(const std::string& path)
       const size_t at = content.find("\"stateW\": [");
       prof.stateBias = parseFloat("stateBias", 0.0f);
       prof.stateScale = parseFloat("stateScale", 1.0f);
+      prof.stateChanMask = (uint8_t)std::clamp((int)std::lround(parseFloat("stateChanMask", 15.0f)), 0, 15);
       bool ok = at != std::string::npos && std::isfinite(prof.stateBias) && prof.stateScale > 1e-6f;
       const char* cur = ok ? content.c_str() + at + 10 : nullptr;
       for (int k = 0; ok && k < kStateFeatureCount; ++k)
@@ -565,11 +587,47 @@ void BciDspEngine::FinishCalibration()
    mStateCalibFailed = !mProfile.stateValid;
    mCalibFeatOpen.clear();
    mCalibFeatClosed.clear();
+   for (int c = 0; c < kChannelCount; ++c)
+      mCalibChanQualitySum[c] = 0.0;
+   mCalibChanQualityCount = 0;
 
    mProfile.valid = true;
    if (mPersistProfile)
       SaveProfile();
    StartBlinkCalibration(kBlinkPhaseSec);
+}
+
+void BciDspEngine::UpdateContactQuality()
+{
+   // Fast time-domain contact check per channel, run unconditionally every 12 samples so a single
+   // noisy or disconnected electrode is flagged even while artifact blanking is active.
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      double sumSq = 0.0, diffSq = 0.0;
+      double prev = (double)mRing[c][mRingHead];
+      for (int i = 0; i < kFftSize; ++i)
+      {
+         const int idx = (mRingHead + i) % kFftSize;
+         const double x = (double)mRing[c][idx];
+         sumSq += x * x;
+         if (i > 0)
+         {
+            const double d = x - prev;
+            diffSq += d * d;
+         }
+         prev = x;
+      }
+      const float rms = (float)std::sqrt(sumSq / (double)kFftSize);
+      const float diffRms = (float)std::sqrt(diffSq / (double)(kFftSize - 1));
+      float q = 1.0f;
+      if (rms < 1.2f)
+         q = rms / 1.2f; // dead / disconnected lead
+      else if (rms > 180.0f)
+         q = std::clamp(1.0f - (rms - 180.0f) / 140.0f, 0.05f, 1.0f); // rail clipping / noisy lead
+      else if (rms > 1e-4f && (diffRms / rms) > 1.35f)
+         q = 0.25f; // mostly broadband high-freq contact hiss
+      mContactQuality[c] = mContactQuality[c] * 0.85f + std::clamp(q, 0.0f, 1.0f) * 0.15f;
+   }
 }
 
 void BciDspEngine::ComputeWelchCorticalPsd()
@@ -583,6 +641,15 @@ void BciDspEngine::ComputeWelchCorticalPsd()
    const int maxBin = std::min(47, kFftSize / 2 - 1);
    const double binHz = mSampleRate / (double)kFftSize;
 
+   bool chGood[kChannelCount];
+   int nGood = 0;
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      chGood[c] = mContactQuality[c] >= 0.45f;
+      if (chGood[c]) ++nGood;
+   }
+   const double avgWeight = nGood > 0 ? (1.0 / (double)nGood) : 0.25;
+
    for (int c = 0; c < kChannelCount; ++c)
    {
       for (int i = 0; i < kFftSize; ++i)
@@ -594,32 +661,15 @@ void BciDspEngine::ComputeWelchCorticalPsd()
       }
       Radix2Fft(re, im);
 
-      // Accumulate channel PSD + check line noise ratio for contact quality
-      double bandPowerSum = 0.0;
-      double totalSq = 0.0;
       for (int b = 1; b <= maxBin; ++b)
       {
          const double p = (re[b] * re[b] + im[b] * im[b]) / (double)(kFftSize * kFftSize);
-         avgPsd[(size_t)b] += p * 0.25;
+         if (nGood == 0 || chGood[c])
+            avgPsd[(size_t)b] += p * avgWeight;
          if (c == 0) psdAf7[(size_t)b] = p;
          if (c == 1) psdAf8[(size_t)b] = p;
          chanPsd[c][b] = p;
-         const double hz = b * binHz;
-         if (hz >= 1.0 && hz <= 42.0)
-            bandPowerSum += p;
-         totalSq += p;
       }
-
-      // Contact quality heuristic: healthy EEG is non-flat, not rail-clipped, and low extreme high-freq hash
-      const float rms = (float)std::sqrt(std::max(0.0, totalSq));
-      float q = 1.0f;
-      if (rms < 1.2f)
-         q = rms / 1.2f; // dead / disconnected lead
-      else if (rms > 240.0f)
-         q = std::clamp(1.0f - (rms - 240.0f) / 260.0f, 0.1f, 1.0f); // rail clipping / poor contact
-      else if (totalSq > 1e-9 && bandPowerSum / totalSq < 0.25)
-         q = 0.45f; // mostly high-freq contact hiss
-      mContactQuality[c] = mContactQuality[c] * 0.85f + std::clamp(q, 0.0f, 1.0f) * 0.15f;
    }
 
    // 1/f^chi Aperiodic Fit (linear regression in log10(f) vs log10(P) over 2..40 Hz excluding 7..14 Hz alpha bump)
@@ -764,7 +814,7 @@ void BciDspEngine::UpdateStateFeatures(const double (&chanPsd)[kChannelCount][48
    }
 
    const double hopSec = 12.0 / std::max(64.0, mSampleRate);
-   const double a = mFeatEmaInit ? 1.0 - std::exp(-hopSec / kStateTauSec) : 1.0;
+   const double a = mFeatEmaInit ? 1.0 - std::exp(-hopSec / std::max(0.25, mStateTauSec)) : 1.0;
    mFeatEmaInit = true;
    for (int k = 0; k < kStateFeatureCount; ++k)
       mFeatEma[k] += a * (feat[k] - mFeatEma[k]);
@@ -789,76 +839,131 @@ void BciDspEngine::UpdateStateFeatures(const double (&chanPsd)[kChannelCount][48
       for (int k = 0; k < kStateFeatureCount; ++k)
          v[(size_t)k] = (float)mFeatEma[k];
       (mCalibPhase == CalibrationPhase::EyesOpen ? mCalibFeatOpen : mCalibFeatClosed).push_back(v);
+      for (int c = 0; c < kChannelCount; ++c)
+         mCalibChanQualitySum[c] += mContactQuality[c];
+      ++mCalibChanQualityCount;
    }
 }
 
 bool BciDspEngine::FitStateWeights()
 {
    // Shrinkage LDA (shrink 0.3 toward a scaled identity), closed = positive class.
-   constexpr int n = kStateFeatureCount;
+   // Supports 1-bad-sensor fallback: drops 1 noisy/disconnected channel and fits 12 features on the remaining 3.
+   constexpr int kMaxN = kStateFeatureCount;
    const size_t n1 = mCalibFeatClosed.size(), n0 = mCalibFeatOpen.size();
    if (n1 < 20 || n0 < 20)
       return false;
-   double mu1[n] = {}, mu0[n] = {};
+
+   double mu1Full[kMaxN] = {}, mu0Full[kMaxN] = {};
    for (const auto& v : mCalibFeatClosed)
-      for (int k = 0; k < n; ++k) mu1[k] += v[(size_t)k] / (double)n1;
+      for (int k = 0; k < kMaxN; ++k) mu1Full[k] += v[(size_t)k] / (double)n1;
    for (const auto& v : mCalibFeatOpen)
-      for (int k = 0; k < n; ++k) mu0[k] += v[(size_t)k] / (double)n0;
-   double S[n][n] = {};
-   auto addCov = [&](const std::vector<std::array<float, n>>& set, const double* mu)
+      for (int k = 0; k < kMaxN; ++k) mu0Full[k] += v[(size_t)k] / (double)n0;
+
+   // Identify active channels: good mean contact quality AND non-degenerate (non-flatline) feature variance.
+   uint8_t chanMask = 0;
+   int activeChCount = 0;
+   int activeIdx[kMaxN] = {};
+   int d = 0;
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      const double meanQ = mCalibChanQualityCount > 0 ? (mCalibChanQualitySum[c] / (double)mCalibChanQualityCount) : 1.0;
+      double varSum = 0.0;
+      for (int b = 0; b < 4; ++b)
+      {
+         const int k = b * kChannelCount + c;
+         for (const auto& v : mCalibFeatClosed)
+         {
+            const double diff = v[(size_t)k] - mu1Full[k];
+            varSum += diff * diff;
+         }
+         for (const auto& v : mCalibFeatOpen)
+         {
+            const double diff = v[(size_t)k] - mu0Full[k];
+            varSum += diff * diff;
+         }
+      }
+      varSum /= (double)(n1 + n0);
+      if (meanQ >= 0.45 && varSum > 1e-8)
+      {
+         chanMask |= (uint8_t)(1u << c);
+         ++activeChCount;
+      }
+   }
+   if (activeChCount < 3)
+      return false;
+
+   for (int b = 0; b < 4; ++b)
+      for (int c = 0; c < kChannelCount; ++c)
+         if (chanMask & (1u << c))
+            activeIdx[d++] = b * kChannelCount + c;
+
+   double mu1[kMaxN] = {}, mu0[kMaxN] = {};
+   for (int i = 0; i < d; ++i)
+   {
+      mu1[i] = mu1Full[activeIdx[i]];
+      mu0[i] = mu0Full[activeIdx[i]];
+   }
+
+   double S[kMaxN][kMaxN] = {};
+   auto addCov = [&](const std::vector<std::array<float, kMaxN>>& set, const double* mu)
    {
       for (const auto& v : set)
-         for (int i = 0; i < n; ++i)
-            for (int j = 0; j < n; ++j)
-               S[i][j] += (v[(size_t)i] - mu[i]) * (v[(size_t)j] - mu[j]);
+         for (int i = 0; i < d; ++i)
+            for (int j = 0; j < d; ++j)
+               S[i][j] += (v[(size_t)activeIdx[i]] - mu[i]) * (v[(size_t)activeIdx[j]] - mu[j]);
    };
    addCov(mCalibFeatClosed, mu1);
    addCov(mCalibFeatOpen, mu0);
    double tr = 0.0;
-   for (int i = 0; i < n; ++i)
-      for (int j = 0; j < n; ++j)
+   for (int i = 0; i < d; ++i)
+      for (int j = 0; j < d; ++j)
          S[i][j] /= (double)(n1 + n0 - 1);
-   for (int i = 0; i < n; ++i)
+   for (int i = 0; i < d; ++i)
       tr += S[i][i];
+
    constexpr double kShrink = 0.3;
-   double A[n][n + 1];
-   for (int i = 0; i < n; ++i)
+   double A[kMaxN][kMaxN + 1] = {};
+   for (int i = 0; i < d; ++i)
    {
-      for (int j = 0; j < n; ++j)
-         A[i][j] = (1.0 - kShrink) * S[i][j] + (i == j ? kShrink * tr / n : 0.0);
-      A[i][n] = mu1[i] - mu0[i];
+      for (int j = 0; j < d; ++j)
+         A[i][j] = (1.0 - kShrink) * S[i][j] + (i == j ? kShrink * tr / (double)d : 0.0);
+      A[i][d] = mu1[i] - mu0[i];
    }
-   for (int col = 0; col < n; ++col) // Gaussian elimination, partial pivoting
+   for (int col = 0; col < d; ++col) // Gaussian elimination, partial pivoting
    {
       int piv = col;
-      for (int r = col + 1; r < n; ++r)
+      for (int r = col + 1; r < d; ++r)
          if (std::fabs(A[r][col]) > std::fabs(A[piv][col]))
             piv = r;
       if (std::fabs(A[piv][col]) < 1e-12)
          return false;
       if (piv != col)
-         for (int j = 0; j <= n; ++j)
+         for (int j = 0; j <= d; ++j)
             std::swap(A[col][j], A[piv][j]);
-      for (int r = 0; r < n; ++r)
+      for (int r = 0; r < d; ++r)
       {
          if (r == col)
             continue;
          const double fct = A[r][col] / A[col][col];
-         for (int j = col; j <= n; ++j)
+         for (int j = col; j <= d; ++j)
             A[r][j] -= fct * A[col][j];
       }
    }
-   double w[n], mid = 0.0, gap = 0.0;
-   for (int i = 0; i < n; ++i)
+   double w[kMaxN] = {}, mid = 0.0, gap = 0.0;
+   for (int i = 0; i < d; ++i)
    {
-      w[i] = A[i][n] / A[i][i];
+      w[i] = A[i][d] / A[i][i];
       mid += w[i] * 0.5 * (mu1[i] + mu0[i]);
       gap += w[i] * (mu1[i] - mu0[i]);
    }
    if (!(gap > 1e-9) || !std::isfinite(gap))
       return false;
-   for (int i = 0; i < n; ++i)
-      mProfile.stateW[i] = (float)w[i];
+   for (int k = 0; k < kMaxN; ++k)
+      mProfile.stateW[k] = 0.0f;
+   for (int i = 0; i < d; ++i)
+      mProfile.stateW[activeIdx[i]] = (float)w[i];
+   mProfile.stateChanMask = chanMask;
    mProfile.stateBias = (float)mid;
    mProfile.stateScale = (float)(gap / 4.0); // class means land at z = +-2 (score 0.88 / 0.12)
    return true;
@@ -1004,11 +1109,13 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
 
       // 1. Preprocessing (0.5 Hz DC HP + 50/60 Hz Notch)
       double clean[kChannelCount];
+      double notched[kChannelCount];
       for (int c = 0; c < kChannelCount; ++c)
       {
-         double x = mHpDc[c].Step((double)f.ch[c]);
-         x = mNotch50[c].Step(x);
-         x = mNotch60[c].Step(x);
+         double n = mNotch50[c].Step((double)f.ch[c]);
+         n = mNotch60[c].Step(n);
+         notched[c] = n;
+         double x = mHpDc[c].Step(n);
          clean[c] = x;
 
          // Advance instantaneous IAF complex resonator
@@ -1038,11 +1145,40 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       mPlvRe += plvAlpha * (0.5 * (fRe + tRe) - mPlvRe);
       mPlvIm += plvAlpha * (0.5 * (fIm + tIm) - mPlvIm);
 
-      // 2. Fast Orthogonal Somatic Demixer
-      const double frontalCommon = 0.5 * (clean[0] + clean[1]);
-      const double frontalDiff = clean[0] - clean[1];
-      // `clean` already has 0.5 Hz DC high-pass; low-pass at 8 Hz preserves intentional blink width
-      const double sBlinkRaw = mBlinkLp.Step(frontalCommon);
+      // 2. Fast Orthogonal Somatic Demixer (per-channel contact-aware so 1 bad lead never deadlocks blanking)
+      const bool af7Ok = mContactQuality[0] >= 0.45f;
+      const bool af8Ok = mContactQuality[1] >= 0.45f;
+      const bool tp9Ok = mContactQuality[2] >= 0.45f;
+      const bool tp10Ok = mContactQuality[3] >= 0.45f;
+      const double frontalCommon = (af7Ok && !af8Ok) ? clean[0]
+                                 : (!af7Ok && af8Ok) ? clean[1]
+                                                     : 0.5 * (clean[0] + clean[1]);
+      const double frontalDiff = (af7Ok && af8Ok) ? (clean[0] - clean[1]) : 0.0;
+      const double blinkIn = (af7Ok && !af8Ok) ? notched[0]
+                           : (!af7Ok && af8Ok) ? notched[1]
+                                               : 0.5 * (notched[0] + notched[1]);
+      const double blinkDiffIn = (af7Ok && af8Ok) ? (notched[0] - notched[1]) : 0.0;
+
+      // 1st-order 0.6 Hz DC blocker on notched frontal signal (zero 2nd-order ringing overshoot on double blinks,
+      // while rejecting slow electrode drift cleanly).
+      if (!mBlinkDcInit || std::fabs(blinkIn - mBlinkDcPrevIn) > 5000.0)
+      {
+         mBlinkDcPrevIn = blinkIn;
+         mBlinkDcPrevOut = 0.0;
+         mBlinkDiffDcPrevIn = blinkDiffIn;
+         mBlinkDiffDcPrevOut = 0.0;
+         mBlinkDcInit = true;
+      }
+      const double dcAlpha = std::exp(-kTwoPi * 0.60 / std::max(64.0, mSampleRate));
+      const double blinkDc = dcAlpha * (mBlinkDcPrevOut + blinkIn - mBlinkDcPrevIn);
+      mBlinkDcPrevIn = blinkIn;
+      mBlinkDcPrevOut = blinkDc;
+      const double blinkDiffDc = dcAlpha * (mBlinkDiffDcPrevOut + blinkDiffIn - mBlinkDiffDcPrevIn);
+      mBlinkDiffDcPrevIn = blinkDiffIn;
+      mBlinkDiffDcPrevOut = blinkDiffDc;
+
+      const double sBlinkRaw = mBlinkLp.Step(blinkDc);
+      const double sBlinkDiff = mBlinkDiffLp.Step(blinkDiffDc);
       // Blink polarity depends on headset and reference (Muse vs OpenBCI). Vote with the time spent past
       // the blink threshold on each side (tau 60 s): blinks are the large, frequent, one-sided pulses,
       // eye movements and drift split both ways. Flip only when the other side leads 1.5 : 1.
@@ -1076,61 +1212,149 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       const float jawRRms = (float)std::sqrt(std::max(0.0, mJawRmsSq[1]));
       const float browRms = (float)std::sqrt(std::max(0.0, mBrowRmsSq));
 
-      // Blink Pulse Width & Amplitude Discrimination (Gap 1: Reflex vs Intentional)
+      // Blink Pulse Width & Amplitude Discrimination (Gap 1: Reflex vs Intentional vs DoubleBlink)
       // Calibrated: half the person's cued blink. Otherwise a population default.
       const float blinkThreshUv = mProfile.blinkValid ? std::max(30.0f, 0.5f * mProfile.medianBlinkUv)
                                                       : std::max(55.0f, 0.55f * mProfile.medianBlinkUv);
-      // Hysteresis: a pulse ends below 70 % of the threshold, so one blink that dips mid-way is not
-      // split in two (the second half would read as a double blink).
-      if (sBlink > blinkThreshUv || (mBlinkInPulse && sBlink > 0.7f * blinkThreshUv))
+
+      if (mBlinkMode == BlinkMode::DoubleBlink)
       {
+         // Dedicated double-blink detector: two symmetric, amplitude-balanced blinks within 220..650 ms
+         // peak-to-peak, with valley-prominence compensation for blink #2 sitting on blink #1's rebound.
+         constexpr double kMinIbiSec = 0.22;
+         constexpr double kMaxIbiSec = 0.58;
+         constexpr double kMinGapSec = 0.04;
+         const float dblThr = mProfile.blinkValid ? std::max(30.0f, 0.50f * mProfile.medianBlinkUv)
+                                                  : std::max(55.0f, 0.55f * mProfile.medianBlinkUv);
+         const float minPk = mProfile.blinkValid ? std::max(dblThr, 0.70f * mProfile.medianBlinkUv)
+                                                 : std::max(dblThr, 0.80f * mProfile.medianBlinkUv);
+         const bool inWin = (mPrevValidBlinkPeakSec > 0.0) &&
+                            ((mStreamTimeSec - mPrevValidBlinkPeakSec) <= kMaxIbiSec) &&
+                            ((mStreamTimeSec - mPrevValidBlinkEndSec) >= kMinGapSec);
          if (!mBlinkInPulse)
          {
-            mBlinkInPulse = true;
-            mBlinkPulseSamples = 0;
-            mBlinkPeakUv = 0.0f;
-            // Double-blink rising edge fires immediately when a second blink lands within 380 ms
-            const bool isDouble = (mStreamTimeSec - mLastBlinkEndSec) < 0.38;
-            if (isDouble && !startleActive && mStreamTimeSec >= mBlinkRefractoryUntilSec)
+            if (mPrevValidBlinkPeakSec > 0.0 && (mStreamTimeSec - mPrevValidBlinkEndSec) < kMaxIbiSec)
+               mBlinkValleyUv = std::min(mBlinkValleyUv, std::max(-0.8 * (double)dblThr, sBlink));
+            else
+               mBlinkValleyUv = 0.0;
+         }
+         const double vProm = inWin ? (sBlink - mBlinkValleyUv) : sBlink;
+         const bool above = (vProm > dblThr) && (!inWin || sBlink > 0.30 * dblThr);
+         const bool stay = mBlinkInPulse && (vProm > 0.70 * dblThr) && (!inWin || sBlink > 0.15 * dblThr);
+         if (above || stay)
+         {
+            if (!mBlinkInPulse)
             {
-               mBlinkLatchUntilSec = mStreamTimeSec + 0.090;
+               mBlinkInPulse = true;
+               mBlinkPulseSamples = 0;
+               mBlinkPeakUv = 0.0f;
+               mBlinkDiffPeakUv = 0.0f;
+               mBlinkStartTimeSec = mStreamTimeSec;
+               mBlinkPeakTimeSec = mStreamTimeSec;
+            }
+            if (above)
+               ++mBlinkPulseSamples;
+            if ((float)vProm > mBlinkPeakUv)
+            {
+               mBlinkPeakUv = (float)vProm;
+               mBlinkPeakTimeSec = mStreamTimeSec;
+            }
+            mBlinkDiffPeakUv = std::max(mBlinkDiffPeakUv, (float)std::fabs(sBlinkDiff));
+         }
+         else if (mBlinkInPulse)
+         {
+            const float widthMs = (float)(mBlinkPulseSamples * dt * 1000.0);
+            const bool validPulse = (widthMs >= 30.0f && widthMs <= 340.0f) &&
+                                    (mBlinkPeakUv >= minPk) &&
+                                    (mBlinkDiffPeakUv <= 0.85f * mBlinkPeakUv);
+            if (validPulse)
+            {
+               const double ibi = mBlinkPeakTimeSec - mPrevValidBlinkPeakSec;
+               const double gap = mBlinkStartTimeSec - mPrevValidBlinkEndSec;
+               const float ampBal = mPrevValidBlinkPeakUv > 1e-3f
+                                       ? (std::min(mBlinkPeakUv, mPrevValidBlinkPeakUv) /
+                                          std::max(mBlinkPeakUv, mPrevValidBlinkPeakUv))
+                                       : 0.0f;
+               if (ibi >= kMinIbiSec && ibi <= kMaxIbiSec && gap >= kMinGapSec && ampBal >= 0.55f &&
+                   !startleActive && mStreamTimeSec >= mBlinkRefractoryUntilSec)
+               {
+                  mBlinkLatchUntilSec = mStreamTimeSec + 0.090;
+                  mBlinkRefractoryUntilSec = mStreamTimeSec + 0.900; // consume pair; ignore triple-blink/rebound
+                  mBlinkFlash = 1.0f;
+                  batchBlinkFired = true;
+                  mPrevValidBlinkPeakSec = -10.0;
+                  mPrevValidBlinkEndSec = -10.0;
+                  mPrevValidBlinkPeakUv = 0.0f;
+                  mBlinkValleyUv = 0.0;
+               }
+               else
+               {
+                  mPrevValidBlinkPeakSec = mBlinkPeakTimeSec;
+                  mPrevValidBlinkEndSec = mStreamTimeSec;
+                  mPrevValidBlinkPeakUv = mBlinkPeakUv;
+                  mBlinkValleyUv = 0.0;
+               }
+            }
+            mLastBlinkEndSec = mStreamTimeSec;
+            mBlinkInPulse = false;
+         }
+      }
+      else
+      {
+         // Hysteresis: a pulse ends below 70 % of the threshold, so one blink that dips mid-way is not
+         // split in two (the second half would read as a double blink).
+         if (sBlink > blinkThreshUv || (mBlinkInPulse && sBlink > 0.7f * blinkThreshUv))
+         {
+            if (!mBlinkInPulse)
+            {
+               mBlinkInPulse = true;
+               mBlinkPulseSamples = 0;
+               mBlinkPeakUv = 0.0f;
+               // Double-blink rising edge fires immediately when a second blink lands within 380 ms
+               const bool isDouble = (mStreamTimeSec - mLastBlinkEndSec) < 0.38;
+               if (isDouble && !startleActive && mStreamTimeSec >= mBlinkRefractoryUntilSec)
+               {
+                  mBlinkLatchUntilSec = mStreamTimeSec + 0.090;
+                  mBlinkRefractoryUntilSec = mStreamTimeSec + 0.150;
+                  mBlinkFlash = 1.0f;
+                  batchBlinkFired = true;
+               }
+            }
+            if (sBlink > blinkThreshUv)
+               ++mBlinkPulseSamples; // width = time above the threshold, as before
+            mBlinkPeakUv = std::max(mBlinkPeakUv, (float)sBlink);
+         }
+         else if (mBlinkInPulse)
+         {
+            const float widthMs = (float)(mBlinkPulseSamples * dt * 1000.0);
+            const bool isDouble = (mStreamTimeSec - mLastBlinkEndSec) < 0.38;
+            // Calibrated: a blink as big or as long as the cued ones is deliberate. Otherwise fixed rules.
+            const bool isIntentional = mProfile.blinkValid
+               ? (mBlinkPeakUv >= 0.8f * mProfile.medianBlinkUv || widthMs >= 0.8f * mProfile.blinkWidthMs || isDouble)
+               : ((widthMs >= 135.0f) || (mBlinkPeakUv >= 1.35f * mProfile.medianBlinkUv) || isDouble);
+            const bool allowFire = (mBlinkMode == BlinkMode::AllBlinks) || isIntentional;
+
+            if (allowFire && !startleActive && mStreamTimeSec >= mBlinkRefractoryUntilSec)
+            {
+               mBlinkLatchUntilSec = mStreamTimeSec + 0.090;     // 90 ms stretch across 60 Hz & 16-sample batches
                mBlinkRefractoryUntilSec = mStreamTimeSec + 0.150;
                mBlinkFlash = 1.0f;
                batchBlinkFired = true;
             }
-         }
-         if (sBlink > blinkThreshUv)
-            ++mBlinkPulseSamples; // width = time above the threshold, as before
-         mBlinkPeakUv = std::max(mBlinkPeakUv, (float)sBlink);
-      }
-      else if (mBlinkInPulse)
-      {
-         const float widthMs = (float)(mBlinkPulseSamples * dt * 1000.0);
-         const bool isDouble = (mStreamTimeSec - mLastBlinkEndSec) < 0.38;
-         // Calibrated: a blink as big or as long as the cued ones is deliberate. Otherwise fixed rules.
-         const bool isIntentional = mProfile.blinkValid
-            ? (mBlinkPeakUv >= 0.8f * mProfile.medianBlinkUv || widthMs >= 0.8f * mProfile.blinkWidthMs || isDouble)
-            : ((widthMs >= 135.0f) || (mBlinkPeakUv >= 1.35f * mProfile.medianBlinkUv) || isDouble);
-         const bool allowFire = (mBlinkMode == BlinkMode::AllBlinks) || isIntentional;
+            // Update median blink baseline gently on vegetative blinks
+            if (!mProfile.blinkValid && widthMs >= 45.0f && widthMs < 130.0f)
+               mProfile.medianBlinkUv = mProfile.medianBlinkUv * 0.9f + mBlinkPeakUv * 0.1f;
 
-         if (allowFire && !startleActive && mStreamTimeSec >= mBlinkRefractoryUntilSec)
-         {
-            mBlinkLatchUntilSec = mStreamTimeSec + 0.090;     // 90 ms stretch across 60 Hz & 16-sample batches
-            mBlinkRefractoryUntilSec = mStreamTimeSec + 0.150;
-            mBlinkFlash = 1.0f;
-            batchBlinkFired = true;
+            mLastBlinkEndSec = mStreamTimeSec;
+            mBlinkInPulse = false;
          }
-         // Update median blink baseline gently on vegetative blinks
-         if (!mProfile.blinkValid && widthMs >= 45.0f && widthMs < 130.0f)
-            mProfile.medianBlinkUv = mProfile.medianBlinkUv * 0.9f + mBlinkPeakUv * 0.1f;
-
-         mLastBlinkEndSec = mStreamTimeSec;
-         mBlinkInPulse = false;
       }
 
-      // Artifact blanking gate (protects cortical PSD from blinks & heavy jaw/brow EMG)
-      const bool somaticArtifactNow = (std::fabs(sBlink) > blinkThreshUv) ||
-                                      (jawLRms > 35.0f) || (jawRRms > 35.0f) || (browRms > 30.0f);
+      // Artifact blanking gate (protects cortical PSD from blinks & heavy jaw/brow EMG; ignores bad leads)
+      const bool frontArt = (af7Ok || af8Ok) && ((std::fabs(sBlink) > blinkThreshUv) || (browRms > 30.0f));
+      const bool jawLArt = tp9Ok && (jawLRms > 35.0f);
+      const bool jawRArt = tp10Ok && (jawRRms > 35.0f);
+      const bool somaticArtifactNow = frontArt || jawLArt || jawRArt;
       if (somaticArtifactNow && mArtifactBlanking)
          mArtifactHoldUntilSec = mStreamTimeSec + 0.250;
 
@@ -1143,6 +1367,7 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       if (mSamplesSincePsd >= 12)
       {
          mSamplesSincePsd = 0;
+         UpdateContactQuality();
          if (!mArtifactBlanking || mStreamTimeSec >= mArtifactHoldUntilSec)
             ComputeWelchCorticalPsd();
          ++mImgSeq; // the Image pin scrolls at a constant rate; a blanked update repeats the last column
@@ -1285,6 +1510,7 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
       outTelemetry.regionAlpha[c] = mRegionAlpha[c];
    outTelemetry.stateCalibrated = mProfile.stateValid;
    outTelemetry.stateCalibFailed = mStateCalibFailed;
+   outTelemetry.stateChanMask = mProfile.stateChanMask;
    outTelemetry.eyesClosedScore = mProfile.stateValid ? mStateScore : 0.0f;
    std::copy(std::begin(mImgCol), std::end(mImgCol), outTelemetry.imageCol);
    outTelemetry.imageState = mProfile.stateValid ? mStateScore : -1.0f;

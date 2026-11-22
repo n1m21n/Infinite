@@ -24,6 +24,7 @@ namespace Bci
       void SetArtifactBlanking(bool enabled) { mArtifactBlanking = enabled; }
       void SetStartleGuard(bool enabled) { mStartleGuard = enabled; }
       void SetBlinkMode(BlinkMode mode) { mBlinkMode = mode; }
+      void SetStateTauSec(double tauSec) { mStateTauSec = std::max(0.25, tauSec); }
 
       // Gap 6: Calibration & profile persistence
       void StartCalibration();
@@ -76,6 +77,7 @@ namespace Bci
       };
 
       void RebuildFilters();
+      void UpdateContactQuality();
       void ComputeWelchCorticalPsd();
       void FinishCalibration();
       void FinishBlinkCalibration();
@@ -101,12 +103,18 @@ namespace Bci
       // Somatic spatial-frequency filters
       Biquad mBlinkLp;
       Biquad mBlinkHp;
+      Biquad mBlinkDiffLp;
       Biquad mSaccadeLp;
       Biquad mSaccadeHp;
       Biquad mJawHp[2];
       Biquad mJawLp[2];
       Biquad mBrowHp;
       Biquad mBrowLp;
+
+      // 1st-order 0.35 Hz DC blocker for blink common/diff (zero ringing overshoot on double blinks)
+      bool mBlinkDcInit = false;
+      double mBlinkDcPrevIn = 0.0, mBlinkDcPrevOut = 0.0;
+      double mBlinkDiffDcPrevIn = 0.0, mBlinkDiffDcPrevOut = 0.0;
 
       // Instantaneous IAF complex resonator state (AF7, AF8, TP9, TP10)
       double mResRe[kChannelCount] = {};
@@ -124,6 +132,13 @@ namespace Bci
       bool mBlinkInPulse = false;
       int mBlinkPulseSamples = 0;
       float mBlinkPeakUv = 0.0f;
+      float mBlinkDiffPeakUv = 0.0f;
+      double mBlinkStartTimeSec = -10.0;
+      double mBlinkPeakTimeSec = -10.0;
+      double mBlinkValleyUv = 0.0;
+      double mPrevValidBlinkPeakSec = -10.0;
+      double mPrevValidBlinkEndSec = -10.0;
+      float mPrevValidBlinkPeakUv = 0.0f;
       double mLastBlinkEndSec = -10.0;
       double mBlinkLatchUntilSec = -10.0;
       double mBlinkRefractoryUntilSec = -10.0;
@@ -159,8 +174,9 @@ namespace Bci
       float mTraceTemporal[kTraceSamples] = {};
       int mTraceDecim = 0;
 
-      // Per-person eyes-closed state (per-channel relative band powers, EMA tau 3 s)
-      static constexpr double kStateTauSec = 3.0;
+      // Per-person eyes-closed state (per-channel relative band powers, EMA tau 1.5 s; see tools/bci/calib_ab.py)
+      static constexpr double kStateTauSec = 1.5;
+      double mStateTauSec = kStateTauSec;
       double mFeatEma[kStateFeatureCount] = {};
       bool mFeatEmaInit = false;
       float mRegionAlpha[kChannelCount] = {};
@@ -168,6 +184,8 @@ namespace Bci
       bool mStateCalibFailed = false;
       std::vector<std::array<float, kStateFeatureCount>> mCalibFeatOpen;
       std::vector<std::array<float, kStateFeatureCount>> mCalibFeatClosed;
+      double mCalibChanQualitySum[kChannelCount] = {};
+      int mCalibChanQualityCount = 0;
 
       // Direct Image pin: log power EMA (tau 0.5 s), running baseline until calibrated
       static constexpr double kImageTauSec = 0.5;
