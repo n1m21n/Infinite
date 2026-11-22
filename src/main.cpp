@@ -6,6 +6,7 @@
 #include "core/CoverageFlush.h"
 #include "core/InfiniteCli.h"
 #include "plugin/engine/HostAudio.h"
+#include "plugin/engine/PluginView.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -92,12 +93,34 @@ int main(int argc, char** argv)
          return rc;
    }
    auto& window = fc.window;
+   // Track graph identity so a closed DAW plugin editor runs the full UI pass
+   // only during startup / after a patch load (to populate Modulation::FrameParams),
+   // then skips all invisible ImGui/node-editor work while closed.
+   size_t lastRegisteredNodes = (size_t)-1;
+   const INode* lastRegisteredFirst = nullptr;
+   const INode* lastRegisteredLast = nullptr;
    while (!glfwWindowShouldClose(window))
    {
       if (PluginEngine::QuitRequested())
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       PluginEngine::MainFrameTick();
       DrawFramePump(fc);
+      const INode* curFirst = gNodes.empty() ? nullptr : gNodes.front().node.get();
+      const INode* curLast = gNodes.empty() ? nullptr : gNodes.back().node.get();
+      const bool graphUnchanged = (gNodes.size() == lastRegisteredNodes &&
+                                   curFirst == lastRegisteredFirst &&
+                                   curLast == lastRegisteredLast);
+      const bool pluginClosedFast = Platform::PluginModeActive() && !PluginView::Open() && !PluginView::Popped() &&
+                                    fc.frameId >= 3 && graphUnchanged;
+      if (pluginClosedFast)
+      {
+         ImGui::EndFrame();
+         DrawPresent(fc);
+         continue;
+      }
+      lastRegisteredNodes = gNodes.size();
+      lastRegisteredFirst = curFirst;
+      lastRegisteredLast = curLast;
       DrawMenuBar(fc);
       DrawLayout(fc);
       DrawDropHandling(fc);
