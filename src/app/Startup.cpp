@@ -848,6 +848,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_AUDIOPCMTEST") != nullptr)
       return Platform::AudioPcmConversionSelfTest() ? 0 : 1;
 
+   if (getenv("INFINITE_AUDIOINRINGTEST") != nullptr)
+      return Platform::AudioInputRingSelfTest() ? 0 : 1;
+
    if (getenv("INFINITE_NDITEST") != nullptr)
       return RunNdiTest();
    if (getenv("INFINITE_EXTENSIONSTEST") != nullptr)

@@ -55,6 +55,16 @@ else
    status=1
 fi
 
+# Live-input ring (Audio In): latency stays one block + one capture cycle, stays flat under
+# clock drift, and a recorder never skips audio. Exit-code gated; true on Windows/Linux.
+echo "== INFINITE_AUDIOINRINGTEST"
+if INFINITE_AUDIOINRINGTEST=1 "$BIN"; then
+   echo "   pass"
+else
+   echo "   FAIL (exit $?)"
+   status=1
+fi
+
 # --- verdict-line gated ----------------------------------------------------
 # Each of these always exits 0, so grep the printf line instead.
 
