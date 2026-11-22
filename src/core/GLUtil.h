@@ -165,6 +165,12 @@ namespace GLUtil
       void Destroy();
    };
 
+   // Cached glGetUniformLocation for string-literal uniform names.
+   // Call DeleteProgram(program) when destroying a cached program so reused GL
+   // program IDs never return stale locations.
+   int UniformLoc(unsigned int program, const char* literalName);
+   void DeleteProgram(unsigned int program);
+
    // Deletes the per-context GL objects this namespace lazily created for the
    // context that is current RIGHT NOW (today: the fullscreen-quad VAO).
    // Call it with a secondary context current, immediately before that

@@ -107,25 +107,62 @@ void DrawLinks(FrameCtx& fc)
    auto& typing = fc.typing;
    auto& cmdOrCtrl = fc.cmdOrCtrl;
 
+      // Lazily pre-index source pointers once per frame only when a node actually
+      // has a non-null geometry/palette/modulator input (0 cost when unused, O(N) instead of O(N^2) when used).
+      static std::unordered_map<const void*, int> sNodeOrGeoOutPin;
+      static std::unordered_map<const IPaletteSource*, int> sPaletteOutPin;
+      static std::unordered_map<const IModulator*, int> sModOutPin;
+      bool builtNodeGeo = false, builtPal = false, builtMod = false;
+
+      auto ensureNodeGeo = [&]()
+      {
+         if (builtNodeGeo) return;
+         builtNodeGeo = true;
+         sNodeOrGeoOutPin.clear();
+         sNodeOrGeoOutPin.reserve(gNodes.size() * 2);
+         for (GraphNode& src : gNodes)
+         {
+            INode* n = src.node.get();
+            const int outPin0 = src.OutputPinId();
+            sNodeOrGeoOutPin.emplace((const void*)n, outPin0);
+            if (const void* asGeo = dynamic_cast<IGeometrySource*>(n))
+               sNodeOrGeoOutPin.emplace(asGeo, outPin0);
+         }
+      };
+      auto ensurePal = [&]()
+      {
+         if (builtPal) return;
+         builtPal = true;
+         sPaletteOutPin.clear();
+         for (GraphNode& src : gNodes)
+            if (const IPaletteSource* asPal = dynamic_cast<IPaletteSource*>(src.node.get()))
+               sPaletteOutPin.emplace(asPal, src.OutputPinId());
+      };
+      auto ensureMod = [&]()
+      {
+         if (builtMod) return;
+         builtMod = true;
+         sModOutPin.clear();
+         for (GraphNode& src : gNodes)
+         {
+            INode* n = src.node.get();
+            const int outs = std::max(1, n->OutputCount());
+            for (int o = 0; o < outs; o++)
+               if (IModulator* mod = ModulatorForOutput(n, o))
+                  sModOutPin.emplace(mod, src.OutputPinId(o));
+         }
+      };
+
       for (GraphNode& gn : gNodes)
       {
          auto linkFromNode = [&](const void* wanted, int slot)
          {
             if (wanted == nullptr)
                return;
-            for (GraphNode& src : gNodes)
-            {
-               // Compared against each interface separately: with multiple
-               // inheritance an IGeometrySource* and an INode* into the same
-               // object are different addresses, so one comparison is not enough.
-               const void* asGeo = dynamic_cast<IGeometrySource*>(src.node.get());
-               if (asGeo == wanted || (const void*)src.node.get() == wanted)
-               {
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(), gn.InputPinId(slot) });
-                  return;
-               }
-            }
+            ensureNodeGeo();
+            auto it = sNodeOrGeoOutPin.find(wanted);
+            if (it != sNodeOrGeoOutPin.end())
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot), it->second, gn.InputPinId(slot) });
          };
 
          // Render3DNode's geometry slots are found generically below via
@@ -143,13 +180,12 @@ void DrawLinks(FrameCtx& fc)
          if (auto* setColor = dynamic_cast<SetColorNode*>(gn.node.get()))
          {
             if (setColor->paletteInput != nullptr)
-               for (GraphNode& src : gNodes)
-                  if (dynamic_cast<IPaletteSource*>(src.node.get()) == setColor->paletteInput)
-                  {
-                     gLinks.push_back({ kLinkIdBase + gn.InputPinId(2),
-                                         src.OutputPinId(), gn.InputPinId(2) });
-                     break;
-                  }
+            {
+               ensurePal();
+               auto it = sPaletteOutPin.find(setColor->paletteInput);
+               if (it != sPaletteOutPin.end())
+                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(2), it->second, gn.InputPinId(2) });
+            }
          }
 
          // Audio Analyze's own link used to be drawn by hand here from its
@@ -163,21 +199,10 @@ void DrawLinks(FrameCtx& fc)
             IModulator* wanted = *gn.node->ModulatorInputSlot(slot);
             if (wanted == nullptr)
                continue;
-            bool found = false;
-            for (GraphNode& src : gNodes)
-            {
-               for (int o = 0; o < std::max(1, src.node->OutputCount()) && !found; o++)
-               {
-                  if (ModulatorForOutput(src.node.get(), o) == wanted)
-                  {
-                     gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                        src.OutputPinId(o), gn.InputPinId(slot) });
-                     found = true;
-                  }
-               }
-               if (found)
-                  break;
-            }
+            ensureMod();
+            auto it = sModOutPin.find(wanted);
+            if (it != sModOutPin.end())
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot), it->second, gn.InputPinId(slot) });
          }
       }
 

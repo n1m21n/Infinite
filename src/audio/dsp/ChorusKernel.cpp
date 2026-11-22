@@ -26,6 +26,17 @@ void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
    const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
    const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
    const float lineCapacityMs = kMaxDelayMs - 4.0f;
+   const double invSr = 1.0 / mSampleRate;
+   const float msToSamples = 0.001f * (float)mSampleRate;
+   const float invTaps = 1.0f / (float)taps;
+   const float syncRateHz = sync
+      ? (float)MusicTime::HzForRateDivision((MusicTime::RateDivision)rateDiv, std::max(1.0, (double)Transport::Instance().Tempo()))
+      : 0.0f;
+   constexpr float kTwoPi = 6.28318530717958647692f;
+   constexpr float kPi = 3.14159265358979323846f;
+   constexpr float kSqrt3Over2 = 0.86602540378443864676f;
+
+   float lastSpread = -1.0f, spreadCos = 1.0f, spreadSin = 0.0f;
 
    for (int i = 0; i < out.numFrames; i++)
    {
@@ -39,17 +50,17 @@ void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       const float spread = std::clamp(mMailbox.SmoothedValue(kSpread), 0.0f, 1.0f);
       const float depthMs = mMailbox.SmoothedValue(kDepthMs);
       const float feedback = std::clamp(mMailbox.SmoothedValue(kFeedback), 0.0f, 0.9f);
+      const float rateHz = sync ? syncRateHz : std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
 
-      float rateHz;
-      if (sync)
+      if (spread != lastSpread)
       {
-         const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
-         rateHz = (float)MusicTime::HzForRateDivision((MusicTime::RateDivision)rateDiv, bpm);
+         lastSpread = spread;
+         const float ang = kPi * spread;
+         spreadCos = cosf(ang);
+         spreadSin = sinf(ang);
       }
-      else
-         rateHz = std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
 
-      mPhase += rateHz / mSampleRate;
+      mPhase += (double)rateHz * invSr;
       if (mPhase >= 1.0)
          mPhase -= floor(mPhase);
 
@@ -60,21 +71,34 @@ void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       if (analog)
       {
          const float lfoDrift = mDriftLfo.Advance(std::max(0.1f, rateHz), 0.15f, 0.04f, mSampleRate) * 0.1f;
+         const float baseAng = kTwoPi * ((float)mPhase + lfoDrift);
+         const float sL = sinf(baseAng);
+         const float cL = cosf(baseAng);
+         const float sR = sL * spreadCos + cL * spreadSin;
+         const float cR = cL * spreadCos - sL * spreadSin;
 
-         for (int k = 0; k < taps; k++)
+         if (taps == 2)
          {
-            const float voiceOffset = (float)k / (float)taps;
-            const float lPhase = (float)mPhase + voiceOffset + lfoDrift;
-            const float rPhase = (float)mPhase + voiceOffset + spread * 0.5f + lfoDrift;
-
-            const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * lPhase), 0.5f, lineCapacityMs);
-            const float rMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * rPhase), 0.5f, lineCapacityMs);
-
-            wetL += mLineL.Read(lMs * 0.001f * (float)mSampleRate);
-            wetR += mLineR.Read(rMs * 0.001f * (float)mSampleRate);
+            wetL = mLineL.Read(std::clamp(delayMs + depthMs * sL, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineL.Read(std::clamp(delayMs - depthMs * sL, 0.5f, lineCapacityMs) * msToSamples);
+            wetR = mLineR.Read(std::clamp(delayMs + depthMs * sR, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineR.Read(std::clamp(delayMs - depthMs * sR, 0.5f, lineCapacityMs) * msToSamples);
          }
-         wetL /= (float)taps;
-         wetR /= (float)taps;
+         else
+         {
+            const float sL1 = -0.5f * sL + kSqrt3Over2 * cL;
+            const float sL2 = -0.5f * sL - kSqrt3Over2 * cL;
+            const float sR1 = -0.5f * sR + kSqrt3Over2 * cR;
+            const float sR2 = -0.5f * sR - kSqrt3Over2 * cR;
+            wetL = mLineL.Read(std::clamp(delayMs + depthMs * sL, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineL.Read(std::clamp(delayMs + depthMs * sL1, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineL.Read(std::clamp(delayMs + depthMs * sL2, 0.5f, lineCapacityMs) * msToSamples);
+            wetR = mLineR.Read(std::clamp(delayMs + depthMs * sR, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineR.Read(std::clamp(delayMs + depthMs * sR1, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineR.Read(std::clamp(delayMs + depthMs * sR2, 0.5f, lineCapacityMs) * msToSamples);
+         }
+         wetL *= invTaps;
+         wetR *= invTaps;
 
          // BBD compander and bucket saturation
          wetL = AnalogDsp::AsymTanh(wetL, 0.10f);
@@ -91,20 +115,34 @@ void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       }
       else
       {
-         for (int k = 0; k < taps; k++)
+         const float baseAng = kTwoPi * (float)mPhase;
+         const float sL = sinf(baseAng);
+         const float cL = cosf(baseAng);
+         const float sR = sL * spreadCos + cL * spreadSin;
+         const float cR = cL * spreadCos - sL * spreadSin;
+
+         if (taps == 2)
          {
-            const float voiceOffset = (float)k / (float)taps;
-            const float lPhase = (float)mPhase + voiceOffset;
-            const float rPhase = (float)mPhase + voiceOffset + spread * 0.5f;
-
-            const float lMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * lPhase), 0.5f, lineCapacityMs);
-            const float rMs = std::clamp(delayMs + depthMs * sinf(2.0f * (float)M_PI * rPhase), 0.5f, lineCapacityMs);
-
-            wetL += mLineL.Read(lMs * 0.001f * (float)mSampleRate);
-            wetR += mLineR.Read(rMs * 0.001f * (float)mSampleRate);
+            wetL = mLineL.Read(std::clamp(delayMs + depthMs * sL, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineL.Read(std::clamp(delayMs - depthMs * sL, 0.5f, lineCapacityMs) * msToSamples);
+            wetR = mLineR.Read(std::clamp(delayMs + depthMs * sR, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineR.Read(std::clamp(delayMs - depthMs * sR, 0.5f, lineCapacityMs) * msToSamples);
          }
-         wetL /= (float)taps;
-         wetR /= (float)taps;
+         else
+         {
+            const float sL1 = -0.5f * sL + kSqrt3Over2 * cL;
+            const float sL2 = -0.5f * sL - kSqrt3Over2 * cL;
+            const float sR1 = -0.5f * sR + kSqrt3Over2 * cR;
+            const float sR2 = -0.5f * sR - kSqrt3Over2 * cR;
+            wetL = mLineL.Read(std::clamp(delayMs + depthMs * sL, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineL.Read(std::clamp(delayMs + depthMs * sL1, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineL.Read(std::clamp(delayMs + depthMs * sL2, 0.5f, lineCapacityMs) * msToSamples);
+            wetR = mLineR.Read(std::clamp(delayMs + depthMs * sR, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineR.Read(std::clamp(delayMs + depthMs * sR1, 0.5f, lineCapacityMs) * msToSamples)
+                 + mLineR.Read(std::clamp(delayMs + depthMs * sR2, 0.5f, lineCapacityMs) * msToSamples);
+         }
+         wetL *= invTaps;
+         wetR *= invTaps;
 
          mLineL.Write(inL + wetL * feedback);
          mLineR.Write(inR + wetR * feedback);

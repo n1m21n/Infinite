@@ -1,4 +1,5 @@
 #include "Geometry3DNodes.h"
+#include "core/GLUtil.h"
 #include "Render3DTonemap.h"
 #include "Render3DSheen.h"
 #include "Render3DThinFilm.h"
@@ -1421,14 +1422,14 @@ static void SetSssUniforms(GLuint prog, const Material& m)
    float r[3];
    for (int k = 0; k < 3; k++)
       r[k] = std::max(m.subsurfaceColor[k], 0.0f) * 0.2f * std::max(m.subsurfaceRadius, 0.0f);
-   glUniform3fv(glGetUniformLocation(prog, "uSssRadius"), 1, r);
-   glUniform1f(glGetUniformLocation(prog, "uTranslucency"), std::clamp(m.translucency, 0.0f, 1.0f));
-   glUniform1f(glGetUniformLocation(prog, "uSssK"), 4.0f); // curvature wrap gain, fitted on mat_subsurface (as live SSS_K)
+   glUniform3fv(GLUtil::UniformLoc(prog, "uSssRadius"), 1, r);
+   glUniform1f(GLUtil::UniformLoc(prog, "uTranslucency"), std::clamp(m.translucency, 0.0f, 1.0f));
+   glUniform1f(GLUtil::UniformLoc(prog, "uSssK"), 4.0f); // curvature wrap gain, fitted on mat_subsurface (as live SSS_K)
 }
 
 static void SetHairUniforms(GLuint prog, const Material& m)
 {
-   glUniform1i(glGetUniformLocation(prog, "uHair"), m.hair ? 1 : 0);
+   glUniform1i(GLUtil::UniformLoc(prog, "uHair"), m.hair ? 1 : 0);
    if (!m.hair)
       return;
    float lc[3], lt[3], sa[3];
@@ -1439,9 +1440,9 @@ static void SetHairUniforms(GLuint prog, const Material& m)
    }
    const float bn = std::clamp(m.radialRoughness, 0.02f, 1.0f);
    r3dhair::Sigma(m.hair, m.melanin, m.melaninRedness, lc, lt, bn, sa);
-   glUniform3fv(glGetUniformLocation(prog, "uHairSigma"), 1, sa);
-   glUniform1f(glGetUniformLocation(prog, "uHairRadial"), bn);
-   glUniform1f(glGetUniformLocation(prog, "uHairShift"), m.hairShift * 0.017453293f);
+   glUniform3fv(GLUtil::UniformLoc(prog, "uHairSigma"), 1, sa);
+   glUniform1f(GLUtil::UniformLoc(prog, "uHairRadial"), bn);
+   glUniform1f(GLUtil::UniformLoc(prog, "uHairShift"), m.hairShift * 0.017453293f);
 }
 
 GeometryNode::~GeometryNode()
@@ -1719,7 +1720,7 @@ bool Render3DNode::EnsureShadowShader()
       char log[1024];
       glGetProgramInfoLog(mShadowProgram, sizeof(log), nullptr, log);
       fprintf(stderr, "Shadow link error: %s\n", log);
-      glDeleteProgram(mShadowProgram);
+      GLUtil::DeleteProgram(mShadowProgram);
       mShadowProgram = 0;
       return false;
    }
@@ -1813,7 +1814,7 @@ bool Render3DNode::EnsureEnvBgShader()
       char log[1024];
       glGetProgramInfoLog(mEnvBgProgram, sizeof(log), nullptr, log);
       fprintf(stderr, "Render3D env background link error: %s\n", log);
-      glDeleteProgram(mEnvBgProgram);
+      GLUtil::DeleteProgram(mEnvBgProgram);
       mEnvBgProgram = 0;
       return false;
    }
@@ -1921,10 +1922,10 @@ Render3DNode::~Render3DNode()
       GLUtil::DestroyFbo(f);
    for (GpuMesh& gpu : mGpu)
       ReleaseGpuMesh(gpu);
-   if (mProgramFull != 0) glDeleteProgram(mProgramFull);
-   if (mProgramOpaque != 0) glDeleteProgram(mProgramOpaque);
-   if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
-   if (mEnvBgProgram != 0) glDeleteProgram(mEnvBgProgram);
+   if (mProgramFull != 0) GLUtil::DeleteProgram(mProgramFull);
+   if (mProgramOpaque != 0) GLUtil::DeleteProgram(mProgramOpaque);
+   if (mShadowProgram != 0) GLUtil::DeleteProgram(mShadowProgram);
+   if (mEnvBgProgram != 0) GLUtil::DeleteProgram(mEnvBgProgram);
    if (mEnvBgVao != 0) glDeleteVertexArrays(1, &mEnvBgVao);
 }
 
@@ -1978,14 +1979,14 @@ static void BindGpuInstances(unsigned int program, const GpuPoints& gp, Instance
    glActiveTexture(GL_TEXTURE12);
    glBindTexture(GL_TEXTURE_2D, gp.colorTex);
    glActiveTexture(GL_TEXTURE0);
-   glUniform1i(glGetUniformLocation(program, "uPointPos"), 11);
-   glUniform1i(glGetUniformLocation(program, "uPointColor"), 12);
-   glUniform1i(glGetUniformLocation(program, "uPointTexW"), gp.texW);
-   glUniformMatrix4fv(glGetUniformLocation(program, "uPointModel"), 1, GL_FALSE, gp.pointMatrix.m);
-   glUniform1f(glGetUniformLocation(program, "uPointSizeScale"), instancer.GpuInstanceSizeScale());
-   glUniformMatrix4fv(glGetUniformLocation(program, "uInstanceGroup"), 1, GL_FALSE, groupMatrix.m);
+   glUniform1i(GLUtil::UniformLoc(program, "uPointPos"), 11);
+   glUniform1i(GLUtil::UniformLoc(program, "uPointColor"), 12);
+   glUniform1i(GLUtil::UniformLoc(program, "uPointTexW"), gp.texW);
+   glUniformMatrix4fv(GLUtil::UniformLoc(program, "uPointModel"), 1, GL_FALSE, gp.pointMatrix.m);
+   glUniform1f(GLUtil::UniformLoc(program, "uPointSizeScale"), instancer.GpuInstanceSizeScale());
+   glUniformMatrix4fv(GLUtil::UniformLoc(program, "uInstanceGroup"), 1, GL_FALSE, groupMatrix.m);
    const Mat4 shape = instancer.GpuInstanceShapeModel();
-   glUniformMatrix4fv(glGetUniformLocation(program, "uShapeModel"), 1, GL_FALSE, shape.m);
+   glUniformMatrix4fv(GLUtil::UniformLoc(program, "uShapeModel"), 1, GL_FALSE, shape.m);
 }
 
 bool Render3DNode::EnsureShader()
@@ -2031,7 +2032,7 @@ bool Render3DNode::EnsureShader()
          char log[1024];
          glGetProgramInfoLog(program, sizeof(log), nullptr, log);
          fprintf(stderr, "Render3D link error: %s\n", log);
-         glDeleteProgram(program);
+         GLUtil::DeleteProgram(program);
          return 0u;
       }
       return program;
@@ -2508,8 +2509,8 @@ void Render3DNode::SyncFieldPrograms()
       return;
    mFldKey = key;
    mFldGlsl = std::move(lib);
-   if (mProgramFull != 0) glDeleteProgram(mProgramFull);
-   if (mProgramOpaque != 0) glDeleteProgram(mProgramOpaque);
+   if (mProgramFull != 0) GLUtil::DeleteProgram(mProgramFull);
+   if (mProgramOpaque != 0) GLUtil::DeleteProgram(mProgramOpaque);
    mProgramFull = mProgramOpaque = mProgram = 0;
    mShaderTried = false;
    if (!EnsureShader() && !mFldGlsl.empty())
@@ -2518,8 +2519,8 @@ void Render3DNode::SyncFieldPrograms()
       Field::IsolateFailingPrograms(ids, Field::MaterialLang::Glsl,
                                     [](const std::string& one) { return FragmentErrorWith(kFragSrc, one); });
       mFldGlsl = Field::BuildMaterialLibrary(ids, Field::MaterialLang::Glsl, mFldKey);
-      if (mProgramFull != 0) glDeleteProgram(mProgramFull);
-      if (mProgramOpaque != 0) glDeleteProgram(mProgramOpaque);
+      if (mProgramFull != 0) GLUtil::DeleteProgram(mProgramFull);
+      if (mProgramOpaque != 0) GLUtil::DeleteProgram(mProgramOpaque);
       mProgramFull = mProgramOpaque = mProgram = 0;
       mShaderTried = false;
       if (!EnsureShader() && !mFldGlsl.empty())
@@ -2921,7 +2922,7 @@ void Render3DNode::CookOnce(int frameId)
          glDisable(GL_CULL_FACE);
 
          glUseProgram(mShadowProgram);
-         glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uLightViewProj"),
+         glUniformMatrix4fv(GLUtil::UniformLoc(mShadowProgram, "uLightViewProj"),
                             1, GL_FALSE, mLightViewProj.m);
 
          for (int i = 0; i < (int)mDraw.size(); i++)
@@ -2936,9 +2937,9 @@ void Render3DNode::CookOnce(int frameId)
             const int instanceCount = gpuInstances != nullptr ? gpuInstances->count : mGpu[i].instanceCount;
             const bool instanced = instancer != nullptr && instanceCount > 0 &&
                                    (mGpu[i].instanceAttribsOn || gpuInstances != nullptr);
-            glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uModel"), 1, GL_FALSE, model.m);
-            glUniform1i(glGetUniformLocation(mShadowProgram, "uInstanced"), instanced ? 1 : 0);
-            glUniform1i(glGetUniformLocation(mShadowProgram, "uGpuPoints"), (instanced && gpuInstances) ? 1 : 0);
+            glUniformMatrix4fv(GLUtil::UniformLoc(mShadowProgram, "uModel"), 1, GL_FALSE, model.m);
+            glUniform1i(GLUtil::UniformLoc(mShadowProgram, "uInstanced"), instanced ? 1 : 0);
+            glUniform1i(GLUtil::UniformLoc(mShadowProgram, "uGpuPoints"), (instanced && gpuInstances) ? 1 : 0);
             if (instanced && gpuInstances != nullptr)
                BindGpuInstances(mShadowProgram, *gpuInstances, *instancer, source->GetInstanceGroupMatrix());
             // Fur's strands stay out: a shadow map can't resolve them, and they would blot the coat.
@@ -3021,20 +3022,20 @@ void Render3DNode::CookOnce(int frameId)
       glDepthMask(GL_FALSE);
 
       glUseProgram(mEnvBgProgram);
-      glUniformMatrix4fv(glGetUniformLocation(mEnvBgProgram, "uInvViewProj"), 1, GL_FALSE, invViewProj.m);
-      glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uCamPos"), 1, eye);
+      glUniformMatrix4fv(GLUtil::UniformLoc(mEnvBgProgram, "uInvViewProj"), 1, GL_FALSE, invViewProj.m);
+      glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uCamPos"), 1, eye);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, envTex);
-      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uEnvMap"), 0);
-      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mEnvBgProgram, "uEnvRotation"), envRotationRad);
-      glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvSky"), 1, envSky);
-      glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvHorizon"), 1, envHorizon);
-      glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvGround"), 1, envGround);
-      glUniform1f(glGetUniformLocation(mEnvBgProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
-      glUniform1f(glGetUniformLocation(mEnvBgProgram, "uExposure"), exposure);
-      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
-      glUniform1f(glGetUniformLocation(mEnvBgProgram, "uBgOpacity"), bgOpacity);
+      glUniform1i(GLUtil::UniformLoc(mEnvBgProgram, "uEnvMap"), 0);
+      glUniform1i(GLUtil::UniformLoc(mEnvBgProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mEnvBgProgram, "uEnvRotation"), envRotationRad);
+      glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uEnvSky"), 1, envSky);
+      glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uEnvHorizon"), 1, envHorizon);
+      glUniform3fv(GLUtil::UniformLoc(mEnvBgProgram, "uEnvGround"), 1, envGround);
+      glUniform1f(GLUtil::UniformLoc(mEnvBgProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
+      glUniform1f(GLUtil::UniformLoc(mEnvBgProgram, "uExposure"), exposure);
+      glUniform1i(GLUtil::UniformLoc(mEnvBgProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
+      glUniform1f(GLUtil::UniformLoc(mEnvBgProgram, "uBgOpacity"), bgOpacity);
 
       glBindVertexArray(mEnvBgVao);
       glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -3082,79 +3083,79 @@ void Render3DNode::CookOnce(int frameId)
          continue;
       mProgram = program;
       glUseProgram(mProgram);
-      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
-      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, view.m);
-      glUniform3fv(glGetUniformLocation(mProgram, "uCamRight"), 1, camRight);
-      glUniform3fv(glGetUniformLocation(mProgram, "uCamUp"), 1, camUp);
-      glUniform1i(glGetUniformLocation(mProgram, "uSpriteShape"), spriteShape);
-      glUniform1i(glGetUniformLocation(mProgram, "uSpriteSizeMode"), spriteSizeMode);
-      glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kMaxLights, lightDirs);
-      glUniform3fv(glGetUniformLocation(mProgram, "uLightAim"), kMaxLights, lightAims);
-      glUniform1i(glGetUniformLocation(mProgram, "uWire"), rig != nullptr && rig->wireframe ? 1 : 0);
-      glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kMaxLights, lightCols);
-      glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kMaxLights, lightPower);
-      glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kMaxLights, lightTypes);
-      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotAngle"), kMaxLights, lightSpotAngle);
-      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kMaxLights, lightSpotPenumbra);
-      glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kMaxLights, lightArea);
-      glUniform4fv(glGetUniformLocation(mProgram, "uLightTerms"), kMaxLights, lightTerms);
-      glUniform1fv(glGetUniformLocation(mProgram, "uLightCutoff"), kMaxLights, lightCutoff);
-      glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
-      glUniform1f(glGetUniformLocation(mProgram, "uFldTime"), (float)Transport::Instance().Seconds());
+      glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+      glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uView"), 1, GL_FALSE, view.m);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uCamRight"), 1, camRight);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uCamUp"), 1, camUp);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSpriteShape"), spriteShape);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSpriteSizeMode"), spriteSizeMode);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uLightDir"), kMaxLights, lightDirs);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uLightAim"), kMaxLights, lightAims);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uWire"), rig != nullptr && rig->wireframe ? 1 : 0);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uLightColor"), kMaxLights, lightCols);
+      glUniform1fv(GLUtil::UniformLoc(mProgram, "uLightIntensity"), kMaxLights, lightPower);
+      glUniform1iv(GLUtil::UniformLoc(mProgram, "uLightType"), kMaxLights, lightTypes);
+      glUniform1fv(GLUtil::UniformLoc(mProgram, "uLightSpotAngle"), kMaxLights, lightSpotAngle);
+      glUniform1fv(GLUtil::UniformLoc(mProgram, "uLightSpotPenumbra"), kMaxLights, lightSpotPenumbra);
+      glUniform2fv(GLUtil::UniformLoc(mProgram, "uLightArea"), kMaxLights, lightArea);
+      glUniform4fv(GLUtil::UniformLoc(mProgram, "uLightTerms"), kMaxLights, lightTerms);
+      glUniform1fv(GLUtil::UniformLoc(mProgram, "uLightCutoff"), kMaxLights, lightCutoff);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uLightCount"), lightCount);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uFldTime"), (float)Transport::Instance().Seconds());
       const float rigAmbient[3] = { ambientColor[0] + (rig != nullptr ? rig->ambient[0] : 0.0f),
                                     ambientColor[1] + (rig != nullptr ? rig->ambient[1] : 0.0f),
                                     ambientColor[2] + (rig != nullptr ? rig->ambient[2] : 0.0f) };
-      glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, rigAmbient);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uAmbient"), 1, rigAmbient);
       {
          const bool probes = mProbeValid && mProbeTex != 0 && !probesOff;
          glActiveTexture(GL_TEXTURE16);
          glBindTexture(GL_TEXTURE_3D, probes ? mProbeTex : 0);
          glBindSampler(16, 0);
          glActiveTexture(GL_TEXTURE0);
-         glUniform1i(glGetUniformLocation(mProgram, "uProbeTex"), 16);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uProbeTex"), 16);
          glActiveTexture(GL_TEXTURE17);
          glBindTexture(GL_TEXTURE_3D, probes ? mProbeDepthTex : 0);
          glBindSampler(17, 0);
          glActiveTexture(GL_TEXTURE0);
-         glUniform1i(glGetUniformLocation(mProgram, "uProbeDepth"), 17);
-         glUniform1i(glGetUniformLocation(mProgram, "uHasProbes"), probes ? 1 : 0);
-         glUniform3fv(glGetUniformLocation(mProgram, "uProbeLo"), 1, mProbeLo);
-         glUniform3fv(glGetUniformLocation(mProgram, "uProbeStep"), 1, mProbeStep);
-         glUniform3iv(glGetUniformLocation(mProgram, "uProbeDims"), 1, mProbeDims);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uProbeDepth"), 17);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uHasProbes"), probes ? 1 : 0);
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uProbeLo"), 1, mProbeLo);
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uProbeStep"), 1, mProbeStep);
+         glUniform3iv(GLUtil::UniformLoc(mProgram, "uProbeDims"), 1, mProbeDims);
       }
-      glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
-      glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
-      glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
-      glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
-      glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
-      glUniform1i(glGetUniformLocation(mProgram, "uPassMask"), passMask);
-      glUniform1i(glGetUniformLocation(mProgram, "uVelocity"), mVelocityPass ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uRim"), rimIntensity);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uCamPos"), 1, eye);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uExposure"), exposure);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uRenderPass"), renderPass);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uPassMask"), std::clamp(passMask, 0, 255));
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uVelocity"), mVelocityPass ? 1 : 0);
       if (mVelocityPass)
       {
          const float reach = std::max(1.0f, motionMax * (float)h / 1080.0f);
-         glUniform2f(glGetUniformLocation(mProgram, "uVelocityScale"), 0.5f * (float)w / (2.0f * reach),
+         glUniform2f(GLUtil::UniformLoc(mProgram, "uVelocityScale"), 0.5f * (float)w / (2.0f * reach),
                      0.5f * (float)h / (2.0f * reach));
-         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uPrevViewProj"), 1, GL_FALSE, mPrevViewProj.m);
+         glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uPrevViewProj"), 1, GL_FALSE, mPrevViewProj.m);
       }
-      glUniform1f(glGetUniformLocation(mProgram, "uMistStart"), mistStart);
-      glUniform1f(glGetUniformLocation(mProgram, "uMistDepth"), mistDepth);
-      glUniform1f(glGetUniformLocation(mProgram, "uMistFalloff"), mistFalloff == 1 ? 1.0f : mistFalloff == 2 ? 0.5f : 2.0f);
-      glUniform1f(glGetUniformLocation(mProgram, "uMistIntensity"), mistIntensity);
-      glUniform1f(glGetUniformLocation(mProgram, "uMistHeight"), mistHeight);
-      glUniform1f(glGetUniformLocation(mProgram, "uPassThreshold"), passThreshold);
-      glUniform1i(glGetUniformLocation(mProgram, "uSolid"), SolidActive() ? 1 : 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uSolidLighting"), solidLighting);
-      glUniform1i(glGetUniformLocation(mProgram, "uSolidColor"), solidColor);
-      glUniform3fv(glGetUniformLocation(mProgram, "uSolidSingle"), 1, solidSingle);
-      glUniform1i(glGetUniformLocation(mProgram, "uMatcap"), matcap);
-      glUniform1i(glGetUniformLocation(mProgram, "uSolidSpecular"), solidSpecular ? 1 : 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uStudioWorld"), studioWorld ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mProgram, "uStudioRotation"), studioRotation * 3.14159265f / 180.0f);
-      glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
-      glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMistStart"), mistStart);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMistDepth"), mistDepth);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMistFalloff"), mistFalloff == 1 ? 1.0f : mistFalloff == 2 ? 0.5f : 2.0f);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMistIntensity"), mistIntensity);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMistHeight"), mistHeight);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uPassThreshold"), passThreshold);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSolid"), SolidActive() ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSolidLighting"), solidLighting);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSolidColor"), solidColor);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uSolidSingle"), 1, solidSingle);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uMatcap"), matcap);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSolidSpecular"), solidSpecular ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uStudioWorld"), studioWorld ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uStudioRotation"), studioRotation * 3.14159265f / 180.0f);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uNear"), nearPlane);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uFar"), farPlane);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
-      glUniform1i(glGetUniformLocation(mProgram, "uShadowMap"), 1);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uShadowMap"), 1);
       {
          static GLuint sRawDepth = 0;   // reads the shadow map without the depth compare
          if (sRawDepth == 0)
@@ -3169,31 +3170,31 @@ void Render3DNode::CookOnce(int frameId)
          glActiveTexture(GL_TEXTURE15);
          glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
          glBindSampler(15, sRawDepth);
-         glUniform1i(glGetUniformLocation(mProgram, "uShadowDepth"), 15);
-         glUniform1f(glGetUniformLocation(mProgram, "uPenumbraScale"), shadowsActive ? penumbraScale : 0.0f);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uShadowDepth"), 15);
+         glUniform1f(GLUtil::UniformLoc(mProgram, "uPenumbraScale"), shadowsActive ? penumbraScale : 0.0f);
       }
-      glUniform1i(glGetUniformLocation(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBiasDepth);
-      glUniform1f(glGetUniformLocation(mProgram, "uShadowSoftness"),
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uShadowBias"), shadowBiasDepth);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uShadowSoftness"),
                   shadowKernel);
-      glUniform1i(glGetUniformLocation(mProgram, "uShadowLight"), ci);
-      glUniform1f(glGetUniformLocation(mProgram, "uShadowStrength"), shadowStrength);
-      glUniform1f(glGetUniformLocation(mProgram, "uShadowTexel"),
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uShadowLight"), ci);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uShadowStrength"), shadowStrength);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uShadowTexel"),
                   mShadowSize > 0 ? 1.0f / (float)mShadowSize : 0.0f);
-      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uLightViewProj"), 1, GL_FALSE,
+      glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uLightViewProj"), 1, GL_FALSE,
                          mLightViewProj.m);
       glActiveTexture(GL_TEXTURE0);
 
-      glUniform3fv(glGetUniformLocation(mProgram, "uEnvSky"), 1, envSky);
-      glUniform3fv(glGetUniformLocation(mProgram, "uEnvHorizon"), 1, envHorizon);
-      glUniform3fv(glGetUniformLocation(mProgram, "uEnvGround"), 1, envGround);
-      glUniform1f(glGetUniformLocation(mProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
-      glUniform1i(glGetUniformLocation(mProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mProgram, "uEnvRotation"), envRotationRad);
-      glUniform1f(glGetUniformLocation(mProgram, "uEnvMaxLod"), envMaxLod);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uEnvSky"), 1, envSky);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uEnvHorizon"), 1, envHorizon);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uEnvGround"), 1, envGround);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uEnvRotation"), envRotationRad);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uEnvMaxLod"), envMaxLod);
       glActiveTexture(GL_TEXTURE6);
       glBindTexture(GL_TEXTURE_2D, hasEnvMap ? envTex : DummyEnvTexture());
-      glUniform1i(glGetUniformLocation(mProgram, "uEnvMap"), 6);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uEnvMap"), 6);
       glActiveTexture(GL_TEXTURE0);
    }
 
@@ -3447,8 +3448,8 @@ void Render3DNode::CookOnce(int frameId)
       glBindTexture(GL_TEXTURE_2D, surface != 0 ? surface : WhiteTexture());
       if (surface != 0)
          PrepareSurfaceTexture(SurfaceWrapMode(cloud));
-      glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uTexture"), 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
       // Per-channel material maps (roughness/metallic/normal/ao) don't apply
       // to a swatch-less billboard; explicitly off rather than left however
       // the previous slot's draw call last set them.
@@ -3459,18 +3460,18 @@ void Render3DNode::CookOnce(int frameId)
       for (int map = kMapRoughness; map < kMapCount; map++)
          glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), 0);
 
-      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, Mat4::Identity().m);
+      glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uModel"), 1, GL_FALSE, Mat4::Identity().m);
       if (MotionActive())
-         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(cloud, model).m);
-      glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)cloud->LightMask());
-      glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), cloud->PassIndex());
-      glUniform1i(glGetUniformLocation(mProgram, "uDrawSlot"), i + 1);
-      { float oc[3]; cloud->ObjectColor(oc); glUniform3fv(glGetUniformLocation(mProgram, "uObjectColor"), 1, oc); }
-      glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
-      glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
-      glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"), 1);
-      glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 1);
-      glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), gpuDraw ? 1 : 0);
+         glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(cloud, model).m);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uLightMask"), (int)cloud->LightMask());
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uObjectIndex"), cloud->PassIndex());
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uDrawSlot"), i + 1);
+      { float oc[3]; cloud->ObjectColor(oc); glUniform3fv(GLUtil::UniformLoc(mProgram, "uObjectColor"), 1, oc); }
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uInstanced"), 1);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uInstanceColored"), 1);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uIsSprite"), 1);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uGpuPoints"), gpuDraw ? 1 : 0);
       if (gpuDraw)
       {
          // Units 11/12: above every unit the material maps, env and shadow
@@ -3480,44 +3481,44 @@ void Render3DNode::CookOnce(int frameId)
          glActiveTexture(GL_TEXTURE12);
          glBindTexture(GL_TEXTURE_2D, gpuPoints->colorTex);
          glActiveTexture(GL_TEXTURE0);
-         glUniform1i(glGetUniformLocation(mProgram, "uPointPos"), 11);
-         glUniform1i(glGetUniformLocation(mProgram, "uPointColor"), 12);
-         glUniform1i(glGetUniformLocation(mProgram, "uPointTexW"), gpuPoints->texW);
-         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uPointModel"), 1, GL_FALSE, gpuPointModel.m);
-         glUniform1f(glGetUniformLocation(mProgram, "uPointSizeScale"), gpuSizeScale);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uPointPos"), 11);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uPointColor"), 12);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uPointTexW"), gpuPoints->texW);
+         glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uPointModel"), 1, GL_FALSE, gpuPointModel.m);
+         glUniform1f(GLUtil::UniformLoc(mProgram, "uPointSizeScale"), gpuSizeScale);
       }
-      glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
-      glUniform1f(glGetUniformLocation(mProgram, "uFldProgram"), (float)material.fieldProgram);
-      glUniform4fv(glGetUniformLocation(mProgram, "uFldPrm"), 4, material.fieldParams);
-      glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
-      glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
-      glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), material.opacity);
-      glUniform1i(glGetUniformLocation(mProgram, "uShading"), material.shading);
-      glUniform3fv(glGetUniformLocation(mProgram, "uEmissionColor"), 1, material.emissionColor);
-      glUniform1f(glGetUniformLocation(mProgram, "uEmission"), material.emission);
-      glUniform1f(glGetUniformLocation(mProgram, "uIor"), material.ior);
-      glUniform1f(glGetUniformLocation(mProgram, "uSpecular"), material.specular);
-      glUniform1f(glGetUniformLocation(mProgram, "uClearcoat"), material.clearcoat);
-      glUniform1f(glGetUniformLocation(mProgram, "uClearcoatRoughness"), material.clearcoatRoughness);
-      glUniform1f(glGetUniformLocation(mProgram, "uSubsurface"), material.subsurface);
-      glUniform3fv(glGetUniformLocation(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
-      glUniform1f(glGetUniformLocation(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uBaseColor"), 1, material.color);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uFldProgram"), (float)material.fieldProgram);
+      glUniform4fv(GLUtil::UniformLoc(mProgram, "uFldPrm"), 4, material.fieldParams);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMetallic"), material.metallic);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uRoughness"), material.roughness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uOpacity"), material.opacity);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uShading"), material.shading);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uEmissionColor"), 1, material.emissionColor);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uEmission"), material.emission);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uIor"), material.ior);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSpecular"), material.specular);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uClearcoat"), material.clearcoat);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uClearcoatRoughness"), material.clearcoatRoughness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSubsurface"), material.subsurface);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
       SetSssUniforms(mProgram, material);
-      glUniform1f(glGetUniformLocation(mProgram, "uSheen"), material.sheen);
-      glUniform3fv(glGetUniformLocation(mProgram, "uSheenColor"), 1, material.sheenColor);
-      glUniform1f(glGetUniformLocation(mProgram, "uSheenRoughness"), material.sheenRoughness);
-      glUniform1f(glGetUniformLocation(mProgram, "uSheenDir"), material.sheenDirection);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSheen"), material.sheen);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uSheenColor"), 1, material.sheenColor);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSheenRoughness"), material.sheenRoughness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSheenDir"), material.sheenDirection);
       SetHairUniforms(mProgram, material);
-      glUniform1f(glGetUniformLocation(mProgram, "uIridescence"), material.iridescence);
-      glUniform1f(glGetUniformLocation(mProgram, "uIridescenceIor"), material.iridescenceIor);
-      glUniform1f(glGetUniformLocation(mProgram, "uIridescenceThickness"), material.iridescenceThickness);
-      glUniform1f(glGetUniformLocation(mProgram, "uAnisotropy"), material.anisotropy);
-      glUniform1f(glGetUniformLocation(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
-      glUniform1f(glGetUniformLocation(mProgram, "uDispersion"), 0.0f);
-      glUniform1f(glGetUniformLocation(mProgram, "uAlphaCutoff"), material.alphaCutoff);
-      glUniform1i(glGetUniformLocation(mProgram, "uTextureAlpha"), material.textureAlpha ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), 0.0f);
-      glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), 0.0f);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uIridescence"), material.iridescence);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uIridescenceIor"), material.iridescenceIor);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uIridescenceThickness"), material.iridescenceThickness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAnisotropy"), material.anisotropy);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uDispersion"), 0.0f);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAlphaCutoff"), material.alphaCutoff);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uTextureAlpha"), material.textureAlpha ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uTransmission"), 0.0f);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uTransmissionRoughness"), 0.0f);
 
       glDrawElementsInstanced(GL_TRIANGLES, gpu.indexCount, GL_UNSIGNED_INT,
                               nullptr, (GLsizei)gpu.instanceCount);
@@ -3559,8 +3560,8 @@ void Render3DNode::CookOnce(int frameId)
          useProgram(variant ? mProgramOpaque : mProgramFull);
          sOpaqueVariantDraws += variant ? 1 : 0;
       }
-      glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uIsSprite"), 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uGpuPoints"), 0);
 
       const Mesh& mesh = source->GetMesh();
       // HasGeometry(), not Empty(): a vertices-only mesh (Points to
@@ -3685,8 +3686,8 @@ void Render3DNode::CookOnce(int frameId)
       glBindTexture(GL_TEXTURE_2D, surface != 0 ? surface : WhiteTexture());
       if (surface != 0)
          PrepareSurfaceTexture(wrapMode);
-      glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uTexture"), 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
 
       // The remaining material channels. Units 0 and 1 are taken by albedo and
       // the shadow map, so these start at 2, and units 6 & 7 by env and sceneColor.
@@ -3737,27 +3738,27 @@ void Render3DNode::CookOnce(int frameId)
       }
       {
          const Material mat = source->GetMaterial();
-         glUniform1f(glGetUniformLocation(mProgram, "uNormalStrength"), mat.normalStrength);
-         glUniform1i(glGetUniformLocation(mProgram, "uNormalBump"), mat.normalBump);
-         glUniform1f(glGetUniformLocation(mProgram, "uDetailScale"), mat.detailScale);
-         glUniform1f(glGetUniformLocation(mProgram, "uDetailStrength"), mat.detailStrength);
+         glUniform1f(GLUtil::UniformLoc(mProgram, "uNormalStrength"), mat.normalStrength);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uNormalBump"), mat.normalBump);
+         glUniform1f(GLUtil::UniformLoc(mProgram, "uDetailScale"), mat.detailScale);
+         glUniform1f(GLUtil::UniformLoc(mProgram, "uDetailStrength"), mat.detailStrength);
       }
 
       {
          const MappingTransform mapping = source->GetMappingTransform();
-         glUniform1i(glGetUniformLocation(mProgram, "uMapSpace"), mapping.space);
-         glUniform3fv(glGetUniformLocation(mProgram, "uMapTranslate"), 1, mapping.translate);
-         glUniform3fv(glGetUniformLocation(mProgram, "uMapRotate"), 1, mapping.rotate);
-         glUniform3fv(glGetUniformLocation(mProgram, "uMapScale"), 1, mapping.scale);
-         glUniform1f(glGetUniformLocation(mProgram, "uTriplanarBlend"), mapping.triplanarBlend);
-         glUniform1f(glGetUniformLocation(mProgram, "uBreakup"), mapping.breakup);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uMapSpace"), mapping.space);
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uMapTranslate"), 1, mapping.translate);
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uMapRotate"), 1, mapping.rotate);
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uMapScale"), 1, mapping.scale);
+         glUniform1f(GLUtil::UniformLoc(mProgram, "uTriplanarBlend"), mapping.triplanarBlend);
+         glUniform1f(GLUtil::UniformLoc(mProgram, "uBreakup"), mapping.breakup);
          // Object-space bounds computed at upload time, so Generated coordinates
          // normalise into this mesh's own box rather than a hardcoded -1..1.
          static const float kFallbackLo[3] = { -1.0f, -1.0f, -1.0f };
          static const float kFallbackHi[3] = { 1.0f, 1.0f, 1.0f };
-         glUniform3fv(glGetUniformLocation(mProgram, "uObjLo"), 1,
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uObjLo"), 1,
                       gpu.hasBounds ? gpu.lo : kFallbackLo);
-         glUniform3fv(glGetUniformLocation(mProgram, "uObjHi"), 1,
+         glUniform3fv(GLUtil::UniformLoc(mProgram, "uObjHi"), 1,
                       gpu.hasBounds ? gpu.hi : kFallbackHi);
       }
 
@@ -3767,8 +3768,8 @@ void Render3DNode::CookOnce(int frameId)
       const GpuPoints* gpuInstances = GpuInstancesFor(source, instancer, material);
       const bool instanced = instancer != nullptr &&
                              (gpuInstances != nullptr || instancer->InstanceCount() > 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), instanced ? 1 : 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), gpuInstances != nullptr ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uInstanced"), instanced ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uGpuPoints"), gpuInstances != nullptr ? 1 : 0);
       if (gpuInstances != nullptr)
       {
          // The copies come from the point textures; the per-instance
@@ -3920,51 +3921,51 @@ void Render3DNode::CookOnce(int frameId)
          gpu.instanceAttribsOn = false;
          gpu.instanceColored = false;
       }
-      glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"),
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uInstanceColored"),
                   (instanced && gpu.instanceColored) ? 1 : 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uHasVertexColor"), gpu.hasVertexColor ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uHasVertexColor"), gpu.hasVertexColor ? 1 : 0);
 
-      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
+      glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uModel"), 1, GL_FALSE, model.m);
       if (MotionActive())
-         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(source, model).m);
-      glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)source->LightMask());
-      glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), source->PassIndex());
-      glUniform1i(glGetUniformLocation(mProgram, "uDrawSlot"), i + 1);
-      { float oc[3]; source->ObjectColor(oc); glUniform3fv(glGetUniformLocation(mProgram, "uObjectColor"), 1, oc); }
-      glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
-      glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
-      glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
-      glUniform1f(glGetUniformLocation(mProgram, "uFldProgram"), (float)material.fieldProgram);
-      glUniform4fv(glGetUniformLocation(mProgram, "uFldPrm"), 4, material.fieldParams);
-      glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
-      glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
-      glUniform1f(glGetUniformLocation(mProgram, "uOpacity"), material.opacity);
-      glUniform1i(glGetUniformLocation(mProgram, "uShading"), material.shading);
-      glUniform3fv(glGetUniformLocation(mProgram, "uEmissionColor"), 1, material.emissionColor);
-      glUniform1f(glGetUniformLocation(mProgram, "uEmission"), material.emission);
-      glUniform1f(glGetUniformLocation(mProgram, "uIor"), material.ior);
-      glUniform1f(glGetUniformLocation(mProgram, "uSpecular"), material.specular);
-      glUniform1f(glGetUniformLocation(mProgram, "uClearcoat"), material.clearcoat);
-      glUniform1f(glGetUniformLocation(mProgram, "uClearcoatRoughness"), material.clearcoatRoughness);
-      glUniform1f(glGetUniformLocation(mProgram, "uSubsurface"), material.subsurface);
-      glUniform3fv(glGetUniformLocation(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
-      glUniform1f(glGetUniformLocation(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
+         glUniformMatrix4fv(GLUtil::UniformLoc(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(source, model).m);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uLightMask"), (int)source->LightMask());
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uObjectIndex"), source->PassIndex());
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uDrawSlot"), i + 1);
+      { float oc[3]; source->ObjectColor(oc); glUniform3fv(GLUtil::UniformLoc(mProgram, "uObjectColor"), 1, oc); }
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
+      glUniformMatrix3fv(GLUtil::UniformLoc(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uBaseColor"), 1, material.color);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uFldProgram"), (float)material.fieldProgram);
+      glUniform4fv(GLUtil::UniformLoc(mProgram, "uFldPrm"), 4, material.fieldParams);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uMetallic"), material.metallic);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uRoughness"), material.roughness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uOpacity"), material.opacity);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uShading"), material.shading);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uEmissionColor"), 1, material.emissionColor);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uEmission"), material.emission);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uIor"), material.ior);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSpecular"), material.specular);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uClearcoat"), material.clearcoat);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uClearcoatRoughness"), material.clearcoatRoughness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSubsurface"), material.subsurface);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uSubsurfaceColor"), 1, material.subsurfaceColor);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSubsurfaceRadius"), material.subsurfaceRadius);
       SetSssUniforms(mProgram, material);
-      glUniform1f(glGetUniformLocation(mProgram, "uSheen"), material.sheen);
-      glUniform3fv(glGetUniformLocation(mProgram, "uSheenColor"), 1, material.sheenColor);
-      glUniform1f(glGetUniformLocation(mProgram, "uSheenRoughness"), material.sheenRoughness);
-      glUniform1f(glGetUniformLocation(mProgram, "uSheenDir"), material.sheenDirection);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSheen"), material.sheen);
+      glUniform3fv(GLUtil::UniformLoc(mProgram, "uSheenColor"), 1, material.sheenColor);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSheenRoughness"), material.sheenRoughness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSheenDir"), material.sheenDirection);
       SetHairUniforms(mProgram, material);
-      glUniform1f(glGetUniformLocation(mProgram, "uIridescence"), material.iridescence);
-      glUniform1f(glGetUniformLocation(mProgram, "uIridescenceIor"), material.iridescenceIor);
-      glUniform1f(glGetUniformLocation(mProgram, "uIridescenceThickness"), material.iridescenceThickness);
-      glUniform1f(glGetUniformLocation(mProgram, "uAnisotropy"), material.anisotropy);
-      glUniform1f(glGetUniformLocation(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
-      glUniform1f(glGetUniformLocation(mProgram, "uDispersion"), material.dispersion);
-      glUniform1f(glGetUniformLocation(mProgram, "uAlphaCutoff"), material.alphaCutoff);
-      glUniform1i(glGetUniformLocation(mProgram, "uTextureAlpha"), material.textureAlpha ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), material.transmission);
-      glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), material.transmissionRoughness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uIridescence"), material.iridescence);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uIridescenceIor"), material.iridescenceIor);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uIridescenceThickness"), material.iridescenceThickness);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAnisotropy"), material.anisotropy);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uDispersion"), material.dispersion);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uAlphaCutoff"), material.alphaCutoff);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uTextureAlpha"), material.textureAlpha ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uTransmission"), material.transmission);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uTransmissionRoughness"), material.transmissionRoughness);
 
       // A flat mesh (a Plane) has no inside, so culling its back makes it vanish
       // when the camera passes under it: draw both sides, lit from the side seen.
@@ -3976,12 +3977,12 @@ void Render3DNode::CookOnce(int frameId)
       }
       const bool twoSided = backfaceCull && ((gpu.hasBounds && extentMax > 0.0f && extentMin <= extentMax * 1e-4f) ||
                                              source->GetMesh().twoSided);
-      glUniform1i(glGetUniformLocation(mProgram, "uTwoSided"), twoSided ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uTwoSided"), twoSided ? 1 : 0);
       {
          const Mesh& ribbonMesh = source->GetMesh();
-         glUniform1i(glGetUniformLocation(mProgram, "uRibbonPrim"),
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uRibbonPrim"),
                      ribbonMesh.twoSided ? (int)(ribbonMesh.ribbonStart / 3) : 0x7fffffff);
-         glUniform1i(glGetUniformLocation(mProgram, "uFurMesh"), ribbonMesh.twoSided ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(mProgram, "uFurMesh"), ribbonMesh.twoSided ? 1 : 0);
       }
       if (twoSided)
          glDisable(GL_CULL_FACE);
@@ -4110,10 +4111,10 @@ void Render3DNode::CookOnce(int frameId)
       glUseProgram(mProgram);
       glActiveTexture(GL_TEXTURE7);
       glBindTexture(GL_TEXTURE_2D, mSceneColorTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uSceneColor"), 7);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uSceneColor"), 7);
       glActiveTexture(GL_TEXTURE0);
-      glUniform1f(glGetUniformLocation(mProgram, "uSceneMaxLod"), mSceneMaxLod);
-      glUniform2f(glGetUniformLocation(mProgram, "uScreenSize"), (float)w, (float)h);
+      glUniform1f(GLUtil::UniformLoc(mProgram, "uSceneMaxLod"), mSceneMaxLod);
+      glUniform2f(GLUtil::UniformLoc(mProgram, "uScreenSize"), (float)w, (float)h);
 
       // No depth write: two overlapping transmissive surfaces both sample the
       // same pre-transmission snapshot rather than compositing against each

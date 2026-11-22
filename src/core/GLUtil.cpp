@@ -322,7 +322,7 @@ namespace GLUtil
 
    void SetImageHeadroom(unsigned int program, bool on)
    {
-      const GLint loc = glGetUniformLocation(program, "uImgHeadroom");
+      const GLint loc = UniformLoc(program, "uImgHeadroom");
       if (loc >= 0)
          glUniform1i(loc, on ? 1 : 0);
    }
@@ -401,7 +401,7 @@ namespace GLUtil
       if (!linked)
       {
          log = InfoLog(program, true);
-         glDeleteProgram(program);
+         DeleteProgram(program);
          return fail("link error: ", log);
       }
       return program;
@@ -663,6 +663,43 @@ namespace GLUtil
       glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
       glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
       return mapped != nullptr;
+   }
+
+   namespace
+   {
+      std::unordered_map<unsigned int, std::unordered_map<const char*, int>> sUniformCache;
+      unsigned int sLastUniformProg = 0;
+      std::unordered_map<const char*, int>* sLastUniformMap = nullptr;
+   }
+
+   int UniformLoc(unsigned int program, const char* literalName)
+   {
+      if (program == 0 || literalName == nullptr)
+         return -1;
+      if (program != sLastUniformProg || sLastUniformMap == nullptr)
+      {
+         sLastUniformProg = program;
+         sLastUniformMap = &sUniformCache[program];
+      }
+      auto it = sLastUniformMap->find(literalName);
+      if (it != sLastUniformMap->end())
+         return it->second;
+      const int loc = glGetUniformLocation(program, literalName);
+      sLastUniformMap->emplace(literalName, loc);
+      return loc;
+   }
+
+   void DeleteProgram(unsigned int program)
+   {
+      if (program == 0)
+         return;
+      sUniformCache.erase(program);
+      if (sLastUniformProg == program)
+      {
+         sLastUniformProg = 0;
+         sLastUniformMap = nullptr;
+      }
+      glDeleteProgram(program);
    }
 
    void AsyncRead::Destroy()

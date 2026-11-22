@@ -1,4 +1,5 @@
 #include "BrushEngine.h"
+#include "core/GLUtil.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -590,7 +591,7 @@ namespace BrushEngine
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, tex);
-         glUniform1i(glGetUniformLocation(sCopy, "uTex"), 0);
+         glUniform1i(GLUtil::UniformLoc(sCopy, "uTex"), 0);
       });
       if (blendOn)
          glEnable(GL_BLEND);
@@ -849,42 +850,42 @@ namespace BrushEngine
          sCarry = GLUtil::CompileProgram(kCarryFrag);
          if (sDab != 0)
          {
-            sDabLoc.center = glGetUniformLocation(sDab, "uCenter");
-            sDabLoc.radius = glGetUniformLocation(sDab, "uRadius");
-            sDabLoc.hard = glGetUniformLocation(sDab, "uHard");
-            sDabLoc.flow = glGetUniformLocation(sDab, "uFlow");
-            sDabLoc.tip = glGetUniformLocation(sDab, "uTip");
-            sDabLoc.seed = glGetUniformLocation(sDab, "uSeed");
-            sDabLoc.angle = glGetUniformLocation(sDab, "uAngle");
-            sDabLoc.round = glGetUniformLocation(sDab, "uRound");
-            sDabLoc.pencil = glGetUniformLocation(sDab, "uPencil");
-            sDabLoc.col = glGetUniformLocation(sDab, "uCol");
-            sDabLoc.dir = glGetUniformLocation(sDab, "uDir");
-            sDabLoc.along = glGetUniformLocation(sDab, "uAlong");
-            sDabLoc.mat = glGetUniformLocation(sDab, "uMat");
-            sDabLoc.profile = glGetUniformLocation(sDab, "uProfile");
-            sDabLoc.depth = glGetUniformLocation(sDab, "uDepth");
-            sDabLoc.light = glGetUniformLocation(sDab, "uLight");
-            sDabLoc.grain = glGetUniformLocation(sDab, "uGrain");
-            sDabLoc.grainScale = glGetUniformLocation(sDab, "uGrainScale");
-            sDabLoc.grainDepth = glGetUniformLocation(sDab, "uGrainDepth");
-            sDabLoc.grainMode = glGetUniformLocation(sDab, "uGrainMode");
-            sDabLoc.dual = glGetUniformLocation(sDab, "uDual");
-            sDabLoc.dualScale = glGetUniformLocation(sDab, "uDualScale");
-            sDabLoc.dualOff = glGetUniformLocation(sDab, "uDualOff");
-            sDabLoc.colB = glGetUniformLocation(sDab, "uColB");
-            sDabLoc.colAlong = glGetUniformLocation(sDab, "uColAlong");
-            sDabLoc.colPeriod = glGetUniformLocation(sDab, "uColPeriod");
-            sDabLoc.carry = glGetUniformLocation(sDab, "uCarry");
-            sDabLoc.wet = glGetUniformLocation(sDab, "uWet");
-            sDabLoc.tipTex = glGetUniformLocation(sDab, "uTipTex");
-            sDabLoc.hasTipTex = glGetUniformLocation(sDab, "uHasTipTex");
-            sDabLoc.grainTex = glGetUniformLocation(sDab, "uGrainTex");
-            sDabLoc.hasGrainTex = glGetUniformLocation(sDab, "uHasGrainTex");
-            sDabLoc.grainTexSize = glGetUniformLocation(sDab, "uGrainTexSize");
-            sDabLoc.colTex = glGetUniformLocation(sDab, "uColTex");
-            sDabLoc.hasColTex = glGetUniformLocation(sDab, "uHasColTex");
-            sDabLoc.surfSize = glGetUniformLocation(sDab, "uSurfSize");
+            sDabLoc.center = GLUtil::UniformLoc(sDab, "uCenter");
+            sDabLoc.radius = GLUtil::UniformLoc(sDab, "uRadius");
+            sDabLoc.hard = GLUtil::UniformLoc(sDab, "uHard");
+            sDabLoc.flow = GLUtil::UniformLoc(sDab, "uFlow");
+            sDabLoc.tip = GLUtil::UniformLoc(sDab, "uTip");
+            sDabLoc.seed = GLUtil::UniformLoc(sDab, "uSeed");
+            sDabLoc.angle = GLUtil::UniformLoc(sDab, "uAngle");
+            sDabLoc.round = GLUtil::UniformLoc(sDab, "uRound");
+            sDabLoc.pencil = GLUtil::UniformLoc(sDab, "uPencil");
+            sDabLoc.col = GLUtil::UniformLoc(sDab, "uCol");
+            sDabLoc.dir = GLUtil::UniformLoc(sDab, "uDir");
+            sDabLoc.along = GLUtil::UniformLoc(sDab, "uAlong");
+            sDabLoc.mat = GLUtil::UniformLoc(sDab, "uMat");
+            sDabLoc.profile = GLUtil::UniformLoc(sDab, "uProfile");
+            sDabLoc.depth = GLUtil::UniformLoc(sDab, "uDepth");
+            sDabLoc.light = GLUtil::UniformLoc(sDab, "uLight");
+            sDabLoc.grain = GLUtil::UniformLoc(sDab, "uGrain");
+            sDabLoc.grainScale = GLUtil::UniformLoc(sDab, "uGrainScale");
+            sDabLoc.grainDepth = GLUtil::UniformLoc(sDab, "uGrainDepth");
+            sDabLoc.grainMode = GLUtil::UniformLoc(sDab, "uGrainMode");
+            sDabLoc.dual = GLUtil::UniformLoc(sDab, "uDual");
+            sDabLoc.dualScale = GLUtil::UniformLoc(sDab, "uDualScale");
+            sDabLoc.dualOff = GLUtil::UniformLoc(sDab, "uDualOff");
+            sDabLoc.colB = GLUtil::UniformLoc(sDab, "uColB");
+            sDabLoc.colAlong = GLUtil::UniformLoc(sDab, "uColAlong");
+            sDabLoc.colPeriod = GLUtil::UniformLoc(sDab, "uColPeriod");
+            sDabLoc.carry = GLUtil::UniformLoc(sDab, "uCarry");
+            sDabLoc.wet = GLUtil::UniformLoc(sDab, "uWet");
+            sDabLoc.tipTex = GLUtil::UniformLoc(sDab, "uTipTex");
+            sDabLoc.hasTipTex = GLUtil::UniformLoc(sDab, "uHasTipTex");
+            sDabLoc.grainTex = GLUtil::UniformLoc(sDab, "uGrainTex");
+            sDabLoc.hasGrainTex = GLUtil::UniformLoc(sDab, "uHasGrainTex");
+            sDabLoc.grainTexSize = GLUtil::UniformLoc(sDab, "uGrainTexSize");
+            sDabLoc.colTex = GLUtil::UniformLoc(sDab, "uColTex");
+            sDabLoc.hasColTex = GLUtil::UniformLoc(sDab, "uHasColTex");
+            sDabLoc.surfSize = GLUtil::UniformLoc(sDab, "uSurfSize");
          }
       }
       return sDab != 0 && sMerge != 0 && sSmudge != 0 && sWarp != 0 && sCarry != 0;
@@ -1234,15 +1235,15 @@ namespace BrushEngine
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, mWetCarry[from].tex);
-         glUniform1i(glGetUniformLocation(sCarry, "uPrev"), 0);
+         glUniform1i(GLUtil::UniformLoc(sCarry, "uPrev"), 0);
          glActiveTexture(GL_TEXTURE1);
          glBindTexture(GL_TEXTURE_2D, mSurface->tex);
-         glUniform1i(glGetUniformLocation(sCarry, "uSurf"), 1);
-         glUniform2f(glGetUniformLocation(sCarry, "uUv"), q.x / std::max(1, mW), q.y / std::max(1, mH));
-         glUniform2f(glGetUniformLocation(sCarry, "uSpan"), 0.5f * r / std::max(1, mW), 0.5f * r / std::max(1, mH));
-         glUniform1f(glGetUniformLocation(sCarry, "uPick"), pick);
-         glUniform1f(glGetUniformLocation(sCarry, "uRefill"), refill);
-         glUniform3f(glGetUniformLocation(sCarry, "uCol"), q.rgb[0], q.rgb[1], q.rgb[2]);
+         glUniform1i(GLUtil::UniformLoc(sCarry, "uSurf"), 1);
+         glUniform2f(GLUtil::UniformLoc(sCarry, "uUv"), q.x / std::max(1, mW), q.y / std::max(1, mH));
+         glUniform2f(GLUtil::UniformLoc(sCarry, "uSpan"), 0.5f * r / std::max(1, mW), 0.5f * r / std::max(1, mH));
+         glUniform1f(GLUtil::UniformLoc(sCarry, "uPick"), pick);
+         glUniform1f(GLUtil::UniformLoc(sCarry, "uRefill"), refill);
+         glUniform3f(GLUtil::UniformLoc(sCarry, "uCol"), q.rgb[0], q.rgb[1], q.rgb[2]);
          glActiveTexture(GL_TEXTURE0);
       });
       mCarryIdx = to;
@@ -1276,18 +1277,18 @@ namespace BrushEngine
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, mMerge.tex);
-         glUniform1i(glGetUniformLocation(sSmudge, "uSrc"), 0);
+         glUniform1i(GLUtil::UniformLoc(sSmudge, "uSrc"), 0);
          glActiveTexture(GL_TEXTURE1);
          glBindTexture(GL_TEXTURE_2D, mSelection);
-         glUniform1i(glGetUniformLocation(sSmudge, "uSel"), 1);
-         glUniform1i(glGetUniformLocation(sSmudge, "uHasSel"), mSelection != 0 ? 1 : 0);
-         glUniform2f(glGetUniformLocation(sSmudge, "uTexel"), 1.0f / std::max(1, mW), 1.0f / std::max(1, mH));
-         glUniform2f(glGetUniformLocation(sSmudge, "uCenter"), q.x, q.y);
-         glUniform2f(glGetUniformLocation(sSmudge, "uOff"), ox, oy);
-         glUniform1f(glGetUniformLocation(sSmudge, "uRadius"), r);
-         glUniform1f(glGetUniformLocation(sSmudge, "uHard"), std::clamp(mBrush.hardness, 0.0f, 0.98f));
-         glUniform1f(glGetUniformLocation(sSmudge, "uStrength"), strength);
-         glUniform1i(glGetUniformLocation(sSmudge, "uLock"), mBrush.lockAlpha ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(sSmudge, "uSel"), 1);
+         glUniform1i(GLUtil::UniformLoc(sSmudge, "uHasSel"), mSelection != 0 ? 1 : 0);
+         glUniform2f(GLUtil::UniformLoc(sSmudge, "uTexel"), 1.0f / std::max(1, mW), 1.0f / std::max(1, mH));
+         glUniform2f(GLUtil::UniformLoc(sSmudge, "uCenter"), q.x, q.y);
+         glUniform2f(GLUtil::UniformLoc(sSmudge, "uOff"), ox, oy);
+         glUniform1f(GLUtil::UniformLoc(sSmudge, "uRadius"), r);
+         glUniform1f(GLUtil::UniformLoc(sSmudge, "uHard"), std::clamp(mBrush.hardness, 0.0f, 0.98f));
+         glUniform1f(GLUtil::UniformLoc(sSmudge, "uStrength"), strength);
+         glUniform1i(GLUtil::UniformLoc(sSmudge, "uLock"), mBrush.lockAlpha ? 1 : 0);
          glActiveTexture(GL_TEXTURE0);
       }, clip);
       if (blendOn)
@@ -1341,24 +1342,24 @@ namespace BrushEngine
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, mMerge.tex);
-         glUniform1i(glGetUniformLocation(sWarp, "uSrc"), 0);
+         glUniform1i(GLUtil::UniformLoc(sWarp, "uSrc"), 0);
          glActiveTexture(GL_TEXTURE1);
          glBindTexture(GL_TEXTURE_2D, mSelection);
-         glUniform1i(glGetUniformLocation(sWarp, "uSel"), 1);
-         glUniform1i(glGetUniformLocation(sWarp, "uHasSel"), mSelection != 0 ? 1 : 0);
-         glUniform2f(glGetUniformLocation(sWarp, "uTexel"), 1.0f / std::max(1, mW), 1.0f / std::max(1, mH));
-         glUniform1i(glGetUniformLocation(sWarp, "uKind"), kind);
-         glUniform2f(glGetUniformLocation(sWarp, "uCenter"), q.x, q.y);
-         glUniform1f(glGetUniformLocation(sWarp, "uRadius"), r);
-         glUniform1f(glGetUniformLocation(sWarp, "uReach"), reach);
-         glUniform1f(glGetUniformLocation(sWarp, "uStrength"), strength);
-         glUniform3f(glGetUniformLocation(sWarp, "uCol"), q.rgb[0], q.rgb[1], q.rgb[2]);
-         glUniform2f(glGetUniformLocation(sWarp, "uDir"), ux, uy);
-         glUniform1f(glGetUniformLocation(sWarp, "uStep"), step);
-         glUniform2fv(glGetUniformLocation(sWarp, "uTines"), 16, tines);
-         glUniform1i(glGetUniformLocation(sWarp, "uTineN"), n);
-         glUniform1f(glGetUniformLocation(sWarp, "uLambda"), lambda);
-         glUniform1i(glGetUniformLocation(sWarp, "uLock"), mBrush.lockAlpha ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(sWarp, "uSel"), 1);
+         glUniform1i(GLUtil::UniformLoc(sWarp, "uHasSel"), mSelection != 0 ? 1 : 0);
+         glUniform2f(GLUtil::UniformLoc(sWarp, "uTexel"), 1.0f / std::max(1, mW), 1.0f / std::max(1, mH));
+         glUniform1i(GLUtil::UniformLoc(sWarp, "uKind"), kind);
+         glUniform2f(GLUtil::UniformLoc(sWarp, "uCenter"), q.x, q.y);
+         glUniform1f(GLUtil::UniformLoc(sWarp, "uRadius"), r);
+         glUniform1f(GLUtil::UniformLoc(sWarp, "uReach"), reach);
+         glUniform1f(GLUtil::UniformLoc(sWarp, "uStrength"), strength);
+         glUniform3f(GLUtil::UniformLoc(sWarp, "uCol"), q.rgb[0], q.rgb[1], q.rgb[2]);
+         glUniform2f(GLUtil::UniformLoc(sWarp, "uDir"), ux, uy);
+         glUniform1f(GLUtil::UniformLoc(sWarp, "uStep"), step);
+         glUniform2fv(GLUtil::UniformLoc(sWarp, "uTines"), 16, tines);
+         glUniform1i(GLUtil::UniformLoc(sWarp, "uTineN"), n);
+         glUniform1f(GLUtil::UniformLoc(sWarp, "uLambda"), lambda);
+         glUniform1i(GLUtil::UniformLoc(sWarp, "uLock"), mBrush.lockAlpha ? 1 : 0);
          glActiveTexture(GL_TEXTURE0);
       }, clip);
       if (blendOn)
@@ -1373,54 +1374,54 @@ namespace BrushEngine
       {
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, surface.tex);
-         glUniform1i(glGetUniformLocation(sMerge, "uSurf"), 0);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uSurf"), 0);
          glActiveTexture(GL_TEXTURE1);
          glBindTexture(GL_TEXTURE_2D, mCoverage.tex);
-         glUniform1i(glGetUniformLocation(sMerge, "uCov"), 1);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uCov"), 1);
          glActiveTexture(GL_TEXTURE2);
          glBindTexture(GL_TEXTURE_2D, mSelection);
-         glUniform1i(glGetUniformLocation(sMerge, "uSel"), 2);
-         glUniform1i(glGetUniformLocation(sMerge, "uHasSel"), mSelection != 0 ? 1 : 0);
-         glUniform3f(glGetUniformLocation(sMerge, "uColor"), mBrush.color[0], mBrush.color[1], mBrush.color[2]);
-         glUniform1f(glGetUniformLocation(sMerge, "uOpacity"), std::clamp(mBrush.opacity, 0.0f, 1.0f));
-         glUniform1i(glGetUniformLocation(sMerge, "uMode"), mBrush.mode);
-         glUniform1i(glGetUniformLocation(sMerge, "uLock"), mBrush.lockAlpha ? 1 : 0);
-         glUniform2f(glGetUniformLocation(sMerge, "uTexel"), 1.0f / std::max(1, surface.w), 1.0f / std::max(1, surface.h));
-         glUniform2f(glGetUniformLocation(sMerge, "uOff"), mBrush.sourceOffset[0], mBrush.sourceOffset[1]);
-         glUniform1i(glGetUniformLocation(sMerge, "uRange"), mBrush.range);
-         glUniform1i(glGetUniformLocation(sMerge, "uProtectHue"), mBrush.protectHue ? 1 : 0);
-         glUniform1i(glGetUniformLocation(sMerge, "uSponge"), mBrush.spongeMode);
-         glUniform3f(glGetUniformLocation(sMerge, "uKey"), mBrush.key[0], mBrush.key[1], mBrush.key[2]);
-         glUniform1f(glGetUniformLocation(sMerge, "uKeyTol"), std::max(0.005f, mBrush.keyTolerance * 1.7320508f));
-         glUniform1i(glGetUniformLocation(sMerge, "uFinal"), mFinal ? 1 : 0);
-         glUniform1i(glGetUniformLocation(sMerge, "uSharpMode"), mBrush.sharpMode);
-         glUniform1i(glGetUniformLocation(sMerge, "uSrcBlend"), mBrush.sourceBlend);
-         glUniform1i(glGetUniformLocation(sMerge, "uWetEdges"), mBrush.wetEdges ? 1 : 0);
-         glUniform1f(glGetUniformLocation(sMerge, "uWetReach"), std::max(1.5f, mBrush.size * 0.12f));
-         glUniform1f(glGetUniformLocation(sMerge, "uAccum"), std::clamp(mBrush.accumulation, 0.0f, 1.0f));
-         glUniform2f(glGetUniformLocation(sMerge, "uAnchor"), mBrush.sourceAnchor[0], mBrush.sourceAnchor[1]);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uSel"), 2);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uHasSel"), mSelection != 0 ? 1 : 0);
+         glUniform3f(GLUtil::UniformLoc(sMerge, "uColor"), mBrush.color[0], mBrush.color[1], mBrush.color[2]);
+         glUniform1f(GLUtil::UniformLoc(sMerge, "uOpacity"), std::clamp(mBrush.opacity, 0.0f, 1.0f));
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uMode"), mBrush.mode);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uLock"), mBrush.lockAlpha ? 1 : 0);
+         glUniform2f(GLUtil::UniformLoc(sMerge, "uTexel"), 1.0f / std::max(1, surface.w), 1.0f / std::max(1, surface.h));
+         glUniform2f(GLUtil::UniformLoc(sMerge, "uOff"), mBrush.sourceOffset[0], mBrush.sourceOffset[1]);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uRange"), mBrush.range);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uProtectHue"), mBrush.protectHue ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uSponge"), mBrush.spongeMode);
+         glUniform3f(GLUtil::UniformLoc(sMerge, "uKey"), mBrush.key[0], mBrush.key[1], mBrush.key[2]);
+         glUniform1f(GLUtil::UniformLoc(sMerge, "uKeyTol"), std::max(0.005f, mBrush.keyTolerance * 1.7320508f));
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uFinal"), mFinal ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uSharpMode"), mBrush.sharpMode);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uSrcBlend"), mBrush.sourceBlend);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uWetEdges"), mBrush.wetEdges ? 1 : 0);
+         glUniform1f(GLUtil::UniformLoc(sMerge, "uWetReach"), std::max(1.5f, mBrush.size * 0.12f));
+         glUniform1f(GLUtil::UniformLoc(sMerge, "uAccum"), std::clamp(mBrush.accumulation, 0.0f, 1.0f));
+         glUniform2f(GLUtil::UniformLoc(sMerge, "uAnchor"), mBrush.sourceAnchor[0], mBrush.sourceAnchor[1]);
          {
             // Destination to source about the anchor: flip, then scale, then turn (column-major for GL).
             const float t = mBrush.sourceRotate * 3.14159265f / 180.0f, k = 1.0f / std::max(0.05f, mBrush.sourceScale);
             const float fx = mBrush.sourceFlipX ? -1.0f : 1.0f, fy = mBrush.sourceFlipY ? -1.0f : 1.0f;
             const float c = std::cos(t) * k, s = std::sin(t) * k;
             const float m[4] = { c * fx, s * fx, -s * fy, c * fy };
-            glUniformMatrix2fv(glGetUniformLocation(sMerge, "uSrcM"), 1, GL_FALSE, m);
+            glUniformMatrix2fv(GLUtil::UniformLoc(sMerge, "uSrcM"), 1, GL_FALSE, m);
          }
          glActiveTexture(GL_TEXTURE3);
          glBindTexture(GL_TEXTURE_2D, mBrush.sourceTex);
-         glUniform1i(glGetUniformLocation(sMerge, "uSrcTex"), 3);
-         glUniform1i(glGetUniformLocation(sMerge, "uHasSrc"), mBrush.sourceTex != 0 ? 1 : 0);
-         glUniform1f(glGetUniformLocation(sMerge, "uSpread"), std::max(1.0f, mBrush.size * 0.06f));
-         glUniform1i(glGetUniformLocation(sMerge, "uGrain"), mBrush.grainTex != 0 ? std::max(1, mBrush.grain) : mBrush.grain);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uSrcTex"), 3);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uHasSrc"), mBrush.sourceTex != 0 ? 1 : 0);
+         glUniform1f(GLUtil::UniformLoc(sMerge, "uSpread"), std::max(1.0f, mBrush.size * 0.06f));
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uGrain"), mBrush.grainTex != 0 ? std::max(1, mBrush.grain) : mBrush.grain);
          glActiveTexture(GL_TEXTURE4);
          glBindTexture(GL_TEXTURE_2D, mBrush.grainTex);
-         glUniform1i(glGetUniformLocation(sMerge, "uGrainTex"), 4);
-         glUniform1i(glGetUniformLocation(sMerge, "uHasGrainTex"), mBrush.grainTex != 0 ? 1 : 0);
-         glUniform2f(glGetUniformLocation(sMerge, "uGrainTexSize"), (float)std::max(1, mBrush.grainTexW), (float)std::max(1, mBrush.grainTexH));
-         glUniform1f(glGetUniformLocation(sMerge, "uGrainScale"), std::max(0.05f, mBrush.grainScale));
-         glUniform1f(glGetUniformLocation(sMerge, "uGrainDepth"), std::clamp(mBrush.grainDepth, 0.0f, 1.0f));
-         glUniform1i(glGetUniformLocation(sMerge, "uGrainMode"), mBrush.grainMode);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uGrainTex"), 4);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uHasGrainTex"), mBrush.grainTex != 0 ? 1 : 0);
+         glUniform2f(GLUtil::UniformLoc(sMerge, "uGrainTexSize"), (float)std::max(1, mBrush.grainTexW), (float)std::max(1, mBrush.grainTexH));
+         glUniform1f(GLUtil::UniformLoc(sMerge, "uGrainScale"), std::max(0.05f, mBrush.grainScale));
+         glUniform1f(GLUtil::UniformLoc(sMerge, "uGrainDepth"), std::clamp(mBrush.grainDepth, 0.0f, 1.0f));
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uGrainMode"), mBrush.grainMode);
          glActiveTexture(GL_TEXTURE0);
       });
       if (blendOn)

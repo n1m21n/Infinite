@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "plugin/engine/PluginView.h"
 
 namespace app
 {
@@ -69,7 +70,18 @@ void DrawPresent(FrameCtx& fc)
       // projector window paces the loop to its display's refresh. Skipped for
       // a headless job (--validate, --audio-summary, --frame...): its phases
       // count ticks, not seconds, so pacing only made every bot call wait.
-      if (gTargetFps > 0 && !gVsync && !FrameClockActive() && !HeadlessJobActive())
+      // Hidden plugin-mode windows do not block on vsync on macOS, so even with
+      // gVsync on, an unpaced loop spins unbounded and burns a core per DAW instance.
+      // Pace with pure sleep_for (no busy-yield spin) except during offline DAW bounces.
+      const bool hiddenPluginWindow = Platform::PluginModeActive() && !PluginView::Popped();
+      if (hiddenPluginWindow && !Transport::Instance().IsOfflineMode() && !HeadlessJobActive())
+      {
+         const double hz = PluginView::Open() ? (double)(gTargetFps > 0 ? gTargetFps : 60) : 60.0;
+         const double slack = (gFrameStart + 1.0 / hz) - glfwGetTime();
+         if (slack > 0.0005)
+            std::this_thread::sleep_for(std::chrono::duration<double>(slack));
+      }
+      else if (gTargetFps > 0 && !gVsync && !FrameClockActive() && !HeadlessJobActive())
       {
          const double budget = 1.0 / (double)gTargetFps;
          const double deadline = gFrameStart + budget;

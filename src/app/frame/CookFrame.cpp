@@ -199,17 +199,6 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    }
    gPerfPendingWrites.clear();
 
-   // Snapshot every registered parameter's current value, keyed by node,
-   // before any of this frame's writes land. This is what lets an
-   // expression reference a sibling parameter by name ("width * 0.5")
-   // without depending on the order params happened to draw in - and it
-   // means a cycle between two expressions just settles a frame late
-   // rather than reading half-updated state mid-pass.
-   std::map<int, std::map<std::string, float>> paramSnapshot;
-   for (const ParamRef& ref : modulation.FrameParams())
-      if (ref.value != nullptr)
-         paramSnapshot[ref.nodeIndex][ref.name] = *ref.value;
-
    // Fixture only: put one envelope field into the expression state, so
    // the UI fixture also covers the fx badge and the clear button - the
    // layout that spilled out of the panel and over the next column.
@@ -240,6 +229,18 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
             gTypedParamJustOpened = key;
          }
       }
+   }
+
+   // Snapshot every registered parameter's current value, keyed by node,
+   // before any of this frame's writes land. Only needed when at least one
+   // parameter has an expression (skips hundreds of std::map allocations per
+   // frame in the common case).
+   std::map<int, std::map<std::string, float>> paramSnapshot;
+   if (!modulation.Expressions().empty())
+   {
+      for (const ParamRef& ref : modulation.FrameParams())
+         if (ref.value != nullptr)
+            paramSnapshot[ref.nodeIndex][ref.name] = *ref.value;
    }
 
    // Advance every predictor exactly once, before any binding reads it (idempotency: a predictor

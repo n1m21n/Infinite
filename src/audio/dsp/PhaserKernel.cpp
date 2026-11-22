@@ -24,34 +24,44 @@ void PhaserKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
    const bool sync = mSync.load(std::memory_order_relaxed) != 0;
    const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
    const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
+   const double invSr = 1.0 / mSampleRate;
+   const float srF = (float)mSampleRate;
+   const float syncRateHz = sync
+      ? (float)MusicTime::HzForRateDivision((MusicTime::RateDivision)rateDiv, std::max(1.0, (double)Transport::Instance().Tempo()))
+      : 0.0f;
+   constexpr float kTwoPi = 6.28318530717958647692f;
+   constexpr float kPi = 3.14159265358979323846f;
+
+   float lastSpread = -1.0f, spreadCos = 1.0f, spreadSin = 0.0f;
 
    for (int i = 0; i < out.numFrames; i++)
    {
       const float cutoffHz = mMailbox.SmoothedValue(kCutoffHz);
-      float rateHz;
-      if (sync)
-      {
-         const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
-         rateHz = (float)MusicTime::HzForRateDivision((MusicTime::RateDivision)rateDiv, bpm);
-      }
-      else
-         rateHz = std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
+      const float rateHz = sync ? syncRateHz : std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
       const float depth = std::clamp(mMailbox.SmoothedValue(kDepth), 0.0f, 1.0f);
       const float spread = std::clamp(mMailbox.SmoothedValue(kSpread), 0.0f, 1.0f);
+      if (spread != lastSpread)
+      {
+         lastSpread = spread;
+         const float ang = kPi * spread;
+         spreadCos = cosf(ang);
+         spreadSin = sinf(ang);
+      }
 
-      mPhase += rateHz / mSampleRate;
+      mPhase += (double)rateHz * invSr;
       if (mPhase >= 1.0)
          mPhase -= floor(mPhase);
 
-      const float octaves = depth * 1.0f;
+      const float octaves = depth;
 
       if (analog)
       {
          const float lfoDrift = mDriftLfo.Advance(std::max(0.1f, rateHz), 0.15f, 0.04f, mSampleRate) * 0.04f;
-         const float fcL = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + lfoDrift)));
-         const float fcR = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f + lfoDrift)));
-         const float aL = AllpassCoeff(fcL, (float)mSampleRate);
-         const float aR = AllpassCoeff(fcR, (float)mSampleRate);
+         const float ang = kTwoPi * ((float)mPhase + lfoDrift);
+         const float sL = sinf(ang);
+         const float fcL = cutoffHz * exp2f(octaves * sL);
+         const float aL = AllpassCoeff(fcL, srF);
+         const float aR = (spread == 0.0f) ? aL : AllpassCoeff(cutoffHz * exp2f(octaves * (sL * spreadCos + cosf(ang) * spreadSin)), srF);
 
          float xL = AnalogDsp::AsymTanh(in.channels[0][i] + kFeedbackAnalog * mFbL, 0.06f);
          float xR = numChannels >= 2 ? AnalogDsp::AsymTanh(in.channels[1][i] + kFeedbackAnalog * mFbR, 0.06f) : xL;
@@ -71,10 +81,11 @@ void PhaserKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       }
       else
       {
-         const float fcL = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * (float)mPhase));
-         const float fcR = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f)));
-         const float aL = AllpassCoeff(fcL, (float)mSampleRate);
-         const float aR = AllpassCoeff(fcR, (float)mSampleRate);
+         const float ang = kTwoPi * (float)mPhase;
+         const float sL = sinf(ang);
+         const float fcL = cutoffHz * exp2f(octaves * sL);
+         const float aL = AllpassCoeff(fcL, srF);
+         const float aR = (spread == 0.0f) ? aL : AllpassCoeff(cutoffHz * exp2f(octaves * (sL * spreadCos + cosf(ang) * spreadSin)), srF);
 
          // Delay-free feedback: the cascade's output is y = G u + S (G the
          // product of the stage coefficients, S what the stage states already
@@ -82,18 +93,18 @@ void PhaserKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
          // needs no unit delay. A z^-1 in the loop is a different time at each
          // rate, so it moved the feedback's peaks (6 kHz read 1.4 dB apart
          // between 44.1 and 96 kHz); this is the analog loop at every rate.
-         float gL = 1.0f, sL = 0.0f, gR = 1.0f, sR = 0.0f;
+         float gL = 1.0f, sL_acc = 0.0f, gR = 1.0f, sR_acc = 0.0f;
          for (int s = 0; s < stages; s++)
          {
             gL *= aL;
-            sL = aL * sL + mStagesL[s].State(aL);
+            sL_acc = aL * sL_acc + mStagesL[s].State(aL);
             gR *= aR;
-            sR = aR * sR + mStagesR[s].State(aR);
+            sR_acc = aR * sR_acc + mStagesR[s].State(aR);
          }
          const float inL = in.channels[0][i];
          const float inR = numChannels >= 2 ? in.channels[1][i] : in.channels[0][i];
-         const float yL = (gL * inL + sL) / (1.0f - kFeedbackDigital * gL);
-         const float yR = (gR * inR + sR) / (1.0f - kFeedbackDigital * gR);
+         const float yL = (gL * inL + sL_acc) / (1.0f - kFeedbackDigital * gL);
+         const float yR = (gR * inR + sR_acc) / (1.0f - kFeedbackDigital * gR);
          float xL = inL + kFeedbackDigital * yL;
          float xR = inR + kFeedbackDigital * yR;
          for (int s = 0; s < stages; s++)
