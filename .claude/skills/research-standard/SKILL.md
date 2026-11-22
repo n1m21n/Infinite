@@ -14,7 +14,7 @@ Templates: [`docs/research/_template/README.md`](../../docs/research/_template/R
 
 ## Non-Negotiable Rules
 
-1. **Clean room.** Infinite is MIT. Never open, read, grep, or cite GPL/copyleft source code (Kronos, Cmajor, SuperCollider, BespokeSynth). Cite only published papers, abstracts, and public discussions—and explicitly distinguish `OPENED` sources from `Seen in search only (do not cite as verified)`.
+1. **Clean room.** Infinite is MIT. Licensing follows AGENTS.md rule 1: open-source code of any licence (GPL included) may be read to understand a technique, never copied or transcribed. A paper or web note cites only published papers, abstracts, documentation and public discussions, never other projects' source files, and the prior-art survey explicitly separates `OPENED` sources from `Seen in search only (do not cite as verified)`.
 2. **Pre-register before running.** Every hypothesis (`H1`, `H2`, ...) must have an explicit numerical metric and **kill criterion** written in `README.md` *before* running the evaluation. Report killed/negative results transparently.
 3. **No self-authored-only validation.** A hand-built corpus may be used for Phase 0/1 calibration, but no hypothesis is marked **confirmed** without held-out / independent validation (e.g., community patches, external datasets, or independent baselines).
 4. **Immutable data & provenance.** Raw CSVs/JSONs in `data/` are never hand-edited. Every figure and table in a paper or web note must be generated programmatically from `data/` and accompanied by provenance (exact Git commit SHA, build flags, OS/hardware, RNG seed, CLI command).
@@ -43,4 +43,4 @@ Templates: [`docs/research/_template/README.md`](../../docs/research/_template/R
 
 ### Phase E — Dual Publish (Formal Paper + Interactive Web Note)
 1. **Formal Paper (`paper/`):** Compile with the target venue's LaTeX template (e.g., DAFx 2-column, max 8 pages, `IEEEbib.bst`) with static vector figures and an Artifact Appendix; archive on arXiv (`cs.SD` / `eess.AS`) and Zenodo (DOI).
-2. **Web Lab Note (`website/research/<slug>.html`):** Publish an interactive HTML note (Distill-style: KaTeX math, live audio/visual `embeds/` or A/B players, collapsible proof drawers, `TechArticle` JSON-LD, `<link rel="alternate" type="application/json">` to `data/`, and pinned commit SHA / DOI).
+2. **Web Lab Note (`website/research/<slug>.html`):** Publish an interactive HTML note (Distill-style: KaTeX math, live audio/visual `embeds/` or A/B players, collapsible proof drawers, `TechArticle` JSON-LD, `<link rel="alternate" type="application/json">` to a copy of `data/` under `website/research/<slug>/data/`, and pinned commit SHA / DOI). Page shell from `website/blog/`; modes per `docs/brand/BRAND.md` 2.2 (Paper for reading); `tools/brand/brand_lint.py` before shipping.
