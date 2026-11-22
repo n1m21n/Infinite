@@ -2128,6 +2128,97 @@
         "Stratified fluid vorticity curls & counter-rotating eddy advection",
         "Steps Mono & Collletttivo grotesque oceanographic chart typography"
       ]
+    },
+    {
+      "id": "molnar_mohr_plotter",
+      "taxonomy": "new",
+      "name": "Molnar & Mohr Algorithmic Plotter Geometry",
+      "palette": [
+        "#F0F0ED",
+        "#111214",
+        "#55575B",
+        "#C84B31"
+      ],
+      "sources": [
+        "Sketch 2D"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.18,
+      "pairs": [
+        "fmdx_operator_bell",
+        "bbd_space_echo_fx"
+      ],
+      "refs": [
+        "Manfred Mohr P-021-G 1970 algorithmic plotter staves & cubic grammars",
+        "Vera Molnar 1% disorder concentric squares on cotton-rag paper",
+        "Terminal Grotesque & Steps Mono plotter specimen typography"
+      ]
+    },
+    {
+      "id": "fuller_geodesic_truss",
+      "taxonomy": "new",
+      "name": "Buckminster Fuller Geodesic Dome & Octet Truss",
+      "palette": [
+        "#0D1118",
+        "#F5B82E",
+        "#FFE680",
+        "#C47D1A"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "fmdx_operator_bell",
+        "bbd_space_echo_fx"
+      ],
+      "refs": [
+        "Buckminster Fuller Vitra geodesic dome translucent amber membrane",
+        "Synergetic octet-truss tetrahedral space-frame lattice",
+        "Geist Mono & Velvetyne Grotesk architectural diagram labels"
+      ]
+    },
+    {
+      "id": "suminagashi_ink_marbling",
+      "taxonomy": "new",
+      "name": "Suminagashi Marbled Ink & Gold-Vein Surfactant",
+      "palette": [
+        "#090B10",
+        "#0E2E52",
+        "#184D7A",
+        "#C8A252"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.38,
+      "pairs": [
+        "fmdx_operator_bell",
+        "bbd_space_echo_fx"
+      ],
+      "refs": [
+        "1880 Prussian blue and gold-vein paper marbling swirl patterns",
+        "Japanese Suminagashi floating sumi ink rings & comb-rake advection",
+        "Fragment Mono & Micro Grotesk catalog typography"
+      ]
     }
   ]
 }

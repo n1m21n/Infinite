@@ -1,0 +1,77 @@
+infinite-patch 1
+# Chowning Formant Vowel Filter FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 55
+  i note2 51
+  i note3 48
+  i note4 55
+  i note5 60
+  i note6 58
+  i note7 55
+  i note8 46
+  i note9 53
+  i note10 50
+  i note11 46
+  i note12 53
+  i note13 58
+  i note14 55
+  i note15 51
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2400.0
+  f resonance 0.28
+  f decay 0.45
+  f volume 0.80
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float vowel = 0.45 [0.0, 1.0];\nparam float morphHz = 0.22 [0.02, 2.2];\nparam float q = 0.28 [0.10, 0.65];\nparam float drive = 1.30 [0.6, 2.5];\nparam float mix = 0.85 [0.0, 1.0];\nstate float lfo = 0;\nstate float bp1 = 0; state float lp1 = 0;\nstate float bp2 = 0; state float lp2 = 0;\n\nlfo = (lfo + morphHz / sr) % 1.0;\nv = clamp(vowel + 0.35 * sin(6.2831853 * lfo), 0.0, 1.0);\ng1 = clamp(2.0 * sin(3.14159265 * (300.0 + v * 480.0) / sr), 0.02, 0.78);\ng2 = clamp(2.0 * sin(3.14159265 * (850.0 + (1.0 - v) * 1450.0) / sr), 0.02, 0.78);\n\nbp1 = bp1 + g1 * (in - lp1 - q * bp1); lp1 = lp1 + g1 * bp1;\nbp2 = bp2 + g2 * (in - lp2 - q * bp2); lp2 = lp2 + g2 * bp2;\n\nformant = (bp1 * 0.70 + bp2 * 0.55) * drive;\nwet = formant / (1.0 + abs(formant) * 0.50);\nout = (in * (1.0 - mix) + wet * mix) * 0.78;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.26 0.38 0.50
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Chowning Formant Vowel Filter FX. Dual parallel state-variable formant bandpass bank morphing smoothly across vowel resonances with soft console saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

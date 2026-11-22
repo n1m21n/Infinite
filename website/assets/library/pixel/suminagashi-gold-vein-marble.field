@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Suminagashi Gold-Vein Marble",
+    "author": "Infinite",
+    "description": "Layered cobalt and obsidian marbled ink eddies interlaced with antique gold-leaf surfactant veins and harmonic rake waves.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float rakeFreq = 6.5 [2.0, 14.0];\nparam float eddyGain = 0.58 [0.1, 1.2];\nparam float goldThresh = 8.5 [3.0, 14.0];\nparam float waveScale = 14.0 [6.0, 28.0];\nparam float drift = 0.16 [0.0, 0.8];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\n# Harmonic rake and counter-eddy fluid deformation\nq = p;\nr1 = vec2(sin(q.y * rakeFreq + t * drift), cos(q.x * rakeFreq * 0.85 - t * drift));\nq = q + r1 * eddyGain * 0.36;\nr2 = vec2(cos(q.y * rakeFreq * 1.7 - sin(q.x * 2.8)), sin(q.x * rakeFreq * 1.5 + cos(q.y * 3.1)));\nq = q + r2 * eddyGain * 0.24;\n\n# Marbled pigment strata + branching gold surfactant veins\nstrata = sin(q.x * waveScale + sin(q.y * waveScale * 0.75 + t * drift * 1.2) * 2.4);\nveinA = abs(sin(q.x * 5.2 + cos(q.y * 6.4 - t * drift * 0.7) * 2.2));\nveinB = abs(cos(q.y * 7.1 - sin(q.x * 5.8 + t * drift * 0.5) * 1.9));\ngoldVein = exp(-min(veinA, veinB) * goldThresh);\n\ncObsidian = vec3(0.035, 0.043, 0.063);\ncPrussian = vec3(0.055, 0.180, 0.322);\ncCobalt   = vec3(0.094, 0.302, 0.478);\ncGold     = vec3(0.784, 0.635, 0.322);\ncWashi    = vec3(0.910, 0.902, 0.875);\n\nband = 0.5 + 0.5 * strata;\ncol = mix(cObsidian, cPrussian, smoothstep(0.18, 0.68, band));\ncol = mix(col, cCobalt, smoothstep(0.52, 0.95, band));\ncol = mix(col, cWashi, smoothstep(0.84, 0.99, band) * 0.45);\ncol = mix(col, cGold, smoothstep(0.32, 0.88, goldVein));\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "rakeFreq": 6.5,
+      "eddyGain": 0.58,
+      "goldThresh": 8.5,
+      "waveScale": 14.0,
+      "drift": 0.16
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

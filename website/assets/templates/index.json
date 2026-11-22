@@ -3555,6 +3555,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "fmdx-six-op-bell-synth",
+      "name": "FMDX Six-Op Bell Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Six-operator inspired FM metallic bell with self-feedback modulator, inharmonic chime ratios, and exponential index decay.",
+      "price": 0,
+      "preview": "assets/templates/fmdx-six-op-bell-synth.webp",
+      "file": "assets/templates/fmdx-six-op-bell-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "fmdx-rhodes-tine-epiano-synth",
+      "name": "FMDX Rhodes Tine E-Piano Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "FM electric piano combining a warm fundamental carrier with a percussive 1:14 tine-strike modulator, gentle tremolo, and soft console saturation.",
+      "price": 0,
+      "preview": "assets/templates/fmdx-rhodes-tine-epiano-synth.webp",
+      "file": "assets/templates/fmdx-rhodes-tine-epiano-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "barberpole-shepard-phaser-fx",
+      "name": "Barberpole Shepard Phaser FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-bank six-stage allpass phaser driven by quadrature sawtooth-triangle Shepard LFOs for continuously rising phase notches.",
+      "price": 0,
+      "preview": "assets/templates/barberpole-shepard-phaser-fx.webp",
+      "file": "assets/templates/barberpole-shepard-phaser-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "chowning-formant-vowel-filter-fx",
+      "name": "Chowning Formant Vowel Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual parallel state-variable formant bandpass bank morphing smoothly across vowel resonances with soft console saturation.",
+      "price": 0,
+      "preview": "assets/templates/chowning-formant-vowel-filter-fx.webp",
+      "file": "assets/templates/chowning-formant-vowel-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
   "count": 205
