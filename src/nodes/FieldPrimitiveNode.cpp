@@ -689,7 +689,8 @@ void FieldPrimitiveNode::LoadPreset(int index)
       if (presets[index].defaultCount > 0)
          count = presets[index].defaultCount;
       code = presets[index].code;
-      Apply();
+      if (Apply())
+         mParamTable.ResetDeclaredToDefaults(); // a preset starts at its own declared values
    }
 }
 
@@ -721,7 +722,8 @@ void FieldPrimitiveNode::LoadDeviceFile(const Field::DeviceFile& device)
    auto itTop = device.nodeSettings.find("topology");
    if (itTop != device.nodeSettings.end())
       topology = (int)itTop->second;
-   Apply();
+   if (Apply())
+      mParamTable.ResetDeclaredToDefaults(); // params the file omits start at their defaults
    for (const auto& kv : device.params)
    {
       Field::ParamEntry* p = mParamTable.Find(kv.first);

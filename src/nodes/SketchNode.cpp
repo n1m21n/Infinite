@@ -57,7 +57,8 @@ void SketchNode::LoadPreset(int index)
       code = p[index].code;
       svg = p[index].svg ? p[index].svg : "";
       svgName = svg.empty() ? "" : "example";
-      Apply();
+      if (Apply())
+         mParamTable.ResetDeclaredToDefaults(); // a preset starts at its own declared values
    }
 }
 

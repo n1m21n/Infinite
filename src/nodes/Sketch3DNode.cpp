@@ -35,7 +35,8 @@ void Sketch3DNode::LoadPreset(int index)
    if (index >= 0 && index < (int)p.size())
    {
       code = p[index].code;
-      Apply();
+      if (Apply())
+         mParamTable.ResetDeclaredToDefaults(); // a preset starts at its own declared values
    }
 }
 

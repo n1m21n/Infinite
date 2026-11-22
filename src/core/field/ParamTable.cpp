@@ -146,6 +146,15 @@ namespace Field
       }
    }
 
+   void ParamTable::ResetDeclaredToDefaults()
+   {
+      for (auto& p : mParams)
+      {
+         if (p.isDeclared)
+            p.value = p.defaultValue;
+      }
+   }
+
    // Ids are never reused while there is room, so a binding saved against a
    // deleted param can't latch onto a new one. Once the counter runs out,
    // take the lowest id no declared param holds, and drop the undeclared

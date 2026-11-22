@@ -772,7 +772,8 @@ void FieldNotesNode::LoadPreset(int index)
    {
       presetIndex = index;
       code = presets[index].code;
-      Apply();
+      if (Apply())
+         mParamTable.ResetDeclaredToDefaults(); // a preset starts at its own declared values
    }
 }
 
@@ -894,7 +895,8 @@ void FieldNotesNode::LoadDeviceFile(const Field::DeviceFile& device)
    auto itS = device.nodeSettings.find("scale");
    if (itS != device.nodeSettings.end())
       scale = (int)itS->second;
-   Apply();
+   if (Apply())
+      mParamTable.ResetDeclaredToDefaults(); // params the file omits start at their defaults
    for (const auto& kv : device.params)
    {
       Field::ParamEntry* p = mParamTable.Find(kv.first);

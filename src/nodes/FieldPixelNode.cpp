@@ -1012,13 +1012,15 @@ void FieldPixelNode::LoadPreset(int index)
    {
       code = p[index].code;
       domain = 0;
-      Apply();
+      if (Apply())
+         mParamTable.ResetDeclaredToDefaults(); // a preset starts at its own declared values
    }
    else if (index >= (int)p.size() && index < (int)(p.size() + m.size()))
    {
       code = m[index - p.size()].code;
       domain = 1;
-      Apply();
+      if (Apply())
+         mParamTable.ResetDeclaredToDefaults(); // a preset starts at its own declared values
    }
 }
 
@@ -1050,7 +1052,8 @@ void FieldPixelNode::LoadDeviceFile(const Field::DeviceFile& device)
    auto itA = device.nodeSettings.find("animate");
    if (itA != device.nodeSettings.end())
       animate = itA->second != 0.0;
-   Apply();
+   if (Apply())
+      mParamTable.ResetDeclaredToDefaults(); // params the file omits start at their defaults
    for (const auto& kv : device.params)
    {
       Field::ParamEntry* p = mParamTable.Find(kv.first);
