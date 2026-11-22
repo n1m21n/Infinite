@@ -14,17 +14,17 @@
   <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Delaunay Triangulation &amp; Voronoi in Real Time | Infinite</title>
-  <meta name="description" content="How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson and audio-reactive 3D.">
+  <meta name="description" content="How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson, polygon insetting, and audio-reactive 3D.">
   <link rel="canonical" href="https://infinitedevices.org/blog/delaunay-triangulation-and-voronoi-geometry-in-real-time.html">
   <meta property="og:title" content="Delaunay Triangulation &amp; Voronoi in Real Time | Infinite">
-  <meta property="og:description" content="How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson and audio-reactive 3D.">
+  <meta property="og:description" content="How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson, polygon insetting, and audio-reactive 3D.">
   <meta property="og:image" content="https://infinitedevices.org/assets/blog_delaunay-triangulation-and-voronoi-geometry-in-real-time.png">
   <meta property="og:url" content="https://infinitedevices.org/blog/delaunay-triangulation-and-voronoi-geometry-in-real-time.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Infinite">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Delaunay Triangulation &amp; Voronoi in Real Time | Infinite">
-  <meta name="twitter:description" content="How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson and audio-reactive 3D.">
+  <meta name="twitter:description" content="How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson, polygon insetting, and audio-reactive 3D.">
   <meta name="twitter:image" content="https://infinitedevices.org/assets/blog_delaunay-triangulation-and-voronoi-geometry-in-real-time.png">
   <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
   <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
@@ -45,7 +45,7 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "BlogPosting"], "headline": "Delaunay triangulation and Voronoi geometry in real time", "description": "How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson and audio-reactive 3D.", "datePublished": "2026-11-10", "dateModified": "2026-11-10", "mainEntityOfPage": "https://infinitedevices.org/blog/delaunay-triangulation-and-voronoi-geometry-in-real-time.html", "url": "https://infinitedevices.org/blog/delaunay-triangulation-and-voronoi-geometry-in-real-time.html", "image": ["https://infinitedevices.org/assets/blog_delaunay-triangulation-and-voronoi-geometry-in-real-time.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "delaunay triangulation, voronoi cells, generative 3d, creative coding, computational geometry", "wordCount": 2727, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "BlogPosting"], "headline": "Delaunay triangulation and Voronoi geometry in real time", "description": "How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson, polygon insetting, and audio-reactive 3D.", "datePublished": "2026-11-10", "dateModified": "2026-11-10", "mainEntityOfPage": "https://infinitedevices.org/blog/delaunay-triangulation-and-voronoi-geometry-in-real-time.html", "url": "https://infinitedevices.org/blog/delaunay-triangulation-and-voronoi-geometry-in-real-time.html", "image": ["https://infinitedevices.org/assets/blog_delaunay-triangulation-and-voronoi-geometry-in-real-time.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "delaunay triangulation, voronoi cells, generative 3d, creative coding, computational geometry", "wordCount": 2727, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "Delaunay triangulation and Voronoi geometry in real time", "item": "https://infinitedevices.org/blog/delaunay-triangulation-and-voronoi-geometry-in-real-time.html"}]}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=0fc401be">
@@ -136,7 +136,7 @@
         <header class="post-head">
           <p class="post-kicker mono">Creative</p>
           <h1>Delaunay triangulation and Voronoi geometry in real time</h1>
-          <p class="post-lede">How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson and audio-reactive 3D.</p>
+          <p class="post-lede">How real-time Delaunay triangulation and dual Voronoi cells work in creative coding: empty circumcircles, Bowyer-Watson, polygon insetting, and audio-reactive 3D.</p>
           <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">10 November 2026 · 12 min read</span></span></p>
         </header>
         <figure class="post-hero"><img src="../assets/blog_delaunay-triangulation-and-voronoi-geometry-in-real-time.png" alt="Technical architecture diagram of real-time Delaunay triangulation and Voronoi cells showing circumcircle test, Bowyer-Watson cavity insertion, cell insetting, and 3D audio-reactive mesh lifting" width="1200" height="675" decoding="async"></figure>

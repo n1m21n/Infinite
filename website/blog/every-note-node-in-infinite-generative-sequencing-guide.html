@@ -149,7 +149,7 @@
 <hr>
 <h2 id="1-midi-notes-hardware-controller-mpe-input-bridge">1. MIDI Notes: hardware controller &amp; MPE input bridge</h2>
 <p>The <strong>MIDI Notes</strong> node connects physical MIDI keyboards, pad controllers, and MPE (MIDI Polyphonic Expression) devices to the Infinite canvas.</p>
-<figure><img src="../assets/nodes/hd/midi-notes.webp" alt="MIDI Notes node in Infinite" width="537" height="550" loading="lazy" decoding="async"><figcaption>MIDI Notes node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/midi-notes.webp" alt="MIDI Notes node in Infinite" width="600" height="550" loading="lazy" decoding="async"><figcaption>MIDI Notes node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Multi-channel routing</strong>: Listens on all channels (Omni) or binds to a specific MIDI channel (<code>1</code> to <code>16</code>).</li><li><strong>MPE support</strong>: Full per-note polyphonic pitch bend, slide, and pressure/aftertouch tracking.</li><li><strong>Port activity visualization</strong>: Real-time visual LEDs displaying active note-on gates, polyphonic voice count, and pitch numbers.</li><li><strong>Event stream outputs</strong>: Outputs polyphonic note events cleanly buffered for sample-accurate scheduling.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -158,7 +158,7 @@
 <hr>
 <h2 id="2-keyboard-interactive-on-screen-playable-piano">2. Keyboard: interactive on-screen playable piano</h2>
 <p>The <strong>Keyboard</strong> node provides a playable virtual piano keyboard directly inside the node canvas, supporting mouse clicks, multi-touch, and computer QWERTY keyboard typing.</p>
-<figure><img src="../assets/nodes/hd/keyboard.webp" alt="Keyboard node in Infinite" width="772" height="550" loading="lazy" decoding="async"><figcaption>Keyboard node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/keyboard.webp" alt="Keyboard node in Infinite" width="804" height="550" loading="lazy" decoding="async"><figcaption>Keyboard node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Octave range navigation</strong>: Configurable key span with quick octave shift controls.</li><li><strong>Musical scale highlighting</strong>: Highlights active scale notes across white and black keys, preventing accidental off-key inputs during live performance.</li><li><strong>Velocity sensitivity</strong>: Clicking near the bottom of a key triggers high velocity (up to 127), while clicking near the top triggers soft pianissimo notes.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -167,7 +167,7 @@
 <hr>
 <h2 id="3-note-filter-range-channel-and-velocity-gate">3. Note Filter: range, channel, and velocity gate</h2>
 <p>The <strong>Note Filter</strong> node acts as a selective filter for incoming note streams, allowing only notes meeting specific musical criteria to pass downstream.</p>
-<figure><img src="../assets/nodes/hd/note-filter.webp" alt="Note Filter node in Infinite" width="752" height="550" loading="lazy" decoding="async"><figcaption>Note Filter node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-filter.webp" alt="Note Filter node in Infinite" width="785" height="550" loading="lazy" decoding="async"><figcaption>Note Filter node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Pitch key zones</strong>: Set minimum and maximum note limits (e.g. <code>C1</code> to <code>B2</code> for bass, <code>C3</code> to <code>C6</code> for leads) to create multi-instrument keyboard splits.</li><li><strong>Velocity window</strong>: Filters notes by dynamics, passing only ghost notes (low velocity) or accents (high velocity).</li><li><strong>Channel filtering</strong>: Strips out or isolates specific MIDI channels from multi-timbral controllers.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -177,7 +177,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="4-note-transpose-chromatic-and-scale-aware-pitch-shifting">4. Note Transpose: chromatic and scale-aware pitch shifting</h2>
 <p>The <strong>Note Transpose</strong> node shifts the pitch of incoming note events by octaves and semitones while optionally constraining the shifted notes to a selected musical scale.</p>
-<figure><img src="../assets/nodes/hd/note-transpose.webp" alt="Note Transpose node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Note Transpose node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-transpose.webp" alt="Note Transpose node in Infinite" width="572" height="550" loading="lazy" decoding="async"><figcaption>Note Transpose node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Octave &amp; semitone offsets</strong>: Shift notes up or down by up to 4 octaves and 12 semitones.</li><li><strong>Modulatable transposition</strong>: The semitone parameter is modulatable, allowing an LFO or step sequencer to modulate chord progressions automatically.</li><li><strong>Scale snapping</strong>: Forces transposed notes onto the nearest valid scale degree to prevent dissonant pitch clashes.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -186,7 +186,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="5-pitch-bend-expressive-pitch-deflection-router">5. Pitch Bend: expressive pitch deflection router</h2>
 <p>The <strong>Pitch Bend</strong> node routes and scales continuous pitch bend wheel messages and modulation signals for connected synthesizers.</p>
-<figure><img src="../assets/nodes/hd/pitch-bend.webp" alt="Pitch Bend node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Pitch Bend node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/pitch-bend.webp" alt="Pitch Bend node in Infinite" width="572" height="550" loading="lazy" decoding="async"><figcaption>Pitch Bend node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Configurable bend range</strong>: Adjust the pitch bend semitone window from 1 semitone to a full octave (<code>-12</code> to <code>+12</code> semitones).</li><li><strong>Bipolar modulation input</strong>: Accepts LFO or envelope modulation to produce automatic vibrato and dive bombs.</li><li><strong>Smoothing</strong>: Built-in 14-bit interpolation prevents audible stepping during aggressive wheel movements.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -195,7 +195,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="6-velocity-curve-dynamic-touch-and-curve-response">6. Velocity Curve: dynamic touch and curve response</h2>
 <p>The <strong>Velocity Curve</strong> node remaps the velocity dynamics of incoming note events, tailoring keyboard touch response to performance preferences.</p>
-<figure><img src="../assets/nodes/hd/velocity-curve.webp" alt="Velocity Curve node in Infinite" width="281" height="550" loading="lazy" decoding="async"><figcaption>Velocity Curve node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/velocity-curve.webp" alt="Velocity Curve node in Infinite" width="293" height="550" loading="lazy" decoding="async"><figcaption>Velocity Curve node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Curve profiles</strong>: Linear, Exponential (emphasising soft touches), Logarithmic (punchy and responsive), and S-curve (compressed dynamics).</li><li><strong>Min/max clamping</strong>: Sets minimum velocity floor and maximum ceiling limits.</li><li><strong>Fixed velocity mode</strong>: Locks all incoming notes to a single uniform velocity level (such as 100 for consistent organ or synth-pop lines).</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -204,7 +204,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="7-gate-rhythmic-duration-and-articulation-shaper">7. Gate: rhythmic duration and articulation shaper</h2>
 <p>The <strong>Gate</strong> node controls the duration of active note events, turning sustained chords into short staccato bursts or stretching short taps into legato drones.</p>
-<figure><img src="../assets/nodes/hd/gate.webp" alt="Gate node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Gate node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/gate.webp" alt="Gate node in Infinite" width="572" height="550" loading="lazy" decoding="async"><figcaption>Gate node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Time and beat modes</strong>: Set gate length in milliseconds (<code>5ms</code> to <code>2000ms</code>) or metric musical divisions (<code>1/16</code>, <code>1/8</code>, <code>1/4</code>).</li><li><strong>Fixed gate vs proportional</strong>: Choose between fixed note lengths or proportional scaling (e.g. 50% staccato of incoming note length).</li><li><strong>Legato tie mode</strong>: Automatically bridges notes together when consecutive keys overlap.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -213,7 +213,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="8-humanizer-micro-timing-shuffle-and-organic-dynamics">8. Humanizer: micro-timing shuffle and organic dynamics</h2>
 <p>The <strong>Humanizer</strong> node injects subtle, natural human imperfections into rigid, computer-quantized note streams.</p>
-<figure><img src="../assets/nodes/hd/humanizer.webp" alt="Humanizer node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Humanizer node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/humanizer.webp" alt="Humanizer node in Infinite" width="572" height="550" loading="lazy" decoding="async"><figcaption>Humanizer node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Timing jitter</strong>: Introduces microscopic Gaussian time offsets (from <code>0ms</code> to <code>35ms</code>) to note onsets, simulating the slight imprecisions of live human performance.</li><li><strong>Velocity spread</strong>: Randomizes note velocity around the played value by a customizable percentage window.</li><li><strong>Pitch drift</strong>: Adds minute micro-tuning offsets for analog acoustic warmth.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -222,7 +222,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="9-quantizer-musical-scale-and-modal-pitch-snapping">9. Quantizer: musical scale and modal pitch snapping</h2>
 <p>The <strong>Quantizer</strong> node forces arbitrary pitch numbers, microtonal frequencies, and random pitch modulators onto chosen musical scales and temperaments.</p>
-<figure><img src="../assets/nodes/hd/quantizer.webp" alt="Quantizer node in Infinite" width="686" height="550" loading="lazy" decoding="async"><figcaption>Quantizer node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/quantizer.webp" alt="Quantizer node in Infinite" width="727" height="550" loading="lazy" decoding="async"><figcaption>Quantizer node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Over 40 musical scales</strong>: Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic Minor, Melodic Minor, Pentatonic, Blues, Hirajoshi, Insen, Raga, and microtonal modes.</li><li><strong>Root note transposition</strong>: Set the tonic key to any pitch (<code>C</code> through <code>B</code>).</li><li><strong>Snap algorithms</strong>: Snaps to the nearest scale degree either upward, downward, or to the absolute closest interval.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -231,7 +231,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="10-glide-monophonic-portamento-and-polyphonic-slide">10. Glide: monophonic portamento and polyphonic slide</h2>
 <p>The <strong>Glide</strong> node produces smooth pitch glides between consecutive notes, featuring both classic analog monophonic portamento and multi-voice polyphonic slide.</p>
-<figure><img src="../assets/nodes/hd/glide.webp" alt="Glide node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Glide node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/glide.webp" alt="Glide node in Infinite" width="572" height="550" loading="lazy" decoding="async"><figcaption>Glide node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Glide time</strong>: Continuous portamento rate control (<code>0ms</code> to <code>3000ms</code>).</li><li><strong>Legato-only mode</strong>: Glides only when two notes overlap in time, leaving non-overlapping notes with instant attack.</li><li><strong>Constant time vs constant rate</strong>: Select whether pitch transitions take the same amount of time regardless of distance, or glide at a fixed semitones-per-second velocity.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -240,7 +240,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="11-note-echo-algorithmic-midi-delay-and-rhythmic-repeats">11. Note Echo: algorithmic MIDI delay and rhythmic repeats</h2>
 <p>The <strong>Note Echo</strong> node creates rhythmic echoing MIDI notes, repeating incoming note events across musical intervals with decay and transposition.</p>
-<figure><img src="../assets/nodes/hd/note-echo.webp" alt="Note Echo node in Infinite" width="310" height="550" loading="lazy" decoding="async"><figcaption>Note Echo node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-echo.webp" alt="Note Echo node in Infinite" width="326" height="550" loading="lazy" decoding="async"><figcaption>Note Echo node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Tempo-synced delay time</strong>: Set delay intervals to standard, dotted, or triplet metric divisions (<code>1/16</code>, <code>1/8d</code>, <code>1/4t</code>).</li><li><strong>Feedback &amp; count</strong>: Controls the number of echo repeats (<code>1</code> to <code>32</code>).</li><li><strong>Velocity decay</strong>: Gradually scales down the velocity of successive repeats for natural fading.</li><li><strong>Semitone pitch transpose</strong>: Shifts each repeat up or down by a set semitone interval, turning a single key press into an ascending or descending staircase.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -249,7 +249,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="12-note-router-dynamic-keyboard-splitting-and-voice-dispatching">12. Note Router: dynamic keyboard splitting and voice dispatching</h2>
 <p>The <strong>Note Router</strong> node directs incoming notes across up to four separate output ports based on pitch thresholds, velocity ranges, or voice allocation.</p>
-<figure><img src="../assets/nodes/hd/note-router.webp" alt="Note Router node in Infinite" width="489" height="550" loading="lazy" decoding="async"><figcaption>Note Router node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-router.webp" alt="Note Router node in Infinite" width="515" height="550" loading="lazy" decoding="async"><figcaption>Note Router node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Split mode</strong>: Routes notes below a split point to Output 1, and notes above to Output 2.</li><li><strong>Velocity dispatch</strong>: Sends soft notes to an intimate electric piano, and hard accents to a brass synth.</li><li><strong>Round-robin voice allocation</strong>: Cycles notes sequentially across Outputs 1, 2, 3, and 4, allowing four distinct synthesizers to share parts of a polyphonic phrase.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -258,7 +258,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="13-note-merge-unified-polyphonic-stream-combiner">13. Note Merge: unified polyphonic stream combiner</h2>
 <p>The <strong>Note Merge</strong> node combines multiple independent note streams into a single unified polyphonic stream with intelligent collision handling.</p>
-<figure><img src="../assets/nodes/hd/note-merge.webp" alt="Note Merge node in Infinite" width="683" height="550" loading="lazy" decoding="async"><figcaption>Note Merge node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-merge.webp" alt="Note Merge node in Infinite" width="745" height="550" loading="lazy" decoding="async"><figcaption>Note Merge node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Multi-input bus</strong>: Combines up to four note sources into one stream.</li><li><strong>Duplicate note suppression</strong>: Prevents hanging notes and double-trigger clicks when two input streams send the same pitch simultaneously.</li><li><strong>Voice priority</strong>: Option to prioritize higher or lower notes during polyphony overflow.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -267,7 +267,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="14-note-switcher-modulated-phrase-selector">14. Note Switcher: modulated phrase selector</h2>
 <p>The <strong>Note Switcher</strong> node selects which of several incoming note streams passes downstream, controlled via a macro knob or logic trigger.</p>
-<figure><img src="../assets/nodes/hd/note-switcher.webp" alt="Note Switcher node in Infinite" width="435" height="550" loading="lazy" decoding="async"><figcaption>Note Switcher node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-switcher.webp" alt="Note Switcher node in Infinite" width="489" height="550" loading="lazy" decoding="async"><figcaption>Note Switcher node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Multi-channel selector</strong>: Seamlessly switches between alternate note patterns without dropping active note-off events.</li><li><strong>Modulatable selection index</strong>: Switch patterns automatically using a slow square LFO or timeline automation track.</li><li><strong>Smooth transition handling</strong>: Sends clean note-off messages to active voices before switching to prevent stuck notes.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -276,7 +276,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="15-arpeggiator-algorithmic-pattern-and-chord-engine">15. Arpeggiator: algorithmic pattern and chord engine</h2>
 <p>The <strong>Arpeggiator</strong> node takes held chords and breaks them into rhythmic, tempo-synced melodic sequences.</p>
-<figure><img src="../assets/nodes/hd/arpeggiator.webp" alt="Arpeggiator node in Infinite" width="684" height="550" loading="lazy" decoding="async"><figcaption>Arpeggiator node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/arpeggiator.webp" alt="Arpeggiator node in Infinite" width="714" height="550" loading="lazy" decoding="async"><figcaption>Arpeggiator node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Directional modes</strong>: Up, Down, Up/Down, Down/Up, Random, Chord Repeat, and As-Played.</li><li><strong>Octave span</strong>: Sweeps arpeggios across <code>1</code> to <code>4</code> octaves with cyclical or ping-pong octave progression.</li><li><strong>Gate &amp; swing</strong>: Adjusts note duration percentage and metric shuffle.</li><li><strong>Hold toggle</strong>: Latches played chords so the arpeggio continues cycling after keys are released.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -285,7 +285,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="16-note-sequencer-16-step-polyphonic-pitch-gate-grid">16. Note Sequencer: 16-step polyphonic pitch &amp; gate grid</h2>
 <p>The <strong>Note Sequencer</strong> node is a classic 16-step grid sequencer with per-step pitch, velocity, octave shift, and gate tie controls.</p>
-<figure><img src="../assets/nodes/hd/note-sequencer.webp" alt="Note Sequencer node in Infinite" width="549" height="550" loading="lazy" decoding="async"><figcaption>Note Sequencer node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-sequencer.webp" alt="Note Sequencer node in Infinite" width="569" height="550" loading="lazy" decoding="async"><figcaption>Note Sequencer node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Interactive step matrix</strong>: 16 dedicated pitch knobs with visual semitone displays.</li><li><strong>Per-step ties &amp; mutes</strong>: Tie steps together for long sustained bass notes, or mute steps for syncopated rests.</li><li><strong>Variable step length</strong>: Set pattern length from 1 to 16 steps to create odd-meter polyrhythms (such as 5/16 or 7/16).</li><li><strong>Direction modes</strong>: Forward, Reverse, Ping-Pong, and Brownian random walk.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -294,7 +294,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="17-random-note-generator-constrained-generative-melody-engine">17. Random Note Generator: constrained generative melody engine</h2>
 <p>The <strong>Random Note Generator</strong> node creates constrained melodic phrases and basslines algorithmically in real time.</p>
-<figure><img src="../assets/nodes/hd/random-note-generator.webp" alt="Random Note Generator node in Infinite" width="833" height="550" loading="lazy" decoding="async"><figcaption>Random Note Generator node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/random-note-generator.webp" alt="Random Note Generator node in Infinite" width="871" height="550" loading="lazy" decoding="async"><figcaption>Random Note Generator node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Key &amp; scale constraints</strong>: Restricts generated notes strictly to a selected musical key and scale.</li><li><strong>Interval jump weighting</strong>: Biases random generation toward small melodic steps (seconds and thirds) rather than wide, disjointed leaps.</li><li><strong>Rhythmic density</strong>: Controls the probability of active note triggers per clock tick, introducing musical rests.</li><li><strong>Seed repeatability</strong>: Freeze the random seed to loop an inspiring generated phrase indefinitely.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -303,7 +303,7 @@ MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
 <hr>
 <h2 id="18-midi-file-standard-midi-file-canvas-player">18. MIDI File: standard MIDI file canvas player</h2>
 <p>The <strong>MIDI File</strong> node loads and plays standard <code>.mid</code> sequence files directly on the canvas, locked to the global transport clock.</p>
-<figure><img src="../assets/nodes/hd/midi-file.webp" alt="MIDI File node in Infinite" width="735" height="550" loading="lazy" decoding="async"><figcaption>MIDI File node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/midi-file.webp" alt="MIDI File node in Infinite" width="686" height="550" loading="lazy" decoding="async"><figcaption>MIDI File node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Drag and drop loading</strong>: Drop standard Type 0 or Type 1 MIDI files directly onto the node body.</li><li><strong>Track isolation</strong>: Choose which MIDI track to output, or sum all tracks into one polyphonic stream.</li><li><strong>Transport synchronization</strong>: Automatically tracks project tempo, loop markers, and timeline playhead location.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -313,7 +313,7 @@ MIDI File (Velocity) -&gt; Particle System (Speed)</code></pre>
 <hr>
 <h2 id="19-chorder-single-note-harmonizer-and-chord-voicings">19. Chorder: single-note harmonizer and chord voicings</h2>
 <p>The <strong>Chorder</strong> node converts single incoming note taps into rich multi-voice polyphonic chords.</p>
-<figure><img src="../assets/nodes/hd/chorder.webp" alt="Chorder node in Infinite" width="833" height="550" loading="lazy" decoding="async"><figcaption>Chorder node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/chorder.webp" alt="Chorder node in Infinite" width="656" height="550" loading="lazy" decoding="async"><figcaption>Chorder node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Pre-configured chord types</strong>: Major, Minor, Sus2, Sus4, Dominant 7th, Major 7th, Minor 7th, 9th, and Diminished.</li><li><strong>Custom chord editor</strong>: Define custom interval offsets (e.g. <code>[0, +7, +12, +16]</code>) for signature chords.</li><li><strong>Root-relative transposition</strong>: Voicings transpose across the keyboard relative to the incoming note pitch.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -322,7 +322,7 @@ MIDI File (Velocity) -&gt; Particle System (Speed)</code></pre>
 <hr>
 <h2 id="20-note-stack-interval-and-octave-voice-layering">20. Note Stack: interval and octave voice layering</h2>
 <p>The <strong>Note Stack</strong> node layers harmonic interval copies on top of played notes to thicken synth leads and basslines.</p>
-<figure><img src="../assets/nodes/hd/note-stack.webp" alt="Note Stack node in Infinite" width="686" height="550" loading="lazy" decoding="async"><figcaption>Note Stack node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-stack.webp" alt="Note Stack node in Infinite" width="716" height="550" loading="lazy" decoding="async"><figcaption>Note Stack node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Up to 4 interval layers</strong>: Add octave below (<code>-12</code>), fifth above (<code>+7</code>), octave above (<code>+12</code>), or custom intervals.</li><li><strong>Per-voice detuning</strong>: Applies subtle pitch detuning between stacked voices for rich chorus effects.</li><li><strong>Velocity scaling</strong>: Scales the velocity of stacked intervals relative to the primary note.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -331,7 +331,7 @@ MIDI File (Velocity) -&gt; Particle System (Speed)</code></pre>
 <hr>
 <h2 id="21-note-capturer-live-performance-buffer-recorder">21. Note Capturer: live performance buffer recorder</h2>
 <p>The <strong>Note Capturer</strong> node acts as a live MIDI scratchpad, recording incoming performances into a circular memory buffer for playback or loop export.</p>
-<figure><img src="../assets/nodes/hd/note-capturer.webp" alt="Note Capturer node in Infinite" width="894" height="550" loading="lazy" decoding="async"><figcaption>Note Capturer node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-capturer.webp" alt="Note Capturer node in Infinite" width="942" height="550" loading="lazy" decoding="async"><figcaption>Note Capturer node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Retrospective recording</strong>: Keeps a continuous rolling buffer of your recent playing, allowing you to capture spontaneous improvisation after it occurs.</li><li><strong>Bar quantization</strong>: Trims captured phrases cleanly to musical bar boundaries.</li><li><strong>Loop playback</strong>: Plays captured takes in a continuous loop while leaving the keyboard free for additional layers.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -340,7 +340,7 @@ MIDI File (Velocity) -&gt; Particle System (Speed)</code></pre>
 <hr>
 <h2 id="22-bouncing-balls-physics-based-rhythmic-trigger-generator">22. Bouncing Balls: physics-based rhythmic trigger generator</h2>
 <p>The <strong>Bouncing Balls</strong> node runs an internal physics simulation where virtual spheres bounce inside a gravity well, triggering note events whenever a ball collides with the floor.</p>
-<figure><img src="../assets/nodes/hd/bouncing-balls.webp" alt="Bouncing Balls node in Infinite" width="438" height="550" loading="lazy" decoding="async"><figcaption>Bouncing Balls node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/bouncing-balls.webp" alt="Bouncing Balls node in Infinite" width="450" height="550" loading="lazy" decoding="async"><figcaption>Bouncing Balls node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Gravity &amp; elasticity</strong>: Balls bounce with physically realistic gravitational acceleration, bouncing rapidly as they reach the floor.</li><li><strong>Multi-ball polyphony</strong>: Simulate up to 8 independent bouncing spheres with differing drop heights and restitution coefficients.</li><li><strong>Collision pitch mapping</strong>: Map collision velocity to note velocity, and bounce frequency to musical pitch.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -349,7 +349,7 @@ MIDI File (Velocity) -&gt; Particle System (Speed)</code></pre>
 <hr>
 <h2 id="23-note-strum-realistic-acoustic-chord-strumming">23. Note Strum: realistic acoustic chord strumming</h2>
 <p>The <strong>Note Strum</strong> node emulates guitar and harp playing by staggering the onset times of notes in a polyphonic chord.</p>
-<figure><img src="../assets/nodes/hd/note-strum.webp" alt="Note Strum node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Note Strum node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/note-strum.webp" alt="Note Strum node in Infinite" width="572" height="550" loading="lazy" decoding="async"><figcaption>Note Strum node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Strum speed</strong>: Sets the time delay between consecutive notes (<code>2ms</code> to <code>150ms</code>).</li><li><strong>Direction control</strong>: Down-strum (low notes to high notes), Up-strum (high notes to low notes), or Alternating.</li><li><strong>Velocity decay</strong>: Gradually tapers velocity across the strum to emulate natural hand dynamics.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -358,7 +358,7 @@ MIDI File (Velocity) -&gt; Particle System (Speed)</code></pre>
 <hr>
 <h2 id="24-field-notes-programmable-algorithmic-note-generation">24. Field Notes: programmable algorithmic note generation</h2>
 <p>The <strong>Field Notes</strong> node allows you to script custom generative algorithms, Markov-chain phrase models, and rhythmic logic directly in Infinite's bare-name Field language.</p>
-<figure><img src="../assets/nodes/hd/field-notes.webp" alt="Field Notes node in Infinite" width="331" height="550" loading="lazy" decoding="async"><figcaption>Field Notes node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/field-notes.webp" alt="Field Notes node in Infinite" width="310" height="550" loading="lazy" decoding="async"><figcaption>Field Notes node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Event-driven execution</strong>: Executes on every clock tick or MIDI input trigger.</li><li><strong>State registers</strong>: Retains history across steps to calculate Euclidean rhythms, Fibonacci sequences, or cellular automata.</li><li><strong>Output note generation</strong>: Emits note pitch, velocity, and gate events directly to downstream synths.</li></ul>
 <h3 id="example-fibonacci-sequence-arpeggiator">Example: Fibonacci sequence arpeggiator</h3>

@@ -149,7 +149,7 @@
 <hr>
 <h2 id="1-oscillator-dual-oscillator-subtractive-fm-engine">1. Oscillator: dual-oscillator subtractive &amp; FM engine</h2>
 <p>The <strong>Oscillator</strong> node is Infinite's foundational sound generator, built upon bandlimited anti-aliased wavetables with linear frequency modulation and phase synchronization.</p>
-<figure><img src="../assets/nodes/hd/oscillator.webp" alt="Oscillator node in Infinite" width="307" height="550" loading="lazy" decoding="async"><figcaption>Oscillator node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/oscillator.webp" alt="Oscillator node in Infinite" width="325" height="550" loading="lazy" decoding="async"><figcaption>Oscillator node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Waveforms</strong>: Sine, Triangle, Sawtooth, and Square with variable Pulse Width (<code>0.01</code> to <code>0.99</code>).</li><li><strong>Pitch controls</strong>: Coarse frequency (<code>20 Hz</code> to <code>8000 Hz</code>), octave shift (<code>-4</code> to <code>+4</code>), semitone offset (<code>-12</code> to <code>+12</code>), and fine detune (<code>-50</code> to <code>+50</code> cents).</li><li><strong>Linear FM input</strong>: An audio-rate <code>fm_in</code> pin enables modulation from a secondary oscillator, producing rich sidebands for metallic chimes, FM brass, and aggressive growls.</li><li><strong>Portamento</strong>: Continuous glide parameter (<code>0</code> to <code>2</code> seconds) providing constant-rate pitch transitions between notes.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -158,7 +158,7 @@
 <hr>
 <h2 id="2-wavetable-64-table-morphing-synth-with-unison">2. Wavetable: 64-table morphing synth with unison</h2>
 <p>The <strong>Wavetable</strong> node is Infinite's flagship polyphonic wavetable instrument, featuring 64 factory wavetables that morph smoothly across eight distinct single-cycle frames.</p>
-<figure><img src="../assets/nodes/hd/wavetable.webp" alt="Wavetable node in Infinite" width="434" height="550" loading="lazy" decoding="async"><figcaption>Wavetable node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/wavetable.webp" alt="Wavetable node in Infinite" width="464" height="550" loading="lazy" decoding="async"><figcaption>Wavetable node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>2D table scanning</strong>: Continuous position interpolation across 8 frames per table, eliminating step clicks or boundary artifacts.</li><li><strong>Unison detune &amp; stereo spread</strong>: Stacks up to 8 voices per note with adjustable frequency detuning and wide stereo placement.</li><li><strong>Sub-oscillator</strong>: Integrated sub-harmonic generator providing dedicated low-end weight independently of table morphing.</li><li><strong>Modulatable position</strong>: The position parameter can be cabled directly to LFOs, envelope followers, or hand tracking modulators.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -167,7 +167,7 @@
 <hr>
 <h2 id="3-analog-polyphonic-virtual-analog-with-nonlinear-filters">3. Analog: polyphonic virtual analog with nonlinear filters</h2>
 <p>The <strong>Analog</strong> node models the physical circuit behaviour of vintage analog synthesizers, complete with subtle oscillator drift, saturation stages, and four distinct nonlinear filter topologies.</p>
-<figure><img src="../assets/nodes/hd/analog.webp" alt="Analog node in Infinite" width="275" height="550" loading="lazy" decoding="async"><figcaption>Analog node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/analog.webp" alt="Analog node in Infinite" width="294" height="550" loading="lazy" decoding="async"><figcaption>Analog node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Twin drift-stabilized oscillators</strong>: Dual oscillators with saw, square, triangle, and sine options, pulse width modulation, sub-oscillator, and a pink/white noise source.</li><li><strong>Circuit-modeled filters</strong>: Switchable between a 4-pole Moog transistor ladder, Korg MS-20 resonant lowpass, diode ladder, and state-variable filter (SVF).</li><li><strong>4x oversampling</strong>: Drives and non-linear filter stages run at 4x internal oversampling to keep aliasing strictly under -80 dB across all octaves.</li><li><strong>Dual ADSR envelopes</strong>: Dedicated amplitude and filter envelopes with exponential decay curves.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -176,7 +176,7 @@
 <hr>
 <h2 id="4-fm-4-operator-frequency-modulation-synthesizer">4. FM: 4-operator frequency modulation synthesizer</h2>
 <p>The <strong>FM</strong> node delivers classic frequency modulation synthesis using four sine operators configured across eleven classic routing algorithms.</p>
-<figure><img src="../assets/nodes/hd/fm.webp" alt="FM node in Infinite" width="281" height="550" loading="lazy" decoding="async"><figcaption>FM node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/fm.webp" alt="FM node in Infinite" width="305" height="550" loading="lazy" decoding="async"><figcaption>FM node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>11 routing algorithms</strong>: Ranging from a pure vertical cascade (<code>4 -&amp;gt; 3 -&amp;gt; 2 -&amp;gt; 1</code>) for complex harmonic teeth, to parallel carriers for additive electric pianos.</li><li><strong>Harmonic frequency ratios</strong>: Per-operator integer and fractional frequency multipliers (<code>0.5x</code> to <code>32x</code>).</li><li><strong>Feedback loop</strong>: Operator 4 includes self-modulation feedback, transitioning from smooth sines to saw waves and broadband noise.</li><li><strong>Per-operator envelopes</strong>: Individual envelope generators shaping the modulation index over time.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -185,7 +185,7 @@
 <hr>
 <h2 id="5-partials-64-harmonic-additive-formant-resynthesis">5. Partials: 64-harmonic additive formant resynthesis</h2>
 <p>The <strong>Partials</strong> node performs real-time additive resynthesis, tracking harmonic partials and reproducing acoustic instruments and voices without pitch artifacts.</p>
-<figure><img src="../assets/nodes/hd/partials.webp" alt="Partials node in Infinite" width="616" height="550" loading="lazy" decoding="async"><figcaption>Partials node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/partials.webp" alt="Partials node in Infinite" width="645" height="550" loading="lazy" decoding="async"><figcaption>Partials node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Formant preservation</strong>: When transposing incoming audio across octaves, Partials keeps the spectral formant envelope locked in place, avoiding the unnatural "chipmunk" timbre common to conventional samplers.</li><li><strong>Spectral tilt &amp; odd/even balance</strong>: Continuous control over harmonic roll-off slope and the ratio between even and odd harmonics.</li><li><strong>Inharmonic stretching</strong>: Stretches partial frequencies away from integer multiples for bell and metallic timbres.</li><li><strong>Residual noise tracking</strong>: Models the turbulent air and breath left behind by harmonic analysis.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -194,7 +194,7 @@
 <hr>
 <h2 id="6-string-karplus-strong-physical-modeling-waveguide">6. String: Karplus-Strong physical modeling waveguide</h2>
 <p>The <strong>String</strong> node models the physical acoustics of vibrating strings stretched over a resonating wooden body using Karplus-Strong waveguide synthesis.</p>
-<figure><img src="../assets/nodes/hd/string.webp" alt="String node in Infinite" width="719" height="550" loading="lazy" decoding="async"><figcaption>String node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/string.webp" alt="String node in Infinite" width="507" height="550" loading="lazy" decoding="async"><figcaption>String node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Physical waveguide loop</strong>: A delay line length tuned exactly to the note's fundamental frequency, coupled with an internal lowpass reflection filter.</li><li><strong>Three exciter modes</strong>: </li><li><em>Pluck</em>: Impulse burst simulating a guitar plectrum or finger pick.</li><li><em>Bow</em>: Continuous friction noise simulating a violin or cello bow.</li><li><em>Strike</em>: Felt hammer excitation simulating an acoustic piano or hammered dulcimer.</li><li><strong>Body resonance &amp; pickup position</strong>: Configurable acoustic body model and spatial pickup location along the string length.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -203,7 +203,7 @@
 <hr>
 <h2 id="7-wave-terrain-topographic-image-to-sound-synthesis">7. Wave Terrain: topographic image-to-sound synthesis</h2>
 <p>The <strong>Wave Terrain</strong> node turns any 2D image, video capture, reaction-diffusion simulation, or procedural texture into a continuous 3D acoustic terrain surface <code>z = T(u, v)</code>.</p>
-<figure><img src="../assets/nodes/hd/wave-terrain.webp" alt="Wave Terrain node in Infinite" width="221" height="550" loading="lazy" decoding="async"><figcaption>Wave Terrain node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/wave-terrain.webp" alt="Wave Terrain node in Infinite" width="237" height="550" loading="lazy" decoding="async"><figcaption>Wave Terrain node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Audio-rate orbital paths</strong>: An oscillator traces a closed orbital trajectory <code>(u(t), v(t))</code> across the image (circle, ellipse, Lissajous curve, or lemniscate).</li><li><strong>Surface height as amplitude</strong>: As the orbital scan travels across pixels, the image luminance <code>z</code> becomes the instantaneous audio amplitude.</li><li><strong>10-level Fourier MIP antialiasing</strong>: Sampling raw image pixels causes harsh aliasing; Infinite computes an internal Real Discrete Fourier Transform (RDFT) MIP pyramid across 10 octaves, ensuring pristine, alias-free polyphonic synthesis across all 8 octaves.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -212,7 +212,7 @@
 <hr>
 <h2 id="8-equation-synth-desmos-style-mathematical-synthesis">8. Equation Synth: Desmos-style mathematical synthesis</h2>
 <p>The <strong>Equation Synth</strong> node evaluates custom mathematical expressions <code>y = f(x, a, b, c, d)</code> directly at 48kHz audio rates, turning formulas into playable instruments.</p>
-<figure><img src="../assets/nodes/hd/equation-synth.webp" alt="Equation Synth node in Infinite" width="285" height="550" loading="lazy" decoding="async"><figcaption>Equation Synth node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/equation-synth.webp" alt="Equation Synth node in Infinite" width="303" height="550" loading="lazy" decoding="async"><figcaption>Equation Synth node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Inline formula parsing</strong>: Type formulas directly using standard mathematical functions (<code>sin</code>, <code>cos</code>, <code>tan</code>, <code>pow</code>, <code>abs</code>, <code>tanh</code>, <code>floor</code>).</li><li><strong>Real-time parameter knobs</strong>: Four continuous parameters (<code>knobA</code>, <code>knobB</code>, <code>knobC</code>, <code>knobD</code>) exposed as modulation pins.</li><li><strong>Compile-time bandlimiting</strong>: Evaluated curves are compiled into bandlimited wavetable mipmaps, preventing mathematical sharp edges from creating audible foldback distortion.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -221,7 +221,7 @@
 <hr>
 <h2 id="9-spectral-synth-real-time-spectrogram-resynthesis">9. Spectral Synth: real-time spectrogram resynthesis</h2>
 <p>The <strong>Spectral Synth</strong> node scans an image or visual canvas horizontally as a spectrogram, converting visual pixels into audible frequencies.</p>
-<figure><img src="../assets/nodes/hd/spectral-synth.webp" alt="Spectral Synth node in Infinite" width="203" height="550" loading="lazy" decoding="async"><figcaption>Spectral Synth node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/spectral-synth.webp" alt="Spectral Synth node in Infinite" width="217" height="550" loading="lazy" decoding="async"><figcaption>Spectral Synth node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Horizontal scan line</strong>: A playhead travels across the texture from left to right at tempo-synced rates.</li><li><strong>Vertical frequency mapping</strong>: The vertical $y$-axis maps to acoustic frequency (low frequencies at the bottom, high frequencies at the top), while pixel brightness sets partial amplitude.</li><li><strong>Spectral freeze</strong>: Freeze the playhead at any point along the image to produce an indefinite, unmoving spectral chord.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -230,7 +230,7 @@
 <hr>
 <h2 id="10-metallic-modal-physical-resonator-for-bells-and-plates">10. Metallic: modal physical resonator for bells and plates</h2>
 <p>The <strong>Metallic</strong> node models the physical vibrations of acoustic metal and glass objects struck by hard or soft mallets using a bank of coupled two-pole bandpass resonators.</p>
-<figure><img src="../assets/nodes/hd/metallic.webp" alt="Metallic node in Infinite" width="374" height="550" loading="lazy" decoding="async"><figcaption>Metallic node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/metallic.webp" alt="Metallic node in Infinite" width="399" height="550" loading="lazy" decoding="async"><figcaption>Metallic node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>8 material presets</strong>: Steel, Brass, Bell Bronze, Aluminium, Glass, Wood, Ceramic, and Titanium.</li><li><strong>Modal dispersion</strong>: Modes follow non-integer frequency ratios corresponding to the physical vibration equations of circular plates and rectangular bars.</li><li><strong>Stiffness &amp; decay</strong>: Stiffness controls modal frequency clustering, while decay adjusts the acoustic damping rate across high versus low modes.</li><li><strong>Strike hardness</strong>: Blends from a soft felt mallet impulse to a sharp metal point impact.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -239,7 +239,7 @@
 <hr>
 <h2 id="11-sampler-polyphonic-multisample-engine">11. Sampler: polyphonic multisample engine</h2>
 <p>The <strong>Sampler</strong> node provides polyphonic sample playback with precision loop boundaries, pitch tracking, and real-time live audio recording.</p>
-<figure><img src="../assets/nodes/hd/sampler.webp" alt="Sampler node in Infinite" width="527" height="550" loading="lazy" decoding="async"><figcaption>Sampler node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/sampler.webp" alt="Sampler node in Infinite" width="557" height="550" loading="lazy" decoding="async"><figcaption>Sampler node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Playback modes</strong>: One-Shot, Forward Loop, Reverse Loop, and Ping-Pong bidirectional loop.</li><li><strong>Live buffer recording</strong>: An audio <code>record_in</code> port allows capturing incoming microphone feeds, guitar inputs, or synth stems straight into memory.</li><li><strong>Root pitch tracking</strong>: Tracks MIDI keyboard pitch relative to a configurable base key with crossfade loop smoothing.</li><li><strong>Envelope shaping</strong>: Built-in ADSR envelope for smooth sample transitions.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -248,7 +248,7 @@
 <hr>
 <h2 id="12-slicer-transient-detecting-beat-chopper">12. Slicer: transient-detecting beat chopper</h2>
 <p>The <strong>Slicer</strong> node analyzes incoming audio loops, detects transient attacks, and slices the recording into individual hits mapped across MIDI notes.</p>
-<figure><img src="../assets/nodes/hd/slicer.webp" alt="Slicer node in Infinite" width="521" height="550" loading="lazy" decoding="async"><figcaption>Slicer node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/slicer.webp" alt="Slicer node in Infinite" width="550" height="550" loading="lazy" decoding="async"><figcaption>Slicer node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Onset detection</strong>: High-precision transient peak detection algorithm automatically finding drum hits and percussive transients.</li><li><strong>Metric grid fallback</strong>: Option to slice by strict musical divisions (1/8, 1/16, or 1/32 notes) locked to transport BPM.</li><li><strong>Per-slice control</strong>: Individual start/end offsets, pitch offsets, and reverse triggers per slice.</li><li><strong>MIDI pad mapping</strong>: Slices automatically map upward from MIDI note C1 for instant pad controller performance.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -257,7 +257,7 @@
 <hr>
 <h2 id="13-paulstretch-extreme-spectral-time-stretching">13. PaulStretch: extreme spectral time-stretching</h2>
 <p>The <strong>PaulStretch</strong> node implements the legendary Paul Nasca spectral time-stretch algorithm, expanding audio recordings from 10x to 1000x their original length without pitch shifts.</p>
-<figure><img src="../assets/nodes/hd/paulstretch.webp" alt="PaulStretch node in Infinite" width="532" height="550" loading="lazy" decoding="async"><figcaption>PaulStretch node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/paulstretch.webp" alt="PaulStretch node in Infinite" width="560" height="550" loading="lazy" decoding="async"><figcaption>PaulStretch node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Windowed FFT analysis</strong>: Deconstructs incoming audio into heavily overlapping spectral windows (typically 0.25 to 2.0 seconds wide).</li><li><strong>Phase randomization</strong>: Completely randomizes the phase angle of every frequency bin while preserving original magnitude, eliminating comb filtering and phase cancellation.</li><li><strong>Extreme stretch factors</strong>: Stretches a 3-second vocal sample into a 5-minute ambient drone that retains acoustic warmth.</li><li><strong>Unison &amp; detune</strong>: Adds multi-voice spectral unison for shimmering cinematic textures.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -266,7 +266,7 @@
 <hr>
 <h2 id="14-molder-harmonic-partial-decomposition-and-waveshaping">14. Molder: harmonic partial decomposition and waveshaping</h2>
 <p>The <strong>Molder</strong> node decomposes incoming audio into tracked sinusoidal partials and residual noise, then applies nonlinear wavefolding and dynamic mutation curves.</p>
-<figure><img src="../assets/nodes/hd/molder.webp" alt="Molder node in Infinite" width="515" height="550" loading="lazy" decoding="async"><figcaption>Molder node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/molder.webp" alt="Molder node in Infinite" width="547" height="550" loading="lazy" decoding="async"><figcaption>Molder node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Sinusoidal tracking</strong>: Extracts frequency tracks and energy envelopes from any incoming sample.</li><li><strong>Mutation roll</strong>: The Roll button mutates frequency tracks, introducing harmonic permutations and metallic shifts.</li><li><strong>Nonlinear folding</strong>: Compresses partial amplitudes through polynomial folding curves, producing grit and analog saturation.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -275,7 +275,7 @@
 <hr>
 <h2 id="15-grain-molder-granular-feature-sorting-and-risers">15. Grain Molder: granular feature sorting and risers</h2>
 <p>The <strong>Grain Molder</strong> node chops an audio buffer into thousands of overlapping micro-grains, analyzes their acoustic properties (loudness, spectral centroid, or pitch), and sorts them in ascending or descending order.</p>
-<figure><img src="../assets/nodes/hd/grain-molder.webp" alt="Grain Molder node in Infinite" width="539" height="550" loading="lazy" decoding="async"><figcaption>Grain Molder node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/grain-molder.webp" alt="Grain Molder node in Infinite" width="571" height="550" loading="lazy" decoding="async"><figcaption>Grain Molder node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Micro-grain slicing</strong>: Deconstructs buffers into grains between 20ms and 150ms with Hann window envelopes.</li><li><strong>Acoustic feature classification</strong>: Measures root-mean-square (RMS) energy, brightness, and pitch density for every grain.</li><li><strong>Sorting engine</strong>: Reorders grains along the playback timeline according to the chosen metric.</li><li><strong>Amount slider</strong>: Morphs continuously from original chronological playback to fully sorted granular order.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -284,7 +284,7 @@
 <hr>
 <h2 id="16-granular-real-time-polyphonic-granular-cloud-engine">16. Granular: real-time polyphonic granular cloud engine</h2>
 <p>The <strong>Granular</strong> node shreds recorded or live audio into micro-sound grains (10ms to 500ms), scattering them across space and time to produce granular clouds, textures, and pitch-shifted shimmers.</p>
-<figure><img src="../assets/nodes/hd/granular.webp" alt="Granular node in Infinite" width="462" height="550" loading="lazy" decoding="async"><figcaption>Granular node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/granular.webp" alt="Granular node in Infinite" width="491" height="550" loading="lazy" decoding="async"><figcaption>Granular node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Grain density &amp; size</strong>: Generates up to 64 simultaneous overlapping grains with customizable duration and emission rate.</li><li><strong>Position scrub &amp; spray</strong>: Controls the center read head position in the buffer, while Spray introduces random time offsets.</li><li><strong>Pitch randomization</strong>: Randomly scatters grain playback speeds across customizable semitone windows.</li><li><strong>Freeze toggle</strong>: Instantly locks the read head to sample an infinitesimal sliver of sound indefinitely.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -293,7 +293,7 @@
 <hr>
 <h2 id="17-field-synth-programmable-per-sample-jit-dsp-kernel">17. Field Synth: programmable per-sample JIT DSP kernel</h2>
 <p>The <strong>Field Synth</strong> node is Infinite's most flexible sound engine: a polyphonic synthesizer whose entire voice algorithm is written in Infinite's bare-name Field language and compiled directly into native machine code.</p>
-<figure><img src="../assets/nodes/hd/field-synth.webp" alt="Field Synth node in Infinite" width="245" height="550" loading="lazy" decoding="async"><figcaption>Field Synth node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/field-synth.webp" alt="Field Synth node in Infinite" width="263" height="550" loading="lazy" decoding="async"><figcaption>Field Synth node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Bare-name syntax</strong>: Write DSP code with plain algebraic expressions (<code>freq</code>, <code>phase</code>, <code>out</code>) without sigils or boilerplate.</li><li><strong>Per-sample execution</strong>: Runs on the audio thread at 48kHz with zero garbage collection or allocation overhead.</li><li><strong>Dynamic user knobs</strong>: Define custom parameters in code that automatically expose modulatable pins on the node body.</li><li><strong>Polyphonic voice architecture</strong>: The engine handles note allocation, voice stealing, and per-voice registers automatically.</li></ul>
 <h3 id="example-resonant-dual-oscillator-kernel">Example: resonant dual-oscillator kernel</h3>
@@ -318,7 +318,7 @@ out = tanh(raw * 1.5) * gate</code></pre>
 <hr>
 <h2 id="18-drum-sequencer-16-step-polyphonic-drum-engine">18. Drum Sequencer: 16-step polyphonic drum engine</h2>
 <p>The <strong>Drum Sequencer</strong> node is an integrated 8-track, 16-step drum machine combining analog drum synthesis circuits with an intuitive pattern grid.</p>
-<figure><img src="../assets/nodes/hd/drum-sequencer.webp" alt="Drum Sequencer node in Infinite" width="293" height="550" loading="lazy" decoding="async"><figcaption>Drum Sequencer node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/drum-sequencer.webp" alt="Drum Sequencer node in Infinite" width="310" height="550" loading="lazy" decoding="async"><figcaption>Drum Sequencer node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>8 synthesized drum voices</strong>: Dedicated circuits for Kick, Snare, Closed Hat, Open Hat, Clap, Low Tom, High Tom, and Percussion.</li><li><strong>Individual audio outputs</strong>: Includes a master stereo mix output plus eight individual audio outs (<code>1</code> to <code>8</code>) for per-channel external processing and mixing.</li><li><strong>Step velocity &amp; swing</strong>: Per-step velocity sliders with configurable shuffle percentage.</li><li><strong>Transport lock</strong>: Automatically locks to Infinite's global BPM and timeline transport.</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -327,7 +327,7 @@ out = tanh(raw * 1.5) * gate</code></pre>
 <hr>
 <h2 id="19-mpc-16-pad-vintage-sampling-groovebox">19. MPC: 16-pad vintage sampling groovebox</h2>
 <p>The <strong>MPC</strong> node captures the tactile immediacy and groove feel of classic 16-pad hardware samplers.</p>
-<figure><img src="../assets/nodes/hd/mpc.webp" alt="MPC node in Infinite" width="321" height="550" loading="lazy" decoding="async"><figcaption>MPC node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/mpc.webp" alt="MPC node in Infinite" width="334" height="550" loading="lazy" decoding="async"><figcaption>MPC node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>16 dynamic sample pads</strong>: Drag and drop audio files onto any of the 16 pads.</li><li><strong>16-level velocity mode</strong>: Spreads either volume or pitch across all 16 pads for expressive melodic playing of a single sample.</li><li><strong>Note repeat</strong>: Hold a pad while pressing Note Repeat to generate rhythmic rolls quantized to 1/8, 1/16, or 1/32 triplets.</li><li><strong>Choke groups</strong>: Assign pads to mutually exclusive mute groups (such as open and closed hi-hats).</li></ul>
 <h3 id="try-it">Try it</h3>
@@ -336,7 +336,7 @@ out = tanh(raw * 1.5) * gate</code></pre>
 <hr>
 <h2 id="20-looper-multi-layer-live-performance-phrase-looper">20. Looper: multi-layer live performance phrase looper</h2>
 <p>The <strong>Looper</strong> node is designed for live improvisation, enabling bar-quantized audio phrase recording, seamless overdubbing, and speed manipulation.</p>
-<figure><img src="../assets/nodes/hd/looper.webp" alt="Looper node in Infinite" width="565" height="550" loading="lazy" decoding="async"><figcaption>Looper node in Infinite</figcaption></figure>
+<figure><img src="../assets/nodes/hd/looper.webp" alt="Looper node in Infinite" width="592" height="550" loading="lazy" decoding="async"><figcaption>Looper node in Infinite</figcaption></figure>
 <h3 id="how-it-works">How it works</h3>
 <ul><li><strong>Bar-quantized punch-in</strong>: Automatically rounds start and stop commands to the nearest bar boundary (1, 2, 4, 8, or 16 bars).</li><li><strong>Non-destructive overdubbing</strong>: Layer takes indefinitely with an adjustable decay feedback control to prevent buildup.</li><li><strong>Reverse &amp; half-speed</strong>: Instant reverse toggle and half-speed playback for tape-style pitch drop effects.</li><li><strong>Boundary crossfades</strong>: Applies 5ms micro-crossfades across loop seams, eliminating clicks on imperfect takes.</li></ul>
 <h3 id="try-it">Try it</h3>

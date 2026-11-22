@@ -1,12 +1,12 @@
 [
  {
-  "slug": "opengl-41-path-tracing-bvh-texture-buffers-agx",
-  "title": "Real-time OpenGL 4.1 path tracing with BVH texture buffers and AgX",
-  "description": "How Infinite's Render 3D node runs a progressive OpenGL 4.1 path tracer using RGBA32F BVH texture buffers, 12 ms strip budgets, and shared AgX tonemapping.",
-  "date": "2026-11-17",
-  "updated": "2026-11-17",
-  "category": "creative",
-  "url": "https://infinitedevices.org/blog/opengl-41-path-tracing-bvh-texture-buffers-agx.html"
+  "slug": "digital-waveguide-wind-and-piano-physical-modelling",
+  "title": "Digital waveguide physical modelling for wind and piano",
+  "description": "How Infinite's Wind and Piano nodes model clarinet reeds, brass lips, Chaigne felt hammers, dispersion allpasses, and a 224-mode soundboard in real-time C++ DSP.",
+  "date": "2026-11-22",
+  "updated": "2026-11-22",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/digital-waveguide-wind-and-piano-physical-modelling.html"
  },
  {
   "slug": "2d-view-non-destructive-layer-compositing-in-infinite",
@@ -34,6 +34,15 @@
   "updated": "2026-11-17",
   "category": "product",
   "url": "https://infinitedevices.org/blog/field-patcher-visual-box-and-wire-dsp-shader-editor.html"
+ },
+ {
+  "slug": "opengl-41-path-tracing-bvh-texture-buffers-agx",
+  "title": "Real-time OpenGL 4.1 path tracing with BVH texture buffers and AgX",
+  "description": "How Infinite's Render 3D node runs a progressive OpenGL 4.1 path tracer using RGBA32F BVH texture buffers, 12 ms strip budgets, and shared AgX tonemapping.",
+  "date": "2026-11-17",
+  "updated": "2026-11-17",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/opengl-41-path-tracing-bvh-texture-buffers-agx.html"
  },
  {
   "slug": "binaural-hrtf-spatial-audio-mixer-dsp",
