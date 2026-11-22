@@ -409,6 +409,46 @@ uint64_t AudioEngine::CallbackGapCount() const
    return mCallbackGaps.load(std::memory_order_relaxed);
 }
 
+void AudioEngine::AccumulateCheckWindow(float peak, double sumSq, uint64_t samples, uint64_t nonFinite, uint64_t over)
+{
+   // Audio thread only: the single writer of every mCheck* accumulator. A reset asked for on the main
+   // thread lands here, at a block boundary, so a window never mixes halves of two blocks.
+   const uint32_t req = mCheckResetReq.load(std::memory_order_acquire);
+   if (req != mCheckResetAck.load(std::memory_order_relaxed))
+   {
+      mCheckPeak.store(0.0f, std::memory_order_relaxed);
+      mCheckSumSq.store(0.0, std::memory_order_relaxed);
+      mCheckSamples.store(0, std::memory_order_relaxed);
+      mCheckNonFinite.store(0, std::memory_order_relaxed);
+      mCheckOver.store(0, std::memory_order_relaxed);
+      mCheckResetAck.store(req, std::memory_order_release);
+   }
+   if (peak > mCheckPeak.load(std::memory_order_relaxed))
+      mCheckPeak.store(peak, std::memory_order_relaxed);
+   mCheckSumSq.store(mCheckSumSq.load(std::memory_order_relaxed) + sumSq, std::memory_order_relaxed);
+   mCheckSamples.store(mCheckSamples.load(std::memory_order_relaxed) + samples, std::memory_order_relaxed);
+   mCheckNonFinite.store(mCheckNonFinite.load(std::memory_order_relaxed) + nonFinite, std::memory_order_relaxed);
+   mCheckOver.store(mCheckOver.load(std::memory_order_relaxed) + over, std::memory_order_relaxed);
+}
+
+void AudioEngine::ResetCheckWindow()
+{
+   mCheckResetReq.fetch_add(1, std::memory_order_acq_rel);
+}
+
+AudioEngine::CheckWindow AudioEngine::ReadCheckWindow() const
+{
+   CheckWindow w;
+   w.resetLanded = mCheckResetAck.load(std::memory_order_acquire) == mCheckResetReq.load(std::memory_order_acquire);
+   w.peak = mCheckPeak.load(std::memory_order_relaxed);
+   const uint64_t n = mCheckSamples.load(std::memory_order_relaxed);
+   w.samples = n;
+   w.rms = n > 0 ? (float)std::sqrt(mCheckSumSq.load(std::memory_order_relaxed) / (double)n) : 0.0f;
+   w.nonFinite = mCheckNonFinite.load(std::memory_order_relaxed);
+   w.over = mCheckOver.load(std::memory_order_relaxed);
+   return w;
+}
+
 uint64_t AudioEngine::MasterOverSamples() const
 {
    return mMasterOvers.load(std::memory_order_relaxed);
@@ -1467,9 +1507,24 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
       mCompletedGeneration.store(list->generation, std::memory_order_release);
    {
       float peak = 0.0f;
-      for (int ch = 0; ch < std::min(numChannels, 2); ch++)
+      double sumSq = 0.0;
+      uint64_t nonFinite = 0, over = 0;
+      const int checkChannels = std::min(numChannels, 2);
+      for (int ch = 0; ch < checkChannels; ch++)
          for (int i = 0; i < numFrames; i++)
-            peak = std::max(peak, std::fabs(buffers[ch][i]));
+         {
+            const float a = std::fabs(buffers[ch][i]);
+            peak = std::max(peak, a);
+            if (!(a <= 1e30f)) // NaN or inf: std::max above skips a NaN, this does not
+               nonFinite++;
+            else
+            {
+               sumSq += (double)a * (double)a;
+               if (a > 1.0f)
+                  over++;
+            }
+         }
+      AccumulateCheckWindow(peak, sumSq, (uint64_t)numFrames * (uint64_t)std::max(checkChannels, 1), nonFinite, over);
       if (peak < mBlockPeakFloor.load(std::memory_order_relaxed))
          mBlockPeakFloor.store(peak, std::memory_order_relaxed);
       if (peak > mBlockPeakCeil.load(std::memory_order_relaxed))

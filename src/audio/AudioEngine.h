@@ -448,6 +448,19 @@ public:
    // (a render resets it at its start, so its notice names the worst peak
    // of the take, not the last one).
    uint64_t MasterOverSamples() const;
+   // Outcome window for the agent's `check`: device output since the last ResetCheckWindow (main thread).
+   // The reset lands on the audio thread at its next block; resetLanded says whether it has yet.
+   struct CheckWindow
+   {
+      bool resetLanded = false;
+      float peak = 0.0f;
+      float rms = 0.0f;
+      uint64_t samples = 0; // channel samples counted (frames x up to 2 channels)
+      uint64_t nonFinite = 0;
+      uint64_t over = 0; // samples above full scale
+   };
+   void ResetCheckWindow();
+   CheckWindow ReadCheckWindow() const;
    float MasterOverPeak() const;
    float MasterOverPeakHold() const;
    void ResetMasterOverPeakHold();
@@ -698,6 +711,11 @@ private:
    std::atomic<bool> mSwitchLanded { false };
    std::atomic<float> mBlockPeakFloor { 1e9f };
    std::atomic<float> mBlockPeakCeil { 0.0f };
+   void AccumulateCheckWindow(float peak, double sumSq, uint64_t samples, uint64_t nonFinite, uint64_t over);
+   std::atomic<uint32_t> mCheckResetReq { 0 }, mCheckResetAck { 0 };
+   std::atomic<float> mCheckPeak { 0.0f };
+   std::atomic<double> mCheckSumSq { 0.0 };
+   std::atomic<uint64_t> mCheckSamples { 0 }, mCheckNonFinite { 0 }, mCheckOver { 0 };
    float mTailScratch[kAudioMaxChannels][kAudioMaxBlockFrames] = {};
    float* mTailScratchChannels[kAudioMaxChannels] = {};
 

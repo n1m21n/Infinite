@@ -115,7 +115,7 @@ namespace chat
          return "Explain the open patch in plain words: what it makes, how the signal flows, and which controls to try. " +
                 (arg.empty() ? std::string("Use `infinite context`.") : "Focus on: " + arg);
       if (name == "check")
-         return "Check the open patch: run `infinite patch check` on it and `infinite code errors` for the window, "
+         return "Check the open patch: run `infinite patch check` (no file: the open window) and `infinite code errors`, "
                 "then report what is wrong in one line each, with a button to fix what you can.";
       if (name == "docs")
          return arg.empty() ? std::string()
@@ -143,7 +143,8 @@ namespace chat
              "The user talks to you from its chat. Answer from the source, never from memory:\n"
              "- `infinite docs` lists the manuals: nodes (Node Field Guide), ui (every panel and control), field, headless, connections, patch-format, geometry, sketch, sketch3d, glsl, "
              "expressions, shortcuts, panels, map, visual, sound, film. `infinite context` shows the open patch and `attention`.\n"
-             "- Check code before you say it works: `infinite code check <file>`, `infinite patch check <p.inf>`, `infinite code errors`.\n"
+             "- Check code before you say it works: `infinite code check <file>`, `infinite patch check <p.inf>`, `infinite code errors`. "
+             "After you change the open window, `infinite patch check` (no file) says whether it reaches an output and sounds, without NaN or clipping: fix what it reports before you say it is done.\n"
              "- Change the open window with `infinite` commands only (`set`, `reset`, `mod`, `expr`, `view2d`, `timeline`, `session`, `notes`, `perf`, `panel`); never write a new .inf unless asked.\n"
              "- Pick nodes with `infinite find <plain words>`, which ranks every node card, not from memory.\n"
              "- Asked for a sample or sound: `infinite studio generate <part>` (Sample studio), then `studio export` for a wav or "

@@ -1,5 +1,8 @@
 // RPC command handler (moved verbatim from main.cpp).
 #include "core/CookProbe.h"
+#include "core/PatchReach.h"
+#include <chrono>
+#include <cmath>
 #include "app/AppShared.h"
 #include "imgui_internal.h"
 
@@ -13,6 +16,31 @@ namespace app
    // touch gNodes/gEditor/etc exactly as the normal UI code does. Returns
    // false with outError set on any failure; RemoteControl wraps that into a
    // JSON-RPC error reply.
+   // Every validation error propose gates on: PatchSchema (graph, keys, values) and node code that does not compile.
+   static void CollectPatchErrors(Patch::Data data, nlohmann::json& errors)
+   {
+      std::vector<Headless::Issue> schemaErrors, schemaWarnings;
+      const PatchSchema::Env env = MakeSchemaEnv(false);
+      PatchSchema::Resolve(data, env, schemaErrors);
+      if (schemaErrors.empty())
+         PatchSchema::ResolveKeys(data, env, schemaErrors);
+      if (schemaErrors.empty())
+         PatchSchema::Validate(data, env, schemaErrors, schemaWarnings);
+      for (const Headless::Issue& is : schemaErrors)
+         errors.push_back({ {"code", is.code}, {"message", is.message}, {"line", is.line}, {"node", is.node}, {"hint", is.hint} });
+      for (GraphNode& gn : gNodes)
+         if (gn.node)
+            if (const std::string err = gn.node->CodeError(); !err.empty())
+            {
+               const bool sketch = gn.typeName == "Sketch" || gn.typeName == "Sketch 3D";
+               const bool glsl = gn.typeName == "Shadertoy";
+               const bool formula = gn.typeName == "Formula" || gn.typeName == "Equation Synth";
+               const char* code = glsl ? "E_GLSL_COMPILE" : sketch ? "E_SKETCH_COMPILE" : formula ? "E_FORMULA_COMPILE" : "E_FIELD_COMPILE";
+               errors.push_back({ {"code", code}, {"node", gn.index}, {"type", gn.typeName}, {"message", err} });
+            }
+   }
+   static std::chrono::steady_clock::time_point sCheckWindowStart {};
+
    bool HandleRpcCommand(const std::string& method, const nlohmann::json& params,
                          nlohmann::json& outResult, std::string& outError)
    {
@@ -1031,34 +1059,82 @@ namespace app
          }
          gSuppressUndoCheckpoints = wasSuppressed;
 
-         // Graph validation via PatchSchema.
-         Patch::Data data = BuildPatchData();
-         std::vector<Headless::Issue> schemaErrors, schemaWarnings;
-         const PatchSchema::Env env = MakeSchemaEnv(false);
-         PatchSchema::Resolve(data, env, schemaErrors);
-         if (schemaErrors.empty())
-            PatchSchema::ResolveKeys(data, env, schemaErrors);
-         if (schemaErrors.empty())
-            PatchSchema::Validate(data, env, schemaErrors, schemaWarnings);
-         for (const Headless::Issue& is : schemaErrors)
-            errors.push_back({ {"code", is.code}, {"message", is.message}, {"line", is.line}, {"node", is.node}, {"hint", is.hint} });
-
-         // Code validation on all nodes.
-         for (GraphNode& gn : gNodes)
-            if (gn.node)
-               if (const std::string err = gn.node->CodeError(); !err.empty())
-               {
-                  const bool sketch = gn.typeName == "Sketch" || gn.typeName == "Sketch 3D";
-                  const bool glsl = gn.typeName == "Shadertoy";
-                  const bool formula = gn.typeName == "Formula" || gn.typeName == "Equation Synth";
-                  const char* code = glsl ? "E_GLSL_COMPILE" : sketch ? "E_SKETCH_COMPILE" : formula ? "E_FORMULA_COMPILE" : "E_FIELD_COMPILE";
-                  errors.push_back({ {"code", code}, {"node", gn.index}, {"type", gn.typeName}, {"message", err} });
-               }
-
+         CollectPatchErrors(BuildPatchData(), errors);
          if (!errors.empty())
             return rollback();
 
-         outResult = { {"ok", true}, {"results", results}, {"undo_id", gUndoStack.size()}, {"label", label} };
+         // The edit landed: the outcome `check` reports starts from here.
+         AudioEngine::Instance().ResetCheckWindow();
+         sCheckWindowStart = std::chrono::steady_clock::now();
+         outResult = { {"ok", true}, {"results", results}, {"undo_id", gUndoStack.size()}, {"label", label},
+                       {"next", "call check to hear and see the result"} };
+         return true;
+      }
+      else if (method == "check")
+      {
+         // Agent outcome check: what propose cannot know. propose proves the edit is valid; check says
+         // whether the patch now does anything - reaches an output, sounds, without NaN or clipping.
+         // Never blocks: the window is whatever the audio thread has played since the last propose (or
+         // reset), and an agent's next model round trip is longer than the window needs.
+         if (params.value("reset", false))
+         {
+            AudioEngine::Instance().ResetCheckWindow();
+            sCheckWindowStart = std::chrono::steady_clock::now();
+            outResult = { {"ok", true}, {"reset", true}, {"note", "window restarted; call check again in a moment"} };
+            return true;
+         }
+         json problems = json::array();
+         const Patch::Data data = BuildPatchData();
+         CollectPatchErrors(data, problems);
+
+         std::string text;
+         Patch::WriteText(data, text);
+         const json unreachable = PatchReach::UnreachableNodes(text);
+         bool hasAudioOut = false, hasOutput = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            hasAudioOut = hasAudioOut || gn.typeName == "Audio Out";
+            hasOutput = hasOutput || gn.typeName == "Output";
+         }
+         if (!unreachable.empty())
+            problems.push_back({ {"code", "W_UNREACHABLE"}, {"nodes", unreachable},
+                                 {"message", std::to_string(unreachable.size()) + " node(s) reach no Output or Audio Out, so they do nothing"},
+                                 {"hint", "cable them into the chain, or delete them"} });
+
+         const AudioEngine::CheckWindow w = AudioEngine::Instance().ReadCheckWindow();
+         const bool playing = Transport::Instance().IsPlaying();
+         const double windowMs = sCheckWindowStart.time_since_epoch().count() == 0 ? -1.0
+            : std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - sCheckWindowStart).count();
+         const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
+         const bool heard = audioOn && w.resetLanded && w.samples > 0;
+         if (hasAudioOut && !audioOn)
+            problems.push_back({ {"code", "W_AUDIO_OFF"},
+                                 {"message", "audio is off, so nothing in this patch can sound; loading a patch does not turn it on"},
+                                 {"hint", "tell the user to turn audio on (New Synth, the Mixer's audio button, or Settings > Audio); do not change the patch for this"} });
+         const auto db = [](float a) { return a > 1e-9f ? 20.0 * std::log10((double)a) : -180.0; };
+         if (heard && w.nonFinite > 0)
+            problems.push_back({ {"code", "E_AUDIO_NAN"}, {"samples", w.nonFinite},
+                                 {"message", "the output carried NaN/inf samples (a node is blowing up; the device hears silence or a burst)"},
+                                 {"hint", "look for a feedback loop, a division by zero in code, or a filter with resonance past its limit"} });
+         if (heard && w.over > 0)
+            problems.push_back({ {"code", "W_AUDIO_CLIP"}, {"samples", w.over}, {"peak_db", db(w.peak)},
+                                 {"message", "the output went past full scale and clips"},
+                                 {"hint", "lower a gain or a level before Audio Out"} });
+         if (heard && hasAudioOut && playing && w.nonFinite == 0 && w.peak < 3.2e-5f && windowMs >= 150.0)
+            problems.push_back({ {"code", "W_AUDIO_SILENT"}, {"peak_db", db(w.peak)},
+                                 {"message", "Audio Out is in the patch and the transport is playing, but nothing has sounded since the last edit"},
+                                 {"hint", "check a sound source reaches Audio Out, a level is not at zero, and notes are being played"} });
+
+         json sound = { {"playing", playing}, {"audio_out", hasAudioOut}, {"audio_on", audioOn},
+                        {"peak_db", db(w.peak)}, {"rms_db", db(w.rms)}, {"non_finite", w.nonFinite}, {"clip_samples", w.over},
+                        {"window_ms", windowMs < 0.0 ? json(nullptr) : json((int)windowMs)} };
+         if (!w.resetLanded || (windowMs >= 0.0 && windowMs < 150.0))
+            sound["settling"] = true;
+         bool ok = true;
+         for (const json& p : problems)
+            ok = ok && p.value("code", std::string()).rfind("E_", 0) != 0;
+         outResult = { {"ok", ok}, {"problems", problems}, {"sound", sound}, {"has_output", hasOutput},
+                       {"unreachable", unreachable} };
          return true;
       }
       else if (method == "save_patch")

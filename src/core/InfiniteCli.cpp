@@ -6,6 +6,7 @@
 #include "core/chat/NodeFinder.h"
 #include "core/NodeFactory.h"
 #include "Patch.h"
+#include "PatchReach.h"
 #include "PatchLayout.h"
 #include "TermDocs.h"
 #include "core/sketch/Sketch3DPresets.h"
@@ -909,74 +910,18 @@ namespace
       return out;
    }
 
-   // Which nodes reach an Output or an Audio Out, from canonical patch text.
-   json Unreachable(const std::string& text)
-   {
-      std::map<int, std::string> types;
-      std::multimap<int, int> feeders;
-      std::istringstream in(text);
-      std::string line;
-      while (std::getline(in, line))
-      {
-         std::istringstream words(line);
-         std::string tag;
-         words >> tag;
-         if (tag == "node")
-         {
-            int index = -1;
-            std::string category, type;
-            words >> index >> category;
-            std::getline(words, type);
-            type.erase(0, type.find_first_not_of(' '));
-            types[index] = type;
-         }
-         else if (tag == "cable")
-         {
-            int dst = -1, slot = 0, src = -1;
-            words >> dst >> slot >> src;
-            feeders.insert({ dst, src });
-         }
-         else if (tag == "geo" || tag == "aud" || tag == "note")
-         {
-            int dst = -1, src = -1;
-            words >> dst >> src;
-            feeders.insert({ dst, src });
-         }
-         else if (tag == "mod")
-         {
-            int dst = -1, param = 0, src = -1;
-            words >> dst >> param >> src;
-            feeders.insert({ dst, src });
-         }
-      }
-      std::set<int> reached;
-      std::vector<int> open;
-      for (const auto& kv : types)
-         if (kv.second == "Output" || kv.second == "Audio Out")
-            open.push_back(kv.first);
-      while (!open.empty())
-      {
-         const int at = open.back();
-         open.pop_back();
-         if (!reached.insert(at).second)
-            continue;
-         const auto range = feeders.equal_range(at);
-         for (auto it = range.first; it != range.second; ++it)
-            open.push_back(it->second);
-      }
-      json out = json::array();
-      for (const auto& kv : types)
-         if (reached.count(kv.first) == 0 && kv.second != "Comment")
-            out.push_back({ { "node", kv.first }, { "type", kv.second } });
-      return out;
-   }
-
    int PatchCheck(Args args)
    {
       std::string want;
       TakeOption(args, "--want", want);
-      if (args.empty())
-         Fail("usage: infinite patch check <file.inf> [--want moving-picture,sound]", kExitUsage);
+      // No file, or --reset: the open window. What propose cannot know - does the patch reach an output,
+      // sound since the last edit, stay free of NaN and clipping.
+      if (args.empty() || (args.size() == 1 && args[0] == "--reset"))
+      {
+         const json reply = gLive.Call("check", { { "reset", !args.empty() } });
+         Print(reply);
+         return reply.value("ok", false) ? 0 : 1;
+      }
       const std::string file = args[0];
       json result = { { "ok", false }, { "file", file }, { "stages", json::array() } };
       const auto stage = [&](const std::string& name, bool ok, json detail) -> bool
@@ -1005,7 +950,7 @@ namespace
 
       const std::string canon = TempPath("canon.inf");
       RunSelf({ "--canonicalize", file, canon }, true);
-      const json dead = Unreachable(ReadFile(canon));
+      const json dead = PatchReach::UnreachableNodes(ReadFile(canon));
       std::error_code ec;
       std::filesystem::remove(AppPaths::FsPath(canon), ec);
       if (!stage("reachable", dead.empty(), { { "unreachable", dead } }))

@@ -1,6 +1,7 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
 #include "Transport.h"
 #include "core/UndoDescribe.h"
+#include "core/PatchReach.h"
 #include "core/Extensions.h"
 #include "core/tracking/HandTracker.h"
 #include "nodes/HandTrackNode.h"
@@ -2766,6 +2767,29 @@ void RunRpcBatchTest()
       Check("propose: failing call rolls back cleanly",
             Call("propose", badPropose, r, e) && !r.value("ok", true) && !r["errors"].empty() &&
                gNodes.size() == 1 && gUndoStack.size() == undo0 + 1);
+   }
+
+   // Agent outcome check: the Shape left from propose reaches nothing; wired into an Output it does.
+   {
+      e.clear();
+      const bool called = Call("check", json::object(), r, e);
+      bool flagged = false;
+      for (const json& p : r.value("problems", json::array()))
+         flagged = flagged || p.value("code", std::string()) == "W_UNREACHABLE";
+      Check("check: an unwired node is reported unreachable",
+            called && flagged && r["unreachable"].size() == 1 && r.contains("sound") && r.value("ok", false));
+      const int shapeIdx = gNodes.empty() ? -1 : gNodes[0].index;
+      json wire = { {"label", "wire output"},
+                    {"calls", json::array({ { {"method", "create_node"}, {"params", { {"typeName", "Output"}, {"category", "Utility"} }} },
+                                            { {"method", "connect"}, {"params", { {"srcIndex", shapeIdx}, {"srcOutput", 0}, {"dstIndex", "$0.index"}, {"dstSlot", 0} }} } })} };
+      const bool wired = Call("propose", wire, r, e) && r.value("ok", false);
+      e.clear();
+      Check("check: wired into an Output, nothing is unreachable",
+            wired && Call("check", json::object(), r, e) && r["unreachable"].empty() && r.value("has_output", false));
+      Check("check: reset restarts the window", Call("check", { {"reset", true} }, r, e) && r.value("reset", false));
+      // Audio cables are "aud dst slot src out": the source is the third number, not the second.
+      const std::string text = "node 0 Audio Oscillator\nnode 1 Audio Audio Out\nnode 2 Audio Filter\naud 1 0 2 0\naud 2 0 0 0\n";
+      Check("check: audio chain read as dst slot src", PatchReach::UnreachableNodes(text).empty());
    }
 
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");

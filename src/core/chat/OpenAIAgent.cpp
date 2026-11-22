@@ -87,6 +87,17 @@ namespace chat
                } },
                { "required", nlohmann::json::array({ "calls" }) }
             }),
+         fn("check",
+            "Check the outcome after a propose: does every node reach an Output or Audio Out, and has the patch "
+            "sounded since the edit, free of NaN and clipping. propose only proves an edit is valid; call check "
+            "after every propose that changes sound or wiring, and fix any E_ problem (and W_ ones that matter) in "
+            "one more propose. If sound.settling is true, call check once more.",
+            {
+               { "type", "object" },
+               { "properties", {
+                  { "reset", { { "type", "boolean" }, { "description", "Restart the listening window without an edit." } } }
+               } }
+            }),
          fn("get_graph",
             "Inspect all nodes and connections in the current patch.",
             { { "type", "object" }, { "properties", nlohmann::json::object() } }),
