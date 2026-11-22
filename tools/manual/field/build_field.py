@@ -51,6 +51,7 @@ def main():
     for d in ("", "website/assets/", "press_kit/manuals/"):
         shutil.copy(out, os.path.join(ROOT, d, "Field_Language_Manual.pdf"))
     print("wrote Field_Language_Manual.pdf (3 copies)")
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "manual", "build_html.py")], check=True)
 
 
 if __name__ == "__main__":
