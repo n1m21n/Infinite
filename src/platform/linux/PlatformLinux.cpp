@@ -100,6 +100,49 @@ namespace
       }
       return path + dotExt;
    }
+
+   // Last folder a file dialog used. Dialogs start here (or in $HOME) so the
+   // helper never receives an empty or bare-name default, which zenity/kdialog
+   // turn into a bogus folder (issue #78).
+   std::string& LastDialogDir()
+   {
+      static std::string dir;
+      return dir;
+   }
+
+   std::string DialogStartDir()
+   {
+      namespace fs = std::filesystem;
+      std::error_code ec;
+      const std::string& last = LastDialogDir();
+      if (!last.empty() && fs::is_directory(last, ec))
+         return last;
+      const char* home = std::getenv("HOME");
+      if (home && home[0] != '\0' && fs::is_directory(home, ec))
+         return home;
+      return "/";
+   }
+
+   void RememberDialogDir(const std::string& chosen)
+   {
+      if (chosen.empty()) return;
+      namespace fs = std::filesystem;
+      std::error_code ec;
+      fs::path p(chosen);
+      fs::path dir = fs::is_directory(p, ec) ? p : p.parent_path();
+      if (!dir.empty() && fs::is_directory(dir, ec))
+         LastDialogDir() = dir.string();
+   }
+
+   // Open dialogs: trailing slash marks a folder, not a file name.
+   std::string OpenStart() { return DialogStartDir() + "/"; }
+
+   // Save dialogs: absolute path = start folder + suggested file name.
+   std::string SaveStart(const std::string& name)
+   {
+      if (!name.empty() && name[0] == '/') return name;
+      return DialogStartDir() + "/" + name;
+   }
 }
 
 namespace Platform
@@ -325,12 +368,13 @@ namespace Platform
       };
       const char* res = tinyfd_openFileDialog(
          "Choose Image",
-         "",
+         OpenStart().c_str(),
          (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
          filterPatterns,
          "Image files",
          0
       );
+      if (res) RememberDialogDir(res);
       return res ? std::string(res) : std::string();
    }
 
@@ -344,12 +388,13 @@ namespace Platform
       };
       const char* res = tinyfd_openFileDialog(
          "Choose HDR Environment",
-         "",
+         OpenStart().c_str(),
          (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
          filterPatterns,
          "HDR images (*.hdr, *.exr)",
          0
       );
+      if (res) RememberDialogDir(res);
       return res ? std::string(res) : std::string();
    }
 
@@ -363,12 +408,13 @@ namespace Platform
       };
       const char* res = tinyfd_openFileDialog(
          "Choose Model",
-         "",
+         OpenStart().c_str(),
          (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
          filterPatterns,
          "3D models (*.obj, *.ply, *.stl)",
          0
       );
+      if (res) RememberDialogDir(res);
       return res ? std::string(res) : std::string();
    }
 
@@ -382,12 +428,13 @@ namespace Platform
       };
       const char* res = tinyfd_openFileDialog(
          "Open Patch",
-         "",
+         OpenStart().c_str(),
          (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
          filterPatterns,
          "Infinite patches (*.infinite, *.inf)",
          0
       );
+      if (res) RememberDialogDir(res);
       return res ? std::string(res) : std::string();
    }
 
@@ -404,12 +451,13 @@ namespace Platform
 
       const char* res = tinyfd_saveFileDialog(
          "Save Patch",
-         defaultPath.c_str(),
+         SaveStart(defaultPath).c_str(),
          1,
          filterPatterns,
          "Infinite patch (*.infinite)"
       );
       if (!res) return "";
+      RememberDialogDir(res);
       return AppendExtensionIfMissing(std::string(res), ".infinite");
    }
 
@@ -423,12 +471,13 @@ namespace Platform
       };
       const char* res = tinyfd_openFileDialog(
          "Open Device",
-         "",
+         OpenStart().c_str(),
          (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
          filterPatterns,
          "Field device (*.field, *.infdev)",
          0
       );
+      if (res) RememberDialogDir(res);
       return res ? std::string(res) : std::string();
    }
 
@@ -440,12 +489,13 @@ namespace Platform
       const char* const filterPatterns[] = { "*.infpack", "*.zip" };
       const char* res = tinyfd_openFileDialog(
          "Install Extension Pack",
-         "",
+         OpenStart().c_str(),
          (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
          filterPatterns,
          "Extension pack (*.infpack, *.zip)",
          0
       );
+      if (res) RememberDialogDir(res);
       return res ? std::string(res) : std::string();
    }
 
@@ -455,7 +505,8 @@ namespace Platform
       ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = { "*.infshow" };
-      const char* res = tinyfd_openFileDialog("Open Show Set", "", 1, filterPatterns, "Show set (*.infshow)", 0);
+      const char* res = tinyfd_openFileDialog("Open Show Set", OpenStart().c_str(), 1, filterPatterns, "Show set (*.infshow)", 0);
+      if (res) RememberDialogDir(res);
       return res ? std::string(res) : std::string();
    }
 
@@ -467,8 +518,9 @@ namespace Platform
       const char* const filterPatterns[] = { "*.infshow" };
       std::string defaultPath = suggestedName.empty() ? "Untitled.infshow" : suggestedName;
       defaultPath = AppendExtensionIfMissing(defaultPath, ".infshow");
-      const char* res = tinyfd_saveFileDialog("Save Show Set", defaultPath.c_str(), 1, filterPatterns, "Show set (*.infshow)");
+      const char* res = tinyfd_saveFileDialog("Save Show Set", SaveStart(defaultPath).c_str(), 1, filterPatterns, "Show set (*.infshow)");
       if (!res) return "";
+      RememberDialogDir(res);
       return AppendExtensionIfMissing(std::string(res), ".infshow");
    }
 
@@ -479,8 +531,9 @@ namespace Platform
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = { "*.wav" };
       std::string defaultPath = AppendExtensionIfMissing(suggestedName.empty() ? "sample.wav" : suggestedName, ".wav");
-      const char* res = tinyfd_saveFileDialog("Export wav", defaultPath.c_str(), 1, filterPatterns, "Wave file (*.wav)");
+      const char* res = tinyfd_saveFileDialog("Export wav", SaveStart(defaultPath).c_str(), 1, filterPatterns, "Wave file (*.wav)");
       if (!res) return "";
+      RememberDialogDir(res);
       return AppendExtensionIfMissing(std::string(res), ".wav");
    }
 
@@ -493,9 +546,10 @@ namespace Platform
       const char* const patterns[] = { ora ? "*.ora" : "*.psd" };
       const std::string dotExt = "." + ext;
       const std::string defaultPath = AppendExtensionIfMissing(suggestedName, dotExt.c_str());
-      const char* res = tinyfd_saveFileDialog(ora ? "Export ORA" : "Export PSD", defaultPath.c_str(), 1, patterns,
+      const char* res = tinyfd_saveFileDialog(ora ? "Export ORA" : "Export PSD", SaveStart(defaultPath).c_str(), 1, patterns,
                                               ora ? "OpenRaster (*.ora)" : "Photoshop (*.psd)");
       if (!res) return "";
+      RememberDialogDir(res);
       return AppendExtensionIfMissing(std::string(res), dotExt.c_str());
    }
 
@@ -506,10 +560,11 @@ namespace Platform
       EnsureDialogBackendChecked();
       const char* const videoPatterns[] = { "*.mp4", "*.mov" };
       const char* const imagePatterns[] = { "*.png", "*.jpg" };
-      const char* res = tinyfd_saveFileDialog(video ? "Render Animation" : "Render Image", suggestedName.c_str(), 2,
+      const char* res = tinyfd_saveFileDialog(video ? "Render Animation" : "Render Image", SaveStart(suggestedName).c_str(), 2,
                                               video ? videoPatterns : imagePatterns,
                                               video ? "Video (*.mp4, *.mov)" : "Image (*.png, *.jpg)");
       if (!res) return "";
+      RememberDialogDir(res);
       std::string path(res);
       const size_t dot = path.rfind('.');
       const std::string ext = dot == std::string::npos ? std::string() : path.substr(dot);
@@ -530,12 +585,13 @@ namespace Platform
 
       const char* res = tinyfd_saveFileDialog(
          "Save Device",
-         defaultPath.c_str(),
+         SaveStart(defaultPath).c_str(),
          1,
          filterPatterns,
          "Field device (*.field)"
       );
       if (!res) return "";
+      RememberDialogDir(res);
       return AppendExtensionIfMissing(std::string(res), ".field");
    }
 
@@ -548,6 +604,7 @@ namespace Platform
          title ? title : "Select Folder",
          initialDir.empty() ? nullptr : initialDir.c_str()
       );
+      if (res) RememberDialogDir(res);
       return res ? std::string(res) : std::string();
    }
 

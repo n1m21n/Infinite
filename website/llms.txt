@@ -115,6 +115,8 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Extensions](https://infinitedevices.org/library.html#extensions): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
 - [Library catalog (JSON)](https://infinitedevices.org/assets/library/catalog.json): every library item with description, category and file URL
 - [Benchmarks](https://infinitedevices.org/benchmarks.html): measured CPU, latency, memory and video quality for Infinite against Ableton Live, Bitwig, Logic, Vital, VCV Rack, Blender, TouchDesigner and more, with method and limits stated
+- [Research](https://infinitedevices.org/research/): pre-registered technical reports, empirical DSP studies, reproducible artifacts and open problems
+- [Aliasing-aware compilation for Field](https://infinitedevices.org/research/aliasing-aware-field.html): technical report 1 — pre-registered study of static alias prediction (H1 confirmed within steady-tone scope across 272 held-out + 97 delay kernels) and per-subgraph oversampling (H2 killed at 15.8%–17.4% saving), with PDF, raw CSVs and A/B audio renders
 - [Benchmark Report (PDF)](https://infinitedevices.org/assets/Infinite_Benchmark_Report.pdf): the same report as a branded PDF
 - [Benchmark data (JSON)](https://infinitedevices.org/assets/benchmarks.json): machine-readable results for the same tests
 - [Blog](https://infinitedevices.org/blog/): guides on audio-reactive visuals, headless rendering, Field language, plugin modulation and motion tracking (feed: https://infinitedevices.org/blog/feed.xml)

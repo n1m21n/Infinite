@@ -1,0 +1,46 @@
+rule B table (class -> median phase-0 factor, 64 = beyond 32x): {'poly': 1, 'analytic': 2, 'kink': 16, 'jump': 64, 'feedback': 2}
+
+set D: 60 kernels, 58 scored (97% coverage)
+  not scored   1  declined: no periodic steady state after # iterations (residual #e-#, 
+  not scored   1  declined: no periodic steady state after # iterations (residual #, loo
+  H1b informative: n=58 kernels, Spearman rho 0.988 (>= 0.8), median |err| 0.0 dB (<= 10)  PASS
+  memoryless (exact by construction, reported only): n=0, rho nan, median |err| nan dB
+
+set G: 240 kernels, 240 scored (100% coverage)
+  H1b informative: n=192 kernels, Spearman rho 0.994 (>= 0.8), median |err| 0.0 dB (<= 10)  PASS
+  memoryless (exact by construction, reported only): n=48, rho 0.961, median |err| 0.1 dB
+
+set L: 32 kernels, 29 scored (91% coverage)
+  not scored   2  declined: no periodic steady state after # iterations (residual #, loo
+  not scored   1  declined: no periodic steady state after # iterations (residual #e-#, 
+  H1b informative: n=18 kernels, Spearman rho 0.963 (>= 0.8), median |err| 0.0 dB (<= 10)  PASS
+  memoryless (exact by construction, reported only): n=11, rho 1.000, median |err| 0.0 dB
+
+H3 on L+G informative (n=210): minimal factor exact - analysis 209 (100%), rule A 13 (6%), rule B 44 (21%)  PASS
+
+measured above predicted by > 3 dB at some factor: 108 kernels (counterexamples only for classes a phase-4c lemma covers)
+  G/g-159                        feedback  +31.6 dB
+  L/l-11-yeh-rational-sat        kink      +30.0 dB
+  G/g-190                        feedback  +29.9 dB
+  G/g-196                        analytic  +29.9 dB
+  G/g-132                        feedback  +29.8 dB
+  D/d-027                        kink      +29.7 dB
+  D/d-045                        jump      +29.7 dB
+  G/g-080                        feedback  +28.9 dB
+  G/g-095                        feedback  +28.8 dB
+  G/g-157                        feedback  +28.8 dB
+  G/g-024                        feedback  +28.4 dB
+  G/g-001                        analytic  +28.4 dB
+  G/g-124                        feedback  +28.2 dB
+  D/d-048                        analytic  +28.0 dB
+  D/d-031                        jump      +27.9 dB
+
+H1b on the primary sets: PASS
+
+H4 (delay lines): coverage 94 of 97 delay kernels in L, G, D (97%; bar 80%, kill < 50%)  PASS
+  L-delay: 11 of 12 scored; informative n=11, rho 0.937 (>= 0.8), median |err| 0.0 dB (<= 10)  PASS
+  G-delay: 25 of 25 scored; informative n=25, rho 0.991 (>= 0.8), median |err| 0.0 dB (<= 10)  PASS
+  D-delay: 58 of 60 scored; informative n=58, rho 0.988 (>= 0.8), median |err| 0.0 dB (<= 10)  PASS
+  H3 rule on delay kernels (n=94): analysis 93 (99%), rule A 9, rule B 38  PASS
+H4: PASS
+wrote data-rerun/phase5-scored.csv

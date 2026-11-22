@@ -5,6 +5,8 @@
   <url><loc>https://infinitedevices.org/samples/</loc><lastmod>2026-11-17</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/piano/</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/</loc><lastmod>2026-11-17</lastmod><priority>0.8</priority></url>
+  <url><loc>https://infinitedevices.org/research/</loc><lastmod>2026-11-21</lastmod><priority>0.8</priority></url>
+  <url><loc>https://infinitedevices.org/research/aliasing-aware-field.html</loc><lastmod>2026-11-21</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/blog/2d-view-non-destructive-layer-compositing-in-infinite.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/3d-view-blender-keymap-scene-composition-in-infinite.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/field-patcher-visual-box-and-wire-dsp-shader-editor.html</loc><lastmod>2026-11-17</lastmod><priority>0.7</priority></url>

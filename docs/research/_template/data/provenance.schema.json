@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Infinite Research Provenance",
+  "type": "object",
+  "required": [
+    "commit_sha",
+    "timestamp_utc",
+    "os",
+    "cpu",
+    "compiler",
+    "build_flags",
+    "command",
+    "seed",
+    "outputs"
+  ],
+  "properties": {
+    "commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "timestamp_utc": { "type": "string", "format": "date-time" },
+    "os": { "type": "string" },
+    "cpu": { "type": "string" },
+    "compiler": { "type": "string" },
+    "build_flags": { "type": "string" },
+    "command": { "type": "string" },
+    "seed": { "type": "integer" },
+    "doi": { "type": "string" },
+    "outputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

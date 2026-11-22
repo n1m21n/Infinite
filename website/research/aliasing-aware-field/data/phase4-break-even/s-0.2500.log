@@ -1,0 +1,109 @@
+FIELDRATE cost model (ns per base sample, INFINITE_FIELDRATE_COST): run 0.0, per instr 3.50, up 2/4/8/16/32 3/6/12/34/58, down 2/6/12/32/58
+FIELDRATE kernel                         class    whole     cost plan                       cost  saving    node   whole  staged   devW   devS    ms W    ms S
+FIELDRATE poly d2 a0.5                   poly     skipped: clean at 1x
+FIELDRATE poly d2 a1                     poly     skipped: clean at 1x
+FIELDRATE poly d3 cubic clip drive 1     poly     skipped: clean at 1x
+FIELDRATE poly d3 cubic clip drive 2     poly     skipped: clean at 1x
+FIELDRATE poly d5                        poly     skipped: clean at 1x
+FIELDRATE poly d7                        poly        2x       68 1x6|2x1|1x3                  53     22%  -137.3  -137.3  -137.0 -167.4 -152.1      11      21  pred -149.6, 2 cands, 4 sets, 0.06 s
+FIELDRATE poly d9 cubic of cubic         chain       2x      103 1x10|2x2|1x3                 67     35%  -138.1  -138.1  -137.9 -142.4  -46.4      11      22  pred -148.4, 6 cands, 42 sets, 0.76 s
+FIELDRATE poly d27 cubic x3              chain       2x      138 1x10|2x7|1x3                102     26%  -137.9  -137.9  -137.9 -159.4  -44.6      13      24  pred -148.9, 8 cands, 93 sets, 1.76 s
+FIELDRATE tanh drive 1                   analytic skipped: clean at 1x
+FIELDRATE tanh drive 2                   analytic    2x      103 1x7|2x6|1x2                  79     24%  -137.9  -137.9  -137.3 -152.8 -166.5      11      24  pred -150.8, 4 cands, 15 sets, 0.22 s
+FIELDRATE tanh drive 4                   analytic    2x      103 1x7|2x6|1x2                  79     24%  -103.3  -103.3  -103.3 -154.2 -149.5      12      18  pred -103.3, 4 cands, 15 sets, 0.21 s
+FIELDRATE tanh drive 8                   analytic    4x      208 1x7|4x6|1x2                 127     39%  -117.9  -117.9  -117.9 -160.6 -149.4      19      27  pred -117.9, 4 cands, 15 sets, 0.18 s
+FIELDRATE sin fold drive 1               analytic skipped: clean at 1x
+FIELDRATE sin fold drive 2               analytic    2x       68 1x7|2x1|1x2                  44     36%  -133.7  -133.7  -132.9 -145.1 -144.1      10      17  pred -138.6, 2 cands, 4 sets, 0.06 s
+FIELDRATE sin fold drive 4               analytic    2x       68 1x7|2x1|1x2                  44     36%  -113.3  -113.3  -113.0 -148.9 -140.7      10      21  pred -113.3, 2 cands, 4 sets, 0.06 s
+FIELDRATE sin fold drive 8               analytic    4x      138 1x7|4x1|1x2                  57     59%  -124.0  -124.0  -118.1 -141.0 -148.3      17      27  pred -123.1, 2 cands, 4 sets, 0.07 s
+FIELDRATE rational x/(1+|x|) drive 2     kink        8x      304 1x6|8x3|1x2                 164     46%   -93.3   -93.3   -93.3 -149.7 -158.1      28      37  pred -93.3, 4 cands, 15 sets, 0.27 s
+FIELDRATE rational x/(1+|x|) drive 8     kink       16x      626 1x6|16x1|1x1|4x3            242      0%   -92.5   -92.5   -79.4 -150.6  -22.0      66     132  pred -80.5, 4 cands, 15 sets, 0.29 s
+FIELDRATE abs mix                        kink       16x      458 1x5|16x1|1x2                216     53%   -84.9   -84.9   -84.9 -143.0 -151.3      58     135  pred -84.9, 2 cands, 4 sets, 0.09 s
+FIELDRATE half-wave max                  kink       16x      514 1x7|16x2                    292     43%   -84.9   -84.9   -84.9 -143.0 -150.9      62     112  pred -84.9, 2 cands, 4 sets, 0.09 s
+FIELDRATE hard clip drive 1              kink       16x      514 1x8|16x1                    318     38%   -84.7   -84.7   -84.7 -144.3 -146.4      60      82  pred -84.8, 1 cands, 2 sets, 0.02 s
+FIELDRATE hard clip drive 2              kink       32x     1012 1x8|32x1                    592     42%   -88.9   -88.9   -88.9 -372.3 -158.9      99     131  pred -88.9, 1 cands, 2 sets, 0.03 s
+FIELDRATE hard clip drive 4              kink       32x     1012 1x8|32x1                    592     42%   -82.0   -82.0   -82.0 -372.5 -150.2     100     132  pred -82.1, 1 cands, 2 sets, 0.03 s
+FIELDRATE hard clip drive 8              kink     skipped: no factor within 32x
+FIELDRATE quantize 4 steps               jump     skipped: no factor within 32x
+FIELDRATE quantize 16 steps              jump     skipped: no factor within 32x
+FIELDRATE comparator square + dry        jump     skipped: no factor within 32x
+FIELDRATE wrap fold mod                  jump     skipped: no factor within 32x
+FIELDRATE tanh x3 chain drive 4          chain      32x     3924 2x17|4x10|8x6|1x2           475      0%  -136.0  -136.0   -43.0 -374.5  -33.1     202      70  pred -80.5, 8 cands, 93 sets, 0.91 s
+FIELDRATE tanh x3 vs fixed 8x: 8x cost 976, alias -46.1 dB; staged cost 475, alias -43.0 dB  staged does not beat 8x
+FIELDRATE clip then cubic                chain       8x      444 1x8|16x1|2x2|1x5            357      0%   -97.3   -97.3   -62.5 -153.1  -24.3      33      97  pred -85.6, 4 cands, 15 sets, 0.29 s
+FIELDRATE tanh feedback 0.3              feedback    2x      138 2x17|1x3                    138      0%  -135.6  -135.6  -135.6  -33.9  -33.9      13      14  pred -137.7, 1 cands, 2 sets, 0.82 s
+FIELDRATE tanh feedback 0.7              feedback    2x      138 2x17|1x3                    138      0%  -102.5  -102.5  -102.5  -22.6  -22.6      14      15  pred -98.0, 1 cands, 2 sets, 1.45 s
+FIELDRATE clip feedback 0.5              feedback   32x     1572 32x14                      1684      0%   -86.7   -86.7   -86.7 -375.9 -375.9     122     122  pred -86.4, 0 cands, 1 sets, 0.65 s
+FIELDRATE osc naive saw 1.75k            osc      skipped: no factor within 32x
+FIELDRATE osc naive square 1.75k         osc      skipped: no factor within 32x
+FIELDRATE osc naive triangle 1.75k       osc         8x      516 8x13|1x5                    418     19%   -82.5   -82.5   -82.5 -114.5 -114.5      32      31  pred -82.7, 2 cands, 4 sets, 0.24 s
+FIELDRATE osc sine pm (ph^3) 1.75k       osc        16x      928 16x13|1x3                   823     11%   -87.2   -87.2   -87.2 -122.4 -122.4      72      70  pred -87.6, 5 cands, 26 sets, 0.52 s
+FIELDRATE osc pinch 100% 1.75k           osc         4x      230 4x13|1x3                    209      9%   -88.7   -88.7   -88.7 -112.9 -112.9      24      26  pred -93.0, 4 cands, 15 sets, 0.49 s
+FIELDRATE preset Tube Overdrive          preset      8x      948 8x34                        976      0%   -88.5   -88.5   -88.5  -39.1  -39.1      49      49  pred -89.7, 0 cands, 1 sets, 0.12 s
+FIELDRATE preset Soft Saturation         preset      8x      444 1x7|8x3|1x6                 209     53%   -90.5   -90.5   -90.5 -149.4 -154.4      33      58  pred -90.5, 2 cands, 4 sets, 0.07 s
+FIELDRATE preset Analog Tape Saturator   preset      8x     1396 8x50                       1424      0%   -87.3   -87.3   -87.3  -41.0  -41.0      67      67  pred -88.1, 0 cands, 1 sets, 0.37 s
+FIELDRATE preset Bass Ribbon Driver      preset   skipped: clean at 1x
+FIELDRATE preset Wavefolder              preset     32x     2580 1x11|32x4|1x8               862     67%   -86.1   -86.1   -85.8 -376.9 -128.1     161     234  pred -85.9, 4 cands, 15 sets, 0.45 s
+FIELDRATE preset Moog 4-Pole Ladder Filter preset   skipped: periodic solution is unstable (loop radius 1.005): self-oscillation
+FIELDRATE H2 28 kernels (16 skipped, 3 plans fell back to whole), executor vs node at the whole factor off by > 3 dB on 0
+FIELDRATE H2 aggregate saving 22.3% (>= 25%), median per kernel 24.9%, tanh x3 does not beat 8x  H2 FAILS
+FIELDRATE corners: factor at amp 0.25/0.5/1.0 x f0 0.5/1/2 x 5 kHz (row = amp)
+FIELDRATE corner poly d2 a0.5                   nominal   1    1   1   1    1   1   1    1   1   1   worst   1
+FIELDRATE corner poly d2 a1                     nominal   1    1   1   1    1   1   1    1   1   1   worst   1
+FIELDRATE corner poly d3 cubic clip drive 1     nominal   1    1   1   2    1   1   2    1   1   2   worst   2
+FIELDRATE corner poly d3 cubic clip drive 2     nominal   1    1   1   2    1   1   2  >32 >32 >32   worst >32
+FIELDRATE corner poly d5                        nominal   1    1   1   2    1   1   2    1   1   2   worst   2
+FIELDRATE corner poly d7                        nominal   2    1   1   1    1   2   2    1   2   2   worst   2
+FIELDRATE corner poly d9 cubic of cubic         nominal   2    1   1   2    1   2   2    1   2   4   worst   4
+FIELDRATE corner poly d27 cubic x3              nominal   2    1   1   2    1   2   4    2   2   4   worst   4
+FIELDRATE corner tanh drive 1                   nominal   1    1   1   2    1   1   2    1   2   2   worst   2
+FIELDRATE corner tanh drive 2                   nominal   2    1   1   2    1   2   2    2   2   4   worst   4
+FIELDRATE corner tanh drive 4                   nominal   2    1   2   2    2   2   4    2   4   8   worst   8
+FIELDRATE corner tanh drive 8                   nominal   4    2   2   4    2   4   8    4   8  16   worst  16
+FIELDRATE corner sin fold drive 1               nominal   1    1   1   2    1   1   2    1   2   4   worst   4
+FIELDRATE corner sin fold drive 2               nominal   2    1   1   2    1   2   4    2   2   4   worst   4
+FIELDRATE corner sin fold drive 4               nominal   2    1   2   4    2   2   4    2   4   8   worst   8
+FIELDRATE corner sin fold drive 8               nominal   4    2   2   4    2   4   8    4   8  16   worst  16
+FIELDRATE corner rational x/(1+|x|) drive 2     nominal   8    4   4   8    4   8  16    4   8  16   worst  16
+FIELDRATE corner rational x/(1+|x|) drive 8     nominal  16    4   8  16    8  16  32   16  16  32   worst  32
+FIELDRATE corner abs mix                        nominal  16    8  16  32    8  16  32    8  16  32   worst  32
+FIELDRATE corner half-wave max                  nominal  16    8  16  32    8  16  32    8  16  32   worst  32
+FIELDRATE corner hard clip drive 1              nominal  16    1   1   1    8  16  32   16  32  32   worst  32
+FIELDRATE corner hard clip drive 2              nominal  32    8  16  32   16  32  32   32  32 >32   worst >32
+FIELDRATE corner hard clip drive 4              nominal  32   16  32  32   32  32 >32   32 >32 >32   worst >32
+FIELDRATE corner hard clip drive 8              nominal >32   32  32 >32   32 >32 >32  >32 >32 >32   worst >32
+FIELDRATE corner quantize 4 steps               nominal >32  >32 >32 >32  >32 >32 >32  >32 >32 >32   worst >32
+FIELDRATE corner quantize 16 steps              nominal >32  >32 >32 >32  >32 >32 >32  >32 >32 >32   worst >32
+FIELDRATE corner comparator square + dry        nominal >32  >32 >32 >32  >32 >32 >32  >32 >32 >32   worst >32
+FIELDRATE corner wrap fold mod                  nominal >32  >32 >32 >32  >32 >32 >32  >32 >32 >32   worst >32
+FIELDRATE corner tanh x3 chain drive 4          nominal  32    8  16  32   16  32  32   16  32 >32   worst >32
+FIELDRATE corner clip then cubic                nominal   8    1   1   2    4   8   8    8   8  16   worst  16
+FIELDRATE corner tanh feedback 0.3              nominal   2    1   1   2    1   2   2    2   2   4   worst   4
+FIELDRATE corner tanh feedback 0.7              nominal   2    1   1   2    2   2   4    2   4   4   worst   4
+FIELDRATE corner clip feedback 0.5              nominal  32   16  16   1   16  32  32   32 >32 >32   worst >32
+FIELDRATE corner preset Tube Overdrive          nominal   8    2   4  16    4   8  16    4  16  32   worst  32
+FIELDRATE corner preset Soft Saturation         nominal   8    4   4   8    4   8  16    8   8  16   worst  16
+FIELDRATE corner preset Analog Tape Saturator   nominal   8    ?   ?   ?    4   8  16    4  16  32   worst  32  (some corners unpredicted)
+FIELDRATE corner preset Bass Ribbon Driver      nominal   1    1   1   1    1   1   1    1   1   1   worst   1
+FIELDRATE corner preset Wavefolder              nominal  32    1   1   1   16  32 >32   32 >32 >32   worst >32
+FIELDRATE corners: 38 kernels, factor changes somewhere on 31, worst corner needs more than nominal on 29
+FIELDRATE held Bitcrusher & Decimator             declined: no periodic steady state after 40 iterations (residual 0.71, loop radius 1.000)
+FIELDRATE held Dynamic Auto-Wah                   declined: no periodic steady state after 40 iterations (residual 2.1e-06, loop radius 0.995)
+FIELDRATE held Ring Modulator                     declined: no periodic steady state after 40 iterations (residual 1e+02, loop radius 0.007)
+FIELDRATE held Chamberlin Multi-Tap SVF           declined: periodic solution is unstable (loop radius 1.002): self-oscillation
+FIELDRATE held Boundary Chime Resonator           declined: no periodic steady state after 40 iterations (residual 2.4e+02, loop radius 0.893)
+FIELDRATE held Chladni Resonant Tone              declined: no periodic steady state after 40 iterations (residual 0.0063, loop radius 0.000)
+FIELDRATE held Warm Tape Echo                     declined: state tables
+FIELDRATE held Optical Tremolo & Drive            declined: no periodic steady state after 40 iterations (residual 1.3e+05, loop radius 1.000)
+FIELDRATE held Stutter Freeze Looper              declined: state tables
+FIELDRATE held Formant Vocoder Bank               declined: periodic solution is unstable (loop radius 1.001): self-oscillation
+FIELDRATE held Granular Cloud                     declined: state tables
+FIELDRATE held Multi-Tap Rhythmic Delay           declined: state tables
+FIELDRATE held Sidechain Ducker                   meas  -91.2 -117.4 -120.9 -125.7 -128.4 -132.2 | pred  -91.1 -110.0 -121.1 -130.7 -133.6 -138.7 | factor 1/1, worst err 0.1 dB
+FIELDRATE held Analog Chorus                      declined: state tables
+FIELDRATE held Resonant Flanger                   declined: state tables
+FIELDRATE held Analog Phaser                      declined: no periodic steady state after 40 iterations (residual 2.1e+06, loop radius 1.029)
+FIELDRATE held Plate Reverb                       declined: state tables
+FIELDRATE held Noise Gate                         meas -138.8 -138.2 -138.5 -138.6 -138.4 -139.2 | pred -137.9 -135.8 -139.3 -143.8 -133.1 -147.8 | factor 1/1, worst err 0.0 dB
+FIELDRATE held-out: 2 accepted (factor exact 2/2, median |err| 0.0 dB), 16 declined
+FIELDRATE OK

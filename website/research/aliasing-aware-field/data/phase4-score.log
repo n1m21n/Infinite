@@ -1,0 +1,34 @@
+rule B table (class -> median phase-0 factor, 64 = beyond 32x): {'poly': 1, 'analytic': 2, 'kink': 16, 'jump': 64, 'feedback': 2}
+
+set G: 240 kernels, 215 scored (90% coverage)
+  not scored  25  declined: delay lines (output is not a function of the input phase alo
+  H1b informative: n=167 kernels, Spearman rho 0.994 (>= 0.8), median |err| 0.0 dB (<= 10)  PASS
+  memoryless (exact by construction, reported only): n=48, rho 0.961, median |err| 0.1 dB
+
+set L: 32 kernels, 18 scored (56% coverage)
+  not scored  12  declined: delay lines (output is not a function of the input phase alo
+  not scored   2  declined: no periodic steady state after # iterations (residual #, loo
+  H1b informative: n=7 kernels, Spearman rho 1.000 (>= 0.8), median |err| 0.0 dB (<= 10)  PASS
+  memoryless (exact by construction, reported only): n=11, rho 1.000, median |err| 0.0 dB
+
+H3 on L+G informative (n=174): minimal factor exact - analysis 174 (100%), rule A 8 (5%), rule B 37 (21%)  PASS
+
+measured above predicted by > 3 dB at some factor: 86 kernels (counterexamples only for classes a phase-4c lemma covers)
+  G/g-159                        feedback  +31.6 dB
+  L/l-11-yeh-rational-sat        kink      +30.0 dB
+  G/g-190                        feedback  +29.9 dB
+  G/g-196                        analytic  +29.9 dB
+  G/g-132                        feedback  +29.8 dB
+  G/g-080                        feedback  +28.9 dB
+  G/g-095                        feedback  +28.8 dB
+  G/g-157                        feedback  +28.8 dB
+  G/g-024                        feedback  +28.4 dB
+  G/g-001                        analytic  +28.4 dB
+  G/g-124                        feedback  +28.2 dB
+  G/g-183                        feedback  +27.3 dB
+  G/g-134                        feedback  +27.3 dB
+  G/g-017                        jump      +26.0 dB
+  G/g-173                        feedback  +26.0 dB
+
+H1b on the primary sets: PASS
+wrote data-rerun/phase4-scored.csv

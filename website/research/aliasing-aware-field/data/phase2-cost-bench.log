@@ -1,0 +1,40 @@
+REPEAT 1 03:38:06 load { 2.87 3.23 3.94 }
+run 0.56 ns, per instr 2.674 ns (short 3 instr 8.58 ns, long 123 instr 329.44 ns)
+up 2/4/8/16/32 10.1/21.4/40.7/121.4/212.3  down 8.9/20.7/44.3/115.5/209.6
+INFINITE_FIELDRATE_COST=0.56,2.674,10.1,21.4,40.7,8.9,20.7,44.3
+REPEAT 2 03:38:26 load { 3.65 3.40 3.99 }
+run 0.17 ns, per instr 2.658 ns (short 3 instr 8.14 ns, long 123 instr 327.08 ns)
+up 2/4/8/16/32 10.1/21.5/40.8/121.6/212.9  down 9.0/20.8/44.2/115.9/210.4
+INFINITE_FIELDRATE_COST=0.17,2.658,10.1,21.5,40.8,9.0,20.8,44.2
+REPEAT 3 03:38:46 load { 2.91 3.25 3.92 }
+run 0.49 ns, per instr 2.661 ns (short 3 instr 8.47 ns, long 123 instr 327.78 ns)
+up 2/4/8/16/32 10.7/23.0/42.5/128.3/226.4  down 9.5/22.2/46.4/122.3/223.6
+INFINITE_FIELDRATE_COST=0.49,2.661,10.7,23.0,42.5,9.5,22.2,46.4
+REPEAT 4 03:39:05 load { 3.17 3.28 3.91 }
+run 0.79 ns, per instr 2.674 ns (short 3 instr 8.81 ns, long 123 instr 329.68 ns)
+up 2/4/8/16/32 10.1/21.6/40.9/121.8/214.0  down 8.9/20.8/44.2/115.4/210.9
+INFINITE_FIELDRATE_COST=0.79,2.674,10.1,21.6,40.9,8.9,20.8,44.2
+REPEAT 5 03:39:25 load { 2.62 3.15 3.86 }
+run 0.09 ns, per instr 2.672 ns (short 3 instr 8.10 ns, long 123 instr 328.75 ns)
+up 2/4/8/16/32 10.1/21.5/40.9/122.1/212.6  down 8.9/20.9/44.3/115.8/211.2
+INFINITE_FIELDRATE_COST=0.09,2.672,10.1,21.5,40.9,8.9,20.9,44.3
+REPEAT 6 03:39:44 load { 2.15 3.01 3.79 }
+run 0.07 ns, per instr 2.663 ns (short 3 instr 8.06 ns, long 123 instr 327.65 ns)
+up 2/4/8/16/32 10.1/22.0/41.5/122.6/217.2  down 8.9/20.8/43.9/115.2/209.9
+INFINITE_FIELDRATE_COST=0.07,2.663,10.1,22.0,41.5,8.9,20.8,43.9
+REPEAT 7 03:40:03 load { 1.82 2.88 3.72 }
+run 0.07 ns, per instr 2.655 ns (short 3 instr 8.04 ns, long 123 instr 326.67 ns)
+up 2/4/8/16/32 10.1/21.5/40.8/121.8/212.4  down 8.9/20.7/43.9/114.9/209.3
+INFINITE_FIELDRATE_COST=0.07,2.655,10.1,21.5,40.8,8.9,20.7,43.9
+REPEAT 8 03:40:22 load { 1.87 2.82 3.68 }
+run 0.08 ns, per instr 2.656 ns (short 3 instr 8.05 ns, long 123 instr 326.71 ns)
+up 2/4/8/16/32 10.0/21.5/40.7/120.7/213.1  down 8.9/20.8/44.3/115.3/210.6
+INFINITE_FIELDRATE_COST=0.08,2.656,10.0,21.5,40.7,8.9,20.8,44.3
+REPEAT 9 03:40:42 load { 2.21 2.83 3.66 }
+run 0.47 ns, per instr 2.763 ns (short 3 instr 8.76 ns, long 123 instr 340.30 ns)
+up 2/4/8/16/32 10.3/21.8/40.7/123.1/214.7  down 9.3/20.8/44.6/118.7/210.9
+INFINITE_FIELDRATE_COST=0.47,2.763,10.3,21.8,40.7,9.3,20.8,44.6
+REPEAT 10 03:41:01 load { 3.79 3.15 3.76 }
+run 0.66 ns, per instr 2.754 ns (short 3 instr 8.92 ns, long 123 instr 339.44 ns)
+up 2/4/8/16/32 10.4/22.1/41.9/125.1/218.3  down 9.2/21.2/45.4/118.8/215.3
+INFINITE_FIELDRATE_COST=0.66,2.754,10.4,22.1,41.9,9.2,21.2,45.4
