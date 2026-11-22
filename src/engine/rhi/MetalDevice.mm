@@ -3078,8 +3078,11 @@ fragment float4 bg_fs(SkyOut in [[stage_in]], constant BgU& u [[buffer(0)]], con
       }
       bool MakeGpu(const engine::MeshData& m, Gpu& g)
       {
-         g.vb = [mDev newBufferWithBytes:m.posNormal.data() length:std::max<size_t>(m.posNormal.size() * 4, 4) options:MTLResourceStorageModeShared];
-         g.ib = [mDev newBufferWithBytes:m.indices.data() length:std::max<size_t>(m.indices.size() * 4, 4) options:MTLResourceStorageModeShared];
+         static const uint32_t kZeroWord = 0;
+         const void* vbSrc = m.posNormal.empty() ? (const void*)&kZeroWord : m.posNormal.data();
+         const void* ibSrc = m.indices.empty() ? (const void*)&kZeroWord : m.indices.data();
+         g.vb = [mDev newBufferWithBytes:vbSrc length:std::max<size_t>(m.posNormal.size() * 4, 4) options:MTLResourceStorageModeShared];
+         g.ib = [mDev newBufferWithBytes:ibSrc length:std::max<size_t>(m.indices.size() * 4, 4) options:MTLResourceStorageModeShared];
          g.uvb = UvBuffer(m);
          g.wb = WearBuffer(m.wear, m.posNormal.size() / 6);
          g.count = (NSUInteger)m.indices.size();

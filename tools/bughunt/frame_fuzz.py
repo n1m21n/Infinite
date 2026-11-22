@@ -38,7 +38,7 @@ def run(binary, log, only="1", row_sec=30.0, rss_limit=3.0, budget_min=20.0, hom
     t_end = time.time() + budget_min * 60
     with open(log, "w") as lf:
         while time.time() < t_end:
-            env = dict(os.environ, INFINITE_FRAMEFUZZ=only)
+            env = dict(os.environ, INFINITE_FRAMEFUZZ=only, INFINITE_NO_UPDATE_CHECK="1")
             if home:
                 env["HOME"] = home
             if after:
@@ -48,20 +48,34 @@ def run(binary, log, only="1", row_sec=30.0, rss_limit=3.0, budget_min=20.0, hom
             p = subprocess.Popen([binary], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             os.set_blocking(p.stdout.fileno(), False)
             row, row_t0, done, buf, why = None, time.time(), False, "", None
+            def drain():
+                nonlocal row, row_t0, done, buf
+                while True:
+                    chunk = p.stdout.read()
+                    if not chunk:
+                        break
+                    buf += chunk.decode("utf-8", "replace")
+                    while "\n" in buf:
+                        line, buf = buf.split("\n", 1)
+                        lf.write(line + "\n")
+                        m = TRY.match(line)
+                        if m:
+                            row, row_t0 = m.group(1), time.time()
+                        elif FLAG.match(line):
+                            findings.append(line)
+                        elif DONE.match(line):
+                            done = True
             while True:
-                chunk = (p.stdout.read() or b"").decode("utf-8", "replace")
-                buf += chunk
-                while "\n" in buf:
-                    line, buf = buf.split("\n", 1)
-                    lf.write(line + "\n")
-                    m = TRY.match(line)
-                    if m:
-                        row, row_t0 = m.group(1), time.time()
-                    elif FLAG.match(line):
-                        findings.append(line)
-                    elif DONE.match(line):
-                        done = True
+                drain()
                 if p.poll() is not None:
+                    os.set_blocking(p.stdout.fileno(), True)
+                    drain()
+                    if buf:
+                        lf.write(buf + "\n")
+                        if FLAG.match(buf):
+                            findings.append(buf)
+                        elif DONE.match(buf):
+                            done = True
                     break
                 if row and time.time() - row_t0 > row_sec:
                     why = "HANG"

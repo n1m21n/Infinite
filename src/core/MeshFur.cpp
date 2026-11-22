@@ -67,7 +67,7 @@ Mesh MeshOps::Fur(const Mesh& in, const FurParams& prm, const Polyline* guide)
 {
    Mesh out = in;
    const size_t nv = in.vertices.size(), nf = in.indices.size() / 3;
-   if (nf == 0 || prm.length <= 0.0f || prm.density <= 0.0f)
+   if (nf == 0 || !std::isfinite(prm.length) || prm.length <= 0.0f || !std::isfinite(prm.density) || prm.density <= 0.0f)
       return out;
    const bool inColour = in.HasVertexColor();
    if (!inColour)
@@ -92,7 +92,8 @@ Mesh MeshOps::Fur(const Mesh& in, const FurParams& prm, const Polyline* guide)
       return out;
 
    const int kClump = 8;
-   const double want = std::min<double>(prm.density * total * 1e4, (double)std::max(prm.maxStrands, 1));
+   const int maxStrands = std::clamp(prm.maxStrands, 1, 400000);
+   const double want = std::min<double>(prm.density * total * 1e4, (double)maxStrands);
    const int clumps = std::max(1, (int)std::ceil(want / kClump));
    const int segs = std::clamp(prm.segments, 1, 32);
    const int pts = segs + 1;
