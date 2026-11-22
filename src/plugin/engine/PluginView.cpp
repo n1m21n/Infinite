@@ -28,7 +28,7 @@ namespace PluginView
       // With no view open the hidden window shrinks: its drawables at 1600x1000 @2x were ~120 MB
       // of IOSurfaces per engine doing nothing (step 2.7, M-9). The view's size comes back on open.
       bool gShrunk = false;
-      constexpr int kClosedW = 400, kClosedH = 250;
+      constexpr int kClosedW = 64, kClosedH = 64;
       std::vector<PluginFrames::InputEvent> gInput;
 
       Ipc::SharedMemory gRegion;

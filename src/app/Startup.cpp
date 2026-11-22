@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "plugin/engine/HostAudio.h"
+#include "plugin/engine/PluginView.h"
 #include "plugin/ipc/PluginFrames.h"
 #include "app/graph/LearningLog.h"
 #include "app/panels/CurveEditorPanel.h"
@@ -71,6 +72,15 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
    SketchNode::SetFontPath(bundledInter);   // text() in Sketch
    SketchEngine::FontFileFor = [](const std::string& family) { return Platform::FontFileForFamily(family); };   // textFont()
+   // DAW plugin engine with no editor open: defer loading the 14 bundled TTF/OTF
+   // fonts + CJK/icon/terminal stacks until the user actually opens the plugin window.
+   if (Platform::PluginModeActive() && !PluginView::Open() && !PluginView::Popped())
+   {
+      ImFont* def = io.Fonts->AddFontDefault();
+      UiType::Reset();
+      UiType::Register(UiType::Weight::Regular, def);
+      return;
+   }
    std::string chosenFontPath;
    {
       const std::string wanted = CategoryColors::GetUiFont();
@@ -1160,7 +1170,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // Windows and X11 size windows in physical pixels: without this a 1600x1000 window is
    // half its intended size on a 200% monitor (no effect on macOS/Wayland, which are
    // already point-based). Headless fixtures keep exact pixel sizes.
-   if (!gHeadlessTestWindow)
+   if (!gHeadlessTestWindow && !Platform::PluginModeActive())
       glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
    // The launcher card plays in its own window first (core/LauncherCard.h); the main window stays
    // hidden until it ends.
@@ -1184,7 +1194,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    mainWindowHints.scaleToMonitor = gHeadlessTestWindow ? GLFW_FALSE : GLFW_TRUE;
    if (LauncherCard::Enabled())
       glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-   window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
+   const int initW = Platform::PluginModeActive() ? 64 : 1600;
+   const int initH = Platform::PluginModeActive() ? 64 : 1000;
+   window = glfwCreateWindow(initW, initH, "Infinite", nullptr, nullptr);
    if (!window)
    {
       if (pluginNoGraphics("no OpenGL 3.3 window"))
@@ -1201,7 +1213,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    SetWindowIcon(window);
    // SCALE_TO_MONITOR can make the window larger than the screen (1600x1000 at 150% on a
    // 1080p panel is 2400x1500 pixels). Fit it to the primary monitor's work area.
-   if (!gHeadlessTestWindow)
+   if (!gHeadlessTestWindow && !Platform::PluginModeActive())
    {
       if (GLFWmonitor* primary = glfwGetPrimaryMonitor())
       {
@@ -1541,15 +1553,16 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // A headless job never shows the Samples or Media panel, and the sample
    // index alone can be tens of MB of JSON (most of a --validate's launch).
    // The plugin index stays: it is small and a patch's plugins resolve through it.
-   if (!HeadlessJobActive())
+   if (!HeadlessJobActive() && !Platform::PluginModeActive())
    {
       loadIndex(gSampleScanner);
       loadIndex(gMediaScanner);
    }
    // Never a scan at launch, for the same reason the two above aren't:
    // the cached index is shown instantly and rebuilding it is the user's
-   // explicit Rescan.
-   loadIndex(gPluginScanner);
+   // explicit Rescan. Inside a DAW, hosting third-party plugins is disabled.
+   if (!Platform::PluginModeActive())
+      loadIndex(gPluginScanner);
    tScanners = Bench::ScopedStageTimer::NowMs();
 
    // One GitHub Releases request, once per launch - see src/core/UpdateCheck.h.
@@ -1674,7 +1687,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // The window was just created with vsync hardcoded on (above); apply the
    // persisted preference now that it's loaded. Headless test windows stay
    // uncapped regardless - they don't want to be paced by the display.
-   if (!gHeadlessTestWindow)
+   if (!gHeadlessTestWindow && !Platform::PluginModeActive())
       SetCanvasSwapInterval(gVsync ? 1 : 0);
    // R0 of the real-time engine plan: a bench run with the display out of the loop, so frame_ms is the work
    // and not the next vsync.
