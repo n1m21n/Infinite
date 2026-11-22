@@ -16,7 +16,7 @@ import sys
 import numpy as np
 
 FS, HOP, N = 256, 12, 256
-TAU, CAL, SETTLE, TEST_SETTLE = 3.0, 30.0, 4.0, 6.0
+TAU, CAL, SETTLE, TEST_SETTLE = 1.5, 30.0, 4.0, 4.0
 LO, HI = (4, 8, 10, 12), (8, 10, 12, 30)
 
 

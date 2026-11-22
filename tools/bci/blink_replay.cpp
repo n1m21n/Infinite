@@ -3,7 +3,7 @@
 // Build + score: tools/bci/blink_m4.py (compiles this with the engine sources, no app build).
 //
 // usage: blink_replay FS MODE SIGN [CAL_SEC] < samples.txt     (one "fp1 fp2" line per sample, uV)
-//   MODE 0 = IntentionalOrDouble, 1 = AllBlinks; SIGN multiplies the input (+1 / -1).
+//   MODE 0 = IntentionalOrDouble, 1 = AllBlinks, 2 = DoubleBlink; SIGN multiplies the input (+1 / -1).
 //   CAL_SEC > 2: seconds 2..CAL_SEC are the prompted-blink calibration phase.
 #include "core/bci/BciDspEngine.h"
 
@@ -35,7 +35,10 @@ int main(int argc, char** argv)
    eng.SetPersistProfile(false);
    eng.SetProfile(Bci::CalibrationProfile{}); // defaults, not the user's saved profile
    eng.SetStartleGuard(false);
-   eng.SetBlinkMode(mode ? Bci::BlinkMode::AllBlinks : Bci::BlinkMode::IntentionalOrDouble);
+   const Bci::BlinkMode bm = mode == 2 ? Bci::BlinkMode::DoubleBlink
+                           : mode == 1 ? Bci::BlinkMode::AllBlinks
+                                       : Bci::BlinkMode::IntentionalOrDouble;
+   eng.SetBlinkMode(bm);
 
    float pins[Bci::kOutputPinCount] = {};
    Bci::TelemetrySnapshot tel;

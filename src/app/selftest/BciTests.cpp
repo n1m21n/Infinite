@@ -711,6 +711,157 @@ bool RunBciSelftest()
       ck.Expect(!dsp3.Profile().blinkValid, "Blink calibration: no blinks, no fit");
    }
 
+   // 11. Double-blink trigger mode: single intentional blinks suppressed; double blink (420 ms IBI) fires once;
+   //     triple blink fires once (refractory lockout prevents double-toggle).
+   {
+      auto runDbl = [&](std::vector<double> testBlinks)
+      {
+         Bci::BciDspEngine dsp;
+         dsp.Reset(256.0);
+         dsp.SetPersistProfile(false);
+         dsp.SetProfile(Bci::CalibrationProfile{});
+         dsp.SetStartleGuard(false);
+         dsp.SetBlinkMode(Bci::BlinkMode::DoubleBlink);
+         std::vector<double> cues = { 5.0, 7.0, 9.0, 11.0, 13.0 };
+         unsigned rng = 54321u;
+         std::vector<Bci::SampleFrame> batch(12);
+         float pins[Bci::kOutputPinCount] = {};
+         Bci::TelemetrySnapshot snap{};
+         int fires = 0;
+         bool prev = false;
+         for (int i = 0; i < 24 * 256; i += 12)
+         {
+            if (i / 12 == 4 * 256 / 12)
+               dsp.StartBlinkCalibration(12.0);
+            for (int k = 0; k < 12; ++k)
+            {
+               const double t = (i + k) / 256.0;
+               double eog = 0.0;
+               for (double c : cues)
+                  eog -= 200.0 * std::exp(-0.5 * std::pow((t - c) / 0.045, 2.0));
+               for (double c : testBlinks)
+                  eog -= 200.0 * std::exp(-0.5 * std::pow((t - c) / 0.045, 2.0));
+               for (int ch = 0; ch < Bci::kChannelCount; ++ch)
+               {
+                  rng = rng * 1664525u + 1013904223u;
+                  batch[k].ch[ch] = (float)(((rng >> 8) / 16777216.0 - 0.5) * 16.0 + (ch < 2 ? eog : 0.0));
+               }
+            }
+            dsp.Process(batch.data(), 12, pins, snap);
+            const bool on = pins[BrainSourceNode::kBlink] > 0.5f;
+            if (on && !prev && i > 17 * 256)
+               ++fires;
+            prev = on;
+         }
+         return fires;
+      };
+      const int sglFires = runDbl({ 19.0, 21.5 });
+      const int dblFires = runDbl({ 19.0, 19.42 });
+      const int trpFires = runDbl({ 19.0, 19.42, 19.84 });
+      std::printf("  [11] DOUBLE_BLINK single=%d/0 double=%d/1 triple=%d/1\n", sglFires, dblFires, trpFires);
+      ck.Expect(sglFires == 0, "DoubleBlink mode: single intentional blinks do not fire");
+      ck.Expect(dblFires == 1, "DoubleBlink mode: 420 ms double blink fires once");
+      ck.Expect(trpFires == 1, "DoubleBlink mode: triple blink fires once (refractory lockout)");
+   }
+
+   // 12. 1-bad-sensor fallback in 72 s calibration: 1 flatline or noisy lead drops to 12-feature LDA (3 channels)
+   //     without pausing calibration or collapsing eyes-closed accuracy.
+   {
+      auto runDropout = [&](int badCh, bool noisy)
+      {
+         Bci::SyntheticCortex cortex;
+         cortex.SetSpontaneousBlinks(false);
+         cortex.SetAutoDemoGestures(false);
+         Bci::BciDspEngine dsp;
+         dsp.Reset(256.0);
+         dsp.SetPersistProfile(false);
+         dsp.SetProfile(Bci::CalibrationProfile{});
+         dsp.SetStartleGuard(false);
+         dsp.SetArtifactBlanking(true);
+
+         std::vector<Bci::SampleFrame> batch;
+         float pins[Bci::kOutputPinCount] = {};
+         Bci::TelemetrySnapshot snap{};
+         unsigned rng = 98765u;
+         auto corruptBatch = [&]()
+         {
+            for (auto& f : batch)
+            {
+               if (noisy)
+               {
+                  rng = rng * 1664525u + 1013904223u;
+                  f.ch[badCh] = (float)(((rng >> 8) / 16777216.0 - 0.5) * 1400.0); // ~400 uV RMS hash
+               }
+               else
+               {
+                  f.ch[badCh] = 0.0f; // dead / disconnected lead
+               }
+            }
+         };
+
+         // 2 s settle so contact quality flags the bad channel
+         cortex.SetPreset(Bci::SyntheticPreset::DeepFocus);
+         for (int i = 0; i < 2 * 256; i += 12)
+         {
+            cortex.Generate(12, 256.0, batch);
+            corruptBatch();
+            dsp.Process(batch.data(), 12, pins, snap);
+         }
+
+         dsp.StartCalibration();
+         // 30 s Eyes Open (DeepFocus = low alpha)
+         for (int i = 0; i < 30 * 256; i += 12)
+         {
+            cortex.Generate(12, 256.0, batch);
+            corruptBatch();
+            dsp.Process(batch.data(), 12, pins, snap);
+         }
+         // 30 s Eyes Closed (CalmAlpha = strong alpha)
+         cortex.SetPreset(Bci::SyntheticPreset::CalmAlpha);
+         for (int i = 0; i < 30 * 256 + 64; i += 12)
+         {
+            cortex.Generate(12, 256.0, batch);
+            corruptBatch();
+            dsp.Process(batch.data(), 12, pins, snap);
+         }
+
+         const auto& pr = dsp.Profile();
+         bool droppedZero = true;
+         for (int b = 0; b < 4; ++b)
+            if (pr.stateW[b * Bci::kChannelCount + badCh] != 0.0f)
+               droppedZero = false;
+
+         // Evaluate 10 s open + 10 s closed after 4 s settle each
+         int hits = 0, total = 0;
+         cortex.SetPreset(Bci::SyntheticPreset::DeepFocus);
+         for (int i = 0; i < 14 * 256; i += 12)
+         {
+            cortex.Generate(12, 256.0, batch);
+            corruptBatch();
+            dsp.Process(batch.data(), 12, pins, snap);
+            if (i >= 4 * 256) { hits += (snap.eyesClosedScore < 0.5f) ? 1 : 0; ++total; }
+         }
+         cortex.SetPreset(Bci::SyntheticPreset::CalmAlpha);
+         for (int i = 0; i < 14 * 256; i += 12)
+         {
+            cortex.Generate(12, 256.0, batch);
+            corruptBatch();
+            dsp.Process(batch.data(), 12, pins, snap);
+            if (i >= 4 * 256) { hits += (snap.eyesClosedScore > 0.5f) ? 1 : 0; ++total; }
+         }
+         const double acc = total > 0 ? (double)hits / total : 0.0;
+         const uint8_t wantMask = (uint8_t)(0x0Fu & ~(1u << badCh));
+         std::printf("  [12] BAD_SENSOR_FALLBACK ch=%d (%s) valid=%d mask=0x%X (want 0x%X) zeroW=%d acc=%.3f\n",
+                     badCh, noisy ? "noisy" : "flat", pr.stateValid ? 1 : 0, (unsigned)pr.stateChanMask,
+                     (unsigned)wantMask, droppedZero ? 1 : 0, acc);
+         ck.Expect(pr.stateValid && pr.stateChanMask == wantMask && droppedZero,
+                   "1-bad-sensor fallback: fits 12-feature LDA on remaining 3 channels");
+         ck.Expect(acc >= 0.80, "1-bad-sensor fallback: held-out accuracy >= 80%");
+      };
+      runDropout(0, false); // AF7 disconnected (flatline)
+      runDropout(2, true);  // TP9 noisy/rail-clipped
+   }
+
    std::printf("BCI_SELFTEST: passed=%d failed=%d %s\n",
                ck.passed, ck.failed, ck.failed == 0 ? "OK" : "FAIL");
    return ck.failed == 0;

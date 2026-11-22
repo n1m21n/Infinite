@@ -1213,6 +1213,23 @@ namespace app
 
       NodeSeparator("acquisition", colW * 2 + gutter);
       DropdownButton("device", BrainSourceNode::DeviceNames(), n->device, [n](int i) { PushUndoCheckpoint(); n->device = i; });
+      if (n->device == BrainSourceNode::kDeviceCsvReplay)
+      {
+         char pathBuf[512];
+         snprintf(pathBuf, sizeof(pathBuf), "%s", n->csvPath.c_str());
+         ImGui::SetNextItemWidth(colW * 2 + gutter);
+         if (FieldWell::InputTextWithHint("csv file", "/path/to/heroic_muse2.csv", pathBuf, sizeof(pathBuf),
+                                          ImGuiInputTextFlags_EnterReturnsTrue))
+         {
+            PushUndoCheckpoint();
+            n->csvPath = pathBuf;
+         }
+         else if (ImGui::IsItemDeactivatedAfterEdit())
+         {
+            PushUndoCheckpoint();
+            n->csvPath = pathBuf;
+         }
+      }
       DropdownButton("synthetic preset", BrainSourceNode::PresetNames(), n->syntheticPreset, [n](int i) { PushUndoCheckpoint(); n->syntheticPreset = i; });
       DropdownButton("blink filter", BrainSourceNode::BlinkModeNames(), n->blinkMode, [n](int i) { PushUndoCheckpoint(); n->blinkMode = i; });
       ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f, "%.2f", colW);

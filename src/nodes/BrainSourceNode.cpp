@@ -151,7 +151,8 @@ const std::vector<std::string>& BrainSourceNode::BlinkModeNames()
 {
    static const std::vector<std::string> names = {
       "Intentional / Double",
-      "All Blinks"
+      "All Blinks",
+      "Double Blink"
    };
    return names;
 }
@@ -604,7 +605,7 @@ void BrainSourceNode::WorkerLoop()
       dsp.SetSmoothing(wantSmooth);
       dsp.SetArtifactBlanking(wantBlanking);
       dsp.SetStartleGuard(wantStartle);
-      dsp.SetBlinkMode(static_cast<Bci::BlinkMode>(std::clamp(wantBlinkMode, 0, 1)));
+      dsp.SetBlinkMode(static_cast<Bci::BlinkMode>(std::clamp(wantBlinkMode, 0, 2)));
 
       // 4 samples @ 256 Hz per ~15.6 ms cycle (~64 Hz fast somatic update)
       runtime.PollSamples(4, batch);

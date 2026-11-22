@@ -25,11 +25,11 @@ def lda(Xc, Xo, shrink=0.3):
     w = np.linalg.solve(S, mu1-mu0); return w, w@(mu1+mu0)/2
 def score(c, o, thr):
     return ((c>thr).sum()+(o<=thr).sum())/(len(c)+len(o))
-out = {n: {'avg':[], 'lda':[]} for n in (1,3,5)}
+out = {n: {'avg':[], 'lda':[]} for n in (1,2,3,5)}
 for name, xo, xc, fs in subs:
     f, Po, _ = bv.welch_windows(xo, fs); _, Pc, _ = bv.welch_windows(xc, fs)
     ho, hc = len(Po)//2, len(Pc)//2
-    for n in (1,3,5):
+    for n in (1,2,3,5):
         # avg baseline
         ao, ac = sm(avgA(f,Po),n), sm(avgA(f,Pc),n)
         t=(ac[:hc].mean()+ao[:ho].mean())/2
@@ -37,7 +37,7 @@ for name, xo, xc, fs in subs:
         Xo, Xc = sm(F(f,Po),n), sm(F(f,Pc),n)
         w, t = lda(Xc[:hc], Xo[:ho])
         out[n]['lda'].append(score(Xc[hc:]@w, Xo[ho:]@w, t))
-for n in (1,3,5):
+for n in (1,2,3,5):
     a, l = np.array(out[n]['avg']), np.array(out[n]['lda'])
     print(f"{ds} span {n+1}s  acc avg {np.median(a):.3f} (>=80%: {100*np.mean(a>=.8):.0f}%)   "
           f"lda {np.median(l):.3f} (>=80%: {100*np.mean(l>=.8):.0f}%)   lda>avg in {100*np.mean(l>a):.0f}% of {len(a)}")
@@ -48,7 +48,7 @@ if ds == 'heroic':
     for name, xo, xc, fs in subs:
         f, Po, _ = bv.welch_windows(xo, fs); _, Pc, _ = bv.welch_windows(xc, fs)
         by.setdefault(name.split('/')[0], []).append((name, f, Po, Pc))
-    for n in (3, 5):
+    for n in (1, 2, 3, 5):
         same, cross, avg_cross = [], [], []
         for sub, ss in by.items():
             if len(ss) < 2: continue
@@ -66,3 +66,21 @@ if ds == 'heroic':
         c, s2, a = map(np.array, (cross, same, avg_cross))
         print(f"cross-day span {n+1}s  n={len(c)}  avg {np.median(a):.3f}  lda(day-1 weights+thr) {np.median(c):.3f}  "
               f"lda(day-1 weights, median-recentred thr) {np.median(s2):.3f} (>=80%: {100*np.mean(s2>=.8):.0f}%)")
+
+    # 1-bad-sensor fallback (12 features on 3 remaining channels, span 6 s)
+    ch_names = ('AF7', 'AF8', 'TP9', 'TP10')
+    for bad in range(4):
+        keep = [c for c in range(4) if c != bad]
+        accs = []
+        for name, xo, xc, fs in subs:
+            f, Po, _ = bv.welch_windows(xo, fs); _, Pc, _ = bv.welch_windows(xc, fs)
+            ho, hc = len(Po)//2, len(Pc)//2
+            def F3(P):
+                Ps = P[:, keep, :]
+                tot = np.maximum(Ps[:, :, (f>=2)&(f<=40)].sum(2), 1e-12)
+                return np.concatenate([np.log10(np.maximum(Ps[:, :, (f>=lo)&(f<hi)].sum(2), 1e-12) / tot) for lo,hi in BANDS], 1)
+            Xo, Xc = sm(F3(Po), 5), sm(F3(Pc), 5)
+            w, t = lda(Xc[:hc], Xo[:ho])
+            accs.append(score(Xc[hc:]@w, Xo[ho:]@w, t))
+        a3 = np.array(accs)
+        print(f"1-bad-sensor drop {ch_names[bad]:4s} (12 feat, span 6s)  lda {np.median(a3):.3f} (>=80%: {100*np.mean(a3>=.8):.0f}%)")

@@ -65,7 +65,8 @@ namespace Bci
    enum class BlinkMode : int
    {
       IntentionalOrDouble = 0,
-      AllBlinks = 1
+      AllBlinks = 1,
+      DoubleBlink = 2
    };
 
    enum class CalibrationPhase : int
@@ -104,6 +105,7 @@ namespace Bci
       float baselineBeta = 0.25f;
       // Shrinkage-LDA weights fitted at calibration (eyes closed vs open), see FitStateWeights.
       bool stateValid = false;
+      uint8_t stateChanMask = 0x0F; // bit c = 1 if channel c (AF7,AF8,TP9,TP10) is active in stateW
       float stateW[kStateFeatureCount] = {};
       float stateBias = 0.0f;
       float stateScale = 1.0f;
@@ -127,6 +129,7 @@ namespace Bci
       float eyesClosedScore = 0.0f;          // calibrated 0..1 (0.5 = boundary); 0 until calibrated
       bool stateCalibrated = false;
       bool stateCalibFailed = false;         // last calibration ended without a fit (too few clean updates)
+      uint8_t stateChanMask = 0x0F;          // active channels used by the calibrated state LDA (3 or 4 bits set)
       float imageCol[kImageColumnSize] = {}; // latest Image pin column, 0..1 (z -3..+3), bin 0 = 1 Hz
       float imageState = -1.0f;              // eyes-closed score for the strip, -1 until calibrated
       unsigned imageSeq = 0;                 // +1 per column (every 12 samples)
