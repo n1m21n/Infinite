@@ -226,9 +226,9 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
 MeshOps::FurParams GeometryOpNode::FurParams() const
 {
    MeshOps::FurParams p;
-   p.density = furDensity; p.maxStrands = furMaxStrands;
+   p.density = furDensity; p.maxStrands = std::clamp(furMaxStrands, 1, 400000);
    p.length = furLength; p.lengthJitter = furJitter; p.width = furWidth;
-   p.segments = furSegments; p.gravity = furGravity; p.clump = furClump; p.curl = furCurl;
+   p.segments = std::clamp(furSegments, 1, 32); p.gravity = furGravity; p.clump = furClump; p.curl = furCurl;
    for (int i = 0; i < 3; i++) p.comb[i] = furComb[i];
    p.seed = (int)seed; p.normals = furNormals;
    return p;

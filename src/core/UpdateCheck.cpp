@@ -264,7 +264,8 @@ namespace
 
 void Start()
 {
-   if (getenv("INFINITE_NO_UPDATE_CHECK") != nullptr || getenv("IMAGERESYNTH_SELFTEST") != nullptr)
+   if (getenv("INFINITE_NO_UPDATE_CHECK") != nullptr || getenv("IMAGERESYNTH_SELFTEST") != nullptr ||
+       getenv("INFINITE_FRAMEFUZZ") != nullptr || getenv("INFINITE_PARAMFUZZ") != nullptr)
    {
       // Resolve synchronously rather than leaving GetStatus() at Idle - a
       // modal driven off it must not spin on "Checking..." forever, and the

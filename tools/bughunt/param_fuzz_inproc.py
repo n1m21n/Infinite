@@ -23,7 +23,7 @@ SAN = re.compile(r'(runtime error: .*|ERROR: AddressSanitizer: \S+.*)')
 
 
 def run_once(binary, types, after, alarm, on_line):
-    env = dict(os.environ, INFINITE_PARAMFUZZ=types or '1')
+    env = dict(os.environ, INFINITE_PARAMFUZZ=types or '1', INFINITE_NO_UPDATE_CHECK='1')
     if after:
         env['INFINITE_PARAMFUZZ_AFTER'] = after
     else:

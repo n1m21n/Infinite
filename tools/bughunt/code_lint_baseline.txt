@@ -10,6 +10,7 @@ clamp-bounds	src/audio/dsp/EquationDsp.h	v1 .. v2
 clamp-bounds	src/audio/dsp/MolderDsp.cpp	minF .. maxF
 clamp-bounds	src/audio/dsp/PitchShiftKernel.cpp	minFade .. fade
 clamp-bounds	src/audio/dsp/SimdF4.h	lo .. hi
+clamp-bounds	src/nodes/AudioNodes.cpp	lo .. hi
 clamp-bounds	src/nodes/AudioPluginNode.cpp	info.minValue .. info.maxValue
 clamp-bounds	src/nodes/FormulaNode.cpp	k.lo .. k.hi
 clamp-bounds	src/nodes/GrainMolderNode.cpp	curStartFrac .. curEndFrac
@@ -27,6 +28,7 @@ clamp-bounds	src/nodes/SamplerNode.cpp	curStartFrac .. curEndFrac
 clamp-bounds	src/nodes/SamplerNode.cpp	startFrac .. endFrac
 clamp-bounds	src/nodes/SamplerNode.cpp	startPos .. endPos
 clamp-bounds	src/nodes/SlicerNode.cpp	lo .. hi
+clamp-bounds	src/nodes/UtilityNodes.cpp	lo .. hi
 clamp-bounds	src/nodes/VideoSourceNode.cpp	effStart .. effEnd
 clamp-bounds	src/nodes/VideoSourceNode.cpp	start .. (double)trimEnd
 clamp-bounds	src/nodes/VmpcNode.cpp	s .. e
@@ -44,6 +46,7 @@ loaded-index	src/nodes/OscillatorNode.cpp	waveform -> [waveform] in src/app/bodi
 loaded-index	src/nodes/PianoNode.cpp	model -> [model] in src/app/bodies
 loaded-index	src/nodes/PredictiveModulatorNode.h	rank -> [rank] in src/app/bodies
 loaded-index	src/nodes/PredictiveRhythmNode.cpp	root -> [root] in src/app/bodies
+loaded-index	src/nodes/UtilityNodes.h	model -> [model] in src/app/bodies
 loaded-index	src/nodes/WaveTerrainNode.cpp	filterType -> [filterType] in src/app/bodies
 loaded-loop	src/nodes/AudioNodes.cpp	bands -> loop bound bands
 shader-loop	src/core/FilterDefs.cpp	i < N
@@ -51,6 +54,7 @@ shader-loop	src/core/FilterDefs.cpp	i < n
 shader-loop	src/core/FilterDefs.cpp	x < n
 shader-loop	src/core/FilterDefs.cpp	y < n
 shader-loop	src/nodes/FormulaNode.cpp	i < N
+shader-loop	src/nodes/Geometry3DNodes.cpp	i < 32 && hc < layer
 shader-loop	src/nodes/OpticalFlowNode.cpp	i < uR
 shader-loop	src/nodes/Render3DPathTrace.cpp	bounce < maxB
 shader-loop	src/nodes/Render3DPathTrace.cpp	k < w1

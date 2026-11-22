@@ -107,8 +107,9 @@ for t in "${TARGETS[@]}"; do
       seed hap "$ROOT"/tests/data/*.mov "$ROOT"/tests/fixtures/*.mov
       ;;
    patch)
-      INC="-I$ROOT/src -I$ROOT/src/core -I$ROOT/src/platform -I$ROOT/external"
-      build patch "$HERE/fuzz_patch.cpp" "$ROOT/src/core/Patch.cpp" "$ROOT/src/core/BlendModes.cpp"
+      INC="-I$ROOT/src -I$ROOT/src/core -I$ROOT/src/platform -I$ROOT/external -I$ROOT/external/stb"
+      STB=$(ext_obj stb "$HERE/stb_impl.cpp" -I"$ROOT/external/stb")
+      build patch "$HERE/fuzz_patch.cpp" "$ROOT/src/core/Patch.cpp" "$ROOT/src/core/BlendModes.cpp" "$ROOT/src/core/TileStore.cpp" "$STB"
       # every patch the repo ships is a seed
       while IFS= read -r f; do seed patch "$f"; done < <(find "$ROOT/tests" "$ROOT/patches" "$ROOT/examples" \
          -name '*.inf' -size -64k 2>/dev/null | head -400)
