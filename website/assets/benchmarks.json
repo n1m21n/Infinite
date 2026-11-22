@@ -64,7 +64,7 @@
    "Vel span dB": "24.1",
    "L/R corr": "1.00",
    "Same twice": "yes",
-   "CPU ms/s idle / voice": "8.83 / 1.45"
+   "CPU ms/s idle / voice": "8.10 / 1.33"
   },
   {
    "Target": "node:Analog",
@@ -79,7 +79,7 @@
    "Vel span dB": "24.1",
    "L/R corr": "1.00",
    "Same twice": "yes",
-   "CPU ms/s idle / voice": "9.03 / 9.05"
+   "CPU ms/s idle / voice": "8.23 / 8.28"
   },
   {
    "Target": "node:Oscillator",
@@ -94,7 +94,7 @@
    "Vel span dB": "24.1",
    "L/R corr": "1.00",
    "Same twice": "yes",
-   "CPU ms/s idle / voice": "9.87 / 3.40"
+   "CPU ms/s idle / voice": "7.93 / 3.16"
   }
  ],
  "effects": [
@@ -123,7 +123,7 @@
    "Flatness ±dB 63-16k": "0.66",
    "Tail -60 s": "0.60",
    "RT60 s": "1.48",
-   "CPU ms/s (net)": "8.50",
+   "CPU ms/s (net)": "6.23",
    "Params": "-"
   },
   {
@@ -165,7 +165,7 @@
    "Flatness ±dB 63-16k": "0.00",
    "Tail -60 s": "0.01",
    "RT60 s": "-",
-   "CPU ms/s (net)": "14.53",
+   "CPU ms/s (net)": "12.03",
    "Params": "-"
   },
   {
@@ -193,7 +193,7 @@
    "Flatness ±dB 63-16k": "0.00",
    "Tail -60 s": "0.01",
    "RT60 s": "-",
-   "CPU ms/s (net)": "2.77",
+   "CPU ms/s (net)": "1.60",
    "Params": "-"
   },
   {
@@ -221,7 +221,7 @@
    "Flatness ±dB 63-16k": "0.00",
    "Tail -60 s": "0.01",
    "RT60 s": "-",
-   "CPU ms/s (net)": "13.37",
+   "CPU ms/s (net)": "10.63",
    "Params": "-"
   },
   {
@@ -249,7 +249,7 @@
    "Flatness ±dB 63-16k": "0.26",
    "Tail -60 s": "1.51",
    "RT60 s": "1.87",
-   "CPU ms/s (net)": "3.33",
+   "CPU ms/s (net)": "2.77",
    "Params": "-"
   },
   {
@@ -277,7 +277,7 @@
    "Flatness ±dB 63-16k": "0.97",
    "Tail -60 s": "0.02",
    "RT60 s": "-",
-   "CPU ms/s (net)": "28.20",
+   "CPU ms/s (net)": "17.07",
    "Params": "-"
   },
   {
@@ -305,7 +305,7 @@
    "Flatness ±dB 63-16k": "4.27",
    "Tail -60 s": "0.02",
    "RT60 s": "0.10",
-   "CPU ms/s (net)": "3.90",
+   "CPU ms/s (net)": "1.50",
    "Params": "-"
   },
   {
@@ -333,7 +333,7 @@
    "Flatness ±dB 63-16k": "4.08",
    "Tail -60 s": "0.05",
    "RT60 s": "0.05",
-   "CPU ms/s (net)": "1.97",
+   "CPU ms/s (net)": "2.33",
    "Params": "-"
   },
   {
@@ -355,13 +355,13 @@
    "Latency smp (ms)": "0 (0.00 ms)",
    "Gain 1k dB": "+1.69",
    "THD -12": "-110.5",
-   "THD+N -12": "-88.7",
+   "THD+N -12": "-88.8",
    "THD -1": "-92.6",
    "Alias HF dB": "-88.6",
    "Flatness ±dB 63-16k": "9.51",
    "Tail -60 s": "0.01",
    "RT60 s": "-",
-   "CPU ms/s (net)": "3.23",
+   "CPU ms/s (net)": "3.13",
    "Params": "-"
   },
   {
@@ -464,17 +464,17 @@
    "App": "Infinite",
    "Window s (1st)": "0.8",
    "Window s (warm)": "0.8",
-   "Idle CPU % mean / max": "12.3 / 13",
-   "Memory MB (footprint)": "244",
-   "Threads": "18",
+   "Idle CPU % mean / max": "10.7 / 13",
+   "Memory MB (footprint)": "588",
+   "Threads": "17",
    "Processes": "1",
-   "Bundle MB": "45"
+   "Bundle MB": "74"
   }
  ],
  "faq": [
   {
    "question": "Is Infinite faster than Vital or Serum 2?",
-   "answer": "On sound quality they are level: all three measure about 0.2 cents of pitch error and about -81 to -85 dB of off-note energy. Infinite's Wavetable synth uses 1.45 ms of CPU per second of audio per voice, against 2.82 for Vital and 3.23 for Serum 2."
+   "answer": "On sound quality they are level: all three measure about 0.2 cents of pitch error and about -81 to -85 dB of off-note energy. Infinite's Wavetable synth uses 1.33 ms of CPU per second of audio per voice, against 2.82 for Vital and 3.23 for Serum 2."
   },
   {
    "question": "How fast does Infinite export video compared with Blender?",
@@ -482,11 +482,11 @@
   },
   {
    "question": "How much memory and disk does Infinite use?",
-   "answer": "244 MB of memory with the app open and idle, and 45 MB on disk. That is less memory than Ableton Live, Blender, Bitwig, TouchDesigner and BespokeSynth, and a fraction of the size of the DAWs tested (Ableton Live is 8 GB on disk)."
+   "answer": "588 MB of memory with the app open and idle, and 74 MB on disk. That is less memory than Ableton Live, Blender, Bitwig, TouchDesigner and BespokeSynth, and a fraction of the size of the DAWs tested (Ableton Live is 8 GB on disk)."
   },
   {
    "question": "Where is Infinite slower than other tools?",
-   "answer": "Idle CPU (12.3 % of a core with nothing loaded), the built-in EQ, Limiter, Drive and Chorus effects, 10,000-object instancing, and the heaviest multi-4K projector scene. All are listed as below target."
+   "answer": "Idle CPU (10.7 % of a core with nothing loaded), the built-in EQ and Drive effects, 10,000-object instancing, and the heaviest multi-4K projector scene. All are listed as below target."
   },
   {
    "question": "Which computer were these benchmarks run on?",

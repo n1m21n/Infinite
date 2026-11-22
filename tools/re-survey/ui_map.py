@@ -122,12 +122,21 @@ def launch_and_wait(app, wait, log):
     return pid, time.time() - t0
 
 
-def quit_app(app, pid, log):
+def quit_app(app, pid, log, force=False):
     subprocess.run(["osascript", "-e", 'tell application id "%s" to quit' % bundle_id(app)], capture_output=True, timeout=60)
     for _ in range(30):
         if subprocess.run(["kill", "-0", str(pid)], capture_output=True).returncode != 0:
             return True
         time.sleep(1)
+    if force:
+        # A fresh Infinite window is "dirty", so a polite quit opens its Save/Don't Save modal and the
+        # AppleEvent returns "User canceled". Benches have their numbers by now: end the process.
+        log("  %s kept open by its unsaved-changes modal; SIGTERM" % os.path.basename(app))
+        subprocess.run(["kill", "-TERM", str(pid)], capture_output=True)
+        for _ in range(10):
+            if subprocess.run(["kill", "-0", str(pid)], capture_output=True).returncode != 0:
+                return True
+            time.sleep(1)
     log("  %s still running after quit (a dialog?); left open" % os.path.basename(app))
     return False
 

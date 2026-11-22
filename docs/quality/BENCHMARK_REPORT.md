@@ -525,10 +525,10 @@ Reading: Wavetable and Analog match Vital and Serum 2 on pitch (0.2 cents worst 
 | Blender | 3.5 | 2.7 | 2.8 / 4 | 696 | 33 | 1 | 879 |
 | Vital | 3.2 | 1.4 | 0.4 / 1 | 248 | 11 | 1 | 24 |
 | BespokeSynth | 6.8 | 2.1 | 26.2 / 31 | 1528 | 13 | 1 | 268 |
-| Infinite | 2.8 | 1.4 | 14.5 / 19 | 237 | 18 | 1 | 45 |
+| Infinite | 0.8 | 0.8 | 10.7 / 13 | 588 | 17 | 1 | 74 |
 
 
-Reading (idle, nothing loaded, 2 runs, 15 s idle window): Infinite opens a window in 2.8 s cold / 1.4 s warm, uses 237 MB and has the smallest bundle of the full workstations (45 MB, against 874 MB to 8 GB for DAWs and TouchDesigner). Memory is below Ableton (672 MB), Blender (696 MB), Bitwig (1.4 GB), TouchDesigner (1.4 GB) and BespokeSynth (1.5 GB); only Logic (122 MB) and the Vital plugin (248 MB, a single synth) are comparable or lower. **Infinite's idle CPU is 14.5% of a core, which is higher than Logic (3.9%), Blender (2.8%) and Vital (0.4%) and below Ableton (41.9%), TouchDesigner (49.8%) and VCV Rack (521.7%, it renders its audio engine continuously).** That idle figure is worth checking on a quiet machine, since it was measured next to a second Infinite instance.
+Reading (idle, nothing loaded; Infinite row re-measured 2026-11-21, 3 runs, 20 s idle window, dev build): Infinite opens a window in 0.8 s cold / 0.8 s warm, uses 588 MB and has the smallest bundle of the full workstations (74 MB, against 874 MB to 8 GB for DAWs and TouchDesigner). Memory is below Ableton (672 MB), Blender (696 MB), Bitwig (1.4 GB), TouchDesigner (1.4 GB) and BespokeSynth (1.5 GB); only Logic (122 MB) and the Vital plugin (248 MB, a single synth) are comparable or lower. **Infinite's idle CPU is 10.7% of a core, which is higher than Logic (3.9%), Blender (2.8%) and Vital (0.4%) and below Ableton (41.9%), TouchDesigner (49.8%) and VCV Rack (521.7%, it renders its audio engine continuously).** The Infinite row was re-measured on a quiet machine with no second instance running.
 
 ## D4 Not run
 

@@ -1,6 +1,6 @@
-# App footprint (tools/re-survey/app_bench.py, 2026-10-17)
+# App footprint (tools/re-survey/app_bench.py, 2026-10-17; Infinite row re-measured 2026-11-21)
 
-Infinite, Blender and Vital re-measured on a quiet machine (20 s idle, 2 runs); the others from the first pass (15 s idle, 2 runs).
+Infinite (2026-11-21: 20 s idle, 3 runs, dev build on the Desktop), Blender and Vital re-measured (2026-10-17) on a quiet machine (20 s idle, 2 runs); the others from the first pass (15 s idle, 2 runs).
 
 | App | Window s (1st) | Window s (warm) | Idle CPU % mean / max | Memory MB (footprint) | Threads | Processes | Bundle MB |
 |---|---|---|---|---|---|---|---|
@@ -12,4 +12,4 @@ Infinite, Blender and Vital re-measured on a quiet machine (20 s idle, 2 runs); 
 | Blender | 2.0 | 2.0 | 1.9 / 3 | 693 | 33 | 1 | 879 |
 | Vital | 2.2 | 0.7 | 0.4 / 2 | 252 | 12 | 1 | 24 |
 | BespokeSynth | 6.8 | 2.1 | 26.2 / 31 | 1528 | 13 | 1 | 268 |
-| Infinite | 0.8 | 0.8 | 12.3 / 13 | 244 | 18 | 1 | 45 |
+| Infinite | 0.8 | 0.8 | 10.7 / 13 | 588 | 17 | 1 | 74 |

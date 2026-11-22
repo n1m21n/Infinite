@@ -105,7 +105,7 @@ def s_glance():
             f'publish the numbers that are good for us and the ones that are not.</p><div class="bm-cards">{c}</div>'
             '<h3>Where Infinite is behind</h3><ul>'
             f'<li><b>Idle CPU.</b> With nothing loaded Infinite sits at {esc(inf["Idle CPU % mean / max"].split("/")[0].strip())} % of one core. Logic, Blender and Vital sit under 4 %. We are working on it.</li>'
-            '<li><b>Some built-in effects cost more CPU</b> than the plugin equivalents: EQ, Limiter, Drive and Chorus (Section 4).</li>'
+            '<li><b>Some built-in effects cost more CPU</b> than the plugin equivalents: EQ and Drive (Section 4).</li>'
             '<li><b>Instancing.</b> 10,000 instanced objects cost 3.1 ms a frame in Infinite and 1.3 ms in Blender.</li>'
             '<li><b>The heaviest projector scene</b> (four 4K videos, three output windows, a camera and Syphon at once) drops frames. Normal and 1080p scenes do not.</li>'
             '<li><b>Default levels.</b> Reverb, Delay, Chorus and Flanger come out louder than they go in at their default settings.</li></ul>')
@@ -170,8 +170,8 @@ def s_effects():
             '<b>Latency</b> is the delay the effect adds after the host compensates for it.</p>' +
             table(["Effect", "Infinite CPU", "Infinite latency (ms)", "Compared with", "CPU", "Latency (ms)", "Result"], rows) +
             '<h3>What this means</h3><ul>'
-            '<li><b>Infinite is lighter</b> on Reverb, Delay and the compressor, and about level on Flanger and Phaser.</li>'
-            '<li><b>The plugins are lighter</b> on EQ, Limiter, Drive and Chorus. The EQ gap is the clearest: ' +
+            '<li><b>Infinite is lighter</b> on Reverb, Delay and the compressor, and about level on Limiter, Chorus, Flanger and Phaser.</li>'
+            '<li><b>The plugins are lighter</b> on EQ and Drive. The EQ gap is the clearest: ' +
             f'{cpu(fxk("node:EQ")):.1f} ms/s for Infinite against {cpu(fxk("Pro-Q 4")):.1f} for Pro-Q 4. These are on our list to fix.</li>'
             '<li>Infinite effects add no delay once compensated (0 ms). ValhallaRoom reports %.1f ms.</li>' % lat(fxk("ValhallaRoom")) +
             '<li>At default settings Infinite\'s Reverb, Delay, Chorus and Flanger are louder than the input and can clip. FabFilter Pro-R 2 and ValhallaDelay stay within about 1 dB. We list this as a known issue.</li>'
@@ -213,8 +213,8 @@ def s_apps():
             '<b>Idle CPU</b> is the share of one core used while doing nothing, over the whole app including its helper processes. <b>Memory</b> is what Activity Monitor shows.</p>' +
             table(["App", "First window, first launch (s)", "Warm (s)", "Idle CPU % (mean / max)", "Memory (MB)", "Download size on disk (MB)"], rows) +
             '<h3>What this means</h3><ul>'
-            '<li>Infinite is a small install: 45 MB, against 874 MB to 8 GB for the DAWs and TouchDesigner. Only VCV Rack and Vital are as small.</li>'
-            '<li>Memory is lower than Ableton, Blender, Bitwig, TouchDesigner and BespokeSynth. Only Logic sits lower.</li>'
+            f'<li>Infinite is a small install: {esc(apk("Infinite")["Bundle MB"])} MB, against 874 MB to 8 GB for the DAWs and TouchDesigner. Only VCV Rack and Vital are as small.</li>'
+            '<li>Memory is lower than Ableton, Blender, Bitwig, TouchDesigner and BespokeSynth. Only Logic and the single-synth Vital sit lower.</li>'
             '<li>Infinite opens its first window in under a second here, the quickest first launch of the apps tested. Infinite, Blender and Vital were re-measured on a quiet machine; the rest come from the first pass.</li>'
             '<li>Idle CPU is mid-pack: higher than Logic, Blender and Vital (all under 4 %), lower than Bitwig, BespokeSynth, Ableton and TouchDesigner. VCV Rack\'s high figure is its audio engine running continuously by design.</li></ul>')
 
@@ -425,7 +425,7 @@ def faq():
          f"Infinite's Wavetable synth uses {vc('node:Wavetable')} ms of CPU per second of audio per voice, against {vc('Vital')} for Vital and {vc('Serum 2')} for Serum 2."),
         ("How fast does Infinite export video compared with Blender?", "On matched test scenes on a base MacBook Air M2, Infinite exported ProRes 4444 at 170 fps at 720p and 44 fps at 4K, against 1.6 fps and 0.5 fps for Blender. These are different renderers, so this compares throughput, not image style."),
         ("How much memory and disk does Infinite use?", f"{inf['Memory MB (footprint)']} MB of memory with the app open and idle, and {inf['Bundle MB']} MB on disk. That is less memory than Ableton Live, Blender, Bitwig, TouchDesigner and BespokeSynth, and a fraction of the size of the DAWs tested (Ableton Live is 8 GB on disk)."),
-        ("Where is Infinite slower than other tools?", f"Idle CPU ({idle} % of a core with nothing loaded), the built-in EQ, Limiter, Drive and Chorus effects, 10,000-object instancing, and the heaviest multi-4K projector scene. All are listed as below target."),
+        ("Where is Infinite slower than other tools?", f"Idle CPU ({idle} % of a core with nothing loaded), the built-in EQ and Drive effects, 10,000-object instancing, and the heaviest multi-4K projector scene. All are listed as below target."),
         ("Which computer were these benchmarks run on?", "A base MacBook Air with an Apple M2 and 8 GB of memory, running macOS, on 12 to 17 October 2026. Windows and Linux were not measured."),
     ]
 
@@ -598,7 +598,7 @@ def compare_head():
 
 
 def v_behind():
-    items = [("power", "Idle CPU"), ("family-audio-effects", "EQ, limiter, drive, chorus"), ("cube", "10k instances"), ("viewport", "4× 4K, 3 windows"), ("mixer", "Default levels")]
+    items = [("power", "Idle CPU"), ("family-audio-effects", "EQ, drive"), ("cube", "10k instances"), ("viewport", "4× 4K, 3 windows"), ("mixer", "Default levels")]
     return (f'<section class="bm-card" id="behind"><div class="th">{_ic("warning")}<span>Behind</span></div><div class="chips">' +
             "".join(f'<span class="pill">{_ic(i)}{esc(t)}</span>' for i, t in items) + "</div></section>")
 
@@ -690,8 +690,9 @@ def data_json(n):
 
 def main():
     body, n = body_html()
+    html_out = page(body, n)  # reads the old benchmarks.html as its template: build before opening it for writing
     open(os.path.join(W, "benchmarks.css"), "w").write(SITE_CSS)
-    open(os.path.join(W, "benchmarks.html"), "w").write(page(body, n))
+    open(os.path.join(W, "benchmarks.html"), "w").write(html_out)
     json.dump(data_json(n), open(os.path.join(W, "assets", "benchmarks.json"), "w"), indent=1, ensure_ascii=False)
     if "--no-pdf" not in sys.argv:
         out = os.path.join(W, "assets", PDF_NAME)

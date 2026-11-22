@@ -108,7 +108,7 @@ def bench_app(name, runs, idle, log):
             time.sleep(1)
         mem = footprint_mb(ss[-1]["pids"])
         if not running:
-            ui_map.quit_app(app, pid, log)
+            ui_map.quit_app(app, pid, log, force=True)
             if ui_map.app_pid(app):
                 raise RuntimeError("did not quit (a dialog?); stopped after run %d" % (i + 1))
         cpu = [s["cpu"] for s in ss]
