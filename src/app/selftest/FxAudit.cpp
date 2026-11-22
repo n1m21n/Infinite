@@ -53,6 +53,7 @@ namespace
    constexpr double kFlagClickDb = 12.0;
    constexpr double kFlagRateDb = 1.0;
    constexpr double kFlagRateTime = 1.15;
+   constexpr double kRelResolveS = 0.05; // ReleaseTime's window: smaller release differences are not resolved
    constexpr double kFlagCpuNs = 4000.0;
 
    struct Rig
@@ -457,10 +458,50 @@ namespace
       }
 
       // rate consistency at defaults
-      double toneSpread = 0.0, relRatio = 1.0;
+      double toneSpread = 0.0, relRatio = 1.0, relSpreadS = 0.0;
       double relAt[3] = {};
       {
          const double rates[3] = { 44100.0, 48000.0, 96000.0 };
+         double relSum[3] = {};
+         int relCnt[3] = {};
+         auto addRelease = [&](int ri, unsigned seedFrom, unsigned seedTo)
+         {
+            // Release after a 1 s noise burst, averaged over three seeds and band-limited to
+            // 16 kHz. One seed read a few-mode resonator's release 0.51-0.64 s across rates: where
+            // a random burst stops decides how loud the modes are ringing, a few dB either way.
+            // And full-band white noise at 96 kHz puts half its power above 24 kHz, in a reverb's
+            // fastest-dying band, so its broadband release read shorter though every audible band
+            // decays at the same rate. Narrow, long-ringing modes still read a few percent apart per
+            // seed, so a ratio past the flag is confirmed with nine more seeds before it counts.
+            const double rr = rates[ri];
+            const int nb = (int)(1.0 * rr), ns = (int)(8.0 * rr);
+            for (unsigned seed = seedFrom; seed <= seedTo; seed++)
+            {
+               auto rig = MakeRig(def, rr);
+               std::vector<float> in = Noise(nb, 0.1f, seed), z((size_t)ns, 0.0f), oL, oR, tL, tR;
+               DspMath::Biquad lp1, lp2;
+               lp1.SetLowpass(16000.0, 0.5412, rr);
+               lp2.SetLowpass(16000.0, 1.3066, rr);
+               for (float& v : in)
+                  v = lp2.Process(lp1.Process(v));
+               Process(*rig, in, in, oL, oR);
+               Process(*rig, z, z, tL, tR);
+               const double ref = std::sqrt(0.5 * (std::pow(Rms(oL, (size_t)(0.5 * rr), oL.size()), 2) +
+                                                   std::pow(Rms(oR, (size_t)(0.5 * rr), oR.size()), 2)));
+               const double rel = ref > 1e-6 ? ReleaseTime(tL, tR, 0, ref, 30.0, rr) : -1.0;
+               if (getenv("INFINITE_FXAUDIT_VERBOSE"))
+                  printf("FXAUDIT REL %-18s %.1f kHz seed %u: ref %.4f burst-end %.4f release %.3f s\n", fx.c_str(),
+                         rr / 1000.0, seed, ref,
+                         std::sqrt(0.5 * (std::pow(Rms(oL, oL.size() - (size_t)(0.05 * rr), oL.size()), 2) +
+                                          std::pow(Rms(oR, oR.size() - (size_t)(0.05 * rr), oR.size()), 2))),
+                         rel);
+               if (rel >= 0.0)
+               {
+                  relSum[ri] += rel;
+                  relCnt[ri]++;
+               }
+            }
+         };
          double lv[3][3] = {};
          for (int ri = 0; ri < 3; ri++)
          {
@@ -505,14 +546,8 @@ namespace
                for (int ti = 0; ti < 3; ti++)
                   lv[ri][ti] = Db(std::sqrt(pout[ti]) / std::max(1e-12, std::sqrt(pin[ti])) * 0.1);
             }
-            auto rig = MakeRig(def, rr);
-            const int nb = (int)(1.0 * rr), ns = (int)(8.0 * rr);
-            std::vector<float> in = Noise(nb, 0.1f, 3), z((size_t)ns, 0.0f), oL, oR, tL, tR;
-            Process(*rig, in, in, oL, oR);
-            Process(*rig, z, z, tL, tR);
-            const double ref = std::sqrt(0.5 * (std::pow(Rms(oL, (size_t)(0.5 * rr), oL.size()), 2) +
-                                                std::pow(Rms(oR, (size_t)(0.5 * rr), oR.size()), 2)));
-            relAt[ri] = ref > 1e-6 ? ReleaseTime(tL, tR, 0, ref, 30.0, rr) : -1.0;
+            addRelease(ri, 3u, 5u);
+            relAt[ri] = relCnt[ri] > 0 ? relSum[ri] / relCnt[ri] : -1.0;
          }
          if (getenv("INFINITE_FXAUDIT_VERBOSE"))
             for (int ri = 0; ri < 3; ri++)
@@ -525,11 +560,30 @@ namespace
             if (mx > -80.0)
                toneSpread = std::max(toneSpread, mx - mn);
          }
-         const double mx = std::max({ relAt[0], relAt[1], relAt[2] }), mn = std::min({ relAt[0], relAt[1], relAt[2] });
-         if (mn > 0.03)
-            relRatio = mx / mn;
-         else if (mx > 0.1 && mn <= 0.03)
-            relRatio = 99.0; // one rate rings, another does not
+         const auto ratioOf = [&]() {
+            const double mx = std::max({ relAt[0], relAt[1], relAt[2] }), mn = std::min({ relAt[0], relAt[1], relAt[2] });
+            if (mn > 0.03)
+               return mx / mn;
+            if (mx > 0.1)
+               return 99.0; // one rate rings, another does not
+            return 1.0;
+         };
+         // A release shorter than the 50 ms analysis window (shapers, filters) reads 0.04-0.06 s
+         // from one 12.5 ms step to the next: a ratio of two such numbers is not a rate drift.
+         const auto spreadOf = [&]() {
+            return std::max({ relAt[0], relAt[1], relAt[2] }) - std::min({ relAt[0], relAt[1], relAt[2] });
+         };
+         relRatio = ratioOf();
+         if (relRatio > kFlagRateTime && relRatio < 99.0 && spreadOf() >= kRelResolveS)
+         {
+            for (int ri = 0; ri < 3; ri++)
+            {
+               addRelease(ri, 6u, 14u);
+               relAt[ri] = relCnt[ri] > 0 ? relSum[ri] / relCnt[ri] : -1.0;
+            }
+            relRatio = ratioOf();
+         }
+         relSpreadS = spreadOf();
       }
 
       printf("FXAUDIT %-18s gain noise %+6.1f tone %+6.1f | corr %5.2f bal %+5.1f | dc %6.0f | tail %5.0f | cpu %6.0f ns"
@@ -613,7 +667,7 @@ namespace
       }
       if (toneSpread > kFlagRateDb)
          flag(fx, "rate", "tone level differs %.1f dB across 44.1/48/96 kHz", toneSpread);
-      if (relRatio > kFlagRateTime)
+      if (relRatio > kFlagRateTime && (relRatio >= 99.0 || relSpreadS >= kRelResolveS))
          flag(fx, "rate", "release time differs x%.2f across 44.1/48/96 kHz", relRatio);
       if (worstPeak > 4.0f)
          flag(fx, "stress", "peak %.1f under 0 dBFS input", worstPeak);
