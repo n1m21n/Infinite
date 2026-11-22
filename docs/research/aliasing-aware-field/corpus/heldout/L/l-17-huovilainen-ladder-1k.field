@@ -1,0 +1,24 @@
+# L set, kernel 17. Huovilainen, DAFx-04, eqs. (13)-(17) and (21): non-linear Moog ladder, normalised so 2 Vt = 1.
+#   ya += g (tanh(x - 4 r yd) - Wa);  yb += g (Wa - Wb);  yc += g (Wb - Wc);  yd += g (Wc - tanh(yd)),  W = tanh(y),
+#   g = 1 - exp(-2 pi Fc / Fs).  Fc = 1 kHz, Fs = 48 kHz -> g = 0.122690; r = 0.5.
+# tanh is not available at sample rate in Field, so every tanh is replaced by Yeh, Abel and Smith's eq. (19), n = 2.5
+# (x / (1 + |x|^2.5)^0.4), which that paper gives as a tanh-like curve. Run at the base rate, without the paper's 2x
+# oversampling and half-sample phase compensation.
+state float ya = 0
+state float yb = 0
+state float yc = 0
+state float yd = 0
+x = in * 2.0
+wa0 = ya / ((1.0 + (abs(ya) ^ 2.5)) ^ 0.4)
+wb0 = yb / ((1.0 + (abs(yb) ^ 2.5)) ^ 0.4)
+wc0 = yc / ((1.0 + (abs(yc) ^ 2.5)) ^ 0.4)
+wd0 = yd / ((1.0 + (abs(yd) ^ 2.5)) ^ 0.4)
+u = x - 4.0 * 0.5 * yd
+ya = ya + 0.122690 * (u / ((1.0 + (abs(u) ^ 2.5)) ^ 0.4) - wa0)
+wa = ya / ((1.0 + (abs(ya) ^ 2.5)) ^ 0.4)
+yb = yb + 0.122690 * (wa - wb0)
+wb = yb / ((1.0 + (abs(yb) ^ 2.5)) ^ 0.4)
+yc = yc + 0.122690 * (wb - wc0)
+wc = yc / ((1.0 + (abs(yc) ^ 2.5)) ^ 0.4)
+yd = yd + 0.122690 * (wc - wd0)
+out = yd * 0.8

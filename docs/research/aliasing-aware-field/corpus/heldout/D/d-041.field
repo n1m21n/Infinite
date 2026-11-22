@@ -1,0 +1,9 @@
+# D set, seed 20261122, kernel 041, shape adaa
+x = in * 2.147
+fx = log(1.0 + abs(((ceil((x * 1.628) * 15.83) / 15.83) / (1.134 + abs((ceil((x * 1.628) * 15.83) / 15.83))))))
+x1 = delay(x, 1)
+f1 = delay(fx, 1)
+dx = x - x1
+m = (x + x1) * 0.5
+gm = cos(cos(m * 1.207) * 3.661)
+out = if(abs(dx) < 0.01, gm, (fx - f1) / if(abs(dx) < 0.01, 1.0, dx)) * 0.5

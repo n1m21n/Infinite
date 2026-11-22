@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 050, shape combff
+x = in * 1.061
+w = log(1.0 + abs((x * 1.448)))
+out = (w + 0.606 * delay(w, 240)) * 0.5

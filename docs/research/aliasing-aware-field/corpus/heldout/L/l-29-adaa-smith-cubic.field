@@ -1,0 +1,13 @@
+# L set, kernel 29. Parker, Zavalishin and Le Bivic, DAFx-16, eqs. (9)-(10) (rectangular kernel) applied to Smith's
+# cubic soft clipper (PASP eq. 9.5). Antiderivative worked from the curve, with F0(0) = 0 as the paper advises:
+# F0 = x^2/2 - x^4/12 for |x| <= 1, (2/3)|x| - 1/4 otherwise.
+x = in * 4.0
+x1 = delay(x, 1)
+p = if(abs(x) <= 1.0, 0.5 * x * x - x * x * x * x / 12.0, 0.666667 * abs(x) - 0.25)
+q = if(abs(x1) <= 1.0, 0.5 * x1 * x1 - x1 * x1 * x1 * x1 / 12.0, 0.666667 * abs(x1) - 0.25)
+m = 0.5 * (x + x1)
+fm = if(m <= -1.0, -0.666667, if(m >= 1.0, 0.666667, m - m * m * m / 3.0))
+d = x - x1
+safe = if(abs(d) < 0.00001, 1.0, d)
+y = if(abs(d) < 0.00001, fm, (p - q) / safe)
+out = y * 0.7

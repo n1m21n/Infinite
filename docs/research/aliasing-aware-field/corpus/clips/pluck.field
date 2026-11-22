@@ -1,0 +1,10 @@
+# Phase 6 clip: pluck. Arpeggio A4, C#5, E5, A5 every 0.06 s; a triangle with a fast decay.
+state float tc = 0
+state float p = 0
+tc = tc + 1.0 / sr
+step = floor(tc / 0.06) % 4
+f = if(step < 0.5, 440.0, if(step < 1.5, 554.37, if(step < 2.5, 659.26, 880.0)))
+p = (p + f / sr) % 1.0
+tri = 1.0 - 4.0 * abs(p - 0.5)
+te = tc % 0.06
+out = tri * exp(-te * 35.0)

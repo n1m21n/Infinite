@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 139, shape post
+x = in * 1.781
+state float z = 0
+z = z + 0.1381 * (log(1.0 + abs(x)) - z)
+out = z * 0.5

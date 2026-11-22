@@ -1,0 +1,9 @@
+# D set, seed 20261122, kernel 023, shape adaa
+x = in * 3.819
+fx = (x * 1.257)
+x1 = delay(x, 1)
+f1 = delay(fx, 1)
+dx = x - x1
+m = (x + x1) * 0.5
+gm = m
+out = if(abs(dx) < 0.01, gm, (fx - f1) / if(abs(dx) < 0.01, 1.0, dx)) * 0.5

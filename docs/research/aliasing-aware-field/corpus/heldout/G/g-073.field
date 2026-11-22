@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 073, shape fb
+state float y = 0
+u = in * 1.186 + y * -0.834
+y = clamp(u - u * u * u / 3.0, -1.0, 1.0)
+out = if((exp(clamp(y, -6.0, 6.0)) - 1.0) > 0.1902, (1.0 - 2.0 / (exp(clamp(2.0 * y, -12.0, 12.0)) + 1.0)), (ceil(y * 10.75) / 10.75)) * 0.5

@@ -1,0 +1,4 @@
+# G set, seed 20261121, kernel 005, shape comb
+x = in * 1.886
+w = max(abs(log(1.0 + abs((x * 1.653)))), 0.4242)
+out = (w + -0.3294 * delay(w, 3)) * 0.5

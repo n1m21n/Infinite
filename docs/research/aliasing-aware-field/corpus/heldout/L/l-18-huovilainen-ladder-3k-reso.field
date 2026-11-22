@@ -1,0 +1,20 @@
+# L set, kernel 18. Huovilainen, DAFx-04, eqs. (13)-(17) and (21) as kernel 17, Fc = 3 kHz (g = 0.324768), r = 0.9
+# (near self-oscillation). tanh replaced by Yeh, Abel and Smith eq. (19), n = 2.5.
+state float ya = 0
+state float yb = 0
+state float yc = 0
+state float yd = 0
+x = in * 2.0
+wa0 = ya / ((1.0 + (abs(ya) ^ 2.5)) ^ 0.4)
+wb0 = yb / ((1.0 + (abs(yb) ^ 2.5)) ^ 0.4)
+wc0 = yc / ((1.0 + (abs(yc) ^ 2.5)) ^ 0.4)
+wd0 = yd / ((1.0 + (abs(yd) ^ 2.5)) ^ 0.4)
+u = x - 4.0 * 0.9 * yd
+ya = ya + 0.324768 * (u / ((1.0 + (abs(u) ^ 2.5)) ^ 0.4) - wa0)
+wa = ya / ((1.0 + (abs(ya) ^ 2.5)) ^ 0.4)
+yb = yb + 0.324768 * (wa - wb0)
+wb = yb / ((1.0 + (abs(yb) ^ 2.5)) ^ 0.4)
+yc = yc + 0.324768 * (wb - wc0)
+wc = yc / ((1.0 + (abs(yc) ^ 2.5)) ^ 0.4)
+yd = yd + 0.324768 * (wc - wd0)
+out = yd * 0.8

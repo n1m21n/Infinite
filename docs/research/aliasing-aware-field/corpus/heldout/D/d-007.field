@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 007, shape combff
+x = in * 2.145
+w = (ceil((x * 1.864) * 13.59) / 13.59)
+out = (w + -0.1313 * delay(w, 13)) * 0.5

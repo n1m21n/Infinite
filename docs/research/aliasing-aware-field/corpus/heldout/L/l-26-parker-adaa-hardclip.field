@@ -1,0 +1,12 @@
+# L set, kernel 26. Parker, Zavalishin and Le Bivic, DAFx-16: rectangular-kernel antiderivative antialiasing, eq. (9),
+# y = (F0(xn) - F0(xn-1)) / (xn - xn-1), with the eq. (10) fallback f((xn + xn-1)/2) when xn ~ xn-1, applied to the
+# hard clipper of eq. (24) with antiderivative eq. (25): F0 = x^2/2 for |x| <= 1, x sgn(x) - 1/2 otherwise.
+# Input gain 3 (their Fig. 4 uses 10). Fallback threshold 0.00001.
+x = in * 6.0
+x1 = delay(x, 1)
+p = if(abs(x) <= 1.0, 0.5 * x * x, abs(x) - 0.5)
+q = if(abs(x1) <= 1.0, 0.5 * x1 * x1, abs(x1) - 0.5)
+d = x - x1
+safe = if(abs(d) < 0.00001, 1.0, d)
+y = if(abs(d) < 0.00001, clamp(0.5 * (x + x1), -1.0, 1.0), (p - q) / safe)
+out = y * 0.5

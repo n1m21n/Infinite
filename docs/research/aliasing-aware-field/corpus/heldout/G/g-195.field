@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 195, shape pre
+state float z = 0
+z = z + 0.07475 * (in - z)
+x = z * 2.749
+out = cos(x * 2.806) * 0.5

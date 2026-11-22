@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 128, shape pre
+state float z = 0
+z = z + 0.07712 * (in - z)
+x = z * 2.65
+out = (exp(clamp(cos(x * 1.375), -6.0, 6.0)) - 1.0) * 0.5

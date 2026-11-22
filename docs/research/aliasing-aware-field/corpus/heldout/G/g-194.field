@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 194, shape pre
+state float z = 0
+z = z + 0.3294 * (in - z)
+x = z * 2.983
+out = (exp(clamp(if((ceil(x * 9.307) / 9.307) > -0.01136, max(x, 0.309), sqrt(abs(x))), -6.0, 6.0)) - 1.0) * 0.5

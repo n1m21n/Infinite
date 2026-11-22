@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 091, shape memoryless
+x = in * 1.271
+out = (log(1.0 + abs((exp(clamp((x * 1.962), -6.0, 6.0)) - 1.0))) / (1.845 + abs(log(1.0 + abs((exp(clamp((x * 1.962), -6.0, 6.0)) - 1.0)))))) * 0.5

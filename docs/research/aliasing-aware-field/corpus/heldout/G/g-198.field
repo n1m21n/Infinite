@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 198, shape pre
+state float z = 0
+z = z + 0.2436 * (in - z)
+x = z * 1.293
+out = sqrt(abs(if(x > 0.1684, ((x * 0.561) * (x * 2.919)), (floor(x * 4.086) / 4.086)))) * 0.5

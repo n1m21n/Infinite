@@ -1,0 +1,10 @@
+# Phase 7 clip: organ chord. D3, F3, A3, C4 as square-ish voices (x / (1 + |x|) of a sine times 6).
+state float pa = 0
+state float pb = 0
+state float pc = 0
+state float pd = 0
+pa = (pa + 146.83 / sr) % 1.0
+pb = (pb + 174.61 / sr) % 1.0
+pc = (pc + 220.0 / sr) % 1.0
+pd = (pd + 261.63 / sr) % 1.0
+out = (sin(6.28318 * pa) * 6.0) / (1.0 + abs(sin(6.28318 * pa) * 6.0)) + (sin(6.28318 * pb) * 6.0) / (1.0 + abs(sin(6.28318 * pb) * 6.0)) + (sin(6.28318 * pc) * 6.0) / (1.0 + abs(sin(6.28318 * pc) * 6.0)) + (sin(6.28318 * pd) * 6.0) / (1.0 + abs(sin(6.28318 * pd) * 6.0))

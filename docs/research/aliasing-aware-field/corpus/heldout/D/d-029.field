@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 029, shape combff
+x = in * 1.763
+w = max((exp(clamp((x * 1.599), -6.0, 6.0)) - 1.0), -0.1958)
+out = (w + -0.5164 * delay(w, 480)) * 0.5

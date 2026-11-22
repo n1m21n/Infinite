@@ -1,0 +1,6 @@
+# L set, kernel 05. Enderby and Baracskai, DAFx-12, eq. (5): cubic soft clipping.
+# y = sgn(x) for |x| > 2/3, 9x/4 - 27x^3/16 otherwise.
+x = in * 2.0
+s = if(x < 0, -1.0, 1.0)
+y = if(abs(x) > 0.6667, s, 2.25 * x - 1.6875 * x * x * x)
+out = y * 0.5

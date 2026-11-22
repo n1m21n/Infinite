@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 021, shape predel
+x = in * 2.332
+xd = delay(x, 240)
+out = if(xd > 0.2546, (xd * 2.788), ((xd + 8.0) % 1.0 - 0.5)) * 0.5

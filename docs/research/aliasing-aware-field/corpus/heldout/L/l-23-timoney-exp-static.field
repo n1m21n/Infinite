@@ -1,0 +1,4 @@
+# L set, kernel 23. Timoney and Lazzarini, Forum Acusticum 2011, eq. (2): g(x) = sgn(x) A (1 - exp(-c |x|)), A = 1,
+# c = 9 (upper part of the 1..12 range they plot).
+x = in * 1.0
+out = if(x < 0, -1.0, 1.0) * (1.0 - exp(-9.0 * abs(x))) * 0.5

@@ -1,0 +1,13 @@
+# L set, kernel 28. Parker, Zavalishin and Le Bivic, DAFx-16, Fig. 8: an antialiased nonlinearity (eq. 9, rectangular
+# kernel, hard clipper eqs. 24-25, fallback eq. 10) followed by a one-pole lowpass. The lowpass is a plain one-pole at
+# 2 kHz (g = 1 - exp(-2 pi 2000 / 48000) = 0.230329), not the paper's delay-eliminated form of Figs. 9-10.
+state float y = 0
+x = in * 6.0
+x1 = delay(x, 1)
+p = if(abs(x) <= 1.0, 0.5 * x * x, abs(x) - 0.5)
+q = if(abs(x1) <= 1.0, 0.5 * x1 * x1, abs(x1) - 0.5)
+d = x - x1
+safe = if(abs(d) < 0.00001, 1.0, d)
+c = if(abs(d) < 0.00001, clamp(0.5 * (x + x1), -1.0, 1.0), (p - q) / safe)
+y = y + 0.230329 * (c - y)
+out = y * 0.6

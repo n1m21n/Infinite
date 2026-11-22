@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 111, shape memoryless
+x = in * 2.394
+out = (ceil(x * 14.45) / 14.45) * 0.5

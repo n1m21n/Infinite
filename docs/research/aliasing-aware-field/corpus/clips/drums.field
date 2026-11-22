@@ -1,0 +1,18 @@
+# Phase 6 clip: drums. Kick every 0.17 s, snare between, hats on sixteenths.
+# Noise is a logistic map (the sample domain has no rand outside Field Notes).
+state float tc = 0
+state float kp = 0
+state float r = 0.4123
+state float hp = 0
+tc = tc + 1.0 / sr
+tk = tc % 0.17
+kp = kp + (48.0 + 140.0 * exp(-tk * 45.0)) / sr
+kick = sin(6.28318 * kp) * exp(-tk * 16.0)
+r = 3.99 * r * (1.0 - r)
+nz = r * 2.0 - 1.0
+ts = (tc + 0.085) % 0.17
+snare = (nz * 0.6 + sin(6.28318 * 190.0 * ts) * 0.4) * exp(-ts * 28.0)
+hp = hp + 0.55 * (nz - hp)
+th = tc % 0.0425
+hat = (nz - hp) * exp(-th * 110.0) * 0.4
+out = kick * 0.8 + snare * 0.45 + hat

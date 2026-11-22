@@ -1,0 +1,5 @@
+# L set, kernel 03. Enderby and Baracskai, DAFx-12, eq. (3), E = 5 (Exp5): exponential soft clipping.
+x = in * 2.0
+s = if(x < 0, -1.0, 1.0)
+y = if(abs(x) > 0.6667, s, s * (1.0 - (abs(1.5 * x - s) ^ 5.0)))
+out = y * 0.5

@@ -1,0 +1,74 @@
+FIELDRATE cost model (ns per base sample, INFINITE_FIELDRATE_COST): run 0.0, per instr 3.50, up 2/4/8/16/32 11/23/47/135/231, down 10/23/49/129/233
+FIELDRATE kernel                         class    whole     cost plan                       cost  saving    node   whole  staged   devW   devS    ms W    ms S
+FIELDRATE poly d2 a0.5                   poly     skipped: clean at 1x
+FIELDRATE poly d2 a1                     poly     skipped: clean at 1x
+FIELDRATE poly d3 cubic clip drive 1     poly     skipped: clean at 1x
+FIELDRATE poly d3 cubic clip drive 2     poly     skipped: clean at 1x
+FIELDRATE poly d5                        poly     skipped: clean at 1x
+FIELDRATE poly d7                        poly        2x       84 1x6|2x1|1x3                  76      9%  -137.3  -137.3  -137.0 -167.4 -152.1      12      23  pred -149.6, 2 cands, 4 sets, 0.06 s
+FIELDRATE poly d9 cubic of cubic         chain       2x      119 1x10|2x2|1x3                 90     24%  -138.1  -138.1  -137.9 -142.4  -46.4      12      22  pred -148.4, 6 cands, 42 sets, 0.80 s
+FIELDRATE poly d27 cubic x3              chain       2x      154 1x10|2x7|1x3                126     19%  -137.9  -137.9  -137.9 -159.4  -44.6      13      23  pred -148.9, 8 cands, 93 sets, 1.70 s
+FIELDRATE tanh drive 1                   analytic skipped: clean at 1x
+FIELDRATE tanh drive 2                   analytic    2x      119 1x7|2x6|1x2                  94     21%  -137.9  -137.9  -137.3 -152.8 -166.5      12      28  pred -150.8, 4 cands, 15 sets, 0.23 s
+FIELDRATE tanh drive 4                   analytic    2x      119 1x7|2x6|1x2                  94     21%  -103.3  -103.3  -103.3 -154.2 -149.5      12      18  pred -103.3, 4 cands, 15 sets, 0.20 s
+FIELDRATE tanh drive 8                   analytic    4x      242 1x7|4x6|1x2                 162     33%  -117.9  -117.9  -117.9 -160.6 -149.4      21      40  pred -117.9, 4 cands, 15 sets, 0.34 s
+FIELDRATE sin fold drive 1               analytic skipped: clean at 1x
+FIELDRATE sin fold drive 2               analytic    2x       84 1x7|2x1|1x2                  60     29%  -133.7  -133.7  -132.9 -145.1 -144.1      11      17  pred -138.6, 2 cands, 4 sets, 0.07 s
+FIELDRATE sin fold drive 4               analytic    2x       84 1x7|2x1|1x2                  60     29%  -113.3  -113.3  -113.0 -148.9 -140.7      11      19  pred -113.3, 2 cands, 4 sets, 0.07 s
+FIELDRATE sin fold drive 8               analytic    4x      172 1x7|4x1|1x2                  92     47%  -124.0  -124.0  -118.1 -141.0 -148.3      18      24  pred -123.1, 2 cands, 4 sets, 0.07 s
+FIELDRATE rational x/(1+|x|) drive 2     kink        8x      376 1x6|8x3|1x2                 236     37%   -93.3   -93.3   -93.3 -149.7 -158.1      29      37  pred -93.3, 4 cands, 15 sets, 0.28 s
+FIELDRATE rational x/(1+|x|) drive 8     kink       16x      824 1x6|16x3|1x2                516     37%   -92.5   -92.5   -92.5 -150.6 -148.7      72      91  pred -92.5, 4 cands, 15 sets, 0.33 s
+FIELDRATE abs mix                        kink       16x      656 1x5|16x1|1x2                612      7%   -84.9   -84.9   -84.9 -143.0 -151.3      59     136  pred -84.9, 2 cands, 4 sets, 0.09 s
+FIELDRATE half-wave max                  kink       16x      712 1x7|16x2                    592     17%   -84.9   -84.9   -84.9 -143.0 -150.9      60     116  pred -84.9, 2 cands, 4 sets, 0.08 s
+FIELDRATE hard clip drive 1              kink       16x      712 1x8|16x1                    516     28%   -84.7   -84.7   -84.7 -144.3 -146.4      66      85  pred -84.8, 1 cands, 2 sets, 0.02 s
+FIELDRATE hard clip drive 2              kink       32x     1360 1x8|32x1                    940     31%   -88.9   -88.9   -88.9 -372.3 -158.9     101     135  pred -88.9, 1 cands, 2 sets, 0.03 s
+FIELDRATE hard clip drive 4              kink       32x     1360 1x8|32x1                    940     31%   -82.0   -82.0   -82.0 -372.5 -150.2     102     137  pred -82.1, 1 cands, 2 sets, 0.03 s
+FIELDRATE hard clip drive 8              kink     skipped: no factor within 32x
+FIELDRATE quantize 4 steps               jump     skipped: no factor within 32x
+FIELDRATE quantize 16 steps              jump     skipped: no factor within 32x
+FIELDRATE comparator square + dry        jump     skipped: no factor within 32x
+FIELDRATE wrap fold mod                  jump     skipped: no factor within 32x
+FIELDRATE dump ideal resamplers: plan -74.0 dB, whole at 32x -134.6 dB
+FIELDRATE dump seg 0 at 2x, [0,17) in: out: r15 pred -99.2 dB
+FIELDRATE dump    op  2 r34 <- r0 r0 r0 imm 0
+FIELDRATE dump    op  1 r0 <- r0 r0 r0 imm 0
+FIELDRATE dump    op 24 r1 <- r34 r0 r0 imm 0
+FIELDRATE dump    op  1 r2 <- r0 r0 r0 imm 4
+FIELDRATE dump    op 27 r3 <- r1 r2 r0 imm 0
+FIELDRATE dump    op  1 r4 <- r0 r0 r0 imm 2
+FIELDRATE dump    op 27 r5 <- r4 r3 r0 imm 0
+FIELDRATE dump    op 49 r6 <- r5 r0 r0 imm 0
+FIELDRATE dump    op  1 r7 <- r0 r0 r0 imm 1
+FIELDRATE dump    op 26 r8 <- r6 r7 r0 imm 0
+FIELDRATE dump    op  1 r9 <- r0 r0 r0 imm 1
+FIELDRATE dump    op 25 r10 <- r6 r9 r0 imm 0
+FIELDRATE dump    op 28 r11 <- r8 r10 r0 imm 0
+FIELDRATE dump    op  1 r12 <- r0 r0 r0 imm 4
+FIELDRATE dump    op 27 r13 <- r11 r12 r0 imm 0
+FIELDRATE dump    op  1 r14 <- r0 r0 r0 imm 2
+FIELDRATE dump    op 27 r15 <- r14 r13 r0 imm 0
+FIELDRATE dump seg 1 at 4x, [17,27) in: r15 out: r25 pred -80.6 dB
+FIELDRATE dump    op 49 r16 <- r15 r0 r0 imm 0
+FIELDRATE dump    op  1 r17 <- r0 r0 r0 imm 1
+FIELDRATE dump    op 26 r18 <- r16 r17 r0 imm 0
+FIELDRATE dump    op  1 r19 <- r0 r0 r0 imm 1
+FIELDRATE dump    op 25 r20 <- r16 r19 r0 imm 0
+FIELDRATE dump    op 28 r21 <- r18 r20 r0 imm 0
+FIELDRATE dump    op  1 r22 <- r0 r0 r0 imm 4
+FIELDRATE dump    op 27 r23 <- r21 r22 r0 imm 0
+FIELDRATE dump    op  1 r24 <- r0 r0 r0 imm 2
+FIELDRATE dump    op 27 r25 <- r24 r23 r0 imm 0
+FIELDRATE dump seg 2 at 8x, [27,33) in: r25 out: r31 pred -108.0 dB
+FIELDRATE dump    op 49 r26 <- r25 r0 r0 imm 0
+FIELDRATE dump    op  1 r27 <- r0 r0 r0 imm 1
+FIELDRATE dump    op 26 r28 <- r26 r27 r0 imm 0
+FIELDRATE dump    op  1 r29 <- r0 r0 r0 imm 1
+FIELDRATE dump    op 25 r30 <- r26 r29 r0 imm 0
+FIELDRATE dump    op 28 r31 <- r28 r30 r0 imm 0
+FIELDRATE dump seg 3 at 1x, [33,35) in: r31 out: pred -154.4 dB
+FIELDRATE dump    op  1 r32 <- r0 r0 r0 imm 0.5
+FIELDRATE dump    op 27 r33 <- r31 r32 r0 imm 0
+FIELDRATE tanh x3 chain drive 4          chain      32x     4272 2x17|4x10|8x6|1x2           597      0%  -136.0  -136.0   -43.0 -374.5  -33.1     206      71  pred -80.5, 8 cands, 93 sets, 0.89 s
+FIELDRATE tanh x3 vs fixed 8x: 8x cost 1048, alias -46.1 dB; staged cost 597, alias -43.0 dB  staged does not beat 8x
+FIELDRATE clip then cubic                chain       8x      516 1x8|8x8                     432     16%   -97.3   -97.3   -97.3 -153.1 -170.6      33      42  pred -97.3, 4 cands, 15 sets, 0.29 s
+FIELDRATE tanh feedback 0.3              feedback    2x      154 2x17|1x3                    154      0%  -135.6  -135.6  -135.6  -33.9  -33.9      13      15  pred -137.7, 1 cands, 2 sets, 0.90 s

@@ -1,0 +1,8 @@
+# L set, kernel 16. Yeh, Abel and Smith, DAFx-07 ("Simulation of the diode limiter"), section 2.1.8: the ODE replaced
+# by a first-order lowpass at the RC corner (1/(2 pi R C) = 7.23 kHz, bilinear at 48 kHz) before a static nonlinearity.
+# The static curve is eq. (19) of the companion paper ("Simplified, physically-informed models"), n = 2.5, 0.6 V drop.
+state float p = 0
+vi = in * 4.0
+p = 0.321337 * (vi + delay(vi, 1)) + 0.357326 * p
+w = p / 0.6
+out = 0.6 * w / ((1.0 + (abs(w) ^ 2.5)) ^ 0.4)

@@ -1,0 +1,16 @@
+# L set, kernel 25. Dattorro, JAES 1997, Fig. 18 and eqs. (28)-(29), and his footnote that two cascaded Chamberlin
+# sections approximate a Moog-style four-pole lowpass: fc = 1.5 kHz, Q = 2 -> Fc = 0.196034, Qc = 0.5 (Fs = 48 kHz).
+# Input drive through Enderby and Baracskai's cubic soft clipper, DAFx-12 eq. (5). Composite of two papers.
+state float l1 = 0
+state float b1 = 0
+state float l2 = 0
+state float b2 = 0
+v = in * 2.0
+x = if(abs(v) > 0.6667, if(v < 0, -1.0, 1.0), 2.25 * v - 1.6875 * v * v * v)
+l1 = l1 + 0.196034 * b1
+h1 = x - l1 - 0.5 * b1
+b1 = b1 + 0.196034 * h1
+l2 = l2 + 0.196034 * b2
+h2 = l1 - l2 - 0.5 * b2
+b2 = b2 + 0.196034 * h2
+out = l2 * 0.5

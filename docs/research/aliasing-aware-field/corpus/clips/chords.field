@@ -1,0 +1,15 @@
+# Phase 6 clip: chords. A minor triad (A3, C4, E4), each voice a fundamental plus two partials,
+# slow attack like a pad.
+state float tc = 0
+state float pa = 0
+state float pc = 0
+state float pe = 0
+tc = tc + 1.0 / sr
+pa = (pa + 220.0 / sr) % 1.0
+pc = (pc + 261.63 / sr) % 1.0
+pe = (pe + 329.63 / sr) % 1.0
+va = sin(6.28318 * pa) + 0.5 * sin(12.56637 * pa) + 0.25 * sin(18.84956 * pa)
+vc = sin(6.28318 * pc) + 0.5 * sin(12.56637 * pc) + 0.25 * sin(18.84956 * pc)
+ve = sin(6.28318 * pe) + 0.5 * sin(12.56637 * pe) + 0.25 * sin(18.84956 * pe)
+env = 1.0 - exp(-tc * 18.0)
+out = (va + vc + ve) * env

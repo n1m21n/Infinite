@@ -1,0 +1,73 @@
+{
+  "_comment": "Every entry was opened and checked on 2026-11-21 (see docs/prior-art/2026-11-21-auto-oversampling-and-zdf.md). Fields a source does not show are left out, never guessed.",
+  "parker2016": {
+    "authors": "J. D. Parker, V. Zavalishin and E. Le Bivic",
+    "title": "Reducing the aliasing of nonlinear waveshaping using continuous-time convolution",
+    "venue": "Proc. 19th Int. Conf. on Digital Audio Effects (DAFx-16), Brno",
+    "year": "2016",
+    "url": "https://dafx.de/paper-archive/details/vem_XXF5qBbfiWOH2RVVAA"
+  },
+  "bilbao2017": {
+    "authors": "S. Bilbao, F. Esqueda, J. D. Parker and V. Välimäki",
+    "title": "Antiderivative antialiasing for memoryless nonlinearities",
+    "venue": "IEEE Signal Processing Letters, vol. 24, no. 7, pp. 1049–1053",
+    "year": "2017",
+    "url": "https://doi.org/10.1109/LSP.2017.2675541"
+  },
+  "holters2020": {
+    "authors": "M. Holters",
+    "title": "Antiderivative antialiasing for stateful systems",
+    "venue": "Applied Sciences, vol. 10, no. 1, art. 20",
+    "year": "2020",
+    "url": "https://doi.org/10.3390/app10010020"
+  },
+  "mikkonen2025": {
+    "authors": "O. Mikkonen and K. J. Werner",
+    "title": "Antiderivative antialiasing for recurrent neural networks",
+    "venue": "Proc. 28th Int. Conf. on Digital Audio Effects (DAFx25), Ancona",
+    "year": "2025",
+    "url": "https://dafx.de/paper-archive/2025/DAFx25_paper_72.pdf"
+  },
+  "gabrielli2026": {
+    "authors": "L. Gabrielli and S. Squartini",
+    "title": "PolyADAA: improving aliasing reduction in memoryless nonlinearities using Lagrange interpolation and polynomial approximation",
+    "venue": "Proc. 29th Int. Conf. on Digital Audio Effects (DAFx26), Cambridge, MA",
+    "year": "2026",
+    "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_47.pdf"
+  },
+  "herrou2024": {
+    "authors": "A. Herrou, F. de Dinechin, S. Letz, Y. Orlarey and A. Volkova",
+    "title": "Towards fixed-point formats determination for Faust programs",
+    "venue": "Journées d'Informatique Musicale (JIM), Marseille; arXiv:2403.06527",
+    "year": "2024",
+    "url": "https://doi.org/10.48550/arXiv.2403.06527"
+  },
+  "orlarey2024": {
+    "authors": "Y. Orlarey and S. Letz",
+    "title": "The future of Faust: ondemand and co.",
+    "venue": "International Faust Conference (IFC 2024), slides",
+    "year": "2024",
+    "url": "https://faust.grame.fr/community/ifc/2024/Ondemand.pdf"
+  },
+  "rbj2013": {
+    "authors": "R. Bristow-Johnson",
+    "title": "Re: Interpolation on WaveShaperNode?",
+    "venue": "W3C public-audio mailing list, 13 May",
+    "year": "2013",
+    "url": "https://lists.w3.org/Archives/Public/public-audio/2013AprJun/0365.html"
+  },
+  "thornburg": {
+    "authors": "H. Thornburg",
+    "title": "Sampling rate estimation techniques in the discretization of nonlinear systems",
+    "venue": "CCRMA DSP seminar abstract, Stanford (Autumn 1998–1999 listing)",
+    "year": "",
+    "url": "https://ccrma.stanford.edu/~jos/mus423h/Sampling_Rate_Estimation_Techniques.html"
+  },
+  "spearman1904": {
+    "authors": "C. Spearman",
+    "title": "The proof and measurement of association between two things",
+    "venue": "The American Journal of Psychology, vol. 15, no. 1, p. 72 ff.",
+    "year": "1904",
+    "url": "https://doi.org/10.2307/1412159"
+  }
+}

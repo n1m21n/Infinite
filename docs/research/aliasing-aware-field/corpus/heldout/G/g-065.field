@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 065, shape post
+x = in * 3.424
+state float z = 0
+z = z + 0.2941 * ((ceil((x * 0.9414) * 5.016) / 5.016) - z)
+out = z * 0.5

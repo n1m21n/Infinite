@@ -1,0 +1,8 @@
+# Phase 7 clip: sub bass. 55 Hz then 41.2 Hz, a sine plus a soft square (x / (1 + |x|) of a sine).
+state float tc = 0
+state float p = 0
+tc = tc + 1.0 / sr
+f = if(tc % 0.17 < 0.085, 55.0, 41.2)
+p = (p + f / sr) % 1.0
+s = sin(6.28318 * p)
+out = s * 0.7 + (s * 4.0) / (1.0 + abs(s * 4.0)) * 0.3

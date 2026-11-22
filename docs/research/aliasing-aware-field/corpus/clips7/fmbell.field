@@ -1,0 +1,10 @@
+# Phase 7 clip: FM bell. Carrier 660 Hz, modulator 1.4 x, index decaying from 6; strikes every 0.11 s.
+state float tc = 0
+state float pc = 0
+state float pm = 0
+tc = tc + 1.0 / sr
+te = tc % 0.11
+pm = (pm + 924.0 / sr) % 1.0
+idx = 6.0 * exp(-te * 20.0)
+pc = (pc + 660.0 / sr) % 1.0
+out = sin(6.28318 * pc + idx * sin(6.28318 * pm)) * exp(-te * 14.0)

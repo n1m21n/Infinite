@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 003, shape predel
+x = in * 3.188
+xd = delay(x, 101)
+out = cos(min((x * 1.361), 0.05341) * 1.427) * 0.5

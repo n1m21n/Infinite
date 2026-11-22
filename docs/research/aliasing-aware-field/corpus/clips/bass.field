@@ -1,0 +1,12 @@
+# Phase 6 clip: bass. A saw line (A1, D2, E2, C2), one-pole low-passed, with a plucked envelope.
+state float tc = 0
+state float p = 0
+state float lp = 0
+tc = tc + 1.0 / sr
+step = floor(tc / 0.085) % 4
+f = if(step < 0.5, 55.0, if(step < 1.5, 73.42, if(step < 2.5, 82.41, 65.41)))
+p = (p + f / sr) % 1.0
+saw = 2.0 * p - 1.0
+te = tc % 0.085
+lp = lp + (0.08 + 0.3 * exp(-te * 30.0)) * (saw - lp)
+out = lp * (0.4 + 0.6 * exp(-te * 12.0))

@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 135, shape pre
+state float z = 0
+z = z + 0.5349 * (in - z)
+x = z * 2.814
+out = sqrt(abs((1.0 - 2.0 / (exp(clamp(2.0 * (x * 2.661), -12.0, 12.0)) + 1.0)))) * 0.5

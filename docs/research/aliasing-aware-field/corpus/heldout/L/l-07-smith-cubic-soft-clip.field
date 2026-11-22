@@ -1,0 +1,5 @@
+# L set, kernel 07. Smith, Physical Audio Signal Processing (CCRMA), "Soft Clipping", eq. (9.5).
+# f(x) = -2/3 for x <= -1, x - x^3/3 for -1 <= x <= 1, 2/3 for x >= 1.
+x = in * 2.0
+y = if(x <= -1.0, -0.6667, if(x >= 1.0, 0.6667, x - x * x * x / 3.0))
+out = y * 0.7

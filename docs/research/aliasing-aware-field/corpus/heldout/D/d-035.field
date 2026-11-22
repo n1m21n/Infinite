@@ -1,0 +1,7 @@
+# D set, seed 20261122, kernel 035, shape dfb
+state float y = 0
+yp = y
+d = delay(yp, 61)
+u = in * 2.779 + d * -0.7154
+y = sin(u)
+out = (((y * 1.951) + 8.0) % 1.0 - 0.5) * 0.5

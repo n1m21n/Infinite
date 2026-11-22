@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 079, shape post
+x = in * 0.557
+state float z = 0
+z = z + 0.4116 * (max((tan(clamp(x, -1.2, 1.2)) * (x * 1.771)), -0.3486) - z)
+out = z * 0.5

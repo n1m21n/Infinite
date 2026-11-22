@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 201, shape memoryless
+x = in * 2.595
+out = sin(x * 3.179) * 0.5

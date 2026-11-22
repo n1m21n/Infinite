@@ -1,0 +1,23 @@
+# L set, kernel 27. Parker, Zavalishin and Le Bivic, DAFx-16: triangular (linear) kernel, eq. (14), with the fallbacks
+# of eqs. (15)-(16), on the hard clipper eq. (24): F0 from eq. (25), F1 (antiderivative of x f(x)) from eq. (26):
+# F1 = x^3/3 for |x| <= 1, (x^2/2 - 1/6) sgn(x) otherwise.
+#   y = [xn (F0(xn) - F0(xn-1)) - (F1(xn) - F1(xn-1))] / (xn - xn-1)^2
+#     + [xn-2 (F0(xn-2) - F0(xn-1)) - (F1(xn-2) - F1(xn-1))] / (xn-2 - xn-1)^2
+# Fallbacks: first term -> f((xn + 2 xn-1)/3)/2, second -> f((xn-2 + 2 xn-1)/3)/2. Threshold 0.01: the 1/(dx)^2 terms lose float32 precision for smaller steps (the paper, sec. 3.1, warns of this ill-conditioning).
+# F0 and F1 are computed once per sample and their past values reused through delay(), as the paper suggests (sec. 3).
+x0 = in * 6.0
+x1 = delay(x0, 1)
+x2 = delay(x0, 2)
+p0 = if(abs(x0) <= 1.0, 0.5 * x0 * x0, abs(x0) - 0.5)
+r0 = if(abs(x0) <= 1.0, x0 * x0 * x0 / 3.0, (0.5 * x0 * x0 - 0.166667) * if(x0 < 0, -1.0, 1.0))
+p1 = delay(p0, 1)
+p2 = delay(p0, 2)
+r1 = delay(r0, 1)
+r2 = delay(r0, 2)
+da = x0 - x1
+db = x2 - x1
+sa = if(abs(da) < 0.01, 1.0, da * da)
+sb = if(abs(db) < 0.01, 1.0, db * db)
+ta = if(abs(da) < 0.01, 0.5 * clamp((x0 + 2.0 * x1) / 3.0, -1.0, 1.0), (x0 * (p0 - p1) - (r0 - r1)) / sa)
+tb = if(abs(db) < 0.01, 0.5 * clamp((x2 + 2.0 * x1) / 3.0, -1.0, 1.0), (x2 * (p2 - p1) - (r2 - r1)) / sb)
+out = (ta + tb) * 0.5

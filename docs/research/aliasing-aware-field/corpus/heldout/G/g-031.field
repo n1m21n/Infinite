@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 031, shape memoryless
+x = in * 3.585
+out = abs(cos(x * 3.726)) * 0.5

@@ -1,0 +1,13 @@
+# L set, kernel 31. Parker, Zavalishin and Le Bivic, DAFx-16, eqs. (9)-(10) applied to Timoney and Lazzarini's
+# exponential saturator (Forum Acusticum 2011 eq. 2), A = 1, c = 3. Antiderivative worked from the curve:
+# F0 = |x| + (exp(-c|x|) - 1)/c (F0(0) = 0).
+x = in * 2.0
+x1 = delay(x, 1)
+p = abs(x) + (exp(-3.0 * abs(x)) - 1.0) / 3.0
+q = abs(x1) + (exp(-3.0 * abs(x1)) - 1.0) / 3.0
+m = 0.5 * (x + x1)
+fm = if(m < 0, -1.0, 1.0) * (1.0 - exp(-3.0 * abs(m)))
+d = x - x1
+safe = if(abs(d) < 0.00001, 1.0, d)
+y = if(abs(d) < 0.00001, fm, (p - q) / safe)
+out = y * 0.5

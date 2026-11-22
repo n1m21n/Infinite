@@ -1,0 +1,12 @@
+# L set, kernel 24. Dattorro, "Effect Design Part 1", JAES 45(9), 1997, Fig. 18 and eqs. (28)-(29): Chamberlin state-
+# variable filter, Fc = 2 sin(pi fc / Fs), Qc = 1/Q; fc = 1 kHz, Q = 4, Fs = 48 kHz -> Fc = 0.130806, Qc = 0.25.
+# Dattorro notes the internal state can be clipped (his footnote on overflow); here the bandpass state passes through
+# Smith's cubic soft clipper (PASP eq. 9.5): x - x^3/3 on [-1, 1], +-2/3 beyond.
+state float lp = 0
+state float bp = 0
+x = in * 1.0
+lp = lp + 0.130806 * bp
+hp = x - lp - 0.25 * bp
+b = bp + 0.130806 * hp
+bp = if(b <= -1.0, -0.6667, if(b >= 1.0, 0.6667, b - b * b * b / 3.0))
+out = lp * 0.6

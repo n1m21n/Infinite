@@ -1,0 +1,4 @@
+# G set, seed 20261121, kernel 203, shape comb
+x = in * 2.89
+w = max(clamp((x * 2.201), -0.5689, 0.5689), 0.3516)
+out = (w + -0.515 * delay(w, 61)) * 0.5

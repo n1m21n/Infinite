@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 076, shape memoryless
+x = in * 3.202
+out = log(1.0 + abs((x * 2.231))) * 0.5

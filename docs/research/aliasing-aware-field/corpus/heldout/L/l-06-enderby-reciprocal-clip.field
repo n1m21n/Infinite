@@ -1,0 +1,6 @@
+# L set, kernel 06. Enderby and Baracskai, DAFx-12, eq. (6): reciprocal soft clipping.
+# y = sgn(x) (1 - 1 / (|30x| + 1)).
+x = in * 1.0
+s = if(x < 0, -1.0, 1.0)
+y = s * (1.0 - 1.0 / (abs(30.0 * x) + 1.0))
+out = y * 0.5

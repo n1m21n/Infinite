@@ -1,0 +1,37 @@
+pairs 1764 (147 kernels x clips); silent, left out: 0
+needed factor: 1x 282, 2x 289, 4x 188, 8x 160, 16x 132, 32x 110, none 603
+
+predictor   pairs  enough        exact
+P0           1764   1490 ( 84.5%)    845 ( 47.9%)
+rule A       1764    919 ( 52.1%)    160 (  9.1%)
+P1           1680   1656 ( 98.6%)    670 ( 39.9%)
+P6           1764   1253 ( 71.0%)   1186 ( 67.2%)
+
+enough by source: P0  rule A  P1  P6
+  bass      93.5% (40.8% exact)   62.9% ( 9.5% exact)   98.9% (29.6% exact)   45.9% (40.1% exact)
+  chords    97.3% (31.6% exact)   69.4% ( 6.1% exact)   99.3% (20.0% exact)   93.9% (87.8% exact)
+  drums     79.3% (61.6% exact)   45.2% (13.9% exact)   99.3% (47.9% exact)   72.8% (71.8% exact)
+  noise     61.6% (53.1% exact)   30.6% ( 7.8% exact)   95.7% (68.2% exact)   86.4% (83.0% exact)
+  pluck     93.2% (41.5% exact)   60.2% ( 6.8% exact)   99.3% (30.4% exact)   58.8% (55.4% exact)
+  sweep     82.0% (58.8% exact)   44.2% (10.2% exact)   98.9% (43.2% exact)   68.4% (65.3% exact)
+
+enough by level: P0  rule A  P1  P6
+  hi        76.9% (44.9% exact)   46.1% (10.3% exact)   97.1% (45.1% exact)   67.9% (64.3% exact)
+  lo        92.1% (50.9% exact)   58.0% ( 7.8% exact)  100.0% (34.6% exact)   74.1% (70.2% exact)
+
+P6 declined, fell back to P0: 41 of 1764 pairs
+H5 enough 71.0% (bar 90%) FAIL; exact 67.2% (bar 70%) FAIL; enough 1253 vs P0 1490 FAIL  => H5 FAIL
+P6 short on 511 pairs; over on 67
+  D/d-045                          bass-lo   P6 1x needs 32x: -10.6 dB at P6's factor (+69.4 dB over)
+  D/d-018                          pluck-lo  P6 4x needs 32x: -16.2 dB at P6's factor (+63.8 dB over)
+  D/d-045                          pluck-lo  P6 2x needs 32x: -18.3 dB at P6's factor (+61.7 dB over)
+  D/d-018                          bass-lo   P6 2x needs 32x: -18.8 dB at P6's factor (+61.2 dB over)
+  D/d-057                          bass-lo   P6 2x needs 32x: -20.5 dB at P6's factor (+59.5 dB over)
+  D/d-045                          bass-hi   P6 4x needs none: -23.1 dB at P6's factor (+56.9 dB over)
+  D/d-018                          chords-lo P6 2x needs 4x: -23.4 dB at P6's factor (+56.6 dB over)
+  D/d-045                          pluck-hi  P6 8x needs none: -23.6 dB at P6's factor (+56.4 dB over)
+  D/d-045                          sweep-lo  P6 8x needs none: -25.2 dB at P6's factor (+54.8 dB over)
+  D/d-057                          pluck-lo  P6 4x needs 32x: -25.4 dB at P6's factor (+54.6 dB over)
+  D/d-044                          bass-lo   P6 4x needs none: -26.3 dB at P6's factor (+53.7 dB over)
+  D/d-044                          pluck-lo  P6 8x needs none: -27.7 dB at P6's factor (+52.3 dB over)
+CPU on the 1142 pairs with a finite need and P6 factor: P6 6623 vs need 8132 vs P0 16002 vs rule A 9136 (sum of factors)

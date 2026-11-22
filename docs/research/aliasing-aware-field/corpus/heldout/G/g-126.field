@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 126, shape memoryless
+x = in * 3.605
+out = (floor(tan(clamp(abs((x * 2.668)), -1.2, 1.2)) * 8.98) / 8.98) * 0.5

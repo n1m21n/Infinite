@@ -1,0 +1,14 @@
+# Phase 7 clip: hat roll. Logistic-map noise, high-passed twice, hits every 0.02 s, accent every fourth.
+state float tc = 0
+state float r = 0.2871
+state float h1 = 0
+state float h2 = 0
+tc = tc + 1.0 / sr
+r = 3.99 * r * (1.0 - r)
+nz = r * 2.0 - 1.0
+h1 = h1 + 0.5 * (nz - h1)
+a = nz - h1
+h2 = h2 + 0.5 * (a - h2)
+th = tc % 0.02
+acc = if(floor(tc / 0.02) % 4 < 0.5, 1.0, 0.45)
+out = (a - h2) * exp(-th * 220.0) * acc

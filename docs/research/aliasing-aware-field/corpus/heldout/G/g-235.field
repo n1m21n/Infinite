@@ -1,0 +1,5 @@
+# G set, seed 20261121, kernel 235, shape pre
+state float z = 0
+z = z + 0.2857 * (in - z)
+x = z * 3.545
+out = max((x * (x * 0.7657)), 0.3396) * 0.5

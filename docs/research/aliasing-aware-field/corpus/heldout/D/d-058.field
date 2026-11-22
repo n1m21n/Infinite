@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 058, shape combff
+x = in * 1.304
+w = (floor(x * 7.11) / 7.11)
+out = (w + -0.4274 * delay(w, 1)) * 0.5

@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 051, shape predel
+x = in * 1.377
+xd = delay(x, 2)
+out = (ceil(mix(x, (x * 2.622), 0.7155) * 7.479) / 7.479) * 0.5

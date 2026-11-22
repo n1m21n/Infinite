@@ -1,0 +1,8 @@
+# D set, seed 20261122, kernel 011, shape multi
+state float z = 0
+x = in * 0.5112
+a = delay(x, 61)
+w = abs(x)
+b = delay(w, 240)
+z = z + 0.2688 * (w + 0.543 * b - z)
+out = z * 0.5

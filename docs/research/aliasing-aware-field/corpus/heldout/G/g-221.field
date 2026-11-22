@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 221, shape memoryless
+x = in * 3.189
+out = tan(clamp(tan(clamp(x, -1.2, 1.2)), -1.2, 1.2)) * 0.5

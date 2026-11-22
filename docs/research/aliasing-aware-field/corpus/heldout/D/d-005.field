@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 005, shape combff
+x = in * 2.808
+w = (1.0 - 2.0 / (exp(clamp(2.0 * (ceil((x * 0.7961) * 5.016) / 5.016), -12.0, 12.0)) + 1.0))
+out = (w + -0.05327 * delay(w, 2)) * 0.5

@@ -1,0 +1,4 @@
+# D set, seed 20261122, kernel 022, shape combff
+x = in * 0.5139
+w = sin(x * 2.649)
+out = (w + 0.5035 * delay(w, 13)) * 0.5

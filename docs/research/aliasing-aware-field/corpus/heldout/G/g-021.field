@@ -1,0 +1,3 @@
+# G set, seed 20261121, kernel 021, shape memoryless
+x = in * 2.966
+out = if((exp(clamp((exp(clamp((x * 2.878), -6.0, 6.0)) - 1.0), -6.0, 6.0)) - 1.0) > 0.1847, mix((x * 1.119), log(1.0 + abs((x * 0.6301))), 0.1148), (ceil(sqrt(abs(x)) * 5.076) / 5.076)) * 0.5

@@ -1,0 +1,4 @@
+# G set, seed 20261121, kernel 037, shape comb
+x = in * 2.943
+w = ((x * 2.024) ^ 2.0)
+out = (w + -0.4488 * delay(w, 13)) * 0.5
