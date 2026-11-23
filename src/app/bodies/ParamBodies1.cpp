@@ -1,5 +1,6 @@
 // Generic node parameter bodies, part 1 (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
 #include "plugin/engine/HostAudio.h"
@@ -1658,7 +1659,7 @@ namespace app
       if (ActionButton::Draw("Randomise FX", ImVec2(kPreviewSize, 0)))
          n->Randomise();
 
-      if (ImGui::TreeNode("pad corners"))
+      if (PanelKit::FoldHeader("pad corners", true, false))
       {
          static const char* kCornerNames[4] = { "bottom left", "bottom right", "top left", "top right" };
          for (int c = 0; c < ResynthNode::kCorners; c++)
@@ -1671,7 +1672,6 @@ namespace app
             ModSlider("amount", &n->cornerAmount[c], 0.0f, 1.0f);
             ImGui::PopID();
          }
-         ImGui::TreePop();
       }
       ModCheckbox("auto iterate", &n->autoIterate);
       if (n->autoIterate)

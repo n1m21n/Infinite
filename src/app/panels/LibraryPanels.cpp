@@ -1,5 +1,6 @@
 // Library / plugin / field search panels (moved verbatim from main.cpp).
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/Tip.h"
 #include <unordered_set>
 #include "app/ui/design/components/FormParts.h"
@@ -831,7 +832,7 @@ namespace app
       }
 #endif
 
-      if (ImGui::TreeNodeEx(L("VST3 search folders"), foldersOpen ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None))
+      if (PanelKit::FoldHeader(L("VST3 search folders"), false, foldersOpen))
       {
          // Snapshot rather than iterate gPluginScanner.Folders() directly:
          // RemoveFolder() below erases from that same live vector, which
@@ -854,36 +855,27 @@ namespace app
             if (!folder.empty())
                gPluginScanner.AddFolder(folder);
          }
-         ImGui::TreePop();
       }
 
       const std::vector<std::string> blocklist = Platform::VST3Blocklist();
       if (!blocklist.empty())
       {
-         ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_900_550_250_1000));
-         if (ImGui::TreeNodeEx(L("Blocklisted VST3 bundles (crashed or hung while scanning)"),
-                                ImGuiTreeNodeFlags_None))
+         if (PanelKit::FoldHeader(L("Blocklisted VST3 bundles (crashed or hung while scanning)"), false, false,
+                                  ImGui::GetColorU32(tok::V4(tok::palf::v_900_550_250_1000))))
          {
-            ImGui::PopStyleColor();
             for (const std::string& path : blocklist)
                ImGui::TextWrapped("%s", path.c_str());
             if (ActionButton::Draw(L("Clear blocklist and retry"), ImVec2(-1.0f, 0)))
                Platform::ClearVST3Blocklist();
-            ImGui::TreePop();
-         }
-         else
-         {
-            ImGui::PopStyleColor();
          }
       }
 
       if (!gPluginScanner.FailedBundles().empty())
       {
-         if (ImGui::TreeNodeEx(L("Bundles that failed to describe"), ImGuiTreeNodeFlags_None))
+         if (PanelKit::FoldHeader(L("Bundles that failed to describe"), false, false))
          {
             for (const std::string& path : gPluginScanner.FailedBundles())
                ImGui::TextWrapped("%s", path.c_str());
-            ImGui::TreePop();
          }
       }
 
@@ -892,11 +884,10 @@ namespace app
          const std::string label = std::to_string(gPluginScanner.UnsupportedPlugins().size())
             + " VST2 plugin" + (gPluginScanner.UnsupportedPlugins().size() == 1 ? "" : "s")
             + " found and skipped - Infinite hosts VST3 and AU only";
-         if (ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_None))
+         if (PanelKit::FoldHeader(label.c_str(), false, false))
          {
             for (const std::string& path : gPluginScanner.UnsupportedPlugins())
                ImGui::TextWrapped("%s", path.c_str());
-            ImGui::TreePop();
          }
       }
 #else

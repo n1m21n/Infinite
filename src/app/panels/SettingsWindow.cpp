@@ -1,5 +1,6 @@
 // Settings window (moved verbatim from main.cpp).
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/Tip.h"
 #include <algorithm>
 #include "app/graph/LearningLog.h"
@@ -1406,7 +1407,7 @@ namespace app
             ImGui::TextDisabled("%s", T("Named values every '=' parameter expression can read."));
             ImGui::TextDisabled("%s", T("Each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5"));
             ImGui::TextDisabled("%s", T("Saved as your app-wide default - every new patch starts with this set."));
-            if (ImGui::CollapsingHeader(L("Language Reference")))
+            if (PanelKit::FoldHeader(L("Language Reference"), false, false))
             {
                // i18n-skip-begin: expression vocabulary
                ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !   . (swizzle)");

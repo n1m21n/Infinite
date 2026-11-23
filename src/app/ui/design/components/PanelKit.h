@@ -108,8 +108,10 @@ namespace PanelKit
       return b;
    }
 
-   // A folding section header, remembered per text. Returns whether the section is open.
-   inline bool FoldHeader(const char* text, bool first = false, bool startOpen = true)
+   // A folding section header, remembered per text. Returns whether the section is open. The only fold in the app
+   // (ratchet ctl_tree_folds): no TreePop after it. `first` skips the gap above (the first row of a card or body);
+   // `tint` colours the title (a warning section), 0 keeps the text colour.
+   inline bool FoldHeader(const char* text, bool first = false, bool startOpen = true, ImU32 tint = 0)
    {
       static std::map<std::string, bool> sOpen;
       if (!first)
@@ -126,7 +128,8 @@ namespace PanelKit
       if (!AuditAsUser())
          sOpen[text] = open;
       open = open || AuditOpenAll();
-      const ImU32 col = ImGui::GetColorU32(hov ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+      const ImU32 col = tint != 0 ? (hov ? tint : tok::ScaleAlpha(tint, tok::alpha_text_quiet))
+                                  : ImGui::GetColorU32(hov ? ImGuiCol_Text : ImGuiCol_TextDisabled);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + tok::fold_arrow_x, p.y + h * 0.5f);
       if (open)

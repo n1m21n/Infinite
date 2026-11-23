@@ -1,5 +1,6 @@
 // Node help text tables, shortcuts and help windows (moved verbatim from main.cpp).
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/AppShared.h"
@@ -1046,7 +1047,7 @@ namespace app
       SectionCard::BeginWindow();
       FormParts::PushReferenceStyle(/*headerFill=*/false);   // each section is a card; the header is its title
       SectionCard::Begin();
-      if (ImGui::CollapsingHeader(L("Getting started"), ImGuiTreeNodeFlags_DefaultOpen))
+      if (PanelKit::FoldHeader(L("Getting started"), true, true))
       {
          ImGui::TextWrapped("%s", T("Infinite is a node graph. Every node renders an image and passes it down a cable to the next one. A typical patch reads left to right:"));
          ImGui::Bullet(); ImGui::TextWrapped("%s", T("Source (image, video, shape, noise, formula) makes a picture."));
@@ -1058,7 +1059,7 @@ namespace app
       }
 
       SectionCard::Begin();
-      if (ImGui::CollapsingHeader(L("Controls"), ImGuiTreeNodeFlags_DefaultOpen))
+      if (PanelKit::FoldHeader(L("Controls"), true, true))
       {
          if (ImGui::BeginTable("controls", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
          {
@@ -1098,7 +1099,7 @@ namespace app
       }
 
       SectionCard::Begin();
-      if (ImGui::CollapsingHeader(L("Transport and modulation"), ImGuiTreeNodeFlags_DefaultOpen))
+      if (PanelKit::FoldHeader(L("Transport and modulation"), true, true))
       {
          ImGui::TextWrapped("%s", T("The top bar holds a global clock: Play/Pause, Rewind and BPM. Everything time-based reads from it - modulators, video playback and animated shaders - so pausing freezes the whole patch and changing the tempo retimes all of it at once."));
          ImGui::Spacing();
@@ -1108,7 +1109,7 @@ namespace app
       }
 
       SectionCard::Begin();
-      if (ImGui::CollapsingHeader(L("Arrangement timeline"), ImGuiTreeNodeFlags_DefaultOpen))
+      if (PanelKit::FoldHeader(L("Arrangement timeline"), true, true))
       {
          ImGui::TextWrapped("%s", T("Shift+T opens a timeline docked beside the canvas. It does not replace the patch - it schedules it. A track ('lane') is video or audio, and every clip on it points at a node that already exists in your graph; the clip decides WHEN that node is heard or seen, not what it does."));
          ImGui::Spacing();
@@ -1130,7 +1131,7 @@ namespace app
       }
 
       SectionCard::Begin();
-      if (ImGui::CollapsingHeader(L("Using Feedback"), ImGuiTreeNodeFlags_DefaultOpen))
+      if (PanelKit::FoldHeader(L("Using Feedback"), true, true))
       {
          ImGui::TextWrapped("%s", T("A Feedback node outputs what its input produced on the PREVIOUS frame. That one-frame delay is the whole point: it lets you wire a cycle without the graph chasing its own tail forever."));
          ImGui::Spacing();
@@ -1148,7 +1149,7 @@ namespace app
       }
 
       SectionCard::Begin();
-      if (ImGui::CollapsingHeader(L("Module reference")))
+      if (PanelKit::FoldHeader(L("Module reference"), true, false))
       {
          struct Entry { const char* name; const char* text; };
          struct Group { const char* category; std::vector<Entry> entries; };
@@ -1369,7 +1370,7 @@ namespace app
       }
 
       SectionCard::Begin();
-      if (ImGui::CollapsingHeader(L("Tips")))
+      if (PanelKit::FoldHeader(L("Tips"), true, false))
       {
          ImGui::Bullet(); ImGui::TextWrapped("%s", T("Put a Fit node before a Blend or Layer Stack when your sources are different sizes."));
          ImGui::Bullet(); ImGui::TextWrapped("%s", T("Modulate a Switcher's 'every' with an LFO for irregular cutting."));

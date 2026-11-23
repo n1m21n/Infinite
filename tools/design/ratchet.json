@@ -28,7 +28,7 @@
   "src/app/panels/DrumPanel.cpp": 20,
   "src/app/panels/FieldPatcherPanel.cpp": 3,
   "src/app/panels/HelpWindows.cpp": 2,
-  "src/app/panels/LibraryPanels.cpp": 6,
+  "src/app/panels/LibraryPanels.cpp": 5,
   "src/app/panels/MixerPanel.cpp": 2,
   "src/app/panels/MixerRender.cpp": 1,
   "src/app/panels/ModMatrixPanel.cpp": 13,
@@ -507,7 +507,6 @@
    "src/app/panels/ChatPanel.cpp": 12,
    "src/app/panels/DrumPanel.cpp": 2,
    "src/app/panels/HelpWindows.cpp": 1,
-   "src/app/panels/LibraryPanels.cpp": 1,
    "src/app/panels/ModMatrixPanel.cpp": 9,
    "src/app/panels/PerfPanel.cpp": 4,
    "src/app/panels/SettingsWindow.cpp": 1,
@@ -558,12 +557,7 @@
    "src/app/panels/View3DPanel.cpp": 1,
    "src/app/ui/ModWidgets.cpp": 3
   },
-  "ctl_tree_folds": {
-   "src/app/bodies/ParamBodies1.cpp": 1,
-   "src/app/panels/HelpWindows.cpp": 7,
-   "src/app/panels/LibraryPanels.cpp": 4,
-   "src/app/panels/SettingsWindow.cpp": 1
-  },
+  "ctl_tree_folds": {},
   "ctl_wires": {
    "src/app/frame/StageLinks.cpp": 5,
    "src/app/panels/FieldPatcherPanel.cpp": 1
@@ -708,7 +702,7 @@
   },
   "raw_inputs": {
    "src/app/bodies/GeometryParams.cpp": 2,
-   "src/app/bodies/ParamBodies1.cpp": 2,
+   "src/app/bodies/ParamBodies1.cpp": 1,
    "src/app/bodies/ParamBodies2.cpp": 1,
    "src/app/bodies/PreviewBodies.cpp": 1,
    "src/app/frame/FrameTests2.cpp": 1,
@@ -722,12 +716,9 @@
    "src/app/panels/ChatPanel.cpp": 4,
    "src/app/panels/CliSetupSection.cpp": 3,
    "src/app/panels/FieldPatcherPanel.cpp": 6,
-   "src/app/panels/HelpWindows.cpp": 7,
-   "src/app/panels/LibraryPanels.cpp": 4,
    "src/app/panels/MixerPanel.cpp": 1,
    "src/app/panels/ModMatrixPanel.cpp": 2,
    "src/app/panels/PerfPanel.cpp": 1,
-   "src/app/panels/SettingsWindow.cpp": 1,
    "src/app/panels/View2DPanel.cpp": 9,
    "src/app/panels/View3DPanel.cpp": 10,
    "src/app/ui/ModWidgets.cpp": 7,
@@ -800,7 +791,7 @@
   "hit": 16,
   "id_stack": 74,
   "key": 12,
-  "label": 698,
+  "label": 697,
   "layout": 249,
   "maths": 191,
   "member_default": 96,
