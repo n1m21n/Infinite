@@ -6,6 +6,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/UiType.h"
+#include "app/ui/design/components/FloatingWindow.h"
 
 namespace app
 {
@@ -642,20 +643,17 @@ namespace app
    // A docked panel popped out: the chat's floating window, for any panel.
    bool BeginFloatingPanel(const char* title, bool* open, const ImVec2& firstSize)
    {
-      const ImGuiViewport* vp = ImGui::GetMainViewport();
-      ImGui::SetNextWindowSize(firstSize, ImGuiCond_FirstUseEver);
-      ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + (vp->WorkSize.x - firstSize.x) * 0.5f, vp->WorkPos.y + (vp->WorkSize.y - firstSize.y) * 0.5f),
-                              ImGuiCond_FirstUseEver);
-      ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f, 160.0f), ImVec2(FLT_MAX, FLT_MAX));
-      PushElevatedPanelStyle(/*isChild=*/false);
-      return ImGui::Begin(title, open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+      // A workspace, not a dialog: no form pad (the panel draws its own inset) and Esc stays the panel's key.
+      FloatingWindow::Spec spec;
+      spec.size = firstSize;
+      spec.minSize = ImVec2(240.0f, 160.0f);
+      spec.flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+      spec.pad = false;
+      spec.escCloses = false;
+      return FloatingWindow::Begin(title, open, spec);
    }
 
-   void EndFloatingPanel()
-   {
-      ImGui::End();
-      PopElevatedPanelStyle();
-   }
+   void EndFloatingPanel() { FloatingWindow::End(); }
 
    void DrawViewportPanelFloating()
    {

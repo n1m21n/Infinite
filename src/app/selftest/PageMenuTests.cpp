@@ -13,6 +13,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/PagePicker.h"
+#include "app/ui/design/components/SettingsWindow.h"
 #include "app/selftest/UiAudit.h"
 #include "imgui_internal.h"
 
@@ -588,7 +589,7 @@ namespace
       Do(std::string(dc.name) + ": dock done", [open] { *open = false; sMouse = ImVec2(-1.0f, -1.0f); }, 2);
    }
 
-   // The 2D View's More.. popovers: one compact column, kPopoverW wide at most.
+   // The 2D View's More.. settings windows: one compact column, kPopoverW wide at most.
    std::vector<std::string> sMoreDone;
    void ScriptMore()
    {
@@ -641,7 +642,7 @@ namespace
          Check(buf, pr.open && pr.winW <= UiDensity::kPopoverW + 1.0f && pr.contentW <= UiDensity::kPopoverW - pad + 1.0f);
          sMoreDone.push_back(sOpenId);
       }, 1);
-      Do("2D: close", [] { ImGui::ClosePopupsExceptModals(); }, 2);
+      Do("2D: close", [] { SettingsWindow::CloseAll(); }, 2);
    }
 }
 

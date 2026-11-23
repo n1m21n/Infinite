@@ -19,6 +19,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
+#include "app/ui/design/components/SettingsWindow.h"
 #include "core/EditMesh.h"
 #include "nodes/ArmatureNode.h"
 #include "nodes/EditMeshNode.h"
@@ -6081,6 +6082,64 @@ namespace
       return open;
    }
 
+   // A look card (Shadows, Bloom, Depth of Field...), as the 2D View's effect cards: the card is its header alone -
+   // on box, name, gear - and every setting lives in its settings window, opened from the gear or the name. The
+   // window stays open while you work and closes like any floating window.
+   template <class F> void WinCard(const char* title, bool* enable, F&& body)
+   {
+      SectionCard::Begin();
+      SectionCard::MarkHeader();
+      sCard = title;
+      const std::string key = std::string("v3d/") + title;
+      const bool open = SettingsWindow::IsOpen(key);
+      ImGui::PushID(title);
+      const float fh = ImGui::GetFrameHeight();
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float w = ImGui::GetContentRegionAvail().x;
+      const ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      float x = p.x;
+      if (enable != nullptr)
+      {
+         ImGui::SetCursorScreenPos(ImVec2(x, p.y + (fh - ImGui::GetTextLineHeight() - 2.0f) * 0.5f));
+         bool on = *enable;
+         if (CheckBox::Box("##on", &on))
+         {
+            PushUndoCheckpoint("Edit in 3D View");
+            *enable = on;
+         }
+         x += 22.0f;
+      }
+      // The name opens the window; the gear sits at the right end, lit while the window is open.
+      ImGui::SetCursorScreenPos(ImVec2(x, p.y));
+      if (ImGui::InvisibleButton("##name", ImVec2(std::max(1.0f, p.x + w - fh - x - tok::space_1), fh)))
+         SettingsWindow::Toggle(key);
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Click for all settings"));
+      dl->AddText(ImVec2(x, p.y + (fh - ImGui::GetFontSize()) * 0.5f), enable != nullptr && !*enable ? ImGui::GetColorU32(ImGuiCol_TextDisabled) : text, title);
+      ImGui::SetCursorScreenPos(ImVec2(p.x + w - fh, p.y));
+      if (ImGui::InvisibleButton("##gear", ImVec2(fh, fh)))
+         SettingsWindow::Toggle(key);
+      const bool hov = ImGui::IsItemHovered();
+      if (hov)
+         HelpTip("%s", T("All settings"));
+      const ImVec2 gmn = ImGui::GetItemRectMin(), gmx = ImGui::GetItemRectMax();
+      if (hov)
+         dl->AddRectFilled(gmn, gmx, ImGui::GetColorU32(ImGuiCol_FrameBgHovered), tok::radius_control);
+      glyph::Draw(dl, ImVec2((gmn.x + gmx.x) * 0.5f, (gmn.y + gmx.y) * 0.5f), tok::icon_control,
+                  open ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : text, IconsInfinite::Settings);
+      ImGui::PopID();
+      SettingsWindow::Draw(key, title, ImVec2(ImGui::GetWindowPos().x - tok::space_2, p.y), [&]() {
+         // The window's compact column: label then well, the window's own width.
+         UiDensity::Compact compact;
+         const float keep = sFieldW;
+         sFieldW = SettingsWindow::Width() - FieldLabelW() - 2.0f * ImGui::GetStyle().WindowPadding.x;
+         body();
+         sFieldW = keep;
+         compact.End();
+      });
+   }
+
    const char* KindGlyph(Scene3DNode* scene, const Item& it)
    {
       const Kind kind = scene->ItemKind(it);
@@ -6672,16 +6731,10 @@ namespace
          });
       }
       Scene3DNode::Backdrop& back = item->backdrop;
-      bool backShow = back.show;
-      const bool backOpen = Card(T("Background Image"), &backShow, false);
-      if (backShow != back.show)
-      {
-         PushUndoCheckpoint("Edit in 3D View");
-         back.show = backShow;
-         scene->Commit();
-      }
-      if (backOpen)
-      {
+      const bool backWas = back.show;
+      bool backShow = backWas;
+      WinCard(T("Background Image"), &backShow, [&]() {
+         const float availW = ImGui::GetContentRegionAvail().x;   // the window's width, not the panel's
          bool edit = false;
          const std::string file = back.path.empty() ? std::string(T("Open image")) : back.path.substr(back.path.find_last_of("/\\") + 1);
          if (ActionButton::Draw(file.c_str(), ImVec2(availW, 0)))
@@ -6721,19 +6774,18 @@ namespace
          }
          if (edit)
             scene->Commit();
+      });
+      if (backShow != backWas)
+      {
+         PushUndoCheckpoint("Edit in 3D View");
+         back.show = backShow;
+         scene->Commit();
       }
       Render3DNode& look = scene->Look();
       Scene3DNode::Settings& set = *sSet;
       bool dof = set.fStop > 0.0f || look.dofAperture > 0.0f;
       const bool was = dof;
-      const bool open = Card(T("Depth of Field"), &dof);
-      if (dof != was)
-      {
-         set.fStop = dof ? 2.8f : 0.0f;
-         look.dofAperture = 0.0f;
-      }
-      if (open)
-      {
+      WinCard(T("Depth of Field"), &dof, [&]() {
          ImGui::BeginDisabled(!dof);
          std::vector<std::string> names = { T("Distance") };
          std::vector<int> ids = { 0 };
@@ -6762,6 +6814,11 @@ namespace
          FloatRow(T("Rotation"), &look.dofRotation, -180.0f, 180.0f, "%.0f");
          FloatRow(T("Ratio"), &look.dofRatio, 0.01f, 2.0f, "%.2f");
          ImGui::EndDisabled();
+      });
+      if (dof != was)
+      {
+         set.fStop = dof ? 2.8f : 0.0f;
+         look.dofAperture = 0.0f;
       }
    }
 
@@ -7476,8 +7533,8 @@ namespace
       Render3DNode& look = scene->Look();
       if (Card(T("Engine")))
          ComboRow(T("Engine"), &look.engine, Render3DNode::EngineNames());
-      if (look.engine == 1 && Card(T("Path Tracing")))
-      {
+      if (look.engine == 1)
+         WinCard(T("Path Tracing"), nullptr, [&]() {
          struct { const char* label; const char* id; int* v; int hi; } rows[] = {
             { T("Samples"), "##v3dptsamples", &look.ptSamples, 4096 }, { T("Bounces"), "##v3dptbounces", &look.ptBounces, 16 } };
          for (const auto& r : rows)
@@ -7488,9 +7545,8 @@ namespace
             FieldWell::Slider(r.id, r.v, 1, r.hi, "%d");
             UndoableFrom(r.v, was, "Edit in 3D View");
          }
-      }
-      if (Card(T("Sampling")))
-      {
+      });
+      WinCard(T("Sampling"), nullptr, [&]() {
          ComboRow(T("Viewport"), &look.samples, Render3DNode::SampleNames());
          FieldLabel(T("Render"));
          ImGui::SetNextItemWidth(sFieldW);
@@ -7499,21 +7555,18 @@ namespace
          UndoableFrom(&look.supersample, was, "Edit in 3D View");
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Samples per frame when rendering out."));
-      }
-      if (Card(T("Shadows"), &look.shadowsEnabled) && look.shadowsEnabled)   // off: rows hidden, not greyed (Block 4b)
-      {
+      });
+      WinCard(T("Shadows"), &look.shadowsEnabled, [&]() {
          ComboRow(T("Quality"), &look.shadowQuality, Render3DNode::ShadowQualityNames());
          FloatRow(T("Strength"), &look.shadowStrength, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Softness"), &look.shadowSoftness, 0.0f, 4.0f, "%.2f");
          FloatRow(T("Bias"), &look.shadowBias, 0.0002f, 0.02f, "%.4f");
-      }
-      if (Card(T("Ambient Occlusion")))
-      {
+      });
+      WinCard(T("Ambient Occlusion"), nullptr, [&]() {
          FloatRow(T("Strength"), &look.aoStrength, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Distance"), &look.aoRadius, 0.05f, 3.0f, "%.2f");
-      }
-      if (Card(T("Shading")))
-      {
+      });
+      WinCard(T("Shading"), nullptr, [&]() {
          ComboRow(T("Mode"), &look.viewShading, Render3DNode::ViewShadingNames());
          if (look.viewShading == 1)
          {
@@ -7537,9 +7590,8 @@ namespace
             if (sSet->bgType == 2)
                ColorRow(T("Background color"), sSet->bgColor);
          }
-      }
-      if (Card(T("Cavity"), &look.cavity) && look.cavity)   // off: rows hidden, not greyed (Block 4b)
-      {
+      });
+      WinCard(T("Cavity"), &look.cavity, [&]() {
          ComboRow(T("Type"), &look.cavityType, Render3DNode::CavityTypeNames());
          if (look.cavityType != 1)
          {
@@ -7552,28 +7604,24 @@ namespace
             FloatRow(T("Curvature ridge"), &look.curvatureRidge, 0.0f, 2.0f, "%.2f");
             FloatRow(T("Curvature valley"), &look.curvatureValley, 0.0f, 2.0f, "%.2f");
          }
-      }
-      if (Card(T("Bloom")))
-      {
+      });
+      WinCard(T("Bloom"), nullptr, [&]() {
          FloatRow(T("Strength"), &look.bloom, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Threshold"), &look.bloomThreshold, 0.5f, 8.0f, "%.2f");
          FloatRow(T("Radius"), &look.bloomRadius, 0.0f, 1.0f, "%.2f");
-      }
-      if (Card(T("Motion Blur"), &look.motionBlur) && look.motionBlur)   // off: rows hidden, not greyed (Block 4b)
-      {
+      });
+      WinCard(T("Motion Blur"), &look.motionBlur, [&]() {
          ComboRow(T("Position"), &look.motionPosition, Render3DNode::MotionPositionNames());
          FloatRow(T("Shutter"), &look.motionShutter, 0.0f, 2.0f, "%.2f");
          FloatRow(T("Max blur"), &look.motionMax, 1.0f, 256.0f, "%.0f px");
-      }
-      if (Card(T("Film")))
-      {
+      });
+      WinCard(T("Film"), nullptr, [&]() {
          BoolRow(T("Transparent"), &sSet->transparent);
          FloatRow(T("Filter size"), &sSet->filterSize, 0.0f, 4.0f, "%.2f px");
          FloatRow(T("Dither"), &sSet->dither, 0.0f, 2.0f, "%.2f");
          BoolRow(T("Simplify"), &sSet->simplify);
-      }
-      if (Card(T("Render Region")))
-      {
+      });
+      WinCard(T("Render Region"), nullptr, [&]() {
          BoolRow(T("Region"), &sSet->border);
          if (sSet->border)
          {
@@ -7581,14 +7629,13 @@ namespace
             FloatPairRow(T("Max"), &sSet->borderMax[0], &sSet->borderMax[1], 0.0f, 1.0f, "X %.3f", "Y %.3f");
             BoolRow(T("Crop to region"), &sSet->crop);
          }
-      }
-      if (Card(T("Colour Management")))
-      {
+      });
+      WinCard(T("Colour Management"), nullptr, [&]() {
          ComboRow(T("View"), &look.tonemap, Render3DNode::TonemapNames());
          FloatRow(T("Exposure"), &look.exposure, 0.1f, 4.0f, "%.2f");
          FloatRow(T("Gamma"), &sSet->gamma, 0.2f, 3.0f, "%.2f");
          ComboRow(T("Look"), &sSet->look, std::vector<std::string>{ T("None"), T("Low contrast"), T("Medium contrast"), T("High contrast"), T("Faded") });
-      }
+      });
    }
 
    void DrawOutputTab(Scene3DNode* scene, float availW)
@@ -7639,8 +7686,7 @@ namespace
          IntInputRow(T("Step"), &sSet->frameStep);
          sSet->frameStep = std::clamp(sSet->frameStep, 1, 100);
       }
-      if (Card(T("Stamp"), &sSet->stamp) && sSet->stamp)   // off: rows hidden, not greyed (Block 4b)
-      {
+      WinCard(T("Stamp"), &sSet->stamp, [&]() {
          Checks("##checks5", {
             { T("Date"), &sSet->stampDate },
             { T("Time"), &sSet->stampTime },
@@ -7666,7 +7712,7 @@ namespace
          FloatRow(T("Font size"), &sSet->stampSize, 6.0f, 96.0f, "%.0f");
          ColorRow(T("Text"), sSet->stampFg);
          ColorRow(T("Background"), sSet->stampBg);
-      }
+      });
       if (Card(T("Output")))
       {
          static const std::vector<std::string> kDepths = { "8", "16" };
@@ -7903,16 +7949,15 @@ namespace
             { T("Camera focus distance"), &set.gizmoCamFocus },
          });
       }
-      if (Card(T("Passepartout")))
+      WinCard(T("Passepartout"), nullptr, [&]() {
          FloatRow(T("Opacity"), &set.passAlpha, 0.0f, 1.0f, "%.2f");
-      if (Card(T("Safe Areas"), &set.safe) && set.safe)
-      {
+      });
+      WinCard(T("Safe Areas"), &set.safe, [&]() {
          FloatRow(T("Title"), &set.safeTitle, 0.0f, 0.3f, "%.3f");
          FloatRow(T("Action"), &set.safeAction, 0.0f, 0.3f, "%.3f");
          BoolRow(T("Center-cut"), &set.safeCenter);
-      }
-      if (Card(T("Composition Guides")))
-      {
+      });
+      WinCard(T("Composition Guides"), nullptr, [&]() {
          ColorRow(T("Colour"), set.guideColor);
          Checks("##checks13", {
             { T("Thirds"), &set.thirds },
@@ -7924,7 +7969,7 @@ namespace
             { T("Harmonious triangle A"), &set.harmonyTriA },
             { T("Harmonious triangle B"), &set.harmonyTriB },
          });
-      }
+      });
    }
 
    // A child whose first card touches its top and sides, so the card lines up with the rail.

@@ -1,4 +1,5 @@
 // Node help text tables, shortcuts and help windows (moved verbatim from main.cpp).
+#include "app/ui/design/components/FloatingWindow.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/AppShared.h"
@@ -1007,16 +1008,13 @@ namespace app
       // rounding than the rest of the "material above the canvas" family.
       // Centering on first appearance matches Settings for the same reason
       // (see DrawSettingsWindow).
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
-      PushElevatedPanelStyle(/*isChild=*/false);
-      FormParts::PushWindowPad();   // same 16 pt inset as Settings; cards reach 8 pt into it
-      const bool shortcutsVisible = ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse);
-      FormParts::PopWindowPad();
+      FloatingWindow::Spec spec;   // same 16 pt inset as Settings; cards reach 8 pt into it
+      spec.size = ImVec2(680, 520);
+      spec.placeCond = ImGuiCond_Appearing;
+      const bool shortcutsVisible = FloatingWindow::Begin("All Shortcuts", open, spec);
       if (!shortcutsVisible)
       {
-         ImGui::End();
-         PopElevatedPanelStyle();
+         FloatingWindow::End();
          return;
       }
 
@@ -1024,8 +1022,7 @@ namespace app
       DrawShortcutsTableBody("win_");
       SectionCard::EndWindow();
       FormParts::WindowEdge();
-      ImGui::End();
-      PopElevatedPanelStyle();
+      FloatingWindow::End();
    }
 
 
@@ -1036,16 +1033,13 @@ namespace app
       // window (Settings, Field editor, colour picker, All Shortcuts) gets,
       // which is why it kept rendering with the wrong backdrop/border in
       // light mode instead of the theme's actual panel colour.
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSize(ImVec2(720, 620), ImGuiCond_FirstUseEver);
-      PushElevatedPanelStyle(/*isChild=*/false);
-      FormParts::PushWindowPad();   // same 16 pt inset as Settings
-      const bool helpVisible = ImGui::Begin("Infinite - help & module reference", open, ImGuiWindowFlags_NoCollapse);
-      FormParts::PopWindowPad();
+      FloatingWindow::Spec spec;   // same 16 pt inset as Settings
+      spec.size = ImVec2(720, 620);
+      spec.placeCond = ImGuiCond_Appearing;
+      const bool helpVisible = FloatingWindow::Begin("Infinite - help & module reference", open, spec);
       if (!helpVisible)
       {
-         ImGui::End();
-         PopElevatedPanelStyle();
+         FloatingWindow::End();
          return;
       }
 
@@ -1393,7 +1387,6 @@ namespace app
       SectionCard::EndWindow();
       FormParts::PopReferenceStyle();
       FormParts::WindowEdge();
-      ImGui::End();
-      PopElevatedPanelStyle();
+      FloatingWindow::End();
    }
 }

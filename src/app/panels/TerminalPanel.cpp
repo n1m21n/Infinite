@@ -1,6 +1,7 @@
 // Terminal panel (docs/plans/terminal/README.md, Block A): docked bottom or top like the Piano Roll. The shell runs
 // on its own threads (core/term/TermSession.h); this file only draws the latest snapshot and queues input, so the
 // frame never waits on a shell. Open state, dock and height are app preferences; patches never touch the terminal.
+#include "app/ui/design/components/FloatingWindow.h"
 #include "app/AppShared.h"
 #include "app/panels/TerminalDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -1177,13 +1178,18 @@ void DrawTerminalFloating()
    static const char* shotW = std::getenv("INFINITE_CHATSHOT_FLOATW");
    if (shotW != nullptr)
       ImGui::SetNextWindowSize(ImVec2(std::max(kMinWidth, (float)std::atof(shotW)), std::min(680.0f, vp->WorkSize.y - 120.0f)), ImGuiCond_Always);
-   ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x - 480.0f, vp->WorkPos.y + 80.0f), ImGuiCond_FirstUseEver);
-   ImGui::SetNextWindowSizeConstraints(ImVec2(kMinWidth, kMinHeight), ImVec2(FLT_MAX, FLT_MAX));
-   PushElevatedPanelStyle(/*isChild=*/false);
+   // A workspace window: the terminal keeps Esc for the shell, and draws its own inset.
+   FloatingWindow::Spec spec;
+   spec.center = false;
+   spec.pos = ImVec2(vp->WorkPos.x + vp->WorkSize.x - 480.0f, vp->WorkPos.y + 80.0f);
+   spec.minSize = ImVec2(kMinWidth, kMinHeight);
+   spec.flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+   spec.pad = false;
+   spec.escCloses = false;
    const bool chat = gTerminalFace == 0 && CliSetup::Prefs().face == "chat";
    std::string title = std::string(chat ? T("Chat") : T("Terminal")) + "###terminalfloat";
    bool open = true;
-   const bool visible = ImGui::Begin(title.c_str(), &open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+   const bool visible = FloatingWindow::Begin(title.c_str(), &open, spec);
    if (visible)
    {
       gTerminalRectMin = ImGui::GetWindowPos();
@@ -1197,8 +1203,7 @@ void DrawTerminalFloating()
       sDrawFrames += 1.0;
       sDrawWorst = std::max(sDrawWorst, drawn);
    }
-   ImGui::End();
-   PopElevatedPanelStyle();
+   FloatingWindow::End();
    if (!open)
       gTerminalOpen = false;
 }

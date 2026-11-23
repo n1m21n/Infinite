@@ -1,4 +1,5 @@
 // Settings window (moved verbatim from main.cpp).
+#include "app/ui/design/components/FloatingWindow.h"
 #include <algorithm>
 #include "app/graph/LearningLog.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -73,19 +74,17 @@ namespace app
       // convention as the Unsaved Changes / Recover Autosave modals below -
       // gives it consistent breathing room on every screen size instead of a
       // fixed offset that would be wrong on a small display.
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
-      PushElevatedPanelStyle(/*isChild=*/false);
       // Cards reach SectionCard::kPad into the window padding, so 16 leaves an 8 pt margin to the window edge on every side.
       // The title starts where the tab labels start (window pad + kNavInset), so "Settings" sits over "Appearance".
       constexpr float kNavInset = tok::space_2;
-      FormParts::PushWindowPad(kNavInset);
-      const bool settingsVisible = ImGui::Begin(L("Settings"), open, ImGuiWindowFlags_NoCollapse);
-      FormParts::PopWindowPad();
+      FloatingWindow::Spec spec;
+      spec.size = ImVec2(740, 560);
+      spec.placeCond = ImGuiCond_Appearing;
+      spec.titleInset = kNavInset;
+      const bool settingsVisible = FloatingWindow::Begin(L("Settings"), open, spec);
       if (!settingsVisible)
       {
-         ImGui::End();
-         PopElevatedPanelStyle();
+         FloatingWindow::End();
          return;
       }
 
@@ -1945,8 +1944,7 @@ namespace app
       SectionCard::EndWindow();
       EndChildSafe();
       FormParts::WindowEdge();
-      ImGui::End();
-      PopElevatedPanelStyle();
+      FloatingWindow::End();
    }
 
 

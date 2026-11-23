@@ -20,6 +20,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
+#include "app/ui/design/components/SettingsWindow.h"
 #include "core/BlendModes.h"
 #include "core/BrushEngine.h"
 #include "nodes/AudioColorRampNode.h"
@@ -1187,15 +1188,6 @@ namespace
       glyph::InkBox(c, 16.0f, g, a, b);
       const float m = std::max(b.x - a.x, b.y - a.y);
       return m > 1.0f ? std::round(16.0f * ink / m) : 16.0f;
-   }
-
-   void FoldMark(ImDrawList* dl, ImVec2 c, bool folded, ImU32 col)
-   {
-      const float w = std::round(HeaderMark() * 0.4f), h = std::round(HeaderMark() * 0.25f);
-      if (!folded)
-         dl->AddTriangleFilled(ImVec2(c.x - w, c.y - h), ImVec2(c.x + w, c.y - h), ImVec2(c.x, c.y + h), col);
-      else
-         dl->AddTriangleFilled(ImVec2(c.x - h, c.y - w), ImVec2(c.x + h, c.y), ImVec2(c.x - h, c.y + w), col);
    }
 
    // One header action at the row's height; returns the click. `grip` = a drag handle (no click, no hover well).
@@ -7609,25 +7601,27 @@ namespace
    {
       MorePopupScope() { ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(200.0f, ImGui::GetMainViewport()->Size.y * 0.6f))); }
    };
+   // The chip opens a settings window, not a popover: it stays open while you paint and closes like any floating
+   // window (its close button, Esc, or the chip again). The window sits under the chip, right edges aligned.
    template <class F> void BarMore(const char* id, F&& body)
    {
-      const std::string pop = std::string(id) + "pop";
-      const bool open = ImGui::IsPopupOpen(pop.c_str());
+      const std::string key = std::string("v2dmore/") + id;
+      const bool open = SettingsWindow::IsOpen(key);
       const std::string chip = std::string(L("More..")) + id;
       if (TextChip(chip.c_str(), open, T("More settings")))
-         ImGui::OpenPopup(pop.c_str());
+         SettingsWindow::Toggle(key);
+      const ImVec2 chipMx = ImGui::GetItemRectMax();
 #ifdef IMGUI_ENABLE_TEST_ENGINE
       View2DMoreProbe& probe = View2DMoreProbes()[id];
       probe.frame = ImGui::GetFrameCount();
       probe.chipMn = ImGui::GetItemRectMin();
-      probe.chipMx = ImGui::GetItemRectMax();
+      probe.chipMx = chipMx;
       probe.open = false;
 #endif
-      MorePopupScope scope;
-      if (MenuParts::BeginPopup(pop.c_str()))
+      SettingsWindow::Draw(key, T("Settings"), ImVec2(chipMx.x, chipMx.y + tok::space_1), [&]()
       {
          {
-            MoreRows rows; // pops its style vars here, while the popup window is still current
+            MoreRows rows; // pops its style vars here, while the window is still current
             sMoreOpen = true;
             body();
             sMoreOpen = true;
@@ -7637,8 +7631,7 @@ namespace
          probe.winW = ImGui::GetCurrentWindow()->Size.x;
          probe.contentW = ImGui::GetCurrentWindow()->ContentSize.x;
 #endif
-         MenuParts::EndPopup();
-      }
+      });
    }
 
 
@@ -10242,6 +10235,32 @@ namespace
             }
             if (ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", T("Layer mask: click to paint it, Shift-click to turn it off"));
+            // The mask thumbnail has its own menu: only what acts on the mask.
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               ImGui::OpenPopup("##maskmenu");
+            if (MenuParts::BeginPopup("##maskmenu"))
+            {
+               if (!Selected(id))
+                  SelectOnly(id);
+               if (MenuParts::Item(T("Paint Mask"), nullptr, aimMask))
+                  sEditMask = true;
+               if (MenuParts::Item(l->pmaskOn ? T("Disable Mask") : T("Enable Mask"), nullptr))
+               {
+                  PushUndoCheckpoint(l->pmaskOn ? "Turn mask off" : "Turn mask on");
+                  l->pmaskOn = !l->pmaskOn;
+                  Touch();
+               }
+               MenuParts::Separator();
+               if (MenuParts::Item(T("Mask to Selection"), nullptr))
+               {
+                  SelStep("Load mask as selection");
+                  doc->SelectMaskPixels(id, Scene2DNode::kSelNew);
+               }
+               if (MenuParts::Item(T("Mask from Selection"), nullptr, false, doc->HasSelection())) sPending.what = Pending::MaskFromSel;
+               MenuParts::Separator();
+               if (MenuParts::Item(T("Delete Mask"), nullptr)) sPending.what = Pending::RemoveMask;
+               MenuParts::EndPopup();
+            }
          }
          x += 33.0f;
          ImGui::SetCursorScreenPos(ImVec2(x, p.y + (rowH - ImGui::GetFrameHeight()) * 0.5f));
@@ -10364,17 +10383,35 @@ namespace
                sRename = id;
                std::snprintf(sRenameBuf, sizeof(sRenameBuf), "%s", LayerName(*l).c_str());
             }
+            // One menu per kind: an adjustment layer is a setting, not a picture, so the picture-only items
+            // (merges into pixels, copy merged, effects, output) stay off it; a clipped layer leads with Release.
+            const bool adj = l->kind == Kind::Adjust;
+            auto clipItem = [&]()
+            {
+               if (MenuParts::Item(l->clip ? T("Release Clipping Mask") : T("Create Clipping Mask"), Sc("Alt+Ctrl+G")))
+               {
+                  PushUndoCheckpoint("Clipping mask");
+                  l->clip = !l->clip;
+                  Touch();
+               }
+            };
+            if (adj && MenuParts::Item(T("All Settings"), nullptr, SettingsWindow::IsOpen("v2dadj/" + std::to_string(sDocUid) + "/" + std::to_string(id))))
+               SettingsWindow::Toggle("v2dadj/" + std::to_string(sDocUid) + "/" + std::to_string(id));
+            if (l->clip)
+               clipItem();
+            MenuParts::Separator();
             if (MenuParts::Item(T("Cut"), Sc("Ctrl+X"))) sPending.what = Pending::Cut;
             if (MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
-            if (MenuParts::Item(T("Copy Merged"), Sc("Shift+Ctrl+C"))) sPending.what = Pending::CopyMerged;
+            if (!adj && MenuParts::Item(T("Copy Merged"), Sc("Shift+Ctrl+C"))) sPending.what = Pending::CopyMerged;
             if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
-            if (!l->effects.empty() && MenuParts::Item(T("Copy Effects"), nullptr))
+            if (!adj && !l->effects.empty() && MenuParts::Item(T("Copy Effects"), nullptr))
                CopyLayerEffects(*l);
-            if (HasCopiedEffects() && l->kind != Kind::Adjust && MenuParts::Item(T("Paste Effects"), nullptr))
+            if (HasCopiedEffects() && !adj && MenuParts::Item(T("Paste Effects"), nullptr))
                PasteLayerEffects(doc, id);
-            if (MenuParts::Item(l->kind == Kind::Group ? T("Duplicate Group") : T("Duplicate Layer"), Sc("Ctrl+J")))
+            if (MenuParts::Item(l->kind == Kind::Group ? T("Duplicate Group") : adj ? T("Duplicate Adjustment") : T("Duplicate Layer"), Sc("Ctrl+J")))
                sPending.what = Pending::Duplicate;
-            TransformSubMenu(doc);
+            if (!adj)
+               TransformSubMenu(doc);
             if (l->kind != Kind::Fill && l->kind != Kind::Adjust && MenuParts::Item(T("Select Layer Pixels")))
                SelectLayerPixels(doc, id, Scene2DNode::kSelNew);
             MenuParts::Separator();
@@ -10382,20 +10419,19 @@ namespace
             if (sSel.size() > 1 ? MenuParts::Item(T("Merge Layers"), Sc("Ctrl+E"))
                                 : MenuParts::Item(T("Merge Down"), Sc("Ctrl+E"), false, LayerUnder(doc, id) != 0))
                sPending.what = Pending::MergeDown;
-            if (MenuParts::Item(T("Merge Visible"), Sc("Shift+Ctrl+E"))) sPending.what = Pending::MergeVisible;
-            if (MenuParts::Item(T("Stamp Visible"), Sc("Shift+Alt+Ctrl+E"))) sPending.what = Pending::StampVisible;
-            // A group flattens alone: its layers become one pixel layer, every other layer and group stays as it is.
-            if (l->kind == Kind::Group && MenuParts::Item(T("Flatten Group"), nullptr)) sPending.what = Pending::FlattenGroup;
-            if (MenuParts::Item(T("Flatten Image"), nullptr)) sPending.what = Pending::Flatten;
+            if (!adj)
+            {
+               if (MenuParts::Item(T("Merge Visible"), Sc("Shift+Ctrl+E"))) sPending.what = Pending::MergeVisible;
+               if (MenuParts::Item(T("Stamp Visible"), Sc("Shift+Alt+Ctrl+E"))) sPending.what = Pending::StampVisible;
+               // A group flattens alone: its layers become one pixel layer, every other layer and group stays as it is.
+               if (l->kind == Kind::Group && MenuParts::Item(T("Flatten Group"), nullptr)) sPending.what = Pending::FlattenGroup;
+               if (MenuParts::Item(T("Flatten Image"), nullptr)) sPending.what = Pending::Flatten;
+            }
             MenuParts::Separator();
             if (MenuParts::Item(T("Group Layers"), Sc("Ctrl+G"))) sPending.what = Pending::Group;
             if (l->kind == Kind::Group && MenuParts::Item(T("Ungroup"), Sc("Shift+Ctrl+G"))) sPending.what = Pending::Ungroup;
-            if (MenuParts::Item(l->clip ? T("Release Clipping Mask") : T("Create Clipping Mask"), Sc("Alt+Ctrl+G")))
-            {
-               PushUndoCheckpoint("Clipping mask");
-               l->clip = !l->clip;
-               Touch();
-            }
+            if (!l->clip)
+               clipItem();
             if (l->kind != Kind::Group)
             {
                if (!l->HasPixelMask() && MenuParts::Item(T("Add Layer Mask"), nullptr))
@@ -10410,8 +10446,7 @@ namespace
                NodeChoiceMenu(T("Replace with"), doc, Pending::ReplaceNode, l->uid);
                CanvasLink::PickMenuItem(PickSpec(true));
             }
-            if ((l->kind == Kind::Fill || l->kind == Kind::Adjust) &&
-                MenuParts::Item(l->kind == Kind::Fill ? T("Edit Fill...") : T("Edit Adjustment..."), nullptr))
+            if (l->kind == Kind::Fill && MenuParts::Item(T("Edit Fill..."), nullptr))
             {
                sTab = 1;
                sSideOpen = true;
@@ -10424,8 +10459,8 @@ namespace
             if (l->kind == Kind::Vector && MenuParts::Item(T("Convert to Sketch Node"), nullptr)) sPending.what = Pending::ToSketch;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Shapes"), nullptr)) sPending.what = Pending::ToShapes;
-            if (MenuParts::Item(T("Layer as Output"), nullptr, l->output)) sPending.what = Pending::LayerOutput;
-            if (doc->CanTakeBelow(*l) && MenuParts::Item(T("Effect on Below"), nullptr, l->below)) sPending.what = Pending::LayerBelow;
+            if (!adj && MenuParts::Item(T("Layer as Output"), nullptr, l->output)) sPending.what = Pending::LayerOutput;
+            if (!adj && doc->CanTakeBelow(*l) && MenuParts::Item(T("Effect on Below"), nullptr, l->below)) sPending.what = Pending::LayerBelow;
             if (l->warpOn && MenuParts::Item(T("Reset Distort"), nullptr))
             {
                PushUndoCheckpoint("Reset distort");
@@ -10434,7 +10469,8 @@ namespace
                Touch();
             }
             MenuParts::Separator();
-            if (MenuParts::Item(T("Delete Layer"), "Delete")) sPending.what = Pending::Delete;
+            if (MenuParts::Item(l->kind == Kind::Group ? T("Delete Group") : adj ? T("Delete Adjustment") : T("Delete Layer"), "Delete"))
+               sPending.what = Pending::Delete;
             MenuParts::EndPopup();
          }
          ImGui::SetCursorScreenPos(ImVec2(p.x, p.y + rowH + 1.0f));
@@ -11171,7 +11207,8 @@ namespace
    const char* const kEffGroups[] = { "Adjust", "Blur", "Distort", "Stylize", "Colour", "Time", "Sim", "Code", "Mask" };
 
    struct EffAdd { int layer = 0; int native = -1; int node = -1; uint64_t doc = 0; } sEffAdd;
-   struct EffOp { int layer = 0; int index = -1; int op = 0; uint64_t doc = 0; int to = -1; } sEffOp;   // 1 up, 2 down, 3 delete, 4 move to `to`
+   // 1 up, 2 down, 3 delete, 4 move to `to`, 5 duplicate (native), 6 reset (native)
+   struct EffOp { int layer = 0; int index = -1; int op = 0; uint64_t doc = 0; int to = -1; } sEffOp;
 
    // The shown top-level layers, bottom to top.
    std::vector<int> VisibleTop(Scene2DNode* doc)
@@ -11588,42 +11625,75 @@ namespace
       }
    };
 
-   // Opacity and blend on one line: "Mix  100%  Normal" in a well; click it to open the two rows. A card at defaults
-   // spends one row on mixing instead of three. `blend` null = opacity only (a mask effect has no blend).
-   void MixRow(float& opacity, int* blend, const std::string& key)
+   // Opacity and blend, in the settings window. `blend` null = opacity only (a mask effect has no blend).
+   void MixRow(float& opacity, int* blend)
    {
-      static std::map<std::string, bool> sMixOpen;
-      bool& open = sMixOpen[key];
-      const bool atDefault = opacity >= 0.999f && (blend == nullptr || *blend == 0);
-      char sum[96];
-      if (blend != nullptr)
-         std::snprintf(sum, sizeof sum, "%.0f%%  %s", opacity * 100.0f, T(Scene2DNode::kEffBlendNames[std::clamp(*blend, 0, 4)]));
-      else
-         std::snprintf(sum, sizeof sum, "%.0f%%", opacity * 100.0f);
-      FieldLabel(T("Mix"));
-      const ImVec2 p = ImGui::GetCursorScreenPos();
-      const ImVec2 sz(sFieldW, ImGui::GetFrameHeight());
-      if (ImGui::InvisibleButton(("##v2dmix" + key).c_str(), sz))
-         open = !open;
-      const bool hov = ImGui::IsItemHovered();
-      FieldWell::PushStyle();
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(hov ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg),
-                        tok::radius_control);
-      dl->AddRect(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(ImGuiCol_Border), tok::radius_control);
-      FieldWell::PopStyle();
-      const ImU32 tc = ImGui::GetColorU32(atDefault && !hov ? ImGuiCol_TextDisabled : ImGuiCol_Text);
-      dl->AddText(ImVec2(p.x + tok::space_2, p.y + (sz.y - ImGui::GetFontSize()) * 0.5f), tc, sum);
-      if ((!open || PanelKit::AuditAsUser()) && !PanelKit::AuditOpenAll())
-         return;
       SliderRow(T("Opacity"), &opacity, 0.0f, 1.0f, "%.2f");
-      if (blend != nullptr)
+      if (blend == nullptr)
+         return;
+      std::vector<std::string> blends;
+      for (const char* b : Scene2DNode::kEffBlendNames)
+         blends.push_back(T(b));
+      ComboRow(T("Blend"), blend, blends);
+   }
+
+   // A muted group title inside a settings window ("Mix", "More"): no fold, the window shows everything.
+   void WinSection(const char* text)
+   {
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      ImGui::TextDisabled("%s", text);
+   }
+
+   // Where a card's settings window first appears: left of the panel, level with the card's header.
+   ImVec2 WinAt(float headerY) { return ImVec2(ImGui::GetWindowPos().x - tok::space_2, headerY); }
+
+   // The card title: click opens the settings window, drag (where the caller adds a source) reorders.
+   // Returns the header rect's left top. `chips` = how many header icons follow on the right.
+   ImVec2 CardTitle(const std::string& id, const std::string& title, bool on, int chips, const std::string& winKey, const char* tip)
+   {
+      const float fh = ImGui::GetFrameHeight();
+      const float chipsW = chips * fh + std::max(0, chips - 1) * tok::space_1;
+      const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
+      const ImVec2 np = ImGui::GetCursorScreenPos();
+      if (ImGui::InvisibleButton(id.c_str(), ImVec2(nameW, fh)))
+         SettingsWindow::Toggle(winKey);
+      const bool hov = ImGui::IsItemHovered();
+      if (hov && tip != nullptr)
+         HelpTip("%s", tip);
+      const ImU32 col = ImGui::GetColorU32(on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !on ? 1.0f : 0.85f);
+      const std::string shown = app::TruncateWithEllipsis(title, std::max(16.0f, nameW - 2.0f));
+      ImGui::GetWindowDrawList()->AddText(ImVec2(np.x, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, shown.c_str());
+      return np;
+   }
+
+   // Right-click on an effect card's header: its own menu (not the layer's).
+   void EffectMenu(Layer& l, int i, const std::string& winKey)
+   {
+      const std::string pop = "##v2deffmenu" + std::to_string(l.id) + "_" + std::to_string(i);
+      if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         ImGui::OpenPopup(pop.c_str());
+      if (!MenuParts::BeginPopup(pop.c_str()))
+         return;
+      const Scene2DNode::Effect& e = l.effects[(size_t)i];
+      const int n = (int)l.effects.size();
+      if (MenuParts::Item(T("All Settings"), nullptr, SettingsWindow::IsOpen(winKey)))
+         SettingsWindow::Toggle(winKey);
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Move Up"), nullptr, false, i > 0))
+         sEffOp = { l.id, i, 1, sDocUid };
+      if (MenuParts::Item(T("Move Down"), nullptr, false, i + 1 < n))
+         sEffOp = { l.id, i, 2, sDocUid };
+      if (e.uid == 0)
       {
-         std::vector<std::string> blends;
-         for (const char* b : Scene2DNode::kEffBlendNames)
-            blends.push_back(T(b));
-         ComboRow(T("Blend"), blend, blends);
+         if (MenuParts::Item(T("Duplicate"), nullptr))
+            sEffOp = { l.id, i, 5, sDocUid };
+         if (MenuParts::Item(T("Reset"), nullptr))
+            sEffOp = { l.id, i, 6, sDocUid };
       }
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Remove Effect"), nullptr))
+         sEffOp = { l.id, i, 3, sDocUid };
+      MenuParts::EndPopup();
    }
 
    void EffectRows(Scene2DNode* doc, Layer& l, int i)
@@ -11632,11 +11702,10 @@ namespace
       S::Effect& e = l.effects[(size_t)i];
       const std::string name = e.uid != 0 ? e.entry : std::string(T(S::AdjName(e.adjType)));
       const std::string base = "##v2deff" + std::to_string(l.id) + "_" + std::to_string(i);
-      // One header row: on box, fold arrow + name, then earlier / later / remove in fixed slots on the right (a
-      // missing arrow keeps its slot, so the chips line up card to card). A folded card is this row alone.
-      static std::map<std::string, bool> sFold;
-      const std::string foldKey = std::to_string(l.id) + "/" + (e.uid != 0 ? std::to_string(e.uid) : "a" + std::to_string(e.adjType));
-      bool& folded = sFold[foldKey];
+      // One header row: on box, name, then gear / show / remove / grip in fixed slots on the right. The card shows
+      // the effect's one or two everyday rows; the gear (or a click on the name) opens all of them in a window.
+      const std::string cardKey = std::to_string(l.id) + "/" + (e.uid != 0 ? std::to_string(e.uid) : "a" + std::to_string(e.adjType));
+      const std::string winKey = "v2deff/" + std::to_string(sDocUid) + "/" + cardKey;
       SectionCard::Begin();
       const float rowY = ImGui::GetCursorPosY();
       ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
@@ -11651,12 +11720,10 @@ namespace
          HelpTip("%s", T("On"));
       FormParts::Inline(0.0f, tok::space_2);
       ImGui::SetCursorPosY(rowY);
-      const float fh = ImGui::GetFrameHeight();
-      const float chipsW = (e.uid != 0 ? 3.0f : 2.0f) * fh + (e.uid != 0 ? 2.0f : 1.0f) * tok::space_1;
-      const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
-      const ImVec2 np = ImGui::GetCursorScreenPos();
-      if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
-         folded = !folded;
+      const ImVec2 np = CardTitle(base + "name", name, e.on, e.uid != 0 ? 4 : 3, winKey,
+                                  e.uid != 0 ? T("Node-backed effect: click for all settings, drag to reorder")
+                                             : T("Click for all settings, drag to reorder"));
+      const float nameW = ImGui::GetItemRectSize().x;
       // Drag the header onto another header to move the effect there.
       if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
       {
@@ -11666,8 +11733,7 @@ namespace
       }
       if (ImGui::BeginDragDropTarget())
       {
-         const ImU32 dcol = Hex(kOutline);
-         ImGui::GetWindowDrawList()->AddLine(np, ImVec2(np.x + nameW, np.y), dcol, 2.0f);
+         ImGui::GetWindowDrawList()->AddLine(np, ImVec2(np.x + nameW, np.y), Hex(kOutline), 2.0f);
          if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("V2DEFF"))
          {
             const int* pay = (const int*)p->Data;
@@ -11676,21 +11742,11 @@ namespace
          }
          ImGui::EndDragDropTarget();
       }
-      if (PanelKit::AuditOpenAll())
-         folded = false;
-      {
-         const bool hov = ImGui::IsItemHovered();
-         if (hov)
-            HelpTip("%s", e.uid != 0 ? T("Node-backed effect: click to fold, drag to reorder")
-                                     : T("Click to fold, drag to reorder"));
-         const ImU32 col = ImGui::GetColorU32(e.on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !e.on ? 1.0f : 0.85f);
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         FoldMark(dl, ImVec2(np.x + HeaderMark() * 0.5f, np.y + fh * 0.5f), folded, col);
-         const float textX = np.x + HeaderMark() + tok::space_2;
-         const std::string display = app::TruncateWithEllipsis(name, std::max(16.0f, nameW - (textX - np.x) - 2.0f));
-         dl->AddText(ImVec2(textX, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, display.c_str());
-      }
+      EffectMenu(l, i, winKey);
       FormParts::Inline(0.0f, tok::space_2);
+      if (HeaderIcon((base + "set").c_str(), IconsInfinite::Settings, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
+         SettingsWindow::Toggle(winKey);
+      FormParts::Inline(0.0f, tok::space_1);
       // A node-backed effect's node: shown on the canvas (lit) or kept off it, one chip instead of a full-width row.
       if (e.uid != 0)
       {
@@ -11713,128 +11769,137 @@ namespace
          ImGui::SetDragDropPayload("V2DEFF", pay, sizeof(pay));
          ImGui::EndDragDropSource();
       }
-      if (!e.on || folded)
-         return;
-      // The effect's own controls, then its rarely used rows under More, then one Mix line (opacity and blend).
-      const std::string moreKey = "More##v2deffmore" + foldKey;
-      if (e.uid == 0)
-      {
-         float lo = 0, hi = 1;
-         S::AdjRange(e.adjType, lo, hi);
-         if (e.adjType != S::kAdjGradientMap)
+      // The effect's controls, all in its settings window: every row, the rarely used ones under More, then Mix.
+      // The card itself is the header alone.
+      auto rows = [&]() {
+         if (e.uid == 0)
          {
-            SliderRow(T(AdjAmountLabel(e.adjType)), &e.adjAmt, lo, hi, AdjFmt(e.adjType));
-            AdjExtras(e, 100000 + l.id * 64 + i, doc);
+            float lo = 0, hi = 1;
+            S::AdjRange(e.adjType, lo, hi);
+            if (e.adjType != S::kAdjGradientMap)
+            {
+               SliderRow(T(AdjAmountLabel(e.adjType)), &e.adjAmt, lo, hi, AdjFmt(e.adjType));
+               AdjExtras(e, 100000 + l.id * 64 + i, doc);
+            }
+            if (e.adjType == S::kAdjGradientMap || e.adjMap)
+            {
+               ColorRow(T("Shadows"), e.colorA);
+               ColorRow(T("Highlights"), e.colorB);
+            }
          }
-         if (e.adjType == S::kAdjGradientMap || e.adjMap)
-         {
-            ColorRow(T("Shadows"), e.colorA);
-            ColorRow(T("Highlights"), e.colorB);
-         }
-      }
-      else
-      {
-         GraphNode* gn = FindNodeByUid(e.uid);
-         if (gn == nullptr)
-            FieldLabel(T("Node gone"));
          else
          {
-            if (auto* fn = dynamic_cast<FilterNode*>(gn->node.get()))
-            {
-               const FilterDef& def = fn->Def();
-               // Linear light is a rendering choice, not a look: it waits behind More.
-               auto rare = [](const FilterParamDef& pd) { return pd.label == "linear light"; };
-               auto row = [&](size_t pi) {
-                  const FilterParamDef& pd = def.params[pi];
-                  const std::string plabel = ParamLabel(pd.label.c_str());
-                  float* pv = fn->ParamPtr(pi);
-                  if (pd.type == FilterParamDef::Type::Float)
-                  {
-                     // Angles read in degrees everywhere in the panel; a filter that stores radians converts here.
-                     if (pd.format.find("rad") != std::string::npos)
-                     {
-                        float deg = *pv * 57.29578f;
-                        if (SliderRow(T(plabel.c_str()), &deg, pd.minVal * 57.29578f, pd.maxVal * 57.29578f, "%.0f\xC2\xB0"))
-                           *pv = deg / 57.29578f;
-                        return;
-                     }
-                     const char* fmt = !pd.format.empty() ? pd.format.c_str() : (pd.integer ? "%.0f" : "%.2f");
-                     if (SliderRow(T(plabel.c_str()), pv, pd.minVal, pd.maxVal, fmt) && pd.integer)
-                        *pv = std::round(*pv);
-                  }
-                  else if (pd.type == FilterParamDef::Type::Int)
-                  {
-                     if (SliderRow(T(plabel.c_str()), pv, pd.minVal, pd.maxVal, "%.0f"))
-                        *pv = std::round(*pv);
-                  }
-                  else if (pd.type == FilterParamDef::Type::Bool)
-                  {
-                     bool bv = *pv > 0.5f;
-                     if (BoolRow(T(plabel.c_str()), &bv))
-                        *pv = bv ? 1.0f : 0.0f;
-                  }
-                  else if (pd.type == FilterParamDef::Type::Enum && !pd.options.empty())
-                  {
-                     int ev = (int)std::lround(*pv);
-                     std::vector<std::string> opts;
-                     for (const std::string& o : pd.options)
-                        opts.push_back(T(o.c_str()));
-                     if (ComboRow(T(plabel.c_str()), &ev, opts))
-                        *pv = (float)ev;
-                  }
-                  else if (pd.type == FilterParamDef::Type::Color)
-                  {
-                     float c[4] = { pv[0], pv[1], pv[2], 1.0f };
-                     if (ColorRow(T(plabel.c_str()), c))
-                        std::copy(c, c + 3, pv);
-                  }
-               };
-               bool anyRare = false;
-               for (size_t pi = 0; pi < def.params.size(); pi++)
-                  if (rare(def.params[pi]))
-                     anyRare = true;
-                  else
-                     row(pi);
-               if (anyRare && PanelKit::FoldHeader(moreKey.c_str(), true, false))
-                  for (size_t pi = 0; pi < def.params.size(); pi++)
-                     if (rare(def.params[pi]))
-                        row(pi);
-            }
+            GraphNode* gn = FindNodeByUid(e.uid);
+            if (gn == nullptr)
+               FieldLabel(T("Node gone"));
             else
             {
-               EffParamRows rows(*gn, 0);
-               gn->node->VisitParams(rows);
-               if (auto* pc = dynamic_cast<PredictiveColoringNode*>(gn->node.get()))
+               if (auto* fn = dynamic_cast<FilterNode*>(gn->node.get()))
                {
-                  const bool learning = pc->IsLearning();
-                  const char* learnLabel = learning ? T("Stop learning") : pc->TotalSamples() > 0 ? T("Learn again") : T("Learn");
-                  if (ActionButton::Draw((std::string(learnLabel) + base + "learn").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+                  const FilterDef& def = fn->Def();
+                  // Linear light is a rendering choice, not a look: it waits under More.
+                  auto rare = [](const FilterParamDef& pd) { return pd.label == "linear light"; };
+                  auto row = [&](size_t pi) {
+                     const FilterParamDef& pd = def.params[pi];
+                     const std::string plabel = ParamLabel(pd.label.c_str());
+                     float* pv = fn->ParamPtr(pi);
+                     if (pd.type == FilterParamDef::Type::Float)
+                     {
+                        // Angles read in degrees everywhere in the panel; a filter that stores radians converts here.
+                        if (pd.format.find("rad") != std::string::npos)
+                        {
+                           float deg = *pv * 57.29578f;
+                           if (SliderRow(T(plabel.c_str()), &deg, pd.minVal * 57.29578f, pd.maxVal * 57.29578f, "%.0f\xC2\xB0"))
+                              *pv = deg / 57.29578f;
+                           return;
+                        }
+                        const char* fmt = !pd.format.empty() ? pd.format.c_str() : (pd.integer ? "%.0f" : "%.2f");
+                        if (SliderRow(T(plabel.c_str()), pv, pd.minVal, pd.maxVal, fmt) && pd.integer)
+                           *pv = std::round(*pv);
+                     }
+                     else if (pd.type == FilterParamDef::Type::Int)
+                     {
+                        if (SliderRow(T(plabel.c_str()), pv, pd.minVal, pd.maxVal, "%.0f"))
+                           *pv = std::round(*pv);
+                     }
+                     else if (pd.type == FilterParamDef::Type::Bool)
+                     {
+                        bool bv = *pv > 0.5f;
+                        if (BoolRow(T(plabel.c_str()), &bv))
+                           *pv = bv ? 1.0f : 0.0f;
+                     }
+                     else if (pd.type == FilterParamDef::Type::Enum && !pd.options.empty())
+                     {
+                        int ev = (int)std::lround(*pv);
+                        std::vector<std::string> opts;
+                        for (const std::string& o : pd.options)
+                           opts.push_back(T(o.c_str()));
+                        if (ComboRow(T(plabel.c_str()), &ev, opts))
+                           *pv = (float)ev;
+                     }
+                     else if (pd.type == FilterParamDef::Type::Color)
+                     {
+                        float c[4] = { pv[0], pv[1], pv[2], 1.0f };
+                        if (ColorRow(T(plabel.c_str()), c))
+                           std::copy(c, c + 3, pv);
+                     }
+                  };
+                  bool anyRare = false;
+                  for (size_t pi = 0; pi < def.params.size(); pi++)
+                     if (rare(def.params[pi]))
+                        anyRare = true;
+                     else
+                        row(pi);
+                  if (anyRare)
                   {
-                     PushUndoCheckpoint("Learn");
-                     pc->SetLearning(!learning);
-                     Touch();
+                     WinSection(T("More"));
+                     for (size_t pi = 0; pi < def.params.size(); pi++)
+                        if (rare(def.params[pi]))
+                           row(pi);
                   }
                }
-               if (rows.hasMore && PanelKit::FoldHeader(moreKey.c_str(), true, false))
+               else
                {
-                  EffParamRows more(*gn, 1);
-                  gn->node->VisitParams(more);
+                  EffParamRows r(*gn, 0);
+                  gn->node->VisitParams(r);
+                  if (auto* pc = dynamic_cast<PredictiveColoringNode*>(gn->node.get()))
+                  {
+                     const bool learning = pc->IsLearning();
+                     const char* learnLabel = learning ? T("Stop learning") : pc->TotalSamples() > 0 ? T("Learn again") : T("Learn");
+                     if (ActionButton::Draw((std::string(learnLabel) + base + "learn").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+                     {
+                        PushUndoCheckpoint("Learn");
+                        pc->SetLearning(!learning);
+                        Touch();
+                     }
+                  }
+                  if (r.hasMore)
+                  {
+                     WinSection(T("More"));
+                     EffParamRows more(*gn, 1);
+                     gn->node->VisitParams(more);
+                  }
                }
-            }
-            if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn->node.get()))
-            {
-               if (ActionButton::Draw((std::string(T("Remove Background")) + base + "rbg").c_str(), ImVec2(-1.0f, 0.0f),
-                                      ActionButton::Kind::Plain))
+               if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn->node.get()))
                {
-                  PushUndoCheckpoint("Remove Background");
-                  rbg->RequestMask();
-                  Touch();
+                  if (ActionButton::Draw((std::string(T("Remove Background")) + base + "rbg").c_str(), ImVec2(-1.0f, 0.0f),
+                                         ActionButton::Kind::Plain))
+                  {
+                     PushUndoCheckpoint("Remove Background");
+                     rbg->RequestMask();
+                     Touch();
+                  }
+                  ImGui::TextDisabled("%s", rbg->Status().c_str());
                }
-               ImGui::TextDisabled("%s", rbg->Status().c_str());
             }
          }
-      }
-      MixRow(e.opacity, e.toMask ? nullptr : &e.blend, foldKey);
+         WinSection(T("Mix"));
+         MixRow(e.opacity, e.toMask ? nullptr : &e.blend);
+      };
+      SettingsWindow::Draw(winKey, name.c_str(), WinAt(np.y), [&]() {
+         MoreRows mr;
+         rows();
+      });
    }
 
    bool FilterMatch(const char* haystack, const char* needle)
@@ -12191,6 +12256,21 @@ namespace
    }
 
    // Adds, moves and removes effects after the rows are drawn (adding spawns nodes, which can move gNodes).
+   Scene2DNode::Effect NewNativeEffect(int type)
+   {
+      using S = Scene2DNode;
+      S::Effect e;
+      e.adjType = type;
+      e.adjAmt = S::AdjDefault(e.adjType);
+      e.adjP = S::AdjParamDefault(e.adjType);
+      if (e.adjType == S::kAdjPhotoFilter)
+      {
+         const float warm[4] = { 0.93f, 0.54f, 0.13f, 1.0f };   // Photoshop's Warming Filter (85)
+         std::copy(warm, warm + 4, e.colorA);
+      }
+      return e;
+   }
+
    void ApplyEffectEdits(Scene2DNode* doc)
    {
       using S = Scene2DNode;
@@ -12199,17 +12279,8 @@ namespace
          {
             if (sEffAdd.native >= 0)
             {
-               S::Effect e;
-               e.adjType = sEffAdd.native;
-               e.adjAmt = S::AdjDefault(e.adjType);
-               e.adjP = S::AdjParamDefault(e.adjType);
-               if (e.adjType == S::kAdjPhotoFilter)
-               {
-                  const float warm[4] = { 0.93f, 0.54f, 0.13f, 1.0f };   // Photoshop's Warming Filter (85)
-                  std::copy(warm, warm + 4, e.colorA);
-               }
                PushUndoCheckpoint("Add effect");
-               l->effects.push_back(e);
+               l->effects.push_back(NewNativeEffect(sEffAdd.native));
                Touch();
             }
             else if (sEffAdd.node >= 0)
@@ -12234,6 +12305,18 @@ namespace
                   auto moved = std::move(l->effects[(size_t)i]);
                   l->effects.erase(l->effects.begin() + i);
                   l->effects.insert(l->effects.begin() + sEffOp.to, std::move(moved));
+               }
+               else if (sEffOp.op == 5 && l->effects[(size_t)i].uid == 0)
+               {
+                  const S::Effect copy = l->effects[(size_t)i];
+                  l->effects.insert(l->effects.begin() + i + 1, copy);
+               }
+               else if (sEffOp.op == 6 && l->effects[(size_t)i].uid == 0)
+               {
+                  S::Effect& e = l->effects[(size_t)i];
+                  S::Effect fresh = NewNativeEffect(e.adjType);
+                  fresh.on = e.on;
+                  e = fresh;
                }
                else if (sEffOp.op == 3)
                {
@@ -12450,14 +12533,14 @@ namespace
       if (l == nullptr || l->kind == Kind::Group)
          return;
       int removeMore = -1;
-      static std::map<int, bool> sFxFold;
       for (int t = 0; t < Scene2DNode::kFxCount; t++)
       {
          if (!l->fx[t].on)
             continue;
          ImGui::PushID(t);
          const std::string base = "##v2dfx" + std::to_string(l->id) + "_" + std::to_string(t);
-         bool& folded = sFxFold[l->id * 32 + t];
+         const std::string winKey = "v2dfx/" + std::to_string(sDocUid) + "/" + std::to_string(l->id) + "/" + std::to_string(t);
+         const char* english = Scene2DNode::FxName(t);
          SectionCard::Begin();
          const float rowY = ImGui::GetCursorPosY();
          ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
@@ -12470,33 +12553,52 @@ namespace
          }
          FormParts::Inline(0.0f, tok::space_2);
          ImGui::SetCursorPosY(rowY);
-         const float fh = ImGui::GetFrameHeight();
-         const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - fh - tok::space_2);
-         const ImVec2 np = ImGui::GetCursorScreenPos();
-         if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
-            folded = !folded;
-         if (PanelKit::AuditOpenAll())
-            folded = false;
+         const ImVec2 np = CardTitle(base + "name", T(english), l->fx[t].on, 2, winKey, T("Click for all settings"));
+         // Right-click on the header: the style's own menu.
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            ImGui::OpenPopup("##v2dfxmenu");
+         if (MenuParts::BeginPopup("##v2dfxmenu"))
          {
-            const bool hov = ImGui::IsItemHovered();
-            const ImU32 col = ImGui::GetColorU32(l->fx[t].on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov ? 1.0f : 0.85f);
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            FoldMark(dl, ImVec2(np.x + HeaderMark() * 0.5f, np.y + fh * 0.5f), folded, col);
-            const float textX = np.x + HeaderMark() + tok::space_2;
-            const std::string title = app::TruncateWithEllipsis(T(Scene2DNode::FxName(t)), std::max(16.0f, nameW - (textX - np.x) - 2.0f));
-            dl->AddText(ImVec2(textX, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, title.c_str());
+            if (MenuParts::Item(T("All Settings"), nullptr, SettingsWindow::IsOpen(winKey)))
+               SettingsWindow::Toggle(winKey);
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Add Another"), nullptr))
+            {
+               PushUndoCheckpoint("Add layer style");
+               Scene2DNode::Fx g = l->fx[t];
+               l->fxMore.emplace_back(t, g);
+               Touch();
+            }
+            if (MenuParts::Item(T("Reset"), nullptr))
+            {
+               PushUndoCheckpoint("Reset layer style");
+               l->fx[t] = Scene2DNode::FxDefault(t);
+               l->fx[t].on = true;
+               Touch();
+            }
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Remove Style"), nullptr))
+            {
+               PushUndoCheckpoint("Remove layer style");
+               l->fx[t].on = false;
+               Touch();
+            }
+            MenuParts::EndPopup();
          }
          FormParts::Inline(0.0f, tok::space_2);
+         if (HeaderIcon((base + "set").c_str(), IconsInfinite::Settings, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
+            SettingsWindow::Toggle(winKey);
+         FormParts::Inline(0.0f, tok::space_1);
          if (HeaderIcon((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove layer style"), rowY))
          {
             PushUndoCheckpoint("Remove layer style");
             l->fx[t].on = false;
             Touch();
          }
-         if (l->fx[t].on && !folded)
-         {
+         // The window: the style's every row, then the other copies of the same kind, each with its own settings.
+         SettingsWindow::Draw(winKey, T(english), WinAt(np.y), [&]() {
+            MoreRows mr;
             FxRows(*l, t, l->fx[t], true);
-            // More of the same kind, each with its own settings.
             for (int m = 0; m < (int)l->fxMore.size(); m++)
             {
                if (l->fxMore[(size_t)m].first != t)
@@ -12510,7 +12612,7 @@ namespace
                   removeMore = m;
                ImGui::PopID();
             }
-         }
+         });
          ImGui::PopID();
       }
       if (removeMore >= 0 && removeMore < (int)l->fxMore.size())
@@ -12575,7 +12677,6 @@ namespace
          }
          MenuParts::EndPopup();
       }
-      static std::map<int, bool> sAdjFold;
       int moveFrom = 0, moveTo = 0;
       bool moveBelow = false;
       int deleteId = 0;
@@ -12587,7 +12688,8 @@ namespace
             continue;
          const int id = l->id;
          const std::string base = "##v2dadj" + std::to_string(id);
-         bool& folded = sAdjFold[id];
+         const std::string winKey = "v2dadj/" + std::to_string(sDocUid) + "/" + std::to_string(id);
+         const char* english = Scene2DNode::AdjName(l->adjType);
          ImGui::PushID(id);
          SectionCard::Begin();
          const float rowY = ImGui::GetCursorPosY();
@@ -12604,14 +12706,12 @@ namespace
          FormParts::Inline(0.0f, tok::space_2);
          ImGui::SetCursorPosY(rowY);
          const float fh = ImGui::GetFrameHeight();
-         const float chipsW = 3.0f * fh + 2.0f * tok::space_1;
-         const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
-         const ImVec2 np = ImGui::GetCursorScreenPos();
-         if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
-         {
-            folded = !folded;
+         const std::string title = (l->name.empty() ? std::string(T(english)) : l->name) +
+                                   (l->clip ? std::string(" · ") + T("Clipped") : std::string());
+         const ImVec2 np = CardTitle(base + "name", title, l->visible, 4, winKey, T("Click for all settings, drag to reorder"));
+         const float nameW = ImGui::GetItemRectSize().x;
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
             SelectOnly(id);
-         }
          if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
          {
             ImGui::SetDragDropPayload("V2D_LAYER", &id, sizeof(int));
@@ -12635,22 +12735,37 @@ namespace
             }
             ImGui::EndDragDropTarget();
          }
-         if (PanelKit::AuditOpenAll())
-            folded = false;
+         // Right-click on the header: an adjustment layer's own menu. It has no pixels, so no merge, copy merged,
+         // mask or output items; only what an adjustment can do.
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
          {
-            const bool hov = ImGui::IsItemHovered();
-            if (hov)
-               HelpTip("%s", T("Click to fold, drag to reorder"));
-            const ImU32 col = ImGui::GetColorU32(l->visible ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !l->visible ? 1.0f : 0.85f);
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            FoldMark(dl, ImVec2(np.x + HeaderMark() * 0.5f, np.y + fh * 0.5f), folded, col);
-            const float textX = np.x + HeaderMark() + tok::space_2;
-            const std::string fullTitle = (l->name.empty() ? std::string(T(Scene2DNode::AdjName(l->adjType))) : l->name) +
-                                          (l->clip ? std::string(" · ") + T("Clipped") : std::string());
-            const std::string title = app::TruncateWithEllipsis(fullTitle, std::max(16.0f, nameW - (textX - np.x) - 2.0f));
-            dl->AddText(ImVec2(textX, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, title.c_str());
+            SelectOnly(id);
+            ImGui::OpenPopup("##v2dadjmenu");
+         }
+         if (MenuParts::BeginPopup("##v2dadjmenu"))
+         {
+            if (MenuParts::Item(T("All Settings"), nullptr, SettingsWindow::IsOpen(winKey)))
+               SettingsWindow::Toggle(winKey);
+            MenuParts::Separator();
+            if (MenuParts::Item(l->clip ? T("Release Clipping Mask") : T("Create Clipping Mask"), Sc("Alt+Ctrl+G")))
+            {
+               PushUndoCheckpoint("Clipping mask");
+               l->clip = !l->clip;
+               Touch();
+            }
+            if (MenuParts::Item(T("Duplicate Adjustment"), Sc("Ctrl+J")))
+               sPending.what = Pending::Duplicate;
+            if (MenuParts::Item(T("Merge Down"), Sc("Ctrl+E"), false, LayerUnder(doc, id) != 0))
+               sPending.what = Pending::MergeDown;
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Delete Adjustment"), "Delete"))
+               deleteId = id;
+            MenuParts::EndPopup();
          }
          FormParts::Inline(0.0f, tok::space_2);
+         if (HeaderIcon((base + "set").c_str(), IconsInfinite::Settings, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
+            SettingsWindow::Toggle(winKey);
+         FormParts::Inline(0.0f, tok::space_1);
          if (HeaderIcon((base + "clip").c_str(), IconsInfinite::Mask, l->clip,
                         l->clip ? T("Unclip from layer below") : T("Clip to layer below"), rowY))
          {
@@ -12668,8 +12783,7 @@ namespace
             ImGui::SetDragDropPayload("V2D_LAYER", &id, sizeof(int));
             ImGui::EndDragDropSource();
          }
-         if (l->visible && !folded)
-         {
+         auto rows = [&]() {
             float lo = 0, hi = 1;
             Scene2DNode::AdjRange(l->adjType, lo, hi);
             if (l->adjType != Scene2DNode::kAdjGradientMap)
@@ -12682,7 +12796,11 @@ namespace
                ColorRow(T("Shadows"), l->colorA);
                ColorRow(T("Highlights"), l->colorB);
             }
-         }
+         };
+         SettingsWindow::Draw(winKey, title.c_str(), WinAt(np.y), [&]() {
+            MoreRows mr;
+            rows();
+         });
          ImGui::PopID();
       }
       if (moveFrom != 0 && moveTo != 0 && moveFrom != moveTo && !doc->IsInside(moveTo, moveFrom))
@@ -16189,8 +16307,12 @@ std::string View2DAuditState(int i)
          for (int t = 0; t < Scene2DNode::kFxCount; t++)
             p->fx[t].on = false;
       }
+      // Each state opens its card's settings window: the card is a header, its rows live there.
+      const std::string du = std::to_string(sDocUid);
+      SettingsWindow::CloseAll();
       if (i < Scene2DNode::kAdjCount)
       {
+         SettingsWindow::Toggle("v2dadj/" + du + "/" + std::to_string(sAuditIds[6]));
          sTab = 6;
          sSel = { sAuditIds[6] };
          if (Layer* a = doc->FindLayer(sAuditIds[6]))
@@ -16209,6 +16331,8 @@ std::string View2DAuditState(int i)
          sTab = 5;
          sSel = { sAuditIds[0] };
          AddNodeEffect(doc, sAuditIds[0], i);
+         if (Layer* p = doc->FindLayer(sAuditIds[0]); p != nullptr && !p->effects.empty())
+            SettingsWindow::Toggle("v2deff/" + du + "/" + std::to_string(p->id) + "/" + std::to_string(p->effects.back().uid));
          doc->Commit();
          return std::string("fx ") + kNodeEffects[i].label;
       }
@@ -16216,7 +16340,10 @@ std::string View2DAuditState(int i)
       sTab = 5;
       sSel = { sAuditIds[0] };
       if (Layer* p = doc->FindLayer(sAuditIds[0]))
+      {
          p->fx[i].on = true;
+         SettingsWindow::Toggle("v2dfx/" + du + "/" + std::to_string(p->id) + "/" + std::to_string(i));
+      }
       doc->Commit();
       return std::string("style ") + Scene2DNode::FxName(i);
    }

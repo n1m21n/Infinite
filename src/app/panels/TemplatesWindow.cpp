@@ -2,6 +2,7 @@
 // a thumbnail each. Opening one makes an untitled copy: the shipped file is never the open document, so Save asks
 // where to put it and the original can't be overwritten. The picker is File > Template library: a window like Settings,
 // one card per template under its group heading (thumbnail, title, one line).
+#include "app/ui/design/components/FloatingWindow.h"
 #include "app/AppShared.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/ActionButton.h"
@@ -134,16 +135,13 @@ namespace
 // File > Template library: a window like Settings. Groups in index.txt order, cards flowing left to right.
 void DrawTemplatesWindow(bool* open)
 {
-   ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-   ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
-   PushElevatedPanelStyle(/*isChild=*/false);
-   FormParts::PushWindowPad();
-   const bool visible = ImGui::Begin(L("Template library"), open, ImGuiWindowFlags_NoCollapse);
-   FormParts::PopWindowPad();
+   FloatingWindow::Spec spec;
+   spec.size = ImVec2(740, 560);
+   spec.placeCond = ImGuiCond_Appearing;
+   const bool visible = FloatingWindow::Begin(L("Template library"), open, spec);
    if (!visible)
    {
-      ImGui::End();
-      PopElevatedPanelStyle();
+      FloatingWindow::End();
       return;
    }
    SectionCard::BeginWindow();
@@ -177,8 +175,7 @@ void DrawTemplatesWindow(bool* open)
    }
    SectionCard::End();
    SectionCard::EndWindow();
-   ImGui::End();
-   PopElevatedPanelStyle();
+   FloatingWindow::End();
    if (picked != nullptr)
    {
       *open = false;

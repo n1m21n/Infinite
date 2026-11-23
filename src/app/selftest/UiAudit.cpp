@@ -1983,7 +1983,8 @@ void FrameTest_UIAUDIT(int frameId, GLFWwindow* window)
             PanelKit::AuditOpenAll() = sWait == -1;
             PanelKit::AuditAsUser() = sWait != -1;
          }
-         if (sWait == -1 && sPage2 == 0 && shots != nullptr)
+         // The shot is the frame drawn with the user's view (as-user: before open-all returns for the checked frame).
+         if (sWait == (asUser ? -2 : -1) && sPage2 == 0 && shots != nullptr)
          {
             std::string file = tn + "_" + sName;
             for (char& c : file)
