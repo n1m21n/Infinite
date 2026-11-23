@@ -1,7 +1,7 @@
 ---
 title: "Proven-stable modulation: automatic stability certificates for user-written filters"
 slug: "stable-modulation"
-status: "phase-2-done"
+status: "phase-3-done"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-stable-modulation.md"
@@ -302,8 +302,141 @@ are reported for both groups separately and together. Raising the register cap i
 question, not part of this study.
 
 
+### Phase 3 (2026-11-23): H1, H3 on L + G, the Float32 re-check, and H4
+
+Run: `scripts/phase3_score.py L,G --jobs 6` (about 85 s, writes `data/phase3-L-G.json` and `.log`), then
+`scripts/phase3_h4.py` (about 3 min, writes `data/phase3-h4.json`). The Float32 step reuses the phase 2
+binary; nothing was rebuilt.
+
+**Verdicts**
+
+| ID | Bar | Result | Verdict |
+|---|---|---|---|
+| H1 | 0 certificates on kernels with a witness | **0** of 89 witness kernels certified (9 L, 80 G) | **Pass** (B still to come) |
+| H3 | ≥ 80% of no-witness G kernels certified | **111 of 120 = 92.5%** (Field matrices 77 / 82, Python 34 / 38) | **Pass** (B still to come) |
+| H4 | ≥ 25% wider k at the 20 ms slew, Moog and diode | **0%** on both, with g over the declared [1e-5, 1e3] | **Fail** |
+
+**H1 and H3 by set**
+
+| Set | Kernels | Witness | No witness | Certified | Certified with a witness |
+|---|---|---|---|---|---|
+| L | 16 | 9 | 7 | 5 (paper SVF, TPT one-pole, TPT SVF, allpass, DC blocker) | 0 |
+| G, Field matrices | 125 | 43 | 82 | 77 | 0 |
+| G, Python matrices (over the register cap) | 75 | 37 | 38 | 34 | 0 |
+
+- Every proof the cover started closed. No kernel ended "grid-certified".
+- The 11 no-witness kernels left without a proof:
+  - Two L filters reach the edge of stability inside their own box: the one-pole at a = 0, and the
+    coupled resonator at r = 1. The best growth found is exactly 1.0, so "no proof" is the right answer.
+  - Nine G kernels have best growth 0.98 to 0.998, and the LMI is clearly infeasible (t from −0.03 to
+    −2.2). Each is either stable without a common P, or unstable in a way the oracle can't find. Phase 4
+    reports the same class on B.
+- Near misses that still certified (worst cell bound): paper SVF 0.9999998 (its box reaches R = R_min),
+  TPT SVF 0.9999999, g121-124 0.9999975, g121-013 0.9999962.
+- Certify time per kernel in Python: median 0.35 s, p95 4.5 s, max 7.7 s. H5 isn't scored yet (C++ port
+  not approved).
+
+**Rig bug in the oracle, found and fixed before any verdict.**
+- The phase 1 oracle looked only at a 4 to 9 point grid, and tuned only near misses above 0.97. Four G
+  kernels (g121-084, 115, 145, 154) are unstable at one fixed knob setting that falls between grid points.
+  They were wrongly counted as "no witness".
+- The oracle now runs a dense frozen scan (129 / 33 / 13 points per axis for 1 / 2 / 3 knobs) with
+  Nelder-Mead from the 5 worst points, and always tunes the top 3 switching sequences.
+- No witness found in phase 1 was lost. 50 of the 80 G witnesses have length 1: frozen unstable.
+- Corrected counts:
+
+  | Count | Phase 1 | Corrected |
+  |---|---|---|
+  | B2: G kernels with a witness | 76 | **80** |
+  | B1a: default-knobs frozen check calls them stable | 54 of 76 | **58 of 80** |
+  | B1b: full-grid frozen check calls them stable | 15 of 76 | **17 of 80** |
+
+  The phase 1 data files are kept unchanged as the baseline record.
+
+**Float32: does each certificate survive the interpreter's arithmetic?**
+- **What was checked.** Each certificate has up to 5000 check points: every LMI point plus the cover
+  points with the highest P-norm. At these points the Field interpreter's A was measured as ‖A_f‖_P.
+- **Two levels.**
+  - *Holds at points*: every ‖A_f‖_P < 1.
+  - *Proved*: the largest rise over float64 is also below the cover's slack (1 − worst cell bound).
+- **Python kernels.** The 75 kernels Field can't compile use a bound in place of the measurement:
+  √κ · n · 10 · (phase 2 error).
+
+| Certified kernels | Holds at points | Proved | Largest rise |
+|---|---|---|---|
+| L, Field (5) | 4 | 3 | 2.5e-7 |
+| G, Field (77) | 77 | **77** | 2.5e-7 |
+| G, Python bound (34) | n/a | 31 | bound up to 8.7e-5 |
+
+- **Fails as proved.**
+  - **paper SVF**: one point reaches ‖A_f‖_P = 1.00000005 against a slack of 2.7e-10. Its float64
+    certificate is correct, but it is closer to 1 than Float32 can resolve. A shipped check must report it
+    as not proved in Float32, or shrink the box: R_min plus a margin.
+  - **TPT SVF**: the rise is 2.5e-7 against a slack of 5e-8, so it holds at every point but isn't proved.
+  - **g121-013, 046, 124** (Python matrices): the loose bound is above their slack of 2.5 to 18e-6.
+- **A second rig bug, fixed before the verdict.**
+  - **Symptom.** The first Float32 pass showed rises up to 0.44 on G kernels that use `if`.
+  - **Cause.** Every worst point sat within 1e-9 of an `if(p > c)` threshold. The cover evaluates A that
+    close inside a break on purpose. Float32 can't resolve 1e-9, so the interpreter rounded the knob back
+    across the threshold and took the other branch.
+  - **Why it isn't an error.** Both branches are covered up to the threshold, so stability isn't affected.
+  - **Fix.** The check moves such points to 1e-6 of the knob range on the cover's side (2389 points).
+    After that, the largest rise on Field kernels is 2.5e-7, the phase 2 rounding error.
+
+**H4: slew certificates (T3)**
+
+| Run | g range (cutoff) | Moog: any-speed → slew k | Diode: any-speed → slew k | Bar 25% |
+|---|---|---|---|---|
+| **Registered** | [1e-5, 1e3] (down to ≈ 0.15 Hz) | 2.88 → **2.88 (0%)** | 8.90 → **≤ 8.8 (0%)**, see the bullets | **Fail** |
+| Exploratory | [tan(π·20/48000), 1e3] (≥ 20 Hz) | 2.88 → 3.50 (+21%) | 8.90 → 12.50 (+41%) | Moog fails, diode passes |
+
+- **Why the registered claim can't be met by any certificate of this kind.**
+  - As the cutoff g → 0, the filter stops moving: A → I.
+  - Hold x fixed and step k up or down by dk. For V(x, k) to never grow, V(x, k ± dk) ≤ V(x, k) must hold
+    in both directions, so V can't depend on k.
+  - With g down to 1e-5, the per-sample decay (about g) is far smaller than any change a k-dependent P
+    could make, so P is forced to be flat in k.
+  - Neither affine P(k) nor piecewise-linear P(k) (9 and 17 nodes, an addition to section 8) certifies past
+    the any-speed limit.
+  - This is a limit of every Lyapunov function V(x, k) that ignores g, not a tuning problem.
+- **Diode under the registered claim.** In this LMI form the slew certificate fails even at the any-speed
+  value 8.8965; it certifies 8.8 (grid effect at the very edge). Either way the slew bound adds nothing.
+- **Control: the gain comes from the slew bound, not the floor.**
+  - With the 20 Hz floor and a constant P (any-speed k), the LMI is already infeasible at Moog 2.9 and at
+    diode 8.9.
+  - A per-k P over g alone exists well past both limits: Moog 3.6 (t = 6e3) and diode 13 (t = 780).
+  - So what's left is how fast P may change with k compared with how fast the filter decays.
+- **Sanity simulations at the exploratory limits** (2^14 samples, bang-bang slew, random g): the peak gain
+  is 1.09 for the Moog and 2.54 for the diode. Both stay bounded; the diode's peak is non-normal transient
+  growth, not divergence.
+- **Section 7 rule.** H4 fails, and the H1 to H3 claim stands. The exploratory row is not a verdict. It
+  shows the slew claim is only meaningful relative to the filter's own speed (the next steps carry it).
+
 ## 11. Critique
 *(After measurement.)*
 
 ## 12. Next steps
-*(After measurement.)*
+
+**This study**
+
+| Step | What | Note |
+|---|---|---|
+| Phase 4 | Lock `phase3_score.py` and `certify.py` by commit, generate B (seed 20261123, settings in D4), score once: H1, H3 | n ≤ 8 makes more of B exceed Field's register cap; same Field / Python split as G |
+| Phase 5 | Sections 11-12 final, `ARTIFACT.md`, `kick-the-tires.sh`, Web Lab Note | |
+| Follow-up (H4 redo, needs its own sign-off) | Rate-aware slew: limit dk relative to the filter's own decay (for example Δk ≤ c · g per sample), or V(x, g, k) with g slew-limited too | Phase 3 shows the fixed 20 ms slew can't help while the cutoff can reach 0 |
+| Product question, not research | Field's 128-register cap blocks dense n ≥ 5 filters | Phase 2 finding |
+
+**Candidate studies (from the owner's DSP research map, 2026-11-23).** Each needs its own sections 1-7
+and sign-off before work. This list is a choice of what to study, not an approval to build.
+
+| # | Study | Why Infinite can get there first | Reuses | Pick |
+|---|---|---|---|---|
+| C1 | **Saturating loops**: stability certificates for `tanh` / `clamp` inside modulated feedback (sector-bounded / Lur'e, with input) | No general discrete-time proof for nonlinear + fast modulation; Field already knows which ops sit in the loop | This certifier (LMI + cover), D4 nonlinear gate, the phase 2 dump | **Yes, first** |
+| C2 | **Lossless and colourless delay networks**: compile-time check that a Field FDN is lossless (Schlecht & Habets 2017 unitary-similarity test) plus a measured "metallic ringing" score (pole clumping, low-order delay sums) | The losslessness test is exact and cheap; nobody ships it in a DSL; colourlessness is still open | Field IR, the dump self-test pattern | **Yes, second** |
+| C3 | Offline FDN tuner (FLAMO-style, Cayley / matrix-exponential parameterisation) | 0% runtime cost | C2 | Later, only after C2, and a new feature needs owner approval |
+| C4 | Rate-aware slew certificates | McClellan's open future work; phase 3 found why the plain form fails | This study | Folded into this study's follow-up above |
+| — | Multi-stage / modulated ADAA | `aliasing-aware-field` already missed its CPU bar | | No |
+| — | Universal perceptual quality metric, real-time phase reconstruction | Crowded fields led by large labs; no Infinite edge | | No |
+| — | Differentiable integer delays, modulated-delay BPTT | Narrow; fits inside C3 if it ever runs | | No |
+| — | "Certified AI instrument sandbox" | Already the agent-collab gate plan (`docs/plans/agent-collab`); C1, C2 and the two current studies feed it | | Not separate |
+

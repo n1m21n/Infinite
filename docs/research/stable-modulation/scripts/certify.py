@@ -47,9 +47,16 @@ def solve_lmi(mats):
     return Pv, float(t.value)
 
 class Box:
-    """lo/hi per axis; axes listed in `log` are gridded and split in log space (cutoff, damping)."""
-    def __init__(self, lo, hi, log=()):
+    """lo/hi per axis; axes listed in `log` are gridded and split in log space (cutoff, damping).
+
+    breaks: {axis: [values]} where A(theta) jumps (a Field `if(p > c, ...)` switch). The cover starts
+    from cells split at every break, and a cell evaluates A just inside any edge that is a break, so
+    each cell only ever sees one side of a jump (phase 3)."""
+    def __init__(self, lo, hi, log=(), breaks=None):
         self.lo, self.hi, self.log = np.array(lo, float), np.array(hi, float), set(log)
+        self.breaks = {j: sorted(float(self.to_u([v if i == j else self.lo[i] for i in range(len(lo))])[j])
+                                 for v in vs if self.lo[j] < v < self.hi[j])
+                       for j, vs in (breaks or {}).items()}
     def to_u(self, x):
         return np.array([math.log(v) if j in self.log else v for j, v in enumerate(x)])
     def from_u(self, u):
@@ -87,15 +94,48 @@ def certify(Afun, box, grid=None, rounds=20, cell_budget=200000):
         info.update(cells=cells, worst_bound=worst)
         if ok:
             ev = np.linalg.eigvalsh(P)
-            return {"status": "certified", "P": P.tolist(), "t": t, "kappa": float(ev[-1] / ev[0]), **info}
+            return {"status": "certified", "P": P.tolist(), "t": t, "kappa": float(ev[-1] / ev[0]),
+                    "check_points": top_points(pn, A, pts, cover.last_points), **info}
         if new_pts:
             pts = pts + new_pts
             info["lmi_points"] = len(pts)
             continue
         ev = np.linalg.eigvalsh(P)
         return {"status": "grid-certified", "reason": "cover did not close within the cell budget",
-                "P": P.tolist(), "t": t, "kappa": float(ev[-1] / ev[0]), **info}
+                "P": P.tolist(), "t": t, "kappa": float(ev[-1] / ev[0]),
+                "check_points": top_points(pn, A, pts, cover.last_points), **info}
     return {"status": "no proof", "reason": "cutting planes did not converge", **info}
+
+CHECK_POINTS = 5000
+
+def top_points(pn, A, pts, cover_pts):
+    """The points a Float32 re-check should look at: every LMI point plus the cover points with the
+    largest P-norm (they set the margin), at most CHECK_POINTS in all."""
+    allp = {tuple(p): pn(A(p)) for p in pts}
+    allp.update(cover_pts)
+    best = sorted(allp.items(), key=lambda kv: -kv[1])[:CHECK_POINTS]
+    return [list(k) for k, _ in best]
+
+def initial_cells(box):
+    edges = []
+    for j in range(len(box.lo)):
+        e = [box.ulo[j]] + box.breaks.get(j, []) + [box.uhi[j]]
+        edges.append(list(zip(e[:-1], e[1:])))
+    return [(np.array([c[0] for c in cell]), np.array([c[1] for c in cell])) for cell in itertools.product(*edges)]
+
+def inside(box, lo, hi):
+    """Map a point of cell [lo, hi] to where A is evaluated: just inside any edge that is a break."""
+    br = [set(box.breaks.get(j, [])) for j in range(len(lo))]
+    if not any(br):
+        return lambda u: u
+    def f(u):
+        u = np.array(u, float)
+        for j in range(len(u)):
+            w = 1e-9 * max(hi[j] - lo[j], 1e-12)
+            if u[j] == lo[j] and lo[j] in br[j]: u[j] = lo[j] + w
+            elif u[j] == hi[j] and hi[j] in br[j]: u[j] = hi[j] - w
+        return u
+    return f
 
 def cover(A, pn, box, d, budget):
     """Return (ok, cells_checked, corner points with P-norm >= 1, worst bound seen)."""
@@ -105,7 +145,8 @@ def cover(A, pn, box, d, budget):
         if key not in nrm:
             nrm[key] = pn(A(box.from_u(u)))
         return nrm[key]
-    stack = [(box.ulo.copy(), box.uhi.copy())]
+    cover.last_points = {}
+    stack = initial_cells(box)
     cells, worst, failing = 0, 0.0, []
     corners_idx = list(itertools.product([0, 1], repeat=d))
     while stack:
@@ -113,7 +154,8 @@ def cover(A, pn, box, d, budget):
         cells += 1
         if cells > budget:
             return False, cells, [], worst
-        corners = [np.where(np.array(c) == 1, hi, lo) for c in corners_idx]
+        ins = inside(box, lo, hi)
+        corners = [ins(np.where(np.array(c) == 1, hi, lo)) for c in corners_idx]
         cn = [N(c) for c in corners]
         if max(cn) >= 1.0:
             failing += [box.from_u(c) for c, v in zip(corners, cn) if v >= 1.0]
@@ -127,8 +169,8 @@ def cover(A, pn, box, d, budget):
         for j in range(d):
             for c in corners_idx:
                 if c[j] == 0:
-                    a = np.where(np.array(c) == 1, hi, lo)
-                    b = a.copy(); b[j] = hi[j]
+                    a = ins(np.where(np.array(c) == 1, hi, lo))
+                    b = a.copy(); b[j] = ins(hi)[j]
                     m = (a + b) / 2
                     err = max(err, pn(A(box.from_u(m)) - (np.array(A(box.from_u(a))) + np.array(A(box.from_u(b)))) / 2))
         bound = max(cn) + SAFETY * err
@@ -136,18 +178,19 @@ def cover(A, pn, box, d, budget):
             worst = max(worst, bound)  # largest bound over the leaf cells that closed
             continue
         # split along the axis with the largest edge error relative to its own width
-        j = int(np.argmax(hi - lo)) if d == 1 else split_axis(A, box, lo, hi, pn)
+        j = int(np.argmax(hi - lo)) if d == 1 else split_axis(A, box, lo, hi, pn, ins)
         m = (lo[j] + hi[j]) / 2
         a_hi = hi.copy(); a_hi[j] = m
         b_lo = lo.copy(); b_lo[j] = m
         stack += [(lo, a_hi), (b_lo, hi)]
     worst = max(worst, 1.0) if failing else worst
+    cover.last_points = {box.from_u(np.array(k)): v for k, v in nrm.items()}
     return (not failing), cells, failing, worst
 
-def split_axis(A, box, lo, hi, pn):
+def split_axis(A, box, lo, hi, pn, ins=lambda u: u):
     errs = []
     for j in range(len(lo)):
-        a = lo.copy(); b = lo.copy(); b[j] = hi[j]
+        a = ins(lo.copy()); b = a.copy(); b[j] = ins(hi)[j]
         m = (a + b) / 2
         errs.append(pn(A(box.from_u(m)) - (A(box.from_u(a)) + A(box.from_u(b))) / 2))
     return int(np.argmax(errs))
