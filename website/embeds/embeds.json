@@ -705,6 +705,16 @@
       "slug": "cathedral-rose-caustic-prism",
       "title": "Cathedral Rose Caustic Prism",
       "description": "Audio-reactive Cathedral Rose Caustic Prism visualizer. Bass opens the radial stone tracery, mids sweep the prismatic caustic shafts, and highs shimmer across the stained-glass bevels."
+    },
+    {
+      "slug": "kumiko-asanoha-shoji-lantern",
+      "title": "Kumiko Asanoha Shoji Lantern",
+      "description": "Audio-reactive Kumiko Asanoha Shoji Lantern visualizer. Bass pulses the warm amber lantern behind fibrous washi paper, mids breathe through the hexagonal timber lattice, and highs glint along the beveled hinoki cypress ribs."
+    },
+    {
+      "slug": "kumiko-seigaiha-timber-screen",
+      "title": "Kumiko Seigaiha Timber Screen",
+      "description": "Audio-reactive Kumiko Seigaiha Timber Screen visualizer. Bass expands the concentric cedar wave-arc glow, mids ripple across the backlit shoji paper, and highs catch the mortised hinoki wood grain."
     }
   ]
 }

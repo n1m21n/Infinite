@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Kumiko Seigaiha Timber Screen",
+    "author": "Infinite",
+    "description": "Overlapping concentric seigaiha cedar wave-arc joinery framed by mortise-and-tenon stiles over warm backlit shoji paper.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float waveScale = 4.2 [2.0, 8.0];\nparam float arcThickness = 0.075 [0.03, 0.14];\nparam float ringsPerCell = 4.0 [2.0, 6.0];\nparam float lanternWarmth = 1.10 [0.4, 2.0];\nparam float paperGrain = 0.14 [0.02, 0.35];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * waveScale;\n\n# Staggered seigaiha wave-arc cells\ncellA = vec2(fract(p.x) - 0.5, fract(p.y) - 0.25);\ncellB = vec2(fract(p.x + 0.5) - 0.5, fract(p.y + 0.5) - 0.25);\n\nrA = length(cellA);\nrB = length(cellB);\n\narcA = abs(fract(rA * ringsPerCell) - 0.5);\narcB = abs(fract(rB * ringsPerCell) - 0.5);\n\nmaskA = smoothstep(arcThickness + 0.02, arcThickness, arcA) * step(rA, 0.72);\nmaskB = smoothstep(arcThickness + 0.02, arcThickness, arcB) * step(rB, 0.72);\nwoodMask = max(maskA, maskB);\n\n# Hinoki cypress wood grain & charred sugi mortar stiles\ngrain = 0.5 + 0.5 * sin(p.x * 32.0 + p.y * 18.0);\ncCedar = vec3(0.102, 0.075, 0.055);\ncHinoki = vec3(0.431, 0.278, 0.169);\nwoodCol = mix(cCedar, cHinoki, 0.42 + 0.42 * grain);\n\n# Vertical & horizontal sashimono muntin bars\nmuntinX = smoothstep(0.032, 0.015, abs(fract(p.x * 0.5) - 0.5));\nmuntinY = smoothstep(0.032, 0.015, abs(fract(p.y * 0.5) - 0.5));\nmuntin = max(muntinX, muntinY);\n\n# Backlit shoji paper with subtle ripple & warm amber lantern\nrCenter = length(vec2((uv.x - 0.5) * aspect, uv.y - 0.5));\nglow = exp(-rCenter * 2.1) * lanternWarmth * (0.9 + 0.1 * sin(t * 0.7));\npaperTex = sin(p.x * 47.0 + cos(p.y * 41.0)) * cos(p.y * 53.0);\ncWashi = vec3(0.910, 0.847, 0.725);\ncAmber = vec3(0.961, 0.651, 0.259);\npaperCol = mix(cWashi * 0.52, cAmber, clamp(glow * 0.85, 0.0, 1.0));\npaperCol += vec3(0.05, 0.035, 0.02) * paperTex * paperGrain * 2.0;\n\ncol = mix(paperCol, woodCol, woodMask);\ncol = mix(col, cCedar * 0.9, muntin);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "waveScale": 4.2,
+      "arcThickness": 0.075,
+      "ringsPerCell": 4.0,
+      "lanternWarmth": 1.1,
+      "paperGrain": 0.14
+    }
+  }
+}

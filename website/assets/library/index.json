@@ -12352,7 +12352,228 @@
       "file": "assets/library/pixel/cathedral-rose-caustic-prism.field",
       "preview": "assets/library/previews/cathedral-rose-caustic-prism.jpg",
       "bytes": 2625
+    },
+    {
+      "id": "chladni-brass-nodal-harmonics",
+      "name": "Chladni Brass Nodal Harmonics",
+      "kind": "Generator",
+      "tags": [
+        "chladni",
+        "cymatics",
+        "acoustics",
+        "brass",
+        "nodal",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Octagonal vibrating brass Chladni plate on an obsidian stage with standing-wave nodal contours, clustered quartz sand grains, and a central brass clamp.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/chladni-brass-nodal-harmonics.js",
+      "preview": "assets/library/previews/chladni-brass-nodal-harmonics.jpg",
+      "bytes": 2763
+    },
+    {
+      "id": "chladni-square-superposition-plate",
+      "name": "Chladni Square Superposition Plate",
+      "kind": "Generator",
+      "tags": [
+        "chladni",
+        "superposition",
+        "cymatics",
+        "brass",
+        "interference",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Square beveled brass Chladni plate framed in mahogany with dual-mode standing-wave interference lines, sand-grain nodes, and bow-excitation markers.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/chladni-square-superposition-plate.js",
+      "preview": "assets/library/previews/chladni-square-superposition-plate.jpg",
+      "bytes": 2158
+    },
+    {
+      "id": "xenakis-philips-pavilion-shells-3d",
+      "name": "Xenakis Philips Pavilion Shells 3D",
+      "kind": "Generator",
+      "tags": [
+        "xenakis",
+        "philips-pavilion",
+        "architecture",
+        "ruled-surface",
+        "brutalist",
+        "3d",
+        "sketch-3d"
+      ],
+      "description": "Asymmetrical ruled hyperbolic paraboloid concrete shells inspired by Iannis Xenakis's 1958 Philips Pavilion with tensioned ridge ribs and terracotta datum plinth.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/xenakis-philips-pavilion-shells-3d.js",
+      "preview": "assets/library/previews/xenakis-philips-pavilion-shells-3d.jpg",
+      "bytes": 1736
+    },
+    {
+      "id": "xenakis-ruled-hyperboloid-tower-3d",
+      "name": "Xenakis Ruled Hyperboloid Tower 3D",
+      "kind": "Generator",
+      "tags": [
+        "xenakis",
+        "hyperboloid",
+        "lattice",
+        "architecture",
+        "parametric",
+        "3d",
+        "sketch-3d"
+      ],
+      "description": "Double-sheeted ruled hyperboloid lattice tower of counter-rotating tensioned steel struts, compression ring collars, and terracotta datum markers.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/xenakis-ruled-hyperboloid-tower-3d.js",
+      "preview": "assets/library/previews/xenakis-ruled-hyperboloid-tower-3d.jpg",
+      "bytes": 1555
+    },
+    {
+      "id": "ondes-martenot-palme-synth",
+      "name": "Ondes Martenot Palme Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "trautonium",
+        "ondes-martenot",
+        "subharmonic",
+        "audio",
+        "dsp"
+      ],
+      "description": "Ondes Martenot inspired expressive ribbon synthesizer with continuous harmonic morphing, sympathetic palme comb resonance, and warm oak-cabinet lowpass.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/ondes-martenot-palme-synth.inf",
+      "preview": "assets/library/previews/ondes-martenot-palme-synth.jpg",
+      "bytes": 2159
+    },
+    {
+      "id": "schroeder-qrd-prime-diffuser-fx",
+      "name": "Schroeder QRD Prime Diffuser FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "schroeder",
+        "qrd",
+        "frippertronics",
+        "tape",
+        "audio",
+        "dsp"
+      ],
+      "description": "Quadratic-residue prime acoustic diffuser processor cascading prime-scaled allpass scattering stages with resonant room absorption and stereo width.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/schroeder-qrd-prime-diffuser-fx.inf",
+      "preview": "assets/library/previews/schroeder-qrd-prime-diffuser-fx.jpg",
+      "bytes": 2200
+    },
+    {
+      "id": "frippertronics-dual-reel-loop-fx",
+      "name": "Frippertronics Dual Reel Loop FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "schroeder",
+        "qrd",
+        "frippertronics",
+        "tape",
+        "audio",
+        "dsp"
+      ],
+      "description": "Dual-capstan reel-to-reel tape loop processor with asymmetric flutter modulation, oxide high-frequency rolloff, and warm transformer feedback saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/frippertronics-dual-reel-loop-fx.inf",
+      "preview": "assets/library/previews/frippertronics-dual-reel-loop-fx.jpg",
+      "bytes": 2217
+    },
+    {
+      "id": "kumiko-asanoha-shoji-lantern",
+      "name": "Kumiko Asanoha Shoji Lantern",
+      "kind": "Generator",
+      "tags": [
+        "kumiko",
+        "sashimono",
+        "shoji",
+        "woodwork",
+        "japanese",
+        "lattice",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Japanese Sashimono Kumiko asanoha hemp-leaf timber lattice backlit by fibrous washi paper and warm lantern amber glow.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/kumiko-asanoha-shoji-lantern.field",
+      "preview": "assets/library/previews/kumiko-asanoha-shoji-lantern.jpg",
+      "bytes": 2467
+    },
+    {
+      "id": "kumiko-seigaiha-timber-screen",
+      "name": "Kumiko Seigaiha Timber Screen",
+      "kind": "Generator",
+      "tags": [
+        "kumiko",
+        "seigaiha",
+        "sashimono",
+        "shoji",
+        "woodwork",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Overlapping concentric seigaiha cedar wave-arc joinery framed by mortise-and-tenon stiles over warm backlit shoji paper.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/kumiko-seigaiha-timber-screen.field",
+      "preview": "assets/library/previews/kumiko-seigaiha-timber-screen.jpg",
+      "bytes": 2289
+    },
+    {
+      "id": "sala-mixtur-formant-ribbon-synth",
+      "name": "Sala Mixtur Formant Ribbon Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "trautonium",
+        "ondes-martenot",
+        "subharmonic",
+        "audio",
+        "dsp"
+      ],
+      "description": "Oskar Sala inspired subharmonic frequency-divider ribbon organ blending 4 subharmonic sawtooth divisions into a resonant formant filter bank and tube saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/sala-mixtur-formant-ribbon-synth.inf",
+      "preview": "assets/library/previews/sala-mixtur-formant-ribbon-synth.jpg",
+      "bytes": 2122
     }
   ],
-  "count": 600
+  "count": 610
 }

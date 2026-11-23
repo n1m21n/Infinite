@@ -2312,6 +2312,94 @@
         "Gothic rose-window stone tracery & directional volumetric caustic shafts",
         "Terminal Grotesque (Velvetyne) & Basically A Mono (UNCUT) brutalist typography"
       ]
+    },
+    {
+      "id": "chladni_brass_nodal",
+      "taxonomy": "new",
+      "name": "Chladni Brass Nodal Plate & Quartz Sand",
+      "palette": [
+        "#141210",
+        "#C9A449",
+        "#F5EFE0",
+        "#6E3F24"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "trautonium_subharmonic_organ"
+      ],
+      "refs": [
+        "Ernst Chladni vibrating brass plates with quartz sand nodal lines on dark stage",
+        "Steps Mono (Velvetyne) & Overused Grotesk (Uncut) scientific instrument typography"
+      ]
+    },
+    {
+      "id": "xenakis_hyperbolic_ruled",
+      "taxonomy": "new",
+      "name": "Xenakis Philips Pavilion & Ruled Hyperboloid",
+      "palette": [
+        "#171615",
+        "#EAE3D5",
+        "#2C2A29",
+        "#B85D3B"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.22,
+      "pairs": [
+        "schroeder_qrd_dispersion"
+      ],
+      "refs": [
+        "Iannis Xenakis & Le Corbusier Philips Pavilion Expo 58 ruled hyperbolic paraboloid shells",
+        "Steps Mono (Velvetyne) & Overused Grotesk (Uncut) architectural drafting typography"
+      ]
+    },
+    {
+      "id": "sashimono_kumiko_shoji",
+      "taxonomy": "new",
+      "name": "Sashimono Kumiko Joinery & Shoji Lantern",
+      "palette": [
+        "#1A130E",
+        "#6E472B",
+        "#E8D8B9",
+        "#F5A642"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.28,
+      "pairs": [
+        "trautonium_subharmonic_organ"
+      ],
+      "refs": [
+        "Traditional Japanese Sashimono interlocking timber joinery and Kumiko asanoha/seigaiha lattices",
+        "Grotesk (Velvetyne) & Fragment Mono (Uncut) warm architectural craft typography"
+      ]
     }
   ]
 }

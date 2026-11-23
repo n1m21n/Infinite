@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Schroeder QRD Prime Diffuser FX",
+    "author": "Infinite",
+    "description": "Quadratic-residue prime acoustic diffuser processor cascading prime-scaled allpass scattering stages with resonant room absorption and stereo width.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float scatter = 0.74 [0.15, 0.92];\nparam float dampingHz = 3200.0 [600.0, 9000.0];\nparam float feedback = 0.46 [0.0, 0.78];\nparam float drive = 1.35 [0.6, 2.6];\nparam float mix = 0.82 [0.0, 1.0];\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0; state float a5 = 0;\nstate float lp = 0; state float fb = 0; state float lfo = 0;\n\nlfo = (lfo + 0.22 / sr) % 1.0;\nc = clamp(scatter + 0.08 * sin(6.2831853 * lfo), 0.1, 0.92);\n\nx = in + fb * feedback;\ny1 = -c * x + a1; a1 = x + c * y1;\ny2 = -(c * 0.91) * y1 + a2; a2 = y1 + (c * 0.91) * y2;\ny3 = -(c * 0.83) * y2 + a3; a3 = y2 + (c * 0.83) * y3;\ny4 = -(c * 0.77) * y3 + a4; a4 = y3 + (c * 0.77) * y4;\ny5 = -(c * 0.69) * y4 + a5; a5 = y4 + (c * 0.69) * y5;\n\ng = clamp(2.0 * sin(3.14159265 * dampingHz / sr), 0.04, 0.88);\nlp = lp + g * (y5 - lp);\nfb = clamp(lp, -1.0, 1.0);\n\nwd = lp * drive;\nwet = wd / (1.0 + abs(wd) * 0.65);\nout = (in * (1.0 - mix) + wet * mix) * 0.88;\n",
+    "params": {
+      "scatter": 0.74,
+      "dampingHz": 3200.0,
+      "feedback": 0.46,
+      "drive": 1.35,
+      "mix": 0.82
+    }
+  }
+}

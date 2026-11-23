@@ -3687,7 +3687,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "ondes-martenot-palme-synth",
+      "name": "Ondes Martenot Palme Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Ondes Martenot inspired expressive ribbon synthesizer with continuous harmonic morphing, sympathetic palme comb resonance, and warm oak-cabinet lowpass.",
+      "price": 0,
+      "preview": "assets/templates/ondes-martenot-palme-synth.webp",
+      "file": "assets/templates/ondes-martenot-palme-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "schroeder-qrd-prime-diffuser-fx",
+      "name": "Schroeder QRD Prime Diffuser FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Quadratic-residue prime acoustic diffuser processor cascading prime-scaled allpass scattering stages with resonant room absorption and stereo width.",
+      "price": 0,
+      "preview": "assets/templates/schroeder-qrd-prime-diffuser-fx.webp",
+      "file": "assets/templates/schroeder-qrd-prime-diffuser-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "frippertronics-dual-reel-loop-fx",
+      "name": "Frippertronics Dual Reel Loop FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-capstan reel-to-reel tape loop processor with asymmetric flutter modulation, oxide high-frequency rolloff, and warm transformer feedback saturation.",
+      "price": 0,
+      "preview": "assets/templates/frippertronics-dual-reel-loop-fx.webp",
+      "file": "assets/templates/frippertronics-dual-reel-loop-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "sala-mixtur-formant-ribbon-synth",
+      "name": "Sala Mixtur Formant Ribbon Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Oskar Sala inspired subharmonic frequency-divider ribbon organ blending 4 subharmonic sawtooth divisions into a resonant formant filter bank and tube saturation.",
+      "price": 0,
+      "preview": "assets/templates/sala-mixtur-formant-ribbon-synth.webp",
+      "file": "assets/templates/sala-mixtur-formant-ribbon-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 225
+  "count": 229
 }

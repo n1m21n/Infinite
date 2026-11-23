@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Frippertronics Dual Reel Loop FX",
+    "author": "Infinite",
+    "description": "Dual-capstan reel-to-reel tape loop processor with asymmetric flutter modulation, oxide high-frequency rolloff, and warm transformer feedback saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float flutterHz = 0.42 [0.1, 2.5];\nparam float flutterDepth = 0.24 [0.0, 0.65];\nparam float oxideHz = 2400.0 [500.0, 7500.0];\nparam float feedback = 0.52 [0.0, 0.82];\nparam float mix = 0.78 [0.0, 1.0];\nstate float lfo1 = 0; state float lfo2 = 0;\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0;\nstate float lp1 = 0; state float lp2 = 0; state float fb = 0;\n\nlfo1 = (lfo1 + flutterHz / sr) % 1.0;\nlfo2 = (lfo2 + (flutterHz * 1.618) / sr) % 1.0;\nc = clamp(0.48 + flutterDepth * (0.65 * sin(6.2831853 * lfo1) + 0.35 * sin(6.2831853 * lfo2)), 0.08, 0.88);\n\nx = in + fb * feedback;\nsat = (x * 1.45) / (1.0 + abs(x * 1.45) * 0.68);\n\ny1 = -c * sat + ap1; ap1 = sat + c * y1;\ny2 = -c * y1 + ap2; ap2 = y1 + c * y2;\ny3 = -c * y2 + ap3; ap3 = y2 + c * y3;\n\ng = clamp(2.0 * sin(3.14159265 * oxideHz / sr), 0.04, 0.86);\nlp1 = lp1 + g * (y3 - lp1);\nlp2 = lp2 + g * (lp1 - lp2);\nfb = clamp(lp2, -1.0, 1.0);\n\nout = (in * (1.0 - mix) + lp2 * mix) * 0.86;\n",
+    "params": {
+      "flutterHz": 0.42,
+      "flutterDepth": 0.24,
+      "oxideHz": 2400.0,
+      "feedback": 0.52,
+      "mix": 0.78
+    }
+  }
+}

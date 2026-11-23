@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ondes Martenot Palme Synth",
+    "author": "Infinite",
+    "description": "Ondes Martenot inspired expressive ribbon synthesizer with continuous harmonic morphing, sympathetic palme comb resonance, and warm oak-cabinet lowpass.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float timbreMorph = 0.55 [0.0, 1.0];\nparam float palmeRing = 0.44 [0.0, 0.9];\nparam float vibratoHz = 5.4 [1.0, 9.0];\nparam float cutoffHz = 2100.0 [350.0, 6500.0];\nparam float decay = 0.9993 [0.995, 0.9998];\nstate float ph = 0; state float vib = 0; state float env = 0;\nstate float bpA = 0; state float lpA = 0; state float lpf = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.055, env * decay);\nvib = (vib + vibratoHz / sr) % 1.0;\nf0 = clamp(freq * (1.0 + 0.006 * sin(6.2831853 * vib)), 45.0, 5200.0);\nph = (ph + f0 / sr) % 1.0;\n\ntri = 1.0 - 4.0 * abs(ph - 0.5);\ncore = tri * (1.0 - timbreMorph) + (sin(6.2831853 * ph) * 0.7 + sin(12.5663706 * ph) * 0.4) * timbreMorph;\n\ngA = clamp(2.0 * sin(3.14159265 * clamp(f0 * 2.38, 120.0, 6500.0) / sr), 0.02, 0.85);\nbpA = bpA + gA * (core - lpA - 0.16 * bpA);\nlpA = lpA + gA * bpA;\n\nsig = (core * 0.74 + bpA * 0.45 * palmeRing) * env;\ngCut = clamp(2.0 * sin(3.14159265 * cutoffHz / sr), 0.02, 0.85);\nlpf = lpf + gCut * (sig - lpf);\n\nout = ((lpf * 1.45) / (1.0 + abs(lpf * 1.45) * 0.65)) * 0.55;\n",
+    "params": {
+      "timbreMorph": 0.55,
+      "palmeRing": 0.44,
+      "vibratoHz": 5.4,
+      "cutoffHz": 2100.0,
+      "decay": 0.9993
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

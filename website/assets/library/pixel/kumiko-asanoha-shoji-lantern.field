@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Kumiko Asanoha Shoji Lantern",
+    "author": "Infinite",
+    "description": "Japanese Sashimono Kumiko asanoha hemp-leaf timber lattice backlit by fibrous washi paper and warm lantern amber glow.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float gridScale = 3.4 [1.8, 6.5];\nparam float ribWidth = 0.055 [0.02, 0.12];\nparam float lanternGlow = 1.15 [0.4, 2.0];\nparam float washiFiber = 0.16 [0.02, 0.35];\nparam float warmth = 0.82 [0.2, 1.2];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * gridScale;\n\n# Hexagonal / triangular asanoha lattice axes (0, 60, 120 deg)\nd0 = abs(fract(p.y) - 0.5);\nd1 = abs(fract(p.x * 0.866025 + p.y * 0.5) - 0.5);\nd2 = abs(fract(p.x * 0.866025 - p.y * 0.5) - 0.5);\n\n# Secondary bisecting asanoha ribs\nd3 = abs(fract(p.x * 1.73205) - 0.5);\nd4 = abs(fract(p.x * 0.866025 + p.y * 1.5) - 0.5);\nd5 = abs(fract(p.x * 0.866025 - p.y * 1.5) - 0.5);\n\nmainDist = min(d0, min(d1, d2));\nsubDist = min(d3, min(d4, d5));\n\nmainRib = smoothstep(ribWidth + 0.014, ribWidth, mainDist);\nsubRib = smoothstep(ribWidth * 0.62 + 0.012, ribWidth * 0.62, subDist);\nwoodMask = max(mainRib, subRib);\n\n# Wood grain & bevel highlight along hinoki ribs\ngrain = 0.5 + 0.5 * sin(p.x * 38.0 + sin(p.y * 14.0) * 2.5);\nbevel = smoothstep(ribWidth * 0.4, ribWidth, mainDist) * mainRib;\ncCedar = vec3(0.102, 0.075, 0.055);\ncHinoki = vec3(0.431, 0.278, 0.169);\nwoodCol = mix(cCedar, cHinoki, 0.45 + 0.35 * grain + 0.25 * bevel);\n\n# Backlit fibrous washi paper & warm lantern radial falloff\nr = length(vec2((uv.x - 0.5) * aspect, uv.y - 0.5));\nfiber = sin(p.x * 43.0 + cos(p.y * 37.0) * 2.0) * cos(p.y * 51.0 - sin(p.x * 29.0) * 2.0);\nlantern = exp(-r * r * (2.2 - 0.35 * sin(t * 0.6))) * lanternGlow;\ncWashi = vec3(0.910, 0.847, 0.725);\ncAmber = vec3(0.961, 0.651, 0.259);\npaperCol = mix(cWashi * 0.48, cAmber * 1.05, clamp(lantern * warmth, 0.0, 1.0));\npaperCol += vec3(0.06, 0.04, 0.02) * fiber * washiFiber * 2.5;\n\n# Outer charred sugi stiles frame\nedgeX = smoothstep(0.46, 0.49, abs(uv.x - 0.5));\nedgeY = smoothstep(0.46, 0.49, abs(uv.y - 0.5));\nframeMask = max(edgeX, edgeY);\n\ncol = mix(paperCol, woodCol, woodMask);\ncol = mix(col, cCedar * 0.85, frameMask);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "gridScale": 3.4,
+      "ribWidth": 0.055,
+      "lanternGlow": 1.15,
+      "washiFiber": 0.16,
+      "warmth": 0.82
+    }
+  }
+}

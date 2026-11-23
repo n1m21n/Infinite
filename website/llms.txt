@@ -373,6 +373,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Binaural Celesta Bell Harp Synth](https://infinitedevices.org/library/binaural-celesta-bell-harp-synth.html): Struck steel-plate celesta and crystal harp hybrid with FM mallet transient, wavefolded overtone body, and micro-detuned shimmer. (file: https://infinitedevices.org/assets/templates/binaural-celesta-bell-harp-synth.inf)
 - [Nagra Tape Flutter Loop FX](https://infinitedevices.org/library/nagra-tape-flutter-loop-fx.html): Reel-to-reel Nagra tape hysteresis saturator with dual-LFO capstan wow and flutter, oxide high-frequency rolloff, and resonant tape feedback. (file: https://infinitedevices.org/assets/templates/nagra-tape-flutter-loop-fx.inf)
 - [Schroeder Allpass Prism FX](https://infinitedevices.org/library/schroeder-allpass-prism-fx.html): Cascaded 4-stage Schroeder allpass dispersion prism with modulated resonant bandpass feedback matrix and warm transformer saturation. (file: https://infinitedevices.org/assets/templates/schroeder-allpass-prism-fx.inf)
+- [Ondes Martenot Palme Synth](https://infinitedevices.org/library/ondes-martenot-palme-synth.html): Ondes Martenot inspired expressive ribbon synthesizer with continuous harmonic morphing, sympathetic palme comb resonance, and warm oak-cabinet lowpass. (file: https://infinitedevices.org/assets/templates/ondes-martenot-palme-synth.inf)
+- [Schroeder QRD Prime Diffuser FX](https://infinitedevices.org/library/schroeder-qrd-prime-diffuser-fx.html): Quadratic-residue prime acoustic diffuser processor cascading prime-scaled allpass scattering stages with resonant room absorption and stereo width. (file: https://infinitedevices.org/assets/templates/schroeder-qrd-prime-diffuser-fx.inf)
+- [Frippertronics Dual Reel Loop FX](https://infinitedevices.org/library/frippertronics-dual-reel-loop-fx.html): Dual-capstan reel-to-reel tape loop processor with asymmetric flutter modulation, oxide high-frequency rolloff, and warm transformer feedback saturation. (file: https://infinitedevices.org/assets/templates/frippertronics-dual-reel-loop-fx.inf)
+- [Sala Mixtur Formant Ribbon Synth](https://infinitedevices.org/library/sala-mixtur-formant-ribbon-synth.html): Oskar Sala inspired subharmonic frequency-divider ribbon organ blending 4 subharmonic sawtooth divisions into a resonant formant filter bank and tube saturation. (file: https://infinitedevices.org/assets/templates/sala-mixtur-formant-ribbon-synth.inf)
 
 ## Library: Community
 
@@ -796,7 +800,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 141 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 143 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -813,4 +817,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 126 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 128 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

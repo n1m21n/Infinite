@@ -4465,6 +4465,151 @@
       "groove": 0.5,
       "fill": 0.3,
       "gain": -9.0
+    },
+    {
+      "id": "trautonium_subharmonic_organ",
+      "family": "experimental",
+      "bpm": [
+        78,
+        104
+      ],
+      "swing": 0.04,
+      "scale": [
+        0,
+        2,
+        3,
+        7,
+        8
+      ],
+      "drums": {
+        "kick": "x.......x.......",
+        "snare": "....o.......o...",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...0...3...2...",
+      "fx": [
+        "Delay",
+        "Reverb",
+        "Saturator"
+      ],
+      "synth": [
+        "Field Synth",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.03,
+      "mod": 0.55,
+      "refs": [
+        "Oskar Sala Mixtur-Trautonium subharmonic frequency divider organ and formant filters",
+        "Ondes Martenot 1960 expressive ribbon oscillator with metallic palme sympathetic resonators"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 20,
+        "human": 8
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.35,
+        "octave": 1,
+        "gate": 60,
+        "gain": -9.0,
+        "rate": 0.5,
+        "range": 8
+      },
+      "groove": 0.4,
+      "fill": 0.25,
+      "gain": -9.0
+    },
+    {
+      "id": "schroeder_qrd_dispersion",
+      "family": "ambient",
+      "bpm": [
+        76,
+        96
+      ],
+      "swing": 0.05,
+      "scale": [
+        0,
+        2,
+        4,
+        7,
+        9
+      ],
+      "drums": {
+        "kick": "x.......x.......",
+        "snare": "........o.......",
+        "chat": "..x...x...x...x.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0.......4...5...",
+      "fx": [
+        "Delay",
+        "Chorus",
+        "Reverb",
+        "Saturator"
+      ],
+      "synth": [
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.04,
+      "mod": 0.6,
+      "refs": [
+        "Manfred Schroeder quadratic-residue prime acoustic diffuser scattering",
+        "Frippertronics dual reel-to-reel capstan tape loop delay with oxide damping"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 30,
+        "human": 12
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.3,
+        "octave": 1,
+        "gate": 65,
+        "gain": -9.5,
+        "rate": 0.5,
+        "range": 7
+      },
+      "groove": 0.45,
+      "fill": 0.2,
+      "gain": -9.0
     }
   ]
 }

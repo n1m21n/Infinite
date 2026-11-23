@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kumiko Asanoha Shoji Lantern — Infinite</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1A130E; }
+    canvas { display: block; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <script>
+    const canvas = document.getElementById("gl");
+    const gl = canvas.getContext("webgl");
+
+    const vsSource = `
+      attribute vec2 position;
+      void main() {
+        gl_Position = vec4(position, 0.0, 1.0);
+      }
+    `;
+
+    const fsSource = `
+precision mediump float;
+uniform vec2 res;
+uniform float t;
+uniform float aspect;
+uniform float audio_bass;
+uniform float audio_mid;
+uniform float audio_high;
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / res;
+  vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * (3.4 + audio_mid * 0.35);
+
+  float d0 = abs(fract(p.y) - 0.5);
+  float d1 = abs(fract(p.x * 0.866025 + p.y * 0.5) - 0.5);
+  float d2 = abs(fract(p.x * 0.866025 - p.y * 0.5) - 0.5);
+  float d3 = abs(fract(p.x * 1.73205) - 0.5);
+  float d4 = abs(fract(p.x * 0.866025 + p.y * 1.5) - 0.5);
+  float d5 = abs(fract(p.x * 0.866025 - p.y * 1.5) - 0.5);
+
+  float ribW = 0.055;
+  float mainDist = min(d0, min(d1, d2));
+  float subDist = min(d3, min(d4, d5));
+  float mainRib = smoothstep(ribW + 0.014, ribW, mainDist);
+  float subRib = smoothstep(ribW * 0.62 + 0.012, ribW * 0.62, subDist);
+  float woodMask = max(mainRib, subRib);
+
+  float grain = 0.5 + 0.5 * sin(p.x * 38.0 + sin(p.y * 14.0) * 2.5);
+  float bevel = smoothstep(ribW * 0.4, ribW, mainDist) * mainRib;
+  vec3 cCedar = vec3(0.102, 0.075, 0.055);
+  vec3 cHinoki = vec3(0.431, 0.278, 0.169);
+  vec3 woodCol = mix(cCedar, cHinoki, 0.45 + 0.35 * grain + 0.25 * bevel + audio_high * 0.18);
+
+  float r = length(vec2((uv.x - 0.5) * aspect, uv.y - 0.5));
+  float fiber = sin(p.x * 43.0 + cos(p.y * 37.0) * 2.0) * cos(p.y * 51.0 - sin(p.x * 29.0) * 2.0);
+  float lantern = exp(-r * r * (2.2 - audio_bass * 0.75)) * (1.15 + audio_bass * 0.65);
+  vec3 cWashi = vec3(0.910, 0.847, 0.725);
+  vec3 cAmber = vec3(0.961, 0.651, 0.259);
+  vec3 paperCol = mix(cWashi * 0.48, cAmber * 1.05, clamp(lantern * 0.82, 0.0, 1.0));
+  paperCol += vec3(0.06, 0.04, 0.02) * fiber * 0.4;
+
+  float edgeX = smoothstep(0.46, 0.49, abs(uv.x - 0.5));
+  float edgeY = smoothstep(0.46, 0.49, abs(uv.y - 0.5));
+  float frameMask = max(edgeX, edgeY);
+
+  vec3 col = mix(paperCol, woodCol, woodMask);
+  col = mix(col, cCedar * 0.85, frameMask);
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}
+
+`;
+
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    const program = gl.createProgram();
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+    const positionLoc = gl.getAttribLocation(program, "position");
+    gl.enableVertexAttribArray(positionLoc);
+    gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const resLoc = gl.getUniformLocation(program, "res");
+    const tLoc = gl.getUniformLocation(program, "t");
+    const aspectLoc = gl.getUniformLocation(program, "aspect");
+    const bassLoc = gl.getUniformLocation(program, "audio_bass");
+    const midLoc = gl.getUniformLocation(program, "audio_mid");
+    const highLoc = gl.getUniformLocation(program, "audio_high");
+
+    let audioBass = 0.0, audioMid = 0.0, audioHigh = 0.0;
+    window.addEventListener("message", (e) => {
+      if (e.data && e.data.type === "infinite_audio") {
+        audioBass = e.data.bass || 0.0;
+        audioMid = e.data.mid || 0.0;
+        audioHigh = e.data.high || 0.0;
+      }
+    });
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    const startTime = performance.now();
+    function render(now) {
+      const t = (now - startTime) * 0.001;
+      gl.uniform2f(resLoc, canvas.width, canvas.height);
+      gl.uniform1f(tLoc, t);
+      gl.uniform1f(aspectLoc, canvas.width / Math.max(1, canvas.height));
+      const b = audioBass || (0.28 + 0.22 * Math.sin(t * 2.1));
+      const m = audioMid  || (0.22 + 0.16 * Math.cos(t * 1.4));
+      const h = audioHigh || (0.18 + 0.14 * Math.sin(t * 3.7));
+      gl.uniform1f(bassLoc, b);
+      gl.uniform1f(midLoc, m);
+      gl.uniform1f(highLoc, h);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>

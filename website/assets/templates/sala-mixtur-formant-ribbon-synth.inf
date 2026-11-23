@@ -1,0 +1,68 @@
+infinite-patch 1
+# Sala Mixtur Formant Ribbon Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 57
+  i note1 59
+  i note2 60
+  i note3 64
+  i note4 65
+  i note5 64
+  i note6 60
+  i note7 59
+  i note8 57
+  i note9 64
+  i note10 65
+  i note11 69
+  i note12 65
+  i note13 64
+  i note14 60
+  i note15 59
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float subMix = 0.68 [0.0, 1.0];\nparam float formantHz = 920.0 [240.0, 3200.0];\nparam float formantRes = 0.62 [0.1, 0.90];\nparam float ribbonVib = 0.0045 [0.0, 0.02];\nparam float drive = 1.65 [0.6, 3.2];\nstate float p0 = 0; state float p2 = 0; state float p3 = 0;\nstate float vib = 0; state float env = 0; state float bp1 = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.08, env * 0.9991);\nvib = (vib + 4.8 / sr) % 1.0;\nf0 = clamp(freq * (1.0 + ribbonVib * sin(6.2831853 * vib)), 40.0, 4800.0);\n\np0 = (p0 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 0.5) / sr) % 1.0;\np3 = (p3 + (f0 * 0.333333) / sr) % 1.0;\n\nmixSig = ((p0 * 2.0 - 1.0) * 0.5 + ((p2 * 2.0 - 1.0) * 0.42 + (p3 * 2.0 - 1.0) * 0.35) * subMix) * env;\ng1 = clamp(2.0 * sin(3.14159265 * formantHz / sr), 0.02, 0.85);\nbp1 = bp1 + g1 * (mixSig - lp1 - clamp(1.1 - formantRes, 0.14, 1.0) * bp1);\nlp1 = lp1 + g1 * bp1;\n\nshaped = (lp1 * 0.70 + bp1 * 0.55) * drive;\nout = (shaped / (1.0 + abs(shaped) * 0.72)) * 0.55;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text Sala Mixtur Formant Ribbon Synth. Oskar Sala inspired subharmonic frequency-divider ribbon organ blending 4 subharmonic sawtooth divisions into a resonant formant filter bank and tube saturation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic
