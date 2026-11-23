@@ -2,6 +2,7 @@
 // MSEG node, following the canvas selection. The node is the model: every edit goes through MSEGNode and
 // core/CurveEdit.h, and is a patch undo step. The panel keeps only its view: pages, zoom, tool and selection.
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/Keymap.h"
 #include "app/panels/CurveEditorPanel.h"
 
 #include "app/AppShared.h"
@@ -1421,18 +1422,18 @@ namespace
          for (const auto& t : kTools)
             if (ImGui::IsKeyPressed(t.key, false))
                s.tool = t.tool;
-         if (ImGui::IsKeyPressed(ImGuiKey_G, false))
+         if (Keymap::KeyPressed(Keymap::Act::CeSnap))
             s.snap = !s.snap;
-         if (ImGui::IsKeyPressed(ImGuiKey_F, false))
+         if (Keymap::KeyPressed(Keymap::Act::FitViewF))
             s.v0 = s.y0 = 0.0f, s.v1 = s.y1 = 1.0f;
-         if (ImGui::IsKeyPressed(ImGuiKey_Q, false))
+         if (Keymap::KeyPressed(Keymap::Act::CeQuantise))
             Quantise(n);
-         if (ImGui::IsKeyPressed(ImGuiKey_N, false))
+         if (Keymap::KeyPressed(Keymap::Act::CeNext))
          {
             if(s.tool==Tool::Stamp) s.preset=(s.preset+1)%(CurveLibrary::count+ModShapes::kEaseCount);
             else s.sideOpen = !s.sideOpen;
          }
-         if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+         if (Keymap::Cancel(false))
          {
             if (gCurveAssignUid != 0)
                gCurveAssignUid = 0;
@@ -1440,16 +1441,16 @@ namespace
                ClearSelection();
          }
       }
-      if (plain && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
+      if (plain && (Keymap::KeyPressed(Keymap::Act::Delete) || Keymap::KeyPressed(Keymap::Act::DeleteAlt)))
          DeleteSelection(n);
       if (plain)
       {
          int numPick = -1;
-         if (ImGui::IsKeyPressed(ImGuiKey_1, false)) numPick = 0;
-         else if (ImGui::IsKeyPressed(ImGuiKey_2, false)) numPick = 1;
-         else if (ImGui::IsKeyPressed(ImGuiKey_3, false)) numPick = 2;
-         else if (ImGui::IsKeyPressed(ImGuiKey_4, false)) numPick = 3;
-         else if (ImGui::IsKeyPressed(ImGuiKey_5, false)) numPick = 4;
+         if (Keymap::KeyPressed(Keymap::Act::CeInterp1)) numPick = 0;
+         else if (Keymap::KeyPressed(Keymap::Act::CeInterp2)) numPick = 1;
+         else if (Keymap::KeyPressed(Keymap::Act::CeInterp3)) numPick = 2;
+         else if (Keymap::KeyPressed(Keymap::Act::CeInterp4)) numPick = 3;
+         else if (Keymap::KeyPressed(Keymap::Act::CeInterp5)) numPick = 4;
          if (numPick >= 0)
          {
             if (io.KeyShift)
@@ -1458,11 +1459,11 @@ namespace
                SetInterp(n, numPick);
          }
       }
-      if (cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_C, false))
+      if (cmd && !io.KeyAlt && !io.KeyShift && Keymap::KeyPressed(Keymap::Act::Copy))
          CopySelection(n);
-      if (cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_V, false))
+      if (cmd && !io.KeyAlt && !io.KeyShift && Keymap::KeyPressed(Keymap::Act::Paste))
          PasteClipboard(n);
-      if (cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false))
+      if (cmd && !io.KeyAlt && !io.KeyShift && Keymap::KeyPressed(Keymap::Act::SelectAllCmd))
       {
          s.sel.clear();
          for (int i = 0; i < (int)n.points.size(); i++)
@@ -1990,7 +1991,7 @@ namespace
       if (r.phase == RecPhase::Idle)
          return;
       MSEGNode* n = AsMseg(FindNodeByUid(r.uid));
-      if (n == nullptr || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+      if (n == nullptr || Keymap::Cancel(false))
       {
          RecStop(false);
          return;

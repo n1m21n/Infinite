@@ -1,5 +1,6 @@
 // Audio-in, mixer, keyboard and note node bodies (moved verbatim from main.cpp).
 #include "arrange/NoteSchedule.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -728,9 +729,9 @@ namespace app
          }
       }
       // - and = step the octave (Logic's Musical Typing keys). Held keys keep the note they pressed.
-      if (canPlay && (ImGui::IsKeyPressed(ImGuiKey_Minus, false) || ImGui::IsKeyPressed(ImGuiKey_Equal, false)))
+      if (canPlay && (Keymap::KeyPressed(Keymap::Act::OctaveDown) || Keymap::KeyPressed(Keymap::Act::OctaveUp)))
       {
-         const int next = std::clamp(n->baseOctave + (ImGui::IsKeyPressed(ImGuiKey_Equal, false) ? 1 : -1), -1, 7);
+         const int next = std::clamp(n->baseOctave + (Keymap::KeyPressed(Keymap::Act::OctaveUp) ? 1 : -1), -1, 7);
          if (next != n->baseOctave)
          {
             PushUndoCheckpoint();

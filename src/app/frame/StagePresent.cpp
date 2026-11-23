@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "app/ui/design/Keymap.h"
 #include "plugin/engine/HostAudio.h"
 #include "plugin/engine/PluginView.h"
 
@@ -32,15 +33,15 @@ void DrawPresent(FrameCtx& fc)
          // Cmd+0 / Cmd+= / Cmd+- are the views' own Fit and Zoom (Photoshop, Blender): while the pointer is on a 2D
          // or 3D View it has the keys, and Settings and UI scale stay out of it.
          const bool viewHasKeys = (gView2DOpen && gView2DClaimedKeys) || (gView3DOpen && gView3DClaimedKeys);
-         if (viewHasKeys && (ImGui::IsKeyPressed(ImGuiKey_0, false) || ImGui::IsKeyPressed(ImGuiKey_Equal, true) ||
-                             ImGui::IsKeyPressed(ImGuiKey_Minus, true)))
+         if (viewHasKeys && (Keymap::KeyPressed(Keymap::Act::Settings) || Keymap::KeyPressed(Keymap::Act::UiScaleUp, true) ||
+                             Keymap::KeyPressed(Keymap::Act::UiScaleDown, true)))
             ;
-         else if (ImGui::IsKeyPressed(ImGuiKey_0, false))
+         else if (Keymap::KeyPressed(Keymap::Act::Settings))
             gSettingsOpen = true;
-         else if (ImGui::IsKeyPressed(ImGuiKey_Equal, true) || ImGui::IsKeyPressed(ImGuiKey_Minus, true))
+         else if (Keymap::KeyPressed(Keymap::Act::UiScaleUp, true) || Keymap::KeyPressed(Keymap::Act::UiScaleDown, true))
          {
             // UI scale in 0.1 steps, like a browser's zoom. Applied through the same rescale path as the Settings slider.
-            const bool up = ImGui::IsKeyPressed(ImGuiKey_Equal, true);
+            const bool up = Keymap::KeyPressed(Keymap::Act::UiScaleUp, true);
             const float next = std::clamp(std::round((CategoryColors::GetUiScale() + (up ? 0.1f : -0.1f)) * 10.0f) / 10.0f, 0.5f, 2.0f);
             if (next != CategoryColors::GetUiScale())
             {
@@ -48,15 +49,15 @@ void DrawPresent(FrameCtx& fc)
                UiScale::RequestRescale();
             }
          }
-         else if (ImGui::IsKeyPressed(ImGuiKey_S, false))
+         else if (Keymap::KeyPressed(Keymap::Act::Save))
             SavePatchInteractive(ImGui::GetIO().KeyShift);
-         else if (ImGui::IsKeyPressed(ImGuiKey_O, false))
+         else if (Keymap::KeyPressed(Keymap::Act::Open))
          {
             const std::string path = Platform::OpenPatchDialog();
             if (!path.empty())
                GuardUnsavedChanges([path]() { LoadPatchFrom(path); });
          }
-         else if (ImGui::IsKeyPressed(ImGuiKey_N, false))
+         else if (Keymap::KeyPressed(Keymap::Act::New))
          {
             if (ImGui::GetIO().KeyShift)
                SpawnPlayableSynth(); // adds to the patch, so nothing unsaved is at risk

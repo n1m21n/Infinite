@@ -5,6 +5,7 @@
 // Changed card diffed from the patch before and after. Files attach by the + button or a drop. Every chat
 // is saved and comes back from the history menu with its agent sessions.
 #include "app/AppShared.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiFmt.h"
@@ -2155,9 +2156,9 @@ namespace app
                sCursorToEnd = false;
             }
             // ↑↓ pick in the dropdown instead of moving the cursor.
-            if (DropdownOpen() && Pickable() && (ImGui::IsKeyPressed(ImGuiKey_UpArrow) || ImGui::IsKeyPressed(ImGuiKey_DownArrow)))
+            if (DropdownOpen() && Pickable() && (Keymap::Up(true) || Keymap::Down(true)))
             {
-               MovePick(ImGui::IsKeyPressed(ImGuiKey_UpArrow) ? -1 : 1);
+               MovePick(Keymap::Up(true) ? -1 : 1);
                data->CursorPos = data->SelectionStart = data->SelectionEnd = std::min(sPrevCursor, data->BufTextLen);
             }
             sCursorAtEnd = data->CursorPos == data->BufTextLen;
@@ -2803,7 +2804,7 @@ namespace app
          if (sViewing.empty())
             return;
          Texture* t = TextureFor(sViewing);
-         if (t == nullptr || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+         if (t == nullptr || Keymap::Cancel(false))
          {
             sViewing.clear();
             return;
@@ -4241,9 +4242,9 @@ namespace app
                }
             }
             const bool typing = ImGui::GetIO().WantTextInput;
-            if (!typing && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_C))
+            if (!typing && Keymap::Pressed(Keymap::Act::CopyText))
                ImGui::SetClipboardText(SelectedText(idx, lo, hi).c_str());
-            if (!typing && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+            if (!typing && Keymap::Cancel(false))
                ClearSelection();
          }
          // A press on an agent's words starts a selection; a double click takes the whole word.
@@ -5033,7 +5034,7 @@ namespace app
          // A paste that attaches takes the key, so the field does not also paste a file's name.
          static bool sInputWasActive = false;
          const ImGuiIO& io = ImGui::GetIO();
-         if (sInputWasActive && (io.KeyCtrl || io.KeySuper) && ImGui::IsKeyPressed(ImGuiKey_V, false) && PasteAttachments())
+         if (sInputWasActive && (io.KeyCtrl || io.KeySuper) && Keymap::KeyPressed(Keymap::Act::Paste) && PasteAttachments())
             ImGui::SetKeyOwner(ImGuiKey_V, ImGui::GetID("##chatpaste"), ImGuiInputFlags_LockThisFrame);
          const ImGuiInputTextFlags flags = ImGuiInputTextFlags_WordWrap | ImGuiInputTextFlags_CtrlEnterForNewLine | ImGuiInputTextFlags_EnterReturnsTrue |
                                            ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackCompletion;
@@ -5053,7 +5054,7 @@ namespace app
                Send();
             sRefocus = true;
          }
-         if (active && ImGui::IsKeyPressed(ImGuiKey_Escape) && DropdownOpen())
+         if (active && Keymap::Cancel(true) && DropdownOpen())
          {
             sDismissed = sDropKey;
             sRefocus = true;

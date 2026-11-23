@@ -5,6 +5,7 @@
 // The idea comes from Ricardo Palmieri's Infinite-Turbo fork; this is a fresh
 // implementation.
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -705,7 +706,7 @@ namespace app
             if (commit || ImGui::IsItemDeactivated())
             {
                const std::string newName = sTrackNameBuf;
-               if (!ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+               if (!Keymap::Cancel(false))
                   ArrangeEdit([&]() {
                      if (Arrange::Lane* ln = Arrange::FindLane(gArrange, hdrLaneId))
                         if (ln->name != newName)
@@ -1036,7 +1037,7 @@ namespace app
                {
                   const std::string newName = gArrangeRenameClipBuffer;
                   const uint64_t rid = ss->clip.id;
-                  if (!ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+                  if (!Keymap::Cancel(false))
                      ArrangeEdit([&]() {
                         if (Arrange::Clip* c = Arrange::FindClip(gArrange, rid))
                            if (c->name != newName)

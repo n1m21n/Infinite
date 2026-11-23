@@ -2,6 +2,7 @@
 // on its own threads (core/term/TermSession.h); this file only draws the latest snapshot and queues input, so the
 // frame never waits on a shell. Open state, dock and height are app preferences; patches never touch the terminal.
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
@@ -825,13 +826,13 @@ namespace
          ImGui::AlignTextToFramePadding();
          ImGui::TextDisabled("%s", label);
       }
-      if (focused && count > 0 && ImGui::IsKeyPressed(ImGuiKey_Enter, true))
+      if (focused && count > 0 && Keymap::Enter(true))
       {
          sSearchIndex = (sSearchIndex + (ImGui::GetIO().KeyShift ? 1 : count - 1)) % count;
          tab.session->ScrollToLine(snap->searchHits[(size_t)sSearchIndex].line);
          sSearchFocus = true;
       }
-      if (focused && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+      if (focused && Keymap::Cancel(false))
       {
          sSearchOpen = false;
          sSearchActive = false;
@@ -1384,7 +1385,7 @@ void DrawTerminalQuitWarning()
          sQuitAction();
       sQuitAction = nullptr;
    }
-   else if (pick == 1 || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+   else if (pick == 1 || Keymap::Cancel(false))
    {
       ImGui::CloseCurrentPopup();
       sQuitAction = nullptr;

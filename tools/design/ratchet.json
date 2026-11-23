@@ -596,31 +596,12 @@
    "src/app/ui/design/components/PanelKit.h": 6
   },
   "key_checks": {
-   "src/app/bodies/NoteBodies.cpp": 3,
-   "src/app/bodies/PreviewBodies.cpp": 2,
-   "src/app/frame/CanvasLink.cpp": 1,
    "src/app/frame/FrameTests1.cpp": 4,
    "src/app/frame/FrameTests2.cpp": 8,
    "src/app/frame/FrameTests5.cpp": 4,
-   "src/app/frame/StageFloating.cpp": 3,
    "src/app/frame/StageFramePump.cpp": 2,
-   "src/app/frame/StageLinks.cpp": 16,
    "src/app/frame/StagePopupsA.cpp": 1,
-   "src/app/frame/StagePopupsB.cpp": 3,
-   "src/app/frame/StagePresent.cpp": 10,
-   "src/app/graph/RpcApp.cpp": 4,
-   "src/app/panels/ArrangePanel.cpp": 39,
-   "src/app/panels/ArrangeSessionGrid.cpp": 2,
-   "src/app/panels/ChatPanel.cpp": 9,
-   "src/app/panels/CurveEditorPanel.cpp": 16,
-   "src/app/panels/FieldPatcherPanel.cpp": 13,
-   "src/app/panels/FindOverlay.cpp": 6,
-   "src/app/panels/MixerPanel.cpp": 2,
-   "src/app/panels/PerfPanel.cpp": 10,
-   "src/app/panels/SampleStudioPanel.cpp": 19,
-   "src/app/panels/TerminalPanel.cpp": 3,
-   "src/app/panels/View2DPanel.cpp": 2,
-   "src/app/panels/View3DPanel.cpp": 12
+   "src/app/graph/RpcApp.cpp": 4
   },
   "layout_literals": {
    "src/app/bodies/AudioBodyKit.cpp": 1,

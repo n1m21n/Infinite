@@ -1,6 +1,7 @@
 // Find on the canvas (Cmd/Ctrl+F). One field over the canvas; matches node title, node type, comment
 // text and param names as you type; Up/Down step, Enter jumps to the node, Esc closes.
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -93,7 +94,7 @@ void DrawFind()
 {
    ImGuiIO& io = ImGui::GetIO();
    const bool cmd = io.KeyCtrl || io.KeySuper;
-   if (cmd && !io.KeyShift && !io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_F, false) &&
+   if (cmd && !io.KeyShift && !io.KeyAlt && Keymap::KeyPressed(Keymap::Act::Find) &&
        (sOpen || !io.WantTextInput) && !gNavOwnsKeys && !gArrangeFocused && !gNodes.empty())
    {
       if (!sOpen)
@@ -138,13 +139,13 @@ void DrawFind()
          ImGui::SetKeyboardFocusHere();
          sFocusField = false;
       }
-      const bool pickNow = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+      const bool pickNow = Keymap::Confirm(false);
       LibraryParts::SearchField("canvasfind", T("find nodes, comments, params..."), sBuf, sizeof(sBuf));
       if (!sMatches.empty())
       {
          const int n = (int)sMatches.size();
-         if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) sCurrent = (sCurrent + 1) % n;
-         if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) sCurrent = (sCurrent + n - 1) % n;
+         if (Keymap::Down(true)) sCurrent = (sCurrent + 1) % n;
+         if (Keymap::Up(true)) sCurrent = (sCurrent + n - 1) % n;
          if (pickNow) sJumpTo = sMatches[sCurrent];
       }
       sFocusField = pickNow;   // Enter ends the edit; take the caret straight back
@@ -155,7 +156,7 @@ void DrawFind()
          ImGui::TextDisabled("%s", T("no matches"));
       else
          ImGui::TextDisabled("%d / %d", sCurrent + 1, (int)sMatches.size());
-      if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+      if (Keymap::Cancel(true))
          stay = false;
    }
    ImGui::End();

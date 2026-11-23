@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include <unordered_map>
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/frame/FrameCtx.h"
 #include "app/ui/design/Tokens.gen.h"
@@ -685,17 +686,17 @@ void DrawLinks(FrameCtx& fc)
       // Shift+Cmd+Z is the Mac convention for redo; Ctrl+Y also works for
       // anyone used to the Windows/Linux binding.
       // Over the Sample Studio's waveform, Cmd+Z undoes the Studio's own edits (SampleStudioPanel.cpp).
-      if (!typing && !(gSampleStudioOpen && gSampleStudioClaimedKeys) && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+      if (!typing && !(gSampleStudioOpen && gSampleStudioClaimedKeys) && cmdOrCtrl && !io.KeyShift && Keymap::KeyPressed(Keymap::Act::Undo))
          Undo();
-      if (!typing && !(gSampleStudioOpen && gSampleStudioClaimedKeys) && ((cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
-                      (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))))
+      if (!typing && !(gSampleStudioOpen && gSampleStudioClaimedKeys) && ((cmdOrCtrl && io.KeyShift && Keymap::KeyPressed(Keymap::Act::Redo)) ||
+                      (io.KeyCtrl && Keymap::KeyPressed(Keymap::Act::RedoAlt))))
          Redo();
 
       // Cmd+A / Shift+A selects every node on the canvas. !gArrangeFocused: the
       // timeline has its own Cmd+A / Shift+A (select all clips) while it owns the
       // keyboard, same as its sibling shortcuts below.
       const bool doSelectAll = gRequestSelectAll ||
-         (!typing && !gPerfMatrixFocused && !gArrangeFocused && (cmdOrCtrl || io.KeyShift) && ImGui::IsKeyPressed(ImGuiKey_A, false));
+         (!typing && !gPerfMatrixFocused && !gArrangeFocused && (cmdOrCtrl || io.KeyShift) && Keymap::KeyPressed(Keymap::Act::SelectAll));
       gRequestSelectAll = false;
       if (doSelectAll)
       {
@@ -740,10 +741,10 @@ void DrawLinks(FrameCtx& fc)
 
          auto dirKey = [&](float& dx, float& dy) {
             dx = dy = 0.0f;
-            if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) dx = -1.0f;
-            else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) dx = 1.0f;
-            else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) dy = -1.0f;
-            else if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) dy = 1.0f;
+            if (Keymap::Left(true)) dx = -1.0f;
+            else if (Keymap::Right(true)) dx = 1.0f;
+            else if (Keymap::Up(true)) dy = -1.0f;
+            else if (Keymap::Down(true)) dy = 1.0f;
             return dx != 0.0f || dy != 0.0f;
          };
          // One undo entry per burst of presses, like one entry per mouse drag.
@@ -759,7 +760,7 @@ void DrawLinks(FrameCtx& fc)
          if (kbFree && !io.KeyAlt)
          {
             // ---- Tab: params of the active node, looped ----
-            if (active != nullptr && ImGui::IsKeyPressed(ImGuiKey_Tab, ImGuiInputFlags_Repeat, kKbTabOwner))
+            if (active != nullptr && Keymap::NextField(ImGuiInputFlags_Repeat, kKbTabOwner))
             {
                std::vector<int> mine;
                for (const KbParamEntry& e : gKbParams)
@@ -776,7 +777,7 @@ void DrawLinks(FrameCtx& fc)
                   gKbFocusParam = mine[next];
                }
             }
-            else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) && gKbFocusNode >= 0)
+            else if (Keymap::Cancel(false) && gKbFocusNode >= 0)
             {
                gKbFocusNode = -1;
                gKbFocusParam = -1;
@@ -882,7 +883,7 @@ void DrawLinks(FrameCtx& fc)
          // ---- Shift+Enter zooms into the node, Enter zooms back out ----
          if (kbFree && !io.KeyAlt)
          {
-            const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+            const bool enter = Keymap::Confirm(false);
             if (enter && gKbZoomed)
             {
                gKbViewRestore = true;
@@ -898,22 +899,22 @@ void DrawLinks(FrameCtx& fc)
          }
 
          // ---- H again closes the help popup (kbFree is off while any popup is open) ----
-         if (gNodeHelpShown && !typing && !cmdOrCtrl && !io.KeyShift && !io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_H, false))
+         if (gNodeHelpShown && !typing && !cmdOrCtrl && !io.KeyShift && !io.KeyAlt && Keymap::KeyPressed(Keymap::Act::NodeHelp))
             gCloseNodeHelp = true;
          gNodeHelpShown = false;
 
          // ---- single-key node commands ----
          const bool plain = kbFree && !io.KeyAlt && !io.KeyShift && !gComputerKeyboardHot;
-         if (plain && active != nullptr && ImGui::IsKeyPressed(ImGuiKey_H, false))
+         if (plain && active != nullptr && Keymap::KeyPressed(Keymap::Act::NodeHelp))
          {
             gHelpPopupNodeIndex = active->index;
             gOpenNodeHelpPopup = true;
          }
-         if (plain && ImGui::IsKeyPressed(ImGuiKey_F, false))
+         if (plain && Keymap::KeyPressed(Keymap::Act::FitViewF))
             gRequestFitView = true;
          // Cmd/Ctrl+U ungroups (kbFree excludes Cmd/Ctrl, so it is gated on its own).
          if (!typing && !gArrangeFocused && cmdOrCtrl && !io.KeyShift && !io.KeyAlt && !gComputerKeyboardHot &&
-             gKbFocusNode < 0 && ImGui::IsKeyPressed(ImGuiKey_U, false))
+             gKbFocusNode < 0 && Keymap::KeyPressed(Keymap::Act::UngroupU))
             gRequestUngroup = true;
 
          // ---- W A S D pan the canvas while held ----

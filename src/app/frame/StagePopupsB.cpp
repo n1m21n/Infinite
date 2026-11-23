@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/Tip.h"
 #include <set>
@@ -190,7 +191,7 @@ void DrawPopupsB(FrameCtx& fc)
                gPatchDirty = true;
             // Esc finishes the same way clicking outside does - no separate
             // "done" step needed for a note this small.
-            if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+            if (Keymap::Cancel(true))
                ImGui::CloseCurrentPopup();
          }
          else
@@ -287,7 +288,7 @@ void DrawPopupsB(FrameCtx& fc)
          std::string q(searchBuf);
          std::transform(q.begin(), q.end(), q.begin(), ::tolower);
 
-         const bool pickFirst = ImGui::IsKeyPressed(ImGuiKey_Enter, false);
+         const bool pickFirst = Keymap::Enter(false);
          std::string spawnName, spawnCategory;
          int shown = 0;
 
@@ -536,7 +537,7 @@ void DrawPopupsB(FrameCtx& fc)
             LibraryParts::SearchField("ddsearch", T("search..."), gDropdown.filterBuf, sizeof(gDropdown.filterBuf));
             MenuParts::Separator();
             // The focused search field takes the first Esc for itself; the list should close on it.
-            if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+            if (Keymap::Cancel(true))
                ImGui::CloseCurrentPopup();
          }
 

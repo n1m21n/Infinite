@@ -1,5 +1,6 @@
 // Canvas Link: one pick state, one canvas hook, one set of words and glyphs (see CanvasLink.h).
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/Keymap.h"
 #include "app/AppShared.h"
 #include "app/selftest/UiAudit.h"
 #include "app/ui/design/Glyphs.gen.h"
@@ -271,7 +272,7 @@ namespace CanvasLink
             return;
          }
       }
-      if (cancelNow || ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (cancelNow || Keymap::Cancel(true) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          Cancel();
    }
 

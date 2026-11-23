@@ -2,6 +2,7 @@
 // the Scene3DNode's placements; the nodes themselves are only ever read, so a
 // source keeps animating under whatever arrangement is made on top of it.
 #include "core/FactoryPresets.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/ReorderDrag.h"
 #include "app/AppCommon.h"
 #include "app/AppShared.h"
@@ -5536,7 +5537,7 @@ namespace
             snprintf(text, sizeof(text), "%.3f  (X %.2f  Y %.2f  Z %.2f)", std::sqrt(dx * dx + dy * dy + dz * dz), dx, dy, dz);
             dl->AddText(ImVec2((a.x + b.x) * 0.5f + 8.0f, (a.y + b.y) * 0.5f - 18.0f), Hex(0xFFFFFF, 0.95f), text);
          }
-         if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || sTool != 0 || sSelMode != 3)
+         if (Keymap::Cancel(false) || sTool != 0 || sSelMode != 3)
             sMeasured = sMeasuring = false;
       }
       for (const Ruler& r : sRulers)
@@ -5553,7 +5554,7 @@ namespace
             dl->AddText(ImVec2((a.x + b.x) * 0.5f + 8.0f, (a.y + b.y) * 0.5f - 18.0f), Hex(0xFFFFFF, 0.95f), text);
          }
       }
-      if (sTool == 0 && sSelMode == 3 && hovered && !sRulers.empty() && ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
+      if (sTool == 0 && sSelMode == 3 && hovered && !sRulers.empty() && Keymap::KeyPressed(Keymap::Act::DeleteAlt))
          sRulers.pop_back();
       if (sTool == 0 && sSelMode == 4 && hovered)
       {
@@ -6209,11 +6210,11 @@ namespace
       if (lf.listSort)
          std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return lower(ItemName(items[a])) < lower(ItemName(items[b])); });
       if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !sSel.empty() && sRename == 0 &&
-          (ImGui::IsKeyPressed(ImGuiKey_UpArrow) || ImGui::IsKeyPressed(ImGuiKey_DownArrow)) && !order.empty())
+          (Keymap::Up(true) || Keymap::Down(true)) && !order.empty())
       {
          // Arrow keys walk the shown list.
          auto at = std::find_if(order.begin(), order.end(), [&](int r) { return items[r].id == sSel.back(); });
-         int next = at == order.end() ? 0 : (int)(at - order.begin()) + (ImGui::IsKeyPressed(ImGuiKey_DownArrow) ? 1 : -1);
+         int next = at == order.end() ? 0 : (int)(at - order.begin()) + (Keymap::Down(true) ? 1 : -1);
          next = std::clamp(next, 0, (int)order.size() - 1);
          sSel = { items[order[next]].id };
          scrollToActive = true;
@@ -6352,15 +6353,15 @@ namespace
       if ((listHovered || sListActive) && sRename == 0 && !io.WantTextInput && !sSel.empty())
       {
          const bool command = io.KeyCtrl || io.KeySuper;
-         if (!command && (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace) || ImGui::IsKeyPressed(ImGuiKey_X)))
+         if (!command && (Keymap::KeyPressed(Keymap::Act::Delete, true) || Keymap::KeyPressed(Keymap::Act::DeleteAlt, true) || Keymap::KeyPressed(Keymap::Act::DeleteX, true)))
             DeleteSelected(scene);
-         else if (command && ImGui::IsKeyPressed(ImGuiKey_C))
+         else if (command && Keymap::KeyPressed(Keymap::Act::Copy, true))
             sCopiedItems = SelectedItems(scene);
-         else if ((command && ImGui::IsKeyPressed(ImGuiKey_D)) || (io.KeyShift && !command && ImGui::IsKeyPressed(ImGuiKey_D)))
+         else if ((command && Keymap::KeyPressed(Keymap::Act::Duplicate, true)) || (io.KeyShift && !command && Keymap::KeyPressed(Keymap::Act::Duplicate, true)))
             DuplicateSelected(scene, io.MousePos, false);
       }
       if ((listHovered || sListActive) && sRename == 0 && !io.WantTextInput && !sCopiedItems.empty() &&
-          (io.KeyCtrl || io.KeySuper) && ImGui::IsKeyPressed(ImGuiKey_V))
+          (io.KeyCtrl || io.KeySuper) && Keymap::KeyPressed(Keymap::Act::Paste, true))
          PasteItems(scene);
       static float sBoxY0 = 0.0f;
       static bool sBoxing = false;

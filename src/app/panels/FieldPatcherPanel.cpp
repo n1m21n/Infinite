@@ -4,6 +4,7 @@
 // `# @boxes v1` header that keeps positions), sets the node's code, compiles it and is one patch undo step. A
 // failed compile leaves the node on its last good program; the footer names the error.
 #include "app/panels/FieldPatcherPanel.h"
+#include "app/ui/design/Keymap.h"
 
 #include "app/AppShared.h"
 #include "app/ui/design/UiDensity.h"
@@ -761,7 +762,7 @@ namespace
       }
       ImGui::Dummy(ImVec2(260.0f, 0.0f));
       LibraryParts::SearchField("fpSearch", T("Search boxes"), s.search, sizeof(s.search));
-      const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false);
+      const bool enter = Keymap::Enter(false);
       MenuParts::Separator();
       const uint32_t mask = MaskOf(p, h);
       std::vector<const Field::BoxSpec*> list = Field::FindBoxSpecsByQuery(s.search, 0);
@@ -851,7 +852,7 @@ namespace
          {
             std::string name = rs.boxNameBuf;
             name.erase(std::remove_if(name.begin(), name.end(), [](char c) { return c == '"' || c == '|' || c == '\n'; }), name.end());
-            if (!ImGui::IsKeyPressed(ImGuiKey_Escape, false) && name != BoxTitle(b))
+            if (!Keymap::Cancel(false) && name != BoxTitle(b))
             {
                b.title = name;
                changed = true;
@@ -1096,18 +1097,18 @@ namespace
          const bool cmd = io.KeyCtrl || io.KeySuper || gFieldPatcherTestCmd;
          const std::vector<int> sel = SelectedIds(p);
          const ImVec2 mouse = ed::ScreenToCanvas(ImGui::GetMousePos());
-         if (cmd && ImGui::IsKeyPressed(ImGuiKey_C, false) && !sel.empty())
+         if (cmd && Keymap::KeyPressed(Keymap::Act::Copy) && !sel.empty())
             CopyBoxes(p, sel);
-         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_X, false) && !sel.empty())
+         else if (cmd && Keymap::KeyPressed(Keymap::Act::Cut) && !sel.empty())
          {
             CopyBoxes(p, sel);
             for (int id : sel)
                RemoveBox(p, id);
             changed = true;
          }
-         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_V, false) && !s.clipBoxes.empty())
+         else if (cmd && Keymap::KeyPressed(Keymap::Act::Paste) && !s.clipBoxes.empty())
             changed = PasteBoxes(p, mouse) > 0;
-         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_D, false) && !sel.empty())
+         else if (cmd && Keymap::KeyPressed(Keymap::Act::Duplicate) && !sel.empty())
          {
             CopyBoxes(p, sel);
             ImVec2 tl(1e9f, 1e9f);
@@ -1115,9 +1116,9 @@ namespace
                tl = ImVec2(std::min(tl.x, b.x), std::min(tl.y, b.y));
             changed = PasteBoxes(p, ImVec2(tl.x + 40.0f, tl.y + 40.0f)) > 0;
          }
-         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_A, false))
+         else if (cmd && Keymap::KeyPressed(Keymap::Act::SelectAllCmd))
             SelectAllBoxes(p);
-         else if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
+         else if (Keymap::KeyPressed(Keymap::Act::Delete) || Keymap::KeyPressed(Keymap::Act::DeleteAlt))
          {
             // Selected wires go too, as on the main canvas.
             std::vector<ed::LinkId> links((size_t)std::max(1, ed::GetSelectedObjectCount()));
@@ -1134,10 +1135,10 @@ namespace
             if (changed)
                ed::ClearSelection();
          }
-         else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+         else if (Keymap::Cancel(false))
             ed::ClearSelection();
-         else if ((!cmd && !io.KeyAlt && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F, false)) ||
-                  (io.KeyShift && !cmd && ImGui::IsKeyPressed(ImGuiKey_Y, false)))
+         else if ((!cmd && !io.KeyAlt && !io.KeyShift && Keymap::KeyPressed(Keymap::Act::FitViewF)) ||
+                  (io.KeyShift && !cmd && Keymap::KeyPressed(Keymap::Act::FitView)))
             ed::NavigateToContent(0.2f); // F / Shift+Y fits the view, as on the main canvas
       }
 
@@ -1751,7 +1752,7 @@ namespace
    void DrawPanel()
    {
       gFieldPatcherClaimedKeys = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::GetIO().WantTextInput;
-      if (gFieldPatcherMaximised && gFieldPatcherClaimedKeys && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+      if (gFieldPatcherMaximised && gFieldPatcherClaimedKeys && Keymap::Cancel(false))
          gFieldPatcherMaximised = false;
       PrunePages();
       FollowCanvasSelection();

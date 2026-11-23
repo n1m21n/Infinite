@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/frame/FrameCtx.h"
@@ -259,7 +260,7 @@ int DrawFloating(FrameCtx& fc)
          }
          if (pick == 1)
             Platform::OpenExternalUrl("https://infinitedevices.org/");
-         if (pick == 2 || ImGui::IsKeyPressed(ImGuiKey_Escape))
+         if (pick == 2 || Keymap::Cancel(true))
             ImGui::CloseCurrentPopup();
          DialogParts::End();
       }
@@ -289,7 +290,7 @@ int DrawFloating(FrameCtx& fc)
             CollectDiagnostics(sIncludePatch && !gPatchPath.empty());
             ImGui::CloseCurrentPopup();
          }
-         if (pick == 1 || ImGui::IsKeyPressed(ImGuiKey_Escape))
+         if (pick == 1 || Keymap::Cancel(true))
             ImGui::CloseCurrentPopup();
          DialogParts::End();
       }
@@ -362,7 +363,7 @@ int DrawFloating(FrameCtx& fc)
             ImGui::CloseCurrentPopup();
             SavePatchWithMediaInteractive();
          }
-         if (pick == 1 || ImGui::IsKeyPressed(ImGuiKey_Escape))
+         if (pick == 1 || Keymap::Cancel(true))
             ImGui::CloseCurrentPopup();
          DialogParts::End();
       }

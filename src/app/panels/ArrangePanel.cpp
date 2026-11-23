@@ -1,5 +1,6 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
 #include "app/ui/design/components/PanelKit.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -913,7 +914,7 @@ namespace app
       // from their gesture snapshot every frame, which would silently undo
       // (and double-push) an edit made mid-gesture.
       // Escape abandons a ruler scrub without seeking.
-      const bool scrubEscaped = gArrangeScrubbing && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+      const bool scrubEscaped = gArrangeScrubbing && Keymap::Cancel(false);
       if (scrubEscaped)
          ArrangeScrubCancel();
       // !ArrangeRenderBusy(): the timeline is read-only for the duration of a
@@ -938,7 +939,7 @@ namespace app
          const bool noMods = !cmd && !kio.KeyAlt && !kio.KeyShift;
          const Arrange::Tick playTick = ArrangePlayTick();
 
-         if ((cmd || kio.KeyShift) && ImGui::IsKeyPressed(ImGuiKey_A, false))
+         if ((cmd || kio.KeyShift) && Keymap::KeyPressed(Keymap::Act::SelectAll))
          {
             gArrangeSel.clear();
             for (const Arrange::Lane& l : gArrange.lanes)
@@ -946,14 +947,14 @@ namespace app
                   gArrangeSel.insert(c.id);
             gArrangeSelAnchor = 0;
          }
-         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_C, false))
+         else if (cmd && Keymap::KeyPressed(Keymap::Act::Copy))
             ArrangeCopySelection();
-         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_X, false))
+         else if (cmd && Keymap::KeyPressed(Keymap::Act::Cut))
          {
             if (ArrangeCopySelection())
                ArrangeDeleteSelection();
          }
-         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_V, false))
+         else if (cmd && Keymap::KeyPressed(Keymap::Act::Paste))
             ArrangePasteAt(playTick);
          // Shift+D / Delete / Cmd+G / Cmd+Shift+G: the header-row selection
          // (gArrangeRowSel - tracks and groups) wins over the clip selection
@@ -962,104 +963,104 @@ namespace app
          // be selected. Row-selection ops each return false (falling through
          // to the clip-selection op below) when the row selection turned out
          // empty by the time they ran, so nothing silently no-ops.
-         else if ((cmd || kio.KeyShift) && ImGui::IsKeyPressed(ImGuiKey_D, false))
+         else if ((cmd || kio.KeyShift) && Keymap::KeyPressed(Keymap::Act::Duplicate))
          {
             if (gArrangeRowSel.empty() || !ArrangeDuplicateRowSelection())
                ArrangeDuplicateSelection();
          }
-         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_E, false))
+         else if (cmd && Keymap::KeyPressed(Keymap::Act::Split))
             ArrangeSplitSelectionAt(playTick);
-         else if (cmd && kio.KeyShift && ImGui::IsKeyPressed(ImGuiKey_G, false))
+         else if (cmd && kio.KeyShift && Keymap::KeyPressed(Keymap::Act::Ungroup))
          {
             if (gArrangeRowSel.empty() || !ArrangeUngroupRowSelection())
                ArrangeUngroupSelection();
          }
-         else if (cmd && ImGui::IsKeyPressed(ImGuiKey_G, false))
+         else if (cmd && Keymap::KeyPressed(Keymap::Act::Group))
          {
             if (gArrangeRowSel.empty() || !ArrangeGroupRowSelection())
                ArrangeGroupSelection();
          }
-         else if (cmd && !kio.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false))
+         else if (cmd && !kio.KeyShift && Keymap::KeyPressed(Keymap::Act::Rename))
             ArrangeRenameSelection();
-         else if (!cmd && kio.KeyShift && !kio.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_J, false))
+         else if (!cmd && kio.KeyShift && !kio.KeyAlt && Keymap::KeyPressed(Keymap::Act::TlAddVideoTrack))
             ArrangeAddTrackShortcut(true);
-         else if (!cmd && kio.KeyShift && !kio.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_K, false))
+         else if (!cmd && kio.KeyShift && !kio.KeyAlt && Keymap::KeyPressed(Keymap::Act::TlAddAudioTrack))
             ArrangeAddTrackShortcut(false);
          else if (!cmd && !kio.KeyAlt &&
-                  (ImGui::IsKeyPressed(ImGuiKey_0, false) || ImGui::IsKeyPressed(ImGuiKey_Keypad0, false)))
+                  (Keymap::KeyPressed(Keymap::Act::TlToggleEnabled) || Keymap::KeyPressed(Keymap::Act::TlToggleEnabledPad)))
             ArrangeToggleEnabledSelection();
-         else if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
+         else if (Keymap::KeyPressed(Keymap::Act::Delete) || Keymap::KeyPressed(Keymap::Act::DeleteAlt))
          {
             if (gArrangeRowSel.empty() || !ArrangeDeleteRowSelection())
                ArrangeDeleteSelection();
          }
          // Markers and the playhead (WP6). The canvas binds none of these
          // keys (Shift+M is the mod matrix, hence noMods on M).
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_M, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlMarker))
             ArrangeAddMarkerAtPlayhead();
          // Tool selection hotkeys (A = Select, T = Trim, R = Range, B = Blade, Z = Zoom, H = Hand)
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_A, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::ToolSelect))
          {
             gArrangeTool = ArrangeTool::Select;
             gArrangeBladeOn = false;
          }
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_T, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlToolTrim))
          {
             gArrangeTool = (gArrangeTool == ArrangeTool::Trim) ? ArrangeTool::Select : ArrangeTool::Trim;
             gArrangeBladeOn = false;
          }
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_R, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlToolRange))
          {
             gArrangeTool = (gArrangeTool == ArrangeTool::Range) ? ArrangeTool::Select : ArrangeTool::Range;
             gArrangeBladeOn = false;
          }
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_B, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::ToolBlade))
          {
             gArrangeTool = (gArrangeTool == ArrangeTool::Blade) ? ArrangeTool::Select : ArrangeTool::Blade;
             gArrangeBladeOn = (gArrangeTool == ArrangeTool::Blade);
          }
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlToolZoom))
          {
             gArrangeTool = (gArrangeTool == ArrangeTool::Zoom) ? ArrangeTool::Select : ArrangeTool::Zoom;
             gArrangeBladeOn = false;
          }
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_H, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::ToolHand))
          {
             gArrangeTool = (gArrangeTool == ArrangeTool::Hand) ? ArrangeTool::Select : ArrangeTool::Hand;
             gArrangeBladeOn = false;
          }
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_P, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlToolPencil))
          {
             gArrangeTool = (gArrangeTool == ArrangeTool::Pencil) ? ArrangeTool::Select : ArrangeTool::Pencil;
             gArrangeBladeOn = false;
          }
          // Keys the DAWs and editors share (v0.6 2.3). F matches the canvas's
          // Fit View; Cmd+= / Cmd+- are the UI scale, so zoom is the bare key.
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_F, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::FitViewF))
             ArrangeZoomToFit(sArrangeLastRulerW);
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_Equal, true))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::ZoomIn, true))
             ArrangeZoomStep(1.25f, sArrangeLastRulerW);
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_Minus, true))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::ZoomOut, true))
             ArrangeZoomStep(0.8f, sArrangeLastRulerW);
-         else if (cmd && !kio.KeyShift && !kio.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_L, false))
+         else if (cmd && !kio.KeyShift && !kio.KeyAlt && Keymap::KeyPressed(Keymap::Act::TlLoop))
             ArrangeSetLoop(!gArrange.settings.loop.enabled, gArrange.settings.loop.start, gArrange.settings.loop.end);
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_I, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlLoopIn))
             ArrangeSetLoopEdgeAtPlayhead(true);
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_O, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlLoopOut))
             ArrangeSetLoopEdgeAtPlayhead(false);
-         else if (kio.KeyAlt && !cmd && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, false))
+         else if (kio.KeyAlt && !cmd && Keymap::KeyPressed(Keymap::Act::TlPrevMarker))
             ArrangeJumpToMarker(-1);
-         else if (kio.KeyAlt && !cmd && ImGui::IsKeyPressed(ImGuiKey_RightArrow, false))
+         else if (kio.KeyAlt && !cmd && Keymap::KeyPressed(Keymap::Act::TlNextMarker))
             ArrangeJumpToMarker(1);
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlNudgeLeft, true))
             ArrangeNudge(-1);
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlNudgeRight, true))
             ArrangeNudge(1);
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_Home, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlStart))
             ArrangeSeekTick(0);
-         else if (noMods && ImGui::IsKeyPressed(ImGuiKey_End, false))
+         else if (noMods && Keymap::KeyPressed(Keymap::Act::TlEnd))
             ArrangeSeekTick(ArrangeEndKeyTargetTick());
-         else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) && gArrangeDrag.mode == kArrangeDragNone)
+         else if (Keymap::Cancel(false) && gArrangeDrag.mode == kArrangeDragNone)
          {
             if (gArrangeTool != ArrangeTool::Select)
             {
@@ -1890,7 +1891,7 @@ namespace app
                {
                   const std::string newName = gArrangeRenameMarkerBuffer;
                   const uint64_t mid = mk.id;
-                  if (!ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+                  if (!Keymap::Cancel(false))
                      ArrangeEdit([&]() { Arrange::RenameMarker(gArrange, mid, newName); });
                   gArrangeRenamingMarkerId = 0;
                   sMarkerRenameFocusedId = 0;
@@ -3531,7 +3532,7 @@ namespace app
                   const std::string newName = gArrangeRenameClipBuffer;
                   std::vector<uint64_t> renameIds = gArrangeRenameTargetIds;
                   renameIds.push_back(clip.id);
-                  if (!ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+                  if (!Keymap::Cancel(false))
                   {
                      ArrangeEdit([&]()
                      {

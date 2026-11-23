@@ -3,6 +3,7 @@
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/ReorderDrag.h"
 #include "app/ui/design/components/ColourChip.h"
@@ -1048,7 +1049,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(cx + bw + 2.0f, y));
          if (Key("##s", "S", m->solo[s], tok::U32(tok::desk_led_yellow), ImVec2(bw, kButtonsH)))
          {
-            if (ImGui::IsKeyDown(ImGuiMod_Alt)) // Alt-click S clears every solo on the console
+            if (ImGui::GetIO().KeyAlt) // Alt-click S clears every solo on the console
             {
                m->solo[s] = !m->solo[s];
                MixerPanelClearSolos(MixerPanelCurrentPageTop());
@@ -1255,7 +1256,7 @@ namespace app
          }
          const ImGuiIO& io = ImGui::GetIO();
          if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !io.WantTextInput && (io.KeySuper || io.KeyCtrl) && !io.KeyShift &&
-             ImGui::IsKeyPressed(ImGuiKey_R, false) && current >= 0)
+             Keymap::KeyPressed(Keymap::Act::Rename) && current >= 0)
             PagePicker::BeginRename("##mixerPage", entries, current);
          PagePicker::Options opt;
          const PagePicker::Result r = PagePicker::Draw("##mixerPage", entries, current, T("New mixer page"), opt);

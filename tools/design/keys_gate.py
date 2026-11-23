@@ -436,10 +436,12 @@ def check_drift(quiet=False):
         k = m.group(1)
         line = src.count("\n", 0, m.start()) + 1
         handlers.setdefault(k, []).append(line)
-    # Keymap.h table rows ({ ImGuiKey_X, Mod::..., ... }): a handler reads them through Keymap::Pressed(Act::X)
-    for m in re.finditer(r"\{\s*ImGuiKey_([A-Za-z0-9]+)\s*,\s*Mod::", src):
-        line = src.count("\n", 0, m.start()) + 1
-        handlers.setdefault(m.group(1), []).append(line)
+    # Keymap.h (a header, so not in appsrc's .cpp text): its table rows ({ Act::X, ImGuiKey_K, Mod::... }) and focus
+    # helpers are the handlers that call sites read through Keymap::Pressed / KeyPressed / Cancel / Confirm.
+    keymap = (ROOT / "src/app/ui/design/Keymap.h").read_text(encoding="utf-8")
+    for m in re.finditer(r"\{\s*Act::\w+\s*,\s*ImGuiKey_([A-Za-z0-9]+)\s*,\s*Mod::|IsKeyPressed\(ImGuiKey_([A-Za-z0-9]+)", keymap):
+        line = keymap.count("\n", 0, m.start()) + 1
+        handlers.setdefault(m.group(1) or m.group(2), []).append(line)
 
     super_only = []
     for i, line in enumerate(src.splitlines(), 1):

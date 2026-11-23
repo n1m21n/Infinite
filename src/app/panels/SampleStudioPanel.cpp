@@ -11,6 +11,7 @@
 // The engine is a private Generate Samples node (never in the graph, never cooked): a take made here and one made
 // on the node are the same sound for the same recipe. Snap to scale re-renders the take's own seed pinned.
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/Keymap.h"
 #include "app/AppShared.h"
 #include "app/graph/GenerateSamplesNode.h"
 #include "app/graph/LearningLog.h"
@@ -2121,27 +2122,27 @@ namespace
       // Keys, while the pointer is over the waveform (the canvas's are off then: gSampleStudioClaimedKeys).
       if (!hovered || io.WantTextInput)
          return;
-      auto Bare = [&io](ImGuiKey k) { return !io.KeyShift && !io.KeyAlt && ImGui::IsKeyPressed(k, false); };
-      if (cmd && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+      auto Bare = [&io](Keymap::Act a) { return !io.KeyShift && !io.KeyAlt && Keymap::KeyPressed(a); };
+      if (cmd && !io.KeyShift && Keymap::KeyPressed(Keymap::Act::Undo))
          Undo();
-      else if (cmd && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+      else if (cmd && io.KeyShift && Keymap::KeyPressed(Keymap::Act::Redo))
          Redo();
-      else if (cmd && ImGui::IsKeyPressed(ImGuiKey_E, false))
+      else if (cmd && Keymap::KeyPressed(Keymap::Act::Split))
          Split(GridFrame(mf));
-      else if (cmd && ImGui::IsKeyPressed(ImGuiKey_C, false))
+      else if (cmd && Keymap::KeyPressed(Keymap::Act::Copy))
          CopySelected();
-      else if (cmd && ImGui::IsKeyPressed(ImGuiKey_X, false))
+      else if (cmd && Keymap::KeyPressed(Keymap::Act::Cut))
       {
          CopySelected();
          DeleteSelected();
       }
-      else if (cmd && ImGui::IsKeyPressed(ImGuiKey_V, false))
+      else if (cmd && Keymap::KeyPressed(Keymap::Act::Paste))
          Paste();
-      else if (ImGui::IsKeyPressed(ImGuiKey_D, false) && (cmd ? !io.KeyShift : io.KeyShift) && !io.KeyAlt)
+      else if (Keymap::KeyPressed(Keymap::Act::Duplicate) && (cmd ? !io.KeyShift : io.KeyShift) && !io.KeyAlt)
          DuplicateSelected(); // Shift+D or Cmd+D, as in the Piano Roll
-      else if (!cmd && !io.KeyShift && !io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_Space, false))
+      else if (!cmd && !io.KeyShift && !io.KeyAlt && Keymap::KeyPressed(Keymap::Act::TogglePlay))
          TogglePlay(); // Space plays and stops, as in the Piano Roll and the Timeline
-      else if (cmd && ImGui::IsKeyPressed(ImGuiKey_A, false))
+      else if (cmd && Keymap::KeyPressed(Keymap::Act::SelectAllCmd))
       {
          s.sel.clear();
          for (const Slice& sl : s.doc.slices)
@@ -2152,38 +2153,38 @@ namespace
       else if (cmd)
          return;
       // The single-letter keys fire bare only: Shift+S is the Session panel's, not Solo.
-      else if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
+      else if (Keymap::KeyPressed(Keymap::Act::Delete) || Keymap::KeyPressed(Keymap::Act::DeleteAlt))
          DeleteSelected();
-      else if (Bare(ImGuiKey_J))
+      else if (Bare(Keymap::Act::SsJoin))
          JoinSelected();
-      else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || Bare(ImGuiKey_A))
+      else if (Keymap::Cancel(false) || Bare(Keymap::Act::ToolSelect))
          s.tool = 0;
-      else if (Bare(ImGuiKey_B))
+      else if (Bare(Keymap::Act::ToolBlade))
          s.tool = s.tool == 1 ? 0 : 1;
-      else if (Bare(ImGuiKey_H))
+      else if (Bare(Keymap::Act::ToolHand))
          s.tool = s.tool == 2 ? 0 : 2;
-      else if (Bare(ImGuiKey_F))
+      else if (Bare(Keymap::Act::FitViewF))
          ViewAll();
-      else if (ImGui::IsKeyPressed(ImGuiKey_Z, false))
+      else if (Keymap::KeyPressed(Keymap::Act::SsZoomSelection))
          io.KeyShift ? ViewAll() : ZoomToSelection();
-      else if (ImGui::IsKeyPressed(ImGuiKey_Equal) || ImGui::IsKeyPressed(ImGuiKey_KeypadAdd))
+      else if (Keymap::KeyPressed(Keymap::Act::ZoomIn, true) || Keymap::KeyPressed(Keymap::Act::ZoomInPad, true))
          ZoomAround(mf, 0.7);
-      else if (ImGui::IsKeyPressed(ImGuiKey_Minus) || ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract))
+      else if (Keymap::KeyPressed(Keymap::Act::ZoomOut, true) || Keymap::KeyPressed(Keymap::Act::ZoomOutPad, true))
          ZoomAround(mf, 1.0 / 0.7);
       // Shift+arrows mould the selected slices: right stretches them, left compacts them (their Length).
-      else if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow))
+      else if (Keymap::KeyPressed(Keymap::Act::SsPrevSlice, true))
          io.KeyShift ? EditSelected([](SliceParams& p) { p.lengthRatio = Mould(p.lengthRatio / 1.05f); }) : SelectStep(-1);
-      else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow))
+      else if (Keymap::KeyPressed(Keymap::Act::SsNextSlice, true))
          io.KeyShift ? EditSelected([](SliceParams& p) { p.lengthRatio = Mould(p.lengthRatio * 1.05f); }) : SelectStep(1);
-      else if (Bare(ImGuiKey_Q))
+      else if (Bare(Keymap::Act::SsAudition))
          Audition(s.sel.empty() ? s.doc.IndexAt((int64_t)mf) : s.doc.IndexOfId(s.primary));
-      else if (Bare(ImGuiKey_M))
+      else if (Bare(Keymap::Act::SsMute))
          EditSelected([](SliceParams& p) { p.mute = !p.mute; });
-      else if (Bare(ImGuiKey_S))
+      else if (Bare(Keymap::Act::SsSolo))
          EditSelected([](SliceParams& p) { p.solo = !p.solo; });
-      else if (Bare(ImGuiKey_V))
+      else if (Bare(Keymap::Act::SsReverse))
          EditSelected([](SliceParams& p) { p.reverse = !p.reverse; });
-      else if (Bare(ImGuiKey_R))
+      else if (Bare(Keymap::Act::SsRecord))
          s.recording ? StopRecording(true) : StartRecording();
    }
 

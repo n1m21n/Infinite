@@ -1,5 +1,6 @@
 // Comment, group, draw and preview node bodies (moved verbatim from main.cpp).
 #include "nodes/ImageSourceNode.h"
+#include "app/ui/design/Keymap.h"
 #include "nodes/VideoSourceNode.h"
 #include "nodes/VideoInNode.h"
 #include "app/ui/design/components/EmptyState.h"
@@ -208,7 +209,7 @@ namespace app
          bool shouldOpen = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
          if (!shouldOpen && !io.KeyCtrl && !io.KeySuper && !io.KeyAlt)
          {
-            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+            if (Keymap::Confirm(false))
                shouldOpen = true;
             else if (!io.InputQueueCharacters.empty())
             {

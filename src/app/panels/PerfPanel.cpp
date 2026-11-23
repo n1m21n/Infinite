@@ -1,5 +1,6 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
 #include "app/ui/design/components/ColourChip.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include <cmath>
 #include "app/ui/design/components/AudioViz.h"
@@ -2005,7 +2006,7 @@ namespace app
       if (!ParamMidiLearnActive())
          return;
       ImGuiIO& lio = ImGui::GetIO();
-      if (ImGui::GetCurrentContext() != nullptr && ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !lio.WantTextInput)
+      if (ImGui::GetCurrentContext() != nullptr && Keymap::Cancel(false) && !lio.WantTextInput)
       {
          MidiLearnCancelAll();
          return;
@@ -2080,7 +2081,7 @@ namespace app
       while ((int)gPerfLayout.pageNames.size() < gPerfLayout.pageCount)
          gPerfLayout.pageNames.push_back("Page " + std::to_string((int)gPerfLayout.pageNames.size() + 1));
 
-      if (gPerfMidiLearnIdx >= 0 && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+      if (gPerfMidiLearnIdx >= 0 && Keymap::Cancel(false))
          gPerfMidiLearnIdx = -1;
 
       // MIDI Learn Alert Banner
@@ -2330,22 +2331,22 @@ namespace app
          {
             const ImGuiIO& kio = ImGui::GetIO();
             const bool cmd = kio.KeySuper || kio.KeyCtrl;
-            if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
+            if (Keymap::KeyPressed(Keymap::Act::Delete) || Keymap::KeyPressed(Keymap::Act::DeleteAlt))
                PerfDeleteSelection();
-            else if (cmd && ImGui::IsKeyPressed(ImGuiKey_C, false))
+            else if (cmd && Keymap::KeyPressed(Keymap::Act::Copy))
                PerfCopySelection();
-            else if (cmd && ImGui::IsKeyPressed(ImGuiKey_X, false))
+            else if (cmd && Keymap::KeyPressed(Keymap::Act::Cut))
             {
                PerfCopySelection();
                PerfDeleteSelection();
             }
-            else if (cmd && ImGui::IsKeyPressed(ImGuiKey_V, false))
+            else if (cmd && Keymap::KeyPressed(Keymap::Act::Paste))
                PerfPasteRecords(gPerfClipboard);
-            else if ((cmd || kio.KeyShift) && ImGui::IsKeyPressed(ImGuiKey_D, false))
+            else if ((cmd || kio.KeyShift) && Keymap::KeyPressed(Keymap::Act::Duplicate))
                PerfDuplicateSelection();
-            else if (cmd && ImGui::IsKeyPressed(ImGuiKey_A, false))
+            else if (cmd && Keymap::KeyPressed(Keymap::Act::SelectAllCmd))
                PerfSelectAllOnPage();
-            else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+            else if (Keymap::Cancel(false))
                gPerfSelection.clear();
          }
       }

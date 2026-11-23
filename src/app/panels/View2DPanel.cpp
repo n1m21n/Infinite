@@ -3,6 +3,7 @@
 // layers; the nodes themselves are only read, so a layer keeps animating under
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "app/AppCommon.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "core/Notices.h"
@@ -1853,7 +1854,7 @@ namespace
       }
       // Delete / Backspace removes the selected inner point when the graph is hovered.
       if (ImGui::IsItemHovered() && sCurveSelLayer == key && sCurveSel > 0 && sCurveSel < (int)c.size() / 2 - 1 &&
-          (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace)))
+          (Keymap::KeyPressed(Keymap::Act::Delete, true) || Keymap::KeyPressed(Keymap::Act::DeleteAlt, true)))
       {
          PushUndoCheckpoint("Curves");
          c.erase(c.begin() + sCurveSel * 2, c.begin() + sCurveSel * 2 + 2);
