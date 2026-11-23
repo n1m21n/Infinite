@@ -18,6 +18,7 @@
 #include "Transport.h"
 #include "core/AudioTopologyRequest.h"
 #include "audio/WavWriter.h"
+#include "app/ui/design/UiFmt.h"
 
 const char* const GranularNode::kWindowShapeNames[GranularNode::kNumWindowShapes] = {
    "Hann",
@@ -737,7 +738,7 @@ void GranularNode::StopRecording()
 
    char stat[128];
    const double durationSec = (double)frames / sr;
-   snprintf(stat, sizeof(stat), "1 ch · %.1fkHz · %.2fs (rec)", sr / 1000.0, durationSec);
+   snprintf(stat, sizeof(stat), "1 ch · %s · %s (rec)", UiFmt::Hz(sr).c, UiFmt::Sec(durationSec).c);
 
    FinishBuffer(decoded, "recording", wavPath, stat);
 }
@@ -761,8 +762,8 @@ bool GranularNode::LoadFile(const std::string& path)
 
    char stat[128];
    const double durationSec = (decoded->sampleRate > 0.0) ? (double)decoded->numFrames / decoded->sampleRate : 0.0;
-   snprintf(stat, sizeof(stat), "%d ch · %.1fkHz · %.2fs",
-            decoded->channels, decoded->sampleRate / 1000.0, durationSec);
+   snprintf(stat, sizeof(stat), "%d ch · %s · %s",
+            decoded->channels, UiFmt::Hz(decoded->sampleRate).c, UiFmt::Sec(durationSec).c);
 
    FinishBuffer(decoded, name, path, stat);
    return true;

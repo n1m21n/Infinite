@@ -64,6 +64,7 @@
 #include <optional>
 #include <sstream>
 #include <thread>
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -2024,7 +2025,7 @@ namespace
       if (active && s.dragKind == 5 && s.dragIndex >= 0 && s.dragIndex < s.doc.Count())
       {
          char buf[24];
-         snprintf(buf, sizeof(buf), "%.2fx", s.doc.slices[(size_t)s.dragIndex].p.lengthRatio);
+         snprintf(buf, sizeof(buf), "%s", UiFmt::Ratio(s.doc.slices[(size_t)s.dragIndex].p.lengthRatio).c);
          ImGui::GetForegroundDrawList()->AddText(ImVec2(io.MousePos.x + 14.0f, io.MousePos.y - 22.0f), ImGui::GetColorU32(ImGuiCol_Text), buf);
       }
       if (active && s.dragMoved && (s.dragKind == 0 || s.dragKind == 1))

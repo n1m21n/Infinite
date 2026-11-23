@@ -63,6 +63,7 @@ Known collisions are listed, not yet resolved; pair the colour with a glyph or l
 | New control class | New component file + gallery entry + golden + a row in the plan's section 0 |
 | A node needs a new look | Never style it in the body file; extend the component |
 | An on/off row | `FormParts::Check(label, &v)` (switch: `FormParts::Switch`): box first, label right, everywhere (owner 2026-11-24); never a label-left bool row or a local copy |
+| A number with a unit (Hz, dB, ms, s, %, st, BPM, px, °, KB/MB, counts, clocks) | `UiFmt::Hz(v).c` etc. in `src/app/ui/design/UiFmt.h`, passed to a `"%s"`; knob readouts go through `FormatAudioParam`, which already uses it. Never a unit in a printf format (ratchet category `unit`; owner 2026-11-24). Migrate old sites with `tools/design/unit_migrate.py` |
 
 ## Before you commit
 

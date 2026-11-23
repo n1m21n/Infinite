@@ -1,5 +1,6 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/components/DropdownField.h"
@@ -230,8 +231,9 @@ namespace app
    }
 
 
-   // Adaptive format helper: scales display precision at small values so
-   // tapered parameters do not display a static "0 ms" or dead string across the bottom sweep.
+   // Knob and slider readouts: a format whose one spec is followed by a known unit ("%.0f Hz", "%+.1f dB",
+   // "%.0f%%") is shown through UiFmt, so every readout follows the unit table (owner 2026-11-24). Anything
+   // else prints with its own format.
    void FormatAudioParam(char* outBuf, size_t outSize, const char* fmt, float val)
    {
       if (!outBuf || outSize == 0)
@@ -242,46 +244,41 @@ namespace app
          return;
       }
 
-      if (strstr(fmt, "ms") != nullptr)
+      const char* spec = strchr(fmt, '%');
+      while (spec && spec[1] == '%')
+         spec = strchr(spec + 2, '%');
+      if (spec)
       {
-         const float absV = std::fabs(val);
-         if (absV < 10.0f && (strstr(fmt, "%.0f") || strstr(fmt, "%.1f")))
+         const char* e = spec + 1;
+         bool sign = false;
+         while (*e == '+' || *e == '-' || *e == ' ' || *e == '#' || *e == '0')
+            sign |= (*e++ == '+');
+         while ((*e >= '0' && *e <= '9') || *e == '.')
+            ++e;
+         if (*e == 'f' || *e == 'g')
          {
-            snprintf(outBuf, outSize, "%.2f ms", val);
-            return;
-         }
-         if (absV < 100.0f && strstr(fmt, "%.0f"))
-         {
-            snprintf(outBuf, outSize, "%.1f ms", val);
-            return;
-         }
-      }
-      else if (strstr(fmt, "Hz") != nullptr)
-      {
-         const float absV = std::fabs(val);
-         if (absV < 10.0f && (strstr(fmt, "%.0f") || strstr(fmt, "%.1f")))
-         {
-            snprintf(outBuf, outSize, "%.2f Hz", val);
-            return;
-         }
-         if (absV < 100.0f && strstr(fmt, "%.0f"))
-         {
-            snprintf(outBuf, outSize, "%.1f Hz", val);
-            return;
-         }
-      }
-      else if (strstr(fmt, "s") != nullptr && strstr(fmt, "st") == nullptr && strstr(fmt, "step") == nullptr && strstr(fmt, "semi") == nullptr)
-      {
-         const float absV = std::fabs(val);
-         if (absV < 0.1f && (strstr(fmt, "%.2f") || strstr(fmt, "%.1f") || strstr(fmt, "%.0f")))
-         {
-            snprintf(outBuf, outSize, "%.3f s", val);
-            return;
-         }
-         if (absV < 1.0f && (strstr(fmt, "%.1f") || strstr(fmt, "%.0f")))
-         {
-            snprintf(outBuf, outSize, "%.2f s", val);
-            return;
+            const char* tail = e + 1;
+            auto unit = [&](const char* u) {
+               const size_t n = strlen(u);
+               if (strncmp(tail, u, n) != 0) return (size_t)0;
+               const char next = tail[n];
+               return (next == '\0' || next == ' ' || next == ')' || next == ',') ? n : (size_t)0;
+            };
+            UiFmt::Str v;
+            size_t n = 0;
+            if ((n = unit(" kHz"))) v = UiFmt::KHz(val, sign);
+            else if ((n = unit(" Hz"))) v = UiFmt::Hz(val, sign);
+            else if ((n = unit(" dB"))) v = sign ? UiFmt::DbOffset(val) : UiFmt::Db(val);
+            else if ((n = unit(" ms"))) v = UiFmt::Ms(val);
+            else if ((n = unit(" s"))) v = UiFmt::Sec(val);
+            else if ((n = unit(" st"))) v = UiFmt::Semi(val);
+            else if ((n = unit(" BPM")) || (n = unit(" bpm"))) v = UiFmt::Bpm(val);
+            else if ((n = unit("%%"))) v = UiFmt::Pct(val, 0, sign);
+            if (n)
+            {
+               snprintf(outBuf, outSize, "%.*s%s%s", (int)(spec - fmt), fmt, v.c, tail + n);
+               return;
+            }
          }
       }
 

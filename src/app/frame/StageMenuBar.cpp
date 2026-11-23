@@ -19,6 +19,7 @@
 #include "plugin/engine/PluginView.h"
 #include "app/ui/design/BrandLogo.gen.h"
 #include "platform/AppPaths.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -1260,7 +1261,7 @@ void DrawMenuBar(FrameCtx& fc)
          const double fps = sSmoothedMs > 0.0001 ? 1000.0 / sSmoothedMs : 0.0;
 
          char readout[80];
-         snprintf(readout, sizeof(readout), "%.1f fps   %.1f ms", fps, sSmoothedMs);
+         snprintf(readout, sizeof(readout), "%.1f fps   %s", fps, UiFmt::Ms(sSmoothedMs).c);
 
          const bool audioEngineOn = AudioEngine::Instance().SampleRate() > 0.0;
          const double audioLoad = AudioEngine::Instance().LastBlockLoad();
@@ -1271,7 +1272,7 @@ void DrawMenuBar(FrameCtx& fc)
          if (audioDead)
             snprintf(cpuReadout, sizeof(cpuReadout), "%s", T("cpu lost"));
          else if (audioEngineOn)
-            snprintf(cpuReadout, sizeof(cpuReadout), "cpu %.0f%%%s", audioLoad * 100.0, xruns > 0 ? " !" : "");
+            snprintf(cpuReadout, sizeof(cpuReadout), "cpu %s%s", UiFmt::PctOf(audioLoad).c, xruns > 0 ? " !" : "");
          else
             snprintf(cpuReadout, sizeof(cpuReadout), "cpu --");
 

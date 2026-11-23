@@ -7,6 +7,7 @@
 #include "app/ui/design/components/GlyphToggle.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "platform/AppPaths.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -199,9 +200,9 @@ namespace app
       // Once stopped, show the blended confidence that actually governs the applied grade.
       const float badgeVal = learning ? n->LocalConfidence01() : conf;
       if (learning)
-         snprintf(confText, sizeof(confText), "learning - %d%%", (int)std::round(badgeVal * 100.0f));
+         snprintf(confText, sizeof(confText), "learning - %s", UiFmt::Pct((int)std::round(badgeVal * 100.0f)).c);
       else
-         snprintf(confText, sizeof(confText), "%d%% conf", (int)std::round(badgeVal * 100.0f));
+         snprintf(confText, sizeof(confText), "%s conf", UiFmt::Pct((int)std::round(badgeVal * 100.0f)).c);
       ImGui::TextColored(badgeVal > 0.6f ? (isLight ? tok::V4(tok::palf::v_100_600_200_1000) : tok::V4(tok::palf::v_200_850_350_1000))
                                     : (isLight ? tok::V4(tok::palf::v_700_400_100_1000) : tok::V4(tok::palf::v_900_700_200_1000)),
                          "%s", confText);
@@ -1185,7 +1186,7 @@ namespace app
          const char* phaseStr = snap.calibPhase == Bci::CalibrationPhase::EyesOpen     ? "Eyes open"
                                 : snap.calibPhase == Bci::CalibrationPhase::EyesClosed ? "Eyes closed"
                                                                                        : "Blink 5 times";
-         ImGui::TextDisabled("%s: %.0f%%", phaseStr, snap.calibProgress * 100.0f);
+         ImGui::TextDisabled("%s: %s", phaseStr, UiFmt::PctOf(snap.calibProgress).c);
       }
 
       if (n->device == BrainSourceNode::kDeviceSynthetic)

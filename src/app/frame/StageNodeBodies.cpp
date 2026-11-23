@@ -7,6 +7,7 @@
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/NodeHeader.h"
 #include "app/frame/FrameCtx.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -608,7 +609,7 @@ void DrawNodeBodies(FrameCtx& fc)
             dl->AddText(ImVec2(origin.x + 12, origin.y + 14),
                         isLight ? tok::U32(tok::pal::c_1E2434FF) : tok::U32(tok::pal::c_C8CEE2FF), name.c_str());
             char tris[48];
-            snprintf(tris, sizeof(tris), "%zu triangles", geo->TriangleCount());
+            snprintf(tris, sizeof(tris), "%s triangles", UiFmt::Count((long long)(geo->TriangleCount())).c);
             dl->AddText(ImVec2(origin.x + 12, origin.y + 34),
                         isLight ? tok::U32(tok::pal::c_5F697DFF) : tok::U32(tok::pal::c_82889CFF), tris);
             dl->AddText(ImVec2(origin.x + 12, origin.y + 54),

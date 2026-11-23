@@ -7,6 +7,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "platform/AppPaths.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -90,7 +91,7 @@ namespace app
       {
          const double dur = std::max(0.001, n->Duration());
          ImGui::ProgressBar((float)(n->Position() / dur), ImVec2(kPreviewSize, 0));
-         ImGui::TextDisabled("%.1f / %.1f s", n->Position(), dur);
+         ImGui::TextDisabled("%s / %s", UiFmt::Sec(n->Position()).c, UiFmt::Sec(dur).c);
 
          if (n->IsPlaying())
          {
@@ -205,7 +206,7 @@ namespace app
    void DrawPathParams(PathNode* n)
    {
       if (n->IsFollowing())
-         ImGui::TextDisabled("following %zu points", n->FollowPointCount());
+         ImGui::TextDisabled("following %s points", UiFmt::Count((long long)(n->FollowPointCount())).c);
       else
          DropdownButton("shape", PathNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
       float p[3];
@@ -326,7 +327,7 @@ namespace app
    void DrawGeometryTableParams(GeometryTableNode* n)
    {
       if (n->HasSamples())
-         ImGui::TextDisabled("following %d points", n->SampleCount());
+         ImGui::TextDisabled("following %s points", UiFmt::Count((long long)(n->SampleCount())).c);
       else
          ImGui::TextDisabled("no geometry");
 
@@ -385,7 +386,7 @@ namespace app
 
    void DrawCurveParams(CurveNode* n)
    {
-      ImGui::TextDisabled("%zu points, %zu triangles", n->PointCount(), n->TriangleCount());
+      ImGui::TextDisabled("%s points, %s triangles", UiFmt::Count((long long)(n->PointCount())).c, UiFmt::Count((long long)(n->TriangleCount())).c);
       DropdownButton("type", CurveNode::KindNames(), n->kind, [n](int i) { n->kind = i; });
       DropdownButton("preset", CurveNode::PresetNames(), n->preset, [n](int i) { n->preset = i; });
 
@@ -442,7 +443,7 @@ namespace app
 
    void DrawMetaBallParams(MetaBallNode* n)
    {
-      ImGui::TextDisabled("%zu balls, %zu triangles", n->BallCount(), n->TriangleCount());
+      ImGui::TextDisabled("%s balls, %s triangles", UiFmt::Count((long long)(n->BallCount())).c, UiFmt::Count((long long)(n->TriangleCount())).c);
       NodeSeparator("field");
       if (n->cloudSource == nullptr || n->cloudSource->GetPointCloud() == nullptr)
       {
@@ -463,7 +464,7 @@ namespace app
 
    void DrawJoinGeometryParams(JoinGeometryNode* n)
    {
-      ImGui::TextDisabled("%d inputs, %zu triangles", n->ConnectedCount(), n->TriangleCount());
+      ImGui::TextDisabled("%s inputs, %s triangles", UiFmt::Count((long long)(n->ConnectedCount())).c, UiFmt::Count((long long)(n->TriangleCount())).c);
       DropdownButton("mode", JoinGeometryNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
       // A merged mesh is one draw call, so it can only wear one material -
       // picked from an input rather than authored here, since editing colour
@@ -509,7 +510,7 @@ namespace app
 
    void DrawWrapParams(WrapNode* n)
    {
-      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
       DropdownButton("mode", WrapNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
       // Axis, radius and fit steer the parametric bend; nearest-surface has no
       // parameterisation for them to act on.
@@ -540,7 +541,7 @@ namespace app
 
    void DrawClothParams(ClothNode* n)
    {
-      ImGui::TextDisabled("%zu triangles, %zu links", n->TriangleCount(), n->ConstraintCount());
+      ImGui::TextDisabled("%s triangles, %s links", UiFmt::Count((long long)(n->TriangleCount())).c, UiFmt::Count((long long)(n->ConstraintCount())).c);
       if (ActionButton::Column("Reset", kParamWidth))
          n->Reset();
 
@@ -609,7 +610,7 @@ namespace app
 
    void DrawRigidBodyParams(RigidBodyNode* n)
    {
-      ImGui::TextDisabled("%zu bodies, %zu triangles", n->BodyCount(), n->TriangleCount());
+      ImGui::TextDisabled("%s bodies, %s triangles", UiFmt::Count((long long)(n->BodyCount())).c, UiFmt::Count((long long)(n->TriangleCount())).c);
       if (ActionButton::Column("Reset", kParamWidth))
          n->Reset();
 
@@ -832,7 +833,7 @@ namespace app
 
    void DrawMaterialParams(MaterialNode* n)
    {
-      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
 
       gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
@@ -962,7 +963,7 @@ namespace app
 
    void DrawMappingParams(MappingNode* n)
    {
-      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
       DropdownButton("space", MappingNode::SpaceNames(), n->space, [n](int i) { n->space = i; });
       if (n->space != kMapSpaceUv)
          ModSlider("blend softness", &n->triplanarBlend, 0.0f, 1.0f);
@@ -1230,7 +1231,7 @@ namespace app
 
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
-      ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());
+      ImGui::TextDisabled("generation %d, %s triangles", n->Generation(), UiFmt::Count((long long)(n->TriangleCount())).c);
       if (ActionButton::Draw("step")) n->StepOnce();
       ImGui::SameLine();
       if (ActionButton::Draw("reset")) n->Reset();
@@ -1253,7 +1254,7 @@ namespace app
 
    void DrawImageToPointsParams(ImageToPointsNode* n)
    {
-      ImGui::TextDisabled("%zu points", n->PointCount());
+      ImGui::TextDisabled("%s points", UiFmt::Count((long long)(n->PointCount())).c);
       ModSliderInt("density", &n->density, 4, 400);
       ModSlider("width", &n->width, 0.1f, 8.0f);
       ModSlider("height", &n->height, 0.1f, 8.0f);
@@ -1275,9 +1276,9 @@ namespace app
    void DrawDepthProjectionParams(DepthProjectionNode* n)
    {
       if (n->outputType == DepthProjectionNode::kPoints)
-         ImGui::TextDisabled("%zu points", n->PointCount());
+         ImGui::TextDisabled("%s points", UiFmt::Count((long long)(n->PointCount())).c);
       else
-         ImGui::TextDisabled("%zu triangles (%zu vertices)", n->TriangleCount(), n->GetMesh().vertices.size());
+         ImGui::TextDisabled("%s triangles (%s vertices)", UiFmt::Count((long long)(n->TriangleCount())).c, UiFmt::Count((long long)(n->GetMesh().vertices.size())).c);
 
       DropdownButton("projection", DepthProjectionNode::ProjectionNames(), n->projection,
                      [n](int i) { n->projection = i; });
@@ -1330,7 +1331,7 @@ namespace app
    void DrawMeshToPointsParams(MeshToPointsNode* n)
    {
       DropdownButton("sample", MeshToPointsNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
-      ImGui::TextDisabled("%zu points, %zu triangles", n->PointCount(), n->TriangleCount());
+      ImGui::TextDisabled("%s points, %s triangles", UiFmt::Count((long long)(n->PointCount())).c, UiFmt::Count((long long)(n->TriangleCount())).c);
       ModSliderInt("max points", &n->maxPoints, 16, 20000);
       ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
       ModCheckbox("weld seams", &n->weld);
@@ -1341,7 +1342,7 @@ namespace app
 
    void DrawDistributePointsOnFacesParams(DistributePointsOnFacesNode* n)
    {
-      ImGui::TextDisabled("%zu points", n->PointCount());
+      ImGui::TextDisabled("%s points", UiFmt::Count((long long)(n->PointCount())).c);
       ModSlider("density", &n->density, 1.0f, 20000.0f, "%.0f", kParamWidth, false, 0.0f, LogPosToValue, LogValueToPos);
       DropdownButton("method", DistributePointsOnFacesNode::MethodNames(), n->method,
                      [n](int i) { n->method = i; });
@@ -1354,14 +1355,14 @@ namespace app
 
    void DrawPointsToVerticesParams(PointsToVerticesNode* n)
    {
-      ImGui::TextDisabled("%zu vertices", n->VertexCount());
+      ImGui::TextDisabled("%s vertices", UiFmt::Count((long long)(n->VertexCount())).c);
       ModCheckbox("alive only", &n->aliveOnly);
    }
 
 
    void DrawProximityLinesParams(ProximityLinesNode* n)
    {
-      ImGui::TextDisabled("%zu lines", n->LinkCount());
+      ImGui::TextDisabled("%s lines", UiFmt::Count((long long)(n->LinkCount())).c);
       ModSlider("radius", &n->radius, 0.0f, 5.0f, "%.3f");
       ModSliderInt("max per point", &n->maxPerPoint, 1, 16);
       ModSliderInt("max lines", &n->maxLinks, 1, 200000);
@@ -1373,7 +1374,7 @@ namespace app
    void DrawPointTrailsParams(PointTrailsNode* n)
    {
       PushTextWrapWidth(kPreviewSize);
-      ImGui::TextDisabled("%zu tails, %d points tracked", n->TrailCount(), n->TrackedPoints());
+      ImGui::TextDisabled("%zu tails, %s points tracked", n->TrailCount(), UiFmt::Count((long long)(n->TrackedPoints())).c);
       if (n->input != nullptr && n->TrailCount() == 0)
          ImGui::TextDisabled("no trails yet: the points are not moving");
       else if (n->input != nullptr)
@@ -1404,7 +1405,7 @@ namespace app
    void DrawCurveOpsParams(CurveOpsNode* n)
    {
       if (n->input != nullptr)
-         ImGui::TextDisabled("%zu points out", n->PointCount());
+         ImGui::TextDisabled("%s points out", UiFmt::Count((long long)(n->PointCount())).c);
       DropdownButton("mode", CurveOpsNode::ModeNames(), n->mode,
                      [n](int i) { PushUndoCheckpoint(); n->mode = i; });
       switch (n->mode)
@@ -1483,7 +1484,7 @@ namespace app
 
    void DrawDelaunayParams(DelaunayMeshNode* n)
    {
-      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
       DropdownButton("plane", DelaunayMeshNode::PlaneNames(), n->plane,
                      [n](int i) { PushUndoCheckpoint(); n->plane = i; });
       ModCheckbox("alive only", &n->aliveOnly);
@@ -1495,7 +1496,7 @@ namespace app
 
    void DrawDistributePointsInGridParams(DistributePointsInGridNode* n)
    {
-      ImGui::TextDisabled("%zu points", n->PointCount());
+      ImGui::TextDisabled("%s points", UiFmt::Count((long long)(n->PointCount())).c);
       ModSliderInt("count x", &n->countX, 1, 200);
       ModSliderInt("count y", &n->countY, 1, 200);
       ModSlider("spacing x", &n->spacingX, 0.01f, 2.0f);
@@ -1510,7 +1511,7 @@ namespace app
    void DrawMergeByDistanceParams(MergeByDistanceNode* n)
    {
       if (n->input != nullptr)
-         ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+         ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
       ModSlider("threshold", &n->threshold, 0.0f, 0.5f, "%.4f");
    }
 
@@ -1680,7 +1681,7 @@ namespace app
             else if (i == 11 && n->shape != 11) n->sides = 3;  // Prism -> triangular prism
             n->shape = i;
          });
-      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
 
       NodeSeparator("form");
       {
@@ -1813,14 +1814,14 @@ namespace app
          if (n->ActsOnInstanceStamp())
          {
             if (n->op == GeometryOpNode::kTransform)
-               ImGui::TextDisabled("whole group, %zu copies",
-                                    n->UpstreamInstanceCount());
+               ImGui::TextDisabled("whole group, %s copies",
+                                    UiFmt::Count((long long)(n->UpstreamInstanceCount())).c);
             else
-               ImGui::TextDisabled("%zu tris, per shape x%zu",
-                                    n->TriangleCount(), n->UpstreamInstanceCount());
+               ImGui::TextDisabled("%s tris, per shape x%zu",
+                                    UiFmt::Count((long long)(n->TriangleCount())).c, n->UpstreamInstanceCount());
          }
          else
-            ImGui::TextDisabled("%zu triangles out", n->TriangleCount());
+            ImGui::TextDisabled("%s triangles out", UiFmt::Count((long long)(n->TriangleCount())).c);
       }
       if (GeometryOpSupportsSelectionOnly(n->op))
          ModCheckbox("selection only", &n->selectionOnly);
@@ -1830,7 +1831,7 @@ namespace app
          case GeometryOpNode::kTransform:
             if (n->selectionOnly)
             {
-               ImGui::TextDisabled("%zu of %zu faces selected", n->SelectedCount(), n->TriangleCount());
+               ImGui::TextDisabled("%zu of %s faces selected", n->SelectedCount(), UiFmt::Count((long long)(n->TriangleCount())).c);
                ModCheckbox("move along normals", &n->moveAlongNormals);
                if (n->moveAlongNormals)
                   ModSlider("normal amount", &n->normalAmount, -2.0f, 2.0f);
@@ -1921,7 +1922,7 @@ namespace app
             static const std::vector<std::string> kSelectModes = {
                "All", "By index", "By position", "By normal", "Random", "By radius"
             };
-            ImGui::TextDisabled("%zu of %zu faces", n->SelectedCount(), n->TriangleCount());
+            ImGui::TextDisabled("%zu of %s faces", n->SelectedCount(), UiFmt::Count((long long)(n->TriangleCount())).c);
             DropdownButton("mode", kSelectModes, n->selectMode, [n](int i) { n->selectMode = i; });
             switch (n->selectMode)
             {
@@ -1959,7 +1960,7 @@ namespace app
          case GeometryOpNode::kDelete:
          case GeometryOpNode::kDeleteSelected:
             if (n->selectionOnly)
-               ImGui::TextDisabled("%zu of %zu faces selected", n->SelectedCount(), n->TriangleCount());
+               ImGui::TextDisabled("%zu of %s faces selected", n->SelectedCount(), UiFmt::Count((long long)(n->TriangleCount())).c);
             ModCheckbox("keep selected instead", &n->keepSelected);
             break;
          case GeometryOpNode::kTransformSelected:
@@ -2044,7 +2045,7 @@ namespace app
    void DrawDisplacementParams(DisplacementNode* n)
    {
       if (n->input != nullptr)
-         ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+         ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
 
       static const std::vector<std::string> kSourceNames = { "Texture", "Noise" };
       DropdownButton("source", kSourceNames, n->source, [n](int i) { n->source = i; });
@@ -2091,7 +2092,7 @@ namespace app
    void DrawAudioDisplacementParams(AudioDisplacementNode* n)
    {
       if (n->input != nullptr)
-         ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+         ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
 
       DropdownButton("mode", AudioDisplacementNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
       ModSlider("strength", &n->strength, -4.0f, 4.0f);
@@ -2271,9 +2272,9 @@ namespace app
             float hz = AudioColorRampNode::PosToFreq(n->crossoverPos[i]);
             char hzText[32];
             if (hz >= 1000.0f)
-               snprintf(hzText, sizeof(hzText), "%.1f kHz", hz / 1000.0f);
+               snprintf(hzText, sizeof(hzText), "%s", UiFmt::Hz(hz).c);
             else
-               snprintf(hzText, sizeof(hzText), "%.0f Hz", hz);
+               snprintf(hzText, sizeof(hzText), "%s", UiFmt::Hz(hz).c);
             snprintf(readout, sizeof(readout), "crossover %d: %s", i + 1, hzText);
          }
       }
@@ -2324,7 +2325,7 @@ namespace app
 
    void DrawAudioRibbonParams(AudioRibbonNode* n)
    {
-      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
       ModSlider("width", &n->width, 0.05f, 5.0f);
       ModSlider("height scale", &n->heightScale, 0.0f, 5.0f);
       ModSliderInt("segments", &n->segments, 16, 1024);
@@ -2358,7 +2359,7 @@ namespace app
    void DrawSetColorParams(SetColorNode* n)
    {
       if (n->input != nullptr)
-         ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+         ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
 
       DropdownButton("source", SetColorNode::SourceNames(), n->source, [n](int i) { n->source = i; });
       switch (n->source)
@@ -2393,7 +2394,7 @@ namespace app
    void DrawInstanceParams(InstanceOnPointsNode* n)
    {
       if (n->pointSource != nullptr && n->instanceShape != nullptr)
-         ImGui::TextDisabled("%zu instances, %zu triangles", n->InstanceCount(), n->TriangleCount());
+         ImGui::TextDisabled("%s instances, %s triangles", UiFmt::Count((long long)(n->InstanceCount())).c, UiFmt::Count((long long)(n->TriangleCount())).c);
 
       DropdownButton("points from", InstanceOnPointsNode::SourceNames(), n->pointMode,
                      [n](int i) { n->pointMode = i; });
@@ -2646,9 +2647,9 @@ namespace app
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
       ImGui::SameLine(0.0f, 16.0f);
       if (n->LastGpuBytes() > 0)
-         ImGui::TextDisabled("%zu triangles in %zu draw calls, %.0f MB GPU", n->LastTriangleCount(), n->LastDrawCalls(), (double)n->LastGpuBytes() / 1048576.0);
+         ImGui::TextDisabled("%s triangles in %zu draw calls, %s GPU", UiFmt::Count((long long)(n->LastTriangleCount())).c, n->LastDrawCalls(), UiFmt::MB((double)n->LastGpuBytes() / 1048576.0).c);
       else
-         ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
+         ImGui::TextDisabled("%s triangles in %zu draw calls", UiFmt::Count((long long)(n->LastTriangleCount())).c, n->LastDrawCalls());
       {
          // The count changes every frame; pad to a fixed worst-case width so the node body doesn't resize with the digits.
          const ImVec2 textMin = ImGui::GetItemRectMin();

@@ -9,6 +9,7 @@
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/StepCell.h"
 #include "audio/NoteTheory.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -116,13 +117,13 @@ namespace app
       const std::string& inputDesc = choices[currentIdx].shortName;
       char stat[96];
       if (host)
-         snprintf(stat, sizeof(stat), "%+.1f dB   %s", n->gainDb, inputDesc.c_str());
+         snprintf(stat, sizeof(stat), "%s   %s", UiFmt::DbOffset(n->gainDb).c, inputDesc.c_str());
       else if (Platform::AudioInputCaptureIsRunning())
-         snprintf(stat, sizeof(stat), "%+.1f dB   %s - live", n->gainDb, inputDesc.c_str());
+         snprintf(stat, sizeof(stat), "%s   %s - live", UiFmt::DbOffset(n->gainDb).c, inputDesc.c_str());
       else if (!n->Status().empty())
-         snprintf(stat, sizeof(stat), "%+.1f dB   %s", n->gainDb, n->Status().c_str());
+         snprintf(stat, sizeof(stat), "%s   %s", UiFmt::DbOffset(n->gainDb).c, n->Status().c_str());
       else
-         snprintf(stat, sizeof(stat), "%+.1f dB   %s - idle", n->gainDb, inputDesc.c_str());
+         snprintf(stat, sizeof(stat), "%s   %s - idle", UiFmt::DbOffset(n->gainDb).c, inputDesc.c_str());
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
@@ -190,7 +191,7 @@ namespace app
       if (count > 0)
       {
          if (n->Level() > 1e-4f)
-            snprintf(stat, sizeof(stat), "%d in \xe2\x86\x92 1 out \xc2\xb7 sum %+.1f dB", count, DspMath::LinearToDb(n->Level()));
+            snprintf(stat, sizeof(stat), "%d in \xe2\x86\x92 1 out \xc2\xb7 sum %s", count, UiFmt::DbOffset(DspMath::LinearToDb(n->Level())).c);
          else
             snprintf(stat, sizeof(stat), "%d in \xe2\x86\x92 1 out \xc2\xb7 silent", count);
       }
@@ -791,7 +792,7 @@ namespace app
       // The semitone readout is the point of this node - make it the
       // visually dominant element, not a text line under six sliders.
       char st[16];
-      snprintf(st, sizeof(st), "%+d st", n->LastSemitone());
+      snprintf(st, sizeof(st), "%s", UiFmt::Semi(n->LastSemitone()).c);
       {
          UiType::Scope readout(UiType::Size::Display, UiType::Weight::Medium);
          ImGui::TextUnformatted(st);
@@ -907,7 +908,7 @@ namespace app
       const bool recording = n->IsRecording();
       char label[48];
       if (recording)
-         snprintf(label, sizeof(label), "stop  (%.1f beats)###cvRec", n->LengthBeats());
+         snprintf(label, sizeof(label), "stop  (%s)###cvRec", UiFmt::Beats(n->LengthBeats()).c);
       else
          snprintf(label, sizeof(label), "record###cvRec");
       if (ActionButton::Draw(label, ImVec2(kPreviewSize, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
@@ -1132,7 +1133,7 @@ namespace app
    void DrawNoteTransposeBody(GraphNode& gn, NoteTransposeNode* n)
    {
       char stat[48];
-      snprintf(stat, sizeof(stat), "%+d st", n->semitones);
+      snprintf(stat, sizeof(stat), "%s", UiFmt::Semi(n->semitones).c);
       DrawSingleKnobIntAudioBody(gn, stat, "transpose", &n->semitones, -48, 48);
    }
 
@@ -1140,7 +1141,7 @@ namespace app
    void DrawPitchBendBody(GraphNode& gn, PitchBendNode* n)
    {
       char stat[48];
-      snprintf(stat, sizeof(stat), "%+.2f st", n->bendSemitones);
+      snprintf(stat, sizeof(stat), "%s", UiFmt::Semi(n->bendSemitones).c);
       DrawSingleKnobAudioBody(gn, stat, "bend", &n->bendSemitones, -PitchBendNode::kRange, PitchBendNode::kRange,
                                "%+.2f st");
    }
@@ -1165,7 +1166,7 @@ namespace app
    void DrawVibratoBody(GraphNode& gn, VibratoNode* n)
    {
       char stat[48];
-      snprintf(stat, sizeof(stat), "%.1f Hz", n->rateHz);
+      snprintf(stat, sizeof(stat), "%s", UiFmt::Hz(n->rateHz).c);
       DrawSingleKnobAudioBody(gn, stat, "rate", &n->rateHz, 0.5f, 12.0f, "%.1f Hz");
    }
 
@@ -1217,8 +1218,8 @@ namespace app
    void DrawVelocityCurveBody(GraphNode& gn, VelocityCurveNode* n)
    {
       char stat[64];
-      snprintf(stat, sizeof(stat), "in %.0f%% -> out %.0f%%", n->LastVelocityIn() * 100.0f,
-               n->LastVelocityOut() * 100.0f);
+      snprintf(stat, sizeof(stat), "in %s -> out %s", UiFmt::PctOf(n->LastVelocityIn()).c,
+               UiFmt::PctOf(n->LastVelocityOut()).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       DrawVelocityCurveChart(n->curve);
@@ -1233,7 +1234,7 @@ namespace app
    void DrawHumanizerBody(GraphNode& gn, HumanizerNode* n)
    {
       char stat[64];
-      snprintf(stat, sizeof(stat), "%.0f ms, %.0f%% vel", n->timingMs, n->velocityPct);
+      snprintf(stat, sizeof(stat), "%s, %s vel", UiFmt::Ms(n->timingMs).c, UiFmt::Pct(n->velocityPct).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       AudioKnobRow row(2, kKnobLarge);
@@ -1269,7 +1270,7 @@ namespace app
       if (conf <= 0.0f)
          return;
       char badge[32];
-      snprintf(badge, sizeof(badge), "%d%% conf", (int)std::round(conf * 100.0f));
+      snprintf(badge, sizeof(badge), "%s conf", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
       const float maxW = bodyW - ImGui::CalcTextSize(badge).x - 36.0f;
       std::string out = stat;
       if (ImGui::CalcTextSize(out.c_str()).x <= maxW)
@@ -1285,9 +1286,9 @@ namespace app
       const float conf = n->Confidence01();
       char stat[64];
       if (n->ModeCount() > 0)
-         snprintf(stat, sizeof(stat), "%d spacings  -  %d onsets total", n->ModeCount(), n->TotalCaptured());
+         snprintf(stat, sizeof(stat), "%d spacings  -  %s onsets total", n->ModeCount(), UiFmt::Count((long long)(n->TotalCaptured())).c);
       else if (n->TotalCaptured() > 0)
-         snprintf(stat, sizeof(stat), "listening  -  %d onsets", n->TotalCaptured());
+         snprintf(stat, sizeof(stat), "listening  -  %s onsets", UiFmt::Count((long long)(n->TotalCaptured())).c);
       else
          snprintf(stat, sizeof(stat), "wire notes in - always adapting");
 
@@ -1298,7 +1299,7 @@ namespace app
       if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
       {
          char confBadge[32];
-         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         snprintf(confBadge, sizeof(confBadge), "%s conf", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
          const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
@@ -1320,9 +1321,9 @@ namespace app
       const float conf = n->Confidence01();
       char stat[64];
       if (n->HasCurve())
-         snprintf(stat, sizeof(stat), "dynamic range learned  -  %d notes total", n->TotalCaptured());
+         snprintf(stat, sizeof(stat), "dynamic range learned  -  %s notes total", UiFmt::Count((long long)(n->TotalCaptured())).c);
       else if (n->TotalCaptured() > 0)
-         snprintf(stat, sizeof(stat), "listening  -  %d notes", n->TotalCaptured());
+         snprintf(stat, sizeof(stat), "listening  -  %s notes", UiFmt::Count((long long)(n->TotalCaptured())).c);
       else
          snprintf(stat, sizeof(stat), "wire notes in - always adapting");
 
@@ -1333,7 +1334,7 @@ namespace app
       if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
       {
          char confBadge[32];
-         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         snprintf(confBadge, sizeof(confBadge), "%s conf", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
          const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
@@ -1356,17 +1357,17 @@ namespace app
       char stat[64];
       const std::string rootName = MidiNoteNameList()[std::clamp(n->root, 0, 127)];
       if (n->IsLearning() && n->Dropped() > 0)
-         snprintf(stat, sizeof(stat), "learning  -  %d notes (%d dropped)", n->NotesCaptured(), n->Dropped());
+         snprintf(stat, sizeof(stat), "learning  -  %s notes (%d dropped)", UiFmt::Count((long long)(n->NotesCaptured())).c, n->Dropped());
       else if (n->IsLearning())
-         snprintf(stat, sizeof(stat), "learning  -  %d notes", n->NotesCaptured());
+         snprintf(stat, sizeof(stat), "learning  -  %s notes", UiFmt::Count((long long)(n->NotesCaptured())).c);
       else if (n->Building())
          snprintf(stat, sizeof(stat), "building model...");
       else if (n->LastLearnTooShort() && n->LearnedNotes() > 0)
-         snprintf(stat, sizeof(stat), "too short, kept %d notes learned", n->LearnedNotes());
+         snprintf(stat, sizeof(stat), "too short, kept %s notes learned", UiFmt::Count((long long)(n->LearnedNotes())).c);
       else if (n->LastLearnTooShort())
          snprintf(stat, sizeof(stat), "too short to learn, wire notes in");
       else if (n->LearnedNotes() > 0)
-         snprintf(stat, sizeof(stat), "%d notes learned, root %s", n->LearnedNotes(), rootName.c_str());
+         snprintf(stat, sizeof(stat), "%s notes learned, root %s", UiFmt::Count((long long)(n->LearnedNotes())).c, rootName.c_str());
       else
          snprintf(stat, sizeof(stat), "wire notes in, press Learn");
 
@@ -1377,7 +1378,7 @@ namespace app
       if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
       {
          char confBadge[32];
-         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         snprintf(confBadge, sizeof(confBadge), "%s conf", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
          const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
@@ -1441,17 +1442,17 @@ namespace app
       const float conf = n->Confidence01();
       char stat[128];
       if (n->IsLearning() && n->Dropped() > 0)
-         snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars (%d dropped)", n->NotesCaptured(), n->BarsCaptured(), n->Dropped());
+         snprintf(stat, sizeof(stat), "learning  -  %s notes, %d bars (%d dropped)", UiFmt::Count((long long)(n->NotesCaptured())).c, n->BarsCaptured(), n->Dropped());
       else if (n->IsLearning())
-         snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars", n->NotesCaptured(), n->BarsCaptured());
+         snprintf(stat, sizeof(stat), "learning  -  %s notes, %d bars", UiFmt::Count((long long)(n->NotesCaptured())).c, n->BarsCaptured());
       else if (n->Building())
          snprintf(stat, sizeof(stat), "building model...");
       else if (n->LastLearnTooShort() && n->LearnedNotes() > 0)
-         snprintf(stat, sizeof(stat), "too short, kept %d notes learned", n->LearnedNotes());
+         snprintf(stat, sizeof(stat), "too short, kept %s notes learned", UiFmt::Count((long long)(n->LearnedNotes())).c);
       else if (n->LastLearnTooShort())
          snprintf(stat, sizeof(stat), "too short to learn, wire more notes in");
       else if (n->LearnedNotes() > 0)
-         snprintf(stat, sizeof(stat), "%d notes learned", n->LearnedNotes());
+         snprintf(stat, sizeof(stat), "%s notes learned", UiFmt::Count((long long)(n->LearnedNotes())).c);
       else
          snprintf(stat, sizeof(stat), "wire notes in, press Learn");
 
@@ -1462,7 +1463,7 @@ namespace app
       if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
       {
          char confBadge[32];
-         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         snprintf(confBadge, sizeof(confBadge), "%s conf", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
          const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddText(ImVec2(statusPos.x + kAudioNodeWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
@@ -1504,7 +1505,7 @@ namespace app
          if (conf > 0.0f)
          {
             char confStr[32];
-            snprintf(confStr, sizeof(confStr), "%d%%", (int)std::round(conf * 100.0f));
+            snprintf(confStr, sizeof(confStr), "%s", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
             const ImVec2 csz = ImGui::CalcTextSize(confStr);
             dl->AddText(ImVec2(p0.x + mw - csz.x - 6.0f, p0.y + (h - csz.y) * 0.5f),
                         tok::U32(tok::pal::c_22C55EFF), confStr);
@@ -1542,7 +1543,7 @@ namespace app
       if (active == 0)
          snprintf(stat, sizeof(stat), "no active inputs");
       else
-         snprintf(stat, sizeof(stat), "%d of %d inputs active", active, NoteMergeNode::kSlots);
+         snprintf(stat, sizeof(stat), "%d of %s inputs active", active, UiFmt::Count((long long)(NoteMergeNode::kSlots)).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
@@ -1565,7 +1566,7 @@ namespace app
          snprintf(stat, sizeof(stat), "every %s  -  slot %d", MusicTime::RateDivisionName(div), active + 1);
       }
       else
-         snprintf(stat, sizeof(stat), "every %.2fs  -  slot %d", n->rateSeconds, active + 1);
+         snprintf(stat, sizeof(stat), "every %s  -  slot %d", UiFmt::Sec(n->rateSeconds).c, active + 1);
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
@@ -1790,15 +1791,15 @@ namespace app
          if (n->useGlobalScale)
             playNote = MusicTime::SnapToScale(playNote, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
          playNote = std::clamp(playNote, 0, 127);
-         snprintf(stat, sizeof(stat), "step %d/%d \xC2\xB7 %s%d (%+dst)%s",
+         snprintf(stat, sizeof(stat), "step %d/%d \xC2\xB7 %s%d (%s)%s",
                   cur + 1, steps,
                   NoteNameList()[playNote % 12].c_str(), playNote / 12 - 1,
-                  playNote - 60,
+                  UiFmt::Semi(playNote - 60).c,
                   n->stepEnabled[cur] ? "" : " [muted]");
       }
       else
       {
-         snprintf(stat, sizeof(stat), "%d steps, looped", steps);
+         snprintf(stat, sizeof(stat), "%s steps, looped", UiFmt::Count((long long)(steps)).c);
       }
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
@@ -2051,12 +2052,12 @@ namespace app
             const int dispOct = dispNote / 12 - 1;
             const int stFromC4 = dispNote - 60;
             if (n->stepEnabled[hoverStep])
-               ImGui::TextDisabled("step %d: %s%d (%+dst) \xC2\xB7 vel %.0f%% (dbl-click to mute)",
-                                   hoverStep + 1, NoteNameList()[dispPc].c_str(), dispOct, stFromC4,
-                                   n->stepVelocity[hoverStep] * 100.0f);
+               ImGui::TextDisabled("step %d: %s%d (%s) \xC2\xB7 vel %s (dbl-click to mute)",
+                                   hoverStep + 1, NoteNameList()[dispPc].c_str(), dispOct, UiFmt::Semi(stFromC4).c,
+                                   UiFmt::PctOf(n->stepVelocity[hoverStep]).c);
             else
-               ImGui::TextDisabled("step %d: %s%d (%+dst) [MUTED] (dbl-click to unmute)",
-                                   hoverStep + 1, NoteNameList()[dispPc].c_str(), dispOct, stFromC4);
+               ImGui::TextDisabled("step %d: %s%d (%s) [MUTED] (dbl-click to unmute)",
+                                   hoverStep + 1, NoteNameList()[dispPc].c_str(), dispOct, UiFmt::Semi(stFromC4).c);
          }
          else
          {
@@ -2086,7 +2087,7 @@ namespace app
       if (n->laneId == 0)
          snprintf(stat, sizeof(stat), "no page linked");
       else
-         snprintf(stat, sizeof(stat), "%s - %d notes", n->laneName.c_str(), s ? (int)s->notes.size() : 0);
+         snprintf(stat, sizeof(stat), "%s - %s notes", n->laneName.c_str(), UiFmt::Count((long long)(s ? (int)s->notes.size() : 0)).c);
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       {
@@ -2175,8 +2176,8 @@ namespace app
       if (!n->Status().empty())
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       else if (song)
-         snprintf(stat, sizeof(stat), "%d notes - %d track%s - %.0f beats", song->noteCount, song->trackCount,
-                  song->trackCount == 1 ? "" : "s", n->LoopBeats());
+         snprintf(stat, sizeof(stat), "%s notes - %d track%s - %s", UiFmt::Count((long long)(song->noteCount)).c, song->trackCount,
+                  song->trackCount == 1 ? "" : "s", UiFmt::Beats(n->LoopBeats()).c);
       else
          snprintf(stat, sizeof(stat), "no file");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
@@ -2278,9 +2279,9 @@ namespace app
       if (last < 0)
       {
          if (n->groove > 0.001f)
-            snprintf(stat, sizeof(stat), "%s in %s..%s - %.0f%% groove", MusicTime::ScaleTable(n->scale).name,
+            snprintf(stat, sizeof(stat), "%s in %s..%s - %s groove", MusicTime::ScaleTable(n->scale).name,
                      NoteNameList()[n->rangeLow % 12].c_str(), NoteNameList()[n->rangeHigh % 12].c_str(),
-                     n->groove * 100.0f);
+                     UiFmt::PctOf(n->groove).c);
          else
             snprintf(stat, sizeof(stat), "%s in %s..%s", MusicTime::ScaleTable(n->scale).name,
                      NoteNameList()[n->rangeLow % 12].c_str(), NoteNameList()[n->rangeHigh % 12].c_str());
@@ -2288,8 +2289,8 @@ namespace app
       else
       {
          if (n->groove > 0.001f)
-            snprintf(stat, sizeof(stat), "last: %s%d - %.0f%% groove", NoteNameList()[last % 12].c_str(),
-                     last / 12 - 1, n->groove * 100.0f);
+            snprintf(stat, sizeof(stat), "last: %s%d - %s groove", NoteNameList()[last % 12].c_str(),
+                     last / 12 - 1, UiFmt::PctOf(n->groove).c);
          else
             snprintf(stat, sizeof(stat), "last: %s%d", NoteNameList()[last % 12].c_str(), last / 12 - 1);
       }
@@ -2553,7 +2554,7 @@ namespace app
       char stat[64];
       const int lastStack = n->LastStackSize();
       if (lastStack > 0)
-         snprintf(stat, sizeof(stat), "%d notes", lastStack);
+         snprintf(stat, sizeof(stat), "%s notes", UiFmt::Count((long long)(lastStack)).c);
       else
          snprintf(stat, sizeof(stat), "%d voice%s on", onCount, onCount == 1 ? "" : "s");
 
@@ -2622,11 +2623,11 @@ namespace app
       const bool playing = n->IsPlaying();
       char stat[64];
       if (recording)
-         snprintf(stat, sizeof(stat), "REC  %.1f beats", n->RecordedLengthBeats());
+         snprintf(stat, sizeof(stat), "REC  %s", UiFmt::Beats(n->RecordedLengthBeats()).c);
       else if (playing)
-         snprintf(stat, sizeof(stat), "playing, %d notes", n->RecordedCount());
+         snprintf(stat, sizeof(stat), "playing, %s notes", UiFmt::Count((long long)(n->RecordedCount())).c);
       else
-         snprintf(stat, sizeof(stat), "%d notes recorded", n->RecordedCount());
+         snprintf(stat, sizeof(stat), "%s notes recorded", UiFmt::Count((long long)(n->RecordedCount())).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawNoteCapturerVisualizer(n);
@@ -2743,7 +2744,7 @@ namespace app
    {
       static const std::vector<std::string> kShapes = { "Circle", "Square", "Triangle" };
       char stat[64];
-      snprintf(stat, sizeof(stat), "%s, %d balls", kShapes[std::clamp(n->shape, 0, 2)].c_str(), n->numBalls);
+      snprintf(stat, sizeof(stat), "%s, %s balls", kShapes[std::clamp(n->shape, 0, 2)].c_str(), UiFmt::Count((long long)(n->numBalls)).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawBouncingBallsVisualizer(n);
@@ -2774,7 +2775,7 @@ namespace app
    void DrawStrumBody(GraphNode& gn, NoteStrumNode* n)
    {
       char stat[48];
-      snprintf(stat, sizeof(stat), "%.1f ms", n->strumMs);
+      snprintf(stat, sizeof(stat), "%s", UiFmt::Ms(n->strumMs).c);
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
       {

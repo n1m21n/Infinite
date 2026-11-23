@@ -9,6 +9,7 @@
 #include "platform/AppPaths.h"
 #include "core/Notices.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -254,7 +255,7 @@ namespace app
       // levels as a balance at a glance" benefit a fader row earns, so it
       // reverts to the app's default control.
       char stat[48];
-      snprintf(stat, sizeof(stat), "%+.1f dB \xc2\xb7 %s", n->gainDb,
+      snprintf(stat, sizeof(stat), "%s \xc2\xb7 %s", UiFmt::DbOffset(n->gainDb).c,
                n->Level() > 0.0005f ? "passing" : "silent");
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
@@ -270,7 +271,7 @@ namespace app
    {
       char stat[48];
       const int pctB = (int)std::lround(n->blend * 100.0f);
-      snprintf(stat, sizeof(stat), "A <-> B   %d%%", pctB);
+      snprintf(stat, sizeof(stat), "A <-> B   %s", UiFmt::Pct(pctB).c);
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
@@ -486,9 +487,9 @@ namespace app
       switch (state)
       {
          case State::Empty: snprintf(stat, sizeof(stat), "pick a part and generate"); break;
-         case State::Generating: snprintf(stat, sizeof(stat), "generating %d%%", (int)(n->Progress() * 100.0f)); break;
+         case State::Generating: snprintf(stat, sizeof(stat), "generating %s", UiFmt::Pct((int)(n->Progress() * 100.0f)).c); break;
          case State::Ready:
-            snprintf(stat, sizeof(stat), "%s, %.0f bpm", n->MadeLabel().c_str(), n->madeBpm);
+            snprintf(stat, sizeof(stat), "%s, %s", n->MadeLabel().c_str(), UiFmt::Bpm(n->madeBpm).c);
             break;
          case State::Stale: snprintf(stat, sizeof(stat), "settings changed"); break;
          case State::Failed: snprintf(stat, sizeof(stat), "could not make one, generate again"); break;
@@ -1883,10 +1884,10 @@ namespace app
          snprintf(grooveLabel, sizeof(grooveLabel), "custom pattern");
       char stat[160];
       if (n->run)
-         snprintf(stat, sizeof(stat), "%s - %d steps - %s - %d loaded", grooveLabel, std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
+         snprintf(stat, sizeof(stat), "%s - %s steps - %s - %d loaded", grooveLabel, UiFmt::Count((long long)(std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps))).c,
                   MusicTime::RateDivisionName(n->rate), n->LoadedLaneCount());
       else
-         snprintf(stat, sizeof(stat), "stopped - %s - %d steps - %s", grooveLabel, std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
+         snprintf(stat, sizeof(stat), "stopped - %s - %s steps - %s", grooveLabel, UiFmt::Count((long long)(std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps))).c,
                   MusicTime::RateDivisionName(n->rate));
 
       BeginAudioBody(gn.index, gn.category, kAudioWideWidth, stat);
@@ -2162,7 +2163,7 @@ namespace app
             const int playPage = (n->run && paged) ? curStep / pageSteps : -1;
             const float startX = ImGui::GetCursorPosX();
             ImGui::AlignTextToFramePadding();
-            ImGui::TextDisabled("%d steps - %s", steps, MusicTime::RateDivisionName(n->rate));
+            ImGui::TextDisabled("%s steps - %s", UiFmt::Count((long long)(steps)).c, MusicTime::RateDivisionName(n->rate));
             FormParts::Inline();
             ImGui::SetCursorPosX(startX + AudioFullWidth() - pillW);
             if (!paged)
@@ -2245,7 +2246,7 @@ namespace app
       const bool unity = n->AtUnity();
       char drift[64] = "";
       if (!unity)
-         snprintf(drift, sizeof(drift), " - %.2fx, drifts off the grid", std::fabs(n->Rate()));
+         snprintf(drift, sizeof(drift), " - %s, drifts off the grid", UiFmt::Ratio(std::fabs(n->Rate())).c);
       switch (n->CurrentState())
       {
          case LooperNode::kArmed:
@@ -2254,20 +2255,20 @@ namespace app
             if (n->take > 0)
                grid = std::min(bar, MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(n->take - 1, 0, MusicTime::kNumRateDivisions - 1)));
             const double into = std::fmod(tr.Beats(), grid);
-            snprintf(out, cap, "armed - starts in %.1f beats", grid - into);
+            snprintf(out, cap, "armed - starts in %s", UiFmt::Beats(grid - into).c);
             break;
          }
          case LooperNode::kRecording:
             if (n->TargetSeconds() > 0.0f)
-               snprintf(out, cap, "recording - %.1f / %.1f s (%s)", n->LengthSeconds(), n->TargetSeconds(), takeName);
+               snprintf(out, cap, "recording - %s / %s (%s)", UiFmt::Sec(n->LengthSeconds()).c, UiFmt::Sec(n->TargetSeconds()).c, takeName);
             else
-               snprintf(out, cap, "recording - %.1f s - Rec ends it", n->LengthSeconds());
+               snprintf(out, cap, "recording - %s - Rec ends it", UiFmt::Sec(n->LengthSeconds()).c);
             break;
          case LooperNode::kPlaying:
-            snprintf(out, cap, "playing - %s - %.2f s - comp %.0f ms%s", len, n->LengthSeconds(), n->CompensationMs(), drift);
+            snprintf(out, cap, "playing - %s - %s - comp %s%s", len, UiFmt::Sec(n->LengthSeconds()).c, UiFmt::Ms(n->CompensationMs()).c, drift);
             break;
          case LooperNode::kOverdubbing:
-            snprintf(out, cap, "overdubbing - %s - %.2f s", len, n->LengthSeconds());
+            snprintf(out, cap, "overdubbing - %s - %s", len, UiFmt::Sec(n->LengthSeconds()).c);
             break;
          case LooperNode::kStopped:
             snprintf(out, cap, "stopped - %s - Play resumes%s", len, drift);
@@ -2807,7 +2808,7 @@ namespace app
                {
                   char val[32];
                   const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
-                  snprintf(val, sizeof(val), "%.3f s", frac * n->padPeaks[cur].Seconds());
+                  snprintf(val, sizeof(val), "%s", UiFmt::Sec(frac * n->padPeaks[cur].Seconds()).c);
                   SetAudioReadout("time", val);
                }
             }

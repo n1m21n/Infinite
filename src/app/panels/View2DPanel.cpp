@@ -55,6 +55,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -5103,7 +5104,7 @@ namespace
          dot(b, 2.5f, false);
          const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
          char t[64];
-         std::snprintf(t, sizeof t, "%.0f px  %.1f°", std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f);
+         std::snprintf(t, sizeof t, "%s  %s", UiFmt::Px(std::hypot(dx, dy)).c, UiFmt::Deg(std::atan2(-dy, dx) * 57.29578f).c);
          const ImVec2 at(b.x + 10.0f, b.y + 6.0f);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
@@ -10156,9 +10157,9 @@ namespace
       FormParts::Inline(0.0f, tok::space_3);
       char buf[200];
       if (sMouseIn)
-         std::snprintf(buf, sizeof(buf), "%d x %d   %.0f, %.0f   %.2f ms", d.w, d.h, sMouseDoc.x, sMouseDoc.y, doc->CookMs());
+         std::snprintf(buf, sizeof(buf), "%d x %d   %.0f, %.0f   %s", d.w, d.h, sMouseDoc.x, sMouseDoc.y, UiFmt::Ms(doc->CookMs()).c);
       else
-         std::snprintf(buf, sizeof(buf), "%d x %d   %.2f ms", d.w, d.h, doc->CookMs());
+         std::snprintf(buf, sizeof(buf), "%d x %d   %s", d.w, d.h, UiFmt::Ms(doc->CookMs()).c);
       CentredText(row0Y, buf);
    }
 

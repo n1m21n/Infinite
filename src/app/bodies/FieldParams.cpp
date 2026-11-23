@@ -3,6 +3,7 @@
 #include "app/AppShared.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -323,7 +324,7 @@ namespace app
          if (n->WasTruncated())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_800_200_1000), "Truncated to %d vertices", n->ActualElementCount());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_800_200_1000), "Truncated to %s vertices", UiFmt::Count((long long)(n->ActualElementCount())).c);
             PopTextWrapWidth();
          }
 
@@ -400,7 +401,7 @@ namespace app
          if (n->WasTruncated())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_800_200_1000), "Truncated to %d vertices", n->ActualElementCount());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_800_200_1000), "Truncated to %s vertices", UiFmt::Count((long long)(n->ActualElementCount())).c);
             PopTextWrapWidth();
          }
 

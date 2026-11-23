@@ -9,6 +9,7 @@
 #include "app/ui/design/components/Switch.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "platform/AppPaths.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -517,8 +518,8 @@ namespace app
          PushTextWrapWidth(kPreviewSize);
          ImGui::TextDisabled("%s", file.c_str());
          PopTextWrapWidth();
-         ImGui::TextDisabled("%dx%d  %.1fs / %.1fs", n->GetOutputWidth(), n->GetOutputHeight(),
-                             n->Position(), n->Duration());
+         ImGui::TextDisabled("%dx%d  %s / %s", n->GetOutputWidth(), n->GetOutputHeight(),
+                             UiFmt::Sec(n->Position()).c, UiFmt::Sec(n->Duration()).c);
       }
       ModCheckbox("loop", &n->loop);
       ModSlider("speed", &n->speed, -2.0f, 4.0f);
@@ -1173,7 +1174,7 @@ namespace app
       }
       else
       {
-         ImGui::TextDisabled("%d steps, looped", count);
+         ImGui::TextDisabled("%s steps, looped", UiFmt::Count((long long)(count)).c);
       }
       PopTextWrapWidth();
    }

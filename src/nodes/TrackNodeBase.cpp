@@ -8,6 +8,7 @@
 #include "GLUtil.h"
 #include "core/Extensions.h"
 #include "core/tracking/OrtRuntime.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace
 {
@@ -225,7 +226,7 @@ void TrackNodeBase::WorkerLoop()
                Publish(v, true, f.t, &overlay);
             }
             char buf[64];
-            snprintf(buf, sizeof(buf), "tracking, %.1f ms", mLastMs.load());
+            snprintf(buf, sizeof(buf), "tracking, %s", UiFmt::Ms(mLastMs.load()).c);
             setStatus(buf);
          }
       }

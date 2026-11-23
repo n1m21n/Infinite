@@ -36,6 +36,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -446,8 +447,8 @@ namespace app
                if (!n->patternName.empty() && cur >= 0)
                   name += std::string(" ") + "ABC"[std::clamp(n->patternPart, 0, 2)];
                char tail[48];
-               snprintf(tail, sizeof tail, "%s  %d  %d%%", MusicTime::RateDivisionName(n->rate), std::clamp(n->numSteps, 1, kMaxSteps),
-                        (int)std::lround(n->swing * 100.0f));
+               snprintf(tail, sizeof tail, "%s  %d  %s", MusicTime::RateDivisionName(n->rate), std::clamp(n->numSteps, 1, kMaxSteps),
+                        UiFmt::Pct((int)std::lround(n->swing * 100.0f)).c);
                const bool clicked = ActionButton::Draw("##grooveFace", ImVec2(kGrooveW, tok::control_h));
                if (ImGui::IsItemHovered())
                   HelpTip("%s", T("Groove: pick from the library"));
@@ -906,7 +907,7 @@ namespace app
                   if (cond != 0)
                      snprintf(badge, sizeof badge, "%s", DrumSequencerNode::CondName(cond));
                   else if (prob < 1.0f)
-                     snprintf(badge, sizeof badge, "%d%%", (int)std::lround(prob * 100.0f));
+                     snprintf(badge, sizeof badge, "%s", UiFmt::Pct((int)std::lround(prob * 100.0f)).c);
                   if (badge[0] != '\0')
                   {
                      UiType::Scope bs(UiType::Size::Caption, UiType::Weight::Semibold);

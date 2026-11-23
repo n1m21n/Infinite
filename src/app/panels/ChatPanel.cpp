@@ -5,6 +5,7 @@
 // Changed card diffed from the patch before and after. Files attach by the + button or a drop. Every chat
 // is saved and comes back from the history menu with its agent sessions.
 #include "app/AppShared.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
@@ -3458,10 +3459,8 @@ namespace app
          if (running)
          {
             const int secs = since >= 0.0 ? (int)(ImGui::GetTime() - since) : 0;
-            if (secs >= 60)
-               std::snprintf(count, sizeof count, "%s  %d:%02d", T("Working…"), secs / 60, secs % 60);
-            else if (secs >= 3)
-               std::snprintf(count, sizeof count, "%s  %ds", T("Working…"), secs);
+            if (secs >= 3)
+               std::snprintf(count, sizeof count, "%s  %s", T("Working…"), UiFmt::Clock(secs).c);
             else
                std::snprintf(count, sizeof count, "%s", T("Working…"));
          }

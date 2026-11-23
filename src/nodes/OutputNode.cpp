@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include "app/ui/design/UiFmt.h"
 
 namespace
 {
@@ -269,7 +270,7 @@ std::string OutputNode::ClipSuffix(float peak)
    if (!(peak > 1.0f))
       return std::string();
    char note[64];
-   snprintf(note, sizeof(note), " (audio clipped, +%.1f dB over)", 20.0f * std::log10(peak));
+   snprintf(note, sizeof(note), " (audio clipped, +%s over)", UiFmt::Db(20.0f * std::log10(peak)).c);
    return std::string(note);
 }
 

@@ -25,6 +25,7 @@
 #include "Transport.h"
 #include "core/AudioTopologyRequest.h"
 #include "audio/WavWriter.h"
+#include "app/ui/design/UiFmt.h"
 
 const int PaulStretchNode::kWindowSizes[PaulStretchNode::kNumWindowSizes] = {
    2048, 4096, 8192, 16384, 32768, 65536, 131072
@@ -819,7 +820,7 @@ void PaulStretchNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::s
    const int totalFrames = decoded->numFrames;
    const float durationSec = (decoded->sampleRate > 0.0) ? (float)totalFrames / (float)decoded->sampleRate : 0.0f;
    char stat[128];
-   snprintf(stat, sizeof(stat), "%.2fs  -  %dch %dHz", durationSec, decoded->channels, (int)decoded->sampleRate);
+   snprintf(stat, sizeof(stat), "%s  -  %dch %s", UiFmt::Sec(durationSec).c, decoded->channels, UiFmt::Hz((int)decoded->sampleRate).c);
    mStatus = stat;
 
    // Build min/max waveform cache for GUI from channel 0

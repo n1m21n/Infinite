@@ -5,6 +5,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -378,7 +379,7 @@ namespace app
                {
                   char val[32];
                   const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
-                  snprintf(val, sizeof(val), "%.2f s", frac * (float)n->PadDuration(cur));
+                  snprintf(val, sizeof(val), "%s", UiFmt::Sec(frac * (float)n->PadDuration(cur)).c);
                   SetAudioReadout("time", val);
                }
             }

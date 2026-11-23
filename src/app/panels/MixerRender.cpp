@@ -27,6 +27,7 @@
 #include <string>
 #include <sys/stat.h>
 #include <vector>
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -552,11 +553,11 @@ namespace app
          const float peakDb = r.peak > 1e-6f ? 20.0f * std::log10(r.peak) : -120.0f;
          char line[160];
          if (r.lufs <= -99.0f)
-            snprintf(line, sizeof(line), "%.1f dB%s  %.1f s  %.1f MB", peakDb, OutputNode::ClipSuffix(r.peak).c_str(),
-                     r.seconds, (double)r.bytes / (1024.0 * 1024.0));
+            snprintf(line, sizeof(line), "%s%s  %s  %s", UiFmt::Db(peakDb).c, OutputNode::ClipSuffix(r.peak).c_str(),
+                     UiFmt::Sec(r.seconds).c, UiFmt::MB((double)r.bytes / (1024.0 * 1024.0)).c);
          else
-            snprintf(line, sizeof(line), "%.1f dB%s  %.1f LUFS  %.1f s  %.1f MB", peakDb, OutputNode::ClipSuffix(r.peak).c_str(),
-                     r.lufs, r.seconds, (double)r.bytes / (1024.0 * 1024.0));
+            snprintf(line, sizeof(line), "%s%s  %s  %s  %s", UiFmt::Db(peakDb).c, OutputNode::ClipSuffix(r.peak).c_str(),
+                     UiFmt::Lufs(r.lufs).c, UiFmt::Sec(r.seconds).c, UiFmt::MB((double)r.bytes / (1024.0 * 1024.0)).c);
          ImGui::TextDisabled("%s", line);
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Peak, integrated loudness, length and size of the file."));

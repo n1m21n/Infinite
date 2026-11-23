@@ -1,6 +1,7 @@
 // Plugin, audio-out, analog and audio-node dispatch bodies (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -242,7 +243,7 @@ namespace app
       if (recording)
       {
          const char* fmtStr = (n->formatIndex == 1) ? "FLAC" : (n->formatIndex == 2 ? "MP3" : "WAV");
-         snprintf(stat, sizeof(stat), "REC %s  %.1fs  %.0f KB", fmtStr, n->ElapsedSeconds(), (double)n->FileSizeBytes() / 1024.0);
+         snprintf(stat, sizeof(stat), "REC %s  %s  %s", fmtStr, UiFmt::Sec(n->ElapsedSeconds()).c, UiFmt::KB((double)n->FileSizeBytes() / 1024.0).c);
       }
       else
       {
@@ -345,8 +346,8 @@ namespace app
       // A finished take that went over full scale was written clipped; the
       // line stays until the next take starts.
       if (!recording && n->TakePeak() > 1.0f)
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "last take clipped, +%.1f dB over",
-                            20.0f * std::log10(n->TakePeak()));
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "last take clipped, +%s over",
+                            UiFmt::Db(20.0f * std::log10(n->TakePeak())).c);
 
       // The summed output of every Audio Out went over full scale: the device
       // and a recorded file both hard-clip there. Held for 3 s after the last
@@ -361,8 +362,8 @@ namespace app
             sLastOverTime = ImGui::GetTime();
          }
          if (ImGui::GetTime() - sLastOverTime < tok::motion_s_clip_hold)
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "clipping +%.1f dB - lower the level",
-                               20.0f * std::log10(std::max(1.0f, AudioEngine::Instance().MasterOverPeak())));
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "clipping +%s - lower the level",
+                               UiFmt::Db(20.0f * std::log10(std::max(1.0f, AudioEngine::Instance().MasterOverPeak()))).c);
       }
 
       EndAudioBody();
@@ -471,8 +472,8 @@ namespace app
       }
       ImGui::EndDisabled();
       if (recording)
-         ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "REC %.1fs  %.0f KB  (head facing front)",
-                            n->ElapsedSeconds(), (double)n->FileSizeBytes() / 1024.0);
+         ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "REC %s  %s  (head facing front)",
+                            UiFmt::Sec(n->ElapsedSeconds()).c, UiFmt::KB((double)n->FileSizeBytes() / 1024.0).c);
       else
          ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "%s",
                             n->recordDirectory.empty() ? "~/Desktop" : n->recordDirectory.c_str());
@@ -493,7 +494,7 @@ namespace app
       if (noteDriven)
          snprintf(stat, sizeof(stat), "%s  -  %d voice%s", filterName, voices, voices == 1 ? "" : "s");
       else
-         snprintf(stat, sizeof(stat), "%s  -  free run %.0f Hz", filterName, n->freq);
+         snprintf(stat, sizeof(stat), "%s  -  free run %s", filterName, UiFmt::Hz(n->freq).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 

@@ -15,6 +15,7 @@
 #include "audio/dsp/MolderDsp.h"
 #include "core/AudioDecodeCache.h"
 #include "platform/Platform.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace
 {
@@ -624,7 +625,7 @@ void PartialsNode::JoinIfDone(int which)
    if (which == 0)
       RebuildBars(*m);
    char stat[96];
-   snprintf(stat, sizeof(stat), "f0 %.1f Hz  -  %.2fs", m->f0, m->DurationSec());
+   snprintf(stat, sizeof(stat), "f0 %s  -  %s", UiFmt::Hz(m->f0).c, UiFmt::Sec(m->DurationSec()).c);
    mStatus = stat;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioPartialsNode>();

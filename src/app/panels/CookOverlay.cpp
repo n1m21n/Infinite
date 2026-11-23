@@ -9,6 +9,7 @@
 #include "audio/AudioEngine.h"
 #include "audio/AudioNode.h"
 #include "imgui_internal.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -126,8 +127,8 @@ void DrawCookOverlay()
       nextLevel[key] = level;
       if (scale < 0.35f && level == 0) continue;   // zoomed far out only the amber and red numbers stay, so a slow node still shows
       char buf[24];
-      if (r.audio) std::snprintf(buf, sizeof buf, "%.1f%% cb", r.v * 100.0f);
-      else std::snprintf(buf, sizeof buf, r.v < 10.0f ? "%.2f ms" : "%.0f ms", r.v);
+      if (r.audio) std::snprintf(buf, sizeof buf, "%s cb", UiFmt::PctOf(r.v, 1).c);
+      else std::snprintf(buf, sizeof buf, "%s", UiFmt::Ms(r.v).c);
       const ImVec2 ts = font->CalcTextSizeA(kPillText, FLT_MAX, 0.0f, buf);
       const ImVec2 q0(p2.x - ts.x - 10.0f, p.y - ts.y - 8.0f), q1(p2.x, p.y - 2.0f);
       if (CoveredByWindow(ImVec2((q0.x + q1.x) * 0.5f, (q0.y + q1.y) * 0.5f))) continue;   // pill sits above the node, may be under a window the node is not

@@ -20,6 +20,7 @@
 #include "SceneNodes.h"
 #include "RigPose.h"
 #include "Modulation.h"
+#include "app/ui/design/UiFmt.h"
 
 std::function<INode*(uint64_t)> Scene3DNode::ResolveUid;
 
@@ -1447,7 +1448,7 @@ unsigned int Scene3DNode::Finish(unsigned int sceneTex, int w, int h, int frameI
          }
       }
       if (st.stampScene) add("Scene", "Scene");
-      if (st.stampRender) { std::snprintf(buf, sizeof(buf), "%.1f ms", mCookMs); add("Render", buf); }
+      if (st.stampRender) { std::snprintf(buf, sizeof(buf), "%s", UiFmt::Ms(mCookMs).c); add("Render", buf); }
       if (st.stampNote && !stampNote.empty()) add("Note", stampNote);
    }
    const bool stamped = !text.empty();

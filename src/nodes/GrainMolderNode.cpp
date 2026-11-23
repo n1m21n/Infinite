@@ -16,6 +16,7 @@
 #include "platform/Platform.h"
 #include "Transport.h"
 #include "core/AudioTopologyRequest.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace
 {
@@ -783,10 +784,10 @@ void GrainMolderNode::CookIfNeeded(int frameId)
          mAudioNode->PushBuffer(sampleBuf.release());
 
       char buf[128];
-      snprintf(buf, sizeof(buf), "%.1fs - %d grains (%.0fms)",
-               (double)numFrames / sampleRate,
+      snprintf(buf, sizeof(buf), "%s - %d grains (%s)",
+               UiFmt::Sec((double)numFrames / sampleRate).c,
                (int)((numFrames - (int)(grain * sampleRate / 1000.0)) / std::max(1, (int)(grain * sampleRate / 2000.0)) + 1),
-               grain);
+               UiFmt::Ms(grain).c);
       mStatus = buf;
    }
 

@@ -1,6 +1,7 @@
 // Arrange panel support: position formatting, typed edit, sliders, media import (moved verbatim from main.cpp).
 #include "app/AppShared.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -92,7 +93,7 @@ namespace app
       if (gArrange.settings.timeDisplay == 1)
       {
          char buf[32];
-         snprintf(buf, sizeof(buf), "%.2fs", Arrange::TicksToSeconds(t, std::max(1.0, (double)Transport::Instance().Tempo())));
+         snprintf(buf, sizeof(buf), "%s", UiFmt::Sec(Arrange::TicksToSeconds(t, std::max(1.0, (double)Transport::Instance().Tempo()))).c);
          return buf;
       }
       return ArrangeFormatBBTLength(t);

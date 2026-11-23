@@ -4,6 +4,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "platform/HeadTracker.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -46,11 +47,11 @@ namespace app
       char stat[112];
       const bool tracked = n->trackMode == 1 && n->HeadTracked();
       if (n->IsRecording())
-         snprintf(stat, sizeof(stat), "REC %s %d-bit  %.1fs", n->formatIndex == 1 ? "FLAC" : "WAV", n->bit24 ? 24 : 16,
-                  n->ElapsedSeconds());
+         snprintf(stat, sizeof(stat), "REC %s %d-bit  %s", n->formatIndex == 1 ? "FLAC" : "WAV", n->bit24 ? 24 : 16,
+                  UiFmt::Sec(n->ElapsedSeconds()).c);
       else if (connected > 0)
-         snprintf(stat, sizeof(stat), "%d in -> %s%s  %.0f LUFS", connected, n->renderMode == 1 ? "stereo" : "binaural",
-                  tracked ? " - tracked" : "", std::max(n->LufsShort(), -99.0f));
+         snprintf(stat, sizeof(stat), "%d in -> %s%s  %s", connected, n->renderMode == 1 ? "stereo" : "binaural",
+                  tracked ? " - tracked" : "", UiFmt::Lufs(std::max(n->LufsShort(), -99.0f)).c);
       else
          snprintf(stat, sizeof(stat), "0 in \xE2\x86\x92 binaural (idle)");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
@@ -193,8 +194,8 @@ namespace app
          if (n->inputs[s].IsConnected() && (hot >= 0 || sDragNode == gn.index))
          {
             char r[96];
-            snprintf(r, sizeof(r), "in %d  az %.0f  el %.0f  %.1f m  %+.1f dB", s + 1, n->azimuth[s],
-                     n->elevation[s], n->distance[s], n->gainDb[s]);
+            snprintf(r, sizeof(r), "in %d  az %.0f  el %.0f  %.1f m  %s", s + 1, n->azimuth[s],
+                     n->elevation[s], n->distance[s], UiFmt::DbOffset(n->gainDb[s]).c);
             gAudioReadout[gn.index] = r;
          }
       }
@@ -227,7 +228,7 @@ namespace app
             const float x0 = right - 3.0f * bw - 2.0f * gap;
             const float y = rp.y;
             char db[24];
-            snprintf(db, sizeof(db), "%+.1f dB", n->gainDb[s]);
+            snprintf(db, sizeof(db), "%s", UiFmt::DbOffset(n->gainDb[s]).c);
             const float tw = ImGui::CalcTextSize(db).x;
             ImGui::SetCursorScreenPos(ImVec2(x0 - 8.0f - tw, y + ty));
             ImGui::TextUnformatted(db);
@@ -347,8 +348,8 @@ namespace app
             SetAudioReadout("ears", model ? "spherical-head model, no measured data" : "measured dummy-head (MIT KEMAR)");
 
          char meter[96];
-         snprintf(meter, sizeof(meter), "%.1f LUFS   peak %.1f dB   gr %.1f dB", std::max(n->LufsShort(), -99.0f),
-                  std::max(n->TruePeakDb(), -99.0f), n->ReductionDb());
+         snprintf(meter, sizeof(meter), "%s   peak %s   gr %s", UiFmt::Lufs(std::max(n->LufsShort(), -99.0f)).c,
+                  UiFmt::Db(std::max(n->TruePeakDb(), -99.0f)).c, UiFmt::Db(n->ReductionDb()).c);
          ImGui::TextUnformatted(meter);
          if (ImGui::IsItemClicked())
             n->ResetPeak();

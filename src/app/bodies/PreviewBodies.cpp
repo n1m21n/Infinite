@@ -9,6 +9,7 @@
 #include "app/ui/design/components/FormParts.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -577,7 +578,7 @@ namespace app
 
       if (n->RecordedStamps() > 0)
       {
-         ImGui::TextDisabled("%zu marks over %.1f beats", n->RecordedStamps(), n->RecordedLength());
+         ImGui::TextDisabled("%zu marks over %s", n->RecordedStamps(), UiFmt::Beats(n->RecordedLength()).c);
          if (n->IsPlayingBack())
             ImGui::TextColored(tok::V4(tok::palf::v_500_950_600_1000), "playhead %.1f", n->PlayheadBeats());
          if (n->RecordingCapped())

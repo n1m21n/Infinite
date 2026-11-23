@@ -13,6 +13,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -3063,7 +3064,7 @@ namespace app
                      dl->PopClipRect();
                   }
                   char opTxt[16];
-                  snprintf(opTxt, sizeof(opTxt), "%.0f%%", pct);
+                  snprintf(opTxt, sizeof(opTxt), "%s", UiFmt::Pct(pct).c);
                   UiType::Scope opScope(UiType::Size::Caption, UiType::Weight::Medium);
                   const ImVec2 otz = ImGui::CalcTextSize(opTxt);
                   dl->AddText(ImVec2(std::round(op.x + (kMixStripW - otz.x) * 0.5f), std::round(op.y + (kMixCtl - otz.y) * 0.5f)),

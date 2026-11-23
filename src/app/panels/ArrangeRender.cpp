@@ -11,6 +11,7 @@
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -1308,8 +1309,8 @@ namespace app
       if (overs == 0)
          return;
       char note[96];
-      snprintf(note, sizeof(note), "The loudest peak was %.1f dB over. Lower the level and render again.",
-               20.0f * std::log10(std::max(1.0f, AudioEngine::Instance().MasterOverPeakHold())));
+      snprintf(note, sizeof(note), "The loudest peak was %s over. Lower the level and render again.",
+               UiFmt::Db(20.0f * std::log10(std::max(1.0f, AudioEngine::Instance().MasterOverPeakHold()))).c);
       job.message = job.message.empty() ? std::string(note) : job.message + "; " + note;
       sRenderNoticeClipped = true;
       gArrangeRenderFailNotice = "\"" + job.path + "\"\n\n" + note;

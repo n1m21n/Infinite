@@ -8,6 +8,7 @@
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/AppShared.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -513,7 +514,7 @@ namespace app
                                              (int)std::round(163.0f + (197.0f - 163.0f) * t),
                                              (int)std::round(184.0f + (94.0f - 184.0f) * t), 255);
                   ImGui::PushStyleColor(ImGuiCol_Text, col);
-                  ImGui::Text("%d%%", (int)std::round(conf * 100.0f));
+                  ImGui::Text("%s", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
                   ImGui::PopStyleColor();
                }
                else

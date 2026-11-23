@@ -41,6 +41,7 @@
 #include "app/frame/CanvasLink.h"
 #include <string>
 #include <vector>
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -3620,8 +3621,8 @@ namespace
                sSculpt.symmetry ^= 1 << k;
       }
       char label[96];
-      snprintf(label, sizeof(label), ok ? "Sculpt Mode   %.0f px   %.2f" : "Sculpt Mode   Topology changed", sSculpt.radius,
-               sSculpt.strength);
+      if (ok) snprintf(label, sizeof(label), "Sculpt Mode   %s   %.2f", UiFmt::Px(sSculpt.radius).c, sSculpt.strength);
+      else snprintf(label, sizeof(label), "Sculpt Mode   Topology changed");
       dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), label);
 
       // F / Shift+F: drag the radius or strength, click to keep, Esc to undo.
@@ -4262,7 +4263,7 @@ namespace
          Normalize(m);
          snprintf(line, sizeof(line), "rotate %.5g %.5g %.5g %.5g", m[0], m[1], m[2], deg);
          char shown[96];
-         snprintf(shown, sizeof(shown), "Rotate   %.1f\xC2\xB0 about X %.2f  Y %.2f  Z %.2f", deg, m[0], -m[2], m[1]);
+         snprintf(shown, sizeof(shown), "Rotate   %s about X %.2f  Y %.2f  Z %.2f", UiFmt::Deg(deg).c, m[0], -m[2], m[1]);
          sEdit.readout = shown;
       }
       else if (sEdit.op == 's')
@@ -4375,7 +4376,7 @@ namespace
       for (unsigned char f : sel.face)
          count += f;
       char label[160];
-      snprintf(label, sizeof(label), "Edit Mode   %d ops   %d faces", node->OpCount(), count);
+      snprintf(label, sizeof(label), "Edit Mode   %d ops   %s faces", node->OpCount(), UiFmt::Count((long long)(count)).c);
       if (sEdit.op != 0 && !sEdit.readout.empty())
       {
          const char* axisName[3] = { "X", "Z", "Y" };   // by engine index
@@ -4952,9 +4953,9 @@ namespace
          char text[64];
          const float fps = ImGui::GetIO().Framerate;
          if (sSet->showPerf && sSet->showFps)
-            snprintf(text, sizeof(text), "%.0f fps   %.1f ms", fps, 1000.0f / std::max(1.0f, fps));
+            snprintf(text, sizeof(text), "%.0f fps   %s", fps, UiFmt::Ms(1000.0f / std::max(1.0f, fps)).c);
          else if (sSet->showPerf)
-            snprintf(text, sizeof(text), "%.1f ms", 1000.0f / std::max(1.0f, fps));
+            snprintf(text, sizeof(text), "%s", UiFmt::Ms(1000.0f / std::max(1.0f, fps)).c);
          else
             snprintf(text, sizeof(text), "%.0f fps", fps);
          dl->AddText(ImVec2(sCam.mx.x - ImGui::CalcTextSize(text).x - tok::space_3, mn.y + tok::space_2), Hex(0xFFFFFF, 0.6f), text);

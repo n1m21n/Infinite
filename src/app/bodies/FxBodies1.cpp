@@ -2,6 +2,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -405,7 +406,7 @@ namespace app
       if (isNear)
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%.0f Hz  %+.1f dB  Q %.2f", freq, gain, q);
+         snprintf(buf, sizeof(buf), "%s  %s  Q %.2f", UiFmt::Hz(freq).c, UiFmt::DbOffset(gain).c, q);
          SetAudioReadout("filter", buf);
       }
       // No trailing Dummy here: the InvisibleButton above already reserved
@@ -438,8 +439,8 @@ namespace app
       const float q = n->Param("q");
 
       char stat[80];
-      snprintf(stat, sizeof(stat), "%s - %.1f kHz - Q %.2f", AudioFilterDsp::TypeName(type),
-               freq / 1000.0f, q);
+      snprintf(stat, sizeof(stat), "%s - %s - Q %.2f", AudioFilterDsp::TypeName(type),
+               UiFmt::Hz(freq).c, q);
 
       const double sampleRate = AudioEngine::Instance().SampleRate() > 0.0
                                    ? AudioEngine::Instance().SampleRate()
@@ -680,12 +681,12 @@ namespace app
       {
          char freqBuf[16];
          if (bands[selected].freq < 1000.0f)
-            snprintf(freqBuf, sizeof(freqBuf), "%.0f Hz", bands[selected].freq);
+            snprintf(freqBuf, sizeof(freqBuf), "%s", UiFmt::Hz(bands[selected].freq).c);
          else
-            snprintf(freqBuf, sizeof(freqBuf), "%.2f kHz", bands[selected].freq / 1000.0f);
+            snprintf(freqBuf, sizeof(freqBuf), "%s", UiFmt::Hz(bands[selected].freq).c);
          char capBuf[80];
-         snprintf(capBuf, sizeof(capBuf), "band %d \xC2\xB7 %s \xC2\xB7 %+.1f dB \xC2\xB7 Q %.2f", selected + 1,
-                  freqBuf, bands[selected].gain, bands[selected].q);
+         snprintf(capBuf, sizeof(capBuf), "band %d \xC2\xB7 %s \xC2\xB7 %s \xC2\xB7 Q %.2f", selected + 1,
+                  freqBuf, UiFmt::DbOffset(bands[selected].gain).c, bands[selected].q);
          dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 4.0f), ScopeTextCol(), capBuf);
       }
 
@@ -845,8 +846,8 @@ namespace app
       {
          const int b = dragBand;
          char buf[80];
-         snprintf(buf, sizeof(buf), "band %d  %.0f Hz  %+.1f dB  Q %.2f  %s", b + 1, bands[b].freq,
-                  bands[b].gain, bands[b].q, bands[b].on ? "on" : "off");
+         snprintf(buf, sizeof(buf), "band %d  %s  %s  Q %.2f  %s", b + 1, UiFmt::Hz(bands[b].freq).c,
+                  UiFmt::DbOffset(bands[b].gain).c, bands[b].q, bands[b].on ? "on" : "off");
          SetAudioReadout("eq", buf);
       }
       // No trailing Dummy: the InvisibleButton above already reserved this
@@ -928,7 +929,7 @@ namespace app
       }
 
       char stat[80];
-      snprintf(stat, sizeof(stat), "5 bands - %d active - %+.1f dB peak", active, peakDb);
+      snprintf(stat, sizeof(stat), "5 bands - %d active - %s peak", active, UiFmt::DbOffset(peakDb).c);
 
       const double sampleRate = AudioEngine::Instance().SampleRate() > 0.0
                                    ? AudioEngine::Instance().SampleRate()
@@ -1138,14 +1139,14 @@ namespace app
          if (hasSignal)
          {
             if (ratio >= kLimiterVizRatio)
-               snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, limit", liveInDb, liveGrDb);
+               snprintf(buf, sizeof(buf), "%s in, -%s GR, limit", UiFmt::Db(liveInDb).c, UiFmt::Db(liveGrDb).c);
             else
-               snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, %.0f:1", liveInDb, liveGrDb, ratio);
+               snprintf(buf, sizeof(buf), "%s in, -%s GR, %.0f:1", UiFmt::Db(liveInDb).c, UiFmt::Db(liveGrDb).c, ratio);
          }
          else if (ratio >= kLimiterVizRatio)
-            snprintf(buf, sizeof(buf), "ceiling %.0f dB", threshold + makeupDb);
+            snprintf(buf, sizeof(buf), "ceiling %s", UiFmt::Db(threshold + makeupDb).c);
          else
-            snprintf(buf, sizeof(buf), "%.0f dB in -> %.0f dB out, %.0f:1", threshold, threshold + makeupDb, ratio);
+            snprintf(buf, sizeof(buf), "%s in -> %s out, %.0f:1", UiFmt::Db(threshold).c, UiFmt::Db(threshold + makeupDb).c, ratio);
          SetAudioReadout(readoutKey, buf);
       }
 
@@ -1158,8 +1159,8 @@ namespace app
       const bool analog = n->Param("analog") != 0.0f;
       const int style = std::clamp((int)std::lround(n->Param("style")), 0, DynamicsDsp::kNumStyles - 1);
       char stat[96];
-      snprintf(stat, sizeof(stat), "%s %.0f:1 @ %.0f dB%s", DynamicsDsp::StyleList()[style].c_str(),
-               n->Param("ratio"), n->Param("threshold"), analog ? " - warm" : "");
+      snprintf(stat, sizeof(stat), "%s %.0f:1 @ %s%s", DynamicsDsp::StyleList()[style].c_str(),
+               n->Param("ratio"), UiFmt::Db(n->Param("threshold")).c, analog ? " - warm" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawGainComputerVisualizer("dynamics", n->Param("threshold"), n->Param("ratio"), n->Param("makeup"), 0.0f,
@@ -1238,8 +1239,8 @@ namespace app
    void DrawLimiterBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[64];
-      snprintf(stat, sizeof(stat), "%.0f dB thresh, -%.1f dB GR", n->Param("threshold"),
-               std::clamp(n->ExtraMeterValue(0), 0.0f, 20.0f));
+      snprintf(stat, sizeof(stat), "%s thresh, -%s GR", UiFmt::Db(n->Param("threshold")).c,
+               UiFmt::Db(std::clamp(n->ExtraMeterValue(0), 0.0f, 20.0f)).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
@@ -1324,7 +1325,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%.0f ms  fb %.0f%%", baseSeconds * 1000.0f, feedback * 100.0f);
+         snprintf(buf, sizeof(buf), "%s  fb %s", UiFmt::Ms(baseSeconds * 1000.0f).c, UiFmt::PctOf(feedback).c);
          SetAudioReadout("delay", buf);
       }
 
@@ -1340,12 +1341,12 @@ namespace app
 
       char stat[112];
       if (sync)
-         snprintf(stat, sizeof(stat), "%s - %.0f%% fb - %.0f%% wet%s",
-                  MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), n->Param("feedback"),
-                  n->mix * 100.0f, analog ? " - tape" : "");
+         snprintf(stat, sizeof(stat), "%s - %s fb - %s wet%s",
+                  MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), UiFmt::Pct(n->Param("feedback")).c,
+                  UiFmt::PctOf(n->mix).c, analog ? " - tape" : "");
       else
-         snprintf(stat, sizeof(stat), "%.0f ms - %.0f%% fb - %.0f%% wet%s", n->Param("timeMs"), n->Param("feedback"),
-                  n->mix * 100.0f, analog ? " - tape" : "");
+         snprintf(stat, sizeof(stat), "%s - %s fb - %s wet%s", UiFmt::Ms(n->Param("timeMs")).c, UiFmt::Pct(n->Param("feedback")).c,
+                  UiFmt::PctOf(n->mix).c, analog ? " - tape" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawDelayVisualizer(n);
@@ -1491,7 +1492,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%.1f s RT60", decaySeconds);
+         snprintf(buf, sizeof(buf), "%s RT60", UiFmt::Sec(decaySeconds).c);
          SetAudioReadout("reverb", buf);
       }
 
@@ -1503,7 +1504,7 @@ namespace app
    {
       const bool analog = n->Param("analog") != 0.0f;
       char stat[96];
-      snprintf(stat, sizeof(stat), "%.1f s - %.0f%% wet%s", n->Param("decay"), n->mix * 100.0f,
+      snprintf(stat, sizeof(stat), "%s - %s wet%s", UiFmt::Sec(n->Param("decay")).c, UiFmt::PctOf(n->mix).c,
                analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
@@ -1607,7 +1608,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%.1f dB drive, bias %.2f", driveDb, bias);
+         snprintf(buf, sizeof(buf), "%s drive, bias %.2f", UiFmt::Db(driveDb).c, bias);
          SetAudioReadout("drive", buf);
       }
 
@@ -1618,7 +1619,7 @@ namespace app
    void DrawDriveBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[80];
-      snprintf(stat, sizeof(stat), "%.1f dB drive - %.0f%% wet", n->Param("drive"), n->mix * 100.0f);
+      snprintf(stat, sizeof(stat), "%s drive - %s wet", UiFmt::Db(n->Param("drive")).c, UiFmt::PctOf(n->mix).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawDriveVisualizer(n);
@@ -1708,8 +1709,8 @@ namespace app
    {
       const int routing = std::clamp((int)(n->Param("routing") + 0.5f), 0, SaturatorDsp::kNumRoutings - 1);
       char stat[80];
-      snprintf(stat, sizeof(stat), "%s - %.0f%% wet", SaturatorDsp::RoutingList()[(size_t)routing].c_str(),
-               n->mix * 100.0f);
+      snprintf(stat, sizeof(stat), "%s - %s wet", SaturatorDsp::RoutingList()[(size_t)routing].c_str(),
+               UiFmt::PctOf(n->mix).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawSaturatorVisualizer(n);
@@ -1860,8 +1861,8 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[80];
-         snprintf(buf, sizeof(buf), "%s, position %.2f, %.1f dB drive", Wavetable::TableName(table), position,
-                   driveDb);
+         snprintf(buf, sizeof(buf), "%s, position %.2f, %s drive", Wavetable::TableName(table), position,
+                   UiFmt::Db(driveDb).c);
          SetAudioReadout("wavetable shaper", buf);
       }
 
@@ -1874,12 +1875,12 @@ namespace app
       const float stereo = n->Param("stereo");
       char stat[112];
       if (stereo > 0.0f)
-         snprintf(stat, sizeof(stat), "%s - %.1f dB drive - %.0f%% stereo - %.0f%% wet",
-                  Wavetable::TableName((int)(n->Param("table") + 0.5f)), n->Param("drive"), stereo * 100.0f,
-                  n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%s - %s drive - %s stereo - %s wet",
+                  Wavetable::TableName((int)(n->Param("table") + 0.5f)), UiFmt::Db(n->Param("drive")).c, UiFmt::PctOf(stereo).c,
+                  UiFmt::PctOf(n->mix).c);
       else
-         snprintf(stat, sizeof(stat), "%s - %.1f dB drive - %.0f%% wet",
-                  Wavetable::TableName((int)(n->Param("table") + 0.5f)), n->Param("drive"), n->mix * 100.0f);
+         snprintf(stat, sizeof(stat), "%s - %s drive - %s wet",
+                  Wavetable::TableName((int)(n->Param("table") + 0.5f)), UiFmt::Db(n->Param("drive")).c, UiFmt::PctOf(n->mix).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawWavetableShaperVisualizer(n);
@@ -1993,7 +1994,7 @@ namespace app
       if (bassMonoHz > 0.0f)
       {
          char blo[24];
-         snprintf(blo, sizeof(blo), "mono <%.0f Hz", bassMonoHz);
+         snprintf(blo, sizeof(blo), "mono <%s", UiFmt::Hz(bassMonoHz).c);
          dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f),
                      isLight ? tok::U32(tok::pal::c_D26414E6) : tok::U32(tok::pal::c_FFC478D2), blo);
       }
@@ -2057,7 +2058,7 @@ namespace app
       dl->AddCircleFilled(ImVec2(markX, midY), 6.0f, isLight ? tok::U32(tok::pal::c_1E6EE6F5) : tok::U32(tok::pal::c_96D6FFF5));
 
       char buf[32];
-      snprintf(buf, sizeof(buf), "%+.1f st", pitch);
+      snprintf(buf, sizeof(buf), "%s", UiFmt::Semi(pitch).c);
       dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), ScopeTextCol(), buf);
 
       AudioViz::End(vizFrame);
@@ -2075,9 +2076,9 @@ namespace app
       const bool spectral = n->Param("spectral") != 0.0f;
       char stat[96];
       if (spectral)
-         snprintf(stat, sizeof(stat), "%+.1f st - spectral%s", n->Param("pitch"), analog ? " - analog" : "");
+         snprintf(stat, sizeof(stat), "%s - spectral%s", UiFmt::Semi(n->Param("pitch")).c, analog ? " - analog" : "");
       else
-         snprintf(stat, sizeof(stat), "%+.1f st - %.0f ms grain%s", n->Param("pitch"), n->Param("grain"),
+         snprintf(stat, sizeof(stat), "%s - %s grain%s", UiFmt::Semi(n->Param("pitch")).c, UiFmt::Ms(n->Param("grain")).c,
                   analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);

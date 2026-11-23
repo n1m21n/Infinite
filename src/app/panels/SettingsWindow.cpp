@@ -12,6 +12,7 @@
 #include "app/ui/design/components/CodeBlock.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/LibraryParts.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -606,7 +607,7 @@ namespace app
             if (gAudioSampleRate != 0.0)
             {
                char buf[32];
-               snprintf(buf, sizeof(buf), "%.0f Hz", gAudioSampleRate);
+               snprintf(buf, sizeof(buf), "%s", UiFmt::Hz(gAudioSampleRate).c);
                rateLabel = buf;
             }
 #if defined(_WIN32)
@@ -619,7 +620,7 @@ namespace app
                for (double rate : kSampleRates)
                {
                   char label[32];
-                  snprintf(label, sizeof(label), "%.0f Hz", rate);
+                  snprintf(label, sizeof(label), "%s", UiFmt::Hz(rate).c);
                   if (MenuParts::Choice(label, gAudioSampleRate == rate))
                      gAudioSampleRate = rate;
                }

@@ -13,6 +13,7 @@
 #include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace DialogParts
 {
@@ -136,7 +137,7 @@ namespace DialogParts
       if (progress >= 0.0f)
       {
          char pct[16];
-         snprintf(pct, sizeof(pct), "%d%%", (int)(known * 100.0f + 0.5f));
+         snprintf(pct, sizeof(pct), "%s", UiFmt::Pct((int)(known * 100.0f + 0.5f)).c);
          dl->AddText(ImVec2(tx, c.y - lh - 1.0f), ImGui::GetColorU32(ImGuiCol_Text), pct);
          dl->AddText(ImVec2(tx, c.y + 1.0f), ImGui::GetColorU32(ImGuiCol_TextDisabled), what);
       }

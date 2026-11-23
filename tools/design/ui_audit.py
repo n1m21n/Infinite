@@ -134,7 +134,10 @@ FAMILY = {
                     "DragRow", "MoreSlider", "MorePct", "DropdownKnob", "NoteField", "DragMulti", "AudioBareDropdown", "IntRow",
                     "AudioKnob", "AudioKnobInt", "PctRow", "Pot"),
     "canvas_pos": ("SpawnNode", "AddPerfElementToCurrentPage"),
-    "value_format": ("snprintf", "ImFormatString", "Format", "StrFormat"),   # unit maths inside a formatter call: the number formatter's job
+    "value_format": ("snprintf", "ImFormatString", "Format", "StrFormat",
+                     # UiFmt (src/app/ui/design/UiFmt.h): the scaling into its unit, e.g. Pct(mix * 100.0f)
+                     "Hz", "KHz", "Db", "DbOffset", "Ms", "Sec", "Pct", "Semi", "Cents", "Ratio", "Px", "Deg", "Bpm", "Lufs",
+                     "Beats", "Bytes", "KB", "MB", "Timecode"),   # unit maths inside a formatter call: the number formatter's job
     "id_stack": ("PushID", "PopID", "GetID", "PopStyleColor", "PopStyleVar"),
     "key": ("IsKeyPressed", "IsKeyDown", "IsKeyReleased", "IsKeyChordPressed", "Shortcut", "digit", "KeyPressed"),
     "cursor": ("SetMouseCursor",),
@@ -312,6 +315,8 @@ def scan_file(rel, src):
             specs = fmt_category(s)
             if specs and (call in TEXT_CALLS or call in PRINTF_CALLS or call in I18N_WRAP or any(p[0] in TEXT_CALLS | PRINTF_CALLS for p in paren)):
                 findings.append(("format", call or "-", " ".join(specs), s[:80]) + where)
+                for um in ([] if ("=%" in s or s.startswith("[")) else UNIT_SPEC.finditer(s)):   # a number printed with its unit: UiFmt's job (owner 2026-11-24)
+                    findings.append(("unit", call or "-", um.group(0), s[:80]) + where)
             visible = call in TEXT_CALLS and re.search(r"[A-Za-z]", FMT.sub("", s.split("##")[0]))
             if not visible:
                 continue
@@ -391,6 +396,11 @@ WIDGET_FAMILY = {
     "id": ("PushID", "PopID", "GetID"),
 }
 WIDGET_OF = {n: f for f, ns in WIDGET_FAMILY.items() for n in ns}
+
+# A printf number followed by a unit that UiFmt (src/app/ui/design/UiFmt.h) owns. Machine-readable log lines
+# ("key=%d", "[tag] ...") are not on screen and are not counted.
+UNIT_SPEC = re.compile(r"(?<![=%])%[-+ #0]*\d*(?:\.\d+)?(?:l|ll|z)?[dfgiu](?: ?(?:kHz|Hz|dB|LUFS|ms|BPM|bpm|px|MB|KB)(?![A-Za-z])"
+                       r"| ?s(?![A-Za-z0-9])|%%| ?st(?![A-Za-z])|\\xC2\\xB0|\u00b0)")
 
 def run(files=None):
     all_f, allowed, raw = [], collections.Counter(), collections.Counter()

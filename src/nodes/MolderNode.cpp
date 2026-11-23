@@ -18,6 +18,7 @@
 #include "Transport.h"
 #include "core/AudioTopologyRequest.h"
 #include "audio/WavWriter.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace
 {
@@ -443,7 +444,7 @@ void MolderNode::JoinWorkerIfDone()
 
       char stat[160];
       const float durSec = mLastRenderedSR > 0.0 ? (float)buf->numFrames / (float)mLastRenderedSR : 0.0f;
-      snprintf(stat, sizeof(stat), "f0 %.1f Hz  -  gen %d  -  %.2fs", mAnalysis.globalF0, mGeneration, durSec);
+      snprintf(stat, sizeof(stat), "f0 %s  -  gen %d  -  %s", UiFmt::Hz(mAnalysis.globalF0).c, mGeneration, UiFmt::Sec(durSec).c);
       mStatus = stat;
    }
    else if (mPendingResult.didAnalyze)

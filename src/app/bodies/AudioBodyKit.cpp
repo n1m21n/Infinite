@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -447,7 +448,7 @@ namespace app
          const float autoPct = prof.share[MovementStats::kPoolAuto] * 100.0f;
          const float replay = prof.share[MovementStats::kPoolReplay] * 100.0f;
          if (prof.valid)
-            ImGui::TextDisabled("profile: %.0f%% you, %.0f%% automation, %.0f%% replay", human, autoPct, replay);
+            ImGui::TextDisabled("profile: %s you, %s automation, %s replay", UiFmt::Pct(human).c, UiFmt::Pct(autoPct).c, UiFmt::Pct(replay).c);
          else
             ImGui::TextDisabled("profile: no data yet - perform a knob to teach it");
       }
@@ -465,8 +466,8 @@ namespace app
          // so a knob that was merely left alone while the transport ran reported thousands of
          // "samples" beside a confidence percentage derived from almost none of them.
          const double moves = n->IndependentSamplesForUI(i);
-         ImGui::TextDisabled("%s: %.0f moves, %.0f%% learned", DriftDestinationLabel(key).c_str(), moves,
-                             confidence);
+         ImGui::TextDisabled("%s: %.0f moves, %s learned", DriftDestinationLabel(key).c_str(), moves,
+                             UiFmt::Pct(confidence).c);
       }
    }
 
@@ -487,8 +488,8 @@ namespace app
       // Real explained variance of the axis this node rides, floor to ceiling. The old
       // clamp(.., 10, 99) invented a 10% floor for a patch with no recorded movement at all,
       // which read as "it knows something" when it knew nothing.
-      ImGui::TextDisabled("%d coupled  |  Focus: %.0f%% energy", n->SlotCount(),
-                          std::clamp(n->ExplainedVariance(0), 0.0f, 1.0f) * 100.0f);
+      ImGui::TextDisabled("%d coupled  |  Focus: %s energy", n->SlotCount(),
+                          UiFmt::PctOf(std::clamp(n->ExplainedVariance(0), 0.0f, 1.0f)).c);
    }
 
 
@@ -520,7 +521,7 @@ namespace app
          char label[64];
          const int pct = n->LearningPercent();
          if (learning)
-            snprintf(label, sizeof(label), "learning - %d%%", pct);
+            snprintf(label, sizeof(label), "learning - %s", UiFmt::Pct(pct).c);
          else if (n->HasLearnAttempt() && !n->HasFit())
          {
             // Stopped, enough history, and FitDMD still rejected it. Showing "learning - 100%"
@@ -529,7 +530,7 @@ namespace app
             if (pct >= 100)
                snprintf(label, sizeof(label), "no usable fit - play more, Learn again");
             else
-               snprintf(label, sizeof(label), "stopped early - %d%%, Learn again", pct);
+               snprintf(label, sizeof(label), "stopped early - %s, Learn again", UiFmt::Pct(pct).c);
          }
          else if (n->HasFit())
             snprintf(label, sizeof(label), "fit - radius %.2f", n->SpectralRadius());
@@ -846,9 +847,9 @@ namespace app
       void FormatSeconds(char* out, size_t size, double seconds)
       {
          if (seconds < 10.0)
-            snprintf(out, size, "%.3f s", seconds);
+            snprintf(out, size, "%s", UiFmt::Sec(seconds).c);
          else
-            snprintf(out, size, "%.2f s", seconds);
+            snprintf(out, size, "%s", UiFmt::Sec(seconds).c);
       }
    }
 
@@ -949,7 +950,7 @@ namespace app
          if (zit != gWaveZoom.end())
          {
             char z[24];
-            snprintf(z, sizeof(z), "%.0fx", 1.0 / (b - a));
+            snprintf(z, sizeof(z), "%s", UiFmt::Ratio(1.0 / (b - a)).c);
             const ImVec2 zs = AudioLabelSize(z);
             AudioLabelText(dl, ImVec2(br.x - zs.x - 5.0f, origin.y + 3.0f), ScopeTextCol(), z);
          }

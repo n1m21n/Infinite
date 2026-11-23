@@ -5,6 +5,7 @@
 #include "app/AppShared.h"
 #include "core/ModShapes.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/UiFmt.h"
 
 namespace app
 {
@@ -1028,9 +1029,9 @@ namespace app
          const float totalMs = *attackMs + *decayMs + *releaseMs;
          char timeText[24];
          if (totalMs >= 1000.0f)
-            snprintf(timeText, sizeof(timeText), "%.1f s", totalMs / 1000.0f);
+            snprintf(timeText, sizeof(timeText), "%s", UiFmt::Sec(totalMs / 1000.0f).c);
          else
-            snprintf(timeText, sizeof(timeText), "%.0f ms", totalMs);
+            snprintf(timeText, sizeof(timeText), "%s", UiFmt::Ms(totalMs).c);
          const ImVec2 tsz = ImGui::CalcTextSize(timeText);
          // Top-right normally; bottom-centre (under the plateau) when a high sustain puts the plateau along the top. The release always ends at the bottom-right corner and the attack starts bottom-left, so neither bottom corner is free.
          const bool highSustain = *sustain > 0.6f;
@@ -1045,13 +1046,13 @@ namespace app
       {
          char buf[96];
          if (activeHandle == 0)
-            snprintf(buf, sizeof(buf), "Attack: %.0f ms", *attackMs);
+            snprintf(buf, sizeof(buf), "Attack: %s", UiFmt::Ms(*attackMs).c);
          else if (activeHandle == 1 || activeHandle == 2)
-            snprintf(buf, sizeof(buf), "Decay: %.0f ms | Sustain: %.2f", *decayMs, *sustain);
+            snprintf(buf, sizeof(buf), "Decay: %s | Sustain: %.2f", UiFmt::Ms(*decayMs).c, *sustain);
          else if (activeHandle == 3)
-            snprintf(buf, sizeof(buf), "Release: %.0f ms", *releaseMs);
+            snprintf(buf, sizeof(buf), "Release: %s", UiFmt::Ms(*releaseMs).c);
          else
-            snprintf(buf, sizeof(buf), "A:%.0fms  D:%.0fms  S:%.2f  R:%.0fms", *attackMs, *decayMs, *sustain, *releaseMs);
+            snprintf(buf, sizeof(buf), "A:%s  D:%s  S:%.2f  R:%s", UiFmt::Ms(*attackMs).c, UiFmt::Ms(*decayMs).c, *sustain, UiFmt::Ms(*releaseMs).c);
 
          SetAudioReadout("ADSR", buf);
       }
@@ -1437,9 +1438,9 @@ namespace app
                   n->engines[1].on ? Wavetable::TableName(n->engines[1].table) : "-", voices,
                   voices == 1 ? "" : "s");
       else
-         snprintf(stat, sizeof(stat), "%s + %s  -  free run %.0f Hz",
+         snprintf(stat, sizeof(stat), "%s + %s  -  free run %s",
                   Wavetable::TableName(n->engines[0].table),
-                  n->engines[1].on ? Wavetable::TableName(n->engines[1].table) : "-", n->frequency);
+                  n->engines[1].on ? Wavetable::TableName(n->engines[1].table) : "-", UiFmt::Hz(n->frequency).c);
 
       gWtTestRects.clear();
       BeginAudioBody(gn.index, gn.category, kAudioWideWidth, stat);
@@ -1626,8 +1627,8 @@ namespace app
          snprintf(stat, sizeof(stat), "%s  -  %d voice%s", waveName,
                   voices, voices == 1 ? "" : "s");
       else
-         snprintf(stat, sizeof(stat), "%s  -  free run %.0f Hz",
-                  waveName, n->frequency);
+         snprintf(stat, sizeof(stat), "%s  -  free run %s",
+                  waveName, UiFmt::Hz(n->frequency).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
@@ -1737,7 +1738,7 @@ namespace app
       if (noteDriven)
          snprintf(stat, sizeof(stat), "%s  -  %d voice%s", matName, voices, voices == 1 ? "" : "s");
       else
-         snprintf(stat, sizeof(stat), "%s  -  free run %.0f Hz", matName, n->frequency);
+         snprintf(stat, sizeof(stat), "%s  -  free run %s", matName, UiFmt::Hz(n->frequency).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
@@ -2339,7 +2340,7 @@ namespace app
       if (noteDriven)
          snprintf(stat, sizeof(stat), "%s  -  %d voice%s", orbitName.c_str(), voices, voices == 1 ? "" : "s");
       else
-         snprintf(stat, sizeof(stat), "%s  -  free run %.0f Hz", orbitName.c_str(), n->frequency);
+         snprintf(stat, sizeof(stat), "%s  -  free run %s", orbitName.c_str(), UiFmt::Hz(n->frequency).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
@@ -2668,7 +2669,7 @@ namespace app
       if (noteDriven)
          snprintf(stat, sizeof(stat), "Equation  -  %d voice%s", voices, voices == 1 ? "" : "s");
       else
-         snprintf(stat, sizeof(stat), "Equation  -  free run %.0f Hz", n->frequency);
+         snprintf(stat, sizeof(stat), "Equation  -  free run %s", UiFmt::Hz(n->frequency).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
@@ -2844,9 +2845,9 @@ namespace app
 
       char stat[128];
       if (noteDriven)
-         snprintf(stat, sizeof(stat), "%s  -  %d voice%s  (%.0f%%)", modeName.c_str(), voices, voices == 1 ? "" : "s", playhead * 100.0f);
+         snprintf(stat, sizeof(stat), "%s  -  %d voice%s  (%s)", modeName.c_str(), voices, voices == 1 ? "" : "s", UiFmt::PctOf(playhead).c);
       else
-         snprintf(stat, sizeof(stat), "%s  -  drone  (%.0f%%)", modeName.c_str(), playhead * 100.0f);
+         snprintf(stat, sizeof(stat), "%s  -  drone  (%s)", modeName.c_str(), UiFmt::PctOf(playhead).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
