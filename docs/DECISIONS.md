@@ -4,6 +4,7 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-11-23 Owner: stable-modulation phase 3 scores all 200 G kernels: matrices from the Field interpreter for the 125 that compile, from Python for the 75 over Field's 128-register cap. Raising the cap is left as a separate product finding (`docs/research/stable-modulation`, phase 2).
 - 2026-11-23 Owner: stable-modulation sections 1-7 signed off as written, D1-D4 as recommended (`docs/research/stable-modulation`).
 - 2026-11-23 Owner: open-problem research goes to the top two: proven-stable modulation (`docs/research/stable-modulation`) and flicker-free pixels (`docs/research/flicker-free-pixels`). Sections 1-7 of each need sign-off before any building or measuring.
 - 2026-10-31 Owner: exception to the 3D View's "no add menu": the Shift+A / + menu (node, camera, light, HDRI, new scene) stays in the 3D View. It only adds scene items and lights/cameras the canvas already has; the panel still never models.

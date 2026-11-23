@@ -296,6 +296,11 @@ n = 6. This limit is in today's product, not in the study: a user can't write a 
 modulated filter in Field. It also removes the hardest cases from a Field-only phase 3. Of the 15
 kernels that fool the full-grid frozen check (B1b), only 4 compile.
 
+**Owner decision (2026-11-23):** phase 3 scores all 200 G kernels. The 125 that compile use matrices from
+the Field interpreter; the 75 over the cap use the Python reference (`gen_kernels.A_from_spec`). Results
+are reported for both groups separately and together. Raising the register cap is a separate product
+question, not part of this study.
+
 
 ## 11. Critique
 *(After measurement.)*
