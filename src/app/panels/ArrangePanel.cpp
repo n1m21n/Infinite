@@ -3031,7 +3031,7 @@ namespace app
                }
                mixGesture(gainChanged, [&] { lane.gainDb = gainDb; });
                if (ImGui::IsItemActive())
-                  ImGui::SetTooltip(T("%.1f dB"), lane.gainDb);
+                  ImGui::SetTooltip("%s", UiFmt::Tr(UiFmt::DbOffset(lane.gainDb)).c);
             }
             else
             {

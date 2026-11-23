@@ -832,9 +832,9 @@
  },
  "audit": {
   "anim": 3,
-  "arith": 2436,
+  "arith": 2433,
   "assign": 830,
-  "call": 1198,
+  "call": 1196,
   "canvas_pos": 139,
   "clamp": 831,
   "colour": 766,
@@ -858,8 +858,8 @@
   "slider": 47,
   "style_var": 6,
   "timing": 130,
-  "unit": 28,
-  "value_format": 44,
+  "unit": 8,
+  "value_format": 43,
   "window": 2
  }
 }

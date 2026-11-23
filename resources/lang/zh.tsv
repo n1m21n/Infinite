@@ -1,9 +1,9 @@
 # 中文简体 - key<TAB>text. English source is the key. Machine-drafted (beta) until a native speaker signs off.
 # Glossary: glossary.tsv. "=en" means intentionally identical to English. Escapes: \n \t \\ \c.
 %s (Space)	%s（空格键）
-(%.1f MB used)	（已用 %.1f MB）
+(%s used)	（已用 %s）
 AI assistants	AI 助手
-Active: %.0f Hz, %u frames	当前：%.0f Hz，%u 帧
+Active: %s, %u frames	当前：%s，%u 帧
 Add Node...	添加节点...
 Add Note	添加便签
 All shortcuts...	所有快捷键...
@@ -96,7 +96,7 @@ Reset to Defaults	恢复默认
 Retention cap	保留上限
 Rewind (Return)	回到开头（回车键）
 Round-trip latency: unknown	往返延迟：未知
-Round-trip latency: ~%.1f ms (%u frames)	往返延迟：约 %.1f ms（%u 帧）
+Round-trip latency: ~%s (%u frames)	往返延迟：约 %s（%u 帧）
 Sample rate	采样率
 Save	保存
 Save As...	另存为...
@@ -156,7 +156,7 @@ volume	音量
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	本次会话 xruns=%llu\n%llu 个延迟块（渲染超出时限）\n%llu 个由音频设备报告
 %.0f (%.2fx)	=en
 %.1f dB	=en
-%.1fs of %.1fs at %d Hz	%.1f 秒 / %.1f 秒，%d Hz
+%s of %s at %s	%s / %s，%s
 %.3f (%.2fx)	=en
 %d frames @ %dfps	%d 帧 @ %d fps
 %d frames dropped - encoder can't keep up	丢弃了 %d 帧——编码器跟不上
@@ -283,7 +283,7 @@ Delete Page	删除页面
 Delete Selected Clips	删除所选片段
 Delete Track	删除轨道
 Destination	目标
-Detected: %.1f BPM	检测到：%.1f BPM
+Detected: %s	检测到：%s
 Detected: none (no clear beat)	检测到：无（没有明确的节拍）
 Digital Number Box (1x1)	=en
 Discard	放弃
@@ -482,7 +482,7 @@ Steep Log (-0.85)	陡峭对数 (-0.85)
 Step Gate (3x1)	=en
 Step Gate Ribbon (3x1)	=en
 Stop recording	停止录制
-Stretched x%.3f to %.1f BPM	已拉伸 x%.3f 至 %.1f BPM
+Stretched x%.3f to %s	已拉伸 x%.3f 至 %s
 Suggested	推荐
 Switch display to Bars / Beats (BBT)	将显示切换为小节 / 拍（BBT）
 Switch display to Time (Minutes:Seconds)	将显示切换为时间（分:秒）
@@ -1487,7 +1487,7 @@ search...	搜索...
 uniform float name; // 0..1 = 0.5   adds a knob	uniform float name; // 0..1 = 0.5   添加一个旋钮
 used twice	使用了两次
 v%s	=en
-v%s, %.0f MB download	v%s，下载 %.0f MB
+v%s, %s download	v%s，下载 %s
 version %s	版本 %s
 version %s is available (you have %s) - click to update, right-click to dismiss	版本 %s 已发布（你使用的是 %s）：点击更新，右键忽略
 %.1f BPM on launch	启动时 %.1f BPM
@@ -2934,12 +2934,10 @@ Zoom around the pointer, or pan; middle-drag also pans	以指针为中心缩放�
 Zoom the value axis around the pointer	以指针为中心缩放数值轴
 param 	参数 
 trig input	trig 输入
-%+.1f dB	=en
-%.1f s %s	=en
 %d x %d, %d layers	%d x %d，%d 层
 %d x %d, F12	=en
-%s %+.1f dB	=en
-%s %d  %+.1f dB  %s	=en
+%s %s	=en
+%s %d  %s  %s	=en
 %s %d: %s\n%s	=en
 (loop)	(循环)
 (whole)	(整段)
@@ -3359,7 +3357,7 @@ Now	现在
 Nudge	微调
 Offbeats	反拍
 Offset	偏移
-%.1f px   %.1f°   W %.0f  H %.0f	%.1f px   %.1f°   宽 %.0f  高 %.0f
+%s   %s   W %.0f  H %.0f	%s   %s   宽 %.0f  高 %.0f
 Layer styles	图层样式
 Metal	金属
 Midtones	中间调
@@ -3424,7 +3422,7 @@ Protect alpha	保护透明度
 Protect hue	保护色相
 Put this document on the canvas	将此文档放到画布上
 Quick Mask	快速蒙版
-REC %.1f s  %.1f MB	REC %.1f 秒  %.1f MB
+REC %s  %s	REC %s  %s
 RGB	=en
 Radial	径向
 Radius in px, not % of the shape	=en
@@ -3739,3 +3737,4 @@ Trim Transparent Edges	修剪透明边缘
 Underlying	下一图层
 White from	白色从
 Remove Background	移除背景
+Unit\cs	秒

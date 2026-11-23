@@ -5104,7 +5104,7 @@ namespace
          dot(b, 2.5f, false);
          const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
          char t[64];
-         std::snprintf(t, sizeof t, "%s  %s", UiFmt::Px(std::hypot(dx, dy)).c, UiFmt::Deg(std::atan2(-dy, dx) * 57.29578f).c);
+         std::snprintf(t, sizeof t, "%s  %s", UiFmt::Px(std::hypot(dx, dy)).c, UiFmt::Rad(std::atan2(-dy, dx)).c);
          const ImVec2 at(b.x + 10.0f, b.y + 6.0f);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
@@ -8414,7 +8414,7 @@ namespace
          {
             const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
             ImGui::AlignTextToFramePadding();
-            ImGui::Text(T("%.1f px   %.1f°   W %.0f  H %.0f"), std::hypot(dx, dy), std::atan2(-dy, dx) * 57.29578f, std::fabs(dx),
+            ImGui::Text(T("%s   %s   W %.0f  H %.0f"), UiFmt::Tr(UiFmt::Px(std::hypot(dx, dy))).c, UiFmt::Rad(std::atan2(-dy, dx)).c, std::fabs(dx),
                         std::fabs(dy));
             next();
             if (TextChip(L("Clear##v2dmclear"), false, nullptr))

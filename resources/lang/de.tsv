@@ -1,9 +1,9 @@
 # Deutsch - key<TAB>text. English source is the key. Machine-drafted (beta) until a native speaker signs off.
 # Glossary: glossary.tsv. "=en" means intentionally identical to English. Escapes: \n \t \\ \c.
 %s (Space)	%s (Leertaste)
-(%.1f MB used)	(%.1f MB belegt)
+(%s used)	(%s belegt)
 AI assistants	KI-Assistenten
-Active: %.0f Hz, %u frames	Aktiv: %.0f Hz, %u Frames
+Active: %s, %u frames	Aktiv: %s, %u Frames
 Add Node...	Node hinzufügen...
 Add Note	Notiz hinzufügen
 All shortcuts...	Alle Tastenkürzel...
@@ -96,7 +96,7 @@ Reset to Defaults	Auf Standard zurücksetzen
 Retention cap	Aufbewahrungslimit
 Rewind (Return)	Zurückspulen (Eingabe)
 Round-trip latency: unknown	Roundtrip-Latenz: unbekannt
-Round-trip latency: ~%.1f ms (%u frames)	Roundtrip-Latenz: ~%.1f ms (%u Frames)
+Round-trip latency: ~%s (%u frames)	Roundtrip-Latenz: ~%s (%u Frames)
 Sample rate	Abtastrate
 Save	Speichern
 Save As...	Speichern unter...
@@ -156,7 +156,7 @@ volume	Lautstärke
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	xruns=%llu in dieser Sitzung\n%llu verspätete(r) Block/Blöcke (Rendering über der Frist)\n%llu vom Audiogerät gemeldet
 %.0f (%.2fx)	=en
 %.1f dB	=en
-%.1fs of %.1fs at %d Hz	%.1f s von %.1f s bei %d Hz
+%s of %s at %s	%s von %s bei %s
 %.3f (%.2fx)	=en
 %d frames @ %dfps	%d Frames bei %d fps
 %d frames dropped - encoder can't keep up	%d Frames verworfen – der Encoder kommt nicht mit
@@ -283,7 +283,7 @@ Delete Page	Seite löschen
 Delete Selected Clips	Ausgewählte Clips löschen
 Delete Track	Spur löschen
 Destination	Ziel
-Detected: %.1f BPM	Erkannt: %.1f BPM
+Detected: %s	Erkannt: %s
 Detected: none (no clear beat)	Erkannt: nichts (kein klarer Beat)
 Digital Number Box (1x1)	=en
 Discard	Verwerfen
@@ -482,7 +482,7 @@ Steep Log (-0.85)	Steil log. (-0.85)
 Step Gate (3x1)	=en
 Step Gate Ribbon (3x1)	=en
 Stop recording	Aufnahme beenden
-Stretched x%.3f to %.1f BPM	Gestreckt x%.3f auf %.1f BPM
+Stretched x%.3f to %s	Gestreckt x%.3f auf %s
 Suggested	Vorgeschlagen
 Switch display to Bars / Beats (BBT)	Anzeige auf Takte / Schläge (BBT) umschalten
 Switch display to Time (Minutes:Seconds)	Anzeige auf Zeit (Minuten:Sekunden) umschalten
@@ -1487,7 +1487,7 @@ search...	suchen...
 uniform float name; // 0..1 = 0.5   adds a knob	uniform float name; // 0..1 = 0.5   fügt einen Knopf hinzu
 used twice	doppelt verwendet
 v%s	=en
-v%s, %.0f MB download	v%s, %.0f MB Download
+v%s, %s download	v%s, %s Download
 version %s	Version %s
 version %s is available (you have %s) - click to update, right-click to dismiss	Version %s ist verfügbar (du hast %s): klicken zum Aktualisieren, Rechtsklick zum Ausblenden
 %.1f BPM on launch	%.1f BPM beim Starten
@@ -2934,12 +2934,10 @@ Zoom around the pointer, or pan; middle-drag also pans	Zoom um den Zeiger oder V
 Zoom the value axis around the pointer	Zoomt die Werteachse um den Zeiger
 param 	Param 
 trig input	trig-Eingang
-%+.1f dB	=en
-%.1f s %s	=en
 %d x %d, %d layers	%d x %d, %d Ebenen
 %d x %d, F12	=en
-%s %+.1f dB	=en
-%s %d  %+.1f dB  %s	=en
+%s %s	=en
+%s %d  %s  %s	=en
 %s %d: %s\n%s	=en
 (loop)	(Schleife)
 (whole)	(gesamt)
@@ -3359,7 +3357,7 @@ Now	Jetzt
 Nudge	Nudge
 Offbeats	Offbeats
 Offset	Versatz
-%.1f px   %.1f°   W %.0f  H %.0f	%.1f px   %.1f°   B %.0f  H %.0f
+%s   %s   W %.0f  H %.0f	%s   %s   B %.0f  H %.0f
 Layer styles	Ebenenstile
 Metal	Metall
 Midtones	Mitteltöne
@@ -3424,7 +3422,7 @@ Protect alpha	Alpha schützen
 Protect hue	Farbton schützen
 Put this document on the canvas	Dieses Dokument auf den Canvas legen
 Quick Mask	Schnellmaske
-REC %.1f s  %.1f MB	REC %.1f s  %.1f MB
+REC %s  %s	REC %s  %s
 RGB	=en
 Radial	Radial
 Radius in px, not % of the shape	=en

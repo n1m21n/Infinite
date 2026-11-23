@@ -1,4 +1,5 @@
 // Arrange panel support: undo, selection, clipboard, drag, add-to-timeline (moved verbatim from main.cpp).
+#include "app/ui/design/UiFmt.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -240,11 +241,11 @@ namespace app
    {
       const double tempo = std::max(1.0, (double)Transport::Instance().Tempo());
       if (c.origBpm > 0.0f)
-         ImGui::TextDisabled(T("Detected: %.1f BPM"), (double)c.origBpm);
+         ImGui::TextDisabled(T("Detected: %s"), UiFmt::Tr(UiFmt::Bpm(c.origBpm)).c);
       else
          ImGui::TextDisabled("%s", T("Detected: none (no clear beat)"));
       if (c.syncToTempo)
-         ImGui::TextDisabled(T("Stretched x%.3f to %.1f BPM"), tempo / std::max(1.0, (double)c.sampleBpm), tempo);
+         ImGui::TextDisabled(T("Stretched x%.3f to %s"), tempo / std::max(1.0, (double)c.sampleBpm), UiFmt::Tr(UiFmt::Bpm(tempo)).c);
       else
          ImGui::TextDisabled("%s", T("Native speed - turn on Sync to Tempo to set Sample BPM"));
    }

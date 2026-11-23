@@ -1,9 +1,9 @@
 # Русский - key<TAB>text. English source is the key. Machine-drafted (beta) until a native speaker signs off.
 # Glossary: glossary.tsv. "=en" means intentionally identical to English. Escapes: \n \t \\ \c.
 %s (Space)	%s (Пробел)
-(%.1f MB used)	(занято %.1f МБ)
+(%s used)	(занято %s)
 AI assistants	ИИ-ассистенты
-Active: %.0f Hz, %u frames	Активно: %.0f Гц, %u кадров
+Active: %s, %u frames	Активно: %s, %u кадров
 Add Node...	Добавить узел...
 Add Note	Добавить заметку
 All shortcuts...	Все сочетания клавиш...
@@ -96,7 +96,7 @@ Reset to Defaults	Сбросить по умолчанию
 Retention cap	Лимит хранения
 Rewind (Return)	Перемотка в начало (Return)
 Round-trip latency: unknown	Сквозная задержка: неизвестна
-Round-trip latency: ~%.1f ms (%u frames)	Сквозная задержка: ~%.1f мс (%u кадров)
+Round-trip latency: ~%s (%u frames)	Сквозная задержка: ~%s (%u кадров)
 Sample rate	Частота дискретизации
 Save	Сохранить
 Save As...	Сохранить как...
@@ -156,7 +156,7 @@ volume	громкость
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	xruns=%llu за сессию\n%llu запоздавших блоков (рендер не уложился в срок)\n%llu сообщено аудиоустройством
 %.0f (%.2fx)	=en
 %.1f dB	=en
-%.1fs of %.1fs at %d Hz	%.1f с из %.1f с, %d Гц
+%s of %s at %s	%s из %s, %s
 %.3f (%.2fx)	=en
 %d frames @ %dfps	%d кадров при %d fps
 %d frames dropped - encoder can't keep up	Пропущено кадров: %d — кодировщик не справляется
@@ -283,7 +283,7 @@ Delete Page	Удалить страницу
 Delete Selected Clips	Удалить выбранные клипы
 Delete Track	Удалить дорожку
 Destination	Назначение
-Detected: %.1f BPM	Определено: %.1f BPM
+Detected: %s	Определено: %s
 Detected: none (no clear beat)	Определено: ничего (чёткого бита нет)
 Digital Number Box (1x1)	=en
 Discard	Отбросить
@@ -482,7 +482,7 @@ Steep Log (-0.85)	Крутой лог. (-0.85)
 Step Gate (3x1)	=en
 Step Gate Ribbon (3x1)	=en
 Stop recording	Остановить запись
-Stretched x%.3f to %.1f BPM	Растянуто x%.3f до %.1f BPM
+Stretched x%.3f to %s	Растянуто x%.3f до %s
 Suggested	Рекомендуемые
 Switch display to Bars / Beats (BBT)	Переключить отображение на такты / доли (BBT)
 Switch display to Time (Minutes:Seconds)	Переключить отображение на время (минуты:секунды)
@@ -1487,7 +1487,7 @@ search...	поиск...
 uniform float name; // 0..1 = 0.5   adds a knob	uniform float name; // 0..1 = 0.5   добавляет ручку
 used twice	используется дважды
 v%s	=en
-v%s, %.0f MB download	v%s, загрузка %.0f МБ
+v%s, %s download	v%s, загрузка %s
 version %s	версия %s
 version %s is available (you have %s) - click to update, right-click to dismiss	доступна версия %s (у вас %s): щёлкните для обновления, правый щелчок — скрыть
 %.1f BPM on launch	%.1f BPM при запуске
@@ -2934,12 +2934,10 @@ Zoom around the pointer, or pan; middle-drag also pans	Масштаб вокру
 Zoom the value axis around the pointer	Масштаб оси значений вокруг указателя
 param 	парам. 
 trig input	вход trig
-%+.1f dB	=en
-%.1f s %s	=en
 %d x %d, %d layers	%d x %d, слоёв: %d
 %d x %d, F12	=en
-%s %+.1f dB	=en
-%s %d  %+.1f dB  %s	=en
+%s %s	=en
+%s %d  %s  %s	=en
 %s %d: %s\n%s	=en
 (loop)	(цикл)
 (whole)	(целиком)
@@ -3359,7 +3357,7 @@ Now	Сейчас
 Nudge	Сдвиг
 Offbeats	Офбиты
 Offset	Смещение
-%.1f px   %.1f°   W %.0f  H %.0f	%.1f px   %.1f°   Ш %.0f  В %.0f
+%s   %s   W %.0f  H %.0f	%s   %s   Ш %.0f  В %.0f
 Layer styles	Стили слоя
 Metal	Металл
 Midtones	Средние тона
@@ -3424,7 +3422,7 @@ Protect alpha	Защитить альфу
 Protect hue	Защитить тон
 Put this document on the canvas	Поместить этот документ на холст
 Quick Mask	Быстрая маска
-REC %.1f s  %.1f MB	REC %.1f с  %.1f МБ
+REC %s  %s	REC %s  %s
 RGB	=en
 Radial	Радиальный
 Radius in px, not % of the shape	=en
@@ -3739,3 +3737,10 @@ Trim Transparent Edges	Обрезать прозрачные края
 Underlying	Нижний слой
 White from	Белый от
 Remove Background	Удалить фон
+Unit\cs	с
+Unit\cms	мс
+Unit\cHz	Гц
+Unit\ckHz	кГц
+Unit\cdB	дБ
+Unit\cMB	МБ
+Unit\cKB	КБ

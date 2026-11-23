@@ -275,8 +275,8 @@ namespace app
       if (gArrangeWavRender.cancelRequested)
          ImGui::Text("%s", T("Cancelling..."));
       else
-         ImGui::Text(T("%.1fs of %.1fs at %d Hz"), (double)done / gArrangeWavRender.sampleRate,
-                     (double)total / gArrangeWavRender.sampleRate,
+         ImGui::Text(T("%s of %s at %s"), UiFmt::Tr(UiFmt::Sec((double)done / gArrangeWavRender.sampleRate)).c,
+                     UiFmt::Tr(UiFmt::Sec((double)total / gArrangeWavRender.sampleRate)).c,
                      (int)llround(gArrangeWavRender.sampleRate));
       // "Job 2 of 4" while a run works through the queue; silent for a lone
       // take, where the count would only be noise.

@@ -6,6 +6,8 @@
 #pragma once
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include "core/I18n.h"
 
 namespace UiFmt
 {
@@ -119,6 +121,7 @@ namespace UiFmt
    inline Str Ratio(double x) { return detail::Num(x, 2, "x"); }
    inline Str Px(double px) { return detail::Num(px, 0, " px"); }
    inline Str Deg(double deg) { return detail::Num(deg, 1, "\xC2\xB0"); }
+   inline Str Rad(double rad) { return Deg(rad * (180.0 / 3.14159265358979323846)); }   // an angle in radians, shown in degrees
    inline Str Bpm(double bpm) { return detail::Num(bpm, 1, " BPM"); }
    inline Str Lufs(double lufs) { return detail::Num(lufs, 1, " LUFS"); }
    inline Str Beats(double beats) { return detail::Num(beats, 1, " beats"); }
@@ -132,6 +135,21 @@ namespace UiFmt
    }
    inline Str KB(double kb) { return Bytes(kb * 1024.0); }
    inline Str MB(double mb) { return Bytes(mb * 1024.0 * 1024.0); }
+
+   // The unit in the current language, for a value inside a translated sentence (a T() format):
+   //    snprintf(buf, n, T("%s of %s"), UiFmt::Tr(UiFmt::Sec(a)).c, UiFmt::Tr(UiFmt::Sec(b)).c);
+   // The unit is the word after the last space; its translation is the "Unit" context in resources/lang
+   // ("Unit\cs" -> "с" in ru.tsv). UI thread only (T() is). English text (node status lines) never calls it.
+   inline Str Tr(Str s)
+   {
+      const char* sp = std::strrchr(s.c, ' ');
+      if (!sp || !sp[1]) return s;
+      const char* local = I18n::TC("Unit", sp + 1);
+      if (!local || std::strcmp(local, sp + 1) == 0) return s;
+      Str out;
+      std::snprintf(out.c, sizeof out.c, "%.*s %s", (int)(sp - s.c), s.c, local);
+      return out;
+   }
 
    // A count: whole number, thousands grouped with a thin space from 10 000.
    inline Str Count(long long n)

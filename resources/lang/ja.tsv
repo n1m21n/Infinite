@@ -1,9 +1,9 @@
 # 日本語 - key<TAB>text. English source is the key. Machine-drafted (beta) until a native speaker signs off.
 # Glossary: glossary.tsv. "=en" means intentionally identical to English. Escapes: \n \t \\ \c.
 %s (Space)	%s（スペース）
-(%.1f MB used)	（%.1f MB 使用中）
+(%s used)	（%s 使用中）
 AI assistants	AIアシスタント
-Active: %.0f Hz, %u frames	現在：%.0f Hz、%u フレーム
+Active: %s, %u frames	現在：%s、%u フレーム
 Add Node...	ノードを追加...
 Add Note	メモを追加
 All shortcuts...	すべてのショートカット...
@@ -96,7 +96,7 @@ Reset to Defaults	デフォルトに戻す
 Retention cap	保持上限
 Rewind (Return)	巻き戻し（Return）
 Round-trip latency: unknown	往復レイテンシ：不明
-Round-trip latency: ~%.1f ms (%u frames)	往復レイテンシ：約 %.1f ms（%u フレーム）
+Round-trip latency: ~%s (%u frames)	往復レイテンシ：約 %s（%u フレーム）
 Sample rate	サンプルレート
 Save	保存
 Save As...	別名で保存...
@@ -156,7 +156,7 @@ volume	ボリューム
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	このセッションの xruns=%llu\n遅延ブロック %llu 個（レンダリングが期限超過）\nオーディオデバイスからの報告 %llu 件
 %.0f (%.2fx)	=en
 %.1f dB	=en
-%.1fs of %.1fs at %d Hz	%.1f秒 / %.1f秒（%d Hz）
+%s of %s at %s	%s / %s（%s）
 %.3f (%.2fx)	=en
 %d frames @ %dfps	%d フレーム @ %d fps
 %d frames dropped - encoder can't keep up	%d フレームが欠落：エンコーダーが追いつきません
@@ -283,7 +283,7 @@ Delete Page	ページを削除
 Delete Selected Clips	選択したクリップを削除
 Delete Track	トラックを削除
 Destination	宛先
-Detected: %.1f BPM	検出：%.1f BPM
+Detected: %s	検出：%s
 Detected: none (no clear beat)	検出：なし（明確なビートなし）
 Digital Number Box (1x1)	=en
 Discard	破棄
@@ -482,7 +482,7 @@ Steep Log (-0.85)	急な対数 (-0.85)
 Step Gate (3x1)	=en
 Step Gate Ribbon (3x1)	=en
 Stop recording	録画を停止
-Stretched x%.3f to %.1f BPM	x%.3f に伸縮して %.1f BPM に
+Stretched x%.3f to %s	x%.3f に伸縮して %s に
 Suggested	おすすめ
 Switch display to Bars / Beats (BBT)	表示を小節／拍（BBT）に切り替え
 Switch display to Time (Minutes:Seconds)	表示を時間（分:秒）に切り替え
@@ -1487,7 +1487,7 @@ search...	検索...
 uniform float name; // 0..1 = 0.5   adds a knob	uniform float name; // 0..1 = 0.5   ノブを追加します
 used twice	2 回使用
 v%s	=en
-v%s, %.0f MB download	v%s、%.0f MB のダウンロード
+v%s, %s download	v%s、%s のダウンロード
 version %s	バージョン %s
 version %s is available (you have %s) - click to update, right-click to dismiss	バージョン %s が利用可能です（現在 %s）：クリックでアップデート、右クリックで閉じる
 %.1f BPM on launch	起動時 %.1f BPM
@@ -2934,12 +2934,10 @@ Zoom around the pointer, or pan; middle-drag also pans	ポインタ中心にズ�
 Zoom the value axis around the pointer	ポインタ中心に値軸をズーム
 param 	パラメータ 
 trig input	trig 入力
-%+.1f dB	=en
-%.1f s %s	=en
 %d x %d, %d layers	%d x %d、%d レイヤー
 %d x %d, F12	=en
-%s %+.1f dB	=en
-%s %d  %+.1f dB  %s	=en
+%s %s	=en
+%s %d  %s  %s	=en
 %s %d: %s\n%s	=en
 (loop)	(ループ)
 (whole)	(全体)
@@ -3359,7 +3357,7 @@ Now	今
 Nudge	ナッジ
 Offbeats	裏拍
 Offset	オフセット
-%.1f px   %.1f°   W %.0f  H %.0f	%.1f px   %.1f°   幅 %.0f  高さ %.0f
+%s   %s   W %.0f  H %.0f	%s   %s   幅 %.0f  高さ %.0f
 Layer styles	レイヤースタイル
 Metal	メタル
 Midtones	中間調
@@ -3424,7 +3422,7 @@ Protect alpha	アルファを保護
 Protect hue	色相を保護
 Put this document on the canvas	このドキュメントをキャンバスに配置
 Quick Mask	クイックマスク
-REC %.1f s  %.1f MB	REC %.1f s  %.1f MB
+REC %s  %s	REC %s  %s
 RGB	=en
 Radial	放射状
 Radius in px, not % of the shape	=en
@@ -3739,3 +3737,4 @@ Trim Transparent Edges	透明な端をトリミング
 Underlying	下のレイヤー
 White from	白の下限
 Remove Background	背景を削除
+Unit\cs	秒

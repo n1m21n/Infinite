@@ -759,7 +759,7 @@ namespace app
             if (audioRunning)
             {
                const uint32_t actualBufferFrames = Platform::AudioDeviceBufferFrames(gAudioOutputDeviceId);
-               ImGui::TextDisabled(T("Active: %.0f Hz, %u frames"), AudioEngine::Instance().SampleRate(),
+               ImGui::TextDisabled(T("Active: %s, %u frames"), UiFmt::Tr(UiFmt::Hz(AudioEngine::Instance().SampleRate())).c,
                                    actualBufferFrames);
 #if defined(_WIN32)
                {
@@ -778,8 +778,8 @@ namespace app
                   const double rate = AudioEngine::Instance().SampleRate();
                   const uint32_t rtFrames = Platform::AudioRoundTripLatencyFrames(gAudioOutputDeviceId);
                   if (rtFrames > 0 && rate > 0.0)
-                     ImGui::TextDisabled(T("Round-trip latency: ~%.1f ms (%u frames)"),
-                                         (double)rtFrames * 1000.0 / rate, rtFrames);
+                     ImGui::TextDisabled(T("Round-trip latency: ~%s (%u frames)"),
+                                         UiFmt::Tr(UiFmt::Ms((double)rtFrames * 1000.0 / rate)).c, rtFrames);
                   else
                      ImGui::TextDisabled("%s", T("Round-trip latency: unknown"));
                   if (ImGui::IsItemHovered())
@@ -948,7 +948,7 @@ namespace app
             FormParts::Inline();
             const uint64_t folderBytes = MovementLog::GetLogFolderSizeBytes();
             const float folderMB = (float)folderBytes / (1024.0f * 1024.0f);
-            ImGui::Text(T("(%.1f MB used)"), folderMB);
+            ImGui::Text(T("(%s used)"), UiFmt::Tr(UiFmt::MB(folderMB)).c);
 
             static const char* kCapLabels[] = { "256 MB", "1 GB", "4 GB" };
             static const uint64_t kCapValues[] = { 256ULL * 1024 * 1024, 1024ULL * 1024 * 1024, 4096ULL * 1024 * 1024 };
@@ -998,7 +998,7 @@ namespace app
                   sLearnMB = (float)LearningLog::FolderBytes() / (1024.0f * 1024.0f);
                   sLearnSizedAt = ImGui::GetTime();
                }
-               ImGui::Text(T("(%.1f MB used)"), sLearnMB);
+               ImGui::Text(T("(%s used)"), UiFmt::Tr(UiFmt::MB(sLearnMB)).c);
                // Two clicks: the first arms it for four seconds.
                static double sForgetArmed = -1.0;
                const bool armed = sForgetArmed >= 0.0 && ImGui::GetTime() - sForgetArmed < tok::motion_s_confirm;
@@ -1681,7 +1681,7 @@ namespace app
                   else if (have)
                      snprintf(st, sizeof st, T("Installed v%s"), have->c_str());
                   else if (offer && offer->size)
-                     snprintf(st, sizeof st, T("v%s, %.0f MB download"), offer->version.c_str(), (double)offer->size / 1.0e6);
+                     snprintf(st, sizeof st, T("v%s, %s download"), offer->version.c_str(), UiFmt::Tr(UiFmt::Bytes((double)offer->size)).c);
                   else if (offer)
                      snprintf(st, sizeof st, T("v%s"), offer->version.c_str());
                   if (st[0])

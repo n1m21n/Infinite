@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/components/FloatingWindow.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/FormParts.h"
@@ -1266,8 +1267,8 @@ void DrawSidePanels(FrameCtx& fc)
                   gSketchEditor->Apply();
                }
                char svgInfo[512];
-               snprintf(svgInfo, sizeof(svgInfo), T("SVG: %s (%d KB). svgSet(\"#id\", \"attr\", value), svgText, svgBox, svgDraw(x, y, w, h)"),
-                        gSketchEditor->svgName.c_str(), (int)(gSketchEditor->svg.size() / 1024));
+               snprintf(svgInfo, sizeof(svgInfo), T("SVG: %s (%s). svgSet(\"#id\", \"attr\", value), svgText, svgBox, svgDraw(x, y, w, h)"),
+                        gSketchEditor->svgName.c_str(), UiFmt::Tr(UiFmt::Bytes((double)gSketchEditor->svg.size())).c);
                EditorHint(svgInfo);
             }
             else

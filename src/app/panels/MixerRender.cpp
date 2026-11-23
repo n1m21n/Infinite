@@ -598,7 +598,7 @@ namespace app
          const bool any = MixerRenderArrangeSpan(startSec, lengthSec);
          FormParts::Label("##lenrange");
          if (any)
-            ImGui::TextDisabled(T("%.1f s %s"), lengthSec, gArrange.settings.loop.enabled ? T("(loop)") : T("(whole)"));
+            ImGui::TextDisabled(T("%s %s"), UiFmt::Tr(UiFmt::Sec(lengthSec)).c, gArrange.settings.loop.enabled ? T("(loop)") : T("(whole)"));
          else
             ImGui::TextDisabled("%s", T("Empty"));
       }
@@ -653,7 +653,7 @@ namespace app
       else if (out->IsRecording())
       {
          // The Audio Out's own Record is running: show that take, and leave Record off.
-         ImGui::TextDisabled(T("REC %.1f s  %.1f MB"), out->ElapsedSeconds(), (double)out->FileSizeBytes() / (1024.0 * 1024.0));
+         ImGui::TextDisabled(T("REC %s  %s"), UiFmt::Tr(UiFmt::Sec(out->ElapsedSeconds())).c, UiFmt::Tr(UiFmt::Bytes((double)out->FileSizeBytes())).c);
          ImGui::BeginDisabled(true);
          ActionButton::Draw(T("Record"), ImVec2(w, 0.0f), ActionButton::Kind::Primary);
          ImGui::EndDisabled();

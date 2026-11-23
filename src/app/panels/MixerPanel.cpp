@@ -2,6 +2,7 @@
 // A3 is the shell (five docks, persist, the "Enable Mixer Audio" chip). A4 is the console: page
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/components/ReorderDrag.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/frame/CanvasLink.h"
@@ -593,7 +594,7 @@ namespace app
                if (m->sendDb[b][s] <= MixerNode::kSendOffDb)
                   HelpTip("%s %d  %s  %s", T("Send"), b + 1, T("off"), m->sendPre[s] ? T("pre") : T("post"));
                else
-                  HelpTip(T("%s %d  %+.1f dB  %s"), T("Send"), b + 1, m->sendDb[b][s], m->sendPre[s] ? T("pre") : T("post"));
+                  HelpTip(T("%s %d  %s  %s"), T("Send"), b + 1, UiFmt::Tr(UiFmt::DbOffset(m->sendDb[b][s])).c, m->sendPre[s] ? T("pre") : T("post"));
             }
             ImGui::PopID();
          }
@@ -917,7 +918,7 @@ namespace app
             if (*db <= -60.0f)
                HelpTip("%s", T("-inf dB"));
             else
-               HelpTip(T("%+.1f dB"), *db);
+               HelpTip("%s", UiFmt::Tr(UiFmt::DbOffset(*db)).c);
          }
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const float capY = bottom - pos01(*db) * (bottom - top);
@@ -1061,7 +1062,7 @@ namespace app
          Pot("##trim", &m->trimDb[s], -24.0f, 24.0f, 0.0f, true, cell, col, T("TRIM"));
          UndoOnActivate(&m->trimDb[s], before);
          if (ImGui::IsItemHovered())
-            HelpTip(T("%s %+.1f dB"), T("Trim"), m->trimDb[s]);
+            HelpTip(T("%s %s"), T("Trim"), UiFmt::Tr(UiFmt::DbOffset(m->trimDb[s])).c);
          ImGui::SetCursorScreenPos(ImVec2(cx + cell, y));
          before = m->pan[s];
          Pot("##pan", &m->pan[s], -1.0f, 1.0f, 0.0f, true, cell, col, T("PAN"));
