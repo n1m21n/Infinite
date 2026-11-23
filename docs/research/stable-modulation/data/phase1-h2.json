@@ -1,0 +1,320 @@
+{
+ "g_box": [
+  1e-05,
+  1000.0
+ ],
+ "moog": {
+  "certified_kmax": 2.88485,
+  "bar": 2.85,
+  "paper": 2.88,
+  "never_past": 2.8856,
+  "pass": true,
+  "trace": [
+   {
+    "kmax": 2.5,
+    "status": "certified",
+    "reason": null,
+    "cells": 705,
+    "seconds": 0.6688277721405029,
+    "kappa": 11.707742941708842
+   },
+   {
+    "kmax": 2.6928,
+    "status": "certified",
+    "reason": null,
+    "cells": 1229,
+    "seconds": 0.7426009178161621,
+    "kappa": 24.507426043959157
+   },
+   {
+    "kmax": 2.7892,
+    "status": "certified",
+    "reason": null,
+    "cells": 1901,
+    "seconds": 0.8503820896148682,
+    "kappa": 47.62980287989492
+   },
+   {
+    "kmax": 2.8374,
+    "status": "certified",
+    "reason": null,
+    "cells": 3505,
+    "seconds": 1.174128770828247,
+    "kappa": 85.61402818724653
+   },
+   {
+    "kmax": 2.8615,
+    "status": "certified",
+    "reason": null,
+    "cells": 5793,
+    "seconds": 1.6317968368530273,
+    "kappa": 141.24879059911737
+   },
+   {
+    "kmax": 2.87355,
+    "status": "certified",
+    "reason": null,
+    "cells": 9439,
+    "seconds": 2.3376259803771973,
+    "kappa": 158.91666383947273
+   },
+   {
+    "kmax": 2.87957,
+    "status": "certified",
+    "reason": null,
+    "cells": 15155,
+    "seconds": 3.480029821395874,
+    "kappa": 23.32362498283346
+   },
+   {
+    "kmax": 2.88259,
+    "status": "certified",
+    "reason": null,
+    "cells": 11391,
+    "seconds": 2.776979923248291,
+    "kappa": 13.044701270723122
+   },
+   {
+    "kmax": 2.8841,
+    "status": "certified",
+    "reason": null,
+    "cells": 15647,
+    "seconds": 3.518510103225708,
+    "kappa": 7.6033723999839875
+   },
+   {
+    "kmax": 2.88485,
+    "status": "certified",
+    "reason": null,
+    "cells": 23769,
+    "seconds": 5.127645969390869,
+    "kappa": 6.842160990552755
+   }
+  ]
+ },
+ "diode": {
+  "certified_kmax": 8.8965,
+  "bar": 8.81,
+  "paper": 8.9,
+  "never_past": 8.9009,
+  "pass": true,
+  "trace": [
+   {
+    "kmax": 8.0,
+    "status": "certified",
+    "reason": null,
+    "cells": 847,
+    "seconds": 0.6527276039123535,
+    "kappa": 31.01938975506214
+   },
+   {
+    "kmax": 8.45045,
+    "status": "certified",
+    "reason": null,
+    "cells": 1133,
+    "seconds": 0.7098100185394287,
+    "kappa": 63.34668361546596
+   },
+   {
+    "kmax": 8.67568,
+    "status": "certified",
+    "reason": null,
+    "cells": 1773,
+    "seconds": 0.8257620334625244,
+    "kappa": 128.2308077195456
+   },
+   {
+    "kmax": 8.78829,
+    "status": "certified",
+    "reason": null,
+    "cells": 2431,
+    "seconds": 1.0131487846374512,
+    "kappa": 226.0330243638661
+   },
+   {
+    "kmax": 8.84459,
+    "status": "certified",
+    "reason": null,
+    "cells": 3835,
+    "seconds": 1.2403960227966309,
+    "kappa": 391.40062577320595
+   },
+   {
+    "kmax": 8.87275,
+    "status": "certified",
+    "reason": null,
+    "cells": 4757,
+    "seconds": 1.617274284362793,
+    "kappa": 217.26924592056275
+   },
+   {
+    "kmax": 8.88682,
+    "status": "certified",
+    "reason": null,
+    "cells": 7937,
+    "seconds": 2.1346402168273926,
+    "kappa": 196.7290502404986
+   },
+   {
+    "kmax": 8.89386,
+    "status": "certified",
+    "reason": null,
+    "cells": 8561,
+    "seconds": 2.168529987335205,
+    "kappa": 179.63361558783996
+   },
+   {
+    "kmax": 8.89738,
+    "status": "no proof",
+    "reason": "LMI infeasible (t=-inf)",
+    "cells": null,
+    "seconds": 0.4597938060760498,
+    "kappa": null
+   },
+   {
+    "kmax": 8.89562,
+    "status": "certified",
+    "reason": null,
+    "cells": 12303,
+    "seconds": 2.8832778930664062,
+    "kappa": 176.81293228230416
+   },
+   {
+    "kmax": 8.8965,
+    "status": "certified",
+    "reason": null,
+    "cells": 11397,
+    "seconds": 2.7945239543914795,
+    "kappa": 164.61382259244087
+   }
+  ]
+ },
+ "sallenkey": {
+  "certified_kmax": 1.99902,
+  "bar": 1.98,
+  "paper": "any k < 2",
+  "never_past": 2.0,
+  "pass": true,
+  "trace": [
+   {
+    "kmax": 1.5,
+    "status": "certified",
+    "reason": null,
+    "cells": 153,
+    "seconds": 0.41423797607421875,
+    "kappa": 2.9975850618023374
+   },
+   {
+    "kmax": 1.75,
+    "status": "certified",
+    "reason": null,
+    "cells": 333,
+    "seconds": 0.42311787605285645,
+    "kappa": 4.472596935457584
+   },
+   {
+    "kmax": 1.875,
+    "status": "certified",
+    "reason": null,
+    "cells": 707,
+    "seconds": 0.533825159072876,
+    "kappa": 5.512335117112344
+   },
+   {
+    "kmax": 1.9375,
+    "status": "certified",
+    "reason": null,
+    "cells": 1459,
+    "seconds": 0.6249871253967285,
+    "kappa": 6.138529123803823
+   },
+   {
+    "kmax": 1.96875,
+    "status": "certified",
+    "reason": null,
+    "cells": 2995,
+    "seconds": 0.9298529624938965,
+    "kappa": 6.484052025564783
+   },
+   {
+    "kmax": 1.98438,
+    "status": "certified",
+    "reason": null,
+    "cells": 6145,
+    "seconds": 1.4785969257354736,
+    "kappa": 6.665915701757957
+   },
+   {
+    "kmax": 1.99219,
+    "status": "certified",
+    "reason": null,
+    "cells": 12687,
+    "seconds": 2.675945997238159,
+    "kappa": 6.75918339029909
+   },
+   {
+    "kmax": 1.99609,
+    "status": "certified",
+    "reason": null,
+    "cells": 25443,
+    "seconds": 5.006826877593994,
+    "kappa": 6.8063728741491465
+   },
+   {
+    "kmax": 1.99804,
+    "status": "certified",
+    "reason": null,
+    "cells": 51139,
+    "seconds": 9.496956825256348,
+    "kappa": 6.830123456395596
+   },
+   {
+    "kmax": 1.99902,
+    "status": "certified",
+    "reason": null,
+    "cells": 102783,
+    "seconds": 18.801997184753418,
+    "kappa": 6.842099232506872
+   }
+  ]
+ },
+ "svf": {
+  "boxes": {
+   "0.01": {
+    "status": "certified",
+    "reason": null,
+    "cells": 19971,
+    "seconds": 4.641050100326538,
+    "kappa": 1.0403958334732806,
+    "P": [
+     [
+      9803.912604486848,
+      194.12704392687377
+     ],
+     [
+      194.12704392687377,
+      9807.812762747273
+     ]
+    ]
+   },
+   "0.1": {
+    "status": "certified",
+    "reason": null,
+    "cells": 4621,
+    "seconds": 1.917954921722412,
+    "kappa": 1.4380858982904652,
+    "P": [
+     [
+      8473.487887141579,
+      1523.1525296115067
+     ],
+     [
+      1523.1525296115067,
+      8480.19964889918
+     ]
+    ]
+   }
+  },
+  "pass": true
+ }
+}

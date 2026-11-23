@@ -1,7 +1,7 @@
 ---
 title: "Proven-stable modulation: automatic stability certificates for user-written filters"
 slug: "stable-modulation"
-status: "phase-0-done"
+status: "phase-1-done"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-stable-modulation.md"
@@ -156,12 +156,12 @@ the H1-H3 claim still stands.
 | Step | How | Where |
 |---|---|---|
 | Extract A(θ) | For each grid θ, run one sample step on the real interpreter with the state set to each unit vector eᵢ and `in` = 0; column i of A(θ) is the next state. A **linearity gate** checks f(a·x + b·y) = a·f(x) + b·f(y) on 8 random state pairs (tolerance 1e-5 relative, Float32); a kernel that fails is "not linear in state" and leaves scope, reported, never certified | An env-gated self-test in the app (`INFINITE_FIELDSTABDUMP`), test code only, dumps JSON. Phase 2 |
-| Parameter box | Every param (and `freq` for synths) inside its declared min/max. A cutoff-like g in (0, ∞) is mapped to w = g / (1 + g) ∈ [0, 1], so the box is closed and g → ∞ (A → −I) is a grid point | Python |
-| Certificate (any speed) | Find P with P ⪰ I and Aᵢᵀ P Aᵢ ⪯ (1 − ε) P at every grid θᵢ (an LMI, Clarabel). **Cutting planes**: solve on a coarse grid (vertices + 5 per axis), then search a 4x finer grid and a local maximiser for the θ where λ_max(P^{-1/2} Aᵀ P A P^{-1/2}) is largest; add it and re-solve, up to 20 rounds | Python |
-| Cover the gaps (D2) | With ρ = max over grid of ‖P^{1/2} Aᵢ P^{-1/2}‖ and L a bound on ‖∂A/∂θ‖ (from finite differences on the fine grid, times 1.5), the box is proven when ρ + √κ(P) · L · h < 1, h = half the grid spacing. If not, the grid is refined locally up to 3 times; otherwise the kernel is "grid-certified" (reported, not counted for H3) | Python |
+| Parameter box | Every param (and `freq` for synths) inside its declared min/max. Cutoff-like and damping-like params are gridded and split on a **log** axis. For the paper's filters, g ∈ [1e-5, 1e3] (about 0.15 Hz to 0.4997 fs at 48 kHz). The open ends g → 0 and g → ∞ are left out, since A → ±I there and nothing decays (phase 0 found this the hard way) | Python |
+| Certificate (any speed) | Find P with I ⪯ P ⪯ 10⁴·I and (P − Aᵢᵀ P Aᵢ) / sᵢ ⪰ t·I at every grid θᵢ, maximising t (an LMI, Clarabel). sᵢ = 1 − ρ(Aᵢ) rescales each point, so points that barely decay are as well conditioned as the rest. The solver's P is then **re-checked in float64** (‖P^½ A P^−½‖ < 1); the solver is never trusted. **Cutting planes**: solve on a coarse grid (vertices + 5 per axis), then search a 4x finer grid and a local maximiser for the θ where λ_max(P^{-1/2} Aᵀ P A P^{-1/2}) is largest; add it and re-solve, up to 20 rounds | Python |
+| Cover the gaps (D2) | The box is split into cells. On a cell, A(θ) lies within e of the multilinear blend of its corner matrices, and the P-norm is convex, so ‖A(θ)‖_P ≤ max over corners ‖A‖_P + e. e = 1.5 × the largest blend error measured at the cell centre and edge midpoints (the Lipschitz margin of D2, in second-order form). A cell that fails is split; a corner with ‖A‖_P ≥ 1 goes back to the LMI as a cutting plane. If the cover can't close within 200 000 cells, the result is "grid-certified" (reported, not counted for H3). *Changed from the first draft:* a first-order Lipschitz margin can't close near g → 0, where the decay per sample shrinks like g but ‖∂A/∂g‖ doesn't | Python |
 | Largest safe range (G2) | Bisection on the upper end of one param (e.g. k), 2 decimals, the other params over their full range | Python |
 | Slew certificate (H4) | P(θ) = P₀ + Σ θⱼ Pⱼ, with A(θ)ᵀ P(θ + Δ) A(θ) ⪯ (1 − ε) P(θ) and P(θ) ⪰ I at every grid θ, for Δ at the corners of the slew box (P is affine in Δ, so corners suffice). Bisection on the k range at Δk = range / 960 | Python |
-| ε | 1e-6, recorded per certificate. Float32 check: the certificate is re-verified with A computed in Float32 | Python |
+| Margin | Recorded per certificate: t, κ(P), and the largest cell bound. Float32 check (phase 3): the certificate is re-verified with A computed in Float32 | Python |
 
 **Oracle (D1, before the certifier is written).** Candidate set S = box vertices plus a 9-per-axis grid.
 (1) Every product of length ≤ 4 over the vertex set; (2) length 2-8 periodic products over S found by
@@ -218,6 +218,49 @@ witness at 2.891 and reported non-monotone results. Cause: the w grid included w
 g → ∞), where A = ±I has radius exactly 1. Those trivial points outranked the real near-misses, so the
 fine-tuning step never started from the right sequence. Fix: candidates are interior w only, and the top 6
 sequences are each fine-tuned (`scripts/stabmod.py`, `find_witness`).
+
+### H2 (phase 1, 2026-11-23): the certifier against McClellan's four hand proofs
+
+Run: `scripts/phase1_h2.py` (about 2 min), then `scripts/phase1_spotcheck.py`. Data: `data/phase1-h2.json`,
+`data/phase1-spotcheck.json`. Bisection to 0.001 on the upper end of k, cutoff over its whole range.
+
+| Filter | Paper's proven range | Bar | **Certified automatically** | Oracle: unstable from | Pass |
+|---|---|---|---|---|---|
+| Moog ladder | k ∈ [0, 2.88] | ≥ 2.85 | **k ∈ [0, 2.8848]** | 2.8856 | Yes, past the paper |
+| Diode ladder | k ∈ [0, 8.90] | ≥ 8.81 | **k ∈ [0, 8.8965]** (99.96%) | 8.9009 | Yes |
+| Sallen-Key | k < 2 | ≥ 1.98 | **k ∈ [0, 1.9990]** | 2 (frozen-unstable) | Yes |
+| SVF | any R ≥ Rmin > 0 | R ∈ [Rmin, 10], Rmin = 0.01 and 0.1 | **both boxes certified** | — | Yes |
+
+**H2 passes on all four**, with no hand work and the same code for each filter. Median time per
+certification is 1.6 s and the slowest is 18.8 s (33 runs, Python, M2). The Moog result goes past the
+published proof: together with phase 0's witness, the true any-speed limit for the linear Moog ladder is now
+pinned to **k ∈ [2.8848, 2.8856)**, against the paper's gap of [2.88, 2.89].
+
+**Independent check.** At each certified edge, 200 000 random (g, k) points the certifier never saw
+(20 000 of them at k = kmax) all have ‖A‖_P < 1 (largest: 1 − 1.3e-10 Moog, 1 − 3.5e-9 diode, 1 − 7.7e-12
+Sallen-Key; the tiny margins sit at g → 1e-5, where decay per sample is about g). 65 536 samples of random
+switching never raise ‖x‖_P above its start.
+
+### B1, B2 (phase 1, 2026-11-23): how often today's check is fooled, on corpus G
+
+Run: `scripts/gen_kernels.py G` (seed 20261121, 200 kernels, n = 1-6, 1-3 knobs; corpus `corpus/G.json`),
+then `scripts/phase1_b12.py` (about 50 s). Data: `data/phase1-b12.json`. The oracle is phase 0's, with
+5-9 points per knob and continuous tuning on near misses.
+
+| # | Number | Value |
+|---|---|---|
+| B2 | G kernels with a witness / without | **76 / 124** (41 of the 76 need switching: the witness is a product of 2-8 steps) |
+| B1a | Kernels with a witness that the **frozen check at default knobs** (what `AliasAnalysis` does today) calls stable | **54 of 76 (71%)** |
+| B1b | The same for a stricter frozen check at **every point of a 7-per-knob grid** | **15 of 76 (20%)** |
+
+So even a frozen check made far stricter than today's misses 1 in 5 kernels that really blow up. Those 15
+grow by 1.0008 to 1.17 per sample under their witness sequence; at 1.17 the output is a million times larger
+after about 90 samples (2 ms at 48 kHz). Of the 100 kernels built to be stable at every fixed setting, 12 have
+a switching witness.
+
+The H3 denominator is the 124 no-witness kernels (88 of them built frozen-stable). H1 is scored on all
+200 in phase 3, from matrices extracted by the real interpreter.
+
 
 ## 11. Critique
 *(After measurement.)*

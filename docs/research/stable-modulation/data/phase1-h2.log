@@ -1,0 +1,36 @@
+  moog kmax=2.6928: certified (0.7s, 1229 cells)
+  moog kmax=2.7892: certified (0.9s, 1901 cells)
+/Users/namansoni/Infinite/worktrees/stable-modulation/docs/research/stable-modulation/scripts/certify.py:41: UserWarning: Solution may be inaccurate. Try another solver, adjusting the solver settings, or solve with verbose=True for more information.
+  prob.solve(solver=cp.CLARABEL)
+  moog kmax=2.8374: certified (1.2s, 3505 cells)
+  moog kmax=2.8615: certified (1.6s, 5793 cells)
+  moog kmax=2.87355: certified (2.3s, 9439 cells)
+  moog kmax=2.87957: certified (3.5s, 15155 cells)
+  moog kmax=2.88259: certified (2.8s, 11391 cells)
+  moog kmax=2.8841: certified (3.5s, 15647 cells)
+  moog kmax=2.88485: certified (5.1s, 23769 cells)
+moog certified up to 2.88485 bar 2.85 pass True
+  diode kmax=8.45045: certified (0.7s, 1133 cells)
+  diode kmax=8.67568: certified (0.8s, 1773 cells)
+  diode kmax=8.78829: certified (1.0s, 2431 cells)
+  diode kmax=8.84459: certified (1.2s, 3835 cells)
+  diode kmax=8.87275: certified (1.6s, 4757 cells)
+  diode kmax=8.88682: certified (2.1s, 7937 cells)
+  diode kmax=8.89386: certified (2.2s, 8561 cells)
+  diode kmax=8.89738: no proof (0.5s, None cells)
+  diode kmax=8.89562: certified (2.9s, 12303 cells)
+  diode kmax=8.8965: certified (2.8s, 11397 cells)
+diode certified up to 8.8965 bar 8.81 pass True
+  sallenkey kmax=1.75: certified (0.4s, 333 cells)
+  sallenkey kmax=1.875: certified (0.5s, 707 cells)
+  sallenkey kmax=1.9375: certified (0.6s, 1459 cells)
+  sallenkey kmax=1.96875: certified (0.9s, 2995 cells)
+  sallenkey kmax=1.98438: certified (1.5s, 6145 cells)
+  sallenkey kmax=1.99219: certified (2.7s, 12687 cells)
+  sallenkey kmax=1.99609: certified (5.0s, 25443 cells)
+  sallenkey kmax=1.99804: certified (9.5s, 51139 cells)
+  sallenkey kmax=1.99902: certified (18.8s, 102783 cells)
+sallenkey certified up to 1.99902 bar 1.98 pass True
+svf R in [0.01, 10] certified 4.6s
+svf R in [0.1, 10] certified 1.9s
+wrote /Users/namansoni/Infinite/worktrees/stable-modulation/docs/research/stable-modulation/data/phase1-h2.json
