@@ -1453,71 +1453,189 @@ namespace
       return changed;
    }
 
-   // A grey ramp with four handles (black, black to, white from, white), kept in order. Returns true on a change.
+   // Blend If's grey ramp (Photoshop's sliders): four handles kept in order - black, black to, white from, white.
+   // Each pair starts as one handle: dragging it moves the pair together; Option (Alt) splits it, and a split half
+   // then moves alone (drag it back onto its partner, or right-click it, to join them). The cut part of the ramp is veiled and the
+   // soft range fades, so the row shows what passes. The values read under the ends; double-click resets.
    bool BlendIfRamp(const char* id, float* b, float width)
    {
-      static int sHeld = -1;
+      static int sHeld = -1;        // handle held (0..3); with sPair, the pair it leads
+      static bool sPair = false;    // dragging a joined pair as one
+      static float sGrabDx = 0.0f;  // pointer to handle, so a grab never jumps
       static ImGuiID sHeldId = 0;
       const float fh = ImGui::GetFrameHeight();
+      const float lineH = ImGui::GetTextLineHeight();
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float w = std::max(40.0f, width);
-      ImGui::InvisibleButton(id, ImVec2(w, fh));
+      const float w = std::max(fh * 2.0f, width);
+      const float hw = std::round(fh * 0.32f);              // handle half width: the hit and the drawn triangle
+      const float h = fh + lineH;                            // ramp + handles, then the values line
+      ImGui::InvisibleButton(id, ImVec2(w, h));
       const ImGuiID me = ImGui::GetItemID();
-      const float inset = 6.0f;
-      const float x0 = p.x + inset, x1 = p.x + w - inset;
-      const float barT = p.y + fh * 0.22f, barB = p.y + fh * 0.52f;
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilledMultiColor(ImVec2(x0, barT), ImVec2(x1, barB), IM_COL32(0, 0, 0, 255), IM_COL32(255, 255, 255, 255),
-                                  IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255));
-      dl->AddRect(ImVec2(x0, barT), ImVec2(x1, barB), ImGui::GetColorU32(ImGuiCol_Border), 0.0f);
+      const float x0 = p.x + hw, x1 = p.x + w - hw;
+      const float barT = p.y + tok::space_1, barB = p.y + fh * 0.55f;
+      const float triB = p.y + fh;
       auto xOf = [&](float v) { return x0 + std::clamp(v, 0.0f, 1.0f) * (x1 - x0); };
+      auto vOf = [&](float x) { return std::clamp((x - x0) / std::max(1.0f, x1 - x0), 0.0f, 1.0f); };
+      auto joined = [&](int pair) { return std::fabs(b[pair * 2] - b[pair * 2 + 1]) < 0.5f / 255.0f; };
       const ImGuiIO& io = ImGui::GetIO();
+      const bool active = ImGui::IsItemActive() && sHeldId == me;
       bool changed = false;
-      if (ImGui::IsItemActivated())
+
+      // The handle under the pointer (hover and grab): the nearest within reach; a split pair's shared spot picks
+      // the half on the pointer's side.
+      int under = -1;
+      if (ImGui::IsItemHovered() || ImGui::IsItemActivated())
       {
-         // The nearest handle; on a split pair's shared spot, the one on the side the pointer came from.
-         float best = 1e9f;
-         sHeld = 0;
+         float best = hw + tok::space_1;
          for (int k = 0; k < 4; k++)
          {
-            float d = std::fabs(io.MousePos.x - xOf(b[k]));
-            if (d < best - 0.01f || (std::fabs(d - best) < 0.5f && ((k == 1 || k == 3) == (io.MousePos.x > xOf(b[k])))))
+            const float d = std::fabs(io.MousePos.x - xOf(b[k]));
+            const bool sideOk = (k == 1 || k == 3) == (io.MousePos.x > xOf(b[k]));
+            if (d < best - 0.01f || (std::fabs(d - best) < 0.5f && sideOk))
             {
                best = d;
-               sHeld = k;
+               under = k;
             }
          }
+      }
+      if (ImGui::IsItemActivated())
+      {
          sHeldId = me;
-         PushUndoCheckpoint("Blend If");
-      }
-      if (ImGui::IsItemActive() && sHeldId == me && sHeld >= 0)
-      {
-         const float v = std::clamp((io.MousePos.x - x0) / std::max(1.0f, x1 - x0), 0.0f, 1.0f);
-         const float lo = sHeld == 0 ? 0.0f : b[sHeld - 1], hi = sHeld == 3 ? 1.0f : b[sHeld + 1];
-         const float nv = std::round(std::clamp(v, lo, hi) * 255.0f) / 255.0f;
-         if (nv != b[sHeld])
+         sHeld = under;
+         sPair = false;
+         if (under >= 0)
          {
-            b[sHeld] = nv;
-            changed = true;
+            const int pair = under / 2;
+            sPair = joined(pair) && !io.KeyAlt;
+            if (sPair)
+               sHeld = pair * 2;
+            sGrabDx = io.MousePos.x - xOf(b[sHeld]);
+            PushUndoCheckpoint("Blend If");
          }
-         ImGui::SetTooltip("%d", (int)std::lround(b[sHeld] * 255.0f));
       }
-      else if (ImGui::IsItemHovered())
-         HelpTip("%d / %d   %d / %d", (int)std::lround(b[0] * 255), (int)std::lround(b[1] * 255), (int)std::lround(b[2] * 255),
-                 (int)std::lround(b[3] * 255));
-      // Handles: small triangles under the ramp, dark for the black pair, light for the white pair.
-      for (int k = 0; k < 4; k++)
+      if (active && sHeld >= 0)
       {
-         const float x = xOf(b[k]);
-         const bool held = ImGui::IsItemActive() && sHeldId == me && sHeld == k;
-         const ImU32 fill = k < 2 ? IM_COL32(20, 20, 20, 255) : IM_COL32(235, 235, 235, 255);
-         const ImU32 edge = held ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : ImGui::GetColorU32(ImGuiCol_Text, 0.8f);
-         const ImVec2 t0(x, barB + 1.0f), t1(x - 5.0f, p.y + fh - 2.0f), t2(x + 5.0f, p.y + fh - 2.0f);
-         dl->AddTriangleFilled(t0, t1, t2, fill);
-         dl->AddTriangle(t0, t1, t2, edge, held ? 1.5f : 1.0f);
+         const float v = std::round(vOf(io.MousePos.x - sGrabDx) * 255.0f) / 255.0f;
+         if (sPair)
+         {
+            const int k0 = sHeld, k1 = sHeld + 1;
+            const float lo = k0 == 0 ? 0.0f : b[k0 - 1], hi = k1 == 3 ? 1.0f : b[k1 + 1];
+            const float nv = std::clamp(v, lo, hi);
+            if (nv != b[k0] || nv != b[k1])
+            {
+               b[k0] = b[k1] = nv;
+               changed = true;
+            }
+         }
+         else
+         {
+            const float lo = sHeld == 0 ? 0.0f : b[sHeld - 1], hi = sHeld == 3 ? 1.0f : b[sHeld + 1];
+            const float nv = std::clamp(v, lo, hi);
+            if (nv != b[sHeld])
+            {
+               b[sHeld] = nv;
+               changed = true;
+            }
+         }
       }
+      if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+      {
+         PushUndoCheckpoint("Blend If");
+         b[0] = b[1] = 0.0f;
+         b[2] = b[3] = 1.0f;
+         changed = true;
+      }
+      // Right-click a handle takes away what it added: a split half folds back onto its partner (the outer one
+      // stays), a joined pair goes back to its end (black to 0, white to 255).
+      if (ImGui::IsItemHovered() && under >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      {
+         const int pair = under / 2, outer = pair == 0 ? 0 : 3, inner = pair == 0 ? 1 : 2;
+         PushUndoCheckpoint("Blend If");
+         if (!joined(pair))
+            b[inner] = b[outer];
+         else
+            b[outer] = b[inner] = pair == 0 ? 0.0f : 1.0f;
+         changed = true;
+      }
+      if ((ImGui::IsItemHovered() && under >= 0) || (active && sHeld >= 0))
+      {
+         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+         if (!active)
+            HelpTip("%s", T("Drag to move; Option-drag splits; right-click removes the split"));
+      }
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const float rr = tok::radius_control * 0.5f;
+      dl->AddRectFilledMultiColor(ImVec2(x0, barT), ImVec2(x1, barB), IM_COL32(0, 0, 0, 255), IM_COL32(255, 255, 255, 255),
+                                  IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255));
+      // What does not pass: veiled outside the outer handles, fading across the soft ranges.
+      const ImU32 veil = ImGui::GetColorU32(ImGuiCol_WindowBg, 0.78f), clear = ImGui::GetColorU32(ImGuiCol_WindowBg, 0.0f);
+      if (xOf(b[0]) > x0)
+         dl->AddRectFilled(ImVec2(x0, barT), ImVec2(xOf(b[0]), barB), veil);
+      if (xOf(b[1]) > xOf(b[0]))
+         dl->AddRectFilledMultiColor(ImVec2(xOf(b[0]), barT), ImVec2(xOf(b[1]), barB), veil, clear, clear, veil);
+      if (xOf(b[3]) > xOf(b[2]))
+         dl->AddRectFilledMultiColor(ImVec2(xOf(b[2]), barT), ImVec2(xOf(b[3]), barB), clear, veil, veil, clear);
+      if (xOf(b[3]) < x1)
+         dl->AddRectFilled(ImVec2(xOf(b[3]), barT), ImVec2(x1, barB), veil);
+      dl->AddRect(ImVec2(x0, barT), ImVec2(x1, barB), FormParts::EdgeCol(), rr);
+
+      // Handles: a joined pair is one triangle; a split pair is two halves, each pointing at its own spot.
+      const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text, 0.85f), lit = ImGui::GetColorU32(app::AccentEmphasisSelected());
+      for (int pair = 0; pair < 2; pair++)
+      {
+         const ImU32 fill = pair == 0 ? IM_COL32(20, 20, 20, 255) : IM_COL32(235, 235, 235, 255);
+         for (int half = 0; half < 2; half++)
+         {
+            const int k = pair * 2 + half;
+            if (joined(pair) && half == 1)
+               break;
+            const float x = xOf(b[k]);
+            const bool on = (active && (sHeld == k || (sPair && sHeld == pair * 2))) || (!active && under == k) ||
+                            (!active && joined(pair) && under / 2 == pair && under >= 0);
+            ImVec2 t0(x, barB), t1(x - hw, triB), t2(x + hw, triB);
+            if (!joined(pair))
+            {
+               // The half on the side away from its partner: black's "to" and white's outer point outwards.
+               const bool right = half == 1;
+               t1 = right ? ImVec2(x, triB) : ImVec2(x - hw, triB);
+               t2 = right ? ImVec2(x + hw, triB) : ImVec2(x, triB);
+            }
+            dl->AddTriangleFilled(t0, t1, t2, fill);
+            dl->AddTriangle(t0, t1, t2, on ? lit : ink, on ? 1.5f : 1.0f);
+         }
+      }
+
+      // The values under the ends, compact: one number for a joined pair, "a / b" for a split one.
+      auto val = [&](int pair) {
+         char buf[24];
+         const int a = (int)std::lround(b[pair * 2] * 255.0f), c = (int)std::lround(b[pair * 2 + 1] * 255.0f);
+         if (a == c)
+            snprintf(buf, sizeof buf, "%d", a);
+         else
+            snprintf(buf, sizeof buf, "%d / %d", a, c);
+         return std::string(buf);
+      };
+      const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      const std::string lv = val(0), rv = val(1);
+      dl->AddText(ImVec2(x0 - hw * 0.5f, triB), dim, lv.c_str());
+      dl->AddText(ImVec2(x1 + hw * 0.5f - ImGui::CalcTextSize(rv.c_str()).x, triB), dim, rv.c_str());
+
       if (ImGui::IsItemDeactivated())
+      {
+         // A half dropped onto its partner joins them again.
+         if (sHeld >= 0 && !sPair)
+         {
+            const int pair = sHeld / 2;
+            if (std::fabs(xOf(b[pair * 2]) - xOf(b[pair * 2 + 1])) < hw * 0.5f && !joined(pair))
+            {
+               b[pair * 2] = b[pair * 2 + 1] = b[sHeld];
+               changed = true;
+            }
+         }
          sHeld = -1;
+         sPair = false;
+      }
       return changed;
    }
 
@@ -11519,6 +11637,16 @@ namespace
 
    // The owned node's own params (its full body, with modulation, is one "Show on canvas" away). Drawn in two passes:
    // tier 0 first, then the tier 1 rows under one More fold. `hasMore` reports whether a second pass has anything.
+   // Rows drawn from data (node params) each get their own ID scope, so two rows with the same label in one window
+   // never share an ImGui ID (a node's "Blend" next to the Mix "Blend").
+   struct ParamIdScope
+   {
+      explicit ParamIdScope(const void* key) { ImGui::PushID(key); }
+      explicit ParamIdScope(const char* key) { ImGui::PushID(key); }
+      explicit ParamIdScope(int key) { ImGui::PushID(key); }
+      ~ParamIdScope() { ImGui::PopID(); }
+   };
+
    class EffParamRows : public ParamVisitor
    {
    public:
@@ -11527,6 +11655,7 @@ namespace
 
       void Float(const char* name, float& v) override
       {
+         const ParamIdScope ids(name);   // one ID scope per param: a node param can share a label with a Mix row
          int band = -1;
          const EffHint* h = Hint(name, band);
          if (!Shown(h, name, band))
@@ -11556,6 +11685,7 @@ namespace
       }
       void Int(const char* name, int& v) override
       {
+         const ParamIdScope ids(name);   // one ID scope per param: a node param can share a label with a Mix row
          int band = -1;
          const EffHint* h = Hint(name, band);
          if (!Shown(h, name, band))
@@ -11596,6 +11726,7 @@ namespace
       }
       void Bool(const char* name, bool& v) override
       {
+         const ParamIdScope ids(name);   // one ID scope per param: a node param can share a label with a Mix row
          int band = -1;
          const EffHint* h = Hint(name, band);
          if (!Shown(h, name, band))
@@ -11605,6 +11736,7 @@ namespace
       void Text(const char*, std::string&) override {}
       void Color(const char* name, float rgb[3]) override
       {
+         const ParamIdScope ids(name);   // one ID scope per param: a node param can share a label with a Mix row
          int band = -1;
          const EffHint* h = Hint(name, band);
          if (band >= 0)
@@ -11687,8 +11819,7 @@ namespace
    void MixRow(float& opacity, int* blend)
    {
       // Its own ID scope: a node param can be called "Blend" or "Opacity" too (Trails), in the same window.
-      ImGui::PushID("##mixrow");
-      struct Pop { ~Pop() { ImGui::PopID(); } } pop;
+      const ParamIdScope ids("##mixrow");
       SliderRow(T("Opacity"), &opacity, 0.0f, 1.0f, "%.2f");
       if (blend == nullptr)
          return;
@@ -11802,7 +11933,7 @@ namespace
       }
       EffectMenu(l, i, winKey);
       FormParts::Inline(0.0f, tok::space_2);
-      if (HeaderIcon((base + "set").c_str(), IconsInfinite::Mixer, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
+      if (HeaderIcon((base + "set").c_str(), IconsInfinite::Sliders, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
          SettingsWindow::Toggle(winKey);
       // The effect's controls, all in its settings window: every row, the rarely used ones under More, then Mix.
       // The card itself is the header alone.
@@ -11835,6 +11966,7 @@ namespace
                   // Linear light is a rendering choice, not a look: it waits under More.
                   auto rare = [](const FilterParamDef& pd) { return pd.label == "linear light"; };
                   auto row = [&](size_t pi) {
+                     const ParamIdScope ids((int)pi);
                      const FilterParamDef& pd = def.params[pi];
                      const std::string plabel = ParamLabel(pd.label.c_str());
                      float* pv = fn->ParamPtr(pi);
@@ -12588,7 +12720,7 @@ namespace
             MenuParts::EndPopup();
          }
          FormParts::Inline(0.0f, tok::space_2);
-         if (HeaderIcon((base + "set").c_str(), IconsInfinite::Mixer, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
+         if (HeaderIcon((base + "set").c_str(), IconsInfinite::Sliders, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
             SettingsWindow::Toggle(winKey);
          // The window: the style's every row, then the other copies of the same kind, each with its own settings.
          SettingsWindow::Draw(winKey, T(english), WinAt(np.y), [&]() {
@@ -12774,7 +12906,7 @@ namespace
             MenuParts::EndPopup();
          }
          FormParts::Inline(0.0f, tok::space_2);
-         if (HeaderIcon((base + "set").c_str(), IconsInfinite::Mixer, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
+         if (HeaderIcon((base + "set").c_str(), IconsInfinite::Sliders, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
             SettingsWindow::Toggle(winKey);
          ImGui::PopID();
       }

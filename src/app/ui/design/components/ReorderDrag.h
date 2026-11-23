@@ -165,6 +165,7 @@ namespace ReorderDrag
          ImVec2 grab{ 0, 0 };
          std::vector<int> order;
          std::vector<ImRect> rects;   // this frame's other items, natural (un-glided) rects, drawn order
+         std::vector<ImRect> slots;   // every item's natural rect in drawn order: the slots (a grid's cells do not move)
          std::unordered_map<int, ImVec2> last, off;   // per data index: natural pos last frame, glide offset
          float lastT = 0.0f;
          ImVec2 cum{ 0, 0 };          // Flow: the offset applied to the cursor so far
@@ -197,7 +198,8 @@ namespace ReorderDrag
          {
             o.x += it->second.x - natural.x;
             o.y += it->second.y - natural.y;
-            const float k = std::exp(-ImGui::GetIO().DeltaTime / 0.045f);
+            // Time constant: half the focus motion token (an item settles in about the on-motion time).
+            const float k = std::exp(-ImGui::GetIO().DeltaTime / (tok::motion_focus * 0.5f / 1000.0f));
             o.x *= k;
             o.y *= k;
             if (std::fabs(o.x) < 0.5f)
@@ -221,6 +223,7 @@ namespace ReorderDrag
       l.vertical = vertical;
       l.n = n;
       l.rects.clear();
+      l.slots.clear();
       l.cum = ImVec2(0, 0);
       l.order.clear();
       if (detail::Dragging(l))
@@ -296,6 +299,11 @@ namespace ReorderDrag
          l.frame = ImGui::GetFrameCount();
          held = index == l.from;
       }
+      {
+         const auto it = l.off.find(index);
+         const ImVec2 o = it != l.off.end() ? it->second : ImVec2(0, 0);
+         l.slots.push_back(ImRect(ImVec2(mn.x - o.x, mn.y - o.y), ImVec2(mx.x - o.x, mx.y - o.y)));
+      }
       if (detail::Dragging(l) && index == l.from)
       {
          // The gap it will land in: the item, veiled, with a faint accent edge.
@@ -304,7 +312,7 @@ namespace ReorderDrag
          dl->AddRect(mn, mx, (AccentCol() & 0x00FFFFFFu) | 0x60000000u, tok::radius_control, 0, 1.0f);
          // The ghost: the item's size, held where it was grabbed.
          const ImGuiIO& io = ImGui::GetIO();
-         const ImVec2 size(std::min(mx.x - mn.x, 320.0f), std::max(mx.y - mn.y, 1.0f));
+         const ImVec2 size(std::max(mx.x - mn.x, 1.0f), std::max(mx.y - mn.y, 1.0f));
          const ImVec2 g0(io.MousePos.x - std::min(l.grab.x, size.x), io.MousePos.y - std::min(l.grab.y, size.y));
          const ImVec2 g1(g0.x + size.x, g0.y + size.y);
          ImDrawList* fg = ImGui::GetForegroundDrawList();
@@ -353,14 +361,36 @@ namespace ReorderDrag
             // The slot: how many of the other items sit before the pointer (rows: past the middle; strips and grids:
             // a row above, or past the middle in the pointer's row).
             const ImVec2 pt = ImGui::GetIO().MousePos;
-            int slot = 0;
-            for (const ImRect& r : l.rects)
+            if (l.vertical)
             {
-               const ImVec2 c = r.GetCenter();
-               const bool before = l.vertical ? pt.y > c.y : (pt.y >= r.Max.y || (pt.y >= r.Min.y && pt.x > c.x));
-               slot += before ? 1 : 0;
+               int slot = 0;
+               for (const ImRect& r : l.rects)
+                  slot += pt.y > r.GetCenter().y ? 1 : 0;
+               l.to = slot;
             }
-            l.to = slot;
+            else if (!l.slots.empty())
+            {
+               // Strips and grids: the cell under the pointer. Cells stay put while items glide between them, so the
+               // slot never chases the animation (no flicker at a boundary). Between cells it keeps the last slot;
+               // past the last row or column it is the end, before the first the start.
+               const float hx = ImGui::GetStyle().ItemSpacing.x * 0.5f + 1.0f, hy = ImGui::GetStyle().ItemSpacing.y * 0.5f + 1.0f;
+               int hit = -1;
+               ImRect all = l.slots[0];
+               for (int j = 0; j < (int)l.slots.size(); j++)
+               {
+                  ImRect r = l.slots[j];
+                  all.Add(r);
+                  r.Expand(ImVec2(hx, hy));
+                  if (hit < 0 && r.Contains(pt))
+                     hit = j;
+               }
+               if (hit < 0 && (pt.y > all.Max.y || (pt.x > all.Max.x && pt.y > l.slots.back().Min.y)))
+                  hit = (int)l.slots.size() - 1;
+               else if (hit < 0 && (pt.y < all.Min.y || (pt.x < all.Min.x && pt.y < l.slots[0].Max.y)))
+                  hit = 0;
+               if (hit >= 0)
+                  l.to = hit;
+            }
             if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
             {
                m.from = l.from;
@@ -382,7 +412,7 @@ namespace ReorderDrag
                }
                l.last.swap(last);
                l.off.swap(off);
-               l.settle = ImGui::GetTime() + 0.2;
+               l.settle = ImGui::GetTime() + tok::motion_accent_fade / 1000.0;
             }
          }
       }

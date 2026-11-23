@@ -6101,11 +6101,11 @@ namespace
          // The sliders ink a little under the on box (the 2D View's header icons use the same size).
          const ImVec2 gc((gmn.x + gmx.x) * 0.5f, (gmn.y + gmx.y) * 0.5f);
          ImVec2 ia, ib;
-         glyph::InkBox(gc, 16.0f, IconsInfinite::Mixer, ia, ib);
+         glyph::InkBox(gc, 16.0f, IconsInfinite::Sliders, ia, ib);
          const float m = std::max(ib.x - ia.x, ib.y - ia.y);
          const float ink = std::round(CheckBox::Size() * 0.72f);
          glyph::Draw(dl, gc, m > 1.0f ? std::round(16.0f * ink / m) : 16.0f,
-                     open ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : text, IconsInfinite::Mixer);
+                     open ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : text, IconsInfinite::Sliders);
       }
       ImGui::PopID();
       SettingsWindow::Draw(key, title, ImVec2(ImGui::GetWindowPos().x - tok::space_2, p.y), [&]() {
