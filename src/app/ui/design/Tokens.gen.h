@@ -25,6 +25,7 @@ namespace tok
    constexpr float icon_page_ratio = 0.8f;
    constexpr float icon_ink_fill = 0.9f;
    constexpr float icon_ink_fill_pointer = 0.8f;
+   constexpr float icon_gizmo = 36.0f;
    constexpr float pin_r_cable = 7.0f;
    constexpr float pin_r_cable_sm = 5.0f;
    constexpr float pin_r_param = 4.5f;

@@ -160,5 +160,9 @@
  "undo-brush": 59806,
  "drum": 59807,
  "text-justify": 59808,
- "sliders": 59809
+ "sliders": 59809,
+ "check": 59810,
+ "dock": 59811,
+ "download": 59812,
+ "trash": 59813
 }

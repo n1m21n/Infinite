@@ -1317,10 +1317,7 @@ void DrawMenuBar(FrameCtx& fc)
                const ImVec4 ac = ImGui::GetStyleColorVec4(ImGuiCol_CheckMark);
                dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(ac.x, ac.y, ac.z, hov ? 0.28f : 0.16f)), tok::radius_control);
                const ImU32 fg = ImGui::GetColorU32(ac);
-               dl->AddLine(ImVec2(c.x, c.y - 6.0f), ImVec2(c.x, c.y + 4.0f), fg, 1.8f);
-               dl->AddLine(ImVec2(c.x - 4.5f, c.y), ImVec2(c.x, c.y + 4.5f), fg, 1.8f);
-               dl->AddLine(ImVec2(c.x + 4.5f, c.y), ImVec2(c.x, c.y + 4.5f), fg, 1.8f);
-               dl->AddLine(ImVec2(c.x - 5.5f, c.y + 7.0f), ImVec2(c.x + 5.5f, c.y + 7.0f), fg, 1.8f);
+               glyph::Draw(dl, c, tok::icon_lg, fg, IconsInfinite::Download);
                StatusDot::OnLastItem(StatusDot::State::Error);
                if (clicked)
                   gShowUpdateCheckModal = true;   // the result is already in; the dialog offers Update now

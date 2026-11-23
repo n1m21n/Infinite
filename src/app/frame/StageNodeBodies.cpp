@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include <unordered_map>
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/TokenColors.h"
@@ -574,18 +575,11 @@ void DrawNodeBodies(FrameCtx& fc)
             const ImVec2 gc(br.x - 30.0f, origin.y + h * 0.5f);
             if (dynamic_cast<CameraNode*>(gn.node.get()) != nullptr)
             {
-               dl->AddRect(ImVec2(gc.x - 14, gc.y - 8), ImVec2(gc.x + 4, gc.y + 8), gz, 2.0f, 0, 1.5f);
-               dl->AddTriangle(ImVec2(gc.x + 4, gc.y), ImVec2(gc.x + 14, gc.y - 8), ImVec2(gc.x + 14, gc.y + 8), gz, 1.5f);
+               glyph::Draw(dl, gc, tok::icon_gizmo, gz, IconsInfinite::ViewCamera);
             }
             else if (dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
             {
-               dl->AddCircle(gc, 5.0f, gz, 0, 1.5f);
-               for (int r = 0; r < 8; ++r)
-               {
-                  const float a = (float)r * 0.7853982f;
-                  dl->AddLine(ImVec2(gc.x + cosf(a) * 8.0f, gc.y + sinf(a) * 8.0f),
-                              ImVec2(gc.x + cosf(a) * 13.0f, gc.y + sinf(a) * 13.0f), gz, 1.5f);
-               }
+               glyph::Draw(dl, gc, tok::icon_gizmo, gz, IconsInfinite::LightSun);
             }
             else if (dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr)
             {

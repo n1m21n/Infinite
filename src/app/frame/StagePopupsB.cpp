@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/Tip.h"
 #include <set>
 #include "app/ui/design/components/MenuParts.h"
@@ -780,11 +781,7 @@ void DrawPopupsB(FrameCtx& fc)
             const ImU32 fg = ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.95f));
             dl->AddCircleFilled(c, r, ImGui::GetColorU32(over ? ImGuiCol_ButtonHovered : ImGuiCol_PopupBg), 24);
             dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_Border), 24, 1.0f);
-            dl->AddLine(ImVec2(c.x - 5.0f * k, c.y - 3.5f * k), ImVec2(c.x + 5.0f * k, c.y - 3.5f * k), fg, std::max(1.0f, 1.5f * k)); // lid
-            dl->AddLine(ImVec2(c.x - 1.6f * k, c.y - 5.5f * k), ImVec2(c.x + 1.6f * k, c.y - 5.5f * k), fg, std::max(1.0f, 1.5f * k)); // handle
-            dl->AddLine(ImVec2(c.x - 3.6f * k, c.y - 3.5f * k), ImVec2(c.x - 3.0f * k, c.y + 5.0f * k), fg, std::max(1.0f, 1.5f * k)); // body
-            dl->AddLine(ImVec2(c.x + 3.6f * k, c.y - 3.5f * k), ImVec2(c.x + 3.0f * k, c.y + 5.0f * k), fg, std::max(1.0f, 1.5f * k));
-            dl->AddLine(ImVec2(c.x - 3.0f * k, c.y + 5.0f * k), ImVec2(c.x + 3.0f * k, c.y + 5.0f * k), fg, std::max(1.0f, 1.5f * k));
+            glyph::Draw(dl, c, tok::icon_md * k, fg, IconsInfinite::Trash);
             if (over && ImGui::IsMouseClicked(0))
             {
                PushUndoCheckpoint();

@@ -4665,8 +4665,7 @@ namespace app
          {
             const ImVec2 c(p.x + w - tok::space_2 - 6.0f, p.y + h * 0.5f);
             const ImU32 col = ImGui::GetColorU32(AccentEmphasisSelected());
-            dl->AddLine(ImVec2(c.x - 4.0f, c.y), ImVec2(c.x - 1.0f, c.y + 3.0f), col, 1.6f);
-            dl->AddLine(ImVec2(c.x - 1.0f, c.y + 3.0f), ImVec2(c.x + 4.5f, c.y - 3.5f), col, 1.6f);
+            glyph::Draw(dl, c, tok::icon_sm, col, IconsInfinite::Check);
          }
          return pressed;
       }
@@ -5315,20 +5314,7 @@ namespace app
             const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
             const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.5f + 0.5f * hv));
             const ImVec2 c(std::floor(o.x + glyph * 0.5f) + 0.5f, std::floor(o.y + 9.0f) + 0.5f);
-            const float r = 5.5f;
-            // the window, open at its top-right corner where the arrow passes
-            dl->PathLineTo(ImVec2(c.x + 1.0f, c.y - r));
-            dl->PathLineTo(ImVec2(c.x - r, c.y - r));
-            dl->PathLineTo(ImVec2(c.x - r, c.y + r));
-            dl->PathLineTo(ImVec2(c.x + r, c.y + r));
-            dl->PathLineTo(ImVec2(c.x + r, c.y - 1.0f));
-            dl->PathStroke(col, ImDrawFlags_None, 1.25f);
-            const ImVec2 tip = gTerminalFloating ? ImVec2(c.x - 0.5f, c.y + 0.5f) : ImVec2(c.x + r + 1.5f, c.y - r - 1.5f);
-            const ImVec2 tail = gTerminalFloating ? ImVec2(c.x + r + 1.5f, c.y - r - 1.5f) : ImVec2(c.x - 0.5f, c.y + 0.5f);
-            dl->AddLine(tail, tip, col, 1.25f);
-            const float sx = tip.x > tail.x ? -1.0f : 1.0f, sy = tip.y > tail.y ? -1.0f : 1.0f;  // head points back along the shaft
-            dl->AddLine(tip, ImVec2(tip.x + sx * 4.0f, tip.y), col, 1.25f);
-            dl->AddLine(tip, ImVec2(tip.x, tip.y + sy * 4.0f), col, 1.25f);
+            glyph::Draw(dl, c, tok::icon_md, col, gTerminalFloating ? IconsInfinite::Dock : IconsInfinite::PopOut);
             if (ImGui::IsItemHovered())
                Tip::Show("%s", gTerminalFloating ? T("Dock") : T("Pop out"));
          }

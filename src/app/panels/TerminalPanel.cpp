@@ -2,6 +2,7 @@
 // on its own threads (core/term/TermSession.h); this file only draws the latest snapshot and queues input, so the
 // frame never waits on a shell. Open state, dock and height are app preferences; patches never touch the terminal.
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "app/panels/TerminalDraw.h"
@@ -758,8 +759,7 @@ namespace
          {
             const ImVec2 c(x + width - 12.0f, start.y + 11.0f);
             const ImU32 mark = overClose ? textColor : dimColor;
-            dl->AddLine(ImVec2(c.x - 3.5f, c.y - 3.5f), ImVec2(c.x + 3.5f, c.y + 3.5f), mark, 1.25f);
-            dl->AddLine(ImVec2(c.x + 3.5f, c.y - 3.5f), ImVec2(c.x - 3.5f, c.y + 3.5f), mark, 1.25f);
+            glyph::Draw(dl, c, tok::icon_sm, mark, IconsInfinite::Close);
          }
          ImGui::PopID();
          x += width + 4.0f;
@@ -769,8 +769,7 @@ namespace
       {
          const ImVec2 c(x + kTabRowH * 0.5f, start.y + kTabRowH * 0.5f);
          const ImU32 mark = ImGui::IsItemHovered() ? textColor : dimColor;
-         dl->AddLine(ImVec2(c.x - 4.5f, c.y), ImVec2(c.x + 4.5f, c.y), mark, 1.25f);
-         dl->AddLine(ImVec2(c.x, c.y - 4.5f), ImVec2(c.x, c.y + 4.5f), mark, 1.25f);
+         glyph::Draw(dl, c, tok::icon_sm, mark, IconsInfinite::Plus);
          if (ImGui::IsItemClicked() && active != nullptr)
          {
             sTabs.push_back(NewTab(active->cols, active->rows));
