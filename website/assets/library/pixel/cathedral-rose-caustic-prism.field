@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cathedral Rose Caustic Prism",
+    "author": "Infinite",
+    "description": "Gothic stone rose-window tracery with 12-fold radial lancet apertures refracting prismatic caustic shafts across dark cathedral masonry.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float petals = 12.0 [6.0, 18.0];\nparam float tracery = 0.24 [0.08, 0.45];\nparam float prismSpread = 0.55 [0.1, 1.0];\nparam float causticGlow = 1.1 [0.4, 2.0];\nparam float rotation = 0.12 [0.0, 0.6];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\nr = length(p);\na = atan2(p.y, p.x) + t * rotation;\n\n# Radial rose-window stone tracery ribs & stained-glass lead cames\nspoke = abs(cos(a * petals * 0.5));\nsubSpoke = abs(cos(a * petals * 1.5));\nring1 = abs(r - 0.28);\nring2 = abs(r - 0.52);\nring3 = abs(r - 0.74);\nring4 = abs(r - 0.90);\n\nstoneRibs = smoothstep(tracery, tracery * 0.25, spoke) * smoothstep(0.14, 0.22, r);\nleadCames = smoothstep(0.08, 0.02, subSpoke) * smoothstep(0.32, 0.45, r) * 0.85;\nstoneRings = smoothstep(0.028, 0.006, min(min(ring1, ring2), min(ring3, ring4)));\nquarry = smoothstep(0.08, 0.02, abs(sin(p.x * 22.0 + p.y * 22.0)) * abs(sin(p.x * 22.0 - p.y * 22.0)));\noculus = smoothstep(0.14, 0.09, r);\ntraceryMask = clamp(max(max(stoneRibs, leadCames), stoneRings) * smoothstep(0.95, 0.88, r) + (1.0 - smoothstep(0.88, 0.94, r)), 0.0, 1.0);\n\n# Prismatic stained glass caustic dispersion\ncaustic = 0.5 + 0.5 * cos(a * petals + r * 18.0 - t * 1.4);\nfacet = 0.5 + 0.5 * sin(a * petals * 2.0 - r * 24.0);\ncRuby = vec3(0.94, 0.26, 0.28);\ncAmber = vec3(0.98, 0.78, 0.28);\ncCobalt = vec3(0.20, 0.50, 0.92);\n\nglassCol = mix(cCobalt, cRuby, smoothstep(0.15, 0.85, sin(a * 3.0 + r * 6.0) * 0.5 + 0.5));\nglassCol = mix(glassCol, cAmber, pow(caustic * facet, 1.4) * prismSpread);\nglassCol *= (0.45 + 0.55 * (1.0 - quarry));\n\n# Sweeping volumetric light shafts & stone masonry contrast\nshaft = exp(-r * 1.1) * (0.55 + 0.45 * pow(abs(cos(a * petals * 0.5)), 2.5)) * causticGlow;\nashlar = 0.06 * step(0.92, abs(sin(p.x * 10.0))) + 0.06 * step(0.92, abs(sin(p.y * 14.0 + floor(p.x * 5.0) * 1.5)));\ncStone = vec3(0.18, 0.17, 0.19) + ashlar;\n\naperture = (1.0 - traceryMask) * smoothstep(0.94, 0.08, r);\ncol = mix(cStone, glassCol * (0.78 + 0.58 * caustic), aperture);\ncol += glassCol * shaft * 0.58;\ncol = mix(col, vec3(0.98, 0.96, 0.92), oculus * 0.95);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "petals": 12.0,
+      "tracery": 0.24,
+      "prismSpread": 0.55,
+      "causticGlow": 1.1,
+      "rotation": 0.12
+    }
+  }
+}

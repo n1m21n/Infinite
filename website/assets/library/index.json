@@ -12131,7 +12131,228 @@
       "file": "assets/library/pixel/suminagashi-gold-vein-marble.field",
       "preview": "assets/library/previews/suminagashi-gold-vein-marble.jpg",
       "bytes": 1974
+    },
+    {
+      "id": "riley-optical-wave-current",
+      "name": "Riley Optical Wave Current",
+      "kind": "Generator",
+      "tags": [
+        "op-art",
+        "riley",
+        "interference",
+        "waves",
+        "moire",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Bridget Riley inspired Op-Art optical wave interference with phase-shifted undulating parallel ribbons, crisp ink contrast, and ochre-cobalt harmonics.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/riley-optical-wave-current.js",
+      "preview": "assets/library/previews/riley-optical-wave-current.jpg",
+      "bytes": 2041
+    },
+    {
+      "id": "vasarely-plastic-sphere-lattice",
+      "name": "Vasarely Plastic Sphere Lattice",
+      "kind": "Generator",
+      "tags": [
+        "op-art",
+        "vasarely",
+        "lattice",
+        "sphere",
+        "geometric",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Victor Vasarely Vega inspired spherical bulge illusion on a warped geometric lattice with disciplined cobalt, ochre, ivory, and charcoal tiles.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/vasarely-plastic-sphere-lattice.js",
+      "preview": "assets/library/previews/vasarely-plastic-sphere-lattice.jpg",
+      "bytes": 2805
+    },
+    {
+      "id": "muqarnas-abencerrajes-star-dome-3d",
+      "name": "Muqarnas Abencerrajes Star Dome 3D",
+      "kind": "Generator",
+      "tags": [
+        "muqarnas",
+        "alhambra",
+        "dome",
+        "architecture",
+        "islamic",
+        "3d",
+        "sketch-3d"
+      ],
+      "description": "Alhambra Abencerrajes inspired 16-fold corbelled muqarnas dome with tiered stalactite niches in warm limestone gold, deep umber shadows, and clerestory openings.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/muqarnas-abencerrajes-star-dome-3d.js",
+      "preview": "assets/library/previews/muqarnas-abencerrajes-star-dome-3d.jpg",
+      "bytes": 1980
+    },
+    {
+      "id": "muqarnas-isfahan-peacock-vault-3d",
+      "name": "Muqarnas Isfahan Peacock Vault 3D",
+      "kind": "Generator",
+      "tags": [
+        "isfahan",
+        "muqarnas",
+        "tilework",
+        "turquoise",
+        "vault",
+        "3d",
+        "sketch-3d"
+      ],
+      "description": "Sheikh Lotfollah Mosque inspired peacock-feather radial dome with turquoise squinch ribs, cobalt calligraphy bands, and concentric gold tile medallions.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/muqarnas-isfahan-peacock-vault-3d.js",
+      "preview": "assets/library/previews/muqarnas-isfahan-peacock-vault-3d.jpg",
+      "bytes": 1994
+    },
+    {
+      "id": "crystallophone-glass-harmonica-synth",
+      "name": "Crystallophone Glass Harmonica Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "crystallophone",
+        "glass-harmonica",
+        "celesta",
+        "audio",
+        "dsp"
+      ],
+      "description": "Bowed nested glass bowl harmonica synthesizer with modal overtone partials, rotational vibrato shimmer, and velocity-coupled harmonic bloom.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/crystallophone-glass-harmonica-synth.inf",
+      "preview": "assets/library/previews/crystallophone-glass-harmonica-synth.jpg",
+      "bytes": 2042
+    },
+    {
+      "id": "binaural-celesta-bell-harp-synth",
+      "name": "Binaural Celesta Bell Harp Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "crystallophone",
+        "glass-harmonica",
+        "celesta",
+        "audio",
+        "dsp"
+      ],
+      "description": "Struck steel-plate celesta and crystal harp hybrid with FM mallet transient, wavefolded overtone body, and micro-detuned shimmer.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/binaural-celesta-bell-harp-synth.inf",
+      "preview": "assets/library/previews/binaural-celesta-bell-harp-synth.jpg",
+      "bytes": 2079
+    },
+    {
+      "id": "nagra-tape-flutter-loop-fx",
+      "name": "Nagra Tape Flutter Loop FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "nagra",
+        "tape",
+        "allpass",
+        "dispersion",
+        "audio",
+        "dsp"
+      ],
+      "description": "Reel-to-reel Nagra tape hysteresis saturator with dual-LFO capstan wow and flutter, oxide high-frequency rolloff, and resonant tape feedback.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/nagra-tape-flutter-loop-fx.inf",
+      "preview": "assets/library/previews/nagra-tape-flutter-loop-fx.jpg",
+      "bytes": 2197
+    },
+    {
+      "id": "schroeder-allpass-prism-fx",
+      "name": "Schroeder Allpass Prism FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "nagra",
+        "tape",
+        "allpass",
+        "dispersion",
+        "audio",
+        "dsp"
+      ],
+      "description": "Cascaded 4-stage Schroeder allpass dispersion prism with modulated resonant bandpass feedback matrix and warm transformer saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/schroeder-allpass-prism-fx.inf",
+      "preview": "assets/library/previews/schroeder-allpass-prism-fx.jpg",
+      "bytes": 2165
+    },
+    {
+      "id": "ando-concrete-light-slit",
+      "name": "Ando Concrete Light Slit",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "ando",
+        "concrete",
+        "light",
+        "shadow",
+        "architecture",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Tadao Ando Church of the Light inspired poured-concrete chamber with formwork tie-hole grid and blinding cruciform daylight slit casting volumetric rays.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/ando-concrete-light-slit.field",
+      "preview": "assets/library/previews/ando-concrete-light-slit.jpg",
+      "bytes": 2524
+    },
+    {
+      "id": "cathedral-rose-caustic-prism",
+      "name": "Cathedral Rose Caustic Prism",
+      "kind": "Generator",
+      "tags": [
+        "cathedral",
+        "caustics",
+        "rose-window",
+        "refraction",
+        "architecture",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Gothic stone rose-window tracery with 12-fold radial lancet apertures refracting prismatic caustic shafts across dark cathedral masonry.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cathedral-rose-caustic-prism.field",
+      "preview": "assets/library/previews/cathedral-rose-caustic-prism.jpg",
+      "bytes": 2625
     }
   ],
-  "count": 550
+  "count": 600
 }

@@ -369,6 +369,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [FMDX Rhodes Tine E-Piano Synth](https://infinitedevices.org/library/fmdx-rhodes-tine-epiano-synth.html): FM electric piano combining a warm fundamental carrier with a percussive 1:14 tine-strike modulator, gentle tremolo, and soft console saturation. (file: https://infinitedevices.org/assets/templates/fmdx-rhodes-tine-epiano-synth.inf)
 - [Barberpole Shepard Phaser FX](https://infinitedevices.org/library/barberpole-shepard-phaser-fx.html): Dual-bank six-stage allpass phaser driven by quadrature sawtooth-triangle Shepard LFOs for continuously rising phase notches. (file: https://infinitedevices.org/assets/templates/barberpole-shepard-phaser-fx.inf)
 - [Chowning Formant Vowel Filter FX](https://infinitedevices.org/library/chowning-formant-vowel-filter-fx.html): Dual parallel state-variable formant bandpass bank morphing smoothly across vowel resonances with soft console saturation. (file: https://infinitedevices.org/assets/templates/chowning-formant-vowel-filter-fx.inf)
+- [Crystallophone Glass Harmonica Synth](https://infinitedevices.org/library/crystallophone-glass-harmonica-synth.html): Bowed nested glass bowl harmonica synthesizer with modal overtone partials, rotational vibrato shimmer, and velocity-coupled harmonic bloom. (file: https://infinitedevices.org/assets/templates/crystallophone-glass-harmonica-synth.inf)
+- [Binaural Celesta Bell Harp Synth](https://infinitedevices.org/library/binaural-celesta-bell-harp-synth.html): Struck steel-plate celesta and crystal harp hybrid with FM mallet transient, wavefolded overtone body, and micro-detuned shimmer. (file: https://infinitedevices.org/assets/templates/binaural-celesta-bell-harp-synth.inf)
+- [Nagra Tape Flutter Loop FX](https://infinitedevices.org/library/nagra-tape-flutter-loop-fx.html): Reel-to-reel Nagra tape hysteresis saturator with dual-LFO capstan wow and flutter, oxide high-frequency rolloff, and resonant tape feedback. (file: https://infinitedevices.org/assets/templates/nagra-tape-flutter-loop-fx.inf)
+- [Schroeder Allpass Prism FX](https://infinitedevices.org/library/schroeder-allpass-prism-fx.html): Cascaded 4-stage Schroeder allpass dispersion prism with modulated resonant bandpass feedback matrix and warm transformer saturation. (file: https://infinitedevices.org/assets/templates/schroeder-allpass-prism-fx.inf)
 
 ## Library: Community
 
@@ -792,7 +796,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 139 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 141 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -809,4 +813,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 124 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 126 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

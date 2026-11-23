@@ -4319,6 +4319,152 @@
       "groove": 0.58,
       "fill": 0.35,
       "gain": -8.8
+    },
+    {
+      "id": "crystallophone_glass_harmonica",
+      "family": "ambient",
+      "bpm": [
+        68,
+        92
+      ],
+      "swing": 0.04,
+      "scale": [
+        0,
+        2,
+        4,
+        7,
+        9,
+        11
+      ],
+      "drums": {
+        "kick": "",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": "x...x...x...x..."
+      },
+      "bass": "0.......7.......",
+      "fx": [
+        "Reverb",
+        "Delay",
+        "Chorus"
+      ],
+      "synth": [
+        "FM",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "18th-century nested glass bowl harmonica bowed modal partials & rotational vibrato",
+        "Struck celesta steel-plate & crystal bar inharmonic overtone harp"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 45,
+        "human": 10
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "FM"
+        ],
+        "density": 0.35,
+        "octave": 2,
+        "gate": 72,
+        "gain": -10.0,
+        "rate": 0.5,
+        "range": 12
+      },
+      "groove": 0.35,
+      "fill": 0.25,
+      "gain": -9.5
+    },
+    {
+      "id": "nagra_tape_dispersion",
+      "family": "dub",
+      "bpm": [
+        84,
+        108
+      ],
+      "swing": 0.06,
+      "scale": [
+        0,
+        2,
+        3,
+        7,
+        10
+      ],
+      "drums": {
+        "kick": "x.......x.......",
+        "snare": "....o.......o...",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...3...5...7...",
+      "fx": [
+        "Delay",
+        "Chorus",
+        "Saturator",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.05,
+      "mod": 0.62,
+      "refs": [
+        "Nagra IV-S reel-to-reel tape hysteresis saturation with capstan wow & flutter",
+        "Cascaded 4-stage Schroeder allpass dispersion prism with resonant feedback matrix"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 25,
+        "human": 10
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.4,
+        "octave": 1,
+        "gate": 55,
+        "gain": -9.5,
+        "rate": 0.5,
+        "range": 9
+      },
+      "groove": 0.5,
+      "fill": 0.3,
+      "gain": -9.0
     }
   ]
 }

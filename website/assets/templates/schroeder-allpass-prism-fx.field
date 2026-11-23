@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Schroeder Allpass Prism FX",
+    "author": "Infinite",
+    "description": "Cascaded 4-stage Schroeder allpass dispersion prism with modulated resonant bandpass feedback matrix and warm transformer saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float centerHz = 1150.0 [220.0, 3800.0];\nparam float dispersion = 0.72 [0.15, 0.92];\nparam float feedback = 0.48 [0.0, 0.80];\nparam float drive = 1.40 [0.6, 2.8];\nparam float mix = 0.85 [0.0, 1.0];\nstate float a1 = 0; state float a2 = 0; state float a3 = 0; state float a4 = 0;\nstate float bp = 0; state float lp = 0; state float fb = 0; state float lfo = 0;\n\nlfo = (lfo + 0.28 / sr) % 1.0;\nmodHz = clamp(centerHz * (0.76 + 0.28 * sin(6.2831853 * lfo)), 150.0, 5000.0);\ng = clamp(2.0 * sin(3.14159265 * modHz / sr), 0.02, 0.85);\n\nx = in + fb * feedback;\nbp = bp + g * (x - lp - 0.55 * bp);\nlp = lp + g * bp;\nfSig = lp * 0.62 + bp * 0.54;\n\nc = dispersion;\ny1 = -c * fSig + a1; a1 = fSig + c * y1;\ny2 = -c * y1 + a2; a2 = y1 + c * y2;\ny3 = -c * y2 + a3; a3 = y2 + c * y3;\ny4 = -c * y3 + a4; a4 = y3 + c * y4;\nfb = clamp(y4, -1.1, 1.1);\n\nwd = y4 * drive;\nwet = wd / (1.0 + abs(wd) * 0.70);\nout = (in * (1.0 - mix) + wet * mix) * 0.86;\n",
+    "params": {
+      "centerHz": 1150.0,
+      "dispersion": 0.72,
+      "feedback": 0.48,
+      "drive": 1.4,
+      "mix": 0.85
+    }
+  }
+}

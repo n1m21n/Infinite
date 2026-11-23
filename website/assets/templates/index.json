@@ -3621,7 +3621,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "crystallophone-glass-harmonica-synth",
+      "name": "Crystallophone Glass Harmonica Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Bowed nested glass bowl harmonica synthesizer with modal overtone partials, rotational vibrato shimmer, and velocity-coupled harmonic bloom.",
+      "price": 0,
+      "preview": "assets/templates/crystallophone-glass-harmonica-synth.webp",
+      "file": "assets/templates/crystallophone-glass-harmonica-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "binaural-celesta-bell-harp-synth",
+      "name": "Binaural Celesta Bell Harp Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Struck steel-plate celesta and crystal harp hybrid with FM mallet transient, wavefolded overtone body, and micro-detuned shimmer.",
+      "price": 0,
+      "preview": "assets/templates/binaural-celesta-bell-harp-synth.webp",
+      "file": "assets/templates/binaural-celesta-bell-harp-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "nagra-tape-flutter-loop-fx",
+      "name": "Nagra Tape Flutter Loop FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Reel-to-reel Nagra tape hysteresis saturator with dual-LFO capstan wow and flutter, oxide high-frequency rolloff, and resonant tape feedback.",
+      "price": 0,
+      "preview": "assets/templates/nagra-tape-flutter-loop-fx.webp",
+      "file": "assets/templates/nagra-tape-flutter-loop-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "schroeder-allpass-prism-fx",
+      "name": "Schroeder Allpass Prism FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Cascaded 4-stage Schroeder allpass dispersion prism with modulated resonant bandpass feedback matrix and warm transformer saturation.",
+      "price": 0,
+      "preview": "assets/templates/schroeder-allpass-prism-fx.webp",
+      "file": "assets/templates/schroeder-allpass-prism-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 205
+  "count": 225
 }

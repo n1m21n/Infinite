@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Crystallophone Glass Harmonica Synth",
+    "author": "Infinite",
+    "description": "Bowed nested glass bowl harmonica synthesizer with modal overtone partials, rotational vibrato shimmer, and velocity-coupled harmonic bloom.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float shimmer = 0.48 [0.0, 1.0];\nparam float rotHz = 4.2 [1.0, 8.0];\nparam float rotDepth = 0.0055 [0.0, 0.02];\nparam float warmth = 1.45 [0.6, 3.0];\nparam float decay = 0.9994 [0.996, 0.9998];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float vibPh = 0; state float env = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.045, env * decay);\nvibPh = (vibPh + rotHz / sr) % 1.0;\nf0 = clamp(freq * (1.0 + rotDepth * sin(6.2831853 * vibPh)), 60.0, 4800.0);\n\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.756) / sr) % 1.0;\np3 = (p3 + (f0 * 5.404) / sr) % 1.0;\n\nbowl1 = sin(6.2831853 * p1);\nbowl2 = sin(6.2831853 * p2) * (0.28 * shimmer * env);\nbowl3 = sin(6.2831853 * p3) * (0.12 * shimmer * env * env);\n\nraw = (bowl1 * 0.68 + bowl2 + bowl3) * warmth;\nsat = raw / (1.0 + abs(raw) * 0.55);\nlp = lp + 0.24 * (sat - lp);\nsig = lp * env * 0.45;\nout = sig / (1.0 + abs(sig) * 0.35);\n",
+    "params": {
+      "shimmer": 0.48,
+      "rotHz": 4.2,
+      "rotDepth": 0.0055,
+      "warmth": 1.45,
+      "decay": 0.9994
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

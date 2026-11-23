@@ -2219,6 +2219,99 @@
         "Japanese Suminagashi floating sumi ink rings & comb-rake advection",
         "Fragment Mono & Micro Grotesk catalog typography"
       ]
+    },
+    {
+      "id": "op_art_riley_vasarely",
+      "taxonomy": "new",
+      "name": "Bridget Riley & Vasarely Optical Wave Interference",
+      "palette": [
+        "#111114",
+        "#F4EFE6",
+        "#D97A2B",
+        "#1E4B8A"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.42,
+      "pairs": [
+        "crystallophone_glass_harmonica"
+      ],
+      "refs": [
+        "Bridget Riley Current (1964) phase-shifted undulating parallel line interference",
+        "Victor Vasarely Vega plastic alphabet spherical lattice bulge illusion",
+        "Steps-Mono (Velvetyne) & Necto Mono (UNCUT) catalog typography"
+      ]
+    },
+    {
+      "id": "muqarnas_corbel_vault",
+      "taxonomy": "new",
+      "name": "Muqarnas Corbelled Stalactite Vault & Isfahan Dome",
+      "palette": [
+        "#1A1410",
+        "#C6934B",
+        "#1B3B6F",
+        "#38899C"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "crystallophone_glass_harmonica"
+      ],
+      "refs": [
+        "Alhambra Hall of the Abencerrajes 16-fold star corbelled muqarnas dome",
+        "Sheikh Lotfollah Mosque Isfahan peacock-feather radial tilework & turquoise squinch ribs",
+        "Steps-Mono (Velvetyne) & Necto Mono (UNCUT) architectural numbering"
+      ]
+    },
+    {
+      "id": "ando_concrete_slit",
+      "taxonomy": "new",
+      "name": "Tadao Ando Concrete Light-Slit & Volumetric Shadow",
+      "palette": [
+        "#121417",
+        "#3A3D40",
+        "#7A7F82",
+        "#F4F7FA"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.32,
+      "pairs": [
+        "nagra_tape_dispersion"
+      ],
+      "refs": [
+        "Tadao Ando Church of the Light poured concrete formwork tie-hole grid & cruciform daylight slit",
+        "Gothic rose-window stone tracery & directional volumetric caustic shafts",
+        "Terminal Grotesque (Velvetyne) & Basically A Mono (UNCUT) brutalist typography"
+      ]
     }
   ]
 }

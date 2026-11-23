@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Binaural Celesta Bell Harp Synth",
+    "author": "Infinite",
+    "description": "Struck steel-plate celesta and crystal harp hybrid with FM mallet transient, wavefolded overtone body, and micro-detuned shimmer.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float fmIndex = 1.85 [0.2, 5.0];\nparam float fold = 1.65 [1.0, 4.0];\nparam float detune = 0.0038 [0.0, 0.015];\nparam float brightHz = 2600.0 [600.0, 6000.0];\nparam float decay = 0.9991 [0.995, 0.9997];\nstate float pc1 = 0; state float pc2 = 0; state float pm = 0;\nstate float env = 0; state float strikeEnv = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.25, env * decay);\nstrikeEnv = if(gate > 0.5, strikeEnv + (1.0 - strikeEnv) * 0.40, strikeEnv * 0.9965);\n\nf0 = clamp(freq, 55.0, 4400.0);\npm = (pm + (f0 * 3.01) / sr) % 1.0;\nmodSig = sin(6.2831853 * pm) * fmIndex * strikeEnv;\n\npc1 = (pc1 + (f0 * (1.0 - detune)) / sr) % 1.0;\npc2 = (pc2 + (f0 * (1.0 + detune)) / sr) % 1.0;\n\nc1 = sin(6.2831853 * pc1 + modSig);\nc2 = sin(6.2831853 * pc2 + modSig * 0.85);\nfolded = sin((c1 + c2) * 0.5 * fold);\n\ng = clamp(2.0 * sin(3.14159265 * brightHz / sr), 0.05, 0.85);\nlp = lp + g * (folded - lp);\nsig = lp * env * 0.44;\nout = sig / (1.0 + abs(sig) * 0.38);\n",
+    "params": {
+      "fmIndex": 1.85,
+      "fold": 1.65,
+      "detune": 0.0038,
+      "brightHz": 2600.0,
+      "decay": 0.9991
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

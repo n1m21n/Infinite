@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ando Concrete Light Slit",
+    "author": "Infinite",
+    "description": "Tadao Ando Church of the Light inspired poured-concrete chamber with formwork tie-hole grid and blinding cruciform daylight slit casting volumetric rays.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float slitWidth = 0.032 [0.01, 0.08];\nparam float beamSpread = 0.45 [0.15, 0.9];\nparam float formworkScale = 6.0 [3.0, 12.0];\nparam float concreteGrain = 0.14 [0.02, 0.35];\nparam float glow = 1.15 [0.5, 2.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0;\n\n# Perspective concrete chamber walls & ceiling panels\nax = abs(p.x);\nay = abs(p.y);\nwallDepth = max(ax, ay * 0.92);\ninEndWall = step(wallDepth, 0.56);\n\n# Formwork grid & tie-hole dots\ngridP = p * formworkScale;\nseamX = smoothstep(0.035, 0.0, abs(fract(gridP.x) - 0.5) - 0.465);\nseamY = smoothstep(0.035, 0.0, abs(fract(gridP.y) - 0.5) - 0.465);\nseams = max(seamX, seamY) * 0.25;\n\ncellF = fract(gridP) - 0.5;\ntieHole = smoothstep(0.055, 0.025, length(vec2(abs(cellF.x) - 0.26, cellF.y)));\n\n# Subtle concrete aggregate texture\ngrain = sin(p.x * 47.0 + sin(p.y * 31.0)) * cos(p.y * 53.0 - sin(p.x * 29.0));\nconcreteBase = 0.24 + 0.06 * grain * concreteGrain - seams - tieHole * 0.16;\n\n# Perspective darkening toward corners\nvign = clamp(1.15 - wallDepth * 0.62, 0.18, 1.0);\nwallCol = vec3(0.22, 0.24, 0.26) * (concreteBase + 0.15) * vign;\n\n# Cruciform daylight slit on the east end wall\nsw = slitWidth * (1.0 + 0.08 * sin(t * 0.8));\nslitV = smoothstep(sw + 0.012, sw * 0.4, abs(p.x)) * smoothstep(0.56, 0.52, abs(p.y));\nslitH = smoothstep(sw + 0.012, sw * 0.4, abs(p.y - 0.06)) * smoothstep(0.56, 0.52, abs(p.x));\nslitMask = max(slitV, slitH);\n\n# Volumetric light shafts radiating across side walls & floor\nrayV = exp(-abs(p.x) * (3.2 - beamSpread * 1.4)) * smoothstep(0.95, 0.05, abs(p.y));\nrayH = exp(-abs(p.y - 0.06) * (3.6 - beamSpread * 1.4)) * smoothstep(0.95, 0.05, abs(p.x));\nvolumetric = (rayV + rayH * 0.85) * 0.42 * glow;\n\ncShadow = vec3(0.071, 0.078, 0.090);\ncDaylight = vec3(0.957, 0.969, 0.980);\n\ncol = mix(cShadow, wallCol, 0.85);\ncol += vec3(0.45, 0.48, 0.52) * volumetric * (1.0 - inEndWall * 0.35);\ncol = mix(col, cDaylight, clamp(slitMask * 1.1, 0.0, 1.0));\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "slitWidth": 0.032,
+      "beamSpread": 0.45,
+      "formworkScale": 6.0,
+      "concreteGrain": 0.14,
+      "glow": 1.15
+    }
+  }
+}

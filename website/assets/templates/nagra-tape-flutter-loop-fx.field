@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Nagra Tape Flutter Loop FX",
+    "author": "Infinite",
+    "description": "Reel-to-reel Nagra tape hysteresis saturator with dual-LFO capstan wow and flutter, oxide high-frequency rolloff, and resonant tape feedback.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float wowHz = 0.45 [0.1, 2.0];\nparam float flutterHz = 5.8 [2.0, 12.0];\nparam float oxideHz = 2400.0 [600.0, 6000.0];\nparam float drive = 1.75 [0.8, 3.5];\nparam float mix = 0.82 [0.0, 1.0];\nstate float pWow = 0; state float pFlu = 0;\nstate float ap1 = 0; state float ap2 = 0;\nstate float lp1 = 0; state float lp2 = 0; state float fb = 0;\n\npWow = (pWow + wowHz / sr) % 1.0;\npFlu = (pFlu + flutterHz / sr) % 1.0;\nmodC = clamp(0.45 + 0.22 * sin(6.2831853 * pWow) + 0.10 * sin(6.2831853 * pFlu), 0.1, 0.88);\n\nx = in + fb * 0.36;\n# Hysteresis soft-clipping\nsat = (x * drive) / (1.0 + abs(x * drive) * 0.68);\n\n# Capstan phase-drift allpass pair\ny1 = -modC * sat + ap1; ap1 = sat + modC * y1;\ny2 = -modC * y1 + ap2; ap2 = y1 + modC * y2;\n\n# Oxide high-frequency rolloff\ng = clamp(2.0 * sin(3.14159265 * oxideHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (y2 - lp1);\nlp2 = lp2 + g * (lp1 - lp2);\nfb = clamp(lp2, -1.0, 1.0);\n\nout = (in * (1.0 - mix) + lp2 * mix) * 0.52;\n",
+    "params": {
+      "wowHz": 0.45,
+      "flutterHz": 5.8,
+      "oxideHz": 2400.0,
+      "drive": 1.75,
+      "mix": 0.82
+    }
+  }
+}

@@ -695,6 +695,16 @@
       "slug": "suminagashi-gold-vein-marble",
       "title": "Suminagashi Gold-Vein Marble",
       "description": "Layered cobalt and obsidian marbled ink eddies interlaced with antique gold-leaf surfactant veins and harmonic rake waves."
+    },
+    {
+      "slug": "ando-concrete-light-slit",
+      "title": "Ando Concrete Light Slit",
+      "description": "Audio-reactive Tadao Ando brutalist concrete light-slit visualizer. Bass pulses the blinding cruciform daylight aperture, mids breathe through volumetric shadow shafts, and highs graze the poured-concrete formwork grid."
+    },
+    {
+      "slug": "cathedral-rose-caustic-prism",
+      "title": "Cathedral Rose Caustic Prism",
+      "description": "Audio-reactive Cathedral Rose Caustic Prism visualizer. Bass opens the radial stone tracery, mids sweep the prismatic caustic shafts, and highs shimmer across the stained-glass bevels."
     }
   ]
 }

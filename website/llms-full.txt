@@ -369,6 +369,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [FMDX Rhodes Tine E-Piano Synth](https://infinitedevices.org/library/fmdx-rhodes-tine-epiano-synth.html): FM electric piano combining a warm fundamental carrier with a percussive 1:14 tine-strike modulator, gentle tremolo, and soft console saturation. (file: https://infinitedevices.org/assets/templates/fmdx-rhodes-tine-epiano-synth.inf)
 - [Barberpole Shepard Phaser FX](https://infinitedevices.org/library/barberpole-shepard-phaser-fx.html): Dual-bank six-stage allpass phaser driven by quadrature sawtooth-triangle Shepard LFOs for continuously rising phase notches. (file: https://infinitedevices.org/assets/templates/barberpole-shepard-phaser-fx.inf)
 - [Chowning Formant Vowel Filter FX](https://infinitedevices.org/library/chowning-formant-vowel-filter-fx.html): Dual parallel state-variable formant bandpass bank morphing smoothly across vowel resonances with soft console saturation. (file: https://infinitedevices.org/assets/templates/chowning-formant-vowel-filter-fx.inf)
+- [Crystallophone Glass Harmonica Synth](https://infinitedevices.org/library/crystallophone-glass-harmonica-synth.html): Bowed nested glass bowl harmonica synthesizer with modal overtone partials, rotational vibrato shimmer, and velocity-coupled harmonic bloom. (file: https://infinitedevices.org/assets/templates/crystallophone-glass-harmonica-synth.inf)
+- [Binaural Celesta Bell Harp Synth](https://infinitedevices.org/library/binaural-celesta-bell-harp-synth.html): Struck steel-plate celesta and crystal harp hybrid with FM mallet transient, wavefolded overtone body, and micro-detuned shimmer. (file: https://infinitedevices.org/assets/templates/binaural-celesta-bell-harp-synth.inf)
+- [Nagra Tape Flutter Loop FX](https://infinitedevices.org/library/nagra-tape-flutter-loop-fx.html): Reel-to-reel Nagra tape hysteresis saturator with dual-LFO capstan wow and flutter, oxide high-frequency rolloff, and resonant tape feedback. (file: https://infinitedevices.org/assets/templates/nagra-tape-flutter-loop-fx.inf)
+- [Schroeder Allpass Prism FX](https://infinitedevices.org/library/schroeder-allpass-prism-fx.html): Cascaded 4-stage Schroeder allpass dispersion prism with modulated resonant bandpass feedback matrix and warm transformer saturation. (file: https://infinitedevices.org/assets/templates/schroeder-allpass-prism-fx.inf)
 
 ## Library: Community
 
@@ -623,6 +627,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kuroshio Karman Vortex Street](https://infinitedevices.org/library/kuroshio-karman-vortex-street.html): Alternating counter-rotating Karman vortex street eddies shedding behind a submerged obstacle with stratified dye streamlines. (file: https://infinitedevices.org/assets/library/pixel/kuroshio-karman-vortex-street.field)
 - [Suminagashi Indigo Ink Rings](https://infinitedevices.org/library/suminagashi-indigo-ink-rings.html): Japanese Suminagashi floating sumi and Prussian indigo ink rings advected by curl-comb strokes and audio-reactive surfactant ripples. (file: https://infinitedevices.org/assets/library/pixel/suminagashi-indigo-ink-rings.field)
 - [Suminagashi Gold-Vein Marble](https://infinitedevices.org/library/suminagashi-gold-vein-marble.html): Layered cobalt and obsidian marbled ink eddies interlaced with antique gold-leaf surfactant veins and harmonic rake waves. (file: https://infinitedevices.org/assets/library/pixel/suminagashi-gold-vein-marble.field)
+- [Ando Concrete Light Slit](https://infinitedevices.org/library/ando-concrete-light-slit.html): Tadao Ando Church of the Light inspired poured-concrete chamber with formwork tie-hole grid and blinding cruciform daylight slit casting volumetric rays. (file: https://infinitedevices.org/assets/library/pixel/ando-concrete-light-slit.field)
+- [Cathedral Rose Caustic Prism](https://infinitedevices.org/library/cathedral-rose-caustic-prism.html): Gothic stone rose-window tracery with 12-fold radial lancet apertures refracting prismatic caustic shafts across dark cathedral masonry. (file: https://infinitedevices.org/assets/library/pixel/cathedral-rose-caustic-prism.field)
 
 ## Library: Sketch
 
@@ -746,6 +752,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Guilloche Panier Basketweave Matrix](https://infinitedevices.org/library/guilloche-panier-basketweave-matrix.html): Rose-engine panier basketweave interference pattern with crossed sinusoidal hairlines and twin sunray cartouche apertures. (file: https://infinitedevices.org/assets/library/sketch/guilloche-panier-basketweave-matrix.js)
 - [Molnar Plotter Interruptions Grid](https://infinitedevices.org/library/molnar-plotter-interruptions-grid.html): Vera Molnar inspired 7x7 concentric plotter squares with progressive angular disorder, stochastic segment dropouts, and vermilion pen accents on cotton paper. (file: https://infinitedevices.org/assets/library/sketch/molnar-plotter-interruptions-grid.js)
 - [Mohr Plotter Staves Grammars](https://infinitedevices.org/library/mohr-plotter-staves-grammars.html): Manfred Mohr P-021-G inspired horizontal algorithmic plotter staves alternating square-wave steps, 45-degree sawtooths, and cubic lattice clusters. (file: https://infinitedevices.org/assets/library/sketch/mohr-plotter-staves-grammars.js)
+- [Riley Optical Wave Current](https://infinitedevices.org/library/riley-optical-wave-current.html): Bridget Riley inspired Op-Art optical wave interference with phase-shifted undulating parallel ribbons, crisp ink contrast, and ochre-cobalt harmonics. (file: https://infinitedevices.org/assets/library/sketch/riley-optical-wave-current.js)
+- [Vasarely Plastic Sphere Lattice](https://infinitedevices.org/library/vasarely-plastic-sphere-lattice.html): Victor Vasarely Vega inspired spherical bulge illusion on a warped geometric lattice with disciplined cobalt, ochre, ivory, and charcoal tiles. (file: https://infinitedevices.org/assets/library/sketch/vasarely-plastic-sphere-lattice.js)
 
 ## Library: Sketch 3D
 
@@ -864,6 +872,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Frei Otto Mannheim Lattice Shell 3D](https://infinitedevices.org/library/frei-otto-mannheim-lattice-shell-3d.html): Form-found inverted catenary timber-and-steel gridshell dome with doubly curved ribs and central compression oculus. (file: https://infinitedevices.org/assets/library/sketch/frei-otto-mannheim-lattice-shell-3d.js)
 - [Fuller Geodesic Icosa Dome 3D](https://infinitedevices.org/library/fuller-geodesic-icosa-dome-3d.html): Buckminster Fuller inspired 2-frequency icosahedral geodesic dome with brass space-frame struts, spherical hub joints, and warm amber membrane panels. (file: https://infinitedevices.org/assets/library/sketch/fuller-geodesic-icosa-dome-3d.js)
 - [Fuller Synergetic Octet Truss 3D](https://infinitedevices.org/library/fuller-synergetic-octet-truss-3d.html): Buckminster Fuller synergetic octet-truss space-frame cantilever with brass primary chords, steel tetrahedral web struts, and spherical joint nodes. (file: https://infinitedevices.org/assets/library/sketch/fuller-synergetic-octet-truss-3d.js)
+- [Muqarnas Abencerrajes Star Dome 3D](https://infinitedevices.org/library/muqarnas-abencerrajes-star-dome-3d.html): Alhambra Abencerrajes inspired 16-fold corbelled muqarnas dome with tiered stalactite niches in warm limestone gold, deep umber shadows, and clerestory openings. (file: https://infinitedevices.org/assets/library/sketch/muqarnas-abencerrajes-star-dome-3d.js)
+- [Muqarnas Isfahan Peacock Vault 3D](https://infinitedevices.org/library/muqarnas-isfahan-peacock-vault-3d.html): Sheikh Lotfollah Mosque inspired peacock-feather radial dome with turquoise squinch ribs, cobalt calligraphy bands, and concentric gold tile medallions. (file: https://infinitedevices.org/assets/library/sketch/muqarnas-isfahan-peacock-vault-3d.js)
 
 ## Library: Synths
 
@@ -982,6 +992,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Serge Chaotic Resonator Synth](https://infinitedevices.org/library/serge-chaotic-resonator-synth.html): Cross-coupled inharmonic FM and wavefolding driving a tuned state-variable bandpass ping resonator. (file: https://infinitedevices.org/assets/templates/serge-chaotic-resonator-synth.inf)
 - [FMDX Six-Op Bell Synth](https://infinitedevices.org/library/fmdx-six-op-bell-synth.html): Six-operator inspired FM metallic bell with self-feedback modulator, inharmonic chime ratios, and exponential index decay. (file: https://infinitedevices.org/assets/templates/fmdx-six-op-bell-synth.inf)
 - [FMDX Rhodes Tine E-Piano Synth](https://infinitedevices.org/library/fmdx-rhodes-tine-epiano-synth.html): FM electric piano combining a warm fundamental carrier with a percussive 1:14 tine-strike modulator, gentle tremolo, and soft console saturation. (file: https://infinitedevices.org/assets/templates/fmdx-rhodes-tine-epiano-synth.inf)
+- [Crystallophone Glass Harmonica Synth](https://infinitedevices.org/library/crystallophone-glass-harmonica-synth.html): Bowed nested glass bowl harmonica synthesizer with modal overtone partials, rotational vibrato shimmer, and velocity-coupled harmonic bloom. (file: https://infinitedevices.org/assets/templates/crystallophone-glass-harmonica-synth.inf)
+- [Binaural Celesta Bell Harp Synth](https://infinitedevices.org/library/binaural-celesta-bell-harp-synth.html): Struck steel-plate celesta and crystal harp hybrid with FM mallet transient, wavefolded overtone body, and micro-detuned shimmer. (file: https://infinitedevices.org/assets/templates/binaural-celesta-bell-harp-synth.inf)
 
 ## Library: Audio Effects
 
@@ -1103,6 +1115,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Oliveros Expanded Resonator FX](https://infinitedevices.org/library/oliveros-expanded-resonator-fx.html): Deep-listening allpass dispersion and drifting formant bandpass chamber with soft console saturation. (file: https://infinitedevices.org/assets/templates/oliveros-expanded-resonator-fx.inf)
 - [Barberpole Shepard Phaser FX](https://infinitedevices.org/library/barberpole-shepard-phaser-fx.html): Dual-bank six-stage allpass phaser driven by quadrature sawtooth-triangle Shepard LFOs for continuously rising phase notches. (file: https://infinitedevices.org/assets/templates/barberpole-shepard-phaser-fx.inf)
 - [Chowning Formant Vowel Filter FX](https://infinitedevices.org/library/chowning-formant-vowel-filter-fx.html): Dual parallel state-variable formant bandpass bank morphing smoothly across vowel resonances with soft console saturation. (file: https://infinitedevices.org/assets/templates/chowning-formant-vowel-filter-fx.inf)
+- [Nagra Tape Flutter Loop FX](https://infinitedevices.org/library/nagra-tape-flutter-loop-fx.html): Reel-to-reel Nagra tape hysteresis saturator with dual-LFO capstan wow and flutter, oxide high-frequency rolloff, and resonant tape feedback. (file: https://infinitedevices.org/assets/templates/nagra-tape-flutter-loop-fx.inf)
+- [Schroeder Allpass Prism FX](https://infinitedevices.org/library/schroeder-allpass-prism-fx.html): Cascaded 4-stage Schroeder allpass dispersion prism with modulated resonant bandpass feedback matrix and warm transformer saturation. (file: https://infinitedevices.org/assets/templates/schroeder-allpass-prism-fx.inf)
 
 ## Nodes
 
@@ -1479,7 +1493,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 139 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 141 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1619,3 +1633,5 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kuroshio Karman Vortex Street](https://infinitedevices.org/embeds/kuroshio-karman-vortex-street.html): Alternating counter-rotating Karman vortex street eddies and dye streamlines driven by bass, mid, and high audio bands.
 - [Suminagashi Indigo Ink Rings](https://infinitedevices.org/embeds/suminagashi-indigo-ink-rings.html): Japanese Suminagashi floating sumi and Prussian indigo ink rings advected by curl-comb strokes and audio-reactive surfactant ripples.
 - [Suminagashi Gold-Vein Marble](https://infinitedevices.org/embeds/suminagashi-gold-vein-marble.html): Layered cobalt and obsidian marbled ink eddies interlaced with antique gold-leaf surfactant veins and harmonic rake waves.
+- [Ando Concrete Light Slit](https://infinitedevices.org/embeds/ando-concrete-light-slit.html): Audio-reactive Tadao Ando brutalist concrete light-slit visualizer. Bass pulses the blinding cruciform daylight aperture, mids breathe through volumetric shadow shafts, and highs graze the poured-concrete formwork grid.
+- [Cathedral Rose Caustic Prism](https://infinitedevices.org/embeds/cathedral-rose-caustic-prism.html): Audio-reactive Cathedral Rose Caustic Prism visualizer. Bass opens the radial stone tracery, mids sweep the prismatic caustic shafts, and highs shimmer across the stained-glass bevels.
