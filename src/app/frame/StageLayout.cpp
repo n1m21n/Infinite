@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/FormParts.h"
@@ -116,7 +117,7 @@ void DrawLayout(FrameCtx& fc)
       const bool sessionTop = gSessionPanelOpen && ArrangePanelDock() == 3;
 
       // Maintain keyboard focus states across docked panels and canvas regardless of dock order
-      if ((ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)) &&
+      if ((ImGui::IsMouseClicked(ImGuiMouseButton_Left) || MenuParts::RightPressed()) &&
           !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
       {
          const ImVec2 m = ImGui::GetIO().MousePos;

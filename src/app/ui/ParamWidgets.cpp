@@ -1,5 +1,7 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/TokenColors.h"
@@ -589,7 +591,7 @@ namespace app
          if (ResetParamToDefault(nodeIndex, paramIndex, /*pushUndo=*/true))
             ImGui::ClearActiveID();
       }
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (hovered && MenuParts::RightPressed())
       {
          gModBindingMenuNode = nodeIndex;
          gModBindingMenuParam = paramIndex;
@@ -888,7 +890,7 @@ namespace app
       const float box = ImGui::GetFrameHeight();
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float textW = ImGui::CalcTextSize(label, nullptr, true).x;
-      const bool clicked = ImGui::InvisibleButton(label, ImVec2(box + (textW > 0.0f ? st.ItemInnerSpacing.x + textW : 0.0f), box));
+      const bool clicked = UiInteract::Hit(label, ImVec2(box + (textW > 0.0f ? st.ItemInnerSpacing.x + textW : 0.0f), box));
       const bool hovered = ImGui::IsItemHovered();
       const ImGuiID iid = ImGui::GetItemID();
       UiAudit::NoteKind("checkbox", label);

@@ -1,5 +1,8 @@
 // Generic node parameter bodies, part 2: curves, palettes, ramps, analyze (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
@@ -27,7 +30,7 @@ namespace app
       const float size = kPreviewSize;
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImGui::PushID(&shape);
-      ImGui::InvisibleButton("##curve", ImVec2(size, size));
+      UiInteract::Hit("##curve", ImVec2(size, size));
       ImGui::PopID();
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
@@ -77,7 +80,7 @@ namespace app
             sDragShape = &shape;
          }
       }
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (hovered && MenuParts::RightPressed())
       {
          if (nearest >= 0)
          {
@@ -241,7 +244,7 @@ namespace app
       const float width = kPreviewSize, height = 120.0f;
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImGui::PushID(n);
-      ImGui::InvisibleButton("##mseg", ImVec2(width, height));
+      UiInteract::Hit("##mseg", ImVec2(width, height));
       ImGui::PopID();
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
@@ -307,7 +310,7 @@ namespace app
             sDragIndex = n->AddPoint(c.x, c.y);
          }
       }
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (hovered && MenuParts::RightPressed())
       {
          PushUndoCheckpoint();
          if (nearPoint >= 0)
@@ -777,7 +780,7 @@ namespace app
       dl->AddRect(trackOrigin, trackBr, tok::U32(tok::pal::c_464A5AFF), 3.0f);
 
       ImGui::SetCursorScreenPos(trackOrigin);
-      ImGui::InvisibleButton("##colorramp", ImVec2(size, trackH));
+      UiInteract::Hit("##colorramp", ImVec2(size, trackH));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
 
@@ -822,7 +825,7 @@ namespace app
          sSelNode = n;
          sSelIndex = sDragIndex;
       }
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && nearest >= 0)
+      if (hovered && MenuParts::RightPressed() && nearest >= 0)
       {
          PushUndoCheckpoint();
          n->RemoveStop(nearest);
@@ -1029,7 +1032,7 @@ namespace app
       }
       const bool mir = n->mirror;
       dl->PushClipRect(tl, br, true);
-      dl->AddImage((ImTextureID)(intptr_t)tex, a, b, ImVec2(mir ? 1.f : 0.f, 1.f), ImVec2(mir ? 0.f : 1.f, 0.f));
+      Thumb::Add(dl, (ImTextureID)(intptr_t)tex, a, b, ImVec2(mir ? 1.f : 0.f, 1.f), ImVec2(mir ? 0.f : 1.f, 0.f));
       std::vector<float> xy;
       n->GetOverlay(xy);
       const int np = (int)xy.size() / 2;

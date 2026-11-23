@@ -1,5 +1,6 @@
 // Node help text tables, shortcuts and help windows (moved verbatim from main.cpp).
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/components/ListRow.h"
 #include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/SectionCard.h"
@@ -963,7 +964,7 @@ namespace app
          {
             char tableId[96];
             snprintf(tableId, sizeof(tableId), "%stbl_%s", idPrefix, s.category);
-            if (ImGui::BeginTable(tableId, 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+            if (ListRow::BeginTable(tableId, 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
             {
                ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, 150.0f);
                ImGui::TableSetupColumn(T("Shortcut"), ImGuiTableColumnFlags_WidthFixed, 180.0f);
@@ -1061,7 +1062,7 @@ namespace app
       SectionCard::Begin();
       if (PanelKit::FoldHeader(L("Controls"), true, true))
       {
-         if (ImGui::BeginTable("controls", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+         if (ListRow::BeginTable("controls", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
          {
             ImGui::TableSetupColumn(T("Action"));
             ImGui::TableSetupColumn(T("How"));

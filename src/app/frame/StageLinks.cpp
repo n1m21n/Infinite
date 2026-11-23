@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/Wire.h"
 #include <unordered_map>
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
@@ -298,7 +299,7 @@ void DrawLinks(FrameCtx& fc)
                {
                   c = CategoryColors::ColorFor("Prediction");
                }
-               ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+               Wire::Draw(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f));
             }
             continue;
          }
@@ -309,7 +310,7 @@ void DrawLinks(FrameCtx& fc)
             if (gCableVisibilityMask & 0x1)
             {
                const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Palette);
-               ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+               Wire::Draw(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f));
             }
             continue;
          }
@@ -329,7 +330,7 @@ void DrawLinks(FrameCtx& fc)
                   if (gCableVisibilityMask & 0x2)
                   {
                      const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Audio);
-                     ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+                     Wire::Draw(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f));
                   }
                   tinted = true;
                }
@@ -338,7 +339,7 @@ void DrawLinks(FrameCtx& fc)
                   if (gCableVisibilityMask & 0x2)
                   {
                      const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Note);
-                     ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+                     Wire::Draw(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f));
                   }
                   tinted = true;
                }
@@ -349,7 +350,7 @@ void DrawLinks(FrameCtx& fc)
             if (gCableVisibilityMask & 0x1)
             {
                const CategoryColors::Color& c = CategoryColors::CableColorFor(CategoryColors::CableType::Stream);
-               ed::Link(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f), 2.0f);
+               Wire::Draw(link.id, link.srcPin, link.dstPin, ImColor(c.r, c.g, c.b, 1.0f));
             }
          }
       }

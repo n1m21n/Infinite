@@ -2,6 +2,9 @@
 // the Scene3DNode's placements; the nodes themselves are only ever read, so a
 // source keeps animating under whatever arrangement is made on top of it.
 #include "core/FactoryPresets.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/components/ListRow.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/ReorderDrag.h"
 #include "app/AppCommon.h"
@@ -2403,7 +2406,7 @@ namespace
          if (sSet->proportional && (pressed(ImGuiKey_PageUp) || pressed(ImGuiKey_PageDown)))
             sSet->propSize = std::clamp(sSet->propSize * (pressed(ImGuiKey_PageUp) ? 1.1f : 1.0f / 1.1f), 0.05f, 500.0f);
          ApplyOp(scene, mouse);
-         if (pressed(ImGuiKey_Escape) || (!sOp.gizmo && ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
+         if (pressed(ImGuiKey_Escape) || (!sOp.gizmo && MenuParts::RightPressed()))
             CancelOp(scene);
          else if (pressed(ImGuiKey_Enter) || pressed(ImGuiKey_KeypadEnter) ||
                   (!sOp.gizmo && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) ||
@@ -3338,7 +3341,7 @@ namespace
          float q[4];
          Skinning::QuatMul(sPose.q0, turn, q);
          Skinning::EulerFromQuat(q, model->Pose().poseRot[sPose.slot]);
-         if (pressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         if (pressed(ImGuiKey_Escape) || MenuParts::RightPressed())
             EndPoseTurn(model, false);
          else if (pressed(ImGuiKey_Enter) || pressed(ImGuiKey_KeypadEnter) || ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             EndPoseTurn(model, true);
@@ -3635,7 +3638,7 @@ namespace
          else
             sSculpt.strength = std::clamp(dist / 200.0f, 0.0f, 1.0f);
          dl->AddCircle(sSculpt.adjustAt, sSculpt.adjust == 'r' ? sSculpt.radius : sSculpt.strength * 200.0f, Hex(kHotHandle), 64, 1.5f);
-         if (pressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         if (pressed(ImGuiKey_Escape) || MenuParts::RightPressed())
          {
             (sSculpt.adjust == 'r' ? sSculpt.radius : sSculpt.strength) = sSculpt.adjustBefore;
             sSculpt.adjust = 0;
@@ -4388,7 +4391,7 @@ namespace
 
       if (sEdit.op != 0)
       {
-         if (pressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         if (pressed(ImGuiKey_Escape) || MenuParts::RightPressed())
          {
             node->ops = sEdit.before;
             sEdit.op = 0;
@@ -5232,7 +5235,7 @@ namespace
    {
       const ImGuiIO& io = ImGui::GetIO();
       ImVec2 mn = ImGui::GetCursorScreenPos();
-      ImGui::InvisibleButton("##view3dcanvas", size,
+      UiInteract::Hit("##view3dcanvas", size,
                              ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonMiddle |
                                 ImGuiButtonFlags_MouseButtonRight);
       const bool hovered = ImGui::IsItemHovered();
@@ -5275,7 +5278,7 @@ namespace
       const float dpi = io.DisplayFramebufferScale.y;
       const unsigned int tex = scene->RenderView((int)(size.x * dpi), (int)(size.y * dpi), view);
       if (tex != 0)
-         dl->AddImage((ImTextureID)(intptr_t)tex, mn, mx, ImVec2(0, 1), ImVec2(1, 0));
+         Thumb::Add(dl, (ImTextureID)(intptr_t)tex, mn, mx, ImVec2(0, 1), ImVec2(1, 0));
 
       const ImVec2 mouse = io.MousePos;
       sViewMn = mn;
@@ -5384,7 +5387,7 @@ namespace
       const bool posing = sOp.mode == 0 && ((sOverlays && DrawPose(dl, scene, mouse, toolHover)) || DrawSculpt(dl, scene, mouse, toolHover) ||
                                             DrawEdit(dl, scene, mouse, toolHover));
       gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning || sPose.stroking || sSculpt.stroking || sSculpt.adjust != 0 || sEdit.op != 0 || sEdit.pressed;
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (MenuParts::RightPressed())
          sRightOk = sOp.mode == 0 && !posing;
       if (!posing)
          HandleKeys(scene, mouse, hovered);
@@ -6071,13 +6074,13 @@ namespace
       }
       // The name opens the window; the gear sits at the right end, lit while the window is open.
       ImGui::SetCursorScreenPos(ImVec2(x, p.y));
-      if (ImGui::InvisibleButton("##name", ImVec2(std::max(1.0f, p.x + w - fh - x - tok::space_1), fh)))
+      if (UiInteract::Hit("##name", ImVec2(std::max(1.0f, p.x + w - fh - x - tok::space_1), fh)))
          SettingsWindow::Toggle(key);
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Click for all settings"));
       dl->AddText(ImVec2(x, p.y + (fh - ImGui::GetFontSize()) * 0.5f), enable != nullptr && !*enable ? ImGui::GetColorU32(ImGuiCol_TextDisabled) : text, title);
       ImGui::SetCursorScreenPos(ImVec2(p.x + w - fh, p.y));
-      if (ImGui::InvisibleButton("##gear", ImVec2(fh, fh)))
+      if (UiInteract::Hit("##gear", ImVec2(fh, fh)))
          SettingsWindow::Toggle(key);
       const bool hov = ImGui::IsItemHovered();
       if (hov)
@@ -6228,7 +6231,7 @@ namespace
          const ImVec2 p = ImGui::GetCursorScreenPos();
          rowTops.push_back({ p.y, it.id });
          ImGui::SetNextItemAllowOverlap();
-         if (ImGui::Selectable("##row", Selected(it.id), ImGuiSelectableFlags_None, ImVec2(availW, rowH)))
+         if (ListRow::Selectable("##row", Selected(it.id), ImGuiSelectableFlags_None, ImVec2(availW, rowH)))
          {
             const bool toggle = io.KeyCtrl || io.KeySuper;
             auto anchor = sSel.empty() ? items.end() : std::find_if(items.begin(), items.end(), [](const Item& x) { return x.id == sSel.back(); });
@@ -6263,7 +6266,7 @@ namespace
             ImGui::SetScrollHereY();
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             StartRename(it);
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         if (MenuParts::ContextClicked())
          {
             if (!Selected(it.id))
                sSel = { it.id };
@@ -6282,7 +6285,7 @@ namespace
             ImGui::SetCursorScreenPos(ImVec2(p.x + 24.0f, midY - ImGui::GetFrameHeight() * 0.5f));
             ImGui::SetNextItemWidth(availW - 72.0f);
             if (sRenameFocus)
-               ImGui::SetKeyboardFocusHere();
+               UiInteract::FocusHere();
             const bool enter = FieldWell::InputText("##rename", sRenameBuf, sizeof(sRenameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
             if (!sRenameFocus && (enter || ImGui::IsItemDeactivated()))
             {
@@ -6309,7 +6312,7 @@ namespace
          {
             colX -= tok::control_h;
             ImGui::SetCursorScreenPos(ImVec2(p.x + colX, p.y));
-            if (ImGui::InvisibleButton("##rnd", ImVec2(tok::control_h, rowH)))
+            if (UiInteract::Hit("##rnd", ImVec2(tok::control_h, rowH)))
             {
                PushUndoCheckpoint("Render toggle in 3D View");
                it.render = !it.render;
@@ -6321,7 +6324,7 @@ namespace
          {
             colX -= tok::control_h;
             ImGui::SetCursorScreenPos(ImVec2(p.x + colX, p.y));
-            if (ImGui::InvisibleButton("##sel", ImVec2(tok::control_h, rowH)))
+            if (UiInteract::Hit("##sel", ImVec2(tok::control_h, rowH)))
             {
                PushUndoCheckpoint("Selectable toggle in 3D View");
                it.hideSelect = !it.hideSelect;
@@ -6330,7 +6333,7 @@ namespace
             glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_control, text, it.hideSelect ? IconsInfinite::EyeOff : IconsInfinite::Cube);
          }
          ImGui::SetCursorScreenPos(ImVec2(p.x + availW - tok::control_h, p.y));
-         if (ImGui::InvisibleButton("##eye", ImVec2(tok::control_h, rowH)))
+         if (UiInteract::Hit("##eye", ImVec2(tok::control_h, rowH)))
          {
             PushUndoCheckpoint("Show or hide in 3D View");
             it.visible = !it.visible;
@@ -6346,7 +6349,7 @@ namespace
       // Item keys act on the picked rows while the list is hovered or was the last thing clicked.
       static bool sListActive = false;
       const bool listHovered = count > 0 && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || MenuParts::RightPressed())
          sListActive = listHovered;
       if (count > 0)
          EndChildSafe();
@@ -7239,7 +7242,7 @@ namespace
       const unsigned int tex = PreviewBallTexture(mat);
       const float side = std::min(availW, 160.0f);
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (availW - side) * 0.5f);
-      ImGui::Image((ImTextureID)(intptr_t)tex, ImVec2(side, side), ImVec2(0, 1), ImVec2(1, 0));
+      Thumb::Image((ImTextureID)(intptr_t)tex, ImVec2(side, side), ImVec2(0, 1), ImVec2(1, 0));
    }
 
    void DrawMaterialTab(Scene3DNode* scene, float availW)
@@ -7949,7 +7952,7 @@ namespace
       FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
       {
          const float sz = 16.0f;
-         if (ImGui::InvisibleButton("##closev3dside", ImVec2(sz, sz)))
+         if (UiInteract::Hit("##closev3dside", ImVec2(sz, sz)))
             sSideOpen = false;
          const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
          glyph::DrawX(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), sz * 0.65f,
@@ -8385,7 +8388,7 @@ namespace
    void DrawDockMenu(float top, float bottom)
    {
       const ImVec2 mn(ImGui::GetWindowPos().x, top), mx(mn.x + ImGui::GetWindowSize().x, bottom);
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
+      if (MenuParts::RightPressed() && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##v3ddockmenu");
       if (MenuParts::TestOpen("##v3ddockmenu"))

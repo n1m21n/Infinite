@@ -1,5 +1,7 @@
 // Audio-in, mixer, keyboard and note node bodies (moved verbatim from main.cpp).
 #include "arrange/NoteSchedule.h"
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/TokenColors.h"
@@ -580,7 +582,7 @@ namespace app
       const float keyW = (w - 4.0f) / (float)whiteCount;
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##keyboardHit", ImVec2(w, h));
+      UiInteract::Hit("##keyboardHit", ImVec2(w, h));
       const bool active = ImGui::IsItemActive();
       const ImVec2 mouse = ImGui::GetIO().MousePos;
 
@@ -1689,7 +1691,7 @@ namespace app
 
          ImGui::PushID(s);
          ImGui::SetCursorScreenPos(cellMin);
-         ImGui::InvisibleButton("gatecell", ImVec2(cellW, h));
+         UiInteract::Hit("gatecell", ImVec2(cellW, h));
 
          const bool wasOn = ((n->stepGates >> s) & 1) != 0;
          if (ImGui::IsItemActivated())
@@ -1866,7 +1868,7 @@ namespace app
 
             // ---- Pitch interactive area ----
             ImGui::SetCursorScreenPos(ImVec2(x0, origin.y));
-            ImGui::InvisibleButton("pitch", ImVec2(barW, pitchH));
+            UiInteract::Hit("pitch", ImVec2(barW, pitchH));
             const bool pitchHovered = ImGui::IsItemHovered();
             const bool pitchActive = ImGui::IsItemActive();
             if (pitchHovered)
@@ -1878,7 +1880,7 @@ namespace app
                PushUndoCheckpoint();
                n->stepEnabled[i] = !n->stepEnabled[i];
             }
-            else if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            else if (MenuParts::ContextClicked())
             {
                PushUndoCheckpoint();
                n->stepEnabled[i] = !n->stepEnabled[i];
@@ -1961,7 +1963,7 @@ namespace app
             const float vy0 = origin.y + pitchH;
             const float vy1 = vy0 + velH;
             ImGui::SetCursorScreenPos(ImVec2(x0, vy0));
-            ImGui::InvisibleButton("vel", ImVec2(barW, velH));
+            UiInteract::Hit("vel", ImVec2(barW, velH));
             const bool velHovered = ImGui::IsItemHovered();
             const bool velActive = ImGui::IsItemActive();
             if (velHovered)
@@ -1972,7 +1974,7 @@ namespace app
                PushUndoCheckpoint();
                n->stepEnabled[i] = !n->stepEnabled[i];
             }
-            else if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            else if (MenuParts::ContextClicked())
             {
                PushUndoCheckpoint();
                n->stepEnabled[i] = !n->stepEnabled[i];
@@ -2364,9 +2366,9 @@ namespace app
          // chord cell
          const ImVec2 cMin(x0, origin.y), cMax(x0 + cellW, origin.y + chordH);
          ImGui::SetCursorScreenPos(cMin);
-         ImGui::InvisibleButton("chordcell", ImVec2(cellW, chordH), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+         UiInteract::Hit("chordcell", ImVec2(cellW, chordH), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
          const bool chordHovered = ImGui::IsItemHovered();
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || MenuParts::ContextClicked())
          {
             // values: 0 .. degreeCount-1, then -1 (hold)
             const int span = degreeCount + 1;
@@ -2395,9 +2397,9 @@ namespace app
          const float ty = origin.y + chordH + gap;
          const ImVec2 tMin(x0, ty), tMax(x0 + cellW, ty + typeH);
          ImGui::SetCursorScreenPos(tMin);
-         ImGui::InvisibleButton("typecell", ImVec2(cellW, typeH), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+         UiInteract::Hit("typecell", ImVec2(cellW, typeH), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
          const bool typeHovered = ImGui::IsItemHovered();
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || MenuParts::ContextClicked())
          {
             const int span = NoteTheory::kNumChordTypes;
             PushUndoCheckpoint();

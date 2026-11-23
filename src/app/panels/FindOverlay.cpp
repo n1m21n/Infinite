@@ -1,6 +1,7 @@
 // Find on the canvas (Cmd/Ctrl+F). One field over the canvas; matches node title, node type, comment
 // text and param names as you type; Up/Down step, Enter jumps to the node, Esc closes.
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/AppShared.h"
@@ -136,7 +137,7 @@ void DrawFind()
    {
       if (sFocusField)
       {
-         ImGui::SetKeyboardFocusHere();
+         UiInteract::FocusHere();
          sFocusField = false;
       }
       const bool pickNow = Keymap::Confirm(false);

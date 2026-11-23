@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 #include "app/panels/FieldPatcherPanel.h"
@@ -590,7 +591,7 @@ void DrawPopupsA(FrameCtx& fc)
                ImGui::SetNextItemWidth(width);
                if (gModRangeTypedJustOpened)
                {
-                  ImGui::SetKeyboardFocusHere();
+                  UiInteract::FocusHere();
                   gModRangeTypedJustOpened = false;
                }
                char buf[64];

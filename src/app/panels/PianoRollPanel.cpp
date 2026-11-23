@@ -2,6 +2,7 @@
 // MIDI lane. A page edits the lane's clips and notes through the Arrange note ops; the linked Piano Roll node plays
 // them. Edits are timeline undo entries; page add and delete touch a node too, so they are patch undo steps.
 #include "app/AppShared.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/frame/CanvasLink.h"
 #include "app/graph/NoteGen.h"
 #include "app/graph/SampleStyles.h"
@@ -523,7 +524,7 @@ namespace
    void DrawDockMenu()
    {
       const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::Chip() + tok::space_3);
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
+      if (MenuParts::RightPressed() && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##pianoDockMenu");
       if (MenuParts::TestOpen("##pianoDockMenu"))
@@ -1664,7 +1665,7 @@ namespace
          ImVec2 bmin, bmax;
          if (PickerFace("##pianoQuantGrid", T("Quantise"), 96.0f, T("Quantise the selection or clip: pick the grid, bars or a division (Q repeats the last). Right-click or Shift+Q for its settings"), bmin, bmax))
             ImGui::OpenPopup("##pianoQuantMenu");
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         if (MenuParts::ContextClicked())
          {
             s.settingsOpen = true;
             s.genOpen = false;
@@ -3216,7 +3217,7 @@ namespace
       const double pinch = TrackpadPinchThisFrame();
       const ImVec2 mouse = ImGui::GetIO().MousePos;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y));
-      ImGui::InvisibleButton("##pianoRoll", ImVec2(a.x1 - origin.x, a.rollB - origin.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+      UiInteract::Hit("##pianoRoll", ImVec2(a.x1 - origin.x, a.rollB - origin.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
       ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
       ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelX);
       const bool hovered = ImGui::IsItemHovered();
@@ -3249,7 +3250,7 @@ namespace
       }
       ClampView(a.rollB - a.rollY);
       HandlePointer(page, a, hovered, mouse);
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && mouse.y >= a.stripY && mouse.x >= a.x0 &&
+      if (hovered && MenuParts::RightPressed() && mouse.y >= a.stripY && mouse.x >= a.x0 &&
           (mouse.y >= a.rollY || ClipAt(page, (Tick)std::max(0.0, a.XTick(mouse.x))) != nullptr))
       {
          State& ms = S();
@@ -3672,7 +3673,7 @@ void DrawPianoRollDocked(const char* id, const ImVec2& size)
    const ImVec2 inner = ImGui::GetContentRegionAvail();
    auto grip = [&]()
    {
-      ImGui::InvisibleButton("##pianogrip", ImVec2(std::max(1.0f, inner.x), kGrip));
+      UiInteract::Hit("##pianogrip", ImVec2(std::max(1.0f, inner.x), kGrip));
       DrawPanelSeam(false, gripFirst);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);

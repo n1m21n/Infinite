@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include <algorithm>
+#include "app/ui/design/components/Thumb.h"
 #include <string>
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -733,7 +734,7 @@ int DrawTestsB(FrameCtx& fc)
                const float k = std::min(size.x / float(tw), size.y / float(th));
                const ImVec2 d(float(tw) * k, float(th) * k);
                const ImVec2 tl(pos.x + (size.x - d.x) * 0.5f, pos.y + (size.y - d.y) * 0.5f);
-               ImGui::GetWindowDrawList()->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + d.x, tl.y + d.y),
+               Thumb::Add(ImGui::GetWindowDrawList(), (ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + d.x, tl.y + d.y),
                                                     ImVec2(0, 1), ImVec2(1, 0));
             }
             else

@@ -1,5 +1,6 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
 #include <algorithm>
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
 #include <cmath>
 #include "app/ui/design/components/AudioViz.h"
@@ -2213,7 +2214,7 @@ namespace app
 
       // 3. Interactive band-boundary dividers, drawn directly on the spectrum.
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##acr_track", ImVec2(size, barH));
+      UiInteract::Hit("##acr_track", ImVec2(size, barH));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
 
@@ -3042,7 +3043,7 @@ namespace app
 
          const bool dragging = (sDragNode == n && sDragSlot == slot);
          ImVec2 headerPos = ImGui::GetCursorScreenPos();
-         ImGui::InvisibleButton("##grip", ImVec2(kPreviewSize, rowHeight));
+         UiInteract::Hit("##grip", ImVec2(kPreviewSize, rowHeight));
          if (ImGui::IsItemActive() && sDragNode == nullptr)
          {
             sDragNode = n;

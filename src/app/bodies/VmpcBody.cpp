@@ -1,6 +1,9 @@
 // VMPC body: the MPC card's layout (4x4 square pads, the selected pad's editor
 // below), with a clip's filmstrip where the MPC draws a waveform.
 #include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
@@ -134,7 +137,7 @@ namespace app
             vHalf = 0.5f * ta / ba;
          const float cell = 1.0f / (float)VmpcNode::kThumbs;
          const float uc = ((float)std::clamp(idx, 0, VmpcNode::kThumbs - 1) + 0.5f) * cell;
-         dl->AddImage((ImTextureID)(intptr_t)tex, mn, mx, ImVec2(uc - uHalf * cell, 0.5f + vHalf),
+         Thumb::Add(dl, (ImTextureID)(intptr_t)tex, mn, mx, ImVec2(uc - uHalf * cell, 0.5f + vHalf),
                       ImVec2(uc + uHalf * cell, 0.5f - vHalf), tint);
       }
 
@@ -220,7 +223,7 @@ namespace app
                   {
                      n->padRect[pad][0] = mn.x; n->padRect[pad][1] = mn.y;
                      n->padRect[pad][2] = mx.x; n->padRect[pad][3] = mx.y;
-                     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+                     if (hovered && MenuParts::RightPressed())
                         n->selectedPad = pad;
                      const bool hit = lvl || (now - n->padFlash[pad]) < tok::motion_s_pad_flash;
                      const bool lit = playing || hit;
@@ -341,7 +344,7 @@ namespace app
             n->stripRect[0] = origin.x; n->stripRect[1] = origin.y; n->stripRect[2] = br.x; n->stripRect[3] = br.y;
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const bool has = n->PadLoaded(cur);
-            ImGui::InvisibleButton("##vmpcstrip", ImVec2(w, h));
+            UiInteract::Hit("##vmpcstrip", ImVec2(w, h));
             const bool hov = ImGui::IsItemHovered();
             if (!has && ImGui::IsItemClicked(ImGuiMouseButton_Left))
                openLoadPad = cur;

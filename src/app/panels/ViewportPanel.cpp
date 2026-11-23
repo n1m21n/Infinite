@@ -1,5 +1,7 @@
 // Viewport panel cards and mini viewports (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -38,7 +40,7 @@ namespace app
                                                cam, (int)size, (int)size);
       if (tex != 0)
       {
-         dl->AddImage((ImTextureID)(intptr_t)tex, origin, ImVec2(origin.x + size, origin.y + size),
+         Thumb::Add(dl, (ImTextureID)(intptr_t)tex, origin, ImVec2(origin.x + size, origin.y + size),
                       ImVec2(0, 1), ImVec2(1, 0));
       }
       else
@@ -55,7 +57,7 @@ namespace app
       // feeds directly, but not with any other node; Zoom stays local to this
       // NodeViewport instance's own distance.
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##miniviewportcanvas", ImVec2(size, size));
+      UiInteract::Hit("##miniviewportcanvas", ImVec2(size, size));
 
       if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
       {
@@ -210,7 +212,7 @@ namespace app
       ImGui::SetCursorScreenPos(ImVec2(cardMax.x - pad - tile, cardMin.y + (titleH - tile) * 0.5f + 2.0f));
       char closeId[40];
       snprintf(closeId, sizeof(closeId), "##closeviewportcard%d", gn.index);
-      const bool closeRequested = ImGui::InvisibleButton(closeId, ImVec2(tile, tile));
+      const bool closeRequested = UiInteract::Hit(closeId, ImVec2(tile, tile));
       {
          const ImVec2 bmin = ImGui::GetItemRectMin();
          const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -248,14 +250,14 @@ namespace app
          const unsigned int tex = viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(gn.node.get())),
                                                   cam, (int)imageSize.x, (int)imageSize.y);
          if (tex != 0)
-            dl->AddImageRounded((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_control);
+            Thumb::AddRounded(dl, (ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_control);
          else
             EmptyState::DrawCaption(origin, br, EmptyPreviewLabel(gn.node.get(), T("No geometry")));
 
          ImGui::SetCursorScreenPos(origin);
          char btnId[32];
          snprintf(btnId, sizeof(btnId), "##viewportcanvas%d", gn.index);
-         ImGui::InvisibleButton(btnId, imageSize);
+         UiInteract::Hit(btnId, imageSize);
 
          if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
          {
@@ -299,7 +301,7 @@ namespace app
             dh = h * scale;
             tl = ImVec2(origin.x + (imageSize.x - dw) * 0.5f,
                        origin.y + (imageSize.y - dh) * 0.5f);
-            dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dw, tl.y + dh),
+            Thumb::Add(dl, (ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dw, tl.y + dh),
                          ImVec2(0, 1), ImVec2(1, 0));
          }
          else
@@ -316,7 +318,7 @@ namespace app
             ImGui::SetCursorScreenPos(origin);
             char btnId[32];
             snprintf(btnId, sizeof(btnId), "##drawviewportcanvas%d", gn.index);
-            ImGui::InvisibleButton(btnId, imageSize);
+            UiInteract::Hit(btnId, imageSize);
 
             if (ImGui::IsItemActive())
             {
@@ -356,7 +358,7 @@ namespace app
             ImGui::SetCursorScreenPos(origin);
             char btnId[32];
             snprintf(btnId, sizeof(btnId), "##render3dviewportcanvas%d", gn.index);
-            ImGui::InvisibleButton(btnId, imageSize);
+            UiInteract::Hit(btnId, imageSize);
 
             float* azimuth = render->camera ? &render->camera->azimuth : &render->camAzimuth;
             float* elevation = render->camera ? &render->camera->elevation : &render->camElevation;
@@ -482,7 +484,7 @@ namespace app
       const ImVec2 mouse = ImGui::GetIO().MousePos;
       const bool overPanel = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + strip.x &&
                              mouse.y >= panelOrigin.y && mouse.y < panelOrigin.y + strip.y;
-      if (overPanel && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered() &&
+      if (overPanel && MenuParts::RightPressed() && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) &&
           !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
          ImGui::OpenPopup("##viewportpanelctx");
@@ -544,7 +546,7 @@ namespace app
 
       auto grip = [&]()
       {
-         ImGui::InvisibleButton("##viewportgrip",
+         UiInteract::Hit("##viewportgrip",
                                 vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
                                          : ImVec2(std::max(1.0f, inner.x), kGrip));
          // The panel's canvas-facing boundary, and the only thing that marks

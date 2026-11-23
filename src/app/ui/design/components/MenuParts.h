@@ -211,6 +211,11 @@ namespace MenuParts
       return open;
    }
 
+   // Context menus (owner 2026-11-24): the right click that opens one. On the last item, or anywhere this frame
+   // (a canvas or a custom hit area tests its own rect, then opens its popup with BeginPopup).
+   inline bool ContextClicked() { return ImGui::IsItemClicked(ImGuiMouseButton_Right); }
+   inline bool RightPressed() { return ImGui::IsMouseClicked(ImGuiMouseButton_Right); }
+
    inline bool BeginContextItem(const char* id, ImGuiPopupFlags flags = ImGuiPopupFlags_MouseButtonRight)
    {
       PushPopupPad();

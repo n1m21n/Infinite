@@ -5,6 +5,8 @@
 // The idea comes from Ricardo Palmieri's Infinite-Turbo fork; this is a fresh
 // implementation.
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/components/EmptyState.h"
@@ -673,7 +675,7 @@ namespace app
          const float x0 = o.x + kSceneColW + colW * (float)li;
          ImGui::SetCursorScreenPos(ImVec2(x0 + kGap, o.y + kGap));
          ImGui::PushID(li);
-         ImGui::InvisibleButton("##hdr", ImVec2(colW - 2.0f * kGap, kHeaderH - 2.0f * kGap),
+         UiInteract::Hit("##hdr", ImVec2(colW - 2.0f * kGap, kHeaderH - 2.0f * kGap),
                                 ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonLeft);
          if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_tile))
             sTrackDragFrom = li;
@@ -686,7 +688,7 @@ namespace app
             sTrackRenameLaneId = hdrLaneId;
             snprintf(sTrackNameBuf, sizeof(sTrackNameBuf), "%s", gArrange.lanes[(size_t)li].name.c_str());
          }
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         if (MenuParts::ContextClicked())
          {
             sTrackCtxLaneId = hdrLaneId;
             ImGui::OpenPopup("##sessiontrackctx");
@@ -698,7 +700,7 @@ namespace app
             ImGui::SetNextItemWidth(std::max(20.0f, colW - 2.0f * kGap - 8.0f));
             if (sFocused != hdrLaneId)
             {
-               ImGui::SetKeyboardFocusHere();
+               UiInteract::FocusHere();
                sFocused = hdrLaneId;
             }
             const bool commit = FieldWell::InputText("##sessrenametrack", sTrackNameBuf, sizeof(sTrackNameBuf),
@@ -756,7 +758,7 @@ namespace app
          const bool realScene = row < (int)gArrange.scenes.size();
          ImGui::PushID(row);
          ImGui::SetCursorScreenPos(a);
-         ImGui::InvisibleButton("##scene", ImVec2(b.x - a.x, b.y - a.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+         UiInteract::Hit("##scene", ImVec2(b.x - a.x, b.y - a.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
          const bool hov = ImGui::IsItemHovered();
          // A click selects the scene (Delete removes it, Cmd+D duplicates it) and launches it, or stops it
          // when it is already playing or waiting to launch. Cmd-click only selects.
@@ -770,7 +772,7 @@ namespace app
             if (!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeySuper && (rowHasClip || anyLaunched))
                ArrangeSessionLaunchScene(row);
          }
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         if (MenuParts::ContextClicked())
          {
             sSelScene = row;
             sSceneCtxRow = row;
@@ -874,7 +876,7 @@ namespace app
             const Arrange::SessionSlot* ss = SlotOf(lane, row);
             ImGui::PushID(row);
             ImGui::SetCursorScreenPos(a);
-            ImGui::InvisibleButton("##cell", ImVec2(b.x - a.x, b.y - a.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+            UiInteract::Hit("##cell", ImVec2(b.x - a.x, b.y - a.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
             const bool hov = ImGui::IsItemHovered();
             const bool held = ImGui::IsItemActive();
             if (ss != nullptr && ImGui::IsItemDeactivated() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
@@ -923,7 +925,7 @@ namespace app
                else
                   gArrangeSel.clear();   // an empty cell is selected as the paste target
             }
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            if (MenuParts::ContextClicked())
             {
                sSelScene = -1;
                sCurLaneId = laneId;
@@ -1028,7 +1030,7 @@ namespace app
                ImGui::SetNextItemWidth(std::max(20.0f, b.x - a.x - 28.0f));
                if (sRenameFocusedId != ss->clip.id)
                {
-                  ImGui::SetKeyboardFocusHere();
+                  UiInteract::FocusHere();
                   sRenameFocusedId = ss->clip.id;
                }
                const bool commit = FieldWell::InputText("##renamingslot", gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer),
@@ -1086,7 +1088,7 @@ namespace app
             const bool canStop = ls.playingSlot >= 0;
             ImGui::BeginDisabled(!canStop);
             ImGui::SetCursorScreenPos(a);
-            if (ImGui::InvisibleButton("##stop", ImVec2(b.x - a.x, b.y - a.y)))
+            if (UiInteract::Hit("##stop", ImVec2(b.x - a.x, b.y - a.y)))
                ArrangeSessionStopLane(laneId);
             const bool hov = ImGui::IsItemHovered();
             ImGui::EndDisabled();
@@ -1616,7 +1618,7 @@ namespace app
             gArrangeMonitorTarget.requestH = std::max(16, (int)avail.y);
             const unsigned int tex = gArrangeMonitorTarget.result.tex;
             if (tex != 0)
-               dl->AddImage((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
+               Thumb::Add(dl, (ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
          }
          ImGui::Dummy(avail);
          EndChildSafe();
@@ -1951,7 +1953,7 @@ namespace app
             const ImVec2 o = ImGui::GetWindowPos();
             if (m.y >= toolbarTop && m.y < toolbarBottom && m.x >= o.x && m.x < o.x + panelSize.x &&
                 ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::IsAnyItemHovered() &&
-                ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##sessiondockctx"))
+                MenuParts::RightPressed() && !ImGui::IsPopupOpen("##sessiondockctx"))
                ImGui::OpenPopup("##sessiondockctx");
             if (MenuParts::TestOpen("##sessiondockctx"))
                ImGui::OpenPopup("##sessiondockctx");
@@ -2038,7 +2040,7 @@ namespace app
       const ImVec2 inner = ImGui::GetContentRegionAvail();
       auto grip = [&]()
       {
-         ImGui::InvisibleButton("##sessionpanelgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
+         UiInteract::Hit("##sessionpanelgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
          DrawPanelSeam(false, gripFirst);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);

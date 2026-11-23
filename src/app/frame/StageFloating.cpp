@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -192,7 +193,7 @@ int DrawFloating(FrameCtx& fc)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - s) * 0.5f);
             const ImVec2 p = ImGui::GetCursorScreenPos();
             ImGui::Dummy(ImVec2(s, s));
-            ImGui::GetWindowDrawList()->AddImageRounded(tex, p, ImVec2(p.x + s, p.y + s), ImVec2(0, 0), ImVec2(1, 1),
+            Thumb::AddRounded(ImGui::GetWindowDrawList(), tex, p, ImVec2(p.x + s, p.y + s), ImVec2(0, 0), ImVec2(1, 1),
                                                         IM_COL32_WHITE, 20.0f);
          }
          ImGui::Dummy(ImVec2(0.0f, tok::space_2));

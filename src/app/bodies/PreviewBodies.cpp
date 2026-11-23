@@ -1,5 +1,7 @@
 // Comment, group, draw and preview node bodies (moved verbatim from main.cpp).
 #include "nodes/ImageSourceNode.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "nodes/VideoSourceNode.h"
 #include "nodes/VideoInNode.h"
@@ -19,7 +21,7 @@ namespace app
    void DrawPaintablePreview(DrawNode* node)
    {
       ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImGui::InvisibleButton("##canvas", ImVec2(kPreviewSize, kPreviewSize));
+      UiInteract::Hit("##canvas", ImVec2(kPreviewSize, kPreviewSize));
 
       const int w = node->GetOutputWidth();
       const int h = node->GetOutputHeight();
@@ -50,7 +52,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       DrawCheckerboardBackdrop(dl, origin, kPreviewSize);
       if (node->GetOutputTexture() != 0)
-         dl->AddImage((ImTextureID)(intptr_t)node->GetOutputTexture(), tl,
+         Thumb::Add(dl, (ImTextureID)(intptr_t)node->GetOutputTexture(), tl,
                       ImVec2(tl.x + dw, tl.y + dh), ImVec2(0, 1), ImVec2(1, 0));
       if (!node->HasStrokes())
          AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize)}, "draw here");
@@ -181,7 +183,7 @@ namespace app
       // Resize grip interaction (bottom-right corner)
       const float gripSize = 20.0f;
       ImGui::SetCursorScreenPos(ImVec2(br.x - gripSize, br.y - gripSize));
-      ImGui::InvisibleButton("##commentresizegrip", ImVec2(gripSize, gripSize));
+      UiInteract::Hit("##commentresizegrip", ImVec2(gripSize, gripSize));
       const bool gripHovered = ImGui::IsItemHovered();
       const bool gripActive = ImGui::IsItemActive();
       if (ImGui::IsItemActivated())
@@ -505,7 +507,7 @@ namespace app
       {
          if (n->renameJustStarted)
          {
-            ImGui::SetKeyboardFocusHere();
+            UiInteract::FocusHere();
             n->renameJustStarted = false;
          }
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0.35f));
@@ -655,7 +657,7 @@ namespace app
          float dw = w * scale;
          float dh = h * scale;
          ImVec2 tl(origin.x + (size - dw) * 0.5f, origin.y + (size - dh) * 0.5f);
-         dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dw, tl.y + dh),
+         Thumb::Add(dl, (ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dw, tl.y + dh),
                       ImVec2(0, 1), ImVec2(1, 0));
       }
       else
@@ -692,7 +694,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##viewport", ImVec2(size, size));
+      UiInteract::Hit("##viewport", ImVec2(size, size));
 
       // A patched Camera node owns the view, so drive that instead of the
       // built-in values; otherwise the drag would appear to do nothing. This

@@ -76,6 +76,7 @@ namespace tok
    constexpr float stroke_mark = 1.8f;
    constexpr float stroke_focus = 2.0f;
    constexpr float stroke_focus_gap = 2.0f;
+   constexpr float stroke_wire = 2.0f;
    constexpr float drag_threshold_fine = 2.0f;
    constexpr float drag_threshold = 4.0f;
    constexpr float drag_threshold_tile = 6.0f;

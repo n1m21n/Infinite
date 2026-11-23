@@ -1,5 +1,7 @@
 // Sampler, slicer, molder, granular, drum sequencer, looper and MPC bodies (moved verbatim from main.cpp).
 #include "app/ui/design/components/StepCell.h"
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/PinDot.h"
@@ -201,7 +203,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##audiometer", ImVec2(w, h));
+      UiInteract::Hit("##audiometer", ImVec2(w, h));
       if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
          n->ResetPeaks();
       if (ImGui::IsItemHovered())
@@ -939,7 +941,7 @@ namespace app
       // opts in via SetNextItemAllowOverlap() before being submitted.
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##molderwavebody", ImVec2(w, h));
+      UiInteract::Hit("##molderwavebody", ImVec2(w, h));
       if (hasSample && ImGui::IsItemActivated())
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
@@ -1012,7 +1014,7 @@ namespace app
          const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
 
          ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
-         ImGui::InvisibleButton("##molderstarthandle", ImVec2(handleW, h));
+         UiInteract::Hit("##molderstarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
@@ -1021,7 +1023,7 @@ namespace app
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
          ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
-         ImGui::InvisibleButton("##molderendhandle", ImVec2(handleW, h));
+         UiInteract::Hit("##molderendhandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
@@ -1199,7 +1201,7 @@ namespace app
 
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##grainmolderwavebody", ImVec2(w, h));
+      UiInteract::Hit("##grainmolderwavebody", ImVec2(w, h));
       if (hasSample && (ImGui::IsItemActivated() || ImGui::IsItemActive()))
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
@@ -1289,7 +1291,7 @@ namespace app
          const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
 
          ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
-         ImGui::InvisibleButton("##gmstarthandle", ImVec2(handleW, h));
+         UiInteract::Hit("##gmstarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
@@ -1298,7 +1300,7 @@ namespace app
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
          ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
-         ImGui::InvisibleButton("##gmendhandle", ImVec2(handleW, h));
+         UiInteract::Hit("##gmendhandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
@@ -2076,7 +2078,7 @@ namespace app
                const float x0 = origin.x + gutterW + (float)sc * (cellW + cellGap);
                ImGui::PushID(s);
                ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-               ImGui::InvisibleButton("cell", ImVec2(cellW, rowH));
+               UiInteract::Hit("cell", ImVec2(cellW, rowH));
                float& vel = n->stepVel[lane][s];
 
                if (ImGui::IsItemActivated())
@@ -2663,7 +2665,7 @@ namespace app
                   {
                      n->padRect[pad][0] = mn.x; n->padRect[pad][1] = mn.y;
                      n->padRect[pad][2] = mx.x; n->padRect[pad][3] = mx.y;
-                     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+                     if (hovered && MenuParts::RightPressed())
                         n->selectedPad = pad;
                      const bool hit = lvl || (now - n->padFlash[pad]) < tok::motion_s_pad_flash;
                      const bool lit = playing || hit;
@@ -2785,7 +2787,7 @@ namespace app
             n->waveRect[0] = origin.x; n->waveRect[1] = origin.y; n->waveRect[2] = br.x; n->waveRect[3] = br.y;
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const bool has = n->PadLoaded(cur);
-            ImGui::InvisibleButton("##mpcwave", ImVec2(w, h));
+            UiInteract::Hit("##mpcwave", ImVec2(w, h));
             const bool hov = ImGui::IsItemHovered();
             if (!has && ImGui::IsItemClicked(ImGuiMouseButton_Left))
                openLoadPad = cur;

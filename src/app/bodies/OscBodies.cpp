@@ -1,5 +1,7 @@
 // Oscillator, wavetable, ADSR, equation and spectral-synth bodies (moved verbatim from main.cpp).
 #include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
@@ -188,7 +190,7 @@ namespace app
       // earlier item opted in via SetNextItemAllowOverlap() *before* it.
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##slicerwavebody", ImVec2(w, h));
+      UiInteract::Hit("##slicerwavebody", ImVec2(w, h));
       if (hasSample && sliceCount > 0 && ImGui::IsItemActivated())
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
@@ -285,7 +287,7 @@ namespace app
             char id[32];
             snprintf(id, sizeof(id), "##slicermk%d", i);
             ImGui::SetCursorScreenPos(ImVec2(btnX, origin.y));
-            ImGui::InvisibleButton(id, ImVec2(handleW, h));
+            UiInteract::Hit(id, ImVec2(handleW, h));
             if (ImGui::IsItemActivated())
                PushUndoCheckpoint();
             if (ImGui::IsItemActive())
@@ -311,7 +313,7 @@ namespace app
 
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##paulstretchwavebody", ImVec2(w, h));
+      UiInteract::Hit("##paulstretchwavebody", ImVec2(w, h));
       if (hasSample && (ImGui::IsItemActivated() || (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))))
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
@@ -379,7 +381,7 @@ namespace app
          const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
 
          ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
-         ImGui::InvisibleButton("##paulstretchstarthandle", ImVec2(handleW, h));
+         UiInteract::Hit("##paulstretchstarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
@@ -391,7 +393,7 @@ namespace app
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
          ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
-         ImGui::InvisibleButton("##paulstretchendhandle", ImVec2(handleW, h));
+         UiInteract::Hit("##paulstretchendhandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
@@ -422,7 +424,7 @@ namespace app
 
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##granularwavebody", ImVec2(w, h));
+      UiInteract::Hit("##granularwavebody", ImVec2(w, h));
       if (hasSample && (ImGui::IsItemActivated() || (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))))
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, s, e);
@@ -522,7 +524,7 @@ namespace app
          const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
 
          ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
-         ImGui::InvisibleButton("##granularstarthandle", ImVec2(handleW, h));
+         UiInteract::Hit("##granularstarthandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
@@ -535,7 +537,7 @@ namespace app
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
          ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
-         ImGui::InvisibleButton("##granularendhandle", ImVec2(handleW, h));
+         UiInteract::Hit("##granularendhandle", ImVec2(handleW, h));
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
@@ -631,7 +633,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
 
-      ImGui::InvisibleButton(id, ImVec2(w, h));
+      UiInteract::Hit(id, ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
       if (ImGui::IsItemActivated())
          PushUndoCheckpoint();
@@ -795,7 +797,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      ImGui::InvisibleButton(id, ImVec2(w, h));
+      UiInteract::Hit(id, ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
       if (ImGui::IsItemActivated())
@@ -2894,7 +2896,7 @@ namespace app
 
          if (n->GetOutputTexture() != 0)
          {
-            dl->AddImage((ImTextureID)(intptr_t)n->GetOutputTexture(), imgTl, imgBr, ImVec2(0, 1), ImVec2(1, 0));
+            Thumb::Add(dl, (ImTextureID)(intptr_t)n->GetOutputTexture(), imgTl, imgBr, ImVec2(0, 1), ImVec2(1, 0));
             dl->AddRect(imgTl, imgBr, tok::U32(tok::pal::c_00F0DC8C), 2.0f, 0, 1.0f);
          }
 
@@ -2924,7 +2926,7 @@ namespace app
 
          // Invisible button for interactive mouse scrubbing across spectrogram
          ImGui::SetCursorScreenPos(imgTl);
-         ImGui::InvisibleButton("##spectrogramScrub", ImVec2(imgSize, imgSize));
+         UiInteract::Hit("##spectrogramScrub", ImVec2(imgSize, imgSize));
          if (ImGui::IsItemActive())
          {
             const ImVec2 m = ImGui::GetMousePos();

@@ -1,5 +1,6 @@
 // Modulatable sliders, knobs, faders, toggles, pins (moved verbatim from main.cpp).
 #include "app/selftest/UiAudit.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -190,7 +191,7 @@ namespace app
          ImGui::SetNextItemWidth(width - box - 4.0f);
          if (gTypedParamJustOpened == editKey)
          {
-            ImGui::SetKeyboardFocusHere();
+            UiInteract::FocusHere();
             gTypedParamJustOpened = std::pair<int, int>(-1, -1);
          }
          char buf[256];
@@ -676,7 +677,7 @@ namespace app
       };
 
       ImGui::SetCursorScreenPos(ImVec2(p.x + (cell - kFaderWidth) * 0.5f, p.y));
-      ImGui::InvisibleButton(label, ImVec2(kFaderWidth, height));
+      UiInteract::Hit(label, ImVec2(kFaderWidth, height));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = !readOnly && ImGui::IsItemActive();
       bool changed = false;
@@ -824,7 +825,7 @@ namespace app
       // modulation pin (v3 §3b), and a drag starting on a pin belongs to the
       // node editor's link machinery, not to the knob.
       ImGui::SetCursorScreenPos(ImVec2(p.x + (cell - diameter) * 0.5f, p.y));
-      ImGui::InvisibleButton(label, ImVec2(diameter, rowH));
+      UiInteract::Hit(label, ImVec2(diameter, rowH));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = !readOnly && ImGui::IsItemActive();
       bool changed = false;
@@ -1012,7 +1013,7 @@ namespace app
       };
 
       ImGui::SetCursorScreenPos(ImVec2(p.x + (cell - diameter) * 0.5f, p.y));
-      ImGui::InvisibleButton(label, ImVec2(diameter, rowH));
+      UiInteract::Hit(label, ImVec2(diameter, rowH));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = !readOnly && ImGui::IsItemActive();
       bool changed = false;
@@ -1351,7 +1352,7 @@ namespace app
          ImGui::SetNextItemWidth(fieldW);
          if (gTypedParamJustOpened == editKey)
          {
-            ImGui::SetKeyboardFocusHere();
+            UiInteract::FocusHere();
             gTypedParamJustOpened = std::pair<int, int>(-1, -1);
          }
          char buf[256];

@@ -1,5 +1,6 @@
 // Offline render windows, arrange clip settings and render queue (moved verbatim from main.cpp).
 #include <algorithm>
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
 #include <cctype>
 #include "app/ui/design/GlyphDraw.h"
@@ -160,7 +161,7 @@ namespace app
                        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
                        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav |
                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-      ImGui::InvisibleButton("##OfflineRenderBlockerCatch", io.DisplaySize);
+      UiInteract::Hit("##OfflineRenderBlockerCatch", io.DisplaySize);
       ImGui::End();
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor();
@@ -255,7 +256,7 @@ namespace app
                       ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
                       ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav |
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-      ImGui::InvisibleButton("##ArrangeWavRenderBlockerCatch", io.DisplaySize);
+      UiInteract::Hit("##ArrangeWavRenderBlockerCatch", io.DisplaySize);
       ImGui::End();
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor();
@@ -435,7 +436,7 @@ namespace app
       auto DrawCloseBtn = []() -> bool
       {
          const float sz = 16.0f;
-         bool clicked = ImGui::InvisibleButton("##closeinspector", ImVec2(sz, sz));
+         bool clicked = UiInteract::Hit("##closeinspector", ImVec2(sz, sz));
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 bmin = ImGui::GetItemRectMin();
          const ImVec2 bmax = ImGui::GetItemRectMax();

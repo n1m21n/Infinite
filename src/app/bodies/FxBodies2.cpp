@@ -1,5 +1,6 @@
 // Modulation/spectral effect bodies + visualizers (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/StepCell.h"
@@ -711,7 +712,7 @@ namespace app
          const ImVec2 p1(p0.x + cellW, p0.y + h);
          ImGui::PushID(i);
          ImGui::SetCursorScreenPos(p0);
-         ImGui::InvisibleButton("step", ImVec2(cellW, h));
+         UiInteract::Hit("step", ImVec2(cellW, h));
          if (ImGui::IsItemClicked())
          {
             PushUndoCheckpoint();

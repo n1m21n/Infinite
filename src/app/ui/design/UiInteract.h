@@ -47,4 +47,12 @@ namespace UiInteract
    const std::vector<Node>& Tree();               // last completed frame
    const Node* Find(const char* key);             // in the last completed frame
    int DuplicateKeys();                           // keys claimed twice in one window frame (a bug)
+
+   // The one invisible hit area (owner 2026-11-24, ui-control-catalogue.md section 4): every custom-drawn control
+   // claims its rect through here, then reads hover / press / drag from ImGui's item state as before.
+   inline bool Hit(const char* id, const ImVec2& size, ImGuiButtonFlags flags = 0) { return ImGui::InvisibleButton(id, size, flags); }
+
+   // Keyboard focus: the next item (or `offset` items on) takes the keys; whether a window has them.
+   inline void FocusHere(int offset = 0) { ImGui::SetKeyboardFocusHere(offset); }
+   inline bool WindowFocused(ImGuiFocusedFlags flags = 0) { return ImGui::IsWindowFocused(flags); }
 }

@@ -3,6 +3,9 @@
 // layers; the nodes themselves are only read, so a layer keeps animating under
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "app/AppCommon.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/components/ListRow.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
@@ -1199,7 +1202,7 @@ namespace
    {
       const float fh = ImGui::GetFrameHeight();
       ImGui::SetCursorPosY(rowY);
-      const bool clicked = ImGui::InvisibleButton(id, ImVec2(fh, fh));
+      const bool clicked = UiInteract::Hit(id, ImVec2(fh, fh));
       const bool hov = ImGui::IsItemHovered();
       if (hov && tip != nullptr)
          HelpTip("%s", tip);
@@ -1472,7 +1475,7 @@ namespace
       const float w = std::max(fh * 2.0f, width);
       const float hw = std::round(fh * 0.32f);              // handle half width: the hit and the drawn triangle
       const float h = fh + lineH;                            // ramp + handles, then the values line
-      ImGui::InvisibleButton(id, ImVec2(w, h));
+      UiInteract::Hit(id, ImVec2(w, h));
       const ImGuiID me = ImGui::GetItemID();
       const float x0 = p.x + hw, x1 = p.x + w - hw;
       const float barT = p.y + tok::space_1, barB = p.y + fh * 0.55f;
@@ -1550,7 +1553,7 @@ namespace
       }
       // Right-click a handle takes away what it added: a split half folds back onto its partner (the outer one
       // stays), a joined pair goes back to its end (black to 0, white to 255).
-      if (ImGui::IsItemHovered() && under >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (ImGui::IsItemHovered() && under >= 0 && MenuParts::RightPressed())
       {
          const int pair = under / 2, outer = pair == 0 ? 0 : 3, inner = pair == 0 ? 1 : 2;
          PushUndoCheckpoint("Blend If");
@@ -1745,7 +1748,7 @@ namespace
          c = { 0.0f, 0.0f, 1.0f, 1.0f };
       const float w = ImGui::GetContentRegionAvail().x, h = std::min(w, 180.0f);
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
-      ImGui::InvisibleButton("##curve", ImVec2(w, h));
+      UiInteract::Hit("##curve", ImVec2(w, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 p1(p0.x + w, p0.y + h);
       dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
@@ -1781,7 +1784,7 @@ namespace
       const bool draggingThis = ImGui::IsItemActive() && sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < n;
       const bool pullOff = draggingThis && sCurveDrag > 0 && sCurveDrag < n - 1 &&
                            (m.x < p0.x - 24.0f || m.x > p1.x + 24.0f || m.y < p0.y - 24.0f || m.y > p1.y + 24.0f);
-      if (ImGui::IsItemHovered() && (ImGui::IsMouseDoubleClicked(0) || ImGui::IsMouseClicked(1)) && near > 0 && near < n - 1)
+      if (ImGui::IsItemHovered() && (ImGui::IsMouseDoubleClicked(0) || MenuParts::RightPressed()) && near > 0 && near < n - 1)
       {
          PushUndoCheckpoint("Curves");
          c.erase(c.begin() + near * 2, c.begin() + near * 2 + 2);
@@ -2031,7 +2034,7 @@ namespace
       FieldLabel(T("Gradient"));
       const float w = sFieldW, h = 16.0f, mk = 6.0f;
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
-      ImGui::InvisibleButton("##bar", ImVec2(w, h + mk + 4.0f));
+      UiInteract::Hit("##bar", ImVec2(w, h + mk + 4.0f));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       auto u32 = [](const float c[4]) { return ImGui::ColorConvertFloat4ToU32(ImVec4(c[0], c[1], c[2], 1.0f)); };
       const float fx0 = p0.x, fx1 = p0.x + w;
@@ -2083,7 +2086,7 @@ namespace
             pick = hit;
          }
       }
-      if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && st.size() > 2)
+      if (MenuParts::ContextClicked() && st.size() > 2)
       {
          const int hit = nearest();
          if (hit >= 0)
@@ -2221,7 +2224,7 @@ namespace
             const float w = ImGui::GetContentRegionAvail().x;
             const float histH = 44.0f, mkH = 10.0f;
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
-            ImGui::InvisibleButton((std::string("##v2dlvh") + std::to_string(key)).c_str(), ImVec2(w, histH + mkH + 2.0f));
+            UiInteract::Hit((std::string("##v2dlvh") + std::to_string(key)).c_str(), ImVec2(w, histH + mkH + 2.0f));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImVec2 hp1(p0.x + w, p0.y + histH);
             dl->AddRectFilled(p0, hp1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
@@ -2482,7 +2485,7 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       bool changed = false;
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      ImGui::InvisibleButton(FormParts::Id(label).c_str(), ImVec2(cell * 3, cell * 3));
+      UiInteract::Hit(FormParts::Id(label).c_str(), ImVec2(cell * 3, cell * 3));
       if (*anchor == 4)
          UiAudit::NoteOn();   // the grid's centre cell is the chosen one: a click there rightly changes nothing
       if (ImGui::IsItemClicked())
@@ -4195,14 +4198,14 @@ namespace
             FormParts::Inline(0.0f, gap);
          ImGui::PushID(i);
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         ImGui::InvisibleButton("##chip", ImVec2(sq, sq));
+         UiInteract::Hit("##chip", ImVec2(sq, sq));
          if (i < (int)list.size())
          {
             const float* c = list[i].c;
             dl->AddRectFilled(p, ImVec2(p.x + sq, p.y + sq), ImGui::GetColorU32(ImVec4(c[0], c[1], c[2], 1.0f)), tok::radius_cell);
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
                picked = i;
-            if (removed != nullptr && ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            if (removed != nullptr && MenuParts::ContextClicked())
                *removed = i;
          }
          else
@@ -6430,7 +6433,7 @@ namespace
       ImGui::PushID(sTextEdit);
       if (sTextFocus)
       {
-         ImGui::SetKeyboardFocusHere();
+         UiInteract::FocusHere();
          sTextFocus = false;
       }
       const ImU32 clear = tok::U32(tok::transparent);
@@ -6504,12 +6507,12 @@ namespace
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       // Chips drawn over the canvas later in the frame (Rasterize?) must be able to take the hover and the click.
       ImGui::SetNextItemAllowOverlap();
-      ImGui::InvisibleButton("##view2dcanvas", size,
+      UiInteract::Hit("##view2dcanvas", size,
                              ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonMiddle | ImGuiButtonFlags_MouseButtonRight);
       // A right-click picks what is under the cursor first (Affinity, Figma; Photoshop's Move tool lists the layers
       // there), so the menu offers what applies to that layer. A pixel selection keeps its layer; so does a click
       // on a layer already selected.
-      if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !doc->HasSelection())
+      if (MenuParts::ContextClicked() && !doc->HasSelection())
       {
          const ImVec2 p = ToDoc(doc, ImGui::GetIO().MousePos);
          float lo[2] = { p.x, p.y }, hi[2] = { p.x, p.y };
@@ -6703,7 +6706,7 @@ namespace
          const bool pixels = sZoom >= 2.0f;
          if (pixels)
             dl->AddCallback(&MagFilterCb, (void*)(intptr_t)(tex | 0x80000000u));
-         dl->AddImageQuad((ImTextureID)(intptr_t)tex, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
+         Thumb::AddQuad(dl, (ImTextureID)(intptr_t)tex, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
          if (pixels)
          {
             dl->AddCallback(&MagFilterCb, (void*)(intptr_t)tex);
@@ -6732,7 +6735,7 @@ namespace
       // The selection's marching ants, or the red quick mask, over the picture.
       if ((doc->HasSelection() || doc->quickMask) && !(doc->HasSelection() && DrawScreenAnts(dl, doc)))
          if (const unsigned ants = doc->SelectionOverlay((float)ImGui::GetTime(), doc->quickMask))
-            dl->AddImageQuad((ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
+            Thumb::AddQuad(dl, (ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       if (ViewTurned())
          dl->AddPolyline(pq, 4, tok::U32(tok::canvas_shade, 120), ImDrawFlags_Closed, 1.0f);
       else
@@ -8159,7 +8162,7 @@ namespace
                {
                   const ImVec2 rmx = ImGui::GetItemRectMax(), rmn = ImGui::GetItemRectMin();
                   const float cy = (rmn.y + rmx.y) * 0.5f;
-                  ImGui::GetWindowDrawList()->AddImage((ImTextureID)(intptr_t)thumb, ImVec2(rmx.x - 96.0f - tok::space_2, cy - 12.0f),
+                  Thumb::Add(ImGui::GetWindowDrawList(), (ImTextureID)(intptr_t)thumb, ImVec2(rmx.x - 96.0f - tok::space_2, cy - 12.0f),
                                                        ImVec2(rmx.x - tok::space_2, cy + 12.0f), ImVec2(0, 1), ImVec2(1, 0));
                }
                if (chose)
@@ -9005,7 +9008,7 @@ namespace
          const float w = std::min(f->w, maxW);
          const float top = std::round(baseline - f->base);
          dl->PushClipRect(ImVec2(a.x, a.y - 8.0f), ImVec2(b.x, b.y + 8.0f), true);
-         dl->AddImage((ImTextureID)(intptr_t)f->tex, ImVec2(a.x, top), ImVec2(a.x + w, top + f->h), ImVec2(0, 0), ImVec2(w / f->w, 1), col);
+         Thumb::Add(dl, (ImTextureID)(intptr_t)f->tex, ImVec2(a.x, top), ImVec2(a.x + w, top + f->h), ImVec2(0, 0), ImVec2(w / f->w, 1), col);
          dl->PopClipRect();
       }
       else
@@ -9054,7 +9057,7 @@ namespace
             sOpenId = id;
             sFontOrig = font;
             sFontFind[0] = 0;
-            ImGui::SetKeyboardFocusHere();
+            UiInteract::FocusHere();
          }
          ImGui::SetNextItemWidth(-1.0f);
          FieldWell::InputText("##fontfind", sFontFind, sizeof(sFontFind));
@@ -9460,7 +9463,7 @@ namespace
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float t = PanelKit::Chip(), sq = std::round(t * 0.6f);
-      ImGui::InvisibleButton("##v2dcolours", ImVec2(t, t));
+      UiInteract::Hit("##v2dcolours", ImVec2(t, t));
       const ImVec2 m = ImGui::GetIO().MousePos;
       const bool inFg = m.x < p.x + sq + 1 && m.y < p.y + sq + 1;
       const bool inSwap = !inFg && m.x > p.x + sq && m.y < p.y + t - sq;
@@ -9563,7 +9566,7 @@ namespace
          }
       }
       ImGui::Spacing();
-      if (ImGui::BeginTable("##v2dpicktbl", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings))
+      if (ListRow::BeginTable("##v2dpicktbl", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings))
       {
          ImGui::TableNextRow();
          for (const std::vector<ToolGroup>& col : PickerColumns())
@@ -9587,7 +9590,7 @@ namespace
                   const float rh = ImGui::GetFrameHeight();
                   const float rw = std::max(ImGui::GetContentRegionAvail().x, 18.0f + tok::space_2 + ImGui::CalcTextSize(name).x + tok::space_2);
                   const ImVec2 rp = ImGui::GetCursorScreenPos();
-                  if (ImGui::InvisibleButton("##row", ImVec2(rw, rh)))
+                  if (UiInteract::Hit("##row", ImVec2(rw, rh)))
                   {
                      sStripHidden[idx] = on;
                      SaveStrip();
@@ -9662,7 +9665,7 @@ namespace
          }
          SaveStrip();
       }
-      if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && MenuParts::RightPressed())
          openPicker = true;
       ImGui::Dummy(ImVec2(w, 0.0f));
       ColourChips();
@@ -10206,7 +10209,7 @@ namespace
          const float k = std::min(sz.x / cw, sz.y / ch);
          const ImVec2 c(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), h(cw * k * 0.5f, ch * k * 0.5f);
          if (ptex != 0)
-            dl->AddImage((ImTextureID)(intptr_t)ptex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y),
+            Thumb::Add(dl, (ImTextureID)(intptr_t)ptex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y),
                          ImVec2(r[0] / pw, 1.0f - r[1] / ph), ImVec2(r[2] / pw, 1.0f - r[3] / ph));
          return;
       }
@@ -10219,7 +10222,7 @@ namespace
          const float k = std::min(sz.x / std::max(1.0f, vw), sz.y / std::max(1.0f, vh));
          const ImVec2 c(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), h(vw * k * 0.5f, vh * k * 0.5f);
          if (vtex != 0)
-            dl->AddImage((ImTextureID)(intptr_t)vtex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
+            Thumb::Add(dl, (ImTextureID)(intptr_t)vtex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
          return;
       }
       INode* src = doc->Source(l);
@@ -10232,7 +10235,7 @@ namespace
       const float sw = (float)std::max(1, src->GetOutputWidth()), sh = (float)std::max(1, src->GetOutputHeight());
       const float k = std::min(sz.x / sw, sz.y / sh);
       const ImVec2 c(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f), h(sw * k * 0.5f, sh * k * 0.5f);
-      dl->AddImage((ImTextureID)(intptr_t)tex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
+      Thumb::Add(dl, (ImTextureID)(intptr_t)tex, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
    }
 
    const ImU32 kLabelCol[8] = { 0, tok::U32(tok::label_red), tok::U32(tok::label_orange), tok::U32(tok::label_yellow),
@@ -10278,7 +10281,7 @@ namespace
          // Eye: Alt-click shows only this one.
          ImGui::SetCursorScreenPos(ImVec2(p.x + 4, p.y + (rowH - 18) * 0.5f));
          // A press flips the eye; dragging on down the column sets every eye it crosses the same way (Photoshop).
-         ImGui::InvisibleButton("##eye", ImVec2(18, 18));
+         UiInteract::Hit("##eye", ImVec2(18, 18));
          if (ImGui::IsItemActivated())
          {
             if (io.KeyAlt)
@@ -10303,7 +10306,7 @@ namespace
          if (l->kind == Kind::Group)
          {
             ImGui::SetCursorScreenPos(ImVec2(x, p.y + (rowH - 16) * 0.5f));
-            if (ImGui::InvisibleButton("##open", ImVec2(12, 16)))
+            if (UiInteract::Hit("##open", ImVec2(12, 16)))
             {
                l->open = !l->open;
                Touch();
@@ -10338,7 +10341,7 @@ namespace
          {
             // An adjustment layer's thumbnail opens its settings window (Photoshop's Properties for that layer).
             ImGui::SetCursorScreenPos(ImVec2(x, p.y + 2));
-            if (ImGui::InvisibleButton("##athumb", tsz))
+            if (UiInteract::Hit("##athumb", tsz))
             {
                SelectOnly(id);
                SettingsWindow::Toggle("v2dadj/" + std::to_string(sDocUid) + "/" + std::to_string(id));
@@ -10349,7 +10352,7 @@ namespace
          if (hasMask)
          {
             ImGui::SetCursorScreenPos(ImVec2(x, p.y + 2));
-            if (ImGui::InvisibleButton("##pthumb", tsz))
+            if (UiInteract::Hit("##pthumb", tsz))
             {
                SelectOnly(id);
                sEditMask = false;
@@ -10363,7 +10366,7 @@ namespace
             const float k = std::min(tsz.x / mw, tsz.y / mh);
             const ImVec2 c(x + tsz.x * 0.5f, p.y + 2 + tsz.y * 0.5f), h(mw * k * 0.5f, mh * k * 0.5f);
             if (const unsigned mt = doc->PixelMaskTexture(id))
-               dl->AddImage((ImTextureID)(intptr_t)mt, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
+               Thumb::Add(dl, (ImTextureID)(intptr_t)mt, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
             if (!l->pmaskOn)
             {
                dl->AddLine(ImVec2(m0.x + 3, m0.y + 3), ImVec2(m1.x - 3, m1.y - 3), tok::U32(tok::record), 2.0f);
@@ -10372,7 +10375,7 @@ namespace
             if (aimMask)
                dl->AddRect(ImVec2(m0.x - 1, m0.y - 1), ImVec2(m1.x + 1, m1.y + 1), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_cell);
             ImGui::SetCursorScreenPos(m0);
-            if (ImGui::InvisibleButton("##mthumb", tsz))
+            if (UiInteract::Hit("##mthumb", tsz))
             {
                if (io.KeySuper || io.KeyCtrl)
                {
@@ -10395,7 +10398,7 @@ namespace
             if (ImGui::IsItemHovered())
                Tip::Show("%s", T("Layer mask: click to paint it, Shift-click to turn it off"));
             // The mask thumbnail has its own menu: only what acts on the mask.
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            if (MenuParts::ContextClicked())
                ImGui::OpenPopup("##maskmenu");
             if (MenuParts::BeginPopup("##maskmenu"))
             {
@@ -10427,7 +10430,7 @@ namespace
          {
             ImGui::SetNextItemWidth(std::max(tok::text_min_w, p.x + w - x - 24.0f));
             if (ImGui::IsWindowAppearing() || !ImGui::IsAnyItemActive())
-               ImGui::SetKeyboardFocusHere();
+               UiInteract::FocusHere();
             const bool done = FieldWell::InputText("##rename", sRenameBuf, sizeof(sRenameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
             if (done || ImGui::IsItemDeactivated())
             {
@@ -10453,7 +10456,7 @@ namespace
          // The row itself: select, rename, drag to restack.
          ImGui::SetCursorScreenPos(ImVec2(x, p.y));
          ImGui::SetNextItemAllowOverlap();
-         ImGui::InvisibleButton("##row", ImVec2(std::max(1.0f, p.x + w - x), rowH));
+         UiInteract::Hit("##row", ImVec2(std::max(1.0f, p.x + w - x), rowH));
          if (ImGui::IsItemClicked())
          {
             if (io.KeyShift || io.KeyCtrl || io.KeySuper)
@@ -10521,7 +10524,7 @@ namespace
             ImGui::EndDragDropTarget();
          }
          // The whole row opens the menu: eye, fold arrow and thumbnail included.
-         if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsWindowHovered() &&
+         if (MenuParts::RightPressed() && ImGui::IsWindowHovered() &&
              ImGui::IsMouseHoveringRect(p, ImVec2(p.x + w, p.y + rowH)) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
             ImGui::OpenPopup("##rowmenu");
          else if (MenuParts::TestOpen("##rowmenu"))   // self-test: the top row, as a right-click on it would
@@ -11819,7 +11822,7 @@ namespace
       const float pad = SectionCard::Pad();
       sCardSpan[0] = ImVec2(np.x - CheckBox::Size() - tok::space_2 - pad, np.y - pad);
       sCardSpan[1] = ImVec2(np.x + ImGui::GetContentRegionAvail().x + pad, np.y + fh + pad);
-      if (ImGui::InvisibleButton(id.c_str(), ImVec2(nameW, fh)))
+      if (UiInteract::Hit(id.c_str(), ImVec2(nameW, fh)))
          SettingsWindow::Toggle(winKey);
       const bool hov = ImGui::IsItemHovered();
       if (hov && tip != nullptr)
@@ -11834,7 +11837,7 @@ namespace
    void EffectMenu(Layer& l, int i, const std::string& winKey)
    {
       const std::string pop = "##v2deffmenu" + std::to_string(l.id) + "_" + std::to_string(i);
-      if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+      if (MenuParts::ContextClicked())
          ImGui::OpenPopup(pop.c_str());
       if (!MenuParts::BeginPopup(pop.c_str()))
          return;
@@ -12074,7 +12077,7 @@ namespace
          return;
       ImGui::SetNextItemWidth(sFieldW);
       if (ImGui::IsWindowAppearing())
-         ImGui::SetKeyboardFocusHere();
+         UiInteract::FocusHere();
       FieldWell::InputText("##v2deffq", sEffSearch, sizeof sEffSearch);
       MenuParts::Separator();
       if (sEffSearch[0] != 0)
@@ -12655,7 +12658,7 @@ namespace
          ImGui::SetCursorPosY(rowY);
          const ImVec2 np = CardTitle(base + "name", T(english), l->fx[t].on, 1, winKey, T("Click for all settings, right-click for more"));
          // Right-click on the header: the style's own menu.
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         if (MenuParts::ContextClicked())
             ImGui::OpenPopup("##v2dfxmenu");
          if (MenuParts::BeginPopup("##v2dfxmenu"))
          {
@@ -12770,7 +12773,7 @@ namespace
       {
          ImGui::SetNextItemWidth(sFieldW);
          if (ImGui::IsWindowAppearing())
-            ImGui::SetKeyboardFocusHere();
+            UiInteract::FocusHere();
          FieldWell::InputText("##v2dadjq", sAdjSearch, sizeof sAdjSearch);
          MenuParts::Separator();
          if (sAdjSearch[0] != 0)
@@ -12846,7 +12849,7 @@ namespace
             SelectOnly(id);
          ReorderDrag::Item(k, title.c_str(), nullptr, 0, sCardSpan);
          // Right-click on the header: an adjustment layer's own menu (no pixel ops).
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         if (MenuParts::ContextClicked())
          {
             SelectOnly(id);
             ImGui::OpenPopup("##v2dadjmenu");
@@ -13699,7 +13702,7 @@ namespace
    void DrawDockMenu(float top, float bottom)
    {
       const ImVec2 mn(ImGui::GetWindowPos().x, top), mx(mn.x + ImGui::GetWindowSize().x, bottom);
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
+      if (MenuParts::RightPressed() && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##v2ddockmenu");
       if (MenuParts::TestOpen("##v2ddockmenu"))
@@ -17180,7 +17183,7 @@ void DrawViewDocked(const char* id, const ImVec2& size, int dock, float& height,
    const ImVec2 inner = ImGui::GetContentRegionAvail();
    auto grip = [&]()
    {
-      ImGui::InvisibleButton(gripId, vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));
+      UiInteract::Hit(gripId, vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));
       DrawPanelSeam(vertical, gripFirst);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);

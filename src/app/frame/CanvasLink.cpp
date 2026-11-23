@@ -272,7 +272,7 @@ namespace CanvasLink
             return;
          }
       }
-      if (cancelNow || Keymap::Cancel(true) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (cancelNow || Keymap::Cancel(true) || MenuParts::RightPressed())
          Cancel();
    }
 

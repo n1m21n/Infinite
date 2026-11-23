@@ -1,5 +1,6 @@
 // Per-frame self-test blocks moved verbatim out of the main loop in main.cpp.
 #include "app/AppShared.h"
+#include "app/ui/design/UiInteract.h"
 #include "audio/PhaseShape.h"
 
 namespace app
@@ -1969,7 +1970,7 @@ void FrameTest_TEXTFOCUSTEST(int frameId, GLFWwindow* window)
          if (frameId == 3)
             claimedIdle = !TextFocusClaimed() ? true : false;
          if (frameId == 5)
-            ImGui::SetKeyboardFocusHere();
+            UiInteract::FocusHere();
          ImGui::InputText("##tf", buf, sizeof(buf));
          if (frameId >= 5 && !sawLag && ImGui::GetCurrentContext()->ActiveId != 0)
          {

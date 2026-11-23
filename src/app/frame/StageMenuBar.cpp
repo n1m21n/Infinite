@@ -1,5 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/ReorderDrag.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/panels/FieldPatcherPanel.h"
@@ -223,11 +225,11 @@ void DrawMenuBar(FrameCtx& fc)
             const float cy = sMenuMidY > 0.0f ? sMenuMidY : ImGui::GetWindowPos().y + tok::bar_h * 0.5f;
             sMenuMidYPtr = &sMenuMidY;
             ImGui::SetCursorScreenPos(ImVec2(p0.x + 4.0f, cy - s * 0.5f));
-            if (ImGui::InvisibleButton("##brandlogo", ImVec2(s, s)))
+            if (UiInteract::Hit("##brandlogo", ImVec2(s, s)))
                gShowAboutModal = true;
             const bool hov = ImGui::IsItemHovered();
             if (const ImTextureID tex = BrandLogoTexture())
-               ImGui::GetWindowDrawList()->AddImageRounded(tex, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+               Thumb::AddRounded(ImGui::GetWindowDrawList(), tex, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
                   ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(ImVec4(1, 1, 1, hov ? 1.0f : 0.92f)), 5.0f);
             if (hov)
                HelpTip("%s", T("About Infinite"));
@@ -1012,7 +1014,7 @@ void DrawMenuBar(FrameCtx& fc)
             {
                // Inside a DAW the host sets tempo and meter every block (unless Settings > DAW sync gives tempo to
                   // Infinite): show them, never edit them.
-               ImGui::InvisibleButton(id, ImVec2(w, TD::kHeight));
+               UiInteract::Hit(id, ImVec2(w, TD::kHeight));
                TD::Value(id, x, w, wellMin.y, shown);
                if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
                   HelpTip("%s", T("Set by the DAW"));
@@ -1027,7 +1029,7 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::SetNextItemWidth(fieldW);
                if (sFieldJustOpened)
                {
-                  ImGui::SetKeyboardFocusHere();
+                  UiInteract::FocusHere();
                   sFieldJustOpened = false;
                }
                const float textW = ImGui::CalcTextSize(sFieldText).x;
@@ -1046,7 +1048,7 @@ void DrawMenuBar(FrameCtx& fc)
                }
                return;
             }
-            ImGui::InvisibleButton(id, ImVec2(w, TD::kHeight));
+            UiInteract::Hit(id, ImVec2(w, TD::kHeight));
             const bool hov = ImGui::IsItemHovered();
             const float hv = UiAnim::Hover(ImGui::GetItemID(), hov, tok::motion_hover_in, tok::motion_hover_out);
             TD::Wash(mn, mx, hv, ImGui::IsItemActive());
@@ -1155,7 +1157,7 @@ void DrawMenuBar(FrameCtx& fc)
             auto Pick = [&](const char* id, float x, float w, const char* shown, const char* popup)
             {
                ImGui::SetCursorScreenPos(ImVec2(x, wellMin.y));
-               if (ImGui::InvisibleButton(id, ImVec2(w, TD::kHeight)))
+               if (UiInteract::Hit(id, ImVec2(w, TD::kHeight)))
                   ImGui::OpenPopup(popup);
                const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
                TD::Wash(ImVec2(x, wellMin.y), ImVec2(x + w, wellMin.y + TD::kHeight), hv, ImGui::IsItemActive());
@@ -1207,7 +1209,7 @@ void DrawMenuBar(FrameCtx& fc)
                                   ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
                                   : 0.0f))
                gMetronomeOn = !gMetronomeOn;
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            if (MenuParts::ContextClicked())
                ImGui::OpenPopup("##metronomePopup");
 
             if (MenuParts::BeginPopup("##metronomePopup"))
@@ -1308,7 +1310,7 @@ void DrawMenuBar(FrameCtx& fc)
                cursorX -= updateWidth;
                TopBarPlaceAt(cursorX);
                ImGui::PushID("##updateicon");
-               const bool clicked = ImGui::InvisibleButton("##update", ImVec2(tok::control_h, tok::control_h));
+               const bool clicked = UiInteract::Hit("##update", ImVec2(tok::control_h, tok::control_h));
                ImGui::PopID();
                const bool hov = ImGui::IsItemHovered();
                const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
@@ -1327,7 +1329,7 @@ void DrawMenuBar(FrameCtx& fc)
                   Tip::Show(T("version %s is available (you have %s) - click to update, right-click to dismiss"),
                                      lv.empty() ? "?" : lv.c_str(), INFINITE_VERSION_STRING);
                }
-               if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               if (MenuParts::ContextClicked())
                   UpdateCheck::Dismiss();
                cursorX -= telemetryGap;
             }

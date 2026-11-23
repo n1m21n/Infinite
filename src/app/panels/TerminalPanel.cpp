@@ -2,6 +2,7 @@
 // on its own threads (core/term/TermSession.h); this file only draws the latest snapshot and queues input, so the
 // frame never waits on a shell. Open state, dock and height are app preferences; patches never touch the terminal.
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/Tip.h"
@@ -683,7 +684,7 @@ namespace
    {
       const bool reported = overCells && snap != nullptr && snap->mouseMode != 0 && !ImGui::GetIO().KeyShift;
       const bool overItem = chat ? ImGui::IsAnyItemHovered() : sTabHovered;
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !reported && !overItem &&
+      if (MenuParts::RightPressed() && !reported && !overItem &&
           !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
          ImGui::OpenPopup("##terminalDockMenu");
@@ -733,7 +734,7 @@ namespace
          const float width = ImGui::CalcTextSize(title.c_str()).x + 44.0f;
          ImGui::PushID(i);
          ImGui::SetCursorScreenPos(ImVec2(x, start.y));
-         ImGui::InvisibleButton("##tab", ImVec2(width, kTabRowH));
+         UiInteract::Hit("##tab", ImVec2(width, kTabRowH));
          const bool hovered = ImGui::IsItemHovered();
          sTabHovered = sTabHovered || hovered;
          // The close mark is part of this button: a second button on top of it never gets the hover.
@@ -766,7 +767,7 @@ namespace
          x += width + 4.0f;
       }
       ImGui::SetCursorScreenPos(ImVec2(x, start.y));
-      ImGui::InvisibleButton("##newtab", ImVec2(kTabRowH, kTabRowH));
+      UiInteract::Hit("##newtab", ImVec2(kTabRowH, kTabRowH));
       {
          const ImVec2 c(x + kTabRowH * 0.5f, start.y + kTabRowH * 0.5f);
          const ImU32 mark = ImGui::IsItemHovered() ? textColor : dimColor;
@@ -798,7 +799,7 @@ namespace
       ImGui::SetNextItemWidth(std::min(280.0f, width - 90.0f));
       if (sSearchFocus)
       {
-         ImGui::SetKeyboardFocusHere();
+         UiInteract::FocusHere();
          sSearchFocus = false;
       }
       const bool edited = FieldWell::InputTextWithHint("##termsearch", T("Find in terminal"), sSearchText, sizeof sSearchText);
@@ -1018,8 +1019,8 @@ namespace
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + avail.x, origin.y + avail.y), tok::U32(tok::terminal_bg, CategoryColors::IsThemeLight()), tok::radius_control);
-      ImGui::InvisibleButton("##terminalcells", avail, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
-      if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
+      UiInteract::Hit("##terminalcells", avail, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
+      if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || MenuParts::ContextClicked())
          gTerminalFocus = true;
       DrawDockMenu(ImGui::IsItemHovered(), snap.get());
 
@@ -1113,7 +1114,7 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    const ImVec2 inner = ImGui::GetContentRegionAvail();
    auto grip = [&]()
    {
-      ImGui::InvisibleButton("##terminalgrip", vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));
+      UiInteract::Hit("##terminalgrip", vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));
       DrawPanelSeam(vertical, gripFirst);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);

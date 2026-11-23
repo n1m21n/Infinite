@@ -5,6 +5,7 @@
 // colour dots opened and closed with Esc, checkboxes clicked twice, every control hovered and wheel-scrolled.
 // tools/ui-audit/run.py launches it, writes the report and holds it against the baseline.
 #include "app/AppShared.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/selftest/UiAudit.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "core/Notices.h"
@@ -880,7 +881,7 @@ namespace
       ImGui::Button("Same##canary");
       ImGui::SameLine();
       ImGui::Button("Same##canary");
-      ImGui::InvisibleButton("tiny", ImVec2(6, 6));
+      UiInteract::Hit("tiny", ImVec2(6, 6));
       const ImVec2 p = ImGui::GetCursorPos();
       ImGui::Button("Over A", ImVec2(70, 20));
       ImGui::SetCursorPos(ImVec2(p.x + 30, p.y + 6));

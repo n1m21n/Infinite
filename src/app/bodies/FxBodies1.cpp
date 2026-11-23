@@ -1,5 +1,6 @@
 // Filter, EQ, dynamics, delay, reverb and drive bodies + visualizers (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
@@ -233,7 +234,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      ImGui::InvisibleButton("##filterCurve", ImVec2(w, h));
+      UiInteract::Hit("##filterCurve", ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
       if (ImGui::IsItemActivated())
@@ -583,7 +584,7 @@ namespace app
 
       gEqTestRect = ImVec4(origin.x, origin.y, br.x, br.y);
 
-      ImGui::InvisibleButton("##eqCurve", ImVec2(w, h));
+      UiInteract::Hit("##eqCurve", ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
       if (ImGui::IsItemActivated())

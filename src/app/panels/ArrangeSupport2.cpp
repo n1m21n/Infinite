@@ -1,5 +1,6 @@
 // Arrange panel support: position formatting, typed edit, sliders, media import (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/UiFmt.h"
@@ -212,7 +213,7 @@ namespace app
       ImGui::SetNextItemWidth(width);
       if (gArrangeTypedEdit.justOpened)
       {
-         ImGui::SetKeyboardFocusHere();
+         UiInteract::FocusHere();
          gArrangeTypedEdit.justOpened = false;
       }
       char buf[128];

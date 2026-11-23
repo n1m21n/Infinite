@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include <unordered_map>
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/AudioViz.h"
@@ -689,7 +690,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const ImVec2 hi = ImGui::GetItemRectMax();
                const ImVec2 after = ImGui::GetCursorScreenPos();
                ImGui::SetCursorScreenPos(lo);
-               ImGui::InvisibleButton("##stmouse", ImVec2(std::max(1.0f, hi.x - lo.x), std::max(1.0f, hi.y - lo.y)));
+               UiInteract::Hit("##stmouse", ImVec2(std::max(1.0f, hi.x - lo.x), std::max(1.0f, hi.y - lo.y)));
                float* m = stFormula->mouse;
                if (ImGui::IsItemActive())
                {

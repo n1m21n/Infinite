@@ -1,5 +1,6 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
 #include "app/ui/design/components/ColourChip.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include <cmath>
@@ -453,7 +454,7 @@ namespace app
       if (gPerfEditMode)
       {
          ImGui::SetCursorScreenPos(cellPos);
-         ImGui::InvisibleButton("##cardbodybtn", cardSize);
+         UiInteract::Hit("##cardbodybtn", cardSize);
          if (ImGui::IsItemHovered())
             outMouseHovered = true;
 
@@ -475,7 +476,7 @@ namespace app
                gPerfSelection.insert(elemIdx);
             }
          }
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && gPerfSelection.count(elemIdx) == 0)
+         if (MenuParts::ContextClicked() && gPerfSelection.count(elemIdx) == 0)
          {
             gPerfSelection.clear();
             gPerfSelection.insert(elemIdx);
@@ -727,7 +728,7 @@ namespace app
       {
          ImGui::SetCursorScreenPos(ImVec2(cellPos.x + 4.0f, cellPos.y + 1.0f));
          ImGui::SetNextItemWidth(cardSize.x - 8.0f);
-         ImGui::SetKeyboardFocusHere();
+         UiInteract::FocusHere();
          if (FieldWell::InputText("##renamingelemfield", gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer),
                               ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll) ||
              (ImGui::IsItemDeactivated() && gPerfRenamingElementIdx == (int)elemIdx))
@@ -891,7 +892,7 @@ namespace app
          auto toPos = [&](float x) { return v2p ? std::clamp(v2p(x, minV, maxV), 0.0f, 1.0f) : std::clamp((x - minV) / (maxV - minV), 0.0f, 1.0f); };
          const ImVec2 sTL = ImGui::GetCursorScreenPos();
          const float sH = 30.0f;
-         ImGui::InvisibleButton("##hslider", ImVec2(sliderW, sH));
+         UiInteract::Hit("##hslider", ImVec2(sliderW, sH));
          const bool sActive = !isModulated && ImGui::IsItemActive();
          const bool sHover = ImGui::IsItemHovered();
          bool sliderMoved = false;
@@ -995,7 +996,7 @@ namespace app
          ImVec2 padBR(origin.x + padSize, origin.y + padSize);
 
          ImGui::SetCursorScreenPos(origin);
-         ImGui::InvisibleButton("##xypad", ImVec2(padSize, padSize));
+         UiInteract::Hit("##xypad", ImVec2(padSize, padSize));
          const bool active = ImGui::IsItemActive();
 
          float minX = kpX.minValue, maxX = kpX.maxValue;
@@ -1057,7 +1058,7 @@ namespace app
          ImVec2 center(centerX + padSize * 0.5f, centerY + padSize * 0.5f);
 
          ImGui::SetCursorScreenPos(bTL);
-         ImGui::InvisibleButton("##bangbtn", ImVec2(padSize, padSize));
+         UiInteract::Hit("##bangbtn", ImVec2(padSize, padSize));
          const bool active = ImGui::IsItemActive();
          const bool hovered = ImGui::IsItemHovered();
          // A trigger wired to a multi-state selector or toggle advances one step per
@@ -1371,7 +1372,7 @@ namespace app
 
             ImGui::SetCursorScreenPos(sTL);
             ImGui::PushID(s + 400);
-            ImGui::InvisibleButton("##stepbtn", ImVec2(stepW, stepH));
+            UiInteract::Hit("##stepbtn", ImVec2(stepW, stepH));
             if (ImGui::IsItemClicked())
             {
                PushUndoCheckpoint();
@@ -2318,7 +2319,7 @@ namespace app
       // both the graph and the matrix.
       if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows |
                                  ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
-          (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
+          (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || MenuParts::RightPressed()))
          gPerfMatrixClaimedKeys = true;
       gPerfMatrixFocused = gPerfMatrixClaimedKeys && gPerfEditMode;
       if (gPerfEditMode)
@@ -2432,7 +2433,7 @@ namespace app
 
       auto grip = [&]()
       {
-         ImGui::InvisibleButton("##perfpanelgrip",
+         UiInteract::Hit("##perfpanelgrip",
                                 vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
                                          : ImVec2(std::max(1.0f, inner.x), kGrip));
          // The panel's canvas-facing boundary, and the only thing that marks

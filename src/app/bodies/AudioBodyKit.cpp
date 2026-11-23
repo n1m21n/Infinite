@@ -1,5 +1,6 @@
 // Audio node body building blocks: columns, sections, knob rows, drift meters, gates (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiInteract.h"
 #include <unordered_map>
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
@@ -632,7 +633,7 @@ namespace app
       ImGui::PushID(id);
       if (h.modulated)
          ImGui::BeginDisabled();
-      ImGui::InvisibleButton("##gate", ImVec2(btnW, height));
+      UiInteract::Hit("##gate", ImVec2(btnW, height));
       const bool held = ImGui::IsItemActive();
       const bool hovered = ImGui::IsItemHovered();
       if (activated != nullptr)
@@ -880,7 +881,7 @@ namespace app
       // SetNextItemAllowOverlap: a later item is otherwise blocked while this one is hovered).
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##body", ImVec2(w, h));
+      UiInteract::Hit("##body", ImVec2(w, h));
       in.activated = ImGui::IsItemActivated();
       in.active = ImGui::IsItemActive();
       in.hovered = ImGui::IsItemHovered();
@@ -989,7 +990,7 @@ namespace app
                                   ImVec2(gx, br.y - grip), col);
 
             ImGui::SetCursorScreenPos(ImVec2(std::clamp(x - handleW * 0.5f, origin.x, br.x - handleW), origin.y));
-            ImGui::InvisibleButton(which == 0 ? "##start" : "##end", ImVec2(handleW, h));
+            UiInteract::Hit(which == 0 ? "##start" : "##end", ImVec2(handleW, h));
             const ImGuiID hid = ImGui::GetItemID();
             const bool fine = ImGui::GetIO().KeyShift;
             const float mouseX = ImGui::GetIO().MousePos.x;

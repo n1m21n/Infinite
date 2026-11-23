@@ -11,6 +11,7 @@
 // The engine is a private Generate Samples node (never in the graph, never cooked): a take made here and one made
 // on the node are the same sound for the same recipe. Snap to scale re-renders the take's own seed pinned.
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/AppShared.h"
 #include "app/graph/GenerateSamplesNode.h"
@@ -1485,7 +1486,7 @@ namespace
    {
       Studio& s = S();
       ImGui::SetCursorScreenPos(mn);
-      ImGui::InvisibleButton("##studioRuler", ImVec2(mx.x - mn.x, mx.y - mn.y));
+      UiInteract::Hit("##studioRuler", ImVec2(mx.x - mn.x, mx.y - mn.y));
       const double fpb = FramesPerBeat();
       const TimeRuler::Axis axis { mn.x, mx.x, g.w0 / fpb, (mx.x - mn.x) / std::max(1e-9, (g.w1 - g.w0) / fpb), 4.0 };
       if (ImGui::IsItemHovered())
@@ -1515,7 +1516,7 @@ namespace
       Studio& s = S();
       const float w = mx.x - mn.x;
       ImGui::SetCursorScreenPos(mn);
-      ImGui::InvisibleButton("##studioOverview", ImVec2(w, mx.y - mn.y));
+      UiInteract::Hit("##studioOverview", ImVec2(w, mx.y - mn.y));
       dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_FrameBg, 0.6f), 3.0f);
       const double total = (double)Frames();
       if (total <= 0.0)
@@ -2202,7 +2203,7 @@ namespace
             SectionCard::RowLabel("");
          ImGui::PushID(c);
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         if (ImGui::InvisibleButton("##col", ImVec2(d, d)))
+         if (UiInteract::Hit("##col", ImVec2(d, d)))
          {
             PushUndo();
             for (int i : SelectedIndices())
@@ -2286,7 +2287,7 @@ namespace
       {
          // The take so far, drawn live: one min/max column per pixel across everything captured.
          ImGui::SetCursorScreenPos(mn);
-         ImGui::InvisibleButton("##studioWave", size);
+         UiInteract::Hit("##studioWave", size);
          gSampleStudioClaimedKeys = ImGui::IsItemHovered() && !ImGui::GetIO().WantTextInput;
          FieldWell::Draw(dl, mn, mx, false, false);
          const float mid = (mn.y + mx.y) * 0.5f, amp = (mx.y - mn.y) * 0.45f;
@@ -2321,7 +2322,7 @@ namespace
       if (!s.src)
       {
          ImGui::SetCursorScreenPos(mn);
-         ImGui::InvisibleButton("##studioWave", size);
+         UiInteract::Hit("##studioWave", size);
          gSampleStudioClaimedKeys = false;
          FieldWell::Draw(dl, mn, mx, false, false);
          if (s.busy)
@@ -2345,10 +2346,10 @@ namespace
       DrawRuler(dl, ImVec2(mn.x, mn.y + kOverviewH + 1.0f), ImVec2(mx.x, mn.y + kOverviewH + kRulerH + 1.0f), g);
 
       ImGui::SetCursorScreenPos(g.mn);
-      ImGui::InvisibleButton("##studioWave", ImVec2(size.x, g.mx.y - g.mn.y));
+      UiInteract::Hit("##studioWave", ImVec2(size.x, g.mx.y - g.mn.y));
       gSampleStudioClaimedKeys = ImGui::IsItemHovered() && !ImGui::GetIO().WantTextInput;
       const double menuFrame = g.FrameAt(ImGui::GetIO().MousePos.x);
-      if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+      if (MenuParts::ContextClicked())
       {
          const int i = s.doc.IndexAt((int64_t)menuFrame);
          if (!IsSel(s.doc.slices[(size_t)i].id))
@@ -2357,7 +2358,7 @@ namespace
       }
       HandleWaveInput(g);
       static double sMenuFrame = 0.0;
-      if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+      if (MenuParts::ContextClicked())
          sMenuFrame = menuFrame;
       // MENUALIVETEST: a right-click in the middle of the view, as above.
       if (s.doc.Count() > 0 && MenuParts::TestOpen("##studioWaveMenu"))
@@ -2902,7 +2903,7 @@ namespace
       FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
       {
          const float sz = 16.0f;
-         if (ImGui::InvisibleButton("##closestudiosettings", ImVec2(sz, sz)))
+         if (UiInteract::Hit("##closestudiosettings", ImVec2(sz, sz)))
             s.settingsOpen = false;
          const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
          glyph::DrawX(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), sz * 0.65f,
@@ -3363,7 +3364,7 @@ namespace
       DrawToolbar(w);
       // Right-click the toolbar's empty space: dock top or bottom.
       const ImVec2 tbMin(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y), tbMax(tbMin.x + ImGui::GetWindowSize().x, ImGui::GetItemRectMax().y);
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(tbMin, tbMax) && !ImGui::IsAnyItemHovered() &&
+      if (MenuParts::RightPressed() && ImGui::IsMouseHoveringRect(tbMin, tbMax) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##studioDockMenu");
       if (MenuParts::TestOpen("##studioDockMenu"))
@@ -3664,7 +3665,7 @@ void DrawSampleStudioDocked(const char* id, const ImVec2& size)
    const ImVec2 inner = ImGui::GetContentRegionAvail();
    auto grip = [&]()
    {
-      ImGui::InvisibleButton("##studiogrip", ImVec2(std::max(1.0f, inner.x), kGrip));
+      UiInteract::Hit("##studiogrip", ImVec2(std::max(1.0f, inner.x), kGrip));
       DrawPanelSeam(false, gripFirst);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);

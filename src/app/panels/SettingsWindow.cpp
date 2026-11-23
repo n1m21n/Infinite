@@ -1,5 +1,7 @@
 // Settings window (moved verbatim from main.cpp).
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/components/ListRow.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/Tip.h"
 #include <algorithm>
@@ -155,7 +157,7 @@ namespace app
          const ImVec2 p = ImGui::GetCursorScreenPos();
          const float w = ImGui::GetContentRegionAvail().x;
          ImGui::PushID(i);
-         if (ImGui::InvisibleButton("##tab", ImVec2(w, h)))
+         if (UiInteract::Hit("##tab", ImVec2(w, h)))
             sTab = i;
          ImGui::PopID();
          const bool hov = ImGui::IsItemHovered();
@@ -263,7 +265,7 @@ namespace app
             // Node Module Category Colors
             FormParts::Section(T("Node Module Category Colors"));
             const std::vector<std::string>& catNames = CategoryColors::CategoryNames();
-            if (ImGui::BeginTable("CatColorsTbl", 2, ImGuiTableFlags_None))
+            if (ListRow::BeginTable("CatColorsTbl", 2, ImGuiTableFlags_None))
             {
                ImGui::TableSetupColumn("Col1", ImGuiTableColumnFlags_WidthStretch);
                ImGui::TableSetupColumn("Col2", ImGuiTableColumnFlags_WidthStretch);
@@ -293,7 +295,7 @@ namespace app
             // Cable Category Colors
             FormParts::Section(T("Cable Category Colors"));
             const std::vector<std::string>& cableNames = CategoryColors::CableTypeNames();
-            if (ImGui::BeginTable("CableColorsTbl", 2, ImGuiTableFlags_None))
+            if (ListRow::BeginTable("CableColorsTbl", 2, ImGuiTableFlags_None))
             {
                ImGui::TableSetupColumn("Col1", ImGuiTableColumnFlags_WidthStretch);
                ImGui::TableSetupColumn("Col2", ImGuiTableColumnFlags_WidthStretch);
@@ -1145,7 +1147,7 @@ namespace app
             if ((sSelectedSection == 0 || sSelectedSection == 2) && MatchesFilter("domains reserved frame element pixel sample graph age note"))
             {
                FormParts::Heading("2. Domains & Reserved Names");
-               if (ImGui::BeginTable("##domainstbl", 4, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+               if (ListRow::BeginTable("##domainstbl", 4, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
                   ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, 80.0f);
                   ImGui::TableSetupColumn("Rate / Backend", ImGuiTableColumnFlags_WidthStretch, 140.0f);
@@ -1226,7 +1228,7 @@ namespace app
             if ((sSelectedSection == 0 || sSelectedSection == 5) && MatchesFilter("operators math functions sin cos lerp mix step rand noise sh bend pinch mirror skew formant"))
             {
                FormParts::Heading("5. Operators & Built-in Math Functions");
-               if (ImGui::BeginTable("##opstbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+               if (ListRow::BeginTable("##opstbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
                   ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthStretch, 140.0f);
                   ImGui::TableSetupColumn("Functions / Operators", ImGuiTableColumnFlags_WidthStretch, 240.0f);
@@ -1307,7 +1309,7 @@ namespace app
                ImGui::TextWrapped("Field allows data-dependent branching (unlike Kronos, which forbids it entirely). Every branch has a real cost that depends on the domain it runs in - always know which domain you're in before you branch.");
                DrawCodeBox("if (P.y > 0.5) { Cd = vec3(1, 0, 0) }", "cb_if_stmt");
 
-               if (ImGui::BeginTable("##branchtbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+               if (ListRow::BeginTable("##branchtbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
                   ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, 90.0f);
                   ImGui::TableSetupColumn("Lowering", ImGuiTableColumnFlags_WidthStretch, 140.0f);
@@ -1566,7 +1568,7 @@ namespace app
 
                   char itemId[256];
                   snprintf(itemId, sizeof(itemId), "##preset_%s", p.name.c_str());
-                  const bool picked = ImGui::Selectable(itemId, false);
+                  const bool picked = ListRow::Selectable(itemId, false);
                   MenuParts::Wash(ImGui::IsItemHovered(), ImGui::IsItemActive(), false);
                   {
                      ImDrawList* dl = ImGui::GetWindowDrawList();

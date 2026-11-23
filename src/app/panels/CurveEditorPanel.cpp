@@ -2,6 +2,7 @@
 // MSEG node, following the canvas selection. The node is the model: every edit goes through MSEGNode and
 // core/CurveEdit.h, and is a patch undo step. The panel keeps only its view: pages, zoom, tool and selection.
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/panels/CurveEditorPanel.h"
 
@@ -1247,7 +1248,7 @@ namespace
                ImGui::IsMouseHoveringRect(ImVec2(a.x0, a.rulerY), ImVec2(a.x1, a.y1)))
          Press(a, n, hover); // the empty panel's button still holds the press this frame, so not "hovered"
       s.strokePending = false;
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && s.drag == Drag::None)
+      if (hovered && MenuParts::RightPressed() && s.drag == Drag::None)
       {
          if (hover >= 0 && !std::binary_search(s.sel.begin(), s.sel.end(), hover))
             SelectOnly(hover, n);
@@ -1662,7 +1663,7 @@ namespace
       const float h = ImGui::GetTextLineHeight() + 2.0f;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float w = ImGui::GetContentRegionAvail().x;
-      if (ImGui::InvisibleButton("##head", ImVec2(w, h)))
+      if (UiInteract::Hit("##head", ImVec2(w, h)))
          open = !open;
       sOpen[title] = open;
       const ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
@@ -2350,7 +2351,7 @@ namespace
       FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
       {
          const float sz = 16.0f;
-         if (ImGui::InvisibleButton("##ceSideClose", ImVec2(sz, sz)))
+         if (UiInteract::Hit("##ceSideClose", ImVec2(sz, sz)))
             S().sideOpen = false;
          const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
          glyph::DrawX(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), sz * 0.65f,
@@ -2573,7 +2574,7 @@ namespace
    void DrawDockMenu()
    {
       const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + PanelKit::Chip() + tok::space_3);
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
+      if (MenuParts::RightPressed() && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##curveDockMenu");
       if (MenuParts::TestOpen("##curveDockMenu"))
@@ -2611,7 +2612,7 @@ namespace
    {
       State& s = S();
       const ImVec2 at = ImGui::GetCursorScreenPos();
-      ImGui::InvisibleButton("##ceGraph", ImVec2(std::max(1.0f, size.x), std::max(1.0f, size.y)),
+      UiInteract::Hit("##ceGraph", ImVec2(std::max(1.0f, size.x), std::max(1.0f, size.y)),
                              ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
       const bool hovered = ImGui::IsItemHovered();
       const Areas a { at.x, at.x + size.x, at.y, at.y + kRulerH, at.y + size.y };
@@ -2663,7 +2664,7 @@ namespace
          const ImVec2 avail = ImGui::GetContentRegionAvail();
          const ImVec2 mn = ImGui::GetCursorScreenPos();
          // A press here makes the page and the same drag draws its curve: draw, Assign, click a knob.
-         ImGui::InvisibleButton("##ceEmpty", ImVec2(std::max(1.0f, avail.x), std::max(1.0f, avail.y)));
+         UiInteract::Hit("##ceEmpty", ImVec2(std::max(1.0f, avail.x), std::max(1.0f, avail.y)));
          if (ImGui::IsItemActivated())
          {
             AddPage();
@@ -2740,7 +2741,7 @@ void DrawCurveEditorDocked(const char* id, const ImVec2& size)
    const ImVec2 inner = ImGui::GetContentRegionAvail();
    auto grip = [&]()
    {
-      ImGui::InvisibleButton("##curvegrip", vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));
+      UiInteract::Hit("##curvegrip", vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));
       DrawPanelSeam(vertical, gripFirst);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);

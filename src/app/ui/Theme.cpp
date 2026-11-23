@@ -1,6 +1,7 @@
 // Theme: colours, scope palette, panel/button/dropdown styles, ApplyTheme (moved verbatim from main.cpp).
 #include "app/AppShared.h"
 #include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/components/Scrollbar.h"
 #include "app/ui/design/TokenColors.h"
 
 namespace app
@@ -444,11 +445,8 @@ namespace app
       // and canvas read as one continuous surface, the same fix already
       // applied to the seam above bottom-docked panels.
       style.Colors[ImGuiCol_MenuBarBg] = vec(t.windowBg);
-      style.Colors[ImGuiCol_ScrollbarBg] = vec(t.windowBg);
-      // Quiet text-tinted pill that deepens on hover/drag; the track stays flat.
-      style.Colors[ImGuiCol_ScrollbarGrab] = vec(t.text, 0.22f);
-      style.Colors[ImGuiCol_ScrollbarGrabHovered] = vec(t.text, 0.40f);
-      style.Colors[ImGuiCol_ScrollbarGrabActive] = vec(t.text, 0.55f);
+      // Quiet text-tinted pill that deepens on hover/drag; the track stays flat (the one look, Scrollbar.h).
+      Scrollbar::Apply(style, vec(t.windowBg), vec(t.text));
       // G15: the checked / active control colour keeps 3:1 against the panel. Pulled toward the text colour only
       // as far as needed, so themes whose accent already passes are unchanged.
       ImVec4 ctrlAccent = vec(t.accent);

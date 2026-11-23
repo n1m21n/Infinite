@@ -1,5 +1,7 @@
 // Modulation matrix panel (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/ListRow.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
@@ -34,7 +36,7 @@ namespace app
       {
          if (gTypedParamJustOpened == editKey)
          {
-            ImGui::SetKeyboardFocusHere();
+            UiInteract::FocusHere();
             gTypedParamJustOpened = std::pair<int, int>(-1, -1);
          }
          char buf[64];
@@ -125,7 +127,7 @@ namespace app
       const ImVec2 pos = ImGui::GetCursorScreenPos();
 
       ImGui::PushID(strId);
-      ImGui::InvisibleButton(strId, ImVec2(w, h));
+      UiInteract::Hit(strId, ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
       const bool doubleClicked = hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
@@ -350,7 +352,7 @@ namespace app
          // for it, so the loop's own target kept receding. Pinning the
          // height to this panel's available height (captured above, before
          // the table exists) gives the loop a stable target to fill to.
-         if (ImGui::BeginTable("##modmatrixtable", 12, flags, ImVec2(0.0f, panelSize.y)))
+         if (ListRow::BeginTable("##modmatrixtable", 12, flags, ImVec2(0.0f, panelSize.y)))
          {
             // Fixed, non-resizable widths rather than the stretch/drag
             // behaviour ImGui tables default to - dragging columns around
@@ -979,7 +981,7 @@ namespace app
       const bool overPanel = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
                              mouse.y >= panelOrigin.y && mouse.y < panelOrigin.y + panelSize.y;
       // Free space only: a row or chip that owns its own menu (the curve menu) keeps the click.
-      if (overPanel && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered() &&
+      if (overPanel && MenuParts::RightPressed() && !ImGui::IsAnyItemHovered() &&
           !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
          ImGui::OpenPopup("##modmatrixctx");
 
@@ -1027,7 +1029,7 @@ namespace app
 
       auto grip = [&]()
       {
-         ImGui::InvisibleButton("##modmatrixgrip",
+         UiInteract::Hit("##modmatrixgrip",
                                 vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
                                          : ImVec2(std::max(1.0f, inner.x), kGrip));
          // The panel's canvas-facing boundary, and the only thing that marks

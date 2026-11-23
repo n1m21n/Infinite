@@ -3,6 +3,7 @@
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/ReorderDrag.h"
@@ -579,7 +580,7 @@ namespace app
             KnobFloat("##send", &m->sendDb[b][s], MixerNode::kSendOffDb, 12.0f, "%.1f dB", kSendKnobD,
                       m->sendPre[s] ? pre : post, false, cell);
             UndoOnActivate(&m->sendDb[b][s], before);
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            if (MenuParts::ContextClicked())
             {
                PushUndoCheckpoint("Mixer strip");
                m->sendPre[s] = !m->sendPre[s];
@@ -650,13 +651,13 @@ namespace app
          else
             dl->AddCircleFilled(dot, 2.5f, ImGui::GetColorU32(ImGuiCol_CheckMark), 8);
          ImGui::SetCursorScreenPos(p);
-         if (ImGui::InvisibleButton("##byp", ImVec2(12.0f, kInsertRowH)))
+         if (UiInteract::Hit("##byp", ImVec2(12.0f, kInsertRowH)))
             changed = MixerPanelInsertBypass(r.mixerIndex, r.slot, i);
          if (ImGui::IsItemHovered())
             HelpTip("%s", off ? T("Enable") : T("Bypass"));
          const std::string name = NodeTitle(*g);
          ImGui::SetCursorScreenPos(ImVec2(p.x + 12.0f, p.y));
-         if (ImGui::InvisibleButton("##chip", ImVec2(std::max(1.0f, w - 12.0f), kInsertRowH)))
+         if (UiInteract::Hit("##chip", ImVec2(std::max(1.0f, w - 12.0f), kInsertRowH)))
             SelectOnCanvas(g->index);
          if (ImGui::IsItemHovered() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
             HelpTip("%s", name.c_str());
@@ -694,7 +695,7 @@ namespace app
          if (r.shared)
          {
             ImGui::SetCursorScreenPos(ImVec2(x, p.y));
-            ImGui::InvisibleButton("##shared", ImVec2(w, kInsertRowH));
+            UiInteract::Hit("##shared", ImVec2(w, kInsertRowH));
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Shared chain: edit it on the canvas"));
             dl->AddText(ImGui::GetFont(), UiType::Px(UiType::Size::Caption), ImVec2(x + 3.0f, p.y + 1.0f),
@@ -790,7 +791,7 @@ namespace app
       bool Pot(const char* id, float* v, float lo, float hi, float def, bool bipolar, float cellW, ImU32 col, const char* tag)
       {
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         ImGui::InvisibleButton(id, ImVec2(cellW, kPotRowH));
+         UiInteract::Hit(id, ImVec2(cellW, kPotRowH));
          const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
          bool changed = false;
          if (active && ImGui::GetIO().MouseDelta.y != 0.0f)
@@ -857,7 +858,7 @@ namespace app
          auto pos01 = [&](float d) { return std::clamp(ConsoleFaderTaper::ValueToPos(d, -60.0f, 12.0f), 0.0f, 1.0f); };
          ImGui::SetCursorScreenPos(ImVec2(slotX - capW * 0.5f, p.y));
          const float before = *db;
-         ImGui::InvisibleButton("##fader", ImVec2(capW, h));
+         UiInteract::Hit("##fader", ImVec2(capW, h));
          const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
          UndoOnActivate(db, before);
          if (active && ImGui::GetIO().MouseDelta.y != 0.0f)
@@ -931,7 +932,7 @@ namespace app
          dl->AddRectFilled(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, p.y + 5), Tint(col, 0.95f, 255), 2.0f, ImDrawFlags_RoundCornersTop);
          dl->AddRect(p, q, Ink(34), 3.0f);
          ImGui::SetCursorScreenPos(p);
-         bool clicked = ImGui::InvisibleButton("##name", ImVec2(w, kScribbleH));
+         bool clicked = UiInteract::Hit("##name", ImVec2(w, kScribbleH));
          const bool hovered = ImGui::IsItemHovered();
          if (strip != nullptr && StripNameActions(dl, p, w, name, *strip, clicked))
             clicked = false;
@@ -984,7 +985,7 @@ namespace app
             ImGui::SetNextItemWidth(nameW);
             if (sEditFocus)
             {
-               ImGui::SetKeyboardFocusHere();
+               UiInteract::FocusHere();
                sEditFocus = false;
             }
             const bool done = ImGui::InputText("##rename", sEditBuf, sizeof(sEditBuf),
@@ -1060,7 +1061,7 @@ namespace app
                PanelKit::UndoOnToggle(&m->solo[s], "Mixer strip");
             }
          }
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         if (MenuParts::ContextClicked())
          {
             PushUndoCheckpoint("Mixer strip");
             m->soloSafe[s] = !m->soloSafe[s];
@@ -1122,7 +1123,7 @@ namespace app
             dl->AddRectFilled(dp, ImVec2(dp.x + cw, dp.y + dispH), Role(tok::desk_well), tok::radius_cell);
             dl->AddRect(dp, ImVec2(dp.x + cw, dp.y + dispH), Hi(30), tok::radius_cell);
             ImGui::SetCursorScreenPos(dp);
-            if (ImGui::InvisibleButton("##loud", ImVec2(cw, dispH)))
+            if (UiInteract::Hit("##loud", ImVec2(cw, dispH)))
                m->ResetMeters();
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("True peak (dBTP) and loudness (LUFS): momentary, short-term, integrated. Click to reset."));
@@ -1406,7 +1407,7 @@ namespace app
          const bool overPanel = mouse.x >= origin.x && mouse.x < origin.x + avail.x &&
                                 mouse.y >= origin.y && mouse.y < origin.y + avail.y;
          gMixerClaimedKeys = overPanel && !ImGui::GetIO().WantTextInput;
-         if (overPanel && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered() &&
+         if (overPanel && MenuParts::RightPressed() && !ImGui::IsAnyItemHovered() &&
              !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))   // a page/strip menu opened on the click
             ImGui::OpenPopup("##mixerpanelctx");
          if (MenuParts::TestOpen("##mixerpanelctx"))
@@ -2071,7 +2072,7 @@ namespace app
 
       auto grip = [&]()
       {
-         ImGui::InvisibleButton("##mixerpanelgrip",
+         UiInteract::Hit("##mixerpanelgrip",
                                 vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
                                          : ImVec2(std::max(1.0f, inner.x), kGrip));
          DrawPanelSeam(vertical, gripFirst);

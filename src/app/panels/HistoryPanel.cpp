@@ -3,6 +3,7 @@
 // the past. Clicking a row moves the document to the state right after that edit, by repeating Undo or Redo.
 // The labels live on UndoEntry and are never written into a patch.
 #include "app/AppShared.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -35,7 +36,7 @@ namespace
       const float w = std::max(1.0f, ImGui::GetContentRegionAvail().x);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::PushID(id);
-      const bool clicked = ImGui::InvisibleButton("##row", ImVec2(w, rowH));
+      const bool clicked = UiInteract::Hit("##row", ImVec2(w, rowH));
       const bool hovered = ImGui::IsItemHovered();
       ImGui::PopID();
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -120,7 +121,7 @@ void DrawHistoryDocked(const char* id, const ImVec2& size)
    ImGui::BeginChild(id, size, false);
    const ImVec2 inner = ImGui::GetContentRegionAvail();
 
-   ImGui::InvisibleButton("##historygrip", ImVec2(kGrip, std::max(1.0f, inner.y)));
+   UiInteract::Hit("##historygrip", ImVec2(kGrip, std::max(1.0f, inner.y)));
    DrawPanelSeam(true, true);
    if (ImGui::IsItemHovered() || ImGui::IsItemActive())
       ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);

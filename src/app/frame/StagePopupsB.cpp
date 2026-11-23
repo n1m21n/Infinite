@@ -1,4 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/Scrollbar.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/frame/CanvasLink.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -156,7 +158,7 @@ void DrawPopupsB(FrameCtx& fc)
             if (gCommentEdit.framesOpen <= 2) // see CommentEditRequest::framesOpen
             {
                ImGui::SetWindowFocus();
-               ImGui::SetKeyboardFocusHere();
+               UiInteract::FocusHere();
             }
 
             const bool isLight = CategoryColors::IsThemeLight();
@@ -168,13 +170,11 @@ void DrawPopupsB(FrameCtx& fc)
             const float fontScale = CommentFontScale(c->fontSize);
             ImGui::PushStyleColor(ImGuiCol_Text, textCol);
             ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_0_0_0_0));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, tok::V4(tok::palf::v_0_0_0_0));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, isLight ? tok::V4(tok::palf::v_0_0_0_150) : tok::V4(tok::palf::v_1000_1000_1000_180));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, isLight ? tok::V4(tok::palf::v_0_0_0_300) : tok::V4(tok::palf::v_1000_1000_1000_350));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, isLight ? tok::V4(tok::palf::v_0_0_0_450) : tok::V4(tok::palf::v_1000_1000_1000_500));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * commentZoom, 8.0f * commentZoom));
-            ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f * commentZoom);
+            // The one scrollbar look, inked black on a light note and white on a dark one (4 colours + 1 var,
+            // counted in the pops below).
+            Scrollbar::Push(isLight, 6.0f * commentZoom);
             ImGui::PushFont(UiType::Font(UiType::Weight::Regular), UiType::Px(UiType::Size::Body) * commentZoom * fontScale);
 
             // Filling the whole popup cleanly at 1:1 scale with the canvas card
@@ -278,7 +278,7 @@ void DrawPopupsB(FrameCtx& fc)
          // SetKeyboardFocusHere() targets the next item, which is its InputText.
          if (searchJustOpened)
          {
-            ImGui::SetKeyboardFocusHere();
+            UiInteract::FocusHere();
             ImGui::GetCurrentContext()->NavCursorVisible = false;  // no focus ring until the keyboard navigates
             searchJustOpened = false;
          }
@@ -531,7 +531,7 @@ void DrawPopupsB(FrameCtx& fc)
          {
             if (ImGui::IsWindowAppearing())
             {
-               ImGui::SetKeyboardFocusHere();
+               UiInteract::FocusHere();
                ImGui::GetCurrentContext()->NavCursorVisible = false; // no focus ring until the keyboard navigates
             }
             LibraryParts::SearchField("ddsearch", T("search..."), gDropdown.filterBuf, sizeof(gDropdown.filterBuf));

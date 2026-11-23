@@ -9,6 +9,7 @@
 //           (Lane, Step or Kit). Lanes are generic: the name is the loaded sample, "Empty" otherwise.
 // Drawn in the Mixer's language: FrameBg wells, one SliderGrab accent, ring/dot LEDs, no bevels.
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "app/ui/design/UiDensity.h"
@@ -378,7 +379,7 @@ namespace app
       // ---- header ------------------------------------------------------------------------------------
       void DrawDockMenu(ImVec2 mn, ImVec2 mx)
       {
-         if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
+         if (MenuParts::RightPressed() && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
              ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
             ImGui::OpenPopup("##drumDockMenu");
          if (MenuParts::TestOpen("##drumDockMenu"))
@@ -678,7 +679,7 @@ namespace app
             DeskParts::FaceSide(dl, ImVec2(p.x, y - 2.0f), ImVec2(x1, y + rowH + 2.0f), NodeColor(gn, loaded ? 1.0f : 0.35f), sel);
             const ImVec2 mn(p.x + 9.0f, y), mx(scribbleX1, y + rowH);
             ImGui::SetCursorScreenPos(mn);
-            ImGui::InvisibleButton("##label", ImVec2(mx.x - mn.x, rowH));
+            UiInteract::Hit("##label", ImVec2(mx.x - mn.x, rowH));
             if (ImGui::IsItemActivated())
                PickLane(n, lane);
             const bool hov = ImGui::IsItemHovered();
@@ -776,7 +777,7 @@ namespace app
 
          // One hit target for the whole grid; the key under the mouse is worked out here.
          ImGui::SetCursorScreenPos(ImVec2(p.x, gridY));
-         ImGui::InvisibleButton("##drumgrid", ImVec2(std::max(1.0f, w), gridH), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+         UiInteract::Hit("##drumgrid", ImVec2(std::max(1.0f, w), gridH), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
          const bool gridHovered = ImGui::IsItemHovered();
          const ImVec2 m = ImGui::GetIO().MousePos;
          auto cellAt = [&](int& lane, int& step) {
@@ -790,7 +791,7 @@ namespace app
          const bool overCell = (gridHovered || sDrag.mode != Drag::None) && cellAt(hl, hs);
          const ImGuiIO& io = ImGui::GetIO();
 
-         if (ImGui::IsItemActivated() && overCell && io.KeyShift && !ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         if (ImGui::IsItemActivated() && overCell && io.KeyShift && !MenuParts::RightPressed())
          {
             // Shift-click: open the key on the Step page (Elektron: hold TRIG), no edit.
             sLane = hl;
@@ -804,7 +805,7 @@ namespace app
             sDrag = { Drag::None, hl, hs, v, m.y };
             sLane = hl;
             sStep = hs;
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            if (MenuParts::RightPressed())
             {
                sDrag.mode = Drag::Erase;
                v = 0.0f;
@@ -1551,7 +1552,7 @@ namespace app
       const ImVec2 inner = ImGui::GetContentRegionAvail();
       auto grip = [&]()
       {
-         ImGui::InvisibleButton("##drumgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
+         UiInteract::Hit("##drumgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
          DrawPanelSeam(false, gripFirst);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);

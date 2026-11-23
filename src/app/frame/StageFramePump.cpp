@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/frame/FrameCtx.h"
 #include "plugin/engine/PluginView.h"
@@ -642,7 +643,7 @@ void DrawFramePump(FrameCtx& fc)
       if (gTerminalFocus)
          ImGui::GetIO().WantTextInput = true;
       // A focus ring belongs to keyboard navigation only; any mouse click hides one an earlier Enter left behind.
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || MenuParts::RightPressed())
          ImGui::GetCurrentContext()->NavCursorVisible = false;
       static const bool sEnvReduce = std::getenv("INFINITE_REDUCEMOTION") != nullptr;
       UiAnim::SetReduceMotion(sEnvReduce || CategoryColors::GetReduceMotion());

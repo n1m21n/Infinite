@@ -1,5 +1,6 @@
 // Minimap (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -110,7 +111,7 @@ namespace app
       // that point - there is no public API to pan to an arbitrary empty
       // spot, only to navigate to a node, so this snaps to the closest one.
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##minimap", ImVec2(w, h));
+      UiInteract::Hit("##minimap", ImVec2(w, h));
       if (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left))
       {
          const ImVec2 mouse = ImGui::GetMousePos();

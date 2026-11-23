@@ -1,5 +1,8 @@
 // Generic node parameter bodies, part 1 (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
@@ -620,7 +623,7 @@ namespace app
    void DrawProjectionHandleOverlay(ProjectionNode* node, ImVec2 origin, ImVec2 imageSize, const char* btnIdSuffix)
    {
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton(btnIdSuffix, imageSize);
+      UiInteract::Hit(btnIdSuffix, imageSize);
 
       static int sDragRow = -1;
       static int sDragCol = -1;
@@ -743,7 +746,7 @@ namespace app
 
       if (node->GetOutputTexture() != 0)
       {
-         dl->AddImage((ImTextureID)(intptr_t)node->GetOutputTexture(), origin,
+         Thumb::Add(dl, (ImTextureID)(intptr_t)node->GetOutputTexture(), origin,
                       ImVec2(origin.x + size, origin.y + size), ImVec2(0, 1), ImVec2(1, 0));
       }
 
@@ -980,7 +983,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImFont* font = ImGui::GetFont();
 
-      ImGui::InvisibleButton("##patterngrid", ImVec2(size, height));
+      UiInteract::Hit("##patterngrid", ImVec2(size, height));
       const bool hovered = ImGui::IsItemHovered();
       const bool itemActive = ImGui::IsItemActive();
       const ImVec2 mouse = ImGui::GetIO().MousePos;
@@ -1039,7 +1042,7 @@ namespace app
          gPatternGridDrag.lastStep = -1;
       }
 
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+      if (hovered && MenuParts::RightPressed())
       {
          PushUndoCheckpoint();
          const int s = stepAt(mouse.x);
@@ -1552,7 +1555,7 @@ namespace app
    {
       const float size = kPreviewSize;
       ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImGui::InvisibleButton("##fxpad", ImVec2(size, size));
+      UiInteract::Hit("##fxpad", ImVec2(size, size));
       const bool active = ImGui::IsItemActive();
 
       if (active)
@@ -1702,7 +1705,7 @@ namespace app
          static ImGuiID sRenaming = 0;
          const ImGuiID rid = ImGui::GetID("##macrorename");
          ImGui::SetCursorScreenPos(ImVec2(origin.x, capY));
-         ImGui::InvisibleButton("##macrocaptionhit", ImVec2(cellW, textH));
+         UiInteract::Hit("##macrocaptionhit", ImVec2(cellW, textH));
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             sRenaming = rid;
          if (sRenaming == rid)
@@ -1713,7 +1716,7 @@ namespace app
             ImGui::SetCursorScreenPos(ImVec2(origin.x, capY - 2.0f));
             ImGui::SetNextItemWidth(cellW);
             if (ImGui::IsWindowAppearing() || ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-               ImGui::SetKeyboardFocusHere();
+               UiInteract::FocusHere();
             if (FieldWell::InputTextWithHint("##macrorenamefield", "name", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
             {
                *editLabel = buf;
@@ -1993,7 +1996,7 @@ namespace app
 
          ImGui::SetCursorScreenPos(sTL);
          ImGui::PushID(s + 800);
-         ImGui::InvisibleButton("##stepgatebtn", ImVec2(stepW, stepH));
+         UiInteract::Hit("##stepgatebtn", ImVec2(stepW, stepH));
          const bool hovered = ImGui::IsItemHovered();
          if (ImGui::IsItemClicked())
          {
@@ -2096,7 +2099,7 @@ namespace app
    {
       const float size = kMacroWideCell;
       ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImGui::InvisibleButton("##macroxy", ImVec2(size, size));
+      UiInteract::Hit("##macroxy", ImVec2(size, size));
       if (ImGui::IsItemActive())
       {
          ImVec2 m = ImGui::GetIO().MousePos;

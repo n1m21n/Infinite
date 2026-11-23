@@ -5,6 +5,8 @@
 // Changed card diffed from the patch before and after. Files attach by the + button or a drop. Every chat
 // is saved and comes back from the history menu with its agent sessions.
 #include "app/AppShared.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/TokenColors.h"
@@ -534,7 +536,7 @@ namespace app
          if (tex != ImTextureID{})
          {
             const ImVec2 mn(std::round(c.x - half), std::round(c.y - half));
-            dl->AddImage(tex, mn, ImVec2(mn.x + half * 2.0f, mn.y + half * 2.0f));
+            Thumb::Add(dl, tex, mn, ImVec2(mn.x + half * 2.0f, mn.y + half * 2.0f));
          }
          else
          {
@@ -1793,10 +1795,10 @@ namespace app
             const float xW = 2.0f * (t1.x - rightC);
             ImGui::SetCursorScreenPos(p);
             ImGui::PushID((int)i);
-            const bool row = ImGui::InvisibleButton("##queued", ImVec2(rowW - xW, kQueueRowH));
+            const bool row = UiInteract::Hit("##queued", ImVec2(rowW - xW, kQueueRowH));
             const bool hot = ImGui::IsItemHovered();
             FormParts::Inline(0.0f, 0.0f);
-            const bool x = ImGui::InvisibleButton("##unqueue", ImVec2(xW, kQueueRowH));
+            const bool x = UiInteract::Hit("##unqueue", ImVec2(xW, kQueueRowH));
             const bool xHot = ImGui::IsItemHovered();
             ImGui::PopID();
             if (row)
@@ -2290,7 +2292,7 @@ namespace app
          const bool live = s.verb == "add" || s.verb == "undo" || s.verb == "open" || s.verb == "web" || s.verb == "say" || s.verb == "reveal" || sCat.Node(s.node) != nullptr;
          ImGui::SetCursorScreenPos(at);
          ImGui::PushID(id.c_str());
-         const bool clicked = ImGui::InvisibleButton("##act", sz) && !done && live;
+         const bool clicked = UiInteract::Hit("##act", sz) && !done && live;
          ImGui::PopID();
          const bool hovered = ImGui::IsItemHovered() && !done && live;
          const float hv = UiAnim::Hover(ImGui::GetItemID(), hovered, tok::motion_hover_in, tok::motion_hover_out);
@@ -2318,7 +2320,7 @@ namespace app
          const chat::CatalogNode* n = sCat.Node(s.node);
          ImGui::SetCursorScreenPos(at);
          ImGui::PushID(id);
-         const bool clicked = ImGui::InvisibleButton("##chip", sz) && n != nullptr;
+         const bool clicked = UiInteract::Hit("##chip", sz) && n != nullptr;
          ImGui::PopID();
          const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
          if (s.kind == chat::Seg::Kind::Missing)
@@ -2599,16 +2601,16 @@ namespace app
          const float samplerX = folderX - folder - tok::space_1;
 
          ImGui::PushID(rawPath.c_str());
-         ImGui::InvisibleButton("##aud", ImVec2(std::max(1.0f, samplerX - at.x - tok::space_1), cardH));
+         UiInteract::Hit("##aud", ImVec2(std::max(1.0f, samplerX - at.x - tok::space_1), cardH));
          const bool hot = ImGui::IsItemHovered() && exists;
          const bool clicked = ImGui::IsItemClicked() && exists;
          FormParts::Inline(0.0f, 0.0f);
          ImGui::SetCursorScreenPos(ImVec2(samplerX, at.y + (cardH - folder) * 0.5f));
-         const bool toSampler = ImGui::InvisibleButton("##sampler", ImVec2(folder, folder)) && exists;
+         const bool toSampler = UiInteract::Hit("##sampler", ImVec2(folder, folder)) && exists;
          const bool samplerHot = ImGui::IsItemHovered() && exists;
          FormParts::Inline(0.0f, 0.0f);
          ImGui::SetCursorScreenPos(ImVec2(folderX, at.y + (cardH - folder) * 0.5f));
-         const bool reveal = ImGui::InvisibleButton("##reveal", ImVec2(folder, folder)) && exists;
+         const bool reveal = UiInteract::Hit("##reveal", ImVec2(folder, folder)) && exists;
          const bool folderHot = ImGui::IsItemHovered() && exists;
          ImGui::PopID();
 
@@ -2726,7 +2728,7 @@ namespace app
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const ImVec2 sz = ImGui::CalcTextSize(label);
          ImGui::PushID(rawPath.c_str());
-         const bool clicked = ImGui::InvisibleButton("##reveal", ImVec2(sz.x, sz.y + 2.0f));
+         const bool clicked = UiInteract::Hit("##reveal", ImVec2(sz.x, sz.y + 2.0f));
          ImGui::PopID();
          const bool hot = ImGui::IsItemHovered();
          ImGui::GetWindowDrawList()->AddText(at, hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), label);
@@ -2744,7 +2746,7 @@ namespace app
          const float rowH = 30.0f;
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImGui::PushID(rawPath.c_str());
-         const bool clicked = ImGui::InvisibleButton("##file", ImVec2(width, rowH)) && exists;
+         const bool clicked = UiInteract::Hit("##file", ImVec2(width, rowH)) && exists;
          ImGui::PopID();
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? 0.09f : 0.05f), tok::radius_control);
@@ -2789,7 +2791,7 @@ namespace app
          const float h = w * (float)t->h / (float)std::max(1, t->w);
          const float s = h > 320.0f ? 320.0f / h : 1.0f;
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         ImGui::Image((ImTextureID)(intptr_t)FrameOf(*t), ImVec2(w * s, h * s));
+         Thumb::Image((ImTextureID)(intptr_t)FrameOf(*t), ImVec2(w * s, h * s));
          const bool hot = ImGui::IsItemHovered();
          ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + w * s, at.y + h * s), TextTint(hot ? 0.24f : 0.12f), tok::radius_control);
          if (hot)
@@ -2823,7 +2825,7 @@ namespace app
             const ImVec2 sz(std::floor(t->w * fit), std::floor(t->h * fit));
             const ImVec2 p0(std::floor(vp->Pos.x + (vp->Size.x - sz.x) * 0.5f), std::floor(vp->Pos.y + (vp->Size.y - sz.y) * 0.5f));
             const ImVec2 p1(p0.x + sz.x, p0.y + sz.y);
-            dl->AddImageRounded((ImTextureID)(intptr_t)FrameOf(*t), p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, tok::radius_control);
+            Thumb::AddRounded(dl, (ImTextureID)(intptr_t)FrameOf(*t), p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, tok::radius_control);
             dl->AddRect(p0, p1, TextTint(0.12f), tok::radius_control);
             const std::string name = std::filesystem::path(sViewing).filename().string();
             char size[32];
@@ -2832,7 +2834,7 @@ namespace app
             dl->AddText(ImVec2(p0.x, y), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
             dl->AddText(ImVec2(p1.x - ImGui::CalcTextSize(size).x, y), Dim(), size);
             ImGui::SetCursorScreenPos(vp->Pos);
-            if (ImGui::InvisibleButton("##imageviewclose", vp->Size))
+            if (UiInteract::Hit("##imageviewclose", vp->Size))
                sViewing.clear();
          }
          ImGui::End();
@@ -2922,12 +2924,12 @@ namespace app
                UploadVideoFrame(*v);
          }
          ImGui::PushID(rawPath.c_str());
-         const bool clicked = ImGui::InvisibleButton("##video", sz);
+         const bool clicked = UiInteract::Hit("##video", sz);
          ImGui::PopID();
          const bool hot = ImGui::IsItemHovered();
          ImDrawList* dl = ImGui::GetWindowDrawList();
          // Frames come row-flipped for GL: draw them with v running bottom to top.
-         dl->AddImageRounded((ImTextureID)(intptr_t)v->tex, at, end, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_control);
+         Thumb::AddRounded(dl, (ImTextureID)(intptr_t)v->tex, at, end, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_control);
          dl->AddRect(at, end, TextTint(hot ? 0.24f : 0.12f), tok::radius_control);
          const bool playing = v->handle != nullptr;
          const ImVec2 c(std::floor((at.x + end.x) * 0.5f), std::floor((at.y + end.y) * 0.5f));
@@ -3017,7 +3019,7 @@ namespace app
          const ImVec2 ts = ImGui::CalcTextSize(label);
          const ImVec2 sz(pad + icon + 6.0f + ts.x + pad, ChipButton::Height());
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         if (ImGui::InvisibleButton(id, sz))
+         if (UiInteract::Hit(id, sz))
             OpenCode(title, code);
          const bool hot = ImGui::IsItemHovered();
          const bool on = sCodeView.open && sCodeView.code == code;
@@ -3429,7 +3431,7 @@ namespace app
          const float rowH = std::max(ImGui::GetTextLineHeight(), 16.0f) + tok::space_1;
          const float gutter = 18.0f;
          ImGui::PushID(id);
-         if (ImGui::InvisibleButton("##steps", ImVec2(width, rowH)) && any && !running)
+         if (UiInteract::Hit("##steps", ImVec2(width, rowH)) && any && !running)
             ui.open = !ui.open;
          ImGui::PopID();
          const bool hot = ImGui::IsItemHovered() && any && !running;
@@ -3787,7 +3789,7 @@ namespace app
             const float w = c.width - 2.0f * tok::space_1;
             ImGui::SetCursorScreenPos(p);
             ImGui::PushID(a.id);
-            const bool click = ImGui::InvisibleButton("##pick", ImVec2(w, rowH)) && usable;
+            const bool click = UiInteract::Hit("##pick", ImVec2(w, rowH)) && usable;
             const bool hot = ImGui::IsItemHovered() && usable;
             ImGui::PopID();
             if (click)
@@ -4506,7 +4508,7 @@ namespace app
                const ImVec2 at = ImGui::GetCursorScreenPos();
                ImGui::PushID(i);
                // Pressed on mouse down: the field loses the keyboard on that same click.
-               const bool clicked = ImGui::InvisibleButton("##row", ImVec2(rowW, rowH), ImGuiButtonFlags_PressedOnClick) && !c.info;
+               const bool clicked = UiInteract::Hit("##row", ImVec2(rowW, rowH), ImGuiButtonFlags_PressedOnClick) && !c.info;
                ImGui::PopID();
                const bool hovered = ImGui::IsItemHovered();
                if (hovered && !c.info && (mouse.x != 0.0f || mouse.y != 0.0f))
@@ -4639,7 +4641,7 @@ namespace app
       {
          const float h = 28.0f;
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         const bool pressed = ImGui::InvisibleButton(id, ImVec2(w, h)) && enabled;
+         const bool pressed = UiInteract::Hit(id, ImVec2(w, h)) && enabled;
          const bool hot = ImGui::IsItemHovered() && enabled;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          if (hot)
@@ -4783,7 +4785,7 @@ namespace app
          const std::string text = app::TruncateWithEllipsis(full, std::max(24.0f, maxW - av - 2.0f * tok::space_2));
          const float w = av + ImGui::CalcTextSize(text.c_str()).x + 2.0f * tok::space_2;
          ImGui::SetCursorScreenPos(ImVec2(right - w, y));
-         clicked = ImGui::InvisibleButton(id, ImVec2(w, h));
+         clicked = UiInteract::Hit(id, ImVec2(w, h));
          const bool hot = ImGui::IsItemHovered() || ImGui::IsPopupOpen(std::string(id).append("menu").c_str());
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
@@ -4964,7 +4966,7 @@ namespace app
             ImGui::RenderTextEllipsis(dl, ImVec2(a.x + 20.0f, a.y + 8.0f + capFs), ImVec2(b.x - 30.0f, b.y), b.x - 30.0f, one.c_str(), nullptr, nullptr);
             const float midY = (a.y + b.y) * 0.5f;
             ImGui::SetCursorScreenPos(ImVec2(b.x - 26.0f, midY - 12.0f));
-            const bool close = ImGui::InvisibleButton("##unreply", ImVec2(24.0f, 24.0f));
+            const bool close = UiInteract::Hit("##unreply", ImVec2(24.0f, 24.0f));
             glyph::Draw(dl, ImVec2(b.x - 14.0f, midY), tok::icon_control, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
             if (close)
                sReplyTo.clear();
@@ -4994,7 +4996,7 @@ namespace app
             ImGui::PopStyleColor();
             ImGui::SetCursorScreenPos(ImVec2(p.x + w - 20.0f, p.y + 1.0f));
             ImGui::PushID((int)i);
-            if (ImGui::InvisibleButton("##unattach", ImVec2(20.0f, 20.0f)))
+            if (UiInteract::Hit("##unattach", ImVec2(20.0f, 20.0f)))
                remove = (int)i;
             const ImU32 mark = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim();
             ImGui::PopID();
@@ -5027,7 +5029,7 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
          if (sRefocus)
          {
-            ImGui::SetKeyboardFocusHere();
+            UiInteract::FocusHere();
             sRefocus = false;
          }
          const bool enterPicks = EnterPicks();
@@ -5065,7 +5067,7 @@ namespace app
          const float sendW = g.tile;
          const ImVec2 ac(std::floor(at.x + g.padX + sendW * 0.5f), midY);
          ImGui::SetCursorScreenPos(ImVec2(ac.x - sendW * 0.5f, ac.y - sendW * 0.5f));
-         if (ImGui::InvisibleButton("##chatattach", ImVec2(sendW, sendW)))
+         if (UiInteract::Hit("##chatattach", ImVec2(sendW, sendW)))
          {
             for (const std::string& f : Platform::OpenFilesDialog(T("Attach files"), chat::AttachExtensions()))
                if (std::find(sAttach.begin(), sAttach.end(), f) == sAttach.end())
@@ -5088,7 +5090,7 @@ namespace app
          ImGui::SetCursorScreenPos(tileMn);
          if (!sRuns.empty())
          {
-            const bool stop = ImGui::InvisibleButton("##chatstop", ImVec2(sendW, sendW));
+            const bool stop = UiInteract::Hit("##chatstop", ImVec2(sendW, sendW));
             const bool hot = ImGui::IsItemHovered();
             dl->AddRectFilled(tileMn, tileMx, TextTint(hot ? 0.16f : 0.10f), tok::radius_control);
             glyph::Draw(dl, sc, tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::StopFill);
@@ -5109,7 +5111,7 @@ namespace app
          else
          {
             const bool canSend = !sInput.empty() || !sAttach.empty();
-            const bool clicked = ImGui::InvisibleButton("##chatsend", ImVec2(sendW, sendW));
+            const bool clicked = UiInteract::Hit("##chatsend", ImVec2(sendW, sendW));
             const bool hot = ImGui::IsItemHovered();
             if (canSend)
                dl->AddRectFilled(tileMn, tileMx, ImGui::GetColorU32(hot ? AccentEmphasisHover() : AccentEmphasisSelected()), tok::radius_control);
@@ -5181,7 +5183,7 @@ namespace app
             const ImVec2 p = ImGui::GetCursorScreenPos();
             const float rw = ImGui::GetContentRegionAvail().x;
             const float rh = 28.0f;
-            const bool open = ImGui::InvisibleButton("##open", ImVec2(rw - 24.0f, rh));
+            const bool open = UiInteract::Hit("##open", ImVec2(rw - 24.0f, rh));
             const bool hot = ImGui::IsMouseHoveringRect(p, ImVec2(p.x + rw, p.y + rh));
             ImDrawList* cd = ImGui::GetWindowDrawList();
             const bool current = t.id == sThread.id;
@@ -5195,7 +5197,7 @@ namespace app
             if (!hot)
                cd->AddText(ImVec2(p.x + rw - aw - tok::space_2, ty), Dim(), age.c_str());
             FormParts::Inline(0.0f, 0.0f);
-            if (ImGui::InvisibleButton("##delete", ImVec2(24.0f, rh)))
+            if (UiInteract::Hit("##delete", ImVec2(24.0f, rh)))
                removeId = t.id;
             if (hot)
                glyph::Draw(cd, ImVec2(p.x + rw - 12.0f, p.y + rh * 0.5f), tok::icon_control, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
@@ -5309,7 +5311,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(toolsX, glyphY));
          {  // Pop out / dock back: a window with an arrow leaving it (or coming home)
             const ImVec2 o = ImGui::GetCursorScreenPos();
-            if (ImGui::InvisibleButton("##chatpopout", ImVec2(glyph, 18.0f)))
+            if (UiInteract::Hit("##chatpopout", ImVec2(glyph, 18.0f)))
                gTerminalFloating = !gTerminalFloating;
             const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
             const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);

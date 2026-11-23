@@ -2,6 +2,8 @@
 // stage with the listener's head at the centre and one draggable dot per
 // connected input, a source strip, and a knob row for the selected object.
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/ListRow.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
 #include "platform/HeadTracker.h"
 #include "app/ui/design/UiFmt.h"
@@ -109,7 +111,7 @@ namespace app
       };
 
       ImGui::SetCursorScreenPos(p0);
-      ImGui::InvisibleButton("##stage", ImVec2(stageW, stageH),
+      UiInteract::Hit("##stage", ImVec2(stageW, stageH),
                              ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
       const bool stageHovered = ImGui::IsItemHovered();
       const ImVec2 mouse = ImGui::GetIO().MousePos;
@@ -215,7 +217,7 @@ namespace app
          dl->AddCircleFilled(ImVec2(rp.x + 8.0f, rp.y + ty + ImGui::GetTextLineHeight() * 0.5f), 5.0f, DotColor(s, 1.0f), 16);
          ImGui::SetCursorScreenPos(ImVec2(rp.x + 20.0f, rp.y + ty));
          const bool sel = (n->selected == s);
-         if (ImGui::Selectable(("in " + std::to_string(s + 1)).c_str(), sel, 0, ImVec2(80.0f, 0.0f)))
+         if (ListRow::Selectable(("in " + std::to_string(s + 1)).c_str(), sel, 0, ImVec2(80.0f, 0.0f)))
             n->selected = s;
          // Right-aligned cluster in screen space: dB readout, then H M S as equal
          // fixed-width buttons ending on the content edge. Window-relative

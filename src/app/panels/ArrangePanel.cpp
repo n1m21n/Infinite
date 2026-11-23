@@ -1,5 +1,8 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
 #include "app/ui/design/components/PanelKit.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/components/ListRow.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/ColourChip.h"
@@ -28,7 +31,7 @@ namespace app
       bool MixToggle(const char* id, const char* letter, bool* v, float sz, const ImVec4& onCol)
       {
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         const bool clicked = ImGui::InvisibleButton(id, ImVec2(sz, sz));
+         const bool clicked = UiInteract::Hit(id, ImVec2(sz, sz));
          if (clicked) *v = !*v;
          const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
          const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
@@ -870,7 +873,7 @@ namespace app
       }
 
       // Keyboard focus claim
-      if (overPanel && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
+      if (overPanel && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || MenuParts::RightPressed()))
       {
          gArrangeClaimedKeys = true;
          gSessionClaimedKeys = false;
@@ -1178,7 +1181,7 @@ namespace app
             PushToolbarChip(viewportWasOn);
             if (ActionButton::Draw("##arrangeshowviewport", ImVec2(tok::control_h, tok::control_h)))
                gArrangeShowViewport = !gArrangeShowViewport;
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangeviewportctx"))
+            if (MenuParts::ContextClicked() && !ImGui::IsPopupOpen("##arrangeviewportctx"))
                ImGui::OpenPopup("##arrangeviewportctx");
             PopToolbarChip();
             if (ImGui::IsItemHovered())
@@ -1518,7 +1521,7 @@ namespace app
          const bool overToolbar = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
                                   mouse.y >= arrangeToolbarTop && mouse.y < arrangeToolbarBottom;
          if (overToolbar && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::IsAnyItemHovered() &&
-             ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangeDockMenu"))
+             MenuParts::RightPressed() && !ImGui::IsPopupOpen("##arrangeDockMenu"))
             ImGui::OpenPopup("##arrangeDockMenu");
       }
       // The monitor child asks for the viewport menu; it opens here, in the same ID scope as the chip's.
@@ -1675,14 +1678,14 @@ namespace app
             gArrangeTimelineMonitorTarget.requestH = monH;
             const unsigned int tex = gArrangeTimelineMonitorTarget.result.tex;
             if (tex != 0)
-               monDl->AddImage((ImTextureID)(intptr_t)tex, monOrigin, monBR, ImVec2(0, 1), ImVec2(1, 0));
+               Thumb::Add(monDl, (ImTextureID)(intptr_t)tex, monOrigin, monBR, ImVec2(0, 1), ImVec2(1, 0));
          }
 
          ImGui::Dummy(monAvail);
 
          // Right-click anywhere on the monitor to reach the Viewport Position menu
          // (Dock Left / Dock Right).
-         if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         if (ImGui::IsWindowHovered() && MenuParts::RightPressed())
             sViewportCtxRequest = true;
 
          EndChildSafe();
@@ -1881,7 +1884,7 @@ namespace app
                ImGui::SetNextItemWidth(120.0f);
                if (sMarkerRenameFocusedId != mk.id)
                {
-                  ImGui::SetKeyboardFocusHere();
+                  UiInteract::FocusHere();
                   sMarkerRenameFocusedId = mk.id;
                }
                const bool commit = FieldWell::InputText("##renamingmarker", gArrangeRenameMarkerBuffer,
@@ -1908,7 +1911,7 @@ namespace app
             if (hitX1 - hitX0 >= 1.0f && gArrangeRenamingMarkerId != mk.id)
             {
                ImGui::SetCursorScreenPos(ImVec2(hitX0, pinnedTopY));
-               ImGui::InvisibleButton("##markerflag", ImVec2(hitX1 - hitX0, kMarkerStripH));
+               UiInteract::Hit("##markerflag", ImVec2(hitX1 - hitX0, kMarkerStripH));
                const bool hovered = ImGui::IsItemHovered();
                if (hovered)
                {
@@ -1994,7 +1997,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(rulerPos);
-      ImGui::InvisibleButton("##arrangerulerbtn", rulerSize);
+      UiInteract::Hit("##arrangerulerbtn", rulerSize);
       const bool rulerShiftHeld = ImGui::GetIO().KeyShift;
       if (ImGui::IsItemActivated())
       {
@@ -2583,7 +2586,7 @@ namespace app
          }
 
          ImGui::SetCursorScreenPos(ImVec2(indentX, rowTop + 4.0f));
-         if (ImGui::InvisibleButton("##grpcollapsebtn", ImVec2(28.0f, 20.0f)))
+         if (UiInteract::Hit("##grpcollapsebtn", ImVec2(28.0f, 20.0f)))
          {
             ArrangeEdit([&]() {
                Arrange::SetTrackGroupCollapsed(gArrange, groupId, !grp->collapsed);
@@ -2609,7 +2612,7 @@ namespace app
             snprintf(grpNameBuf, sizeof(grpNameBuf), "%s", grp->name.c_str());
             if (gArrangeRenameJustStarted)
             {
-               ImGui::SetKeyboardFocusHere();
+               UiInteract::FocusHere();
                gArrangeRenameJustStarted = false;
             }
             const bool grpNameEdited = FieldWell::InputText("##groupname", grpNameBuf, sizeof(grpNameBuf),
@@ -2634,7 +2637,7 @@ namespace app
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::U32(tok::pal::c_00000000));
             ImGui::PushStyleColor(ImGuiCol_Header, tok::U32(tok::pal::c_00000000));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
-            ImGui::Selectable(ArrangeGroupDisplayName(*grp).c_str(), false, ImGuiSelectableFlags_None,
+            ListRow::Selectable(ArrangeGroupDisplayName(*grp).c_str(), false, ImGuiSelectableFlags_None,
                               ImVec2(grpNameW, kLaneHeight - 8.0f));
             ImGui::PopStyleVar();
             ImGui::PopStyleColor(3);
@@ -2669,7 +2672,7 @@ namespace app
          ImGui::TextDisabled("(%d)", memberCount);
 
          ImGui::SetCursorScreenPos(ImVec2(headerStartX, rowTop));
-         ImGui::InvisibleButton("##grprowctx", ImVec2(rulerStartX - headerStartX, kLaneHeight));
+         UiInteract::Hit("##grprowctx", ImVec2(rulerStartX - headerStartX, kLaneHeight));
          if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
          {
             ctxGroupId = groupId;
@@ -2851,7 +2854,7 @@ namespace app
          // actually reachable.
          ImGui::SetCursorScreenPos(ImVec2(headerStartX, curY));
          ImGui::SetNextItemAllowOverlap();
-         ImGui::InvisibleButton("##lanerowbg", ImVec2(rulerStartX - headerStartX, rowH));
+         UiInteract::Hit("##lanerowbg", ImVec2(rulerStartX - headerStartX, rowH));
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          {
             ToggleOrOpenRowSettings(laneId);
@@ -2917,7 +2920,7 @@ namespace app
             snprintf(nameBuf, sizeof(nameBuf), "%s", lane.name.c_str());
             if (gArrangeRenameJustStarted)
             {
-               ImGui::SetKeyboardFocusHere();
+               UiInteract::FocusHere();
                gArrangeRenameJustStarted = false;
             }
             const bool nameEdited = FieldWell::InputText("##streamname", nameBuf, sizeof(nameBuf),
@@ -2943,7 +2946,7 @@ namespace app
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::U32(tok::pal::c_00000000));
             ImGui::PushStyleColor(ImGuiCol_Header, tok::U32(tok::pal::c_00000000));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 2.0f));
-            ImGui::Selectable(lane.name.c_str(), false, ImGuiSelectableFlags_None, nameBoxSize);
+            ListRow::Selectable(lane.name.c_str(), false, ImGuiSelectableFlags_None, nameBoxSize);
             ImGui::PopStyleVar();
             ImGui::PopStyleColor(3);
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -3038,7 +3041,7 @@ namespace app
                float pct = lane.opacity * 100.0f;
                // A readout well that fills left to right (no grab stub): drag to set, double-click for 100%.
                const ImVec2 op = ImGui::GetCursorScreenPos();
-               ImGui::InvisibleButton("##laneopacity", ImVec2(kMixStripW, kMixCtl));
+               UiInteract::Hit("##laneopacity", ImVec2(kMixStripW, kMixCtl));
                bool opChanged = false;
                if (ImGui::IsItemActive())
                {
@@ -3120,7 +3123,7 @@ namespace app
                : (clipNode != nullptr ? NodeTitle(*clipNode) : std::string("Unassigned"));
 
             ImGui::SetCursorScreenPos(ImVec2(cLeft, cTop));
-            ImGui::InvisibleButton("##clipbtn", ImVec2(cWidth, cBottom - cTop));
+            UiInteract::Hit("##clipbtn", ImVec2(cWidth, cBottom - cTop));
             const bool clipActive = ImGui::IsItemActive();
             const bool clipHovered = ImGui::IsItemHovered();
             const bool clipActivated = ImGui::IsItemActivated();
@@ -3160,7 +3163,7 @@ namespace app
                   gArrangeZoomDragStartPpb = gArrangePixelsPerBeat;
                   gArrangeZoomDragStartBeats = gArrangeScrollBeats;
                }
-               else if (clipHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+               else if (clipHovered && MenuParts::RightPressed())
                {
                   zoomAroundMouse(0.75f);
                }
@@ -3434,7 +3437,7 @@ namespace app
                   dl->PushClipRect(ImVec2(cLeft + 1.0f, cTop + 1.0f), ImVec2(cRight - 1.0f, cBottom - 1.0f), true);
                   // Flipped V: an FBO's texture is bottom-up, the same
                   // convention every other AddImage of a node texture uses.
-                  dl->AddImage((ImTextureID)(intptr_t)thumbIt->second.fbo.tex, tl, br,
+                  Thumb::Add(dl, (ImTextureID)(intptr_t)thumbIt->second.fbo.tex, tl, br,
                                ImVec2(0, 1), ImVec2(1, 0));
                   dl->AddRect(tl, br, tok::U32(tok::pal::c_0000008C), tok::radius_cell);
                   dl->PopClipRect();
@@ -3522,7 +3525,7 @@ namespace app
                ImGui::SetNextItemWidth(std::max(20.0f, cWidth - 8.0f));
                if (sArrangeRenameFocusedId != clip.id)
                {
-                  ImGui::SetKeyboardFocusHere();
+                  UiInteract::FocusHere();
                   sArrangeRenameFocusedId = clip.id;
                }
                const bool commit = FieldWell::InputText("##renamingclipfield", gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer),
@@ -3590,7 +3593,7 @@ namespace app
                   gArrangeZoomDragStartPpb = gArrangePixelsPerBeat;
                   gArrangeZoomDragStartBeats = gArrangeScrollBeats;
                }
-               else if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+               else if (MenuParts::RightPressed())
                {
                   zoomAroundMouse(0.75f);
                }
@@ -3723,7 +3726,7 @@ namespace app
          {
             const float kGripH = 5.0f;
             ImGui::SetCursorScreenPos(ImVec2(headerStartX, curY + rowH - kGripH * 0.5f));
-            ImGui::InvisibleButton("##laneheightgrip", ImVec2(rulerStartX - headerStartX, kGripH));
+            UiInteract::Hit("##laneheightgrip", ImVec2(rulerStartX - headerStartX, kGripH));
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
             if (ImGui::IsItemActivated())
@@ -4363,7 +4366,7 @@ namespace app
 
       auto grip = [&]()
       {
-         ImGui::InvisibleButton("##arrangepanelgrip",
+         UiInteract::Hit("##arrangepanelgrip",
                                 vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
                                          : ImVec2(std::max(1.0f, inner.x), kGrip));
          DrawPanelSeam(vertical, gripFirst);

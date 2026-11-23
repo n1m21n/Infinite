@@ -3,6 +3,8 @@
 // with no node yet. The node's `code` is the model: every gesture prints the box graph back to Field (with the
 // `# @boxes v1` header that keeps positions), sets the node's code, compiles it and is one patch undo step. A
 // failed compile leaves the node on its last good program; the footer names the error.
+#include "app/ui/design/components/Wire.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/Keymap.h"
 
@@ -736,7 +738,7 @@ namespace
    void DrawDockMenu()
    {
       const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowSize().x, mn.y + ChipButton::Height() + tok::space_3);
-      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
+      if (MenuParts::RightPressed() && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
          ImGui::OpenPopup("##fpDockMenu");
       if (MenuParts::TestOpen("##fpDockMenu"))
@@ -758,7 +760,7 @@ namespace
       if (ImGui::IsWindowAppearing())
       {
          s.search[0] = 0; // a stale query from last time would open on an empty list
-         ImGui::SetKeyboardFocusHere();
+         UiInteract::FocusHere();
       }
       ImGui::Dummy(ImVec2(260.0f, 0.0f));
       LibraryParts::SearchField("fpSearch", T("Search boxes"), s.search, sizeof(s.search));
@@ -845,7 +847,7 @@ namespace
       {
          State& rs = S();
          if (rs.boxNameFocus)
-            ImGui::SetKeyboardFocusHere(), rs.boxNameFocus = false;
+            UiInteract::FocusHere(), rs.boxNameFocus = false;
          ImGui::SetNextItemWidth(140.0f);
          const bool enter = FieldWell::InputText("##fpBoxName", rs.boxNameBuf, sizeof(rs.boxNameBuf), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
          if (enter || ImGui::IsItemDeactivated())
@@ -986,7 +988,7 @@ namespace
       for (const Field::BoxWire& w : p.graph.wires)
       {
          const ImU32 col = KindCol(w.kind, 0.9f);
-         ed::Link(w.id, OutPinId(w.srcBoxId, w.srcPinIdx), InPinId(w.dstBoxId, w.dstPinIdx), ImGui::ColorConvertU32ToFloat4(col), 2.0f);
+         Wire::Draw(w.id, OutPinId(w.srcBoxId, w.srcPinIdx), InPinId(w.dstBoxId, w.dstPinIdx), ImGui::ColorConvertU32ToFloat4(col));
          if (w.kind == Field::ValueKind::Pulse)
             ed::Flow(w.id);
       }
@@ -1613,7 +1615,7 @@ namespace
       const float freeW = ImGui::GetContentRegionAvail().x - tailW - tok::space_1;
       if (freeW > 8.0f)
       {
-         ImGui::InvisibleButton("##fpStripFree", ImVec2(freeW, tile));
+         UiInteract::Hit("##fpStripFree", ImVec2(freeW, tile));
          if (MenuParts::BeginContextItem("##fpStripMenu"))
          {
             DockItem();
@@ -1696,7 +1698,7 @@ namespace
       const float freeW = ImGui::GetContentRegionAvail().x;
       if (freeW > 8.0f)
       {
-         ImGui::InvisibleButton("##fpFooterFree", ImVec2(freeW, ChipButton::Height()));
+         UiInteract::Hit("##fpFooterFree", ImVec2(freeW, ChipButton::Height()));
          if (MenuParts::BeginContextItem("##fpFooterMenu"))
          {
             DockItem();
@@ -1723,7 +1725,7 @@ namespace
          ed::SetCurrentEditor(prev);
       }
       ImGui::GetWindowDrawList()->AddRectFilled(mn, mx, bg, tok::radius_container);
-      ImGui::InvisibleButton("##fpEmptyCanvas", ImVec2(mx.x - mn.x, mx.y - mn.y));
+      UiInteract::Hit("##fpEmptyCanvas", ImVec2(mx.x - mn.x, mx.y - mn.y));
       if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          AddScratch("", "");
       if (MenuParts::BeginContextItem("##fpEmptyMenu"))
@@ -1910,7 +1912,7 @@ void DrawFieldPatcherDocked(const char* id, const ImVec2& size)
    gFieldPatcherClaimedKeys = false;
    const ImVec2 inner = ImGui::GetContentRegionAvail();
    auto grip = [&]() {
-      ImGui::InvisibleButton("##fpgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
+      UiInteract::Hit("##fpgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
       DrawPanelSeam(false, gripFirst);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);

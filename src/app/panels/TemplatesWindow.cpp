@@ -3,6 +3,8 @@
 // where to put it and the original can't be overwritten. The picker is File > Template library: a window like Settings,
 // one card per template under its group heading (thumbnail, title, one line).
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/components/Thumb.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/ActionButton.h"
@@ -108,7 +110,7 @@ namespace
       const float h = CardHeight(w);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::PushID(e.slug.c_str());
-      const bool clicked = ImGui::InvisibleButton("##card", ImVec2(w, h));
+      const bool clicked = UiInteract::Hit("##card", ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
       ImGui::PopID();
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -116,7 +118,7 @@ namespace
       dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hovered ? 0.10f : 0.05f)), tok::radius_container);
       const ImVec2 t0(p.x + tok::space_2, p.y + tok::space_2);
       if (const unsigned int tex = ThumbTexture(e.slug); tex != 0)
-         dl->AddImageRounded((ImTextureID)(intptr_t)tex, t0, ImVec2(t0.x + thumb, t0.y + thumb), ImVec2(0, 0), ImVec2(1, 1),
+         Thumb::AddRounded(dl, (ImTextureID)(intptr_t)tex, t0, ImVec2(t0.x + thumb, t0.y + thumb), ImVec2(0, 0), ImVec2(1, 1),
                              IM_COL32_WHITE, tok::radius_control);
       else
          dl->AddRectFilled(t0, ImVec2(t0.x + thumb, t0.y + thumb), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f)), tok::radius_control);
