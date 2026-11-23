@@ -1,5 +1,14 @@
 [
  {
+  "slug": "superflux-transient-slicing-and-beat-chopping-dsp",
+  "title": "SuperFlux transient slicing and beat chopping in real-time DSP",
+  "description": "How Infinite's Slicer node uses SuperFlux onset detection, centred STFT framing, and position-domain confinement for tight real-time beat chopping.",
+  "date": "2026-11-23",
+  "updated": "2026-11-23",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/superflux-transient-slicing-and-beat-chopping-dsp.html"
+ },
+ {
   "slug": "digital-waveguide-wind-and-piano-physical-modelling",
   "title": "Digital waveguide physical modelling for wind and piano",
   "description": "How Infinite's Wind and Piano nodes model clarinet reeds, brass lips, Chaigne felt hammers, dispersion allpasses, and a 224-mode soundboard in real-time C++ DSP.",
