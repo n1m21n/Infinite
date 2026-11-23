@@ -46,7 +46,7 @@ def build():
         if not k.startswith("_"):
             L.append(f"   constexpr float page_{k} = {float(v)}f;")
     # Docked panels (StageLayout): each panel's floor and the room the canvas keeps.
-    for grp in ("dock", "cell", "arrange", "chat"):   # panel floors, knob-row cells, per-panel layout
+    for grp in ("dock", "cell", "hit", "arrange", "chat"):   # panel floors, knob-row cells, per-panel layout
         for k, v in b.get(grp, {}).items():
             if not k.startswith("_"):
                 L.append(f"   constexpr float {grp}_{k} = {float(v)}f;")

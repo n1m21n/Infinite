@@ -1151,7 +1151,7 @@ namespace app
          char label[16];
          snprintf(label, sizeof(label), "%d", i + 1);
          const float labelFontSize = count <= 8 ? ImGui::GetFontSize()
-                                                 : std::clamp(cellW * 0.95f, 8.0f, ImGui::GetFontSize());
+                                                 : std::clamp(cellW * tok::type_fit_frac, tok::type_min, ImGui::GetFontSize());
          const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
          const ImU32 stepNumCol = isCurrent
             ? (isLight ? tok::U32(tok::pal::c_E18214FF) : tok::U32(tok::pal::c_FFC850FF))

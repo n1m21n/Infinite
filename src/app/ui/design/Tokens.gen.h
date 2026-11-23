@@ -12,6 +12,8 @@ namespace tok
    constexpr float type_caption = 12.0f;
    constexpr float type_body = 13.0f;
    constexpr float type_display = 22.0f;
+   constexpr float type_min = 8.0f;
+   constexpr float type_fit_frac = 0.95f;
    constexpr float icon_lg = 20.0f;
    constexpr float icon_sm = 14.0f;
    constexpr float icon_md = 18.0f;
@@ -225,6 +227,10 @@ namespace tok
    constexpr float cell_dropdown_min_w = 20.0f;
    constexpr float cell_pin_w = 16.0f;
    constexpr float cell_pin_lead = 20.0f;
+   constexpr float hit_point = 7.0f;
+   constexpr float hit_edge = 7.0f;
+   constexpr float hit_snap = 6.0f;
+   constexpr float hit_marker_edge = 3.0f;
    constexpr float arrange_wide_w = 720.0f;
    constexpr float arrange_viewport_frac = 0.28f;
    constexpr float arrange_viewport_min_w = 180.0f;

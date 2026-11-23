@@ -54,10 +54,10 @@ bool gCurveRecordPicking = false;
 
 namespace
 {
-   constexpr float kMinHeight = 220.0f, kMinWidth = 360.0f;
+   constexpr float kMinHeight = tok::dock_curve_min_h, kMinWidth = 360.0f;
    constexpr float kIconW = tok::control_h, kSideW = UiDensity::kInspectorW + 2.0f * tok::space_3, kRulerH = 16.0f;
    constexpr float kPad = 8.0f;     // graph edge to the 0 and 1 value lines
-   constexpr float kHit = 7.0f;     // px a point or handle grabs from
+   constexpr float kHit = tok::hit_point;     // px a point or handle grabs from
    constexpr float kEraseR = 9.0f;  // px the eraser rubs out
    constexpr float kMinSpan = 1.0f / 512.0f;
 

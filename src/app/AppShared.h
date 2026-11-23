@@ -147,7 +147,7 @@ extern float gViewportPanelHeight;
    inline const float kPinRadius = 7.0f;
 
 
-   inline const float kPinHit = 20.0f;
+   inline const float kPinHit = tok::hit_min;
 
 bool IsThemeLight();
 

@@ -21,6 +21,7 @@ Also counts every raw `ImGui::` call outside src/app/ui/design, by widget family
   tools/design/ui_audit.py                 print the category table, write internal/plans/ui-audit.md
   tools/design/ui_audit.py --out PATH      write the report somewhere else
   tools/design/ui_audit.py --file F...     print every finding in these files (hand checks)
+  tools/design/ui_audit.py --cat C...      print every finding in these categories outside the kit
   tools/design/ui_audit.py --ratchet       per-category counts vs ratchet.json "audit" (may only go down); exit 1 on a rise
   tools/design/ui_audit.py --ratchet --update | --reset   lower / rewrite the stored counts
 """
@@ -171,7 +172,9 @@ THEME = [
     ("timing", re.compile(r"\b(GetTime|DeltaTime|steady_clock|system_clock|milliseconds|microseconds|sleep_for|wait_for)\b"),
                re.compile(r"(time|timer|hold|delay|duration|dur$|secs?$|seconds$|ms$|Ms$|period|interval|timeout|blink|flash|pulse|"
                           r"elapsed|debounce|anim|glide|tween|cooldown|grace|age$)", re.I)),
-    ("hit", None, re.compile(r"(hit|grab|tol$|tolerance|pick|slop|reach|catch|snapDist|snapPx|handleR|hoverR|nearPx|thresholdPx)", re.I)),
+    # matched on whole camelCase words, so whiteCount or pickedUnit are not hit sizes
+    ("hit", None, re.compile(r"(?:^|_)(?:hit|grab|tol|tolerance|slop|reach|catch)(?![a-z])|(?:Hit|Grab|Tol|Tolerance|Slop|Reach|Catch)"
+                             r"(?![a-z])|snapDist|snapPx|SnapPx|handleR\b|hoverR|nearPx|thresholdPx")),
     ("font", re.compile(r"\b(AddFontFrom\w+|SizePixels|PushFont|SetWindowFontScale)\b"), re.compile(r"(font|glyph)(Size|Px|Scale)", re.I)),
 ]
 FMT = re.compile(r"%[-+ #0]*\d*(?:\.\d+)?(?:hh|h|ll|l|z|j|t|L)?[diouxXeEfgGaAcsp]")
@@ -479,6 +482,13 @@ def main():
             if x[5] == ln: print("finding", x[0], repr(x[2]), "in", x[1], x[6])
         for r in TRACE:
             if r[1] == ln: print("allowed", r[2])
+        return 0
+    if "--cat" in a:   # --cat CAT [CAT...]: every finding in these categories outside the kit, by file and line
+        cats = set(x for x in a[a.index("--cat") + 1:] if not x.startswith("--"))
+        findings, _, _ = run()
+        for f in sorted(findings, key=lambda x: (x[4], x[5])):
+            if f[0] in cats and not f[4].startswith(KIT):
+                print(f"{f[4]}:{f[5]} [{f[0]}] {f[2]!r} in {f[1]} ({f[6]}) | {f[3]}")
         return 0
     if "--file" in a:
         files = a[a.index("--file") + 1:]

@@ -2023,7 +2023,7 @@ namespace app
             // column width instead of down, so going from 8 to 9+ steps (still
             // ~45px-wide columns at this node width) jumped the step numbers
             // to ~3x the normal text size instead of shrinking them.
-            const float labelFontSize = std::min(ImGui::GetFontSize(), std::max(8.0f, barW * 0.95f));
+            const float labelFontSize = std::min(ImGui::GetFontSize(), std::max(tok::type_min, barW * tok::type_fit_frac));
             const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
             const ImU32 stepNumCol = isCurrent
                ? (isLight ? tok::U32(tok::pal::c_E18214FF) : tok::U32(tok::pal::c_FFC850FF))

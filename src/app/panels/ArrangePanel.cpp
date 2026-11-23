@@ -1903,7 +1903,7 @@ namespace app
                            lum > 150.0f ? tok::U32(tok::pal::c_141418FF) : tok::U32(tok::pal::c_FFFFFFFF), nm);
             }
 
-            const float hitX0 = std::max(rulerStartX, fx - 3.0f);
+            const float hitX0 = std::max(rulerStartX, fx - tok::hit_marker_edge);
             const float hitX1 = std::min(rulerStartX + rulerWidth, fx + flagW);
             if (hitX1 - hitX0 >= 1.0f && gArrangeRenamingMarkerId != mk.id)
             {
@@ -1963,7 +1963,7 @@ namespace app
       // Dragging along the loop borders ([start, end]) or loop header adjusts the loop.
       const float loopX0 = tickToX(gArrange.settings.loop.start);
       const float loopX1 = tickToX(gArrange.settings.loop.end);
-      const float kBorderHitRadius = 7.0f;
+      const float kBorderHitRadius = tok::hit_edge;
       // An edge scrolled out of the view isn't drawn, so it can't be grabbed either.
       const auto edgeInView = [&](float x) { return x >= rulerPos.x - 0.5f && x <= rulerPos.x + rulerSize.x + 0.5f; };
       const bool mouseInRuler = mouse.x >= rulerPos.x && mouse.x < rulerPos.x + rulerSize.x &&

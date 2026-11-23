@@ -717,7 +717,7 @@ namespace app
             const float dDot = (m.x - hx[b]) * (m.x - hx[b]) + (m.y - hy[b]) * (m.y - hy[b]);
             if (dDot < bestDotDist2) { bestDotDist2 = dDot; bestDotBand = b; }
          }
-         const float kHandleGrabRadius2 = 20.0f * 20.0f;
+         const float kHandleGrabRadius2 = tok::hit_min * tok::hit_min;
          cache.dragInert = false;
          if (bestDotDist2 <= kHandleGrabRadius2)
          {

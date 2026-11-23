@@ -108,7 +108,7 @@ namespace
    };
    constexpr float kRuler = 18.0f;
    constexpr float kHandle = 7.0f;
-   constexpr float kSnapPx = 6.0f;
+   constexpr float kSnapPx = tok::hit_snap;
    constexpr float kPi = 3.14159265f;
    constexpr const char* kUndo = "Edit in 2D View";
 

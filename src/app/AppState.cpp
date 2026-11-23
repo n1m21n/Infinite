@@ -460,7 +460,7 @@ bool gHeadlessNeedProbe = false;
    float gTerminalWidth = 560.0f;
    int   gTerminalDock = 1;
    bool  gTerminalFloating = false;
-   float gTerminalFontSize = 13.0f;
+   float gTerminalFontSize = tok::type_body;
    bool  gTerminalFocus = false;
    ImVec2 gTerminalRectMin, gTerminalRectMax;
    std::vector<std::string> gTerminalDropPending;
