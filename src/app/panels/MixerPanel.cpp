@@ -2,6 +2,7 @@
 // A3 is the shell (five docks, persist, the "Enable Mixer Audio" chip). A4 is the console: page
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
+#include "app/ui/design/components/ReorderDrag.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/frame/CanvasLink.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -489,22 +490,17 @@ namespace app
             BeginRename(*m, mGn->uid, r.slot, name);
             picked = true;
          }
-         if (ImGui::BeginDragDropSource())
          {
             const int payload[2] = { r.mixerIndex, r.slot };
-            ImGui::SetDragDropPayload("MIXER_STRIP", payload, sizeof(payload));
-            ImGui::TextUnformatted(name);
-            ImGui::EndDragDropSource();
-         }
-         if (ImGui::BeginDragDropTarget())
-         {
-            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("MIXER_STRIP"))
+            ReorderDrag::Source("MIXER_STRIP", payload, sizeof(payload), name);
+            const ImGuiPayload* pk = ImGui::GetDragDropPayload();
+            const int from = pk != nullptr && pk->IsDataType("MIXER_STRIP") ? static_cast<const int*>(pk->Data)[1] : r.slot;
+            if (const ImGuiPayload* pl = ReorderDrag::Target("MIXER_STRIP", ReorderDrag::SlotEdge(from, r.slot), false))
             {
                const int* d = static_cast<const int*>(pl->Data);
                if (d[0] == r.mixerIndex && d[1] != r.slot)
                   MixerPanelStripMove(r.mixerIndex, d[1], r.slot);
             }
-            ImGui::EndDragDropTarget();
          }
          if (MenuParts::BeginContextItem("##stripctx"))
          {
@@ -668,22 +664,18 @@ namespace app
             SelectOnCanvas(g->index);
          if (ImGui::IsItemHovered() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
             HelpTip("%s", name.c_str());
-         if (!changed && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+         if (!changed)
          {
             const int payload[3] = { r.mixerIndex, r.slot, i };
-            ImGui::SetDragDropPayload("MIXER_INSERT", payload, sizeof(payload));
-            ImGui::TextUnformatted(name.c_str());
-            ImGui::EndDragDropSource();
-         }
-         if (!changed && ImGui::BeginDragDropTarget())
-         {
-            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("MIXER_INSERT"))
+            ReorderDrag::Source("MIXER_INSERT", payload, sizeof(payload), name.c_str(), ImGuiDragDropFlags_SourceAllowNullID);
+            const ImGuiPayload* pk = ImGui::GetDragDropPayload();
+            const int from = pk != nullptr && pk->IsDataType("MIXER_INSERT") ? static_cast<const int*>(pk->Data)[2] : i;
+            if (const ImGuiPayload* pl = ReorderDrag::Target("MIXER_INSERT", ReorderDrag::SlotEdge(from, i)))
             {
                const int* d = static_cast<const int*>(pl->Data);
                if (d[0] == r.mixerIndex && d[1] == r.slot && d[2] != i)
                   changed = MixerPanelInsertMove(r.mixerIndex, r.slot, d[2], i);
             }
-            ImGui::EndDragDropTarget();
          }
          if (!changed && MenuParts::BeginContextItem("##insctx"))
          {

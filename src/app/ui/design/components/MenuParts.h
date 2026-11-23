@@ -41,11 +41,14 @@ namespace MenuParts
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
+      // No keyboard-nav box: a search field focused on open turns ImGui's nav cursor on, and it framed menu rows
+      // (and submenu rows) in the accent. The row wash is the one hover mark.
+      ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
    }
 
    inline void EndContent()
    {
-      ImGui::PopStyleColor(3);
+      ImGui::PopStyleColor(4);
       ImGui::PopStyleVar();
    }
 

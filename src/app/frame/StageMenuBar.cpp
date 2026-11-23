@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/ReorderDrag.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/StatusDot.h"
@@ -93,19 +94,14 @@ static void DrawPanelRail()
       if (PanelRail::Item(e.id, top + slot * step, e.glyphOff, e.glyphOn, *e.open, e.tip))
          *e.open = !*e.open;
       // Drag a tile onto another to reorder; the order is saved with the workspace.
-      if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+      ReorderDrag::Source("RAIL_TILE", &slot, sizeof(slot), nullptr);
       {
-         ImGui::SetDragDropPayload("RAIL_TILE", &slot, sizeof(slot));
-         ImGui::EndDragDropSource();
-      }
-      if (ImGui::BeginDragDropTarget())
-      {
-         if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RAIL_TILE"))
+         const int* from = ReorderDrag::Peek<int>("RAIL_TILE");
+         if (const ImGuiPayload* pl = ReorderDrag::Target("RAIL_TILE", ReorderDrag::SlotEdge(from != nullptr ? *from : slot, slot)))
          {
             moveFrom = *(const int*)pl->Data;
             moveTo = slot;
          }
-         ImGui::EndDragDropTarget();
       }
    }
    if (moveFrom >= 0 && moveFrom != moveTo)

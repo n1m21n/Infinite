@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "app/ui/design/components/ReorderDrag.h"
 #include "app/AppCommon.h"
 #include "app/AppShared.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -277,15 +278,10 @@ namespace PagePicker
             }
             if (opt.reorder && pages.size() > 1)
             {
-               if (ImGui::BeginDragDropSource())
+               ReorderDrag::Source("INFINITE_PAGE_CHIP", &i, sizeof i, e.name.c_str());
                {
-                  ImGui::SetDragDropPayload("INFINITE_PAGE_CHIP", &i, sizeof i);
-                  ImGui::TextUnformatted(e.name.c_str());
-                  ImGui::EndDragDropSource();
-               }
-               if (ImGui::BeginDragDropTarget())
-               {
-                  if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("INFINITE_PAGE_CHIP"))
+                  const int* pk = ReorderDrag::Peek<int>("INFINITE_PAGE_CHIP");
+                  if (const ImGuiPayload* p = ReorderDrag::Target("INFINITE_PAGE_CHIP", ReorderDrag::SlotEdge(pk != nullptr ? *pk : i, i), false))
                   {
                      const int from = *static_cast<const int*>(p->Data);
                      if (from != i)
@@ -295,7 +291,6 @@ namespace PagePicker
                         out.to = i;
                      }
                   }
-                  ImGui::EndDragDropTarget();
                }
             }
             const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();

@@ -19,6 +19,7 @@
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/components/ReorderDrag.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/SettingsWindow.h"
 #include "core/BlendModes.h"
@@ -1190,8 +1191,8 @@ namespace
       return m > 1.0f ? std::round(16.0f * ink / m) : 16.0f;
    }
 
-   // One header action at the row's height; returns the click. `grip` = a drag handle (no click, no hover well).
-   bool HeaderIcon(const char* id, const char* g, bool lit, const char* tip, float rowY, bool grip = false)
+   // One header action at the row's height; returns the click.
+   bool HeaderIcon(const char* id, const char* g, bool lit, const char* tip, float rowY)
    {
       const float fh = ImGui::GetFrameHeight();
       ImGui::SetCursorPosY(rowY);
@@ -1201,19 +1202,19 @@ namespace
          HelpTip("%s", tip);
       const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      if (!grip && (hov || ImGui::IsItemActive()))
+      if (hov || ImGui::IsItemActive())
          dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGui::IsItemActive() ? ImGuiCol_FrameBgActive : ImGuiCol_FrameBgHovered),
                            tok::radius_control);
       const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
       const float ink = std::round(HeaderMark() * 0.85f);
       const float gs = InkFit(c, g, ink);
       const ImU32 col = lit ? ImGui::GetColorU32(app::AccentEmphasisSelected())
-                            : ImGui::GetColorU32(grip ? ImGuiCol_TextDisabled : ImGuiCol_Text, grip && !hov ? 0.55f : 0.9f);
+                            : ImGui::GetColorU32(ImGuiCol_Text, 0.9f);
       glyph::Draw(dl, c, gs, col, g);
       ImVec2 imn, imx;
       glyph::InkBox(c, gs, g, imn, imx);
       UiAudit::NoteInk(1, imn, imx, ink, tip, g);
-      return clicked && !grip;
+      return clicked;
    }
 
    bool ZoomChip(const char* id, bool plus, const char* tip)
@@ -1449,6 +1450,74 @@ namespace
       FieldWell::PopStyle();
       if (changed)
          Touch();
+      return changed;
+   }
+
+   // A grey ramp with four handles (black, black to, white from, white), kept in order. Returns true on a change.
+   bool BlendIfRamp(const char* id, float* b, float width)
+   {
+      static int sHeld = -1;
+      static ImGuiID sHeldId = 0;
+      const float fh = ImGui::GetFrameHeight();
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float w = std::max(40.0f, width);
+      ImGui::InvisibleButton(id, ImVec2(w, fh));
+      const ImGuiID me = ImGui::GetItemID();
+      const float inset = 6.0f;
+      const float x0 = p.x + inset, x1 = p.x + w - inset;
+      const float barT = p.y + fh * 0.22f, barB = p.y + fh * 0.52f;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilledMultiColor(ImVec2(x0, barT), ImVec2(x1, barB), IM_COL32(0, 0, 0, 255), IM_COL32(255, 255, 255, 255),
+                                  IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255));
+      dl->AddRect(ImVec2(x0, barT), ImVec2(x1, barB), ImGui::GetColorU32(ImGuiCol_Border), 0.0f);
+      auto xOf = [&](float v) { return x0 + std::clamp(v, 0.0f, 1.0f) * (x1 - x0); };
+      const ImGuiIO& io = ImGui::GetIO();
+      bool changed = false;
+      if (ImGui::IsItemActivated())
+      {
+         // The nearest handle; on a split pair's shared spot, the one on the side the pointer came from.
+         float best = 1e9f;
+         sHeld = 0;
+         for (int k = 0; k < 4; k++)
+         {
+            float d = std::fabs(io.MousePos.x - xOf(b[k]));
+            if (d < best - 0.01f || (std::fabs(d - best) < 0.5f && ((k == 1 || k == 3) == (io.MousePos.x > xOf(b[k])))))
+            {
+               best = d;
+               sHeld = k;
+            }
+         }
+         sHeldId = me;
+         PushUndoCheckpoint("Blend If");
+      }
+      if (ImGui::IsItemActive() && sHeldId == me && sHeld >= 0)
+      {
+         const float v = std::clamp((io.MousePos.x - x0) / std::max(1.0f, x1 - x0), 0.0f, 1.0f);
+         const float lo = sHeld == 0 ? 0.0f : b[sHeld - 1], hi = sHeld == 3 ? 1.0f : b[sHeld + 1];
+         const float nv = std::round(std::clamp(v, lo, hi) * 255.0f) / 255.0f;
+         if (nv != b[sHeld])
+         {
+            b[sHeld] = nv;
+            changed = true;
+         }
+         ImGui::SetTooltip("%d", (int)std::lround(b[sHeld] * 255.0f));
+      }
+      else if (ImGui::IsItemHovered())
+         HelpTip("%d / %d   %d / %d", (int)std::lround(b[0] * 255), (int)std::lround(b[1] * 255), (int)std::lround(b[2] * 255),
+                 (int)std::lround(b[3] * 255));
+      // Handles: small triangles under the ramp, dark for the black pair, light for the white pair.
+      for (int k = 0; k < 4; k++)
+      {
+         const float x = xOf(b[k]);
+         const bool held = ImGui::IsItemActive() && sHeldId == me && sHeld == k;
+         const ImU32 fill = k < 2 ? IM_COL32(20, 20, 20, 255) : IM_COL32(235, 235, 235, 255);
+         const ImU32 edge = held ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : ImGui::GetColorU32(ImGuiCol_Text, 0.8f);
+         const ImVec2 t0(x, barB + 1.0f), t1(x - 5.0f, p.y + fh - 2.0f), t2(x + 5.0f, p.y + fh - 2.0f);
+         dl->AddTriangleFilled(t0, t1, t2, fill);
+         dl->AddTriangle(t0, t1, t2, edge, held ? 1.5f : 1.0f);
+      }
+      if (ImGui::IsItemDeactivated())
+         sHeld = -1;
       return changed;
    }
 
@@ -7588,7 +7657,12 @@ namespace
       MoreRows() : keepW(sFieldW), keepL(sLabelW)
       {
          sLabelW = UiDensity::M().label + tok::space_4;   // "Accumulation" at compact text fits
-         sFieldW = UiDensity::kPopoverW - sLabelW - 2.0f * ImGui::GetStyle().WindowPadding.x; // padding both sides
+         // A settings window is resizable: its wells follow its width. A popover fits its content, so it keeps the
+         // strip width (its own width would chase itself).
+         if ((ImGui::GetCurrentWindow()->Flags & ImGuiWindowFlags_AlwaysAutoResize) == 0)
+            sFieldW = std::max(60.0f, ImGui::GetContentRegionAvail().x - sLabelW);
+         else
+            sFieldW = UiDensity::kPopoverW - sLabelW - 2.0f * ImGui::GetStyle().WindowPadding.x; // padding both sides
       }
       ~MoreRows()
       {
@@ -9493,19 +9567,14 @@ namespace
          shown++;
          if (IconChip(kTools[i].id, kTools[i].glyph, sTool == kTools[i].tool, Sc(T(kTools[i].tip))))
             sTool = kTools[i].tool;
-         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+         ReorderDrag::Source("V2DTOOL", &k, sizeof(int), nullptr);
          {
-            ImGui::SetDragDropPayload("V2DTOOL", &k, sizeof(int));
-            ImGui::EndDragDropSource();
-         }
-         if (ImGui::BeginDragDropTarget())
-         {
-            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2DTOOL"))
+            const int* from = ReorderDrag::Peek<int>("V2DTOOL");
+            if (const ImGuiPayload* pl = ReorderDrag::Target("V2DTOOL", ReorderDrag::SlotEdge(from != nullptr ? *from : k, k), cols == 1))
             {
                dropFrom = *(const int*)pl->Data;
                dropTo = k;
             }
-            ImGui::EndDragDropTarget();
          }
       }
       if (dropFrom >= 0 && dropFrom != dropTo)
@@ -10187,6 +10256,18 @@ namespace
              ImGui::IsMouseHoveringRect(ImVec2(x, p.y + 2), ImVec2(x + tsz.x, p.y + 2 + tsz.y)) &&
              l->kind != Kind::Fill && l->kind != Kind::Adjust)
             SelectLayerPixels(doc, id, io.KeyShift ? Scene2DNode::kSelAdd : io.KeyAlt ? Scene2DNode::kSelSub : Scene2DNode::kSelNew);
+         if (l->kind == Kind::Adjust)
+         {
+            // An adjustment layer's thumbnail opens its settings window (Photoshop's Properties for that layer).
+            ImGui::SetCursorScreenPos(ImVec2(x, p.y + 2));
+            if (ImGui::InvisibleButton("##athumb", tsz))
+            {
+               SelectOnly(id);
+               SettingsWindow::Toggle("v2dadj/" + std::to_string(sDocUid) + "/" + std::to_string(id));
+            }
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Click for its settings"));
+         }
          if (hasMask)
          {
             ImGui::SetCursorScreenPos(ImVec2(x, p.y + 2));
@@ -10291,8 +10372,6 @@ namespace
          }
          if (l->lock != 0)
             glyph::Draw(dl, ImVec2(p.x + w - 12, p.y + rowH * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_TextDisabled), IconsInfinite::Lock);
-         else
-            glyph::Draw(dl, ImVec2(p.x + w - 12, p.y + rowH * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.55f), IconsInfinite::Grip);
          // The row itself: select, rename, drag to restack.
          ImGui::SetCursorScreenPos(ImVec2(x, p.y));
          ImGui::SetNextItemAllowOverlap();
@@ -10309,12 +10388,7 @@ namespace
             sRename = id;
             std::snprintf(sRenameBuf, sizeof(sRenameBuf), "%s", LayerName(*l).c_str());
          }
-         if (ImGui::BeginDragDropSource())
-         {
-            ImGui::SetDragDropPayload("V2D_LAYER", &id, sizeof(int));
-            ImGui::TextUnformatted(LayerName(*l).c_str());
-            ImGui::EndDragDropSource();
-         }
+         ReorderDrag::Source("V2D_LAYER", &id, sizeof(int), LayerName(*l).c_str());
          if (ImGui::BeginDragDropTarget())
          {
             const float t = (io.MousePos.y - p.y) / rowH;
@@ -10325,17 +10399,17 @@ namespace
                                   l->kind != Kind::Group && l->kind != Kind::Adjust && t > 0.25f && t < 0.75f;
             const bool into = !clipDrop && l->kind == Kind::Group && t > 0.3f && t < 0.7f;
             const bool below = !into && !clipDrop && t >= 0.5f;
-            const ImU32 col = Hex(kOutline);
-            if (clipDrop)
+            if (peekId != 0)
             {
-               dl->AddRect(p, ImVec2(p.x + w, p.y + rowH), col, tok::radius_cell, 0, 2.0f);
-               ImGui::SetTooltip(T("Clip to %s"), LayerName(*l).c_str());
+               // The app's one reorder mark (ReorderDrag): a box when it goes into a group or clips, else the bar.
+               if (clipDrop || into)
+                  ReorderDrag::Box(p, ImVec2(p.x + w, p.y + rowH));
+               else
+                  ReorderDrag::Bar(ImVec2(p.x + 2.0f, below ? p.y + rowH : p.y), ImVec2(p.x + w - 2.0f, below ? p.y + rowH : p.y));
+               if (clipDrop)
+                  ImGui::SetTooltip(T("Clip to %s"), LayerName(*l).c_str());
             }
-            else if (into)
-               dl->AddRect(p, ImVec2(p.x + w, p.y + rowH), col, 3.0f, 0, 2.0f);
-            else
-               dl->AddLine(ImVec2(p.x, below ? p.y + rowH : p.y), ImVec2(p.x + w, below ? p.y + rowH : p.y), col, 2.0f);
-            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2D_LAYER"))
+            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2D_LAYER", ImGuiDragDropFlags_AcceptNoDrawDefaultRect))
             {
                const int moving = *(const int*)pl->Data;
                if (io.KeyAlt && !(into && doc->IsInside(id, moving)))
@@ -10748,26 +10822,16 @@ namespace
          BoolRow(T("Sort 3D with outside"), &l->collapse);
       if (l->kind != Kind::Adjust)
       {
-         // Blend If (grey): black from-to and white from-to, for this layer and for what is under it.
+         // Blend If (grey), Photoshop's sliders: one grey ramp per row, four handles on it - black, black to, white
+         // from, white. The inner two split off the outer two (drag a handle off its pair to make the soft range).
          SectionCard::Begin(T("Blend If"));
          for (int side = 0; side < 2; side++)
          {
             float* b = side == 0 ? l->bifT : l->bifU;
             ImGui::PushID(side);
             FieldLabel(side == 0 ? T("This layer") : T("Underlying"));
-            {
-               Pairs g;
-               SliderRow(T("Black"), &b[0], 0.0f, 1.0f, "%.2f");
-               SliderRow(T("Black to"), &b[1], 0.0f, 1.0f, "%.2f");
-            }
-            {
-               Pairs g;
-               SliderRow(T("White from"), &b[2], 0.0f, 1.0f, "%.2f");
-               SliderRow(T("White"), &b[3], 0.0f, 1.0f, "%.2f");
-            }
-            b[1] = std::max(b[1], b[0]);
-            b[2] = std::max(b[2], b[1]);
-            b[3] = std::max(b[3], b[2]);
+            if (BlendIfRamp("##bif", b, sFieldW))
+               Touch();
             ImGui::PopID();
          }
       }
@@ -11647,6 +11711,8 @@ namespace
    // Where a card's settings window first appears: left of the panel, level with the card's header.
    ImVec2 WinAt(float headerY) { return ImVec2(ImGui::GetWindowPos().x - tok::space_2, headerY); }
 
+   ImVec2 sCardSpan[2];   // the last CardTitle's whole card (ReorderDrag bar extent)
+
    // The card title: click opens the settings window, drag (where the caller adds a source) reorders.
    // Returns the header rect's left top. `chips` = how many header icons follow on the right.
    ImVec2 CardTitle(const std::string& id, const std::string& title, bool on, int chips, const std::string& winKey, const char* tip)
@@ -11655,6 +11721,10 @@ namespace
       const float chipsW = chips * fh + std::max(0, chips - 1) * tok::space_1;
       const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
       const ImVec2 np = ImGui::GetCursorScreenPos();
+      // The whole card, for the drag-to-reorder bar: on box on the left, header icons on the right, card padding round.
+      const float pad = SectionCard::Pad();
+      sCardSpan[0] = ImVec2(np.x - CheckBox::Size() - tok::space_2 - pad, np.y - pad);
+      sCardSpan[1] = ImVec2(np.x + ImGui::GetContentRegionAvail().x + pad, np.y + fh + pad);
       if (ImGui::InvisibleButton(id.c_str(), ImVec2(nameW, fh)))
          SettingsWindow::Toggle(winKey);
       const bool hov = ImGui::IsItemHovered();
@@ -11678,6 +11748,12 @@ namespace
       const int n = (int)l.effects.size();
       if (MenuParts::Item(T("All Settings"), nullptr, SettingsWindow::IsOpen(winKey)))
          SettingsWindow::Toggle(winKey);
+      if (e.uid != 0 && MenuParts::Item(T(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show)), nullptr, e.shown))
+      {
+         PushUndoCheckpoint("Show effect node");
+         l.effects[(size_t)i].shown = !e.shown;
+         Touch();
+      }
       MenuParts::Separator();
       if (MenuParts::Item(T("Move Up"), nullptr, false, i > 0))
          sEffOp = { l.id, i, 1, sDocUid };
@@ -11702,7 +11778,7 @@ namespace
       S::Effect& e = l.effects[(size_t)i];
       const std::string name = e.uid != 0 ? e.entry : std::string(T(S::AdjName(e.adjType)));
       const std::string base = "##v2deff" + std::to_string(l.id) + "_" + std::to_string(i);
-      // One header row: on box, name, then gear / show / remove / grip in fixed slots on the right. The card shows
+      // One header row: on box, name, gear (the 3D View grammar). The card shows
       // the effect's one or two everyday rows; the gear (or a click on the name) opens all of them in a window.
       const std::string cardKey = std::to_string(l.id) + "/" + (e.uid != 0 ? std::to_string(e.uid) : "a" + std::to_string(e.adjType));
       const std::string winKey = "v2deff/" + std::to_string(sDocUid) + "/" + cardKey;
@@ -11720,55 +11796,26 @@ namespace
          HelpTip("%s", T("On"));
       FormParts::Inline(0.0f, tok::space_2);
       ImGui::SetCursorPosY(rowY);
-      const ImVec2 np = CardTitle(base + "name", name, e.on, e.uid != 0 ? 4 : 3, winKey,
-                                  e.uid != 0 ? T("Node-backed effect: click for all settings, drag to reorder")
-                                             : T("Click for all settings, drag to reorder"));
-      const float nameW = ImGui::GetItemRectSize().x;
-      // Drag the header onto another header to move the effect there.
-      if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+      // The 3D View's card grammar: on box, name, gear. Show on canvas and Remove are on the right-click menu.
+      const ImVec2 np = CardTitle(base + "name", name, e.on, 1, winKey, T("Click for all settings, drag to reorder, right-click for more"));
+      // Drag the card onto another card to move the effect there (the shared reorder motion).
       {
          const int pay[2] = { l.id, i };
-         ImGui::SetDragDropPayload("V2DEFF", pay, sizeof(pay));
-         ImGui::EndDragDropSource();
-      }
-      if (ImGui::BeginDragDropTarget())
-      {
-         ImGui::GetWindowDrawList()->AddLine(np, ImVec2(np.x + nameW, np.y), Hex(kOutline), 2.0f);
-         if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("V2DEFF"))
+         ReorderDrag::Source("V2DEFF", pay, sizeof(pay), name.c_str());
+         int from = -1;
+         if (const ImGuiPayload* pp = ImGui::GetDragDropPayload(); pp != nullptr && pp->IsDataType("V2DEFF"))
+            from = ((const int*)pp->Data)[1];
+         if (const ImGuiPayload* p = ReorderDrag::Target("V2DEFF", ReorderDrag::SlotEdge(from, i), true, sCardSpan))
          {
-            const int* pay = (const int*)p->Data;
-            if (pay[0] == l.id && pay[1] != i)
-               sEffOp = { l.id, pay[1], 4, sDocUid, i };
+            const int* pp = (const int*)p->Data;
+            if (pp[0] == l.id && pp[1] != i)
+               sEffOp = { l.id, pp[1], 4, sDocUid, i };
          }
-         ImGui::EndDragDropTarget();
       }
       EffectMenu(l, i, winKey);
       FormParts::Inline(0.0f, tok::space_2);
       if (HeaderIcon((base + "set").c_str(), IconsInfinite::Settings, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
          SettingsWindow::Toggle(winKey);
-      FormParts::Inline(0.0f, tok::space_1);
-      // A node-backed effect's node: shown on the canvas (lit) or kept off it, one chip instead of a full-width row.
-      if (e.uid != 0)
-      {
-         if (HeaderIcon((base + "show").c_str(), CanvasLink::Glyph(CanvasLink::Verb::Show), e.shown,
-                        T(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show)), rowY))
-         {
-            PushUndoCheckpoint("Show effect node");
-            e.shown = !e.shown;
-            Touch();
-         }
-         FormParts::Inline(0.0f, tok::space_1);
-      }
-      if (HeaderIcon((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove effect"), rowY))
-         sEffOp = { l.id, i, 3, sDocUid };
-      FormParts::Inline(0.0f, tok::space_1);
-      HeaderIcon((base + "grip").c_str(), IconsInfinite::Grip, false, nullptr, rowY, true);
-      if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
-      {
-         const int pay[2] = { l.id, i };
-         ImGui::SetDragDropPayload("V2DEFF", pay, sizeof(pay));
-         ImGui::EndDragDropSource();
-      }
       // The effect's controls, all in its settings window: every row, the rarely used ones under More, then Mix.
       // The card itself is the header alone.
       auto rows = [&]() {
@@ -11997,6 +12044,7 @@ namespace
    }
 
    std::string EffPresetDir() { return AppPaths::AppSupportDir() + "/2dfx"; }
+   std::string StylePresetDir() { return AppPaths::AppSupportDir() + "/2dstyle"; }
 
    // A node effect's params in a preset: one "name value" line each (texts with newlines escaped), set back by name.
    class ParamLines : public ParamVisitor
@@ -12128,7 +12176,6 @@ namespace
       }
    }
 
-   void StylePresets(Layer& l, float btnW = -1.0f, bool embedded = false);
    void EffectPresets(Layer& l, float btnW = -1.0f)
    {
       static char name[64] = "";
@@ -12140,6 +12187,10 @@ namespace
          for (const auto& de : std::filesystem::directory_iterator(EffPresetDir(), ec))
             if (de.path().extension() == ".inf2dfx")
                sFiles.push_back(de.path().stem().string());
+         // Style presets saved before stacks held styles: listed too, they apply as a stack with styles only.
+         for (const auto& de : std::filesystem::directory_iterator(StylePresetDir(), ec))
+            if (de.path().extension() == ".inf2dstyle")
+               sFiles.push_back(de.path().stem().string() + "\x1f");
          std::sort(sFiles.begin(), sFiles.end());
       };
       static ImVec2 sPrePos(0, 0);
@@ -12154,15 +12205,19 @@ namespace
          return;
       ImGui::SetNextItemWidth(sFieldW);
       FieldWell::InputText("##v2deffname", name, sizeof name);
-      ImGui::BeginDisabled(name[0] == 0 || l.effects.empty());
+      // One kind of preset: the stack, which is the layer's whole look (its effects and its styles).
+      const bool any = !l.effects.empty() || l.AnyFx();
+      ImGui::BeginDisabled(name[0] == 0 || !any);
       const bool saveStack = ActionButton::Draw((std::string(T("Save stack")) + "##v2deffsave").c_str(), ImVec2(sFieldW, 0.0f), ActionButton::Kind::Plain);
       ImGui::EndDisabled();
-      if (saveStack && name[0] != 0 && !l.effects.empty())
+      if (saveStack && name[0] != 0 && any)
       {
          std::error_code ec;
          std::filesystem::create_directories(EffPresetDir(), ec);
          std::ofstream f(AppPaths::FsPath(EffPresetDir() + "/" + name + ".inf2dfx"));
          f << Scene2DNode::EffectsText(l) << "\n--params\n" << EffectParamsText(l);
+         if (l.AnyFx())
+            f << "\n--styles\n" << Scene2DNode::StyleText(l);
          rescan();
       }
       if (!sFiles.empty())
@@ -12170,12 +12225,36 @@ namespace
          MenuParts::Separator();
          for (size_t fi = 0; fi < sFiles.size(); fi++)
          {
-            if (MenuParts::Item(sFiles[fi].c_str()))
+            const bool styleOnly = !sFiles[fi].empty() && sFiles[fi].back() == '\x1f';
+            const std::string shown = styleOnly ? sFiles[fi].substr(0, sFiles[fi].size() - 1) : sFiles[fi];
+            if (MenuParts::Item((shown + "##pre" + std::to_string(fi)).c_str()))
             {
-               std::ifstream f(AppPaths::FsPath(EffPresetDir() + "/" + sFiles[fi] + ".inf2dfx"));
+               std::ifstream f(AppPaths::FsPath(styleOnly ? StylePresetDir() + "/" + shown + ".inf2dstyle"
+                                                          : EffPresetDir() + "/" + shown + ".inf2dfx"));
                std::stringstream ss;
                ss << f.rdbuf();
-               std::string text = ss.str(), params;
+               std::string text = ss.str(), params, styles;
+               if (styleOnly)
+               {
+                  styles = text;
+                  text.clear();
+               }
+               if (const size_t sc = text.find("\n--styles\n"); sc != std::string::npos)
+               {
+                  styles = text.substr(sc + 10);
+                  text.resize(sc);
+               }
+               if (!styles.empty())
+               {
+                  Layer got = l;
+                  if (Scene2DNode::ParseStyle(styles, got))
+                  {
+                     PushUndoCheckpoint("Apply layer style");
+                     std::copy(got.fx, got.fx + Scene2DNode::kFxCount, l.fx);
+                     l.fxMore = got.fxMore;
+                     Touch();
+                  }
+               }
                const size_t cut = text.find("\n--params\n");
                if (cut != std::string::npos)
                {
@@ -12183,7 +12262,7 @@ namespace
                   text.resize(cut);
                }
                Layer got = l;
-               if (Scene2DNode::ParseEffects(text, got))
+               if (!text.empty() && Scene2DNode::ParseEffects(text, got))
                {
                   std::map<int, ParamSet> sets = ParseEffectParams(params);
                   std::vector<Scene2DNode::Effect> keep;
@@ -12216,13 +12295,6 @@ namespace
                }
             }
          }
-      }
-      // Style presets in the same menu: one Presets button for the whole look.
-      if (l.kind != Kind::Group)
-      {
-         MenuParts::Separator();
-         ImGui::TextDisabled("%s", T("Styles"));
-         StylePresets(l, -1.0f, true);
       }
       MenuParts::EndPopup();
    }
@@ -12447,77 +12519,6 @@ namespace
          FxContourRow(f, 900000 + t * 64 + (int)(ImGui::GetID("ct") & 63));
    }
 
-   std::string StylePresetDir() { return AppPaths::AppSupportDir() + "/2dstyle"; }
-
-   // Layer style presets: compact popup next to Add style (no separate redundant Style card).
-   // `embedded`: draw the save row and the list straight into the popup that is open (the Look's one Presets menu).
-   void StylePresets(Layer& l, float btnW, bool embedded)
-   {
-      static char name[64] = "";
-      static std::vector<std::string> sFiles;
-      auto rescan = [&]()
-      {
-         sFiles.clear();
-         std::error_code ec;
-         for (const auto& de : std::filesystem::directory_iterator(StylePresetDir(), ec))
-            if (de.path().extension() == ".inf2dstyle")
-               sFiles.push_back(de.path().stem().string());
-         std::sort(sFiles.begin(), sFiles.end());
-      };
-      static ImVec2 sStyPos(0, 0);
-      if (embedded)
-      {
-         if (ImGui::IsWindowAppearing())
-            rescan();
-      }
-      else
-      {
-         if (ActionButton::Draw((std::string(T("Presets")) + "##v2dstyleprebtn").c_str(), ImVec2(btnW, 0.0f), ActionButton::Kind::Plain))
-         {
-            rescan();
-            sStyPos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
-            ImGui::OpenPopup("##v2dstyleprepop");
-         }
-         ImGui::SetNextWindowPos(sStyPos, ImGuiCond_Appearing);
-         if (!MenuParts::BeginPopup("##v2dstyleprepop"))
-            return;
-      }
-      ImGui::SetNextItemWidth(sFieldW);
-      FieldWell::InputText("##v2dstylename", name, sizeof name);
-      ImGui::BeginDisabled(name[0] == 0 || !l.AnyFx());
-      const bool saveStyle = ActionButton::Draw((std::string(T("Save style")) + "##v2dstylesave").c_str(), ImVec2(sFieldW, 0.0f), ActionButton::Kind::Plain);
-      ImGui::EndDisabled();
-      if (saveStyle && name[0] != 0 && l.AnyFx())
-      {
-         std::error_code ec;
-         std::filesystem::create_directories(StylePresetDir(), ec);
-         std::ofstream(AppPaths::FsPath(StylePresetDir() + "/" + name + ".inf2dstyle")) << Scene2DNode::StyleText(l);
-         rescan();
-      }
-      if (!sFiles.empty())
-      {
-         MenuParts::Separator();
-         for (size_t fi = 0; fi < sFiles.size(); fi++)
-         {
-            if (MenuParts::Item(sFiles[fi].c_str()))
-            {
-               std::ifstream f(AppPaths::FsPath(StylePresetDir() + "/" + sFiles[fi] + ".inf2dstyle"));
-               std::stringstream ss;
-               ss << f.rdbuf();
-               Layer got = l;
-               if (Scene2DNode::ParseStyle(ss.str(), got))
-               {
-                  PushUndoCheckpoint("Apply layer style");
-                  std::copy(got.fx, got.fx + Scene2DNode::kFxCount, l.fx);
-                  l.fxMore = got.fxMore;
-                  Touch();
-               }
-            }
-         }
-      }
-      if (!embedded)
-         MenuParts::EndPopup();
-   }
 
    void DrawEffectsTab(Scene2DNode* doc)
    {
@@ -12553,7 +12554,7 @@ namespace
          }
          FormParts::Inline(0.0f, tok::space_2);
          ImGui::SetCursorPosY(rowY);
-         const ImVec2 np = CardTitle(base + "name", T(english), l->fx[t].on, 2, winKey, T("Click for all settings"));
+         const ImVec2 np = CardTitle(base + "name", T(english), l->fx[t].on, 1, winKey, T("Click for all settings, right-click for more"));
          // Right-click on the header: the style's own menu.
          if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
             ImGui::OpenPopup("##v2dfxmenu");
@@ -12588,13 +12589,6 @@ namespace
          FormParts::Inline(0.0f, tok::space_2);
          if (HeaderIcon((base + "set").c_str(), IconsInfinite::Settings, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
             SettingsWindow::Toggle(winKey);
-         FormParts::Inline(0.0f, tok::space_1);
-         if (HeaderIcon((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove layer style"), rowY))
-         {
-            PushUndoCheckpoint("Remove layer style");
-            l->fx[t].on = false;
-            Touch();
-         }
          // The window: the style's every row, then the other copies of the same kind, each with its own settings.
          SettingsWindow::Draw(winKey, T(english), WinAt(np.y), [&]() {
             MoreRows mr;
@@ -12623,167 +12617,24 @@ namespace
       }
    }
 
-   // Colour: the adjustment layers as one clean panel with searchable Add + collapsible, draggable cards.
-   void DrawColourTab(Scene2DNode* doc)
+   // Adjustment layers live in the Layers list (Look is the selected layer's own effects). Each one's settings window
+   // opens from its thumbnail, its right-click menu or a double-click, and is drawn here every frame, whatever tab
+   // is showing, so it stays open while you work.
+   void DrawAdjustWindows(Scene2DNode* doc)
    {
-      SectionCard::Begin(T("Adjustment layers"));
-      static char sAdjSearch[64] = "";
-      static ImVec2 sAdjPopPos(0, 0);
-      if (ActionButton::Draw((std::string(T("Add")) + "##v2daddadjbtn").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
-      {
-         sAdjSearch[0] = 0;
-         sAdjPopPos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
-         ImGui::OpenPopup("##v2daddadjpop");
-      }
-      ImGui::SetNextWindowPos(sAdjPopPos, ImGuiCond_Appearing);
-      if (MenuParts::BeginPopup("##v2daddadjpop"))
-      {
-         ImGui::SetNextItemWidth(sFieldW);
-         if (ImGui::IsWindowAppearing())
-            ImGui::SetKeyboardFocusHere();
-         FieldWell::InputText("##v2dadjq", sAdjSearch, sizeof sAdjSearch);
-         MenuParts::Separator();
-         if (sAdjSearch[0] != 0)
-         {
-            bool any = false;
-            for (int t = 0; t < Scene2DNode::kAdjCount; t++)
-               if (FilterMatch(T(Scene2DNode::AdjName(t)), sAdjSearch) || FilterMatch(Scene2DNode::AdjGroup(t), sAdjSearch))
-               {
-                  any = true;
-                  if (MenuParts::Item(T(Scene2DNode::AdjName(t)), T(Scene2DNode::AdjGroup(t)), false, true))
-                  {
-                     sPending.what = Pending::AddAdjust;
-                     sPending.arg = t;
-                  }
-               }
-            if (!any)
-               ImGui::TextDisabled("%s", T("No matching adjustments"));
-         }
-         else
-         {
-            for (const char* g : { "Adjust", "Colour", "Stylize" })
-            {
-               if (!MenuParts::SubMenu(T(g), true))
-                  continue;
-               for (int t = 0; t < Scene2DNode::kAdjCount; t++)
-                  if (std::strcmp(Scene2DNode::AdjGroup(t), g) == 0 &&
-                      MenuParts::Item(T(Scene2DNode::AdjName(t)), nullptr, false, true))
-                  {
-                     sPending.what = Pending::AddAdjust;
-                     sPending.arg = t;
-                  }
-               ImGui::EndMenu();
-            }
-         }
-         MenuParts::EndPopup();
-      }
-      int moveFrom = 0, moveTo = 0;
-      bool moveBelow = false;
-      int deleteId = 0;
       std::vector<Layer>& ls = doc->Layers();
-      for (int i = (int)ls.size() - 1; i >= 0; i--)
+      for (Layer& lr : ls)
       {
-         Layer* l = &ls[i];
+         Layer* l = &lr;
          if (l->kind != Kind::Adjust)
             continue;
-         const int id = l->id;
-         const std::string base = "##v2dadj" + std::to_string(id);
-         const std::string winKey = "v2dadj/" + std::to_string(sDocUid) + "/" + std::to_string(id);
-         const char* english = Scene2DNode::AdjName(l->adjType);
-         ImGui::PushID(id);
-         SectionCard::Begin();
-         const float rowY = ImGui::GetCursorPosY();
-         ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
-         bool on = l->visible;
-         if (CheckBox::Box((base + "on").c_str(), &on))
-         {
-            PushUndoCheckpoint(on ? "Show adjustment" : "Hide adjustment");
-            l->visible = on;
-            Touch();
-         }
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("On"));
-         FormParts::Inline(0.0f, tok::space_2);
-         ImGui::SetCursorPosY(rowY);
-         const float fh = ImGui::GetFrameHeight();
-         const std::string title = (l->name.empty() ? std::string(T(english)) : l->name) +
-                                   (l->clip ? std::string(" · ") + T("Clipped") : std::string());
-         const ImVec2 np = CardTitle(base + "name", title, l->visible, 4, winKey, T("Click for all settings, drag to reorder"));
-         const float nameW = ImGui::GetItemRectSize().x;
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
-            SelectOnly(id);
-         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
-         {
-            ImGui::SetDragDropPayload("V2D_LAYER", &id, sizeof(int));
-            ImGui::EndDragDropSource();
-         }
-         if (ImGui::BeginDragDropTarget())
-         {
-            const float rel = (ImGui::GetIO().MousePos.y - np.y) / std::max(1.0f, fh);
-            const bool below = rel >= 0.5f;
-            ImGui::GetWindowDrawList()->AddLine(ImVec2(np.x, below ? np.y + fh : np.y),
-                                                ImVec2(np.x + nameW, below ? np.y + fh : np.y), Hex(kOutline), 2.0f);
-            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2D_LAYER"))
-            {
-               const int moving = *(const int*)pl->Data;
-               if (moving != id)
-               {
-                  moveFrom = moving;
-                  moveTo = id;
-                  moveBelow = below;
-               }
-            }
-            ImGui::EndDragDropTarget();
-         }
-         // Right-click on the header: an adjustment layer's own menu. It has no pixels, so no merge, copy merged,
-         // mask or output items; only what an adjustment can do.
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-         {
-            SelectOnly(id);
-            ImGui::OpenPopup("##v2dadjmenu");
-         }
-         if (MenuParts::BeginPopup("##v2dadjmenu"))
-         {
-            if (MenuParts::Item(T("All Settings"), nullptr, SettingsWindow::IsOpen(winKey)))
-               SettingsWindow::Toggle(winKey);
-            MenuParts::Separator();
-            if (MenuParts::Item(l->clip ? T("Release Clipping Mask") : T("Create Clipping Mask"), Sc("Alt+Ctrl+G")))
-            {
-               PushUndoCheckpoint("Clipping mask");
-               l->clip = !l->clip;
-               Touch();
-            }
-            if (MenuParts::Item(T("Duplicate Adjustment"), Sc("Ctrl+J")))
-               sPending.what = Pending::Duplicate;
-            if (MenuParts::Item(T("Merge Down"), Sc("Ctrl+E"), false, LayerUnder(doc, id) != 0))
-               sPending.what = Pending::MergeDown;
-            MenuParts::Separator();
-            if (MenuParts::Item(T("Delete Adjustment"), "Delete"))
-               deleteId = id;
-            MenuParts::EndPopup();
-         }
-         FormParts::Inline(0.0f, tok::space_2);
-         if (HeaderIcon((base + "set").c_str(), IconsInfinite::Settings, SettingsWindow::IsOpen(winKey), T("All settings"), rowY))
-            SettingsWindow::Toggle(winKey);
-         FormParts::Inline(0.0f, tok::space_1);
-         if (HeaderIcon((base + "clip").c_str(), IconsInfinite::Mask, l->clip,
-                        l->clip ? T("Unclip from layer below") : T("Clip to layer below"), rowY))
-         {
-            PushUndoCheckpoint("Clipping mask");
-            l->clip = !l->clip;
-            Touch();
-         }
-         FormParts::Inline(0.0f, tok::space_1);
-         if (HeaderIcon((base + "del").c_str(), IconsInfinite::Close, false, T("Delete adjustment"), rowY))
-            deleteId = id;
-         FormParts::Inline(0.0f, tok::space_1);
-         HeaderIcon((base + "grip").c_str(), IconsInfinite::Grip, false, nullptr, rowY, true);
-         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
-         {
-            ImGui::SetDragDropPayload("V2D_LAYER", &id, sizeof(int));
-            ImGui::EndDragDropSource();
-         }
-         auto rows = [&]() {
+         const std::string winKey = "v2dadj/" + std::to_string(sDocUid) + "/" + std::to_string(l->id);
+         if (!SettingsWindow::IsOpen(winKey))
+            continue;
+         const std::string title = l->name.empty() ? std::string(T(Scene2DNode::AdjName(l->adjType))) : l->name;
+         ImGui::PushID(l->id);
+         SettingsWindow::Draw(winKey, title.c_str(), WinAt(ImGui::GetWindowPos().y + 48.0f), [&]() {
+            MoreRows mr;
             float lo = 0, hi = 1;
             Scene2DNode::AdjRange(l->adjType, lo, hi);
             if (l->adjType != Scene2DNode::kAdjGradientMap)
@@ -12796,25 +12647,8 @@ namespace
                ColorRow(T("Shadows"), l->colorA);
                ColorRow(T("Highlights"), l->colorB);
             }
-         };
-         SettingsWindow::Draw(winKey, title.c_str(), WinAt(np.y), [&]() {
-            MoreRows mr;
-            rows();
          });
          ImGui::PopID();
-      }
-      if (moveFrom != 0 && moveTo != 0 && moveFrom != moveTo && !doc->IsInside(moveTo, moveFrom))
-      {
-         PushUndoCheckpoint("Reorder adjustment");
-         doc->MoveLayer(moveFrom, moveTo, moveBelow, false);
-         Touch();
-      }
-      if (deleteId != 0)
-      {
-         PushUndoCheckpoint("Delete adjustment");
-         doc->RemoveLayer(deleteId);
-         sSel.erase(std::remove(sSel.begin(), sSel.end(), deleteId), sSel.end());
-         Touch();
       }
    }
 
@@ -13058,8 +12892,8 @@ namespace
       UiDensity::Compact compact;   // the side panel is a compact strip (Photoshop / Affinity Properties size)
       sLabelW = SectionCard::LabelW();
 
-      // The tab column: four stops, each one whole job. Layer holds its transform, Look holds the layer's
-      // adjustments, effects and styles plus the document's adjustment layers, Document holds the render settings.
+      // The tab column: four stops, each one whole job. Layer holds its transform, Look holds the selected
+      // layer's effects and styles (adjustment layers stay in Layers), Document holds the render settings.
       // sTab keeps its old values (1/2, 5/6, 3/4 open the same stop), so code that opens a tab by number still lands.
       const struct { const char* id; const char* icon; const char* tip; int tab; int alt; } kTabs[4] = {
          { "##v2dt0", IconsInfinite::Layers, "Layers", 0, 0 },
@@ -13113,18 +12947,25 @@ namespace
             const Layer* al = Active(doc);
             if (al != nullptr && al->kind != Kind::Adjust)
                DrawEffectsTab(doc);
-            DrawColourTab(doc);
+            else
+            {
+               SectionCard::Begin();
+               ImGui::TextDisabled("%s", al != nullptr ? T("An adjustment layer: click its thumbnail for its settings.")
+                                                       : T("Select a layer to see its look."));
+            }
          }
          else
          {
             DrawDocumentTab(doc);
             DrawOutputTab(doc, w);
          }
+         SectionCard::End();   // close the last card first, so the room below is not inside it
          ImGui::Dummy(ImVec2(0.0f, tok::space_5));   // room under the last card so a scroll never ends on the edge
          ImGui::PopStyleVar(2);
          SectionCard::EndWindow();
          EndChildSafe();
       }
+      DrawAdjustWindows(doc);   // open adjustment windows stay up on every tab
       compact.End(); // before the child closes: the pushes were made inside it
       EndChildSafe();
       sChip = tok::control_h;   // the compact scope is still alive here: back to the regular chip explicitly

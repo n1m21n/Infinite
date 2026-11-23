@@ -48,9 +48,12 @@ namespace SettingsWindow
       spec.pos = ImVec2(std::max(vp->WorkPos.x + Width(), at.x), at.y);
       spec.pivot = ImVec2(1.0f, 0.0f);
       spec.placeCond = ImGuiCond_Appearing;
-      spec.minSize = ImVec2(Width(), 0.0f);
-      spec.maxSize = ImVec2(Width(), std::max(200.0f, vp->WorkSize.y * 0.7f));
-      spec.flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings;
+      // Resizable like every floating window: it opens at the strip width and its content's height (0 = fit once),
+      // then keeps whatever size it is dragged to. Bodies size their wells from the window's own width.
+      spec.minSize = ImVec2(Width(), 60.0f);
+      spec.maxSize = ImVec2(vp->WorkSize.x, vp->WorkSize.y);
+      spec.flags = ImGuiWindowFlags_NoSavedSettings;
+      ImGui::SetNextWindowSize(ImVec2(Width(), 0.0f), ImGuiCond_Appearing);
       spec.pad = false;   // the compact strip: MoreRows sizes its column from the style's own window padding
       const std::string id = std::string(title) + "###setwin" + key;
       bool ran = false;

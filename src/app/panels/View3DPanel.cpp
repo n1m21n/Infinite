@@ -2,6 +2,7 @@
 // the Scene3DNode's placements; the nodes themselves are only ever read, so a
 // source keeps animating under whatever arrangement is made on top of it.
 #include "core/FactoryPresets.h"
+#include "app/ui/design/components/ReorderDrag.h"
 #include "app/AppCommon.h"
 #include "app/AppShared.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -6037,49 +6038,19 @@ namespace
       return changed;
    }
 
-   // Blender's collapsing panel, optionally with its switch in the header.
-   bool Card(const char* title, bool* enable = nullptr, bool startOpen = true)
+   // The rule for every card, 3D and 2D: one or two controls are shown in place (a titled card, no fold, no gear: a
+   // window for two rows would only add a click); three or more live in the card's settings window (WinCard: on box,
+   // name, gear).
+   bool InlineCard(const char* title)
    {
-      static std::map<std::string, bool> sOpen;
-      auto found = sOpen.find(title);
-      bool open = found != sOpen.end() ? found->second : startOpen;
-      SectionCard::Begin();
-      SectionCard::MarkHeader();
+      SectionCard::Begin(title);
       sCard = title;
-      ImGui::PushID(title);
-      const float h = ImGui::GetTextLineHeight() + 2.0f;
-      const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float w = ImGui::GetContentRegionAvail().x;
-      // Overlap lets the switch drawn on top take its own clicks.
-      ImGui::SetNextItemAllowOverlap();
-      if (ImGui::InvisibleButton("##head", ImVec2(w, h)))
-         open = !open;
-      sOpen[title] = open;
-      open = open || PanelKit::AuditOpenAll();
-      const ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 c(p.x + 5.0f, p.y + h * 0.5f);
-      if (open)
-         dl->AddTriangleFilled(ImVec2(c.x - 4, c.y - 2), ImVec2(c.x + 4, c.y - 2), ImVec2(c.x, c.y + 3), text);
-      else
-         dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 4), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 4), text);
-      float x = p.x + 16.0f;
-      if (enable != nullptr)
-      {
-         const ImVec2 after = ImGui::GetCursorScreenPos();
-         ImGui::SetCursorScreenPos(ImVec2(x, p.y));
-         bool on = *enable;
-         if (CheckBox::Box("##on", &on))
-         {
-            PushUndoCheckpoint("Edit in 3D View");
-            *enable = on;
-         }
-         ImGui::SetCursorScreenPos(after);
-         x += 22.0f;
-      }
-      dl->AddText(ImVec2(x, p.y + 1.0f), text, title);
-      ImGui::PopID();
-      return open;
+      return true;
+   }
+   template <class F> void InlineCard(const char* title, F&& body)
+   {
+      InlineCard(title);
+      body();
    }
 
    // A look card (Shadows, Bloom, Depth of Field...), as the 2D View's effect cards: the card is its header alone -
@@ -6133,7 +6104,7 @@ namespace
          // The window's compact column: label then well, the window's own width.
          UiDensity::Compact compact;
          const float keep = sFieldW;
-         sFieldW = SettingsWindow::Width() - FieldLabelW() - 2.0f * ImGui::GetStyle().WindowPadding.x;
+         sFieldW = std::max(60.0f, ImGui::GetContentRegionAvail().x - FieldLabelW());
          body();
          sFieldW = keep;
          compact.End();
@@ -6187,8 +6158,7 @@ namespace
          std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return (char)std::tolower(c); });
          return text;
       };
-      if (Card(T("Filter"), nullptr, false))
-      {
+      WinCard(T("Filter"), nullptr, [&]() {
          Scene3DNode::Settings& f = *sSet;
          Checks("##checks1", {
             { T("Match case"), &f.listCase },
@@ -6204,9 +6174,9 @@ namespace
             { T("Selectable column"), &f.colSelect },
             { T("Render column"), &f.colRender },
          });
-      }
+            });
       bool scrollToActive = false;
-      if (ActionButton::Draw(L("Show Active"), ImVec2(availW, 0)))
+      if (ActionButton::Draw(L("Show Active"), ImVec2(-1.0f, 0)))
          scrollToActive = true;
       const Scene3DNode::Settings& lf = *sSet;
       const std::string search = lf.listCase ? std::string(sSearch) : lower(sSearch);
@@ -6283,20 +6253,15 @@ namespace
             else
                sSel = { it.id };
          }
-         if (!io.KeyAlt && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+         if (!io.KeyAlt)
+            ReorderDrag::Source("v3ditem", &row, sizeof(int), ItemName(it).c_str());
          {
-            ImGui::SetDragDropPayload("v3ditem", &row, sizeof(int));
-            ImGui::TextUnformatted(ItemName(it).c_str());
-            ImGui::EndDragDropSource();
-         }
-         if (ImGui::BeginDragDropTarget())
-         {
-            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("v3ditem"))
+            const int* from = ReorderDrag::Peek<int>("v3ditem");
+            if (const ImGuiPayload* pl = ReorderDrag::Target("v3ditem", ReorderDrag::SlotEdge(from != nullptr ? *from : row, row)))
             {
                dragFrom = *(const int*)pl->Data;
                dragTo = row;
             }
-            ImGui::EndDragDropTarget();
          }
          if (scrollToActive && !sSel.empty() && sSel.back() == it.id)
             ImGui::SetScrollHereY();
@@ -6458,7 +6423,7 @@ namespace
 
    void PointAtCursor(Scene3DNode* scene, Item* item, float availW)
    {
-      if (!ActionButton::Draw(L("Point at 3D Cursor"), ImVec2(availW, 0)))
+      if (!ActionButton::Draw(L("Point at 3D Cursor"), ImVec2(-1.0f, 0)))
          return;
       PushUndoCheckpoint("Aim in 3D View");
       scene->AimAt(*item, sSet->cursor);
@@ -6482,8 +6447,7 @@ namespace
 
    void DrawLightCard(Scene3DNode* scene, Item* item, LightNode* light, float availW)
    {
-      if (!Card(T("Light")))
-         return;
+      WinCard(T("Light"), nullptr, [&]() {
       static const std::vector<std::string> kTypes = { "Directional", "Point", "Sun", "Ambient", "Spot", "Area" };
       std::vector<std::string> names;
       for (const std::string& n : kTypes)
@@ -6551,19 +6515,21 @@ namespace
          }
          PointAtCursor(scene, item, availW);
       }
+      });
    }
 
    void DrawLitBy(Scene3DNode* scene, Item* item)
    {
-      bool header = false;
+      bool anyLight = false;
+      for (const Item& other : scene->Items())
+         anyLight = anyLight || scene->ItemKind(other) == Kind::Light;
+      if (!anyLight)
+         return;
+      WinCard(T("Lit by"), nullptr, [&]() {
       for (const Item& other : scene->Items())
       {
          if (scene->ItemKind(other) != Kind::Light)
             continue;
-         if (!header)
-            if (!Card(T("Lit by")))
-               return;
-         header = true;
          ImGui::PushID(other.id);
          auto found = std::find(item->unlit.begin(), item->unlit.end(), other.uid);
          bool lit = found == item->unlit.end();
@@ -6580,20 +6546,22 @@ namespace
          ImGui::TextUnformatted(ItemName(other).c_str());
          ImGui::PopID();
       }
+      });
    }
 
    // Shadow linking (row 4.2): the lights this item blocks; unchecked, that light passes through it.
    void DrawBlocks(Scene3DNode* scene, Item* item)
    {
-      bool header = false;
+      bool anyLight = false;
+      for (const Item& other : scene->Items())
+         anyLight = anyLight || scene->ItemKind(other) == Kind::Light;
+      if (!anyLight)
+         return;
+      WinCard(T("Blocks"), nullptr, [&]() {
       for (const Item& other : scene->Items())
       {
          if (scene->ItemKind(other) != Kind::Light)
             continue;
-         if (!header)
-            if (!Card(T("Blocks")))
-               return;
-         header = true;
          ImGui::PushID(other.id);
          auto found = std::find(item->unshadow.begin(), item->unshadow.end(), other.uid);
          bool blocks = found == item->unshadow.end();
@@ -6610,6 +6578,7 @@ namespace
          ImGui::TextUnformatted(ItemName(other).c_str());
          ImGui::PopID();
       }
+      });
    }
 
    float RenderAspect(Scene3DNode* scene)
@@ -6635,8 +6604,7 @@ namespace
 
    void DrawCameraCards(Scene3DNode* scene, Item* item, CameraNode* cam, float availW)
    {
-      if (Card(T("View")))
-      {
+      WinCard(T("View"), nullptr, [&]() {
          FloatRow(T("Distance"), &cam->distance, 0.05f, 100.0f, "%.2f");
          FloatRow(T("Orbit"), &cam->azimuth, -180.0f, 180.0f, "%.1f");
          FloatRow(T("Elevation"), &cam->elevation, -90.0f, 90.0f, "%.1f");
@@ -6646,9 +6614,8 @@ namespace
             const char* fmt[3] = { "X %.2f", "Y %.2f", "Z %.2f" };
             FloatMultiRow(T("Target"), v, fmt, 3, -50.0f, 50.0f);
          }
-      }
-      if (Card(T("Lens")))
-      {
+            });
+      WinCard(T("Lens"), nullptr, [&]() {
          static const std::vector<std::string> kTypes = { "Perspective", "Orthographic" };
          std::vector<std::string> names;
          for (const std::string& n : kTypes)
@@ -6675,9 +6642,8 @@ namespace
          FloatPairRow(T("Shift"), &cam->shiftX, &cam->shiftY, -2.0f, 2.0f, "X %.3f", "Y %.3f");
          FloatRow(T("Clip start"), &cam->nearPlane, 0.001f, 10.0f, "%.3f");
          FloatRow(T("Clip end"), &cam->farPlane, 1.0f, 10000.0f, "%.0f");
-      }
-      if (Card(T("Camera")))
-      {
+            });
+      WinCard(T("Camera"), nullptr, [&]() {
          // Blender holds the focal length while the sensor changes; the view angle follows.
          const float mm = cam->FocalLength(RenderAspect(scene));
          int fit = cam->sensorFit;
@@ -6709,19 +6675,18 @@ namespace
          }
          if (scene->activeCamera != item->id)
          {
-            if (ActionButton::Draw(L("Render through this camera"), ImVec2(availW, 0)))
+            if (ActionButton::Draw(L("Render through this camera"), ImVec2(-1.0f, 0)))
             {
                PushUndoCheckpoint("Set 3D View camera");
                scene->activeCamera = item->id;
                scene->Commit();
             }
          }
-         else if (ActionButton::Draw(L("Move camera to view"), ImVec2(availW, 0)))
+         else if (ActionButton::Draw(L("Move camera to view"), ImVec2(-1.0f, 0)))
             CameraToView(scene);
          PointAtCursor(scene, item, availW);
-      }
-      if (Card(T("Viewport Display")))
-      {
+            });
+      WinCard(T("Viewport Display"), nullptr, [&]() {
          FloatRow(T("Size"), &cam->displaySize, 0.01f, 10.0f, "%.2f");
          Checks("##checks4", {
             { T("Limits"), &cam->showLimits },
@@ -6729,15 +6694,14 @@ namespace
             { T("Name"), &cam->showName },
             { T("Sensor"), &cam->showSensor },
          });
-      }
+            });
       Scene3DNode::Backdrop& back = item->backdrop;
       const bool backWas = back.show;
       bool backShow = backWas;
       WinCard(T("Background Image"), &backShow, [&]() {
-         const float availW = ImGui::GetContentRegionAvail().x;   // the window's width, not the panel's
          bool edit = false;
          const std::string file = back.path.empty() ? std::string(T("Open image")) : back.path.substr(back.path.find_last_of("/\\") + 1);
-         if (ActionButton::Draw(file.c_str(), ImVec2(availW, 0)))
+         if (ActionButton::Draw(file.c_str(), ImVec2(-1.0f, 0)))
          {
             const std::string path = Platform::OpenImageDialog();
             if (!path.empty())
@@ -6750,7 +6714,7 @@ namespace
          }
          if (!back.path.empty())
          {
-            if (ActionButton::Draw(L("Remove image"), ImVec2(availW, 0)))
+            if (ActionButton::Draw(L("Remove image"), ImVec2(-1.0f, 0)))
             {
                PushUndoCheckpoint("Remove camera background image");
                back.path.clear();
@@ -6831,13 +6795,11 @@ namespace
          return;
       }
       scene->motionShown = item->id;
-      if (Card(T("Source")))
-      {
+      InlineCard(T("Source"), [&]() {
          FieldLabel(T("Node"));
          CanvasLink::Field("##v3dsource", item->uid, SourceSpec(item->id), false, sFieldW);
-      }
-      if (Card(T("Transform")))
-      {
+            });
+      WinCard(T("Transform"), nullptr, [&]() {
          auto field = [&](const char* label, float* v, float speed, const char* fmt = "%.2f")
          {
             FieldLabel(label);
@@ -6946,9 +6908,8 @@ namespace
          if (changed)
             scene->Commit();
          FieldWell::PopStyle();
-      }
-      if (Card(T("Delta Transform"), nullptr, false))
-      {
+            });
+      WinCard(T("Delta Transform"), nullptr, [&]() {
          // Same axes as Transform above: shown Z up.
          auto field = [&](const char* label, float* v, float speed)
          {
@@ -6988,9 +6949,8 @@ namespace
          }
          if (changed)
             scene->Commit();
-      }
-      if (Card(T("Lock")))
-      {
+            });
+      WinCard(T("Lock"), nullptr, [&]() {
          const char* names[3] = { T("Location"), T("Rotation"), T("Scale") };
          for (int row = 0; row < 3; row++)
          {
@@ -7011,42 +6971,45 @@ namespace
                scene->Commit();
             }
          }
-      }
-      if (Card(T("Visibility")))
-      {
+            });
+      WinCard(T("Visibility"), nullptr, [&]() {
          if (Checks("##vis", { { T("Show in renders"), &item->render }, { T("Cast shadows"), &item->castShadow },
                                { T("Hide selection"), &item->hideSelect } }, 3, "Object visibility"))
             scene->Commit();
-      }
-      if (Card(T("Viewport Display")))
-      {
+            });
+      WinCard(T("Viewport Display"), nullptr, [&]() {
          bool changed = Checks("##disp", { { T("Name"), &item->showName }, { T("Axes"), &item->showAxes },
                                           { T("Bounds"), &item->showBounds } }, 3, "Viewport display");
          if (item->showBounds)
             changed |= ComboRow(T("Shape"), &item->boundsType, { T("Box"), T("Sphere"), T("Cylinder"), T("Cone"), T("Capsule") }, "Bounds shape");
          if (changed)
             scene->Commit();
-      }
-      if (scene->ItemKind(*item) == Kind::Picture && Card(T("Picture")))
+            });
+      if (scene->ItemKind(*item) == Kind::Picture)
       {
+         InlineCard(T("Picture"), [&]() {
          if (BoolRow(T("Lit"), &item->pictureLit, "Picture lit"))
             scene->Commit();
+               });
       }
-      if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Viewport Colour")))
+      if (scene->ItemKind(*item) == Kind::Geometry)
       {
+         InlineCard(T("Viewport Colour"), [&]() {
          if (ColorRow(T("Colour"), item->color, "Edit in 3D View"))
             scene->Commit();
+               });
       }
-      if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Pass Index")))
+      if (scene->ItemKind(*item) == Kind::Geometry)
       {
+         InlineCard(T("Pass Index"), [&]() {
          if (IntInputRow(T("Index"), &item->passIndex))
          {
             item->passIndex = std::clamp(item->passIndex, 0, 255);
             scene->Commit();
          }
+               });
       }
-      if (Card(T("Follow")))
-      {
+      WinCard(T("Follow"), nullptr, [&]() {
          std::vector<std::string> names = { T("None") };
          std::vector<int> ids = { 0 };
          for (const Item& other : scene->Items())
@@ -7070,9 +7033,8 @@ namespace
             PushUndoCheckpoint("Follow in 3D View");
             scene->Commit();
          }
-      }
-      if (Card(T("Motion")))
-      {
+            });
+      WinCard(T("Motion"), nullptr, [&]() {
          auto field = [&](const char* label, float* v, float speed)
          {
             FieldLabel(label);
@@ -7086,7 +7048,7 @@ namespace
          changed |= field(T("Rotation"), item->motion + 3, 0.5f);
          changed |= field(T("Scale"), item->motion + 6, 0.01f);
          FieldWell::PopStyle();
-         if (ActionButton::Draw(L("Reset motion"), ImVec2(availW, 0)))
+         if (ActionButton::Draw(L("Reset motion"), ImVec2(-1.0f, 0)))
          {
             const float rest[9] = { 0, 0, 0, 0, 0, 0, 1, 1, 1 };
             std::copy(rest, rest + 9, item->motion);
@@ -7095,13 +7057,13 @@ namespace
          }
          if (changed)
             scene->Commit();
-      }
+            });
       GraphNode* gn = FindNodeByUid(item->uid);
       if (scene->ItemKind(*item) == Kind::Geometry || (scene->ItemKind(*item) == Kind::Picture && item->pictureLit))
          DrawLitBy(scene, item);
       if (scene->ItemKind(*item) == Kind::Geometry && item->castShadow)
          DrawBlocks(scene, item);
-      if (gn != nullptr && ActionButton::Draw(L("Go to node"), ImVec2(availW, 0)))
+      if (gn != nullptr && ActionButton::Draw(L("Go to node"), ImVec2(-1.0f, 0)))
       {
          gRequestSelectNodeIndex = gn->index;
          gRequestFitViewNodeIndex = gn->index;
@@ -7122,8 +7084,7 @@ namespace
          Hint(T("Select a camera or a light."));
          return;
       }
-      if (Card(T("Look at")))
-      {
+      WinCard(T("Look at"), nullptr, [&]() {
          std::vector<std::string> names = { T("None") };
          std::vector<int> ids = { 0 };
          for (const Item& other : scene->Items())
@@ -7150,7 +7111,7 @@ namespace
             if (changed)
                scene->Commit();
          }
-      }
+            });
    }
 
    // The Material node that colours an item: the item's own node, or the first one met walking up
@@ -7299,7 +7260,7 @@ namespace
       {
          // The column starts a spacing high for a card; a bare button needs it back.
          ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y);
-         if (ActionButton::Draw(L("Add Material"), ImVec2(availW, 0)))
+         if (ActionButton::Draw(L("Add Material"), ImVec2(-1.0f, 0)))
             AddMaterial(scene, *item);
          return;
       }
@@ -7317,8 +7278,7 @@ namespace
             gPatchDirty = true;
          }
       }
-      if (Card(T("Surface")))
-      {
+      WinCard(T("Surface"), nullptr, [&]() {
          ComboRow(T("Shading"), &mat->shading, GeometryNode::ShadingNames(), "Material shading");
          ColorRow(T("Colour"), mat->color, "Material colour");
          FloatRow(T("Metallic"), &mat->metallic, 0.0f, 1.0f, "%.2f");
@@ -7330,14 +7290,12 @@ namespace
          FloatRow(T("Clearcoat"), &mat->clearcoat, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Sheen"), &mat->sheen, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Subsurface"), &mat->subsurface, 0.0f, 1.0f, "%.2f");
-      }
-      if (Card(T("Emission")))
-      {
+            });
+      InlineCard(T("Emission"), [&]() {
          ColorRow(T("Colour"), mat->emissionColor, "Material emission colour");
          FloatRow(T("Strength"), &mat->emission, 0.0f, 8.0f, "%.2f");
-      }
-      if (Card(T("Maps")))
-      {
+            });
+      WinCard(T("Maps"), nullptr, [&]() {
          static const char* const kMaps[kMapCount] = { "Base colour", "Roughness", "Metallic", "Normal",
                                                        "AO", "Emission", "Clearcoat", "Sheen",
                                                        "Opacity", "Transmission" };
@@ -7373,15 +7331,14 @@ namespace
          }
          if (mat->MapInput(kMapNormal).IsConnected())
             FloatRow(T("Normal strength"), &mat->normalStrength, 0.0f, 4.0f, "%.2f");
-      }
+            });
    }
 
    void DrawWorldTab(Scene3DNode* scene, float availW)
    {
       GraphNode* world = scene->worldUid != 0 ? FindNodeByUid(scene->worldUid) : nullptr;
       auto* env = world != nullptr ? dynamic_cast<EnvironmentNode*>(world->node.get()) : nullptr;
-      if (Card(T("Surface")))
-      {
+      WinCard(T("Surface"), nullptr, [&]() {
          int mode = world != nullptr ? (env != nullptr ? 2 : 3) : scene->worldColorOn ? 1 : 0;
          const int was = mode;
          std::vector<std::string> names = { T("None, transparent"), T("Background colour"), T("Environment texture") };
@@ -7405,7 +7362,7 @@ namespace
             if (FloatRow(T("Strength"), &scene->worldStrength, 0.0f, 10.0f, "%.3f", "3D View world"))
                scene->Commit();
          }
-         if (env == nullptr && ActionButton::Draw(L("Load HDRI..."), ImVec2(availW, 0)))
+         if (env == nullptr && ActionButton::Draw(L("Load HDRI..."), ImVec2(-1.0f, 0)))
             sPending.what = Pending::PickHdri;
          if (world != nullptr && env == nullptr)
          {
@@ -7414,7 +7371,7 @@ namespace
          }
          if (env != nullptr)
          {
-            if (ActionButton::Draw(L("Load HDRI..."), ImVec2(availW, 0)))
+            if (ActionButton::Draw(L("Load HDRI..."), ImVec2(-1.0f, 0)))
                sPending.what = Pending::PickHdri;
             FloatRow(T("Rotation"), &env->rotation, -180.0f, 180.0f, "%.0f");
             FloatRow(T("Strength"), &env->intensity, 0.0f, 10.0f, "%.3f");
@@ -7432,13 +7389,12 @@ namespace
                FloatRow(T("Sun filter"), &env->sunShadowFilter, 0.0f, 10.0f, "%.2f");
             }
          }
-      }
+            });
       Render3DNode& look = scene->Look();
-      if (Card(T("Light")))
-      {
+      InlineCard(T("Light"), [&]() {
          ColorRow(T("Ambient"), look.ambientColor);
          FloatRow(T("Reflections"), &look.envIntensity, 0.0f, 3.0f, "%.2f");
-      }
+            });
    }
 
    std::string sLastRender;     // where the last render went, shown under the buttons
@@ -7523,7 +7479,7 @@ namespace
             continue;
          Hint(sSlot[i].c_str());
          const std::string label = std::string(i == 0 ? T("Reveal Latest") : T("Reveal Previous"));
-         if (ActionButton::Draw(label.c_str(), ImVec2(availW, 0)))
+         if (ActionButton::Draw(label.c_str(), ImVec2(-1.0f, 0)))
             Platform::RevealInFileManager(sSlot[i]);
       }
    }
@@ -7531,10 +7487,10 @@ namespace
    void DrawRenderTab(Scene3DNode* scene)
    {
       Render3DNode& look = scene->Look();
-      if (Card(T("Engine")))
+      if (InlineCard(T("Engine")))
          ComboRow(T("Engine"), &look.engine, Render3DNode::EngineNames());
       if (look.engine == 1)
-         WinCard(T("Path Tracing"), nullptr, [&]() {
+         InlineCard(T("Path Tracing"), [&]() {
          struct { const char* label; const char* id; int* v; int hi; } rows[] = {
             { T("Samples"), "##v3dptsamples", &look.ptSamples, 4096 }, { T("Bounces"), "##v3dptbounces", &look.ptBounces, 16 } };
          for (const auto& r : rows)
@@ -7562,7 +7518,7 @@ namespace
          FloatRow(T("Softness"), &look.shadowSoftness, 0.0f, 4.0f, "%.2f");
          FloatRow(T("Bias"), &look.shadowBias, 0.0002f, 0.02f, "%.4f");
       });
-      WinCard(T("Ambient Occlusion"), nullptr, [&]() {
+      InlineCard(T("Ambient Occlusion"), [&]() {
          FloatRow(T("Strength"), &look.aoStrength, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Distance"), &look.aoRadius, 0.05f, 3.0f, "%.2f");
       });
@@ -7642,8 +7598,7 @@ namespace
    {
       PumpStill();
       Render3DNode& look = scene->Look();
-      if (Card(T("Format")))
-      {
+      WinCard(T("Format"), nullptr, [&]() {
          int w = (int)scene->renderW, h = (int)scene->renderH;
          {
             // X | Y on one row (Block 4b pairs).
@@ -7675,9 +7630,8 @@ namespace
             sSet->fps = (float)kRates[rate];
          FloatRow(T("Base"), &sSet->fpsBase, 1.0f, 1.01f, "%.3f");
          FloatPairRow(T("Pixel aspect"), &sSet->pixelAspect[0], &sSet->pixelAspect[1], 0.1f, 10.0f, "X %.2f", "Y %.2f");
-      }
-      if (Card(T("Frame Range")))
-      {
+            });
+      WinCard(T("Frame Range"), nullptr, [&]() {
          int seconds = (int)sSet->seconds;
          if (IntInputRow(T("Seconds"), &seconds))
             sSet->seconds = (float)std::clamp(seconds, 1, 3600);
@@ -7685,7 +7639,7 @@ namespace
          ImGui::Text("%d", (int)(sSet->seconds * sSet->fps) / std::max(1, sSet->frameStep));
          IntInputRow(T("Step"), &sSet->frameStep);
          sSet->frameStep = std::clamp(sSet->frameStep, 1, 100);
-      }
+            });
       WinCard(T("Stamp"), &sSet->stamp, [&]() {
          Checks("##checks5", {
             { T("Date"), &sSet->stampDate },
@@ -7713,8 +7667,7 @@ namespace
          ColorRow(T("Text"), sSet->stampFg);
          ColorRow(T("Background"), sSet->stampBg);
       });
-      if (Card(T("Output")))
-      {
+      WinCard(T("Output"), nullptr, [&]() {
          static const std::vector<std::string> kDepths = { "8", "16" };
          int depth = look.floatOutput ? 1 : 0;
          if (ComboRow(T("Colour Depth"), &depth, kDepths))
@@ -7744,16 +7697,16 @@ namespace
             FloatRow(T("Dome angle"), &look.domeAngle, 60.0f, 360.0f, "%.0f");
             FloatRow(T("Dome tilt"), &look.domeTilt, 0.0f, 90.0f, "%.0f");
          }
-      }
+            });
       ImGui::BeginDisabled(gOfflineRender.active || scene->activeCamera == 0);
-      if (ActionButton::Draw(L("Render Image"), ImVec2(availW, 0)))
+      if (ActionButton::Draw(L("Render Image"), ImVec2(-1.0f, 0)))
          RenderStill(scene);
       if (!Platform::PluginModeActive() && // the DAW bounces
-          ActionButton::Draw(L("Render Animation"), ImVec2(availW, 0), ActionButton::Kind::Primary))
+          ActionButton::Draw(L("Render Animation"), ImVec2(-1.0f, 0), ActionButton::Kind::Primary))
          StartRender(scene);
       ImGui::EndDisabled();
       ImGui::BeginDisabled(!gOfflineRender.active);
-      if (ActionButton::Draw(L("Cancel Render"), ImVec2(availW, 0)))
+      if (ActionButton::Draw(L("Cancel Render"), ImVec2(-1.0f, 0)))
          ArrangeRenderCancelActive();
       ImGui::EndDisabled();
       if (scene->activeCamera == 0)
@@ -7779,22 +7732,20 @@ namespace
    void DrawViewTab(Scene3DNode* scene, float availW)
    {
       Scene3DNode::Settings& set = *sSet;
-      if (Card(T("Transform")))
-      {
+      WinCard(T("Transform"), nullptr, [&]() {
          ComboRow(T("Orientation"), &set.orientation, OrientationNames());
          ComboRow(T("Pivot"), &set.pivot, PivotNames());
          BoolRow(T("Only locations"), &set.onlyLocations);
          ImGui::BeginDisabled(sSel.empty() || set.customCount >= 4);
-         if (ActionButton::Draw(L("Create Orientation"), ImVec2(availW, 0)))
+         if (ActionButton::Draw(L("Create Orientation"), ImVec2(-1.0f, 0)))
             CreateOrientation(scene);
          ImGui::EndDisabled();
          ImGui::BeginDisabled(set.orientation < 4);
-         if (ActionButton::Draw(L("Delete Orientation"), ImVec2(availW, 0)))
+         if (ActionButton::Draw(L("Delete Orientation"), ImVec2(-1.0f, 0)))
             DeleteOrientation();
          ImGui::EndDisabled();
-      }
-      if (Card(T("Units")))
-      {
+            });
+      WinCard(T("Units"), nullptr, [&]() {
          ComboRow(T("System"), &set.unitSystem, std::vector<std::string>{ T("None"), T("Metric"), T("Imperial") });
          if (set.unitSystem == 1)
             ComboRow(T("Length"), &set.lengthUnit, std::vector<std::string>{ T("Meters"), T("Centimeters"), T("Millimeters"), T("Kilometers") });
@@ -7802,9 +7753,8 @@ namespace
             ComboRow(T("Length"), &set.lengthUnit, std::vector<std::string>{ T("Feet"), T("Inches"), T("Yards") });
          FloatRow(T("Unit scale"), &set.unitScale, 0.001f, 1000.0f, "%.3f");
          ComboRow(T("Rotation"), &set.rotUnits, std::vector<std::string>{ T("Degrees"), T("Radians") });
-      }
-      if (Card(T("Snap")))
-      {
+            });
+      WinCard(T("Snap"), nullptr, [&]() {
          BoolRow(T("On"), &set.snap);
          FloatRow(T("Move"), &set.snapMove, 0.01f, 5.0f, "%.2f");
          FloatRow(T("Rotate"), &set.snapRot, 1.0f, 90.0f, "%.0f");
@@ -7822,16 +7772,14 @@ namespace
             { T("Selectable only"), &set.snapSelectable },
             { T("Align rotation to target"), &set.snapAlign },
          });
-      }
-      if (Card(T("Proportional Editing")))
-      {
+            });
+      WinCard(T("Proportional Editing"), nullptr, [&]() {
          BoolRow(T("On (O)"), &set.proportional);
          ComboRow(T("Falloff"), &set.propFalloff, std::vector<std::string>{ T("Smooth"), T("Sphere"), T("Root"), T("Linear"), T("Sharp"), T("Constant") });
          FloatRow(T("Size"), &set.propSize, 0.05f, 50.0f, "%.2f");
          BoolRow(T("Projected from view"), &set.projectedProp);
-      }
-      if (Card(T("Placement"), nullptr, false))
-      {
+            });
+      WinCard(T("Placement"), nullptr, [&]() {
          ComboRow(T("Depth"), &set.planeDepth, std::vector<std::string>{ T("Cursor Plane"), T("Cursor View") });
          ComboRow(T("Orientation"), &set.planeOrient, std::vector<std::string>{ T("Default"), T("Surface") });
          ImGui::BeginDisabled(set.planeDepth == 1 || set.planeOrient == 1);
@@ -7840,9 +7788,8 @@ namespace
          ComboRow(T("Plane axis"), &set.planeAxis, std::vector<std::string>{ "X", "Y", "Z" });
          ImGui::EndDisabled();
          ImGui::EndDisabled();
-      }
-      if (Card(T("3D Cursor")))
-      {
+            });
+      WinCard(T("3D Cursor"), nullptr, [&]() {
          FieldLabel(T("Location"));
          ImGui::SetNextItemWidth(sFieldW);
          FieldWell::PushStyle();
@@ -7891,30 +7838,27 @@ namespace
          FieldWell::PopStyle();
          Undoable("Turn 3D cursor");
          ImGui::BeginDisabled(sSel.empty());
-         if (ActionButton::Draw(L("Cursor to Selected"), ImVec2(availW, 0)))
+         if (ActionButton::Draw(L("Cursor to Selected"), ImVec2(-1.0f, 0)))
             CursorToSelected(scene);
-         if (ActionButton::Draw(L("Selection to Cursor"), ImVec2(availW, 0)))
+         if (ActionButton::Draw(L("Selection to Cursor"), ImVec2(-1.0f, 0)))
             SelectionToCursor(scene);
          ImGui::EndDisabled();
-      }
-      if (Card(T("View"), nullptr, false))
-      {
+            });
+      WinCard(T("View"), nullptr, [&]() {
          FloatRow(T("Focal length"), &set.viewLens, 10.0f, 250.0f, "%.0f mm");
          FloatRow(T("Clip start"), &set.clipStart, 0.001f, 10.0f, "%.3f");
          FloatRow(T("Clip end"), &set.clipEnd, 10.0f, 10000.0f, "%.0f");
          BoolRow(T("Lock to 3D cursor"), &set.lockCursor);
-      }
-      if (Card(T("Viewport Visibility"), nullptr, false))
-      {
+            });
+      WinCard(T("Viewport Visibility"), nullptr, [&]() {
          Checks("##checks9", {
             { T("Cameras shown"), &set.showCameras },
             { T("Cameras selectable"), &set.pickCameras },
             { T("Lights shown"), &set.showLights },
             { T("Lights selectable"), &set.pickLights },
          });
-      }
-      if (Card(T("Overlays")))
-      {
+            });
+      WinCard(T("Overlays"), nullptr, [&]() {
          Checks("##checks11", {
             { T("Text info"), &set.textInfo },
             { T("Statistics"), &set.stats },
@@ -7926,9 +7870,8 @@ namespace
             { T("Wireframe"), &set.wireOver },
             { T("Performance"), &set.showPerf },
          });
-      }
-      if (Card(T("Grid"), nullptr, false))
-      {
+            });
+      WinCard(T("Grid"), nullptr, [&]() {
          BoolRow(T("Orthographic grid"), &set.orthoGrid);
          FieldLabel(T("Axes"));
          Checks("##gridaxes", { { "X", &set.axisX }, { "Y", &set.axisY }, { "Z", &set.axisZ } });
@@ -7937,9 +7880,8 @@ namespace
             set.gridLines = std::clamp(set.gridLines, 1, 200);
          if (IntInputRow(T("Subdivisions"), &set.gridSubdiv))
             set.gridSubdiv = std::clamp(set.gridSubdiv, 2, 100);
-      }
-      if (Card(T("Gizmos")))
-      {
+            });
+      WinCard(T("Gizmos"), nullptr, [&]() {
          Checks("##checks12", {
             { T("Navigate"), &set.gizmoNav },
             { T("Move, rotate, scale"), &set.gizmoMove },
@@ -7948,8 +7890,8 @@ namespace
             { T("Camera lens"), &set.gizmoCamLens },
             { T("Camera focus distance"), &set.gizmoCamFocus },
          });
-      }
-      WinCard(T("Passepartout"), nullptr, [&]() {
+            });
+      InlineCard(T("Passepartout"), [&]() {
          FloatRow(T("Opacity"), &set.passAlpha, 0.0f, 1.0f, "%.2f");
       });
       WinCard(T("Safe Areas"), &set.safe, [&]() {
@@ -7999,7 +7941,15 @@ namespace
       PopDockedPanelStyle();
       UiDensity::Compact compact;   // the settings are a compact strip (Photoshop / Affinity Properties size)
       float availW = ImGui::GetContentRegionAvail().x;
-      SectionCard::Title(T("3D View"));
+      // The title names the tab that is open (Render, Object, Material...), as Blender's Properties header does.
+      {
+         Item* const ti = sSel.size() == 1 ? scene->FindItem(sSel[0]) : nullptr;
+         const bool light = ti != nullptr && scene->ItemKind(*ti) == Kind::Light;
+         const char* name = sTab == kSceneTab ? T("Scene") : sTab == 0 ? T("Render") : sTab == 1 ? T("Output")
+                            : sTab == 2 ? T("World") : sTab == 3 ? T("Object") : sTab == 4 ? (light ? T("Light") : T("Camera"))
+                            : sTab == kMaterialTab ? T("Material") : sTab == 5 ? T("Viewport") : T("3D View");
+         SectionCard::Title(name);
+      }
       FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
       {
          const float sz = 16.0f;
