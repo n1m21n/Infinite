@@ -4,6 +4,7 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-11-23 Owner: the next research study is C1, saturating loops (`docs/research/saturating-loops`), after stable-modulation shipped as Technical Report 2. Sections 1-7 and D1-D5 need sign-off before any building or measuring.
 - 2026-11-23 Owner: stable-modulation phase 3 scores all 200 G kernels: matrices from the Field interpreter for the 125 that compile, from Python for the 75 over Field's 128-register cap. Raising the cap is left as a separate product finding (`docs/research/stable-modulation`, phase 2).
 - 2026-11-23 Owner: stable-modulation sections 1-7 signed off as written, D1-D4 as recommended (`docs/research/stable-modulation`).
 - 2026-11-23 Owner: open-problem research goes to the top two: proven-stable modulation (`docs/research/stable-modulation`) and flicker-free pixels (`docs/research/flicker-free-pixels`). Sections 1-7 of each need sign-off before any building or measuring.
