@@ -10,7 +10,7 @@ a.np-step:hover { transform: translateY(-1px); }
 .np-io h3 { margin: 0 0 8px; }
 .np-ports { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .np-ports li { display: flex; align-items: center; gap: 10px; }
-.np-kind { display: inline-block; padding: 2px 10px; border-radius: 10px; background: var(--nm-up); box-shadow: var(--nm-raise); font: 500 0.75rem/1.5 var(--font-mono, ui-monospace, monospace); text-transform: capitalize; }
+.np-kind { display: inline-block; padding: 2px 10px; border-radius: 10px; background: var(--nm-up); box-shadow: var(--nm-raise); font: 500 0.75rem/1.5 var(--font-sans, 'Geist', system-ui, sans-serif); text-transform: capitalize; }
 .np-kind[data-kind="picture"] { color: var(--cat-source, #4ADE80); }
 .np-kind[data-kind="audio"] { color: var(--cat-audiofx, #53C7E3); }
 .np-kind[data-kind="notes"] { color: var(--cat-notes, #4CD964); }
@@ -19,7 +19,7 @@ a.np-step:hover { transform: translateY(-1px); }
 .np-table { overflow-x: auto; margin: 12px 0 0; border-radius: var(--web-card-radius, 24px); background: var(--nm-down); box-shadow: var(--nm-pocket); }
 .np-table table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 .np-table th, .np-table td { padding: 10px 16px; text-align: left; vertical-align: top; }
-.np-table thead th { font: 500 0.75rem/1.4 var(--font-mono, ui-monospace, monospace); color: var(--ink2); text-transform: uppercase; letter-spacing: 0.08em; }
+.np-table thead th { font: 500 0.75rem/1.4 var(--font-sans, 'Geist', system-ui, sans-serif); color: var(--ink2); letter-spacing: 0; }
 .np-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--ink) 4%, transparent); }
 .np-table tbody th { font-weight: 600; text-transform: capitalize; }
 .np-table td { color: var(--ink2); }

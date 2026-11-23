@@ -91,7 +91,8 @@ body {
 img, video, canvas, svg { display: block; max-width: 100%; }
 a { color: inherit; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
-code, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+code { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.mono { font-variant-numeric: tabular-nums; }
 strong { font-weight: 600; color: var(--ink); }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
@@ -241,7 +242,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 
 .hud-coord {
   position: absolute; top: 26px; z-index: 2;
-  font-family: var(--font-mono); font-size: var(--fs-micro); letter-spacing: 0.04em;
+  font-family: var(--font-sans, 'Geist', system-ui, sans-serif); font-size: var(--fs-micro); letter-spacing: 0.04em;
   color: color-mix(in srgb, var(--shadow) 42%, transparent); font-variant-numeric: tabular-nums;
 }
 .hud-tl { left: 40px; }
@@ -342,7 +343,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
   margin-top: 18px; display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 16px; border-radius: var(--r-pill);
   background: var(--glass); box-shadow: 0 0 0 0 transparent;
-  font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--ink2); letter-spacing: 0.02em;
+  font-family: var(--font-sans, 'Geist', system-ui, sans-serif); font-size: var(--fs-micro); color: var(--ink2); letter-spacing: 0.02em;
 }
 .dot-live { width: 7px; height: 7px; border-radius: 50%; background: #22D388; box-shadow: 0 0 0 3px rgba(34, 211, 136, 0.18); flex: none; }
 
@@ -366,7 +367,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 .app-bar .dots i:nth-child(1) { background: #F57F66; }
 .app-bar .dots i:nth-child(2) { background: #343B5E; }
 .app-bar .dots i:nth-child(3) { background: #343B5E; }
-.app-title { font-family: var(--font-mono); color: var(--app-text); opacity: 0.8; }
+.app-title { font-family: var(--font-sans, 'Geist', system-ui, sans-serif); color: var(--app-text); opacity: 0.8; }
 .product-shot { width: 100%; height: auto; aspect-ratio: 16 / 10; display: block; }
 .showcase-counter { color: var(--app-dim); font-size: var(--fs-micro); opacity: 0.8; }
 .showcase-expand-btn { background: none; border: none; padding: 4px; border-radius: var(--r-sm); color: var(--app-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color var(--dur-small) var(--ease-out); }
@@ -515,7 +516,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 }
 .cat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cat); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--cat) 22%, transparent); }
 .node-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.node-cat { margin-left: auto; font-family: var(--font-mono); font-size: var(--size-micro-mono); color: var(--app-dim); font-weight: 500; letter-spacing: 0.03em; }
+.node-cat { margin-left: auto; font-family: var(--font-sans, 'Geist', system-ui, sans-serif); font-size: var(--size-micro-mono); color: var(--app-dim); font-weight: 500; letter-spacing: 0.03em; }
 .node-view {
   margin: 8px; border-radius: var(--r-md); overflow: hidden;
   aspect-ratio: 1 / 1; background: var(--midnight-950); position: relative;
@@ -610,7 +611,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 .yt-poster:active .yt-play { transform: scale(0.94); }
 .yt-label {
   position: absolute; left: 14px; bottom: 14px; padding: 4px 12px; border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--ground) 94%, transparent); font-family: var(--font-mono); font-size: var(--size-micro-mono);
+  background: color-mix(in srgb, var(--ground) 94%, transparent); font-family: var(--font-sans, 'Geist', system-ui, sans-serif); font-size: var(--size-micro-mono);
 }
 
 .recipe-num { font-size: var(--size-micro-mono); color: var(--accent); letter-spacing: 0.06em; }
@@ -662,7 +663,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
   font-size: 0.8438rem; font-weight: 500; white-space: nowrap;
   transition: transform var(--spring-slab-ms) var(--spring-slab), color var(--dur-small) var(--ease-out), box-shadow var(--dur-small) var(--ease-out);
 }
-.ticker-pill small { font-family: var(--font-mono); font-size: var(--size-micro-mono); color: var(--muted); }
+.ticker-pill small { font-family: var(--font-sans, 'Geist', system-ui, sans-serif); font-size: var(--size-micro-mono); color: var(--muted); }
 .ticker-pill:hover { color: var(--ink); background: var(--surface-2); transform: translateY(-2px); box-shadow: var(--shadow-1); }
 .ticker-pill:active { transform: scale(0.95); transition-duration: 0.08s; }
 .ticker-forward { animation: tick-fwd var(--dur, 60s) linear infinite; }
@@ -737,7 +738,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 .btn-dl.primary small { color: color-mix(in srgb, var(--ground) 65%, transparent); }
 .btn-dl.primary::after {
   content: 'your system'; margin-left: 10px; padding: 4px 8px; border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--paper) 16%, transparent); font-family: var(--font-mono); font-size: var(--size-micro-mono); font-weight: 500;
+  background: color-mix(in srgb, var(--paper) 16%, transparent); font-family: var(--font-sans, 'Geist', system-ui, sans-serif); font-size: var(--size-micro-mono); font-weight: 500;
 }
 .specs { position: relative; text-align: center; margin-top: 22px; font-size: var(--size-micro-mono); color: var(--ink2); }
 .specs div { display: flex; gap: 8px; }

@@ -28,9 +28,9 @@ body > .site-footer { margin-top: auto; }
 .t-lead    { font: var(--type-lead);    letter-spacing: var(--track-lead);    text-wrap: pretty; color: var(--ink-2); }
 .t-body    { font: var(--type-body);    letter-spacing: var(--track-body);    text-wrap: pretty; }
 .t-caption { font: var(--type-caption); letter-spacing: var(--track-caption); color: var(--ink-2); }
-.t-micro   { font: var(--type-micro-mono); letter-spacing: var(--track-micro-mono); color: var(--ink-3); }
+.t-micro   { font: 500 0.75rem/1.35 var(--font-sans, 'Geist', system-ui, sans-serif); font-variant-numeric: tabular-nums; letter-spacing: 0; color: var(--ink-3); }
 .t-folio, .folio {
-  font: var(--type-folio-mono-caps); letter-spacing: var(--track-folio-mono-caps); text-transform: uppercase;
+  font: 500 0.75rem/1.3 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0;
   color: var(--ink-3); font-variant-numeric: tabular-nums;
 }
 .t-hand { font-family: var(--font-hand); font-weight: 600; font-size: 1.25em; line-height: 1; letter-spacing: 0; }
@@ -42,7 +42,7 @@ body > .site-footer { margin-top: auto; }
 .fig-xl { font: var(--type-num-xl); letter-spacing: var(--track-num); }
 .fig-l  { font: var(--type-num-l);  letter-spacing: var(--track-num); }
 .fig-m  { font: var(--type-num-m);  letter-spacing: var(--track-num); }
-.fig-unit { font: 500 max(var(--web-floor), 0.25em)/1 var(--font-mono); letter-spacing: 0.02em; color: var(--ink-3);
+.fig-unit { font: 500 max(var(--web-floor), 0.25em)/1 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0.02em; color: var(--ink-3);
   margin-top: 0.12em; text-transform: none; }
 .tnum { font-variant-numeric: tabular-nums lining-nums; }
 .ratio-sep { color: var(--ink-3); padding: 0 0.25em; }
@@ -93,7 +93,7 @@ body > .site-footer { margin-top: auto; }
 
 /* Chips label and filter; radius 10, not a pill, so they never look like a button. */
 .sys-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border-radius: var(--r-sm);
-  font: 500 var(--size-micro-mono)/1 var(--font-mono); letter-spacing: 0.02em; color: var(--ink-2);
+  font: 500 var(--size-micro-mono)/1 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0.02em; color: var(--ink-2);
   background: color-mix(in srgb, var(--ink) 7%, transparent); }
 .sys-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cat, var(--signal)); }
 
@@ -187,7 +187,7 @@ a.card:hover, .card:has(a.card-link:hover) { transform: translateY(-2px); box-sh
 .kt-swap > :not(.on) { opacity: 0; transform: translateY(0.4em); pointer-events: none; }
 .kt-swap > .out { opacity: 0; transform: translateY(-0.4em); transition: transform var(--dur-small) var(--ease-in), opacity var(--dur-small) var(--ease-in); }
 .loop-type { width: 100%; height: auto; overflow: visible; color: var(--ink-2); }
-.loop-type text { font: 500 12px/1 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; fill: currentColor; }
+.loop-type text { font: 500 12px/1 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0; fill: currentColor; }
 @media (prefers-reduced-motion: reduce) {
   .kt-slab .w, .kt-swap > * { transform: none !important; opacity: 1; transition: none !important; }
   .kt-swap > :not(.on) { display: none; }

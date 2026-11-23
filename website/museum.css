@@ -84,7 +84,7 @@ body:not(.is-loading) .intro { opacity: 0; visibility: hidden; }
 .counter {
   top: max(18px, env(safe-area-inset-top)); right: 18px;
   padding: 8px 16px; gap: 4px; min-height: 40px; box-sizing: border-box; justify-content: center;
-  font: 500 12px/1 var(--font-mono); letter-spacing: 0.04em;
+  font: 500 12px/1 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0.04em;
   opacity: 0; pointer-events: none; transform: translateY(-6px);
 }
 .counter em { font-style: normal; color: var(--muted); }
@@ -124,7 +124,7 @@ body.is-focus .modes { opacity: 0; pointer-events: none; transform: translate(-5
 .hint {
   position: fixed; z-index: 9; left: 50%; bottom: max(30px, calc(env(safe-area-inset-bottom) + 18px));
   transform: translate(-50%, 6px);
-  font: 500 12px/1.4 var(--font-mono); letter-spacing: 0.04em;
+  font: 500 12px/1.4 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0.04em;
   color: var(--ink); text-align: center; white-space: nowrap;
   padding: 8px 16px; border-radius: 999px; background: var(--glass); border: 0; box-shadow: var(--shadow);
   -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
@@ -147,7 +147,7 @@ body.is-focus .hint { opacity: 0 !important; }
 }
 .plaque-no { font: 500 0.8438rem/1 var(--font-sans); color: var(--accent); }
 .plaque-title { font: 700 40px/0.9 var(--hand); margin-top: 8px; }
-.plaque-meta { font: 400 12px/1.4 var(--font-mono); color: var(--muted); margin-top: 8px; letter-spacing: 0.02em; }
+.plaque-meta { font: 400 12px/1.4 var(--font-sans, 'Geist', system-ui, sans-serif); color: var(--muted); margin-top: 8px; letter-spacing: 0.02em; }
 body.is-focus .plaque { opacity: 1; transform: none; transition-delay: 0.25s, 0.25s; }
 
 .focus-ui {

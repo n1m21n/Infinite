@@ -12,7 +12,7 @@
   background: color-mix(in srgb, var(--surface-2) 80%, var(--deep)); box-shadow: var(--glass-hi); font: 600 0.85rem/1 var(--font-sans); }
 .sto-sel::after { content: ""; position: absolute; right: 13px; top: 15px; width: 6px; height: 6px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg); opacity: 0.6; pointer-events: none; }
 .sto-sel select { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 16px; }
-.sto-sel small { color: var(--muted); font: 500 0.72rem/1 var(--font-mono); margin-right: 7px; text-transform: lowercase; }
+.sto-sel small { color: var(--muted); font: 500 0.72rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); margin-right: 7px; text-transform: lowercase; }
 .sto-gen { height: 42px; padding: 0 20px; border: 0; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
   background: var(--solid); color: var(--ground); box-shadow: var(--solid-hi), var(--glass-shadow); font: 700 0.92rem/1 var(--font-sans); }
 .sto-gen:hover { background: var(--solid-hover); }
@@ -22,7 +22,7 @@
 /* main grid: feel field | pills + readout */
 .sto-main { display: grid; grid-template-columns: minmax(280px, 400px) 1fr; gap: 14px; }
 .sto-card { position: relative; border-radius: 20px; padding: 14px; background: color-mix(in srgb, var(--surface-2) 70%, var(--surface-1)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent); }
-.sto-lbl { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 10px; font: 700 0.72rem/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sto-lbl { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 10px; font: 700 0.72rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0; color: var(--muted); }
 .sto-lbl em { font-style: normal; letter-spacing: 0; text-transform: none; font-weight: 500; }
 
 /* the feel field: energy across, mood up */
@@ -36,9 +36,9 @@
 .sto-field::before, .sto-field::after { content: ""; position: absolute; background: color-mix(in srgb, var(--ink) 12%, transparent); }
 .sto-field::before { left: 50%; top: 8%; bottom: 8%; width: 1px; }
 .sto-field::after { top: 50%; left: 8%; right: 8%; height: 1px; }
-.sto-q { position: absolute; font: 600 0.78rem/1 var(--font-mono); color: color-mix(in srgb, var(--ink) 70%, transparent); pointer-events: none; }
+.sto-q { position: absolute; font: 600 0.78rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); color: color-mix(in srgb, var(--ink) 70%, transparent); pointer-events: none; }
 .sto-q.tl { left: 12px; top: 12px; } .sto-q.tr { right: 12px; top: 12px; } .sto-q.bl { left: 12px; bottom: 12px; } .sto-q.br { right: 12px; bottom: 12px; }
-.sto-axis { position: absolute; font: 500 0.66rem/1 var(--font-mono); color: var(--muted); pointer-events: none; letter-spacing: 0.04em; }
+.sto-axis { position: absolute; font: 500 0.66rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); color: var(--muted); pointer-events: none; letter-spacing: 0.04em; }
 .sto-axis.x { bottom: 50%; right: 10px; transform: translateY(-6px); } .sto-axis.y { left: 50%; top: 10px; transform: translateX(8px); }
 .sto-trail { position: absolute; inset: 0; pointer-events: none; }
 
@@ -57,24 +57,24 @@
 .sto-pills { display: grid; gap: 12px; }
 .sto-pill { display: grid; grid-template-columns: 92px 1fr 64px; align-items: center; gap: 12px; }
 .sto-pill b { font: 700 0.86rem/1.1 var(--font-sans); }
-.sto-pill b small { display: block; color: var(--muted); font: 500 0.66rem/1.3 var(--font-mono); margin-top: 3px; }
+.sto-pill b small { display: block; color: var(--muted); font: 500 0.66rem/1.3 var(--font-sans, 'Geist', system-ui, sans-serif); margin-top: 3px; }
 .sto-track { position: relative; height: 34px; border-radius: 999px; touch-action: none; cursor: pointer;
   background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-hi), inset 0 1px 6px rgb(0 0 0 / 0.18); }
 .sto-track::before { content: ""; position: absolute; left: 17px; right: 17px; top: 50%; height: 2px; margin-top: -1px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
 .sto-track i { position: absolute; top: 50%; height: 4px; margin-top: -2px; border-radius: 4px; background: var(--accent); opacity: 0.8; }
 .sto-track .sto-dot { top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; }
-.sto-track .ends { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 14px; font: 500 0.64rem/1 var(--font-mono); color: var(--muted); pointer-events: none; }
-.sto-val { font: 600 0.78rem/1 var(--font-mono); color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
-.sto-reset { border: 0; background: none; color: var(--muted); font: 600 0.72rem/1 var(--font-mono); cursor: pointer; padding: 4px 0; }
+.sto-track .ends { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 14px; font: 500 0.64rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); color: var(--muted); pointer-events: none; }
+.sto-val { font: 600 0.78rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+.sto-reset { border: 0; background: none; color: var(--muted); font: 600 0.72rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); cursor: pointer; padding: 4px 0; }
 .sto-reset:hover { color: var(--ink); }
 
 /* what moved */
 .sto-moved { display: grid; gap: 6px; margin-top: 14px; }
 .sto-stats { display: flex; flex-wrap: wrap; gap: 6px; }
-.sto-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px; font: 600 0.74rem/1 var(--font-mono);
+.sto-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px; font: 600 0.74rem/1 var(--font-sans, 'Geist', system-ui, sans-serif);
   background: var(--glass); box-shadow: var(--glass-hi); color: var(--ink); white-space: nowrap; }
 .sto-chip.up { color: var(--accent); }
-.sto-diff { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font: 500 0.74rem/1.35 var(--font-mono); color: var(--ink-2); min-height: 4.2em; }
+.sto-diff { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font: 500 0.74rem/1.35 var(--font-sans, 'Geist', system-ui, sans-serif); color: var(--ink-2); min-height: 4.2em; }
 .sto-diff li { display: flex; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sto-diff li span { color: var(--muted); }
 
@@ -88,7 +88,7 @@
 .sto-h { position: absolute; top: 0; bottom: 0; width: 14px; margin-left: -7px; cursor: ew-resize; }
 .sto-h::after { content: ""; position: absolute; left: 6px; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--ink); box-shadow: 0 0 0 1px var(--ground); }
 .sto-ph { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); pointer-events: none; box-shadow: 0 0 10px var(--accent); }
-.sto-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font: 500 0.82rem/1.3 var(--font-mono); text-align: center; padding: 0 16px; }
+.sto-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font: 500 0.82rem/1.3 var(--font-sans, 'Geist', system-ui, sans-serif); text-align: center; padding: 0 16px; }
 .sto-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sto-tools .grow { flex: 1; }
 .sto-tog { height: 34px; padding: 0 13px; border-radius: 999px; border: 0; cursor: pointer; font: 600 0.78rem/1 var(--font-sans); color: var(--ink);
@@ -99,12 +99,12 @@
   font: 700 0.82rem/1 var(--font-sans); background: color-mix(in srgb, var(--surface-2) 80%, var(--deep)); color: var(--ink); box-shadow: var(--glass-hi), var(--shadow-1); }
 .sto-x:hover { background: var(--ink); color: var(--paper); }
 .sto-x svg { width: 15px; height: 15px; }
-.sto-x small { color: inherit; opacity: 0.6; font: 500 0.7rem/1 var(--font-mono); }
+.sto-x small { color: inherit; opacity: 0.6; font: 500 0.7rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); }
 
 /* takes */
 .sto-takes { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .sto-takes::-webkit-scrollbar { display: none; }
-.sto-take { flex: none; height: 30px; padding: 0 11px; border-radius: 999px; border: 0; cursor: pointer; font: 600 0.72rem/1 var(--font-mono); color: var(--ink-2);
+.sto-take { flex: none; height: 30px; padding: 0 11px; border-radius: 999px; border: 0; cursor: pointer; font: 600 0.72rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); color: var(--ink-2);
   background: color-mix(in srgb, var(--surface-2) 80%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent); }
 .sto-take.on { background: var(--ink); color: var(--paper); box-shadow: none; }
 
@@ -112,12 +112,12 @@
 .sto-patch svg { display: block; width: 100%; height: auto; }
 .sto-patch .nd rect { fill: var(--surface-1); stroke-width: 1.5; }
 .sto-patch .nd text { fill: var(--ink); font: 600 11px var(--font-sans); }
-.sto-patch .nd text.c { fill: var(--muted); font: 500 9px var(--font-mono); }
+.sto-patch .nd text.c { fill: var(--muted); font: 500 9px var(--font-sans, 'Geist', system-ui, sans-serif); }
 .sto-patch .nd.moved rect { stroke-dasharray: none; filter: drop-shadow(0 0 6px var(--accent)); }
 .sto-patch path { fill: none; stroke: color-mix(in srgb, var(--ink) 28%, transparent); stroke-width: 1.4; }
 .sto-patch path.note { stroke: color-mix(in srgb, var(--cat-notes) 70%, transparent); stroke-dasharray: 3 3; }
 .sto-patch .scroll { overflow-x: auto; }
-.sto-legend { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font: 500 0.7rem/1 var(--font-mono); }
+.sto-legend { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font: 500 0.7rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); }
 .sto-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 
 .sto-note { color: var(--muted); font-size: 0.85rem; margin: 14px 4px 0; }

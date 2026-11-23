@@ -98,7 +98,7 @@
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-hi);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans, 'Geist', system-ui, sans-serif);
   font-size: var(--size-micro-mono);
   color: var(--ink);
   pointer-events: none;
@@ -310,7 +310,7 @@
 }
 
 .st-val {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans, 'Geist', system-ui, sans-serif);
   font-size: var(--size-micro-mono);
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
@@ -398,7 +398,7 @@
 
 .st-pad-q {
   position: absolute;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans, 'Geist', system-ui, sans-serif);
   font-size: var(--size-micro-mono);
   color: var(--ink-3);
   pointer-events: none;
@@ -499,7 +499,7 @@
   padding: 0 11px;
   border-radius: 999px;
   cursor: pointer;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans, 'Geist', system-ui, sans-serif);
   font-size: var(--size-micro-mono);
   color: var(--ink-2);
   background: color-mix(in srgb, var(--surface-2) 72%, transparent);
@@ -523,7 +523,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans, 'Geist', system-ui, sans-serif);
   font-size: var(--size-micro-mono);
   color: var(--ink-3);
   user-select: none;
@@ -552,7 +552,7 @@
 
 .st-patch-svg .nd rect { fill: var(--surface-1); stroke-width: 1.5; }
 .st-patch-svg .nd text { fill: var(--ink); font-family: var(--font-sans); font-size: var(--size-micro-mono); font-weight: 600; }
-.st-patch-svg .nd text.c { fill: var(--ink-3); font-family: var(--font-mono); font-size: var(--size-micro-mono); }
+.st-patch-svg .nd text.c { fill: var(--ink-3); font-family: var(--font-sans, 'Geist', system-ui, sans-serif); font-size: var(--size-micro-mono); }
 .st-patch-svg path { fill: none; stroke: color-mix(in srgb, var(--ink) 28%, transparent); stroke-width: 1.4; }
 .st-patch-svg path.note { stroke: color-mix(in srgb, var(--cat-notes) 72%, transparent); stroke-dasharray: 4 3; }
 

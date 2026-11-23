@@ -34,9 +34,9 @@ button { border: 0; background: none; padding: 0; cursor: pointer; -webkit-tap-h
 :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 
 .mono, .folio, .readout, output, .pop-title, .load, .loader-step, .loader-meta, .patch-meta, .patch h2 {
-  font: var(--type-micro-mono); letter-spacing: var(--track-micro-mono);
+  font: 500 0.75rem/1.35 var(--font-sans, 'Geist', system-ui, sans-serif); font-variant-numeric: tabular-nums; letter-spacing: 0;
 }
-.folio, .pop-title, .patch h2 { letter-spacing: var(--track-folio-mono-caps); text-transform: uppercase; color: var(--ink-2); margin: 0; }
+.folio, .pop-title, .patch h2 { letter-spacing: 0; color: var(--ink-2); margin: 0; }
 
 .glass {
   background: var(--glass);

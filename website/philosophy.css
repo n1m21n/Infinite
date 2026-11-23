@@ -99,7 +99,7 @@
 .ph-prin { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; width: min(1120px, 100%); }
 .ph-prin li { position: relative; padding: 20px 20px 24px; border-radius: 24px; gap: 6px; justify-items: start; align-content: start; overflow: hidden; isolation: isolate; color: #EEF1FA;
   background: radial-gradient(120% 70% at 50% 18%, color-mix(in srgb, var(--signal-300) 26%, var(--midnight-900)), var(--midnight-950) 78%); box-shadow: 0 16px 40px color-mix(in srgb, #000 30%, transparent), inset 0 1px 0 rgb(255 255 255 / 0.12); }
-.ph-prin .pp-n { font: 500 var(--size-micro-mono)/1 'Geist Mono', ui-monospace, monospace; letter-spacing: 0.12em; color: rgb(238 241 250 / 0.6); }
+.ph-prin .pp-n { font: 500 var(--size-micro-mono)/1 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0; color: rgb(238 241 250 / 0.6); }
 .ph-prin .pp-img { width: 100%; height: 200px; object-fit: contain; margin: 0 0 8px; filter: drop-shadow(0 18px 22px rgb(0 0 0 / 0.5)); transition: transform var(--dur-page, 667ms) var(--ease-out, ease); }
 .ph-prin li:hover .pp-img { transform: translateY(-4px) scale(1.04); }
 .ph-prin li > b { display: inline-flex; align-items: center; gap: 8px; font: 750 1.25rem/1.2 Geist, system-ui, sans-serif; color: #EEF1FA; }

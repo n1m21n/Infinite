@@ -49,7 +49,7 @@
 .sr-ico { grid-row: span 2; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--nm-up); box-shadow: var(--nm-raise); color: var(--nm-ink, var(--ink)); }
 .sr-ico svg { width: 17px; height: 17px; }
 .sr-t { font-weight: 600; font-size: 0.9375rem; line-height: 1.3; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.sr-k { font: 500 0.6875rem/1 var(--font-mono, ui-monospace, monospace); color: var(--ink2); text-transform: uppercase; letter-spacing: 0.04em; }
+.sr-k { font: 500 0.6875rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); color: var(--ink2); letter-spacing: 0.04em; }
 .sr-s { font-size: 0.8125rem; line-height: 1.45; color: var(--ink2); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .sr-item[data-kind="Code"] .sr-s { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.78rem; }
 .sr mark { background: color-mix(in srgb, var(--signal) 28%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }

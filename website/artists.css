@@ -124,7 +124,7 @@
 .mx-dial:focus-visible { box-shadow: 0 0 0 3px var(--mid-sig); }
 @media (prefers-reduced-motion: reduce) { .mx-cap { transition: none; } }
 .mx-knob span { font: 500 var(--size-caption)/1.2 'Geist', system-ui, sans-serif; color: var(--mid-ink); }
-.mx-knob output { font: 500 var(--size-micro-mono)/1 'Geist Mono', ui-monospace, monospace; color: rgba(238, 241, 250, 0.7); }
+.mx-knob output { font: 500 var(--size-micro-mono)/1 var(--font-sans, 'Geist', system-ui, sans-serif); color: rgba(238, 241, 250, 0.7); }
 .mx-rack.live .mx-arc { filter: drop-shadow(0 0 6px rgba(167, 177, 255, 0.7)); }
 @media (min-width: 900px) { .mx-rack { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; padding: 24px; gap: 32px; } .mx-top { flex-direction: column; align-items: stretch; } .mx-scope { height: 96px; } .mx-play { justify-content: center; } .mx-dial { width: 76px; height: 76px; } }
 @media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); font-size: 0.875rem; } .mx-dial { width: 72px; height: 72px; } .mx-rack { padding: 14px; } }
@@ -146,7 +146,7 @@
 .ax-lab .lab-side { align-items: center; gap: 10px; padding: 14px 16px 16px; }
 .ax-lab .ctl { --p: 50%; position: relative; flex: 1 1 220px; min-width: 0; padding: 14px 18px 4px; border-radius: var(--web-card-radius); background: linear-gradient(180deg, rgba(238, 241, 250, 0.13), rgba(238, 241, 250, 0.06)); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 28px rgba(4, 5, 14, 0.35); row-gap: 0; }
 .ax-lab .ctl label { font: 500 var(--size-caption)/1 'Geist', system-ui, sans-serif; color: var(--mid-ink); }
-.ax-lab .ctl output { min-width: 0; padding: 5px 10px; border-radius: var(--r-pill); background: rgba(13, 16, 32, 0.45); color: var(--mid-ink); font: 500 var(--size-micro-mono)/1 'Geist Mono', ui-monospace, monospace; }
+.ax-lab .ctl output { min-width: 0; padding: 5px 10px; border-radius: var(--r-pill); background: rgba(13, 16, 32, 0.45); color: var(--mid-ink); font: 500 var(--size-micro-mono)/1 var(--font-sans, 'Geist', system-ui, sans-serif); }
 .ax-lab .ctl input[type=range] { height: 40px; }
 .ax-lab .pads { display: inline-flex; gap: 2px; padding: 4px; border-radius: var(--r-pill); background: rgba(238, 241, 250, 0.1); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); }
 .ax-lab .pad { min-height: 40px; padding: 0 16px; background: transparent; color: rgba(238, 241, 250, 0.8); box-shadow: none; transition: background var(--dur-short, 188ms) var(--ease-out, ease), color var(--dur-short, 188ms) var(--ease-out, ease); }
@@ -162,7 +162,7 @@
 .ax-print .lab-view { cursor: crosshair; }
   color: var(--mid-ink); font: 700 clamp(3.5rem, 9vw, 7.5rem)/0.85 'Geist', system-ui, sans-serif; letter-spacing: -0.06em; font-variant-numeric: tabular-nums; text-shadow: 0 2px 24px rgb(13 16 32 / 0.6); }
 .pr-cap { position: absolute; right: clamp(16px, 3vw, 32px); bottom: clamp(12px, 2.4vw, 24px); margin: 0; pointer-events: none;
-  font: 500 var(--size-caption)/1 'Geist Mono', ui-monospace, monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mid-ink);
+  font: 500 var(--size-caption)/1 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0; color: var(--mid-ink);
   padding: 8px 12px; border-radius: var(--r-pill); background: rgb(13 16 32 / 0.72); }
 .pr-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex: 1 1 100%; }
 .pr-tile { display: flex; align-items: baseline; gap: 10px; min-height: 56px; padding: 10px 16px; border: 0; border-radius: var(--web-media-radius); cursor: pointer;
@@ -186,7 +186,7 @@
 .ax-bento-t::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgb(13 16 32 / 0.85), rgb(13 16 32 / 0) 55%); z-index: -1; }
 .ax-bento-t:hover img { transform: scale(1.05); }
 .ax-bento-l { position: absolute; left: 16px; right: 16px; bottom: 14px; display: flex; flex-direction: column; gap: 4px; font: 600 var(--size-body)/1.2 'Geist', system-ui, sans-serif; }
-.ax-bento-l small { font: 500 var(--size-micro-mono)/1 'Geist Mono', ui-monospace, monospace; letter-spacing: 0.08em; color: var(--mid-sig); }
+.ax-bento-l small { font: 500 var(--size-micro-mono)/1 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0; color: var(--mid-sig); }
 .ax-bento-t:focus-visible { outline: 3px solid var(--signal); outline-offset: 3px; }
 @media (max-width: 640px) { .ax-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 132px; gap: 8px; } }
 
@@ -213,7 +213,7 @@ html:not([data-mode="midnight"]) .ax-ttl, .ax-bento-t { color: var(--midnight-50
 /* sliders: small and quiet. A hairline track, the filled part in Signal, a 14px thumb; label and value on one line above. */
 .ax-lab .ctl { --p: 50%; flex: 1 1 200px; padding: 4px 2px 0; gap: 0 12px; border-radius: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .ax-lab .ctl label { font: 500 var(--size-caption)/1 'Geist', system-ui, sans-serif; letter-spacing: 0; color: var(--mid-ink); }
-.ax-lab .ctl output { padding: 0; min-width: 0; background: none; font: 500 var(--size-micro-mono)/1 'Geist Mono', ui-monospace, monospace; color: color-mix(in srgb, var(--mid-ink) 62%, transparent); }
+.ax-lab .ctl output { padding: 0; min-width: 0; background: none; font: 500 var(--size-micro-mono)/1 var(--font-sans, 'Geist', system-ui, sans-serif); color: color-mix(in srgb, var(--mid-ink) 62%, transparent); }
 /* sliders, 3D (ref: the soft 3D slider sheet): a recessed groove with ticks, a glossy pill fill, a ringed thumb with a lit centre */
 .ax-lab .ctl input[type=range] { height: 40px; }
 
@@ -278,7 +278,7 @@ html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radia
 .ax-albums { margin: 0; display: grid; gap: 10px; padding: 16px 18px; background: var(--r-paper); border: 2.5px solid var(--r-ink); border-radius: 6px; }
 .ax-albums div { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .ax-albums dt { font: 800 1.15rem/1.1 'Bricolage Grotesque', sans-serif; font-stretch: 80%; text-transform: lowercase; color: var(--r-ink); }
-.ax-albums dd { margin: 0; padding: 7px 10px; border: 1.5px solid var(--r-ink); border-radius: 4px; font: 500 .75rem/1 'DM Mono', ui-monospace, monospace; }
+.ax-albums dd { margin: 0; padding: 7px 10px; border: 1.5px solid var(--r-ink); border-radius: 4px; font: 500 .75rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); }
 @media (min-width: 760px) { .ax-maker { grid-template-columns: 1fr minmax(220px, 300px); align-items: center; } }
 
 .ax-name { display: flex; align-items: center; gap: 14px; margin: 0 0 10px; }

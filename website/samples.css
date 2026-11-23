@@ -2,7 +2,7 @@
 .smp-wrap { max-width: 980px; margin: 0 auto; }
 .smp-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 22px 0 18px; }
 .smp-bar .grow { flex: 1; }
-.smp-count { color: var(--muted); font: 500 0.8rem/1 var(--font-mono); }
+.smp-count { color: var(--muted); font: 500 0.8rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); }
 .smp-seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: color-mix(in srgb, var(--surface-2) 70%, transparent); box-shadow: var(--glass-hi), var(--shadow-1); }
 .smp-seg button { border: 0; background: transparent; color: var(--muted); font: 600 0.85rem/1 var(--font-sans); padding: 9px 14px; border-radius: 999px; cursor: pointer; }
 .smp-seg button.is-on { background: var(--ink); color: var(--paper); }
@@ -15,7 +15,7 @@
 .smp-play svg { width: 18px; height: 18px; }
 .smp-row.on .smp-play { background: var(--ink); color: var(--paper); }
 .smp-dl { height: 32px; padding: 0 10px; border-radius: 999px; border: 0; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; text-decoration: none;
-  background: transparent; color: var(--muted); font: 600 0.74rem/1 var(--font-mono); letter-spacing: 0.02em;
+  background: transparent; color: var(--muted); font: 600 0.74rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0.02em;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent); transition: background var(--dur-small) var(--ease-out), color var(--dur-small) var(--ease-out), box-shadow var(--dur-small) var(--ease-out); }
 .smp-dl svg { width: 13px; height: 13px; flex-shrink: 0; }
 .smp-dl:hover { background: var(--ink); color: var(--paper); box-shadow: none; }
@@ -25,7 +25,7 @@
 .smp-thumb img, .smp-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .smp-id { min-width: 0; display: grid; gap: 3px; }
 .smp-id b { font: 600 1rem/1.2 var(--font-sans); letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.smp-id span { color: var(--muted); font: 500 0.78rem/1.3 var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smp-id span { color: var(--muted); font: 500 0.78rem/1.3 var(--font-sans, 'Geist', system-ui, sans-serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .smp-wave { width: 100%; height: 44px; display: block; color: var(--muted); --smp-on: var(--accent); cursor: pointer; }
 .smp-track { height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
 .smp-track i { display: block; height: 100%; width: 0; background: var(--accent); }
@@ -53,7 +53,7 @@
 .smp-card video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .smp-cap { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 26px 14px 10px 18px;
   background: linear-gradient(to top, rgb(0 0 0 / 0.55), transparent); color: #fff; }
-.smp-cap b { font: 700 0.98rem/1.2 var(--font-mono); letter-spacing: 0.02em; text-transform: lowercase; }
+.smp-cap b { font: 700 0.98rem/1.2 var(--font-sans, 'Geist', system-ui, sans-serif); letter-spacing: 0.02em; text-transform: lowercase; }
 .smp-cap .smp-dl { color: #fff; }
 .smp-cap .smp-dl:hover { background: #fff; color: var(--deep); }
 .smp-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; font-size: 1.5rem; line-height: 1;
@@ -76,7 +76,7 @@
   .reels-page .reel-wrap { height: min(84dvh, 800px); }
 }
 .reels-page .reel-card video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.smp-none { color: var(--deep); text-align: center; padding: 40vh 24px 0; font: 500 0.9rem/1.4 var(--font-mono); }
+.smp-none { color: var(--deep); text-align: center; padding: 40vh 24px 0; font: 500 0.9rem/1.4 var(--font-sans, 'Geist', system-ui, sans-serif); }
 
 .smp-pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0 8px; }
 .smp-pager .lib-icon-pill { width: auto; padding: 0 16px; }
@@ -98,8 +98,8 @@
 .smp-menu[hidden] { display: none; }
 .smp-menu a { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 10px 12px; border-radius: 9px; color: var(--ink); text-decoration: none; }
 .smp-menu a:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
-.smp-menu b { font: 700 0.82rem/1 var(--font-mono); }
-.smp-menu span { color: var(--muted); font: 500 0.72rem/1 var(--font-mono); }
+.smp-menu b { font: 700 0.82rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); }
+.smp-menu span { color: var(--muted); font: 500 0.72rem/1 var(--font-sans, 'Geist', system-ui, sans-serif); }
 
 /* Filters: part segments, style and key picks. A plain well, no chevron. */
 .smp-pick { appearance: none; -webkit-appearance: none; border: 0; cursor: pointer; padding: 10px 14px; border-radius: 999px; max-width: 200px;
@@ -196,7 +196,7 @@
 .smp-dot::after { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: var(--c);
   transform: translate(-50%, -50%) scale(calc(0.45 + 0.75 * var(--amt, 0.5))); opacity: calc(0.45 + 0.55 * var(--amt, 0.5));
   box-shadow: 0 0 calc(14px * var(--amt, 0.5)) var(--c); transition: transform .12s ease, opacity .12s ease; }
-.smp-legend { margin: 6px 0 0; text-align: center; color: var(--ink-3); font: 500 0.72rem/1.4 var(--font-mono); }
+.smp-legend { margin: 6px 0 0; text-align: center; color: var(--ink-3); font: 500 0.72rem/1.4 var(--font-sans, 'Geist', system-ui, sans-serif); }
 .smp-legend i { display: inline-block; width: 8px; height: 8px; margin: 0 4px 0 10px; border-radius: 50%; background: var(--c); vertical-align: 0; }
 .smp-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 680px) { .smp-dot { width: 26px; height: 26px; } .smp-dot::after { width: 12px; height: 12px; } }
