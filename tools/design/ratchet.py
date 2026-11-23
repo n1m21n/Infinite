@@ -168,11 +168,13 @@ def store(c, w, z, f, rn, pp, lints=None, helpers=None):
         old_l, old_h = load_lints()
         lints = old_l if lints is None else lints
         helpers = old_h if helpers is None else helpers
-    STORE.write_text(json.dumps({"colours": dict(sorted(c.items())), "widgets": dict(sorted(w.items())),
+    keep = json.loads(STORE.read_text()) if STORE.exists() else {}   # keys other tools own (ui_audit's "audit") survive
+    keep.update({"colours": dict(sorted(c.items())), "widgets": dict(sorted(w.items())),
                                  "sizes": dict(sorted(z.items())), "font_scales": dict(sorted(f.items())),
                                  "roundings": dict(sorted(rn.items())), "popups": dict(sorted(pp.items())),
                                  "lints": {k: dict(sorted(v.items())) for k, v in sorted(lints.items())},
-                                 "helpers": dict(sorted((helpers or {}).items()))}, indent=1) + "\n")
+                                 "helpers": dict(sorted((helpers or {}).items()))})
+    STORE.write_text(json.dumps(keep, indent=1) + "\n")
     print(f"ratchet: {sum(c.values())} literal colours, {sum(w.values())} raw widget calls, {sum(z.values())} size literals, {sum(f.values())} font scales, {sum(rn.values())} rounding literals, {sum(pp.values())} raw popups")
 
 def main():
@@ -188,13 +190,15 @@ def main():
     cur_l = {name: lint_counts(rx, allow, bases) for name, (rx, allow, bases, _) in LINTS.items()}
     cur_h = helper_counts()
     old_l, old_h = load_lints()
+    audit = [sys.executable, str(ROOT / "tools/design/ui_audit.py"), "--ratchet"]
     if "--reset" in sys.argv:
-        store(cur_c, cur_w, cur_z, cur_f, cur_r, cur_p, cur_l, cur_h); return 0
+        store(cur_c, cur_w, cur_z, cur_f, cur_r, cur_p, cur_l, cur_h); return subprocess.run(audit + ["--reset"]).returncode
     if "--update" in sys.argv:
         low = lambda cur, old: {k: min(v, old.get(k, v)) for k, v in cur.items()}
         new_l = {n: (low(cur_l[n], old_l[n]) if n in old_l else cur_l[n]) for n in LINTS}
         new_h = cur_h if old_h is None else {h: min(v, old_h.get(h, v)) for h, v in cur_h.items()}
-        store(low(cur_c, old_c), low(cur_w, old_w), low(cur_z, old_z), low(cur_f, old_f), low(cur_r, old_r), low(cur_p, old_p), new_l, new_h); return 0
+        store(low(cur_c, old_c), low(cur_w, old_w), low(cur_z, old_z), low(cur_f, old_f), low(cur_r, old_r), low(cur_p, old_p), new_l, new_h)
+        return subprocess.run(audit + ["--update"]).returncode
     badl = []
     for name, (_, _, _, hint) in LINTS.items():
         if name not in old_l:
@@ -235,7 +239,8 @@ def main():
                 rawend.append(f"{f.relative_to(ROOT)}:{i}")
     for x in rawend: print(f"RATCHET: {x} calls ImGui::EndChild(): use EndChildSafe()")
     print(f"ratchet: raw EndChild {len(rawend)} (allowed 0)")
-    return 1 if bad or badw or badz or badf or badr or badp or badl or rawend or r.returncode else 0
+    ra = subprocess.run(audit)   # per-category counts from the tokenizer scan (tools/design/ui_audit.py)
+    return 1 if bad or badw or badz or badf or badr or badp or badl or rawend or r.returncode or ra.returncode else 0
 
 if __name__ == "__main__":
     sys.exit(main())
