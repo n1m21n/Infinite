@@ -1232,6 +1232,7 @@ namespace app
       }
       DropdownButton("synthetic preset", BrainSourceNode::PresetNames(), n->syntheticPreset, [n](int i) { PushUndoCheckpoint(); n->syntheticPreset = i; });
       DropdownButton("blink filter", BrainSourceNode::BlinkModeNames(), n->blinkMode, [n](int i) { PushUndoCheckpoint(); n->blinkMode = i; });
+      DropdownButton("image", BrainSourceNode::ImageModeNames(), n->imageMode, [n](int i) { PushUndoCheckpoint(); n->imageMode = i; });
       ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f, "%.2f", colW);
       ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f", colW);
       ModCheckbox("artifact blanking", &n->artifactBlanking);

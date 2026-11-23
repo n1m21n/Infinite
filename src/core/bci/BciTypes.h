@@ -131,6 +131,7 @@ namespace Bci
       bool stateCalibFailed = false;         // last calibration ended without a fit (too few clean updates)
       uint8_t stateChanMask = 0x0F;          // active channels used by the calibrated state LDA (3 or 4 bits set)
       float imageCol[kImageColumnSize] = {}; // latest Image pin column, 0..1 (z -3..+3), bin 0 = 1 Hz
+      float imageZ[kImageColumnSize] = {};   // same column, unclipped z (-30 = no signal at all), for Brain Light
       float imageState = -1.0f;              // eyes-closed score for the strip, -1 until calibrated
       unsigned imageSeq = 0;                 // +1 per column (every 12 samples)
       float alphaPhaseRad = 0.0f;
@@ -148,6 +149,32 @@ namespace Bci
       bool packMissing = false;
       char statusText[96] = "synthetic cortex ready";
    };
+
+   // Brain Light (docs/plans/bci/BRAIN_LIGHT.md): the image pin's Light mode, where every pixel's colour and
+   // brightness comes from the signal. Mirrored in tools/bci/brain_light.py; the GPU shader in
+   // BrainSourceNode.cpp draws BrainLightPixel's maths.
+   struct BrainLightFrame
+   {
+      float a[kChannelCount] = {};     // strength (excess over the person's baseline) -> brightness
+      float hue[kChannelCount] = {};   // rhythm: 1 Hz red .. 40 Hz blue-violet (radians)
+      float vivid[kChannelCount] = {}; // one clear rhythm -> vivid, many -> grey
+      float grain[kChannelCount] = {}; // fast (>= 25 Hz, EMG) excess -> grain
+      float phase[kChannelCount] = {}; // the wave's own phase (radians, wraps at 2 pi * kLightSlow)
+      float pres[kChannelCount] = {};  // any signal at all -> dim glow; 0 on a flat line
+      float state = 0.0f;              // calibrated eyes-closed score (0 until calibrated)
+      unsigned seq = 0;                // column counter, seeds the grain
+   };
+   constexpr float kLightSlow = 20.0f, kLightRing = 40.0f, kLightEps = 0.012f;
+   constexpr float kLightGlow = 0.12f, kLightState = 0.45f;
+   // Sensor spots seen from above, nose up (u right, v down; v is scaled by the frame's height / width).
+   constexpr float kLightPos[kChannelCount][2] = { { 0.14f, 0.16f }, { 0.86f, 0.16f }, { 0.10f, 0.86f }, { 0.90f, 0.86f } };
+
+   // z: kImageColumnSize unclipped z values (channel-major, bin 0 = 1 Hz); phase: kChannelCount radians;
+   // state01: calibrated eyes-closed score, < 0 when not calibrated.
+   void BrainLightFeatures(const float* z, const float* phase, float state01, BrainLightFrame& out);
+   // One pixel of the shader on the CPU (u, v in 0..1, v down; hOverW = height / width; noise = one
+   // standard-normal sample). For tests and tools.
+   void BrainLightPixel(const BrainLightFrame& f, float u, float v, float hOverW, float noise, float rgb[3]);
 
    // Lock-free global `brain.*` registry shared across BrainSourceNode, Expression, and Field backends.
    int BrainGlobalCount();

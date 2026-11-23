@@ -195,6 +195,7 @@ namespace Bci
       double mImgRunDev[kImageColumnSize] = {};
       bool mImgInit = false;
       float mImgCol[kImageColumnSize] = {};
+      float mImgZ[kImageColumnSize] = {};
       unsigned mImgSeq = 0;
       std::vector<std::array<float, kImageColumnSize>> mCalibImgOpen;
 

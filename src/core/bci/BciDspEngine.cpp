@@ -213,6 +213,7 @@ void BciDspEngine::Reset(double sampleRateHz)
    mImgInit = false;
    mImgSeq = 0;
    std::fill(std::begin(mImgCol), std::end(mImgCol), 0.5f);
+   std::fill(std::begin(mImgZ), std::end(mImgZ), 0.0f);
    for (int c = 0; c < kChannelCount; ++c)
    {
       std::fill(std::begin(mAudLine[c]), std::end(mAudLine[c]), 0.0);
@@ -990,6 +991,8 @@ void BciDspEngine::UpdateImageColumn(const double (&chanPsd)[kChannelCount][48],
          const double mad = mProfile.directValid ? mProfile.imgMad[i] : mImgRunDev[i];
          const double z = (mImgLog[i] - med) / std::max(1e-3, mad);
          mImgCol[i] = (float)std::clamp((z + 3.0) / 6.0, 0.0, 1.0);
+         // Brain Light wants the strongest rhythm unclipped; a dead-flat channel reads as no signal.
+         mImgZ[i] = mImgLog[i] < -11.0 ? -30.0f : (float)std::clamp(z, -30.0, 30.0);
       }
    mImgInit = true;
 
@@ -1513,6 +1516,7 @@ void BciDspEngine::Process(const SampleFrame* frames, int count, float outPins24
    outTelemetry.stateChanMask = mProfile.stateChanMask;
    outTelemetry.eyesClosedScore = mProfile.stateValid ? mStateScore : 0.0f;
    std::copy(std::begin(mImgCol), std::end(mImgCol), outTelemetry.imageCol);
+   std::copy(std::begin(mImgZ), std::end(mImgZ), outTelemetry.imageZ);
    outTelemetry.imageState = mProfile.stateValid ? mStateScore : -1.0f;
    outTelemetry.imageSeq = mImgSeq;
 }

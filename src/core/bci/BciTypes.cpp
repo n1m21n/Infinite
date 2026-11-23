@@ -1,6 +1,7 @@
 #include "BciTypes.h"
 
 #include <algorithm>
+#include <cmath>
 #include <atomic>
 #include <chrono>
 
@@ -140,5 +141,78 @@ void NotifyOutputTransient(float audioRmsDelta, float lumaDelta)
 double LastOutputTransientSec()
 {
    return gLastTransientSec.load(std::memory_order_relaxed);
+}
+
+void BrainLightFeatures(const float* z, const float* phase, float state01, BrainLightFrame& out)
+{
+   constexpr float kPi = 3.14159265358979f;
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      double eSum = 0.0, e2Sum = 0.0, fastSum = 0.0, presSum = 0.0, vx = 0.0, vy = 0.0;
+      int nFast = 0;
+      for (int k = 0; k < kImageBins; ++k)
+      {
+         const double zz = (double)z[c * kImageBins + k];
+         const double e = std::max(zz - 1.0, 0.0);
+         const double hue = (double)(280.0f * kPi / 180.0f) * (double)k / 39.0; // bin k = (k + 1) Hz
+         eSum += e;
+         e2Sum += e * e;
+         vx += e * e * std::cos(hue);
+         vy += e * e * std::sin(hue);
+         presSum += std::max(zz + 3.0, 0.0);
+         if (k + 1 >= 25)
+         {
+            fastSum += e;
+            ++nFast;
+         }
+      }
+      out.a[c] = (float)std::tanh(eSum / kImageBins / 0.6);
+      out.hue[c] = (float)std::atan2(vy, vx);
+      out.vivid[c] = (float)(std::sqrt(vx * vx + vy * vy) / (e2Sum + 1e-9));
+      out.grain[c] = (float)std::tanh(fastSum / std::max(1, nFast) / 6.0);
+      out.pres[c] = (float)std::tanh(presSum / kImageBins / 3.0);
+      out.phase[c] = phase[c];
+   }
+   out.state = std::clamp(state01, 0.0f, 1.0f);
+}
+
+void BrainLightPixel(const BrainLightFrame& f, float u, float v, float hOverW, float noise, float rgb[3])
+{
+   constexpr float kPi = 3.14159265358979f;
+   const float hueAlpha = 280.0f * kPi / 180.0f * 9.0f / 39.0f; // 10 Hz
+   float w[kChannelCount], d[kChannelCount], wSum = 0.0f;
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      const float dx = u - kLightPos[c][0], dy = (v - kLightPos[c][1]) * hOverW;
+      d[c] = std::sqrt(dx * dx + dy * dy);
+      w[c] = 1.0f / (d[c] * d[c] + kLightEps);
+      wSum += w[c];
+   }
+   float m = 0.0f, vx = 0.0f, vy = 0.0f, val = 0.0f, grain = 0.0f;
+   for (int c = 0; c < kChannelCount; ++c)
+   {
+      const float wc = w[c] / wSum;
+      const float pull = kLightState * f.state * f.pres[c];
+      const float mc = wc * (f.a[c] + kLightGlow * f.pres[c] + pull);
+      m += mc;
+      vx += wc * (f.a[c] * f.vivid[c] * std::cos(f.hue[c]) + pull * std::cos(hueAlpha));
+      vy += wc * (f.a[c] * f.vivid[c] * std::sin(f.hue[c]) + pull * std::sin(hueAlpha));
+      val += mc * (0.6f + 0.4f * std::cos(kLightRing * d[c] - f.phase[c] / kLightSlow));
+      grain += wc * f.grain[c];
+   }
+   val = std::clamp(val + grain * 0.5f * noise, 0.0f, 1.0f);
+   const float sat = std::clamp(std::sqrt(vx * vx + vy * vy) / (m + 1e-9f), 0.0f, 1.0f);
+   // HSV -> RGB, hue in radians
+   float h = std::atan2(vy, vx);
+   h = std::fmod(h, 2.0f * kPi);
+   if (h < 0.0f)
+      h += 2.0f * kPi;
+   h /= kPi / 3.0f;
+   const int i = (int)std::floor(h) % 6;
+   const float fr = h - std::floor(h);
+   const float p = val * (1 - sat), q = val * (1 - sat * fr), t = val * (1 - sat * (1 - fr));
+   const float table[6][3] = { { val, t, p }, { q, val, p }, { p, val, t }, { p, q, val }, { t, p, val }, { val, p, q } };
+   for (int k = 0; k < 3; ++k)
+      rgb[k] = table[i][k];
 }
 }

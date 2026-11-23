@@ -1378,6 +1378,14 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return ok ? 0 : 1;
    }
 
+   if (getenv("INFINITE_BRAINLIGHT_GPUTEST") != nullptr)
+   {
+      const bool ok = RunBrainLightGpuTest();
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      return ok ? 0 : 1;
+   }
+
    if (getenv("INFINITE_ENGINETEST") != nullptr)
    {
       const bool ok = RunEngineTest();
