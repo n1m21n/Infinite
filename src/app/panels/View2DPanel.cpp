@@ -12489,10 +12489,10 @@ namespace
    // Colour: the adjustment layers as one clean panel with searchable Add + collapsible, draggable cards.
    void DrawColourTab(Scene2DNode* doc)
    {
-      SectionCard::Begin(T("Adjustments"));
+      SectionCard::Begin(T("Adjustment layers"));
       static char sAdjSearch[64] = "";
       static ImVec2 sAdjPopPos(0, 0);
-      if (ActionButton::Draw((std::string(T("Add adjustment")) + "##v2daddadjbtn").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+      if (ActionButton::Draw((std::string(T("Add")) + "##v2daddadjbtn").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
       {
          sAdjSearch[0] = 0;
          sAdjPopPos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
@@ -12661,8 +12661,6 @@ namespace
          }
          ImGui::PopID();
       }
-      if (adjCount == 0)
-         ImGui::TextDisabled("%s", T("Add an adjustment above, or drag one onto a layer to clip it."));
       if (moveFrom != 0 && moveTo != 0 && moveFrom != moveTo && !doc->IsInside(moveTo, moveFrom))
       {
          PushUndoCheckpoint("Reorder adjustment");
@@ -12918,22 +12916,21 @@ namespace
       UiDensity::Compact compact;   // the side panel is a compact strip (Photoshop / Affinity Properties size)
       sLabelW = SectionCard::LabelW();
 
-      // The tab column, as the 3D View: each group of settings one click away instead of down one long scroll.
-      const struct { const char* id; const char* icon; const char* tip; } kTabs[7] = {
-         { "##v2dt0", IconsInfinite::Layers, "Layers" },
-         { "##v2dt1", IconsInfinite::Edit, "Layer" },
-         { "##v2dt2", IconsInfinite::ToolMove, "Transform" },
-         { "##v2dt3", IconsInfinite::Crop, "Document" },
-         { "##v2dt4", IconsInfinite::ShadeRender, "Render" },
-         { "##v2dt5", IconsInfinite::FamilyEffects, "Effects" },
-         { "##v2dt6", IconsInfinite::Curve, "Colour" },
+      // The tab column: four stops, each one whole job. Layer holds its transform, Look holds the layer's
+      // adjustments, effects and styles plus the document's adjustment layers, Document holds the render settings.
+      // sTab keeps its old values (1/2, 5/6, 3/4 open the same stop), so code that opens a tab by number still lands.
+      const struct { const char* id; const char* icon; const char* tip; int tab; int alt; } kTabs[4] = {
+         { "##v2dt0", IconsInfinite::Layers, "Layers", 0, 0 },
+         { "##v2dt1", IconsInfinite::Edit, "Layer", 1, 2 },
+         { "##v2dt5", IconsInfinite::FamilyEffects, "Look", 5, 6 },
+         { "##v2dt3", IconsInfinite::Crop, "Document", 3, 4 },
       };
       sTab = std::clamp(sTab, 0, 6);
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, tok::space_1));
       ImGui::BeginGroup();
-      for (int i = 0; i < 7; i++)
-         if (IconChip(kTabs[i].id, kTabs[i].icon, sTab == i, T(kTabs[i].tip)))
-            sTab = i;
+      for (int i = 0; i < 4; i++)
+         if (IconChip(kTabs[i].id, kTabs[i].icon, sTab == kTabs[i].tab || sTab == kTabs[i].alt, T(kTabs[i].tip)))
+            sTab = kTabs[i].tab;
       ImGui::EndGroup();
       ImGui::PopStyleVar();
       ActionButton::RowNext();
@@ -12962,12 +12959,25 @@ namespace
          sFieldW = std::floor(std::max(60.0f, w - sLabelW));   // whole pixels, so strip cells and wells end on one edge
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, PanelKit::FramePadY()));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::RowGap()));
-         if (sTab == 1) DrawLayerTab(doc, 0);
-         else if (sTab == 2) DrawLayerTab(doc, 1);
-         else if (sTab == 3) DrawDocumentTab(doc);
-         else if (sTab == 5) DrawEffectsTab(doc);
-         else if (sTab == 6) DrawColourTab(doc);
-         else DrawOutputTab(doc, w);
+         if (sTab == 1 || sTab == 2)
+         {
+            DrawLayerTab(doc, 0);
+            const Layer* al = Active(doc);
+            if (al != nullptr && al->kind != Kind::Group && al->kind != Kind::Fill && al->kind != Kind::Adjust)
+               DrawLayerTab(doc, 1);
+         }
+         else if (sTab == 5 || sTab == 6)
+         {
+            const Layer* al = Active(doc);
+            if (al != nullptr && al->kind != Kind::Adjust)
+               DrawEffectsTab(doc);
+            DrawColourTab(doc);
+         }
+         else
+         {
+            DrawDocumentTab(doc);
+            DrawOutputTab(doc, w);
+         }
          ImGui::Dummy(ImVec2(0.0f, tok::space_5));   // room under the last card so a scroll never ends on the edge
          ImGui::PopStyleVar(2);
          SectionCard::EndWindow();
