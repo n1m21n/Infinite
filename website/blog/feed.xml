@@ -8,6 +8,43 @@
   <lastBuildDate>Mon, 23 Nov 2026 09:00:00 +0000</lastBuildDate>
   <atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
   <item>
+    <title>Make your first beat and synth bassline</title>
+    <link>https://infinitedevices.org/blog/make-your-first-beat-and-synth-bassline.html</link>
+    <guid isPermaLink="true">https://infinitedevices.org/blog/make-your-first-beat-and-synth-bassline.html</guid>
+    <pubDate>Mon, 23 Nov 2026 09:00:00 +0000</pubDate>
+    <dc:creator>Naman Soni</dc:creator>
+    <category>creative</category>
+    <description>Build a drum groove, patch a warm synth bassline, add space with Reverb and Delay, and mix everything to your speakers in Infinite.</description>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_make-your-first-beat-and-synth-bassline.png" alt="Node patch diagram showing Drum Sequencer and Note Sequencer into Analog, combined in Mixer through Delay and Reverb to Audio Out" /></p>
+<p>If you want to make your first beat in Infinite without getting lost in menus, you only need a handful of nodes. In about ten minutes, you can build a drum groove, patch a warm synth bassline that locks to the same tempo, add depth with echo and room space, and balance the levels to your speakers.</p>
+<p>Infinite works like a tabletop of instruments and effects connected by cables. Notes flow from sequencers into synths, and audio flows from synths through effects into your speakers. Nothing is hidden behind nested mixer windows unless you want it to be.</p>
+<h2 id="1-hear-sound-first-with-audio-out">1. Hear sound first with Audio Out</h2>
+<p>Every audio patch ends at <strong>Audio Out</strong>. Add an <strong>Audio Out</strong> node to the canvas and place it on the right side so you have room to build from left to right. <strong>Audio Out</strong> has a single audio input pin and no output pin, because it sends sound straight to your audio interface or laptop speakers.</p>
+<p>One rule helps keep patches tidy: <strong>Audio Out</strong> accepts only one cable. Whenever you want to hear drums and a synth at the same time, you combine them in a <strong>Mixer</strong> node first and run a single cable from <strong>Mixer</strong> into <strong>Audio Out</strong>.</p>
+<h2 id="2-build-a-drum-groove-with-drum-sequencer">2. Build a drum groove with Drum Sequencer</h2>
+<p>Add a <strong>Drum Sequencer</strong> node on the left of the canvas and a <strong>Mixer</strong> node between it and <strong>Audio Out</strong>. Connect the output of <strong>Drum Sequencer</strong> to the first input of <strong>Mixer</strong>, then connect the output of <strong>Mixer</strong> to <strong>Audio Out</strong>.</p>
+<p>Press play on the transport bar at the top of the window. <strong>Drum Sequencer</strong> locks to the project tempo right away and gives you eight drum lanes above a 16-step grid. You have three quick ways to start a pattern:</p>
+<ul><li><strong>Click steps on the grid.</strong> Click any square to turn a hit on or off, drag vertically on a lit step to change how hard it hits, or drag across a row to paint a quick hi-hat run.</li><li><strong>Press Randomise.</strong> If you want an instant kick, snare, and hat pattern to react to, click the randomise button and tweak from there.</li><li><strong>Pick a built-in groove.</strong> Open the groove picker between the lane cards and the grid to browse 141 rhythms across ten styles. Choosing a groove loads the pattern, swing, and bundled kit samples in one step, and you can switch between its A, B, and C parts for verses, bridges, and choruses.</li></ul>
+<p>Each of the eight lanes has its own volume, pan, pitch, and decay controls. Try shortening the decay on your hi-hats for a tighter pocket, or nudging the swing slider up slightly to give the beat a relaxed bounce.</p>
+<h2 id="3-patch-a-synth-bassline-with-note-sequencer-and-analog">3. Patch a synth bassline with Note Sequencer and Analog</h2>
+<p>Now that the drums are moving, add a bassline underneath them. Drop a <strong>Note Sequencer</strong> node and an <strong>Analog</strong> synth node below your drums on the canvas.</p>
+<p>Connect the note output of <strong>Note Sequencer</strong> to the note input of <strong>Analog</strong>, then connect the audio output of <strong>Analog</strong> to the second input of <strong>Mixer</strong>.</p>
+<p>In <strong>Note Sequencer</strong>, each vertical bar is one step. Drag the tall upper section of a bar up or down to pick the note pitch, and click the thin strip underneath to turn that step on or off. For a simple, driving bassline, start with 8 or 16 steps and leave a few rests so the kick drum has room to breathe. You can adjust <strong>gate</strong> to make the notes short and plucky or long and sustained.</p>
+<p>Next, shape the sound on <strong>Analog</strong>:</p>
+<ul><li>Turn down the <strong>cutoff</strong> control on the filter until the sound feels round and warm rather than buzzy.</li><li>Bring up the <strong>sub</strong> oscillator to add weight an octave below the main pitch.</li><li>Keep <strong>attack</strong> fast so each bass note speaks cleanly on the beat, and adjust <strong>decay</strong> to control how quickly the note settles.</li></ul>
+<p>If you want to explore more synth textures later, the <a href="https://infinitedevices.org/musicians.html">musicians guide</a> walks through the other instruments and note tools built into Infinite.</p>
+<h2 id="4-add-space-with-delay-and-reverb">4. Add space with Delay and Reverb</h2>
+<p>Dry drums and dry bass can sound flat on their own. To give your loop width and depth, insert <strong>Delay</strong> and <strong>Reverb</strong> between <strong>Mixer</strong> and <strong>Audio Out</strong>, or patch <strong>Reverb</strong> after <strong>Analog</strong> if you want the bass and synth chords to sit in a room while the kick stays dry and centred.</p>
+<p>In <strong>Delay</strong>, tempo sync is on by default, so your echoes land in time with the beat. Set <strong>rate</strong> to a dotted eighth or quarter note, keep <strong>feedback</strong> moderate so the repeats fade cleanly, and turn on <strong>bounce</strong> if you want echoes to hop from left to right. Turning on the <strong>analog</strong> switch adds gentle tape warmth so each repeat softens slightly as it fades.</p>
+<p>In <strong>Reverb</strong>, start with a short <strong>size</strong> and <strong>decay</strong>, and keep <strong>mix</strong> low so the groove stays punchy. A little <strong>predelay</strong> leaves a tiny gap before the room tail blooms, which keeps drum hits crisp.</p>
+<h2 id="5-balance-your-mix-and-keep-building">5. Balance your mix and keep building</h2>
+<p>With both instruments playing through <strong>Mixer</strong>, use the per-slot <strong>gain</strong>, <strong>pan</strong>, <strong>mute</strong>, and <strong>solo</strong> controls to balance the drums against the bass. Press <code>Shift+L</code> at any time to open the Mixer panel for a full console view of your strips and master loudness meter.</p>
+<p>When you are happy with the loop, you can record a take straight from the Mixer panel or pair your beat with visuals on the same canvas. Our beginner guide on how to <a href="https://infinitedevices.org/blog/make-your-first-audio-reactive-visual.html">make your first audio-reactive visual</a> shows how to drive a shape from the music you just patched.</p>
+<p>Ready to try it yourself? <a href="https://infinitedevices.org/download.html">Download Infinite</a> for macOS, Windows, or Linux, or browse starter patches in the <a href="https://infinitedevices.org/library.html">preset library</a> to open a beat and take it apart at your own pace.</p>
+<hr />
+<p><em>Originally published at <a href="https://infinitedevices.org/blog/make-your-first-beat-and-synth-bassline.html">https://infinitedevices.org/blog/make-your-first-beat-and-synth-bassline.html</a>. Infinite is a free, open-source DAW for visuals, music and code: <a href="https://infinitedevices.org">infinitedevices.org</a>.</em></p>]]></content:encoded>
+  </item>
+  <item>
     <title>SuperFlux transient slicing and beat chopping in real-time DSP</title>
     <link>https://infinitedevices.org/blog/superflux-transient-slicing-and-beat-chopping-dsp.html</link>
     <guid isPermaLink="true">https://infinitedevices.org/blog/superflux-transient-slicing-and-beat-chopping-dsp.html</guid>
