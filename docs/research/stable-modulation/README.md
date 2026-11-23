@@ -592,4 +592,5 @@ and sign-off before work. This list is a choice of what to study, not an approva
 | — | Universal perceptual quality metric, real-time phase reconstruction | Crowded fields led by large labs; no Infinite edge | | No |
 | — | Differentiable integer delays, modulated-delay BPTT | Narrow; fits inside C3 if it ever runs | | No |
 | — | "Certified AI instrument sandbox" | Already the agent-collab gate plan (`docs/plans/agent-collab`); C1, C2 and the two current studies feed it | | Not separate |
+| C5 | **Natural vocal pitch correction** (added 2026-11-23 from the owner's external plan `natural_autotune_plan.md`): streamable F0 with a fry/confidence gate, a voiced / sibilant / silence gate, Dynamic Pitch Warping instead of a retune speed, formant-safe shifting (live TD-PSOLA + LPC, studio phase vocoder + true envelope) | No Infinite vocal tuner today; `SpectralFieldEngine` already exists for the studio path | Spectral-field study, the audio-node rules | **Queued**, after C1; needs sections 1-7 in the research template and sign-off |
 

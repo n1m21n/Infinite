@@ -4,6 +4,8 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-11-23 Agent (owner delegated "take whatever decision you want"): saturating-loops G1 verdict is "certified" when T1 or T3 proves it (both sound); svf-clip is proved by T1 only.
+- 2026-11-23 Owner: natural vocal pitch correction (`natural-autotune`) added to the study queue from an external plan; needs its own sections 1-7 and sign-off before any work.
 - 2026-11-23 Owner: queue a rigorous checker for stable-modulation's 4 paper filters (interval cover on A(θ) + exact rational re-check of P), to run after saturating-loops phase 0. Python only; reviewer-critique follow-up.
 - 2026-11-23 Owner: saturating-loops H2 is scored over the Moog port's full cutoff range (up to fs/8), not capped at the g = 0.524 crossover found in phase 0; the crossover is reported as a finding.
 - 2026-11-23 Owner: saturating-loops D3 amended: the Lur'e-Lyapunov term (T3) is the main G1 method, because sector-only (T1) provably can't certify ladders (phase 0). T1 stays as the baseline.

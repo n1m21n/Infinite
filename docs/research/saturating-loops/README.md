@@ -342,7 +342,7 @@ witness (bisection step 1/256 of the range) and the frozen limit:
 - **T3 misses svf-clip, which T1 and B4 prove.** Its C has one row on two states, so the rule added in
   phase 0 asks T3 for strict decay in |x| too (`x_strict`, section 8): ΔV ≤ −t|w|² alone does not give
   x → 0 when C is not injective. T1 survives because it gets strictness from the gain floor of a bounded
-  orbit, not from the form. **Proposed, needs owner sign-off:** score G1 as "certified" when T1 or T3 proves it, since both are sound.
+  orbit, not from the form. **Decided 2026-11-23 (owner delegated):** G1 is "certified" when T1 or T3 proves it, since both are sound; each verdict records which one.
 - **Ceilings sit close to the first witness** except on the diode (3.81 vs 9.38: common-P conservatism, as
   on the Moog at low cutoff) and the phaser (not multi-affine: corners are not exact, so it is grid-only
   and not counted).
@@ -384,3 +384,15 @@ Venv: `~/.venvs/stable-modulation`, reused unchanged; `scripts/requirements.txt`
 
 ## 12. Next steps
 *(After measurement.)*
+
+**Checkpoint 2026-11-23 (paused here; resume from this list).** Branch `feature/saturating-loops`, not
+pushed. Phase 0 is done (B2, B3, T1/T3/B4 on L, ceilings vs first witness). Main already carries Report 2's
+phase 6 as separate commits; merge `origin/main` into this branch before it lands (the phase 6 commit
+exists on both sides as a cherry-pick).
+
+| Step | What | Note |
+|---|---|---|
+| Phase 1 | Generator for G (Report 2's linear generator + 1-3 saturators from the shape library on loop paths, half frozen-stable without them), fixed seed; B1, B2, B4 on G; G1 verdict = T1 or T3 | Python only; reuse `lit.py` / `satloops.oracle` / `t3cert` |
+| H2 | Score over the Moog's full cutoff range as decided: T3 1.141-1.154 at g = 0.785 vs Hélie's 5/3, so H2 fails as registered; the 0.524 crossover is the finding | Write-up only |
+| T3 on non-injective C | svf-clip shows T3's `x_strict` rule is too strict; a detectability argument could replace it | Optional; T1 covers the case today |
+| Phase 2 | Extend `INFINITE_FIELDSTABDUMP` for saturating kernels | Needs the one build at plan end |
