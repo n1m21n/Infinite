@@ -2,6 +2,7 @@
 // on its own threads (core/term/TermSession.h); this file only draws the latest snapshot and queues input, so the
 // frame never waits on a shell. Open state, dock and height are app preferences; patches never touch the terminal.
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "app/panels/TerminalDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -784,7 +785,7 @@ namespace
          if (GlyphToggle::Draw("##chatface", IconsInfinite::Chat, IconsInfinite::Chat, false))
             gTerminalFace = 0, gChatSideTerminal = false;
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("Chat"));
+            Tip::Show("%s", T("Chat"));
       }
       if (closeIndex >= 0)
          CloseTab(closeIndex);

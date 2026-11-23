@@ -1,5 +1,6 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
 #include <algorithm>
+#include "app/ui/design/components/Tip.h"
 #include <cmath>
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/PinDot.h"
@@ -2755,7 +2756,7 @@ namespace app
       // The requested sample count is clamped by both the driver and a memory
       // budget, so say what actually happened when they disagree.
       if (n->ActiveSamples() != wantedAa && ImGui::IsItemHovered())
-         ImGui::SetTooltip("antialias reduced to %dx at this size", n->ActiveSamples());
+         Tip::Show("antialias reduced to %dx at this size", n->ActiveSamples());
       DropdownButton("tonemap", Render3DNode::TonemapNames(), n->tonemap,
                      [n](int i) { n->tonemap = i; }, colW);
       ModSlider("exposure", &n->exposure, 0.1f, 4.0f, "%.3f", colW);

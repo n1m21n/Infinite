@@ -2,6 +2,7 @@
 // CliSetup::Describe() says; reads only status.json, never terminal text, and spawns nothing itself:
 // the buttons hand one line to a new Terminal tab.
 #include "app/AppShared.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/Tokens.gen.h"
@@ -101,7 +102,7 @@ namespace app
          else
             ImGui::TextUnformatted(shown.c_str());
          if (shown != text && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", text.c_str());
+            Tip::Show("%s", text.c_str());
       };
       // The row's button, in the right column.
       auto button = [&](const char* label, bool primary)

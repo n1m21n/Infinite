@@ -1,5 +1,6 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
 #include "app/ui/design/components/PanelKit.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/DialogParts.h"
@@ -1114,7 +1115,7 @@ namespace app
             }
             // Only a failure explains itself on hover; the label says the rest.
             if (ImGui::IsItemHovered() && !gAudioStartError.empty() && !engineOn)
-               ImGui::SetTooltip("%s", gAudioStartError.c_str());
+               Tip::Show("%s", gAudioStartError.c_str());
             ImGui::SetCursorScreenPos(savedCursor);
 
             // Render, pinned just left of Start/Stop Audio - exports the
@@ -2655,9 +2656,9 @@ namespace app
             {
                ArrangeRowRef ref{true, groupId};
                ImGui::SetDragDropPayload("ARRANGE_ROW_REF", &ref, sizeof(ref));
-               ImGui::BeginTooltip();
+               Tip::Begin();
                ImGui::Text(T("Move Group: %s"), ArrangeGroupDisplayName(*grp).c_str());
-               ImGui::EndTooltip();
+               Tip::End();
                ImGui::EndDragDropSource();
             }
          }
@@ -2964,9 +2965,9 @@ namespace app
             {
                ArrangeRowRef ref{ false, laneId };
                ImGui::SetDragDropPayload("ARRANGE_ROW_REF", &ref, sizeof(ref));
-               ImGui::BeginTooltip();
+               Tip::Begin();
                ImGui::Text(T("Move Track: %s"), lane.name.c_str());
-               ImGui::EndTooltip();
+               Tip::End();
                ImGui::EndDragDropSource();
             }
          }
@@ -3015,9 +3016,9 @@ namespace app
                if (ImGui::IsItemActive())
                {
                   if (std::fabs(lane.pan) < 0.005f)
-                     ImGui::SetTooltip("%s", T("C"));
+                     Tip::Show("%s", T("C"));
                   else
-                     ImGui::SetTooltip("%s %d", lane.pan < 0.0f ? "L" : "R", (int)std::lround(std::fabs(lane.pan) * 100.0f));
+                     Tip::Show("%s %d", lane.pan < 0.0f ? "L" : "R", (int)std::lround(std::fabs(lane.pan) * 100.0f));
                }
                ImGui::SameLine(0.0f, kMixKnobGap);
                float gainDb = lane.gainDb;
@@ -3029,7 +3030,7 @@ namespace app
                }
                mixGesture(gainChanged, [&] { lane.gainDb = gainDb; });
                if (ImGui::IsItemActive())
-                  ImGui::SetTooltip("%s", UiFmt::Tr(UiFmt::DbOffset(lane.gainDb)).c);
+                  Tip::Show("%s", UiFmt::Tr(UiFmt::DbOffset(lane.gainDb)).c);
             }
             else
             {

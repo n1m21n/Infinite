@@ -1,5 +1,6 @@
 // Modulation matrix panel (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
@@ -460,7 +461,7 @@ namespace app
                }
                KindRail(dotCursor, dotH, dotColour);
                if (inert && ImGui::IsItemHovered())
-                  ImGui::SetTooltip("%s", T("A predictor drives continuous parameters only - this binding is inactive."));
+                  Tip::Show("%s", T("A predictor drives continuous parameters only - this binding is inactive."));
 
                const ImVec4 textColour = (src.enabled && !inert) ? ImGui::GetStyle().Colors[ImGuiCol_Text]
                                                      : ImGui::GetStyle().Colors[ImGuiCol_TextDisabled];

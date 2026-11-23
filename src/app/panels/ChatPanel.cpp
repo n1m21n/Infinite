@@ -5,6 +5,7 @@
 // Changed card diffed from the patch before and after. Files attach by the + button or a drop. Every chat
 // is saved and comes back from the history menu with its agent sessions.
 #include "app/AppShared.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/Tokens.gen.h"
@@ -1815,9 +1816,9 @@ namespace app
             ImGui::PopStyleColor();
             glyph::Draw(dl, ImVec2(rightC, cy), tok::icon_control, xHot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
             if (hot)
-               ImGui::SetTooltip("%s", T("Edit"));
+               Tip::Show("%s", T("Edit"));
             else if (xHot)
-               ImGui::SetTooltip("%s", T("Remove"));
+               Tip::Show("%s", T("Remove"));
          }
          ImGui::SetCursorScreenPos(ImVec2(at.x, t1.y));
          if (take >= 0)
@@ -2663,13 +2664,13 @@ namespace app
             dl->AddRectFilled(ImVec2(folderX, fc.y - folder * 0.5f), ImVec2(folderX + folder, fc.y + folder * 0.5f), TextTint(0.08f), tok::radius_control);
          glyph::Draw(dl, fc, tok::icon_control, folderHot ? text : Dim(), IconsInfinite::Folder);
          if (folderHot)
-            ImGui::SetTooltip("%s", T("Show in folder"));
+            Tip::Show("%s", T("Show in folder"));
          const ImVec2 sc(samplerX + folder * 0.5f, at.y + cardH * 0.5f);
          if (samplerHot)
             dl->AddRectFilled(ImVec2(samplerX, sc.y - folder * 0.5f), ImVec2(samplerX + folder, sc.y + folder * 0.5f), TextTint(0.08f), tok::radius_control);
          glyph::Draw(dl, sc, tok::icon_control, samplerHot ? text : Dim(), IconsInfinite::Waveform);
          if (samplerHot)
-            ImGui::SetTooltip("%s", T("Open in a Sampler"));
+            Tip::Show("%s", T("Open in a Sampler"));
          if (hot || folderHot || samplerHot)
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + cardH));
@@ -3020,7 +3021,7 @@ namespace app
          const bool hot = ImGui::IsItemHovered();
          const bool on = sCodeView.open && sCodeView.code == code;
          if (hot)
-            ImGui::SetTooltip("%s", on ? T("Close code") : T("Open code"));
+            Tip::Show("%s", on ? T("Close code") : T("Open code"));
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), TextTint(hot ? 0.10f : 0.06f), tok::radius_control);
          if (on)
@@ -5076,7 +5077,7 @@ namespace app
             if (hot)
             {
                dl->AddRectFilled(ImVec2(ac.x - sendW * 0.5f, ac.y - sendW * 0.5f), ImVec2(ac.x + sendW * 0.5f, ac.y + sendW * 0.5f), TextTint(0.10f), tok::radius_control);
-               ImGui::SetTooltip("%s", T("Attach files"));
+               Tip::Show("%s", T("Attach files"));
             }
             glyph::Draw(dl, ac, tok::icon_control, hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(0.70f), IconsInfinite::Plus);
          }
@@ -5092,7 +5093,7 @@ namespace app
             dl->AddRectFilled(tileMn, tileMx, TextTint(hot ? 0.16f : 0.10f), tok::radius_control);
             glyph::Draw(dl, sc, tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::StopFill);
             if (hot)
-               ImGui::SetTooltip("%s", T("Stop"));
+               Tip::Show("%s", T("Stop"));
             if (stop)
             {
                sQueueHold = true;
@@ -5114,7 +5115,7 @@ namespace app
                dl->AddRectFilled(tileMn, tileMx, ImGui::GetColorU32(hot ? AccentEmphasisHover() : AccentEmphasisSelected()), tok::radius_control);
             glyph::Draw(dl, sc, tok::icon_control, canSend ? tok::U32(tok::pal::c_FFFFFFFF) : TextTint(0.35f), IconsInfinite::Send);
             if (hot && canSend)
-               ImGui::SetTooltip("%s", T("Send"));
+               Tip::Show("%s", T("Send"));
             if (clicked && canSend)
             {
                Send();
@@ -5199,7 +5200,7 @@ namespace app
             if (hot)
                glyph::Draw(cd, ImVec2(p.x + rw - 12.0f, p.y + rh * 0.5f), tok::icon_control, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", T("Delete"));
+               Tip::Show("%s", T("Delete"));
             if (open && sRuns.empty())
                OpenThread(t.path);
             ImGui::PopID();
@@ -5238,12 +5239,12 @@ namespace app
             sCodeView.copiedAt = now;
          }
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", now - sCodeView.copiedAt < tok::motion_s_copied ? T("Copied") : T("Copy"));
+            Tip::Show("%s", now - sCodeView.copiedAt < tok::motion_s_copied ? T("Copied") : T("Copy"));
          FormParts::Inline(0.0f, 2.0f);
          if (GlyphToggle::Draw("##codeclose", IconsInfinite::Close, IconsInfinite::Close, false))
             sCodeView.open = false;
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("Close"));
+            Tip::Show("%s", T("Close"));
          dl->AddLine(ImVec2(at.x, at.y + rowH - 0.5f), ImVec2(at.x + width, at.y + rowH - 0.5f), TextTint(0.08f));
 
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH));
@@ -5302,7 +5303,7 @@ namespace app
                sHistory = chat::ListThreads(ChatsDir()), sHistoryLoaded = true;
          }
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("Chats"));
+            Tip::Show("%s", T("Chats"));
          const float titleX = ImGui::GetItemRectMax().x + tok::space_2;
          const float toolsX = at.x + width - tok::space_1 - 3.0f * glyph - 2.0f * gap;
          ImGui::SetCursorScreenPos(ImVec2(toolsX, glyphY));
@@ -5329,18 +5330,18 @@ namespace app
             dl->AddLine(tip, ImVec2(tip.x + sx * 4.0f, tip.y), col, 1.25f);
             dl->AddLine(tip, ImVec2(tip.x, tip.y + sy * 4.0f), col, 1.25f);
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", gTerminalFloating ? T("Dock") : T("Pop out"));
+               Tip::Show("%s", gTerminalFloating ? T("Dock") : T("Pop out"));
          }
          FormParts::Inline(0.0f, gap);
          if (GlyphToggle::Draw("##chatterminal", IconsInfinite::Terminal, IconsInfinite::Terminal, gChatSideTerminal))
             gChatSideTerminal = !gChatSideTerminal;  // opens beside the chat, like the side terminal in Claude
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("Terminal"));
+            Tip::Show("%s", T("Terminal"));
          FormParts::Inline(0.0f, gap);
          if (GlyphToggle::Draw("##chatnew", IconsInfinite::Plus, IconsInfinite::Plus, false) && sRuns.empty())
             NewChat();
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("New chat"));
+            Tip::Show("%s", T("New chat"));
          const float right = toolsX - tok::space_2;
          {
             Weight s(UiType::Weight::Medium);

@@ -1,6 +1,7 @@
 // Settings > "Infinite as VST3/AU" tab (docs/plans/vst-au/README.md 8.11, 3.6): install the plugin
 // bundles the app carries into the user's plugin folders. Approved 2026-11-07 (12.4).
 #include "app/AppShared.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/components/FormParts.h"
@@ -55,7 +56,7 @@ namespace app
          ImGui::AlignTextToFramePadding();
          ImGui::TextDisabled("%s", f.c_str());
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("Click to copy"));
+            Tip::Show("%s", T("Click to copy"));
          if (ImGui::IsItemClicked())
             ImGui::SetClipboardText(f.c_str());
          ImGui::PopID();

@@ -9,6 +9,7 @@
 //           (Lane, Step or Kit). Lanes are generic: the name is the loaded sample, "Empty" otherwise.
 // Drawn in the Mixer's language: FrameBg wells, one SliderGrab accent, ring/dot LEDs, no bevels.
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -835,7 +836,7 @@ namespace app
             {
                float& v = n->stepVel[sDrag.lane][sDrag.step];
                v = std::clamp(sDrag.startVel + (sDrag.startY - m.y) * 0.006f, 0.05f, 1.0f);
-               ImGui::SetTooltip("%s %.2f%s", T("velocity"), v, v >= 0.99f ? "  (accent)" : "");
+               Tip::Show("%s %.2f%s", T("velocity"), v, v >= 0.99f ? "  (accent)" : "");
             }
             else if (overCell && (sDrag.mode == Drag::PaintOn || sDrag.mode == Drag::PaintOff || sDrag.mode == Drag::Erase))
             {

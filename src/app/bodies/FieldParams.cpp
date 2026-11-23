@@ -1,5 +1,6 @@
 // Field node parameter bodies and scopes (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/AudioViz.h"
@@ -696,7 +697,7 @@ namespace app
          if (ModCheckbox("publish scalar output", &publish) && publish != n->publishScalarOutput)
          {
             if (!publish && FieldOutputPinHasLiveCable(gCurrentNodeIndex, 1))
-               ImGui::SetTooltip("%s", T("refused: publish output is still wired"));
+               Tip::Show("%s", T("refused: publish output is still wired"));
             else
                n->publishScalarOutput = publish;
          }

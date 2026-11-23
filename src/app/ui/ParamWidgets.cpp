@@ -1,5 +1,6 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/CheckBox.h"
@@ -72,12 +73,10 @@ namespace app
          va_end(args);
          return;
       }
-      if (ImGui::BeginTooltip())
+      if (Tip::Begin())
       {
-         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);   // one max width: about 24 em
-         ImGui::TextV(fmt, args);
-         ImGui::PopTextWrapPos();
-         ImGui::EndTooltip();
+         ImGui::TextV(fmt, args);   // Tip::Begin sets the one max width (tok::tip_wrap_em)
+         Tip::End();
       }
       va_end(args);
    }
@@ -562,9 +561,9 @@ namespace app
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_ForTooltip))
       {
          if (sGateNode == nodeIndex && !sGateLabel.empty())
-            ImGui::SetTooltip("%s %s", T("Off: set by"), sGateLabel.c_str());
+            Tip::Show("%s %s", T("Off: set by"), sGateLabel.c_str());
          else
-            ImGui::SetTooltip("%s", T("Off in this mode"));
+            Tip::Show("%s", T("Off in this mode"));
       }
    }
 

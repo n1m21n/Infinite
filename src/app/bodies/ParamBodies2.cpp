@@ -1,5 +1,6 @@
 // Generic node parameter bodies, part 2: curves, palettes, ramps, analyze (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/FormParts.h"
@@ -444,7 +445,7 @@ namespace app
       PushTextWrapWidth(kPreviewSize);
       ImGui::TextDisabled("%s", n->Status().c_str());
       if (ImGui::IsItemHovered())
-         ImGui::SetTooltip("engine: %s", Platform::MattingBackend().c_str());
+         Tip::Show("engine: %s", Platform::MattingBackend().c_str());
       PopTextWrapWidth();
 
       ModSlider("feather", &n->feather, 0.0f, 4.0f);

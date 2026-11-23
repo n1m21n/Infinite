@@ -1,5 +1,6 @@
 // Offline render windows, arrange clip settings and render queue (moved verbatim from main.cpp).
 #include <algorithm>
+#include "app/ui/design/components/Tip.h"
 #include <cctype>
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -850,7 +851,7 @@ namespace app
             RowLabel("Node");
             ImGui::TextUnformatted(NodeTitleWithInstance(*srcNode).c_str());
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", srcNode->typeName.c_str());
+               Tip::Show("%s", srcNode->typeName.c_str());
             // --- per-clip modulation bypass -----------------------------
             // Every modulation currently bound to this clip's source node,
             // each with a checkbox saying whether THIS clip wants it. The

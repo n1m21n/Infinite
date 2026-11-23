@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/components/Tip.h"
 #include <set>
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -692,7 +693,7 @@ void DrawPopupsB(FrameCtx& fc)
                }
                if (ImGui::IsItemHovered() && opt.desc != nullptr && opt.desc[0] != '\0')
                {
-                  ImGui::SetTooltip("%s", opt.desc);
+                  Tip::Show("%s", opt.desc);
                }
             }
          }

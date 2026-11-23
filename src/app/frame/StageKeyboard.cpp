@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/panels/FieldPatcherPanel.h"
@@ -1058,21 +1059,19 @@ void DrawKeyboard(FrameCtx& fc)
       // per-node draw loop where an ed::Suspend()'d tooltip is safe to draw.
       if (gGlobalScaleTooltipHovered)
       {
-         ImGui::BeginTooltip();
+         Tip::Begin();
          ImGui::TextUnformatted(gGlobalScaleTooltipEnabled ? "Global Scale: ON (click to disable)"
                                                             : "Global Scale: OFF (click to enable)");
-         ImGui::EndTooltip();
+         Tip::End();
       }
 
       // Deferred from the node draw loop (cook warning, live schema issue).
       if (!gNodeHoverTip.empty())
-         ImGui::SetTooltip("%s", gNodeHoverTip.c_str());
-      else if (!gNodeHelpTip.empty() && ImGui::BeginTooltip())
+         Tip::Show("%s", gNodeHoverTip.c_str());
+      else if (!gNodeHelpTip.empty() && Tip::Begin())
       {
-         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);   // same max width as HelpTip
-         ImGui::TextUnformatted(gNodeHelpTip.c_str());
-         ImGui::PopTextWrapPos();
-         ImGui::EndTooltip();
+         ImGui::TextUnformatted(gNodeHelpTip.c_str());   // Tip wraps at the one tip width, as HelpTip
+         Tip::End();
       }
 
       // Right-click (two-finger click on a Mac trackpad) opens the same

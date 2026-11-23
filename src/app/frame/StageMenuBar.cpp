@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/ReorderDrag.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/StatusDot.h"
@@ -840,7 +841,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (audioOn || !gAudioStartError.empty())
                StatusDot::OnLastItem(!audioOn ? StatusDot::State::Error : StatusDot::State::Ok);
             if (!audioOn && !gAudioStartError.empty() && ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", gAudioStartError.c_str());
+               Tip::Show("%s", gAudioStartError.c_str());
 
          }
          };
@@ -1326,7 +1327,7 @@ void DrawMenuBar(FrameCtx& fc)
                if (hov)
                {
                   const std::string& lv = UpdateCheck::LatestVersion();
-                  ImGui::SetTooltip(T("version %s is available (you have %s) - click to update, right-click to dismiss"),
+                  Tip::Show(T("version %s is available (you have %s) - click to update, right-click to dismiss"),
                                      lv.empty() ? "?" : lv.c_str(), INFINITE_VERSION_STRING);
                }
                if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
@@ -1349,7 +1350,7 @@ void DrawMenuBar(FrameCtx& fc)
                                   ImGui::GetFrameHeight()))
                   PluginView::RequestPopped(!popped);
                if (ImGui::IsItemHovered())
-                  ImGui::SetTooltip("%s", popped ? T("Back to the plugin") : T("Pop out"));
+                  Tip::Show("%s", popped ? T("Back to the plugin") : T("Pop out"));
                cursorX -= telemetryGap;
             }
             if (fits(tok::control_h))
@@ -1361,7 +1362,7 @@ void DrawMenuBar(FrameCtx& fc)
                                   ImGui::GetFrameHeight()))
                   PluginView::SetPicture(!picture);
                if (ImGui::IsItemHovered())
-                  ImGui::SetTooltip("%s", picture ? T("Canvas") : T("Picture"));
+                  Tip::Show("%s", picture ? T("Canvas") : T("Picture"));
                cursorX -= telemetryGap;
             }
             if (fits(tok::control_h))
@@ -1372,7 +1373,7 @@ void DrawMenuBar(FrameCtx& fc)
                                   ImGui::IsPopupOpen("##slotsmap"), tok::control_h, ImGui::GetFrameHeight()))
                   ImGui::OpenPopup("##slotsmap");
                if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("##slotsmap"))
-                  ImGui::SetTooltip("%s", T("Host slots"));
+                  Tip::Show("%s", T("Host slots"));
                if (MenuParts::BeginPopup("##slotsmap"))
                {
                   int shown = 0;
@@ -1402,7 +1403,7 @@ void DrawMenuBar(FrameCtx& fc)
                   TopBarPlaceAt(cursorX);
                   TabLabel("topbar.hostxruns", xr, "99999 xruns", true);
                   if (ImGui::IsItemHovered())
-                     ImGui::SetTooltip("%s", T("Late blocks the host played as silence"));
+                     Tip::Show("%s", T("Late blocks the host played as silence"));
                   cursorX -= telemetryGap;
                }
             }
@@ -1419,7 +1420,7 @@ void DrawMenuBar(FrameCtx& fc)
             TabLabel("topbar.cpu", cpuReadout, cpuWidest, true);
 
             if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
-               ImGui::SetTooltip(T("xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device"),
+               Tip::Show(T("xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device"),
                                  (unsigned long long)xruns,
                                  (unsigned long long)xrunParts.deadline,
                                  (unsigned long long)xrunParts.os);

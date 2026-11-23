@@ -1,5 +1,6 @@
 // Library / plugin / field search panels (moved verbatim from main.cpp).
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/components/Tip.h"
 #include <unordered_set>
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -328,7 +329,7 @@ namespace app
             browseDir = folder;
          MaybeStartFolderDrag(folder, mediaKind);
          if (row.hovered && !gSampleDragActive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
-            ImGui::SetTooltip("%s", folder.c_str());
+            Tip::Show("%s", folder.c_str());
          ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
          if (LibraryParts::IconButton("refreshfolder", LibraryParts::Icon::Refresh, !scanning))
             folderToScan = folder;
@@ -643,7 +644,7 @@ namespace app
              gPreviewErrorPath == entry.path &&
              ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
          {
-            ImGui::SetTooltip("%s", gPreviewErrorMessage.c_str());
+            Tip::Show("%s", gPreviewErrorMessage.c_str());
          }
 
 
@@ -1120,7 +1121,7 @@ namespace app
             gPluginDragDesc = entry;
          }
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(T("%s\n%s"), entry.format.c_str(), entry.identifier.c_str());
+            Tip::Show(T("%s\n%s"), entry.format.c_str(), entry.identifier.c_str());
 
 
          if (MenuParts::BeginContextItem("##plugin_ctx"))

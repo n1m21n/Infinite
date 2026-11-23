@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include <unordered_map>
+#include "app/ui/design/components/Tip.h"
 #include "app/frame/FrameCtx.h"
 #include "app/ui/design/Tokens.gen.h"
 
@@ -640,7 +641,7 @@ void DrawLinks(FrameCtx& fc)
                      // from the cursor by an amount that grows with zoom and
                      // pan (v3 §1a - same bug the knob tooltip had).
                      ed::Suspend();
-                     ImGui::SetTooltip("%s", rejectReason);
+                     Tip::Show("%s", rejectReason);
                      ed::Resume();
                   }
                }

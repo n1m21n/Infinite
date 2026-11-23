@@ -1,5 +1,6 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
 #include "app/ui/design/components/ColourChip.h"
+#include "app/ui/design/components/Tip.h"
 #include <cmath>
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/EmptyState.h"
@@ -755,7 +756,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(headerTL, headerBR))
       {
          if (gPerfRenamingElementIdx != (int)elemIdx && ImGui::CalcTextSize(displayLabel.c_str()).x > (cardSize.x - 12.0f))
-            ImGui::SetTooltip("%s", displayLabel.c_str());
+            Tip::Show("%s", displayLabel.c_str());
          if (gPerfEditMode && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          {
             gPerfRenamingElementIdx = (int)elemIdx;
@@ -1428,7 +1429,7 @@ namespace app
             dl->AddRectFilled(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR, cardBg, 3.0f);
             dl->AddText(tagTL, isLight ? tok::U32(tok::pal::c_BE6E1EFF) : tok::U32(tok::pal::c_F0AA46FF), tag);
             if (ImGui::IsMouseHoveringRect(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR))
-               ImGui::SetTooltip("%s", T("This node is bypassed - the control still stores its value, which applies when the node is back in the chain"));
+               Tip::Show("%s", T("This node is bypassed - the control still stores its value, which applies when the node is back in the chain"));
          }
       }
 
@@ -2052,7 +2053,7 @@ namespace app
          if (MenuParts::Item(L("Listening...")))
             MidiLearnCancelAll();
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", L("Click or press Esc to cancel"));
+            Tip::Show("%s", L("Click or press Esc to cancel"));
          return;
       }
       if (!ParamMidiLearnable(nodeIndex, paramIndex))
@@ -2061,7 +2062,7 @@ namespace app
          MenuParts::Item(L("MIDI learn"));
          ImGui::EndDisabled();
          if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("%s", L("Already driven by something else"));
+            Tip::Show("%s", L("Already driven by something else"));
          return;
       }
       const Modulation::Source cur = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);

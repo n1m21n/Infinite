@@ -1,5 +1,6 @@
 // Settings window (moved verbatim from main.cpp).
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/components/Tip.h"
 #include <algorithm>
 #include "app/graph/LearningLog.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -862,7 +863,7 @@ namespace app
                if (ImGui::IsItemHovered())
                {
                   const std::string path = AutosavePath();
-                  ImGui::SetTooltip(T("Could not write %s.\nCheck permissions and free disk space."),
+                  Tip::Show(T("Could not write %s.\nCheck permissions and free disk space."),
                                     path.empty() ? T("the settings directory") : path.c_str());
                }
             }
@@ -1599,7 +1600,7 @@ namespace app
                   }
                   if (ImGui::IsItemHovered())
                   {
-                     ImGui::SetTooltip(T("%s\nFormula: %s"), p.description.c_str(), p.expr.c_str());
+                     Tip::Show(T("%s\nFormula: %s"), p.description.c_str(), p.expr.c_str());
                   }
                }
                MenuParts::EndPopup();

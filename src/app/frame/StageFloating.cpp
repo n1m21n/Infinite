@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/frame/FrameCtx.h"
 #include "app/ui/design/components/DialogParts.h"
@@ -343,7 +344,7 @@ int DrawFloating(FrameCtx& fc)
                dl->AddText(ImVec2(p.x + w - stateW, p.y), stateCol, state);
                ImGui::Dummy(ImVec2(w, rowH));
                if (ImGui::IsItemHovered())
-                  ImGui::SetTooltip("%s", item.source.c_str());
+                  Tip::Show("%s", item.source.c_str());
             }
             LibraryParts::EndWell();
             ImGui::Dummy(ImVec2(0.0f, tok::space_1));

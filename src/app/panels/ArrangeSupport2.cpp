@@ -1,5 +1,6 @@
 // Arrange panel support: position formatting, typed edit, sliders, media import (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/UiFmt.h"
 
@@ -1209,11 +1210,11 @@ namespace app
    {
       if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          return;
-      ImGui::BeginTooltip();
+      Tip::Begin();
       ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
       ImGui::TextUnformatted(body);
       ImGui::PopTextWrapPos();
-      ImGui::EndTooltip();
+      Tip::End();
    }
 
 

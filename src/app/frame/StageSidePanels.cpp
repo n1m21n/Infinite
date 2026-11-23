@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/FloatingWindow.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/FormParts.h"
@@ -556,7 +557,7 @@ void DrawSidePanels(FrameCtx& fc)
                      spawnCategory = match.second;
                   }
                   if (row.hovered && rowLabel != DisplayName(match.first))
-                     ImGui::SetTooltip("%s", DisplayName(match.first).c_str());
+                     Tip::Show("%s", DisplayName(match.first).c_str());
                   if (MenuParts::BeginContextItem("##mod_ctx"))
                   {
                      if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
@@ -618,7 +619,7 @@ void DrawSidePanels(FrameCtx& fc)
                         spawnCategory = category;
                      }
                      if (row.hovered && rowLabel != DisplayName(name))
-                        ImGui::SetTooltip("%s", DisplayName(name).c_str());
+                        Tip::Show("%s", DisplayName(name).c_str());
                      if (MenuParts::BeginContextItem("##mod_cat_ctx"))
                      {
                         if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
@@ -919,7 +920,7 @@ void DrawSidePanels(FrameCtx& fc)
                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                   ShowSetGo(i);
                if (ImGui::IsItemHovered() && !ShowSetError(i).empty())
-                  ImGui::SetTooltip("%s", ShowSetError(i).c_str());
+                  Tip::Show("%s", ShowSetError(i).c_str());
             }
 
             // Every row of buttons spans the full width in equal cells with the same 4px gutter,

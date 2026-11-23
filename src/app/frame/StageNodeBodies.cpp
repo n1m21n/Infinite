@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include <unordered_map>
+#include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -1324,7 +1325,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   ModCheckbox(L("include audio"), &n->includeAudio);
                   ImGui::EndDisabled();
                   if (n->IsRecording() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                     ImGui::SetTooltip("%s", T("locked for the current take"));
+                     Tip::Show("%s", T("locked for the current take"));
                   if (n->includeAudio && n->AudioInput().IsConnected())
                   {
                      INode* src = n->AudioInput().GetSource();

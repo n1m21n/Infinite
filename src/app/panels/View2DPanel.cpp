@@ -3,6 +3,7 @@
 // layers; the nodes themselves are only read, so a layer keeps animating under
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "app/AppCommon.h"
+#include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "core/Notices.h"
 #include "app/frame/CanvasLink.h"
@@ -1370,7 +1371,7 @@ namespace
       // A click on a driven field jumps to its node.
       if (sModNext.driven && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
       {
-         ImGui::SetTooltip("%s", T("Driven on canvas"));
+         Tip::Show("%s", T("Driven on canvas"));
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             if (const int ni = DocNodeIndex(); ni >= 0)
             {
@@ -10391,7 +10392,7 @@ namespace
                }
             }
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", T("Layer mask: click to paint it, Shift-click to turn it off"));
+               Tip::Show("%s", T("Layer mask: click to paint it, Shift-click to turn it off"));
             // The mask thumbnail has its own menu: only what acts on the mask.
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                ImGui::OpenPopup("##maskmenu");
@@ -10483,7 +10484,7 @@ namespace
                else
                   ReorderDrag::Bar(ImVec2(p.x + 2.0f, below ? p.y + rowH : p.y), ImVec2(p.x + w - 2.0f, below ? p.y + rowH : p.y));
                if (clipDrop)
-                  ImGui::SetTooltip(T("Clip to %s"), LayerName(*l).c_str());
+                  Tip::Show(T("Clip to %s"), LayerName(*l).c_str());
             }
             if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2D_LAYER", ImGuiDragDropFlags_AcceptNoDrawDefaultRect))
             {
