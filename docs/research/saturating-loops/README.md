@@ -265,6 +265,9 @@ form is convex in g and linear in k, so the cell's corners are exact: no Lipschi
 
 - **Hélie's 5/3 is certified for cutoff ceilings up to g = 0.524.** Above it the explicit filter's own
   limit falls below 5/3.
+- **H2 scoring range (owner, 2026-11-23, decided after these numbers were seen):** H2 is scored over the
+  port's full declared cutoff range, g up to 0.785 (fs/8). On this phase-0 run that is 1.154 < 5/3, so H2
+  is expected to fail as registered; the 0.524 crossover is reported as a finding, not used to pass H2.
 - **The certificate is Hélie-like.** P comes out ≈ 0 (min eigenvalue < 1e-8) and every qᵢ > 0, so V is
   essentially 2Σ qᵢ ln cosh(yᵢ). It grows without bound, so the proof is global.
 - **Soundness checks at every certified k:** 200 random-switching runs of the real nonlinear filter from
