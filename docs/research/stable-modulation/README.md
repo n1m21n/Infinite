@@ -533,7 +533,7 @@ binary; nothing was rebuilt.
 | Follow-up (H4 redo, needs its own sign-off) | Rate-aware slew: limit dk relative to the filter's own decay (for example Δk ≤ c · g per sample), or V(x, g, k) with g slew-limited too | Phase 3 shows the fixed 20 ms slew can't help while the cutoff can reach 0 |
 | Product question, not research | Field's 128-register cap blocks dense n ≥ 5 filters | Phase 2 finding |
 | Next held-out set | Score Infinite's shipped Field presets with `state` cells, and community kernels | Real filters, not generated ones (section 11) |
-| Rigorous cover | Replace the 1.5x heuristic margin with an interval bound on A(θ) per cell | Turns "verified on a cover" into a proof |
+| Rigorous cover (**queued 2026-11-23, after C1 phase 0**) | For the 4 paper filters: an interval bound on A(θ) per cell in place of the 1.5x heuristic margin, plus an exact rational check (P rounded to rationals, exact Cholesky of P − AᵀPA at each cell bound). Python only | Turns the [2.8848, 2.8856) bracket from "verified on a cover" into a computer-assisted proof; also closes the one-sided-oracle objection for those certificates |
 | In-app port (H5) | C++ LMI solver, report-only pass in the Field compiler | A new feature: needs owner approval first |
 
 **Candidate studies (from the owner's DSP research map, 2026-11-23).** Each needs its own sections 1-7

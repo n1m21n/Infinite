@@ -1,0 +1,706 @@
+{
+ "moog-tanh": {
+  "name": "moog-tanh",
+  "shapes": [
+   "tanh",
+   "tanh",
+   "tanh",
+   "tanh",
+   "tanh"
+  ],
+  "box": [
+   [
+    0.0001,
+    0.0
+   ],
+   [
+    0.785,
+    4.0
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 1.2713083811569876,
+  "frozen_check": "unsafe",
+  "B4_linear": "no proof",
+  "T1": "no proof",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.03668240131092871)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": [
+    1,
+    2,
+    3,
+    4
+   ]
+  },
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.717193162000312,
+     4.0
+    ],
+    [
+     0.785,
+     4.0
+    ]
+   ],
+   "repeats": 6,
+   "residual": 9.30536459832363e-16,
+   "amplitude": 1.3950508464944322,
+   "x": [
+    4.5512230401283963e-26,
+    -1.0423435931229592,
+    -0.7841487316448942,
+    -0.49477011312331176
+   ]
+  },
+  "T3_ceiling": {
+   "axis": 1,
+   "value": 1.140625
+  },
+  "seconds": 51.0,
+  "ceiling_check": {
+   "oracle_at_T3_ceiling": null,
+   "frozen_limit": 1.28125,
+   "first_witness_at": 1.2969970703125,
+   "first_witness_kind": "sticks"
+  }
+ },
+ "moog-soft": {
+  "name": "moog-soft",
+  "shapes": [
+   "soft",
+   "soft",
+   "soft",
+   "soft",
+   "soft"
+  ],
+  "box": [
+   [
+    0.0001,
+    0.0
+   ],
+   [
+    0.785,
+    4.0
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 1.2713083811569876,
+  "frozen_check": "unsafe",
+  "B4_linear": "no proof",
+  "T1": "no proof",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.03668240131092871)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": [
+    1,
+    2,
+    3,
+    4
+   ]
+  },
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.785,
+     2.3774054862805425
+    ],
+    [
+     0.785,
+     4.0
+    ]
+   ],
+   "repeats": 7,
+   "residual": 2.2887833992611187e-16,
+   "amplitude": 0.8397006271244243,
+   "x": [
+    -1.1047054151856764e-25,
+    -0.6347490717312413,
+    -0.4779351163511251,
+    -0.27160409365087884
+   ]
+  },
+  "T3_ceiling": {
+   "axis": 1,
+   "value": 1.140625
+  },
+  "seconds": 48.8,
+  "ceiling_check": {
+   "oracle_at_T3_ceiling": null,
+   "frozen_limit": 1.28125,
+   "first_witness_at": 1.2969970703125,
+   "first_witness_kind": "sticks"
+  }
+ },
+ "moog-fbsat": {
+  "name": "moog-fbsat",
+  "shapes": [
+   "tanh"
+  ],
+  "box": [
+   [
+    0.0001,
+    0.0
+   ],
+   [
+    0.785,
+    4.0
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 1.2713083811569876,
+  "frozen_check": "unsafe",
+  "B4_linear": "no proof",
+  "T1": "no proof",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.03608187173588013)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": []
+  },
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.7289635261251702,
+     4.0
+    ],
+    [
+     0.785,
+     4.0
+    ]
+   ],
+   "repeats": 5,
+   "residual": 6.036438800836626e-16,
+   "amplitude": 1.4271167015536996,
+   "x": [
+    9.878414946087767e-24,
+    0.9684649874088826,
+    0.8891192378140849,
+    0.5551618043107118
+   ]
+  },
+  "T3_ceiling": {
+   "axis": 1,
+   "value": 1.25
+  },
+  "seconds": 3.6,
+  "ceiling_check": {
+   "oracle_at_T3_ceiling": null,
+   "frozen_limit": 1.28125,
+   "first_witness_at": 1.29296875,
+   "first_witness_kind": "sticks"
+  }
+ },
+ "diode-fbsat": {
+  "name": "diode-fbsat",
+  "shapes": [
+   "tanh"
+  ],
+  "box": [
+   [
+    0.0001,
+    0.0
+   ],
+   [
+    0.4,
+    16.0
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 1.0838383430394485,
+  "frozen_check": "unsafe",
+  "B4_linear": "no proof",
+  "T1": "no proof",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0034684229574573687)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": []
+  },
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.4,
+     11.921077916801863
+    ],
+    [
+     0.4,
+     16.0
+    ]
+   ],
+   "repeats": 25,
+   "residual": 8.59171451493781e-11,
+   "amplitude": 0.24897436469691608,
+   "x": [
+    3.9393622092695784e-22,
+    -0.1983538470407831,
+    -0.13789973539233094,
+    -0.0602299644618831
+   ]
+  },
+  "T3_ceiling": {
+   "axis": 1,
+   "value": 3.8125
+  },
+  "seconds": 3.7,
+  "ceiling_check": {
+   "oracle_at_T3_ceiling": null,
+   "frozen_limit": 9.34375,
+   "first_witness_at": 9.382568359375,
+   "first_witness_kind": "sticks"
+  }
+ },
+ "korg35-sat": {
+  "name": "korg35-sat",
+  "shapes": [
+   "tanh"
+  ],
+  "box": [
+   [
+    0.0001,
+    0.0
+   ],
+   [
+    0.5,
+    2.5
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 1.224744871391589,
+  "frozen_check": "unsafe",
+  "B4_linear": "no proof",
+  "T1": "no proof",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.060362664268365666)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": []
+  },
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.5,
+     2.5
+    ],
+    [
+     0.5,
+     2.5
+    ],
+    [
+     0.5,
+     2.5
+    ],
+    [
+     0.27946074617732114,
+     0.0
+    ],
+    [
+     0.5,
+     2.5
+    ],
+    [
+     0.5,
+     2.5
+    ]
+   ],
+   "repeats": 2,
+   "residual": 1.5700924534652638e-16,
+   "amplitude": 0.44510422783631437,
+   "x": [
+    7.380089519681874e-25,
+    0.44510422783631437
+   ]
+  },
+  "T3_ceiling": {
+   "axis": 1,
+   "value": 1.455078125
+  },
+  "seconds": 3.2,
+  "ceiling_check": {
+   "oracle_at_T3_ceiling": null,
+   "frozen_limit": 1.4990234375,
+   "first_witness_at": 1.504058837890625,
+   "first_witness_kind": "sticks"
+  }
+ },
+ "onepole-tanh": {
+  "name": "onepole-tanh",
+  "shapes": [
+   "tanh"
+  ],
+  "box": [
+   [
+    0.0001,
+    0.0
+   ],
+   [
+    1.0,
+    0.0
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 0.9999,
+  "frozen_check": "safe",
+  "B4_linear": "certified",
+  "T1": "certified",
+  "T3": {
+   "status": "certified",
+   "reason": "",
+   "t": 1.0000000000277465,
+   "worst": 1.1030388021845762e-10,
+   "ncells": 24,
+   "x_strict": false,
+   "P_min_eig": 2.4692655659013705e-05,
+   "q": [
+    0.9999753073443407
+   ],
+   "I": [
+    0
+   ]
+  },
+  "witness": null,
+  "seconds": 3.5
+ },
+ "tdf2-statesat": {
+  "name": "tdf2-statesat",
+  "shapes": [
+   "tanh",
+   "tanh"
+  ],
+  "box": [
+   [
+    -1.85,
+    0.9
+   ],
+   [
+    0.0,
+    0.98
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 0.9899494936611667,
+  "frozen_check": "safe",
+  "B4_linear": "no proof",
+  "T1": "no proof",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.41598501578649516)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": [
+    0,
+    1
+   ]
+  },
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     -1.85,
+     0.98
+    ],
+    [
+     0.0,
+     0.98
+    ],
+    [
+     -1.85,
+     0.9
+    ],
+    [
+     -1.85,
+     0.98
+    ],
+    [
+     0.0,
+     0.98
+    ],
+    [
+     -1.85,
+     0.9
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 1.919039307861744,
+   "x": [
+    1.8350795044678339,
+    -0.5614223698790166
+   ]
+  },
+  "seconds": 1.8
+ },
+ "tdf2-outsat": {
+  "name": "tdf2-outsat",
+  "shapes": [
+   "tanh"
+  ],
+  "box": [
+   [
+    -1.85,
+    0.9
+   ],
+   [
+    0.0,
+    0.98
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 0.9899494936611667,
+  "frozen_check": "safe",
+  "B4_linear": "no proof",
+  "T1": "no proof",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.24004972697441548)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": [
+    0
+   ]
+  },
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     -1.85,
+     0.98
+    ],
+    [
+     0.0,
+     0.98
+    ],
+    [
+     -1.85,
+     0.9
+    ],
+    [
+     -1.85,
+     0.98
+    ],
+    [
+     0.0,
+     0.98
+    ],
+    [
+     -1.85,
+     0.9
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 2.269318283803128,
+   "x": [
+    2.168859991420881,
+    -0.6677213571670373
+   ]
+  },
+  "seconds": 1.2
+ },
+ "rossum-2pole": {
+  "name": "rossum-2pole",
+  "shapes": [
+   "tanh"
+  ],
+  "box": [
+   [
+    -1.85,
+    0.9
+   ],
+   [
+    0.0,
+    0.98
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 0.9899494936611667,
+  "frozen_check": "safe",
+  "B4_linear": "no proof",
+  "T1": "no proof",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.24426582569866828)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": []
+  },
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     0.98
+    ],
+    [
+     -1.85,
+     0.98
+    ],
+    [
+     -0.7215740504482034,
+     0.9
+    ]
+   ],
+   "repeats": 2,
+   "residual": 1.5700924578626738e-16,
+   "amplitude": 0.8521440477443794,
+   "x": [
+    -1.1612124656827935e-25,
+    -0.8521440477443794
+   ]
+  },
+  "seconds": 0.9
+ },
+ "svf-clip": {
+  "name": "svf-clip",
+  "shapes": [
+   "clamp"
+  ],
+  "box": [
+   [
+    0.01,
+    0.5
+   ],
+   [
+    0.5,
+    1.5
+   ]
+  ],
+  "multi_affine": true,
+  "frozen_max_radius": 0.997496867163,
+  "frozen_check": "safe",
+  "B4_linear": "certified",
+  "T1": "certified",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-4.41041936873468e-09)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": []
+  },
+  "witness": null,
+  "seconds": 1.0
+ },
+ "phaser-clip": {
+  "name": "phaser-clip",
+  "shapes": [
+   "clamp"
+  ],
+  "box": [
+   [
+    -0.9,
+    0.0
+   ],
+   [
+    0.9,
+    0.95
+   ]
+  ],
+  "multi_affine": false,
+  "frozen_max_radius": 0.9993340838930547,
+  "frozen_check": "safe",
+  "B4_linear": "not run (not multi-affine)",
+  "T1": "not run (not multi-affine)",
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.05612418874661263)",
+   "t": null,
+   "worst": null,
+   "ncells": null,
+   "x_strict": null,
+   "P_min_eig": null,
+   "q": null,
+   "I": []
+  },
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     -0.30000000000000004,
+     0.95
+    ],
+    [
+     -0.9,
+     0.0
+    ],
+    [
+     -0.30000000000000004,
+     0.95
+    ],
+    [
+     -0.9,
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 2.300467152993038,
+   "x": [
+    -0.6448818897637795,
+    0.5021390042780086,
+    -0.30404221280883514,
+    0.07242895693553814,
+    2.12754442248918
+   ]
+  },
+  "T3_ceiling": {
+   "axis": 1,
+   "value": 0.43417968749999997
+  },
+  "seconds": 21.0,
+  "ceiling_check": {
+   "oracle_at_T3_ceiling": null,
+   "frozen_limit": 0.94814453125,
+   "first_witness_at": 0.5067169189453125,
+   "first_witness_kind": "sticks"
+  }
+ }
+}

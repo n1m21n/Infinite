@@ -296,6 +296,62 @@ samples from 0.01 and N from 5 multiples missed witnesses by up to 0.32 in k; se
 - The open gap (2.652 vs 3.632 at low cutoff) is the same common-P conservatism as Report 2's linear Moog
   (2.737 there); T3 loses little on top of it.
 
+**Phase 0, L and B2** (`scripts/lit.py`, `scripts/phase0_L.py`, `scripts/phase0_L_ceil.py`,
+`data/phase0-L.json`, about 8 min). Eleven filters from published equations, zero input, each with its
+declared knob box. B4 = Report 2's vertex certificate with every saturator replaced by the identity; T1 =
+sector vertices; T3 = Lur'e-Lyapunov, the main G1 method. The oracle is the general form of B3's:
+Report 2's linear witness search on the small-signal matrix plus the box corners, 0.3, 30 and 200 random
+starts (amplitude 1e-2 to 1e2) run for 2¹⁶ samples, then a Newton orbit (locked when it rotates).
+
+| Filter | Saturators | Box | Frozen check | B4 | T1 | T3 | Witness |
+|---|---|---|---|---|---|---|---|
+| moog-tanh | tanh × 5 | g ≤ 0.785, k ≤ 4 | unsafe | no proof | no proof | no proof | sticks |
+| moog-soft | soft × 5 | same | unsafe | no proof | no proof | no proof | sticks |
+| moog-fbsat | tanh on feedback | same | unsafe | no proof | no proof | no proof | sticks |
+| diode-fbsat | tanh on feedback | g ≤ 0.4, k ≤ 16 | unsafe | no proof | no proof | no proof | sticks |
+| korg35-sat | tanh on feedback | g ≤ 0.5, k ≤ 2.5 | unsafe | no proof | no proof | no proof | sticks |
+| onepole-tanh | tanh × 1 | g ≤ 1 | safe | certified | certified | certified | none |
+| tdf2-statesat (after Chowdhury) | tanh × 2 | a1 ∈ [−1.85, 0], a2 ∈ [0.9, 0.98] | safe | no proof | no proof | no proof | sticks |
+| tdf2-outsat | tanh × 1 | same | safe | no proof | no proof | no proof | sticks |
+| rossum-2pole | tanh × 1 | same | safe | no proof | no proof | no proof | sticks |
+| svf-clip (Chamberlin) | clamp on bp | f ∈ [0.01, 0.5], q ∈ [0.5, 1.5] | safe | certified | certified | no proof | none |
+| phaser-clip | clamp on feedback | a ∈ [−0.9, 0.9], fb ≤ 0.95 | safe | not run | not run | no proof | sticks |
+
+**B2 on L:** 9 with a witness (9 sticks, 0 grows), 2 without. Every witness was re-run for 2000 periods
+and did not decay.
+
+**Largest certified resonance ceiling** (the other knobs at their box top), against the oracle's first
+witness (bisection step 1/256 of the range) and the frozen limit:
+
+| Filter | Knob | T3 certified | Oracle at T3 ceiling | First witness ≤ | Frozen limit |
+|---|---|---|---|---|---|
+| moog-tanh | k | 1.141 | none | 1.297 | 1.281 |
+| moog-soft | k | 1.141 | none | 1.297 | 1.281 |
+| moog-fbsat | k | 1.250 | none | 1.293 | 1.281 |
+| diode-fbsat | k | 3.813 | none | 9.383 | 9.344 |
+| korg35-sat | k | 1.455 | none | 1.504 | 1.499 |
+| phaser-clip | fb | 0.434 (grid only) | none | 0.507 | 0.948 |
+
+- **H1 holds on L:** no certificate (B4, T1 or T3, at the full box or at a ceiling) on a kernel or box with
+  a witness.
+- **B1, the frozen check, is false-safe on 4 of 4** frozen-safe filters that have a witness: both TDF-II
+  biquads, the Rossum 2-pole and the phaser all stick under switching at knob values that are each stable
+  when frozen. That is the whole case for the study.
+- **B4 is never wrong on L and never beaten.** Linearise-and-hope certified exactly the two filters with no
+  witness. Whether the saturator-aware pass is *needed* is decided on G, not here.
+- **T3 misses svf-clip, which T1 and B4 prove.** Its C has one row on two states, so the rule added in
+  phase 0 asks T3 for strict decay in |x| too (`x_strict`, section 8): ΔV ≤ −t|w|² alone does not give
+  x → 0 when C is not injective. T1 survives because it gets strictness from the gain floor of a bounded
+  orbit, not from the form. **Proposed, needs owner sign-off:** score G1 as "certified" when T1 or T3 proves it, since both are sound.
+- **Ceilings sit close to the first witness** except on the diode (3.81 vs 9.38: common-P conservatism, as
+  on the Moog at low cutoff) and the phaser (not multi-affine: corners are not exact, so it is grid-only
+  and not counted).
+- *Rig bug found and fixed:* the first pass reported a stuck orbit inside moog-tanh's certified box. It
+  was float64 absorption: Newton walked to a state of size 2.7e12, where the per-sample increments
+  (about 1e-4) round away, so the state looked fixed. A sticks witness now also needs amplitude ≤ 1e6 and,
+  at every step, fl(x⁺) − x equal to the true increment to 1e-6 relative (`genuine` in `satloops.py`).
+  After the fix: no witness at any certified ceiling, and all 9 real witnesses still pass.
+
 **Phases.**
 
 | Phase | Work | Needs a build |

@@ -14,7 +14,9 @@ S-procedure, multipliers lambda >= 0 common over the knob box:
     (s = sign c), i.e. (w_i - s w_j)(|c| s w_j - w_i) >= 0, linear in c.
 Certificate: D(theta) + sum lambda Q(theta) + t s(theta) E_w'E_w <= 0 at every box corner, t > 0,
 s(theta) = ||B(theta)||_2 (the decrease per sample scales with the loop gain, e.g. with g for a ladder),
-so Delta V <= -t s |w|^2. The form has exact null directions (w = v = 0 and x+ = x), so the float64
+so Delta V <= -t s |w|^2. That implies x -> 0 only if w -> 0 forces x -> 0: every C(theta) has full
+column rank and every shape has phi(y) = 0 only at y = 0 (tanh, soft clip, clamp, abs; not sin). For
+any other kernel the strict term also includes t s |x|^2 (`x_strict`). The form has exact null directions (w = v = 0 and x+ = x), so the float64
 re-check accepts lambda_max <= TOL * ||F|| (TOL = 1e-9), recorded with every certificate. If the saturator arguments determine x (C has full column rank), V decreasing,
 bounded below and radially unbounded gives sum |w_k|^2 < inf, so w -> 0, y -> 0 and x -> 0 under any
 knob sequence.
@@ -110,6 +112,17 @@ def cells_of(lo, hi, cells, log_axes):
         edges.append(list(zip(e[:-1], e[1:])))
     return [(tuple(x[0] for x in cell), tuple(x[1] for x in cell)) for cell in itertools.product(*edges)]
 
+ZERO_ONLY_AT_0 = {"tanh", "soft", "clamp", "abs"}
+
+def needs_x_strict(sys_, lo, hi):
+    if not set(sys_.shapes) <= ZERO_ONLY_AT_0:
+        return True
+    for th in itertools.product(*zip(lo, hi)):
+        C = sys_.ABC(*th)[2]
+        if np.linalg.matrix_rank(C) < C.shape[1]:
+            return True
+    return False
+
 def certify_t3(sys_, lo, hi, I=None, cells=None, log_axes=(0,)):
     th0 = tuple(lo)
     A, B, C = sys_.ABC(*th0)
@@ -123,6 +136,7 @@ def certify_t3(sys_, lo, hi, I=None, cells=None, log_axes=(0,)):
     t = cp.Variable()
     rp = ratio_pairs(sys_, list(itertools.product(*zip(lo, hi))))
     ncross = len(cross_terms(sys_, *[build(sys_, th0, I, n, m)[k] for k in (1, 4, 2, 5)], I, C, rp))
+    xs = needs_x_strict(sys_, lo, hi)
     cons = [P >> 0, cp.trace(P) + cp.sum(q) == 1]
     cell_list = cells_of(lo, hi, cells, log_axes)
     mults = []
@@ -153,7 +167,7 @@ def certify_t3(sys_, lo, hi, I=None, cells=None, log_axes=(0,)):
         Cth = sys_.ABC(*th)[2]
         for c, Qc in enumerate(cross_terms(sys_, Ew, Y, Ev, Yp, I, Cth, rp)):
             F = F + lam_c[c] * Qc
-        F = F + t * np.linalg.norm(B_of(sys_, th), 2) * (Ew.T @ Ew)
+        F = F + t * np.linalg.norm(B_of(sys_, th), 2) * (Ew.T @ Ew + (Ex.T @ Ex if xs else 0))
         F = (F + F.T) / 2
         cons.append(F << 0)
     prob = cp.Problem(cp.Maximize(t), cons)
@@ -163,14 +177,14 @@ def certify_t3(sys_, lo, hi, I=None, cells=None, log_axes=(0,)):
         return {"status": "no proof", "reason": "solver error", "I": I}
     if t.value is None or t.value <= 1e-9:
         return {"status": "no proof", "reason": f"LMI infeasible (t={t.value})", "I": I}
-    cert = {"P": P.value, "q": q.value, "t": float(t.value), "I": I, "rp": rp,
+    cert = {"P": P.value, "q": q.value, "t": float(t.value), "I": I, "rp": rp, "x_strict": xs,
             "cells": [(clo, chi, {k: v.value for k, v in mu_.items()}) for (clo, chi), mu_ in zip(cell_list, mults)]}
     worst = max(check(sys_, cert, list(itertools.product(*zip(clo, chi))), cm) for clo, chi, cm in cert["cells"])
     ok = worst <= TOL
     ev = np.linalg.eigvalsh((cert["P"] + cert["P"].T) / 2)
     return {"status": "certified" if ok else "no proof",
             "reason": "" if ok else f"float64 re-check failed ({worst:.3g})",
-            "t": cert["t"], "worst": worst, "ncells": len(cell_list), "P_min_eig": float(ev[0]), "q": cert["q"].tolist(), "I": I,
+            "t": cert["t"], "worst": worst, "ncells": len(cell_list), "x_strict": xs, "P_min_eig": float(ev[0]), "q": cert["q"].tolist(), "I": I,
             "cert": cert}
 
 def check(sys_, cert, thetas, cm):
@@ -198,7 +212,7 @@ def check(sys_, cert, thetas, cm):
             F += cm["s"][j] * _sym(dw - s0 * dy, s1 * dy - dw)
         for c, Qc in enumerate(cross_terms(sys_, Ew, Y, Ev, Yp, I, C, cert["rp"])):
             F += cm["c"][c] * Qc
-        F += cert["t"] / 2 * np.linalg.norm(B, 2) * (Ew.T @ Ew)
+        F += cert["t"] / 2 * np.linalg.norm(B, 2) * (Ew.T @ Ew + (Ex.T @ Ex if cert.get("x_strict") else 0))
         ev = np.linalg.eigvalsh((F + F.T) / 2)
         worst = max(worst, float(ev[-1]) / max(1.0, float(np.abs(ev).max())))
     return worst
