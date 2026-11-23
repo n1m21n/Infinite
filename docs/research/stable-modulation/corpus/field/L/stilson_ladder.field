@@ -1,0 +1,21 @@
+# L set: stilson_ladder, textbook form
+param float p = 0.3 [0, 1]
+param float k = 1 [0, 4]
+state float l1 = 0
+state float l2 = 0
+state float l3 = 0
+state float l4 = 0
+u = in - k*l4
+n1 = l1 + p*(u - l1)
+n2 = l2 + p*(n1 - l2)
+n3 = l3 + p*(n2 - l3)
+n4 = l4 + p*(n3 - l4)
+nx_l1 = n1
+nx_l2 = n2
+nx_l3 = n3
+nx_l4 = n4
+l1 = nx_l1
+l2 = nx_l2
+l3 = nx_l3
+l4 = nx_l4
+out = l1

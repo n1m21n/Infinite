@@ -1,0 +1,18 @@
+# L set: tpt_svf, textbook form
+param float fc = 1000 [20, 20000]
+param float R = 0.5 [0.01, 2]
+state float c1 = 0
+state float c2 = 0
+gg = tan(3.14159265358979*fc/sr)
+kk = 2*R
+a1 = 1/(1 + gg*(gg + kk))
+a2 = gg*a1
+a3 = gg*a2
+v3 = in - c2
+v1 = a1*c1 + a2*v3
+v2 = c2 + a2*c1 + a3*v3
+nx_c1 = 2*v1 - c1
+nx_c2 = 2*v2 - c2
+c1 = nx_c1
+c2 = nx_c2
+out = c1

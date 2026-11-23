@@ -1,0 +1,26 @@
+# L set: phaser4, textbook form
+param float fc = 1000 [20, 20000]
+param float fb = 0.5 [0, 0.95]
+state float s1 = 0
+state float s2 = 0
+state float s3 = 0
+state float s4 = 0
+state float yo = 0
+tt = tan(3.14159265358979*fc/sr)
+a = (tt - 1)/(tt + 1)
+u1 = in + fb*yo
+y1 = a*u1 + s1
+y2 = a*y1 + s2
+y3 = a*y2 + s3
+y4 = a*y3 + s4
+nx_s1 = u1 - a*y1
+nx_s2 = y1 - a*y2
+nx_s3 = y2 - a*y3
+nx_s4 = y3 - a*y4
+nx_yo = y4
+s1 = nx_s1
+s2 = nx_s2
+s3 = nx_s3
+s4 = nx_s4
+yo = nx_yo
+out = s1

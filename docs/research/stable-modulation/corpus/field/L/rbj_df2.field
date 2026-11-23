@@ -1,0 +1,21 @@
+# L set: rbj_df2, textbook form
+param float fc = 1000 [20, 20000]
+param float Q = 0.707 [0.5, 20]
+state float w1 = 0
+state float w2 = 0
+w0 = 2*3.14159265358979*fc/sr
+cw = cos(w0)
+al = sin(w0)/(2*Q)
+a0 = 1 + al
+b0 = (1 - cw)/2/a0
+b1 = (1 - cw)/a0
+b2 = b0
+a1 = -2*cw/a0
+a2 = (1 - al)/a0
+w = in - a1*w1 - a2*w2
+y = b0*w + b1*w1 + b2*w2
+nx_w1 = w
+nx_w2 = w1
+w1 = nx_w1
+w2 = nx_w2
+out = w1

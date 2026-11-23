@@ -596,6 +596,7 @@ set(COMMON_SOURCES
     src/app/selftest/DspFixtures3.cpp
     src/app/selftest/DspFixtures4.cpp
     src/app/selftest/AliasTests.cpp
+    src/app/selftest/StabilityTests.cpp
     src/app/selftest/FxAudit.cpp
     src/app/selftest/ModAudit.cpp
     src/app/selftest/BciTests.cpp

@@ -1,0 +1,12 @@
+# L set: allpass1, textbook form
+param float fc = 1000 [20, 20000]
+state float x1 = 0
+state float y1 = 0
+tt = tan(3.14159265358979*fc/sr)
+a = (tt - 1)/(tt + 1)
+y = a*in + x1 - a*y1
+nx_x1 = in
+nx_y1 = y
+x1 = nx_x1
+y1 = nx_y1
+out = x1

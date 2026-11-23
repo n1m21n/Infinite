@@ -1,7 +1,7 @@
 ---
 title: "Proven-stable modulation: automatic stability certificates for user-written filters"
 slug: "stable-modulation"
-status: "phase-1-done"
+status: "phase-2-done"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-stable-modulation.md"
@@ -260,6 +260,41 @@ a switching witness.
 
 The H3 denominator is the 124 no-witness kernels (88 of them built frozen-stable). H1 is scored on all
 200 in phase 3, from matrices extracted by the real interpreter.
+
+### Phase 2 (2026-11-23): A(θ) from the real interpreter matches Python
+
+Run: `scripts/emit_field.py corpus/field` writes L and G as `.field` kernels with a `.grid` of knob settings.
+Then one dev build and `INFINITE_FIELDSTABDUMP=corpus/field INFINITE_FIELDSTABDUMP_OUT=<dir> Infinite`
+(self-test `src/app/selftest/StabilityTests.cpp`, about 2 s), then `scripts/phase2_compare.py <dir>`.
+Data: `data/phase2-compare.json`.
+
+| Set | Kernels | Dumped | Grid points | Max abs error vs Python | Linearity / `in` gate, max error |
+|---|---|---|---|---|---|
+| L: McClellan's four filters, in the paper's state form | 4 | 4 | 324 | 1.7e-6 (SVF) | 3.2e-6 |
+| L: 12 textbook filters (one-pole, TPT one-pole, Chamberlin and TPT SVF, RBJ DF1/DF2/DF2T, coupled resonator, allpass, 4-stage phaser, Stilson ladder, DC blocker) | 12 | 12 | 540 | 1.0e-6 | 2.7e-7 |
+| G | 200 | **125** | 17,381 | 1.9e-7 | 2.3e-7 |
+
+- Every kernel that compiled was dumped. Every dumped matrix matches Python within 1.7e-6, below the 1e-5
+  bar. The error is Float32 rounding.
+- No kernel failed the linearity gate or the `in` gate. That's expected, since L and G are linear by
+  construction. Nonlinear kernels are tested in phase 3.
+- Changes from section 8, none of which affect a result:
+  - The gate tolerance in the code is 1e-4, not 1e-5. The largest error measured was 3.2e-6, so the
+    planned 1e-5 would pass too.
+  - The gate uses 2 random pairs per grid point (at least 18 per kernel) instead of 8 per kernel.
+  - The output is a text matrix file, not JSON.
+- Two bugs in the emitter, fixed before scoring:
+  - `lo` is a reserved name in Field.
+  - The first G emission spent a register per coefficient. It is now compact: the scale is folded into
+    the coefficients, and each knob function is computed once and shared.
+
+**Finding: 75 of the 200 G kernels don't compile in Field.** The sample backend never reuses a
+register, and a kernel gets 128 (`kSampleMaxRegs`, `src/core/field/SampleProgram.h:20`; allocation in
+`src/core/field/BackendRegister.cpp:57`). A dense state update costs about 3n² registers before any knob
+terms, so the failures are all large: 6 of 39 kernels at n = 4, 20 of 31 at n = 5, and 49 of 49 at
+n = 6. This limit is in today's product, not in the study: a user can't write a dense 6-state
+modulated filter in Field. It also removes the hardest cases from a Field-only phase 3. Of the 15
+kernels that fool the full-grid frozen check (B1b), only 4 compile.
 
 
 ## 11. Critique

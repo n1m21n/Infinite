@@ -1,0 +1,6 @@
+# L set: onepole, textbook form
+param float a = 0.5 [0, 1]
+state float z = 0
+nx_z = z + a*(in - z)
+z = nx_z
+out = z
