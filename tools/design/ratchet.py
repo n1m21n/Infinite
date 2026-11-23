@@ -127,9 +127,18 @@ def lint_counts(rx, allow, bases):
             if f.suffix not in (".cpp", ".h", ".mm"): continue
             rel = str(f.relative_to(ROOT))
             if any(rel.startswith(a) for a in allow): continue
-            n = len(rx.findall(f.read_text(errors="ignore")))
+            text = f.read_text(errors="ignore")
+            if rx is LINTS["raw_labels"][0]:
+                text = english_regions_out(text)
+            n = len(rx.findall(text))
             if n: out[rel] = n
     return out
+
+def english_regions_out(text):
+    """raw_labels skips what tools/i18n/lint.py skips: // i18n-skip-begin .. end regions and lines tagged i18n-ok
+    (English by owner decision D2, e.g. the Field language reference)."""
+    text = re.sub(r"i18n-skip-begin.*?i18n-skip-end", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
+    return "\n".join("" if "i18n-ok" in l else l for l in text.split("\n"))
 
 def helper_counts():
     rx = {h: re.compile(r"^[ \t]*(?:static\s+|inline\s+|constexpr\s+)*[\w:<>*&]+[ \t]+[*&]?" + h + r"\s*\([^;]*$", re.M) for h in HELPERS}

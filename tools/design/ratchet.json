@@ -741,9 +741,7 @@
    "src/app/ui/ModWidgets.cpp": 7,
    "src/app/ui/ParamWidgets.cpp": 2
   },
-  "raw_labels": {
-   "src/app/panels/SettingsWindow.cpp": 75
-  },
+  "raw_labels": {},
   "timings": {
    "src/app/AppShared.h": 1,
    "src/app/bodies/AudioNodeBodies.cpp": 1,
