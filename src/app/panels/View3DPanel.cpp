@@ -6097,14 +6097,22 @@ namespace
       const ImVec2 gmn = ImGui::GetItemRectMin(), gmx = ImGui::GetItemRectMax();
       if (hov)
          dl->AddRectFilled(gmn, gmx, ImGui::GetColorU32(ImGuiCol_FrameBgHovered), tok::radius_control);
-      glyph::Draw(dl, ImVec2((gmn.x + gmx.x) * 0.5f, (gmn.y + gmx.y) * 0.5f), tok::icon_control,
-                  open ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : text, IconsInfinite::Settings);
+      {
+         // The sliders ink a little under the on box (the 2D View's header icons use the same size).
+         const ImVec2 gc((gmn.x + gmx.x) * 0.5f, (gmn.y + gmx.y) * 0.5f);
+         ImVec2 ia, ib;
+         glyph::InkBox(gc, 16.0f, IconsInfinite::Mixer, ia, ib);
+         const float m = std::max(ib.x - ia.x, ib.y - ia.y);
+         const float ink = std::round(CheckBox::Size() * 0.72f);
+         glyph::Draw(dl, gc, m > 1.0f ? std::round(16.0f * ink / m) : 16.0f,
+                     open ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : text, IconsInfinite::Mixer);
+      }
       ImGui::PopID();
       SettingsWindow::Draw(key, title, ImVec2(ImGui::GetWindowPos().x - tok::space_2, p.y), [&]() {
-         // The window's compact column: label then well, the window's own width.
+         // The window's compact column: label then well, at the strip's fixed width (no stretching).
          UiDensity::Compact compact;
          const float keep = sFieldW;
-         sFieldW = std::max(60.0f, ImGui::GetContentRegionAvail().x - FieldLabelW());
+         sFieldW = SettingsWindow::Width() - FieldLabelW() - 2.0f * ImGui::GetStyle().WindowPadding.x;
          body();
          sFieldW = keep;
          compact.End();

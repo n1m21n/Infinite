@@ -1,13 +1,23 @@
 // ReorderDrag: the one drag-to-reorder motion every list, card stack, tab strip and rail in the app uses.
 //   - The thing itself is the handle: drag a card, row, chip or tile anywhere on it (no grip icon).
-//   - While dragging, a ghost of the item (its size, its label) follows the pointer from where it was grabbed,
-//     and the item left behind is dimmed in place.
-//   - Over a target, an accent insertion bar shows where it will land (before or after), or an outline box when it
-//     will go into the target (a group, a clip).
-// Call Source right after the item's own button, then Target on the same item. Payload types stay per list.
+//   - Flat lists (cards, chips, tiles, strips) shift live, as Figma's layers, macOS toolbars and every sortable
+//     list do: while you drag, the others slide aside (a short glide, not a jump) to open a gap where the item will
+//     land; the ghost follows the pointer from where it was grabbed; release drops it into the gap, Esc cancels.
+//     Nothing in the data moves until the drop, so one drag is one undo step.
+//   - Trees (layer groups, outliner parents) keep the insertion bar / "into" box (Source + Target), because there a
+//     drop can also mean "inside this one".
+// Flat list use:
+//     for (int i : ReorderDrag::Order("TYPE", n, vertical)) { ReorderDrag::Flow(i); <draw item i>; ReorderDrag::Item(i, ...); }
+//     if (const ReorderDrag::Move m = ReorderDrag::End()) <move m.from to m.to>;
+// Flow is for items laid out by the cursor; an item placed at an explicit position uses Glide on that position.
 #pragma once
 #include <algorithm>
+#include <cmath>
 #include <cstring>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include "imgui_internal.h"
 #include "app/AppShared.h"
 #include "app/ui/design/Tokens.gen.h"
 
@@ -35,6 +45,22 @@ namespace ReorderDrag
       const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
       const ImVec2 m = ImGui::GetIO().MousePos;
       return vertical ? m.y >= (mn.y + mx.y) * 0.5f : m.x >= (mn.x + mx.x) * 0.5f;
+   }
+
+   namespace detail
+   {
+      // A copy of a delivered payload that outlives ImGui's ClearDragDrop.
+      inline const ImGuiPayload* Keep(const ImGuiPayload& p)
+      {
+         static ImGuiPayload copy;
+         static unsigned char bytes[64];
+         copy = p;
+         const int n = std::min(p.DataSize, (int)sizeof(bytes));
+         std::memcpy(bytes, p.Data, (size_t)n);
+         copy.Data = bytes;
+         copy.DataSize = n;
+         return &copy;
+      }
    }
 
    inline ImU32 AccentCol() { return ImGui::GetColorU32(app::AccentEmphasisSelected()); }
@@ -108,7 +134,9 @@ namespace ReorderDrag
             const float x = edge == Edge::After ? mx.x + 1.0f : mn.x - 1.0f;
             Bar(ImVec2(x, mn.y + 2.0f), ImVec2(x, mx.y - 2.0f));
          }
-         out = ImGui::AcceptDragDropPayload(type, ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
+         // EndDragDropTarget clears the payload right after delivery (Data becomes null), so the drop is copied out first.
+         if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(type, ImGuiDragDropFlags_AcceptNoDrawDefaultRect); p != nullptr && p->Data != nullptr)
+            out = detail::Keep(*p);
       }
       ImGui::EndDragDropTarget();
       return out;
@@ -116,4 +144,249 @@ namespace ReorderDrag
 
    // For "move from slot a to slot b" lists: the bar goes after the target when moving down, before when moving up.
    inline Edge SlotEdge(int from, int to) { return from < to ? Edge::After : Edge::Before; }
+
+   // ---- flat lists: live shift ---------------------------------------------------------------------------------
+   struct Move
+   {
+      int from = -1, to = -1;
+      explicit operator bool() const { return from >= 0 && to >= 0 && from != to; }
+   };
+
+   namespace detail
+   {
+      struct List
+      {
+         std::string type;
+         bool vertical = true;
+         int n = 0;
+         int from = -1, to = -1;   // dragging: data index held, slot it would land in
+         int frame = -1;           // last frame the held item was dragged
+         double settle = 0.0;      // glides run until this time (a little after a drop)
+         ImVec2 grab{ 0, 0 };
+         std::vector<int> order;
+         std::vector<ImRect> rects;   // this frame's other items, natural (un-glided) rects, drawn order
+         std::unordered_map<int, ImVec2> last, off;   // per data index: natural pos last frame, glide offset
+         float lastT = 0.0f;
+         ImVec2 cum{ 0, 0 };          // Flow: the offset applied to the cursor so far
+         int glideFrame = -1;
+      };
+      inline std::unordered_map<ImGuiID, List>& Lists()
+      {
+         static std::unordered_map<ImGuiID, List> m;
+         return m;
+      }
+      inline std::vector<ImGuiID>& Stack()
+      {
+         static std::vector<ImGuiID> s;
+         return s;
+      }
+      inline List& Top() { return Lists()[Stack().back()]; }
+      inline bool Dragging(const List& l) { return l.from >= 0 && l.from < l.n; }
+
+      // The glide: an item whose natural place moved keeps where it was drawn and eases into the new place
+      // (about 90 ms). Only while a drag runs or settles, so scrolling or a relayout never animates.
+      inline ImVec2 Glide(List& l, int index, ImVec2 natural)
+      {
+         const double now = ImGui::GetTime();
+         const bool live = Dragging(l) || now < l.settle;
+         auto it = l.last.find(index);
+         ImVec2& o = l.off[index];
+         if (!live)
+            o = ImVec2(0, 0);
+         else if (it != l.last.end())
+         {
+            o.x += it->second.x - natural.x;
+            o.y += it->second.y - natural.y;
+            const float k = std::exp(-ImGui::GetIO().DeltaTime / 0.045f);
+            o.x *= k;
+            o.y *= k;
+            if (std::fabs(o.x) < 0.5f)
+               o.x = 0.0f;
+            if (std::fabs(o.y) < 0.5f)
+               o.y = 0.0f;
+         }
+         l.last[index] = natural;
+         return o;
+      }
+   }
+
+   // Starts a flat list of `n` items (call where the list begins, in the same ID scope as End). Returns the order to
+   // draw the items in: the data order, or while one is held, the order it would have if dropped now.
+   inline const std::vector<int>& Order(const char* type, int n, bool vertical = true)
+   {
+      const ImGuiID id = ImGui::GetID(type);
+      detail::Stack().push_back(id);
+      detail::List& l = detail::Lists()[id];
+      l.type = type;
+      l.vertical = vertical;
+      l.n = n;
+      l.rects.clear();
+      l.cum = ImVec2(0, 0);
+      l.order.clear();
+      if (detail::Dragging(l))
+      {
+         for (int i = 0; i < n; i++)
+            if (i != l.from)
+               l.order.push_back(i);
+         l.order.insert(l.order.begin() + std::clamp(l.to, 0, n - 1), l.from);
+      }
+      else
+      {
+         l.from = l.to = -1;
+         for (int i = 0; i < n; i++)
+            l.order.push_back(i);
+      }
+      return l.order;
+   }
+
+   // Before an item laid out by the cursor: moves the cursor by the item's glide.
+   inline void Flow(int index)
+   {
+      detail::List& l = detail::Top();
+      const ImVec2 cur = ImGui::GetCursorPos();
+      const ImVec2 natural(cur.x - l.cum.x, cur.y - l.cum.y);
+      ImVec2 o = detail::Glide(l, index, natural);
+      if (l.vertical)
+         o.x = 0.0f;
+      if (o.x != l.cum.x || o.y != l.cum.y)
+         ImGui::SetCursorPos(ImVec2(natural.x + o.x, natural.y + o.y));
+      l.cum = o;
+   }
+
+   // An item placed at an explicit position (a rail tile at y): where to draw it this frame.
+   inline ImVec2 Glide(int index, ImVec2 natural)
+   {
+      const ImVec2 o = detail::Glide(detail::Top(), index, natural);
+      return ImVec2(natural.x + o.x, natural.y + o.y);
+   }
+
+   // Call right after the item (its last widget is the handle). `data` is the drag payload other targets see
+   // (nullptr: the index). `span` (min, max) is the whole card when the handle is only part of it.
+   // Returns true while this item is held.
+   inline bool Item(int index, const char* label, const void* data = nullptr, size_t bytes = 0, const ImVec2* span = nullptr,
+                    ImGuiDragDropFlags flags = 0)
+   {
+      detail::List& l = detail::Top();
+      ImVec2 mn = span != nullptr ? span[0] : ImGui::GetItemRectMin();
+      ImVec2 mx = span != nullptr ? span[1] : ImGui::GetItemRectMax();
+      bool held = false;
+      if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip | flags))
+      {
+         if (data == nullptr)
+         {
+            data = &index;
+            bytes = sizeof(int);
+         }
+         ImGui::SetDragDropPayload(l.type.c_str(), data, bytes, ImGuiCond_Always);
+         ImGui::EndDragDropSource();
+         if (!detail::Dragging(l))
+         {
+            l.from = index;
+            int slot = 0;
+            for (int i : l.order)
+            {
+               if (i == index)
+                  break;
+               slot++;
+            }
+            l.to = slot;
+            const ImVec2 c = ImGui::GetIO().MouseClickedPos[0];
+            l.grab = ImVec2(std::clamp(c.x - mn.x, 0.0f, mx.x - mn.x), std::clamp(c.y - mn.y, 0.0f, mx.y - mn.y));
+         }
+         l.frame = ImGui::GetFrameCount();
+         held = index == l.from;
+      }
+      if (detail::Dragging(l) && index == l.from)
+      {
+         // The gap it will land in: the item, veiled, with a faint accent edge.
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_WindowBg, 0.82f), tok::radius_control);
+         dl->AddRect(mn, mx, (AccentCol() & 0x00FFFFFFu) | 0x60000000u, tok::radius_control, 0, 1.0f);
+         // The ghost: the item's size, held where it was grabbed.
+         const ImGuiIO& io = ImGui::GetIO();
+         const ImVec2 size(std::min(mx.x - mn.x, 320.0f), std::max(mx.y - mn.y, 1.0f));
+         const ImVec2 g0(io.MousePos.x - std::min(l.grab.x, size.x), io.MousePos.y - std::min(l.grab.y, size.y));
+         const ImVec2 g1(g0.x + size.x, g0.y + size.y);
+         ImDrawList* fg = ImGui::GetForegroundDrawList();
+         fg->AddRectFilled(ImVec2(g0.x + 2.0f, g0.y + 3.0f), ImVec2(g1.x + 2.0f, g1.y + 3.0f), IM_COL32(0, 0, 0, 60), tok::radius_control);
+         fg->AddRectFilled(g0, g1, ImGui::GetColorU32(ImGuiCol_PopupBg, 0.94f), tok::radius_control);
+         fg->AddRect(g0, g1, AccentCol(), tok::radius_control, 0, 1.0f);
+         if (label != nullptr && label[0] != '\0')
+         {
+            fg->PushClipRect(g0, g1, true);
+            fg->AddText(ImVec2(g0.x + tok::space_2, (g0.y + g1.y - ImGui::GetFontSize()) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), label);
+            fg->PopClipRect();
+         }
+         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+      }
+      else
+      {
+         // Natural rect (the glide taken out), so the slot it picks does not chase the animation.
+         const auto it = l.off.find(index);
+         const ImVec2 o = it != l.off.end() ? it->second : ImVec2(0, 0);
+         l.rects.push_back(ImRect(ImVec2(mn.x - o.x, mn.y - o.y), ImVec2(mx.x - o.x, mx.y - o.y)));
+      }
+      return held;
+   }
+
+   // Ends the list started by Order. Returns the move on the frame it is dropped.
+   inline Move End()
+   {
+      detail::List& l = detail::Top();
+      Move m;
+      if (l.cum.x != 0.0f || l.cum.y != 0.0f)
+      {
+         const ImVec2 cur = ImGui::GetCursorPos();
+         ImGui::SetCursorPos(ImVec2(cur.x - (l.vertical ? 0.0f : l.cum.x), cur.y - l.cum.y));
+         ImGui::Dummy(ImVec2(0, 0));
+         l.cum = ImVec2(0, 0);
+      }
+      if (detail::Dragging(l))
+      {
+         const ImGuiPayload* p = ImGui::GetDragDropPayload();
+         const bool ours = p != nullptr && p->IsDataType(l.type.c_str());
+         const bool fresh = l.frame >= ImGui::GetFrameCount() - 1;
+         if (!ours || !fresh)
+            l.from = l.to = -1;   // cancelled (Esc), or the held item went away
+         else
+         {
+            // The slot: how many of the other items sit before the pointer (rows: past the middle; strips and grids:
+            // a row above, or past the middle in the pointer's row).
+            const ImVec2 pt = ImGui::GetIO().MousePos;
+            int slot = 0;
+            for (const ImRect& r : l.rects)
+            {
+               const ImVec2 c = r.GetCenter();
+               const bool before = l.vertical ? pt.y > c.y : (pt.y >= r.Max.y || (pt.y >= r.Min.y && pt.x > c.x));
+               slot += before ? 1 : 0;
+            }
+            l.to = slot;
+            if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            {
+               m.from = l.from;
+               m.to = l.to;
+               l.from = l.to = -1;
+               // The data is about to move: carry each item's glide state to its new index.
+               std::vector<int> perm;
+               for (int i = 0; i < l.n; i++)
+                  if (i != m.from)
+                     perm.push_back(i);
+               perm.insert(perm.begin() + std::clamp(m.to, 0, std::max(0, l.n - 1)), m.from);
+               std::unordered_map<int, ImVec2> last, off;
+               for (int j = 0; j < (int)perm.size(); j++)
+               {
+                  if (auto it = l.last.find(perm[j]); it != l.last.end())
+                     last[j] = it->second;
+                  if (auto it = l.off.find(perm[j]); it != l.off.end())
+                     off[j] = it->second;
+               }
+               l.last.swap(last);
+               l.off.swap(off);
+               l.settle = ImGui::GetTime() + 0.2;
+            }
+         }
+      }
+      detail::Stack().pop_back();
+      return m;
+   }
 }

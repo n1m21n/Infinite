@@ -28,6 +28,7 @@ namespace SettingsWindow
       bool& o = Opens()[key];
       o = !o;
    }
+   inline void Close(const std::string& key) { Opens().erase(key); }
    inline void CloseAll() { Opens().clear(); }
 
    // The window's content width: the compact strip (tokens.json "compact").
@@ -48,10 +49,11 @@ namespace SettingsWindow
       spec.pos = ImVec2(std::max(vp->WorkPos.x + Width(), at.x), at.y);
       spec.pivot = ImVec2(1.0f, 0.0f);
       spec.placeCond = ImGuiCond_Appearing;
-      // Resizable like every floating window: it opens at the strip width and its content's height (0 = fit once),
-      // then keeps whatever size it is dragged to. Bodies size their wells from the window's own width.
+      // The main Settings window's rule: controls keep one fixed width whatever the window does. So the width is
+      // the strip's (rows never stretch) and the height resizes: it opens at its content's height (0 = fit once),
+      // then keeps whatever height it is dragged to (a long list scrolls).
       spec.minSize = ImVec2(Width(), 60.0f);
-      spec.maxSize = ImVec2(vp->WorkSize.x, vp->WorkSize.y);
+      spec.maxSize = ImVec2(Width(), vp->WorkSize.y);
       spec.flags = ImGuiWindowFlags_NoSavedSettings;
       ImGui::SetNextWindowSize(ImVec2(Width(), 0.0f), ImGuiCond_Appearing);
       spec.pad = false;   // the compact strip: MoreRows sizes its column from the style's own window padding

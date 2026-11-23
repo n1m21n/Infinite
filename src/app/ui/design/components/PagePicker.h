@@ -227,10 +227,13 @@ namespace PagePicker
          // Taken before the chips' PushID(i): OpenPopup inside the loop would hash the chip's index into the ID
          // and the menu below (drawn outside the loop) would never open.
          const ImGuiID menuId = ImGui::GetID("##pageMenu");
-         for (int i = 0; i < (int)pages.size(); i++)
+         // Drag a chip to reorder: the others slide aside live (ReorderDrag), the move lands on release.
+         int drawn = 0;
+         for (int i : ReorderDrag::Order("INFINITE_PAGE_CHIP", (int)pages.size(), false))
          {
-            if (i > 0)
+            if (drawn++ > 0)
                ImGui::SameLine(0.0f, tok::space_1);
+            ReorderDrag::Flow(i);
             ImGui::PushID(i);
             const Entry& e = pages[i];
             const float w = ChipW(e);
@@ -277,22 +280,7 @@ namespace PagePicker
                ImGui::OpenPopup(menuId);
             }
             if (opt.reorder && pages.size() > 1)
-            {
-               ReorderDrag::Source("INFINITE_PAGE_CHIP", &i, sizeof i, e.name.c_str());
-               {
-                  const int* pk = ReorderDrag::Peek<int>("INFINITE_PAGE_CHIP");
-                  if (const ImGuiPayload* p = ReorderDrag::Target("INFINITE_PAGE_CHIP", ReorderDrag::SlotEdge(pk != nullptr ? *pk : i, i), false))
-                  {
-                     const int from = *static_cast<const int*>(p->Data);
-                     if (from != i)
-                     {
-                        out.act = Act::Move;
-                        out.index = from;
-                        out.to = i;
-                     }
-                  }
-               }
-            }
+               ReorderDrag::Item(i, e.name.c_str());
             const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
             PAGEPICKER_PROBE(probe.chipMn.resize(pages.size()); probe.chipMx.resize(pages.size()); probe.chipMn[i] = bmin; probe.chipMx[i] = bmax;)
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -313,6 +301,12 @@ namespace PagePicker
             dl->AddText(ImVec2(tx, cy - ImGui::GetFontSize() * 0.5f), col, e.name.c_str());
             dl->PopClipRect();
             ImGui::PopID();
+         }
+         if (const ReorderDrag::Move mv = ReorderDrag::End())
+         {
+            out.act = Act::Move;
+            out.index = mv.from;
+            out.to = mv.to;
          }
          if (MenuParts::BeginPopup("##pageMenu"))
          {

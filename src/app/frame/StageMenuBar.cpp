@@ -87,21 +87,23 @@ static void DrawPanelRail()
          if (!used[i])
             order[n++] = i;
    }
+   // Drag a tile to reorder: the others slide aside live; the order is saved with the workspace.
    int moveFrom = -1, moveTo = -1;
-   for (int slot = 0; slot < kN; slot++)
    {
-      const Entry& e = kEntries[order[slot]];
-      if (PanelRail::Item(e.id, top + slot * step, e.glyphOff, e.glyphOn, *e.open, e.tip))
-         *e.open = !*e.open;
-      // Drag a tile onto another to reorder; the order is saved with the workspace.
-      ReorderDrag::Source("RAIL_TILE", &slot, sizeof(slot), nullptr);
+      int drawn = 0;
+      for (int slot : ReorderDrag::Order("RAIL_TILE", kN))
       {
-         const int* from = ReorderDrag::Peek<int>("RAIL_TILE");
-         if (const ImGuiPayload* pl = ReorderDrag::Target("RAIL_TILE", ReorderDrag::SlotEdge(from != nullptr ? *from : slot, slot)))
-         {
-            moveFrom = *(const int*)pl->Data;
-            moveTo = slot;
-         }
+         const Entry& e = kEntries[order[slot]];
+         const float y = ReorderDrag::Glide(slot, ImVec2(0.0f, top + drawn * step)).y;
+         drawn++;
+         if (PanelRail::Item(e.id, y, e.glyphOff, e.glyphOn, *e.open, e.tip))
+            *e.open = !*e.open;
+         ReorderDrag::Item(slot, nullptr);
+      }
+      if (const ReorderDrag::Move m = ReorderDrag::End())
+      {
+         moveFrom = m.from;
+         moveTo = m.to;
       }
    }
    if (moveFrom >= 0 && moveFrom != moveTo)
