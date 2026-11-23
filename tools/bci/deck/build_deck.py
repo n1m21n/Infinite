@@ -47,11 +47,12 @@ h1{position:absolute;left:64px;top:44px;font-size:40px;line-height:48px;font-wei
 .mark{position:absolute;right:64px;top:54px;width:64px}
 h2{font-size:22px;line-height:1.25;font-weight:600;color:var(--ink)}
 b{font-weight:600;color:var(--ink)}
-.lab{font-family:GM;font-size:12px;line-height:1.4;letter-spacing:.1em;text-transform:uppercase;color:var(--signal)}
+.lab{font-size:15px;line-height:1.4;font-weight:600;color:var(--ink)}
+.lab[style*="ink2"]{font-weight:500}
 .card{position:absolute;background:var(--white);border-radius:24px;padding:24px;box-shadow:var(--e1)}
 .in{background:var(--s3);border-radius:16px;padding:14px 16px}
 .take{position:absolute;left:64px;width:1152px;top:640px;font-size:18px;line-height:1.35;font-weight:600;color:var(--signal)}
-.tag{display:inline-block;font-family:GM;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);
+.tag{display:inline-block;font-size:15px;font-weight:600;color:var(--ink);
   background:var(--glass);-webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6);
   border-radius:999px;padding:5px 12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 4px 12px rgba(26,31,54,.08)}
 .tag.sig{background:var(--signal);color:var(--white)}
@@ -155,15 +156,15 @@ def s04():
             y = 75 + 26 * math.sin(a) * (0.4 + 0.15 * j) - (j - 2) * 14
             pts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="#4A54D6"/>')
     p3 = f'<svg width="320" height="150" viewBox="0 0 320 150">{"".join(pts)}</svg>'
-    cards = [("Music", "Waves", wave, "A wave that repeats. How many times a second it repeats (Hz) is the pitch you hear.",
+    cards = [("Music", "Waves", asset("s4_sound.png"), "A wave that repeats. How many times a second it repeats (Hz) is the pitch you hear.",
               "440 Hz, one cycle"),
-             ("Images", "Pixels", pix, "A grid of tiny dots. Each dot is a mix of red, green and blue.", "8 x 5 dots"),
-             ("3D", "Points", p3, "Shapes made of points in space. Each point is three numbers: x, y and z.", "70 points")]
+             ("Images", "Pixels", asset("s4_image.png"), "A grid of tiny dots. Each dot is a mix of red, green and blue.", "8 x 5 dots"),
+             ("3D", "Points", asset("s4_geometry.png"), "Shapes made of points in space. Each point is three numbers: x, y and z.", "70 points")]
     body = ""
     for i, (lab, h, art, txt, note) in enumerate(cards):
         body += (f'<div class="card" style="left:{64 + i * 392}px;top:128px;width:368px;height:472px">'
-                 f'<div class="lab">{lab}</div><h2 style="margin-top:4px">{h}</h2>'
-                 f'<div class="in" style="margin-top:16px;padding:16px 0">{art}<div class="lab" style="text-align:center;color:var(--ink2);margin-top:8px">{note}</div></div>'
+                 f'<div class="lab" style="color:var(--ink2)">{lab}</div><h2 style="margin-top:4px">{h}</h2>'
+                 f'<img class="ph" src="{art}" style="width:320px;height:250px;margin-top:16px">'
                  f'<div style="margin-top:16px">{txt}</div></div>')
     return ("Everything is numbers", body,
             "A brain headset gives numbers too. Infinite turns them into 0 to 1 signals that drive waves, pixels and points.")
@@ -177,21 +178,13 @@ def box(x, y, w, t, on=False):
 
 
 def s05():
-    d = '<div class="card" style="left:64px;top:128px;width:600px;height:472px">'
-    for k, (lab, src, on) in enumerate([("Today", "LFO", False), ("With a brain", "Brain", True)]):
-        y = 44 + k * 220
-        d += f'<div class="lab" style="position:absolute;left:24px;top:{y}px">{lab}</div>'
-        d += box(24, y + 32, 140, src, on) + box(412, y + 32, 164, "Picture")
-        d += (f'<svg style="position:absolute;left:164px;top:{y + 32}px" width="248" height="56">'
-              f'<path d="M0 28 C80 28 168 28 240 28" stroke="#4A54D6" stroke-width="3" fill="none"/>'
-              f'<path d="M232 20 L244 28 L232 36" stroke="#4A54D6" stroke-width="3" fill="none"/></svg>')
-        d += f'<div class="lab" style="position:absolute;left:164px;width:248px;text-align:center;top:{y + 98}px;color:var(--ink2)">0 to 1</div>'
-    d += "</div>"
+    d = (f'<div class="card" style="left:64px;top:128px;width:624px;height:384px">'
+         f'<img class="ph" src="{asset("s5_illustration.png")}" style="width:576px;height:312px"></div>')
     rows = [("The signal", "A number from 0 to 1 that keeps changing. The cable carries it to a knob."),
             ("Today", "An LFO, a simple repeating wave, moves the picture."),
             ("With a brain", "Swap the LFO for brain signals. The same cable now lets your brain move a picture, a sound or a 3D shape."),
             ("The brain node", "Brain Source turns a headset's raw brain voltage into 24 of these signals.")]
-    d += '<div style="position:absolute;left:712px;top:128px;width:504px">'
+    d += '<div style="position:absolute;left:728px;top:128px;width:488px">'
     d += "".join(f'<div style="margin-bottom:22px"><div class="lab">{a}</div><div>{b}</div></div>' for a, b in rows) + "</div>"
     return "Swap the LFO for a brain", d, None
 
@@ -199,14 +192,8 @@ def s05():
 def s06():
     steps = [("Sensors", "4 sensors, 256 numbers a second"), ("Clean", "Remove mains hum and slow drift"),
              ("Split", "5 brain rhythms, plus blink and jaw"), ("Out", "24 signals from 0 to 1, plus picture and sound")]
-    b = ""
-    for i, (h, t) in enumerate(steps):
-        x = 64 + i * 296
-        b += (f'<div class="card" style="left:{x}px;top:128px;width:264px;height:148px;background:{"var(--signal)" if i == 3 else "var(--white)"}">'
-              f'<div class="lab" style="{"color:var(--white)" if i == 3 else ""}">0{i + 1} {h}</div>'
-              f'<div style="margin-top:10px;{"color:var(--white)" if i == 3 else "color:var(--ink)"};font-weight:600">{t}</div></div>')
-        if i < 3:
-            b += f'<div class="arrow" style="position:absolute;left:{x + 270}px;top:186px">&#8594;</div>'
+    b = (f'<div class="card" style="left:64px;top:128px;width:1152px;height:324px">'
+         f'<img class="ph" src="{asset("s6_inside.png")}" style="width:1104px;height:265px"></div>')
     cards = [("Why these channels", "A Muse 2 has 4 dry sensors: two on the forehead, two behind the ears. We keep only what "
                                     "they show reliably: calm (alpha), blinks, jaw and brow."),
              ("Where the mock data comes from", "A built-in simulator makes fake brain waves: calm, focus and dream states, "
@@ -214,7 +201,7 @@ def s06():
              ("How it is tested", "Automatic checks: calm against focus, blink against jaw, then real recordings, where "
                                   "closing the eyes must raise alpha.")]
     for i, (h, t) in enumerate(cards):
-        b += (f'<div style="position:absolute;left:{64 + i * 392 + 24}px;top:320px;width:320px">'
+        b += (f'<div style="position:absolute;left:{64 + i * 392 + 24}px;top:480px;width:340px">'
               f'<div class="lab">{h}</div><div style="margin-top:10px">{t}</div></div>')
     return "Inside the Brain node", b, None
 
@@ -268,20 +255,8 @@ def s08():
 
 
 def s09():
-    head = ('<svg width="300" height="330" viewBox="0 0 300 330">'
-            '<ellipse cx="150" cy="180" rx="112" ry="132" fill="#F5F5F8" stroke="none"/>'
-            '<path d="M134 50 L150 30 L166 50" fill="none" stroke="#404660" stroke-width="2"/>'
-            '<path d="M38 170 C30 160 26 200 38 196 M262 170 C270 160 274 200 262 196" fill="none" stroke="#404660" stroke-width="2"/>'
-            '<path d="M70 92 C110 60 190 60 230 92" fill="none" stroke="#4A54D6" stroke-width="10" stroke-linecap="round" opacity=".35"/>'
-            '<path d="M44 140 C40 170 44 200 52 220 M256 140 C260 170 256 200 248 220" fill="none" stroke="#4A54D6" stroke-width="10" stroke-linecap="round" opacity=".35"/>')
-    for x, y, n in [(96, 78, "AF7"), (204, 78, "AF8"), (46, 214, "TP9"), (254, 214, "TP10")]:
-        head += f'<circle cx="{x}" cy="{y}" r="13" fill="#4A54D6"/>'
-    head += "</svg>"
     b = (f'<div class="card" style="left:64px;top:128px;width:400px;height:396px">'
-         f'<div class="lab" style="text-align:center">Front</div><div style="margin:4px 0 0 26px">{head}</div>')
-    for x, y, n, al in [(82, 108, "AF7", "left"), (262, 108, "AF8", "left"), (16, 244, "TP9", "left"), (330, 244, "TP10", "left")]:
-        b += f'<div class="lab" style="position:absolute;left:{x}px;top:{y}px;color:var(--ink)">{n}</div>'
-    b += "</div>"
+         f'<img class="ph" src="{asset("s7_headband.png")}" style="width:352px;height:325px;margin-top:10px"></div>')
     b += ('<div style="position:absolute;left:64px;top:536px;width:400px;line-height:1.5">'
           '<b>AF7, AF8</b> forehead: blinks and eye movement<br><b>TP9, TP10</b> behind the ears: alpha and jaw</div>')
     groups = [("Contact, pulse, direct", ["presence", "heart", "image", "audio"], ""),
@@ -296,7 +271,7 @@ def s09():
     b += "</div>"
     sets = ["device", "synthetic preset", "blink filter", "smoothing", "hold ms", "artifact blanking", "startle guard",
             "play baked take", "calibrate"]
-    b += ('<div class="card" style="left:488px;top:540px;width:728px;height:116px;padding:16px 24px"><div class="lab">Node settings</div>'
+    b += ('<div class="card" style="left:488px;top:536px;width:728px;height:136px;padding:16px 24px"><div class="lab">Node settings</div>'
           '<div style="margin-top:6px">' + "".join(f'<span class="chip">{c}</span>' for c in sets) + "</div></div>")
     return "The headband and its outputs", b, None
 
