@@ -66,7 +66,10 @@ namespace glyph
          return role;
       ImVec2 mn, mx;
       InkBox(center, role, g, mn, mx);
-      const float ink = std::max(mx.x - mn.x, mx.y - mn.y), target = 0.9f * role;
+      // The pointer is a solid wedge: fitted to 0.9 it out-weighed the stroked icons beside it (pick rows, tool
+      // columns), so it fills less of the box.
+      const float fill = std::strcmp(g, IconsInfinite::Pointer) == 0 ? 0.8f : 0.9f;
+      const float ink = std::max(mx.x - mn.x, mx.y - mn.y), target = fill * role;
       return ink > 1.0f && ink < target - 1.5f ? std::round(role * std::min(1.4f, target / ink)) : role;
    }
 

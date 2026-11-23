@@ -1976,6 +1976,13 @@ void FrameTest_UIAUDIT(int frameId, GLFWwindow* window)
       {
          // Golden shots: the panel's pixels for each state's first page, written as this frame ends.
          static const char* shots = getenv("INFINITE_UIAUDIT_V2D_SHOTS");
+         // AS_USER: the shot shows folds as a user first sees them; the audit's open-all returns for the frame it checks.
+         static const bool asUser = getenv("INFINITE_UIAUDIT_V2D_SHOTS_AS_USER") != nullptr;
+         if (asUser && sPage2 == 0 && shots != nullptr)
+         {
+            PanelKit::AuditOpenAll() = sWait == -1;
+            PanelKit::AuditAsUser() = sWait != -1;
+         }
          if (sWait == -1 && sPage2 == 0 && shots != nullptr)
          {
             std::string file = tn + "_" + sName;

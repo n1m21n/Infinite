@@ -1176,6 +1176,54 @@ namespace
       return PanelKit::IconChip(id, glyphStr, on, tip, w > 0.0f ? w : sChip, sChip);
    }
 
+   // Card headers (effects, styles, adjustment layers): on box, fold arrow + name, then action icons. Every mark is
+   // drawn to one size, the on box's, and centred on the header row's middle; the actions are frameless (a well on
+   // hover only), so the on box is the one box in the row.
+   float HeaderMark() { return CheckBox::Size(); }
+
+   float InkFit(ImVec2 c, const char* g, float ink)
+   {
+      ImVec2 a, b;
+      glyph::InkBox(c, 16.0f, g, a, b);
+      const float m = std::max(b.x - a.x, b.y - a.y);
+      return m > 1.0f ? std::round(16.0f * ink / m) : 16.0f;
+   }
+
+   void FoldMark(ImDrawList* dl, ImVec2 c, bool folded, ImU32 col)
+   {
+      const float w = std::round(HeaderMark() * 0.4f), h = std::round(HeaderMark() * 0.25f);
+      if (!folded)
+         dl->AddTriangleFilled(ImVec2(c.x - w, c.y - h), ImVec2(c.x + w, c.y - h), ImVec2(c.x, c.y + h), col);
+      else
+         dl->AddTriangleFilled(ImVec2(c.x - h, c.y - w), ImVec2(c.x + h, c.y), ImVec2(c.x - h, c.y + w), col);
+   }
+
+   // One header action at the row's height; returns the click. `grip` = a drag handle (no click, no hover well).
+   bool HeaderIcon(const char* id, const char* g, bool lit, const char* tip, float rowY, bool grip = false)
+   {
+      const float fh = ImGui::GetFrameHeight();
+      ImGui::SetCursorPosY(rowY);
+      const bool clicked = ImGui::InvisibleButton(id, ImVec2(fh, fh));
+      const bool hov = ImGui::IsItemHovered();
+      if (hov && tip != nullptr)
+         HelpTip("%s", tip);
+      const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      if (!grip && (hov || ImGui::IsItemActive()))
+         dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGui::IsItemActive() ? ImGuiCol_FrameBgActive : ImGuiCol_FrameBgHovered),
+                           tok::radius_control);
+      const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
+      const float ink = std::round(HeaderMark() * 0.85f);
+      const float gs = InkFit(c, g, ink);
+      const ImU32 col = lit ? ImGui::GetColorU32(app::AccentEmphasisSelected())
+                            : ImGui::GetColorU32(grip ? ImGuiCol_TextDisabled : ImGuiCol_Text, grip && !hov ? 0.55f : 0.9f);
+      glyph::Draw(dl, c, gs, col, g);
+      ImVec2 imn, imx;
+      glyph::InkBox(c, gs, g, imn, imx);
+      UiAudit::NoteInk(1, imn, imx, ink, tip, g);
+      return clicked && !grip;
+   }
+
    bool ZoomChip(const char* id, bool plus, const char* tip)
    {
       return IconChip(id, plus ? IconsInfinite::Zoom : IconsInfinite::ZoomOut, false, tip);
@@ -11566,7 +11614,7 @@ namespace
       FieldWell::PopStyle();
       const ImU32 tc = ImGui::GetColorU32(atDefault && !hov ? ImGuiCol_TextDisabled : ImGuiCol_Text);
       dl->AddText(ImVec2(p.x + tok::space_2, p.y + (sz.y - ImGui::GetFontSize()) * 0.5f), tc, sum);
-      if (!open && !PanelKit::AuditOpenAll())
+      if ((!open || PanelKit::AuditAsUser()) && !PanelKit::AuditOpenAll())
          return;
       SliderRow(T("Opacity"), &opacity, 0.0f, 1.0f, "%.2f");
       if (blend != nullptr)
@@ -11603,11 +11651,10 @@ namespace
          HelpTip("%s", T("On"));
       FormParts::Inline(0.0f, tok::space_2);
       ImGui::SetCursorPosY(rowY);
-      const float gripW = 16.0f;
-      const float chipsW = (e.uid != 0 ? 2.0f : 1.0f) * (sChip + tok::space_1) + gripW;
+      const float fh = ImGui::GetFrameHeight();
+      const float chipsW = (e.uid != 0 ? 3.0f : 2.0f) * fh + (e.uid != 0 ? 2.0f : 1.0f) * tok::space_1;
       const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
       const ImVec2 np = ImGui::GetCursorScreenPos();
-      const float fh = ImGui::GetFrameHeight();
       if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
          folded = !folded;
       // Drag the header onto another header to move the effect there.
@@ -11638,20 +11685,17 @@ namespace
                                      : T("Click to fold, drag to reorder"));
          const ImU32 col = ImGui::GetColorU32(e.on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !e.on ? 1.0f : 0.85f);
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImVec2 c(np.x + 5.0f, np.y + fh * 0.5f);
-         if (!folded)
-            dl->AddTriangleFilled(ImVec2(c.x - 3.5f, c.y - 2), ImVec2(c.x + 3.5f, c.y - 2), ImVec2(c.x, c.y + 3), col);
-         else
-            dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 3.5f), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 3.5f), col);
-         const std::string display = app::TruncateWithEllipsis(name, std::max(16.0f, nameW - 18.0f));
-         dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, display.c_str());
+         FoldMark(dl, ImVec2(np.x + HeaderMark() * 0.5f, np.y + fh * 0.5f), folded, col);
+         const float textX = np.x + HeaderMark() + tok::space_2;
+         const std::string display = app::TruncateWithEllipsis(name, std::max(16.0f, nameW - (textX - np.x) - 2.0f));
+         dl->AddText(ImVec2(textX, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, display.c_str());
       }
       FormParts::Inline(0.0f, tok::space_2);
       // A node-backed effect's node: shown on the canvas (lit) or kept off it, one chip instead of a full-width row.
       if (e.uid != 0)
       {
-         if (IconChip((base + "show").c_str(), CanvasLink::Glyph(CanvasLink::Verb::Show), e.shown,
-                      T(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show))))
+         if (HeaderIcon((base + "show").c_str(), CanvasLink::Glyph(CanvasLink::Verb::Show), e.shown,
+                        T(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show)), rowY))
          {
             PushUndoCheckpoint("Show effect node");
             e.shown = !e.shown;
@@ -11659,20 +11703,15 @@ namespace
          }
          FormParts::Inline(0.0f, tok::space_1);
       }
-      if (IconChip((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove effect")))
+      if (HeaderIcon((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove effect"), rowY))
          sEffOp = { l.id, i, 3, sDocUid };
       FormParts::Inline(0.0f, tok::space_1);
+      HeaderIcon((base + "grip").c_str(), IconsInfinite::Grip, false, nullptr, rowY, true);
+      if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
       {
-         const ImVec2 gp = ImGui::GetCursorScreenPos();
-         ImGui::InvisibleButton((base + "grip").c_str(), ImVec2(gripW, fh));
-         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
-         {
-            const int pay[2] = { l.id, i };
-            ImGui::SetDragDropPayload("V2DEFF", pay, sizeof(pay));
-            ImGui::EndDragDropSource();
-         }
-         glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(gp.x + gripW * 0.5f, gp.y + fh * 0.5f), tok::icon_control,
-                     ImGui::GetColorU32(ImGuiCol_TextDisabled, ImGui::IsItemHovered() ? 0.95f : 0.55f), IconsInfinite::Grip);
+         const int pay[2] = { l.id, i };
+         ImGui::SetDragDropPayload("V2DEFF", pay, sizeof(pay));
+         ImGui::EndDragDropSource();
       }
       if (!e.on || folded)
          return;
@@ -11704,7 +11743,7 @@ namespace
             {
                const FilterDef& def = fn->Def();
                // Linear light is a rendering choice, not a look: it waits behind More.
-               auto rare = [](const FilterParamDef& pd) { return pd.label == "Linear light"; };
+               auto rare = [](const FilterParamDef& pd) { return pd.label == "linear light"; };
                auto row = [&](size_t pi) {
                   const FilterParamDef& pd = def.params[pi];
                   const std::string plabel = ParamLabel(pd.label.c_str());
@@ -12431,10 +12470,9 @@ namespace
          }
          FormParts::Inline(0.0f, tok::space_2);
          ImGui::SetCursorPosY(rowY);
-         const float chipsW = sChip;
-         const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
-         const ImVec2 np = ImGui::GetCursorScreenPos();
          const float fh = ImGui::GetFrameHeight();
+         const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - fh - tok::space_2);
+         const ImVec2 np = ImGui::GetCursorScreenPos();
          if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
             folded = !folded;
          if (PanelKit::AuditOpenAll())
@@ -12443,16 +12481,13 @@ namespace
             const bool hov = ImGui::IsItemHovered();
             const ImU32 col = ImGui::GetColorU32(l->fx[t].on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov ? 1.0f : 0.85f);
             ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 c(np.x + 5.0f, np.y + fh * 0.5f);
-            if (!folded)
-               dl->AddTriangleFilled(ImVec2(c.x - 3.5f, c.y - 2), ImVec2(c.x + 3.5f, c.y - 2), ImVec2(c.x, c.y + 3), col);
-            else
-               dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 3.5f), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 3.5f), col);
-            const std::string title = app::TruncateWithEllipsis(T(Scene2DNode::FxName(t)), std::max(16.0f, nameW - 18.0f));
-            dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, title.c_str());
+            FoldMark(dl, ImVec2(np.x + HeaderMark() * 0.5f, np.y + fh * 0.5f), folded, col);
+            const float textX = np.x + HeaderMark() + tok::space_2;
+            const std::string title = app::TruncateWithEllipsis(T(Scene2DNode::FxName(t)), std::max(16.0f, nameW - (textX - np.x) - 2.0f));
+            dl->AddText(ImVec2(textX, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, title.c_str());
          }
          FormParts::Inline(0.0f, tok::space_2);
-         if (IconChip((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove layer style")))
+         if (HeaderIcon((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove layer style"), rowY))
          {
             PushUndoCheckpoint("Remove layer style");
             l->fx[t].on = false;
@@ -12568,11 +12603,10 @@ namespace
             HelpTip("%s", T("On"));
          FormParts::Inline(0.0f, tok::space_2);
          ImGui::SetCursorPosY(rowY);
-         const float gripW = 16.0f;
-         const float chipsW = 2.0f * sChip + 2.0f * tok::space_1 + gripW;
+         const float fh = ImGui::GetFrameHeight();
+         const float chipsW = 3.0f * fh + 2.0f * tok::space_1;
          const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
          const ImVec2 np = ImGui::GetCursorScreenPos();
-         const float fh = ImGui::GetFrameHeight();
          if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
          {
             folded = !folded;
@@ -12609,38 +12643,30 @@ namespace
                HelpTip("%s", T("Click to fold, drag to reorder"));
             const ImU32 col = ImGui::GetColorU32(l->visible ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !l->visible ? 1.0f : 0.85f);
             ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 c(np.x + 5.0f, np.y + fh * 0.5f);
-            if (!folded)
-               dl->AddTriangleFilled(ImVec2(c.x - 3.5f, c.y - 2), ImVec2(c.x + 3.5f, c.y - 2), ImVec2(c.x, c.y + 3), col);
-            else
-               dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 3.5f), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 3.5f), col);
+            FoldMark(dl, ImVec2(np.x + HeaderMark() * 0.5f, np.y + fh * 0.5f), folded, col);
+            const float textX = np.x + HeaderMark() + tok::space_2;
             const std::string fullTitle = (l->name.empty() ? std::string(T(Scene2DNode::AdjName(l->adjType))) : l->name) +
                                           (l->clip ? std::string(" · ") + T("Clipped") : std::string());
-            const std::string title = app::TruncateWithEllipsis(fullTitle, std::max(16.0f, nameW - 18.0f));
-            dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, title.c_str());
+            const std::string title = app::TruncateWithEllipsis(fullTitle, std::max(16.0f, nameW - (textX - np.x) - 2.0f));
+            dl->AddText(ImVec2(textX, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, title.c_str());
          }
          FormParts::Inline(0.0f, tok::space_2);
-         if (IconChip((base + "clip").c_str(), IconsInfinite::Mask, l->clip,
-                      l->clip ? T("Unclip from layer below") : T("Clip to layer below")))
+         if (HeaderIcon((base + "clip").c_str(), IconsInfinite::Mask, l->clip,
+                        l->clip ? T("Unclip from layer below") : T("Clip to layer below"), rowY))
          {
             PushUndoCheckpoint("Clipping mask");
             l->clip = !l->clip;
             Touch();
          }
          FormParts::Inline(0.0f, tok::space_1);
-         if (IconChip((base + "del").c_str(), IconsInfinite::Close, false, T("Delete adjustment")))
+         if (HeaderIcon((base + "del").c_str(), IconsInfinite::Close, false, T("Delete adjustment"), rowY))
             deleteId = id;
          FormParts::Inline(0.0f, tok::space_1);
+         HeaderIcon((base + "grip").c_str(), IconsInfinite::Grip, false, nullptr, rowY, true);
+         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
          {
-            const ImVec2 gp = ImGui::GetCursorScreenPos();
-            ImGui::InvisibleButton((base + "grip").c_str(), ImVec2(gripW, fh));
-            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
-            {
-               ImGui::SetDragDropPayload("V2D_LAYER", &id, sizeof(int));
-               ImGui::EndDragDropSource();
-            }
-            glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(gp.x + gripW * 0.5f, gp.y + fh * 0.5f), tok::icon_control,
-                        ImGui::GetColorU32(ImGuiCol_TextDisabled, ImGui::IsItemHovered() ? 0.95f : 0.55f), IconsInfinite::Grip);
+            ImGui::SetDragDropPayload("V2D_LAYER", &id, sizeof(int));
+            ImGui::EndDragDropSource();
          }
          if (l->visible && !folded)
          {

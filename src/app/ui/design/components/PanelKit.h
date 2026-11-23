@@ -99,6 +99,12 @@ namespace PanelKit
       static bool b = false;
       return b;
    }
+   // The audit's user-view shots: every fold draws at its default, whatever earlier pokes left stored.
+   inline bool& AuditAsUser()
+   {
+      static bool b = false;
+      return b;
+   }
 
    // A folding section header, remembered per text. Returns whether the section is open.
    inline bool FoldHeader(const char* text, bool first = false, bool startOpen = true)
@@ -107,7 +113,7 @@ namespace PanelKit
       if (!first)
          ImGui::Dummy(ImVec2(0.0f, kSection - RowGap() * 2.0f));
       auto it = sOpen.find(text);
-      bool open = it != sOpen.end() ? it->second : startOpen;
+      bool open = it != sOpen.end() && !AuditAsUser() ? it->second : startOpen;
       ImGui::PushID(text);
       const float h = ImGui::GetTextLineHeight() + 2.0f;
       const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -115,7 +121,8 @@ namespace PanelKit
          open = !open;
       const bool hov = ImGui::IsItemHovered();
       ImGui::PopID();
-      sOpen[text] = open;
+      if (!AuditAsUser())
+         sOpen[text] = open;
       open = open || AuditOpenAll();
       const ImU32 col = ImGui::GetColorU32(hov ? ImGuiCol_Text : ImGuiCol_TextDisabled);
       ImDrawList* dl = ImGui::GetWindowDrawList();

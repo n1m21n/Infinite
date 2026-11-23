@@ -43,6 +43,7 @@ def main():
     ap.add_argument("--rebaseline", action="store_true")
     ap.add_argument("--view2d", action="store_true", help="audit the 2D View alone (registry + coverage gate)")
     ap.add_argument("--shots", default="", help="--view2d: also save the panel's pixels per state into this folder")
+    ap.add_argument("--as-user", action="store_true", help="--shots: folds drawn as a user first sees them, not all open")
     ap.add_argument("--app", default="", help="the debug app binary to run (default build-dev)")
     a = ap.parse_args()
     global BASELINE
@@ -68,6 +69,8 @@ def main():
         if a.shots:
             os.makedirs(a.shots, exist_ok=True)
             env["INFINITE_UIAUDIT_V2D_SHOTS"] = os.path.abspath(a.shots)
+            if a.as_user:
+                env["INFINITE_UIAUDIT_V2D_SHOTS_AS_USER"] = "1"
     t0 = time.time()
     # Under a pty: redirected output is lost if the run is killed.
     p = subprocess.Popen(["script", "-q", log, a.app or BIN], env=env, stdin=subprocess.DEVNULL,
