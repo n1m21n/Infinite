@@ -1,7 +1,7 @@
 ---
 title: "Proven-stable modulation: automatic stability certificates for user-written filters"
 slug: "stable-modulation"
-status: "phase-3-done"
+status: "phase-4-done"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-stable-modulation.md"
@@ -412,6 +412,68 @@ binary; nothing was rebuilt.
 - **Section 7 rule.** H4 fails, and the H1 to H3 claim stands. The exploratory row is not a verdict. It
   shows the slew claim is only meaningful relative to the filter's own speed (the next steps carry it).
 
+### Phase 4 (2026-11-23): blind set B, scored once
+
+- **Lock.** The scorer was locked at commit `f9180894`, before B existed. That commit only taught the
+  scripts to read `corpus/B.json`; no threshold, oracle setting or certifier step changed.
+- **Generation.** `scripts/gen_kernels.py B` was then run as D4 sets out: seed 20261123, 200 kernels, n from
+  1 to 8, select at 30% of terms.
+  - D4's "30% Select" is read as a share of terms. G is at 15% of terms, which already puts a select in 68%
+    of its kernels. Measured on B: 29.6% of terms, 177 of 200 kernels.
+  - Sizes: n = 1 to 8 → 17 / 19 / 28 / 31 / 30 / 22 / 31 / 22 kernels.
+- **Run.** `emit_field.py`, one interpreter dump with the phase 2 binary (no rebuild),
+  `phase2_compare.py <dir> data/phase4-B-compare.json`, then `phase3_score.py B --jobs 6`, once (105 s).
+  Data: `data/phase4-B.json`, `.log`, `data/phase4-B-compare.json`.
+
+**Field dump on B**
+- 91 of 200 compile. All 91 match Python within 2.2e-7, below the 1e-5 bar. The largest gate error is
+  3.0e-7.
+- 109 exceed the 128-register cap: every kernel with n ≥ 6, plus most with n = 5. They are scored on
+  Python matrices under the G rule (owner decision 2026-11-23).
+- The Float32 bound for those kernels uses the 1.9e-7 fixed at the lock. B's measured 2.2e-7 is inside the
+  10x factor.
+
+**Verdicts on B**
+
+| ID | Bar | Result on B | Verdict |
+|---|---|---|---|
+| H1 | 0 certificates on kernels with a witness | **0** of 85 | **Pass**: confirmed on L + G + B |
+| H3 | ≥ 80% of no-witness kernels certified | **102 of 115 = 88.7%** | **Pass**: confirmed on B |
+
+| Group | Kernels | Witness | No witness | Certified | Share |
+|---|---|---|---|---|---|
+| Field matrices | 91 | 34 | 57 | 55 | 96.5% |
+| Python matrices (over the cap) | 109 | 51 | 58 | 47 | 81.0% |
+| All of B | 200 | 85 | 115 | 102 | 88.7% |
+
+- **Coverage drops with size.** n ≤ 5: 73 of 76 no-witness kernels certified. n = 6 to 8: 29 of 39.
+  - Larger random systems are less likely to have one common quadratic P.
+  - H3 still clears 80% on the Python group, where all the large kernels sit.
+- **The 13 kernels without a proof** have best growth 0.95 to 0.998, and every LMI is infeasible. None
+  ended "grid-certified".
+- **Float32.**
+
+  | Certified kernels | Holds at points | Proved | Largest rise |
+  |---|---|---|---|
+  | Field (55) | 55 | **55** | 1.3e-7 |
+  | Python bound (47) | n/a | 41 | bound up to 9.5e-5 |
+
+  The 6 that aren't proved all use the loose bound, with slack 1.2e-6 to 3.8e-5. No measured Field
+  certificate failed.
+- **Today's frozen check on B** (phase 1 definitions):
+
+  | Check | Result |
+  |---|---|
+  | B1a: default knobs (box midpoint) | calls **77 of 85** unstable kernels safe (91%) |
+  | B1b: every point of a 7-per-axis grid | calls **28 of 85** safe (33%) |
+  | The certifier | calls **0** safe |
+
+  47 of B's 85 witnesses are frozen-unstable at one setting.
+- **Certify time in Python:** median 0.37 s, p95 9.5 s, max 19.1 s. Times grow with n = 8.
+
+**Section 7 rule.** H1 to H3 pass on L, G and B, so the study ships as research. H4 failed as registered
+(phase 3). H5 waits for approval of the in-app port.
+
 ## 11. Critique
 *(After measurement.)*
 
@@ -421,7 +483,6 @@ binary; nothing was rebuilt.
 
 | Step | What | Note |
 |---|---|---|
-| Phase 4 | Lock `phase3_score.py` and `certify.py` by commit, generate B (seed 20261123, settings in D4), score once: H1, H3 | n ≤ 8 makes more of B exceed Field's register cap; same Field / Python split as G |
 | Phase 5 | Sections 11-12 final, `ARTIFACT.md`, `kick-the-tires.sh`, Web Lab Note | |
 | Follow-up (H4 redo, needs its own sign-off) | Rate-aware slew: limit dk relative to the filter's own decay (for example Δk ≤ c · g per sample), or V(x, g, k) with g slew-limited too | Phase 3 shows the fixed 20 ms slew can't help while the cutoff can reach 0 |
 | Product question, not research | Field's 128-register cap blocks dense n ≥ 5 filters | Phase 2 finding |

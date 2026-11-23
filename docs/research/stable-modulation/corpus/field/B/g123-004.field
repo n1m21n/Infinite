@@ -1,0 +1,10 @@
+# G set g123-004, n 1, knobs 3
+param float p0 = 0.5 [0, 1]
+param float p1 = 0.5 [0, 1]
+param float p2 = 0.5 [0, 1]
+state float z0 = 0
+f0 = p1
+f1 = if(p0 > 0.559591634, 1, 0)
+nx_z0 = 0.98*z0 + f0*(-0.0524322862*z0) + f1*(-1.34435157*z0) + in
+z0 = nx_z0
+out = z0
