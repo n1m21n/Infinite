@@ -135,10 +135,7 @@ namespace app
       char sSceneNameBuf[64] = {};
       float sSceneTempoEdit = 0.0f;
 
-      ImU32 WithAlpha(ImU32 c, float a)
-      {
-         return (c & 0x00FFFFFFu) | ((ImU32)(std::clamp(a, 0.0f, 1.0f) * 255.0f) << IM_COL32_A_SHIFT);
-      }
+      using tok::WithAlpha;
 
       ImU32 TextCol(float alpha)
       {

@@ -5,6 +5,7 @@
 // Changed card diffed from the patch before and after. Files attach by the + button or a drop. Every chat
 // is saved and comes back from the history menu with its agent sessions.
 #include "app/AppShared.h"
+#include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -270,13 +271,8 @@ namespace app
 
       bool Light() { return CategoryColors::IsThemeLight(); }
 
-      ImU32 WithAlpha(ImU32 c, float a) { return (c & 0x00FFFFFFu) | ((ImU32)(std::clamp(a, 0.0f, 1.0f) * 255.0f) << 24); }
-
-      ImU32 TextTint(float a)
-      {
-         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         return ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, a));
-      }
+      using tok::WithAlpha;
+      using tok::TextTint;
 
       ImU32 Dim() { return ImGui::GetColorU32(ImGuiCol_TextDisabled); }
       ImU32 Red() { return tok::U32(tok::action_record, Light()); }

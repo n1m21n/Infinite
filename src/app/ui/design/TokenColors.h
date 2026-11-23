@@ -43,4 +43,28 @@ namespace tok
       const Rgbaf& c = light ? p.light : p.dark;
       return ImVec4(c.r, c.g, c.b, c.a);
    }
+
+   // The one alpha helpers (chunk 3: one definition each). WithAlpha sets the alpha (0..1); ScaleAlpha multiplies
+   // the alpha the colour already has; the ImVec4 form goes through ImGui, so the style's disabled dimming applies.
+   inline ImU32 WithAlpha(ImU32 c, float a)
+   {
+      const float k = a < 0.0f ? 0.0f : a > 1.0f ? 1.0f : a;
+      return (c & ~IM_COL32_A_MASK) | ((ImU32)(k * 255.0f) << IM_COL32_A_SHIFT);
+   }
+   inline ImU32 WithAlpha(ImVec4 c, float a)
+   {
+      c.w = a;
+      return ImGui::GetColorU32(c);
+   }
+   inline ImU32 ScaleAlpha(ImU32 c, float k)
+   {
+      const ImU32 base = (c >> IM_COL32_A_SHIFT) & 0xFF;
+      return (c & ~IM_COL32_A_MASK) | ((ImU32)(k * (float)base) << IM_COL32_A_SHIFT);
+   }
+   // The theme's text colour at alpha a (faint fills and rules drawn in ink).
+   inline ImU32 TextTint(float a)
+   {
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      return ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, a));
+   }
 }

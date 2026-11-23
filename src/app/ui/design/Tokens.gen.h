@@ -151,6 +151,7 @@ namespace tok
    constexpr float radius_container = 8.0f;
    constexpr float control_w = 150.0f;
    constexpr float list_max_w = 280.0f;
+   constexpr float list_min_w = 120.0f;
    constexpr float colour_dot = 15.0f;
    constexpr float title_pad_y = 14.0f;
    constexpr float progress_h = 6.0f;

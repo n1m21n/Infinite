@@ -14,6 +14,8 @@
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/CheckBox.h"
+#include "app/ui/design/components/MenuParts.h"
+#include <vector>
 #include "app/selftest/UiAudit.h"
 
 namespace PanelKit
@@ -282,5 +284,75 @@ namespace PanelKit
       ImGui::SetCursorScreenPos(o);
       ImGui::Dummy(ImVec2(avail, rows * rowH + (rows - 1) * gapRow));
       return hit;
+   }
+
+   // ---- toolbar chips, pickers, undo (one definition each; were copied per panel)
+
+   // The scoped chip kind for a run of toolbar items: on is Selected, or Go (green) for a running state.
+   inline void PushToolbarChip(bool on, bool green = false)
+   {
+      ActionButton::Scoped() = !on ? ActionButton::Kind::Plain : green ? ActionButton::Kind::Go : ActionButton::Kind::Selected;
+   }
+   inline void PopToolbarChip() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
+
+   // A dropdown face: the value clipped inside a Chip()-tall chip of width w. bmin/bmax give the chip's rect.
+   inline bool PickerFace(const char* id, const char* value, float w, const char* tip, ImVec2& bmin, ImVec2& bmax)
+   {
+      const bool clicked = ActionButton::Draw(id, ImVec2(w, Chip()));
+      if (tip != nullptr && ImGui::IsItemHovered())
+         HelpTip("%s", tip);
+      bmin = ImGui::GetItemRectMin();
+      bmax = ImGui::GetItemRectMax();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const float cy = (bmin.y + bmax.y) * 0.5f;
+      dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_2, bmax.y), true);
+      dl->AddText(ImVec2(bmin.x + tok::space_3, cy - ImGui::GetFontSize() * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), value);
+      dl->PopClipRect();
+      return clicked;
+   }
+
+   // The list under a picker face, at least the face's width, list_min_w..list_max_w wide.
+   inline bool BeginPickerMenu(const char* id, ImVec2 bmin, ImVec2 bmax, float w)
+   {
+      ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(tok::list_min_w, w), 0.0f), ImVec2(tok::list_max_w, MenuParts::ListMaxH()));
+      return MenuParts::BeginPopup(id);
+   }
+
+   // A dropdown of width w over `count` items (already in the UI language). Returns true when the pick changed.
+   inline bool Picker(const char* id, const char* const* items, int count, int& cur, float w, const char* tip = nullptr)
+   {
+      ImVec2 bmin, bmax;
+      if (PickerFace(id, count > 0 ? items[std::clamp(cur, 0, count - 1)] : "", w, tip, bmin, bmax))
+         ImGui::OpenPopup(id);
+      bool changed = false;
+      if (BeginPickerMenu(id, bmin, bmax, w))
+      {
+         for (int i = 0; i < count; i++)
+            if (MenuParts::Choice(items[i], i == cur) && i != cur)
+            {
+               cur = i;
+               changed = true;
+            }
+         MenuParts::EndPopup();
+      }
+      return changed;
+   }
+   // The same over English item names, translated for display.
+   inline bool Picker(const char* id, const std::vector<std::string>& items, int& cur, float w, const char* tip = nullptr)
+   {
+      std::vector<const char*> shown;
+      shown.reserve(items.size());
+      for (const std::string& s : items)
+         shown.push_back(I18n::T(s.c_str()));
+      return Picker(id, shown.data(), (int)shown.size(), cur, w, tip);
+   }
+
+   // A toggle that has already flipped *v: records the undo step with the value it had before.
+   inline void UndoOnToggle(bool* v, const char* what)
+   {
+      *v = !*v;
+      PushUndoCheckpoint(what);
+      *v = !*v;
    }
 }

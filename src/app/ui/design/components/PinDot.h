@@ -36,17 +36,11 @@ namespace PinDot
       return 0.86f + 0.14f * std::sin((float)ImGui::GetTime() * 2.6f);
    }
 
-   inline ImU32 WithAlpha(ImU32 c, float a)
-   {
-      const ImU32 base = (c >> 24) & 0xFF;
-      return (c & 0x00FFFFFFu) | ((ImU32)(a * (float)base) << 24);
-   }
-
    // Param pin centred on `c`. Sits in a tok::pin_box square.
    inline void Param(ImDrawList* dl, ImVec2 c, State s, bool isLight)
    {
       const bool on = Driven(s);
-      const ImU32 col = WithAlpha(Colour(s, isLight), Pulse(s));
+      const ImU32 col = tok::ScaleAlpha(Colour(s, isLight), Pulse(s));
       dl->AddCircleFilled(c, tok::pin_r_param_on, tok::U32(tok::pin_well, isLight));
       dl->AddCircle(c, on ? tok::pin_r_param_on : tok::pin_r_param, col, 12, 2.0f);
       if (on)

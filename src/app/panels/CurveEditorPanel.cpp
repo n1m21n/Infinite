@@ -491,48 +491,9 @@ namespace
       return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::Chip());
    }
 
-   bool PickerFace(const char* id, const char* value, float w, const char* tip, ImVec2& bmin, ImVec2& bmax)
-   {
-      const bool clicked = ActionButton::Draw(id, ImVec2(w, PanelKit::Chip()));
-      if (tip != nullptr && ImGui::IsItemHovered())
-         HelpTip("%s", tip);
-      bmin = ImGui::GetItemRectMin();
-      bmax = ImGui::GetItemRectMax();
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const float cy = (bmin.y + bmax.y) * 0.5f;
-      dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_2, bmax.y), true);
-      dl->AddText(ImVec2(bmin.x + tok::space_3, cy - ImGui::GetFontSize() * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), value);
-      dl->PopClipRect();
-      return clicked;
-   }
-
-   bool BeginPickerMenu(const char* id, ImVec2 bmin, ImVec2 bmax, float w)
-   {
-      ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
-      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(120.0f, w), 0.0f), ImVec2(280.0f, MenuParts::ListMaxH()));
-      return MenuParts::BeginPopup(id);
-   }
-
-   // A dropdown face of width w and its menu. Returns true when the pick changed.
-   bool Picker(const char* id, const std::vector<std::string>& items, int& cur, float w, const char* tip = nullptr)
-   {
-      ImVec2 bmin, bmax;
-      const int shown = std::clamp(cur, 0, std::max(0, (int)items.size() - 1));
-      if (PickerFace(id, items.empty() ? "" : T(items[shown].c_str()), w, tip, bmin, bmax))
-         ImGui::OpenPopup(id);
-      bool changed = false;
-      if (BeginPickerMenu(id, bmin, bmax, w))
-      {
-         for (int i = 0; i < (int)items.size(); i++)
-            if (MenuParts::Choice(T(items[i].c_str()), i == cur) && i != cur)
-            {
-               cur = i;
-               changed = true;
-            }
-         MenuParts::EndPopup();
-      }
-      return changed;
-   }
+   using PanelKit::PickerFace;
+   using PanelKit::BeginPickerMenu;
+   using PanelKit::Picker;
 
    // An inspector edit is one undo step: the checkpoint lands when the control is grabbed.
    void UndoOnGrab()

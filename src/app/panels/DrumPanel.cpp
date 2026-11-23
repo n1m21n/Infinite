@@ -14,6 +14,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiType.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/DeskParts.h"
@@ -163,12 +164,6 @@ namespace app
          *v = before;
          PushUndoCheckpoint("Drums");
          *v = now;
-      }
-      void UndoOnToggle(bool* v)
-      {
-         *v = !*v;
-         PushUndoCheckpoint("Drums");
-         *v = !*v;
       }
 
       float TextW(const char* s) { return ImGui::CalcTextSize(s, nullptr, true).x + 2.0f * tok::space_2; }
@@ -593,7 +588,7 @@ namespace app
             if (ChipButton::Draw((std::string(T("Run")) + "##run").c_str(), n->run, tok::control_h))
             {
                n->run = !n->run;
-               UndoOnToggle(&n->run);
+               PanelKit::UndoOnToggle(&n->run, "Drums");
             }
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Run this sequencer's steps (the transport keeps going)"));
@@ -698,14 +693,14 @@ namespace app
             if (DeskParts::Key("M##m", "M", n->laneMute[lane], tok::U32(tok::desk_led_red), ImVec2(keyW, keyH)))
             {
                n->laneMute[lane] = !n->laneMute[lane];
-               UndoOnToggle(&n->laneMute[lane]);
+               PanelKit::UndoOnToggle(&n->laneMute[lane], "Drums");
             }
             x += keyW + pad;
             ImGui::SetCursorScreenPos(ImVec2(x, cy - keyH * 0.5f));
             if (DeskParts::Key("S##s", "S", n->laneSolo[lane], tok::U32(tok::desk_led_yellow), ImVec2(keyW, keyH)))
             {
                n->laneSolo[lane] = !n->laneSolo[lane];
-               UndoOnToggle(&n->laneSolo[lane]);
+               PanelKit::UndoOnToggle(&n->laneSolo[lane], "Drums");
             }
             x += keyW + pad;
             DeskParts::ConsoleMeter(x, y, meterW, rowH, LaneLit(n, lane));
@@ -1126,10 +1121,10 @@ namespace app
             HelpTip("%s", T("Lanes in one choke group cut each other off (closed hat stops the open hat)"));
          SectionCard::RowLabel(T("Mix"));
          if (DeskParts::Key("M##im", "M", n->laneMute[lane], tok::U32(tok::desk_led_red), ImVec2(tok::control_h, tok::control_h)) && (n->laneMute[lane] = !n->laneMute[lane], true))
-            UndoOnToggle(&n->laneMute[lane]);
+            PanelKit::UndoOnToggle(&n->laneMute[lane], "Drums");
          ImGui::SameLine(0.0f, 1.0f);
          if (DeskParts::Key("S##is", "S", n->laneSolo[lane], tok::U32(tok::desk_led_yellow), ImVec2(tok::control_h, tok::control_h)) && (n->laneSolo[lane] = !n->laneSolo[lane], true))
-            UndoOnToggle(&n->laneSolo[lane]);
+            PanelKit::UndoOnToggle(&n->laneSolo[lane], "Drums");
          ImGui::PopID();
       }
 

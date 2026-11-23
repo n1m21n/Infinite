@@ -2927,29 +2927,17 @@ namespace
    // ---- the toolbar ----
    // One height (PanelKit::Chip()) for every item, one gap inside a group (space_1) and one between groups (space_3).
 
-   void PushToolbarChip(bool on, bool green = false)
-   {
-      ActionButton::Scoped() = !on ? ActionButton::Kind::Plain : green ? ActionButton::Kind::Go : ActionButton::Kind::Selected;
-   }
-   void PopToolbarChip() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
+   using PanelKit::PushToolbarChip;
+   using PanelKit::PopToolbarChip;
 
    constexpr float kIconW = tok::control_h;
 
    float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_3; }
 
-   // An icon chip in the Timeline's toolbar grammar. Returns true when clicked.
+   // An icon chip in the Timeline's toolbar grammar (the kit's chip, one glyph size per chip size).
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, bool green = false)
    {
-      PushToolbarChip(on, green);
-      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, PanelKit::Chip()));
-      PopToolbarChip();
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", tip);
-      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      const ImU32 icol = on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
-      if (glyphStr != nullptr)
-         glyph::Draw(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_control, icol, glyphStr);
-      return clicked;
+      return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::Chip(), green ? ActionButton::Kind::Go : ActionButton::Kind::Plain);
    }
 
    bool TextChip(const char* label, ActionButton::Kind kind = ActionButton::Kind::Plain)

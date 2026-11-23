@@ -1,4 +1,5 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/DialogParts.h"
@@ -38,11 +39,8 @@ namespace app
          return clicked;
       }
 
-      void PushToolbarChip(bool on, bool green = false)
-      {
-         ActionButton::Scoped() = !on ? ActionButton::Kind::Plain : green ? ActionButton::Kind::Go : ActionButton::Kind::Selected;
-      }
-      void PopToolbarChip() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
+      using PanelKit::PushToolbarChip;
+      using PanelKit::PopToolbarChip;
    }
 
    // Combo in the field-well style with the inspector's small chevron (no ImGui arrow button).

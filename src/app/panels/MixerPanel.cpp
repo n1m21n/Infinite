@@ -3,6 +3,7 @@
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/ReorderDrag.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/frame/CanvasLink.h"
@@ -444,12 +445,6 @@ namespace app
          PushUndoCheckpoint("Mixer strip");
          *v = now;
       }
-      void UndoOnToggle(bool* v)
-      {
-         *v = !*v;
-         PushUndoCheckpoint("Mixer strip");
-         *v = !*v;
-      }
 
       ImU32 CategoryColorOf(const GraphNode* gn)
       {
@@ -566,7 +561,6 @@ namespace app
          return picked;
       }
 
-      void DrawConsoleMeter(float x, float y, float w, float h, float level);
 
       // §4.2: one mini knob per send bus of this strip's Mixer (right-click: pre/post), then "+" for a new send FX.
       [[maybe_unused]] void DrawSends(ImVec2 p, MixerNode* m, const StripRef& r)
@@ -759,44 +753,6 @@ namespace app
          }
       }
 
-      // A segmented level meter with a calibrated -60..0 dB scale, unlit segments always visible and a falling peak
-      // marker held for a moment (state kept per meter in ImGui's storage).
-      void DrawConsoleMeter(float x, float y, float w, float h, float level)
-      {
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImVec2 tl(x, y), br(x + w, y + h);
-         dl->AddRectFilled(tl, br, Role(tok::desk_meter_off), tok::radius_cell);
-         const float db = level > 1e-4f ? 20.0f * log10f(level) : -120.0f;
-         auto frac = [](float d) { return std::clamp((d + 60.0f) / 60.0f, 0.0f, 1.0f); };
-         const float seg = 3.0f, gap = 1.0f, step = seg + gap;
-         const int n = std::max(1, (int)((h - 2.0f) / step));
-         const float lit = frac(db) * (float)n;
-         ImGuiStorage* st = ImGui::GetStateStorage();
-         const ImGuiID id = ImGui::GetID("##mpk");
-         float peak = st->GetFloat(id, 0.0f);
-         const float dt = ImGui::GetIO().DeltaTime;
-         peak = std::max(lit, peak - tok::motion_rate_peak_fall * dt * (float)n / 30.0f);
-         st->SetFloat(id, peak);
-         for (int i = 0; i < n; i++)
-         {
-            const float topY = br.y - 1.0f - (float)(i + 1) * step + gap;
-            const float segDb = -60.0f + 60.0f * ((float)i + 0.5f) / (float)n;
-            const bool on = (float)i + 0.5f <= lit;
-            const ImU32 base = tok::U32(segDb > -3.0f ? tok::desk_led_red : segDb > -12.0f ? tok::desk_led_amber : tok::desk_led_green);
-            dl->AddRectFilled(ImVec2(x + 1.5f, topY), ImVec2(br.x - 1.5f, topY + seg), on ? base : (base & 0x00FFFFFF) | (38u << 24), 0.5f);
-         }
-         const int pi = std::clamp((int)peak, 0, n - 1);
-         if (peak > 1.0f)
-         {
-            const float topY = br.y - 1.0f - (float)(pi + 1) * step + gap;
-            dl->AddRectFilled(ImVec2(x + 1.5f, topY), ImVec2(br.x - 1.5f, topY + seg), Hi(200), 0.5f);
-         }
-         static const float kTicks[] = { 0.0f, -6.0f, -12.0f, -24.0f, -48.0f };
-         for (float t : kTicks)
-            dl->AddLine(ImVec2(x - 3.0f, br.y - 1.0f - (h - 2.0f) * frac(t)), ImVec2(x - 1.0f, br.y - 1.0f - (h - 2.0f) * frac(t)),
-                        Ink(70), 1.0f);
-         dl->AddRect(tl, br, Hi(26), tok::radius_cell);
-      }
 
       // ---- Hardware desk look -------------------------------------------------------------------------------
       // References: SSL 4000 G (colour cap, scribble name, trim/pan pots, M/S keys with LEDs, long-throw fader with
@@ -958,7 +914,7 @@ namespace app
          dl->AddLine(ImVec2(a.x + 2.0f, capY), ImVec2(b.x - 2.0f, capY), Hi(255), 2.0f);
          // meter
          ImGui::PushID("mtr");
-         DrawConsoleMeter(p.x + w - meterW, p.y, meterW, h, level);
+         DeskParts::ConsoleMeter(p.x + w - meterW, p.y, meterW, h, level, true);
          ImGui::PopID();
       }
 
@@ -1085,7 +1041,7 @@ namespace app
          if (Key("##m", "M", m->mute[s], tok::U32(tok::desk_led_red), ImVec2(bw, kButtonsH)))
          {
             m->mute[s] = !m->mute[s];
-            UndoOnToggle(&m->mute[s]);
+            PanelKit::UndoOnToggle(&m->mute[s], "Mixer strip");
          }
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Mute"));
@@ -1100,7 +1056,7 @@ namespace app
             else
             {
                m->solo[s] = !m->solo[s];
-               UndoOnToggle(&m->solo[s]);
+               PanelKit::UndoOnToggle(&m->solo[s], "Mixer strip");
             }
          }
          if (ImGui::IsItemClicked(ImGuiMouseButton_Right))

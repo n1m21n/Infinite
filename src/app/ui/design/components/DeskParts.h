@@ -217,8 +217,8 @@ namespace DeskParts
    }
 
    // The Mixer's segmented LED meter (green / amber / red segments, held peak, dB ticks). level is linear 0..1;
-   // call between PushID/PopID so each meter keeps its own peak.
-   inline void ConsoleMeter(float x, float y, float w, float h, float level)
+   // call between PushID/PopID so each meter keeps its own peak. ticks: dB marks left of the meter (the Mixer).
+   inline void ConsoleMeter(float x, float y, float w, float h, float level, bool ticks = false)
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 tl(x, y), br(x + w, y + h);
@@ -232,7 +232,7 @@ namespace DeskParts
       const ImGuiID id = ImGui::GetID("##mpk");
       float peak = st->GetFloat(id, 0.0f);
       const float dt = ImGui::GetIO().DeltaTime;
-      peak = std::max(lit, peak - 14.0f * dt * (float)n / 30.0f);
+      peak = std::max(lit, peak - tok::motion_rate_peak_fall * dt * (float)n / 30.0f);
       st->SetFloat(id, peak);
       for (int i = 0; i < n; i++)
       {
@@ -247,6 +247,13 @@ namespace DeskParts
       {
          const float topY = br.y - 1.0f - (float)(pi + 1) * step + gap;
          dl->AddRectFilled(ImVec2(x + 1.5f, topY), ImVec2(br.x - 1.5f, topY + seg), Hi(200), 0.5f);
+      }
+      if (ticks)
+      {
+         static const float kTicks[] = { 0.0f, -6.0f, -12.0f, -24.0f, -48.0f };
+         for (float t : kTicks)
+            dl->AddLine(ImVec2(x - 3.0f, br.y - 1.0f - (h - 2.0f) * frac(t)), ImVec2(x - 1.0f, br.y - 1.0f - (h - 2.0f) * frac(t)),
+                        Ink(70), 1.0f);
       }
       dl->AddRect(tl, br, Hi(26), tok::radius_cell);
    }
