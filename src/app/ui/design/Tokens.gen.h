@@ -266,6 +266,8 @@ namespace tok
    constexpr float chat_code_min_w = 300.0f;
    constexpr float chat_code_max_w = 640.0f;
    constexpr float chat_autoscroll_max = 24.0f;
+   constexpr float perf_pad_inset_x = 16.0f;
+   constexpr float perf_pad_inset_y = 30.0f;
 
    struct Rgba8 { unsigned char r, g, b, a; };
    struct Rgbaf { float r, g, b, a; };

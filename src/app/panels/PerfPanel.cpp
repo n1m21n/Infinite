@@ -989,7 +989,7 @@ namespace app
          int p2 = elem.dstParam2 >= 0 ? elem.dstParam2 : (elem.dstParam >= 0 ? elem.dstParam + 1 : -1);
          auto [valY, kpY] = getParamRef(elem.dstIndex, p2, elem.value2);
 
-         float padSize = std::min(cardSize.x - 16.0f, cardSize.y - 30.0f);
+         float padSize = std::min(cardSize.x - tok::perf_pad_inset_x, cardSize.y - tok::perf_pad_inset_y);
          ImVec2 origin(cellPos.x + (cardSize.x - padSize) * 0.5f, cellPos.y + 22.0f);
          ImVec2 padBR(origin.x + padSize, origin.y + padSize);
 
@@ -1049,7 +1049,7 @@ namespace app
       }
       else if (elem.kind == 5) // Momentary Trigger / Bang (1x1)
       {
-         float padSize = std::min(cardSize.x - 18.0f, cardSize.y - 28.0f);
+         float padSize = std::min(cardSize.x - tok::perf_pad_inset_x, cardSize.y - tok::perf_pad_inset_y);
          float centerX = cellPos.x + (cardSize.x - padSize) * 0.5f;
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f - padSize) * 0.5f;
          ImVec2 bTL(centerX, centerY);

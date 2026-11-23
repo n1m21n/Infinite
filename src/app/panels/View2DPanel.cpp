@@ -8538,7 +8538,7 @@ namespace
          changed = true;
       }
       next();
-      if (FormParts::ColorDot("##v2dvfillc", t.fillC, std::min(18.0f, sRowH - 4.0f), sRowH))
+      if (FormParts::ColorDot("##v2dvfillc", t.fillC, std::min(tok::colour_dot, sRowH - 4.0f), sRowH))
       {
          // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
          static double sAt = -1.0;
@@ -8624,7 +8624,7 @@ namespace
          changed = true;
       }
       next();
-      if (FormParts::ColorDot("##v2dvstrokec", t.strokeC, std::min(18.0f, sRowH - 4.0f), sRowH))
+      if (FormParts::ColorDot("##v2dvstrokec", t.strokeC, std::min(tok::colour_dot, sRowH - 4.0f), sRowH))
       {
          // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
          static double sAt = -1.0;
@@ -9262,7 +9262,7 @@ namespace
       changed |= TextStyleChips(l != nullptr ? &l->bold : &sBold, l != nullptr ? &l->italic : &sItalic,
                                 l != nullptr ? &l->underline : &sUnder, l != nullptr ? &l->caps : &sCaps, undo, next);
       gap();
-      if (FormParts::ColorDot("##v2dtextc", colour, std::min(18.0f, sRowH - 4.0f), sRowH))
+      if (FormParts::ColorDot("##v2dtextc", colour, std::min(tok::colour_dot, sRowH - 4.0f), sRowH))
       {
          // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
          static double sAt = -1.0;
