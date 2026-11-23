@@ -27,7 +27,7 @@ namespace ActionButton
 
    // Where the slider/dropdown faces start and how wide they are inside a param column of `colW`
    // (the 12px pin box + 4px gap sit left of every face). Button rows span exactly that.
-   inline float ColumnIndent() { return 16.0f; }
+   inline float ColumnIndent() { return tok::space_4; }
    inline float ColumnWidth(float colW) { return std::max(1.0f, colW - ColumnIndent()); }
    // Width of each of `n` equal buttons laid across the slider column of `colW` with the 4px gutter.
    inline float RowWidth(int n, float colW)
@@ -52,8 +52,8 @@ namespace ActionButton
                                     : size.x > 0.0f
                                     // A given width is a layout cell (a strip that must end flush): kept unless the
                                     // label would not fit with even the small padding.
-                                    ? std::max(size.x, ts.x + (glyph != nullptr ? 20.0f : 0.0f) + 2.0f * tok::space_1)
-                                    : ts.x + (glyph != nullptr ? 20.0f : 0.0f) + 2.0f * tok::space_2;
+                                    ? std::max(size.x, ts.x + (glyph != nullptr ? tok::icon_lg : 0.0f) + 2.0f * tok::space_1)
+                                    : ts.x + (glyph != nullptr ? tok::icon_lg : 0.0f) + 2.0f * tok::space_2;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       if (ImGui::ButtonLabelHook != nullptr)
          ImGui::ButtonLabelHook(label); // headless --describe lists the buttons a node draws, as ImGui::Button does
@@ -70,11 +70,11 @@ namespace ActionButton
       {
       case Kind::Primary:
       case Kind::Selected: fill = app::AccentEmphasisSelected(); break;
-      case Kind::Record: { const tok::Rgba8& c = light ? tok::action_record.light : tok::action_record.dark; fill = ImVec4(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, 1.0f); break; }
-      case Kind::Learn: { const tok::Rgba8& c = light ? tok::action_learn.light : tok::action_learn.dark; fill = ImVec4(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, 1.0f); break; }
-      case Kind::Go: { const tok::Rgba8& c = light ? tok::action_go.light : tok::action_go.dark; fill = ImVec4(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, 1.0f); break; }
-      case Kind::Solo: { const tok::Rgba8& c = light ? tok::action_solo.light : tok::action_solo.dark; fill = ImVec4(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, 1.0f); break; }
-      default: fill = ImVec4(t.x, t.y, t.z, 0.06f + 0.05f * hv + (held ? 0.04f : 0.0f)); solid = false; break;
+      case Kind::Record: fill = tok::V4(tok::action_record, light); break;
+      case Kind::Learn: fill = tok::V4(tok::action_learn, light); break;
+      case Kind::Go: fill = tok::V4(tok::action_go, light); break;
+      case Kind::Solo: fill = tok::V4(tok::action_solo, light); break;
+      default: fill = ImVec4(t.x, t.y, t.z, tok::alpha_fill_rest + tok::alpha_hover_add * hv + (held ? tok::alpha_lift : 0.0f)); solid = false; break;
       }
       if (solid)
       {
@@ -83,8 +83,8 @@ namespace ActionButton
       }
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(fill), tok::radius_control);
-      const float iconW = glyph != nullptr ? 20.0f : 0.0f; // 14px glyph + 6px gap
-      const ImU32 ink = ImGui::GetColorU32(kind == Kind::Solo ? ImVec4(0.10f, 0.10f, 0.12f, 1.0f) : solid ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.85f));
+      const float iconW = glyph != nullptr ? tok::icon_lg : 0.0f; // 14px glyph + 6px gap
+      const ImU32 ink = ImGui::GetColorU32(kind == Kind::Solo ? ImVec4(0.10f, 0.10f, 0.12f, 1.0f) : solid ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, tok::alpha_text_soft));
       const float x0 = p.x + (w - ts.x - iconW) * 0.5f;
       if (glyph != nullptr)
          glyph::Draw(dl, ImVec2(std::round(x0 + 7.0f), std::round(p.y + h * 0.5f)), 14.0f, ink, glyph);
@@ -96,7 +96,7 @@ namespace ActionButton
       {
          ImVec2 gmn, gmx;
          glyph::InkBox(ImVec2(std::round(x0 + 7.0f), std::round(p.y + h * 0.5f)), 14.0f, glyph, gmn, gmx);
-         UiAudit::NoteInk(1, gmn, gmx, 14.0f, shown.c_str(), glyph);
+         UiAudit::NoteInk(1, gmn, gmx, tok::icon_sm, shown.c_str(), glyph);
       }
       if (!shown.empty())
          UiAudit::NoteInk(glyph != nullptr ? 5 : 0, tp, ImVec2(tp.x + ts.x, tp.y + ts.y));

@@ -5,6 +5,7 @@
 // Changed card diffed from the patch before and after. Files attach by the + button or a drop. Every chat
 // is saved and comes back from the history menu with its agent sessions.
 #include "app/AppShared.h"
+#include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
@@ -5242,7 +5243,7 @@ namespace app
             sCodeView.copiedAt = now;
          }
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", now - sCodeView.copiedAt < 1.5 ? T("Copied") : T("Copy"));
+            ImGui::SetTooltip("%s", now - sCodeView.copiedAt < tok::motion_s_copied ? T("Copied") : T("Copy"));
          FormParts::Inline(0.0f, 2.0f);
          if (GlyphToggle::Draw("##codeclose", IconsInfinite::Close, IconsInfinite::Close, false))
             sCodeView.open = false;

@@ -16,15 +16,15 @@
 
 namespace DialogParts
 {
-   constexpr float kButtonMinW = 72.0f;   // buttons hug their label, never stretch
+   constexpr float kButtonMinW = tok::dialog_button_min_w;   // buttons hug their label, never stretch
    constexpr float kButtonH = tok::control_h;
-   constexpr float kMaxW = 480.0f;        // widest a dialog grows; longer text wraps (other languages, bigger fonts)
+   constexpr float kMaxW = tok::dialog_w_max;        // widest a dialog grows; longer text wraps (other languages, bigger fonts)
 
    // Call after OpenPopup; pair a true result with End().
    inline bool Begin(const char* name)
    {
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSizeConstraints(ImVec2(280.0f, 0.0f), ImVec2(kMaxW, 4000.0f));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::dialog_w_min, 0.0f), ImVec2(kMaxW, tok::dialog_h_max));
       app::PushElevatedPanelStyle(false);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
       const bool open = ImGui::BeginPopupModal(name, nullptr,
@@ -181,7 +181,7 @@ namespace DialogParts
          const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
          const ImVec4 e = CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.16f) : ImVec4(1, 1, 1, 0.08f);
          ImGui::GetWindowDrawList()->AddRect(ImVec2(wp.x + 0.5f, wp.y + 0.5f), ImVec2(wp.x + ws.x - 0.5f, wp.y + ws.y - 0.5f),
-                                             ImGui::GetColorU32(e), 12.0f);
+                                             ImGui::GetColorU32(e), tok::radius_dialog);
       }
       ImGui::EndPopup();
       app::PopElevatedPanelStyle();

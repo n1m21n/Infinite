@@ -12,7 +12,7 @@ namespace app
    void DrawWavetableScope(WavetableNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
-      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / tok::motion_hz_scope)
       {
          float buf[WavetableNode::kScopeCacheCapacity];
          const int count = n->ReadScope(buf, WavetableNode::kScopeCacheCapacity);
@@ -70,7 +70,7 @@ namespace app
    void DrawFieldSampleScope(FieldSampleNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
-      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / tok::motion_hz_scope)
       {
          float buf[FieldSampleNode::kScopeCacheCapacity];
          const int count = n->ReadScope(buf, FieldSampleNode::kScopeCacheCapacity);
@@ -174,7 +174,7 @@ namespace app
    void DrawFieldSynthScope(FieldSynthNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
-      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / tok::motion_hz_scope)
       {
          float buf[FieldSynthNode::kScopeCacheCapacity];
          const int count = n->ReadScope(buf, FieldSynthNode::kScopeCacheCapacity);

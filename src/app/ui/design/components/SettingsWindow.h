@@ -53,7 +53,7 @@ namespace SettingsWindow
       // fixed width whatever the window does (the body's rows are sized from Width(), never from the window), so a
       // wider window leaves room on the right instead of stretching rows. It opens at the strip's width and its
       // content's height (0 = fit once), then keeps whatever size it is dragged to (a long list scrolls).
-      spec.minSize = ImVec2(Width(), 60.0f);
+      spec.minSize = ImVec2(Width(), tok::window_min_h);
       spec.maxSize = ImVec2(vp->WorkSize.x, vp->WorkSize.y);
       spec.flags = ImGuiWindowFlags_NoSavedSettings;
       ImGui::SetNextWindowSize(ImVec2(Width(), 0.0f), ImGuiCond_Appearing);

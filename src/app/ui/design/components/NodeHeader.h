@@ -11,7 +11,7 @@
 // Node header: title row carries the category to the right of the title, dimmed, led by its family glyph.
 namespace NodeHeader
 {
-   constexpr float kFamilyGlyph = 14.0f;
+   constexpr float kFamilyGlyph = tok::icon_sm;
 
    // One glyph per node category (G12 decision: families, not one per node type). nullptr = none known.
    inline const char* FamilyGlyph(const char* category)
@@ -68,7 +68,7 @@ namespace NodeHeader
          ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          if (ImGui::BeginTooltip())
          {
-            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * tok::tip_wrap_em);
             ImGui::TextUnformatted(issue.reason.c_str());
             ImGui::PopTextWrapPos();
             ImGui::EndTooltip();

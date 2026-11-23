@@ -24,7 +24,7 @@ namespace PanelFrame
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_container);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
       ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(t.border.r, t.border.g, t.border.b, 0.9f));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(t.border.r, t.border.g, t.border.b, tok::alpha_edge_strong));
    }
    inline void PopFloatingStyle()
    {
@@ -55,7 +55,7 @@ namespace PanelFrame
       ImDrawList* dl = ImGui::GetWindowDrawList();
       for (int i = 6; i >= 1; --i)   // soft shadow: stacked, widening, fainter rings
          dl->AddRectFilled(ImVec2(c0.x - i, c0.y - i + 2.0f), ImVec2(c1.x + i, c1.y + i + 2.0f),
-                           ImGui::GetColorU32(ImVec4(0, 0, 0, 7 / 255.0f)), tok::radius_container + i);
+                           ImGui::GetColorU32(ImVec4(0, 0, 0, tok::alpha8_shadow_panel / 255.0f)), tok::radius_container + i);
       dl->AddRectFilled(c0, c1, ImGui::GetColorU32(ImGuiCol_ChildBg), tok::radius_container);
    }
 

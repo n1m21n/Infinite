@@ -25,7 +25,7 @@ namespace PillGroup
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       dl->AddRectFilled(ImVec2(r.x, r.y), ImVec2(r.Right(), r.Bottom()),
-                        ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.06f)), tok::radius_container);
+                        ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, tok::alpha_fill_rest)), tok::radius_container);
       const UiLayout::Rect inner = r.Inset(2.0f);
       std::vector<UiLayout::Cell> cells(static_cast<size_t>(count), UiLayout::Flex());
       const std::vector<UiLayout::Rect> rects = UiLayout::Row(inner, cells, 0.0f);
@@ -49,15 +49,15 @@ namespace PillGroup
          const float hv = UiAnim::Hover(s.id, s.hovered && i != selected, tok::motion_hover_in, tok::motion_hover_out);
          if (hv > 0.001f)
             dl->AddRectFilled(ImVec2(cr.x, cr.y), ImVec2(cr.Right(), cr.Bottom()),
-                              ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.06f * hv)), tok::radius_container);
+                              ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, tok::alpha_fill_rest * hv)), tok::radius_container);
          if (s.focused)
             dl->AddRect(ImVec2(cr.x - 1, cr.y - 1), ImVec2(cr.Right() + 1, cr.Bottom() + 1),
                         ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_container + 1.0f, 0, 2.0f);
          UiType::Scope ts(labelSize, UiType::Weight::Medium);
          // A longer label (another language, a bigger font) is cut with an ellipsis instead of spilling out of its pill.
          std::string shown(segs[i].label);
-         if (ImGui::CalcTextSize(segs[i].label).x > cr.w - 8.0f)
-            shown = app::TruncateWithEllipsis(shown, cr.w - 8.0f);
+         if (ImGui::CalcTextSize(segs[i].label).x > cr.w - tok::space_2)
+            shown = app::TruncateWithEllipsis(shown, cr.w - tok::space_2);
          const ImVec2 sz = ImGui::CalcTextSize(shown.c_str());
          dl->AddText(ImVec2(std::round(cr.CenterX() - sz.x * 0.5f), std::round(cr.CenterY() - sz.y * 0.5f)),
                      ImGui::GetColorU32(text), shown.c_str());

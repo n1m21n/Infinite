@@ -11,7 +11,7 @@ namespace app
    void DrawOscillatorScope(OscillatorNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
-      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / tok::motion_hz_scope)
       {
          float buf[OscillatorNode::kScopeCacheCapacity];
          const int count = n->ReadScope(buf, OscillatorNode::kScopeCacheCapacity);
@@ -69,7 +69,7 @@ namespace app
    void DrawMetallicScope(MetallicNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
-      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / tok::motion_hz_scope)
       {
          float buf[MetallicNode::kScopeCacheCapacity];
          const int count = n->ReadScope(buf, MetallicNode::kScopeCacheCapacity);
@@ -1847,7 +1847,7 @@ namespace app
    void DrawFMScope(FMNode* n, float h)
    {
       const double now = ImGui::GetTime();
-      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / tok::motion_hz_scope)
       {
          float buf[FMNode::kScopeCacheCapacity];
          const int count = n->ReadScope(buf, FMNode::kScopeCacheCapacity);
@@ -2279,7 +2279,7 @@ namespace app
    void DrawWaveTerrainScope(WaveTerrainNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
-      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / tok::motion_hz_scope)
       {
          float buf[WaveTerrainNode::kScopeCapacity];
          const int count = n->ReadScope(buf, WaveTerrainNode::kScopeCapacity);
@@ -2785,7 +2785,7 @@ namespace app
    void DrawImageSpectralSynthScope(ImageSpectralSynthNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
-      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / 30.0)
+      if (n->scopeCacheTime < 0.0 || now - n->scopeCacheTime > 1.0 / tok::motion_hz_scope)
       {
          float buf[ImageSpectralSynthNode::kScopeCapacity];
          const int count = n->ReadScope(buf, ImageSpectralSynthNode::kScopeCapacity);

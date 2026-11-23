@@ -774,7 +774,7 @@ namespace app
          const ImGuiID id = ImGui::GetID("##mpk");
          float peak = st->GetFloat(id, 0.0f);
          const float dt = ImGui::GetIO().DeltaTime;
-         peak = std::max(lit, peak - 14.0f * dt * (float)n / 30.0f);
+         peak = std::max(lit, peak - tok::motion_rate_peak_fall * dt * (float)n / 30.0f);
          st->SetFloat(id, peak);
          for (int i = 0; i < n; i++)
          {

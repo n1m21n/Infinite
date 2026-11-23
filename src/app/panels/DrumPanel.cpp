@@ -1404,7 +1404,7 @@ namespace app
             const float bodyH = bodyMax.y - bodyMin.y;
             const float dt = ImGui::GetIO().DeltaTime;
             for (int l = 0; l < kLanes; l++)
-               sPadFlash[l] = std::max(0.0f, sPadFlash[l] - dt * 6.0f);
+               sPadFlash[l] = std::max(0.0f, sPadFlash[l] - dt * tok::motion_rate_pad_decay);
             // A fixed desk: labels, a grid of fixed keys (16 a page) and the inspector right beside it, the same size at
             // any panel width or height; a smaller panel shows less of it, a bigger one leaves room around it.
             const ImVec2 seqMin = bodyMin;

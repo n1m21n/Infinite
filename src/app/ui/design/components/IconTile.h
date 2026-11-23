@@ -32,17 +32,17 @@ namespace IconTile
       const ImVec2 t0(c.x - ts * 0.5f, c.y - ts * 0.5f), t1(c.x + ts * 0.5f, c.y + ts * 0.5f);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      const float disabledA = enabled ? 1.0f : 0.35f;
+      const float disabledA = enabled ? 1.0f : tok::alpha_disabled;
 
       // Neutral hover/press overlay (6% / 12% of the text colour), fades with the hover value.
-      const float overlay = (down ? 0.12f : 0.06f * hv) * (1.0f - onv);
+      const float overlay = (down ? tok::alpha_fill_press : tok::alpha_fill_rest * hv) * (1.0f - onv);
       if (overlay > 0.001f)
          dl->AddRectFilled(t0, t1, ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, overlay)), tok::radius_control);
       // On: accent tile grows from the centre (radius-scaled), hue constant on hover, +4% light at most.
       if (onv > 0.001f)
       {
          ImVec4 a = app::AccentEmphasisSelected();
-         const float lift = 0.04f * hv;
+         const float lift = tok::alpha_lift * hv;
          a = ImVec4(a.x + (1.0f - a.x) * lift, a.y + (1.0f - a.y) * lift, a.z + (1.0f - a.z) * lift, 1.0f);
          if (down) a = app::AccentEmphasisPressed();
          const float k = onv;

@@ -2,6 +2,7 @@
 // draws itself in. Drawing and hit target only: the label and row layout belong to the caller (FormParts, MenuParts).
 #pragma once
 #include "app/selftest/UiAudit.h"
+#include "app/ui/design/TokenColors.h"
 #include <algorithm>
 #include <cmath>
 #include "app/AppShared.h"
@@ -19,9 +20,9 @@ namespace CheckBox
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec2 q(p.x + Size(), p.y + Size());
-      UiAudit::NoteFill(ImVec4(t.x, t.y, t.z, 0.06f));
-      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f + 0.06f * hv)), tok::radius_control);
-      dl->AddRect(p, q, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.10f) : ImVec4(1, 1, 1, 0.08f)),
+      UiAudit::NoteFill(ImVec4(t.x, t.y, t.z, tok::alpha_fill_rest));
+      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_fill_rest + tok::alpha_fill_rest * hv)), tok::radius_control);
+      dl->AddRect(p, q, ImGui::GetColorU32(tok::InkEdge(CategoryColors::IsThemeLight(), tok::alpha_mark_edge_light, tok::alpha_mark_edge_dark)),
                   tok::radius_control);
       if (onv <= 0.001f)
          return;
@@ -43,7 +44,7 @@ namespace CheckBox
          const float k2 = std::min(1.0f, (d - l1) / l2);
          dl->PathLineTo(ImVec2(a1.x + (a2.x - a1.x) * k2, a1.y + (a2.y - a1.y) * k2));
       }
-      dl->PathStroke(col, 0, 1.8f);
+      dl->PathStroke(col, 0, tok::stroke_mark);
    }
 
    // A box on its own line position; returns true when toggled. `id` must be unique in the window.
@@ -51,7 +52,7 @@ namespace CheckBox
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
       // G16: hit area 24x24 around the 16 box; layout keeps the 16 box (Dummy below).
-      const float kHit = std::max(UiDensity::M().row, Size() + 4.0f);
+      const float kHit = std::max(UiDensity::M().row, Size() + tok::space_1);
       ImGui::SetCursorScreenPos(ImVec2(p.x - (kHit - Size()) * 0.5f, p.y - (kHit - Size()) * 0.5f));
       const bool clicked = ImGui::InvisibleButton(id, ImVec2(kHit, kHit));
       const bool hovered = ImGui::IsItemHovered();

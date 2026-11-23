@@ -1,6 +1,7 @@
 // FieldWell: the recessed well behind a numeric/combo field (same 6% text tint as ChipButton) and its value fill.
 #pragma once
 #include <string>
+#include "app/ui/design/TokenColors.h"
 #include <algorithm>
 #include "app/ui/design/UiAnim.h"
 #include <type_traits>
@@ -14,10 +15,10 @@ namespace FieldWell
    inline void Draw(ImDrawList* dl, ImVec2 mn, ImVec2 mx, bool hovered, bool active)
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      const float a = active ? 0.12f : hovered ? 0.10f : 0.06f;
-      UiAudit::NoteFill(ImVec4(t.x, t.y, t.z, 0.06f));
+      const float a = active ? tok::alpha_fill_press : hovered ? tok::alpha_fill_hover : tok::alpha_fill_rest;
+      UiAudit::NoteFill(ImVec4(t.x, t.y, t.z, tok::alpha_fill_rest));
       dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, a)), tok::radius_control);
-      dl->AddRect(mn, mx, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),
+      dl->AddRect(mn, mx, ImGui::GetColorU32(tok::Hairline(CategoryColors::IsThemeLight())),
                   tok::radius_control);
    }
 
@@ -27,7 +28,7 @@ namespace FieldWell
       fillX = std::clamp(fillX, mn.x, mx.x);
       if (fillX <= mn.x) return;
       ImVec4 ac = app::AccentEmphasisSelected();
-      ac.w = 0.32f;
+      ac.w = tok::alpha_accent_wash;
       dl->PushClipRect(mn, ImVec2(fillX, mx.y), true);
       dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ac), tok::radius_control);
       dl->PopClipRect();
@@ -40,20 +41,20 @@ namespace FieldWell
    inline void PushStyle(ImGuiID id = 0)
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      float rest = 0.06f, hover = 0.10f;
+      float rest = tok::alpha_fill_rest, hover = tok::alpha_fill_hover;
       if (id != 0)
       {
          const ImVec2 mn = ImGui::GetCursorScreenPos();
          const bool hot = ImGui::IsMouseHoveringRect(mn, ImVec2(mn.x + ImGui::CalcItemWidth(), mn.y + ImGui::GetFrameHeight())) &&
                           ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
-         rest = hover = 0.06f + 0.04f * UiAnim::Hover(id, hot, tok::motion_hover_in, tok::motion_hover_out);
+         rest = hover = tok::alpha_fill_rest + tok::alpha_lift * UiAnim::Hover(id, hot, tok::motion_hover_in, tok::motion_hover_out);
       }
       ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(t.x, t.y, t.z, rest));
       ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(t.x, t.y, t.z, hover));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(t.x, t.y, t.z, 0.12f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(t.x, t.y, t.z, tok::alpha_fill_press));
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_Border, CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::Hairline(CategoryColors::IsThemeLight()));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
    }
@@ -67,7 +68,7 @@ namespace FieldWell
    inline void PushTypedEditStyle()
    {
       ImVec4 edge = ImGui::GetStyleColorVec4(ImGuiCol_SliderGrab);
-      edge.w = 0.6f;
+      edge.w = tok::accent_selected;
       ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_Border, edge);
       ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_PopupBg));
@@ -139,7 +140,7 @@ namespace FieldWell
       if (typing)
       {
          ImVec4 ac = app::AccentEmphasisSelected();
-         ac.w = 0.6f;
+         ac.w = tok::accent_selected;
          ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
          ImGui::PushStyleColor(ImGuiCol_Border, ac);
       }
@@ -208,10 +209,10 @@ namespace FieldWell
 
    // Row of round colour dots, `n` entries, `cols[i]` as ImU32. `selected` is the index with a ring (-1 = none).
    // Returns the clicked index or -1. `names[i]` feeds the tooltip.
-   inline int SwatchRow(const ImU32* cols, const char* const* names, int n, int selected, float d = 16.0f)
+   inline int SwatchRow(const ImU32* cols, const char* const* names, int n, int selected, float d = tok::page_swatch)
    {
       int clicked = -1;
-      const float gap = 4.0f;
+      const float gap = tok::space_1;
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       for (int i = 0; i < n; ++i)
       {

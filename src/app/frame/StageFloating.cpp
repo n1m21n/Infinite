@@ -382,7 +382,7 @@ int DrawFloating(FrameCtx& fc)
             case UpdateCheck::Status::Idle:
             case UpdateCheck::Status::Checking:
                // A few dots cycling off the clock so the dialog never looks frozen while the request is in flight.
-               snprintf(msg, sizeof(msg), T("Checking for updates%.*s"), (int)(ImGui::GetTime() * 2.0) % 4, "...");
+               snprintf(msg, sizeof(msg), T("Checking for updates%.*s"), (int)(ImGui::GetTime() * tok::motion_rate_dots) % 4, "...");
                DialogParts::Message(msg);
                break;
             case UpdateCheck::Status::UpToDate:

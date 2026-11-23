@@ -27,11 +27,11 @@ namespace FilterBar
       {
          const ImVec4 t = TextCol();
          dl->AddRectFilled(ImVec2(r.x, r.y), ImVec2(r.Right(), r.Bottom()),
-                           ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f)), tok::radius_container);
+                           ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_fill_rest)), tok::radius_container);
          const UiLayout::Rect in = r.Inset(2.0f);
          if (hv > 0.001f)
             dl->AddRectFilled(ImVec2(in.x, in.y), ImVec2(in.Right(), in.Bottom()),
-                              ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.06f * hv)), tok::radius_container);
+                              ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_fill_rest * hv)), tok::radius_container);
          if (tint > 0.001f)
          {
             const ImVec4 a = app::AccentEmphasisSelected();
@@ -43,8 +43,8 @@ namespace FilterBar
       // Icons are drawn as lines on one shared centre line, so they cannot drift off-centre like font glyphs.
       inline void Cross(ImDrawList* dl, ImVec2 c, ImU32 col)
       {
-         dl->AddLine(ImVec2(c.x - 3.5f, c.y - 3.5f), ImVec2(c.x + 3.5f, c.y + 3.5f), col, 1.5f);
-         dl->AddLine(ImVec2(c.x - 3.5f, c.y + 3.5f), ImVec2(c.x + 3.5f, c.y - 3.5f), col, 1.5f);
+         dl->AddLine(ImVec2(c.x - 3.5f, c.y - 3.5f), ImVec2(c.x + 3.5f, c.y + 3.5f), col, tok::stroke_cross);
+         dl->AddLine(ImVec2(c.x - 3.5f, c.y + 3.5f), ImVec2(c.x + 3.5f, c.y - 3.5f), col, tok::stroke_cross);
       }
 
       inline void OpenMenu(const std::vector<std::string>& options, int current, std::function<void(int)> onSelect)
@@ -80,14 +80,14 @@ namespace FilterBar
          if (shown != label)
             shown += "...";
          const float ty = std::round(r.CenterY() - ImGui::GetFontSize() * 0.5f);
-         dl->AddText(ImVec2(r.x + tok::space_3, ty), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, active ? 0.8f : 0.5f)), cap.c_str());
-         dl->AddText(ImVec2(tx, ty), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.95f)), shown.c_str());
+         dl->AddText(ImVec2(r.x + tok::space_3, ty), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, active ? tok::alpha_text_quiet : tok::alpha_text_dim)), cap.c_str());
+         dl->AddText(ImVec2(tx, ty), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_text_strong)), shown.c_str());
          bool cleared = false;
          if (active)
          {
             const ImVec2 c(trail, r.CenterY());
             const bool hov = ImGui::IsMouseHoveringRect(ImVec2(c.x - 10, c.y - 10), ImVec2(c.x + 10, c.y + 10));
-            detail::Cross(dl, c, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 1.0f : 0.8f)));
+            detail::Cross(dl, c, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 1.0f : tok::alpha_text_quiet)));
             cleared = s.clicked && hov;
          }
          if (clearClicked)
@@ -104,7 +104,7 @@ namespace FilterBar
          ImDrawList* dl = ImGui::GetWindowDrawList();
          Well(dl, r, hv, 0.0f);
          const ImVec4 t = TextCol();
-         const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.6f + 0.3f * hv));
+         const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_head + 0.3f * hv));
          // Sort glyph: three bars of different length. Longest on top = descending, shortest on top = ascending.
          const float cx = r.CenterX(), cy = r.CenterY();
          for (int i = 0; i < 3; ++i)

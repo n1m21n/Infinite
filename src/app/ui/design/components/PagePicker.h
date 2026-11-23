@@ -294,7 +294,7 @@ namespace PagePicker
             }
             if (e.glyph != nullptr)
             {
-               glyph::Draw(dl, ImVec2(tx + tok::icon_control * 0.5f, cy), tok::icon_control * 0.8f, col, e.glyph);
+               glyph::Draw(dl, ImVec2(tx + tok::icon_control * 0.5f, cy), tok::icon_control * tok::icon_page_ratio, col, e.glyph);
                tx += tok::icon_control + tok::space_1;
             }
             dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_2, bmax.y), true);

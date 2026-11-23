@@ -360,7 +360,7 @@ namespace app
             sSeenOvers = overs;
             sLastOverTime = ImGui::GetTime();
          }
-         if (ImGui::GetTime() - sLastOverTime < 3.0)
+         if (ImGui::GetTime() - sLastOverTime < tok::motion_s_clip_hold)
             ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "clipping +%.1f dB - lower the level",
                                20.0f * std::log10(std::max(1.0f, AudioEngine::Instance().MasterOverPeak())));
       }

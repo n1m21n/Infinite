@@ -14,7 +14,7 @@ namespace StateRing
    inline void Draw(ImDrawList* dl, ImVec2 a, ImVec2 b, Kind kind, bool isLight, float radius = tok::radius_control)
    {
       constexpr float kOutset = 2.0f;
-      constexpr float kWeight = 1.5f;
+      constexpr float kWeight = tok::stroke_ring;
       ImU32 col = kind == Kind::Learn ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF))
                                       : (isLight ? tok::U32(tok::pal::c_1E6EDCFF) : tok::U32(tok::pal::c_5FA5FFFF));
       if (kind == Kind::Learn)

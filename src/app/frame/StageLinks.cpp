@@ -1,6 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include <unordered_map>
 #include "app/frame/FrameCtx.h"
+#include "app/ui/design/Tokens.gen.h"
 
 namespace app
 {
@@ -748,7 +749,7 @@ void DrawLinks(FrameCtx& fc)
          auto burstUndo = [&]() {
             static double lastTime = -10.0;
             const double now = ImGui::GetTime();
-            if (now - lastTime > 0.6)
+            if (now - lastTime > tok::motion_s_undo_burst)
                PushUndoCheckpoint();
             lastTime = now;
          };
@@ -921,7 +922,7 @@ void DrawLinks(FrameCtx& fc)
             float py = (ImGui::IsKeyDown(ImGuiKey_S) ? 1.0f : 0.0f) - (ImGui::IsKeyDown(ImGuiKey_W) ? 1.0f : 0.0f);
             if (px != 0.0f || py != 0.0f)
             {
-               const float perFrame = 900.0f * io.DeltaTime / std::max(0.05f, ed::GetCurrentZoom());
+               const float perFrame = tok::motion_rate_edge_pan * io.DeltaTime / std::max(0.05f, ed::GetCurrentZoom());
                gKbPan = ImVec2(gKbPan.x + px * perFrame, gKbPan.y + py * perFrame);
                gKbZoomed = false; // the saved view no longer matches what is on screen
             }

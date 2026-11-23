@@ -3,6 +3,7 @@
 // bright target ("Piano Roll"), one Cancel chip. Hugs its text, one control row tall, no accent colour.
 #pragma once
 #include <cmath>
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -21,7 +22,7 @@ namespace ModeBanner
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, 0.0f));
       ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetStyleColorVec4(ImGuiCol_PopupBg));
-      ImGui::PushStyleColor(ImGuiCol_Border, light ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::Hairline(light));
       bool cancel = false;
       const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                                      ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
@@ -37,9 +38,9 @@ namespace ModeBanner
             ImGui::Dummy(ImVec2(sz.x, h));
             ImGui::SameLine();
          };
-         text(head, 0.6f, UiType::Weight::Semibold);
+         text(head, tok::alpha_head, UiType::Weight::Semibold);
          if (target != nullptr && target[0] != '\0')
-            text(target, 0.9f, UiType::Weight::Regular);
+            text(target, tok::alpha_text_hover, UiType::Weight::Regular);
          ImGui::Dummy(ImVec2(tok::space_1, h));
          ImGui::SameLine();
          cancel = ChipButton::Draw(I18n::L("Cancel##modebanner"), false, h);

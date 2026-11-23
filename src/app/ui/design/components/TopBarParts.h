@@ -13,11 +13,11 @@ namespace TopBarParts
    // Spacing is pushed only for the BeginMenu call so the popup keeps the normal metrics.
    inline bool MenuTile(const char* label)
    {
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(16.0f, tok::control_h - ImGui::GetFontSize()));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_4, tok::control_h - ImGui::GetFontSize()));
       ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));   // the press flash is the tile wash below, never the accent
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, 10.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::topbar_pad_y));
       const bool open = ImGui::BeginMenu(label);
       ImGui::PopStyleVar();
       ImGui::PopStyleColor(3);
@@ -27,7 +27,7 @@ namespace TopBarParts
       const float hv = UiAnim::Hover(aid, ImGui::IsItemHovered() || open, tok::motion_hover_in, tok::motion_hover_out);
       if (hv > 0.001f)
          ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
-            ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, (open ? 0.10f : 0.06f) * hv)), tok::radius_control);
+            ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, (open ? tok::alpha_fill_hover : tok::alpha_fill_rest) * hv)), tok::radius_control);
       return open;
    }
 
@@ -38,7 +38,7 @@ namespace TopBarParts
       ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::control_h) * 0.5f));
       const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::Dummy(ImVec2(1.0f, tok::control_h));
-      Divider::Vertical(UiLayout::Rect { p.x, p.y, 1.0f, tok::control_h }, 4.0f);
+      Divider::Vertical(UiLayout::Rect { p.x, p.y, 1.0f, tok::control_h }, tok::space_1);
       // Menu-bar lines do not carry a SetCursorPos y into the next SameLine; pin the line here.
       ImGui::GetCurrentWindow()->DC.CursorPosPrevLine.y = p.y;
       ImGui::SameLine(0.0f, tok::space_5 * 0.5f);

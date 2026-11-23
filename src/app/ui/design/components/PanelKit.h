@@ -52,7 +52,7 @@ namespace PanelKit
       const ImVec2 gc((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
       // One icon size per chip size: 0.72 of the chip, capped at the control icon, so a compact strip's glyphs do
       // not fill their chips edge to edge (16 in an 18 chip read as oversized).
-      const float roleGs = std::min(tok::icon_control, std::round(h * 0.72f));
+      const float roleGs = std::min(tok::icon_control, std::round(h * tok::icon_chip_ratio));
       const float gs = glyph::FitSize(gc, roleGs, glyphStr);
       glyph::Draw(ImGui::GetWindowDrawList(), gc, gs, on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
 #ifdef IMGUI_ENABLE_TEST_ENGINE
@@ -126,12 +126,12 @@ namespace PanelKit
       open = open || AuditOpenAll();
       const ImU32 col = ImGui::GetColorU32(hov ? ImGuiCol_Text : ImGuiCol_TextDisabled);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 c(p.x + 5.0f, p.y + h * 0.5f);
+      const ImVec2 c(p.x + tok::fold_arrow_x, p.y + h * 0.5f);
       if (open)
          dl->AddTriangleFilled(ImVec2(c.x - 4, c.y - 2), ImVec2(c.x + 4, c.y - 2), ImVec2(c.x, c.y + 3), col);
       else
          dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 4), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 4), col);
-      dl->AddText(ImVec2(p.x + 16.0f, p.y + 1.0f), col, text, ImGui::FindRenderedTextEnd(text));
+      dl->AddText(ImVec2(p.x + tok::space_4, p.y + 1.0f), col, text, ImGui::FindRenderedTextEnd(text));
       return open;
    }
 
@@ -271,7 +271,7 @@ namespace PanelKit
          const ImVec2 tp(p.x + box + gapIn, std::round(p.y + (rowH - ImGui::GetFontSize()) * 0.5f));
          const ImVec2 tmax(p.x + cellW, p.y + rowH);
          dl->PushClipRect(tp, tmax, true);
-         dl->AddText(tp, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hovered ? 0.9f : 0.72f)), labels[i], end);
+         dl->AddText(tp, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hovered ? tok::alpha_text_hover : tok::alpha_label)), labels[i], end);
          dl->PopClipRect();
          const float tw = ImGui::CalcTextSize(labels[i], end).x;
          UiAudit::NoteInk(4, tp, ImVec2(tp.x + tw, tp.y + ImGui::GetFontSize()), 0.0f, labels[i]);

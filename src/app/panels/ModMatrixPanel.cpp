@@ -662,7 +662,7 @@ namespace app
                KindRail(dotCursor, dotH, tok::U32(tok::expression));
 
                NextCell();
-               ImGui::TextUnformatted("Expression");
+               ImGui::TextUnformatted(T("Expression"));
 
                NextCell();
                if (MenuParts::Choice(NodeTitleWithInstance(*dstNode).c_str(), false))
@@ -792,7 +792,7 @@ namespace app
                KindRail(dotCursor, dotH, tok::U32(tok::record));
 
                NextCell();
-               ImGui::TextUnformatted("Recording");
+               ImGui::TextUnformatted(T("Recording"));
 
                NextCell();
                if (MenuParts::Choice(NodeTitleWithInstance(*dstNode).c_str(), false))

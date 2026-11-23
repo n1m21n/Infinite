@@ -13,7 +13,7 @@ namespace CodeBlock
 {
    inline void Draw(const char* code, const char* id)
    {
-      const float copyW = 22.0f;
+      const float copyW = tok::copy_w;
       const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(tx.x, tx.y, tx.z, 0.06f));
       ImGui::PushStyleColor(ImGuiCol_Border, FormParts::EdgeCol());
@@ -21,9 +21,9 @@ namespace CodeBlock
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
       ImGui::PushFont(app::TerminalMonoFont(), 0.0f);  // nullptr keeps the current face when the install lacks it
       const float outer = ImGui::GetContentRegionAvail().x;
-      const float textW = std::max(40.0f, outer - 2.0f * tok::space_2 - copyW - tok::space_2);
+      const float textW = std::max(tok::text_min_w, outer - 2.0f * tok::space_2 - copyW - tok::space_2);
       const float textH = ImGui::CalcTextSize(code, nullptr, false, textW).y;
-      const float h = std::max(textH, 18.0f) + 2.0f * tok::space_2;
+      const float h = std::max(textH, tok::compact_row) + 2.0f * tok::space_2;
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
       ImGui::BeginChild(id, ImVec2(0, h), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
       ImGui::PopStyleVar();

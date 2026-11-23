@@ -1,4 +1,4 @@
-// MenuParts: rows for the File / Edit / Menu popups. Every row is 24 pt tall (kRow) with a rounded
+// MenuParts: rows for the File / Edit / Menu popups. Every row is tok::row_h tall (kRow) with a rounded
 // wash inset 4 pt from the popup edge and text inset 8 pt from the wash; separators are a hairline in a
 // 8 pt gap. ImGui still lays out and activates the rows (shortcut column, arrows, keyboard nav); only the
 // fill is ours, so hover reads the same as the top bar tiles.
@@ -20,7 +20,7 @@ namespace MenuParts
    constexpr float kInset = tok::space_1;   // wash distance from the popup edge
    constexpr float kTextInset = tok::space_2; // text distance from the wash edge
    constexpr float kRow = tok::row_h;           // row pitch of every menu / dropdown / list popup
-   constexpr float kPadY = kInset + 4.0f;     // popup padding: the row wash starts 4 pt above its text
+   constexpr float kPadY = kInset + tok::space_1;     // popup padding: the row wash starts 4 pt above its text
    constexpr int kMaxListRows = 12;           // a dropdown list shows at most this many rows, then scrolls
 
    // Height of a dropdown list that shows `rows` rows (padding included).
@@ -61,7 +61,7 @@ namespace MenuParts
       if (w == nullptr)
          w = ImGui::GetCurrentWindow();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      const float a = (down ? 0.12f : (open ? 0.10f : 0.07f)) * hv;
+      const float a = (down ? tok::alpha_fill_press : (open ? tok::alpha_fill_hover : tok::alpha_row_hover)) * hv;
       w->DrawList->AddRectFilled(ImVec2(w->Pos.x + kInset, ImGui::GetItemRectMin().y + 1.0f),
                                  ImVec2(w->Pos.x + w->Size.x - kInset, ImGui::GetItemRectMax().y - 1.0f),
                                  ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, a)), tok::radius_control);
@@ -191,8 +191,8 @@ namespace MenuParts
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       w->DrawList->AddLine(ImVec2(w->Pos.x + kInset + kTextInset, std::floor(y)),
                            ImVec2(w->Pos.x + w->Size.x - kInset - kTextInset, std::floor(y)),
-                           ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.12f)), 1.0f);
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 8.0f);
+                           ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_fill_press)), tok::stroke_rule);
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + tok::space_2);
    }
 
    // Popups opened from the canvas / panels: same padding, row pitch and wash as the menu bar's popups.

@@ -1237,7 +1237,7 @@ namespace app
       std::vector<float>& hist = sGateInHist[nodeIndex];
       const double now = ImGui::GetTime();
       double& last = sGateLastT[nodeIndex];
-      if (hist.empty() || now - last > 0.25 || now < last)
+      if (hist.empty() || now - last > tok::motion_s_history_step || now < last)
       {
          hist.assign(1, inA);
          last = now;
@@ -1888,7 +1888,7 @@ namespace app
          n->flash = 1.0f;
       else if (n->flash > 0.0f)
       {
-         n->flash -= ImGui::GetIO().DeltaTime * 4.0f;
+         n->flash -= ImGui::GetIO().DeltaTime * tok::motion_rate_flash_decay;
          if (n->flash < 0.0f) n->flash = 0.0f;
       }
       ImGui::SetCursorScreenPos(origin);

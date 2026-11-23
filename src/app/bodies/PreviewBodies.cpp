@@ -768,7 +768,7 @@ namespace app
    void DrawFieldGraphWaveform(FieldGraphNode* fgn, INode* audioTerminal)
    {
       const double now = ImGui::GetTime();
-      if (fgn->waveformCacheTime < 0.0 || now - fgn->waveformCacheTime > 1.0 / 30.0)
+      if (fgn->waveformCacheTime < 0.0 || now - fgn->waveformCacheTime > 1.0 / tok::motion_hz_scope)
       {
          float raw[256];
          int rawCount = 0;

@@ -22,15 +22,15 @@ namespace NoticeCard
          const ImU32 col = tok::U32(err ? tok::action_record : tok::action_learn, light);
          const ImVec2 p = ImGui::GetCursorScreenPos();
          const float h = ImGui::GetTextLineHeight();
-         glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(p.x + 7.0f, p.y + h * 0.5f), 14.0f, col,
+         glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(p.x + tok::icon_sm * 0.5f, p.y + h * 0.5f), tok::icon_sm, col,
                      err ? IconsInfinite::Error : IconsInfinite::Warning);
-         ImGui::Dummy(ImVec2(14.0f, h));
+         ImGui::Dummy(ImVec2(tok::icon_sm, h));
          ImGui::SameLine(0.0f, tok::space_2);
       }
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width - 3.0f * tok::space_4);
       ImGui::TextUnformatted(n.title.c_str());
       ImGui::PopTextWrapPos();
-      ImGui::SameLine(width - tok::space_4 - 14.0f);
+      ImGui::SameLine(width - tok::space_4 - tok::icon_sm);
       if (GlyphToggle::Draw("##dismiss", IconsInfinite::Close, IconsInfinite::Close, false, 18.0f))
          result = Result::Dismiss;
       if (!n.detail.empty())

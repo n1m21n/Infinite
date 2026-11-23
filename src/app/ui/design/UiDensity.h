@@ -18,7 +18,7 @@ namespace UiDensity
       float pad;       // card edge to its content
       float check;     // checkbox square
    };
-   constexpr Metrics kRegular { tok::type_body, tok::control_h, tok::row_gap, 72.0f, tok::space_2, tok::check_box };
+   constexpr Metrics kRegular { tok::type_body, tok::control_h, tok::row_gap, tok::label_w_regular, tok::space_2, tok::check_box };
    // Compact sizes live in tokens.json "compact" (tok::compact_*): change them there, never here.
    constexpr Metrics kCompactMetrics { tok::compact_text, tok::compact_row, tok::compact_gap, tok::compact_label,
                                        tok::compact_pad, tok::compact_check };

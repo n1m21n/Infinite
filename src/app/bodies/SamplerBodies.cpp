@@ -2664,7 +2664,7 @@ namespace app
                      n->padRect[pad][2] = mx.x; n->padRect[pad][3] = mx.y;
                      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
                         n->selectedPad = pad;
-                     const bool hit = lvl || (now - n->padFlash[pad]) < 0.14;
+                     const bool hit = lvl || (now - n->padFlash[pad]) < tok::motion_s_pad_flash;
                      const bool lit = playing || hit;
                      const ImU32 green = isLight ? tok::U32(tok::pal::c_239650FF) : tok::U32(tok::pal::c_3CAF64FF);
                      ImU32 fill = isLoaded ? (isLight ? tok::U32(tok::pal::c_D6DDECFF) : tok::U32(tok::pal::c_282E40FF))

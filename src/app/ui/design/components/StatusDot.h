@@ -16,7 +16,7 @@ namespace StatusDot
       const tok::Pair8& pair = s == State::Ok ? tok::action_go : (s == State::Warn ? tok::action_learn : tok::action_record);
       const ImVec2 mx = ImGui::GetItemRectMax();
       const ImVec2 mn = ImGui::GetItemRectMin();
-      const float r = 3.0f;
+      const float r = tok::status_r;
       const ImVec2 c(mx.x - tok::space_1 - r, mn.y + tok::space_1 + r);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddCircleFilled(c, r + 1.0f, ImGui::GetColorU32(ImGuiCol_PopupBg, 0.9f), 12);

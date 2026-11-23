@@ -10,8 +10,8 @@
 
 namespace VFader
 {
-   constexpr float kHandleW = 18.0f;
-   constexpr float kHandleH = 12.0f;
+   constexpr float kHandleW = tok::fader_handle_w;
+   constexpr float kHandleH = tok::fader_handle_h;
 
    inline ImU32 PinDotAlpha(ImU32 c, float a)
    {

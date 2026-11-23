@@ -25,18 +25,18 @@ namespace TextButton
       if (kind == Kind::Primary)
       {
          ImVec4 a = s.down ? app::AccentEmphasisPressed() : app::AccentEmphasisSelected();
-         const float lift = 0.04f * hv;
+         const float lift = tok::alpha_lift * hv;
          a = ImVec4(a.x + (1.0f - a.x) * lift, a.y + (1.0f - a.y) * lift, a.z + (1.0f - a.z) * lift, 1.0f);
          dl->AddRectFilled(p0, p1, ImGui::GetColorU32(a), tok::radius_control);
       }
       else
       {
-         const float o = s.down ? 0.12f : 0.06f * hv;
+         const float o = s.down ? tok::alpha_fill_press : tok::alpha_fill_rest * hv;
          if (o > 0.001f)
             dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, o)), tok::radius_control);
       }
       if (!enabled)
-         label4.w *= 0.35f;
+         label4.w *= tok::alpha_disabled;
       if (s.focused)
          dl->AddRect(ImVec2(p0.x - 2, p0.y - 2), ImVec2(p1.x + 2, p1.y + 2),
                      ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + 2.0f, 0, 2.0f);

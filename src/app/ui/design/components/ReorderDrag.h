@@ -71,13 +71,13 @@ namespace ReorderDrag
    inline void Bar(ImVec2 a, ImVec2 b)
    {
       ImDrawList* dl = ImGui::GetForegroundDrawList();
-      dl->AddLine(a, b, AccentCol(), 2.0f);
-      dl->AddCircleFilled(a, 3.0f, AccentCol());
-      dl->AddCircleFilled(b, 3.0f, AccentCol());
+      dl->AddLine(a, b, AccentCol(), tok::drag_bar_w);
+      dl->AddCircleFilled(a, tok::drag_bar_dot, AccentCol());
+      dl->AddCircleFilled(b, tok::drag_bar_dot, AccentCol());
    }
 
    // The "goes into this one" outline.
-   inline void Box(ImVec2 mn, ImVec2 mx) { ImGui::GetForegroundDrawList()->AddRect(mn, mx, AccentCol(), tok::radius_control, 0, 2.0f); }
+   inline void Box(ImVec2 mn, ImVec2 mx) { ImGui::GetForegroundDrawList()->AddRect(mn, mx, AccentCol(), tok::radius_control, 0, tok::stroke_focus); }
 
    // Makes the last item draggable. `label` is drawn on the ghost (nullptr: an empty ghost, for icon tiles).
    // Returns true while this item is being dragged.
@@ -90,17 +90,17 @@ namespace ReorderDrag
       const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
       const ImGuiIO& io = ImGui::GetIO();
       // The item left behind: dimmed in place.
-      ImGui::GetWindowDrawList()->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_WindowBg, 0.6f), tok::radius_control);
+      ImGui::GetWindowDrawList()->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_WindowBg, tok::alpha_veil), tok::radius_control);
       // The ghost: the item's size, held where it was grabbed.
-      const ImVec2 size(std::min(mx.x - mn.x, 320.0f), std::max(mx.y - mn.y, ImGui::GetFrameHeight()));
+      const ImVec2 size(std::min(mx.x - mn.x, tok::drag_ghost_max_w), std::max(mx.y - mn.y, ImGui::GetFrameHeight()));
       ImVec2 grab(io.MouseClickedPos[0].x - mn.x, io.MouseClickedPos[0].y - mn.y);
       grab.x = std::clamp(grab.x, 0.0f, size.x);
       grab.y = std::clamp(grab.y, 0.0f, size.y);
       const ImVec2 g0(io.MousePos.x - grab.x, io.MousePos.y - grab.y), g1(g0.x + size.x, g0.y + size.y);
       ImDrawList* fg = ImGui::GetForegroundDrawList();
-      fg->AddRectFilled(ImVec2(g0.x + 2.0f, g0.y + 3.0f), ImVec2(g1.x + 2.0f, g1.y + 3.0f), IM_COL32(0, 0, 0, 60), tok::radius_control);
-      fg->AddRectFilled(g0, g1, ImGui::GetColorU32(ImGuiCol_PopupBg, 0.94f), tok::radius_control);
-      fg->AddRect(g0, g1, AccentCol(), tok::radius_control, 0, 1.0f);
+      fg->AddRectFilled(ImVec2(g0.x + tok::drag_shadow_dx, g0.y + tok::drag_shadow_dy), ImVec2(g1.x + tok::drag_shadow_dx, g1.y + tok::drag_shadow_dy), IM_COL32(0, 0, 0, tok::alpha8_shadow_drop), tok::radius_control);
+      fg->AddRectFilled(g0, g1, ImGui::GetColorU32(ImGuiCol_PopupBg, tok::alpha_ghost), tok::radius_control);
+      fg->AddRect(g0, g1, AccentCol(), tok::radius_control, 0, tok::stroke_rule);
       if (label != nullptr && label[0] != '\0')
       {
          fg->PushClipRect(g0, g1, true);
@@ -354,17 +354,17 @@ namespace ReorderDrag
       {
          // The gap it will land in: the item, veiled, with a faint accent edge.
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_WindowBg, 0.82f), tok::radius_control);
-         dl->AddRect(mn, mx, (AccentCol() & 0x00FFFFFFu) | 0x60000000u, tok::radius_control, 0, 1.0f);
+         dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_WindowBg, tok::alpha_veil_live), tok::radius_control);
+         dl->AddRect(mn, mx, (AccentCol() & 0x00FFFFFFu) | 0x60000000u, tok::radius_control, 0, tok::stroke_rule);
          // The ghost: the item's size, held where it was grabbed.
          const ImGuiIO& io = ImGui::GetIO();
          const ImVec2 size(std::max(mx.x - mn.x, 1.0f), std::max(mx.y - mn.y, 1.0f));
          const ImVec2 g0(io.MousePos.x - std::min(l.grab.x, size.x), io.MousePos.y - std::min(l.grab.y, size.y));
          const ImVec2 g1(g0.x + size.x, g0.y + size.y);
          ImDrawList* fg = ImGui::GetForegroundDrawList();
-         fg->AddRectFilled(ImVec2(g0.x + 2.0f, g0.y + 3.0f), ImVec2(g1.x + 2.0f, g1.y + 3.0f), IM_COL32(0, 0, 0, 60), tok::radius_control);
-         fg->AddRectFilled(g0, g1, ImGui::GetColorU32(ImGuiCol_PopupBg, 0.94f), tok::radius_control);
-         fg->AddRect(g0, g1, AccentCol(), tok::radius_control, 0, 1.0f);
+         fg->AddRectFilled(ImVec2(g0.x + tok::drag_shadow_dx, g0.y + tok::drag_shadow_dy), ImVec2(g1.x + tok::drag_shadow_dx, g1.y + tok::drag_shadow_dy), IM_COL32(0, 0, 0, tok::alpha8_shadow_drop), tok::radius_control);
+         fg->AddRectFilled(g0, g1, ImGui::GetColorU32(ImGuiCol_PopupBg, tok::alpha_ghost), tok::radius_control);
+         fg->AddRect(g0, g1, AccentCol(), tok::radius_control, 0, tok::stroke_rule);
          if (label != nullptr && label[0] != '\0')
          {
             fg->PushClipRect(g0, g1, true);

@@ -1000,7 +1000,7 @@ namespace app
                ImGui::Text(T("(%.1f MB used)"), sLearnMB);
                // Two clicks: the first arms it for four seconds.
                static double sForgetArmed = -1.0;
-               const bool armed = sForgetArmed >= 0.0 && ImGui::GetTime() - sForgetArmed < 4.0;
+               const bool armed = sForgetArmed >= 0.0 && ImGui::GetTime() - sForgetArmed < tok::motion_s_confirm;
                if (FormParts::Button(armed ? L("Click again to delete everything learned") : L("Forget me")))
                {
                   if (armed)

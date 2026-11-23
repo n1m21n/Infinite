@@ -39,10 +39,10 @@ namespace DropdownField
       float valueX = mn.x + pad;
       if (hasLabel)
       {
-         const float valueW = std::min(ts.x, std::max(0.0f, avail - std::min(labelW + pad, 24.0f)));
+         const float valueW = std::min(ts.x, std::max(0.0f, avail - std::min(labelW + pad, tok::dropdown_label_min)));
          valueX = textRight - valueW;
          ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         dim.w *= 0.55f;
+         dim.w *= tok::alpha_caption;
          dl->PushClipRect(mn, ImVec2(std::max(mn.x + pad, valueX - pad), mx.y), true);
          dl->AddText(ImVec2(mn.x + pad, mn.y + (h - ts.y) * 0.5f), ImGui::GetColorU32(dim), label);
          dl->PopClipRect();
@@ -66,7 +66,7 @@ namespace DropdownField
    {
       const float h = ImGui::GetFrameHeight();
       const float pad = tok::space_2;
-      const float w = width > 0.0f ? width : 168.0f;
+      const float w = width > 0.0f ? width : tok::dropdown_w_l;
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       const ImVec2 mx(mn.x + w, mn.y + h);
       if (ImGui::ButtonLabelHook != nullptr)
@@ -80,7 +80,7 @@ namespace DropdownField
       if (hasLabel)
       {
          ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         dim.w *= 0.55f;
+         dim.w *= tok::alpha_caption;
          const float lw = ImGui::CalcTextSize(label).x;
          // segments get at least 60% of the face; the label yields
          const float maxLabel = w * 0.4f - pad;

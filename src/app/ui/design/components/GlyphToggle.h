@@ -8,9 +8,9 @@
 
 namespace GlyphToggle
 {
-   inline bool Draw(const char* id, const char* glyphOff, const char* glyphOn, bool on, float w = 22.0f, bool lit = false)
+   inline bool Draw(const char* id, const char* glyphOff, const char* glyphOn, bool on, float w = tok::glyph_toggle_w, bool lit = false)
    {
-      const float h = 18.0f;
+      const float h = tok::compact_row;
       const ImVec2 o = ImGui::GetCursorScreenPos();
       const bool pressed = ImGui::InvisibleButton(id, ImVec2(w, h));
       const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
@@ -20,7 +20,7 @@ namespace GlyphToggle
       {
          const ImVec4 a = hv > 0.5f ? app::AccentEmphasisHover() : app::AccentEmphasisSelected();
          dl->AddCircleFilled(glyph::SnappedCentre(c, 18.0f), 6.6f, ImGui::GetColorU32(a), 32);
-         glyph::Draw(dl, c, 18.0f, ImGui::GetColorU32(ImVec4(1, 1, 1, 1)), glyphOn);
+         glyph::Draw(dl, c, tok::icon_md, ImGui::GetColorU32(ImVec4(1, 1, 1, 1)), glyphOn);
          return pressed;
       }
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
@@ -30,7 +30,7 @@ namespace GlyphToggle
          const ImVec4 a = app::AccentEmphasisSelected();
          col = ImVec4(a.x + (t.x - a.x) * 0.25f * hv, a.y + (t.y - a.y) * 0.25f * hv, a.z + (t.z - a.z) * 0.25f * hv, 1.0f);
       }
-      glyph::Draw(dl, c, 18.0f, ImGui::GetColorU32(col), on ? glyphOn : glyphOff);
+      glyph::Draw(dl, c, tok::icon_md, ImGui::GetColorU32(col), on ? glyphOn : glyphOff);
       return pressed;
    }
 }

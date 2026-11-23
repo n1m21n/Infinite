@@ -724,7 +724,7 @@ void DrawPopupsB(FrameCtx& fc)
             sTrashSeen = now;
          }
          ImVec2 canvasMid;
-         if (sTrashLink != 0 && FindLink(sTrashLink) != nullptr && now - sTrashSeen < 0.12 && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
+         if (sTrashLink != 0 && FindLink(sTrashLink) != nullptr && now - sTrashSeen < tok::motion_s_trash_grace && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
          {
             ImVec2 c = ed::CanvasToScreen(canvasMid);
             // Drawn on the foreground list, so it must be hidden by hand wherever something else is in front of the

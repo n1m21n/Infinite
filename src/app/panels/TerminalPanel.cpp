@@ -407,7 +407,7 @@ namespace
          return;
       const double now = ImGui::GetTime();
       // Solid while typing; blink only once input stops.
-      const bool blinkOff = focused && snap.cursorBlink && now - sLastInputTime > 0.6 && std::fmod(now, 1.06) > 0.53;
+      const bool blinkOff = focused && snap.cursorBlink && now - sLastInputTime > tok::motion_s_caret_idle && std::fmod(now, tok::motion_s_caret_period) > tok::motion_s_caret_on;
       if (blinkOff)
          return;
       const float x = origin.x + (float)snap.cursorCol * cw, y = origin.y + (float)snap.cursorRow * ch;

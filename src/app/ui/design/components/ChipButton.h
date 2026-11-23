@@ -22,7 +22,7 @@ namespace ChipButton
       const char* key = std::strstr(label, "##");
       const std::string shown = key != nullptr ? std::string(label, key) : std::string(label);
       const ImVec2 ts = ImGui::CalcTextSize(shown.c_str());
-      const ImVec2 sz(std::max(minW, ts.x + 2.0f * (UiDensity::IsCompact() ? 6.0f : tok::space_2)), h);
+      const ImVec2 sz(std::max(minW, ts.x + 2.0f * (UiDensity::IsCompact() ? tok::compact_frame_pad_x : tok::space_2)), h);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const bool clicked = ImGui::InvisibleButton(label, sz);
       const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
@@ -31,10 +31,10 @@ namespace ChipButton
       const ImVec4 a = onCol != nullptr ? *onCol : app::AccentEmphasisSelected();
       // soft: a quiet selected state (text-tinted well, full-strength label) for secondary groups next to an accent chip
       const bool acc = on && !soft;
-      const ImVec4 bg = acc ? a : ImVec4(t.x, t.y, t.z, (on ? 0.16f : 0.06f) + 0.05f * hv);
+      const ImVec4 bg = acc ? a : ImVec4(t.x, t.y, t.z, (on ? tok::alpha_fill_on : tok::alpha_fill_rest) + tok::alpha_hover_add * hv);
       dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(bg), tok::radius_control);
       dl->AddText(ImVec2(std::round(p.x + (sz.x - ts.x) * 0.5f), std::round(p.y + (sz.y - ts.y) * 0.5f)),
-                  ImGui::GetColorU32(acc ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, on ? 1.0f : 0.8f)), shown.c_str());
+                  ImGui::GetColorU32(acc ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, on ? 1.0f : tok::alpha_text_quiet)), shown.c_str());
       return clicked;
    }
 }

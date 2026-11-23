@@ -4,6 +4,7 @@
 // Also here: the label column (RowLabel), the dialog title, and a thin progress bar.
 #pragma once
 #include <algorithm>
+#include "app/ui/design/TokenColors.h"
 #include <cmath>
 #include "app/AppShared.h"
 #include "app/ui/design/UiAnim.h"
@@ -45,8 +46,8 @@ namespace SectionCard
          return;
       }
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)), tok::radius_container);
-      dl->AddRect(a, b, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),
+      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_card)), tok::radius_container);
+      dl->AddRect(a, b, ImGui::GetColorU32(tok::Hairline(CategoryColors::IsThemeLight())),
                   tok::radius_container);
    }
 
@@ -115,7 +116,7 @@ namespace SectionCard
    {
       ImGui::AlignTextToFramePadding();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.72f));
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, tok::alpha_label));
       ImGui::TextUnformatted(text);
       ImGui::PopStyleColor();
       ImGui::SameLine(LabelW());
@@ -131,7 +132,7 @@ namespace SectionCard
    // Thin rounded progress bar. frac < 0 = indeterminate (a bar sweeping across).
    inline void Progress(float frac, float w)
    {
-      const float h = 6.0f;
+      const float h = tok::progress_h;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::Dummy(ImVec2(w, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();

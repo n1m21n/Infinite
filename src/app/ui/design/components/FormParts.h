@@ -4,6 +4,7 @@
 // changes its namespace.
 #pragma once
 #include <algorithm>
+#include "app/ui/design/TokenColors.h"
 #include <cstring>
 #include <string>
 #include <vector>
@@ -21,7 +22,7 @@
 namespace FormParts
 {
    constexpr float kLabelW = tok::label_w_wide;
-   constexpr float kControlW = 150.0f;
+   constexpr float kControlW = tok::control_w;
    constexpr float kSliderW = kControlW;   // sliders, dropdowns and inputs share one width in Settings
    constexpr float kRowH = tok::control_h + tok::row_gap;   // a settings row: one control plus the row gap
 
@@ -46,11 +47,11 @@ namespace FormParts
    // The hairline edge every surface carries (same value the Library wells use).
    inline ImU32 EdgeCol()
    {
-      return ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f));
+      return ImGui::GetColorU32(tok::Hairline(CategoryColors::IsThemeLight()));
    }
 
    // Round colour dot (same shape as the Clip Settings swatches); a click opens a picker. True when edited.
-   inline bool ColorDot(const char* id, float* rgb, float d = 15.0f, float rowH = 0.0f)
+   inline bool ColorDot(const char* id, float* rgb, float d = tok::colour_dot, float rowH = 0.0f)
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float h = std::max(d, rowH); // rowH: centre the dot on a form row
@@ -84,7 +85,7 @@ namespace FormParts
       const std::string v = Visible(label);
       ImGui::AlignTextToFramePadding();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.78f));
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, tok::alpha_label_form));
       ImGui::TextUnformatted(v.c_str());
       ImGui::PopStyleColor();
       ImGui::SameLine(gLabelW);
@@ -131,7 +132,7 @@ namespace FormParts
    // shows whole in a tooltip; the open list is free to grow to kListMaxW so every option reads in full.
    inline bool BeginCombo(const char* label, const char* preview, float listMinW = 0.0f)
    {
-      constexpr float kListMaxW = 280.0f;
+      constexpr float kListMaxW = tok::list_max_w;
       Label(label);
       const float controlW = ControlW();
       ImGui::SetNextItemWidth(controlW);
@@ -257,7 +258,7 @@ namespace FormParts
    inline void PushWindowPad(float titleInset = 0.0f)
    {
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_4 + titleInset, tok::space_3 + 2.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_4 + titleInset, tok::title_pad_y));
    }
    inline void PopWindowPad() { ImGui::PopStyleVar(2); }
 
@@ -265,11 +266,11 @@ namespace FormParts
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(t.x, t.y, t.z, 0.08f));
-      ImGui::PushStyleColor(ImGuiCol_TabSelected, ImVec4(t.x, t.y, t.z, 0.14f));
+      ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(t.x, t.y, t.z, tok::alpha_tab_hover));
+      ImGui::PushStyleColor(ImGuiCol_TabSelected, ImVec4(t.x, t.y, t.z, tok::alpha_tab_on));
       ImGui::PushStyleColor(ImGuiCol_TabSelectedOverline, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_TabDimmed, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_TabDimmedSelected, ImVec4(t.x, t.y, t.z, 0.14f));
+      ImGui::PushStyleColor(ImGuiCol_TabDimmedSelected, ImVec4(t.x, t.y, t.z, tok::alpha_tab_on));
       ImGui::PushStyleColor(ImGuiCol_TabDimmedSelectedOverline, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleVar(ImGuiStyleVar_TabRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_TabBarBorderSize, 0.0f);
@@ -321,15 +322,15 @@ namespace FormParts
    inline void PushReferenceStyle(bool headerFill = true)
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      const ImVec4 edge = CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.07f) : ImVec4(1, 1, 1, 0.06f);
+      const ImVec4 edge = tok::InkEdge(CategoryColors::IsThemeLight(), tok::alpha_rule_light, tok::alpha_rule_dark);
       ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, edge);
       ImGui::PushStyleColor(ImGuiCol_TableBorderLight, edge);
       ImGui::PushStyleColor(ImGuiCol_TableRowBg, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, ImVec4(t.x, t.y, t.z, 0.035f));
+      ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, ImVec4(t.x, t.y, t.z, tok::alpha_band));
       ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(t.x, t.y, t.z, headerFill ? 0.06f : 0.0f));   // off when a card is the surface
-      ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(t.x, t.y, t.z, 0.09f));
-      ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(t.x, t.y, t.z, 0.12f));
+      ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(t.x, t.y, t.z, headerFill ? tok::alpha_fill_rest : 0.0f));   // off when a card is the surface
+      ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(t.x, t.y, t.z, tok::alpha_header_hover));
+      ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(t.x, t.y, t.z, tok::alpha_fill_press));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
    }
    inline void PopReferenceStyle()

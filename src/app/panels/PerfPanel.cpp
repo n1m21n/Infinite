@@ -1157,7 +1157,7 @@ namespace app
          float flash = gPerfBangFlash[elemIdx];
          if (flash > 0.0f)
          {
-            flash -= ImGui::GetIO().DeltaTime * 4.0f;
+            flash -= ImGui::GetIO().DeltaTime * tok::motion_rate_flash_decay;
             if (flash < 0.0f) flash = 0.0f;
             gPerfBangFlash[elemIdx] = flash;
          }
@@ -2521,7 +2521,7 @@ namespace app
       const double now = ImGui::GetTime();
       double& last = lastSampleAt[nodeIndex];
       constexpr double kStep = 1.0 / 60.0;
-      if (history.empty() || now - last > 0.25 || now < last)
+      if (history.empty() || now - last > tok::motion_s_history_step || now < last)
       {
          history.clear();
          history.push_back(value);

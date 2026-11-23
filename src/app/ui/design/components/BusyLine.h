@@ -11,7 +11,7 @@
 
 namespace BusyLine
 {
-   constexpr float kSpinner = 12.0f;
+   constexpr float kSpinner = tok::spinner;
 
    inline void Spinner(float size = kSpinner)
    {
@@ -20,9 +20,9 @@ namespace BusyLine
       const ImVec2 c(p.x + size * 0.5f, p.y + h * 0.5f);
       const float r = size * 0.5f - 1.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImU32 track = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.35f);
+      const ImU32 track = ImGui::GetColorU32(ImGuiCol_TextDisabled, tok::alpha_disabled);
       const ImU32 head = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-      dl->AddCircle(c, r, track, 24, 1.5f);
+      dl->AddCircle(c, r, track, 24, tok::stroke_ring);
       const bool still = CategoryColors::GetReduceMotion();
       const float a0 = still ? -1.5708f : (float)ImGui::GetTime() * 4.0f;
       dl->PathClear();
@@ -31,7 +31,7 @@ namespace BusyLine
          const float a = a0 + 2.0f * (float)i / 8.0f;
          dl->PathLineTo(ImVec2(c.x + std::cos(a) * r, c.y + std::sin(a) * r));
       }
-      dl->PathStroke(head, ImDrawFlags_None, 1.5f);
+      dl->PathStroke(head, ImDrawFlags_None, tok::stroke_ring);
       ImGui::Dummy(ImVec2(size, h));
    }
 
@@ -51,7 +51,7 @@ namespace BusyLine
          cancelled = ImGui::SmallButton(I18n::T("Cancel"));
       }
       if (progress >= 0.0f)
-         ImGui::ProgressBar(progress > 1.0f ? 1.0f : progress, ImVec2(-1.0f, 4.0f), "");
+         ImGui::ProgressBar(progress > 1.0f ? 1.0f : progress, ImVec2(-1.0f, tok::busy_bar_h), "");
       return cancelled;
    }
 }

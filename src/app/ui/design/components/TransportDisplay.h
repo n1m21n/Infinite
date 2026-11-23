@@ -11,7 +11,7 @@
 
 namespace TransportDisplay
 {
-   constexpr float kHeight = 32.0f;
+   constexpr float kHeight = tok::cell_h;
    constexpr float kValueH = tok::type_body + 3.0f;
    constexpr float kValueY = (kHeight - kValueH) * 0.5f;  // value line top, from the well's top edge: centred
 

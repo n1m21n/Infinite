@@ -1909,7 +1909,7 @@ namespace
          if (pullOff)
             ImGui::TextDisabled("%s", T("Release to remove point"));
          else
-            ImGui::TextDisabled("In %d   Out %d", inV, outV);
+            ImGui::TextDisabled(T("In %d   Out %d"), inV, outV);
       }
       else if (ImGui::IsItemHovered())
       {
@@ -3058,7 +3058,7 @@ namespace
       const ImGuiIO& io = ImGui::GetIO();
       if (sSpringKey != ImGuiKey_None && !ImGui::IsKeyDown(sSpringKey) && sOp.kind == 0)
       {
-         if (ImGui::GetTime() - sSpringT > 0.35)
+         if (ImGui::GetTime() - sSpringT > tok::motion_s_spring)
             sTool = sSpringPrev;
          sSpringKey = ImGuiKey_None;
       }
@@ -4465,7 +4465,7 @@ namespace
          return false;
       const ImU32 white = tok::U32(tok::canvas_ink), black = tok::U32(tok::canvas_shade);
       constexpr float kDash = 4.0f;
-      const float march = std::fmod((float)ImGui::GetTime() * 16.0f, kDash * 2.0f);
+      const float march = std::fmod((float)ImGui::GetTime() * tok::motion_rate_ants, kDash * 2.0f);
       for (const Seg& sg : segs)
       {
          const ImVec2 a = ToScreen(doc, sg.ax, sg.ay), b = ToScreen(doc, sg.bx, sg.by);
@@ -5099,20 +5099,20 @@ namespace
             AddDocRect(dl, doc, lo[0] + dx, lo[1] + dy, hi[0] + dx, hi[1] + dy, ink, 1.0f);
          }
       }
-      if (sTool == kClone && ImGui::GetTime() - sCloneAsk < 2.5)
+      if (sTool == kClone && ImGui::GetTime() - sCloneAsk < tok::motion_s_hint)
       {
          const char* t = T("Alt-click to set the source");
          const ImVec2 at(ImGui::GetIO().MousePos.x + 14.0f, ImGui::GetIO().MousePos.y + 14.0f);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
       }
-      if (ImGui::GetTime() - sExportNoteT < 5.0 && !sExportNote.empty())
+      if (ImGui::GetTime() - sExportNoteT < tok::motion_s_notice && !sExportNote.empty())
       {
          const ImVec2 at(sViewMn.x + 12.0f, sViewMn.y + 12.0f);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, sExportNote.c_str());
          dl->AddText(at, ink, sExportNote.c_str());
       }
-      if (ImGui::GetTime() - sGroupPickAsk < 2.5)
+      if (ImGui::GetTime() - sGroupPickAsk < tok::motion_s_hint)
       {
          const char* t = T("Pick a layer");
          const ImVec2 at(ImGui::GetIO().MousePos.x + 14.0f, ImGui::GetIO().MousePos.y + 14.0f);
@@ -6482,7 +6482,7 @@ namespace
          for (const std::array<float, 4>& r : sTextMarks.sel)
             dl->AddQuadFilled(BoxScreen(doc, *l, r[0], r[1]), BoxScreen(doc, *l, r[2], r[1]), BoxScreen(doc, *l, r[2], r[3]),
                               BoxScreen(doc, *l, r[0], r[3]), Hex(kOutline, 0.35f));
-         if (std::fmod(ImGui::GetTime(), 1.0) < 0.6)
+         if (std::fmod(ImGui::GetTime(), 1.0) < tok::motion_s_blink_on)
             dl->AddLine(BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[1]),
                         BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[2]), Hex(kOutline), 1.5f);
       }

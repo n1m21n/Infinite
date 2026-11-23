@@ -7,8 +7,8 @@
 
 namespace Switch
 {
-   constexpr float kW = 30.0f;
-   constexpr float kH = 16.0f;
+   constexpr float kW = tok::switch_w;
+   constexpr float kH = tok::switch_h;
 
    // `scale` enlarges the whole switch (macro front-panel controls); 1 is the Settings size.
    inline bool Box(const char* id, bool* v, float scale = 1.0f)
@@ -33,7 +33,7 @@ namespace Switch
       }
       const float r = kH * 0.5f - 3.0f;
       const float x = p.x + kH * 0.5f + onv * (kW - kH);
-      const ImVec4 thumbOff(t.x, t.y, t.z, 0.65f);
+      const ImVec4 thumbOff(t.x, t.y, t.z, tok::alpha_thumb_off);
       const ImVec4 thumb(thumbOff.x + (1.0f - thumbOff.x) * onv, thumbOff.y + (1.0f - thumbOff.y) * onv,
                          thumbOff.z + (1.0f - thumbOff.z) * onv, thumbOff.w + (1.0f - thumbOff.w) * onv);
       dl->AddCircleFilled(ImVec2(x, p.y + kH * 0.5f), r, ImGui::GetColorU32(thumb), 16);

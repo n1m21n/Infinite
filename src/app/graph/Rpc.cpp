@@ -1,5 +1,6 @@
 // RPC command handler (moved verbatim from main.cpp).
 #include "core/CookProbe.h"
+#include "app/ui/design/Tokens.gen.h"
 #include "core/PatchReach.h"
 #include <chrono>
 #include <cmath>
@@ -713,7 +714,7 @@ namespace app
                gn->showParams = gn->showAdvancedParams = true;
             gModMatrixHighlightNode = gn->index;
             gModMatrixHighlightParam = param;
-            gModMatrixHighlightUntil = ImGui::GetTime() + 2.0;
+            gModMatrixHighlightUntil = ImGui::GetTime() + tok::motion_s_highlight_long;
             gModMatrixScrollPending = true;
             outResult["param"] = param;
          }

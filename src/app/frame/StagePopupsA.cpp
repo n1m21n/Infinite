@@ -699,7 +699,7 @@ void DrawPopupsA(FrameCtx& fc)
                   gModMatrixOpen = true;
                   gModMatrixHighlightNode = nodeIndex;
                   gModMatrixHighlightParam = paramIndex;
-                  gModMatrixHighlightUntil = ImGui::GetTime() + 1.5;
+                  gModMatrixHighlightUntil = ImGui::GetTime() + tok::motion_s_highlight;
                   gModMatrixScrollPending = true;
                }
                MenuParts::Separator();

@@ -16,6 +16,14 @@ def build():
     for group in ("space", "radius", "type", "icon", "pin"):
         for k, v in b[group].items():
             L.append(f"   constexpr float {group}_{k} = {float(v)}f;")
+    # Optional groups, emitted as <group>_<key>: opacities, stroke weights and the per-component size groups.
+    for group in ("alpha", "stroke", "drag", "ruler", "fader", "topbar", "fold", "motion_s", "motion_rate", "motion_hz"):
+        for k, v in b.get(group, {}).items():
+            if not k.startswith("_"):
+                L.append(f"   constexpr float {group}_{k} = {float(v)}f;")
+    for k, v in b.get("alpha8", {}).items():
+        if not k.startswith("_"):
+            L.append(f"   constexpr int alpha8_{k} = {int(v)};")
     for k, v in b["motion_ms"].items():
         L.append(f"   constexpr float motion_{k} = {float(v)}f;")
     L.append(f"   constexpr float hit_min = {float(b['hit_min'])}f;")

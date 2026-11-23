@@ -1,5 +1,6 @@
 // Draws one Infinite Glyph (Glyphs.gen.h) centred on a point, at an exact pixel size.
 #pragma once
+#include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "imgui.h"
@@ -68,7 +69,7 @@ namespace glyph
       InkBox(center, role, g, mn, mx);
       // The pointer is a solid wedge: fitted to 0.9 it out-weighed the stroked icons beside it (pick rows, tool
       // columns), so it fills less of the box.
-      const float fill = std::strcmp(g, IconsInfinite::Pointer) == 0 ? 0.8f : 0.9f;
+      const float fill = std::strcmp(g, IconsInfinite::Pointer) == 0 ? tok::icon_ink_fill_pointer : tok::icon_ink_fill;
       const float ink = std::max(mx.x - mn.x, mx.y - mn.y), target = fill * role;
       return ink > 1.0f && ink < target - 1.5f ? std::round(role * std::min(1.4f, target / ink)) : role;
    }

@@ -14,10 +14,10 @@
 
 namespace TimeRuler
 {
-   inline constexpr float kHeight = 16.0f;
-   inline constexpr float kEdgeHit = 7.0f; // px either side of a loop edge that grabs it
-   inline constexpr float kCap = 5.0f;     // half width of the playhead's cap
-   inline constexpr double kMinLabelPx = 50.0;
+   inline constexpr float kHeight = tok::ruler_h;
+   inline constexpr float kEdgeHit = tok::ruler_edge_hit; // px either side of a loop edge that grabs it
+   inline constexpr float kCap = tok::ruler_cap;     // half width of the playhead's cap
+   inline constexpr double kMinLabelPx = tok::ruler_min_label_px;
 
    struct Axis
    {
@@ -147,7 +147,7 @@ namespace TimeRuler
    inline int UnitPills(const char* id, const PillGroup::Segment* segs, int count, int selected)
    {
       const ImVec2 at = ImGui::GetCursorScreenPos();
-      const UiLayout::Rect r{ at.x, at.y, count > 2 ? 186.0f : 104.0f, tok::control_h }; // "Samples" needs the room
+      const UiLayout::Rect r{ at.x, at.y, count > 2 ? tok::ruler_units_w : tok::ruler_units_w_narrow, tok::control_h }; // "Samples" needs the room
       const int picked = PillGroup::Draw(id, r, segs, count, selected);
       ImGui::SetCursorScreenPos(at);
       ImGui::Dummy(ImVec2(r.w, r.h));
