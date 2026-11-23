@@ -170,7 +170,7 @@ H1-H3 claim still stands.
 |---|---|---|
 | D1 | What counts as "not safe" | A witness as in section 6: growth past 10⁶ × ‖x₀‖, or a Newton-refined periodic orbit (residual < 1e-10, amplitude > 1e-3). Plain long simulation only as a sanity check |
 | D2 | Which saturators are recognised | The fixed shape library in section 3, each with a sector and slope bound proved on paper and checked numerically on a log grid out to 10⁶. Anything else is "unrecognised saturator" and never certified |
-| D3 | Which multiplier | Start with a diagonal sector multiplier per saturator (circle-criterion style, the simplest LMI). Add slope-restricted (Lur'e-Lyapunov / Zames-Falb-type) terms only for G2, and as an ablation on G1 if H3 misses its bar by under 15 points |
+| D3 | Which multiplier | Start with a diagonal sector multiplier per saturator (circle-criterion style, the simplest LMI). Add slope-restricted (Lur'e-Lyapunov / Zames-Falb-type) terms only for G2, and as an ablation on G1 if H3 misses its bar by under 15 points. **Amended by the owner 2026-11-23 after phase 0:** the Lur'e-Lyapunov term (T3) is the main G1 method; sector-only (T1) is kept as the baseline it is compared with |
 | D4 | H3 bar | 70%, below Report 2's 80%, because sector bounds are conservative. Say so in the paper; don't move it later |
 | D5 | Blind set B | Seed 20261124, n up to 8 (G stops at 6), up to 4 saturators (G up to 3), 30% of terms with `Select` |
 
@@ -245,7 +245,7 @@ H2 filter, needs 5, so L may have up to 5 saturators. G (≤ 3) and B (≤ 4) ar
   V non-increasing forces P₁₂ = P₂₂; with stage 1 at slope 0 it forces P₁₂ = 0; so P₂₂ = 0, impossible.
   The +80 dB fallback doesn't rescue it: with |y| ≤ 10 it proves k < 0.04, with |y| ≤ 100 nothing.
   Hélie's 5/12 proof needs more than a sector bound per saturator. This makes the Lur'e-Lyapunov term (T3,
-  V = xᵀPx + Σ qᵢ ∫φᵢ) necessary for G1, not an ablation. Changing that needs the owner (D3).
+  V = xᵀPx + Σ qᵢ ∫φᵢ) necessary for G1, not an ablation. The owner made T3 the main method (D3 amended, 2026-11-23).
 - **The explicit Moog's own limit falls with cutoff.** Frozen at fs/8 it is unstable from k = 1.288, below
   Hélie's 5/3, so H2's bar can't be met over the full cutoff range by any sound method. Raised with the
   owner after D3.
@@ -267,9 +267,9 @@ Venv: `~/.venvs/stable-modulation`, reused unchanged; `scripts/requirements.txt`
 
 | # | Trajectory | For | Against | Choice |
 |---|---|---|---|---|
-| T1 | Sector vertices + common P, on Report 2's certifier and cover | Exact for its class; no new solver code; inherits Report 2's tested cover and Float32 check | Sector-only is conservative: it can't use that `tanh` is smooth and odd | **Main (G1)** |
+| T1 | Sector vertices + common P, on Report 2's certifier and cover | Exact for its class; no new solver code; inherits Report 2's tested cover and Float32 check | Provably fails on ladders (phase 0) | Baseline (was main; D3 amended) |
 | T2 | Diagonal S-procedure multiplier LMI (D3 as written) | One LMI per point, the textbook circle-criterion form | Never proves more than T1; only a cross-check | Cross-check |
-| T3 | Slope-restricted Lur'e-Lyapunov function, V = xᵀPx + Σ qᵢ ∫φᵢ | Uses slope bounds, less conservative for `tanh` | Larger LMI; V is not quadratic, so the cell cover needs new work | Ablation if H3 misses by under 15 points (D3) |
+| T3 | Slope-restricted Lur'e-Lyapunov function, V = xᵀPx + Σ qᵢ ∫φᵢ | Uses slope bounds; the only route found for ladders | Larger LMI; V is not quadratic, so the cell cover needs new work | **Main (G1)**, owner 2026-11-23 |
 | T4 | Slope vertices + common P on the difference system | The direct G2 route; same code as T1 | Slope floors of 0 need the amplitude argument; `clamp` mostly gets no proof | **Main (G2)** |
 | T5 | Zames-Falb / IQC multipliers | The least conservative known tests for slope-restricted loops | Built for time-invariant linear parts; our A(θ) switches every sample. We have not opened those papers | Rejected for this study |
 | T6 | Per-circuit energy functions (Hélie, port-Hamiltonian) | Proofs for real circuits | By hand, one circuit at a time; not a compiler pass | Reference values only (H2) |

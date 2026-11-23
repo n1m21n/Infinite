@@ -4,6 +4,7 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-11-23 Owner: saturating-loops D3 amended: the Lur'e-Lyapunov term (T3) is the main G1 method, because sector-only (T1) provably can't certify ladders (phase 0). T1 stays as the baseline.
 - 2026-11-23 Owner: saturating-loops scope amended: the literature set L may have up to 5 saturators per kernel (the tanh Moog needs 5); G and B unchanged.
 - 2026-11-23 Owner: saturating-loops (C1) sections 1-7 signed off as written, D1-D5 as recommended (`docs/research/saturating-loops`).
 - 2026-11-23 Owner: the next research study is C1, saturating loops (`docs/research/saturating-loops`), after stable-modulation shipped as Technical Report 2. Sections 1-7 and D1-D5 need sign-off before any building or measuring.
