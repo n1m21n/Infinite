@@ -52,7 +52,7 @@ namespace ColourChip
    // current one. Returns the clicked index or -1. Menus may hold this; they never hold sliders or fields.
    inline int Dots(const ImU32* cols, const char* const* names, int n, int selected, int perRow = 7)
    {
-      const float d = ImGui::GetFontSize() * 1.1f;
+      const float d = ImGui::GetFontSize() * tok::colour_dot_em;
       int hit = -1;
       for (int i = 0; i < n; i++)
       {

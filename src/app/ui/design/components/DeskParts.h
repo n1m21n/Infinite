@@ -97,7 +97,7 @@ namespace DeskParts
          dl->AddRectFilled(ImVec2(la.x - 1, la.y - 1), ImVec2(lb.x + 1, lb.y + 1), (led & 0x00FFFFFF) | ((ImU32)(60.0f * ledLit) << 24), tok::radius_cell);
       if (legend != nullptr)
       {
-         const float fs = ImGui::GetFontSize() * 0.92f;
+         const float fs = ImGui::GetFontSize() * tok::desk_legend_em;
          const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, legend);
          dl->AddText(ImGui::GetFont(), fs, ImVec2(a.x + ((b.x - a.x) - ts.x) * 0.5f, a.y + 6.0f + (b.y - a.y - 6.0f - ts.y) * 0.5f),
                      ledLit > 0.0f ? Ink() : Ink(190), legend);
@@ -183,7 +183,7 @@ namespace DeskParts
       dl->AddCircleFilled(ImVec2(c.x - 1.5f, c.y - 2.5f), cr - 4.0f, Tint(pot, 1.6f), 20);
       dl->AddCircle(c, cr, Lo(170), 24, 1.0f);
       dl->AddLine(ImVec2(c.x + cosf(ang) * 2.0f, c.y + sinf(ang) * 2.0f), ImVec2(c.x + cosf(ang) * (cr - 0.5f), c.y + sinf(ang) * (cr - 0.5f)), col, 2.2f);
-      const float fs = ImGui::GetFontSize() * 0.72f;
+      const float fs = ImGui::GetFontSize() * tok::desk_tag_em;
       const float tw = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, tag).x;
       dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + (cellW - tw) * 0.5f, p.y + kPotD + 3.0f), Ink(140), tag);
       return changed;
@@ -195,7 +195,7 @@ namespace DeskParts
       const ImVec2 q(p.x + w, p.y + kPlateH);
       dl->AddRectFilled(p, q, Role(tok::desk_well), tok::radius_cell);
       dl->AddRect(p, q, Hi(30), tok::radius_cell);
-      const float fs = ImGui::GetFontSize() * 0.86f;
+      const float fs = ImGui::GetFontSize() * tok::desk_plate_em;
       const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, text);
       dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + (w - ts.x) * 0.5f, p.y + (kPlateH - ts.y) * 0.5f), ink, text);
    }
@@ -208,7 +208,7 @@ namespace DeskParts
       dl->AddRect(p, q, Ink(34), 3.0f);
       char num[16];
       snprintf(num, sizeof(num), "%d", number);
-      const float nfs = ImGui::GetFontSize() * 0.78f;
+      const float nfs = ImGui::GetFontSize() * tok::desk_number_em;
       const float cy = (p.y + q.y) * 0.5f;
       dl->AddText(ImGui::GetFont(), nfs, ImVec2(p.x + 9.0f, cy - nfs * 0.5f), Tint(col, app::IsThemeLight() ? 0.7f : 1.25f), num);
       dl->PushClipRect(ImVec2(p.x + 3.0f, p.y), ImVec2(q.x - 3.0f, q.y), true);

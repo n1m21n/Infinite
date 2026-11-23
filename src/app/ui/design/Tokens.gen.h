@@ -14,6 +14,7 @@ namespace tok
    constexpr float type_display = 22.0f;
    constexpr float type_min = 8.0f;
    constexpr float type_fit_frac = 0.95f;
+   constexpr float type_cap_em = 0.74f;
    constexpr float icon_lg = 20.0f;
    constexpr float icon_sm = 14.0f;
    constexpr float icon_md = 18.0f;
@@ -92,6 +93,10 @@ namespace tok
    constexpr float fader_handle_h = 12.0f;
    constexpr float topbar_pad_y = 10.0f;
    constexpr float fold_arrow_x = 5.0f;
+   constexpr float desk_legend_em = 0.92f;
+   constexpr float desk_tag_em = 0.72f;
+   constexpr float desk_plate_em = 0.86f;
+   constexpr float desk_number_em = 0.78f;
    constexpr float motion_s_pad_flash = 0.14f;
    constexpr float motion_s_spring = 0.35f;
    constexpr float motion_s_clip_hold = 3.0f;
@@ -169,6 +174,8 @@ namespace tok
    constexpr float dropdown_w_l = 168.0f;
    constexpr float dropdown_label_min = 24.0f;
    constexpr float tip_wrap_em = 24.0f;
+   constexpr float notice_w_em = 24.0f;
+   constexpr float colour_dot_em = 1.1f;
    constexpr float label_w_regular = 72.0f;
    constexpr float text_min_w = 40.0f;
    constexpr float glyph_toggle_w = 22.0f;

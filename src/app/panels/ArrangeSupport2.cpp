@@ -1211,9 +1211,7 @@ namespace app
       if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          return;
       Tip::Begin();
-      ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
       ImGui::TextUnformatted(body);
-      ImGui::PopTextWrapPos();
       Tip::End();
    }
 

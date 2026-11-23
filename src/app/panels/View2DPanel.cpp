@@ -8959,7 +8959,7 @@ namespace
          baseRow = (float)hy1 + 1.0f;
       }
       // Target: the UI font's cap height, in screen points.
-      const float k = std::clamp(ImGui::GetFontSize() * 0.74f / capPx, 0.0f, 4.0f);   // probe px -> points
+      const float k = std::clamp(ImGui::GetFontSize() * tok::type_cap_em / capPx, 0.0f, 4.0f);   // probe px -> points
       const int w = nx1 - nx0 + 1, h = ny1 - ny0 + 1;
       std::vector<unsigned char> out((size_t)w * h * 4);
       for (int y = 0; y < h; y++)
@@ -12614,7 +12614,7 @@ namespace
             f.material = m - 1;
       }
       if (t == S::kFxShadow || t == S::kFxGlow || t == S::kFxBevel || t == S::kFxSatin)
-         FxContourRow(f, 900000 + t * 64 + (int)(ImGui::GetID("ct") & 63));
+         FxContourRow(f, (int)ImHashData(&t, sizeof t, ImGui::GetID("ct")));   // whole id: this layer's scope plus the effect
    }
 
 

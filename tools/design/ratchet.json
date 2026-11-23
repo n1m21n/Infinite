@@ -569,16 +569,8 @@
    "src/app/panels/FieldPatcherPanel.cpp": 1
   },
   "drag_thresholds": {},
-  "font_sizes": {
-   "src/app/panels/ArrangeSupport2.cpp": 1,
-   "src/app/panels/NoticeStack.cpp": 1,
-   "src/app/panels/View2DPanel.cpp": 1,
-   "src/app/ui/design/components/ColourChip.h": 1,
-   "src/app/ui/design/components/DeskParts.h": 4
-  },
-  "id_masks": {
-   "src/app/panels/View2DPanel.cpp": 1
-  },
+  "font_sizes": {},
+  "id_masks": {},
   "int_sizes": {
    "src/app/Startup.cpp": 1,
    "src/app/bodies/GeometryParams.cpp": 3,
@@ -793,11 +785,11 @@
  },
  "audit": {
   "anim": 3,
-  "arith": 2415,
+  "arith": 2413,
   "assign": 829,
-  "call": 1196,
+  "call": 1194,
   "canvas_pos": 139,
-  "clamp": 827,
+  "clamp": 826,
   "colour": 761,
   "compare": 1300,
   "const_def": 506,
@@ -809,7 +801,7 @@
   "id_stack": 74,
   "key": 12,
   "label": 698,
-  "layout": 250,
+  "layout": 249,
   "maths": 191,
   "member_default": 96,
   "palette": 1123,

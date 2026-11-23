@@ -15,9 +15,10 @@ def build():
     b = t["base"]
     for group in ("space", "radius", "type", "icon", "pin"):
         for k, v in b[group].items():
-            L.append(f"   constexpr float {group}_{k} = {float(v)}f;")
+            if not k.startswith("_"):
+                L.append(f"   constexpr float {group}_{k} = {float(v)}f;")
     # Optional groups, emitted as <group>_<key>: opacities, stroke weights and the per-component size groups.
-    for group in ("alpha", "stroke", "drag", "ruler", "fader", "topbar", "fold", "motion_s", "motion_rate", "motion_hz"):
+    for group in ("alpha", "stroke", "drag", "ruler", "fader", "topbar", "fold", "desk", "motion_s", "motion_rate", "motion_hz"):
         for k, v in b.get(group, {}).items():
             if not k.startswith("_"):
                 L.append(f"   constexpr float {group}_{k} = {float(v)}f;")

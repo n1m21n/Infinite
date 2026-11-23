@@ -31,7 +31,7 @@ void DrawNotices()
       return;
 
    const ImGuiViewport* vp = ImGui::GetMainViewport();
-   const float width = ImGui::GetFontSize() * 24.0f;
+   const float width = ImGui::GetFontSize() * tok::notice_w_em;
    float y = vp->WorkPos.y + vp->WorkSize.y - tok::space_4;
    const float x = vp->WorkPos.x + vp->WorkSize.x - width - tok::space_4;
 
