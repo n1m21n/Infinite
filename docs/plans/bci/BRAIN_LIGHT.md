@@ -171,6 +171,9 @@ C++ (option A):
 2. ~~Python mirror + proof sheets (no build).~~ Done, 3 rounds.
 3. Blind sets built; **owner picks** L2 (10 pairs) and L3 (10 triplets) from `~/Infinite/datasets/eeg/brain_light_blind/`,
    then the key is opened and the scores go into §10. Owner says yes/no for L6.
-4. ~~C++ + shader, one build, selftests.~~ Done. Then the deck slide (retitle the Brain Sculpt slide "control layer",
-   lead with Brain Light).
+4. ~~C++ + shader, one build, selftests.~~ Done.
+   ~~Deck slide.~~ Done 2026-11-23: slide 12 of `website/bci-deck.html`, "Brain Light: the brain paints every pixel"
+   (one person open vs closed, bars 74% / 68% / 89%). Source and frames in `proof/brain_light/deck_slide/`
+   (`frames.py` renders them, `slide.html` is shot with headless Chrome at 1280x720). Still open: retitle the Brain
+   Sculpt slide "control layer" once that slide lands in the deck.
 5. Headset session when one is on hand: the same checks live.
