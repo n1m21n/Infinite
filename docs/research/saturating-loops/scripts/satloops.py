@@ -121,3 +121,58 @@ def stick_witness(sys_, seq, x0, settle=4096, amp=1e-3, tol=1e-10):
         a = max(float(np.linalg.norm(v)) for v in orbit)
         return {"kind": "sticks", "seq": [list(t) for t in seq], "x": xs.tolist(), "residual": res, "amplitude": a}
     return None
+
+def locked_orbit(sys_, seq, slot, axis, box, x0, N, iters=60, tol=1e-10):
+    """Periodic stuck orbit with one knob value tuned so the orbit closes after N repeats of `seq`.
+
+    Unknowns: the state x and knob `axis` of `seq[slot]`. Equations: F^N(x) - x = 0 plus the phase
+    condition x[0] = 0. The tuned knob must stay inside [box[0][axis], box[1][axis]]. Returns
+    (seq_tuned, x, residual) or None.
+    """
+    n = len(x0)
+    def F(z):
+        s = [list(t) for t in seq]
+        s[slot][axis] = z[n]
+        return simulate(sys_, [tuple(t) for t in s], z[:n], N) - z[:n]
+    def G(z):
+        return np.concatenate([F(z), [z[0]]])
+    z = np.concatenate([x0, [seq[slot][axis]]])
+    for _ in range(iters):
+        r = G(z)
+        if np.linalg.norm(r) < tol:
+            break
+        J = np.empty((n + 1, n + 1))
+        for j in range(n + 1):
+            h = 1e-7 * max(1.0, abs(z[j]))
+            e = np.zeros(n + 1); e[j] = h
+            J[:, j] = (G(z + e) - G(z - e)) / (2 * h)
+        try:
+            dz = np.linalg.lstsq(J, -r, rcond=None)[0]
+        except np.linalg.LinAlgError:
+            return None
+        step = 1.0
+        while step > 1e-4 and np.linalg.norm(G(z + step * dz)) > np.linalg.norm(r):
+            step /= 2
+        z = z + step * dz
+    res = float(np.linalg.norm(F(z)))
+    lo, hi = box[0][axis], box[1][axis]
+    if res < tol and lo <= z[n] <= hi and np.linalg.norm(z[:n]) > 1e-3:
+        s = [list(t) for t in seq]; s[slot][axis] = float(z[n])
+        return s, z[:n], res
+    return None
+
+def settle(sys_, seq, x0, samples=8192):
+    x = np.array(x0, float)
+    for _ in range(max(1, samples // len(seq))):
+        x = simulate(sys_, seq, x, 1)
+    return x
+
+def phase_zero(sys_, seq, x, max_steps=4096):
+    """Step along the orbit (whole sequences) until x[0] changes sign, then return the state nearest 0."""
+    prev = x
+    for _ in range(max_steps):
+        nx = simulate(sys_, seq, prev, 1)
+        if np.sign(nx[0]) != np.sign(prev[0]):
+            return nx if abs(nx[0]) < abs(prev[0]) else prev
+        prev = nx
+    return x

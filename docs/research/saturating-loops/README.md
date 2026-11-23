@@ -275,6 +275,27 @@ form is convex in g and linear in k, so the cell's corners are exact: no Lipschi
   re-check inside each cell stays ≤ 7.5e-10 relative, inside the declared tolerance of 1e-9. That
   tolerance exists because the form has exact null directions; it is numerical, not a proof.
 
+**Phase 0, baseline B3** (`scripts/phase0_b3.py`, `data/phase0-b3.json`): the oracle's smallest k with a
+stuck-oscillation witness on the explicit tanh Moog. A witness is a knob sequence inside the box and a
+Newton-refined periodic orbit of the real filter with zero input. One knob value in the sequence is tuned
+inside its range so the orbit closes after N repeats; N comes from the best rational approximations of
+the settled orbit's rotation (denominators up to 4096). *Changed from the first try:* settling for 8 192
+samples from 0.01 and N from 5 multiples missed witnesses by up to 0.32 in k; settling for 2¹⁷ samples from
+0.3 with rational N fixed it.
+
+| Cutoff ceiling g | T3 certified | Oracle's first witness | Frozen limit | Witness orbit |
+|---|---|---|---|---|
+| 0.05 | 2.652 | 3.632 | 3.632 | 740 repeats, residual 7e-12, amplitude 0.005 |
+| 0.2 | 2.332 | 2.810 | 2.810 | 128 repeats, residual 7e-11, amplitude 0.011 |
+| 0.4 | 1.907 | 2.096 | 2.096 | 959 repeats, residual 6e-11, amplitude 0.006 |
+| 0.785 | 1.154 | 1.289 | 1.288 | 149 repeats, residual 1e-14, amplitude 0.034 |
+
+- The oracle agrees with the known answer (the frozen limit, where the Moog must self-oscillate) to 0.001,
+  so it is fit to judge certificates. No witness exists at any T3-certified k.
+- Saturation turns every linear blow-up into a stuck oscillation, as section 2 predicted.
+- The open gap (2.652 vs 3.632 at low cutoff) is the same common-P conservatism as Report 2's linear Moog
+  (2.737 there); T3 loses little on top of it.
+
 **Phases.**
 
 | Phase | Work | Needs a build |
