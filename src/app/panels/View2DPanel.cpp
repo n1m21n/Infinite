@@ -22,7 +22,12 @@
 #include "app/ui/design/components/SectionCard.h"
 #include "core/BlendModes.h"
 #include "core/BrushEngine.h"
+#include "nodes/AudioColorRampNode.h"
 #include "nodes/DrawNode.h"
+#include "nodes/FeedbackNodes.h"
+#include "nodes/FluidNode.h"
+#include "nodes/OpticalFlowNode.h"
+#include "nodes/TimeMachineNode.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/Scene3DNode.h"
 #include "nodes/SceneNodes.h"
@@ -131,7 +136,11 @@ namespace
       using S = Scene2DNode;
       if (t == S::kAdjShadowsHighlights)
          return "%.0f px";
-      return t == S::kAdjPixelate || t == S::kAdjHalftone || t == S::kAdjDither || t == S::kAdjPosterize || t == S::kAdjHue ? "%.0f" : "%.2f";
+      if (t == S::kAdjPixelate || t == S::kAdjHalftone)
+         return "%.0f px";
+      if (t == S::kAdjHue)
+         return "%.0f\xC2\xB0";
+      return t == S::kAdjDither || t == S::kAdjPosterize ? "%.0f" : "%.2f";
    }
    float sBrushHue = 0.0f;   // degrees, turns the colour each stroke starts with (sound as a paint input)
    // Turns an RGB colour round the hue circle, keeping its value and saturation.
@@ -1686,7 +1695,23 @@ namespace
    const char* AdjAmountLabel(int t)
    {
       using S = Scene2DNode;
-      return t == S::kAdjLevels ? "Gamma" : t == S::kAdjPhotoFilter ? "Density" : t == S::kAdjShadowsHighlights ? "Radius" : "Amount";
+      // The slider's own meaning where it is the value itself; "Amount" only where it mixes the look in.
+      switch (t)
+      {
+      case S::kAdjLevels: return "Gamma";
+      case S::kAdjPhotoFilter: return "Density";
+      case S::kAdjShadowsHighlights: return "Radius";
+      case S::kAdjPixelate: case S::kAdjHalftone: return "Size";
+      case S::kAdjDither: case S::kAdjPosterize: return "Levels";
+      case S::kAdjThreshold: return "Level";
+      case S::kAdjBrightness: return "Brightness";
+      case S::kAdjContrast: return "Contrast";
+      case S::kAdjHue: return "Shift";
+      case S::kAdjSaturation: return "Saturation";
+      case S::kAdjExposure: return "Exposure";
+      case S::kAdjVibrance: return "Vibrance";
+      default: return "Amount";
+      }
    }
 
    bool IntRow(const char* label, int* v)
@@ -2095,7 +2120,7 @@ namespace
       if (t == S::kAdjCurves || t == S::kAdjHue)
       {
          const bool armed = sAdjPick.key == key && sAdjPick.doc == sDocUid;
-         if (ActionButton::Draw((std::string(armed ? T("Picking") : T("Pick on picture")) + "##v2dadjpick" + std::to_string(key)).c_str(),
+         if (ActionButton::Draw((std::string(armed ? T("Click the picture") : T("Pick on picture")) + "##v2dadjpick" + std::to_string(key)).c_str(),
                                 ImVec2(-1.0f, 0.0f), armed ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
             sAdjPick = armed ? AdjPick() : AdjPick{ key, sDocUid };
       }
@@ -2104,9 +2129,9 @@ namespace
          ComboRow(T("Tone"), &sAdjTone, { T("Shadows"), T("Midtones"), T("Highlights") });
          sAdjTone = std::clamp(sAdjTone, 0, 2);
          float* q = p + sAdjTone * 3;
-         SliderRow(T("Cyan - Red"), &q[0], -1.0f, 1.0f, "%.2f");
-         SliderRow(T("Magenta - Green"), &q[1], -1.0f, 1.0f, "%.2f");
-         SliderRow(T("Yellow - Blue"), &q[2], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Red"), &q[0], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Green"), &q[1], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Blue"), &q[2], -1.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjSelective)
       {
@@ -11256,13 +11281,124 @@ namespace
       return out;
    }
 
-   // The owned node's own params, generic (its full body, with modulation, is one "Show on canvas" away).
+   // How a node effect's param reads in the 2D panel: a short label, its real range and choices, and whether it waits
+   // behind More (tier 1) or is never shown (tier 2: internal, or drawn as its own control). Names and ranges follow
+   // the node's own canvas body, so the panel and the node card agree. A param with no entry keeps the generic row.
+   using EffNames = const std::vector<std::string>& (*)();
+   const std::vector<std::string>& EffResNames() { static const std::vector<std::string> v = { "Full", "Half", "Quarter" }; return v; }
+   const std::vector<std::string>& EffTrailBlends() { static const std::vector<std::string> v = { "Max", "Add", "Screen" }; return v; }
+   const std::vector<std::string>& EffFlowViews() { static const std::vector<std::string> v = { "Vectors", "Colour" }; return v; }
+   const std::vector<std::string>& EffPixelDomains() { static const std::vector<std::string> v = { "Image", "Material" }; return v; }
+   struct EffHint
+   {
+      const char* type;
+      const char* param;
+      const char* label;
+      float lo, hi;
+      const char* fmt;
+      EffNames opts;
+      int tier;
+   };
+   const EffHint kEffHints[] = {
+      { "Trails", "blendMode", "Blend", 0, 0, nullptr, EffTrailBlends, 0 },
+      { "Trails", "decay", "Decay", 0.5f, 0.999f, "%.3f", nullptr, 0 },
+      { "Trails", "zoom", "Zoom", 0.9f, 1.1f, "%.3f", nullptr, 0 },
+      { "Trails", "rotate", "Rotate", -5.7296f, 5.7296f, "%.1f\xC2\xB0", nullptr, 0 },
+      { "Trails", "hueShift", "Hue shift", -0.05f, 0.05f, "%.3f", nullptr, 0 },
+      { "Trails", "driftX", "Drift X", -0.02f, 0.02f, "%.3f", nullptr, 1 },
+      { "Trails", "driftY", "Drift Y", -0.02f, 0.02f, "%.3f", nullptr, 1 },
+      { "Feedback", "delayFrames", "", 0, 0, nullptr, nullptr, 2 },
+      { "Time Machine", "length", "Length", 2.0f, (float)TimeMachineNode::kMaxLength, "%.0f fr", nullptr, 0 },
+      { "Time Machine", "invert", "Invert", 0, 0, nullptr, nullptr, 0 },
+      { "Time Machine", "resolution", "Quality", 0, 0, nullptr, EffResNames, 1 },
+      { "Optical Flow", "view", "View", 0, 0, nullptr, EffFlowViews, 0 },
+      { "Optical Flow", "gain", "Gain", 0.0f, 8.0f, "%.2f", nullptr, 0 },
+      { "Optical Flow", "resolution", "Quality", 0, 0, nullptr, EffResNames, 1 },
+      { "Optical Flow", "levels", "Levels", 1.0f, (float)OpticalFlowNode::kMaxLevels, "%.0f", nullptr, 1 },
+      { "Optical Flow", "window", "Window", 1.0f, 6.0f, "%.0f", nullptr, 1 },
+      { "Optical Flow", "iterations", "Passes", 1.0f, 6.0f, "%.0f", nullptr, 1 },
+      { "Fluid", "view", "View", 0, 0, nullptr, &FluidNode::ViewNames, 0 },
+      { "Fluid", "stirrer", "Stirrer", 0, 0, nullptr, &FluidNode::StirrerNames, 0 },
+      { "Fluid", "stirrerStrength", "Stir", 0.0f, 4.0f, "%.2f", nullptr, 0 },
+      { "Fluid", "stirrerSize", "Stir size", 0.01f, 0.3f, "%.3f", nullptr, 0 },
+      { "Fluid", "forceGain", "Force", 0.0f, 8.0f, "%.2f", nullptr, 0 },
+      { "Fluid", "vorticity", "Swirl", 0.0f, 2.0f, "%.2f", nullptr, 0 },
+      { "Fluid", "dyeFade", "Fade", 0.0f, 0.1f, "%.3f", nullptr, 0 },
+      { "Fluid", "refresh", "Refresh", 0.0f, 1.0f, "%.3f", nullptr, 0 },
+      { "Fluid", "viscosity", "Viscosity", 0.0f, 0.2f, "%.3f", nullptr, 1 },
+      { "Fluid", "velocityDamping", "Damping", 0.0f, 0.1f, "%.3f", nullptr, 1 },
+      { "Fluid", "resolution", "Quality", 0, 0, nullptr, EffResNames, 1 },
+      { "Fluid", "pressureIterations", "Solver", 1.0f, (float)FluidNode::kMaxPressureIterations, "%.0f", nullptr, 1 },
+      { "Reaction Diffusion", "preset", "Preset", 0, 0, nullptr, &ReactionDiffusionNode::PresetNames, 0 },
+      { "Reaction Diffusion", "feed", "Feed", 0.01f, 0.09f, "%.4f", nullptr, 0 },
+      { "Reaction Diffusion", "kill", "Kill", 0.03f, 0.08f, "%.4f", nullptr, 0 },
+      { "Reaction Diffusion", "stepsPerFrame", "Speed", 1.0f, 32.0f, "%.0f", nullptr, 0 },
+      { "Reaction Diffusion", "sourceInfluence", "Source", 0.0f, 1.0f, "%.2f", nullptr, 0 },
+      { "Reaction Diffusion", "lowColor", "Low", 0, 0, nullptr, nullptr, 0 },
+      { "Reaction Diffusion", "highColor", "High", 0, 0, nullptr, nullptr, 0 },
+      { "Reaction Diffusion", "diffuseA", "Diffuse A", 0.2f, 1.5f, "%.2f", nullptr, 1 },
+      { "Reaction Diffusion", "diffuseB", "Diffuse B", 0.1f, 1.0f, "%.2f", nullptr, 1 },
+      { "Reaction Diffusion", "width", "Width", 64.0f, 2048.0f, "%.0f px", nullptr, 1 },
+      { "Reaction Diffusion", "height", "Height", 64.0f, 2048.0f, "%.0f px", nullptr, 1 },
+      { "Remove Background", "mode", "Detect", 0, 0, nullptr, &RemoveBgNode::ModeNames, 0 },
+      { "Remove Background", "outputMode", "Output", 0, 0, nullptr, &RemoveBgNode::OutputModeNames, 0 },
+      { "Remove Background", "feather", "Feather", 0.0f, 4.0f, "%.2f", nullptr, 0 },
+      { "Remove Background", "threshold", "Threshold", 0.0f, 1.0f, "%.2f", nullptr, 0 },
+      { "Remove Background", "contrast", "Edge", 0.5f, 8.0f, "%.2f", nullptr, 0 },
+      { "Remove Background", "bgColor", "Backdrop", 0, 0, nullptr, nullptr, 1 },
+      { "Remove Background", "bgOpacity", "Back opacity", 0.0f, 1.0f, "%.2f", nullptr, 1 },
+      { "Remove Background", "autoRefresh", "Live", 0, 0, nullptr, nullptr, 1 },
+      { "Remove Background", "refreshFrames", "Every", 1.0f, 120.0f, "%.0f fr", nullptr, 1 },
+      { "Remove Background", "maskActive", "", 0, 0, nullptr, nullptr, 2 },
+      { "Predictive Coloring", "mix", "Mix", 0.0f, 1.0f, "%.2f", nullptr, 0 },
+      { "Predictive Coloring", "wander", "Wander", 0.0f, 1.0f, "%.2f", nullptr, 0 },
+      { "Predictive Coloring", "selfNormalize", "Normalize", 0, 0, nullptr, nullptr, 1 },
+      { "Predictive Coloring", "seed", "Seed", 0, 0, nullptr, nullptr, 1 },
+      { "Predictive Coloring", "learning", "", 0, 0, nullptr, nullptr, 2 },
+      { "Audio Color Ramp", "mode", "Mode", 0, 0, nullptr, &AudioColorRampNode::ModeNames, 0 },
+      { "Audio Color Ramp", "interpMode", "Blend", 0, 0, nullptr, &AudioColorRampNode::InterpNames, 0 },
+      { "Audio Color Ramp", "bandCount", "Bands", 2.0f, (float)AudioColorRampNode::kMaxBands, "%.0f", nullptr, 0 },
+      { "Audio Color Ramp", "gain", "Gain", 0.1f, 10.0f, "%.2f", nullptr, 0 },
+      { "Audio Color Ramp", "minBrightness", "Min glow", 0.0f, 1.0f, "%.2f", nullptr, 0 },
+      { "FieldPixel", "animate", "Animate", 0, 0, nullptr, nullptr, 0 },
+      { "FieldPixel", "width", "Width", 16.0f, 4096.0f, "%.0f px", nullptr, 1 },
+      { "FieldPixel", "height", "Height", 16.0f, 4096.0f, "%.0f px", nullptr, 1 },
+      { "FieldPixel", "domain", "Domain", 0, 0, nullptr, EffPixelDomains, 1 },
+      { "FieldPixel", "exposeAuxTexture", "", 0, 0, nullptr, nullptr, 2 },
+   };
+   const EffHint* FindEffHint(const std::string& type, const char* param)
+   {
+      for (const EffHint& h : kEffHints)
+         if (type == h.type && std::strcmp(param, h.param) == 0)
+            return &h;
+      return nullptr;
+   }
+
+   // The owned node's own params (its full body, with modulation, is one "Show on canvas" away). Drawn in two passes:
+   // tier 0 first, then the tier 1 rows under one More fold. `hasMore` reports whether a second pass has anything.
    class EffParamRows : public ParamVisitor
    {
    public:
+      EffParamRows(GraphNode& gn, int tier) : mGn(gn), mType(gn.typeName), mTier(tier) {}
+      bool hasMore = false;
+
       void Float(const char* name, float& v) override
       {
-         const std::string label = ParamLabel(name);
+         int band = -1;
+         const EffHint* h = Hint(name, band);
+         if (!Shown(h, name, band))
+            return;
+         if (band >= 0)   // Audio Color Ramp's per-band gain, behind More
+         {
+            SliderRow((std::string(T("Gain")) + " " + std::to_string(band + 1)).c_str(), &v, 0.0f, 2.0f, "%.2f");
+            return;
+         }
+         if (h != nullptr && h->hi > h->lo)
+         {
+            SliderRow(T(h->label), &v, h->lo, h->hi, h->fmt != nullptr ? h->fmt : "%.2f");
+            return;
+         }
+         const std::string label = h != nullptr ? std::string(T(h->label)) : ParamLabel(name);
          FieldLabel(label.c_str());
          ImGui::SetNextItemWidth(sFieldW);
          FieldWell::PushStyle();
@@ -11277,24 +11413,170 @@ namespace
       }
       void Int(const char* name, int& v) override
       {
-         const std::string label = ParamLabel(name);
-         if (IntRow(label.c_str(), &v))
+         int band = -1;
+         const EffHint* h = Hint(name, band);
+         if (!Shown(h, name, band))
+            return;
+         if (h != nullptr && h->opts != nullptr && !h->opts().empty())
+         {
+            std::vector<std::string> opts;
+            for (const std::string& o : h->opts())
+               opts.push_back(T(o.c_str()));
+            int nv = v;
+            if (ComboRow(T(h->label), &nv, opts))
+            {
+               if (auto* rd = dynamic_cast<ReactionDiffusionNode*>(mGn.node.get()); rd != nullptr && &v == &rd->preset)
+                  rd->ApplyPreset(nv);
+               else
+                  v = nv;
+               if (auto* acr = dynamic_cast<AudioColorRampNode*>(mGn.node.get()))
+                  acr->MarkDirty();
+            }
+            return;
+         }
+         if (h != nullptr && h->hi > h->lo)
+         {
+            float f = (float)v;
+            if (SliderRow(T(h->label), &f, h->lo, h->hi, h->fmt != nullptr ? h->fmt : "%.0f"))
+            {
+               const int nv = (int)std::lround(f);
+               if (auto* acr = dynamic_cast<AudioColorRampNode*>(mGn.node.get()); acr != nullptr && &v == &acr->bandCount)
+                  acr->SetBandCount(nv);
+               else
+                  v = nv;
+            }
+            return;
+         }
+         if (IntRow(h != nullptr ? T(h->label) : ParamLabel(name).c_str(), &v))
             Touch();
          UndoOnActivate("Effect");
       }
       void Bool(const char* name, bool& v) override
       {
-         if (std::strcmp(name, "maskActive") != 0)
-            BoolRow(ParamLabel(name).c_str(), &v);
+         int band = -1;
+         const EffHint* h = Hint(name, band);
+         if (!Shown(h, name, band))
+            return;
+         BoolRow(h != nullptr ? T(h->label) : ParamLabel(name).c_str(), &v);
       }
       void Text(const char*, std::string&) override {}
       void Color(const char* name, float rgb[3]) override
       {
+         int band = -1;
+         const EffHint* h = Hint(name, band);
+         if (band >= 0)
+         {
+            // Audio Color Ramp's band colours read as one row of dots, low band on the left.
+            if (mTier != 0 || band >= Bands())
+               return;
+            if (band == 0)
+               FieldLabel(T("Colours"));
+            else
+               FormParts::Inline(0.0f, tok::space_1);
+            float c[4] = { rgb[0], rgb[1], rgb[2], 1.0f };
+            const float fh = ImGui::GetFrameHeight();
+            if (FormParts::ColorDot(("##v2dacr" + std::to_string(band)).c_str(), c, 15.0f, fh))
+            {
+               std::copy(c, c + 3, rgb);
+               if (auto* acr = dynamic_cast<AudioColorRampNode*>(mGn.node.get()))
+                  acr->MarkDirty();
+               Touch();
+            }
+            return;
+         }
+         if (!Shown(h, name, band))
+            return;
          float c[4] = { rgb[0], rgb[1], rgb[2], 1.0f };
-         if (ColorRow(ParamLabel(name).c_str(), c))
+         if (ColorRow(h != nullptr ? T(h->label) : ParamLabel(name).c_str(), c))
             std::copy(c, c + 3, rgb);
       }
+
+   private:
+      GraphNode& mGn;
+      const std::string& mType;
+      int mTier;
+
+      int Bands() const
+      {
+         if (auto* acr = dynamic_cast<AudioColorRampNode*>(mGn.node.get()))
+            return std::clamp(acr->bandCount, 2, AudioColorRampNode::kMaxBands);
+         return 0;
+      }
+      // Audio Color Ramp numbers its band params (cross0, color0, gain0): those map to a band, not to a table row.
+      const EffHint* Hint(const char* name, int& band) const
+      {
+         band = -1;
+         if (mType == "Audio Color Ramp")
+            for (const char* pre : { "cross", "color", "gain" })
+            {
+               const size_t n = std::strlen(pre);
+               if (std::strncmp(name, pre, n) == 0 && std::isdigit((unsigned char)name[n]))
+               {
+                  band = std::atoi(name + n);
+                  if (pre[0] == 'c' && pre[1] == 'r')
+                     band = -2;   // crossovers: dragged on the node's own band editor
+                  return nullptr;
+               }
+            }
+         return FindEffHint(mType, name);
+      }
+      // Whether this pass draws the row; a tier 1 row seen on the first pass asks for the More fold.
+      bool Shown(const EffHint* h, const char*, int band)
+      {
+         if (band == -2)
+            return false;
+         int tier = h != nullptr ? h->tier : 0;
+         if (band >= 0)
+         {
+            if (band >= Bands())
+               return false;
+            tier = 1;
+         }
+         if (tier == 2)
+            return false;
+         if (tier == 1 && mTier == 0)
+            hasMore = true;
+         return tier == mTier;
+      }
    };
+
+   // Opacity and blend on one line: "Mix  100%  Normal" in a well; click it to open the two rows. A card at defaults
+   // spends one row on mixing instead of three. `blend` null = opacity only (a mask effect has no blend).
+   void MixRow(float& opacity, int* blend, const std::string& key)
+   {
+      static std::map<std::string, bool> sMixOpen;
+      bool& open = sMixOpen[key];
+      const bool atDefault = opacity >= 0.999f && (blend == nullptr || *blend == 0);
+      char sum[96];
+      if (blend != nullptr)
+         std::snprintf(sum, sizeof sum, "%.0f%%  %s", opacity * 100.0f, T(Scene2DNode::kEffBlendNames[std::clamp(*blend, 0, 4)]));
+      else
+         std::snprintf(sum, sizeof sum, "%.0f%%", opacity * 100.0f);
+      FieldLabel(T("Mix"));
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const ImVec2 sz(sFieldW, ImGui::GetFrameHeight());
+      if (ImGui::InvisibleButton(("##v2dmix" + key).c_str(), sz))
+         open = !open;
+      const bool hov = ImGui::IsItemHovered();
+      FieldWell::PushStyle();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(hov ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg),
+                        tok::radius_control);
+      dl->AddRect(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(ImGuiCol_Border), tok::radius_control);
+      FieldWell::PopStyle();
+      const ImU32 tc = ImGui::GetColorU32(atDefault && !hov ? ImGuiCol_TextDisabled : ImGuiCol_Text);
+      dl->AddText(ImVec2(p.x + tok::space_2, p.y + (sz.y - ImGui::GetFontSize()) * 0.5f), tc, sum);
+      if (!open && !PanelKit::AuditOpenAll())
+         return;
+      SliderRow(T("Opacity"), &opacity, 0.0f, 1.0f, "%.2f");
+      if (blend != nullptr)
+      {
+         std::vector<std::string> blends;
+         for (const char* b : Scene2DNode::kEffBlendNames)
+            blends.push_back(T(b));
+         ComboRow(T("Blend"), blend, blends);
+      }
+   }
 
    void EffectRows(Scene2DNode* doc, Layer& l, int i)
    {
@@ -11322,7 +11604,7 @@ namespace
       FormParts::Inline(0.0f, tok::space_2);
       ImGui::SetCursorPosY(rowY);
       const float gripW = 16.0f;
-      const float chipsW = sChip + tok::space_1 + gripW;
+      const float chipsW = (e.uid != 0 ? 2.0f : 1.0f) * (sChip + tok::space_1) + gripW;
       const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
       const ImVec2 np = ImGui::GetCursorScreenPos();
       const float fh = ImGui::GetFrameHeight();
@@ -11361,10 +11643,22 @@ namespace
             dl->AddTriangleFilled(ImVec2(c.x - 3.5f, c.y - 2), ImVec2(c.x + 3.5f, c.y - 2), ImVec2(c.x, c.y + 3), col);
          else
             dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 3.5f), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 3.5f), col);
-         const std::string display = app::TruncateWithEllipsis(e.uid != 0 ? (name + " · Node") : name, std::max(16.0f, nameW - 18.0f));
+         const std::string display = app::TruncateWithEllipsis(name, std::max(16.0f, nameW - 18.0f));
          dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, display.c_str());
       }
       FormParts::Inline(0.0f, tok::space_2);
+      // A node-backed effect's node: shown on the canvas (lit) or kept off it, one chip instead of a full-width row.
+      if (e.uid != 0)
+      {
+         if (IconChip((base + "show").c_str(), CanvasLink::Glyph(CanvasLink::Verb::Show), e.shown,
+                      T(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show))))
+         {
+            PushUndoCheckpoint("Show effect node");
+            e.shown = !e.shown;
+            Touch();
+         }
+         FormParts::Inline(0.0f, tok::space_1);
+      }
       if (IconChip((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove effect")))
          sEffOp = { l.id, i, 3, sDocUid };
       FormParts::Inline(0.0f, tok::space_1);
@@ -11382,7 +11676,8 @@ namespace
       }
       if (!e.on || folded)
          return;
-      // Primary effect controls first (consistent with Adjustments), then Blend/Opacity at the bottom.
+      // The effect's own controls, then its rarely used rows under More, then one Mix line (opacity and blend).
+      const std::string moreKey = "More##v2deffmore" + foldKey;
       if (e.uid == 0)
       {
          float lo = 0, hi = 1;
@@ -11408,13 +11703,22 @@ namespace
             if (auto* fn = dynamic_cast<FilterNode*>(gn->node.get()))
             {
                const FilterDef& def = fn->Def();
-               for (size_t pi = 0; pi < def.params.size(); pi++)
-               {
+               // Linear light is a rendering choice, not a look: it waits behind More.
+               auto rare = [](const FilterParamDef& pd) { return pd.label == "Linear light"; };
+               auto row = [&](size_t pi) {
                   const FilterParamDef& pd = def.params[pi];
                   const std::string plabel = ParamLabel(pd.label.c_str());
                   float* pv = fn->ParamPtr(pi);
                   if (pd.type == FilterParamDef::Type::Float)
                   {
+                     // Angles read in degrees everywhere in the panel; a filter that stores radians converts here.
+                     if (pd.format.find("rad") != std::string::npos)
+                     {
+                        float deg = *pv * 57.29578f;
+                        if (SliderRow(T(plabel.c_str()), &deg, pd.minVal * 57.29578f, pd.maxVal * 57.29578f, "%.0f\xC2\xB0"))
+                           *pv = deg / 57.29578f;
+                        return;
+                     }
                      const char* fmt = !pd.format.empty() ? pd.format.c_str() : (pd.integer ? "%.0f" : "%.2f");
                      if (SliderRow(T(plabel.c_str()), pv, pd.minVal, pd.maxVal, fmt) && pd.integer)
                         *pv = std::round(*pv);
@@ -11445,12 +11749,38 @@ namespace
                      if (ColorRow(T(plabel.c_str()), c))
                         std::copy(c, c + 3, pv);
                   }
-               }
+               };
+               bool anyRare = false;
+               for (size_t pi = 0; pi < def.params.size(); pi++)
+                  if (rare(def.params[pi]))
+                     anyRare = true;
+                  else
+                     row(pi);
+               if (anyRare && PanelKit::FoldHeader(moreKey.c_str(), true, false))
+                  for (size_t pi = 0; pi < def.params.size(); pi++)
+                     if (rare(def.params[pi]))
+                        row(pi);
             }
             else
             {
-               EffParamRows rows;
+               EffParamRows rows(*gn, 0);
                gn->node->VisitParams(rows);
+               if (auto* pc = dynamic_cast<PredictiveColoringNode*>(gn->node.get()))
+               {
+                  const bool learning = pc->IsLearning();
+                  const char* learnLabel = learning ? T("Stop learning") : pc->TotalSamples() > 0 ? T("Learn again") : T("Learn");
+                  if (ActionButton::Draw((std::string(learnLabel) + base + "learn").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+                  {
+                     PushUndoCheckpoint("Learn");
+                     pc->SetLearning(!learning);
+                     Touch();
+                  }
+               }
+               if (rows.hasMore && PanelKit::FoldHeader(moreKey.c_str(), true, false))
+               {
+                  EffParamRows more(*gn, 1);
+                  gn->node->VisitParams(more);
+               }
             }
             if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn->node.get()))
             {
@@ -11463,24 +11793,9 @@ namespace
                }
                ImGui::TextDisabled("%s", rbg->Status().c_str());
             }
-            if (ActionButton::Draw((std::string(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show)) + base + "show").c_str(), ImVec2(-1.0f, 0.0f),
-                                   ActionButton::Kind::Plain))
-            {
-               PushUndoCheckpoint("Show effect node");
-               e.shown = !e.shown;
-               Touch();
-            }
          }
       }
-      ImGui::Separator();
-      SliderRow(T("Opacity"), &e.opacity, 0.0f, 1.0f, "%.2f");
-      if (!e.toMask)
-      {
-         std::vector<std::string> blends;
-         for (const char* b : S::kEffBlendNames)
-            blends.push_back(T(b));
-         ComboRow(T("Blend"), &e.blend, blends);
-      }
+      MixRow(e.opacity, e.toMask ? nullptr : &e.blend, foldKey);
    }
 
    bool FilterMatch(const char* haystack, const char* needle)
@@ -12290,7 +12605,8 @@ namespace
                dl->AddTriangleFilled(ImVec2(c.x - 3.5f, c.y - 2), ImVec2(c.x + 3.5f, c.y - 2), ImVec2(c.x, c.y + 3), col);
             else
                dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 3.5f), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 3.5f), col);
-            const std::string fullTitle = LayerName(*l) + (l->clip ? " · Clipped" : "");
+            const std::string fullTitle = (l->name.empty() ? std::string(T(Scene2DNode::AdjName(l->adjType))) : l->name) +
+                                          (l->clip ? std::string(" · ") + T("Clipped") : std::string());
             const std::string title = app::TruncateWithEllipsis(fullTitle, std::max(16.0f, nameW - 18.0f));
             dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, title.c_str());
          }
