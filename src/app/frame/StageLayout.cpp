@@ -199,11 +199,11 @@ void DrawLayout(FrameCtx& fc)
          const bool arrangeVertical = gArrangePanelOpen && (ArrangePanelDock() == 0 || ArrangePanelDock() == 3);
 
          const float maxHeight = std::max(kViewportPanelMinHeight,
-                                          room.y - 150.0f - (matrixVertical ? gModMatrixHeight : 0.0f)
+                                          room.y - tok::dock_canvas_min_h - (matrixVertical ? gModMatrixHeight : 0.0f)
                                                           - (perfVertical ? gPerfPanelHeight : 0.0f)
                                                           - (arrangeVertical ? gArrangePanelHeight : 0.0f) - ((sessionTop || sessionBottom) ? gSessionPanelHeight : 0.0f));
          const float maxWidth = std::max(kViewportPanelMinWidth,
-                                         room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
+                                         room.x - tok::dock_canvas_min_w - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
                                          (matrixHorizontal ? gModMatrixWidth : 0.0f) -
                                          (perfHorizontal ? gPerfPanelWidth : 0.0f) -
                                          (arrangeHorizontal ? gArrangePanelWidth : 0.0f));
@@ -211,11 +211,11 @@ void DrawLayout(FrameCtx& fc)
          gViewportPanelWidth = std::min(std::max(gViewportPanelWidth, kViewportPanelMinWidth), maxWidth);
 
          const float maxMatrixHeight = std::max(kModMatrixMinHeight,
-                                                room.y - 150.0f - (viewportVertical ? gViewportPanelHeight : 0.0f)
+                                                room.y - tok::dock_canvas_min_h - (viewportVertical ? gViewportPanelHeight : 0.0f)
                                                                 - (perfVertical ? gPerfPanelHeight : 0.0f)
                                                                 - (arrangeVertical ? gArrangePanelHeight : 0.0f) - ((sessionTop || sessionBottom) ? gSessionPanelHeight : 0.0f));
          const float maxMatrixWidth = std::max(kModMatrixMinWidth,
-                                               room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
+                                               room.x - tok::dock_canvas_min_w - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
                                                (viewportHorizontal ? gViewportPanelWidth : 0.0f) -
                                                (perfHorizontal ? gPerfPanelWidth : 0.0f) -
                                                (arrangeHorizontal ? gArrangePanelWidth : 0.0f));
@@ -223,11 +223,11 @@ void DrawLayout(FrameCtx& fc)
          gModMatrixWidth = std::min(std::max(gModMatrixWidth, kModMatrixMinWidth), maxMatrixWidth);
 
          const float maxPerfHeight = std::max(kPerfPanelMinHeight,
-                                              room.y - 150.0f - (viewportVertical ? gViewportPanelHeight : 0.0f)
+                                              room.y - tok::dock_canvas_min_h - (viewportVertical ? gViewportPanelHeight : 0.0f)
                                                               - (matrixVertical ? gModMatrixHeight : 0.0f)
                                                               - (arrangeVertical ? gArrangePanelHeight : 0.0f) - ((sessionTop || sessionBottom) ? gSessionPanelHeight : 0.0f));
          const float maxPerfWidth = std::max(kPerfPanelMinWidth,
-                                             room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
+                                             room.x - tok::dock_canvas_min_w - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
                                              (viewportHorizontal ? gViewportPanelWidth : 0.0f) -
                                              (matrixHorizontal ? gModMatrixWidth : 0.0f) -
                                              (arrangeHorizontal ? gArrangePanelWidth : 0.0f));
@@ -235,19 +235,19 @@ void DrawLayout(FrameCtx& fc)
          gPerfPanelWidth = std::min(std::max(gPerfPanelWidth, kPerfPanelMinWidth), maxPerfWidth);
 
          const float maxArrangeHeight = std::max(kArrangePanelMinHeight,
-                                                 room.y - 150.0f - (viewportVertical ? gViewportPanelHeight : 0.0f)
+                                                 room.y - tok::dock_canvas_min_h - (viewportVertical ? gViewportPanelHeight : 0.0f)
                                                                  - (matrixVertical ? gModMatrixHeight : 0.0f)
                                                                  - (perfVertical ? gPerfPanelHeight : 0.0f)
                                                                  - ((sessionTop || sessionBottom) ? gSessionPanelHeight : 0.0f));
          const float maxArrangeWidth = std::max(kArrangePanelMinWidth,
-                                                room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
+                                                room.x - tok::dock_canvas_min_w - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
                                                 (viewportHorizontal ? gViewportPanelWidth : 0.0f) -
                                                 (matrixHorizontal ? gModMatrixWidth : 0.0f) -
                                                 (perfHorizontal ? gPerfPanelWidth : 0.0f));
          gArrangePanelHeight = std::min(std::max(gArrangePanelHeight, kArrangePanelMinHeight), maxArrangeHeight);
          gArrangePanelWidth = std::min(std::max(gArrangePanelWidth, kArrangePanelMinWidth), maxArrangeWidth);
          const float maxSessionHeight = std::max(kSessionPanelMinHeight,
-                                                 room.y - 150.0f - (viewportVertical ? gViewportPanelHeight : 0.0f)
+                                                 room.y - tok::dock_canvas_min_h - (viewportVertical ? gViewportPanelHeight : 0.0f)
                                                                  - (matrixVertical ? gModMatrixHeight : 0.0f)
                                                                  - (perfVertical ? gPerfPanelHeight : 0.0f)
                                                                  - (arrangeVertical ? gArrangePanelHeight : 0.0f));
@@ -279,17 +279,17 @@ void DrawLayout(FrameCtx& fc)
       if (mixerRow)
       {
          gMixerPanelHeight = std::clamp(gMixerPanelHeight, kMixerPanelMinHeight,
-                                        std::max(kMixerPanelMinHeight, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+                                        std::max(kMixerPanelMinHeight, ImGui::GetContentRegionAvail().y - topBottom - tok::dock_canvas_min_h));
          topBottom += gMixerPanelHeight;
          topBottomRows++;
       }
       gMixerPanelWidth = std::clamp(gMixerPanelWidth, kMixerPanelMinWidth,
-                                    std::max(kMixerPanelMinWidth, ImGui::GetContentRegionAvail().x - 300.0f));
+                                    std::max(kMixerPanelMinWidth, ImGui::GetContentRegionAvail().x - tok::dock_canvas_keep_w));
       if (arrangeTop  || arrangeBottom)  { topBottom += gArrangePanelHeight;  topBottomRows++; }
       if (sessionTop  || sessionBottom)  { topBottom += gSessionPanelHeight;  topBottomRows++; }
       if (gSampleStudioOpen)
       {
-         gSampleStudioHeight = std::clamp(gSampleStudioHeight, 180.0f, std::max(180.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         gSampleStudioHeight = std::clamp(gSampleStudioHeight, tok::dock_sample_studio_min_h, std::max(tok::dock_sample_studio_min_h, ImGui::GetContentRegionAvail().y - topBottom - tok::dock_canvas_min_h));
          topBottom += gSampleStudioHeight;
          topBottomRows++;
       }
@@ -306,22 +306,22 @@ void DrawLayout(FrameCtx& fc)
       const bool view2DFill = gView2DOpen && gView2DDock == 4;
       if (view3DRow)
       {
-         gView3DHeight = std::clamp(gView3DHeight, 300.0f, std::max(300.0f, ImGui::GetContentRegionAvail().y * 0.8f));
+         gView3DHeight = std::clamp(gView3DHeight, tok::dock_view_min_h, std::max(tok::dock_view_min_h, ImGui::GetContentRegionAvail().y * tok::dock_view_max_frac));
          topBottom += gView3DHeight;
       }
       if (view2DRow)
       {
-         gView2DHeight = std::clamp(gView2DHeight, 300.0f, std::max(300.0f, ImGui::GetContentRegionAvail().y * 0.8f));
+         gView2DHeight = std::clamp(gView2DHeight, tok::dock_view_min_h, std::max(tok::dock_view_min_h, ImGui::GetContentRegionAvail().y * tok::dock_view_max_frac));
          topBottom += gView2DHeight;
       }
       {
-         const float widest = std::max(320.0f, ImGui::GetContentRegionAvail().x - 300.0f);
-         gView3DWidth = std::clamp(gView3DWidth, 320.0f, widest);
-         gView2DWidth = std::clamp(gView2DWidth, 320.0f, widest);
+         const float widest = std::max(tok::dock_view_min_w, ImGui::GetContentRegionAvail().x - tok::dock_canvas_keep_w);
+         gView3DWidth = std::clamp(gView3DWidth, tok::dock_view_min_w, widest);
+         gView2DWidth = std::clamp(gView2DWidth, tok::dock_view_min_w, widest);
       }
       if (gPianoRollOpen)
       {
-         gPianoRollHeight = std::clamp(gPianoRollHeight, 240.0f, std::max(240.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         gPianoRollHeight = std::clamp(gPianoRollHeight, tok::dock_piano_roll_min_h, std::max(tok::dock_piano_roll_min_h, ImGui::GetContentRegionAvail().y - topBottom - tok::dock_canvas_min_h));
          topBottom += gPianoRollHeight;
          topBottomRows++;
       }
@@ -330,7 +330,7 @@ void DrawLayout(FrameCtx& fc)
       if (gDrumPanelOpen)
       {
          // User-sized by the grip; a short window trims it.
-         gDrumPanelHeight = std::clamp(gDrumPanelHeight, 160.0f, std::max(160.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         gDrumPanelHeight = std::clamp(gDrumPanelHeight, tok::dock_drum_min_h, std::max(tok::dock_drum_min_h, ImGui::GetContentRegionAvail().y - topBottom - tok::dock_canvas_min_h));
          topBottom += gDrumPanelHeight;
          topBottomRows++;
       }
@@ -338,7 +338,7 @@ void DrawLayout(FrameCtx& fc)
          gCurveEditorDock = 0; // bottom or top only
       if (gCurveEditorOpen)
       {
-         gCurveEditorHeight = std::clamp(gCurveEditorHeight, 220.0f, std::max(220.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         gCurveEditorHeight = std::clamp(gCurveEditorHeight, tok::dock_curve_min_h, std::max(tok::dock_curve_min_h, ImGui::GetContentRegionAvail().y - topBottom - tok::dock_canvas_min_h));
          topBottom += gCurveEditorHeight;
          topBottomRows++;
       }
@@ -346,9 +346,9 @@ void DrawLayout(FrameCtx& fc)
          gFieldPatcherDock = 0; // bottom or top only
       if (gFieldPatcherOpen)
       {
-         const float room = std::max(220.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f);
-         gFieldPatcherHeight = std::clamp(gFieldPatcherHeight, 220.0f, room);
-         gFieldPatcherShownHeight = gFieldPatcherMaximised ? std::max(220.0f, ImGui::GetContentRegionAvail().y - topBottom - 24.0f)
+         const float room = std::max(tok::dock_field_min_h, ImGui::GetContentRegionAvail().y - topBottom - tok::dock_canvas_min_h);
+         gFieldPatcherHeight = std::clamp(gFieldPatcherHeight, tok::dock_field_min_h, room);
+         gFieldPatcherShownHeight = gFieldPatcherMaximised ? std::max(tok::dock_field_min_h, ImGui::GetContentRegionAvail().y - topBottom - tok::dock_maximised_margin)
                                                            : gFieldPatcherHeight;
          topBottom += gFieldPatcherShownHeight;
          topBottomRows++;
@@ -357,7 +357,7 @@ void DrawLayout(FrameCtx& fc)
          gFieldPatcherMaximised = false;
       if (TerminalDocked() && (gTerminalDock == 0 || gTerminalDock == 3))
       {
-         gTerminalHeight = std::clamp(gTerminalHeight, 160.0f, std::max(160.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         gTerminalHeight = std::clamp(gTerminalHeight, tok::dock_terminal_min_h, std::max(tok::dock_terminal_min_h, ImGui::GetContentRegionAvail().y - topBottom - tok::dock_canvas_min_h));
          topBottom += gTerminalHeight;
          topBottomRows++;
       }
@@ -367,7 +367,7 @@ void DrawLayout(FrameCtx& fc)
       // row gap here would leave an unused windowBg strip at the bottom -
       // which is the same visible bar, just moved.
       (void)topBottomRows;
-      graphHeight = std::max(150.0f,
+      graphHeight = std::max(tok::dock_canvas_min_h,
          ImGui::GetContentRegionAvail().y - topBottom);
 
       // Top- and left-docked panels draw before the canvas: nothing else in
@@ -452,7 +452,7 @@ void DrawLayout(FrameCtx& fc)
          ImGui::SameLine(0.0f, 0.0f);
       }
       if (TerminalDocked() && (gTerminalDock == 1 || gTerminalDock == 2))
-         gTerminalWidth = std::clamp(gTerminalWidth, 280.0f, std::max(280.0f, ImGui::GetContentRegionAvail().x - 300.0f));
+         gTerminalWidth = std::clamp(gTerminalWidth, tok::dock_terminal_min_w, std::max(tok::dock_terminal_min_w, ImGui::GetContentRegionAvail().x - tok::dock_canvas_keep_w));
       if (TerminalDocked() && gTerminalDock == 2)
       {
          DrawTerminalDocked("##terminal_left", ImVec2(gTerminalWidth, graphHeight));
@@ -514,11 +514,11 @@ void DrawLayout(FrameCtx& fc)
       if (gView2DOpen && gView2DDock == 1) rightReserved += gView2DWidth;
       if (gHistoryOpen)
       {
-         gHistoryWidth = std::min(gHistoryWidth, std::max(220.0f, ImGui::GetContentRegionAvail().x * 0.5f));
+         gHistoryWidth = std::min(gHistoryWidth, std::max(tok::dock_history_min_w, ImGui::GetContentRegionAvail().x * tok::dock_history_max_frac));
          rightReserved += gHistoryWidth;
       }
       const float graphWidth = rightReserved > 0.0f
-                                  ? std::max(200.0f, ImGui::GetContentRegionAvail().x - rightReserved)
+                                  ? std::max(tok::dock_canvas_min_w, ImGui::GetContentRegionAvail().x - rightReserved)
                                   : 0.0f;
 
       // The canvas rect, captured here rather than from inside the editor:

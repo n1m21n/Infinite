@@ -3220,8 +3220,8 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const float diameter = 34.0f;
          const float lineH = ImGui::GetTextLineHeight();
-         const float perRowF = std::max(1.0f, std::floor(inner / 76.0f));
-         const float cellW = std::min(96.0f, inner / perRowF);
+         const float perRowF = std::max(1.0f, std::floor(inner / tok::chat_attach_tile));
+         const float cellW = std::min(tok::chat_attach_cell_max_w, inner / perRowF);
          const int perRow = (int)perRowF;
          const float cellH = diameter + tok::space_2 + 2.0f * lineH;
          const ImU32 accent = ImGui::GetColorU32(AccentEmphasisSelected());
@@ -3538,7 +3538,7 @@ namespace app
          float y = origin.y;
          if (!segs.empty())
          {
-            const float maxW = std::max(80.0f, width * 0.8f);
+            const float maxW = std::max(tok::chat_bubble_min_w, width * tok::chat_bubble_max_frac);
             float textW = 0.0f;
             for (const chat::Seg& s : segs)
                textW += ImGui::CalcTextSize(s.text.c_str()).x + (s.kind == chat::Seg::Kind::Text ? 0.0f : 2.0f * tok::space_1 + 3.0f);
@@ -3597,7 +3597,7 @@ namespace app
          c.width = width;
          c.pad = tok::space_3;
          c.x = c.at.x + c.pad;
-         c.inner = std::max(40.0f, width - 2.0f * c.pad);
+         c.inner = std::max(tok::text_min_w, width - 2.0f * c.pad);
          c.split.Split(ImGui::GetWindowDrawList(), 2);
          c.split.SetCurrentChannel(ImGui::GetWindowDrawList(), 1);
          ImGui::SetCursorScreenPos(ImVec2(c.x, c.at.y + c.pad));
@@ -4163,9 +4163,9 @@ namespace app
                sSelB = HitTest(idx, m);
                const float top = win->InnerRect.Min.y, bottom = win->InnerRect.Max.y;
                if (m.y < top)
-                  ImGui::SetScrollY(ImGui::GetScrollY() - std::min(24.0f, (top - m.y) * 0.5f + 2.0f));
+                  ImGui::SetScrollY(ImGui::GetScrollY() - std::min(tok::chat_autoscroll_max, (top - m.y) * 0.5f + 2.0f));
                else if (m.y > bottom)
-                  ImGui::SetScrollY(ImGui::GetScrollY() + std::min(24.0f, (m.y - bottom) * 0.5f + 2.0f));
+                  ImGui::SetScrollY(ImGui::GetScrollY() + std::min(tok::chat_autoscroll_max, (m.y - bottom) * 0.5f + 2.0f));
             }
          }
          const bool has = sSelEntry >= 0 && !idx.empty() && (sSelA.piece != sSelB.piece || sSelA.ch != sSelB.ch);
@@ -4368,7 +4368,7 @@ namespace app
                      else if (ag != sAgents.end() && ag->second.login != nullptr)
                      {
                         ImGui::TextDisabled("%s", T("Finish in your browser…"));
-                        DrawCodeEntry(ag->second, std::min(width, 360.0f));
+                        DrawCodeEntry(ag->second, std::min(width, tok::chat_code_entry_w));
                      }
                      if (!e.detail.empty())
                      {
@@ -5130,7 +5130,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + g.totalH));
          ImGui::Dummy(ImVec2(width, 0.0f));
          if (active || sDropHovered)
-            DrawDropdown(ImVec2(at.x, at.y), std::min(width, 420.0f));
+            DrawDropdown(ImVec2(at.x, at.y), std::min(width, tok::chat_dropdown_max_w));
          else
             sDropHovered = false;
       }
@@ -5513,7 +5513,7 @@ namespace app
          return;
       }
       const float gap = tok::space_1;
-      const float codeW = std::floor(std::clamp(avail.x * 0.45f, 300.0f, 640.0f));
+      const float codeW = std::floor(std::clamp(avail.x * tok::chat_code_frac, tok::chat_code_min_w, tok::chat_code_max_w));
       const ImGuiWindowFlags flags = ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
       ImGui::BeginChild("##chatleft", ImVec2(avail.x - codeW - gap, avail.y), false, flags);
       DrawChatBody();

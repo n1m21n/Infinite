@@ -6421,7 +6421,7 @@ namespace
       // only a caret is drawn (one copy of the text, not two).
       const ImVec2 bmn(std::min(std::min(c[0].x, c[1].x), std::min(c[2].x, c[3].x)), std::min(std::min(c[0].y, c[1].y), std::min(c[2].y, c[3].y)));
       const ImVec2 bmx(std::max(std::max(c[0].x, c[1].x), std::max(c[2].x, c[3].x)), std::max(std::max(c[0].y, c[1].y), std::max(c[2].y, c[3].y)));
-      const float w = std::max(40.0f, bmx.x - bmn.x), h = std::max(ImGui::GetFrameHeight(), bmx.y - bmn.y);
+      const float w = std::max(tok::text_min_w, bmx.x - bmn.x), h = std::max(ImGui::GetFrameHeight(), bmx.y - bmn.y);
       const ImVec2 at = bmn;
       const ImVec2 keep = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(at);
@@ -10423,7 +10423,7 @@ namespace
          ImGui::SetCursorScreenPos(ImVec2(x, p.y + (rowH - ImGui::GetFrameHeight()) * 0.5f));
          if (sRename == id)
          {
-            ImGui::SetNextItemWidth(std::max(40.0f, p.x + w - x - 24.0f));
+            ImGui::SetNextItemWidth(std::max(tok::text_min_w, p.x + w - x - 24.0f));
             if (ImGui::IsWindowAppearing() || !ImGui::IsAnyItemActive())
                ImGui::SetKeyboardFocusHere();
             const bool done = FieldWell::InputText("##rename", sRenameBuf, sizeof(sRenameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
@@ -17192,8 +17192,8 @@ void DrawViewDocked(const char* id, const ImVec2& size, int dock, float& height,
             case 2: width += d.x; break;
             default: height += d.y; break;
          }
-         height = std::max(300.0f, height);
-         width = std::max(320.0f, width);
+         height = std::max(tok::dock_view_min_h, height);
+         width = std::max(tok::dock_view_min_w, width);
       }
    };
    if (gripFirst && !fill)

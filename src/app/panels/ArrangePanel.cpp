@@ -1573,13 +1573,13 @@ namespace app
       ImGui::Separator();
 
       // Layout: Global Viewport Monitor alongside / above timeline lanes
-      const bool isWide = panelSize.x >= 720.0f;
+      const bool isWide = panelSize.x >= tok::arrange_wide_w;
       const bool showVp = isWide && gArrangeShowViewport;
-      const float kViewportW = isWide ? std::clamp(panelSize.x * 0.28f, 180.0f, 320.0f) : panelSize.x;
+      const float kViewportW = isWide ? std::clamp(panelSize.x * tok::arrange_viewport_frac, tok::arrange_viewport_min_w, tok::arrange_viewport_max_w) : panelSize.x;
       // Clip Settings takes more columns while the timeline keeps at least 420 pt.
-      const float kSettingsW = ArrangeClipSettingsWidth(std::max(244.0f, panelSize.x - (showVp ? kViewportW : 0.0f) - 420.0f));
+      const float kSettingsW = ArrangeClipSettingsWidth(std::max(tok::arrange_settings_min_w, panelSize.x - (showVp ? kViewportW : 0.0f) - tok::arrange_lanes_keep_w));
 
-      const float kHeaderWidth = 175.0f; // Mix strip (S M pan gain / opacity), name box, drag handle
+      const float kHeaderWidth = tok::arrange_header_w; // Mix strip (S M pan gain / opacity), name box, drag handle
       const float kMarkerStripH = 14.0f; // marker flags (WP6), above the tick/label strip
       const float kRulerHeight = kMarkerStripH + TimeRuler::kHeight; // marker strip + the shared ruler
       const float kLaneHeight = 30.0f;  // default/group row height; a lane can be drag-resized off this via Lane::rowHeight
@@ -1858,7 +1858,7 @@ namespace app
          {
             const float fx = tickToX(mk.pos);
             const char* nm = mk.name.empty() ? "Marker" : mk.name.c_str();
-            const float flagW = std::clamp(ImGui::CalcTextSize(nm).x + 10.0f, 12.0f, 120.0f);
+            const float flagW = std::clamp(ImGui::CalcTextSize(nm).x + tok::arrange_flag_pad, tok::arrange_flag_min_w, tok::arrange_flag_max_w);
             if (fx + flagW < rulerStartX || fx > rulerStartX + rulerWidth)
                continue;
             const ImVec2 f0(fx, pinnedTopY + 1.0f);
@@ -2601,7 +2601,7 @@ namespace app
 
          ImGui::SameLine(0.0f, 6.0f);
 
-         const float grpNameW = std::max(40.0f, rulerStartX - ImGui::GetCursorScreenPos().x - 24.0f);
+         const float grpNameW = std::max(tok::text_min_w, rulerStartX - ImGui::GetCursorScreenPos().x - 24.0f);
          if (gArrangeRenamingLaneId == groupId)
          {
             ImGui::SetNextItemWidth(grpNameW);
@@ -2904,7 +2904,7 @@ namespace app
          const float kMixStripW = kMixCtl * 4.0f + kMixGap + 6.0f + kMixKnobGap; // 90px
 
          const float contentStartX = headerStartX + 4.0f + (float)laneDepth * kGroupIndent;
-         const float nameBoxW = std::max(35.0f, rulerStartX - contentStartX - kMixStripW - 6.0f);
+         const float nameBoxW = std::max(tok::arrange_name_min_w, rulerStartX - contentStartX - kMixStripW - 6.0f);
          const ImVec2 nameBoxPos(contentStartX, curY + 4.0f);
          const ImVec2 nameBoxSize(nameBoxW, rowH - 8.0f);
 
@@ -3132,7 +3132,7 @@ namespace app
 
             // Hit zones: a trim handle is at most a quarter of the clip on
             // each side (2..6 px), so the middle half of any clip always moves.
-            const float handleW = std::clamp((clipX1 - clipX0) * 0.25f, 2.0f, 6.0f);
+            const float handleW = std::clamp((clipX1 - clipX0) * 0.25f, tok::arrange_trim_min_w, tok::arrange_trim_max_w);
             const bool onLeftEdge = clipHovered && clipX0 >= rulerStartX && (mPos.x - clipX0 <= handleW);
             const bool onRightEdge = clipHovered && !onLeftEdge && clipX1 <= rulerStartX + rulerWidth &&
                                      (clipX1 - mPos.x <= handleW);

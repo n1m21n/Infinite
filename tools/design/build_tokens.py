@@ -45,6 +45,11 @@ def build():
     for k, v in b.get("page", {}).items():
         if not k.startswith("_"):
             L.append(f"   constexpr float page_{k} = {float(v)}f;")
+    # Docked panels (StageLayout): each panel's floor and the room the canvas keeps.
+    for grp in ("dock", "cell", "arrange", "chat"):   # panel floors, knob-row cells, per-panel layout
+        for k, v in b.get(grp, {}).items():
+            if not k.startswith("_"):
+                L.append(f"   constexpr float {grp}_{k} = {float(v)}f;")
     r = t["roles"]
     L += ["", "   struct Rgba8 { unsigned char r, g, b, a; };", "   struct Rgbaf { float r, g, b, a; };", "   struct Pair8 { Rgba8 dark, light; };", "   struct Pairf { Rgbaf dark, light; };"]
     for k, v in r["pairs"].items():

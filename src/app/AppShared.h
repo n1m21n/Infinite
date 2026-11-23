@@ -29,14 +29,14 @@ extern float gViewportPanelWidth;
 extern float gViewportPanelHeight;
 
 
-   inline const float kViewportPanelMinWidth = 160.0f;
+   inline const float kViewportPanelMinWidth = tok::dock_viewport_min_w;
 
 
    // Taller than the width floor's equivalent margin: a top/bottom card gives
    // up two full rows (the dock combo/close row, then its own title row)
    // before the image even starts, so a floor sized like the width one left
    // next to nothing for the image itself - see the "so small" screenshot.
-   inline const float kViewportPanelMinHeight = 190.0f;
+   inline const float kViewportPanelMinHeight = tok::dock_viewport_min_h;
 
 
    // Param column width. 168 by default; a node whose pin header is wider stretches it to the header
@@ -790,8 +790,8 @@ extern float gMixerPanelWidth;
 extern float gMixerPanelHeight;
 extern bool  gMixerClaimedKeys;
 extern ImVec2 gMixerPanelRectMin, gMixerPanelRectMax;
-inline const float kMixerPanelMinWidth = 320.0f;
-inline const float kMixerPanelMinHeight = 180.0f;
+inline const float kMixerPanelMinWidth = tok::dock_mixer_min_w;
+inline const float kMixerPanelMinHeight = tok::dock_mixer_min_h;
 // A page is one console: an Audio Out whose input resolves to a Mixer (that Mixer is the page's top).
 // Mixer Audio routes exactly these terminals; the panel lists exactly these pages.
 bool IsMixerPageTerminal(const INode* terminal, const INode* resolvedSource);
@@ -884,10 +884,10 @@ extern float gModMatrixWidth;
 extern float gModMatrixHeight;
 
 
-   inline const float kModMatrixMinWidth = 300.0f;
+   inline const float kModMatrixMinWidth = tok::dock_matrix_min_w;
 
    // eight columns need real room
-   inline const float kModMatrixMinHeight = 140.0f;
+   inline const float kModMatrixMinHeight = tok::dock_matrix_min_h;
 
 extern bool  gPerfPanelOpen;
 
@@ -898,10 +898,10 @@ extern float gPerfPanelWidth;
 extern float gPerfPanelHeight;
 
 
-   inline const float kPerfPanelMinWidth = 240.0f;
+   inline const float kPerfPanelMinWidth = tok::dock_perf_min_w;
 
 
-   inline const float kPerfPanelMinHeight = 160.0f;
+   inline const float kPerfPanelMinHeight = tok::dock_perf_min_h;
 
 extern bool  gArrangePanelOpen;
 
@@ -913,13 +913,13 @@ extern bool  gSessionPanelOpen;
 
 extern float gSessionPanelHeight;
 
-   inline const float kSessionPanelMinHeight = 160.0f;
+   inline const float kSessionPanelMinHeight = tok::dock_session_min_h;
 
 
-   inline const float kArrangePanelMinWidth = 300.0f;
+   inline const float kArrangePanelMinWidth = tok::dock_arrange_min_w;
 
 
-   inline const float kArrangePanelMinHeight = 140.0f;
+   inline const float kArrangePanelMinHeight = tok::dock_arrange_min_h;
 
 extern float gArrangePixelsPerBeat;
 
@@ -3286,7 +3286,7 @@ void EndAudioSection();
          const float cellX0 = x0 + (float)index * cellW;
          const float btnH = ImGui::GetFrameHeight();
          const float btnY = y0 + headerH + (maxDia - btnH) * 0.5f;
-         const float btnW = std::min(cellW - 8.0f, 96.0f);
+         const float btnW = std::min(cellW - 2.0f * tok::cell_inset, tok::cell_button_max_w);
          const float btnX = cellX0 + (cellW - btnW) * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
          const bool clicked = ActionButton::Draw(label, ImVec2(btnW, 0));
@@ -3331,10 +3331,10 @@ void EndAudioSection();
             RegisterDiscreteParam(label, (float)safe, (float)lastIndex, /*isBool=*/false, &options);
 
          const float knobW = (maxDia >= kKnobLarge) ? kKnobLarge : kKnobSmall;
-         const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
-         const float pinW = 16.0f;
-         float btnX = cellX0 + 4.0f;
-         float btnW = std::min(cellW - 8.0f, 112.0f);
+         const float pinX = cellX0 + std::max(tok::cell_edge_min, (cellW - knobW) * 0.5f - tok::cell_pin_lead);
+         const float pinW = tok::cell_pin_w;
+         float btnX = cellX0 + tok::cell_inset;
+         float btnW = std::min(cellW - 2.0f * tok::cell_inset, tok::cell_dropdown_max_w);
 
          if (h.registered)
          {
@@ -3358,13 +3358,13 @@ void EndAudioSection();
                index++;
                return; // registered so the modulator keeps writing; just not drawn
             }
-            ImGui::SetCursorScreenPos(ImVec2(pinX, btnY + (btnH - 12.0f) * 0.5f));
+            ImGui::SetCursorScreenPos(ImVec2(pinX, btnY + (btnH - tok::pin_box) * 0.5f));
             DrawDiscreteParamPin(h, label, cellW - (pinX - cellX0) - pinW);
             btnX = pinX + pinW;
-            const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
-            btnW = std::max(20.0f, std::min(btnRight - btnX, 112.0f));
+            const float btnRight = cellX0 + cellW - std::max(tok::cell_inset, (pinX - cellX0));
+            btnW = std::max(tok::cell_dropdown_min_w, std::min(btnRight - btnX, tok::cell_dropdown_max_w));
             // Never clip the value: grow toward the cell's right edge when the text needs more than the symmetric width.
-            btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - 4.0f - btnX, 112.0f)));
+            btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - tok::cell_inset - btnX, tok::cell_dropdown_max_w)));
          }
 
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
@@ -3454,20 +3454,20 @@ void EndAudioSection();
             if (drawIt)
             {
                const float knobW = dia;
-               const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
-               const float pinW = 16.0f;
-               float btnX = cellX0 + 4.0f;
-               float btnW = std::min(cellW - 8.0f, 112.0f);
+               const float pinX = cellX0 + std::max(tok::cell_edge_min, (cellW - knobW) * 0.5f - tok::cell_pin_lead);
+               const float pinW = tok::cell_pin_w;
+               float btnX = cellX0 + tok::cell_inset;
+               float btnW = std::min(cellW - 2.0f * tok::cell_inset, tok::cell_dropdown_max_w);
 
                if (h.registered)
                {
-                  ImGui::SetCursorScreenPos(ImVec2(pinX, y0 + (btnH - 12.0f) * 0.5f));
+                  ImGui::SetCursorScreenPos(ImVec2(pinX, y0 + (btnH - tok::pin_box) * 0.5f));
                   DrawDiscreteParamPin(h, dropId, cellW - (pinX - cellX0) - pinW);
                   btnX = pinX + pinW;
-                  const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
-                  btnW = std::max(20.0f, std::min(btnRight - btnX, 112.0f));
+                  const float btnRight = cellX0 + cellW - std::max(tok::cell_inset, (pinX - cellX0));
+                  btnW = std::max(tok::cell_dropdown_min_w, std::min(btnRight - btnX, tok::cell_dropdown_max_w));
                   // Never clip the value: grow toward the cell's right edge when the text needs more than the symmetric width.
-                  btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - 4.0f - btnX, 112.0f)));
+                  btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - tok::cell_inset - btnX, tok::cell_dropdown_max_w)));
                }
 
                ImGui::SetCursorScreenPos(ImVec2(btnX, y0));
@@ -3554,8 +3554,8 @@ void EndAudioSection();
          // above already exits before this point whenever that mode is on.
          const float cellX0 = x0 + (float)index * cellW;
          const float knobW = (maxDia >= kKnobLarge) ? kKnobLarge : kKnobSmall;
-         const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
-         const float pinW = 16.0f;
+         const float pinX = cellX0 + std::max(tok::cell_edge_min, (cellW - knobW) * 0.5f - tok::cell_pin_lead);
+         const float pinW = tok::cell_pin_w;
          const float checkY = y0 + headerH + (maxDia - ImGui::GetFrameHeight()) * 0.5f;
 
          if (h.registered)
