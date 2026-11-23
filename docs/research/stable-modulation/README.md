@@ -1,7 +1,7 @@
 ---
 title: "Proven-stable modulation: automatic stability certificates for user-written filters"
 slug: "stable-modulation"
-status: "signed-off"
+status: "phase-0-done"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-stable-modulation.md"
@@ -150,13 +150,74 @@ the H1-H3 claim still stands.
 | D4 | Blind set B and the nonlinear stretch | B uses seed 20261123, n up to 8 (G stops at 6), 30% `Select` kernels. Nonlinear loops (sector-bounded `clamp`/`abs`) stay out of this study; they become a follow-up if H1-H3 pass |
 
 ## 8. Best and optimised methodology
-*(After sign-off.)*
+
+**Pipeline.** Field kernel → A(θ) → certifier → certificate or "no proof".
+
+| Step | How | Where |
+|---|---|---|
+| Extract A(θ) | For each grid θ, run one sample step on the real interpreter with the state set to each unit vector eᵢ and `in` = 0; column i of A(θ) is the next state. A **linearity gate** checks f(a·x + b·y) = a·f(x) + b·f(y) on 8 random state pairs (tolerance 1e-5 relative, Float32); a kernel that fails is "not linear in state" and leaves scope, reported, never certified | An env-gated self-test in the app (`INFINITE_FIELDSTABDUMP`), test code only, dumps JSON. Phase 2 |
+| Parameter box | Every param (and `freq` for synths) inside its declared min/max. A cutoff-like g in (0, ∞) is mapped to w = g / (1 + g) ∈ [0, 1], so the box is closed and g → ∞ (A → −I) is a grid point | Python |
+| Certificate (any speed) | Find P with P ⪰ I and Aᵢᵀ P Aᵢ ⪯ (1 − ε) P at every grid θᵢ (an LMI, Clarabel). **Cutting planes**: solve on a coarse grid (vertices + 5 per axis), then search a 4x finer grid and a local maximiser for the θ where λ_max(P^{-1/2} Aᵀ P A P^{-1/2}) is largest; add it and re-solve, up to 20 rounds | Python |
+| Cover the gaps (D2) | With ρ = max over grid of ‖P^{1/2} Aᵢ P^{-1/2}‖ and L a bound on ‖∂A/∂θ‖ (from finite differences on the fine grid, times 1.5), the box is proven when ρ + √κ(P) · L · h < 1, h = half the grid spacing. If not, the grid is refined locally up to 3 times; otherwise the kernel is "grid-certified" (reported, not counted for H3) | Python |
+| Largest safe range (G2) | Bisection on the upper end of one param (e.g. k), 2 decimals, the other params over their full range | Python |
+| Slew certificate (H4) | P(θ) = P₀ + Σ θⱼ Pⱼ, with A(θ)ᵀ P(θ + Δ) A(θ) ⪯ (1 − ε) P(θ) and P(θ) ⪰ I at every grid θ, for Δ at the corners of the slew box (P is affine in Δ, so corners suffice). Bisection on the k range at Δk = range / 960 | Python |
+| ε | 1e-6, recorded per certificate. Float32 check: the certificate is re-verified with A computed in Float32 | Python |
+
+**Oracle (D1, before the certifier is written).** Candidate set S = box vertices plus a 9-per-axis grid.
+(1) Every product of length ≤ 4 over the vertex set; (2) length 2-8 periodic products over S found by
+200 random starts of a greedy search that swaps one factor at a time to raise the spectral radius. A
+witness is any product with spectral radius > 1 + 1e-6. Recorded: the sequence, its radius, and its
+growth simulated over 2¹⁶ samples.
+
+**Phases.**
+
+| Phase | Work | Needs a build |
+|---|---|---|
+| 0 | Research venv; the four McClellan filters in Python straight from the paper's matrices (eq. 6 discretisation); oracle; **B3**: our smallest unstable k vs 2.89 / 8.91 | No |
+| 1 | Certifier; **H2** on the four filters; generator for G (matrices and Field code together); **B1, B2** on G in Python | No |
+| 2 | Field side: L ported to `.field`, `INFINITE_FIELDSTABDUMP` self-test; check that extracted A(θ) matches the Python matrices on all of L and G (max abs diff ≤ 1e-5) | Yes, one build at the end |
+| 3 | **H1, H3** on L + G from extracted matrices; **H4** slew | No |
+| 4 | Lock the scorer (commit), generate B (D4), score once | No |
+| 5 | Sections 10-12, `ARTIFACT.md`, `kick-the-tires.sh`, Web Lab Note | No |
+
+Venv: `~/.venvs/stable-modulation` (Python 3.12, numpy, scipy, cvxpy 1.9.3, Clarabel). Outside the repo;
+`scripts/requirements.txt` pins it.
 
 ## 9. Proposed solution trajectories
-*(After sign-off.)*
+
+| # | Trajectory | For | Against | Choice |
+|---|---|---|---|---|
+| T1 | Common P on a grid with cutting planes and a Lipschitz cover | Proves any-speed stability for the whole box; small LMIs; works for any coefficient function | Conservative for filters that need slow modulation (the Moog gap 2.88 vs 4) | **Main** |
+| T2 | k-step norm (Werner & McClellan): ‖A(θₖ)…A(θ₁)‖_P < 1 for all length-k products | Can prove more than one common P | Number of products grows as grid^k; only practical for k ≤ 3 | Comparison only, on L |
+| T3 | Parameter-dependent P(θ) with a slew bound | The only route to H4; reduces to T1 when the slew is unbounded | Bigger LMI (n² · (params + 1) unknowns) | **H4** |
+| T4 | Sum-of-squares over polynomial coefficients | Exact over the box, no grid | Field coefficients use `tan`, `exp`, `pow`, `Select`: not polynomial; needs a new solver stack | Rejected |
+| T5 | Symbolic A(θ) from Field IR instead of the interpreter | Exact derivatives for L | A second evaluator to keep in sync with the real one; the interpreter is ground truth | Rejected |
 
 ## 10. Benchmarking against the baseline
-*(After measurement.)*
+
+### B3 (phase 0, 2026-11-23): the oracle against the paper's counterexamples
+
+Run: `~/.venvs/stable-modulation/bin/python scripts/phase0_b3.py` (about 60 s). Data:
+`data/phase0-b3.json`, log `data/phase0-b3.log`. g is free in (0, ∞), k in [0, kmax]; bisection on kmax to
+0.001 for the smallest value at which the oracle finds a witness.
+
+| Filter | Paper: proven stable up to | Paper: counterexample | Oracle: smallest unstable kmax | Oracle's witness | Agrees |
+|---|---|---|---|---|---|
+| Moog ladder | 2.88 | 2.89 (g = 1.3764 fixed, k = 0, 2.89, …) | **2.8856** | g = 1.7769, k = 0, then g = 1.0661, k = 2.886, repeated; radius 1.00004 | Yes: inside (2.88, 2.89] |
+| Diode ladder | 8.90 | 8.91 (g = 1.8161 fixed) | **8.9009** | g = 3.0815, k = 0, then g = 1.0703, k = 8.901; radius 1.00006 | Yes: inside (8.90, 8.91] |
+
+The paper's own counterexamples reproduce exactly: radius of A(2.89)·A(0) at g = 1.3764 is 1.00109 (paper:
+|λ| ≈ 1.001); at 2.88 it is 0.99870. For the diode ladder, 1.00084 at 8.91 and 0.99998 at 8.90.
+
+What's new: letting g change along with k breaks the Moog ladder at k = 2.8856, below the paper's 2.89
+(which holds g fixed). So the true limit sits between 2.88 and 2.8856. For the diode ladder the paper's 8.90
+is already tight to 0.001.
+
+**Rig bug, found and fixed before any score** (recorded under H1's rule). The first oracle missed the
+witness at 2.891 and reported non-monotone results. Cause: the w grid included w = 0 and w = 1 (g = 0 and
+g → ∞), where A = ±I has radius exactly 1. Those trivial points outranked the real near-misses, so the
+fine-tuning step never started from the right sequence. Fix: candidates are interior w only, and the top 6
+sequences are each fine-tuned (`scripts/stabmod.py`, `find_witness`).
 
 ## 11. Critique
 *(After measurement.)*
