@@ -1,7 +1,7 @@
 ---
 title: "Proven-stable modulation: automatic stability certificates for user-written filters"
 slug: "stable-modulation"
-status: "phase-0-framing"
+status: "signed-off"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-stable-modulation.md"
@@ -10,8 +10,8 @@ commit_sha: "pending-measurement"
 
 # Proven-stable modulation
 
-Sections 1-7 are for the owner's sign-off. Nothing is built or measured until they are signed and locked
-by a commit. Sections 8-12 are filled after sign-off. Paired study: `docs/research/flicker-free-pixels`
+**Signed off by the owner on 2026-11-23, as written, with D1-D4 as recommended. Sections 1-7 are locked
+by this commit.** Sections 8-12 are filled after sign-off. Paired study: `docs/research/flicker-free-pixels`
 (branch `feature/flicker-free-pixels`); both reuse the analysis in `src/core/field/AliasAnalysis.cpp`.
 
 ## 1. Goal
