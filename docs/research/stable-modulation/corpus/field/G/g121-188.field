@@ -1,0 +1,12 @@
+# G set g121-188, n 2, knobs 3
+param float p0 = 0.5 [0, 1]
+param float p1 = 0.5 [0, 1]
+param float p2 = 0.5 [0, 1]
+state float z0 = 0
+state float z1 = 0
+f0 = (exp(p0) - 1)
+nx_z0 = 0.0729030415*z0 + f0*(0.527909301*z0) + in
+nx_z1 = 0.0151202742*z0 + -0.183302554*z1 + f0*(0.524598102*z1)
+z0 = nx_z0
+z1 = nx_z1
+out = z0

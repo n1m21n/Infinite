@@ -1,0 +1,13 @@
+# L set: coupled_resonator, textbook form
+param float fc = 1000 [20, 20000]
+param float r = 0.99 [0, 1]
+state float u = 0
+state float v = 0
+th = 2*3.14159265358979*fc/sr
+c = r*cos(th)
+s = r*sin(th)
+nx_u = c*u - s*v + in
+nx_v = s*u + c*v
+u = nx_u
+v = nx_v
+out = u

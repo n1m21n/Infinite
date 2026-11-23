@@ -1,0 +1,201 @@
+B g123-000               n 8 witness False certified         0.1s 
+B g123-001               n 6 witness False certified         9.1s 
+B g123-002               n 4 witness False certified         0.0s 
+B g123-003               n 4 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-004               n 1 witness False certified         1.6s 
+B g123-005               n 6 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-006               n 7 witness False certified         0.1s 
+B g123-007               n 7 witness True  no proof          0.5s LMI infeasible (t=-4.08)
+B g123-008               n 1 witness False certified         0.2s 
+B g123-009               n 4 witness True  no proof          2.9s LMI infeasible (t=-inf)
+B g123-010               n 5 witness False certified         0.0s 
+B g123-011               n 6 witness False certified         4.8s 
+B g123-012               n 6 witness False certified         4.4s 
+B g123-013               n 4 witness False certified         3.1s 
+B g123-014               n 7 witness False no proof          0.1s LMI infeasible (t=-3.08)
+B g123-015               n 6 witness False no proof          0.0s LMI infeasible (t=-1.26)
+B g123-016               n 7 witness True  no proof          0.5s LMI infeasible (t=-16.7)
+B g123-017               n 3 witness False certified         2.4s 
+B g123-018               n 2 witness False certified         0.0s 
+B g123-019               n 3 witness True  no proof          0.3s LMI infeasible (t=-10.6)
+B g123-020               n 5 witness False certified         0.3s 
+B g123-021               n 1 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-022               n 4 witness True  no proof          0.3s LMI infeasible (t=-22.3)
+B g123-023               n 7 witness True  no proof          0.3s LMI infeasible (t=-inf)
+B g123-024               n 5 witness False certified         0.3s 
+B g123-025               n 5 witness True  no proof          2.9s LMI infeasible (t=-inf)
+B g123-026               n 6 witness False no proof          0.1s LMI infeasible (t=-0.106)
+B g123-027               n 2 witness False certified         0.2s 
+B g123-028               n 1 witness False certified         1.9s 
+B g123-029               n 8 witness False certified         8.3s 
+B g123-030               n 5 witness True  no proof          0.4s LMI infeasible (t=-7.16)
+B g123-031               n 1 witness True  no proof          1.8s LMI infeasible (t=-inf)
+B g123-032               n 1 witness False certified         0.3s 
+B g123-033               n 7 witness True  no proof          0.3s LMI infeasible (t=-inf)
+B g123-034               n 5 witness False certified         0.4s 
+B g123-035               n 4 witness True  no proof          0.1s LMI infeasible (t=-18.3)
+B g123-036               n 3 witness True  no proof          0.1s LMI infeasible (t=-inf)
+B g123-037               n 1 witness False certified         1.7s 
+B g123-038               n 8 witness False certified        19.1s 
+B g123-039               n 5 witness False certified         0.1s 
+B g123-040               n 2 witness True  no proof          0.2s LMI infeasible (t=-1.83)
+B g123-041               n 4 witness False certified         0.0s 
+B g123-042               n 5 witness False certified         0.4s 
+B g123-043               n 5 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-044               n 3 witness False certified         0.0s 
+B g123-045               n 1 witness False certified         2.2s 
+B g123-046               n 6 witness True  no proof          5.0s LMI infeasible (t=-inf)
+B g123-047               n 8 witness False no proof          0.8s LMI infeasible (t=-1.27)
+B g123-048               n 8 witness True  no proof          9.5s LMI infeasible (t=-4.82)
+B g123-049               n 7 witness True  no proof          0.3s LMI infeasible (t=-inf)
+B g123-050               n 2 witness False certified         0.0s 
+B g123-051               n 4 witness True  no proof          3.2s LMI infeasible (t=-inf)
+B g123-052               n 3 witness False certified         3.5s 
+B g123-053               n 2 witness True  no proof          0.2s LMI infeasible (t=-inf)
+B g123-054               n 3 witness True  no proof          0.3s LMI infeasible (t=-1.78)
+B g123-055               n 5 witness False certified         0.1s 
+B g123-056               n 7 witness False certified         0.1s 
+B g123-057               n 8 witness True  no proof          0.4s LMI infeasible (t=-inf)
+B g123-058               n 5 witness False certified         4.3s 
+B g123-059               n 2 witness True  no proof          2.5s LMI infeasible (t=-inf)
+B g123-060               n 5 witness True  no proof          4.6s LMI infeasible (t=-0.235)
+B g123-061               n 5 witness False no proof          9.4s LMI infeasible (t=-0.0118)
+B g123-062               n 5 witness False certified         0.3s 
+B g123-063               n 3 witness True  no proof          0.4s LMI infeasible (t=-inf)
+B g123-064               n 7 witness False no proof          7.9s LMI infeasible (t=-0.402)
+B g123-065               n 6 witness True  no proof          0.3s LMI infeasible (t=-inf)
+B g123-066               n 6 witness True  no proof          0.4s LMI infeasible (t=-4.05)
+B g123-067               n 7 witness True  no proof          4.8s LMI infeasible (t=-inf)
+B g123-068               n 3 witness False certified         0.0s 
+B g123-069               n 7 witness False certified         7.1s 
+B g123-070               n 4 witness False certified         0.0s 
+B g123-071               n 8 witness True  no proof          0.1s LMI infeasible (t=-inf)
+B g123-072               n 3 witness False certified         0.5s 
+B g123-073               n 8 witness True  no proof          0.6s LMI infeasible (t=-inf)
+B g123-074               n 6 witness False certified         4.6s 
+B g123-075               n 4 witness True  no proof          2.7s LMI infeasible (t=-inf)
+B g123-076               n 4 witness False certified         0.3s 
+B g123-077               n 3 witness True  no proof          2.5s LMI infeasible (t=-inf)
+B g123-078               n 1 witness False certified         0.0s 
+B g123-079               n 7 witness True  no proof          0.6s LMI infeasible (t=-1.16)
+B g123-080               n 1 witness False certified         1.7s 
+B g123-081               n 6 witness True  no proof          0.3s LMI infeasible (t=-inf)
+B g123-082               n 3 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-083               n 7 witness False certified        14.6s 
+B g123-084               n 4 witness False certified         0.0s 
+B g123-085               n 7 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-086               n 6 witness False no proof          0.0s LMI infeasible (t=-0.46)
+B g123-087               n 6 witness True  no proof          3.7s LMI infeasible (t=-inf)
+B g123-088               n 3 witness False certified         2.7s 
+B g123-089               n 5 witness True  no proof          3.3s LMI infeasible (t=-inf)
+B g123-090               n 2 witness False certified         2.3s 
+B g123-091               n 4 witness True  no proof          0.2s LMI infeasible (t=-inf)
+B g123-092               n 2 witness False certified         2.3s 
+B g123-093               n 5 witness True  no proof          0.3s LMI infeasible (t=-inf)
+B g123-094               n 7 witness True  no proof          0.0s LMI infeasible (t=-4.36)
+B g123-095               n 3 witness True  no proof          2.4s LMI infeasible (t=-0.266)
+B g123-096               n 5 witness False certified         0.1s 
+B g123-097               n 3 witness False certified         0.0s 
+B g123-098               n 7 witness False certified         7.6s 
+B g123-099               n 7 witness True  no proof          0.3s LMI infeasible (t=-inf)
+B g123-100               n 2 witness False certified         0.0s 
+B g123-101               n 1 witness False certified         1.8s 
+B g123-102               n 4 witness True  no proof          3.2s LMI infeasible (t=-1.57)
+B g123-103               n 5 witness True  no proof          3.5s LMI infeasible (t=-inf)
+B g123-104               n 4 witness False certified         3.1s 
+B g123-105               n 2 witness True  no proof          2.4s LMI infeasible (t=-inf)
+B g123-106               n 2 witness False certified         2.5s 
+B g123-107               n 6 witness True  no proof          0.3s LMI infeasible (t=-inf)
+B g123-108               n 3 witness False no proof          3.1s LMI infeasible (t=-7.55)
+B g123-109               n 3 witness False certified         3.0s 
+B g123-110               n 6 witness False certified         0.6s 
+B g123-111               n 3 witness True  no proof          2.8s LMI infeasible (t=-inf)
+B g123-112               n 7 witness False certified         0.2s 
+B g123-113               n 3 witness True  no proof          2.7s LMI infeasible (t=-inf)
+B g123-114               n 6 witness False no proof          1.0s LMI infeasible (t=-inf)
+B g123-115               n 1 witness True  no proof          0.2s LMI infeasible (t=-inf)
+B g123-116               n 8 witness False certified         9.4s 
+B g123-117               n 3 witness False certified         3.1s 
+B g123-118               n 8 witness False certified         0.2s 
+B g123-119               n 5 witness False certified         3.8s 
+B g123-120               n 4 witness True  no proof          0.0s LMI infeasible (t=-8.98)
+B g123-121               n 6 witness True  no proof          0.4s LMI infeasible (t=-inf)
+B g123-122               n 6 witness True  no proof          0.4s LMI infeasible (t=-3.48)
+B g123-123               n 8 witness False no proof          0.7s LMI infeasible (t=-inf)
+B g123-124               n 2 witness False certified         0.0s 
+B g123-125               n 5 witness False certified         0.1s 
+B g123-126               n 6 witness False certified         0.0s 
+B g123-127               n 7 witness False certified         0.0s 
+B g123-128               n 2 witness False certified         0.0s 
+B g123-129               n 8 witness True  no proof          0.5s LMI infeasible (t=-inf)
+B g123-130               n 3 witness False certified         2.5s 
+B g123-131               n 3 witness True  no proof          0.2s LMI infeasible (t=-inf)
+B g123-132               n 2 witness False certified         0.3s 
+B g123-133               n 7 witness False certified        11.8s 
+B g123-134               n 2 witness False certified         2.5s 
+B g123-135               n 5 witness True  no proof          2.9s LMI infeasible (t=-inf)
+B g123-136               n 5 witness False certified         3.5s 
+B g123-137               n 8 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-138               n 4 witness False certified         0.0s 
+B g123-139               n 6 witness True  no proof          3.5s LMI infeasible (t=-inf)
+B g123-140               n 4 witness False certified         3.0s 
+B g123-141               n 4 witness True  no proof          2.6s LMI infeasible (t=-inf)
+B g123-142               n 7 witness False certified         0.5s 
+B g123-143               n 4 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-144               n 8 witness True  no proof          5.9s LMI infeasible (t=-inf)
+B g123-145               n 1 witness True  no proof          1.6s LMI infeasible (t=-inf)
+B g123-146               n 7 witness True  no proof          0.4s LMI infeasible (t=-8.38)
+B g123-147               n 6 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-148               n 5 witness False certified         3.5s 
+B g123-149               n 3 witness False certified         0.2s 
+B g123-150               n 4 witness False certified         2.9s 
+B g123-151               n 4 witness False certified         0.0s 
+B g123-152               n 5 witness False certified         0.1s 
+B g123-153               n 7 witness False certified         0.5s 
+B g123-154               n 4 witness True  no proof          0.3s LMI infeasible (t=-2.45)
+B g123-155               n 2 witness False certified         0.2s 
+B g123-156               n 5 witness False certified         0.3s 
+B g123-157               n 3 witness False certified         0.2s 
+B g123-158               n 2 witness False certified         3.5s 
+B g123-159               n 8 witness False certified         0.1s 
+B g123-160               n 8 witness False certified        12.9s 
+B g123-161               n 7 witness True  no proof          6.3s LMI infeasible (t=-inf)
+B g123-162               n 8 witness False certified         0.1s 
+B g123-163               n 7 witness True  no proof          1.1s LMI infeasible (t=-inf)
+B g123-164               n 4 witness True  no proof          0.1s LMI infeasible (t=-3.61)
+B g123-165               n 3 witness True  no proof          0.4s LMI infeasible (t=-inf)
+B g123-166               n 4 witness False certified         0.1s 
+B g123-167               n 4 witness True  no proof          4.2s LMI infeasible (t=-inf)
+B g123-168               n 8 witness False certified        11.7s 
+B g123-169               n 5 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-170               n 4 witness False certified         5.0s 
+B g123-171               n 4 witness True  no proof          0.1s LMI infeasible (t=-inf)
+B g123-172               n 7 witness False certified        17.2s 
+B g123-173               n 4 witness False certified         0.1s 
+B g123-174               n 8 witness False certified         0.3s 
+B g123-175               n 8 witness False no proof          0.1s LMI infeasible (t=-2.79)
+B g123-176               n 1 witness False certified         0.0s 
+B g123-177               n 1 witness False certified         2.9s 
+B g123-178               n 5 witness False no proof          0.0s LMI infeasible (t=-0.144)
+B g123-179               n 2 witness True  no proof          0.3s LMI infeasible (t=-inf)
+B g123-180               n 8 witness True  no proof         12.7s LMI infeasible (t=-inf)
+B g123-181               n 7 witness True  no proof          6.0s LMI infeasible (t=-inf)
+B g123-182               n 5 witness False certified         4.9s 
+B g123-183               n 3 witness True  no proof          0.4s LMI infeasible (t=-inf)
+B g123-184               n 7 witness False certified        12.8s 
+B g123-185               n 6 witness False certified         5.0s 
+B g123-186               n 7 witness True  no proof          0.1s LMI infeasible (t=-inf)
+B g123-187               n 7 witness False no proof         14.0s LMI infeasible (t=-0.0229)
+B g123-188               n 5 witness True  no proof          0.4s LMI infeasible (t=-3.39)
+B g123-189               n 3 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-190               n 8 witness True  no proof          6.2s LMI infeasible (t=-1.92)
+B g123-191               n 7 witness True  no proof          4.0s LMI infeasible (t=-inf)
+B g123-192               n 1 witness False certified         0.2s 
+B g123-193               n 4 witness True  no proof          0.0s LMI infeasible (t=-inf)
+B g123-194               n 3 witness False certified         0.2s 
+B g123-195               n 5 witness True  no proof          2.9s LMI infeasible (t=-inf)
+B g123-196               n 3 witness False certified         0.2s 
+B g123-197               n 4 witness False certified         0.0s 
+B g123-198               n 2 witness False certified         0.2s 
+B g123-199               n 1 witness False certified         1.8s 
+wrote /Users/namansoni/Infinite/worktrees/stable-modulation/docs/research/stable-modulation/data/phase3-B.json 105s

@@ -1,0 +1,21 @@
+# L set: svf, McClellan DAFx26, trapezoidal in the paper's state form
+param float g = 1 [0.00001, 1000]
+param float R = 0.5 [0.01, 2]
+state float x0 = 0
+state float x1 = 0
+m00 = 1 - g*(-2*R)
+m01 = -g*(-1)
+r0 = x0 + g*((-2*R)*x0 + (-1)*x1) + 2*g*in
+m10 = -g*(1)
+m11 = 1
+r1 = x1 + g*((1)*x0)
+f10 = m10 / m00
+m11_1 = m11 - f10*m01
+r1_1 = r1 - f10*r0
+y1 = (r1_1) / m11_1
+y0 = (r0 - m01*y1) / m00
+nx_x0 = y0
+nx_x1 = y1
+x0 = nx_x0
+x1 = nx_x1
+out = x1

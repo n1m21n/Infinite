@@ -4,6 +4,9 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-11-23 Owner: stable-modulation phase 3 scores all 200 G kernels: matrices from the Field interpreter for the 125 that compile, from Python for the 75 over Field's 128-register cap. Raising the cap is left as a separate product finding (`docs/research/stable-modulation`, phase 2).
+- 2026-11-23 Owner: stable-modulation sections 1-7 signed off as written, D1-D4 as recommended (`docs/research/stable-modulation`).
+- 2026-11-23 Owner: open-problem research goes to the top two: proven-stable modulation (`docs/research/stable-modulation`) and flicker-free pixels (`docs/research/flicker-free-pixels`). Sections 1-7 of each need sign-off before any building or measuring.
 - 2026-10-31 Owner: exception to the 3D View's "no add menu": the Shift+A / + menu (node, camera, light, HDRI, new scene) stays in the 3D View. It only adds scene items and lights/cameras the canvas already has; the panel still never models.
 - 2026-10-30 Owner: the 3D View is approved: a final-stage composer over node outputs. Right-click a 3D node to add it; arranging never writes back to the node; cameras and lights are the existing nodes; transparent until a world is set; it renders a camera for a chosen duration. Not a Blender replacement: no modelling and no add menu. Plan: `docs/plans/3d-view/README.md`.
 - 2026-10-30 Owner: the Terminal is approved: a real terminal in the right rail, an `infinite` command with full parity (every panel, command and setting gets a verb), expert `code` tools for Field, Sketch, Sketch 3D, GLSL and formulas, and patch generation from the terminal. Coding agents are the user's own; none ships with Infinite. Plan: `docs/plans/terminal/README.md`.

@@ -1,0 +1,21 @@
+{
+  "commit_sha": "ccf102e151b1ecb00dc1743b2ae4e42ef4b25026",
+  "commit_note": "Code that produced every phase 0-4 output. Pre-registration (sections 1-7): 5de4551b. Phase 0: 4110cdec. Phase 1: d6400b4d. Phase 2 (self-test and dump on a dev build of b3bcfc0c): b3bcfc0c. Phase 3: bb460c87. Scorer locked before B existed: f9180894; B generated and scored once: ccf102e1. Phase 5 figure data (phase5-trap.json, phase5-frozen.json) comes from scripts/phase5_figdata.py in the commit that adds them; it reads the phase 3 and 4 outputs and changes no verdict.",
+  "timestamp_utc": "2026-11-23T08:12:57Z",
+  "os": "macOS 27.2.1 arm64",
+  "cpu": "Apple M2, 8 cores, 8 GB RAM",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.4.1.1), for the dev build that dumps A(theta)",
+  "build_flags": "scripts/ibuild.py build --mode dev (CMake Debug, arm64); one build, in phase 2",
+  "python": "3.12.13, numpy 2.5.5, scipy 1.18.1, cvxpy 1.9.3, clarabel 0.11.1 (venv ~/.venvs/stable-modulation, pinned by scripts/requirements.txt)",
+  "command": "docs/research/stable-modulation/scripts/run_all.sh (every phase into data-rerun/; set INFINITE_BIN for the Float32 step). Quick check: scripts/kick-the-tires.sh. Field dump: INFINITE_FIELDSTABDUMP=corpus/field INFINITE_FIELDSTABDUMP_OUT=<dir> Infinite, then scripts/phase2_compare.py <dir> [out.json]. Figures: scripts/phase5_figdata.py.",
+  "seed": 20261121,
+  "seed_note": "Set G: scripts/gen_kernels.py G, seed 20261121. Blind set B: scripts/gen_kernels.py B, seed 20261123 (generated after the scorer lock). Oracle searches use numpy default_rng with fixed seeds in the scripts.",
+  "outputs": [
+    "phase0-b3.json", "phase0-b3.log",
+    "phase1-h2.json", "phase1-h2.log", "phase1-spotcheck.json", "phase1-b12.json", "phase1-b12.log",
+    "phase2-compare.json",
+    "phase3-L-G.json", "phase3-L-G.log", "phase3-h4.json",
+    "phase4-B.json", "phase4-B.log", "phase4-B-compare.json",
+    "phase5-trap.json", "phase5-frozen.json"
+  ]
+}

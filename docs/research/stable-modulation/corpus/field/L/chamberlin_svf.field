@@ -1,0 +1,13 @@
+# L set: chamberlin_svf, textbook form
+param float fc = 1000 [20, 20000]
+param float q = 0.5 [0.05, 2]
+state float lp = 0
+state float bp = 0
+f = 2*sin(3.14159265358979*fc/sr)
+lp2 = lp + f*bp
+hp = in - lp2 - q*bp
+nx_lp = lp2
+nx_bp = f*hp + bp
+lp = nx_lp
+bp = nx_bp
+out = lp

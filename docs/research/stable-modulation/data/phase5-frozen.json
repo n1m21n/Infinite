@@ -1,0 +1,1175 @@
+{
+ "G": {
+  "with_witness": 80,
+  "B1a": 58,
+  "B1b": 17,
+  "certified": 0,
+  "length_1": 50,
+  "rows": [
+   {
+    "name": "g121-001",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-003",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-005",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-007",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-009",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-010",
+    "status": "no proof",
+    "witness_len": 3,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-011",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-015",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-017",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-019",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-021",
+    "status": "no proof",
+    "witness_len": 8,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-031",
+    "status": "no proof",
+    "witness_len": 5,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-032",
+    "status": "no proof",
+    "witness_len": 8,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-033",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-035",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-037",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-039",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-041",
+    "status": "no proof",
+    "witness_len": 6,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-045",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-053",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-059",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-061",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-064",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-067",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-071",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-073",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-075",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-079",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-081",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-084",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-085",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-086",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-087",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-092",
+    "status": "no proof",
+    "witness_len": 3,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-093",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-095",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-097",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-101",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-104",
+    "status": "no proof",
+    "witness_len": 8,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-105",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-106",
+    "status": "no proof",
+    "witness_len": 5,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-111",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-112",
+    "status": "no proof",
+    "witness_len": 7,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-115",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-117",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-121",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-123",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-127",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-129",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-130",
+    "status": "no proof",
+    "witness_len": 7,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-133",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-135",
+    "status": "no proof",
+    "witness_len": 8,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-137",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-139",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-141",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-143",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-144",
+    "status": "no proof",
+    "witness_len": 6,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-145",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-147",
+    "status": "no proof",
+    "witness_len": 8,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-149",
+    "status": "no proof",
+    "witness_len": 6,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-153",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-154",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-155",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-156",
+    "status": "no proof",
+    "witness_len": 5,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-158",
+    "status": "no proof",
+    "witness_len": 3,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g121-159",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-161",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-163",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-165",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-169",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-173",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-175",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-177",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-179",
+    "status": "no proof",
+    "witness_len": 3,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-181",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-183",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-185",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-187",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-193",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g121-195",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   }
+  ]
+ },
+ "B": {
+  "with_witness": 85,
+  "B1a": 77,
+  "B1b": 28,
+  "certified": 0,
+  "length_1": 47,
+  "rows": [
+   {
+    "name": "g123-003",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-005",
+    "status": "no proof",
+    "witness_len": 6,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-007",
+    "status": "no proof",
+    "witness_len": 7,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-009",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-016",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-019",
+    "status": "no proof",
+    "witness_len": 3,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-021",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-022",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-023",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-025",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-030",
+    "status": "no proof",
+    "witness_len": 8,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-031",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-033",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-035",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-036",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-040",
+    "status": "no proof",
+    "witness_len": 5,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-043",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-046",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-048",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-049",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-051",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-053",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-054",
+    "status": "no proof",
+    "witness_len": 5,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-057",
+    "status": "no proof",
+    "witness_len": 3,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-059",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-060",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-063",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-065",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-066",
+    "status": "no proof",
+    "witness_len": 6,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-067",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-071",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-073",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-075",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-077",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-079",
+    "status": "no proof",
+    "witness_len": 6,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-081",
+    "status": "no proof",
+    "witness_len": 3,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-082",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-085",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-087",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-089",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-091",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-093",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-094",
+    "status": "no proof",
+    "witness_len": 8,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-095",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-099",
+    "status": "no proof",
+    "witness_len": 5,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-102",
+    "status": "no proof",
+    "witness_len": 3,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-103",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-105",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-107",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-111",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-113",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-115",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-120",
+    "status": "no proof",
+    "witness_len": 7,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-121",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-122",
+    "status": "no proof",
+    "witness_len": 8,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-129",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-131",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-135",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-137",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-139",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-141",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-143",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-144",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-145",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-146",
+    "status": "no proof",
+    "witness_len": 8,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-147",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-154",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-161",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-163",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-164",
+    "status": "no proof",
+    "witness_len": 5,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-165",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": false,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-167",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-169",
+    "status": "no proof",
+    "witness_len": 4,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-171",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-179",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-180",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-181",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-183",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-186",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-188",
+    "status": "no proof",
+    "witness_len": 6,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-189",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-190",
+    "status": "no proof",
+    "witness_len": 7,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": true
+   },
+   {
+    "name": "g123-191",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-193",
+    "status": "no proof",
+    "witness_len": 2,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   },
+   {
+    "name": "g123-195",
+    "status": "no proof",
+    "witness_len": 1,
+    "frozen_default_says_stable": true,
+    "frozen_grid_says_stable": false
+   }
+  ]
+ }
+}

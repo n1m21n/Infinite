@@ -1,0 +1,10 @@
+# L set: dc_blocker, textbook form
+param float R = 0.995 [0.9, 0.9999]
+state float x1 = 0
+state float y1 = 0
+y = in - x1 + R*y1
+nx_x1 = in
+nx_y1 = y
+x1 = nx_x1
+y1 = nx_y1
+out = x1

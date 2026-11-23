@@ -1,0 +1,20 @@
+{
+ "moog": {
+  "kmax": 2.88485,
+  "status": "certified",
+  "max_pnorm_random_200k": 0.9999999998657044,
+  "sim_peak_over_start": 1.0
+ },
+ "diode": {
+  "kmax": 8.8965,
+  "status": "certified",
+  "max_pnorm_random_200k": 0.9999999965190385,
+  "sim_peak_over_start": 1.0
+ },
+ "sallenkey": {
+  "kmax": 1.99902,
+  "status": "certified",
+  "max_pnorm_random_200k": 0.9999999999923213,
+  "sim_peak_over_start": 1.0
+ }
+}

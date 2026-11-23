@@ -1,0 +1,9 @@
+{
+ "G": 200,
+ "with_witness": 76,
+ "without_witness": 124,
+ "B1a_false_safe_default_only": 54,
+ "B1b_false_safe_whole_grid": 15,
+ "witness_needs_switching": 41,
+ "seconds": 49.221710205078125
+}

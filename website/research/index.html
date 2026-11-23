@@ -45,7 +45,7 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite Research", "url": "https://infinitedevices.org/research/", "description": "Pre-registered technical reports, empirical DSP benchmarks, reproducible artifacts, and open compiler and physics problems from Infinite.", "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/"}, "mainEntity": {"@type": "ItemList", "numberOfItems": 1, "itemListElement": [{"@type": "ListItem", "position": 1, "url": "https://infinitedevices.org/research/aliasing-aware-field.html", "name": "Aliasing-aware compilation for Field"}]}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite Research", "url": "https://infinitedevices.org/research/", "description": "Pre-registered technical reports, empirical DSP benchmarks, reproducible artifacts, and open compiler and physics problems from Infinite.", "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/"}, "mainEntity": {"@type": "ItemList", "numberOfItems": 2, "itemListElement": [{"@type": "ListItem", "position": 1, "url": "https://infinitedevices.org/research/stable-modulation.html", "name": "Proven-stable modulation for Field filters"}, {"@type": "ListItem", "position": 2, "url": "https://infinitedevices.org/research/aliasing-aware-field.html", "name": "Aliasing-aware compilation for Field"}]}}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Research", "item": "https://infinitedevices.org/research/"}]}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=0fc401be">
@@ -63,10 +63,27 @@
         <p class="bm-spec mono">Pre-registered studies · Pinned commits · Raw CSVs &amp; audio</p>
         <p class="lead">Empirical studies, compiler proofs, and honest negative results from building Infinite's audio, visual, and Field engines.</p>
         <div class="bm-actions">
-          <a class="btn btn-primary" href="aliasing-aware-field.html">Read Report 1</a>
+          <a class="btn btn-primary" href="stable-modulation.html">Read Report 2</a>
           <a class="btn btn-ghost" href="../benchmarks.html">Engine benchmarks</a>
           <a class="btn btn-ghost" href="https://github.com/n1m21n/Infinite/blob/main/docs/RESEARCH_STANDARD.md" target="_blank" rel="noopener">Standard</a>
         </div>
+
+        <div class="kick chap">Technical Report 2 · 2026-11-23</div>
+        <article class="bm-card">
+          <div class="chips" style="margin-bottom:12px;">
+            <span class="pill">H1&ndash;H3 confirmed</span>
+            <span class="pill">H4 failed (slew limit adds 0% as registered)</span>
+            <span class="pill">0 false certificates in 416 kernels</span>
+          </div>
+          <h2><a href="stable-modulation.html" style="color:inherit;text-decoration:none;">Proven-stable modulation for Field filters</a></h2>
+          <p>Can a compiler prove, from a kernel's code alone, that a filter cannot blow up however fast its knobs move? A quadratic-energy certifier (LMI plus a checked cover) never certified any of 174 kernels an instability oracle can blow up, and certified 92.5% of the generated and 88.7% of the blind stable-looking kernels. Today's frozen-knob check calls 58 of 80 unstable kernels safe. The Moog ladder bound is pinned to k &isin; [2.8848, 2.8856]. A slew limit adds nothing once the cutoff can reach zero.</p>
+          <div class="bm-actions">
+            <a class="btn btn-primary btn-sm" href="stable-modulation.html">Read report</a>
+            <a class="btn btn-ghost btn-sm" href="stable-modulation.pdf">PDF</a>
+            <a class="btn btn-ghost btn-sm" href="stable-modulation/data/provenance.json">Provenance JSON</a>
+            <a class="btn btn-ghost btn-sm" href="https://github.com/n1m21n/Infinite/tree/ccf102e151b1ecb00dc1743b2ae4e42ef4b25026/docs/research/stable-modulation" target="_blank" rel="noopener">Code &amp; data</a>
+          </div>
+        </article>
 
         <div class="kick chap">Technical Report 1 · 2026-11-21</div>
         <article class="bm-card">

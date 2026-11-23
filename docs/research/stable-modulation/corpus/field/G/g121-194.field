@@ -1,0 +1,7 @@
+# G set g121-194, n 1, knobs 1
+param float p0 = 0.5 [0, 1]
+state float z0 = 0
+f0 = sin(3.14159265358979*p0)
+nx_z0 = 0.98*z0 + f0*(-0.10656784*z0) + in
+z0 = nx_z0
+out = z0

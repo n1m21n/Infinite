@@ -1,0 +1,10 @@
+# L set: tpt_onepole, textbook form
+param float fc = 1000 [20, 20000]
+state float s = 0
+gg = tan(3.14159265358979*fc/sr)
+G = gg/(1 + gg)
+v = (in - s)*G
+y = v + s
+nx_s = y + v
+s = nx_s
+out = s

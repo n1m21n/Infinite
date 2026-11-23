@@ -28,6 +28,7 @@ bool RunFieldAliasTest(); // selftest/AliasTests.cpp
 bool RunFieldRatePlanTest(); // selftest/AliasTests.cpp
 bool RunFieldHeldOutTest(); // selftest/AliasTests.cpp
 bool RunFieldRealTest(); // selftest/AliasTests.cpp
+bool RunFieldStabDumpTest(); // selftest/StabilityTests.cpp
 bool RunPitchTest(); // selftest/PitchTests.cpp
 bool RunLearningLogTest(); // selftest/GenSampleTests.cpp
 bool RunGenSampleTest(); // selftest/GenSampleTests.cpp
@@ -725,6 +726,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // Phase 6: the same kernels on real clips (interleaved-copy oracle).
    if (getenv("INFINITE_FIELDREAL") != nullptr)
       return RunFieldRealTest() ? 0 : 1;
+   // State matrices of Field kernels for docs/research/stable-modulation (phase 2). Report only.
+   if (getenv("INFINITE_FIELDSTABDUMP") != nullptr)
+      return RunFieldStabDumpTest() ? 0 : 1;
 
    // Pitch Shifter quality: purity, chord, unity null, transients (selftest/PitchTests.cpp).
    if (getenv("INFINITE_PITCHTEST") != nullptr)
