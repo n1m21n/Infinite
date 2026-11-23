@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Barberpole Shepard Phaser FX",
+    "author": "Infinite",
+    "description": "Dual-bank six-stage allpass phaser driven by quadrature sawtooth-triangle Shepard LFOs for continuously rising phase notches.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rateHz = 0.28 [0.04, 2.5];\nparam float depth = 0.72 [0.1, 0.95];\nparam float resonance = 0.48 [0.0, 0.82];\nparam float warmth = 0.35 [0.0, 1.0];\nparam float mix = 0.82 [0.0, 1.0];\nstate float a1 = 0; state float a2 = 0; state float a3 = 0;\nstate float b1 = 0; state float b2 = 0; state float b3 = 0;\nstate float fbA = 0; state float fbB = 0; state float ph = 0; state float lp = 0;\n\nph = (ph + rateHz / sr) % 1.0;\nph2 = (ph + 0.5) % 1.0;\ncA = clamp(0.15 + depth * 0.72 * ph, 0.05, 0.91);\ncB = clamp(0.15 + depth * 0.72 * ph2, 0.05, 0.91);\n\nxA = in + fbA * resonance;\nyA1 = -cA * xA + a1; a1 = xA + cA * yA1;\nyA2 = -cA * yA1 + a2; a2 = yA1 + cA * yA2;\nyA3 = -cA * yA2 + a3; a3 = yA2 + cA * yA3;\nfbA = clamp(yA3, -1.0, 1.0);\n\nxB = in + fbB * resonance;\nyB1 = -cB * xB + b1; b1 = xB + cB * yB1;\nyB2 = -cB * yB1 + b2; b2 = yB1 + cB * yB2;\nyB3 = -cB * yB2 + b3; b3 = yB2 + cB * yB3;\nfbB = clamp(yB3, -1.0, 1.0);\n\nphased = (yA3 * sin(3.14159265 * ph) + yB3 * sin(3.14159265 * ph2)) * 0.82;\nlp = lp + clamp(0.45 - warmth * 0.25, 0.10, 0.60) * (phased - lp);\nwet = lp / (1.0 + abs(lp) * 0.45);\nout = (in * (1.0 - mix) + wet * mix) * 0.78;\n",
+    "params": {
+      "rateHz": 0.28,
+      "depth": 0.72,
+      "resonance": 0.48,
+      "warmth": 0.35,
+      "mix": 0.82
+    }
+  }
+}

@@ -4173,6 +4173,152 @@
       "groove": 0.62,
       "fill": 0.35,
       "gain": -8.5
+    },
+    {
+      "id": "fmdx_operator_bell",
+      "family": "electronic",
+      "bpm": [
+        108,
+        124
+      ],
+      "swing": 0.0,
+      "scale": [
+        0,
+        2,
+        4,
+        7,
+        9
+      ],
+      "drums": {
+        "kick": "x.......x.......",
+        "snare": "....o.......o...",
+        "chat": "x.x.x.x.x.x.x.x.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": "..o...o...o...o."
+      },
+      "bass": "0...0...4...5...",
+      "fx": [
+        "Chorus",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "FM"
+      ],
+      "ban": [
+        "Distortion"
+      ],
+      "glitch": 0.05,
+      "mod": 0.55,
+      "refs": [
+        "Yamaha DX7 6-operator FM metallic bell & electric tine ratios",
+        "Chowning exponential FM index decay with carrier feedback"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 20,
+        "human": 8
+      },
+      "notefx": [
+        "Note Strum",
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "FM"
+        ],
+        "density": 0.45,
+        "octave": 2,
+        "gate": 55,
+        "gain": -9.0,
+        "rate": 0.5,
+        "range": 12
+      },
+      "groove": 0.48,
+      "fill": 0.3,
+      "gain": -9.0
+    },
+    {
+      "id": "bbd_space_echo_fx",
+      "family": "dub",
+      "bpm": [
+        92,
+        114
+      ],
+      "swing": 0.08,
+      "scale": [
+        0,
+        3,
+        5,
+        7,
+        10
+      ],
+      "drums": {
+        "kick": "x.....x...x.....",
+        "snare": "....o.......o...",
+        "chat": "x.o.x.o.x.o.x.o.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...3...5...7...",
+      "fx": [
+        "Delay",
+        "Chorus",
+        "Phaser",
+        "Saturator",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.08,
+      "mod": 0.68,
+      "refs": [
+        "BBD analog bucket-brigade chorus/flanger with dark lowpass feedback",
+        "RE-201 Space Echo multi-head tape delay with wow/flutter saturation"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 30,
+        "human": 12
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.4,
+        "octave": 1,
+        "gate": 48,
+        "gain": -9.5,
+        "rate": 0.5,
+        "range": 9
+      },
+      "groove": 0.58,
+      "fill": 0.35,
+      "gain": -8.8
     }
   ]
 }

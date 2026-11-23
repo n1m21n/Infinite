@@ -685,6 +685,16 @@
       "slug": "kuroshio-karman-vortex-street",
       "title": "Kuroshio Karman Vortex Street",
       "description": "Alternating counter-rotating Karman vortex street eddies and dye streamlines driven by bass, mid, and high audio bands."
+    },
+    {
+      "slug": "suminagashi-indigo-ink-rings",
+      "title": "Suminagashi Indigo Ink Rings",
+      "description": "Japanese Suminagashi floating sumi and Prussian indigo ink rings advected by curl-comb strokes and audio-reactive surfactant ripples."
+    },
+    {
+      "slug": "suminagashi-gold-vein-marble",
+      "title": "Suminagashi Gold-Vein Marble",
+      "description": "Layered cobalt and obsidian marbled ink eddies interlaced with antique gold-leaf surfactant veins and harmonic rake waves."
     }
   ]
 }

@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "FMDX Six-Op Bell Synth",
+    "author": "Infinite",
+    "description": "Six-operator inspired FM metallic bell with self-feedback modulator, inharmonic chime ratios, and exponential index decay.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float modIndex = 2.4 [0.2, 6.0];\nparam float bellRatio = 3.503 [1.0, 8.0];\nparam float feedback = 0.28 [0.0, 0.85];\nparam float decay = 0.9996 [0.9985, 0.9999];\nparam float drive = 1.35 [0.6, 2.6];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0; state float p4 = 0;\nstate float env = 0; state float idxEnv = 0; state float fb = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.32, env * decay);\nidxEnv = if(gate > 0.5, idxEnv + (1.0 - idxEnv) * 0.45, idxEnv * 0.9992);\nf0 = clamp(freq, 45.0, 4200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * bellRatio) / sr) % 1.0;\np3 = (p3 + (f0 * 7.019) / sr) % 1.0;\np4 = (p4 + (f0 * 1.498) / sr) % 1.0;\n\nop2 = sin(6.2831853 * p2 + fb * feedback);\nfb = op2;\nop3 = sin(6.2831853 * p3) * (modIndex * 0.55 * idxEnv * idxEnv);\nc1 = sin(6.2831853 * p1 + op2 * modIndex * idxEnv + op3);\nc2 = sin(6.2831853 * p4 + op2 * (modIndex * 0.35 * idxEnv)) * 0.38;\n\nraw = (c1 + c2) * env;\ncutHz = clamp(650.0 + idxEnv * 6200.0, 200.0, 11000.0);\ng = clamp(2.0 * sin(3.14159265 * cutHz / sr), 0.02, 0.78);\nlp = lp + g * (raw - lp);\nsig = lp * drive;\nout = (sig / (1.0 + abs(sig) * 0.45)) * 0.32;\n",
+    "params": {
+      "modIndex": 2.4,
+      "bellRatio": 3.503,
+      "feedback": 0.28,
+      "decay": 0.9996,
+      "drive": 1.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

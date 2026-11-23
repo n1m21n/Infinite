@@ -1,0 +1,68 @@
+infinite-patch 1
+# FMDX Rhodes Tine E-Piano Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 55
+  i note2 60
+  i note3 64
+  i note4 53
+  i note5 60
+  i note6 65
+  i note7 69
+  i note8 50
+  i note9 57
+  i note10 62
+  i note11 65
+  i note12 55
+  i note13 62
+  i note14 67
+  i note15 71
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float tineAmount = 1.45 [0.1, 4.0];\nparam float warmth = 1.15 [0.2, 2.5];\nparam float tremHz = 3.6 [0.2, 9.0];\nparam float decay = 0.9995 [0.9985, 0.9999];\nparam float drive = 1.45 [0.6, 2.8];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0; state float trem = 0;\nstate float env = 0; state float tineEnv = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.25, env * decay);\ntineEnv = if(gate > 0.5, tineEnv + (1.0 - tineEnv) * 0.55, tineEnv * 0.9984);\nf0 = clamp(freq, 40.0, 3600.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 14.02) / sr) % 1.0;\np3 = (p3 + (f0 * 2.002) / sr) % 1.0;\ntrem = (trem + tremHz / sr) % 1.0;\n\ntineMod = sin(6.2831853 * p2) * tineAmount * tineEnv;\nbodyMod = sin(6.2831853 * p3) * warmth * 0.45 * env;\ntone = sin(6.2831853 * p1 + bodyMod + tineMod * 0.45) + sin(12.56637 * p1 + tineMod) * 0.24 * tineEnv;\nraw = tone * env * (0.85 + 0.15 * sin(6.2831853 * trem));\ng = clamp(2.0 * sin(3.14159265 * clamp(420.0 + env * 3400.0, 180.0, 9500.0) / sr), 0.02, 0.78);\nlp = lp + g * (raw - lp);\nsig = lp * drive;\nout = (sig / (1.0 + abs(sig) * 0.48)) * 0.34;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.18 0.66 0.61
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text FMDX Rhodes Tine E-Piano Synth. FM electric piano combining a warm fundamental carrier with a percussive 1:14 tine-strike modulator, gentle tremolo, and soft console saturation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic
