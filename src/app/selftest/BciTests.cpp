@@ -16,6 +16,7 @@
 #include "platform/AppPaths.h"
 #include "audio/AudioNode.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -878,8 +879,173 @@ bool RunBciSelftest()
       runDropout(2, true);  // TP9 noisy/rail-clipped
    }
 
+   // 13. Brain Light (docs/plans/bci/BRAIN_LIGHT.md L1): no authored art. A flat line is black even with the
+   //     eyes-closed state at 1; swapping left/right sensors mirrors the picture; same data, same frame;
+   //     a pure 10 Hz excess is gold; the wave's phase moves the rings.
+   {
+      auto render = [](const Bci::BrainLightFrame& f, std::vector<float>& px, int w = 64, int h = 40)
+      {
+         px.assign((size_t)w * h * 3, 0.0f);
+         for (int y = 0; y < h; ++y)
+            for (int x = 0; x < w; ++x)
+               Bci::BrainLightPixel(f, (float)x / (w - 1), (float)y / (h - 1), (float)h / (float)w, 0.0f,
+                                    &px[((size_t)y * w + x) * 3]);
+      };
+      float z[Bci::kImageColumnSize], ph[Bci::kChannelCount] = { 0.3f, 1.1f, 2.0f, 4.0f };
+      std::fill(std::begin(z), std::end(z), -30.0f);
+      Bci::BrainLightFrame flat;
+      Bci::BrainLightFeatures(z, ph, 1.0f, flat);
+      std::vector<float> px;
+      render(flat, px);
+      float flatMax = 0.0f;
+      for (float v : px)
+         flatMax = std::max(flatMax, v);
+
+      // A made-up but busy column: each sensor its own spectrum shape.
+      for (int c = 0; c < Bci::kChannelCount; ++c)
+         for (int k = 0; k < Bci::kImageBins; ++k)
+            z[c * Bci::kImageBins + k] = (float)(1.5 * std::sin(0.37 * (k + 1) * (c + 1)) + (k == 9 ? 2.0 + c : 0.0));
+      Bci::BrainLightFrame f1, f2, fs;
+      Bci::BrainLightFeatures(z, ph, 0.7f, f1);
+      Bci::BrainLightFeatures(z, ph, 0.7f, f2);
+      std::vector<float> p1, p2, psw;
+      render(f1, p1);
+      render(f2, p2);
+      float zs[Bci::kImageColumnSize], phs[Bci::kChannelCount];
+      const int swapOf[4] = { 1, 0, 3, 2 };
+      for (int c = 0; c < Bci::kChannelCount; ++c)
+      {
+         std::copy_n(z + swapOf[c] * Bci::kImageBins, Bci::kImageBins, zs + c * Bci::kImageBins);
+         phs[c] = ph[swapOf[c]];
+      }
+      Bci::BrainLightFeatures(zs, phs, 0.7f, fs);
+      render(fs, psw);
+      const int W = 64, H = 40;
+      float mirrorErr = 0.0f, lit = 0.0f;
+      for (int y = 0; y < H; ++y)
+         for (int x = 0; x < W; ++x)
+            for (int k = 0; k < 3; ++k)
+            {
+               mirrorErr = std::max(mirrorErr, std::fabs(psw[((size_t)y * W + x) * 3 + k] - p1[((size_t)y * W + (W - 1 - x)) * 3 + k]));
+               lit = std::max(lit, p1[((size_t)y * W + x) * 3 + k]);
+            }
+
+      // Pure 10 Hz excess on every sensor, no state: hue = 280 deg * 9 / 39 = 64.6 deg (gold).
+      for (int i = 0; i < Bci::kImageColumnSize; ++i)
+         z[i] = (i % Bci::kImageBins) == 9 ? 4.0f : 0.0f;
+      Bci::BrainLightFrame fg;
+      Bci::BrainLightFeatures(z, ph, -1.0f, fg);
+      float rgb[3];
+      Bci::BrainLightPixel(fg, 0.5f, 0.5f, 0.625f, 0.0f, rgb);
+      const float mx = std::max(rgb[0], std::max(rgb[1], rgb[2])), mn = std::min(rgb[0], std::min(rgb[1], rgb[2]));
+      const float hueDeg = std::fmod(std::atan2(std::sqrt(3.0f) * (rgb[1] - rgb[2]), 2 * rgb[0] - rgb[1] - rgb[2]) * 57.29578f + 360.0f, 360.0f);
+
+      // Phase alone moves the picture.
+      Bci::BrainLightFrame fp = f1;
+      for (float& q : fp.phase)
+         q += 6.0f;
+      std::vector<float> pp;
+      render(fp, pp);
+      int moved = 0;
+      for (size_t i = 0; i < pp.size(); ++i)
+         moved += std::fabs(pp[i] - p1[i]) > 2.0f / 255.0f ? 1 : 0;
+
+      std::printf("  [13] BRAIN_LIGHT flatMax=%.4f lit=%.3f mirrorErr=%.5f gold hue=%.1f sat=%.2f moved=%.1f%%\n",
+                  flatMax, lit, mirrorErr, hueDeg, mx > 0 ? (mx - mn) / mx : 0.0f, 100.0 * moved / pp.size());
+      ck.Expect(flatMax == 0.0f, "Brain Light: a flat line is black, even with the eyes-closed state at 1");
+      ck.Expect(lit > 0.1f && p1 == p2, "Brain Light: real data lights the frame; same data gives the same frame");
+      ck.Expect(mirrorErr < 1e-4f, "Brain Light: swapping left/right sensors mirrors the picture");
+      ck.Expect(hueDeg > 55.0f && hueDeg < 75.0f && mx > 0.2f, "Brain Light: a pure 10 Hz excess is gold");
+      ck.Expect(moved > (int)pp.size() / 10, "Brain Light: the wave's phase moves the rings");
+   }
+
    std::printf("BCI_SELFTEST: passed=%d failed=%d %s\n",
                ck.passed, ck.failed, ck.failed == 0 ? "OK" : "FAIL");
    return ck.failed == 0;
+}
+
+// Brain Light on the GPU (L1 + L5): the shader matches Bci::BrainLightPixel, a flat line is black, and one
+// 1920x1080 frame costs < 0.5 ms. Needs a GL context: INFINITE_BRAINLIGHT_GPUTEST=1.
+bool RunBrainLightGpuTest()
+{
+   std::printf("[BRAINLIGHT_GPUTEST]\n");
+   int failed = 0;
+   auto expect = [&](bool ok, const char* what)
+   {
+      std::printf("  [%s] %s\n", ok ? "PASS" : "FAIL", what);
+      failed += ok ? 0 : 1;
+   };
+   float z[Bci::kImageColumnSize], ph[Bci::kChannelCount] = { 0.3f, 1.1f, 2.0f, 4.0f };
+   for (int c = 0; c < Bci::kChannelCount; ++c)
+      for (int k = 0; k < Bci::kImageBins; ++k)
+         z[c * Bci::kImageBins + k] = (float)(1.5 * std::sin(0.37 * (k + 1) * (c + 1)) + (k == 9 ? 2.0 + c : 0.0));
+   Bci::BrainLightFrame f;
+   Bci::BrainLightFeatures(z, ph, 0.7f, f);
+   for (float& g : f.grain)
+      g = 0.0f; // the CPU reference has no noise
+
+   GLUtil::Fbo small, big;
+   small.w = 160;
+   small.h = 100;
+   unsigned int prog = 0;
+   const bool drew = BrainSourceNode::DrawLight(small, prog, f);
+   expect(drew && prog != 0, "Light shader compiles and draws");
+   if (!drew)
+   {
+      std::printf("BRAINLIGHT_GPUTEST FAIL\n");
+      return false;
+   }
+   std::vector<float> rgba;
+   unsigned int scratch = 0;
+   GLUtil::ReadTexturePixels(scratch, small.tex, small.w, small.h, rgba);
+   float worst = 0.0f;
+   for (int y = 0; y < small.h; ++y)
+      for (int x = 0; x < small.w; ++x)
+      {
+         // GL row 0 is the bottom; the CPU reference has v down. Sample at pixel centres.
+         const float u = ((float)x + 0.5f) / small.w, v = 1.0f - ((float)y + 0.5f) / small.h;
+         float ref[3];
+         Bci::BrainLightPixel(f, u, v, (float)small.h / small.w, 0.0f, ref);
+         for (int k = 0; k < 3; ++k)
+            worst = std::max(worst, std::fabs(rgba[((size_t)y * small.w + x) * 4 + k] - ref[k]));
+      }
+   std::printf("  shader vs CPU: worst channel diff %.4f\n", worst);
+   expect(worst < 3.0f / 255.0f, "Shader matches Bci::BrainLightPixel within 3/255");
+
+   Bci::BrainLightFrame flat;
+   std::fill(std::begin(z), std::end(z), -30.0f);
+   Bci::BrainLightFeatures(z, ph, 1.0f, flat);
+   BrainSourceNode::DrawLight(small, prog, flat);
+   GLUtil::ReadTexturePixels(scratch, small.tex, small.w, small.h, rgba);
+   float flatMax = 0.0f;
+   for (size_t i = 0; i < rgba.size(); i += 4)
+      flatMax = std::max(flatMax, std::max(rgba[i], std::max(rgba[i + 1], rgba[i + 2])));
+   expect(flatMax == 0.0f, "Flat line draws a black frame on the GPU");
+
+   big.w = 1920;
+   big.h = 1080;
+   Bci::BrainLightFeatures(z, ph, 0.7f, f);
+   BrainSourceNode::DrawLight(big, prog, f);
+   glFinish();
+   const int n = 120;
+   const auto t0 = std::chrono::steady_clock::now();
+   for (int i = 0; i < n; ++i)
+   {
+      f.seq = (unsigned)i;
+      f.phase[0] += 0.1f;
+      BrainSourceNode::DrawLight(big, prog, f);
+   }
+   glFinish();
+   const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / n;
+   std::printf("  BRAINLIGHT_GPU_MS %.3f per 1920x1080 frame (%d frames)\n", ms, n);
+   expect(ms < 0.5, "L5: one 1920x1080 Light frame under 0.5 ms");
+
+   GLUtil::DestroyFbo(small);
+   GLUtil::DestroyFbo(big);
+   if (scratch != 0)
+      glDeleteFramebuffers(1, &scratch);
+   glDeleteProgram(prog);
+   std::printf("BRAINLIGHT_GPUTEST %s\n", failed == 0 ? "OK" : "FAIL");
+   return failed == 0;
 }
 }

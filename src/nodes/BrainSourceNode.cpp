@@ -174,11 +174,110 @@ BrainSourceNode::~BrainSourceNode()
    StopWorker();
    if (mTexture != 0)
       glDeleteTextures(1, &mTexture);
+   GLUtil::DestroyFbo(mLightFbo);
+   if (mLightProgram != 0)
+      glDeleteProgram(mLightProgram);
 }
 
 AudioNode* BrainSourceNode::GetAudioNode()
 {
    return mAudio.get();
+}
+
+namespace
+{
+   // Brain Light (docs/plans/bci/BRAIN_LIGHT.md): the same maths as Bci::BrainLightPixel, per pixel.
+   const char* kLightFrag =
+      "#version 150\n"
+      "in vec2 vUv;\n"
+      "out vec4 fragColor;\n"
+      "uniform float uA[4];\n"
+      "uniform float uHue[4];\n"
+      "uniform float uVivid[4];\n"
+      "uniform float uGrain[4];\n"
+      "uniform float uPhase[4];\n"
+      "uniform float uPres[4];\n"
+      "uniform vec2 uPos[4];\n"
+      "uniform float uState;\n"
+      "uniform float uHOverW;\n"
+      "uniform float uSeq;\n"
+      "uniform vec2 uRes;\n"
+      "uniform vec4 uK;\n" // slow, ring, eps, glow
+      "uniform vec2 uK2;\n" // state weight, alpha hue
+      "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
+      "vec3 hsv(float h, float s, float v) {\n"
+      "   vec3 k = clamp(abs(mod(h / 1.0471976 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);\n"
+      "   return v * mix(vec3(1.0), k, s);\n"
+      "}\n"
+      "void main() {\n"
+      "   float u = vUv.x, v = 1.0 - vUv.y;\n"
+      "   float w[4]; float d[4]; float wSum = 0.0;\n"
+      "   for (int c = 0; c < 4; ++c) {\n"
+      "      vec2 dd = vec2(u - uPos[c].x, (v - uPos[c].y) * uHOverW);\n"
+      "      d[c] = length(dd);\n"
+      "      w[c] = 1.0 / (d[c] * d[c] + uK.z);\n"
+      "      wSum += w[c];\n"
+      "   }\n"
+      "   float m = 0.0, val = 0.0, grain = 0.0; vec2 vec = vec2(0.0);\n"
+      "   for (int c = 0; c < 4; ++c) {\n"
+      "      float wc = w[c] / wSum;\n"
+      "      float pull = uK2.x * uState * uPres[c];\n"
+      "      float mc = wc * (uA[c] + uK.w * uPres[c] + pull);\n"
+      "      m += mc;\n"
+      "      vec += wc * (uA[c] * uVivid[c] * vec2(cos(uHue[c]), sin(uHue[c])) + pull * vec2(cos(uK2.y), sin(uK2.y)));\n"
+      "      val += mc * (0.6 + 0.4 * cos(uK.y * d[c] - uPhase[c] / uK.x));\n"
+      "      grain += wc * uGrain[c];\n"
+      "   }\n"
+      "   vec2 px = floor(vUv * uRes);\n"
+      "   float r1 = max(hash(px + vec2(uSeq * 0.37, 1.7)), 1e-6), r2 = hash(px.yx + vec2(5.3, uSeq * 0.61));\n"
+      "   float noise = sqrt(-2.0 * log(r1)) * cos(6.2831853 * r2);\n"
+      "   val = clamp(val + grain * 0.5 * noise, 0.0, 1.0);\n"
+      "   float sat = clamp(length(vec) / (m + 1e-9), 0.0, 1.0);\n"
+      "   float h = atan(vec.y, vec.x);\n"
+      "   if (h < 0.0) h += 6.2831853;\n"
+      "   fragColor = vec4(hsv(h, sat, val), 1.0);\n"
+      "}\n";
+}
+
+const std::vector<std::string>& BrainSourceNode::ImageModeNames()
+{
+   static const std::vector<std::string> kNames = { "Spectrogram", "Light" };
+   return kNames;
+}
+
+bool BrainSourceNode::DrawLight(GLUtil::Fbo& out, unsigned int& program, const Bci::BrainLightFrame& f)
+{
+   if (program == 0)
+      program = GLUtil::CompileProgram(kLightFrag);
+   if (program == 0)
+      return false;
+   const int w = out.w > 0 ? out.w : kLightW, h = out.h > 0 ? out.h : kLightH;
+   if (!GLUtil::EnsureFbo(out, w, h, GL_RGBA8, "BrainLight"))
+      return false;
+   float pos[Bci::kChannelCount * 2];
+   for (int c = 0; c < Bci::kChannelCount; ++c)
+   {
+      pos[c * 2] = Bci::kLightPos[c][0];
+      pos[c * 2 + 1] = Bci::kLightPos[c][1];
+   }
+   GLUtil::RunShaderPass(out, program, [&]()
+   {
+      auto loc = [&](const char* nm) { return GLUtil::UniformLoc(program, nm); };
+      glUniform1fv(loc("uA"), 4, f.a);
+      glUniform1fv(loc("uHue"), 4, f.hue);
+      glUniform1fv(loc("uVivid"), 4, f.vivid);
+      glUniform1fv(loc("uGrain"), 4, f.grain);
+      glUniform1fv(loc("uPhase"), 4, f.phase);
+      glUniform1fv(loc("uPres"), 4, f.pres);
+      glUniform2fv(loc("uPos"), 4, pos);
+      glUniform1f(loc("uState"), f.state);
+      glUniform1f(loc("uHOverW"), (float)out.h / (float)out.w);
+      glUniform1f(loc("uSeq"), (float)(f.seq % 4096u));
+      glUniform2f(loc("uRes"), (float)out.w, (float)out.h);
+      glUniform4f(loc("uK"), Bci::kLightSlow, Bci::kLightRing, Bci::kLightEps, Bci::kLightGlow);
+      glUniform2f(loc("uK2"), Bci::kLightState, 280.0f * 3.14159265f / 180.0f * 9.0f / 39.0f);
+   });
+   return true;
 }
 
 void BrainSourceNode::CopyImagePixels(std::vector<uint8_t>& out) const
@@ -187,12 +286,36 @@ void BrainSourceNode::CopyImagePixels(std::vector<uint8_t>& out) const
    out = mPixels;
 }
 
+Bci::BrainLightFrame BrainSourceNode::LightFrame() const
+{
+   std::lock_guard<std::mutex> lk(mPixMu);
+   return mLight;
+}
+
 void BrainSourceNode::FeedDirect(const Bci::TelemetrySnapshot& snap, unsigned& lastImgSeq,
                                  const std::vector<Bci::AudifyFrame>& frames, double eegRateHz)
 {
+   // The wave's own phase per sensor (same Hilbert phase the audio pin plays), kept bounded:
+   // the rings use phase / kLightSlow, so wrapping at 2 pi * kLightSlow is seamless.
+   const double wrap = 2.0 * 3.141592653589793 * (double)Bci::kLightSlow;
+   for (const auto& fr : frames)
+      for (int c = 0; c < Bci::kChannelCount; ++c)
+         mLightPhase[c] = std::fmod(mLightPhase[c] + (double)fr.dphase[c], wrap);
    const int newCols = std::min(4, (int)(snap.imageSeq - lastImgSeq));
    for (int k = 0; k < newCols; ++k)
       AppendImageColumn(snap);
+   if (newCols > 0)
+   {
+      float ph[Bci::kChannelCount];
+      for (int c = 0; c < Bci::kChannelCount; ++c)
+         ph[c] = (float)mLightPhase[c];
+      Bci::BrainLightFrame f;
+      Bci::BrainLightFeatures(snap.imageZ, ph, snap.imageState, f);
+      std::lock_guard<std::mutex> lk(mPixMu);
+      f.seq = mLight.seq + (unsigned)newCols;
+      mLight = f;
+      ++mLightRevision;
+   }
    lastImgSeq = snap.imageSeq;
    if (!frames.empty())
       mAudio->Push(frames.data(), (int)frames.size(), eegRateHz);
@@ -441,6 +564,21 @@ void BrainSourceNode::CookIfNeeded(int frameId)
       vals[i] = Value(i);
    Bci::PublishBrainGlobals(vals, !bypassed);
 
+   if (imageMode == kImageLight)
+   {
+      Bci::BrainLightFrame f;
+      {
+         std::lock_guard<std::mutex> lk(mPixMu);
+         if (mLightRevision == mLightDrawn && mLightFbo.tex != 0)
+            return;
+         mLightDrawn = mLightRevision;
+         f = mLight;
+      }
+      if (DrawLight(mLightFbo, mLightProgram, f))
+         ++mTexRevision;
+      return;
+   }
+
    // Image pin upload (GL thread): only when the worker added a column.
    std::vector<uint8_t> flipped;
    {
@@ -487,6 +625,8 @@ void BrainSourceNode::VisitParams(ParamVisitor& v)
    v.Int("device", device);
    v.Int("syntheticPreset", syntheticPreset);
    v.Int("blinkMode", blinkMode);
+   v.Int("imageMode", imageMode);
+   imageMode = std::clamp(imageMode, (int)kImageSpectrogram, (int)kImageLight);
    v.Float("smoothing", smoothing);
    v.Float("holdMs", holdMs);
    v.Bool("artifactBlanking", artifactBlanking);

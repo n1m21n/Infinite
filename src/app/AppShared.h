@@ -6270,6 +6270,7 @@ bool RunModelAbTest();
 bool RunThreeDBench();
 bool RunRhiTest();
 bool RunEngineTest();
+bool RunBrainLightGpuTest(); // selftest/BciTests.cpp
 bool RunThreeDFlowTest();
 bool RunBvhTest();
 bool RunPathTraceTest();

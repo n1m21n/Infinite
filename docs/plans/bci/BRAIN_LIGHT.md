@@ -1,6 +1,7 @@
 # Brain Light: every pixel from brain data
 
-Status: **§1–7 signed off by the owner 2026-11-23; §9 option A chosen (a mode on Brain Source's `image` pin).** Branch `feature/bci-brain-light`.
+Status: **§1–7 signed off by the owner 2026-11-23; §9 option A chosen (a mode on Brain Source's `image` pin).
+Built: Brain Source's `image` dropdown → Light (C++ + GPU shader); owner blind sets waiting.** Branch `feature/bci-brain-light`.
 Parent plan: `docs/plans/bci/STRATEGY.md` (Blocks A–C done there).
 
 ## 1. Goal
@@ -108,31 +109,45 @@ What-ifs:
 
 ## 10. Benchmark vs baseline
 
-Python mirror, 2 rounds of law changes plus one exposure fix (2026-11-23).
-Tool: `tools/bci/brain_light.py` (`sheet`, `checks`). Data: HEROIC Muse 2, 63 sessions, 126 pairs.
+Python mirror first, then the same law in C++ (2026-11-23).
+Tool: `tools/bci/brain_light.py` (`sheet`, `checks`, `blind`). Data: HEROIC Muse 2, 63 sessions, 126 pairs.
 Sheets: `proof/brain_light/brain_light_open_closed.png`, `proof/brain_light/brain_light_bursts.png`.
 Clips (not in the repo, large): `~/Infinite/media/bci-brain-light/*.mp4`.
+Blind sets: `~/Infinite/datasets/eeg/brain_light_blind/` (L2 and L3 sheets); key kept apart in
+`~/Infinite/datasets/eeg/brain_light_key.json` (seed 23). Not opened by the agent.
 
-| Metric | Bar | Result | vs baseline (§6) |
-|---|---|---|---|
-| L1 zero input → black | yes | **pass** (max pixel 0) | demo bell drew a bell on zero input |
-| L1 same data → same frame | yes | **pass** | — |
-| L1 swap left/right sensors → mirrored picture | yes | **pass** (99th pct pixel diff 10/255, grain only) | — |
-| L2 proxy: more gold light with eyes closed | ≥ 0.80 | **fail: 0.675** (85/126) | raw spectrogram proxy was 0.74 |
-| L2 owner blind | ≥ 9/10 | not run yet | 10/10 only via the strip |
-| L3 eyes closed / blink / jaw 3-way | ≥ 8/10 | not run; no labelled jaw data | — |
-| L4 alive at rest | > 1% pixels change, never frozen 1 s | **mixed**: 47% mean (min session 16.5%), but one 1.36 s near-frozen run | — |
-| L5 GPU < 0.5 ms | — | not measured (no C++ yet) | — |
-| L6 owner: art, not a readout | yes | waiting for the owner | — |
+| Metric | Bar | Round 2 (raw law) | **Round 3 (+ calibrated state)** | vs baseline (§6) |
+|---|---|---|---|---|
+| L1 zero input → black | yes | pass | **pass** (max 0, even with the state forced to 1) | demo bell drew a bell on zero input |
+| L1 same data → same frame | yes | pass | **pass** | — |
+| L1 swap left/right sensors → mirrored picture | yes | pass | **pass** (99th pct diff 10/255, grain only) | — |
+| L2 proxy: more gold light with eyes closed | ≥ 0.80 | 0.675 | **0.889** (112/126) | raw spectrogram 0.74 |
+| L2 owner blind | ≥ 9/10 | — | sheet ready, waiting for the owner | 10/10 only via the strip |
+| L3 closed / blink / jaw 3-way | ≥ 8/10 | — | sheet ready (jaw = biggest fast TP9/TP10 burst, not labelled) | — |
+| L4 alive at rest | > 1% change, never frozen 1 s | 47%, 1.36 s frozen | **63% mean (min 29.9%), longest near-frozen 0.14 s** | — |
+| L5 GPU, 1920×1080 | < 0.5 ms | — | L5_RESULT | — |
+| L6 owner: art, not a readout | yes | — | waiting for the owner | — |
 
 Rounds:
-1. Per-bin excess clipped at 1, EMG grain at full strength: the grain covered everything; clipping flattened
+1. Per-bin excess clipped at 1, EMG grain at full strength: grain covered everything; clipping flattened
    the spectrum, so blinks were green-white instead of red.
 2. Unclipped excess, colour weighted by excess², grain only well above baseline: blinks turn the forehead red,
-   noise gone; too dark. Exposure gain raised (`tanh(mean/0.6)`), not a law change.
+   noise gone; too dark. Exposure gain raised (`tanh(mean/0.6)`). Eyes-closed proxy 0.675: on Muse the alpha
+   excess is often smaller than other bins', so the colour wandered.
+3. Two more pieces of brain data, no authored art: the **calibrated eyes-closed score** (the LDA fitted on the
+   person's own 30 s open + 30 s closed, the same score that made M3 10/10) pulls the light toward alpha gold
+   and opens it up; a **presence glow** (any signal at all, `tanh(mean(max(z+3,0))/3)`) keeps a dim moving
+   picture at baseline, so it never freezes. A flat line still gives black.
 
-Reading the sheets: eyes closed is brighter than eyes open in most sessions, but the colour is not reliably
-gold. On Muse the alpha excess is often smaller than other bins' excess, so the colour wanders (teal, red, blue).
+C++ (option A):
+- `Bci::BrainLightFeatures` / `Bci::BrainLightPixel` (`src/core/bci/BciTypes.cpp`): the law, shared by the
+  worker and the tests. The engine now also hands over the unclipped z column (`imageZ`; −30 = dead-flat channel).
+- `BrainSourceNode`: param `imageMode` (dropdown "image": Spectrogram / Light). The worker keeps each sensor's
+  Hilbert phase from the audio pin's phase steps and computes 4 × 6 numbers + the state per column (21.3/s);
+  the GL thread draws one fragment shader into a 1280×800 target. Pin indices unchanged; old patches load as
+  Spectrogram.
+- Tests: `INFINITE_BCI_SELFTEST` [13] (flat → black even at state 1, mirror, determinism, 10 Hz → gold, phase
+  moves rings); `INFINITE_BRAINLIGHT_GPUTEST` (shader vs CPU within 3/255, flat → black on the GPU, L5 timing).
 
 ## 11. Critique
 
@@ -140,15 +155,22 @@ gold. On Muse the alpha excess is often smaller than other bins' excess, so the 
 - 4 sensors give a very coarse map; most pixels are blends. The picture will be soft by nature.
 - EMG and blinks may dominate the picture over real brain rhythms. That is true to the data but may look "wrong".
 - L6 is taste; the other bars keep it from being only taste.
-- **Results (§10): the raw law alone does not carry eyes-closed on Muse** (0.675 < 0.80, below the raw
-  spectrogram's 0.74). This matches STRATEGY §11: without calibration Muse alpha is near a coin flip for half
-  of people. The calibrated eyes-closed score (Block A) is what made M3 readable.
+- **The raw law alone did not carry eyes-closed on Muse** (0.675 < 0.80). Round 3 passes (0.889) only because
+  the calibrated eyes-closed score feeds the light. That is still brain data, but it is a learned summary, not
+  the raw spectrum: without the 60 s calibration the picture loses its clearest state. Say so in the deck.
+- The L2 proxy counts gold light, and round 3 adds gold when the score is high, so the proxy partly measures the
+  score (its own held-out accuracy, STRATEGY Block A). The owner's blind pick is the real test.
+- The presence glow lights a calibrated-but-quiet head dimly grey; it is honest (signal is there) but it is the
+  one term that is not about a rhythm.
 - The "EMG" burst found by searching HEROIC is the biggest fast excess on TP9/TP10, not a labelled jaw clench.
 - Rings dominate the look in every state; the geometry may read as one template.
 
 ## 12. Next steps
 
 1. ~~Owner signs off §1–7 and picks A/B/C in §9.~~ Done 2026-11-23: option A.
-2. Python mirror + proof sheets (no build).
-3. Blind sets, owner picks.
-4. C++ + shader, one build, selftests, then the deck slide.
+2. ~~Python mirror + proof sheets (no build).~~ Done, 3 rounds.
+3. Blind sets built; **owner picks** L2 (10 pairs) and L3 (10 triplets) from `~/Infinite/datasets/eeg/brain_light_blind/`,
+   then the key is opened and the scores go into §10. Owner says yes/no for L6.
+4. ~~C++ + shader, one build, selftests.~~ Done. Then the deck slide (retitle the Brain Sculpt slide "control layer",
+   lead with Brain Light).
+5. Headset session when one is on hand: the same checks live.

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "INode.h"
+#include "GLUtil.h"
 #include "Modulation.h"
 #include "core/bci/BciTypes.h"
 
@@ -22,6 +23,7 @@ class BrainAudioNode;
 // and publishes 24 lock-free 0..1 modulator outputs plus `brain.*` Field symbols.
 // Direct pins (Block B, docs/plans/bci/STRATEGY.md): output 24 "image" = calibrated eyes-closed strip
 // over a 4-row 1-40 Hz spectrogram; output 25 "audio" = the 4 channels audified (frequency x 32).
+// The image pin's Light mode (docs/plans/bci/BRAIN_LIGHT.md) instead draws every pixel from the signal on the GPU.
 class BrainSourceNode : public INode, public IAudioSource
 {
 public:
@@ -73,6 +75,10 @@ public:
    static constexpr int kImgStrip = 12;
    static constexpr int kImgGap = 2;
    static constexpr int kImgH = kImgStrip + 4 * (kImgGap + Bci::kImageBins);
+   // Light mode target (16:10, the head map's aspect).
+   static constexpr int kLightW = 1280;
+   static constexpr int kLightH = 800;
+   enum ImageMode { kImageSpectrogram = 0, kImageLight };
 
    enum SourceDevice
    {
@@ -88,15 +94,24 @@ public:
    static const std::vector<std::string>& DeviceNames();
    static const std::vector<std::string>& PresetNames();
    static const std::vector<std::string>& BlinkModeNames();
+   static const std::vector<std::string>& ImageModeNames();
+
+   // Brain Light shader pass into `out` (any size); used by the node and the GPU selftest.
+   static bool DrawLight(GLUtil::Fbo& out, unsigned int& program, const Bci::BrainLightFrame& f);
 
    static INode* Create() { return new BrainSourceNode(); }
    BrainSourceNode();
    ~BrainSourceNode() override;
 
    unsigned int GetOutputTexture() override { return 0; }
-   unsigned int GetOutputTexture(int index) override { return index == kImagePin ? mTexture : 0; }
-   int GetOutputWidth() const override { return kImgW; }
-   int GetOutputHeight() const override { return kImgH; }
+   unsigned int GetOutputTexture(int index) override
+   {
+      if (index != kImagePin)
+         return 0;
+      return imageMode == kImageLight ? mLightFbo.tex : mTexture;
+   }
+   int GetOutputWidth() const override { return imageMode == kImageLight ? kLightW : kImgW; }
+   int GetOutputHeight() const override { return imageMode == kImageLight ? kLightH : kImgH; }
    unsigned long long TextureRevision() const override { return mTexRevision; }
    void CookIfNeeded(int frameId) override;
 
@@ -127,6 +142,8 @@ public:
    void GetTelemetry(Bci::TelemetrySnapshot& out) const;
    // Copy of the Image pin's RGBA pixels (kImgW x kImgH, row 0 = top); for tests and tools.
    void CopyImagePixels(std::vector<uint8_t>& out) const;
+   // Latest Brain Light features (what the Light shader draws); for tests and tools.
+   Bci::BrainLightFrame LightFrame() const;
    // What the worker does with each processed batch; public so the selftest can drive the pins.
    void FeedDirect(const Bci::TelemetrySnapshot& snap, unsigned& lastImgSeq, const std::vector<Bci::AudifyFrame>& frames,
                    double eegRateHz);
@@ -137,6 +154,7 @@ public:
    int device = kDeviceSynthetic;
    int syntheticPreset = 0; // 0=Calm Alpha, 1=Deep Focus, 2=Theta Dream, 3=Micro-Gesture Perf
    int blinkMode = 0;       // 0=Intentional/Double, 1=All Blinks
+   int imageMode = kImageSpectrogram;
    float smoothing = 0.45f; // 0..1 One-Euro adaptive cutoff
    float holdMs = 300.0f;   // Contact drop hold before decaying
    bool artifactBlanking = true;
@@ -193,6 +211,14 @@ private:
    unsigned long long mUploadedRevision = 0;
    unsigned long long mTexRevision = 1;
    unsigned int mTexture = 0;
+
+   // Light mode: worker computes the per-sensor features (mLight, under mPixMu), the GL thread draws them.
+   double mLightPhase[Bci::kChannelCount] = {}; // worker only
+   Bci::BrainLightFrame mLight;
+   unsigned long long mLightRevision = 0; // guarded by mPixMu
+   unsigned long long mLightDrawn = ~0ull;
+   GLUtil::Fbo mLightFbo;
+   unsigned int mLightProgram = 0;
 
    // Audio pin: worker pushes audified EEG frames, the audio thread plays them.
    std::unique_ptr<BrainAudioNode> mAudio;
