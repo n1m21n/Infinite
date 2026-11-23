@@ -10,6 +10,8 @@
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -520,8 +522,16 @@ namespace app
             });
          }
          ImGui::SetNextItemWidth(200.0f);
-         ImGui::DragFloat("##scenetempo", &sSceneTempoEdit, 0.25f, 0.0f, 300.0f,
-                          sSceneTempoEdit > 0.0f ? T("%.1f BPM on launch") : T("Tempo: unchanged"));
+         char tempoFmt[64];
+         if (sSceneTempoEdit > 0.0f)
+         {
+            char bpm[48];
+            FormParts::UnitReadout(bpm, sizeof bpm, UiFmt::Bpm, sSceneTempoEdit);
+            std::snprintf(tempoFmt, sizeof tempoFmt, T("%s on launch"), bpm);
+         }
+         else
+            std::snprintf(tempoFmt, sizeof tempoFmt, "%s", T("Tempo: unchanged"));
+         ImGui::DragFloat("##scenetempo", &sSceneTempoEdit, 0.25f, 0.0f, 300.0f, tempoFmt, ImGuiSliderFlags_NoRoundToFormat);
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Launching this scene sets the project tempo. 0 leaves the tempo alone."));
          if (ImGui::IsItemDeactivatedAfterEdit())

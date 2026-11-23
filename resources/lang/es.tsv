@@ -1490,7 +1490,7 @@ v%s	=en
 v%s, %s download	v%s, descarga de %s
 version %s	versión %s
 version %s is available (you have %s) - click to update, right-click to dismiss	la versión %s está disponible (tienes %s): haz clic para actualizar, clic derecho para descartar
-%.1f BPM on launch	%.1f BPM al lanzar
+%s on launch	%s al lanzar
 %d bar	%d compás
 %d bars	%d compases
 Add a track in Timeline view, then drop audio or video files onto its cells here.	Añade una pista en la vista Línea de tiempo y suelta aquí archivos de audio o vídeo en sus celdas.

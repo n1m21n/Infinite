@@ -609,7 +609,7 @@ namespace app
          FieldWell::Slider("##lenval", &s.length, 1.0f, s.lengthUnit == 1 ? 256.0f : 600.0f, s.lengthUnit == 1 ? "%.0f" : "%.0f s");
          s.length = std::clamp(s.lengthUnit == 1 ? std::round(s.length) : s.length, 1.0f, 3600.0f);
       }
-      FormParts::SliderFloat(T("Tail"), &s.tail, 0.0f, 30.0f, "%.1f s");
+      FormParts::SliderFloat(T("Tail"), &s.tail, 0.0f, 30.0f, UiFmt::Sec, 1);
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Extra time after the length, with the transport stopped, so reverbs and delays ring out."));
       ImGui::BeginDisabled(s.lengthUnit == 3);

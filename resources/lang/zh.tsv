@@ -1490,7 +1490,7 @@ v%s	=en
 v%s, %s download	v%s，下载 %s
 version %s	版本 %s
 version %s is available (you have %s) - click to update, right-click to dismiss	版本 %s 已发布（你使用的是 %s）：点击更新，右键忽略
-%.1f BPM on launch	启动时 %.1f BPM
+%s on launch	启动时 %s
 %d bar	%d 小节
 %d bars	%d 小节
 Add a track in Timeline view, then drop audio or video files onto its cells here.	请先在时间线视图中添加轨道，然后将音频或视频文件拖到这里的单元格上。

@@ -331,7 +331,7 @@ namespace app
             }
 
             float rounding = CategoryColors::GetNodeRounding();
-            if (FormParts::SliderFloat(L("Node Corner Radius"), &rounding, 0.0f, 24.0f, "%.0f px", ImGuiSliderFlags_AlwaysClamp))
+            if (FormParts::SliderFloat(L("Node Corner Radius"), &rounding, 0.0f, 24.0f, UiFmt::Px, 0, ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetNodeRounding(rounding, false);
                ApplyTheme();
@@ -459,7 +459,7 @@ namespace app
                ApplyTheme();
                SaveWorkspaceSettings();
             }
-            FormParts::SliderFloat(L("Grid size"), &gGridSnap, 5.0f, 100.0f, "%.0f px");
+            FormParts::SliderFloat(L("Grid size"), &gGridSnap, 5.0f, 100.0f, UiFmt::Px, 0);
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
             FormParts::SliderFloat(L("Zoom sensitivity"), &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
@@ -485,7 +485,7 @@ namespace app
                      }
                   FormParts::EndCombo();
                }
-               FormParts::SliderFloat(L("Size"), &gMinimapSize, 120.0f, 360.0f, "%.0f px");
+               FormParts::SliderFloat(L("Size"), &gMinimapSize, 120.0f, 360.0f, UiFmt::Px, 0);
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
                FormParts::SliderFloat(L("Opacity"), &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
@@ -1882,7 +1882,7 @@ namespace app
             SectionCard::End();
             ImGui::Spacing();
             FormParts::Section(T("Navigation"));
-            FormParts::SliderFloat(L("Smooth view"), &v.smoothTime, 0.0f, 1.0f, "%.2f s");
+            FormParts::SliderFloat(L("Smooth view"), &v.smoothTime, 0.0f, 1.0f, UiFmt::Sec, 2);
             saved();
             FormParts::SliderFloat(L("Rotation step"), &v.rotStep, 1.0f, 90.0f, "%.0f");
             saved();

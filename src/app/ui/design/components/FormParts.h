@@ -12,6 +12,7 @@
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiType.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -253,6 +254,33 @@ namespace FormParts
       Label(label);
       ImGui::SetNextItemWidth(ControlW());
       return FieldWell::Slider(Id(label).c_str(), v, lo, hi, fmt, fl);
+   }
+
+   // A value with a unit: the readout comes from UiFmt (one rule per unit, unit word translated), so no slider
+   // writes "%.0f px" itself. `decimals` is the step the value snaps to while dragging (0 = whole numbers).
+   using UnitFn = UiFmt::Str (*)(double);
+   inline void UnitReadout(char* out, size_t n, UnitFn unit, double v)
+   {
+      const UiFmt::Str s = UiFmt::Tr(unit(v));
+      size_t o = 0;
+      for (const char* c = s.c; *c && o + 2 < n; ++c)
+      {
+         if (*c == '%') out[o++] = '%';   // the readout is a format string to ImGui: a literal % is %%
+         out[o++] = *c;
+      }
+      out[o] = 0;
+   }
+   inline bool SliderFloat(const char* label, float* v, float lo, float hi, UnitFn unit, int decimals, ImGuiSliderFlags fl = 0)
+   {
+      char fmt[48];
+      UnitReadout(fmt, sizeof fmt, unit, *v);
+      const bool r = SliderFloat(label, v, lo, hi, fmt, fl);
+      if (r)
+      {
+         const float p = std::pow(10.0f, (float)decimals);
+         *v = std::round(*v * p) / p;
+      }
+      return r;
    }
 
    inline bool SliderInt(const char* label, int* v, int lo, int hi, const char* fmt = "%d", ImGuiSliderFlags fl = 0)

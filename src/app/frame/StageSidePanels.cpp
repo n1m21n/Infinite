@@ -989,7 +989,7 @@ void DrawSidePanels(FrameCtx& fc)
                      q = i;
                FormParts::EndCombo();
             }
-            FormParts::SliderFloat(L("Fade"), &ShowSetFadeMs(), 0.0f, 8000.0f, "%.0f ms");
+            FormParts::SliderFloat(L("Fade"), &ShowSetFadeMs(), 0.0f, 8000.0f, UiFmt::Ms, 0);
             EditorHint(T("A switch lands on the quantize grid; the old patch fades out over the fade time"));
 
             SectionCard::Begin(T("Launch"));

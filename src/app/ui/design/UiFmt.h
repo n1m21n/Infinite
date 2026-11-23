@@ -137,7 +137,7 @@ namespace UiFmt
    inline Str MB(double mb) { return Bytes(mb * 1024.0 * 1024.0); }
 
    // The unit in the current language, for a value inside a translated sentence (a T() format):
-   //    snprintf(buf, n, T("%s of %s"), UiFmt::Tr(UiFmt::Sec(a)).c, UiFmt::Tr(UiFmt::Sec(b)).c);
+   //    snprintf(buf, n, translatedFmt, UiFmt::Tr(UiFmt::Sec(a)).c);   // translatedFmt from T(), "%s" in place of the value
    // The unit is the word after the last space; its translation is the "Unit" context in resources/lang
    // ("Unit\cs" -> "с" in ru.tsv). UI thread only (T() is). English text (node status lines) never calls it.
    inline Str Tr(Str s)

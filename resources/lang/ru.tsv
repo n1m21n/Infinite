@@ -1490,7 +1490,7 @@ v%s	=en
 v%s, %s download	v%s, загрузка %s
 version %s	версия %s
 version %s is available (you have %s) - click to update, right-click to dismiss	доступна версия %s (у вас %s): щёлкните для обновления, правый щелчок — скрыть
-%.1f BPM on launch	%.1f BPM при запуске
+%s on launch	%s при запуске
 %d bar	%d такт
 %d bars	%d тактов
 Add a track in Timeline view, then drop audio or video files onto its cells here.	Добавьте дорожку в виде «Таймлайн», затем перетащите аудио- или видеофайлы на её ячейки здесь.

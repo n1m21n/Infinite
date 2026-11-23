@@ -1490,7 +1490,7 @@ v%s	=en
 v%s, %s download	v%s、%s のダウンロード
 version %s	バージョン %s
 version %s is available (you have %s) - click to update, right-click to dismiss	バージョン %s が利用可能です（現在 %s）：クリックでアップデート、右クリックで閉じる
-%.1f BPM on launch	起動時 %.1f BPM
+%s on launch	起動時 %s
 %d bar	%d 小節
 %d bars	%d 小節
 Add a track in Timeline view, then drop audio or video files onto its cells here.	タイムラインビューでトラックを追加し、ここでそのセルにオーディオまたはビデオファイルをドロップします。
