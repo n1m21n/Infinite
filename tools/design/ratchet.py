@@ -105,7 +105,9 @@ CONTROLS = {
     "hand_shapes": (r"->Add(?:Rect|RectFilled|Circle|CircleFilled|Line|Triangle|TriangleFilled|Quad|QuadFilled|Bezier\w*|Polyline|ConvexPolyFilled)\(",
                     "components (no hand-drawn chrome)"),
     "canvas_pins": (r"ed::BeginPin\(|ed::PinRect\(", "PinDot"),
-    "knobs": (r"\bKnob\(", "ModWidgets knob (one Knob)"),
+    # A knob drawn outside the kit: ImGui knob add-ons or a hand-rolled Draw*Knob. Row calls (r.Knob, KnobRow) are the kit's
+    # layout and end in ModKnob (or DeskParts::Pot, the desk skin), so they do not count (owner 2026-11-24: one Knob).
+    "knobs": (r"ImGuiKnobs::|(?<![\w.>:])Draw\w+Knob\(|ImGui::Knob\w*\(", "ModWidgets knob (one Knob)"),
     "wires": (r"ed::Link\(", "none yet (Wire: one cable look)"),
     "meters": (r"\b\w*Meter\(", "AudioViz meter"),
     "faders": (r"\b(?:Draw)?\w*Fader\((?!.*VFader)", "VFader"),

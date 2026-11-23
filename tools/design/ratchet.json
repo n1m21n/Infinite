@@ -341,18 +341,7 @@
    "src/app/graph/GraphHosts.cpp": 1,
    "src/app/graph/PatchIO.cpp": 1
   },
-  "ctl_knobs": {
-   "src/app/AppShared.h": 2,
-   "src/app/bodies/AudioNodeBodies.cpp": 17,
-   "src/app/bodies/FxBodies1.cpp": 59,
-   "src/app/bodies/FxBodies2.cpp": 65,
-   "src/app/bodies/NoteBodies.cpp": 35,
-   "src/app/bodies/OscBodies.cpp": 106,
-   "src/app/bodies/SamplerBodies.cpp": 8,
-   "src/app/bodies/SpatialMixerBody.cpp": 8,
-   "src/app/bodies/VmpcBody.cpp": 1,
-   "src/app/panels/DrumPanel.cpp": 19
-  },
+  "ctl_knobs": {},
   "ctl_menus": {
    "src/app/panels/View2DPanel.cpp": 2
   },
