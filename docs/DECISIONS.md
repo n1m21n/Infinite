@@ -4,6 +4,7 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-11-23 Owner: the 2D View side panel is rebuilt around one Look stack per layer (adjustments, effects and styles in one list, one Add sheet, one Mix line, More for rare rows) and a 4-icon rail; plan signed off ("plan everything and then fix"), `internal/plans/2d-view/look-stack.md`. Develop strip and canvas handles wait for the owner.
 - 2026-11-23 Owner: stable-modulation phase 3 scores all 200 G kernels: matrices from the Field interpreter for the 125 that compile, from Python for the 75 over Field's 128-register cap. Raising the cap is left as a separate product finding (`docs/research/stable-modulation`, phase 2).
 - 2026-11-23 Owner: stable-modulation sections 1-7 signed off as written, D1-D4 as recommended (`docs/research/stable-modulation`).
 - 2026-11-23 Owner: open-problem research goes to the top two: proven-stable modulation (`docs/research/stable-modulation`) and flicker-free pixels (`docs/research/flicker-free-pixels`). Sections 1-7 of each need sign-off before any building or measuring.
