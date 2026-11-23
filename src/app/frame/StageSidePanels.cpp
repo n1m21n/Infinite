@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/FloatingWindow.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/SectionCard.h"
@@ -76,10 +77,9 @@ namespace
    // no collapse arrow, SectionCard surface) so they read as the same family as every other floating window.
    bool BeginEditorWindow(const char* name, bool* open)
    {
-      app::PushElevatedPanelStyle(/*isChild=*/false);
-      FormParts::PushWindowPad();
-      const bool visible = ImGui::Begin(name, open, ImGuiWindowFlags_NoCollapse);
-      FormParts::PopWindowPad();
+      FloatingWindow::Spec spec;
+      // First appears in the middle, as Settings does (the caller sets the first size).
+      const bool visible = FloatingWindow::Begin(name, open, spec);
       if (visible)
       {
          SectionCard::BeginWindow();
@@ -94,8 +94,7 @@ namespace
          FormParts::PopReferenceStyle();
          SectionCard::EndWindow();
       }
-      ImGui::End();
-      app::PopElevatedPanelStyle();
+      FloatingWindow::End();
    }
    // Dim, wrapped help line (the old TextDisabled lines ran off the window edge).
    void EditorHint(const char* text)

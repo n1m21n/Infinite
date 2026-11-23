@@ -449,6 +449,12 @@ void DrawLinks(FrameCtx& fc)
                         valid = false;
                         rejectReason = T("Cannot connect: this would loop geometry - close it through Feedback 3D's loop pin");
                      }
+                     extern bool WouldCreateScene2DCycle(INode* src, INode* dst);
+                     if (valid && WouldCreateScene2DCycle(srcNode->node.get(), dstNode->node.get()))
+                     {
+                        valid = false;
+                        rejectReason = T("Cannot connect: this would feed a 2D Document back into itself");
+                     }
                   }
                }
 

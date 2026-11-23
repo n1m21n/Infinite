@@ -3,6 +3,7 @@
 // layer blends with what is under it. Also the colour lookup (.cube) and Shadows / Highlights helpers.
 #include "Scene2DNode.h"
 #include "GLUtil.h"
+#include "RemoveBgNode.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -333,7 +334,15 @@ unsigned long long Scene2DNode::EffectsHash(const Layer& l, int frameId)
       for (const std::string& t : snap.texts)
          for (char c : t)
             h = EMix(h, (unsigned char)c);
-      if (e.animated)
+      if (auto* rbg = dynamic_cast<RemoveBgNode*>(n))
+      {
+         h = EMix(h, n->TextureRevision());
+         for (char c : rbg->Status())
+            h = EMix(h, (unsigned char)c);
+         if (rbg->NeedsMask() || rbg->autoRefresh || (!rbg->HasMask() && rbg->maskActive))
+            h = EMix(h, NextTextureRevision());
+      }
+      else if (e.animated)
          h = EMix(h, NextTextureRevision());
    }
    if (INode* m = NodeThrough(l.effMaskUid))
@@ -534,6 +543,68 @@ unsigned Scene2DNode::BlurLuma(unsigned src, float radius)
 
 namespace
 {
+   // Downsample a texture (in working space when `finishProg != 0`, or already display-ready when 0) into a tiny
+   // 128x128 RGBA8 buffer for fast histogram calculation (64 KB readback instead of 16+ MB full-res stalls).
+   bool ReadDownsampled(unsigned srcTex, int srcW, int srcH, unsigned finishProg, bool linear, bool headroom,
+                        std::vector<unsigned char>& px, int& outW, int& outH)
+   {
+      if (srcTex == 0 || srcW <= 0 || srcH <= 0)
+         return false;
+      const int kMaxSide = 128;
+      if (srcW >= srcH)
+      {
+         outW = std::min(srcW, kMaxSide);
+         outH = std::max(1, (int)std::lround((double)srcH * outW / srcW));
+      }
+      else
+      {
+         outH = std::min(srcH, kMaxSide);
+         outW = std::max(1, (int)std::lround((double)srcW * outH / srcH));
+      }
+      GLUtil::Fbo smallFbo;
+      if (!GLUtil::EnsureFbo(smallFbo, outW, outH, GL_RGBA8, "Scene2DHist"))
+         return false;
+      if (finishProg != 0)
+      {
+         GLUtil::RunShaderPass(smallFbo, finishProg, [&]()
+         {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, srcTex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glUniform1i(GLUtil::UniformLoc(finishProg, "uAcc"), 0);
+            glUniform1i(GLUtil::UniformLoc(finishProg, "uLinear"), linear ? 1 : 0);
+            GLUtil::SetImageHeadroom(finishProg, headroom);
+         });
+      }
+      else
+      {
+         // Already display-encoded output texture: blit with linear downsample.
+         GLuint srcFbo = 0;
+         glGenFramebuffers(1, &srcFbo);
+         GLint prevR = 0, prevD = 0;
+         glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevR);
+         glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevD);
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, srcFbo);
+         glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, srcTex, 0);
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, smallFbo.fbo);
+         glBlitFramebuffer(0, 0, srcW, srcH, 0, 0, outW, outH, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, prevR);
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevD);
+         glDeleteFramebuffers(1, &srcFbo);
+      }
+      px.assign((size_t)outW * outH * 4, 0);
+      GLint prev = 0;
+      glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, smallFbo.fbo);
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      glReadPixels(0, 0, outW, outH, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+      glPixelStorei(GL_PACK_ALIGNMENT, 4);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
+      GLUtil::DestroyFbo(smallFbo);
+      return true;
+   }
+
    // The composite (display values, 8 bit) as the panel sees it: the document's own output (bottom-up rows).
    bool ReadOut(Scene2DNode& doc, std::vector<unsigned char>& px, int& w, int& h)
    {
@@ -562,13 +633,87 @@ namespace
 
 bool Scene2DNode::Histogram(int id, std::vector<float>& bins, int count, int effect)
 {
+   if (count < 2)
+      return false;
    std::vector<unsigned char> px;
    int w = 0, h = 0;
-   if (count < 2 || !ReadUnder(*this, id, effect, px, w, h))
-      return false;
+   if (id == 0)
+   {
+      if (!ReadDownsampled(GetOutputTexture(), GetOutputWidth(), GetOutputHeight(), 0, false, false, px, w, h))
+         return false;
+   }
+   else
+   {
+      Layers();
+      if (FindConst(id) == nullptr || !EnsureShaders() || mFinishProgram == 0)
+         return false;
+      SyncSurfaces();
+      SyncRasters();
+      const std::vector<Layer> keep = mLayers;
+      const bool keepOpaque = mAccOpaque;
+      const int keepSolo = soloLayer;
+      if (effect < 0)
+      {
+         for (int at = id, level = 0; at != 0; level++)
+         {
+            const Layer* t = FindConst(at);
+            if (t == nullptr)
+               break;
+            const int parent = t->parent;
+            bool after = false;
+            for (const Layer* k : ListOf(parent))
+            {
+               if (k->id == at)
+               {
+                  after = true;
+                  if (level > 0)
+                     continue;
+               }
+               if (after)
+                  if (Layer* m = FindLayer(k->id))
+                     m->visible = false;
+            }
+            at = parent;
+         }
+         soloLayer = 0;
+      }
+      else
+      {
+         for (int at = id; at != 0;)
+         {
+            Layer* t = FindLayer(at);
+            if (t == nullptr)
+               break;
+            t->visible = true;
+            t->opacity = 1.0f;
+            if (at == id)
+            {
+               t->blend = 0;
+               t->clip = false;
+               for (size_t i = (size_t)effect; i < t->effects.size(); i++)
+                  t->effects[i].on = false;
+            }
+            at = t->parent;
+         }
+         soloLayer = id;
+         mAccOpaque = false;
+      }
+      mIsolating = true;
+      const float none[4] = { 0, 0, 0, 0 };
+      Clear(PairAt(0), none);
+      DrawList(0, 0, 0, 1.0f);
+      FlushQueue();
+      mIsolating = false;
+      mAccOpaque = keepOpaque;
+      soloLayer = keepSolo;
+      const bool ok = ReadDownsampled(PairAt(0).Tex(), mDoc.w, mDoc.h, mFinishProgram, mDoc.linear, mDoc.headroom, px, w, h);
+      mLayers = keep;
+      if (!ok)
+         return false;
+   }
    bins.assign((size_t)count, 0.0f);
-   for (int y = 0; y < h; y += 2)
-      for (int x = 0; x < w; x += 2)
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
       {
          const unsigned char* p = &px[((size_t)y * w + x) * 4];
          if (id != 0 && p[3] == 0)

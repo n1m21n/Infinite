@@ -1125,6 +1125,73 @@ namespace app
    }
 
 
+   // True when connecting `src -> dst` would close a feedback loop through a Scene 2D document (e.g. a converted
+   // Document feeding canvas effects whose output is also used as a layer or mask in that Document).
+   bool WouldCreateScene2DCycle(INode* src, INode* dst)
+   {
+      if (src == nullptr || dst == nullptr)
+         return false;
+      if (src == dst)
+         return dynamic_cast<Scene2DNode*>(src) != nullptr;
+      struct State { INode* node; bool saw2D; };
+      std::vector<State> stack{ { dst, dynamic_cast<Scene2DNode*>(dst) != nullptr || dynamic_cast<Scene2DNode*>(src) != nullptr } };
+      std::set<std::pair<INode*, bool>> visited;
+      while (!stack.empty())
+      {
+         const State cur = stack.back();
+         stack.pop_back();
+         if (cur.node == nullptr || !visited.insert({ cur.node, cur.saw2D }).second)
+            continue;
+         for (GraphNode& gn : gNodes)
+         {
+            INode* n = gn.node.get();
+            if (n == nullptr)
+               continue;
+            bool readsCur = false;
+            if (auto* s2 = dynamic_cast<Scene2DNode*>(n))
+            {
+               for (const auto& lay : s2->Layers())
+               {
+                  auto matches = [&](uint64_t u)
+                  {
+                     if (u == 0) return false;
+                     GraphNode* ug = FindNodeByUid(u);
+                     return ug != nullptr && ug->node.get() == cur.node;
+                  };
+                  if (matches(lay.uid) || matches(lay.maskUid) || matches(lay.effMaskUid))
+                     readsCur = true;
+                  for (const auto& ef : lay.effects)
+                     if (matches(ef.uid))
+                        readsCur = true;
+                  if (readsCur)
+                     break;
+               }
+            }
+            else
+            {
+               const int nIn = InputCountFor(gn);
+               for (int slot = 0; slot < nIn && !readsCur; slot++)
+               {
+                  if (ImageCable* ic = CableFor(gn, slot))
+                     if (ic->GetSource() == cur.node)
+                        readsCur = true;
+                  if (IGeometrySource** field = n->GeometryInputSlot(slot))
+                     if (*field != nullptr && dynamic_cast<INode*>(*field) == cur.node)
+                        readsCur = true;
+               }
+            }
+            if (!readsCur)
+               continue;
+            const bool nextSaw2D = cur.saw2D || dynamic_cast<Scene2DNode*>(n) != nullptr;
+            if (n == src && nextSaw2D)
+               return true;
+            stack.push_back({ n, nextSaw2D });
+         }
+      }
+      return false;
+   }
+
+
    // Headless equivalent of the ed::QueryNewLink handler's connect-acceptance
    // path (below, in the main editor draw loop) - same validity checks and
    // wiring calls, extracted so RemoteControl's `connect` RPC can wire an
@@ -1180,6 +1247,13 @@ namespace app
           WouldCreateGeometryCycle(srcNode->node.get(), dstNode->node.get(), dstSlot))
       {
          outError = "would create a geometry loop - close it through a Feedback 3D's loop pin";
+         return false;
+      }
+      if (WouldCreateScene2DCycle(srcNode->node.get(), dstNode->node.get()))
+      {
+         outError = "would create a 2D View feedback loop";
+         Notices::Post(Notices::Level::Warning, "view2d.cycle", T("Can't connect"),
+                       T("That would feed a 2D Document back into itself."));
          return false;
       }
 

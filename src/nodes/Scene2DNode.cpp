@@ -7,6 +7,7 @@
 #include <cstring>
 #include <cmath>
 #include <sstream>
+#include <unordered_set>
 
 #include "BlendModes.h"
 #include "ImageCable.h"
@@ -3519,6 +3520,16 @@ void Scene2DNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
       return;
+   // Re-entrancy guard: if a legacy patch has a cycle through this 2D Document, break it cleanly instead of
+   // recursing or re-cooking infinitely.
+   static std::unordered_set<const Scene2DNode*> sCooking;
+   if (!sCooking.insert(this).second)
+      return;
+   struct CookGuard
+   {
+      const Scene2DNode* self;
+      ~CookGuard() { sCooking.erase(self); }
+   } cookGuard{ this };
    mLastCookFrame = frameId;
    Layers();
    if (bypassed)
