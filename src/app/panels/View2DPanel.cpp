@@ -11813,7 +11813,20 @@ namespace
       using S = Scene2DNode;
       static char sEffSearch[64] = "";
       static ImVec2 sEffPopPos(0, 0);
-      if (ActionButton::Draw((std::string(T("Add effect")) + "##v2deffadd").c_str(), ImVec2(btnW, 0.0f), ActionButton::Kind::Plain))
+      // Layer styles sit in the same menu (group "Style"); one already on adds a second of its kind.
+      const bool styles = l.kind != Kind::Group;
+      auto addStyle = [&](int t) {
+         PushUndoCheckpoint("Add layer style");
+         if (!l.fx[t].on)
+            l.fx[t].on = true;
+         else
+         {
+            Scene2DNode::Fx g = l.fx[t];
+            l.fxMore.emplace_back(t, g);
+         }
+         Touch();
+      };
+      if (ActionButton::Draw((std::string(T("Add")) + "##v2deffadd").c_str(), ImVec2(btnW, 0.0f), ActionButton::Kind::Plain))
       {
          sEffSearch[0] = 0;
          sEffPopPos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
@@ -11844,8 +11857,15 @@ namespace
                if (MenuParts::Item(T(kNodeEffects[k].label), T(kNodeEffects[k].group), false, true))
                   sEffAdd = { l.id, -1, k, sDocUid };
             }
+         for (int t = 0; styles && t < S::kFxCount; t++)
+            if (FilterMatch(T(S::FxName(t)), sEffSearch) || FilterMatch("Style", sEffSearch))
+            {
+               any = true;
+               if (MenuParts::Item((std::string(T(S::FxName(t))) + "##v2dfxq" + std::to_string(t)).c_str(), T("Style"), false, true))
+                  addStyle(t);
+            }
          if (!any)
-            ImGui::TextDisabled("%s", T("No matching effects"));
+            ImGui::TextDisabled("%s", T("No matches"));
       }
       else
       {
@@ -11859,6 +11879,13 @@ namespace
             for (int k = 0; k < (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0])); k++)
                if (std::strcmp(kNodeEffects[k].group, g) == 0 && MenuParts::Item(T(kNodeEffects[k].label), nullptr, false, true))
                   sEffAdd = { l.id, -1, k, sDocUid };
+            ImGui::EndMenu();
+         }
+         if (styles && MenuParts::SubMenu(T("Style"), true))
+         {
+            for (int t = 0; t < S::kFxCount; t++)
+               if (MenuParts::Item((std::string(T(S::FxName(t))) + "##v2dfxm" + std::to_string(t)).c_str(), nullptr, false, true))
+                  addStyle(t);
             ImGui::EndMenu();
          }
       }
@@ -11997,6 +12024,7 @@ namespace
       }
    }
 
+   void StylePresets(Layer& l, float btnW = -1.0f, bool embedded = false);
    void EffectPresets(Layer& l, float btnW = -1.0f)
    {
       static char name[64] = "";
@@ -12084,6 +12112,13 @@ namespace
                }
             }
          }
+      }
+      // Style presets in the same menu: one Presets button for the whole look.
+      if (l.kind != Kind::Group)
+      {
+         MenuParts::Separator();
+         ImGui::TextDisabled("%s", T("Styles"));
+         StylePresets(l, -1.0f, true);
       }
       MenuParts::EndPopup();
    }
@@ -12176,7 +12211,7 @@ namespace
 
    void EffectStack(Scene2DNode* doc, Layer& l)
    {
-      SectionCard::Begin(T("Effects"));
+      SectionCard::Begin(T("Look"));
       const float avail = ImGui::GetContentRegionAvail().x;
       const float preW = 84.0f;
       AddEffectMenu(l, std::max(60.0f, avail - preW - tok::space_1));
@@ -12293,7 +12328,8 @@ namespace
    std::string StylePresetDir() { return AppPaths::AppSupportDir() + "/2dstyle"; }
 
    // Layer style presets: compact popup next to Add style (no separate redundant Style card).
-   void StylePresets(Layer& l, float btnW = -1.0f)
+   // `embedded`: draw the save row and the list straight into the popup that is open (the Look's one Presets menu).
+   void StylePresets(Layer& l, float btnW, bool embedded)
    {
       static char name[64] = "";
       static std::vector<std::string> sFiles;
@@ -12307,15 +12343,23 @@ namespace
          std::sort(sFiles.begin(), sFiles.end());
       };
       static ImVec2 sStyPos(0, 0);
-      if (ActionButton::Draw((std::string(T("Presets")) + "##v2dstyleprebtn").c_str(), ImVec2(btnW, 0.0f), ActionButton::Kind::Plain))
+      if (embedded)
       {
-         rescan();
-         sStyPos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
-         ImGui::OpenPopup("##v2dstyleprepop");
+         if (ImGui::IsWindowAppearing())
+            rescan();
       }
-      ImGui::SetNextWindowPos(sStyPos, ImGuiCond_Appearing);
-      if (!MenuParts::BeginPopup("##v2dstyleprepop"))
-         return;
+      else
+      {
+         if (ActionButton::Draw((std::string(T("Presets")) + "##v2dstyleprebtn").c_str(), ImVec2(btnW, 0.0f), ActionButton::Kind::Plain))
+         {
+            rescan();
+            sStyPos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
+            ImGui::OpenPopup("##v2dstyleprepop");
+         }
+         ImGui::SetNextWindowPos(sStyPos, ImGuiCond_Appearing);
+         if (!MenuParts::BeginPopup("##v2dstyleprepop"))
+            return;
+      }
       ImGui::SetNextItemWidth(sFieldW);
       FieldWell::InputText("##v2dstylename", name, sizeof name);
       ImGui::BeginDisabled(name[0] == 0 || !l.AnyFx());
@@ -12349,7 +12393,8 @@ namespace
             }
          }
       }
-      MenuParts::EndPopup();
+      if (!embedded)
+         MenuParts::EndPopup();
    }
 
    void DrawEffectsTab(Scene2DNode* doc)
@@ -12366,32 +12411,6 @@ namespace
       if (l == nullptr || l->kind == Kind::Group)
          return;
       int removeMore = -1;
-      {
-         SectionCard::Begin(T("Layer styles"));
-         const float avail = ImGui::GetContentRegionAvail().x;
-         const float preW = 84.0f;
-         ImGui::SetNextItemWidth(std::max(60.0f, avail - preW - tok::space_1));
-         if (MenuParts::BeginCombo("##v2daddstyle", T("Add style...")))
-         {
-            bool any = false;
-            for (int t = 0; t < Scene2DNode::kFxCount; t++)
-               if (!l->fx[t].on)
-               {
-                  any = true;
-                  if (MenuParts::Choice((std::string(T(Scene2DNode::FxName(t))) + "##v2daddfx" + std::to_string(t)).c_str(), false))
-                  {
-                     PushUndoCheckpoint("Add layer style");
-                     l->fx[t].on = true;
-                     Touch();
-                  }
-               }
-            if (!any)
-               ImGui::TextDisabled("%s", T("All styles are on"));
-            MenuParts::EndCombo();
-         }
-         FormParts::Inline(0.0f, tok::space_1);
-         StylePresets(*l, preW);
-      }
       static std::map<int, bool> sFxFold;
       for (int t = 0; t < Scene2DNode::kFxCount; t++)
       {
@@ -12455,14 +12474,6 @@ namespace
                if (ActionButton::Draw(T("Remove"), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
                   removeMore = m;
                ImGui::PopID();
-            }
-            if (ActionButton::Draw(T("Add another"), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
-            {
-               PushUndoCheckpoint("Add layer style");
-               Scene2DNode::Fx g = l->fx[t];
-               g.on = true;
-               l->fxMore.emplace_back(t, g);
-               Touch();
             }
          }
          ImGui::PopID();
