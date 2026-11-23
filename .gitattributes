@@ -1,0 +1,4 @@
+# GitHub language stats: count the app, not the website or its generators.
+website/** linguist-documentation
+tools/website/** linguist-documentation
+tools/seo/** linguist-documentation

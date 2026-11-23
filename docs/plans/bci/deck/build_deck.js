@@ -393,6 +393,31 @@ function makeSlide(modeName) {
   s.addNotes("Inside the Brain node: four sensors give 256 numbers a second each, the node removes mains hum and slow drift, splits what is left into five brain rhythms plus blink and jaw detectors, and outputs 24 signals from 0 to 1 plus a picture and a sound. Without a headset a built-in simulator and four public datasets stand in, and automatic checks test every step.");
 }
 
+// ================================================================ SLIDE 06b: TEACH THE BRAIN YOUR MAPPING (Brain Sculpt)
+{
+  const { s, m } = makeSlide("paper");
+  s.addText("Teach the brain your mapping", {
+    isTextBox: true, margin: 0, x: M, y: 0.6, w: 10, h: 0.9,
+    fontFace: "Geist", fontSize: 44, bold: true, color: m.ink, valign: "middle",
+  });
+  const lw = 1.35, lh = lw / 2.3273;
+  s.addImage({ path: LOGO_MARK, x: W - M - lw, y: 0.6 + (0.9 - lh) / 2, w: lw, h: lh, altText: "Infinite mark" });
+  // Real shot of Brain Source -> Brain Sculpt -> bloom radius (headless patch, left to right), cropped to the nodes.
+  const IY = 1.56, IH = CW * 944 / 2594;
+  s.addImage({ path: path.join(HERE, "s6b_sculpt_shot.png"), x: M, y: IY, w: CW, h: IH, altText: "Real Infinite patch: Brain Source wired into Brain Sculpt, which drives the radius of a bloom on a glowing ring" });
+  const GAP = 0.5, CWc = (CW - 2 * GAP) / 3, TY = IY + IH + 0.22;
+  [
+    ["SHIFT-GRAB A KNOB", "Hold Shift and grab any wired knob while you are in a mental state: calm, focused, surprised."],
+    ["EACH RELEASE IS AN ANCHOR", "It stores the knob position and where your mind was in a 6D brain space: arousal, valence, entropy, coherence, brow, jaw."],
+    ["THEN THE MIND MOVES IT", "A smooth Gaussian blend between anchors moves every bound knob as your mind travels between those states."],
+  ].forEach(([k, v], n) => {
+    const x = M + n * (CWc + GAP);
+    s.addText(k, { isTextBox: true, margin: 0, x, y: TY, w: CWc, h: 0.26, fontFace: "Geist Mono", fontSize: 10, bold: true, charSpacing: 1.2, color: m.signal, valign: "middle" });
+    s.addText(v, { isTextBox: true, margin: 0, x, y: TY + 0.3, w: CWc, h: 0.9, fontFace: "Geist", fontSize: 13, color: m.ink, valign: "top" });
+  });
+  s.addNotes("Brain Sculpt teaches the brain your own mapping. Brain Source feeds it the brain signals. Hold Shift and grab any wired knob while in a mental state; each release stores an anchor in a six-dimensional brain space (arousal, valence, entropy, coherence, brow, jaw). A Gaussian RBF blend between anchors then moves every bound knob as the mind moves between states.");
+}
+
 // ================================================================ SLIDE 07: THE HEADBAND AND ITS OUTPUTS
 {
   const { s, m } = makeSlide("paper");
