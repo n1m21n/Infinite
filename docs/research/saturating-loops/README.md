@@ -1,7 +1,7 @@
 ---
 title: "Saturating loops: stability certificates for modulated filters with saturation in the feedback"
 slug: "saturating-loops"
-status: "signed-off"
+status: "pre-registered"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-saturating-loops.md"
@@ -175,10 +175,86 @@ H1-H3 claim still stands.
 | D5 | Blind set B | Seed 20261124, n up to 8 (G stops at 6), up to 4 saturators (G up to 3), 30% of terms with `Select` |
 
 ## 8. Best and optimised methodology
-*(After sign-off.)*
+
+**Pipeline.** Field kernel → saturators found → A(θ), B(θ), C(θ) → vertex matrices → Report 2's certifier
+→ certificate or "no proof".
+
+**Key step: the sector set is a polytope.** With zero input the loop is x⁺ = A x + B w, wᵢ = φᵢ(yᵢ),
+y = C x. A saturator in sector [αᵢ, βᵢ] means wᵢ = δᵢ yᵢ for some δᵢ ∈ [αᵢ, βᵢ] that can change every
+sample. So every trajectory is also a trajectory of the switched linear system x⁺ = (A + B Δ C) x, where
+Δ = diag(δ). For a quadratic V, V(x⁺) is convex in Δ, so the worst case is at a corner of the δ box. G1 is
+therefore Report 2's common-P certificate over the **2ᵐ vertex matrices** A(θ) + B(θ) Δᵥ C(θ) at every
+grid θ. This is exact for "quadratic V, sector bounds only", the class D3 asks for first. D3's diagonal
+multiplier LMI is the same class written as an S-procedure; it is run as a cross-check (T2) and can never
+prove more.
+
+| Step | How | Where |
+|---|---|---|
+| Find saturators | Match the shape library (table below) in the kernel's IR on every path inside the state loop. Scaling is folded into B and C (`a·φ(b·y)` → φ with B·a, C·b). A non-linear op on a loop path that isn't in the library makes the kernel "unrecognised saturator", reported, never certified | Phases 0-1: the generator emits matrices and Field code together. Phase 2: C++ in the dump self-test (test code only) |
+| Extract A, B, C | Extend `INFINITE_FIELDSTABDUMP`: each recognised saturator is cut, its output replaced by an injected value wᵢ and its argument yᵢ recorded. One sample step per unit vector of x (w = 0) gives A and C; one per unit vector of w (x = 0) gives B. A **linearity gate** on the cut kernel (Report 2's, 8 random pairs, 1e-5) catches anything the matcher missed | Phase 2, one build |
+| Vertex matrices | Mᵥ(θ) = A(θ) + B(θ) Δᵥ C(θ) for the 2ᵐ corners of ∏[αᵢ, βᵢ]; m ≤ 5 gives ≤ 32 per grid point | Python |
+| G1 certificate | Report 2's LMI, cutting planes and cell cover, unchanged, on every (θ, v) pair. The cover is per vertex: Mᵥ(θ) is a fixed linear map of (A, B, C), so the corner blend bound holds for each v | Python |
+| Saturators that reach slope 0 | `tanh`, `x/(1+abs(x))` and `clamp` have αᵢ = 0. At δᵢ = 0 that saturator passes nothing, and a stage that relies on it for damping holds its state: strict decrease is impossible there. Rule: the δᵢ = 0 vertices get the **non-strict** inequality ‖Mᵥ‖_P ≤ 1, every other vertex the strict one. Then V never grows, every trajectory is bounded, so each δᵢ stays above a floor δmin > 0 along it. The convex blend then puts weight ≥ ∏ δmin/βᵢ on the strict all-upper corner, and V decays: global asymptotic stability from any start | Python |
+| If the non-strict vertices can't close the cover | The cover's margin e > 0 can push a vertex that sits exactly at 1 over it. Fallback, reported separately: an **amplitude-bounded** certificate. Starting with ‖x‖ ≤ R (R = 10⁴, +80 dB over full scale), the state stays in V ≤ λmax(P)·R², so |yᵢ| ≤ Yᵢ = ‖cᵢ‖·R·√κ(P) and the sector floor is αᵢ = φᵢ(Yᵢ)/Yᵢ > 0. Every vertex is then strict. Y depends on P, so P and the floor are iterated until they agree (at most 5 rounds). It counts for H3 only if the owner approves (see the amendment below) | Python; found in phase 0 on the Moog |
+| G2 certificate (H4) | Two trajectories under the same input and modulation, difference e: e⁺ = (A + B S C) e with Sᵢ in the **slope** range of φᵢ (mean-value theorem). Same vertex certificate over the slope box. Slopes that reach 0 get the same non-strict rule. The floor comes from the reachable set for inputs ‖in‖ ≤ U = 4 (+12 dBFS), bounded with G1's P. `clamp` has slope exactly 0 when clipped, so it gets no floor: its G2 holds only if its slope-0 vertices are strict on their own | Python |
+| Largest safe range (H2) | Report 2's bisection on k, 4 decimals, cutoff over its full range | Python |
+| Margins | t, κ(P), largest cell bound, δmin; Float32 re-check of the extracted matrices, as in Report 2 | Python |
+
+**Shape library (D2).** Each bound is proved on paper in `scripts/shapes.md` and checked numerically on a
+log grid out to 10⁶ before use.
+
+| Shape in Field | φ | Sector [α, β] | Slope range |
+|---|---|---|---|
+| `clamp(y, -c, c)`, c > 0 | hard clip | [0, 1] | [0, 1] |
+| `min(y, c)` / `max(y, -c)`, c > 0 | one-sided clip | [0, 1] | [0, 1] |
+| `y / (1 + abs(y))` | soft clip | [0, 1] | (0, 1] |
+| `(exp(2*y) - 1) / (exp(2*y) + 1)` and its rearrangements | tanh | [0, 1] | (0, 1] |
+| `sin(y)` | fold | [−0.2172, 1] | [−1, 1] |
+| `abs(y)` | rectifier | [−1, 1] | [−1, 1] |
+
+`min`/`max` against a constant of the wrong sign don't pass through 0, so they aren't sector-bounded:
+unrecognised.
+
+**Oracle.** As in section 6 (D1). Two additions to make "sticks" a real check:
+- A periodic orbit of the switched map (period p ≤ 8) is found by Newton's method on x = F_σ(x), with F_σ
+  the composed sample steps for the switching sequence σ. A Newton step that won't reduce the residual
+  below 1e-10 in 50 iterations is no witness.
+- The orbit's amplitude must exceed 1e-3, so the trivial orbit x = 0 can't count. Its stability (attracting
+  or not) is recorded but not required: an unstable stuck orbit still means V can't decrease everywhere.
+
+**Literature filters (L).** Ported by script from the published equations, never tuned. The tanh Moog is
+used in two explicit forms: forward Euler, yᵢ⁺ = yᵢ + g(tanh(yᵢ₋₁) − tanh(yᵢ)), y₀ = in − k·y₄; and the
+one-pole-per-stage form with g/(1+g), tanh taken at the previous state. Both have 5 saturators (the input
+and each stage). Our results are on these discrete forms; Hélie's 5/3 is for the continuous circuit. That
+difference is reported, not hidden.
+
+**Amendment needed (locked scope).** Section 3 says "up to 4 saturators per kernel". Hélie's tanh Moog, the
+H2 filter, needs 5. Proposal: allow up to 5 saturators for L only; G (≤ 3) and B (≤ 4) are unchanged.
+Not applied until the owner says yes.
+
+**Phases.**
+
+| Phase | Work | Needs a build |
+|---|---|---|
+| 0 | Reuse the venv. L in Python straight from the papers' equations; the oracle with the Newton orbit search; **B3** (the Moog's first witness k vs 2.8856); **B2** on L; check whether the non-strict vertices close on the Moog | No |
+| 1 | Vertex certifier on Report 2's code; **H2** on the Moog; the T2 multiplier cross-check; generator for G (matrices and Field code together); **B1, B2, B4** on G | No |
+| 2 | Field side: L as `.field` files with the saturator shapes; the dump learns to cut at saturators; extracted A, B, C match Python on all of L and G (max abs diff ≤ 1e-5) | Yes, one build at the end |
+| 3 | **H1, H3** on L + G from extracted matrices; **H4** (G2) | No |
+| 4 | Lock the scorer (commit), generate B (D5), score once | No |
+| 5 | Sections 10-12, `ARTIFACT.md`, `kick-the-tires.sh`, Web Lab Note (Technical Report 3) | No |
+
+Venv: `~/.venvs/stable-modulation`, reused unchanged; `scripts/requirements.txt` pins it.
 
 ## 9. Proposed solution trajectories
-*(After sign-off.)*
+
+| # | Trajectory | For | Against | Choice |
+|---|---|---|---|---|
+| T1 | Sector vertices + common P, on Report 2's certifier and cover | Exact for its class; no new solver code; inherits Report 2's tested cover and Float32 check | Sector-only is conservative: it can't use that `tanh` is smooth and odd | **Main (G1)** |
+| T2 | Diagonal S-procedure multiplier LMI (D3 as written) | One LMI per point, the textbook circle-criterion form | Never proves more than T1; only a cross-check | Cross-check |
+| T3 | Slope-restricted Lur'e-Lyapunov function, V = xᵀPx + Σ qᵢ ∫φᵢ | Uses slope bounds, less conservative for `tanh` | Larger LMI; V is not quadratic, so the cell cover needs new work | Ablation if H3 misses by under 15 points (D3) |
+| T4 | Slope vertices + common P on the difference system | The direct G2 route; same code as T1 | Slope floors of 0 need the amplitude argument; `clamp` mostly gets no proof | **Main (G2)** |
+| T5 | Zames-Falb / IQC multipliers | The least conservative known tests for slope-restricted loops | Built for time-invariant linear parts; our A(θ) switches every sample. We have not opened those papers | Rejected for this study |
+| T6 | Per-circuit energy functions (Hélie, port-Hamiltonian) | Proofs for real circuits | By hand, one circuit at a time; not a compiler pass | Reference values only (H2) |
 
 ## 10. Benchmarking against the baseline
 *(After measurement.)*
