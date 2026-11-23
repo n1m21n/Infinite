@@ -6,7 +6,7 @@ Follows **ACM Artifact Review and Badging v1.1**. Badges sought: Artifacts Avail
 - **Git Commit SHA:** `ccf102e151b1ecb00dc1743b2ae4e42ef4b25026` (produces every phase 0-4 output; per-phase commits in `data/provenance.json`)
 - **Archival DOI (on release):** none yet; no paper submitted
 - **OS / Hardware:** macOS 27.2.1 arm64, Apple M2, 8 GB RAM
-- **Toolchain & Build Flags:** Python 3.12.13 venv at `~/.venvs/stable-modulation` (numpy 2.5.5, scipy 1.18.1, cvxpy 1.9.3, Clarabel 0.11.1; `scripts/requirements.txt`). The Float32 and A(θ) dump steps need one dev build of Infinite: `python3 scripts/ibuild.py build --mode dev` (Apple clang 21.0.0, CMake Debug, arm64)
+- **Toolchain & Build Flags:** Python 3.12.13 venv at `~/.venvs/stable-modulation` (numpy 2.5.5, scipy 1.18.1, cvxpy 1.9.3, Clarabel 0.11.1, python-flint 0.9.0; `scripts/requirements.txt`). The Float32 and A(θ) dump steps need one dev build of Infinite: `python3 scripts/ibuild.py build --mode dev` (Apple clang 21.0.0, CMake Debug, arm64)
 - **Determinism / Seeds:** G seed 20261121, B seed 20261123 (`scripts/gen_kernels.py`); oracle searches use fixed numpy seeds. The LMI solver is deterministic on one machine; across machines P may differ in its last digits, and a verdict can only move for a kernel at the very edge of its box
 
 ## 2. Quick Verification ("Kick the Tires", about 2 minutes)

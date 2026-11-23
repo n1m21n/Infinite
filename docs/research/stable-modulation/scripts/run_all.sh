@@ -29,5 +29,6 @@ run phase3_score.py L,G --jobs 6 > ../data/phase3-L-G.log      # H1, H3, Float32
 run phase3_h4.py                                                 # H4
 run phase3_score.py B --jobs 6 > ../data/phase4-B.log            # phase 4: B with the locked scorer
 mv ../data/phase3-B.json ../data/phase4-B.json
+run phase6_exact.py                                              # phase 6: exact proof of H2
 mkdir -p "$STUDY/data-rerun"; cp -R "$W/data/." "$STUDY/data-rerun/"
 echo "wrote $STUDY/data-rerun"

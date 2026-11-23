@@ -234,7 +234,8 @@ Run: `scripts/phase1_h2.py` (about 2 min), then `scripts/phase1_spotcheck.py`. D
 **H2 passes on all four**, with no hand work and the same code for each filter. Median time per
 certification is 1.6 s and the slowest is 18.8 s (33 runs, Python, M2). The Moog result goes past the
 published proof: together with phase 0's witness, the true any-speed limit for the linear Moog ladder is now
-pinned to **k ∈ [2.8848, 2.8856)**, against the paper's gap of [2.88, 2.89].
+pinned to **k ∈ [2.8848, 2.8856)**, against the paper's gap of [2.88, 2.89]. Both ends are now proved
+exactly (phase 6).
 
 **Independent check.** At each certified edge, 200 000 random (g, k) points the certifier never saw
 (20 000 of them at k = kmax) all have ‖A‖_P < 1 (largest: 1 − 1.3e-10 Moog, 1 − 3.5e-9 diode, 1 − 7.7e-12
@@ -471,6 +472,47 @@ binary; nothing was rebuilt.
   47 of B's 85 witnesses are frozen-unstable at one setting.
 - **Certify time in Python:** median 0.37 s, p95 9.5 s, max 19.1 s. Times grow with n = 8.
 
+### Phase 6 (2026-11-23): exact proof of the four H2 certificates and the two witnesses
+
+Run: `scripts/phase6_exact.py` (about 30 s). Data: `data/phase6-exact.json`. A reviewer-critique
+follow-up (owner, 2026-11-23): the H2 results rested on the cover's heuristic 1.5x margin.
+
+**Why no cover is needed for these four.** They are trapezoidal: A = M⁻¹N with M = I − g·Ac and
+N = I + g·Ac. M and N commute, so A = N·M⁻¹ and
+
+  Mᵀ(AᵀPA − P)M = NᵀPN − MᵀPM = 2g·(AcᵀP + P·Ac).
+
+So ‖A(g, k)‖_P < 1 at every g > 0 exactly when S(k) = −(Ac(k)ᵀP + P·Ac(k)) is positive definite. That
+also makes Ac Hurwitz, so M is invertible for every g > 0. Ac is affine in the knob, so S is too, and
+positive definiteness at both ends of the knob interval gives it on the whole interval (the PD cone is
+convex). The proof is two exact rational LDLᵀ factorisations per certificate. It uses the certifier's own
+float64 P, converted to rationals exactly (every float is a dyadic rational). It covers g ∈ (0, ∞),
+wider than the certified box [1e-5, 1e3]. The identity also explains the near-miss margins in H2:
+1 − ‖A‖_P shrinks like g as g → 0.
+
+**Witnesses.** Each phase 0 witness is a two-step switching sequence at float knob values, which are exact
+rationals. The product of the two A matrices is computed exactly in ℚ. The roots of its characteristic
+polynomial are enclosed in Arb balls (`python-flint` 0.9.0), and a lower bound above 1 proves growth.
+
+| Filter | Knob interval | P ≻ 0 | S ≻ 0 at both ends | Witness | Spectral radius ≥ (rigorous) |
+|---|---|---|---|---|---|
+| Moog ladder | k ∈ [0, 2.88485] | yes | yes | k = 2.8856 | 1.0000399 |
+| Diode ladder | k ∈ [0, 8.8965] | yes | yes | k = 8.9009 | 1.0000619 |
+| Sallen-Key | k ∈ [0, 1.99902] | yes | yes | — (k = 2 is frozen-marginal) | — |
+| SVF | R ∈ [0.01, 10] | yes | yes | — | — |
+| SVF | R ∈ [0.1, 10] | yes | yes | — | — |
+
+- **The Moog's any-speed limit is now a theorem:** a common quadratic Lyapunov function exists for
+  k ∈ [0, 2.88485], at every cutoff g > 0, and a switching sequence at k = 2.8856 grows. The diode is the
+  same: [0, 8.8965] proved, 8.9009 grows.
+- **Negative controls:** the same Moog P fails the exact check at k = 2.8856 and at k = 2.95. A
+  non-witness sequence (k = 2.8849) encloses below 1. The identity holds in float64 to 4e-12 at random
+  (g, k).
+- **Scope.** The identity needs trapezoidal discretisation and a knob that enters Ac affinely. It covers
+  these four filters and any L filter with that form, not G or B: their A(θ) is not a Cayley transform,
+  so their certificates still rest on the cover's heuristic margin. Float32 runtime arithmetic is separate
+  (phase 3).
+
 **Section 7 rule.** H1 to H3 pass on L, G and B, so the study ships as research. H4 failed as registered
 (phase 3). H5 waits for approval of the in-app port.
 
@@ -494,8 +536,9 @@ binary; nothing was rebuilt.
   - Evidence the margin holds: 200,000 random points never seen by the certifier (phase 1 spot check).
   - Up to 5000 more check points per certificate in Float32 (phase 3, phase 4).
   - No point anywhere had ‖A‖_P ≥ 1 in float64.
-  - A rigorous version needs a Lipschitz or interval bound on A(θ) per cell. That is possible for Field's
-    operator set, but it isn't done.
+  - For the four H2 filters this is closed: phase 6 proves their certificates exactly over every g > 0,
+    with no cover. For L's other filters and for G and B, a rigorous version still needs an interval
+    bound on A(θ) per cell. That is possible for Field's operator set, but it isn't done.
 - **The oracle is one-sided.** A witness proves instability, but "no witness" doesn't prove stability.
   - H1 counts certificates on kernels with a found witness. An unstable kernel the oracle misses would
     land in the H3 denominator, and could only make a false certificate look like a success.
@@ -533,7 +576,7 @@ binary; nothing was rebuilt.
 | Follow-up (H4 redo, needs its own sign-off) | Rate-aware slew: limit dk relative to the filter's own decay (for example Δk ≤ c · g per sample), or V(x, g, k) with g slew-limited too | Phase 3 shows the fixed 20 ms slew can't help while the cutoff can reach 0 |
 | Product question, not research | Field's 128-register cap blocks dense n ≥ 5 filters | Phase 2 finding |
 | Next held-out set | Score Infinite's shipped Field presets with `state` cells, and community kernels | Real filters, not generated ones (section 11) |
-| Rigorous cover (**queued 2026-11-23, after C1 phase 0**) | For the 4 paper filters: an interval bound on A(θ) per cell in place of the 1.5x heuristic margin, plus an exact rational check (P rounded to rationals, exact Cholesky of P − AᵀPA at each cell bound). Python only | Turns the [2.8848, 2.8856) bracket from "verified on a cover" into a computer-assisted proof; also closes the one-sided-oracle objection for those certificates |
+| Rigorous cover | Four H2 filters: **done (phase 6)**, by an exact identity, no cover. Rest of L, G and B: an interval (Arb) bound on A(θ) per cell in place of the 1.5x margin | Only if a paper submission needs it |
 | In-app port (H5) | C++ LMI solver, report-only pass in the Field compiler | A new feature: needs owner approval first |
 
 **Candidate studies (from the owner's DSP research map, 2026-11-23).** Each needs its own sections 1-7
