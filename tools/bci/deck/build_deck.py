@@ -84,8 +84,14 @@ def s01():
         lis = "".join(f"<div>{t}</div>" for t in items)
         body += (f'<div class="card" style="left:{64 + i * 392}px;top:128px;width:368px;height:232px">'
                  f'<div class="lab">{h}</div><div style="margin-top:12px;line-height:1.7">{lis}</div></div>')
-    body += ('<svg style="position:absolute;left:64px;top:364px" width="1152" height="48">'
-             + "".join(f'<path d="M{184 + i * 392} 4 L576 44" stroke="#4A54D6" stroke-width="2" fill="none"/>' for i in range(3))
+    # Three S-curves from each card's centre into one point above the Infinite card; the right curve is the
+    # exact mirror of the left (x -> 1152 - x), the middle one is straight, one shared arrowhead.
+    sig = "#4A54D6"
+    paths = ["M184 6 C184 30 576 14 576 38", "M576 6 L576 38", "M968 6 C968 30 576 14 576 38"]
+    body += ('<svg style="position:absolute;left:64px;top:364px" width="1152" height="48" fill="none">'
+             + "".join(f'<path d="{d}" stroke="{sig}" stroke-width="2" stroke-linecap="round"/>' for d in paths)
+             + "".join(f'<circle cx="{x}" cy="6" r="3.5" fill="{sig}"/>' for x in (184, 576, 968))
+             + f'<path d="M569.5 37 L576 46 L582.5 37 Z" fill="{sig}"/>'
              + '</svg>')
     body += ('<div class="card" style="left:64px;top:416px;width:1152px;height:120px;text-align:center;padding-top:28px">'
              '<h2 style="font-size:40px;line-height:44px;font-weight:800">Infinite</h2>'
