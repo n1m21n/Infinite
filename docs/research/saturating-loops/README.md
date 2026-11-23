@@ -72,7 +72,7 @@ modulation. Absence in a search is not proof of absence.
 | Loops of the form x⁺ = A(θ)x + B(θ)φ(C(θ)x + D(θ)·in) + E(θ)·in: linear in the state except for **scalar saturators** φᵢ, each applied to one linear combination | Saturators of two signals at once (`max(a, b)` of two states), products of states (ring mod, signal-dependent coefficients) |
 | Saturator shapes from a fixed library with known sector and slope bounds (D2): `clamp`, `min`/`max` against a constant, `x/(1+abs(x))`, written-out `tanh` via `exp`, `sin` (slope ≥ −1, sector [−0.22, 1]), `abs` (sector [−1, 1]) | Unknown shapes: reported as "unrecognised saturator", never certified |
 | Zero-input stability (G1) and convergence under input (G2), at any modulation speed, θ inside declared min/max | Bounded-input output-level claims (how loud it gets); the slew-limited extension (Report 2's H4 failed as registered; it is its own follow-up) |
-| State dimension n ≤ 8, up to 4 saturators per kernel | `delay(x, N)` lines in the loop |
+| State dimension n ≤ 8, up to 4 saturators per kernel (up to 5 for L; amended 2026-11-23, see section 8) | `delay(x, N)` lines in the loop |
 | Report-only analysis (prints a certificate, changes nothing at runtime) | Safe ranges on knobs, auto-clamping, an in-app solver: each needs owner approval later |
 | Research solver in Python, offline, reusing Report 2's certifier, cover and dump | Shipped C++ filters (`FilterModels.h` etc.) |
 
@@ -228,9 +228,8 @@ one-pole-per-stage form with g/(1+g), tanh taken at the previous state. Both hav
 and each stage). Our results are on these discrete forms; Hélie's 5/3 is for the continuous circuit. That
 difference is reported, not hidden.
 
-**Amendment needed (locked scope).** Section 3 says "up to 4 saturators per kernel". Hélie's tanh Moog, the
-H2 filter, needs 5. Proposal: allow up to 5 saturators for L only; G (≤ 3) and B (≤ 4) are unchanged.
-Not applied until the owner says yes.
+**Amendment (owner, 2026-11-23).** Section 3 said "up to 4 saturators per kernel". Hélie's tanh Moog, the
+H2 filter, needs 5, so L may have up to 5 saturators. G (≤ 3) and B (≤ 4) are unchanged.
 
 **Phases.**
 
