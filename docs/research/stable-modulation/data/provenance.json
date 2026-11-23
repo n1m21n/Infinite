@@ -1,6 +1,6 @@
 {
   "commit_sha": "ccf102e151b1ecb00dc1743b2ae4e42ef4b25026",
-  "commit_note": "Code that produced every phase 0-4 output. Pre-registration (sections 1-7): 5de4551b. Phase 0: 4110cdec. Phase 1: d6400b4d. Phase 2 (self-test and dump on a dev build of b3bcfc0c): b3bcfc0c. Phase 3: bb460c87. Scorer locked before B existed: f9180894; B generated and scored once: ccf102e1. Phase 5 figure data (phase5-trap.json, phase5-frozen.json) comes from scripts/phase5_figdata.py in the commit that adds them; it reads the phase 3 and 4 outputs and changes no verdict.",
+  "commit_note": "Code that produced every phase 0-4 output. Pre-registration (sections 1-7): 5de4551b. Phase 0: 4110cdec. Phase 1: d6400b4d. Phase 2 (self-test and dump on a dev build of b3bcfc0c): b3bcfc0c. Phase 3: bb460c87. Scorer locked before B existed: f9180894; B generated and scored once: ccf102e1. Phase 5 figure data (phase5-trap.json, phase5-frozen.json) comes from scripts/phase5_figdata.py in the commit that adds them; it reads the phase 3 and 4 outputs and changes no verdict. Phase 6 (exact proof of the H2 certificates and witnesses, python-flint 0.9.0) comes from scripts/phase6_exact.py in the commit that adds it; it reads phase 0 and 1 outputs, re-runs the certifier for P, and changes no verdict.",
   "timestamp_utc": "2026-11-23T08:12:57Z",
   "os": "macOS 27.2.1 arm64",
   "cpu": "Apple M2, 8 cores, 8 GB RAM",
@@ -11,11 +11,22 @@
   "seed": 20261121,
   "seed_note": "Set G: scripts/gen_kernels.py G, seed 20261121. Blind set B: scripts/gen_kernels.py B, seed 20261123 (generated after the scorer lock). Oracle searches use numpy default_rng with fixed seeds in the scripts.",
   "outputs": [
-    "phase0-b3.json", "phase0-b3.log",
-    "phase1-h2.json", "phase1-h2.log", "phase1-spotcheck.json", "phase1-b12.json", "phase1-b12.log",
+    "phase0-b3.json",
+    "phase0-b3.log",
+    "phase1-h2.json",
+    "phase1-h2.log",
+    "phase1-spotcheck.json",
+    "phase1-b12.json",
+    "phase1-b12.log",
     "phase2-compare.json",
-    "phase3-L-G.json", "phase3-L-G.log", "phase3-h4.json",
-    "phase4-B.json", "phase4-B.log", "phase4-B-compare.json",
-    "phase5-trap.json", "phase5-frozen.json"
+    "phase3-L-G.json",
+    "phase3-L-G.log",
+    "phase3-h4.json",
+    "phase4-B.json",
+    "phase4-B.log",
+    "phase4-B-compare.json",
+    "phase5-trap.json",
+    "phase5-frozen.json",
+    "phase6-exact.json"
   ]
 }

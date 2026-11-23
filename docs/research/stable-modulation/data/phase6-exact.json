@@ -1,0 +1,133 @@
+{
+ "moog": {
+  "knob": "k",
+  "interval": [
+   0,
+   2.88485
+  ],
+  "P_pd": true,
+  "P_min_pivot": 2421.405439945887,
+  "ends": {
+   "0": {
+    "pd": true,
+    "min_pivot": 13.399127725657324
+   },
+   "57697/20000": {
+    "pd": true,
+    "min_pivot": 0.3678027727715788
+   }
+  },
+  "proved": true,
+  "witness": {
+   "kmax": 2.8856,
+   "seq": [
+    [
+     0.6398873433383452,
+     0.0
+    ],
+    [
+     0.516002790536229,
+     2.8856
+    ]
+   ],
+   "radius_lower_bound": 1.0000398553111576,
+   "grows": true
+  }
+ },
+ "diode": {
+  "knob": "k",
+  "interval": [
+   0,
+   8.8965
+  ],
+  "P_pd": true,
+  "P_min_pivot": 385.63797221399255,
+  "ends": {
+   "0": {
+    "pd": true,
+    "min_pivot": 4.93279641663339
+   },
+   "17793/2000": {
+    "pd": true,
+    "min_pivot": 7.982876593841107
+   }
+  },
+  "proved": true,
+  "witness": {
+   "kmax": 8.9009,
+   "seq": [
+    [
+     0.5169751466697192,
+     8.9009
+    ],
+    [
+     0.7549948243265341,
+     0.0
+    ]
+   ],
+   "radius_lower_bound": 1.0000618881814929,
+   "grows": true
+  }
+ },
+ "sallenkey": {
+  "knob": "k",
+  "interval": [
+   0,
+   1.99902
+  ],
+  "P_pd": true,
+  "P_min_pivot": 3823.0070723778354,
+  "ends": {
+   "0": {
+    "pd": true,
+    "min_pivot": 7.4901607510655595
+   },
+   "99951/50000": {
+    "pd": true,
+    "min_pivot": 0.002932898275807925
+   }
+  },
+  "proved": true
+ },
+ "svf R>=0.01": {
+  "knob": "R",
+  "interval": [
+   0.01,
+   10.0
+  ],
+  "P_pd": true,
+  "P_min_pivot": 9803.912604486848,
+  "ends": {
+   "1/100": {
+    "pd": true,
+    "min_pivot": 3.9024163257263877
+   },
+   "10": {
+    "pd": true,
+    "min_pivot": 349.8542077371912
+   }
+  },
+  "proved": true
+ },
+ "svf R>=0.1": {
+  "knob": "R",
+  "interval": [
+   0.1,
+   10.0
+  ],
+  "P_pd": true,
+  "P_min_pivot": 8206.405237511339,
+  "ends": {
+   "1/10": {
+    "pd": true,
+    "min_pivot": 343.09009563361803
+   },
+   "10": {
+    "pd": true,
+    "min_pivot": 284.7470813796691
+   }
+  },
+  "proved": true
+ },
+ "seconds": 26.3
+}
