@@ -12544,14 +12544,12 @@ namespace
       int moveFrom = 0, moveTo = 0;
       bool moveBelow = false;
       int deleteId = 0;
-      int adjCount = 0;
       std::vector<Layer>& ls = doc->Layers();
       for (int i = (int)ls.size() - 1; i >= 0; i--)
       {
          Layer* l = &ls[i];
          if (l->kind != Kind::Adjust)
             continue;
-         adjCount++;
          const int id = l->id;
          const std::string base = "##v2dadj" + std::to_string(id);
          bool& folded = sAdjFold[id];
