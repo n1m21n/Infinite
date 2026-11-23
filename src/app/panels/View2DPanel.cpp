@@ -9663,12 +9663,13 @@ namespace
       ParseStrip();
       int shown = 0, lastSection = -1;
       bool openPicker = false;
-      // The tools on show, in strip order; a drag reorders among them (the others slide aside live).
+      // The tools on show, in strip order; a drag reorders among them.
       std::vector<int> vis;
       for (int k = 0; k < (int)sStripOrder.size(); k++)
          if (!sStripHidden[sStripOrder[k]] || kTools[sStripOrder[k]].tool == sTool)
             vis.push_back(k);
-      for (int v : ReorderDrag::Order("V2DTOOL", (int)vis.size(), cols == 1))
+      // One column is a list (the others slide aside); two or more is an icon grid (a drop swaps two icons).
+      for (int v : ReorderDrag::Order("V2DTOOL", (int)vis.size(), cols == 1, cols > 1))
       {
          const int i = sStripOrder[vis[v]];
          if (cols == 1 && shown > 0 && kTools[i].section != lastSection)
@@ -9691,9 +9692,14 @@ namespace
       if (const ReorderDrag::Move m = ReorderDrag::End())
       {
          const int from = vis[m.from], to = vis[m.to];
-         const int moved = sStripOrder[from];
-         sStripOrder.erase(sStripOrder.begin() + from);
-         sStripOrder.insert(sStripOrder.begin() + to, moved);
+         if (m.swap)
+            std::swap(sStripOrder[from], sStripOrder[to]);
+         else
+         {
+            const int moved = sStripOrder[from];
+            sStripOrder.erase(sStripOrder.begin() + from);
+            sStripOrder.insert(sStripOrder.begin() + to, moved);
+         }
          SaveStrip();
       }
       if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))

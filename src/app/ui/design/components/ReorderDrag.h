@@ -4,6 +4,8 @@
 //     list do: while you drag, the others slide aside (a short glide, not a jump) to open a gap where the item will
 //     land; the ghost follows the pointer from where it was grabbed; release drops it into the gap, Esc cancels.
 //     Nothing in the data moves until the drop, so one drag is one undo step.
+//   - Icon grids (a tool palette) swap instead: dropping on a cell trades places with the icon there, so only those
+//     two move (a grid that reflows sends every icon in between round the row ends, which reads as jitter).
 //   - Trees (layer groups, outliner parents) keep the insertion bar / "into" box (Source + Target), because there a
 //     drop can also mean "inside this one".
 // Flat list use:
@@ -149,6 +151,7 @@ namespace ReorderDrag
    struct Move
    {
       int from = -1, to = -1;
+      bool swap = false;   // trade places (icon grids) rather than take `from` out and insert it at `to`
       explicit operator bool() const { return from >= 0 && to >= 0 && from != to; }
    };
 
@@ -158,6 +161,7 @@ namespace ReorderDrag
       {
          std::string type;
          bool vertical = true;
+         bool swap = false;
          int n = 0;
          int from = -1, to = -1;   // dragging: data index held, slot it would land in
          int frame = -1;           // last frame the held item was dragged
@@ -168,7 +172,8 @@ namespace ReorderDrag
          std::vector<ImRect> slots;   // every item's natural rect in drawn order: the slots (a grid's cells do not move)
          std::unordered_map<int, ImVec2> last, off;   // per data index: natural pos last frame, glide offset
          float lastT = 0.0f;
-         ImVec2 cum{ 0, 0 };          // Flow: the offset applied to the cursor so far
+         ImVec2 applied{ 0, 0 };      // Flow: the glide the last item was drawn with
+         float lineY = 0.0f;          // Flow: the glide of the first item on the current line (ImGui's line top)
          int glideFrame = -1;
       };
       inline std::unordered_map<ImGuiID, List>& Lists()
@@ -183,6 +188,24 @@ namespace ReorderDrag
       }
       inline List& Top() { return Lists()[Stack().back()]; }
       inline bool Dragging(const List& l) { return l.from >= 0 && l.from < l.n; }
+      // Data indices in drawn order once `from` lands on `to`.
+      inline std::vector<int> Perm(int n, int from, int to, bool swap)
+      {
+         std::vector<int> o;
+         for (int i = 0; i < n; i++)
+            o.push_back(i);
+         if (from < 0 || from >= n)
+            return o;
+         to = std::clamp(to, 0, n - 1);
+         if (swap)
+            std::swap(o[from], o[to]);
+         else
+         {
+            o.erase(o.begin() + from);
+            o.insert(o.begin() + to, from);
+         }
+         return o;
+      }
 
       // The glide: an item whose natural place moved keeps where it was drawn and eases into the new place
       // (about 90 ms). Only while a drag runs or settles, so scrolling or a relayout never animates.
@@ -214,31 +237,23 @@ namespace ReorderDrag
 
    // Starts a flat list of `n` items (call where the list begins, in the same ID scope as End). Returns the order to
    // draw the items in: the data order, or while one is held, the order it would have if dropped now.
-   inline const std::vector<int>& Order(const char* type, int n, bool vertical = true)
+   // `swap`: an icon grid, where a drop trades places (see the top).
+   inline const std::vector<int>& Order(const char* type, int n, bool vertical = true, bool swap = false)
    {
       const ImGuiID id = ImGui::GetID(type);
       detail::Stack().push_back(id);
       detail::List& l = detail::Lists()[id];
       l.type = type;
       l.vertical = vertical;
+      l.swap = swap;
       l.n = n;
       l.rects.clear();
       l.slots.clear();
-      l.cum = ImVec2(0, 0);
-      l.order.clear();
-      if (detail::Dragging(l))
-      {
-         for (int i = 0; i < n; i++)
-            if (i != l.from)
-               l.order.push_back(i);
-         l.order.insert(l.order.begin() + std::clamp(l.to, 0, n - 1), l.from);
-      }
-      else
-      {
+      l.applied = ImVec2(0, 0);
+      l.lineY = 0.0f;
+      if (!detail::Dragging(l))
          l.from = l.to = -1;
-         for (int i = 0; i < n; i++)
-            l.order.push_back(i);
-      }
+      l.order = detail::Perm(n, l.from, l.to, swap);
       return l.order;
    }
 
@@ -246,14 +261,20 @@ namespace ReorderDrag
    inline void Flow(int index)
    {
       detail::List& l = detail::Top();
+      // ImGui placed the cursor after items that were drawn glided: take that back out to find the natural place.
+      // On the same line, x follows the last item and y the line's top (its first item); on a new line, y follows
+      // the last line's top. So a wrapped grid row or the next card never inherits a neighbour's motion.
+      const bool sameLine = ImGui::GetCurrentWindowRead()->DC.IsSameLine;
       const ImVec2 cur = ImGui::GetCursorPos();
-      const ImVec2 natural(cur.x - l.cum.x, cur.y - l.cum.y);
+      const ImVec2 natural(cur.x - (sameLine ? l.applied.x : 0.0f), cur.y - l.lineY);
       ImVec2 o = detail::Glide(l, index, natural);
       if (l.vertical)
          o.x = 0.0f;
-      if (o.x != l.cum.x || o.y != l.cum.y)
+      if (o.x != cur.x - natural.x || o.y != cur.y - natural.y)
          ImGui::SetCursorPos(ImVec2(natural.x + o.x, natural.y + o.y));
-      l.cum = o;
+      l.applied = o;
+      if (!sameLine)
+         l.lineY = o.y;
    }
 
    // An item placed at an explicit position (a rail tile at y): where to draw it this frame.
@@ -342,12 +363,13 @@ namespace ReorderDrag
    {
       detail::List& l = detail::Top();
       Move m;
-      if (l.cum.x != 0.0f || l.cum.y != 0.0f)
+      if (l.lineY != 0.0f)
       {
-         const ImVec2 cur = ImGui::GetCursorPos();
-         ImGui::SetCursorPos(ImVec2(cur.x - (l.vertical ? 0.0f : l.cum.x), cur.y - l.cum.y));
-         ImGui::Dummy(ImVec2(0, 0));
-         l.cum = ImVec2(0, 0);
+         // What follows the list starts where it would with nothing moving (no Dummy: that would add a row gap).
+         ImGuiWindow* win = ImGui::GetCurrentWindow();
+         win->DC.CursorPos.y -= l.lineY;
+         win->DC.CursorPosPrevLine.y -= l.lineY;
+         l.lineY = 0.0f;
       }
       if (detail::Dragging(l))
       {
@@ -395,13 +417,10 @@ namespace ReorderDrag
             {
                m.from = l.from;
                m.to = l.to;
+               m.swap = l.swap;
                l.from = l.to = -1;
                // The data is about to move: carry each item's glide state to its new index.
-               std::vector<int> perm;
-               for (int i = 0; i < l.n; i++)
-                  if (i != m.from)
-                     perm.push_back(i);
-               perm.insert(perm.begin() + std::clamp(m.to, 0, std::max(0, l.n - 1)), m.from);
+               const std::vector<int> perm = detail::Perm(l.n, m.from, m.to, m.swap);
                std::unordered_map<int, ImVec2> last, off;
                for (int j = 0; j < (int)perm.size(); j++)
                {
