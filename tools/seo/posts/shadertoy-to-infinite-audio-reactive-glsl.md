@@ -1,7 +1,7 @@
 ---
-title: Bringing Shadertoy GLSL shaders into Infinite for audio reactivity
+title: Make Shadertoy GLSL Shaders Audio-Reactive (Free Desktop App)
 seo_title: Shadertoy GLSL shaders in Infinite, made audio-reactive
-description: How to convert any Shadertoy fragment shader into a native real-time node in Infinite, hook it up to audio analysis FFT bands, and export high-resolution video.
+description: Paste any Shadertoy GLSL fragment shader, drive uniforms with real-time FFT audio bands and MIDI, and export 4K video with no boilerplate or coding setup.
 date: 2026-10-19
 category: creative
 tags: [shadertoy, glsl, audio reactive, shaders, creative coding]

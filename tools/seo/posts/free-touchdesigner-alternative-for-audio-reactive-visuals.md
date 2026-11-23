@@ -1,6 +1,6 @@
 ---
-title: A free TouchDesigner alternative for audio-reactive visuals?
-description: An honest look at where Infinite fits next to TouchDesigner for audio-reactive visuals and VJ work, and where TouchDesigner is still the better choice.
+title: Free TouchDesigner Alternative for Audio-Reactive Visuals
+description: Looking for a free TouchDesigner alternative on macOS, Windows, or Linux? Compare Infinite vs. TouchDesigner for audio-reactive GLSL shaders, MIDI, and VJing.
 date: 2026-10-17
 category: creative
 tags: [touchdesigner, audio reactive, vj, comparison]

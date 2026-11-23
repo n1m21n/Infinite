@@ -1,7 +1,7 @@
 ---
-title: Wave terrain synthesis: audio from 3D surfaces
+title: Wave Terrain Synthesis Explained (Real-Time 3D Synth)
 seo_title: Wave Terrain Synthesis: Audio from 3D Surfaces | Infinite
-description: How wave terrain synthesis works: orbital trajectories, 3D surfaces, discrete Fourier transform anti-aliasing, and patching audio-visual synths in Infinite.
+description: See how wave terrain synthesis turns 3D surfaces and orbital trajectories into alias-free sound in real time, plus a free modular patch you can run today.
 date: 2026-11-08
 category: creative
 tags: [wave terrain, synthesis, sound design, creative coding, dsp]

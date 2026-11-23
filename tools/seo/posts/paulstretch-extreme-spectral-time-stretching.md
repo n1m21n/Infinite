@@ -1,7 +1,7 @@
 ---
-title: "PaulStretch on Mac: extreme spectral time stretching in Infinite"
+title: PaulStretch on Mac (Free Real-Time Spectral Time Stretch)
 seo_title: "PaulStretch on Mac: extreme spectral time stretching"
-description: "Explore PaulStretch on Mac with Infinite. Learn how real-time spectral time stretching, phase randomisation, and FFT analysis turn audio into ambient drones."
+description: Run PaulStretch-style extreme spectral time stretching natively on Apple Silicon Mac. Turn any sound into lush ambient drones in real time with Infinite.
 date: 2026-10-21
 category: creative
 tags: [paulstretch, time stretch, sound design, ambient, dsp]

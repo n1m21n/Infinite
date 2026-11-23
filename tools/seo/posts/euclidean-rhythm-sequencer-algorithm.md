@@ -1,6 +1,6 @@
 ---
-title: Euclidean rhythm sequencer algorithms for modular music
-description: How to generate Euclidean rhythm sequencer algorithms using Bjorklund integer distribution, modular arithmetic, and audio-reactive triggers in Infinite.
+title: Euclidean Rhythm Sequencer: Bjorklund Algorithm Explained
+description: Learn how the Bjorklund Euclidean rhythm sequencer algorithm works, with modular arithmetic, polymetric patterns, and free real-time audio patching in Infinite.
 date: 2026-10-20
 category: creative
 tags: [euclidean rhythms, sequencing, modular synthesis, algorithmic composition]

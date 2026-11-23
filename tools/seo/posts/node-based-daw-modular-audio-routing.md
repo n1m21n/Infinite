@@ -1,7 +1,7 @@
 ---
-title: Node-based DAW workflows: modular audio routing on an infinite canvas
+title: Node-Based DAW: Free Modular Audio & Visual Patching | Infinite
 seo_title: Node-based DAW workflows | Infinite
-description: Explore node-based DAW workflows in Infinite: wire synths, route MIDI into generative sequencers, and patch audio directly into live visual shaders.
+description: Patch synths, VST3 plugins, generative MIDI sequencers, and live GLSL visuals on one infinite node canvas. Free native desktop app for macOS, Windows & Linux.
 date: 2026-10-25
 category: creative
 tags: [node based daw, modular audio, music production, synthesiser, creative coding]
