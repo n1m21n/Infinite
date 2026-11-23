@@ -174,6 +174,9 @@ namespace ReorderDrag
          float lastT = 0.0f;
          ImVec2 applied{ 0, 0 };      // Flow: the glide the last item was drawn with
          float lineY = 0.0f;          // Flow: the glide of the first item on the current line (ImGui's line top)
+         ImDrawList* vdl = nullptr;   // strips and grids: the draw list and first vertex of the item being drawn,
+         int vtx0 = -1;               // moved by `vo` once it is drawn (the layout itself never moves)
+         ImVec2 vo{ 0, 0 };
          int glideFrame = -1;
       };
       inline std::unordered_map<ImGuiID, List>& Lists()
@@ -188,6 +191,17 @@ namespace ReorderDrag
       }
       inline List& Top() { return Lists()[Stack().back()]; }
       inline bool Dragging(const List& l) { return l.from >= 0 && l.from < l.n; }
+      // Strips and grids: what the last item drew moves by its glide (pixels only; hit areas and layout stay put).
+      inline void Shift(List& l)
+      {
+         if (l.vtx0 >= 0 && l.vdl != nullptr && (l.vo.x != 0.0f || l.vo.y != 0.0f))
+            for (int v = l.vtx0; v < l.vdl->VtxBuffer.Size; v++)
+            {
+               l.vdl->VtxBuffer[v].pos.x += l.vo.x;
+               l.vdl->VtxBuffer[v].pos.y += l.vo.y;
+            }
+         l.vtx0 = -1;
+      }
       // Data indices in drawn order once `from` lands on `to`.
       inline std::vector<int> Perm(int n, int from, int to, bool swap)
       {
@@ -251,6 +265,7 @@ namespace ReorderDrag
       l.slots.clear();
       l.applied = ImVec2(0, 0);
       l.lineY = 0.0f;
+      l.vtx0 = -1;
       if (!detail::Dragging(l))
          l.from = l.to = -1;
       l.order = detail::Perm(n, l.from, l.to, swap);
@@ -261,7 +276,17 @@ namespace ReorderDrag
    inline void Flow(int index)
    {
       detail::List& l = detail::Top();
-      // ImGui placed the cursor after items that were drawn glided: take that back out to find the natural place.
+      if (!l.vertical)
+      {
+         // Strips and grids move pixels, not the layout: moving the cursor would make ImGui grow the row (an item
+         // nudged down makes its whole line taller) and every row below would bounce.
+         detail::Shift(l);
+         l.vo = detail::Glide(l, index, ImGui::GetCursorPos());
+         l.vdl = ImGui::GetWindowDrawList();
+         l.vtx0 = l.vdl->VtxBuffer.Size;
+         return;
+      }
+      // Lists: one item per line, so the cursor moves. ImGui placed the cursor after items that were drawn glided: take that back out to find the natural place.
       // On the same line, x follows the last item and y the line's top (its first item); on a new line, y follows
       // the last line's top. So a wrapped grid row or the next card never inherits a neighbour's motion.
       const bool sameLine = ImGui::GetCurrentWindowRead()->DC.IsSameLine;
@@ -322,7 +347,7 @@ namespace ReorderDrag
       }
       {
          const auto it = l.off.find(index);
-         const ImVec2 o = it != l.off.end() ? it->second : ImVec2(0, 0);
+         const ImVec2 o = !l.vertical || it == l.off.end() ? ImVec2(0, 0) : it->second;
          l.slots.push_back(ImRect(ImVec2(mn.x - o.x, mn.y - o.y), ImVec2(mx.x - o.x, mx.y - o.y)));
       }
       if (detail::Dragging(l) && index == l.from)
@@ -350,9 +375,10 @@ namespace ReorderDrag
       }
       else
       {
-         // Natural rect (the glide taken out), so the slot it picks does not chase the animation.
+         // Natural rect (the glide taken out), so the slot it picks does not chase the animation. A strip's item is
+         // laid out at its natural place already (only its pixels move).
          const auto it = l.off.find(index);
-         const ImVec2 o = it != l.off.end() ? it->second : ImVec2(0, 0);
+         const ImVec2 o = !l.vertical || it == l.off.end() ? ImVec2(0, 0) : it->second;
          l.rects.push_back(ImRect(ImVec2(mn.x - o.x, mn.y - o.y), ImVec2(mx.x - o.x, mx.y - o.y)));
       }
       return held;
@@ -363,6 +389,7 @@ namespace ReorderDrag
    {
       detail::List& l = detail::Top();
       Move m;
+      detail::Shift(l);
       if (l.lineY != 0.0f)
       {
          // What follows the list starts where it would with nothing moving (no Dummy: that would add a row gap).
