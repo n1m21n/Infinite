@@ -1,7 +1,7 @@
 ---
 title: "Flicker-free music-driven visuals: predicting temporal aliasing in Field Pixel kernels"
 slug: "flicker-free-pixels"
-status: "phase-0-framing"
+status: "signed-off"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-flicker-free-pixels.md"
@@ -10,8 +10,8 @@ commit_sha: "pending-measurement"
 
 # Flicker-free music-driven visuals
 
-Sections 1-7 are for the owner's sign-off. Nothing is built or measured until they are signed and locked
-by a commit. Sections 8-12 are filled after sign-off. Paired study: `docs/research/stable-modulation`
+**Signed off by the owner on 2026-11-23, as written, with D1-D4 as recommended. Sections 1-7 are locked
+by this commit.** Sections 8-12 are filled after sign-off. Paired study: `docs/research/stable-modulation`
 (branch `feature/stable-modulation`). This is the visual twin of `docs/research/aliasing-aware-field`:
 the same question (how much does this code widen the spectrum?) asked about **time** in a pixel kernel.
 
