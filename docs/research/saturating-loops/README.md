@@ -250,6 +250,28 @@ H2 filter, needs 5, so L may have up to 5 saturators. G (≤ 3) and B (≤ 4) ar
   Hélie's 5/3, so H2's bar can't be met over the full cutoff range by any sound method. Raised with the
   owner after D3.
 
+**Phase 0 findings, T3 on the tanh Moog** (`scripts/t3cert.py`, `scripts/phase0_t3.py`, `data/phase0-t3.json`).
+T3 as built: V = xᵀPx + 2Σ qᵢ ∫φᵢ over the stage saturators, with sector, slope, cross-pair slope and
+ratio bounds (φ(c·y) lies between φ(y) and c·φ(y) for odd shapes concave on y > 0) as S-procedure terms.
+P and q are shared over the knob box; the multipliers are per cutoff cell (24 log cells). Inside a cell the
+form is convex in g and linear in k, so the cell's corners are exact: no Lipschitz margin.
+
+| Cutoff ceiling g | T3, tanh Moog, any speed | Linear Moog, common P (Report 2 method) | Frozen limit |
+|---|---|---|---|
+| 0.05 | 2.652 | 2.737 | 3.632 |
+| 0.2 | 2.332 | 2.343 | 2.810 |
+| 0.4 | 1.907 | 1.908 | 2.096 |
+| 0.785 (fs/8) | 1.154 | 1.274 | 1.288 |
+
+- **Hélie's 5/3 is certified for cutoff ceilings up to g = 0.524.** Above it the explicit filter's own
+  limit falls below 5/3.
+- **The certificate is Hélie-like.** P comes out ≈ 0 (min eigenvalue < 1e-8) and every qᵢ > 0, so V is
+  essentially 2Σ qᵢ ln cosh(yᵢ). It grows without bound, so the proof is global.
+- **Soundness checks at every certified k:** 200 random-switching runs of the real nonlinear filter from
+  starts up to 100 all decay (worst final/initial ratio ≤ 8e-23); the stick search finds nothing; a dense
+  re-check inside each cell stays ≤ 7.5e-10 relative, inside the declared tolerance of 1e-9. That
+  tolerance exists because the form has exact null directions; it is numerical, not a proof.
+
 **Phases.**
 
 | Phase | Work | Needs a build |

@@ -13,9 +13,9 @@ import certify as R2cert  # noqa: E402,F401
 
 # ---- shape library (README section 8): sector [a, b], slope range [smin, smax] -----------------
 SHAPES = {
-    "tanh":    {"f": np.tanh, "sector": (0.0, 1.0), "slope": (0.0, 1.0)},
-    "soft":    {"f": lambda y: y / (1 + np.abs(y)), "sector": (0.0, 1.0), "slope": (0.0, 1.0)},
-    "clamp":   {"f": lambda y: np.clip(y, -1.0, 1.0), "sector": (0.0, 1.0), "slope": (0.0, 1.0)},
+    "tanh":    {"f": np.tanh, "sector": (0.0, 1.0), "slope": (0.0, 1.0), "odd": True, "concave": True},
+    "soft":    {"f": lambda y: y / (1 + np.abs(y)), "sector": (0.0, 1.0), "slope": (0.0, 1.0), "odd": True, "concave": True},
+    "clamp":   {"f": lambda y: np.clip(y, -1.0, 1.0), "sector": (0.0, 1.0), "slope": (0.0, 1.0), "odd": True, "concave": True},
     "sin":     {"f": np.sin, "sector": (-0.21723362821122166, 1.0), "slope": (-1.0, 1.0)},
     "abs":     {"f": np.abs, "sector": (-1.0, 1.0), "slope": (-1.0, 1.0)},
     "id":      {"f": lambda y: y, "sector": (1.0, 1.0), "slope": (1.0, 1.0)},
