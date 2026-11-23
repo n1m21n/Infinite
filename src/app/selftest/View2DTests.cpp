@@ -2939,6 +2939,54 @@ void RunView2DTest()
       Check("Sweep: every layer setting undoes back to the same document", bad == 0);
       doc = Doc();
    }
+   // Regression: cycle prevention (Document -> canvas effect -> back into 2D View) and fast downsampled Histogram.
+   if (doc != nullptr)
+   {
+      GraphNode* docGn = nullptr;
+      for (GraphNode& gn : gNodes)
+         if (gn.node.get() == doc)
+         {
+            docGn = &gn;
+            break;
+         }
+      if (docGn != nullptr)
+      {
+         doc->panelOnly = false;
+         docGn->hiddenFromCanvas = false;
+         GraphNode* fx = SpawnNode("invert", "Compositing", 0, 0);
+         if (fx != nullptr)
+         {
+            const int docIdx = docGn->index, fxIdx = fx->index;
+            std::string err;
+            const bool wired = ConnectNodes(docIdx, 0, fxIdx, 0, err);
+            const size_t beforeLayers = doc->Layers().size();
+            if (GraphNode* fxAgain = FindNodeByIndex(fxIdx))
+               View2DAddNode(*fxAgain);
+            Check("Cycle: adding a node downstream of a 2D Document back to it is refused",
+                  wired && doc->Layers().size() == beforeLayers);
+            RemoveNodeByIndex(fxIdx);
+         }
+         // Reverse direction: a node already used as a layer cannot be fed from the Document.
+         GraphNode* fx2 = SpawnNode("invert", "Compositing", 0, 0);
+         if (fx2 != nullptr)
+         {
+            const int fx2Idx = fx2->index;
+            View2DAddNode(*fx2);
+            std::string err;
+            const bool wiredBack = ConnectNodes(docGn->index, 0, fx2Idx, 0, err);
+            Check("Cycle: wiring a 2D Document into a node that is already one of its layers is refused", !wiredBack);
+            RemoveNodeByIndex(fx2Idx);
+         }
+      }
+      doc->CookIfNeeded(999123);
+      std::vector<float> hist;
+      const bool histOk = doc->Histogram(0, hist, 64, -1);
+      bool histNorm = hist.size() == 64;
+      for (float b : hist)
+         if (!(b >= 0.0f && b <= 1.0001f))
+            histNorm = false;
+      Check("Histogram: fast downsampled readback returns 64 normalized bins", histOk && histNorm);
+   }
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;
    printf("VIEW2DTEST %s\n", ok ? "OK" : "FAIL");

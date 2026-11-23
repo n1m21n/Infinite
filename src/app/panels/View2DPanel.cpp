@@ -4,6 +4,7 @@
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "app/AppCommon.h"
 #include "app/AppShared.h"
+#include "core/Notices.h"
 #include "app/frame/CanvasLink.h"
 #include "ImageCable.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -1031,12 +1032,80 @@ namespace
       SelectOnly(id);
    }
 
+   // True when `candidate` already reads from `doc` (directly or through canvas cables / other Scene2D documents),
+   // so adding `candidate` back into `doc` as a layer or mask would create a feedback loop.
+   bool WouldCreateDocCycle(const Scene2DNode* doc, INode* candidate)
+   {
+      if (doc == nullptr || candidate == nullptr)
+         return false;
+      if (candidate == doc)
+         return true;
+      std::vector<INode*> stack{ candidate };
+      std::set<INode*> visited;
+      while (!stack.empty())
+      {
+         INode* cur = stack.back();
+         stack.pop_back();
+         if (cur == nullptr || !visited.insert(cur).second)
+            continue;
+         if (cur == doc)
+            return true;
+         if (auto* s2 = dynamic_cast<Scene2DNode*>(cur))
+         {
+            for (const auto& lay : s2->Layers())
+            {
+               if (lay.uid != 0)
+                  if (GraphNode* u = FindNodeByUid(lay.uid))
+                     stack.push_back(u->node.get());
+               if (lay.maskUid != 0)
+                  if (GraphNode* u = FindNodeByUid(lay.maskUid))
+                     stack.push_back(u->node.get());
+               if (lay.effMaskUid != 0)
+                  if (GraphNode* u = FindNodeByUid(lay.effMaskUid))
+                     stack.push_back(u->node.get());
+               for (const auto& ef : lay.effects)
+                  if (ef.uid != 0)
+                     if (GraphNode* u = FindNodeByUid(ef.uid))
+                        stack.push_back(u->node.get());
+            }
+            continue;
+         }
+         GraphNode* curGn = nullptr;
+         for (GraphNode& gn : gNodes)
+            if (gn.node.get() == cur)
+            {
+               curGn = &gn;
+               break;
+            }
+         if (curGn == nullptr)
+            continue;
+         const int nIn = InputCountFor(*curGn);
+         for (int slot = 0; slot < nIn; slot++)
+         {
+            if (ImageCable* ic = CableFor(*curGn, slot))
+               if (INode* src = ic->GetSource())
+                  stack.push_back(src);
+            if (IGeometrySource** field = cur->GeometryInputSlot(slot))
+               if (*field != nullptr)
+                  if (INode* src = dynamic_cast<INode*>(*field))
+                     stack.push_back(src);
+         }
+      }
+      return false;
+   }
+
    // A canvas node as a layer, centred at a document point (the middle when null).
    int AddNodeLayer(Scene2DNode* doc, uint64_t uid, const ImVec2* at)
    {
       GraphNode* gn = FindNodeByUid(uid);
       if (gn == nullptr || !View2DCanAdd(*gn))
          return 0;
+      if (WouldCreateDocCycle(doc, gn->node.get()))
+      {
+         Notices::Post(Notices::Level::Warning, "view2d.cycle", T("Can't add layer"),
+                       T("That node already reads from this 2D Document (would create a feedback loop)."));
+         return 0;
+      }
       Layer& l = NewLayerAt(doc, Kind::Node, uid);
       l.is3d = Is3DNode(gn->node.get());
       if (at != nullptr)
@@ -1057,6 +1126,12 @@ namespace
       GraphNode* gn = FindNodeByUid(uid);
       if (l == nullptr || l->kind != Kind::Node || gn == nullptr || !View2DCanAdd(*gn) || gn->node.get() == doc || l->uid == uid)
          return false;
+      if (WouldCreateDocCycle(doc, gn->node.get()))
+      {
+         Notices::Post(Notices::Level::Warning, "view2d.cycle", T("Can't replace layer"),
+                       T("That node already reads from this 2D Document (would create a feedback loop)."));
+         return false;
+      }
       l->uid = uid;
       doc->Commit();
       return true;
@@ -1070,7 +1145,7 @@ namespace
       bool any = false;
       for (GraphNode& gn : gNodes)
       {
-         if (gn.node.get() == doc || !View2DCanAdd(gn))
+         if (gn.node.get() == doc || !View2DCanAdd(gn) || WouldCreateDocCycle(doc, gn.node.get()))
             continue;
          any = true;
          const std::string name = gn.typeName + " " + std::to_string(gn.index) + "##n" + std::to_string(gn.uid);
@@ -1341,14 +1416,20 @@ namespace
    }
 
    // Curves: the graph is the control. Click adds a point, drag moves it (ends move up and down only),
-   // double-click or right-click takes an inner point away.
+   // drag an inner point off the graph (or double-click / right-click / Delete) to remove it.
    int sCurveDrag = -1;
+   int sCurveSel = -1;
+   int sCurveSelLayer = 0;
    int sCurveLayer = 0;
    uint64_t sCurveDoc = 0;         // the drag belongs to one layer of one document
-   std::vector<float> sHist;   // the luminance histogram of the picture an adjustment works on, refreshed every half second
-   double sHistAt = -1.0;
+   struct HistEntry
+   {
+      std::vector<float> bins;
+      double at = -1.0;
+      uint64_t rev = 0;
+   };
+   std::map<int, HistEntry> sHistCache;
    uint64_t sHistDoc = 0;
-   int sHistKey = -1;
    // An adjustment's key (AdjExtras): an adjustment layer's id, or 100000 + layer id * 64 + effect index.
    void KeySource(int key, int& id, int& effect)
    {
@@ -1362,29 +1443,64 @@ namespace
    }
    const std::vector<float>& DocHistogram(Scene2DNode* doc, int key = 0)
    {
-      if (doc != nullptr && (ImGui::GetTime() - sHistAt > 0.5 || sHistDoc != sDocUid || sHistKey != key))
+      static const std::vector<float> kEmpty;
+      if (doc == nullptr)
+         return kEmpty;
+      if (sHistDoc != sDocUid)
       {
-         sHistAt = ImGui::GetTime();
+         sHistCache.clear();
          sHistDoc = sDocUid;
-         sHistKey = key;
+      }
+      if (sHistCache.size() > 24)
+         sHistCache.clear();
+      HistEntry& e = sHistCache[key];
+      const double now = ImGui::GetTime();
+      const uint64_t rev = doc->TextureRevision();
+      // Never trigger a GPU readback while the user is actively dragging a curve or slider; refresh only when
+      // the cache is cold or the document actually changed and at least 0.5 s have elapsed.
+      const bool cold = e.at < 0.0;
+      const bool stale = !ImGui::IsAnyItemActive() && rev != e.rev && (now - e.at > 0.5);
+      if (cold || stale)
+      {
+         e.at = now;
+         e.rev = rev;
          int id = 0, eff = -1;
          KeySource(key, id, eff);
-         if (!doc->Histogram(id, sHist, 64, eff))
-            sHist.clear();
+         if (!doc->Histogram(id, e.bins, 64, eff))
+            e.bins.clear();
       }
-      return sHist;
+      return e.bins;
    }
    void HistogramUnder(ImDrawList* dl, ImVec2 p0, ImVec2 p1, const std::vector<float>& bins)
    {
       const int n = (int)bins.size();
+      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Border, 0.55f);
       for (int i = 0; i < n; i++)
       {
          const float x0 = p0.x + (p1.x - p0.x) * i / n, x1 = p0.x + (p1.x - p0.x) * (i + 1) / n;
-         dl->AddRectFilled(ImVec2(x0, p1.y - (p1.y - p0.y) * bins[i]), ImVec2(x1, p1.y), ImGui::GetColorU32(ImGuiCol_Border));
+         dl->AddRectFilled(ImVec2(x0, p1.y - (p1.y - p0.y) * bins[i]), ImVec2(x1, p1.y), col);
       }
    }
 
-   void CurveEditor(std::vector<float>& c, int key, const std::vector<float>* hist = nullptr)
+   ImU32 CurveChannelColor(int channel, float alpha = 1.0f)
+   {
+      if (channel == 1) return ImGui::ColorConvertFloat4ToU32(ImVec4(
+         ImGui::ColorConvertU32ToFloat4(tok::U32(tok::label_red)).x,
+         ImGui::ColorConvertU32ToFloat4(tok::U32(tok::label_red)).y,
+         ImGui::ColorConvertU32ToFloat4(tok::U32(tok::label_red)).z, alpha));
+      if (channel == 2) return ImGui::ColorConvertFloat4ToU32(ImVec4(
+         ImGui::ColorConvertU32ToFloat4(tok::U32(tok::label_green)).x,
+         ImGui::ColorConvertU32ToFloat4(tok::U32(tok::label_green)).y,
+         ImGui::ColorConvertU32ToFloat4(tok::U32(tok::label_green)).z, alpha));
+      if (channel == 3) return ImGui::ColorConvertFloat4ToU32(ImVec4(
+         ImGui::ColorConvertU32ToFloat4(tok::U32(tok::label_blue)).x,
+         ImGui::ColorConvertU32ToFloat4(tok::U32(tok::label_blue)).y,
+         ImGui::ColorConvertU32ToFloat4(tok::U32(tok::label_blue)).z, alpha));
+      return ImGui::GetColorU32(ImGuiCol_Text, alpha);
+   }
+
+   void CurveEditor(std::vector<float>& c, int key, const std::vector<float>* hist = nullptr, int channel = 0,
+                    const std::vector<float>* const* otherCh = nullptr)
    {
       if (c.size() < 4)
          c = { 0.0f, 0.0f, 1.0f, 1.0f };
@@ -1394,77 +1510,174 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 p1(p0.x + w, p0.y + h);
       dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
-      if (hist != nullptr)
+      if (hist != nullptr && !hist->empty())
          HistogramUnder(dl, p0, p1, *hist);
+      // 4x4 grid + subtle diagonal identity reference line.
+      const ImU32 gridCol = ImGui::GetColorU32(ImGuiCol_Border, 0.55f);
       for (int i = 1; i < 4; i++)
       {
          const float fx = p0.x + w * i / 4.0f, fy = p0.y + h * i / 4.0f;
-         dl->AddLine(ImVec2(fx, p0.y), ImVec2(fx, p1.y), ImGui::GetColorU32(ImGuiCol_Border));
-         dl->AddLine(ImVec2(p0.x, fy), ImVec2(p1.x, fy), ImGui::GetColorU32(ImGuiCol_Border));
+         dl->AddLine(ImVec2(fx, p0.y), ImVec2(fx, p1.y), gridCol);
+         dl->AddLine(ImVec2(p0.x, fy), ImVec2(p1.x, fy), gridCol);
       }
+      dl->AddLine(ImVec2(p0.x, p1.y), ImVec2(p1.x, p0.y), ImGui::GetColorU32(ImGuiCol_Border, 0.8f), 1.0f);
       const auto ToScreen = [&](float x, float y) { return ImVec2(p0.x + x * w, p1.y - y * h); };
       const ImVec2 m = ImGui::GetIO().MousePos;
       const float mx = std::clamp((m.x - p0.x) / std::max(1.0f, w), 0.0f, 1.0f);
       const float my = std::clamp((p1.y - m.y) / std::max(1.0f, h), 0.0f, 1.0f);
       const int n = (int)c.size() / 2;
       int near = -1;
+      float bestD2 = 10.0f * 10.0f;   // 10 px hit radius, pick closest point
       for (int i = 0; i < n; i++)
       {
          const ImVec2 q = ToScreen(c[i * 2], c[i * 2 + 1]);
-         if (std::fabs(q.x - m.x) < 7.0f && std::fabs(q.y - m.y) < 7.0f)
+         const float dx = q.x - m.x, dy = q.y - m.y, d2 = dx * dx + dy * dy;
+         if (d2 < bestD2)
+         {
+            bestD2 = d2;
             near = i;
+         }
       }
       bool changed = false;
+      const bool draggingThis = ImGui::IsItemActive() && sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < n;
+      const bool pullOff = draggingThis && sCurveDrag > 0 && sCurveDrag < n - 1 &&
+                           (m.x < p0.x - 24.0f || m.x > p1.x + 24.0f || m.y < p0.y - 24.0f || m.y > p1.y + 24.0f);
       if (ImGui::IsItemHovered() && (ImGui::IsMouseDoubleClicked(0) || ImGui::IsMouseClicked(1)) && near > 0 && near < n - 1)
       {
          PushUndoCheckpoint("Curves");
          c.erase(c.begin() + near * 2, c.begin() + near * 2 + 2);
          sCurveDrag = -1;
+         if (sCurveSelLayer == key)
+            sCurveSel = -1;
          changed = true;
       }
       else if (ImGui::IsItemActivated())
       {
-         PushUndoCheckpoint("Curves");
-         sCurveLayer = key;
-         sCurveDoc = sDocUid;
-         sCurveDrag = near;
-         if (near < 0 && n < 16)
+         if (ImGui::GetIO().KeyAlt)
          {
-            int at = 1;
-            while (at < n - 1 && c[at * 2] < mx)
-               at++;
-            c.insert(c.begin() + at * 2, { mx, my });
-            sCurveDrag = at;
+            PushUndoCheckpoint("Reset curve");
+            c = { 0.0f, 0.0f, 1.0f, 1.0f };
+            sCurveDrag = -1;
+            if (sCurveSelLayer == key)
+               sCurveSel = -1;
             changed = true;
+         }
+         else
+         {
+            PushUndoCheckpoint("Curves");
+            sCurveLayer = key;
+            sCurveDoc = sDocUid;
+            sCurveDrag = near;
+            if (near < 0 && n < 16)
+            {
+               int at = 1;
+               while (at < n - 1 && c[at * 2] < mx)
+                  at++;
+               c.insert(c.begin() + at * 2, { mx, my });
+               sCurveDrag = at;
+               changed = true;
+            }
+            sCurveSel = sCurveDrag;
+            sCurveSelLayer = key;
          }
       }
       if (ImGui::IsItemActive() && sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < (int)c.size() / 2)
       {
          const int i = sCurveDrag, last = (int)c.size() / 2 - 1;
-         float x = mx;
-         if (i == 0)
-            x = 0.0f;
-         else if (i == last)
-            x = 1.0f;
-         else
-            x = std::clamp(x, c[(i - 1) * 2] + 0.01f, c[(i + 1) * 2] - 0.01f);
-         if (x != c[i * 2] || my != c[i * 2 + 1])
+         if (!pullOff)
          {
-            c[i * 2] = x;
-            c[i * 2 + 1] = my;
-            changed = true;
+            float x = mx;
+            if (i == 0)
+               x = std::clamp(x, 0.0f, std::max(0.0f, c[2] - 0.02f));
+            else if (i == last)
+               x = std::clamp(x, std::min(1.0f, c[(last - 1) * 2] + 0.02f), 1.0f);
+            else
+               x = std::clamp(x, c[(i - 1) * 2] + 0.01f, c[(i + 1) * 2] - 0.01f);
+            if (x != c[i * 2] || my != c[i * 2 + 1])
+            {
+               c[i * 2] = x;
+               c[i * 2 + 1] = my;
+               changed = true;
+            }
          }
       }
-      float lut[64];
-      Scene2DNode::CurveLut(c, lut, 64);
-      ImVec2 line[64];
-      for (int i = 0; i < 64; i++)
-         line[i] = ToScreen(i / 63.0f, lut[i]);
-      dl->AddPolyline(line, 64, ImGui::GetColorU32(ImGuiCol_Text), 0, 1.5f);
-      for (int i = 0; i < (int)c.size() / 2; i++)
+      else if (ImGui::IsItemDeactivated() && sCurveLayer == key && sCurveDoc == sDocUid)
+      {
+         if (sCurveDrag > 0 && sCurveDrag < (int)c.size() / 2 - 1 &&
+             (m.x < p0.x - 24.0f || m.x > p1.x + 24.0f || m.y < p0.y - 24.0f || m.y > p1.y + 24.0f))
+         {
+            c.erase(c.begin() + sCurveDrag * 2, c.begin() + sCurveDrag * 2 + 2);
+            if (sCurveSelLayer == key)
+               sCurveSel = -1;
+            changed = true;
+         }
+         sCurveDrag = -1;
+      }
+      // Delete / Backspace removes the selected inner point when the graph is hovered.
+      if (ImGui::IsItemHovered() && sCurveSelLayer == key && sCurveSel > 0 && sCurveSel < (int)c.size() / 2 - 1 &&
+          (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace)))
+      {
+         PushUndoCheckpoint("Curves");
+         c.erase(c.begin() + sCurveSel * 2, c.begin() + sCurveSel * 2 + 2);
+         sCurveSel = -1;
+         changed = true;
+      }
+      // Faint ghost previews for other non-default channels so multi-channel grades remain readable.
+      if (otherCh != nullptr)
+      {
+         for (int ch = 0; ch < 3; ch++)
+         {
+            if (ch + 1 == channel || otherCh[ch] == nullptr)
+               continue;
+            const std::vector<float>& oc = *otherCh[ch];
+            if (oc.size() == 4 && oc[0] == 0.0f && oc[1] == 0.0f && oc[2] == 1.0f && oc[3] == 1.0f)
+               continue;
+            float glut[64];
+            Scene2DNode::CurveLut(oc, glut, 64);
+            ImVec2 gline[64];
+            for (int i = 0; i < 64; i++)
+               gline[i] = ToScreen(i / 63.0f, glut[i]);
+            dl->AddPolyline(gline, 64, CurveChannelColor(ch + 1, 0.35f), 0, 1.0f);
+         }
+      }
+      constexpr int kSamples = 128;
+      float lut[kSamples];
+      Scene2DNode::CurveLut(c, lut, kSamples);
+      ImVec2 line[kSamples];
+      for (int i = 0; i < kSamples; i++)
+         line[i] = ToScreen(i / (float)(kSamples - 1), lut[i]);
+      const ImU32 curveCol = CurveChannelColor(channel, 1.0f);
+      dl->AddPolyline(line, kSamples, curveCol, 0, 2.0f);
+      const int curN = (int)c.size() / 2;
+      for (int i = 0; i < curN; i++)
       {
          const ImVec2 q = ToScreen(c[i * 2], c[i * 2 + 1]);
-         dl->AddCircleFilled(q, i == near || i == sCurveDrag ? 4.5f : 3.5f, ImGui::GetColorU32(ImGuiCol_Text));
+         const bool activePt = (sCurveLayer == key && sCurveDoc == sDocUid && i == sCurveDrag);
+         const bool selPt = (sCurveSelLayer == key && i == sCurveSel);
+         const bool hovPt = ImGui::IsItemHovered() && i == near;
+         const float r = (activePt || hovPt) ? 5.0f : 3.8f;
+         const ImU32 ptCol = (activePt && pullOff) ? ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.5f) : curveCol;
+         dl->AddCircleFilled(q, r, ptCol);
+         if (selPt || activePt)
+            dl->AddCircle(q, r + 2.0f, ImGui::GetColorU32(ImGuiCol_Text, 0.85f), 0, 1.2f);
+      }
+      dl->AddRect(p0, p1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_control);
+      // Compact live In / Out coordinate readout when hovering or dragging.
+      const int showIdx = (sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < curN) ? sCurveDrag
+                        : (ImGui::IsItemHovered() && near >= 0 && near < curN) ? near
+                        : (sCurveSelLayer == key && sCurveSel >= 0 && sCurveSel < curN) ? sCurveSel : -1;
+      if (showIdx >= 0)
+      {
+         const int inV = (int)std::lround(c[showIdx * 2] * 255.0f);
+         const int outV = (int)std::lround(c[showIdx * 2 + 1] * 255.0f);
+         if (pullOff)
+            ImGui::TextDisabled("%s", T("Release to remove point"));
+         else
+            ImGui::TextDisabled("In %d   Out %d", inV, outV);
+      }
+      else if (ImGui::IsItemHovered())
+      {
+         ImGui::TextDisabled("%s", T("Click to add, drag off or right-click to remove"));
       }
       if (changed)
          Touch();
@@ -1705,7 +1918,8 @@ namespace
 
    // The rows an adjustment has besides its amount: Levels and Curves per channel (with the picture's histogram and
    // Auto), and the settings of the newer adjustments. T is a Layer or an Effect: both hold the same fields.
-   int sAdjCh = 0;          // 0 the master, 1..3 red, green, blue
+   std::map<int, int> sAdjChMap;   // per-adjustment channel selector: 0 master RGB, 1..3 red, green, blue
+   int& AdjChannel(int key) { return sAdjChMap[key]; }
    // Curves / Hue picked on the picture (Photoshop's hand): armed for one adjustment key; a drag on the canvas then moves
    // the curve point at the clicked tone up and down, or turns the hue left and right.
    struct AdjPick { int key = 0; uint64_t doc = 0; } sAdjPick;
@@ -1762,29 +1976,85 @@ namespace
             x.adjP.push_back(def[(size_t)i]);
       }
       float* p = x.adjP.data();
+      int& adjCh = AdjChannel(key);
       if (t == S::kAdjLevels || t == S::kAdjCurves)
       {
-         ComboRow(T("Channel"), &sAdjCh, { T("RGB"), T("Red"), T("Green"), T("Blue") });
-         sAdjCh = std::clamp(sAdjCh, 0, 3);
+         ComboRow(T("Channel"), &adjCh, { T("RGB"), T("Red"), T("Green"), T("Blue") });
+         adjCh = std::clamp(adjCh, 0, 3);
       }
       if (t == S::kAdjLevels)
       {
-         float* lv = sAdjCh == 0 ? x.levels : x.levelsCh[sAdjCh - 1];
+         float* lv = adjCh == 0 ? x.levels : x.levelsCh[adjCh - 1];
          const std::vector<float>& h = DocHistogram(doc, key);
-         if (!h.empty())
          {
             const float w = ImGui::GetContentRegionAvail().x;
+            const float histH = 44.0f, mkH = 10.0f;
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
-            ImGui::Dummy(ImVec2(w, 40.0f));
-            HistogramUnder(ImGui::GetWindowDrawList(), p0, ImVec2(p0.x + w, p0.y + 40.0f), h);
+            ImGui::InvisibleButton((std::string("##v2dlvh") + std::to_string(key)).c_str(), ImVec2(w, histH + mkH + 2.0f));
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 hp1(p0.x + w, p0.y + histH);
+            dl->AddRectFilled(p0, hp1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
+            if (!h.empty())
+               HistogramUnder(dl, p0, hp1, h);
+            dl->AddRect(p0, hp1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_control);
+            // Interactive Black / Gamma / White triangle handles beneath the histogram.
+            const float span = std::max(0.01f, lv[1] - lv[0]);
+            const float gPos = adjCh == 0 ? std::clamp(lv[0] + span * std::pow(0.5f, std::clamp(x.adjAmt, 0.1f, 4.0f)), lv[0] + 0.01f, lv[1] - 0.01f)
+                                          : (lv[0] + lv[1]) * 0.5f;
+            const float hx[3] = { p0.x + lv[0] * w, p0.x + gPos * w, p0.x + lv[1] * w };
+            const int nHandles = adjCh == 0 ? 3 : 2;
+            const int idxMap[3] = { 0, adjCh == 0 ? 1 : 2, 2 };
+            static int sLvDragKey = 0, sLvDragIdx = -1;
+            const ImVec2 mp = ImGui::GetIO().MousePos;
+            const float mt = std::clamp((mp.x - p0.x) / std::max(1.0f, w), 0.0f, 1.0f);
+            if (ImGui::IsItemActivated())
+            {
+               int best = -1;
+               float bestD = 12.0f;
+               for (int k = 0; k < nHandles; k++)
+               {
+                  const int hi = idxMap[k];
+                  const float d = std::fabs(hx[hi] - mp.x);
+                  if (d < bestD) { bestD = d; best = hi; }
+               }
+               if (best >= 0)
+               {
+                  PushUndoCheckpoint("Levels");
+                  sLvDragKey = key;
+                  sLvDragIdx = best;
+               }
+            }
+            if (ImGui::IsItemActive() && sLvDragKey == key && sLvDragIdx >= 0)
+            {
+               if (sLvDragIdx == 0)
+                  lv[0] = std::clamp(mt, 0.0f, std::max(0.0f, lv[1] - 0.02f));
+               else if (sLvDragIdx == 2)
+                  lv[1] = std::clamp(mt, std::min(1.0f, lv[0] + 0.02f), 1.0f);
+               else if (sLvDragIdx == 1 && adjCh == 0)
+               {
+                  const float u = std::clamp((mt - lv[0]) / std::max(0.02f, lv[1] - lv[0]), 0.02f, 0.98f);
+                  x.adjAmt = std::clamp(std::log(u) / std::log(0.5f), 0.1f, 4.0f);
+               }
+               Touch();
+            }
+            else if (ImGui::IsItemDeactivated() && sLvDragKey == key)
+               sLvDragIdx = -1;
+            for (int k = 0; k < nHandles; k++)
+            {
+               const int hi = idxMap[k];
+               const float cx = hx[hi], cy = hp1.y + 1.0f;
+               const ImU32 fill = hi == 0 ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                : hi == 2 ? ImGui::GetColorU32(ImGuiCol_Text)
+                                          : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+               dl->AddTriangleFilled(ImVec2(cx, cy), ImVec2(cx - 5.0f, cy + mkH), ImVec2(cx + 5.0f, cy + mkH), fill);
+               dl->AddTriangle(ImVec2(cx, cy), ImVec2(cx - 5.0f, cy + mkH), ImVec2(cx + 5.0f, cy + mkH),
+                               ImGui::GetColorU32(sLvDragKey == key && sLvDragIdx == hi ? ImGuiCol_Text : ImGuiCol_Border), 1.2f);
+            }
          }
-         {
-            Pairs g;
-            SliderRow(T("Input black"), &lv[0], 0.0f, 1.0f, "%.2f");
-            SliderRow(T("Input white"), &lv[1], 0.0f, 1.0f, "%.2f");
-            SliderRow(T("Output black"), &lv[2], 0.0f, 1.0f, "%.2f");
-            SliderRow(T("Output white"), &lv[3], 0.0f, 1.0f, "%.2f");
-         }
+         SliderRow(T("In Black"), &lv[0], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("In White"), &lv[1], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Out Black"), &lv[2], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Out White"), &lv[3], 0.0f, 1.0f, "%.2f");
          float autoLv[3][4];
          if (ActionButton::Draw((std::string(T("Auto")) + "##v2dauto" + std::to_string(key)).c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain) &&
              doc != nullptr && [&]() { int id = 0, eff = -1; KeySource(key, id, eff); return doc->AutoLevels(id, autoLv, eff); }())
@@ -1796,7 +2066,32 @@ namespace
          }
       }
       if (t == S::kAdjCurves)
-         CurveEditor(sAdjCh == 0 ? x.curve : x.curveCh[sAdjCh - 1], key * 4 + sAdjCh, &DocHistogram(doc, key));
+      {
+         FieldLabel(T("Preset"));
+         ImGui::SetNextItemWidth(sFieldW);
+         if (MenuParts::BeginCombo((std::string("##v2dcrvpre") + std::to_string(key)).c_str(), T("Choose...")))
+         {
+            struct CurvePreset { const char* name; std::vector<float> pts; };
+            static const CurvePreset kCurvePresets[] = {
+               { "Linear",          { 0.0f, 0.0f, 1.0f, 1.0f } },
+               { "S-Curve",         { 0.0f, 0.0f, 0.25f, 0.18f, 0.75f, 0.82f, 1.0f, 1.0f } },
+               { "Strong Contrast", { 0.0f, 0.0f, 0.22f, 0.10f, 0.78f, 0.90f, 1.0f, 1.0f } },
+               { "Fade Blacks",     { 0.0f, 0.12f, 0.30f, 0.30f, 1.0f, 1.0f } },
+               { "Lift Shadows",    { 0.0f, 0.0f, 0.25f, 0.36f, 0.75f, 0.78f, 1.0f, 1.0f } },
+               { "Invert",          { 0.0f, 1.0f, 1.0f, 0.0f } },
+            };
+            for (const CurvePreset& cp : kCurvePresets)
+               if (MenuParts::Choice(T(cp.name), false))
+               {
+                  PushUndoCheckpoint("Curve preset");
+                  (adjCh == 0 ? x.curve : x.curveCh[adjCh - 1]) = cp.pts;
+                  Touch();
+               }
+            MenuParts::EndCombo();
+         }
+         const std::vector<float>* ghosts[3] = { &x.curveCh[0], &x.curveCh[1], &x.curveCh[2] };
+         CurveEditor(adjCh == 0 ? x.curve : x.curveCh[adjCh - 1], key * 4 + adjCh, &DocHistogram(doc, key), adjCh, ghosts);
+      }
       if (t == S::kAdjCurves || t == S::kAdjHue)
       {
          const bool armed = sAdjPick.key == key && sAdjPick.doc == sDocUid;
@@ -1819,13 +2114,10 @@ namespace
                                              T("Whites"), T("Neutrals"), T("Blacks") });
          sAdjRange = std::clamp(sAdjRange, 0, 8);
          float* q = p + sAdjRange * 4;
-         {
-            Pairs g;
-            SliderRow(T("Cyan"), &q[0], -1.0f, 1.0f, "%.2f");
-            SliderRow(T("Magenta"), &q[1], -1.0f, 1.0f, "%.2f");
-            SliderRow(T("Yellow"), &q[2], -1.0f, 1.0f, "%.2f");
-            SliderRow(T("Black"), &q[3], -1.0f, 1.0f, "%.2f");
-         }
+         SliderRow(T("Cyan"), &q[0], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Magenta"), &q[1], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Yellow"), &q[2], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Black"), &q[3], -1.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjMixer)
       {
@@ -1838,12 +2130,9 @@ namespace
             sAdjOut = std::clamp(sAdjOut, 0, 2);
          }
          float* q = p + (mono ? 0 : sAdjOut) * 3;
-         {
-            Pairs g(3);
-            SliderRow(T("Red"), &q[0], -2.0f, 2.0f, "%.2f");
-            SliderRow(T("Green"), &q[1], -2.0f, 2.0f, "%.2f");
-            SliderRow(T("Blue"), &q[2], -2.0f, 2.0f, "%.2f");
-         }
+         SliderRow(T("Red"), &q[0], -2.0f, 2.0f, "%.2f");
+         SliderRow(T("Green"), &q[1], -2.0f, 2.0f, "%.2f");
+         SliderRow(T("Blue"), &q[2], -2.0f, 2.0f, "%.2f");
       }
       if (t == S::kAdjBlackWhite)
       {
@@ -1860,41 +2149,32 @@ namespace
       }
       if (t == S::kAdjShadowsHighlights)
       {
-         {
-            Pairs g;
-            SliderRow(T("Shadows"), &p[0], 0.0f, 1.0f, "%.2f");
-            SliderRow(T("Highlights"), &p[1], 0.0f, 1.0f, "%.2f");
-         }
+         SliderRow(T("Shadows"), &p[0], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Highlights"), &p[1], 0.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjWhiteBalance)
       {
-         {
-            Pairs g;
-            SliderRow(T("White Balance"), &p[0], -1.0f, 1.0f, "%.2f");
-            SliderRow(T("Tint"), &p[1], -1.0f, 1.0f, "%.2f");
-         }
+         SliderRow(T("Temp"), &p[0], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Tint"), &p[1], -1.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjSplitToning)
       {
-         SliderRow(T("Highlights Hue"), &p[0], 0.0f, 360.0f, "%.0f");
-         SliderRow(T("Highlights Saturation"), &p[1], 0.0f, 1.0f, "%.2f");
-         SliderRow(T("Shadows Hue"), &p[2], 0.0f, 360.0f, "%.0f");
-         SliderRow(T("Shadows Saturation"), &p[3], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Hi Hue"), &p[0], 0.0f, 360.0f, "%.0f°");
+         SliderRow(T("Hi Sat"), &p[1], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Shad Hue"), &p[2], 0.0f, 360.0f, "%.0f°");
+         SliderRow(T("Shad Sat"), &p[3], 0.0f, 1.0f, "%.2f");
          SliderRow(T("Balance"), &p[4], 0.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjRecolour)
       {
-         SliderRow(T("Hue"), &p[0], 0.0f, 360.0f, "%.0f");
+         SliderRow(T("Hue"), &p[0], 0.0f, 360.0f, "%.0f°");
          SliderRow(T("Saturation"), &p[1], 0.0f, 1.0f, "%.2f");
          SliderRow(T("Lightness"), &p[2], -1.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjNormals)
       {
-         {
-            Pairs g;
-            SliderRow(T("Rotation"), &p[0], -180.0f, 180.0f, "%.0f°");
-            SliderRow(T("Scale"), &p[1], 0.0f, 2.0f, "%.2f");
-         }
+         SliderRow(T("Rotation"), &p[0], -180.0f, 180.0f, "%.0f°");
+         SliderRow(T("Scale"), &p[1], 0.0f, 2.0f, "%.2f");
          bool fx = p[2] > 0.5f, fy = p[3] > 0.5f;
          if (BoolRow(T("Flip X"), &fx))
             p[2] = fx ? 1.0f : 0.0f;
@@ -1903,12 +2183,9 @@ namespace
       }
       if (t == S::kAdjToneCompression)
       {
-         {
-            Pairs g(3);
-            SliderRow(T("Exposure"), &p[0], 0.0f, 2.0f, "%.2f");
-            SliderRow(T("Gamma"), &p[1], 0.0f, 2.0f, "%.2f");
-            SliderRow(T("Colour"), &p[2], 0.0f, 1.0f, "%.2f");
-         }
+         SliderRow(T("Exposure"), &p[0], 0.0f, 2.0f, "%.2f");
+         SliderRow(T("Gamma"), &p[1], 0.0f, 2.0f, "%.2f");
+         SliderRow(T("Colour"), &p[2], 0.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjToneStretch)
       {
@@ -1943,7 +2220,12 @@ namespace
       spec.owner = "v2d.row." + key;
       spec.kind = T("picture node");
       const uint64_t docUid = sDocUid;
-      spec.accepts = [docUid](const GraphNode& gn) { return gn.uid != docUid && View2DCanAdd(gn); };
+      spec.accepts = [docUid](const GraphNode& gn)
+      {
+         const GraphNode* dgn = FindNodeByUid(docUid);
+         const auto* doc = dgn != nullptr ? dynamic_cast<const Scene2DNode*>(dgn->node.get()) : nullptr;
+         return gn.uid != docUid && View2DCanAdd(gn) && !WouldCreateDocCycle(doc, gn.node.get());
+      };
       spec.onPicked = [key](uint64_t u) { sRowPick = { key, u, true }; };
       CanvasLink::Field(FormParts::Id(label).c_str(), *uid, spec, allowNone, sFieldW);
       if (!sRowPick.has || sRowPick.key != key)
@@ -2455,7 +2737,22 @@ namespace
          else
             sPending.what = Pending::Delete;
       }
-      if (cmd && !shift && key(ImGuiKey_J)) sPending.what = Pending::Duplicate;
+      if ((cmd && !shift && key(ImGuiKey_J)) || (!cmd && !alt && shift && key(ImGuiKey_D)))
+         sPending.what = Pending::Duplicate;
+      if (cmd && !shift && !alt && key(ImGuiKey_R))
+      {
+         if (Layer* active = Active(doc))
+         {
+            sRename = active->id;
+            std::snprintf(sRenameBuf, sizeof(sRenameBuf), "%s", LayerName(*active).c_str());
+         }
+         else
+         {
+            PushUndoCheckpoint("Rulers");
+            doc->Doc().rulers = !doc->Doc().rulers;
+            Touch();
+         }
+      }
       if (cmd && !alt && key(ImGuiKey_E)) sPending.what = shift ? Pending::MergeVisible : Pending::MergeDown;
       if (cmd && alt && key(ImGuiKey_E)) sPending.what = shift ? Pending::StampVisible : Pending::StampDown;
       if (cmd && shift && !alt && key(ImGuiKey_C)) sPending.what = Pending::CopyMerged;
@@ -2618,7 +2915,7 @@ namespace
          Touch();
       };
       if (cmd && !shift && key(ImGuiKey_Apostrophe)) flip(d.grid, "Grid");
-      if (cmd && !shift && key(ImGuiKey_R)) flip(d.rulers, "Rulers");
+      if (cmd && shift && key(ImGuiKey_R)) flip(d.rulers, "Rulers");
       if (cmd && !shift && key(ImGuiKey_Semicolon)) flip(d.guidesOn, "Guides");
       if (cmd && shift && key(ImGuiKey_Semicolon)) flip(d.snap, "Snap");
       if (sTool == kCrop && sCropOn)
@@ -6586,8 +6883,9 @@ namespace
          {
             if (x.adjType == Scene2DNode::kAdjCurves)
             {
-               const float v = sAdjCh == 0 ? 0.2126f * c[0] + 0.7152f * c[1] + 0.0722f * c[2] : c[sAdjCh - 1];
-               std::vector<float>& cv = sAdjCh == 0 ? x.curve : x.curveCh[sAdjCh - 1];
+               const int ch = std::clamp(AdjChannel(key), 0, 3);
+               const float v = ch == 0 ? 0.2126f * c[0] + 0.7152f * c[1] + 0.0722f * c[2] : c[ch - 1];
+               std::vector<float>& cv = ch == 0 ? x.curve : x.curveCh[ch - 1];
                sOp.hx = std::clamp(v, 0.0f, 1.0f);
                sOp.hy = CurveAt(cv, sOp.hx);
             }
@@ -7011,7 +7309,8 @@ namespace
             {
                if (x.adjType == Scene2DNode::kAdjCurves)
                {
-                  std::vector<float>& cv = sAdjCh == 0 ? x.curve : x.curveCh[sAdjCh - 1];
+                  const int ch = std::clamp(AdjChannel(sOp.guideIndex), 0, 3);
+                  std::vector<float>& cv = ch == 0 ? x.curve : x.curveCh[ch - 1];
                   const int i = CurvePointAt(cv, sOp.hx);
                   if (i >= 0)
                      cv[(size_t)i * 2 + 1] = std::clamp(sOp.hy + dy, 0.0f, 1.0f);
@@ -7422,7 +7721,7 @@ namespace
          int cur = 0;
          for (GraphNode& gn : gNodes)
          {
-            if (gn.node.get() == doc || !View2DCanAdd(gn))
+            if (gn.node.get() == doc || !View2DCanAdd(gn) || WouldCreateDocCycle(doc, gn.node.get()))
                continue;
             if (gn.uid == d.brushSrc[k])
                cur = (int)uids.size();
@@ -9738,6 +10037,10 @@ namespace
 
    int sEyeDrag = -1;   // a drag down the eye column: 1 shows, 0 hides what it crosses, -1 none
 
+   bool HasCopiedEffects();
+   void CopyLayerEffects(const Layer& l);
+   void PasteLayerEffects(Scene2DNode* doc, int id);
+
    void DrawLayerRows(Scene2DNode* doc, int parent, int depth, float w)
    {
       if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
@@ -9885,7 +10188,8 @@ namespace
          }
          else
          {
-            const std::string name = LayerName(*l);
+            const std::string full = LayerName(*l);
+            const std::string name = app::TruncateWithEllipsis(full, std::max(16.0f, p.x + w - x - 24.0f));
             const bool missing = l->kind == Kind::Node && doc->Source(*l) == nullptr;
             ImGui::AlignTextToFramePadding();
             if (missing)
@@ -9895,6 +10199,8 @@ namespace
          }
          if (l->lock != 0)
             glyph::Draw(dl, ImVec2(p.x + w - 12, p.y + rowH * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_TextDisabled), IconsInfinite::Lock);
+         else
+            glyph::Draw(dl, ImVec2(p.x + w - 12, p.y + rowH * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.55f), IconsInfinite::Grip);
          // The row itself: select, rename, drag to restack.
          ImGui::SetCursorScreenPos(ImVec2(x, p.y));
          ImGui::SetNextItemAllowOverlap();
@@ -9920,10 +10226,20 @@ namespace
          if (ImGui::BeginDragDropTarget())
          {
             const float t = (io.MousePos.y - p.y) / rowH;
-            const bool into = l->kind == Kind::Group && t > 0.3f && t < 0.7f;
-            const bool below = !into && t >= 0.5f;
+            const ImGuiPayload* peek = ImGui::GetDragDropPayload();
+            const int peekId = (peek != nullptr && peek->IsDataType("V2D_LAYER") && peek->DataSize == sizeof(int)) ? *(const int*)peek->Data : 0;
+            const Layer* peekLayer = peekId != 0 ? doc->FindLayer(peekId) : nullptr;
+            const bool clipDrop = peekLayer != nullptr && peekLayer->kind == Kind::Adjust && peekId != id &&
+                                  l->kind != Kind::Group && l->kind != Kind::Adjust && t > 0.25f && t < 0.75f;
+            const bool into = !clipDrop && l->kind == Kind::Group && t > 0.3f && t < 0.7f;
+            const bool below = !into && !clipDrop && t >= 0.5f;
             const ImU32 col = Hex(kOutline);
-            if (into)
+            if (clipDrop)
+            {
+               dl->AddRect(p, ImVec2(p.x + w, p.y + rowH), col, tok::radius_cell, 0, 2.0f);
+               ImGui::SetTooltip(T("Clip to %s"), LayerName(*l).c_str());
+            }
+            else if (into)
                dl->AddRect(p, ImVec2(p.x + w, p.y + rowH), col, 3.0f, 0, 2.0f);
             else
                dl->AddLine(ImVec2(p.x, below ? p.y + rowH : p.y), ImVec2(p.x + w, below ? p.y + rowH : p.y), col, 2.0f);
@@ -9937,14 +10253,25 @@ namespace
                   const int dup = doc->Duplicate(moving);
                   if (dup != 0 && dup != id)
                   {
-                     doc->MoveLayer(dup, id, below, into);
+                     doc->MoveLayer(dup, id, clipDrop ? false : below, into);
+                     if (Layer* dl2 = doc->FindLayer(dup))
+                        dl2->clip = clipDrop;
                      SelectOnly(dup);
+                     Touch();
                   }
                }
                else if (moving != id && !doc->IsInside(id, moving))
                {
-                  PushUndoCheckpoint("Move layer");
-                  doc->MoveLayer(moving, id, below, into);
+                  PushUndoCheckpoint(clipDrop ? "Clip adjustment to layer" : "Move layer");
+                  doc->MoveLayer(moving, id, clipDrop ? false : below, into);
+                  if (Layer* ml = doc->FindLayer(moving))
+                  {
+                     if (clipDrop)
+                        ml->clip = true;
+                     else if (ml->kind == Kind::Adjust && (below || into))
+                        ml->clip = false;
+                  }
+                  Touch();
                }
             }
             ImGui::EndDragDropTarget();
@@ -9968,6 +10295,10 @@ namespace
             if (MenuParts::Item(T("Copy"), Sc("Ctrl+C"))) sPending.what = Pending::Copy;
             if (MenuParts::Item(T("Copy Merged"), Sc("Shift+Ctrl+C"))) sPending.what = Pending::CopyMerged;
             if (MenuParts::Item(T("Paste"), Sc("Ctrl+V"))) sPending.what = Pending::Paste;
+            if (!l->effects.empty() && MenuParts::Item(T("Copy Effects"), nullptr))
+               CopyLayerEffects(*l);
+            if (HasCopiedEffects() && l->kind != Kind::Adjust && MenuParts::Item(T("Paste Effects"), nullptr))
+               PasteLayerEffects(doc, id);
             if (MenuParts::Item(l->kind == Kind::Group ? T("Duplicate Group") : T("Duplicate Layer"), Sc("Ctrl+J")))
                sPending.what = Pending::Duplicate;
             TransformSubMenu(doc);
@@ -10226,7 +10557,7 @@ namespace
          bool any = false;
          for (GraphNode& gn : gNodes)
          {
-            if (gn.node.get() == doc || !View2DCanAdd(gn))
+            if (gn.node.get() == doc || !View2DCanAdd(gn) || WouldCreateDocCycle(doc, gn.node.get()))
                continue;
             any = true;
             const std::string name = gn.typeName + " " + std::to_string(gn.index) + "##n" + std::to_string(gn.uid);
@@ -10762,7 +11093,7 @@ namespace
       { "Fluid", "Sim", "Fluid", "Compositing", true, false },
       { "Reaction Diffusion", "Sim", "Reaction Diffusion", "Compositing", true, false },
       { "Field Pixel", "Code", "FieldPixel", "Source", true, false },
-      { "Remove Background", "Mask", "Remove Background", "Compositing", true, true },
+      { "Remove Background", "Mask", "Remove Background", "Compositing", false, true },
    };
    const char* const kEffGroups[] = { "Adjust", "Blur", "Distort", "Stylize", "Colour", "Time", "Sim", "Code", "Mask" };
 
@@ -10883,6 +11214,13 @@ namespace
       GraphNode* gn = SpawnNode(ne.type, ne.category, x, y);   // checkpoints the undo itself
       if (gn == nullptr)
          return 0;
+      // Field Pixel starts as a UV generator with no image input pin; seed it with an image-input pass-through
+      // kernel so DeclaredImageInput(0) exists immediately when attached as a 2D View effect.
+      if (auto* fp = dynamic_cast<FieldPixelNode*>(gn->node.get()))
+      {
+         fp->code = "input pixel image img;\ncol = img.rgb;\nalpha = img.a;";
+         fp->CookIfNeeded(-1);
+      }
       const uint64_t uid = gn->uid;
       if (ne.helper != nullptr)
          if (GraphNode* h = SpawnNode(ne.helper, ne.helperCat, x - 260.0f, y))   // can move gNodes: find the effect again
@@ -10897,9 +11235,11 @@ namespace
       return uid;
    }
 
-   // A param name as a label: "edgeSoftness" -> "Edge softness".
+   // A param name as a label: "edgeSoftness" -> "Edge softness" (with short labels for verbose names).
    std::string ParamLabel(const char* name)
    {
+      if (std::strcmp(name, "blendMode") == 0) return "Blend";
+      if (std::strcmp(name, "delayFrames") == 0) return "Delay";
       std::string out;
       for (const char* c = name; *c; c++)
       {
@@ -10981,7 +11321,8 @@ namespace
          HelpTip("%s", T("On"));
       FormParts::Inline(0.0f, tok::space_2);
       ImGui::SetCursorPosY(rowY);
-      const float chipsW = 3.0f * sChip + 2.0f * tok::space_1;
+      const float gripW = 16.0f;
+      const float chipsW = sChip + tok::space_1 + gripW;
       const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
       const ImVec2 np = ImGui::GetCursorScreenPos();
       const float fh = ImGui::GetFrameHeight();
@@ -10996,6 +11337,8 @@ namespace
       }
       if (ImGui::BeginDragDropTarget())
       {
+         const ImU32 dcol = Hex(kOutline);
+         ImGui::GetWindowDrawList()->AddLine(np, ImVec2(np.x + nameW, np.y), dcol, 2.0f);
          if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("V2DEFF"))
          {
             const int* pay = (const int*)p->Data;
@@ -11008,46 +11351,38 @@ namespace
          folded = false;
       {
          const bool hov = ImGui::IsItemHovered();
+         if (hov)
+            HelpTip("%s", e.uid != 0 ? T("Node-backed effect: click to fold, drag to reorder")
+                                     : T("Click to fold, drag to reorder"));
          const ImU32 col = ImGui::GetColorU32(e.on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !e.on ? 1.0f : 0.85f);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(np.x + 5.0f, np.y + fh * 0.5f);
          if (!folded)
-            dl->AddTriangleFilled(ImVec2(c.x - 4, c.y - 2), ImVec2(c.x + 4, c.y - 2), ImVec2(c.x, c.y + 3), col);
+            dl->AddTriangleFilled(ImVec2(c.x - 3.5f, c.y - 2), ImVec2(c.x + 3.5f, c.y - 2), ImVec2(c.x, c.y + 3), col);
          else
-            dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 4), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 4), col);
-         dl->PushClipRect(np, ImVec2(np.x + nameW, np.y + fh), true);
-         dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, name.c_str());
-         dl->PopClipRect();
+            dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 3.5f), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 3.5f), col);
+         const std::string display = app::TruncateWithEllipsis(e.uid != 0 ? (name + " · Node") : name, std::max(16.0f, nameW - 18.0f));
+         dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, display.c_str());
       }
       FormParts::Inline(0.0f, tok::space_2);
-      if (i > 0)
-      {
-         if (IconChip((base + "up").c_str(), IconsInfinite::ChevronUp, false, T("Earlier")))
-            sEffOp = { l.id, i, 1, sDocUid };
-      }
-      else
-         ImGui::Dummy(ImVec2(sChip, sChip));
-      FormParts::Inline(0.0f, tok::space_1);
-      if (i + 1 < (int)l.effects.size())
-      {
-         if (IconChip((base + "dn").c_str(), IconsInfinite::ChevronDown, false, T("Later")))
-            sEffOp = { l.id, i, 2, sDocUid };
-      }
-      else
-         ImGui::Dummy(ImVec2(sChip, sChip));
-      FormParts::Inline(0.0f, tok::space_1);
       if (IconChip((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove effect")))
          sEffOp = { l.id, i, 3, sDocUid };
+      FormParts::Inline(0.0f, tok::space_1);
+      {
+         const ImVec2 gp = ImGui::GetCursorScreenPos();
+         ImGui::InvisibleButton((base + "grip").c_str(), ImVec2(gripW, fh));
+         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+         {
+            const int pay[2] = { l.id, i };
+            ImGui::SetDragDropPayload("V2DEFF", pay, sizeof(pay));
+            ImGui::EndDragDropSource();
+         }
+         glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(gp.x + gripW * 0.5f, gp.y + fh * 0.5f), tok::icon_control,
+                     ImGui::GetColorU32(ImGuiCol_TextDisabled, ImGui::IsItemHovered() ? 0.95f : 0.55f), IconsInfinite::Grip);
+      }
       if (!e.on || folded)
          return;
-      SliderRow(T("Opacity"), &e.opacity, 0.0f, 1.0f, "%.2f");
-      if (!e.toMask)
-      {
-         std::vector<std::string> blends;
-         for (const char* b : S::kEffBlendNames)
-            blends.push_back(T(b));
-         ComboRow(T("Blend"), &e.blend, blends);
-      }
+      // Primary effect controls first (consistent with Adjustments), then Blend/Opacity at the bottom.
       if (e.uid == 0)
       {
          float lo = 0, hi = 1;
@@ -11062,54 +11397,155 @@ namespace
             ColorRow(T("Shadows"), e.colorA);
             ColorRow(T("Highlights"), e.colorB);
          }
-         return;
       }
-      GraphNode* gn = FindNodeByUid(e.uid);
-      if (gn == nullptr)
+      else
       {
-         FieldLabel(T("Node gone"));
-         return;
-      }
-      EffParamRows rows;
-      gn->node->VisitParams(rows);
-      if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn->node.get()))
-      {
-         if (ActionButton::Draw((std::string(T("Remove Background")) + base + "rbg").c_str(), ImVec2(-1.0f, 0.0f),
-                                ActionButton::Kind::Plain))
+         GraphNode* gn = FindNodeByUid(e.uid);
+         if (gn == nullptr)
+            FieldLabel(T("Node gone"));
+         else
          {
-            PushUndoCheckpoint("Remove Background");
-            rbg->RequestMask();
-            Touch();
+            if (auto* fn = dynamic_cast<FilterNode*>(gn->node.get()))
+            {
+               const FilterDef& def = fn->Def();
+               for (size_t pi = 0; pi < def.params.size(); pi++)
+               {
+                  const FilterParamDef& pd = def.params[pi];
+                  const std::string plabel = ParamLabel(pd.label.c_str());
+                  float* pv = fn->ParamPtr(pi);
+                  if (pd.type == FilterParamDef::Type::Float)
+                  {
+                     const char* fmt = !pd.format.empty() ? pd.format.c_str() : (pd.integer ? "%.0f" : "%.2f");
+                     if (SliderRow(T(plabel.c_str()), pv, pd.minVal, pd.maxVal, fmt) && pd.integer)
+                        *pv = std::round(*pv);
+                  }
+                  else if (pd.type == FilterParamDef::Type::Int)
+                  {
+                     if (SliderRow(T(plabel.c_str()), pv, pd.minVal, pd.maxVal, "%.0f"))
+                        *pv = std::round(*pv);
+                  }
+                  else if (pd.type == FilterParamDef::Type::Bool)
+                  {
+                     bool bv = *pv > 0.5f;
+                     if (BoolRow(T(plabel.c_str()), &bv))
+                        *pv = bv ? 1.0f : 0.0f;
+                  }
+                  else if (pd.type == FilterParamDef::Type::Enum && !pd.options.empty())
+                  {
+                     int ev = (int)std::lround(*pv);
+                     std::vector<std::string> opts;
+                     for (const std::string& o : pd.options)
+                        opts.push_back(T(o.c_str()));
+                     if (ComboRow(T(plabel.c_str()), &ev, opts))
+                        *pv = (float)ev;
+                  }
+                  else if (pd.type == FilterParamDef::Type::Color)
+                  {
+                     float c[4] = { pv[0], pv[1], pv[2], 1.0f };
+                     if (ColorRow(T(plabel.c_str()), c))
+                        std::copy(c, c + 3, pv);
+                  }
+               }
+            }
+            else
+            {
+               EffParamRows rows;
+               gn->node->VisitParams(rows);
+            }
+            if (auto* rbg = dynamic_cast<RemoveBgNode*>(gn->node.get()))
+            {
+               if (ActionButton::Draw((std::string(T("Remove Background")) + base + "rbg").c_str(), ImVec2(-1.0f, 0.0f),
+                                      ActionButton::Kind::Plain))
+               {
+                  PushUndoCheckpoint("Remove Background");
+                  rbg->RequestMask();
+                  Touch();
+               }
+               ImGui::TextDisabled("%s", rbg->Status().c_str());
+            }
+            if (ActionButton::Draw((std::string(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show)) + base + "show").c_str(), ImVec2(-1.0f, 0.0f),
+                                   ActionButton::Kind::Plain))
+            {
+               PushUndoCheckpoint("Show effect node");
+               e.shown = !e.shown;
+               Touch();
+            }
          }
-         ImGui::TextDisabled("%s", rbg->Status().c_str());
       }
-      if (ActionButton::Draw((std::string(CanvasLink::Label(e.shown ? CanvasLink::Verb::Hide : CanvasLink::Verb::Show)) + base + "show").c_str(), ImVec2(-1.0f, 0.0f),
-                             ActionButton::Kind::Plain))
+      ImGui::Separator();
+      SliderRow(T("Opacity"), &e.opacity, 0.0f, 1.0f, "%.2f");
+      if (!e.toMask)
       {
-         PushUndoCheckpoint("Show effect node");
-         e.shown = !e.shown;
-         Touch();
+         std::vector<std::string> blends;
+         for (const char* b : S::kEffBlendNames)
+            blends.push_back(T(b));
+         ComboRow(T("Blend"), &e.blend, blends);
       }
    }
 
-   void AddEffectMenu(Layer& l)
+   bool FilterMatch(const char* haystack, const char* needle)
+   {
+      if (needle == nullptr || needle[0] == 0)
+         return true;
+      std::string h(haystack), q(needle);
+      for (char& ch : h) ch = (char)std::tolower((unsigned char)ch);
+      for (char& ch : q) ch = (char)std::tolower((unsigned char)ch);
+      return h.find(q) != std::string::npos;
+   }
+
+   void AddEffectMenu(Layer& l, float btnW = -1.0f)
    {
       using S = Scene2DNode;
-      if (ActionButton::Draw((std::string(T("Add effect")) + "##v2deffadd").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+      static char sEffSearch[64] = "";
+      static ImVec2 sEffPopPos(0, 0);
+      if (ActionButton::Draw((std::string(T("Add effect")) + "##v2deffadd").c_str(), ImVec2(btnW, 0.0f), ActionButton::Kind::Plain))
+      {
+         sEffSearch[0] = 0;
+         sEffPopPos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
          ImGui::OpenPopup("##v2deffpop");
+      }
+      ImGui::SetNextWindowPos(sEffPopPos, ImGuiCond_Appearing);
       if (!MenuParts::BeginPopup("##v2deffpop"))
          return;
-      for (const char* g : kEffGroups)
+      ImGui::SetNextItemWidth(sFieldW);
+      if (ImGui::IsWindowAppearing())
+         ImGui::SetKeyboardFocusHere();
+      FieldWell::InputText("##v2deffq", sEffSearch, sizeof sEffSearch);
+      MenuParts::Separator();
+      if (sEffSearch[0] != 0)
       {
-         if (!ImGui::BeginMenu(T(g)))
-            continue;
+         bool any = false;
          for (int t = 0; t < S::kAdjCount; t++)
-            if (std::strcmp(S::AdjGroup(t), g) == 0 && MenuParts::Item(T(S::AdjName(t)), nullptr, false, true))
-               sEffAdd = { l.id, t, -1, sDocUid };
+            if (FilterMatch(T(S::AdjName(t)), sEffSearch) || FilterMatch(S::AdjGroup(t), sEffSearch))
+            {
+               any = true;
+               if (MenuParts::Item(T(S::AdjName(t)), T(S::AdjGroup(t)), false, true))
+                  sEffAdd = { l.id, t, -1, sDocUid };
+            }
          for (int k = 0; k < (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0])); k++)
-            if (std::strcmp(kNodeEffects[k].group, g) == 0 && MenuParts::Item(T(kNodeEffects[k].label), nullptr, false, true))
-               sEffAdd = { l.id, -1, k, sDocUid };
-         ImGui::EndMenu();
+            if (FilterMatch(T(kNodeEffects[k].label), sEffSearch) || FilterMatch(kNodeEffects[k].group, sEffSearch))
+            {
+               any = true;
+               if (MenuParts::Item(T(kNodeEffects[k].label), T(kNodeEffects[k].group), false, true))
+                  sEffAdd = { l.id, -1, k, sDocUid };
+            }
+         if (!any)
+            ImGui::TextDisabled("%s", T("No matching effects"));
+      }
+      else
+      {
+         for (const char* g : kEffGroups)
+         {
+            if (!MenuParts::SubMenu(T(g), true))
+               continue;
+            for (int t = 0; t < S::kAdjCount; t++)
+               if (std::strcmp(S::AdjGroup(t), g) == 0 && MenuParts::Item(T(S::AdjName(t)), nullptr, false, true))
+                  sEffAdd = { l.id, t, -1, sDocUid };
+            for (int k = 0; k < (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0])); k++)
+               if (std::strcmp(kNodeEffects[k].group, g) == 0 && MenuParts::Item(T(kNodeEffects[k].label), nullptr, false, true))
+                  sEffAdd = { l.id, -1, k, sDocUid };
+            ImGui::EndMenu();
+         }
       }
       MenuParts::EndPopup();
    }
@@ -11198,68 +11634,33 @@ namespace
       return out;
    }
 
-   void EffectPresets(Layer& l)
+   std::string sEffClipText, sEffClipParams;
+   bool HasCopiedEffects() { return !sEffClipText.empty(); }
+   void CopyLayerEffects(const Layer& l)
    {
-      static char name[64] = "";
-      FieldLabel(T("Preset"));
-      ImGui::SetNextItemWidth(sFieldW);
-      FieldWell::PushStyle();
-      ImGui::InputTextWithHint("##v2deffname", T("Name"), name, sizeof name);
-      FieldWell::PopStyle();
-      ImGui::BeginDisabled(name[0] == 0 || l.effects.empty());   // greyed until there is a name and a stack to save
-      const bool saveStack = ActionButton::Draw((std::string(T("Save stack")) + "##v2deffsave").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain);
-      ImGui::EndDisabled();
-      if (saveStack && name[0] != 0 && !l.effects.empty())
-      {
-         std::error_code ec;
-         std::filesystem::create_directories(EffPresetDir(), ec);
-         std::ofstream f(AppPaths::FsPath(EffPresetDir() + "/" + name + ".inf2dfx"));
-         f << Scene2DNode::EffectsText(l) << "\n--params\n" << EffectParamsText(l);
-      }
-      std::vector<std::string> files;
-      std::error_code ec;
-      for (const auto& de : std::filesystem::directory_iterator(EffPresetDir(), ec))
-         if (de.path().extension() == ".inf2dfx")
-            files.push_back(de.path().stem().string());
-      if (files.empty())
+      sEffClipText = Scene2DNode::EffectsText(l);
+      sEffClipParams = EffectParamsText(l);
+   }
+   void PasteLayerEffects(Scene2DNode* doc, int id)
+   {
+      Layer* cur = doc != nullptr ? doc->FindLayer(id) : nullptr;
+      if (cur == nullptr || sEffClipText.empty())
          return;
-      std::sort(files.begin(), files.end());
-      int pick = -1;
-      std::vector<std::string> names = { T("Load stack") };
-      names.insert(names.end(), files.begin(), files.end());
-      int shown = 0;
-      if (ComboRow(T("Load"), &shown, names) && shown > 0)
-         pick = shown - 1;
-      if (pick < 0)
+      Layer got = *cur;
+      if (!Scene2DNode::ParseEffects(sEffClipText, got))
          return;
-      std::ifstream f(AppPaths::FsPath(EffPresetDir() + "/" + files[(size_t)pick] + ".inf2dfx"));
-      std::stringstream ss;
-      ss << f.rdbuf();
-      std::string text = ss.str(), params;
-      const size_t cut = text.find("\n--params\n");
-      if (cut != std::string::npos)
-      {
-         params = text.substr(cut + 10);
-         text.resize(cut);
-      }
-      Layer got = l;
-      if (!Scene2DNode::ParseEffects(text, got))
-         return;
-      std::map<int, ParamSet> sets = ParseEffectParams(params);
-      // Node effects come back as new nodes of the same kind, with the params the preset saved.
+      std::map<int, ParamSet> sets = ParseEffectParams(sEffClipParams);
       std::vector<Scene2DNode::Effect> keep;
       for (int gi = 0; gi < (int)got.effects.size(); gi++)
       {
-         Scene2DNode::Effect& e = got.effects[(size_t)gi];
-         if (e.uid == 0)
+         Scene2DNode::Effect& ef = got.effects[(size_t)gi];
+         if (ef.uid == 0)
          {
-            keep.push_back(e);
+            keep.push_back(ef);
             continue;
          }
-         GraphNode* old = FindNodeByUid(e.uid);
-         const std::string type = old != nullptr ? old->typeName : std::string();
          for (const NodeEffectEntry& ne : kNodeEffects)
-            if (e.entry == ne.label)
+            if (ef.entry == ne.label)
                if (const uint64_t uid = SpawnEffectNode(ne, 0.0f, 0.0f))
                {
                   const auto ps = sets.find(gi);
@@ -11267,16 +11668,109 @@ namespace
                      if (GraphNode* gn = FindNodeByUid(uid))
                         if (gn->node)
                            gn->node->VisitParams(ps->second);
-                  e.uid = uid;
-                  e.shown = true;
-                  keep.push_back(e);
+                  ef.uid = uid;
+                  ef.shown = false;
+                  keep.push_back(ef);
                }
-         (void)type;
       }
-      PushUndoCheckpoint("Load effect stack");
-      for (Scene2DNode::Effect& e : keep)
-         l.effects.push_back(e);
-      Touch();
+      if (Layer* target = doc->FindLayer(id))
+      {
+         PushUndoCheckpoint("Paste effects");
+         for (Scene2DNode::Effect& ef : keep)
+            target->effects.push_back(ef);
+         Touch();
+      }
+   }
+
+   void EffectPresets(Layer& l, float btnW = -1.0f)
+   {
+      static char name[64] = "";
+      static std::vector<std::string> sFiles;
+      auto rescan = [&]()
+      {
+         sFiles.clear();
+         std::error_code ec;
+         for (const auto& de : std::filesystem::directory_iterator(EffPresetDir(), ec))
+            if (de.path().extension() == ".inf2dfx")
+               sFiles.push_back(de.path().stem().string());
+         std::sort(sFiles.begin(), sFiles.end());
+      };
+      static ImVec2 sPrePos(0, 0);
+      if (ActionButton::Draw((std::string(T("Presets")) + "##v2deffprebtn").c_str(), ImVec2(btnW, 0.0f), ActionButton::Kind::Plain))
+      {
+         rescan();
+         sPrePos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
+         ImGui::OpenPopup("##v2deffprepop");
+      }
+      ImGui::SetNextWindowPos(sPrePos, ImGuiCond_Appearing);
+      if (!MenuParts::BeginPopup("##v2deffprepop"))
+         return;
+      ImGui::SetNextItemWidth(sFieldW);
+      FieldWell::InputText("##v2deffname", name, sizeof name);
+      ImGui::BeginDisabled(name[0] == 0 || l.effects.empty());
+      const bool saveStack = ActionButton::Draw((std::string(T("Save stack")) + "##v2deffsave").c_str(), ImVec2(sFieldW, 0.0f), ActionButton::Kind::Plain);
+      ImGui::EndDisabled();
+      if (saveStack && name[0] != 0 && !l.effects.empty())
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(EffPresetDir(), ec);
+         std::ofstream f(AppPaths::FsPath(EffPresetDir() + "/" + name + ".inf2dfx"));
+         f << Scene2DNode::EffectsText(l) << "\n--params\n" << EffectParamsText(l);
+         rescan();
+      }
+      if (!sFiles.empty())
+      {
+         MenuParts::Separator();
+         for (size_t fi = 0; fi < sFiles.size(); fi++)
+         {
+            if (MenuParts::Item(sFiles[fi].c_str()))
+            {
+               std::ifstream f(AppPaths::FsPath(EffPresetDir() + "/" + sFiles[fi] + ".inf2dfx"));
+               std::stringstream ss;
+               ss << f.rdbuf();
+               std::string text = ss.str(), params;
+               const size_t cut = text.find("\n--params\n");
+               if (cut != std::string::npos)
+               {
+                  params = text.substr(cut + 10);
+                  text.resize(cut);
+               }
+               Layer got = l;
+               if (Scene2DNode::ParseEffects(text, got))
+               {
+                  std::map<int, ParamSet> sets = ParseEffectParams(params);
+                  std::vector<Scene2DNode::Effect> keep;
+                  for (int gi = 0; gi < (int)got.effects.size(); gi++)
+                  {
+                     Scene2DNode::Effect& e = got.effects[(size_t)gi];
+                     if (e.uid == 0)
+                     {
+                        keep.push_back(e);
+                        continue;
+                     }
+                     for (const NodeEffectEntry& ne : kNodeEffects)
+                        if (e.entry == ne.label)
+                           if (const uint64_t uid = SpawnEffectNode(ne, 0.0f, 0.0f))
+                           {
+                              const auto ps = sets.find(gi);
+                              if (ps != sets.end())
+                                 if (GraphNode* gn = FindNodeByUid(uid))
+                                    if (gn->node)
+                                       gn->node->VisitParams(ps->second);
+                              e.uid = uid;
+                              e.shown = false;
+                              keep.push_back(e);
+                           }
+                  }
+                  PushUndoCheckpoint("Load effect stack");
+                  for (Scene2DNode::Effect& e : keep)
+                     l.effects.push_back(e);
+                  Touch();
+               }
+            }
+         }
+      }
+      MenuParts::EndPopup();
    }
 
    // Attaches a node effect from `kNodeEffects` to `layerId` and triggers it immediately if applicable.
@@ -11295,7 +11789,7 @@ namespace
          Scene2DNode::Effect e;
          e.uid = uid;
          e.entry = ne.label;
-         e.shown = true;
+         e.shown = false;
          e.animated = ne.animated;
          e.toMask = ne.toMask;
          if (GraphNode* spawnedGn = FindNodeByUid(uid))
@@ -11367,11 +11861,14 @@ namespace
 
    void EffectStack(Scene2DNode* doc, Layer& l)
    {
-      SectionCard::Begin(T("Stack"));
-      AddEffectMenu(l);
+      SectionCard::Begin(T("Effects"));
+      const float avail = ImGui::GetContentRegionAvail().x;
+      const float preW = 84.0f;
+      AddEffectMenu(l, std::max(60.0f, avail - preW - tok::space_1));
+      FormParts::Inline(0.0f, tok::space_1);
+      EffectPresets(l, preW);
       if (!l.effects.empty())
          NodeRow(T("Mask from"), &l.effMaskUid, true, "effmask" + std::to_string(l.id));
-      EffectPresets(l);
       for (int i = 0; i < (int)l.effects.size(); i++)
       {
          ImGui::PushID(1000 + i);
@@ -11480,48 +11977,64 @@ namespace
 
    std::string StylePresetDir() { return AppPaths::AppSupportDir() + "/2dstyle"; }
 
-   // Layer style presets: the layer's styles saved by name, applied to any layer (replacing its styles).
-   void StylePresets(Layer& l)
+   // Layer style presets: compact popup next to Add style (no separate redundant Style card).
+   void StylePresets(Layer& l, float btnW = -1.0f)
    {
       static char name[64] = "";
-      SectionCard::Begin(T("Style"));
-      FieldLabel(T("Preset"));
+      static std::vector<std::string> sFiles;
+      auto rescan = [&]()
+      {
+         sFiles.clear();
+         std::error_code ec;
+         for (const auto& de : std::filesystem::directory_iterator(StylePresetDir(), ec))
+            if (de.path().extension() == ".inf2dstyle")
+               sFiles.push_back(de.path().stem().string());
+         std::sort(sFiles.begin(), sFiles.end());
+      };
+      static ImVec2 sStyPos(0, 0);
+      if (ActionButton::Draw((std::string(T("Presets")) + "##v2dstyleprebtn").c_str(), ImVec2(btnW, 0.0f), ActionButton::Kind::Plain))
+      {
+         rescan();
+         sStyPos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
+         ImGui::OpenPopup("##v2dstyleprepop");
+      }
+      ImGui::SetNextWindowPos(sStyPos, ImGuiCond_Appearing);
+      if (!MenuParts::BeginPopup("##v2dstyleprepop"))
+         return;
       ImGui::SetNextItemWidth(sFieldW);
-      FieldWell::PushStyle();
-      ImGui::InputTextWithHint("##v2dstylename", T("Name"), name, sizeof name);
-      FieldWell::PopStyle();
-      ImGui::BeginDisabled(name[0] == 0 || !l.AnyFx());   // greyed until there is a name and a style to save
-      const bool saveStyle = ActionButton::Draw((std::string(T("Save style")) + "##v2dstylesave").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain);
+      FieldWell::InputText("##v2dstylename", name, sizeof name);
+      ImGui::BeginDisabled(name[0] == 0 || !l.AnyFx());
+      const bool saveStyle = ActionButton::Draw((std::string(T("Save style")) + "##v2dstylesave").c_str(), ImVec2(sFieldW, 0.0f), ActionButton::Kind::Plain);
       ImGui::EndDisabled();
       if (saveStyle && name[0] != 0 && l.AnyFx())
       {
          std::error_code ec;
          std::filesystem::create_directories(StylePresetDir(), ec);
          std::ofstream(AppPaths::FsPath(StylePresetDir() + "/" + name + ".inf2dstyle")) << Scene2DNode::StyleText(l);
+         rescan();
       }
-      std::vector<std::string> files;
-      std::error_code ec;
-      for (const auto& de : std::filesystem::directory_iterator(StylePresetDir(), ec))
-         if (de.path().extension() == ".inf2dstyle")
-            files.push_back(de.path().stem().string());
-      if (files.empty())
-         return;
-      std::sort(files.begin(), files.end());
-      std::vector<std::string> names = { T("Apply style") };
-      names.insert(names.end(), files.begin(), files.end());
-      int shown = 0;
-      if (!ComboRow(T("Apply"), &shown, names) || shown <= 0)
-         return;
-      std::ifstream f(AppPaths::FsPath(StylePresetDir() + "/" + files[(size_t)shown - 1] + ".inf2dstyle"));
-      std::stringstream ss;
-      ss << f.rdbuf();
-      Layer got = l;
-      if (!Scene2DNode::ParseStyle(ss.str(), got))
-         return;
-      PushUndoCheckpoint("Apply layer style");
-      std::copy(got.fx, got.fx + Scene2DNode::kFxCount, l.fx);
-      l.fxMore = got.fxMore;
-      Touch();
+      if (!sFiles.empty())
+      {
+         MenuParts::Separator();
+         for (size_t fi = 0; fi < sFiles.size(); fi++)
+         {
+            if (MenuParts::Item(sFiles[fi].c_str()))
+            {
+               std::ifstream f(AppPaths::FsPath(StylePresetDir() + "/" + sFiles[fi] + ".inf2dstyle"));
+               std::stringstream ss;
+               ss << f.rdbuf();
+               Layer got = l;
+               if (Scene2DNode::ParseStyle(ss.str(), got))
+               {
+                  PushUndoCheckpoint("Apply layer style");
+                  std::copy(got.fx, got.fx + Scene2DNode::kFxCount, l.fx);
+                  l.fxMore = got.fxMore;
+                  Touch();
+               }
+            }
+         }
+      }
+      MenuParts::EndPopup();
    }
 
    void DrawEffectsTab(Scene2DNode* doc)
@@ -11537,14 +12050,13 @@ namespace
       l = Active(doc);
       if (l == nullptr || l->kind == Kind::Group)
          return;
-      StylePresets(*l);
       int removeMore = -1;
       {
-         // Styles that are off stay in a drop-down; turning one on gives it a card, its On box turns it off again.
          SectionCard::Begin(T("Layer styles"));
-         FieldLabel(T("Add"));
-         ImGui::SetNextItemWidth(sFieldW);
-         if (MenuParts::BeginCombo("##v2daddstyle", T("Choose...")))
+         const float avail = ImGui::GetContentRegionAvail().x;
+         const float preW = 84.0f;
+         ImGui::SetNextItemWidth(std::max(60.0f, avail - preW - tok::space_1));
+         if (MenuParts::BeginCombo("##v2daddstyle", T("Add style...")))
          {
             bool any = false;
             for (int t = 0; t < Scene2DNode::kFxCount; t++)
@@ -11562,15 +12074,57 @@ namespace
                ImGui::TextDisabled("%s", T("All styles are on"));
             MenuParts::EndCombo();
          }
+         FormParts::Inline(0.0f, tok::space_1);
+         StylePresets(*l, preW);
       }
+      static std::map<int, bool> sFxFold;
       for (int t = 0; t < Scene2DNode::kFxCount; t++)
       {
          if (!l->fx[t].on)
             continue;
          ImGui::PushID(t);
-         SectionCard::Begin(T(Scene2DNode::FxName(t)));
-         BoolRow(T("On"), &l->fx[t].on);
-         if (l->fx[t].on)
+         const std::string base = "##v2dfx" + std::to_string(l->id) + "_" + std::to_string(t);
+         bool& folded = sFxFold[l->id * 32 + t];
+         SectionCard::Begin();
+         const float rowY = ImGui::GetCursorPosY();
+         ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
+         bool on = l->fx[t].on;
+         if (CheckBox::Box((base + "on").c_str(), &on))
+         {
+            PushUndoCheckpoint("Toggle layer style");
+            l->fx[t].on = on;
+            Touch();
+         }
+         FormParts::Inline(0.0f, tok::space_2);
+         ImGui::SetCursorPosY(rowY);
+         const float chipsW = sChip;
+         const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
+         const ImVec2 np = ImGui::GetCursorScreenPos();
+         const float fh = ImGui::GetFrameHeight();
+         if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
+            folded = !folded;
+         if (PanelKit::AuditOpenAll())
+            folded = false;
+         {
+            const bool hov = ImGui::IsItemHovered();
+            const ImU32 col = ImGui::GetColorU32(l->fx[t].on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov ? 1.0f : 0.85f);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 c(np.x + 5.0f, np.y + fh * 0.5f);
+            if (!folded)
+               dl->AddTriangleFilled(ImVec2(c.x - 3.5f, c.y - 2), ImVec2(c.x + 3.5f, c.y - 2), ImVec2(c.x, c.y + 3), col);
+            else
+               dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 3.5f), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 3.5f), col);
+            const std::string title = app::TruncateWithEllipsis(T(Scene2DNode::FxName(t)), std::max(16.0f, nameW - 18.0f));
+            dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, title.c_str());
+         }
+         FormParts::Inline(0.0f, tok::space_2);
+         if (IconChip((base + "rm").c_str(), IconsInfinite::Close, false, T("Remove layer style")))
+         {
+            PushUndoCheckpoint("Remove layer style");
+            l->fx[t].on = false;
+            Touch();
+         }
+         if (l->fx[t].on && !folded)
          {
             FxRows(*l, t, l->fx[t], true);
             // More of the same kind, each with its own settings.
@@ -11606,51 +12160,194 @@ namespace
       }
    }
 
-   // Colour: the adjustment layers as one panel, a click adds one above the active layer.
+   // Colour: the adjustment layers as one clean panel with searchable Add + collapsible, draggable cards.
    void DrawColourTab(Scene2DNode* doc)
    {
       SectionCard::Begin(T("Adjustments"));
-      // One drop-down, grouped as the Effects menu is, instead of a button per adjustment.
-      FieldLabel(T("Add"));
-      ImGui::SetNextItemWidth(sFieldW);
-      if (MenuParts::BeginCombo("##v2daddadj", T("Choose...")))
+      static char sAdjSearch[64] = "";
+      static ImVec2 sAdjPopPos(0, 0);
+      if (ActionButton::Draw((std::string(T("Add adjustment")) + "##v2daddadjbtn").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
       {
-         for (const char* g : { "Adjust", "Colour", "Stylize" })
-         {
-            ImGui::TextDisabled("%s", T(g));
-            for (int t = 0; t < Scene2DNode::kAdjCount; t++)
-               if (std::strcmp(Scene2DNode::AdjGroup(t), g) == 0 && MenuParts::Choice((std::string(T(Scene2DNode::AdjName(t))) + "##v2dcadj" + std::to_string(t)).c_str(), false))
-               {
-                  sPending.what = Pending::AddAdjust;
-                  sPending.arg = t;
-               }
-         }
-         MenuParts::EndCombo();
+         sAdjSearch[0] = 0;
+         sAdjPopPos = ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
+         ImGui::OpenPopup("##v2daddadjpop");
       }
-      // Every adjustment in the document keeps its card, top of the stack first: adding a second one never takes
-      // the first one's settings away.
+      ImGui::SetNextWindowPos(sAdjPopPos, ImGuiCond_Appearing);
+      if (MenuParts::BeginPopup("##v2daddadjpop"))
+      {
+         ImGui::SetNextItemWidth(sFieldW);
+         if (ImGui::IsWindowAppearing())
+            ImGui::SetKeyboardFocusHere();
+         FieldWell::InputText("##v2dadjq", sAdjSearch, sizeof sAdjSearch);
+         MenuParts::Separator();
+         if (sAdjSearch[0] != 0)
+         {
+            bool any = false;
+            for (int t = 0; t < Scene2DNode::kAdjCount; t++)
+               if (FilterMatch(T(Scene2DNode::AdjName(t)), sAdjSearch) || FilterMatch(Scene2DNode::AdjGroup(t), sAdjSearch))
+               {
+                  any = true;
+                  if (MenuParts::Item(T(Scene2DNode::AdjName(t)), T(Scene2DNode::AdjGroup(t)), false, true))
+                  {
+                     sPending.what = Pending::AddAdjust;
+                     sPending.arg = t;
+                  }
+               }
+            if (!any)
+               ImGui::TextDisabled("%s", T("No matching adjustments"));
+         }
+         else
+         {
+            for (const char* g : { "Adjust", "Colour", "Stylize" })
+            {
+               if (!MenuParts::SubMenu(T(g), true))
+                  continue;
+               for (int t = 0; t < Scene2DNode::kAdjCount; t++)
+                  if (std::strcmp(Scene2DNode::AdjGroup(t), g) == 0 &&
+                      MenuParts::Item(T(Scene2DNode::AdjName(t)), nullptr, false, true))
+                  {
+                     sPending.what = Pending::AddAdjust;
+                     sPending.arg = t;
+                  }
+               ImGui::EndMenu();
+            }
+         }
+         MenuParts::EndPopup();
+      }
+      static std::map<int, bool> sAdjFold;
+      int moveFrom = 0, moveTo = 0;
+      bool moveBelow = false;
+      int deleteId = 0;
+      int adjCount = 0;
       std::vector<Layer>& ls = doc->Layers();
       for (int i = (int)ls.size() - 1; i >= 0; i--)
       {
          Layer* l = &ls[i];
          if (l->kind != Kind::Adjust)
             continue;
-         ImGui::PushID(l->id);
-         SectionCard::Begin(LayerName(*l).c_str());
-         BoolRow(T("On"), &l->visible);
-         float lo = 0, hi = 1;
-         Scene2DNode::AdjRange(l->adjType, lo, hi);
-         if (l->adjType != Scene2DNode::kAdjGradientMap)
+         adjCount++;
+         const int id = l->id;
+         const std::string base = "##v2dadj" + std::to_string(id);
+         bool& folded = sAdjFold[id];
+         ImGui::PushID(id);
+         SectionCard::Begin();
+         const float rowY = ImGui::GetCursorPosY();
+         ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
+         bool on = l->visible;
+         if (CheckBox::Box((base + "on").c_str(), &on))
          {
-            SliderRow(T(AdjAmountLabel(l->adjType)), &l->adjAmt, lo, hi, AdjFmt(l->adjType));
-            AdjExtras(*l, l->id, doc);
+            PushUndoCheckpoint(on ? "Show adjustment" : "Hide adjustment");
+            l->visible = on;
+            Touch();
          }
-         if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("On"));
+         FormParts::Inline(0.0f, tok::space_2);
+         ImGui::SetCursorPosY(rowY);
+         const float gripW = 16.0f;
+         const float chipsW = 2.0f * sChip + 2.0f * tok::space_1 + gripW;
+         const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
+         const ImVec2 np = ImGui::GetCursorScreenPos();
+         const float fh = ImGui::GetFrameHeight();
+         if (ImGui::InvisibleButton((base + "fold").c_str(), ImVec2(nameW, fh)))
          {
-            ColorRow(T("Shadows"), l->colorA);
-            ColorRow(T("Highlights"), l->colorB);
+            folded = !folded;
+            SelectOnly(id);
+         }
+         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+         {
+            ImGui::SetDragDropPayload("V2D_LAYER", &id, sizeof(int));
+            ImGui::EndDragDropSource();
+         }
+         if (ImGui::BeginDragDropTarget())
+         {
+            const float rel = (ImGui::GetIO().MousePos.y - np.y) / std::max(1.0f, fh);
+            const bool below = rel >= 0.5f;
+            ImGui::GetWindowDrawList()->AddLine(ImVec2(np.x, below ? np.y + fh : np.y),
+                                                ImVec2(np.x + nameW, below ? np.y + fh : np.y), Hex(kOutline), 2.0f);
+            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2D_LAYER"))
+            {
+               const int moving = *(const int*)pl->Data;
+               if (moving != id)
+               {
+                  moveFrom = moving;
+                  moveTo = id;
+                  moveBelow = below;
+               }
+            }
+            ImGui::EndDragDropTarget();
+         }
+         if (PanelKit::AuditOpenAll())
+            folded = false;
+         {
+            const bool hov = ImGui::IsItemHovered();
+            if (hov)
+               HelpTip("%s", T("Click to fold, drag to reorder"));
+            const ImU32 col = ImGui::GetColorU32(l->visible ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !l->visible ? 1.0f : 0.85f);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 c(np.x + 5.0f, np.y + fh * 0.5f);
+            if (!folded)
+               dl->AddTriangleFilled(ImVec2(c.x - 3.5f, c.y - 2), ImVec2(c.x + 3.5f, c.y - 2), ImVec2(c.x, c.y + 3), col);
+            else
+               dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 3.5f), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 3.5f), col);
+            const std::string fullTitle = LayerName(*l) + (l->clip ? " · Clipped" : "");
+            const std::string title = app::TruncateWithEllipsis(fullTitle, std::max(16.0f, nameW - 18.0f));
+            dl->AddText(ImVec2(np.x + 16.0f, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, title.c_str());
+         }
+         FormParts::Inline(0.0f, tok::space_2);
+         if (IconChip((base + "clip").c_str(), IconsInfinite::Mask, l->clip,
+                      l->clip ? T("Unclip from layer below") : T("Clip to layer below")))
+         {
+            PushUndoCheckpoint("Clipping mask");
+            l->clip = !l->clip;
+            Touch();
+         }
+         FormParts::Inline(0.0f, tok::space_1);
+         if (IconChip((base + "del").c_str(), IconsInfinite::Close, false, T("Delete adjustment")))
+            deleteId = id;
+         FormParts::Inline(0.0f, tok::space_1);
+         {
+            const ImVec2 gp = ImGui::GetCursorScreenPos();
+            ImGui::InvisibleButton((base + "grip").c_str(), ImVec2(gripW, fh));
+            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoPreviewTooltip))
+            {
+               ImGui::SetDragDropPayload("V2D_LAYER", &id, sizeof(int));
+               ImGui::EndDragDropSource();
+            }
+            glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(gp.x + gripW * 0.5f, gp.y + fh * 0.5f), tok::icon_control,
+                        ImGui::GetColorU32(ImGuiCol_TextDisabled, ImGui::IsItemHovered() ? 0.95f : 0.55f), IconsInfinite::Grip);
+         }
+         if (l->visible && !folded)
+         {
+            float lo = 0, hi = 1;
+            Scene2DNode::AdjRange(l->adjType, lo, hi);
+            if (l->adjType != Scene2DNode::kAdjGradientMap)
+            {
+               SliderRow(T(AdjAmountLabel(l->adjType)), &l->adjAmt, lo, hi, AdjFmt(l->adjType));
+               AdjExtras(*l, l->id, doc);
+            }
+            if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
+            {
+               ColorRow(T("Shadows"), l->colorA);
+               ColorRow(T("Highlights"), l->colorB);
+            }
          }
          ImGui::PopID();
+      }
+      if (adjCount == 0)
+         ImGui::TextDisabled("%s", T("Add an adjustment above, or drag one onto a layer to clip it."));
+      if (moveFrom != 0 && moveTo != 0 && moveFrom != moveTo && !doc->IsInside(moveTo, moveFrom))
+      {
+         PushUndoCheckpoint("Reorder adjustment");
+         doc->MoveLayer(moveFrom, moveTo, moveBelow, false);
+         Touch();
+      }
+      if (deleteId != 0)
+      {
+         PushUndoCheckpoint("Delete adjustment");
+         doc->RemoveLayer(deleteId);
+         sSel.erase(std::remove(sSel.begin(), sSel.end(), deleteId), sSel.end());
+         Touch();
       }
    }
 
@@ -15097,7 +15794,12 @@ std::map<std::string, View2DMoreProbe>& View2DMoreProbes()
 }
 #endif
 
-int View2DAuditStateCount() { return 7 * kAuditKinds + kToolCount + 8; }
+int View2DAuditStateCount()
+{
+   if (std::getenv("INFINITE_UIAUDIT_V2D_ALL_FX") != nullptr)
+      return Scene2DNode::kAdjCount + (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0])) + Scene2DNode::kFxCount;
+   return 7 * kAuditKinds + kToolCount + 8;
+}
 
 // Puts the panel into state i and returns its name ("Effects / text", "tool Brush", "dock top"); empty past the end.
 std::string View2DAuditState(int i)
@@ -15110,6 +15812,53 @@ std::string View2DAuditState(int i)
    sSideOpen = true;
    sOp = Op();
    sRename = 0;
+   if (std::getenv("INFINITE_UIAUDIT_V2D_ALL_FX") != nullptr)
+   {
+      gView2DDock = 0;
+      sTool = kMove;
+      constexpr int kNE = (int)(sizeof(kNodeEffects) / sizeof(kNodeEffects[0]));
+      // Clean up any previous audit node effects and styles on the paint layer.
+      if (Layer* p = doc->FindLayer(sAuditIds[0]))
+      {
+         for (const auto& ef : p->effects)
+            if (ef.uid != 0)
+               if (GraphNode* gn = FindNodeByUid(ef.uid))
+                  RemoveNodeByIndex(gn->index);
+         p->effects.clear();
+         for (int t = 0; t < Scene2DNode::kFxCount; t++)
+            p->fx[t].on = false;
+      }
+      if (i < Scene2DNode::kAdjCount)
+      {
+         sTab = 6;
+         sSel = { sAuditIds[6] };
+         if (Layer* a = doc->FindLayer(sAuditIds[6]))
+         {
+            a->visible = true;
+            a->adjType = i;
+            a->adjAmt = Scene2DNode::AdjDefault(i);
+            a->adjP = Scene2DNode::AdjParamDefault(i);
+         }
+         doc->Commit();
+         return std::string("adj ") + Scene2DNode::AdjName(i);
+      }
+      i -= Scene2DNode::kAdjCount;
+      if (i < kNE)
+      {
+         sTab = 5;
+         sSel = { sAuditIds[0] };
+         AddNodeEffect(doc, sAuditIds[0], i);
+         doc->Commit();
+         return std::string("fx ") + kNodeEffects[i].label;
+      }
+      i -= kNE;
+      sTab = 5;
+      sSel = { sAuditIds[0] };
+      if (Layer* p = doc->FindLayer(sAuditIds[0]))
+         p->fx[i].on = true;
+      doc->Commit();
+      return std::string("style ") + Scene2DNode::FxName(i);
+   }
    // The last states (relief, curves, marbling, liquify) dress the audit layers and the brush; every state starts
    // from them undressed so the earlier states read the same as before.
    static int sAuditAdjWas = -1;
@@ -15704,14 +16453,20 @@ void View2DAddNode(GraphNode& gn)
 {
    // MakeDoc can move gNodes, so read what's needed from gn first.
    const uint64_t uid = gn.uid;
-   PushUndoCheckpoint("Add to 2D View");
    Scene2DNode* doc = EnsureDoc(gn);
    if (doc == nullptr)
       return;
+   GraphNode* added = FindNodeByUid(uid);
+   if (added == nullptr || WouldCreateDocCycle(doc, added->node.get()))
+   {
+      Notices::Post(Notices::Level::Warning, "view2d.cycle", T("Can't add to 2D View"),
+                    T("That node already reads from this 2D Document (would create a feedback loop)."));
+      return;
+   }
+   PushUndoCheckpoint("Add to 2D View");
    gView2DOpen = true;
    Layer& l = NewLayerAt(doc, Kind::Node, uid);
-   GraphNode* added = FindNodeByUid(uid);
-   l.is3d = added != nullptr && Is3DNode(added->node.get());
+   l.is3d = Is3DNode(added->node.get());
    if (l.is3d)
       doc->Commit();
    SelectOnly(l.id);
