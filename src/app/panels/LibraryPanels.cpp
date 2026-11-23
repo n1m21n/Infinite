@@ -260,7 +260,7 @@ namespace app
    // Sequencer or MPC it loads the folder as a kit (see the SampleFolder branch in StagePopupsA.cpp).
    static void MaybeStartFolderDrag(const std::string& folder, bool mediaKind)
    {
-      if (mediaKind || !ImGui::IsItemActive() || !ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
+      if (mediaKind || !ImGui::IsItemActive() || !ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold))
          return;
       gSampleDragActive = true;
       gSampleDragKind = LibraryDragKind::SampleFolder;
@@ -627,7 +627,7 @@ namespace app
          // first frame the button goes active, so a plain click still just
          // clicks (Selectable has no useful action of its own here today,
          // but a click-drag distinction matters the moment one is added).
-         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold))
          {
             gSampleDragActive = true;
             gSampleDragKind = mediaKind ? LibraryDragKind::Media : LibraryDragKind::Sample;
@@ -1111,7 +1111,7 @@ namespace app
          }
          // Same manual drag mechanism as the Samples/Media rows - see
          // gSampleDragActive's comment for why this isn't an ImGui drag source.
-         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold))
          {
             gSampleDragActive = true;
             gSampleDragKind = LibraryDragKind::Plugin;
@@ -1316,7 +1316,7 @@ namespace app
             dl->AddText(ImVec2(selMax.x - badgeReserve - catTextW - 6.0f, selMin.y + (selMax.y - selMin.y - ImGui::GetTextLineHeight()) * 0.5f),
                         ImGui::GetColorU32(ImGuiCol_TextDisabled), entry.category.c_str());
 
-            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold))
             {
                gSampleDragActive = true;
                gSampleDragKind = LibraryDragKind::FieldPreset;

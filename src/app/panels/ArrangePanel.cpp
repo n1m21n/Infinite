@@ -1946,7 +1946,7 @@ namespace app
                gArrangeMarkerDragId = 0;
                ArrangeGestureEnd();
             }
-            else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+            else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_fine))
             {
                const Arrange::Tick target =
                   gridSnap(gArrangeMarkerDragOrigPos + (xToTick(mouse.x) - gArrangeMarkerDragGrabTick));
@@ -2325,7 +2325,7 @@ namespace app
             }
             else
             {
-               if (!drag.live && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 3.0f))
+               if (!drag.live && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_fine))
                   drag.live = true;
                if (drag.live)
                {

@@ -5615,7 +5615,7 @@ namespace
       }
       if (sReduceTo != 0 && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
       {
-         if (io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] < 25.0f)
+         if (io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] < tok::drag_threshold * tok::drag_threshold)
             sSel = { sReduceTo };
          sReduceTo = 0;
       }
@@ -5623,7 +5623,7 @@ namespace
       {
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
             sTweak = false;
-         else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 5.0f))
+         else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold))
          {
             sTweak = false;
             BeginOp('g', scene, sPressAt, -1, true);

@@ -651,7 +651,7 @@ namespace
          }
          sSelecting = clicks == 1;
       }
-      if (sSelecting && active && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+      if (sSelecting && active && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_fine))
       {
          tab.selLineB = line;
          tab.selColB = col;

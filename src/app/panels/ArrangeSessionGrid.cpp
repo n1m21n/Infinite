@@ -674,7 +674,7 @@ namespace app
          ImGui::PushID(li);
          ImGui::InvisibleButton("##hdr", ImVec2(colW - 2.0f * kGap, kHeaderH - 2.0f * kGap),
                                 ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonLeft);
-         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f))
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_tile))
             sTrackDragFrom = li;
          if (ImGui::IsItemHovered() && sTrackDragFrom < 0)
             HelpTip("%s", T("Drag to reorder tracks. Right-click for more."));
@@ -778,7 +778,7 @@ namespace app
             sSceneTempoEdit = realScene ? gArrange.scenes[(size_t)row].tempo : 0.0f;
             sSceneCtxOpen = true;
          }
-         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f))
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_tile))
             sSceneDragFrom = row;
          if (hov && sSceneDragFrom < 0)
             HelpTip("%s", rowHasClip ? T("Click to launch this row on every track, click again to stop it. Drag to reorder. Right-click for its tempo and what plays next.")
@@ -883,7 +883,7 @@ namespace app
                   ArrangeSessionLaunch(laneId, row);
             }
             if (held && ss != nullptr && sDrag.laneId == laneId && sDrag.row == row && !sDrag.dragging &&
-                ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f))
+                ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_tile))
                sDrag.dragging = true;
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
             {

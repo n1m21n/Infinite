@@ -2091,7 +2091,7 @@ namespace app
                }
                const bool isOrigin = (gDrumGridDrag.originLane == lane && gDrumGridDrag.originStep == s);
                if (isOrigin && ImGui::IsItemActive() && vel > 0.0f &&
-                   ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+                   ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_fine))
                {
                   const float my = ImGui::GetIO().MousePos.y;
                   const float t = 1.0f - std::clamp((my - y0) / rowH, 0.0f, 1.0f);

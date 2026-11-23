@@ -1001,7 +1001,7 @@ void DrawKeyboard(FrameCtx& fc)
          }
       }
       if (gDragSnapshotValid && !gDragSnapshotPushed &&
-          ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+          ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_fine))
       {
          bool moved = false;
          for (const Patch::NodeRecord& rec : gDragStartSnapshot.nodes)
