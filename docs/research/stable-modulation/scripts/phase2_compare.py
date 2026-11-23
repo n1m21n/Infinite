@@ -1,6 +1,6 @@
 """Phase 2 check: matrices dumped by INFINITE_FIELDSTABDUMP (Float32 interpreter) vs the Python reference.
 
-    python phase2_compare.py <amat dir>     writes data/phase2-compare.json and prints a table
+    python phase2_compare.py <amat dir> [out.json]     writes data/phase2-compare.json (default) and prints a table
 
 Pass rule (README section 8, phase 2): every kernel dumped (status ok), and max |A_field - A_python| <= 1e-5
 over all its grid points. Both the absolute and the relative error (over max |A|) are recorded, since
@@ -48,9 +48,9 @@ if __name__ == "__main__":
         else:
             r["pass"] = False
         res.append(r)
-    out = HERE.parent / "data" / "phase2-compare.json"
+    out = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else HERE.parent / "data" / "phase2-compare.json"
     out.write_text(json.dumps(res, indent=1))
-    for s in ("L", "G"):
+    for s in ("L", "G", "B"):
         rs = [r for r in res if r["set"] == s]
         ok = [r for r in rs if r.get("pass")]
         print(f"{s}: {len(ok)}/{len(rs)} pass; max abs {max((r.get('max_abs', 0) for r in rs), default=0):.3g}")

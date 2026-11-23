@@ -238,9 +238,13 @@ def kernels():
     for name, (_, axes, _, _, _) in TEXTBOOK.items():
         txt, params = textbook_kernel(name)
         yield "L", name, txt, params, grid_of(axes), (lambda th, nm=name: textbook_ref(nm, th))
-    for spec in json.loads((HERE.parent / "corpus" / "G.json").read_text()):
-        txt, params = g_kernel(spec)
-        yield "G", spec["id"], txt, params, frozen_grid(spec["d"]), (lambda th, s=spec: A_from_spec(s, th))
+    for set_ in ("G", "B"):  # B exists only after phase 4 generates it
+        f = HERE.parent / "corpus" / f"{set_}.json"
+        if not f.exists():
+            continue
+        for spec in json.loads(f.read_text()):
+            txt, params = g_kernel(spec)
+            yield set_, spec["id"], txt, params, frozen_grid(spec["d"]), (lambda th, s=spec: A_from_spec(s, th))
 
 if __name__ == "__main__":
     out = pathlib.Path(sys.argv[1])

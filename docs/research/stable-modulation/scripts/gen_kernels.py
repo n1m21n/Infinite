@@ -75,8 +75,12 @@ if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "G"
     if which == "G":
         specs = generate(seed=20261121, count=200, n_max=6, depth_terms=2, p_select=0.15)
+    elif which == "B":
+        # D4: seed 20261123, n up to 8, Select at 30% of terms (G: 15% of terms, already in 68% of kernels).
+        # Generated only after the scorer lock commit (phase 4).
+        specs = generate(seed=20261123, count=200, n_max=8, depth_terms=2, p_select=0.30)
     else:
-        raise SystemExit("B is generated only after the scorer is locked (phase 4, D4)")
+        raise SystemExit("sets: G, B")
     p = pathlib.Path(__file__).resolve().parent.parent / "corpus" / f"{which}.json"
     p.parent.mkdir(exist_ok=True)
     p.write_text(json.dumps(specs, indent=0))

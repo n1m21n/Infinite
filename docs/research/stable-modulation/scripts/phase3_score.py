@@ -13,7 +13,7 @@ Per kernel:
      can't compile (the 75 G kernels over the register cap, owner decision 2026-11-23) use the bound
      sqrt(kappa) * n * 10 * (largest Field-vs-Python error measured in phase 2 for that set).
 
-    python phase3_score.py <set,...> [--jobs N] [--only name,...]     sets: L, G (B in phase 4)
+    python phase3_score.py <set,...> [--jobs N] [--only name,...]     sets: L, G, B
 Writes data/phase3-<sets>.json.
 """
 import argparse, json, math, os, pathlib, shutil, subprocess, sys, tempfile, time
@@ -31,7 +31,7 @@ from stabmod import find_witness, radius  # noqa: E402
 TOL = 1e-6
 SEED = 20261123
 # Largest Field-vs-Python error per set from phase 2 (data/phase2-compare.json), times 10 for the bound.
-PHASE2_ERR = {"L": 1.67e-6, "G": 1.9e-7}
+PHASE2_ERR = {"L": 1.67e-6, "G": 1.9e-7, "B": 1.9e-7}  # B: G's value, fixed at the lock (same generator)
 
 def box_of(params, spec=None):
     lo = [p[2] for p in params]
@@ -203,8 +203,9 @@ if __name__ == "__main__":
     a = ap.parse_args()
     sets, only = a.sets.split(","), set(filter(None, a.only.split(",")))
     init_refs()
-    G = {s["id"]: s for s in json.loads((ROOT / "corpus" / "G.json").read_text())}
-    jobs = [(s, nm, params, G.get(nm) if s == "G" else None, i)
+    G = {s["id"]: s for c in ("G", "B") if (ROOT / "corpus" / f"{c}.json").exists()
+         for s in json.loads((ROOT / "corpus" / f"{c}.json").read_text())}
+    jobs = [(s, nm, params, G.get(nm) if s in ("G", "B") else None, i)
             for i, (s, nm, _, params, _, _) in enumerate(kernels()) if s in sets and (not only or nm in only)]
     t0 = time.time()
     with Pool(a.jobs, initializer=init_refs) as pool:
