@@ -231,6 +231,25 @@ difference is reported, not hidden.
 **Amendment (owner, 2026-11-23).** Section 3 said "up to 4 saturators per kernel". Hélie's tanh Moog, the
 H2 filter, needs 5, so L may have up to 5 saturators. G (≤ 3) and B (≤ 4) are unchanged.
 
+**Phase 0 findings on the tanh Moog** (`scripts/phase0_moog.py`, `data/phase0-moog.json`; g from 1e-4 to the ceiling, k from 0):
+
+| Cutoff ceiling g | Frozen limit k | First linear switching witness k | Linear common-P certificate k | tanh, sector-only (T1) |
+|---|---|---|---|---|
+| 0.05 | 3.632 | 3.632 | 2.737 | no proof at k = 0 |
+| 0.2 | 2.810 | 2.810 | 2.343 | no proof at k = 0 |
+| 0.4 | 2.096 | 2.096 | 1.908 | no proof at k = 0 |
+| 0.785 (fs/8) | 1.288 | 1.285 | 1.274 | no proof at k = 0 |
+
+- **T1 cannot work on ladders.** Sector-only quadratic certificates fail on a two-stage tanh cascade at one
+  fixed cutoff, with no feedback at all. The proof: with stage 2's saturator at slope 0 and stage 1's at 1,
+  V non-increasing forces P₁₂ = P₂₂; with stage 1 at slope 0 it forces P₁₂ = 0; so P₂₂ = 0, impossible.
+  The +80 dB fallback doesn't rescue it: with |y| ≤ 10 it proves k < 0.04, with |y| ≤ 100 nothing.
+  Hélie's 5/12 proof needs more than a sector bound per saturator. This makes the Lur'e-Lyapunov term (T3,
+  V = xᵀPx + Σ qᵢ ∫φᵢ) necessary for G1, not an ablation. Changing that needs the owner (D3).
+- **The explicit Moog's own limit falls with cutoff.** Frozen at fs/8 it is unstable from k = 1.288, below
+  Hélie's 5/3, so H2's bar can't be met over the full cutoff range by any sound method. Raised with the
+  owner after D3.
+
 **Phases.**
 
 | Phase | Work | Needs a build |
