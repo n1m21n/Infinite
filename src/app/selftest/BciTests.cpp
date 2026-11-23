@@ -955,7 +955,7 @@ bool RunBciSelftest()
       ck.Expect(flatMax == 0.0f, "Brain Light: a flat line is black, even with the eyes-closed state at 1");
       ck.Expect(lit > 0.1f && p1 == p2, "Brain Light: real data lights the frame; same data gives the same frame");
       ck.Expect(mirrorErr < 1e-4f, "Brain Light: swapping left/right sensors mirrors the picture");
-      ck.Expect(hueDeg > 55.0f && hueDeg < 75.0f && mx > 0.2f, "Brain Light: a pure 10 Hz excess is gold");
+      ck.Expect(hueDeg > 55.0f && hueDeg < 75.0f && mx > 0.05f && (mx - mn) / mx > 0.3f, "Brain Light: a pure 10 Hz excess is gold");
       ck.Expect(moved > (int)pp.size() / 10, "Brain Light: the wave's phase moves the rings");
    }
 

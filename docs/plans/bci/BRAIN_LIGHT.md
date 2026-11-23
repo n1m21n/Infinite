@@ -125,7 +125,7 @@ Blind sets: `~/Infinite/datasets/eeg/brain_light_blind/` (L2 and L3 sheets); key
 | L2 owner blind | ≥ 9/10 | — | sheet ready, waiting for the owner | 10/10 only via the strip |
 | L3 closed / blink / jaw 3-way | ≥ 8/10 | — | sheet ready (jaw = biggest fast TP9/TP10 burst, not labelled) | — |
 | L4 alive at rest | > 1% change, never frozen 1 s | 47%, 1.36 s frozen | **63% mean (min 29.9%), longest near-frozen 0.14 s** | — |
-| L5 GPU, 1920×1080 | < 0.5 ms | — | L5_RESULT | — |
+| L5 GPU, 1920×1080 | < 0.5 ms | — | **0.062 ms** (GPU test, 120 frames on the M2; shader matches the CPU law within 0.002) | — |
 | L6 owner: art, not a readout | yes | — | waiting for the owner | — |
 
 Rounds:
