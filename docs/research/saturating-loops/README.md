@@ -1,7 +1,7 @@
 ---
 title: "Saturating loops: stability certificates for modulated filters with saturation in the feedback"
 slug: "saturating-loops"
-status: "phase-0-framing"
+status: "signed-off"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-saturating-loops.md"
@@ -10,8 +10,8 @@ commit_sha: "pending-measurement"
 
 # Saturating loops
 
-**Draft for sign-off. Sections 1-7 and decisions D1-D5 lock when the owner signs off; nothing is built or
-run before that.** Sections 8-12 are filled after sign-off. Follows `docs/research/stable-modulation`
+**Signed off by the owner on 2026-11-23, as written, with D1-D5 as recommended. Sections 1-7 are locked
+by this commit.** Sections 8-12 are filled after sign-off. Follows `docs/research/stable-modulation`
 (Technical Report 2, validated 2026-11-23), which proved linear filters only; this is candidate study C1
 from its section 12.
 
