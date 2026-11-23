@@ -1,0 +1,71 @@
+{
+  "_comment": "Entries 1-5 and 7 were opened on 2026-11-23 (docs/prior-art/2026-11-23-stable-modulation.md). The software entries name the versions pinned in scripts/requirements.txt. Fields a source does not show are left out, never guessed.",
+  "mcclellan2026": {
+    "authors": "R. McClellan",
+    "title": "Stability analysis of time-varying virtual analog filters",
+    "venue": "Proc. 29th Int. Conf. on Digital Audio Effects (DAFx26), Cambridge, MA",
+    "year": "2026",
+    "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_28.pdf"
+  },
+  "laroche2007": {
+    "authors": "J. Laroche",
+    "title": "On the stability of time-varying recursive filters",
+    "venue": "Journal of the Audio Engineering Society, vol. 55, no. 6, pp. 460–471",
+    "year": "2007",
+    "url": "https://www.aes.org/e-lib/browse.cfm?elib=14168"
+  },
+  "werner2022": {
+    "authors": "K. J. Werner and R. McClellan",
+    "title": "Time-varying filter stability and state matrix products",
+    "venue": "Proc. Int. Conf. on Digital Audio Effects (DAFx20in22), Vienna",
+    "year": "2022",
+    "url": "https://www.dafx.de/paper-archive/details/RdjkWSf80p3vUeP3_STX_w"
+  },
+  "wishnick2014": {
+    "authors": "A. Wishnick",
+    "title": "Time-varying filters for musical applications",
+    "venue": "Proc. 17th Int. Conf. on Digital Audio Effects (DAFx-14), Erlangen",
+    "year": "2014",
+    "url": "https://dafx.de/paper-archive/details/yfd4LbdXr2Cywsqxfby8ug"
+  },
+  "rabenstein1985": {
+    "authors": "R. Rabenstein and B. Czarnach",
+    "title": "Stability of recursive time-varying digital filters by state vector transformation",
+    "venue": "Signal Processing",
+    "year": "1985",
+    "url": "https://www.sciencedirect.com/science/article/abs/pii/0165168485900908"
+  },
+  "boyd1994": {
+    "authors": "S. Boyd, L. El Ghaoui, E. Feron and V. Balakrishnan",
+    "title": "Linear Matrix Inequalities in System and Control Theory",
+    "venue": "SIAM Studies in Applied Mathematics, vol. 15",
+    "year": "1994",
+    "url": "https://web.stanford.edu/~boyd/lmibook/"
+  },
+  "faust_vaeffects": {
+    "authors": "GRAME",
+    "title": "Faust libraries: vaeffects",
+    "venue": "Faust library documentation",
+    "url": "https://faustlibraries.grame.fr/libs/vaeffects/"
+  },
+  "cvxpy": {
+    "authors": "S. Diamond and S. Boyd",
+    "title": "CVXPY: a Python-embedded modeling language for convex optimization",
+    "venue": "Journal of Machine Learning Research, vol. 17, no. 83, pp. 1–5 (software version 1.9.3 used here)",
+    "year": "2016",
+    "url": "https://www.cvxpy.org"
+  },
+  "clarabel": {
+    "authors": "P. J. Goulart and Y. Chen",
+    "title": "Clarabel: an interior-point solver for conic programs with quadratic objectives",
+    "venue": "Software",
+    "url": "https://clarabel.org"
+  },
+  "infinite_report1": {
+    "authors": "N. Soni",
+    "title": "Aliasing-aware compilation for Field",
+    "venue": "Infinite Research, Technical Report 1",
+    "year": "2026",
+    "url": "https://infinitedevices.org/research/aliasing-aware-field.html"
+  }
+}

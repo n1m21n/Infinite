@@ -1,11 +1,11 @@
 ---
 title: "Proven-stable modulation: automatic stability certificates for user-written filters"
 slug: "stable-modulation"
-status: "phase-4-done"
+status: "validated"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-stable-modulation.md"
-commit_sha: "pending-measurement"
+commit_sha: "ccf102e151b1ecb00dc1743b2ae4e42ef4b25026"
 ---
 
 # Proven-stable modulation
@@ -365,7 +365,7 @@ binary; nothing was rebuilt.
 | Certified kernels | Holds at points | Proved | Largest rise |
 |---|---|---|---|
 | L, Field (5) | 4 | 3 | 2.5e-7 |
-| G, Field (77) | 77 | **77** | 2.5e-7 |
+| G, Field (77) | 77 | **77** | 1.7e-7 |
 | G, Python bound (34) | n/a | 31 | bound up to 8.7e-5 |
 
 - **Fails as proved.**
@@ -412,7 +412,7 @@ binary; nothing was rebuilt.
 - **Section 7 rule.** H4 fails, and the H1 to H3 claim stands. The exploratory row is not a verdict. It
   shows the slew claim is only meaningful relative to the filter's own speed (the next steps carry it).
 
-### Phase 4 (2026-11-23): blind set B, scored once
+### Phase 4 (2026-11-23): held-out validation on blind set B, scored once
 
 - **Lock.** The scorer was locked at commit `f9180894`, before B existed. That commit only taught the
   scripts to read `corpus/B.json`; no threshold, oracle setting or certifier step changed.
@@ -475,7 +475,53 @@ binary; nothing was rebuilt.
 (phase 3). H5 waits for approval of the in-app port.
 
 ## 11. Critique
-*(After measurement.)*
+
+### Goals against what was delivered
+
+| Goal | Delivered | Gap |
+|---|---|---|
+| G1: proof or "no proof" from the kernel's code | Yes, from matrices the real interpreter produces (Python for kernels over the register cap). H1 holds on L + G + B, and H3 is 92.5% on G and 88.7% on B | Report-only research tool in Python; not in the app |
+| G2: largest safe range and largest safe slew | Range by bisection for the four paper filters only (H2). The slew certificate (H4) fails as registered | No per-kernel range search on G / B; no slew result that holds down to g → 0 |
+| G3: match the hand proofs | H2 passed on all four filters in phase 1 | none |
+| G4: publish either way | README sections 1-12, data, scripts, `ARTIFACT.md`, `kick-the-tires.sh`, Lab Note | none |
+
+### Threats to validity
+
+- **What "certified" means.** The LMI and its float64 re-check are exact at their points. Between points,
+  the cover uses a heuristic margin: 1.5 × the blend error measured at the cell centre and edge midpoints
+  (D2). So a certificate is "verified on a dense adaptive cover with a heuristic interpolation margin",
+  not a formal proof over the continuum.
+  - Evidence the margin holds: 200,000 random points never seen by the certifier (phase 1 spot check).
+  - Up to 5000 more check points per certificate in Float32 (phase 3, phase 4).
+  - No point anywhere had ‖A‖_P ≥ 1 in float64.
+  - A rigorous version needs a Lipschitz or interval bound on A(θ) per cell. That is possible for Field's
+    operator set, but it isn't done.
+- **The oracle is one-sided.** A witness proves instability, but "no witness" doesn't prove stability.
+  - H1 counts certificates on kernels with a found witness. An unstable kernel the oracle misses would
+    land in the H3 denominator, and could only make a false certificate look like a success.
+  - The float64 cover makes such a certificate unlikely, but the oracle can't rule it out.
+  - The oracle had one rig bug, found and fixed in phase 3, with no verdict changed.
+- **Who wrote the kernels.**
+  - L was ported by the author from papers and textbooks.
+  - G and B come from one generator the author wrote, with B on a different seed, larger n and twice the
+    select share.
+  - No real user kernels or shipped Field presets were scored.
+  - Generated kernels are dense random systems. That is a harder shape than typical filters (ladders and
+    SVFs are sparse), so coverage on real filters may be higher. It isn't measured.
+- **Field-matrix coverage.**
+  - 184 of 400 G + B kernels exceed Field's 128-register cap and were scored on Python matrices.
+  - For those, the Float32 check is a bound, not a measurement. 9 certificates in that group aren't
+    proved in Float32 by the bound.
+  - The two marginal L filters (paper SVF, TPT SVF) are certified in float64, but their margin is below
+    Float32 resolution.
+- **Linear only.** Nonlinear loops (`tanh`, `clamp`) and delay lines are out of scope, and they are
+  common in real patches.
+- **H4's negative result is about the claim, not just the method.**
+  - Any Lyapunov function V(x, k) that ignores g can't use a slew limit while the cutoff can reach 0, as
+    phase 3 shows.
+  - The registered bar was therefore unreachable by design. That should have been caught at sign-off.
+- **Cost.** In Python: median 0.35 s and p95 9.5 s per kernel, on one M2. H5 (≤ 50 ms median in C++) is
+  not scored.
 
 ## 12. Next steps
 
@@ -483,9 +529,12 @@ binary; nothing was rebuilt.
 
 | Step | What | Note |
 |---|---|---|
-| Phase 5 | Sections 11-12 final, `ARTIFACT.md`, `kick-the-tires.sh`, Web Lab Note | |
+| Phase 5 | Sections 11-12 final, `ARTIFACT.md`, `kick-the-tires.sh`, Web Lab Note | Done 2026-11-23 |
 | Follow-up (H4 redo, needs its own sign-off) | Rate-aware slew: limit dk relative to the filter's own decay (for example Δk ≤ c · g per sample), or V(x, g, k) with g slew-limited too | Phase 3 shows the fixed 20 ms slew can't help while the cutoff can reach 0 |
 | Product question, not research | Field's 128-register cap blocks dense n ≥ 5 filters | Phase 2 finding |
+| Next held-out set | Score Infinite's shipped Field presets with `state` cells, and community kernels | Real filters, not generated ones (section 11) |
+| Rigorous cover | Replace the 1.5x heuristic margin with an interval bound on A(θ) per cell | Turns "verified on a cover" into a proof |
+| In-app port (H5) | C++ LMI solver, report-only pass in the Field compiler | A new feature: needs owner approval first |
 
 **Candidate studies (from the owner's DSP research map, 2026-11-23).** Each needs its own sections 1-7
 and sign-off before work. This list is a choice of what to study, not an approval to build.

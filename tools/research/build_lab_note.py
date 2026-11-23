@@ -7,7 +7,7 @@ What: renders docs/research/<slug>/web/note.md as a numbered technical report on
       from web/figures.py (numbered in order, "Figure n" / "Table n");  [[fig:name]] refers to one;
       [@key] or [@a; @b] cites web/references.json (numbered in order of first citation, listed at the end);
       {{name}} is a number from figures.numbers(data_dir). Frontmatter: description, abstract, keywords, series,
-      version, seo_title. data/ is copied unchanged to website/research/<slug>/data/.
+      version, seo_title, prereg_commit (the commit that locked sections 1-7), outcome (the status line). data/ is copied unchanged to website/research/<slug>/data/.
       The page carries TechArticle JSON-LD, <link rel="alternate"> to data/provenance.json, BibTeX, and a provenance
       block pinned to the README's commit_sha. Reading pages default to Paper (BRAND.md 2.2).
 Why:  docs/RESEARCH_STANDARD.md section 5: the web note and paper are generated from data/, with provenance.
@@ -246,6 +246,7 @@ def main():
     sha = readme.get("commit_sha") or prov.get("commit_sha", "")
     spec = importlib.util.spec_from_file_location("figs", paths["figs"])
     figs = importlib.util.module_from_spec(spec); spec.loader.exec_module(figs)
+    TABLES.update(getattr(figs, "TABLES", ()))  # a study's figures.py may name its own tables
 
     for k, v in figs.numbers(data_dir).items():
         md = md.replace("{{" + k + "}}", v)
@@ -270,11 +271,11 @@ def main():
     title, desc = readme["title"], note["description"]
     url = f"{BASE}research/{slug}.html"
     pdf_name = f"{slug}.pdf"
-    published, prereg = readme["date"], git_date("d38d29b7") or readme["date"]
+    published, prereg = readme["date"], git_date(note.get("prereg_commit", "d38d29b7")) or readme["date"]
     status = readme.get("status", "")
     series, version = note.get("series", "Infinite Research"), note.get("version", "1.0")
     year = published[:4]
-    bib = (f"@techreport{{soni{year}aliasing,\n  author      = {{{AUTHOR}}},\n  title       = {{{title}}},\n"
+    bib = (f"@techreport{{soni{year}{slug.split('-')[0]},\n  author      = {{{AUTHOR}}},\n  title       = {{{title}}},\n"
            f"  institution = {{Infinite}},\n  type        = {{{series.split(' · ')[-1]}}},\n  year        = {{{year}}},\n"
            f"  note        = {{Version {version}, pre-registered study, data and code at commit {sha[:8]}}},\n  url         = {{{url}}}\n}}")
     words = len(re.findall(r"\w+", re.sub(r"<[^>]+>", " ", raw)))
@@ -326,7 +327,7 @@ def main():
           <h1>{e(title)}</h1>
           <p class="rp-by"><a href="https://github.com/n1m21n" rel="noopener">{AUTHOR}</a></p>
           <p class="rp-aff">Infinite · infinitedevices.org</p>
-          <p class="rp-dates"><span><b>pre-registered</b>{e(prereg)}</span><span><b>published</b>{e(published)}</span><span><b>version</b>{e(version)}</span><span><b>outcome</b><span class="rp-status">H1 not confirmed · H2 {e(status)}</span></span></p>
+          <p class="rp-dates"><span><b>pre-registered</b>{e(prereg)}</span><span><b>published</b>{e(published)}</span><span><b>version</b>{e(version)}</span><span><b>outcome</b><span class="rp-status">{e(note.get("outcome", "H1 not confirmed · H2 " + status))}</span></span></p>
           <ul class="rp-links"><li><a href="{pdf_name}">PDF</a></li><li><a href="{tree}/data" rel="noopener">Data</a></li><li><a href="{REPO}/tree/{e(sha)}/docs/research/{slug}" rel="noopener">Code</a></li><li><a href="#cite">Cite</a></li></ul>
         </header>
         <section class="rp-abs" aria-labelledby="abstract"><h2 id="abstract">Abstract</h2><p>{e(note.get('abstract', ''))}</p>
