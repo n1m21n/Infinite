@@ -436,6 +436,10 @@ def check_drift(quiet=False):
         k = m.group(1)
         line = src.count("\n", 0, m.start()) + 1
         handlers.setdefault(k, []).append(line)
+    # Keymap.h table rows ({ ImGuiKey_X, Mod::..., ... }): a handler reads them through Keymap::Pressed(Act::X)
+    for m in re.finditer(r"\{\s*ImGuiKey_([A-Za-z0-9]+)\s*,\s*Mod::", src):
+        line = src.count("\n", 0, m.start()) + 1
+        handlers.setdefault(m.group(1), []).append(line)
 
     super_only = []
     for i, line in enumerate(src.splitlines(), 1):

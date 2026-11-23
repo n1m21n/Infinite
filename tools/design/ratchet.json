@@ -604,7 +604,6 @@
    "src/app/frame/FrameTests5.cpp": 4,
    "src/app/frame/StageFloating.cpp": 3,
    "src/app/frame/StageFramePump.cpp": 2,
-   "src/app/frame/StageKeyboard.cpp": 36,
    "src/app/frame/StageLinks.cpp": 16,
    "src/app/frame/StagePopupsA.cpp": 1,
    "src/app/frame/StagePopupsB.cpp": 3,

@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
@@ -57,8 +58,7 @@ void DrawKeyboard(FrameCtx& fc)
       // modifier, so Cmd-/ stays free for a binding later.
       // !gArrangeFocused: "/" is the 3D View's local view while the pointer is there, and no
       // docked panel that owns the keys should drop a comment on the canvas behind it.
-      const bool doAddComment = gRequestAddComment || (!typing && !gArrangeFocused && gCommentEdit.target == nullptr && !cmdOrCtrl && !io.KeyShift &&
-                                                      ImGui::IsKeyPressed(ImGuiKey_Slash, false));
+      const bool doAddComment = gRequestAddComment || (!typing && !gArrangeFocused && gCommentEdit.target == nullptr && Keymap::Pressed(Keymap::Act::AddComment));
       gRequestAddComment = false;
       if (doAddComment)
       {
@@ -86,9 +86,9 @@ void DrawKeyboard(FrameCtx& fc)
       // button, so the timeline can be started or paused without reaching
       // for the mouse.
       // The Sample Studio's waveform plays its own edit on Space (TogglePlay there), so the canvas stays out.
-      if (!typing && !cmdOrCtrl && !io.KeyShift && !(gView2DOpen && gView2DClaimedKeys) &&
+      if (!typing && !(gView2DOpen && gView2DClaimedKeys) &&
           !(gSampleStudioOpen && gSampleStudioClaimedKeys) &&
-          ImGui::IsKeyPressed(ImGuiKey_Space, false))
+          Keymap::Pressed(Keymap::Act::TogglePlay))
          LaunchRequestTogglePlay();
 
       // ---- Shift+<letter> canvas shortcuts ----
@@ -96,7 +96,6 @@ void DrawKeyboard(FrameCtx& fc)
       // the trackpad: V/X act on the selection, M/N/H/K are canvas-wide
       // toggles. All of them are gated on Shift alone (never Cmd/Ctrl), so
       // they can't collide with the system/menu bindings above.
-      const bool shiftOnly = !cmdOrCtrl && io.KeyShift;
 
       // Shift+V:
       // - When one or more eligible nodes are selected: opens the viewport panel
@@ -104,7 +103,7 @@ void DrawKeyboard(FrameCtx& fc)
       //   is already open and all selected cards are already docked, toggles them off).
       // - When no node is selected (e.g. after clicking on blank canvas): toggles the
       //   whole viewport panel view on / off.
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_V, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::ViewportPanel))
       {
          const int count = ed::GetSelectedObjectCount();
          std::vector<int> eligible;
@@ -178,85 +177,80 @@ void DrawKeyboard(FrameCtx& fc)
 
       // Cmd+Shift+L: show lock. Cmd+Period: panic (v0.6 2.36). Both work with a text field
       // focused: a performer must be able to stop the sound from anywhere.
-      if (cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_L, false))
+      if (Keymap::Pressed(Keymap::Act::ShowLock))
          ShowLockToggle();
-      if (cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Period, false))
+      if (Keymap::Pressed(Keymap::Act::Panic))
          ShowPanicToggle();
 
       // PageDown / PageUp: next / previous patch of the show set (v0.6 2.35).
-      if (!typing && !cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_PageDown, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::ShowNext))
          ShowSetStep(+1);
-      if (!typing && !cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_PageUp, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::ShowPrev))
          ShowSetStep(-1);
 
       // Shift+M: the docked modulation matrix, same panel the modulator
       // context menu's "Show modulation matrix" opens.
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_M, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::ModMatrixPanel))
          gModMatrixOpen = !gModMatrixOpen;
 
       // Shift+L: the Mixer panel
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_L, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::MixerPanel))
          gMixerPanelOpen = !gMixerPanelOpen;
 
       // Shift+P: the docked performance matrix
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_P, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::PerfPanel))
          gPerfPanelOpen = !gPerfPanelOpen;
 
       // Shift+T: the docked arrangement timeline
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_T, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::ArrangePanel))
          gArrangePanelOpen = !gArrangePanelOpen;
 
       // Shift+S: the docked Session panel (clip launcher)
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_S, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::SessionPanel))
          gSessionPanelOpen = !gSessionPanelOpen;
 
       // Shift+U: the docked edit history
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_U, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::HistoryPanel))
          gHistoryOpen = !gHistoryOpen;
 
       // Shift+W: the docked Sample studio (plain W pans the canvas)
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_W, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::SampleStudioPanel))
          gSampleStudioOpen = !gSampleStudioOpen;
 
       // Ctrl+` opens the Terminal, moves the keyboard to it, or closes it; physical Ctrl on every OS.
-#if defined(__APPLE__)
-      const bool terminalChord = io.KeySuper && !io.KeyCtrl && !io.KeyShift && !io.KeyAlt;
-#else
-      const bool terminalChord = io.KeyCtrl && !io.KeyShift && !io.KeyAlt;
-#endif
-      if (terminalChord && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
+      if (!(gView3DOpen && gView3DClaimedKeys) && Keymap::Pressed(Keymap::Act::Terminal))
          TerminalToggleShortcut();
 
       // Shift+R: the docked Piano Roll (the 3D View keeps Shift+R for Repeat Last while it has the pointer)
-      if (!typing && shiftOnly && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_R, false))
+      if (!typing && !(gView3DOpen && gView3DClaimedKeys) && Keymap::Pressed(Keymap::Act::PianoRollPanel))
          gPianoRollOpen = !gPianoRollOpen;
 
       // Shift+J: the docked Drum panel (the Timeline keeps Shift+J for a new track while it has the keys)
-      if (!typing && shiftOnly && (!gArrangeFocused || (gDrumPanelOpen && gDrumClaimedKeys)) && ImGui::IsKeyPressed(ImGuiKey_J, false))
+      if (!typing && (!gArrangeFocused || (gDrumPanelOpen && gDrumClaimedKeys)) && Keymap::Pressed(Keymap::Act::DrumPanel))
          gDrumPanelOpen = !gDrumPanelOpen;
 
       // Shift+E: the docked Curve Editor
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_E, false))
+      if (!typing && Keymap::Pressed(Keymap::Act::CurveEditorPanel))
          gCurveEditorOpen = !gCurveEditorOpen;
 
       // Shift+F: the docked Field Patcher (the 3D View keeps Shift+F for sculpt strength while it has the pointer)
-      if (!typing && shiftOnly && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_F, false))
+      if (!typing && !(gView3DOpen && gView3DClaimedKeys) && Keymap::Pressed(Keymap::Act::FieldPatcherPanel))
          gFieldPatcherOpen = !gFieldPatcherOpen;
 
       // Shift+3: the 3D View (inside the Curve Editor, Shift+1..5 pick handle types)
-      if (!typing && shiftOnly && !(gCurveEditorOpen && gCurveEditorClaimedKeys) &&
-          !(gFieldPatcherOpen && gFieldPatcherClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_3, false))
+      if (!typing && !(gCurveEditorOpen && gCurveEditorClaimedKeys) &&
+          !(gFieldPatcherOpen && gFieldPatcherClaimedKeys) && Keymap::Pressed(Keymap::Act::View3DPanel))
          gView3DOpen = !gView3DOpen;
 
       // Shift+2: the 2D View
-      if (!typing && shiftOnly && !(gCurveEditorOpen && gCurveEditorClaimedKeys) &&
+      if (!typing && !(gCurveEditorOpen && gCurveEditorClaimedKeys) &&
           !(gFieldPatcherOpen && gFieldPatcherClaimedKeys) && !(gView3DOpen && gView3DClaimedKeys) &&
-          ImGui::IsKeyPressed(ImGuiKey_2, false))
+          Keymap::Pressed(Keymap::Act::View2DPanel))
          gView2DOpen = !gView2DOpen;
 
       // Shift+Y: fit view to content, replacing the old menu-only entry
       // Canvas-only keys (Shift+Y, Shift+H) stay off while any docked panel has the keys (gArrangeFocused, last frame).
-      if (!typing && shiftOnly && !gArrangeFocused && ImGui::IsKeyPressed(ImGuiKey_Y, false))
+      if (!typing && !gArrangeFocused && Keymap::Pressed(Keymap::Act::FitView))
          gRequestFitView = true;
 
       // Shift+N: the type-to-filter node picker, without having to find empty
@@ -270,8 +264,8 @@ void DrawKeyboard(FrameCtx& fc)
       // (DrawArrangePanelContent's own keyboard block), a different action
       // that must not also pop the canvas node picker open underneath it.
       const bool doAddNode = gRequestAddNode ||
-         (!cmdOrCtrl && io.KeyShift && (!typing || searchPopupOpen) && (!gArrangeFocused || searchPopupOpen) &&
-          gCommentEdit.target == nullptr && ImGui::IsKeyPressed(ImGuiKey_N, false));
+         ((!typing || searchPopupOpen) && (!gArrangeFocused || searchPopupOpen) &&
+          gCommentEdit.target == nullptr && Keymap::Pressed(Keymap::Act::NodePicker));
       gRequestAddNode = false;
       if (doAddNode)
       {
@@ -304,7 +298,7 @@ void DrawKeyboard(FrameCtx& fc)
       // "is anything showing?" either, or a canvas of audio nodes would make
       // the first press a no-op.
       // Not over the 3D View: Shift+H there hides the unselected items (View3DPanel HandleKeys).
-      if (!typing && shiftOnly && !gArrangeFocused && ImGui::IsKeyPressed(ImGuiKey_H, false))
+      if (!typing && !gArrangeFocused && Keymap::Pressed(Keymap::Act::ShowParams))
       {
          std::vector<GraphNode*> targets;
          const int count = ed::GetSelectedObjectCount();
@@ -343,7 +337,7 @@ void DrawKeyboard(FrameCtx& fc)
       // button drives - routed through StartAudioEngine rather than
       // AudioEngine::Start() so a patch loaded while the engine was off gets
       // re-prepared at the device's rate (see StartAudioEngine's comment).
-      if (!typing && !gArrangeFocused && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_K, false))
+      if (!typing && !gArrangeFocused && Keymap::Pressed(Keymap::Act::AudioEngine))
       {
          if (AudioEngine::Instance().SampleRate() > 0.0)
          {
@@ -362,7 +356,7 @@ void DrawKeyboard(FrameCtx& fc)
       // broader "delete what's selected", handled by the Delete/Backspace
       // block below.
       // !gArrangeFocused like Delete below: X is the 3D View's remove key while the pointer is there.
-      if (!typing && !gArrangeFocused && !cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_X, false) && !ShowLockBlocks())
+      if (!typing && !gArrangeFocused && Keymap::Pressed(Keymap::Act::Mute) && !ShowLockBlocks())
       {
          const int count = ed::GetSelectedObjectCount();
          if (count > 0)
@@ -388,9 +382,9 @@ void DrawKeyboard(FrameCtx& fc)
       }
 
       bool doDelete = gRequestDelete ||
-         (!typing && !gPerfMatrixFocused && !gArrangeFocused && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
-                      ImGui::IsKeyPressed(ImGuiKey_Backspace, false) ||
-                      (shiftOnly && ImGui::IsKeyPressed(ImGuiKey_X, false))));
+         (!typing && !gPerfMatrixFocused && !gArrangeFocused && (Keymap::Pressed(Keymap::Act::Delete) ||
+                      Keymap::Pressed(Keymap::Act::DeleteAlt) ||
+                      Keymap::Pressed(Keymap::Act::DeleteShift)));
       gRequestDelete = false;
       if (doDelete && ShowLockBlocks())
          doDelete = false;
@@ -461,7 +455,7 @@ void DrawKeyboard(FrameCtx& fc)
       // Shift+D (or Cmd/Ctrl+D) duplicates whatever is selected without
       // touching the clipboard.
       const bool doDuplicate = gRequestDuplicate ||
-         (!typing && !gPerfMatrixFocused && !gArrangeFocused && (io.KeyShift || cmdOrCtrl) && ImGui::IsKeyPressed(ImGuiKey_D, false));
+         (!typing && !gPerfMatrixFocused && !gArrangeFocused && Keymap::Pressed(Keymap::Act::Duplicate));
       gRequestDuplicate = false;
       if (doDuplicate)
       {
@@ -572,10 +566,10 @@ void DrawKeyboard(FrameCtx& fc)
       // Arrangement panel has focus, and must not also group canvas nodes.
       const bool doGroup =
          gRequestGroup ||
-         (!typing && !gArrangeFocused && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_G, false));
+         (!typing && !gArrangeFocused && Keymap::Pressed(Keymap::Act::Group));
       const bool doUngroup =
          gRequestUngroup ||
-         (!typing && !gArrangeFocused && cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_G, false));
+         (!typing && !gArrangeFocused && Keymap::Pressed(Keymap::Act::Ungroup));
       gRequestGroup = false;
       gRequestUngroup = false;
 
@@ -747,8 +741,8 @@ void DrawKeyboard(FrameCtx& fc)
       // panel, not to the canvas selection behind it.
       const bool doBypass =
          gRequestBypass ||
-         (!typing && !gPerfMatrixFocused && !gArrangeFocused && !cmdOrCtrl && !io.KeyShift && !io.KeyAlt &&
-          ImGui::IsKeyPressed(ImGuiKey_B, false));
+         (!typing && !gPerfMatrixFocused && !gArrangeFocused && !io.KeyAlt &&
+          Keymap::Pressed(Keymap::Act::Bypass));
       gRequestBypass = false;
 
       if (doBypass)
@@ -787,9 +781,9 @@ void DrawKeyboard(FrameCtx& fc)
          gRequestCopy = gRequestPaste = false;
       }
       const bool canvasKeys = !typing && !gPerfMatrixFocused && !gArrangeFocused && gChatSelectionFrame < ImGui::GetFrameCount() - 1 && cmdOrCtrl;
-      const bool doCut = (gRequestCut || (canvasKeys && ImGui::IsKeyPressed(ImGuiKey_X, false))) && !ShowLockBlocks();
+      const bool doCut = (gRequestCut || (canvasKeys && Keymap::Pressed(Keymap::Act::Cut))) && !ShowLockBlocks();
       gRequestCut = false;
-      const bool doCopy = gRequestCopy || doCut || (canvasKeys && ImGui::IsKeyPressed(ImGuiKey_C, false));
+      const bool doCopy = gRequestCopy || doCut || (canvasKeys && Keymap::Pressed(Keymap::Act::Copy));
       gRequestCopy = false;
       if (doCopy)
       {
@@ -850,7 +844,7 @@ void DrawKeyboard(FrameCtx& fc)
          }
       }
 
-      const bool pasteAsked = gRequestPaste || (!typing && !gPerfMatrixFocused && !gArrangeFocused && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false));
+      const bool pasteAsked = gRequestPaste || (!typing && !gPerfMatrixFocused && !gArrangeFocused && Keymap::Pressed(Keymap::Act::Paste));
       gRequestPaste = false;
       // Nodes copied somewhere else (another patch, another window) arrive as text. Our own copy stays on the
       // in-process path below, which keeps live node state the text does not.
