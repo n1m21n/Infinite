@@ -272,14 +272,8 @@ namespace app
                SaveConfig(wpaths.config, prefs);
             }
          }
-         FormParts::Label(L("Edit files in them"));
-         {
-            const float pad = (rowH - Switch::kH) * 0.5f;
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
-            if (Switch::Box("##agentaccess", &prefs.folderAccess))
-               SaveConfig(wpaths.config, prefs);
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
-         }
+         if (FormParts::Check(T("Edit files in them"), &prefs.folderAccess, true, "##agentaccess"))
+            SaveConfig(wpaths.config, prefs);
          for (size_t i = 0; i < prefs.commands.size(); i++)
          {
             ImGui::PushID(1000 + (int)i);

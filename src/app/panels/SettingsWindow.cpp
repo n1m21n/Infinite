@@ -831,7 +831,7 @@ namespace app
                   auto off = std::find(gMidiOffSources.begin(), gMidiOffSources.end(), src.name);
                   bool on = off == gMidiOffSources.end();
                   ImGui::PushID((int)src.id);
-                  if (ImGui::Checkbox(src.name.c_str(), &on))
+                  if (FormParts::Check(src.name.c_str(), &on))
                   {
                      if (on)
                         gMidiOffSources.erase(off);

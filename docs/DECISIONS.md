@@ -4,6 +4,7 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-11-24 Owner: every on/off row is box first, label right, on every surface (Settings, panels, node bodies, dialogs); one shared check row in the design kit, no label-left variant.
 - 2026-11-23 Owner: the 2D View side panel is rebuilt around one Look stack per layer (adjustments, effects and styles in one list, one Add sheet, one Mix line, More for rare rows) and a 4-icon rail; plan signed off ("plan everything and then fix"), `internal/plans/2d-view/look-stack.md`. Develop strip and canvas handles wait for the owner.
 - 2026-11-23 Agent (owner delegated "take whatever decision you want"): saturating-loops G1 verdict is "certified" when T1 or T3 proves it (both sound); svf-clip is proved by T1 only.
 - 2026-11-23 Owner: natural vocal pitch correction (`natural-autotune`) added to the study queue from an external plan; needs its own sections 1-7 and sign-off before any work.

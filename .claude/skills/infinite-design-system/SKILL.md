@@ -62,6 +62,7 @@ Known collisions are listed, not yet resolved; pair the colour with a glyph or l
 | Restyle one control class everywhere | Edit its file in `components/`; update its golden in the same commit |
 | New control class | New component file + gallery entry + golden + a row in the plan's section 0 |
 | A node needs a new look | Never style it in the body file; extend the component |
+| An on/off row | `FormParts::Check(label, &v)` (switch: `FormParts::Switch`): box first, label right, everywhere (owner 2026-11-24); never a label-left bool row or a local copy |
 
 ## Before you commit
 

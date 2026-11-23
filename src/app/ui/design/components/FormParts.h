@@ -18,6 +18,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/Switch.h"
 #include "app/ui/design/components/SectionCard.h"
+#include "app/ui/design/components/PanelKit.h"
 
 namespace FormParts
 {
@@ -106,27 +107,55 @@ namespace FormParts
       SectionCard::Begin(title);
    }
 
-   inline bool Checkbox(const char* label, bool* v)
+
+   // The one on/off row (owner 2026-11-24): box first, label right, on every surface. The label shares the row's
+   // click. Inside a PanelKit::GridScope each check takes one cell. `asSwitch` draws a switch instead of a box
+   // (immediate-effect settings); `id` replaces the default "##label" widget ID. Writes *v and returns true on a click;
+   // undo is the caller's.
+   inline bool Check(const char* label, bool* v, bool asSwitch = false, const char* id = nullptr)
    {
-      Label(label);
-      // Row height matches the other controls so rows keep one rhythm.
-      const float pad = (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f;
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
-      const bool r = CheckBox::Box(Id(label).c_str(), v);
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
-      return r;
+      const float cw = PanelKit::NextCell();
+      const float x0 = ImGui::GetCursorPosX();
+      const float rowY = ImGui::GetCursorPosY();
+      ImGui::BeginGroup();   // box + label (+ cell) are one item: a caller's IsItemHovered() after the row means the row
+      const float ctlH = asSwitch ? ::Switch::kH : CheckBox::Size();
+      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - ctlH) * 0.5f);
+      bool on = *v;
+      const std::string wid = id != nullptr ? std::string(id) : Id(label);
+      bool hit = asSwitch ? ::Switch::Box(wid.c_str(), &on) : CheckBox::Box(wid.c_str(), &on);
+      const std::string shown = Visible(label);
+      if (!shown.empty())
+      {
+         ImGui::SameLine(0.0f, tok::space_2);
+         ImGui::SetCursorPosY(rowY);
+         ImGui::AlignTextToFramePadding();
+         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         ImGui::TextColored(ImVec4(t.x, t.y, t.z, tok::alpha_label), "%s", shown.c_str());
+         UiAudit::NoteInk(4, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, shown.c_str());
+         if (ImGui::IsItemClicked())
+         {
+            on = !on;
+            hit = true;
+         }
+      }
+      if (cw > 0.0f)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         ImGui::Dummy(ImVec2(std::max(0.0f, x0 + cw - ImGui::GetCursorPosX()), 1.0f));
+      }
+      ImGui::EndGroup();
+      // The centred box starts the ImGui line low, which made check rows taller than the rest; end on the row pitch.
+      if (cw <= 0.0f || PanelKit::Grid().at % std::max(1, PanelKit::Grid().cols) == 0)
+         ImGui::SetCursorPosY(rowY + ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y);
+      if (hit)
+         *v = on;
+      return hit;
    }
 
-   // Immediate-effect boolean in Settings and panels (C5).
-   inline bool Switch(const char* label, bool* v)
-   {
-      Label(label);
-      const float pad = (ImGui::GetFrameHeight() - ::Switch::kH) * 0.5f;
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
-      const bool r = ::Switch::Box(Id(label).c_str(), v);
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
-      return r;
-   }
+   inline bool Checkbox(const char* label, bool* v) { return Check(label, v); }
+
+   // Immediate-effect boolean in Settings and panels (C5): the same box-first row with a switch.
+   inline bool Switch(const char* label, bool* v) { return Check(label, v, true); }
 
    // Every Settings dropdown face is the same width (kControlW). A value too long for it is cut with an ellipsis and
    // shows whole in a tooltip; the open list is free to grow to kListMaxW so every option reads in full.

@@ -5980,22 +5980,8 @@ namespace
 
    bool BoolRow(const char* label, bool* v, const char* undo = "Edit in 3D View")
    {
-      // Box first and the label beside it, so a long label has the whole row.
-      const float rowY = ImGui::GetCursorPosY();
-      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
       bool on = *v;
-      bool hit = CheckBox::Box(RowId(label).c_str(), &on);
-      FormParts::Inline(0.0f, tok::space_2);
-      ImGui::SetCursorPosY(rowY);
-      ImGui::AlignTextToFramePadding();
-      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", label);
-      if (ImGui::IsItemClicked())
-      {
-         on = !on;
-         hit = true;
-      }
-      if (!hit)
+      if (!FormParts::Check(label, &on, false, RowId(label).c_str()))
          return false;
       PushUndoCheckpoint(undo);
       *v = on;

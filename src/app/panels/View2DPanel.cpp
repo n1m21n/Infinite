@@ -1973,32 +1973,8 @@ namespace
 
    bool BoolRow(const char* label, bool* v)
    {
-      const float cw = PanelKit::NextCell();   // in a Pairs grid, checks sit side by side, one per cell
-      const float x0 = ImGui::GetCursorPosX();
-      const float rowY = ImGui::GetCursorPosY();
-      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
       bool on = *v;
-      bool hit = CheckBox::Box(FormParts::Id(label).c_str(), &on);
-      FormParts::Inline(0.0f, tok::space_2);
-      ImGui::SetCursorPosY(rowY);
-      ImGui::AlignTextToFramePadding();
-      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", label);
-      UiAudit::NoteInk(4, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, label);
-      if (ImGui::IsItemClicked())
-      {
-         on = !on;
-         hit = true;
-      }
-      if (cw > 0.0f)
-      {
-         FormParts::Inline(0.0f, 0.0f);
-         ImGui::Dummy(ImVec2(std::max(0.0f, x0 + cw - ImGui::GetCursorPosX()), 1.0f));
-      }
-      // The centred box starts the ImGui line 4 pt low, which made check rows taller than the rest; end on the row pitch.
-      if (cw <= 0.0f || PanelKit::Grid().at % std::max(1, PanelKit::Grid().cols) == 0)
-         ImGui::SetCursorPosY(rowY + ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y);
-      if (!hit)
+      if (!FormParts::Check(label, &on))
          return false;
       PushUndoCheckpoint(kUndo);
       *v = on;
@@ -7849,27 +7825,8 @@ namespace
 
    void MoreCheck(const char* label, bool* v)
    {
-      if (!sMoreOpen)
-         return;
-      const float cw = PanelKit::NextCell();   // in a grid, checks sit side by side, one per cell
-      const float x0 = ImGui::GetCursorPosX();
-      const float rowY = ImGui::GetCursorPosY();
-      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
-      bool on = *v;
-      if (CheckBox::Box(FormParts::Id(label).c_str(), &on))
-         *v = on;
-      FormParts::Inline(0.0f, tok::space_2);
-      ImGui::SetCursorPosY(rowY);
-      ImGui::AlignTextToFramePadding();
-      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", label);
-      if (ImGui::IsItemClicked())
-         *v = !*v;
-      if (cw > 0.0f)
-      {
-         FormParts::Inline(0.0f, 0.0f);
-         ImGui::Dummy(ImVec2(std::max(0.0f, x0 + cw - ImGui::GetCursorPosX()), 1.0f));
-      }
+      if (sMoreOpen)
+         FormParts::Check(label, v);
    }
 
    // A dropdown on a tool bar: the value well alone, names translated.
