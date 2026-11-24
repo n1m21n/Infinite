@@ -3511,7 +3511,7 @@ namespace app
                Ui::Claim(ImVec2(width, lineH));
             }
          }
-         ImGui::Dummy(ImVec2(width, tok::chat_spacer_h));
+         Ui::Claim(ImVec2(width, tok::chat_spacer_h));
       }
 
       void DrawUser(const Entry& e, float width, int id)
@@ -3630,7 +3630,7 @@ namespace app
       {
          Weight s(UiType::Weight::Semibold);
          CardText(c, text, ImGui::GetColorU32(ImGuiCol_Text));
-         ImGui::Dummy(ImVec2(tok::chat_spacer_w, tok::space_1));
+         Ui::Claim(ImVec2(tok::chat_spacer_w, tok::space_1));
       }
 
       // A row of buttons at the card's left edge; returns the index pressed, or -1.
@@ -3806,7 +3806,7 @@ namespace app
                dl->AddText(ImVec2(c.x + c.inner - ImGui::CalcTextSize(tag.c_str()).x, ty), Dim(), tag.c_str());
             }
             ImGui::SetCursorScreenPos(ImVec2(c.x, p.y + rowH + tok::space_0_5));
-            ImGui::Dummy(ImVec2(tok::chat_spacer_w, 0.0f));
+            Ui::Claim(ImVec2(tok::chat_spacer_w, 0.0f));
          }
          for (const chat::Problem& p : chat::CheckMachine(o.facts))
             if (!p.blocks)
@@ -3877,7 +3877,7 @@ namespace app
          const bool in = s.ready.signedIn && !s.authBroken;
          const S signIn = in ? S::kOk : (signingIn ? S::kRunning : (!s.loginError.empty() ? S::kFailed : S::kPending));
          StepRow(c, signIn, T("Sign in"));
-         ImGui::Dummy(ImVec2(tok::chat_spacer_w, tok::space_1));
+         Ui::Claim(ImVec2(tok::chat_spacer_w, tok::space_1));
 
          bool back = false;
          if (!setting && s.failed)

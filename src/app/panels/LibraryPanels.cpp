@@ -332,10 +332,10 @@ namespace app
          MaybeStartFolderDrag(folder, mediaKind);
          if (row.hovered && !gSampleDragActive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
             Tip::Show("%s", folder.c_str());
-         ImGui::SameLine(panelW - tok::library_search_panel_ratio * btnW - tok::space_1);
+         FormParts::Inline(panelW - tok::library_search_panel_ratio * btnW - tok::space_1);
          if (LibraryParts::IconButton("refreshfolder", LibraryParts::Icon::Refresh, !scanning))
             folderToScan = folder;
-         ImGui::SameLine(panelW - btnW);
+         FormParts::Inline(panelW - btnW);
          if (LibraryParts::IconButton("removefolder", LibraryParts::Icon::Close, true, true))
             folderToRemove = folder;
          ImGui::PopID();
@@ -529,7 +529,6 @@ namespace app
             // icon dominated the row next to the filename text.
             const float btnH = rowH * tok::library_btn_h_ratio;
             const float btnW = btnH; // square, tighter than a wide text label
-            const float rowStartY = ImGui::GetCursorPosY();
             const ImVec2 rowScreenMin = ImGui::GetCursorScreenPos();
 
             if (isPlaying)
@@ -545,7 +544,7 @@ namespace app
             // Nudge the (now-shorter) button down so it sits centered
             // against the full-height Selectable beside it, rather than
             // pinned to the row's top edge.
-            ImGui::SetCursorPosY(rowStartY + (rowH - btnH) * 0.5f);
+            Ui::CentreInRow centred(rowH, btnH);   // the cursor goes back to the row top when the block ends
 
             // Drawn as vector shapes on the button, not a font glyph - the
             // UI font is loaded with no glyph range beyond Basic Latin, so a
@@ -596,10 +595,8 @@ namespace app
                }
             }
             Ui::SameRow();
-            // Back to the row's actual top, not the button's centered
-            // offset, so the Selectable spans the full row height and the
-            // clipper's fixed row-height assumption keeps holding.
-            ImGui::SetCursorPosY(rowStartY);
+            // Back to the row's actual top when `centred` ends, not the button's centered offset, so the Selectable
+            // spans the full row height and the clipper's fixed row-height assumption keeps holding.
          }
 
          // The drag target - IsItemActive()/IsMouseDragging() and the

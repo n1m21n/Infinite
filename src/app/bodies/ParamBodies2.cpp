@@ -1006,7 +1006,7 @@ namespace app
          char label[32];
          snprintf(label, sizeof(label), "stop %d", rank + 1);
          ColorSwatch(label, n->stopColor[idx], n);
-         ImGui::SameLine(size - tok::param_color_ramp_editor_gap);
+         FormParts::Inline(size - tok::param_color_ramp_editor_gap);
          ImGui::BeginDisabled(n->stopCount <= 2);
          if (GlyphToggle::Draw("##delstop", IconsInfinite::Close, IconsInfinite::Close, false))
          {
@@ -1136,7 +1136,7 @@ namespace app
       ImGui::EndGroup();
 
       // --- Right Column ---
-      ImGui::SameLine(0.0f, gutter);
+      FormParts::Inline(0.0f, gutter);
       ImGui::BeginGroup();
 
       NodeSeparator("shaping", colW);
@@ -1222,7 +1222,7 @@ namespace app
       ImGui::BeginGroup();
       DrawTrackPreview(n, colW);
       ImGui::EndGroup();
-      ImGui::SameLine(0.0f, gutter);
+      FormParts::Inline(0.0f, gutter);
       ImGui::BeginGroup();
       Ui::DrawParams(n, kTrackParamsRows);
       ImGui::EndGroup();

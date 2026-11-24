@@ -570,7 +570,7 @@ namespace app
                            [&semi](int i) { PushUndoCheckpoint(); semi = (float)(i + params::audio_node::semi_lo); }, semiW);
          ImGui::PopID();
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
          Ui::Spacer(Ui::Space::S1);
       };
       tuningHeader("1", n->wave1, n->fine1, n->semi1, n->oct1);

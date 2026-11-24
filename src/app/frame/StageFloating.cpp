@@ -276,7 +276,7 @@ int DrawFloating(FrameCtx& fc)
       if (DialogParts::Begin(L("Collect diagnostics")))
       {
          static bool sIncludePatch = false;
-         ImGui::Dummy(ImVec2(tok::stage_floating_spacer_w_sm, 0.0f));
+         Ui::Claim(ImVec2(tok::stage_floating_spacer_w_sm, 0.0f));
          DialogParts::Title(T("Collect diagnostics"));
          DialogParts::Message(T("System info, logs, settings (home folder hidden) and recent crash reports go into one zip on your Desktop. Nothing is sent anywhere."));
          Ui::Spacer(Ui::Space::S2);
@@ -309,7 +309,7 @@ int DrawFloating(FrameCtx& fc)
       }
       if (DialogParts::Begin(L("Save with media")))
       {
-         ImGui::Dummy(ImVec2(tok::stage_floating_spacer_w_lg, 0.0f));
+         Ui::Claim(ImVec2(tok::stage_floating_spacer_w_lg, 0.0f));
          DialogParts::Title(T("Save with media"));
          DialogParts::Message(T("Copies every file this patch reads into a \"<name> media\" folder next to it, and saves the patch pointing there, so the two move together. The originals stay where they are."));
          Ui::Spacer(Ui::Space::S2);

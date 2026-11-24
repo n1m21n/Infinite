@@ -13,6 +13,7 @@
 #include "app/frame/FrameCtx.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiScope.h"
+#include "app/ui/design/components/FormParts.h"
 
 namespace app
 {
@@ -289,7 +290,7 @@ void DrawNodeBodies(FrameCtx& fc)
                      rowUsed = 0.0f;   // next pin starts a new row (no SameLine)
                   else
                   {
-                     ImGui::SameLine(0.0f, pinSpacing);
+                     FormParts::Inline(0.0f, pinSpacing);
                      rowUsed += pinSpacing;
                   }
                }
@@ -757,8 +758,7 @@ void DrawNodeBodies(FrameCtx& fc)
             if (isWide)
             {
                const float offset = WideNodeCentreOffset(gn.node.get(), kViewportSize);
-               if (offset > 0.0f)
-                  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+               Ui::CentreNext(offset);
             }
             // Name-only macros have nothing behind the eye, so the
             // toggle is dropped and bypass is the row's first control.
@@ -1541,10 +1541,10 @@ void DrawNodeBodies(FrameCtx& fc)
                   ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y));   // beside the toggle; the pad Dummy follows
                   pad = std::max(0.0f, pad - tok::stage_node_x);
                }
-               ImGui::Dummy(ImVec2(pad, tok::stage_node_spacer_h_sm));
+               Ui::Claim(ImVec2(pad, tok::stage_node_spacer_h_sm));
                for (int o = 0; o < outputs; o++)
                {
-                  ImGui::SameLine(0.0f, o == 0 ? 0.0f : tok::space_2_5);
+                  FormParts::Inline(0.0f, o == 0 ? 0.0f : tok::space_2_5);
                   DrawPin(gn.OutputPinId(o), ed::PinKind::Output, gn.node->OutputLabel(o), true);
                }
             }
@@ -1568,7 +1568,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawPin(gn.OutputPinId(o), ed::PinKind::Output, gn.node->OutputLabel(o), true);
                }
                ImGui::SetCursorScreenPos(ImVec2(gridOrigin.x, gridOrigin.y + (float)((outputs + cols - 1) / cols) * rowH));
-               ImGui::Dummy(ImVec2(contentW, tok::stage_node_spacer_h_sm));
+               Ui::Claim(ImVec2(contentW, tok::stage_node_spacer_h_sm));
             }
          }
 

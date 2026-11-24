@@ -765,7 +765,7 @@ namespace
          s.search[0] = 0; // a stale query from last time would open on an empty list
          UiInteract::FocusHere();
       }
-      ImGui::Dummy(ImVec2(tok::field_patcher_spacer_w_lg, 0.0f));
+      Ui::Claim(ImVec2(tok::field_patcher_spacer_w_lg, 0.0f));
       LibraryParts::SearchField("fpSearch", T("Search boxes"), s.search, sizeof(s.search));
       const bool enter = Keymap::Enter(false);
       MenuParts::Separator();
@@ -932,7 +932,7 @@ namespace
             ed::EndPin();
          }
          else
-            ImGui::Dummy(ImVec2(tok::field_patcher_spacer_w_sm, ImGui::GetTextLineHeight()));
+            Ui::Claim(ImVec2(tok::field_patcher_spacer_w_sm, ImGui::GetTextLineHeight()));
          if (r < (int)b.outlets.size())
          {
             FormParts::Inline(0.0f, tok::field_patcher_box_inline_layout);
@@ -1523,11 +1523,9 @@ namespace
       va_start(args, fmt);
       std::vsnprintf(buf, sizeof(buf), fmt, args);
       va_end(args);
-      const float dy = std::max(0.0f, (ChipButton::Height() - ImGui::GetTextLineHeight()) * 0.5f);
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + dy);
+      Ui::CentreInRow centred(ChipButton::Height(), ImGui::GetTextLineHeight());
       ImGui::TextDisabled("%s", buf);
       Ui::SameRow(Ui::Space::S2);
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() - dy);
    }
 
    void DrawStrip()
@@ -1646,18 +1644,16 @@ namespace
       const int boxes = (int)p.graph.boxes.size();
       const int codeBoxes = p.graph.CountCodeBoxes();
       const ImVec4 warn = ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_PlotHistogramHovered));
-      const float dy = std::max(0.0f, (ChipButton::Height() - ImGui::GetTextLineHeight()) * 0.5f);
-      const float y0 = ImGui::GetCursorPosY();
-      // Every item of the row shares one centre line: chips are kHeight tall, text is nudged to match.
+      // Every item of the row shares one centre line: chips are kHeight tall, text is nudged to match, and each
+      // text goes back to the row's top when it ends, so every chip and the footer start on the row's top.
       auto text = [&](const char* t, const ImVec4* col = nullptr) {
-         ImGui::SetCursorPosY(y0 + dy);
+         Ui::CentreInRow centred(ChipButton::Height(), ImGui::GetTextLineHeight());
          if (col != nullptr)
             ImGui::TextColored(*col, "%s", t);
          else
             ImGui::TextDisabled("%s", t);
          Ui::SameRow(Ui::Space::S3);
       };
-      ImGui::SetCursorPosY(y0);
       if (p.uid == 0)
       {
          const ExportTarget t = TargetOf(p.graph, ScratchMask(p.scratchCode));
@@ -1667,7 +1663,6 @@ namespace
          else if (t.typeName != nullptr)
          {
             const std::string chip = std::string(T(t.label)) + "##fpExport";
-            ImGui::SetCursorPosY(y0);
             if (ChipButton::Draw(chip.c_str(), true))
                Export(p);
             if (ImGui::IsItemHovered())
@@ -1697,7 +1692,6 @@ namespace
       if (!p.parseError.empty())
          text(p.parseError.c_str(), &warn);
       // The free footer: right-click for the dock switch.
-      ImGui::SetCursorPosY(y0);
       const float freeW = Ui::AvailW();
       if (freeW > tok::field_patcher_footer_limit)
       {

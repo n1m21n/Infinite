@@ -942,7 +942,7 @@ namespace app
                for (int col = 0; col < 12; ++col)
                {
                   NextCell();
-                  ImGui::Dummy(ImVec2(tok::mod_matrix_spacer_w, ImGui::GetTextLineHeight()));
+                  Ui::Claim(ImVec2(tok::mod_matrix_spacer_w, ImGui::GetTextLineHeight()));
                }
                const float after = ImGui::GetCursorPosY();
                if (after <= before)

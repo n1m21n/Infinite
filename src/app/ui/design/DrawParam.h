@@ -7,6 +7,7 @@
 //   Ui::DrawParams(n, kShapeRows);              // a stacked body: every row, top to bottom
 //   Ui::DrawParams(n, kRows, n->on);            // ... greyed out while the third argument is false
 //   Ui::DrawParam(n, kShapeRows[3]);            // one row, where hand code still sits around it
+//   { Ui::Section s("emission", colW, on); }    // a titled section greyed as one (Ui::RowsLive: untitled)
 //   Ui::DrawKnobs(row, n, kChorusRows);         // knob rows into an AudioKnobRow's cells, left to right
 //   Ui::RegisterParams(n, nodeIndex, kRows);    // ParamRefs for every shown slider, no ImGui at all
 #pragma once
@@ -93,6 +94,24 @@ namespace Ui
          bool off;
       };
    }
+
+   // A group of rows that greys together while `live` is false (the RowLive rule: never while only registering).
+   // Scopes nest the way BeginDisabled does, so a row inside two of them greys while either is off.
+   //   { Ui::RowsLive on(n->type == 5); ...rows... }
+   struct RowsLive
+   {
+      explicit RowsLive(bool live) : row(live) {}
+      detail::RowLive row;
+   };
+
+   // A titled section: the separator and every row under it grey together while `live` is false. A section whose
+   // title stays readable while its rows grey is a NodeSeparator followed by a RowsLive.
+   //   { Ui::Section s("emission", colW, !pbrUnused); ...rows... }
+   struct Section
+   {
+      Section(const char* title, float width, bool live) : rows(live) { app::NodeSeparator(title, width); }
+      RowsLive rows;
+   };
 
    // One row, drawn where the call sits. Returns what the widget returned (true on a change for sliders and
    // toggles; false for rows that report nothing).

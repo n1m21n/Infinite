@@ -7707,7 +7707,7 @@ namespace
       const float x = std::round(p.x) + tok::px_align;
       ImGui::GetWindowDrawList()->AddLine(ImVec2(x, top + tok::space_1_5), ImVec2(x, top + sRowH - tok::space_1_5), ImGui::GetColorU32(ImGuiCol_Separator), tok::view2d_bar_divider_stroke);
       ImGui::SetCursorScreenPos(ImVec2(p.x, top));
-      ImGui::Dummy(ImVec2(tok::view2d_spacer_w, sRowH));
+      Ui::Claim(ImVec2(tok::view2d_spacer_w, sRowH));
       FormParts::Inline(0.0f, tok::space_2);
    }
 
@@ -9567,8 +9567,7 @@ namespace
          const float wa = ImGui::CalcTextSize(a).x + pad, wb = ImGui::CalcTextSize(b).x + pad;
          Ui::SameRow();
          const float x = ImGui::GetWindowContentRegionMax().x - wa - wb - tok::space_1;
-         if (x > ImGui::GetCursorPosX())
-            ImGui::SetCursorPosX(x);
+         Ui::ColumnAt(x);
          if (TextChip(L("Essentials##v2dpickess"), false, T("Show essentials only"), wa))
          {
             gView2DTools.clear();
@@ -9660,7 +9659,7 @@ namespace
             const ImVec2 p = ImGui::GetCursorScreenPos();
             const float y = std::round(p.y + 0.5f * (tok::space_1 + 1.0f) - tok::space_1 * 0.5f);
             dl->AddLine(ImVec2(p.x + tok::space_1, y), ImVec2(p.x + w - tok::space_1, y), ImGui::GetColorU32(ImGuiCol_Separator), tok::view2d_tool_strip_stroke);
-            ImGui::Dummy(ImVec2(w, tok::view2d_spacer_h_sm));
+            Ui::Claim(ImVec2(w, tok::view2d_spacer_h_sm));
          }
          else if (cols > 1 && shown % cols != 0)
             FormParts::Inline(0.0f, tok::space_1);
@@ -9708,10 +9707,8 @@ namespace
    // Text centred on the chip row, so labels share the chips' centre line.
    [[maybe_unused]] void RowLabel(const char* text)
    {
-      const float y = ImGui::GetCursorPosY();
-      ImGui::SetCursorPosY(y + (sRowH - ImGui::GetTextLineHeight()) * 0.5f);
+      Ui::CentreInRow centred(sRowH, ImGui::GetTextLineHeight());
       ImGui::TextDisabled("%s", text);
-      ImGui::SetCursorPosY(y);
    }
 
    // The context bar: what the current tool can do (plan §5). Laid out on one tile row from the cursor.

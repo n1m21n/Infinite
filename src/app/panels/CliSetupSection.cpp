@@ -113,7 +113,7 @@ namespace app
          // none reaches past the card (that overflow let the page scroll sideways).
          const float w = std::max(bw, ImGui::CalcTextSize(label, nullptr, true).x + tok::cli_setup_section_ratio * tok::space_3);
          FormParts::Inline(0.0f, 0.0f);
-         ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - w);
+         Ui::AlignRight(w);
          return ChipButton::Draw(label, primary, rowH, w);
       };
 
@@ -311,8 +311,7 @@ namespace app
             const float deleteW = std::max(tok::cli_setup_section_cancel_w_min, ImGui::CalcTextSize(T("Delete")).x + tok::cli_setup_section_ratio * tok::space_2);
             const float total = cancelW + tok::space_2 + deleteW;
             const float avail = Ui::AvailW();
-            if (avail > total)
-               ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - total);
+            Ui::ColumnAt(ImGui::GetCursorPosX() + avail - total);   // only when there is room: never left of the cursor
             if (ChipButton::Draw(L("Cancel"), false, tok::control_h, cancelW))
                ImGui::CloseCurrentPopup();
             FormParts::Inline(0.0f, tok::space_2);
@@ -554,7 +553,7 @@ namespace app
          centred(UiType::Size::Caption, UiType::Weight::Regular, tok::U32(tok::action_record, CategoryColors::IsThemeLight()), sError.c_str());
       }
       ImGui::SetCursorScreenPos(ImVec2(origin.x, y));
-      ImGui::Dummy(ImVec2(availW, tok::space_4));
+      Ui::Claim(ImVec2(availW, tok::space_4));
       return true;
    }
 }

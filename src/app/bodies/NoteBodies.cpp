@@ -297,7 +297,7 @@ namespace app
                ImGui::PopID();
             }
             ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
-            ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight() + tok::space_1));
+            Ui::Claim(ImVec2(gAudioContentW, ImGui::GetFrameHeight() + tok::space_1));
          }
 
          {
@@ -2200,7 +2200,7 @@ namespace app
          }
          else
          {
-            ImGui::Dummy(ImVec2(0.0f, ImGui::GetTextLineHeight())); // hover line keeps its row; the idle text lives in the status line
+            Ui::Claim(ImVec2(0.0f, ImGui::GetTextLineHeight())); // hover line keeps its row; the idle text lives in the status line
          }
       }
 

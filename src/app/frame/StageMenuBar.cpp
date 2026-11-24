@@ -25,6 +25,7 @@
 #include "platform/AppPaths.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiScope.h"
+#include "app/ui/design/components/FormParts.h"
 
 namespace app
 {
@@ -756,9 +757,9 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_1, tok::space_1));
 
          // Right-edge items are placed at an absolute x on the bar's line.
-         auto TopBarPlaceAt = [](float x) { ImGui::SameLine(x); };
+         auto TopBarPlaceAt = [](float x) { FormParts::Inline(x); };
          auto TopBarSameLine = [](float spacing = tok::space_1) {
-            ImGui::SameLine(0.0f, spacing);
+            FormParts::Inline(0.0f, spacing);
          };
          // A live number: tabular digits in a slot as wide as its widest value, so it never
          // shifts what sits beside it. `widest` is the longest text it can show.
@@ -902,7 +903,7 @@ void DrawMenuBar(FrameCtx& fc)
          static float sCentreW = 0.0f;
          const float centreX = std::max(leftClusterEndX + tok::space_5,
                                         std::round((ImGui::GetWindowWidth() - sCentreW) * 0.5f));
-         ImGui::SameLine(centreX);
+         FormParts::Inline(centreX);
          ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::control_h) * 0.5f));
          const float centreStartScreenX = ImGui::GetCursorScreenPos().x;
          // Transport sits just left of the tempo, audio power just right of it.

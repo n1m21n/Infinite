@@ -29,8 +29,7 @@ namespace app
 
       {
          const float offset = isMaterial ? WideNodeCentreOffset(gn.node.get(), size) : CachedCentreOffset(gn.node.get(), size);
-         if (offset > 0.0f)
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+         Ui::CentreNext(offset);
       }
 
       ImVec2 origin = ImGui::GetCursorScreenPos();

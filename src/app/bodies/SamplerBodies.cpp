@@ -614,7 +614,7 @@ namespace app
       if (state == State::Empty || state == State::Failed || (state == State::Generating && n->waveformCacheCount == 0))
       {
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         ImGui::Dummy(ImVec2(AudioFullWidth(), tok::sampler_generate_samples_spacer_h_lg));
+         Ui::Claim(ImVec2(AudioFullWidth(), tok::sampler_generate_samples_spacer_h_lg));
          EmptyState::Draw(p, ImVec2(p.x + AudioFullWidth(), p.y + tok::sampler_generate_samples_body_gap),
                           state == State::Generating ? T("Generating") : state == State::Failed ? T("Could not make one") : T("No sample yet"),
                           state == State::Failed ? T("Generate again") : state == State::Generating ? nullptr : T("Pick a part and generate"));
@@ -749,7 +749,7 @@ namespace app
          AudioBareDropdown("slice by##slicerSliceBy", kSliceByNames, n->sliceBy,
                            [n](int i) { PushUndoCheckpoint(); n->sliceBy = i; }, halfW);
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(halfW, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(halfW, ImGui::GetFrameHeight()));
       }
       FormParts::Inline();
       ImGui::BeginDisabled(!onsetMode);
@@ -766,7 +766,7 @@ namespace app
                            [n](int i) { PushUndoCheckpoint(); n->division = i; }, halfW);
          ImGui::EndDisabled();
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(halfW, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(halfW, ImGui::GetFrameHeight()));
       }
       FormParts::Inline();
       ImGui::BeginDisabled(!onsetMode);
@@ -1676,7 +1676,7 @@ namespace app
             PushUndoCheckpoint();
             n->laneChoke[lane] = (n->laneChoke[lane] + 1) % tok::sampler_lane_choke;
          }
-         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(gAudioContentW, ImGui::GetFrameHeight()));
       }
 
       DrawDrumLaneWaveform(n, lane, 84.0f);
@@ -2183,7 +2183,7 @@ namespace app
 
          ImGui::SetCursorScreenPos(
             ImVec2(origin.x, origin.y + (float)DrumSequencerNode::kNumLanes * (rowH + rowGap) + tok::space_1));
-         ImGui::Dummy(ImVec2(gAudioBodyW, tok::sampler_drum_sequencer_spacer_h_sm));
+         Ui::Claim(ImVec2(gAudioBodyW, tok::sampler_drum_sequencer_spacer_h_sm));
 
          // ---- grid stat line: left readout, compact '1-16 | 17-32' pill
          // right-aligned. Always drawn (greyed via BeginDisabled at <= 16
@@ -2199,7 +2199,7 @@ namespace app
             ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("%s steps - %s", UiFmt::Count((long long)(steps)).c, MusicTime::RateDivisionName(n->rate));
             FormParts::Inline();
-            ImGui::SetCursorPosX(startX + AudioFullWidth() - pillW);
+            Ui::ColumnAt(startX + AudioFullWidth() - pillW);
             if (!paged)
                ImGui::BeginDisabled();
             const int pc = DrumSegmentedPill("drumpage", kPages, 2, page, pgw, playPage);

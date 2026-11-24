@@ -2467,17 +2467,10 @@ namespace
    // The editing controls the header carries after the pages: snap, grid, Assign. One tile high each, like the 3D View's.
    float ControlsW(const MSEGNode& n) { return tok::curve_editor_controls_w_ratio * (kIconW + tok::space_1) + GridW(n) + tok::space_3 + AssignW(); }
 
-   // Every header item starts on the row's top: a mixed row (chips, a picker face, a text button) otherwise drifts by
-   // the text-baseline offset ImGui carries between SameLine items.
-   struct HeaderRow
+   // Every header item starts on the row's top (Ui::RowAlign::Top).
+   struct HeaderRow : Ui::Row
    {
-      float y;
-      HeaderRow() : y(ImGui::GetCursorPosY()) {}
-      void Next(float spacing) const
-      {
-         FormParts::Inline(0.0f, spacing);
-         ImGui::SetCursorPosY(y);
-      }
+      HeaderRow() : Ui::Row(Ui::Space::None, Ui::RowAlign::Top) {}
    };
 
    void DrawControls(GraphNode& gn, MSEGNode& n, const HeaderRow& row)
@@ -2490,12 +2483,12 @@ namespace
          ImGui::OpenPopup("##ceLibMenu");
       }
       DrawLibraryMenu(gn, n);
-      row.Next(tok::space_1);
+      row.Next(Ui::Space::S1);
       if (IconChip("##ceSnap", IconsInfinite::Snap, s.snap, T("Snap to grid (G)")))
          s.snap = !s.snap;
-      row.Next(tok::space_1);
+      row.Next(Ui::Space::S1);
       Picker("##ceGrid", GridNames(n), GridIndex(n), GridW(n), T("Grid: snap and quantise (Q)"));
-      row.Next(tok::space_3);
+      row.Next(Ui::Space::S3);
       {
          const bool live = R().phase != RecPhase::Idle && R().uid == gn.uid;
          if (IconChip("##ceRec", R().phase == RecPhase::Recording && live ? IconsInfinite::RecordFill : IconsInfinite::Record, live, RecTip()))
@@ -2509,7 +2502,7 @@ namespace
             }
          }
       }
-      row.Next(tok::space_1);
+      row.Next(Ui::Space::S1);
       const bool armed = gCurveAssignUid == gn.uid;
       if (ActionButton::Draw(AssignLabel(), ImVec2(AssignW(), PanelKit::Chip()), armed ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
          gCurveAssignUid = armed ? 0 : gn.uid;
@@ -2541,7 +2534,7 @@ namespace
             const char* label = T(kKinds[k]);
             const float w = ImGui::CalcTextSize(label).x + tok::curve_editor_w_ratio * tok::space_3;
             if (k > 0)
-               row.Next(tok::space_1);
+               row.Next(Ui::Space::S1);
             ActionButton::Scoped() = s.motion == (k == 1) ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
             const std::string id = std::string(label) + "##ceKind" + std::to_string(k);
             if (ActionButton::Draw(id.c_str(), ImVec2(w, PanelKit::Chip())) && s.motion != (k == 1))
@@ -2554,7 +2547,7 @@ namespace
             ActionButton::Scoped() = ActionButton::Kind::Plain;
             switchW += w + (k > 0 ? tok::space_1 : 0.0f);
          }
-         row.Next(tok::space_3);
+         row.Next(Ui::Space::S3);
          switchW += tok::space_3;
       }
       DrawPageStrip(std::max(1.0f, availW - switchW - togglesW - controlsW - (n != nullptr ? tok::space_3 : 0.0f)));
@@ -2563,15 +2556,15 @@ namespace
       const float rightX = startX + availW - togglesW;
       if (!side)
       {
-         row.Next(tok::space_3);
+         row.Next(Ui::Space::S3);
          Ui::ColumnAt(rightX - tok::space_3 - ControlsW(*n));
          DrawControls(*gn, *n, row);
       }
-      row.Next(tok::space_3);
+      row.Next(Ui::Space::S3);
       Ui::ColumnAt(rightX);
       if (IconChip("##ceGhost", s.ghost ? IconsInfinite::Eye : IconsInfinite::EyeOff, s.ghost, T("Show other curves")))
          s.ghost = !s.ghost;
-      row.Next(tok::space_1);
+      row.Next(Ui::Space::S1);
       if (IconChip("##ceSide", IconsInfinite::Edit, s.sideOpen, T("Properties (N)")))
          s.sideOpen = !s.sideOpen;
    }

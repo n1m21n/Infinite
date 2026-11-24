@@ -655,8 +655,7 @@ namespace app
 
       {
          const float offset = render != nullptr ? WideNodeCentreOffset(node, size) : CachedCentreOffset(node, size);
-         if (offset > 0.0f)
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+         Ui::CentreNext(offset);
       }
 
       ImVec2 origin = ImGui::GetCursorScreenPos();

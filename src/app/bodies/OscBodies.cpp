@@ -1358,7 +1358,7 @@ namespace app
                            [&eng](int i) { PushUndoCheckpoint(); eng.semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
       }
       Ui::Spacer(Ui::Space::S1);
 
@@ -1690,7 +1690,7 @@ namespace app
                            [&eng](int i) { PushUndoCheckpoint(); eng.semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
       }
       Ui::Spacer(Ui::Space::S1);
 
@@ -1814,7 +1814,7 @@ namespace app
                            [n](int i) { PushUndoCheckpoint(); n->semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
       }
       Ui::Spacer(Ui::Space::S1);
 
@@ -2098,7 +2098,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + w - loopW, y));
          Ui::DrawParam(n, PartialsBodyRow::Toggle<&PartialsNode::loop>("loop##partialsLoop"));
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
       }
       Ui::Spacer(Ui::Space::S1);
       DrawPartialsBars(n, 52.0f);
@@ -2489,7 +2489,7 @@ namespace app
 
          // Selectors on their own row; tuning row below is the same size as every synth header.
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
          Ui::Spacer(Ui::Space::S1);
          const float y2 = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
@@ -2504,7 +2504,7 @@ namespace app
                            [n](int i) { PushUndoCheckpoint(); n->semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
       }
       Ui::Spacer(Ui::Space::S1);
 
@@ -2826,7 +2826,7 @@ namespace app
                            [n](int i) { PushUndoCheckpoint(); n->domainMode = i; n->CompileEquation(); }, domW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
          Ui::Spacer(Ui::Space::S1);
          const float y2 = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
@@ -2841,7 +2841,7 @@ namespace app
                            [n](int i) { PushUndoCheckpoint(); n->semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
       }
       Ui::Spacer(Ui::Space::S1);
 
@@ -3023,7 +3023,7 @@ namespace app
                            [n](int i) { PushUndoCheckpoint(); n->semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
       }
       Ui::Spacer(Ui::Space::S1);
 
@@ -3139,7 +3139,7 @@ namespace app
          }
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
 
          Ui::Spacer(Ui::Space::S0_75);
          AudioKnobRow row(tok::osc_image_spectral_synth_body_audio_knob_row_layout);
@@ -3180,7 +3180,7 @@ namespace app
                            [n](int i) { PushUndoCheckpoint(); n->freqScale = i; }, scaleW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
 
          Ui::Spacer(Ui::Space::S0_75);
 
@@ -3202,7 +3202,7 @@ namespace app
          }
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         Ui::Claim(ImVec2(w, ImGui::GetFrameHeight()));
 
          // Row 3 Knobs: Frequency Boundaries & Pitch
          Ui::Spacer(Ui::Space::S1);

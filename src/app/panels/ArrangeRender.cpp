@@ -508,7 +508,7 @@ namespace app
             ? (isSample ? "Video Sample" : "Video Clip")
             : (isSample ? "Audio Sample" : "Audio Clip");
          InspectorTitle(clipKindLabel);
-         ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
+         FormParts::Inline(wholeW - tok::arrange_clip_settings_child_gap);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          InspectorCardBegin();
@@ -940,7 +940,7 @@ namespace app
             snprintf(mt, sizeof(mt), T("Multiple Clips (%d)"), (int)gArrangeSel.size());
             InspectorTitle(mt);
          }
-         ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
+         FormParts::Inline(wholeW - tok::arrange_clip_settings_child_gap);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          InspectorCardBegin();
@@ -1039,7 +1039,7 @@ namespace app
          {
             const bool isVideo = lane->type == Arrange::kLaneVideo;
             InspectorTitle(isVideo ? "Video Track" : "Audio Track");
-            ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
+            FormParts::Inline(wholeW - tok::arrange_clip_settings_child_gap);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;
             InspectorCardBegin();
@@ -1170,7 +1170,7 @@ namespace app
          else if (const Arrange::TrackGroup* grp = Arrange::FindTrackGroup(gArrange, rowId))
          {
             InspectorTitle("Track Group");
-            ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
+            FormParts::Inline(wholeW - tok::arrange_clip_settings_child_gap);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;
             InspectorCardBegin();
@@ -1241,7 +1241,7 @@ namespace app
       else
       {
          InspectorTitle(T("Inspector"));
-         ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
+         FormParts::Inline(wholeW - tok::arrange_clip_settings_child_gap);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          InspectorCardBegin();

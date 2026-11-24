@@ -1,4 +1,6 @@
 // Arrange panel support: position formatting, typed edit, sliders, media import (moved verbatim from main.cpp).
+#include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/UiScope.h"
 #include "app/AppShared.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
@@ -250,7 +252,7 @@ namespace app
             visible = nullptr;
          if (visible != nullptr)
          {
-            ImGui::SameLine(0.0f, GImGui->Style.ItemInnerSpacing.x);
+            FormParts::Inline(0.0f, GImGui->Style.ItemInnerSpacing.x);
             if (hash != nullptr)
                ImGui::TextUnformatted(visible, hash);
             else

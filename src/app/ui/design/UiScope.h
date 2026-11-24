@@ -60,14 +60,34 @@ namespace Ui
    inline void SameRow() { ImGui::SameLine(); }
    inline void SameRow(Space gap) { ImGui::SameLine(0.0f, Px(gap)); }
 
-   // A row of items: Next() before every item after the first.
+   // A row of items: Next() before every item after the first. RowAlign::Top starts every item on the row's top
+   // (the cursor's Y when the row was made): a mixed row of chips, pickers and text buttons otherwise drifts by the
+   // text-baseline offset ImGui carries between SameLine items. Next(gap) takes this one gap instead of the row's.
+   enum class RowAlign : uint8_t { Flow, Top };
    struct Row
    {
-      explicit Row(Space gap) : gap(gap), styled(false) {}
-      Row() : gap(Space::None), styled(true) {}
-      void Next() const { styled ? SameRow() : SameRow(gap); }
+      explicit Row(Space gap, RowAlign align = RowAlign::Flow)
+         : gap(gap), styled(false), pinTop(align == RowAlign::Top), top(pinTop ? ImGui::GetCursorPosY() : 0.0f) {}
+      Row() : gap(Space::None), styled(true), pinTop(false), top(0.0f) {}
+      void Next() const
+      {
+         styled ? SameRow() : SameRow(gap);
+         Pin();
+      }
+      void Next(Space g) const
+      {
+         SameRow(g);
+         Pin();
+      }
+      void Pin() const
+      {
+         if (pinTop)
+            ImGui::SetCursorPosY(top);
+      }
       Space gap;
       bool styled;
+      bool pinTop;
+      float top;
    };
 
    // Items below each other with a ladder gap between rows (the style's ItemSpacing.y while the scope lives).
@@ -122,6 +142,14 @@ namespace Ui
    {
       const float d = (inW - itemW) * 0.5f;
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (d > 0.0f ? d : 0.0f));
+   }
+
+   // The next item sits `offset` right of the cursor: a centring offset the caller already worked out (a node's
+   // WideNodeCentreOffset); never left of the cursor.
+   inline void CentreNext(float offset)
+   {
+      if (offset > 0.0f)
+         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
    }
 
    // The next item sits right under the last one, without the style's item gap / with one more item gap.
