@@ -16,10 +16,10 @@ namespace ModeBanner
    {
       const bool light = CategoryColors::IsThemeLight();
       const ImVec4 ink = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::SetNextWindowPos(topCentre, ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+      ImGui::SetNextWindowPos(topCentre, ImGuiCond_Always, ImVec2(tok::mode_banner_window_x, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_1));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_container);
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, tok::border_hairline);
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, 0.0f));
       ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetStyleColorVec4(ImGuiCol_PopupBg));
       ImGui::PushStyleColor(ImGuiCol_Border, tok::Hairline(light));

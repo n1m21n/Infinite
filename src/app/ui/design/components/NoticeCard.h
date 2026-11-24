@@ -27,15 +27,15 @@ namespace NoticeCard
          ImGui::Dummy(ImVec2(tok::icon_sm, h));
          ImGui::SameLine(0.0f, tok::space_2);
       }
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width - 3.0f * tok::space_4);
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width - tok::notice_card_text_wrap_local_pos_x_lg * tok::space_4);
       ImGui::TextUnformatted(n.title.c_str());
       ImGui::PopTextWrapPos();
       ImGui::SameLine(width - tok::space_4 - tok::icon_sm);
-      if (GlyphToggle::Draw("##dismiss", IconsInfinite::Close, IconsInfinite::Close, false, 18.0f))
+      if (GlyphToggle::Draw("##dismiss", IconsInfinite::Close, IconsInfinite::Close, false, tok::notice_card_dismiss_cap_y))
          result = Result::Dismiss;
       if (!n.detail.empty())
       {
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width - 2.0f * tok::space_4);
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width - tok::notice_card_text_wrap_local_pos_x_sm * tok::space_4);
          ImGui::TextDisabled("%s", n.detail.c_str());
          ImGui::PopTextWrapPos();
       }

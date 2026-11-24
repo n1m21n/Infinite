@@ -19,7 +19,7 @@ namespace StatusDot
       const float r = tok::status_r;
       const ImVec2 c(mx.x - tok::space_1 - r, mn.y + tok::space_1 + r);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddCircleFilled(c, r + 1.0f, ImGui::GetColorU32(ImGuiCol_PopupBg, 0.9f), 12);
-      dl->AddCircleFilled(c, r, tok::U32(pair, CategoryColors::IsThemeLight()), 12);
+      dl->AddCircleFilled(c, r + 1.0f, ImGui::GetColorU32(ImGuiCol_PopupBg, tok::status_dot_on_last_item_im_gui_col_popup_bg_alpha), tok::status_dot_on_last_item_segments);
+      dl->AddCircleFilled(c, r, tok::U32(pair, CategoryColors::IsThemeLight()), tok::status_dot_on_last_item_segments);
    }
 }

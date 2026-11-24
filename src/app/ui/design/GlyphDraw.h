@@ -16,7 +16,7 @@ namespace glyph
    // AddText snaps its origin to whole pixels, so the drawn centre can differ from `center` by up to half a pixel.
    inline float TopFor(ImFont* font, ImVec2 center, float size)
    {
-      return center.y + 0.3f * size - (float)(int)(font->GetFontBaked(size)->Ascent + 0.5f);
+      return center.y + tok::glyph_draw_top_for_ratio * size - (float)(int)(font->GetFontBaked(size)->Ascent + 0.5f);
    }
 
    // The centre a glyph is really drawn at: draw backing shapes (discs, tiles) here so they sit concentric with it.
@@ -24,7 +24,7 @@ namespace glyph
    {
       ImFont* font = ImGui::GetFont();
       const float raw = TopFor(font, center, size);
-      return ImVec2(center.x, center.y + ((float)(int)(raw + 0.5f) - raw));
+      return ImVec2(center.x, center.y + ((float)(int)(raw + tok::px_align) - raw));
    }
 
    inline void Draw(ImDrawList* dl, ImVec2 center, float size, ImU32 col, const char* g)
@@ -36,7 +36,7 @@ namespace glyph
       const unsigned int cp = (u[0] & 0xF0) == 0xE0 ? ((u[0] & 0x0Fu) << 12) | ((u[1] & 0x3Fu) << 6) | (u[2] & 0x3Fu) : u[0];
       const ImFontGlyph* gl = font->GetFontBaked(size)->FindGlyphNoFallback((ImWchar)cp);
       const float left = gl != nullptr ? center.x - (gl->X0 + gl->X1) * 0.5f : center.x - font->CalcTextSizeA(size, FLT_MAX, 0.0f, g).x * 0.5f;
-      dl->AddText(font, size, ImVec2(left, (float)(int)(TopFor(font, center, size) + 0.5f)), col, g);
+      dl->AddText(font, size, ImVec2(left, (float)(int)(TopFor(font, center, size) + tok::px_align)), col, g);
    }
 
    // The box the glyph's ink covers when drawn by Draw at `center` (for the UI audit's centring checks).
@@ -46,7 +46,7 @@ namespace glyph
       const unsigned char* u = (const unsigned char*)g;
       const unsigned int cp = (u[0] & 0xF0) == 0xE0 ? ((u[0] & 0x0Fu) << 12) | ((u[1] & 0x3Fu) << 6) | (u[2] & 0x3Fu) : u[0];
       const ImFontGlyph* gl = font->GetFontBaked(size)->FindGlyphNoFallback((ImWchar)cp);
-      const float top = (float)(int)(TopFor(font, center, size) + 0.5f);
+      const float top = (float)(int)(TopFor(font, center, size) + tok::px_align);
       if (gl == nullptr)
       {
          mn = mx = center;
@@ -126,12 +126,12 @@ namespace glyph
    {
       if (!dl) return;
       Draw(dl, c, size, col, IconsInfinite::MetronomeBody);
-      const float u = size / 20.0f;
-      const float a = (swing < -1.0f ? -1.0f : swing > 1.0f ? 1.0f : swing) * 0.41f;
-      const ImVec2 pivot(c.x, c.y + 3.2f * u);
+      const float u = size / tok::glyph_draw_u_ratio;
+      const float a = (swing < -1.0f ? -1.0f : swing > 1.0f ? 1.0f : swing) * tok::glyph_draw_a_ratio;
+      const ImVec2 pivot(c.x, c.y + tok::glyph_draw_metronome_ratio * u);
       const float len = 9.0f * u;
       const ImVec2 tip(pivot.x + sinf(a) * len, pivot.y - cosf(a) * len);
-      dl->AddLine(pivot, tip, col, 1.5f * u);
-      dl->AddCircleFilled(ImVec2(pivot.x + sinf(a) * len * 0.8f, pivot.y - cosf(a) * len * 0.8f), 1.2f * u, col);
+      dl->AddLine(pivot, tip, col, tok::glyph_draw_line_stroke * u);
+      dl->AddCircleFilled(ImVec2(pivot.x + sinf(a) * len * tok::glyph_draw_dot_x, pivot.y - cosf(a) * len * tok::glyph_draw_dot_x), tok::glyph_draw_dot_r * u, col);
    }
 }

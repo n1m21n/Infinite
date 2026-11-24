@@ -22,7 +22,7 @@ namespace PanelFrame
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_container);
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, tok::border_hairline);
       ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(t.border.r, t.border.g, t.border.b, tok::alpha_edge_strong));
    }
@@ -54,7 +54,7 @@ namespace PanelFrame
       const ImVec2 c1(p0.x + size.x - in.r, p0.y + size.y - in.b);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       for (int i = 6; i >= 1; --i)   // soft shadow: stacked, widening, fainter rings
-         dl->AddRectFilled(ImVec2(c0.x - i, c0.y - i + 2.0f), ImVec2(c1.x + i, c1.y + i + 2.0f),
+         dl->AddRectFilled(ImVec2(c0.x - i, c0.y - i + tok::space_0_5), ImVec2(c1.x + i, c1.y + i + tok::space_0_5),
                            ImGui::GetColorU32(ImVec4(0, 0, 0, tok::alpha8_shadow_panel / 255.0f)), tok::radius_container + i);
       dl->AddRectFilled(c0, c1, ImGui::GetColorU32(ImGuiCol_ChildBg), tok::radius_container);
    }

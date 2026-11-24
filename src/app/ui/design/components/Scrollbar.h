@@ -3,13 +3,14 @@
 // surface with its own ink (a comment note on the canvas) pushes the same look with that ink.
 #pragma once
 #include "imgui.h"
+#include "app/ui/design/Tokens.gen.h"
 
 namespace Scrollbar
 {
    // Grab alpha over the ink: at rest, hovered, dragged.
-   inline constexpr float kRest = 0.22f;
-   inline constexpr float kHover = 0.40f;
-   inline constexpr float kDrag = 0.55f;
+   inline constexpr float kRest = tok::scrollbar_rest;
+   inline constexpr float kHover = tok::scrollbar_hover;
+   inline constexpr float kDrag = tok::scrollbar_drag;
 
    inline ImVec4 Ink(const ImVec4& ink, float a) { return ImVec4(ink.x, ink.y, ink.z, a); }
 

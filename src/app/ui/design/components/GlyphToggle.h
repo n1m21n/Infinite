@@ -18,17 +18,17 @@ namespace GlyphToggle
       ImDrawList* dl = ImGui::GetWindowDrawList();
       if (on && lit)
       {
-         const ImVec4 a = hv > 0.5f ? app::AccentEmphasisHover() : app::AccentEmphasisSelected();
-         dl->AddCircleFilled(glyph::SnappedCentre(c, 18.0f), 6.6f, ImGui::GetColorU32(a), 32);
+         const ImVec4 a = hv > tok::glyph_toggle_a_limit ? app::AccentEmphasisHover() : app::AccentEmphasisSelected();
+         dl->AddCircleFilled(glyph::SnappedCentre(c, tok::glyph_toggle_snapped_centre_size), tok::glyph_toggle_dot_r, ImGui::GetColorU32(a), tok::glyph_toggle_dot_segments);
          glyph::Draw(dl, c, tok::icon_md, ImGui::GetColorU32(ImVec4(1, 1, 1, 1)), glyphOn);
          return pressed;
       }
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImVec4 col = ImVec4(t.x, t.y, t.z, 0.5f + 0.5f * hv);
+      ImVec4 col = ImVec4(t.x, t.y, t.z, tok::glyph_toggle_y_lg + 0.5f * hv);
       if (on)
       {
          const ImVec4 a = app::AccentEmphasisSelected();
-         col = ImVec4(a.x + (t.x - a.x) * 0.25f * hv, a.y + (t.y - a.y) * 0.25f * hv, a.z + (t.z - a.z) * 0.25f * hv, 1.0f);
+         col = ImVec4(a.x + (t.x - a.x) * tok::glyph_toggle_y_sm * hv, a.y + (t.y - a.y) * tok::glyph_toggle_y_sm * hv, a.z + (t.z - a.z) * tok::glyph_toggle_y_sm * hv, 1.0f);
       }
       glyph::Draw(dl, c, tok::icon_md, ImGui::GetColorU32(col), on ? glyphOn : glyphOff);
       return pressed;

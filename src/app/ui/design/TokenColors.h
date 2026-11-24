@@ -61,14 +61,14 @@ namespace tok
    // Palette roles (tok::col, owner 2026-11-24). Role / RoleV4 follow the theme (dark or light side); Base / BaseV4
    // are the role's own (dark-side) value, for a call site that already picks its colour per theme. Alpha is the
    // call site's: 0-255 for the ImU32 forms, 0-1 for the ImVec4 forms.
-   inline ImU32 Role(const Pair8& p, int alpha = 255) { return U32(p, CategoryColors::IsThemeLight(), alpha); }
+   inline ImU32 Role(const Pair8& p, int alpha = alpha_opaque) { return U32(p, CategoryColors::IsThemeLight(), alpha); }
    inline ImVec4 RoleV4(const Pair8& p, float alpha = 1.0f)
    {
       ImVec4 c = V4(p, CategoryColors::IsThemeLight());
       c.w = alpha;
       return c;
    }
-   constexpr ImU32 Base(const Pair8& p, int alpha = 255) { return U32(p, false, alpha); }
+   constexpr ImU32 Base(const Pair8& p, int alpha = alpha_opaque) { return U32(p, false, alpha); }
    constexpr ImVec4 BaseV4(const Pair8& p, float alpha = 1.0f) { return ImVec4(p.dark.r / 255.0f, p.dark.g / 255.0f, p.dark.b / 255.0f, alpha); }
 
    // The one alpha helpers (chunk 3: one definition each). WithAlpha sets the alpha (0..1); ScaleAlpha multiplies

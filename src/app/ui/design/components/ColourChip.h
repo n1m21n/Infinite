@@ -18,7 +18,7 @@ namespace ColourChip
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 q(p.x + size.x, p.y + h);
       dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), tok::radius_control);
-      dl->AddRect(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_swatch_edge + tok::alpha_swatch_edge_hover * hv)), tok::radius_control, 0, 1.0f);
+      dl->AddRect(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_swatch_edge + tok::alpha_swatch_edge_hover * hv)), tok::radius_control, 0, tok::colour_chip_outline_stroke);
       return clicked;
    }
 
@@ -49,7 +49,7 @@ namespace ColourChip
       const ImVec2 sMin(mx.x - inset - sw, mn.y + inset), sMax(mx.x - inset, mx.y - inset);
       dl->AddRectFilled(sMin, sMax, ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), tok::radius_control);
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      dl->AddRect(sMin, sMax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_swatch_edge)), tok::radius_control, 0, 1.0f);
+      dl->AddRect(sMin, sMax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_swatch_edge)), tok::radius_control, 0, tok::colour_chip_row_stroke);
       ImVec4 dim = labelTint != nullptr ? *labelTint : ImVec4(t.x, t.y, t.z, t.w * tok::alpha_caption);
       dl->PushClipRect(mn, ImVec2(sMin.x - pad, mx.y), true);
       dl->AddText(ImVec2(mn.x + pad, mn.y + (h - ImGui::GetFontSize()) * 0.5f), ImGui::GetColorU32(dim), caption);
@@ -75,9 +75,9 @@ namespace ColourChip
          const bool hov = ImGui::IsItemHovered();
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(p.x + d * 0.5f, p.y + d * 0.5f);
-         dl->AddCircleFilled(c, d * (hov ? 0.46f : 0.42f), cols[i]);
+         dl->AddCircleFilled(c, d * (hov ? tok::colour_chip_dots_lg : tok::colour_chip_dots_sm), cols[i]);
          if (i == selected)
-            dl->AddCircle(c, d * 0.5f, ImGui::GetColorU32(ImGuiCol_Text), 0, 1.5f);
+            dl->AddCircle(c, d * 0.5f, ImGui::GetColorU32(ImGuiCol_Text), 0, tok::colour_chip_dots_stroke);
          if (hov && names != nullptr && names[i] != nullptr)
             app::HelpTip("%s", names[i]);
          ImGui::PopID();
@@ -98,7 +98,7 @@ namespace ColourChip
          names[i] = app::kArrangePalette[i].name;
          const ImVec4 c = ImGui::ColorConvertU32ToFloat4(cols[i]);
          if ((i == 0 && r == 0.0f && g == 0.0f && b == 0.0f) ||
-             (i > 0 && std::fabs(r - c.x) < 0.01f && std::fabs(g - c.y) < 0.01f && std::fabs(b - c.z) < 0.01f))
+             (i > 0 && std::fabs(r - c.x) < tok::colour_chip_tint_dots_limit && std::fabs(g - c.y) < tok::colour_chip_tint_dots_limit && std::fabs(b - c.z) < 0.01f))
             selected = i;
       }
       return Dots(cols, names, 10, selected, 5);

@@ -22,13 +22,13 @@ namespace BusyLine
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImU32 track = ImGui::GetColorU32(ImGuiCol_TextDisabled, tok::alpha_disabled);
       const ImU32 head = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-      dl->AddCircle(c, r, track, 24, tok::stroke_ring);
+      dl->AddCircle(c, r, track, tok::busy_line_spinner_segments, tok::stroke_ring);
       const bool still = CategoryColors::GetReduceMotion();
       const float a0 = still ? -1.5708f : (float)ImGui::GetTime() * 4.0f;
       dl->PathClear();
       for (int i = 0; i <= 8; ++i)
       {
-         const float a = a0 + 2.0f * (float)i / 8.0f;
+         const float a = a0 + tok::busy_line_a_ratio * (float)i / tok::busy_line_spinner_scale;
          dl->PathLineTo(ImVec2(c.x + std::cos(a) * r, c.y + std::sin(a) * r));
       }
       dl->PathStroke(head, ImDrawFlags_None, tok::stroke_ring);

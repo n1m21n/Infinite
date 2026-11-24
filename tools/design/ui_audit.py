@@ -479,6 +479,11 @@ DATA_REASON = (r"(?:patch data|byte|buffer|binary|log format|RPC|parsing|saved s
 ANGLE = re.compile(r"\b(?:kPi|kTau|cos|sin|cosf|sinf|atan2?f?|angle|ang|theta|deg|rad)\b")
 
 
+def kit_ok(rel):
+    """the migration tools also move the kit's own literals with --kit (owner 2026-11-24); the token plumbing stays"""
+    return "--kit" in sys.argv and not rel.endswith(("Tokens.gen.h", "TokenColors.h", "Glyphs.gen.h"))
+
+
 def alpha_mask(text):
     """an ImU32 mask / or-in that sets the alpha byte to a chosen level (col & 0x80FFFFFF, | 0x40000000u)"""
     m = re.fullmatch(r"0[xX]([0-9A-Fa-f]{8})[uUlL]*", text)

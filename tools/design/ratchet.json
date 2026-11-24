@@ -49,14 +49,7 @@
   "src/app/panels/DrumPanel.cpp": 2,
   "src/app/panels/MixerPanel.cpp": 1,
   "src/app/panels/PerfPanel.cpp": 1,
-  "src/app/ui/design/components/CheckBox.h": 1,
-  "src/app/ui/design/components/ColourChip.h": 2,
-  "src/app/ui/design/components/DeskParts.h": 17,
-  "src/app/ui/design/components/IconTile.h": 1,
-  "src/app/ui/design/components/LibraryParts.h": 1,
-  "src/app/ui/design/components/PillGroup.h": 1,
-  "src/app/ui/design/components/TextButton.h": 1,
-  "src/app/ui/design/components/VFader.h": 2
+  "src/app/ui/design/components/DeskParts.h": 1
  },
  "font_scales": {},
  "roundings": {},
@@ -67,17 +60,7 @@
  "lints": {
   "alphas": {
    "src/app/frame/FrameTestsGpuPoints.cpp": 1,
-   "src/app/panels/View2DPanel.cpp": 1,
-   "src/app/ui/design/UiGallery.cpp": 2,
-   "src/app/ui/design/components/CodeBlock.h": 1,
-   "src/app/ui/design/components/DialogParts.h": 3,
-   "src/app/ui/design/components/EmptyState.h": 1,
-   "src/app/ui/design/components/FieldWell.h": 1,
-   "src/app/ui/design/components/LibraryParts.h": 7,
-   "src/app/ui/design/components/SectionCard.h": 1,
-   "src/app/ui/design/components/StatusDot.h": 1,
-   "src/app/ui/design/components/TimeRuler.h": 4,
-   "src/app/ui/design/components/VFader.h": 1
+   "src/app/panels/View2DPanel.cpp": 1
   },
   "ctl_buttons": {
    "src/app/panels/View2DPanel.cpp": 3
@@ -407,10 +390,7 @@
    "src/app/frame/FrameTests2.cpp": 1,
    "src/app/frame/FrameTests5.cpp": 5,
    "src/app/panels/View2DPanel.cpp": 25,
-   "src/app/ui/design/UiGallery.cpp": 51,
-   "src/app/ui/design/components/DeskParts.h": 6,
-   "src/app/ui/design/components/FilterBar.h": 2,
-   "src/app/ui/design/components/PanelKit.h": 6
+   "src/app/ui/design/UiGallery.cpp": 5
   },
   "key_checks": {
    "src/app/frame/FrameTests1.cpp": 4,
@@ -421,8 +401,7 @@
    "src/app/graph/RpcApp.cpp": 4
   },
   "layout_literals": {
-   "src/app/frame/FrameTests5.cpp": 2,
-   "src/app/ui/design/components/TopBarParts.h": 1
+   "src/app/frame/FrameTests5.cpp": 2
   },
   "line_icons": {
    "src/app/frame/StageLinks.cpp": 1,
@@ -430,9 +409,7 @@
    "src/app/panels/ChatPanel.cpp": 6,
    "src/app/panels/ModMatrixPanel.cpp": 3
   },
-  "palette": {
-   "src/app/ui/design/components/TimeRuler.h": 6
-  },
+  "palette": {},
   "raw_inputs": {
    "src/app/bodies/GeometryParams.cpp": 2,
    "src/app/bodies/ParamBodies1.cpp": 1,

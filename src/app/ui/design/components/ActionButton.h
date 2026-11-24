@@ -52,8 +52,8 @@ namespace ActionButton
                                     : size.x > 0.0f
                                     // A given width is a layout cell (a strip that must end flush): kept unless the
                                     // label would not fit with even the small padding.
-                                    ? std::max(size.x, ts.x + (glyph != nullptr ? tok::icon_lg : 0.0f) + 2.0f * tok::space_1)
-                                    : ts.x + (glyph != nullptr ? tok::icon_lg : 0.0f) + 2.0f * tok::space_2;
+                                    ? std::max(size.x, ts.x + (glyph != nullptr ? tok::icon_lg : 0.0f) + tok::action_button_min * tok::space_1)
+                                    : ts.x + (glyph != nullptr ? tok::icon_lg : 0.0f) + tok::action_button_w_ratio * tok::space_2;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       if (ImGui::ButtonLabelHook != nullptr)
          ImGui::ButtonLabelHook(label); // headless --describe lists the buttons a node draws, as ImGui::Button does
@@ -78,16 +78,16 @@ namespace ActionButton
       }
       if (solid)
       {
-         const float lift = 0.06f * hv - (held ? 0.08f : 0.0f);
+         const float lift = tok::action_button_lift_ratio * hv - (held ? 0.08f : 0.0f);
          fill = ImVec4(std::clamp(fill.x + lift, 0.0f, 1.0f), std::clamp(fill.y + lift, 0.0f, 1.0f), std::clamp(fill.z + lift, 0.0f, 1.0f), 1.0f);
       }
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(fill), tok::radius_control);
       const float iconW = glyph != nullptr ? tok::icon_lg : 0.0f; // 14px glyph + 6px gap
-      const ImU32 ink = ImGui::GetColorU32(kind == Kind::Solo ? ImVec4(0.10f, 0.10f, 0.12f, 1.0f) : solid ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, tok::alpha_text_soft));
+      const ImU32 ink = ImGui::GetColorU32(kind == Kind::Solo ? tok::V4(tok::action_button_ink_shade_sm) : solid ? tok::V4(tok::action_button_ink_shade_lg) : ImVec4(t.x, t.y, t.z, tok::alpha_text_soft));
       const float x0 = p.x + (w - ts.x - iconW) * 0.5f;
       if (glyph != nullptr)
-         glyph::Draw(dl, ImVec2(std::round(x0 + 7.0f), std::round(p.y + h * 0.5f)), 14.0f, ink, glyph);
+         glyph::Draw(dl, ImVec2(std::round(x0 + tok::action_button_strum_frames), std::round(p.y + h * 0.5f)), tok::action_button_top, ink, glyph);
       // Snap to device pixels, not points: 15 pt text in a 24 pt control sits at 4.5 pt, where ImGui's own frames put it.
       const float px = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y);
       const ImVec2 tp(std::round(x0 + iconW), std::round((p.y + (h - ts.y) * 0.5f) * px) / px);
@@ -95,7 +95,7 @@ namespace ActionButton
       if (glyph != nullptr)
       {
          ImVec2 gmn, gmx;
-         glyph::InkBox(ImVec2(std::round(x0 + 7.0f), std::round(p.y + h * 0.5f)), 14.0f, glyph, gmn, gmx);
+         glyph::InkBox(ImVec2(std::round(x0 + tok::action_button_strum_frames), std::round(p.y + h * 0.5f)), tok::action_button_glyph_box, glyph, gmn, gmx);
          UiAudit::NoteInk(1, gmn, gmx, tok::icon_sm, shown.c_str(), glyph);
       }
       if (!shown.empty())

@@ -30,12 +30,12 @@ namespace CheckBox
       a.w *= onv;
       dl->AddRectFilled(p, q, ImGui::GetColorU32(a), tok::radius_control);
       // Tick: two strokes, drawn along their length by `onv`.
-      const ImVec2 a0(p.x + Size() * 0.24f, p.y + Size() * 0.52f);
-      const ImVec2 a1(p.x + Size() * 0.43f, p.y + Size() * 0.71f);
-      const ImVec2 a2(p.x + Size() * 0.77f, p.y + Size() * 0.31f);
-      const float l1 = 0.27f, l2 = 0.53f;                   // stroke lengths, in box units
+      const ImVec2 a0(p.x + Size() * tok::check_box_a0_scale_sm, p.y + Size() * tok::check_box_a0_scale_lg);
+      const ImVec2 a1(p.x + Size() * tok::check_box_a1_scale_sm, p.y + Size() * tok::check_box_a1_scale_lg);
+      const ImVec2 a2(p.x + Size() * tok::check_box_a2_scale_lg, p.y + Size() * tok::check_box_a2_scale_sm);
+      const float l1 = tok::check_box_l1, l2 = tok::check_box_l2;                   // stroke lengths, in box units
       const float d = onv * (l1 + l2);
-      const ImU32 col = ImGui::GetColorU32(ImVec4(1, 1, 1, std::min(1.0f, onv * 1.4f)));
+      const ImU32 col = ImGui::GetColorU32(ImVec4(1, 1, 1, std::min(1.0f, onv * tok::check_box_max)));
       const float k1 = std::min(1.0f, d / l1);
       dl->PathLineTo(a0);
       dl->PathLineTo(ImVec2(a0.x + (a1.x - a0.x) * k1, a0.y + (a1.y - a0.y) * k1));
@@ -64,11 +64,11 @@ namespace CheckBox
       if (clicked)
          *v = !*v;
       const float hv = UiAnim::Hover(iid, hovered, tok::motion_hover_in, tok::motion_hover_out);
-      const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);
+      const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);  // ui-audit-ok: hash salt for the hover anim id
       Draw(ImGui::GetWindowDrawList(), p, onv, hv);
       if (focused && ImGui::GetIO().NavVisible)
-         ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x - 2, p.y - 2), ImVec2(p.x + Size() + 2, p.y + Size() + 2),
-                                             ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + 2.0f, 0, 1.5f);
+         ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x - tok::space_0_5, p.y - tok::space_0_5), ImVec2(p.x + Size() + tok::space_0_5, p.y + Size() + tok::space_0_5),
+                                             ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + tok::space_0_5, 0, tok::check_box_stroke);
       return clicked;
    }
 }

@@ -51,8 +51,8 @@ namespace PillGroup
             dl->AddRectFilled(ImVec2(cr.x, cr.y), ImVec2(cr.Right(), cr.Bottom()),
                               ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, tok::alpha_fill_rest * hv)), tok::radius_container);
          if (s.focused)
-            dl->AddRect(ImVec2(cr.x - 1, cr.y - 1), ImVec2(cr.Right() + 1, cr.Bottom() + 1),
-                        ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_container + 1.0f, 0, 2.0f);
+            dl->AddRect(ImVec2(cr.x - tok::space_0_25, cr.y - tok::space_0_25), ImVec2(cr.Right() + tok::space_0_25, cr.Bottom() + tok::space_0_25),
+                        ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_container + tok::space_0_25, 0, tok::pill_group_outline_stroke);
          UiType::Scope ts(labelSize, UiType::Weight::Medium);
          // A longer label (another language, a bigger font) is cut with an ellipsis instead of spilling out of its pill.
          std::string shown(segs[i].label);

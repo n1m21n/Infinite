@@ -42,7 +42,7 @@ namespace PinDot
       const bool on = Driven(s);
       const ImU32 col = tok::ScaleAlpha(Colour(s, isLight), Pulse(s));
       dl->AddCircleFilled(c, tok::pin_r_param_on, tok::U32(tok::pin_well, isLight));
-      dl->AddCircle(c, on ? tok::pin_r_param_on : tok::pin_r_param, col, 12, 2.0f);
+      dl->AddCircle(c, on ? tok::pin_r_param_on : tok::pin_r_param, col, tok::pin_dot_param_segments, tok::pin_dot_param_stroke);
       if (on)
          dl->AddCircleFilled(c, tok::pin_r_param_on * 0.5f, col);
    }
@@ -52,13 +52,13 @@ namespace PinDot
    {
       const float r = small ? tok::pin_r_cable_sm : tok::pin_r_cable;
       dl->AddCircleFilled(c, r, tok::U32(prediction ? tok::pin_cable_pred : tok::pin_cable, isLight));
-      dl->AddCircle(c, r, tok::U32(tok::pin_edge, isLight), 0, 1.5f);
+      dl->AddCircle(c, r, tok::U32(tok::pin_edge, isLight), 0, tok::pin_dot_cable_stroke);
    }
 
    // Palette pin: a small filled dot.
    inline void Swatch(ImDrawList* dl, ImVec2 c, bool bound, bool isLight)
    {
       const float r = tok::pin_r_colour;
-      dl->AddCircleFilled(c, r + 0.5f, tok::U32(bound ? tok::pin_colour_bound : tok::pin_colour, isLight));
+      dl->AddCircleFilled(c, r + tok::px_align, tok::U32(bound ? tok::pin_colour_bound : tok::pin_colour, isLight));
    }
 }

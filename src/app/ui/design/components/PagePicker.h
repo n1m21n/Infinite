@@ -133,11 +133,11 @@ namespace PagePicker
 #define PAGEPICKER_PROBE(stmt)
 #endif
 
-   inline ImU32 U32(unsigned int rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, 255); }
+   inline ImU32 U32(unsigned int rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, tok::page_picker_probe_row_alpha); }  // ui-audit-ok: channel mask / bit packing, not a colour value
 
    inline float ChipW(const Entry& e)
    {
-      float w = ImGui::CalcTextSize(e.name.c_str()).x + 2.0f * tok::space_3;
+      float w = ImGui::CalcTextSize(e.name.c_str()).x + tok::page_picker_w_ratio * tok::space_3;
       if (e.color != 0)
          w += tok::page_dot + tok::space_2;
       if (e.glyph != nullptr)
@@ -187,9 +187,9 @@ namespace PagePicker
          }
          const bool on = page.color == kColours[c];
          ImDrawList* mdl = ImGui::GetWindowDrawList();
-         mdl->AddCircleFilled(ImVec2(p.x + d * 0.5f, p.y + d * 0.5f), d * 0.5f - (ImGui::IsItemHovered() || on ? 0.0f : 1.5f), U32(kColours[c]), 24);
+         mdl->AddCircleFilled(ImVec2(p.x + d * 0.5f, p.y + d * 0.5f), d * 0.5f - (ImGui::IsItemHovered() || on ? 0.0f : tok::page_picker_colour_row), U32(kColours[c]), tok::page_picker_colour_row_segments);
          if (on)
-            mdl->AddCircle(ImVec2(p.x + d * 0.5f, p.y + d * 0.5f), d * 0.5f + 1.5f, ImGui::GetColorU32(ImGuiCol_Text), 24, 1.0f);
+            mdl->AddCircle(ImVec2(p.x + d * 0.5f, p.y + d * 0.5f), d * 0.5f + tok::page_picker_colour_row_gap, ImGui::GetColorU32(ImGuiCol_Text), tok::page_picker_colour_row_segments, 1.0f);
          ImGui::PopID();
       }
       if (MenuParts::Item(L("None"), nullptr, page.color == 0))
@@ -289,7 +289,7 @@ namespace PagePicker
             float tx = bmin.x + tok::space_3;
             if (e.color != 0)
             {
-               dl->AddCircleFilled(ImVec2(tx + tok::page_dot * 0.5f, cy), tok::page_dot * 0.5f, U32(e.color), 24);
+               dl->AddCircleFilled(ImVec2(tx + tok::page_dot * 0.5f, cy), tok::page_dot * 0.5f, U32(e.color), tok::page_picker_dot_segments);
                tx += tok::page_dot + tok::space_2;
             }
             if (e.glyph != nullptr)

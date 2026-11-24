@@ -38,8 +38,8 @@ namespace TextButton
       if (!enabled)
          label4.w *= tok::alpha_disabled;
       if (s.focused)
-         dl->AddRect(ImVec2(p0.x - 2, p0.y - 2), ImVec2(p1.x + 2, p1.y + 2),
-                     ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + 2.0f, 0, 2.0f);
+         dl->AddRect(ImVec2(p0.x - tok::space_0_5, p0.y - tok::space_0_5), ImVec2(p1.x + tok::space_0_5, p1.y + tok::space_0_5),
+                     ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + tok::space_0_5, 0, tok::text_button_outline_stroke);
       UiType::Scope ts(UiType::Size::Body, UiType::Weight::Medium);
       const ImVec2 sz = ImGui::CalcTextSize(label);
       dl->AddText(ImVec2(std::round(r.CenterX() - sz.x * 0.5f), std::round(r.CenterY() - sz.y * 0.5f)),
@@ -51,6 +51,6 @@ namespace TextButton
    inline float WidthFor(const char* label)
    {
       UiType::Scope ts(UiType::Size::Body, UiType::Weight::Medium);
-      return std::ceil(ImGui::CalcTextSize(label).x) + tok::space_3 * 2.0f;
+      return std::ceil(ImGui::CalcTextSize(label).x) + tok::space_3 * tok::text_button_width_for_ratio;
    }
 }

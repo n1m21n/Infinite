@@ -59,10 +59,10 @@ namespace NodeHeader
       ImGui::SameLine(0.0f, tok::space_2);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetTextLineHeight();
-      const bool clicked = ImGui::InvisibleButton("##nodeissue", ImVec2(kFamilyGlyph + 2.0f, h));
+      const bool clicked = ImGui::InvisibleButton("##nodeissue", ImVec2(kFamilyGlyph + tok::space_0_5, h));
       const bool hot = ImGui::IsItemHovered();
-      glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(p.x + (kFamilyGlyph + 2.0f) * 0.5f, p.y + h * 0.5f),
-                  kFamilyGlyph + (hot ? 2.0f : 0.0f), col, err ? IconsInfinite::Error : IconsInfinite::Warning);
+      glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(p.x + (kFamilyGlyph + tok::node_header_issue_badge_inset) * 0.5f, p.y + h * 0.5f),
+                  kFamilyGlyph + (hot ? tok::node_header_issue_badge : 0.0f), col, err ? IconsInfinite::Error : IconsInfinite::Warning);
       if (hot)
       {
          ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);

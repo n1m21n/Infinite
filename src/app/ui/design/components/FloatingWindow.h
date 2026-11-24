@@ -45,7 +45,7 @@ namespace FloatingWindow
    inline bool Begin(const char* title, bool* open, const Spec& s = Spec())
    {
       if (s.place && s.center)
-         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), s.placeCond, ImVec2(0.5f, 0.5f));
+         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), s.placeCond, ImVec2(tok::floating_window_x, tok::floating_window_y));
       else if (s.place)
          ImGui::SetNextWindowPos(s.pos, s.placeCond, s.pivot);
       if (s.size.x > 0.0f && s.size.y > 0.0f)

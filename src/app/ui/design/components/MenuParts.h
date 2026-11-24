@@ -24,7 +24,7 @@ namespace MenuParts
    constexpr int kMaxListRows = 12;           // a dropdown list shows at most this many rows, then scrolls
 
    // Height of a dropdown list that shows `rows` rows (padding included).
-   inline float ListMaxH(int rows = kMaxListRows) { return kRow * rows + 2.0f * kPadY; }
+   inline float ListMaxH(int rows = kMaxListRows) { return kRow * rows + tok::menu_list_max_h_ratio * kPadY; }
 
    // Popups are chrome, not canvas content: constant on-screen size at any canvas zoom (infinite-design-system).
 
@@ -152,7 +152,7 @@ namespace MenuParts
       ImGuiWindow* w = ImGui::GetCurrentWindow();
       const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
       const float hv = UiAnim::Hover(gid, ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
-      const float onv = UiAnim::Hover(gid ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);
+      const float onv = UiAnim::Hover(gid ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);  // ui-audit-ok: hash salt for the hover anim id
       CheckBox::Draw(w->DrawList, ImVec2(mn.x, std::floor((mn.y + mx.y - CheckBox::Size()) * 0.5f)), onv, hv);
       const char* end = std::strstr(label, "##");
       w->DrawList->AddText(ImVec2(mn.x + boxW, std::floor((mn.y + mx.y - ImGui::GetTextLineHeight()) * 0.5f)),
@@ -187,7 +187,7 @@ namespace MenuParts
    inline void Separator()
    {
       ImGuiWindow* w = ImGui::GetCurrentWindow();
-      const float y = ImGui::GetCursorScreenPos().y - (kRow - ImGui::GetTextLineHeight()) * 0.5f + 4.0f;
+      const float y = ImGui::GetCursorScreenPos().y - (kRow - ImGui::GetTextLineHeight()) * 0.5f + tok::space_1;
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       w->DrawList->AddLine(ImVec2(w->Pos.x + kInset + kTextInset, std::floor(y)),
                            ImVec2(w->Pos.x + w->Size.x - kInset - kTextInset, std::floor(y)),

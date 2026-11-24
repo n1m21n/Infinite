@@ -4,6 +4,7 @@
 // everywhere: click or drag places the playhead, Shift+drag carves the loop, loop edges drag.
 #pragma once
 #include <algorithm>
+#include "app/ui/design/UiFmt.h"
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -27,13 +28,13 @@ namespace TimeRuler
       double Beat(float x) const { return startBeat + (double)(x - x0) / pxPerBeat; }
    };
 
-   inline ImU32 TickColor() { return ImGui::GetColorU32(ImGuiCol_Text, 0.38f); }
-   inline ImU32 LabelColor() { return ImGui::GetColorU32(ImGuiCol_Text, 0.62f); }
+   inline ImU32 TickColor() { return ImGui::GetColorU32(ImGuiCol_Text, tok::time_ruler_tick_color_im_gui_col_text_alpha); }
+   inline ImU32 LabelColor() { return ImGui::GetColorU32(ImGuiCol_Text, tok::time_ruler_label_color_im_gui_col_text_alpha); }
 
    inline void Background(ImDrawList* dl, const Axis& a, float y0)
    {
-      dl->AddRectFilled(ImVec2(a.x0, y0), ImVec2(a.x1, y0 + kHeight), ImGui::GetColorU32(ImGuiCol_Text, 0.04f));
-      dl->AddLine(ImVec2(a.x0, y0 + kHeight), ImVec2(a.x1, y0 + kHeight), ImGui::GetColorU32(ImGuiCol_Text, 0.08f));
+      dl->AddRectFilled(ImVec2(a.x0, y0), ImVec2(a.x1, y0 + kHeight), ImGui::GetColorU32(ImGuiCol_Text, tok::time_ruler_background_im_gui_col_text_alpha));
+      dl->AddLine(ImVec2(a.x0, y0 + kHeight), ImVec2(a.x1, y0 + kHeight), ImGui::GetColorU32(ImGuiCol_Text, tok::time_ruler_color_alpha_mul));
    }
 
    // Bars count from 1: beat 0 is "1", "4.3" is bar 4's third beat, "4.2.5" between beats.
@@ -48,7 +49,7 @@ namespace TimeRuler
       else if (std::fabs(inBar - std::round(inBar)) < 1e-6)
          std::snprintf(label, sizeof label, "%d.%d", bar, (int)std::round(inBar) + 1);
       else
-         std::snprintf(label, sizeof label, "%d.%.3g", bar, inBar + 1.0);
+         std::snprintf(label, sizeof label, "%d.%s", bar, UiFmt::G3(inBar + 1.0).c);
       return label;
    }
 
@@ -59,7 +60,7 @@ namespace TimeRuler
       UiType::Scope type(UiType::Size::Caption, UiType::Weight::Medium);
       const float y1 = y0 + kHeight, fontY = y0 + (kHeight - ImGui::GetFontSize()) * 0.5f;
       const double stepPx = step * beatsPerUnit * a.pxPerBeat;
-      const int subs = stepPx / 4.0 >= 8.0 ? 4 : stepPx / 2.0 >= 8.0 ? 2 : 1;
+      const int subs = stepPx / tok::time_ruler_subs_ratio >= 8.0 ? 4 : stepPx / tok::time_ruler_subs_scale >= 8.0 ? 2 : 1;
       const double first = std::max(0.0, std::floor(a.startBeat / beatsPerUnit / step) * step);
       const long long count = (long long)std::ceil((a.Beat(a.x1) / beatsPerUnit - first) / step) + 1;
       dl->PushClipRect(ImVec2(a.x0, y0), ImVec2(a.x1, y1), true);
@@ -67,13 +68,13 @@ namespace TimeRuler
       {
          const double u = first + (double)k * step;
          const float x = a.X(u * beatsPerUnit);
-         dl->AddLine(ImVec2(x, y1 - (major(u) ? 6.0f : 4.0f)), ImVec2(x, y1), TickColor());
+         dl->AddLine(ImVec2(x, y1 - (major(u) ? tok::time_ruler_ticks_lg : tok::time_ruler_ticks_sm)), ImVec2(x, y1), TickColor());
          for (int m = 1; m < subs; m++)
          {
             const float mx = a.X((u + step * m / subs) * beatsPerUnit);
-            dl->AddLine(ImVec2(mx, y1 - 2.0f), ImVec2(mx, y1), TickColor());
+            dl->AddLine(ImVec2(mx, y1 - tok::space_0_5), ImVec2(mx, y1), TickColor());
          }
-         dl->AddText(ImVec2(x + 3.0f, fontY), LabelColor(), label(u, step).c_str());
+         dl->AddText(ImVec2(x + tok::space_0_75, fontY), LabelColor(), label(u, step).c_str());
       }
       dl->PopClipRect();
    }
@@ -95,7 +96,7 @@ namespace TimeRuler
    template <class Format>
    inline void DrawUnits(ImDrawList* dl, const Axis& a, float y0, double unitsPerBeat, double minStep, Format format)
    {
-      const double want = std::max(minStep, kMinLabelPx * 1.4 * unitsPerBeat / a.pxPerBeat);
+      const double want = std::max(minStep, kMinLabelPx * tok::time_ruler_units_ratio * unitsPerBeat / a.pxPerBeat);
       double step = std::pow(10.0, std::floor(std::log10(std::max(1e-9, want))));
       for (double m : { 1.0, 2.0, 5.0, 10.0 })
          if (step * m >= want)
@@ -112,10 +113,10 @@ namespace TimeRuler
    {
       if (x < vx0 - 0.5f || x > vx1 + 0.5f)
          return;
-      const ImU32 col = tok::U32(ghost ? tok::pal::c_EF444478 : tok::pal::c_EF4444FF);
-      dl->AddLine(ImVec2(x, top), ImVec2(x, bottom), col, ghost ? 1.5f : 1.25f);
+      const ImU32 col = ghost ? tok::Role(tok::col::transport_playhead, tok::time_ruler_playhead_ghost_alpha) : tok::Role(tok::col::transport_playhead);
+      dl->AddLine(ImVec2(x, top), ImVec2(x, bottom), col, ghost ? tok::time_ruler_playhead_stroke : tok::time_ruler_line_stroke_xs);
       dl->PushClipRect(ImVec2(vx0, top), ImVec2(vx1, bottom), true); // the cap at bar 1 stays off the keys
-      dl->AddTriangleFilled(ImVec2(x - kCap, top), ImVec2(x + kCap, top), ImVec2(x, top + kCap * 1.6f), col);
+      dl->AddTriangleFilled(ImVec2(x - kCap, top), ImVec2(x + kCap, top), ImVec2(x, top + kCap * tok::time_ruler_playhead_ratio), col);
       dl->PopClipRect();
    }
 
@@ -127,16 +128,16 @@ namespace TimeRuler
    {
       if (bx1 < vx0 || bx0 > vx1 || vx1 <= vx0)
          return;
-      dl->PushClipRect(ImVec2(vx0 - 1.5f, top), ImVec2(vx1 + 1.5f, bottom), true); // room for an edge sitting on the border
-      const ImU32 border = tok::Role(tok::col::role_modulation, 180);
-      dl->AddRectFilled(ImVec2(bx0, top), ImVec2(bx1, bottom), tok::U32(carving ? tok::pal::c_FACC152D : tok::pal::c_FACC151E));
-      dl->AddRectFilled(ImVec2(bx0, top), ImVec2(bx1, top + 4.0f), tok::U32(drag == 3 ? tok::pal::c_FFEB3BFF : tok::pal::c_FACC15E6), tok::radius_cell);
+      dl->PushClipRect(ImVec2(vx0 - tok::time_ruler_loop_band_gap, top), ImVec2(vx1 + tok::time_ruler_loop_band_gap, bottom), true); // room for an edge sitting on the border
+      const ImU32 border = tok::Role(tok::col::role_modulation, tok::time_ruler_loop_band_role_modulation_alpha);
+      dl->AddRectFilled(ImVec2(bx0, top), ImVec2(bx1, bottom), tok::Role(tok::col::transport_loop, carving ? tok::time_ruler_loop_carving_alpha : tok::time_ruler_loop_band_alpha));
+      dl->AddRectFilled(ImVec2(bx0, top), ImVec2(bx1, top + tok::space_1), drag == 3 ? tok::Role(tok::col::role_solo_pressed) : tok::Role(tok::col::transport_loop, tok::time_ruler_loop_edge_alpha), tok::radius_cell);  // ui-audit-ok: model value: drag mode 3 is a move
       const auto edge = [&](float x, float inward, bool held)
       {
          const ImU32 col = held ? tok::Role(tok::col::ink_white) : border;
-         dl->AddLine(ImVec2(x, top), ImVec2(x, bottom), col, held ? 2.5f : 1.5f);
-         dl->AddLine(ImVec2(x, top), ImVec2(x, top + 8.0f), col, 3.0f);
-         dl->AddLine(ImVec2(x, top + 8.0f), ImVec2(x + inward, top + 8.0f), col, 2.0f);
+         dl->AddLine(ImVec2(x, top), ImVec2(x, bottom), col, held ? tok::time_ruler_loop_band_stroke : tok::time_ruler_line_stroke_sm);
+         dl->AddLine(ImVec2(x, top), ImVec2(x, top + tok::space_2), col, tok::time_ruler_line_stroke_lg);
+         dl->AddLine(ImVec2(x, top + tok::space_2), ImVec2(x + inward, top + tok::space_2), col, tok::time_ruler_line_stroke_md);
       };
       edge(bx0, 5.0f, drag == 1);
       edge(bx1, -5.0f, drag == 2);

@@ -79,7 +79,7 @@ namespace SectionCard
       const float y1 = ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y + Pad();
       const bool header = s.header;
       s.header = false;
-      if (header || y1 - s.top >= 4.0f * Pad())   // nothing drawn in it: no empty sliver; a header alone is still a card
+      if (header || y1 - s.top >= tok::section_card_end_ratio * Pad())   // nothing drawn in it: no empty sliver; a header alone is still a card
       {
          s.split.SetCurrentChannel(dl, 0);
          Well(ImVec2(x0, s.top - Pad()), ImVec2(x1, y1));
@@ -137,7 +137,7 @@ namespace SectionCard
       ImGui::Dummy(ImVec2(w, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.10f)), h * 0.5f);
+      dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::section_card_progress_im_vec4_alpha)), h * 0.5f);
       ImVec4 a = app::AccentEmphasisSelected();
       float x0 = p.x, x1 = p.x;
       if (frac >= 0.0f)
@@ -145,10 +145,10 @@ namespace SectionCard
       else
       {
          const float ph = UiAnim::ReduceMotion() ? 0.7f : std::fmod((float)ImGui::GetTime() * 0.8f, 1.0f);   // still bar under reduce-motion
-         x0 = p.x + w * std::max(0.0f, ph * 1.4f - 0.4f);
-         x1 = p.x + w * std::min(1.0f, ph * 1.4f);
+         x0 = p.x + w * std::max(0.0f, ph * tok::section_card_progress_ratio - tok::section_card_progress_gap);
+         x1 = p.x + w * std::min(1.0f, ph * tok::section_card_progress_ratio);
       }
-      if (x1 - x0 > 0.5f)
+      if (x1 - x0 > tok::section_card_progress_limit)
          dl->AddRectFilled(ImVec2(x0, p.y), ImVec2(x1, p.y + h), ImGui::GetColorU32(a), h * 0.5f);
    }
 }

@@ -72,7 +72,7 @@ namespace PanelKit
       if (h <= 0.0f)
          h = Chip();
       if (w <= 0.0f)
-         w = ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_2;
+         w = ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + tok::panel_w_ratio * tok::space_2;
       ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
       const bool clicked = ActionButton::Draw(label, ImVec2(w, h), kind);
       ActionButton::Scoped() = ActionButton::Kind::Plain;
@@ -115,11 +115,11 @@ namespace PanelKit
    {
       static std::map<std::string, bool> sOpen;
       if (!first)
-         ImGui::Dummy(ImVec2(0.0f, kSection - RowGap() * 2.0f));
+         ImGui::Dummy(ImVec2(0.0f, kSection - RowGap() * tok::panel_fold_header_ratio));
       auto it = sOpen.find(text);
       bool open = it != sOpen.end() && !AuditAsUser() ? it->second : startOpen;
       ImGui::PushID(text);
-      const float h = ImGui::GetTextLineHeight() + 2.0f;
+      const float h = ImGui::GetTextLineHeight() + tok::space_0_5;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       if (ImGui::InvisibleButton("##sec", ImVec2(std::max(1.0f, ImGui::GetContentRegionAvail().x), h)))
          open = !open;
@@ -133,9 +133,9 @@ namespace PanelKit
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + tok::fold_arrow_x, p.y + h * 0.5f);
       if (open)
-         dl->AddTriangleFilled(ImVec2(c.x - 4, c.y - 2), ImVec2(c.x + 4, c.y - 2), ImVec2(c.x, c.y + 3), col);
+         dl->AddTriangleFilled(ImVec2(c.x - tok::space_1, c.y - tok::space_0_5), ImVec2(c.x + tok::space_1, c.y - tok::space_0_5), ImVec2(c.x, c.y + tok::space_0_75), col);
       else
-         dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 4), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 4), col);
+         dl->AddTriangleFilled(ImVec2(c.x - tok::space_0_5, c.y - tok::space_1), ImVec2(c.x + tok::space_0_75, c.y), ImVec2(c.x - tok::space_0_5, c.y + tok::space_1), col);
       dl->AddText(ImVec2(p.x + tok::space_4, p.y + 1.0f), col, text, ImGui::FindRenderedTextEnd(text));
       return open;
    }
@@ -209,7 +209,7 @@ namespace PanelKit
          for (char& c : probe)
             if (c >= '1' && c <= '9')
                c = '0';
-         const float room = cellW - 2.0f * tok::space_2 - ImGui::CalcTextSize(probe.c_str()).x - ImGui::CalcTextSize(" ").x;
+         const float room = cellW - tok::panel_room_ratio * tok::space_2 - ImGui::CalcTextSize(probe.c_str()).x - ImGui::CalcTextSize(" ").x;
          fitted = app::TruncateWithEllipsis(std::string(label, end), std::max(0.0f, room));
          label = fitted.c_str();
          end = label + fitted.size();
@@ -224,7 +224,7 @@ namespace PanelKit
       s += ' ';
       std::string f = fmt;
       const size_t px = f.rfind(" px");
-      if (px != std::string::npos && px + 3 == f.size())
+      if (px != std::string::npos && px + tok::panel_in_well_format_gap == f.size())
          f.erase(px);
       s += f;
       return s;
@@ -270,7 +270,7 @@ namespace PanelKit
             hit = i;
          const bool on = values[i] != clicked;   // drawn as it will be, so the tick starts this frame
          const float hv = UiAnim::Hover(iid, hovered, tok::motion_hover_in, tok::motion_hover_out);
-         const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, on, tok::motion_on, tok::motion_off);
+         const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, on, tok::motion_on, tok::motion_off);  // ui-audit-ok: hash salt for the hover anim id
          CheckBox::Draw(dl, ImVec2(p.x, std::round(p.y + (rowH - box) * 0.5f)), onv, hv);
          const char* end = ImGui::FindRenderedTextEnd(labels[i]);
          const ImVec2 tp(p.x + box + gapIn, std::round(p.y + (rowH - ImGui::GetFontSize()) * 0.5f));
@@ -285,7 +285,7 @@ namespace PanelKit
       }
       ImGui::PopID();
       ImGui::SetCursorScreenPos(o);
-      ImGui::Dummy(ImVec2(avail, rows * rowH + (rows - 1) * gapRow));
+      ImGui::Dummy(ImVec2(avail, rows * rowH + (rows - tok::panel_check_grid_inset) * gapRow));
       return hit;
    }
 

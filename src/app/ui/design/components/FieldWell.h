@@ -56,7 +56,7 @@ namespace FieldWell
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_Border, tok::Hairline(CategoryColors::IsThemeLight()));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, tok::border_hairline);
    }
    inline void PopStyle()
    {
@@ -73,7 +73,7 @@ namespace FieldWell
       ImGui::PushStyleColor(ImGuiCol_Border, edge);
       ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_PopupBg));
       ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, tok::border_hairline);
    }
 
    inline void PopTypedEditStyle()
@@ -134,7 +134,7 @@ namespace FieldWell
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
       // The grab is invisible and the fill spans the whole well, so the value maps over the whole well too:
       // a press lands where the fill will end, even in a narrow well (ImGui otherwise maps over well minus grab).
-      ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, tok::field_well_grab_min);
       // The text field gets a quiet accent edge instead of ImGui's bright blue nav ring.
       const bool typing = editing || sTypeId == id;
       if (typing)
@@ -224,9 +224,9 @@ namespace FieldWell
          if (hov && names != nullptr) ImGui::SetTooltip("%s", names[i]);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(p.x + d * 0.5f, p.y + d * 0.5f);
-         dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), cols[i], 48);
+         dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), cols[i], tok::field_well_swatch_row_segments);
          if (i == selected)
-            dl->AddCircle(c, d * 0.5f + 2.0f, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.9f)), 48, 1.5f);
+            dl->AddCircle(c, d * 0.5f + tok::space_0_5, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::field_well_swatch_row_im_vec4_alpha)), tok::field_well_swatch_row_segments, tok::field_well_swatch_row_stroke);
          ImGui::PopID();
       }
       return clicked;

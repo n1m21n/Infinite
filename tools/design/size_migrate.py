@@ -278,7 +278,7 @@ def main():
     for f in findings:
         if not UI_SCOPE.match(f[4]) and only_file is None: continue   # graph/startup code holds patch data (node defaults, canvas positions)
         if f[0].startswith("call:") and (f[0][5:] in COLOUR_CALLS or f[0][5:] in PARAM_CALLS): continue
-        if want(f[0]) and not f[4].startswith(ui_audit.KIT) and (only_file is None or f[4] == only_file):
+        if want(f[0]) and (not f[4].startswith(ui_audit.KIT) or ui_audit.kit_ok(f[4])) and (only_file is None or f[4] == only_file):
             by_file.setdefault(f[4], []).append(f)
 
     sj = json.loads(SURF.read_text()) if SURF.exists() else {"_doc": SURF_DOC}

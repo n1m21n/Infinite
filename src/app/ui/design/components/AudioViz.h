@@ -59,12 +59,12 @@ namespace AudioViz
       if (peaks.Empty() || w < 1.0f || b <= a)
          return;
       const bool light = app::IsThemeLight();
-      const ImU32 edge = lit ? tok::Base(tok::col::ink_white, 140)
-                             : (light ? tok::Base(tok::col::accent, 110) : tok::Base(tok::col::accent_alt, 110));
-      const ImU32 core = lit ? tok::Base(tok::col::ink_white, 230)
-                             : (light ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_alt, 220));
+      const ImU32 edge = lit ? tok::Base(tok::col::ink_white, tok::audio_viz_peaks_ink_white_alpha)
+                             : (light ? tok::Base(tok::col::accent, tok::audio_viz_peaks_accent_alpha) : tok::Base(tok::col::accent_alt, tok::audio_viz_peaks_accent_alt_alpha));
+      const ImU32 core = lit ? tok::Base(tok::col::ink_white, tok::audio_viz_core_alpha_lg)
+                             : (light ? tok::Base(tok::col::accent, tok::audio_viz_core_alpha_sm) : tok::Base(tok::col::accent_alt, tok::audio_viz_core_alpha_sm));
       const float midY = origin.y + h * 0.5f;
-      const float amp = h * 0.45f;
+      const float amp = h * tok::audio_viz_amp_ratio;
       const int cols = (int)std::ceil(w);
       const double perCol = (b - a) / (double)cols;
       for (int c = 0; c < cols; c++)
@@ -73,8 +73,8 @@ namespace AudioViz
          peaks.RangeFrac(a + perCol * c, a + perCol * (c + 1), mn, mx, rms);
          const float x = origin.x + (float)c;
          // Half a pixel either side of the mid line, so silence still reads as a line.
-         dl->AddRectFilled(ImVec2(x, std::min(midY - mx * amp, midY - 0.5f)),
-                           ImVec2(x + 1.0f, std::max(midY - mn * amp, midY + 0.5f)), edge);
+         dl->AddRectFilled(ImVec2(x, std::min(midY - mx * amp, midY - tok::px_align)),
+                           ImVec2(x + 1.0f, std::max(midY - mn * amp, midY + tok::px_align)), edge);
          const float r = std::min(rms, std::max(mx, -mn));
          if (r * amp >= 0.5f)
             dl->AddRectFilled(ImVec2(x, midY - r * amp), ImVec2(x + 1.0f, midY + r * amp), core);
@@ -94,8 +94,8 @@ namespace AudioViz
       {
          float mn, mx, rms;
          peaks.RangeFrac((double)c / cols, (double)(c + 1) / cols, mn, mx, rms);
-         dl->AddRectFilled(ImVec2(origin.x + (float)c, std::min(midY - mx * amp, midY - 0.5f)),
-                           ImVec2(origin.x + (float)c + 1.0f, std::max(midY - mn * amp, midY + 0.5f)), col);
+         dl->AddRectFilled(ImVec2(origin.x + (float)c, std::min(midY - mx * amp, midY - tok::px_align)),
+                           ImVec2(origin.x + (float)c + 1.0f, std::max(midY - mn * amp, midY + tok::px_align)), col);
       }
    }
 

@@ -129,12 +129,12 @@ namespace ReorderDrag
          else if (vertical)
          {
             const float y = edge == Edge::After ? mx.y + 1.0f : mn.y - 1.0f;
-            Bar(ImVec2(mn.x + 2.0f, y), ImVec2(mx.x - 2.0f, y));
+            Bar(ImVec2(mn.x + tok::space_0_5, y), ImVec2(mx.x - tok::space_0_5, y));
          }
          else
          {
             const float x = edge == Edge::After ? mx.x + 1.0f : mn.x - 1.0f;
-            Bar(ImVec2(x, mn.y + 2.0f), ImVec2(x, mx.y - 2.0f));
+            Bar(ImVec2(x, mn.y + tok::space_0_5), ImVec2(x, mx.y - tok::space_0_5));
          }
          // EndDragDropTarget clears the payload right after delivery (Data becomes null), so the drop is copied out first.
          if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(type, ImGuiDragDropFlags_AcceptNoDrawDefaultRect); p != nullptr && p->Data != nullptr)
@@ -239,9 +239,9 @@ namespace ReorderDrag
             const float k = std::exp(-ImGui::GetIO().DeltaTime / (tok::motion_focus * 0.5f / 1000.0f));
             o.x *= k;
             o.y *= k;
-            if (std::fabs(o.x) < 0.5f)
+            if (std::fabs(o.x) < tok::reorder_drag_glide_limit)
                o.x = 0.0f;
-            if (std::fabs(o.y) < 0.5f)
+            if (std::fabs(o.y) < tok::reorder_drag_glide_limit)
                o.y = 0.0f;
          }
          l.last[index] = natural;
@@ -355,7 +355,7 @@ namespace ReorderDrag
          // The gap it will land in: the item, veiled, with a faint accent edge.
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_WindowBg, tok::alpha_veil_live), tok::radius_control);
-         dl->AddRect(mn, mx, (AccentCol() & 0x00FFFFFFu) | 0x60000000u, tok::radius_control, 0, tok::stroke_rule);
+         dl->AddRect(mn, mx, (AccentCol() & 0x00FFFFFFu) | tok::reorder_drag_item_alpha, tok::radius_control, 0, tok::stroke_rule);  // ui-audit-ok: channel mask / bit packing, not a colour value
          // The ghost: the item's size, held where it was grabbed.
          const ImGuiIO& io = ImGui::GetIO();
          const ImVec2 size(std::max(mx.x - mn.x, 1.0f), std::max(mx.y - mn.y, 1.0f));

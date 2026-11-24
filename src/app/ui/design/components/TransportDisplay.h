@@ -12,7 +12,7 @@
 namespace TransportDisplay
 {
    constexpr float kHeight = tok::cell_h;
-   constexpr float kValueH = tok::type_body + 3.0f;
+   constexpr float kValueH = tok::type_body + tok::space_0_75;
    constexpr float kValueY = (kHeight - kValueH) * 0.5f;  // value line top, from the well's top edge: centred
 
    inline ImVec4 Text(float a)
@@ -24,13 +24,13 @@ namespace TransportDisplay
 
    inline void Well(ImVec2 mn, ImVec2 mx)
    {
-      ImGui::GetWindowDrawList()->AddRectFilled(mn, mx, ImGui::GetColorU32(Text(0.06f)), tok::radius_container);
+      ImGui::GetWindowDrawList()->AddRectFilled(mn, mx, ImGui::GetColorU32(Text(tok::transport_display_text_n_sm)), tok::radius_container);
    }
 
    inline void Divider(float x, float top)
    {
-      ImGui::GetWindowDrawList()->AddLine(ImVec2(std::round(x), top + 6.0f), ImVec2(std::round(x), top + kHeight - 6.0f),
-                                          ImGui::GetColorU32(Text(0.12f)), 1.0f);
+      ImGui::GetWindowDrawList()->AddLine(ImVec2(std::round(x), top + tok::space_1_5), ImVec2(std::round(x), top + kHeight - tok::space_1_5),
+                                          ImGui::GetColorU32(Text(tok::transport_display_text_n_lg)), tok::transport_display_divider_stroke);
    }
 
    inline float ValueWidth(const char* widest)
@@ -48,9 +48,9 @@ namespace TransportDisplay
    // Hover/press wash over one editable value (the well's own 6% stays underneath).
    inline void Wash(ImVec2 mn, ImVec2 mx, float hover, bool down)
    {
-      const float a = down ? 0.12f : 0.07f * hover;
-      if (a > 0.001f)
-         ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(mn.x + 1, mn.y + 2), ImVec2(mx.x - 1, mx.y - 2),
+      const float a = down ? tok::transport_display_a : tok::transport_display_a_ratio * hover;
+      if (a > tok::transport_display_wash_limit)
+         ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(mn.x + 1, mn.y + tok::space_0_5), ImVec2(mx.x - 1, mx.y - tok::space_0_5),
                                                    ImGui::GetColorU32(Text(a)), tok::radius_control);
    }
 }

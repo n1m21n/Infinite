@@ -32,7 +32,7 @@ namespace FilterBar
          if (hv > 0.001f)
             dl->AddRectFilled(ImVec2(in.x, in.y), ImVec2(in.Right(), in.Bottom()),
                               ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_fill_rest * hv)), tok::radius_container);
-         if (tint > 0.001f)
+         if (tint > tok::filter_bar_well_limit)
          {
             const ImVec4 a = app::AccentEmphasisSelected();
             dl->AddRectFilled(ImVec2(in.x, in.y), ImVec2(in.Right(), in.Bottom()),
@@ -43,8 +43,8 @@ namespace FilterBar
       // Icons are drawn as lines on one shared centre line, so they cannot drift off-centre like font glyphs.
       inline void Cross(ImDrawList* dl, ImVec2 c, ImU32 col)
       {
-         dl->AddLine(ImVec2(c.x - 3.5f, c.y - 3.5f), ImVec2(c.x + 3.5f, c.y + 3.5f), col, tok::stroke_cross);
-         dl->AddLine(ImVec2(c.x - 3.5f, c.y + 3.5f), ImVec2(c.x + 3.5f, c.y - 3.5f), col, tok::stroke_cross);
+         dl->AddLine(ImVec2(c.x - tok::filter_bar_cross_gap, c.y - tok::filter_bar_cross_gap), ImVec2(c.x + tok::filter_bar_cross_gap, c.y + tok::filter_bar_cross_gap), col, tok::stroke_cross);
+         dl->AddLine(ImVec2(c.x - tok::filter_bar_cross_gap, c.y + tok::filter_bar_cross_gap), ImVec2(c.x + tok::filter_bar_cross_gap, c.y - tok::filter_bar_cross_gap), col, tok::stroke_cross);
       }
 
       inline void OpenMenu(const std::vector<std::string>& options, int current, std::function<void(int)> onSelect)
@@ -72,10 +72,10 @@ namespace FilterBar
          const float capW = ImGui::CalcTextSize(cap.c_str()).x;
          const std::string label = value;
          const float tx = r.x + tok::space_3 + capW;
-         const float trail = r.Right() - tok::space_2 - 8.0f;
+         const float trail = r.Right() - tok::space_2 - tok::space_2;
          const float room = trail - tok::space_2 - tx;  // value gets what the caption leaves
          std::string shown = label;
-         while (shown.size() > 3 && ImGui::CalcTextSize(shown.c_str()).x > room)
+         while (shown.size() > tok::filter_bar_chip_limit && ImGui::CalcTextSize(shown.c_str()).x > room)
             shown.pop_back();
          if (shown != label)
             shown += "...";
@@ -86,7 +86,7 @@ namespace FilterBar
          if (active)
          {
             const ImVec2 c(trail, r.CenterY());
-            const bool hov = ImGui::IsMouseHoveringRect(ImVec2(c.x - 10, c.y - 10), ImVec2(c.x + 10, c.y + 10));
+            const bool hov = ImGui::IsMouseHoveringRect(ImVec2(c.x - tok::space_2_5, c.y - tok::space_2_5), ImVec2(c.x + tok::space_2_5, c.y + tok::space_2_5));
             detail::Cross(dl, c, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 1.0f : tok::alpha_text_quiet)));
             cleared = s.clicked && hov;
          }
@@ -104,14 +104,14 @@ namespace FilterBar
          ImDrawList* dl = ImGui::GetWindowDrawList();
          Well(dl, r, hv, 0.0f);
          const ImVec4 t = TextCol();
-         const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_head + 0.3f * hv));
+         const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_head + tok::filter_bar_dir_button_im_vec4_scale * hv));
          // Sort glyph: three bars of different length. Longest on top = descending, shortest on top = ascending.
          const float cx = r.CenterX(), cy = r.CenterY();
          for (int i = 0; i < 3; ++i)
          {
             const float len = (descending ? 12.0f - 4.0f * i : 4.0f + 4.0f * i);
-            const float y = std::round(cy + (i - 1) * 4.0f) + 0.5f;
-            dl->AddLine(ImVec2(std::round(cx - 6.0f), y), ImVec2(std::round(cx - 6.0f + len), y), col, 1.5f);
+            const float y = std::round(cy + (i - 1) * tok::filter_bar_dir_button_ratio) + tok::px_align;
+            dl->AddLine(ImVec2(std::round(cx - tok::space_1_5), y), ImVec2(std::round(cx - tok::space_1_5 + len), y), col, tok::filter_bar_dir_button_stroke);
          }
          if (s.hovered)
             ImGui::SetTooltip("%s", descending ? I18n::T("Descending") : I18n::T("Ascending"));

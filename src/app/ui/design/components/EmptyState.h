@@ -2,6 +2,7 @@
 // hint under it, centred in the rectangle it is given. Drawn, not laid out, so it can sit over table filler rows.
 #pragma once
 #include "imgui.h"
+#include "app/ui/design/TokenColors.h"
 #include <algorithm>
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/Tokens.gen.h"
@@ -40,7 +41,7 @@ namespace EmptyState
    {
       const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
       const float cx = (min.x + max.x) * 0.5f;
-      const float maxW = std::max(tok::text_min_w, max.x - min.x - 2.0f * tok::space_3);
+      const float maxW = std::max(tok::text_min_w, max.x - min.x - tok::empty_state_to_ratio * tok::space_3);
       float y = (min.y + max.y) * 0.5f - (hint != nullptr ? tok::space_3 : tok::space_2);
       {
          UiType::Scope body(UiType::Size::Body, UiType::Weight::Medium);
@@ -49,7 +50,7 @@ namespace EmptyState
       if (hint != nullptr)
       {
          UiType::Scope cap(UiType::Size::Caption);
-         DrawWrapped(dl, cx, y, maxW, ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.7f), hint);
+         DrawWrapped(dl, cx, y, maxW, ImGui::GetColorU32(ImGuiCol_TextDisabled, tok::empty_state_to_im_gui_col_text_disabled_alpha), hint);
       }
    }
 
@@ -64,7 +65,7 @@ namespace EmptyState
       UiType::Scope cap(UiType::Size::Caption);
       const ImVec2 ts = ImGui::CalcTextSize(message);
       const float cx = (min.x + max.x) * 0.5f;
-      const float maxW = std::max(tok::text_min_w, max.x - min.x - 2.0f * tok::space_2);
+      const float maxW = std::max(tok::text_min_w, max.x - min.x - tok::empty_state_caption_ratio * tok::space_2);
       if (ts.x <= maxW)
       {
          // A quiet scrim so a baseline or checker behind the caption never strikes through it.
@@ -72,7 +73,7 @@ namespace EmptyState
          const bool darkTheme = (t.x + t.y + t.z) > 1.5f;
          const float y0 = (min.y + max.y) * 0.5f - ts.y * 0.5f;
          ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - ts.x * 0.5f - tok::empty_plate_pad, y0 - 1.0f), ImVec2(cx + ts.x * 0.5f + tok::empty_plate_pad, y0 + ts.y + 1.0f),
-                                                   darkTheme ? IM_COL32(0, 0, 0, tok::alpha8_plate_dark) : IM_COL32(255, 255, 255, tok::alpha8_plate_light), tok::switch_inset);
+                                                   darkTheme ? tok::U32(tok::empty_state_caption_col, tok::alpha8_plate_dark) : tok::U32(tok::empty_state_fill_shade, tok::alpha8_plate_light), tok::switch_inset);
       }
       DrawWrapped(ImGui::GetWindowDrawList(), cx, (min.y + max.y) * 0.5f - ts.y * 0.5f, maxW, ImGui::GetColorU32(ImGuiCol_TextDisabled), message);
    }

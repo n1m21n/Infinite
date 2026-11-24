@@ -3,6 +3,7 @@
 // caller opens the option list. Text colour is whatever ImGuiCol_Text is (the modulated amber is pushed by the caller).
 #pragma once
 #include <algorithm>
+#include "app/ui/design/Tokens.gen.h"
 #include <string>
 #include <vector>
 #include "app/ui/design/components/FieldWell.h"
@@ -21,7 +22,7 @@ namespace DropdownField
       
       const char* end = ImGui::FindRenderedTextEnd(caption);
       const ImVec2 ts = ImGui::CalcTextSize(caption, end);
-      const float w = size.x > 0.0f ? size.x : ts.x + 2.0f * pad;
+      const float w = size.x > 0.0f ? size.x : ts.x + tok::dropdown_field_w_ratio * pad;
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       const ImVec2 mx(mn.x + w, mn.y + h);
       if (ImGui::ButtonLabelHook != nullptr)
@@ -76,34 +77,34 @@ namespace DropdownField
       ImDrawList* dl = ImGui::GetWindowDrawList();
       FieldWell::Draw(dl, mn, mx, hovered, ImGui::IsItemActive());
       const bool hasLabel = label != nullptr && label[0] != '\0';
-      float segL = mn.x + 2.0f;
+      float segL = mn.x + tok::space_0_5;
       if (hasLabel)
       {
          ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          dim.w *= tok::alpha_caption;
          const float lw = ImGui::CalcTextSize(label).x;
          // segments get at least 60% of the face; the label yields
-         const float maxLabel = w * 0.4f - pad;
+         const float maxLabel = w * tok::dropdown_field_max_label_ratio - pad;
          dl->PushClipRect(mn, ImVec2(mn.x + pad + maxLabel, mx.y), true);
          dl->AddText(ImVec2(mn.x + pad, mn.y + (h - ImGui::GetTextLineHeight()) * 0.5f), ImGui::GetColorU32(dim), label);
          dl->PopClipRect();
          segL = mn.x + pad + std::min(lw, maxLabel) + pad;
       }
       const int n = (int)opts.size();
-      const float segW = (mx.x - 2.0f - segL) / (float)std::max(1, n);
+      const float segW = (mx.x - tok::space_0_5 - segL) / (float)std::max(1, n);
       int clicked = -1;
       if (pressed && n > 0)
          clicked = std::clamp((int)((ImGui::GetIO().MousePos.x - segL) / segW), 0, n - 1);
       if (current >= 0 && current < n)
       {
          const ImVec4 a = app::AccentEmphasisSelected();
-         dl->AddRectFilled(ImVec2(segL + segW * (float)current, mn.y + 2.0f), ImVec2(segL + segW * (float)(current + 1), mx.y - 2.0f),
+         dl->AddRectFilled(ImVec2(segL + segW * (float)current, mn.y + tok::space_0_5), ImVec2(segL + segW * (float)(current + 1), mx.y - tok::space_0_5),
                            ImGui::GetColorU32(a), tok::radius_container);
       }
       for (int i = 0; i < n; ++i)
       {
          const ImVec2 ts = ImGui::CalcTextSize(opts[i].c_str());
-         dl->AddText(ImVec2(std::round(segL + segW * ((float)i + 0.5f) - ts.x * 0.5f), mn.y + (h - ts.y) * 0.5f),
+         dl->AddText(ImVec2(std::round(segL + segW * ((float)i + tok::dropdown_field_segments_inset) - ts.x * 0.5f), mn.y + (h - ts.y) * 0.5f),
                      ImGui::GetColorU32(ImGuiCol_Text), opts[i].c_str());
       }
       return clicked;

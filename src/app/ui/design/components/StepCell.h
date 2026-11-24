@@ -12,7 +12,7 @@ namespace StepCell
    inline void PlayheadOutline(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx, float thickness = tok::stroke_ring)
    {
       const bool light = app::IsThemeLight();
-      dl->AddRect(mn, mx, light ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 230), tok::radius_control, 0,
+      dl->AddRect(mn, mx, light ? tok::Base(tok::col::state_warn, tok::step_cell_playhead_outline_state_warn_alpha) : tok::Base(tok::col::role_modulation, tok::step_cell_playhead_outline_role_modulation_alpha), tok::radius_control, 0,
                   thickness);
    }
 
@@ -25,11 +25,11 @@ namespace StepCell
       if (on)
          dl->AddRectFilled(mn, mx,
                            playhead ? (light ? tok::Base(tok::col::text_warn) : tok::Base(tok::col::role_modulation))
-                                    : (light ? tok::Base(tok::col::accent, 240) : tok::Base(tok::col::accent_alt, 200)),
+                                    : (light ? tok::Base(tok::col::accent, tok::step_cell_alpha) : tok::Base(tok::col::accent_alt, tok::step_cell_edge_alpha_sm)),
                            r);
-      const ImU32 edge = playhead ? (light ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 230))
-                                  : (hovered ? (light ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 200))
+      const ImU32 edge = playhead ? (light ? tok::Base(tok::col::state_warn, tok::step_cell_edge_alpha_lg) : tok::Base(tok::col::role_modulation, tok::step_cell_edge_alpha_md))
+                                  : (hovered ? (light ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::step_cell_edge_alpha_sm))
                                              : (light ? tok::Base(tok::col::edge_mid_light_fixed) : tok::Base(tok::col::edge_lo_light)));
-      dl->AddRect(mn, mx, edge, r, 0, playhead ? 2.0f : 1.0f);
+      dl->AddRect(mn, mx, edge, r, 0, playhead ? tok::step_cell_outline_stroke_lg : tok::step_cell_outline_stroke_sm);
    }
 }

@@ -24,19 +24,19 @@ namespace Switch
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec2 q(p.x + kW, p.y + kH);
-      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.10f + 0.05f * hv)), kH * 0.5f);
+      dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::switch_box_im_vec4_offset + tok::switch_box_im_vec4_scale * hv)), kH * 0.5f);
       if (onv > 0.001f)
       {
          ImVec4 a = app::AccentEmphasisSelected();
          a.w *= onv;
          dl->AddRectFilled(p, q, ImGui::GetColorU32(a), kH * 0.5f);
       }
-      const float r = kH * 0.5f - 3.0f;
+      const float r = kH * 0.5f - tok::space_0_75;
       const float x = p.x + kH * 0.5f + onv * (kW - kH);
       const ImVec4 thumbOff(t.x, t.y, t.z, tok::alpha_thumb_off);
       const ImVec4 thumb(thumbOff.x + (1.0f - thumbOff.x) * onv, thumbOff.y + (1.0f - thumbOff.y) * onv,
                          thumbOff.z + (1.0f - thumbOff.z) * onv, thumbOff.w + (1.0f - thumbOff.w) * onv);
-      dl->AddCircleFilled(ImVec2(x, p.y + kH * 0.5f), r, ImGui::GetColorU32(thumb), 16);
+      dl->AddCircleFilled(ImVec2(x, p.y + kH * 0.5f), r, ImGui::GetColorU32(thumb), tok::switch_box_segments);
       return clicked;
    }
 }

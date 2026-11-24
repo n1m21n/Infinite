@@ -37,7 +37,7 @@ namespace TopBarParts
       ImGui::SameLine(0.0f, tok::space_5 * 0.5f);
       ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::control_h) * 0.5f));
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      ImGui::Dummy(ImVec2(1.0f, tok::control_h));
+      ImGui::Dummy(ImVec2(tok::top_bar_spacer_w, tok::control_h));
       Divider::Vertical(UiLayout::Rect { p.x, p.y, 1.0f, tok::control_h }, tok::space_1);
       // Menu-bar lines do not carry a SetCursorPos y into the next SameLine; pin the line here.
       ImGui::GetCurrentWindow()->DC.CursorPosPrevLine.y = p.y;

@@ -61,9 +61,9 @@ namespace FormParts
       const bool hov = ImGui::IsItemHovered();
       const ImVec2 c(p.x + d * 0.5f, p.y + h * 0.5f);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), 48);   // 48 segments: the auto count facets a 9 px circle
+      dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), tok::form_color_dot_segments);   // 48 segments: the auto count facets a 9 px circle
       // Hairline ring: a black or near-background colour still reads as a swatch.
-      dl->AddCircle(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImGuiCol_Border), 48, 1.0f);
+      dl->AddCircle(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImGuiCol_Border), tok::form_color_dot_segments, 1.0f);
       if (click)
          ImGui::OpenPopup(id);
       bool changed = false;
@@ -142,7 +142,7 @@ namespace FormParts
       if (cw > 0.0f)
       {
          ImGui::SameLine(0.0f, 0.0f);
-         ImGui::Dummy(ImVec2(std::max(0.0f, x0 + cw - ImGui::GetCursorPosX()), 1.0f));
+         ImGui::Dummy(ImVec2(std::max(0.0f, x0 + cw - ImGui::GetCursorPosX()), tok::form_spacer_h));
       }
       ImGui::EndGroup();
       // The centred box starts the ImGui line low, which made check rows taller than the rest; end on the row pitch.
@@ -170,7 +170,7 @@ namespace FormParts
       MenuParts::PushPopupPad();
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
       std::string shown = preview;
-      const float room = controlW - 2.0f * tok::space_3;
+      const float room = controlW - tok::form_room_ratio * tok::space_3;
       const bool cut = ImGui::CalcTextSize(preview).x > room;
       if (cut)
       {
@@ -249,7 +249,7 @@ namespace FormParts
       return changed;
    }
 
-   inline bool SliderFloat(const char* label, float* v, float lo, float hi, const char* fmt = "%.3f", ImGuiSliderFlags fl = 0)
+   inline bool SliderFloat(const char* label, float* v, float lo, float hi, const char* fmt = UiFmt::Spec::F3, ImGuiSliderFlags fl = 0)
    {
       Label(label);
       ImGui::SetNextItemWidth(ControlW());
@@ -343,7 +343,7 @@ namespace FormParts
    inline void WindowEdge(float rounding = tok::radius_container)
    {
       const ImVec2 p = ImGui::GetWindowPos(), z = ImGui::GetWindowSize();
-      ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x + 0.5f, p.y + 0.5f), ImVec2(p.x + z.x - 0.5f, p.y + z.y - 0.5f),
+      ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x + tok::px_align, p.y + tok::px_align), ImVec2(p.x + z.x - tok::px_align, p.y + z.y - tok::px_align),
                                           EdgeCol(), rounding);
    }
 

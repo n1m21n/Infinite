@@ -58,7 +58,7 @@ def main():
         cat = f[0]
         is_col = cat in ("colour", "palette") or (cat == "draw" and sm.num_kind(f[2]) == "hex") or \
             (cat.startswith("call:") and (cat[5:] in sm.COLOUR_CALLS or re.search(r"(?i)col|tint|tone|accent|ink|rgb|^V4$|^U32$|^Hex$", cat[5:])))
-        if not is_col or f[4].startswith(ui_audit.KIT): continue
+        if not is_col or (f[4].startswith(ui_audit.KIT) and not ui_audit.kit_ok(f[4])): continue
         if only_file is not None and f[4] != only_file: continue
         by_file.setdefault(f[4], []).append(f)
 

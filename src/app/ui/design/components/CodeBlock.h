@@ -15,15 +15,15 @@ namespace CodeBlock
    {
       const float copyW = tok::copy_w;
       const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(tx.x, tx.y, tx.z, 0.06f));
+      ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(tx.x, tx.y, tx.z, tok::code_block_y));
       ImGui::PushStyleColor(ImGuiCol_Border, FormParts::EdgeCol());
       ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tok::radius_control);
-      ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, tok::border_hairline);
       ImGui::PushFont(app::TerminalMonoFont(), 0.0f);  // nullptr keeps the current face when the install lacks it
       const float outer = ImGui::GetContentRegionAvail().x;
-      const float textW = std::max(tok::text_min_w, outer - 2.0f * tok::space_2 - copyW - tok::space_2);
+      const float textW = std::max(tok::text_min_w, outer - tok::code_block_text_w_min * tok::space_2 - copyW - tok::space_2);
       const float textH = ImGui::CalcTextSize(code, nullptr, false, textW).y;
-      const float h = std::max(textH, tok::compact_row) + 2.0f * tok::space_2;
+      const float h = std::max(textH, tok::compact_row) + tok::code_block_h_ratio * tok::space_2;
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
       ImGui::BeginChild(id, ImVec2(0, h), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
       ImGui::PopStyleVar();
@@ -32,7 +32,7 @@ namespace CodeBlock
       ImGui::TextUnformatted(code);
       ImGui::PopTextWrapPos();
       ImGui::PopFont();  // the glyph lives in the UI face's merged icon range, not in the mono face
-      ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - copyW - tok::space_1, tok::space_2 + (std::min(textH, 18.0f) - 18.0f) * 0.5f));
+      ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - copyW - tok::space_1, tok::space_2 + (std::min(textH, tok::code_block_max) - tok::code_block_inset) * 0.5f));
       static ImGuiID sCopied = 0;
       static double sCopiedAt = -10.0;
       const std::string glyphId = std::string("##copy") + id;

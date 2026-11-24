@@ -25,26 +25,26 @@ namespace VFader
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       auto tone = [&](float a) { return ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, a)); };
-      dl->AddRectFilled(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f), tone(0.10f), 3.0f);
+      dl->AddRectFilled(ImVec2(cx - tok::space_0_75, top - tok::space_1), ImVec2(cx + tok::space_0_75, bottom + tok::space_1), tone(tok::v_fader_tone_alpha_xs), tok::v_fader_fill_radius);
       if (hasRange)
-         dl->AddRectFilled(ImVec2(cx - 5.0f, std::min(rangeYLo, rangeYHi)), ImVec2(cx + 5.0f, std::max(rangeYLo, rangeYHi)),
-                           PinDotAlpha(tok::U32(tok::pin_mod, isLight), 0.45f));
+         dl->AddRectFilled(ImVec2(cx - tok::space_1_25, std::min(rangeYLo, rangeYHi)), ImVec2(cx + tok::space_1_25, std::max(rangeYLo, rangeYHi)),
+                           PinDotAlpha(tok::U32(tok::pin_mod, isLight), tok::v_fader_pin_alpha));
       if (hasFill)
-         dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fill, tok::radius_cell);
+         dl->AddRectFilled(ImVec2(cx - tok::space_0_5, capY), ImVec2(cx + tok::space_0_5, bottom + tok::space_1), fill, tok::radius_cell);
       for (int i = 0; i < nTicks; ++i)
       {
-         dl->AddLine(ImVec2(cx + 6.0f, ticks[i]), ImVec2(cx + 9.0f, ticks[i]), tone(0.18f), 1.0f);
-         dl->AddLine(ImVec2(cx - 9.0f, ticks[i]), ImVec2(cx - 6.0f, ticks[i]), tone(0.18f), 1.0f);
+         dl->AddLine(ImVec2(cx + tok::space_1_5, ticks[i]), ImVec2(cx + tok::v_fader_line_x, ticks[i]), tone(tok::v_fader_tone_alpha_md), tok::v_fader_line_stroke_sm);
+         dl->AddLine(ImVec2(cx - tok::v_fader_line_x, ticks[i]), ImVec2(cx - tok::space_1_5, ticks[i]), tone(tok::v_fader_tone_alpha_md), tok::v_fader_line_stroke_sm);
       }
       const ImVec2 a(cx - kHandleW * 0.5f, capY - kHandleH * 0.5f), b(cx + kHandleW * 0.5f, capY + kHandleH * 0.5f);
       const float lift = readOnly ? 0.0f : (hovered || active ? 0.06f : 0.0f);
-      dl->AddRectFilled(a, b, tone(readOnly ? 0.14f : 0.22f + lift), kHandleH * 0.5f);
-      dl->AddLine(ImVec2(cx - 4.0f, capY), ImVec2(cx + 4.0f, capY), tone(readOnly ? 0.35f : 0.8f), 1.6f);
+      dl->AddRectFilled(a, b, tone(readOnly ? tok::v_fader_tone_alpha_sm : tok::v_fader_tone_inset + lift), kHandleH * 0.5f);
+      dl->AddLine(ImVec2(cx - tok::space_1, capY), ImVec2(cx + tok::space_1, capY), tone(readOnly ? tok::v_fader_tone_alpha_lg : tok::v_fader_tone_alpha_xl), tok::v_fader_line_stroke_lg);
       if (active && !readOnly)
       {
          ImVec4 acc = app::AccentEmphasisSelected();
-         acc.w = 0.8f;
-         dl->AddRect(ImVec2(a.x - 1.0f, a.y - 1.0f), ImVec2(b.x + 1.0f, b.y + 1.0f), ImGui::GetColorU32(acc), kHandleH * 0.5f + 1.0f, 0, 2.0f);
+         acc.w = tok::v_fader_w;
+         dl->AddRect(ImVec2(a.x - tok::space_0_25, a.y - tok::space_0_25), ImVec2(b.x + tok::space_0_25, b.y + tok::space_0_25), ImGui::GetColorU32(acc), kHandleH * 0.5f + tok::space_0_25, 0, tok::v_fader_outline_stroke);
       }
    }
 }

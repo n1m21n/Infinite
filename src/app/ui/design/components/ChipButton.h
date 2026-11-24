@@ -22,7 +22,7 @@ namespace ChipButton
       const char* key = std::strstr(label, "##");
       const std::string shown = key != nullptr ? std::string(label, key) : std::string(label);
       const ImVec2 ts = ImGui::CalcTextSize(shown.c_str());
-      const ImVec2 sz(std::max(minW, ts.x + 2.0f * (UiDensity::IsCompact() ? tok::compact_frame_pad_x : tok::space_2)), h);
+      const ImVec2 sz(std::max(minW, ts.x + tok::chip_button_min * (UiDensity::IsCompact() ? tok::compact_frame_pad_x : tok::space_2)), h);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const bool clicked = ImGui::InvisibleButton(label, sz);
       const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);

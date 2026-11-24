@@ -24,7 +24,7 @@ namespace DialogParts
    // Call after OpenPopup; pair a true result with End().
    inline bool Begin(const char* name)
    {
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(tok::dialog_window_x, tok::dialog_window_y));
       ImGui::SetNextWindowSizeConstraints(ImVec2(tok::dialog_w_min, 0.0f), ImVec2(kMaxW, tok::dialog_h_max));
       app::PushElevatedPanelStyle(false);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
@@ -60,23 +60,23 @@ namespace DialogParts
    inline void Progress(const char* what, float progress)
    {
       constexpr float kTwoPi = 6.28318530718f;
-      const float A = 58.0f, sw = 0.257f * A * 0.62f;       // half-width of the mark, stroke
-      const float h = A * 0.42f;                             // half-height of a lemniscate of half-width A
+      const float A = tok::dialog_a, sw = tok::dialog_sw_ratio * A * 0.62f;       // half-width of the mark, stroke
+      const float h = A * tok::dialog_h_ratio;                             // half-height of a lemniscate of half-width A
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
-      const float rowH = h * 2.0f + sw + 6.0f;
-      const ImVec2 c(p0.x + A + sw * 0.5f + 2.0f, p0.y + rowH * 0.5f);
+      const float rowH = h * tok::dialog_row_h_ratio + sw + tok::space_1_5;
+      const ImVec2 c(p0.x + A + sw * 0.5f + tok::space_0_5, p0.y + rowH * 0.5f);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const bool still = CategoryColors::GetReduceMotion();
       const float known = progress >= 0.0f ? std::min(progress, 1.0f) : 1.0f;
-      constexpr int kSeg = 160;
+      constexpr int kSeg = tok::dialog_seg;
       auto at = [&](float u) { const ImVec2 q = Splash::Lemniscate(u * kTwoPi); return ImVec2(c.x + q.x * A, c.y + q.y * A); };
       // track: the whole mark, quiet
       dl->PathClear();
       for (int i = 0; i <= kSeg; ++i)
          dl->PathLineTo(at((float)i / kSeg));
-      dl->PathStroke(ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.10f)), ImDrawFlags_None, sw);
+      dl->PathStroke(ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::dialog_progress_im_vec4_alpha)), ImDrawFlags_None, sw);
       // stroke: the drawn part, coloured by x as on the logo
       if (known > 0.0f)
       {
@@ -117,7 +117,7 @@ namespace DialogParts
             }
          }
       }
-      dl->AddCircleFilled(at(known), sw * 0.5f, Splash::BrandColor((at(known).x - c.x) / A * 0.5f + 0.5f, 1.0f), 24);
+      dl->AddCircleFilled(at(known), sw * tok::dialog_progress_add_circle_filled_scale, Splash::BrandColor((at(known).x - c.x) / A * tok::dialog_progress_brand_color_scale + tok::dialog_progress_brand_color_u, 1.0f), tok::dialog_progress_segments);
       // bead: rides the head while the size is known, loops the mark when it is not
       float bu = known;
       if (progress < 0.0f && !still)
@@ -127,10 +127,10 @@ namespace DialogParts
          bu -= std::floor(bu);
       }
       const ImVec2 bp = at(bu);
-      const float r = sw * 0.42f;
-      dl->AddCircleFilled(bp, r, IM_COL32(0xC2, 0x59, 0x3F, 255), 24);
-      dl->AddCircleFilled(ImVec2(bp.x - r * 0.18f, bp.y - r * 0.2f), r * 0.78f, IM_COL32(0xF9, 0xA5, 0x8F, 255), 24);
-      dl->AddCircleFilled(ImVec2(bp.x - r * 0.34f, bp.y - r * 0.38f), r * 0.28f, IM_COL32(255, 255, 255, 230), 16);
+      const float r = sw * tok::dialog_r_ratio;
+      dl->AddCircleFilled(bp, r, IM_COL32(tok::dialog_dot_shade_sm, tok::dialog_dot_alpha_sm, tok::dialog_dot_alpha_xs, tok::dialog_dot_alpha), tok::dialog_progress_segments);
+      dl->AddCircleFilled(ImVec2(bp.x - r * tok::dialog_progress_ratio, bp.y - r * tok::dialog_dot_y_sm), r * tok::dialog_dot_r_lg, IM_COL32(tok::dialog_dot_shade_lg, tok::dialog_dot_alpha_lg, tok::dialog_dot_alpha_md, tok::dialog_dot_alpha), tok::dialog_progress_segments);
+      dl->AddCircleFilled(ImVec2(bp.x - r * tok::dialog_dot_x, bp.y - r * tok::dialog_dot_y_lg), r * tok::dialog_dot_r_sm, tok::U32(tok::dialog_progress_col), tok::dialog_dot_segments);
       // words beside the mark
       const float tx = p0.x + A * 2.0f + sw + tok::space_4;
       const float lh = ImGui::GetTextLineHeight();
@@ -143,7 +143,7 @@ namespace DialogParts
       }
       else
          dl->AddText(ImVec2(tx, c.y - lh * 0.5f), ImGui::GetColorU32(ImGuiCol_TextDisabled), what);
-      ImGui::Dummy(ImVec2(A * 2.0f + sw + tok::space_4 + 110.0f, rowH));
+      ImGui::Dummy(ImVec2(A * tok::dialog_spacer_w + sw + tok::space_4 + tok::dialog_progress_gap, rowH));
    }
 
    // Right-aligned row; returns the clicked index or -1. The last label is the primary action.
@@ -155,7 +155,7 @@ namespace DialogParts
       const auto widthOf = [](const char* l)
       {
          const char* end = std::strstr(l, "##");
-         return std::max(kButtonMinW, ImGui::CalcTextSize(l, end).x + 2.0f * tok::space_3);
+         return std::max(kButtonMinW, ImGui::CalcTextSize(l, end).x + tok::dialog_buttons_ratio * tok::space_3);
       };
       float total = tok::space_2 * (n - 1);
       for (const char* l : labels)
@@ -180,8 +180,8 @@ namespace DialogParts
       // A modal floats over a same-coloured canvas, so its edge is stronger than a docked surface's hairline.
       {
          const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
-         const ImVec4 e = CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.16f) : ImVec4(1, 1, 1, 0.08f);
-         ImGui::GetWindowDrawList()->AddRect(ImVec2(wp.x + 0.5f, wp.y + 0.5f), ImVec2(wp.x + ws.x - 0.5f, wp.y + ws.y - 0.5f),
+         const ImVec4 e = tok::V4(tok::dialog_e, CategoryColors::IsThemeLight());
+         ImGui::GetWindowDrawList()->AddRect(ImVec2(wp.x + tok::px_align, wp.y + tok::px_align), ImVec2(wp.x + ws.x - tok::px_align, wp.y + ws.y - tok::px_align),
                                              ImGui::GetColorU32(e), tok::radius_dialog);
       }
       ImGui::EndPopup();

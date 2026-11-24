@@ -1,6 +1,14 @@
 {
  "_doc": "Per-surface semantic sizes (owner rule A1, 2026-11-24): a thing's own width, height, radius, stroke, count, ratio or limit, named for what it is; tok::<surface>_<name>. surface = float, surface_i = int, surface_d = double (the literal's own C++ type). Written by tools/design/size_migrate.py; edit values here.",
  "surface": {
+  "action_button": {
+   "glyph_box": 14.0,
+   "lift_ratio": 0.06,
+   "min": 2.0,
+   "strum_frames": 7.0,
+   "top": 14.0,
+   "w_ratio": 2.0
+  },
   "app_shared": {
    "audio_solo_button_w": 26.0,
    "btn_w_ratio": 3.0,
@@ -282,8 +290,15 @@
    "unmap_btn_w_ratio": 2.0,
    "wave_w_min": 70.0
   },
+  "audio_viz": {
+   "amp_ratio": 0.45
+  },
   "browser": {
    "star_size": 11.0
+  },
+  "busy_line": {
+   "a_ratio": 2.0,
+   "spinner_scale": 8.0
   },
   "canvas_link": {
    "dim_color_alpha_mul": 0.62,
@@ -343,6 +358,7 @@
    "composer_ratio": 2.0,
    "composer_shade_lg": 0.7,
    "composer_shade_sm": 0.35,
+   "composer_tile": 24.0,
    "composer_w_max": 760.0,
    "cw_ratio": 2.0,
    "diameter": 34.0,
@@ -495,8 +511,22 @@
    "x_w_ratio": 2.0,
    "y": 24.0,
    "y_gap": 40.0,
-   "y_ratio": 2.0,
-   "composer_tile": 24.0
+   "y_ratio": 2.0
+  },
+  "check_box": {
+   "a0_scale_lg": 0.52,
+   "a0_scale_sm": 0.24,
+   "a1_scale_lg": 0.71,
+   "a1_scale_sm": 0.43,
+   "a2_scale_lg": 0.77,
+   "a2_scale_sm": 0.31,
+   "l1": 0.27,
+   "l2": 0.53,
+   "max": 1.4,
+   "stroke": 1.5
+  },
+  "chip_button": {
+   "min": 2.0
   },
   "cli_setup_section": {
    "cancel_w_min": 64.0,
@@ -513,11 +543,27 @@
    "step_icon_stroke": 2.0,
    "terminal_welcome_ratio": 2.0
   },
+  "code_block": {
+   "h_ratio": 2.0,
+   "inset": 18.0,
+   "max": 18.0,
+   "text_w_min": 2.0,
+   "y": 0.06
+  },
+  "colour_chip": {
+   "dots_lg": 0.46,
+   "dots_sm": 0.42,
+   "dots_stroke": 1.5,
+   "outline_stroke": 1.0,
+   "row_stroke": 1.0,
+   "tint_dots_limit": 0.01
+  },
   "cook_overlay": {
    "pill_bg_y": 0.92
   },
   "curve_editor": {
    "axis_col_shade": 0.5,
+   "bend_curve_stroke": 5.0,
    "controls_w_ratio": 3.0,
    "dot_shade": 0.8,
    "erase_r": 9.0,
@@ -535,6 +581,7 @@
    "graph_stroke": 1.0,
    "graph_w_min": 80.0,
    "grid_w_ratio": 2.0,
+   "group_curve_stroke": 1.4,
    "height": 360.0,
    "library_menu_scale": 2.0,
    "line_shade_lg": 0.45,
@@ -568,9 +615,101 @@
    "x": 0.5,
    "x_ratio": 1024.0,
    "y": 0.5,
-   "y_ratio": 2.0,
-   "group_curve_stroke": 1.4,
-   "bend_curve_stroke": 5.0
+   "y_ratio": 2.0
+  },
+  "desk": {
+   "a0_ratio": 0.75,
+   "a1_ratio": 2.25,
+   "a_ratio": 24.0,
+   "cap_hi_alpha": 1.14,
+   "cap_lo_alpha": 0.72,
+   "chassis_gap": 9.0,
+   "chassis_radius": 5.0,
+   "chassis_stroke": 1.0,
+   "console_meter_gap": 1.5,
+   "console_meter_radius": 0.5,
+   "console_meter_stroke": 1.0,
+   "dot_alpha": 1.6,
+   "dot_r_lg": 2.6,
+   "dot_r_sm": 1.6,
+   "dot_y": 1.5,
+   "face_gap": 6.5,
+   "face_ratio": 7.0,
+   "face_side_gap": 6.5,
+   "face_side_ratio": 7.0,
+   "face_side_stroke": 1.0,
+   "face_stroke": 1.0,
+   "fill_alpha_lg": 0.78,
+   "fill_alpha_sm": 0.22,
+   "fill_radius": 2.0,
+   "key_cap_gap": 2.5,
+   "key_cap_led_h": 2.5,
+   "key_cap_radius": 3.0,
+   "key_cap_ratio": 70.0,
+   "key_cap_scale": 60.0,
+   "key_cap_stroke": 1.5,
+   "key_cap_tint_offset": 0.55,
+   "key_cap_tint_scale": 0.75,
+   "key_cap_tint_shade": 1.08,
+   "led_alpha": 0.35,
+   "led_h": 2.0,
+   "line_alpha": 0.33,
+   "line_stroke_lg": 2.2,
+   "line_stroke_sm": 1.0,
+   "line_x": 1.6,
+   "line_y": 1.5,
+   "max": 255.0,
+   "outline_stroke_lg": 1.5,
+   "outline_stroke_sm": 1.0,
+   "plate_h": 16.0,
+   "pot_d": 30.0,
+   "pot_gap": 2.5,
+   "pot_inset_lg": 3.0,
+   "pot_inset_sm": 0.5,
+   "pot_ratio": 2.0,
+   "pot_scale": 2.0,
+   "pot_stroke": 2.5,
+   "pot_tint_shade": 1.4,
+   "r": 3.0,
+   "screw_gap": 0.6,
+   "screw_r": 3.0,
+   "screw_stroke": 1.0,
+   "screw_tint_shade": 1.5,
+   "scribble_row_gap": 9.0,
+   "scribble_row_radius": 3.0,
+   "scribble_row_tint_shade": 0.95,
+   "seg": 3.0,
+   "seg_db_shade_lg": 12.0,
+   "seg_db_shade_sm": 3.0,
+   "text_alpha_lg": 1.25,
+   "text_alpha_sm": 0.7,
+   "text_x": 21.0
+  },
+  "dialog": {
+   "a": 58.0,
+   "buttons_ratio": 2.0,
+   "dot_r_lg": 0.78,
+   "dot_r_sm": 0.28,
+   "dot_x": 0.34,
+   "dot_y_lg": 0.38,
+   "dot_y_sm": 0.2,
+   "h_ratio": 0.42,
+   "progress_add_circle_filled_scale": 0.5,
+   "progress_brand_color_scale": 0.5,
+   "progress_gap": 110.0,
+   "progress_im_vec4_alpha": 0.1,
+   "progress_ratio": 0.18,
+   "r_ratio": 0.42,
+   "row_h_ratio": 2.0,
+   "spacer_w": 2.0,
+   "sw_ratio": 0.257,
+   "window_x": 0.5,
+   "window_y": 0.5
+  },
+  "dropdown_field": {
+   "max_label_ratio": 0.4,
+   "segments_inset": 0.5,
+   "w_ratio": 2.0
   },
   "drum": {
    "bw_ratio": 3.0,
@@ -618,6 +757,11 @@
    "tabs_w_ratio": 2.0,
    "text_w_ratio": 2.0,
    "w_ratio": 2.0
+  },
+  "empty_state": {
+   "caption_ratio": 2.0,
+   "to_im_gui_col_text_disabled_alpha": 0.7,
+   "to_ratio": 2.0
   },
   "field_params": {
    "bar_h_min": 2.0,
@@ -670,6 +814,18 @@
    "w_md": 110.0,
    "w_sm": 84.0
   },
+  "field_well": {
+   "grab_min": 1.0,
+   "swatch_row_im_vec4_alpha": 0.9,
+   "swatch_row_stroke": 1.5
+  },
+  "filter_bar": {
+   "cross_gap": 3.5,
+   "dir_button_im_vec4_scale": 0.3,
+   "dir_button_ratio": 4.0,
+   "dir_button_stroke": 1.5,
+   "well_limit": 0.001
+  },
   "find_overlay": {
    "outline_stroke": 1.5,
    "radius": 6.0,
@@ -679,6 +835,14 @@
    "window_x": 0.5,
    "y_lg": 1.0,
    "y_sm": 0.6
+  },
+  "floating": {
+   "window_x": 0.5,
+   "window_y": 0.5
+  },
+  "form": {
+   "room_ratio": 2.0,
+   "spacer_h": 1.0
   },
   "fx": {
    "arc_scale": 2.0,
@@ -844,6 +1008,7 @@
    "gutter": 16.0,
    "h": 60.0,
    "h_ratio": 0.1,
+   "layer_block_rows": 3.0,
    "layer_stack_gap": 11.0,
    "layer_stack_r": 1.3,
    "layer_stack_radius": 3.0,
@@ -858,8 +1023,23 @@
    "table_grid_pin_pivot_alignment_y": 0.5,
    "table_grid_radius": 8.0,
    "table_grid_stroke": 1.5,
-   "text_x": 20.0,
-   "layer_block_rows": 3.0
+   "text_x": 20.0
+  },
+  "glyph_draw": {
+   "a_ratio": 0.41,
+   "dot_r": 1.2,
+   "dot_x": 0.8,
+   "line_stroke": 1.5,
+   "metronome_ratio": 3.2,
+   "top_for_ratio": 0.3,
+   "u_ratio": 20.0
+  },
+  "glyph_toggle": {
+   "a_limit": 0.5,
+   "dot_r": 6.6,
+   "snapped_centre_size": 18.0,
+   "y_lg": 0.5,
+   "y_sm": 0.25
   },
   "help_windows": {
    "column_col_w": 180.0,
@@ -873,18 +1053,55 @@
    "color_alpha_mul": 0.3,
    "min_width": 220.0
   },
+  "icon_tile": {
+   "outline_stroke": 2.0,
+   "swing_target": 2.0
+  },
   "library": {
+   "a_gap": 0.55,
+   "a_ratio": 0.4,
+   "action_button": 0.14,
+   "action_button_gap": 0.07,
+   "action_button_im_vec4_alpha": 0.9,
+   "action_button_ratio": 0.04,
+   "action_button_y": 0.4,
    "badge_reserve": 40.0,
+   "begin_well_col_2_alpha": 0.04,
+   "breadcrumb_im_vec4_alpha": 0.4,
+   "breadcrumb_ratio": 2.0,
    "btn_h_ratio": 0.7,
    "btn_w": 24.0,
    "cat_tag_reserve": 70.0,
+   "folder_row_im_vec4_alpha": 0.45,
+   "folder_row_im_vec4_offset": 0.3,
+   "folder_row_im_vec4_scale": 0.4,
+   "header_strum_frames": 2.0,
+   "header_y": 0.35,
+   "icon_button_im_vec4_alpha": 0.3,
+   "icon_button_im_vec4_offset": 0.07,
+   "icon_button_im_vec4_scale": 0.05,
+   "icon_button_y": 0.45,
    "icon_size_ratio": 0.85,
+   "line_stroke": 1.5,
+   "r": 3.5,
+   "row_r": 3.0,
    "row_w_ratio": 2.0,
+   "search_field_im_vec4_alpha": 0.1,
+   "search_field_im_vec4_scale": 0.85,
+   "search_field_stroke": 1.0,
+   "search_field_y_lg": 0.9,
+   "search_field_y_md": 0.8,
+   "search_field_y_sm": 0.5,
    "search_min_lg": 48.0,
    "search_min_sm": 20.0,
    "search_panel_gap": 64.0,
    "search_panel_ratio": 2.0,
-   "spacer_h": 4.0
+   "section_header_im_vec4_alpha": 0.6,
+   "spacer_h": 4.0,
+   "well_alpha": 0.27
+  },
+  "menu": {
+   "list_max_h_ratio": 2.0
   },
   "minimap": {
    "gap": 1.5,
@@ -1062,6 +1279,9 @@
    "w_col_lg": 130.0,
    "width": 50.0
   },
+  "mode_banner": {
+   "window_x": 0.5
+  },
   "node": {
    "audio_narrow_width": 200.0,
    "audio_time_viz_h": 150.0,
@@ -1078,6 +1298,10 @@
    "preview_size": 190.0,
    "viewport_size": 340.0,
    "wide_width": 476.0
+  },
+  "node_header": {
+   "issue_badge": 2.0,
+   "issue_badge_inset": 2.0
   },
   "note": {
    "arp_gate_grid_max": 46.0,
@@ -1147,6 +1371,11 @@
    "velocity_curve_chart_stroke": 1.0,
    "w_min": 280.0,
    "x_ratio": 0.3
+  },
+  "notice_card": {
+   "dismiss_cap_y": 18.0,
+   "text_wrap_local_pos_x_lg": 3.0,
+   "text_wrap_local_pos_x_sm": 2.0
   },
   "osc": {
    "audio_bare_dropdown_min": 24.0,
@@ -1306,6 +1535,16 @@
    "x1_ratio": 0.25,
    "x2_ratio": 0.75,
    "y0_ratio": 0.35
+  },
+  "page_picker": {
+   "colour_row": 1.5,
+   "colour_row_gap": 1.5,
+   "w_ratio": 2.0
+  },
+  "panel": {
+   "fold_header_ratio": 2.0,
+   "room_ratio": 2.0,
+   "w_ratio": 2.0
   },
   "param": {
    "alpha": 0.65,
@@ -1601,6 +1840,13 @@
    "window_w_lg": 280.0,
    "window_w_sm": 220.0
   },
+  "pill_group": {
+   "outline_stroke": 2.0
+  },
+  "pin_dot": {
+   "cable_stroke": 1.5,
+   "param_stroke": 2.0
+  },
   "preview": {
    "azimuth_ratio": 0.6875,
    "bottom_ratio": 0.45,
@@ -1639,6 +1885,9 @@
    "stroke": 2.0,
    "top_ratio": 0.45,
    "zoom_min": 0.01
+  },
+  "reorder_drag": {
+   "glide_limit": 0.5
   },
   "sample_studio": {
    "accent_alpha_lg": 0.7,
@@ -1798,6 +2047,18 @@
    "toggle_w": 44.0,
    "top_ratio": 0.45,
    "w_top_gap": 7.0
+  },
+  "scrollbar": {
+   "drag": 0.55,
+   "hover": 0.4,
+   "rest": 0.22
+  },
+  "section_card": {
+   "end_ratio": 4.0,
+   "progress_gap": 0.4,
+   "progress_im_vec4_alpha": 0.1,
+   "progress_limit": 0.5,
+   "progress_ratio": 1.4
   },
   "settings": {
    "btn_w": 96.0,
@@ -2073,6 +2334,25 @@
    "perf_panel_height": 620.0,
    "scrollbar_size": 12.0
   },
+  "state_ring": {
+   "circle_inset": 0.55,
+   "circle_ratio": 0.45,
+   "circle_stroke": 1.5,
+   "inset": 0.55,
+   "outset": 2.0,
+   "scale": 0.45
+  },
+  "status_dot": {
+   "on_last_item_im_gui_col_popup_bg_alpha": 0.9
+  },
+  "step_cell": {
+   "outline_stroke_lg": 2.0,
+   "outline_stroke_sm": 1.0
+  },
+  "switch": {
+   "box_im_vec4_offset": 0.1,
+   "box_im_vec4_scale": 0.05
+  },
   "templates": {
    "card_height_ratio": 2.0,
    "card_ratio": 2.0,
@@ -2115,6 +2395,10 @@
    "braille_dot_row_step": 0.24,
    "braille_ratio": 0.2
   },
+  "text_button": {
+   "outline_stroke": 2.0,
+   "width_for_ratio": 2.0
+  },
   "theme": {
    "apply_ed_vec_alpha_lg": 0.8,
    "apply_ed_vec_alpha_md": 0.784,
@@ -2146,6 +2430,58 @@
    "push_elevated_panel_style_col_2_alpha": 0.22,
    "push_primary_button_style_ratio": 1.1,
    "return_scale": 0.7152
+  },
+  "time_ruler": {
+   "background_im_gui_col_text_alpha": 0.04,
+   "color_alpha_mul": 0.08,
+   "label_color_im_gui_col_text_alpha": 0.62,
+   "line_stroke_lg": 3.0,
+   "line_stroke_md": 2.0,
+   "line_stroke_sm": 1.5,
+   "line_stroke_xs": 1.25,
+   "loop_band_gap": 1.5,
+   "loop_band_stroke": 2.5,
+   "playhead_ratio": 1.6,
+   "playhead_stroke": 1.5,
+   "tick_color_im_gui_col_text_alpha": 0.38,
+   "ticks_lg": 6.0,
+   "ticks_sm": 4.0
+  },
+  "top_bar": {
+   "spacer_w": 1.0
+  },
+  "transport_display": {
+   "a": 0.12,
+   "a_ratio": 0.07,
+   "divider_stroke": 1.0,
+   "text_n_lg": 0.12,
+   "text_n_sm": 0.06,
+   "wash_limit": 0.001
+  },
+  "ui_gallery": {
+   "bar_h": 36.0,
+   "light_limit": 0.5,
+   "max": 1500.0,
+   "pad_ratio": 2.0,
+   "row_h": 28.0,
+   "tb_perf_ticks": 0.55,
+   "tb_play_cap_y": 28.0,
+   "w": 0.6
+  },
+  "v_fader": {
+   "fill_radius": 3.0,
+   "line_stroke_lg": 1.6,
+   "line_stroke_sm": 1.0,
+   "line_x": 9.0,
+   "outline_stroke": 2.0,
+   "pin_alpha": 0.45,
+   "tone_alpha_lg": 0.35,
+   "tone_alpha_md": 0.18,
+   "tone_alpha_sm": 0.14,
+   "tone_alpha_xl": 0.8,
+   "tone_alpha_xs": 0.1,
+   "tone_inset": 0.22,
+   "w": 0.8
   },
   "view2d": {
    "a1": 1.2,
@@ -2625,6 +2961,12 @@
    "third_w": 2.0,
    "third_w_ratio": 3.0,
    "v": 100.0
+  },
+  "border": {
+   "hairline": 1.0
+  },
+  "dialog_progress": {
+   "brand_color_u": 0.5
   }
  },
  "surface_i": {
@@ -2736,8 +3078,18 @@
    "analog_body_audio_knob_row_layout": 4,
    "envelope_alpha": 245
   },
+  "audio_viz": {
+   "core_alpha_lg": 230,
+   "core_alpha_sm": 220,
+   "peaks_accent_alpha": 110,
+   "peaks_accent_alt_alpha": 110,
+   "peaks_ink_white_alpha": 140
+  },
   "browser": {
    "h": 16777619
+  },
+  "busy_line": {
+   "spinner_segments": 24
   },
   "chat": {
    "agent_logo_texture_ratio": 4,
@@ -2762,8 +3114,59 @@
    "menu_ratio": 2,
    "release_limit": 2
   },
+  "desk": {
+   "a": 255,
+   "chassis_hi_alpha": 22,
+   "chassis_lo_alpha": 200,
+   "console_meter": 38,
+   "console_meter_hi_alpha": 200,
+   "console_meter_ink_alpha": 70,
+   "dot_segments_lg": 28,
+   "dot_segments_md": 20,
+   "dot_segments_sm": 8,
+   "face_hi_alpha": 28,
+   "face_hi_offset": 5,
+   "face_lo_alpha": 220,
+   "face_lo_alpha_md": 160,
+   "face_lo_alpha_sm": 50,
+   "face_lo_offset": 6,
+   "face_side_hi_alpha": 28,
+   "face_side_hi_offset": 5,
+   "face_side_lo_alpha": 220,
+   "face_side_lo_alpha_md": 160,
+   "face_side_lo_alpha_sm": 50,
+   "face_side_lo_offset": 6,
+   "hi_alpha_lg": 70,
+   "hi_alpha_md": 46,
+   "hi_alpha_sm": 26,
+   "hsh_scale": 2654435761,
+   "key_cap_hi_alpha": 60,
+   "key_cap_ink_alpha": 190,
+   "key_cap_lo_alpha": 150,
+   "key_cap_lo_alpha_lg": 220,
+   "key_cap_lo_alpha_sm": 70,
+   "plate_hi_alpha": 30,
+   "pot_hi_alpha": 70,
+   "pot_ink_alpha": 140,
+   "pot_lo_alpha": 150,
+   "pot_lo_alpha_lg": 170,
+   "pot_lo_alpha_sm": 130,
+   "pot_segments": 24,
+   "screw_lo_alpha": 120,
+   "screw_segments": 10,
+   "scribble_row_ink_alpha": 34,
+   "scribble_row_scribble_text_alpha": 110,
+   "scribble_row_tint_alpha": 255,
+   "text_alpha": 255
+  },
   "diagnostics": {
    "redact_home_limit": 2
+  },
+  "dialog": {
+   "dot_alpha": 255,
+   "dot_segments": 16,
+   "progress_segments": 24,
+   "seg": 160
   },
   "drum": {
    "dot_alpha_u8": 60,
@@ -2804,6 +3207,15 @@
    "load_state_limit": 2,
    "out_limit": 64,
    "pin_gap": 64
+  },
+  "field_well": {
+   "swatch_row_segments": 48
+  },
+  "filter_bar": {
+   "chip_limit": 3
+  },
+  "form": {
+   "color_dot_segments": 48
   },
   "fx": {
    "alpha": 255,
@@ -2963,9 +3375,15 @@
    "table_grid_edge_lo_light_alpha": 140,
    "table_grid_surface_hi_alpha": 70
   },
+  "glyph_toggle": {
+   "dot_segments": 32
+  },
   "help_windows": {
    "shortcuts_table_body_begin_table_layout": 3,
    "window_begin_table_layout": 2
+  },
+  "library": {
+   "row_segments": 12
   },
   "minimap": {
    "fill_alpha_lg": 230,
@@ -3183,6 +3601,15 @@
    "wind_diagram_accent_alt_vivid_warm_hi_alpha": 240,
    "wind_diagram_accent_light_muted_warm_alpha": 240
   },
+  "page_picker": {
+   "colour_row_segments": 24,
+   "dot_segments": 24,
+   "probe_row_alpha": 255
+  },
+  "panel": {
+   "check_grid_inset": 1,
+   "in_well_format_gap": 3
+  },
   "param": {
    "audio_slider_float_edge_hi_alpha": 220,
    "audio_slider_float_lg": 225,
@@ -3243,6 +3670,9 @@
    "line_limit": 11,
    "line_period": 12,
    "velocity_ramp_limit": 2
+  },
+  "pin_dot": {
+   "param_segments": 12
   },
   "preview": {
    "bg_col_alpha_lg": 245,
@@ -3373,6 +3803,20 @@
    "init_h": 64,
    "init_w": 64
   },
+  "status_dot": {
+   "on_last_item_segments": 12
+  },
+  "step_cell": {
+   "alpha": 240,
+   "edge_alpha_lg": 240,
+   "edge_alpha_md": 230,
+   "edge_alpha_sm": 200,
+   "playhead_outline_role_modulation_alpha": 230,
+   "playhead_outline_state_warn_alpha": 240
+  },
+  "switch": {
+   "box_segments": 16
+  },
   "templates": {
    "entries_limit": 4
   },
@@ -3387,6 +3831,38 @@
   },
   "theme": {
    "checkerboard_backdrop_period": 2
+  },
+  "time_ruler": {
+   "loop_band_alpha": 30,
+   "loop_band_role_modulation_alpha": 180,
+   "loop_carving_alpha": 45,
+   "loop_edge_alpha": 230,
+   "playhead_ghost_alpha": 120
+  },
+  "ui_gallery": {
+   "fixed_g_pg1_size": 240,
+   "fixed_g_ro_a_size": 90,
+   "fixed_search_size": 28,
+   "inset": 28,
+   "section_heading_h": 14,
+   "type_section_h": 100,
+   "top_bar_section_h": 36,
+   "controls_section_h": 44,
+   "divider_v_cell_w": 16,
+   "divider_h_cell_w": 160,
+   "type_header_row_h": 14,
+   "type_caption_row_h": 18,
+   "type_body_row_h": 22,
+   "type_display_row_h": 34,
+   "type_cell_w": 220,
+   "pos_readout_w": 130,
+   "tempo_readout_w": 84,
+   "sig_readout_w": 36,
+   "key_readout_w": 72,
+   "perf_readout_w": 110,
+   "pin_cell_w": 32,
+   "button_cell_w": 78,
+   "switch_cell_w": 40
   },
   "view2d": {
    "anchor": 4,
@@ -3519,6 +3995,12 @@
    "fill_alpha_sm": 140,
    "line_alpha": 235,
    "pad_ratio": 4
+  },
+  "state_ring": {
+   "target_alpha": 34
+  },
+  "alpha": {
+   "opaque": 255
   }
  },
  "surface_d": {
@@ -3550,11 +4032,52 @@
   },
   "stage_frame_pump": {
    "next_mem_log_s": 300.0
+  },
+  "time_ruler": {
+   "subs_ratio": 4.0,
+   "subs_scale": 2.0,
+   "units_ratio": 1.4
   }
  },
  "surface_hex": {
+  "arrange": {
+   "panel_content_alpha": "0xE0000000",
+   "panel_content_alpha_mask": "0x60FFFFFF"
+  },
+  "curve_editor": {
+   "alpha": "0x80000000",
+   "fill_alpha": "0x22000000",
+   "graph_alpha": "0x99000000"
+  },
+  "dialog": {
+   "dot_alpha_lg": "0xA5",
+   "dot_alpha_md": "0x8F",
+   "dot_alpha_sm": "0x59",
+   "dot_alpha_xs": "0x3F",
+   "dot_shade_lg": "0xF9",
+   "dot_shade_sm": "0xC2"
+  },
   "mixer": {
    "strip_name_actions_alpha_hex": "0xFF"
+  },
+  "mod": {
+   "range_col_alpha": "0x70000000",
+   "range_col_alpha_lg": "0x82000000"
+  },
+  "osc": {
+   "editable_adsr_alpha": "0x40000000",
+   "editable_adsr_fill_alpha": "0x2E000000",
+   "fill_alpha_alpha": "0x4A000000"
+  },
+  "param": {
+   "brain_source_body_alpha": "0x55000000",
+   "line_alpha_lg_hex": "0x99000000",
+   "line_alpha_sm_hex": "0x80000000",
+   "mseg_editor_alpha": "0x1E000000"
+  },
+  "perf": {
+   "dot_alpha": "0x88000000",
+   "element_alpha": "0x33000000"
   },
   "splash_screen": {
    "brand_color_alpha_lg": "0xF1",
@@ -3568,6 +4091,10 @@
    "mix_bg_shade_lg": "0xF9",
    "mix_bg_shade_md": "0xC2",
    "mix_bg_shade_sm": "0x8F"
+  },
+  "view2d": {
+   "canvas_alpha": "0x80000000",
+   "mag_filter_cb_alpha": "0x80000000"
   },
   "view3d": {
    "bc_shade": "0xFFFFFF",
@@ -3588,37 +4115,8 @@
    "text_shade": "0xFFFFFF",
    "toolpad_shade": "0xFFFFFF"
   },
-  "osc": {
-   "editable_adsr_alpha": "0x40000000",
-   "editable_adsr_fill_alpha": "0x2E000000",
-   "fill_alpha_alpha": "0x4A000000"
-  },
-  "param": {
-   "brain_source_body_alpha": "0x55000000",
-   "line_alpha_lg_hex": "0x99000000",
-   "line_alpha_sm_hex": "0x80000000",
-   "mseg_editor_alpha": "0x1E000000"
-  },
-  "arrange": {
-   "panel_content_alpha": "0xE0000000",
-   "panel_content_alpha_mask": "0x60FFFFFF"
-  },
-  "curve_editor": {
-   "alpha": "0x80000000",
-   "fill_alpha": "0x22000000",
-   "graph_alpha": "0x99000000"
-  },
-  "perf": {
-   "dot_alpha": "0x88000000",
-   "element_alpha": "0x33000000"
-  },
-  "view2d": {
-   "canvas_alpha": "0x80000000",
-   "mag_filter_cb_alpha": "0x80000000"
-  },
-  "mod": {
-   "range_col_alpha": "0x70000000",
-   "range_col_alpha_lg": "0x82000000"
+  "reorder_drag": {
+   "item_alpha": "0x60000000"
   }
  },
  "surface_rgba8": {
@@ -3630,6 +4128,13 @@
   },
   "arrange_session_grid": {
    "outline_shade": [255, 255, 255, 255]
+  },
+  "dialog": {
+   "progress_col": [255, 255, 255, 230]
+  },
+  "empty_state": {
+   "caption_col": [0, 0, 0, 255],
+   "fill_shade": [255, 255, 255, 255]
   },
   "fx": {
    "dot_col_shade": [235, 245, 255, 255],
@@ -3669,6 +4174,9 @@
   "stage_popups_b": {
    "text_col": [30, 36, 48, 255]
   },
+  "tool_cursor": {
+   "badge_col": [255, 255, 255, 255]
+  },
   "view2d": {
    "dim_shade": [0, 0, 0, 255],
    "fill_shade_lg": [255, 255, 255, 255],
@@ -3680,6 +4188,10 @@
   }
  },
  "surface_rgbaf": {
+  "action_button": {
+   "ink_shade_lg": [1.0, 1.0, 1.0, 1.0],
+   "ink_shade_sm": [0.1, 0.1, 0.12, 1.0]
+  },
   "arrange": {
    "mix_toggle_shade": [1.0, 1.0, 1.0, 1.0],
    "shade_lg": [1.0, 1.0, 1.0, 0.04],
@@ -3699,6 +4211,9 @@
    "sample_shade": [1.0, 0.4, 0.4, 1.0],
    "spectral_shade": [1.0, 0.4, 0.4, 1.0],
    "synth_shade": [1.0, 0.4, 0.4, 1.0]
+  },
+  "library": {
+   "well_shade": [0.0, 0.0, 0.0, 1.0]
   },
   "param": {
    "palette_shade": [1.0, 0.4, 0.4, 1.0]
@@ -3729,6 +4244,9 @@
   },
   "theme": {
    "border_shadow_shade": [0.0, 0.0, 0.0, 1.0]
+  },
+  "ui_gallery": {
+   "shade": [0.5, 0.5, 0.5, 0.06]
   }
  },
  "surface_pair8": {
@@ -3770,6 +4288,18 @@
   }
  },
  "surface_pairf": {
+  "dialog": {
+   "e": {
+    "dark": [1.0, 1.0, 1.0, 0.08],
+    "light": [0.0, 0.0, 0.0, 0.16]
+   }
+  },
+  "library": {
+   "begin_well_col": {
+    "dark": [1.0, 1.0, 1.0, 0.04],
+    "light": [0.0, 0.0, 0.0, 0.055]
+   }
+  },
   "perf": {
    "shade_pairf": {
     "dark": [1.0, 1.0, 1.0, 0.04],
