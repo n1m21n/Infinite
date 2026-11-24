@@ -2520,6 +2520,127 @@
         "Carlos Cruz-Diez Physichromie kinetic vertical chromatic interference louvers",
         "Uncut Sans (Uncut) & Steps Mono (Velvetyne) kinetic optical art typography"
       ]
+    },
+    {
+      "id": "cosmatesque_opus_sectile",
+      "taxonomy": "new",
+      "name": "Cosmatesque Opus Sectile Pavement",
+      "palette": [
+        "#2E2D2B",
+        "#6E2429",
+        "#244235",
+        "#DCD2BC",
+        "#B8924A"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.15,
+      "pairs": [
+        "casio_cz_phase_distortion"
+      ],
+      "refs": [
+        "Westminster Abbey & Roman Cosmati opus sectile geometric marble pavement",
+        "Compagnon (Velvetyne) & Azeret Mono (Fontshare) lapidary geometric typography"
+      ]
+    },
+    {
+      "id": "candela_hypar_shell",
+      "taxonomy": "new",
+      "name": "Felix Candela Thin-Shell Hypar",
+      "palette": [
+        "#141820",
+        "#ECE8DF",
+        "#3A4659",
+        "#2C5AA0"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "six_stage_allpass_phaser"
+      ],
+      "refs": [
+        "Felix Candela Los Manantiales & Oceanografic hyperbolic paraboloid concrete shells",
+        "Clash Grotesk (Fontshare) & Steps Mono (Velvetyne) structural modernist type"
+      ]
+    },
+    {
+      "id": "turrell_ganzfeld_aperture",
+      "taxonomy": "new",
+      "name": "James Turrell Ganzfeld Aperture",
+      "palette": [
+        "#120A08",
+        "#D42A32",
+        "#F4B860",
+        "#FFF2C6"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "casio_cz_phase_distortion"
+      ],
+      "refs": [
+        "James Turrell Aten Reign concentric elliptical Ganzfeld light apertures",
+        "Satoshi (Fontshare) & Monor (Uncut) luminous spatial minimalism typography"
+      ]
+    },
+    {
+      "id": "pevsner_gabo_ruled",
+      "taxonomy": "new",
+      "name": "Gabo & Pevsner Ruled Constructivism",
+      "palette": [
+        "#141618",
+        "#8B9296",
+        "#C89A5B",
+        "#E5E7E9"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.3,
+      "pairs": [
+        "six_stage_allpass_phaser"
+      ],
+      "refs": [
+        "Naum Gabo & Antoine Pevsner constructivist ruled-surface bronze and perspex sculptures",
+        "Steps Mono (Velvetyne) & Martian Mono (Uncut) constructivist technical type"
+      ]
     }
   ]
 }

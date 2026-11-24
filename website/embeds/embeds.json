@@ -725,6 +725,16 @@
       "slug": "cruz-diez-chromosaturation-moire",
       "title": "Cruz-Diez Chromosaturation Moire",
       "description": "Audio-reactive Cruz-Diez Chromosaturation Moire visualizer. Bass bends the interference wave, mids shift louver density, and highs brighten the ivory chromatic slats."
+    },
+    {
+      "slug": "turrell-skyspace-ganzfeld",
+      "title": "Turrell Skyspace Ganzfeld",
+      "description": "Luminous concentric Ganzfeld elliptical light apertures inspired by James Turrell. Bass expands the inner core, mids shift chromatic warmth, highs shimmer the rim."
+    },
+    {
+      "slug": "gabo-ruled-perspex-waves",
+      "title": "Gabo Ruled Perspex Waves",
+      "description": "Constructivist ruled-surface string interference inspired by Naum Gabo and Antoine Pevsner. Bass flexes the saddle envelope, mids shift string tension, highs brighten specular filaments."
     }
   ]
 }

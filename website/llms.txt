@@ -390,6 +390,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Gamelan Ombak Metallophone Synth](https://infinitedevices.org/library/gamelan-ombak-metallophone-synth.html): Struck bronze gamelan metallophone with paired ombak beating detune, inharmonic bar partials, mallet transient, and bamboo tube resonator. (file: https://infinitedevices.org/assets/templates/gamelan-ombak-metallophone-synth.inf)
 - [EMT Spring Tank Dispersion FX](https://infinitedevices.org/library/emt-spring-tank-dispersion-fx.html): Cascaded allpass spring-coil dispersion network with mechanical chirp, magnetic pickup saturation, and damped metallic feedback tail. (file: https://infinitedevices.org/assets/templates/emt-spring-tank-dispersion-fx.inf)
 - [Leslie Baffle Doppler Horn FX](https://infinitedevices.org/library/leslie-baffle-doppler-horn-fx.html): Dual-rotor horn and drum crossover Doppler processor with asymmetric rotation, phase-modulated cabinet reflections, and tube preamp saturation. (file: https://infinitedevices.org/assets/templates/leslie-baffle-doppler-horn-fx.inf)
+- [CZ Phase Distortion Brass Synth](https://infinitedevices.org/library/cz-phase-distortion-brass-synth.html): Casio CZ-inspired cosine-windowed phase distortion synthesizer with envelope-swept resonant knee, sub-harmonic reinforcement, and warm saturation. (file: https://infinitedevices.org/assets/templates/cz-phase-distortion-brass-synth.inf)
+- [Glottal Formant Choir Synth](https://infinitedevices.org/library/glottal-formant-choir-synth.html): Pitch-tracked glottal pulse and three-band parallel state-variable vowel formant synthesizer with subtle vibrato and warm saturation. (file: https://infinitedevices.org/assets/templates/glottal-formant-choir-synth.inf)
+- [Six-Stage Allpass Phaser FX](https://infinitedevices.org/library/six-stage-allpass-phaser-fx.html): Six-stage cascaded first-order allpass phaser with LFO-swept notch combs, asymmetric diode feedback saturation, and lush phase dispersion. (file: https://infinitedevices.org/assets/templates/six-stage-allpass-phaser-fx.inf)
+- [Resonant Vowel Formant FX](https://infinitedevices.org/library/resonant-vowel-formant-fx.html): Three-band parallel state-variable formant filter bank that morphs between A-E-I-O-U vocal resonances with LFO sweep and warm tube saturation. (file: https://infinitedevices.org/assets/templates/resonant-vowel-formant-fx.inf)
 
 ## Library: Community
 
@@ -813,7 +817,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 145 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 147 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -830,4 +834,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 130 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 132 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

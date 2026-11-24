@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Gabo Ruled Perspex Waves",
+    "author": "Infinite",
+    "description": "Constructivist Naum Gabo and Antoine Pevsner ruled-surface tensioned string families in brushed steel, warm bronze, and deep gunmetal.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float stringFreq = 36.0 [18.0, 64.0];\nparam float twistAmp = 0.28 [0.05, 0.55];\nparam float envelopeRad = 0.44 [0.28, 0.48];\nparam float bronzeMix = 0.48 [0.0, 1.0];\nparam float speed = 0.45 [0.1, 1.5];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\n# Two counter-twisted ruled hyperbolic surface families\nu1 = p.x * cos(0.45 + sin(t * speed) * twistAmp) - p.y * sin(0.45 + sin(t * speed) * twistAmp);\nv1 = p.x * sin(0.45) + p.y * cos(0.45);\ns1 = abs(sin((u1 + v1 * v1 * 1.8) * stringFreq));\n\nu2 = p.x * cos(-0.55 - cos(t * speed * 0.8) * twistAmp) - p.y * sin(-0.55);\nv2 = p.x * sin(-0.55) + p.y * cos(-0.55);\ns2 = abs(sin((u2 - v2 * v2 * 1.6) * stringFreq * 0.92));\n\n# Crisp tensioned filament lines\nline1 = 1.0 - smoothstep(0.0, 0.16, s1);\nline2 = 1.0 - smoothstep(0.0, 0.16, s2);\n\n# Sculptural parabolic silhouette mask\nmask = 1.0 - smoothstep(envelopeRad - 0.04, envelopeRad + 0.02, r + 0.08 * cos(2.0 * a + t * speed * 0.5));\nrim = smoothstep(envelopeRad - 0.02, envelopeRad, r) * (1.0 - smoothstep(envelopeRad, envelopeRad + 0.025, r));\n\ncGunmetal = vec3(0.078, 0.086, 0.094);\ncSteel = vec3(0.545, 0.573, 0.588);\ncBronze = vec3(0.784, 0.604, 0.357);\ncIvory = vec3(0.910, 0.920, 0.930);\n\ncol = cGunmetal;\ncol = mix(col, mix(cSteel, cBronze, bronzeMix), line1 * mask * 0.85);\ncol = mix(col, cIvory, line2 * mask * 0.65);\ncol = mix(col, cBronze, rim * 0.72);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "stringFreq": 36.0,
+      "twistAmp": 0.28,
+      "envelopeRad": 0.44,
+      "bronzeMix": 0.48,
+      "speed": 0.45
+    }
+  }
+}

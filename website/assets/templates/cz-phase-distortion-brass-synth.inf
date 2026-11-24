@@ -1,0 +1,68 @@
+infinite-patch 1
+# CZ Phase Distortion Brass Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 50
+  i note2 52
+  i note3 55
+  i note4 57
+  i note5 55
+  i note6 52
+  i note7 50
+  i note8 48
+  i note9 55
+  i note10 57
+  i note11 60
+  i note12 57
+  i note13 55
+  i note14 52
+  i note15 50
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float pdDepth = 0.68 [0.05, 0.94];\nparam float resHarm = 3.5 [1.0, 9.0];\nparam float subMix = 0.24 [0.0, 0.6];\nparam float envDecay = 0.9994 [0.997, 0.9998];\nparam float drive = 1.35 [0.6, 2.8];\nstate float p = 0; state float pSub = 0; state float env = 0; state float dc = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.035, env * envDecay);\np = (p + clamp(freq, 30.0, 5200.0) / sr) % 1.0;\npSub = (pSub + clamp(freq * 0.5, 20.0, 2600.0) / sr) % 1.0;\n\n# Cosine-windowed phase distortion with dynamic knee\nknee = clamp(0.5 - pdDepth * 0.45 * env, 0.04, 0.50);\npw = if(p < knee, p * 0.5 / knee, 0.5 + (p - knee) * 0.5 / (1.0 - knee));\nwin = 0.5 - 0.5 * cos(6.2831853 * p);\nresOsc = cos(6.2831853 * resHarm * pw) * win;\nfund = cos(6.2831853 * pw);\nsub = sin(6.2831853 * pSub);\n\nraw = (fund * 0.55 + resOsc * 0.55 + sub * subMix) * env;\ndc = dc + 0.002 * (raw - dc);\nclean = (raw - dc) * drive;\nout = (clean / (1.0 + abs(clean) * 0.72)) * 0.56;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.24 0.30 0.36
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text CZ Phase Distortion Brass Synth. Casio CZ-inspired cosine-windowed phase distortion synthesizer with envelope-swept resonant knee, sub-harmonic reinforcement, and warm saturation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

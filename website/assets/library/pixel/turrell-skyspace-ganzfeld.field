@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Turrell Skyspace Ganzfeld",
+    "author": "Infinite",
+    "description": "Concentric elliptical Ganzfeld light apertures in velvety crimson, luminous amber-gold, and warm ivory with atmospheric grain.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float ringCount = 6.0 [3.0, 10.0];\nparam float apertureEcc = 0.72 [0.5, 1.0];\nparam float glowSoftness = 0.045 [0.01, 0.12];\nparam float warmShift = 0.52 [0.0, 1.0];\nparam float grainAmt = 0.035 [0.0, 0.10];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\npe = vec2(p.x / apertureEcc, p.y);\nr = length(pe);\n\n# Concentric stepped Ganzfeld light rings\nphase = sin(t * 0.35) * 0.03;\nrNorm = clamp(r * 2.15 + phase, 0.0, 1.25);\n\n# Smooth stepped aperture bands\nringIdx = floor(rNorm * ringCount);\nringFrac = fract(rNorm * ringCount);\nstepEdge = smoothstep(0.0, glowSoftness * 4.0, ringFrac);\nbandVal = (ringIdx + stepEdge) / ringCount;\n\n# Palette: ivory core -> amber gold -> coral crimson -> obsidian room\ncIvory = vec3(1.000, 0.949, 0.776);\ncAmber = vec3(0.957, 0.722, 0.376);\ncCrimson = vec3(0.831, 0.165, 0.196);\ncVoid = vec3(0.071, 0.039, 0.031);\n\ncol = mix(cIvory, cAmber, smoothstep(0.05, 0.42, bandVal + warmShift * 0.12));\ncol = mix(col, cCrimson, smoothstep(0.36, 0.78, bandVal));\ncol = mix(col, cVoid, smoothstep(0.76, 1.05, rNorm));\n\n# Subtle optical film grain\ng = fract(sin(dot(uv * 313.7 + t * 0.1, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;\ncol = clamp(col + g * grainAmt, 0.0, 1.0);\n",
+    "params": {
+      "ringCount": 6.0,
+      "apertureEcc": 0.72,
+      "glowSoftness": 0.045,
+      "warmShift": 0.52,
+      "grainAmt": 0.035
+    }
+  }
+}

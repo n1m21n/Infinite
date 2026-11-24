@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Six-Stage Allpass Phaser FX",
+    "author": "Infinite",
+    "description": "Six-stage cascaded first-order allpass phaser with LFO-swept notch combs, asymmetric diode feedback saturation, and lush phase dispersion.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float lfoRate = 0.42 [0.05, 4.0];\nparam float centerHz = 920.0 [220.0, 3200.0];\nparam float sweepOct = 2.4 [0.2, 4.0];\nparam float feedback = 0.62 [0.0, 0.88];\nparam float mix = 0.75 [0.0, 1.0];\nstate float lfo = 0; state float fb = 0;\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0;\nstate float ap4 = 0; state float ap5 = 0; state float ap6 = 0;\n\nlfo = (lfo + lfoRate / sr) % 1.0;\nmod = sin(6.2831853 * lfo);\nhz = clamp(centerHz * pow(2.0, mod * sweepOct * 0.5), 90.0, 9500.0);\nw = clamp(3.14159265 * hz / sr, 0.01, 1.25);\nc = (1.0 - w) / (1.0 + w);\n\nx = in + fb * feedback;\nsat = x / (1.0 + abs(x) * 0.45);\n\ny1 = -c * sat + ap1; ap1 = sat + c * y1;\ny2 = -c * y1 + ap2; ap2 = y1 + c * y2;\ny3 = -c * y2 + ap3; ap3 = y2 + c * y3;\ny4 = -c * y3 + ap4; ap4 = y3 + c * y4;\ny5 = -c * y4 + ap5; ap5 = y4 + c * y5;\ny6 = -c * y5 + ap6; ap6 = y5 + c * y6;\n\nfb = clamp(y6, -1.0, 1.0);\nphased = (sat + y6) * 0.55;\nout = (in * (1.0 - mix) + phased * mix) * 0.58;\n",
+    "params": {
+      "lfoRate": 0.42,
+      "centerHz": 920.0,
+      "sweepOct": 2.4,
+      "feedback": 0.62,
+      "mix": 0.75
+    }
+  }
+}
