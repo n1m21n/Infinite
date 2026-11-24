@@ -270,7 +270,13 @@ void DrawNodeBodies(FrameCtx& fc)
             // Shadertoy's four iChannel pins show as ch0..ch3 in a 2x2 block: the full names in one row were wider than
             // the whole param column and stretched every slider and dropdown below to match.
             const bool channelPins = dynamic_cast<FormulaNode*>(gn.node.get()) != nullptr && gn.node->InputLabel(0) != nullptr;
-            const float wrapW = channelPins ? tok::stage_node_wrap_w_ratio * (kPinHit + tok::stage_node_wrap_w_sm + tok::stage_node_wrap_w_lg) + tok::space_3 : kParamWidth * tok::stage_node_wrap_w_ratio + tok::space_4 + tok::stage_node_wrap_w_span;
+            const bool isWidePinHeader = isAudioBody ||
+                                         dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr ||
+                                         dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr;
+            const float wrapW = channelPins
+               ? tok::stage_node_wrap_w_ratio * (kPinHit + tok::stage_node_wrap_w_sm + tok::stage_node_wrap_w_lg) + tok::space_3
+               : (isWidePinHeader ? (kParamWidthBase * tok::stage_node_wrap_w_ratio + tok::space_4 + tok::stage_node_wrap_w_span)
+                                  : kPreviewSize);
             float rowUsed = 0.0f;
             for (int slot = 0; slot < inputs; slot++)
             {
@@ -340,7 +346,10 @@ void DrawNodeBodies(FrameCtx& fc)
          // ed::GetNodeSize() is scaled by the current zoom, so feeding it back
          // into padding inflated the node a little more every frame until it
          // covered the canvas and swallowed every click.
-         gParamWidthLive = std::max(kParamWidthBase, headerRightX - ImGui::GetCursorScreenPos().x);
+         const bool isWideParamNode = isAudioBody ||
+                                      dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr ||
+                                      dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr;
+         gParamWidthLive = isWideParamNode ? std::max(kParamWidthBase, headerRightX - ImGui::GetCursorScreenPos().x) : kParamWidthBase;
          ImGui::BeginGroup();
 
          if (!isComment)

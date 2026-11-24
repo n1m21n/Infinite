@@ -209,8 +209,9 @@ namespace
    // drawing has let go of it.
    struct Pending
    {
-      enum What { None, Camera, Light, Hdri, PickHdri, Node, Scene, DuplicateScene, PasteScene, DeleteScene, ConvertScene, Sculpt, EditMesh } what = None;
+      enum What { None, Camera, Light, Primitive, Hdri, PickHdri, Node, Scene, DuplicateScene, PasteScene, DeleteScene, ConvertScene, Sculpt, EditMesh } what = None;
       int lightType = 1;
+      int primShape = 0;
       int item = 0;
       uint64_t uid = 0;
    } sPending;
@@ -5774,73 +5775,6 @@ namespace
    {
       const float availW = Ui::AvailW();
       const float startX = ImGui::GetCursorPosX();
-      auto gap = []() { FormParts::Inline(0.0f, tok::space_3); };
-      auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
-      if (IconChip("##v3dadd", IconsInfinite::Plus, false, T("Add a node, a camera, a light, an HDRI or a new scene (Shift+A)")))
-         sOpenAdd = true;
-      gap();
-      if (IconChip("##v3dselect", IconsInfinite::Pointer, sTool == 0, T("Select (Shift+Space, W). Right-click: box, lasso, 3D cursor, measure"))) sTool = 0;
-      if (MenuParts::BeginContextItem("##v3dselmode"))
-      {
-         const char* modes[5] = { T("Select Box"), T("Select Lasso"), T("Cursor"), T("Measure"), T("Select Circle") };
-         for (int i = 0; i < 5; i++)
-            if (MenuParts::Item(modes[i], nullptr, sSelMode == i))
-            {
-               sSelMode = i;
-               sTool = 0;
-            }
-         if (MenuParts::Item(T("Clear Rulers"), nullptr, false, !sRulers.empty()))
-            sRulers.clear();
-         MenuParts::EndPopup();
-      }
-      next();
-      if (IconChip("##v3dmove", IconsInfinite::ToolMove, sTool == 1, T("Move tool (Shift+Space, G). G moves at once"))) sTool = 1;
-      next();
-      if (IconChip("##v3drotate", IconsInfinite::ToolRotate, sTool == 2, T("Rotate tool (Shift+Space, R). R rotates at once"))) sTool = 2;
-      next();
-      if (IconChip("##v3dscale", IconsInfinite::ToolScale, sTool == 3, T("Scale tool (Shift+Space, S). S scales at once"))) sTool = 3;
-      next();
-      // Sculpt and Edit need a selected geometry item (Blender greys modes with no active mesh); off, they stay live.
-      const Item* modeIt = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
-      const GraphNode* modeGn = modeIt != nullptr ? FindNodeByUid(modeIt->uid) : nullptr;
-      const bool modeOk = modeGn != nullptr && dynamic_cast<IGeometrySource*>(modeGn->node.get()) != nullptr;
-      ImGui::BeginDisabled(!modeOk && !sSculpt.on);
-      if (IconChip("##v3dsculpt", IconsInfinite::Pencil, sSculpt.on, T("Sculpt (Ctrl+Tab)"))) ToggleSculpt(scene);
-      ImGui::EndDisabled();
-      next();
-      ImGui::BeginDisabled(!modeOk && !sEdit.on);
-      if (IconChip("##v3dedit", IconsInfinite::EditMesh, sEdit.on, T("Edit Mode (Tab)"))) ToggleEdit(scene);
-      ImGui::EndDisabled();
-      gap();
-      if (IconChip("##v3dwire", IconsInfinite::ShadeWire, sShading == Shading::Wire, T("Wireframe (Shift+Z)"))) sShading = Shading::Wire;
-      next();
-      if (IconChip("##v3dsolid", IconsInfinite::ShadeSolid, sShading == Shading::Solid, T("Solid: a neutral light, to see the shapes"))) sShading = Shading::Solid;
-      next();
-      if (IconChip("##v3dfinal", IconsInfinite::ShadeRender, sShading == Shading::Final, T("Rendered: your lights, world and render settings (Z cycles)"))) sShading = Shading::Final;
-      next();
-      if (IconChip("##v3dxray", IconsInfinite::Cube, sSet->xray && sShading == Shading::Solid, T("X-ray: see through surfaces in Solid (Alt+Z)")))
-         sSet->xray = !sSet->xray;
-      gap();
-      if (IconChip("##v3dcamera", IconsInfinite::ViewCamera, sCameraView,
-                   scene->activeCamera != 0 ? T("Camera view (Numpad 0 or 0)") : T("Add a camera from this view (0)")))
-         ToggleCamera(scene);
-      next();
-      if (IconChip("##v3dortho", sOrtho ? IconsInfinite::ViewOrtho : IconsInfinite::ViewPersp, sOrtho, sOrtho ? T("Orthographic: click for perspective (5)") : T("Perspective: click for orthographic (5)")))
-      {
-         sOrtho = !sOrtho;
-         sAutoOrtho = false;
-      }
-      gap();
-      if (IconChip("##v3dsnap", IconsInfinite::Snap, sSet->snap, T("Snap (Shift+Tab, hold Ctrl to flip)")))
-      {
-         PushUndoCheckpoint("Snap in 3D View");
-         sSet->snap = !sSet->snap;
-      }
-      next();
-      if (IconChip("##v3dgrid", IconsInfinite::GridDots, sGrid, T("Grid"))) sGrid = !sGrid;
-      next();
-      if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (Ctrl+`)"))) sOverlays = !sOverlays;
-      ActionButton::RowNext();
       // Pinned right like the Sample Studio's Convert.
       const float rightX = startX + availW - tok::view3d_right_x_ratio * kIconW - tok::space_1;
       if (scene->panelOnly)
@@ -5858,6 +5792,113 @@ namespace
       if (IconChip("##v3dside", IconsInfinite::Edit, sSideOpen, T("Properties (N)"))) sSideOpen = !sSideOpen;
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v3dfill", IconsInfinite::PopOut, gView3DDock == 4, ViewDockFillTip())) ViewDockToggleFill(3);
+   }
+
+   void DrawLeftRail(Scene3DNode* scene, float height)
+   {
+      enum RailTool {
+         kAdd = 0, kSelect, kMove, kRotate, kScale, kSculpt, kEdit,
+         kWire, kSolid, kFinal, kXray, kCamera, kOrtho, kSnap, kGrid, kOverlays, kRailCount
+      };
+      static std::vector<int> sRailOrder;
+      if ((int)sRailOrder.size() != kRailCount)
+      {
+         sRailOrder.resize(kRailCount);
+         for (int i = 0; i < kRailCount; i++) sRailOrder[i] = i;
+      }
+      const Item* modeIt = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+      const GraphNode* modeGn = modeIt != nullptr ? FindNodeByUid(modeIt->uid) : nullptr;
+      const bool modeOk = modeGn != nullptr && dynamic_cast<IGeometrySource*>(modeGn->node.get()) != nullptr;
+
+      PanelFrame::BeginRail("##v3drail", ImVec2(kIconW + tok::space_1, height));
+      for (int slot : ReorderDrag::Order("V3DTOOL", (int)sRailOrder.size(), true))
+      {
+         ReorderDrag::Flow(slot);
+         const int t = sRailOrder[slot];
+         switch (t)
+         {
+         case kAdd:
+            if (IconChip("##v3dadd", IconsInfinite::Plus, false, T("Add a mesh, node, camera, light, HDRI or scene (Shift+A)")))
+               sOpenAdd = true;
+            break;
+         case kSelect:
+            if (IconChip("##v3dselect", IconsInfinite::Pointer, sTool == 0, T("Select (Shift+Space, W). Right-click: box, lasso, 3D cursor, measure"))) sTool = 0;
+            if (MenuParts::BeginContextItem("##v3dselmode"))
+            {
+               const char* modes[5] = { T("Select Box"), T("Select Lasso"), T("Cursor"), T("Measure"), T("Select Circle") };
+               for (int i = 0; i < 5; i++)
+                  if (MenuParts::Item(modes[i], nullptr, sSelMode == i)) { sSelMode = i; sTool = 0; }
+               if (MenuParts::Item(T("Clear Rulers"), nullptr, false, !sRulers.empty())) sRulers.clear();
+               MenuParts::EndPopup();
+            }
+            break;
+         case kMove:
+            if (IconChip("##v3dmove", IconsInfinite::ToolMove, sTool == 1, T("Move tool (Shift+Space, G). G moves at once"))) sTool = 1;
+            break;
+         case kRotate:
+            if (IconChip("##v3drotate", IconsInfinite::ToolRotate, sTool == 2, T("Rotate tool (Shift+Space, R). R rotates at once"))) sTool = 2;
+            break;
+         case kScale:
+            if (IconChip("##v3dscale", IconsInfinite::ToolScale, sTool == 3, T("Scale tool (Shift+Space, S). S scales at once"))) sTool = 3;
+            break;
+         case kSculpt:
+            ImGui::BeginDisabled(!modeOk && !sSculpt.on);
+            if (IconChip("##v3dsculpt", IconsInfinite::Pencil, sSculpt.on, T("Sculpt (Ctrl+Tab)"))) ToggleSculpt(scene);
+            ImGui::EndDisabled();
+            break;
+         case kEdit:
+            ImGui::BeginDisabled(!modeOk && !sEdit.on);
+            if (IconChip("##v3dedit", IconsInfinite::EditMesh, sEdit.on, T("Edit Mode (Tab)"))) ToggleEdit(scene);
+            ImGui::EndDisabled();
+            break;
+         case kWire:
+            if (IconChip("##v3dwire", IconsInfinite::ShadeWire, sShading == Shading::Wire, T("Wireframe (Shift+Z)"))) sShading = Shading::Wire;
+            break;
+         case kSolid:
+            if (IconChip("##v3dsolid", IconsInfinite::ShadeSolid, sShading == Shading::Solid, T("Solid: a neutral light, to see the shapes"))) sShading = Shading::Solid;
+            break;
+         case kFinal:
+            if (IconChip("##v3dfinal", IconsInfinite::ShadeRender, sShading == Shading::Final, T("Rendered: your lights, world and render settings (Z cycles)"))) sShading = Shading::Final;
+            break;
+         case kXray:
+            if (IconChip("##v3dxray", IconsInfinite::Cube, sSet->xray && sShading == Shading::Solid, T("X-ray: see through surfaces in Solid (Alt+Z)")))
+               sSet->xray = !sSet->xray;
+            break;
+         case kCamera:
+            if (IconChip("##v3dcamera", IconsInfinite::ViewCamera, sCameraView,
+                         scene->activeCamera != 0 ? T("Camera view (Numpad 0 or 0)") : T("Add a camera from this view (0)")))
+               ToggleCamera(scene);
+            break;
+         case kOrtho:
+            if (IconChip("##v3dortho", sOrtho ? IconsInfinite::ViewOrtho : IconsInfinite::ViewPersp, sOrtho, sOrtho ? T("Orthographic: click for perspective (5)") : T("Perspective: click for orthographic (5)")))
+            {
+               sOrtho = !sOrtho;
+               sAutoOrtho = false;
+            }
+            break;
+         case kSnap:
+            if (IconChip("##v3dsnap", IconsInfinite::Snap, sSet->snap, T("Snap (Shift+Tab, hold Ctrl to flip)")))
+            {
+               PushUndoCheckpoint("Snap in 3D View");
+               sSet->snap = !sSet->snap;
+            }
+            break;
+         case kGrid:
+            if (IconChip("##v3dgrid", IconsInfinite::GridDots, sGrid, T("Grid"))) sGrid = !sGrid;
+            break;
+         case kOverlays:
+            if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (Ctrl+`)"))) sOverlays = !sOverlays;
+            break;
+         }
+         ReorderDrag::Item(slot, nullptr);
+      }
+      if (const ReorderDrag::Move m = ReorderDrag::End())
+      {
+         const int moved = sRailOrder[m.from];
+         sRailOrder.erase(sRailOrder.begin() + m.from);
+         sRailOrder.insert(sRailOrder.begin() + m.to, moved);
+      }
+      PanelFrame::EndRail();
    }
 
    OutputNode* FindOutput()
@@ -8043,6 +8084,17 @@ namespace
          if (!inScene && View3DCanAdd(gn) && dynamic_cast<EnvironmentNode*>(gn.node.get()) == nullptr)
             nodes.push_back(&gn);
       }
+      if (MenuParts::SubMenu(T("Mesh"), true))
+      {
+         const auto& shapes = GeometryNode::ShapeNames();
+         for (int i = 0; i < (int)shapes.size(); i++)
+            if (MenuParts::Item(T(shapes[(size_t)i].c_str())))
+            {
+               sPending.what = Pending::Primitive;
+               sPending.primShape = i;
+            }
+         ImGui::EndMenu();
+      }
       if (MenuParts::SubMenu(T("From canvas"), !nodes.empty()))
       {
          for (const GraphNode* gn : nodes)
@@ -8207,6 +8259,21 @@ namespace
          sShading = Shading::Final;
    }
 
+   void AddPrimitiveNow(Scene3DNode* scene, int shapeIndex)
+   {
+      const auto& names = GeometryNode::ShapeNames();
+      if (shapeIndex < 0 || shapeIndex >= (int)names.size())
+         return;
+      PushUndoCheckpoint("Add primitive to 3D View");
+      const ImVec2 at = SpawnSpot(scene);
+      GraphNode* gn = SpawnNode(names[(size_t)shapeIndex], "3D", at.x, at.y);
+      if (gn == nullptr)
+         return;
+      Item& it = scene->AddItem(gn->uid);
+      scene->Commit();
+      sSel = { it.id };
+   }
+
    void AddCameraNow(Scene3DNode* scene)
    {
       PushUndoCheckpoint("Add camera to 3D View");
@@ -8336,6 +8403,8 @@ namespace
          AddCameraNow(scene);
       else if (todo.what == Pending::Light)
          AddLightNow(scene, todo.lightType);
+      else if (todo.what == Pending::Primitive)
+         AddPrimitiveNow(scene, todo.primShape);
       else if (todo.what == Pending::Hdri || todo.what == Pending::PickHdri)
          ChooseHdri(scene, todo.what == Pending::PickHdri);
       else if (todo.what == Pending::Scene)
@@ -8492,10 +8561,14 @@ namespace
       DrawDockMenu(headTop, ImGui::GetCursorScreenPos().y);
       const ImVec2 avail = Ui::Avail();
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
+      const float railW = kIconW + tok::space_1;
+      const float viewH = std::max(tok::view3d_min, avail.y);
       const float sideBase = std::min(kSideW, avail.x * 0.5f);
       const float sideW = sSideOpen ? sideBase : 0.0f;
-      const float viewW = std::max(tok::view3d_view_w_min, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
-      DrawViewport(scene, ImVec2(viewW, std::max(tok::view3d_min, avail.y)));
+      const float viewW = std::max(tok::view3d_view_w_min, avail.x - railW - gapX - sideW - (sSideOpen ? gapX : 0.0f));
+      DrawLeftRail(scene, viewH);
+      ActionButton::RowNext();
+      DrawViewport(scene, ImVec2(viewW, viewH));
       if (sSideOpen)
       {
          ActionButton::RowNext();

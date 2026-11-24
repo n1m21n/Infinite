@@ -620,6 +620,11 @@ namespace app
    {
       start = std::max<Arrange::Tick>(0, start);
       end = std::max(end, start);
+      if (enabled && end <= start)
+      {
+         start = 0;
+         end = Arrange::kTicksPerBar * 4;
+      }
       Arrange::LoopRange& loop = gArrange.settings.loop;
       if (loop.enabled == enabled && loop.start == start && loop.end == end)
          return;

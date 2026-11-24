@@ -18,6 +18,7 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/IconTile.h"
+#include "app/ui/design/components/ReorderDrag.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PagePicker.h"
@@ -1517,13 +1518,29 @@ namespace
    void DrawToolButtons(bool row)
    {
       State& s = S();
-      for (int i = 0; i < (int)Tool::Count; i++)
+      static std::vector<int> sToolOrder;
+      if ((int)sToolOrder.size() != (int)Tool::Count)
       {
-         if (i > 0 && row)
+         sToolOrder.resize((size_t)Tool::Count);
+         for (int i = 0; i < (int)Tool::Count; i++) sToolOrder[(size_t)i] = i;
+      }
+      int drawn = 0;
+      for (int slot : ReorderDrag::Order("CETOOL", (int)sToolOrder.size(), !row))
+      {
+         if (drawn++ > 0 && row)
             FormParts::Inline(0.0f, tok::space_1);
-         const std::string id = "##ceTool" + std::to_string(i);
-         if (IconChip(id.c_str(), ToolGlyph((Tool)i), s.tool == (Tool)i, ToolTip((Tool)i)))
-            s.tool = (Tool)i;
+         ReorderDrag::Flow(slot);
+         const int t = sToolOrder[(size_t)slot];
+         const std::string id = "##ceTool" + std::to_string(t);
+         if (IconChip(id.c_str(), ToolGlyph((Tool)t), s.tool == (Tool)t, ToolTip((Tool)t)))
+            s.tool = (Tool)t;
+         ReorderDrag::Item(slot, nullptr);
+      }
+      if (const ReorderDrag::Move m = ReorderDrag::End())
+      {
+         const int moved = sToolOrder[(size_t)m.from];
+         sToolOrder.erase(sToolOrder.begin() + m.from);
+         sToolOrder.insert(sToolOrder.begin() + m.to, moved);
       }
    }
 

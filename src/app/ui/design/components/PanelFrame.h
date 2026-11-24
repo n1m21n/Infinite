@@ -87,4 +87,13 @@ namespace PanelFrame
          ImGui::SetCursorPosY(tok::space_1);
    }
    inline void EndCard() { EndChildSafe(); }
+
+   // Borderless, transparent vertical tool rail (scrollable when tall, no visible scrollbar chrome).
+   inline void BeginRail(const char* id, ImVec2 size)
+   {
+      ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+      ImGui::BeginChild(id, size, ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
+      ImGui::PopStyleColor();
+   }
+   inline void EndRail() { EndChildSafe(); }
 }
