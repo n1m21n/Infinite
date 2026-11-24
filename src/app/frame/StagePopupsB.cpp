@@ -869,6 +869,11 @@ void DrawPopupsB(FrameCtx& fc)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
       if ((getenv("INFINITE_AUDIOUITEST") != nullptr || getenv("INFINITE_FXGALLERY") != nullptr || getenv("INFINITE_NODEGALLERY") != nullptr) && frameId == 3)
          gRequestFitView = true; // same, for the audio node UI fixture
+      // Golden fixture: INFINITE_GALLERYSTOP holds the transport stopped, so a playhead (Drum Sequencer steps) can't
+      // land on a different step from run to run.
+      if (frameId >= 1 && getenv("INFINITE_NODEGALLERY") != nullptr && getenv("INFINITE_GALLERYSTOP") != nullptr &&
+          Transport::Instance().IsPlaying())
+         Transport::Instance().SetPlaying(false);
       if ((getenv("INFINITE_NODEGALLERY") != nullptr || getenv("INFINITE_LOADPATCH") != nullptr) && frameId == 12)
       {
          // Review aid: INFINITE_GALLERYZOOM=<z> zooms the canvas, INFINITE_GALLERYOPENDD=<param index> opens that

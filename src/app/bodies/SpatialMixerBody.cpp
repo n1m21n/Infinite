@@ -288,9 +288,9 @@ namespace app
          {
             if (lane == sel)
                continue;
-            ModKnob("azimuth", &n->azimuth[lane], -180.0f, 180.0f, "%.0f deg", kKnobLarge, 0.0f, AudioWidgetStyle::Knob,
+            ModKnob("azimuth", &n->azimuth[lane], -180.0f, 180.0f, "%.0f\xC2\xB0", kKnobLarge, 0.0f, AudioWidgetStyle::Knob,
                     0.0f, nullptr, nullptr, laneParam(lane, 0), laneName(lane, "azimuth").c_str());
-            ModKnob("elevation", &n->elevation[lane], -90.0f, 90.0f, "%.0f deg", kKnobLarge, 0.0f,
+            ModKnob("elevation", &n->elevation[lane], -90.0f, 90.0f, "%.0f\xC2\xB0", kKnobLarge, 0.0f,
                     AudioWidgetStyle::Knob, 0.0f, nullptr, nullptr, laneParam(lane, 1), laneName(lane, "elevation").c_str());
             ModKnob("distance", &n->distance[lane], 0.2f, kEdgeMetres, "%.1f m", kKnobLarge, 0.0f,
                     AudioWidgetStyle::Knob, 0.0f, nullptr, nullptr, laneParam(lane, 2), laneName(lane, "distance").c_str());
@@ -305,9 +305,9 @@ namespace app
          AudioKnobRow row(tok::spatial_mixer_body_audio_knob_row_layout, kKnobLarge);
          const auto az = laneName(sel, "azimuth"), el = laneName(sel, "elevation"), di = laneName(sel, "distance"),
                     wi = laneName(sel, "width"), lv = laneName(sel, "level");
-         row.Knob("azimuth", &n->azimuth[sel], params::SpatialMixer::azimuth_lo, params::SpatialMixer::azimuth_hi, "%.0f deg", kKnobLarge, false, false,
+         row.Knob("azimuth", &n->azimuth[sel], params::SpatialMixer::azimuth_lo, params::SpatialMixer::azimuth_hi, "%.0f\xC2\xB0", kKnobLarge, false, false,
                   AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 0), az.c_str());
-         row.Knob("elevation", &n->elevation[sel], params::SpatialMixer::elevation_lo, params::SpatialMixer::elevation_hi, "%.0f deg", kKnobLarge, false, false,
+         row.Knob("elevation", &n->elevation[sel], params::SpatialMixer::elevation_lo, params::SpatialMixer::elevation_hi, "%.0f\xC2\xB0", kKnobLarge, false, false,
                   AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 1), el.c_str());
          row.Knob("distance", &n->distance[sel], params::SpatialMixer::distance_lo, kEdgeMetres, "%.1f m", kKnobLarge, false, false,
                   AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 2), di.c_str());

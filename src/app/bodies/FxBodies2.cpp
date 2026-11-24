@@ -1196,7 +1196,7 @@ namespace app
       using TremoloBodyRow = params::Row<AudioEffectNode>;
       const TremoloBodyRow kTremoloBodyRows[] = {
          TremoloBodyRow::Knob("depth", [](AudioEffectNode* n) { return n->ParamPtr("depth"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
-         TremoloBodyRow::Knob("stereo", [](AudioEffectNode* n) { return n->ParamPtr("stereoPhase"); }, params::fx::stereo_lo, params::fx::stereo_hi).Fmt("%.0f deg").Size(kKnobLarge),
+         TremoloBodyRow::Knob("stereo", [](AudioEffectNode* n) { return n->ParamPtr("stereoPhase"); }, params::fx::stereo_lo, params::fx::stereo_hi).Fmt("%.0f\xC2\xB0").Size(kKnobLarge),
       };
    }
 

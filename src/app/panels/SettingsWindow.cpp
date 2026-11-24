@@ -873,7 +873,7 @@ namespace app
             if (FormParts::Switch(L("Autosave enabled"), &gAutosaveEnabled))
                SaveGeneralSettings();
             int seconds = gAutosaveSeconds;
-            if (FormParts::SliderInt(L("Autosave interval"), &seconds, params::settings::seconds_lo, params::settings::seconds_hi, T("%d sec")))
+            if (FormParts::SliderInt(L("Autosave interval"), &seconds, params::settings::seconds_lo, params::settings::seconds_hi, T("%d s")))
                gAutosaveSeconds = seconds;
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveGeneralSettings();

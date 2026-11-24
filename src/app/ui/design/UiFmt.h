@@ -120,11 +120,14 @@ namespace UiFmt
 
    inline Str Ratio(double x) { return detail::Num(x, 2, "x"); }
    inline Str Px(double px) { return detail::Num(px, 0, " px"); }
-   inline Str Deg(double deg) { return detail::Num(deg, 1, "\xC2\xB0"); }
+   inline Str Deg(double deg, int decimals = 1) { return detail::Num(deg, decimals, "\xC2\xB0"); }
+   inline Str Metres(double m, int decimals = 2) { return detail::Num(m, decimals, " m"); }
+   inline Str Oct(double oct, int decimals = 2, bool sign = false) { return detail::Num(oct, decimals, " oct", sign); }
    inline Str Rad(double rad) { return Deg(rad * (180.0 / 3.14159265358979323846)); }   // an angle in radians, shown in degrees
    inline Str Bpm(double bpm) { return detail::Num(bpm, 1, " BPM"); }
    inline Str Lufs(double lufs) { return detail::Num(lufs, 1, " LUFS"); }
    inline Str Beats(double beats) { return detail::Num(beats, 1, " beats"); }
+   inline Str Bars(long long bars) { return detail::Num((double)bars, 0, bars == 1 ? " bar" : " bars"); }
 
    // Sizes: KB with no places under 1 MB, then MB with one place.
    inline Str Bytes(double bytes)

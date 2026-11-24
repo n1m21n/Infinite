@@ -1059,7 +1059,7 @@ namespace app
       };
       const MaterialParamsRow kMaterialParamsRows10[] = {
          MaterialParamsRow::Slider<&MaterialNode::radialRoughness>("radial rough", params::Material::radial_roughness_lo, params::Material::radial_roughness_hi),
-         MaterialParamsRow::Slider<&MaterialNode::hairShift>("cuticle shift", params::Material::hair_shift_lo, params::Material::hair_shift_hi).Fmt("%.1f deg"),
+         MaterialParamsRow::Slider<&MaterialNode::hairShift>("cuticle shift", params::Material::hair_shift_lo, params::Material::hair_shift_hi).Fmt("%.1f\xC2\xB0"),
       };
    }
 
@@ -2473,15 +2473,15 @@ namespace app
       const GeometryOpParamsRow kGeometryOpParamsRows21[] = {
          GeometryOpParamsRow::Slider<&GeometryOpNode::bevelWidth>("width", params::geometry_params::bevel_width_lo, params::geometry_params::bevel_width_hi),
          GeometryOpParamsRow::SliderInt<&GeometryOpNode::bevelSegments>("segments", params::geometry_params::bevel_segments_lo, params::geometry_params::bevel_segments_hi),
-         GeometryOpParamsRow::Slider<&GeometryOpNode::bevelAngle>("sharp angle", params::geometry_params::bevel_angle_lo, params::geometry_params::bevel_angle_hi).Fmt("%.0f deg"),
+         GeometryOpParamsRow::Slider<&GeometryOpNode::bevelAngle>("sharp angle", params::geometry_params::bevel_angle_lo, params::geometry_params::bevel_angle_hi).Fmt("%.0f\xC2\xB0"),
       };
       const GeometryOpParamsRow kGeometryOpParamsRows22[] = {
          GeometryOpParamsRow::Slider<&GeometryOpNode::insetWidth>("width", params::geometry_params::inset_width_lo, params::geometry_params::inset_width_hi),
          GeometryOpParamsRow::Slider<&GeometryOpNode::insetDepth>("depth", params::geometry_params::inset_depth_lo, params::geometry_params::inset_depth_hi),
-         GeometryOpParamsRow::Slider<&GeometryOpNode::bevelAngle>("patch angle", params::geometry_params::bevel_angle_lo, params::geometry_params::bevel_angle_hi).Fmt("%.0f deg"),
+         GeometryOpParamsRow::Slider<&GeometryOpNode::bevelAngle>("patch angle", params::geometry_params::bevel_angle_lo, params::geometry_params::bevel_angle_hi).Fmt("%.0f\xC2\xB0"),
       };
       const GeometryOpParamsRow kGeometryOpParamsRows23[] = {
-         GeometryOpParamsRow::Slider<&GeometryOpNode::uvAngle>("angle", params::geometry_params::uv_angle_lo, params::geometry_params::uv_angle_hi).Fmt("%.0f deg"),
+         GeometryOpParamsRow::Slider<&GeometryOpNode::uvAngle>("angle", params::geometry_params::uv_angle_lo, params::geometry_params::uv_angle_hi).Fmt("%.0f\xC2\xB0"),
          GeometryOpParamsRow::Slider<&GeometryOpNode::uvMargin>("margin", params::geometry_params::uv_margin_lo, params::geometry_params::uv_margin_hi),
       };
       const GeometryOpParamsRow kGeometryOpParamsRows24[] = {

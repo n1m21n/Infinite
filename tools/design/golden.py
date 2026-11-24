@@ -46,11 +46,12 @@ PAGES = {
     "mixer": (lambda mode: {"INFINITE_NODEGALLERY": "*|Mixer,Oscillator,Chorus", "INFINITE_GALLERYGRID": "3,520,760",
                             "INFINITE_OPENPANELS": mode + ",mixer", "INFINITE_SCREENSHOT_FRAME": "40"}, "canvas"),
     "drums": (lambda mode: {"INFINITE_NODEGALLERY": "*|Drum Sequencer", "INFINITE_GALLERYGRID": "3,520,760",
-                            "INFINITE_OPENPANELS": mode + ",drums", "INFINITE_SCREENSHOT_FRAME": "40"}, "live"),
+                            "INFINITE_GALLERYSTOP": "1",
+                            "INFINITE_OPENPANELS": mode + ",drums", "INFINITE_SCREENSHOT_FRAME": "40"}, "canvas"),
 }
-# live: the fixture's transport plays, so the Drum Sequencer's playhead column (node and panel) sits on a wall-time
-# step - about 0.2 % of pixels run to run. A moved control or row shifts far more than 0.4 %.
-TOL = {"flat": (0.05, 0.0002), "canvas": (0.5, 0.0005), "live": (0.5, 0.004)}
+# The gallery fixture starts the transport; INFINITE_GALLERYSTOP holds it stopped on the Drums page so the Drum
+# Sequencer's playhead column can't land on a different step run to run.
+TOL = {"flat": (0.05, 0.0002), "canvas": (0.5, 0.0005)}
 
 
 def diff_images(cand_path, gold_path, diff_out, tol="flat"):

@@ -2419,7 +2419,7 @@ namespace app
       const WaveTerrainBodyRow kWaveTerrainBodyRows2[] = {
          WaveTerrainBodyRow::Knob<&WaveTerrainNode::ratioA>("ratioA", params::WaveTerrain::ratio_a_lo, params::WaveTerrain::ratio_a_hi).Fmt("%.0f"),
          WaveTerrainBodyRow::Knob<&WaveTerrainNode::ratioB>("ratioB", params::WaveTerrain::ratio_b_lo, params::WaveTerrain::ratio_b_hi).Fmt("%.0f"),
-         WaveTerrainBodyRow::Knob<&WaveTerrainNode::rotation>("rotation", params::WaveTerrain::rotation_lo, params::WaveTerrain::rotation_hi).Fmt("%.0f deg"),
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::rotation>("rotation", params::WaveTerrain::rotation_lo, params::WaveTerrain::rotation_hi).Fmt("%.0f\xC2\xB0"),
          WaveTerrainBodyRow::Knob<&WaveTerrainNode::scanSpeed>("speed", params::WaveTerrain::scan_speed_lo, params::WaveTerrain::scan_speed_hi).Fmt("%.2f"),
       };
       const WaveTerrainBodyRow kWaveTerrainBodyRows3[] = {

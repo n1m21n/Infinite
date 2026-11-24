@@ -345,16 +345,22 @@ def scan_file(rel, src):
             s = t.text[t.text.index('"') + 1:-1] if '"' in t.text else t.text
             wrapped = any(p[0] in I18N_WRAP for p in paren)
             specs = fmt_category(s)
+            widget_fmt = call in I18N_WRAP and any(p[0] in FAMILY["slider"] for p in paren)
             if specs and (call in TEXT_CALLS or call in PRINTF_CALLS or call in I18N_WRAP or any(p[0] in TEXT_CALLS | PRINTF_CALLS for p in paren)):
                 if all(PLAIN_SPEC.fullmatch(x) for x in specs):   # a %s / %d slot in a sentence: no design value in it
                     allowed.bump("placeholder", t.line)
-                elif call in I18N_WRAP and any(p[0] in FAMILY["slider"] for p in paren):
+                elif widget_fmt:
                     # a slider's own display format with a translated unit word ("%.0f ticks"): ImGui prints the value
                     allowed.bump("widget_format", t.line)
                 else:
                     findings.append(("format", call or "-", " ".join(specs), s[:80]) + where)
-                for um in ([] if ("=%" in s or s.startswith("[")) else UNIT_SPEC.finditer(s)):   # a number printed with its unit: UiFmt's job (owner 2026-11-24)
+                # a number printed with its unit: UiFmt's job (owner 2026-11-24). A slider's display format is printed
+                # by ImGui and can't call UiFmt; its spelling is held by UNIT_SPELLING below.
+                for um in ([] if ("=%" in s or s.startswith("[") or widget_fmt) else UNIT_SPEC.finditer(s)):
                     findings.append(("unit", call or "-", um.group(0), s[:80]) + where)
+            for um in ([] if ("=%" in s or s.startswith("[")) else UNIT_SPELLING.finditer(s)):
+                # any literal, widget formats included (".Fmt(\"%.0f deg\")"): a unit spelled off the unit table
+                findings.append(("unit", call or "-", um.group(0), s[:80]) + where)
             visible = call in TEXT_CALLS and re.search(r"[A-Za-z]", re.sub(r"\\x[0-9A-Fa-f]{2}|\\[nt]", "", FMT.sub("", s.split("##")[0])))
             if not visible:
                 continue
@@ -460,6 +466,12 @@ WIDGET_OF = {n: f for f, ns in WIDGET_FAMILY.items() for n in ns}
 # ("key=%d", "[tag] ...") are not on screen and are not counted.
 UNIT_SPEC = re.compile(r"(?<![=%])%[-+ #0]*\d*(?:\.\d+)?(?:l|ll|z)?[dfgiu](?: ?(?:kHz|Hz|dB|LUFS|ms|BPM|bpm|px|MB|KB)(?![A-Za-z])"
                        r"| ?s(?![A-Za-z0-9])|%%| ?st(?![A-Za-z])|\\xC2\\xB0|\u00b0)")
+
+# A number followed by a unit spelled off the unit table (internal/plans/ui-unit-table.md): "deg" and "degrees"
+# are "\u00b0", "sec" / "secs" are "s", "msec" is "ms", lowercase hz / khz / db and "Bpm" have one spelling, and %
+# takes no space. Checked on every literal, so a widget format the knob router or ImGui prints is caught too.
+UNIT_SPELLING = re.compile(r"(?<![=%])%[-+ #0]*\d*(?:\.\d+)?(?:l|ll|z)?[dfgiu]"
+                           r" ?(?:deg|degs|degrees|secs?|msecs?|hz|khz|KHz|db|DB|Bpm| %%)(?![A-Za-z])")
 
 # ---------------------------------------------------------------- logic vs design (arith/compare/assign/clamp/maths/call:*)
 # A number is a design value when it sits next to a screen quantity (a position, width, padding, font height, a tok::

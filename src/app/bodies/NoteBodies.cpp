@@ -1558,7 +1558,7 @@ namespace app
       if (n->IsLearning() && n->Dropped() > 0)
          snprintf(stat, sizeof(stat), "learning  -  %s notes, %d bars (%d dropped)", UiFmt::Count((long long)(n->NotesCaptured())).c, n->BarsCaptured(), n->Dropped());
       else if (n->IsLearning())
-         snprintf(stat, sizeof(stat), "learning  -  %s notes, %d bars", UiFmt::Count((long long)(n->NotesCaptured())).c, n->BarsCaptured());
+         snprintf(stat, sizeof(stat), "learning  -  %s notes, %s", UiFmt::Count((long long)(n->NotesCaptured())).c, UiFmt::Bars(n->BarsCaptured()).c);
       else if (n->Building())
          snprintf(stat, sizeof(stat), "building model...");
       else if (n->LastLearnTooShort() && n->LearnedNotes() > 0)

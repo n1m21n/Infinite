@@ -767,7 +767,7 @@ namespace app
       }
       FormParts::Inline();
       ImGui::BeginDisabled(!onsetMode);
-      AudioSlider("sensitivity", &n->sensitivity, params::Slicer::sensitivity_lo, params::Slicer::sensitivity_hi, "%.0f %%", halfW);
+      AudioSlider("sensitivity", &n->sensitivity, params::Slicer::sensitivity_lo, params::Slicer::sensitivity_hi, "%.0f%%", halfW);
       ImGui::EndDisabled();
 
       AudioSlider("pitch", &n->pitch, params::Slicer::pitch_lo, params::Slicer::pitch_hi, "%.1f st", halfW);

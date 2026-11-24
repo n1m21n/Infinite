@@ -235,7 +235,7 @@ namespace app
 
 
    // Knob and slider readouts: a format whose one spec is followed by a known unit ("%.0f Hz", "%+.1f dB",
-   // "%.0f%%") is shown through UiFmt, so every readout follows the unit table (owner 2026-11-24). Anything
+   // "%.0f%%", "%.0f\xC2\xB0", "%.2f m", "%+.0f ct", "%.2f oct") is shown through UiFmt, so every readout follows the unit table (owner 2026-11-24). Anything
    // else prints with its own format.
    void FormatAudioParam(char* outBuf, size_t outSize, const char* fmt, float val)
    {
@@ -256,8 +256,15 @@ namespace app
          bool sign = false;
          while (*e == '+' || *e == '-' || *e == ' ' || *e == '#' || *e == '0')
             sign |= (*e++ == '+');
-         while ((*e >= '0' && *e <= '9') || *e == '.')
+         while (*e >= '0' && *e <= '9')
             ++e;
+         int decimals = 6;   // printf's default precision
+         if (*e == '.')
+         {
+            decimals = 0;
+            while (*++e >= '0' && *e <= '9')
+               decimals = decimals * 10 + (*e - '0');
+         }
          if (*e == 'f' || *e == 'g')
          {
             const char* tail = e + 1;
@@ -276,6 +283,10 @@ namespace app
             else if ((n = unit(" s"))) v = UiFmt::Sec(val);
             else if ((n = unit(" st"))) v = UiFmt::Semi(val);
             else if ((n = unit(" BPM")) || (n = unit(" bpm"))) v = UiFmt::Bpm(val);
+            else if ((n = unit("\xC2\xB0"))) v = UiFmt::Deg(val, decimals);
+            else if ((n = unit(" m"))) v = UiFmt::Metres(val, decimals);
+            else if ((n = unit(" ct"))) v = UiFmt::Cents(val);
+            else if ((n = unit(" oct"))) v = UiFmt::Oct(val, decimals, sign);
             else if ((n = unit("%%"))) v = UiFmt::Pct(val, 0, sign);
             if (n)
             {
