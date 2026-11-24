@@ -1010,7 +1010,6 @@ bool RunFieldAliasTest()
       ctx.inAmplitude = kAmplitude;
       ctx.usesInput = c.usesInput;
       int iters[6] = {};
-      long long evals[6] = {};
       for (int k = 0; k < 6 && ok; k++)
       {
          const auto t0 = std::chrono::steady_clock::now();
@@ -1032,7 +1031,6 @@ bool RunFieldAliasTest()
          analyzeSec += std::chrono::duration<double>(std::chrono::steady_clock::now() - t2).count();
          analyzeEvals += spec.evaluations;
          iters[k] = spec.iterations;
-         evals[k] = spec.evaluations;
          if (got)
             pred[k] = Field::PredictAliasDb(spec, ctx.f0Hz, kRate, kFieldFactors[k], kAudibleHz,
                                             (double)kLobe * kRate / (double)kN);
