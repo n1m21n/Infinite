@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "EMT Spring Tank Dispersion FX",
+    "author": "Infinite",
+    "description": "Cascaded allpass spring-coil dispersion network with mechanical chirp, magnetic pickup saturation, and damped metallic feedback tail.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float chirpCoeff = 0.62 [0.15, 0.88];\nparam float tensionHz = 2800.0 [600.0, 6500.0];\nparam float feedback = 0.54 [0.0, 0.84];\nparam float drive = 1.45 [0.5, 2.8];\nparam float mix = 0.72 [0.0, 1.0];\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\nstate float lp1 = 0; state float hp1 = 0; state float fb = 0;\n\nx = in + fb * feedback;\nsat = (x * drive) / (1.0 + abs(x * drive) * 0.70);\nc = clamp(chirpCoeff, 0.12, 0.90);\n\ny1 = -c * sat + ap1; ap1 = sat + c * y1;\ny2 = -c * y1 + ap2; ap2 = y1 + c * y2;\ny3 = -c * y2 + ap3; ap3 = y2 + c * y3;\ny4 = -c * y3 + ap4; ap4 = y3 + c * y4;\n\ng = clamp(2.0 * sin(3.14159265 * tensionHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (y4 - lp1);\nhp1 = hp1 + 0.015 * (lp1 - hp1);\ntank = lp1 - hp1;\nfb = clamp(tank, -1.0, 1.0);\n\nout = (in * (1.0 - mix) + tank * mix) * 0.45;\n",
+    "params": {
+      "chirpCoeff": 0.62,
+      "tensionHz": 2800.0,
+      "feedback": 0.54,
+      "drive": 1.45,
+      "mix": 0.72
+    }
+  }
+}

@@ -715,6 +715,16 @@
       "slug": "kumiko-seigaiha-timber-screen",
       "title": "Kumiko Seigaiha Timber Screen",
       "description": "Audio-reactive Kumiko Seigaiha Timber Screen visualizer. Bass expands the concentric cedar wave-arc glow, mids ripple across the backlit shoji paper, and highs catch the mortised hinoki wood grain."
+    },
+    {
+      "slug": "belousov-zhabotinsky-spirals",
+      "title": "Belousov-Zhabotinsky Spirals",
+      "description": "Audio-reactive Belousov-Zhabotinsky Spirals visualizer. Bass accelerates the chemical wavefronts, mids warp the convection currents, and highs illuminate the oxidized silver crests."
+    },
+    {
+      "slug": "cruz-diez-chromosaturation-moire",
+      "title": "Cruz-Diez Chromosaturation Moire",
+      "description": "Audio-reactive Cruz-Diez Chromosaturation Moire visualizer. Bass bends the interference wave, mids shift louver density, and highs brighten the ivory chromatic slats."
     }
   ]
 }

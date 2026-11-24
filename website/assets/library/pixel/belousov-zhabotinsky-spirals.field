@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Belousov-Zhabotinsky Spirals",
+    "author": "Infinite",
+    "description": "Colliding chemical reaction-diffusion spiral rotors and target wavefronts in ferroin crimson and oxidized indigo-slate inside a backlit glass petri dish.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float waveFreq = 18.0 [8.0, 32.0];\nparam float spiralArms = 3.0 [1.0, 6.0];\nparam float speed = 1.6 [0.2, 4.0];\nparam float curlWarp = 0.24 [0.05, 0.55];\nparam float dishRadius = 0.44 [0.30, 0.48];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nrDish = length(p);\n\n# Domain warp for organic convection currents\nw1 = vec2(sin(p.y * 9.5 + t * 0.35), cos(p.x * 9.5 - t * 0.30)) * curlWarp * 0.18;\nw2 = vec2(cos(p.y * 17.0 - t * 0.45), sin(p.x * 16.0 + t * 0.40)) * curlWarp * 0.08;\nq = p + w1 + w2;\n\n# Three colliding Belousov-Zhabotinsky spiral rotors\nc1 = q - vec2(-0.14, 0.08);\nc2 = q - vec2(0.15, -0.09);\nc3 = q - vec2(-0.02, -0.17);\n\na1 = atan2(c1.y, c1.x);\na2 = atan2(c2.y, c2.x);\na3 = atan2(c3.y, c3.x);\n\nph1 = length(c1) * waveFreq - t * speed + spiralArms * a1;\nph2 = length(c2) * waveFreq * 1.08 - t * speed * 1.12 - (spiralArms - 1.0) * a2;\nph3 = length(c3) * waveFreq * 0.94 - t * speed * 0.92 + 2.0 * a3;\n\n# Sharp chemical oxidation wavefronts (asymmetric saw-like crest)\nu1 = fract(ph1 / 6.2831853);\nu2 = fract(ph2 / 6.2831853);\nu3 = fract(ph3 / 6.2831853);\nf1 = smoothstep(0.0, 0.16, u1) * (1.0 - smoothstep(0.16, 0.85, u1));\nf2 = smoothstep(0.0, 0.18, u2) * (1.0 - smoothstep(0.18, 0.85, u2));\nf3 = smoothstep(0.0, 0.17, u3) * (1.0 - smoothstep(0.17, 0.85, u3));\n\nwave = max(f1, max(f2, f3));\ncrest = pow(wave, 1.4);\n\n# Ferroin crimson-rust reduced state & oxidized indigo-silver wavefront\ncMaroon = vec3(0.235, 0.078, 0.078);\ncFerroin = vec3(0.545, 0.180, 0.165);\ncIndigo = vec3(0.353, 0.424, 0.557);\ncSilver = vec3(0.667, 0.745, 0.831);\n\nbgRad = smoothstep(0.0, dishRadius, rDish);\ndishCol = mix(cFerroin, cMaroon, bgRad * 0.85);\ndishCol = mix(dishCol, cIndigo, smoothstep(0.18, 0.72, wave));\ndishCol = mix(dishCol, cSilver, smoothstep(0.68, 0.98, crest));\n\n# Glass petri rim & lab tabletop ground\ninDish = 1.0 - smoothstep(dishRadius - 0.008, dishRadius + 0.004, rDish);\nrim = smoothstep(dishRadius - 0.014, dishRadius, rDish) * (1.0 - smoothstep(dishRadius, dishRadius + 0.022, rDish));\ncTable = vec3(0.125, 0.118, 0.114);\ncGlass = vec3(0.76, 0.82, 0.80);\n\ncol = mix(cTable, dishCol, inDish);\ncol = mix(col, cGlass, rim * 0.72);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "waveFreq": 18.0,
+      "spiralArms": 3.0,
+      "speed": 1.6,
+      "curlWarp": 0.24,
+      "dishRadius": 0.44
+    }
+  }
+}

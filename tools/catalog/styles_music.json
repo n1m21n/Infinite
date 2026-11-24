@@ -4610,6 +4610,152 @@
       "groove": 0.45,
       "fill": 0.2,
       "gain": -9.0
+    },
+    {
+      "id": "ems_synthi_pin_matrix",
+      "family": "experimental",
+      "bpm": [
+        92,
+        118
+      ],
+      "swing": 0.04,
+      "scale": [
+        0,
+        2,
+        3,
+        6,
+        7,
+        10
+      ],
+      "drums": {
+        "kick": "x.......x.......",
+        "snare": "....o.......o...",
+        "chat": "..x...x...x...x.",
+        "ohat": "",
+        "clap": "",
+        "tom": "",
+        "htom": "",
+        "bell": ""
+      },
+      "bass": "0...3...5...6...",
+      "fx": [
+        "Delay",
+        "Phaser",
+        "Reverb",
+        "Saturator"
+      ],
+      "synth": [
+        "FM",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.08,
+      "mod": 0.72,
+      "refs": [
+        "EMS Synthi AKS pin-matrix cross-modulation and trapezoid envelope",
+        "EMT spring tank dispersion and magnetic pickup saturation"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 2.0,
+        "strum": 18,
+        "human": 8
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "FM"
+        ],
+        "density": 0.45,
+        "octave": 1,
+        "gate": 55,
+        "gain": -8.5,
+        "rate": 0.5,
+        "range": 9
+      },
+      "groove": 0.4,
+      "fill": 0.25,
+      "gain": -9.0
+    },
+    {
+      "id": "gamelan_pelog_metallophone",
+      "family": "ambient",
+      "bpm": [
+        78,
+        104
+      ],
+      "swing": 0.02,
+      "scale": [
+        0,
+        1,
+        3,
+        7,
+        8
+      ],
+      "drums": {
+        "kick": "x...............",
+        "snare": "",
+        "chat": "",
+        "ohat": "",
+        "clap": "",
+        "tom": "....o.......o...",
+        "htom": "..o...o...o...o.",
+        "bell": "x.....x...x....."
+      },
+      "bass": "0.......3...7...",
+      "fx": [
+        "Chorus",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "FM",
+        "Modal"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.02,
+      "mod": 0.45,
+      "refs": [
+        "Balinese & Javanese Gamelan bronze metallophone paired ombak beating",
+        "Leslie dual-rotor cabinet Doppler horn modulation"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "strum": 35,
+        "human": 14
+      },
+      "notefx": [
+        "Humanizer"
+      ],
+      "motif": {
+        "synth": [
+          "FM"
+        ],
+        "density": 0.55,
+        "octave": 1,
+        "gate": 70,
+        "gain": -8.0,
+        "rate": 0.25,
+        "range": 7
+      },
+      "groove": 0.35,
+      "fill": 0.2,
+      "gain": -8.5
     }
   ]
 }

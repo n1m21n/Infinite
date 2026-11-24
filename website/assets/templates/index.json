@@ -3753,6 +3753,72 @@
         "Field Synth",
         "Audio Out"
       ]
+    },
+    {
+      "id": "ems-synthi-pin-matrix-synth",
+      "name": "EMS Synthi Pin Matrix Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Three-oscillator pin-matrix synthesizer with cross-FM, ring modulation, trapezoid envelope, and diode-ladder resonant lowpass filter.",
+      "price": 0,
+      "preview": "assets/templates/ems-synthi-pin-matrix-synth.webp",
+      "file": "assets/templates/ems-synthi-pin-matrix-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "gamelan-ombak-metallophone-synth",
+      "name": "Gamelan Ombak Metallophone Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Struck bronze gamelan metallophone with paired ombak beating detune, inharmonic bar partials, mallet transient, and bamboo tube resonator.",
+      "price": 0,
+      "preview": "assets/templates/gamelan-ombak-metallophone-synth.webp",
+      "file": "assets/templates/gamelan-ombak-metallophone-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "emt-spring-tank-dispersion-fx",
+      "name": "EMT Spring Tank Dispersion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Cascaded allpass spring-coil dispersion network with mechanical chirp, magnetic pickup saturation, and damped metallic feedback tail.",
+      "price": 0,
+      "preview": "assets/templates/emt-spring-tank-dispersion-fx.webp",
+      "file": "assets/templates/emt-spring-tank-dispersion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "leslie-baffle-doppler-horn-fx",
+      "name": "Leslie Baffle Doppler Horn FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-rotor horn and drum crossover Doppler processor with asymmetric rotation, phase-modulated cabinet reflections, and tube preamp saturation.",
+      "price": 0,
+      "preview": "assets/templates/leslie-baffle-doppler-horn-fx.webp",
+      "file": "assets/templates/leslie-baffle-doppler-horn-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
   "count": 229

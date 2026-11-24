@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Gamelan Ombak Metallophone Synth",
+    "author": "Infinite",
+    "description": "Struck bronze gamelan metallophone with paired ombak beating detune, inharmonic bar partials, mallet transient, and bamboo tube resonator.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float ombakHz = 4.2 [0.5, 14.0];\nparam float bronzeMix = 0.42 [0.0, 1.0];\nparam float mallet = 0.45 [0.0, 1.0];\nparam float tubeHz = 680.0 [180.0, 2400.0];\nparam float decay = 0.9995 [0.997, 0.9998];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float env = 0; state float bp1 = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.14, env * decay);\np1 = (p1 + clamp(freq, 60.0, 4200.0) / sr) % 1.0;\np2 = (p2 + clamp(freq + ombakHz, 60.0, 4200.0) / sr) % 1.0;\np3 = (p3 + clamp(freq * 2.756, 80.0, 7800.0) / sr) % 1.0;\n\nbar = ((sin(6.2831853 * p1) + sin(6.2831853 * p2)) * 0.45 + sin(6.2831853 * p3) * bronzeMix * (0.38 + mallet * 0.28 * env)) * env;\ng = clamp(2.0 * sin(3.14159265 * tubeHz / sr), 0.02, 0.78);\nbp1 = bp1 + g * (bar - lp1 - 0.55 * bp1);\nlp1 = lp1 + g * bp1;\nmixSig = bar * 0.68 + bp1 * 0.42;\nout = (mixSig / (1.0 + abs(mixSig) * 0.55)) * 0.62;\n",
+    "params": {
+      "ombakHz": 4.2,
+      "bronzeMix": 0.42,
+      "mallet": 0.45,
+      "tubeHz": 680.0,
+      "decay": 0.9995
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

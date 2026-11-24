@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Leslie Baffle Doppler Horn FX",
+    "author": "Infinite",
+    "description": "Dual-rotor horn and drum crossover Doppler processor with asymmetric rotation, phase-modulated cabinet reflections, and tube preamp saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float hornHz = 5.6 [0.5, 9.5];\nparam float drumHz = 0.85 [0.2, 4.0];\nparam float depth = 0.42 [0.05, 0.85];\nparam float tubeDrive = 1.5 [0.6, 2.8];\nparam float mix = 0.82 [0.0, 1.0];\nstate float pHorn = 0; state float pDrum = 0;\nstate float lpX = 0; state float ap1 = 0; state float ap2 = 0; state float ap3 = 0;\n\npHorn = (pHorn + hornHz / sr) % 1.0;\npDrum = (pDrum + drumHz / sr) % 1.0;\nsHorn = sin(6.2831853 * pHorn);\nsDrum = sin(6.2831853 * pDrum);\n\ngX = clamp(2.0 * sin(3.14159265 * 820.0 / sr), 0.02, 0.72);\nlpX = lpX + gX * (in - lpX);\nhiX = in - lpX;\n\nc1 = clamp(0.45 + depth * 0.40 * sHorn, 0.05, 0.88);\nc2 = clamp(0.42 + depth * 0.36 * cos(6.2831853 * pHorn), 0.05, 0.88);\n\nh1 = -c1 * hiX + ap1; ap1 = hiX + c1 * h1;\nh2 = -c2 * h1 + ap2; ap2 = h1 + c2 * h2;\nd1 = -clamp(0.35 + depth * 0.25 * sDrum, 0.05, 0.85) * lpX + ap3;\nap3 = lpX + clamp(0.35 + depth * 0.25 * sDrum, 0.05, 0.85) * d1;\n\nhornMod = h2 * (0.78 + 0.22 * sHorn);\ndrumMod = d1 * (0.85 + 0.15 * sDrum);\nwet = (hornMod + drumMod) * tubeDrive;\nwetSat = wet / (1.0 + abs(wet) * 0.65);\n\nout = (in * (1.0 - mix) + wetSat * mix) * 0.86;\n",
+    "params": {
+      "hornHz": 5.6,
+      "drumHz": 0.85,
+      "depth": 0.42,
+      "tubeDrive": 1.5,
+      "mix": 0.82
+    }
+  }
+}

@@ -1,0 +1,77 @@
+infinite-patch 1
+# EMT Spring Tank Dispersion FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 52
+  i note2 55
+  i note3 57
+  i note4 55
+  i note5 52
+  i note6 48
+  i note7 50
+  i note8 48
+  i note9 55
+  i note10 59
+  i note11 60
+  i note12 57
+  i note13 55
+  i note14 52
+  i note15 50
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 320 1024
+  f cutoff 2600.0
+  f resonance 0.28
+  f decay 0.42
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 640 1024
+  s code param float chirpCoeff = 0.62 [0.15, 0.88];\nparam float tensionHz = 2800.0 [600.0, 6500.0];\nparam float feedback = 0.54 [0.0, 0.84];\nparam float drive = 1.45 [0.5, 2.8];\nparam float mix = 0.72 [0.0, 1.0];\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0; state float ap4 = 0;\nstate float lp1 = 0; state float hp1 = 0; state float fb = 0;\n\nx = in + fb * feedback;\nsat = (x * drive) / (1.0 + abs(x * drive) * 0.70);\nc = clamp(chirpCoeff, 0.12, 0.90);\n\ny1 = -c * sat + ap1; ap1 = sat + c * y1;\ny2 = -c * y1 + ap2; ap2 = y1 + c * y2;\ny3 = -c * y2 + ap3; ap3 = y2 + c * y3;\ny4 = -c * y3 + ap4; ap4 = y3 + c * y4;\n\ng = clamp(2.0 * sin(3.14159265 * tensionHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (y4 - lp1);\nhp1 = hp1 + 0.015 * (lp1 - hp1);\ntank = lp1 - hp1;\nfb = clamp(tank, -1.0, 1.0);\n\nout = (in * (1.0 - mix) + tank * mix) * 0.45;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 960 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.30 0.24 0.18
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text EMT Spring Tank Dispersion FX. Cascaded allpass spring-coil dispersion network with mechanical chirp, magnetic pickup saturation, and damped metallic feedback tail.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

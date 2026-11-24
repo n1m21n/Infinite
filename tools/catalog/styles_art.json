@@ -2400,6 +2400,126 @@
         "Traditional Japanese Sashimono interlocking timber joinery and Kumiko asanoha/seigaiha lattices",
         "Grotesk (Velvetyne) & Fragment Mono (Uncut) warm architectural craft typography"
       ]
+    },
+    {
+      "id": "lissitzky_proun_constructivism",
+      "taxonomy": "new",
+      "name": "El Lissitzky Proun Constructivism",
+      "palette": [
+        "#F4EFE6",
+        "#161616",
+        "#C82820",
+        "#C99848"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "ems_synthi_pin_matrix"
+      ],
+      "refs": [
+        "El Lissitzky Proun 2C axonometric constructivist planes and cantilevered beams",
+        "Gorki (Velvetyne) & Uncut Sans (Uncut) constructivist geometric typography"
+      ]
+    },
+    {
+      "id": "scarpa_stepped_concrete",
+      "taxonomy": "new",
+      "name": "Carlo Scarpa Stepped Concrete & Bronze",
+      "palette": [
+        "#1A1815",
+        "#D9D0BE",
+        "#B08660",
+        "#7A633C"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "gamelan_pelog_metallophone"
+      ],
+      "refs": [
+        "Carlo Scarpa Tomba Brion gradoni stepped cast concrete and bronze inlays",
+        "Terminal Grotesque (Velvetyne) & Steps Mono (Velvetyne) architectural brutalist type"
+      ]
+    },
+    {
+      "id": "belousov_zhabotinsky_waves",
+      "taxonomy": "new",
+      "name": "Belousov-Zhabotinsky Chemical Spirals",
+      "palette": [
+        "#3C1414",
+        "#8B2E2A",
+        "#5A6C8E",
+        "#9AAEC4"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "ems_synthi_pin_matrix"
+      ],
+      "refs": [
+        "Belousov-Zhabotinsky ferroin oscillatory chemical reaction spirals in Petri dish",
+        "Azeret Mono (Fontshare) & Compagnon (Velvetyne) scientific lab typography"
+      ]
+    },
+    {
+      "id": "cruz_diez_chromosaturation",
+      "taxonomy": "new",
+      "name": "Cruz-Diez Chromosaturation Physichromie",
+      "palette": [
+        "#11131A",
+        "#E63946",
+        "#2A9D8F",
+        "#F4A261"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.3,
+      "pairs": [
+        "gamelan_pelog_metallophone"
+      ],
+      "refs": [
+        "Carlos Cruz-Diez Physichromie kinetic vertical chromatic interference louvers",
+        "Uncut Sans (Uncut) & Steps Mono (Velvetyne) kinetic optical art typography"
+      ]
     }
   ]
 }

@@ -1,0 +1,77 @@
+infinite-patch 1
+# Leslie Baffle Doppler Horn FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 53
+  i note1 55
+  i note2 57
+  i note3 60
+  i note4 62
+  i note5 60
+  i note6 57
+  i note7 55
+  i note8 53
+  i note9 57
+  i note10 60
+  i note11 64
+  i note12 62
+  i note13 60
+  i note14 57
+  i note15 55
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 320 1024
+  f cutoff 2400.0
+  f resonance 0.22
+  f decay 0.48
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 640 1024
+  s code param float hornHz = 5.6 [0.5, 9.5];\nparam float drumHz = 0.85 [0.2, 4.0];\nparam float depth = 0.42 [0.05, 0.85];\nparam float tubeDrive = 1.5 [0.6, 2.8];\nparam float mix = 0.82 [0.0, 1.0];\nstate float pHorn = 0; state float pDrum = 0;\nstate float lpX = 0; state float ap1 = 0; state float ap2 = 0; state float ap3 = 0;\n\npHorn = (pHorn + hornHz / sr) % 1.0;\npDrum = (pDrum + drumHz / sr) % 1.0;\nsHorn = sin(6.2831853 * pHorn);\nsDrum = sin(6.2831853 * pDrum);\n\ngX = clamp(2.0 * sin(3.14159265 * 820.0 / sr), 0.02, 0.72);\nlpX = lpX + gX * (in - lpX);\nhiX = in - lpX;\n\nc1 = clamp(0.45 + depth * 0.40 * sHorn, 0.05, 0.88);\nc2 = clamp(0.42 + depth * 0.36 * cos(6.2831853 * pHorn), 0.05, 0.88);\n\nh1 = -c1 * hiX + ap1; ap1 = hiX + c1 * h1;\nh2 = -c2 * h1 + ap2; ap2 = h1 + c2 * h2;\nd1 = -clamp(0.35 + depth * 0.25 * sDrum, 0.05, 0.85) * lpX + ap3;\nap3 = lpX + clamp(0.35 + depth * 0.25 * sDrum, 0.05, 0.85) * d1;\n\nhornMod = h2 * (0.78 + 0.22 * sHorn);\ndrumMod = d1 * (0.85 + 0.15 * sDrum);\nwet = (hornMod + drumMod) * tubeDrive;\nwetSat = wet / (1.0 + abs(wet) * 0.65);\n\nout = (in * (1.0 - mix) + wetSat * mix) * 0.86;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 960 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.20 0.32 0.26
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Leslie Baffle Doppler Horn FX. Dual-rotor horn and drum crossover Doppler processor with asymmetric rotation, phase-modulated cabinet reflections, and tube preamp saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

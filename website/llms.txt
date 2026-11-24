@@ -377,6 +377,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Schroeder QRD Prime Diffuser FX](https://infinitedevices.org/library/schroeder-qrd-prime-diffuser-fx.html): Quadratic-residue prime acoustic diffuser processor cascading prime-scaled allpass scattering stages with resonant room absorption and stereo width. (file: https://infinitedevices.org/assets/templates/schroeder-qrd-prime-diffuser-fx.inf)
 - [Frippertronics Dual Reel Loop FX](https://infinitedevices.org/library/frippertronics-dual-reel-loop-fx.html): Dual-capstan reel-to-reel tape loop processor with asymmetric flutter modulation, oxide high-frequency rolloff, and warm transformer feedback saturation. (file: https://infinitedevices.org/assets/templates/frippertronics-dual-reel-loop-fx.inf)
 - [Sala Mixtur Formant Ribbon Synth](https://infinitedevices.org/library/sala-mixtur-formant-ribbon-synth.html): Oskar Sala inspired subharmonic frequency-divider ribbon organ blending 4 subharmonic sawtooth divisions into a resonant formant filter bank and tube saturation. (file: https://infinitedevices.org/assets/templates/sala-mixtur-formant-ribbon-synth.inf)
+- [EMS Synthi Pin Matrix Synth](https://infinitedevices.org/library/ems-synthi-pin-matrix-synth.html): Three-oscillator pin-matrix synthesizer with cross-FM, ring modulation, trapezoid envelope, and diode-ladder resonant lowpass filter. (file: https://infinitedevices.org/assets/templates/ems-synthi-pin-matrix-synth.inf)
+- [Gamelan Ombak Metallophone Synth](https://infinitedevices.org/library/gamelan-ombak-metallophone-synth.html): Struck bronze gamelan metallophone with paired ombak beating detune, inharmonic bar partials, mallet transient, and bamboo tube resonator. (file: https://infinitedevices.org/assets/templates/gamelan-ombak-metallophone-synth.inf)
+- [EMT Spring Tank Dispersion FX](https://infinitedevices.org/library/emt-spring-tank-dispersion-fx.html): Cascaded allpass spring-coil dispersion network with mechanical chirp, magnetic pickup saturation, and damped metallic feedback tail. (file: https://infinitedevices.org/assets/templates/emt-spring-tank-dispersion-fx.inf)
+- [Leslie Baffle Doppler Horn FX](https://infinitedevices.org/library/leslie-baffle-doppler-horn-fx.html): Dual-rotor horn and drum crossover Doppler processor with asymmetric rotation, phase-modulated cabinet reflections, and tube preamp saturation. (file: https://infinitedevices.org/assets/templates/leslie-baffle-doppler-horn-fx.inf)
 
 ## Library: Community
 
@@ -800,7 +804,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 143 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 145 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -817,4 +821,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 128 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 130 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

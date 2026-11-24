@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "EMS Synthi Pin Matrix Synth",
+    "author": "Infinite",
+    "description": "EMS Synthi AKS inspired three-oscillator pin-matrix synthesizer with cross-FM, ring modulation, trapezoid envelope, and diode-ladder resonant lowpass filter.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float matrixFm = 1.65 [0.0, 5.0];\nparam float ringMix = 0.38 [0.0, 1.0];\nparam float diodeHz = 1450.0 [220.0, 5200.0];\nparam float diodeRes = 0.56 [0.05, 0.88];\nparam float drive = 1.55 [0.6, 3.0];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float env = 0; state float lp1 = 0; state float lp2 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.06, env * 0.9993);\np3 = (p3 + clamp(freq * 0.501, 25.0, 2600.0) / sr) % 1.0;\ns3 = sin(6.2831853 * p3);\np2 = (p2 + (clamp(freq * 1.498, 45.0, 6200.0) + s3 * matrixFm * env * 140.0) / sr) % 1.0;\ns2 = p2 * 2.0 - 1.0;\np1 = (p1 + (clamp(freq, 35.0, 4800.0) + s2 * matrixFm * env * 220.0) / sr) % 1.0;\ns1 = sin(6.2831853 * p1);\n\nraw = ((s1 * 0.55 + s2 * 0.25 + s3 * 0.20) * (1.0 - ringMix) + (s1 * s2) * ringMix) * env;\ng = clamp(2.0 * sin(3.14159265 * clamp(diodeHz + env * 1800.0, 180.0, 6800.0) / sr), 0.02, 0.82);\nlp1 = lp1 + g * (raw - lp2 * clamp(diodeRes * 2.1, 0.0, 1.95) - lp1);\nlp2 = lp2 + g * (lp1 - lp2);\nshaped = lp2 * drive;\nout = (shaped / (1.0 + abs(shaped) * 0.78)) * 0.56;\n",
+    "params": {
+      "matrixFm": 1.65,
+      "ringMix": 0.38,
+      "diodeHz": 1450.0,
+      "diodeRes": 0.56,
+      "drive": 1.55
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

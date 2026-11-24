@@ -1,0 +1,68 @@
+infinite-patch 1
+# EMS Synthi Pin Matrix Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 48
+  i note1 51
+  i note2 55
+  i note3 54
+  i note4 48
+  i note5 55
+  i note6 58
+  i note7 54
+  i note8 48
+  i note9 51
+  i note10 53
+  i note11 58
+  i note12 55
+  i note13 54
+  i note14 51
+  i note15 50
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float matrixFm = 1.65 [0.0, 5.0];\nparam float ringMix = 0.38 [0.0, 1.0];\nparam float diodeHz = 1450.0 [220.0, 5200.0];\nparam float diodeRes = 0.56 [0.05, 0.88];\nparam float drive = 1.55 [0.6, 3.0];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float env = 0; state float lp1 = 0; state float lp2 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.06, env * 0.9993);\np3 = (p3 + clamp(freq * 0.501, 25.0, 2600.0) / sr) % 1.0;\ns3 = sin(6.2831853 * p3);\np2 = (p2 + (clamp(freq * 1.498, 45.0, 6200.0) + s3 * matrixFm * env * 140.0) / sr) % 1.0;\ns2 = p2 * 2.0 - 1.0;\np1 = (p1 + (clamp(freq, 35.0, 4800.0) + s2 * matrixFm * env * 220.0) / sr) % 1.0;\ns1 = sin(6.2831853 * p1);\n\nraw = ((s1 * 0.55 + s2 * 0.25 + s3 * 0.20) * (1.0 - ringMix) + (s1 * s2) * ringMix) * env;\ng = clamp(2.0 * sin(3.14159265 * clamp(diodeHz + env * 1800.0, 180.0, 6800.0) / sr), 0.02, 0.82);\nlp1 = lp1 + g * (raw - lp2 * clamp(diodeRes * 2.1, 0.0, 1.95) - lp1);\nlp2 = lp2 + g * (lp1 - lp2);\nshaped = lp2 * drive;\nout = (shaped / (1.0 + abs(shaped) * 0.78)) * 0.56;\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.22 0.28 0.38
+  f size 0.24
+end
+node 5 Utility Output
+  id out
+  pos 460 0
+end
+node 6 Compositing Comment
+  pos 0 722
+  s text EMS Synthi Pin Matrix Synth. Three-oscillator pin-matrix synthesizer with cross-FM, ring modulation, trapezoid envelope, and diode-ladder resonant lowpass filter.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 pic

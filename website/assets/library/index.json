@@ -12573,6 +12573,219 @@
       "file": "assets/templates/sala-mixtur-formant-ribbon-synth.inf",
       "preview": "assets/library/previews/sala-mixtur-formant-ribbon-synth.jpg",
       "bytes": 2122
+    },
+    {
+      "id": "proun-lissitzky-axonometric-beams",
+      "name": "Proun Lissitzky Axonometric Beams",
+      "kind": "Generator",
+      "tags": [
+        "constructivism",
+        "proun",
+        "lissitzky",
+        "axonometric",
+        "sketch",
+        "geometric"
+      ],
+      "description": "Axonometric constructivist planes, cantilevered vermilion accents, and carbon-slate beams on warm drafting parchment.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/proun-lissitzky-axonometric-beams.js",
+      "preview": "assets/library/previews/proun-lissitzky-axonometric-beams.jpg",
+      "bytes": 3722
+    },
+    {
+      "id": "moholy-light-space-modulator",
+      "name": "Moholy Light-Space Modulator",
+      "kind": "Generator",
+      "tags": [
+        "bauhaus",
+        "moholy-nagy",
+        "kinetic",
+        "optical",
+        "sketch",
+        "mechanical"
+      ],
+      "description": "Rotating perforated aluminum stator rings, diagonal light cones, and brass baffle bars inspired by Bauhaus kinetic sculpture.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/moholy-light-space-modulator.js",
+      "preview": "assets/library/previews/moholy-light-space-modulator.jpg",
+      "bytes": 2580
+    },
+    {
+      "id": "scarpa-brion-gradoni-vault-3d",
+      "name": "Scarpa Brion Gradoni Vault 3D",
+      "kind": "Generator",
+      "tags": [
+        "scarpa",
+        "brutalist",
+        "concrete",
+        "architecture",
+        "3d",
+        "gradoni"
+      ],
+      "description": "Stepped ziggurat concrete cornices, cantilevered arched ribs, and oxidized bronze tie-bars inspired by Carlo Scarpa.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/scarpa-brion-gradoni-vault-3d.js",
+      "preview": "assets/library/previews/scarpa-brion-gradoni-vault-3d.jpg",
+      "bytes": 1789
+    },
+    {
+      "id": "scarpa-venetian-water-pavilion-3d",
+      "name": "Scarpa Venetian Water Pavilion 3D",
+      "kind": "Generator",
+      "tags": [
+        "scarpa",
+        "pavilion",
+        "architecture",
+        "travertine",
+        "3d",
+        "vesica"
+      ],
+      "description": "Interlocking concrete vesica portals, stepped travertine plinths, and bronze-capped colonnade over a dark reflecting basin.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/scarpa-venetian-water-pavilion-3d.js",
+      "preview": "assets/library/previews/scarpa-venetian-water-pavilion-3d.jpg",
+      "bytes": 1767
+    },
+    {
+      "id": "ems-synthi-pin-matrix-synth",
+      "name": "EMS Synthi Pin Matrix Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "ems-synthi",
+        "matrix",
+        "fm",
+        "ring-mod",
+        "audio",
+        "dsp"
+      ],
+      "description": "Three-oscillator pin-matrix synthesizer with cross-FM, ring modulation, trapezoid envelope, and diode-ladder resonant lowpass filter.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/ems-synthi-pin-matrix-synth.inf",
+      "preview": "assets/library/previews/ems-synthi-pin-matrix-synth.jpg",
+      "bytes": 2150
+    },
+    {
+      "id": "gamelan-ombak-metallophone-synth",
+      "name": "Gamelan Ombak Metallophone Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "gamelan",
+        "metallophone",
+        "ombak",
+        "inharmonic",
+        "audio",
+        "dsp"
+      ],
+      "description": "Struck bronze gamelan metallophone with paired ombak beating detune, inharmonic bar partials, mallet transient, and bamboo tube resonator.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/gamelan-ombak-metallophone-synth.inf",
+      "preview": "assets/library/previews/gamelan-ombak-metallophone-synth.jpg",
+      "bytes": 2006
+    },
+    {
+      "id": "emt-spring-tank-dispersion-fx",
+      "name": "EMT Spring Tank Dispersion FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "spring-reverb",
+        "dispersion",
+        "allpass",
+        "audio",
+        "dsp"
+      ],
+      "description": "Cascaded allpass spring-coil dispersion network with mechanical chirp, magnetic pickup saturation, and damped metallic feedback tail.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/emt-spring-tank-dispersion-fx.inf",
+      "preview": "assets/library/previews/emt-spring-tank-dispersion-fx.jpg",
+      "bytes": 2069
+    },
+    {
+      "id": "leslie-baffle-doppler-horn-fx",
+      "name": "Leslie Baffle Doppler Horn FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "leslie",
+        "rotary",
+        "doppler",
+        "audio",
+        "dsp"
+      ],
+      "description": "Dual-rotor horn and drum crossover Doppler processor with asymmetric rotation, phase-modulated cabinet reflections, and tube preamp saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/leslie-baffle-doppler-horn-fx.inf",
+      "preview": "assets/library/previews/leslie-baffle-doppler-horn-fx.jpg",
+      "bytes": 2355
+    },
+    {
+      "id": "belousov-zhabotinsky-spirals",
+      "name": "Belousov-Zhabotinsky Spirals",
+      "kind": "Generator",
+      "tags": [
+        "reaction-diffusion",
+        "belousov-zhabotinsky",
+        "chemical",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Colliding chemical reaction-diffusion spiral rotors and target wavefronts in ferroin crimson and oxidized indigo-slate inside a backlit glass petri dish.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/belousov-zhabotinsky-spirals.field",
+      "preview": "assets/library/previews/belousov-zhabotinsky-spirals.jpg",
+      "bytes": 2736
+    },
+    {
+      "id": "cruz-diez-chromosaturation-moire",
+      "name": "Cruz-Diez Chromosaturation Moire",
+      "kind": "Generator",
+      "tags": [
+        "cruz-diez",
+        "physichromie",
+        "op-art",
+        "moire",
+        "shader",
+        "webgl",
+        "audio-reactive"
+      ],
+      "description": "Kinetic vertical chromatic louver bands and optical interference moire inspired by Carlos Cruz-Diez Physichromie reliefs.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cruz-diez-chromosaturation-moire.field",
+      "preview": "assets/library/previews/cruz-diez-chromosaturation-moire.jpg",
+      "bytes": 1884
     }
   ],
   "count": 610
