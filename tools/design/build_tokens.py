@@ -17,8 +17,10 @@ ALIAS = token_tiers.ALIAS
 def cval(v, ty):
     """A token's C++ initialiser: an alias names its primitive (same value, the tier stays visible), else the literal."""
     if isinstance(v, str) and ALIAS.match(v):
-        m = ALIAS.match(v); ref = f"{m.group(1)}_{m.group(2)}"
-        return ref if ty == "float" else f"static_cast<{ty}>({ref})"
+        m = ALIAS.match(v); g, k = m.group(1), m.group(2)
+        ref = f"{g}_{k}"
+        ref_ty = "int" if g in token_tiers.INT_PRIMITIVE_GROUPS else "float"
+        return ref if ty == ref_ty else f"static_cast<{ty}>({ref})"
     if ty == "float": return f"{float(v)}f"
     if ty == "int": return str(int(v))
     if ty == "double": return repr(float(v))
@@ -56,8 +58,12 @@ def build():
     L.append("   // primitives (tools/design/token_tiers.py): ladders the semantic tokens below alias")
     prim = token_tiers.primitives(t)
     for group in token_tiers.PRIMITIVE_GROUPS:
+        is_int = group in token_tiers.INT_PRIMITIVE_GROUPS
         for k, v in prim[group].items():
-            L.append(f"   constexpr float {group}_{k} = {float(v)}f;")
+            if is_int:
+                L.append(f"   constexpr int {group}_{k} = {int(v)};")
+            else:
+                L.append(f"   constexpr float {group}_{k} = {float(v)}f;")
     L.append("   // semantic")
     for group in ("radius", "type", "icon", "pin"):
         for k, v, dep in entries(b[group]):

@@ -41,7 +41,8 @@ LADDERS = {
     "opacity": [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.1, 0.12, 0.14, 0.15, 0.16, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
                 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1],
 }
-PRIMITIVE_GROUPS = ("space", "radius", "stroke_scale", "opacity")
+PRIMITIVE_GROUPS = ("space", "radius", "stroke_scale", "opacity", "opacity8")
+INT_PRIMITIVE_GROUPS = ("opacity8",)
 
 
 def step_key(v, scale=1.0):
@@ -51,6 +52,8 @@ def step_key(v, scale=1.0):
 
 
 def ladder_keys(group, values):
+    if group == "opacity8":
+        return {step_key(v, 100.0): int(round(v * 255)) for v in values}
     scale = 100.0 if group == "opacity" else 1.0
     return {step_key(v, scale): float(v) for v in values}
 
@@ -61,24 +64,29 @@ def primitives(tok):
     out = {}
     for g in PRIMITIVE_GROUPS:
         src = b.get(g, {})
-        out[g] = {k: float(v) for k, v in src.items() if not k.startswith("_") and isinstance(v, (int, float))
+        cast = int if g in INT_PRIMITIVE_GROUPS else float
+        out[g] = {k: cast(v) for k, v in src.items() if not k.startswith("_") and isinstance(v, (int, float))
                   and re.fullmatch(r"[0-9_]+", k)}
     return out
 
 
 # ---------------------------------------------------------------- what kind of value is this?
 LAST_SKIP = {"sm", "lg", "md", "xs", "xl", "xxs", "xxl", "lo", "hi", "u8", "n", "alt", "2", "3", "4"}
+SPACE_WORDS = {"gap", "pad", "inset", "spacing", "gutter", "margin", "indent", "padding"}
+DIR_SUFFIX = {"x", "y", "l", "r", "t", "b", "w", "h", "i"}
 
 
 def parts(key):
     p = key.split("_")
     while len(p) > 1 and p[-1] in LAST_SKIP:
         p.pop()
+    if len(p) > 1 and p[-1] in DIR_SUFFIX and p[-2] in SPACE_WORDS:
+        p.pop()
     return p
 
 
-def kind(key, v):
-    """space / radius / stroke / opacity (design kinds, must sit on a ladder) or a why word."""
+def kind(key, v, group="surface"):
+    """space / radius / stroke / opacity / opacity8 (design kinds, must sit on a ladder) or a why word."""
     p = parts(key)
     last = p[-1]
     words = set(p)
@@ -86,33 +94,41 @@ def kind(key, v):
         return "maths"
     if last in ("ratio", "scale", "mul", "frac", "t", "phase", "u", "em", "k", "factor", "fade", "amt", "amount", "mix"):
         return "ratio"
+    if last == "shade" and 0 < v <= 4:
+        return "ratio"
     if last in ("frames", "count", "rows", "cols", "steps", "limit", "res", "max", "min", "cap", "floor", "threshold",
                 "lines", "chars", "items", "decimals", "digits", "segments", "octaves", "taps", "ms", "s", "sec", "hz",
                 "rate", "period", "hold", "delay", "speed", "deg", "angle"):
         return "limit"
-    if last in ("alpha", "opacity", "a") and 0 < v <= 1:
-        return "opacity"
+    if last in ("alpha", "opacity", "a"):
+        if group != "surface_i" and 0 < v <= 1:
+            return "opacity"
+        if group != "surface_i" and 1 < v <= 4:
+            return "ratio"
+        if 1 <= v <= 255 and float(v).is_integer():
+            return "opacity8"
     if last in ("stroke", "hairline", "thick", "thickness", "weight", "line_w") and 0 < v <= 6:
         return "stroke"
     if last in ("radius", "rounding", "round", "corner") or "rounding" in words:
         return "radius" if 0 < v <= 16 else "own_size"
-    if last in ("gap", "pad", "inset", "spacing", "gutter", "margin", "indent", "padding") and 1 <= v <= 24:
+    if last in SPACE_WORDS and 1 <= v <= 24:
         return "space"
     if 0 < abs(v) < 1:
         return "ratio"
     return "own_size"
 
 
-DESIGN_TO_LADDER = {"space": "space", "radius": "radius", "stroke": "stroke_scale", "opacity": "opacity"}
+DESIGN_TO_LADDER = {"space": "space", "radius": "radius", "stroke": "stroke_scale", "opacity": "opacity", "opacity8": "opacity8"}
 
 
-def place(key, v, prim):
+def place(key, v, prim, group="surface"):
     """('alias', '{g.k}') or (why, value)."""
-    k = kind(key, float(v))
+    k = kind(key, float(v), group)
     if k in DESIGN_TO_LADDER:
         g = DESIGN_TO_LADDER[k]
+        target = int(round(v)) if g in INT_PRIMITIVE_GROUPS else float(v)
         for pk, pv in prim.get(g, {}).items():
-            if pv == float(v):
+            if pv == target:
                 return "alias", "{%s.%s}" % (g, pk)
         return "off_scale", v
     return k, v
@@ -156,18 +172,22 @@ def resolve(value, tok):
     return value
 
 
-def tier_surface(entries, prim, colour):
-    """Rewrite one surface's entries into aliases + buckets (keeps existing aliases and buckets)."""
+def tier_surface(entries, prim, colour, group="surface", refile=False):
+    """Rewrite one surface's entries into aliases + buckets (keeps existing aliases and buckets; refile re-checks own_size)."""
     out, buckets = {}, {}
     for k, v in entries.items():
         if k.startswith("_"):
             out[k] = v; continue
         if is_bucket(k, v):
             for kk, vv in v.items():
-                if k == "off_scale":        # re-placed every run: a ladder step added later picks it up
-                    where, val = place(kk, vv, prim)
+                if kk.startswith("_"):
+                    buckets.setdefault(k, {})[kk] = vv; continue
+                if k == "off_scale" or (refile and k == "own_size" and isinstance(vv, (int, float))):
+                    where, val = place(kk, vv, prim, group)
                     if where == "alias":
                         out[kk] = val; continue
+                    if refile and k == "own_size" and where != "own_size":
+                        buckets.setdefault(where, {})[kk] = val; continue
                 buckets.setdefault(k, {})[kk] = vv
             continue
         if isinstance(v, str) and ALIAS.match(v):
@@ -176,7 +196,7 @@ def tier_surface(entries, prim, colour):
             buckets.setdefault("own_colour", {})[k] = v; continue
         if isinstance(v, str):          # hex words in a numeric group (never expected)
             buckets.setdefault("own_colour", {})[k] = v; continue
-        where, val = place(k, v, prim)
+        where, val = place(k, v, prim, group)
         if where == "alias":
             out[k] = val
         else:
@@ -193,7 +213,16 @@ def lint(tok, sj):
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
             for k, v in kv.items():
-                if k.startswith("_") or is_bucket(k, v):
+                if k.startswith("_"):
+                    continue
+                if is_bucket(k, v):
+                    if k == "own_size" and g in NUM_GROUPS:
+                        for kk, vv in v.items():
+                            if kk.startswith("_") or not isinstance(vv, (int, float)):
+                                continue
+                            where, _ = place(kk, vv, prim, g)
+                            if where != "own_size":
+                                bad.append(f"{g}.{s}.own_size.{kk} = {vv}: misfiled (belongs in {where})")
                     continue
                 if isinstance(v, str) and ALIAS.match(v):
                     m = ALIAS.match(v)
@@ -201,7 +230,7 @@ def lint(tok, sj):
                         bad.append(f"{g}.{s}.{k}: alias {v} is not a primitive")
                     continue
                 bad.append(f"{g}.{s}.{k} = {v}: raw value with no alias and no why bucket")
-    for g in ("alpha", "stroke"):
+    for g in ("alpha", "alpha8", "stroke"):
         for k, v in tok["base"].get(g, {}).items():
             if k.startswith("_") or is_bucket(k, v):
                 continue
@@ -234,33 +263,38 @@ def dumps(obj):
     return re.sub(r"\[\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+)\s*\]", r"[\1, \2, \3, \4]", s) + "\n"
 
 
-def apply(tok, sj):
+def apply(tok, sj, refile=False):
     b = tok["base"]
-    # 1. primitive ladders (space exists; radius gains numeric steps beside its semantic 'cell')
-    for g, vals in LADDERS.items():
+    # 1. primitive ladders (space exists; radius gains numeric steps beside its semantic 'cell'; opacity8 mirrors opacity)
+    all_ladders = {**LADDERS, "opacity8": LADDERS["opacity"]}
+    for g, vals in all_ladders.items():
         grp = b.setdefault(g, {})
         for k, v in ladder_keys(g, vals).items():
             grp.setdefault(k, v)
     grp_doc = {"radius": "Primitive radius ladder (numeric keys) + semantic radii that alias it",
                "stroke_scale": "Primitive stroke-weight ladder; semantic weights live in 'stroke' and alias it",
-               "opacity": "Primitive opacity ladder in percent (opacity.12 = 0.12); semantic alphas live in 'alpha' and alias it"}
+               "opacity": "Primitive opacity ladder in percent (opacity.12 = 0.12); semantic alphas live in 'alpha' and alias it",
+               "opacity8": "Primitive 8-bit opacity ladder (round(opacity * 255)) for IM_COL32; semantic 8-bit alphas live in 'alpha8'"}
     for g, d in grp_doc.items():
         b[g].setdefault("_doc", d)
         b[g] = {"_doc": b[g]["_doc"], **{k: v for k, v in b[g].items() if k != "_doc"}}
     prim = primitives(tok)
     # 2. tokens.json semantic groups alias the ladders where they can
-    for g, ladder in (("alpha", "opacity"), ("stroke", "stroke_scale"), ("radius", "radius")):
+    for g, ladder in (("alpha", "opacity"), ("alpha8", "opacity8"), ("stroke", "stroke_scale"), ("radius", "radius")):
+        if g not in b:
+            continue
+        cast = int if ladder in INT_PRIMITIVE_GROUPS else float
         for k, v in list(b[g].items()):
             if k.startswith("_") or not isinstance(v, (int, float)) or (g == "radius" and re.fullmatch(r"[0-9_]+", k)):
                 continue
-            hit = next((pk for pk, pv in prim[ladder].items() if pv == float(v)), None)
+            hit = next((pk for pk, pv in prim[ladder].items() if pv == cast(v)), None)
             if hit is not None:
                 b[g][k] = "{%s.%s}" % (ladder, hit)
-            elif g in ("alpha", "stroke"):
+            elif g in ("alpha", "alpha8", "stroke"):
                 b[g].setdefault("off_scale", {})[k] = v
                 del b[g][k]
         for k, v in list(b[g].get("off_scale", {}).items()):
-            hit = next((pk for pk, pv in prim[ladder].items() if pv == float(v)), None)
+            hit = next((pk for pk, pv in prim[ladder].items() if pv == cast(v)), None)
             if hit is not None:
                 b[g][k] = "{%s.%s}" % (ladder, hit); del b[g]["off_scale"][k]
         if g in b and b[g].get("off_scale") == {}:
@@ -268,7 +302,7 @@ def apply(tok, sj):
     # 3. surfaces
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
-            sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS)
+            sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS, group=g, refile=refile)
     return tok, sj
 
 
@@ -279,9 +313,9 @@ def report(tok, sj):
     for g in NUM_GROUPS:
         for s, kv in sj.get(g, {}).items():
             for k, v in kv.get("off_scale", {}).items():
-                off.append((kind(k, float(v)), f"{s}_{k}", v))
-    for g in ("alpha", "stroke"):
-        for k, v in tok["base"][g].get("off_scale", {}).items():
+                off.append((kind(k, float(v), g), f"{s}_{k}", v))
+    for g in ("alpha", "alpha8", "stroke"):
+        for k, v in tok["base"].get(g, {}).get("off_scale", {}).items():
             off.append((g, f"{g}_{k}", v))
     by = {}
     for kd, n, v in off:
@@ -297,8 +331,9 @@ def report(tok, sj):
 def main():
     tok = json.loads(TOK.read_text())
     sj = json.loads(SURF.read_text())
-    if "--apply" in sys.argv:
-        tok, sj = apply(tok, sj)
+    refile = "--refile" in sys.argv
+    if "--apply" in sys.argv or refile:
+        tok, sj = apply(tok, sj, refile=refile)
         TOK.write_text(json.dumps(tok, indent=1, ensure_ascii=False) + "\n")
         SURF.write_text(dumps(sj))
         print("wrote tokens.json, surfaces.json")
@@ -307,7 +342,7 @@ def main():
         for b in bad[:40]:
             print(b)
         if bad:
-            print(f"{len(bad)} token(s) with a raw value and no alias or why: run tools/design/token_tiers.py --apply")
+            print(f"{len(bad)} token(s) failed tier lint: run tools/design/token_tiers.py --refile")
             return 1
         print("token tiers: every semantic token aliases a primitive or says why")
         return 0
