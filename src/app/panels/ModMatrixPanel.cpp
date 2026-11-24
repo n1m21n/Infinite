@@ -117,6 +117,7 @@ namespace app
    }
 
 
+   // ui-content-begin: curve graph: the plotted curve and its grid
    bool DrawMiniCurveWidget(const char* strId, float* curve, float liveInput01 = -1.0f, float width = tok::mod_matrix_width)
    {
       bool changed = false;
@@ -259,8 +260,10 @@ namespace app
       ImGui::PopID();
       return changed;
    }
+   // ui-content-end
 
 
+   // ui-content-begin: curve graph: the plotted curve and its grid
    void DrawSparklineMiniGraph(const char* strId, const SparklineHistory& hist, ImU32 lineCol, float width, float height)
    {
       const ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -297,6 +300,7 @@ namespace app
       }
       Ui::Claim(ImVec2(width, height));
    }
+   // ui-content-end
 
 
    // Row kind marker: a short rounded rail (colour = modulation / expression / recording), not a dot.

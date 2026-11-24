@@ -13,6 +13,7 @@ namespace app
    // Drains WavetableNode's MeterRing into a small cache on the node itself
    // and redraws the trace from that cache at most 30x/sec (README.md §1's
    // scope-drawing cap), regardless of how often the app frame runs.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawWavetableScope(WavetableNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -69,8 +70,10 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawFieldSampleScope(FieldSampleNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -127,10 +130,12 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    // Spectral Field preview: 64 log bands, input as a faint fill, output as
    // the stroke. dB scale -90..0.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawSpectralFieldSpectrum(SpectralFieldNode* n, float h, float width)
    {
       constexpr int kB = SpectralFieldNode::kBands;
@@ -173,8 +178,10 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawFieldSynthScope(FieldSynthNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -231,11 +238,13 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    // Last two bars (8 beats) of what the script played: one bar per note,
    // pitch on the y axis (auto-ranged to what is on screen, never narrower
    // than an octave), brightness = velocity. Reads main-thread readouts only.
+   // ui-content-begin: node preview: the node's output picture
    void DrawFieldNotesRoll(FieldNotesNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -297,6 +306,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace

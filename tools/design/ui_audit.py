@@ -29,7 +29,9 @@ import collections, json, pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 STORE = ROOT / "tools/design/ratchet.json"
-KIT = "src/app/ui/design/"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import kit as _kit  # noqa: E402  the one kit list (tools/design/kit.py)
+KIT = _kit.KIT   # a tuple: str.startswith takes it
 SKIP = re.compile(r"(^src/app/selftest/|/third_party/|^src/third_party|\.gen\.h$|Tests?\w*\.(cpp|h)$|/tests?/|BenchHarness)")
 UI_FILE = re.compile(r"ImGui::|ImDrawList|ImVec2|ImU32|IM_COL32")
 
@@ -803,7 +805,7 @@ def layout_calls():
     per, canvas = {}, 0
     for rel, src in ui_files():
         if rel.startswith(KIT): continue
-        code = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), src, flags=re.S)
+        code = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), _kit.content_out(src), flags=re.S)
         for line in code.split("\n"):
             hits = LAYOUT_RX.findall(line.split("//")[0])
             if not hits: continue

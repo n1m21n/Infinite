@@ -1514,6 +1514,7 @@ namespace
          });
    }
 
+   // ui-content-begin: sample studio: the waveform and its overview are the sample
    void DrawOverview(ImDrawList* dl, ImVec2 mn, ImVec2 mx)
    {
       Studio& s = S();
@@ -1545,6 +1546,7 @@ namespace
       dl->AddRectFilled(ImVec2(va, mn.y), ImVec2(std::max(va + tok::space_0_5, vb), mx.y), AccentU32(tok::sample_studio_accent_alpha_sm), tok::radius_cell);
       dl->AddRect(ImVec2(va, mn.y), ImVec2(std::max(va + tok::space_0_5, vb), mx.y), AccentU32(tok::sample_studio_accent_alpha_lg), tok::radius_cell);
    }
+   // ui-content-end
 
    // The marker under x: kind 0 a slice start (its index), kind 1 the end marker. -1 when none is within reach.
    int MarkerAt(const WaveGeom& g, float x, int& index)
@@ -2283,6 +2285,7 @@ namespace
       MenuParts::EndPopup();
    }
 
+   // ui-content-begin: sample studio: the waveform and its overview are the sample
    void DrawWave(ImVec2 mn, ImVec2 size)
    {
       Studio& s = S();
@@ -2644,6 +2647,7 @@ namespace
       if (s.scrubFrame >= 0.0)
          TimeRuler::Playhead(dl, g.XOfW(s.scrubFrame), rulerTop, g.mx.y, g.mn.x, g.mx.x, true);
    }
+   // ui-content-end
 
    // ---- the inspector ----
 

@@ -26,6 +26,7 @@ namespace app
    // liveX >= 0 draws a dot on the curve at that input position; crosshair
    // draws a 0.5/0.5 gridline, which is where "no modulation" lives under a
    // bipolar binding.
+   // ui-content-begin: editable graph: the curve, ramp or grid the user drags
    void DrawCurveEditor(CurveShape& shape, ImU32 lineCol, bool resetOnEmptyRightClick = false,
                         bool crosshair = false, float liveX = -1.0f)
    {
@@ -148,6 +149,7 @@ namespace app
       }
       AudioViz::Border(dl, origin, br);
    }
+   // ui-content-end
 
 
    namespace
@@ -258,6 +260,7 @@ namespace app
    // a point to remove it (empty space: reset). The small ring on each segment
    // bends it; drag it up or down. Loop on shades the looped part, and the
    // vertical line is where the shape is now.
+   // ui-content-begin: editable graph: the curve, ramp or grid the user drags
    static void DrawMSEGEditor(MSEGNode* n, ImU32 lineCol)
    {
       const float width = kPreviewSize, height = tok::param_mseg_editor_height;
@@ -399,6 +402,7 @@ namespace app
       dl->AddCircle(toScreen(px, n->Evaluate(px)), tok::param_mseg_editor_dot_r_sm, ring, 0, tok::param_ring_stroke_md);
       AudioViz::Border(dl, origin, br);
    }
+   // ui-content-end
 
 
    void DrawModRateControls(int* rateMode, float* rateBeats, float* rateHz, int hzOrdinal,
@@ -704,6 +708,7 @@ namespace app
    // Preview is the palette itself, not the strip texture: the strip is a
    // by-product, while the swatches are what the rest of the graph binds to,
    // and they need to be readable and countable at a glance.
+   // ui-content-begin: node preview: the node's output picture
    void DrawPalettePreview(PaletteNode* n)
    {
       const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -754,6 +759,7 @@ namespace app
                   tok::Role(tok::col::edge_lo_light), tok::radius_control);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -858,6 +864,7 @@ namespace app
    // click a marker to remove it. Position isn't run through ModSlider like
    // RampNode's - dragging on the bar is the primary interaction, and it would
    // otherwise fight the drag for control of the same float every frame.
+   // ui-content-begin: editable graph: the curve, ramp or grid the user drags
    void DrawColorRampEditor(ColorRampNode* n)
    {
       const float size = kPreviewSize;
@@ -1025,6 +1032,7 @@ namespace app
       }
       ImGui::EndDisabled();
    }
+   // ui-content-end
 
 
    namespace
@@ -1144,6 +1152,7 @@ namespace app
 
    // The small live view every tracking node shows: the frame the tracker saw, with what it found drawn on top,
    // so it is clear what is being tracked (and that the image is reaching the node at all).
+   // ui-content-begin: node preview: the node's output picture
    static void DrawTrackPreview(TrackNodeBase* n, float w)
    {
       const float aspect = std::max(0.5f, std::min(2.0f, n->PreviewAspect()));
@@ -1189,6 +1198,7 @@ namespace app
       }
       dl->PopClipRect();
    }
+   // ui-content-end
 
    namespace
    {

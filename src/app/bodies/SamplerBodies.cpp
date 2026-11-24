@@ -69,6 +69,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawAudioMeterVisualizer(AudioMeterNode* n, float x, float y, float w, float h)
    {
       using namespace AudioMeterScale;
@@ -217,6 +218,7 @@ namespace app
          SetAudioReadout("rms", buf);
       }
    }
+   // ui-content-end
 
 
    void DrawAudioMeterBody(GraphNode& gn, AudioMeterNode* n)
@@ -934,6 +936,7 @@ namespace app
    // node (rebuilt only when a new render/analysis lands - see
    // MolderNode::RebuildWaveformCache/RebuildPartialCache), never
    // recomputed per frame.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawMolderWaveform(MolderNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -1042,8 +1045,10 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawMolderPartialBars(MolderNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -1083,6 +1088,7 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    void DrawMolderBody(GraphNode& gn, MolderNode* n)
@@ -1198,6 +1204,7 @@ namespace app
 
 
    // ----------------------------------------------------------- Grain Molder
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawGrainMolderWaveform(GrainMolderNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -1319,6 +1326,7 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    void DrawGrainMolderBody(GraphNode& gn, GrainMolderNode* n)
@@ -2315,6 +2323,7 @@ namespace app
    // when the loop is a whole number of beats, and the recorded extent against
    // the take window while a fixed take records. No start/end triangles: the
    // Looper has no start/end.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawLooperWave(LooperNode* n, float h, float w)
    {
       const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -2401,6 +2410,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    void DrawLooperBody(GraphNode& gn, LooperNode* n)

@@ -2864,6 +2864,7 @@ namespace app
    }
 
 
+   // ui-content-begin: editable graph: the curve, ramp or grid the user drags
    void DrawAudioColorRampEditor(AudioColorRampNode* n)
    {
       const float size = kPreviewSize;
@@ -2995,6 +2996,7 @@ namespace app
 
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + barH + gap + readoutH + gap));
    }
+   // ui-content-end
 
 
    namespace

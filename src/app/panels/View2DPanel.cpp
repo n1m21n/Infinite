@@ -1467,6 +1467,7 @@ namespace
    // Each pair starts as one handle: dragging it moves the pair together; Option (Alt) splits it, and a split half
    // then moves alone (drag it back onto its partner, or right-click it, to join them). The cut part of the ramp is veiled and the
    // soft range fades, so the row shows what passes. The values read under the ends; double-click resets.
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    bool BlendIfRamp(const char* id, float* b, float width)
    {
       static int sHeld = -1;        // handle held (0..3); with sPair, the pair it leads
@@ -1648,6 +1649,7 @@ namespace
       }
       return changed;
    }
+   // ui-content-end
 
    bool SliderRow(const char* label, float* v, float lo, float hi, const char* fmt)
    {
@@ -1745,6 +1747,7 @@ namespace
       return ImGui::GetColorU32(ImGuiCol_Text, alpha);
    }
 
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void CurveEditor(std::vector<float>& c, int key, const std::vector<float>* hist = nullptr, int channel = 0,
                     const std::vector<float>* const* otherCh = nullptr)
    {
@@ -1928,6 +1931,7 @@ namespace
       if (changed)
          Touch();
    }
+   // ui-content-end
 
    const char* AdjAmountLabel(int t)
    {
@@ -4244,6 +4248,7 @@ namespace
 
    // The pointer follows the tool, as in every image editor: an I-beam for text, a crosshair with the tool's
    // badge for tools that act on a point, the arrow for the selection tools.
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void DrawToolCursor(ImDrawList* dl, ImVec2 mouse)
    {
       if (sTool == kText)
@@ -4273,6 +4278,7 @@ namespace
                glyph::Draw(dl, ImVec2(badge.x + dx, badge.y + dy), tok::icon_control, tok::U32(tok::canvas_shade, tok::view2d_tool_cursor_alpha_lg), g);
       glyph::Draw(dl, badge, tok::icon_control, tok::U32(tok::canvas_ink), g);
    }
+   // ui-content-end
 
    // Predicted points: the last two pen samples carried 8 ms ahead and drawn in the paint colour, so the line
    // reaches the pen instead of trailing it by a frame. Only a picture: the next real sample replaces it.
@@ -4306,6 +4312,7 @@ namespace
       dl->PopClipRect();
    }
 
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void DrawBrushCursor(ImDrawList* dl, ImVec2 mouse)
    {
       const BrushEngine::Brush& b = ToolBrush();
@@ -4328,6 +4335,7 @@ namespace
       if (!b.pencil && b.hardness < 0.95f && r * b.hardness > 3.0f)
          ring(r * b.hardness, 0.45f);
    }
+   // ui-content-end
 
    // Quick mask is part of the document, so switching it is an undo step.
    void ToggleQuickMask(Scene2DNode* doc)
@@ -5058,6 +5066,7 @@ namespace
    }
 
    // What the newer pixel tools show on the canvas: boxes and lines being dragged, the mesh, corners, the spot.
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void DrawToolOverlays(Scene2DNode* doc, ImDrawList* dl, ImU32 ink, ImU32 shade)
    {
       const ImVec2 mouse = ImGui::GetIO().MousePos;
@@ -5152,6 +5161,7 @@ namespace
          dl->AddCircle(mouse, r, ink, tok::view2d_tool_overlays_segments, 1.0f);
       }
    }
+   // ui-content-end
 
    void ScaleActive(Scene2DNode* doc, ImVec2 mouse)
    {
@@ -5328,6 +5338,7 @@ namespace
    }
 
    // Draws the gizmo; returns the part under the pointer (0..2 axes, 3 centre) or -1.
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    int DrawGizmo3D(ImDrawList* dl, Scene2DNode* doc, const Layer& l, ImVec2 mouse, int held)
    {
       const float at[3] = { l.x, l.y, l.z };
@@ -5423,6 +5434,7 @@ namespace
          hot = 3;
       return hot;
    }
+   // ui-content-end
 
    void DragGizmo3D(Scene2DNode* doc, ImVec2 mouse)
    {
@@ -5590,6 +5602,7 @@ namespace
       return 10000.0f;
    }
 
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void DrawRulers(ImDrawList* dl, Scene2DNode* doc, ImVec2 mn, ImVec2 mx)
    {
       const ImU32 bg = ImGui::GetColorU32(ImGuiCol_FrameBg), text = ImGui::GetColorU32(ImGuiCol_TextDisabled);
@@ -5633,6 +5646,7 @@ namespace
          dl->AddLine(ImVec2(mn.x, p.y), ImVec2(mn.x + kRuler, p.y), Hex(kOutline));
       }
    }
+   // ui-content-end
 
    int HoverGuide(Scene2DNode* doc, ImVec2 mouse, int& axis)
    {
@@ -5704,6 +5718,7 @@ namespace
       sCrop[3] = std::round(cy + h * 0.5f);
    }
 
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void DrawCropOverlay(ImDrawList* dl, Scene2DNode* doc)
    {
       // Document-space box, so it turns with the view; the dim is four document-space bands around it.
@@ -5732,6 +5747,7 @@ namespace
          dl->AddRectFilled(ImVec2(p.x - tok::space_1, p.y - tok::space_1), ImVec2(p.x + tok::space_1, p.y + tok::space_1), tok::U32(tok::canvas_ink));
       }
    }
+   // ui-content-end
 
    int HoverCropHandle(Scene2DNode* doc, ImVec2 mouse)
    {
@@ -6195,6 +6211,7 @@ namespace
       Touch();
    }
 
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void DrawVectorOverlay(ImDrawList* dl, Scene2DNode* doc, ImVec2 mouse, bool hovered)
    {
       Layer* l = Active(doc);
@@ -6259,6 +6276,7 @@ namespace
          }
       }
    }
+   // ui-content-end
 
    // ---- text -------------------------------------------------------------
 
@@ -6504,6 +6522,7 @@ namespace
       return false;
    }
 
+   // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void DrawCanvas(Scene2DNode* doc, ImVec2 size)
    {
       ImGuiIO& io = ImGui::GetIO();
@@ -7677,6 +7696,7 @@ namespace
       DrawRasterAsk(doc);
       DrawFillDialog(doc);
    }
+   // ui-content-end
 
    // Between two groups of a bar: space_2, a 1 px hairline as tall as the chips' inner area, space_2 (Photopea's divider).
    void BarDivider()

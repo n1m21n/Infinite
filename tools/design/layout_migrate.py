@@ -27,7 +27,7 @@ import ui_audit  # noqa: E402
 
 ROOT = ui_audit.ROOT
 SCOPE = ("src/app/panels/", "src/app/frame/", "src/app/ui/", "src/app/graph/", "src/app/AppShared.h", "src/app/AppCommon.h")
-SKIP = (ui_audit.KIT, "src/app/bodies/", "src/app/selftest/")
+SKIP = (*ui_audit.KIT, "src/app/bodies/", "src/app/selftest/")
 INCLUDE = '#include "app/ui/design/UiScope.h"'
 NUM = r"[0-9]+(?:\.[0-9]*)?f?"
 ZERO = r"0(?:\.0*)?f?"

@@ -20,6 +20,7 @@ namespace app
 {
    // Paintable preview: the Draw node turns its 1:1 preview into the canvas, so
    // you draw directly on the node rather than in a separate window.
+   // ui-content-begin: node preview: the node's output picture
    void DrawPaintablePreview(DrawNode* node)
    {
       ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -61,6 +62,7 @@ namespace app
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
                   tok::Role(tok::col::accent_muted_hi), tok::preview_paintable_radius, 0, tok::preview_paintable_stroke);
    }
+   // ui-content-end
 
 
    // A comment shows its note on the face of the node, not behind the params
@@ -640,6 +642,7 @@ namespace app
 
 
    // Square, letterboxed preview so non-square sources still read 1:1.
+   // ui-content-begin: node preview: the node's output picture
    void DrawPreview(INode* node)
    {
       INode* shown = DisplayNode(node);
@@ -755,6 +758,7 @@ namespace app
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                      tok::Role(tok::col::accent_pale_muted_warm, tok::preview_outline_alpha), tok::preview_radius, 0, tok::preview_stroke);
    }
+   // ui-content-end
 
 
    // Build step 15 follow-up (§5.3.1): inline min/max waveform preview for
@@ -785,6 +789,7 @@ namespace app
    // pattern. Rebuilt on a throttled ~30Hz cadence, matching
    // DrawFieldSampleScope's own cadence above - never synchronously inside
    // an audio callback.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawFieldGraphWaveform(FieldGraphNode* fgn, INode* audioTerminal)
    {
       const double now = ImGui::GetTime();
@@ -871,4 +876,5 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 }

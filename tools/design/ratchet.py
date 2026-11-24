@@ -30,9 +30,12 @@ ROUNDING = re.compile(
     r"|float\s+rounding\s*=\s*[0-9.]+f"
 )
 POPUP = re.compile(r"ImGui::BeginPopup\(")
-ALLOW = {"src/app/ui/design/", "src/app/selftest/UiAudit.cpp"}  # components themselves; UiAudit draws raw widgets on purpose as canaries
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import kit  # noqa: E402  the one kit list (tools/design/kit.py)
 
-KIT = {"src/app/ui/design/"}
+ALLOW = {*kit.KIT, "src/app/selftest/UiAudit.cpp"}  # components themselves; UiAudit draws raw widgets on purpose as canaries
+
+KIT = set(kit.KIT)
 SELFTEST = {"src/app/selftest/"}
 CHROME = ("src/app/frame", "src/app/panels/TerminalPanel.cpp", "src/app/panels/ModMatrixPanel.cpp", "src/app/panels/ChatPanel.cpp",
           "src/app/panels/HelpWindows.cpp", "src/app/panels/SettingsWindow.cpp", "src/app/panels/LibraryPanels.cpp")
@@ -129,7 +132,7 @@ def lint_counts(rx, allow, bases):
             if f.suffix not in (".cpp", ".h", ".mm"): continue
             rel = str(f.relative_to(ROOT))
             if any(rel.startswith(a) for a in allow): continue
-            text = f.read_text(errors="ignore")
+            text = kit.content_out(f.read_text(errors="ignore"))
             if rx is LINTS["raw_labels"][0]:
                 text = english_regions_out(text)
             n = len(rx.findall(text))
@@ -160,7 +163,7 @@ def counts(rx=RX, allow=None, bases=("src/app", "src/arrange", "src/nodes")):
             if f.suffix not in (".cpp", ".h", ".mm"): continue
             rel = str(f.relative_to(ROOT))
             if any(rel.startswith(a) for a in allow): continue
-            n = len(rx.findall(f.read_text(errors="ignore")))
+            n = len(rx.findall(kit.content_out(f.read_text(errors="ignore"))))
             if n: out[rel] = n
     return out
 
@@ -185,6 +188,8 @@ def store(c, w, z, f, rn, pp, lints=None, helpers=None):
                                  "roundings": dict(sorted(rn.items())), "popups": dict(sorted(pp.items())),
                                  "lints": {k: dict(sorted(v.items())) for k, v in sorted(lints.items())},
                                  "helpers": dict(sorted((helpers or {}).items()))})
+    import content_report
+    keep["content_regions"] = dict(sorted(content_report.per_file().items()))
     STORE.write_text(json.dumps(keep, indent=1) + "\n")
     print(f"ratchet: {sum(c.values())} literal colours, {sum(w.values())} raw widget calls, {sum(z.values())} size literals, {sum(f.values())} font scales, {sum(rn.values())} rounding literals, {sum(pp.values())} raw popups")
 
@@ -253,6 +258,14 @@ def main():
     # Token names say the job (owner 2026-11-24): no _arg_N / _draw_x / _ratio_N / trailing-number names: always 0.
     rn = subprocess.run([sys.executable, str(ROOT / "tools/design/token_names.py"), "--lint"])
     ra = subprocess.run(audit)   # per-category counts from the tokenizer scan (tools/design/ui_audit.py)
+    # Declared content regions (tools/design/kit.py): a new region per file is a reviewed ratchet.json change.
+    import content_report
+    cur_cr, old_cr = content_report.per_file(), json.loads(STORE.read_text()).get("content_regions", {})
+    badc = [k for k, v in cur_cr.items() if v > old_cr.get(k, 0)]
+    for k in badc: print(f"RATCHET: {k} has {cur_cr[k]} ui-content regions (allowed {old_cr.get(k, 0)}): review the reason, then --update")
+    rc = subprocess.run([sys.executable, str(ROOT / "tools/design/content_report.py"), "--check"])
+    print(f"ratchet: content regions {sum(cur_cr.values())} (stored {sum(old_cr.values())})")
+    if badc or rc.returncode: badl.append("content")
     return 1 if bad or badw or badz or badf or badr or badp or badl or rawend or r.returncode or ra.returncode or rn.returncode else 0
 
 if __name__ == "__main__":

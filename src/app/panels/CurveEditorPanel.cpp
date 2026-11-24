@@ -676,6 +676,7 @@ namespace
       }
    }
 
+   // ui-content-begin: curve graph: the plotted curve and its grid
    void DrawGraph(ImDrawList* dl, const Areas& a, const MSEGNode& n, int hover)
    {
       const State& s = S();
@@ -779,6 +780,7 @@ namespace
       dl->PopClipRect();
       dl->AddRect(mn, mx, Tint(tok::curve_editor_outline_shade));
    }
+   // ui-content-end
 
    int PointAt(const Areas& a, const MSEGNode& n, ImVec2 m)
    {

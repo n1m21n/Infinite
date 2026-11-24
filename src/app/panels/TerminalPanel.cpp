@@ -285,6 +285,7 @@ namespace
       return (c.flags & term::kCellDefaultBg) ? tok::U32(tok::terminal_bg, CategoryColors::IsThemeLight()) : (ImU32)c.bg;
    }
 
+   // ui-content-begin: terminal: the character grid and caret are the text itself
    void DrawCells(ImDrawList* dl, const term::Snapshot& snap, ImVec2 origin, float cw, float ch, float px,
                   const Tab& tab)
    {
@@ -405,7 +406,9 @@ namespace
          }
       }
    }
+   // ui-content-end
 
+   // ui-content-begin: terminal: the character grid and caret are the text itself
    void DrawCursor(ImDrawList* dl, const term::Snapshot& snap, ImVec2 origin, float cw, float ch, bool focused)
    {
       if (!snap.cursorVisible || snap.cursorRow < 0 || snap.scrollOffset > 0)
@@ -438,6 +441,7 @@ namespace
          }
       }
    }
+   // ui-content-end
 
    int Modifiers(const ImGuiIO& io, bool physicalCtrl)
    {

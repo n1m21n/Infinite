@@ -20,7 +20,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-KIT = "src/app/ui/design/"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kit import KIT  # noqa: E402
 
 DL = r"((?:ImGui::GetWindowDrawList\(\)|ImGui::GetForegroundDrawList\(\)|ImGui::GetBackgroundDrawList\(\)|\w+))->"
 RULES = [

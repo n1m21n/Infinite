@@ -3029,6 +3029,7 @@ namespace
    }
 
    // Blender's 3D cursor: a red and white ring with four ticks.
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    void DrawCursor(ImDrawList* dl)
    {
       ImVec2 s;
@@ -3046,6 +3047,7 @@ namespace
          dl->AddLine(ImVec2(s.x + d.x * tok::view3d_cursor_ratio, s.y + d.y * tok::view3d_cursor_ratio), ImVec2(s.x + d.x * tok::view3d_line_x_sm, s.y + d.y * tok::view3d_line_x_sm), Hex(0x000000, tok::view3d_cursor_line_alpha), tok::view3d_line_stroke_sm);
       }
    }
+   // ui-content-end
 
    void TransformBy(const Mat4& t, const float p[3], float out[3])
    {
@@ -3222,6 +3224,7 @@ namespace
 
    // Draws the bones and runs the mode's clicks and keys. Returns true while
    // the mode owns the mouse and keys (navigation still runs).
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    bool DrawPose(ImDrawList* dl, Scene3DNode* scene, ImVec2 mouse, bool hovered)
    {
       Mat4 world;
@@ -3430,6 +3433,7 @@ namespace
       }
       return true;
    }
+   // ui-content-end
 
    // Sculpt mode (Ctrl+Tab on an item with no rig, or the brush chip):
    // brushes paint the offsets held by the item's Sculpt node (one is
@@ -3591,6 +3595,7 @@ namespace
 
    // Draws the brush and its bar, runs strokes and keys. Returns true while
    // the mode owns the mouse and keys (navigation still runs).
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    bool DrawSculpt(ImDrawList* dl, Scene3DNode* scene, ImVec2 mouse, bool hovered)
    {
       Mat4 world;
@@ -3747,6 +3752,7 @@ namespace
          SculptDab(node, world, mouse);
       return true;
    }
+   // ui-content-end
 
    // Edit Mode (Tab on an item, or the chip): the item's Edit Mesh node (one
    // is added after the item's node if it has none) holds the edits as ops.
@@ -4308,6 +4314,7 @@ namespace
    // Draws the mesh's points, edges and selected faces, runs selection and
    // ops. Returns true while the mode owns the mouse and keys (navigation
    // still runs).
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    bool DrawEdit(ImDrawList* dl, Scene3DNode* scene, ImVec2 mouse, bool hovered)
    {
       Mat4 world;
@@ -4494,8 +4501,10 @@ namespace
       }
       return true;
    }
+   // ui-content-end
 
    // The camera as a frustum, the shape of what it will render.
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    void DrawCameraShape(ImDrawList* dl, Scene3DNode* scene, const Item& it, ImU32 col)
    {
       Mat4 view;
@@ -4578,8 +4587,10 @@ namespace
          }
       }
    }
+   // ui-content-end
 
    // A light drawn as what it does: rays, a cone, a panel, each pointing where it shines.
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    void DrawLightShape(ImDrawList* dl, Scene3DNode* scene, const Item& it, const float p[3], ImU32 col)
    {
       GraphNode* gn = FindNodeByUid(it.uid);
@@ -4685,6 +4696,7 @@ namespace
          Line3D(dl, p, ground, col & tok::view3d_line3_d_mask);
       }
    }
+   // ui-content-end
 
    // Axis directions the handles point along: the orientation, except scale, which is the item's own.
    void HandleAxis(Scene3DNode* scene, int a, float out[3])
@@ -4695,6 +4707,7 @@ namespace
    }
 
    // Draws the tool's handles at the selection and says which one the mouse is on.
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    int DrawGizmo(ImDrawList* dl, Scene3DNode* scene, const float at[3], ImVec2 mouse, bool active)
    {
       ImVec2 c;
@@ -4810,8 +4823,10 @@ namespace
          hot = 3;
       return active ? hot : -1;
    }
+   // ui-content-end
 
    // Top right: the three axes as they stand now. Click a ball for that view, drag to orbit.
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    int DrawNavGizmo(ImDrawList* dl, ImVec2 mn, ImVec2 mx, ImVec2 mouse, bool hovered, bool& onDisc)
    {
       const float pad = tok::view3d_pad_ratio * gView3DPrefs.miniSize / tok::view3d_nav_gizmo_scale_lg;
@@ -4862,6 +4877,7 @@ namespace
       }
       return hit;
    }
+   // ui-content-end
 
    // Nearest item under the ray. Cameras and lights go by their marker and win, being
    // small; geometry goes by its box, hit by the ray itself.
@@ -5007,6 +5023,7 @@ namespace
    }
 
    // The frame, as Blender draws it: dashes round the render, then any guides inside.
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    void DrawCameraGuides(ImDrawList* dl, Scene3DNode* scene)
    {
       const ImVec2 a = sCam.frameMn, b = sCam.frameMx;
@@ -5098,6 +5115,7 @@ namespace
       if (cam->showName)
          dl->AddText(ImVec2(a.x + tok::space_1_5, b.y - ImGui::GetFontSize() - tok::space_1), Hex(kWire, tok::view3d_edge_alpha), ItemName(*active).c_str());
    }
+   // ui-content-end
 
    // Along the bottom edge: drag to zoom, drag to pan, camera view, then the lock or the projection.
    void DrawToolpad(ImDrawList* dl, Scene3DNode* scene, ImVec2 mn, ImVec2 mx, ImVec2 mouse, bool hovered, bool& onPad)
@@ -5233,6 +5251,7 @@ namespace
       gPatchDirty = true;
    }
 
+   // ui-content-begin: 3D viewport: scene guides, gizmos and handles drawn in the scene
    void DrawViewport(Scene3DNode* scene, ImVec2 size)
    {
       const ImGuiIO& io = ImGui::GetIO();
@@ -5744,6 +5763,7 @@ namespace
       }
       dl->PopClipRect();
    }
+   // ui-content-end
 
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip)
    {

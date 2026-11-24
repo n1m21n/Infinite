@@ -2,13 +2,12 @@
  "colours": {},
  "widgets": {
   "src/app/AppShared.h": 3,
-  "src/app/bodies/AudioBodyKit.cpp": 3,
   "src/app/bodies/AudioNodeBodies.cpp": 14,
   "src/app/bodies/GeometryParams.cpp": 10,
   "src/app/bodies/NoteBodies.cpp": 5,
   "src/app/bodies/OscBodies.cpp": 5,
   "src/app/bodies/ParamBodies1.cpp": 6,
-  "src/app/bodies/ParamBodies2.cpp": 8,
+  "src/app/bodies/ParamBodies2.cpp": 7,
   "src/app/bodies/PreviewBodies.cpp": 5,
   "src/app/bodies/SpatialMixerBody.cpp": 2,
   "src/app/frame/StageMenuBar.cpp": 20,
@@ -29,14 +28,10 @@
   "src/app/panels/SettingsWindow.cpp": 1,
   "src/app/panels/View2DPanel.cpp": 27,
   "src/app/panels/View3DPanel.cpp": 1,
-  "src/app/panels/ViewportPanel.cpp": 1,
-  "src/app/ui/ModWidgets.cpp": 43,
-  "src/app/ui/ParamWidgets.cpp": 20,
-  "src/app/ui/Theme.cpp": 21
+  "src/app/panels/ViewportPanel.cpp": 1
  },
  "sizes": {
   "src/app/bodies/AudioBodyKit.cpp": 1,
-  "src/app/bodies/FieldParams.cpp": 1,
   "src/app/graph/PatchLoad.cpp": 2,
   "src/app/graph/Wiring.cpp": 1,
   "src/app/panels/ArrangeSessionGrid.cpp": 2,
@@ -54,8 +49,7 @@
  },
  "lints": {
   "alphas": {
-   "src/app/frame/FrameTestsGpuPoints.cpp": 1,
-   "src/app/panels/View2DPanel.cpp": 1
+   "src/app/frame/FrameTestsGpuPoints.cpp": 1
   },
   "ctl_buttons": {
    "src/app/panels/View2DPanel.cpp": 3
@@ -64,10 +58,7 @@
    "src/app/bodies/GeometryParams.cpp": 3,
    "src/app/bodies/SamplerBodies.cpp": 2,
    "src/app/frame/StageNodeBodies.cpp": 1,
-   "src/app/panels/FieldPatcherPanel.cpp": 2,
-   "src/app/ui/ModWidgets.cpp": 5,
-   "src/app/ui/ParamWidgets.cpp": 1,
-   "src/app/ui/Theme.cpp": 1
+   "src/app/panels/FieldPatcherPanel.cpp": 2
   },
   "ctl_checkboxes": {},
   "ctl_child_windows": {
@@ -100,10 +91,8 @@
   },
   "ctl_context_menus": {},
   "ctl_cursors": {
-   "src/app/bodies/AudioBodyKit.cpp": 1,
-   "src/app/bodies/OscBodies.cpp": 5,
    "src/app/bodies/PreviewBodies.cpp": 1,
-   "src/app/bodies/SamplerBodies.cpp": 5,
+   "src/app/bodies/SamplerBodies.cpp": 1,
    "src/app/bodies/VmpcBody.cpp": 1,
    "src/app/frame/CanvasLink.cpp": 1,
    "src/app/frame/StageMenuBar.cpp": 1,
@@ -122,21 +111,20 @@
    "src/app/panels/SampleStudioPanel.cpp": 5,
    "src/app/panels/TemplatesWindow.cpp": 1,
    "src/app/panels/TerminalPanel.cpp": 2,
-   "src/app/panels/View2DPanel.cpp": 9,
+   "src/app/panels/View2DPanel.cpp": 1,
    "src/app/panels/ViewportPanel.cpp": 1
   },
   "ctl_disabled": {
    "src/app/AppShared.h": 5,
-   "src/app/bodies/AudioBodyKit.cpp": 2,
    "src/app/bodies/AudioNodeBodies.cpp": 12,
    "src/app/bodies/FieldParams.cpp": 1,
-   "src/app/bodies/FxBodies1.cpp": 8,
+   "src/app/bodies/FxBodies1.cpp": 7,
    "src/app/bodies/FxBodies2.cpp": 3,
    "src/app/bodies/GeometryParams.cpp": 62,
    "src/app/bodies/NoteBodies.cpp": 8,
    "src/app/bodies/OscBodies.cpp": 18,
    "src/app/bodies/ParamBodies1.cpp": 5,
-   "src/app/bodies/ParamBodies2.cpp": 4,
+   "src/app/bodies/ParamBodies2.cpp": 2,
    "src/app/bodies/SamplerBodies.cpp": 10,
    "src/app/bodies/SpatialMixerBody.cpp": 1,
    "src/app/bodies/VmpcBody.cpp": 3,
@@ -159,9 +147,7 @@
    "src/app/panels/SampleStudioPanel.cpp": 7,
    "src/app/panels/SettingsWindow.cpp": 8,
    "src/app/panels/View2DPanel.cpp": 21,
-   "src/app/panels/View3DPanel.cpp": 14,
-   "src/app/ui/ModWidgets.cpp": 1,
-   "src/app/ui/ParamWidgets.cpp": 1
+   "src/app/panels/View3DPanel.cpp": 14
   },
   "ctl_drag_drop": {
    "src/app/panels/ArrangePanel.cpp": 3,
@@ -183,17 +169,13 @@
    "src/app/panels/TerminalPanel.cpp": 1
   },
   "ctl_hand_shapes": {
-   "src/app/bodies/AudioBodyKit.cpp": 18,
-   "src/app/bodies/FieldParams.cpp": 10,
-   "src/app/bodies/FxBodies1.cpp": 40,
-   "src/app/bodies/FxBodies2.cpp": 40,
-   "src/app/bodies/GeometryParams.cpp": 14,
-   "src/app/bodies/NoteBodies.cpp": 35,
-   "src/app/bodies/OscBodies.cpp": 82,
-   "src/app/bodies/ParamBodies1.cpp": 36,
-   "src/app/bodies/ParamBodies2.cpp": 41,
-   "src/app/bodies/PreviewBodies.cpp": 8,
-   "src/app/bodies/SamplerBodies.cpp": 52,
+   "src/app/bodies/GeometryParams.cpp": 9,
+   "src/app/bodies/NoteBodies.cpp": 22,
+   "src/app/bodies/OscBodies.cpp": 16,
+   "src/app/bodies/ParamBodies1.cpp": 12,
+   "src/app/bodies/ParamBodies2.cpp": 5,
+   "src/app/bodies/PreviewBodies.cpp": 4,
+   "src/app/bodies/SamplerBodies.cpp": 10,
    "src/app/bodies/SpatialMixerBody.cpp": 10,
    "src/app/bodies/VmpcBody.cpp": 11,
    "src/app/frame/CanvasLink.cpp": 1,
@@ -209,41 +191,31 @@
    "src/app/panels/ChatPanel.cpp": 63,
    "src/app/panels/CliSetupSection.cpp": 3,
    "src/app/panels/CookOverlay.cpp": 1,
-   "src/app/panels/CurveEditorPanel.cpp": 21,
+   "src/app/panels/CurveEditorPanel.cpp": 4,
    "src/app/panels/DrumPanel.cpp": 15,
    "src/app/panels/FieldPatcherPanel.cpp": 1,
    "src/app/panels/FindOverlay.cpp": 1,
    "src/app/panels/HistoryPanel.cpp": 2,
    "src/app/panels/LibraryPanels.cpp": 1,
-   "src/app/panels/Minimap.cpp": 6,
    "src/app/panels/MixerPanel.cpp": 29,
-   "src/app/panels/ModMatrixPanel.cpp": 12,
+   "src/app/panels/ModMatrixPanel.cpp": 1,
    "src/app/panels/PerfPanel.cpp": 34,
-   "src/app/panels/PianoRollPanel.cpp": 16,
-   "src/app/panels/SampleStudioPanel.cpp": 25,
+   "src/app/panels/PianoRollPanel.cpp": 4,
    "src/app/panels/SettingsWindow.cpp": 3,
    "src/app/panels/TemplatesWindow.cpp": 2,
    "src/app/panels/TerminalDraw.cpp": 3,
-   "src/app/panels/TerminalPanel.cpp": 11,
-   "src/app/panels/View2DPanel.cpp": 148,
-   "src/app/panels/View3DPanel.cpp": 78,
-   "src/app/panels/ViewportPanel.cpp": 6,
-   "src/app/ui/ModWidgets.cpp": 33,
-   "src/app/ui/ParamWidgets.cpp": 3,
-   "src/app/ui/Theme.cpp": 4
+   "src/app/panels/TerminalPanel.cpp": 4,
+   "src/app/panels/View2DPanel.cpp": 59,
+   "src/app/panels/View3DPanel.cpp": 7,
+   "src/app/panels/ViewportPanel.cpp": 6
   },
   "ctl_hand_text": {
-   "src/app/bodies/AudioBodyKit.cpp": 4,
-   "src/app/bodies/FieldParams.cpp": 5,
-   "src/app/bodies/FxBodies1.cpp": 11,
-   "src/app/bodies/FxBodies2.cpp": 7,
-   "src/app/bodies/GeometryParams.cpp": 3,
+   "src/app/bodies/GeometryParams.cpp": 2,
    "src/app/bodies/NoteBodies.cpp": 9,
-   "src/app/bodies/OscBodies.cpp": 20,
-   "src/app/bodies/ParamBodies1.cpp": 8,
-   "src/app/bodies/ParamBodies2.cpp": 6,
-   "src/app/bodies/PreviewBodies.cpp": 3,
-   "src/app/bodies/SamplerBodies.cpp": 1,
+   "src/app/bodies/OscBodies.cpp": 2,
+   "src/app/bodies/ParamBodies1.cpp": 2,
+   "src/app/bodies/ParamBodies2.cpp": 3,
+   "src/app/bodies/PreviewBodies.cpp": 2,
    "src/app/bodies/SpatialMixerBody.cpp": 5,
    "src/app/frame/StageFloating.cpp": 2,
    "src/app/frame/StageNodeBodies.cpp": 8,
@@ -259,18 +231,15 @@
    "src/app/panels/HistoryPanel.cpp": 1,
    "src/app/panels/LibraryPanels.cpp": 1,
    "src/app/panels/MixerPanel.cpp": 8,
-   "src/app/panels/ModMatrixPanel.cpp": 1,
    "src/app/panels/PerfPanel.cpp": 5,
-   "src/app/panels/PianoRollPanel.cpp": 5,
-   "src/app/panels/SampleStudioPanel.cpp": 6,
+   "src/app/panels/PianoRollPanel.cpp": 3,
+   "src/app/panels/SampleStudioPanel.cpp": 2,
    "src/app/panels/SettingsWindow.cpp": 3,
    "src/app/panels/TemplatesWindow.cpp": 2,
-   "src/app/panels/TerminalPanel.cpp": 3,
-   "src/app/panels/View2DPanel.cpp": 18,
-   "src/app/panels/View3DPanel.cpp": 20,
-   "src/app/panels/ViewportPanel.cpp": 1,
-   "src/app/ui/ModWidgets.cpp": 6,
-   "src/app/ui/ParamWidgets.cpp": 2
+   "src/app/panels/TerminalPanel.cpp": 1,
+   "src/app/panels/View2DPanel.cpp": 6,
+   "src/app/panels/View3DPanel.cpp": 6,
+   "src/app/panels/ViewportPanel.cpp": 1
   },
   "ctl_hit_areas": {},
   "ctl_images": {
@@ -283,7 +252,6 @@
   },
   "ctl_meters": {
    "src/app/AppShared.h": 3,
-   "src/app/bodies/AudioBodyKit.cpp": 1,
    "src/app/bodies/NoteBodies.cpp": 2,
    "src/app/bodies/OscBodies.cpp": 1,
    "src/app/frame/StageNodeBodies.cpp": 2,
@@ -315,9 +283,7 @@
    "src/app/panels/ModMatrixPanel.cpp": 1,
    "src/app/panels/PerfPanel.cpp": 1,
    "src/app/panels/View2DPanel.cpp": 4,
-   "src/app/panels/View3DPanel.cpp": 9,
-   "src/app/ui/ModWidgets.cpp": 4,
-   "src/app/ui/ParamWidgets.cpp": 2
+   "src/app/panels/View3DPanel.cpp": 9
   },
   "ctl_style_colours": {
    "src/app/AppShared.h": 3,
@@ -337,13 +303,9 @@
    "src/app/panels/ModMatrixPanel.cpp": 9,
    "src/app/panels/PerfPanel.cpp": 4,
    "src/app/panels/SettingsWindow.cpp": 1,
-   "src/app/panels/View2DPanel.cpp": 7,
-   "src/app/ui/ModWidgets.cpp": 43,
-   "src/app/ui/ParamWidgets.cpp": 16,
-   "src/app/ui/Theme.cpp": 14
+   "src/app/panels/View2DPanel.cpp": 7
   },
   "ctl_style_vars": {
-   "src/app/bodies/OscBodies.cpp": 1,
    "src/app/frame/StageMenuBar.cpp": 8,
    "src/app/frame/StageNodeBodies.cpp": 7,
    "src/app/frame/StagePopupsB.cpp": 5,
@@ -357,9 +319,7 @@
    "src/app/panels/PerfPanel.cpp": 1,
    "src/app/panels/View2DPanel.cpp": 15,
    "src/app/panels/View3DPanel.cpp": 1,
-   "src/app/panels/ViewportPanel.cpp": 1,
-   "src/app/ui/ParamWidgets.cpp": 4,
-   "src/app/ui/Theme.cpp": 7
+   "src/app/panels/ViewportPanel.cpp": 1
   },
   "ctl_tables_lists": {},
   "ctl_tabs": {},
@@ -373,8 +333,7 @@
    "src/app/panels/MixerPanel.cpp": 1,
    "src/app/panels/ModMatrixPanel.cpp": 1,
    "src/app/panels/View2DPanel.cpp": 4,
-   "src/app/panels/View3DPanel.cpp": 1,
-   "src/app/ui/ModWidgets.cpp": 3
+   "src/app/panels/View3DPanel.cpp": 1
   },
   "ctl_tree_folds": {},
   "ctl_wires": {},
@@ -401,8 +360,7 @@
   "line_icons": {
    "src/app/frame/StageLinks.cpp": 1,
    "src/app/frame/StageMenuBar.cpp": 1,
-   "src/app/panels/ChatPanel.cpp": 6,
-   "src/app/panels/ModMatrixPanel.cpp": 3
+   "src/app/panels/ChatPanel.cpp": 6
   },
   "palette": {},
   "raw_inputs": {
@@ -425,16 +383,13 @@
    "src/app/panels/ModMatrixPanel.cpp": 2,
    "src/app/panels/PerfPanel.cpp": 1,
    "src/app/panels/View2DPanel.cpp": 9,
-   "src/app/panels/View3DPanel.cpp": 10,
-   "src/app/ui/ModWidgets.cpp": 7,
-   "src/app/ui/ParamWidgets.cpp": 2
+   "src/app/panels/View3DPanel.cpp": 10
   },
   "raw_labels": {},
   "timings": {
    "src/app/AppShared.h": 1,
    "src/app/bodies/AudioNodeBodies.cpp": 1,
    "src/app/bodies/ParamBodies1.cpp": 1,
-   "src/app/bodies/PreviewBodies.cpp": 1,
    "src/app/frame/FrameTests5.cpp": 1,
    "src/app/frame/FrameTests6.cpp": 2,
    "src/app/frame/StageBenchHarness.cpp": 3,
@@ -454,8 +409,7 @@
    "src/app/panels/SettingsWindow.cpp": 2,
    "src/app/panels/TerminalPanel.cpp": 3,
    "src/app/panels/View2DPanel.cpp": 4,
-   "src/app/panels/View3DPanel.cpp": 1,
-   "src/app/ui/ParamWidgets.cpp": 1
+   "src/app/panels/View3DPanel.cpp": 1
   },
   "tooltips": {}
  },
@@ -480,18 +434,16 @@
  "audit": {},
  "audit_ok": 223,
  "layout_call": {
-  "src/app/bodies/AudioBodyKit.cpp": 15,
   "src/app/bodies/AudioNodeBodies.cpp": 20,
-  "src/app/bodies/FieldParams.cpp": 5,
-  "src/app/bodies/FxBodies1.cpp": 19,
-  "src/app/bodies/FxBodies2.cpp": 34,
+  "src/app/bodies/FxBodies1.cpp": 11,
+  "src/app/bodies/FxBodies2.cpp": 18,
   "src/app/bodies/GeometryParams.cpp": 13,
-  "src/app/bodies/NoteBodies.cpp": 37,
-  "src/app/bodies/OscBodies.cpp": 79,
-  "src/app/bodies/ParamBodies1.cpp": 10,
-  "src/app/bodies/ParamBodies2.cpp": 12,
-  "src/app/bodies/PreviewBodies.cpp": 6,
-  "src/app/bodies/SamplerBodies.cpp": 43,
+  "src/app/bodies/NoteBodies.cpp": 34,
+  "src/app/bodies/OscBodies.cpp": 66,
+  "src/app/bodies/ParamBodies1.cpp": 9,
+  "src/app/bodies/ParamBodies2.cpp": 9,
+  "src/app/bodies/PreviewBodies.cpp": 3,
+  "src/app/bodies/SamplerBodies.cpp": 39,
   "src/app/bodies/SpatialMixerBody.cpp": 5,
   "src/app/bodies/VmpcBody.cpp": 4,
   "src/app/frame/StageFloating.cpp": 4,
@@ -506,9 +458,27 @@
   "src/app/panels/LibraryPanels.cpp": 4,
   "src/app/panels/ModMatrixPanel.cpp": 1,
   "src/app/panels/View2DPanel.cpp": 6,
-  "src/app/panels/ViewportPanel.cpp": 1,
-  "src/app/ui/ModWidgets.cpp": 2,
-  "src/app/ui/ParamWidgets.cpp": 1
+  "src/app/panels/ViewportPanel.cpp": 1
  },
- "layout_canvas": 3
+ "layout_canvas": 3,
+ "content_regions": {
+  "src/app/bodies/FieldParams.cpp": 5,
+  "src/app/bodies/FxBodies1.cpp": 12,
+  "src/app/bodies/FxBodies2.cpp": 16,
+  "src/app/bodies/GeometryParams.cpp": 1,
+  "src/app/bodies/NoteBodies.cpp": 4,
+  "src/app/bodies/OscBodies.cpp": 15,
+  "src/app/bodies/ParamBodies1.cpp": 4,
+  "src/app/bodies/ParamBodies2.cpp": 5,
+  "src/app/bodies/PreviewBodies.cpp": 3,
+  "src/app/bodies/SamplerBodies.cpp": 5,
+  "src/app/panels/CurveEditorPanel.cpp": 1,
+  "src/app/panels/Minimap.cpp": 1,
+  "src/app/panels/ModMatrixPanel.cpp": 2,
+  "src/app/panels/PianoRollPanel.cpp": 4,
+  "src/app/panels/SampleStudioPanel.cpp": 2,
+  "src/app/panels/TerminalPanel.cpp": 2,
+  "src/app/panels/View2DPanel.cpp": 10,
+  "src/app/panels/View3DPanel.cpp": 10
+ }
 }

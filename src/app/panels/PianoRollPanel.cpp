@@ -565,6 +565,7 @@ namespace
       return { a.x0, a.x1, a.XTick(a.x0) / (double)Arrange::kPPQ, (double)Arrange::kPPQ * S().pxPerTick, 4.0 };
    }
 
+   // ui-content-begin: piano roll: note grid, keys, ruler and notes are the edited picture
    void DrawRuler(ImDrawList* dl, const Areas& a)
    {
       const TimeRuler::Axis axis = RulerAxis(a);
@@ -577,6 +578,7 @@ namespace
       else
          TimeRuler::DrawBars(dl, axis, a.rulerY);
    }
+   // ui-content-end
 
    void DrawClipStrip(ImDrawList* dl, const Areas& a, const Arrange::Lane& page)
    {
@@ -622,6 +624,7 @@ namespace
       }
    }
 
+   // ui-content-begin: piano roll: note grid, keys, ruler and notes are the edited picture
    void DrawKeys(ImDrawList* dl, const Areas& a, const Arrange::Lane& page)
    {
       const State& s = S();
@@ -650,7 +653,9 @@ namespace
       }
       dl->PopClipRect();
    }
+   // ui-content-end
 
+   // ui-content-begin: piano roll: note grid, keys, ruler and notes are the edited picture
    void DrawGrid(ImDrawList* dl, const Areas& a, const Arrange::Lane& page)
    {
       const State& s = S();
@@ -687,10 +692,12 @@ namespace
          dl->AddLine(ImVec2(x, a.rollY), ImVec2(x, a.rollB), Tint(alpha));
       }
    }
+   // ui-content-end
 
    // Drum rows draw every note as the same short hit.
    float DrumHitW() { return std::max(6.0f, (float)(S().pxPerTick * (double)(Arrange::kPPQ / 4))); }
 
+   // ui-content-begin: piano roll: note grid, keys, ruler and notes are the edited picture
    void DrawClipsAndNotes(ImDrawList* dl, const Areas& a, const Arrange::Lane& page)
    {
       const State& s = S();
@@ -728,6 +735,7 @@ namespace
          });
       }
    }
+   // ui-content-end
 
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, bool green = false)
    {

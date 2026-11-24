@@ -20,6 +20,7 @@ namespace app
    // and `mix` are deliberately not reflected here (an animated live LFO
    // costs more to draw than the effect it illustrates - README §1 - and
    // mix never changes a wet effect's own shape).
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawChorusVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -74,6 +75,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -176,6 +178,7 @@ namespace app
    // directly (the Ableton flanger reference's own dual-wave look, adapted
    // to this codebase's single accent color via a dim dry trace instead of
    // a second hue).
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawFlangerVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -237,6 +240,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -328,6 +332,7 @@ namespace app
    // deliberately not reflected - see DrawChorusVisualizer's comment). A
    // second, dimmer trace offset by `spread` shows the right channel's
    // widened sweep.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawPhaserVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -395,6 +400,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -490,6 +496,7 @@ namespace app
    // staircase look (rather than a centered oscillating line) - `bits`
    // sets the step height (levels on the vertical stairs), `rate` sets the
    // step width (how long each hold lasts).
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawBitcrushVisualizer(AudioEffectNode* n, double sampleRate)
    {
       const float w = gAudioBodyW;
@@ -547,6 +554,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -629,6 +637,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawTransientShaperVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -705,6 +714,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -828,6 +838,7 @@ namespace app
    // The modulator waveform itself, one static cycle - the ring-modding
    // oscillator's shape is the node's whole identity (its frequency and
    // waveform, not the input signal, define the sidebands).
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawRingModVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -870,6 +881,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -939,6 +951,7 @@ namespace app
    // partials on the lower row with directional arrows showing rigid sideways
    // translation (the defining characteristic of linear frequency shifting vs
    // harmonic pitch scaling), plus a large in-panel numeric Hz readout.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawFrequencyShifterVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1042,6 +1055,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1112,6 +1126,7 @@ namespace app
    // not - see TremoloKernel.h's class comment on the distinction. The right
    // channel's envelope overlays as a second, dimmer stroke whenever
    // `stereoPhase` is non-zero, since that knob is otherwise invisible.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawTremoloVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1189,6 +1204,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1245,6 +1261,7 @@ namespace app
    // the picture a filter's own frequency-response curve would give, but
    // for three narrow bandpass peaks rather than one broad shape, so three
    // labelled markers reads more clearly than a busy triple-peaked curve.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawFormantFilterVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1292,6 +1309,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1327,6 +1345,7 @@ namespace app
    // ---- Resonator Bank -------------------------------------------------
    // Log-frequency pole-distribution visualizer: stems showing each active
    // resonator's center frequency, Q height and stereo pan coloring.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawResonatorBankVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1424,6 +1443,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1501,6 +1521,7 @@ namespace app
    // ---- Cycle Shaper ---------------------------------------------------
    // Single-wavecycle replacement visualizer: shows the synthesized geometric
    // waveform (Sine / Square / Triangle) within the gate threshold bounds.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawCycleShaperVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1563,6 +1584,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1622,6 +1644,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawSpecBlurVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1726,6 +1749,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1799,6 +1823,7 @@ namespace app
 
    // Live output spectrum on a log axis with a line at every note of the
    // scale (root brighter) - the peaks should sit on the lines.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawKeySnapVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1897,6 +1922,7 @@ namespace app
       }
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1957,6 +1983,7 @@ namespace app
 
    // Live output spectrum on a log axis; a marker under it shows where the
    // slide sits between A (left end) and B (right end).
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawSpectrumSlideVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -2047,6 +2074,7 @@ namespace app
       }
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -2078,6 +2106,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawShapeResonatorVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -2125,6 +2154,7 @@ namespace app
       }
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -2178,6 +2208,7 @@ namespace app
    // The impulse response actually in use (designed or loaded), as its peak
    // level over time on a 0..-72 dB scale. Read from the kernel's main-thread
    // copy, so it is the built response, not a sketch of the settings.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawConvolutionSpaceVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -2229,6 +2260,7 @@ namespace app
       }
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace

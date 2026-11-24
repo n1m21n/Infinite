@@ -8,6 +8,7 @@ namespace app
 {
    // Drawn inside the ed::Suspend() block alongside the popups, so plain
    // ImGui widgets work normally without the editor intercepting the mouse.
+   // ui-content-begin: minimap: a scaled picture of the node canvas
    void DrawMinimap()
    {
       if (!gMinimapEnabled || gNodes.empty())
@@ -135,4 +136,5 @@ namespace app
          }
       }
    }
+   // ui-content-end
 }

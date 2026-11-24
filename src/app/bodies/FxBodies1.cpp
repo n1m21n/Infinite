@@ -73,6 +73,7 @@ namespace app
    // Shared graticule for Audio Filter and EQ - decade-anchored frequency
    // ticks plus dB ticks, both labeled. The two callers were previously
    // drawing identical unlabeled tick loops (confirmed-safe dedup).
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawFilterGraticule(ImDrawList* dl, ImVec2 origin, float w, float h)
    {
       static const float kFreqTicks[] = { 20.0f, 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f,
@@ -122,6 +123,7 @@ namespace app
          }
       }
    }
+   // ui-content-end
 
 
    // Spectrum level has its own dB scale, independent of the +-24 dB gain
@@ -182,6 +184,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawAudioSpectrum(ImDrawList* dl, ImVec2 origin, float w, float h, double sampleRate, const AudioSpectrumState& st,
                        bool isLight)
    {
@@ -207,6 +210,7 @@ namespace app
       }
       dl->PathStroke(lineCol, 0, tok::fx_audio_spectrum_stroke);
    }
+   // ui-content-end
 
 
    // Full-resolution response curve, exactly as the visualizer computes it -
@@ -228,6 +232,7 @@ namespace app
    // band - the reason Audio Filter is built first (§1.1): X = freq,
    // Y = gain, Shift-drag = Q, double-click = enable/disable. This *is* the
    // Tier 1 control surface's picture, per audio-node-ui-system.md §3g.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawAudioFilterVisualizer(AudioEffectNode* n, double sampleRate)
    {
       const float w = gAudioBodyW;
@@ -417,6 +422,7 @@ namespace app
       // double-reserve it and leave a blank gap the height of the graph
       // between it and whatever's drawn next.
    }
+   // ui-content-end
 
 
    // Forward declaration: the shared sync/rate-mode cell pair Chorus/
@@ -579,6 +585,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawEqVisualizer(AudioEffectNode* n, double sampleRate)
    {
       const float w = gAudioBodyW;
@@ -859,6 +866,7 @@ namespace app
       // No trailing Dummy: the InvisibleButton above already reserved this
       // (w, h) layout space.
    }
+   // ui-content-end
 
 
    // One band's four cells - [type v][freq][Q][gain] - at that band's own
@@ -1033,6 +1041,7 @@ namespace app
 
    // The gain-computer picture shared by Dynamics and Limiter (a limiter is the same curve with an
    // infinite ratio): transfer curve + threshold marker + live operating point + slim GR meter.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawGainComputerVisualizer(const char* readoutKey, float threshold, float ratio, float makeupDb,
                                    float inGainDb, const GainVizLive& live, float kneeDb = 6.0f)
    {
@@ -1158,6 +1167,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1297,6 +1307,7 @@ namespace app
    // path now, so this is exact, not illustrative. Deliberately not a full
    // IR view (README §1's drawing-cost warning): main-thread from params
    // only, except the two meter values for the level pair beneath.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawDelayVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1356,6 +1367,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1475,6 +1487,7 @@ namespace app
    // FDN's actual impulse response is not something worth computing here -
    // README §1's drawing-cost warning - the envelope shape is what a user
    // tweaking size/decay/damping actually needs to see).
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawReverbVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1537,6 +1550,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1612,6 +1626,7 @@ namespace app
    // the live running kernel - same discipline as Dynamics' curve. Tone is
    // a post-shape filter, not part of the static curve, so it's left out
    // here exactly as Delay's tone tilt is left out of the tap-bar view.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawDriveVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1664,6 +1679,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1713,6 +1729,7 @@ namespace app
    // One transfer curve per stage, side by side, at the stage's amount - the
    // same main-thread-from-params rule as Drive's curve. A stage that is off
    // shows the dim 1:1 line alone.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawSaturatorVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1765,6 +1782,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
    namespace
    {
@@ -1848,6 +1866,7 @@ namespace app
    // at the kernel's last input sample (ExtraMeterValue(0)), since this curve
    // is otherwise entirely static and the dot is what makes it read as an
    // instrument rather than a diagram.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawWavetableShaperVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -1937,6 +1956,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -2007,6 +2027,7 @@ namespace app
    // same picture the reference plugin's stereo field display uses.
    // `bassMono` is a frequency-domain effect a polar field can't depict, so
    // it's shown as a text label instead.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawStereoVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -2091,6 +2112,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -2124,6 +2146,7 @@ namespace app
    // A simple bipolar meter (-24..+24 semitones) rather than a spectrogram -
    // the shift amount is the node's whole identity and a spectrogram would
    // cost far more to draw than this effect's DSP itself (README §1).
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawPitchShiftVisualizer(AudioEffectNode* n)
    {
       const float w = gAudioBodyW;
@@ -2156,6 +2179,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace

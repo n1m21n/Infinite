@@ -708,6 +708,7 @@ namespace app
    }
 
 
+   // ui-content-begin: editable graph: the curve, ramp or grid the user drags
    void DrawProjectionHandleOverlay(ProjectionNode* node, ImVec2 origin, ImVec2 imageSize, const char* btnIdSuffix)
    {
       ImGui::SetCursorScreenPos(origin);
@@ -821,8 +822,10 @@ namespace app
          }
       }
    }
+   // ui-content-end
 
 
+   // ui-content-begin: node preview: the node's output picture
    void DrawProjectionPreview(ProjectionNode* node)
    {
       const float size = kViewportSize;
@@ -847,6 +850,7 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(size, size));
    }
+   // ui-content-end
 
 
    void DrawProjectionParams(ProjectionNode* n)
@@ -1085,6 +1089,7 @@ namespace app
    }
 
 
+   // ui-content-begin: editable graph: the curve, ramp or grid the user drags
    void DrawPatternStepGrid(PatternNode* n)
    {
       const int count = std::clamp(n->EffectiveLength(), 1, PatternNode::kSteps);
@@ -1299,6 +1304,7 @@ namespace app
       }
       PopTextWrapWidth();
    }
+   // ui-content-end
 
 
    namespace
@@ -1806,6 +1812,7 @@ namespace app
 
    // 2D control surface. Dragging the orb sweeps the mutation weights; the
    // recorded path is drawn behind it so a loop is visible while it plays.
+   // ui-content-begin: editable graph: the curve, ramp or grid the user drags
    void DrawFxPad(ResynthNode* n)
    {
       const float size = kPreviewSize;
@@ -1865,6 +1872,7 @@ namespace app
       dl->AddCircle(orb, tok::param_fx_pad_r, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, tok::param_ring_stroke_lg);
       AudioViz::Border(dl, origin, br);
    }
+   // ui-content-end
 
 
    namespace

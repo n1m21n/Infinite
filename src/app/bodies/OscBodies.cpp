@@ -13,6 +13,7 @@
 
 namespace app
 {
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawOscillatorScope(OscillatorNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -69,8 +70,10 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawMetallicScope(MetallicNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -127,6 +130,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    // Sampler's waveform + playhead: the shared trimmed waveform (DrawTrimWave
@@ -172,6 +176,7 @@ namespace app
    // at 0) can be dragged. Grid boundaries are derived from the transport, so
    // dragging them is disabled rather than silently undone on the next
    // recompute.
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawSlicerWaveform(SlicerNode* n, float h, float width)
    {
       static const char* kPitchClass[12] = { "C", "C#", "D", "D#", "E", "F",
@@ -302,9 +307,11 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    // Waveform and playhead renderer for PaulStretch extreme time-stretcher
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawPaulStretchWaveform(PaulStretchNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -410,9 +417,11 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    // Waveform and real-time grain particle renderer for Granular synthesis node
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawGranularWaveform(GranularNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -555,6 +564,7 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    // Narrow vertical meter drawn beside a channel fader. Same traffic-light
@@ -619,6 +629,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawWavetableFrames(WavetableEngine& eng, const char* id, float h, float width, bool dim)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -705,6 +716,7 @@ namespace app
       if (hovered)
          SetAudioReadout("position", posText);
    }
+   // ui-content-end
 
 
    ADSRLayout ComputeADSRLayout(ImVec2 origin, float w, float h, float attackMs, float decayMs,
@@ -790,6 +802,7 @@ namespace app
 
    // Directly editable ADSR: interactive handles with proportional relative-time
    // display, analog exponential decay/release curves, and smooth responsive dragging.
+   // ui-content-begin: editable graph: the curve, ramp or grid the user drags
    void DrawEditableADSR(const char* id, float* attackMs, float* decayMs, float* sustain,
                          float* releaseMs, float maxTimeMs, float h, ImU32 color, float width,
                          const ::ModShapes::Ahdsr* shape = nullptr)
@@ -1061,6 +1074,7 @@ namespace app
          SetAudioReadout("ADSR", buf);
       }
    }
+   // ui-content-end
 
 
    // ---- Wavetable --------------------------------------------------------
@@ -1513,6 +1527,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawOscillatorWaveform(int waveform, float phase, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -1623,6 +1638,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -1873,6 +1889,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawFMScope(FMNode* n, float h)
    {
       const double now = ImGui::GetTime();
@@ -1911,6 +1928,7 @@ namespace app
       AudioViz::End(f);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -2107,6 +2125,7 @@ namespace app
 
 
    // The string from nut (left) to bridge (right) with the exciter's point on it.
+   // ui-content-begin: instrument picture: keys/strings drawn as the instrument
    void DrawStringDiagram(StringNode* n, float h)
    {
       const float w = gAudioContentW;
@@ -2127,6 +2146,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
    namespace
    {
@@ -2200,6 +2220,7 @@ namespace app
 
    // The bore from mouthpiece (left) to bell (right): straight for the
    // clarinet and flute, a cone for the sax, a flare at the end for brass.
+   // ui-content-begin: instrument picture: keys/strings drawn as the instrument
    void DrawWindDiagram(WindNode* n, float h)
    {
       const float w = gAudioContentW;
@@ -2234,6 +2255,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
    namespace
    {
@@ -2282,6 +2304,7 @@ namespace app
 
    // Three unison strings from the bridge pin (left) and the hammer under
    // them at an eighth of their length, lifted while a note is sounding.
+   // ui-content-begin: instrument picture: keys/strings drawn as the instrument
    void DrawPianoDiagram(PianoNode* n, float h)
    {
       const float w = gAudioContentW;
@@ -2305,6 +2328,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
    namespace
    {
@@ -2354,6 +2378,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawWaveTerrainScope(WaveTerrainNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -2405,6 +2430,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -2638,6 +2664,7 @@ namespace app
     }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawEquationVisualizer(EquationNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -2752,6 +2779,7 @@ namespace app
       AudioViz::End(vizFrame);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -2888,6 +2916,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawImageSpectralSynthScope(ImageSpectralSynthNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -2939,6 +2968,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace

@@ -389,6 +389,7 @@ namespace app
    // of its lit/unlit fill - Note Filter's live last-note-passed/blocked
    // marker (node-ui-pillars P9's "one live marker" requirement). MIDI Notes
    // doesn't pass it, so its two call sites are unaffected by the default.
+   // ui-content-begin: instrument picture: keys/strings drawn as the instrument
    void DrawMidiKeyboard(const bool held[128], int lowNote, int octaves, int ringNote = -1, bool ringGood = true)
    {
       const float w = gAudioBodyW, h = tok::note_h;
@@ -444,6 +445,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -574,6 +576,7 @@ namespace app
    // lowNote and never moves, so what you see is always what you're pressing.
    // Returns the note the mouse is currently over while the button is held
    // (drag included), or -1 when nothing is pressed.
+   // ui-content-begin: instrument picture: keys/strings drawn as the instrument
    int DrawInteractiveKeyboard(const bool held[128], int lowNote, int octaves)
    {
       const float w = gAudioBodyW, h = tok::note_interactive_keyboard_h;
@@ -655,6 +658,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       return hitNote;
    }
+   // ui-content-end
 
 
    struct TypingKey { ImGuiKey key; int semitone; };
@@ -1240,6 +1244,7 @@ namespace app
    // body. Read-only (the curve is fully determined by the one knob below
    // it), but redrawn from the live curve value every frame like every
    // other params-only visualizer in this file.
+   // ui-content-begin: editable graph: the curve, ramp or grid the user drags
    void DrawVelocityCurveChart(float curve)
    {
       const float w = gAudioBodyW;
@@ -1276,6 +1281,7 @@ namespace app
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
+   // ui-content-end
 
 
    namespace
@@ -2853,6 +2859,7 @@ namespace app
    }
 
 
+   // ui-content-begin: node visualizer: the signal picture (trace, spectrum, meter, grid)
    void DrawBouncingBallsVisualizer(BouncingBallsNode* n)
    {
       // The frame is the full body width like every other viewer (shared left/right edges); the square
@@ -2911,6 +2918,7 @@ namespace app
       ImGui::SetCursorScreenPos(rowOrigin);
       ImGui::Dummy(ImVec2(fullW, h));
    }
+   // ui-content-end
 
 
    namespace
