@@ -84,6 +84,19 @@ namespace app
    }
 
 
+   namespace
+   {
+      using SlideshowParamsRow = params::Row<SlideshowNode>;
+      const SlideshowParamsRow kSlideshowParamsRows[] = {
+         SlideshowParamsRow::Choice<&SlideshowNode::transition>("transition", &SlideshowNode::TransitionNames),
+         SlideshowParamsRow::Slider<&SlideshowNode::holdDuration>("hold", params::Slideshow::hold_duration_lo, params::Slideshow::hold_duration_hi).Fmt("%.2f s"),
+         SlideshowParamsRow::Slider<&SlideshowNode::transitionDuration>("transition time", params::Slideshow::transition_duration_lo, params::Slideshow::transition_duration_hi).Fmt("%.2f s"),
+         SlideshowParamsRow::Choice<&SlideshowNode::fitMode>("fit", &SlideshowNode::FitModeNames),
+         SlideshowParamsRow::Slider<&SlideshowNode::width>("width", params::Slideshow::width_lo, params::Slideshow::width_hi).Fmt("%.0f"),
+         SlideshowParamsRow::Slider<&SlideshowNode::height>("height", params::Slideshow::height_lo, params::Slideshow::height_hi).Fmt("%.0f"),
+      };
+   }
+
    void DrawSlideshowParams(SlideshowNode* n)
    {
       if (ActionButton::Draw("Choose folder...", ImVec2(kPreviewSize, 0)))
@@ -95,14 +108,7 @@ namespace app
             n->ReloadFromFolder();
       }
 
-      DropdownButton("transition", SlideshowNode::TransitionNames(), n->transition,
-                     [n](int i) { n->transition = i; });
-      ModSlider("hold", &n->holdDuration, params::Slideshow::hold_duration_lo, params::Slideshow::hold_duration_hi, "%.2f s");
-      ModSlider("transition time", &n->transitionDuration, params::Slideshow::transition_duration_lo, params::Slideshow::transition_duration_hi, "%.2f s");
-      DropdownButton("fit", SlideshowNode::FitModeNames(), n->fitMode,
-                     [n](int i) { n->fitMode = i; });
-      ModSlider("width", &n->width, params::Slideshow::width_lo, params::Slideshow::width_hi, "%.0f");
-      ModSlider("height", &n->height, params::Slideshow::height_lo, params::Slideshow::height_hi, "%.0f");
+      Ui::DrawParams(n, kSlideshowParamsRows);
 
       PushTextWrapWidth(kPreviewSize);
       if (!n->LastError().empty())
@@ -281,25 +287,41 @@ namespace app
    }
 
 
-   void DrawOscReceiveParams(OscReceiveNode* n)
+   namespace
    {
-      ModSliderInt("port", &n->port, params::OscReceive::port_lo, params::OscReceive::port_hi);
-      ImGui::SetNextItemWidth(kParamWidth);
-      FieldWell::InputText("address", &n->address);
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
+      using OscReceiveParamsRow = params::Row<OscReceiveNode>;
+      const OscReceiveParamsRow kOscReceiveParamsRows[] = {
+         OscReceiveParamsRow::Slider<&OscReceiveNode::low>("low", 0.0f, 1.0f),
+         OscReceiveParamsRow::Slider<&OscReceiveNode::high>("high", 0.0f, 1.0f),
+      };
    }
 
+   void DrawOscReceiveParams(OscReceiveNode* n)
+   {
+      Ui::DrawParam(n, OscReceiveParamsRow::SliderInt<&OscReceiveNode::port>("port", params::OscReceive::port_lo, params::OscReceive::port_hi));
+      ImGui::SetNextItemWidth(kParamWidth);
+      FieldWell::InputText("address", &n->address);
+      Ui::DrawParams(n, kOscReceiveParamsRows);
+   }
+
+
+   namespace
+   {
+      using OscSendParamsRow = params::Row<OscSendNode>;
+      const OscSendParamsRow kOscSendParamsRows[] = {
+         OscSendParamsRow::Slider<&OscSendNode::epsilon>("epsilon", params::OscSend::epsilon_lo, params::OscSend::epsilon_hi).Fmt("%.4f"),
+         OscSendParamsRow::Slider<&OscSendNode::intervalMs>("interval (ms)", params::OscSend::interval_ms_lo, params::OscSend::interval_ms_hi).Fmt("%.0f"),
+      };
+   }
 
    void DrawOscSendParams(OscSendNode* n)
    {
       ImGui::SetNextItemWidth(kParamWidth);
       FieldWell::InputText("host", &n->host);
-      ModSliderInt("port", &n->port, params::OscSend::port_lo, params::OscSend::port_hi);
+      Ui::DrawParam(n, OscSendParamsRow::SliderInt<&OscSendNode::port>("port", params::OscSend::port_lo, params::OscSend::port_hi));
       ImGui::SetNextItemWidth(kParamWidth);
       FieldWell::InputText("address", &n->address);
-      ModSlider("epsilon", &n->epsilon, params::OscSend::epsilon_lo, params::OscSend::epsilon_hi, "%.4f");
-      ModSlider("interval (ms)", &n->intervalMs, params::OscSend::interval_ms_lo, params::OscSend::interval_ms_hi, "%.0f");
+      Ui::DrawParams(n, kOscSendParamsRows);
       if (n->LastSent() < 0.0f)
          ImGui::TextDisabled("not sent yet");
       else
@@ -307,17 +329,31 @@ namespace app
    }
 
 
+   namespace
+   {
+      using EnvironmentParamsRow = params::Row<EnvironmentNode>;
+      const EnvironmentParamsRow kEnvironmentParamsRows1[] = {
+         EnvironmentParamsRow::Slider<&EnvironmentNode::skyElevation>("sun elevation", params::Environment::sky_elevation_lo, params::Environment::sky_elevation_hi).Fmt("%.1f\xC2\xB0"),
+         EnvironmentParamsRow::Slider<&EnvironmentNode::skyAzimuth>("sun azimuth", params::Environment::sky_azimuth_lo, params::Environment::sky_azimuth_hi).Fmt("%.1f\xC2\xB0"),
+         EnvironmentParamsRow::Slider<&EnvironmentNode::turbidity>("turbidity", params::Environment::turbidity_lo, params::Environment::turbidity_hi),
+         EnvironmentParamsRow::Slider<&EnvironmentNode::intensity>("intensity", params::Environment::intensity_lo, params::Environment::intensity_hi),
+         EnvironmentParamsRow::Slider<&EnvironmentNode::rotation>("rotation", params::Environment::rotation_lo, params::Environment::rotation_hi).Fmt("%.1f\xC2\xB0"),
+      };
+      const EnvironmentParamsRow kEnvironmentParamsRows2[] = {
+         EnvironmentParamsRow::Slider<&EnvironmentNode::intensity>("intensity", params::Environment::intensity_lo, params::Environment::intensity_hi),
+         EnvironmentParamsRow::Slider<&EnvironmentNode::rotation>("rotation", params::Environment::rotation_lo, params::Environment::rotation_hi).Fmt("%.1f\xC2\xB0"),
+         // Skewed so half the travel covers 0..5, where most skies' suns are cut; the rest reaches 100.
+         EnvironmentParamsRow::Slider<&EnvironmentNode::sunThreshold>("sun threshold", params::Environment::sun_threshold_lo, params::Environment::sun_threshold_hi).Curve([](float p, float lo, float hi) { return SkewTaperMath::PosToValue(p, lo, hi, 5.0f); }, [](float v, float lo, float hi) { return SkewTaperMath::ValueToPos(v, lo, hi, 5.0f); }),
+      };
+   }
+
    void DrawEnvironmentParams(EnvironmentNode* n)
    {
       static const std::vector<std::string> kSources = { "Image", "Physical sky" };
       DropdownButton("source", kSources, n->source, [n](int i) { n->source = i; }, kParamWidth);
       if (n->source == 1)
       {
-         ModSlider("sun elevation", &n->skyElevation, params::Environment::sky_elevation_lo, params::Environment::sky_elevation_hi, "%.1f\xC2\xB0");
-         ModSlider("sun azimuth", &n->skyAzimuth, params::Environment::sky_azimuth_lo, params::Environment::sky_azimuth_hi, "%.1f\xC2\xB0");
-         ModSlider("turbidity", &n->turbidity, params::Environment::turbidity_lo, params::Environment::turbidity_hi);
-         ModSlider("intensity", &n->intensity, params::Environment::intensity_lo, params::Environment::intensity_hi);
-         ModSlider("rotation", &n->rotation, params::Environment::rotation_lo, params::Environment::rotation_hi, "%.1f\xC2\xB0");
+         Ui::DrawParams(n, kEnvironmentParamsRows1);
          return;
       }
       if (ActionButton::Draw("Choose HDRI...", ImVec2(kPreviewSize, 0)))
@@ -343,12 +379,7 @@ namespace app
          PopTextWrapWidth();
       }
 
-      ModSlider("intensity", &n->intensity, params::Environment::intensity_lo, params::Environment::intensity_hi);
-      ModSlider("rotation", &n->rotation, params::Environment::rotation_lo, params::Environment::rotation_hi, "%.1f\xC2\xB0");
-      // Skewed so half the travel covers 0..5, where most skies' suns are cut; the rest reaches 100.
-      ModSlider("sun threshold", &n->sunThreshold, params::Environment::sun_threshold_lo, params::Environment::sun_threshold_hi, "%.3f", kParamWidth, false, 0.0f,
-                [](float p, float lo, float hi) { return SkewTaperMath::PosToValue(p, lo, hi, 5.0f); },
-                [](float v, float lo, float hi) { return SkewTaperMath::ValueToPos(v, lo, hi, 5.0f); });
+      Ui::DrawParams(n, kEnvironmentParamsRows2);
    }
 
 
@@ -391,6 +422,21 @@ namespace app
    }
 
 
+   namespace
+   {
+      using FormulaParamsRow = params::Row<FormulaNode>;
+      const FormulaParamsRow kFormulaParamsRows1[] = {
+         FormulaParamsRow::Slider<&FormulaNode::width>("width", params::Formula::width_lo, params::Formula::width_hi).Fmt("%.0f"),
+         FormulaParamsRow::Slider<&FormulaNode::height>("height", params::Formula::height_lo, params::Formula::height_hi).Fmt("%.0f"),
+      };
+      const FormulaParamsRow kFormulaParamsRows2[] = {
+         FormulaParamsRow::Slider<&FormulaNode::knobA>("uA", 0.0f, 1.0f),
+         FormulaParamsRow::Slider<&FormulaNode::knobB>("uB", 0.0f, 1.0f),
+         FormulaParamsRow::Slider<&FormulaNode::knobC>("uC", 0.0f, 1.0f),
+         FormulaParamsRow::Slider<&FormulaNode::knobD>("uD", 0.0f, 1.0f),
+      };
+   }
+
    void DrawFormulaParams(FormulaNode* n)
    {
       // The GLSL editor lives in its own window, not inline: ImGui multi-line
@@ -423,8 +469,7 @@ namespace app
          PopTextWrapWidth();
       }
 
-      ModSlider("width", &n->width, params::Formula::width_lo, params::Formula::width_hi, "%.0f");
-      ModSlider("height", &n->height, params::Formula::height_lo, params::Formula::height_hi, "%.0f");
+      Ui::DrawParams(n, kFormulaParamsRows1);
       if (n->IsShadertoy())
       {
          const std::vector<FormulaNode::Knob>& knobs = n->Knobs();
@@ -433,14 +478,41 @@ namespace app
       }
       else
       {
-         ModSlider("uA", &n->knobA, 0.0f, 1.0f);
-         ModSlider("uB", &n->knobB, 0.0f, 1.0f);
-         ModSlider("uC", &n->knobC, 0.0f, 1.0f);
-         ModSlider("uD", &n->knobD, 0.0f, 1.0f);
+         Ui::DrawParams(n, kFormulaParamsRows2);
       }
-      ModCheckbox("animate", &n->animate);
+      Ui::DrawParam(n, FormulaParamsRow::Toggle<&FormulaNode::animate>("animate"));
    }
 
+
+   namespace
+   {
+      using TextParamsRow = params::Row<TextNode>;
+      const TextParamsRow kTextParamsRows1[] = {
+         TextParamsRow::Slider<&TextNode::fontSize>("size", params::Text::font_size_lo, params::Text::font_size_hi),
+         TextParamsRow::Colour<&TextNode::color>("colour"),
+         TextParamsRow::Slider<&TextNode::tracking>("tracking", params::Text::tracking_lo, params::Text::tracking_hi),
+         TextParamsRow::Slider<&TextNode::posX>("pos x", 0.0f, 1.0f),
+         TextParamsRow::Slider<&TextNode::posY>("pos y", 0.0f, 1.0f),
+      };
+      const TextParamsRow kTextParamsRows2[] = {
+         TextParamsRow::Slider<&TextNode::scaleX>("scale x", params::Text::scale_x_lo, params::Text::scale_x_hi),
+         TextParamsRow::Slider<&TextNode::scaleY>("scale y", params::Text::scale_y_lo, params::Text::scale_y_hi),
+         TextParamsRow::Toggle<&TextNode::wordWrap>("word wrap"),
+      };
+      const TextParamsRow kTextParamsRows3[] = {
+         TextParamsRow::Slider<&TextNode::wrapWidth>("box width", params::Text::wrap_width_lo, params::Text::wrap_width_hi),
+         TextParamsRow::Slider<&TextNode::wrapHeight>("box height", params::Text::wrap_height_lo, params::Text::wrap_height_hi),
+         TextParamsRow::Toggle<&TextNode::fitToBox>("fit text to box"),
+      };
+      const TextParamsRow kTextParamsRows4[] = {
+         TextParamsRow::Colour<&TextNode::outlineColor>("outline colour"),
+         TextParamsRow::Toggle<&TextNode::outlineOnly>("outline only"),
+      };
+      const TextParamsRow kTextParamsRows5[] = {
+         TextParamsRow::Slider<&TextNode::width>("width", params::Text::width_lo, params::Text::width_hi).Fmt("%.0f"),
+         TextParamsRow::Slider<&TextNode::height>("height", params::Text::height_lo, params::Text::height_hi).Fmt("%.0f"),
+      };
+   }
 
    void DrawTextParams(TextNode* n)
    {
@@ -471,34 +543,37 @@ namespace app
       }
       DropdownButton("font", fonts, fontIdx, [n, &fonts](int i) { n->fontName = fonts[i]; });
 
-      ModSlider("size", &n->fontSize, params::Text::font_size_lo, params::Text::font_size_hi);
-      ColorSwatch("colour", n->color, n);
-      ModSlider("tracking", &n->tracking, params::Text::tracking_lo, params::Text::tracking_hi);
-      ModSlider("pos x", &n->posX, 0.0f, 1.0f);
-      ModSlider("pos y", &n->posY, 0.0f, 1.0f);
+      Ui::DrawParams(n, kTextParamsRows1);
       DropdownButton("align", AlignOptions(), n->align, [n](int i) { n->align = i; });
-      ModSlider("scale x", &n->scaleX, params::Text::scale_x_lo, params::Text::scale_x_hi);
-      ModSlider("scale y", &n->scaleY, params::Text::scale_y_lo, params::Text::scale_y_hi);
-      ModCheckbox("word wrap", &n->wordWrap);
+      Ui::DrawParams(n, kTextParamsRows2);
       if (n->wordWrap)
       {
-         ModSlider("box width", &n->wrapWidth, params::Text::wrap_width_lo, params::Text::wrap_width_hi);
-         ModSlider("box height", &n->wrapHeight, params::Text::wrap_height_lo, params::Text::wrap_height_hi);
-         ModCheckbox("fit text to box", &n->fitToBox);
+         Ui::DrawParams(n, kTextParamsRows3);
          if (n->fitToBox)
             ImGui::TextDisabled("size is a maximum - fitted to %s pt", UiFmt::F0(n->FittedSize()).c);
-         ModSlider("line spacing", &n->lineSpacing, params::Text::line_spacing_lo, params::Text::line_spacing_hi);
+         Ui::DrawParam(n, TextParamsRow::Slider<&TextNode::lineSpacing>("line spacing", params::Text::line_spacing_lo, params::Text::line_spacing_hi));
       }
-      ModSlider("outline", &n->outlineWidth, params::Text::outline_width_lo, params::Text::outline_width_hi);
+      Ui::DrawParam(n, TextParamsRow::Slider<&TextNode::outlineWidth>("outline", params::Text::outline_width_lo, params::Text::outline_width_hi));
       if (n->outlineWidth > 0.0f)
       {
-         ColorSwatch("outline colour", n->outlineColor, n);
-         ModCheckbox("outline only", &n->outlineOnly);
+         Ui::DrawParams(n, kTextParamsRows4);
       }
-      ModSlider("width", &n->width, params::Text::width_lo, params::Text::width_hi, "%.0f");
-      ModSlider("height", &n->height, params::Text::height_lo, params::Text::height_hi, "%.0f");
+      Ui::DrawParams(n, kTextParamsRows5);
    }
 
+
+   namespace
+   {
+      using VideoParamsRow = params::Row<VideoSourceNode>;
+      const VideoParamsRow kVideoParamsRows1[] = {
+         VideoParamsRow::Toggle<&VideoSourceNode::loop>("loop"),
+         VideoParamsRow::Slider<&VideoSourceNode::speed>("speed", params::VideoSource::speed_lo, params::VideoSource::speed_hi),
+      };
+      const VideoParamsRow kVideoParamsRows2[] = {
+         VideoParamsRow::Toggle<&VideoSourceNode::audioEnabled>("audioEnabled"),
+         VideoParamsRow::Slider<&VideoSourceNode::volume>("volume", 0.0f, 1.0f),
+      };
+   }
 
    void DrawVideoParams(VideoSourceNode* n)
    {
@@ -520,8 +595,7 @@ namespace app
          ImGui::TextDisabled("%dx%d  %s / %s", n->GetOutputWidth(), n->GetOutputHeight(),
                              UiFmt::Sec(n->Position()).c, UiFmt::Sec(n->Duration()).c);
       }
-      ModCheckbox("loop", &n->loop);
-      ModSlider("speed", &n->speed, params::VideoSource::speed_lo, params::VideoSource::speed_hi);
+      Ui::DrawParams(n, kVideoParamsRows1);
       {
          double dur = n->Duration();
          float sliderMax = (dur > 0.0) ? (float)dur : 1.0f;
@@ -532,8 +606,7 @@ namespace app
       if (n->HasAudio())
       {
          NodeSeparator();
-         ModCheckbox("audioEnabled", &n->audioEnabled);
-         ModSlider("volume", &n->volume, 0.0f, 1.0f);
+         Ui::DrawParams(n, kVideoParamsRows2);
       }
       else if (!n->AudioError().empty())
       {
@@ -545,11 +618,19 @@ namespace app
    }
 
 
+   namespace
+   {
+      using VideoInParamsRow = params::Row<VideoInNode>;
+      const VideoInParamsRow kVideoInParamsRows[] = {
+         VideoInParamsRow::Toggle<&VideoInNode::active>("active"),
+         VideoInParamsRow::Toggle<&VideoInNode::mirror>("mirror"),
+      };
+   }
+
    void DrawVideoInParams(VideoInNode* n)
    {
       gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // dropdowns as wide as the preview above them
-      ModCheckbox("active", &n->active);
-      ModCheckbox("mirror", &n->mirror);
+      Ui::DrawParams(n, kVideoInParamsRows);
 
       n->RefreshDevices();
       const auto& devices = n->AvailableDevices();
@@ -580,9 +661,7 @@ namespace app
          });
       }
 
-      DropdownButton("res", VideoInNode::ResolutionNames(), n->resolution, [n](int idx) {
-         n->resolution = idx;
-      });
+      Ui::DrawParam(n, VideoInParamsRow::Choice<&VideoInNode::resolution>("res", &VideoInNode::ResolutionNames));
 
       if (!n->LastError().empty())
       {
@@ -599,19 +678,33 @@ namespace app
    }
 
 
+   namespace
+   {
+      using FitParamsRow = params::Row<FitNode>;
+      const FitParamsRow kFitParamsRows1[] = {
+         FitParamsRow::Choice<&FitNode::mode>("mode", &FitNode::ModeNames),
+         FitParamsRow::Toggle<&FitNode::matchInput>("match input res"),
+      };
+      const FitParamsRow kFitParamsRows2[] = {
+         FitParamsRow::Slider<&FitNode::width>("width", params::Fit::width_lo, params::Fit::width_hi).Fmt("%.0f"),
+         FitParamsRow::Slider<&FitNode::height>("height", params::Fit::height_lo, params::Fit::height_hi).Fmt("%.0f"),
+      };
+      const FitParamsRow kFitParamsRows3[] = {
+         FitParamsRow::Slider<&FitNode::offsetX>("offset X", params::Fit::offset_x_lo, params::Fit::offset_x_hi).Fmt("%.0f px"),
+         FitParamsRow::Slider<&FitNode::offsetY>("offset Y", params::Fit::offset_y_lo, params::Fit::offset_y_hi).Fmt("%.0f px"),
+         FitParamsRow::Colour<&FitNode::bgColor>("bg"),
+         FitParamsRow::Slider<&FitNode::bgOpacity>("bg opacity", 0.0f, 1.0f),
+      };
+   }
+
    void DrawFitParams(FitNode* n)
    {
-      DropdownButton("mode", FitNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
-      ModCheckbox("match input res", &n->matchInput);
+      Ui::DrawParams(n, kFitParamsRows1);
       if (!n->matchInput)
       {
-         ModSlider("width", &n->width, params::Fit::width_lo, params::Fit::width_hi, "%.0f");
-         ModSlider("height", &n->height, params::Fit::height_lo, params::Fit::height_hi, "%.0f");
+         Ui::DrawParams(n, kFitParamsRows2);
       }
-      ModSlider("offset X", &n->offsetX, params::Fit::offset_x_lo, params::Fit::offset_x_hi, "%.0f px");
-      ModSlider("offset Y", &n->offsetY, params::Fit::offset_y_lo, params::Fit::offset_y_hi, "%.0f px");
-      ColorSwatch("bg", n->bgColor, n);
-      ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
+      Ui::DrawParams(n, kFitParamsRows3);
    }
 
 
@@ -907,23 +1000,30 @@ namespace app
    }
 
 
+   namespace
+   {
+      using LFOParamsRow = params::Row<LFONode>;
+      const LFOParamsRow kLFOParamsRows[] = {
+         LFOParamsRow::Slider<&LFONode::phase>("phase", 0.0f, 1.0f),
+         LFOParamsRow::Slider<&LFONode::low>("low", 0.0f, 1.0f),
+         LFOParamsRow::Slider<&LFONode::high>("high", 0.0f, 1.0f),
+      };
+   }
+
    void DrawLFOParams(LFONode* n)
    {
-      DropdownButton("shape", LFONode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
+      Ui::DrawParam(n, LFOParamsRow::Choice<&LFONode::shape>("shape", &LFONode::ShapeNames));
       DrawModRateControls(&n->rateMode, &n->rateBeats, &n->rateHz, 4);
-      ModSlider("phase", &n->phase, 0.0f, 1.0f);
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
+      Ui::DrawParams(n, kLFOParamsRows);
       // Per voice, each note starts the cycle: phase from does not apply.
       ImGui::BeginDisabled(n->voice);
-      DropdownButton("phase from", LFONode::PhaseModeNames(), n->phaseMode,
-                     [n](int i) { PushUndoCheckpoint(); n->phaseMode = i; });
+      Ui::DrawParam(n, LFOParamsRow::Choice<&LFONode::phaseMode>("phase from", &LFONode::PhaseModeNames).Undo());
       ImGui::EndDisabled();
       // Seed only means something for S&H (shape 5) on the new maths.
       if (n->shape == 5 && n->maths >= 1)
       {
          FixedParamOrdinal at(5);
-         ModSlider("seed", &n->seed, params::LFO::seed_lo, params::LFO::seed_hi, "%.0f", kParamWidth, false, 1.0f);
+         Ui::DrawParam(n, LFOParamsRow::Slider<&LFONode::seed>("seed", params::LFO::seed_lo, params::LFO::seed_hi).Fmt("%.0f").Step(1.0f));
       }
       else
       {
@@ -933,33 +1033,55 @@ namespace app
    }
 
 
+   namespace
+   {
+      using RandomParamsRow = params::Row<RandomNode>;
+      const RandomParamsRow kRandomParamsRows[] = {
+         RandomParamsRow::Slider<&RandomNode::smooth>("smooth", 0.0f, 1.0f),
+         RandomParamsRow::Slider<&RandomNode::low>("low", 0.0f, 1.0f),
+         RandomParamsRow::Slider<&RandomNode::high>("high", 0.0f, 1.0f),
+         RandomParamsRow::Slider<&RandomNode::seed>("seed", params::Random::seed_lo, params::Random::seed_hi).Fmt("%.0f").Step(1.0f),
+      };
+   }
+
    void DrawRandomParams(RandomNode* n)
    {
       DrawModRateControls(&n->rateMode, &n->rateBeats, &n->rateHz, 5);
-      ModSlider("smooth", &n->smooth, 0.0f, 1.0f);
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
-      ModSlider("seed", &n->seed, params::Random::seed_lo, params::Random::seed_hi, "%.0f", kParamWidth, false, 1.0f);
+      Ui::DrawParams(n, kRandomParamsRows);
       DrawPerVoiceCheckbox(&n->voice);
    }
 
 
+   namespace
+   {
+      using VoiceSpreadParamsRow = params::Row<VoiceSpreadNode>;
+      const VoiceSpreadParamsRow kVoiceSpreadParamsRows[] = {
+         VoiceSpreadParamsRow::Choice<&VoiceSpreadNode::mode>("mode", &VoiceSpreadNode::ModeNames).Undo(),
+         VoiceSpreadParamsRow::SliderInt<&VoiceSpreadNode::count>("count", 1, ModShapes::kSpreadMaxCount),
+         VoiceSpreadParamsRow::Slider<&VoiceSpreadNode::low>("low", 0.0f, 1.0f),
+         VoiceSpreadParamsRow::Slider<&VoiceSpreadNode::high>("high", 0.0f, 1.0f),
+      };
+   }
+
    void DrawVoiceSpreadParams(VoiceSpreadNode* n)
    {
-      DropdownButton("mode", VoiceSpreadNode::ModeNames(), n->mode,
-                     [n](int i) { PushUndoCheckpoint(); n->mode = i; });
-      ModSliderInt("count", &n->count, 1, ModShapes::kSpreadMaxCount);
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
+      Ui::DrawParams(n, kVoiceSpreadParamsRows);
    }
 
 
+   namespace
+   {
+      using NoteExpressionParamsRow = params::Row<NoteExpressionNode>;
+      const NoteExpressionParamsRow kNoteExpressionParamsRows[] = {
+         NoteExpressionParamsRow::Choice<&NoteExpressionNode::source>("source", &NoteExpressionNode::SourceNames).Undo(),
+         NoteExpressionParamsRow::Slider<&NoteExpressionNode::low>("low", 0.0f, 1.0f),
+         NoteExpressionParamsRow::Slider<&NoteExpressionNode::high>("high", 0.0f, 1.0f),
+      };
+   }
+
    void DrawNoteExpressionParams(NoteExpressionNode* n)
    {
-      DropdownButton("source", NoteExpressionNode::SourceNames(), n->source,
-                     [n](int i) { PushUndoCheckpoint(); n->source = i; });
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
+      Ui::DrawParams(n, kNoteExpressionParamsRows);
    }
 
 
@@ -1179,48 +1301,69 @@ namespace app
    }
 
 
+   namespace
+   {
+      using PatternParamsRow = params::Row<PatternNode>;
+      const PatternParamsRow kPatternParamsRows[] = {
+         PatternParamsRow::SliderInt<&PatternNode::length>("length", 1, PatternNode::kSteps),
+         PatternParamsRow::Slider<&PatternNode::stepBeats>("beats / step", params::Pattern::step_beats_lo, params::Pattern::step_beats_hi),
+         PatternParamsRow::Toggle<&PatternNode::smoothSteps>("glide between steps"),
+         PatternParamsRow::Slider<&PatternNode::low>("low", 0.0f, 1.0f),
+         PatternParamsRow::Slider<&PatternNode::high>("high", 0.0f, 1.0f),
+      };
+   }
+
    void DrawPatternParams(PatternNode* n)
    {
       DrawPatternStepGrid(n);
 
-      ModSliderInt("length", &n->length, 1, PatternNode::kSteps);
-      ModSlider("beats / step", &n->stepBeats, params::Pattern::step_beats_lo, params::Pattern::step_beats_hi);
-      ModCheckbox("glide between steps", &n->smoothSteps);
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
+      Ui::DrawParams(n, kPatternParamsRows);
    }
 
+
+   namespace
+   {
+      using MathParamsRow = params::Row<MathNode>;
+      const MathParamsRow kMathParamsRows[] = {
+         MathParamsRow::Slider<&MathNode::gain>("gain", params::Math::gain_lo, params::Math::gain_hi),
+         MathParamsRow::Slider<&MathNode::offset>("offset", -1.0f, 1.0f),
+         MathParamsRow::Toggle<&MathNode::clampOutput>("clamp to 0..1"),
+      };
+   }
 
    void DrawMathParams(MathNode* n)
    {
-      DropdownButton("operation", MathNode::OpNames(), n->op, [n](int i) { n->op = i; });
+      Ui::DrawParam(n, MathParamsRow::Choice<&MathNode::op>("operation", &MathNode::OpNames));
       if (n->inputA == nullptr)
-         ModSlider("A (no cable)", &n->constantA, 0.0f, 1.0f);
+         Ui::DrawParam(n, MathParamsRow::Slider<&MathNode::constantA>("A (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("A: patched");
       if (n->inputB == nullptr)
-         ModSlider("B (no cable)", &n->constantB, 0.0f, 1.0f);
+         Ui::DrawParam(n, MathParamsRow::Slider<&MathNode::constantB>("B (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("B: patched");
-      ModSlider("gain", &n->gain, params::Math::gain_lo, params::Math::gain_hi);
-      ModSlider("offset", &n->offset, -1.0f, 1.0f);
-      ModCheckbox("clamp to 0..1", &n->clampOutput);
+      Ui::DrawParams(n, kMathParamsRows);
    }
 
 
+   namespace
+   {
+      using CompareParamsRow = params::Row<CompareNode>;
+   }
+
    void DrawCompareParams(CompareNode* n)
    {
-      DropdownButton("operation", CompareNode::OpNames(), n->op, [n](int i) { n->op = i; });
+      Ui::DrawParam(n, CompareParamsRow::Choice<&CompareNode::op>("operation", &CompareNode::OpNames));
       if (n->inputA == nullptr)
-         ModSlider("A (no cable)", &n->constantA, 0.0f, 1.0f);
+         Ui::DrawParam(n, CompareParamsRow::Slider<&CompareNode::constantA>("A (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("A: patched");
       if (n->inputB == nullptr)
-         ModSlider("B (no cable)", &n->constantB, 0.0f, 1.0f);
+         Ui::DrawParam(n, CompareParamsRow::Slider<&CompareNode::constantB>("B (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("B: patched");
       if (n->op == 4 || n->op == 5) // == or !=
-         ModSlider("tolerance", &n->tolerance, params::Compare::tolerance_lo, params::Compare::tolerance_hi);
+         Ui::DrawParam(n, CompareParamsRow::Slider<&CompareNode::tolerance>("tolerance", params::Compare::tolerance_lo, params::Compare::tolerance_hi));
    }
 
 
@@ -1302,33 +1445,54 @@ namespace app
    }
 
 
+   namespace
+   {
+      using LogicGateParamsRow = params::Row<LogicGateNode>;
+      const LogicGateParamsRow kLogicGateParamsRows1[] = {
+         LogicGateParamsRow::Choice<&LogicGateNode::op>("operation", &LogicGateNode::OpNames).Undo(),
+         LogicGateParamsRow::Choice<&LogicGateNode::quantize>("quantize", &LogicGateNode::QuantizeNames).Undo(),
+      };
+      const LogicGateParamsRow kLogicGateParamsRows2[] = {
+         LogicGateParamsRow::Slider<&LogicGateNode::highThresh>("high thresh", params::LogicGate::high_thresh_lo, params::LogicGate::high_thresh_hi),
+         LogicGateParamsRow::Slider<&LogicGateNode::lowThresh>("low thresh", params::LogicGate::low_thresh_lo, params::LogicGate::low_thresh_hi),
+         LogicGateParamsRow::Slider<&LogicGateNode::holdMs>("hold ms", params::LogicGate::hold_ms_lo, params::LogicGate::hold_ms_hi).Fmt("%.0f"),
+      };
+   }
+
    void DrawLogicGateParams(LogicGateNode* n)
    {
-      DropdownButton("operation", LogicGateNode::OpNames(), n->op, [n](int i) { PushUndoCheckpoint(); n->op = i; });
-      DropdownButton("quantize", LogicGateNode::QuantizeNames(), n->quantize, [n](int i) { PushUndoCheckpoint(); n->quantize = i; });
+      Ui::DrawParams(n, kLogicGateParamsRows1);
       if (n->inputA == nullptr)
-         ModSlider("in A (no cable)", &n->constantA, 0.0f, 1.0f);
+         Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::constantA>("in A (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("in A: patched");
       if (n->inputB == nullptr)
-         ModSlider("in B (no cable)", &n->constantB, 0.0f, 1.0f);
+         Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::constantB>("in B (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("in B: patched");
 
-      ModSlider("high thresh", &n->highThresh, params::LogicGate::high_thresh_lo, params::LogicGate::high_thresh_hi);
-      ModSlider("low thresh", &n->lowThresh, params::LogicGate::low_thresh_lo, params::LogicGate::low_thresh_hi);
-      ModSlider("hold ms", &n->holdMs, params::LogicGate::hold_ms_lo, params::LogicGate::hold_ms_hi, "%.0f");
+      Ui::DrawParams(n, kLogicGateParamsRows2);
       const bool needsPulse = (n->op == LogicGateNode::kOpRisingEdge);
       const bool needsRefrac = (n->op == LogicGateNode::kOpRisingEdge || n->op == LogicGateNode::kOpToggle);
       ImGui::BeginDisabled(!needsPulse && !gParamRegisterOnly);
-      ModSlider("pulse ms", &n->pulseMs, params::LogicGate::pulse_ms_lo, params::LogicGate::pulse_ms_hi, "%.0f");
+      Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::pulseMs>("pulse ms", params::LogicGate::pulse_ms_lo, params::LogicGate::pulse_ms_hi).Fmt("%.0f"));
       ImGui::EndDisabled();
       ImGui::BeginDisabled(!needsRefrac && !gParamRegisterOnly);
-      ModSlider("refractory ms", &n->refractoryMs, params::LogicGate::refractory_ms_lo, params::LogicGate::refractory_ms_hi, "%.0f");
+      Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::refractoryMs>("refractory ms", params::LogicGate::refractory_ms_lo, params::LogicGate::refractory_ms_hi).Fmt("%.0f"));
       ImGui::EndDisabled();
-      ModSlider("min presence", &n->minPresence, params::LogicGate::min_presence_lo, params::LogicGate::min_presence_hi);
+      Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::minPresence>("min presence", params::LogicGate::min_presence_lo, params::LogicGate::min_presence_hi));
    }
 
+
+   namespace
+   {
+      using BrainSculptParamsRow = params::Row<BrainSculptNode>;
+      const BrainSculptParamsRow kBrainSculptParamsRows[] = {
+         BrainSculptParamsRow::Slider<&BrainSculptNode::sigma>("kernel width", params::BrainSculpt::sigma_lo, params::BrainSculpt::sigma_hi),
+         BrainSculptParamsRow::Slider<&BrainSculptNode::smoothing>("smoothing", 0.0f, 1.0f),
+         BrainSculptParamsRow::Slider<&BrainSculptNode::regularization>("regularization", params::BrainSculpt::regularization_lo, params::BrainSculpt::regularization_hi),
+      };
+   }
 
    void DrawBrainSculptParams(BrainSculptNode* n)
    {
@@ -1339,30 +1503,45 @@ namespace app
          PushUndoCheckpoint();
          n->ClearAnchors();
       }
-      ModSlider("kernel width", &n->sigma, params::BrainSculpt::sigma_lo, params::BrainSculpt::sigma_hi);
-      ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f);
-      ModSlider("regularization", &n->regularization, params::BrainSculpt::regularization_lo, params::BrainSculpt::regularization_hi);
+      Ui::DrawParams(n, kBrainSculptParamsRows);
    }
 
+
+   namespace
+   {
+      using RangeToRangeParamsRow = params::Row<RangeToRangeNode>;
+      const RangeToRangeParamsRow kRangeToRangeParamsRows[] = {
+         RangeToRangeParamsRow::Slider<&RangeToRangeNode::inLow>("in low", params::RangeToRange::in_low_lo, params::RangeToRange::in_low_hi),
+         RangeToRangeParamsRow::Slider<&RangeToRangeNode::inHigh>("in high", params::RangeToRange::in_high_lo, params::RangeToRange::in_high_hi),
+         RangeToRangeParamsRow::Slider<&RangeToRangeNode::outLow>("out low", params::RangeToRange::out_low_lo, params::RangeToRange::out_low_hi),
+         RangeToRangeParamsRow::Slider<&RangeToRangeNode::outHigh>("out high", params::RangeToRange::out_high_lo, params::RangeToRange::out_high_hi),
+         RangeToRangeParamsRow::Toggle<&RangeToRangeNode::clampOutput>("clamp to out range"),
+      };
+   }
 
    void DrawRangeToRangeParams(RangeToRangeNode* n)
    {
       if (n->input == nullptr)
-         ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+         Ui::DrawParam(n, RangeToRangeParamsRow::Slider<&RangeToRangeNode::constantIn>("in (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("in: patched");
-      ModSlider("in low", &n->inLow, params::RangeToRange::in_low_lo, params::RangeToRange::in_low_hi);
-      ModSlider("in high", &n->inHigh, params::RangeToRange::in_high_lo, params::RangeToRange::in_high_hi);
-      ModSlider("out low", &n->outLow, params::RangeToRange::out_low_lo, params::RangeToRange::out_low_hi);
-      ModSlider("out high", &n->outHigh, params::RangeToRange::out_high_lo, params::RangeToRange::out_high_hi);
-      ModCheckbox("clamp to out range", &n->clampOutput);
+      Ui::DrawParams(n, kRangeToRangeParamsRows);
    }
 
+
+   namespace
+   {
+      using SmoothParamsRow = params::Row<SmoothNode>;
+      const SmoothParamsRow kSmoothParamsRows[] = {
+         SmoothParamsRow::Slider<&SmoothNode::frequency>("frequency (Hz)", params::Smooth::frequency_lo, params::Smooth::frequency_hi),
+         SmoothParamsRow::Slider<&SmoothNode::damping>("damping", params::Smooth::damping_lo, params::Smooth::damping_hi),
+      };
+   }
 
    void DrawSmoothParams(SmoothNode* n)
    {
       if (n->input == nullptr)
-         ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+         Ui::DrawParam(n, SmoothParamsRow::Slider<&SmoothNode::constantIn>("in (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("in: patched");
       // Legacy (maths 0) amount is a per-frame factor; on the new maths it is
@@ -1371,122 +1550,200 @@ namespace app
       static const std::vector<std::string> kModes = { "amount", "time", "spring" };
       DropdownButton("mode", n->maths >= 1 ? kModes : kLegacyModes, n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; });
       if (n->mode == SmoothNode::kTime)
-         ModSlider("time (s)", &n->timeConstant, params::Smooth::time_constant_lo, params::Smooth::time_constant_hi);
+         Ui::DrawParam(n, SmoothParamsRow::Slider<&SmoothNode::timeConstant>("time (s)", params::Smooth::time_constant_lo, params::Smooth::time_constant_hi));
       else if (n->mode == SmoothNode::kSpring)
       {
-         ModSlider("frequency (Hz)", &n->frequency, params::Smooth::frequency_lo, params::Smooth::frequency_hi);
-         ModSlider("damping", &n->damping, params::Smooth::damping_lo, params::Smooth::damping_hi);
+         Ui::DrawParams(n, kSmoothParamsRows);
       }
       else
-         ModSlider("amount", &n->amount, params::Smooth::amount_lo, params::Smooth::amount_hi);
+         Ui::DrawParam(n, SmoothParamsRow::Slider<&SmoothNode::amount>("amount", params::Smooth::amount_lo, params::Smooth::amount_hi));
    }
 
+
+   namespace
+   {
+      using InvertParamsRow = params::Row<InvertNode>;
+      const InvertParamsRow kInvertParamsRows[] = {
+         InvertParamsRow::Slider<&InvertNode::low>("low", params::Invert::low_lo, params::Invert::low_hi),
+         InvertParamsRow::Slider<&InvertNode::high>("high", params::Invert::high_lo, params::Invert::high_hi),
+      };
+   }
 
    void DrawInvertParams(InvertNode* n)
    {
       if (n->input == nullptr)
-         ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+         Ui::DrawParam(n, InvertParamsRow::Slider<&InvertNode::constantIn>("in (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("in: patched");
-      ModSlider("low", &n->low, params::Invert::low_lo, params::Invert::low_hi);
-      ModSlider("high", &n->high, params::Invert::high_lo, params::Invert::high_hi);
+      Ui::DrawParams(n, kInvertParamsRows);
    }
 
+
+   namespace
+   {
+      using ModDepthParamsRow = params::Row<ModDepthNode>;
+   }
 
    void DrawModDepthParams(ModDepthNode* n)
    {
       if (n->input == nullptr)
-         ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+         Ui::DrawParam(n, ModDepthParamsRow::Slider<&ModDepthNode::constantIn>("in (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("in: patched");
-      ModSlider("depth", &n->depth, -1.0f, 1.0f);
+      Ui::DrawParam(n, ModDepthParamsRow::Slider<&ModDepthNode::depth>("depth", -1.0f, 1.0f));
    }
 
 
+   namespace
+   {
+      using NoiseParamsRow = params::Row<NoiseNode>;
+      const NoiseParamsRow kNoiseParamsRows1[] = {
+         NoiseParamsRow::Choice<&NoiseNode::noiseType>("type", &NoiseNode::TypeNames),
+         NoiseParamsRow::Slider<&NoiseNode::width>("width", params::Noise::width_lo, params::Noise::width_hi).Fmt("%.0f"),
+         NoiseParamsRow::Slider<&NoiseNode::height>("height", params::Noise::height_lo, params::Noise::height_hi).Fmt("%.0f"),
+         NoiseParamsRow::Slider<&NoiseNode::scale>("scale", params::Noise::scale_lo, params::Noise::scale_hi),
+      };
+      const NoiseParamsRow kNoiseParamsRows2[] = {
+         NoiseParamsRow::Slider<&NoiseNode::octaves>("octaves", params::Noise::octaves_lo, params::Noise::octaves_hi).Fmt("%.0f"),
+         NoiseParamsRow::Slider<&NoiseNode::lacunarity>("lacunarity", params::Noise::lacunarity_lo, params::Noise::lacunarity_hi),
+         NoiseParamsRow::Slider<&NoiseNode::gain>("gain", params::Noise::gain_lo, params::Noise::gain_hi),
+      };
+      const NoiseParamsRow kNoiseParamsRows3[] = {
+         NoiseParamsRow::Slider<&NoiseNode::warp>("warp", params::Noise::warp_lo, params::Noise::warp_hi),
+         NoiseParamsRow::Slider<&NoiseNode::speed>("speed", params::Noise::speed_lo, params::Noise::speed_hi),
+         NoiseParamsRow::Slider<&NoiseNode::contrast>("contrast", params::Noise::contrast_lo, params::Noise::contrast_hi),
+         NoiseParamsRow::Slider<&NoiseNode::brightness>("brightness", params::Noise::brightness_lo, params::Noise::brightness_hi),
+         NoiseParamsRow::Slider<&NoiseNode::seed>("seed", params::Noise::seed_lo, params::Noise::seed_hi).Fmt("%.0f").Step(1.0f),
+         NoiseParamsRow::Toggle<&NoiseNode::colorNoise>("rgb noise"),
+      };
+      const NoiseParamsRow kNoiseParamsRows4[] = {
+         NoiseParamsRow::Colour<&NoiseNode::lowColor>("low"),
+         NoiseParamsRow::Colour<&NoiseNode::highColor>("high"),
+      };
+   }
+
    void DrawNoiseParams(NoiseNode* n)
    {
-      DropdownButton("type", NoiseNode::TypeNames(), n->noiseType, [n](int i) { n->noiseType = i; });
-      ModSlider("width", &n->width, params::Noise::width_lo, params::Noise::width_hi, "%.0f");
-      ModSlider("height", &n->height, params::Noise::height_lo, params::Noise::height_hi, "%.0f");
-      ModSlider("scale", &n->scale, params::Noise::scale_lo, params::Noise::scale_hi);
+      Ui::DrawParams(n, kNoiseParamsRows1);
       // Octaves, lacunarity and gain only shape the fractal types (and the colour channels of the
       // plain ones, which are fractal); the other types ignore them.
       const int nt = n->noiseType;
       const bool fractal = nt == 1 || nt == 2 || nt == 8 || nt == 9 || (n->colorNoise && nt <= 4);
       ImGui::BeginDisabled(!fractal && !gParamRegisterOnly);
-      ModSlider("octaves", &n->octaves, params::Noise::octaves_lo, params::Noise::octaves_hi, "%.0f");
-      ModSlider("lacunarity", &n->lacunarity, params::Noise::lacunarity_lo, params::Noise::lacunarity_hi);
-      ModSlider("gain", &n->gain, params::Noise::gain_lo, params::Noise::gain_hi);
+      Ui::DrawParams(n, kNoiseParamsRows2);
       ImGui::EndDisabled();
-      ModSlider("warp", &n->warp, params::Noise::warp_lo, params::Noise::warp_hi);
-      ModSlider("speed", &n->speed, params::Noise::speed_lo, params::Noise::speed_hi);
-      ModSlider("contrast", &n->contrast, params::Noise::contrast_lo, params::Noise::contrast_hi);
-      ModSlider("brightness", &n->brightness, params::Noise::brightness_lo, params::Noise::brightness_hi);
-      ModSlider("seed", &n->seed, params::Noise::seed_lo, params::Noise::seed_hi, "%.0f", kParamWidth, false, 1.0f);
-      ModCheckbox("rgb noise", &n->colorNoise);
+      Ui::DrawParams(n, kNoiseParamsRows3);
       if (!n->colorNoise)
       {
-         ColorSwatch("low", n->lowColor, n);
-         ColorSwatch("high", n->highColor, n);
+         Ui::DrawParams(n, kNoiseParamsRows4);
       }
    }
 
 
+   namespace
+   {
+      using TextureParamsRow = params::Row<TextureNode>;
+      const TextureParamsRow kTextureParamsRows1[] = {
+         TextureParamsRow::Choice<&TextureNode::textureType>("type", &TextureNode::TypeNames),
+         TextureParamsRow::Slider<&TextureNode::width>("width", params::Texture::width_lo, params::Texture::width_hi).Fmt("%.0f"),
+         TextureParamsRow::Slider<&TextureNode::height>("height", params::Texture::height_lo, params::Texture::height_hi).Fmt("%.0f"),
+         TextureParamsRow::Slider<&TextureNode::scale>("scale", params::Texture::scale_lo, params::Texture::scale_hi),
+         TextureParamsRow::Slider<&TextureNode::seed>("seed", params::Texture::seed_lo, params::Texture::seed_hi).Fmt("%.0f").Step(1.0f),
+      };
+      const TextureParamsRow kTextureParamsRows2[] = {
+         TextureParamsRow::Choice<&TextureNode::voronoiDistance>("distance", &TextureNode::VoronoiDistanceNames),
+         TextureParamsRow::Choice<&TextureNode::voronoiFeature>("feature", &TextureNode::VoronoiFeatureNames),
+      };
+      const TextureParamsRow kTextureParamsRows3[] = {
+         TextureParamsRow::Slider<&TextureNode::voronoiRandomness>("randomness", 0.0f, 1.0f),
+         TextureParamsRow::Toggle<&TextureNode::voronoiCellColor>("cell color"),
+      };
+      const TextureParamsRow kTextureParamsRows4[] = {
+         TextureParamsRow::Slider<&TextureNode::brickWidth>("brick width", params::Texture::brick_width_lo, params::Texture::brick_width_hi),
+         TextureParamsRow::Slider<&TextureNode::brickHeight>("row height", params::Texture::brick_height_lo, params::Texture::brick_height_hi),
+         TextureParamsRow::Slider<&TextureNode::brickRowOffset>("row offset", 0.0f, 1.0f),
+         TextureParamsRow::Slider<&TextureNode::brickMortarSize>("mortar size", params::Texture::brick_mortar_size_lo, params::Texture::brick_mortar_size_hi),
+         TextureParamsRow::Slider<&TextureNode::brickMortarSmooth>("mortar smooth", 0.0f, 1.0f),
+         TextureParamsRow::Slider<&TextureNode::brickBias>("bias", params::Texture::brick_bias_lo, params::Texture::brick_bias_hi),
+         TextureParamsRow::Colour<&TextureNode::mortarColor>("mortar"),
+      };
+      const TextureParamsRow kTextureParamsRows5[] = {
+         TextureParamsRow::Slider<&TextureNode::magicDepth>("depth", params::Texture::magic_depth_lo, params::Texture::magic_depth_hi).Fmt("%.0f"),
+         TextureParamsRow::Slider<&TextureNode::magicDistortion>("distortion", params::Texture::magic_distortion_lo, params::Texture::magic_distortion_hi),
+      };
+      const TextureParamsRow kTextureParamsRows6[] = {
+         TextureParamsRow::Choice<&TextureNode::waveProfile>("profile", &TextureNode::WaveProfileNames),
+         TextureParamsRow::Slider<&TextureNode::waveDistortion>("distortion", params::Texture::wave_distortion_lo, params::Texture::wave_distortion_hi),
+         TextureParamsRow::Slider<&TextureNode::waveDetail>("detail", params::Texture::wave_detail_lo, params::Texture::wave_detail_hi).Fmt("%.0f"),
+         TextureParamsRow::Slider<&TextureNode::waveDetailScale>("detail scale", params::Texture::wave_detail_scale_lo, params::Texture::wave_detail_scale_hi),
+         TextureParamsRow::Slider<&TextureNode::wavePhaseOffset>("phase offset", 0.0f, 1.0f),
+      };
+      const TextureParamsRow kTextureParamsRows7[] = {
+         TextureParamsRow::Choice<&TextureNode::musgraveType>("musgrave type", &TextureNode::MusgraveTypeNames),
+         TextureParamsRow::Slider<&TextureNode::musgraveDimension>("dimension", params::Texture::musgrave_dimension_lo, params::Texture::musgrave_dimension_hi),
+         TextureParamsRow::Slider<&TextureNode::musgraveLacunarity>("lacunarity", params::Texture::musgrave_lacunarity_lo, params::Texture::musgrave_lacunarity_hi),
+         TextureParamsRow::Slider<&TextureNode::musgraveOctaves>("octaves", params::Texture::musgrave_octaves_lo, params::Texture::musgrave_octaves_hi).Fmt("%.0f"),
+      };
+      const TextureParamsRow kTextureParamsRows8[] = {
+         TextureParamsRow::Slider<&TextureNode::cloudsDepth>("depth", params::Texture::clouds_depth_lo, params::Texture::clouds_depth_hi).Fmt("%.0f"),
+         TextureParamsRow::Toggle<&TextureNode::cloudsHard>("hard"),
+      };
+      const TextureParamsRow kTextureParamsRows9[] = {
+         TextureParamsRow::Choice<&TextureNode::marbleType>("marble type", &TextureNode::MarbleTypeNames),
+         TextureParamsRow::Slider<&TextureNode::marbleTurbulence>("turbulence", params::Texture::marble_turbulence_lo, params::Texture::marble_turbulence_hi),
+         TextureParamsRow::Slider<&TextureNode::marbleNoiseScale>("noise scale", params::Texture::marble_noise_scale_lo, params::Texture::marble_noise_scale_hi),
+         TextureParamsRow::Slider<&TextureNode::marbleNoiseDepth>("noise depth", params::Texture::marble_noise_depth_lo, params::Texture::marble_noise_depth_hi).Fmt("%.0f"),
+      };
+      const TextureParamsRow kTextureParamsRows10[] = {
+         TextureParamsRow::Choice<&TextureNode::woodType>("wood type", &TextureNode::WoodTypeNames),
+         TextureParamsRow::Slider<&TextureNode::woodTurbulence>("turbulence", params::Texture::wood_turbulence_lo, params::Texture::wood_turbulence_hi),
+         TextureParamsRow::Slider<&TextureNode::woodNoiseScale>("noise scale", params::Texture::wood_noise_scale_lo, params::Texture::wood_noise_scale_hi),
+      };
+      const TextureParamsRow kTextureParamsRows11[] = {
+         TextureParamsRow::Slider<&TextureNode::contrast>("contrast", params::Texture::contrast_lo, params::Texture::contrast_hi),
+         TextureParamsRow::Slider<&TextureNode::brightness>("brightness", params::Texture::brightness_lo, params::Texture::brightness_hi),
+      };
+      const TextureParamsRow kTextureParamsRows12[] = {
+         TextureParamsRow::Colour<&TextureNode::lowColor>("low"),
+         TextureParamsRow::Colour<&TextureNode::highColor>("high"),
+      };
+   }
+
    void DrawTextureParams(TextureNode* n)
    {
-      DropdownButton("type", TextureNode::TypeNames(), n->textureType, [n](int i) { n->textureType = i; });
-      ModSlider("width", &n->width, params::Texture::width_lo, params::Texture::width_hi, "%.0f");
-      ModSlider("height", &n->height, params::Texture::height_lo, params::Texture::height_hi, "%.0f");
-      ModSlider("scale", &n->scale, params::Texture::scale_lo, params::Texture::scale_hi);
-      ModSlider("seed", &n->seed, params::Texture::seed_lo, params::Texture::seed_hi, "%.0f", kParamWidth, false, 1.0f);
+      Ui::DrawParams(n, kTextureParamsRows1);
 
       if (n->textureType == 0) // Voronoi
       {
-         DropdownButton("distance", TextureNode::VoronoiDistanceNames(), n->voronoiDistance, [n](int i) { n->voronoiDistance = i; });
-         DropdownButton("feature", TextureNode::VoronoiFeatureNames(), n->voronoiFeature, [n](int i) { n->voronoiFeature = i; });
+         Ui::DrawParams(n, kTextureParamsRows2);
          if (n->voronoiDistance == 3)
-            ModSlider("minkowski exponent", &n->voronoiMinkowskiExponent, params::Texture::voronoi_minkowski_exponent_lo, params::Texture::voronoi_minkowski_exponent_hi);
+            Ui::DrawParam(n, TextureParamsRow::Slider<&TextureNode::voronoiMinkowskiExponent>("minkowski exponent", params::Texture::voronoi_minkowski_exponent_lo, params::Texture::voronoi_minkowski_exponent_hi));
          if (n->voronoiFeature == 2)
-            ModSlider("smoothness", &n->voronoiSmoothness, params::Texture::voronoi_smoothness_lo, params::Texture::voronoi_smoothness_hi);
-         ModSlider("randomness", &n->voronoiRandomness, 0.0f, 1.0f);
-         ModCheckbox("cell color", &n->voronoiCellColor);
+            Ui::DrawParam(n, TextureParamsRow::Slider<&TextureNode::voronoiSmoothness>("smoothness", params::Texture::voronoi_smoothness_lo, params::Texture::voronoi_smoothness_hi));
+         Ui::DrawParams(n, kTextureParamsRows3);
       }
       else if (n->textureType == 1) // Brick
       {
-         ModSlider("brick width", &n->brickWidth, params::Texture::brick_width_lo, params::Texture::brick_width_hi);
-         ModSlider("row height", &n->brickHeight, params::Texture::brick_height_lo, params::Texture::brick_height_hi);
-         ModSlider("row offset", &n->brickRowOffset, 0.0f, 1.0f);
-         ModSlider("mortar size", &n->brickMortarSize, params::Texture::brick_mortar_size_lo, params::Texture::brick_mortar_size_hi);
-         ModSlider("mortar smooth", &n->brickMortarSmooth, 0.0f, 1.0f);
-         ModSlider("bias", &n->brickBias, params::Texture::brick_bias_lo, params::Texture::brick_bias_hi);
-         ColorSwatch("mortar", n->mortarColor, n);
+         Ui::DrawParams(n, kTextureParamsRows4);
       }
       else if (n->textureType == 2) // Magic
       {
-         ModSlider("depth", &n->magicDepth, params::Texture::magic_depth_lo, params::Texture::magic_depth_hi, "%.0f");
-         ModSlider("distortion", &n->magicDistortion, params::Texture::magic_distortion_lo, params::Texture::magic_distortion_hi);
+         Ui::DrawParams(n, kTextureParamsRows5);
       }
       else if (n->textureType == 3) // Wave
       {
-         DropdownButton("wave type", TextureNode::WaveTypeNames(), n->waveType, [n](int i) { n->waveType = i; });
+         Ui::DrawParam(n, TextureParamsRow::Choice<&TextureNode::waveType>("wave type", &TextureNode::WaveTypeNames));
          if (n->waveType == 0)
-            DropdownButton("bands direction", TextureNode::WaveBandsDirectionNames(), n->waveBandsDirection, [n](int i) { n->waveBandsDirection = i; });
-         DropdownButton("profile", TextureNode::WaveProfileNames(), n->waveProfile, [n](int i) { n->waveProfile = i; });
-         ModSlider("distortion", &n->waveDistortion, params::Texture::wave_distortion_lo, params::Texture::wave_distortion_hi);
-         ModSlider("detail", &n->waveDetail, params::Texture::wave_detail_lo, params::Texture::wave_detail_hi, "%.0f");
-         ModSlider("detail scale", &n->waveDetailScale, params::Texture::wave_detail_scale_lo, params::Texture::wave_detail_scale_hi);
-         ModSlider("phase offset", &n->wavePhaseOffset, 0.0f, 1.0f);
+            Ui::DrawParam(n, TextureParamsRow::Choice<&TextureNode::waveBandsDirection>("bands direction", &TextureNode::WaveBandsDirectionNames));
+         Ui::DrawParams(n, kTextureParamsRows6);
       }
       else if (n->textureType == 4) // Musgrave
       {
-         DropdownButton("musgrave type", TextureNode::MusgraveTypeNames(), n->musgraveType, [n](int i) { n->musgraveType = i; });
-         ModSlider("dimension", &n->musgraveDimension, params::Texture::musgrave_dimension_lo, params::Texture::musgrave_dimension_hi);
-         ModSlider("lacunarity", &n->musgraveLacunarity, params::Texture::musgrave_lacunarity_lo, params::Texture::musgrave_lacunarity_hi);
-         ModSlider("octaves", &n->musgraveOctaves, params::Texture::musgrave_octaves_lo, params::Texture::musgrave_octaves_hi, "%.0f");
+         Ui::DrawParams(n, kTextureParamsRows7);
          if (n->musgraveType == 3)
-            ModSlider("gain", &n->musgraveGain, params::Texture::musgrave_gain_lo, params::Texture::musgrave_gain_hi);
+            Ui::DrawParam(n, TextureParamsRow::Slider<&TextureNode::musgraveGain>("gain", params::Texture::musgrave_gain_lo, params::Texture::musgrave_gain_hi));
          if (n->musgraveType >= 2)
-            ModSlider("offset", &n->musgraveOffset, params::Texture::musgrave_offset_lo, params::Texture::musgrave_offset_hi);
+            Ui::DrawParam(n, TextureParamsRow::Slider<&TextureNode::musgraveOffset>("offset", params::Texture::musgrave_offset_lo, params::Texture::musgrave_offset_hi));
       }
       else if (n->textureType == 5) // Checker
       {
@@ -1494,48 +1751,51 @@ namespace app
       }
       else if (n->textureType == 6) // Gradient
       {
-         DropdownButton("gradient type", TextureNode::GradientTypeNames(), n->gradientType, [n](int i) { n->gradientType = i; });
+         Ui::DrawParam(n, TextureParamsRow::Choice<&TextureNode::gradientType>("gradient type", &TextureNode::GradientTypeNames));
       }
       else if (n->textureType == 7) // Clouds
       {
-         ModSlider("depth", &n->cloudsDepth, params::Texture::clouds_depth_lo, params::Texture::clouds_depth_hi, "%.0f");
-         ModCheckbox("hard", &n->cloudsHard);
+         Ui::DrawParams(n, kTextureParamsRows8);
       }
       else if (n->textureType == 8) // Marble
       {
-         DropdownButton("marble type", TextureNode::MarbleTypeNames(), n->marbleType, [n](int i) { n->marbleType = i; });
-         ModSlider("turbulence", &n->marbleTurbulence, params::Texture::marble_turbulence_lo, params::Texture::marble_turbulence_hi);
-         ModSlider("noise scale", &n->marbleNoiseScale, params::Texture::marble_noise_scale_lo, params::Texture::marble_noise_scale_hi);
-         ModSlider("noise depth", &n->marbleNoiseDepth, params::Texture::marble_noise_depth_lo, params::Texture::marble_noise_depth_hi, "%.0f");
+         Ui::DrawParams(n, kTextureParamsRows9);
       }
       else // Wood
       {
-         DropdownButton("wood type", TextureNode::WoodTypeNames(), n->woodType, [n](int i) { n->woodType = i; });
-         ModSlider("turbulence", &n->woodTurbulence, params::Texture::wood_turbulence_lo, params::Texture::wood_turbulence_hi);
-         ModSlider("noise scale", &n->woodNoiseScale, params::Texture::wood_noise_scale_lo, params::Texture::wood_noise_scale_hi);
+         Ui::DrawParams(n, kTextureParamsRows10);
       }
 
-      ModSlider("contrast", &n->contrast, params::Texture::contrast_lo, params::Texture::contrast_hi);
-      ModSlider("brightness", &n->brightness, params::Texture::brightness_lo, params::Texture::brightness_hi);
+      Ui::DrawParams(n, kTextureParamsRows11);
       if (n->textureType != 1 && !(n->textureType == 0 && n->voronoiCellColor) && n->textureType != 2)
       {
-         ColorSwatch("low", n->lowColor, n);
-         ColorSwatch("high", n->highColor, n);
+         Ui::DrawParams(n, kTextureParamsRows12);
       }
    }
 
 
+   namespace
+   {
+      using SwitcherParamsRow = params::Row<SwitcherNode>;
+      const SwitcherParamsRow kSwitcherParamsRows1[] = {
+         SwitcherParamsRow::Choice<&SwitcherNode::unit>("unit", &SwitcherNode::UnitNames),
+         SwitcherParamsRow::Slider<&SwitcherNode::interval>("every", params::Switcher::interval_lo, params::Switcher::interval_hi),
+      };
+      const SwitcherParamsRow kSwitcherParamsRows2[] = {
+         SwitcherParamsRow::Slider<&SwitcherNode::crossfade>("crossfade", params::Switcher::crossfade_lo, params::Switcher::crossfade_hi),
+         SwitcherParamsRow::Toggle<&SwitcherNode::manual>("manual"),
+      };
+   }
+
    void DrawSwitcherParams(SwitcherNode* n)
    {
       ImGui::BeginDisabled(n->manual && !gParamRegisterOnly);   // manual pins the slot; the clock is unused
-      DropdownButton("unit", SwitcherNode::UnitNames(), n->unit, [n](int i) { n->unit = i; });
-      ModSlider("every", &n->interval, params::Switcher::interval_lo, params::Switcher::interval_hi);
+      Ui::DrawParams(n, kSwitcherParamsRows1);
       ImGui::EndDisabled();
-      ModSlider("crossfade", &n->crossfade, params::Switcher::crossfade_lo, params::Switcher::crossfade_hi);
-      ModCheckbox("manual", &n->manual);
+      Ui::DrawParams(n, kSwitcherParamsRows2);
       if (n->manual)
       {
-         ModSliderInt("slot", &n->manualSlot, 0, SwitcherNode::kSlots - 1);
+         Ui::DrawParam(n, SwitcherParamsRow::SliderInt<&SwitcherNode::manualSlot>("slot", 0, SwitcherNode::kSlots - 1));
       }
       else
       {
@@ -1607,6 +1867,17 @@ namespace app
    }
 
 
+   namespace
+   {
+      using ResynthParamsRow = params::Row<ResynthNode>;
+      const ResynthParamsRow kResynthParamsRows[] = {
+         ResynthParamsRow::Slider<&ResynthNode::chaos>("chaos", 0.0f, 1.0f),
+         ResynthParamsRow::Slider<&ResynthNode::mutation>("mutation", 0.0f, 1.0f),
+         ResynthParamsRow::Slider<&ResynthNode::feedback>("feedback", 0.0f, 1.0f),
+         ResynthParamsRow::Slider<&ResynthNode::sourcePull>("source pull", 0.0f, 1.0f),
+      };
+   }
+
    void DrawResynthParams(ResynthNode* n)
    {
       DrawFxPad(n);
@@ -1635,17 +1906,14 @@ namespace app
       // looping only means something once a path is recorded
       if (n->Path().size() >= tok::param_resynth_params_limit)
       {
-         ModCheckbox("loop path", &n->loopPath);
+         Ui::DrawParam(n, ResynthParamsRow::Toggle<&ResynthNode::loopPath>("loop path"));
          ImGui::SameLine();
       }
       if (ActionButton::Draw("clear"))
          n->ClearPath();
 
       NodeSeparator();
-      ModSlider("chaos", &n->chaos, 0.0f, 1.0f);
-      ModSlider("mutation", &n->mutation, 0.0f, 1.0f);
-      ModSlider("feedback", &n->feedback, 0.0f, 1.0f);
-      ModSlider("source pull", &n->sourcePull, 0.0f, 1.0f);
+      Ui::DrawParams(n, kResynthParamsRows);
 
       NodeSeparator();
       ImGui::TextDisabled("generation %d", n->Generation());
@@ -1671,10 +1939,10 @@ namespace app
             ImGui::PopID();
          }
       }
-      ModCheckbox("auto iterate", &n->autoIterate);
+      Ui::DrawParam(n, ResynthParamsRow::Toggle<&ResynthNode::autoIterate>("auto iterate"));
       if (n->autoIterate)
-         ModSlider("steps / beat", &n->stepsPerBeat, params::Resynth::steps_per_beat_lo, params::Resynth::steps_per_beat_hi);
-      ModSlider("seed", &n->seed, params::Resynth::seed_lo, params::Resynth::seed_hi, "%.0f", kParamWidth, false, 1.0f);
+         Ui::DrawParam(n, ResynthParamsRow::Slider<&ResynthNode::stepsPerBeat>("steps / beat", params::Resynth::steps_per_beat_lo, params::Resynth::steps_per_beat_hi));
+      Ui::DrawParam(n, ResynthParamsRow::Slider<&ResynthNode::seed>("seed", params::Resynth::seed_lo, params::Resynth::seed_hi).Fmt("%.0f").Step(1.0f));
    }
 
 
@@ -1857,11 +2125,16 @@ namespace app
    }
 
 
+   namespace
+   {
+      using MacroToggleParamsRow = params::Row<MacroToggleNode>;
+   }
+
    void DrawMacroToggleParams(MacroToggleNode* n)
    {
       MacroNameField(n->label, kMacroCell);
       MacroHostSlotField(n->hostSlot, kMacroCell);
-      ModCheckbox("state", &n->state);
+      Ui::DrawParam(n, MacroToggleParamsRow::Toggle<&MacroToggleNode::state>("state"));
    }
 
 
@@ -1963,13 +2236,18 @@ namespace app
    }
 
 
+   namespace
+   {
+      using MacroRadioSelectorParamsRow = params::Row<MacroRadioSelectorNode>;
+   }
+
    void DrawMacroRadioSelectorParams(MacroRadioSelectorNode* n)
    {
       MacroNameField(n->label, kMacroWideCell);
       MacroHostSlotField(n->hostSlot, kMacroWideCell);
       // Clamped to 8 because the body only ever draws 8 segments - a count of
       // 16 used to leave half the selector unreachable.
-      ModSliderInt("count", &n->count, params::MacroRadioSelector::count_lo, params::MacroRadioSelector::count_hi);
+      Ui::DrawParam(n, MacroRadioSelectorParamsRow::SliderInt<&MacroRadioSelectorNode::count>("count", params::MacroRadioSelector::count_lo, params::MacroRadioSelector::count_hi));
    }
 
 
@@ -2008,13 +2286,28 @@ namespace app
    }
 
 
+   namespace
+   {
+      using MacroStepGateParamsRow = params::Row<MacroStepGateNode>;
+   }
+
    void DrawMacroStepGateParams(MacroStepGateNode* n)
    {
       MacroNameField(n->label, kMacroWideCell);
       MacroHostSlotField(n->hostSlot, kMacroWideCell);
-      ModSlider("rate", &n->rateBeats, params::MacroStepGate::rate_beats_lo, params::MacroStepGate::rate_beats_hi, "%.2f beats");
+      Ui::DrawParam(n, MacroStepGateParamsRow::Slider<&MacroStepGateNode::rateBeats>("rate", params::MacroStepGate::rate_beats_lo, params::MacroStepGate::rate_beats_hi).Fmt("%.2f beats"));
    }
 
+
+   namespace
+   {
+      using MidiCCParamsRow = params::Row<MidiCCNode>;
+      const MidiCCParamsRow kMidiCCParamsRows[] = {
+         MidiCCParamsRow::Slider<&MidiCCNode::low>("low", 0.0f, 1.0f),
+         MidiCCParamsRow::Slider<&MidiCCNode::high>("high", 0.0f, 1.0f),
+         MidiCCParamsRow::Toggle<&MidiCCNode::invert>("invert"),
+      };
+   }
 
    void DrawMidiCCParams(MidiCCNode* n)
    {
@@ -2040,15 +2333,22 @@ namespace app
       }
       ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
 
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
-      ModCheckbox("invert", &n->invert);
+      Ui::DrawParams(n, kMidiCCParamsRows);
    }
 
 
+   namespace
+   {
+      using MidiTriggerParamsRow = params::Row<MidiTriggerNode>;
+      const MidiTriggerParamsRow kMidiTriggerParamsRows[] = {
+         MidiTriggerParamsRow::Slider<&MidiTriggerNode::hold>("hold", params::MidiTrigger::hold_lo, params::MidiTrigger::hold_hi),
+         MidiTriggerParamsRow::Toggle<&MidiTriggerNode::velocitySensitive>("velocity sensitive"),
+      };
+   }
+
    void DrawMidiTriggerParams(MidiTriggerNode* n)
    {
-      DropdownButton("device type", MidiTriggerNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
+      Ui::DrawParam(n, MidiTriggerParamsRow::Choice<&MidiTriggerNode::mode>("device type", &MidiTriggerNode::ModeNames));
 
       if (n->IsLearning())
       {
@@ -2084,8 +2384,7 @@ namespace app
       }
       else
       {
-         ModSlider("hold", &n->hold, params::MidiTrigger::hold_lo, params::MidiTrigger::hold_hi);
-         ModCheckbox("velocity sensitive", &n->velocitySensitive);
+         Ui::DrawParams(n, kMidiTriggerParamsRows);
       }
    }
 
@@ -2129,6 +2428,15 @@ namespace app
    }
 
 
+   namespace
+   {
+      using MacroXYParamsRow = params::Row<MacroXYNode>;
+      const MacroXYParamsRow kMacroXYParamsRows[] = {
+         MacroXYParamsRow::Toggle<&MacroXYNode::loopPath>("loop"),
+         MacroXYParamsRow::Slider<&MacroXYNode::speed>("speed", params::MacroXY::speed_lo, params::MacroXY::speed_hi),
+      };
+   }
+
    void DrawMacroXYParams(MacroXYNode* n)
    {
       ImGui::TextDisabled("x %s   y %s", UiFmt::F3(n->padX).c, UiFmt::F3(n->padY).c);
@@ -2155,8 +2463,7 @@ namespace app
       ImGui::SameLine();
       if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * tok::param_macro_xy_params_ratio, 0)))
          n->ClearPath();
-      ModCheckbox("loop", &n->loopPath);
-      ModSlider("speed", &n->speed, params::MacroXY::speed_lo, params::MacroXY::speed_hi);
+      Ui::DrawParams(n, kMacroXYParamsRows);
       if (Platform::PluginModeActive())
       {
          MacroHostSlotField(n->hostSlot, kPreviewSize * tok::param_macro_host_slot_field_cell_w, "##hostslotx", "x slot");

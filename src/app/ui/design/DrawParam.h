@@ -13,6 +13,7 @@
 #include "app/graph/ParamDesc.h"
 
 #include <cstddef>
+#include <functional>
 
 namespace Ui
 {
@@ -38,6 +39,30 @@ namespace Ui
       };
 
       // False when the row is hidden; a hidden Keep() row still uses up its running ordinal.
+      // A Choice row's current index and its store (an int member, or a float param rounded the way the audio
+      // bodies read it: (int)(v + 0.5f)).
+      template <class N>
+      int ChoiceCurrent(N* n, const params::Row<N>& r)
+      {
+         return r.i != nullptr ? *r.i(n) : (int)(*r.f(n) + 0.5f);
+      }
+
+      template <class N>
+      std::function<void(int)> ChoiceStore(N* n, const params::Row<N>& r)
+      {
+         int* (*gi)(N*) = r.i;
+         float* (*gf)(N*) = r.f;
+         const bool undo = r.undo;
+         return [n, gi, gf, undo](int v) {
+            if (undo)
+               app::PushUndoCheckpoint();
+            if (gi != nullptr)
+               *gi(n) = v;
+            else
+               *gf(n) = (float)v;
+         };
+      }
+
       template <class N>
       bool Shown(const N* n, const params::Row<N>& r)
       {
@@ -48,10 +73,11 @@ namespace Ui
          return false;
       }
 
-      // Greys the row out (BeginDisabled) while its LiveIf test is false.
+      // Greys the row out (BeginDisabled) while its LiveIf test is false. Only while drawing: under
+      // gParamRegisterOnly there may be no ImGui window at all, and the widget it wraps isn't drawn anyway.
       struct RowLive
       {
-         explicit RowLive(bool live) : off(!live)
+         explicit RowLive(bool live) : off(!live && !app::gParamRegisterOnly)
          {
             if (off)
                ImGui::BeginDisabled();
@@ -88,11 +114,9 @@ namespace Ui
       case Kind::Toggle:
          return app::ModCheckbox(r.label, r.b(n));
       case Kind::Choice:
-      {
-         int* (*get)(N*) = r.i;
-         app::DropdownButton(r.label, r.options(), *get(n), [n, get](int v) { *get(n) = v; }, w);
+         app::DropdownButton(r.label, r.Options(), detail::ChoiceCurrent(n, r), detail::ChoiceStore(n, r), w, r.caption,
+                             r.segmented);
          return false;
-      }
       case Kind::Colour:
          app::ColorSwatch(r.label, r.f(n), n);
          return false;
@@ -135,6 +159,12 @@ namespace Ui
          return;
       case Kind::KnobInt:
          row.KnobInt(r.label, r.i(n), (int)r.lo, (int)r.hi, dia);
+         return;
+      case Kind::Choice:
+         row.Dropdown(r.label, r.Options(), detail::ChoiceCurrent(n, r), detail::ChoiceStore(n, r));
+         return;
+      case Kind::Toggle:
+         row.Checkbox(r.label, r.b(n));
          return;
       default:
       {

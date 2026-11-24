@@ -9,6 +9,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "platform/AppPaths.h"
 #include "core/Notices.h"
 #include "app/ui/design/components/AudioViz.h"
@@ -270,6 +271,11 @@ namespace app
    }
 
 
+   namespace
+   {
+      using BlendAudioBodyRow = params::Row<BlendAudioNode>;
+   }
+
    void DrawBlendAudioBody(GraphNode& gn, BlendAudioNode* n)
    {
       char stat[48];
@@ -279,7 +285,7 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::sampler_blend_audio_spacer_h));
 
       AudioKnobRow row(1, kKnobLarge);
-      row.Knob("blend", &n->blend, 0.0f, 1.0f, "%.2f", kKnobLarge);
+      Ui::DrawKnob(row, n, BlendAudioBodyRow::Knob<&BlendAudioNode::blend>("blend", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
       row.End();
       EndAudioBody();
    }
@@ -1872,6 +1878,22 @@ namespace app
    }
 
 
+   namespace
+   {
+      using DrumSequencerBodyRow = params::Row<DrumSequencerNode>;
+      const DrumSequencerBodyRow kDrumSequencerBodyRows1[] = {
+         DrumSequencerBodyRow::KnobInt<&DrumSequencerNode::numSteps>("steps", 1, DrumSequencerNode::kMaxSteps),
+         DrumSequencerBodyRow::Knob<&DrumSequencerNode::swing>("swing", 0.0f, 1.0f).Fmt("%.2f"),
+         DrumSequencerBodyRow::Knob<&DrumSequencerNode::volume>("output", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+      const DrumSequencerBodyRow kDrumSequencerBodyRows2[] = {
+         DrumSequencerBodyRow::Knob<&DrumSequencerNode::globalTransient>("transient", -1.0f, 1.0f).Fmt("%.2f"),
+         DrumSequencerBodyRow::Knob<&DrumSequencerNode::globalDecay>("decay", -1.0f, 1.0f).Fmt("%.2f"),
+         DrumSequencerBodyRow::Knob<&DrumSequencerNode::globalPitch>("pitch", params::DrumSequencer::global_pitch_lo, params::DrumSequencer::global_pitch_hi).Fmt("%.1f st"),
+         DrumSequencerBodyRow::Knob<&DrumSequencerNode::globalPan>("pan", -1.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
+
    void DrawDrumSequencerBody(GraphNode& gn, DrumSequencerNode* n)
    {
       const DrumGrooveLists& gl = DrumGrooves();
@@ -2193,17 +2215,12 @@ namespace app
          AudioKnobRow row(tok::sampler_drum_sequencer_body_audio_knob_row_layout);
          row.Dropdown("rate", MusicTime::RateDivisionList(), n->rate,
                       [n](int i) { PushUndoCheckpoint(); n->rate = i; });
-         row.KnobInt("steps", &n->numSteps, 1, DrumSequencerNode::kMaxSteps);
-         row.Knob("swing", &n->swing, 0.0f, 1.0f, "%.2f");
-         row.Knob("output", &n->volume, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kDrumSequencerBodyRows1);
          row.End();
       }
       {
          AudioKnobRow row(tok::sampler_drum_sequencer_body_audio_knob_row_layout);
-         row.Knob("transient", &n->globalTransient, -1.0f, 1.0f, "%.2f");
-         row.Knob("decay", &n->globalDecay, -1.0f, 1.0f, "%.2f");
-         row.Knob("pitch", &n->globalPitch, params::DrumSequencer::global_pitch_lo, params::DrumSequencer::global_pitch_hi, "%.1f st");
-         row.Knob("pan", &n->globalPan, -1.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kDrumSequencerBodyRows2);
          row.End();
       }
       ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_spacer_h_md));

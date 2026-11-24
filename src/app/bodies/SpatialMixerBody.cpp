@@ -6,6 +6,7 @@
 #include "app/ui/design/components/ListRow.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "platform/HeadTracker.h"
 #include "app/ui/design/UiFmt.h"
 
@@ -38,6 +39,15 @@ namespace app
             PopSelectedButtonColors();
          return clicked;
       }
+   }
+
+   namespace
+   {
+      using SpatialMixerBodyRow = params::Row<SpatialMixerNode>;
+      const SpatialMixerBodyRow kSpatialMixerBodyRows[] = {
+         SpatialMixerBodyRow::Knob<&SpatialMixerNode::room>("room", 0.0f, 1.0f).Fmt("%.2f").At(0),
+         SpatialMixerBodyRow::Knob<&SpatialMixerNode::bassHz>("bass mono", params::SpatialMixer::bass_hz_lo, params::SpatialMixer::bass_hz_hi).Fmt("%.0f Hz").At(1),
+      };
    }
 
    void DrawSpatialMixerBody(GraphNode& gn, SpatialMixerNode* n)
@@ -307,10 +317,7 @@ namespace app
          AudioKnobRow row2(tok::spatial_mixer_body_audio_knob_row_layout, kKnobSmall);
          row2.Knob("level", &n->gainDb[sel], params::SpatialMixer::gain_db_lo, params::SpatialMixer::gain_db_hi, "%.1f dB", kKnobSmall, /*dbTaper=*/true, false,
                    AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 4), lv.c_str());
-         row2.Knob("room", &n->room, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr,
-                   nullptr, 0);
-         row2.Knob("bass mono", &n->bassHz, params::SpatialMixer::bass_hz_lo, params::SpatialMixer::bass_hz_hi, "%.0f Hz", kKnobSmall, false, false,
-                   AudioWidgetStyle::Knob, nullptr, nullptr, 1);
+         Ui::DrawKnobs(row2, n, kSpatialMixerBodyRows);
          row2.Knob("out", &n->outDb, params::SpatialMixer::out_db_lo, params::SpatialMixer::out_db_hi, "%.1f dB", kKnobSmall, /*dbTaper=*/true, false,
                    AudioWidgetStyle::Knob, nullptr, nullptr, params::SpatialMixer::out_db_def);
          row2.End();

@@ -4,6 +4,7 @@
 #include "app/ui/design/UiInteract.h"
 #include <unordered_map>
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
 
@@ -416,13 +417,21 @@ namespace app
    }
 
 
+   namespace
+   {
+      using DriftParamsRow = params::Row<DriftNode>;
+      const DriftParamsRow kDriftParamsRows[] = {
+         DriftParamsRow::Slider<&DriftNode::speed>("speed", params::Drift::speed_lo, params::Drift::speed_hi).Fmt("%.2fx"),
+         DriftParamsRow::Slider<&DriftNode::stray>("stray", params::Drift::stray_lo, params::Drift::stray_hi).Fmt("%.2f"),
+         DriftParamsRow::Slider<&DriftNode::momentum>("momentum", params::Drift::momentum_lo, params::Drift::momentum_hi).Fmt("%.2fs"),
+         DriftParamsRow::Slider<&DriftNode::smoothness>("smoothing", params::Drift::smoothness_lo, params::Drift::smoothness_hi).Fmt("%.2f"),
+         DriftParamsRow::Slider<&DriftNode::depth>("depth", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
+
    void DrawDriftParams(GraphNode& gn, DriftNode* n)
    {
-      ModSlider("speed", &n->speed, params::Drift::speed_lo, params::Drift::speed_hi, "%.2fx");
-      ModSlider("stray", &n->stray, params::Drift::stray_lo, params::Drift::stray_hi, "%.2f");
-      ModSlider("momentum", &n->momentum, params::Drift::momentum_lo, params::Drift::momentum_hi, "%.2fs");
-      ModSlider("smoothing", &n->smoothness, params::Drift::smoothness_lo, params::Drift::smoothness_hi, "%.2f");
-      ModSlider("depth", &n->depth, 0.0f, 1.0f, "%.2f");
+      Ui::DrawParams(n, kDriftParamsRows);
       // `low`/`high` used to sit here, writing rangeLo/rangeHi/rangeOverride: ONE range clamped
       // onto every destination at once. That is meaningless on this node - each destination has
       // its own slot and its own learned range, so a single pair of sliders either did nothing or
@@ -499,6 +508,16 @@ namespace app
    // dropdown, an honest read-only spectral-radius readout, and the constantIn fallback shown
    // only when nothing is patched in (mirrors SmoothNode/RangeToRangeNode's own "(no cable)"
    // convention rather than inventing a new one).
+   namespace
+   {
+      using PredictiveModulatorParamsRow = params::Row<PredictiveModulatorNode>;
+      const PredictiveModulatorParamsRow kPredictiveModulatorParamsRows[] = {
+         PredictiveModulatorParamsRow::Slider<&PredictiveModulatorNode::speed>("speed", params::PredictiveModulator::speed_lo, params::PredictiveModulator::speed_hi).Fmt("%.2fx"),
+         PredictiveModulatorParamsRow::Slider<&PredictiveModulatorNode::low>("low", 0.0f, 1.0f).Fmt("%.2f"),
+         PredictiveModulatorParamsRow::Slider<&PredictiveModulatorNode::high>("high", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
+
    void DrawPredictiveModulatorParams(PredictiveModulatorNode* n)
    {
       const bool learning = n->IsLearning();
@@ -551,11 +570,9 @@ namespace app
       // (how many lagged copies of the one input signal DMD gets to fit a transition matrix
       // against), an implementation detail of "how", not a UI/UX decision - it stays fixed at
       // n->rank's own default from here on, the same "no params" treatment Drift got.
-      ModSlider("speed", &n->speed, params::PredictiveModulator::speed_lo, params::PredictiveModulator::speed_hi, "%.2fx");
-      ModSlider("low", &n->low, 0.0f, 1.0f, "%.2f");
-      ModSlider("high", &n->high, 0.0f, 1.0f, "%.2f");
+      Ui::DrawParams(n, kPredictiveModulatorParamsRows);
       if (n->input == nullptr)
-         ModSlider("constant", &n->constantIn, 0.0f, 1.0f, "%.2f");
+         Ui::DrawParam(n, PredictiveModulatorParamsRow::Slider<&PredictiveModulatorNode::constantIn>("constant", 0.0f, 1.0f).Fmt("%.2f"));
    }
 
 

@@ -68,6 +68,10 @@ namespace params
       int cell = -1;                      // knob rows: the AudioKnobRow cell; -1: the row's next cell
       void (*custom)(N*) = nullptr;
       const std::vector<std::string>& (*options)() = nullptr;
+      const std::vector<std::string>* optionList = nullptr; // a namespace-scope list, when there is no Names()
+      bool undo = false;      // Choice: an undo checkpoint before the pick is stored
+      bool caption = true;    // Choice: DropdownButton's showCaption
+      bool segmented = false; // Choice: DropdownButton's segmented look
 
       // ---- rows ----
       template <auto M> static float* MemF(N* n) { return &(n->*M); }
@@ -132,6 +136,7 @@ namespace params
          return r;
       }
 
+      // A dropdown storing the picked index: in an int member, or (float stores, the audio nodes) as a float.
       template <auto M>
       static constexpr Row Choice(const char* label, const std::vector<std::string>& (*options)())
       {
@@ -140,6 +145,29 @@ namespace params
          r.options = options;
          return r;
       }
+      template <auto M>
+      static constexpr Row Choice(const char* label, const std::vector<std::string>* list)
+      {
+         Row r = Make(Kind::Choice, label);
+         r.i = &MemI<M>;
+         r.optionList = list;
+         return r;
+      }
+      static constexpr Row ChoiceF(const char* label, float* (*get)(N*), const std::vector<std::string>& (*options)())
+      {
+         Row r = Make(Kind::Choice, label);
+         r.f = get;
+         r.options = options;
+         return r;
+      }
+      static constexpr Row ChoiceF(const char* label, float* (*get)(N*), const std::vector<std::string>* list)
+      {
+         Row r = Make(Kind::Choice, label);
+         r.f = get;
+         r.optionList = list;
+         return r;
+      }
+      const std::vector<std::string>& Options() const { return optionList != nullptr ? *optionList : options(); }
 
       template <auto M>
       static constexpr Row Colour(const char* label) { return Colour(label, &MemArr<M>); }
@@ -178,5 +206,8 @@ namespace params
       constexpr Row Keep() const { Row r = *this; r.reserve = true; return r; }
       constexpr Row LiveIf(bool (*isLive)(const N&)) const { Row r = *this; r.live = isLive; return r; }
       constexpr Row Cell(int index) const { Row r = *this; r.cell = index; return r; }
+      constexpr Row Undo() const { Row r = *this; r.undo = true; return r; }
+      constexpr Row NoCaption() const { Row r = *this; r.caption = false; return r; }
+      constexpr Row Segmented() const { Row r = *this; r.segmented = true; return r; }
    };
 }

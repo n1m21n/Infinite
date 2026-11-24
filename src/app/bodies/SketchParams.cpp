@@ -1,12 +1,23 @@
 // Sketch node body: Edit button, error line, size, and the knobs that the script's
 // param() calls declared (modulatable like Field's, see docs/plans/sketch/README.md).
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "app/graph/NodeParams.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
 
 namespace app
 {
+   namespace
+   {
+      using SketchParamsRow = params::Row<SketchNode>;
+      const SketchParamsRow kSketchParamsRows[] = {
+         SketchParamsRow::Slider<&SketchNode::width>("width", params::Sketch::width_lo, params::Sketch::width_hi).Fmt("%.0f"),
+         SketchParamsRow::Slider<&SketchNode::height>("height", params::Sketch::height_lo, params::Sketch::height_hi).Fmt("%.0f"),
+         SketchParamsRow::Toggle<&SketchNode::animate>("animate"),
+      };
+   }
+
    void DrawSketchParams(SketchNode* n)
    {
       n->SetNodeIndex(gCurrentNodeIndex);
@@ -34,9 +45,7 @@ namespace app
          }
       }
 
-      ModSlider("width", &n->width, params::Sketch::width_lo, params::Sketch::width_hi, "%.0f");
-      ModSlider("height", &n->height, params::Sketch::height_lo, params::Sketch::height_hi, "%.0f");
-      ModCheckbox("animate", &n->animate);
+      Ui::DrawParams(n, kSketchParamsRows);
 
       DrawFieldParamSliders(n);
    }

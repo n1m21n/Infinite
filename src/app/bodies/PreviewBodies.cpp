@@ -12,6 +12,7 @@
 #include "app/ui/design/components/GlyphToggle.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
 
@@ -544,18 +545,34 @@ namespace app
    }
 
 
+   namespace
+   {
+      using DrawParamsRow = params::Row<DrawNode>;
+      const DrawParamsRow kDrawParamsRows1[] = {
+         DrawParamsRow::Choice<&DrawNode::brush>("brush", &DrawNode::BrushNames),
+         DrawParamsRow::Slider<&DrawNode::brushSize>("size", params::Draw::brush_size_lo, params::Draw::brush_size_hi),
+         DrawParamsRow::Slider<&DrawNode::opacity>("opacity", params::Draw::opacity_lo, params::Draw::opacity_hi),
+         DrawParamsRow::Slider<&DrawNode::hardness>("hardness", params::Draw::hardness_lo, params::Draw::hardness_hi),
+         DrawParamsRow::Slider<&DrawNode::spacing>("spacing", params::Draw::spacing_lo, params::Draw::spacing_hi),
+         DrawParamsRow::Slider<&DrawNode::jitter>("jitter", params::Draw::jitter_lo, params::Draw::jitter_hi),
+         DrawParamsRow::Colour<&DrawNode::color>("colour"),
+         DrawParamsRow::Toggle<&DrawNode::eraser>("eraser"),
+      };
+      const DrawParamsRow kDrawParamsRows2[] = {
+         DrawParamsRow::Toggle<&DrawNode::loopPlayback>("loop replay"),
+         DrawParamsRow::Slider<&DrawNode::playSpeed>("replay speed", params::Draw::play_speed_lo, params::Draw::play_speed_hi),
+      };
+      const DrawParamsRow kDrawParamsRows3[] = {
+         DrawParamsRow::Slider<&DrawNode::canvasWidth>("canvas w", params::Draw::canvas_width_lo, params::Draw::canvas_width_hi).Fmt("%.0f"),
+         DrawParamsRow::Slider<&DrawNode::canvasHeight>("canvas h", params::Draw::canvas_height_lo, params::Draw::canvas_height_hi).Fmt("%.0f"),
+      };
+   }
+
    void DrawDrawParams(DrawNode* n)
    {
       gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the canvas and the buttons
       const float halfW = (kPreviewSize - tok::space_1) * 0.5f;
-      DropdownButton("brush", DrawNode::BrushNames(), n->brush, [n](int i) { n->brush = i; });
-      ModSlider("size", &n->brushSize, params::Draw::brush_size_lo, params::Draw::brush_size_hi);
-      ModSlider("opacity", &n->opacity, params::Draw::opacity_lo, params::Draw::opacity_hi);
-      ModSlider("hardness", &n->hardness, params::Draw::hardness_lo, params::Draw::hardness_hi);
-      ModSlider("spacing", &n->spacing, params::Draw::spacing_lo, params::Draw::spacing_hi);
-      ModSlider("jitter", &n->jitter, params::Draw::jitter_lo, params::Draw::jitter_hi);
-      ColorSwatch("colour", n->color, n);
-      ModCheckbox("eraser", &n->eraser);
+      Ui::DrawParams(n, kDrawParamsRows1);
       if (ActionButton::Draw("Clear canvas", ImVec2(kPreviewSize, 0)))
          n->ClearCanvas();
 
@@ -592,12 +609,10 @@ namespace app
             PopTextWrapWidth();
          }
       }
-      ModCheckbox("loop replay", &n->loopPlayback);
-      ModSlider("replay speed", &n->playSpeed, params::Draw::play_speed_lo, params::Draw::play_speed_hi);
+      Ui::DrawParams(n, kDrawParamsRows2);
       if (ActionButton::Draw("clear recording", ImVec2(kPreviewSize, 0)))
          n->ClearRecording();
-      ModSlider("canvas w", &n->canvasWidth, params::Draw::canvas_width_lo, params::Draw::canvas_width_hi, "%.0f");
-      ModSlider("canvas h", &n->canvasHeight, params::Draw::canvas_height_lo, params::Draw::canvas_height_hi, "%.0f");
+      Ui::DrawParams(n, kDrawParamsRows3);
    }
 
 

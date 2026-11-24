@@ -3,6 +3,7 @@
 #include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "app/ui/design/UiFmt.h"
 
 namespace app
@@ -484,6 +485,31 @@ namespace app
    }
 
 
+   namespace
+   {
+      using AnalogBodyRow = params::Row<AnalogNode>;
+      const AnalogBodyRow kAnalogBodyRows1[] = {
+         AnalogBodyRow::Knob<&AnalogNode::osc1Vol>("vol 1", 0.0f, 1.0f).Fmt("%.2f"),
+         AnalogBodyRow::Knob<&AnalogNode::osc2Vol>("vol 2", 0.0f, 1.0f).Fmt("%.2f"),
+         AnalogBodyRow::Toggle<&AnalogNode::sync>("sync"),
+         AnalogBodyRow::Toggle<&AnalogNode::analog>("analog"),
+      };
+      const AnalogBodyRow kAnalogBodyRows2[] = {
+         AnalogBodyRow::Knob<&AnalogNode::pw1>("pw", params::Analog::pw1_lo, params::Analog::pw1_hi).Fmt("%.2f"),
+         AnalogBodyRow::Knob<&AnalogNode::voices>("voices", params::Analog::voices_lo, params::Analog::voices_hi).Fmt("%.0f"),
+      };
+      const AnalogBodyRow kAnalogBodyRows3[] = {
+         AnalogBodyRow::Knob<&AnalogNode::detune>("detune", params::Analog::detune_lo, params::Analog::detune_hi).Fmt("%.1f c"),
+         AnalogBodyRow::Knob<&AnalogNode::oscMix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         AnalogBodyRow::Knob<&AnalogNode::sub>("sub", 0.0f, 1.0f).Fmt("%.2f"),
+         AnalogBodyRow::Knob<&AnalogNode::noise>("noise", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+      const AnalogBodyRow kAnalogBodyRows4[] = {
+         AnalogBodyRow::Knob<&AnalogNode::drive>("drive", 0.0f, 1.0f).Fmt("%.2f"),
+         AnalogBodyRow::Knob<&AnalogNode::keyTrack>("key track", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
+
    void DrawAnalogBody(GraphNode& gn, AnalogNode* n)
    {
       const bool noteDriven = n->noteInput.GetSource() != nullptr;
@@ -551,30 +577,23 @@ namespace app
       {
          // Row 3: Osc 1 Vol, Osc 2 Vol, Sync & Analog switches
          AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
-         row.Knob("vol 1", &n->osc1Vol, 0.0f, 1.0f, "%.2f");
-         row.Knob("vol 2", &n->osc2Vol, 0.0f, 1.0f, "%.2f");
-         row.Checkbox("sync", &n->sync);
-         row.Checkbox("analog", &n->analog);
+         Ui::DrawKnobs(row, n, kAnalogBodyRows1);
          row.End();
       }
       {
          // Row 4: pw, voices, spread, fm
          AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
-         row.Knob("pw", &n->pw1, params::Analog::pw1_lo, params::Analog::pw1_hi, "%.2f");
-         row.Knob("voices", &n->voices, params::Analog::voices_lo, params::Analog::voices_hi, "%.0f");
+         Ui::DrawKnobs(row, n, kAnalogBodyRows2);
          ImGui::BeginDisabled((n->voices < 1.5f) && !gParamRegisterOnly);
-         row.Knob("spread", &n->spread, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnob(row, n, AnalogBodyRow::Knob<&AnalogNode::spread>("spread", 0.0f, 1.0f).Fmt("%.2f"));
          ImGui::EndDisabled();
-         row.Knob("fm", &n->fm, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, AnalogBodyRow::Knob<&AnalogNode::fm>("fm", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          row.End();
       }
       {
          // Row 5: detune, mix (default 50%), sub, noise
          AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
-         row.Knob("detune", &n->detune, params::Analog::detune_lo, params::Analog::detune_hi, "%.1f c");
-         row.Knob("mix", &n->oscMix, 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("sub", &n->sub, 0.0f, 1.0f, "%.2f");
-         row.Knob("noise", &n->noise, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kAnalogBodyRows3);
          row.End();
       }
       EndAudioSection();
@@ -590,10 +609,9 @@ namespace app
                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
                           "filter", &n->cutoff, params::Analog::cutoff_lo, params::Analog::cutoff_hi, "%.0f Hz", filterOff, kKnobLarge, true);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
-         row.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, AnalogBodyRow::Knob<&AnalogNode::resonance>("reso", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          ImGui::EndDisabled();
-         row.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
-         row.Knob("key track", &n->keyTrack, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kAnalogBodyRows4);
          row.End();
       }
       EndAudioSection();
@@ -615,12 +633,12 @@ namespace app
          AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->freq, params::Analog::freq_lo, params::Analog::freq_hi, "%.0f Hz", kKnobLarge);
+         Ui::DrawKnob(row, n, AnalogBodyRow::Knob<&AnalogNode::freq>("freq", params::Analog::freq_lo, params::Analog::freq_hi).Fmt("%.0f Hz").Size(kKnobLarge));
          if (noteDriven)
             ImGui::EndDisabled();
-         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, AnalogBodyRow::Knob<&AnalogNode::volume>("volume", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          row.Knob("glide", &n->glide, params::Analog::glide_lo, params::Analog::glide_hi, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
-         row.Knob("bend", &n->pitchBend, params::Analog::pitch_bend_lo, params::Analog::pitch_bend_hi, "%+.2f st");
+         Ui::DrawKnob(row, n, AnalogBodyRow::Knob<&AnalogNode::pitchBend>("bend", params::Analog::pitch_bend_lo, params::Analog::pitch_bend_hi).Fmt("%+.2f st"));
          row.End();
       }
       EndAudioSection();

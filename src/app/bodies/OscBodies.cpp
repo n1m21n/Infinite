@@ -6,6 +6,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "core/ModShapes.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
@@ -1430,6 +1431,15 @@ namespace app
    }
 
 
+   namespace
+   {
+      using WavetableBodyRow = params::Row<WavetableNode>;
+      const WavetableBodyRow kWavetableBodyRows[] = {
+         WavetableBodyRow::Knob<&WavetableNode::mix>("mix  a-b", 0.0f, 1.0f).Fmt("%.2f"),
+         WavetableBodyRow::Knob<&WavetableNode::volume>("volume", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
+
    void DrawWavetableBody(GraphNode& gn, WavetableNode* n)
    {
       const bool noteDriven = n->noteInput.GetSource() != nullptr;
@@ -1473,13 +1483,12 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_md));
       {
          AudioKnobRow row(tok::osc_wavetable_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
-         row.Knob("mix  a-b", &n->mix, 0.0f, 1.0f, "%.2f");
-         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kWavetableBodyRows);
          // Free-running pitch is meaningless once notes drive pitch - greyed
          // rather than hidden so the row never reflows (§5).
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->frequency, params::Wavetable::frequency_lo, params::Wavetable::frequency_hi, "%.0f Hz");
+         Ui::DrawKnob(row, n, WavetableBodyRow::Knob<&WavetableNode::frequency>("freq", params::Wavetable::frequency_lo, params::Wavetable::frequency_hi).Fmt("%.0f Hz"));
          if (noteDriven)
             ImGui::EndDisabled();
          row.Knob("glide", &n->glide, params::Wavetable::glide_lo, params::Wavetable::glide_hi, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
@@ -1488,7 +1497,7 @@ namespace app
          // in on each note's own bendSemitones field instead (see
          // NoteEvent.h) and adds additively with whatever this knob is set
          // to. Drag this one directly for a bend with nothing patched.
-         row.Knob("bend", &n->pitchBend, params::Wavetable::pitch_bend_lo, params::Wavetable::pitch_bend_hi, "%+.2f st");
+         Ui::DrawKnob(row, n, WavetableBodyRow::Knob<&WavetableNode::pitchBend>("bend", params::Wavetable::pitch_bend_lo, params::Wavetable::pitch_bend_hi).Fmt("%+.2f st"));
          // fmMode picks phase modulation (cheap, always-stable sideband FM)
          // vs linear through-zero FM (DX7/Serum/Operator-style, can self-
          // modulate harder and run the carrier backward at high depth) - the
@@ -1616,6 +1625,11 @@ namespace app
    }
 
 
+   namespace
+   {
+      using OscillatorBodyRow = params::Row<OscillatorNode>;
+   }
+
    void DrawOscillatorBody(GraphNode& gn, OscillatorNode* n)
    {
       const bool noteDriven = n->noteInput.GetSource() != nullptr;
@@ -1713,11 +1727,11 @@ namespace app
          AudioKnobRow row(tok::osc_oscillator_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->frequency, params::Oscillator::frequency_lo, params::Oscillator::frequency_hi, "%.0f Hz");
+         Ui::DrawKnob(row, n, OscillatorBodyRow::Knob<&OscillatorNode::frequency>("freq", params::Oscillator::frequency_lo, params::Oscillator::frequency_hi).Fmt("%.0f Hz"));
          if (noteDriven)
             ImGui::EndDisabled();
          row.Knob("glide", &n->glide, params::Oscillator::glide_lo, params::Oscillator::glide_hi, "%.2f s", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide150);
-         row.Knob("bend", &n->pitchBend, params::Oscillator::pitch_bend_lo, params::Oscillator::pitch_bend_hi, "%+.2f st");
+         Ui::DrawKnob(row, n, OscillatorBodyRow::Knob<&OscillatorNode::pitchBend>("bend", params::Oscillator::pitch_bend_lo, params::Oscillator::pitch_bend_hi).Fmt("%+.2f st"));
          // fmMode picks phase modulation vs linear through-zero FM - see the
          // Wavetable master row's identical control for why they're paired.
          row.DropdownKnob("oscFmMode", { "pm", "fm" }, n->fmMode,
@@ -1730,6 +1744,21 @@ namespace app
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using MetallicBodyRow = params::Row<MetallicNode>;
+      const MetallicBodyRow kMetallicBodyRows1[] = {
+         MetallicBodyRow::Knob<&MetallicNode::transient>("transient", params::Metallic::transient_lo, params::Metallic::transient_hi).Fmt("%.2f"),
+         MetallicBodyRow::Knob<&MetallicNode::decay>("decay", params::Metallic::decay_lo, params::Metallic::decay_hi).Fmt("%.2f s"),
+         MetallicBodyRow::Knob<&MetallicNode::stiffness>("stiffness", params::Metallic::stiffness_lo, params::Metallic::stiffness_hi).Fmt("%.2f"),
+         MetallicBodyRow::Knob<&MetallicNode::width>("width", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+      const MetallicBodyRow kMetallicBodyRows2[] = {
+         MetallicBodyRow::Knob<&MetallicNode::drive>("drive", 0.0f, 1.0f).Fmt("%.2f"),
+         MetallicBodyRow::Knob<&MetallicNode::volume>("volume", params::Metallic::volume_lo, params::Metallic::volume_hi).Fmt("%.2f"),
+      };
+   }
 
    void DrawMetallicBody(GraphNode& gn, MetallicNode* n)
    {
@@ -1799,10 +1828,7 @@ namespace app
       BeginAudioSection("physical acoustics");
       {
          AudioKnobRow row(tok::osc_metallic_body_audio_knob_row_layout);
-         row.Knob("transient", &n->transient, params::Metallic::transient_lo, params::Metallic::transient_hi, "%.2f");
-         row.Knob("decay", &n->decay, params::Metallic::decay_lo, params::Metallic::decay_hi, "%.2f s");
-         row.Knob("stiffness", &n->stiffness, params::Metallic::stiffness_lo, params::Metallic::stiffness_hi, "%.2f");
-         row.Knob("width", &n->width, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kMetallicBodyRows1);
          row.End();
       }
       EndAudioSection();
@@ -1820,10 +1846,9 @@ namespace app
                           [n](int displayIdx) { PushUndoCheckpoint(); n->filterType = MetallicDsp::DisplayIndexToFilterMode(displayIdx); },
                           "filter", &n->filterCutoff, params::Metallic::filter_cutoff_lo, params::Metallic::filter_cutoff_hi, "%.0f Hz", filterOff);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
-         row.Knob("reso", &n->filterResonance, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnob(row, n, MetallicBodyRow::Knob<&MetallicNode::filterResonance>("reso", 0.0f, 1.0f).Fmt("%.2f"));
          ImGui::EndDisabled();
-         row.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
-         row.Knob("volume", &n->volume, params::Metallic::volume_lo, params::Metallic::volume_hi, "%.2f");
+         Ui::DrawKnobs(row, n, kMetallicBodyRows2);
          row.End();
       }
       EndAudioSection();
@@ -1836,7 +1861,7 @@ namespace app
          AudioKnobRow row(tok::osc_row_layout_sm);
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->frequency, params::Metallic::frequency_lo, params::Metallic::frequency_hi, "%.0f Hz");
+         Ui::DrawKnob(row, n, MetallicBodyRow::Knob<&MetallicNode::frequency>("freq", params::Metallic::frequency_lo, params::Metallic::frequency_hi).Fmt("%.0f Hz"));
          if (noteDriven)
             ImGui::EndDisabled();
          row.Knob("glide", &n->glide, 0.0f, 1.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
@@ -1888,6 +1913,15 @@ namespace app
    }
 
 
+   namespace
+   {
+      using FMBodyRow = params::Row<FMNode>;
+      const FMBodyRow kFMBodyRows[] = {
+         FMBodyRow::Knob<&FMNode::feedback>("feedback", 0.0f, 1.0f).Fmt("%.2f"),
+         FMBodyRow::Knob<&FMNode::volume>("volume", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+   }
+
    void DrawFMBody(GraphNode& gn, FMNode* n)
    {
       const int voices = n->ActiveVoices();
@@ -1904,8 +1938,7 @@ namespace app
             PushUndoCheckpoint();
             n->algorithm = i;
          });
-         row.Knob("feedback", &n->feedback, 0.0f, 1.0f, "%.2f");
-         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kFMBodyRows);
          row.End();
       }
 
@@ -1997,6 +2030,21 @@ namespace app
    }
 
 
+   namespace
+   {
+      using PartialsBodyRow = params::Row<PartialsNode>;
+      const PartialsBodyRow kPartialsBodyRows1[] = {
+         PartialsBodyRow::Knob<&PartialsNode::pitch>("pitch", params::Partials::pitch_lo, params::Partials::pitch_hi).Fmt("%+.1f st"),
+         PartialsBodyRow::Knob<&PartialsNode::formant>("formant", params::Partials::formant_lo, params::Partials::formant_hi).Fmt("%+.1f st"),
+         PartialsBodyRow::Knob<&PartialsNode::partials>("partials", params::Partials::partials_lo, params::Partials::partials_hi).Fmt("%.0f"),
+         PartialsBodyRow::Knob<&PartialsNode::morph>("morph", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+      const PartialsBodyRow kPartialsBodyRows2[] = {
+         PartialsBodyRow::Knob<&PartialsNode::speed>("speed", params::Partials::speed_lo, params::Partials::speed_hi).Fmt("%.2fx"),
+         PartialsBodyRow::Knob<&PartialsNode::noise>("noise", params::Partials::noise_lo, params::Partials::noise_hi).Fmt("%.2f"),
+      };
+   }
+
    void DrawPartialsBody(GraphNode& gn, PartialsNode* n)
    {
       const int voices = n->ActiveVoices();
@@ -2034,7 +2082,7 @@ namespace app
             ImGui::PopID();
          }
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + w - loopW, y));
-         ModCheckbox("loop##partialsLoop", &n->loop);
+         Ui::DrawParam(n, PartialsBodyRow::Toggle<&PartialsNode::loop>("loop##partialsLoop"));
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
@@ -2043,19 +2091,15 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       {
          AudioKnobRow row(tok::osc_partials_body_audio_knob_row_layout);
-         row.Knob("pitch", &n->pitch, params::Partials::pitch_lo, params::Partials::pitch_hi, "%+.1f st");
-         row.Knob("formant", &n->formant, params::Partials::formant_lo, params::Partials::formant_hi, "%+.1f st");
-         row.Knob("partials", &n->partials, params::Partials::partials_lo, params::Partials::partials_hi, "%.0f");
-         row.Knob("morph", &n->morph, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kPartialsBodyRows1);
          row.End();
       }
       {
          AudioKnobRow row(tok::osc_partials_body_audio_knob_row_layout);
-         row.Knob("speed", &n->speed, params::Partials::speed_lo, params::Partials::speed_hi, "%.2fx");
-         row.Knob("noise", &n->noise, params::Partials::noise_lo, params::Partials::noise_hi, "%.2f");
+         Ui::DrawKnobs(row, n, kPartialsBodyRows2);
          row.Knob("release", &n->release, params::Partials::release_lo, params::Partials::release_hi, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
-         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, PartialsBodyRow::Knob<&PartialsNode::volume>("volume", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          row.End();
       }
       EndAudioBody();
@@ -2084,6 +2128,23 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+   namespace
+   {
+      using StringBodyRow = params::Row<StringNode>;
+      const StringBodyRow kStringBodyRows1[] = {
+         StringBodyRow::Knob<&StringNode::position>("position", params::String::position_lo, params::String::position_hi).Fmt("%.2f"),
+         StringBodyRow::Knob<&StringNode::stiffness>("stiffness", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+      const StringBodyRow kStringBodyRows2[] = {
+         StringBodyRow::Knob<&StringNode::body>("body", 0.0f, 1.0f).Fmt("%.2f"),
+         StringBodyRow::Knob<&StringNode::tone>("tone", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+      const StringBodyRow kStringBodyRows3[] = {
+         StringBodyRow::Knob<&StringNode::pressure>("pressure", 0.0f, 1.0f).Fmt("%.2f"),
+         StringBodyRow::Knob<&StringNode::noise>("noise", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
+
    void DrawStringBody(GraphNode& gn, StringNode* n)
    {
       const int voices = n->ActiveVoices();
@@ -2100,8 +2161,7 @@ namespace app
             PushUndoCheckpoint();
             n->exciter = i;
          });
-         row.Knob("position", &n->position, params::String::position_lo, params::String::position_hi, "%.2f");
-         row.Knob("stiffness", &n->stiffness, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kStringBodyRows1);
          row.End();
       }
       {
@@ -2110,16 +2170,15 @@ namespace app
             PushUndoCheckpoint();
             n->bodyType = i;
          });
-         row.Knob("body", &n->body, 0.0f, 1.0f, "%.2f");
-         row.Knob("tone", &n->tone, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kStringBodyRows2);
          row.End();
       }
       {
          AudioKnobRow row(tok::osc_string_body_audio_knob_row_layout);
-         row.Knob("decay", &n->decay, params::String::decay_lo, params::String::decay_hi, "%.2f s");
+         Ui::DrawKnob(row, n, StringBodyRow::Knob<&StringNode::decay>("decay", params::String::decay_lo, params::String::decay_hi).Fmt("%.2f s"));
          row.Knob("release", &n->release, params::String::release_lo, params::String::release_hi, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
-         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, StringBodyRow::Knob<&StringNode::volume>("volume", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          row.End();
       }
       {
@@ -2128,11 +2187,10 @@ namespace app
          const bool bowed = n->exciter == StringNode::kBow;
          AudioKnobRow row(tok::osc_string_body_audio_knob_row_layout);
          ImGui::BeginDisabled((bowed || n->exciter == StringNode::kStrike) && !gParamRegisterOnly);
-         row.Knob("hardness", &n->hardness, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnob(row, n, StringBodyRow::Knob<&StringNode::hardness>("hardness", 0.0f, 1.0f).Fmt("%.2f"));
          ImGui::EndDisabled();
          ImGui::BeginDisabled(!bowed && !gParamRegisterOnly);
-         row.Knob("pressure", &n->pressure, 0.0f, 1.0f, "%.2f");
-         row.Knob("noise", &n->noise, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kStringBodyRows3);
          ImGui::EndDisabled();
          row.End();
       }
@@ -2177,6 +2235,20 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+   namespace
+   {
+      using WindBodyRow = params::Row<WindNode>;
+      const WindBodyRow kWindBodyRows1[] = {
+         WindBodyRow::Knob<&WindNode::breath>("breath", 0.0f, 1.0f).Fmt("%.2f"),
+         WindBodyRow::Knob<&WindNode::tone>("tone", 0.0f, 1.0f).Fmt("%.2f"),
+         WindBodyRow::Knob<&WindNode::noise>("noise", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+      const WindBodyRow kWindBodyRows2[] = {
+         WindBodyRow::Knob<&WindNode::vibrato>("vibrato", 0.0f, 1.0f).Fmt("%.2f"),
+         WindBodyRow::Knob<&WindNode::attack>("attack", params::Wind::attack_lo, params::Wind::attack_hi).Fmt("%.0f ms"),
+      };
+   }
+
    void DrawWindBody(GraphNode& gn, WindNode* n)
    {
       const int voices = n->ActiveVoices();
@@ -2193,18 +2265,15 @@ namespace app
             PushUndoCheckpoint();
             n->instrument = i;
          });
-         row.Knob("breath", &n->breath, 0.0f, 1.0f, "%.2f");
-         row.Knob("tone", &n->tone, 0.0f, 1.0f, "%.2f");
-         row.Knob("noise", &n->noise, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kWindBodyRows1);
          row.End();
       }
       {
          AudioKnobRow row(tok::osc_wind_body_audio_knob_row_layout);
-         row.Knob("vibrato", &n->vibrato, 0.0f, 1.0f, "%.2f");
-         row.Knob("attack", &n->attack, params::Wind::attack_lo, params::Wind::attack_hi, "%.0f ms");
+         Ui::DrawKnobs(row, n, kWindBodyRows2);
          row.Knob("release", &n->release, params::Wind::release_lo, params::Wind::release_hi, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
-         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, WindBodyRow::Knob<&WindNode::volume>("volume", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          row.End();
       }
       EndAudioBody();
@@ -2237,6 +2306,11 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+   namespace
+   {
+      using PianoBodyRow = params::Row<PianoNode>;
+   }
+
    void DrawPianoBody(GraphNode& gn, PianoNode* n)
    {
       const int voices = n->ActiveVoices();
@@ -2256,14 +2330,14 @@ namespace app
             n->model = i;
          });
          if (electric)
-            row.Knob("tremolo", &n->tremolo, 0.0f, 1.0f, "%.2f");
+            Ui::DrawKnob(row, n, PianoBodyRow::Knob<&PianoNode::tremolo>("tremolo", 0.0f, 1.0f).Fmt("%.2f"));
          row.End();
       }
       {
          AudioKnobRow row(tok::osc_row_layout_lg);
-         row.Knob("hardness", &n->hardness, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnob(row, n, PianoBodyRow::Knob<&PianoNode::hardness>("hardness", 0.0f, 1.0f).Fmt("%.2f"));
          row.Knob(electric ? "pickup" : "tone", &n->tone, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "tone");
-         row.Knob("decay", &n->decay, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnob(row, n, PianoBodyRow::Knob<&PianoNode::decay>("decay", 0.0f, 1.0f).Fmt("%.2f"));
          row.Knob(electric ? "fork" : "detune", &n->detune, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "detune");
          row.End();
       }
@@ -2273,7 +2347,7 @@ namespace app
          row.Knob(electric ? "speaker" : "body", &n->body, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "body");
          row.Knob("release", &n->release, params::Piano::release_lo, params::Piano::release_hi, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
-         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, PianoBodyRow::Knob<&PianoNode::volume>("volume", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          row.End();
       }
       EndAudioBody();
@@ -2332,6 +2406,32 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
+   namespace
+   {
+      using WaveTerrainBodyRow = params::Row<WaveTerrainNode>;
+      const WaveTerrainBodyRow kWaveTerrainBodyRows1[] = {
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::centerX>("centerX", 0.0f, 1.0f).Fmt("%.2f"),
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::centerY>("centerY", 0.0f, 1.0f).Fmt("%.2f"),
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::radiusX>("radiusX", params::WaveTerrain::radius_x_lo, params::WaveTerrain::radius_x_hi).Fmt("%.2f"),
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::radiusY>("radiusY", params::WaveTerrain::radius_y_lo, params::WaveTerrain::radius_y_hi).Fmt("%.2f"),
+      };
+      const WaveTerrainBodyRow kWaveTerrainBodyRows2[] = {
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::ratioA>("ratioA", params::WaveTerrain::ratio_a_lo, params::WaveTerrain::ratio_a_hi).Fmt("%.0f"),
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::ratioB>("ratioB", params::WaveTerrain::ratio_b_lo, params::WaveTerrain::ratio_b_hi).Fmt("%.0f"),
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::rotation>("rotation", params::WaveTerrain::rotation_lo, params::WaveTerrain::rotation_hi).Fmt("%.0f deg"),
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::scanSpeed>("speed", params::WaveTerrain::scan_speed_lo, params::WaveTerrain::scan_speed_hi).Fmt("%.2f"),
+      };
+      const WaveTerrainBodyRow kWaveTerrainBodyRows3[] = {
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::volume>("volume", params::WaveTerrain::volume_lo, params::WaveTerrain::volume_hi).Fmt("%.2f"),
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::pan>("pan", -1.0f, 1.0f).Fmt("%.2f"),
+         WaveTerrainBodyRow::KnobInt<&WaveTerrainNode::unison>("unison", 1, WaveTerrainNode::kMaxUnison),
+      };
+      const WaveTerrainBodyRow kWaveTerrainBodyRows4[] = {
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::drive>("drive", 0.0f, 1.0f).Fmt("%.2f"),
+         WaveTerrainBodyRow::Knob<&WaveTerrainNode::position>("morph", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
 
    void DrawWaveTerrainBody(GraphNode& gn, WaveTerrainNode* n)
    {
@@ -2474,18 +2574,12 @@ namespace app
       BeginAudioSection("orbit & terrain geometry");
       {
          AudioKnobRow row1(tok::osc_wave_terrain_body_audio_knob_row_layout);
-         row1.Knob("centerX", &n->centerX, 0.0f, 1.0f, "%.2f");
-         row1.Knob("centerY", &n->centerY, 0.0f, 1.0f, "%.2f");
-         row1.Knob("radiusX", &n->radiusX, params::WaveTerrain::radius_x_lo, params::WaveTerrain::radius_x_hi, "%.2f");
-         row1.Knob("radiusY", &n->radiusY, params::WaveTerrain::radius_y_lo, params::WaveTerrain::radius_y_hi, "%.2f");
+         Ui::DrawKnobs(row1, n, kWaveTerrainBodyRows1);
          row1.End();
 
          ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
          AudioKnobRow row2(tok::osc_wave_terrain_body_audio_knob_row_layout);
-         row2.Knob("ratioA", &n->ratioA, params::WaveTerrain::ratio_a_lo, params::WaveTerrain::ratio_a_hi, "%.0f");
-         row2.Knob("ratioB", &n->ratioB, params::WaveTerrain::ratio_b_lo, params::WaveTerrain::ratio_b_hi, "%.0f");
-         row2.Knob("rotation", &n->rotation, params::WaveTerrain::rotation_lo, params::WaveTerrain::rotation_hi, "%.0f deg");
-         row2.Knob("speed", &n->scanSpeed, params::WaveTerrain::scan_speed_lo, params::WaveTerrain::scan_speed_hi, "%.2f");
+         Ui::DrawKnobs(row2, n, kWaveTerrainBodyRows2);
          row2.End();
       }
       EndAudioSection();
@@ -2496,11 +2590,9 @@ namespace app
       BeginAudioSection("voice & filter");
       {
          AudioKnobRow row1(tok::osc_wave_terrain_body_audio_knob_row_layout);
-         row1.Knob("volume", &n->volume, params::WaveTerrain::volume_lo, params::WaveTerrain::volume_hi, "%.2f");
-         row1.Knob("pan", &n->pan, -1.0f, 1.0f, "%.2f");
-         row1.KnobInt("unison", &n->unison, 1, WaveTerrainNode::kMaxUnison);
+         Ui::DrawKnobs(row1, n, kWaveTerrainBodyRows3);
          ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
-         row1.Knob("detune", &n->detune, params::WaveTerrain::detune_lo, params::WaveTerrain::detune_hi, "%.1f c");
+         Ui::DrawKnob(row1, n, WaveTerrainBodyRow::Knob<&WaveTerrainNode::detune>("detune", params::WaveTerrain::detune_lo, params::WaveTerrain::detune_hi).Fmt("%.1f c"));
          ImGui::EndDisabled();
          row1.End();
 
@@ -2511,10 +2603,9 @@ namespace app
                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
                           "cutoff", &n->cutoff, params::WaveTerrain::cutoff_lo, params::WaveTerrain::cutoff_hi, "%.0f Hz", filterOff);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
-         row2.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnob(row2, n, WaveTerrainBodyRow::Knob<&WaveTerrainNode::resonance>("reso", 0.0f, 1.0f).Fmt("%.2f"));
          ImGui::EndDisabled();
-         row2.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
-         row2.Knob("morph", &n->position, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row2, n, kWaveTerrainBodyRows4);
          row2.End();
       }
       EndAudioSection();
@@ -2535,7 +2626,7 @@ namespace app
          AudioKnobRow row(tok::osc_row_layout_sm);
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->frequency, params::WaveTerrain::frequency_lo, params::WaveTerrain::frequency_hi, "%.0f Hz");
+         Ui::DrawKnob(row, n, WaveTerrainBodyRow::Knob<&WaveTerrainNode::frequency>("freq", params::WaveTerrain::frequency_lo, params::WaveTerrain::frequency_hi).Fmt("%.0f Hz"));
          if (noteDriven)
             ImGui::EndDisabled();
          row.Knob("glide", &n->glide, params::WaveTerrain::glide_lo, params::WaveTerrain::glide_hi, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
@@ -2663,6 +2754,22 @@ namespace app
    }
 
 
+   namespace
+   {
+      using EquationBodyRow = params::Row<EquationNode>;
+      const EquationBodyRow kEquationBodyRows1[] = {
+         EquationBodyRow::Knob<&EquationNode::knobA>("A", 0.0f, 1.0f).Fmt("%.3f"),
+         EquationBodyRow::Knob<&EquationNode::knobB>("B", 0.0f, 1.0f).Fmt("%.3f"),
+         EquationBodyRow::Knob<&EquationNode::knobC>("C", 0.0f, 1.0f).Fmt("%.3f"),
+         EquationBodyRow::Knob<&EquationNode::knobD>("D", 0.0f, 1.0f).Fmt("%.3f"),
+      };
+      const EquationBodyRow kEquationBodyRows2[] = {
+         EquationBodyRow::Knob<&EquationNode::volume>("volume", params::Equation::volume_lo, params::Equation::volume_hi).Fmt("%.2f"),
+         EquationBodyRow::Knob<&EquationNode::pan>("pan", -1.0f, 1.0f).Fmt("%.2f"),
+         EquationBodyRow::KnobInt<&EquationNode::unison>("unison", 1, EquationNode::kMaxUnison),
+      };
+   }
+
    void DrawEquationBody(GraphNode& gn, EquationNode* n)
    {
       const bool noteDriven = n->NoteInput().GetSource() != nullptr;
@@ -2737,10 +2844,7 @@ namespace app
       BeginAudioSection("function parameters");
       {
          AudioKnobRow row(tok::osc_equation_body_audio_knob_row_layout, kKnobLarge);
-         row.Knob("A", &n->knobA, 0.0f, 1.0f, "%.3f");
-         row.Knob("B", &n->knobB, 0.0f, 1.0f, "%.3f");
-         row.Knob("C", &n->knobC, 0.0f, 1.0f, "%.3f");
-         row.Knob("D", &n->knobD, 0.0f, 1.0f, "%.3f");
+         Ui::DrawKnobs(row, n, kEquationBodyRows1);
          row.End();
       }
       EndAudioSection();
@@ -2751,11 +2855,9 @@ namespace app
       BeginAudioSection("voice & filter");
       {
          AudioKnobRow row1(tok::osc_equation_body_audio_knob_row_layout);
-         row1.Knob("volume", &n->volume, params::Equation::volume_lo, params::Equation::volume_hi, "%.2f");
-         row1.Knob("pan", &n->pan, -1.0f, 1.0f, "%.2f");
-         row1.KnobInt("unison", &n->unison, 1, EquationNode::kMaxUnison);
+         Ui::DrawKnobs(row1, n, kEquationBodyRows2);
          ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
-         row1.Knob("detune", &n->detune, params::Equation::detune_lo, params::Equation::detune_hi, "%.1f c");
+         Ui::DrawKnob(row1, n, EquationBodyRow::Knob<&EquationNode::detune>("detune", params::Equation::detune_lo, params::Equation::detune_hi).Fmt("%.1f c"));
          ImGui::EndDisabled();
          row1.End();
 
@@ -2766,9 +2868,9 @@ namespace app
                            [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
                            "cutoff", &n->cutoff, params::Equation::cutoff_lo, params::Equation::cutoff_hi, "%.0f Hz", filterOff);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
-         row2.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnob(row2, n, EquationBodyRow::Knob<&EquationNode::resonance>("reso", 0.0f, 1.0f).Fmt("%.2f"));
          ImGui::EndDisabled();
-         row2.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnob(row2, n, EquationBodyRow::Knob<&EquationNode::drive>("drive", 0.0f, 1.0f).Fmt("%.2f"));
          row2.Knob("glide", &n->glide, 0.0f, 1.0f, "%.3f s", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide150);
          row2.End();
       }
@@ -2838,6 +2940,28 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
+   namespace
+   {
+      using ImageSpectralSynthBodyRow = params::Row<ImageSpectralSynthNode>;
+      const ImageSpectralSynthBodyRow kImageSpectralSynthBodyRows1[] = {
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::minFreq>("minHz", params::ImageSpectralSynth::min_freq_lo, params::ImageSpectralSynth::min_freq_hi).Fmt("%.0f Hz"),
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::maxFreq>("maxHz", params::ImageSpectralSynth::max_freq_lo, params::ImageSpectralSynth::max_freq_hi).Fmt("%.0f Hz"),
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::rootFreq>("rootHz", params::ImageSpectralSynth::root_freq_lo, params::ImageSpectralSynth::root_freq_hi).Fmt("%.0f Hz"),
+         ImageSpectralSynthBodyRow::KnobInt<&ImageSpectralSynthNode::unison>("unison", 1, ImageSpectralSynthNode::kMaxUnison),
+      };
+      const ImageSpectralSynthBodyRow kImageSpectralSynthBodyRows2[] = {
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::brightness>("gain", params::ImageSpectralSynth::brightness_lo, params::ImageSpectralSynth::brightness_hi).Fmt("%.2f"),
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::threshold>("thresh", params::ImageSpectralSynth::threshold_lo, params::ImageSpectralSynth::threshold_hi).Fmt("%.2f"),
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::contrast>("contrast", params::ImageSpectralSynth::contrast_lo, params::ImageSpectralSynth::contrast_hi).Fmt("%.2f"),
+      };
+      const ImageSpectralSynthBodyRow kImageSpectralSynthBodyRows3[] = {
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::volume>("volume", params::ImageSpectralSynth::volume_lo, params::ImageSpectralSynth::volume_hi).Fmt("%.2f"),
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::pan>("pan", -1.0f, 1.0f).Fmt("%.2f"),
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::drive>("drive", 0.0f, 1.0f).Fmt("%.2f"),
+         ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::fine>("fine", params::ImageSpectralSynth::fine_lo, params::ImageSpectralSynth::fine_hi).Fmt("%.1f c"),
+      };
+   }
 
    void DrawImageSpectralSynthBody(GraphNode& gn, ImageSpectralSynthNode* n)
    {
@@ -2995,14 +3119,14 @@ namespace app
          AudioKnobRow row(tok::osc_image_spectral_synth_body_audio_knob_row_layout);
          if (isManual)
          {
-            row.Knob("pos", &n->position, 0.0f, 1.0f, "%.2f");
+            Ui::DrawKnob(row, n, ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::position>("pos", 0.0f, 1.0f).Fmt("%.2f"));
          }
          else
          {
-            row.Knob("speed", &n->scanSpeed, params::ImageSpectralSynth::scan_speed_lo, params::ImageSpectralSynth::scan_speed_hi, "%.2fx");
+            Ui::DrawKnob(row, n, ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::scanSpeed>("speed", params::ImageSpectralSynth::scan_speed_lo, params::ImageSpectralSynth::scan_speed_hi).Fmt("%.2fx"));
          }
          row.Knob("glide", &n->glide, params::ImageSpectralSynth::glide_lo, params::ImageSpectralSynth::glide_hi, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
-         row.Knob("width", &n->stereoWidth, params::ImageSpectralSynth::stereo_width_lo, params::ImageSpectralSynth::stereo_width_hi, "%.2f");
+         Ui::DrawKnob(row, n, ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::stereoWidth>("width", params::ImageSpectralSynth::stereo_width_lo, params::ImageSpectralSynth::stereo_width_hi).Fmt("%.2f"));
          row.End();
       }
       EndAudioSection();
@@ -3057,20 +3181,15 @@ namespace app
          // Row 3 Knobs: Frequency Boundaries & Pitch
          ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
          AudioKnobRow row1(tok::osc_row1_layout);
-         row1.Knob("minHz", &n->minFreq, params::ImageSpectralSynth::min_freq_lo, params::ImageSpectralSynth::min_freq_hi, "%.0f Hz");
-         row1.Knob("maxHz", &n->maxFreq, params::ImageSpectralSynth::max_freq_lo, params::ImageSpectralSynth::max_freq_hi, "%.0f Hz");
-         row1.Knob("rootHz", &n->rootFreq, params::ImageSpectralSynth::root_freq_lo, params::ImageSpectralSynth::root_freq_hi, "%.0f Hz");
-         row1.KnobInt("unison", &n->unison, 1, ImageSpectralSynthNode::kMaxUnison);
+         Ui::DrawKnobs(row1, n, kImageSpectralSynthBodyRows1);
          row1.End();
 
          // Row 4 Knobs: Conditioning & Gain
          ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
          AudioKnobRow row2(tok::osc_row1_layout);
-         row2.Knob("gain", &n->brightness, params::ImageSpectralSynth::brightness_lo, params::ImageSpectralSynth::brightness_hi, "%.2f");
-         row2.Knob("thresh", &n->threshold, params::ImageSpectralSynth::threshold_lo, params::ImageSpectralSynth::threshold_hi, "%.2f");
-         row2.Knob("contrast", &n->contrast, params::ImageSpectralSynth::contrast_lo, params::ImageSpectralSynth::contrast_hi, "%.2f");
+         Ui::DrawKnobs(row2, n, kImageSpectralSynthBodyRows2);
          ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
-         row2.Knob("detune", &n->detune, params::ImageSpectralSynth::detune_lo, params::ImageSpectralSynth::detune_hi, "%.1f c");
+         Ui::DrawKnob(row2, n, ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::detune>("detune", params::ImageSpectralSynth::detune_lo, params::ImageSpectralSynth::detune_hi).Fmt("%.1f c"));
          ImGui::EndDisabled();
          row2.End();
       }
@@ -3082,10 +3201,7 @@ namespace app
       BeginAudioSection("voice & filter");
       {
          AudioKnobRow row1(tok::osc_row1_layout);
-         row1.Knob("volume", &n->volume, params::ImageSpectralSynth::volume_lo, params::ImageSpectralSynth::volume_hi, "%.2f");
-         row1.Knob("pan", &n->pan, -1.0f, 1.0f, "%.2f");
-         row1.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
-         row1.Knob("fine", &n->fine, params::ImageSpectralSynth::fine_lo, params::ImageSpectralSynth::fine_hi, "%.1f c");
+         Ui::DrawKnobs(row1, n, kImageSpectralSynthBodyRows3);
          row1.End();
 
          ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
@@ -3095,7 +3211,7 @@ namespace app
                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
                           "cutoff", &n->cutoff, params::ImageSpectralSynth::cutoff_lo, params::ImageSpectralSynth::cutoff_hi, "%.0f Hz", filterOff);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
-         row2.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnob(row2, n, ImageSpectralSynthBodyRow::Knob<&ImageSpectralSynthNode::resonance>("reso", 0.0f, 1.0f).Fmt("%.2f"));
          ImGui::EndDisabled();
          row2.End();
       }

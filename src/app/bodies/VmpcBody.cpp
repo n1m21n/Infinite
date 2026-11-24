@@ -7,6 +7,7 @@
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/UiFmt.h"
@@ -171,6 +172,11 @@ namespace app
          const int next = n->NextEmptyPad(pad + 1);
          pad = (next >= 0 && next != pad) ? next : -1;
       }
+   }
+
+   namespace
+   {
+      using VmpcBodyRow = params::Row<VmpcNode>;
    }
 
    void DrawVmpcBody(GraphNode& gn, VmpcNode* n)
@@ -460,8 +466,7 @@ namespace app
          row.Dropdown("transition##vmpctrans", VmpcTransitionList(), n->transition,
                       [n](int i) { PushUndoCheckpoint(); n->transition = i; });
          ImGui::BeginDisabled(n->transition == VmpcNode::kCut);
-         row.Knob("time", &n->transitionMs, params::Vmpc::transition_ms_lo, params::Vmpc::transition_ms_hi, "%.0f ms", kKnobSmall, false, false,
-                  AudioWidgetStyle::Knob, nullptr, nullptr, VmpcNode::kTimeParamId, "transition time");
+         Ui::DrawKnob(row, n, VmpcBodyRow::Knob<&VmpcNode::transitionMs>("time", params::Vmpc::transition_ms_lo, params::Vmpc::transition_ms_hi).Fmt("%.0f ms").At(VmpcNode::kTimeParamId).Named("transition time"));
          ImGui::EndDisabled();
          bool changed = false;
          row.Checkbox("hold frame##vmpchold", &n->holdLast, &changed);

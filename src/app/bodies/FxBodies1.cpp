@@ -1160,6 +1160,21 @@ namespace app
    }
 
 
+   namespace
+   {
+      using DynamicsBodyRow = params::Row<AudioEffectNode>;
+      const DynamicsBodyRow kDynamicsBodyRows1[] = {
+         DynamicsBodyRow::Knob("threshold", [](AudioEffectNode* n) { return n->ParamPtr("threshold"); }, params::fx::threshold_lo, params::fx::threshold_hi).Fmt("%.1f dB").Size(kKnobLarge),
+         DynamicsBodyRow::Knob("ratio", [](AudioEffectNode* n) { return n->ParamPtr("ratio"); }, params::fx::ratio_lo, params::fx::ratio_hi).Fmt("%.1f:1").Size(kKnobLarge),
+         DynamicsBodyRow::Knob("attack", [](AudioEffectNode* n) { return n->ParamPtr("attack"); }, params::fx::attack_lo, params::fx::attack_hi).Fmt("%.2f ms").Size(kKnobLarge),
+      };
+      const DynamicsBodyRow kDynamicsBodyRows2[] = {
+         DynamicsBodyRow::Knob("release", [](AudioEffectNode* n) { return n->ParamPtr("release"); }, params::fx::release_lo, params::fx::release_hi).Fmt("%.0f ms").Size(kKnobLarge),
+         DynamicsBodyRow::Knob("makeup", [](AudioEffectNode* n) { return n->ParamPtr("makeup"); }, params::fx::makeup_lo, params::fx::makeup_hi).Fmt("%.1f dB").Size(kKnobLarge),
+         DynamicsBodyRow::Knob<&AudioEffectNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+   }
+
    void DrawDynamicsBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool analog = n->Param("analog") != 0.0f;
@@ -1181,17 +1196,13 @@ namespace app
             PushUndoCheckpoint();
             *n->ParamPtr("style") = (float)i;
          });
-         row.Knob("threshold", n->ParamPtr("threshold"), params::fx::threshold_lo, params::fx::threshold_hi, "%.1f dB", kKnobLarge);
-         row.Knob("ratio", n->ParamPtr("ratio"), params::fx::ratio_lo, params::fx::ratio_hi, "%.1f:1", kKnobLarge);
-         row.Knob("attack", n->ParamPtr("attack"), params::fx::attack_lo, params::fx::attack_hi, "%.2f ms", kKnobLarge);
+         Ui::DrawKnobs(row, n, kDynamicsBodyRows1);
          row.End();
       }
       {
          AudioKnobRow row(tok::fx_dynamics_body_audio_knob_row_layout, kKnobLarge);
          row.index++; // under the style dropdown
-         row.Knob("release", n->ParamPtr("release"), params::fx::release_lo, params::fx::release_hi, "%.0f ms", kKnobLarge);
-         row.Knob("makeup", n->ParamPtr("makeup"), params::fx::makeup_lo, params::fx::makeup_hi, "%.1f dB", kKnobLarge);
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kDynamicsBodyRows2);
          row.End();
       }
       {
@@ -1242,6 +1253,17 @@ namespace app
    // the reference brief asked for, and distinct enough from
    // DrawStripMeter's plain level bar (no scale, grows up) to warrant its
    // own small ImDrawList routine rather than reusing that primitive.
+   namespace
+   {
+      using LimiterBodyRow = params::Row<AudioEffectNode>;
+      const LimiterBodyRow kLimiterBodyRows[] = {
+         LimiterBodyRow::Knob("threshold", [](AudioEffectNode* n) { return n->ParamPtr("threshold"); }, params::fx::threshold_2_lo, params::fx::threshold_2_hi).Fmt("%.1f dB").Size(kKnobLarge),
+         LimiterBodyRow::Knob("release", [](AudioEffectNode* n) { return n->ParamPtr("release"); }, params::fx::release_lo, params::fx::release_2_hi).Fmt("%.0f ms").Size(kKnobLarge),
+         LimiterBodyRow::Knob("in gain", [](AudioEffectNode* n) { return n->ParamPtr("inGain"); }, params::fx::in_gain_lo, params::fx::in_gain_hi).Fmt("%.1f dB"),
+         LimiterBodyRow::Knob("out gain", [](AudioEffectNode* n) { return n->ParamPtr("outGain"); }, params::fx::out_gain_lo, params::fx::out_gain_hi).Fmt("%.1f dB"),
+      };
+   }
+
    void DrawLimiterBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[64];
@@ -1261,10 +1283,7 @@ namespace app
 
       {
          AudioKnobRow row(tok::fx_limiter_body_audio_knob_row_layout);
-         row.Knob("threshold", n->ParamPtr("threshold"), params::fx::threshold_2_lo, params::fx::threshold_2_hi, "%.1f dB", kKnobLarge);
-         row.Knob("release", n->ParamPtr("release"), params::fx::release_lo, params::fx::release_2_hi, "%.0f ms", kKnobLarge);
-         row.Knob("in gain", n->ParamPtr("inGain"), params::fx::in_gain_lo, params::fx::in_gain_hi, "%.1f dB");
-         row.Knob("out gain", n->ParamPtr("outGain"), params::fx::out_gain_lo, params::fx::out_gain_hi, "%.1f dB");
+         Ui::DrawKnobs(row, n, kLimiterBodyRows);
          row.End();
       }
 
@@ -1339,6 +1358,26 @@ namespace app
    }
 
 
+   namespace
+   {
+      using DelayBodyRow = params::Row<AudioEffectNode>;
+      const DelayBodyRow kDelayBodyRows1[] = {
+         DelayBodyRow::Knob("feedback", [](AudioEffectNode* n) { return n->ParamPtr("feedback"); }, params::fx::feedback_lo, params::fx::feedback_hi).Fmt("%.0f%%").Size(kKnobLarge),
+         DelayBodyRow::Knob("tone", [](AudioEffectNode* n) { return n->ParamPtr("tone"); }, -1.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         DelayBodyRow::Knob<&AudioEffectNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+      const DelayBodyRow kDelayBodyRows2[] = {
+         DelayBodyRow::Knob("wow", [](AudioEffectNode* n) { return n->ParamPtr("wow"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         DelayBodyRow::Knob("flutter", [](AudioEffectNode* n) { return n->ParamPtr("flutter"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         DelayBodyRow::Knob("saturation", [](AudioEffectNode* n) { return n->ParamPtr("saturation"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         DelayBodyRow::Knob("diffusion", [](AudioEffectNode* n) { return n->ParamPtr("diffusion"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+      const DelayBodyRow kDelayBodyRows3[] = {
+         DelayBodyRow::Knob("pan", [](AudioEffectNode* n) { return n->ParamPtr("pan"); }, -1.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         DelayBodyRow::Knob("duck", [](AudioEffectNode* n) { return n->ParamPtr("ducking"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+   }
+
    void DrawDelayBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool sync = n->Param("sync") != 0.0f;
@@ -1367,20 +1406,15 @@ namespace app
       {
          AudioKnobRow row(tok::fx_delay_body_audio_knob_row_layout);
          ImGui::BeginDisabled(sync && !gParamRegisterOnly);
-         row.Knob("time", n->ParamPtr("timeMs"), params::fx::time_lo, params::fx::time_hi, "%.0f ms", kKnobLarge);
+         Ui::DrawKnob(row, n, DelayBodyRow::Knob("time", [](AudioEffectNode* n) { return n->ParamPtr("timeMs"); }, params::fx::time_lo, params::fx::time_hi).Fmt("%.0f ms").Size(kKnobLarge));
          ImGui::EndDisabled();
-         row.Knob("feedback", n->ParamPtr("feedback"), params::fx::feedback_lo, params::fx::feedback_hi, "%.0f%%", kKnobLarge);
-         row.Knob("tone", n->ParamPtr("tone"), -1.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kDelayBodyRows1);
          row.End();
       }
       {
          ImGui::BeginDisabled(!analog && !gParamRegisterOnly);
          AudioKnobRow row(tok::fx_delay_body_audio_knob_row_layout);
-         row.Knob("wow", n->ParamPtr("wow"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("flutter", n->ParamPtr("flutter"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("saturation", n->ParamPtr("saturation"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("diffusion", n->ParamPtr("diffusion"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kDelayBodyRows2);
          row.End();
          ImGui::EndDisabled();
       }
@@ -1426,8 +1460,7 @@ namespace app
          const bool savedRegisterOnly = gParamRegisterOnly;
          gParamRegisterOnly = true;
          AudioKnobRow row(tok::fx_row_layout_sm_n);
-         row.Knob("pan", n->ParamPtr("pan"), -1.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("duck", n->ParamPtr("ducking"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kDelayBodyRows3);
          gParamRegisterOnly = savedRegisterOnly;
       }
 
@@ -1506,6 +1539,21 @@ namespace app
    }
 
 
+   namespace
+   {
+      using ReverbBodyRow = params::Row<AudioEffectNode>;
+      const ReverbBodyRow kReverbBodyRows1[] = {
+         ReverbBodyRow::Knob("size", [](AudioEffectNode* n) { return n->ParamPtr("size"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         ReverbBodyRow::Knob("decay", [](AudioEffectNode* n) { return n->ParamPtr("decay"); }, params::fx::decay_lo, params::fx::decay_hi).Fmt("%.2f s").Size(kKnobLarge),
+         ReverbBodyRow::Knob("damping", [](AudioEffectNode* n) { return n->ParamPtr("damping"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+      const ReverbBodyRow kReverbBodyRows2[] = {
+         ReverbBodyRow::Knob("predelay", [](AudioEffectNode* n) { return n->ParamPtr("predelay"); }, params::fx::predelay_lo, params::fx::predelay_hi).Fmt("%.0f ms").Size(kKnobLarge),
+         ReverbBodyRow::Knob("width", [](AudioEffectNode* n) { return n->ParamPtr("width"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         ReverbBodyRow::Knob<&AudioEffectNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+   }
+
    void DrawReverbBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool analog = n->Param("analog") != 0.0f;
@@ -1525,16 +1573,12 @@ namespace app
       // params sit ahead of it.
       {
          AudioKnobRow row(tok::fx_reverb_body_audio_knob_row_layout);
-         row.Knob("size", n->ParamPtr("size"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("decay", n->ParamPtr("decay"), params::fx::decay_lo, params::fx::decay_hi, "%.2f s", kKnobLarge);
-         row.Knob("damping", n->ParamPtr("damping"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kReverbBodyRows1);
          row.End();
       }
       {
          AudioKnobRow row(tok::fx_reverb_body_audio_knob_row_layout);
-         row.Knob("predelay", n->ParamPtr("predelay"), params::fx::predelay_lo, params::fx::predelay_hi, "%.0f ms", kKnobLarge);
-         row.Knob("width", n->ParamPtr("width"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kReverbBodyRows2);
          row.End();
       }
 
@@ -1622,6 +1666,21 @@ namespace app
    }
 
 
+   namespace
+   {
+      using DriveBodyRow = params::Row<AudioEffectNode>;
+      const DriveBodyRow kDriveBodyRows1[] = {
+         DriveBodyRow::Knob("drive", [](AudioEffectNode* n) { return n->ParamPtr("drive"); }, params::fx::drive_lo, params::fx::drive_hi).Fmt("%.1f dB").Size(kKnobLarge),
+         DriveBodyRow::Knob("bias", [](AudioEffectNode* n) { return n->ParamPtr("bias"); }, -1.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         DriveBodyRow::Knob("tone", [](AudioEffectNode* n) { return n->ParamPtr("tone"); }, -1.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+      const DriveBodyRow kDriveBodyRows2[] = {
+         DriveBodyRow::Knob("color", [](AudioEffectNode* n) { return n->ParamPtr("color"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         DriveBodyRow::Knob("output", [](AudioEffectNode* n) { return n->ParamPtr("output"); }, params::fx::output_lo, params::fx::output_hi).Fmt("%.1f dB").Size(kKnobLarge),
+         DriveBodyRow::Knob<&AudioEffectNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+   }
+
    void DrawDriveBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[80];
@@ -1637,16 +1696,12 @@ namespace app
       // matching Dynamics/Delay/Reverb's grammar.
       {
          AudioKnobRow row(tok::fx_drive_body_audio_knob_row_layout);
-         row.Knob("drive", n->ParamPtr("drive"), params::fx::drive_lo, params::fx::drive_hi, "%.1f dB", kKnobLarge);
-         row.Knob("bias", n->ParamPtr("bias"), -1.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("tone", n->ParamPtr("tone"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kDriveBodyRows1);
          row.End();
       }
       {
          AudioKnobRow row(tok::fx_drive_body_audio_knob_row_layout);
-         row.Knob("color", n->ParamPtr("color"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("output", n->ParamPtr("output"), params::fx::output_lo, params::fx::output_hi, "%.1f dB", kKnobLarge);
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kDriveBodyRows2);
          row.End();
       }
 
@@ -1711,6 +1766,15 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+   namespace
+   {
+      using SaturatorBodyRow = params::Row<AudioEffectNode>;
+      const SaturatorBodyRow kSaturatorBodyRows[] = {
+         SaturatorBodyRow::Knob("output", [](AudioEffectNode* n) { return n->ParamPtr("output"); }, params::fx::output_lo, params::fx::output_hi).Fmt("%.1f dB"),
+         SaturatorBodyRow::Knob<&AudioEffectNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
+
    void DrawSaturatorBody(GraphNode& gn, AudioEffectNode* n)
    {
       const int routing = std::clamp((int)(n->Param("routing") + 0.5f), 0, SaturatorDsp::kNumRoutings - 1);
@@ -1764,11 +1828,10 @@ namespace app
          const bool fbLive = routing == SaturatorDsp::kFeedback;
          if (!fbLive)
             ImGui::BeginDisabled();
-         row.Knob("feedback", n->ParamPtr("feedback"), params::fx::feedback_2_lo, params::fx::feedback_2_hi, "%.2f");
+         Ui::DrawKnob(row, n, SaturatorBodyRow::Knob("feedback", [](AudioEffectNode* n) { return n->ParamPtr("feedback"); }, params::fx::feedback_2_lo, params::fx::feedback_2_hi).Fmt("%.2f"));
          if (!fbLive)
             ImGui::EndDisabled();
-         row.Knob("output", n->ParamPtr("output"), params::fx::output_lo, params::fx::output_hi, "%.1f dB");
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f");
+         Ui::DrawKnobs(row, n, kSaturatorBodyRows);
          row.End();
       }
       EndAudioSection();
@@ -1876,6 +1939,22 @@ namespace app
    }
 
 
+   namespace
+   {
+      using WavetableShaperBodyRow = params::Row<AudioEffectNode>;
+      const WavetableShaperBodyRow kWavetableShaperBodyRows1[] = {
+         WavetableShaperBodyRow::Knob("position", [](AudioEffectNode* n) { return n->ParamPtr("position"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+         WavetableShaperBodyRow::Knob("drive", [](AudioEffectNode* n) { return n->ParamPtr("drive"); }, params::fx::drive_2_lo, params::fx::drive_2_hi).Fmt("%.1f dB").Size(kKnobLarge),
+         WavetableShaperBodyRow::Knob("stereo", [](AudioEffectNode* n) { return n->ParamPtr("stereo"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+      const WavetableShaperBodyRow kWavetableShaperBodyRows2[] = {
+         WavetableShaperBodyRow::Knob("bias", [](AudioEffectNode* n) { return n->ParamPtr("bias"); }, -1.0f, 1.0f).Fmt("%.2f"),
+         WavetableShaperBodyRow::Knob("smooth", [](AudioEffectNode* n) { return n->ParamPtr("smooth"); }, 0.0f, 1.0f).Fmt("%.2f"),
+         WavetableShaperBodyRow::Knob("output", [](AudioEffectNode* n) { return n->ParamPtr("output"); }, params::fx::output_lo, params::fx::output_hi).Fmt("%.1f dB"),
+         WavetableShaperBodyRow::Knob<&AudioEffectNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
+
    void DrawWavetableShaperBody(GraphNode& gn, AudioEffectNode* n)
    {
       const float stereo = n->Param("stereo");
@@ -1906,17 +1985,12 @@ namespace app
             PushUndoCheckpoint();
             *n->ParamPtr("table") = (float)i;
          });
-         row.Knob("position", n->ParamPtr("position"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("drive", n->ParamPtr("drive"), params::fx::drive_2_lo, params::fx::drive_2_hi, "%.1f dB", kKnobLarge);
-         row.Knob("stereo", n->ParamPtr("stereo"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kWavetableShaperBodyRows1);
          row.End();
       }
       {
          AudioKnobRow row(tok::fx_wavetable_shaper_body_audio_knob_row_layout);
-         row.Knob("bias", n->ParamPtr("bias"), -1.0f, 1.0f, "%.2f", kKnobSmall);
-         row.Knob("smooth", n->ParamPtr("smooth"), 0.0f, 1.0f, "%.2f", kKnobSmall);
-         row.Knob("output", n->ParamPtr("output"), params::fx::output_lo, params::fx::output_hi, "%.1f dB", kKnobSmall);
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         Ui::DrawKnobs(row, n, kWavetableShaperBodyRows2);
          row.End();
       }
 
@@ -2019,6 +2093,15 @@ namespace app
    }
 
 
+   namespace
+   {
+      using StereoBodyRow = params::Row<AudioEffectNode>;
+      const StereoBodyRow kStereoBodyRows[] = {
+         StereoBodyRow::Knob("width", [](AudioEffectNode* n) { return n->ParamPtr("width"); }, params::fx::width_lo, params::fx::width_hi).Fmt("%.2f").Size(kKnobLarge),
+         StereoBodyRow::Knob("pan", [](AudioEffectNode* n) { return n->ParamPtr("pan"); }, -1.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      };
+   }
+
    void DrawStereoBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[80];
@@ -2029,8 +2112,7 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       AudioKnobRow row(tok::fx_stereo_body_audio_knob_row_layout);
-      row.Knob("width", n->ParamPtr("width"), params::fx::width_lo, params::fx::width_hi, "%.2f", kKnobLarge);
-      row.Knob("pan", n->ParamPtr("pan"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+      Ui::DrawKnobs(row, n, kStereoBodyRows);
       row.Knob("bass mono", n->ParamPtr("bassMono"), params::fx::bass_mono_lo, params::fx::bass_mono_hi, "%.0f Hz", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewBassMono);
       row.End();
 
@@ -2076,6 +2158,11 @@ namespace app
    }
 
 
+   namespace
+   {
+      using PitchShiftBodyRow = params::Row<AudioEffectNode>;
+   }
+
    void DrawPitchShiftBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool analog = n->Param("analog") != 0.0f;
@@ -2092,14 +2179,14 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       AudioKnobRow row(tok::fx_pitch_shift_body_audio_knob_row_layout);
-      row.Knob("pitch", n->ParamPtr("pitch"), params::fx::pitch_lo, params::fx::pitch_hi, "%+.1f st", kKnobLarge);
+      Ui::DrawKnob(row, n, PitchShiftBodyRow::Knob("pitch", [](AudioEffectNode* n) { return n->ParamPtr("pitch"); }, params::fx::pitch_lo, params::fx::pitch_hi).Fmt("%+.1f st").Size(kKnobLarge));
       {
          // Spectral mode has no grains: the knob would do nothing.
          ImGui::BeginDisabled(spectral && !gParamRegisterOnly);
-         row.Knob("grain", n->ParamPtr("grain"), params::fx::grain_lo, params::fx::grain_hi, "%.0f ms", kKnobLarge);
+         Ui::DrawKnob(row, n, PitchShiftBodyRow::Knob("grain", [](AudioEffectNode* n) { return n->ParamPtr("grain"); }, params::fx::grain_lo, params::fx::grain_hi).Fmt("%.0f ms").Size(kKnobLarge));
          ImGui::EndDisabled();
       }
-      row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+      Ui::DrawKnob(row, n, PitchShiftBodyRow::Knob<&AudioEffectNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
       row.End();
 
       {

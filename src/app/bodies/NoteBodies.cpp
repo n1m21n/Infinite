@@ -7,6 +7,7 @@
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "core/ModShapes.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -445,6 +446,16 @@ namespace app
    }
 
 
+   namespace
+   {
+      using MidiNotesBodyRow = params::Row<MidiNotesNode>;
+      const MidiNotesBodyRow kMidiNotesBodyRows[] = {
+         MidiNotesBodyRow::KnobInt<&MidiNotesNode::channel>("channel", params::MidiNotes::channel_lo, params::MidiNotes::channel_hi).Size(kKnobLarge),
+         MidiNotesBodyRow::KnobInt<&MidiNotesNode::transpose>("transpose", params::MidiNotes::transpose_lo, params::MidiNotes::transpose_hi).Size(kKnobLarge),
+         MidiNotesBodyRow::Knob<&MidiNotesNode::velocityScale>("velocity", params::MidiNotes::velocity_scale_lo, params::MidiNotes::velocity_scale_hi).Fmt("%.2f").Size(kKnobLarge),
+      };
+   }
+
    void DrawMidiNotesBody(GraphNode& gn, MidiNotesNode* n)
    {
       bool held[128];
@@ -473,9 +484,7 @@ namespace app
          AudioKnobRow row(tok::note_midi_notes_body_audio_knob_row_layout, kKnobLarge);
          // -1 is omni, so the knob's low end is a mode rather than a channel
          // number - spelled out in the readout format rather than hidden.
-         row.KnobInt("channel", &n->channel, params::MidiNotes::channel_lo, params::MidiNotes::channel_hi, kKnobLarge);
-         row.KnobInt("transpose", &n->transpose, params::MidiNotes::transpose_lo, params::MidiNotes::transpose_hi, kKnobLarge);
-         row.Knob("velocity", &n->velocityScale, params::MidiNotes::velocity_scale_lo, params::MidiNotes::velocity_scale_hi, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kMidiNotesBodyRows);
          row.End();
       }
       // MPE: each held note follows its own member channel's pitch bend.
@@ -484,7 +493,7 @@ namespace app
          const float gap = ImGui::GetStyle().ItemSpacing.x;
          const float checkW = tok::note_check_w;
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         ModCheckbox("mpe##midiMpe", &n->mpe);
+         Ui::DrawParam(n, MidiNotesBodyRow::Toggle<&MidiNotesNode::mpe>("mpe##midiMpe"));
          ImGui::SetCursorScreenPos(ImVec2(at.x + checkW + gap, at.y));
          AudioSlider("bend st", &n->mpeBendRange, params::MidiNotes::mpe_bend_range_lo, params::MidiNotes::mpe_bend_range_hi, "%.0f", gAudioContentW - checkW - gap);
       }
@@ -670,6 +679,16 @@ namespace app
    };
 
 
+   namespace
+   {
+      using KeyboardBodyRow = params::Row<KeyboardNode>;
+      const KeyboardBodyRow kKeyboardBodyRows[] = {
+         KeyboardBodyRow::KnobInt<&KeyboardNode::baseOctave>("octave", params::Keyboard::base_octave_lo, params::Keyboard::base_octave_hi).Size(kKnobLarge),
+         KeyboardBodyRow::KnobInt<&KeyboardNode::transpose>("transpose", params::Keyboard::transpose_lo, params::Keyboard::transpose_hi).Size(kKnobLarge),
+         KeyboardBodyRow::Knob<&KeyboardNode::velocityScale>("velocity", params::Keyboard::velocity_scale_lo, params::Keyboard::velocity_scale_hi).Fmt("%.2f").Size(kKnobLarge),
+      };
+   }
+
    void DrawKeyboardBody(GraphNode& gn, KeyboardNode* n)
    {
       bool held[128];
@@ -746,9 +765,7 @@ namespace app
 
       {
          AudioKnobRow row(tok::note_keyboard_body_audio_knob_row_layout, kKnobLarge);
-         row.KnobInt("octave", &n->baseOctave, params::Keyboard::base_octave_lo, params::Keyboard::base_octave_hi, kKnobLarge);
-         row.KnobInt("transpose", &n->transpose, params::Keyboard::transpose_lo, params::Keyboard::transpose_hi, kKnobLarge);
-         row.Knob("velocity", &n->velocityScale, params::Keyboard::velocity_scale_lo, params::Keyboard::velocity_scale_hi, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kKeyboardBodyRows);
          row.End();
       }
       {
@@ -757,7 +774,7 @@ namespace app
          // the same "bottom left" shape as the other AudioEffects checkbox
          // rows (e.g. DrawChorusBody's "analog" row).
          AudioKnobRow row(tok::note_keyboard_body_audio_knob_row_layout, tok::note_row_layout_lg, 0.0f, false);
-         row.Checkbox("numpad##kbToggle", &n->computerKeyboardEnabled);
+         Ui::DrawKnob(row, n, KeyboardBodyRow::Toggle<&KeyboardNode::computerKeyboardEnabled>("numpad##kbToggle"));
          row.Skip();
          row.Skip();
          row.End();
@@ -791,6 +808,11 @@ namespace app
    }
 
 
+   namespace
+   {
+      using CVToPitchParamsRow = params::Row<CVToPitchNode>;
+   }
+
    void DrawCVToPitchParams(CVToPitchNode* n)
    {
       // The semitone readout is the point of this node - make it the
@@ -803,7 +825,7 @@ namespace app
       }
 
       if (n->input == nullptr)
-         ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+         Ui::DrawParam(n, CVToPitchParamsRow::Slider<&CVToPitchNode::constantIn>("in (no cable)", 0.0f, 1.0f));
       else
          ImGui::TextDisabled("in: patched");
 
@@ -817,9 +839,14 @@ namespace app
       if (n->scale != MusicTime::kChromatic)
          DropdownButton("root", NoteNameList(), n->root, [n](int i) { n->root = i; });
 
-      ModSlider("glide (ms)", &n->glideMs, params::CVToPitch::glide_ms_lo, params::CVToPitch::glide_ms_hi);
+      Ui::DrawParam(n, CVToPitchParamsRow::Slider<&CVToPitchNode::glideMs>("glide (ms)", params::CVToPitch::glide_ms_lo, params::CVToPitch::glide_ms_hi));
    }
 
+
+   namespace
+   {
+      using NoteToCVParamsRow = params::Row<NoteToCVNode>;
+   }
 
    void DrawNoteToCVParams(NoteToCVNode* n)
    {
@@ -834,17 +861,34 @@ namespace app
       if (ModSliderInt("range high", &n->rangeHigh, params::NoteToCV::range_high_lo, params::NoteToCV::range_high_hi))
          n->rangeLow = std::min(n->rangeLow, n->rangeHigh - 1);
 
-      ModSlider("glide (ms)", &n->glideMs, params::NoteToCV::glide_ms_lo, params::NoteToCV::glide_ms_hi);
+      Ui::DrawParam(n, NoteToCVParamsRow::Slider<&NoteToCVNode::glideMs>("glide (ms)", params::NoteToCV::glide_ms_lo, params::NoteToCV::glide_ms_hi));
    }
 
+
+   namespace
+   {
+      using VelocityToCVParamsRow = params::Row<VelocityToCVNode>;
+      const VelocityToCVParamsRow kVelocityToCVParamsRows[] = {
+         VelocityToCVParamsRow::Slider<&VelocityToCVNode::rangeLow>("range low", 0.0f, 1.0f),
+         VelocityToCVParamsRow::Slider<&VelocityToCVNode::rangeHigh>("range high", 0.0f, 1.0f),
+      };
+   }
 
    void DrawVelocityToCVParams(VelocityToCVNode* n)
    {
       ImGui::TextDisabled("velocity: %s", UiFmt::F2(n->Value01()).c);
-      ModSlider("range low", &n->rangeLow, 0.0f, 1.0f);
-      ModSlider("range high", &n->rangeHigh, 0.0f, 1.0f);
+      Ui::DrawParams(n, kVelocityToCVParamsRows);
    }
 
+
+   namespace
+   {
+      using MidiOutParamsRow = params::Row<MidiOutNode>;
+      const MidiOutParamsRow kMidiOutParamsRows[] = {
+         MidiOutParamsRow::SliderInt<&MidiOutNode::channel>("channel", params::MidiOut::channel_lo, params::MidiOut::channel_hi),
+         MidiOutParamsRow::Slider<&MidiOutNode::offsetMs>("offset (ms)", params::MidiOut::offset_ms_lo, params::MidiOut::offset_ms_hi).Fmt("%.1f"),
+      };
+   }
 
    void DrawMidiOutParams(MidiOutNode* n)
    {
@@ -876,8 +920,7 @@ namespace app
             n->device = n->Devices()[i - 1];
       });
 
-      ModSliderInt("channel", &n->channel, params::MidiOut::channel_lo, params::MidiOut::channel_hi);
-      ModSlider("offset (ms)", &n->offsetMs, params::MidiOut::offset_ms_lo, params::MidiOut::offset_ms_hi, "%.1f");
+      Ui::DrawParams(n, kMidiOutParamsRows);
       NodeCheckbox("clock##midiOutClock", &n->clock);
 
       // Stable labels, so a modulation cable stays bound when the cc number changes.
@@ -902,6 +945,16 @@ namespace app
          ImGui::TextDisabled("no device");
    }
 
+
+   namespace
+   {
+      using CVRecorderParamsRow = params::Row<CVRecorderNode>;
+      const CVRecorderParamsRow kCVRecorderParamsRows[] = {
+         CVRecorderParamsRow::Slider<&CVRecorderNode::speed>("speed", params::CVRecorder::speed_lo, params::CVRecorder::speed_hi),
+         CVRecorderParamsRow::Slider<&CVRecorderNode::low>("low", 0.0f, 1.0f),
+         CVRecorderParamsRow::Slider<&CVRecorderNode::high>("high", 0.0f, 1.0f),
+      };
+   }
 
    void DrawCVRecorderParams(CVRecorderNode* n)
    {
@@ -931,12 +984,10 @@ namespace app
       }
 
       ImGui::BeginDisabled(n->input != nullptr);
-      ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+      Ui::DrawParam(n, CVRecorderParamsRow::Slider<&CVRecorderNode::constantIn>("in (no cable)", 0.0f, 1.0f));
       ImGui::EndDisabled();
 
-      ModSlider("speed", &n->speed, params::CVRecorder::speed_lo, params::CVRecorder::speed_hi);
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
+      Ui::DrawParams(n, kCVRecorderParamsRows);
    }
 
 
@@ -997,6 +1048,16 @@ namespace app
    }
 
 
+   namespace
+   {
+      using NoteFilterBodyRow = params::Row<NoteFilterNode>;
+      const NoteFilterBodyRow kNoteFilterBodyRows[] = {
+         NoteFilterBodyRow::KnobInt<&NoteFilterNode::rangeLow>("lo", params::NoteFilter::range_low_lo, params::NoteFilter::range_low_hi),
+         NoteFilterBodyRow::KnobInt<&NoteFilterNode::rangeHigh>("hi", params::NoteFilter::range_high_lo, params::NoteFilter::range_high_hi),
+         NoteFilterBodyRow::Knob<&NoteFilterNode::chance>("chance", params::NoteFilter::chance_lo, params::NoteFilter::chance_hi).Fmt("%.0f%%"),
+      };
+   }
+
    void DrawNoteFilterBody(GraphNode& gn, NoteFilterNode* n)
    {
       char stat[96];
@@ -1036,9 +1097,7 @@ namespace app
       }
       {
          AudioKnobRow row(tok::note_filter_body_audio_knob_row_layout);
-         row.KnobInt("lo", &n->rangeLow, params::NoteFilter::range_low_lo, params::NoteFilter::range_low_hi, kKnobSmall);
-         row.KnobInt("hi", &n->rangeHigh, params::NoteFilter::range_high_lo, params::NoteFilter::range_high_hi, kKnobSmall);
-         row.Knob("chance", &n->chance, params::NoteFilter::chance_lo, params::NoteFilter::chance_hi, "%.0f%%", kKnobSmall);
+         Ui::DrawKnobs(row, n, kNoteFilterBodyRows);
          row.End();
       }
 
@@ -1219,6 +1278,11 @@ namespace app
    }
 
 
+   namespace
+   {
+      using VelocityCurveBodyRow = params::Row<VelocityCurveNode>;
+   }
+
    void DrawVelocityCurveBody(GraphNode& gn, VelocityCurveNode* n)
    {
       char stat[64];
@@ -1229,11 +1293,20 @@ namespace app
       DrawVelocityCurveChart(n->curve);
       ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
       AudioKnobRow row(1, kKnobLarge);
-      row.Knob("curve", &n->curve, params::VelocityCurve::curve_lo, params::VelocityCurve::curve_hi, "%.2f", kKnobLarge);
+      Ui::DrawKnob(row, n, VelocityCurveBodyRow::Knob<&VelocityCurveNode::curve>("curve", params::VelocityCurve::curve_lo, params::VelocityCurve::curve_hi).Fmt("%.2f").Size(kKnobLarge));
       row.End();
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using HumanizerBodyRow = params::Row<HumanizerNode>;
+      const HumanizerBodyRow kHumanizerBodyRows[] = {
+         HumanizerBodyRow::Knob<&HumanizerNode::timingMs>("hu.time", params::Humanizer::timing_ms_lo, params::Humanizer::timing_ms_hi).Fmt("%.0f ms").Size(kKnobLarge),
+         HumanizerBodyRow::Knob<&HumanizerNode::velocityPct>("hu.vel", params::Humanizer::velocity_pct_lo, params::Humanizer::velocity_pct_hi).Fmt("%.0f%%").Size(kKnobLarge),
+      };
+   }
 
    void DrawHumanizerBody(GraphNode& gn, HumanizerNode* n)
    {
@@ -1242,8 +1315,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       AudioKnobRow row(tok::note_humanizer_body_audio_knob_row_layout, kKnobLarge);
-      row.Knob("hu.time", &n->timingMs, params::Humanizer::timing_ms_lo, params::Humanizer::timing_ms_hi, "%.0f ms", kKnobLarge);
-      row.Knob("hu.vel", &n->velocityPct, params::Humanizer::velocity_pct_lo, params::Humanizer::velocity_pct_hi, "%.0f%%", kKnobLarge);
+      Ui::DrawKnobs(row, n, kHumanizerBodyRows);
       row.End();
       EndAudioBody();
    }
@@ -1285,6 +1357,11 @@ namespace app
    }
 
 
+   namespace
+   {
+      using PredictiveQuantizeBodyRow = params::Row<PredictiveQuantizeNode>;
+   }
+
    void DrawPredictiveQuantizeBody(GraphNode& gn, PredictiveQuantizeNode* n)
    {
       const float conf = n->Confidence01();
@@ -1312,13 +1389,18 @@ namespace app
 
       {
          AudioKnobRow row(1);
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, PredictiveQuantizeBodyRow::Knob<&PredictiveQuantizeNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          row.End();
       }
 
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using PredictiveVelocityBodyRow = params::Row<PredictiveVelocityNode>;
+   }
 
    void DrawPredictiveVelocityBody(GraphNode& gn, PredictiveVelocityNode* n)
    {
@@ -1347,13 +1429,18 @@ namespace app
 
       {
          AudioKnobRow row(1);
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, PredictiveVelocityBodyRow::Knob<&PredictiveVelocityNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          row.End();
       }
 
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using PredictiveRhythmBodyRow = params::Row<PredictiveRhythmNode>;
+   }
 
    void DrawPredictiveRhythmBody(GraphNode& gn, PredictiveRhythmNode* n)
    {
@@ -1402,13 +1489,22 @@ namespace app
       {
          AudioKnobRow row(tok::note_predictive_rhythm_body_audio_knob_row_layout);
          row.Dropdown("root", MidiNoteNameList(), n->root, [n](int i) { n->root = i; });
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnob(row, n, PredictiveRhythmBodyRow::Knob<&PredictiveRhythmNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
          row.End();
       }
 
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using NoteEchoBodyRow = params::Row<NoteEchoNode>;
+      const NoteEchoBodyRow kNoteEchoBodyRows[] = {
+         NoteEchoBodyRow::KnobInt<&NoteEchoNode::repeats>("repeats", 1, NoteEchoNode::kMaxRepeats),
+         NoteEchoBodyRow::Knob<&NoteEchoNode::decay>("decay", params::NoteEcho::decay_lo, params::NoteEcho::decay_hi).Fmt("%.0f%%"),
+      };
+   }
 
    void DrawNoteEchoBody(GraphNode& gn, NoteEchoNode* n)
    {
@@ -1424,13 +1520,12 @@ namespace app
       }
       {
          AudioKnobRow row(tok::note_echo_body_audio_knob_row_layout);
-         row.KnobInt("repeats", &n->repeats, 1, NoteEchoNode::kMaxRepeats);
-         row.Knob("decay", &n->decay, params::NoteEcho::decay_lo, params::NoteEcho::decay_hi, "%.0f%%", kKnobSmall);
+         Ui::DrawKnobs(row, n, kNoteEchoBodyRows);
          row.End();
       }
       {
          AudioKnobRow row(tok::note_echo_body_audio_knob_row_layout);
-         row.KnobInt("transpose", &n->transposePerRepeat, -NoteEchoNode::kMaxTransposePerRepeat, NoteEchoNode::kMaxTransposePerRepeat);
+         Ui::DrawKnob(row, n, NoteEchoBodyRow::KnobInt<&NoteEchoNode::transposePerRepeat>("transpose", -NoteEchoNode::kMaxTransposePerRepeat, NoteEchoNode::kMaxTransposePerRepeat));
          bool muteDryBool = n->muteDry;
          if (row.Checkbox("Mute Dry##echoMuteDry", &muteDryBool))
             n->muteDry = muteDryBool;
@@ -1440,6 +1535,21 @@ namespace app
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using PredictiveNotesBodyRow = params::Row<PredictiveNotesNode>;
+      const PredictiveNotesBodyRow kPredictiveNotesBodyRows1[] = {
+         PredictiveNotesBodyRow::Knob<&PredictiveNotesNode::stray>("stray", 0.0f, 1.0f).Fmt("%.2f"),
+         PredictiveNotesBodyRow::KnobInt<&PredictiveNotesNode::memory>("memory", params::PredictiveNotes::memory_lo, params::PredictiveNotes::memory_hi),
+         PredictiveNotesBodyRow::Knob<&PredictiveNotesNode::lengthSpread>("length", 0.0f, 1.0f).Fmt("%.2f"),
+         PredictiveNotesBodyRow::Knob<&PredictiveNotesNode::velocitySpread>("velocity", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+      const PredictiveNotesBodyRow kPredictiveNotesBodyRows2[] = {
+         PredictiveNotesBodyRow::KnobInt<&PredictiveNotesNode::rangeLow>("low", params::PredictiveNotes::range_low_lo, params::PredictiveNotes::range_low_hi),
+         PredictiveNotesBodyRow::KnobInt<&PredictiveNotesNode::rangeHigh>("high", params::PredictiveNotes::range_high_lo, params::PredictiveNotes::range_high_hi),
+      };
+   }
 
    void DrawPredictiveNotesBody(GraphNode& gn, PredictiveNotesNode* n)
    {
@@ -1519,16 +1629,12 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
       {
          AudioKnobRow row(tok::note_predictive_notes_body_audio_knob_row_layout);
-         row.Knob("stray", &n->stray, 0.0f, 1.0f, "%.2f", kKnobSmall);
-         row.KnobInt("memory", &n->memory, params::PredictiveNotes::memory_lo, params::PredictiveNotes::memory_hi);
-         row.Knob("length", &n->lengthSpread, 0.0f, 1.0f, "%.2f", kKnobSmall);
-         row.Knob("velocity", &n->velocitySpread, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         Ui::DrawKnobs(row, n, kPredictiveNotesBodyRows1);
          row.End();
       }
       {
          AudioKnobRow row(tok::note_predictive_notes_body_audio_knob_row_layout);
-         row.KnobInt("low", &n->rangeLow, params::PredictiveNotes::range_low_lo, params::PredictiveNotes::range_low_hi);
-         row.KnobInt("high", &n->rangeHigh, params::PredictiveNotes::range_high_lo, params::PredictiveNotes::range_high_hi);
+         Ui::DrawKnobs(row, n, kPredictiveNotesBodyRows2);
          row.End();
       }
 
@@ -1557,6 +1663,11 @@ namespace app
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using NoteSwitcherBodyRow = params::Row<NoteSwitcherNode>;
+   }
 
    void DrawNoteSwitcherBody(GraphNode& gn, NoteSwitcherNode* n)
    {
@@ -1607,17 +1718,22 @@ namespace app
 
       {
          AudioKnobRow row(tok::note_switcher_body_audio_knob_row_layout, tok::note_row_layout_lg, 0.0f, false);
-         row.Checkbox("manual##switcherManual", &n->manual);
+         Ui::DrawKnob(row, n, NoteSwitcherBodyRow::Toggle<&NoteSwitcherNode::manual>("manual##switcherManual"));
          row.End();
       }
       if (n->manual)
       {
-         ModSliderInt("slot", &n->manualSlot, 0, NoteSwitcherNode::kSlots - 1);
+         Ui::DrawParam(n, NoteSwitcherBodyRow::SliderInt<&NoteSwitcherNode::manualSlot>("slot", 0, NoteSwitcherNode::kSlots - 1));
       }
 
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using NoteRouterBodyRow = params::Row<NoteRouterNode>;
+   }
 
    void DrawNoteRouterBody(GraphNode& gn, NoteRouterNode* n)
    {
@@ -1661,7 +1777,7 @@ namespace app
          AudioKnobRow row(showProb ? tok::note_router_body_audio_knob_row_layout : 1);
          row.Dropdown("mode", kModes, n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; });
          if (showProb)
-            row.Knob("prob", &n->probability, params::NoteRouter::probability_lo, params::NoteRouter::probability_hi, "%.0f%%", kKnobSmall);
+            Ui::DrawKnob(row, n, NoteRouterBodyRow::Knob<&NoteRouterNode::probability>("prob", params::NoteRouter::probability_lo, params::NoteRouter::probability_hi).Fmt("%.0f%%"));
          row.End();
       }
 
@@ -1731,6 +1847,11 @@ namespace app
    }
 
 
+   namespace
+   {
+      using ArpeggiatorBodyRow = params::Row<ArpeggiatorNode>;
+   }
+
    void DrawArpeggiatorBody(GraphNode& gn, ArpeggiatorNode* n)
    {
       // Display order per the design ask; enum values (mode's serialized
@@ -1769,19 +1890,28 @@ namespace app
                       [n](int i) { PushUndoCheckpoint(); n->mLastPresetUiIndex = i; n->ApplyPreset(i); });
          row.Dropdown("mode", kModeLabels, modeUiIndex,
                       [n](int i) { PushUndoCheckpoint(); n->mode = kModeValues[std::clamp(i, 0, (int)kModeLabels.size() - 1)]; });
-         row.KnobInt("octaves", &n->octaves, params::Arpeggiator::octaves_lo, params::Arpeggiator::octaves_hi);
+         Ui::DrawKnob(row, n, ArpeggiatorBodyRow::KnobInt<&ArpeggiatorNode::octaves>("octaves", params::Arpeggiator::octaves_lo, params::Arpeggiator::octaves_hi));
          row.End();
       }
       {
          AudioKnobRow row(tok::note_arpeggiator_body_audio_knob_row_layout);
          DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
-         row.Knob("gate", &n->gatePercent, params::Arpeggiator::gate_percent_lo, params::Arpeggiator::gate_percent_hi, "%.0f%%", kKnobSmall);
+         Ui::DrawKnob(row, n, ArpeggiatorBodyRow::Knob<&ArpeggiatorNode::gatePercent>("gate", params::Arpeggiator::gate_percent_lo, params::Arpeggiator::gate_percent_hi).Fmt("%.0f%%"));
          row.End();
       }
 
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using NoteSequencerBodyRow = params::Row<NoteSequencerNode>;
+      const NoteSequencerBodyRow kNoteSequencerBodyRows[] = {
+         NoteSequencerBodyRow::KnobInt<&NoteSequencerNode::steps>("steps", 1, NoteSequencerNode::kMaxSteps),
+         NoteSequencerBodyRow::Knob<&NoteSequencerNode::gatePercent>("gate", params::NoteSequencer::gate_percent_lo, params::NoteSequencer::gate_percent_hi).Fmt("%.0f%%"),
+      };
+   }
 
    void DrawNoteSequencerBody(GraphNode& gn, NoteSequencerNode* n)
    {
@@ -2073,8 +2203,7 @@ namespace app
          ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
          AudioKnobRow row(tok::note_sequencer_body_audio_knob_row_layout);
          DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
-         row.KnobInt("steps", &n->steps, 1, NoteSequencerNode::kMaxSteps);
-         row.Knob("gate", &n->gatePercent, params::NoteSequencer::gate_percent_lo, params::NoteSequencer::gate_percent_hi, "%.0f%%", kKnobSmall);
+         Ui::DrawKnobs(row, n, kNoteSequencerBodyRows);
          row.End();
       }
 
@@ -2084,6 +2213,15 @@ namespace app
 
    // The Piano Roll node's card: the linked page's notes as a mini roll over
    // the lane's span, the transport playhead, and the node's four controls.
+   namespace
+   {
+      using PianoRollBodyRow = params::Row<PianoRollNode>;
+      const PianoRollBodyRow kPianoRollBodyRows[] = {
+         PianoRollBodyRow::KnobInt<&PianoRollNode::transpose>("transpose", params::PianoRoll::transpose_lo, params::PianoRoll::transpose_hi),
+         PianoRollBodyRow::Knob<&PianoRollNode::velocity>("vel", params::PianoRoll::velocity_lo, params::PianoRoll::velocity_hi).Fmt("%.2f"),
+      };
+   }
+
    void DrawPianoRollBody(GraphNode& gn, PianoRollNode* n)
    {
       const Arrange::NoteSchedule* s = n->DisplaySchedule();
@@ -2152,15 +2290,14 @@ namespace app
 
       {
          AudioKnobRow row(tok::note_piano_roll_body_audio_knob_row_layout);
-         row.KnobInt("transpose", &n->transpose, params::PianoRoll::transpose_lo, params::PianoRoll::transpose_hi);
-         row.Knob("vel", &n->velocity, params::PianoRoll::velocity_lo, params::PianoRoll::velocity_hi, "%.2f", kKnobSmall);
+         Ui::DrawKnobs(row, n, kPianoRollBodyRows);
          row.Skip();
          row.Skip();
          row.End();
       }
       {
          AudioKnobRow row(tok::note_piano_roll_body_audio_knob_row_layout, tok::note_row_layout_lg, 0.0f, false);
-         row.Checkbox("thru", &n->thru);
+         Ui::DrawKnob(row, n, PianoRollBodyRow::Toggle<&PianoRollNode::thru>("thru"));
          row.Skip();
          row.Skip();
          row.Skip();
@@ -2172,6 +2309,17 @@ namespace app
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using MidiFileBodyRow = params::Row<MidiFileNode>;
+      const MidiFileBodyRow kMidiFileBodyRows[] = {
+         MidiFileBodyRow::KnobInt<&MidiFileNode::transpose>("transpose", params::MidiFile::transpose_lo, params::MidiFile::transpose_hi),
+         MidiFileBodyRow::Knob<&MidiFileNode::position>("position", 0.0f, 1.0f).Fmt("%.2f"),
+         MidiFileBodyRow::Knob<&MidiFileNode::speed>("speed", params::MidiFile::speed_lo, params::MidiFile::speed_hi).Fmt("%.2fx"),
+         MidiFileBodyRow::Knob<&MidiFileNode::velocity>("vel", params::MidiFile::velocity_lo, params::MidiFile::velocity_hi).Fmt("%.2f"),
+      };
+   }
 
    void DrawMidiFileBody(GraphNode& gn, MidiFileNode* n)
    {
@@ -2257,15 +2405,12 @@ namespace app
          // Four knobs a row (five cells put each mod pin against its neighbour's knob), the checkbox bottom-left
          // under them - the Keyboard's shape (P3, P6).
          AudioKnobRow row(tok::note_midi_file_body_audio_knob_row_layout);
-         row.KnobInt("transpose", &n->transpose, params::MidiFile::transpose_lo, params::MidiFile::transpose_hi);
-         row.Knob("position", &n->position, 0.0f, 1.0f, "%.2f", kKnobSmall);
-         row.Knob("speed", &n->speed, params::MidiFile::speed_lo, params::MidiFile::speed_hi, "%.2fx", kKnobSmall);
-         row.Knob("vel", &n->velocity, params::MidiFile::velocity_lo, params::MidiFile::velocity_hi, "%.2f", kKnobSmall);
+         Ui::DrawKnobs(row, n, kMidiFileBodyRows);
          row.End();
       }
       {
          AudioKnobRow row(tok::note_midi_file_body_audio_knob_row_layout, tok::note_row_layout_lg, 0.0f, false);
-         row.Checkbox("loop", &n->loop);
+         Ui::DrawKnob(row, n, MidiFileBodyRow::Toggle<&MidiFileNode::loop>("loop"));
          row.Skip();
          row.Skip();
          row.Skip();
@@ -2275,6 +2420,19 @@ namespace app
       EndAudioBody();
    }
 
+
+   namespace
+   {
+      using RandomNoteGeneratorBodyRow = params::Row<RandomNoteGeneratorNode>;
+      const RandomNoteGeneratorBodyRow kRandomNoteGeneratorBodyRows1[] = {
+         RandomNoteGeneratorBodyRow::KnobInt<&RandomNoteGeneratorNode::rangeLow>("lo", params::RandomNoteGenerator::range_low_lo, params::RandomNoteGenerator::range_low_hi),
+         RandomNoteGeneratorBodyRow::KnobInt<&RandomNoteGeneratorNode::rangeHigh>("hi", params::RandomNoteGenerator::range_high_lo, params::RandomNoteGenerator::range_high_hi),
+      };
+      const RandomNoteGeneratorBodyRow kRandomNoteGeneratorBodyRows2[] = {
+         RandomNoteGeneratorBodyRow::KnobInt<&RandomNoteGeneratorNode::maxStep>("wander", params::RandomNoteGenerator::max_step_lo, params::RandomNoteGenerator::max_step_hi),
+         RandomNoteGeneratorBodyRow::Knob<&RandomNoteGeneratorNode::groove>("groove", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
 
    void DrawRandomNoteGeneratorBody(GraphNode& gn, RandomNoteGeneratorNode* n)
    {
@@ -2312,8 +2470,7 @@ namespace app
                       [n](int i) { PushUndoCheckpoint(); n->root = i; });
          if (n->useGlobalScale)
             ImGui::EndDisabled();
-         row.KnobInt("lo", &n->rangeLow, params::RandomNoteGenerator::range_low_lo, params::RandomNoteGenerator::range_low_hi, kKnobSmall);
-         row.KnobInt("hi", &n->rangeHigh, params::RandomNoteGenerator::range_high_lo, params::RandomNoteGenerator::range_high_hi, kKnobSmall);
+         Ui::DrawKnobs(row, n, kRandomNoteGeneratorBodyRows1);
          row.End();
       }
       // Row 2 (4): same grid - mode/rate selector column left, knobs right.
@@ -2323,8 +2480,7 @@ namespace app
       {
          AudioKnobRow row(tok::note_random_generator_body_audio_knob_row_layout);
          DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
-         row.KnobInt("wander", &n->maxStep, params::RandomNoteGenerator::max_step_lo, params::RandomNoteGenerator::max_step_hi);
-         row.Knob("groove", &n->groove, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         Ui::DrawKnobs(row, n, kRandomNoteGeneratorBodyRows2);
          row.End();
       }
 
@@ -2426,6 +2582,15 @@ namespace app
    }
 
 
+   namespace
+   {
+      using ChorderBodyRow = params::Row<ChorderNode>;
+      const ChorderBodyRow kChorderBodyRows[] = {
+         ChorderBodyRow::Knob<&ChorderNode::humanizeTimingMs>("hu.time", params::Chorder::humanize_timing_ms_lo, params::Chorder::humanize_timing_ms_hi).Fmt("%.0fms"),
+         ChorderBodyRow::Knob<&ChorderNode::humanizeVelocity>("hu.vel", params::Chorder::humanize_velocity_lo, params::Chorder::humanize_velocity_hi).Fmt("%.0f%%"),
+      };
+   }
+
    void DrawChorderBody(GraphNode& gn, ChorderNode* n)
    {
       char stat[64];
@@ -2493,13 +2658,13 @@ namespace app
          // notes = how many notes stack into each chord (3 = triad, 4 = seventh, 5+ = ninth, 11th).
          // length = how many chords the progression strip below plays before it loops.
          // oct up = chance a chord gets one extra tone doubled an octave higher (airier voicing).
-         row.KnobInt("notes", &n->chordSize, params::Chorder::chord_size_lo, params::Chorder::chord_size_hi);
+         Ui::DrawKnob(row, n, ChorderBodyRow::KnobInt<&ChorderNode::chordSize>("notes", params::Chorder::chord_size_lo, params::Chorder::chord_size_hi));
          if (ImGui::IsItemHovered())
             gNodeHoverTip = "Notes per chord: 3 = triad, 4 = with a 7th, 5-6 = 9th and 11th colour";
-         row.KnobInt("length", &n->progSteps, 1, ChorderNode::kProgCells);
+         Ui::DrawKnob(row, n, ChorderBodyRow::KnobInt<&ChorderNode::progSteps>("length", 1, ChorderNode::kProgCells));
          if (ImGui::IsItemHovered())
             gNodeHoverTip = "Chords before the progression loops (uses the cells below; random mode ignores it)";
-         row.Knob("oct up", &n->upperHarmonics, params::Chorder::upper_harmonics_lo, params::Chorder::upper_harmonics_hi, "%.0f%%", kKnobSmall);
+         Ui::DrawKnob(row, n, ChorderBodyRow::Knob<&ChorderNode::upperHarmonics>("oct up", params::Chorder::upper_harmonics_lo, params::Chorder::upper_harmonics_hi).Fmt("%.0f%%"));
          if (ImGui::IsItemHovered())
             gNodeHoverTip = "Chance a chord gets an extra note an octave above one of its tones";
          row.End();
@@ -2507,8 +2672,7 @@ namespace app
       {
          AudioKnobRow row(tok::note_row_layout);
          row.Knob("strum", &n->strumMs, params::Chorder::strum_ms_lo, params::Chorder::strum_ms_hi, "%.0fms", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewStrum30);
-         row.Knob("hu.time", &n->humanizeTimingMs, params::Chorder::humanize_timing_ms_lo, params::Chorder::humanize_timing_ms_hi, "%.0fms", kKnobSmall);
-         row.Knob("hu.vel", &n->humanizeVelocity, params::Chorder::humanize_velocity_lo, params::Chorder::humanize_velocity_hi, "%.0f%%", kKnobSmall);
+         Ui::DrawKnobs(row, n, kChorderBodyRows);
          row.End();
       }
       DrawChorderProgressionStrip(n);
@@ -2621,6 +2785,11 @@ namespace app
    }
 
 
+   namespace
+   {
+      using NoteCapturerBodyRow = params::Row<NoteCapturerNode>;
+   }
+
    void DrawNoteCapturerBody(GraphNode& gn, NoteCapturerNode* n)
    {
       const bool recording = n->IsRecording();
@@ -2673,7 +2842,7 @@ namespace app
          // precedent) since a lone checkbox doesn't need full knob height
          // plus a caption-line reservation.
          AudioKnobRow row(tok::note_capturer_body_audio_knob_row_layout, tok::note_row_layout_lg, tok::note_row_layout_sm, false);
-         row.Checkbox("loop##capturerLoop", &n->loop);
+         Ui::DrawKnob(row, n, NoteCapturerBodyRow::Toggle<&NoteCapturerNode::loop>("loop##capturerLoop"));
          row.Skip();
          row.Skip();
          row.Skip();
@@ -2744,6 +2913,20 @@ namespace app
    }
 
 
+   namespace
+   {
+      using BouncingBallsBodyRow = params::Row<BouncingBallsNode>;
+      const BouncingBallsBodyRow kBouncingBallsBodyRows1[] = {
+         BouncingBallsBodyRow::KnobInt<&BouncingBallsNode::numBalls>("balls", 1, BouncingBallsNode::kMaxBalls),
+         BouncingBallsBodyRow::Knob<&BouncingBallsNode::ballSpeed>("speed", params::BouncingBalls::ball_speed_lo, params::BouncingBalls::ball_speed_hi).Fmt("%.2f"),
+      };
+      const BouncingBallsBodyRow kBouncingBallsBodyRows2[] = {
+         BouncingBallsBodyRow::Knob<&BouncingBallsNode::ballSize>("size", params::BouncingBalls::ball_size_lo, params::BouncingBalls::ball_size_hi).Fmt("%.2f"),
+         BouncingBallsBodyRow::KnobInt<&BouncingBallsNode::rangeLow>("lo", params::BouncingBalls::range_low_lo, params::BouncingBalls::range_low_hi),
+         BouncingBallsBodyRow::KnobInt<&BouncingBallsNode::rangeHigh>("hi", params::BouncingBalls::range_high_lo, params::BouncingBalls::range_high_hi),
+      };
+   }
+
    void DrawBouncingBallsBody(GraphNode& gn, BouncingBallsNode* n)
    {
       static const std::vector<std::string> kShapes = { "Circle", "Square", "Triangle" };
@@ -2757,15 +2940,12 @@ namespace app
       {
          AudioKnobRow row(tok::note_bouncing_balls_body_audio_knob_row_layout);
          row.Dropdown("shape", kShapes, n->shape, [n](int i) { PushUndoCheckpoint(); n->shape = i; });
-         row.KnobInt("balls", &n->numBalls, 1, BouncingBallsNode::kMaxBalls);
-         row.Knob("speed", &n->ballSpeed, params::BouncingBalls::ball_speed_lo, params::BouncingBalls::ball_speed_hi, "%.2f", kKnobSmall);
+         Ui::DrawKnobs(row, n, kBouncingBallsBodyRows1);
          row.End();
       }
       {
          AudioKnobRow row(tok::note_bouncing_balls_body_audio_knob_row_layout);
-         row.Knob("size", &n->ballSize, params::BouncingBalls::ball_size_lo, params::BouncingBalls::ball_size_hi, "%.2f", kKnobSmall);
-         row.KnobInt("lo", &n->rangeLow, params::BouncingBalls::range_low_lo, params::BouncingBalls::range_low_hi, kKnobSmall);
-         row.KnobInt("hi", &n->rangeHigh, params::BouncingBalls::range_high_lo, params::BouncingBalls::range_high_hi, kKnobSmall);
+         Ui::DrawKnobs(row, n, kBouncingBallsBodyRows2);
          row.End();
       }
 
@@ -2792,6 +2972,15 @@ namespace app
    }
 
 
+   namespace
+   {
+      using AudioToCVBodyRow = params::Row<AudioToCVNode>;
+      const AudioToCVBodyRow kAudioToCVBodyRows[] = {
+         AudioToCVBodyRow::Knob<&AudioToCVNode::attackMs>("att", params::AudioToCV::attack_ms_lo, params::AudioToCV::attack_ms_hi).Fmt("%.1f ms"),
+         AudioToCVBodyRow::Knob<&AudioToCVNode::releaseMs>("rel", params::AudioToCV::release_ms_lo, params::AudioToCV::release_ms_hi).Fmt("%.0f ms"),
+      };
+   }
+
    void DrawAudioToCVBody(GraphNode& gn, AudioToCVNode* n)
    {
       const float lvl = n->CurrentLevel();
@@ -2805,13 +2994,12 @@ namespace app
          static const std::vector<std::string> kModes = { "Peak", "RMS" };
          row.Dropdown("mode", kModes, n->mode,
                       [n](int i) { PushUndoCheckpoint(); n->mode = i; });
-         row.Knob("gain", &n->gain, params::AudioToCV::gain_lo, params::AudioToCV::gain_hi, "%.2fx", kKnobSmall);
+         Ui::DrawKnob(row, n, AudioToCVBodyRow::Knob<&AudioToCVNode::gain>("gain", params::AudioToCV::gain_lo, params::AudioToCV::gain_hi).Fmt("%.2fx"));
          row.End();
       }
       {
          AudioKnobRow row(tok::note_audio_to_cv_body_audio_knob_row_layout);
-         row.Knob("att", &n->attackMs, params::AudioToCV::attack_ms_lo, params::AudioToCV::attack_ms_hi, "%.1f ms", kKnobSmall);
-         row.Knob("rel", &n->releaseMs, params::AudioToCV::release_ms_lo, params::AudioToCV::release_ms_hi, "%.0f ms", kKnobSmall);
+         Ui::DrawKnobs(row, n, kAudioToCVBodyRows);
          row.End();
       }
 

@@ -3,6 +3,7 @@
 #include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
@@ -298,6 +299,11 @@ namespace app
    }
 
 
+   namespace
+   {
+      using FieldElementParamsRow = params::Row<FieldElementNode>;
+   }
+
    void DrawFieldElementParams(FieldElementNode* n)
    {
       gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them
@@ -345,9 +351,9 @@ namespace app
          }
       }
 
-      ModSliderInt("max elements", &n->maxElements, params::FieldElement::max_elements_lo, params::FieldElement::max_elements_hi);
+      Ui::DrawParam(n, FieldElementParamsRow::SliderInt<&FieldElementNode::maxElements>("max elements", params::FieldElement::max_elements_lo, params::FieldElement::max_elements_hi));
       if (!n->input)
-         ModSliderInt("generate count", &n->generateCount, params::FieldElement::generate_count_lo, params::FieldElement::generate_count_hi);
+         Ui::DrawParam(n, FieldElementParamsRow::SliderInt<&FieldElementNode::generateCount>("generate count", params::FieldElement::generate_count_lo, params::FieldElement::generate_count_hi));
 
       {
          bool publish = n->publishScalarOutput;
@@ -374,6 +380,15 @@ namespace app
       DrawFieldParamSliders(n);
    }
 
+
+   namespace
+   {
+      using FieldPrimitiveParamsRow = params::Row<FieldPrimitiveNode>;
+      const FieldPrimitiveParamsRow kFieldPrimitiveParamsRows[] = {
+         FieldPrimitiveParamsRow::SliderInt<&FieldPrimitiveNode::count>("count", params::FieldPrimitive::count_lo, params::FieldPrimitive::count_hi),
+         FieldPrimitiveParamsRow::SliderInt<&FieldPrimitiveNode::maxElements>("max elements", params::FieldPrimitive::max_elements_lo, params::FieldPrimitive::max_elements_hi),
+      };
+   }
 
    void DrawFieldPrimitiveParams(FieldPrimitiveNode* n)
    {
@@ -437,8 +452,7 @@ namespace app
       if (!n->valueMode || gParamRegisterOnly)
       {
          DropdownButton("topology", kTopologies, n->topology, [n](int i) { n->topology = i; });
-         ModSliderInt("count", &n->count, params::FieldPrimitive::count_lo, params::FieldPrimitive::count_hi);
-         ModSliderInt("max elements", &n->maxElements, params::FieldPrimitive::max_elements_lo, params::FieldPrimitive::max_elements_hi);
+         Ui::DrawParams(n, kFieldPrimitiveParamsRows);
       }
 
       if (!n->valueMode || gParamRegisterOnly)
@@ -533,6 +547,15 @@ namespace app
    }
 
 
+   namespace
+   {
+      using SpectralFieldParamsRow = params::Row<SpectralFieldNode>;
+      const SpectralFieldParamsRow kSpectralFieldParamsRows[] = {
+         SpectralFieldParamsRow::Choice<&SpectralFieldNode::sizeIndex>("size", &SpectralFieldNode::SizeNames),
+         SpectralFieldParamsRow::Slider<&SpectralFieldNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f"),
+      };
+   }
+
    void DrawSpectralFieldParams(SpectralFieldNode* n)
    {
       gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);
@@ -564,8 +587,7 @@ namespace app
          }
       }
 
-      DropdownButton("size", SpectralFieldNode::SizeNames(), n->sizeIndex, [n](int i) { n->sizeIndex = i; });
-      ModSlider("mix", &n->mix, 0.0f, 1.0f, "%.2f");
+      Ui::DrawParams(n, kSpectralFieldParamsRows);
 
       DrawFieldParamSliders(n);
    }
@@ -786,6 +808,16 @@ namespace app
    }
 
 
+   namespace
+   {
+      using FieldPixelParamsRow = params::Row<FieldPixelNode>;
+      const FieldPixelParamsRow kFieldPixelParamsRows[] = {
+         FieldPixelParamsRow::Slider<&FieldPixelNode::width>("width", params::FieldPixel::width_lo, params::FieldPixel::width_hi).Fmt("%.0f"),
+         FieldPixelParamsRow::Slider<&FieldPixelNode::height>("height", params::FieldPixel::height_lo, params::FieldPixel::height_hi).Fmt("%.0f"),
+         FieldPixelParamsRow::Toggle<&FieldPixelNode::animate>("animate"),
+      };
+   }
+
    void DrawFieldPixelParams(FieldPixelNode* n)
    {
       gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them
@@ -836,9 +868,7 @@ namespace app
          n->domain = i;
          n->Apply();
       });
-      ModSlider("width", &n->width, params::FieldPixel::width_lo, params::FieldPixel::width_hi, "%.0f");
-      ModSlider("height", &n->height, params::FieldPixel::height_lo, params::FieldPixel::height_hi, "%.0f");
-      ModCheckbox("animate", &n->animate);
+      Ui::DrawParams(n, kFieldPixelParamsRows);
 
       {
          bool expose = n->exposeAuxTexture;
