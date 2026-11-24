@@ -143,7 +143,7 @@ namespace app
             }
          }
          PushTextWrapWidth(bodyW);
-         ImGui::TextColored(tok::V4(tok::palf::v_500_900_1000_1000), "source: %s", srcName);
+         ImGui::TextColored(tok::RoleV4(tok::col::text_alt), "source: %s", srcName);
          PopTextWrapWidth();
       }
       else
@@ -168,18 +168,18 @@ namespace app
       const float h = 60.0f;
       ImGui::Dummy(ImVec2(bodyW, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::U32(tok::pal::c_101016FF), 3.0f);
+      dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::Role(tok::col::surface_deep), 3.0f);
       const float bw = bodyW / (float)Platform::kAudioBands;
       for (int i = 0; i < Platform::kAudioBands; i++)
       {
          const float v = std::min(1.0f, levels.bands[i] * n->gain);
          dl->AddRectFilled(ImVec2(origin.x + i * bw + 1, origin.y + h - v * h),
                            ImVec2(origin.x + (i + 1) * bw - 1, origin.y + h),
-                           tok::U32(tok::pal::c_78C8FFEB));
+                           tok::Role(tok::col::accent_2, 235));
       }
       if (!n->input.IsConnected() && !Platform::AudioIsRunning())
          AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + bodyW, origin.y + h)}, "idle");
-      dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::U32(tok::pal::c_464A5AFF), 3.0f);
+      dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::Role(tok::col::edge_lo_2), 3.0f);
 
       // --- Left Column ---
       ImGui::BeginGroup();
@@ -266,8 +266,8 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const bool isLight = IsThemeLight();
-      const ImU32 borderCol = isLight ? tok::U32(tok::pal::c_3C44558C) : tok::U32(tok::pal::c_D2DAEB46);
-      const ImU32 textCol = isLight ? tok::U32(tok::pal::c_232834FF) : tok::U32(tok::pal::c_DEE4F0FF);
+      const ImU32 borderCol = isLight ? tok::Base(tok::col::edge_lo_2, 140) : tok::Base(tok::col::surface_hi, 70);
+      const ImU32 textCol = isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::surface_hi);
 
       dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, 8.0f, 0, 1.5f);
       for (int r = 1; r < rowCount; r++)
@@ -2164,7 +2164,7 @@ namespace app
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), tok::U32(tok::pal::c_0E0E14FF), 3.0f);
+      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), tok::Role(tok::col::surface_deep), 3.0f);
 
       const int count = std::clamp(n->bandCount, 2, AudioColorRampNode::kMaxBands);
       const float* energies = n->GetBandEnergies();
@@ -2207,10 +2207,10 @@ namespace app
             float mag = std::clamp(spec[bin] * 2.5f, 0.0f, 1.0f);
             pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - 4.0f)));
          }
-         dl->AddPolyline(pts.data(), (int)pts.size(), tok::U32(tok::pal::c_FFFFFF82), false, 1.5f);
+         dl->AddPolyline(pts.data(), (int)pts.size(), tok::Role(tok::col::ink_white, 130), false, 1.5f);
       }
 
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::U32(tok::pal::c_464A5AFF), 3.0f);
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::Role(tok::col::edge_lo_2), 3.0f);
 
       // 3. Interactive band-boundary dividers, drawn directly on the spectrum.
       ImGui::SetCursorScreenPos(origin);
@@ -2266,7 +2266,7 @@ namespace app
       {
          float x = toScreenX(n->crossoverPos[i]);
          bool isHov = (nearest == i || (sDragNode == n && sDragIndex == i));
-         ImU32 lineCol = isHov ? tok::U32(tok::pal::c_FFDC64E6) : tok::U32(tok::pal::c_FFFFFF64);
+         ImU32 lineCol = isHov ? tok::Role(tok::col::role_modulation, 230) : tok::Role(tok::col::ink_white, 100);
          dl->AddLine(ImVec2(x, origin.y + 2.0f), ImVec2(x, origin.y + barH - 2.0f), lineCol, isHov ? 2.5f : 1.5f);
 
          if (isHov)
@@ -2282,7 +2282,7 @@ namespace app
       }
 
       const float readoutH = ImGui::GetTextLineHeight();
-      dl->AddText(ImVec2(origin.x, origin.y + barH + gap), tok::U32(tok::pal::c_A0A6BAFF), readout);
+      dl->AddText(ImVec2(origin.x, origin.y + barH + gap), tok::Role(tok::col::text_secondary), readout);
 
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + barH + gap + readoutH + gap));
    }
@@ -2666,7 +2666,7 @@ namespace app
       if (!n->EngineError().empty())
       {
          PushTextWrapWidth(kPreviewSize);
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->EngineError().c_str());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->EngineError().c_str());
          PopTextWrapWidth();
       }
 
@@ -3056,15 +3056,15 @@ namespace app
          {
             dl->AddRectFilled(headerPos,
                               ImVec2(headerPos.x + kPreviewSize, headerPos.y + rowHeight),
-                              dragging ? tok::U32(tok::pal::c_465A82C8) : tok::U32(tok::pal::c_323644A0), 3.0f);
+                              dragging ? tok::Role(tok::col::surface_lo_2, 200) : tok::Role(tok::col::edge_lo, 160), 3.0f);
          }
          // grip dots, so the header reads as draggable
          for (int d = 0; d < 3; d++)
          {
             dl->AddCircleFilled(ImVec2(headerPos.x + 6, headerPos.y + 5 + d * 4.0f), 1.3f,
-                                tok::U32(tok::pal::c_8C92A8FF));
+                                tok::Role(tok::col::edge_mid));
             dl->AddCircleFilled(ImVec2(headerPos.x + 11, headerPos.y + 5 + d * 4.0f), 1.3f,
-                                tok::U32(tok::pal::c_8C92A8FF));
+                                tok::Role(tok::col::edge_mid));
          }
          // Name the layer after whatever is feeding it - far more useful than
          // "layer C" once a stack has four things in it.
@@ -3085,7 +3085,7 @@ namespace app
             snprintf(title, sizeof(title), "%c  (empty)", 'A' + slot);
          }
          dl->AddText(ImVec2(headerPos.x + 20, headerPos.y + 2),
-                     source ? tok::U32(tok::pal::c_BEC4D7FF) : tok::U32(tok::pal::c_787C8EFF), title);
+                     source ? tok::Role(tok::col::surface_mid) : tok::Role(tok::col::edge_mid), title);
 
          char modeLabel[32];
          snprintf(modeLabel, sizeof(modeLabel), "mode##%d", slot);

@@ -2390,7 +2390,7 @@ void EndPredictorGrab(const PredictorGrabCtx& c, const ParamRef& ref);
 
 
    // Prediction green: pin ring, and the track/fill colours of a green-bound slider.
-   inline constexpr ImU32 kPredictionPinCol = tok::U32(tok::pal::c_6ED78CFF);
+   inline constexpr ImU32 kPredictionPinCol = tok::Base(tok::col::state_ok);
 
 bool ModCheckbox(const char* label, bool* value, bool* outUserChanged = nullptr);
 
@@ -2621,16 +2621,16 @@ uint32_t ArrangeMarkerRGBA(ImU32 col);
 
 
    inline const ArrangePaletteEntry kArrangePalette[10] = {
-      { "Default", tok::U32(tok::pal::c_6E788CFF) },
-      { "Crimson", tok::U32(tok::pal::c_EF4444FF) },
-      { "Orange",  tok::U32(tok::pal::c_F97316FF) },
-      { "Amber",   tok::U32(tok::pal::c_F59E0BFF) },
-      { "Emerald", tok::U32(tok::pal::c_10B981FF) },
-      { "Cyan",    tok::U32(tok::pal::c_06B6D4FF) },
-      { "Blue",    tok::U32(tok::pal::c_3B82F6FF) },
-      { "Purple",  tok::U32(tok::pal::c_8B5CF6FF) },
-      { "Magenta", tok::U32(tok::pal::c_D946EFFF) },
-      { "Rose",    tok::U32(tok::pal::c_F43F5EFF) }
+      { "Default", tok::Role(tok::col::edge_mid) },
+      { "Crimson", tok::Role(tok::col::state_err) },
+      { "Orange",  tok::Role(tok::col::state_warn) },
+      { "Amber",   tok::Role(tok::col::text_warn) },
+      { "Emerald", tok::Role(tok::col::viz_teal) },
+      { "Cyan",    tok::Role(tok::col::accent_alt_7) },
+      { "Blue",    tok::Role(tok::col::accent) },
+      { "Purple",  tok::Role(tok::col::role_expression) },
+      { "Magenta", tok::Role(tok::col::viz_magenta) },
+      { "Rose",    tok::Role(tok::col::state_err) }
    };
 
 
@@ -3378,8 +3378,8 @@ void EndAudioSection();
          PushDropdownStyle();
          if (h.modulated)
          {
-            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
-                                                                : tok::V4(tok::palf::v_1000_750_350_1000));
+            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::BaseV4(tok::col::text_modulation)
+                                                                : tok::BaseV4(tok::col::role_modulation));
             ImGui::BeginDisabled();
             NodeDropdownField(caption.c_str(), ImVec2(btnW, 0), inLabel);
             ImGui::EndDisabled();
@@ -3476,8 +3476,8 @@ void EndAudioSection();
                PushDropdownStyle();
                if (h.modulated)
                {
-                  ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
-                                                                      : tok::V4(tok::palf::v_1000_750_350_1000));
+                  ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::BaseV4(tok::col::text_modulation)
+                                                                      : tok::BaseV4(tok::col::role_modulation));
                   ImGui::BeginDisabled();
                   NodeDropdownField(caption.c_str(), ImVec2(btnW, 0));
                   ImGui::EndDisabled();
@@ -3571,8 +3571,8 @@ void EndAudioSection();
          if (h.modulated)
          {
             bool shown = *value;
-            ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000)
-                                                                     : tok::V4(tok::palf::v_1000_750_350_1000));
+            ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::BaseV4(tok::col::state_warn)
+                                                                     : tok::BaseV4(tok::col::role_modulation));
             ImGui::BeginDisabled();
             NodeCheckbox(label, &shown, true);
             ImGui::EndDisabled();

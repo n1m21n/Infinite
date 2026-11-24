@@ -861,7 +861,7 @@ namespace app
       if (!blocklist.empty())
       {
          if (PanelKit::FoldHeader(L("Blocklisted VST3 bundles (crashed or hung while scanning)"), false, false,
-                                  ImGui::GetColorU32(tok::V4(tok::palf::v_900_550_250_1000))))
+                                  ImGui::GetColorU32(tok::RoleV4(tok::col::state_warn))))
          {
             for (const std::string& path : blocklist)
                ImGui::TextWrapped("%s", path.c_str());

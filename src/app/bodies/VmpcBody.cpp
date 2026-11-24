@@ -227,22 +227,22 @@ namespace app
                         n->selectedPad = pad;
                      const bool hit = lvl || (now - n->padFlash[pad]) < tok::motion_s_pad_flash;
                      const bool lit = playing || hit;
-                     const ImU32 green = isLight ? tok::U32(tok::pal::c_239650FF) : tok::U32(tok::pal::c_3CAF64FF);
-                     ImU32 fill = isLoaded ? (isLight ? tok::U32(tok::pal::c_D6DDECFF) : tok::U32(tok::pal::c_282E40FF))
-                                           : (isLight ? tok::U32(tok::pal::c_E8EBF2FF) : tok::U32(tok::pal::c_1A1C25FF));
+                     const ImU32 green = isLight ? tok::Base(tok::col::state_ok_4) : tok::Base(tok::col::state_ok_5);
+                     ImU32 fill = isLoaded ? (isLight ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::edge_lo))
+                                           : (isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::edge_deep));
                      if (hovered && !lit)
-                        fill = isLight ? tok::U32(tok::pal::c_CCD4E6FF) : tok::U32(tok::pal::c_343B50FF);
+                        fill = isLight ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::edge_lo);
                      if (lit)
                         fill = green;
                      dl->AddRectFilled(mn, mx, fill, 6.0f);
-                     const ImU32 selCol = isLight ? tok::U32(tok::pal::c_3264E6FF) : tok::U32(tok::pal::c_6EA0FFFF);
-                     const ImU32 edge = isLight ? tok::U32(tok::pal::c_AAB2C3FF) : tok::U32(tok::pal::c_555C73C8);
+                     const ImU32 selCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4);
+                     const ImU32 edge = isLight ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::surface_lo_2, 200);
                      dl->AddRect(mn, mx, isSel ? selCol : edge, 6.0f, 0, isSel ? 2.0f : 1.0f);
 
-                     const ImU32 ink = lit ? tok::U32(tok::pal::c_FFFFFFFF)
-                                           : (isLoaded ? (isLight ? tok::U32(tok::pal::c_282D3CFF) : tok::U32(tok::pal::c_D7DCEBFF))
-                                                       : tok::U32(tok::pal::c_788096FF));
-                     const ImU32 dim = lit ? tok::U32(tok::pal::c_FFFFFFBE) : (isLight ? tok::U32(tok::pal::c_5F6982FF) : tok::U32(tok::pal::c_969EB4FF));
+                     const ImU32 ink = lit ? tok::Base(tok::col::ink_white)
+                                           : (isLoaded ? (isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::surface_hi))
+                                                       : tok::Base(tok::col::edge_mid));
+                     const ImU32 dim = lit ? tok::Base(tok::col::ink_white, 190) : (isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::text_secondary));
                      dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 1.0f, mx.y - 1.0f), true);
                      const float lh = AudioLabelFontSize();
                      char num[16];
@@ -266,7 +266,7 @@ namespace app
                         const float cur = n->PadCursor(pad);
                         const float at = cur >= 0.0f ? cur : n->padStart[pad] / 100.0f;
                         if (thumbs != 0)
-                           DrawThumb(dl, thumbs, ThumbIndexAt(at), pmn, pmx, tok::U32(tok::pal::c_FFFFFFFF));
+                           DrawThumb(dl, thumbs, ThumbIndexAt(at), pmn, pmx, tok::Role(tok::col::ink_white));
                         else
                         {
                            AudioViz::Fill(dl, pmn, pmx);
@@ -278,8 +278,8 @@ namespace app
                         {
                            // Progress through the clip along the picture's bottom edge.
                            const float px = pmn.x + (pmx.x - pmn.x) * std::clamp(cur, 0.0f, 1.0f);
-                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - 2.0f), ImVec2(pmx.x, pmx.y), tok::U32(tok::pal::c_0000008C));
-                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - 2.0f), ImVec2(px, pmx.y), tok::U32(tok::pal::c_FFFFFFE6));
+                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - 2.0f), ImVec2(pmx.x, pmx.y), tok::Role(tok::col::ink_black, 140));
+                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - 2.0f), ImVec2(px, pmx.y), tok::Role(tok::col::ink_white, 230));
                         }
                         std::string nm = n->PadName(pad);
                         const size_t dot = nm.find_last_of('.');
@@ -298,8 +298,8 @@ namespace app
                      modDot = ImVec2(mx.x - 8.0f, mx.y - 8.0f);
                      if (anyMod)
                      {
-                        dl->AddCircleFilled(modDot, 4.0f, isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF));
-                        dl->AddCircle(modDot, 4.0f, isLight ? tok::U32(tok::pal::c_6E7382FF) : tok::U32(tok::pal::c_1E2028FF), 12, 1.0f);
+                        dl->AddCircleFilled(modDot, 4.0f, isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
+                        dl->AddCircle(modDot, 4.0f, isLight ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::surface_lo), 12, 1.0f);
                      }
                      dl->PopClipRect();
                   },
@@ -357,7 +357,7 @@ namespace app
                if (tex != 0)
                   for (int i = 0; i < VmpcNode::kThumbs; i++)
                      DrawThumb(dl, tex, i, ImVec2(origin.x + cw * (float)i, origin.y),
-                               ImVec2(origin.x + cw * (float)(i + 1), br.y), tok::U32(tok::pal::c_FFFFFFFF));
+                               ImVec2(origin.x + cw * (float)(i + 1), br.y), tok::Role(tok::col::ink_white));
                else
                   EmptyState::DrawCaption(origin, br, n->PadLoading(cur) ? T("Loading preview...")
                                                       : (n->PadIsHap(cur) ? T("HAP clip - no filmstrip") : T("No preview")));
@@ -367,16 +367,16 @@ namespace app
                if (b < a)
                   std::swap(a, b);
                const float xa = origin.x + w * a, xb = origin.x + w * b;
-               dl->AddRectFilled(origin, ImVec2(xa, br.y), tok::U32(tok::pal::c_0000008C));
-               dl->AddRectFilled(ImVec2(xb, origin.y), br, tok::U32(tok::pal::c_0000008C));
-               const ImU32 edgeCol = isLight ? tok::U32(tok::pal::c_3264E6FF) : tok::U32(tok::pal::c_6EA0FFFF);
+               dl->AddRectFilled(origin, ImVec2(xa, br.y), tok::Role(tok::col::ink_black, 140));
+               dl->AddRectFilled(ImVec2(xb, origin.y), br, tok::Base(tok::col::ink_black, 140));
+               const ImU32 edgeCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4);
                dl->AddLine(ImVec2(xa, origin.y), ImVec2(xa, br.y), edgeCol, 2.0f);
                dl->AddLine(ImVec2(xb, origin.y), ImVec2(xb, br.y), edgeCol, 2.0f);
                const float at = n->PadCursor(cur);
                if (n->PadPlaying(cur) && at >= 0.0f)
                {
                   const float px = origin.x + w * std::clamp(at, 0.0f, 1.0f);
-                  dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), tok::U32(tok::pal::c_FFFFFFEB), 1.5f);
+                  dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), tok::Role(tok::col::ink_white, 235), 1.5f);
                }
                if (hov)
                {
@@ -390,7 +390,7 @@ namespace app
                EmptyState::DrawCaption(origin, br, n->PadHasPath(cur) ? T("File missing - drop a clip or Clear")
                                                                       : T("No clip loaded"));
             dl->PopClipRect();
-            AudioViz::Border(dl, origin, br, (!has && hov) ? (isLight ? tok::U32(tok::pal::c_3264E6FF) : tok::U32(tok::pal::c_6EA0FFFF)) : 0);
+            AudioViz::Border(dl, origin, br, (!has && hov) ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4)) : 0);
             if (!has && hov)
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          }

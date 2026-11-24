@@ -64,6 +64,14 @@ def build():
         L.append(f"   constexpr Pairf {ident(k)} = {{ {f(d)}, {f(l)} }};")
     for k, v in r["accent_ladder"].items():
         L.append(f"   constexpr float accent_{k} = {v}f;")
+    # Palette roles (owner 2026-11-24): a dark + light pair each; tok::Role picks by theme, tok::Base keeps dark.
+    L += ["", "   namespace col", "   {"]
+    for k, v in r.get("col", {}).items():
+        if k.startswith("_"):
+            continue
+        d, l = v["dark"], v["light"]
+        L.append(f"      constexpr Pair8 {ident(k)} = {{ {{{d[0]}, {d[1]}, {d[2]}, {d[3]}}}, {{{l[0]}, {l[1]}, {l[2]}, {l[3]}}} }};")
+    L += ["   }"]
     L += ["", "   namespace pal", "   {"]
     for k, v in t.get("palette", {}).items():
         L.append(f"      constexpr Rgba8 {k} = {{{v[0]}, {v[1]}, {v[2]}, {v[3]}}};")

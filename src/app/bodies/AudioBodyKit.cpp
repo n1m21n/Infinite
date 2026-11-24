@@ -34,7 +34,7 @@ namespace app
       const float h = ImGui::GetTextLineHeight() + 6.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(p, ImVec2(p.x + width, p.y + h),
-                        isLight ? tok::U32(tok::pal::c_0000000C) : tok::U32(tok::pal::c_FFFFFF0A), 3.0f);
+                        isLight ? tok::Base(tok::col::ink_black, 12) : tok::Base(tok::col::ink_white, 10), 3.0f);
       const float textY = p.y + 3.0f;
       // Both texts are fitted to the strip: a long status string (a device
       // error, a file name) used to run out past the node's right edge. The
@@ -86,12 +86,12 @@ namespace app
          const std::string idleFit = fitText(idleNorm.c_str(), idleMax);
          if (!idleFit.empty())
             dl->AddText(ImVec2(p.x + 7.0f, textY),
-                        isLight ? tok::U32(tok::pal::c_50586CFF) : tok::U32(tok::pal::c_848A9EFF),
+                        isLight ? tok::Base(tok::col::surface_lo_2) : tok::Base(tok::col::edge_mid),
                         idleFit.c_str());
       }
       if (!readoutFit.empty())
          dl->AddText(ImVec2(p.x + width - 8.0f - readoutW, textY),
-                     isLight ? tok::U32(tok::pal::c_1E2434FF) : tok::U32(tok::pal::c_E2E8F4FF),
+                     isLight ? tok::Base(tok::col::surface_lo) : tok::Base(tok::col::edge_hi),
                      readoutFit.c_str());
       ImGui::Dummy(ImVec2(width, h));
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
@@ -190,9 +190,9 @@ namespace app
       if (cached > 0.0f)
       {
          dl->AddRectFilled(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                           isLight ? tok::U32(tok::pal::c_0000000A) : tok::U32(tok::pal::c_FFFFFF09), 5.0f);
+                           isLight ? tok::Base(tok::col::ink_black, 10) : tok::Base(tok::col::ink_white, 9), 5.0f);
          dl->AddRect(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                     isLight ? tok::U32(tok::pal::c_00000014) : tok::U32(tok::pal::c_FFFFFF10), 5.0f);
+                     isLight ? tok::Base(tok::col::ink_black, 20) : tok::Base(tok::col::ink_white, 16), 5.0f);
       }
 
       const float headerH = ImGui::GetTextLineHeight() + 4.0f;
@@ -205,7 +205,7 @@ namespace app
       const float ruleY = p.y + headerH + 2.0f;
       dl->AddLine(ImVec2(gAudioBodyX + kAudioSectionPad, ruleY),
                   ImVec2(gAudioBodyX + gAudioBodyW - kAudioSectionPad, ruleY),
-                  isLight ? tok::U32(tok::pal::c_00000016) : tok::U32(tok::pal::c_FFFFFF12), 1.0f);
+                  isLight ? tok::Base(tok::col::ink_black, 22) : tok::Base(tok::col::ink_white, 18), 1.0f);
       ImGui::Dummy(ImVec2(gAudioBodyW, headerH + 4.0f));
 
       ImGui::Indent(kAudioSectionPad);
@@ -255,14 +255,14 @@ namespace app
    ImU32 DriftLineColor(int i, int alpha)
    {
       static const ImU32 kRGB[] = {
-         tok::U32(tok::pal::c_34D39900),  // green
-         tok::U32(tok::pal::c_60A5FA00),  // blue
-         tok::U32(tok::pal::c_FBBF2400),  // amber
-         tok::U32(tok::pal::c_F472B600), // pink
-         tok::U32(tok::pal::c_A78BFA00), // violet
-         tok::U32(tok::pal::c_2DD4BF00),  // teal
-         tok::U32(tok::pal::c_F8717100), // red
-         tok::U32(tok::pal::c_A3E63500),  // lime
+         tok::Base(tok::col::viz_teal, 0),  // green
+         tok::Base(tok::col::accent_4, 0),  // blue
+         tok::Base(tok::col::role_modulation, 0),  // amber
+         tok::Base(tok::col::text_pink, 0), // pink
+         tok::Base(tok::col::role_expression_6, 0), // violet
+         tok::Base(tok::col::viz_teal_7, 0),  // teal
+         tok::Base(tok::col::text_err, 0), // red
+         tok::Base(tok::col::state_ok_12, 0),  // lime
       };
       const ImU32 c = kRGB[i % (int)(sizeof(kRGB) / sizeof(kRGB[0]))];
       return (c & 0x00FFFFFFu) | ((ImU32)std::clamp(alpha, 0, 255) << IM_COL32_A_SHIFT);
@@ -518,7 +518,7 @@ namespace app
          const ImVec2 p0 = ImGui::GetCursorScreenPos();
          const float mw = w - w * 0.3f - ImGui::GetStyle().ItemSpacing.x;
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::U32(tok::pal::c_FFFFFF0E), 3.0f);
+         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::Role(tok::col::ink_white, 14), 3.0f);
          char label[64];
          const int pct = n->LearningPercent();
          if (learning)
@@ -541,7 +541,7 @@ namespace app
          // label would otherwise draw straight past the node's edge instead of just past mw.
          dl->PushClipRect(p0, ImVec2(p0.x + mw, p0.y + h), true);
          const ImVec2 lsz = ImGui::CalcTextSize(label);
-         dl->AddText(ImVec2(p0.x + 6.0f, p0.y + (h - lsz.y) * 0.5f), tok::U32(tok::pal::c_C8C8C8C8), label);
+         dl->AddText(ImVec2(p0.x + 6.0f, p0.y + (h - lsz.y) * 0.5f), tok::Role(tok::col::surface_mid, 200), label);
          dl->PopClipRect();
          ImGui::Dummy(ImVec2(mw, h));
       }
@@ -911,8 +911,8 @@ namespace app
       const float midY = origin.y + h * 0.5f;
       dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
-      const ImU32 startCol = isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96FF);
-      const ImU32 endCol = isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896FF);
+      const ImU32 startCol = isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok);
+      const ImU32 endCol = isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink);
       if (has)
       {
          AudioViz::Peaks(dl, peaks, origin, w, h, a, b);
@@ -921,7 +921,7 @@ namespace app
             // Dim what the trim excludes, so the played range reads at a glance.
             const float startX = toX(std::clamp(*start, 0.0f, 1.0f));
             const float endX = toX(std::clamp(*end, 0.0f, 1.0f));
-            const ImU32 dimCol = isLight ? tok::U32(tok::pal::c_FFFFFF8C) : tok::U32(tok::pal::c_00000082);
+            const ImU32 dimCol = isLight ? tok::Base(tok::col::ink_white, 140) : tok::Base(tok::col::ink_black, 130);
             if (startX > origin.x)
                dl->AddRectFilled(origin, ImVec2(std::min(startX, br.x), br.y), dimCol);
             if (endX < br.x)
@@ -931,7 +931,7 @@ namespace app
          {
             const float px = toX(std::clamp(playhead, 0.0f, 1.0f));
             dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                        isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFC85AF0), 2.0f);
+                        isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 240), 2.0f);
          }
          // One cursor per sounding voice, fading with the voice.
          for (int v = 0; v < numCursors; v++)

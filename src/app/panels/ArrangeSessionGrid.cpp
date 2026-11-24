@@ -157,15 +157,15 @@ namespace app
          if (ClipHasTint(c))
             return ImGui::ColorConvertFloat4ToU32(ImVec4(c.colorR, c.colorG, c.colorB, 1.0f));
          if (active)
-            return isVideo ? tok::U32(tok::pal::c_8B5CF6FF) : tok::U32(tok::pal::c_10B981FF);
-         return isVideo ? tok::U32(tok::pal::c_6D28D9D2) : tok::U32(tok::pal::c_059669D2);
+            return isVideo ? tok::Role(tok::col::role_expression) : tok::Role(tok::col::viz_teal);
+         return isVideo ? tok::Role(tok::col::role_expression, 210) : tok::Role(tok::col::state_ok_4, 210);
       }
 
       ImU32 LabelOn(ImU32 fill)
       {
          const ImVec4 f = ImGui::ColorConvertU32ToFloat4(fill);
          const float lum = (0.299f * f.x + 0.587f * f.y + 0.114f * f.z) * 255.0f;
-         return lum > 150.0f ? tok::U32(tok::pal::c_141418FF) : tok::U32(tok::pal::c_FFFFFFFF);
+         return lum > 150.0f ? tok::Role(tok::col::surface_deep) : tok::Role(tok::col::ink_white);
       }
 
       std::string SlotLabel(const Arrange::Clip& c)
@@ -804,7 +804,7 @@ namespace app
          if (sSelScene == row)
             dl->AddRect(a, b, TextCol(0.70f), tok::radius_control, 0, 1.5f);
          if (rowPlaying)
-            dl->AddRectFilled(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.10f), tok::radius_control);
+            dl->AddRectFilled(a, b, WithAlpha(tok::Role(tok::col::ink_white), 0.10f), tok::radius_control);
          if (rowPlaying)
             DrawProgressRing(dl, ImVec2(a.x + 13.0f, cy), 7.0f, rowProgress, TextCol(0.95f));
          else
@@ -951,18 +951,18 @@ namespace app
                const bool muted = !ss->clip.enabled || !laneOn || src == nullptr;
                ImU32 fill = SlotFill(ss->clip, isVideo, st.playing || held);
                if (muted)
-                  fill = isLight ? tok::U32(tok::pal::c_B0B2BADC) : tok::U32(tok::pal::c_484850DC);
+                  fill = isLight ? tok::Base(tok::col::edge_mid_2, 220) : tok::Base(tok::col::edge_lo_2, 220);
                dl->AddRectFilled(a, b, fill, tok::radius_control);
                if (muted)
-                  DrawArrangeHatch(dl, a, b, isLight ? tok::U32(tok::pal::c_0000002D) : tok::U32(tok::pal::c_FFFFFF26));
+                  DrawArrangeHatch(dl, a, b, isLight ? tok::Base(tok::col::ink_black, 45) : tok::Base(tok::col::ink_white, 38));
                const ImU32 ink = muted ? TextCol(0.55f) : LabelOn(fill);
                if (st.playing)
-                  dl->AddRect(a, b, tok::U32(tok::pal::c_FFFFFFF0), tok::radius_control, 0, 1.5f);
+                  dl->AddRect(a, b, tok::Role(tok::col::ink_white, 240), tok::radius_control, 0, 1.5f);
                else if (hov)
-                  dl->AddRect(a, b, tok::U32(tok::pal::c_E6E6F0DC), tok::radius_control, 0, 1.0f);
+                  dl->AddRect(a, b, tok::Role(tok::col::edge_hi, 220), tok::radius_control, 0, 1.0f);
                const ImVec2 ic(a.x + 13.0f, cy);
                if (st.playing)
-                  DrawProgressRing(dl, ic, 7.0f, st.progress, tok::U32(tok::pal::c_FFFFFFFF));
+                  DrawProgressRing(dl, ic, 7.0f, st.progress, tok::Role(tok::col::ink_white));
                else
                   glyph::DrawPlayerPlay(dl, ic, tok::icon_control, WithAlpha(ink, st.queued ? pulse : 0.85f), !st.queued);
                if (gArrangeAssigningClipId == ss->clip.id)
@@ -971,7 +971,7 @@ namespace app
                   // target - a pulsing outline, steady under Reduce Motion.
                   const float ap = UiAnim::ReduceMotion() ? 1.0f : 0.55f + 0.45f * std::sin((float)ImGui::GetTime() * tok::motion_rate_pulse);
                   dl->AddRect(ImVec2(a.x - 2.0f, a.y - 2.0f), ImVec2(b.x + 2.0f, b.y + 2.0f),
-                              WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), ap), tok::radius_control, 0, 2.5f);
+                              WithAlpha(tok::Role(tok::col::ink_white), ap), tok::radius_control, 0, 2.5f);
                   HelpTip("%s", T("Click a node on the canvas to assign it. Esc cancels."));
                }
                if (gArrangeFlashClipId == ss->clip.id)
@@ -984,12 +984,12 @@ namespace app
                                  IM_COL32(255, 255, 255, (int)(255.0f * (1.0f - ft / 1.2f))), tok::radius_control, 0, 2.5f);
                }
                if (st.queued)
-                  dl->AddRect(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.9f * pulse), tok::radius_control, 0, 1.5f);
+                  dl->AddRect(a, b, WithAlpha(tok::Role(tok::col::ink_white), 0.9f * pulse), tok::radius_control, 0, 1.5f);
                if (st.upNext)
                {
                   // Up next (a follow action is about to start this clip): a steady inner outline and a chevron.
                   dl->AddRect(ImVec2(a.x + 2.0f, a.y + 2.0f), ImVec2(b.x - 2.0f, b.y - 2.0f),
-                              WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.75f), tok::radius_control, 0, 1.0f);
+                              WithAlpha(tok::Role(tok::col::ink_white), 0.75f), tok::radius_control, 0, 1.0f);
                   glyph::DrawChevronDown(dl, ImVec2(b.x - 14.0f, a.y + 8.0f), tok::icon_control, WithAlpha(ink, 0.9f));
                }
                const std::string label = SlotLabel(ss->clip);
@@ -1819,7 +1819,7 @@ namespace app
          {
             const ImVec2 c((ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f, (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f);
             ImDrawList* tdl = ImGui::GetWindowDrawList();
-            const ImU32 icol = sSessionShowMonitor ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol;
+            const ImU32 icol = sSessionShowMonitor ? tok::Role(tok::col::ink_white) : iconCol;
             const ImVec2 tl(c.x - 6.5f, c.y - 5.5f), br(c.x + 6.5f, c.y + 3.5f);
             if (sSessionShowMonitor)
                tdl->AddRectFilled(tl, br, icol, 1.5f);
@@ -1847,7 +1847,7 @@ namespace app
          if (ImGui::IsItemHovered())
             HelpTip(playing ? T("Pause (Space)") : T("Play (Space)"));
          if (playing)
-            glyph::DrawPlayerPause(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, tok::U32(tok::pal::c_FFFFFFFF));
+            glyph::DrawPlayerPause(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, tok::Role(tok::col::ink_white));
          else
             glyph::DrawPlayerPlay(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, iconCol);
          nextTo(tok::space_1);
@@ -1865,7 +1865,7 @@ namespace app
                                     ? T("Record your performance: the clips and scenes you launch are written into the Timeline.")
                                     : T("Record your performance: the clips and scenes you launch are written into the Timeline, ready to render with Render Take."));
          glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control,
-                     rec ? tok::U32(tok::pal::c_FFFFFFFF) : RecordDotCol(), IconsInfinite::RecordFill);
+                     rec ? tok::Role(tok::col::ink_white) : RecordDotCol(), IconsInfinite::RecordFill);
          nextTo(tok::space_1);
 
          // Stop All: every track stops at the next quantize point.
@@ -1915,7 +1915,7 @@ namespace app
             ActionButton::Scoped() = ActionButton::Kind::Plain;
             if (ImGui::IsItemHovered())
                HelpTip("%s", inspWasOpen ? T("Clip Inspector: Open") : T("Settings of the selected clip. Double-click a clip to open it."));
-            glyph::DrawEdit(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, inspWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol);
+            glyph::DrawEdit(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, inspWasOpen ? tok::Role(tok::col::ink_white) : iconCol);
             const char* audioLabel = T("Audio");
             const float audioW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
             const float audioX = right - tok::control_h - tok::space_1 - audioW;

@@ -12,7 +12,7 @@ namespace StepCell
    inline void PlayheadOutline(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx, float thickness = tok::stroke_ring)
    {
       const bool light = app::IsThemeLight();
-      dl->AddRect(mn, mx, light ? tok::U32(tok::pal::c_E18214F0) : tok::U32(tok::pal::c_FFD250E6), tok::radius_control, 0,
+      dl->AddRect(mn, mx, light ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 230), tok::radius_control, 0,
                   thickness);
    }
 
@@ -21,15 +21,15 @@ namespace StepCell
    {
       const bool light = app::IsThemeLight();
       const float r = tok::radius_control;
-      dl->AddRectFilled(mn, mx, light ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_0B0C10FF), r);
+      dl->AddRectFilled(mn, mx, light ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::surface_deep), r);
       if (on)
          dl->AddRectFilled(mn, mx,
-                           playhead ? (light ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC850FF))
-                                    : (light ? tok::U32(tok::pal::c_2878EBF0) : tok::U32(tok::pal::c_96D6FFC8)),
+                           playhead ? (light ? tok::Base(tok::col::text_warn) : tok::Base(tok::col::role_modulation))
+                                    : (light ? tok::Base(tok::col::accent, 240) : tok::Base(tok::col::accent_alt, 200)),
                            r);
-      const ImU32 edge = playhead ? (light ? tok::U32(tok::pal::c_E18214F0) : tok::U32(tok::pal::c_FFD250E6))
-                                  : (hovered ? (light ? tok::U32(tok::pal::c_1E64E6FF) : tok::U32(tok::pal::c_96D6FFC8))
-                                             : (light ? tok::U32(tok::pal::c_B4BCCCFF) : tok::U32(tok::pal::c_404454FF)));
+      const ImU32 edge = playhead ? (light ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 230))
+                                  : (hovered ? (light ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 200))
+                                             : (light ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::edge_lo_2)));
       dl->AddRect(mn, mx, edge, r, 0, playhead ? 2.0f : 1.0f);
    }
 }

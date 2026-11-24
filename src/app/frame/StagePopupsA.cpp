@@ -146,9 +146,9 @@ void DrawPopupsA(FrameCtx& fc)
             }
             view3DItems(*gn);
             MenuParts::Separator();
-            ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_950_350_350_1000));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::V4(tok::palf::v_850_200_200_250));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::V4(tok::palf::v_850_200_200_400));
+            ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, 0.25f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, 0.4f));
             if (MenuParts::Item(L("Delete Group"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -239,9 +239,9 @@ void DrawPopupsA(FrameCtx& fc)
                }
             }
             MenuParts::Separator();
-            ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_950_350_350_1000));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::V4(tok::palf::v_850_200_200_250));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::V4(tok::palf::v_850_200_200_400));
+            ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, 0.25f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, 0.4f));
             if (MenuParts::Item(L("Delete Note"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -469,9 +469,9 @@ void DrawPopupsA(FrameCtx& fc)
             MenuParts::Separator();
 
             // Destructive Action: Delete Node with HIG danger hover styling
-            ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_950_350_350_1000));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::V4(tok::palf::v_850_200_200_250));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::V4(tok::palf::v_850_200_200_400));
+            ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, 0.25f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, 0.4f));
             if (MenuParts::Item(L("Delete Node"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -939,7 +939,7 @@ void DrawPopupsA(FrameCtx& fc)
          const std::string dragDisplayName = (gSampleDragKind == LibraryDragKind::FieldPreset)
             ? gFieldDragPresetName : gSampleDragName;
          ImGui::GetForegroundDrawList()->AddText(ImVec2(mp.x + 14.0f, mp.y + 14.0f),
-                                                  tok::U32(tok::pal::c_E6EBF5FF), dragDisplayName.c_str());
+                                                  tok::Role(tok::col::edge_hi), dragDisplayName.c_str());
 
          if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
          {

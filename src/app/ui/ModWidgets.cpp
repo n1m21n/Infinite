@@ -58,8 +58,8 @@ namespace app
       if (h.modulated)
       {
          bool shown = *value;
-         ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000)
-                                                                  : tok::V4(tok::palf::v_1000_750_350_1000));
+         ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::BaseV4(tok::col::state_warn)
+                                                                  : tok::BaseV4(tok::col::role_modulation));
          ImGui::BeginDisabled();
          NodeCheckbox(label, &shown, true);
          ImGui::EndDisabled();
@@ -309,8 +309,8 @@ namespace app
             // full-bright ring color - the user tried the bright version
             // here and asked for this darker tone back, same as the Color
             // Adjustments node's params already use.
-            const ImU32 trackCol = predicted ? (isLight ? tok::U32(tok::pal::c_B0E8C2FF) : tok::U32(tok::pal::c_144A28FF))
-                                             : (isLight ? tok::U32(tok::pal::c_FADB94FF) : tok::U32(tok::pal::c_523D14FF));
+            const ImU32 trackCol = predicted ? (isLight ? tok::Base(tok::col::state_ok_10) : tok::Base(tok::col::state_ok_11))
+                                             : (isLight ? tok::Base(tok::col::role_solo) : tok::Base(tok::col::role_modulation_4));
             const bool moved = AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
                              trackCol, /*readOnly=*/ro, posToValue, valueToPos, /*vividState=*/true);
             if (grab.editable && moved)
@@ -332,28 +332,28 @@ namespace app
             {
                if (isLight)
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_690_910_760_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_100_550_250_1000));
-                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::state_ok_10));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::state_ok_4));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::surface_deep));
                }
                else
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_80_290_160_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_350_850_500_1000));
-                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_920_980_940_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::state_ok_11));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::state_ok_9));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::edge_hi));
                }
             }
             else if (isLight)
             {
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_980_860_580_1000));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_800_520_100_1000));
-               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::role_solo));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::state_warn));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::surface_deep));
             }
             else
             {
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_320_240_80_1000));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_950_720_320_1000));
-               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_970_950_900_1000));
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::role_modulation_4));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::role_modulation));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::edge_hi));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             const bool moved = ImGui::SliderFloat(label, &shown, minV, maxV, fmt,
@@ -388,7 +388,7 @@ namespace app
          {
             // Same muted purple as the plain-slider branch's FrameBg below.
             AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
-                             isLight ? tok::U32(tok::pal::c_E0D1FAFF) : tok::U32(tok::pal::c_332652FF),
+                             isLight ? tok::Base(tok::col::role_expression_11) : tok::Base(tok::col::role_expression_12),
                              /*readOnly=*/false, posToValue, valueToPos, /*vividState=*/true);
          }
          else
@@ -397,15 +397,15 @@ namespace app
             // state above - see that comment.
             if (isLight)
             {
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_880_820_980_1000));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_480_280_850_1000));
-               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::role_expression_11));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::role_expression));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::surface_deep));
             }
             else
             {
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_200_150_320_1000));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_660_510_980_1000));
-               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_950_930_990_1000));
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::role_expression_12));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::role_expression_6));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::edge_hi));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             ImGui::SliderFloat(label, &shown, minV, maxV, fmt);
@@ -432,8 +432,8 @@ namespace app
          // Recording uses the same muted red as the plain-slider branch's
          // FrameBg a few lines down, not the knob's bright ring - see the
          // modulated/expression branches above for why.
-         const ImU32 activeCol = recording ? (isLight ? tok::U32(tok::pal::c_FCCCCCFF) : tok::U32(tok::pal::c_571A1AFF))
-                                            : tok::U32(tok::pal::c_78C8FFEB);
+         const ImU32 activeCol = recording ? (isLight ? tok::Base(tok::col::surface_hi_3) : tok::Base(tok::col::state_err_4))
+                                            : tok::Base(tok::col::accent_2, 235);
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
@@ -451,21 +451,21 @@ namespace app
                // both flip with the theme, same as the other colored states.
                if (isLight)
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_990_800_800_1000));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_990_720_720_1000));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_990_660_660_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_800_140_140_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_800_140_140_1000));
-                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::surface_hi_3));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::RoleV4(tok::col::viz_pink_hover));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::RoleV4(tok::col::viz_pink_3));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::state_err));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::RoleV4(tok::col::state_err));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::surface_deep));
                }
                else
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_340_100_100_1000));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_400_120_120_1000));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_460_140_140_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_920_300_300_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_920_300_300_1000));
-                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_990_930_930_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::state_err_4));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::RoleV4(tok::col::state_err_6));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::RoleV4(tok::col::state_err_hover));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::state_err_pressed));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::RoleV4(tok::col::state_err_pressed));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::edge_hi));
                }
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
@@ -495,8 +495,8 @@ namespace app
          // Recording uses the same muted red as the plain-slider branch's
          // FrameBg a few lines down, not the knob's bright ring - see the
          // modulated/expression branches above for why.
-         const ImU32 activeCol = recording ? (isLight ? tok::U32(tok::pal::c_FCCCCCFF) : tok::U32(tok::pal::c_571A1AFF))
-                                            : tok::U32(tok::pal::c_78C8FFEB);
+         const ImU32 activeCol = recording ? (isLight ? tok::Base(tok::col::surface_hi_3) : tok::Base(tok::col::state_err_4))
+                                            : tok::Base(tok::col::accent_2, 235);
          // A finished, looping recording is locked against direct grabs, the
          // same way modulated/expression params are - only Shift (re-record
          // via a session) or an explicit "Record Again" arm may drive it
@@ -525,21 +525,21 @@ namespace app
                // both flip with the theme, same as the other colored states.
                if (isLight)
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_990_800_800_1000));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_990_720_720_1000));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_990_660_660_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_800_140_140_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_800_140_140_1000));
-                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::surface_hi_3));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::RoleV4(tok::col::viz_pink_hover));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::RoleV4(tok::col::viz_pink_3));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::state_err));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::RoleV4(tok::col::state_err));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::surface_deep));
                }
                else
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_340_100_100_1000));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_400_120_120_1000));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_460_140_140_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_920_300_300_1000));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_920_300_300_1000));
-                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_990_930_930_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::state_err_4));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::RoleV4(tok::col::state_err_6));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::RoleV4(tok::col::state_err_hover));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::state_err_pressed));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::RoleV4(tok::col::state_err_pressed));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::edge_hi));
                }
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
@@ -709,7 +709,7 @@ namespace app
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
          GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().RecordClockNow());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
-         fillColor = tok::U32(tok::pal::c_EB4646FF);
+         fillColor = tok::Role(tok::col::state_err);
 
       const float cx = p.x + cell * 0.5f;
       const float top = p.y + 4.0f;
@@ -736,8 +736,8 @@ namespace app
       const char* caption = label[0] == '#' ? "" : label;
       const ImVec2 textSize = ImGui::CalcTextSize(caption);
       const ImU32 capTextCol = isLight
-         ? (readOnly ? tok::U32(tok::pal::c_7D8291FF) : tok::U32(tok::pal::c_323746FF))
-         : (readOnly ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_B0B6C6FF));
+         ? (readOnly ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::edge_lo))
+         : (readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_mid_2));
       const float capTextY = p.y + height + 4.0f;
       dl->PushClipRect(ImVec2(p.x, capTextY), ImVec2(p.x + cell, capTextY + textH), true);
       dl->AddText(ImVec2(cx - textSize.x * 0.5f, capTextY), capTextCol, caption);
@@ -870,17 +870,17 @@ namespace app
          // Kept dark even in light mode so it still reads as a shadow, not
          // a glow.
          const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_1E202810), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_1E202816), 32);
-         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_DCE0EAFF), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_F2F5FAFF), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::Role(tok::col::surface_lo, 16), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::Role(tok::col::surface_lo, 22), 32);
+         dl->AddCircleFilled(center, radius, tok::Role(tok::col::surface_hi), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::Role(tok::col::ink_white), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
          // The guide ring covers the knob's whole travel, not just the
          // value-proportional fill arc below - tinting it when recording is
          // what makes the state readable at a glance regardless of where the
          // value happens to sit (a knob near its low end barely shows any
          // fill arc at all otherwise).
-         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_C3C8D4FF), 0, 3.0f);
+         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::surface_hi), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
@@ -894,10 +894,10 @@ namespace app
          }
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_8C91A0FF) : tok::U32(tok::pal::c_282D3CFF), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_AFB4C3FF), 32, 1.0f);
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_lo), 2.0f);
+         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_mid_2), 32, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_0000001E), 32, 3.0f);
+            dl->AddCircle(center, radius + 2.5f, tok::Role(tok::col::ink_black, 30), 32, 3.0f);
       }
       else
       {
@@ -906,12 +906,12 @@ namespace app
          // still separate the bezel from the body - same two-layer fake-blur
          // idiom, tuned darker/stronger for this background.
          const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_0000002D), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_0000003C), 32);
-         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_242630FF), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_16171EFF), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::Role(tok::col::ink_black, 45), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::Role(tok::col::ink_black, 60), 32);
+         dl->AddCircleFilled(center, radius, tok::Role(tok::col::edge_lo), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::Role(tok::col::surface_deep), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_3A3E4CFF), 0, 3.0f);
+         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
@@ -925,10 +925,10 @@ namespace app
          }
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_C8CAD4FF) : tok::U32(tok::pal::c_EEF0F8FF), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_4A4E5EFF), 32, 1.0f);
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::surface_hi) : tok::Role(tok::col::edge_hi), 2.0f);
+         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo_2), 32, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_FFFFFF28), 32, 3.0f);
+            dl->AddCircle(center, radius + 2.5f, tok::Role(tok::col::ink_white, 40), 32, 3.0f);
       }
 
       // The knob's permanent caption is the param *name*, not its value - a
@@ -942,8 +942,8 @@ namespace app
          // row's fit-to-body-width guarantee.
          ImVec2 textSize = ImGui::CalcTextSize(caption);
          const ImU32 capCol = isLight
-            ? (readOnly ? tok::U32(tok::pal::c_7D8291FF) : tok::U32(tok::pal::c_323746FF))
-            : (readOnly ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_B0B6C6FF));
+            ? (readOnly ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::edge_lo))
+            : (readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_mid_2));
          const float capY = p.y + diameter + 4.0f;
          if (textSize.x <= cell)
          {
@@ -1048,7 +1048,7 @@ namespace app
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
          GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().RecordClockNow());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
-         fillColor = tok::U32(tok::pal::c_EB4646FF);
+         fillColor = tok::Role(tok::col::state_err);
 
       const ImVec2 center(p.x + cell * 0.5f, p.y + diameter * 0.5f);
       const float radius = diameter * 0.5f - 2.0f;
@@ -1065,12 +1065,12 @@ namespace app
          // above for the rationale (fake-blur via layered low-alpha circles,
          // offset down so the bezel reads as sitting above the panel).
          const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_1E202810), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_1E202816), 32);
-         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_DCE0EAFF), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_F2F5FAFF), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::Role(tok::col::surface_lo, 16), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::Role(tok::col::surface_lo, 22), 32);
+         dl->AddCircleFilled(center, radius, tok::Role(tok::col::surface_hi), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::Role(tok::col::ink_white), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_C3C8D4FF), 0, 3.0f);
+         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::surface_hi), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
@@ -1079,7 +1079,7 @@ namespace app
          }
 
          // Center tick
-         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::U32(tok::pal::c_969BAAFF), 1.5f);
+         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::Role(tok::col::text_secondary), 1.5f);
 
          // Arc from center (12 o'clock) to current angle
          if (angle < aMid)
@@ -1095,22 +1095,22 @@ namespace app
 
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_8C91A0FF) : tok::U32(tok::pal::c_282D3CFF), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_AFB4C3FF), 32, 1.0f);
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_lo), 2.0f);
+         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_mid_2), 32, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_0000001E), 32, 3.0f);
+            dl->AddCircle(center, radius + 2.5f, tok::Role(tok::col::ink_black, 30), 32, 3.0f);
       }
       else
       {
          // Dark theme: slightly stronger alpha than the light version, same
          // rationale as KnobFloat's dark branch above.
          const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_0000002D), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_0000003C), 32);
-         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_242630FF), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_16171EFF), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::Role(tok::col::ink_black, 45), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::Role(tok::col::ink_black, 60), 32);
+         dl->AddCircleFilled(center, radius, tok::Role(tok::col::edge_lo), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::Role(tok::col::surface_deep), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_3A3E4CFF), 0, 3.0f);
+         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
@@ -1119,7 +1119,7 @@ namespace app
          }
 
          // Center tick
-         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::U32(tok::pal::c_646978FF), 1.5f);
+         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::Role(tok::col::edge_lo_3), 1.5f);
 
          // Arc from center (12 o'clock) to current angle
          if (angle < aMid)
@@ -1135,10 +1135,10 @@ namespace app
 
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_787D8CFF) : tok::U32(tok::pal::c_E6EBF5FF), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_4A4E5EFF), 32, 1.0f);
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_hi), 2.0f);
+         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo_2), 32, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_FFFFFF28), 32, 3.0f);
+            dl->AddCircle(center, radius + 2.5f, tok::Role(tok::col::ink_white, 40), 32, 3.0f);
       }
 
       // rowH has always reserved room for a caption here; nothing ever drew
@@ -1148,8 +1148,8 @@ namespace app
       {
          const ImVec2 textSize = ImGui::CalcTextSize(caption);
          const ImU32 capCol = isLight
-            ? (readOnly ? tok::U32(tok::pal::c_7D8291FF) : tok::U32(tok::pal::c_323746FF))
-            : (readOnly ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_B0B6C6FF));
+            ? (readOnly ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::edge_lo))
+            : (readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_mid_2));
          const float capY = p.y + diameter + 4.0f;
          if (textSize.x <= cell)
          {
@@ -1436,7 +1436,7 @@ namespace app
          const Modulation::Source src = Modulation::Instance().ResolvedSourceFor(ref);
          // Green (prediction) binding: read-only unless Shift is held - see BeginPredictorGrab.
          const PredictorGrabCtx grab = BeginPredictorGrab(ref);
-         const bool moved = DrawWidget(&shown, grab.pred != nullptr ? pinColor : tok::U32(tok::pal::c_FFBE5AFF),
+         const bool moved = DrawWidget(&shown, grab.pred != nullptr ? pinColor : tok::Role(tok::col::role_modulation),
                                        /*readOnly=*/!grab.editable, /*hasRange=*/true, src.lo, src.hi);
          if (grab.editable && moved)
          {
@@ -1456,7 +1456,7 @@ namespace app
          // right-click menu's Unbind, so an accidental drag can't destroy a
          // formula someone typed on purpose.
          float shown = *value;
-         DrawWidget(&shown, tok::U32(tok::pal::c_AA82FFFF), /*readOnly=*/false);
+         DrawWidget(&shown, tok::Role(tok::col::role_expression_6), /*readOnly=*/false);
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
@@ -1475,7 +1475,7 @@ namespace app
          const bool hasPlayback = GestureRecorder::Instance().Playbacks().count(GestureRecorder::Key(nodeIndex, paramIndex)) > 0;
          const bool locked = hasPlayback && !ImGui::GetIO().KeyShift && !GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex);
          float shown = *value;
-         const bool widgetChanged = DrawWidget(&shown, recording ? tok::U32(tok::pal::c_EB4646FF) : tok::U32(tok::pal::c_78C8FFEB),
+         const bool widgetChanged = DrawWidget(&shown, recording ? tok::Role(tok::col::state_err) : tok::Role(tok::col::accent_2, 235),
                               /*readOnly=*/false, /*hasRange=*/false, 0.0f, 0.0f, /*activeTint=*/recording);
          if (!locked)
          {

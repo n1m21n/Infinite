@@ -81,7 +81,7 @@ namespace app
          const ImVec2 a = toMinimap(ImVec2(gn.liveX, gn.liveY));
          const ImVec2 b = toMinimap(ImVec2(gn.liveX + kNodeW, gn.liveY + kNodeH));
          const bool selected = ed::IsNodeSelected(gn.NodeId());
-         dl->AddRectFilled(a, b, selected ? tok::U32(tok::pal::c_FFBE5AE6) : tok::U32(tok::pal::c_6E96D2C8), tok::radius_cell);
+         dl->AddRectFilled(a, b, selected ? tok::Role(tok::col::role_modulation, 230) : tok::Role(tok::col::accent_17, 200), tok::radius_cell);
          if (FindIsMatch(gn.index))
             dl->AddRect(ImVec2(a.x - 1.5f, a.y - 1.5f), ImVec2(b.x + 1.5f, b.y + 1.5f),
                         ImGui::GetColorU32(AccentEmphasisSelected()), 2.0f, 0, 2.0f);
@@ -90,7 +90,7 @@ namespace app
             // Selection must read as more than a hue swap (HIG focus/selection
             // guidance) - add a bright outline so it's legible for colorblind
             // users and in poor viewing conditions, on top of the color change.
-            dl->AddRect(a, b, isLight ? tok::U32(tok::pal::c_282C37FF) : tok::U32(tok::pal::c_FFFFFFFF), 2.0f, 0, 1.5f);
+            dl->AddRect(a, b, isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::ink_white), 2.0f, 0, 1.5f);
          }
       }
 
@@ -103,7 +103,7 @@ namespace app
          dl->PushClipRect(origin, ImVec2(origin.x + w, origin.y + h), true);
          const ImVec2 a = toMinimap(viewWorldTL);
          const ImVec2 b = toMinimap(viewWorldBR);
-         dl->AddRect(a, b, isLight ? tok::U32(tok::pal::c_282C37DC) : tok::U32(tok::pal::c_FFFFFFDC), 2.0f, 0, 1.5f);
+         dl->AddRect(a, b, isLight ? tok::Base(tok::col::edge_lo, 220) : tok::Base(tok::col::ink_white, 220), 2.0f, 0, 1.5f);
          dl->PopClipRect();
       }
 

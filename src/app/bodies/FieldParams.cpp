@@ -53,8 +53,8 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
             }
             const ImU32 strokeCol = isLight
-               ? (pass == 0 ? tok::U32(tok::pal::c_1E6EE632) : tok::U32(tok::pal::c_1464E6FF))
-               : (pass == 0 ? tok::U32(tok::pal::c_78C8FF2E) : tok::U32(tok::pal::c_96D6FFF5));
+               ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
+               : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
             dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
          }
       }
@@ -111,8 +111,8 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
             }
             const ImU32 strokeCol = isLight
-               ? (pass == 0 ? tok::U32(tok::pal::c_1E6EE632) : tok::U32(tok::pal::c_1464E6FF))
-               : (pass == 0 ? tok::U32(tok::pal::c_78C8FF2E) : tok::U32(tok::pal::c_96D6FFF5));
+               ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
+               : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
             dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
          }
       }
@@ -152,8 +152,8 @@ namespace app
             return br.y - t * h;
          };
          const bool isLight = IsThemeLight();
-         const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_1E6EE632) : tok::U32(tok::pal::c_78C8FF2E);
-         const ImU32 strokeCol = isLight ? tok::U32(tok::pal::c_1464E6FF) : tok::U32(tok::pal::c_96D6FFF5);
+         const ImU32 fillCol = isLight ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent_2, 46);
+         const ImU32 strokeCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
          const float bw = w / (float)kB;
          for (int i = 0; i < kB; i++)
             dl->AddRectFilled(ImVec2(origin.x + i * bw, yFor(in[i])), ImVec2(origin.x + (i + 1) * bw, br.y), fillCol);
@@ -215,8 +215,8 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
             }
             const ImU32 strokeCol = isLight
-               ? (pass == 0 ? tok::U32(tok::pal::c_1E6EE632) : tok::U32(tok::pal::c_1464E6FF))
-               : (pass == 0 ? tok::U32(tok::pal::c_78C8FF2E) : tok::U32(tok::pal::c_96D6FFF5));
+               ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
+               : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
             dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
          }
       }
@@ -284,7 +284,7 @@ namespace app
             const float x = origin.x + (float)((r.beat - startBeat) / kWindowBeats) * w;
             const float y = br.y - barH - ((r.note - lo + 1.0f) / (hi - lo + 2.0f)) * (h - barH);
             const float v = std::max(0.15f, std::min(1.0f, r.vel));
-            const ImU32 col = isLight ? tok::U32(tok::pal::c_1464E6FF) : tok::U32(tok::pal::c_96D6FFF5);
+            const ImU32 col = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
             ImVec4 c = ImGui::ColorConvertU32ToFloat4(col);
             c.w *= v;
             dl->AddRectFilled(ImVec2(x, y), ImVec2(x + barW, y + barH), ImGui::ColorConvertFloat4ToU32(c), 1.0f);
@@ -325,14 +325,14 @@ namespace app
          if (n->WasTruncated())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_800_200_1000), "Truncated to %s vertices", UiFmt::Count((long long)(n->ActualElementCount())).c);
+            ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "Truncated to %s vertices", UiFmt::Count((long long)(n->ActualElementCount())).c);
             PopTextWrapWidth();
          }
 
          if (!n->Notice().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "%s", n->Notice().c_str());
             PopTextWrapWidth();
          }
 
@@ -365,7 +365,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->pinRefusal.c_str());
             PopTextWrapWidth();
          }
       }
@@ -402,14 +402,14 @@ namespace app
          if (n->WasTruncated())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_800_200_1000), "Truncated to %s vertices", UiFmt::Count((long long)(n->ActualElementCount())).c);
+            ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "Truncated to %s vertices", UiFmt::Count((long long)(n->ActualElementCount())).c);
             PopTextWrapWidth();
          }
 
          if (!n->Notice().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "%s", n->Notice().c_str());
             PopTextWrapWidth();
          }
 
@@ -458,7 +458,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->pinRefusal.c_str());
             PopTextWrapWidth();
          }
       }
@@ -493,7 +493,7 @@ namespace app
          if (!n->Notice().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "%s", n->Notice().c_str());
             PopTextWrapWidth();
          }
 
@@ -501,7 +501,7 @@ namespace app
          if (faults > 0)
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
             PopTextWrapWidth();
          }
       }
@@ -523,7 +523,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->pinRefusal.c_str());
             PopTextWrapWidth();
          }
       }
@@ -558,7 +558,7 @@ namespace app
          if (!n->Notice().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "%s", n->Notice().c_str());
             PopTextWrapWidth();
          }
       }
@@ -596,7 +596,7 @@ namespace app
          if (!n->Notice().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "%s", n->Notice().c_str());
             PopTextWrapWidth();
          }
 
@@ -604,7 +604,7 @@ namespace app
          if (faults > 0)
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
             PopTextWrapWidth();
          }
       }
@@ -634,7 +634,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->pinRefusal.c_str());
             PopTextWrapWidth();
          }
       }
@@ -671,14 +671,14 @@ namespace app
          if (!n->Notice().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "%s", n->Notice().c_str());
             PopTextWrapWidth();
          }
 
          if (n->DroppedTotal() > 0)
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%llu note(s) dropped", (unsigned long long)n->DroppedTotal());
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%llu note(s) dropped", (unsigned long long)n->DroppedTotal());
             PopTextWrapWidth();
          }
       }
@@ -754,7 +754,7 @@ namespace app
          if (!n->Notice().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "%s", n->Notice().c_str());
             PopTextWrapWidth();
          }
       }
@@ -776,7 +776,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->pinRefusal.c_str());
             PopTextWrapWidth();
          }
       }
@@ -856,7 +856,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->pinRefusal.c_str());
             PopTextWrapWidth();
          }
       }

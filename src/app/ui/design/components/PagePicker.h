@@ -285,7 +285,7 @@ namespace PagePicker
             PAGEPICKER_PROBE(probe.chipMn.resize(pages.size()); probe.chipMx.resize(pages.size()); probe.chipMn[i] = bmin; probe.chipMx[i] = bmax;)
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const float cy = (bmin.y + bmax.y) * 0.5f;
-            const ImU32 col = on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
+            const ImU32 col = on ? tok::Role(tok::col::ink_white) : ImGui::GetColorU32(ImGuiCol_Text);
             float tx = bmin.x + tok::space_3;
             if (e.color != 0)
             {

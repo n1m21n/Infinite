@@ -57,7 +57,7 @@ namespace app
       if (!node->HasStrokes())
          AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize)}, "draw here");
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
-                  tok::U32(tok::pal::c_5A82BEFF), 4.0f, 0, 2.0f);
+                  tok::Role(tok::col::accent_12), 4.0f, 0, 2.0f);
    }
 
 
@@ -132,7 +132,7 @@ namespace app
       dl->AddRect(origin, br, borderCol, 6.0f, 0, 1.2f);
 
       const ImU32 textCol = isLight
-         ? tok::U32(tok::pal::c_1E2430FF)
+         ? tok::Base(tok::col::surface_lo)
          : IM_COL32((int)((n->color[0] * 0.5f + 0.5f) * 255),
                     (int)((n->color[1] * 0.5f + 0.5f) * 255),
                     (int)((n->color[2] * 0.5f + 0.5f) * 255), 255);
@@ -148,7 +148,7 @@ namespace app
       {
          dl->AddText(ImGui::GetFont(), drawFontSize,
                      ImVec2(origin.x + 8, origin.y + 8),
-                     isLight ? tok::U32(tok::pal::c_8C92A0FF) : tok::U32(tok::pal::c_9696A0FF),
+                     isLight ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::text_secondary),
                      "double-click or type to write", nullptr, w - 16.0f);
       }
       else
@@ -583,7 +583,7 @@ namespace app
       {
          ImGui::TextDisabled("%zu marks over %s", n->RecordedStamps(), UiFmt::Beats(n->RecordedLength()).c);
          if (n->IsPlayingBack())
-            ImGui::TextColored(tok::V4(tok::palf::v_500_950_600_1000), "playhead %.1f", n->PlayheadBeats());
+            ImGui::TextColored(tok::RoleV4(tok::col::state_ok), "playhead %.1f", n->PlayheadBeats());
          if (n->RecordingCapped())
          {
             PushTextWrapWidth(kPreviewSize);
@@ -737,7 +737,7 @@ namespace app
 
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     tok::U32(tok::pal::c_78C8FFC8), 4.0f, 0, 2.0f);
+                     tok::Role(tok::col::accent_2, 200), 4.0f, 0, 2.0f);
    }
 
 
@@ -843,7 +843,7 @@ namespace app
             const float top = midY - fgn->waveformMax[i] * h * 0.45f;
             const float bottom = midY - fgn->waveformMin[i] * h * 0.45f;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::U32(tok::pal::c_285AC8C8) : tok::U32(tok::pal::c_8CA0DCAF));
+                              isLight ? tok::Base(tok::col::accent, 200) : tok::Base(tok::col::accent_11, 175));
          }
       }
       else

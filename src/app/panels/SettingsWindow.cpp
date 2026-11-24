@@ -860,7 +860,7 @@ namespace app
             FormParts::Section(T("Autosave"));
             if (gAutosaveFailed)
             {
-               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_1000_420_350_1000));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
                ImGui::TextUnformatted(T("Autosave is FAILING - save manually"));
                ImGui::PopStyleColor();
                if (ImGui::IsItemHovered())
@@ -1330,7 +1330,7 @@ namespace app
 
                   ImGui::TableNextColumn(); ImGui::Text("pixel");
                   ImGui::TableNextColumn(); ImGui::Text("predication");
-                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_1000_700_400_1000), "always pays the sum of both sides (GPU evaluates both)");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "always pays the sum of both sides (GPU evaluates both)");
 
                   ImGui::EndTable();
                }
@@ -1510,12 +1510,12 @@ namespace app
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
                   const float iconSize = (bmax.y - bmin.y) * 0.65f;
-                  const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+                  const ImU32 col = ImGui::IsItemHovered() ? tok::Role(tok::col::state_err) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
                   glyph::DrawX(dl, center, iconSize, col);
                }
 
                if (!g.error.empty())
-                  ImGui::TextColored(tok::V4(tok::palf::v_1000_550_500_1000), "   %s", g.error.c_str());
+                  ImGui::TextColored(tok::RoleV4(tok::col::text_err_3), "   %s", g.error.c_str());
 
                ImGui::PopID();
             }
@@ -1738,9 +1738,9 @@ namespace app
                ImGui::TextDisabled("%s", T("No packs to download right now. You can install one from a file."));
 
             if (!ex.message.empty() && ex.messageIsError)
-               ImGui::TextColored(tok::V4(tok::palf::v_1000_550_500_1000), "%s", ex.message.c_str());
+               ImGui::TextColored(tok::RoleV4(tok::col::text_err_3), "%s", ex.message.c_str());
             if (!ex.catalogLoaded && !ex.catalogLoading && !ex.catalogError.empty())
-               ImGui::TextColored(tok::V4(tok::palf::v_1000_550_500_1000), "%s",
+               ImGui::TextColored(tok::RoleV4(tok::col::text_err_3), "%s",
                                   T("Can't reach the extension catalog. Check your connection and try again."));
             ImGui::Dummy(ImVec2(0.0f, tok::space_1));
             ImGui::BeginDisabled(busy);

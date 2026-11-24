@@ -782,7 +782,7 @@ namespace
       if (ImGui::IsItemHovered())
          HelpTip("%s", ToolTip(s.tool));
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      const ImU32 col = nonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
+      const ImU32 col = nonDefault ? tok::Role(tok::col::ink_white) : ImGui::GetColorU32(ImGuiCol_Text);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       glyph::Draw(dl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_control, col, ToolGlyph(s.tool));
       if (clicked)

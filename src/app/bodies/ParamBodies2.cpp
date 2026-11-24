@@ -119,8 +119,8 @@ namespace app
       if (crosshair)
       {
          ImVec2 mid = toScreen(0.5f, 0.5f);
-         dl->AddLine(ImVec2(mid.x, origin.y), ImVec2(mid.x, br.y), isLight ? tok::U32(tok::pal::c_646E82C8) : tok::U32(tok::pal::c_787C8CC8));
-         dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), isLight ? tok::U32(tok::pal::c_646E82C8) : tok::U32(tok::pal::c_787C8CC8));
+         dl->AddLine(ImVec2(mid.x, origin.y), ImVec2(mid.x, br.y), isLight ? tok::Base(tok::col::edge_lo_3, 200) : tok::Base(tok::col::edge_mid, 200));
+         dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), isLight ? tok::Base(tok::col::edge_lo_3, 200) : tok::Base(tok::col::edge_mid, 200));
       }
 
       const int kSegments = 64;
@@ -135,14 +135,14 @@ namespace app
       {
          ImVec2 sp = toScreen(pts[i].x, pts[i].y);
          dl->AddCircleFilled(sp, i == nearest ? 6.0f : 4.5f, lineCol);
-         dl->AddCircle(sp, i == nearest ? 6.0f : 4.5f, isLight ? tok::U32(tok::pal::c_F0F2F8FF) : tok::U32(tok::pal::c_12121AFF), 0, 1.5f);
+         dl->AddCircle(sp, i == nearest ? 6.0f : 4.5f, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, 1.5f);
       }
       if (liveX >= 0.0f)
       {
          float clampedX = std::min(1.0f, std::max(0.0f, liveX));
          ImVec2 dot = toScreen(clampedX, shape.Evaluate(clampedX));
-         dl->AddCircleFilled(dot, 5.0f, isLight ? tok::U32(tok::pal::c_DC8214FF) : tok::U32(tok::pal::c_FFC83CFF));
-         dl->AddCircle(dot, 5.0f, isLight ? tok::U32(tok::pal::c_F0F2F8FF) : tok::U32(tok::pal::c_12121AFF), 0, 1.5f);
+         dl->AddCircleFilled(dot, 5.0f, isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
+         dl->AddCircle(dot, 5.0f, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, 1.5f);
       }
       AudioViz::Border(dl, origin, br);
    }
@@ -153,10 +153,10 @@ namespace app
       DropdownButton("channel", CurvesNode::ChannelNames(), n->activeChannel,
                      [n](int i) { n->activeChannel = i; });
       const bool isLight = IsThemeLight();
-      ImU32 lineCol = isLight ? tok::U32(tok::pal::c_1E283CFF) : tok::U32(tok::pal::c_E6EBFAFF);
-      if (n->activeChannel == CurvesNode::kRed)   lineCol = isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_FF6E6EFF);
-      if (n->activeChannel == CurvesNode::kGreen) lineCol = isLight ? tok::U32(tok::pal::c_19A03CFF) : tok::U32(tok::pal::c_78E682FF);
-      if (n->activeChannel == CurvesNode::kBlue)  lineCol = isLight ? tok::U32(tok::pal::c_1E64E6FF) : tok::U32(tok::pal::c_78AAFFFF);
+      ImU32 lineCol = isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_hi);
+      if (n->activeChannel == CurvesNode::kRed)   lineCol = isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::text_err);
+      if (n->activeChannel == CurvesNode::kGreen) lineCol = isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok);
+      if (n->activeChannel == CurvesNode::kBlue)  lineCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4);
       DrawCurveEditor(n->Shape(n->activeChannel), lineCol);
       if (ActionButton::Draw("Reset channel", ImVec2(kPreviewSize, 0)))
          n->ResetChannel(n->activeChannel);
@@ -207,8 +207,8 @@ namespace app
          snprintf(confText, sizeof(confText), "learning - %s", UiFmt::Pct((int)std::round(badgeVal * 100.0f)).c);
       else
          snprintf(confText, sizeof(confText), "%s conf", UiFmt::Pct((int)std::round(badgeVal * 100.0f)).c);
-      ImGui::TextColored(badgeVal > 0.6f ? (isLight ? tok::V4(tok::palf::v_100_600_200_1000) : tok::V4(tok::palf::v_200_850_350_1000))
-                                    : (isLight ? tok::V4(tok::palf::v_700_400_100_1000) : tok::V4(tok::palf::v_900_700_200_1000)),
+      ImGui::TextColored(badgeVal > 0.6f ? (isLight ? tok::BaseV4(tok::col::state_ok_3) : tok::BaseV4(tok::col::text_ok_2))
+                                    : (isLight ? tok::BaseV4(tok::col::text_warn_2) : tok::BaseV4(tok::col::text_modulation_2)),
                          "%s", confText);
 
       PushCheckboxStyle();
@@ -225,7 +225,7 @@ namespace app
    {
       const bool isLight = IsThemeLight();
       const float in = n->input ? n->input->Value01() : n->constantIn;
-      DrawCurveEditor(n->curve, isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_E6EBFAFF), /*resetOnEmptyRightClick=*/true,
+      DrawCurveEditor(n->curve, isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::edge_hi), /*resetOnEmptyRightClick=*/true,
                      /*crosshair=*/true, /*liveX=*/in);
       if (n->input == nullptr)
          ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
@@ -342,7 +342,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + width, origin.y + height);
       const bool isLight = IsThemeLight();
-      const ImU32 ring = isLight ? tok::U32(tok::pal::c_F0F2F8FF) : tok::U32(tok::pal::c_12121AFF);
+      const ImU32 ring = isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep);
       AudioViz::Fill(dl, origin, br);
       for (int i = 1; i < 4; i++)
       {
@@ -374,7 +374,7 @@ namespace app
          dl->AddCircle(sp, i == nearPoint ? 6.0f : 4.5f, ring, 0, 1.5f);
       }
       const float px = n->Position();
-      const ImU32 liveCol = isLight ? tok::U32(tok::pal::c_DC8214FF) : tok::U32(tok::pal::c_FFC83CFF);
+      const ImU32 liveCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation);
       dl->AddLine(ImVec2(toScreen(px, 0).x, origin.y), ImVec2(toScreen(px, 0).x, br.y), (liveCol & 0x00FFFFFF) | 0x80000000);
       dl->AddCircleFilled(toScreen(px, n->Evaluate(px)), 4.0f, liveCol);
       dl->AddCircle(toScreen(px, n->Evaluate(px)), 4.0f, ring, 0, 1.5f);
@@ -409,7 +409,7 @@ namespace app
    void DrawMSEGParams(MSEGNode* n)
    {
       const bool isLight = IsThemeLight();
-      DrawMSEGEditor(n, isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_E6EBFAFF));
+      DrawMSEGEditor(n, isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::edge_hi));
       DrawModRateControls(&n->rateMode, &n->rateBeats, &n->rateHz, 3, MSEGNode::RateModeNames());
       // Ordinals 4-7 come after the card's first four (rate, loop start,
       // loop end, rate Hz) so saved cables keep their targets.
@@ -616,7 +616,7 @@ namespace app
       const float h = 118.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                        tok::U32(tok::pal::c_121218FF), tok::radius_control);
+                        tok::Role(tok::col::surface_deep), tok::radius_control);
 
       const int count = std::max(1, n->SwatchCount());
       const float pad = 6.0f;
@@ -639,11 +639,11 @@ namespace app
          const float weight = n->SwatchWeight(i);
          dl->AddRectFilled(ImVec2(tl.x, br.y + 4.0f),
                            ImVec2(tl.x + (chipW - 2.0f) * std::min(1.0f, weight), br.y + 7.0f),
-                           tok::U32(tok::pal::c_969CB0FF));
+                           tok::Role(tok::col::text_secondary));
 
          char idx[16];
          snprintf(idx, sizeof(idx), "%d", i + 1);
-         dl->AddText(ImVec2(tl.x + 2.0f, br.y + 9.0f), tok::U32(tok::pal::c_767C90FF), idx);
+         dl->AddText(ImVec2(tl.x + 2.0f, br.y + 9.0f), tok::Role(tok::col::edge_mid), idx);
       }
 
       const char* status;
@@ -654,10 +654,10 @@ namespace app
       else
          status = "choose a photo or cable 'ref'";
       dl->AddText(ImVec2(origin.x + pad, origin.y + h - 18.0f),
-                  tok::U32(tok::pal::c_7E8498FF), status);
+                  tok::Role(tok::col::edge_mid), status);
 
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                  tok::U32(tok::pal::c_464A5AFF), tok::radius_control);
+                  tok::Role(tok::col::edge_lo_2), tok::radius_control);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
    }
 
@@ -771,13 +771,13 @@ namespace app
          ImU32 col1 = IM_COL32((int)(c1[0] * 255), (int)(c1[1] * 255), (int)(c1[2] * 255), 255);
          dl->AddRectFilledMultiColor(tl, br, col0, col1, col1, col0);
       }
-      dl->AddRect(ImVec2(origin.x + pad, origin.y), ImVec2(origin.x + size - pad, origin.y + barH), tok::U32(tok::pal::c_464A5AFF), 3.0f);
+      dl->AddRect(ImVec2(origin.x + pad, origin.y), ImVec2(origin.x + size - pad, origin.y + barH), tok::Role(tok::col::edge_lo_2), 3.0f);
 
       // stop track
       ImVec2 trackOrigin(origin.x, origin.y + barH + gap);
       ImVec2 trackBr(origin.x + size, trackOrigin.y + trackH);
-      dl->AddRectFilled(trackOrigin, trackBr, tok::U32(tok::pal::c_101016FF), 3.0f);
-      dl->AddRect(trackOrigin, trackBr, tok::U32(tok::pal::c_464A5AFF), 3.0f);
+      dl->AddRectFilled(trackOrigin, trackBr, tok::Role(tok::col::surface_deep), 3.0f);
+      dl->AddRect(trackOrigin, trackBr, tok::Role(tok::col::edge_lo_2), 3.0f);
 
       ImGui::SetCursorScreenPos(trackOrigin);
       UiInteract::Hit("##colorramp", ImVec2(size, trackH));
@@ -860,7 +860,7 @@ namespace app
          float r = (i == nearest || isSel) ? 7.0f : 5.5f;
          ImVec2 tip(x, trackOrigin.y + 2.0f);
          dl->AddTriangleFilled(ImVec2(x - r, tip.y + r * 1.6f), ImVec2(x + r, tip.y + r * 1.6f), tip,
-                               isSel ? tok::U32(tok::pal::c_FFDC78FF) : tok::U32(tok::pal::c_DCE0ECFF));
+                               isSel ? tok::Role(tok::col::role_solo) : tok::Role(tok::col::surface_hi));
          ImVec2 chipTl(x - r * 0.6f, tip.y + r * 1.6f + 1.0f);
          dl->AddRectFilled(chipTl, ImVec2(chipTl.x + r * 1.2f, chipTl.y + 5.0f), fill);
       }
@@ -974,7 +974,7 @@ namespace app
          }
          if (!n->ExpressionError().empty())
          {
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_400_400_1000), "err: %s", n->ExpressionError().c_str());
+            ImGui::TextColored(tok::RoleV4(tok::col::text_err), "err: %s", n->ExpressionError().c_str());
          }
          else
          {
@@ -1039,7 +1039,7 @@ namespace app
       if (np > 0)
       {
          auto pt = [&](int i) { return ImVec2(a.x + (mir ? 1.f - xy[i * 2] : xy[i * 2]) * iw, a.y + xy[i * 2 + 1] * h); };
-         const ImU32 shadow = tok::U32(tok::pal::c_00000096);
+         const ImU32 shadow = tok::Base(tok::col::ink_black, 150);
          const ImU32 ink = tok::U32(tok::action_go, CategoryColors::IsThemeLight());
          for (const auto& l : n->OverlayLines())
             if (l.first < np && l.second < np)
@@ -1062,7 +1062,7 @@ namespace app
       const float colW = kParamWidth;
       const float gutter = 16.0f;
       if (n->PackMissing())
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", T("Install the Tracking pack: Settings > Extensions"));
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", T("Install the Tracking pack: Settings > Extensions"));
       else
          ImGui::TextDisabled("%s", n->Status().c_str());
 
@@ -1105,12 +1105,12 @@ namespace app
          const float q = snap.contactQuality[kChanMap[p]];
          const ImVec2 p0(origin.x + p * (pillW + pillGap), origin.y);
          const ImVec2 p1(p0.x + pillW, p0.y + pillH);
-         ImU32 fillCol = tok::U32(tok::pal::c_22C55EFF);
+         ImU32 fillCol = tok::Role(tok::col::state_ok_2);
          if (q < 0.40f)
-            fillCol = tok::U32(tok::pal::c_EF4444FF);
+            fillCol = tok::Role(tok::col::state_err);
          else if (q < 0.75f)
-            fillCol = tok::U32(tok::pal::c_FFBE5AFF);
-         dl->AddRectFilled(p0, p1, tok::U32(tok::pal::c_FFFFFF12), 3.0f);
+            fillCol = tok::Role(tok::col::role_modulation);
+         dl->AddRectFilled(p0, p1, tok::Role(tok::col::ink_white, 18), 3.0f);
          dl->AddRectFilled(p0, ImVec2(p0.x + pillW * std::clamp(q, 0.05f, 1.0f), p1.y),
                            (fillCol & 0x00FFFFFFu) | 0x55000000u, 3.0f);
          const ImVec2 ts = ImGui::CalcTextSize(kPillNames[p]);
@@ -1127,8 +1127,8 @@ namespace app
       const float traceTop = sTl.y + 4.0f;
       const float traceH = 34.0f;
       const float midY = traceTop + traceH * 0.5f;
-      const ImU32 frontCol = tok::U32(tok::pal::c_22C55EFF);
-      const ImU32 tempCol = tok::U32(tok::pal::c_FFBE5AFF);
+      const ImU32 frontCol = tok::Role(tok::col::state_ok_2);
+      const ImU32 tempCol = tok::Role(tok::col::role_modulation);
       for (int i = 1; i < Bci::kTraceSamples; ++i)
       {
          const float x0 = sTl.x + 4.0f + ((float)(i - 1) / (float)(Bci::kTraceSamples - 1)) * (w - 8.0f);
@@ -1147,7 +1147,7 @@ namespace app
          const char* tag = snap.blinkFlash > 0.15f ? "BLINK"
                          : (snap.jawLFlash > 0.15f ? "JAW L"
                          : (snap.jawRFlash > 0.15f ? "JAW R" : "WINK"));
-         dl->AddText(ImVec2(sTl.x + 6.0f, sTl.y + 3.0f), tok::U32(tok::pal::c_FFBE5AFF), tag);
+         dl->AddText(ImVec2(sTl.x + 6.0f, sTl.y + 3.0f), tok::Role(tok::col::role_modulation), tag);
       }
 
       // Bottom 5 detrended cortical band bars (d, t, a, b, g) + 1/f slope readout
@@ -1212,7 +1212,7 @@ namespace app
       const float colW = kParamWidth;
       const float gutter = 16.0f;
       if (n->PackMissing())
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", T("Install the BCI pack: Settings > Extensions (synthetic fallback active)"));
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", T("Install the BCI pack: Settings > Extensions (synthetic fallback active)"));
       else
          ImGui::TextDisabled("%s", n->Status().c_str());
 

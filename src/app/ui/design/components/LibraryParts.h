@@ -143,7 +143,7 @@ namespace LibraryParts
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(p, ImVec2(p.x + s, p.y + s), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.07f + 0.05f * hv)), tok::radius_control);
-      const ImU32 col = (danger && hot) ? tok::U32(tok::pal::c_E63C3CFF)
+      const ImU32 col = (danger && hot) ? tok::Role(tok::col::state_err)
                                          : ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, enabled ? 0.45f + 0.45f * hv : 0.3f));
       DrawIcon(dl, ImVec2(p.x + s * 0.5f, p.y + s * 0.5f), tok::icon_row, col, icon);
       ImGui::PopID();
@@ -216,7 +216,7 @@ namespace LibraryParts
 
       const ImVec2 trail(p.x + w - tok::space_3 - 6.0f, cy);
       if (fav)
-         glyph::DrawStar(dl, trail, tok::icon_xs, tok::U32(tok::pal::c_FFCD2DFF), /*filled=*/true);
+         glyph::DrawStar(dl, trail, tok::icon_xs, tok::Role(tok::col::role_modulation), /*filled=*/true);
       else if (hv > 0.001f)
          glyph::Draw(dl, trail, tok::icon_sm, ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, tok::alpha_head * hv)), IconsInfinite::Plus);
       return r;

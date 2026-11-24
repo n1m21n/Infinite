@@ -742,11 +742,11 @@ void DrawMenuBar(FrameCtx& fc)
 
          // Top bar controls styling: clean, symmetrical, unboxed with pixel-perfect alignment.
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_1000_1000_1000_80));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_1000_1000_1000_160));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::RoleV4(tok::col::ink_white, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::RoleV4(tok::col::ink_white, 0.16f));
          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_1000_1000_1000_80));
-         ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_1000_1000_1000_160));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::RoleV4(tok::col::ink_white, 0.08f));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::RoleV4(tok::col::ink_white, 0.16f));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
          ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
          // 24 pt controls (tok::control_h) on one centre line; the cursor Y below pins them in the bar.
@@ -789,7 +789,7 @@ void DrawMenuBar(FrameCtx& fc)
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = tok::icon_control;
             const ImU32 col = isTransportPlaying
-                                  ? tok::U32(tok::pal::c_FFFFFFFF)
+                                  ? tok::Role(tok::col::ink_white)
                                   : ImGui::GetColorU32(ImGuiCol_Text);
             if (isTransportPlaying)
                glyph::DrawPlayerPause(dl, center, iconSize, col);

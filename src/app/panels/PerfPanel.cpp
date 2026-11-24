@@ -139,7 +139,7 @@ namespace app
          const CategoryColors::Color& c = CategoryColors::ColorFor(dstNode->category);
          return IM_COL32((int)(c.r * 255.0f), (int)(c.g * 255.0f), (int)(c.b * 255.0f), 255);
       }
-      return isLight ? tok::U32(tok::pal::c_505A6EFF) : tok::U32(tok::pal::c_8C96AFFF);
+      return isLight ? tok::Base(tok::col::surface_lo_2) : tok::Base(tok::col::text_secondary);
    }
 
 
@@ -832,7 +832,7 @@ namespace app
 
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
-         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation)) : themeTint;
 
          float v = dragSeed(val);
          const bool knobMoved = KnobFloat("##knob", &v, minV, maxV, "%.2f", diameter, fillCol, isModulated, diameter, p2v, v2p);
@@ -859,7 +859,7 @@ namespace app
          const bool isDb = (minV < 0.0f && maxV <= 12.0f && kp.posToValue == ConsoleFaderTaper::PosToValue);
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
-         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation)) : themeTint;
 
          float v = dragSeed(val);
          const bool faderMoved = VFaderFloat("##vfader", &v, minV, maxV, isDb ? "%.1f dB" : "%.2f", faderH, fillCol, isModulated,
@@ -883,7 +883,7 @@ namespace app
          float sliderW = cardSize.x - 18.0f;
          ImGui::SetCursorScreenPos(ImVec2(cellPos.x + 9.0f, cellPos.y + 20.0f + (cardSize.y - 38.0f) * 0.5f));
 
-         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation)) : themeTint;
          float v = dragSeed(val);
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
@@ -1313,7 +1313,7 @@ namespace app
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f) * 0.44f;
          ImGui::SetCursorScreenPos(ImVec2(centerX - diameter * 0.5f, centerY - diameter * 0.5f));
 
-         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation)) : themeTint;
          float v = dragSeed(bipVal);
          const bool bipMoved = BipolarKnobFloat("##bipolarknob", &v, -1.0f, 1.0f, "%.2f", diameter, fillCol, isModulated, diameter);
          dragHold(v);
@@ -1422,14 +1422,14 @@ namespace app
          if (anyTarget && allBypassed)
          {
             const ImVec2 bodyTL(cellPos.x, cellPos.y + 18.0f);
-            dl->AddRectFilled(bodyTL, cardBR, isLight ? tok::U32(tok::pal::c_F5F7FC96) : tok::U32(tok::pal::c_161921A0),
+            dl->AddRectFilled(bodyTL, cardBR, isLight ? tok::Base(tok::col::ink_white, 150) : tok::Base(tok::col::edge_deep, 160),
                               kCardR, ImDrawFlags_RoundCornersBottom);
             const char* tag = "bypassed";
             const ImVec2 tagSize = ImGui::CalcTextSize(tag);
             const ImVec2 tagTL(cardBR.x - tagSize.x - 10.0f, cellPos.y + 2.0f);
             const ImVec2 tagBR(cardBR.x - 4.0f, cellPos.y + 2.0f + tagSize.y);
             dl->AddRectFilled(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR, cardBg, 3.0f);
-            dl->AddText(tagTL, isLight ? tok::U32(tok::pal::c_BE6E1EFF) : tok::U32(tok::pal::c_F0AA46FF), tag);
+            dl->AddText(tagTL, isLight ? tok::Base(tok::col::text_warn_2) : tok::Base(tok::col::text_modulation_2), tag);
             if (ImGui::IsMouseHoveringRect(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR))
                Tip::Show("%s", T("This node is bypassed - the control still stores its value, which applies when the node is back in the chain"));
          }
@@ -2279,7 +2279,7 @@ namespace app
       if (gPerfEditMode)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         ImU32 gridCol = isLight ? tok::U32(tok::pal::c_D7DCE650) : tok::U32(tok::pal::c_30344150);
+         ImU32 gridCol = isLight ? tok::Base(tok::col::surface_hi, 80) : tok::Base(tok::col::edge_lo, 80);
          float gridMaxX = std::max(maxElemX + 200.0f, ImGui::GetWindowWidth());
          float gridMaxY = std::max(maxElemY + 200.0f, ImGui::GetWindowHeight());
          int numCols = (int)std::ceil(gridMaxX / (cellSize + gap)) + 1;
@@ -2566,8 +2566,8 @@ namespace app
 
       const bool isPredictor = dynamic_cast<IPredictor*>(mod) != nullptr ||
                                dynamic_cast<PredictiveModulatorNode*>(mod) != nullptr;
-      const ImU32 lineCol = isPredictor ? tok::U32(tok::pal::c_22C55EFF)
-                                        : (isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_FFBE5AFF));
+      const ImU32 lineCol = isPredictor ? tok::Base(tok::col::state_ok_2)
+                                        : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::role_modulation));
 
       dl->PushClipRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), true); // backstop, not the primary fix
       for (size_t i = 1; i < history.size(); i++)

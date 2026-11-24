@@ -3123,7 +3123,7 @@ namespace
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool"));
          const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-         const ImU32 col = nonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
+         const ImU32 col = nonDefault ? tok::Role(tok::col::ink_white) : ImGui::GetColorU32(ImGuiCol_Text);
          const char* tg = s.tool == 1 ? IconsInfinite::Scissors : s.tool == 2 ? IconsInfinite::Hand : IconsInfinite::Pointer;
          ImDrawList* tdl = ImGui::GetWindowDrawList();
          glyph::Draw(tdl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_control, col, tg);

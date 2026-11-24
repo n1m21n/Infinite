@@ -224,8 +224,8 @@ void DrawSidePanels(FrameCtx& fc)
          // clearly visible dark line in light mode. Suppressed the same way the
          // menu-bar/canvas seam was: make the two colors it reads transparent
          // for just this call.
-         ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
-         ImGui::PushStyleColor(ImGuiCol_BorderShadow, tok::V4(tok::palf::v_0_0_0_0));
+         ImGui::PushStyleColor(ImGuiCol_Border, tok::RoleV4(tok::col::ink_black, 0f));
+         ImGui::PushStyleColor(ImGuiCol_BorderShadow, tok::RoleV4(tok::col::ink_black, 0f));
          ed::End();
          ImGui::PopStyleColor(2);
          ImGui::PopStyleVar();
@@ -1706,7 +1706,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             if (!gFieldGraphEditor->Notice().empty())
             {
-               ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", gFieldGraphEditor->Notice().c_str());
+               ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "%s", gFieldGraphEditor->Notice().c_str());
             }
          }
          EndEditorWindow(editorVisible);

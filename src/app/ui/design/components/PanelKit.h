@@ -56,7 +56,7 @@ namespace PanelKit
       // not fill their chips edge to edge (16 in an 18 chip read as oversized).
       const float roleGs = std::min(tok::icon_control, std::round(h * tok::icon_chip_ratio));
       const float gs = glyph::FitSize(gc, roleGs, glyphStr);
-      glyph::Draw(ImGui::GetWindowDrawList(), gc, gs, on ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
+      glyph::Draw(ImGui::GetWindowDrawList(), gc, gs, on ? tok::Role(tok::col::ink_white) : ImGui::GetColorU32(ImGuiCol_Text), glyphStr);
 #ifdef IMGUI_ENABLE_TEST_ENGINE
       ImVec2 imn, imx;
       glyph::InkBox(gc, gs, glyphStr, imn, imx);

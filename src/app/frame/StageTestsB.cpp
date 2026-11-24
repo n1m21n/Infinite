@@ -742,7 +742,7 @@ int DrawTestsB(FrameCtx& fc)
                const char* none = T("No Output");
                const ImVec2 ts = ImGui::CalcTextSize(none);
                ImGui::GetWindowDrawList()->AddText(ImVec2(pos.x + (size.x - ts.x) * 0.5f, pos.y + (size.y - ts.y) * 0.5f),
-                                                   tok::U32(tok::pal::c_FFFFFF6E), none);
+                                                   tok::Role(tok::col::ink_white, 110), none);
             }
          }
          ImGui::End();

@@ -69,7 +69,7 @@ namespace app
          // wrap pos is window-relative; passing a bare width put it left of the
          // cursor and wrapped every single character onto its own line
          PushTextWrapWidth(kPreviewSize);
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->LastError().c_str());
          PopTextWrapWidth();
       }
       else if (!n->LoadedPath().empty())
@@ -104,7 +104,7 @@ namespace app
 
       PushTextWrapWidth(kPreviewSize);
       if (!n->LastError().empty())
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->LastError().c_str());
       if (n->ImageCount() > 0)
       {
          const std::string file = n->CurrentFileName();
@@ -137,11 +137,11 @@ namespace app
       PushTextWrapWidth(kPreviewSize);
       if (n->PublishedWidth() > 0 && n->PublishedHeight() > 0)
       {
-         ImGui::TextColored(tok::V4(tok::palf::v_400_1000_500_1000), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_ok), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
          if (!Platform::SyphonServerCanReportClients())
             ImGui::TextDisabled("Clients: not reported");
          else if (n->HasClients())
-            ImGui::TextColored(tok::V4(tok::palf::v_300_900_1000_1000), "Clients: Active");
+            ImGui::TextColored(tok::RoleV4(tok::col::accent_alt_2), "Clients: Active");
          else
             ImGui::TextDisabled("Clients: Waiting for app...");
       }
@@ -197,11 +197,11 @@ namespace app
          PushTextWrapWidth(kPreviewSize);
          if (n->IsConnected())
          {
-            ImGui::TextColored(tok::V4(tok::palf::v_400_1000_500_1000), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
+            ImGui::TextColored(tok::RoleV4(tok::col::text_ok), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
          }
          else
          {
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "Connecting...");
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "Connecting...");
          }
          PopTextWrapWidth();
       }
@@ -226,9 +226,9 @@ namespace app
       PushTextWrapWidth(kPreviewSize);
       if (n->IsPublishing())
       {
-         ImGui::TextColored(tok::V4(tok::palf::v_400_1000_500_1000), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_ok), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
          if (n->Connections() > 0)
-            ImGui::TextColored(tok::V4(tok::palf::v_300_900_1000_1000), "Receivers: %d", n->Connections());
+            ImGui::TextColored(tok::RoleV4(tok::col::accent_alt_2), "Receivers: %d", n->Connections());
          else
             ImGui::TextDisabled("Receivers: waiting...");
       }
@@ -272,9 +272,9 @@ namespace app
       if (n->SourceName().empty())
          ImGui::TextDisabled("Pick a source");
       else if (n->IsReceiving())
-         ImGui::TextColored(tok::V4(tok::palf::v_400_1000_500_1000), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_ok), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
       else
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "Waiting for frames...");
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "Waiting for frames...");
       PopTextWrapWidth();
    }
 
@@ -324,7 +324,7 @@ namespace app
       if (!n->LastError().empty())
       {
          PushTextWrapWidth(kPreviewSize);
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->LastError().c_str());
          PopTextWrapWidth();
       }
       else if (!n->LoadedPath().empty())
@@ -424,7 +424,7 @@ namespace app
       if (!n->LastError().empty())
       {
          PushTextWrapWidth(kPreviewSize);
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->LastError().c_str());
          PopTextWrapWidth();
       }
 
@@ -513,7 +513,7 @@ namespace app
       if (!n->LastError().empty())
       {
          PushTextWrapWidth(kPreviewSize);
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->LastError().c_str());
          PopTextWrapWidth();
       }
       else if (!n->LoadedPath().empty())
@@ -592,7 +592,7 @@ namespace app
       if (!n->LastError().empty())
       {
          PushTextWrapWidth(kPreviewSize);
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", n->LastError().c_str());
          PopTextWrapWidth();
       }
       else if (n->IsRunning() && n->GetOutputWidth() > 0 && n->GetOutputHeight() > 0)
@@ -692,7 +692,7 @@ namespace app
          {
             ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
             ImVec2 pB = toScreen(node->points[r][c + 1].x, node->points[r][c + 1].y);
-            dl->AddLine(pA, pB, tok::U32(tok::pal::c_FFB432C8), 1.5f);
+            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, 200), 1.5f);
          }
       }
       for (int c = 0; c < gw; ++c)
@@ -701,7 +701,7 @@ namespace app
          {
             ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
             ImVec2 pB = toScreen(node->points[r + 1][c].x, node->points[r + 1][c].y);
-            dl->AddLine(pA, pB, tok::U32(tok::pal::c_FFB432C8), 1.5f);
+            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, 200), 1.5f);
          }
       }
 
@@ -712,8 +712,8 @@ namespace app
          ImVec2 pTR = toScreen(node->points[0][1].x, node->points[0][1].y);
          ImVec2 pBR = toScreen(node->points[1][1].x, node->points[1][1].y);
          ImVec2 pBL = toScreen(node->points[1][0].x, node->points[1][0].y);
-         dl->AddLine(pTL, pBR, tok::U32(tok::pal::c_FFB43246), 1.0f);
-         dl->AddLine(pTR, pBL, tok::U32(tok::pal::c_FFB43246), 1.0f);
+         dl->AddLine(pTL, pBR, tok::Role(tok::col::role_modulation, 70), 1.0f);
+         dl->AddLine(pTR, pBL, tok::Role(tok::col::role_modulation, 70), 1.0f);
       }
 
       // Draw circular pin handles
@@ -726,10 +726,10 @@ namespace app
             float distToMouse = std::hypot(mouse.x - pt.x, mouse.y - pt.y);
             const bool isHovered = (distToMouse < 18.0f);
 
-            dl->AddCircleFilled(pt, 6.0f, tok::U32(tok::pal::c_FFB432FF));
-            dl->AddCircle(pt, 7.0f, tok::U32(tok::pal::c_141419FF), 0, 1.5f);
+            dl->AddCircleFilled(pt, 6.0f, tok::Role(tok::col::role_modulation));
+            dl->AddCircle(pt, 7.0f, tok::Role(tok::col::surface_deep), 0, 1.5f);
             if (isDragged || isHovered)
-               dl->AddCircle(pt, 11.0f, tok::U32(tok::pal::c_FFFFFFF0), 0, 2.0f);
+               dl->AddCircle(pt, 11.0f, tok::Role(tok::col::ink_white, 240), 0, 2.0f);
          }
       }
    }
@@ -753,7 +753,7 @@ namespace app
       char btnId[32];
       snprintf(btnId, sizeof(btnId), "##projinlinenode%p", (void*)node);
       DrawProjectionHandleOverlay(node, origin, ImVec2(size, size), btnId);
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), tok::U32(tok::pal::c_5A82BEFF), 4.0f, 0, 2.0f);
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), tok::Role(tok::col::accent_12), 4.0f, 0, 2.0f);
 
       // Reserve space so the eye toggle and params below aren't drawn over the preview!
       ImGui::SetCursorScreenPos(origin);
@@ -1058,13 +1058,13 @@ namespace app
       const bool isLight = IsThemeLight();
 
       // ---- 1) Container chassis background ----
-      dl->AddRectFilled(origin, br, isLight ? tok::U32(tok::pal::c_ECF0F8FF) : tok::U32(tok::pal::c_101016FF), tok::radius_control);
+      dl->AddRectFilled(origin, br, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), tok::radius_control);
 
       // ---- 2) Subtle horizontal guide lines (25%, 50%, 75%) ----
       const float y25 = origin.y + height * 0.25f;
       const float y50 = origin.y + height * 0.50f;
       const float y75 = origin.y + height * 0.75f;
-      const ImU32 subGuideCol = isLight ? tok::U32(tok::pal::c_DADFEA96) : tok::U32(tok::pal::c_20232E96);
+      const ImU32 subGuideCol = isLight ? tok::Base(tok::col::surface_hi, 150) : tok::Base(tok::col::surface_lo, 150);
       dl->AddLine(ImVec2(origin.x + 2.0f, y25), ImVec2(br.x - 2.0f, y25), subGuideCol, 1.0f);
       dl->AddLine(ImVec2(origin.x + 2.0f, y50), ImVec2(br.x - 2.0f, y50), subGuideCol, 1.0f);
       dl->AddLine(ImVec2(origin.x + 2.0f, y75), ImVec2(br.x - 2.0f, y75), subGuideCol, 1.0f);
@@ -1087,20 +1087,20 @@ namespace app
 
          // Track lane background
          const ImU32 gridCol = isLight
-            ? (isGroupStart ? tok::U32(tok::pal::c_D4DAE6FF) : tok::U32(tok::pal::c_E0E4EEFF))
-            : (isGroupStart ? tok::U32(tok::pal::c_20232EFF) : tok::U32(tok::pal::c_161820FF));
+            ? (isGroupStart ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::surface_hi))
+            : (isGroupStart ? tok::Role(tok::col::surface_lo) : tok::Role(tok::col::edge_deep));
          dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y), gridCol, tok::radius_cell);
 
          // Column hover or playhead background wash
          if (isCurrent)
          {
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? tok::U32(tok::pal::c_FFC85032) : tok::U32(tok::pal::c_FFBE5023), tok::radius_cell);
+                              isLight ? tok::Base(tok::col::role_modulation, 50) : tok::Base(tok::col::role_modulation, 35), tok::radius_cell);
          }
          else if (isHoveredCol)
          {
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? tok::U32(tok::pal::c_0000000A) : tok::U32(tok::pal::c_FFFFFF0C), tok::radius_cell);
+                              isLight ? tok::Base(tok::col::ink_black, 10) : tok::Base(tok::col::ink_white, 12), tok::radius_cell);
          }
 
          const float v = std::clamp(n->steps[i], 0.0f, 1.0f);
@@ -1109,8 +1109,8 @@ namespace app
 
          // Bar stem fill
          const ImU32 fillCol = isCurrent
-            ? (isLight ? tok::U32(tok::pal::c_EB911EF0) : tok::U32(tok::pal::c_FFBE50F0))
-            : (isLight ? tok::U32(tok::pal::c_2378EBE6) : tok::U32(tok::pal::c_4BA5FFDC));
+            ? (isLight ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 240))
+            : (isLight ? tok::Base(tok::col::accent, 230) : tok::Base(tok::col::accent_4, 220));
 
          if (std::fabs(fillBottom - fillTop) > 1.0f)
          {
@@ -1122,11 +1122,11 @@ namespace app
          const float capY = std::clamp(fillTop, origin.y, br.y - capH);
 
          const ImU32 capCol = isCurrent
-            ? (isLight ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC850FF))
-            : (isLight ? tok::U32(tok::pal::c_2882F0FF) : tok::U32(tok::pal::c_5FB9FFFF));
+            ? (isLight ? tok::Base(tok::col::text_warn) : tok::Base(tok::col::role_modulation))
+            : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_7));
          const ImU32 capBorder = isCurrent
-            ? (isLight ? tok::U32(tok::pal::c_FFE68CFF) : tok::U32(tok::pal::c_FFF5B4FF))
-            : (isLight ? tok::U32(tok::pal::c_A0CDFFC8) : tok::U32(tok::pal::c_B4E6FFB4));
+            ? (isLight ? tok::Base(tok::col::role_solo) : tok::Base(tok::col::role_solo_2))
+            : (isLight ? tok::Base(tok::col::accent_alt, 200) : tok::Base(tok::col::accent_alt, 180));
 
          dl->AddRectFilled(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capCol, 2.5f);
          dl->AddRect(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capBorder, 2.5f);
@@ -1141,7 +1141,7 @@ namespace app
                snprintf(valStr, sizeof(valStr), "%.1f", v);
 
             const float fontValSz = count <= 8 ? 9.5f : 8.5f;
-            const ImU32 txtCol = isCurrent ? tok::U32(tok::pal::c_140F05FF) : tok::U32(tok::pal::c_0A1423FF);
+            const ImU32 txtCol = isCurrent ? tok::Role(tok::col::surface_deep) : tok::Role(tok::col::surface_deep);
             DrawTextCentered(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), txtCol, valStr, fontValSz);
          }
 
@@ -1158,16 +1158,16 @@ namespace app
                                                  : std::clamp(cellW * tok::type_fit_frac, tok::type_min, ImGui::GetFontSize());
          const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
          const ImU32 stepNumCol = isCurrent
-            ? (isLight ? tok::U32(tok::pal::c_E18214FF) : tok::U32(tok::pal::c_FFC850FF))
+            ? (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation))
             : (isLight
-                  ? (isGroupStart ? tok::U32(tok::pal::c_283041FF) : tok::U32(tok::pal::c_6E7484FF))
-                  : (isGroupStart ? tok::U32(tok::pal::c_BEC2D2FF) : tok::U32(tok::pal::c_6E7282FF)));
+                  ? (isGroupStart ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_mid))
+                  : (isGroupStart ? tok::Role(tok::col::surface_mid) : tok::Role(tok::col::edge_mid)));
          dl->AddText(font, labelFontSize, ImVec2(x0 + (cellW - textSize.x) * 0.5f, br.y + 3.0f),
                      stepNumCol, label);
       }
 
       // Outer border
-      dl->AddRect(origin, br, isLight ? tok::U32(tok::pal::c_B9C0D0FF) : tok::U32(tok::pal::c_414655FF), tok::radius_control);
+      dl->AddRect(origin, br, isLight ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::edge_lo_2), tok::radius_control);
 
       const float labelRowH = ImGui::GetFontSize() + 5.0f;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, br.y + labelRowH));
@@ -1276,14 +1276,14 @@ namespace app
       const float yHi = yOf(hi);
       const float yLo = yOf(lo);
       dl->AddRectFilled(ImVec2(origin.x + pad, yHi), ImVec2(origin.x + w - pad, yLo),
-                        isLight ? tok::U32(tok::pal::c_00000014) : tok::U32(tok::pal::c_FFFFFF0A));
+                        isLight ? tok::Base(tok::col::ink_black, 20) : tok::Base(tok::col::ink_white, 10));
       dl->AddLine(ImVec2(origin.x + pad, yHi), ImVec2(origin.x + w - pad, yHi),
-                  tok::U32(tok::pal::c_22C55EFF), 1.0f);
+                  tok::Role(tok::col::state_ok_2), 1.0f);
       dl->AddLine(ImVec2(origin.x + pad, yLo), ImVec2(origin.x + w - pad, yLo),
-                  tok::U32(tok::pal::c_FFBE5AFF), 1.0f);
+                  tok::Role(tok::col::role_modulation), 1.0f);
 
       // Live input A curve
-      const ImU32 curveCol = isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_FFBE5AFF);
+      const ImU32 curveCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::role_modulation);
       for (size_t i = 1; i < hist.size(); ++i)
       {
          const float x0 = origin.x + pad + ((float)(i - 1) / 139.0f) * innerW;
@@ -1296,13 +1296,13 @@ namespace app
       const float barW = 44.0f;
       const ImVec2 barTl(origin.x + pad, origin.y + pad);
       const ImVec2 barBr(barTl.x + barW, barTl.y + 4.0f);
-      dl->AddRectFilled(barTl, barBr, tok::U32(tok::pal::c_FFFFFF18), 2.0f);
+      dl->AddRectFilled(barTl, barBr, tok::Role(tok::col::ink_white, 24), 2.0f);
       if (hold01 > 0.01f)
-         dl->AddRectFilled(barTl, ImVec2(barTl.x + barW * hold01, barBr.y), tok::U32(tok::pal::c_22C55EFF), 2.0f);
+         dl->AddRectFilled(barTl, ImVec2(barTl.x + barW * hold01, barBr.y), tok::Role(tok::col::state_ok_2), 2.0f);
 
       const bool high = val > 0.5f;
       const ImVec2 ledPos(origin.x + w - pad - 6.0f, origin.y + pad + 6.0f);
-      dl->AddCircleFilled(ledPos, 5.0f, high ? tok::U32(tok::pal::c_22C55EFF) : tok::U32(tok::pal::c_FFFFFF18));
+      dl->AddCircleFilled(ledPos, 5.0f, high ? tok::Role(tok::col::state_ok_2) : tok::Role(tok::col::ink_white, 24));
       AudioViz::Border(dl, origin, br);
    }
 
@@ -1584,12 +1584,12 @@ namespace app
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, isLight ? tok::U32(tok::pal::c_1E78E6DC) : tok::U32(tok::pal::c_78C8FFAA), 1.6f);
+         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 170), 1.6f);
       }
 
       // Corner labels: the pad blends between these four named effects, so it is
       // obvious what is being swept rather than four anonymous weights.
-      const ImU32 labelCol = isLight ? tok::U32(tok::pal::c_323A4BFF) : tok::U32(tok::pal::c_969CB4FF);
+      const ImU32 labelCol = isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::text_secondary);
       const char* bl = n->CornerLabel(0);
       const char* brName = n->CornerLabel(1);
       const char* tl = n->CornerLabel(2);
@@ -1603,11 +1603,11 @@ namespace app
       dl->AddText(ImVec2(br.x - brSize.x - 5, br.y - brSize.y - 4), labelCol, brName);
 
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
-      ImU32 orbColor = n->IsRecordingPath() ? tok::U32(tok::pal::c_FF5A5AFF)
-                     : n->IsPlayingPath()   ? (isLight ? tok::U32(tok::pal::c_1EB450FF) : tok::U32(tok::pal::c_78EB96FF))
-                                            : (isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFBE5AFF));
+      ImU32 orbColor = n->IsRecordingPath() ? tok::Base(tok::col::text_err)
+                     : n->IsPlayingPath()   ? (isLight ? tok::Base(tok::col::state_ok_5) : tok::Base(tok::col::state_ok))
+                                            : (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
       dl->AddCircleFilled(orb, 9.0f, orbColor);
-      dl->AddCircle(orb, 9.0f, isLight ? tok::U32(tok::pal::c_F0F0F0FF) : tok::U32(tok::pal::c_14141CFF), 0, 2.0f);
+      dl->AddCircle(orb, 9.0f, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, 2.0f);
       AudioViz::Border(dl, origin, br);
    }
 
@@ -1695,7 +1695,7 @@ namespace app
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      const ImU32 capCol = isLight ? tok::U32(tok::pal::c_323746FF) : tok::U32(tok::pal::c_B0B6C6FF);
+      const ImU32 capCol = isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_mid_2);
       const float textH = ImGui::GetTextLineHeight();
       const float capY = origin.y + contentH + 4.0f;
       bool renaming = false;
@@ -2122,14 +2122,14 @@ namespace app
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, isLight ? tok::U32(tok::pal::c_1E78E6DC) : tok::U32(tok::pal::c_78C8FFAA), 1.6f);
+         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 170), 1.6f);
       }
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
-      ImU32 orbColor = n->IsRecordingPath() ? tok::U32(tok::pal::c_FF5A5AFF)
-                     : n->IsPlayingPath()   ? (isLight ? tok::U32(tok::pal::c_1EB450FF) : tok::U32(tok::pal::c_78EB96FF))
-                                            : (isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFBE5AFF));
+      ImU32 orbColor = n->IsRecordingPath() ? tok::Base(tok::col::text_err)
+                     : n->IsPlayingPath()   ? (isLight ? tok::Base(tok::col::state_ok_5) : tok::Base(tok::col::state_ok))
+                                            : (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
       dl->AddCircleFilled(orb, 9.0f, orbColor);
-      dl->AddCircle(orb, 9.0f, isLight ? tok::U32(tok::pal::c_F0F0F0FF) : tok::U32(tok::pal::c_14141CFF), 0, 2.0f);
+      dl->AddCircle(orb, 9.0f, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, 2.0f);
       AudioViz::Border(dl, origin, br);
    }
 

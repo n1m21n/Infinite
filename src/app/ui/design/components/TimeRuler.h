@@ -128,12 +128,12 @@ namespace TimeRuler
       if (bx1 < vx0 || bx0 > vx1 || vx1 <= vx0)
          return;
       dl->PushClipRect(ImVec2(vx0 - 1.5f, top), ImVec2(vx1 + 1.5f, bottom), true); // room for an edge sitting on the border
-      const ImU32 border = tok::U32(tok::pal::c_FACC15B4);
+      const ImU32 border = tok::Role(tok::col::role_modulation, 180);
       dl->AddRectFilled(ImVec2(bx0, top), ImVec2(bx1, bottom), tok::U32(carving ? tok::pal::c_FACC152D : tok::pal::c_FACC151E));
       dl->AddRectFilled(ImVec2(bx0, top), ImVec2(bx1, top + 4.0f), tok::U32(drag == 3 ? tok::pal::c_FFEB3BFF : tok::pal::c_FACC15E6), tok::radius_cell);
       const auto edge = [&](float x, float inward, bool held)
       {
-         const ImU32 col = held ? tok::U32(tok::pal::c_FFFFFFFF) : border;
+         const ImU32 col = held ? tok::Role(tok::col::ink_white) : border;
          dl->AddLine(ImVec2(x, top), ImVec2(x, bottom), col, held ? 2.5f : 1.5f);
          dl->AddLine(ImVec2(x, top), ImVec2(x, top + 8.0f), col, 3.0f);
          dl->AddLine(ImVec2(x, top + 8.0f), ImVec2(x + inward, top + 8.0f), col, 2.0f);

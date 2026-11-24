@@ -59,10 +59,10 @@ namespace AudioViz
       if (peaks.Empty() || w < 1.0f || b <= a)
          return;
       const bool light = app::IsThemeLight();
-      const ImU32 edge = lit ? tok::U32(tok::pal::c_FFFFFF8C)
-                             : (light ? tok::U32(tok::pal::c_1E6EE66E) : tok::U32(tok::pal::c_96D6FF6E));
-      const ImU32 core = lit ? tok::U32(tok::pal::c_FFFFFFE6)
-                             : (light ? tok::U32(tok::pal::c_1E6EE6DC) : tok::U32(tok::pal::c_96D6FFDC));
+      const ImU32 edge = lit ? tok::Base(tok::col::ink_white, 140)
+                             : (light ? tok::Base(tok::col::accent, 110) : tok::Base(tok::col::accent_alt, 110));
+      const ImU32 core = lit ? tok::Base(tok::col::ink_white, 230)
+                             : (light ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_alt, 220));
       const float midY = origin.y + h * 0.5f;
       const float amp = h * 0.45f;
       const int cols = (int)std::ceil(w);

@@ -482,9 +482,9 @@ namespace
    }
 
    ImU32 Tint(float a) { return ImGui::GetColorU32(ImGuiCol_Text, a); }
-   ImU32 LineCol() { return IsThemeLight() ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_E6EBFAFF); }
-   ImU32 SelCol() { return IsThemeLight() ? tok::U32(tok::pal::c_DC8214FF) : tok::U32(tok::pal::c_FFC83CFF); }
-   ImU32 RingCol() { return IsThemeLight() ? tok::U32(tok::pal::c_F0F2F8FF) : tok::U32(tok::pal::c_12121AFF); }
+   ImU32 LineCol() { return IsThemeLight() ? tok::Base(tok::col::accent) : tok::Base(tok::col::edge_hi); }
+   ImU32 SelCol() { return IsThemeLight() ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation); }
+   ImU32 RingCol() { return IsThemeLight() ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep); }
 
    // ---- small faces, the Piano Roll's grammar
 

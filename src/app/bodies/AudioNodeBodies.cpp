@@ -160,9 +160,9 @@ namespace app
                ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW - unmapBtnW - 4.0f, /*audioStyle=*/true);
                ImGui::SameLine(0.0f, 2.0f);
                ImGui::PushID(i + 40000);
-               ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_0_0_0_0));
-               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_500_150_150_1000));
-               ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_600_200_200_1000));
+               ImGui::PushStyleColor(ImGuiCol_Button, tok::RoleV4(tok::col::ink_black, 0f));
+               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::RoleV4(tok::col::state_err_hover));
+               ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::RoleV4(tok::col::state_err_10));
                if (ActionButton::Draw("x"))
                {
                   PushUndoCheckpoint();
@@ -338,16 +338,16 @@ namespace app
       ImGui::EndDisabled();
 
       const std::string destLabel = n->recordDirectory.empty() ? std::string("~/Desktop") : n->recordDirectory;
-      ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "%s", destLabel.c_str());
+      ImGui::TextColored(tok::RoleV4(tok::col::text_secondary), "%s", destLabel.c_str());
       }
 
       if (n->DroppedSampleCount() > 0)
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "dropped samples - device can't keep up");
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "dropped samples - device can't keep up");
 
       // A finished take that went over full scale was written clipped; the
       // line stays until the next take starts.
       if (!recording && n->TakePeak() > 1.0f)
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "last take clipped, +%s over",
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "last take clipped, +%s over",
                             UiFmt::Db(20.0f * std::log10(n->TakePeak())).c);
 
       // The summed output of every Audio Out went over full scale: the device
@@ -363,7 +363,7 @@ namespace app
             sLastOverTime = ImGui::GetTime();
          }
          if (ImGui::GetTime() - sLastOverTime < tok::motion_s_clip_hold)
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "clipping +%s - lower the level",
+            ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "clipping +%s - lower the level",
                                UiFmt::Db(20.0f * std::log10(std::max(1.0f, AudioEngine::Instance().MasterOverPeak()))).c);
       }
 
@@ -473,13 +473,13 @@ namespace app
       }
       ImGui::EndDisabled();
       if (recording)
-         ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "REC %s  %s  (head facing front)",
+         ImGui::TextColored(tok::RoleV4(tok::col::text_secondary), "REC %s  %s  (head facing front)",
                             UiFmt::Sec(n->ElapsedSeconds()).c, UiFmt::KB((double)n->FileSizeBytes() / 1024.0).c);
       else
-         ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "%s",
+         ImGui::TextColored(tok::RoleV4(tok::col::text_secondary), "%s",
                             n->recordDirectory.empty() ? "~/Desktop" : n->recordDirectory.c_str());
       if (n->DroppedSampleCount() > 0)
-         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "dropped samples - device can't keep up");
+         ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "dropped samples - device can't keep up");
    }
 
 
@@ -603,7 +603,7 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope  -  drag the handles", "##analogAmpEnv", &n->attack,
                         &n->decay, &n->sustain, &n->release, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::U32(tok::pal::c_96D6FFF5));
+                        tok::Role(tok::col::accent_alt, 245));
       ImGui::PopID();
 
       ImGui::Dummy(ImVec2(0.0f, 2.0f));

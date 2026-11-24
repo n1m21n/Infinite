@@ -502,12 +502,12 @@ namespace app
 
       for (int i = 0; i < kNumSteps - 1; i++)
          dl->AddQuadFilled(pts[i], pts[i + 1], ImVec2(pts[i + 1].x, baseY), ImVec2(pts[i].x, baseY),
-                            isLight ? tok::U32(tok::pal::c_6E50D250) : tok::U32(tok::pal::c_966EE66E));
+                            isLight ? tok::Base(tok::col::role_expression_9, 80) : tok::Base(tok::col::role_expression_14, 110));
 
       dl->PathClear();
       for (int i = 0; i < kNumSteps; i++)
          dl->PathLineTo(pts[i]);
-      dl->PathStroke(isLight ? tok::U32(tok::pal::c_7850E6F5) : tok::U32(tok::pal::c_BEA0FFF5), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::Base(tok::col::role_expression, 245) : tok::Base(tok::col::role_expression_3, 245), 0, 1.8f);
 
       AudioViz::End(vizFrame);
 
@@ -630,7 +630,7 @@ namespace app
          const float y = TsVizDbToY(ampDb, origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE63C) : tok::U32(tok::pal::c_96D6FF3C), 0, 1.5f);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent, 60) : tok::Base(tok::col::accent_alt, 60), 0, 1.5f);
 
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
@@ -651,11 +651,11 @@ namespace app
             peakY = y;
          }
       }
-      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245), 0, 1.8f);
 
       const float transientAmount = std::clamp(n->ExtraMeterValue(0), 0.0f, 1.0f);
       dl->AddCircleFilled(ImVec2(peakX, peakY), 3.0f + transientAmount * 4.0f,
-                          isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFC478E6));
+                          isLight ? tok::Base(tok::col::state_warn, 230) : tok::Base(tok::col::role_modulation, 230));
 
       AudioViz::End(vizFrame);
 
@@ -807,7 +807,7 @@ namespace app
          const float y = midY - v * amp;
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245), 0, 1.8f);
 
       AudioViz::End(vizFrame);
 
@@ -914,9 +914,9 @@ namespace app
 
       // Arrow & shifted partial color: amber for up-shift, coral/magenta for down-shift, blue-grey for zero
       const ImU32 arrowCol = (shift > 0.5f)
-         ? (isLight ? tok::U32(tok::pal::c_D27814F0) : tok::U32(tok::pal::c_FFB946E6))
-         : ((shift < -0.5f) ? (isLight ? tok::U32(tok::pal::c_DC2846F0) : tok::U32(tok::pal::c_FF6E82E6))
-                            : (isLight ? tok::U32(tok::pal::c_5A6982C8) : tok::U32(tok::pal::c_8CA0C3B4)));
+         ? (isLight ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 230))
+         : ((shift < -0.5f) ? (isLight ? tok::Base(tok::col::state_err, 240) : tok::Base(tok::col::text_err, 230))
+                            : (isLight ? tok::Base(tok::col::edge_lo_3, 200) : tok::Base(tok::col::text_secondary, 180)));
 
       for (int i = 0; i < kNumPartials; i++)
       {
@@ -925,7 +925,7 @@ namespace app
 
          // Input partial tick (upper row)
          dl->AddLine(ImVec2(xIn, topY - 7.0f), ImVec2(xIn, topY + 3.0f),
-                     isLight ? tok::U32(tok::pal::c_465A82DC) : tok::U32(tok::pal::c_96AACDD2), 1.5f);
+                     isLight ? tok::Base(tok::col::surface_lo_2, 220) : tok::Base(tok::col::accent_13, 210), 1.5f);
 
          // Shifted partial tick (lower row)
          dl->AddLine(ImVec2(xOutL, botY - 3.0f), ImVec2(xOutL, botY + 7.0f), arrowCol, 1.8f);
@@ -947,9 +947,9 @@ namespace app
             const float dxR = shiftRFrac * kMaxShiftPix;
             const float xOutR = xIn + dxR;
             const ImU32 spreadCol = (shift + spread > 0.5f)
-               ? (isLight ? tok::U32(tok::pal::c_D28C288C) : tok::U32(tok::pal::c_FFCD6E78))
-               : ((shift + spread < -0.5f) ? (isLight ? tok::U32(tok::pal::c_D250648C) : tok::U32(tok::pal::c_FF8CA078))
-                                           : (isLight ? tok::U32(tok::pal::c_5A698278) : tok::U32(tok::pal::c_8CA0C364)));
+               ? (isLight ? tok::Base(tok::col::state_warn, 140) : tok::Base(tok::col::role_modulation, 120))
+               : ((shift + spread < -0.5f) ? (isLight ? tok::Base(tok::col::viz_pink_4, 140) : tok::Base(tok::col::viz_pink_5, 120))
+                                           : (isLight ? tok::Base(tok::col::edge_lo_3, 120) : tok::Base(tok::col::text_secondary, 100)));
             dl->AddLine(ImVec2(xOutR, botY - 2.0f), ImVec2(xOutR, botY + 6.0f), spreadCol, 1.2f);
          }
       }
@@ -973,7 +973,7 @@ namespace app
 
       const ImVec2 textSz = ImGui::CalcTextSize(valBuf);
       dl->AddText(ImVec2(br.x - textSz.x - 10.0f, origin.y + 8.0f),
-                  isLight ? tok::U32(tok::pal::c_283750F0) : tok::U32(tok::pal::c_E6EEFFF0), valBuf);
+                  isLight ? tok::Base(tok::col::edge_lo, 240) : tok::Base(tok::col::edge_hi, 240), valBuf);
 
       AudioViz::End(vizFrame);
 
@@ -1087,12 +1087,12 @@ namespace app
       }
       for (int i = 0; i < kNumPoints - 1; i++)
          dl->AddQuadFilled(envPts[i], envPts[i + 1], ImVec2(envPts[i + 1].x, br.y), ImVec2(envPts[i].x, br.y),
-                            isLight ? tok::U32(tok::pal::c_1E6EE62D) : tok::U32(tok::pal::c_96D6FF3C));
+                            isLight ? tok::Base(tok::col::accent, 45) : tok::Base(tok::col::accent_alt, 60));
 
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
          dl->PathLineTo(envPts[i]);
-      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245), 0, 1.8f);
 
       if (stereoPhaseCycles > 0.0f)
       {
@@ -1103,7 +1103,7 @@ namespace app
             const float x = origin.x + (float)i / (float)(kNumPoints - 1) * w;
             dl->PathLineTo(ImVec2(x, envelopeY(phase)));
          }
-         dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE66E) : tok::U32(tok::pal::c_96D6FF6E), 0, 1.4f);
+         dl->PathStroke(isLight ? tok::Base(tok::col::accent, 110) : tok::Base(tok::col::accent_alt, 110), 0, 1.4f);
       }
 
       AudioViz::End(vizFrame);
@@ -1206,7 +1206,7 @@ namespace app
          const float x = freqToX(formants[i]);
          const float peakY = br.y - 6.0f - weights[i] * (h - 20.0f);
          dl->AddLine(ImVec2(x, br.y - 6.0f), ImVec2(x, peakY),
-                     isLight ? tok::U32(tok::pal::c_1E6EE6E6) : tok::U32(tok::pal::c_96D6FFDC), 3.0f);
+                     isLight ? tok::Base(tok::col::accent, 230) : tok::Base(tok::col::accent_alt, 220), 3.0f);
          dl->AddText(ImVec2(x - 7.0f, peakY - 14.0f), ScopeTextCol(), kFormantLabels[i]);
       }
 
@@ -1318,10 +1318,10 @@ namespace app
 
          const float pos = (numPoles > 1) ? ((float)i / (float)(numPoles - 1) - 0.5f) * spread + 0.5f : 0.5f;
          const ImU32 baseCol = (pos < 0.45f)
-            ? (isLight ? tok::U32(tok::pal::c_1E6EE6DC) : tok::U32(tok::pal::c_6EC8FFDC))
+            ? (isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 220))
             : ((pos > 0.55f)
-               ? (isLight ? tok::U32(tok::pal::c_E65A28DC) : tok::U32(tok::pal::c_FF8C5ADC))
-               : (isLight ? tok::U32(tok::pal::c_28B46EDC) : tok::U32(tok::pal::c_6EE6A0DC)));
+               ? (isLight ? tok::Base(tok::col::state_err, 220) : tok::Base(tok::col::state_warn, 220))
+               : (isLight ? tok::Base(tok::col::viz_teal, 220) : tok::Base(tok::col::state_ok, 220)));
          const unsigned baseAlpha = (baseCol >> IM_COL32_A_SHIFT) & 0xFF;
          const ImU32 stemCol = (baseCol & ~IM_COL32_A_MASK) |
             (((unsigned)(baseAlpha * alphaScale)) << IM_COL32_A_SHIFT);
@@ -1430,11 +1430,11 @@ namespace app
       const float threshLinear = powf(10.0f, thresholdDb / 20.0f);
       const float threshY1 = midY - threshLinear * (h * 0.45f);
       const float threshY2 = midY + threshLinear * (h * 0.45f);
-      const ImU32 threshCol = isLight ? tok::U32(tok::pal::c_B4505064) : tok::U32(tok::pal::c_E65A5A64);
+      const ImU32 threshCol = isLight ? tok::Base(tok::col::state_err_8, 100) : tok::Base(tok::col::state_err_pressed, 100);
       dl->AddLine(ImVec2(origin.x, threshY1), ImVec2(br.x, threshY1), threshCol, 1.0f);
       dl->AddLine(ImVec2(origin.x, threshY2), ImVec2(br.x, threshY2), threshCol, 1.0f);
 
-      const ImU32 waveCol = isLight ? tok::U32(tok::pal::c_148CC8F0) : tok::U32(tok::pal::c_50C8FFF0);
+      const ImU32 waveCol = isLight ? tok::Base(tok::col::accent_6, 240) : tok::Base(tok::col::accent_2, 240);
       const int kPlotPoints = 128;
       ImVec2 pts[kPlotPoints];
 
@@ -1598,8 +1598,8 @@ namespace app
       if (peak < 0.02f)
          AudioViz::IdleLabel(vizFrame);
 
-      const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_8C46DC2D) : tok::U32(tok::pal::c_B464FF2D);
-      const ImU32 lineCol = isLight ? tok::U32(tok::pal::c_963CE6F0) : tok::U32(tok::pal::c_C882FFF0);
+      const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, 45) : tok::Base(tok::col::role_expression, 45);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_2, 240);
 
       for (int i = 0; i < kPlotPoints - 1; i++)
       {
@@ -1712,9 +1712,9 @@ namespace app
       const uint32_t mask = KeySnapKernel::ScaleMask(scale, root);
       // Three opacity tiers of one neutral (white on dark, ink on light), all fainter
       // than the purple spectrum: off-scale barely there, in-scale soft, root strongest.
-      const ImU32 offCol = isLight ? tok::U32(tok::pal::c_28283C0E) : tok::U32(tok::pal::c_FFFFFF0A);
-      const ImU32 noteCol = isLight ? tok::U32(tok::pal::c_28283C3C) : tok::U32(tok::pal::c_FFFFFF30);
-      const ImU32 rootCol = isLight ? tok::U32(tok::pal::c_28283C82) : tok::U32(tok::pal::c_FFFFFF6E);
+      const ImU32 offCol = isLight ? tok::Base(tok::col::edge_lo, 14) : tok::Base(tok::col::ink_white, 10);
+      const ImU32 noteCol = isLight ? tok::Base(tok::col::edge_lo, 60) : tok::Base(tok::col::ink_white, 48);
+      const ImU32 rootCol = isLight ? tok::Base(tok::col::edge_lo, 130) : tok::Base(tok::col::ink_white, 110);
       for (int pass = 0; pass < 3; pass++) // off-scale first, root last, so root is never overdrawn
       {
          for (int midi = 24; midi <= 120; midi++)
@@ -1772,8 +1772,8 @@ namespace app
          const float normY = std::clamp((db + 60.0f) / 60.0f, 0.0f, 1.0f);
          pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * 0.9f) - 2.0f);
       }
-      const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_8C46DC2D) : tok::U32(tok::pal::c_B464FF2D);
-      const ImU32 lineCol = isLight ? tok::U32(tok::pal::c_963CE6F0) : tok::U32(tok::pal::c_C882FFF0);
+      const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, 45) : tok::Base(tok::col::role_expression, 45);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_2, 240);
       for (int i = 0; i < kPlotPoints - 1; i++)
       {
          ImVec2 quad[4] = { pts[i], pts[i + 1], ImVec2(pts[i + 1].x, br.y), ImVec2(pts[i].x, br.y) };
@@ -1855,7 +1855,7 @@ namespace app
 
       const float loHz = 50.0f, hiHz = 12000.0f;
       const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
-      const ImU32 gridCol = isLight ? tok::U32(tok::pal::c_28283C1C) : tok::U32(tok::pal::c_FFFFFF16);
+      const ImU32 gridCol = isLight ? tok::Base(tok::col::edge_lo, 28) : tok::Base(tok::col::ink_white, 22);
       for (float hz : { 100.0f, 1000.0f, 10000.0f })
       {
          const float x = origin.x + (log10f(hz) - logLo) / logSpan * w;
@@ -1906,8 +1906,8 @@ namespace app
       }
       if (peak < 0.02f)
          AudioViz::IdleLabel(vizFrame);
-      const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_8C46DC2D) : tok::U32(tok::pal::c_B464FF2D);
-      const ImU32 lineCol = isLight ? tok::U32(tok::pal::c_963CE6F0) : tok::U32(tok::pal::c_C882FFF0);
+      const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, 45) : tok::Base(tok::col::role_expression, 45);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_2, 240);
       for (int i = 0; i < kPlotPoints - 1; i++)
       {
          ImVec2 quad[4] = { pts[i], pts[i + 1], ImVec2(pts[i + 1].x, br.y), ImVec2(pts[i].x, br.y) };
@@ -1918,8 +1918,8 @@ namespace app
       // A -> B track along the bottom edge with the slide position on it.
       const float slide = std::clamp(n->Param("slide"), 0.0f, 1.0f);
       const float ty = br.y - 3.0f;
-      const ImU32 trackCol = isLight ? tok::U32(tok::pal::c_28283C3C) : tok::U32(tok::pal::c_FFFFFF32);
-      const ImU32 dotCol = isLight ? tok::U32(tok::pal::c_28283CC8) : tok::U32(tok::pal::c_FFFFFFBE);
+      const ImU32 trackCol = isLight ? tok::Base(tok::col::edge_lo, 60) : tok::Base(tok::col::ink_white, 50);
+      const ImU32 dotCol = isLight ? tok::Base(tok::col::edge_lo, 200) : tok::Base(tok::col::ink_white, 190);
       dl->AddLine(ImVec2(origin.x + 8.0f, ty), ImVec2(br.x - 8.0f, ty), trackCol, 1.0f);
       dl->AddCircleFilled(ImVec2(origin.x + 8.0f + slide * (w - 16.0f), ty), 2.5f, dotCol);
 
@@ -1968,7 +1968,7 @@ namespace app
 
       const float loHz = 30.0f, hiHz = 12000.0f;
       const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
-      const ImU32 gridCol = isLight ? tok::U32(tok::pal::c_28283C1C) : tok::U32(tok::pal::c_FFFFFF16);
+      const ImU32 gridCol = isLight ? tok::Base(tok::col::edge_lo, 28) : tok::Base(tok::col::ink_white, 22);
       for (float hz : { 100.0f, 1000.0f, 10000.0f })
       {
          const float x = origin.x + (log10f(hz) - logLo) / logSpan * w;
@@ -1981,7 +1981,7 @@ namespace app
       const float decay = std::clamp(n->Param("decay"), 0.02f, 20.0f);
       const float damping = std::clamp(n->Param("damping"), 0.0f, 1.0f);
       const float tune = std::max(n->Param("tune"), 20.0f);
-      const ImU32 lineCol = isLight ? tok::U32(tok::pal::c_963CE6E6) : tok::U32(tok::pal::c_C882FFE6);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 230) : tok::Base(tok::col::role_expression_2, 230);
       for (int i = 0; i < count; i++)
       {
          // Line height = how long this mode rings relative to the longest.
@@ -1991,7 +1991,7 @@ namespace app
          dl->AddLine(ImVec2(x, br.y - 4.0f), ImVec2(x, br.y - 4.0f - rel * (h - 14.0f)), lineCol, 2.0f);
       }
       if (solving || count == 0)
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 6.0f), isLight ? tok::U32(tok::pal::c_28283CA0) : tok::U32(tok::pal::c_FFFFFF96),
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 6.0f), isLight ? tok::Base(tok::col::edge_lo, 160) : tok::Base(tok::col::ink_white, 150),
                      solving ? "solving shape..." : "no modes");
 
       AudioViz::End(vizFrame);
@@ -2074,7 +2074,7 @@ namespace app
             const float x = origin.x + t / seconds * w;
             dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
          }
-         const ImU32 lineCol = isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5);
+         const ImU32 lineCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
          dl->PathClear();
          for (int i = 0; i < count; i++)
          {
@@ -2084,7 +2084,7 @@ namespace app
          dl->PathStroke(lineCol, 0, 1.8f);
       }
       if (building || count == 0)
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 6.0f), isLight ? tok::U32(tok::pal::c_28283CA0) : tok::U32(tok::pal::c_FFFFFF96),
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 6.0f), isLight ? tok::Base(tok::col::edge_lo, 160) : tok::Base(tok::col::ink_white, 150),
                      "building space...");
 
       AudioViz::End(vizFrame);

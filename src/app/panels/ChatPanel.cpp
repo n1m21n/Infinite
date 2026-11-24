@@ -5115,7 +5115,7 @@ namespace app
             const bool hot = ImGui::IsItemHovered();
             if (canSend)
                dl->AddRectFilled(tileMn, tileMx, ImGui::GetColorU32(hot ? AccentEmphasisHover() : AccentEmphasisSelected()), tok::radius_control);
-            glyph::Draw(dl, sc, tok::icon_control, canSend ? tok::U32(tok::pal::c_FFFFFFFF) : TextTint(0.35f), IconsInfinite::Send);
+            glyph::Draw(dl, sc, tok::icon_control, canSend ? tok::Role(tok::col::ink_white) : TextTint(0.35f), IconsInfinite::Send);
             if (hot && canSend)
                Tip::Show("%s", T("Send"));
             if (clicked && canSend)

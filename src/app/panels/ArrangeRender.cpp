@@ -153,7 +153,7 @@ namespace app
       // clicks without needing per-panel disable flags scattered elsewhere.
       ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
       ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::V4(tok::palf::v_0_0_0_350));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, 0.35f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("##OfflineRenderBlocker", nullptr,
@@ -248,7 +248,7 @@ namespace app
       ImGuiIO& io = ImGui::GetIO();
       ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
       ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::V4(tok::palf::v_0_0_0_350));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, 0.35f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("##ArrangeWavRenderBlocker", nullptr,
@@ -321,11 +321,11 @@ namespace app
    {
       switch (status)
       {
-      case kArrangeJobDone:       return tok::V4(tok::palf::v_450_800_500_1000);
-      case kArrangeJobFailed:     return tok::V4(tok::palf::v_900_450_400_1000);
-      case kArrangeJobCancelled:  return tok::V4(tok::palf::v_700_650_400_1000);
+      case kArrangeJobDone:       return tok::RoleV4(tok::col::state_ok);
+      case kArrangeJobFailed:     return tok::RoleV4(tok::col::state_err_11);
+      case kArrangeJobCancelled:  return tok::RoleV4(tok::col::role_solo_4);
       case kArrangeJobRendering:
-      case kArrangeJobFinalizing: return tok::V4(tok::palf::v_500_720_950_1000);
+      case kArrangeJobFinalizing: return tok::RoleV4(tok::col::accent_7);
       default:                    return ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
       }
    }
@@ -1079,7 +1079,7 @@ namespace app
             {
                SectionHeader(T("Audio Track Controls"));
                bool solo = lane->solo;
-               const ImVec4 soloCol = ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pal::c_F59E0BFF));
+               const ImVec4 soloCol = ImGui::ColorConvertU32ToFloat4(tok::Role(tok::col::text_warn));
                const float halfW = (ImGui::GetContentRegionAvail().x - tok::space_1) * 0.5f;
                if (ToggleChip(L("Solo##tracksolo"), &solo, halfW, &soloCol))
                {

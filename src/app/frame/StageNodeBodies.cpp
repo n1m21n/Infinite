@@ -567,12 +567,12 @@ void DrawNodeBodies(FrameCtx& fc)
             else
                snprintf(line, sizeof(line), "%s", T("scene node"));
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10),
-                        isLight ? tok::U32(tok::pal::c_1E2434FF) : tok::U32(tok::pal::c_C8CEE2FF),
+                        isLight ? tok::Base(tok::col::surface_lo) : tok::Base(tok::col::surface_hi),
                         NodeTitleWithInstance(gn).c_str());
             dl->AddText(ImVec2(origin.x + 12, origin.y + 28),
-                        isLight ? tok::U32(tok::pal::c_5F697DFF) : tok::U32(tok::pal::c_82889CFF), line);
+                        isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid), line);
             // R11: scene nodes (camera / light / particles) get a small gizmo on the right instead of an empty box.
-            const ImU32 gz = isLight ? tok::U32(tok::pal::c_5F697DFF) : tok::U32(tok::pal::c_82889CFF);
+            const ImU32 gz = isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid);
             const ImVec2 gc(br.x - 30.0f, origin.y + h * 0.5f);
             if (dynamic_cast<CameraNode*>(gn.node.get()) != nullptr)
             {
@@ -603,13 +603,13 @@ void DrawNodeBodies(FrameCtx& fc)
             const std::string& name = GeometryNode::ShapeNames()[
                std::max(0, std::min(geo->shape, (int)GeometryNode::ShapeNames().size() - 1))];
             dl->AddText(ImVec2(origin.x + 12, origin.y + 14),
-                        isLight ? tok::U32(tok::pal::c_1E2434FF) : tok::U32(tok::pal::c_C8CEE2FF), name.c_str());
+                        isLight ? tok::Base(tok::col::surface_lo) : tok::Base(tok::col::surface_hi), name.c_str());
             char tris[48];
             snprintf(tris, sizeof(tris), "%s triangles", UiFmt::Count((long long)(geo->TriangleCount())).c);
             dl->AddText(ImVec2(origin.x + 12, origin.y + 34),
-                        isLight ? tok::U32(tok::pal::c_5F697DFF) : tok::U32(tok::pal::c_82889CFF), tris);
+                        isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid), tris);
             dl->AddText(ImVec2(origin.x + 12, origin.y + 54),
-                        isLight ? tok::U32(tok::pal::c_5F697DFF) : tok::U32(tok::pal::c_82889CFF), T("geometry -> Render 3D"));
+                        isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid), T("geometry -> Render 3D"));
          }
          else if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
             DrawPaintablePreview(draw);
@@ -803,9 +803,9 @@ void DrawNodeBodies(FrameCtx& fc)
                const ImVec2 tagSz(txtSz.x + 8.0f, txtSz.y + 2.0f);
                ImDrawList* dl = ImGui::GetWindowDrawList();
                dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
-                                 isLight ? tok::U32(tok::pal::c_FFEBC8C8) : tok::U32(tok::pal::c_463214B4), 3.0f);
+                                 isLight ? tok::Base(tok::col::surface_hi_4, 200) : tok::Base(tok::col::surface_lo_4, 180), 3.0f);
                dl->AddText(ImVec2(p.x + 4.0f, p.y + 1.0f),
-                           isLight ? tok::U32(tok::pal::c_B46414FF) : tok::U32(tok::pal::c_FFBE5AFF), tagText);
+                           isLight ? tok::Base(tok::col::text_warn_2) : tok::Base(tok::col::role_modulation), tagText);
                ImGui::Dummy(tagSz);
                modTagMin = p;
                modTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
@@ -819,9 +819,9 @@ void DrawNodeBodies(FrameCtx& fc)
                const ImVec2 tagSz(txtSz.x + 8.0f, txtSz.y + 2.0f);
                ImDrawList* dl = ImGui::GetWindowDrawList();
                dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
-                                 isLight ? tok::U32(tok::pal::c_C8F5EBC8) : tok::U32(tok::pal::c_143C32B4), 3.0f);
+                                 isLight ? tok::Base(tok::col::accent_alt_6, 200) : tok::Base(tok::col::surface_lo_5, 180), 3.0f);
                dl->AddText(ImVec2(p.x + 4.0f, p.y + 1.0f),
-                           isLight ? tok::U32(tok::pal::c_148C6EFF) : tok::U32(tok::pal::c_80DCBEFF), tagText);
+                           isLight ? tok::Base(tok::col::state_ok_8) : tok::Base(tok::col::viz_teal_8), tagText);
                ImGui::Dummy(tagSz);
                palTagMin = p;
                palTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
@@ -1383,7 +1383,7 @@ void DrawNodeBodies(FrameCtx& fc)
                         // Same orange as the VST3 blocklist warning - "this is a
                         // problem, not an error": the encoder is losing frames,
                         // but recording is continuing.
-                        ImGui::TextColored(tok::V4(tok::palf::v_900_550_250_1000), T("%d frames dropped - encoder can't keep up"), dropped);
+                        ImGui::TextColored(tok::RoleV4(tok::col::state_warn), T("%d frames dropped - encoder can't keep up"), dropped);
                      }
                   }
                   else
