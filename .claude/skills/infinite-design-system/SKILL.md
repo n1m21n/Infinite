@@ -20,6 +20,44 @@ tokens.json ──build_tokens.py──▶ Tokens.gen.h ──▶ components/* �
 art/icons/src/*.svg ──build_glyphs.py──▶ font + Glyphs.gen.h ──▶ components/IconTile, Pin, ...
 ```
 
+## Every UI change: scan before and after (owner 2026-11-24)
+
+1. Run `python3 tools/design/ui_audit.py` before and after any UI change, and fix every new finding; the scanner and the catalogue are the source of truth. It scans every `.cpp/.h/.mm/.hpp/.inl` under `src/app` and `src/core` (tests and generated headers excepted) and writes `internal/plans/ui-audit.md`. `--file <path>` lists one file's findings, `--why <file> <line>` says why a literal was allowed.
+2. A new literal gets a token (`tokens.json` for roles and the scales, `surfaces.json` for a surface's own size, named for its job) or a kit part. Never a tag.
+3. `// ui-audit-ok: <word> (note)` is only for data that never reaches the screen. The word must be one of `OK_WORDS` in `ui_audit.py`: patch_data, model, index, mask, hash, unit, bytes, sentinel, timing, key, rpc, log, core, world, count, setting. Any other reason is a `bad_ok` finding, and a tagged literal that reaches a colour, alpha, position or size is still a finding. The tag count is in the ratchet and can only go down.
+4. `python3 tools/design/ratchet.py` must exit 0. The pre-commit hook runs it on every commit that touches `src/app`, `src/core` or `tools/design` and blocks a rise (install once per clone with `scripts/git-hooks/install.sh`).
+
+### Which kit part per control
+
+From `CONTROLS` in `tools/design/ratchet.py`. Counts and files are in the control catalogue, `internal/plans/ui-control-catalogue.md` (main checkout; refresh with `python3 tools/design/control_catalogue.py`). A raw `ImGui::` call of the type outside `src/app/ui/design/` is counted, and the count may only go down.
+
+| Control | Use | Instead of |
+|---|---|---|
+| Button | `ActionButton` / `TextButton` / `IconTile` | `ImGui::Button`, `SmallButton`, `ArrowButton`, `ImageButton` |
+| Checkbox, radio | `CheckBox` / `Switch` | `ImGui::Checkbox`, `RadioButton` |
+| Slider, drag number | `FieldWell` (numeric) / `VFader` | `ImGui::SliderFloat`, `DragFloat`, `DragInt`, ... |
+| Knob | `ModWidgets` knob (rows: `r.Knob`, `KnobRow`) | `ImGuiKnobs::`, a hand-rolled `Draw*Knob` |
+| Fader | `VFader` | a hand-drawn `*Fader(` |
+| Meter | `AudioViz` meter | a hand-drawn `*Meter(` |
+| Text input | `FieldWell` / `FilterBar` | `ImGui::InputText`, `InputFloat`, `InputInt` |
+| Dropdown | `DropdownField` | `ImGui::BeginCombo`, `Combo` |
+| Colour picker | `ColourChip` | `ImGui::ColorButton`, `ColorEdit*`, `ColorPicker*` |
+| Popup, dialog | `MenuParts` / `DialogParts` | `ImGui::BeginPopup`, `BeginPopupModal` |
+| Menu | `MenuParts` | `ImGui::BeginMenu`, `MenuItem` |
+| Fold | `PanelKit::FoldHeader` | `ImGui::CollapsingHeader`, `TreeNode*` |
+| Tabs, segments | `PillGroup` / `PagePicker` | `ImGui::BeginTabBar`, `BeginTabItem` |
+| Progress | `BusyLine` | `ImGui::ProgressBar` |
+| Separator | `Divider` | `ImGui::Separator`, `SeparatorText` |
+| Child window, card | `PanelFrame` / `SectionCard` | `ImGui::BeginChild` |
+| Cursor | `ToolCursor` | `SetMouseCursor` |
+| Font, type size | `UiType` | `PushFont`, `SetWindowFontScale` |
+| Text on a draw list | `UiType` / `Readout` | `->AddText` |
+| Shapes, chrome | a component (no hand-drawn chrome) | `->AddRect`, `AddCircle`, `AddLine`, ... |
+| Pin | `PinDot` | `ed::BeginPin`, `ed::PinRect` |
+| Drag and drop | `ReorderDrag` | `BeginDragDropSource` / `Target` |
+| Style colours, vars | component states / `UiDensity` | `PushStyleColor`, `PushStyleVar` |
+| Hit area, context menu, list row, focus ring, image, wire | none yet (`UiInteract`, `MenuParts::Context`, `ListRow`, `Thumb`, `Wire`) | add the kit part first, then move call sites |
+
 ## Where things live
 
 | Path | Holds |
@@ -67,7 +105,7 @@ Known collisions are listed, not yet resolved; pair the colour with a glyph or l
 
 ## Before you commit
 
-1. `python3 tools/design/ratchet.py`: literal colours, raw widgets, size literals and popups went down or stayed the same (CI runs it in `build.yml`).
+1. `python3 tools/design/ui_audit.py` shows no new finding, and `python3 tools/design/ratchet.py` exits 0: literal colours, raw widgets, size literals, popups, the ui_audit categories and the ui-audit-ok tag count went down or stayed the same (the pre-commit hook and CI `build.yml` run it).
 2. Generated headers match their sources.
 3. Gallery goldens: changed only where you meant to change them, in light and dark.
 4. Motion: nothing over 200 ms, values never animate, reduce-motion turns eases off (plan section 4b). Every `motion_ms` token is a note value at 120 BPM (1/16 = 125, 1/16T = 83, 1/8T = 167, 1/16D = 188); `tools/design/motion_lint.py` enforces it, laws in BRAND.md §8 / `tools/brand/motion.py`.
