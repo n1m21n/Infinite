@@ -286,8 +286,19 @@ namespace MenuParts
          ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, ListMaxH()));
       PushPopupPad();
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+      const ImGuiID gid = ImGui::GetID(id);
+#endif
       const bool open = ImGui::BeginCombo(id, preview, flags | ImGuiComboFlags_NoArrowButton); // field well + value, never a chevron
       ImGui::PopStyleVar(2);
+      // ImGui's combo registers no label for the test hooks: name it, so journeys and the UI audit can find it.
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+      if (!open)
+      {
+         ImGuiContext& g = *GImGui;
+         IMGUI_TEST_ENGINE_ITEM_INFO(gid, id, g.LastItemData.StatusFlags | ImGuiItemStatusFlags_Openable);
+      }
+#endif
       if (open)
          BeginContent();
       return open;

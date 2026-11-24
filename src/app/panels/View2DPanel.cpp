@@ -10140,7 +10140,7 @@ namespace
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dside", IconsInfinite::Layers, sSideOpen, T("Layers and properties"))) sSideOpen = !sSideOpen;
       FormParts::Inline(0.0f, tok::space_1);
-      if (IconChip("##v2dfill", IconsInfinite::PopOut, gView2DDock == 4, ViewDockFillTip())) ViewDockToggleFill(2);
+      if (IconChip("##v2ddockfill", IconsInfinite::PopOut, gView2DDock == 4, ViewDockFillTip())) ViewDockToggleFill(2);
    }
 
    // The bottom row: zoom out / in, the zoom itself (click it to type one), Fit and 1:1, then the document facts.
@@ -10781,8 +10781,10 @@ namespace
       if (IconChip("##v2ddl", IconsInfinite::Close, false, T("Delete layer")))
          sPending.what = Pending::Delete;
       ImGui::EndDisabled();
-      // The blend / opacity / lock rows above already took their height: the list gets what is left, so it scrolls.
-      listH = std::max(tok::view2d_layers_card_ratio * (kRowH + 1.0f), std::min(listH, Ui::AvailH() - tok::space_0_5));
+      // The blend / opacity / lock rows above already took their height: the list gets what is left less the strip
+      // under it (one chip row), so it scrolls and the strip stays on screen.
+      const float footH = sChip + ImGui::GetStyle().ItemSpacing.y;
+      listH = std::max(tok::view2d_layers_card_ratio * (kRowH + 1.0f), std::min(listH, Ui::AvailH() - footH - tok::space_0_5));
       ImGui::BeginChild("##v2dlayers", ImVec2(w, listH), ImGuiChildFlags_None);
       const float rowsW = Ui::AvailW();
       if (doc->Layers().empty())
@@ -16762,6 +16764,8 @@ bool View2DJourneySetup(const std::string& line, std::string* err)
       sTab = 0;
       gView2DDock = 0;
       gPianoRollOpen = false;   // a journey that opened it must not take the next journey's keys
+      sEditMask = false;        // a journey that added a mask left mask editing on; the next one paints the layer
+      sTextEdit = 0;
       return true;
    }
    Scene2DNode* doc = FindDoc();
