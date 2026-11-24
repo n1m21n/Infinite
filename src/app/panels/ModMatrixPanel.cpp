@@ -319,7 +319,7 @@ namespace app
       Modulation& mod = Modulation::Instance();
 
       const ImVec2 panelOrigin = ImGui::GetCursorScreenPos();
-      const ImVec2 panelSize = ImGui::GetContentRegionAvail();
+      const ImVec2 panelSize = Ui::Avail();
 
       GestureRecorder& rec = GestureRecorder::Instance();
       {
@@ -1026,7 +1026,7 @@ namespace app
       // has so the panel is solid edge to edge.
       // Outer child is transparent: the panel floats as a card on the canvas colour (PanelFrame).
       ImGui::BeginChild(id, size, false);
-      const ImVec2 inner = ImGui::GetContentRegionAvail();
+      const ImVec2 inner = Ui::Avail();
 
       auto grip = [&]()
       {

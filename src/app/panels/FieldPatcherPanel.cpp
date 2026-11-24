@@ -1342,7 +1342,7 @@ namespace
             s.codeBuf = src;
             s.codeBufFor = src;
          }
-         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const ImVec2 avail = Ui::Avail();
          FieldWell::InputTextMultiline("##fpCode", &s.codeBuf, ImVec2(avail.x, std::max(tok::field_patcher_edit_code_box_min, avail.y)), ImGuiInputTextFlags_WordWrap);
          s.codeEditing = ImGui::IsItemActive();
          if (ImGui::IsItemDeactivatedAfterEdit() && s.codeBuf != src)
@@ -1374,7 +1374,7 @@ namespace
             }
             if (b->specId == "code")
             {
-               const ImVec2 avail = ImGui::GetContentRegionAvail();
+               const ImVec2 avail = Ui::Avail();
                FieldWell::InputTextMultiline("##fpRaw", &b->rawCode, ImVec2(avail.x, std::max(tok::field_patcher_edit_code_box_min, avail.y)), ImGuiInputTextFlags_WordWrap);
                if (ImGui::IsItemDeactivatedAfterEdit())
                   Commit(p, h, "Edit Code Box");
@@ -1545,7 +1545,7 @@ namespace
          entries.push_back(std::move(e));
       }
       PagePicker::Options opt;
-      opt.maxW = std::max(1.0f, ImGui::GetContentRegionAvail().x - tok::field_patcher_strip_ratio * (tok::control_h + tok::space_1) - tok::space_2);
+      opt.maxW = std::max(1.0f, Ui::AvailW() - tok::field_patcher_strip_ratio * (tok::control_h + tok::space_1) - tok::space_2);
       opt.canClose = true;
       int closeAt = -1;
       {
@@ -1615,7 +1615,7 @@ namespace
       const float tile = ChipButton::Height();
       Page* fp = Front();
       const float tailW = (fp != nullptr ? tile + tok::space_1 : 0.0f) + tile;
-      const float freeW = ImGui::GetContentRegionAvail().x - tailW - tok::space_1;
+      const float freeW = Ui::AvailW() - tailW - tok::space_1;
       if (freeW > tok::field_patcher_strip_limit)
       {
          UiInteract::Hit("##fpStripFree", ImVec2(freeW, tile));
@@ -1698,7 +1698,7 @@ namespace
          text(p.parseError.c_str(), &warn);
       // The free footer: right-click for the dock switch.
       ImGui::SetCursorPosY(y0);
-      const float freeW = ImGui::GetContentRegionAvail().x;
+      const float freeW = Ui::AvailW();
       if (freeW > tok::field_patcher_footer_limit)
       {
          UiInteract::Hit("##fpFooterFree", ImVec2(freeW, ChipButton::Height()));
@@ -1716,7 +1716,7 @@ namespace
    // lists the starters by kind.
    void DrawEmpty()
    {
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       const ImVec2 mx(mn.x + std::max(1.0f, avail.x), mn.y + std::max(1.0f, avail.y));
       ImU32 bg = ImGui::GetColorU32(ImGuiCol_WindowBg);
@@ -1775,7 +1775,7 @@ namespace
          Reparse(*p, src, MaskOf(*p, h));
 
       const float footerH = ImGui::GetFrameHeightWithSpacing();
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       const float bodyH = std::max(1.0f, avail.y - footerH);
       const float gap = tok::space_2;
       DrawRail(*p, h, bodyH);
@@ -1913,7 +1913,7 @@ void DrawFieldPatcherDocked(const char* id, const ImVec2& size)
    gFieldPatcherRectMin = ImGui::GetWindowPos();
    gFieldPatcherRectMax = ImVec2(gFieldPatcherRectMin.x + ImGui::GetWindowWidth(), gFieldPatcherRectMin.y + ImGui::GetWindowHeight());
    gFieldPatcherClaimedKeys = false;
-   const ImVec2 inner = ImGui::GetContentRegionAvail();
+   const ImVec2 inner = Ui::Avail();
    auto grip = [&]() {
       UiInteract::Hit("##fpgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
       DrawPanelSeam(false, gripFirst);

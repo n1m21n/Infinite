@@ -9,6 +9,10 @@ Rewrites, one call at a time, only when the result is the same ImGui call with t
   ImGui::SameLine()                  -> Ui::SameRow()
   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x) -> Ui::FillNext()
   ImGui::Dummy(ImVec2(w, h)) / Dummy(size), w and h not literals    -> Ui::Claim(...)   a drawn part's own size
+  ImGui::Dummy(ImVec2(0, 0))          -> Ui::Settle()       ends a hand-placed row
+  SetCursorPosY(GetCursorPosY() -/+ ItemSpacing.y)   -> Ui::JoinBelow() / Ui::ExtraItemGap()
+  SetCursorPosX(std::max(GetCursorPosX(), x))        -> Ui::ColumnAt(x)
+  ImGui::GetContentRegionAvail()[.x|.y]  -> Ui::Avail() / AvailW() / AvailH()   a size read, no placement
 
 G may be a literal or a tok:: name; tok:: names are resolved from Tokens.gen.h. Anything else (an off-ladder gap,
 a computed gap, cursor placement, avail maths) is listed for review and left alone: those need a Row with tracks or
@@ -76,12 +80,22 @@ def step(expr, allow_zero=False):
 
 ARG = r"((?:[^()]|\([^()]*\))+?)"
 RULES = [
+    ("settle", re.compile(r"ImGui::Dummy\(ImVec2\(\s*" + ZERO + r"\s*,\s*" + ZERO + r"\s*\)\)"), lambda m: "Ui::Settle()"),
+    ("join_below", re.compile(r"ImGui::SetCursorPosY\(\s*ImGui::GetCursorPosY\(\)\s*-\s*ImGui::GetStyle\(\)\.ItemSpacing\.y\s*\)"),
+     lambda m: "Ui::JoinBelow()"),
+    ("extra_item_gap", re.compile(r"ImGui::SetCursorPosY\(\s*ImGui::GetCursorPosY\(\)\s*\+\s*ImGui::GetStyle\(\)\.ItemSpacing\.y\s*\)"),
+     lambda m: "Ui::ExtraItemGap()"),
+    ("column_at", re.compile(r"ImGui::SetCursorPosX\(\s*std::max\(\s*ImGui::GetCursorPosX\(\)\s*,\s*" + ARG + r"\s*\)\s*\)"),
+     lambda m: f"Ui::ColumnAt({m.group(1).strip()})"),
     ("spacer", re.compile(r"ImGui::Dummy\(ImVec2\(\s*" + ZERO + r"\s*,\s*" + ARG + r"\s*\)\)"),
      lambda m: (lambda s: s and f"Ui::Spacer(Ui::Space::{s})")(step(m.group(1)))),
     ("same_row_gap", re.compile(r"ImGui::SameLine\(\s*" + ZERO + r"\s*,\s*" + ARG + r"\s*\)"),
      lambda m: (lambda s: s and f"Ui::SameRow(Ui::Space::{s})")(step(m.group(1), allow_zero=True))),
     ("same_row", re.compile(r"ImGui::SameLine\(\s*\)"), lambda m: "Ui::SameRow()"),
     ("fill_next", re.compile(r"ImGui::SetNextItemWidth\(\s*ImGui::GetContentRegionAvail\(\)\.x\s*\)"), lambda m: "Ui::FillNext()"),
+    ("avail_w", re.compile(r"ImGui::GetContentRegionAvail\(\)\.x\b"), lambda m: "Ui::AvailW()"),
+    ("avail_h", re.compile(r"ImGui::GetContentRegionAvail\(\)\.y\b"), lambda m: "Ui::AvailH()"),
+    ("avail", re.compile(r"ImGui::GetContentRegionAvail\(\)"), lambda m: "Ui::Avail()"),
     ("claim", re.compile(r"ImGui::Dummy\(" + ARG + r"\)"), None),   # handled below
 ]
 
@@ -91,7 +105,8 @@ def claim(m):
     v = re.fullmatch(r"ImVec2\(\s*" + ARG + r"\s*,\s*" + ARG + r"\s*\)", arg)
     if v:
         a, b = v.group(1).strip(), v.group(2).strip()
-        if value(a) is not None or value(b) is not None:   # a literal / token side: a gap, not a drawn part's size
+        nonzero = lambda e: value(e) is not None and value(e) != 0.0
+        if nonzero(a) or nonzero(b) or (value(a) == 0.0 and value(b) == 0.0):   # a literal / token side: a gap, not a part's size
             return None
     elif value(arg) is not None:
         return None
@@ -123,10 +138,16 @@ def add_include(text):
     if INCLUDE in text:
         return text
     lines = text.split("\n")
-    last = max((i for i, l in enumerate(lines) if l.startswith("#include")), default=None)
+    head = []   # the leading include block only: a header may include more files further down, after code using Ui::
+    for i, l in enumerate(lines):
+        t = l.strip()
+        if t and not t.startswith(("#", "//", "/*", "*")):
+            break
+        head.append(i)
+    last = max((i for i in head if lines[i].startswith("#include")), default=None)
     if last is None:
         return text
-    design = [i for i, l in enumerate(lines) if l.startswith('#include "app/ui/design/')]
+    design = [i for i in head if lines[i].startswith('#include "app/ui/design/')]
     at = (design[-1] if design else last) + 1
     lines.insert(at, INCLUDE)
     return "\n".join(lines)

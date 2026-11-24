@@ -24,6 +24,7 @@
 #include "app/ui/design/BrandLogo.gen.h"
 #include "platform/AppPaths.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -769,7 +770,7 @@ void DrawMenuBar(FrameCtx& fc)
                UiType::Scope ts(UiType::Size::Body, UiType::Weight::Regular);
                w = std::max(Readout::Measure(widest), Readout::Measure(text));
             }
-            ImGui::Dummy(ImVec2(w, tok::control_h));
+            Ui::Claim(ImVec2(w, tok::control_h));
             Readout::Draw(key, UiLayout::Rect { p.x, p.y, w, tok::control_h }, text, text, UiType::Size::Body,
                           UiType::Weight::Regular, Readout::Align::Left, dim ? tok::stage_menu_bar_ticks : 1.0f);
          };

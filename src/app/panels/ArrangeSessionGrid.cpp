@@ -613,7 +613,7 @@ namespace app
    void DrawArrangeSessionGrid(float width)
    {
       const bool isLight = IsThemeLight();
-      ImVec2 avail = ImGui::GetContentRegionAvail();
+      ImVec2 avail = Ui::Avail();
       avail.x = std::min(avail.x, width);
       const int laneCount = (int)gArrange.lanes.size();
 
@@ -1609,7 +1609,7 @@ namespace app
          PushDockedPanelStyle(/*isChild=*/true);
          ImGui::BeginChild("##sessionmonitor", ImVec2(width, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          PopDockedPanelStyle();
-         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const ImVec2 avail = Ui::Avail();
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          const ImVec2 br(origin.x + avail.x, origin.y + avail.y);
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1801,7 +1801,7 @@ namespace app
          HandleSessionKeys();
          ArrangePruneSelection();
          ArrangePollMediaImports();
-         const ImVec2 panelSize = ImGui::GetContentRegionAvail();
+         const ImVec2 panelSize = Ui::Avail();
 
          // Toolbar, laid out like the Timeline's: Monitor | Play, Record, Stop All, Quantize | Inspector, and pinned
          // right the audio mode chip (and Render Take once a take exists). Right-click it for Close.
@@ -1999,12 +1999,12 @@ namespace app
          const bool isWide = panelSize.x >= tok::arrange_session_grid_is_wide_limit;
          const bool showMon = isWide && sSessionShowMonitor;
          const float monW = isWide ? std::clamp(panelSize.x * tok::arrange_session_grid_panel_content_ratio, tok::arrange_session_grid_mon_w_lo, tok::arrange_session_grid_mon_w_hi) : 0.0f;
-         const float kInspectorW = ArrangeClipSettingsWidth(std::max(tok::arrange_session_grid_inspector_w_min, ImGui::GetContentRegionAvail().x * 0.5f));
+         const float kInspectorW = ArrangeClipSettingsWidth(std::max(tok::arrange_session_grid_inspector_w_min, Ui::AvailW() * 0.5f));
          // The inspector shows the selected slot clip; it opens from a cell (double-click) and closes with its own X.
          const bool showInspector = gArrangeClipSettingsPanelOpen && ArrangeSelectedSlotId() != 0;
          const float spacing = ImGui::GetStyle().ItemSpacing.x;
          const ImVec2 rowOrigin = ImGui::GetCursorScreenPos();
-         const float rowW = ImGui::GetContentRegionAvail().x;
+         const float rowW = Ui::AvailW();
          if (showMon)
             DrawSessionMonitor(monW);
          const float gridX = rowOrigin.x + (showMon ? monW + spacing : 0.0f);
@@ -2040,7 +2040,7 @@ namespace app
       ImGui::BeginChild(id, size, false);
       gSessionPanelRectMin = ImGui::GetWindowPos();
       gSessionPanelRectMax = ImVec2(gSessionPanelRectMin.x + ImGui::GetWindowSize().x, gSessionPanelRectMin.y + ImGui::GetWindowSize().y);
-      const ImVec2 inner = ImGui::GetContentRegionAvail();
+      const ImVec2 inner = Ui::Avail();
       auto grip = [&]()
       {
          UiInteract::Hit("##sessionpanelgrip", ImVec2(std::max(1.0f, inner.x), kGrip));

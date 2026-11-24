@@ -15,23 +15,53 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import golden  # noqa: E402
 
 ROOT = golden.ROOT
-PANELS = ["settingsgeneral", "settingsglobals", "settingsplugins", "settingsreference", "settingsterminal", "settingsdaw",
-          "arrange", "mixer", "drums", "library", "perf", "modmatrix", "curveeditor", "pianoroll", "history",
-          "view2d", "view3d", "terminal"]
+# name -> INFINITE_OPENPANELS value. Settings tabs need "settingswin" to open the window; the demo hooks give the
+# Performance and History panels rows to show. No showcase patch: its previews animate on wall time, so two runs of
+# one binary would never match; an empty canvas leaves only the panel chrome, which is what a layout sweep touches.
+PANELS = {
+    "settingsgeneral": "settingswin,settingsgeneral", "settingsglobals": "settingswin,settingsglobals",
+    "settingsplugins": "settingswin,settingsplugins", "settingsreference": "settingswin,settingsreference",
+    "settingsterminal": "settingswin,settingsterminal", "settingsdaw": "settingswin,settingsdaw",
+    "settingsfield": "settingswin,settingsfield", "settings3d": "settingswin,settingstab=10",
+    "arrange": "arrange", "mixer": "mixer", "drums": "drums", "library": "library", "perf": "perfdemo",
+    "modmatrix": "modmatrix", "curveeditor": "curveeditor", "pianoroll": "pianoroll", "history": "historydemo",
+    "view2d": "view2d", "view3d": "view3d", "terminal": "terminal",
+}
 
 
 def shoot(out, binary, panels):
     os.makedirs(out, exist_ok=True)
     for p in panels:
         shot = os.path.join(out, p + ".png")
-        env = dict(os.environ, INFINITE_OPENPANELS=p, INFINITE_NO_UPDATE_CHECK="1", IMAGERESYNTH_SCREENSHOT=shot,
-                   INFINITE_SHOWCASE="1")
+        env = dict(os.environ, INFINITE_OPENPANELS=PANELS.get(p, p), INFINITE_NO_UPDATE_CHECK="1",
+                   IMAGERESYNTH_SCREENSHOT=shot, INFINITE_SCREENSHOT_FRAME="30")
         try:
             subprocess.run([binary], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120, check=False)
         except subprocess.TimeoutExpired:
             print(f"{p}: timed out")
             continue
         print(f"{p}: {'ok' if os.path.exists(shot) else 'no shot'}", flush=True)
+
+
+# Two shoots of one binary differ by mean ~0.25 and <= 0.02% of pixels off by >24 (the canvas grid's sub-pixel
+# shimmer, measured 2026-11-24 over all panels). A moved row or a changed gap shifts whole lines of text, far past this.
+MAX_BIG = 0.0005
+
+
+def diff(cand, gold, diff_out):
+    from PIL import Image, ImageChops
+    a, b = Image.open(cand).convert("RGB"), Image.open(gold).convert("RGB")
+    if a.size != b.size:
+        return False, 1.0, 255.0
+    d = ImageChops.difference(a, b).convert("L")
+    d.paste(0, (0, 0, d.size[0], 64))   # the menu bar shows live fps
+    hist = d.histogram()
+    n = a.size[0] * a.size[1]
+    big = sum(hist[25:]) / n
+    ok = big <= MAX_BIG
+    if not ok and diff_out:
+        d.point(lambda v: 255 if v > 24 else 0).save(diff_out)
+    return ok, big, sum(i * c for i, c in enumerate(hist)) / n
 
 
 def compare(before, after, diff_out):
@@ -43,8 +73,8 @@ def compare(before, after, diff_out):
         a = os.path.join(after, name)
         if not os.path.exists(a):
             print(f"{name}: missing in {after}"); bad += 1; continue
-        ok, msg = golden.diff_images(a, os.path.join(before, name), os.path.join(diff_out, name))
-        print(f"{name}: {'same' if ok else 'DIFF'} {msg}")
+        ok, big, mean = diff(a, os.path.join(before, name), os.path.join(diff_out, name))
+        print(f"{name}: {'same' if ok else 'DIFF'}  mean {mean:.3f}, pixels >24: {big*100:.4f}%")
         bad += 0 if ok else 1
     return 1 if bad else 0
 

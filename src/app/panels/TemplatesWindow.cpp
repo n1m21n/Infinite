@@ -10,6 +10,7 @@
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/SectionCard.h"
+#include "app/ui/design/UiScope.h"
 #include "core/gl3.h"
 #include "stb_image.h"
 #include <map>
@@ -152,7 +153,7 @@ void DrawTemplatesWindow(bool* open)
 
    constexpr float kCardW = tok::templates_card_w;
    const std::vector<Entry>& entries = Entries();
-   const float avail = ImGui::GetContentRegionAvail().x;
+   const float avail = Ui::AvailW();
    const float gap = ImGui::GetStyle().ItemSpacing.x;
    const int perRow = std::max(1, (int)((avail + gap) / (kCardW + gap)));
    const Entry* picked = nullptr;
@@ -173,7 +174,7 @@ void DrawTemplatesWindow(bool* open)
       }
       const int rows = (col + perRow - 1) / perRow;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + (float)rows * (cardH + gap) - gap));
-      ImGui::Dummy(ImVec2(0.0f, 0.0f));
+      Ui::Settle();
    }
    SectionCard::End();
    SectionCard::EndWindow();

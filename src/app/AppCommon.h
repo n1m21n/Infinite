@@ -15,6 +15,7 @@
 #endif
 
 #include "imgui.h"
+#include "app/ui/design/UiScope.h"
 #include "platform/common/MidiCC14.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -85,7 +86,7 @@
 inline void EndChildSafe()
 {
    if (ImGui::GetCurrentWindow()->DC.IsSetPos)
-      ImGui::Dummy(ImVec2(0.0f, 0.0f));
+      Ui::Settle();
    ImGui::EndChild();
 }
 

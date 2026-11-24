@@ -314,7 +314,7 @@ namespace app
       std::string folderToScan;
       bool scanAll = false;
       const bool scanning = scanner.IsScanning();
-      const float panelW = ImGui::GetContentRegionAvail().x;
+      const float panelW = Ui::AvailW();
       for (const std::string& folder : scanner.Folders())
       {
          ImGui::PushID(folder.c_str());
@@ -504,7 +504,7 @@ namespace app
                // Subfolder rows first: a click opens it, a drag (Samples) loads it as a kit.
                const std::string& folder = subfolders[(size_t)rowIdx];
                ImGui::PushID(folder.c_str());
-               const float availW = ImGui::GetContentRegionAvail().x;
+               const float availW = Ui::AvailW();
                const std::string name = FolderDisplayName(folder);
                if (LibraryParts::FolderRow("sub", TruncateWithEllipsis(name, std::max(tok::library_search_min_sm, availW - tok::library_search_min_lg))).clicked)
                   browseDir = folder;
@@ -537,7 +537,7 @@ namespace app
                // A subtle tint behind the whole row so the playing one stays
                // findable after the list has scrolled - drawn before the
                // row's widgets so it sits behind them, not on top.
-               const ImVec2 rowMax(rowScreenMin.x + ImGui::GetContentRegionAvail().x, rowScreenMin.y + rowH);
+               const ImVec2 rowMax(rowScreenMin.x + Ui::AvailW(), rowScreenMin.y + rowH);
                ImGui::GetWindowDrawList()->AddRectFilled(rowScreenMin, rowMax,
                                                         ImGui::ColorConvertFloat4ToU32(AccentEmphasisHover()));
             }
@@ -607,7 +607,7 @@ namespace app
          // key off *this* item, not the play button, so a drag started on
          // the button (which is a separate widget one item back) never
          // begins a sample drag.
-         const float availW = ImGui::GetContentRegionAvail().x;
+         const float availW = Ui::AvailW();
          // Reserved unconditionally (not just when isFav) so a row's text
          // doesn't reflow when its favourite state toggles.
          const float badgeReserve = tok::library_badge_reserve;
@@ -1090,7 +1090,7 @@ namespace app
          if (!entry.manufacturer.empty())
             label += "  -  " + entry.manufacturer;
 
-         const float availW = ImGui::GetContentRegionAvail().x;
+         const float availW = Ui::AvailW();
          const float badgeReserve = tok::library_badge_reserve;
          const std::string rowLabel = TruncateWithEllipsis(label, std::max(20.0f, availW - badgeReserve));
          LibraryParts::Row("row", rowLabel, nullptr, isFav);
@@ -1289,7 +1289,7 @@ namespace app
             ImGui::PushID(entry.name.c_str());
 
             const bool isFav = gBrowserFavorites.IsFavoriteFieldPreset(entry.name);
-            const float availW = ImGui::GetContentRegionAvail().x;
+            const float availW = Ui::AvailW();
             const float badgeReserve = tok::library_badge_reserve;
             const float catTagReserve = tok::library_cat_tag_reserve;
 

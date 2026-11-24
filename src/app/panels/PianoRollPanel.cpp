@@ -3183,12 +3183,12 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float toolbarH = PanelKit::Chip() + ImGui::GetStyle().ItemSpacing.y;
       {
-         const ImVec2 room = ImGui::GetContentRegionAvail();
+         const ImVec2 room = Ui::Avail();
          DrawToolbar(page, room.x - kKeysW, room.y - toolbarH - kRulerH - kStripH);
       }
       Ui::Spacer(Ui::Space::S1);   // toolbar to ruler = seam to toolbar (grip + space_1)
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       Areas a;
       const float inspectorBase = std::min(kInspectorW, avail.x * tok::piano_roll_page_ratio);
       const float inspectorW = s.settingsOpen || s.genOpen
@@ -3522,7 +3522,7 @@ namespace
       }
       gPianoRollPendingDrop.clear();
       static Arrange::Lane sNoPage;
-      const ImVec2 room = ImGui::GetContentRegionAvail();
+      const ImVec2 room = Ui::Avail();
       DrawToolbar(sNoPage, room.x - kKeysW, room.y);
       EmptyState::DrawInWindow(T("No pages yet"), T("Choose New Page in the page list to start writing notes."));
    }
@@ -3673,7 +3673,7 @@ void DrawPianoRollDocked(const char* id, const ImVec2& size)
    gPianoRollRectMin = ImGui::GetWindowPos();
    gPianoRollRectMax = ImVec2(gPianoRollRectMin.x + ImGui::GetWindowSize().x, gPianoRollRectMin.y + ImGui::GetWindowSize().y);
    gPianoRollClaimedKeys = false;
-   const ImVec2 inner = ImGui::GetContentRegionAvail();
+   const ImVec2 inner = Ui::Avail();
    auto grip = [&]()
    {
       UiInteract::Hit("##pianogrip", ImVec2(std::max(1.0f, inner.x), kGrip));

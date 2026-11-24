@@ -181,17 +181,17 @@ int DrawFloating(FrameCtx& fc)
       if (DialogParts::Begin(L("About Infinite")))
       {
          const float w = tok::stage_floating_w;
-         ImGui::Dummy(ImVec2(w, 0.0f));
+         Ui::Claim(ImVec2(w, 0.0f));
          const auto Centered = [&](const char* text, bool dim)
          {
             const float tw = ImGui::CalcTextSize(text).x;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - tw) * 0.5f));
+            Ui::CentreNext(tw, w);
             if (dim) DialogParts::Message(text); else ImGui::TextUnformatted(text);
          };
          if (const ImTextureID tex = BrandLogoTexture())
          {
             const float s = 96.0f;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - s) * 0.5f);
+            Ui::CentreNext(s, w);
             const ImVec2 p = ImGui::GetCursorScreenPos();
             Ui::Claim(ImVec2(s, s));
             Thumb::AddRounded(ImGui::GetWindowDrawList(), tex, p, ImVec2(p.x + s, p.y + s), ImVec2(0, 0), ImVec2(1, 1),
@@ -234,7 +234,7 @@ int DrawFloating(FrameCtx& fc)
                                 { T("Third-party notices"), "https://github.com/n1m21n/Infinite/blob/main/THIRD_PARTY_NOTICES" },
                                 { T("Releases"), "https://github.com/n1m21n/Infinite/releases" } };
             // Laid out by hand so they wrap with the dialog instead of overflowing it.
-            const float x0 = ImGui::GetCursorPosX(), maxX = x0 + ImGui::GetContentRegionAvail().x;
+            const float x0 = ImGui::GetCursorPosX(), maxX = x0 + Ui::AvailW();
             const float lineH = ImGui::GetTextLineHeight() + tok::space_1;
             float x = x0, y = ImGui::GetCursorPosY();
             for (const L& l : links)
@@ -332,7 +332,7 @@ int DrawFloating(FrameCtx& fc)
             for (const MediaCollect::Item& item : sMediaPlan)
             {
                const ImVec2 p = ImGui::GetCursorScreenPos();
-               const float w = ImGui::GetContentRegionAvail().x;
+               const float w = Ui::AvailW();
                const size_t slash = item.source.find_last_of("/\\");
                const std::string name = slash == std::string::npos ? item.source : item.source.substr(slash + 1);
                const char* state = item.state == MediaCollect::State::Missing   ? T("missing")

@@ -15,6 +15,7 @@
 #include "app/ui/design/components/GlyphToggle.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/UiScope.h"
 #include "core/CliSetup.h"
 #include "core/RemoteControl.h"
 #include "core/term/TermSession.h"
@@ -712,7 +713,7 @@ namespace
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 start = ImGui::GetCursorScreenPos();
-      const float rowW = ImGui::GetContentRegionAvail().x;
+      const float rowW = Ui::AvailW();
       const ImU32 textColor = ImGui::GetColorU32(ImGuiCol_Text);
       const ImU32 dimColor = ImGui::GetColorU32(ImGuiCol_TextDisabled);
       float x = start.x;
@@ -795,7 +796,7 @@ namespace
 
    void DrawSearchRow(Tab& tab, const term::Snapshot* snap)
    {
-      const float width = ImGui::GetContentRegionAvail().x;
+      const float width = Ui::AvailW();
       ImGui::SetNextItemWidth(std::min(tok::terminal_search_row_max, width - tok::terminal_search_row_gap));
       if (sSearchFocus)
       {
@@ -949,7 +950,7 @@ namespace
             return;
          }
          // The terminal opens beside the chat, as the side terminal does in Claude: chat left, shell right.
-         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const ImVec2 avail = Ui::Avail();
          const float gap = tok::space_1;
          const float left = std::floor((avail.x - gap) * tok::terminal_panel_ratio);
          ImGui::BeginChild("##chatside", ImVec2(left, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
@@ -989,7 +990,7 @@ namespace
       DrawTabRow(snap.get());
       if (sTabs.empty())
       {
-         ImGui::Dummy(ImVec2(0.0f, 0.0f)); // the tab row moved the cursor
+         Ui::Settle(); // the tab row moved the cursor
          return;
       }
       tab = sTabs[(size_t)sActive].get();
@@ -1000,12 +1001,12 @@ namespace
       const float px = std::max(tok::terminal_px_min, gTerminalFontSize);
       const float cw = sFont->GetFontBaked(px)->GetCharAdvance('M');
       const float ch = std::floor(px * kLineHeight + tok::terminal_ch_u_res);
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       if (avail.x < cw * 2.0f || avail.y < ch * 2.0f)
       {
          // The tab row moved the cursor; submit an item so ImGui's boundary check stays quiet.
-         ImGui::Dummy(ImVec2(0.0f, 0.0f));
+         Ui::Settle();
          return;
       }
       const int cols = std::max(2, (int)(avail.x / cw));
@@ -1111,7 +1112,7 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    // A click anywhere else gives the keys back to the app.
    if (gTerminalFocus && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsMouseHoveringRect(gTerminalRectMin, gTerminalRectMax, false))
       gTerminalFocus = false;
-   const ImVec2 inner = ImGui::GetContentRegionAvail();
+   const ImVec2 inner = Ui::Avail();
    auto grip = [&]()
    {
       UiInteract::Hit("##terminalgrip", vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));

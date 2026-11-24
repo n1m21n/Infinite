@@ -47,6 +47,7 @@
 #include <string>
 #include <vector>
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -5751,7 +5752,7 @@ namespace
 
    void DrawHeader(Scene3DNode* scene)
    {
-      const float availW = ImGui::GetContentRegionAvail().x;
+      const float availW = Ui::AvailW();
       const float startX = ImGui::GetCursorPosX();
       auto gap = []() { FormParts::Inline(0.0f, tok::space_3); };
       auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
@@ -5826,14 +5827,14 @@ namespace
       {
          const char* convertL = L("Convert##v3dconvert");
          const float convertW = ImGui::CalcTextSize(convertL, ImGui::FindRenderedTextEnd(convertL)).x + tok::view3d_convert_w_ratio * tok::space_3;
-         ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX - tok::space_1 - convertW));
+         Ui::ColumnAt(rightX - tok::space_1 - convertW);
          if (ActionButton::Draw(convertL, ImVec2(convertW, PanelKit::Chip())))
             sPending.what = Pending::ConvertScene;
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Put this scene on the canvas"));
          ActionButton::RowNext();
       }
-      ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX));
+      Ui::ColumnAt(rightX);
       if (IconChip("##v3dside", IconsInfinite::Edit, sSideOpen, T("Properties (N)"))) sSideOpen = !sSideOpen;
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v3dfill", IconsInfinite::PopOut, gView3DDock == 4, ViewDockFillTip())) ViewDockToggleFill(3);
@@ -6058,7 +6059,7 @@ namespace
       ImGui::PushID(title);
       const float fh = ImGui::GetFrameHeight();
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float w = ImGui::GetContentRegionAvail().x;
+      const float w = Ui::AvailW();
       const ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       float x = p.x;
@@ -6344,7 +6345,7 @@ namespace
             HelpTip("%s", it.visible ? T("Hide (H)") : T("Show (Alt+H shows everything)"));
          glyph::Draw(dl, ImVec2(p.x + availW - tok::space_3, midY), tok::icon_control, text, it.visible ? IconsInfinite::Eye : IconsInfinite::EyeOff);
          ImGui::SetCursorScreenPos(ImVec2(p.x, p.y + rowH));
-         ImGui::Dummy(ImVec2(0.0f, 0.0f));
+         Ui::Settle();
          ImGui::PopID();
       }
       // Item keys act on the picked rows while the list is hovered or was the last thing clicked.
@@ -7242,7 +7243,7 @@ namespace
    {
       const unsigned int tex = PreviewBallTexture(mat);
       const float side = std::min(availW, 160.0f);
-      ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (availW - side) * 0.5f);
+      Ui::CentreNext(side, availW);   // side <= availW
       Thumb::Image((ImTextureID)(intptr_t)tex, ImVec2(side, side), ImVec2(0, 1), ImVec2(1, 0));
    }
 
@@ -7259,7 +7260,7 @@ namespace
       if (mat == nullptr)
       {
          // The column starts a spacing high for a card; a bare button needs it back.
-         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y);
+         Ui::ExtraItemGap();
          if (ActionButton::Draw(L("Add Material"), ImVec2(-1.0f, 0)))
             AddMaterial(scene, *item);
          return;
@@ -7921,7 +7922,7 @@ namespace
       ImGui::BeginChild(id, ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding | flags);
       ImGui::PopStyleVar();
       SectionCard::BeginWindow();
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+      Ui::JoinBelow();
    }
 
    void EndCardColumn()
@@ -7940,7 +7941,7 @@ namespace
       ImGui::GetStyle().WindowPadding = savedPad;
       PopDockedPanelStyle();
       UiDensity::Compact compact;   // the settings are a compact strip (Photoshop / Affinity Properties size)
-      float availW = ImGui::GetContentRegionAvail().x;
+      float availW = Ui::AvailW();
       // The title names the tab that is open (Render, Object, Material...), as Blender's Properties header does.
       {
          Item* const ti = sSel.size() == 1 ? scene->FindItem(sSel[0]) : nullptr;
@@ -7995,10 +7996,10 @@ namespace
       ImGui::EndGroup();
       ActionButton::RowNext();
       BeginCardColumn("##v3dprops", ImGuiChildFlags_None);
-      availW = std::floor(ImGui::GetContentRegionAvail().x);
+      availW = std::floor(Ui::AvailW());
       sFieldW = std::max(tok::view3d_field_w_min, availW - FieldLabelW());
       sCard.clear();
-      if (sTab == kSceneTab) DrawOutliner(scene, availW, ImGui::GetContentRegionAvail().y);
+      if (sTab == kSceneTab) DrawOutliner(scene, availW, Ui::AvailH());
       else if (sTab == 0) DrawRenderTab(scene);
       else if (sTab == 1) DrawOutputTab(scene, availW);
       else if (sTab == 2) DrawWorldTab(scene, availW);
@@ -8469,7 +8470,7 @@ namespace
       const float headTop = ImGui::GetCursorScreenPos().y;
       DrawHeader(scene);
       DrawDockMenu(headTop, ImGui::GetCursorScreenPos().y);
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
       const float sideBase = std::min(kSideW, avail.x * 0.5f);
       const float sideW = sSideOpen ? sideBase : 0.0f;

@@ -1750,7 +1750,7 @@ namespace
    {
       if (c.size() < tok::view2d_curve_editor_limit)
          c = { 0.0f, 0.0f, 1.0f, 1.0f };
-      const float w = ImGui::GetContentRegionAvail().x, h = std::min(w, tok::view2d_curve_max);
+      const float w = Ui::AvailW(), h = std::min(w, tok::view2d_curve_max);
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
       UiInteract::Hit("##curve", ImVec2(w, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2225,7 +2225,7 @@ namespace
          float* lv = adjCh == 0 ? x.levels : x.levelsCh[adjCh - 1];
          const std::vector<float>& h = DocHistogram(doc, key);
          {
-            const float w = ImGui::GetContentRegionAvail().x;
+            const float w = Ui::AvailW();
             const float histH = tok::view2d_hist_h, mkH = tok::view2d_mk_h;
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
             UiInteract::Hit((std::string("##v2dlvh") + std::to_string(key)).c_str(), ImVec2(w, histH + mkH + tok::space_0_5));
@@ -9587,7 +9587,7 @@ namespace
                   // The whole row is the toggle: the icon and name dim when the tool is off the strip.
                   const char* name = T(ToolTitle(kTools[idx].tip));
                   const float rh = ImGui::GetFrameHeight();
-                  const float rw = std::max(ImGui::GetContentRegionAvail().x, tok::view2d_tool_picker_gap + tok::space_2 + ImGui::CalcTextSize(name).x + tok::space_2);
+                  const float rw = std::max(Ui::AvailW(), tok::view2d_tool_picker_gap + tok::space_2 + ImGui::CalcTextSize(name).x + tok::space_2);
                   const ImVec2 rp = ImGui::GetCursorScreenPos();
                   if (UiInteract::Hit("##row", ImVec2(rw, rh)))
                   {
@@ -9666,10 +9666,10 @@ namespace
       }
       if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && MenuParts::RightPressed())
          openPicker = true;
-      ImGui::Dummy(ImVec2(w, 0.0f));
+      Ui::Claim(ImVec2(w, 0.0f));
       FgBgTile();
       if (cols == 1)
-         ImGui::Dummy(ImVec2(w, 0.0f));
+         Ui::Claim(ImVec2(w, 0.0f));
       else
          FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2dqm", IconsInfinite::QuickMask, doc->quickMask, T(doc->quickMask ? "Quick mask on (Q)" : "Quick mask (Q)")))
@@ -10048,7 +10048,7 @@ namespace
 
    void DrawHeader(Scene2DNode* doc)
    {
-      const float availW = ImGui::GetContentRegionAvail().x;
+      const float availW = Ui::AvailW();
       const float startX = ImGui::GetCursorPosX();
       if (sTool != kCrop)
          sCropOn = false;
@@ -10628,7 +10628,7 @@ namespace
             MenuParts::EndPopup();
          }
          ImGui::SetCursorScreenPos(ImVec2(p.x, p.y + rowH + 1.0f));
-         ImGui::Dummy(ImVec2(0, 0));
+         Ui::Settle();
          const bool open = l->kind == Kind::Group && l->open;
          ImGui::PopID();
          if (open)
@@ -10763,14 +10763,14 @@ namespace
          sPending.what = Pending::Delete;
       ImGui::EndDisabled();
       // The blend / opacity / lock rows above already took their height: the list gets what is left, so it scrolls.
-      listH = std::max(tok::view2d_layers_card_ratio * (kRowH + 1.0f), std::min(listH, ImGui::GetContentRegionAvail().y - tok::space_0_5));
+      listH = std::max(tok::view2d_layers_card_ratio * (kRowH + 1.0f), std::min(listH, Ui::AvailH() - tok::space_0_5));
       ImGui::BeginChild("##v2dlayers", ImVec2(w, listH), ImGuiChildFlags_None);
-      const float rowsW = ImGui::GetContentRegionAvail().x;
+      const float rowsW = Ui::AvailW();
       if (doc->Layers().empty())
          CentredText(ImGui::GetCursorScreenPos().y, T("No layers"));
       DrawLayerRows(doc, 0, 0, rowsW);
       // Dropping below the last row puts a layer at the bottom of the document.
-      ImGui::Dummy(ImVec2(rowsW, std::max(tok::view2d_layers_card_min, ImGui::GetContentRegionAvail().y)));
+      Ui::Claim(ImVec2(rowsW, std::max(tok::view2d_layers_card_min, Ui::AvailH())));
       if (ImGui::BeginDragDropTarget())
       {
          if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2D_LAYER"))
@@ -10788,7 +10788,7 @@ namespace
       EndChildSafe();
       // The strip under the list, as in every layers panel, centred under it.
       const float footW = tok::view2d_foot_w_ratio * sChip + tok::view2d_layers_card_foot_w * tok::space_1;
-      ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - footW) * 0.5f));
+      Ui::CentreNext(footW, w);
       if (IconChip("##v2dnewpaint", IconsInfinite::Brush, false, T("New layer")))
          sPending.what = Pending::AddPaint;
       FormParts::Inline(0.0f, tok::space_1);
@@ -11815,12 +11815,12 @@ namespace
    {
       const float fh = ImGui::GetFrameHeight();
       const float chipsW = chips * fh + std::max(0, chips - 1) * tok::space_1;
-      const float nameW = std::max(1.0f, ImGui::GetContentRegionAvail().x - chipsW - tok::space_2);
+      const float nameW = std::max(1.0f, Ui::AvailW() - chipsW - tok::space_2);
       const ImVec2 np = ImGui::GetCursorScreenPos();
       // The whole card, for the drag-to-reorder bar: on box on the left, header icons on the right, card padding round.
       const float pad = SectionCard::Pad();
       sCardSpan[0] = ImVec2(np.x - CheckBox::Size() - tok::space_2 - pad, np.y - pad);
-      sCardSpan[1] = ImVec2(np.x + ImGui::GetContentRegionAvail().x + pad, np.y + fh + pad);
+      sCardSpan[1] = ImVec2(np.x + Ui::AvailW() + pad, np.y + fh + pad);
       if (UiInteract::Hit(id.c_str(), ImVec2(nameW, fh)))
          SettingsWindow::Toggle(winKey);
       const bool hov = ImGui::IsItemHovered();
@@ -11880,18 +11880,19 @@ namespace
       const std::string winKey = "v2deff/" + std::to_string(sDocUid) + "/" + cardKey;
       SectionCard::Begin();
       const float rowY = ImGui::GetCursorPosY();
-      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
-      bool on = e.on;
-      if (CheckBox::Box((base + "on").c_str(), &on))
       {
-         PushUndoCheckpoint("Effect on");
-         e.on = on;
-         Touch();
+         Ui::CentreInRow centred(ImGui::GetFrameHeight(), CheckBox::Size());
+         bool on = e.on;
+         if (CheckBox::Box((base + "on").c_str(), &on))
+         {
+            PushUndoCheckpoint("Effect on");
+            e.on = on;
+            Touch();
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("On"));
+         FormParts::Inline(0.0f, tok::space_2);
       }
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("On"));
-      FormParts::Inline(0.0f, tok::space_2);
-      ImGui::SetCursorPosY(rowY);
       // The 3D View's card grammar: on box, name, gear. Show on canvas and Remove are on the right-click menu.
       const ImVec2 np = CardTitle(base + "name", name, e.on, 1, winKey, T("Click for all settings, drag to reorder, right-click for more"));
       // Drag the card to move the effect: the other cards slide aside live (the shared reorder motion).
@@ -12503,7 +12504,7 @@ namespace
    void EffectStack(Scene2DNode* doc, Layer& l)
    {
       SectionCard::Begin(T("Look"));
-      const float avail = ImGui::GetContentRegionAvail().x;
+      const float avail = Ui::AvailW();
       const float preW = tok::view2d_pre_w;
       AddEffectMenu(l, std::max(tok::view2d_effect_stack_min, avail - preW - tok::space_1));
       FormParts::Inline(0.0f, tok::space_1);
@@ -12645,16 +12646,17 @@ namespace
          const char* english = Scene2DNode::FxName(t);
          SectionCard::Begin();
          const float rowY = ImGui::GetCursorPosY();
-         ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
-         bool on = l->fx[t].on;
-         if (CheckBox::Box((base + "on").c_str(), &on))
          {
-            PushUndoCheckpoint("Toggle layer style");
-            l->fx[t].on = on;
-            Touch();
+            Ui::CentreInRow centred(ImGui::GetFrameHeight(), CheckBox::Size());
+            bool on = l->fx[t].on;
+            if (CheckBox::Box((base + "on").c_str(), &on))
+            {
+               PushUndoCheckpoint("Toggle layer style");
+               l->fx[t].on = on;
+               Touch();
+            }
+            FormParts::Inline(0.0f, tok::space_2);
          }
-         FormParts::Inline(0.0f, tok::space_2);
-         ImGui::SetCursorPosY(rowY);
          const ImVec2 np = CardTitle(base + "name", T(english), l->fx[t].on, 1, winKey, T("Click for all settings, right-click for more"));
          // Right-click on the header: the style's own menu.
          if (MenuParts::ContextClicked())
@@ -12829,18 +12831,19 @@ namespace
          ImGui::PushID(id);
          SectionCard::Begin();
          const float rowY = ImGui::GetCursorPosY();
-         ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::Size()) * 0.5f);
-         bool on = l->visible;
-         if (CheckBox::Box((base + "on").c_str(), &on))
          {
-            PushUndoCheckpoint(on ? "Show adjustment" : "Hide adjustment");
-            l->visible = on;
-            Touch();
+            Ui::CentreInRow centred(ImGui::GetFrameHeight(), CheckBox::Size());
+            bool on = l->visible;
+            if (CheckBox::Box((base + "on").c_str(), &on))
+            {
+               PushUndoCheckpoint(on ? "Show adjustment" : "Hide adjustment");
+               l->visible = on;
+               Touch();
+            }
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("On"));
+            FormParts::Inline(0.0f, tok::space_2);
          }
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("On"));
-         FormParts::Inline(0.0f, tok::space_2);
-         ImGui::SetCursorPosY(rowY);
          const std::string title = (l->name.empty() ? std::string(T(english)) : l->name) +
                                    (l->clip ? std::string(" · ") + T("Clipped") : std::string());
          CardTitle(base + "name", title, l->visible, 1, winKey, T("Click for all settings, right-click for more"));
@@ -13165,11 +13168,11 @@ namespace
       if (sTab == 0)
       {
          ImGui::BeginChild("##v2dlayers", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-         const float availW = ImGui::GetContentRegionAvail().x;
+         const float availW = Ui::AvailW();
          // One row gap for the whole tab (PanelKit), so the document row sits on the same pitch as the rows below it.
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::RowGap()));
          DrawDocPicker(doc, availW);
-         const float roomH = ImGui::GetContentRegionAvail().y;
+         const float roomH = Ui::AvailH();
          DrawLayersCard(doc, availW, std::max(tok::view2d_side_ratio * (kRowH + 1.0f), roomH - tok::space_1));
          ImGui::PopStyleVar();
          EndChildSafe();
@@ -13180,8 +13183,8 @@ namespace
          ImGui::BeginChild("##v2dprops", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
          ImGui::PopStyleVar();
          SectionCard::BeginWindow();
-         ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
-         const float w = std::floor(ImGui::GetContentRegionAvail().x);
+         Ui::JoinBelow();
+         const float w = std::floor(Ui::AvailW());
          sFieldW = std::floor(std::max(tok::view2d_field_w_min, w - sLabelW));   // whole pixels, so strip cells and wells end on one edge
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, PanelKit::FramePadY()));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::RowGap()));
@@ -13910,7 +13913,7 @@ namespace
       const float headTop = ImGui::GetCursorScreenPos().y;
       DrawHeader(doc);   // tile height, as Sample Studio's and the Piano Roll's bars
       DrawDockMenu(headTop, ImGui::GetCursorScreenPos().y);
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
       const float sideBase = std::min(kSideW, avail.x * 0.5f);
       const float sideW = sSideOpen ? sideBase : 0.0f;
@@ -17179,7 +17182,7 @@ void DrawViewDocked(const char* id, const ImVec2& size, int dock, float& height,
       ImGui::PopStyleColor();
    rectMin = ImGui::GetWindowPos();
    rectMax = ImVec2(rectMin.x + ImGui::GetWindowSize().x, rectMin.y + ImGui::GetWindowSize().y);
-   const ImVec2 inner = ImGui::GetContentRegionAvail();
+   const ImVec2 inner = Ui::Avail();
    auto grip = [&]()
    {
       UiInteract::Hit(gripId, vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));

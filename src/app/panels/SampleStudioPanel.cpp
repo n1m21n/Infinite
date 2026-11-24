@@ -2893,7 +2893,7 @@ namespace
       PopDockedPanelStyle();
       UiDensity::Compact compact;
       SectionCard::BeginWindow();
-      const float availW = ImGui::GetContentRegionAvail().x;
+      const float availW = Ui::AvailW();
       const float fieldW = std::max(tok::sample_studio_field_w_min, availW - SectionCard::LabelW());
 
       PruneSelection();
@@ -3365,7 +3365,7 @@ namespace
          LaunchRequestTogglePlay();
       }
 
-      const float w = std::max(1.0f, ImGui::GetContentRegionAvail().x);
+      const float w = std::max(1.0f, Ui::AvailW());
       DrawToolbar(w);
       // Right-click the toolbar's empty space: dock top or bottom.
       const ImVec2 tbMin(ImGui::GetWindowPos().x, ImGui::GetItemRectMin().y), tbMax(tbMin.x + ImGui::GetWindowSize().x, ImGui::GetItemRectMax().y);
@@ -3402,7 +3402,7 @@ namespace
 
       Ui::Spacer(Ui::Space::S1);
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       const float h = std::max(tok::sample_studio_min, avail.y);
       const float gap = ImGui::GetStyle().ItemSpacing.x;
       const float panelW = kSettingsW;
@@ -3667,7 +3667,7 @@ void DrawSampleStudioDocked(const char* id, const ImVec2& size)
    gSampleStudioRectMin = ImGui::GetWindowPos();
    gSampleStudioRectMax = ImVec2(gSampleStudioRectMin.x + ImGui::GetWindowSize().x, gSampleStudioRectMin.y + ImGui::GetWindowSize().y);
    gSampleStudioClaimedKeys = false;
-   const ImVec2 inner = ImGui::GetContentRegionAvail();
+   const ImVec2 inner = Ui::Avail();
    auto grip = [&]()
    {
       UiInteract::Hit("##studiogrip", ImVec2(std::max(1.0f, inner.x), kGrip));

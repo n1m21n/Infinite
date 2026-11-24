@@ -1336,7 +1336,7 @@ namespace app
       void DrawMixerPanelContent()
       {
          const ImVec2 origin = ImGui::GetCursorScreenPos();
-         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const ImVec2 avail = Ui::Avail();
          ApplyPendingPageEdits();
          const std::vector<Page> pages = CollectPages();
          FollowCanvasSelection(pages);
@@ -1394,7 +1394,7 @@ namespace app
                   x += stripW + kStripGap;
                }
                ImGui::SetCursorScreenPos(base);
-               ImGui::Dummy(ImVec2(std::max(tok::mixer_min, x - base.x - kStripGap), colH));
+               Ui::Claim(ImVec2(std::max(tok::mixer_min, x - base.x - kStripGap), colH));
                gMixerStripsMin = wmn;
                gMixerStripsMax = ImVec2(wmn.x + ImGui::GetWindowWidth(), wmn.y + ImGui::GetWindowHeight());
             }
@@ -2070,7 +2070,7 @@ namespace app
       const bool gripFirst = (dock == 0 || dock == 1);
 
       ImGui::BeginChild(id, size, false);
-      const ImVec2 inner = ImGui::GetContentRegionAvail();
+      const ImVec2 inner = Ui::Avail();
 
       auto grip = [&]()
       {

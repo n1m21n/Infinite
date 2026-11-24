@@ -2678,7 +2678,7 @@ namespace app
          if (hot || folderHot || samplerHot)
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + cardH));
-         ImGui::Dummy(ImVec2(0.0f, 0.0f));
+         Ui::Settle();
 
          // The file becomes a Sampler on the canvas, loaded and in view.
          if (toSampler)
@@ -3095,7 +3095,7 @@ namespace app
                   else
                      h = DrawFlow(b.segs, ImVec2(at.x + indent, at.y), width - indent, bid, ImGui::GetColorU32(ImGuiCol_Text));
                   ImGui::SetCursorScreenPos(at);
-                  ImGui::Dummy(ImVec2(width, h + (b.kind == chat::Block::Kind::Bullet ? 0.0f : tok::space_1)));
+                  Ui::Claim(ImVec2(width, h + (b.kind == chat::Block::Kind::Bullet ? 0.0f : tok::space_1)));
                   break;
                }
             }
@@ -3305,7 +3305,7 @@ namespace app
             }
             const int rows = (k + perRow - 1) / perRow;
             ImGui::SetCursorScreenPos(o);
-            ImGui::Dummy(ImVec2(inner, (float)rows * cellH + (float)(rows - tok::chat_change_knobs_inset) * tok::space_2));
+            Ui::Claim(ImVec2(inner, (float)rows * cellH + (float)(rows - tok::chat_change_knobs_inset) * tok::space_2));
          }
       }
 
@@ -4296,7 +4296,7 @@ namespace app
          ImGui::PopStyleVar();
          sPieces.clear();
          sEntryRects.clear();
-         const float width = ImGui::GetContentRegionAvail().x;
+         const float width = Ui::AvailW();
          const bool setup = DrawSetup(width);
          if (setup && !sThread.entries.empty())
             Ui::Spacer(Ui::Space::S3);
@@ -4316,7 +4316,7 @@ namespace app
             EntryUi& ui = sUi[(size_t)i];
             const Entry* prev = i > 0 ? &sThread.entries[(size_t)i - 1] : nullptr;
             if (prev != nullptr)
-               ImGui::Dummy(ImVec2(0.0f, e.kind == Entry::Kind::User || prev->kind == Entry::Kind::User ? tok::space_4 : tok::space_1));
+               Ui::Claim(ImVec2(0.0f, e.kind == Entry::Kind::User || prev->kind == Entry::Kind::User ? tok::space_4 : tok::space_1));
             // An agent's name sits over the first of its rows in a run of them.
             const bool label = prev == nullptr || prev->agent != e.agent || prev->kind == Entry::Kind::User;
             bool running = false;
@@ -4501,7 +4501,7 @@ namespace app
             sDropHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
             sPick = std::clamp(sPick, 0, (int)sCands.size() - 1);
             ImDrawList* dl = ImGui::GetWindowDrawList();
-            const float rowW = ImGui::GetContentRegionAvail().x;
+            const float rowW = Ui::AvailW();
             const ImVec2 mouse = ImGui::GetIO().MouseDelta;
             for (int i = 0; i < (int)sCands.size(); i++)
             {
@@ -4633,7 +4633,7 @@ namespace app
       {
          UiType::Scope cap(UiType::Size::Body, UiType::Weight::Semibold);  // same size as the rows and the pill
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeight() + tok::space_2));
+         Ui::Claim(ImVec2(w, ImGui::GetTextLineHeight() + tok::space_2));
          ImGui::GetWindowDrawList()->AddText(ImVec2(p.x + tok::space_2, p.y + tok::space_1), Dim(), text);
       }
 
@@ -5128,7 +5128,7 @@ namespace app
          // The agent and model, under the well at its right edge.
          DrawPicker(at.x + width - tok::space_1, at.y + wellH + tok::space_1, g.pickerH, at.x + tok::space_1);
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + g.totalH));
-         ImGui::Dummy(ImVec2(width, 0.0f));
+         Ui::Claim(ImVec2(width, 0.0f));
          if (active || sDropHovered)
             DrawDropdown(ImVec2(at.x, at.y), std::min(width, tok::chat_dropdown_max_w));
          else
@@ -5182,7 +5182,7 @@ namespace app
             }
             ImGui::PushID(t.id.c_str());
             const ImVec2 p = ImGui::GetCursorScreenPos();
-            const float rw = ImGui::GetContentRegionAvail().x;
+            const float rw = Ui::AvailW();
             const float rh = tok::chat_rh;
             const bool open = UiInteract::Hit("##open", ImVec2(rw - tok::space_5, rh));
             const bool hot = ImGui::IsMouseHoveringRect(p, ImVec2(p.x + rw, p.y + rh));
@@ -5467,9 +5467,9 @@ namespace app
                if (!l.code.empty() && !sCodeView.open)
                   OpenCode(CodeTitle(l), l.code);
       }
-      if (sRail && ImGui::GetContentRegionAvail().x > tok::chat_panel_limit)
+      if (sRail && Ui::AvailW() > tok::chat_panel_limit)
       {
-         const ImVec2 all = ImGui::GetContentRegionAvail();
+         const ImVec2 all = Ui::Avail();
          const float railW = tok::chat_rail_w;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          ImGui::GetWindowDrawList()->AddRectFilled(origin, ImVec2(origin.x + all.x, origin.y + all.y), tok::U32(tok::terminal_bg, Light()), tok::radius_control);
@@ -5493,7 +5493,7 @@ namespace app
          DrawChatBody();
          return;
       }
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       if (avail.x < tok::chat_with_code_limit)
       {
          DrawCodePane(avail.x, avail.y);
@@ -5514,7 +5514,7 @@ namespace app
    void DrawChatBody()
    {
       const ImVec2 mn = ImGui::GetCursorScreenPos();
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       ImGui::GetWindowDrawList()->AddRectFilled(mn, ImVec2(mn.x + avail.x, mn.y + avail.y), tok::U32(tok::terminal_bg, Light()), tok::radius_control);
       const float width = avail.x;
       DrawHeader(width);
@@ -5523,7 +5523,7 @@ namespace app
       // The composer's height is known before it draws: the log takes the rest.
       const float composerH = Geom(composerW).totalH;
       const float queueH = QueueHeight();
-      DrawMessages(std::max(tok::chat_min, ImGui::GetContentRegionAvail().y - composerH - queueH - tok::space_4));
+      DrawMessages(std::max(tok::chat_min, Ui::AvailH() - composerH - queueH - tok::space_4));
       const ImVec2 c = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(mn.x + (width - composerW) * 0.5f, c.y + tok::space_1));
       if (!sQueue.empty())

@@ -11,6 +11,7 @@
 #include "app/ui/design/components/ModeBanner.h"
 #include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/StateRing.h"
+#include "app/ui/design/UiScope.h"
 #include <imgui_node_editor.h>
 #include <map>
 #include <vector>
@@ -353,7 +354,7 @@ namespace CanvasLink
       ImGui::PushID(id);
       const float chip = ImGui::GetFrameHeight();
       const float gap = tok::space_1;
-      const float full = w > 0.0f ? w : ImGui::GetContentRegionAvail().x;
+      const float full = w > 0.0f ? w : Ui::AvailW();
       const GraphNode* cur = uid != 0 ? FindNodeByUid(uid) : nullptr;
       const std::string preview = cur != nullptr ? NodeTitleWithInstance(*cur) : uid != 0 ? std::string(T("Missing")) : std::string(T("None"));
       bool changed = false;

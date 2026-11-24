@@ -928,7 +928,7 @@ namespace app
       if (filterBuf[0] != '\0' && FormParts::Button(L("Clear")))
          filterBuf[0] = '\0';
 
-      ImGui::Dummy(ImVec2(0.0f, SectionCard::kPad));   // the first card reaches kPad above its cursor
+      Ui::Claim(ImVec2(0.0f, SectionCard::kPad));   // the first card reaches kPad above its cursor
       std::string filter = filterBuf;
       for (char& c : filter)
          c = (char)tolower((unsigned char)c);

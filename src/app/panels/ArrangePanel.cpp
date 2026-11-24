@@ -464,7 +464,7 @@ namespace app
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
       FieldWell::PushStyle();
       SectionCard::BeginWindow();
-      const float fieldW = ImGui::GetContentRegionAvail().x - SectionCard::kLabelW;
+      const float fieldW = Ui::AvailW() - SectionCard::kLabelW;
       SectionCard::Title(T("Render Timeline"));
 
       // ---- Time range ----
@@ -745,7 +745,7 @@ namespace app
       auto nodeForUid = [](uint64_t uid) -> GraphNode* { return FindNodeByUid(uid); };
 
       const ImVec2 panelOrigin = ImGui::GetCursorScreenPos();
-      const ImVec2 panelSize = ImGui::GetContentRegionAvail();
+      const ImVec2 panelSize = Ui::Avail();
 
       // The timeline is read-only for the duration of a take (WP7): the
       // compositor and the audio scheduler both read gArrange frame by frame
@@ -1659,7 +1659,7 @@ namespace app
                            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          PopDockedPanelStyle();
 
-         const ImVec2 monAvail = ImGui::GetContentRegionAvail();
+         const ImVec2 monAvail = Ui::Avail();
          const int monW = std::max(tok::arrange_mon_w_min, (int)monAvail.x);
          const int monH = std::max(tok::arrange_mon_w_min, (int)monAvail.y);
 
@@ -1712,7 +1712,7 @@ namespace app
       {
          // The lanes sit in a recessed well (same surface as the Library list), not on a panel-coloured child.
          const ImVec2 w0 = ImGui::GetCursorScreenPos();
-         const ImVec2 wa = ImGui::GetContentRegionAvail();
+         const ImVec2 wa = Ui::Avail();
          const ImVec2 w1(w0.x + (timelineChildWidth < 0.0f ? wa.x + timelineChildWidth : wa.x), w0.y + wa.y);
          const bool wellLight = IsThemeLight();
          ImDrawList* wdl = ImGui::GetWindowDrawList();
@@ -1732,7 +1732,7 @@ namespace app
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 scrollTL = ImGui::GetCursorScreenPos();
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       const float headerStartX = scrollTL.x + ImGui::GetScrollX();
       const float rulerStartX = headerStartX + kHeaderWidth;
       sArrangeLastRulerStartX = rulerStartX;
@@ -3010,7 +3010,7 @@ namespace app
             {
                bool solo = lane.solo;
                mixGesture(MixToggle("##lanesolo", "S", &solo, kMixCtl, ImGui::ColorConvertU32ToFloat4(tok::Role(tok::col::text_warn))), [&] { lane.solo = solo; });
-               ImGui::SameLine(0.0f, kMixGap);
+               Ui::SameRow(Ui::Space::S0_75); // kMixGap
                bool mute = lane.mute;
                mixGesture(MixToggle("##lanemute", "M", &mute, kMixCtl, app::AccentEmphasisSelected()), [&] { lane.mute = mute; });
                Ui::SameRow(Ui::Space::S1_5);
@@ -3026,7 +3026,7 @@ namespace app
                   else
                      Tip::Show("%s %d", lane.pan < 0.0f ? T("L") : T("R"), (int)std::lround(std::fabs(lane.pan) * 100.0f));
                }
-               ImGui::SameLine(0.0f, kMixKnobGap);
+               ImGui::SameLine(0.0f, kMixKnobGap); // ui-layout: canvas (knob arc reach, the timeline's hand-placed mix strip)
                float gainDb = lane.gainDb;
                bool gainChanged = KnobFloat("##lanegain", &gainDb, -60.0f, 12.0f, "%.1f dB", kMixCtl, mixFill, false);
                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && gainDb != 0.0f)
@@ -4364,7 +4364,7 @@ namespace app
       gArrangePanelRectMax = ImVec2(gArrangePanelRectMin.x + ImGui::GetWindowSize().x,
                                  gArrangePanelRectMin.y + ImGui::GetWindowSize().y);
 
-      const ImVec2 inner = ImGui::GetContentRegionAvail();
+      const ImVec2 inner = Ui::Avail();
 
       auto grip = [&]()
       {

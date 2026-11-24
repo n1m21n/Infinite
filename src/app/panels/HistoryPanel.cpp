@@ -7,6 +7,7 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -33,7 +34,7 @@ namespace
    // One row: returns true when clicked. `dim` for undone entries, `current` for the state the document is in.
    bool Row(const char* id, const std::string& text, bool current, bool dim, float rowH)
    {
-      const float w = std::max(1.0f, ImGui::GetContentRegionAvail().x);
+      const float w = std::max(1.0f, Ui::AvailW());
       const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::PushID(id);
       const bool clicked = UiInteract::Hit("##row", ImVec2(w, rowH));
@@ -119,7 +120,7 @@ void DrawHistoryDocked(const char* id, const ImVec2& size)
       ImGui::SetCursorScreenPos(ImVec2(prevMax.x, ImGui::GetItemRectMin().y));
    }
    ImGui::BeginChild(id, size, false);
-   const ImVec2 inner = ImGui::GetContentRegionAvail();
+   const ImVec2 inner = Ui::Avail();
 
    UiInteract::Hit("##historygrip", ImVec2(kGrip, std::max(1.0f, inner.y)));
    DrawPanelSeam(true, true);

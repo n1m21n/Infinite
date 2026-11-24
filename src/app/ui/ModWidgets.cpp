@@ -1429,7 +1429,7 @@ namespace app
          // Same footprint the widget would have had, so the row is identical
          // whether or not one of its cells is being typed into.
          ImGui::SetCursorScreenPos(cellOrigin);
-         ImGui::Dummy(ImVec2(cell, diameter + kKnobCaptionGap + ImGui::GetTextLineHeight()));
+         Ui::Claim(ImVec2(cell, diameter + kKnobCaptionGap + ImGui::GetTextLineHeight()));
       }
       else if (modulated)
       {

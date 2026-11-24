@@ -943,7 +943,7 @@ namespace app
          {
             x0 = ImGui::GetCursorScreenPos().x;
             y = ImGui::GetCursorScreenPos().y;
-            cell = ImGui::GetContentRegionAvail().x / (float)count;
+            cell = Ui::AvailW() / (float)count;
          }
          // A desk pot with its CAPS caption and a green readout plate under it. No undo step here.
          bool Raw(const char* label, float* v, float lo, float hi, const char* fmt, ImU32 col, bool bipolar = false)
@@ -971,7 +971,7 @@ namespace app
          void End()
          {
             ImGui::SetCursorScreenPos(ImVec2(x0, y + DeskParts::kPotRowH + DeskParts::kPlateH + tok::space_0_5 + tok::space_1));
-            ImGui::Dummy(ImVec2(0.0f, 0.0f));
+            Ui::Settle();
          }
       };
 
@@ -995,7 +995,7 @@ namespace app
          char title[64];
          snprintf(title, sizeof title, "%s %d  %s", T("Lane"), lane + 1, LaneName(n, lane).c_str());
          SectionCard::Begin(title);
-         const float w = ImGui::GetContentRegionAvail().x;
+         const float w = Ui::AvailW();
          float pos[DrumSequencerNode::kVoicesPerLane], amp[DrumSequencerNode::kVoicesPerLane];
          n->LaneCursors(lane, pos, amp);
          WaveCursor cursors[DrumSequencerNode::kVoicesPerLane];
@@ -1192,7 +1192,7 @@ namespace app
       {
          const ImU32 col = NodeColor(gn);
          SectionCard::Begin(T("Groove"));
-         const float w = ImGui::GetContentRegionAvail().x;
+         const float w = Ui::AvailW();
          DrawGroovePicker(n, w);
          int count = 0, current = -1;
          const DrumPatterns::Groove* all = DrumPatterns::All(count);
@@ -1277,7 +1277,7 @@ namespace app
          char title[64];
          snprintf(title, sizeof title, "%s %d  %s %d", T("Step"), s + 1, T("lane"), lane + 1);
          SectionCard::Begin(title);
-         const float w = ImGui::GetContentRegionAvail().x;
+         const float w = Ui::AvailW();
          float& vel = n->stepVel[lane][s];
          if (vel <= 0.0f)
          {
@@ -1387,7 +1387,7 @@ namespace app
          const std::vector<GraphNode*> pages = CollectPages();
          const int current = CurrentPage(pages);
          const ImVec2 origin = ImGui::GetCursorScreenPos();
-         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const ImVec2 avail = Ui::Avail();
          DrawHeader(pages, current, origin, avail.x);
 
          const ImVec2 bodyMin(origin.x, origin.y + tok::control_h + tok::space_2);
@@ -1551,7 +1551,7 @@ namespace app
       gDrumPanelRectMin = ImGui::GetWindowPos();
       gDrumPanelRectMax = ImVec2(gDrumPanelRectMin.x + ImGui::GetWindowSize().x, gDrumPanelRectMin.y + ImGui::GetWindowSize().y);
       gDrumClaimedKeys = false;
-      const ImVec2 inner = ImGui::GetContentRegionAvail();
+      const ImVec2 inner = Ui::Avail();
       auto grip = [&]()
       {
          UiInteract::Hit("##drumgrip", ImVec2(std::max(1.0f, inner.x), kGrip));

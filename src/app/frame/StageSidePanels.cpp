@@ -26,10 +26,10 @@ static void DrawFieldError(const std::string& err, const std::string& code)
    const ImU32 red = tok::U32(tok::record);
    {
       // Wrapped, token-coloured message drawn directly (no style push).
-      const float wrap = std::max(40.0f, ImGui::GetContentRegionAvail().x);
+      const float wrap = std::max(40.0f, Ui::AvailW());
       const ImVec2 at = ImGui::GetCursorScreenPos();
       ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(), at, red, err.c_str(), nullptr, wrap);
-      ImGui::Dummy(ImGui::CalcTextSize(err.c_str(), nullptr, false, wrap));
+      Ui::Claim(ImGui::CalcTextSize(err.c_str(), nullptr, false, wrap));
    }
 
    int line = 0, col = 0;
@@ -72,7 +72,7 @@ static void DrawFieldError(const std::string& err, const std::string& code)
    put(before, dim);
    put(bad.empty() ? "_" : bad, red);
    put(after, dim);
-   ImGui::Dummy(ImVec2(pos.x - ImGui::GetCursorScreenPos().x, ImGui::GetTextLineHeight()));
+   Ui::Claim(ImVec2(pos.x - ImGui::GetCursorScreenPos().x, ImGui::GetTextLineHeight()));
 }
 
 namespace
@@ -438,7 +438,7 @@ void DrawSidePanels(FrameCtx& fc)
                if (kModes[i] == gSearchPanelMode)
                   sel = i;
             const ImVec2 cp = ImGui::GetCursorScreenPos();
-            const UiLayout::Rect r{ cp.x, cp.y, ImGui::GetContentRegionAvail().x, 32.0f };
+            const UiLayout::Rect r{ cp.x, cp.y, Ui::AvailW(), 32.0f };
             const int hit = PillGroup::Draw("lib.tabs", r, segs, segCount, sel, UiType::Size::Body);
             if (hit >= 0)
                gSearchPanelMode = kModes[hit];
@@ -549,7 +549,7 @@ void DrawSidePanels(FrameCtx& fc)
                {
                   ImGui::PushID(match.first.c_str());
                   const bool isFav = gBrowserFavorites.IsFavoriteModule(match.first);
-                  const float availW = ImGui::GetContentRegionAvail().x;
+                  const float availW = Ui::AvailW();
                   const std::string rowLabel =
                      TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - tok::stage_side_panels_gap));
                   const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
@@ -611,7 +611,7 @@ void DrawSidePanels(FrameCtx& fc)
                   {
                      ImGui::PushID(name.c_str());
                      const bool isFav = gBrowserFavorites.IsFavoriteModule(name);
-                     const float availW = ImGui::GetContentRegionAvail().x;
+                     const float availW = Ui::AvailW();
                      const std::string rowLabel =
                         TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - tok::stage_side_panels_gap));
                      const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
@@ -703,7 +703,7 @@ void DrawSidePanels(FrameCtx& fc)
       if (fc.viewFill)
       {
          // Back from the off-window canvas row to the line under the filling view.
-         ImGui::SetCursorPos(fc.viewFillResume);
+         ImGui::SetCursorPos(fc.viewFillResume); // ui-layout: canvas (the view-fill row steps around the off-window canvas)
          ImGui::GetCurrentWindow()->DC.CursorMaxPos = fc.viewFillMax;
          ImGui::GetCurrentWindow()->DC.IsSetPos = false;   // nothing was extended: the row is back where it was
       }
@@ -820,7 +820,7 @@ void DrawSidePanels(FrameCtx& fc)
             EditorHint(T("uniform float name; // 0..1 = 0.5   adds a knob"));
             {
                const ImVec2 cp = ImGui::GetCursorScreenPos();
-               const UiLayout::Rect r{ cp.x, cp.y, ImGui::GetContentRegionAvail().x, 28.0f };
+               const UiLayout::Rect r{ cp.x, cp.y, Ui::AvailW(), 28.0f };
                const int hit = PillGroup::Draw("st.tabs", r, segs, count, sel);
                ImGui::SetCursorScreenPos(cp);
                Ui::Claim(ImVec2(r.w, r.h));
@@ -833,7 +833,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             SectionCard::Begin(T("Code"));
             FieldWell::InputTextMultiline("##stglsl", stBuf, sizeof(stBuf),
-                                          ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_lg));
+                                          ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_lg));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -867,7 +867,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##glsl", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_lg));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_lg));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -929,7 +929,7 @@ void DrawSidePanels(FrameCtx& fc)
             // so the panel reads as one grid with no ragged edges.
             const auto rowBtn = [](const char* label, const char* glyphName, int cells, ActionButton::Kind kind = ActionButton::Kind::Plain) {
                const float gap = ImGui::GetStyle().ItemSpacing.x;
-               const float w = (ImGui::GetContentRegionAvail().x - gap * (float)(cells - 1)) / (float)cells;
+               const float w = (Ui::AvailW() - gap * (float)(cells - 1)) / (float)cells;
                return ActionButton::Draw(label, ImVec2(std::floor(w), 0.0f), kind, glyphName);
             };
 
@@ -1087,7 +1087,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -1151,7 +1151,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldPrimitiveCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -1200,7 +1200,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -1288,7 +1288,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##sketchCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -1345,7 +1345,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##sketch3dCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -1423,7 +1423,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -1486,7 +1486,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##spectralFieldCode", editBuf, sizeof(editBuf),
-                                          ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                          ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -1548,7 +1548,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldSynthCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -1612,7 +1612,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldNotesCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))
@@ -1676,7 +1676,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_field_well_h_sm));
+                                      ImVec2(-1, Ui::AvailH() - tok::stage_side_field_well_h_sm));
 
             PushPrimaryButtonStyle();
             if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_apply_x, 0)))

@@ -432,7 +432,7 @@ namespace app
       // the panel flicker once a certain number of cards is open.
       const float bar = ImGui::GetStyle().ScrollbarSize;
       const ImVec2 panelOrigin = ImGui::GetCursorScreenPos();
-      const ImVec2 strip = ImGui::GetContentRegionAvail();
+      const ImVec2 strip = Ui::Avail();
       // Floating, the cards run along the window's long side.
       const bool horizontal = gViewportPanelDock == kDockFloating ? strip.x > strip.y : (gViewportPanelDock == 0 || gViewportPanelDock == 3);
       // The PanelFrame card around this already keeps space_2 to the edge on every side, so cards fill the strip.
@@ -543,7 +543,7 @@ namespace app
       // has so the panel is solid edge to edge.
       // Outer child is transparent: the panel floats as a card on the canvas colour (PanelFrame).
       ImGui::BeginChild(id, size, false);
-      const ImVec2 inner = ImGui::GetContentRegionAvail();
+      const ImVec2 inner = Ui::Avail();
 
       auto grip = [&]()
       {

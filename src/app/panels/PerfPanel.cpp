@@ -2096,7 +2096,7 @@ namespace app
          const ImVec4 uiTxt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          const float stripH = tok::perf_strip_h;
          const ImVec2 sp = ImGui::GetCursorScreenPos();
-         const float stripW = ImGui::GetContentRegionAvail().x;
+         const float stripW = Ui::AvailW();
          ImDrawList* sdl = ImGui::GetWindowDrawList();
          // Same recessed well as the Library list: neutral, no accent colour.
          sdl->AddRectFilled(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(tok::V4(tok::perf_shade_rgbaf, isLightT ? tok::perf_panel_content_col_4_alpha : tok::perf_alpha)), tok::radius_container);
@@ -2190,7 +2190,7 @@ namespace app
          opt.canAdd = gPerfLayout.pageCount < Patch::PerfLayoutRecord::kMaxPages;
          opt.duplicate = opt.canAdd;
          opt.canDelete = gPerfLayout.pageCount > 1;
-         opt.maxW = std::max(tok::perf_max_w_min, ImGui::GetContentRegionAvail().x - tok::control_h - tok::space_2);
+         opt.maxW = std::max(tok::perf_max_w_min, Ui::AvailW() - tok::control_h - tok::space_2);
          PagePicker::RenameKey("##perfPages", entries, gPerfActivePage);
          const PagePicker::Result r = PagePicker::Draw("##perfPages", entries, gPerfActivePage, T("Add New Page"), opt);
          const int p = r.index;
@@ -2431,7 +2431,7 @@ namespace app
       gPerfPanelRectMin = ImGui::GetWindowPos();
       gPerfPanelRectMax = ImVec2(gPerfPanelRectMin.x + ImGui::GetWindowSize().x,
                                  gPerfPanelRectMin.y + ImGui::GetWindowSize().y);
-      const ImVec2 inner = ImGui::GetContentRegionAvail();
+      const ImVec2 inner = Ui::Avail();
 
       auto grip = [&]()
       {

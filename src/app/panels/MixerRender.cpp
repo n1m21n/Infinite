@@ -643,7 +643,7 @@ namespace app
       ImGui::EndDisabled();
 
       Ui::Spacer(Ui::Space::S1);
-      const float w = std::max(1.0f, ImGui::GetContentRegionAvail().x);
+      const float w = std::max(1.0f, Ui::AvailW());
       if (active)
       {
          const float p = MixerRenderProgress();

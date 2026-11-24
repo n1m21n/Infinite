@@ -90,7 +90,7 @@ namespace app
       // Label first, then this: the value text, cut to what fits before the button column.
       auto value = [&](const std::string& text, bool dim)
       {
-         const float room = std::max(0.0f, ImGui::GetContentRegionAvail().x - bw - tok::space_3);
+         const float room = std::max(0.0f, Ui::AvailW() - bw - tok::space_3);
          std::string shown = text;
          if (ImGui::CalcTextSize(shown.c_str()).x > room)
          {
@@ -123,7 +123,7 @@ namespace app
          const ChatAgentInfo info = ChatAgentStatus(a.id);
          ImGui::PushID(a.id);
          FormParts::Label(L(a.name));
-         const float rowW = ImGui::GetContentRegionAvail().x;
+         const float rowW = Ui::AvailW();
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), rowH * tok::cli_setup_section_chat_avatar_r, a.id);
          Ui::Claim(ImVec2(rowH, rowH));
@@ -297,7 +297,7 @@ namespace app
          const int count = ChatSavedCount();
          const std::string label = std::string(T("Saved chats")) + " (" + std::to_string(count) + ")";
          FormParts::Label(label.c_str());
-         ImGui::Dummy(ImVec2(0.0f, rowH));
+         Ui::Claim(ImVec2(0.0f, rowH));
          ImGui::BeginDisabled(count == 0 || ChatBusy());
          if (button(L("Clear all"), false))
             ImGui::OpenPopup("##clearchats");
@@ -310,7 +310,7 @@ namespace app
             const float cancelW = std::max(tok::cli_setup_section_cancel_w_min, ImGui::CalcTextSize(T("Cancel")).x + tok::cli_setup_section_ratio * tok::space_2);
             const float deleteW = std::max(tok::cli_setup_section_cancel_w_min, ImGui::CalcTextSize(T("Delete")).x + tok::cli_setup_section_ratio * tok::space_2);
             const float total = cancelW + tok::space_2 + deleteW;
-            const float avail = ImGui::GetContentRegionAvail().x;
+            const float avail = Ui::AvailW();
             if (avail > total)
                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - total);
             if (ChipButton::Draw(L("Cancel"), false, tok::control_h, cancelW))
@@ -493,7 +493,7 @@ namespace app
 
       // One centred column, never wider than reads well; every control is a design component.
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const float availW = ImGui::GetContentRegionAvail().x;
+      const float availW = Ui::AvailW();
       const float colW = std::min(tok::cli_setup_section_col_w_max, std::max(tok::cli_setup_section_col_w_min, availW - tok::cli_setup_section_terminal_welcome_ratio * tok::space_4));
       const float x = origin.x + (availW - colW) * 0.5f;
       const float rowH = ImGui::GetFrameHeight() + tok::space_1;

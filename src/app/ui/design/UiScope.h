@@ -114,4 +114,40 @@ namespace Ui
    // A part drawn by hand (draw list) claims its rect so layout flows past it. Its size is the part's own, not a gap.
    inline void Claim(const ImVec2& size) { ImGui::Dummy(size); }
 
+   // Ends a row whose cursor was moved by hand (a zero-size item), so the next item starts on a fresh line.
+   inline void Settle() { ImGui::Dummy(ImVec2(0.0f, 0.0f)); }
+
+   // The next item, `itemW` wide, sits centred in the `inW` that starts at the cursor (never left of the cursor).
+   inline void CentreNext(float itemW, float inW)
+   {
+      const float d = (inW - itemW) * 0.5f;
+      ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (d > 0.0f ? d : 0.0f));
+   }
+
+   // The next item sits right under the last one, without the style's item gap / with one more item gap.
+   inline void JoinBelow() { ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y); }
+   inline void ExtraItemGap() { ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y); }
+
+   // The next item starts at window-local `x` (a right column), or right after what is before it if that reaches
+   // further, so a long name pushes the column instead of running under it.
+   inline void ColumnAt(float x)
+   {
+      const float cx = ImGui::GetCursorPosX();
+      ImGui::SetCursorPosX(cx > x ? cx : x);
+   }
+
+   // A control `itemH` tall, centred in a row `rowH` tall (a check box beside frame-height parts). When the scope
+   // ends the cursor's Y goes back to the row's top, so the next part on the row lines up with the row.
+   struct CentreInRow
+   {
+      CentreInRow(float rowH, float itemH) : rowY(ImGui::GetCursorPosY())
+      {
+         ImGui::SetCursorPosY(rowY + (rowH - itemH) * 0.5f);
+      }
+      ~CentreInRow() { ImGui::SetCursorPosY(rowY); }
+      CentreInRow(const CentreInRow&) = delete;
+      CentreInRow& operator=(const CentreInRow&) = delete;
+      float rowY;
+   };
+
 }

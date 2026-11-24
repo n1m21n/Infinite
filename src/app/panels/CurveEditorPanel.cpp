@@ -1665,7 +1665,7 @@ namespace
       ImGui::PushID(title);
       const float h = ImGui::GetTextLineHeight() + tok::space_0_5;
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float w = ImGui::GetContentRegionAvail().x;
+      const float w = Ui::AvailW();
       if (UiInteract::Hit("##head", ImVec2(w, h)))
          open = !open;
       sOpen[title] = open;
@@ -1785,7 +1785,7 @@ namespace
       {
          ImGui::PushID(key.first * 4096 + key.second);
          const std::string name = TargetName(key.first, key.second);
-         const float rowX = ImGui::GetCursorPosX(), rowW = ImGui::GetContentRegionAvail().x;
+         const float rowX = ImGui::GetCursorPosX(), rowW = Ui::AvailW();
          ImGui::AlignTextToFramePadding();
          ImGui::PushClipRect(ImGui::GetCursorScreenPos(), ImVec2(ImGui::GetCursorScreenPos().x + rowW - kIconW - tok::space_2, tok::curve_editor_targets_push_clip_rect_y), true);
          ImGui::TextUnformatted(name.c_str());
@@ -2349,7 +2349,7 @@ namespace
       ImGui::GetStyle().WindowPadding = savedPad;
       PopDockedPanelStyle();
       UiDensity::Compact compact;
-      const float availW = ImGui::GetContentRegionAvail().x;
+      const float availW = Ui::AvailW();
       SectionCard::Title(T("Curve"));
       FormParts::Inline(availW - tok::space_4 + ImGui::GetStyle().WindowPadding.x);
       {
@@ -2363,8 +2363,8 @@ namespace
       // A child whose first card touches its top and sides (the 3D View's BeginCardColumn); only it scrolls.
       FormParts::BeginChildPadX("##ceProps", SectionCard::Pad());
       SectionCard::BeginWindow();
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
-      sFieldW = std::max(tok::curve_editor_field_w_min, ImGui::GetContentRegionAvail().x - FieldLabelW());
+      Ui::JoinBelow();
+      sFieldW = std::max(tok::curve_editor_field_w_min, Ui::AvailW() - FieldLabelW());
       DrawInspector(gn, n);
       SectionCard::EndWindow();
       EndChildSafe();
@@ -2526,7 +2526,7 @@ namespace
    {
       State& s = S();
       const HeaderRow row;
-      const float availW = ImGui::GetContentRegionAvail().x;
+      const float availW = Ui::AvailW();
       const float startX = ImGui::GetCursorPosX();
       const float togglesW = n != nullptr ? tok::curve_editor_toggles_w_ratio * kIconW + tok::space_1 : 0.0f;
       const float controlsW = n != nullptr && !side ? ControlsW(*n) + tok::space_3 : 0.0f;
@@ -2562,11 +2562,11 @@ namespace
       if (!side)
       {
          row.Next(tok::space_3);
-         ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX - tok::space_3 - ControlsW(*n)));
+         Ui::ColumnAt(rightX - tok::space_3 - ControlsW(*n));
          DrawControls(*gn, *n, row);
       }
       row.Next(tok::space_3);
-      ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX));
+      Ui::ColumnAt(rightX);
       if (IconChip("##ceGhost", s.ghost ? IconsInfinite::Eye : IconsInfinite::EyeOff, s.ghost, T("Show other curves")))
          s.ghost = !s.ghost;
       row.Next(tok::space_1);
@@ -2664,7 +2664,7 @@ namespace
       Ui::Spacer(Ui::Space::S1);   // breathing room between the header chips and the ruler / side card
       if (n == nullptr)
       {
-         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const ImVec2 avail = Ui::Avail();
          const ImVec2 mn = ImGui::GetCursorScreenPos();
          // A press here makes the page and the same drag draws its curve: draw, Assign, click a knob.
          UiInteract::Hit("##ceEmpty", ImVec2(std::max(1.0f, avail.x), std::max(1.0f, avail.y)));
@@ -2686,7 +2686,7 @@ namespace
             const HeaderRow row;
             DrawControls(*gn, *n, row);
          }
-         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const ImVec2 avail = Ui::Avail();
          const float spacing = ImGui::GetStyle().ItemSpacing.y;
          const float graphH = s.sideOpen ? std::max(tok::curve_editor_graph_h_min, avail.y * 0.5f) : std::max(1.0f, avail.y);
          DrawGraphArea(*n, ImVec2(avail.x, graphH));
@@ -2695,7 +2695,7 @@ namespace
          return;
       }
       // Columns: tool rail, graph, properties on the outer edge. The widths add up to the row, so nothing scrolls.
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 avail = Ui::Avail();
       const float bodyH = std::max(1.0f, avail.y);
       ImGui::BeginChild("##ceRail", ImVec2(kIconW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       DrawToolButtons(false);
@@ -2741,7 +2741,7 @@ void DrawCurveEditorDocked(const char* id, const ImVec2& size)
    gCurveEditorRectMin = ImGui::GetWindowPos();
    gCurveEditorRectMax = ImVec2(gCurveEditorRectMin.x + ImGui::GetWindowSize().x, gCurveEditorRectMin.y + ImGui::GetWindowSize().y);
    gCurveEditorClaimedKeys = false;
-   const ImVec2 inner = ImGui::GetContentRegionAvail();
+   const ImVec2 inner = Ui::Avail();
    auto grip = [&]()
    {
       UiInteract::Hit("##curvegrip", vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));

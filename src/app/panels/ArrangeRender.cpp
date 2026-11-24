@@ -431,7 +431,7 @@ namespace app
       SectionCard::BeginWindow();
 
       UiDensity::Compact compact;
-      const float wholeW = ImGui::GetContentRegionAvail().x;
+      const float wholeW = Ui::AvailW();
       const float availW = wholeW;
 
       auto DrawCloseBtn = []() -> bool
@@ -610,7 +610,7 @@ namespace app
                "the clip - and where they overlap the upper track hides this one's blend mode, "
                "opacity and grade.\n\nMake Unique gives this clip its own copy of the node, fed "
                "by the same inputs and carrying the same modulations.");
-            if (ChipButton::Draw(L("Make Unique##clipuniquevideo"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Make Unique##clipuniquevideo"), false, 0.0f, Ui::AvailW()))
                ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
@@ -630,7 +630,7 @@ namespace app
                "whichever is summed last wins and this clip can end up playing the other one's "
                "position.\n\nMake Unique gives this clip its own copy of the node, fed by the "
                "same inputs and carrying the same modulations.");
-            if (ChipButton::Draw(L("Make Unique##clipuniqueaudio"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Make Unique##clipuniqueaudio"), false, 0.0f, Ui::AvailW()))
                ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
@@ -782,7 +782,7 @@ namespace app
                ImGui::Spacing();
                SectionHeader(T("Tempo Sync"));
                bool syncToTempo = clip->syncToTempo;
-               if (ToggleChip(L("Sync to Tempo##clipsync"), &syncToTempo, ImGui::GetContentRegionAvail().x))
+               if (ToggleChip(L("Sync to Tempo##clipsync"), &syncToTempo, Ui::AvailW()))
                   ArrangeEdit([&]() { ArrangeSetSampleSync(clipId, syncToTempo); });
                // Locked while sync is off: unsynced plays at native speed,
                // so Sample BPM would be a control that does nothing.
@@ -824,7 +824,7 @@ namespace app
                                       "%.2fx", ImGuiSliderFlags_Logarithmic))
                   ArrangeEdit([&]() { ArrangeSetClipSpeed(clipId, speed); });
                bool reverse = clip->reverse;
-               if (ToggleChip(L("Reverse##clipreverse"), &reverse, ImGui::GetContentRegionAvail().x))
+               if (ToggleChip(L("Reverse##clipreverse"), &reverse, Ui::AvailW()))
                   ArrangeEdit([&]() { ArrangeSetClipReverse(clipId, reverse); });
             }
          }
@@ -883,7 +883,7 @@ namespace app
                      // clip shows every box ticked.
                      bool active = !clip->IsModBypassed(paramIndex);
                      ImGui::PushID(paramIndex);
-                     if (ToggleChip(entry.second.c_str(), &active, ImGui::GetContentRegionAvail().x))
+                     if (ToggleChip(entry.second.c_str(), &active, Ui::AvailW()))
                      {
                         ArrangeEdit([&]() {
                            if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -905,7 +905,7 @@ namespace app
             // ArrangeModel.h). Only Audio/Video Clip can be reassigned.
             if (!isSample)
             {
-               const float half = std::floor((ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f);
+               const float half = std::floor((Ui::AvailW() - ImGui::GetStyle().ItemSpacing.x) * 0.5f);
                if (ChipButton::Draw(L("Reassign..."), false, 0.0f, half))
                   gArrangeAssigningClipId = clipId;
                Ui::SameRow();
@@ -925,7 +925,7 @@ namespace app
          else if (!isSample)
          {
             InspectorNote(T("(unassigned)"));
-            if (ChipButton::Draw(L("Assign Node..."), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Assign Node..."), false, 0.0f, Ui::AvailW()))
                gArrangeAssigningClipId = clipId;
          }
          else
@@ -1018,13 +1018,13 @@ namespace app
          if (anyGrouped)
          {
             ImGui::Spacing();
-            if (ChipButton::Draw(L("Ungroup"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Ungroup"), false, 0.0f, Ui::AvailW()))
                ArrangeUngroupSelection();
          }
 
          InspectorCardEnd();
          Ui::Spacer(Ui::Space::S2);
-         if (ChipButton::Draw(L("Delete Selected Clips"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+         if (ChipButton::Draw(L("Delete Selected Clips"), false, 0.0f, Ui::AvailW()))
          {
             ArrangeEdit([&]() {
                Arrange::Delete(gArrange, std::vector<uint64_t>(gArrangeSel.begin(), gArrangeSel.end()));
@@ -1081,7 +1081,7 @@ namespace app
                SectionHeader(T("Audio Track Controls"));
                bool solo = lane->solo;
                const ImVec4 soloCol = ImGui::ColorConvertU32ToFloat4(tok::Role(tok::col::text_warn));
-               const float halfW = (ImGui::GetContentRegionAvail().x - tok::space_1) * 0.5f;
+               const float halfW = (Ui::AvailW() - tok::space_1) * 0.5f;
                if (ToggleChip(L("Solo##tracksolo"), &solo, halfW, &soloCol))
                {
                   ArrangeEdit([&]() {
@@ -1153,13 +1153,13 @@ namespace app
 
             InspectorCardEnd();
             Ui::Spacer(Ui::Space::S2);
-            if (ChipButton::Draw(L("Duplicate Track"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Duplicate Track"), false, 0.0f, Ui::AvailW()))
             {
                ArrangeEdit([&]() {
                   Arrange::DuplicateLane(gArrange, rowId);
                });
             }
-            if (ChipButton::Draw(L("Delete Track"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Delete Track"), false, 0.0f, Ui::AvailW()))
             {
                ArrangeEdit([&]() {
                   Arrange::RemoveLane(gArrange, rowId);
@@ -1204,28 +1204,28 @@ namespace app
 
             InspectorCardEnd();
             Ui::Spacer(Ui::Space::S2);
-            if (ChipButton::Draw(L("Add Video Track to Group"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Add Video Track to Group"), false, 0.0f, Ui::AvailW()))
             {
                ArrangeEdit([&]() {
                   const uint64_t newLaneId = Arrange::AddLane(gArrange, Arrange::kLaneVideo);
                   Arrange::SetLaneTrackGroup(gArrange, newLaneId, rowId);
                });
             }
-            if (ChipButton::Draw(L("Add Audio Track to Group"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Add Audio Track to Group"), false, 0.0f, Ui::AvailW()))
             {
                ArrangeEdit([&]() {
                   const uint64_t newLaneId = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
                   Arrange::SetLaneTrackGroup(gArrange, newLaneId, rowId);
                });
             }
-            if (ChipButton::Draw(L("Ungroup (Keep Tracks)"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Ungroup (Keep Tracks)"), false, 0.0f, Ui::AvailW()))
             {
                ArrangeEdit([&]() {
                   Arrange::RemoveTrackGroup(gArrange, rowId, false);
                });
                gArrangeRowSel.clear();
             }
-            if (ChipButton::Draw(L("Delete Group + Tracks"), false, 0.0f, ImGui::GetContentRegionAvail().x))
+            if (ChipButton::Draw(L("Delete Group + Tracks"), false, 0.0f, Ui::AvailW()))
             {
                ArrangeEdit([&]() {
                   Arrange::RemoveTrackGroup(gArrange, rowId, true);
