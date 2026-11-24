@@ -2130,6 +2130,11 @@ if(NOT MSVC)
             else()
                 set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -Wall)
             endif()
+            # gcc's -Wformat-truncation flags every snprintf of a UiFmt unit string (40-byte buffer) into a
+            # shorter on-screen label. snprintf truncates safely there, so it is not an error; clang never warns.
+            if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+                set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -Wno-format-truncation)
+            endif()
         endif()
     endforeach()
 endif()

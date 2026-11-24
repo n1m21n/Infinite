@@ -37,7 +37,7 @@ namespace Bci
       void PollSamples(int targetSamples, std::vector<SampleFrame>& outFrames);
 
    private:
-      bool LoadLibrary(const std::string& libPath, std::string& err);
+      bool LoadBoardLibrary(const std::string& libPath, std::string& err);
 
       void* mLib = nullptr;
       bool mHardwareActive = false;

@@ -55,6 +55,8 @@ ALLOW = {
     # f and files.front() are std::filesystem::path.
     ("src/app/panels/View2DPanel.cpp", "std::ofstream(f, std::ios::binary).write(bytes.data(), (std::streamsize)bytes.size());"),
     ("src/nodes/DrumSequencerNode.cpp", "std::ifstream f(files.front());"),
+    # LoadIes takes a std::filesystem::path; both callers build it with AppPaths::FsPath.
+    ("src/engine/Ies.h", "std::ifstream f(path, std::ios::binary);"),
 }
 
 

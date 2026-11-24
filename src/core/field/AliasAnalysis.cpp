@@ -140,14 +140,6 @@ namespace Field
          }
       };
 
-      double Rms(const std::vector<double>& v)
-      {
-         double s = 0.0;
-         for (double x : v)
-            s += x * x;
-         return v.empty() ? 0.0 : std::sqrt(s / (double)v.size());
-      }
-
       // Distance on the unit circle of phase values (accumulators wrap).
       double WrapDist(double a, double b)
       {

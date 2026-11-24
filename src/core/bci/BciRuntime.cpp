@@ -45,7 +45,7 @@ int BciRuntime::BrainFlowBoardId(BoardKind kind)
    }
 }
 
-bool BciRuntime::LoadLibrary(const std::string& libPath, std::string& err)
+bool BciRuntime::LoadBoardLibrary(const std::string& libPath, std::string& err)
 {
    if (mLib && mFnPrepare && mFnStart && mFnData)
       return true;
@@ -134,7 +134,7 @@ bool BciRuntime::Open(BoardKind kind, const std::string& serialPort, const std::
    }
 
    std::string err;
-   if (!LoadLibrary(PackLibraryPath(packDir), err))
+   if (!LoadBoardLibrary(PackLibraryPath(packDir), err))
    {
       mPackMissing = true;
       mSampleRateHz = kSampleRateHz;

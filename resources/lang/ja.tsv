@@ -3736,3 +3736,216 @@ Underlying	下のレイヤー
 White from	白の下限
 Remove Background	背景を削除
 Unit\cs	秒
+\n--params\n	=en
+\n--styles\n	=en
+            a sibling of the same name shadows a global	=en
+            floor ceil round fract mod fmod min max clamp lerp mix	=en
+            length normalize distance dot cross	=en
+            phase shapes: bend pinch mirror skew formant (phase, amount)	=en
+            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)	=en
+            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)	=en
+            swizzles: .xy .xyz .xyzw or .rg .rgb .rgba (e.g. P.xz, Cd.bgr)	=en
+  (accent)	  （アクセント）
+%.0f ticks	%.0f ティック
+%.2f beats	%.2f 拍
+%d fps	%d fps
+%d s	%d 秒
+(none)	（なし）
++ Scene	+ シーン
+1. Core Principles	=en
+1.0 on the sample where the transport crosses a beat division (1/16, 1/8, 1/4...), else 0.	=en
+10. Canonical Recipes	=en
+2. Domains & Reserved Names	=en
+3. Declarations	=en
+3D cell noise on the coordinate patched into vector (Generated when empty), times scale. Distance to the nearest point, Second nearest, Edge (the gap between the two), Cell (one grey per cell) or Colour (one colour per cell). Scale also takes a wired Shade node. Patch it into a Material's field input.	vector に接続した座標（空なら Generated）に scale を掛けた 3D セルノイズ。Distance は最近点までの距離、Second nearest、Edge（二つの距離の差）、Cell（セルごとのグレー）、Colour（セルごとの色）。Scale には Shade ノードも接続できます。Material の field 入力に接続します。
+4. Types & Rank Polymorphism	=en
+48 kHz / Register VM	=en
+5. Operators & Built-in Math Functions	=en
+6. Domain Transfer Operators	=en
+60 fps / Bytecode VM	=en
+60 x N / Bytecode VM	=en
+60 x W x H / GLSL	=en
+7. Branching, Loops & Control Flow	=en
+8. Field Synth, Effect & Notes (sample domain)	=en
+9. Field Graph (graph domain)	=en
+A 3D checker of two colours on the coordinate patched into vector (Generated when empty), times scale. Patch it into a Material's field input to drive the base colour; the Material's other knobs still apply. A Shade node wired into colour 1, colour 2 or scale takes over that knob.	vector に接続した座標（空なら Generated）に scale を掛けた2色の 3D チェッカー。Material の field 入力に接続するとベースカラーを駆動します。Material の他のつまみも引き続き有効です。colour 1、colour 2、scale に接続した Shade ノードがそのつまみを引き継ぎます。
+A delay line; the length is a positive integer literal. Total delay memory per kernel is capped.	=en
+A height bends the normal by strength over distance; invert flips it; strength and distance also take a wired Shade node. Wire it into Material's normal pin.	高さは strength に応じて距離にわたり法線を曲げます。invert で反転。strength と distance には Shade ノードも接続できます。Material の normal ピンに接続します。
+A state table: a fixed-size array of cells, indexed with name[idx]. The size is a compile-time integer literal; a table cannot be read as a bare name.	=en
+A statement that sends a note out of the node's notes pin; len is in beats (0 = as long as the incoming note). rand() with no arguments is also Field Notes only. noteNum is the incoming note number, beat the transport position in beats.	=en
+A tangent-space normal map colour (Shade Image set to Data) as a normal for Material's normal pin. Strength scales the tilt, and takes a wired Shade node too.	接線空間の法線マップの色（Shade Image を Data に設定）を、Material の normal ピンの法線として使います。Strength で傾きの強さを調整。Shade ノードも接続できます。
+AAAB	=en
+AABA	=en
+ABAB	=en
+AU	=en
+Acid	Acid
+Add Another	もう一つ追加
+Add a mesh, node, camera, light, HDRI or scene (Shift+A)	メッシュ、ノード、カメラ、ライト、HDRI、シーンを追加（Shift+A）
+Adds a pin to the node. Types are the scalar and vector types plus three pin types: geometry (input only, a whole mesh), audio (a sample-domain float) and image (a pixel-domain vec4). An output frame float becomes a modulation source.	=en
+Adjustment layers	調整レイヤー
+Advanced Math	=en
+All Settings	すべての設定
+All settings	すべての設定
+An adjustment layer: its settings are in Colour.	調整レイヤー：設定は「カラー」にあります。
+Audio Effect: 1-Pole Lowpass Filter (Field Effect Node)	=en
+Audio Effect: Expose a Bass Level (Field Effect Node, reduce.rms)	=en
+Audio Synth: Sine Oscillator (Field Synth Node)	=en
+Audio in/out, sample rate (sr), sample index (n), voice note Hz (freq), gate (1.0/0.0), the latest note event. Field Notes adds noteNum and beat.	=en
+Blocks	ブロック
+Bricks in the x and y of the coordinate patched into vector (Generated when empty), times scale. Width and height size one brick, offset shifts every second row, mortar size is the gap, tint mixes each brick between colour 1 and colour 2 at random. The two colours, mortar colour and scale also take a wired Shade node. Patch it into a Material's field input.	vector に接続した座標（空なら Generated）に scale を掛けた x・y 方向のレンガ。Width と height は 1 個のレンガの大きさ、offset は 1 行おきにずらす量、mortar size は目地の幅、tint は各レンガを colour 1 と colour 2 の間でランダムに混ぜます。2 つの色、mortar colour、scale には Shade ノードも接続できます。Material の field 入力に接続します。
+Can't add layer	レイヤーを追加できません
+Can't add to 2D View	2D ビューに追加できません
+Can't replace layer	レイヤーを置き換えできません
+Cannot connect: this would feed a 2D Document back into itself	接続できません：2D ドキュメントが自分自身にフィードバックされます
+Click for all settings	クリックですべての設定
+Click for all settings, drag to reorder, right-click for more	クリックですべての設定、ドラッグで並べ替え、右クリックでその他
+Click for all settings, right-click for more	クリックですべての設定、右クリックでその他
+Click for its settings	クリックで設定を表示
+Click the picture	画像をクリック
+Click to add, drag off or right-click to remove	クリックで追加、外へドラッグか右クリックで削除
+Clip to %s	%s にクリップ
+Clipped	クリップ済み
+Coarse \\xE2\\x86\\x92 fine happens automatically via rate inference. Writing broadcast(...) is a compile error.	=en
+Copy Effects	エフェクトをコピー
+Declares an exposed control that auto-creates an interactive, modulatable knob/slider in the node UI.	=en
+Declares custom per-element attributes living on geometry points or vertices.	=en
+Delete Adjustment	調整を削除
+Delete Mask	マスクを削除
+Disable Mask	マスクを無効化
+Disc	ディスク
+Domain is a bare identifier: frame, element, pixel or sample. Samples rather than aggregates, so fine \\xE2\\x86\\x92 coarse can alias - prefer reduce.rms for levels/envelopes.	=en
+Drag to move; Option-drag splits; right-click removes the split	ドラッグで移動、Option-ドラッグで分割、右クリックで分割を削除
+Duplicate Adjustment	調整を複製
+Edit time / Interpreter	=en
+Enable Mask	マスクを有効化
+Expression	=en
+FILL	塗り
+Field Pixel: img is the current-pixel RGBA input. img(vec2) samples it at normalized coordinates, clamped to the source's edge texel centres. Filtering follows the source sampler (normally linear). Only a declared image input is callable; col is the RGB output. No connected image reads transparent black.	=en
+Field allows data-dependent branching (unlike Kronos, which forbids it entirely). Every branch has a real cost that depends on the domain it runs in - always know which domain you're in before you branch.	=en
+Funk	Funk
+Geometry Deformer: Wave Ripple (Field Modifier Node)	=en
+Global Scale: OFF (click to enable)	グローバルスケール：オフ（クリックで有効）
+Global Scale: ON (click to disable)	グローバルスケール：オン（クリックで無効）
+Hi Hue	ハイライト色相
+Hi Sat	ハイライト彩度
+Host automation	ホストオートメーション
+Host automation (slots full)	ホストオートメーション（スロット満杯）
+In %d   Out %d	入力 %d   出力 %d
+In Black	入力ブラック
+In White	入力ホワイト
+Install the BCI pack: Settings > Extensions (synthetic fallback active)	BCI パックをインストール：設定 > 拡張機能（合成フォールバック有効）
+L	=en
+Layered 3D noise on the coordinate patched into vector (Generated when empty), times scale. Detail adds octaves, roughness sets how strong each finer octave is, distortion warps the coordinate. Value is grey, Colour gives three different noises. Scale, roughness and distortion also take a wired Shade node. Patch it into a Material's field input.	vector に接続した座標（空なら Generated）に scale を掛けた、階層化された 3D ノイズ。Detail はオクターブを追加し、roughness は細かいオクターブそれぞれの強さ、distortion は座標を歪めます。Value はグレー、Colour は 3 種類の異なるノイズを出します。Scale、roughness、distortion には Shade ノードも接続できます。Material の field 入力に接続します。
+Learn	学習
+Learn again	再学習
+Logic & Compare	=en
+Long	ロング
+Look presets	ルックプリセット
+Loops are bounded. In the sample domain the bounds must be compile-time integer constants and the loop is unrolled (with a cap); a Field Graph loop stops at an iteration limit.	=en
+MIDI note of a scale degree in the project key and scale (top bar).	=en
+Mask to Selection	マスクを選択範囲に
+Math Utilities	=en
+Melodic	メロディック
+Mesh	メッシュ
+More	その他
+Move Down	下へ移動
+Move Up	上へ移動
+No matching adjustments	一致する調整はありません
+Node graph metaprogramming: emit(), connect(), set(), place().	=en
+None yet	まだありません
+Normalized UV [0..1], Pixel XY, Output color (vec3), Screen resolution, aspect ratio, output alpha.	=en
+OFF	オフ
+ON	オン
+Operators	=en
+Out Black	出力ブラック
+Out White	出力ホワイト
+P, N, uv, Cd, i, count	=en
+Paint Mask	マスクをペイント
+Paste Effects	エフェクトをペースト
+Persistent delay cell (one execution unit of memory). Essential for feedback loops, filters, and integrators.	=en
+Phase Shapes	=en
+Pixel Shader: Radial Glow SDF (Field Pixel Node)	=en
+Position (vec3), Normal (vec3), UV (vec2), Color (vec3), vertex index, total count.	=en
+Pure Randomness	=en
+R	=en
+Re-learn MIDI	MIDI を再学習
+Ready-to-use starting points - copy into a Field node's editor and adjust the param ranges.	=en
+Release to remove point	離すとポイントを削除
+Remove Effect	エフェクトを削除
+Remove Style	スタイルを削除
+Rolling	ローリング
+Runs at edit time and builds nodes on the canvas. emit("Node Name", key) adds a node and returns a handle (the key keeps it stable across re-runs), connect(a, outPin, b, inPin) patches a cable, set(handle, "param", value) sets a param, place(handle, x, y) positions it. Nodes it made are updated, not duplicated, when you apply again.	=en
+Runs the body N times, once per lane, inside element or pixel kernels (the body domain must be the same or finer than the surrounding one). Cost is N x the body. The lane index inside the body is map_index; N must be a compile-time constant (1-64).	=en
+SVG: %s (%s). svgSet("#id", "attr", value), svgText, svgBox, svgDraw(x, y, w, h)	SVG：%s（%s）。svgSet("#id", "attr", value)、svgText、svgBox、svgDraw(x, y, w, h)
+Sample kernels run on the audio thread. They have a smaller function set: abs, floor, ceil, clamp, lerp, min, max, pow, sqrt, exp, log, sin, cos, tan, if, plus the calls below.	=en
+Save this look	このルックを保存
+Saved	保存しました
+Select a layer to see its look.	レイヤーを選択するとルックが表示されます。
+Shad Hue	シャドウ色相
+Shad Sat	シャドウ彩度
+Standard boolean comparisons and logic gates.	=en
+Standard trig functions (radians).	=en
+Stop learning	学習を停止
+Temp	色温度
+That node already reads from this 2D Document (would create a feedback loop).	そのノードはすでにこの 2D ドキュメントを読み込んでいます（フィードバックループになります）。
+That would feed a 2D Document back into itself.	2D ドキュメントが自分自身にフィードバックされます。
+The function form if(cond, a, b) also exists (from the '=' parameter-expression language) and always evaluates both branches with no short-circuit - it is not the same construct as the statement form above, but both are valid Field/expression syntax.	=en
+Threshold and Hermite interpolation, exponents, roots, min/max bounds, a select that evaluates both sides.	=en
+Time in seconds, delta time, global frame counter, cooks since this node's state was cleared (seed a simulation when age == 0), pi.	=en
+Trap 808	Trap 808
+Trigonometry	=en
+VST3	=en
+Vector Math	=en
+Vector norms, distance between points, dot/cross products.	=en
+Want geometry or pixels to react to audio? A single kernel can't read 'in' from an element or pixel domain - drive a param from an audio-analysis node through the modulation matrix instead, and reference the param (e.g. 'height' above) from within the geometry/pixel kernel.	=en
+Wobble	ゆらぎ
+^ is right-associative power (2^3 == 8).	=en
+abs, sign, floor, ceil, round, fract, mod, fmod, clamp, lerp, mix	=en
+always pays the sum of both sides (GPU evaluates both)	=en
+attrib <type> <name> = <init>	=en
+bend, pinch, mirror, skew, formant	=en
+bound       t = transport seconds, pi	=en
+breaks vectorization of the batch	=en
+broadcast - one to many, implicit, NEVER written	=en
+deg(degree)	=en
+delay(x, samples)	=en
+downsample(x, k) - run at a fraction of the ambient rate	=en
+element	=en
+element, pixel and sample are mutually incomparable domains - they never join implicitly. Every crossing between them goes through frame, either explicitly (reduce/resample/downsample) or via a reduce.	=en
+f() f(speed) f(min, max) f(min, max, speed, seed). rand jumps, noise glides, sh samples and holds. Deterministic in time and seed.	=en
+filter colors...	色を絞り込み...
+for (init; cond; step) { ... }	=en
+frame	=en
+free	=en
+functions   sin cos tan atan2 abs sign sqrt exp log pow	=en
+graph	=en
+in a param  lo / hi = that param's own range, plus its siblings	=en
+in, out, sr, n, freq, gate, noteOn, notePitch, noteVel	=en
+input pixel image img; img(coord)	=en
+k must be a compile-time constant integer literal >= 1. A non-constant k is refused at compile time.	=en
+length, distance, normalize, dot, cross	=en
+lerp(a, b, t) and mix(a, b, t) are linear interpolation; mod and fmod are the floating-point remainder.	=en
+map(N) { ... } - one kernel invocation per lane, explicit	=en
+mispredict risk on the audio thread	=en
+note(pitch, vel, len)   - Field Notes only	=en
+operators   + - * / % ^   < <= > >= == !=   && || !   . (swizzle)	=en
+output <domain> <type> <name> = <expr>   /   input <domain> <type> <name>	=en
+param <type> <name> = <default> [<min>, <max>]	=en
+pixel	=en
+predication	=en
+rand, noise, sh	=en
+real branch	=en
+reduce.<op>(x) - many to one, written explicitly	=en
+reduce.rms(in, lo, hi) is output-only in v1: it must be its own 'output frame float <name> = reduce.rms(in, lo, hi)' declaration (at most one per kernel), and that value cannot be read back into this same kernel's per-sample lines - it can only be exposed as a pin and driven onto another node's param through the modulation matrix. Signal processing on 'in' happens independently, in ordinary per-sample lines.	=en
+resample(x, Domain) - read domain A while standing in domain B	=en
+sample	=en
+shape(phase, amount): warps a 0..1 phase the way Wavetable's warps do. Amount 0 (ratio 1 for formant) leaves it unchanged.	=en
+sin, cos, tan, atan2	=en
+state <type> <name> = <init>	=en
+state <type> <name>[<size>] = <init>	=en
+step, smoothstep, pow, sqrt, exp, log, min, max, if(c, a, b)	=en
+t, dt, frame, age, pi	=en
+tick(division)	=en
+uv, xy, col, res, aspect, alpha, age	=en
+vectors     vec2(x,y) vec3(x,y,z) vec4(x,y,z,w) or splat vec3(1)	=en
+xvfb-run -a ...	=en
