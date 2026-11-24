@@ -32,6 +32,7 @@ GROUPS = [
         ("vjs.html", "VJs", "Live visuals on stage"),
         ("creative-coders.html", "Creative coders", "Field, sketches and shaders"),
         ("developers.html", "Developers", "Headless CLI, Python SDK, MCP"),
+        ("game-developers.html", "Game developers", "Procedural SFX, 3D, shaders &amp; CLI"),
     ]),
     ("explore", "Explore", [
         ("library.html", "Library", "Templates, patches and Field devices"),
@@ -55,7 +56,7 @@ GROUPS = [
 FOOTER_COLS = [
     ("Who it's for", [
         ("artists.html", "Artists"), ("musicians.html", "Musicians"), ("vjs.html", "VJs"),
-        ("creative-coders.html", "Creative coders"), ("developers.html", "Developers"),
+        ("creative-coders.html", "Creative coders"), ("developers.html", "Developers"), ("game-developers.html", "Game developers"),
     ]),
     ("Explore", [
         ("library.html", "Library"), ("samples/", "Sample generator"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"),
@@ -125,7 +126,7 @@ def is_current(path, rel):
 
 
 NAV_ICON = {"artists.html": "family-compositing", "musicians.html": "family-notes", "vjs.html": "perform", "creative-coders.html": "edit",
-            "developers.html": "cube", "library.html": "library", "artworks.html": "viewport", "embeds/": "grid-dots", "nodes/": "cube", "extensions.html": "pointer", "chat.html": "chat",
+            "developers.html": "cube", "game-developers.html": "cube", "library.html": "library", "artworks.html": "viewport", "embeds/": "grid-dots", "nodes/": "cube", "extensions.html": "pointer", "chat.html": "chat",
             "benchmarks.html": "range", "samples/": "range", "index.html#learn": "play", "manual/": "library", "philosophy.html": "loop", "research/": "range", "blog/": "pencil", "releases.html": "history"}
 
 
@@ -192,7 +193,7 @@ def dock_html(rel):
 
 
 AUDIENCE_PAGES = {"artists.html": "artists", "musicians.html": "musicians", "vjs.html": "vjs",
-                  "creative-coders.html": "creative-coders", "developers.html": "developers"}
+                  "creative-coders.html": "creative-coders", "developers.html": "developers", "game-developers.html": "game-developers"}
 
 
 def signup_html(rel):
