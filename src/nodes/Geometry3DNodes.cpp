@@ -3298,7 +3298,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(GLUtil::UniformLoc(mProgram, "uExposure"), exposure);
       glUniform1i(GLUtil::UniformLoc(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
       glUniform1i(GLUtil::UniformLoc(mProgram, "uRenderPass"), renderPass);
-      glUniform1i(GLUtil::UniformLoc(mProgram, "uPassMask"), passMask);
+      glUniform1i(GLUtil::UniformLoc(mProgram, "uPassMask"), std::clamp(passMask, 0, 255));
       glUniform1i(GLUtil::UniformLoc(mProgram, "uVelocity"), mVelocityPass ? 1 : 0);
       if (mVelocityPass)
       {

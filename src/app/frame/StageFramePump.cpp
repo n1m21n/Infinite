@@ -494,6 +494,16 @@ void DrawFramePump(FrameCtx& fc)
       ImGui_ImplGlfw_NewFrame();
       // Plugin mode: the view in the DAW is this window's screen, mouse and keyboard.
       PluginView::BeginFrame(window);
+      // Lazy-load the full font stack and media/sample browser indexes the first
+      // time a DAW plugin editor is actually opened.
+      static bool sPluginUiWarmed = false;
+      if (Platform::PluginModeActive() && !sPluginUiWarmed && (PluginView::Open() || PluginView::Popped()))
+      {
+         sPluginUiWarmed = true;
+         UiScale::RequestRescale();
+         try { gSampleScanner.LoadFromDisk(); } catch (const std::exception&) {}
+         try { gMediaScanner.LoadFromDisk(); } catch (const std::exception&) {}
+      }
 
       // dev-only: click inside the colour picker to prove it is interactive now
       FrameTest_COLORTEST(frameId, window);

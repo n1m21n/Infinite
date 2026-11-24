@@ -756,23 +756,33 @@ int DrawTestsB(FrameCtx& fc)
       if (splashEnabled)
          Splash::Draw();
 
+      // Closed plugin editor: nothing is visible and no PBO capture runs, so skip GL rendering and swap.
+      const bool pluginHiddenClosed = Platform::PluginModeActive() && !PluginView::Open() && !PluginView::Popped();
+
       int fbW, fbH;
       glfwGetFramebufferSize(window, &fbW, &fbH);
       {
          ConditionalStageTimer timerImGuiRender(benchStagesCpuSample ? &sStageImGuiRender : nullptr, Bench::FrameTail::kImGuiRender);
          Bench::ConditionalGpuStageTimer timerImGuiRenderGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "imgui_render", frameId);
-         ImGui::Render();
-         MenuAliveAfterRender();
-         glViewport(0, 0, fbW, fbH);
-         // Backs every transparent ImGui child/window (ChildBg/WindowBg alpha 0
-         // by default, see ApplyTheme) - any panel that skips
-         // PushElevatedPanelStyle shows this colour through, so it has to track
-         // the theme rather than stay a fixed dark constant or a light theme
-         // renders that gap as near-black.
-         const CategoryColors::UiTheme& clearTheme = CategoryColors::CurrentUiTheme();
-         glClearColor(clearTheme.windowBg.r, clearTheme.windowBg.g, clearTheme.windowBg.b, 1.0f);
-         glClear(GL_COLOR_BUFFER_BIT);
-         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+         if (pluginHiddenClosed)
+         {
+            ImGui::EndFrame();
+         }
+         else
+         {
+            ImGui::Render();
+            MenuAliveAfterRender();
+            glViewport(0, 0, fbW, fbH);
+            // Backs every transparent ImGui child/window (ChildBg/WindowBg alpha 0
+            // by default, see ApplyTheme) - any panel that skips
+            // PushElevatedPanelStyle shows this colour through, so it has to track
+            // the theme rather than stay a fixed dark constant or a light theme
+            // renders that gap as near-black.
+            const CategoryColors::UiTheme& clearTheme = CategoryColors::CurrentUiTheme();
+            glClearColor(clearTheme.windowBg.r, clearTheme.windowBg.g, clearTheme.windowBg.b, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+         }
       }
       // Plugin mode: this frame to the view in the DAW.
       PluginView::Capture(fbW, fbH);
@@ -848,9 +858,9 @@ int DrawTestsB(FrameCtx& fc)
       }
       {
          ConditionalStageTimer timerSwap(benchStagesCpuSample ? &sStageSwap : nullptr, Bench::FrameTail::kSwap);
-         // A headless job's window is never shown and its pictures are read
-         // from node textures, so presenting the canvas is wasted time.
-         if (!HeadlessJobActive())
+         // A headless job's or closed plugin editor's window is never shown,
+         // so presenting the canvas is wasted time (and hammers the GPU across multiple DAW instances).
+         if (!HeadlessJobActive() && !pluginHiddenClosed)
             glfwSwapBuffers(window);
       }
       if (Bench::Tail().active)
