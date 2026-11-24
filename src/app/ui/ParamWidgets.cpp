@@ -378,7 +378,7 @@ namespace app
          // stroke) - those three states are exactly what the user pointed at
          // saying "match the knob's saturation", and a translucent wash of
          // the same RGB read as a different, washed-out color next to it.
-         const ImU32 alpha = vividState ? (isLight ? 225 : 205) : (isLight ? 110 : 86);
+         const ImU32 alpha = vividState ? (isLight ? tok::param_audio_slider_float_lg : tok::param_audio_slider_float_md) : (isLight ? tok::param_audio_slider_float_sm : tok::param_audio_slider_float_xs);
          const ImU32 soft = (fillColor & 0x00FFFFFF) | (alpha << 24);
          dl->PushClipRect(r0, ImVec2(fillX, r1.y), true);
          dl->AddRectFilled(r0, r1, soft, tok::radius_control);
@@ -407,7 +407,7 @@ namespace app
          // the app, just forced to full strength since it now sits over a
          // near-opaque accent once the fill does cover it.
          valCol = isLight ? tok::Base(tok::col::surface_deep) : tok::Base(tok::col::ink_white);
-         nameCol = isLight ? tok::Base(tok::col::surface_lo, 220) : tok::Base(tok::col::edge_hi, 220);
+         nameCol = isLight ? tok::Base(tok::col::surface_lo, tok::param_audio_slider_float_surface_lo_alpha) : tok::Base(tok::col::edge_hi, tok::param_audio_slider_float_edge_hi_alpha);
       }
       else
       {

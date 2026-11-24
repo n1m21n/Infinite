@@ -237,13 +237,13 @@ namespace app
                         fill = green;
                      dl->AddRectFilled(mn, mx, fill, tok::vmpc_body_radius);
                      const ImU32 selCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo);
-                     const ImU32 edge = isLight ? tok::Base(tok::col::edge_mid_light_fixed) : tok::Base(tok::col::surface_lo_pale_fixed, 200);
+                     const ImU32 edge = isLight ? tok::Base(tok::col::edge_mid_light_fixed) : tok::Base(tok::col::surface_lo_pale_fixed, tok::vmpc_body_surface_lo_pale_fixed_alpha);
                      dl->AddRect(mn, mx, isSel ? selCol : edge, tok::vmpc_body_radius, 0, isSel ? tok::vmpc_body_stroke : tok::vmpc_outline_stroke);
 
                      const ImU32 ink = lit ? tok::Base(tok::col::ink_white)
                                            : (isLoaded ? (isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::surface_hi))
                                                        : tok::Base(tok::col::edge_mid));
-                     const ImU32 dim = lit ? tok::Base(tok::col::ink_white, 190) : (isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::text_secondary));
+                     const ImU32 dim = lit ? tok::Base(tok::col::ink_white, tok::vmpc_body_ink_white_alpha) : (isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::text_secondary));
                      dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 1.0f, mx.y - 1.0f), true);
                      const float lh = AudioLabelFontSize();
                      char num[16];
@@ -363,7 +363,7 @@ namespace app
                   EmptyState::DrawCaption(origin, br, n->PadLoading(cur) ? T("Loading preview...")
                                                       : (n->PadIsHap(cur) ? T("HAP clip - no filmstrip") : T("No preview")));
                // The play window: outside start..end is dimmed, its edges marked.
-               float a = std::clamp(n->padStart[cur] / 100.0f, 0.0f, 1.0f);
+               float a = std::clamp(n->padStart[cur] / tok::vmpc_v, 0.0f, 1.0f);
                float b = std::clamp(n->padEnd[cur] / 100.0f, 0.0f, 1.0f);
                if (b < a)
                   std::swap(a, b);

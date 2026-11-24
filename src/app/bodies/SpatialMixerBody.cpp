@@ -68,7 +68,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const ImU32 line = light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_line_alpha_lg) : tok::Base(tok::col::ink_white, tok::spatial_mixer_line_alpha_sm);
-      const ImU32 text = light ? tok::Base(tok::col::ink_black, 150) : tok::Base(tok::col::ink_white, 150);
+      const ImU32 text = light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_body_ink_black_alpha) : tok::Base(tok::col::ink_white, tok::spatial_mixer_body_ink_white_alpha);
       dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_fill_alpha_lg) : tok::Base(tok::col::ink_white, tok::spatial_mixer_fill_alpha_sm), tok::radius_control);
       dl->AddCircle(centre, R, line, tok::spatial_mixer_body_segments);
       for (float m : { 1.0f, 2.0f })
@@ -107,7 +107,7 @@ namespace app
       // ---- dots ----------------------------------------------------------
       auto dotPos = [&](int s) {
          const float rad = R * RadiusFracFromDist(n->distance[s]);
-         const float a = n->azimuth[s] * 0.017453292f;
+         const float a = n->azimuth[s] * tok::spatial_mixer_a_ratio;
          return ImVec2(centre.x + std::sin(a) * rad, centre.y - std::cos(a) * rad);
       };
 

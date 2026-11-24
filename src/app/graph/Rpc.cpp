@@ -1112,7 +1112,7 @@ namespace app
             problems.push_back({ {"code", "W_AUDIO_OFF"},
                                  {"message", "audio is off, so nothing in this patch can sound; loading a patch does not turn it on"},
                                  {"hint", "tell the user to turn audio on (New Synth, the Mixer's audio button, or Settings > Audio); do not change the patch for this"} });
-         const auto db = [](float a) { return a > 1e-9f ? 20.0 * std::log10((double)a) : -180.0; };
+         const auto db = [](float a) { return a > 1e-9f ? 20.0 * std::log10((double)a) : -180.0; };  // ui-audit-ok: dB maths on a model value
          if (heard && w.nonFinite > 0)
             problems.push_back({ {"code", "E_AUDIO_NAN"}, {"samples", w.nonFinite},
                                  {"message", "the output carried NaN/inf samples (a node is blowing up; the device hears silence or a burst)"},

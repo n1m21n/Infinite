@@ -253,7 +253,7 @@ namespace
 
    ImU32 Hex(unsigned rgb, float a = 1.0f)
    {
-      return ImGui::ColorConvertFloat4ToU32(ImVec4(((rgb >> 16) & 255) / 255.0f, ((rgb >> 8) & 255) / 255.0f, (rgb & 255) / 255.0f, a));
+      return ImGui::ColorConvertFloat4ToU32(ImVec4(((rgb >> 16) & tok::view3d_hex) / 255.0f, ((rgb >> 8) & tok::view3d_hex) / 255.0f, (rgb & tok::view3d_hex) / 255.0f, a));
    }
 
    // The engine is Y up; the panel speaks Blender: X right, Y away from the viewer, Z up. Axis index 0 1 2 are the
@@ -2851,7 +2851,7 @@ namespace
             {
             case 1:
                for (int a = 0; a < 3; a++)
-                  DrawEllipse3D(dl, m, h, a, (a + 1) % 3, bc);
+                  DrawEllipse3D(dl, m, h, a, (a + 1) % tok::view3d_ellipse3_d_period, bc);
                break;
             case 2:
             case 4:
@@ -4629,7 +4629,7 @@ namespace
             if (i > 0)
             {
                Line3D(dl, prev, q, col);
-               Line3D(dl, prevIn, in, col & 0x80FFFFFF);
+               Line3D(dl, prevIn, in, col & tok::view3d_light_shape_alpha_mask);
             }
             if (i % 8 == 0 && i < 32)
                Line3D(dl, p, q, col);
@@ -4641,7 +4641,7 @@ namespace
       {
          const float len = light->useCutoff ? light->cutoffDistance : std::max(0.05f, light->distance);
          const float r = len * std::tan(light->spotAngle * kPi / tok::view3d_tan_scale);
-         const ImU32 fill = (col & 0x00FFFFFF) | 0x26000000;
+         const ImU32 fill = (col & 0x00FFFFFF) | tok::view3d_fill_alpha;
          ImVec2 prev;
          bool prevOk = false;
          for (int i = 0; i <= 32; i++)
@@ -4655,7 +4655,7 @@ namespace
             if (ok && prevOk)
             {
                dl->AddTriangleFilled(s, prev, qs, fill);
-               dl->AddLine(prev, qs, col & 0x80FFFFFF);  // ui-audit-ok: channel mask / bit packing, not a colour value
+               dl->AddLine(prev, qs, col & tok::view3d_light_shape_alpha_mask);  // ui-audit-ok: channel mask / bit packing, not a colour value
             }
             prev = qs;
             prevOk = ok;
@@ -4671,7 +4671,7 @@ namespace
          {
             float x, y;
             if (nPts == 4) { x = (i == 1 || i == tok::view3d_light_shape_limit) ? hw : -hw; y = i < tok::view3d_y_limit ? -hh : hh; }
-            else { const float a = 6.2831853f * float(i) / float(nPts); x = std::cos(a) * hw; y = std::sin(a) * hh; }
+            else { const float a = tok::view3d_a_ratio * float(i) / float(nPts); x = std::cos(a) * hw; y = std::sin(a) * hh; }
             for (int k = 0; k < 3; k++)
                c[i][k] = p[k] + u[k] * x + v[k] * y;
          }
@@ -4681,7 +4681,7 @@ namespace
       if (type == 1 || type == 4 || type == 5)
       {
          const float ground[3] = { p[0], 0.0f, p[2] };
-         Line3D(dl, p, ground, col & 0x55FFFFFF);
+         Line3D(dl, p, ground, col & tok::view3d_line3_d_mask);
       }
    }
 
@@ -4781,7 +4781,7 @@ namespace
 
       for (int a = 0; a < 3; a++)
       {
-         const float fade = 1.0f - std::clamp((std::abs(Dot(axes[a], sCam.fwd)) - 0.93f) / 0.05f, 0.0f, 1.0f);
+         const float fade = 1.0f - std::clamp((std::abs(Dot(axes[a], sCam.fwd)) - tok::view3d_gizmo_inset) / tok::view3d_gizmo_v, 0.0f, 1.0f);
          if (fade <= 0.0f)
             continue;
          const float tip[3] = { at[0] + axes[a][0] * len, at[1] + axes[a][1] * len, at[2] + axes[a][2] * len };

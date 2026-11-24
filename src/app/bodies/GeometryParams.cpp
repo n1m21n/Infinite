@@ -267,7 +267,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const bool isLight = IsThemeLight();
-      const ImU32 borderCol = isLight ? tok::Base(tok::col::edge_lo_light, 140) : tok::Base(tok::col::surface_hi, 70);
+      const ImU32 borderCol = isLight ? tok::Base(tok::col::edge_lo_light, tok::geometry_params_table_grid_edge_lo_light_alpha) : tok::Base(tok::col::surface_hi, tok::geometry_params_table_grid_surface_hi_alpha);
       const ImU32 textCol = isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::surface_hi);
 
       dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, tok::geometry_params_table_grid_radius, 0, tok::geometry_params_table_grid_stroke);
@@ -2267,7 +2267,7 @@ namespace app
       {
          float x = toScreenX(n->crossoverPos[i]);
          bool isHov = (nearest == i || (sDragNode == n && sDragIndex == i));
-         ImU32 lineCol = isHov ? tok::Role(tok::col::role_modulation, 230) : tok::Role(tok::col::ink_white, 100);
+         ImU32 lineCol = isHov ? tok::Role(tok::col::role_modulation, tok::geometry_params_audio_color_ramp_editor_role_modulation_alpha) : tok::Role(tok::col::ink_white, tok::geometry_params_audio_color_ramp_editor_ink_white_alpha);
          dl->AddLine(ImVec2(x, origin.y + tok::space_0_5), ImVec2(x, origin.y + barH - tok::space_0_5), lineCol, isHov ? tok::geometry_params_line_stroke_lg : tok::geometry_params_audio_color_ramp_editor_stroke);
 
          if (isHov)
@@ -3108,7 +3108,7 @@ namespace app
          else
          {
             sDragAccum += ImGui::GetIO().MouseDelta.y;
-            const float threshold = rowHeight * 3.0f; // one full layer block  // ui-audit-ok: three rows (a layer block)
+            const float threshold = rowHeight * tok::geometry_params_layer_block_rows; // one full layer block
             while (sDragAccum > threshold && sDragSlot < LayerStackNode::kSlots - 1)
             {
                n->SwapLayers(sDragSlot, sDragSlot + 1);

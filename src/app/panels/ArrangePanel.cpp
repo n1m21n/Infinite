@@ -1483,7 +1483,7 @@ namespace app
             const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
             const ImU32 barCol = anyResized
                ? arrangeIconCol
-               : (arrangeIconCol & 0x60FFFFFFu);
+               : (arrangeIconCol & tok::arrange_panel_content_alpha_mask);
             glyph::DrawLineHeight(ImGui::GetWindowDrawList(), rcenter, tok::icon_control, barCol);
             if (hovered)
                HelpTip(anyResized ? T("Reset all track heights to default") : T("All tracks already at default height"));
@@ -1867,8 +1867,8 @@ namespace app
             const ImVec2 f0(fx, pinnedTopY + 1.0f);
             const ImVec2 f1(fx + flagW, kTickStripTop - 1.0f);
             const ImU32 fcol = ArrangeMarkerColU32(mk.color);
-            const float lum = 0.299f * (float)((mk.color >> 24) & 0xFF) + 0.587f * (float)((mk.color >> 16) & 0xFF) +
-                              0.114f * (float)((mk.color >> 8) & 0xFF);
+            const float lum = 0.299f * (float)((mk.color >> 24) & 0xFF) + tok::arrange_lum_ratio * (float)((mk.color >> 16) & 0xFF) +
+                              tok::arrange_lum_scale * (float)((mk.color >> 8) & 0xFF);
             const bool dragged = gArrangeMarkerDragId == mk.id;
             dl->AddRectFilled(f0, f1, fcol, tok::arrange_fill_radius_sm, ImDrawFlags_RoundCornersRight);
             // A hairline edge so a pale flag still reads on the light ruler.
@@ -2573,7 +2573,7 @@ namespace app
          for (int d = 0; d < depth; d++)
          {
             const float lineX = headerStartX + tok::space_1_5 + (float)d * kGroupIndent;
-            dl->AddLine(ImVec2(lineX, rowTop), ImVec2(lineX, rowTop + kLaneHeight), tint & 0x60FFFFFFu, tok::arrange_line_stroke_xs);  // ui-audit-ok: channel mask / bit packing, not a colour value
+            dl->AddLine(ImVec2(lineX, rowTop), ImVec2(lineX, rowTop + kLaneHeight), tint & tok::arrange_panel_content_alpha_mask, tok::arrange_line_stroke_xs);  // ui-audit-ok: channel mask / bit packing, not a colour value
          }
 
          const bool grpRowSelected = gArrangeRowSel.count(groupId) != 0;
@@ -2593,7 +2593,7 @@ namespace app
             });
          }
          const bool foldHovered = ImGui::IsItemHovered();
-         const ImU32 chevronCol = foldHovered ? (isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_hi)) : (tint | 0xE0000000u);
+         const ImU32 chevronCol = foldHovered ? (isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_hi)) : (tint | tok::arrange_panel_content_alpha);
          const ImVec2 chevCenter(indentX + tok::space_1_5, rowTop + kLaneHeight * 0.5f);
          if (grp->collapsed)
             glyph::DrawChevronRight(dl, chevCenter, 11.0f, chevronCol);
@@ -3038,7 +3038,7 @@ namespace app
             }
             else
             {
-               float pct = lane.opacity * 100.0f;
+               float pct = lane.opacity * tok::arrange_pct_ratio;
                // A readout well that fills left to right (no grab stub): drag to set, double-click for 100%.
                const ImVec2 op = ImGui::GetCursorScreenPos();
                UiInteract::Hit("##laneopacity", ImVec2(kMixStripW, kMixCtl));
@@ -3073,7 +3073,7 @@ namespace app
                   dl->AddText(ImVec2(std::round(op.x + (kMixStripW - otz.x) * 0.5f), std::round(op.y + (kMixCtl - otz.y) * 0.5f)),
                               ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, tok::arrange_y_xl)), opTxt);
                }
-               mixGesture(opChanged, [&] { lane.opacity = std::clamp(pct / 100.0f, 0.0f, 1.0f); });
+               mixGesture(opChanged, [&] { lane.opacity = std::clamp(pct / tok::arrange_v_lg, 0.0f, 1.0f); });
             }
             ImGui::PopStyleVar();
          }
@@ -3314,19 +3314,19 @@ namespace app
             // Styling. A Color Tint overrides the type palette; a disabled or
             // offline clip is drawn desaturated under a diagonal hatch - the
             // "this will not play" mark.
-            const bool hasTint = clip.colorR > 0.001f || clip.colorG > 0.001f || clip.colorB > 0.001f;
+            const bool hasTint = clip.colorR > tok::arrange_has_tint_limit || clip.colorG > tok::arrange_has_tint_limit || clip.colorB > tok::arrange_has_tint_limit;
             // A Color Tint is drawn at full opacity in both states so the clip always
             // shows exactly the palette swatch the user picked, not a blended-down shade.
             ImU32 clipBaseCol = hasTint
                ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), tok::arrange_clip_base_col_alpha)
-               : (isVideo ? tok::Role(tok::col::role_expression, 210) : tok::Role(tok::col::state_ok_deep_mid, 210));
+               : (isVideo ? tok::Role(tok::col::role_expression, tok::arrange_panel_content_role_expression_alpha) : tok::Role(tok::col::state_ok_deep_mid, tok::arrange_panel_content_state_ok_deep_mid_alpha));
             ImU32 clipActiveCol = hasTint
                ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), tok::arrange_clip_base_col_alpha)
                : (isVideo ? tok::Role(tok::col::role_expression) : tok::Role(tok::col::viz_teal));
             const bool muted = !clip.enabled || offline || laneSilenced;
             if (muted)
             {
-               clipBaseCol = isLight ? tok::Base(tok::col::edge_mid_light_fixed, 220) : tok::Base(tok::col::edge_lo_light, 220);
+               clipBaseCol = isLight ? tok::Base(tok::col::edge_mid_light_fixed, tok::arrange_panel_content_edge_mid_light_fixed_alpha) : tok::Base(tok::col::edge_lo_light, tok::arrange_panel_content_edge_lo_light_alpha);
                clipActiveCol = isLight ? tok::Base(tok::col::text_secondary) : tok::Base(tok::col::surface_lo_pale_fixed);
             }
             // A grouped clip is edged in its group's colour (brighter when
@@ -3334,10 +3334,10 @@ namespace app
             // carries the selection); a loose selected clip takes the accent.
             const bool grouped = clip.groupId != 0;
             const ImU32 clipBorderCol = grouped
-               ? ArrangeGroupColor(clip.groupId, isSelected ? 255 : (clipHovered ? 235 : 190))
+               ? ArrangeGroupColor(clip.groupId, isSelected ? tok::arrange_panel_content_arrange_group_color_alpha : (clipHovered ? tok::arrange_clip_border_col_lg : tok::arrange_clip_border_col_sm))
                : isSelected
                ? ImGui::GetColorU32(app::AccentEmphasisSelected())
-               : (clipActive ? tok::Role(tok::col::ink_white, 240) : (clipHovered ? tok::Role(tok::col::edge_hi, 220) : tok::Role(tok::col::surface_deep, 180)));
+               : (clipActive ? tok::Role(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha) : (clipHovered ? tok::Role(tok::col::edge_hi, tok::arrange_panel_content_edge_hi_alpha) : tok::Role(tok::col::surface_deep, tok::arrange_panel_content_surface_deep_alpha)));
 
             dl->AddRectFilled(ImVec2(cLeft, cTop), ImVec2(cRight, cBottom),
                               clipActive ? clipActiveCol : clipBaseCol, tok::radius_control);
@@ -3357,7 +3357,7 @@ namespace app
             {
                const float midY = (cTop + cBottom) * 0.5f;
                const float halfH = std::max(tok::arrange_half_h_min, (cBottom - cTop) * 0.5f - tok::space_1_25);
-               const ImU32 waveCol = muted ? tok::Role(tok::col::ink_white, 60) : tok::Role(tok::col::ink_white, 115);
+               const ImU32 waveCol = muted ? tok::Role(tok::col::ink_white, tok::arrange_wave_col_alpha_sm) : tok::Role(tok::col::ink_white, tok::arrange_wave_col_alpha_lg);
                dl->PushClipRect(ImVec2(cLeft + 1.0f, cTop + 1.0f), ImVec2(cRight - 1.0f, cBottom - 1.0f), true);
                dl->AddLine(ImVec2(cLeft + tok::space_0_25, midY), ImVec2(cRight - tok::space_0_25, midY),
                            tok::Role(tok::col::ink_white, tok::arrange_line_alpha_sm), tok::arrange_line_stroke_xs);
@@ -3493,7 +3493,7 @@ namespace app
                   gArrangeFlashClipId = 0;
                else
                {
-                  const int a = (int)(255.0f * (1.0f - t / 1.2f));
+                  const int a = (int)(255.0f * (1.0f - t / tok::arrange_scale));
                   dl->AddRect(ImVec2(cLeft - tok::space_0_5, cTop - tok::space_0_5), ImVec2(cRight + tok::space_0_5, cBottom + tok::space_0_5),
                               tok::U32(tok::arrange_outline_shade_lg, a), tok::arrange_outline_radius, 0, tok::arrange_outline_stroke);
                }
@@ -3509,8 +3509,8 @@ namespace app
             // Trim handle marks
             if (cWidth > tok::arrange_limit_xl)
             {
-               const ImU32 handleCol = onLeftEdge ? tok::Role(tok::col::ink_white, 220) : tok::Role(tok::col::ink_white, 80);
-               const ImU32 handleRCol = onRightEdge ? tok::Role(tok::col::ink_white, 220) : tok::Role(tok::col::ink_white, 80);
+               const ImU32 handleCol = onLeftEdge ? tok::Role(tok::col::ink_white, tok::arrange_col_alpha_lg) : tok::Role(tok::col::ink_white, tok::arrange_col_alpha_sm);
+               const ImU32 handleRCol = onRightEdge ? tok::Role(tok::col::ink_white, tok::arrange_col_alpha_lg) : tok::Role(tok::col::ink_white, tok::arrange_col_alpha_sm);
                dl->AddLine(ImVec2(cLeft + tok::space_0_75, cTop + tok::space_1_5), ImVec2(cLeft + tok::space_0_75, cBottom - tok::space_1_5), handleCol, tok::arrange_line_stroke_lg);
                dl->AddLine(ImVec2(cRight - tok::space_0_75, cTop + tok::space_1_5), ImVec2(cRight - tok::space_0_75, cBottom - tok::space_1_5), handleRCol, tok::arrange_line_stroke_lg);
             }

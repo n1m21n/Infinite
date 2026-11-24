@@ -303,7 +303,7 @@ namespace app
          std::mt19937_64 g(((uint64_t)rd() << 32) ^ rd());
          char buf[40];
          const uint64_t a = g(), b = g();
-         std::snprintf(buf, sizeof buf, "%s-%s-4%s-%s-%s", UiFmt::Hex8((unsigned)(a >> 32)).c, UiFmt::Hex4((unsigned)(a >> 16) & 0xFFFF).c, UiFmt::Hex3((unsigned)a & 0xFFF).c,
+         std::snprintf(buf, sizeof buf, "%s-%s-4%s-%s-%s", UiFmt::Hex8((unsigned)(a >> 32)).c, UiFmt::Hex4((unsigned)(a >> 16) & 0xFFFF).c, UiFmt::Hex3((unsigned)a & 0xFFF).c,  // ui-audit-ok: bit packing of a UUID
                        UiFmt::Hex4((unsigned)((b >> 48) & 0x3FFF) | 0x8000).c, UiFmt::Hex12((unsigned long long)(b & 0xFFFFFFFFFFFFull)).c);
          return buf;
       }
@@ -4826,7 +4826,7 @@ namespace app
       // and attachments above it), and the agent picker as a quiet row under the well.
       struct ComposerGeom
       {
-         float padX = 0.0f, padV = 0.0f, tile = 24.0f, fieldW = 0.0f, wrapW = 0.0f, textH = 0.0f, chipsH = 0.0f, rowTop = 0.0f, rowH = 0.0f,
+         float padX = 0.0f, padV = 0.0f, tile = tok::chat_composer_tile, fieldW = 0.0f, wrapW = 0.0f, textH = 0.0f, chipsH = 0.0f, rowTop = 0.0f, rowH = 0.0f,
                wellH = 0.0f, pickerH = tok::chat_composer_picker_h, totalH = 0.0f;
          int lines = 1;
       };

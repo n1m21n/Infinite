@@ -245,6 +245,8 @@ def scan_file(rel, src):
         if skipping or "i18n-ok" in l: ok_lines.add(n)
     # `// ui-audit-ok: <reason>` on a line: not on screen (a file name, a log line); the reason is required
     off_lines = {n for n, l in enumerate(src.split("\n"), 1) if re.search(r"//\s*ui-audit-ok:\s*\S", l)}
+    # a tag excuses a literal that reaches a colour or a pixel only when its reason says the value is data, not a look
+    data_lines = {n for n, l in enumerate(src.split("\n"), 1) if re.search(r"//\s*ui-audit-ok:.*" + DATA_REASON, l)}
 
     def func_name():
         for _, nm in reversed(funcs):
@@ -322,7 +324,8 @@ def scan_file(rel, src):
             continue
         if harness_stack and harness_stack[-1]:
             allowed.bump("test", t.line); continue
-        if t.line in off_lines:
+        if t.line in off_lines and not (t.kind == "num" and (alpha_mask(t.text) or (t.line not in data_lines and
+                design_sink(paren, stmt_text(i), _neigh(toks, match, i) + [stmt_lhs(stmt_start, i)])))):
             allowed.bump("off_screen", t.line); continue
         call = paren[-1][0] if paren else ""
         qual = paren[-1][3] if paren else ""
@@ -462,6 +465,43 @@ GEOM_NAME = re.compile(
     r"(?:space|radius|hit|pin|icon|bar|stroke|row|page|dock|cell|ruler|fader|topbar|fold|compact|desk|arrange|chat|drag|type)_\w+)$")
 GEOM_CTX = {"ImVec2", "ImRect", "SetNextItemWidth", "PushItemWidth", "Dummy", "InvisibleButton", "BeginChild", "SetCursorPos",
             "SetCursorPosX", "SetCursorPosY", "SetCursorScreenPos", "SameLine", "IsMouseHoveringRect", "ItemSize", "ItemAdd"}
+# A literal that flows into a colour / alpha or into a pixel position / size is a design value whatever other reason
+# matches (owner 2026-11-24): the bits / domain / unit_conv / no_geometry reasons and a ui-audit-ok tag do not excuse it.
+COLOUR_SINK = {"IM_COL32", "Base", "Role", "BaseV4", "RoleV4", "U32", "WithAlpha", "GetColorU32", "ColorConvertFloat4ToU32",
+               "ColorConvertHSVtoRGB", "ImColor", "Tint", "TextTint", "PushStyleColor", "TextColored", "MulAlpha", "Alpha",
+               "LerpCol", "LerpColor", "Mix", "Fade", "ScaleAlpha", "SetNextWindowBgAlpha"}
+COLOUR_NAME = re.compile(r"^(?:a|alpha|fade|opacity|tint|shade|col|colour|color|rgba|\w*(?:Alpha|Fade|Opacity|Tint|Shade|Col|Colour|Color))$")
+PIXEL_NAME = re.compile(r"^(?:tile|tiles|tileW|tileH|\w*Tile)$")
+
+
+DATA_REASON = (r"(?:patch data|byte|buffer|binary|log format|RPC|parsing|saved setting|settings default|off screen|bytes per pixel|"
+               r"scrollback|param id|string length|model value|\bdB\b|sentinel|core cannot|bit packing|channel mask|hash|protocol|file)")
+ANGLE = re.compile(r"\b(?:kPi|kTau|cos|sin|cosf|sinf|atan2?f?|angle|ang|theta|deg|rad)\b")
+
+
+def alpha_mask(text):
+    """an ImU32 mask / or-in that sets the alpha byte to a chosen level (col & 0x80FFFFFF, | 0x40000000u)"""
+    m = re.fullmatch(r"0[xX]([0-9A-Fa-f]{8})[uUlL]*", text)
+    if not m: return False
+    h = m.group(1).upper()
+    return h[:2] not in ("00", "FF") and h[2:] in ("FFFFFF", "000000") and h != "7FFFFFFF"   # 0x7fffffff: an int-max id mask
+
+
+COLOUR_ARG = {"TextColored": 0, "PushStyleColor": 1}   # calls where only one argument is the colour
+
+
+def design_sink(paren, st, names):
+    """'colour' or 'pixel' when the literal's value ends up on screen as a colour or a position / size, else ''"""
+    for p in paren:
+        if p[0] in COLOUR_ARG and p[2] != COLOUR_ARG[p[0]]: continue   # TextColored's text, not its colour
+        if p[0] in COLOUR_SINK or (p[0] == "ImVec4" and re.search(r"Col|col|colour|color", st)): return "colour"
+    if any(COLOUR_NAME.match(n) for n in names if n and not (n == "a" and ANGLE.search(st))): return "colour"
+    for p in paren:
+        if p[0] in GEOM_CTX or CALL_FAMILY.get(p[0]) in ("draw", "layout", "window", "style_var"): return "pixel"
+    if any(GEOM_NAME.match(n) or PIXEL_NAME.match(n) for n in names if n): return "pixel"
+    return ""
+
+
 DSP_WORDS = {"db", "hz", "khz", "freq", "frequency", "cutoff", "reso", "resonance", "gain", "bpm", "tempo", "beat", "beats", "bar",
              "bars", "ppq", "tick", "ticks", "sample", "samples", "sr", "semi", "semis", "semitone", "semitones", "note", "notes",
              "midi", "pitch", "cents", "octave", "octaves", "phase", "vel", "velocity", "param", "ratio", "lufs", "rms", "peak",
@@ -535,6 +575,16 @@ def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs, cat, rel=""):
         return "api_arg"
     names = _neigh(toks, match, i) + ([lhs] if lhs else [])
     bitop = {"<<", ">>", "&", "|", "^", "%", "~", "&=", "|="}
+    if v is not None and float(v).is_integer() and prev is not None and prev.text in ("==", "!=") and cat != "timing":
+        return "mode"   # an integer equality is a mode / enum / index test even inside a draw call
+    if alpha_mask(t.text):
+        return None   # sets the alpha byte: a design value
+    unpack = (prev is not None and prev.text in (">>", "<<", ">>=", "<<=")) or (t.text.upper().rstrip("UL") in ("0XFF", "0XFF00", "0XFF0000", "0XFF000000", "0XFFFFFF", "0X00FFFFFF")) \
+        or (v in (8, 16, 24, 32) and nxt is not None and nxt.text in (")",) and "SHIFT" in st)
+    if unpack:
+        return "bits"   # a channel shift / byte mask: unpacking a colour, not choosing one
+    if design_sink(paren, st, names):
+        return None
     if t.text.lower().startswith("0x") or (prev is not None and prev.text in bitop) or (nxt is not None and nxt.text in bitop):
         return "bits"
     if v is not None and float(v).is_integer() and prev is not None and prev.text in ("==", "!=") and cat != "timing":

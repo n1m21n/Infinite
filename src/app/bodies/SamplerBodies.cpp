@@ -91,7 +91,7 @@ namespace app
       const ImU32 kGreen = isLight ? tok::Base(tok::col::state_ok_deep_hi) : tok::Base(tok::col::state_ok_vivid);
       const ImU32 kAmber = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation);
       const ImU32 kRed = isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::text_err);
-      const ImU32 slotCol = isLight ? tok::Base(tok::col::ink_black, 14) : tok::Base(tok::col::ink_white, 10);
+      const ImU32 slotCol = isLight ? tok::Base(tok::col::ink_black, tok::sampler_audio_meter_visualizer_ink_black_alpha) : tok::Base(tok::col::ink_white, tok::sampler_audio_meter_visualizer_ink_white_alpha);
       auto zoneCol = [&](float db) { return db > 0.0f ? kRed : db > -6.0f ? kAmber : kGreen; };
       auto withAlpha = [](ImU32 c, int a) { return (c & ~IM_COL32_A_MASK) | ((ImU32)a << IM_COL32_A_SHIFT); };
 
@@ -160,7 +160,7 @@ namespace app
          fillZones(bx, LevelToDb(peak), isLight ? 90 : 80);
          fillZones(bx, LevelToDb(rms), isLight ? 235 : 225);
          // LED segmentation: a 1px gap every 3px, in the scope background.
-         const ImU32 gapCol = withAlpha(ScopeBgCol(), 150);
+         const ImU32 gapCol = withAlpha(ScopeBgCol(), tok::sampler_audio_meter_visualizer_with_alpha_alpha);
          for (float gy = barBot - 3.0f; gy > barTop; gy -= 3.0f)
             dl->AddLine(ImVec2(bx, gy), ImVec2(bx + barW, gy), gapCol, tok::sampler_audio_meter_visualizer_stroke);
          const float holdDb = LevelToDb(hold);
@@ -973,7 +973,7 @@ namespace app
          // Dim whatever the start/end range excludes.
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? tok::Base(tok::col::ink_white, 140) : tok::Base(tok::col::ink_black, 130);
+         const ImU32 dimCol = isLight ? tok::Base(tok::col::ink_white, tok::sampler_molder_waveform_ink_white_alpha) : tok::Base(tok::col::ink_black, tok::sampler_molder_waveform_ink_black_alpha);
          if (startX > origin.x)
             dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
          if (endX < br.x)
@@ -1234,7 +1234,7 @@ namespace app
 
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? tok::Base(tok::col::ink_white, 140) : tok::Base(tok::col::ink_black, 130);
+         const ImU32 dimCol = isLight ? tok::Base(tok::col::ink_white, tok::sampler_grain_molder_waveform_ink_white_alpha) : tok::Base(tok::col::ink_black, tok::sampler_grain_molder_waveform_ink_black_alpha);
          if (startX > origin.x)
             dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
          if (endX < br.x)
@@ -1245,7 +1245,7 @@ namespace app
          const float posClamped = std::clamp(n->position, n->start, n->end);
          const float activeFrac = (snap.selfActive && snap.selfPos >= 0.0f) ? snap.selfPos : posClamped;
          const float posX = origin.x + w * std::clamp(activeFrac, 0.0f, 1.0f);
-         const ImU32 yellowCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 240);
+         const ImU32 yellowCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::sampler_grain_molder_waveform_role_modulation_alpha);
          dl->AddLine(ImVec2(posX, origin.y), ImVec2(posX, br.y), yellowCol, tok::sampler_line_stroke_lg);
 
          // Polyphonic white playheads moving at different speeds according to incoming pitch
@@ -1659,7 +1659,7 @@ namespace app
          if (NodeDropdownField(chokeLabel, ImVec2(tok::sampler_drum_lane_card_node_dropdown_field_x, 0), "choke"))
          {
             PushUndoCheckpoint();
-            n->laneChoke[lane] = (n->laneChoke[lane] + 1) % 4;
+            n->laneChoke[lane] = (n->laneChoke[lane] + 1) % tok::sampler_lane_choke;
          }
          ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight()));
       }
@@ -2118,7 +2118,7 @@ namespace app
                {
                   const float fillTop = y0 + (1.0f - vel) * rowH;
                   const ImU32 fillCol = (s == curStep && n->run) ? (isLight ? tok::Base(tok::col::text_warn) : tok::Base(tok::col::role_modulation))
-                                                                 : (isLight ? tok::Base(tok::col::accent, 240) : tok::Base(tok::col::accent_pale_muted_warm, 220));
+                                                                 : (isLight ? tok::Base(tok::col::accent, tok::sampler_drum_sequencer_body_accent_alpha) : tok::Base(tok::col::accent_pale_muted_warm, tok::sampler_drum_sequencer_body_accent_pale_muted_warm_alpha));
                   dl->AddRectFilled(ImVec2(x0 + 1.0f, fillTop), ImVec2(cMax.x - 1.0f, y0 + rowH - 1.0f), fillCol, tok::radius_cell);
                }
                if (isBar && s > 0)
@@ -2350,7 +2350,7 @@ namespace app
       {
          const float total = std::max(span, len);
          const float colW = w / (float)LooperNode::kWaveCols;
-         const ImU32 col = isLight ? tok::Base(tok::col::accent, 210) : tok::Base(tok::col::accent_alt, 200);
+         const ImU32 col = isLight ? tok::Base(tok::col::accent, tok::sampler_looper_wave_accent_alpha) : tok::Base(tok::col::accent_alt, tok::sampler_looper_wave_accent_alt_alpha);
          for (int c = 0; c < LooperNode::kWaveCols; c++)
          {
             if (total * (float)c / (float)LooperNode::kWaveCols >= len)
@@ -2679,13 +2679,13 @@ namespace app
                         fill = green;
                      dl->AddRectFilled(mn, mx, fill, tok::sampler_mpc_body_radius);
                      const ImU32 selCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo);
-                     const ImU32 edge = isLight ? tok::Base(tok::col::edge_mid_light_fixed) : tok::Base(tok::col::surface_lo_pale_fixed, 200);
+                     const ImU32 edge = isLight ? tok::Base(tok::col::edge_mid_light_fixed) : tok::Base(tok::col::surface_lo_pale_fixed, tok::sampler_mpc_body_surface_lo_pale_fixed_alpha);
                      dl->AddRect(mn, mx, isSel ? selCol : edge, tok::sampler_mpc_body_radius, 0, isSel ? tok::sampler_mpc_body_stroke : tok::sampler_outline_stroke);
 
                      const ImU32 ink = lit ? tok::Base(tok::col::ink_white)
                                            : (isLoaded ? (isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::surface_hi))
                                                        : tok::Base(tok::col::edge_mid));
-                     const ImU32 dim = lit ? tok::Base(tok::col::ink_white, 190) : (isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::text_secondary));
+                     const ImU32 dim = lit ? tok::Base(tok::col::ink_white, tok::sampler_mpc_body_ink_white_alpha) : (isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::text_secondary));
                      dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 1.0f, mx.y - 1.0f), true);
                      // All text in the pad is the size of a slider's label
                      // (AudioLabelText): number and mode tag on top, name below.

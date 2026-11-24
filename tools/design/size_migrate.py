@@ -282,7 +282,8 @@ def main():
             by_file.setdefault(f[4], []).append(f)
 
     sj = json.loads(SURF.read_text()) if SURF.exists() else {"_doc": SURF_DOC}
-    groups = {"float": sj.setdefault("surface", {}), "int": sj.setdefault("surface_i", {}), "double": sj.setdefault("surface_d", {})}
+    groups = {"float": sj.setdefault("surface", {}), "int": sj.setdefault("surface_i", {}), "double": sj.setdefault("surface_d", {}),
+              "hex": sj.setdefault("surface_hex", {})}
     existing = set(re.findall(r"constexpr \w+ (\w+) =", GEN.read_text()))
     taken = {}   # ident -> (kind, value)
     for kind, g in groups.items():
@@ -328,6 +329,16 @@ def main():
             if words_of(T, i) & BYTE_TYPES:
                 tag.add(ln); continue
             nk = num_kind(text)
+            if nk == "hex" and ui_audit.alpha_mask(text):
+                # an alpha mask / or-in on a packed colour (col & 0x80FFFFFF, | 0x40000000u): an unsigned surface_hex token
+                words, lhs = decl_type(T, i)
+                h = re.sub(r"[uUlL]+$", "", text).upper().replace("0X", "0x")
+                base = strip_surf(snake(lhs), surf) if lhs else func_part(func, surf)
+                name = "_".join(p for p in (base, "alpha_mask" if h.endswith("FFFFFF") else "alpha") if p)
+                ident = token_for(surf, name, "hex", h)
+                edits.append((T[i].pos, T[i].pos + len(text), f"tok::{ident}"))
+                stats[(cat, "alpha")] = stats.get((cat, "alpha"), 0) + 1
+                done += 1; continue
             if nk == "hex":
                 print(f"skip {rel}:{ln} hex {text}"); skipped += 1; continue
             v = ui_audit.num_value(text)

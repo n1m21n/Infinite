@@ -208,7 +208,7 @@ namespace app
       }
 
       // Title row: name on the left, a quiet close tile on the right (neutral wash on hover, no red).
-      const float tile = 20.0f;
+      const float tile = tok::viewport_tile;
       ImGui::SetCursorScreenPos(ImVec2(cardMax.x - pad - tile, cardMin.y + (titleH - tile) * 0.5f + tok::space_0_5));
       char closeId[40];
       snprintf(closeId, sizeof(closeId), "##closeviewportcard%d", gn.index);

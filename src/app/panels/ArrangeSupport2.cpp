@@ -10,9 +10,9 @@ namespace app
    // A stable per-group colour, so a group reads as one thing on every lane.
    ImU32 ArrangeGroupColor(uint64_t groupId, int alpha)
    {
-      uint64_t h = groupId * 0x9E3779B97F4A7C15ull;
+      uint64_t h = groupId * 0x9E3779B97F4A7C15ull;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
       h ^= h >> 29;
-      const float hue = (float)(h % 360ull) / tok::arrange_support2_hue_ratio;
+      const float hue = (float)(h % tok::arrange_support2_hue_period) / tok::arrange_support2_hue_ratio;
       float r, g, b;
       ImGui::ColorConvertHSVtoRGB(hue, tok::arrange_support2_hue_sat, tok::arrange_support2_hue_val, r, g, b);
       return IM_COL32((int)(r * tok::arrange_support2_group_color_ratio), (int)(g * 255.0f), (int)(b * 255.0f), alpha);

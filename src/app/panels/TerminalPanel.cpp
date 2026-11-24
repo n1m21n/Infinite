@@ -253,7 +253,7 @@ namespace
       const term::Cell* cells = snap.cells.data() + (size_t)row * (size_t)snap.cols;
       std::string line;
       for (int i = 0; i < snap.cols; ++i)
-         line += cells[i].ch >= 0x21 && cells[i].ch < 0x7F ? (char)cells[i].ch : ' ';
+         line += cells[i].ch >= 0x21 && cells[i].ch < 0x7F ? (char)cells[i].ch : ' ';  // ui-audit-ok: byte range of printable ASCII in scrollback
       for (const char* scheme : { "https://", "http://" })
       {
          size_t at = 0;

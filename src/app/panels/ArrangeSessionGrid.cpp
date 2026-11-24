@@ -952,7 +952,7 @@ namespace app
                const bool muted = !ss->clip.enabled || !laneOn || src == nullptr;
                ImU32 fill = SlotFill(ss->clip, isVideo, st.playing || held);
                if (muted)
-                  fill = isLight ? tok::Base(tok::col::edge_mid_light_fixed, 220) : tok::Base(tok::col::edge_lo_light, 220);
+                  fill = isLight ? tok::Base(tok::col::edge_mid_light_fixed, tok::arrange_session_grid_edge_mid_light_fixed_alpha) : tok::Base(tok::col::edge_lo_light, tok::arrange_session_grid_edge_lo_light_alpha);
                dl->AddRectFilled(a, b, fill, tok::radius_control);
                if (muted)
                   DrawArrangeHatch(dl, a, b, isLight ? tok::Base(tok::col::ink_black, tok::arrange_session_grid_hatch_alpha_lg) : tok::Base(tok::col::ink_white, tok::arrange_session_grid_hatch_alpha_sm));
@@ -1094,7 +1094,7 @@ namespace app
             const bool hov = ImGui::IsItemHovered();
             ImGui::EndDisabled();
             dl->AddRectFilled(a, b, TextCol(canStop ? (hov ? tok::arrange_session_grid_can_stop_shade_lg : tok::arrange_session_grid_can_stop_shade_sm) : tok::arrange_session_grid_fill_shade_xxs), tok::radius_control);
-            const float alpha = !canStop ? 0.22f : (ls.stopQueued ? 0.9f * pulse : 0.85f);
+            const float alpha = !canStop ? tok::arrange_session_grid_alpha : (ls.stopQueued ? tok::arrange_session_grid_scale * pulse : tok::arrange_session_grid_value);
             DrawStopSquare(dl, ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), 9.0f, TextCol(alpha));
             if (hov)
                HelpTip("%s", T("Stop this track at the next quantize point"));

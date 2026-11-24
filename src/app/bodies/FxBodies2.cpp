@@ -44,7 +44,7 @@ namespace app
       {
          const float voiceOffset = (float)k / (float)taps;
          const float phaseOffset = voiceOffset + spread * 0.5f * ((float)k / (float)std::max(1, taps - 1));
-         const int alpha = std::clamp(150 - k * 40 + (int)(feedback * 90.0f), 60, 255);
+         const int alpha = std::clamp(tok::fx_chorus_visualizer_v_lg - k * tok::fx_chorus_visualizer_v_sm + (int)(feedback * tok::fx_chorus_visualizer_scale), tok::fx_chorus_visualizer_lo, tok::fx_chorus_visualizer_hi);
          dl->PathClear();
          const int kNumPoints = 96;
          for (int i = 0; i < kNumPoints; i++)
@@ -914,10 +914,10 @@ namespace app
       const float dxL = shiftFrac * kMaxShiftPix;
 
       // Arrow & shifted partial color: amber for up-shift, coral/magenta for down-shift, blue-grey for zero
-      const ImU32 arrowCol = (shift > 0.5f)
-         ? (isLight ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 230))
-         : ((shift < -0.5f) ? (isLight ? tok::Base(tok::col::state_err, 240) : tok::Base(tok::col::text_err, 230))
-                            : (isLight ? tok::Base(tok::col::edge_lo_pale, 200) : tok::Base(tok::col::text_secondary, 180)));
+      const ImU32 arrowCol = (shift > tok::fx_arrow_col_limit)
+         ? (isLight ? tok::Base(tok::col::state_warn, tok::fx_frequency_shifter_visualizer_state_warn_alpha) : tok::Base(tok::col::role_modulation, tok::fx_frequency_shifter_visualizer_role_modulation_alpha))
+         : ((shift < -tok::fx_arrow_col_inset) ? (isLight ? tok::Base(tok::col::state_err, tok::fx_frequency_shifter_visualizer_state_err_alpha) : tok::Base(tok::col::text_err, tok::fx_frequency_shifter_visualizer_text_err_alpha))
+                            : (isLight ? tok::Base(tok::col::edge_lo_pale, tok::fx_frequency_shifter_visualizer_edge_lo_pale_alpha) : tok::Base(tok::col::text_secondary, tok::fx_frequency_shifter_visualizer_text_secondary_alpha)));
 
       for (int i = 0; i < kNumPartials; i++)
       {
@@ -947,10 +947,10 @@ namespace app
             const float shiftRFrac = std::clamp((shift + spread) / maxShiftSpan, -1.0f, 1.0f);
             const float dxR = shiftRFrac * kMaxShiftPix;
             const float xOutR = xIn + dxR;
-            const ImU32 spreadCol = (shift + spread > 0.5f)
-               ? (isLight ? tok::Base(tok::col::state_warn, 140) : tok::Base(tok::col::role_modulation, 120))
-               : ((shift + spread < -0.5f) ? (isLight ? tok::Base(tok::col::viz_pink_dark, 140) : tok::Base(tok::col::viz_pink_light, 120))
-                                           : (isLight ? tok::Base(tok::col::edge_lo_pale, 120) : tok::Base(tok::col::text_secondary, 100)));
+            const ImU32 spreadCol = (shift + spread > tok::fx_arrow_col_limit)
+               ? (isLight ? tok::Base(tok::col::state_warn, tok::fx_spread_col_alpha_lg) : tok::Base(tok::col::role_modulation, tok::fx_spread_col_alpha_md))
+               : ((shift + spread < -tok::fx_arrow_col_inset) ? (isLight ? tok::Base(tok::col::viz_pink_dark, tok::fx_frequency_shifter_visualizer_viz_pink_dark_alpha) : tok::Base(tok::col::viz_pink_light, tok::fx_frequency_shifter_visualizer_viz_pink_light_alpha))
+                                           : (isLight ? tok::Base(tok::col::edge_lo_pale, tok::fx_spread_col_alpha_md) : tok::Base(tok::col::text_secondary, tok::fx_spread_col_alpha_sm)));
             dl->AddLine(ImVec2(xOutR, botY - tok::space_0_5), ImVec2(xOutR, botY + tok::space_1_5), spreadCol, tok::fx_frequency_shifter_visualizer_line_stroke_sm);
          }
       }
@@ -1319,10 +1319,10 @@ namespace app
 
          const float pos = (numPoles > 1) ? ((float)i / (float)(numPoles - 1) - tok::fx_resonator_bank_visualizer_inset) * spread + tok::px_align : tok::fx_pos;
          const ImU32 baseCol = (pos < tok::fx_resonator_bank_visualizer_limit)
-            ? (isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_pale_muted_warm, 220))
+            ? (isLight ? tok::Base(tok::col::accent, tok::fx_resonator_bank_visualizer_accent_alpha) : tok::Base(tok::col::accent_pale_muted_warm, tok::fx_resonator_bank_visualizer_accent_pale_muted_warm_alpha))
             : ((pos > tok::fx_base_col_limit)
-               ? (isLight ? tok::Base(tok::col::state_err, 220) : tok::Base(tok::col::state_warn, 220))
-               : (isLight ? tok::Base(tok::col::viz_teal, 220) : tok::Base(tok::col::state_ok, 220)));
+               ? (isLight ? tok::Base(tok::col::state_err, tok::fx_resonator_bank_visualizer_state_err_alpha) : tok::Base(tok::col::state_warn, tok::fx_resonator_bank_visualizer_state_warn_alpha))
+               : (isLight ? tok::Base(tok::col::viz_teal, tok::fx_resonator_bank_visualizer_viz_teal_alpha) : tok::Base(tok::col::state_ok, tok::fx_resonator_bank_visualizer_state_ok_alpha)));
          const unsigned baseAlpha = (baseCol >> IM_COL32_A_SHIFT) & 0xFF;
          const ImU32 stemCol = (baseCol & ~IM_COL32_A_MASK) |
             (((unsigned)(baseAlpha * alphaScale)) << IM_COL32_A_SHIFT);
@@ -1431,11 +1431,11 @@ namespace app
       const float threshLinear = powf(10.0f, thresholdDb / 20.0f);
       const float threshY1 = midY - threshLinear * (h * tok::fx_cycle_shaper_visualizer_ratio);
       const float threshY2 = midY + threshLinear * (h * tok::fx_cycle_shaper_visualizer_ratio);
-      const ImU32 threshCol = isLight ? tok::Base(tok::col::state_err_muted, 100) : tok::Base(tok::col::state_err_pressed, 100);
+      const ImU32 threshCol = isLight ? tok::Base(tok::col::state_err_muted, tok::fx_cycle_shaper_visualizer_state_err_muted_alpha) : tok::Base(tok::col::state_err_pressed, tok::fx_cycle_shaper_visualizer_state_err_pressed_alpha);
       dl->AddLine(ImVec2(origin.x, threshY1), ImVec2(br.x, threshY1), threshCol, tok::fx_cycle_shaper_visualizer_stroke);
       dl->AddLine(ImVec2(origin.x, threshY2), ImVec2(br.x, threshY2), threshCol, tok::fx_cycle_shaper_visualizer_stroke);
 
-      const ImU32 waveCol = isLight ? tok::Base(tok::col::accent_light_muted_warm, 240) : tok::Base(tok::col::accent_pale_muted_warm, 240);
+      const ImU32 waveCol = isLight ? tok::Base(tok::col::accent_light_muted_warm, tok::fx_cycle_shaper_visualizer_accent_light_muted_warm_alpha) : tok::Base(tok::col::accent_pale_muted_warm, tok::fx_cycle_shaper_visualizer_accent_pale_muted_warm_alpha);
       const int kPlotPoints = 128;
       ImVec2 pts[kPlotPoints];
 
@@ -1599,8 +1599,8 @@ namespace app
       if (peak < 0.02f)
          AudioViz::IdleLabel(vizFrame);
 
-      const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, 45) : tok::Base(tok::col::role_expression, 45);
-      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_pale, 240);
+      const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, tok::fx_spec_blur_visualizer_role_expression_alpha) : tok::Base(tok::col::role_expression, tok::fx_spec_blur_visualizer_role_expression_alpha);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, tok::fx_line_col_alpha_lg) : tok::Base(tok::col::role_expression_pale, tok::fx_spec_blur_visualizer_role_expression_pale_alpha);
 
       for (int i = 0; i < kPlotPoints - 1; i++)
       {
@@ -1713,9 +1713,9 @@ namespace app
       const uint32_t mask = KeySnapKernel::ScaleMask(scale, root);
       // Three opacity tiers of one neutral (white on dark, ink on light), all fainter
       // than the purple spectrum: off-scale barely there, in-scale soft, root strongest.
-      const ImU32 offCol = isLight ? tok::Base(tok::col::edge_lo, 14) : tok::Base(tok::col::ink_white, 10);
-      const ImU32 noteCol = isLight ? tok::Base(tok::col::edge_lo, 60) : tok::Base(tok::col::ink_white, 48);
-      const ImU32 rootCol = isLight ? tok::Base(tok::col::edge_lo, 130) : tok::Base(tok::col::ink_white, 110);
+      const ImU32 offCol = isLight ? tok::Base(tok::col::edge_lo, tok::fx_key_snap_visualizer_edge_lo_alpha) : tok::Base(tok::col::ink_white, tok::fx_key_snap_visualizer_ink_white_alpha);
+      const ImU32 noteCol = isLight ? tok::Base(tok::col::edge_lo, tok::fx_note_col_alpha_lg) : tok::Base(tok::col::ink_white, tok::fx_note_col_alpha_sm);
+      const ImU32 rootCol = isLight ? tok::Base(tok::col::edge_lo, tok::fx_root_col_alpha_lg) : tok::Base(tok::col::ink_white, tok::fx_root_col_alpha_sm);
       for (int pass = 0; pass < 3; pass++) // off-scale first, root last, so root is never overdrawn
       {
          for (int midi = 24; midi <= 120; midi++)
@@ -1773,8 +1773,8 @@ namespace app
          const float normY = std::clamp((db + tok::fx_key_snap_visualizer_norm_y) / tok::fx_key_snap_visualizer_ratio, 0.0f, 1.0f);
          pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * tok::fx_key_snap_visualizer_scale) - tok::space_0_5);
       }
-      const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, 45) : tok::Base(tok::col::role_expression, 45);
-      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_pale, 240);
+      const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, tok::fx_key_snap_visualizer_role_expression_alpha) : tok::Base(tok::col::role_expression, tok::fx_key_snap_visualizer_role_expression_alpha);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, tok::fx_line_col_alpha_lg) : tok::Base(tok::col::role_expression_pale, tok::fx_key_snap_visualizer_role_expression_pale_alpha);
       for (int i = 0; i < kPlotPoints - 1; i++)
       {
          ImVec2 quad[4] = { pts[i], pts[i + 1], ImVec2(pts[i + 1].x, br.y), ImVec2(pts[i].x, br.y) };
@@ -1856,7 +1856,7 @@ namespace app
 
       const float loHz = 50.0f, hiHz = 12000.0f;
       const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
-      const ImU32 gridCol = isLight ? tok::Base(tok::col::edge_lo, 28) : tok::Base(tok::col::ink_white, 22);
+      const ImU32 gridCol = isLight ? tok::Base(tok::col::edge_lo, tok::fx_spectrum_slide_visualizer_edge_lo_alpha) : tok::Base(tok::col::ink_white, tok::fx_spectrum_slide_visualizer_ink_white_alpha);
       for (float hz : { 100.0f, 1000.0f, 10000.0f })
       {
          const float x = origin.x + (log10f(hz) - logLo) / logSpan * w;
@@ -1907,8 +1907,8 @@ namespace app
       }
       if (peak < 0.02f)
          AudioViz::IdleLabel(vizFrame);
-      const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, 45) : tok::Base(tok::col::role_expression, 45);
-      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_pale, 240);
+      const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, tok::fx_spectrum_slide_visualizer_role_expression_alpha) : tok::Base(tok::col::role_expression, tok::fx_spectrum_slide_visualizer_role_expression_alpha);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, tok::fx_line_col_alpha_lg) : tok::Base(tok::col::role_expression_pale, tok::fx_spectrum_slide_visualizer_role_expression_pale_alpha);
       for (int i = 0; i < kPlotPoints - 1; i++)
       {
          ImVec2 quad[4] = { pts[i], pts[i + 1], ImVec2(pts[i + 1].x, br.y), ImVec2(pts[i].x, br.y) };
@@ -1919,8 +1919,8 @@ namespace app
       // A -> B track along the bottom edge with the slide position on it.
       const float slide = std::clamp(n->Param("slide"), 0.0f, 1.0f);
       const float ty = br.y - tok::space_0_75;
-      const ImU32 trackCol = isLight ? tok::Base(tok::col::edge_lo, 60) : tok::Base(tok::col::ink_white, 50);
-      const ImU32 dotCol = isLight ? tok::Base(tok::col::edge_lo, 200) : tok::Base(tok::col::ink_white, 190);
+      const ImU32 trackCol = isLight ? tok::Base(tok::col::edge_lo, tok::fx_track_col_alpha_lg) : tok::Base(tok::col::ink_white, tok::fx_track_col_alpha_sm);
+      const ImU32 dotCol = isLight ? tok::Base(tok::col::edge_lo, tok::fx_dot_col_alpha_lg) : tok::Base(tok::col::ink_white, tok::fx_dot_col_alpha_md);
       dl->AddLine(ImVec2(origin.x + tok::space_2, ty), ImVec2(br.x - tok::space_2, ty), trackCol, tok::fx_spectrum_slide_visualizer_stroke);
       dl->AddCircleFilled(ImVec2(origin.x + tok::space_2 + slide * (w - tok::space_4), ty), tok::fx_spectrum_slide_visualizer_r, dotCol);
 
@@ -1969,7 +1969,7 @@ namespace app
 
       const float loHz = 30.0f, hiHz = 12000.0f;
       const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
-      const ImU32 gridCol = isLight ? tok::Base(tok::col::edge_lo, 28) : tok::Base(tok::col::ink_white, 22);
+      const ImU32 gridCol = isLight ? tok::Base(tok::col::edge_lo, tok::fx_shape_resonator_visualizer_edge_lo_alpha) : tok::Base(tok::col::ink_white, tok::fx_shape_resonator_visualizer_ink_white_alpha);
       for (float hz : { 100.0f, 1000.0f, 10000.0f })
       {
          const float x = origin.x + (log10f(hz) - logLo) / logSpan * w;
@@ -1982,7 +1982,7 @@ namespace app
       const float decay = std::clamp(n->Param("decay"), 0.02f, 20.0f);
       const float damping = std::clamp(n->Param("damping"), 0.0f, 1.0f);
       const float tune = std::max(n->Param("tune"), 20.0f);
-      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 230) : tok::Base(tok::col::role_expression_pale, 230);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, tok::fx_shape_resonator_visualizer_role_expression_alpha) : tok::Base(tok::col::role_expression_pale, tok::fx_shape_resonator_visualizer_role_expression_pale_alpha);
       for (int i = 0; i < count; i++)
       {
          // Line height = how long this mode rings relative to the longest.
@@ -2075,7 +2075,7 @@ namespace app
             const float x = origin.x + t / seconds * w;
             dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), tok::fx_convolution_space_visualizer_stroke);
          }
-         const ImU32 lineCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
+         const ImU32 lineCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_convolution_space_visualizer_accent_alt_alpha);
          dl->PathClear();
          for (int i = 0; i < count; i++)
          {

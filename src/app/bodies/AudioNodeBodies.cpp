@@ -349,7 +349,7 @@ namespace app
       // line stays until the next take starts.
       if (!recording && n->TakePeak() > 1.0f)
          ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "last take clipped, +%s over",
-                            UiFmt::Db(20.0f * std::log10(n->TakePeak())).c);
+                            UiFmt::Db(20.0f * std::log10(n->TakePeak())).c);  // ui-audit-ok: dB / bytes unit maths inside a formatter
 
       // The summed output of every Audio Out went over full scale: the device
       // and a recorded file both hard-clip there. Held for 3 s after the last
@@ -475,7 +475,7 @@ namespace app
       ImGui::EndDisabled();
       if (recording)
          ImGui::TextColored(tok::RoleV4(tok::col::text_secondary), "REC %s  %s  (head facing front)",
-                            UiFmt::Sec(n->ElapsedSeconds()).c, UiFmt::KB((double)n->FileSizeBytes() / 1024.0).c);
+                            UiFmt::Sec(n->ElapsedSeconds()).c, UiFmt::KB((double)n->FileSizeBytes() / 1024.0).c);  // ui-audit-ok: dB / bytes unit maths inside a formatter
       else
          ImGui::TextColored(tok::RoleV4(tok::col::text_secondary), "%s",
                             n->recordDirectory.empty() ? "~/Desktop" : n->recordDirectory.c_str());

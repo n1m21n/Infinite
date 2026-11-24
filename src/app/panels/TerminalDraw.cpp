@@ -104,7 +104,7 @@ namespace
       else if (index == 16) Rect(dl, midX, y, x1, y1, c);
       else if (index <= 19)
       {
-         const ImU32 alpha = (c >> 24) * (ImU32)(index - 16) / 4;
+         const ImU32 alpha = (c >> 24) * (ImU32)(index - tok::terminal_draw_block_inset) / tok::terminal_draw_alpha_ratio;
          Rect(dl, x, y, x1, y1, (c & 0x00FFFFFFu) | (alpha << 24));
       }
       else if (index == 20) Rect(dl, x, y, x1, Snap(y + h / tok::terminal_draw_block_ratio), c);

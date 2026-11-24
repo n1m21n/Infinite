@@ -355,7 +355,7 @@ namespace app
       {
          const float a = std::clamp(std::min(n->loopStart, n->loopEnd), 0.0f, 1.0f);
          const float b = std::clamp(std::max(n->loopStart, n->loopEnd), 0.0f, 1.0f);
-         dl->AddRectFilled(ImVec2(toScreen(a, 0).x, origin.y), ImVec2(toScreen(b, 0).x, br.y), (lineCol & 0x00FFFFFF) | 0x1E000000);  // ui-audit-ok: channel mask / bit packing, not a colour value
+         dl->AddRectFilled(ImVec2(toScreen(a, 0).x, origin.y), ImVec2(toScreen(b, 0).x, br.y), (lineCol & 0x00FFFFFF) | tok::param_mseg_editor_alpha);  // ui-audit-ok: channel mask / bit packing, not a colour value
          dl->AddLine(ImVec2(toScreen(a, 0).x, origin.y), ImVec2(toScreen(a, 0).x, br.y), ScopeMidLineCol());
          dl->AddLine(ImVec2(toScreen(b, 0).x, origin.y), ImVec2(toScreen(b, 0).x, br.y), ScopeMidLineCol());
       }
@@ -376,7 +376,7 @@ namespace app
       }
       const float px = n->Position();
       const ImU32 liveCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation);
-      dl->AddLine(ImVec2(toScreen(px, 0).x, origin.y), ImVec2(toScreen(px, 0).x, br.y), (liveCol & 0x00FFFFFF) | 0x80000000);  // ui-audit-ok: channel mask / bit packing, not a colour value
+      dl->AddLine(ImVec2(toScreen(px, 0).x, origin.y), ImVec2(toScreen(px, 0).x, br.y), (liveCol & 0x00FFFFFF) | tok::param_line_alpha_sm_hex);  // ui-audit-ok: channel mask / bit packing, not a colour value
       dl->AddCircleFilled(toScreen(px, n->Evaluate(px)), tok::param_mseg_editor_dot_r_sm, liveCol);
       dl->AddCircle(toScreen(px, n->Evaluate(px)), tok::param_mseg_editor_dot_r_sm, ring, 0, tok::param_ring_stroke_md);
       AudioViz::Border(dl, origin, br);
@@ -1040,7 +1040,7 @@ namespace app
       if (np > 0)
       {
          auto pt = [&](int i) { return ImVec2(a.x + (mir ? 1.f - xy[i * 2] : xy[i * 2]) * iw, a.y + xy[i * 2 + 1] * h); };
-         const ImU32 shadow = tok::Base(tok::col::ink_black, 150);
+         const ImU32 shadow = tok::Base(tok::col::ink_black, tok::param_track_preview_ink_black_alpha);
          const ImU32 ink = tok::U32(tok::action_go, CategoryColors::IsThemeLight());
          for (const auto& l : n->OverlayLines())
             if (l.first < np && l.second < np)
@@ -1113,7 +1113,7 @@ namespace app
             fillCol = tok::Role(tok::col::role_modulation);
          dl->AddRectFilled(p0, p1, tok::Role(tok::col::ink_white, tok::param_brain_source_fill_alpha), tok::param_brain_source_body_radius);
          dl->AddRectFilled(p0, ImVec2(p0.x + pillW * std::clamp(q, tok::param_brain_source_lo, 1.0f), p1.y),
-                           (fillCol & 0x00FFFFFFu) | 0x55000000u, tok::param_brain_source_body_radius);  // ui-audit-ok: channel mask / bit packing, not a colour value
+                           (fillCol & 0x00FFFFFFu) | tok::param_brain_source_body_alpha, tok::param_brain_source_body_radius);  // ui-audit-ok: channel mask / bit packing, not a colour value
          const ImVec2 ts = ImGui::CalcTextSize(kPillNames[p]);
          dl->AddText(ImVec2(p0.x + (pillW - ts.x) * 0.5f, p0.y + (pillH - ts.y) * 0.5f),
                      ImGui::GetColorU32(ImGuiCol_Text), kPillNames[p]);
@@ -1138,7 +1138,7 @@ namespace app
          const float y1f = midY - std::clamp(snap.traceFrontal[i], -1.0f, 1.0f) * (traceH * tok::param_y0f_scale);
          const float y0t = midY - std::clamp(snap.traceTemporal[i - 1], -1.0f, 1.0f) * (traceH * tok::param_y0f_scale);
          const float y1t = midY - std::clamp(snap.traceTemporal[i], -1.0f, 1.0f) * (traceH * tok::param_y0f_scale);
-         dl->AddLine(ImVec2(x0, y0t), ImVec2(x1, y1t), (tempCol & 0x00FFFFFFu) | 0x99000000u, tok::param_brain_source_body_stroke);  // ui-audit-ok: channel mask / bit packing, not a colour value
+         dl->AddLine(ImVec2(x0, y0t), ImVec2(x1, y1t), (tempCol & 0x00FFFFFFu) | tok::param_line_alpha_lg_hex, tok::param_brain_source_body_stroke);  // ui-audit-ok: channel mask / bit packing, not a colour value
          dl->AddLine(ImVec2(x0, y0f), ImVec2(x1, y1f), frontCol, tok::param_line_stroke_sm);
       }
 

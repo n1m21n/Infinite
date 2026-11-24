@@ -408,7 +408,7 @@ namespace
       a = std::clamp<int64_t>(a, 0, src.Frames());
       b = std::clamp<int64_t>(b, a, src.Frames());
       lo = hi = 0.0f;
-      const Mip* m = b - a >= 4096 * 2 ? &s.mip4096 : b - a >= 256 * 2 ? &s.mip256 : nullptr;
+      const Mip* m = b - a >= tok::sample_studio_m_ratio * 2 ? &s.mip4096 : b - a >= tok::sample_studio_range_min_max_limit * 2 ? &s.mip256 : nullptr;
       if (m != nullptr)
       {
          for (int64_t c = a / m->block, e = std::min<int64_t>((int64_t)m->lo.size(), (b + m->block - 1) / m->block); c < e; c++)
@@ -434,7 +434,7 @@ namespace
       a = std::clamp<int64_t>(a, 0, (int64_t)v.size());
       b = std::clamp<int64_t>(b, a, (int64_t)v.size());
       lo = hi = 0.0f;
-      if (b - a >= 256 * 2 && !s.laid256.lo.empty())
+      if (b - a >= tok::sample_studio_laid_min_max_ratio * 2 && !s.laid256.lo.empty())
       {
          for (int64_t c = a / 256, e = std::min<int64_t>((int64_t)s.laid256.lo.size(), (b + 255) / 256); c < e; c++)
          {
@@ -1612,7 +1612,7 @@ namespace
       for (int i = 0; i < s.doc.Count(); i++)
       {
          const int64_t a = s.doc.slices[(size_t)i].start, b = s.doc.EndOf(i);
-         if (g.XOf((double)b) - g.XOf((double)a) < 16.0f)
+         if (g.XOf((double)b) - g.XOf((double)a) < tok::sample_studio_fade_at_limit)
             continue;
          if (std::fabs(g.XOf((double)(a + FadeFrames(i, true))) - m.x) < tok::sample_studio_fade_handle_at_limit)
          {
@@ -3328,7 +3328,7 @@ namespace
          sDemoSlices = false;
          s.doc.FromEqual(8, s.doc.StartFrame(), s.doc.endFrame);
          s.doc.slices[2].p.reverse = true;
-         s.doc.slices[2].colour = 7;
+         s.doc.slices[2].colour = tok::sample_studio_colour;
          s.doc.slices[5].p.mute = true;
          SelectOnly(3);
          s.dirty = true;

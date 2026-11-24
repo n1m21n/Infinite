@@ -198,7 +198,7 @@ namespace Splash
       {
          const float e = (float)(now - st.fadeStart);
          fadeK = Smooth(e / 0.18f);
-         alpha = 1.0f - Smooth((e - 0.15f) / 0.30f);
+         alpha = 1.0f - Smooth((e - tok::splash_screen_inset) / tok::splash_screen_smooth_in);
          if (st.cardOnly)
             alpha = 1.0f; // the window itself is the card; the main window is restored right after the melt
          if (st.cardOnly ? e > 0.22f : alpha <= 0.0f)
@@ -225,18 +225,19 @@ namespace Splash
       // The card's own gradient (the icon's navy, a touch lighter toward the bottom).
       auto cardCol = [&](float y, float a) {
          const float k = Clamp01((y - y0) / cardH);
-         return IM_COL32((int)(0x15 + (0x23 - 0x15) * k), (int)(0x1A + (0x27 - 0x1A) * k), (int)(0x2F + (0x46 - 0x2F) * k),
+         constexpr tok::Rgba8 t = tok::splash_screen_card_top_shade, b = tok::splash_screen_card_bottom_shade;
+         return IM_COL32((int)(t.r + (b.r - t.r) * k), (int)(t.g + (b.g - t.g) * k), (int)(t.b + (b.b - t.b) * k),
                          (int)(a * 255.0f));
       };
       // Blend a colour toward the card gradient at height y, keeping its alpha.
       auto mixBg = [&](ImU32 c, float y) {
          const ImU32 b = cardCol(y, 1.0f);
-         const float r = (float)((c >> IM_COL32_R_SHIFT) & 255), g = (float)((c >> IM_COL32_G_SHIFT) & 255),
+         const float r = (float)((c >> IM_COL32_R_SHIFT) & tok::splash_screen_br_shade), g = (float)((c >> IM_COL32_G_SHIFT) & 255),
                      bl = (float)((c >> IM_COL32_B_SHIFT) & 255);
-         const float br = (float)((b >> IM_COL32_R_SHIFT) & 255), bg = (float)((b >> IM_COL32_G_SHIFT) & 255),
-                     bb = (float)((b >> IM_COL32_B_SHIFT) & 255);
+         const float br = (float)((b >> IM_COL32_R_SHIFT) & tok::splash_screen_br_shade), bg = (float)((b >> IM_COL32_G_SHIFT) & 255),
+                     bb = (float)((b >> IM_COL32_B_SHIFT) & tok::splash_screen_br_shade);
          return IM_COL32((int)(r + (br - r) * fadeK), (int)(g + (bg - g) * fadeK), (int)(bl + (bb - bl) * fadeK),
-                         (int)((c >> IM_COL32_A_SHIFT) & 255));
+                         (int)((c >> IM_COL32_A_SHIFT) & tok::splash_screen_br_shade));
       };
 
       // --- the topmost window that owns input --------------------------------------------
@@ -346,7 +347,7 @@ namespace Splash
          // One quiet footer line, like Bitwig's. Names are not shown for now (Credits() is kept for later).
          const float fs = 8.5f * sc;
          // The font has no trademark glyph, so "TM" is drawn as a small raised superscript.
-         const ImU32 footCol = IM_COL32(tok::splash_screen_mix_bg_shade_sm, tok::splash_screen_foot_col_alpha_sm, tok::splash_screen_foot_col_alpha_lg, (int)(210.0f * textA));
+         const ImU32 footCol = IM_COL32(tok::splash_screen_mix_bg_shade_sm, tok::splash_screen_foot_col_alpha_sm, tok::splash_screen_foot_col_alpha_lg, (int)(tok::splash_screen_foot_col_shade * textA));
          const float fy = y1 - pad - fs;
          float fx = x0 + pad;
          dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "Infinite");   // i18n-ok: brand mark, never translated

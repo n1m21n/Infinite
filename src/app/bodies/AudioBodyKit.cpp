@@ -394,7 +394,7 @@ namespace app
          const DriftTrace& tr = gDriftTraces[{sourceUid, live[li].first}];
          if (tr.filled < 2)
             continue;
-         const ImU32 col = DriftLineColor((int)li, 210);
+         const ImU32 col = DriftLineColor((int)li, tok::audio_drift_meter_drift_line_color_alpha);
          ImVec2 prev;
          for (int i = 0; i < tr.filled; i++)
          {
@@ -899,7 +899,7 @@ namespace app
             WaveZoom z;
             z.a = std::max(0.0, (double)*start - margin);
             z.b = std::min(1.0, (double)*end + margin);
-            if (z.b - z.a < 0.95)
+            if (z.b - z.a < tok::audio_trim_wave_limit)
                gWaveZoom[zoomKey] = z;
          }
          zit = gWaveZoom.find(zoomKey);
@@ -922,7 +922,7 @@ namespace app
             // Dim what the trim excludes, so the played range reads at a glance.
             const float startX = toX(std::clamp(*start, 0.0f, 1.0f));
             const float endX = toX(std::clamp(*end, 0.0f, 1.0f));
-            const ImU32 dimCol = isLight ? tok::Base(tok::col::ink_white, 140) : tok::Base(tok::col::ink_black, 130);
+            const ImU32 dimCol = isLight ? tok::Base(tok::col::ink_white, tok::audio_trim_wave_ink_white_alpha) : tok::Base(tok::col::ink_black, tok::audio_trim_wave_ink_black_alpha);
             if (startX > origin.x)
                dl->AddRectFilled(origin, ImVec2(std::min(startX, br.x), br.y), dimCol);
             if (endX < br.x)
@@ -937,10 +937,10 @@ namespace app
          // One cursor per sounding voice, fading with the voice.
          for (int v = 0; v < numCursors; v++)
          {
-            if (cursors[v].pos < 0.0f || cursors[v].alpha < 0.01f)
+            if (cursors[v].pos < 0.0f || cursors[v].alpha < tok::audio_trim_wave_limit_sm)
                continue;
             const float px = toX(std::clamp(cursors[v].pos, 0.0f, 1.0f));
-            const int alpha = (int)(std::clamp(cursors[v].alpha, 0.0f, 1.0f) * 235.0f) + 20;
+            const int alpha = (int)(std::clamp(cursors[v].alpha, 0.0f, 1.0f) * tok::audio_trim_wave_ratio) + tok::audio_alpha_gap;
             dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
                         tok::U32(tok::audio_line_shade, isLight, alpha), tok::audio_trim_wave_line_stroke_sm);
          }

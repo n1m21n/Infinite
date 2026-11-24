@@ -714,7 +714,7 @@ namespace
       if (n.motionGroup != 0)
          for (GraphNode& g : gNodes)
             if (const MSEGNode* other = AsMseg(&g); other != nullptr && other != &n && other->motionGroup == n.motionGroup)
-               DrawCurve(dl, a, *other, (AxisCol(other->motionChannel) & 0x00FFFFFF) | 0x99000000, 1.4f);
+               DrawCurve(dl, a, *other, (AxisCol(other->motionChannel) & 0x00FFFFFF) | tok::curve_editor_graph_alpha, tok::curve_editor_group_curve_stroke);
       DrawUnitsLabels(dl, a);
       const int count = n.source == 1 ? 0 : (int)n.points.size(); // an expression page has no points to show
       const ImU32 selCol = SelCol(), ring = RingCol(), line = LineCol();
@@ -723,7 +723,7 @@ namespace
       {
          const int seg = s.drag == Drag::Bend ? s.grab : ModShapes::MsegFindSegment(n.points.data(), count, std::clamp(a.U(m.x), 0.0f, 1.0f), -1);
          if (seg >= 0 && seg + 1 < count)
-            DrawCurve(dl, a, n, (selCol & 0x00FFFFFF) | 0x80000000, 5.0f, n.points[seg].x, n.points[seg + 1].x);
+            DrawCurve(dl, a, n, (selCol & 0x00FFFFFF) | tok::curve_editor_alpha, tok::curve_editor_bend_curve_stroke, n.points[seg].x, n.points[seg + 1].x);
       }
       DrawCurve(dl, a, n, line, 1.8f);
       // Bezier handles of the selected points.
@@ -772,7 +772,7 @@ namespace
       if (s.drag == Drag::Marquee)
       {
          const ImVec2 r0(std::min(m.x, s.from.x), std::min(m.y, s.from.y)), r1(std::max(m.x, s.from.x), std::max(m.y, s.from.y));
-         dl->AddRectFilled(r0, r1, (selCol & 0x00FFFFFF) | 0x22000000);  // ui-audit-ok: channel mask / bit packing, not a colour value
+         dl->AddRectFilled(r0, r1, (selCol & 0x00FFFFFF) | tok::curve_editor_fill_alpha);  // ui-audit-ok: channel mask / bit packing, not a colour value
          dl->AddRect(r0, r1, selCol);
       }
       dl->PopClipRect();

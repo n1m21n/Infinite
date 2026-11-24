@@ -1065,7 +1065,7 @@ namespace app
       const float y25 = origin.y + height * tok::param_y25_ratio;
       const float y50 = origin.y + height * 0.50f;
       const float y75 = origin.y + height * tok::param_y75_ratio;
-      const ImU32 subGuideCol = isLight ? tok::Base(tok::col::surface_hi, 150) : tok::Base(tok::col::surface_lo, 150);
+      const ImU32 subGuideCol = isLight ? tok::Base(tok::col::surface_hi, tok::param_pattern_step_grid_surface_hi_alpha) : tok::Base(tok::col::surface_lo, tok::param_pattern_step_grid_surface_lo_alpha);
       dl->AddLine(ImVec2(origin.x + tok::space_0_5, y25), ImVec2(br.x - tok::space_0_5, y25), subGuideCol, tok::param_pattern_step_grid_stroke);
       dl->AddLine(ImVec2(origin.x + tok::space_0_5, y50), ImVec2(br.x - tok::space_0_5, y50), subGuideCol, tok::param_pattern_step_grid_stroke);
       dl->AddLine(ImVec2(origin.x + tok::space_0_5, y75), ImVec2(br.x - tok::space_0_5, y75), subGuideCol, tok::param_pattern_step_grid_stroke);
@@ -1110,8 +1110,8 @@ namespace app
 
          // Bar stem fill
          const ImU32 fillCol = isCurrent
-            ? (isLight ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 240))
-            : (isLight ? tok::Base(tok::col::accent, 230) : tok::Base(tok::col::accent_pale_muted_xlo, 220));
+            ? (isLight ? tok::Base(tok::col::state_warn, tok::param_pattern_step_grid_state_warn_alpha) : tok::Base(tok::col::role_modulation, tok::param_pattern_step_grid_role_modulation_alpha))
+            : (isLight ? tok::Base(tok::col::accent, tok::param_pattern_step_grid_accent_alpha) : tok::Base(tok::col::accent_pale_muted_xlo, tok::param_pattern_step_grid_accent_pale_muted_xlo_alpha));
 
          if (std::fabs(fillBottom - fillTop) > 1.0f)
          {
@@ -1127,7 +1127,7 @@ namespace app
             : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xhi));
          const ImU32 capBorder = isCurrent
             ? (isLight ? tok::Base(tok::col::role_solo) : tok::Base(tok::col::role_solo_alt))
-            : (isLight ? tok::Base(tok::col::accent_alt, 200) : tok::Base(tok::col::accent_alt, 180));
+            : (isLight ? tok::Base(tok::col::accent_alt, tok::param_pattern_step_grid_accent_alt_alpha) : tok::Base(tok::col::accent_alt, tok::param_cap_border_alpha));
 
          dl->AddRectFilled(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capCol, tok::param_pattern_step_grid_radius);
          dl->AddRect(ImVec2(x0 + tok::space_0_25, capY), ImVec2(x1 - tok::space_0_25, capY + capH), capBorder, tok::param_pattern_step_grid_radius);
@@ -1155,7 +1155,7 @@ namespace app
          // Step number label below column
          char label[16];
          snprintf(label, sizeof(label), "%d", i + 1);
-         const float labelFontSize = count <= 8 ? ImGui::GetFontSize()   // ui-audit-ok: cell count above which the label shrinks to fit
+         const float labelFontSize = count <= 8 ? ImGui::GetFontSize()  // ui-audit-ok: model value: cell count above which the label shrinks to fit
                                                  : std::clamp(cellW * tok::type_fit_frac, tok::type_min, ImGui::GetFontSize());
          const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
          const ImU32 stepNumCol = isCurrent

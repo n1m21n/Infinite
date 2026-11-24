@@ -186,8 +186,8 @@ namespace app
    {
       const float binWidth = (float)(sampleRate > 0.0 ? sampleRate : tok::fx_audio_spectrum_bin_width) / tok::fx_bin_width_ratio;
       const float baselineY = origin.y + h;
-      const ImU32 fillCol = isLight ? tok::Base(tok::col::surface_lo_pale_fixed, 40) : tok::Base(tok::col::surface_hi, 40);
-      const ImU32 lineCol = isLight ? tok::Base(tok::col::surface_lo_pale_fixed, 130) : tok::Base(tok::col::surface_hi, 130);
+      const ImU32 fillCol = isLight ? tok::Base(tok::col::surface_lo_pale_fixed, tok::fx_audio_spectrum_surface_lo_pale_fixed_alpha) : tok::Base(tok::col::surface_hi, tok::fx_audio_spectrum_surface_hi_alpha);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::surface_lo_pale_fixed, tok::fx_line_col_alpha_sm) : tok::Base(tok::col::surface_hi, tok::fx_line_col_alpha_sm);
 
       float prevX = FilterVizFreqToX(binWidth, origin.x, w);
       float prevY = AudioSpectrumDbToY(tok::fx_prev_y_audio_spectrum_db_to_y * log10f(std::max(st.smoothed[1], tok::fx_prev_y_min)), origin.y, h);
@@ -321,7 +321,7 @@ namespace app
       if (cachedPoints > 1)
       {
          const float yBottom = origin.y + h;
-         const ImU32 fillCol = isLight ? tok::Base(tok::col::accent, 32) : tok::Base(tok::col::accent_pale_muted_xhi, 36);
+         const ImU32 fillCol = isLight ? tok::Base(tok::col::accent, tok::fx_audio_filter_visualizer_accent_alpha) : tok::Base(tok::col::accent_pale_muted_xhi, tok::fx_audio_filter_visualizer_accent_pale_muted_xhi_alpha);
          for (int i = 0; i < cachedPoints - 1; i++)
          {
             const float x0 = origin.x + (float)i * (w / (float)(cachedPoints - 1));
@@ -1669,7 +1669,7 @@ namespace app
       const float gap = tok::space_2;
       const float panelW = (w - tok::fx_saturator_visualizer_ratio * gap) / tok::fx_panel_w_ratio;
       const float panelH = h - tok::fx_panel_h_ratio * gap;
-      const ImU32 curveCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
+      const ImU32 curveCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_saturator_visualizer_accent_alt_alpha);
       for (int s = 0; s < 3; s++)
       {
          const int model = std::clamp((int)(n->Param(kModel[s]) + 0.5f), 0, SaturatorDsp::kNumModels - 1);
@@ -1822,8 +1822,8 @@ namespace app
       for (int pass = 0; pass < (stereo > 0.0f ? 2 : 1); pass++)
       {
          const float tracePosition = (pass == 1) ? positionR : positionL;
-         const int alpha = (stereo > 0.0f) ? (pass == 0 ? 200 : 150) : 255;
-         const ImU32 fillCol = isLight ? tok::U32(tok::fx_fill_col_shade_sm, (int)(alpha * 0.12f)) : tok::U32(tok::fx_fill_col_shade_lg, (int)(alpha * 0.14f));
+         const int alpha = (stereo > 0.0f) ? (pass == 0 ? tok::fx_wavetable_shaper_visualizer_lg : tok::fx_wavetable_shaper_visualizer_sm) : tok::fx_alpha;
+         const ImU32 fillCol = isLight ? tok::U32(tok::fx_fill_col_shade_sm, (int)(alpha * tok::fx_fill_col_shade_sm_alt)) : tok::U32(tok::fx_fill_col_shade_lg, (int)(alpha * tok::fx_fill_col_shade_lg_alt));
          for (int i = 0; i < kNumPoints - 1; i++)
          {
             const float xIn0 = -1.0f + 2.0f * (float)i / (float)(kNumPoints - 1);

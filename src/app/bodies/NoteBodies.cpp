@@ -413,7 +413,7 @@ namespace app
             const int note = lowNote + o * 12 + kWhiteOffsets[k];
             const bool on = note >= 0 && note < 128 && held[note];
             const float x = origin.x + tok::space_0_5 + (float)(o * tok::note_midi_keyboard_ratio + k) * keyW;
-            const ImU32 whiteCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_warm, 245))
+            const ImU32 whiteCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_warm, tok::note_midi_keyboard_accent_pale_muted_warm_alpha))
                                       : (isLight ? tok::Base(tok::col::ink_white) : tok::Base(tok::col::surface_hi));
             dl->AddRectFilled(ImVec2(x + tok::px_align, origin.y + tok::space_0_75), ImVec2(x + keyW - tok::px_align, br.y - tok::space_0_75),
                               whiteCol, tok::radius_cell);
@@ -611,7 +611,7 @@ namespace app
          if (hitNote < 0)
          {
             const int col = std::clamp((int)((mouse.x - origin.x - tok::space_0_5) / keyW), 0, whiteCount - 1);
-            hitNote = lowNote + (col / 7) * 12 + kWhiteOffsets[col % 7];
+            hitNote = lowNote + (col / 7) * 12 + kWhiteOffsets[col % 7];  // ui-audit-ok: model value: 7 white keys and 12 semitones per octave
          }
       }
 
@@ -622,7 +622,7 @@ namespace app
             const int note = lowNote + o * 12 + kWhiteOffsets[k];
             const bool on = note >= 0 && note < 128 && held[note];
             const float x = origin.x + tok::space_0_5 + (float)(o * tok::note_interactive_keyboard_scale + k) * keyW;
-            const ImU32 whiteCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_warm, 245))
+            const ImU32 whiteCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_warm, tok::note_interactive_keyboard_accent_pale_muted_warm_alpha))
                                       : (isLight ? tok::Base(tok::col::ink_white) : tok::Base(tok::col::surface_hi));
             dl->AddRectFilled(ImVec2(x + tok::px_align, origin.y + tok::space_0_75), ImVec2(x + keyW - tok::px_align, br.y - tok::space_0_75),
                               whiteCol, tok::radius_cell);
@@ -1843,8 +1843,8 @@ namespace app
             const float lineY = origin.y + (float)(kHigh - octNote) * noteH;
             const bool isMiddleC = (octNote == 60);
             const ImU32 lineCol = isMiddleC
-               ? (isLight ? tok::Base(tok::col::edge_mid_light_fixed, 220) : tok::Base(tok::col::edge_lo_light, 220))
-               : (isLight ? tok::Base(tok::col::surface_hi, 150) : tok::Base(tok::col::surface_lo, 150));
+               ? (isLight ? tok::Base(tok::col::edge_mid_light_fixed, tok::note_sequencer_body_edge_mid_light_fixed_alpha) : tok::Base(tok::col::edge_lo_light, tok::note_sequencer_body_edge_lo_light_alpha))
+               : (isLight ? tok::Base(tok::col::surface_hi, tok::note_sequencer_body_surface_hi_alpha) : tok::Base(tok::col::surface_lo, tok::note_sequencer_body_surface_lo_alpha));
             dl->AddLine(ImVec2(origin.x + tok::space_0_5, lineY), ImVec2(br.x - tok::space_0_5, lineY), lineCol, isMiddleC ? tok::note_sequencer_body_stroke : tok::note_line_stroke);
          }
 
@@ -1918,8 +1918,8 @@ namespace app
             if (capBot < origin.y + pitchH)
             {
                const ImU32 stemCol = n->stepEnabled[i]
-                  ? (isLight ? tok::Base(tok::col::accent, 150) : tok::Base(tok::col::accent, 140))
-                  : (isLight ? tok::Base(tok::col::surface_hi, 90) : tok::Base(tok::col::edge_lo, 90));
+                  ? (isLight ? tok::Base(tok::col::accent, tok::note_sequencer_body_accent_alpha) : tok::Base(tok::col::accent, tok::note_stem_col_alpha_lg))
+                  : (isLight ? tok::Base(tok::col::surface_hi, tok::note_stem_col_alpha_sm) : tok::Base(tok::col::edge_lo, tok::note_sequencer_body_edge_lo_alpha));
                dl->AddRectFilled(ImVec2(x0 + 1.0f, capBot), ImVec2(x1 - 1.0f, origin.y + pitchH),
                                  stemCol, tok::radius_cell);
             }
@@ -1935,7 +1935,7 @@ namespace app
                         : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo)));
                const ImU32 capBorder = isCurrent
                   ? (isLight ? tok::Base(tok::col::role_solo) : tok::Base(tok::col::role_solo_alt))
-                  : (isLight ? tok::Base(tok::col::accent_alt, 200) : tok::Base(tok::col::accent_alt, 180));
+                  : (isLight ? tok::Base(tok::col::accent_alt, tok::note_sequencer_body_accent_alt_alpha) : tok::Base(tok::col::accent_alt, tok::note_cap_border_alpha));
 
                dl->AddRectFilled(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capCol, tok::note_sequencer_body_radius);
                dl->AddRect(ImVec2(x0 + tok::space_0_25, capTop), ImVec2(x1 - tok::space_0_25, capBot), capBorder, tok::note_sequencer_body_radius);
@@ -1949,14 +1949,14 @@ namespace app
             }
             else
             {
-               const ImU32 capCol = isLight ? tok::Base(tok::col::surface_hi, 200) : tok::Base(tok::col::edge_lo, 200);
-               const ImU32 capBorder = isLight ? tok::Base(tok::col::edge_mid_light_fixed, 180) : tok::Base(tok::col::edge_lo_light, 180);
+               const ImU32 capCol = isLight ? tok::Base(tok::col::surface_hi, tok::note_cap_col_else_alpha) : tok::Base(tok::col::edge_lo, tok::note_cap_col_else_alpha);
+               const ImU32 capBorder = isLight ? tok::Base(tok::col::edge_mid_light_fixed, tok::note_cap_border_else_alpha) : tok::Base(tok::col::edge_lo_light, tok::note_cap_border_else_alpha);
                dl->AddRectFilled(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capCol, tok::note_sequencer_body_radius);
                dl->AddRect(ImVec2(x0 + tok::space_0_25, capTop), ImVec2(x1 - tok::space_0_25, capBot), capBorder, tok::note_sequencer_body_radius);
 
                char noteStr[16];
                snprintf(noteStr, sizeof(noteStr), "%s%d", NoteNameList()[dispPc].c_str(), dispOct);
-               const ImU32 txtCol = isLight ? tok::Base(tok::col::edge_mid, 200) : tok::Base(tok::col::edge_lo_pale, 180);
+               const ImU32 txtCol = isLight ? tok::Base(tok::col::edge_mid, tok::note_sequencer_body_edge_mid_alpha) : tok::Base(tok::col::edge_lo_pale, tok::note_sequencer_body_edge_lo_pale_alpha);
                DrawTextCentered(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), txtCol, noteStr, fontCapSz);
             }
 
@@ -2391,7 +2391,7 @@ namespace app
          const ImVec2 ts = ImGui::CalcTextSize(label);
          ImU32 col = lit ? litText : (n->progDegree[c] < 0 ? dimCol : textCol);
          if (!used || !progression)
-            col = (col & ~IM_COL32_A_MASK) | ((ImU32)((float)((col >> IM_COL32_A_SHIFT) & 0xFF) * (used ? 0.6f : 0.3f)) << IM_COL32_A_SHIFT);
+            col = (col & ~IM_COL32_A_MASK) | ((ImU32)((float)((col >> IM_COL32_A_SHIFT) & 0xFF) * (used ? tok::note_chorder_progression_strip_lg : tok::note_chorder_progression_strip_sm)) << IM_COL32_A_SHIFT);
          dl->AddText(ImVec2(x0 + (cellW - ts.x) * 0.5f, origin.y + (chordH - ts.y) * 0.5f), col, label);
 
          // type cell
@@ -2730,7 +2730,7 @@ namespace app
       {
          const ImVec2 p = ToScreen(bx[i], by[i] - ballShiftY);
          const float flash = std::clamp(bf[i], 0.0f, 1.0f);
-         const ImU32 restCol = isLight ? tok::Base(tok::col::accent, 245) : tok::Base(tok::col::accent_pale_muted_warm, 235);
+         const ImU32 restCol = isLight ? tok::Base(tok::col::accent, tok::note_bouncing_balls_visualizer_accent_alpha) : tok::Base(tok::col::accent_pale_muted_warm, tok::note_bouncing_balls_visualizer_accent_pale_muted_warm_alpha);
          const ImU32 hitCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation);
          const ImU32 col = ImGui::ColorConvertFloat4ToU32(
             ImLerp(ImGui::ColorConvertU32ToFloat4(restCol), ImGui::ColorConvertU32ToFloat4(hitCol), flash));

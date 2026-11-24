@@ -478,7 +478,7 @@ namespace
    {
       const unsigned v = (unsigned)(intptr_t)cmd->UserCallbackData;
       glBindTexture(GL_TEXTURE_2D, v & 0x7FFFFFFFu);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (v & 0x80000000u) ? GL_NEAREST : GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (v & tok::view2d_mag_filter_cb_alpha) ? GL_NEAREST : GL_LINEAR);  // ui-audit-ok: bit packing: the nearest-filter flag bit on a texture id
    }
    bool ViewTurned() { return std::fabs(sViewAngle) > 1e-4f; }
    ImVec2 ToScreen(Scene2DNode* doc, float x, float y)
@@ -3189,7 +3189,7 @@ namespace
                if (key(kDigits[i]) && (LockOf(doc, *a) & Scene2DNode::kLockAll) == 0)
                {
                   PushUndoCheckpoint("Layer opacity");
-                  a->opacity = (i + 1) / 10.0f;
+                  a->opacity = (i + 1) / tok::view2d_opacity_ratio;
                   Touch();
                }
          }
@@ -3369,7 +3369,7 @@ namespace
       BrushEngine::Brush b;
       b.size = tok::view2d_size;
       b.hardness = 0.4f;
-      b.opacity = 0.5f;
+      b.opacity = tok::view2d_opacity;
       b.spacing = tok::view2d_spacing;
       return b;
    }();
@@ -3646,10 +3646,10 @@ namespace
       }
       if (!MenuParts::BeginPopup("##v2dfilldlg"))
          return;
-      float pct = sFillOpacity * 100.0f;
+      float pct = sFillOpacity * tok::view2d_pct_ratio;
       ImGui::SetNextItemWidth(tok::view2d_field_w);
       if (FieldWell::Slider("##v2dfillop", &pct, params::view2d::pct_lo, params::view2d::pct_hi, "%.0f%%"))
-         sFillOpacity = std::clamp(pct / 100.0f, 0.01f, 1.0f);
+         sFillOpacity = std::clamp(pct / tok::view2d_fill_dialog_ratio, tok::view2d_fill_opacity_lo, 1.0f);
       static const char* kWith[5] = { "Foreground", "Background", "Black", "White", "50% Grey" };
       for (int i = 0; i < 5; i++)
          if (MenuParts::Item(T(kWith[i])))
@@ -4357,7 +4357,7 @@ namespace
                                                   ImGuiKey_6, ImGuiKey_7, ImGuiKey_8, ImGuiKey_9, ImGuiKey_0 };
             for (int i = 0; i < 10; i++)
                if (key(kDigits[i]))
-                  b.opacity = (i + 1) / 10.0f;
+                  b.opacity = (i + 1) / tok::view2d_opacity_ratio;
          }
       }
       if (cmd && !shift && key(ImGuiKey_D) && doc->HasSelection())
@@ -4864,7 +4864,7 @@ namespace
          return;
       auto pull = [&](int k, float x, float y) { l->warp[k * 2] += x; l->warp[k * 2 + 1] += y; };
       const int h = sOp.warpHandle;
-      if (h % 2 == 0)
+      if (h % tok::view2d_warp_active_period == 0)
       {
          const int k = h == 0 ? 0 : h == 2 ? 1 : h == 4 ? 2 : 3;   // handle -> corner (TL TR BR BL)
          if (sOp.warpStyle == 1)
@@ -4903,7 +4903,7 @@ namespace
       else
       {
          // An edge slides along itself: both its corners move by the drag along the edge.
-         const int a = h == 1 ? 0 : h == 3 ? 1 : h == 5 ? 2 : 3, b = (a + 1) % 4;
+         const int a = h == 1 ? 0 : h == 3 ? 1 : h == 5 ? 2 : 3, b = (a + 1) % 4;  // ui-audit-ok: model value: corner handle index
          if (sOp.warpStyle == 2)
          {
             pull(a, dx, dy);   // distort: the edge goes where it is dragged
@@ -6706,7 +6706,7 @@ namespace
          // for every other user of the texture.
          const bool pixels = sZoom >= 2.0f;
          if (pixels)
-            dl->AddCallback(&MagFilterCb, (void*)(intptr_t)(tex | 0x80000000u));
+            dl->AddCallback(&MagFilterCb, (void*)(intptr_t)(tex | tok::view2d_canvas_alpha));  // ui-audit-ok: bit packing: the nearest-filter flag bit on a texture id
          Thumb::AddQuad(dl, (ImTextureID)(intptr_t)tex, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
          if (pixels)
          {
@@ -6778,7 +6778,7 @@ namespace
             const float r = std::hypot(cx, cy);
             for (int k = 0; k < n; k++)
             {
-               const float a = tok::view2d_a_ratio * 3.14159265f * k / n - 1.5707963f;
+               const float a = tok::view2d_a_ratio * tok::view2d_canvas_scale_sm * k / n - tok::view2d_a_gap;
                dl->AddLine(ToScreen(doc, cx, cy), ToScreen(doc, cx + std::cos(a) * r, cy + std::sin(a) * r), col);
             }
          }
@@ -8035,12 +8035,12 @@ namespace
       {
          BrushEngine::Brush& b = ToolBrush();
          BarSlider("##v2drsize", &b.size, params::view2d::size_lo, params::view2d::size_hi, "Size %.0f px", kWellL);
-         float hard = b.hardness * 100.0f, op = b.opacity * 100.0f, flow = b.flow * 100.0f;
+         float hard = b.hardness * tok::view2d_hard_ratio, op = b.opacity * 100.0f, flow = b.flow * 100.0f;  // ui-audit-ok: model value: 0-1 brush param shown as percent
          BarSlider("##v2drhard", &hard, params::view2d::hard_lo, params::view2d::hard_hi, "Hardness %.0f%%", kWellL);
          BarSlider("##v2drop", &op, params::view2d::op_lo, params::view2d::op_hi, "Opacity %.0f%%", kWellL);
          BarSlider("##v2drflow", &flow, params::view2d::flow_lo, params::view2d::flow_hi, "Flow %.0f%%", kWellL);
          b.hardness = hard / 100.0f;
-         b.opacity = op / 100.0f;
+         b.opacity = op / tok::view2d_v2drsize_scale;
          b.flow = flow / 100.0f;
          if (sTool == kDodge || sTool == kBurn)
          {
@@ -8186,7 +8186,7 @@ namespace
          ModBegin();
          BarSlider("##v2dsize", &b.size, params::view2d::size_lo, params::view2d::size_hi, "Size %.0f px", kWellL);
          ModEnd();
-         float hard = b.hardness * 100.0f, op = b.opacity * 100.0f, flow = b.flow * 100.0f;
+         float hard = b.hardness * tok::view2d_hard_ratio, op = b.opacity * 100.0f, flow = b.flow * 100.0f;  // ui-audit-ok: model value: 0-1 brush param shown as percent
          BarSlider("##v2dhard", &hard, params::view2d::hard_lo, params::view2d::hard_hi, "Hardness %.0f%%", kWellL);
          if (brush)
             ModNextParam(kBrushOpacityParam);
@@ -8199,7 +8199,7 @@ namespace
          BarSlider("##v2dflow", &flow, params::view2d::flow_lo, params::view2d::flow_hi, "Flow %.0f%%", kWellL);
          ModEnd();
          b.hardness = hard / 100.0f;
-         b.opacity = op / 100.0f;
+         b.opacity = op / tok::view2d_v2drsize_scale;
          b.flow = flow / 100.0f;
          float smooth = b.smoothing * 100.0f;
          BarSlider("##v2dsmooth", &smooth, params::view2d::smooth_lo, params::view2d::smooth_hi, "Smoothing %.0f%%", kWellL);
@@ -8328,13 +8328,13 @@ namespace
          b.hardness = hard / 100.0f;
          if (sTool == kMixer)
          {
-            float op = b.opacity * 100.0f, flow = b.flow * 100.0f, wet = b.wet * 100.0f, refill = b.refill * 100.0f;
+            float op = b.opacity * tok::view2d_op_ratio, flow = b.flow * 100.0f, wet = b.wet * 100.0f, refill = b.refill * 100.0f;
             BarSlider("##v2dxop", &op, params::view2d::op_lo, params::view2d::op_hi, "Opacity %.0f%%", kWellL);
             BarSlider("##v2dxflow", &flow, params::view2d::flow_lo, params::view2d::flow_hi, "Flow %.0f%%", kWellL);
             gap();
             BarSlider("##v2dxwet", &wet, params::view2d::wet_lo, params::view2d::wet_hi, "Wet %.0f%%", kWellL);
             BarSlider("##v2dxrefill", &refill, params::view2d::refill_lo, params::view2d::refill_hi, "Refill %.0f%%", kWellL);
-            b.opacity = op / 100.0f;
+            b.opacity = op / tok::view2d_v2drsize_scale;
             b.flow = flow / 100.0f;
             b.wet = wet / 100.0f;
             b.refill = refill / 100.0f;
@@ -8441,9 +8441,9 @@ namespace
          if (BarCombo("##v2dgkind", &k, kKinds, 5, kWellL))
             sFillKind = k + 1;
          gap();
-         float op = sGradOpacity * 100.0f;
+         float op = sGradOpacity * tok::view2d_op_ratio;
          BarSlider("##v2dgop", &op, params::view2d::op_lo, params::view2d::op_hi, "Opacity %.0f%%", kWellL);
-         sGradOpacity = op / 100.0f;
+         sGradOpacity = op / tok::view2d_grad_opacity_ratio;
          next();
          if (TextChip(L("Reverse##v2dgrev"), sGradReverse, T("Background colour to foreground")))
             sGradReverse = !sGradReverse;
@@ -10697,12 +10697,12 @@ namespace
          }
          FormParts::Inline(0.0f, tok::space_1);
          ImGui::SetNextItemWidth(w - half - tok::space_1);
-         float pct = a->opacity * 100.0f;
+         float pct = a->opacity * tok::view2d_pct_ratio;
          ModNext(*a, Scene2DNode::kLfOpacity);
          ModBegin();
          if (FieldWell::Slider("##v2dopacity", &pct, 0.0f, params::view2d::pct_hi, "Opacity %.0f%%"))
          {
-            a->opacity = pct / 100.0f;
+            a->opacity = pct / tok::view2d_v2drsize_scale;
             Touch();
          }
          ModEnd();
@@ -14289,7 +14289,7 @@ namespace
             err.Add(i, "E_VALUE", "'color' wants [r, g, b], 0..1");
          if (op == "fill" && !(c.contains("at") && c["at"].is_array() && c["at"].size() == 2))
             err.Add(i, "E_SHAPE", "'at' wants [x, y] in document px");
-         if (op == "stroke" && !(c.contains("points") && c["points"].is_array() && c["points"].size() >= tok::view2d_v2_check_limit && c["points"].size() % 2 == 0))
+         if (op == "stroke" && !(c.contains("points") && c["points"].is_array() && c["points"].size() >= tok::view2d_v2_check_limit && c["points"].size() % tok::view2d_points_period == 0))
             err.Add(i, "E_SHAPE", "'points' wants [x0, y0, x1, y1, ...] in document px");
       }
       else
@@ -16326,7 +16326,7 @@ namespace
       {
          BrushEngine::Brush b;
          b.size = tok::view2d_audit_doc_size;
-         b.color[0] = 0.9f;
+         b.color[0] = tok::view2d_color;
          if (doc->BeginPaint(id[0], 0, b, 200.0f, 200.0f, 1.0f))
          {
             doc->PaintTo(400.0f, 260.0f, 1.0f);
@@ -16348,7 +16348,7 @@ namespace
       id[8] = doc->AddPaintLayer();
       doc->AddPixelMask(id[8]);
       if (Layer* f = doc->FindLayer(id[5]))
-         f->opacity = 0.3f;
+         f->opacity = tok::view2d_audit_doc_opacity;
       doc->Commit();
       sSel.clear();
       sNeedFit = true;

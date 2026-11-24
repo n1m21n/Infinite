@@ -111,19 +111,19 @@ namespace app
 
       const bool isLight = IsThemeLight();
       const ImU32 bgCol = isLight
-         ? IM_COL32((int)(224 + n->color[0] * 28),
-                    (int)(227 + n->color[1] * 25),
-                    (int)(232 + n->color[2] * 20), tok::preview_bg_col_alpha_lg)
-         : IM_COL32((int)(16 + n->color[0] * 36),
-                    (int)(18 + n->color[1] * 36),
-                    (int)(24 + n->color[2] * 36), tok::preview_bg_col_alpha_sm);
+         ? IM_COL32((int)(tok::preview_comment_gap + n->color[0] * tok::preview_comment_bg_col_shade_lg),
+                    (int)(tok::preview_comment_bg_col_shade_xxl + n->color[1] * tok::preview_comment_bg_col_shade_md),
+                    (int)(tok::preview_comment_bg_col_shade_xxxl + n->color[2] * tok::preview_comment_bg_col_shade_xs), tok::preview_bg_col_alpha_lg)
+         : IM_COL32((int)(tok::preview_comment_bg_col_shade_xxxs + n->color[0] * tok::preview_comment_bg_col_shade_xl),
+                    (int)(tok::preview_comment_bg_col_shade_xxs + n->color[1] * tok::preview_comment_bg_col_shade_xl),
+                    (int)(tok::preview_comment_bg_col_shade_sm + n->color[2] * tok::preview_comment_bg_col_shade_xl), tok::preview_bg_col_alpha_sm);
       const ImU32 borderCol = isLight
-         ? IM_COL32((int)(n->color[0] * 180 + 40),
-                    (int)(n->color[1] * 180 + 40),
-                    (int)(n->color[2] * 180 + 40), tok::preview_grip_col_alpha)
-         : IM_COL32((int)(n->color[0] * 200 + 55),
-                    (int)(n->color[1] * 200 + 55),
-                    (int)(n->color[2] * 200 + 55), tok::preview_border_col_alpha);
+         ? IM_COL32((int)(n->color[0] * tok::preview_border_col_shade_md + tok::preview_border_col_shade_xs),
+                    (int)(n->color[1] * tok::preview_border_col_shade_md + tok::preview_border_col_shade_xs),
+                    (int)(n->color[2] * tok::preview_border_col_shade_md + tok::preview_border_col_shade_xs), tok::preview_grip_col_alpha)
+         : IM_COL32((int)(n->color[0] * tok::preview_border_col_shade_lg + tok::preview_border_col_shade_sm),
+                    (int)(n->color[1] * tok::preview_border_col_shade_lg + tok::preview_border_col_shade_sm),
+                    (int)(n->color[2] * tok::preview_border_col_shade_lg + tok::preview_border_col_shade_sm), tok::preview_border_col_alpha);
 
       dl->AddRectFilled(origin, br, bgCol, tok::preview_comment_radius);
       // Header accent bar (Apple Notes / sticky card feel)
@@ -134,9 +134,9 @@ namespace app
 
       const ImU32 textCol = isLight
          ? tok::Base(tok::col::surface_lo)
-         : IM_COL32((int)((n->color[0] * 0.5f + 0.5f) * 255),
-                    (int)((n->color[1] * 0.5f + 0.5f) * 255),
-                    (int)((n->color[2] * 0.5f + 0.5f) * 255), tok::preview_comment_alpha);
+         : IM_COL32((int)((n->color[0] * tok::preview_comment_shade + tok::preview_comment_shade) * 255),
+                    (int)((n->color[1] * tok::preview_comment_shade + tok::preview_comment_shade) * 255),
+                    (int)((n->color[2] * tok::preview_comment_shade + tok::preview_comment_shade) * 255), tok::preview_comment_alpha);
       // Clipped to the box so a note longer than its height is cut off at the
       // edge instead of spilling over the card.
       dl->PushClipRect(origin, br, true);
@@ -161,8 +161,8 @@ namespace app
 
       // Draw bottom-right resize grip indicator (3 diagonal grip lines)
       const ImU32 gripCol = isLight
-         ? IM_COL32((int)(n->color[0] * 120 + 40), (int)(n->color[1] * 120 + 40), (int)(n->color[2] * 120 + 40), tok::preview_grip_col_alpha)
-         : IM_COL32((int)(n->color[0] * tok::preview_grip_col_shade + 60), (int)(n->color[1] * tok::preview_grip_col_shade + 60), (int)(n->color[2] * tok::preview_grip_col_shade + 60), tok::preview_grip_col_alpha);
+         ? IM_COL32((int)(n->color[0] * tok::preview_grip_col_shade_md + tok::preview_border_col_shade_xs), (int)(n->color[1] * tok::preview_grip_col_shade_md + tok::preview_border_col_shade_xs), (int)(n->color[2] * tok::preview_grip_col_shade_md + tok::preview_border_col_shade_xs), tok::preview_grip_col_alpha)
+         : IM_COL32((int)(n->color[0] * tok::preview_grip_col_shade + tok::preview_grip_col_shade_sm), (int)(n->color[1] * tok::preview_grip_col_shade + tok::preview_grip_col_shade_sm), (int)(n->color[2] * tok::preview_grip_col_shade + tok::preview_grip_col_shade_sm), tok::preview_grip_col_alpha);
       for (int i = 0; i < 3; i++)
       {
          const float offset = tok::space_1 + (float)i * 4.0f;
@@ -466,8 +466,8 @@ namespace app
       const bool isLight = IsThemeLight();
       // A group that is off reads as dimmed: its members hold black and silent.
       const float offDim = n->on ? 1.0f : 0.4f;
-      const float bgAlpha = (isLight ? 0.08f : 0.13f) * offDim;
-      const float borderAlpha = (isLight ? 0.65f : 0.80f) * offDim;
+      const float bgAlpha = (isLight ? tok::preview_group_node_bg_alpha_sm : tok::preview_group_node_bg_alpha_lg) * offDim;
+      const float borderAlpha = (isLight ? tok::preview_group_node_border_alpha_sm : tok::preview_group_node_border_alpha_lg) * offDim;
       ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(0, 0, 0, 0));
       ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0, 0, 0, 0));
       ed::PushStyleColor(ed::StyleColor_GroupBg,

@@ -682,7 +682,7 @@ namespace
          const float x = a.TickX((double)t);
          if (x > a.x1)
             break;
-         const float alpha = t % Arrange::kTicksPerBar == 0 ? 0.22f : t % Arrange::kPPQ == 0 ? 0.11f : 0.05f;
+         const float alpha = t % Arrange::kTicksPerBar == 0 ? tok::piano_roll_alpha : t % Arrange::kPPQ == 0 ? tok::piano_roll_grid_alpha_lg : tok::piano_roll_grid_alpha_sm;
          dl->AddLine(ImVec2(x, a.rollY), ImVec2(x, a.rollB), Tint(alpha));
       }
    }

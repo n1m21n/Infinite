@@ -74,7 +74,7 @@ namespace app
       {
          for (int x = 0; x < cols; x++)
          {
-            if ((x + y) % 2)
+            if ((x + y) % tok::theme_checkerboard_backdrop_period)
                continue;
             const ImVec2 tl(origin.x + x * cell, origin.y + y * cell);
             const ImVec2 cbr(std::min(br.x, tl.x + cell), std::min(br.y, tl.y + cell));
@@ -157,7 +157,7 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_Button, accent);
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                              ImVec4(std::min(accent.x * tok::theme_push_primary_button_style_ratio, 1.0f), std::min(accent.y * tok::theme_push_primary_button_style_ratio, 1.0f),
-                                    std::min(accent.z * 1.1f, 1.0f), 1.0f));
+                                    std::min(accent.z * tok::theme_push_primary_button_style_ratio, 1.0f), 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive,
                              ImVec4(accent.x * tok::theme_primary_button_style_y, accent.y * tok::theme_primary_button_style_y, accent.z * tok::theme_primary_button_style_y, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::ink_white));
@@ -233,7 +233,7 @@ namespace app
       // rasterized at all - a transparent 1px border still antialiases against
       // the rounded corner and was itself the corner-bleed users saw.
       ImGui::PushStyleColor(ImGuiCol_Border, tok::BaseV4(tok::col::ink_black, 0.0f));
-      ImGui::PushStyleColor(ImGuiCol_BorderShadow, tok::V4(tok::theme_border_shadow_shade, isLight ? 0.06f : tok::theme_push_elevated_panel_style_col_2_alpha));
+      ImGui::PushStyleColor(ImGuiCol_BorderShadow, tok::V4(tok::theme_border_shadow_shade, isLight ? tok::theme_push_elevated_panel_style_border_shadow_shade_alpha : tok::theme_push_elevated_panel_style_col_2_alpha));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
       // Top-level floating windows (Settings, Formula/Field-*-editor) use the

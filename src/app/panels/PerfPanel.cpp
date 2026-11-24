@@ -1047,7 +1047,7 @@ namespace app
          float normX = kpX.valueToPos ? kpX.valueToPos(valX, minX, maxX) : ((maxX > minX) ? std::clamp((valX - minX) / (maxX - minX), 0.0f, 1.0f) : 0.0f);
          float normY = kpY.valueToPos ? kpY.valueToPos(valY, minY, maxY) : ((maxY > minY) ? std::clamp((valY - minY) / (maxY - minY), 0.0f, 1.0f) : 0.0f);
          ImVec2 orbPos(origin.x + normX * padSize, origin.y + (1.0f - normY) * padSize);
-         dl->AddCircleFilled(orbPos, tok::perf_element_r, (themeTint & 0x00FFFFFF) | 0x33000000);  // ui-audit-ok: channel mask / bit packing, not a colour value
+         dl->AddCircleFilled(orbPos, tok::perf_element_r, (themeTint & 0x00FFFFFF) | tok::perf_element_alpha);  // ui-audit-ok: channel mask / bit packing, not a colour value
          dl->AddCircleFilled(orbPos, tok::perf_dot_r_lg, themeTint);
       }
       else if (elem.kind == 5) // Momentary Trigger / Bang (1x1)
@@ -1178,7 +1178,7 @@ namespace app
          }
          else
          {
-            dl->AddCircleFilled(center, r * tok::perf_dot_r_sm, (themeTint & 0x00FFFFFF) | 0x88000000, tok::perf_element_segments);  // ui-audit-ok: channel mask / bit packing, not a colour value
+            dl->AddCircleFilled(center, r * tok::perf_dot_r_sm, (themeTint & 0x00FFFFFF) | tok::perf_dot_alpha, tok::perf_element_segments);  // ui-audit-ok: channel mask / bit packing, not a colour value
          }
          if (hovered)
             dl->AddCircle(center, r + tok::space_0_5, wellCol(tok::perf_element_well_col_alpha_md), tok::perf_element_segments, tok::perf_element_stroke);
@@ -2280,7 +2280,7 @@ namespace app
       if (gPerfEditMode)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         ImU32 gridCol = isLight ? tok::Base(tok::col::surface_hi, 80) : tok::Base(tok::col::edge_lo, 80);
+         ImU32 gridCol = isLight ? tok::Base(tok::col::surface_hi, tok::perf_panel_content_surface_hi_alpha) : tok::Base(tok::col::edge_lo, tok::perf_panel_content_edge_lo_alpha);
          float gridMaxX = std::max(maxElemX + tok::perf_grid_max_x_min, ImGui::GetWindowWidth());
          float gridMaxY = std::max(maxElemY + tok::perf_grid_max_x_min, ImGui::GetWindowHeight());
          int numCols = (int)std::ceil(gridMaxX / (cellSize + gap)) + 1;

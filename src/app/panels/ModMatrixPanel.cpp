@@ -367,7 +367,7 @@ namespace app
             // rather than each column sized to its own content, so the
             // table reads as a symmetrical grid instead of a ragged one.
             const bool vertical = gModMatrixDock == 1 || gModMatrixDock == 2;
-            const float wCol = vertical ? 57.0f : 130.0f; // vertical is 130 * 0.6 - 40% narrower
+            const float wCol = vertical ? tok::mod_matrix_w_col : tok::mod_matrix_w_col_lg; // vertical is 130 * 0.6 - 40% narrower
             const float wCurve = vertical ? 42.0f : 50.0f;
 
             ImGui::TableSetupScrollFreeze(0, 1);
@@ -513,9 +513,9 @@ namespace app
                   // floors, 0% is a real and common answer ("this key has no data of its own"),
                   // and a confident-looking green 0% is exactly the misread this column is for.
                   const float t = std::clamp(conf, 0.0f, 1.0f);
-                  const ImU32 col = IM_COL32((int)std::round(148.0f + (34.0f - 148.0f) * t),
-                                             (int)std::round(163.0f + (197.0f - 163.0f) * t),
-                                             (int)std::round(184.0f + (94.0f - 184.0f) * t), tok::mod_matrix_idle_col_alpha);
+                  const ImU32 col = IM_COL32((int)std::round(tok::mod_matrix_table_shade_sm + (tok::mod_matrix_table_shade_xxs - tok::mod_matrix_table_shade_sm) * t),
+                                             (int)std::round(tok::mod_matrix_table_shade_md + (tok::mod_matrix_table_shade_xl - tok::mod_matrix_table_shade_md) * t),
+                                             (int)std::round(tok::mod_matrix_table_shade_lg + (tok::mod_matrix_table_shade_xs - tok::mod_matrix_table_shade_lg) * t), tok::mod_matrix_idle_col_alpha);
                   ImGui::PushStyleColor(ImGuiCol_Text, col);
                   ImGui::Text("%s", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
                   ImGui::PopStyleColor();
@@ -628,7 +628,7 @@ namespace app
                   const ImU32 idleCol = IM_COL32(
                      (int)((disabled4.x * tok::mod_matrix_table_ratio + text4.x * tok::mod_matrix_idle_col_shade_sm) * tok::mod_matrix_idle_col_shade_lg),
                      (int)((disabled4.y * tok::mod_matrix_table_ratio + text4.y * tok::mod_matrix_idle_col_shade_sm) * tok::mod_matrix_idle_col_shade_lg),
-                     (int)((disabled4.z * 0.6f + text4.z * 0.4f) * 255.0f),
+                     (int)((disabled4.z * tok::mod_matrix_table_ratio + text4.z * tok::mod_matrix_idle_col_shade) * 255.0f),
                      tok::mod_matrix_idle_col_alpha);
                   const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover) : idleCol;
                   glyph::DrawX(dl, center, iconSize, col);

@@ -231,7 +231,7 @@ void DrawMenuBar(FrameCtx& fc)
             const bool hov = ImGui::IsItemHovered();
             if (const ImTextureID tex = BrandLogoTexture())
                Thumb::AddRounded(ImGui::GetWindowDrawList(), tex, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
-                  ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(tok::V4(tok::stage_menu_bar_tex_shade, hov ? 1.0f : 0.92f)), 5.0f);
+                  ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(tok::V4(tok::stage_menu_bar_tex_shade, hov ? 1.0f : tok::stage_menu_bar_tex_shade_alpha)), 5.0f);
             if (hov)
                HelpTip("%s", T("About Infinite"));
             ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_2, p0.y));

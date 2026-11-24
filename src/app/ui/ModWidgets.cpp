@@ -433,7 +433,7 @@ namespace app
          // FrameBg a few lines down, not the knob's bright ring - see the
          // modulated/expression branches above for why.
          const ImU32 activeCol = recording ? (isLight ? tok::Base(tok::col::surface_hi_alt) : tok::Base(tok::col::state_err_deep_muted_lo))
-                                            : tok::Base(tok::col::accent_pale_muted_warm, 235);
+                                            : tok::Base(tok::col::accent_pale_muted_warm, tok::mod_slider_accent_pale_muted_warm_alpha);
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
@@ -496,7 +496,7 @@ namespace app
          // FrameBg a few lines down, not the knob's bright ring - see the
          // modulated/expression branches above for why.
          const ImU32 activeCol = recording ? (isLight ? tok::Base(tok::col::surface_hi_alt) : tok::Base(tok::col::state_err_deep_muted_lo))
-                                            : tok::Base(tok::col::accent_pale_muted_warm, 235);
+                                            : tok::Base(tok::col::accent_pale_muted_warm, tok::mod_slider_accent_pale_muted_warm_alpha);
          // A finished, looping recording is locked against direct grabs, the
          // same way modulated/expression params are - only Shift (re-record
          // via a session) or an explicit "Record Again" arm may drive it
@@ -780,7 +780,7 @@ namespace app
       ~FadeIfDisabled()
       {
          const float a = ImGui::GetStyle().Alpha;
-         if (a >= 0.999f)
+         if (a >= tok::mod_fade_if_disabled_limit)
             return;
          for (int i = vtxStart; i < dl->VtxBuffer.Size; i++)
          {
@@ -883,7 +883,7 @@ namespace app
          dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::surface_hi), 0, tok::mod_knob_float_stroke);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
-            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
+            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | tok::mod_range_col_alpha;
             dl->PathArcTo(center, radius + tok::mod_arc_r, std::min(angleLo, angleHi), std::max(angleLo, angleHi), tok::mod_knob_float_segments);
             dl->PathStroke(rangeCol, 0, tok::mod_path_stroke);
          }
@@ -914,7 +914,7 @@ namespace app
          dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo), 0, tok::mod_knob_float_stroke);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
-            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
+            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | tok::mod_range_col_alpha_lg;
             dl->PathArcTo(center, radius + tok::mod_arc_r, std::min(angleLo, angleHi), std::max(angleLo, angleHi), tok::mod_knob_float_segments);
             dl->PathStroke(rangeCol, 0, tok::mod_path_stroke);
          }
@@ -1073,7 +1073,7 @@ namespace app
          dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::surface_hi), 0, tok::mod_bipolar_knob_float_stroke);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
-            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
+            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | tok::mod_range_col_alpha;
             dl->PathArcTo(center, radius + tok::mod_arc_r, std::min(angleLo, angleHi), std::max(angleLo, angleHi), tok::mod_bipolar_knob_float_segments);
             dl->PathStroke(rangeCol, 0, tok::mod_path_stroke);
          }
@@ -1113,7 +1113,7 @@ namespace app
          dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo), 0, tok::mod_bipolar_knob_float_stroke);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
-            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
+            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | tok::mod_range_col_alpha_lg;
             dl->PathArcTo(center, radius + tok::mod_arc_r, std::min(angleLo, angleHi), std::max(angleLo, angleHi), tok::mod_bipolar_knob_float_segments);
             dl->PathStroke(rangeCol, 0, tok::mod_path_stroke);
          }
@@ -1475,7 +1475,7 @@ namespace app
          const bool hasPlayback = GestureRecorder::Instance().Playbacks().count(GestureRecorder::Key(nodeIndex, paramIndex)) > 0;
          const bool locked = hasPlayback && !ImGui::GetIO().KeyShift && !GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex);
          float shown = *value;
-         const bool widgetChanged = DrawWidget(&shown, recording ? tok::Role(tok::col::state_err) : tok::Role(tok::col::accent_pale_muted_warm, 235),
+         const bool widgetChanged = DrawWidget(&shown, recording ? tok::Role(tok::col::state_err) : tok::Role(tok::col::accent_pale_muted_warm, tok::mod_knob_accent_pale_muted_warm_alpha),
                               /*readOnly=*/false, /*hasRange=*/false, 0.0f, 0.0f, /*activeTint=*/recording);
          if (!locked)
          {

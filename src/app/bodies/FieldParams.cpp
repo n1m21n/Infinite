@@ -54,8 +54,8 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_path_line_to_y));
             }
             const ImU32 strokeCol = isLight
-               ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
-               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, 46) : tok::Role(tok::col::accent_alt, 245));
+               ? (pass == 0 ? tok::Base(tok::col::accent, tok::field_params_wavetable_scope_accent_alpha) : tok::Base(tok::col::accent))
+               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, tok::field_params_wavetable_scope_accent_pale_muted_warm_alpha) : tok::Role(tok::col::accent_alt, tok::field_params_wavetable_scope_accent_alt_alpha));
             dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_path_stroke_lg : tok::field_params_path_stroke_sm);
          }
       }
@@ -112,8 +112,8 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_path_line_to_y));
             }
             const ImU32 strokeCol = isLight
-               ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
-               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, 46) : tok::Role(tok::col::accent_alt, 245));
+               ? (pass == 0 ? tok::Base(tok::col::accent, tok::field_params_sample_scope_accent_alpha) : tok::Base(tok::col::accent))
+               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, tok::field_params_sample_scope_accent_pale_muted_warm_alpha) : tok::Role(tok::col::accent_alt, tok::field_params_sample_scope_accent_alt_alpha));
             dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_path_stroke_lg : tok::field_params_path_stroke_sm);
          }
       }
@@ -153,8 +153,8 @@ namespace app
             return br.y - t * h;
          };
          const bool isLight = IsThemeLight();
-         const ImU32 fillCol = isLight ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent_pale_muted_warm, 46);
-         const ImU32 strokeCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
+         const ImU32 fillCol = isLight ? tok::Base(tok::col::accent, tok::field_params_spectral_spectrum_accent_alpha) : tok::Base(tok::col::accent_pale_muted_warm, tok::field_params_spectral_spectrum_accent_pale_muted_warm_alpha);
+         const ImU32 strokeCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::field_params_spectral_spectrum_accent_alt_alpha);
          const float bw = w / (float)kB;
          for (int i = 0; i < kB; i++)
             dl->AddRectFilled(ImVec2(origin.x + i * bw, yFor(in[i])), ImVec2(origin.x + (i + 1) * bw, br.y), fillCol);
@@ -216,8 +216,8 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_path_line_to_y));
             }
             const ImU32 strokeCol = isLight
-               ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
-               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, 46) : tok::Role(tok::col::accent_alt, 245));
+               ? (pass == 0 ? tok::Base(tok::col::accent, tok::field_params_synth_scope_accent_alpha) : tok::Base(tok::col::accent))
+               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, tok::field_params_synth_scope_accent_pale_muted_warm_alpha) : tok::Role(tok::col::accent_alt, tok::field_params_synth_scope_accent_alt_alpha));
             dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_path_stroke_lg : tok::field_params_path_stroke_sm);
          }
       }
@@ -285,7 +285,7 @@ namespace app
             const float x = origin.x + (float)((r.beat - startBeat) / kWindowBeats) * w;
             const float y = br.y - barH - ((r.note - lo + 1.0f) / (hi - lo + tok::field_params_notes_roll_bar_h)) * (h - barH);
             const float v = std::max(0.15f, std::min(1.0f, r.vel));
-            const ImU32 col = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
+            const ImU32 col = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::field_params_notes_roll_accent_alt_alpha);
             ImVec4 c = ImGui::ColorConvertU32ToFloat4(col);
             c.w *= v;
             dl->AddRectFilled(ImVec2(x, y), ImVec2(x + barW, y + barH), ImGui::ColorConvertFloat4ToU32(c), 1.0f);

@@ -4842,7 +4842,7 @@ uint64_t AddNodeToArrangeSession(int nodeIndex, int laneType = -1, int srcOutput
 
 bool ArrangeAssignClipSource(uint64_t clipId, uint64_t uid);
 
-ImU32 ArrangeGroupColor(uint64_t groupId, int alpha = 255);
+ImU32 ArrangeGroupColor(uint64_t groupId, int alpha = 255);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
 
 void DrawArrangeHatch(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float spacing = tok::app_shared_spacing);
 

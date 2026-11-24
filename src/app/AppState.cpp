@@ -861,7 +861,7 @@ bool gHeadlessNeedProbe = false;
  // 0=TL, 1=TR, 2=BL, 3=BR
    float gMinimapSize = tok::app_state_minimap_size;
 
-   float gMinimapOpacity = 0.85f;
+   float gMinimapOpacity = tok::app_state_minimap_opacity;
 
    View3DPrefs gView3DPrefs;
 

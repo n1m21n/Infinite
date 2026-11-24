@@ -989,7 +989,7 @@ namespace
          DrawBox(p, h, b, changed);
       for (const Field::BoxWire& w : p.graph.wires)
       {
-         const ImU32 col = KindCol(w.kind, 0.9f);
+         const ImU32 col = KindCol(w.kind, tok::field_patcher_canvas_kind_col_alpha);
          Wire::Draw(w.id, OutPinId(w.srcBoxId, w.srcPinIdx), InPinId(w.dstBoxId, w.dstPinIdx), ImGui::ColorConvertU32ToFloat4(col));
          if (w.kind == Field::ValueKind::Pulse)
             ed::Flow(w.id);

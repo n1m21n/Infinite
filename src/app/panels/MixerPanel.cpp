@@ -827,7 +827,7 @@ namespace app
          dl->AddCircleFilled(c, R, DeskParts::Role(tok::desk_knurl), tok::mixer_dot_segments_lg);                                   // skirt
          for (int i = 0; i < 24; i++)                                               // knurl
          {
-            const float a = (float)i / 24.0f * 2.0f * IM_PI;
+            const float a = (float)i / tok::mixer_a_ratio * tok::mixer_pot_scale * IM_PI;
             dl->AddLine(ImVec2(c.x + cosf(a) * (R - tok::mixer_pot_inset_lg), c.y + sinf(a) * (R - tok::mixer_pot_inset_lg)), ImVec2(c.x + cosf(a) * (R - tok::mixer_pot_inset_sm), c.y + sinf(a) * (R - tok::mixer_pot_inset_sm)),
                         Hi(hovered || active ? tok::mixer_pot_hi_alpha_lg : tok::mixer_pot_hi_alpha_sm), tok::mixer_line_stroke_sm);
          }
@@ -1139,7 +1139,7 @@ namespace app
                   snprintf(txt, sizeof(txt), "-inf");
                else
                   snprintf(txt, sizeof(txt), "%s", UiFmt::F1(vals[i]).c);
-               const float colX = dp.x + (i % 2) * (cw * 0.5f);
+               const float colX = dp.x + (i % tok::mixer_col_x_period) * (cw * 0.5f);
                const float ry = dp.y + (i / 2) * rowH + (rowH - fs) * 0.5f;
                const bool over = i == 0 && vals[0] > -1.0f; // above -1 dBTP: likely to clip once encoded
                dl->AddText(ImGui::GetFont(), fs, ImVec2(colX + tok::space_0_75, ry), Hi(tok::mixer_master_hi_alpha_lg), tags[i]);

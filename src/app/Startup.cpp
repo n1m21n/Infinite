@@ -3420,8 +3420,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          particles->turbulenceScale = 0.8f;
          particles->startSize = 1.0f;
          particles->endSize = 1.0f; // constant - reads as floating cubes, not dying particles
-         particles->startColor[0] = 1.0f; particles->startColor[1] = 0.55f; particles->startColor[2] = 0.25f;
-         particles->endColor[0] = 0.25f; particles->endColor[1] = 0.55f; particles->endColor[2] = 1.0f;
+         particles->startColor[0] = 1.0f; particles->startColor[1] = 0.55f; particles->startColor[2] = 0.25f;  // ui-audit-ok: demo patch data (node param values the patch saves)
+         particles->endColor[0] = 0.25f; particles->endColor[1] = 0.55f; particles->endColor[2] = 1.0f;  // ui-audit-ok: demo patch data (node param values the patch saves)
          particles->seed = 4.0f;
 
          auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[3].node.get());
@@ -3433,7 +3433,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          inst->alignToNormal = true; // orients each cube along its drift direction
          inst->metallic = 0.35f;
          inst->roughness = 0.35f;
-         inst->emissionColor[0] = 1.0f; inst->emissionColor[1] = 0.85f; inst->emissionColor[2] = 0.6f;
+         inst->emissionColor[0] = 1.0f; inst->emissionColor[1] = 0.85f; inst->emissionColor[2] = 0.6f;  // ui-audit-ok: demo patch data (node param values the patch saves)
          inst->emission = 0.02f; // let lighting and bloom's own threshold define the highlights,
                                   // not a flat self-glow blowing out the whole surface
          inst->seed = 9.0f;
@@ -3444,12 +3444,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
          auto* keyLight = static_cast<LightNode*>(gNodes[5].node.get());
          keyLight->azimuth = 51.5662f; keyLight->elevation = 57.2958f;
-         keyLight->color[0] = 1.0f; keyLight->color[1] = 0.92f; keyLight->color[2] = 0.8f;
+         keyLight->color[0] = 1.0f; keyLight->color[1] = 0.92f; keyLight->color[2] = 0.8f;  // ui-audit-ok: demo patch data (node param values the patch saves)
          keyLight->intensity = 1.4f; keyLight->orbitPerBeat = 0.02f;
 
          auto* fillLight = static_cast<LightNode*>(gNodes[6].node.get());
          fillLight->azimuth = -126.0507f; fillLight->elevation = 28.6479f;
-         fillLight->color[0] = 0.55f; fillLight->color[1] = 0.7f; fillLight->color[2] = 1.0f;
+         fillLight->color[0] = 0.55f; fillLight->color[1] = 0.7f; fillLight->color[2] = 1.0f;  // ui-audit-ok: demo patch data (node param values the patch saves)
          fillLight->intensity = 0.6f; fillLight->orbitPerBeat = -0.015f; // drifts the opposite way for parallax
 
          auto* render = static_cast<Render3DNode*>(gNodes[7].node.get());
@@ -3461,12 +3461,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          render->samples = 2; render->tonemap = 1; render->exposure = 1.1f;
          // A dark teal, not pure black: the warm cube light/emission needs a cool
          // backdrop to read as graded contrast rather than glowing blobs on a void.
-         render->bgColor[0] = 0.03f; render->bgColor[1] = 0.045f; render->bgColor[2] = 0.07f;
+         render->bgColor[0] = 0.03f; render->bgColor[1] = 0.045f; render->bgColor[2] = 0.07f;  // ui-audit-ok: demo patch data (node param values the patch saves)
          render->envSky[0] = 0.14f; render->envSky[1] = 0.20f; render->envSky[2] = 0.32f;
          render->envHorizon[0] = 0.07f; render->envHorizon[1] = 0.09f; render->envHorizon[2] = 0.13f;
          render->envGround[0] = 0.02f; render->envGround[1] = 0.025f; render->envGround[2] = 0.035f;
          render->envIntensity = 0.9f;
-         render->ambientColor[0] = 0.10f; render->ambientColor[1] = 0.16f; render->ambientColor[2] = 0.26f;
+         render->ambientColor[0] = 0.10f; render->ambientColor[1] = 0.16f; render->ambientColor[2] = 0.26f;  // ui-audit-ok: demo patch data (node param values the patch saves)
          render->rimIntensity = 0.5f;
          render->shadowsEnabled = true;
          render->shadowQuality = 1;
@@ -3733,7 +3733,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          shape->shapeType = 6;
          shape->sides = 7;
          shape->size = 0.36f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
-         shape->fillColor[0] = 1.0f; shape->fillColor[1] = 0.42f; shape->fillColor[2] = 0.2f;
+         shape->fillColor[0] = 1.0f; shape->fillColor[1] = 0.42f; shape->fillColor[2] = 0.2f;  // ui-audit-ok: demo patch data (node param values the patch saves)
          auto* txt = static_cast<TextNode*>(gNodes[2].node.get());
          txt->text = "INFINITE";
          txt->fontSize = 150.0f;   // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
