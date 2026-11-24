@@ -225,20 +225,20 @@ void DrawLinks(FrameCtx& fc)
                   c = CategoryColors::ColorFor("Prediction");
                const ImU32 col = ImColor(c.r, c.g, c.b, 0.8f);
                const ImVec2 a = from->second, b = to->second;
-               const float dx = std::max(40.0f, std::fabs(b.x - a.x) * 0.5f);
+               const float dx = std::max(tok::stage_links_bound, std::fabs(b.x - a.x) * 0.5f);
                const ImVec2 c1(a.x + dx, a.y), c2(b.x - dx, b.y);
                ImDrawList* ddl = ImGui::GetWindowDrawList();
                // Dashes by arc length, so dash size does not stretch with the cable.
                constexpr int kSamples = 240;
-               constexpr float kDash = 6.0f, kGap = 5.0f;
+               constexpr float kDash = tok::stage_links_dash, kGap = tok::space_1_25;
                ImVec2 prev = a;
                float acc = 0.0f;   // distance along the cable since the last phase flip
                bool on = true;
                for (int i = 1; i <= kSamples; i++)
                {
                   const float t = (float)i / kSamples, u = 1.0f - t;
-                  const ImVec2 pt(u * u * u * a.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * b.x,
-                                  u * u * u * a.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * b.y);
+                  const ImVec2 pt(u * u * u * a.x + tok::stage_links_ratio * u * u * t * c1.x + tok::stage_links_ratio * u * t * t * c2.x + t * t * t * b.x,
+                                  u * u * u * a.y + tok::stage_links_ratio * u * u * t * c1.y + tok::stage_links_ratio * u * t * t * c2.y + t * t * t * b.y);
                   float seg = std::hypot(pt.x - prev.x, pt.y - prev.y);
                   ImVec2 from = prev;
                   while (seg > 0.0f)
@@ -248,11 +248,11 @@ void DrawLinks(FrameCtx& fc)
                      const float f = step / seg;
                      const ImVec2 to(from.x + (pt.x - from.x) * f, from.y + (pt.y - from.y) * f);
                      if (on)
-                        ddl->AddLine(from, to, col, 2.0f);
+                        ddl->AddLine(from, to, col, tok::stage_links_stroke);
                      from = to;
                      seg -= step;
                      acc += step;
-                     if (acc >= (on ? kDash : kGap) - 1e-4f)
+                     if (acc >= (on ? kDash : kGap) - tok::stage_links_gap)
                      {
                         acc = 0.0f;
                         on = !on;
@@ -877,7 +877,7 @@ void DrawLinks(FrameCtx& fc)
             if (dirKey(dx, dy))
             {
                burstUndo();
-               gKbNudge = ((dx > 0.0f || dy < 0.0f) ? 10 : -10);
+               gKbNudge = ((dx > 0.0f || dy < 0.0f) ? tok::stage_links_assign : -10);
             }
          }
 

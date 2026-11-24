@@ -22,7 +22,7 @@ namespace
       if (eol == std::string::npos)
          return -1;
       const std::string num = text.substr(n, eol - n);
-      if (num.empty() || num.size() > 6 || !std::all_of(num.begin(), num.end(), [](char c) { return c >= '0' && c <= '9'; }))
+      if (num.empty() || num.size() > 6 || !std::all_of(num.begin(), num.end(), [](char c) { return c >= '0' && c <= '9'; }))  // ui-audit-ok: bounds sentinels and header parsing, patch data
          return -1;
       if (bodyAt != nullptr)
          *bodyAt = eol + 1;
@@ -115,7 +115,7 @@ NodePasteResult NodeClipboardPaste(const std::string& text, const ImVec2& at)
    const bool laidOut = PatchLayout::Apply(data);
 
    // Centre of the copied nodes, to land them on `at`.
-   float minX = 1e30f, minY = 1e30f, maxX = -1e30f, maxY = -1e30f;
+   float minX = 1e30f, minY = 1e30f, maxX = -1e30f, maxY = -1e30f;  // ui-audit-ok: bounds sentinels and header parsing, patch data
    for (const Patch::NodeRecord& rec : data.nodes)
    {
       minX = std::min(minX, rec.x); maxX = std::max(maxX, rec.x);
@@ -239,7 +239,7 @@ NodePasteResult NodeClipboardPaste(const std::string& text, const ImVec2& at)
    for (const Patch::GestureRecord& g : data.gestures)
    {
       GraphNode* dst = resolve(g.dstIndex);
-      if (dst == nullptr || g.samples.size() < 2)
+      if (dst == nullptr || g.samples.size() < 2)  // ui-audit-ok: bounds sentinels and header parsing, patch data
          continue;
       GestureRecorder::Playback pb;
       pb.speed = g.speed;

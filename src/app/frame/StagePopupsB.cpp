@@ -171,7 +171,7 @@ void DrawPopupsB(FrameCtx& fc)
             ImGui::PushStyleColor(ImGuiCol_Text, textCol);
             ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::ink_black, 0.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * commentZoom, 8.0f * commentZoom));
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::stage_popups_b_ratio * commentZoom, tok::stage_popups_b_ratio * commentZoom));
             // The one scrollbar look, inked black on a light note and white on a dark one (4 colours + 1 var,
             // counted in the pops below).
             Scrollbar::Push(isLight, 6.0f * commentZoom);
@@ -252,12 +252,12 @@ void DrawPopupsB(FrameCtx& fc)
          MenuParts::EndPopup();
       }
 
-      ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(320, 440));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x, 0), ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_2, tok::stage_popups_b_set_next_window_size_constraints_y));
       if (searchPopupCentered)
       {
          const ImVec2 center = ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f,
                                       gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
-         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(tok::stage_popups_b_set_next_window_pos_x, tok::stage_popups_b_set_next_window_pos_y));
       }
       if (MenuParts::BeginPopup("search"))
       {
@@ -328,7 +328,7 @@ void DrawPopupsB(FrameCtx& fc)
             // keeps the same height and category-first layout as the normal node picker.
             if (!gLinkDragSuggestions.empty())
             {
-               constexpr size_t kMaxInlineSuggestions = 8;
+               constexpr size_t kMaxInlineSuggestions = 8;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
                const size_t nShow = std::min(gLinkDragSuggestions.size(), kMaxInlineSuggestions);
                ImGui::TextDisabled("%s", T("Suggested"));
                for (size_t i = 0; i < nShow; ++i)
@@ -373,7 +373,7 @@ void DrawPopupsB(FrameCtx& fc)
                      return ok;
                   });
                }
-               ImGui::SetNextWindowSizeConstraints(ImVec2(180, 0), ImVec2(320, 440));
+               ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_3, 0), ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_2, tok::stage_popups_b_set_next_window_size_constraints_y));
                if (!anyCompatible)
                   ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
                const bool openCat = MenuParts::SubMenu(DisplayName(category).c_str());
@@ -512,17 +512,17 @@ void DrawPopupsB(FrameCtx& fc)
       // floor - a short list like the filter-mode options ("off", "lp 12",
       // ...) doesn't need anywhere near that width, and a fixed floor just
       // stretches the pills into a wide, empty-feeling bar.
-      const float dropdownTextPadX = 8.0f;
+      const float dropdownTextPadX = tok::space_2;
       float dropdownMaxTextW = 0.0f;
       for (const std::string& opt : gDropdown.options)
          dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(opt.c_str()).x);
       for (const std::string& cat : gDropdown.categories)
          dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(cat.c_str()).x);
-      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * 2.0f
-                                                 + dropdownTextPadX * 2.0f
+      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * tok::stage_popups_b_ratio_2
+                                                 + dropdownTextPadX * tok::stage_popups_b_ratio_2
                                                  + ImGui::GetStyle().ScrollbarSize,
-                                              160.0f, 280.0f);
-      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(280.0f, ImMin(480.0f, ImGui::GetMainViewport()->Size.y - 40.0f)));
+                                              tok::stage_popups_b_bound, tok::stage_popups_b_bound_2);
+      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_4, ImMin(tok::stage_popups_b_bound_3, ImGui::GetMainViewport()->Size.y - tok::stage_popups_b_gap)));
       const bool ddOpen = MenuParts::BeginPopup("##dropdown");
       if (ddOpen)
       {
@@ -596,7 +596,7 @@ void DrawPopupsB(FrameCtx& fc)
       if (MenuParts::BeginPopup("##fielddevicesave"))
       {
          ImGui::TextDisabled("%s", T("Save device as:"));
-         ImGui::SetNextItemWidth(220.0f);
+         ImGui::SetNextItemWidth(tok::stage_popups_b_set_next_item_width_w);
          bool enterPressed = FieldWell::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
                                                   sizeof(gFieldDeviceSave.nameBuf),
                                                   ImGuiInputTextFlags_EnterReturnsTrue);
@@ -628,7 +628,7 @@ void DrawPopupsB(FrameCtx& fc)
             : ed::CanvasToScreen(gAudioDropPicker.canvasPos);
          // With the file already on the canvas at the drop point, the list opens to its left, not over it.
          if (!gAudioDropPicker.autoNodes.empty())
-            ImGui::SetNextWindowPos(ImVec2(popupPos.x - 12.0f, popupPos.y), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+            ImGui::SetNextWindowPos(ImVec2(popupPos.x - tok::space_3, popupPos.y), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
          else
             ImGui::SetNextWindowPos(popupPos, ImGuiCond_Always);
       }
@@ -639,7 +639,7 @@ void DrawPopupsB(FrameCtx& fc)
             : ed::CanvasToScreen(gAudioDropPicker.canvasPos);
          ImGui::SetNextWindowPos(popupPos, ImGuiCond_Appearing);
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(360, 480));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_5, 0), ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_6, tok::stage_popups_b_set_next_window_size_constraints_y_2));
       if (MenuParts::BeginPopup("##audiodroppicker"))
       {
          if (gAudioDropPicker.paths.empty())
@@ -771,17 +771,17 @@ void DrawPopupsB(FrameCtx& fc)
             // Scales with the canvas zoom so it stays proportionate to the cable when zoomed out.
             const float zoom = ed::CanvasToScreen(ImVec2(1.0f, 0.0f)).x - ed::CanvasToScreen(ImVec2(0.0f, 0.0f)).x;
             const float k = std::min(1.0f, std::max(0.4f, zoom));
-            const float r = 11.0f * k;
+            const float r = tok::stage_popups_b_r_ratio * k;
             const ImVec2 m = ImGui::GetMousePos();
-            const bool over = (m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= (r + 2.0f) * (r + 2.0f);
+            const bool over = (m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= (r + tok::space_0_5) * (r + tok::space_0_5);
             // Stays while the cursor is on the button (or just beside it); gone ~0.1 s after the cursor leaves both.
-            if ((m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= 20.0f * 20.0f)
+            if ((m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= tok::stage_popups_b_ratio_3 * 20.0f)
                sTrashSeen = now;
             ImDrawList* dl = ImGui::GetForegroundDrawList();
             const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
             const ImU32 fg = ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.95f));
-            dl->AddCircleFilled(c, r, ImGui::GetColorU32(over ? ImGuiCol_ButtonHovered : ImGuiCol_PopupBg), 24);
-            dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_Border), 24, 1.0f);
+            dl->AddCircleFilled(c, r, ImGui::GetColorU32(over ? ImGuiCol_ButtonHovered : ImGuiCol_PopupBg), tok::stage_popups_b_segments);
+            dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_Border), tok::stage_popups_b_segments, 1.0f);
             glyph::Draw(dl, c, tok::icon_md * k, fg, IconsInfinite::Trash);
             if (over && ImGui::IsMouseClicked(0))
             {
@@ -875,7 +875,7 @@ void DrawPopupsB(FrameCtx& fc)
          if (const char* z = getenv("INFINITE_GALLERYZOOM"))
          {
             gKbSavedZoom = (float)atof(z);
-            gKbSavedScroll = ImVec2(-60.0f, -40.0f);
+            gKbSavedScroll = ImVec2(-tok::stage_popups_b_x, -tok::stage_popups_b_y);
             gKbViewRestore = true; // applied inside the editor scope next frame
          }
       }

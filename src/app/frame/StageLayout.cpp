@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/panels/CurveEditorPanel.h"
 #include "app/panels/FieldPatcherPanel.h"
@@ -93,7 +94,7 @@ void DrawLayout(FrameCtx& fc)
          liveCfg.NavigateButtonIndex = gPanWithLeft ? 0 : 1;
       }
 
-      kNodePanelWidth = 360.0f;
+      kNodePanelWidth = tok::stage_layout_node_panel_width;
       PersistPanelLayoutIfChanged();
       const bool viewportPanelOpen = gViewportPanelOpen;
       viewportBottom = viewportPanelOpen && gViewportPanelDock == 0;
@@ -425,7 +426,7 @@ void DrawLayout(FrameCtx& fc)
          }
          fc.viewFillResume = ImGui::GetCursorPos();
          fc.viewFillMax = ImGui::GetCurrentWindow()->DC.CursorMaxPos;
-         ImGui::SetCursorPosY(fc.viewFillResume.y + ImGui::GetIO().DisplaySize.y + 4000.0f);
+         ImGui::SetCursorPosY(fc.viewFillResume.y + ImGui::GetIO().DisplaySize.y + tok::stage_layout_gap);
       }
       if (viewportLeft)
       {

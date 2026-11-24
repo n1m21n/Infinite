@@ -91,9 +91,9 @@ void DrawPopupsA(FrameCtx& fc)
          view2DAddFrom = gn.index;
    };
 
-      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(320.0f, ImMax(120.0f, ImGui::GetMainViewport()->Size.y - 40.0f))); // popups: capped width, scroll past the window
+      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_set_next_window_size_constraints_x, ImMax(tok::stage_popups_a_bound, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_gap))); // popups: capped width, scroll past the window
       if (gShotNodeMenu)  // review shots: a fixed spot, not wherever the mouse happens to be
-         ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->Pos.x + 120.0f, ImGui::GetMainViewport()->Pos.y + 120.0f));
+         ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->Pos.x + tok::stage_popups_a_gap_2, ImGui::GetMainViewport()->Pos.y + tok::stage_popups_a_gap_2));
       if (MenuParts::BeginPopup("##nodecontext"))
       {
          GraphNode* gn = FindNodeByIndex(gContextMenuNodeIndex);
@@ -234,7 +234,7 @@ void DrawPopupsA(FrameCtx& fc)
                         const ImVec2 gp = ed::GetNodePosition(ownerGn->NodeId());
                         const ImVec2 gs = ed::GetNodeSize(ownerGn->NodeId());
                         const ImVec2 mp = ed::GetNodePosition(gn->NodeId());
-                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + 40.0f));
+                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + tok::stage_popups_a_gap));
                      }
                   }
                }
@@ -461,7 +461,7 @@ void DrawPopupsA(FrameCtx& fc)
                         const ImVec2 gp = ed::GetNodePosition(ownerGn->NodeId());
                         const ImVec2 gs = ed::GetNodeSize(ownerGn->NodeId());
                         const ImVec2 mp = ed::GetNodePosition(gn->NodeId());
-                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + 40.0f));
+                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + tok::stage_popups_a_gap));
                      }
                   }
                }
@@ -503,7 +503,7 @@ void DrawPopupsA(FrameCtx& fc)
          ImGui::OpenPopup("##nodehelp");
          gOpenNodeHelpPopup = false;
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(280, 0), ImVec2(420, FLT_MAX));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_a_set_next_window_size_constraints_x_2, 0), ImVec2(tok::stage_popups_a_set_next_window_size_constraints_x_3, FLT_MAX));
       if (MenuParts::BeginPopup("##nodehelp"))
       {
          gNodeHelpShown = true;
@@ -521,7 +521,7 @@ void DrawPopupsA(FrameCtx& fc)
          {
             ImGui::TextUnformatted(NodeTitle(*gn).c_str());
             MenuParts::Separator();
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::stage_popups_a_gap_3);
             ImGui::TextWrapped("%s", HelpT(NodeHelpText(*gn)));
             ImGui::PopTextWrapPos();
          }
@@ -540,7 +540,7 @@ void DrawPopupsA(FrameCtx& fc)
          gModRangeTypedPendingInit = false;
          gModRangeTypedNoAutoSelect = false;
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(320.0f, ImMax(120.0f, ImGui::GetMainViewport()->Size.y - 40.0f))); // popups: capped width, scroll past the window
+      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_set_next_window_size_constraints_x, ImMax(tok::stage_popups_a_bound, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_gap))); // popups: capped width, scroll past the window
       const bool modbindOpen = MenuParts::BeginPopup("##modbind");
       if (modbindOpen)
       {
@@ -583,7 +583,7 @@ void DrawPopupsA(FrameCtx& fc)
          bool rangeChanged = false;
          auto drawRangeField = [&](int field, const char* dragId, const char* typedId,
                                    const char* dragFmt, float minV, float maxV, float& v,
-                                   float step = -1.0f, float width = 90.0f)
+                                   float step = -1.0f, float width = tok::stage_popups_a_width)
          {
             if (step < 0.0f)
                step = isInt ? 1.0f : (maxV - minV) * 0.01f;
@@ -939,7 +939,7 @@ void DrawPopupsA(FrameCtx& fc)
          const ImVec2 mp = ImGui::GetMousePos();
          const std::string dragDisplayName = (gSampleDragKind == LibraryDragKind::FieldPreset)
             ? gFieldDragPresetName : gSampleDragName;
-         ImGui::GetForegroundDrawList()->AddText(ImVec2(mp.x + 14.0f, mp.y + 14.0f),
+         ImGui::GetForegroundDrawList()->AddText(ImVec2(mp.x + tok::space_3_5, mp.y + tok::space_3_5),
                                                   tok::Role(tok::col::edge_hi), dragDisplayName.c_str());
 
          if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))

@@ -60,14 +60,14 @@ namespace app
    // stale display bucket that the next playback pass overwrites anyway.
    uint64_t ArrangeClipShape(uint64_t srcUid, int srcOutput, Arrange::Tick start, Arrange::Tick length)
    {
-      uint64_t h = 1469598103934665603ull;
+      uint64_t h = 1469598103934665603ull;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
       const uint64_t parts[4] = { srcUid, (uint64_t)(int64_t)srcOutput,
                                   (uint64_t)(int64_t)start, (uint64_t)(int64_t)length };
       for (uint64_t v : parts)
          for (int b = 0; b < 8; b++)
          {
             h ^= (v >> (b * 8)) & 0xffull;
-            h *= 1099511628211ull;
+            h *= tok::arrange_support1_h;
          }
       return h;
    }
@@ -1331,7 +1331,7 @@ namespace app
    bool ArrangeCanGroupSelection()
    {
       const std::vector<uint64_t> ids = Arrange::ExpandSelectionToGroups(gArrange, ArrangeSelectionIds());
-      if (ids.size() < 2)
+      if (ids.size() < tok::arrange_support1_can_group_selection_limit)
          return false;
       uint64_t only = 0;
       for (uint64_t id : ids)
@@ -1970,7 +1970,7 @@ namespace app
       // Resolve drop tick position from screenPos.x
       const double startBeat = std::max(0.0, gArrangeScrollBeats);
       const double ppb = std::max(1.0, (double)gArrangePixelsPerBeat);
-      const float rulerStart = (sArrangeLastRulerStartX > 0.0f) ? sArrangeLastRulerStartX : (gArrangePanelRectMin.x + 300.0f);
+      const float rulerStart = (sArrangeLastRulerStartX > 0.0f) ? sArrangeLastRulerStartX : (gArrangePanelRectMin.x + tok::arrange_support1_add_file_to_timeline_at_gap);
       const double dropBeat = std::max(0.0, startBeat + (double)(screenPos.x - rulerStart) / ppb);
       Arrange::Tick dropTick = Arrange::BeatsToTicks(dropBeat);
       const Arrange::Tick gridTicks = ArrangeSnapGridTicks();

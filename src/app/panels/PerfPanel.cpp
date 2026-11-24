@@ -39,15 +39,15 @@ namespace app
       switch (kind)
       {
          case 0: return ImVec2(1.0f, 1.0f); // Knob
-         case 1: return ImVec2(1.0f, 2.0f); // VFader
-         case 2: return ImVec2(2.0f, 1.0f); // HSlider
+         case 1: return ImVec2(1.0f, tok::perf_get_element_cell_span_y); // VFader
+         case 2: return ImVec2(tok::perf_get_element_cell_span_x, 1.0f); // HSlider
          case 3: return ImVec2(1.0f, 1.0f); // Toggle
-         case 4: return ImVec2(2.0f, 2.0f); // XYPad
+         case 4: return ImVec2(tok::perf_get_element_cell_span_x, tok::perf_get_element_cell_span_y); // XYPad
          case 5: return ImVec2(1.0f, 1.0f); // Trigger / Bang
          case 6: return ImVec2(1.0f, 1.0f); // Digital Number Box
-         case 7: return ImVec2(2.0f, 1.0f); // Radio Selector
+         case 7: return ImVec2(tok::perf_get_element_cell_span_x, 1.0f); // Radio Selector
          case 8: return ImVec2(1.0f, 1.0f); // Bipolar Pan Knob
-         case 9: return ImVec2(3.0f, 1.0f); // Step Gate Ribbon
+         case 9: return ImVec2(tok::perf_get_element_cell_span_x_2, 1.0f); // Step Gate Ribbon
          default: return ImVec2(1.0f, 1.0f);
       }
    }
@@ -138,7 +138,7 @@ namespace app
       if (dstNode != nullptr)
       {
          const CategoryColors::Color& c = CategoryColors::ColorFor(dstNode->category);
-         return IM_COL32((int)(c.r * 255.0f), (int)(c.g * 255.0f), (int)(c.b * 255.0f), 255);
+         return IM_COL32((int)(c.r * tok::perf_get_element_color_ratio), (int)(c.g * 255.0f), (int)(c.b * 255.0f), 255);
       }
       return isLight ? tok::Base(tok::col::surface_lo_2) : tok::Base(tok::col::text_secondary);
    }
@@ -362,7 +362,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       ImVec2 span = GetPerfElementCellSpan(elem.kind);
-      const float gap = 8.0f;
+      const float gap = tok::space_2;
       ImVec2 cellPos(gridOrigin.x + elem.cellX * (cellSize + gap) + gap * 0.5f,
                      gridOrigin.y + elem.cellY * (cellSize + gap) + gap * 0.5f);
       ImVec2 cardSize(span.x * cellSize + (span.x - 1.0f) * gap,
@@ -375,7 +375,7 @@ namespace app
       {
          ImVec2 m = ImGui::GetIO().MousePos;
          int rawSnapX = std::max(0, (int)std::round((m.x - gridOrigin.x - gap * 0.5f - cardSize.x * 0.5f) / (cellSize + gap)));
-         int rawSnapY = std::max(0, (int)std::round((m.y - gridOrigin.y - gap * 0.5f - 10.0f) / (cellSize + gap)));
+         int rawSnapY = std::max(0, (int)std::round((m.y - gridOrigin.y - gap * 0.5f - tok::perf_element_bias) / (cellSize + gap)));
 
          auto [adjX, adjY] = FindAdjustedNonOverlappingCell(elem.page, (int)elemIdx, rawSnapX, rawSnapY, (int)span.x, (int)span.y);
          snapX = adjX;
@@ -412,13 +412,13 @@ namespace app
 
       dl->AddRectFilled(cellPos, cardBR, cardBg, kCardR);
       if (gPerfEditMode)
-         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.22f)), kCardR, 0, 1.2f);
+         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.22f)), kCardR, 0, tok::perf_element_stroke);
       if (gPerfMidiLearnIdx == (int)elemIdx)
          StateRing::Draw(dl, cellPos, cardBR, StateRing::Kind::Learn, isLight, kCardR);
       else if (gPerfEditMode && gPerfSelection.count(elemIdx) > 0)
          StateRing::Draw(dl, cellPos, cardBR, StateRing::Kind::Select, isLight, kCardR);
       else
-         dl->AddRect(cellPos, cardBR, cardHair, kCardR, 0, 1.0f);
+         dl->AddRect(cellPos, cardBR, cardHair, kCardR, 0, tok::perf_element_stroke_2);
 
       // Title/Label Header
       std::string displayLabel = elem.label;
@@ -448,7 +448,7 @@ namespace app
       // Header background badge
       // No bar and no dot: a quiet caption, like the Library section headers.
       const float titleX = cellPos.x + tok::space_2;
-      ImVec2 titlePos(titleX, cellPos.y + 3.0f);
+      ImVec2 titlePos(titleX, cellPos.y + tok::space_0_75);
       ImU32 textCol = ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.65f));
 
       // In Edit Mode, full card invisible button handles right-click popup and dragging
@@ -501,7 +501,7 @@ namespace app
             gPerfDragIdx = -1;
          }
 
-         ImGui::SetNextWindowSizeConstraints(ImVec2(180.0f, 0.0f), ImVec2(240.0f, 480.0f));
+         ImGui::SetNextWindowSizeConstraints(ImVec2(tok::perf_element_set_next_window_size_constraints_x, 0.0f), ImVec2(tok::perf_element_set_next_window_size_constraints_x_2, tok::perf_element_set_next_window_size_constraints_y));
          if (MenuParts::BeginContextItem("##elemcontext", ImGuiPopupFlags_MouseButtonRight))
          {
             if (MenuParts::Item(L("Rename")))
@@ -727,8 +727,8 @@ namespace app
       // Inline renaming or title text
       if (gPerfRenamingElementIdx == (int)elemIdx)
       {
-         ImGui::SetCursorScreenPos(ImVec2(cellPos.x + 4.0f, cellPos.y + 1.0f));
-         ImGui::SetNextItemWidth(cardSize.x - 8.0f);
+         ImGui::SetCursorScreenPos(ImVec2(cellPos.x + tok::space_1, cellPos.y + 1.0f));
+         ImGui::SetNextItemWidth(cardSize.x - tok::space_2);
          UiInteract::FocusHere();
          if (FieldWell::InputText("##renamingelemfield", gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer),
                               ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll) ||
@@ -745,7 +745,7 @@ namespace app
       }
       else
       {
-         dl->PushClipRect(ImVec2(cellPos.x + 4.0f, cellPos.y), ImVec2(cardBR.x - 4.0f, cellPos.y + 18.0f), true);
+         dl->PushClipRect(ImVec2(cellPos.x + tok::space_1, cellPos.y), ImVec2(cardBR.x - tok::space_1, cellPos.y + tok::perf_element_gap), true);
          {
             UiType::Scope ts(UiType::Size::Caption, UiType::Weight::Semibold);
             dl->AddText(titlePos, textCol, displayLabel.c_str());
@@ -755,10 +755,10 @@ namespace app
 
       // Header double-click to rename & tooltip when label is truncated
       ImVec2 headerTL = cellPos;
-      ImVec2 headerBR(cardBR.x, cellPos.y + 18.0f);
+      ImVec2 headerBR(cardBR.x, cellPos.y + tok::perf_element_gap);
       if (ImGui::IsMouseHoveringRect(headerTL, headerBR))
       {
-         if (gPerfRenamingElementIdx != (int)elemIdx && ImGui::CalcTextSize(displayLabel.c_str()).x > (cardSize.x - 12.0f))
+         if (gPerfRenamingElementIdx != (int)elemIdx && ImGui::CalcTextSize(displayLabel.c_str()).x > (cardSize.x - tok::space_3))
             Tip::Show("%s", displayLabel.c_str());
          if (gPerfEditMode && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          {
@@ -826,9 +826,9 @@ namespace app
          auto [val, kp] = getParamRef(elem.dstIndex, elem.dstParam, elem.value);
          float minV = kp.minValue, maxV = kp.maxValue;
          if (minV >= maxV) { minV = 0.0f; maxV = 1.0f; }
-         float diameter = std::max(28.0f, std::min(cellSize * 0.52f, 44.0f));
+         float diameter = std::max(28.0f, std::min(cellSize * tok::perf_element_ratio, 44.0f));
          float centerX = cellPos.x + cardSize.x * 0.5f;
-         float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f) * 0.44f;
+         float centerY = cellPos.y + tok::perf_center_y_gap + (cardSize.y - tok::perf_element_gap_2) * tok::perf_center_y_ratio;
          ImGui::SetCursorScreenPos(ImVec2(centerX - diameter * 0.5f, centerY - diameter * 0.5f));
 
          FaderPosToValueFn p2v = kp.posToValue;
@@ -853,9 +853,9 @@ namespace app
          auto [val, kp] = getParamRef(elem.dstIndex, elem.dstParam, elem.value);
          float minV = kp.minValue, maxV = kp.maxValue;
          if (minV >= maxV) { minV = 0.0f; maxV = 1.0f; }
-         float faderH = cardSize.y - 30.0f;
+         float faderH = cardSize.y - tok::perf_fader_h_gap;
          float centerX = cellPos.x + cardSize.x * 0.5f;
-         ImGui::SetCursorScreenPos(ImVec2(centerX - 16.0f, cellPos.y + 22.0f));
+         ImGui::SetCursorScreenPos(ImVec2(centerX - tok::space_4, cellPos.y + tok::perf_element_gap_3));
 
          const bool isDb = (minV < 0.0f && maxV <= 12.0f && kp.posToValue == ConsoleFaderTaper::PosToValue);
          FaderPosToValueFn p2v = kp.posToValue;
@@ -881,8 +881,8 @@ namespace app
          auto [val, kp] = getParamRef(elem.dstIndex, elem.dstParam, elem.value);
          float minV = kp.minValue, maxV = kp.maxValue;
          if (minV >= maxV) { minV = 0.0f; maxV = 1.0f; }
-         float sliderW = cardSize.x - 18.0f;
-         ImGui::SetCursorScreenPos(ImVec2(cellPos.x + 9.0f, cellPos.y + 20.0f + (cardSize.y - 38.0f) * 0.5f));
+         float sliderW = cardSize.x - tok::perf_slider_w_gap;
+         ImGui::SetCursorScreenPos(ImVec2(cellPos.x + tok::perf_element_gap_4, cellPos.y + tok::perf_element_gap_2 + (cardSize.y - tok::perf_element_gap_5) * 0.5f));
 
          ImU32 fillCol = isModulated ? (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation)) : themeTint;
          float v = dragSeed(val);
@@ -892,12 +892,12 @@ namespace app
          // control's colour, tick marks above and below, and a rectangular cap with a centre line.
          auto toPos = [&](float x) { return v2p ? std::clamp(v2p(x, minV, maxV), 0.0f, 1.0f) : std::clamp((x - minV) / (maxV - minV), 0.0f, 1.0f); };
          const ImVec2 sTL = ImGui::GetCursorScreenPos();
-         const float sH = 30.0f;
+         const float sH = tok::perf_h;
          UiInteract::Hit("##hslider", ImVec2(sliderW, sH));
          const bool sActive = !isModulated && ImGui::IsItemActive();
          const bool sHover = ImGui::IsItemHovered();
          bool sliderMoved = false;
-         const float left = sTL.x + 10.0f, right = sTL.x + sliderW - 10.0f, cy = sTL.y + sH * 0.5f;
+         const float left = sTL.x + tok::space_2_5, right = sTL.x + sliderW - tok::space_2_5, cy = sTL.y + sH * 0.5f;
          if (sActive)
          {
             const float pos = std::clamp((ImGui::GetIO().MousePos.x - left) / (right - left), 0.0f, 1.0f);
@@ -908,17 +908,17 @@ namespace app
          const ImU32 tickCol = wellCol(0.2f);
          for (int i = 0; i <= 4; i++)
          {
-            const float x = left + (float)i * 0.25f * (right - left);
-            dl->AddLine(ImVec2(x, cy - 12.0f), ImVec2(x, cy - 9.0f), tickCol, 1.0f);
-            dl->AddLine(ImVec2(x, cy + 9.0f), ImVec2(x, cy + 12.0f), tickCol, 1.0f);
+            const float x = left + (float)i * tok::perf_x_ratio * (right - left);
+            dl->AddLine(ImVec2(x, cy - tok::space_3), ImVec2(x, cy - tok::perf_element_gap_4), tickCol, tok::perf_element_stroke_2);
+            dl->AddLine(ImVec2(x, cy + tok::perf_element_gap_4), ImVec2(x, cy + tok::space_3), tickCol, tok::perf_element_stroke_2);
          }
-         dl->AddRectFilled(ImVec2(left - 4.0f, cy - 3.0f), ImVec2(right + 4.0f, cy + 3.0f), wellCol(0.12f), 3.0f);
+         dl->AddRectFilled(ImVec2(left - tok::space_1, cy - tok::space_0_75), ImVec2(right + tok::space_1, cy + tok::space_0_75), wellCol(0.12f), tok::perf_element_radius);
          if (capX > left)
-            dl->AddRectFilled(ImVec2(left - 4.0f, cy - 2.0f), ImVec2(capX, cy + 2.0f), fillCol, tok::radius_cell);
-         const ImVec2 cTL(capX - 6.0f, cy - 9.0f), cBR(capX + 6.0f, cy + 9.0f);
-         dl->AddRectFilled(cTL, cBR, isLight ? ImGui::GetColorU32(ImVec4(1, 1, 1, 0.95f)) : wellCol(0.28f), 3.0f);
-         dl->AddRect(cTL, cBR, wellCol(sActive ? 0.5f : (sHover ? 0.3f : 0.15f)), 3.0f);
-         dl->AddLine(ImVec2(capX, cy - 7.0f), ImVec2(capX, cy + 7.0f), wellCol(0.8f), 1.6f);
+            dl->AddRectFilled(ImVec2(left - tok::space_1, cy - tok::space_0_5), ImVec2(capX, cy + tok::space_0_5), fillCol, tok::radius_cell);
+         const ImVec2 cTL(capX - tok::space_1_5, cy - tok::perf_element_gap_4), cBR(capX + tok::space_1_5, cy + tok::perf_element_gap_4);
+         dl->AddRectFilled(cTL, cBR, isLight ? ImGui::GetColorU32(ImVec4(1, 1, 1, 0.95f)) : wellCol(0.28f), tok::perf_element_radius);
+         dl->AddRect(cTL, cBR, wellCol(sActive ? 0.5f : (sHover ? tok::perf_element_assign : tok::perf_element_assign_2)), tok::perf_element_radius);
+         dl->AddLine(ImVec2(capX, cy - tok::perf_element_gap_6), ImVec2(capX, cy + tok::perf_element_gap_6), wellCol(0.8f), tok::perf_element_stroke_3);
          if (sHover || sActive)
          {
             char valBuf[48];
@@ -958,9 +958,9 @@ namespace app
          // clamped 28..44) rather than nearly filling the cell - the old
          // cardSize-18/-28 formula left almost no breathing room and read as
          // oversized next to every other control's cell padding.
-         float btnSize = std::max(28.0f, std::min(cellSize * 0.52f, 44.0f));
+         float btnSize = std::max(tok::perf_element_bound, std::min(cellSize * tok::perf_element_ratio, tok::perf_element_bound_2));
          float centerX = cellPos.x + (cardSize.x - btnSize) * 0.5f;
-         float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f - btnSize) * 0.5f;
+         float centerY = cellPos.y + tok::perf_center_y_gap + (cardSize.y - tok::perf_element_gap_2 - btnSize) * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(centerX, centerY));
 
          const bool toggleClicked = ActionButton::Draw(curVal ? L("ON") : L("OFF"), ImVec2(btnSize, btnSize),
@@ -993,7 +993,7 @@ namespace app
          auto [valY, kpY] = getParamRef(elem.dstIndex, p2, elem.value2);
 
          float padSize = std::min(cardSize.x - tok::perf_pad_inset_x, cardSize.y - tok::perf_pad_inset_y);
-         ImVec2 origin(cellPos.x + (cardSize.x - padSize) * 0.5f, cellPos.y + 22.0f);
+         ImVec2 origin(cellPos.x + (cardSize.x - padSize) * 0.5f, cellPos.y + tok::perf_element_gap_3);
          ImVec2 padBR(origin.x + padSize, origin.y + padSize);
 
          ImGui::SetCursorScreenPos(origin);
@@ -1041,20 +1041,20 @@ namespace app
          }
 
          dl->AddRectFilled(origin, padBR, wellCol(0.07f), tok::radius_control);
-         dl->AddLine(ImVec2(origin.x + padSize * 0.5f, origin.y + 4.0f), ImVec2(origin.x + padSize * 0.5f, padBR.y - 4.0f), wellCol(0.10f));
-         dl->AddLine(ImVec2(origin.x + 4.0f, origin.y + padSize * 0.5f), ImVec2(padBR.x - 4.0f, origin.y + padSize * 0.5f), wellCol(0.10f));
+         dl->AddLine(ImVec2(origin.x + padSize * 0.5f, origin.y + tok::space_1), ImVec2(origin.x + padSize * 0.5f, padBR.y - tok::space_1), wellCol(0.10f));
+         dl->AddLine(ImVec2(origin.x + tok::space_1, origin.y + padSize * 0.5f), ImVec2(padBR.x - tok::space_1, origin.y + padSize * 0.5f), wellCol(0.10f));
 
          float normX = kpX.valueToPos ? kpX.valueToPos(valX, minX, maxX) : ((maxX > minX) ? std::clamp((valX - minX) / (maxX - minX), 0.0f, 1.0f) : 0.0f);
          float normY = kpY.valueToPos ? kpY.valueToPos(valY, minY, maxY) : ((maxY > minY) ? std::clamp((valY - minY) / (maxY - minY), 0.0f, 1.0f) : 0.0f);
          ImVec2 orbPos(origin.x + normX * padSize, origin.y + (1.0f - normY) * padSize);
-         dl->AddCircleFilled(orbPos, 9.0f, (themeTint & 0x00FFFFFF) | 0x33000000);
-         dl->AddCircleFilled(orbPos, 5.5f, themeTint);
+         dl->AddCircleFilled(orbPos, tok::perf_element_r, (themeTint & 0x00FFFFFF) | 0x33000000);
+         dl->AddCircleFilled(orbPos, tok::perf_element_r_2, themeTint);
       }
       else if (elem.kind == 5) // Momentary Trigger / Bang (1x1)
       {
          float padSize = std::min(cardSize.x - tok::perf_pad_inset_x, cardSize.y - tok::perf_pad_inset_y);
          float centerX = cellPos.x + (cardSize.x - padSize) * 0.5f;
-         float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f - padSize) * 0.5f;
+         float centerY = cellPos.y + tok::perf_center_y_gap + (cardSize.y - tok::perf_element_gap_2 - padSize) * 0.5f;
          ImVec2 bTL(centerX, centerY);
          ImVec2 center(centerX + padSize * 0.5f, centerY + padSize * 0.5f);
 
@@ -1166,22 +1166,22 @@ namespace app
             gPerfBangFlash[elemIdx] = flash;
          }
 
-         float r = padSize * 0.44f;
+         float r = padSize * tok::perf_r_ratio;
          ImU32 baseCol = wellCol(0.08f);
-         dl->AddCircleFilled(center, r, baseCol, 32);
+         dl->AddCircleFilled(center, r, baseCol, tok::perf_element_segments);
 
          if (flash > 0.0f)
          {
             ImU32 flashCol = (themeTint & 0x00FFFFFF) | ((ImU32)(flash * (float)tok::alpha8_flash) << 24);
-            dl->AddCircleFilled(center, r * (0.6f + 0.4f * flash), flashCol, 32);
-            dl->AddCircle(center, r + 2.0f * (1.0f - flash), (themeTint & 0x00FFFFFF) | ((ImU32)(flash * 255.0f) << 24), 32, 2.0f);
+            dl->AddCircleFilled(center, r * (tok::perf_element_bias_2 + tok::perf_element_ratio_2 * flash), flashCol, tok::perf_element_segments);
+            dl->AddCircle(center, r + tok::perf_element_ratio_3 * (1.0f - flash), (themeTint & 0x00FFFFFF) | ((ImU32)(flash * tok::perf_element_ratio_4) << 24), tok::perf_element_segments, tok::perf_element_stroke_4);
          }
          else
          {
-            dl->AddCircleFilled(center, r * 0.55f, (themeTint & 0x00FFFFFF) | 0x88000000, 32);
+            dl->AddCircleFilled(center, r * tok::perf_element_ratio_5, (themeTint & 0x00FFFFFF) | 0x88000000, tok::perf_element_segments);
          }
          if (hovered)
-            dl->AddCircle(center, r + 2.0f, wellCol(0.25f), 32, 1.2f);
+            dl->AddCircle(center, r + tok::space_0_5, wellCol(0.25f), tok::perf_element_segments, tok::perf_element_stroke);
       }
       else if (elem.kind == 6) // Digital Number Box (1x1)
       {
@@ -1189,10 +1189,10 @@ namespace app
          float minV = kp.minValue, maxV = kp.maxValue;
          if (minV >= maxV) { minV = 0.0f; maxV = 1.0f; }
 
-         float boxW = cardSize.x - 16.0f;
+         float boxW = cardSize.x - tok::space_4;
          float boxH = tok::control_h;
-         float centerX = cellPos.x + 8.0f;
-         float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f - boxH) * 0.5f;
+         float centerX = cellPos.x + tok::space_2;
+         float centerY = cellPos.y + tok::perf_center_y_gap + (cardSize.y - tok::perf_element_gap_2 - boxH) * 0.5f;
 
          ImVec2 bTL(centerX, centerY);
          ImVec2 bBR(centerX + boxW, centerY + boxH);
@@ -1247,17 +1247,17 @@ namespace app
          else
             curIndex = std::clamp((int)std::round((val - minV) / (maxV - minV) * (float)(count - 1)), 0, count - 1);
 
-         float areaW = cardSize.x - 16.0f;
+         float areaW = cardSize.x - tok::space_4;
          float btnH = tok::control_h;
-         float startY = cellPos.y + 20.0f + (cardSize.y - 20.0f - btnH) * 0.5f;
-         float btnW = (areaW - (count - 1) * 3.0f) / (float)count;
+         float startY = cellPos.y + tok::perf_start_y_gap + (cardSize.y - tok::perf_element_gap_2 - btnH) * 0.5f;
+         float btnW = (areaW - (count - 1) * tok::perf_element_ratio_6) / (float)count;
 
          // Names only if the whole row can carry them: one long name among
          // short ones would leave a mix of names and numbers.
          bool useNames = isDiscreteEnum && (int)kp.enumOptions.size() >= count;
          if (useNames)
          {
-            const float room = btnW - 6.0f;
+            const float room = btnW - tok::space_1_5;
             for (int b = 0; b < count && useNames; b++)
                if (ImGui::CalcTextSize(kp.enumOptions[b].c_str()).x > room)
                   useNames = false;
@@ -1266,7 +1266,7 @@ namespace app
          for (int b = 0; b < count; b++)
          {
             if (b > 0) ImGui::SameLine();
-            float bx = cellPos.x + 8.0f + b * (btnW + 3.0f);
+            float bx = cellPos.x + tok::space_2 + b * (btnW + tok::space_0_75);
             ImGui::SetCursorScreenPos(ImVec2(bx, startY));
             ImGui::PushID(b + 300);
 
@@ -1309,9 +1309,9 @@ namespace app
          float halfSpan = (maxV - minV) * 0.5f;
          float bipVal = (halfSpan > 0.0001f) ? std::clamp((val - midV) / halfSpan, -1.0f, 1.0f) : elem.value;
 
-         float diameter = std::max(28.0f, std::min(cellSize * 0.52f, 44.0f));
+         float diameter = std::max(28.0f, std::min(cellSize * tok::perf_element_ratio, 44.0f));
          float centerX = cellPos.x + cardSize.x * 0.5f;
-         float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f) * 0.44f;
+         float centerY = cellPos.y + tok::perf_center_y_gap + (cardSize.y - tok::perf_element_gap_2) * tok::perf_center_y_ratio;
          ImGui::SetCursorScreenPos(ImVec2(centerX - diameter * 0.5f, centerY - diameter * 0.5f));
 
          ImU32 fillCol = isModulated ? (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation)) : themeTint;
@@ -1341,10 +1341,10 @@ namespace app
             elem.value2 = (float)pattern;
          }
 
-         float areaW = cardSize.x - 16.0f;
-         float stepH = cardSize.y - 30.0f;
-         float stepW = (areaW - 7.0f * 3.0f) / 8.0f;
-         float startY = cellPos.y + 22.0f;
+         float areaW = cardSize.x - tok::space_4;
+         float stepH = cardSize.y - tok::perf_step_h_gap;
+         float stepW = (areaW - tok::perf_element_ratio_7 * tok::perf_element_ratio_6) / tok::perf_step_w_ratio;
+         float startY = cellPos.y + tok::perf_start_y_gap_2;
 
          static int sCurrentStep = 0;
          if (Transport::Instance().IsPlaying())
@@ -1367,7 +1367,7 @@ namespace app
 
          for (int s = 0; s < 8; s++)
          {
-            float sx = cellPos.x + 8.0f + s * (stepW + 3.0f);
+            float sx = cellPos.x + tok::space_2 + s * (stepW + tok::space_0_75);
             ImVec2 sTL(sx, startY);
             ImVec2 sBR(sx + stepW, startY + stepH);
 
@@ -1392,7 +1392,7 @@ namespace app
             dl->AddRectFilled(sTL, sBR, stepBg, tok::radius_control);
 
             if (isCurrent && Transport::Instance().IsPlaying())
-               dl->AddRectFilled(ImVec2(sx + 2.0f, sBR.y + 3.0f), ImVec2(sx + stepW - 2.0f, sBR.y + 5.0f), wellCol(0.85f), 1.0f);
+               dl->AddRectFilled(ImVec2(sx + tok::space_0_5, sBR.y + tok::space_0_75), ImVec2(sx + stepW - tok::space_0_5, sBR.y + tok::space_1_25), wellCol(0.85f), 1.0f);
          }
       }
 
@@ -1422,16 +1422,16 @@ namespace app
             consider(t.dstIndex);
          if (anyTarget && allBypassed)
          {
-            const ImVec2 bodyTL(cellPos.x, cellPos.y + 18.0f);
+            const ImVec2 bodyTL(cellPos.x, cellPos.y + tok::perf_element_gap);
             dl->AddRectFilled(bodyTL, cardBR, isLight ? tok::Base(tok::col::ink_white, 150) : tok::Base(tok::col::edge_deep, 160),
                               kCardR, ImDrawFlags_RoundCornersBottom);
             const char* tag = "bypassed";
             const ImVec2 tagSize = ImGui::CalcTextSize(tag);
-            const ImVec2 tagTL(cardBR.x - tagSize.x - 10.0f, cellPos.y + 2.0f);
-            const ImVec2 tagBR(cardBR.x - 4.0f, cellPos.y + 2.0f + tagSize.y);
-            dl->AddRectFilled(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR, cardBg, 3.0f);
+            const ImVec2 tagTL(cardBR.x - tagSize.x - tok::space_2_5, cellPos.y + tok::space_0_5);
+            const ImVec2 tagBR(cardBR.x - tok::space_1, cellPos.y + tok::space_0_5 + tagSize.y);
+            dl->AddRectFilled(ImVec2(tagTL.x - tok::space_0_75, tagTL.y), tagBR, cardBg, tok::perf_element_radius);
             dl->AddText(tagTL, isLight ? tok::Base(tok::col::text_warn_2) : tok::Base(tok::col::text_modulation_2), tag);
-            if (ImGui::IsMouseHoveringRect(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR))
+            if (ImGui::IsMouseHoveringRect(ImVec2(tagTL.x - tok::space_0_75, tagTL.y), tagBR))
                Tip::Show("%s", T("This node is bypassed - the control still stores its value, which applies when the node is back in the chain"));
          }
       }
@@ -1790,7 +1790,7 @@ namespace app
             float rawValY = 0.0f;
             if (Platform::MidiRead(elem.midiDeviceY, elem.midiChannelY, elem.midiControllerY, elem.midiIsNoteY, rawValY))
             {
-               if (st.lastValY < 0.0f || std::abs(rawValY - st.lastValY) > 0.001f)
+               if (st.lastValY < 0.0f || std::abs(rawValY - st.lastValY) > tok::perf_performance_matrix_midi_limit)
                {
                   st.lastValY = rawValY;
                   int p2 = elem.dstParam2 >= 0 ? elem.dstParam2 : (elem.dstParam >= 0 ? elem.dstParam + 1 : -1);
@@ -1960,7 +1960,7 @@ namespace app
       }
       if (srcIndex < 0)
       {
-         float sx = dest->spawnX - 320.0f;
+         float sx = dest->spawnX - tok::perf_sx_gap;
          float sy = dest->spawnY;
          if (gEditor != nullptr)
          {
@@ -1968,7 +1968,7 @@ namespace app
             ed::SetCurrentEditor(gEditor);
             const ImVec2 p = ed::GetNodePosition(dest->NodeId());
             ed::SetCurrentEditor(prev);
-            const ImVec2 spot = FindFreeSpawnPosition(ImVec2(p.x - 320.0f, p.y));
+            const ImVec2 spot = FindFreeSpawnPosition(ImVec2(p.x - tok::perf_param_midi_learn_commit_gap, p.y));
             sx = spot.x;
             sy = spot.y;
          }
@@ -2043,7 +2043,7 @@ namespace app
       const std::string target = dest->typeName + " > " + ((known != nullptr && !known->name.empty()) ? known->name : std::string("parameter"));
       // The shared mode strip (ModeBanner), as the canvas pick uses: under the top bar, centred.
       const ImGuiViewport* vp = ImGui::GetMainViewport();
-      if (ModeBanner::Float("##midilearn.banner", ImVec2(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + 44.0f), L("MIDI learn"), target.c_str()))
+      if (ModeBanner::Float("##midilearn.banner", ImVec2(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + tok::perf_param_midi_learn_banner_gap), L("MIDI learn"), target.c_str()))
          MidiLearnCancelAll();
    }
 
@@ -2079,7 +2079,7 @@ namespace app
    void DrawPerfPanelContent()
    {
       if (gPerfLayout.pageCount < 1) gPerfLayout.pageCount = 1;
-      if (gPerfLayout.cellSize < 40) gPerfLayout.cellSize = 76;
+      if (gPerfLayout.cellSize < tok::perf_panel_content_limit) gPerfLayout.cellSize = tok::perf_cell_size;
       while ((int)gPerfLayout.pageNames.size() < gPerfLayout.pageCount)
          gPerfLayout.pageNames.push_back("Page " + std::to_string((int)gPerfLayout.pageNames.size() + 1));
 
@@ -2093,7 +2093,7 @@ namespace app
          const auto& elem = gPerfElements[gPerfMidiLearnIdx];
          const bool isLightT = CategoryColors::IsThemeLight();
          const ImVec4 uiTxt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         const float stripH = 30.0f;
+         const float stripH = tok::perf_strip_h;
          const ImVec2 sp = ImGui::GetCursorScreenPos();
          const float stripW = ImGui::GetContentRegionAvail().x;
          ImDrawList* sdl = ImGui::GetWindowDrawList();
@@ -2121,12 +2121,12 @@ namespace app
          }
          {
             UiType::Scope ts(UiType::Size::Body);
-            const float room = sp.x + stripW - 84.0f - tx;
+            const float room = sp.x + stripW - tok::perf_room_gap - tx;
             if (ImGui::CalcTextSize(hint).x <= room)
                sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.4f)), hint);
          }
-         ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - 76.0f, sp.y + (stripH - ChipButton::Height()) * 0.5f));
-         if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::Height(), 68.0f))
+         ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - tok::perf_panel_content_gap, sp.y + (stripH - ChipButton::Height()) * 0.5f));
+         if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::Height(), tok::perf_panel_content_draw))
             gPerfMidiLearnIdx = -1;
          ImGui::SetCursorScreenPos(ImVec2(sp.x, sp.y));
          ImGui::Dummy(ImVec2(stripW, stripH + tok::space_2));
@@ -2141,14 +2141,14 @@ namespace app
       // WindowPadding with no added Spacing(), which is the gap this now
       // matches.
       // Mode Switch Button (Edit / Perform)
-      if (ChipButton::Draw(gPerfEditMode ? L("Edit Mode") : L("Perform"), gPerfEditMode, kPerfChipH, 86.0f))
+      if (ChipButton::Draw(gPerfEditMode ? L("Edit Mode") : L("Perform"), gPerfEditMode, kPerfChipH, tok::perf_panel_content_draw_2))
          gPerfEditMode = !gPerfEditMode;
 
       // Add Control button in Edit Mode
       if (gPerfEditMode)
       {
          ImGui::SameLine();
-         if (ChipButton::Draw(L("+ Add Control"), false, kPerfChipH, 100.0f))
+         if (ChipButton::Draw(L("+ Add Control"), false, kPerfChipH, tok::perf_panel_content_draw_3))
             ImGui::OpenPopup("##perfaddcontrolmenu");
 
          if (MenuParts::BeginPopup("##perfaddcontrolmenu"))
@@ -2189,7 +2189,7 @@ namespace app
          opt.canAdd = gPerfLayout.pageCount < Patch::PerfLayoutRecord::kMaxPages;
          opt.duplicate = opt.canAdd;
          opt.canDelete = gPerfLayout.pageCount > 1;
-         opt.maxW = std::max(120.0f, ImGui::GetContentRegionAvail().x - tok::control_h - tok::space_2);
+         opt.maxW = std::max(tok::perf_panel_content_bound, ImGui::GetContentRegionAvail().x - tok::control_h - tok::space_2);
          PagePicker::RenameKey("##perfPages", entries, gPerfActivePage);
          const PagePicker::Result r = PagePicker::Draw("##perfPages", entries, gPerfActivePage, T("Add New Page"), opt);
          const int p = r.index;
@@ -2259,7 +2259,7 @@ namespace app
 
       // Calculate dynamic content bounding box on active page
       const float cellSize = (float)gPerfLayout.cellSize;
-      const float gap = 8.0f;
+      const float gap = tok::space_2;
       float maxElemX = 0.0f;
       float maxElemY = 0.0f;
       for (const auto& el : gPerfElements)
@@ -2267,8 +2267,8 @@ namespace app
          if (el.page == gPerfActivePage)
          {
             ImVec2 s = GetPerfElementCellSpan(el.kind);
-            maxElemX = std::max(maxElemX, (el.cellX + s.x) * (cellSize + gap) + 32.0f);
-            maxElemY = std::max(maxElemY, (el.cellY + s.y) * (cellSize + gap) + 32.0f);
+            maxElemX = std::max(maxElemX, (el.cellX + s.x) * (cellSize + gap) + tok::perf_panel_content_gap_2);
+            maxElemY = std::max(maxElemY, (el.cellY + s.y) * (cellSize + gap) + tok::perf_panel_content_gap_2);
          }
       }
 
@@ -2281,8 +2281,8 @@ namespace app
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
          ImU32 gridCol = isLight ? tok::Base(tok::col::surface_hi, 80) : tok::Base(tok::col::edge_lo, 80);
-         float gridMaxX = std::max(maxElemX + 200.0f, ImGui::GetWindowWidth());
-         float gridMaxY = std::max(maxElemY + 200.0f, ImGui::GetWindowHeight());
+         float gridMaxX = std::max(maxElemX + tok::perf_panel_content_gap_3, ImGui::GetWindowWidth());
+         float gridMaxY = std::max(maxElemY + tok::perf_panel_content_gap_3, ImGui::GetWindowHeight());
          int numCols = (int)std::ceil(gridMaxX / (cellSize + gap)) + 1;
          int numRows = (int)std::ceil(gridMaxY / (cellSize + gap)) + 1;
          for (int x = 0; x < numCols; x++)
@@ -2539,7 +2539,7 @@ namespace app
          if (n == 4)
             last = now;
       }
-      while (history.size() > 160)
+      while (history.size() > tok::perf_modulator_meter_limit)
          history.erase(history.begin());
 
       // Fixed 0..1 axis: the box's bottom is 0 and its top is 1, always, so
@@ -2553,10 +2553,10 @@ namespace app
       const float range = hi - lo;
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
-      const float h = 90.0f;
-      const float pad = 6.0f; // R12: plotted values stay inside the frame by this inset
-      const float innerW = kPreviewSize - 2.0f * pad;
-      const float innerH = h - 2.0f * pad;
+      const float h = tok::perf_h_2;
+      const float pad = tok::space_1_5; // R12: plotted values stay inside the frame by this inset
+      const float innerW = kPreviewSize - tok::perf_inner_w_ratio * pad;
+      const float innerH = h - tok::perf_inner_h_ratio * pad;
       auto yOf = [&](float v) { return origin.y + pad + innerH - (v - lo) / range * innerH; };
       ImDrawList* dl = ImGui::GetWindowDrawList();
       // Was a hardcoded near-black fill regardless of theme - on a light
@@ -2573,11 +2573,11 @@ namespace app
       dl->PushClipRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), true); // backstop, not the primary fix
       for (size_t i = 1; i < history.size(); i++)
       {
-         float x0 = origin.x + pad + innerW * (float)(i - 1) / 160.0f;
-         float x1 = origin.x + pad + innerW * (float)i / 160.0f;
+         float x0 = origin.x + pad + innerW * (float)(i - 1) / tok::perf_x0_ratio;
+         float x1 = origin.x + pad + innerW * (float)i / tok::perf_x1_ratio;
          float y0 = yOf(history[i - 1]);
          float y1 = yOf(history[i]);
-         dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), lineCol, 1.6f);
+         dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), lineCol, tok::perf_modulator_meter_stroke);
       }
       dl->PopClipRect();
 
@@ -2595,13 +2595,13 @@ namespace app
          {
             const float gy = yOf(q * 0.25f);
             dl->AddLine(ImVec2(origin.x, gy), ImVec2(origin.x + kPreviewSize, gy),
-                        ScopeMidLineCol(), q == 2 ? 1.0f : 0.5f);
+                        ScopeMidLineCol(), q == tok::perf_modulator_meter_stroke_2 ? tok::perf_modulator_meter_stroke_3 : tok::perf_modulator_meter_stroke_4);
          }
          if (!history.empty())
          {
             const float cy = yOf(history.back());
-            dl->AddCircleFilled(ImVec2(origin.x + pad + innerW * (float)(history.size() - 1) / 160.0f, cy),
-                                3.0f, lineCol);
+            dl->AddCircleFilled(ImVec2(origin.x + pad + innerW * (float)(history.size() - 1) / tok::perf_modulator_meter_ratio, cy),
+                                tok::perf_modulator_meter_r, lineCol);
          }
       }
       if (outOfContract)
@@ -2610,9 +2610,9 @@ namespace app
          const float y1line = yOf(1.0f);
          const ImU32 hairlineCol = ScopeMidLineCol();
          if (y0line >= origin.y && y0line <= origin.y + h)
-            dl->AddLine(ImVec2(origin.x, y0line), ImVec2(origin.x + kPreviewSize, y0line), hairlineCol, 1.0f);
+            dl->AddLine(ImVec2(origin.x, y0line), ImVec2(origin.x + kPreviewSize, y0line), hairlineCol, tok::perf_modulator_meter_stroke_3);
          if (y1line >= origin.y && y1line <= origin.y + h)
-            dl->AddLine(ImVec2(origin.x, y1line), ImVec2(origin.x + kPreviewSize, y1line), hairlineCol, 1.0f);
+            dl->AddLine(ImVec2(origin.x, y1line), ImVec2(origin.x + kPreviewSize, y1line), hairlineCol, tok::perf_modulator_meter_stroke_3);
       }
       AudioViz::Border(dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + h), outOfContract ? lineCol : 0);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
@@ -2622,7 +2622,7 @@ namespace app
    void DrawPerfPanelFloating()
    {
       bool open = true;
-      if (BeginFloatingPanel((std::string(T("Performance")) + "###perffloat").c_str(), &open, ImVec2(640.0f, 420.0f)))
+      if (BeginFloatingPanel((std::string(T("Performance")) + "###perffloat").c_str(), &open, ImVec2(tok::perf_panel_floating_begin_floating_panel_x, tok::perf_panel_floating_begin_floating_panel_y)))
          DrawPerfPanelContent();
       EndFloatingPanel();
       if (!open)

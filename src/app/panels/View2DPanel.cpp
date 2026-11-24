@@ -73,9 +73,9 @@ using I18n::L;
 using I18n::T;
 
 bool gView2DOpen = false;
-float gView2DHeight = 460.0f;
+float gView2DHeight = tok::view2d_view2_d_height;
 int gView2DDock = 0;
-float gView2DWidth = 620.0f;
+float gView2DWidth = tok::view2d_view2_d_width;
 int gView2DDockBack = 0;
 bool gView2DClaimedKeys = false;
 int gView2DMenuEdit = 0;
@@ -112,7 +112,7 @@ namespace
          sRowH = sChip = PanelKit::Chip();
       }
    };
-   constexpr float kRuler = 18.0f;
+   constexpr float kRuler = tok::view2d_ruler;
    constexpr float kHandle = 7.0f;
    constexpr float kSnapPx = tok::hit_snap;
    constexpr float kPi = 3.14159265f;
@@ -157,7 +157,7 @@ namespace
    {
       float h = 0, sat = 0, v = 0;
       ImGui::ColorConvertRGBtoHSV(c[0], c[1], c[2], h, sat, v);
-      h = std::fmod(h + degrees / 360.0f + 1.0f, 1.0f);
+      h = std::fmod(h + degrees / tok::view2d_hue_turn_ratio + 1.0f, 1.0f);
       ImGui::ColorConvertHSVtoRGB(h, sat, v, c[0], c[1], c[2]);
    }
    int sBrushPreset = -1, sEraserPreset = -1;
@@ -203,7 +203,7 @@ namespace
    bool sCropThirds = true;
    int sLassoKind = 0;             // 0 freehand, 1 polygon
    float sFeather = 0.0f;
-   float sSelModPx = 4.0f;         // Expand / Contract / Smooth / Border, document px
+   float sSelModPx = tok::view2d_sel_mod_px;         // Expand / Contract / Smooth / Border, document px
    int sSelOp = 0;                 // Scene2DNode::SelOp
    std::vector<float> sPoly;       // polygon lasso points so far, document px
    int sPolyOp = 0;
@@ -383,7 +383,7 @@ namespace
       if (Scene2DNode* d = FindDoc())
          return d;
       const ImVec2 at = NodePos(near);
-      return MakeDoc(at.x + 340.0f, at.y, "");
+      return MakeDoc(at.x + tok::view2d_ensure_doc_gap, at.y, "");
    }
 
    bool Selected(int id) { return std::find(sSel.begin(), sSel.end(), id) != sSel.end(); }
@@ -513,7 +513,7 @@ namespace
    {
       ImVec2 q[4];
       DocRect(doc, x0, y0, x1, y1, q);
-      dl->AddPolyline(q, 4, col, ImDrawFlags_Closed, thick);
+      dl->AddPolyline(q, tok::view2d_add_doc_rect_add_polyline_draw, col, ImDrawFlags_Closed, thick);
    }
    // Turn the view by `rad` about a screen point (the document centre when it is the pivot).
    void TurnViewAbout(Scene2DNode* doc, float rad, ImVec2 at)
@@ -534,7 +534,7 @@ namespace
 
    void FitView(Scene2DNode* doc)
    {
-      const float vw = std::max(40.0f, sViewMx.x - sViewMn.x - 48.0f), vh = std::max(40.0f, sViewMx.y - sViewMn.y - 48.0f);
+      const float vw = std::max(40.0f, sViewMx.x - sViewMn.x - tok::view2d_fit_view_gap), vh = std::max(40.0f, sViewMx.y - sViewMn.y - tok::view2d_fit_view_gap);
       // A turned document fits by its turned box.
       const float co = std::fabs(std::cos(sViewAngle)), si = std::fabs(std::sin(sViewAngle));
       const float bw = co * doc->Doc().w + si * doc->Doc().h, bh = si * doc->Doc().w + co * doc->Doc().h;
@@ -776,7 +776,7 @@ namespace
             return e.rgba.empty() ? nullptr : &e.rgba;
       cache.erase(std::remove_if(cache.begin(), cache.end(), [&](const Entry& e) { return e.frame != now || e.id == id; }), cache.end());
       Entry e{ id, now, {} };
-      if (!doc->RenderLayerAlone(id, ++sInkFrame, e.rgba) || e.rgba.size() != (size_t)doc->Doc().w * doc->Doc().h * 4)
+      if (!doc->RenderLayerAlone(id, ++sInkFrame, e.rgba) || e.rgba.size() != (size_t)doc->Doc().w * doc->Doc().h * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
          e.rgba.clear();
       cache.push_back(std::move(e));
       return cache.back().rgba.empty() ? nullptr : &cache.back().rgba;
@@ -799,10 +799,10 @@ namespace
       const int x0 = std::clamp((int)std::floor(lo[0]), 0, w - 1), x1 = std::clamp((int)std::ceil(hi[0]), 0, w - 1);
       const int y0 = std::clamp((int)std::floor(lo[1]), 0, h - 1), y1 = std::clamp((int)std::ceil(hi[1]), 0, h - 1);
       // A big box is sampled on a grid (about 200 x 200 probes): a stroke thinner than the step can be missed.
-      const int step = std::max(1, std::max(x1 - x0, y1 - y0) / 200);
+      const int step = std::max(1, std::max(x1 - x0, y1 - y0) / tok::view2d_ink_in_ratio);
       for (int y = y0; y <= y1; y += step)
          for (int x = x0; x <= x1; x += step)
-            if ((*px)[((size_t)y * w + x) * 4 + 3] > 8)
+            if ((*px)[((size_t)y * w + x) * 4 + 3] > 8)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
                return true;
       return false;
    }
@@ -941,7 +941,7 @@ namespace
          if (doc->Bounds(id, a, b))
             order.push_back({ (a[axis] + b[axis]) * 0.5f, id });
       }
-      if (order.size() < 3)
+      if (order.size() < tok::view2d_distribute_limit)
          return;
       std::sort(order.begin(), order.end());
       PushUndoCheckpoint("Distribute in 2D View");
@@ -1251,8 +1251,8 @@ namespace
    }
 
    // Field widths by content class (plan §3): S numbers, M short words, L labelled sliders and names.
-   constexpr float kWellS = 56.0f, kWellM = 72.0f, kWellL = 110.0f;
-   float sFieldW = 160.0f;
+   constexpr float kWellS = tok::view2d_well_s, kWellM = tok::view2d_well_m, kWellL = tok::view2d_well_l;
+   float sFieldW = tok::view2d_field_w;
    constexpr float kLabelW = tok::label_w;
    float sLabelW = kLabelW;   // the More.. forms widen it for their longer names
 
@@ -1473,7 +1473,7 @@ namespace
       const float fh = ImGui::GetFrameHeight();
       const float lineH = ImGui::GetTextLineHeight();
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float w = std::max(fh * 2.0f, width);
+      const float w = std::max(fh * tok::view2d_blend_if_ramp_ratio, width);
       const float hw = std::round(fh * 0.32f);              // handle half width: the hit and the drawn triangle
       const float h = fh + lineH;                            // ramp + handles, then the values line
       UiInteract::Hit(id, ImVec2(w, h));
@@ -1609,7 +1609,7 @@ namespace
                t2 = right ? ImVec2(x + hw, triB) : ImVec2(x, triB);
             }
             dl->AddTriangleFilled(t0, t1, t2, fill);
-            dl->AddTriangle(t0, t1, t2, on ? lit : ink, on ? 1.5f : 1.0f);
+            dl->AddTriangle(t0, t1, t2, on ? lit : ink, on ? tok::view2d_blend_if_ramp_stroke : 1.0f);
          }
       }
 
@@ -1694,7 +1694,7 @@ namespace
          sHistCache.clear();
          sHistDoc = sDocUid;
       }
-      if (sHistCache.size() > 24)
+      if (sHistCache.size() > tok::view2d_doc_histogram_limit)
          sHistCache.clear();
       HistEntry& e = sHistCache[key];
       const double now = ImGui::GetTime();
@@ -1745,9 +1745,9 @@ namespace
    void CurveEditor(std::vector<float>& c, int key, const std::vector<float>* hist = nullptr, int channel = 0,
                     const std::vector<float>* const* otherCh = nullptr)
    {
-      if (c.size() < 4)
+      if (c.size() < tok::view2d_curve_editor_limit)
          c = { 0.0f, 0.0f, 1.0f, 1.0f };
-      const float w = ImGui::GetContentRegionAvail().x, h = std::min(w, 180.0f);
+      const float w = ImGui::GetContentRegionAvail().x, h = std::min(w, tok::view2d_curve_editor_bound);
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
       UiInteract::Hit("##curve", ImVec2(w, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1763,12 +1763,12 @@ namespace
          dl->AddLine(ImVec2(fx, p0.y), ImVec2(fx, p1.y), gridCol);
          dl->AddLine(ImVec2(p0.x, fy), ImVec2(p1.x, fy), gridCol);
       }
-      dl->AddLine(ImVec2(p0.x, p1.y), ImVec2(p1.x, p0.y), ImGui::GetColorU32(ImGuiCol_Border, 0.8f), 1.0f);
+      dl->AddLine(ImVec2(p0.x, p1.y), ImVec2(p1.x, p0.y), ImGui::GetColorU32(ImGuiCol_Border, 0.8f), tok::view2d_curve_editor_stroke);
       const auto ToScreen = [&](float x, float y) { return ImVec2(p0.x + x * w, p1.y - y * h); };
       const ImVec2 m = ImGui::GetIO().MousePos;
       const float mx = std::clamp((m.x - p0.x) / std::max(1.0f, w), 0.0f, 1.0f);
       const float my = std::clamp((p1.y - m.y) / std::max(1.0f, h), 0.0f, 1.0f);
-      const int n = (int)c.size() / 2;
+      const int n = (int)c.size() / tok::view2d_n_ratio;
       int near = -1;
       float bestD2 = 10.0f * 10.0f;   // 10 px hit radius, pick closest point
       for (int i = 0; i < n; i++)
@@ -1784,7 +1784,7 @@ namespace
       bool changed = false;
       const bool draggingThis = ImGui::IsItemActive() && sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < n;
       const bool pullOff = draggingThis && sCurveDrag > 0 && sCurveDrag < n - 1 &&
-                           (m.x < p0.x - 24.0f || m.x > p1.x + 24.0f || m.y < p0.y - 24.0f || m.y > p1.y + 24.0f);
+                           (m.x < p0.x - tok::space_5 || m.x > p1.x + tok::space_5 || m.y < p0.y - tok::space_5 || m.y > p1.y + tok::space_5);
       if (ImGui::IsItemHovered() && (ImGui::IsMouseDoubleClicked(0) || MenuParts::RightPressed()) && near > 0 && near < n - 1)
       {
          PushUndoCheckpoint("Curves");
@@ -1824,18 +1824,18 @@ namespace
             sCurveSelLayer = key;
          }
       }
-      if (ImGui::IsItemActive() && sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < (int)c.size() / 2)
+      if (ImGui::IsItemActive() && sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < (int)c.size() / tok::view2d_curve_editor_ratio)
       {
-         const int i = sCurveDrag, last = (int)c.size() / 2 - 1;
+         const int i = sCurveDrag, last = (int)c.size() / tok::view2d_last_ratio - 1;
          if (!pullOff)
          {
             float x = mx;
             if (i == 0)
-               x = std::clamp(x, 0.0f, std::max(0.0f, c[2] - 0.02f));
+               x = std::clamp(x, 0.0f, std::max(0.0f, c[2] - tok::view2d_curve_editor_gap));
             else if (i == last)
-               x = std::clamp(x, std::min(1.0f, c[(last - 1) * 2] + 0.02f), 1.0f);
+               x = std::clamp(x, std::min(1.0f, c[(last - 1) * 2] + tok::view2d_curve_editor_gap), 1.0f);
             else
-               x = std::clamp(x, c[(i - 1) * 2] + 0.01f, c[(i + 1) * 2] - 0.01f);
+               x = std::clamp(x, c[(i - 1) * 2] + tok::view2d_curve_editor_gap_2, c[(i + 1) * 2] - tok::view2d_curve_editor_gap_2);
             if (x != c[i * 2] || my != c[i * 2 + 1])
             {
                c[i * 2] = x;
@@ -1846,8 +1846,8 @@ namespace
       }
       else if (ImGui::IsItemDeactivated() && sCurveLayer == key && sCurveDoc == sDocUid)
       {
-         if (sCurveDrag > 0 && sCurveDrag < (int)c.size() / 2 - 1 &&
-             (m.x < p0.x - 24.0f || m.x > p1.x + 24.0f || m.y < p0.y - 24.0f || m.y > p1.y + 24.0f))
+         if (sCurveDrag > 0 && sCurveDrag < (int)c.size() / tok::view2d_curve_editor_ratio - 1 &&
+             (m.x < p0.x - tok::space_5 || m.x > p1.x + tok::space_5 || m.y < p0.y - tok::space_5 || m.y > p1.y + tok::space_5))
          {
             c.erase(c.begin() + sCurveDrag * 2, c.begin() + sCurveDrag * 2 + 2);
             if (sCurveSelLayer == key)
@@ -1857,7 +1857,7 @@ namespace
          sCurveDrag = -1;
       }
       // Delete / Backspace removes the selected inner point when the graph is hovered.
-      if (ImGui::IsItemHovered() && sCurveSelLayer == key && sCurveSel > 0 && sCurveSel < (int)c.size() / 2 - 1 &&
+      if (ImGui::IsItemHovered() && sCurveSelLayer == key && sCurveSel > 0 && sCurveSel < (int)c.size() / tok::view2d_curve_editor_ratio - 1 &&
           (Keymap::KeyPressed(Keymap::Act::Delete, true) || Keymap::KeyPressed(Keymap::Act::DeleteAlt, true)))
       {
          PushUndoCheckpoint("Curves");
@@ -1880,7 +1880,7 @@ namespace
             ImVec2 gline[64];
             for (int i = 0; i < 64; i++)
                gline[i] = ToScreen(i / 63.0f, glut[i]);
-            dl->AddPolyline(gline, 64, CurveChannelColor(ch + 1, 0.35f), 0, 1.0f);
+            dl->AddPolyline(gline, tok::view2d_curve_editor_add_polyline_draw, CurveChannelColor(ch + 1, 0.35f), 0, 1.0f);
          }
       }
       constexpr int kSamples = 128;
@@ -1890,19 +1890,19 @@ namespace
       for (int i = 0; i < kSamples; i++)
          line[i] = ToScreen(i / (float)(kSamples - 1), lut[i]);
       const ImU32 curveCol = CurveChannelColor(channel, 1.0f);
-      dl->AddPolyline(line, kSamples, curveCol, 0, 2.0f);
-      const int curN = (int)c.size() / 2;
+      dl->AddPolyline(line, kSamples, curveCol, 0, tok::view2d_curve_editor_stroke_2);
+      const int curN = (int)c.size() / tok::view2d_cur_n_ratio;
       for (int i = 0; i < curN; i++)
       {
          const ImVec2 q = ToScreen(c[i * 2], c[i * 2 + 1]);
          const bool activePt = (sCurveLayer == key && sCurveDoc == sDocUid && i == sCurveDrag);
          const bool selPt = (sCurveSelLayer == key && i == sCurveSel);
          const bool hovPt = ImGui::IsItemHovered() && i == near;
-         const float r = (activePt || hovPt) ? 5.0f : 3.8f;
+         const float r = (activePt || hovPt) ? tok::view2d_r : tok::view2d_r_2;
          const ImU32 ptCol = (activePt && pullOff) ? ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.5f) : curveCol;
          dl->AddCircleFilled(q, r, ptCol);
          if (selPt || activePt)
-            dl->AddCircle(q, r + 2.0f, ImGui::GetColorU32(ImGuiCol_Text, 0.85f), 0, 1.2f);
+            dl->AddCircle(q, r + tok::space_0_5, ImGui::GetColorU32(ImGuiCol_Text, 0.85f), 0, tok::view2d_curve_editor_stroke_3);
       }
       dl->AddRect(p0, p1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_control);
       // Compact live In / Out coordinate readout when hovering or dragging.
@@ -2020,7 +2020,7 @@ namespace
       bool changed = false;
       // Edited on a copy, so a gradient nobody touched keeps no stops of its own.
       std::vector<G> st = owner;
-      if (st.size() < 2)
+      if (st.size() < tok::view2d_gradient_rows_limit)
       {
          G s0, s1;
          std::copy(a, a + 4, s0.c);
@@ -2033,9 +2033,9 @@ namespace
       int& pick = sStopPick[key];
       pick = std::clamp(pick, 0, (int)st.size() - 1);
       FieldLabel(T("Gradient"));
-      const float w = sFieldW, h = 16.0f, mk = 6.0f;
+      const float w = sFieldW, h = tok::view2d_h, mk = tok::view2d_mk;
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
-      UiInteract::Hit("##bar", ImVec2(w, h + mk + 4.0f));
+      UiInteract::Hit("##bar", ImVec2(w, h + mk + tok::space_1));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       auto u32 = [](const float c[4]) { return ImGui::ColorConvertFloat4ToU32(ImVec4(c[0], c[1], c[2], 1.0f)); };
       const float fx0 = p0.x, fx1 = p0.x + w;
@@ -2051,9 +2051,9 @@ namespace
       for (int i = 0; i < (int)st.size(); i++)
       {
          const float x = fx0 + w * st[(size_t)i].t, y = p0.y + h + 1.0f;
-         dl->AddTriangleFilled(ImVec2(x, y), ImVec2(x - mk * 0.6f, y + mk), ImVec2(x + mk * 0.6f, y + mk), u32(st[(size_t)i].c));
-         dl->AddTriangle(ImVec2(x, y), ImVec2(x - mk * 0.6f, y + mk), ImVec2(x + mk * 0.6f, y + mk),
-                         ImGui::GetColorU32(i == pick ? ImGuiCol_Text : ImGuiCol_Border), i == pick ? 2.0f : 1.0f);
+         dl->AddTriangleFilled(ImVec2(x, y), ImVec2(x - mk * tok::view2d_gradient_rows_ratio, y + mk), ImVec2(x + mk * tok::view2d_gradient_rows_ratio, y + mk), u32(st[(size_t)i].c));
+         dl->AddTriangle(ImVec2(x, y), ImVec2(x - mk * tok::view2d_gradient_rows_ratio, y + mk), ImVec2(x + mk * tok::view2d_gradient_rows_ratio, y + mk),
+                         ImGui::GetColorU32(i == pick ? ImGuiCol_Text : ImGuiCol_Border), i == pick ? tok::view2d_gradient_rows_stroke : 1.0f);
       }
       const ImVec2 m = ImGui::GetIO().MousePos;
       const float mt = std::clamp((m.x - fx0) / w, 0.0f, 1.0f);
@@ -2087,7 +2087,7 @@ namespace
             pick = hit;
          }
       }
-      if (MenuParts::ContextClicked() && st.size() > 2)
+      if (MenuParts::ContextClicked() && st.size() > tok::view2d_gradient_rows_limit)
       {
          const int hit = nearest();
          if (hit >= 0)
@@ -2111,7 +2111,7 @@ namespace
          else
          {
             // Released well below the bar: the stop goes (Photoshop's drag-off).
-            if (m.y > p0.y + h + mk + 24.0f && st.size() > 2)
+            if (m.y > p0.y + h + mk + 24.0f && st.size() > tok::view2d_gradient_rows_limit)
             {
                st.erase(st.begin() + sStopDrag);
                changed = true;
@@ -2183,9 +2183,9 @@ namespace
    }
    int CurvePointAt(std::vector<float>& c, float x)
    {
-      const int n = (int)c.size() / 2;
+      const int n = (int)c.size() / tok::view2d_n_ratio;
       for (int i = 0; i < n; i++)
-         if (std::fabs(c[(size_t)i * 2] - x) < 0.03f)
+         if (std::fabs(c[(size_t)i * 2] - x) < 0.03f)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
             return i;
       if (n >= 16)
          return -1;
@@ -2223,9 +2223,9 @@ namespace
          const std::vector<float>& h = DocHistogram(doc, key);
          {
             const float w = ImGui::GetContentRegionAvail().x;
-            const float histH = 44.0f, mkH = 10.0f;
+            const float histH = tok::view2d_hist_h, mkH = tok::view2d_mk_h;
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
-            UiInteract::Hit((std::string("##v2dlvh") + std::to_string(key)).c_str(), ImVec2(w, histH + mkH + 2.0f));
+            UiInteract::Hit((std::string("##v2dlvh") + std::to_string(key)).c_str(), ImVec2(w, histH + mkH + tok::space_0_5));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImVec2 hp1(p0.x + w, p0.y + histH);
             dl->AddRectFilled(p0, hp1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
@@ -2234,7 +2234,7 @@ namespace
             dl->AddRect(p0, hp1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_control);
             // Interactive Black / Gamma / White triangle handles beneath the histogram.
             const float span = std::max(0.01f, lv[1] - lv[0]);
-            const float gPos = adjCh == 0 ? std::clamp(lv[0] + span * std::pow(0.5f, std::clamp(x.adjAmt, 0.1f, 4.0f)), lv[0] + 0.01f, lv[1] - 0.01f)
+            const float gPos = adjCh == 0 ? std::clamp(lv[0] + span * std::pow(tok::view2d_adj_extras_pow_maths, std::clamp(x.adjAmt, tok::view2d_adj_extras_bound, tok::view2d_adj_extras_bound_2)), lv[0] + tok::view2d_adj_extras_gap, lv[1] - tok::view2d_adj_extras_gap)
                                           : (lv[0] + lv[1]) * 0.5f;
             const float hx[3] = { p0.x + lv[0] * w, p0.x + gPos * w, p0.x + lv[1] * w };
             const int nHandles = adjCh == 0 ? 3 : 2;
@@ -2281,9 +2281,9 @@ namespace
                const ImU32 fill = hi == 0 ? ImGui::GetColorU32(ImGuiCol_FrameBg)
                                 : hi == 2 ? ImGui::GetColorU32(ImGuiCol_Text)
                                           : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-               dl->AddTriangleFilled(ImVec2(cx, cy), ImVec2(cx - 5.0f, cy + mkH), ImVec2(cx + 5.0f, cy + mkH), fill);
-               dl->AddTriangle(ImVec2(cx, cy), ImVec2(cx - 5.0f, cy + mkH), ImVec2(cx + 5.0f, cy + mkH),
-                               ImGui::GetColorU32(sLvDragKey == key && sLvDragIdx == hi ? ImGuiCol_Text : ImGuiCol_Border), 1.2f);
+               dl->AddTriangleFilled(ImVec2(cx, cy), ImVec2(cx - tok::space_1_25, cy + mkH), ImVec2(cx + tok::space_1_25, cy + mkH), fill);
+               dl->AddTriangle(ImVec2(cx, cy), ImVec2(cx - tok::space_1_25, cy + mkH), ImVec2(cx + tok::space_1_25, cy + mkH),
+                               ImGui::GetColorU32(sLvDragKey == key && sLvDragIdx == hi ? ImGuiCol_Text : ImGuiCol_Border), tok::view2d_adj_extras_stroke);
             }
          }
          SliderRow(T("In Black"), &lv[0], 0.0f, 1.0f, "%.2f");
@@ -2478,32 +2478,32 @@ namespace
    bool AnchorRow(const char* label, int* anchor)
    {
       // The label sits on the grid's centre line, as every other label sits on its field's.
-      const float cell = 14.0f;
+      const float cell = tok::view2d_cell;
       const ImVec2 row = ImGui::GetCursorScreenPos();
-      ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + std::round((cell * 3.0f - ImGui::GetFrameHeight()) * 0.5f)));
+      ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + std::round((cell * tok::view2d_anchor_row_ratio - ImGui::GetFrameHeight()) * 0.5f)));
       FieldLabel(label);
       ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, row.y));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       bool changed = false;
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      UiInteract::Hit(FormParts::Id(label).c_str(), ImVec2(cell * 3, cell * 3));
+      UiInteract::Hit(FormParts::Id(label).c_str(), ImVec2(cell * tok::view2d_anchor_row_ratio, cell * tok::view2d_anchor_row_ratio));
       if (*anchor == 4)
          UiAudit::NoteOn();   // the grid's centre cell is the chosen one: a click there rightly changes nothing
       if (ImGui::IsItemClicked())
       {
          const ImVec2 m = ImGui::GetIO().MousePos;
-         const int cx = std::clamp((int)((m.x - p.x) / cell), 0, 2), cy = std::clamp((int)((m.y - p.y) / cell), 0, 2);
-         *anchor = cy * 3 + cx;
+         const int cx = std::clamp((int)((m.x - p.x) / cell), 0, tok::view2d_anchor_row_bound), cy = std::clamp((int)((m.y - p.y) / cell), 0, tok::view2d_anchor_row_bound);
+         *anchor = cy * tok::view2d_anchor_ratio + cx;
          changed = true;
       }
       const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled), on = ImGui::GetColorU32(ImGuiCol_Text);
       for (int i = 0; i < 9; i++)
       {
-         const ImVec2 c(p.x + (i % 3 + 0.5f) * cell, p.y + (i / 3 + 0.5f) * cell);
+         const ImVec2 c(p.x + (i % tok::view2d_anchor_row_arith + tok::view2d_anchor_row_bias) * cell, p.y + (i / tok::view2d_anchor_row_ratio_2 + tok::view2d_anchor_row_bias) * cell);
          if (i == *anchor)
-            dl->AddRectFilled(ImVec2(c.x - 4, c.y - 4), ImVec2(c.x + 4, c.y + 4), on, 1.5f);
+            dl->AddRectFilled(ImVec2(c.x - tok::space_1, c.y - tok::space_1), ImVec2(c.x + tok::space_1, c.y + tok::space_1), on, tok::view2d_anchor_row_radius);
          else
-            dl->AddRect(ImVec2(c.x - 3, c.y - 3), ImVec2(c.x + 3, c.y + 3), dim, 1.0f);
+            dl->AddRect(ImVec2(c.x - tok::space_0_75, c.y - tok::space_0_75), ImVec2(c.x + tok::space_0_75, c.y + tok::space_0_75), dim, tok::view2d_anchor_row_radius_2);
       }
       return changed;
    }
@@ -2606,7 +2606,7 @@ namespace
             hide = hide || l.noExport;
       if (hide)
       {
-         static int ef = 7400000;
+         static int ef = tok::view2d_ef;
          Scene2DNode::sExport = true;
          doc->CookIfNeeded(++ef);
          out->CookIfNeeded(ef);
@@ -3252,7 +3252,7 @@ namespace
    template <class F> void BrushFields(BrushEngine::Brush& b, F f)
    {
       auto i = [&](const char* n, int& v) { float x = (float)v; f(n, &x, 1); v = (int)std::lround(x); };
-      auto bo = [&](const char* n, bool& v) { float x = v ? 1.0f : 0.0f; f(n, &x, 1); v = x > 0.5f; };
+      auto bo = [&](const char* n, bool& v) { float x = v ? 1.0f : 0.0f; f(n, &x, 1); v = x > tok::view2d_v_limit; };
       i("tip", b.tip); f("size", &b.size, 1); f("hardness", &b.hardness, 1); f("opacity", &b.opacity, 1);
       f("flow", &b.flow, 1); f("spacing", &b.spacing, 1); f("jitter", &b.jitter, 1); f("angle", &b.angle, 1);
       f("roundness", &b.roundness, 1); f("smoothing", &b.smoothing, 1); i("stabiliser", b.stabiliser);
@@ -3366,10 +3366,10 @@ namespace
    BrushEngine::Brush sRetouch = []()
    {
       BrushEngine::Brush b;
-      b.size = 40.0f;
+      b.size = tok::view2d_size;
       b.hardness = 0.4f;
       b.opacity = 0.5f;
-      b.spacing = 0.1f;
+      b.spacing = tok::view2d_spacing;
       return b;
    }();
    ImVec2 sCloneSrc(0, 0), sCloneOffset(0, 0), sCloneAnchor(0, 0);
@@ -3378,7 +3378,7 @@ namespace
    BrushEngine::Brush sMixer = []()
    {
       BrushEngine::Brush b;
-      b.size = 40.0f;
+      b.size = tok::view2d_size;
       b.wet = 0.6f;
       b.refill = 0.1f;
       return b;
@@ -3386,11 +3386,11 @@ namespace
    BrushEngine::Brush sSelBrush = []()
    {
       BrushEngine::Brush b;
-      b.size = 40.0f;
+      b.size = tok::view2d_size;
       b.hardness = 0.8f;
       return b;
    }();
-   float sBlemishSize = 24.0f;      // blemish removal: the spot's width, document px
+   float sBlemishSize = tok::view2d_blemish_size;      // blemish removal: the spot's width, document px
    int sStyleFrom = 0;              // style picker: the layer whose style is held
    ImVec2 sMeasureA(0, 0), sMeasureB(0, 0);
    bool sMeasureOn = false;
@@ -3556,7 +3556,7 @@ namespace
    // the text colour so they read on the menu.
    unsigned BrushThumb(int i)
    {
-      constexpr int kW = 96, kH = 24;
+      constexpr int kW = tok::view2d_w, kH = tok::view2d_h_2;
       static std::map<int, GLUtil::Fbo> thumbs;
       const auto& presets = BrushEngine::Presets();
       if (i < 0 || i >= (int)presets.size())
@@ -3586,15 +3586,15 @@ namespace
          b.color[1] = t.y;
          b.color[2] = t.z;
       }
-      b.size = std::clamp(b.size, 3.0f, (float)kH * 0.55f);
+      b.size = std::clamp(b.size, tok::view2d_brush_thumb_bound, (float)kH * tok::view2d_brush_thumb_ratio);
       b.stabiliser = 0;
       b.smoothing = 0.0f;
       b.colorTex = b.tipTex = b.grainTex = 0;
       BrushEngine::Stroke st;
-      const float pad = b.size * 0.5f + 2.0f;
+      const float pad = b.size * 0.5f + tok::space_0_5;
       auto at = [&](float u, float& x, float& y) {
-         x = pad + u * ((float)kW - 2.0f * pad);
-         y = (float)kH * 0.5f + std::sin(u * 6.2831853f) * ((float)kH * 0.5f - pad);
+         x = pad + u * ((float)kW - tok::view2d_brush_thumb_ratio_2 * pad);
+         y = (float)kH * 0.5f + std::sin(u * tok::view2d_brush_thumb_ratio_3) * ((float)kH * 0.5f - pad);
       };
       float x = 0, y = 0;
       at(0.0f, x, y);
@@ -3646,7 +3646,7 @@ namespace
       if (!MenuParts::BeginPopup("##v2dfilldlg"))
          return;
       float pct = sFillOpacity * 100.0f;
-      ImGui::SetNextItemWidth(160.0f);
+      ImGui::SetNextItemWidth(tok::view2d_fill_dialog_set_next_item_width_w);
       if (FieldWell::Slider("##v2dfillop", &pct, 1.0f, 100.0f, "%.0f%%"))
          sFillOpacity = std::clamp(pct / 100.0f, 0.01f, 1.0f);
       static const char* kWith[5] = { "Foreground", "Background", "Black", "White", "50% Grey" };
@@ -4126,7 +4126,7 @@ namespace
 
    void ClosePoly(Scene2DNode* doc)
    {
-      if (sPoly.size() >= 6)
+      if (sPoly.size() >= tok::view2d_close_poly_limit)
       {
          SelStep("Lasso");
          doc->SelectPolygon(sPoly, sPolyOp, sFeather, true);
@@ -4153,7 +4153,7 @@ namespace
       sRecentCols.erase(std::remove_if(sRecentCols.begin(), sRecentCols.end(), [&](const Rgb& r) { return SameColour(r.c, c); }),
                         sRecentCols.end());
       sRecentCols.insert(sRecentCols.begin(), Rgb{ { c[0], c[1], c[2] } });
-      if (sRecentCols.size() > 10)
+      if (sRecentCols.size() > tok::view2d_note_colour_used_limit)
          sRecentCols.resize(10);
    }
 
@@ -4161,7 +4161,7 @@ namespace
    {
       std::vector<Rgb> out;
       size_t at = 0;
-      while (at + 6 <= gView2DSwatches.size())
+      while (at + tok::view2d_swatches_gap <= gView2DSwatches.size())
       {
          unsigned v = 0;
          if (std::sscanf(gView2DSwatches.c_str() + at, "%6x", &v) == 1)
@@ -4187,7 +4187,7 @@ namespace
    // A row of colour chips; a click returns its index, a right click its index in `removed`.
    int SwatchStrip(const char* id, const std::vector<Rgb>& list, bool addChip, int* removed)
    {
-      const float sq = 16.0f, gap = 3.0f;
+      const float sq = tok::view2d_sq, gap = tok::space_0_75;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       int picked = -1;
       ImGui::PushID(id);
@@ -4212,8 +4212,8 @@ namespace
          {
             const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text);
             const ImVec2 c(p.x + sq * 0.5f, p.y + sq * 0.5f);
-            dl->AddLine(ImVec2(c.x - 4, c.y), ImVec2(c.x + 4, c.y), ink, 1.2f);
-            dl->AddLine(ImVec2(c.x, c.y - 4), ImVec2(c.x, c.y + 4), ink, 1.2f);
+            dl->AddLine(ImVec2(c.x - tok::space_1, c.y), ImVec2(c.x + tok::space_1, c.y), ink, tok::view2d_swatch_strip_stroke);
+            dl->AddLine(ImVec2(c.x, c.y - tok::space_1), ImVec2(c.x, c.y + tok::space_1), ink, tok::view2d_swatch_strip_stroke);
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
                picked = i;
             ColourChip::Swatch(dl, p, sq, nullptr, ImGui::IsItemHovered());
@@ -4258,12 +4258,12 @@ namespace
       {
          const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, 170) : tok::U32(tok::canvas_ink);
          const float th = pass == 0 ? 3.0f : 1.0f;
-         dl->AddLine(ImVec2(mouse.x - 8, mouse.y), ImVec2(mouse.x - 2, mouse.y), col, th);
-         dl->AddLine(ImVec2(mouse.x + 2, mouse.y), ImVec2(mouse.x + 8, mouse.y), col, th);
-         dl->AddLine(ImVec2(mouse.x, mouse.y - 8), ImVec2(mouse.x, mouse.y - 2), col, th);
-         dl->AddLine(ImVec2(mouse.x, mouse.y + 2), ImVec2(mouse.x, mouse.y + 8), col, th);
+         dl->AddLine(ImVec2(mouse.x - tok::space_2, mouse.y), ImVec2(mouse.x - tok::space_0_5, mouse.y), col, th);
+         dl->AddLine(ImVec2(mouse.x + tok::space_0_5, mouse.y), ImVec2(mouse.x + tok::space_2, mouse.y), col, th);
+         dl->AddLine(ImVec2(mouse.x, mouse.y - tok::space_2), ImVec2(mouse.x, mouse.y - tok::space_0_5), col, th);
+         dl->AddLine(ImVec2(mouse.x, mouse.y + tok::space_0_5), ImVec2(mouse.x, mouse.y + tok::space_2), col, th);
       }
-      const ImVec2 badge(mouse.x + 15.0f, mouse.y + 15.0f);
+      const ImVec2 badge(mouse.x + tok::view2d_tool_cursor_gap, mouse.y + tok::view2d_tool_cursor_gap);
       for (int dx = -1; dx <= 1; dx++)
          for (int dy = -1; dy <= 1; dy++)
             if (dx != 0 || dy != 0)
@@ -4292,7 +4292,7 @@ namespace
       const BrushEngine::Brush& b = sBrush;
       float to[2];
       if (sPenN < 2 || b.stabiliser > 0 || b.smoothing > 0.0f
-          || !BrushEngine::Stroke::Predict(sPen[0], sPen[1], 8.0f, std::max(4.0f, b.size * 2.0f), to))
+          || !BrushEngine::Stroke::Predict(sPen[0], sPen[1], 8.0f, std::max(tok::view2d_predicted_bound, b.size * tok::view2d_predicted_ratio), to))
          return;
       const ImVec2 a = ToScreen(doc, sPen[1][0], sPen[1][1]), c = ToScreen(doc, to[0], to[1]);
       const float w = std::max(1.0f, b.size * sZoom);
@@ -4310,15 +4310,15 @@ namespace
       ImGui::SetMouseCursor(ImGuiMouseCursor_None);
       auto ring = [&](float rr, float alpha)
       {
-         dl->AddCircle(mouse, rr, IM_COL32(0, 0, 0, (int)(160 * alpha)), 48, 2.5f);
-         dl->AddCircle(mouse, rr, IM_COL32(255, 255, 255, (int)(230 * alpha)), 48, 1.0f);
+         dl->AddCircle(mouse, rr, IM_COL32(0, 0, 0, (int)(tok::view2d_brush_cursor_ratio * alpha)), tok::view2d_brush_cursor_segments, tok::view2d_brush_cursor_stroke);
+         dl->AddCircle(mouse, rr, IM_COL32(255, 255, 255, (int)(tok::view2d_brush_cursor_ratio_2 * alpha)), tok::view2d_brush_cursor_segments, 1.0f);
       };
-      if (r < 2.0f)
+      if (r < tok::view2d_brush_cursor_limit)
       {
-         dl->AddLine(ImVec2(mouse.x - 6, mouse.y), ImVec2(mouse.x + 6, mouse.y), tok::U32(tok::canvas_shade, 200), 2.5f);
-         dl->AddLine(ImVec2(mouse.x, mouse.y - 6), ImVec2(mouse.x, mouse.y + 6), tok::U32(tok::canvas_shade, 200), 2.5f);
-         dl->AddLine(ImVec2(mouse.x - 6, mouse.y), ImVec2(mouse.x + 6, mouse.y), tok::U32(tok::canvas_ink));
-         dl->AddLine(ImVec2(mouse.x, mouse.y - 6), ImVec2(mouse.x, mouse.y + 6), tok::U32(tok::canvas_ink));
+         dl->AddLine(ImVec2(mouse.x - tok::space_1_5, mouse.y), ImVec2(mouse.x + tok::space_1_5, mouse.y), tok::U32(tok::canvas_shade, 200), tok::view2d_brush_cursor_stroke);
+         dl->AddLine(ImVec2(mouse.x, mouse.y - tok::space_1_5), ImVec2(mouse.x, mouse.y + tok::space_1_5), tok::U32(tok::canvas_shade, 200), tok::view2d_brush_cursor_stroke);
+         dl->AddLine(ImVec2(mouse.x - tok::space_1_5, mouse.y), ImVec2(mouse.x + tok::space_1_5, mouse.y), tok::U32(tok::canvas_ink));
+         dl->AddLine(ImVec2(mouse.x, mouse.y - tok::space_1_5), ImVec2(mouse.x, mouse.y + tok::space_1_5), tok::U32(tok::canvas_ink));
          return;
       }
       ring(r, 1.0f);
@@ -4348,8 +4348,8 @@ namespace
          if (BrushTool(sTool))
          {
             BrushEngine::Brush& b = ToolBrush();
-            if (!shift && rep(ImGuiKey_LeftBracket)) b.size = std::max(1.0f, b.size * 0.9f - 1.0f);
-            if (!shift && rep(ImGuiKey_RightBracket)) b.size = std::min(2000.0f, b.size * 1.1f + 1.0f);
+            if (!shift && rep(ImGuiKey_LeftBracket)) b.size = std::max(1.0f, b.size * tok::view2d_pixel_keys_ratio - 1.0f);
+            if (!shift && rep(ImGuiKey_RightBracket)) b.size = std::min(tok::view2d_pixel_keys_bound, b.size * tok::view2d_pixel_keys_ratio_2 + 1.0f);
             if (shift && rep(ImGuiKey_LeftBracket)) b.hardness = std::max(0.0f, b.hardness - 0.25f);
             if (shift && rep(ImGuiKey_RightBracket)) b.hardness = std::min(1.0f, b.hardness + 0.25f);
             static const ImGuiKey kDigits[10] = { ImGuiKey_1, ImGuiKey_2, ImGuiKey_3, ImGuiKey_4, ImGuiKey_5,
@@ -4416,7 +4416,7 @@ namespace
       struct Seg { float ax, ay, bx, by; };
       static std::vector<Seg> segs;
       segs.clear();
-      constexpr size_t kMaxSegs = 40000;
+      constexpr size_t kMaxSegs = 40000;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
       for (int y = y0; y <= y1 && segs.size() < kMaxSegs; y++)   // horizontal edges, between rows y-1 and y
          for (int x = x0; x < x1;)
          {
@@ -4446,12 +4446,12 @@ namespace
       if (segs.size() >= kMaxSegs)
          return false;
       const ImU32 white = tok::U32(tok::canvas_ink), black = tok::U32(tok::canvas_shade);
-      constexpr float kDash = 4.0f;
+      constexpr float kDash = tok::view2d_dash;
       const float march = std::fmod((float)ImGui::GetTime() * tok::motion_rate_ants, kDash * 2.0f);  // ui-audit-ok: dash period (two dashes)
       for (const Seg& sg : segs)
       {
          const ImVec2 a = ToScreen(doc, sg.ax, sg.ay), b = ToScreen(doc, sg.bx, sg.by);
-         dl->AddLine(a, b, white, 1.0f);
+         dl->AddLine(a, b, white, tok::view2d_screen_ants_stroke);
          const float len = std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
          if (len < 0.5f)
             continue;
@@ -4462,7 +4462,7 @@ namespace
          {
             const float t0 = std::max(0.0f, t), t1 = std::min(len, t + kDash);
             if (t1 > t0)
-               dl->AddLine(ImVec2(a.x + u.x * t0, a.y + u.y * t0), ImVec2(a.x + u.x * t1, a.y + u.y * t1), black, 1.0f);
+               dl->AddLine(ImVec2(a.x + u.x * t0, a.y + u.y * t0), ImVec2(a.x + u.x * t1, a.y + u.y * t1), black, tok::view2d_screen_ants_stroke);
          }
       }
       return true;
@@ -4487,7 +4487,7 @@ namespace
       Entry e{ l.id, l.tiles, false, { 0, 0, bw, bh } };
       std::vector<uint8_t> px;
       int w = 0, h = 0;
-      if (doc->ReadPaint(l.id, px, w, h) && w > 0 && h > 0 && px.size() >= (size_t)w * h * 4)
+      if (doc->ReadPaint(l.id, px, w, h) && w > 0 && h > 0 && px.size() >= (size_t)w * h * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
       {
          int x0 = w, y0 = h, x1 = -1, y1 = -1;
          for (int y = 0; y < h; y++)
@@ -4507,7 +4507,7 @@ namespace
          }
       }
       cache.erase(std::remove_if(cache.begin(), cache.end(), [&](const Entry& c) { return c.id == l.id; }), cache.end());
-      if (cache.size() > 32)
+      if (cache.size() > tok::view2d_content_rect_limit)
          cache.erase(cache.begin());
       cache.push_back(e);
       if (e.has)
@@ -4564,7 +4564,7 @@ namespace
          ImVec2 p;
          HandlePoint(doc, l, kHandleAt[i][0], kHandleAt[i][1], p);
          const float dx = mouse.x - p.x, dy = mouse.y - p.y;
-         if (dx * dx + dy * dy <= 22.0f * 22.0f)
+         if (dx * dx + dy * dy <= tok::view2d_hover_handle_ratio * 22.0f)
          {
             float c[8];
             ContentCorners(doc, l, c);
@@ -4640,8 +4640,8 @@ namespace
       {
          const ImVec2 p = GroupHandlePoint(doc, lo, hi, i);
          const float dx = mouse.x - p.x, dy = mouse.y - p.y;
-         if (!inside && dx * dx + dy * dy <= 22.0f * 22.0f)
-            return 8;
+         if (!inside && dx * dx + dy * dy <= tok::view2d_hover_group_handle_ratio * 22.0f)
+            return tok::view2d_hover_group_handle_assign;
       }
       return -1;
    }
@@ -4654,7 +4654,7 @@ namespace
       doc->LayerBox(b, bw, bh);
       doc->LayerMatrix(b, m0);
       Apply(m0, bw * 0.5f, bh * 0.5f, px, py);
-      const float r = turnDeg * kPi / 180.0f, cs = std::cos(r), sn = std::sin(r);
+      const float r = turnDeg * kPi / tok::view2d_r_ratio, cs = std::cos(r), sn = std::sin(r);
       const float qx = fix.x + ((px - fix.x) * cs - (py - fix.y) * sn) * kx;
       const float qy = fix.y + ((px - fix.x) * sn + (py - fix.y) * cs) * ky;
       l = b;
@@ -4673,7 +4673,7 @@ namespace
    void ScaleGroup(Scene2DNode* doc, ImVec2 mouse)
    {
       const float* g = sOp.g0;
-      const float w = std::max(g[2] - g[0], 1e-3f), h = std::max(g[3] - g[1], 1e-3f);
+      const float w = std::max(g[2] - g[0], tok::view2d_scale_group_bound), h = std::max(g[3] - g[1], tok::view2d_scale_group_bound);
       const float ox = sOp.fromCentre ? 0.5f : 1.0f - sOp.hx, oy = sOp.fromCentre ? 0.5f : 1.0f - sOp.hy;
       const ImVec2 md = ToDoc(doc, mouse);
       const float bx = (md.x - g[0]) / w, by = (md.y - g[1]) / h;
@@ -4791,8 +4791,8 @@ namespace
             float m1[6], nx, ny;
             doc->LayerMatrix(*l, m1);
             Apply(m1, bw * 0.5f, bh * 0.5f, nx, ny);
-            l->x += (vertical ? cx : 2.0f * px - cx) - nx;
-            l->y += (vertical ? 2.0f * py - cy : cy) - ny;
+            l->x += (vertical ? cx : tok::view2d_flip_selection_ratio * px - cx) - nx;
+            l->y += (vertical ? tok::view2d_flip_selection_ratio * py - cy : cy) - ny;
          }
       if (lift)
          DropFloat(doc);
@@ -4827,7 +4827,7 @@ namespace
             if (b.warpOn)
             {
                // Pulled corners are document offsets: they turn with the layer.
-               const float r = deg * kPi / 180.0f, cs = std::cos(r), sn = std::sin(r);
+               const float r = deg * kPi / tok::view2d_r_ratio, cs = std::cos(r), sn = std::sin(r);
                for (int k = 0; k < 4; k++)
                {
                   const float wx = b.warp[k * 2], wy = b.warp[k * 2 + 1];
@@ -4973,7 +4973,7 @@ namespace
       for (int k = 0; k < 16; k++)
       {
          const ImVec2 q = ToScreen(doc, sMeshPts[k * 2], sMeshPts[k * 2 + 1]);
-         if (std::hypot(q.x - mouse.x, q.y - mouse.y) < 10.0f)
+         if (std::hypot(q.x - mouse.x, q.y - mouse.y) < tok::view2d_near_mesh_handle_limit)
             return true;
       }
       return false;
@@ -5059,11 +5059,11 @@ namespace
    {
       const ImVec2 mouse = ImGui::GetIO().MousePos;
       auto line = [&](ImVec2 a, ImVec2 b) {
-         dl->AddLine(a, b, shade, 2.5f);
-         dl->AddLine(a, b, ink, 1.0f);
+         dl->AddLine(a, b, shade, tok::view2d_tool_overlays_stroke);
+         dl->AddLine(a, b, ink, tok::view2d_tool_overlays_stroke_2);
       };
       auto dot = [&](ImVec2 p, float r, bool hot) {
-         dl->AddCircleFilled(p, r + 1.5f, shade);
+         dl->AddCircleFilled(p, r + tok::view2d_tool_overlays_gap, shade);
          dl->AddCircleFilled(p, r, hot ? Hex(kOutline) : ink);
       };
       if (sOp.kind == 24)
@@ -5084,20 +5084,20 @@ namespace
       if (sTool == kClone && ImGui::GetTime() - sCloneAsk < tok::motion_s_hint)
       {
          const char* t = T("Alt-click to set the source");
-         const ImVec2 at(ImGui::GetIO().MousePos.x + 14.0f, ImGui::GetIO().MousePos.y + 14.0f);
+         const ImVec2 at(ImGui::GetIO().MousePos.x + tok::space_3_5, ImGui::GetIO().MousePos.y + tok::space_3_5);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
       }
       if (ImGui::GetTime() - sExportNoteT < tok::motion_s_notice && !sExportNote.empty())
       {
-         const ImVec2 at(sViewMn.x + 12.0f, sViewMn.y + 12.0f);
+         const ImVec2 at(sViewMn.x + tok::space_3, sViewMn.y + tok::space_3);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, sExportNote.c_str());
          dl->AddText(at, ink, sExportNote.c_str());
       }
       if (ImGui::GetTime() - sGroupPickAsk < tok::motion_s_hint)
       {
          const char* t = T("Pick a layer");
-         const ImVec2 at(ImGui::GetIO().MousePos.x + 14.0f, ImGui::GetIO().MousePos.y + 14.0f);
+         const ImVec2 at(ImGui::GetIO().MousePos.x + tok::space_3_5, ImGui::GetIO().MousePos.y + tok::space_3_5);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
       }
@@ -5110,7 +5110,7 @@ namespace
          const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
          char t[64];
          std::snprintf(t, sizeof t, "%s  %s", UiFmt::Px(std::hypot(dx, dy)).c, UiFmt::Rad(std::atan2(-dy, dx)).c);
-         const ImVec2 at(b.x + 10.0f, b.y + 6.0f);
+         const ImVec2 at(b.x + tok::space_2_5, b.y + tok::space_1_5);
          dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
          dl->AddText(at, ink, t);
       }
@@ -5144,9 +5144,9 @@ namespace
          }
       if (sTool == kBlemish && sMouseIn)
       {
-         const float r = std::max(2.0f, sBlemishSize * 0.5f * sZoom);
-         dl->AddCircle(mouse, r, shade, 48, 2.5f);
-         dl->AddCircle(mouse, r, ink, 48, 1.0f);
+         const float r = std::max(tok::view2d_tool_overlays_bound, sBlemishSize * 0.5f * sZoom);
+         dl->AddCircle(mouse, r, shade, tok::view2d_tool_overlays_segments, tok::view2d_tool_overlays_stroke);
+         dl->AddCircle(mouse, r, ink, tok::view2d_tool_overlays_segments, 1.0f);
       }
    }
 
@@ -5198,7 +5198,7 @@ namespace
          for (int ax = 0; ax < 2; ax++)
          {
             const float h = ax == 0 ? sOp.hx : sOp.hy, k = ax == 0 ? kx : ky, f = ax == 0 ? fx0 : fy0, h0 = ax == 0 ? hx0 : hy0;
-            if (std::fabs(h - 0.5f) < 0.1f || std::fabs(h0 - f) < 1e-3f)
+            if (std::fabs(h - tok::px_align) < tok::view2d_scale_active_limit || std::fabs(h0 - f) < 1e-3f)
                continue;
             const float now = f + (h0 - f) * k;
             const float e[3] = { now, now, now };
@@ -5253,7 +5253,7 @@ namespace
    // ---- the 3D gizmo (3D layers) -----------------------------------------
 
    constexpr unsigned kGizmoHex[3] = { 0xFF3352, 0x8BDC00, 0x2890FF };   // the 3D View's axis colours
-   constexpr float kGizmoPx = 80.0f;
+   constexpr float kGizmoPx = tok::view2d_gizmo_px;
 
    bool GizmoScreen(Scene2DNode* doc, const float p[3], ImVec2& out)
    {
@@ -5366,7 +5366,7 @@ namespace
                const bool ok = GizmoPoint(doc, at, dir, c, kGizmoPx, q);
                if (ok && prevOk)
                {
-                  dl->AddLine(prev, q, tone(a, 1.0f), 2.5f);
+                  dl->AddLine(prev, q, tone(a, 1.0f), tok::view2d_gizmo3_d_stroke);
                   const float d = SegDist2D(mouse, prev, q);
                   if (d < best)
                   {
@@ -5391,8 +5391,8 @@ namespace
          if (sl < 10.0f)
          {
             // Pointing at the camera: a dot that drags with the pointer's up and down.
-            dl->AddCircleFilled(ImVec2(c.x + 16.0f, c.y - 16.0f), 5.0f, tone(a, 1.0f));
-            const float d = std::hypot(mouse.x - c.x - 16.0f, mouse.y - c.y + 16.0f);
+            dl->AddCircleFilled(ImVec2(c.x + tok::space_4, c.y - tok::space_4), tok::view2d_gizmo3_d_r, tone(a, 1.0f));
+            const float d = std::hypot(mouse.x - c.x - tok::space_4, mouse.y - c.y + tok::space_4);
             if (d < best)
             {
                best = d;
@@ -5402,21 +5402,21 @@ namespace
          }
          const ImVec2 dir(dx / sl, dy / sl), side(-dy / sl, dx / sl);
          const ImU32 col = tone(a, 1.0f);
-         dl->AddLine(ImVec2(c.x + dir.x * 12.0f, c.y + dir.y * 12.0f), s, col, 2.5f);
+         dl->AddLine(ImVec2(c.x + dir.x * tok::view2d_gizmo3_d_ratio, c.y + dir.y * tok::view2d_gizmo3_d_ratio), s, col, tok::view2d_gizmo3_d_stroke);
          if (mode == 0)
-            dl->AddTriangleFilled(ImVec2(s.x + dir.x * 14.0f, s.y + dir.y * 14.0f), ImVec2(s.x + side.x * 5.5f, s.y + side.y * 5.5f),
-                                  ImVec2(s.x - side.x * 5.5f, s.y - side.y * 5.5f), col);
+            dl->AddTriangleFilled(ImVec2(s.x + dir.x * tok::view2d_gizmo3_d_ratio_2, s.y + dir.y * tok::view2d_gizmo3_d_ratio_2), ImVec2(s.x + side.x * tok::view2d_gizmo3_d_ratio_3, s.y + side.y * tok::view2d_gizmo3_d_ratio_3),
+                                  ImVec2(s.x - side.x * tok::view2d_gizmo3_d_ratio_3, s.y - side.y * tok::view2d_gizmo3_d_ratio_3), col);
          else
-            dl->AddRectFilled(ImVec2(s.x - 5, s.y - 5), ImVec2(s.x + 5, s.y + 5), col);
-         const float d = SegDist2D(mouse, c, ImVec2(s.x + dir.x * 14.0f, s.y + dir.y * 14.0f));
-         if (d < best && std::hypot(mouse.x - c.x, mouse.y - c.y) > 11.0f)
+            dl->AddRectFilled(ImVec2(s.x - tok::space_1_25, s.y - tok::space_1_25), ImVec2(s.x + tok::space_1_25, s.y + tok::space_1_25), col);
+         const float d = SegDist2D(mouse, c, ImVec2(s.x + dir.x * tok::view2d_gizmo3_d_ratio_2, s.y + dir.y * tok::view2d_gizmo3_d_ratio_2));
+         if (d < best && std::hypot(mouse.x - c.x, mouse.y - c.y) > tok::view2d_gizmo3_d_limit)
          {
             best = d;
             hot = a;
          }
       }
-      dl->AddCircle(c, 8.0f, held == 3 || (held < 0 && sGizmoHot == 3) ? white : tok::U32(tok::canvas_ink, 190), 24, 1.5f);
-      if (std::hypot(mouse.x - c.x, mouse.y - c.y) <= 10.0f)
+      dl->AddCircle(c, tok::view2d_gizmo3_d_r_2, held == tok::view2d_gizmo3_d_add_circle_draw || (held < 0 && sGizmoHot == 3) ? white : tok::U32(tok::canvas_ink, 190), tok::view2d_gizmo3_d_segments, tok::view2d_gizmo3_d_stroke_2);
+      if (std::hypot(mouse.x - c.x, mouse.y - c.y) <= tok::view2d_gizmo3_d_limit_2)
          hot = 3;
       return hot;
    }
@@ -5482,8 +5482,8 @@ namespace
          float* v = a == 0 ? &l->rx : a == 1 ? &l->ry : &l->angle;
          float r = (a == 0 ? l0.rx : a == 1 ? l0.ry : l0.angle) + deg;
          if (snap)
-            r = std::round(r / 15.0f) * 15.0f;
-         *v = std::fmod(r + 540.0f, 360.0f) - 180.0f;
+            r = std::round(r / tok::view2d_drag_gizmo3_d_ratio) * tok::view2d_r_ratio_2;
+         *v = std::fmod(r + tok::view2d_drag_gizmo3_d_gap, 360.0f) - tok::view2d_v_gap;
       }
       else
       {
@@ -5603,9 +5603,9 @@ namespace
          const bool major = std::fabs(std::fmod(std::fabs(v) + 0.01f * step, step)) < 0.02f * step;
          if (sx < mn.x + kRuler)
             continue;
-         dl->AddLine(ImVec2(sx, mn.y + kRuler - (major ? kRuler * 0.7f : 4.0f)), ImVec2(sx, mn.y + kRuler), text);
+         dl->AddLine(ImVec2(sx, mn.y + kRuler - (major ? kRuler * tok::view2d_rulers_ratio : tok::view2d_rulers_assign)), ImVec2(sx, mn.y + kRuler), text);
          if (major)
-            dl->AddText(ImVec2(sx + 2.0f, mn.y), text, std::to_string((int)std::lround(v)).c_str());
+            dl->AddText(ImVec2(sx + tok::space_0_5, mn.y), text, std::to_string((int)std::lround(v)).c_str());
       }
       const float y0 = std::floor(((mn.y + kRuler) - o.y) / sZoom / step) * step;
       for (float v = y0; o.y + v * sZoom < mx.y; v += step * 0.1f)
@@ -5614,12 +5614,12 @@ namespace
          const bool major = std::fabs(std::fmod(std::fabs(v) + 0.01f * step, step)) < 0.02f * step;
          if (sy < mn.y + kRuler)
             continue;
-         dl->AddLine(ImVec2(mn.x + kRuler - (major ? kRuler * 0.7f : 4.0f), sy), ImVec2(mn.x + kRuler, sy), text);
+         dl->AddLine(ImVec2(mn.x + kRuler - (major ? kRuler * tok::view2d_rulers_ratio : tok::view2d_rulers_assign), sy), ImVec2(mn.x + kRuler, sy), text);
          if (major)
          {
             const std::string s = std::to_string((int)std::lround(v));
             for (size_t i = 0; i < s.size() && i < 5; i++)
-               dl->AddText(ImVec2(mn.x + 2.0f, sy + 1.0f + i * 9.0f), text, s.substr(i, 1).c_str());
+               dl->AddText(ImVec2(mn.x + tok::space_0_5, sy + 1.0f + i * tok::view2d_rulers_ratio_2), text, s.substr(i, 1).c_str());
          }
       }
       // Where the pointer is.
@@ -5659,7 +5659,7 @@ namespace
    {
       if (!sMarqueeCentre)
          return a;
-      return ImVec2(2.0f * a.x - e.x, 2.0f * a.y - e.y);
+      return ImVec2(tok::view2d_marquee_start_ratio * a.x - e.x, tok::view2d_marquee_start_ratio * a.y - e.y);
    }
    ImVec2 MarqueeEnd(ImVec2 a, ImVec2 b)
    {
@@ -5719,14 +5719,14 @@ namespace
       AddDocRect(dl, doc, x0, y0, x1, y1, tok::U32(tok::canvas_ink, 230));
       for (int i = 1; i < 3 && sCropThirds; i++)
       {
-         const float x = x0 + (x1 - x0) * i / 3.0f, y = y0 + (y1 - y0) * i / 3.0f;
+         const float x = x0 + (x1 - x0) * i / tok::view2d_x_ratio, y = y0 + (y1 - y0) * i / tok::view2d_y_ratio;
          dl->AddLine(ToScreen(doc, x, y0), ToScreen(doc, x, y1), tok::U32(tok::canvas_ink, 70));
          dl->AddLine(ToScreen(doc, x0, y), ToScreen(doc, x1, y), tok::U32(tok::canvas_ink, 70));
       }
       for (int i = 0; i < 8; i++)
       {
          const ImVec2 p = ToScreen(doc, x0 + (x1 - x0) * kHandleAt[i][0], y0 + (y1 - y0) * kHandleAt[i][1]);
-         dl->AddRectFilled(ImVec2(p.x - 4, p.y - 4), ImVec2(p.x + 4, p.y + 4), tok::U32(tok::canvas_ink));
+         dl->AddRectFilled(ImVec2(p.x - tok::space_1, p.y - tok::space_1), ImVec2(p.x + tok::space_1, p.y + tok::space_1), tok::U32(tok::canvas_ink));
       }
    }
 
@@ -5741,7 +5741,7 @@ namespace
             return i;
       }
       const ImVec2 md = ToDoc(doc, mouse);
-      return md.x > x0 && md.x < x1 && md.y > y0 && md.y < y1 ? 8 : -1;
+      return md.x > x0 && md.x < x1 && md.y > y0 && md.y < y1 ? tok::view2d_hover_crop_handle_assign : -1;
    }
 
    void DragCrop(Scene2DNode* doc, ImVec2 mouse)
@@ -5922,7 +5922,7 @@ namespace
       const ImGuiIO& io = ImGui::GetIO();
       if (!sOp.made)
       {
-         if (std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < 3.0f)
+         if (std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < tok::view2d_drag_shape_limit)
             return;
          PushUndoCheckpoint("Draw shape");
          Layer* l = DrawTarget(doc);
@@ -6019,7 +6019,7 @@ namespace
       if (open->Anchors() >= 2)
       {
          const ImVec2 f = BoxScreen(doc, *l, open->pts[0], open->pts[1]);
-         if (std::hypot(mouse.x - f.x, mouse.y - f.y) < 8.0f)
+         if (std::hypot(mouse.x - f.x, mouse.y - f.y) < tok::view2d_pen_click_limit)
          {
             open->closed = true;
             sAnchor = 0;
@@ -6040,7 +6040,7 @@ namespace
       if (items == nullptr || sPenItem < 0 || sPenItem >= (int)items->size())
          return;
       Shape& s = (*items)[sPenItem];
-      if (sAnchor < 0 || sAnchor >= s.Anchors() || std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < 2.0f)
+      if (sAnchor < 0 || sAnchor >= s.Anchors() || std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < tok::view2d_pen_drag_limit)
          return;
       float* p = &s.pts[(size_t)sAnchor * 6];
       const ImVec2 b = BoxPt(doc, *l, sMouseDoc);
@@ -6056,7 +6056,7 @@ namespace
    {
       auto near = [&](float bx, float by) {
          const ImVec2 q = BoxScreen(doc, l, bx, by);
-         return std::hypot(mouse.x - q.x, mouse.y - q.y) < 6.0f;
+         return std::hypot(mouse.x - q.x, mouse.y - q.y) < tok::view2d_hit_item_limit;
       };
       if (l.id == sItemLayer && sItem >= 0 && sItem < (int)items.size())
       {
@@ -6083,7 +6083,7 @@ namespace
          }
       }
       const ImVec2 b = BoxPt(doc, l, ToDoc(doc, mouse));
-      const float pad = 4.0f / std::max(0.01f, sZoom);
+      const float pad = tok::view2d_pad_ratio / std::max(tok::view2d_hit_item_bound, sZoom);
       for (int i = (int)items.size() - 1; i >= 0; i--)
       {
          float lo[2], hi[2];
@@ -6177,7 +6177,7 @@ namespace
                p[k] += (k % 2) == 0 ? dx : dy;
          else
          {
-            const int h = sPart == 1 ? 2 : 4, o = sPart == 1 ? 4 : 2;
+            const int h = sPart == 1 ? tok::view2d_h_3 : tok::view2d_h_4, o = sPart == 1 ? 4 : 2;
             p[h] += dx;
             p[h + 1] += dy;
             // The opposite handle turns with it, keeping its length; Alt breaks the pair.
@@ -6210,8 +6210,8 @@ namespace
             std::vector<ImVec2> q;
             for (size_t k = 0; k + 1 < ln.size(); k += 2)
                q.push_back(BoxScreen(doc, *l, ln[k], ln[k + 1]));
-            if (q.size() >= 2)
-               dl->AddPolyline(q.data(), (int)q.size(), Hex(kOutline, picked ? 1.0f : 0.45f), ImDrawFlags_None, picked ? 1.5f : 1.0f);
+            if (q.size() >= tok::view2d_vector_overlay_limit)
+               dl->AddPolyline(q.data(), (int)q.size(), Hex(kOutline, picked ? 1.0f : 0.45f), ImDrawFlags_None, picked ? tok::view2d_vector_overlay_stroke : 1.0f);
          }
          if (!picked || sTool == kShape)
             continue;
@@ -6219,12 +6219,12 @@ namespace
             const ImVec2 p = BoxScreen(doc, *l, bx, by);
             if (square)
             {
-               dl->AddRectFilled(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), white);
-               dl->AddRect(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), Hex(kOutline));
+               dl->AddRectFilled(ImVec2(p.x - tok::view2d_vector_overlay_gap, p.y - tok::view2d_vector_overlay_gap), ImVec2(p.x + tok::view2d_vector_overlay_gap, p.y + tok::view2d_vector_overlay_gap), white);
+               dl->AddRect(ImVec2(p.x - tok::view2d_vector_overlay_gap, p.y - tok::view2d_vector_overlay_gap), ImVec2(p.x + tok::view2d_vector_overlay_gap, p.y + tok::view2d_vector_overlay_gap), Hex(kOutline));
             }
             else
             {
-               dl->AddCircleFilled(p, 3.0f, Hex(kOutline));
+               dl->AddCircleFilled(p, tok::view2d_vector_overlay_r, Hex(kOutline));
             }
          };
          if (s.type == Shape::kPath)
@@ -6252,7 +6252,7 @@ namespace
          if (s.Anchors() > 0 && !s.closed)
          {
             const float* p = &s.pts[(size_t)(s.Anchors() - 1) * 6];
-            dl->AddLine(BoxScreen(doc, *l, p[0], p[1]), mouse, Hex(kOutline, 0.7f), 1.0f);
+            dl->AddLine(BoxScreen(doc, *l, p[0], p[1]), mouse, Hex(kOutline, 0.7f), tok::view2d_vector_overlay_stroke_2);
          }
       }
    }
@@ -6311,7 +6311,7 @@ namespace
       const size_t undo0 = gUndoStack.size();
       PushUndoCheckpoint("New text");
       TakeForeground();
-      const bool box = std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) > 6.0f;
+      const bool box = std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) > tok::view2d_box_limit;
       const float x = box ? std::min(sOp.docStart.x, sMouseDoc.x) : sOp.docStart.x;
       const float y = box ? std::min(sOp.docStart.y, sMouseDoc.y) : sOp.docStart.y;
       const int id = PlaceNew(doc, doc->AddTextLayer("", x, y, box ? std::fabs(sMouseDoc.x - sOp.docStart.x) : 0.0f, NewAbove(doc))).id;
@@ -6402,7 +6402,7 @@ namespace
             const int a = std::max(selA, ln.first), b = std::min(selB, ln.second);
             const float xa = left + advance(ln, a - ln.first);
             // A selected line break shows as a sliver past the line's end.
-            const float xb = left + advance(ln, b - ln.first) + (selB > ln.second ? std::max(2.0f, l.fontSize * 0.25f) : 0.0f);
+            const float xb = left + advance(ln, b - ln.first) + (selB > ln.second ? std::max(2.0f, l.fontSize * tok::view2d_text_marks_ratio) : 0.0f);
             sTextMarks.sel.push_back({ xa, y0, xb, y1 });
          }
       }
@@ -6421,7 +6421,7 @@ namespace
       doc->LayerBox(*l, bw, bh);
       ImVec2 c[4] = { BoxScreen(doc, *l, 0, 0), BoxScreen(doc, *l, bw, 0), BoxScreen(doc, *l, bw, bh), BoxScreen(doc, *l, 0, bh) };
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddPolyline(c, 4, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
+      dl->AddPolyline(c, tok::view2d_text_editor_add_polyline_draw, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
       // Type in place: the layer itself shows the text, so the input sits invisibly over the layer's box and
       // only a caret is drawn (one copy of the text, not two).
       const ImVec2 bmn(std::min(std::min(c[0].x, c[1].x), std::min(c[2].x, c[3].x)), std::min(std::min(c[0].y, c[1].y), std::min(c[2].y, c[3].y)));
@@ -6678,7 +6678,7 @@ namespace
          sFitH = d.h;
          sNeedFit = true;
       }
-      if (sNeedFit && size.x > 60.0f && size.y > 60.0f)
+      if (sNeedFit && size.x > tok::view2d_canvas_limit && size.y > tok::view2d_canvas_limit)
       {
          FitView(doc);
          sNeedFit = false;
@@ -6723,7 +6723,7 @@ namespace
             const int y1 = std::min(d.h, (int)std::ceil(std::max({ c0.y, c1.y, c2.y, c3.y })));
             const float al = std::min(0.22f, (sZoom - 8.0f) / 24.0f * 0.22f + 0.08f);
             const ImU32 gc = IM_COL32(200, 200, 200, (int)(al * 255.0f));
-            if (x1 - x0 < 600 && y1 - y0 < 600)
+            if (x1 - x0 < tok::view2d_canvas_limit_2 && y1 - y0 < tok::view2d_canvas_limit_2)
             {
                for (int x = x0; x <= x1; x++)
                   dl->AddLine(ToScreen(doc, (float)x, (float)y0), ToScreen(doc, (float)x, (float)y1), gc);
@@ -6737,9 +6737,9 @@ namespace
          if (const unsigned ants = doc->SelectionOverlay((float)ImGui::GetTime(), doc->quickMask))
             Thumb::AddQuad(dl, (ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       if (ViewTurned())
-         dl->AddPolyline(pq, 4, tok::U32(tok::canvas_shade, 120), ImDrawFlags_Closed, 1.0f);
+         dl->AddPolyline(pq, tok::view2d_canvas_add_polyline_draw, tok::U32(tok::canvas_shade, 120), ImDrawFlags_Closed, 1.0f);
       else
-         dl->AddRect(ImVec2(a.x - 1, a.y - 1), ImVec2(b.x + 1, b.y + 1), tok::U32(tok::canvas_shade, 120));
+         dl->AddRect(ImVec2(a.x - tok::space_0_25, a.y - tok::space_0_25), ImVec2(b.x + tok::space_0_25, b.y + tok::space_0_25), tok::U32(tok::canvas_shade, 120));
 
       if (d.grid && d.gridSize > 0.0f)
       {
@@ -6748,18 +6748,18 @@ namespace
          {
             int n = 0;
             for (float x = 0; x <= d.w + 0.01f; x += sub, n++)
-               dl->AddLine(ToScreen(doc, x, 0), ToScreen(doc, x, (float)d.h), Hex(kGrid, n % std::max(1, d.gridSubdiv) == 0 ? 0.55f : 0.2f));
+               dl->AddLine(ToScreen(doc, x, 0), ToScreen(doc, x, (float)d.h), Hex(kGrid, n % std::max(tok::view2d_canvas_bound, d.gridSubdiv) == 0 ? 0.55f : 0.2f));
             n = 0;
             for (float y = 0; y <= d.h + 0.01f; y += sub, n++)
-               dl->AddLine(ToScreen(doc, 0, y), ToScreen(doc, (float)d.w, y), Hex(kGrid, n % std::max(1, d.gridSubdiv) == 0 ? 0.55f : 0.2f));
+               dl->AddLine(ToScreen(doc, 0, y), ToScreen(doc, (float)d.w, y), Hex(kGrid, n % std::max(tok::view2d_canvas_bound, d.gridSubdiv) == 0 ? 0.55f : 0.2f));
          }
       }
       if (d.guidesOn)
       {
          for (float g : d.guidesX)
-            dl->AddLine(ToScreen(doc, g, -1e5f), ToScreen(doc, g, 1e5f), Hex(kGuide));
+            dl->AddLine(ToScreen(doc, g, -tok::view2d_canvas_to_screen_arg), ToScreen(doc, g, tok::view2d_canvas_to_screen_arg), Hex(kGuide));
          for (float g : d.guidesY)
-            dl->AddLine(ToScreen(doc, -1e5f, g), ToScreen(doc, 1e5f, g), Hex(kGuide));
+            dl->AddLine(ToScreen(doc, -tok::view2d_canvas_to_screen_arg, g), ToScreen(doc, tok::view2d_canvas_to_screen_arg, g), Hex(kGuide));
       }
 
       // Symmetry guides while a painting tool is up: the mirror axes, or the radial spokes, through the centre.
@@ -6777,7 +6777,7 @@ namespace
             const float r = std::hypot(cx, cy);
             for (int k = 0; k < n; k++)
             {
-               const float a = 2.0f * 3.14159265f * k / n - 1.5707963f;
+               const float a = tok::view2d_a_ratio * 3.14159265f * k / n - 1.5707963f;
                dl->AddLine(ToScreen(doc, cx, cy), ToScreen(doc, cx + std::cos(a) * r, cy + std::sin(a) * r), col);
             }
          }
@@ -6811,7 +6811,7 @@ namespace
                   {
                      ImVec2 q[4] = { BoxScreen(doc, *l, lo[0], lo[1]), BoxScreen(doc, *l, hi[0], lo[1]), BoxScreen(doc, *l, hi[0], hi[1]),
                                      BoxScreen(doc, *l, lo[0], hi[1]) };
-                     dl->AddPolyline(q, 4, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
+                     dl->AddPolyline(q, tok::view2d_canvas_add_polyline_draw, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
                   }
                   continue;
                }
@@ -6820,7 +6820,7 @@ namespace
                ImVec2 q[4];
                for (int i = 0; i < 4; i++)
                   q[i] = ToScreen(doc, c[i * 2], c[i * 2 + 1]);
-               dl->AddPolyline(q, 4, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
+               dl->AddPolyline(q, tok::view2d_canvas_add_polyline_draw, Hex(kOutline), ImDrawFlags_Closed, 1.0f);
             }
       const bool gizmo3d = canTransform && active->is3d;
       sGizmoHot = -1;
@@ -6835,13 +6835,13 @@ namespace
          {
             ImVec2 p;
             HandlePoint(doc, *active, kHandleAt[i][0], kHandleAt[i][1], p);
-            dl->AddRectFilled(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), tok::U32(tok::canvas_ink));
-            dl->AddRect(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), Hex(kOutline));
+            dl->AddRectFilled(ImVec2(p.x - tok::view2d_canvas_gap, p.y - tok::view2d_canvas_gap), ImVec2(p.x + tok::view2d_canvas_gap, p.y + tok::view2d_canvas_gap), tok::U32(tok::canvas_ink));
+            dl->AddRect(ImVec2(p.x - tok::view2d_canvas_gap, p.y - tok::view2d_canvas_gap), ImVec2(p.x + tok::view2d_canvas_gap, p.y + tok::view2d_canvas_gap), Hex(kOutline));
          }
          const ImVec2 an = ToScreen(doc, active->x, active->y);
-         dl->AddCircle(an, 4.0f, Hex(kOutline), 12, 1.5f);
-         dl->AddLine(ImVec2(an.x - 7, an.y), ImVec2(an.x + 7, an.y), Hex(kOutline));
-         dl->AddLine(ImVec2(an.x, an.y - 7), ImVec2(an.x, an.y + 7), Hex(kOutline));
+         dl->AddCircle(an, tok::view2d_canvas_r, Hex(kOutline), tok::view2d_canvas_segments, tok::view2d_canvas_stroke);
+         dl->AddLine(ImVec2(an.x - tok::view2d_canvas_gap_2, an.y), ImVec2(an.x + tok::view2d_canvas_gap_2, an.y), Hex(kOutline));
+         dl->AddLine(ImVec2(an.x, an.y - tok::view2d_canvas_gap_2), ImVec2(an.x, an.y + tok::view2d_canvas_gap_2), Hex(kOutline));
       }
       const bool groupT = !canTransform && GroupTarget(doc);
       if (groupT)
@@ -6853,8 +6853,8 @@ namespace
             for (int i = 0; i < 8; i++)
             {
                const ImVec2 p = GroupHandlePoint(doc, lo, hi, i);
-               dl->AddRectFilled(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), tok::U32(tok::canvas_ink));
-               dl->AddRect(ImVec2(p.x - 3.5f, p.y - 3.5f), ImVec2(p.x + 3.5f, p.y + 3.5f), Hex(kOutline));
+               dl->AddRectFilled(ImVec2(p.x - tok::view2d_canvas_gap, p.y - tok::view2d_canvas_gap), ImVec2(p.x + tok::view2d_canvas_gap, p.y + tok::view2d_canvas_gap), tok::U32(tok::canvas_ink));
+               dl->AddRect(ImVec2(p.x - tok::view2d_canvas_gap, p.y - tok::view2d_canvas_gap), ImVec2(p.x + tok::view2d_canvas_gap, p.y + tok::view2d_canvas_gap), Hex(kOutline));
             }
          }
       }
@@ -6863,15 +6863,15 @@ namespace
       if (sOp.kind == 15)
       {
          const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y);
-         if (std::hypot(mouse.x - p0.x, mouse.y - p0.y) > 6.0f)
+         if (std::hypot(mouse.x - p0.x, mouse.y - p0.y) > tok::view2d_canvas_limit_3)
             AddDocRect(dl, doc, sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, Hex(kOutline));
       }
       if (sOp.kind == 1 || sOp.kind == 2)
       {
          for (float x : sSnapX)
-            dl->AddLine(ToScreen(doc, x, -1e5f), ToScreen(doc, x, 1e5f), Hex(kSmart));
+            dl->AddLine(ToScreen(doc, x, -tok::view2d_canvas_to_screen_arg), ToScreen(doc, x, tok::view2d_canvas_to_screen_arg), Hex(kSmart));
          for (float y : sSnapY)
-            dl->AddLine(ToScreen(doc, -1e5f, y), ToScreen(doc, 1e5f, y), Hex(kSmart));
+            dl->AddLine(ToScreen(doc, -tok::view2d_canvas_to_screen_arg, y), ToScreen(doc, tok::view2d_canvas_to_screen_arg, y), Hex(kSmart));
       }
       // Shapes being dragged out by the pixel tools.
       const ImU32 ink = tok::U32(tok::canvas_ink, 230), shade = tok::U32(tok::canvas_shade, 160);
@@ -6887,8 +6887,8 @@ namespace
             ImVec2 ring[64];
             for (int i = 0; i < 64; i++)
                ring[i] = ToScreen(doc, cx + rx * std::cos(i * 6.2831853f / 64.0f), cy + ry * std::sin(i * 6.2831853f / 64.0f));
-            dl->AddPolyline(ring, 64, shade, ImDrawFlags_Closed, 2.5f);
-            dl->AddPolyline(ring, 64, ink, ImDrawFlags_Closed, 1.0f);
+            dl->AddPolyline(ring, tok::view2d_canvas_add_polyline_draw_2, shade, ImDrawFlags_Closed, tok::view2d_canvas_stroke_2);
+            dl->AddPolyline(ring, tok::view2d_canvas_add_polyline_draw_2, ink, ImDrawFlags_Closed, 1.0f);
          }
          else
          {
@@ -6903,9 +6903,9 @@ namespace
             q.push_back(ToScreen(doc, pts[i], pts[i + 1]));
          if (toMouse)
             q.push_back(mouse);
-         if (q.size() >= 2)
+         if (q.size() >= tok::view2d_canvas_limit_4)
          {
-            dl->AddPolyline(q.data(), (int)q.size(), shade, ImDrawFlags_None, 2.5f);
+            dl->AddPolyline(q.data(), (int)q.size(), shade, ImDrawFlags_None, tok::view2d_canvas_stroke_2);
             dl->AddPolyline(q.data(), (int)q.size(), ink, ImDrawFlags_None, 1.0f);
          }
       };
@@ -6918,14 +6918,14 @@ namespace
          ImVec2 q[4];
          DocRect(doc, sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, q);
          dl->AddQuadFilled(q[0], q[1], q[2], q[3], tok::U32(tok::canvas_select, 40));
-         dl->AddPolyline(q, 4, tok::U32(tok::canvas_select, 220), ImDrawFlags_Closed, 1.0f);
+         dl->AddPolyline(q, tok::view2d_canvas_add_polyline_draw, tok::U32(tok::canvas_select, 220), ImDrawFlags_Closed, 1.0f);
       }
       if (sOp.kind == 8)
       {
          const ImVec2 p0 = ToScreen(doc, sOp.docStart.x, sOp.docStart.y);
-         dl->AddLine(p0, mouse, shade, 2.5f);
-         dl->AddLine(p0, mouse, ink, 1.0f);
-         dl->AddCircleFilled(p0, 3.0f, ink);
+         dl->AddLine(p0, mouse, shade, tok::view2d_canvas_stroke_2);
+         dl->AddLine(p0, mouse, ink, tok::view2d_canvas_stroke_3);
+         dl->AddCircleFilled(p0, tok::view2d_canvas_r_2, ink);
       }
       if (sTool == kCrop)
       {
@@ -6970,17 +6970,17 @@ namespace
          }
          else if (io.KeyShift)
          {
-            sPan.x += (io.MouseWheelH + io.MouseWheel) * 12.0f;
+            sPan.x += (io.MouseWheelH + io.MouseWheel) * tok::view2d_x_ratio_2;
          }
          else
          {
-            sPan.x += io.MouseWheelH * 10.0f;
-            sPan.y += io.MouseWheel * 10.0f;
+            sPan.x += io.MouseWheelH * tok::view2d_x_ratio_3;
+            sPan.y += io.MouseWheel * tok::view2d_y_ratio_2;
          }
 #else
          if (io.KeyShift)
          {
-            sPan.x += (io.MouseWheelH + io.MouseWheel) * 12.0f;
+            sPan.x += (io.MouseWheelH + io.MouseWheel) * tok::view2d_x_ratio_2;
          }
          else
          {
@@ -7023,21 +7023,21 @@ namespace
       // Just outside a corner turns the layer: a curved-arrow badge says so (ImGui has no rotate cursor).
       if (hovered && !panTool && ((sOp.kind == 0 && hoverHandle == 8) || sOp.kind == 3 || sOp.kind == 21))
       {
-         const ImVec2 c(mouse.x + 16.0f, mouse.y + 16.0f);
-         const float r = 6.0f, a0 = -2.6f, a1 = 1.2f;
+         const ImVec2 c(mouse.x + tok::space_4, mouse.y + tok::space_4);
+         const float r = tok::view2d_r_3, a0 = -2.6f, a1 = tok::view2d_a1;
          for (int pass = 0; pass < 2; pass++)
          {
             const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, 200) : tok::U32(tok::canvas_ink);
             const float th = pass == 0 ? 3.5f : 1.5f;
-            dl->PathArcTo(c, r, a0, a1, 14);
+            dl->PathArcTo(c, r, a0, a1, tok::view2d_canvas_segments_2);
             dl->PathStroke(col, 0, th);
             const ImVec2 tip(c.x + r * std::cos(a1), c.y + r * std::sin(a1));
             const ImVec2 tan(-std::sin(a1), std::cos(a1));   // the way the arc runs at its end
             const ImVec2 nrm(std::cos(a1), std::sin(a1));
-            const ImVec2 p1(tip.x - tan.x * 4.0f + nrm.x * 3.0f, tip.y - tan.y * 4.0f + nrm.y * 3.0f);
-            const ImVec2 p2(tip.x - tan.x * 4.0f - nrm.x * 3.0f, tip.y - tan.y * 4.0f - nrm.y * 3.0f);
+            const ImVec2 p1(tip.x - tan.x * tok::view2d_canvas_ratio + nrm.x * tok::view2d_canvas_ratio_2, tip.y - tan.y * tok::view2d_canvas_ratio + nrm.y * tok::view2d_canvas_ratio_2);
+            const ImVec2 p2(tip.x - tan.x * tok::view2d_canvas_ratio - nrm.x * tok::view2d_canvas_ratio_2, tip.y - tan.y * tok::view2d_canvas_ratio - nrm.y * tok::view2d_canvas_ratio_2);
             if (pass == 0)
-               dl->AddTriangleFilled(ImVec2(tip.x + tan.x * 1.5f, tip.y + tan.y * 1.5f), p1, p2, col);
+               dl->AddTriangleFilled(ImVec2(tip.x + tan.x * tok::view2d_canvas_ratio_3, tip.y + tan.y * tok::view2d_canvas_ratio_3), p1, p2, col);
             else
                dl->AddTriangleFilled(tip, p1, p2, col);
          }
@@ -7058,9 +7058,9 @@ namespace
          {
             const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, 170) : tok::U32(tok::canvas_ink);
             const float th = pass == 0 ? 3.0f : 1.0f;
-            dl->AddLine(ImVec2(src.x - 7, src.y), ImVec2(src.x + 7, src.y), col, th);
-            dl->AddLine(ImVec2(src.x, src.y - 7), ImVec2(src.x, src.y + 7), col, th);
-            dl->AddCircle(src, 4.0f, col, 16, th);
+            dl->AddLine(ImVec2(src.x - tok::view2d_canvas_gap_2, src.y), ImVec2(src.x + tok::view2d_canvas_gap_2, src.y), col, th);
+            dl->AddLine(ImVec2(src.x, src.y - tok::view2d_canvas_gap_2), ImVec2(src.x, src.y + tok::view2d_canvas_gap_2), col, th);
+            dl->AddCircle(src, tok::view2d_canvas_r, col, tok::view2d_canvas_segments_3, th);
          }
          dl->PopClipRect();
       }
@@ -7291,7 +7291,7 @@ namespace
             if (sPoly.empty())
                sPolyOp = SelOpFor(io);
             const ImVec2 first = sPoly.empty() ? mouse : ToScreen(doc, sPoly[0], sPoly[1]);
-            const bool closing = sPoly.size() >= 6 && (std::hypot(mouse.x - first.x, mouse.y - first.y) < 8.0f ||
+            const bool closing = sPoly.size() >= tok::view2d_closing_limit && (std::hypot(mouse.x - first.x, mouse.y - first.y) < tok::view2d_canvas_limit_5 ||
                                                        ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left));
             if (closing)
                ClosePoly(doc);
@@ -7483,8 +7483,8 @@ namespace
          else if (sOp.kind == 28)
          {
             BrushEngine::Brush& b = ToolBrush();
-            b.size = std::clamp(sOp.hx + (mouse.x - sOp.start.x) * 2.0f / std::max(0.05f, sZoom), 1.0f, 1000.0f);
-            b.hardness = std::clamp(sOp.hy - (mouse.y - sOp.start.y) * 0.005f, 0.0f, 1.0f);
+            b.size = std::clamp(sOp.hx + (mouse.x - sOp.start.x) * tok::view2d_canvas_ratio_4 / std::max(tok::view2d_canvas_bound_2, sZoom), 1.0f, tok::view2d_canvas_bound_3);
+            b.hardness = std::clamp(sOp.hy - (mouse.y - sOp.start.y) * tok::view2d_canvas_ratio_5, 0.0f, 1.0f);
          }
          else if (sOp.kind == 22)
          {
@@ -7498,11 +7498,11 @@ namespace
             DragCrop(doc, mouse);
          else if (sOp.kind == 19)
          {
-            if (std::fabs(mouse.x - sOp.start.x) >= 3.0f)
+            if (std::fabs(mouse.x - sOp.start.x) >= tok::view2d_canvas_limit_6)
             {
                sZoom = sOp.zoom0;
                sPan = sOp.pan0;
-               ZoomAt(doc, std::exp((mouse.x - sOp.start.x) * 0.01f), sOp.start);
+               ZoomAt(doc, std::exp((mouse.x - sOp.start.x) * tok::view2d_canvas_ratio_6), sOp.start);
             }
          }
          else if (sOp.kind == 7)
@@ -7524,7 +7524,7 @@ namespace
          else if (sOp.kind == 10)
          {
             const ImVec2 last = ToScreen(doc, sOp.path[sOp.path.size() - 2], sOp.path.back());
-            if (std::hypot(mouse.x - last.x, mouse.y - last.y) >= 2.0f)
+            if (std::hypot(mouse.x - last.x, mouse.y - last.y) >= tok::view2d_canvas_limit_7)
             {
                sOp.path.push_back(sMouseDoc.x);
                sOp.path.push_back(sMouseDoc.y);
@@ -7538,7 +7538,7 @@ namespace
             NodeDrag(doc);
          else if (sOp.kind == 23)
          {
-            const float dx = (mouse.x - sOp.start.x) / 300.0f, dy = (sOp.start.y - mouse.y) / 300.0f;
+            const float dx = (mouse.x - sOp.start.x) / tok::view2d_dx_ratio, dy = (sOp.start.y - mouse.y) / tok::view2d_dy_ratio;
             WithAdjKey(doc, sOp.guideIndex, [&](auto& x)
             {
                if (x.adjType == Scene2DNode::kAdjCurves)
@@ -7580,8 +7580,8 @@ namespace
          {
             if (sOp.kind == 7)
                EndStroke(doc);
-            else if (sOp.kind == 19 && std::fabs(mouse.x - sOp.start.x) < 3.0f)
-               ZoomAt(doc, io.KeyAlt ? 0.5f : 2.0f, mouse);
+            else if (sOp.kind == 19 && std::fabs(mouse.x - sOp.start.x) < tok::view2d_canvas_limit_6)
+               ZoomAt(doc, io.KeyAlt ? 0.5f : tok::view2d_canvas_zoom_at_arg, mouse);
             else if (sOp.kind == 5 && !CropBoxOk())
                std::copy(sOp.cropWas, sOp.cropWas + 4, sCrop);   // a click without a drag keeps the box there was
             else if (sOp.kind == 13)
@@ -7593,7 +7593,7 @@ namespace
             }
             else if (sOp.kind == 17)
                MarqueeLayers(doc, sOp.docStart, sMouseDoc, true);   // the press already cleared it unless Shift
-            else if (sOp.kind == 24 && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= 3.0f)
+            else if (sOp.kind == 24 && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= tok::view2d_canvas_limit_6)
             {
                Layer* al = Active(doc);
                SelStep("Object selection");
@@ -7601,7 +7601,7 @@ namespace
                if (sObjSoft)
                   doc->ModifySelection(4, 2);
             }
-            else if (sOp.kind == 25 && doc->HasSelection() && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= 3.0f &&
+            else if (sOp.kind == 25 && doc->HasSelection() && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= tok::view2d_canvas_limit_6 &&
                      !PaintRefused(doc))
             {
                // The selection is mended from where it was dragged to.
@@ -7620,12 +7620,12 @@ namespace
             else if (sOp.kind == 15)
                TextRelease(doc, mouse);
             else if (sOp.kind == 8 && std::hypot(mouse.x - ToScreen(doc, sOp.docStart.x, sOp.docStart.y).x,
-                                                 mouse.y - ToScreen(doc, sOp.docStart.x, sOp.docStart.y).y) > 2.0f)
+                                                 mouse.y - ToScreen(doc, sOp.docStart.x, sOp.docStart.y).y) > tok::view2d_canvas_limit_7)
                GradientTo(doc, sOp.docStart, sMouseDoc);
             else if (sOp.kind == 9)
             {
                // A click without a drag drops the selection, as in every image editor.
-               if (std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < 3.0f)
+               if (std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < tok::view2d_canvas_limit_6)
                {
                   if (sOp.selOp == Scene2DNode::kSelNew && doc->HasSelection())
                   {
@@ -7643,7 +7643,7 @@ namespace
             }
             else if (sOp.kind == 10)
             {
-               if (sOp.path.size() >= 6)
+               if (sOp.path.size() >= tok::view2d_canvas_limit_8)
                {
                   SelStep("Lasso");
                   doc->SelectPolygon(sOp.path, sOp.selOp, sFeather, true);
@@ -7681,10 +7681,10 @@ namespace
       const float top = ImGui::GetItemRectMin().y;
       FormParts::Inline(0.0f, tok::space_2);
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float x = std::round(p.x) + 0.5f;
-      ImGui::GetWindowDrawList()->AddLine(ImVec2(x, top + 6.0f), ImVec2(x, top + sRowH - 6.0f), ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
+      const float x = std::round(p.x) + tok::px_align;
+      ImGui::GetWindowDrawList()->AddLine(ImVec2(x, top + tok::space_1_5), ImVec2(x, top + sRowH - tok::space_1_5), ImGui::GetColorU32(ImGuiCol_Separator), tok::view2d_bar_divider_stroke);
       ImGui::SetCursorScreenPos(ImVec2(p.x, top));
-      ImGui::Dummy(ImVec2(1.0f, sRowH));
+      ImGui::Dummy(ImVec2(tok::view2d_bar_divider_dummy_w, sRowH));
       FormParts::Inline(0.0f, tok::space_2);
    }
 
@@ -7696,7 +7696,7 @@ namespace
       char a[64], b[64];
       std::snprintf(a, sizeof a, fmt, lo);
       std::snprintf(b, sizeof b, fmt, hi);
-      const float fit = std::max(ImGui::CalcTextSize(a).x, ImGui::CalcTextSize(b).x) + 2.0f * tok::space_2 + 4.0f;
+      const float fit = std::max(ImGui::CalcTextSize(a).x, ImGui::CalcTextSize(b).x) + tok::view2d_fit_ratio * tok::space_2 + tok::space_1;
       // One width for every bar slider (wider only when its text needs it), so bars line up tool to tool.
       ImGui::SetNextItemWidth(w > 0.0f ? std::max(w, fit) : fit);
       FieldWell::Slider(id, v, lo, hi, fmt);
@@ -7759,7 +7759,7 @@ namespace
          sLabelW = UiDensity::M().label + tok::space_4;   // "Accumulation" at compact text fits
          // Fixed strip widths, like the main Settings window's fixed control width: a window resized taller (or a
          // popover) never stretches its rows.
-         sFieldW = UiDensity::kPopoverW - sLabelW - 2.0f * ImGui::GetStyle().WindowPadding.x; // padding both sides
+         sFieldW = UiDensity::kPopoverW - sLabelW - tok::view2d_field_w_ratio * ImGui::GetStyle().WindowPadding.x; // padding both sides
       }
       ~MoreRows()
       {
@@ -7770,7 +7770,7 @@ namespace
    };
    struct MorePopupScope
    {
-      MorePopupScope() { ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(200.0f, ImGui::GetMainViewport()->Size.y * 0.6f))); }
+      MorePopupScope() { ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, std::max(tok::view2d_more_popup_scope_bound, ImGui::GetMainViewport()->Size.y * tok::view2d_more_popup_scope_ratio))); }
    };
    // The chip opens a settings window, not a popover: it stays open while you paint and closes like any floating
    // window (its close button, Esc, or the chip again). The window sits under the chip, right edges aligned.
@@ -8141,7 +8141,7 @@ namespace
          const auto& presets = BrushEngine::Presets();
          ImGui::SetNextItemWidth(kWellL);
          const char* shown = preset >= 0 && preset < (int)presets.size() ? presets[preset].name : "";
-         ImGui::SetNextWindowSizeConstraints(ImVec2(260.0f, 0.0f), ImVec2(FLT_MAX, MenuParts::ListMaxH()));
+         ImGui::SetNextWindowSizeConstraints(ImVec2(tok::view2d_pixel_bar_set_next_window_size_constraints_x, 0.0f), ImVec2(FLT_MAX, MenuParts::ListMaxH()));
          if (MenuParts::BeginCombo("##v2dpreset", T(shown)))
          {
             const char* group = nullptr;
@@ -8162,8 +8162,8 @@ namespace
                {
                   const ImVec2 rmx = ImGui::GetItemRectMax(), rmn = ImGui::GetItemRectMin();
                   const float cy = (rmn.y + rmx.y) * 0.5f;
-                  Thumb::Add(ImGui::GetWindowDrawList(), (ImTextureID)(intptr_t)thumb, ImVec2(rmx.x - 96.0f - tok::space_2, cy - 12.0f),
-                                                       ImVec2(rmx.x - tok::space_2, cy + 12.0f), ImVec2(0, 1), ImVec2(1, 0));
+                  Thumb::Add(ImGui::GetWindowDrawList(), (ImTextureID)(intptr_t)thumb, ImVec2(rmx.x - tok::view2d_pixel_bar_gap - tok::space_2, cy - tok::space_3),
+                                                       ImVec2(rmx.x - tok::space_2, cy + tok::space_3), ImVec2(0, 1), ImVec2(1, 0));
                }
                if (chose)
                {
@@ -8222,7 +8222,7 @@ namespace
                float scatterY = b.scatterY < 0.0f ? b.jitter : b.scatterY;
                MorePct(T("Scatter"), &b.jitter, 0.0f, 200.0f);
                MorePct(T("Scatter Y"), &scatterY, 0.0f, 200.0f);
-               if (std::fabs(scatterY - (b.scatterY < 0.0f ? b.jitter : b.scatterY)) > 1e-6f)
+               if (std::fabs(scatterY - (b.scatterY < 0.0f ? b.jitter : b.scatterY)) > tok::view2d_pixel_bar_limit)
                   b.scatterY = scatterY;
                MoreSlider(T("Taper in"), &b.taperIn, 0.0f, 1000.0f, "%.0f px");
                MoreSlider(T("Taper out"), &b.taperOut, 0.0f, 1000.0f, "%.0f px");
@@ -8489,9 +8489,9 @@ namespace
       else if (sTool == kPick)
       {
          static const char* kSample[3] = { "Point", "3x3 average", "5x5 average" };
-         int si = sPickSize / 2;
+         int si = sPickSize / tok::view2d_si_ratio;
          if (BarCombo("##v2dpsize", &si, kSample, 3, kWellL))
-            sPickSize = si * 2 + 1;
+            sPickSize = si * tok::view2d_pick_size_ratio + 1;
          gap();
          static const char* kFrom[2] = { "All layers", "Current layer" };
          int from = sPickLayer ? 1 : 0;
@@ -8542,7 +8542,7 @@ namespace
          changed = true;
       }
       next();
-      if (FormParts::ColorDot("##v2dvfillc", t.fillC, std::min(tok::colour_dot, sRowH - 4.0f), sRowH))
+      if (FormParts::ColorDot("##v2dvfillc", t.fillC, std::min(tok::colour_dot, sRowH - tok::space_1), sRowH))
       {
          // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
          static double sAt = -1.0;
@@ -8628,7 +8628,7 @@ namespace
          changed = true;
       }
       next();
-      if (FormParts::ColorDot("##v2dvstrokec", t.strokeC, std::min(tok::colour_dot, sRowH - 4.0f), sRowH))
+      if (FormParts::ColorDot("##v2dvstrokec", t.strokeC, std::min(tok::colour_dot, sRowH - tok::space_1), sRowH))
       {
          // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
          static double sAt = -1.0;
@@ -8771,7 +8771,7 @@ namespace
             float pct = t.radius / side * 100.0f;
             if (FieldWell::Slider("##v2dvradp", &pct, 0.0f, 50.0f, "Radius %.0f%%"))
             {
-               t.radius = pct * side / 100.0f;
+               t.radius = pct * side / tok::view2d_radius_ratio;
                changed = true;
             }
          }
@@ -8933,7 +8933,7 @@ namespace
       budget--;
       f.tried = true;
       const float scale = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y);
-      const float probe = 40.0f * scale;   // render big, then scale down to the row
+      const float probe = tok::view2d_probe_ratio * scale;   // render big, then scale down to the row
       const int cw = (int)std::ceil(probe * 16.0f), ch = (int)std::ceil(probe * 2.0f);
       auto raster = [&](const std::string& text, std::vector<unsigned char>& buf)
       {
@@ -8943,8 +8943,8 @@ namespace
          req.fontName = fam;
          req.fontSize = probe;
          req.align = 1;
-         req.posX = 0.5f;
-         req.posY = 0.5f;
+         req.posX = tok::view2d_pos_x;
+         req.posY = tok::view2d_pos_y;
          req.wrapWidth = 1.0f;
          req.wrapHeight = 1.0f;
          float fitted = probe;
@@ -8956,7 +8956,7 @@ namespace
       int nx0, ny0, nx1, ny1, hx0, hy0, hx1, hy1;
       if (!InkBox(name, cw, ch, nx0, ny0, nx1, ny1))
          return nullptr;
-      float capPx = probe * 0.7f, baseRow = (float)ny1;
+      float capPx = probe * tok::view2d_cap_px_ratio, baseRow = (float)ny1;
       if (InkBox(cap, cw, ch, hx0, hy0, hx1, hy1) && hy1 > hy0)
       {
          capPx = (float)(hy1 - hy0 + 1);
@@ -8965,7 +8965,7 @@ namespace
       // Target: the UI font's cap height, in screen points.
       const float k = std::clamp(ImGui::GetFontSize() * tok::type_cap_em / capPx, 0.0f, 4.0f);   // probe px -> points
       const int w = nx1 - nx0 + 1, h = ny1 - ny0 + 1;
-      std::vector<unsigned char> out((size_t)w * h * 4);
+      std::vector<unsigned char> out((size_t)w * h * 4);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
       for (int y = 0; y < h; y++)
          for (int x = 0; x < w; x++)
          {
@@ -9007,7 +9007,7 @@ namespace
          const float maxW = b.x - a.x;
          const float w = std::min(f->w, maxW);
          const float top = std::round(baseline - f->base);
-         dl->PushClipRect(ImVec2(a.x, a.y - 8.0f), ImVec2(b.x, b.y + 8.0f), true);
+         dl->PushClipRect(ImVec2(a.x, a.y - tok::space_2), ImVec2(b.x, b.y + tok::space_2), true);
          Thumb::Add(dl, (ImTextureID)(intptr_t)f->tex, ImVec2(a.x, top), ImVec2(a.x + w, top + f->h), ImVec2(0, 0), ImVec2(w / f->w, 1), col);
          dl->PopClipRect();
       }
@@ -9022,7 +9022,7 @@ namespace
          return;
       sRecentFonts.erase(std::remove(sRecentFonts.begin(), sRecentFonts.end(), fam), sRecentFonts.end());
       sRecentFonts.insert(sRecentFonts.begin(), fam);
-      if (sRecentFonts.size() > 5)
+      if (sRecentFonts.size() > tok::view2d_note_recent_font_limit)
          sRecentFonts.resize(5);
    }
 
@@ -9047,11 +9047,11 @@ namespace
       auto nameOf = [](const std::string& f) { return f.empty() ? std::string(T("Default")) : f; };
       bool changed = false;
       ImGui::SetNextItemWidth(width);
-      ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(300.0f, MenuParts::ListMaxH(MenuParts::kMaxListRows + 5)));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::view2d_font_picker_set_next_window_size_constraints_x, 0.0f), ImVec2(tok::view2d_font_picker_set_next_window_size_constraints_x, MenuParts::ListMaxH(MenuParts::kMaxListRows + tok::view2d_font_picker_gap)));
       if (MenuParts::BeginCombo(id, nameOf(openHere ? sFontOrig : font).c_str(), ImGuiComboFlags_HeightLargest))
       {
          // The bar's tile padding stops here: the search field and rows are the side panel's size.
-         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, std::max(1.0f, (SideChip() - ImGui::GetFontSize()) * 0.5f)));
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, std::max(tok::view2d_font_picker_bound, (SideChip() - ImGui::GetFontSize()) * 0.5f)));
          if (!openHere)
          {
             sOpenId = id;
@@ -9068,7 +9068,7 @@ namespace
             ImGui::GetWindowDrawList()->AddText(ImVec2(fa.x + ImGui::GetStyle().FramePadding.x, fa.y + ImGui::GetStyle().FramePadding.y),
                                                 ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.4f)), T("Search"));
          }
-         ImGui::Dummy(ImVec2(0.0f, 2.0f));
+         ImGui::Dummy(ImVec2(0.0f, tok::view2d_font_picker_dummy_h));
          std::string want = sFontFind;
          std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
          const std::string* hovered = nullptr;
@@ -9113,7 +9113,7 @@ namespace
          }
          const float rowH = MenuParts::kRow;
          // Default and Recent rows come out of the list's 12, so the whole popup stays one dropdown tall.
-         const int extra = want.empty() ? 1 + (sRecentFonts.empty() ? 0 : (int)sRecentFonts.size() + 2) : 0;
+         const int extra = want.empty() ? 1 + (sRecentFonts.empty() ? 0 : (int)sRecentFonts.size() + tok::view2d_font_picker_gap_2) : 0;
          const int listRows = std::clamp(MenuParts::kMaxListRows - extra, 6, MenuParts::kMaxListRows);
          const float listH = std::min((float)rows.size(), (float)listRows) * rowH;
          // The list spans the popup edge to edge with the popup's own side padding, so its rows, washes and text
@@ -9127,7 +9127,7 @@ namespace
                            ImGuiWindowFlags_NoBackground);
          ImGui::PopStyleVar();
          if (ImGui::IsWindowAppearing() && curRow >= 0)
-            ImGui::SetScrollY(std::max(0.0f, curRow * rowH - listH * 0.4f));
+            ImGui::SetScrollY(std::max(0.0f, curRow * rowH - listH * tok::view2d_font_picker_ratio));
          ImGuiListClipper clip;
          clip.Begin((int)rows.size(), rowH);
          while (clip.Step())
@@ -9205,7 +9205,7 @@ namespace
          if (i > 0)
             next();
          // Cells fill the field column exactly, rounding spread so no chip is more than 1 px off another.
-         const float w = chipW > 0.0f ? PanelKit::StripW(sFieldW, 4, i) : 0.0f;
+         const float w = chipW > 0.0f ? PanelKit::StripW(sFieldW, tok::view2d_text_style_chips_strip_w_arg, i) : 0.0f;
          if (TextChip(kLabels[i], *v[i], T(kTips[i]), w))
          {
             undo();
@@ -9223,7 +9223,7 @@ namespace
       Layer* a = Active(doc);
       Layer* l = a != nullptr && a->kind == Kind::Text ? a : nullptr;
       std::string& font = l != nullptr ? l->font : sFont;
-      float autoSize = std::clamp(std::round(doc->Doc().h / 12.0f), 12.0f, 400.0f);
+      float autoSize = std::clamp(std::round(doc->Doc().h / tok::view2d_text_bar_ratio), tok::view2d_text_bar_bound, tok::view2d_text_bar_bound_2);
       float& size = l != nullptr ? l->fontSize : (sTextSize > 0.0f ? sTextSize : (sTextSize = autoSize));
       float& leading = l != nullptr ? l->leading : sLeading;
       float& tracking = l != nullptr ? l->tracking : sTracking;
@@ -9266,7 +9266,7 @@ namespace
       changed |= TextStyleChips(l != nullptr ? &l->bold : &sBold, l != nullptr ? &l->italic : &sItalic,
                                 l != nullptr ? &l->underline : &sUnder, l != nullptr ? &l->caps : &sCaps, undo, next);
       gap();
-      if (FormParts::ColorDot("##v2dtextc", colour, std::min(tok::colour_dot, sRowH - 4.0f), sRowH))
+      if (FormParts::ColorDot("##v2dtextc", colour, std::min(tok::colour_dot, sRowH - tok::space_1), sRowH))
       {
          // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
          static double sAt = -1.0;
@@ -9446,11 +9446,11 @@ namespace
    {
       const int n = VisibleTools();
       const float step = PanelKit::Chip() + tok::space_1;
-      const float oneCol = n * step + 4 * (tok::space_1 + 1.0f) + tok::space_1 + 3 * step;   // + sections + chips rows
+      const float oneCol = n * step + tok::view2d_one_col_ratio * (tok::space_1 + 1.0f) + tok::space_1 + tok::view2d_one_col_ratio_2 * step;   // + sections + chips rows
       if (oneCol <= h)
          return 1;
       for (int cols = 2; cols < 6; cols++)
-         if (((n + cols - 1) / cols + (cols >= 3 ? 1 : 2)) * step + tok::space_1 <= h)
+         if (((n + cols - 1) / cols + (cols >= 3 ? 1 : tok::view2d_strip_columns_assign)) * step + tok::space_1 <= h)
             return cols;
       return 6;
    }
@@ -9482,13 +9482,13 @@ namespace
       ColourChip::Swatch(dl, p, sq, sFg);
       const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text);
       // swap: a bent arrow in the top-right corner
-      const ImVec2 s0(p.x + sq + 2.5f, p.y + 2.5f);
-      dl->AddBezierQuadratic(ImVec2(s0.x, s0.y + 0.5f), ImVec2(s0.x + 6.0f, s0.y + 0.5f), ImVec2(s0.x + 6.0f, s0.y + 6.5f), ink, 1.2f);
+      const ImVec2 s0(p.x + sq + tok::view2d_fg_bg_tile_gap, p.y + tok::view2d_fg_bg_tile_gap);
+      dl->AddBezierQuadratic(ImVec2(s0.x, s0.y + tok::px_align), ImVec2(s0.x + tok::space_1_5, s0.y + tok::px_align), ImVec2(s0.x + tok::space_1_5, s0.y + tok::view2d_fg_bg_tile_gap_2), ink, tok::view2d_fg_bg_tile_add_bezier_quadratic_draw);
       // reset: a tiny black-over-white pair in the bottom-left corner
-      const ImVec2 r0(p.x + 1.5f, p.y + sq + 3.0f);
-      dl->AddRectFilled(ImVec2(r0.x + 2.5f, r0.y + 2.5f), ImVec2(r0.x + 7.0f, r0.y + 7.0f), tok::U32(tok::canvas_ink));
-      dl->AddRectFilled(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), tok::U32(tok::canvas_shade));
-      dl->AddRect(r0, ImVec2(r0.x + 4.5f, r0.y + 4.5f), edge);
+      const ImVec2 r0(p.x + tok::view2d_fg_bg_tile_gap_3, p.y + sq + tok::space_0_75);
+      dl->AddRectFilled(ImVec2(r0.x + tok::view2d_fg_bg_tile_gap, r0.y + tok::view2d_fg_bg_tile_gap), ImVec2(r0.x + tok::view2d_fg_bg_tile_gap_4, r0.y + tok::view2d_fg_bg_tile_gap_4), tok::U32(tok::canvas_ink));
+      dl->AddRectFilled(r0, ImVec2(r0.x + tok::view2d_fg_bg_tile_gap_5, r0.y + tok::view2d_fg_bg_tile_gap_5), tok::U32(tok::canvas_shade));
+      dl->AddRect(r0, ImVec2(r0.x + tok::view2d_fg_bg_tile_gap_5, r0.y + tok::view2d_fg_bg_tile_gap_5), edge);
       for (int i = 0; i < 2; i++)
          if (MenuParts::BeginPopup(i == 0 ? "##v2dfgpick" : "##v2dbgpick"))
          {
@@ -9540,7 +9540,7 @@ namespace
       {
          const char* a = T("Essentials");
          const char* b = T("All");
-         const float pad = 2.0f * tok::space_2;
+         const float pad = tok::view2d_pad_ratio_2 * tok::space_2;
          const float wa = ImGui::CalcTextSize(a).x + pad, wb = ImGui::CalcTextSize(b).x + pad;
          ImGui::SameLine();
          const float x = ImGui::GetWindowContentRegionMax().x - wa - wb - tok::space_1;
@@ -9562,7 +9562,7 @@ namespace
          }
       }
       ImGui::Spacing();
-      if (ListRow::BeginTable("##v2dpicktbl", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings))
+      if (ListRow::BeginTable("##v2dpicktbl", tok::view2d_tool_picker_begin_table_layout, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings))
       {
          ImGui::TableNextRow();
          for (const std::vector<ToolGroup>& col : PickerColumns())
@@ -9584,7 +9584,7 @@ namespace
                   // The whole row is the toggle: the icon and name dim when the tool is off the strip.
                   const char* name = T(ToolTitle(kTools[idx].tip));
                   const float rh = ImGui::GetFrameHeight();
-                  const float rw = std::max(ImGui::GetContentRegionAvail().x, 18.0f + tok::space_2 + ImGui::CalcTextSize(name).x + tok::space_2);
+                  const float rw = std::max(ImGui::GetContentRegionAvail().x, tok::view2d_tool_picker_gap + tok::space_2 + ImGui::CalcTextSize(name).x + tok::space_2);
                   const ImVec2 rp = ImGui::GetCursorScreenPos();
                   if (UiInteract::Hit("##row", ImVec2(rw, rh)))
                   {
@@ -9598,8 +9598,8 @@ namespace
                   if (ImGui::IsItemHovered())
                      pdl->AddRectFilled(rp, ImVec2(rp.x + rw, rp.y + rh), ImGui::GetColorU32(ImGuiCol_HeaderHovered), tok::radius_control);
                   const ImU32 ink = ImGui::GetColorU32(on ? ImGuiCol_Text : ImGuiCol_TextDisabled, on ? 1.0f : 0.6f);
-                  glyph::Draw(pdl, ImVec2(rp.x + tok::space_1 + 8.0f, rp.y + rh * 0.5f), tok::icon_control, ink, kTools[idx].glyph);
-                  const ImVec2 tp(rp.x + tok::space_1 + 18.0f + tok::space_2, rp.y + (rh - ImGui::GetTextLineHeight()) * 0.5f);
+                  glyph::Draw(pdl, ImVec2(rp.x + tok::space_1 + tok::space_2, rp.y + rh * 0.5f), tok::icon_control, ink, kTools[idx].glyph);
+                  const ImVec2 tp(rp.x + tok::space_1 + tok::view2d_tool_picker_gap + tok::space_2, rp.y + (rh - ImGui::GetTextLineHeight()) * 0.5f);
                   pdl->AddText(tp, ink, name);
                   UiAudit::NoteInk(0, tp, ImVec2(tp.x + ImGui::CalcTextSize(name).x, tp.y + ImGui::GetTextLineHeight()));
                   ImGui::PopID();
@@ -9636,8 +9636,8 @@ namespace
             // A hairline between sections, centred in its gap.
             const ImVec2 p = ImGui::GetCursorScreenPos();
             const float y = std::round(p.y + 0.5f * (tok::space_1 + 1.0f) - tok::space_1 * 0.5f);
-            dl->AddLine(ImVec2(p.x + 4.0f, y), ImVec2(p.x + w - 4.0f, y), ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
-            ImGui::Dummy(ImVec2(w, 1.0f));
+            dl->AddLine(ImVec2(p.x + tok::space_1, y), ImVec2(p.x + w - tok::space_1, y), ImGui::GetColorU32(ImGuiCol_Separator), tok::view2d_tool_strip_stroke);
+            ImGui::Dummy(ImVec2(w, tok::view2d_tool_strip_dummy_h));
          }
          else if (cols > 1 && shown % cols != 0)
             FormParts::Inline(0.0f, tok::space_1);
@@ -9785,18 +9785,18 @@ namespace
    {
       const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
       const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
-      const float k = 0.78f * tok::icon_control / 14.0f;
+      const float k = tok::view2d_k_ratio * tok::icon_control / tok::view2d_k_ratio_2;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
       if (tick)
       {
-         const ImVec2 pts[3] = { ImVec2(c.x - 6 * k, c.y), ImVec2(c.x - 2 * k, c.y + 4 * k), ImVec2(c.x + 6 * k, c.y - 5 * k) };
-         dl->AddPolyline(pts, 3, col, 0, 1.75f);
+         const ImVec2 pts[3] = { ImVec2(c.x - tok::view2d_tick_cross_ratio * k, c.y), ImVec2(c.x - tok::view2d_tick_cross_ratio_2 * k, c.y + tok::view2d_tick_cross_ratio_3 * k), ImVec2(c.x + tok::view2d_tick_cross_ratio * k, c.y - tok::view2d_tick_cross_ratio_4 * k) };
+         dl->AddPolyline(pts, tok::view2d_tick_cross_add_polyline_draw, col, 0, tok::view2d_tick_cross_stroke);
       }
       else
       {
-         dl->AddLine(ImVec2(c.x - 5 * k, c.y - 5 * k), ImVec2(c.x + 5 * k, c.y + 5 * k), col, 1.75f);
-         dl->AddLine(ImVec2(c.x + 5 * k, c.y - 5 * k), ImVec2(c.x - 5 * k, c.y + 5 * k), col, 1.75f);
+         dl->AddLine(ImVec2(c.x - tok::view2d_tick_cross_ratio_4 * k, c.y - tok::view2d_tick_cross_ratio_4 * k), ImVec2(c.x + tok::view2d_tick_cross_ratio_4 * k, c.y + tok::view2d_tick_cross_ratio_4 * k), col, tok::view2d_tick_cross_stroke);
+         dl->AddLine(ImVec2(c.x + tok::view2d_tick_cross_ratio_4 * k, c.y - tok::view2d_tick_cross_ratio_4 * k), ImVec2(c.x - tok::view2d_tick_cross_ratio_4 * k, c.y + tok::view2d_tick_cross_ratio_4 * k), col, tok::view2d_tick_cross_stroke);
       }
    }
 
@@ -9866,7 +9866,7 @@ namespace
    // the chips look like they floated.
    void DrawContextBar(Scene2DNode* doc)
    {
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, std::max(1.0f, (sRowH - ImGui::GetFontSize()) * 0.5f)));
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, std::max(tok::view2d_context_bar_bound, (sRowH - ImGui::GetFontSize()) * 0.5f)));
       DrawContextBarItems(doc);
       ImGui::PopStyleVar();
    }
@@ -9930,24 +9930,24 @@ namespace
             const ImU32 col = ImGui::GetColorU32(sSel.empty() ? ImGuiCol_TextDisabled : ImGuiCol_Text);
             const int side = i % 3;
             // Drawn to the icon set's ink (0.78 of the role's em), so the align marks match the other bar icons.
-            const float k = 0.78f * tok::icon_control / 14.0f;
+            const float k = tok::view2d_k_ratio * tok::icon_control / tok::view2d_k_ratio_2;
             if (i < 3)
             {
-               const float x = side == 0 ? c.x - 5 * k : side == 1 ? c.x : c.x + 5 * k;
-               dl->AddLine(ImVec2(x, c.y - 7 * k), ImVec2(x, c.y + 7 * k), col, 1.5f);
+               const float x = side == 0 ? c.x - tok::view2d_x_ratio_4 * k : side == 1 ? c.x : c.x + tok::view2d_x_ratio_4 * k;
+               dl->AddLine(ImVec2(x, c.y - tok::view2d_context_bar_items_ratio * k), ImVec2(x, c.y + tok::view2d_context_bar_items_ratio * k), col, tok::view2d_context_bar_items_stroke);
                const float w1 = 10 * k, w2 = 6 * k;
                const float s1 = side == 0 ? x : side == 1 ? x - w1 / 2 : x - w1, s2 = side == 0 ? x : side == 1 ? x - w2 / 2 : x - w2;
-               dl->AddRectFilled(ImVec2(s1, c.y - 5 * k), ImVec2(s1 + w1, c.y - 1 * k), col);
-               dl->AddRectFilled(ImVec2(s2, c.y + 1 * k), ImVec2(s2 + w2, c.y + 5 * k), col);
+               dl->AddRectFilled(ImVec2(s1, c.y - tok::view2d_context_bar_items_ratio_2 * k), ImVec2(s1 + w1, c.y - 1 * k), col);
+               dl->AddRectFilled(ImVec2(s2, c.y + 1 * k), ImVec2(s2 + w2, c.y + tok::view2d_context_bar_items_ratio_2 * k), col);
             }
             else
             {
-               const float y = side == 0 ? c.y - 5 * k : side == 1 ? c.y : c.y + 5 * k;
-               dl->AddLine(ImVec2(c.x - 7 * k, y), ImVec2(c.x + 7 * k, y), col, 1.5f);
+               const float y = side == 0 ? c.y - tok::view2d_y_ratio_3 * k : side == 1 ? c.y : c.y + tok::view2d_y_ratio_3 * k;
+               dl->AddLine(ImVec2(c.x - tok::view2d_context_bar_items_ratio * k, y), ImVec2(c.x + tok::view2d_context_bar_items_ratio * k, y), col, tok::view2d_context_bar_items_stroke);
                const float h1 = 10 * k, h2 = 6 * k;
                const float s1 = side == 0 ? y : side == 1 ? y - h1 / 2 : y - h1, s2 = side == 0 ? y : side == 1 ? y - h2 / 2 : y - h2;
-               dl->AddRectFilled(ImVec2(c.x - 5 * k, s1), ImVec2(c.x - 1 * k, s1 + h1), col);
-               dl->AddRectFilled(ImVec2(c.x + 1 * k, s2), ImVec2(c.x + 5 * k, s2 + h2), col);
+               dl->AddRectFilled(ImVec2(c.x - tok::view2d_context_bar_items_ratio_2 * k, s1), ImVec2(c.x - 1 * k, s1 + h1), col);
+               dl->AddRectFilled(ImVec2(c.x + 1 * k, s2), ImVec2(c.x + tok::view2d_context_bar_items_ratio_2 * k, s2 + h2), col);
             }
             if (hit)
                Align(doc, i);
@@ -9956,7 +9956,7 @@ namespace
          for (int i = 0; i < 2; i++)
          {
             next();
-            ImGui::BeginDisabled(sSel.size() < 3);
+            ImGui::BeginDisabled(sSel.size() < tok::view2d_context_bar_items_begin_disabled_arg);
             const bool hit = ActionButton::Draw(i == 0 ? "##dist0" : "##dist1", ImVec2(kIconW, sRowH));
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -9965,14 +9965,14 @@ namespace
             const ImVec2 c((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImU32 col = ImGui::GetColorU32(sSel.size() < 3 ? ImGuiCol_TextDisabled : ImGuiCol_Text);
-            const float ks = 0.78f * tok::icon_control / 14.0f;
+            const float ks = tok::view2d_ks_ratio * tok::icon_control / tok::view2d_ks_ratio_2;
             for (int k = -1; k <= 1; k++)
             {
                const float o = k * 5.5f * ks, len = (k == 0 ? 4.0f : 6.0f) * ks;
                if (i == 0)
-                  dl->AddRectFilled(ImVec2(c.x + o - 1.25f, c.y - len), ImVec2(c.x + o + 1.25f, c.y + len), col);
+                  dl->AddRectFilled(ImVec2(c.x + o - tok::view2d_context_bar_items_gap, c.y - len), ImVec2(c.x + o + tok::view2d_context_bar_items_gap, c.y + len), col);
                else
-                  dl->AddRectFilled(ImVec2(c.x - len, c.y + o - 1.25f), ImVec2(c.x + len, c.y + o + 1.25f), col);
+                  dl->AddRectFilled(ImVec2(c.x - len, c.y + o - tok::view2d_context_bar_items_gap), ImVec2(c.x + len, c.y + o + tok::view2d_context_bar_items_gap), col);
             }
             if (hit)
                Distribute(doc, i);
@@ -10058,10 +10058,10 @@ namespace
       // Right cluster first, so the bar knows its room: [Convert] [Render] [Layers], right-aligned on the bar's row.
       const char* renderL = L("Render##v2drender");
       const char* convertL = L("Convert##v2dconvert");
-      auto chipW = [](const char* l) { return ImGui::CalcTextSize(l, ImGui::FindRenderedTextEnd(l)).x + 2.0f * tok::space_2; };
-      const float rightW = (doc->panelOnly ? chipW(convertL) + tok::space_1 : 0.0f) + chipW(renderL) + 2.0f * (tok::space_1 + sChip);
+      auto chipW = [](const char* l) { return ImGui::CalcTextSize(l, ImGui::FindRenderedTextEnd(l)).x + tok::view2d_header_ratio * tok::space_2; };
+      const float rightW = (doc->panelOnly ? chipW(convertL) + tok::space_1 : 0.0f) + chipW(renderL) + tok::view2d_right_w_ratio * (tok::space_1 + sChip);
       const float rowTop = ImGui::GetCursorScreenPos().y;
-      const float barRoom = availW - rightW - (2.0f * tok::space_2 + 1.0f);   // one bar divider before the right cluster
+      const float barRoom = availW - rightW - (tok::view2d_header_ratio * tok::space_2 + 1.0f);   // one bar divider before the right cluster
       // A bar wider than its room is clipped at a chip edge-free boundary and a "..." chip opens the whole bar.
       static float sBarW = 0.0f;
       const bool overflow = sBarW > barRoom;
@@ -10198,7 +10198,7 @@ namespace
          // sitting as a speck in a document-sized square. A little margin keeps its edge off the frame.
          float r[4];
          ContentRect(doc, l, r);
-         const float m = std::max(r[2] - r[0], r[3] - r[1]) * 0.06f;
+         const float m = std::max(r[2] - r[0], r[3] - r[1]) * tok::view2d_m_ratio;
          r[0] = std::max(0.0f, r[0] - m), r[1] = std::max(0.0f, r[1] - m);
          r[2] = std::min(pw, r[2] + m), r[3] = std::min(ph, r[3] + m);
          const float cw = std::max(1.0f, r[2] - r[0]), ch = std::max(1.0f, r[3] - r[1]);
@@ -10271,13 +10271,13 @@ namespace
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const bool sel = Selected(id);
          if (sel)
-            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), ImGui::GetColorU32(ImGuiCol_Header, Active(doc) == l ? 1.0f : 0.6f), 3.0f);
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), ImGui::GetColorU32(ImGuiCol_Header, Active(doc) == l ? 1.0f : 0.6f), tok::view2d_layer_rows_radius);
          if (l->label > 0 && l->label < 8)
-            dl->AddRectFilled(ImVec2(p.x, p.y + 3), ImVec2(p.x + 3, p.y + rowH - 3), kLabelCol[l->label]);
+            dl->AddRectFilled(ImVec2(p.x, p.y + tok::space_0_75), ImVec2(p.x + tok::space_0_75, p.y + rowH - tok::space_0_75), kLabelCol[l->label]);
          // Eye: Alt-click shows only this one.
-         ImGui::SetCursorScreenPos(ImVec2(p.x + 4, p.y + (rowH - 18) * 0.5f));
+         ImGui::SetCursorScreenPos(ImVec2(p.x + tok::space_1, p.y + (rowH - tok::view2d_layer_rows_gap) * 0.5f));
          // A press flips the eye; dragging on down the column sets every eye it crosses the same way (Photoshop).
-         UiInteract::Hit("##eye", ImVec2(18, 18));
+         UiInteract::Hit("##eye", ImVec2(tok::view2d_layer_rows_hit_x, tok::view2d_layer_rows_hit_y));
          if (ImGui::IsItemActivated())
          {
             if (io.KeyAlt)
@@ -10291,52 +10291,52 @@ namespace
             }
          }
          else if (sEyeDrag >= 0 && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
-                  ImGui::IsMouseHoveringRect(ImVec2(p.x + 4, p.y), ImVec2(p.x + 22, p.y + rowH)) && l->visible != (sEyeDrag == 1))
+                  ImGui::IsMouseHoveringRect(ImVec2(p.x + tok::space_1, p.y), ImVec2(p.x + tok::view2d_layer_rows_gap_2, p.y + rowH)) && l->visible != (sEyeDrag == 1))
          {
             l->visible = sEyeDrag == 1;
             Touch();
          }
-         glyph::Draw(dl, ImVec2(p.x + 13, p.y + rowH * 0.5f), tok::icon_control,
+         glyph::Draw(dl, ImVec2(p.x + tok::view2d_layer_rows_gap_3, p.y + rowH * 0.5f), tok::icon_control,
                      ImGui::GetColorU32(l->visible ? ImGuiCol_Text : ImGuiCol_TextDisabled), l->visible ? IconsInfinite::Eye : IconsInfinite::EyeOff);
-         float x = p.x + 24.0f + depth * 12.0f;
+         float x = p.x + tok::space_5 + depth * tok::view2d_x_ratio_2;
          if (l->kind == Kind::Group)
          {
-            ImGui::SetCursorScreenPos(ImVec2(x, p.y + (rowH - 16) * 0.5f));
-            if (UiInteract::Hit("##open", ImVec2(12, 16)))
+            ImGui::SetCursorScreenPos(ImVec2(x, p.y + (rowH - tok::view2d_layer_rows_gap_4) * 0.5f));
+            if (UiInteract::Hit("##open", ImVec2(tok::view2d_layer_rows_hit_x_2, tok::view2d_layer_rows_hit_y_2)))
             {
                l->open = !l->open;
                Touch();
             }
-            const ImVec2 c(x + 6, p.y + rowH * 0.5f);
+            const ImVec2 c(x + tok::space_1_5, p.y + rowH * 0.5f);
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
             if (l->open)
-               dl->AddTriangleFilled(ImVec2(c.x - 4, c.y - 2), ImVec2(c.x + 4, c.y - 2), ImVec2(c.x, c.y + 3), col);
+               dl->AddTriangleFilled(ImVec2(c.x - tok::space_1, c.y - tok::space_0_5), ImVec2(c.x + tok::space_1, c.y - tok::space_0_5), ImVec2(c.x, c.y + tok::space_0_75), col);
             else
-               dl->AddTriangleFilled(ImVec2(c.x - 2, c.y - 4), ImVec2(c.x + 3, c.y), ImVec2(c.x - 2, c.y + 4), col);
+               dl->AddTriangleFilled(ImVec2(c.x - tok::space_0_5, c.y - tok::space_1), ImVec2(c.x + tok::space_0_75, c.y), ImVec2(c.x - tok::space_0_5, c.y + tok::space_1), col);
          }
-         x += 14.0f;
+         x += tok::view2d_x;
          if (l->clip)
          {
             // The bent arrow that points down at the layer it is clipped to.
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-            dl->AddLine(ImVec2(x, p.y + 5), ImVec2(x, p.y + rowH - 6), col, 1.5f);
-            dl->AddLine(ImVec2(x, p.y + rowH - 6), ImVec2(x + 6, p.y + rowH - 6), col, 1.5f);
-            x += 10.0f;
+            dl->AddLine(ImVec2(x, p.y + tok::space_1_25), ImVec2(x, p.y + rowH - tok::space_1_5), col, tok::view2d_layer_rows_stroke);
+            dl->AddLine(ImVec2(x, p.y + rowH - tok::space_1_5), ImVec2(x + tok::space_1_5, p.y + rowH - tok::space_1_5), col, tok::view2d_layer_rows_stroke);
+            x += tok::view2d_x_2;
          }
          // Photoshop's pair: picture thumb, then the mask thumb. Click one to aim the brush at it (the framed one is
          // the target); Shift-click the mask to turn it off and on.
          const bool hasMask = l->kind != Kind::Group && l->HasPixelMask();
          const bool aimMask = hasMask && sEditMask && Active(doc) == l;
-         const ImVec2 tsz(28, rowH - 4);
-         DrawThumb(dl, doc, *l, ImVec2(x, p.y + 2), tsz);
+         const ImVec2 tsz(tok::view2d_layer_rows_x, rowH - tok::space_1);
+         DrawThumb(dl, doc, *l, ImVec2(x, p.y + tok::space_0_5), tsz);
          if ((io.KeySuper || io.KeyCtrl) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() &&
-             ImGui::IsMouseHoveringRect(ImVec2(x, p.y + 2), ImVec2(x + tsz.x, p.y + 2 + tsz.y)) &&
+             ImGui::IsMouseHoveringRect(ImVec2(x, p.y + tok::space_0_5), ImVec2(x + tsz.x, p.y + tok::space_0_5 + tsz.y)) &&
              l->kind != Kind::Fill && l->kind != Kind::Adjust)
             SelectLayerPixels(doc, id, io.KeyShift ? Scene2DNode::kSelAdd : io.KeyAlt ? Scene2DNode::kSelSub : Scene2DNode::kSelNew);
          if (l->kind == Kind::Adjust)
          {
             // An adjustment layer's thumbnail opens its settings window (Photoshop's Properties for that layer).
-            ImGui::SetCursorScreenPos(ImVec2(x, p.y + 2));
+            ImGui::SetCursorScreenPos(ImVec2(x, p.y + tok::space_0_5));
             if (UiInteract::Hit("##athumb", tsz))
             {
                SelectOnly(id);
@@ -10347,29 +10347,29 @@ namespace
          }
          if (hasMask)
          {
-            ImGui::SetCursorScreenPos(ImVec2(x, p.y + 2));
+            ImGui::SetCursorScreenPos(ImVec2(x, p.y + tok::space_0_5));
             if (UiInteract::Hit("##pthumb", tsz))
             {
                SelectOnly(id);
                sEditMask = false;
             }
             if (!aimMask && Active(doc) == l)
-               dl->AddRect(ImVec2(x - 1, p.y + 1), ImVec2(x + tsz.x + 1, p.y + 3 + tsz.y), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_cell);
-            x += tsz.x + 4.0f;
-            const ImVec2 m0(x, p.y + 2), m1(x + tsz.x, p.y + 2 + tsz.y);
+               dl->AddRect(ImVec2(x - tok::space_0_25, p.y + tok::space_0_25), ImVec2(x + tsz.x + tok::space_0_25, p.y + tok::space_0_75 + tsz.y), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_cell);
+            x += tsz.x + tok::space_1;
+            const ImVec2 m0(x, p.y + tok::space_0_5), m1(x + tsz.x, p.y + tok::view2d_layer_rows_gap_5 + tsz.y);
             dl->AddRectFilled(m0, m1, tok::U32(tok::backdrop_base, app::IsThemeLight()), tok::radius_cell);
             const float mw = (float)std::max(1, l->mw), mh = (float)std::max(1, l->mh);
             const float k = std::min(tsz.x / mw, tsz.y / mh);
-            const ImVec2 c(x + tsz.x * 0.5f, p.y + 2 + tsz.y * 0.5f), h(mw * k * 0.5f, mh * k * 0.5f);
+            const ImVec2 c(x + tsz.x * 0.5f, p.y + tok::space_0_5 + tsz.y * 0.5f), h(mw * k * 0.5f, mh * k * 0.5f);
             if (const unsigned mt = doc->PixelMaskTexture(id))
                Thumb::Add(dl, (ImTextureID)(intptr_t)mt, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
             if (!l->pmaskOn)
             {
-               dl->AddLine(ImVec2(m0.x + 3, m0.y + 3), ImVec2(m1.x - 3, m1.y - 3), tok::U32(tok::record), 2.0f);
-               dl->AddLine(ImVec2(m1.x - 3, m0.y + 3), ImVec2(m0.x + 3, m1.y - 3), tok::U32(tok::record), 2.0f);
+               dl->AddLine(ImVec2(m0.x + tok::space_0_75, m0.y + tok::space_0_75), ImVec2(m1.x - tok::space_0_75, m1.y - tok::space_0_75), tok::U32(tok::record), tok::view2d_layer_rows_stroke_2);
+               dl->AddLine(ImVec2(m1.x - tok::space_0_75, m0.y + tok::space_0_75), ImVec2(m0.x + tok::space_0_75, m1.y - tok::space_0_75), tok::U32(tok::record), tok::view2d_layer_rows_stroke_2);
             }
             if (aimMask)
-               dl->AddRect(ImVec2(m0.x - 1, m0.y - 1), ImVec2(m1.x + 1, m1.y + 1), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_cell);
+               dl->AddRect(ImVec2(m0.x - tok::space_0_25, m0.y - tok::space_0_25), ImVec2(m1.x + tok::space_0_25, m1.y + tok::space_0_25), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_cell);
             ImGui::SetCursorScreenPos(m0);
             if (UiInteract::Hit("##mthumb", tsz))
             {
@@ -10420,11 +10420,11 @@ namespace
                MenuParts::EndPopup();
             }
          }
-         x += 33.0f;
+         x += tok::view2d_x_3;
          ImGui::SetCursorScreenPos(ImVec2(x, p.y + (rowH - ImGui::GetFrameHeight()) * 0.5f));
          if (sRename == id)
          {
-            ImGui::SetNextItemWidth(std::max(tok::text_min_w, p.x + w - x - 24.0f));
+            ImGui::SetNextItemWidth(std::max(tok::text_min_w, p.x + w - x - tok::space_5));
             if (ImGui::IsWindowAppearing() || !ImGui::IsAnyItemActive())
                UiInteract::FocusHere();
             const bool done = FieldWell::InputText("##rename", sRenameBuf, sizeof(sRenameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
@@ -10439,7 +10439,7 @@ namespace
          else
          {
             const std::string full = LayerName(*l);
-            const std::string name = app::TruncateWithEllipsis(full, std::max(16.0f, p.x + w - x - 24.0f));
+            const std::string name = app::TruncateWithEllipsis(full, std::max(16.0f, p.x + w - x - tok::space_5));
             const bool missing = l->kind == Kind::Node && doc->Source(*l) == nullptr;
             ImGui::AlignTextToFramePadding();
             if (missing)
@@ -10448,7 +10448,7 @@ namespace
                ImGui::TextUnformatted(name.c_str());
          }
          if (l->lock != 0)
-            glyph::Draw(dl, ImVec2(p.x + w - 12, p.y + rowH * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_TextDisabled), IconsInfinite::Lock);
+            glyph::Draw(dl, ImVec2(p.x + w - tok::space_3, p.y + rowH * 0.5f), tok::icon_control, ImGui::GetColorU32(ImGuiCol_TextDisabled), IconsInfinite::Lock);
          // The row itself: select, rename, drag to restack.
          ImGui::SetCursorScreenPos(ImVec2(x, p.y));
          ImGui::SetNextItemAllowOverlap();
@@ -10482,7 +10482,7 @@ namespace
                if (clipDrop || into)
                   ReorderDrag::Box(p, ImVec2(p.x + w, p.y + rowH));
                else
-                  ReorderDrag::Bar(ImVec2(p.x + 2.0f, below ? p.y + rowH : p.y), ImVec2(p.x + w - 2.0f, below ? p.y + rowH : p.y));
+                  ReorderDrag::Bar(ImVec2(p.x + tok::space_0_5, below ? p.y + rowH : p.y), ImVec2(p.x + w - tok::space_0_5, below ? p.y + rowH : p.y));
                if (clipDrop)
                   Tip::Show(T("Clip to %s"), LayerName(*l).c_str());
             }
@@ -10706,7 +10706,7 @@ namespace
          }
          ModEnd();
          UndoOnActivate("Opacity");
-         const float lockW = ImGui::CalcTextSize(T("Lock")).x + 4.0f * (tok::space_1 + sChip);
+         const float lockW = ImGui::CalcTextSize(T("Lock")).x + tok::view2d_lock_w_ratio * (tok::space_1 + sChip);
          ImGui::SetNextItemWidth(std::max(kWellM, w - lockW - tok::space_1));
          float fillPct = a->fill * 100.0f;
          ModNext(*a, Scene2DNode::kLfFill);
@@ -10760,14 +10760,14 @@ namespace
          sPending.what = Pending::Delete;
       ImGui::EndDisabled();
       // The blend / opacity / lock rows above already took their height: the list gets what is left, so it scrolls.
-      listH = std::max(3.0f * (kRowH + 1.0f), std::min(listH, ImGui::GetContentRegionAvail().y - 2.0f));
+      listH = std::max(tok::view2d_layers_card_ratio * (kRowH + 1.0f), std::min(listH, ImGui::GetContentRegionAvail().y - tok::space_0_5));
       ImGui::BeginChild("##v2dlayers", ImVec2(w, listH), ImGuiChildFlags_None);
       const float rowsW = ImGui::GetContentRegionAvail().x;
       if (doc->Layers().empty())
          CentredText(ImGui::GetCursorScreenPos().y, T("No layers"));
       DrawLayerRows(doc, 0, 0, rowsW);
       // Dropping below the last row puts a layer at the bottom of the document.
-      ImGui::Dummy(ImVec2(rowsW, std::max(8.0f, ImGui::GetContentRegionAvail().y)));
+      ImGui::Dummy(ImVec2(rowsW, std::max(tok::view2d_layers_card_bound, ImGui::GetContentRegionAvail().y)));
       if (ImGui::BeginDragDropTarget())
       {
          if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("V2D_LAYER"))
@@ -10784,7 +10784,7 @@ namespace
       }
       EndChildSafe();
       // The strip under the list, as in every layers panel, centred under it.
-      const float footW = 9 * sChip + 8 * tok::space_1;
+      const float footW = tok::view2d_foot_w_ratio * sChip + tok::view2d_foot_w_ratio_2 * tok::space_1;
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - footW) * 0.5f));
       if (IconChip("##v2dnewpaint", IconsInfinite::Brush, false, T("New layer")))
          sPending.what = Pending::AddPaint;
@@ -11005,7 +11005,7 @@ namespace
          static char buf[4096];
          std::snprintf(buf, sizeof(buf), "%s", l->text.c_str());
          FieldWell::PushStyle();
-         if (ImGui::InputTextMultiline("##v2dtexttab", buf, sizeof(buf), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4.0f)))
+         if (ImGui::InputTextMultiline("##v2dtexttab", buf, sizeof(buf), ImVec2(-1.0f, ImGui::GetTextLineHeight() * tok::view2d_layer_tab_ratio)))
          {
             l->text = buf;
             Touch();
@@ -11019,7 +11019,7 @@ namespace
             if (FontPicker("##v2dtabfont", l->font, sFieldW, undo))
                Touch();
             // Four chips each, filling the field column so both rows end where the wells above and below do.
-            const float chipW = PanelKit::StripW(sFieldW, 4, 0);
+            const float chipW = PanelKit::StripW(sFieldW, tok::view2d_layer_tab_strip_w_arg, 0);
             FieldLabel(T("Style"), sRowH);
             if (TextStyleChips(&l->bold, &l->italic, &l->underline, &l->caps, undo, next, chipW))
                Touch();
@@ -11031,7 +11031,7 @@ namespace
                if (i > 0)
                   next();
                const std::string id = std::string("##v2dtabal") + std::to_string(i);
-               const float w = PanelKit::StripW(sFieldW, 4, i);
+               const float w = PanelKit::StripW(sFieldW, tok::view2d_layer_tab_strip_w_arg, i);
                if ((i < 3 ? IconChip(id.c_str(), kGlyphs[i], l->align == i, T(kTips[i]), w) : JustifyChip(id.c_str(), l->align == i, w)) &&
                    l->align != i)
                {
@@ -11369,7 +11369,7 @@ namespace
       static int sStampFrame = 1 << 25;
       std::vector<uint8_t> rgba;
       const int W = doc->Doc().w, H = doc->Doc().h;
-      if (set.empty() || !doc->RenderSet(set, ++sStampFrame, rgba) || rgba.size() < (size_t)W * H * 4)
+      if (set.empty() || !doc->RenderSet(set, ++sStampFrame, rgba) || rgba.size() < (size_t)W * H * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
          return 0;
       if (cutToSelection && doc->HasSelection())
       {
@@ -11400,7 +11400,7 @@ namespace
       static int sClipFrame = 1 << 26;
       std::vector<uint8_t> rgba;
       const int W = doc->Doc().w, H = doc->Doc().h;
-      if (!doc->RenderSet(set, ++sClipFrame, rgba) || rgba.size() < (size_t)W * H * 4)
+      if (!doc->RenderSet(set, ++sClipFrame, rgba) || rgba.size() < (size_t)W * H * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
          return;
       int x0 = W, y0 = H, x1 = -1, y1 = -1;
       for (int y = 0; y < H; y++)
@@ -11410,7 +11410,7 @@ namespace
       if (x1 < x0)
          return;
       const int w = x1 - x0 + 1, h = y1 - y0 + 1;
-      std::vector<uint8_t> crop((size_t)w * h * 4);
+      std::vector<uint8_t> crop((size_t)w * h * 4);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
       for (int y = 0; y < h; y++)
          std::memcpy(&crop[(size_t)y * w * 4], &rgba[((size_t)(y0 + y) * W + x0) * 4], (size_t)w * 4);
       std::vector<uint8_t> png;
@@ -11443,11 +11443,11 @@ namespace
          rgba.assign(img, img + (size_t)w * h * 4);
          stbi_image_free(img);
       }
-      if (w <= 0 || h <= 0 || rgba.size() < (size_t)w * h * 4)
+      if (w <= 0 || h <= 0 || rgba.size() < (size_t)w * h * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
          return false;
       Layer* a = Active(doc);
       PushUndoCheckpoint("Paste");
-      const int x = (doc->Doc().w - w) / 2, y = (doc->Doc().h - h) / 2;
+      const int x = (doc->Doc().w - w) / tok::view2d_x_ratio_5, y = (doc->Doc().h - h) / tok::view2d_y_ratio_4;
       const int nid = doc->AddFileLayer(0, "Pasted", x, y, w, h, rgba, a != nullptr ? a->id : 0);
       doc->Commit();
       SelectOnly(nid);
@@ -11461,7 +11461,7 @@ namespace
    {
       if (x == 0.0f && y == 0.0f)
          if (GraphNode* host = DocGraphNode())
-            x = host->liveX - 300.0f, y = host->liveY + 200.0f;
+            x = host->liveX - tok::view2d_x_gap, y = host->liveY + tok::view2d_y_gap;
       GraphNode* gn = SpawnNode(ne.type, ne.category, x, y);   // checkpoints the undo itself
       if (gn == nullptr)
          return 0;
@@ -11824,7 +11824,7 @@ namespace
       if (hov && tip != nullptr)
          HelpTip("%s", tip);
       const ImU32 col = ImGui::GetColorU32(on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !on ? 1.0f : 0.85f);
-      const std::string shown = app::TruncateWithEllipsis(title, std::max(16.0f, nameW - 2.0f));
+      const std::string shown = app::TruncateWithEllipsis(title, std::max(16.0f, nameW - tok::space_0_5));
       ImGui::GetWindowDrawList()->AddText(ImVec2(np.x, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, shown.c_str());
       return np;
    }
@@ -12403,7 +12403,7 @@ namespace
       for (GraphNode& gn : gNodes)
          if (gn.node.get() == doc)
             host = &gn;
-      const float x = host != nullptr ? host->liveX - 300.0f : 0.0f, y = host != nullptr ? host->liveY + 200.0f : 0.0f;
+      const float x = host != nullptr ? host->liveX - tok::view2d_x_gap : 0.0f, y = host != nullptr ? host->liveY + tok::view2d_y_gap : 0.0f;
       if (const uint64_t uid = SpawnEffectNode(ne, x, y))
       {
          Scene2DNode::Effect e;
@@ -12501,8 +12501,8 @@ namespace
    {
       SectionCard::Begin(T("Look"));
       const float avail = ImGui::GetContentRegionAvail().x;
-      const float preW = 84.0f;
-      AddEffectMenu(l, std::max(60.0f, avail - preW - tok::space_1));
+      const float preW = tok::view2d_pre_w;
+      AddEffectMenu(l, std::max(tok::view2d_effect_stack_bound, avail - preW - tok::space_1));
       FormParts::Inline(0.0f, tok::space_1);
       EffectPresets(l, preW);
       if (!l.effects.empty())
@@ -12731,7 +12731,7 @@ namespace
             continue;
          const std::string title = l->name.empty() ? std::string(T(Scene2DNode::AdjName(l->adjType))) : l->name;
          ImGui::PushID(l->id);
-         SettingsWindow::Draw(winKey, title.c_str(), WinAt(ImGui::GetWindowPos().y + 48.0f), [&]() {
+         SettingsWindow::Draw(winKey, title.c_str(), WinAt(ImGui::GetWindowPos().y + tok::view2d_adjust_windows_gap), [&]() {
             MoreRows mr;
             float lo = 0, hi = 1;
             Scene2DNode::AdjRange(l->adjType, lo, hi);
@@ -12925,7 +12925,7 @@ namespace
             }
          MenuParts::EndCombo();
       }
-      static int sCanvasW = 0, sCanvasH = 0, sAnchor = 4;
+      static int sCanvasW = 0, sCanvasH = 0, sAnchor = tok::view2d_anchor;
       if (sSizeFor != sDocUid || sSizeSeenW != d.w || sSizeSeenH != d.h)
       {
          sSizeFor = sDocUid;
@@ -13167,7 +13167,7 @@ namespace
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::RowGap()));
          DrawDocPicker(doc, availW);
          const float roomH = ImGui::GetContentRegionAvail().y;
-         DrawLayersCard(doc, availW, std::max(3.0f * (kRowH + 1.0f), roomH - 4.0f));
+         DrawLayersCard(doc, availW, std::max(tok::view2d_side_ratio * (kRowH + 1.0f), roomH - tok::space_1));
          ImGui::PopStyleVar();
          EndChildSafe();
       }
@@ -13179,7 +13179,7 @@ namespace
          SectionCard::BeginWindow();
          ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
          const float w = std::floor(ImGui::GetContentRegionAvail().x);
-         sFieldW = std::floor(std::max(60.0f, w - sLabelW));   // whole pixels, so strip cells and wells end on one edge
+         sFieldW = std::floor(std::max(tok::view2d_side_bound, w - sLabelW));   // whole pixels, so strip cells and wells end on one edge
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, PanelKit::FramePadY()));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, PanelKit::RowGap()));
          if (sTab == 1 || sTab == 2)
@@ -13385,19 +13385,19 @@ namespace
       {
       case Pending::NewDoc:
          PushUndoCheckpoint("New document");
-         MakeDoc(at.x, at.y + 300.0f, "");
+         MakeDoc(at.x, at.y + tok::view2d_run_pending_gap, "");
          break;
       case Pending::DuplicateDoc:
       {
          PushUndoCheckpoint("Duplicate document");
-         MakeDoc(at.x, at.y + 300.0f, DocTextWithoutSelection(doc->DocText()));
+         MakeDoc(at.x, at.y + tok::view2d_run_pending_gap, DocTextWithoutSelection(doc->DocText()));
          break;
       }
       case Pending::DeleteDoc: DeleteDoc(doc); break;
       case Pending::OpenFile:
          if (!AuditNoDialog())
             for (const std::string& path : Platform::OpenFilesDialog(T("Open"), { "psd", "ora" }))
-               OpenLayeredFile(path, ImVec2(at.x, at.y + 300.0f));
+               OpenLayeredFile(path, ImVec2(at.x, at.y + tok::view2d_run_pending_gap));
          break;
       case Pending::ExportPsd:
       case Pending::ExportOra:
@@ -13494,7 +13494,7 @@ namespace
                if (const Layer* l = doc->FindLayer(c))
                   if (todo.what == Pending::Flatten || doc->Shown(*l))
                      ids.push_back(c);
-         if (ids.size() < 2 && todo.what != Pending::Flatten)
+         if (ids.size() < tok::view2d_run_pending_limit && todo.what != Pending::Flatten)
             break;
          if (ids.empty())
             break;
@@ -13580,7 +13580,7 @@ namespace
             PushUndoCheckpoint("Paste layer");
             Layer* a = Active(doc);
             sPasteCount++;
-            const float nudge = 16.0f * std::max(0, sPasteCount);
+            const float nudge = tok::view2d_nudge_ratio * std::max(0, sPasteCount);
             sSel = doc->PasteLayers(sClip, a != nullptr ? a->id : 0, nudge, nudge);
          }
          break;
@@ -13775,15 +13775,15 @@ namespace
       auto place = [&](GraphNode* gn) {   // a live source (video, model) stays a visible node on the canvas
          if (gn == nullptr)
             return;
-         const ImVec2 at(docPt.x + 24.0f * (float)added, docPt.y + 24.0f * (float)added);
+         const ImVec2 at(docPt.x + tok::view2d_drop_files_ratio * (float)added, docPt.y + tok::view2d_drop_files_ratio * (float)added);
          if (AddNodeLayer(doc, gn->uid, &at) != 0)
             added++;
       };
       float row = 0.0f;
       for (const std::string& path : files)
       {
-         const ImVec2 spot(base.x - 360.0f, base.y + row);
-         row += 200.0f;
+         const ImVec2 spot(base.x - tok::view2d_drop_files_gap, base.y + row);
+         row += tok::view2d_row;
          if (HasExtension(path, kSvg))
          {
             if (ImportSvgInto(doc, path))
@@ -13829,8 +13829,8 @@ namespace
                std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
                if (const size_t dot = name.rfind('.'); dot != std::string::npos && dot > 0)
                   name.resize(dot);
-               const int x = (int)std::lround(docPt.x + 24.0f * (float)added) - w / 2;
-               const int y = (int)std::lround(docPt.y + 24.0f * (float)added) - h / 2;
+               const int x = (int)std::lround(docPt.x + tok::view2d_drop_files_ratio * (float)added) - w / tok::view2d_x_ratio_5;
+               const int y = (int)std::lround(docPt.y + tok::view2d_drop_files_ratio * (float)added) - h / tok::view2d_y_ratio_4;
                Layer* a = Active(doc);
                if (const int nid = doc->AddFileLayer(0, name, x, y, w, h, rgba, a != nullptr ? a->id : 0))
                {
@@ -13911,9 +13911,9 @@ namespace
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
       const float sideBase = std::min(kSideW, avail.x * 0.5f);
       const float sideW = sSideOpen ? sideBase : 0.0f;
-      const float viewW = std::max(120.0f, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
+      const float viewW = std::max(tok::view2d_panel_bound, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
       const float statusH = CompactRowH() + ImGui::GetStyle().ItemSpacing.y;
-      const float canvasH = std::max(80.0f, avail.y - statusH);
+      const float canvasH = std::max(tok::view2d_panel_bound_2, avail.y - statusH);
       const float stripW = StripWidth(StripColumns(canvasH));
       DrawToolStrip(canvasH, doc);
       ActionButton::RowNext();
@@ -14079,7 +14079,7 @@ namespace
 
    bool V2Color(const json& v, float out[4])
    {
-      if (!v.is_array() || v.size() < 3 || v.size() > 4)
+      if (!v.is_array() || v.size() < tok::view2d_v2_color_limit || v.size() > tok::view2d_v2_color_limit_2)
          return false;
       for (size_t i = 0; i < v.size(); i++)
       {
@@ -14288,7 +14288,7 @@ namespace
             err.Add(i, "E_VALUE", "'color' wants [r, g, b], 0..1");
          if (op == "fill" && !(c.contains("at") && c["at"].is_array() && c["at"].size() == 2))
             err.Add(i, "E_SHAPE", "'at' wants [x, y] in document px");
-         if (op == "stroke" && !(c.contains("points") && c["points"].is_array() && c["points"].size() >= 2 && c["points"].size() % 2 == 0))
+         if (op == "stroke" && !(c.contains("points") && c["points"].is_array() && c["points"].size() >= tok::view2d_v2_check_limit && c["points"].size() % 2 == 0))
             err.Add(i, "E_SHAPE", "'points' wants [x0, y0, x1, y1, ...] in document px");
       }
       else
@@ -14426,7 +14426,7 @@ namespace
             return doc->Bucket(lid, c["at"][0].get<float>(), c["at"][1].get<float>(), rgba, c.value("opacity", 1.0f),
                                c.value("tolerance", 32), c.value("contiguous", true), false);
          BrushEngine::Brush b;
-         b.size = c.value("size", 20.0f);
+         b.size = c.value("size", tok::view2d_v2_apply_value_arg);
          b.hardness = c.value("hardness", 1.0f);
          std::copy(rgba, rgba + 3, b.color);
          const json& pts = c["points"];
@@ -16294,7 +16294,7 @@ bool AddUserFont(const std::string& path, std::string& family)
 // and the panel states the audit steps through (every side tab x every layer kind, every tool's bar, both docks).
 namespace
 {
-   constexpr int kAuditKinds = 10;   // 9 layer kinds and "nothing selected"
+   constexpr int kAuditKinds = tok::view2d_audit_kinds;   // 9 layer kinds and "nothing selected"
    const char* kAuditKindNames[kAuditKinds] = { "paint", "node", "3D node", "text", "shape", "fill", "adjust", "group", "masked", "none" };
    const char* kAuditTabNames[7] = { "Layers", "Layer", "Transform", "Document", "Render", "Effects", "Colour" };
    const char* kAuditToolNames[kToolCount] = { "Move", "Crop", "Hand", "Zoom", "Brush", "Eraser", "Fill", "Pick", "Marquee", "Lasso", "Wand",
@@ -16316,15 +16316,15 @@ namespace
       if (doc == nullptr)
          return nullptr;
       sAuditDoc = sDocUid;
-      doc->Doc().w = 960;
-      doc->Doc().h = 540;
+      doc->Doc().w = tok::view2d_w_2;
+      doc->Doc().h = tok::view2d_h_5;
       doc->Commit();
       int* id = sAuditIds;
       sSel.clear();
       id[0] = doc->AddPaintLayer();
       {
          BrushEngine::Brush b;
-         b.size = 60.0f;
+         b.size = tok::view2d_size_2;
          b.color[0] = 0.9f;
          if (doc->BeginPaint(id[0], 0, b, 200.0f, 200.0f, 1.0f))
          {
@@ -16660,13 +16660,13 @@ std::string View2DAuditRanges()
             return buf;
    }
    const auto& d = doc->Doc();
-   if (d.w < 1 || d.h < 1 || d.w > 16384 || d.h > 16384)
+   if (d.w < 1 || d.h < 1 || d.w > tok::view2d_view2_d_audit_ranges_limit || d.h > tok::view2d_view2_d_audit_ranges_limit)
    {
       snprintf(buf, sizeof buf, "document %d x %d", d.w, d.h);
       return buf;
    }
    for (const BrushEngine::Brush* b : { &sBrush, &sEraser })
-      if (!(b->size >= 1.0f && b->size <= 5000.0f) || !(b->hardness >= 0 && b->hardness <= 1) || !(b->opacity >= 0 && b->opacity <= 1) ||
+      if (!(b->size >= 1.0f && b->size <= tok::view2d_view2_d_audit_ranges_limit_2) || !(b->hardness >= 0 && b->hardness <= 1) || !(b->opacity >= 0 && b->opacity <= 1) ||
           !(b->flow >= 0 && b->flow <= 1))
       {
          snprintf(buf, sizeof buf, "brush size %s hardness %s opacity %s flow %s", UiFmt::G(b->size).c, UiFmt::G(b->hardness).c, UiFmt::G(b->opacity).c, UiFmt::G(b->flow).c);
@@ -16723,7 +16723,7 @@ bool View2DJourneySetup(const std::string& line, std::string* err)
    sSideOpen = true;
    if (cmd == "doc")
    {
-      int w = 960, h = 540;
+      int w = tok::view2d_w_2, h = tok::view2d_h_5;
       in >> w >> h;
       sJourneyNames.clear();
       Scene2DNode* doc = MakeDoc(0.0f, 0.0f, "");
@@ -17088,7 +17088,7 @@ void DrawScene2DBody(GraphNode& gn)
    if (doc == nullptr)
       return;
    ImGui::TextDisabled(T("%d x %d, %d layers"), doc->Doc().w, doc->Doc().h, (int)doc->Layers().size());
-   if (ActionButton::Draw(L("Open in 2D View"), ImVec2(160.0f, 0)))
+   if (ActionButton::Draw(L("Open in 2D View"), ImVec2(tok::view2d_scene2_d_body_draw_x, 0)))
    {
       sDocUid = gn.uid;
       sSel.clear();

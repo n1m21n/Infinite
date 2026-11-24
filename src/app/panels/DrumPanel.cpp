@@ -44,10 +44,10 @@
 namespace app
 {
    bool  gDrumPanelOpen = false;
-   float gDrumPanelHeight = 400.0f;
+   float gDrumPanelHeight = tok::drum_panel_height;
    int   gDrumPanelDock = 0; // 0 bottom, 3 top
    bool  gDrumClaimedKeys = false;
-   float gDrumPanelNaturalH = 400.0f; // the height that shows every lane at full row height and no more
+   float gDrumPanelNaturalH = tok::drum_panel_natural_h; // the height that shows every lane at full row height and no more
    ImVec2 gDrumPanelRectMin(0.0f, 0.0f), gDrumPanelRectMax(0.0f, 0.0f);
 
    // The node body's groove helpers (SamplerBodies.cpp): the panel picks grooves the same way.
@@ -62,15 +62,15 @@ namespace app
       constexpr int kLanes = DrumSequencerNode::kNumLanes;
       constexpr int kMaxSteps = DrumSequencerNode::kMaxSteps;
       constexpr int kPageSteps = DrumSequencerNode::kEditPageSteps;
-      constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
+      constexpr float kInspectorW = UiDensity::kInspectorW + tok::drum_inspector_w_ratio * tok::space_2;   // one compact strip
       constexpr float kRowH = tok::cell_h;  // a lane row: one grid cell tall (the Session grid's cells too)
-      constexpr float kLabelW = 178.0f;  // lane name + M S, left of the grid
+      constexpr float kLabelW = tok::drum_label_w;  // lane name + M S, left of the grid
       constexpr float kRulerH = tok::row_h;
-      constexpr float kGroupGap = 4.0f; // extra space between four-step key groups
+      constexpr float kGroupGap = tok::space_1; // extra space between four-step key groups
       constexpr float kRowGap = tok::row_gap;
-      constexpr float kCellGap = 2.0f;
-      constexpr float kCellW = 30.0f;   // a step key at its narrowest; wider panels share the free width among the steps
-      constexpr float kCellWMax = 56.0f;
+      constexpr float kCellGap = tok::space_0_5;
+      constexpr float kCellW = tok::drum_cell_w;   // a step key at its narrowest; wider panels share the free width among the steps
+      constexpr float kCellWMax = tok::drum_cell_w_max;
       constexpr float kDefaultVel = 0.8f;
 
       uint64_t sPageUid = 0;
@@ -168,7 +168,7 @@ namespace app
          *v = now;
       }
 
-      float TextW(const char* s) { return ImGui::CalcTextSize(s, nullptr, true).x + 2.0f * tok::space_2; }
+      float TextW(const char* s) { return ImGui::CalcTextSize(s, nullptr, true).x + tok::drum_text_w_ratio * tok::space_2; }
 
       ImU32 NodeColor(const GraphNode* gn, float alpha = 1.0f)
       {
@@ -427,7 +427,7 @@ namespace app
 
       void DrawGrooveMenu(DrumSequencerNode* n);
       std::vector<std::string>& GrooveFiles();
-      constexpr float kGrooveW = 240.0f; // fixed: a long groove name never moves the bar
+      constexpr float kGrooveW = tok::drum_groove_w; // fixed: a long groove name never moves the bar
 
       // < groove > : the arrows step the library like the node body's; the face is a dropdown of the whole
       // library and reads out part, rate, steps and swing.
@@ -614,7 +614,7 @@ namespace app
                if (paged && play >= 0 && play / kPageSteps == p)
                {
                   const ImVec2 mx = ImGui::GetItemRectMax(), mn = ImGui::GetItemRectMin();
-                  ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(mx.x - 5.0f, mn.y + 5.0f), 2.5f, ImGui::GetColorU32(ImGuiCol_CheckMark));
+                  ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(mx.x - tok::space_1_25, mn.y + tok::space_1_25), tok::drum_header_r, ImGui::GetColorU32(ImGuiCol_CheckMark));
                }
             }
             if (!paged)
@@ -626,7 +626,7 @@ namespace app
 
             // Inspector pages pinned right.
             const char* kTabs[3] = { T("Lane"), T("Step"), T("Kit") };
-            const float tabsW = TextW(kTabs[0]) + TextW(kTabs[1]) + TextW(kTabs[2]) + 2.0f * tok::space_1;
+            const float tabsW = TextW(kTabs[0]) + TextW(kTabs[1]) + TextW(kTabs[2]) + tok::drum_tabs_w_ratio * tok::space_1;
             ImGui::SameLine();
             ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + width - tabsW), origin.y));
             for (int t = 0; t < 3; t++)
@@ -665,9 +665,9 @@ namespace app
       void DrawLabels(GraphNode* gn, DrumSequencerNode* n, ImVec2 p, float rowH, float x1)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         const float keyW = 22.0f, meterW = 14.0f, pad = 3.0f;
-         const float keyH = std::min(rowH, 24.0f);
-         const float scribbleX1 = p.x + kLabelW - (2.0f * keyW + meterW + 4.0f * pad);
+         const float keyW = tok::drum_key_w, meterW = tok::drum_meter_w, pad = tok::space_0_75;
+         const float keyH = std::min(rowH, tok::drum_labels_bound);
+         const float scribbleX1 = p.x + kLabelW - (tok::drum_labels_ratio * keyW + meterW + tok::drum_labels_ratio_2 * pad);
          for (int lane = 0; lane < kLanes; lane++)
          {
             ImGui::PushID(lane);
@@ -676,8 +676,8 @@ namespace app
             const bool loaded = !n->FileName(lane).empty();
             const bool sel = lane == sLane;
             // The lane is a horizontal channel strip: graphite housing, the colour cap down its left edge.
-            DeskParts::FaceSide(dl, ImVec2(p.x, y - 2.0f), ImVec2(x1, y + rowH + 2.0f), NodeColor(gn, loaded ? 1.0f : 0.35f), sel);
-            const ImVec2 mn(p.x + 9.0f, y), mx(scribbleX1, y + rowH);
+            DeskParts::FaceSide(dl, ImVec2(p.x, y - tok::space_0_5), ImVec2(x1, y + rowH + tok::space_0_5), NodeColor(gn, loaded ? 1.0f : 0.35f), sel);
+            const ImVec2 mn(p.x + tok::drum_labels_gap, y), mx(scribbleX1, y + rowH);
             ImGui::SetCursorScreenPos(mn);
             UiInteract::Hit("##label", ImVec2(mx.x - mn.x, rowH));
             if (ImGui::IsItemActivated())
@@ -687,7 +687,7 @@ namespace app
             DeskParts::ScribbleRow(dl, mn, mx, name.c_str(), lane + 1, NodeColor(gn, loaded ? 1.0f : 0.35f), !loaded);
             if (hov)
             {
-               dl->AddRect(mn, mx, DeskParts::Ink(70), 3.0f);
+               dl->AddRect(mn, mx, DeskParts::Ink(70), tok::drum_labels_radius);
                HelpTip(T("%s %d: %s\n%s"), T("Lane"), lane + 1, name.c_str(), T("Click to play and select (Alt = accent). Keys 1-8 too."));
             }
             float x = scribbleX1 + pad;
@@ -740,7 +740,7 @@ namespace app
          g.cols = paged ? kPageSteps : maxLen;
          g.x0 = p.x;
          // Cells are sized for a full page of 16, so a shorter pattern keeps the same keys.
-         g.cellW = std::clamp((w - kCellGap * (float)(kPageSteps - 1) - kGroupGap * (float)((kPageSteps - 1) / 4)) / (float)kPageSteps,
+         g.cellW = std::clamp((w - kCellGap * (float)(kPageSteps - 1) - kGroupGap * (float)((kPageSteps - 1) / tok::drum_grid_ratio)) / (float)kPageSteps,
                               kCellW, kCellWMax);
          const int play = PlayStep(n);
          const float gridY = p.y + kRulerH;
@@ -756,21 +756,21 @@ namespace app
             snprintf(num, sizeof num, "%d", s + 1);
             const float rfs = tok::type_caption;
             const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(rfs, FLT_MAX, 0.0f, num);
-            if (g.cellW >= ts.x + 2.0f || beat)
-               dl->AddText(ImGui::GetFont(), rfs, ImVec2(x0 + (g.cellW - ts.x) * 0.5f, p.y + 2.0f), DeskParts::Ink((beat || now ? 215 : 120) * (inPat ? 255 : 70) / 255), num);
+            if (g.cellW >= ts.x + tok::space_0_5 || beat)
+               dl->AddText(ImGui::GetFont(), rfs, ImVec2(x0 + (g.cellW - ts.x) * 0.5f, p.y + tok::space_0_5), DeskParts::Ink((beat || now ? tok::drum_grid_assign : tok::drum_grid_assign_2) * (inPat ? tok::drum_grid_assign_3 : tok::drum_grid_assign_4) / 255), num);
             // engraved tick under the number, longer on the beat (like the fader scale)
-            dl->AddLine(ImVec2(x0 + g.cellW * 0.5f, p.y + 3.0f + rfs), ImVec2(x0 + g.cellW * 0.5f, p.y + 3.0f + rfs + (beat ? 4.0f : 2.0f)),
-                        DeskParts::Ink(inPat ? (beat ? 200 : 110) : 50), 1.0f);
+            dl->AddLine(ImVec2(x0 + g.cellW * 0.5f, p.y + tok::space_0_75 + rfs), ImVec2(x0 + g.cellW * 0.5f, p.y + tok::space_0_75 + rfs + (beat ? tok::drum_grid_assign_5 : tok::drum_grid_assign_6)),
+                        DeskParts::Ink(inPat ? (beat ? tok::drum_grid_assign_7 : tok::drum_grid_assign_8) : 50), tok::drum_grid_stroke);
             // Chase light: one LED per step, the playing one lit (TR step LEDs).
             if (inPat)
             {
                const ImU32 chase = tok::U32(tok::desk_led_red);
-               const ImVec2 lc(x0 + g.cellW * 0.5f, p.y + kRulerH - 4.0f);
-               dl->AddCircleFilled(lc, 2.5f, DeskParts::Tint(chase, 0.22f), 10);
+               const ImVec2 lc(x0 + g.cellW * 0.5f, p.y + kRulerH - tok::space_1);
+               dl->AddCircleFilled(lc, tok::drum_grid_r, DeskParts::Tint(chase, 0.22f), tok::drum_grid_segments);
                if (now)
                {
-                  dl->AddCircleFilled(lc, 4.5f, tok::U32(tok::desk_led_red, 60), 12);
-                  dl->AddCircleFilled(lc, 2.5f, chase, 10);
+                  dl->AddCircleFilled(lc, tok::drum_grid_r_2, tok::U32(tok::desk_led_red, 60), tok::drum_grid_segments_2);
+                  dl->AddCircleFilled(lc, tok::drum_grid_r, chase, tok::drum_grid_segments);
                }
             }
          }
@@ -825,7 +825,7 @@ namespace app
             const bool sameCell = overCell && hl == sDrag.lane && hs == sDrag.step;
             if (sDrag.mode == Drag::Pending)
             {
-               if (sameCell && std::fabs(m.y - sDrag.startY) > 3.0f)
+               if (sameCell && std::fabs(m.y - sDrag.startY) > tok::drum_grid_limit)
                   sDrag.mode = Drag::Velocity;
                else if (overCell && !sameCell)
                {
@@ -836,7 +836,7 @@ namespace app
             if (sDrag.mode == Drag::Velocity)
             {
                float& v = n->stepVel[sDrag.lane][sDrag.step];
-               v = std::clamp(sDrag.startVel + (sDrag.startY - m.y) * 0.006f, 0.05f, 1.0f);
+               v = std::clamp(sDrag.startVel + (sDrag.startY - m.y) * tok::drum_grid_ratio_2, 0.05f, 1.0f);
                Tip::Show("%s %s%s", T("velocity"), UiFmt::F2(v).c, v >= 0.99f ? T("  (accent)") : "");
             }
             else if (overCell && (sDrag.mode == Drag::PaintOn || sDrag.mode == Drag::PaintOff || sDrag.mode == Drag::Erase))
@@ -872,7 +872,7 @@ namespace app
                const ImVec2 cMin(x0, y0), cMax(x0 + g.cellW, y0 + rowH);
                if (s >= len)
                {
-                  dl->AddRectFilled(cMin, cMax, DeskParts::Lo(90), 3.0f);
+                  dl->AddRectFilled(cMin, cMax, DeskParts::Lo(90), tok::drum_grid_radius);
                   continue;
                }
                const bool hov = overCell && hl == lane && hs == s;
@@ -888,17 +888,17 @@ namespace app
                   DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, lit, kTrLed, nullptr, true, 0.0f, TrKey(s, 0.75f + 0.35f * lit));
                   if (now)
                   {
-                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(90), 3.0f);
-                     dl->AddRect(cMin, cMax, DeskParts::Ink(), 3.0f, 0, 1.5f);
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(90), tok::drum_grid_radius);
+                     dl->AddRect(cMin, cMax, DeskParts::Ink(), tok::drum_grid_radius, 0, tok::drum_grid_stroke_2);
                   }
                   const float nudge = n->stepNudge[lane][s];
                   if (std::fabs(nudge) > 0.001f)
                   {
-                     const float cx = (x0 + cMax.x) * 0.5f + nudge * (g.cellW - 6.0f);
-                     dl->AddRectFilled(ImVec2(cx - 2.0f, cMax.y - 4.5f), ImVec2(cx + 2.0f, cMax.y - 3.0f), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.9f)), 1.0f);
+                     const float cx = (x0 + cMax.x) * 0.5f + nudge * (g.cellW - tok::space_1_5);
+                     dl->AddRectFilled(ImVec2(cx - tok::space_0_5, cMax.y - tok::drum_grid_gap), ImVec2(cx + tok::space_0_5, cMax.y - tok::space_0_75), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.9f)), 1.0f);
                   }
                   if (accent)
-                     dl->AddRectFilled(ImVec2(x0 + 3.0f, cMax.y - 3.5f), ImVec2(cMax.x - 3.0f, cMax.y - 2.0f), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.9f)), 1.0f);
+                     dl->AddRectFilled(ImVec2(x0 + tok::space_0_75, cMax.y - tok::drum_grid_gap_2), ImVec2(cMax.x - tok::space_0_75, cMax.y - tok::space_0_5), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.9f)), 1.0f);
                   const int cond = n->stepCond[lane][s];
                   char badge[8] = "";
                   if (cond != 0)
@@ -909,11 +909,11 @@ namespace app
                   {
                      UiType::Scope bs(UiType::Size::Caption, UiType::Weight::Semibold);
                      const ImVec2 bsz = ImGui::CalcTextSize(badge);
-                     if (bsz.x + 4.0f <= g.cellW && bsz.y + 8.0f <= rowH)
-                        dl->AddText(ImVec2(x0 + 3.0f, cMax.y - bsz.y - 3.0f), badgeText, badge);
+                     if (bsz.x + tok::space_1 <= g.cellW && bsz.y + tok::space_2 <= rowH)
+                        dl->AddText(ImVec2(x0 + tok::space_0_75, cMax.y - bsz.y - tok::space_0_75), badgeText, badge);
                      else
-                        dl->AddTriangleFilled(ImVec2(cMax.x - 6.0f, cMax.y - 1.0f), ImVec2(cMax.x - 1.0f, cMax.y - 1.0f),
-                                              ImVec2(cMax.x - 1.0f, cMax.y - 6.0f), badgeText);
+                        dl->AddTriangleFilled(ImVec2(cMax.x - tok::space_1_5, cMax.y - 1.0f), ImVec2(cMax.x - 1.0f, cMax.y - 1.0f),
+                                              ImVec2(cMax.x - 1.0f, cMax.y - tok::space_1_5), badgeText);
                   }
                }
                else
@@ -921,12 +921,12 @@ namespace app
                   DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, 0.0f, kTrLed, nullptr, true, 0.0f, TrKey(s, 0.38f));
                   if (now)
                   {
-                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(50), 3.0f);
-                     dl->AddRect(cMin, cMax, DeskParts::Ink(200), 3.0f, 0, 1.5f);
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(50), tok::drum_grid_radius);
+                     dl->AddRect(cMin, cMax, DeskParts::Ink(200), tok::drum_grid_radius, 0, tok::drum_grid_stroke_2);
                   }
                }
                if (sTab == kTabStep && lane == sLane && s == sStep)
-                  dl->AddRect(ImVec2(cMin.x - 1.5f, cMin.y - 1.5f), ImVec2(cMax.x + 1.5f, cMax.y + 1.5f), ImGui::GetColorU32(ImGuiCol_Text), 2.0f, 0, 1.5f);
+                  dl->AddRect(ImVec2(cMin.x - tok::drum_grid_gap_3, cMin.y - tok::drum_grid_gap_3), ImVec2(cMax.x + tok::drum_grid_gap_3, cMax.y + tok::drum_grid_gap_3), ImGui::GetColorU32(ImGuiCol_Text), tok::drum_grid_radius_2, 0, tok::drum_grid_stroke_2);
             }
          }
       }
@@ -956,8 +956,8 @@ namespace app
             tag[k] = '\0';
             const bool ch = DeskParts::Pot(id, v, lo, hi, bipolar, cell, col, tag);
             snprintf(buf, sizeof buf, fmt, *v);
-            const float pw = std::min(cell - 4.0f, 62.0f);
-            DeskParts::Plate(ImGui::GetWindowDrawList(), ImVec2(cx + (cell - pw) * 0.5f, y + DeskParts::kPotRowH + 2.0f), pw, buf);
+            const float pw = std::min(cell - tok::space_1, 62.0f);
+            DeskParts::Plate(ImGui::GetWindowDrawList(), ImVec2(cx + (cell - pw) * 0.5f, y + DeskParts::kPotRowH + tok::space_0_5), pw, buf);
             return ch;
          }
          void Knob(const char* label, float* v, float lo, float hi, const char* fmt, ImU32 col, bool bipolar = false)
@@ -968,7 +968,7 @@ namespace app
          }
          void End()
          {
-            ImGui::SetCursorScreenPos(ImVec2(x0, y + DeskParts::kPotRowH + DeskParts::kPlateH + 2.0f + tok::space_1));
+            ImGui::SetCursorScreenPos(ImVec2(x0, y + DeskParts::kPotRowH + DeskParts::kPlateH + tok::space_0_5 + tok::space_1));
             ImGui::Dummy(ImVec2(0.0f, 0.0f));
          }
       };
@@ -981,8 +981,8 @@ namespace app
          for (; label[k] != '\0' && !(label[k] == '#' && label[k + 1] == '#') && k + 1 < sizeof legend; k++)
             legend[k] = (char)toupper((unsigned char)label[k]);
          legend[k] = '\0';
-         const float w = std::max(minW, ImGui::CalcTextSize(legend).x + 16.0f);
-         return DeskParts::Key(label, legend, on, Accent(1.0f), ImVec2(w, h > 0.0f ? h : 24.0f));
+         const float w = std::max(minW, ImGui::CalcTextSize(legend).x + tok::space_4);
+         return DeskParts::Key(label, legend, on, Accent(1.0f), ImVec2(w, h > 0.0f ? h : tok::drum_desk_key_key_y));
       }
 
       void DrawLaneInspector(GraphNode* gn, DrumSequencerNode* n)
@@ -1027,7 +1027,7 @@ namespace app
             n->laneStart[lane] = s1;
             n->laneEnd[lane] = e1;
          }
-         const float bw = (w - 2.0f * tok::space_1) / 3.0f;
+         const float bw = (w - tok::drum_lane_inspector_ratio * tok::space_1) / tok::drum_bw_ratio;
          if (DeskKey(T("Play"), false, bw, 0.0f))
             Hit(n, lane, kDefaultVel);
          ImGui::SameLine(0.0f, tok::space_1);
@@ -1092,15 +1092,15 @@ namespace app
          for (int f = 0; f < 3; f++)
          {
             if (f > 0)
-               ImGui::SameLine(0.0f, 1.0f);
-            if (DeskKey(kFilt[f], n->laneFilter[lane] == f, 34.0f, tok::control_h) && n->laneFilter[lane] != f)
+               ImGui::SameLine(0.0f, tok::space_0_25);
+            if (DeskKey(kFilt[f], n->laneFilter[lane] == f, tok::drum_lane_inspector_desk_key_arg, tok::control_h) && n->laneFilter[lane] != f)
             {
                PushUndoCheckpoint("Drums filter");
                n->laneFilter[lane] = f;
             }
          }
          SectionCard::RowLabel(T("Play"));
-         if (DeskKey(T("Reverse"), n->laneReverse[lane], 70.0f, tok::control_h))
+         if (DeskKey(T("Reverse"), n->laneReverse[lane], tok::drum_lane_inspector_desk_key_arg_2, tok::control_h))
          {
             PushUndoCheckpoint("Drums reverse");
             n->laneReverse[lane] = !n->laneReverse[lane];
@@ -1112,8 +1112,8 @@ namespace app
          for (int c = 0; c < 4; c++)
          {
             if (c > 0)
-               ImGui::SameLine(0.0f, 1.0f);
-            if (DeskKey(kChoke[c], n->laneChoke[lane] == c, 30.0f, tok::control_h) && n->laneChoke[lane] != c)
+               ImGui::SameLine(0.0f, tok::space_0_25);
+            if (DeskKey(kChoke[c], n->laneChoke[lane] == c, tok::drum_lane_inspector_desk_key_arg_3, tok::control_h) && n->laneChoke[lane] != c)
             {
                PushUndoCheckpoint("Drums choke");
                n->laneChoke[lane] = c;
@@ -1124,7 +1124,7 @@ namespace app
          SectionCard::RowLabel(T("Mix"));
          if (DeskParts::Key("M##im", "M", n->laneMute[lane], tok::U32(tok::desk_led_red), ImVec2(tok::control_h, tok::control_h)) && (n->laneMute[lane] = !n->laneMute[lane], true))
             PanelKit::UndoOnToggle(&n->laneMute[lane], "Drums");
-         ImGui::SameLine(0.0f, 1.0f);
+         ImGui::SameLine(0.0f, tok::space_0_25);
          if (DeskParts::Key("S##is", "S", n->laneSolo[lane], tok::U32(tok::desk_led_yellow), ImVec2(tok::control_h, tok::control_h)) && (n->laneSolo[lane] = !n->laneSolo[lane], true))
             PanelKit::UndoOnToggle(&n->laneSolo[lane], "Drums");
          ImGui::PopID();
@@ -1204,8 +1204,8 @@ namespace app
          for (int p = 0; p < 3; p++)
          {
             if (p > 0)
-               ImGui::SameLine(0.0f, 1.0f);
-            if (DeskKey(kParts[p], current >= 0 && n->patternPart == p, 30.0f, tok::control_h) && current >= 0)
+               ImGui::SameLine(0.0f, tok::space_0_25);
+            if (DeskKey(kParts[p], current >= 0 && n->patternPart == p, tok::drum_kit_inspector_desk_key_arg, tok::control_h) && current >= 0)
                ApplyDrumGroove(n, current, p);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                HelpTip("%s", DrumPatterns::PartName(p));
@@ -1301,13 +1301,13 @@ namespace app
             r.End();
          }
          SectionCard::Begin(T("Condition"));
-         const float cw = (w - 4.0f * 1.0f) / 5.0f;
+         const float cw = (w - tok::drum_step_inspector_ratio * 1.0f) / tok::drum_cw_ratio;
          for (int c = 0; c < DrumSequencerNode::kNumConds; c++)
          {
             // Rows: none + Fill pair + 1st pair | 1:2 2:2 1:3 2:3 3:3 | 1:4 .. 4:4
             const bool rowStart = c == 0 || c == 5 || c == 10;
             if (!rowStart)
-               ImGui::SameLine(0.0f, 1.0f);
+               ImGui::SameLine(0.0f, tok::space_0_25);
             char id[24];
             snprintf(id, sizeof id, "%s##cd%d", DrumSequencerNode::CondName(c), c);
             if (DeskKey(id, n->stepCond[lane][s] == c, cw, tok::control_h) && n->stepCond[lane][s] != c)
@@ -1330,7 +1330,7 @@ namespace app
       {
          ImGui::SetCursorScreenPos(at);
          ImDrawList* pdl = ImGui::GetWindowDrawList();
-         DeskParts::Chassis(pdl, ImVec2(at.x - 4.0f, at.y - 4.0f), ImVec2(at.x + size.x + 4.0f, at.y + size.y));
+         DeskParts::Chassis(pdl, ImVec2(at.x - tok::space_1, at.y - tok::space_1), ImVec2(at.x + size.x + tok::space_1, at.y + size.y));
          ImGui::BeginChild("##drumInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
          UiDensity::Compact compact;
          // Text and cards inside the desk use the desk tones (light desk in light mode).
@@ -1354,10 +1354,10 @@ namespace app
 
       void DrawEmpty(ImVec2 mn, ImVec2 mx)
       {
-         EmptyState::DrawTo(ImGui::GetWindowDrawList(), mn, ImVec2(mx.x, mn.y + (mx.y - mn.y) * 0.6f), T("No Drum Sequencer yet"));
+         EmptyState::DrawTo(ImGui::GetWindowDrawList(), mn, ImVec2(mx.x, mn.y + (mx.y - mn.y) * tok::drum_empty_ratio), T("No Drum Sequencer yet"));
          const char* label = T("New Drum Sequencer");
-         const float w = ImGui::CalcTextSize(label).x + 2.0f * tok::space_3;
-         ImGui::SetCursorScreenPos(ImVec2((mn.x + mx.x - w) * 0.5f, mn.y + (mx.y - mn.y) * 0.6f));
+         const float w = ImGui::CalcTextSize(label).x + tok::drum_w_ratio * tok::space_3;
+         ImGui::SetCursorScreenPos(ImVec2((mn.x + mx.x - w) * 0.5f, mn.y + (mx.y - mn.y) * tok::drum_empty_ratio));
          if (ActionButton::Draw(label, ImVec2(w, 0.0f), ActionButton::Kind::Primary))
             AddPage();
       }
@@ -1397,7 +1397,7 @@ namespace app
             if (bodyMax.y > bodyMin.y)
                DrawEmpty(bodyMin, bodyMax);
          }
-         else if (bodyMax.y - bodyMin.y > 60.0f)
+         else if (bodyMax.y - bodyMin.y > tok::drum_panel_limit)
          {
             const float bodyH = bodyMax.y - bodyMin.y;
             const float dt = ImGui::GetIO().DeltaTime;
@@ -1413,20 +1413,20 @@ namespace app
             const float inspW = kInspectorW;
             // The steps share the width left of the inspector; the lanes end where the steps end.
             const float gaps = kCellGap * (float)(cols - 1) + kGroupGap * (float)((cols - 1) / 4);
-            const float freeW = bodyMax.x - gridX0 - tok::space_1 - tok::space_2 - 4.0f - inspW;
+            const float freeW = bodyMax.x - gridX0 - tok::space_1 - tok::space_2 - tok::space_1 - inspW;
             const float cellW = std::clamp((freeW - gaps) / (float)cols, kCellW, kCellWMax);
             const float gridW = (float)cols * cellW + gaps;
             const float leftX1 = gridX0 + gridW + tok::space_1;
             const float rowH = kRowH;
             // What the panel needs around the grid, measured, so the layout can stop the panel at the grid's foot.
-            gDrumPanelNaturalH = (gDrumPanelHeight - seqH) + kRulerH + (float)kLanes * kRowH + (float)(kLanes - 1) * kRowGap + 6.0f;
-            DeskParts::Chassis(ImGui::GetWindowDrawList(), ImVec2(seqMin.x - 4.0f, seqMin.y - 4.0f), ImVec2(leftX1 + 4.0f, bodyMax.y));
+            gDrumPanelNaturalH = (gDrumPanelHeight - seqH) + kRulerH + (float)kLanes * kRowH + (float)(kLanes - 1) * kRowGap + tok::space_1_5;
+            DeskParts::Chassis(ImGui::GetWindowDrawList(), ImVec2(seqMin.x - tok::space_1, seqMin.y - tok::space_1), ImVec2(leftX1 + tok::space_1, bodyMax.y));
             DeskParts::Screw(ImGui::GetWindowDrawList(), ImVec2(seqMin.x + 1.0f, seqMin.y + 1.0f));
             DeskParts::Screw(ImGui::GetWindowDrawList(), ImVec2(leftX1 - 1.0f, seqMin.y + 1.0f));
             DrawLabels(gn, n, seqMin, rowH, leftX1);
             DrawGrid(gn, n, ImVec2(gridX0, seqMin.y), gridW, rowH);
             if (inspector)
-               DrawInspector(gn, n, ImVec2(leftX1 + tok::space_2 + 4.0f, bodyMin.y), ImVec2(inspW, bodyH));
+               DrawInspector(gn, n, ImVec2(leftX1 + tok::space_2 + tok::space_1, bodyMin.y), ImVec2(inspW, bodyH));
          }
          gDrumClaimedKeys = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::GetIO().WantTextInput;
          DrawKeys(n);
@@ -1557,7 +1557,7 @@ namespace app
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
          if (ImGui::IsItemActive())
-            gDrumPanelHeight = std::max(160.0f, gDrumPanelHeight + (gripFirst ? -ImGui::GetIO().MouseDelta.y : ImGui::GetIO().MouseDelta.y));
+            gDrumPanelHeight = std::max(tok::drum_panel_docked_bound, gDrumPanelHeight + (gripFirst ? -ImGui::GetIO().MouseDelta.y : ImGui::GetIO().MouseDelta.y));
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
             gDrumPanelHeight = gDrumPanelNaturalH; // double-click: fit the lanes
       };

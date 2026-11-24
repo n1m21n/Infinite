@@ -26,14 +26,14 @@ namespace app
 {
    namespace
    {
-      constexpr float kSceneColW = 136.0f;
-      constexpr float kColMinW = 112.0f;
-      constexpr float kColMaxW = 176.0f;
+      constexpr float kSceneColW = tok::arrange_session_grid_scene_col_w;
+      constexpr float kColMinW = tok::arrange_session_grid_col_min_w;
+      constexpr float kColMaxW = tok::arrange_session_grid_col_max_w;
       constexpr float kHeaderH = tok::row_h;
       constexpr float kRowH = tok::cell_h;   // a clip or scene cell: taller than a list row so a clip name and its state read
       constexpr float kFooterH = tok::row_h;
-      constexpr float kGap = 2.0f;
-      constexpr int kMinRows = 6;
+      constexpr float kGap = tok::space_0_5;
+      constexpr int kMinRows = tok::arrange_session_grid_min_rows;
 
       const char* const kFollowNames[Arrange::kFollowCount] = {
          I18N_KEY("No Follow Action"), I18N_KEY("Next"), I18N_KEY("Previous"), I18N_KEY("Random"), I18N_KEY("Stop")
@@ -71,7 +71,7 @@ namespace app
       uint64_t sTrackCtxLaneId = 0;
       uint64_t sTrackRenameLaneId = 0;   // the track header showing its name field
       char sTrackNameBuf[64] = {};
-      constexpr float kAddColW = 40.0f;
+      constexpr float kAddColW = tok::arrange_session_grid_add_col_w;
 
       void AddTrackOfType(int type)
       {
@@ -164,7 +164,7 @@ namespace app
       ImU32 LabelOn(ImU32 fill)
       {
          const ImVec4 f = ImGui::ColorConvertU32ToFloat4(fill);
-         const float lum = (0.299f * f.x + 0.587f * f.y + 0.114f * f.z) * 255.0f;
+         const float lum = (tok::arrange_session_grid_label_on_ratio * f.x + tok::arrange_session_grid_label_on_ratio_2 * f.y + tok::arrange_session_grid_label_on_ratio_3 * f.z) * 255.0f;
          return lum > 150.0f ? tok::Role(tok::col::surface_deep) : tok::Role(tok::col::ink_white);
       }
 
@@ -218,19 +218,19 @@ namespace app
       // starting at twelve o'clock (the MPC pad ring).
       void DrawProgressRing(ImDrawList* dl, ImVec2 c, float r, float progress, ImU32 col)
       {
-         dl->AddCircle(c, r, WithAlpha(col, 0.30f), 24, 2.0f);
+         dl->AddCircle(c, r, WithAlpha(col, 0.30f), tok::arrange_session_grid_progress_ring_segments, tok::arrange_session_grid_progress_ring_stroke);
          const float a0 = -IM_PI * 0.5f;
          const float a1 = a0 + std::clamp(progress, 0.0f, 1.0f) * 2.0f * IM_PI;
          if (a1 > a0 + 0.02f)
          {
-            dl->PathArcTo(c, r, a0, a1, 24);
-            dl->PathStroke(col, 0, 2.0f);
+            dl->PathArcTo(c, r, a0, a1, tok::arrange_session_grid_progress_ring_segments);
+            dl->PathStroke(col, 0, tok::arrange_session_grid_progress_ring_stroke);
          }
       }
 
       void DrawStopSquare(ImDrawList* dl, ImVec2 c, float s, ImU32 col)
       {
-         dl->AddRectFilled(ImVec2(c.x - s * 0.5f, c.y - s * 0.5f), ImVec2(c.x + s * 0.5f, c.y + s * 0.5f), col, 1.5f);
+         dl->AddRectFilled(ImVec2(c.x - s * 0.5f, c.y - s * 0.5f), ImVec2(c.x + s * 0.5f, c.y + s * 0.5f), col, tok::arrange_session_grid_stop_square_radius);
       }
 
       // Queued launches and stops pulse on the beat, so the wait reads in time
@@ -251,7 +251,7 @@ namespace app
          char num[16];
          snprintf(num, sizeof(num), "%d", ss.followBars);
          const ImVec2 ns = ImGui::CalcTextSize(num);
-         const float gx = rightCentre.x - ns.x - 9.0f;
+         const float gx = rightCentre.x - ns.x - tok::arrange_session_grid_gx_gap;
          const ImVec2 gc(gx, rightCentre.y);
          const float gs = tok::icon_control;
          switch (ss.followAction)
@@ -504,7 +504,7 @@ namespace app
             MenuParts::EndPopup();
             return;
          }
-         ImGui::SetNextItemWidth(200.0f);
+         ImGui::SetNextItemWidth(tok::arrange_session_grid_scene_menu_set_next_item_width_w);
          if (ImGui::InputTextWithHint("##scenename", T("Scene name"), sSceneNameBuf, sizeof(sSceneNameBuf)))
          {
          }
@@ -521,7 +521,7 @@ namespace app
                }
             });
          }
-         ImGui::SetNextItemWidth(200.0f);
+         ImGui::SetNextItemWidth(tok::arrange_session_grid_scene_menu_set_next_item_width_w);
          char tempoFmt[64];
          if (sSceneTempoEdit > 0.0f)
          {
@@ -619,11 +619,11 @@ namespace app
          const ImVec2 o = ImGui::GetCursorScreenPos();
          EmptyState::Draw(o, ImVec2(o.x + avail.x, o.y + avail.y), T("No tracks yet"),
                           T("Add a track, then add clips to its cells or drop audio and video files onto them."));
-         ImGui::SetCursorScreenPos(ImVec2(o.x + avail.x * 0.5f - 130.0f, o.y + avail.y * 0.5f + 40.0f));
-         if (ActionButton::Draw(L("+ Video Track##sessaddv"), ImVec2(125, 0)))
+         ImGui::SetCursorScreenPos(ImVec2(o.x + avail.x * 0.5f - tok::arrange_session_grid_gap, o.y + avail.y * 0.5f + tok::arrange_session_grid_gap_2));
+         if (ActionButton::Draw(L("+ Video Track##sessaddv"), ImVec2(tok::arrange_session_grid_draw_x, 0)))
             AddTrackOfType(Arrange::kLaneVideo);
-         ImGui::SetCursorScreenPos(ImVec2(o.x + avail.x * 0.5f + 5.0f, o.y + avail.y * 0.5f + 40.0f));
-         if (ActionButton::Draw(L("+ Audio Track##sessadda"), ImVec2(125, 0)))
+         ImGui::SetCursorScreenPos(ImVec2(o.x + avail.x * 0.5f + tok::space_1_25, o.y + avail.y * 0.5f + tok::arrange_session_grid_gap_2));
+         if (ActionButton::Draw(L("+ Audio Track##sessadda"), ImVec2(tok::arrange_session_grid_draw_x, 0)))
             AddTrackOfType(Arrange::kLaneAudio);
          ImGui::SetCursorScreenPos(o);
          ImGui::Dummy(avail);
@@ -649,7 +649,7 @@ namespace app
       // ---- corner: the scene column's header (Record and Stop All live in the toolbar) ----
       {
          const float th = ImGui::GetTextLineHeight();
-         dl->AddText(ImVec2(o.x + kGap + 9.0f, o.y + (kHeaderH - th) * 0.5f), TextCol(0.55f), T("Scenes"));
+         dl->AddText(ImVec2(o.x + kGap + tok::arrange_session_grid_gap_3, o.y + (kHeaderH - th) * 0.5f), TextCol(0.55f), T("Scenes"));
       }
 
       // ---- track headers ----
@@ -664,8 +664,8 @@ namespace app
          const float th = ImGui::GetTextLineHeight();
          if (lane.id == sTrackRenameLaneId)
             continue;
-         dl->PushClipRect(a, ImVec2(b.x - 4.0f, b.y), true);
-         dl->AddText(ImVec2(a.x + 9.0f, (a.y + b.y - th) * 0.5f),
+         dl->PushClipRect(a, ImVec2(b.x - tok::space_1, b.y), true);
+         dl->AddText(ImVec2(a.x + tok::arrange_session_grid_gap_3, (a.y + b.y - th) * 0.5f),
                      Arrange::LaneEffectivelyEnabled(gArrange, lane) ? TextCol(0.92f) : TextCol(0.40f), name.c_str());
          dl->PopClipRect();
       }
@@ -675,7 +675,7 @@ namespace app
          const float x0 = o.x + kSceneColW + colW * (float)li;
          ImGui::SetCursorScreenPos(ImVec2(x0 + kGap, o.y + kGap));
          ImGui::PushID(li);
-         UiInteract::Hit("##hdr", ImVec2(colW - 2.0f * kGap, kHeaderH - 2.0f * kGap),
+         UiInteract::Hit("##hdr", ImVec2(colW - tok::arrange_session_grid_ratio * kGap, kHeaderH - tok::arrange_session_grid_ratio * kGap),
                                 ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonLeft);
          if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold_tile))
             sTrackDragFrom = li;
@@ -696,8 +696,8 @@ namespace app
          if (hdrLaneId == sTrackRenameLaneId)
          {
             static uint64_t sFocused = 0;
-            ImGui::SetCursorScreenPos(ImVec2(x0 + kGap + 4.0f, o.y + kGap + 3.0f));
-            ImGui::SetNextItemWidth(std::max(20.0f, colW - 2.0f * kGap - 8.0f));
+            ImGui::SetCursorScreenPos(ImVec2(x0 + kGap + tok::space_1, o.y + kGap + tok::space_0_75));
+            ImGui::SetNextItemWidth(std::max(tok::arrange_session_grid_bound, colW - tok::arrange_session_grid_ratio * kGap - tok::space_2));
             if (sFocused != hdrLaneId)
             {
                UiInteract::FocusHere();
@@ -724,7 +724,7 @@ namespace app
       }
       {
          ImGui::SetCursorScreenPos(ImVec2(o.x + kSceneColW + colW * (float)laneCount + kGap, o.y + kGap));
-         if (ActionButton::Draw("+##sessaddtrack", ImVec2(kAddColW - 2.0f * kGap, kHeaderH - 2.0f * kGap)))
+         if (ActionButton::Draw("+##sessaddtrack", ImVec2(kAddColW - tok::arrange_session_grid_ratio * kGap, kHeaderH - tok::arrange_session_grid_ratio * kGap)))
          {
             sTrackCtxLaneId = 0;
             ImGui::OpenPopup("##sessiontrackctx");
@@ -736,7 +736,7 @@ namespace app
       // ---- add scene row ----
       {
          ImGui::SetCursorScreenPos(ImVec2(o.x + kGap, bodyTop + kRowH * (float)rows + kGap));
-         if (ActionButton::Draw(L("+ Scene##sessaddscene"), ImVec2(kSceneColW - 2.0f * kGap, kRowH - 2.0f * kGap)))
+         if (ActionButton::Draw(L("+ Scene##sessaddscene"), ImVec2(kSceneColW - tok::arrange_session_grid_ratio * kGap, kRowH - tok::arrange_session_grid_ratio * kGap)))
             ArrangeEdit([&]() {
                while ((int)gArrange.scenes.size() < rows + 1)
                   gArrange.scenes.push_back(Arrange::Scene{});
@@ -765,7 +765,7 @@ namespace app
          // Acts on release, so a press that becomes a reorder drag does not launch the scene.
          const ImVec2 sceneDragD(ImGui::GetMousePos().x - ImGui::GetIO().MouseClickedPos[0].x, ImGui::GetMousePos().y - ImGui::GetIO().MouseClickedPos[0].y);
          if (ImGui::IsItemDeactivated() && hov && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
-             sceneDragD.x * sceneDragD.x + sceneDragD.y * sceneDragD.y < 36.0f)
+             sceneDragD.x * sceneDragD.x + sceneDragD.y * sceneDragD.y < tok::arrange_session_grid_limit)
          {
             sSelScene = row;
             gArrangeSel.clear();
@@ -802,27 +802,27 @@ namespace app
                break;
             }
          if (sSelScene == row)
-            dl->AddRect(a, b, TextCol(0.70f), tok::radius_control, 0, 1.5f);
+            dl->AddRect(a, b, TextCol(0.70f), tok::radius_control, 0, tok::arrange_session_grid_stroke);
          if (rowPlaying)
             dl->AddRectFilled(a, b, WithAlpha(tok::Role(tok::col::ink_white), 0.10f), tok::radius_control);
          if (rowPlaying)
-            DrawProgressRing(dl, ImVec2(a.x + 13.0f, cy), 7.0f, rowProgress, TextCol(0.95f));
+            DrawProgressRing(dl, ImVec2(a.x + tok::arrange_session_grid_gap_4, cy), tok::arrange_session_grid_draw_progress_ring_arg, rowProgress, TextCol(0.95f));
          else
-            glyph::DrawPlayerPlay(dl, ImVec2(a.x + 13.0f, cy), tok::icon_control,
+            glyph::DrawPlayerPlay(dl, ImVec2(a.x + tok::arrange_session_grid_gap_4, cy), tok::icon_control,
                                   rowQueued ? WithAlpha(TextCol(0.95f), pulse) : (rowHasClip ? TextCol(0.85f) : TextCol(0.25f)), true);
          const std::string label = SceneLabel(row);
          const float th = ImGui::GetTextLineHeight();
-         float rightEdge = b.x - 6.0f;
+         float rightEdge = b.x - tok::space_1_5;
          if (realScene && gArrange.scenes[(size_t)row].tempo > 0.0f)
          {
             char tbuf[24];
             snprintf(tbuf, sizeof(tbuf), "%s", UiFmt::F0(gArrange.scenes[(size_t)row].tempo).c);
             const ImVec2 ts = ImGui::CalcTextSize(tbuf);
             dl->AddText(ImVec2(rightEdge - ts.x, cy - th * 0.5f), TextCol(0.55f), tbuf);
-            rightEdge -= ts.x + 6.0f;
+            rightEdge -= ts.x + tok::space_1_5;
          }
          dl->PushClipRect(a, ImVec2(rightEdge, b.y), true);
-         dl->AddText(ImVec2(a.x + 26.0f, cy - th * 0.5f), realScene ? TextCol(0.85f) : TextCol(0.35f), label.c_str());
+         dl->AddText(ImVec2(a.x + tok::arrange_session_grid_gap_5, cy - th * 0.5f), realScene ? TextCol(0.85f) : TextCol(0.35f), label.c_str());
          dl->PopClipRect();
       }
 
@@ -957,12 +957,12 @@ namespace app
                   DrawArrangeHatch(dl, a, b, isLight ? tok::Base(tok::col::ink_black, 45) : tok::Base(tok::col::ink_white, 38));
                const ImU32 ink = muted ? TextCol(0.55f) : LabelOn(fill);
                if (st.playing)
-                  dl->AddRect(a, b, tok::Role(tok::col::ink_white, 240), tok::radius_control, 0, 1.5f);
+                  dl->AddRect(a, b, tok::Role(tok::col::ink_white, 240), tok::radius_control, 0, tok::arrange_session_grid_stroke);
                else if (hov)
-                  dl->AddRect(a, b, tok::Role(tok::col::edge_hi, 220), tok::radius_control, 0, 1.0f);
-               const ImVec2 ic(a.x + 13.0f, cy);
+                  dl->AddRect(a, b, tok::Role(tok::col::edge_hi, 220), tok::radius_control, 0, tok::arrange_session_grid_stroke_2);
+               const ImVec2 ic(a.x + tok::arrange_session_grid_gap_4, cy);
                if (st.playing)
-                  DrawProgressRing(dl, ic, 7.0f, st.progress, tok::Role(tok::col::ink_white));
+                  DrawProgressRing(dl, ic, tok::arrange_session_grid_draw_progress_ring_arg, st.progress, tok::Role(tok::col::ink_white));
                else
                   glyph::DrawPlayerPlay(dl, ic, tok::icon_control, WithAlpha(ink, st.queued ? pulse : 0.85f), !st.queued);
                if (gArrangeAssigningClipId == ss->clip.id)
@@ -970,8 +970,8 @@ namespace app
                   // Waiting for a canvas node: the same cue as the Timeline's
                   // target - a pulsing outline, steady under Reduce Motion.
                   const float ap = UiAnim::ReduceMotion() ? 1.0f : tok::alpha_pulse_floor + tok::alpha_pulse_depth * std::sin((float)ImGui::GetTime() * tok::motion_rate_pulse);
-                  dl->AddRect(ImVec2(a.x - 2.0f, a.y - 2.0f), ImVec2(b.x + 2.0f, b.y + 2.0f),
-                              WithAlpha(tok::Role(tok::col::ink_white), ap), tok::radius_control, 0, 2.5f);
+                  dl->AddRect(ImVec2(a.x - tok::space_0_5, a.y - tok::space_0_5), ImVec2(b.x + tok::space_0_5, b.y + tok::space_0_5),
+                              WithAlpha(tok::Role(tok::col::ink_white), ap), tok::radius_control, 0, tok::arrange_session_grid_stroke_3);
                   HelpTip("%s", T("Click a node on the canvas to assign it. Esc cancels."));
                }
                if (gArrangeFlashClipId == ss->clip.id)
@@ -980,24 +980,24 @@ namespace app
                   if (ft >= 1.2f)
                      gArrangeFlashClipId = 0;
                   else
-                     dl->AddRect(ImVec2(a.x - 2.0f, a.y - 2.0f), ImVec2(b.x + 2.0f, b.y + 2.0f),
-                                 IM_COL32(255, 255, 255, (int)(255.0f * (1.0f - ft / 1.2f))), tok::radius_control, 0, 2.5f);
+                     dl->AddRect(ImVec2(a.x - tok::space_0_5, a.y - tok::space_0_5), ImVec2(b.x + tok::space_0_5, b.y + tok::space_0_5),
+                                 IM_COL32(255, 255, 255, (int)(tok::arrange_session_grid_ratio_2 * (tok::arrange_session_grid_bias - ft / tok::arrange_session_grid_ratio_3))), tok::radius_control, 0, tok::arrange_session_grid_stroke_3);
                }
                if (st.queued)
-                  dl->AddRect(a, b, WithAlpha(tok::Role(tok::col::ink_white), 0.9f * pulse), tok::radius_control, 0, 1.5f);
+                  dl->AddRect(a, b, WithAlpha(tok::Role(tok::col::ink_white), 0.9f * pulse), tok::radius_control, 0, tok::arrange_session_grid_stroke);
                if (st.upNext)
                {
                   // Up next (a follow action is about to start this clip): a steady inner outline and a chevron.
-                  dl->AddRect(ImVec2(a.x + 2.0f, a.y + 2.0f), ImVec2(b.x - 2.0f, b.y - 2.0f),
-                              WithAlpha(tok::Role(tok::col::ink_white), 0.75f), tok::radius_control, 0, 1.0f);
-                  glyph::DrawChevronDown(dl, ImVec2(b.x - 14.0f, a.y + 8.0f), tok::icon_control, WithAlpha(ink, 0.9f));
+                  dl->AddRect(ImVec2(a.x + tok::space_0_5, a.y + tok::space_0_5), ImVec2(b.x - tok::space_0_5, b.y - tok::space_0_5),
+                              WithAlpha(tok::Role(tok::col::ink_white), 0.75f), tok::radius_control, 0, tok::arrange_session_grid_stroke_2);
+                  glyph::DrawChevronDown(dl, ImVec2(b.x - tok::space_3_5, a.y + tok::space_2), tok::icon_control, WithAlpha(ink, 0.9f));
                }
                const std::string label = SlotLabel(ss->clip);
-               const float badgeW = ss->followAction != Arrange::kFollowNone ? 30.0f : 0.0f;
-               dl->PushClipRect(a, ImVec2(b.x - 6.0f - badgeW, b.y), true);
-               dl->AddText(ImVec2(a.x + 26.0f, cy - th * 0.5f), ink, label.c_str());
+               const float badgeW = ss->followAction != Arrange::kFollowNone ? tok::arrange_session_grid_badge_w : 0.0f;
+               dl->PushClipRect(a, ImVec2(b.x - tok::space_1_5 - badgeW, b.y), true);
+               dl->AddText(ImVec2(a.x + tok::arrange_session_grid_gap_5, cy - th * 0.5f), ink, label.c_str());
                dl->PopClipRect();
-               DrawFollowBadge(dl, ImVec2(b.x - 6.0f, cy), *ss, WithAlpha(ink, 0.8f));
+               DrawFollowBadge(dl, ImVec2(b.x - tok::space_1_5, cy), *ss, WithAlpha(ink, 0.8f));
                if (hov)
                   HelpTip("%s", muted ? (src == nullptr ? T("This slot's source is missing") : T("This slot is inactive"))
                                       : T("Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions."));
@@ -1012,8 +1012,8 @@ namespace app
                   // A plus: a double-click adds an unassigned clip to this cell.
                   const ImVec2 pc((a.x + b.x) * 0.5f, cy);
                   const ImU32 pcol = TextCol(0.55f);
-                  dl->AddLine(ImVec2(pc.x - 6.0f, pc.y), ImVec2(pc.x + 6.0f, pc.y), pcol, 1.5f);
-                  dl->AddLine(ImVec2(pc.x, pc.y - 6.0f), ImVec2(pc.x, pc.y + 6.0f), pcol, 1.5f);
+                  dl->AddLine(ImVec2(pc.x - tok::space_1_5, pc.y), ImVec2(pc.x + tok::space_1_5, pc.y), pcol, tok::arrange_session_grid_stroke);
+                  dl->AddLine(ImVec2(pc.x, pc.y - tok::space_1_5), ImVec2(pc.x, pc.y + tok::space_1_5), pcol, tok::arrange_session_grid_stroke);
                   HelpTip("%s", isVideo ? T("Double-click to add a clip. Click selects the cell to paste into. You can also drop a video or image file here.")
                                         : T("Double-click to add a clip. Click selects the cell to paste into. You can also drop an audio file here."));
                }
@@ -1021,13 +1021,13 @@ namespace app
 
             // The keyboard cursor / selected clip.
             if ((ss != nullptr && gArrangeSel.count(ss->clip.id) != 0) || (laneId == sCurLaneId && row == sCurRow))
-               dl->AddRect(ImVec2(a.x - 1.0f, a.y - 1.0f), ImVec2(b.x + 1.0f, b.y + 1.0f),
-                           WithAlpha(TextCol(1.0f), gSessionClaimedKeys ? 0.9f : 0.45f), tok::radius_control, 0, 1.5f);
+               dl->AddRect(ImVec2(a.x - tok::space_0_25, a.y - tok::space_0_25), ImVec2(b.x + tok::space_0_25, b.y + tok::space_0_25),
+                           WithAlpha(TextCol(1.0f), gSessionClaimedKeys ? 0.9f : 0.45f), tok::radius_control, 0, tok::arrange_session_grid_stroke);
             if (ss != nullptr && gArrangeRenamingClipId == ss->clip.id)
             {
                static uint64_t sRenameFocusedId = 0;
-               ImGui::SetCursorScreenPos(ImVec2(a.x + 22.0f, a.y + 3.0f));
-               ImGui::SetNextItemWidth(std::max(20.0f, b.x - a.x - 28.0f));
+               ImGui::SetCursorScreenPos(ImVec2(a.x + tok::arrange_session_grid_gap_6, a.y + tok::space_0_75));
+               ImGui::SetNextItemWidth(std::max(tok::arrange_session_grid_bound, b.x - a.x - tok::arrange_session_grid_gap_7));
                if (sRenameFocusedId != ss->clip.id)
                {
                   UiInteract::FocusHere();
@@ -1092,7 +1092,7 @@ namespace app
                ArrangeSessionStopLane(laneId);
             const bool hov = ImGui::IsItemHovered();
             ImGui::EndDisabled();
-            dl->AddRectFilled(a, b, TextCol(canStop ? (hov ? 0.12f : 0.07f) : 0.03f), tok::radius_control);
+            dl->AddRectFilled(a, b, TextCol(canStop ? (hov ? tok::arrange_session_grid_assign : tok::arrange_session_grid_assign_2) : 0.03f), tok::radius_control);
             const float alpha = !canStop ? 0.22f : (ls.stopQueued ? 0.9f * pulse : 0.85f);
             DrawStopSquare(dl, ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), 9.0f, TextCol(alpha));
             if (hov)
@@ -1114,13 +1114,13 @@ namespace app
          if (fits)
          {
             const float x0 = o.x + kSceneColW + colW * (float)li, y0 = bodyTop + kRowH * (float)row;
-            dl->AddRect(ImVec2(x0 + kGap - 1.0f, y0 + kGap - 1.0f), ImVec2(x0 + colW - kGap + 1.0f, y0 + kRowH - kGap + 1.0f),
-                        TextCol(0.95f), tok::radius_control, 0, 2.0f);
+            dl->AddRect(ImVec2(x0 + kGap - tok::space_0_25, y0 + kGap - tok::space_0_25), ImVec2(x0 + colW - kGap + tok::space_0_25, y0 + kRowH - kGap + tok::space_0_25),
+                        TextCol(0.95f), tok::radius_control, 0, tok::arrange_session_grid_stroke_4);
          }
          if (srcLane != nullptr && SlotOf(*srcLane, sDrag.row) != nullptr)
          {
             const std::string label = SlotLabel(srcLane->slots[(size_t)sDrag.row].clip);
-            ImGui::GetForegroundDrawList()->AddText(ImVec2(mouse.x + 14.0f, mouse.y + 4.0f), TextCol(fits ? 0.95f : 0.45f),
+            ImGui::GetForegroundDrawList()->AddText(ImVec2(mouse.x + tok::space_3_5, mouse.y + tok::space_1), TextCol(fits ? 0.95f : 0.45f),
                                                     (copy ? "+ " + label : label).c_str());
          }
          ImGui::SetMouseCursor(fits ? ImGuiMouseCursor_Hand : ImGuiMouseCursor_NotAllowed);
@@ -1135,8 +1135,8 @@ namespace app
          sDrag = {};
 
       // Hairline under the headers and above the stop row: the grid's frame.
-      dl->AddLine(ImVec2(o.x, bodyTop - 0.5f), ImVec2(o.x + gridW, bodyTop - 0.5f), TextCol(0.10f), 1.0f);
-      dl->AddLine(ImVec2(o.x, footerTop + 0.5f), ImVec2(o.x + gridW, footerTop + 0.5f), TextCol(0.10f), 1.0f);
+      dl->AddLine(ImVec2(o.x, bodyTop - tok::px_align), ImVec2(o.x + gridW, bodyTop - tok::px_align), TextCol(0.10f), tok::arrange_session_grid_stroke_2);
+      dl->AddLine(ImVec2(o.x, footerTop + tok::px_align), ImVec2(o.x + gridW, footerTop + tok::px_align), TextCol(0.10f), tok::arrange_session_grid_stroke_2);
 
       DrawSlotMenu();
       DrawSceneMenu();
@@ -1614,8 +1614,8 @@ namespace app
          // Outside Session audio mode the playback model is the Timeline's own: the Session monitor stays empty.
          if (gAudioMode == AudioMode::Session && CountActiveArrangeVideoClips(Transport::Instance().Beats()) > 0)
          {
-            gArrangeMonitorTarget.requestW = std::max(16, (int)avail.x);
-            gArrangeMonitorTarget.requestH = std::max(16, (int)avail.y);
+            gArrangeMonitorTarget.requestW = std::max(tok::arrange_session_grid_monitor_bound, (int)avail.x);
+            gArrangeMonitorTarget.requestH = std::max(tok::arrange_session_grid_monitor_bound, (int)avail.y);
             const unsigned int tex = gArrangeMonitorTarget.result.tex;
             if (tex != 0)
                Thumb::Add(dl, (ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
@@ -1820,13 +1820,13 @@ namespace app
             const ImVec2 c((ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f, (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f);
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             const ImU32 icol = sSessionShowMonitor ? tok::Role(tok::col::ink_white) : iconCol;
-            const ImVec2 tl(c.x - 6.5f, c.y - 5.5f), br(c.x + 6.5f, c.y + 3.5f);
+            const ImVec2 tl(c.x - tok::arrange_session_grid_panel_content_gap, c.y - tok::arrange_session_grid_panel_content_gap_2), br(c.x + tok::arrange_session_grid_panel_content_gap, c.y + tok::arrange_session_grid_panel_content_gap_3);
             if (sSessionShowMonitor)
-               tdl->AddRectFilled(tl, br, icol, 1.5f);
+               tdl->AddRectFilled(tl, br, icol, tok::arrange_session_grid_panel_content_radius);
             else
-               tdl->AddRect(tl, br, icol, 1.5f, 0, 1.4f);
-            tdl->AddLine(ImVec2(c.x, br.y), ImVec2(c.x, br.y + 2.5f), icol, 1.4f);
-            tdl->AddLine(ImVec2(c.x - 3.5f, br.y + 2.5f), ImVec2(c.x + 3.5f, br.y + 2.5f), icol, 1.4f);
+               tdl->AddRect(tl, br, icol, tok::arrange_session_grid_panel_content_radius, 0, tok::arrange_session_grid_panel_content_stroke);
+            tdl->AddLine(ImVec2(c.x, br.y), ImVec2(c.x, br.y + tok::arrange_session_grid_panel_content_gap_4), icol, tok::arrange_session_grid_panel_content_stroke);
+            tdl->AddLine(ImVec2(c.x - tok::arrange_session_grid_panel_content_gap_3, br.y + tok::arrange_session_grid_panel_content_gap_4), ImVec2(c.x + tok::arrange_session_grid_panel_content_gap_3, br.y + tok::arrange_session_grid_panel_content_gap_4), icol, tok::arrange_session_grid_panel_content_stroke);
          }
          nextTo(tok::space_4);
 
@@ -1917,7 +1917,7 @@ namespace app
                HelpTip("%s", inspWasOpen ? T("Clip Inspector: Open") : T("Settings of the selected clip. Double-click a clip to open it."));
             glyph::DrawEdit(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, inspWasOpen ? tok::Role(tok::col::ink_white) : iconCol);
             const char* audioLabel = T("Audio");
-            const float audioW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
+            const float audioW = ImGui::CalcTextSize(audioLabel).x + tok::arrange_session_grid_audio_w_ratio * tok::space_2;
             const float audioX = right - tok::control_h - tok::space_1 - audioW;
             ImGui::SetCursorScreenPos(ImVec2(audioX, toolbarOrigin.y));
             if (ChipButton::Draw(audioLabel, sessionMode, tok::control_h))
@@ -1930,7 +1930,7 @@ namespace app
             if (ArrangeSessionLastTake(from, to))
             {
                const char* takeLabel = T("Render Take");
-               const float takeW = ImGui::CalcTextSize(takeLabel).x + 2.0f * tok::space_2;
+               const float takeW = ImGui::CalcTextSize(takeLabel).x + tok::arrange_session_grid_take_w_ratio * tok::space_2;
                ImGui::SetCursorScreenPos(ImVec2(audioX - tok::space_2 - takeW, toolbarOrigin.y));
                if (ChipButton::Draw(takeLabel, false, tok::control_h))
                {
@@ -1993,10 +1993,10 @@ namespace app
             ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetStyle().WindowPadding.x, ly + 1.0f + gapY));
          }
 
-         const bool isWide = panelSize.x >= 720.0f;
+         const bool isWide = panelSize.x >= tok::arrange_session_grid_is_wide_limit;
          const bool showMon = isWide && sSessionShowMonitor;
-         const float monW = isWide ? std::clamp(panelSize.x * 0.28f, 180.0f, 320.0f) : 0.0f;
-         const float kInspectorW = ArrangeClipSettingsWidth(std::max(244.0f, ImGui::GetContentRegionAvail().x * 0.5f));
+         const float monW = isWide ? std::clamp(panelSize.x * tok::arrange_session_grid_panel_content_ratio, tok::arrange_session_grid_panel_content_bound, tok::arrange_session_grid_panel_content_bound_2) : 0.0f;
+         const float kInspectorW = ArrangeClipSettingsWidth(std::max(tok::arrange_session_grid_panel_content_bound_3, ImGui::GetContentRegionAvail().x * 0.5f));
          // The inspector shows the selected slot clip; it opens from a cell (double-click) and closes with its own X.
          const bool showInspector = gArrangeClipSettingsPanelOpen && ArrangeSelectedSlotId() != 0;
          const float spacing = ImGui::GetStyle().ItemSpacing.x;

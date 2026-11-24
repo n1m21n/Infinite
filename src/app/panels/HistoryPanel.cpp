@@ -12,7 +12,7 @@ namespace app
 {
 namespace
 {
-   constexpr float kMinWidth = 220.0f;
+   constexpr float kMinWidth = tok::history_min_width;
 
    // The top row's label is derived from the live graph, so it is refreshed on a short timer, not every frame.
    const std::string& TopLabel()

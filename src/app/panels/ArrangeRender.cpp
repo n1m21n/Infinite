@@ -167,7 +167,7 @@ namespace app
       ImGui::PopStyleColor();
 
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
-                               ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+                               ImGuiCond_Always, ImVec2(tok::arrange_offline_render_progress_window_set_next_window_pos_x, tok::arrange_offline_render_progress_window_set_next_window_pos_y));
       PushElevatedPanelStyle(/*isChild=*/false);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
@@ -208,7 +208,7 @@ namespace app
       ArrangeRenderQueuePosition(qIdx, qTotal);
       if (qTotal > 1 && qIdx > 0)
          ImGui::TextDisabled(T("Job %d of %d"), qIdx, qTotal);
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 300.0f);
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::arrange_offline_render_progress_window_gap);
       ImGui::TextDisabled("%s", n->recordVideoPath.c_str());
       ImGui::PopTextWrapPos();
       // A cancelled take's progress bar is meaningless - it would sit frozen
@@ -220,12 +220,12 @@ namespace app
          SectionCard::Progress(frac, 300.0f);
 
       ImGui::BeginDisabled(n->IsOfflineFinalizing());
-      if (ChipButton::Draw(L("Cancel"), false, 0.0f, 100.0f))
+      if (ChipButton::Draw(L("Cancel"), false, 0.0f, tok::arrange_offline_render_progress_window_draw))
          n->RequestFinishOfflineRender(true);
       ImGui::EndDisabled();
       ImGui::SameLine(0.0f, tok::space_2);
       ImGui::BeginDisabled(qTotal <= 1);
-      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, 100.0f))
+      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, tok::arrange_offline_render_progress_window_draw))
          ArrangeRenderCancelAll();
       ImGui::EndDisabled();
 
@@ -262,7 +262,7 @@ namespace app
       ImGui::PopStyleColor();
 
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
-                              ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+                              ImGuiCond_Always, ImVec2(tok::arrange_wav_render_progress_window_set_next_window_pos_x, tok::arrange_wav_render_progress_window_set_next_window_pos_y));
       PushElevatedPanelStyle(/*isChild=*/false);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
@@ -288,12 +288,12 @@ namespace app
          ImGui::TextDisabled(T("Job %d of %d"), qIdx, qTotal);
       SectionCard::Progress(frac, 300.0f);
       ImGui::BeginDisabled(gArrangeWavRender.cancelRequested);
-      if (ChipButton::Draw(L("Cancel"), false, 0.0f, 100.0f))
+      if (ChipButton::Draw(L("Cancel"), false, 0.0f, tok::arrange_wav_render_progress_window_draw))
          ArrangeRenderCancelActive();
       ImGui::EndDisabled();
       ImGui::SameLine(0.0f, tok::space_2);
       ImGui::BeginDisabled(qTotal <= 1);
-      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, 100.0f))
+      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, tok::arrange_wav_render_progress_window_draw))
          ArrangeRenderCancelAll();
       ImGui::EndDisabled();
       ImGui::End();
@@ -435,13 +435,13 @@ namespace app
 
       auto DrawCloseBtn = []() -> bool
       {
-         const float sz = 16.0f;
+         const float sz = tok::arrange_sz;
          bool clicked = UiInteract::Hit("##closeinspector", ImVec2(sz, sz));
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 bmin = ImGui::GetItemRectMin();
          const ImVec2 bmax = ImGui::GetItemRectMax();
          const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-         const float iconSize = sz * 0.65f;
+         const float iconSize = sz * tok::arrange_icon_size_ratio;
          const ImU32 col = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled);
          glyph::DrawX(dl, center, iconSize, col);
          return clicked;
@@ -460,7 +460,7 @@ namespace app
          clipId = *gArrangeSel.begin();
       Arrange::Clip* clip = clipId != 0 ? Arrange::FindClip(gArrange, clipId) : nullptr;
 
-      const float fieldW = std::max(70.0f, availW - RowLabelW());
+      const float fieldW = std::max(tok::arrange_clip_settings_child_bound, availW - RowLabelW());
 
       auto tickField = [&](const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
                            ArrangeTickUnit unit, Arrange::Tick* out) -> bool
@@ -507,7 +507,7 @@ namespace app
             ? (isSample ? "Video Sample" : "Video Clip")
             : (isSample ? "Audio Sample" : "Audio Clip");
          InspectorTitle(clipKindLabel);
-         ImGui::SameLine(wholeW - 18.0f);
+         ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          InspectorCardBegin();
@@ -516,8 +516,8 @@ namespace app
          char nameBuf[128];
          snprintf(nameBuf, sizeof(nameBuf), "%s", clip->name.c_str());
          // Name and Active share a row (Logic's region inspector: name, then the switches beside it).
-         const float activeW = 72.0f;
-         ImGui::SetNextItemWidth(std::max(60.0f, availW - activeW - ImGui::GetStyle().ItemSpacing.x));
+         const float activeW = tok::arrange_active_w;
+         ImGui::SetNextItemWidth(std::max(tok::arrange_clip_settings_child_bound_2, availW - activeW - ImGui::GetStyle().ItemSpacing.x));
          if (FieldWell::InputText("##clipinspname", nameBuf, sizeof(nameBuf)))
          {
             ArrangeEdit([&]() {
@@ -939,7 +939,7 @@ namespace app
             snprintf(mt, sizeof(mt), T("Multiple Clips (%d)"), (int)gArrangeSel.size());
             InspectorTitle(mt);
          }
-         ImGui::SameLine(wholeW - 18.0f);
+         ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          InspectorCardBegin();
@@ -947,10 +947,10 @@ namespace app
          // Multi-clip renaming
          static char sBulkRenameBuf[128] = "Clip";
          SectionHeader(T("Rename All Selected"));
-         ImGui::SetNextItemWidth(availW - 56.0f - tok::space_1);
+         ImGui::SetNextItemWidth(availW - tok::arrange_clip_settings_child_gap_2 - tok::space_1);
          FieldWell::InputText("##bulkrenametext", sBulkRenameBuf, sizeof(sBulkRenameBuf));
          FormParts::Inline(0.0f, tok::space_1);
-         if (ChipButton::Draw(L("Apply##bulkapplyrename"), false, ImGui::GetFrameHeight(), 56.0f))
+         if (ChipButton::Draw(L("Apply##bulkapplyrename"), false, ImGui::GetFrameHeight(), tok::arrange_clip_settings_child_draw))
          {
             ArrangeEdit([&]() {
                int idx = 1;
@@ -1038,7 +1038,7 @@ namespace app
          {
             const bool isVideo = lane->type == Arrange::kLaneVideo;
             InspectorTitle(isVideo ? "Video Track" : "Audio Track");
-            ImGui::SameLine(wholeW - 18.0f);
+            ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;
             InspectorCardBegin();
@@ -1169,7 +1169,7 @@ namespace app
          else if (const Arrange::TrackGroup* grp = Arrange::FindTrackGroup(gArrange, rowId))
          {
             InspectorTitle("Track Group");
-            ImGui::SameLine(wholeW - 18.0f);
+            ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;
             InspectorCardBegin();
@@ -1240,7 +1240,7 @@ namespace app
       else
       {
          InspectorTitle(T("Inspector"));
-         ImGui::SameLine(wholeW - 18.0f);
+         ImGui::SameLine(wholeW - tok::arrange_clip_settings_child_gap);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          InspectorCardBegin();
@@ -1354,7 +1354,7 @@ namespace app
          DialogParts::Title(sRenderNoticeClipped ? T("Audio clipped") : T("Render failed"));
          DialogParts::Message(sRenderNoticeClipped ? T("The file was written, but its audio went over full scale and is clipped.")
                                                    : T("The render stopped before it finished. Your patch was not changed."));
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::arrange_render_fail_notice_gap);
          DialogParts::Message(gArrangeRenderFailNotice.c_str());
          ImGui::PopTextWrapPos();
          if (DialogParts::Buttons({ L("OK") }) == 0)

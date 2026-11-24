@@ -120,7 +120,7 @@ namespace
       const std::string label = ((n->presetIndex >= 0 && n->presetIndex < (int)names.size())
                                     ? names[n->presetIndex] : std::string("Preset")) + "##" + id;
       PushDropdownStyle();
-      if (ActionButton::Draw(label.c_str(), ImVec2(220.0f, 0)))
+      if (ActionButton::Draw(label.c_str(), ImVec2(tok::stage_side_sketch_preset_dropdown_draw_x, 0)))
       {
          gDropdown.options = names;
          gDropdown.categories.assign(names.size(), "Presets");
@@ -549,7 +549,7 @@ void DrawSidePanels(FrameCtx& fc)
                   const bool isFav = gBrowserFavorites.IsFavoriteModule(match.first);
                   const float availW = ImGui::GetContentRegionAvail().x;
                   const std::string rowLabel =
-                     TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - 64.0f));
+                     TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - tok::stage_side_panels_gap));
                   const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
                   if (row.clicked)
                   {
@@ -611,7 +611,7 @@ void DrawSidePanels(FrameCtx& fc)
                      const bool isFav = gBrowserFavorites.IsFavoriteModule(name);
                      const float availW = ImGui::GetContentRegionAvail().x;
                      const std::string rowLabel =
-                        TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - 64.0f));
+                        TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - tok::stage_side_panels_gap));
                      const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
                      if (row.clicked)
                      {
@@ -763,7 +763,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gFormulaEditorOpen && gFormulaEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(620, 460), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w, tok::stage_side_panels_set_next_window_size_h), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Formula editor"), &gFormulaEditorOpen);
          if (editorVisible && gFormulaEditor->IsShadertoy())
          {
@@ -831,10 +831,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
             SectionCard::Begin(T("Code"));
             FieldWell::InputTextMultiline("##stglsl", stBuf, sizeof(stBuf),
-                                          ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+                                          ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_2));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                drafts[stTab] = stBuf;
                for (int p = 0; p < FormulaNode::kPasses; p++)
@@ -843,7 +843,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                loadAll();
 
             if (!fn->LastError().empty())
@@ -865,17 +865,17 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##glsl", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_2));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gFormulaEditor->formula = editBuf;
                gFormulaEditor->Apply();
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
 
             if (!gFormulaEditor->LastError().empty())
@@ -889,7 +889,7 @@ void DrawSidePanels(FrameCtx& fc)
       // Show set (v0.6 2.35): the list of patches a live set steps through.
       if (gShowSetOpen)
       {
-         ImGui::SetNextWindowSize(ImVec2(420, 460), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_2, tok::stage_side_panels_set_next_window_size_h), ImGuiCond_FirstUseEver);
          const bool visible = BeginEditorWindow(L("Show Set"), &gShowSetOpen);
          if (visible)
          {
@@ -1053,7 +1053,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gFieldElementEditorOpen && gFieldElementEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_2), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Field element editor"), &gFieldElementEditorOpen);
          if (editorVisible)
          {
@@ -1085,10 +1085,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gFieldElementEditor->code = editBuf;
                gFieldElementEditor->Apply();
@@ -1096,7 +1096,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
 
             if (!gFieldElementEditor->LastError().empty())
@@ -1124,7 +1124,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gFieldPrimitiveEditorOpen && gFieldPrimitiveEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_2), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Field primitive editor"), &gFieldPrimitiveEditorOpen);
          if (editorVisible)
          {
@@ -1149,10 +1149,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldPrimitiveCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gFieldPrimitiveEditor->code = editBuf;
                gFieldPrimitiveEditor->Apply();
@@ -1160,7 +1160,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPrimitiveEditor->code.c_str());
 
             if (!gFieldPrimitiveEditor->LastError().empty())
@@ -1173,7 +1173,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gFieldPixelEditorOpen && gFieldPixelEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_2), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Field pixel editor"), &gFieldPixelEditorOpen);
          if (editorVisible)
          {
@@ -1198,10 +1198,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gFieldPixelEditor->code = editBuf;
                gFieldPixelEditor->Apply();
@@ -1209,7 +1209,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
 
             if (!gFieldPixelEditor->LastError().empty())
@@ -1235,7 +1235,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gSketchEditorOpen && gSketchEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 520), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_3), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Sketch editor"), &gSketchEditorOpen);
          if (editorVisible)
          {
@@ -1248,7 +1248,7 @@ void DrawSidePanels(FrameCtx& fc)
 
             // SVG: dropped on the canvas, or pasted here (no file dialog needed).
             FormParts::Inline();
-            if (ActionButton::Draw(L("Paste SVG"), ImVec2(100, 0)))
+            if (ActionButton::Draw(L("Paste SVG"), ImVec2(tok::stage_side_panels_draw_x_2, 0)))
             {
                const char* clip = ImGui::GetClipboardText();
                if (clip && std::strstr(clip, "<svg"))
@@ -1261,7 +1261,7 @@ void DrawSidePanels(FrameCtx& fc)
             if (!gSketchEditor->svg.empty())
             {
                FormParts::Inline();
-               if (ActionButton::Draw(L("Clear SVG"), ImVec2(100, 0)))
+               if (ActionButton::Draw(L("Clear SVG"), ImVec2(tok::stage_side_panels_draw_x_2, 0)))
                {
                   gSketchEditor->svg.clear();
                   gSketchEditor->svgName.clear();
@@ -1286,10 +1286,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##sketchCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gSketchEditor->code = editBuf;
                gSketchEditor->Apply();
@@ -1297,7 +1297,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gSketchEditor->code.c_str());
 
             if (!gSketchEditor->LastError().empty())
@@ -1321,7 +1321,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gSketch3DEditorOpen && gSketch3DEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 520), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_3), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Sketch 3D editor"), &gSketch3DEditorOpen);
          if (editorVisible)
          {
@@ -1343,10 +1343,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##sketch3dCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gSketch3DEditor->code = editBuf;
                gSketch3DEditor->Apply();
@@ -1354,7 +1354,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gSketch3DEditor->code.c_str());
 
             if (!gSketch3DEditor->LastError().empty())
@@ -1396,7 +1396,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gFieldSampleEditorOpen && gFieldSampleEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_2), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Field effect editor"), &gFieldSampleEditorOpen);
          if (editorVisible)
          {
@@ -1421,10 +1421,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gFieldSampleEditor->code = editBuf;
                gFieldSampleEditor->Apply();
@@ -1432,7 +1432,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSampleEditor->code.c_str());
 
             if (!gFieldSampleEditor->LastError().empty())
@@ -1460,7 +1460,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gSpectralFieldEditorOpen && gSpectralFieldEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_2), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Spectral field editor"), &gSpectralFieldEditorOpen);
          if (editorVisible)
          {
@@ -1484,10 +1484,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##spectralFieldCode", editBuf, sizeof(editBuf),
-                                          ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                          ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gSpectralFieldEditor->code = editBuf;
                gSpectralFieldEditor->Apply();
@@ -1495,7 +1495,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gSpectralFieldEditor->code.c_str());
 
             if (!gSpectralFieldEditor->LastError().empty())
@@ -1521,7 +1521,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gFieldSynthEditorOpen && gFieldSynthEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_2), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Field synth editor"), &gFieldSynthEditorOpen);
          if (editorVisible)
          {
@@ -1546,10 +1546,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldSynthCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gFieldSynthEditor->code = editBuf;
                gFieldSynthEditor->Apply();
@@ -1557,7 +1557,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSynthEditor->code.c_str());
 
             if (!gFieldSynthEditor->LastError().empty())
@@ -1585,7 +1585,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gFieldNotesEditorOpen && gFieldNotesEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_2), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Field notes editor"), &gFieldNotesEditorOpen);
          if (editorVisible)
          {
@@ -1610,10 +1610,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldNotesCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                gFieldNotesEditor->code = editBuf;
                gFieldNotesEditor->Apply();
@@ -1621,7 +1621,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldNotesEditor->code.c_str());
 
             if (!gFieldNotesEditor->LastError().empty())
@@ -1649,7 +1649,7 @@ void DrawSidePanels(FrameCtx& fc)
 
       if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
       {
-         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         ImGui::SetNextWindowSize(ImVec2(tok::stage_side_panels_set_next_window_size_w_3, tok::stage_side_panels_set_next_window_size_h_2), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Field graph editor"), &gFieldGraphEditorOpen);
          if (editorVisible)
          {
@@ -1674,10 +1674,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             FieldWell::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - tok::stage_side_panels_gap_3));
 
             PushPrimaryButtonStyle();
-            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                // Compile-only (T11): never mutates the real graph on its own -
                // see FieldGraphNode::Apply()'s doc comment. Regenerate (below)
@@ -1688,10 +1688,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             FormParts::Inline();
-            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(tok::stage_side_panels_draw_x, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
             FormParts::Inline();
-            if (ActionButton::Draw(L("Regenerate"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Regenerate"), ImVec2(tok::stage_side_panels_draw_x, 0)))
             {
                // Safe to call directly (not deferred) here: this window draws
                // after ed::End() has already returned for the frame, unlike

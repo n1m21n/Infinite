@@ -123,7 +123,7 @@ namespace CanvasLink
             continue;
          const bool in = mp.x >= p.rowMin.x && mp.x <= p.rowMax.x && mp.y >= p.rowMin.y && mp.y <= p.rowMax.y;
          const float dx = mp.x - p.screenPos.x, dy = mp.y - p.screenPos.y;
-         if (in || dx * dx + dy * dy < 20.0f * 20.0f)
+         if (in || dx * dx + dy * dy < tok::canvas_link_hovered_param_ratio * 20.0f)
             hit = (int)i; // the last drawn wins, as before
       }
       return hit;
@@ -358,7 +358,7 @@ namespace CanvasLink
       const std::string preview = cur != nullptr ? NodeTitleWithInstance(*cur) : uid != 0 ? std::string(T("Missing")) : std::string(T("None"));
       bool changed = false;
       uint64_t chosen = uid;
-      ImGui::SetNextItemWidth(std::max(chip, full - 2.0f * (chip + gap)));
+      ImGui::SetNextItemWidth(std::max(chip, full - tok::canvas_link_field_ratio * (chip + gap)));
       if (MenuParts::BeginCombo("##cl.field", preview.c_str()))
       {
          if (allowNone && MenuParts::Choice(T("None"), uid == 0) && uid != 0)

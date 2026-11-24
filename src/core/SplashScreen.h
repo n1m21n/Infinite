@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include "app/ui/design/Tokens.gen.h"
 
 #include <algorithm>
 #include <cmath>
@@ -112,12 +113,12 @@ namespace Splash
    inline float EaseInOutCubic(float x)
    {
       x = Clamp01(x);
-      return x < 0.5f ? 4.0f * x * x * x : 1.0f - std::pow(-2.0f * x + 2.0f, 3.0f) * 0.5f;
+      return x < tok::splash_screen_ease_in_out_cubic_limit ? tok::splash_screen_ease_in_out_cubic_ratio * x * x * x : 1.0f - std::pow(-tok::splash_screen_ease_in_out_cubic_ratio_2 * x + tok::space_0_5, tok::splash_screen_ease_in_out_cubic_pow_maths) * 0.5f;
    }
    inline float Smooth(float x)
    {
       x = Clamp01(x);
-      return x * x * (3.0f - 2.0f * x);
+      return x * x * (3.0f - tok::splash_screen_smooth_ratio * x);
    }
 
    // Lemniscate of Bernoulli, unit half-width: the website logo's exact curve.
@@ -207,18 +208,18 @@ namespace Splash
       }
 
       // --- layout: a card about 600 x 380 points ----------------------------------------
-      const float sc = st.cardOnly ? std::min(W / 600.0f, H / 380.0f)
-                                   : std::max(0.7f, std::min(1.4f, std::min(W / 760.0f, H / 520.0f)));
-      const float cardW = st.cardOnly ? W : 600.0f * sc, cardH = st.cardOnly ? H : 380.0f * sc;
+      const float sc = st.cardOnly ? std::min(W / tok::splash_screen_draw_ratio, H / tok::splash_screen_draw_ratio_2)
+                                   : std::max(0.7f, std::min(1.4f, std::min(W / tok::splash_screen_draw_ratio_3, H / tok::splash_screen_draw_ratio_4)));
+      const float cardW = st.cardOnly ? W : tok::splash_screen_card_w_ratio * sc, cardH = st.cardOnly ? H : tok::splash_screen_card_h_ratio * sc;
       const float x0 = st.cardOnly ? 0.0f : std::floor((W - cardW) * 0.5f);
       const float y0 = st.cardOnly ? 0.0f : std::floor((H - cardH) * 0.5f);
       const float x1 = x0 + cardW, y1 = y0 + cardH;
       const float rounding = 18.0f * sc;
-      const float pad = 26.0f * sc;
+      const float pad = tok::splash_screen_pad_ratio * sc;
       const float A = 105.0f * sc;      // lemniscate half-width
-      const float strokeW = 0.257f * A; // 87/338 of A, as on the website
+      const float strokeW = tok::splash_screen_stroke_w_ratio * A; // 87/338 of A, as on the website
       const float cx = (x0 + x1) * 0.5f;
-      const float cy = y0 + cardH * 0.43f;
+      const float cy = y0 + cardH * tok::splash_screen_cy_ratio;
 
       // The card's own gradient (the icon's navy, a touch lighter toward the bottom).
       auto cardCol = [&](float y, float a) {
@@ -252,19 +253,19 @@ namespace Splash
 
       // dim the app behind the card, then the card with a soft shadow
       if (!st.cardOnly)
-         dl->AddRectFilled(ImVec2(0, 0), ImVec2(W, H), IM_COL32(6, 8, 16, (int)(150.0f * alpha)));
+         dl->AddRectFilled(ImVec2(0, 0), ImVec2(W, H), IM_COL32(6, 8, 16, (int)(tok::splash_screen_draw_ratio_5 * alpha)));
       for (int i = st.cardOnly ? 0 : 6; i >= 1; --i)
-         dl->AddRectFilled(ImVec2(x0 - i * 4.0f * sc, y0 - i * 3.0f * sc + 10.0f * sc),
-                           ImVec2(x1 + i * 4.0f * sc, y1 + i * 3.0f * sc + 10.0f * sc), IM_COL32(0, 0, 0, (int)(9.0f * alpha)),
-                           rounding + i * 4.0f * sc);
+         dl->AddRectFilled(ImVec2(x0 - i * tok::splash_screen_draw_ratio_6 * sc, y0 - i * tok::splash_screen_draw_ratio_7 * sc + tok::splash_screen_draw_ratio_8 * sc),
+                           ImVec2(x1 + i * tok::splash_screen_draw_ratio_6 * sc, y1 + i * tok::splash_screen_draw_ratio_7 * sc + tok::splash_screen_draw_ratio_8 * sc), IM_COL32(0, 0, 0, (int)(tok::splash_screen_draw_ratio_9 * alpha)),
+                           rounding + i * tok::splash_screen_draw_ratio_6 * sc);
       {
          // Rounded card with a vertical gradient: clip the gradient rect to the rounded shape by
          // drawing a solid rounded rect, then a gradient inset by the corner radius in the middle.
          const ImU32 top = cardCol(y0, alpha), bot = cardCol(y1, alpha);
          dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), cardCol((y0 + y1) * 0.5f, alpha), rounding);
-         dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y0 + rounding * 2.0f), top, rounding, ImDrawFlags_RoundCornersTop);
-         dl->AddRectFilled(ImVec2(x0, y1 - rounding * 2.0f), ImVec2(x1, y1), bot, rounding, ImDrawFlags_RoundCornersBottom);
-         dl->AddRectFilledMultiColor(ImVec2(x0, y0 + rounding * 2.0f), ImVec2(x1, y1 - rounding * 2.0f),
+         dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y0 + rounding * tok::splash_screen_draw_ratio_10), top, rounding, ImDrawFlags_RoundCornersTop);
+         dl->AddRectFilled(ImVec2(x0, y1 - rounding * tok::splash_screen_draw_ratio_10), ImVec2(x1, y1), bot, rounding, ImDrawFlags_RoundCornersBottom);
+         dl->AddRectFilledMultiColor(ImVec2(x0, y0 + rounding * tok::splash_screen_draw_ratio_10), ImVec2(x1, y1 - rounding * tok::splash_screen_draw_ratio_10),
                                      cardCol(y0 + rounding * 2.0f, alpha), cardCol(y0 + rounding * 2.0f, alpha),
                                      cardCol(y1 - rounding * 2.0f, alpha), cardCol(y1 - rounding * 2.0f, alpha));
       }
@@ -316,7 +317,7 @@ namespace Splash
          {
             const ImVec2 hq = Lemniscate(twoPi * draw);
             dl->AddCircleFilled(ImVec2(cx + hq.x * A, cy + hq.y * A), hw,
-                                mixBg(BrandColor((hq.x + 1.0f) * 0.5f, 1.0f), cy + hq.y * A), 48);
+                                mixBg(BrandColor((hq.x + 1.0f) * 0.5f, 1.0f), cy + hq.y * A), tok::splash_screen_draw_segments);
          }
       }
 
@@ -328,12 +329,12 @@ namespace Splash
          const float e = u + 0.035f * std::sin(u * 3.14159265f * 4.0f); // quicker through the crossing
          const ImVec2 q = Lemniscate(twoPi * (e - std::floor(e)));
          const ImVec2 c(cx + q.x * A, cy + q.y * A);
-         const float r = strokeW * 0.30f;
-         dl->AddCircleFilled(c, r, mixBg(IM_COL32(0xC2, 0x59, 0x3F, (int)(255.0f * fadeIn)), c.y), 24);
-         dl->AddCircleFilled(ImVec2(c.x - r * 0.18f, c.y - r * 0.2f), r * 0.78f,
-                             mixBg(IM_COL32(0xF9, 0xA5, 0x8F, (int)(255.0f * fadeIn)), c.y), 24);
-         dl->AddCircleFilled(ImVec2(c.x - r * 0.34f, c.y - r * 0.38f), r * 0.28f,
-                             mixBg(IM_COL32(255, 255, 255, (int)(230.0f * fadeIn)), c.y), 16);
+         const float r = strokeW * tok::splash_screen_r_ratio;
+         dl->AddCircleFilled(c, r, mixBg(IM_COL32(0xC2, 0x59, 0x3F, (int)(tok::splash_screen_draw_ratio_11 * fadeIn)), c.y), tok::splash_screen_draw_segments_2);
+         dl->AddCircleFilled(ImVec2(c.x - r * tok::splash_screen_draw_ratio_12, c.y - r * tok::splash_screen_draw_ratio_13), r * tok::splash_screen_draw_ratio_14,
+                             mixBg(IM_COL32(0xF9, 0xA5, 0x8F, (int)(tok::splash_screen_draw_ratio_11 * fadeIn)), c.y), tok::splash_screen_draw_segments_2);
+         dl->AddCircleFilled(ImVec2(c.x - r * tok::splash_screen_draw_ratio_15, c.y - r * tok::splash_screen_draw_ratio_16), r * tok::splash_screen_draw_ratio_17,
+                             mixBg(IM_COL32(255, 255, 255, (int)(tok::splash_screen_draw_ratio_18 * fadeIn)), c.y), tok::splash_screen_draw_segments_3);
       }
 
       // --- bottom left: credits; bottom right: version -----------------------------------
@@ -349,7 +350,7 @@ namespace Splash
          float fx = x0 + pad;
          dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "Infinite");   // i18n-ok: brand mark, never translated
          fx += font->CalcTextSizeA(fs, FLT_MAX, 0.0f, "Infinite").x + 1.0f * sc;
-         dl->AddText(font, fs * 0.55f, ImVec2(fx, fy - fs * 0.12f), mixBg(footCol, fy), "TM");   // i18n-ok: brand mark, never translated
+         dl->AddText(font, fs * tok::splash_screen_draw_ratio_19, ImVec2(fx, fy - fs * tok::splash_screen_draw_ratio_20), mixBg(footCol, fy), "TM");   // i18n-ok: brand mark, never translated
          fx += font->CalcTextSizeA(fs * 0.55f, FLT_MAX, 0.0f, "TM").x;
          dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "   |   Made in India   |   Open source (MIT license)");   // i18n-ok: brand footer, never translated
          const std::string ver = std::string("v") + INFINITE_VERSION_STRING;
@@ -362,9 +363,9 @@ namespace Splash
          if (st.tasksTotal > 0)
          {
             const float frac = (float)st.tasksDone / (float)st.tasksTotal;
-            const float w = 120.0f * sc, lx = cx - w * 0.5f, ly = cy + A * 0.5f + 34.0f * sc;
-            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w, ly), mixBg(IM_COL32(0x8F, 0x98, 0xB8, 60), ly), 1.0f);
-            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w * frac, ly), mixBg(BrandColor(0.5f, 1.0f), ly), 1.5f);
+            const float w = tok::splash_screen_w_ratio * sc, lx = cx - w * 0.5f, ly = cy + A * 0.5f + 34.0f * sc;
+            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w, ly), mixBg(IM_COL32(0x8F, 0x98, 0xB8, 60), ly), tok::splash_screen_draw_stroke);
+            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w * frac, ly), mixBg(BrandColor(0.5f, 1.0f), ly), tok::splash_screen_draw_stroke_2);
          }
       }
 

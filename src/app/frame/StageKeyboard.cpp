@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/frame/FrameCtx.h"
@@ -649,7 +650,7 @@ void DrawKeyboard(FrameCtx& fc)
                      const ImVec2 gp = ed::GetNodePosition(ownerGn->NodeId());
                      const ImVec2 gs = ed::GetNodeSize(ownerGn->NodeId());
                      const ImVec2 mp = ed::GetNodePosition(gn->NodeId());
-                     ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + 40.0f));
+                     ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + tok::stage_keyboard_gap));
                   }
                }
             }
@@ -711,12 +712,12 @@ void DrawKeyboard(FrameCtx& fc)
 
             if (any)
             {
-               const float kPad = 32.0f;
+               const float kPad = tok::stage_keyboard_pad;
                const float kHeader = 24.0f;
                const float gx = bmin.x - kPad;
                const float gy = bmin.y - kPad - kHeader;
-               const float gw = (bmax.x - bmin.x) + kPad * 2.0f;
-               const float gh = (bmax.y - bmin.y) + kPad * 2.0f + kHeader;
+               const float gw = (bmax.x - bmin.x) + kPad * tok::stage_keyboard_gw_ratio;
+               const float gh = (bmax.y - bmin.y) + kPad * tok::stage_keyboard_gh_ratio + kHeader;
 
                PushUndoCheckpoint("Group");
                gSuppressUndoCheckpoints = true;
@@ -1003,7 +1004,7 @@ void DrawKeyboard(FrameCtx& fc)
          {
             GraphNode* gn = FindNodeByIndex(rec.index);
             if (gn != nullptr &&
-                (std::fabs(gn->liveX - rec.x) > 0.5f || std::fabs(gn->liveY - rec.y) > 0.5f))
+                (std::fabs(gn->liveX - rec.x) > tok::stage_keyboard_limit || std::fabs(gn->liveY - rec.y) > tok::stage_keyboard_limit))
             {
                moved = true;
                break;
@@ -1035,7 +1036,7 @@ void DrawKeyboard(FrameCtx& fc)
             ImVec2 p = ed::GetNodePosition(gn.NodeId());
             ImVec2 snapped(std::round(p.x / gGridSnap) * gGridSnap,
                            std::round(p.y / gGridSnap) * gGridSnap);
-            if (std::fabs(snapped.x - p.x) > 0.01f || std::fabs(snapped.y - p.y) > 0.01f)
+            if (std::fabs(snapped.x - p.x) > tok::stage_keyboard_limit_2 || std::fabs(snapped.y - p.y) > tok::stage_keyboard_limit_2)
                ed::SetNodePosition(gn.NodeId(), snapped);
          }
       }

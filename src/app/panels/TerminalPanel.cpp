@@ -45,11 +45,11 @@ namespace app
 
 namespace
 {
-   constexpr float kMinHeight = 160.0f;
-   constexpr float kMinWidth = 280.0f;
+   constexpr float kMinHeight = tok::terminal_min_height;
+   constexpr float kMinWidth = tok::terminal_min_width;
    constexpr float kTabRowH = tok::row_h;
-   constexpr float kLineHeight = 1.3f;
-   constexpr int kWheelLines = 3;
+   constexpr float kLineHeight = tok::terminal_line_height;
+   constexpr int kWheelLines = tok::terminal_wheel_lines;
 
    struct Tab
    {
@@ -397,7 +397,7 @@ namespace
             dl->AddText(font, px, ImVec2(x, y + textOffset), fg, run.c_str(), run.c_str() + run.size());
             const float x1 = origin.x + (float)end * cw;
             if (c.flags & term::kCellUnderline)
-               dl->AddRectFilled(ImVec2(x, y + ch - 2.0f), ImVec2(x1, y + ch - 1.0f), fg);
+               dl->AddRectFilled(ImVec2(x, y + ch - tok::space_0_5), ImVec2(x1, y + ch - 1.0f), fg);
             if (c.flags & term::kCellStrike)
                dl->AddRectFilled(ImVec2(x, y + std::floor(ch * 0.5f)), ImVec2(x1, y + std::floor(ch * 0.5f) + 1.0f), fg);
             col = end;
@@ -419,9 +419,9 @@ namespace
       if (!focused)
          dl->AddRect(ImVec2(x, y), ImVec2(x + cw, y + ch), color);
       else if (snap.cursorShape == term::CursorShape::Bar)
-         dl->AddRectFilled(ImVec2(x, y), ImVec2(x + 2.0f, y + ch), color);
+         dl->AddRectFilled(ImVec2(x, y), ImVec2(x + tok::space_0_5, y + ch), color);
       else if (snap.cursorShape == term::CursorShape::Underline)
-         dl->AddRectFilled(ImVec2(x, y + ch - 2.0f), ImVec2(x + cw, y + ch), color);
+         dl->AddRectFilled(ImVec2(x, y + ch - tok::space_0_5), ImVec2(x + cw, y + ch), color);
       else
       {
          dl->AddRectFilled(ImVec2(x, y), ImVec2(x + cw, y + ch), color);
@@ -729,16 +729,16 @@ namespace
          if (i == sActive)
             tab.attention = false;
          std::string title = tab.name.empty() ? TabTitle(snap.get()) : tab.name;
-         if (title.size() > 28)
+         if (title.size() > tok::terminal_tab_row_limit)
             title = title.substr(0, 27) + "...";
-         const float width = ImGui::CalcTextSize(title.c_str()).x + 44.0f;
+         const float width = ImGui::CalcTextSize(title.c_str()).x + tok::terminal_width_gap;
          ImGui::PushID(i);
          ImGui::SetCursorScreenPos(ImVec2(x, start.y));
          UiInteract::Hit("##tab", ImVec2(width, kTabRowH));
          const bool hovered = ImGui::IsItemHovered();
          sTabHovered = sTabHovered || hovered;
          // The close mark is part of this button: a second button on top of it never gets the hover.
-         const ImVec2 closeMin(x + width - 20.0f, start.y + 3.0f), closeMax(closeMin.x + 16.0f, closeMin.y + 16.0f);
+         const ImVec2 closeMin(x + width - tok::terminal_tab_row_gap, start.y + tok::space_0_75), closeMax(closeMin.x + tok::space_4, closeMin.y + tok::space_4);
          const bool overClose = hovered && ImGui::IsMouseHoveringRect(closeMin, closeMax);
          if (ImGui::IsItemClicked(ImGuiMouseButton_Middle) || (overClose && ImGui::IsItemClicked()))
             closeIndex = i;
@@ -754,17 +754,17 @@ namespace
          const bool busy = snap && snap->busy;
          const bool failed = snap && snap->exited && snap->exitCode != 0;
          const ImU32 dot = failed ? Ansi(1) : tab.attention ? Ansi(3) : busy ? Ansi(2) : dimColor;
-         dl->AddCircleFilled(ImVec2(x + 10.0f, start.y + (kTabRowH) * 0.5f), 3.0f, dot);
-         dl->AddText(ImVec2(x + 19.0f, start.y + (kTabRowH - ImGui::GetFontSize()) * 0.5f),
+         dl->AddCircleFilled(ImVec2(x + tok::space_2_5, start.y + (kTabRowH) * 0.5f), tok::terminal_tab_row_r, dot);
+         dl->AddText(ImVec2(x + tok::terminal_tab_row_gap_2, start.y + (kTabRowH - ImGui::GetFontSize()) * 0.5f),
                      i == sActive ? textColor : dimColor, title.c_str());
          if (hovered || i == sActive)
          {
-            const ImVec2 c(x + width - 12.0f, start.y + 11.0f);
+            const ImVec2 c(x + width - tok::space_3, start.y + tok::terminal_tab_row_gap_3);
             const ImU32 mark = overClose ? textColor : dimColor;
             glyph::Draw(dl, c, tok::icon_sm, mark, IconsInfinite::Close);
          }
          ImGui::PopID();
-         x += width + 4.0f;
+         x += width + tok::space_1;
       }
       ImGui::SetCursorScreenPos(ImVec2(x, start.y));
       UiInteract::Hit("##newtab", ImVec2(kTabRowH, kTabRowH));
@@ -782,7 +782,7 @@ namespace
       // The chat face, at the row's right end; not while the chat already shows beside the shell.
       if (CliSetup::Prefs().face == "chat" && !gChatSideTerminal)
       {
-         ImGui::SetCursorScreenPos(ImVec2(start.x + rowW - 22.0f, start.y));
+         ImGui::SetCursorScreenPos(ImVec2(start.x + rowW - tok::terminal_tab_row_gap_4, start.y));
          if (GlyphToggle::Draw("##chatface", IconsInfinite::Chat, IconsInfinite::Chat, false))
             gTerminalFace = 0, gChatSideTerminal = false;
          if (ImGui::IsItemHovered())
@@ -796,7 +796,7 @@ namespace
    void DrawSearchRow(Tab& tab, const term::Snapshot* snap)
    {
       const float width = ImGui::GetContentRegionAvail().x;
-      ImGui::SetNextItemWidth(std::min(280.0f, width - 90.0f));
+      ImGui::SetNextItemWidth(std::min(tok::terminal_search_row_bound, width - tok::terminal_search_row_gap));
       if (sSearchFocus)
       {
          UiInteract::FocusHere();
@@ -951,7 +951,7 @@ namespace
          // The terminal opens beside the chat, as the side terminal does in Claude: chat left, shell right.
          const ImVec2 avail = ImGui::GetContentRegionAvail();
          const float gap = tok::space_1;
-         const float left = std::floor((avail.x - gap) * 0.55f);
+         const float left = std::floor((avail.x - gap) * tok::terminal_panel_ratio);
          ImGui::BeginChild("##chatside", ImVec2(left, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawChatPanel();
          DrawDockMenu(false, nullptr, true);
@@ -997,9 +997,9 @@ namespace
       if (sSearchOpen)
          DrawSearchRow(*tab, snap.get());
 
-      const float px = std::max(8.0f, gTerminalFontSize);
+      const float px = std::max(tok::terminal_body_bound, gTerminalFontSize);
       const float cw = sFont->GetFontBaked(px)->GetCharAdvance('M');
-      const float ch = std::floor(px * kLineHeight + 0.5f);
+      const float ch = std::floor(px * kLineHeight + tok::terminal_body_bias);
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       if (avail.x < cw * 2.0f || avail.y < ch * 2.0f)
@@ -1050,10 +1050,10 @@ namespace
       if (snap->scrollOffset > 0 && snap->scrollbackSize > 0)
       {
          const float total = (float)(snap->scrollbackSize + snap->rows);
-         const float h = std::max(24.0f, avail.y * (float)snap->rows / total);
+         const float h = std::max(tok::terminal_body_bound_2, avail.y * (float)snap->rows / total);
          const float y = (avail.y - h) * (1.0f - (float)snap->scrollOffset / (float)snap->scrollbackSize);
-         dl->AddRectFilled(ImVec2(origin.x + avail.x - 4.0f, origin.y + y), ImVec2(origin.x + avail.x - 1.0f, origin.y + y + h),
-                           tok::U32(tok::terminal_ansi8, CategoryColors::IsThemeLight()), 1.5f);
+         dl->AddRectFilled(ImVec2(origin.x + avail.x - tok::space_1, origin.y + y), ImVec2(origin.x + avail.x - 1.0f, origin.y + y + h),
+                           tok::U32(tok::terminal_ansi8, CategoryColors::IsThemeLight()), tok::terminal_body_radius);
       }
       dl->PopClipRect();
 
@@ -1175,15 +1175,15 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
 void DrawTerminalFloating()
 {
    const ImGuiViewport* vp = ImGui::GetMainViewport();
-   ImGui::SetNextWindowSize(ImVec2(440.0f, std::min(680.0f, vp->WorkSize.y - 120.0f)), ImGuiCond_FirstUseEver);
+   ImGui::SetNextWindowSize(ImVec2(tok::terminal_floating_set_next_window_size_w, std::min(tok::terminal_floating_bound, vp->WorkSize.y - tok::terminal_floating_gap)), ImGuiCond_FirstUseEver);
    // Review shots (tools/chat-shots --float-width): hold the window at one width.
    static const char* shotW = std::getenv("INFINITE_CHATSHOT_FLOATW");
    if (shotW != nullptr)
-      ImGui::SetNextWindowSize(ImVec2(std::max(kMinWidth, (float)std::atof(shotW)), std::min(680.0f, vp->WorkSize.y - 120.0f)), ImGuiCond_Always);
+      ImGui::SetNextWindowSize(ImVec2(std::max(kMinWidth, (float)std::atof(shotW)), std::min(tok::terminal_floating_bound, vp->WorkSize.y - tok::terminal_floating_gap)), ImGuiCond_Always);
    // A workspace window: the terminal keeps Esc for the shell, and draws its own inset.
    FloatingWindow::Spec spec;
    spec.center = false;
-   spec.pos = ImVec2(vp->WorkPos.x + vp->WorkSize.x - 480.0f, vp->WorkPos.y + 80.0f);
+   spec.pos = ImVec2(vp->WorkPos.x + vp->WorkSize.x - tok::terminal_floating_gap_2, vp->WorkPos.y + tok::terminal_floating_gap_3);
    spec.minSize = ImVec2(kMinWidth, kMinHeight);
    spec.flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
    spec.pad = false;

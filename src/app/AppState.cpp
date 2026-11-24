@@ -8,9 +8,9 @@ namespace app
    // per-node mini 3D viewport toggle. Not const: the panel's canvas-facing
    // edge is a drag handle, so these are starting sizes, not fixed ones.
    // Clamped against the window every frame - see the layout section.
-   float gViewportPanelWidth = 320.0f;
+   float gViewportPanelWidth = tok::app_state_viewport_panel_width;
 
-   float gViewportPanelHeight = 260.0f;
+   float gViewportPanelHeight = tok::app_state_viewport_panel_height;
 
 
    // Backdrop for any node preview about to blit a texture: a flat dark rect
@@ -448,16 +448,16 @@ bool gHeadlessNeedProbe = false;
    // above - not serialized to patch data or tracked by undo.
    bool  gModMatrixOpen = false;
    bool  gHistoryOpen = false;
-   float gHistoryWidth = 300.0f;
+   float gHistoryWidth = tok::app_state_history_width;
    bool  gSampleStudioOpen = false;
-   float gSampleStudioHeight = 260.0f;
+   float gSampleStudioHeight = tok::app_state_sample_studio_height;
    int   gSampleStudioDock = 0;
    bool  gSampleStudioClaimedKeys = false;
    ImVec2 gSampleStudioRectMin(0.0f, 0.0f), gSampleStudioRectMax(0.0f, 0.0f);
    std::string gSampleStudioPendingDrop;
    bool  gTerminalOpen = false;
-   float gTerminalHeight = 320.0f;
-   float gTerminalWidth = 560.0f;
+   float gTerminalHeight = tok::app_state_terminal_height;
+   float gTerminalWidth = tok::app_state_terminal_width;
    int   gTerminalDock = 1;
    bool  gTerminalFloating = false;
    float gTerminalFontSize = tok::type_body;
@@ -465,7 +465,7 @@ bool gHeadlessNeedProbe = false;
    ImVec2 gTerminalRectMin, gTerminalRectMax;
    std::vector<std::string> gTerminalDropPending;
    bool  gPianoRollOpen = false;
-   float gPianoRollHeight = 480.0f;
+   float gPianoRollHeight = tok::app_state_piano_roll_height;
    int   gPianoRollDock = 3; // top, like the Timeline's second row
    bool  gPianoRollClaimedKeys = false;
    ImVec2 gPianoRollRectMin(0.0f, 0.0f), gPianoRollRectMax(0.0f, 0.0f);
@@ -502,31 +502,31 @@ bool gHeadlessNeedProbe = false;
          // INFINITE_MODMATRIXGEOM probe only
    float gModMatrixScrollMax = -1.0f;
      // INFINITE_MODMATRIXGEOM probe only
-   float gModMatrixWidth = 420.0f;
+   float gModMatrixWidth = tok::app_state_mod_matrix_width;
 
-   float gModMatrixHeight = 240.0f;
+   float gModMatrixHeight = tok::app_state_mod_matrix_height;
 
    // The dockable performance matrix: custom control surface for live VJing.
    bool  gPerfPanelOpen = false;
 
    int   gPerfPanelDock = 0;
               // 0 = bottom, 1 = right, 2 = left, 3 = top
-   float gPerfPanelWidth = 460.0f;
+   float gPerfPanelWidth = tok::app_state_perf_panel_width;
 
-   float gPerfPanelHeight = 280.0f;
+   float gPerfPanelHeight = tok::app_state_perf_panel_height;
 
    // The dockable arrangement timeline panel: DAW/video-editor style lanes and clips.
    bool  gArrangePanelOpen = false;
 
-   float gArrangePanelWidth = 480.0f;
+   float gArrangePanelWidth = tok::app_state_arrange_panel_width;
 
-   float gArrangePanelHeight = 240.0f;
+   float gArrangePanelHeight = tok::app_state_arrange_panel_height;
 
    // The dockable Session panel: the clip launcher (tracks as columns, scenes as rows). Docks on the same side as the
    // Arrangement Timeline.
    bool  gSessionPanelOpen = false;
 
-   float gSessionPanelHeight = 300.0f;
+   float gSessionPanelHeight = tok::app_state_session_panel_height;
 
    // The view axis is musical (WP6): pixels per quarter-note beat and the
    // leftmost visible beat, so clips (stored in ticks) hold still on screen
@@ -859,7 +859,7 @@ bool gHeadlessNeedProbe = false;
    // for the module list.
    int gMinimapCorner = 2;
  // 0=TL, 1=TR, 2=BL, 3=BR
-   float gMinimapSize = 190.0f;
+   float gMinimapSize = tok::app_state_minimap_size;
 
    float gMinimapOpacity = 0.85f;
 

@@ -28,7 +28,7 @@ namespace PluginView
       // With no view open the hidden window shrinks: its drawables at 1600x1000 @2x were ~120 MB
       // of IOSurfaces per engine doing nothing (step 2.7, M-9). The view's size comes back on open.
       bool gShrunk = false;
-      constexpr int kClosedW = 64, kClosedH = 64;
+      constexpr int kClosedW = 64, kClosedH = 64;  // ui-audit-ok: plugin engine hidden window and frame buffers, off screen
       std::vector<PluginFrames::InputEvent> gInput;
 
       Ipc::SharedMemory gRegion;
@@ -100,7 +100,7 @@ namespace PluginView
             gPboFull[prev] = false;
             const uint64_t t0 = Ipc::MonotonicNs();
             const int w = gPboW[prev], h = gPboH[prev];
-            const size_t stride = size_t(w) * 4;
+            const size_t stride = size_t(w) * 4;  // ui-audit-ok: plugin engine hidden window and frame buffers, off screen
             if (EnsureRegion(uint64_t(stride) * uint64_t(h)))
             {
                glBindBuffer(GL_PIXEL_PACK_BUFFER, gPbo[prev]);
@@ -156,8 +156,8 @@ namespace PluginView
       {
          PluginFrames::ViewState v;
          std::memcpy(&v, data, sizeof v);
-         v.width = std::clamp<uint32_t>(v.width, 64, 8192);
-         v.height = std::clamp<uint32_t>(v.height, 64, 8192);
+         v.width = std::clamp<uint32_t>(v.width, 64, 8192);  // ui-audit-ok: plugin engine hidden window and frame buffers, off screen
+         v.height = std::clamp<uint32_t>(v.height, 64, 8192);  // ui-audit-ok: plugin engine hidden window and frame buffers, off screen
          gSizeApplied = gSizeApplied && v.width == gView.width && v.height == gView.height;
          gView = v;
          if (!gView.open)
@@ -221,14 +221,14 @@ namespace PluginView
          if (gPopped)
          {
             // The window keeps what the view showed: its size in points, centred on the main screen.
-            const int w = gView.open ? int(gView.width) : 1280, h = gView.open ? int(gView.height) : 800;
+            const int w = gView.open ? int(gView.width) : 1280, h = gView.open ? int(gView.height) : 800;  // ui-audit-ok: plugin engine hidden window and frame buffers, off screen
             glfwSetWindowSize(window, w, h);
             gShrunk = false;
             if (GLFWmonitor* m = glfwGetPrimaryMonitor())
             {
                int mx = 0, my = 0, mw = 0, mh = 0;
                glfwGetMonitorWorkarea(m, &mx, &my, &mw, &mh);
-               glfwSetWindowPos(window, mx + std::max(0, (mw - w) / 2), my + std::max(0, (mh - h) / 2));
+               glfwSetWindowPos(window, mx + std::max(0, (mw - w) / 2), my + std::max(0, (mh - h) / 2));  // ui-audit-ok: plugin engine hidden window and frame buffers, off screen
             }
             gPboFull[0] = gPboFull[1] = false; // no stale frame when it comes back
             Platform::AllowPluginEngineWindows();
@@ -337,7 +337,7 @@ namespace PluginView
 
       // This frame into one buffer.
       const int cur = gPboNext;
-      const size_t bytes = size_t(fbW) * size_t(fbH) * 4;
+      const size_t bytes = size_t(fbW) * size_t(fbH) * 4;  // ui-audit-ok: plugin engine hidden window and frame buffers, off screen
       if (!gPbo[cur])
          glGenBuffers(1, &gPbo[cur]);
       glBindBuffer(GL_PIXEL_PACK_BUFFER, gPbo[cur]);

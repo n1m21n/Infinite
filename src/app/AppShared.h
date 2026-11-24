@@ -2498,7 +2498,7 @@ void DrawPin(int pinId, ed::PinKind kind, const char* label, bool labelFirst = f
 
       void VisitParams(ParamVisitor& v) override { v.Float("pos", pos); }
 
-      float pos = 0.5f;
+      float pos = tok::app_shared_pos;
       int tickCount = 0, grabCount = 0, releaseCount = 0;
       ParamKey lastGrab, lastRelease;
       float releasePos = -1.0f, releaseVel = 0.0f;
@@ -2966,7 +2966,7 @@ void DrawShapeParams(ShapeNode* n);
       }
       PopDropdownStyle();
 
-      const float btnW = (kPreviewSize - 2.0f * spacing) / 3.0f;
+      const float btnW = (kPreviewSize - tok::app_shared_field_device_controls_ratio * spacing) / tok::app_shared_btn_w_ratio;
       if (ActionButton::Draw(("Save##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
          snprintf(gFieldDeviceSave.nameBuf, sizeof(gFieldDeviceSave.nameBuf), "Untitled");
@@ -3286,7 +3286,7 @@ void EndAudioSection();
          const float cellX0 = x0 + (float)index * cellW;
          const float btnH = ImGui::GetFrameHeight();
          const float btnY = y0 + headerH + (maxDia - btnH) * 0.5f;
-         const float btnW = std::min(cellW - 2.0f * tok::cell_inset, tok::cell_button_max_w);
+         const float btnW = std::min(cellW - tok::app_shared_button_ratio * tok::cell_inset, tok::cell_button_max_w);
          const float btnX = cellX0 + (cellW - btnW) * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
          const bool clicked = ActionButton::Draw(label, ImVec2(btnW, 0));
@@ -3334,7 +3334,7 @@ void EndAudioSection();
          const float pinX = cellX0 + std::max(tok::cell_edge_min, (cellW - knobW) * 0.5f - tok::cell_pin_lead);
          const float pinW = tok::cell_pin_w;
          float btnX = cellX0 + tok::cell_inset;
-         float btnW = std::min(cellW - 2.0f * tok::cell_inset, tok::cell_dropdown_max_w);
+         float btnW = std::min(cellW - tok::app_shared_dropdown_ratio * tok::cell_inset, tok::cell_dropdown_max_w);
 
          if (h.registered)
          {
@@ -3364,7 +3364,7 @@ void EndAudioSection();
             const float btnRight = cellX0 + cellW - std::max(tok::cell_inset, (pinX - cellX0));
             btnW = std::max(tok::cell_dropdown_min_w, std::min(btnRight - btnX, tok::cell_dropdown_max_w));
             // Never clip the value: grow toward the cell's right edge when the text needs more than the symmetric width.
-            btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - tok::cell_inset - btnX, tok::cell_dropdown_max_w)));
+            btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + tok::app_shared_dropdown_ratio * tok::space_2, std::min(cellX0 + cellW - tok::cell_inset - btnX, tok::cell_dropdown_max_w)));
          }
 
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
@@ -3373,7 +3373,7 @@ void EndAudioSection();
          // The parameter name sits inside the face (dim, left) whenever it fits beside the value.
          const std::string inName = StripParamLabel(label);
          const char* inLabel = (!inName.empty() &&
-                                btnW >= ImGui::CalcTextSize(options[safe].c_str()).x + ImGui::CalcTextSize(inName.c_str()).x + 3.0f * tok::space_2)
+                                btnW >= ImGui::CalcTextSize(options[safe].c_str()).x + ImGui::CalcTextSize(inName.c_str()).x + tok::app_shared_dropdown_ratio_2 * tok::space_2)
                                   ? inName.c_str() : nullptr;
          PushDropdownStyle();
          if (h.modulated)
@@ -3457,7 +3457,7 @@ void EndAudioSection();
                const float pinX = cellX0 + std::max(tok::cell_edge_min, (cellW - knobW) * 0.5f - tok::cell_pin_lead);
                const float pinW = tok::cell_pin_w;
                float btnX = cellX0 + tok::cell_inset;
-               float btnW = std::min(cellW - 2.0f * tok::cell_inset, tok::cell_dropdown_max_w);
+               float btnW = std::min(cellW - tok::app_shared_dropdown_knob_ratio * tok::cell_inset, tok::cell_dropdown_max_w);
 
                if (h.registered)
                {
@@ -3467,7 +3467,7 @@ void EndAudioSection();
                   const float btnRight = cellX0 + cellW - std::max(tok::cell_inset, (pinX - cellX0));
                   btnW = std::max(tok::cell_dropdown_min_w, std::min(btnRight - btnX, tok::cell_dropdown_max_w));
                   // Never clip the value: grow toward the cell's right edge when the text needs more than the symmetric width.
-                  btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - tok::cell_inset - btnX, tok::cell_dropdown_max_w)));
+                  btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + tok::app_shared_dropdown_knob_ratio * tok::space_2, std::min(cellX0 + cellW - tok::cell_inset - btnX, tok::cell_dropdown_max_w)));
                }
 
                ImGui::SetCursorScreenPos(ImVec2(btnX, y0));
@@ -3560,7 +3560,7 @@ void EndAudioSection();
 
          if (h.registered)
          {
-            ImGui::SetCursorScreenPos(ImVec2(pinX, checkY + (ImGui::GetFrameHeight() - 12.0f) * 0.5f));
+            ImGui::SetCursorScreenPos(ImVec2(pinX, checkY + (ImGui::GetFrameHeight() - tok::space_3) * 0.5f));
             DrawDiscreteParamPin(h, label, cellW - (pinX - cellX0) - pinW);
          }
 
@@ -3603,7 +3603,7 @@ void EndAudioSection();
          if (gParamRegisterOnly)
             return;
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, rowH + tok::space_1 + 2.0f));  // row gap: a caption never touches the next row's knob
+         ImGui::Dummy(ImVec2(gAudioContentW, rowH + tok::space_1 + tok::space_0_5));  // row gap: a caption never touches the next row's knob
       }
    };
 
@@ -3690,7 +3690,7 @@ bool AudioSlider(const char* label, float* v, float lo, float hi, const char* fm
 
 bool AudioSliderInt(const char* label, int* v, int lo, int hi, float width, const char* fmt = "%.0f");
 
-bool AudioToggleButton(const char* label, bool* value, float width = 44.0f, float height = 0.0f);
+bool AudioToggleButton(const char* label, bool* value, float width = tok::app_shared_width, float height = 0.0f);
 
 
 
@@ -3708,11 +3708,11 @@ bool DrawGateButton(const char* id, float totalW, float height, const GatePainte
 
 bool DrawGateControl(const char* id, const char* label, float btnW, int style, bool lit);
 
-bool AudioSoloButton(const char* label, bool* value, float width = 26.0f, float height = 0.0f);
+bool AudioSoloButton(const char* label, bool* value, float width = tok::app_shared_width_2, float height = 0.0f);
 
-bool AudioMuteButton(const char* label, bool* value, float width = 26.0f, float height = 0.0f);
+bool AudioMuteButton(const char* label, bool* value, float width = tok::app_shared_width_2, float height = 0.0f);
 
-bool AudioSmallButton(const char* label, float width = 26.0f, float height = 0.0f);
+bool AudioSmallButton(const char* label, float width = tok::app_shared_width_2, float height = 0.0f);
 
 bool IsAudioBodyNode(INode* node);
 
@@ -4393,7 +4393,7 @@ std::vector<uint8_t> EncodePng16(int w, int h, const uint16_t* rgba, int level);
       ~PngSequenceWriter() { Finish(); }
       void Submit(std::string path, int w, int h, std::vector<unsigned char> rgba8, std::vector<uint16_t> rgba16, int level)
       {
-         const size_t bytes = rgba8.size() + rgba16.size() * 2;
+         const size_t bytes = rgba8.size() + rgba16.size() * 2;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
          std::unique_lock<std::mutex> lock(mMutex);
          mSpace.wait(lock, [&] { return mQueued == 0 || mQueued + bytes <= mBudget; });
          mQueued += bytes;
@@ -4844,7 +4844,7 @@ bool ArrangeAssignClipSource(uint64_t clipId, uint64_t uid);
 
 ImU32 ArrangeGroupColor(uint64_t groupId, int alpha = 255);
 
-void DrawArrangeHatch(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float spacing = 7.0f);
+void DrawArrangeHatch(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float spacing = tok::app_shared_spacing);
 
 std::string ArrangeFormatBBT(Arrange::Tick t);
 
@@ -6740,7 +6740,7 @@ void RunView2DTest();
 // is global, and the tile store encodes paint tiles on a worker thread, so a set flag stores them upside down.
 inline void FlipRowsRgba8(std::vector<unsigned char>& px, int w, int h)
 {
-   const size_t row = (size_t)w * 4;
+   const size_t row = (size_t)w * 4;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
    std::vector<unsigned char> tmp(row);
    for (int y = 0; y < h / 2; y++)
    {

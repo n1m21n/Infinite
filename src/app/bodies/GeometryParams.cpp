@@ -97,15 +97,15 @@ namespace app
 
          if (n->IsPlaying())
          {
-            if (ActionButton::Draw("Pause", ImVec2(kPreviewSize * 0.48f, 0)))
+            if (ActionButton::Draw("Pause", ImVec2(kPreviewSize * tok::geometry_params_audio_file_ratio, 0)))
                n->Pause();
          }
-         else if (ActionButton::Draw("Play", ImVec2(kPreviewSize * 0.48f, 0)))
+         else if (ActionButton::Draw("Play", ImVec2(kPreviewSize * tok::geometry_params_audio_file_ratio, 0)))
          {
             n->Play();
          }
          ImGui::SameLine();
-         if (ActionButton::Draw("Restart", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Restart", ImVec2(kPreviewSize * tok::geometry_params_audio_file_ratio, 0)))
             n->Restart();
 
          ModCheckbox("follow transport", &n->followTransport);
@@ -117,7 +117,7 @@ namespace app
 
          const Platform::AudioLevels& lv = n->Levels();
          ImGui::Text("level "); ImGui::SameLine();
-         ImGui::ProgressBar(std::min(1.0f, lv.rms * n->gain), ImVec2(kPreviewSize * 0.6f, 0), "");
+         ImGui::ProgressBar(std::min(1.0f, lv.rms * n->gain), ImVec2(kPreviewSize * tok::geometry_params_audio_file_ratio_2, 0), "");
       }
    }
 
@@ -126,8 +126,8 @@ namespace app
    {
       gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
-      const float gutter = 16.0f;
-      const float bodyW = colW * 2 + gutter;
+      const float gutter = tok::geometry_params_gutter;
+      const float bodyW = colW * tok::geometry_params_body_w_ratio + gutter;
 
       if (n->input.IsConnected())
       {
@@ -165,10 +165,10 @@ namespace app
       // spectrum, so it is obvious whether audio is actually arriving
       const Platform::AudioLevels& levels = n->Levels();
       ImVec2 origin = ImGui::GetCursorScreenPos();
-      const float h = 60.0f;
+      const float h = tok::geometry_params_h;
       ImGui::Dummy(ImVec2(bodyW, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::Role(tok::col::surface_deep), 3.0f);
+      dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::Role(tok::col::surface_deep), tok::geometry_params_audio_analyze_radius);
       const float bw = bodyW / (float)Platform::kAudioBands;
       for (int i = 0; i < Platform::kAudioBands; i++)
       {
@@ -179,7 +179,7 @@ namespace app
       }
       if (!n->input.IsConnected() && !Platform::AudioIsRunning())
          AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + bodyW, origin.y + h)}, "idle");
-      dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::Role(tok::col::edge_lo_2), 3.0f);
+      dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::Role(tok::col::edge_lo_2), tok::geometry_params_audio_analyze_radius);
 
       // --- Left Column ---
       ImGui::BeginGroup();
@@ -258,9 +258,9 @@ namespace app
    void DrawGeometryTableGrid(GeometryTableNode* n, int nodeIndex)
    {
       const int rowCount = n->RowCount();
-      const float cellW = kPreviewSize / 3.0f;
-      const float cellH = 34.0f;
-      const float gridW = cellW * 3.0f;
+      const float cellW = kPreviewSize / tok::geometry_params_cell_w_ratio;
+      const float cellH = tok::geometry_params_cell_h;
+      const float gridW = cellW * tok::geometry_params_grid_w_ratio;
       const float gridH = cellH * (float)rowCount;
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -269,16 +269,16 @@ namespace app
       const ImU32 borderCol = isLight ? tok::Base(tok::col::edge_lo_2, 140) : tok::Base(tok::col::surface_hi, 70);
       const ImU32 textCol = isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::surface_hi);
 
-      dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, 8.0f, 0, 1.5f);
+      dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, tok::geometry_params_table_grid_radius, 0, tok::geometry_params_table_grid_stroke);
       for (int r = 1; r < rowCount; r++)
       {
          const float y = origin.y + cellH * (float)r;
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + gridW, y), borderCol, 1.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + gridW, y), borderCol, tok::geometry_params_table_grid_stroke_2);
       }
       for (int c = 1; c < 3; c++)
       {
          const float x = origin.x + cellW * (float)c;
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + gridH), borderCol, 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + gridH), borderCol, tok::geometry_params_table_grid_stroke_2);
       }
 
       for (int r = 0; r < rowCount; r++)
@@ -287,7 +287,7 @@ namespace app
          {
             const ImVec2 cellMin(origin.x + cellW * (float)a, origin.y + cellH * (float)r);
             const ImVec2 cellMax(cellMin.x + cellW, cellMin.y + cellH);
-            const int outputIndex = 4 + r * 3 + a;
+            const int outputIndex = tok::geometry_params_output_index_gap + r * tok::geometry_params_output_index_ratio + a;
 
             char buf[16];
             snprintf(buf, sizeof(buf), "%s", UiFmt::F2(n->DisplayValue(outputIndex)).c);
@@ -310,8 +310,8 @@ namespace app
             ImGui::PushID(outputIndex);
             const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kOutputBase + outputIndex;
             ed::BeginPin(pinId, ed::PinKind::Output);
-            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-            const ImVec2 pinCenter(cellMax.x - 9.0f, cellMax.y - 9.0f);
+            ed::PinPivotAlignment(ImVec2(tok::geometry_params_table_grid_pin_pivot_alignment_x, tok::geometry_params_table_grid_pin_pivot_alignment_y));
+            const ImVec2 pinCenter(cellMax.x - tok::geometry_params_table_grid_gap, cellMax.y - tok::geometry_params_table_grid_gap);
             const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
             ed::PinRect(pinMin, pinMax);
@@ -839,7 +839,7 @@ namespace app
 
       gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
-      const float gutter = 16.0f;
+      const float gutter = tok::geometry_params_gutter;
 
       // As Render 3D: both columns draw every row every frame, and a row that does not apply right now
       // is greyed, never dropped, so the body never grows or shifts as a value crosses zero. The rows
@@ -2158,13 +2158,13 @@ namespace app
    void DrawAudioColorRampEditor(AudioColorRampNode* n)
    {
       const float size = kPreviewSize;
-      const float barH = 64.0f;
-      const float gap = 4.0f;
+      const float barH = tok::geometry_params_bar_h;
+      const float gap = tok::space_1;
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), tok::Role(tok::col::surface_deep), 3.0f);
+      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), tok::Role(tok::col::surface_deep), tok::geometry_params_audio_color_ramp_editor_radius);
 
       const int count = std::clamp(n->bandCount, 2, AudioColorRampNode::kMaxBands);
       const float* energies = n->GetBandEnergies();
@@ -2184,7 +2184,7 @@ namespace app
          if (x1 > x0)
          {
             float lvl = std::clamp(energies[b], 0.0f, 1.0f);
-            float h = barH * 0.10f + (barH * 0.85f) * lvl;
+            float h = barH * tok::geometry_params_h_ratio + (barH * tok::geometry_params_audio_color_ramp_editor_ratio) * lvl;
             ImU32 col = IM_COL32((int)(std::clamp(n->bandColor[b][0], 0.0f, 1.0f) * 255),
                                  (int)(std::clamp(n->bandColor[b][1], 0.0f, 1.0f) * 255),
                                  (int)(std::clamp(n->bandColor[b][2], 0.0f, 1.0f) * 255), 255);
@@ -2205,12 +2205,12 @@ namespace app
             float freq = AudioColorRampNode::PosToFreq(t);
             int bin = std::clamp((int)(freq * (1024.0f / 44100.0f)), 1, 511);
             float mag = std::clamp(spec[bin] * 2.5f, 0.0f, 1.0f);
-            pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - 4.0f)));
+            pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - tok::space_1)));
          }
-         dl->AddPolyline(pts.data(), (int)pts.size(), tok::Role(tok::col::ink_white, 130), false, 1.5f);
+         dl->AddPolyline(pts.data(), (int)pts.size(), tok::Role(tok::col::ink_white, 130), false, tok::geometry_params_audio_color_ramp_editor_stroke);
       }
 
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::Role(tok::col::edge_lo_2), 3.0f);
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::Role(tok::col::edge_lo_2), tok::geometry_params_audio_color_ramp_editor_radius);
 
       // 3. Interactive band-boundary dividers, drawn directly on the spectrum.
       ImGui::SetCursorScreenPos(origin);
@@ -2245,8 +2245,8 @@ namespace app
       }
       if (active && sDragNode == n && sDragIndex >= 0)
       {
-         float minPos = (sDragIndex == 0) ? 0.02f : (n->crossoverPos[sDragIndex - 1] + 0.02f);
-         float maxPos = (sDragIndex == numDividers - 1) ? 0.98f : (n->crossoverPos[sDragIndex + 1] - 0.02f);
+         float minPos = (sDragIndex == 0) ? tok::geometry_params_min_pos : (n->crossoverPos[sDragIndex - 1] + tok::geometry_params_audio_color_ramp_editor_gap);
+         float maxPos = (sDragIndex == numDividers - 1) ? tok::geometry_params_max_pos : (n->crossoverPos[sDragIndex + 1] - tok::geometry_params_audio_color_ramp_editor_gap);
          n->crossoverPos[sDragIndex] = std::clamp(toX(mouse.x), minPos, maxPos);
          n->MarkDirty();
       }
@@ -2267,7 +2267,7 @@ namespace app
          float x = toScreenX(n->crossoverPos[i]);
          bool isHov = (nearest == i || (sDragNode == n && sDragIndex == i));
          ImU32 lineCol = isHov ? tok::Role(tok::col::role_modulation, 230) : tok::Role(tok::col::ink_white, 100);
-         dl->AddLine(ImVec2(x, origin.y + 2.0f), ImVec2(x, origin.y + barH - 2.0f), lineCol, isHov ? 2.5f : 1.5f);
+         dl->AddLine(ImVec2(x, origin.y + tok::space_0_5), ImVec2(x, origin.y + barH - tok::space_0_5), lineCol, isHov ? tok::geometry_params_audio_color_ramp_editor_stroke_2 : tok::geometry_params_audio_color_ramp_editor_stroke);
 
          if (isHov)
          {
@@ -2499,7 +2499,7 @@ namespace app
       {
          const bool has = !n->iesFile.empty();
          const std::string label = has ? AppPaths::FsPath(n->iesFile).filename().u8string() : std::string("IES profile...");
-         if (ActionButton::Draw(label.c_str(), ImVec2(has ? kPreviewSize * 0.7f : kPreviewSize, 0)))
+         if (ActionButton::Draw(label.c_str(), ImVec2(has ? kPreviewSize * tok::geometry_params_light_ratio : kPreviewSize, 0)))
          {
             const std::string path = Platform::OpenIesDialog();
             if (!path.empty()) { PushUndoCheckpoint(); n->iesFile = path; }
@@ -2507,7 +2507,7 @@ namespace app
          if (has)
          {
             ImGui::SameLine();
-            if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * 0.28f, 0))) { PushUndoCheckpoint(); n->iesFile.clear(); }
+            if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * tok::geometry_params_light_ratio_2, 0))) { PushUndoCheckpoint(); n->iesFile.clear(); }
          }
       }
       ImGui::EndDisabled();
@@ -2647,7 +2647,7 @@ namespace app
    {
       const int connected = (int)n->FlattenedGeometry().size();
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
-      ImGui::SameLine(0.0f, 16.0f);
+      ImGui::SameLine(0.0f, tok::space_4);
       if (n->LastGpuBytes() > 0)
          ImGui::TextDisabled("%s triangles in %zu draw calls, %s GPU", UiFmt::Count((long long)(n->LastTriangleCount())).c, n->LastDrawCalls(), UiFmt::MB((double)n->LastGpuBytes() / 1048576.0).c);
       else
@@ -2672,7 +2672,7 @@ namespace app
 
       gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
-      const float gutter = 16.0f;
+      const float gutter = tok::geometry_params_gutter;
 
       // The rarely-touched rows sit behind one node-wide "show more" (GraphNode::showAdvancedParams, saved with
       // the patch), the first row of the right column, level with Frame scene on the left. Folded rows are still registered, in the
@@ -3056,14 +3056,14 @@ namespace app
          {
             dl->AddRectFilled(headerPos,
                               ImVec2(headerPos.x + kPreviewSize, headerPos.y + rowHeight),
-                              dragging ? tok::Role(tok::col::surface_lo_2, 200) : tok::Role(tok::col::edge_lo, 160), 3.0f);
+                              dragging ? tok::Role(tok::col::surface_lo_2, 200) : tok::Role(tok::col::edge_lo, 160), tok::geometry_params_layer_stack_radius);
          }
          // grip dots, so the header reads as draggable
          for (int d = 0; d < 3; d++)
          {
-            dl->AddCircleFilled(ImVec2(headerPos.x + 6, headerPos.y + 5 + d * 4.0f), 1.3f,
+            dl->AddCircleFilled(ImVec2(headerPos.x + tok::space_1_5, headerPos.y + tok::space_1_25 + d * tok::geometry_params_layer_stack_ratio), tok::geometry_params_layer_stack_r,
                                 tok::Role(tok::col::edge_mid));
-            dl->AddCircleFilled(ImVec2(headerPos.x + 11, headerPos.y + 5 + d * 4.0f), 1.3f,
+            dl->AddCircleFilled(ImVec2(headerPos.x + tok::geometry_params_layer_stack_gap, headerPos.y + tok::space_1_25 + d * tok::geometry_params_layer_stack_ratio), tok::geometry_params_layer_stack_r,
                                 tok::Role(tok::col::edge_mid));
          }
          // Name the layer after whatever is feeding it - far more useful than
@@ -3084,7 +3084,7 @@ namespace app
          {
             snprintf(title, sizeof(title), "%c  (empty)", 'A' + slot);
          }
-         dl->AddText(ImVec2(headerPos.x + 20, headerPos.y + 2),
+         dl->AddText(ImVec2(headerPos.x + tok::geometry_params_layer_stack_gap_2, headerPos.y + tok::space_0_5),
                      source ? tok::Role(tok::col::surface_mid) : tok::Role(tok::col::edge_mid), title);
 
          char modeLabel[32];
@@ -3185,7 +3185,7 @@ namespace app
             if (i == 0)
             {
                const float gap = tok::space_1;
-               const float cellW = std::floor((kParamWidth - 2.0f * gap) / 3.0f);
+               const float cellW = std::floor((kParamWidth - tok::geometry_params_filter_ratio * gap) / tok::geometry_params_filter_ratio_2);
                for (size_t k = 0; k < 9; k++)
                {
                   const FilterParamDef& kp = def.params[k];

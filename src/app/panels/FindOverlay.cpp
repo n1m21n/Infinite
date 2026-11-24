@@ -124,9 +124,9 @@ void DrawFind()
    if (Lower(sBuf) != sLastQuery || gNodes.size() != sLastNodeCount)
       Rebuild();
 
-   const float w = 340.0f;
-   const ImVec2 pos(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f, gGraphScreenTL.y + 14.0f);
-   ImGui::SetNextWindowPos(pos, ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+   const float w = tok::find_overlay_w;
+   const ImVec2 pos(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f, gGraphScreenTL.y + tok::space_3_5);
+   ImGui::SetNextWindowPos(pos, ImGuiCond_Always, ImVec2(tok::find_overlay_set_next_window_pos_x, 0.0f));
    ImGui::SetNextWindowSize(ImVec2(w, 0.0f));
    PanelFrame::PushFloatingStyle();
    bool stay = true;
@@ -150,7 +150,7 @@ void DrawFind()
          if (pickNow) sJumpTo = sMatches[sCurrent];
       }
       sFocusField = pickNow;   // Enter ends the edit; take the caret straight back
-      ImGui::Dummy(ImVec2(0, 2));
+      ImGui::Dummy(ImVec2(0, tok::find_overlay_dummy_h));
       if (sBuf[0] == '\0')
          ImGui::TextDisabled("%s", T("Type to find. Up/Down step, Enter jumps, Esc closes."));
       else if (sMatches.empty())
@@ -192,8 +192,8 @@ void DrawFind()
          const ImVec2 p = ed::CanvasToScreen(cp);
          const ImVec2 p2 = ed::CanvasToScreen(ImVec2(cp.x + cs.x, cp.y + cs.y));
          const bool cur = i == sCurrent;
-         dl->AddRect(ImVec2(p.x - 3, p.y - 3), ImVec2(p2.x + 3, p2.y + 3),
-                     ImGui::GetColorU32(ImVec4(a.x, a.y, a.z, cur ? 1.0f : 0.6f)), 6.0f, 0, cur ? 3.0f : 1.5f);
+         dl->AddRect(ImVec2(p.x - tok::space_0_75, p.y - tok::space_0_75), ImVec2(p2.x + tok::space_0_75, p2.y + tok::space_0_75),
+                     ImGui::GetColorU32(ImVec4(a.x, a.y, a.z, cur ? 1.0f : 0.6f)), tok::find_overlay_radius, 0, cur ? tok::find_overlay_stroke : tok::find_overlay_stroke_2);
       }
       dl->PopClipRect();
    }

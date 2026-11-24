@@ -567,7 +567,7 @@ namespace app
             const size_t eq = kv.find('=');
             const std::string k = kv.substr(0, eq);
             if (k == "INFINITE_UIAUDIT" ||
-                (k.rfind("INFINITE_", 0) == 0 && k.size() > 13 && k.compare(k.size() - 4, 4, "TEST") == 0))
+                (k.rfind("INFINITE_", 0) == 0 && k.size() > 13 && k.compare(k.size() - 4, 4, "TEST") == 0))  // ui-audit-ok: string length test, not a screen quantity
                return true;
          }
          return false;

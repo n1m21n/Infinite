@@ -63,7 +63,7 @@ namespace app
       {
          const ImVec2 drag = ImGui::GetIO().MouseDelta;
          // Degrees per pixel, matching DrawPreview's drag feel (0.6875 deg/px).
-         viewport.Orbit(cam, drag.x * 0.6875f, drag.y * 0.6875f);
+         viewport.Orbit(cam, drag.x * tok::viewport_mini_ratio, drag.y * tok::viewport_mini_ratio);
       }
       if (ImGui::IsItemHovered())
       {
@@ -80,7 +80,7 @@ namespace app
       ApplyViewHotkeys(cam.azimuth, cam.elevation);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     tok::Role(tok::col::accent_2, 200), 4.0f, 0, 2.0f);
+                     tok::Role(tok::col::accent_2, 200), tok::viewport_mini_radius, 0, tok::viewport_mini_stroke);
    }
 
 
@@ -192,7 +192,7 @@ namespace app
       const float titleH = ViewportPanelTitleHeight();
       const float pad = kViewportCardPad;
       // The render's own box: the card minus its padding and title row.
-      const ImVec2 imageSize(std::max(16.0f, cardSize.x - pad * 2.0f), std::max(16.0f, cardSize.y - titleH - pad));
+      const ImVec2 imageSize(std::max(tok::viewport_panel_card_bound, cardSize.x - pad * tok::viewport_panel_card_ratio), std::max(tok::viewport_panel_card_bound, cardSize.y - titleH - pad));
       char childId[32];
       snprintf(childId, sizeof(childId), "##viewportcard%d", gn.index);
       PushDockedPanelStyle(/*isChild=*/true);
@@ -203,13 +203,13 @@ namespace app
       const ImVec2 cardMax(cardMin.x + cardSize.x, cardMin.y + cardSize.y);
       {
          ImVec4 w = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         w.w *= 0.05f;
+         w.w *= tok::viewport_w;
          dl->AddRectFilled(cardMin, cardMax, ImGui::GetColorU32(w), tok::radius_container);
       }
 
       // Title row: name on the left, a quiet close tile on the right (neutral wash on hover, no red).
       const float tile = 20.0f;
-      ImGui::SetCursorScreenPos(ImVec2(cardMax.x - pad - tile, cardMin.y + (titleH - tile) * 0.5f + 2.0f));
+      ImGui::SetCursorScreenPos(ImVec2(cardMax.x - pad - tile, cardMin.y + (titleH - tile) * 0.5f + tok::space_0_5));
       char closeId[40];
       snprintf(closeId, sizeof(closeId), "##closeviewportcard%d", gn.index);
       const bool closeRequested = UiInteract::Hit(closeId, ImVec2(tile, tile));
@@ -221,15 +221,15 @@ namespace app
          if (hot)
             dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, ImGui::IsItemActive() ? 0.12f : 0.07f)),
                               tok::radius_control);
-         t.w *= hot ? 1.0f : 0.55f;
+         t.w *= hot ? 1.0f : tok::viewport_w_2;
          glyph::DrawX(dl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tile * 0.5f, ImGui::GetColorU32(t));
       }
       {
          UiType::Scope ts(UiType::Size::Body, UiType::Weight::Medium);
          const std::string title = NodeTitleWithInstance(gn);
-         const float maxW = cardSize.x - pad * 2.0f - tile - tok::space_1;
+         const float maxW = cardSize.x - pad * tok::viewport_max_w_ratio - tile - tok::space_1;
          dl->PushClipRect(ImVec2(cardMin.x + pad, cardMin.y), ImVec2(cardMin.x + pad + std::max(1.0f, maxW), cardMax.y), true);
-         dl->AddText(ImVec2(cardMin.x + pad, cardMin.y + (titleH - ImGui::GetTextLineHeight()) * 0.5f + 2.0f),
+         dl->AddText(ImVec2(cardMin.x + pad, cardMin.y + (titleH - ImGui::GetTextLineHeight()) * 0.5f + tok::space_0_5),
                      ImGui::GetColorU32(ImGuiCol_Text), title.c_str());
          dl->PopClipRect();
       }
@@ -262,7 +262,7 @@ namespace app
          if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
          {
             const ImVec2 drag = ImGui::GetIO().MouseDelta;
-            viewport.Orbit(cam, drag.x * 0.6875f, drag.y * 0.6875f);
+            viewport.Orbit(cam, drag.x * tok::viewport_panel_card_ratio_2, drag.y * tok::viewport_panel_card_ratio_2);
          }
          if (ImGui::IsItemHovered())
          {
@@ -277,7 +277,7 @@ namespace app
          // matching drag-orbit just above on this same gNodeCameras entry.
          ApplyViewHotkeys(cam.azimuth, cam.elevation);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_control, 0, 1.0f);
+            dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_control, 0, tok::viewport_panel_card_stroke);
          // Layout cursor already sits at origin+imageSize from the
          // InvisibleButton above; the trailing Dummy(imageSize) below is
          // shared with the non-geometry branch, so rewind rather than
@@ -367,8 +367,8 @@ namespace app
             if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
             {
                const ImVec2 drag = ImGui::GetIO().MouseDelta;
-               *azimuth -= drag.x * 0.6875f;
-               *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * 0.6875f, 85.9437f));
+               *azimuth -= drag.x * tok::viewport_azimuth_ratio;
+               *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * tok::viewport_panel_card_ratio_2, 85.9437f));
             }
             if (ImGui::IsItemHovered())
             {
@@ -383,7 +383,7 @@ namespace app
             // this render's "orbit"/"elevation" sliders (main.cpp ~23053).
             ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-               dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_control, 0, 1.0f);
+               dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_control, 0, tok::viewport_panel_card_stroke);
             ImGui::SetCursorScreenPos(origin);
          }
       }
@@ -648,7 +648,7 @@ namespace app
       // A workspace, not a dialog: no form pad (the panel draws its own inset) and Esc stays the panel's key.
       FloatingWindow::Spec spec;
       spec.size = firstSize;
-      spec.minSize = ImVec2(240.0f, 160.0f);
+      spec.minSize = ImVec2(tok::viewport_begin_floating_panel_x, tok::viewport_begin_floating_panel_y);
       spec.flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
       spec.pad = false;
       spec.escCloses = false;
@@ -660,7 +660,7 @@ namespace app
    void DrawViewportPanelFloating()
    {
       bool open = true;
-      if (BeginFloatingPanel((std::string(T("Viewport")) + "###viewportfloat").c_str(), &open, ImVec2(520.0f, 420.0f)))
+      if (BeginFloatingPanel((std::string(T("Viewport")) + "###viewportfloat").c_str(), &open, ImVec2(tok::viewport_panel_floating_begin_floating_panel_x, tok::viewport_panel_floating_begin_floating_panel_y)))
          DrawViewportPanelContainer();
       EndFloatingPanel();
       if (!open)

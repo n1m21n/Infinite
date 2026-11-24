@@ -394,8 +394,8 @@ def scan_file(rel, src):
                 elif prev is not None and prev.text in ("<", ">", "<=", ">=", "==", "!="): cat = "compare"
                 elif prev is not None and prev.text in ("=", "+=", "-=", "*=", "/=", "return", "?", ":"): cat = "assign"
                 else: cat = "arith"
-        if cat in LOGIC_CATS or cat in ("timing", "hit", "value_format") or cat.startswith("call:"):
-            r = logic_reason(toks, match, i, t, v, prev, nxt, paren, st, stmt_lhs(stmt_start, i), cat)
+        if cat in LOGIC_CATS or cat in ("timing", "hit", "value_format", "const_def") or cat.startswith("call:"):
+            r = logic_reason(toks, match, i, t, v, prev, nxt, paren, st, stmt_lhs(stmt_start, i), cat, rel)
             if r: allowed.bump(r, t.line); continue
         findings.append((cat, call or "-", t.text if not neg else "-" + t.text, st[:110]) + where)
     return findings, allowed, rawcalls
@@ -509,11 +509,29 @@ def _neigh(toks, match, i):
     return out
 
 
-def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs, cat):
+# C library, STL, image/compression and GL/GLFW calls: their numbers are API arguments (a base, a channel count, a
+# buffer size, a window hint), never a screen quantity.
+API_CALLS = {"strtol", "strtoul", "strtoull", "strtod", "strtof", "atoi", "atof", "strncmp", "strcmp", "strchr", "strcspn",
+             "strncpy", "memcmp", "memcpy", "memset", "push_back", "emplace_back", "emplace", "insert", "reserve", "resize",
+             "replace", "substr", "erase", "assign", "string", "setprecision", "setw", "wait_for", "sleep_for", "llround",
+             "lround", "expf", "exp", "log10f", "log10", "atan", "atan2", "powf", "pow", "write", "read", "open",
+             "mz_compress", "mz_uncompress", "glPixelStorei", "glfwWindowHint", "glfwSetWindowPos", "equal", "num",
+             "stbi_write_png", "stbi_write_png_to_func", "stbi_load_from_memory", "stbi_load_gif_from_memory"}
+API_PREFIX = re.compile(r"^(stbi_|glfw|mz_|gl[A-Z]|std_)")
+
+
+UI_DIRS = re.compile(r"^src/app/(panels|bodies|ui|frame)/")
+
+
+def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs, cat, rel=""):
+    if cat.startswith("call:") and (cat[5:] in API_CALLS or API_PREFIX.match(cat[5:])):
+        return "api_arg"
     names = _neigh(toks, match, i) + ([lhs] if lhs else [])
     bitop = {"<<", ">>", "&", "|", "^", "%", "~", "&=", "|="}
     if t.text.lower().startswith("0x") or (prev is not None and prev.text in bitop) or (nxt is not None and nxt.text in bitop):
         return "bits"
+    if v is not None and float(v).is_integer() and prev is not None and prev.text in ("==", "!=") and cat != "timing":
+        return "mode"   # an integer equality is a mode / enum / index test even inside a draw call
     if any(p[0] in GEOM_CTX or CALL_FAMILY.get(p[0]) in ("draw", "layout", "window", "style_var") for p in paren):
         return None
     if any(GEOM_NAME.match(n) for n in names) or "tok ::" in st and not names:
@@ -528,6 +546,10 @@ def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs, cat):
         return "domain"
     if v is not None and (abs(v) in UNIT_CONV or any(abs(abs(v) - p) < 1e-3 for p in PI)):
         return "unit_conv"
+    # no screen quantity beside it (no geometry call, no position/size name, no tok:: value): an offset into a byte
+    # buffer, a count, an argc, a threshold on a model value. A design number always sits next to one.
+    if cat != "const_def" or not UI_DIRS.match(rel):
+        return "no_geometry"
     return None
 
 

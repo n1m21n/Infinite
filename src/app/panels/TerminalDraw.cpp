@@ -1,4 +1,5 @@
 #include "app/panels/TerminalDraw.h"
+#include "app/ui/design/Tokens.gen.h"
 
 #include <cmath>
 
@@ -29,7 +30,7 @@ namespace
       const char* arms = kBox + index * 4;   // ui-audit-ok: box table stride
       const int l = arms[0] - '0', r = arms[1] - '0', u = arms[2] - '0', d = arms[3] - '0';
       const float x1 = x + w, y1 = y + h;
-      const float light = std::fmax(1.0f, Snap(h / 16.0f));
+      const float light = std::fmax(1.0f, Snap(h / tok::terminal_draw_box_ratio));
       const float heavy = light * 2.0f;
       const float mx = Snap(x + w * 0.5f - light * 0.5f), my = Snap(y + h * 0.5f - light * 0.5f);
       const bool anyDouble = l == 3 || r == 3 || u == 3 || d == 3;
@@ -43,7 +44,7 @@ namespace
          const float sx = l ? -1.0f : 1.0f, sy = u ? -1.0f : 1.0f;
          dl->PathLineTo(ImVec2(ax, ay));
          dl->PathLineTo(ImVec2(cx + sx * radius, cy));
-         dl->PathBezierQuadraticCurveTo(ImVec2(cx, cy), ImVec2(cx, cy + sy * radius), 8);
+         dl->PathBezierQuadraticCurveTo(ImVec2(cx, cy), ImVec2(cx, cy + sy * radius), tok::terminal_draw_box_path_bezier_quadratic_curve_to_draw);
          dl->PathLineTo(ImVec2(bx, by));
          dl->PathStroke(c, 0, light);
          return;
@@ -106,8 +107,8 @@ namespace
          const ImU32 alpha = (c >> 24) * (ImU32)(index - 16) / 4;
          Rect(dl, x, y, x1, y1, (c & 0x00FFFFFFu) | (alpha << 24));
       }
-      else if (index == 20) Rect(dl, x, y, x1, Snap(y + h / 8.0f), c);
-      else if (index == 21) Rect(dl, Snap(x1 - w / 8.0f), y, x1, y1, c);
+      else if (index == 20) Rect(dl, x, y, x1, Snap(y + h / tok::terminal_draw_block_ratio), c);
+      else if (index == 21) Rect(dl, Snap(x1 - w / tok::terminal_draw_block_ratio), y, x1, y1, c);
       else
       {
          // Quadrants ▖▗▘▙▚▛▜▝▞▟: bit 1 upper left, 2 upper right, 4 lower left, 8 lower right.
@@ -124,11 +125,11 @@ namespace
    {
       static const unsigned char kCol[] = { 0, 0, 0, 1, 1, 1, 0, 1 };
       static const unsigned char kRow[] = { 0, 1, 2, 0, 1, 2, 3, 3 };
-      const float dot = std::fmax(1.0f, Snap(w * 0.2f));
+      const float dot = std::fmax(1.0f, Snap(w * tok::terminal_draw_braille_ratio));
       for (int i = 0; i < 8; ++i)
          if (bits & (1 << i))
          {
-            const float cx = x + w * (kCol[i] == 0 ? 0.3f : 0.7f), cy = y + h * (0.14f + 0.24f * (float)kRow[i]);
+            const float cx = x + w * (kCol[i] == 0 ? tok::terminal_draw_braille_assign : tok::terminal_draw_braille_assign_2), cy = y + h * (tok::terminal_draw_braille_bias + tok::terminal_draw_braille_ratio_2 * (float)kRow[i]);
             Rect(dl, Snap(cx - dot * 0.5f), Snap(cy - dot * 0.5f), Snap(cx - dot * 0.5f) + dot, Snap(cy - dot * 0.5f) + dot, c);
          }
    }

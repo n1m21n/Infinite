@@ -21,7 +21,7 @@ namespace app
    static void EmptyBlock(const char* message, const char* hint)
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const ImVec2 sz(kPreviewSize, 52.0f);
+      const ImVec2 sz(kPreviewSize, tok::param_empty_block_y);
       ImGui::Dummy(sz);
       EmptyState::Draw(p, ImVec2(p.x + sz.x, p.y + sz.y), message, hint);
    }
@@ -692,7 +692,7 @@ namespace app
          {
             ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
             ImVec2 pB = toScreen(node->points[r][c + 1].x, node->points[r][c + 1].y);
-            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, 200), 1.5f);
+            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, 200), tok::param_projection_handle_overlay_stroke);
          }
       }
       for (int c = 0; c < gw; ++c)
@@ -701,7 +701,7 @@ namespace app
          {
             ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
             ImVec2 pB = toScreen(node->points[r + 1][c].x, node->points[r + 1][c].y);
-            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, 200), 1.5f);
+            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, 200), tok::param_projection_handle_overlay_stroke);
          }
       }
 
@@ -712,8 +712,8 @@ namespace app
          ImVec2 pTR = toScreen(node->points[0][1].x, node->points[0][1].y);
          ImVec2 pBR = toScreen(node->points[1][1].x, node->points[1][1].y);
          ImVec2 pBL = toScreen(node->points[1][0].x, node->points[1][0].y);
-         dl->AddLine(pTL, pBR, tok::Role(tok::col::role_modulation, 70), 1.0f);
-         dl->AddLine(pTR, pBL, tok::Role(tok::col::role_modulation, 70), 1.0f);
+         dl->AddLine(pTL, pBR, tok::Role(tok::col::role_modulation, 70), tok::param_projection_handle_overlay_stroke_2);
+         dl->AddLine(pTR, pBL, tok::Role(tok::col::role_modulation, 70), tok::param_projection_handle_overlay_stroke_2);
       }
 
       // Draw circular pin handles
@@ -726,10 +726,10 @@ namespace app
             float distToMouse = std::hypot(mouse.x - pt.x, mouse.y - pt.y);
             const bool isHovered = (distToMouse < 18.0f);
 
-            dl->AddCircleFilled(pt, 6.0f, tok::Role(tok::col::role_modulation));
-            dl->AddCircle(pt, 7.0f, tok::Role(tok::col::surface_deep), 0, 1.5f);
+            dl->AddCircleFilled(pt, tok::param_projection_handle_overlay_r, tok::Role(tok::col::role_modulation));
+            dl->AddCircle(pt, tok::param_projection_handle_overlay_r_2, tok::Role(tok::col::surface_deep), 0, tok::param_projection_handle_overlay_stroke);
             if (isDragged || isHovered)
-               dl->AddCircle(pt, 11.0f, tok::Role(tok::col::ink_white, 240), 0, 2.0f);
+               dl->AddCircle(pt, tok::param_projection_handle_overlay_r_3, tok::Role(tok::col::ink_white, 240), 0, tok::param_projection_handle_overlay_stroke_3);
          }
       }
    }
@@ -753,7 +753,7 @@ namespace app
       char btnId[32];
       snprintf(btnId, sizeof(btnId), "##projinlinenode%p", (void*)node);
       DrawProjectionHandleOverlay(node, origin, ImVec2(size, size), btnId);
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), tok::Role(tok::col::accent_12), 4.0f, 0, 2.0f);
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), tok::Role(tok::col::accent_12), tok::param_projection_preview_radius, 0, tok::param_projection_preview_stroke);
 
       // Reserve space so the eye toggle and params below aren't drawn over the preview!
       ImGui::SetCursorScreenPos(origin);
@@ -797,13 +797,13 @@ namespace app
          if (ModSliderInt("grid X", &gw, 2, 8, 100.0f))
             n->SetGridSize(gw, n->gridH);
 
-         ImGui::SameLine(0.0f, 16.0f);
+         ImGui::SameLine(0.0f, tok::space_4);
          int gh = n->gridH;
          if (ModSliderInt("grid Y", &gh, 2, 8, 100.0f))
             n->SetGridSize(n->gridW, gh);
       }
 
-      const float btnW = ActionButton::RowWidth(4, kParamWidth);
+      const float btnW = ActionButton::RowWidth(tok::param_projection_params_row_width_arg, kParamWidth);
       ActionButton::RowBegin();
       if (ActionButton::Draw("Reset Corners", ImVec2(btnW, 0)))
       {
@@ -972,10 +972,10 @@ namespace app
    {
       const int count = std::clamp(n->EffectiveLength(), 1, PatternNode::kSteps);
       const int curStep = n->CurrentStep();
-      const int groupSize = 4;
+      const int groupSize = tok::param_group_size;
       const float size = kPreviewSize;
-      const float height = 115.0f;
-      const float gap = 2.0f;
+      const float height = tok::param_height;
+      const float gap = tok::space_0_5;
       const float cellW = count > 1 ? (size - gap * (float)(count - 1)) / (float)count : size;
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -1021,7 +1021,7 @@ namespace app
          {
             if (ImGui::GetIO().KeyShift)
             {
-               n->steps[s] = std::clamp(n->steps[s] - ImGui::GetIO().MouseDelta.y / height * 0.25f, 0.0f, 1.0f);
+               n->steps[s] = std::clamp(n->steps[s] - ImGui::GetIO().MouseDelta.y / height * tok::param_pattern_step_grid_ratio, 0.0f, 1.0f);
             }
             else
             {
@@ -1061,13 +1061,13 @@ namespace app
       dl->AddRectFilled(origin, br, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), tok::radius_control);
 
       // ---- 2) Subtle horizontal guide lines (25%, 50%, 75%) ----
-      const float y25 = origin.y + height * 0.25f;
+      const float y25 = origin.y + height * tok::param_y25_ratio;
       const float y50 = origin.y + height * 0.50f;
-      const float y75 = origin.y + height * 0.75f;
+      const float y75 = origin.y + height * tok::param_y75_ratio;
       const ImU32 subGuideCol = isLight ? tok::Base(tok::col::surface_hi, 150) : tok::Base(tok::col::surface_lo, 150);
-      dl->AddLine(ImVec2(origin.x + 2.0f, y25), ImVec2(br.x - 2.0f, y25), subGuideCol, 1.0f);
-      dl->AddLine(ImVec2(origin.x + 2.0f, y50), ImVec2(br.x - 2.0f, y50), subGuideCol, 1.0f);
-      dl->AddLine(ImVec2(origin.x + 2.0f, y75), ImVec2(br.x - 2.0f, y75), subGuideCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x + tok::space_0_5, y25), ImVec2(br.x - tok::space_0_5, y25), subGuideCol, tok::param_pattern_step_grid_stroke);
+      dl->AddLine(ImVec2(origin.x + tok::space_0_5, y50), ImVec2(br.x - tok::space_0_5, y50), subGuideCol, tok::param_pattern_step_grid_stroke);
+      dl->AddLine(ImVec2(origin.x + tok::space_0_5, y75), ImVec2(br.x - tok::space_0_5, y75), subGuideCol, tok::param_pattern_step_grid_stroke);
 
       auto DrawTextCentered = [&](const ImVec2& minP, const ImVec2& maxP, ImU32 col, const char* text, float fSz) {
          const ImVec2 sz = font->CalcTextSizeA(fSz, FLT_MAX, 0.0f, text);
@@ -1118,7 +1118,7 @@ namespace app
          }
 
          // Value Cap Pill at the level mark
-         const float capH = 14.0f;
+         const float capH = tok::param_cap_h;
          const float capY = std::clamp(fillTop, origin.y, br.y - capH);
 
          const ImU32 capCol = isCurrent
@@ -1128,14 +1128,14 @@ namespace app
             ? (isLight ? tok::Base(tok::col::role_solo) : tok::Base(tok::col::role_solo_2))
             : (isLight ? tok::Base(tok::col::accent_alt, 200) : tok::Base(tok::col::accent_alt, 180));
 
-         dl->AddRectFilled(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capCol, 2.5f);
-         dl->AddRect(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capBorder, 2.5f);
+         dl->AddRectFilled(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capCol, tok::param_pattern_step_grid_radius);
+         dl->AddRect(ImVec2(x0 + tok::space_0_25, capY), ImVec2(x1 - tok::space_0_25, capY + capH), capBorder, tok::param_pattern_step_grid_radius);
 
          // Display value inside cap if column is wide enough
-         if (cellW >= 18.0f)
+         if (cellW >= tok::param_pattern_step_grid_limit)
          {
             char valStr[16];
-            if (cellW >= 30.0f)
+            if (cellW >= tok::param_pattern_step_grid_limit_2)
                snprintf(valStr, sizeof(valStr), "%s", UiFmt::F2(v).c);
             else
                snprintf(valStr, sizeof(valStr), "%s", UiFmt::F1(v).c);
@@ -1162,14 +1162,14 @@ namespace app
             : (isLight
                   ? (isGroupStart ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_mid))
                   : (isGroupStart ? tok::Role(tok::col::surface_mid) : tok::Role(tok::col::edge_mid)));
-         dl->AddText(font, labelFontSize, ImVec2(x0 + (cellW - textSize.x) * 0.5f, br.y + 3.0f),
+         dl->AddText(font, labelFontSize, ImVec2(x0 + (cellW - textSize.x) * 0.5f, br.y + tok::space_0_75),
                      stepNumCol, label);
       }
 
       // Outer border
       dl->AddRect(origin, br, isLight ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::edge_lo_2), tok::radius_control);
 
-      const float labelRowH = ImGui::GetFontSize() + 5.0f;
+      const float labelRowH = ImGui::GetFontSize() + tok::space_1_25;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, br.y + labelRowH));
       PushTextWrapWidth(size);
       if (hoverStep >= 0)
@@ -1256,15 +1256,15 @@ namespace app
          if (steps == 4)
             last = now;
       }
-      while (hist.size() > 140)
+      while (hist.size() > tok::param_logic_gate_body_limit)
          hist.erase(hist.begin());
 
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float w = kPreviewSize;
-      const float h = 76.0f;
-      const float pad = 6.0f;
-      const float innerW = w - 2.0f * pad;
-      const float innerH = h - 2.0f * pad;
+      const float h = tok::param_h;
+      const float pad = tok::space_1_5;
+      const float innerW = w - tok::param_inner_w_ratio * pad;
+      const float innerH = h - tok::param_inner_h_ratio * pad;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImGui::Dummy(ImVec2(w, h));
       const ImVec2 br(origin.x + w, origin.y + h);
@@ -1278,31 +1278,31 @@ namespace app
       dl->AddRectFilled(ImVec2(origin.x + pad, yHi), ImVec2(origin.x + w - pad, yLo),
                         isLight ? tok::Base(tok::col::ink_black, 20) : tok::Base(tok::col::ink_white, 10));
       dl->AddLine(ImVec2(origin.x + pad, yHi), ImVec2(origin.x + w - pad, yHi),
-                  tok::Role(tok::col::state_ok_2), 1.0f);
+                  tok::Role(tok::col::state_ok_2), tok::param_logic_gate_body_stroke);
       dl->AddLine(ImVec2(origin.x + pad, yLo), ImVec2(origin.x + w - pad, yLo),
-                  tok::Role(tok::col::role_modulation), 1.0f);
+                  tok::Role(tok::col::role_modulation), tok::param_logic_gate_body_stroke);
 
       // Live input A curve
       const ImU32 curveCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::role_modulation);
       for (size_t i = 1; i < hist.size(); ++i)
       {
-         const float x0 = origin.x + pad + ((float)(i - 1) / 139.0f) * innerW;
-         const float x1 = origin.x + pad + ((float)i / 139.0f) * innerW;
-         dl->AddLine(ImVec2(x0, yOf(hist[i - 1])), ImVec2(x1, yOf(hist[i])), curveCol, 1.6f);
+         const float x0 = origin.x + pad + ((float)(i - 1) / tok::param_logic_gate_body_ratio) * innerW;
+         const float x1 = origin.x + pad + ((float)i / tok::param_logic_gate_body_ratio) * innerW;
+         dl->AddLine(ImVec2(x0, yOf(hist[i - 1])), ImVec2(x1, yOf(hist[i])), curveCol, tok::param_logic_gate_body_stroke_2);
       }
 
       // Hold dwell bar + output state LED in top-right
       const float hold01 = n->HoldProgress01();
-      const float barW = 44.0f;
+      const float barW = tok::param_bar_w;
       const ImVec2 barTl(origin.x + pad, origin.y + pad);
-      const ImVec2 barBr(barTl.x + barW, barTl.y + 4.0f);
-      dl->AddRectFilled(barTl, barBr, tok::Role(tok::col::ink_white, 24), 2.0f);
+      const ImVec2 barBr(barTl.x + barW, barTl.y + tok::space_1);
+      dl->AddRectFilled(barTl, barBr, tok::Role(tok::col::ink_white, 24), tok::param_logic_gate_body_radius);
       if (hold01 > 0.01f)
-         dl->AddRectFilled(barTl, ImVec2(barTl.x + barW * hold01, barBr.y), tok::Role(tok::col::state_ok_2), 2.0f);
+         dl->AddRectFilled(barTl, ImVec2(barTl.x + barW * hold01, barBr.y), tok::Role(tok::col::state_ok_2), tok::param_logic_gate_body_radius);
 
       const bool high = val > 0.5f;
-      const ImVec2 ledPos(origin.x + w - pad - 6.0f, origin.y + pad + 6.0f);
-      dl->AddCircleFilled(ledPos, 5.0f, high ? tok::Role(tok::col::state_ok_2) : tok::Role(tok::col::ink_white, 24));
+      const ImVec2 ledPos(origin.x + w - pad - tok::space_1_5, origin.y + pad + tok::space_1_5);
+      dl->AddCircleFilled(ledPos, tok::param_logic_gate_body_r, high ? tok::Role(tok::col::state_ok_2) : tok::Role(tok::col::ink_white, 24));
       AudioViz::Border(dl, origin, br);
    }
 
@@ -1584,7 +1584,7 @@ namespace app
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 170), 1.6f);
+         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 170), tok::param_fx_pad_stroke);
       }
 
       // Corner labels: the pad blends between these four named effects, so it is
@@ -1592,22 +1592,22 @@ namespace app
       const ImU32 labelCol = isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::text_secondary);
       const char* bl = n->CornerLabel(0);
       const char* brName = n->CornerLabel(1);
-      const char* tl = n->CornerLabel(2);
+      const char* tl = n->CornerLabel(tok::param_fx_pad_corner_label_arg);
       const char* trName = n->CornerLabel(3);
-      dl->AddText(ImVec2(origin.x + 5, origin.y + 4), labelCol, tl);
+      dl->AddText(ImVec2(origin.x + tok::space_1_25, origin.y + tok::space_1), labelCol, tl);
       ImVec2 trSize = ImGui::CalcTextSize(trName);
-      dl->AddText(ImVec2(br.x - trSize.x - 5, origin.y + 4), labelCol, trName);
+      dl->AddText(ImVec2(br.x - trSize.x - tok::space_1_25, origin.y + tok::space_1), labelCol, trName);
       ImVec2 blSize = ImGui::CalcTextSize(bl);
-      dl->AddText(ImVec2(origin.x + 5, br.y - blSize.y - 4), labelCol, bl);
+      dl->AddText(ImVec2(origin.x + tok::space_1_25, br.y - blSize.y - tok::space_1), labelCol, bl);
       ImVec2 brSize = ImGui::CalcTextSize(brName);
-      dl->AddText(ImVec2(br.x - brSize.x - 5, br.y - brSize.y - 4), labelCol, brName);
+      dl->AddText(ImVec2(br.x - brSize.x - tok::space_1_25, br.y - brSize.y - tok::space_1), labelCol, brName);
 
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
       ImU32 orbColor = n->IsRecordingPath() ? tok::Base(tok::col::text_err)
                      : n->IsPlayingPath()   ? (isLight ? tok::Base(tok::col::state_ok_5) : tok::Base(tok::col::state_ok))
                                             : (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
-      dl->AddCircleFilled(orb, 9.0f, orbColor);
-      dl->AddCircle(orb, 9.0f, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, 2.0f);
+      dl->AddCircleFilled(orb, tok::param_fx_pad_r, orbColor);
+      dl->AddCircle(orb, tok::param_fx_pad_r, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, tok::param_fx_pad_stroke_2);
       AudioViz::Border(dl, origin, br);
    }
 
@@ -1618,27 +1618,27 @@ namespace app
 
       if (n->IsRecordingPath())
       {
-         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.48f, 0), ActionButton::Kind::Record))
+         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0), ActionButton::Kind::Record))
             n->StopRecording();
       }
       else
       {
-         if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0)))
             n->StartRecording();
       }
       ImGui::SameLine();
       if (n->IsPlayingPath())
       {
-         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0)))
             n->StopPath();
       }
       else
       {
-         if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0)))
             n->PlayPath();
       }
       // looping only means something once a path is recorded
-      if (n->Path().size() >= 2)
+      if (n->Path().size() >= tok::param_resynth_params_limit)
       {
          ModCheckbox("loop path", &n->loopPath);
          ImGui::SameLine();
@@ -1654,10 +1654,10 @@ namespace app
 
       NodeSeparator();
       ImGui::TextDisabled("generation %d", n->Generation());
-      if (ActionButton::Draw("Iterate", ImVec2(kPreviewSize * 0.48f, 0)))
+      if (ActionButton::Draw("Iterate", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0)))
          n->StepOnce();
       ImGui::SameLine();
-      if (ActionButton::Draw("Reset", ImVec2(kPreviewSize * 0.48f, 0)))
+      if (ActionButton::Draw("Reset", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0)))
          n->Reset();
       if (ActionButton::Draw("Randomise FX", ImVec2(kPreviewSize, 0)))
          n->Randomise();
@@ -1697,7 +1697,7 @@ namespace app
       const bool isLight = IsThemeLight();
       const ImU32 capCol = isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_mid_2);
       const float textH = ImGui::GetTextLineHeight();
-      const float capY = origin.y + contentH + 4.0f;
+      const float capY = origin.y + contentH + tok::space_1;
       bool renaming = false;
       if (editLabel != nullptr)
       {
@@ -1713,7 +1713,7 @@ namespace app
             renaming = true;
             char buf[64];
             snprintf(buf, sizeof(buf), "%s", editLabel->c_str());
-            ImGui::SetCursorScreenPos(ImVec2(origin.x, capY - 2.0f));
+            ImGui::SetCursorScreenPos(ImVec2(origin.x, capY - tok::space_0_5));
             ImGui::SetNextItemWidth(cellW);
             if (ImGui::IsWindowAppearing() || ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                UiInteract::FocusHere();
@@ -1745,7 +1745,7 @@ namespace app
          }
       }
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(cellW, contentH + 4.0f + textH));
+      ImGui::Dummy(ImVec2(cellW, contentH + tok::space_1 + textH));
    }
 
 
@@ -1845,10 +1845,10 @@ namespace app
    void DrawMacroToggleBody(MacroToggleNode* n)
    {
       // The shared Switch, enlarged to read as a front-panel control.
-      constexpr float kScale = 1.7f;
+      constexpr float kScale = tok::param_scale;
       const float btnW = Switch::kW * kScale, btnH = Switch::kH * kScale;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImGui::SetCursorScreenPos(ImVec2(origin.x + (kMacroCell - btnW) * 0.5f, origin.y + 2.0f));
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + (kMacroCell - btnW) * 0.5f, origin.y + tok::space_0_5));
       ImGui::PushID(901);
       bool v = n->state;
       if (Switch::Box("##macrotogglebtn", &v, kScale))
@@ -1858,7 +1858,7 @@ namespace app
       }
       ImGui::PopID();
       ImGui::SetCursorScreenPos(origin);
-      MacroBodyEnd(origin, kMacroCell, btnH + 4.0f, n->label.empty() ? std::string("toggle") : n->label, &n->label);
+      MacroBodyEnd(origin, kMacroCell, btnH + tok::space_1, n->label.empty() ? std::string("toggle") : n->label, &n->label);
    }
 
 
@@ -1873,10 +1873,10 @@ namespace app
    void DrawMacroTriggerBody(MacroTriggerNode* n)
    {
       // The shared ActionButton; held or just fired it takes the Primary (accent) look.
-      constexpr float kBtnH = 30.0f;
-      const float btnW = 72.0f;
+      constexpr float kBtnH = tok::param_btn_h;
+      const float btnW = tok::param_btn_w;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImGui::SetCursorScreenPos(ImVec2(origin.x + (kMacroCell - btnW) * 0.5f, origin.y + 2.0f));
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + (kMacroCell - btnW) * 0.5f, origin.y + tok::space_0_5));
       ImGui::PushID(902);
       ActionButton::Draw("bang##macrotriggerbtn", ImVec2(btnW, kBtnH),
                          n->flash > 0.0f ? ActionButton::Kind::Primary : ActionButton::Kind::Plain);
@@ -1896,7 +1896,7 @@ namespace app
          if (n->flash < 0.0f) n->flash = 0.0f;
       }
       ImGui::SetCursorScreenPos(origin);
-      MacroBodyEnd(origin, kMacroCell, kBtnH + 4.0f, n->label.empty() ? std::string("bang") : n->label, &n->label);
+      MacroBodyEnd(origin, kMacroCell, kBtnH + tok::space_1, n->label.empty() ? std::string("bang") : n->label, &n->label);
    }
 
 
@@ -1909,10 +1909,10 @@ namespace app
 
    void DrawMacroNumBoxBody(MacroNumBoxNode* n)
    {
-      const float boxW = kMacroCell - 8.0f;
+      const float boxW = kMacroCell - tok::space_2;
       const float boxH = kMacroRowH;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const ImVec2 bTL(origin.x + 4.0f, origin.y);
+      const ImVec2 bTL(origin.x + tok::space_1, origin.y);
       const ImVec2 bBR(bTL.x + boxW, bTL.y + boxH);
 
       (void)bBR;
@@ -1944,7 +1944,7 @@ namespace app
    void DrawMacroRadioSelectorBody(MacroRadioSelectorNode* n)
    {
       const int count = std::clamp(n->count, 2, 8);
-      const float gap = 2.0f;
+      const float gap = tok::space_0_5;
       const float btnH = kMacroRowH;
       const float btnW = (kMacroWideCell - (count - 1) * gap) / (float)count;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -1980,9 +1980,9 @@ namespace app
 
    void DrawMacroStepGateBody(MacroStepGateNode* n)
    {
-      const float gap = 2.0f;
+      const float gap = tok::space_0_5;
       const float stepH = kMacroRowH;
-      const float stepW = (kMacroWideCell - 7.0f * gap) / 8.0f;
+      const float stepW = (kMacroWideCell - tok::param_macro_step_gate_body_ratio * gap) / tok::param_step_w_ratio;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2122,14 +2122,14 @@ namespace app
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 170), 1.6f);
+         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 170), tok::param_macro_xy_body_stroke);
       }
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
       ImU32 orbColor = n->IsRecordingPath() ? tok::Base(tok::col::text_err)
                      : n->IsPlayingPath()   ? (isLight ? tok::Base(tok::col::state_ok_5) : tok::Base(tok::col::state_ok))
                                             : (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
-      dl->AddCircleFilled(orb, 9.0f, orbColor);
-      dl->AddCircle(orb, 9.0f, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, 2.0f);
+      dl->AddCircleFilled(orb, tok::param_macro_xy_body_r, orbColor);
+      dl->AddCircle(orb, tok::param_macro_xy_body_r, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, tok::param_macro_xy_body_stroke_2);
       AudioViz::Border(dl, origin, br);
    }
 
@@ -2140,33 +2140,33 @@ namespace app
 
       if (n->IsRecordingPath())
       {
-         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.31f, 0), ActionButton::Kind::Record))
+         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * tok::param_macro_xy_params_ratio, 0), ActionButton::Kind::Record))
             n->StopRecording();
       }
-      else if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * 0.31f, 0)))
+      else if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * tok::param_macro_xy_params_ratio, 0)))
       {
          n->StartRecording();
       }
       ImGui::SameLine();
       if (n->IsPlayingPath())
       {
-         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.31f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * tok::param_macro_xy_params_ratio, 0)))
             n->StopPath();
       }
-      else if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * 0.31f, 0)))
+      else if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * tok::param_macro_xy_params_ratio, 0)))
       {
          n->PlayPath();
       }
       ImGui::SameLine();
-      if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * 0.31f, 0)))
+      if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * tok::param_macro_xy_params_ratio, 0)))
          n->ClearPath();
       ModCheckbox("loop", &n->loopPath);
       ModSlider("speed", &n->speed, 0.05f, 4.0f);
       if (Platform::PluginModeActive())
       {
-         MacroHostSlotField(n->hostSlot, kPreviewSize * 0.48f, "##hostslotx", "x slot");
+         MacroHostSlotField(n->hostSlot, kPreviewSize * tok::param_macro_xy_params_ratio_2, "##hostslotx", "x slot");
          FormParts::Inline();
-         MacroHostSlotField(n->hostSlotY, kPreviewSize * 0.48f, "##hostsloty", "y slot");
+         MacroHostSlotField(n->hostSlotY, kPreviewSize * tok::param_macro_xy_params_ratio_2, "##hostsloty", "y slot");
       }
    }
 }

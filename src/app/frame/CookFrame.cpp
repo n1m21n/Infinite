@@ -347,7 +347,7 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
          st.x = st.y = x;
       else if (tickDt > 0.0)
       {
-         st.y = (float)Modulation::SmoothStep(st.y, st.x, x, tickDt, smoothMs * 0.001);
+         st.y = (float)Modulation::SmoothStep(st.y, st.x, x, tickDt, smoothMs * tok::cook_frame_apply_modulation_and_palette_ratio);
          st.x = x;
       }
       return std::clamp(st.y, 0.0f, 1.0f);

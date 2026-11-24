@@ -57,7 +57,7 @@ namespace app
       if (!node->HasStrokes())
          AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize)}, "draw here");
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
-                  tok::Role(tok::col::accent_12), 4.0f, 0, 2.0f);
+                  tok::Role(tok::col::accent_12), tok::preview_paintable_radius, 0, tok::preview_paintable_stroke);
    }
 
 
@@ -67,10 +67,10 @@ namespace app
    {
       switch (sizeIdx)
       {
-         case 0: return baseFontSize * 0.82f;  // Small (~13px)
+         case 0: return baseFontSize * tok::preview_comment_font_size_ratio;  // Small (~13px)
          case 1: default: return baseFontSize; // Normal (~15px)
-         case 2: return baseFontSize * 1.35f;  // Large (~20px)
-         case 3: return baseFontSize * 1.85f;  // Extra Large (~28px)
+         case 2: return baseFontSize * tok::preview_comment_font_size_ratio_2;  // Large (~20px)
+         case 3: return baseFontSize * tok::preview_comment_font_size_ratio_3;  // Extra Large (~28px)
       }
    }
 
@@ -97,8 +97,8 @@ namespace app
    // screen space, exactly like the colour picker and the dropdowns.
    void DrawCommentPreview(CommentNode* n)
    {
-      const float w = std::max(120.0f, n->width);
-      const float h = std::max(60.0f, n->height);
+      const float w = std::max(tok::preview_comment_bound, n->width);
+      const float h = std::max(tok::preview_comment_bound_2, n->height);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + w, origin.y + h);
@@ -124,12 +124,12 @@ namespace app
                     (int)(n->color[1] * 200 + 55),
                     (int)(n->color[2] * 200 + 55), 180);
 
-      dl->AddRectFilled(origin, br, bgCol, 6.0f);
+      dl->AddRectFilled(origin, br, bgCol, tok::preview_comment_radius);
       // Header accent bar (Apple Notes / sticky card feel)
-      dl->AddRectFilled(origin, ImVec2(br.x, origin.y + 4.0f),
-                        IM_COL32((int)(n->color[0] * 255), (int)(n->color[1] * 255),
-                                 (int)(n->color[2] * 255), 220), 6.0f, ImDrawFlags_RoundCornersTop);
-      dl->AddRect(origin, br, borderCol, 6.0f, 0, 1.2f);
+      dl->AddRectFilled(origin, ImVec2(br.x, origin.y + tok::space_1),
+                        IM_COL32((int)(n->color[0] * tok::preview_comment_ratio), (int)(n->color[1] * tok::preview_comment_ratio),
+                                 (int)(n->color[2] * tok::preview_comment_ratio), 220), tok::preview_comment_radius, ImDrawFlags_RoundCornersTop);
+      dl->AddRect(origin, br, borderCol, tok::preview_comment_radius, 0, tok::preview_comment_stroke);
 
       const ImU32 textCol = isLight
          ? tok::Base(tok::col::surface_lo)
@@ -147,15 +147,15 @@ namespace app
       else if (n->text.empty())
       {
          dl->AddText(ImGui::GetFont(), drawFontSize,
-                     ImVec2(origin.x + 8, origin.y + 8),
+                     ImVec2(origin.x + tok::space_2, origin.y + tok::space_2),
                      isLight ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::text_secondary),
-                     "double-click or type to write", nullptr, w - 16.0f);
+                     "double-click or type to write", nullptr, w - tok::space_4);
       }
       else
       {
          dl->AddText(ImGui::GetFont(), drawFontSize,
-                     ImVec2(origin.x + 8, origin.y + 8), textCol,
-                     n->text.c_str(), nullptr, w - 16.0f);
+                     ImVec2(origin.x + tok::space_2, origin.y + tok::space_2), textCol,
+                     n->text.c_str(), nullptr, w - tok::space_4);
       }
 
       // Draw bottom-right resize grip indicator (3 diagonal grip lines)
@@ -164,8 +164,8 @@ namespace app
          : IM_COL32((int)(n->color[0] * 160 + 60), (int)(n->color[1] * 160 + 60), (int)(n->color[2] * 160 + 60), 160);
       for (int i = 0; i < 3; i++)
       {
-         const float offset = 4.0f + (float)i * 4.0f;
-         dl->AddLine(ImVec2(br.x - offset, br.y - 3.0f), ImVec2(br.x - 3.0f, br.y - offset), gripCol, 1.2f);
+         const float offset = tok::space_1 + (float)i * 4.0f;
+         dl->AddLine(ImVec2(br.x - offset, br.y - tok::space_0_75), ImVec2(br.x - tok::space_0_75, br.y - offset), gripCol, tok::preview_comment_stroke);
       }
       dl->PopClipRect();
 
@@ -181,7 +181,7 @@ namespace app
       }
 
       // Resize grip interaction (bottom-right corner)
-      const float gripSize = 20.0f;
+      const float gripSize = tok::preview_grip_size;
       ImGui::SetCursorScreenPos(ImVec2(br.x - gripSize, br.y - gripSize));
       UiInteract::Hit("##commentresizegrip", ImVec2(gripSize, gripSize));
       const bool gripHovered = ImGui::IsItemHovered();
@@ -196,10 +196,10 @@ namespace app
       }
       if (gripActive)
       {
-         const float zoom = std::max(0.01f, ed::GetCurrentZoom());
+         const float zoom = std::max(tok::preview_comment_bound_3, ed::GetCurrentZoom());
          ImGuiIO& io = ImGui::GetIO();
-         n->width = std::clamp(n->width + io.MouseDelta.x / zoom, 120.0f, 1600.0f);
-         n->height = std::clamp(n->height + io.MouseDelta.y / zoom, 60.0f, 1200.0f);
+         n->width = std::clamp(n->width + io.MouseDelta.x / zoom, tok::preview_comment_bound, tok::preview_comment_bound_4);
+         n->height = std::clamp(n->height + io.MouseDelta.y / zoom, tok::preview_comment_bound_2, tok::preview_comment_bound_5);
          gPatchDirty = true;
       }
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + h));
@@ -306,8 +306,8 @@ namespace app
          }
       }
       if (!any)
-         return ImVec2(0.0f, 40.0f);
-      const float kMargin = 60.0f;
+         return ImVec2(0.0f, tok::preview_cluster_offset_y);
+      const float kMargin = tok::preview_margin;
       return ImVec2(0.0f, (bmax.y - bmin.y) + kMargin);
    }
 
@@ -479,14 +479,14 @@ namespace app
       ImGui::BeginGroup();
       // The same power glyph as a node's: lit while the group plays. A live
       // control, like node power, so it is not an undo step.
-      if (GlyphToggle::Draw("##grouppower", IconsInfinite::Power, IconsInfinite::PowerFill, n->on, 22.0f, true))
+      if (GlyphToggle::Draw("##grouppower", IconsInfinite::Power, IconsInfinite::PowerFill, n->on, tok::preview_group_node_draw, true))
          n->on = !n->on;
       if (ImGui::IsItemHovered())
          HelpTip("%s", n->on ? T("Turn the group off: its nodes stop cooking and go silent") : T("Turn the group on"));
       FormParts::Inline();
       if (ImGui::ColorButton("##groupcolor", ImVec4(n->color[0], n->color[1], n->color[2], 1.0f),
                              ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder,
-                             ImVec2(14, 14)))
+                             ImVec2(tok::preview_group_node_color_button_w, tok::preview_group_node_color_button_h)))
       {
          PushUndoCheckpoint();
          gColor.target = n->color;
@@ -511,7 +511,7 @@ namespace app
             n->renameJustStarted = false;
          }
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0.35f));
-         ImGui::SetNextItemWidth(std::max(60.0f, n->width - 40.0f));
+         ImGui::SetNextItemWidth(std::max(tok::preview_group_node_bound, n->width - tok::preview_group_node_gap));
          if (FieldWell::InputText("##grouprename", &n->label, ImGuiInputTextFlags_EnterReturnsTrue) ||
              ImGui::IsItemDeactivated())
             n->renaming = false;
@@ -537,9 +537,9 @@ namespace app
       ed::PopStyleColor(4);
 
       const ImVec2 total = ed::GetNodeSize(gn.NodeId());
-      n->width = std::max(120.0f, total.x);
+      n->width = std::max(tok::preview_group_node_bound_2, total.x);
       n->headerH = headerSize.y + ImGui::GetStyle().ItemSpacing.y;
-      n->height = std::max(60.0f, total.y - n->headerH);
+      n->height = std::max(tok::preview_group_node_bound, total.y - n->headerH);
    }
 
 
@@ -711,10 +711,10 @@ namespace app
          const ImVec2 drag = ImGui::GetIO().MouseDelta;
          // azimuth/elevation are stored in degrees; 0.6875 deg/px matches the
          // drag feel of the old 0.012 rad/px (0.012 * 180/pi).
-         *azimuth -= drag.x * 0.6875f;
+         *azimuth -= drag.x * tok::preview_azimuth_ratio;
          // Clamped just short of the poles: straight overhead makes the view
          // matrix's up vector parallel to the view direction and the image rolls.
-         *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * 0.6875f, 85.9437f));
+         *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * tok::preview_ratio, 85.9437f));
       }
 
       if (ImGui::IsItemHovered())
@@ -737,7 +737,7 @@ namespace app
 
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     tok::Role(tok::col::accent_2, 200), 4.0f, 0, 2.0f);
+                     tok::Role(tok::col::accent_2, 200), tok::preview_radius, 0, tok::preview_stroke);
    }
 
 
@@ -822,7 +822,7 @@ namespace app
       }
 
       const float w = AudioFullWidth();
-      const float h = 100.0f;
+      const float h = tok::preview_h;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
@@ -830,7 +830,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::preview_field_graph_waveform_stroke);
 
       if (fgn->waveformCacheCount > 0)
       {
@@ -840,15 +840,15 @@ namespace app
          {
             const float x = origin.x + w * (float)i / (float)count;
             const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - fgn->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - fgn->waveformMin[i] * h * 0.45f;
+            const float top = midY - fgn->waveformMax[i] * h * tok::preview_top_ratio;
+            const float bottom = midY - fgn->waveformMin[i] * h * tok::preview_bottom_ratio;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
                               isLight ? tok::Base(tok::col::accent, 200) : tok::Base(tok::col::accent_11, 175));
          }
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1), ScopeTextCol(), "idle");
       }
 
       dl->PopClipRect();

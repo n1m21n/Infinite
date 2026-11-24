@@ -137,8 +137,8 @@ namespace app
             vHalf = 0.5f * ta / ba;
          const float cell = 1.0f / (float)VmpcNode::kThumbs;
          const float uc = ((float)std::clamp(idx, 0, VmpcNode::kThumbs - 1) + 0.5f) * cell;
-         Thumb::Add(dl, (ImTextureID)(intptr_t)tex, mn, mx, ImVec2(uc - uHalf * cell, 0.5f + vHalf),
-                      ImVec2(uc + uHalf * cell, 0.5f - vHalf), tint);
+         Thumb::Add(dl, (ImTextureID)(intptr_t)tex, mn, mx, ImVec2(uc - uHalf * cell, tok::px_align + vHalf),
+                      ImVec2(uc + uHalf * cell, tok::px_align - vHalf), tint);
       }
 
       int ThumbIndexAt(float frac)
@@ -207,7 +207,7 @@ namespace app
          {
             for (int col = 0; col < 4; col++)
             {
-               const int pad = (3 - row) * 4 + col;
+               const int pad = (tok::vmpc_body_gap - row) * tok::vmpc_pad_ratio + col;
                char id[16];
                snprintf(id, sizeof(id), "vpad%d", pad + 1);
                ImGui::SetCursorScreenPos(ImVec2(x0 + (float)col * (cellW + gap), y0 + (float)row * (side + gap)));
@@ -234,10 +234,10 @@ namespace app
                         fill = isLight ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::edge_lo);
                      if (lit)
                         fill = green;
-                     dl->AddRectFilled(mn, mx, fill, 6.0f);
+                     dl->AddRectFilled(mn, mx, fill, tok::vmpc_body_radius);
                      const ImU32 selCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4);
                      const ImU32 edge = isLight ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::surface_lo_2, 200);
-                     dl->AddRect(mn, mx, isSel ? selCol : edge, 6.0f, 0, isSel ? 2.0f : 1.0f);
+                     dl->AddRect(mn, mx, isSel ? selCol : edge, tok::vmpc_body_radius, 0, isSel ? tok::vmpc_body_stroke : tok::vmpc_body_stroke_2);
 
                      const ImU32 ink = lit ? tok::Base(tok::col::ink_white)
                                            : (isLoaded ? (isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::surface_hi))
@@ -247,7 +247,7 @@ namespace app
                      const float lh = AudioLabelFontSize();
                      char num[16];
                      snprintf(num, sizeof(num), "%d", pad + 1);
-                     AudioLabelText(dl, ImVec2(mn.x + 5.0f, mn.y + 3.0f), ink, num);
+                     AudioLabelText(dl, ImVec2(mn.x + tok::space_1_25, mn.y + tok::space_0_75), ink, num);
                      if (isLoaded)
                      {
                         char tag[32];
@@ -256,13 +256,13 @@ namespace app
                            snprintf(tag, sizeof(tag), "%s %s", kModeTag[std::clamp(n->padMode[pad], 0, 2)],
                                     MusicTime::RateDivisionName(n->padDiv[pad]));
                         const ImVec2 ts = AudioLabelSize(tag);
-                        AudioLabelText(dl, ImVec2(mx.x - ts.x - 5.0f, mn.y + 3.0f), dim, tag);
+                        AudioLabelText(dl, ImVec2(mx.x - ts.x - tok::space_1_25, mn.y + tok::space_0_75), dim, tag);
 
                         // The picture: the filmstrip frame nearest the pad's
                         // position (its window start when idle), in the box
                         // the MPC gives its waveform.
-                        const ImVec2 pmn(mn.x + 5.0f, mn.y + lh + 7.0f);
-                        const ImVec2 pmx(mx.x - 5.0f, mx.y - lh - 7.0f);
+                        const ImVec2 pmn(mn.x + tok::space_1_25, mn.y + lh + tok::vmpc_body_gap_2);
+                        const ImVec2 pmx(mx.x - tok::space_1_25, mx.y - lh - tok::vmpc_body_gap_2);
                         const float cur = n->PadCursor(pad);
                         const float at = cur >= 0.0f ? cur : n->padStart[pad] / 100.0f;
                         if (thumbs != 0)
@@ -278,15 +278,15 @@ namespace app
                         {
                            // Progress through the clip along the picture's bottom edge.
                            const float px = pmn.x + (pmx.x - pmn.x) * std::clamp(cur, 0.0f, 1.0f);
-                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - 2.0f), ImVec2(pmx.x, pmx.y), tok::Role(tok::col::ink_black, 140));
-                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - 2.0f), ImVec2(px, pmx.y), tok::Role(tok::col::ink_white, 230));
+                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(pmx.x, pmx.y), tok::Role(tok::col::ink_black, 140));
+                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(px, pmx.y), tok::Role(tok::col::ink_white, 230));
                         }
                         std::string nm = n->PadName(pad);
                         const size_t dot = nm.find_last_of('.');
                         if (dot != std::string::npos && dot > 0)
                            nm.resize(dot);
-                        dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 16.0f, mx.y - 1.0f), true);
-                        AudioLabelText(dl, ImVec2(mn.x + 5.0f, mx.y - lh - 4.0f), dim, nm.c_str());
+                        dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - tok::space_4, mx.y - 1.0f), true);
+                        AudioLabelText(dl, ImVec2(mn.x + tok::space_1_25, mx.y - lh - tok::space_1), dim, nm.c_str());
                         dl->PopClipRect();
                      }
                      else
@@ -295,11 +295,11 @@ namespace app
                         const ImVec2 hs = AudioLabelSize(hint);
                         AudioLabelText(dl, ImVec2((mn.x + mx.x - hs.x) * 0.5f, (mn.y + mx.y - hs.y) * 0.5f), dim, hint);
                      }
-                     modDot = ImVec2(mx.x - 8.0f, mx.y - 8.0f);
+                     modDot = ImVec2(mx.x - tok::space_2, mx.y - tok::space_2);
                      if (anyMod)
                      {
-                        dl->AddCircleFilled(modDot, 4.0f, isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
-                        dl->AddCircle(modDot, 4.0f, isLight ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::surface_lo), 12, 1.0f);
+                        dl->AddCircleFilled(modDot, tok::vmpc_body_r, isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
+                        dl->AddCircle(modDot, tok::vmpc_body_r, isLight ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::surface_lo), tok::vmpc_body_segments, 1.0f);
                      }
                      dl->PopClipRect();
                   },
@@ -319,9 +319,9 @@ namespace app
             }
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, 4.0f * side + 3.0f * gap));
+         ImGui::Dummy(ImVec2(gAudioContentW, tok::vmpc_body_ratio * side + tok::vmpc_body_ratio_2 * gap));
       }
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::vmpc_body_dummy_h));
 
       // Selected pad: header, filmstrip (also the drop target), Load / Folder /
       // Clear, then the pad's rows.
@@ -338,7 +338,7 @@ namespace app
 
          {
             const float w = AudioFullWidth();
-            const float h = 90.0f;
+            const float h = tok::vmpc_h;
             const ImVec2 origin = ImGui::GetCursorScreenPos();
             const ImVec2 br(origin.x + w, origin.y + h);
             n->stripRect[0] = origin.x; n->stripRect[1] = origin.y; n->stripRect[2] = br.x; n->stripRect[3] = br.y;
@@ -370,13 +370,13 @@ namespace app
                dl->AddRectFilled(origin, ImVec2(xa, br.y), tok::Role(tok::col::ink_black, 140));
                dl->AddRectFilled(ImVec2(xb, origin.y), br, tok::Base(tok::col::ink_black, 140));
                const ImU32 edgeCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4);
-               dl->AddLine(ImVec2(xa, origin.y), ImVec2(xa, br.y), edgeCol, 2.0f);
-               dl->AddLine(ImVec2(xb, origin.y), ImVec2(xb, br.y), edgeCol, 2.0f);
+               dl->AddLine(ImVec2(xa, origin.y), ImVec2(xa, br.y), edgeCol, tok::vmpc_body_stroke);
+               dl->AddLine(ImVec2(xb, origin.y), ImVec2(xb, br.y), edgeCol, tok::vmpc_body_stroke);
                const float at = n->PadCursor(cur);
                if (n->PadPlaying(cur) && at >= 0.0f)
                {
                   const float px = origin.x + w * std::clamp(at, 0.0f, 1.0f);
-                  dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), tok::Role(tok::col::ink_white, 235), 1.5f);
+                  dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), tok::Role(tok::col::ink_white, 235), tok::vmpc_body_stroke_3);
                }
                if (hov)
                {
@@ -394,9 +394,9 @@ namespace app
             if (!has && hov)
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          }
-         ImGui::Dummy(ImVec2(0.0f, 6.0f));
+         ImGui::Dummy(ImVec2(0.0f, tok::vmpc_body_dummy_h));
 
-         const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+         const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::vmpc_body_ratio_3) / tok::vmpc_third_w_ratio;
          if (ActionButton::Draw("Load...##vmpc", ImVec2(thirdW, 0)))
             openLoadPad = cur;
          FormParts::Inline();
@@ -417,7 +417,7 @@ namespace app
             n->ClearPad(cur);
          }
          ImGui::EndDisabled();
-         ImGui::Dummy(ImVec2(0.0f, 6.0f));
+         ImGui::Dummy(ImVec2(0.0f, tok::vmpc_body_dummy_h));
 
          auto slider = [&](int k, float width)
          {
@@ -455,7 +455,7 @@ namespace app
       // What every pad shares: how one picture gives way to the next, and the sound.
       BeginAudioSection("output");
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(tok::vmpc_body_audio_knob_row_layout);
          row.Dropdown("transition##vmpctrans", VmpcTransitionList(), n->transition,
                       [n](int i) { PushUndoCheckpoint(); n->transition = i; });
          ImGui::BeginDisabled(n->transition == VmpcNode::kCut);

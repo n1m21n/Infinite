@@ -10,9 +10,9 @@ namespace app
    // half of kParamWidth minus a 4px gutter, so two of these plus
    // ImGui::SameLine's default spacing sit inside the same node body width
    // a full-width ModSlider already uses.
-   [[maybe_unused]] const float kCompactParamWidth = 82.0f;
+   [[maybe_unused]] const float kCompactParamWidth = tok::theme_compact_param_width;
 
-   [[maybe_unused]] const float kAudioHalfWidth = 214.0f;
+   [[maybe_unused]] const float kAudioHalfWidth = tok::theme_audio_half_width;
 
    // Mixer needs a wider body than the standard 440: with 8 strips, cellW =
    // gAudioContentW / MixerNode::kSlots must leave room for both a 56px knob
@@ -21,13 +21,13 @@ namespace app
    // => body >= 768. 800 is the smallest round number above that floor -
    // don't shrink this back toward 440, the pin-clamp bug it fixes re-engages
    // below 768.
-   [[maybe_unused]] const float kAudioMixerWidth = 800.0f;
+   [[maybe_unused]] const float kAudioMixerWidth = tok::theme_audio_mixer_width;
  // generous click target - small dots were unhittable
 
    bool IsThemeLight()
    {
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
-      return (0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
+      return (tok::theme_is_light_ratio * t.windowBg.r + tok::theme_is_light_ratio_2 * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
    }
 
 
@@ -67,7 +67,7 @@ namespace app
       dl->AddRectFilled(origin, br, tok::U32(tok::backdrop_base, isLight), rounding);
       if (!gCheckerboardBackdrop)
          return;
-      const float cell = 12.0f;
+      const float cell = tok::theme_cell;
       const int cols = (int)std::ceil((br.x - origin.x) / cell);
       const int rows = (int)std::ceil((br.y - origin.y) / cell);
       for (int y = 0; y < rows; y++)
@@ -156,7 +156,7 @@ namespace app
       const ImVec4 accent(t.accent.r, t.accent.g, t.accent.b, 1.0f);
       ImGui::PushStyleColor(ImGuiCol_Button, accent);
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                             ImVec4(std::min(accent.x * 1.1f, 1.0f), std::min(accent.y * 1.1f, 1.0f),
+                             ImVec4(std::min(accent.x * tok::theme_push_primary_button_style_ratio, 1.0f), std::min(accent.y * tok::theme_push_primary_button_style_ratio, 1.0f),
                                     std::min(accent.z * 1.1f, 1.0f), 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive,
                              ImVec4(accent.x * 0.82f, accent.y * 0.82f, accent.z * 0.82f, 1.0f));
@@ -337,13 +337,13 @@ namespace app
       const ImU32 col = PanelSeamColor();
       if (vertical)
       {
-         const float x = facesStart ? a.x + 0.5f : b.x - 0.5f;
-         dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), col, 1.0f);
+         const float x = facesStart ? a.x + tok::px_align : b.x - tok::px_align;
+         dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), col, tok::theme_panel_seam_stroke);
       }
       else
       {
-         const float y = facesStart ? a.y + 0.5f : b.y - 0.5f;
-         dl->AddLine(ImVec2(a.x, y), ImVec2(b.x, y), col, 1.0f);
+         const float y = facesStart ? a.y + tok::px_align : b.y - tok::px_align;
+         dl->AddLine(ImVec2(a.x, y), ImVec2(b.x, y), col, tok::theme_panel_seam_stroke);
       }
    }
 
@@ -373,7 +373,7 @@ namespace app
       auto vec = [](const CategoryColors::Color& c, float a = 1.0f) {
          return ImVec4(c.r, c.g, c.b, a);
       };
-      const float lum = 0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b;
+      const float lum = tok::theme_lum_ratio * t.windowBg.r + tok::theme_lum_ratio_2 * t.windowBg.g + 0.0722f * t.windowBg.b;
       const bool isLight = (lum > 0.5f);
 
       auto shade = [isLight](const CategoryColors::Color& c, float amt) {
@@ -411,7 +411,7 @@ namespace app
       {
          auto lum = [](float r, float g, float b) {
             auto f = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
-            return 0.2126f * f(r) + 0.7152f * f(g) + 0.0722f * f(b);
+            return 0.2126f * f(r) + tok::theme_apply_ratio * f(g) + 0.0722f * f(b);
          };
          auto ratio = [](float a, float b) { return (std::max(a, b) + 0.05f) / (std::min(a, b) + 0.05f); };
          const float panelL = lum(t.panelBg.r, t.panelBg.g, t.panelBg.b);
@@ -453,7 +453,7 @@ namespace app
       {
          auto lum = [](float r, float g, float b) {
             auto f = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
-            return 0.2126f * f(r) + 0.7152f * f(g) + 0.0722f * f(b);
+            return 0.2126f * f(r) + tok::theme_apply_ratio * f(g) + 0.0722f * f(b);
          };
          const float panelL = lum(t.panelBg.r, t.panelBg.g, t.panelBg.b);
          for (float k = 0.0f; k < 1.0f; k += 0.05f)

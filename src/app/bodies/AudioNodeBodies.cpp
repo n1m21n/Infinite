@@ -47,7 +47,7 @@ namespace app
       if (!ready)
          ImGui::BeginDisabled();
       // "open" / "close", not a glyph - see the note above about the font.
-      if (ActionButton::Draw(editorOpen ? "close" : "open", ImVec2(64.0f, 0)))
+      if (ActionButton::Draw(editorOpen ? "close" : "open", ImVec2(tok::audio_node_plugin_body_draw_x, 0)))
          n->ToggleEditor();
       if (!ready)
          ImGui::EndDisabled();
@@ -78,7 +78,7 @@ namespace app
       // width collides with the node's resize hit-zone.
       if (n->HasPlugin())
       {
-         const float unloadW = 60.0f;
+         const float unloadW = tok::audio_node_unload_w;
          ImGui::SameLine();
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - unloadW,
                                           ImGui::GetCursorScreenPos().y));
@@ -89,7 +89,7 @@ namespace app
          }
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_plugin_body_dummy_h));
 
       // --- fallback parameter picker ---
       // Learn alone is not enough: plenty of plugin editors don't notify the
@@ -113,7 +113,7 @@ namespace app
          AudioBareDropdown("##pluginparampick", names, sPickIndex, [](int i) { sPickIndex = i; },
                            gAudioContentW - 70.0f - ImGui::GetStyle().ItemSpacing.x);
          ImGui::SameLine();
-         if (ActionButton::Draw("map", ImVec2(70.0f, 0)))
+         if (ActionButton::Draw("map", ImVec2(tok::audio_node_plugin_body_draw_x_2, 0)))
          {
             PushUndoCheckpoint();
             n->MapParameter(params[sPickIndex].address);
@@ -156,9 +156,9 @@ namespace app
             snprintf(label, sizeof(label), "%s##map%d", m.displayName.c_str(), i);
             if (n->Configuring())
             {
-               const float unmapBtnW = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f + 2.0f;
+               const float unmapBtnW = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * tok::audio_node_unmap_btn_w_ratio + tok::space_0_5;
                ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW - unmapBtnW - 4.0f, /*audioStyle=*/true);
-               ImGui::SameLine(0.0f, 2.0f);
+               ImGui::SameLine(0.0f, tok::space_0_5);
                ImGui::PushID(i + 40000);
                ImGui::PushStyleColor(ImGuiCol_Button, tok::RoleV4(tok::col::ink_black, 0.0f));
                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::RoleV4(tok::col::state_err_hover));
@@ -252,14 +252,14 @@ namespace app
       }
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_out_body_dummy_h));
 
       const bool canRecord = !Platform::PluginModeActive(); // inside a DAW the DAW records
       // Format selector: WAV | FLAC | MP3
       if (canRecord)
       {
       ImGui::BeginDisabled(recording);
-      const float fmtBtnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+      const float fmtBtnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::audio_node_out_body_ratio) / tok::audio_node_fmt_btn_w_ratio;
       const char* fmtNames[] = { "WAV", "FLAC", "MP3" };
       for (int i = 0; i < 3; i++)
       {
@@ -277,7 +277,7 @@ namespace app
             ImGui::SameLine();
       }
       ImGui::EndDisabled();
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_out_body_dummy_h_2));
       }
 
       // Live: skip alignment against other Audio Outs (see AudioOutputNode::live).
@@ -297,7 +297,7 @@ namespace app
          if (ImGui::IsItemHovered())
             SetAudioReadout("live", n->live ? "not delayed to match other outputs" : "aligned with other outputs");
       }
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_out_body_dummy_h_2));
 
       // Record/Stop is the only control that ever starts or stops a
       // recording - Choose... below only ever changes where the *next*
@@ -305,7 +305,7 @@ namespace app
       // can't be mistaken for pressing Record.
       if (canRecord)
       {
-      const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+      const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / tok::audio_node_btn_w_ratio;
       ImGui::BeginDisabled(!recording && !audioOn);
       if (ActionButton::Draw(recording ? "Stop##audioOutRec" : "Record##audioOutRec", ImVec2(btnW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
@@ -379,8 +379,8 @@ namespace app
       const bool recording = n->IsRecording();
       const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
       const bool canRecord = !Platform::PluginModeActive(); // inside a DAW the DAW records
-      const float half = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
-      const float third = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+      const float half = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / tok::audio_node_half_ratio;
+      const float third = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::audio_node_spatial_export_panel_ratio) / tok::audio_node_third_ratio;
       if (canRecord)
       {
       ImGui::BeginDisabled(recording);
@@ -526,9 +526,9 @@ namespace app
          const float w = gAudioContentW;
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
-         const float gap = 5.0f;
+         const float gap = tok::space_1_25;
          const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
-         const float waveW = std::max(70.0f, w - octW - semiW - fineW - gap * 3.0f);
+         const float waveW = std::max(tok::audio_node_analog_body_bound, w - octW - semiW - fineW - gap * tok::audio_node_analog_body_ratio);
          ImGui::PushID(idBase);
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          AudioBareDropdown(waveId.c_str(), waveList, wave, [&wave](int i) { PushUndoCheckpoint(); wave = i; }, waveW);
@@ -543,13 +543,13 @@ namespace app
          ImGui::PopID();
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
-         ImGui::Dummy(ImVec2(0.0f, 4.0f));
+         ImGui::Dummy(ImVec2(0.0f, tok::audio_node_analog_body_dummy_h));
       };
       tuningHeader("1", n->wave1, n->fine1, n->semi1, n->oct1);
       tuningHeader("2", n->wave2, n->fine2, n->semi2, n->oct2);
       {
          // Row 3: Osc 1 Vol, Osc 2 Vol, Sync & Analog switches
-         AudioKnobRow row(4);
+         AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
          row.Knob("vol 1", &n->osc1Vol, 0.0f, 1.0f, "%.2f");
          row.Knob("vol 2", &n->osc2Vol, 0.0f, 1.0f, "%.2f");
          row.Checkbox("sync", &n->sync);
@@ -558,7 +558,7 @@ namespace app
       }
       {
          // Row 4: pw, voices, spread, fm
-         AudioKnobRow row(4);
+         AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
          row.Knob("pw", &n->pw1, 0.01f, 0.99f, "%.2f");
          row.Knob("voices", &n->voices, 1.0f, 7.0f, "%.0f");
          ImGui::BeginDisabled((n->voices < 1.5f) && !gParamRegisterOnly);
@@ -569,7 +569,7 @@ namespace app
       }
       {
          // Row 5: detune, mix (default 50%), sub, noise
-         AudioKnobRow row(4);
+         AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
          row.Knob("detune", &n->detune, 0.0f, 100.0f, "%.1f c");
          row.Knob("mix", &n->oscMix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("sub", &n->sub, 0.0f, 1.0f, "%.2f");
@@ -578,13 +578,13 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_analog_body_dummy_h_2));
 
       // Filter section
       BeginAudioSection("filter");
       {
          const bool filterOff = (n->filterType == kAFilterOff);
-         AudioKnobRow row(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
+         AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row.DropdownKnob("analogFlt", filterNames, n->filterType,
                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
                           "filter", &n->cutoff, 20.0f, 18000.0f, "%.0f Hz", filterOff, kKnobLarge, true);
@@ -597,7 +597,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_analog_body_dummy_h_2));
 
       // Envelope section (interactive ADSR curve panel with parameter sliders)
       ImGui::PushID("amp");
@@ -606,12 +606,12 @@ namespace app
                         tok::Role(tok::col::accent_alt, 245));
       ImGui::PopID();
 
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_analog_body_dummy_h_2));
 
       // Output section
       BeginAudioSection("output");
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
          if (noteDriven)
             ImGui::BeginDisabled();
          row.Knob("freq", &n->freq, 20.0f, 8000.0f, "%.0f Hz", kKnobLarge);

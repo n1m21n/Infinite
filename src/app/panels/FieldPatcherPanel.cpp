@@ -50,15 +50,15 @@ namespace app
 bool gFieldPatcherOpen = false;
 ImVec2 gFieldPatcherRectMin, gFieldPatcherRectMax;
 int gFieldPatcherDock = 0;
-float gFieldPatcherHeight = 380.0f;
+float gFieldPatcherHeight = tok::field_patcher_height;
 bool gFieldPatcherClaimedKeys = false;
 bool gFieldPatcherMaximised = false;
-float gFieldPatcherShownHeight = 380.0f;
+float gFieldPatcherShownHeight = tok::field_patcher_shown_height;
 
 namespace
 {
-   constexpr float kMinHeight = 220.0f;
-   constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
+   constexpr float kMinHeight = tok::field_patcher_min_height;
+   constexpr float kInspectorW = UiDensity::kInspectorW + tok::field_patcher_inspector_w_ratio * tok::space_2;   // one compact strip
    constexpr int kPinStride = 128; // pin ids: box * stride + 1 + inlet, outlets from +64
 
    // ---- hosts: the three Field nodes a page can show
@@ -606,7 +606,7 @@ namespace
       State& s = S();
       if (s.clipBoxes.empty())
          return 0;
-      float minX = 1e9f, minY = 1e9f;
+      float minX = tok::field_patcher_min_x, minY = tok::field_patcher_min_y;
       for (const Field::BoxNode& b : s.clipBoxes)
       {
          minX = std::min(minX, b.x);
@@ -673,8 +673,8 @@ namespace
    {
       box = id / kPinStride;
       const int r = id % kPinStride;
-      out = r >= 64;
-      pin = out ? r - 64 : r - 1;
+      out = r >= tok::field_patcher_out_limit;
+      pin = out ? r - tok::field_patcher_pin_gap : r - 1;
    }
 
    ImU32 KindCol(Field::ValueKind k, float a = 1.0f)
@@ -763,7 +763,7 @@ namespace
          s.search[0] = 0; // a stale query from last time would open on an empty list
          UiInteract::FocusHere();
       }
-      ImGui::Dummy(ImVec2(260.0f, 0.0f));
+      ImGui::Dummy(ImVec2(tok::field_patcher_pick_menu_dummy_w, 0.0f));
       LibraryParts::SearchField("fpSearch", T("Search boxes"), s.search, sizeof(s.search));
       const bool enter = Keymap::Enter(false);
       MenuParts::Separator();
@@ -800,8 +800,8 @@ namespace
          return (family < 0 || (int)spec.family == family) && spec.id != "assign_var" && spec.id != "ident";
       };
       // The list scrolls in a window of about ten rows, so the menu never runs off the screen.
-      const float rowH = ImGui::GetTextLineHeightWithSpacing() + 4.0f;
-      ImGui::BeginChild("##fpPickList", ImVec2(260.0f, rowH * 10.0f), false);
+      const float rowH = ImGui::GetTextLineHeightWithSpacing() + tok::space_1;
+      ImGui::BeginChild("##fpPickList", ImVec2(tok::field_patcher_pick_menu_begin_child_w, rowH * tok::field_patcher_pick_menu_ratio), false);
       if (s.search[0] == 0 && family < 0)
       {
          for (int f = 0; f < (int)Field::BoxFamily::Count && !added; f++)
@@ -849,7 +849,7 @@ namespace
          State& rs = S();
          if (rs.boxNameFocus)
             UiInteract::FocusHere(), rs.boxNameFocus = false;
-         ImGui::SetNextItemWidth(140.0f);
+         ImGui::SetNextItemWidth(tok::field_patcher_box_set_next_item_width_w);
          const bool enter = FieldWell::InputText("##fpBoxName", rs.boxNameBuf, sizeof(rs.boxNameBuf), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
          if (enter || ImGui::IsItemDeactivated())
          {
@@ -876,7 +876,7 @@ namespace
       if (b.specId == "number")
       {
          float v = (float)b.numberValue;
-         ImGui::SetNextItemWidth(84.0f);
+         ImGui::SetNextItemWidth(tok::field_patcher_box_set_next_item_width_w_2);
          if (ImGui::DragFloat("##num", &v, 0.01f, 0.0f, 0.0f, UiFmt::Spec::G3))
          {
             b.numberValue = v;
@@ -891,7 +891,7 @@ namespace
       {
          Field::ParamEntry* e = h.params != nullptr ? h.params->Find(b.varName) : nullptr;
          float v = e != nullptr ? e->value : (float)b.numberValue;
-         ImGui::SetNextItemWidth(110.0f);
+         ImGui::SetNextItemWidth(tok::field_patcher_box_set_next_item_width_w_3);
          if (ImGui::SliderFloat("##knob", &v, (float)b.minVal, (float)b.maxVal, UiFmt::Spec::G3))
          {
             if (e != nullptr)
@@ -907,9 +907,9 @@ namespace
       else if (b.specId == "code")
       {
          std::string text = b.rawCode;
-         if (text.size() > 160)
+         if (text.size() > tok::field_patcher_box_limit)
             text = text.substr(0, 160) + " …";
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 240.0f);
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::field_patcher_box_gap);
          ImGui::TextDisabled("%s", text.c_str());
          ImGui::PopTextWrapPos();
       }
@@ -925,17 +925,17 @@ namespace
          if (r < (int)b.inlets.size())
          {
             ed::BeginPin(InPinId(b.id, r), ed::PinKind::Input);
-            ed::PinPivotAlignment(ImVec2(0.0f, 0.5f));
+            ed::PinPivotAlignment(ImVec2(0.0f, tok::field_patcher_box_pin_pivot_alignment_y));
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(KindCol(b.inlets[r].kind)), "● %s", b.inlets[r].name.c_str());
             ed::EndPin();
          }
          else
-            ImGui::Dummy(ImVec2(60.0f, ImGui::GetTextLineHeight()));
+            ImGui::Dummy(ImVec2(tok::field_patcher_box_dummy_w, ImGui::GetTextLineHeight()));
          if (r < (int)b.outlets.size())
          {
-            FormParts::Inline(0.0f, 24.0f);
+            FormParts::Inline(0.0f, tok::field_patcher_box_inline_layout);
             ed::BeginPin(OutPinId(b.id, r), ed::PinKind::Output);
-            ed::PinPivotAlignment(ImVec2(1.0f, 0.5f));
+            ed::PinPivotAlignment(ImVec2(1.0f, tok::field_patcher_box_pin_pivot_alignment_y));
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(KindCol(b.outlets[r].kind)), "%s ●", b.outlets[r].name.c_str());
             ed::EndPin();
          }
@@ -1011,7 +1011,7 @@ namespace
          if (ImGui::IsWindowHovered() && (ImGui::GetIO().MouseWheel != 0.0f || ImGui::GetIO().MouseWheelH != 0.0f || p.panLeft ||
                                           ImGui::IsMouseDown(ImGuiMouseButton_Right) || ImGui::IsMouseDown(ImGuiMouseButton_Middle)))
             p.autoFit = false;
-         else if (std::fabs(size.x - p.fitW) > 2.0f || std::fabs(size.y - p.fitH) > 2.0f)
+         else if (std::fabs(size.x - p.fitW) > tok::field_patcher_canvas_limit || std::fabs(size.y - p.fitH) > tok::field_patcher_canvas_limit)
          {
             ed::NavigateToContent(0.0f);
             p.fitW = size.x;
@@ -1078,7 +1078,7 @@ namespace
          for (Field::BoxNode& b : p.graph.boxes)
          {
             const ImVec2 at = ed::GetNodePosition(b.id);
-            if (std::fabs(at.x - b.x) > 0.5f || std::fabs(at.y - b.y) > 0.5f)
+            if (std::fabs(at.x - b.x) > tok::field_patcher_canvas_limit_2 || std::fabs(at.y - b.y) > tok::field_patcher_canvas_limit_2)
             {
                b.x = at.x;
                b.y = at.y;
@@ -1114,10 +1114,10 @@ namespace
          else if (cmd && Keymap::KeyPressed(Keymap::Act::Duplicate) && !sel.empty())
          {
             CopyBoxes(p, sel);
-            ImVec2 tl(1e9f, 1e9f);
+            ImVec2 tl(tok::field_patcher_canvas_x, tok::field_patcher_canvas_y);
             for (const Field::BoxNode& b : s.clipBoxes)
                tl = ImVec2(std::min(tl.x, b.x), std::min(tl.y, b.y));
-            changed = PasteBoxes(p, ImVec2(tl.x + 40.0f, tl.y + 40.0f)) > 0;
+            changed = PasteBoxes(p, ImVec2(tl.x + tok::field_patcher_canvas_gap, tl.y + tok::field_patcher_canvas_gap)) > 0;
          }
          else if (cmd && Keymap::KeyPressed(Keymap::Act::SelectAllCmd))
             SelectAllBoxes(p);
@@ -1206,10 +1206,10 @@ namespace
          if (MenuParts::Item(T("Duplicate"), nullptr, false, !sel.empty()))
          {
             CopyBoxes(p, sel);
-            ImVec2 tl(1e9f, 1e9f);
+            ImVec2 tl(tok::field_patcher_canvas_x, tok::field_patcher_canvas_y);
             for (const Field::BoxNode& b : s.clipBoxes)
                tl = ImVec2(std::min(tl.x, b.x), std::min(tl.y, b.y));
-            if (PasteBoxes(p, ImVec2(tl.x + 40.0f, tl.y + 40.0f)) > 0)
+            if (PasteBoxes(p, ImVec2(tl.x + tok::field_patcher_canvas_gap, tl.y + tok::field_patcher_canvas_gap)) > 0)
                Commit(p, h, "Duplicate Boxes"), changed = false;
          }
          MenuParts::Separator();
@@ -1250,7 +1250,7 @@ namespace
          for (Field::BoxNode& b : p.graph.boxes)
          {
             const ImVec2 at = ed::GetNodePosition(b.id);
-            if (at.x < 1e8f)
+            if (at.x < tok::field_patcher_canvas_limit_3)
             {
                b.x = at.x;
                b.y = at.y;
@@ -1341,7 +1341,7 @@ namespace
             s.codeBufFor = src;
          }
          const ImVec2 avail = ImGui::GetContentRegionAvail();
-         FieldWell::InputTextMultiline("##fpCode", &s.codeBuf, ImVec2(avail.x, std::max(60.0f, avail.y)), ImGuiInputTextFlags_WordWrap);
+         FieldWell::InputTextMultiline("##fpCode", &s.codeBuf, ImVec2(avail.x, std::max(tok::field_patcher_inspector_bound, avail.y)), ImGuiInputTextFlags_WordWrap);
          s.codeEditing = ImGui::IsItemActive();
          if (ImGui::IsItemDeactivatedAfterEdit() && s.codeBuf != src)
          {
@@ -1373,7 +1373,7 @@ namespace
             if (b->specId == "code")
             {
                const ImVec2 avail = ImGui::GetContentRegionAvail();
-               FieldWell::InputTextMultiline("##fpRaw", &b->rawCode, ImVec2(avail.x, std::max(60.0f, avail.y)), ImGuiInputTextFlags_WordWrap);
+               FieldWell::InputTextMultiline("##fpRaw", &b->rawCode, ImVec2(avail.x, std::max(tok::field_patcher_inspector_bound, avail.y)), ImGuiInputTextFlags_WordWrap);
                if (ImGui::IsItemDeactivatedAfterEdit())
                   Commit(p, h, "Edit Code Box");
             }
@@ -1543,7 +1543,7 @@ namespace
          entries.push_back(std::move(e));
       }
       PagePicker::Options opt;
-      opt.maxW = std::max(1.0f, ImGui::GetContentRegionAvail().x - 3.0f * (tok::control_h + tok::space_1) - 8.0f);
+      opt.maxW = std::max(1.0f, ImGui::GetContentRegionAvail().x - tok::field_patcher_strip_ratio * (tok::control_h + tok::space_1) - tok::space_2);
       opt.canClose = true;
       int closeAt = -1;
       {
@@ -1614,7 +1614,7 @@ namespace
       Page* fp = Front();
       const float tailW = (fp != nullptr ? tile + tok::space_1 : 0.0f) + tile;
       const float freeW = ImGui::GetContentRegionAvail().x - tailW - tok::space_1;
-      if (freeW > 8.0f)
+      if (freeW > tok::field_patcher_strip_limit)
       {
          UiInteract::Hit("##fpStripFree", ImVec2(freeW, tile));
          if (MenuParts::BeginContextItem("##fpStripMenu"))
@@ -1697,7 +1697,7 @@ namespace
       // The free footer: right-click for the dock switch.
       ImGui::SetCursorPosY(y0);
       const float freeW = ImGui::GetContentRegionAvail().x;
-      if (freeW > 8.0f)
+      if (freeW > tok::field_patcher_footer_limit)
       {
          UiInteract::Hit("##fpFooterFree", ImVec2(freeW, ChipButton::Height()));
          if (MenuParts::BeginContextItem("##fpFooterMenu"))
@@ -1778,8 +1778,8 @@ namespace
       const float gap = tok::space_2;
       DrawRail(*p, h, bodyH);
       FormParts::Inline(0.0f, gap);
-      const float inspW = std::min(kInspectorW, avail.x * 0.35f);
-      const float canvasW = std::max(80.0f, avail.x - tok::control_h - inspW - 2.0f * gap);
+      const float inspW = std::min(kInspectorW, avail.x * tok::field_patcher_panel_ratio);
+      const float canvasW = std::max(tok::field_patcher_panel_bound, avail.x - tok::control_h - inspW - tok::field_patcher_panel_ratio_2 * gap);
       ImGui::BeginChild("##fpCanvasWrap", ImVec2(canvasW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       DrawCanvas(*p, h, ImVec2(canvasW, bodyH));
       EndChildSafe();
@@ -1873,25 +1873,25 @@ void FieldPatcherLoadState(const std::string& text)
          nl = text.size();
       const std::string line = text.substr(at, nl - at);
       at = nl + 1;
-      if (line.size() > 2 && line[0] == 's' && line[1] == '\t')
+      if (line.size() > tok::field_patcher_load_state_limit && line[0] == 's' && line[1] == '\t')
       {
          const size_t tab = line.find('\t', 2);
          if (tab == std::string::npos)
             continue;
          last = &AddScratch(unesc(line.substr(2, tab - 2)), unesc(line.substr(tab + 1)));
       }
-      else if (line.size() > 2 && line[0] == 'c' && line[1] == '\t')
+      else if (line.size() > tok::field_patcher_load_state_limit && line[0] == 'c' && line[1] == '\t')
       {
          if (last != nullptr)
             last->color = (unsigned int)std::strtoul(line.c_str() + 2, nullptr, 10);
       }
-      else if (line.size() > 2 && line[0] == 'r' && line[1] == '\t')
+      else if (line.size() > tok::field_patcher_load_state_limit && line[0] == 'r' && line[1] == '\t')
       {
          const size_t tab = line.find('\t', 2);
          if (tab != std::string::npos)
             s.nodeNames[std::strtoull(line.c_str() + 2, nullptr, 10)] = unesc(line.substr(tab + 1));
       }
-      else if (line.size() > 2 && line[0] == 'p' && line[1] == '\t')
+      else if (line.size() > tok::field_patcher_load_state_limit && line[0] == 'p' && line[1] == '\t')
       {
          const uint64_t uid = std::strtoull(line.c_str() + 2, nullptr, 10);
          ShowNodePage(uid);

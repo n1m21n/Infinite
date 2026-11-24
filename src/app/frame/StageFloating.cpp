@@ -95,7 +95,7 @@ int DrawFloating(FrameCtx& fc)
       if (gPatchChangedOnDisk)
       {
          const ImGuiViewport* vp = ImGui::GetMainViewport();
-         ImGui::SetNextWindowPos(ImVec2(vp->GetCenter().x, vp->Pos.y + 48.0f), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+         ImGui::SetNextWindowPos(ImVec2(vp->GetCenter().x, vp->Pos.y + tok::stage_floating_gap), ImGuiCond_Always, ImVec2(tok::stage_floating_set_next_window_pos_x, 0.0f));
          ImGui::SetNextWindowBgAlpha(0.95f);
          if (ImGui::Begin("##patchchangedondisk", nullptr,
                           ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
@@ -179,7 +179,7 @@ int DrawFloating(FrameCtx& fc)
       }
       if (DialogParts::Begin(L("About Infinite")))
       {
-         const float w = 400.0f;
+         const float w = tok::stage_floating_w;
          ImGui::Dummy(ImVec2(w, 0.0f));
          const auto Centered = [&](const char* text, bool dim)
          {
@@ -275,7 +275,7 @@ int DrawFloating(FrameCtx& fc)
       if (DialogParts::Begin(L("Collect diagnostics")))
       {
          static bool sIncludePatch = false;
-         ImGui::Dummy(ImVec2(400.0f, 0.0f));
+         ImGui::Dummy(ImVec2(tok::stage_floating_dummy_w, 0.0f));
          DialogParts::Title(T("Collect diagnostics"));
          DialogParts::Message(T("System info, logs, settings (home folder hidden) and recent crash reports go into one zip on your Desktop. Nothing is sent anywhere."));
          ImGui::Dummy(ImVec2(0.0f, tok::space_2));
@@ -308,7 +308,7 @@ int DrawFloating(FrameCtx& fc)
       }
       if (DialogParts::Begin(L("Save with media")))
       {
-         ImGui::Dummy(ImVec2(420.0f, 0.0f));
+         ImGui::Dummy(ImVec2(tok::stage_floating_dummy_w_2, 0.0f));
          DialogParts::Title(T("Save with media"));
          DialogParts::Message(T("Copies every file this patch reads into a \"<name> media\" folder next to it, and saves the patch pointing there, so the two move together. The originals stay where they are."));
          ImGui::Dummy(ImVec2(0.0f, tok::space_2));
@@ -324,7 +324,7 @@ int DrawFloating(FrameCtx& fc)
          else
          {
             const float rowH = ImGui::GetTextLineHeightWithSpacing();
-            LibraryParts::BeginWell("##media_list", std::min(8.0f, (float)sMediaPlan.size()) * rowH + tok::space_2 * 2.0f);
+            LibraryParts::BeginWell("##media_list", std::min(tok::stage_floating_bound, (float)sMediaPlan.size()) * rowH + tok::space_2 * tok::stage_floating_ratio);
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text);
             const ImU32 dimCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
@@ -398,7 +398,7 @@ int DrawFloating(FrameCtx& fc)
                DialogParts::Message(msg);
                break;
             case UpdateCheck::Status::Failed:
-               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
+               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::stage_floating_gap_2);
                DialogParts::Message(UpdateCheck::LastError().c_str());
                ImGui::PopTextWrapPos();
                break;
@@ -442,7 +442,7 @@ int DrawFloating(FrameCtx& fc)
             }
             else
             {
-               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
+               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::stage_floating_gap_2);
                if (stage == SelfUpdate::Stage::Failed)
                   DialogParts::Message(SelfUpdate::LastError().c_str());
                else if (!inPlace)

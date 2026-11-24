@@ -130,10 +130,10 @@ void DrawCookOverlay()
       if (r.audio) std::snprintf(buf, sizeof buf, "%s cb", UiFmt::PctOf(r.v, 1).c);
       else std::snprintf(buf, sizeof buf, "%s", UiFmt::Ms(r.v).c);
       const ImVec2 ts = font->CalcTextSizeA(kPillText, FLT_MAX, 0.0f, buf);
-      const ImVec2 q0(p2.x - ts.x - 10.0f, p.y - ts.y - 8.0f), q1(p2.x, p.y - 2.0f);
+      const ImVec2 q0(p2.x - ts.x - tok::space_2_5, p.y - ts.y - tok::space_2), q1(p2.x, p.y - tok::space_0_5);
       if (CoveredByWindow(ImVec2((q0.x + q1.x) * 0.5f, (q0.y + q1.y) * 0.5f))) continue;   // pill sits above the node, may be under a window the node is not
       dl->AddRectFilled(q0, q1, pillBg, tok::radius_control);
-      dl->AddText(font, kPillText, ImVec2(q0.x + 5.0f, q0.y + 3.0f), level == 0 ? pillText : (level == 2 ? red : amber), buf);
+      dl->AddText(font, kPillText, ImVec2(q0.x + tok::space_1_25, q0.y + tok::space_0_75), level == 0 ? pillText : (level == 2 ? red : amber), buf);
    }
    dl->PopClipRect();
    for (const Row& r : rows)   // off-screen nodes keep their level

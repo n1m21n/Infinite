@@ -96,17 +96,17 @@ namespace app
 
       // Geometry: [readout] row on top, bars in the middle, L/R captions
       // below; bars sit either side of a centred scale column.
-      const float pad = 10.0f;
-      const float scaleW = 34.0f;
-      const float barW = std::min(36.0f, (w - 2.0f * pad - scaleW) * 0.5f);
-      const float groupW = 2.0f * barW + scaleW;
+      const float pad = tok::space_2_5;
+      const float scaleW = tok::sampler_scale_w;
+      const float barW = std::min(tok::sampler_audio_meter_visualizer_bound, (w - tok::sampler_audio_meter_visualizer_ratio * pad - scaleW) * 0.5f);
+      const float groupW = tok::sampler_group_w_ratio * barW + scaleW;
       const float lx = x + (w - groupW) * 0.5f;
       const float rx = lx + barW + scaleW;
       const float scaleCx = lx + barW + scaleW * 0.5f;
       const float readTop = y + pad;
-      const float readH = textH + 6.0f;
-      const float barTop = readTop + readH + 10.0f;
-      const float barBot = br.y - pad - textH - 6.0f;
+      const float readH = textH + tok::space_1_5;
+      const float barTop = readTop + readH + tok::space_2_5;
+      const float barBot = br.y - pad - textH - tok::space_1_5;
       const float barH = barBot - barTop;
       auto yOf = [&](float db) { return barBot - DbToFrac(db) * barH; };
 
@@ -119,15 +119,15 @@ namespace app
       for (float db : kMinor)
       {
          const float ty = std::floor(yOf(db)) + 0.5f;
-         dl->AddLine(ImVec2(lx + barW + 2.0f, ty), ImVec2(lx + barW + 5.0f, ty), ScopeMidLineCol(), 1.0f);
-         dl->AddLine(ImVec2(rx - 5.0f, ty), ImVec2(rx - 2.0f, ty), ScopeMidLineCol(), 1.0f);
+         dl->AddLine(ImVec2(lx + barW + tok::space_0_5, ty), ImVec2(lx + barW + tok::space_1_25, ty), ScopeMidLineCol(), tok::sampler_audio_meter_visualizer_stroke);
+         dl->AddLine(ImVec2(rx - tok::space_1_25, ty), ImVec2(rx - tok::space_0_5, ty), ScopeMidLineCol(), tok::sampler_audio_meter_visualizer_stroke);
       }
       for (float db : kLabelled)
       {
          const float ty = std::floor(yOf(db)) + 0.5f;
          const ImU32 lineCol = db == 0.0f ? ScopeMidLineCol() : ScopeGridCol();
-         dl->AddLine(ImVec2(lx, ty), ImVec2(lx + barW, ty), lineCol, 1.0f);
-         dl->AddLine(ImVec2(rx, ty), ImVec2(rx + barW, ty), lineCol, 1.0f);
+         dl->AddLine(ImVec2(lx, ty), ImVec2(lx + barW, ty), lineCol, tok::sampler_audio_meter_visualizer_stroke);
+         dl->AddLine(ImVec2(rx, ty), ImVec2(rx + barW, ty), lineCol, tok::sampler_audio_meter_visualizer_stroke);
          char buf[8];
          snprintf(buf, sizeof(buf), "%s", UiFmt::F0(db).c);
          const ImVec2 ts = textSize(buf);
@@ -161,7 +161,7 @@ namespace app
          // LED segmentation: a 1px gap every 3px, in the scope background.
          const ImU32 gapCol = withAlpha(ScopeBgCol(), 150);
          for (float gy = barBot - 3.0f; gy > barTop; gy -= 3.0f)
-            dl->AddLine(ImVec2(bx, gy), ImVec2(bx + barW, gy), gapCol, 1.0f);
+            dl->AddLine(ImVec2(bx, gy), ImVec2(bx + barW, gy), gapCol, tok::sampler_audio_meter_visualizer_stroke);
          const float holdDb = LevelToDb(hold);
          if (holdDb > -60.0f)
          {
@@ -194,7 +194,7 @@ namespace app
       // Channel captions under the bars; "dB" under the scale.
       auto caption = [&](float cx, const char* s) {
          const ImVec2 ts = textSize(s);
-         text(ImVec2(cx - ts.x * 0.5f, barBot + 5.0f), ScopeTextCol(), s);
+         text(ImVec2(cx - ts.x * 0.5f, barBot + tok::space_1_25), ScopeTextCol(), s);
       };
       caption(lx + barW * 0.5f, "L");
       caption(rx + barW * 0.5f, "R");
@@ -236,13 +236,13 @@ namespace app
          snprintf(stat, sizeof(stat), "no signal");
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_audio_meter_body_dummy_h));
 
       // Three kKnobLarge knob rows tall - 1.5x Limiter's gain-reduction
       // meter (two rows, DrawLimiterBody). At the Limiter's height the
       // -48..0 span was too short to read a level against the ticks.
-      const float rowH = kKnobLarge + 4.0f + ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y;
-      const float meterH = 3.0f * rowH;
+      const float rowH = kKnobLarge + tok::space_1 + ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y;
+      const float meterH = tok::sampler_meter_h_ratio * rowH;
       DrawAudioMeterVisualizer(n, gAudioContentX, ImGui::GetCursorScreenPos().y, gAudioContentW, meterH);
 
       EndAudioBody();
@@ -260,7 +260,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%s \xc2\xb7 %s", UiFmt::DbOffset(n->gainDb).c,
                n->Level() > 0.0005f ? "passing" : "silent");
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_gain_body_dummy_h));
 
       AudioKnobRow row(1, kKnobLarge);
       row.Knob("gain", &n->gainDb, -60.0f, 12.0f, "%.1f dB", kKnobLarge, /*dbTaper=*/true);
@@ -275,7 +275,7 @@ namespace app
       const int pctB = (int)std::lround(n->blend * 100.0f);
       snprintf(stat, sizeof(stat), "A <-> B   %s", UiFmt::Pct(pctB).c);
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_blend_audio_body_dummy_h));
 
       AudioKnobRow row(1, kKnobLarge);
       row.Knob("blend", &n->blend, 0.0f, 1.0f, "%.2f", kKnobLarge);
@@ -350,7 +350,7 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       // Load / Record / Audition share the row with the three 44 pt mode toggles at its right edge.
-      const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 5.0f - 44.0f * 3.0f) / 3.0f;
+      const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::sampler_body_ratio - tok::sampler_body_ratio_2 * tok::sampler_body_ratio_3) / tok::sampler_third_w_ratio;
       if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
@@ -416,8 +416,8 @@ namespace app
       // control in this file already anchors off the fixed content width
       // for exactly this reason.
       FormParts::Inline();
-      const float toggleW = 44.0f;
-      const float modsW = toggleW * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+      const float toggleW = tok::sampler_toggle_w;
+      const float modsW = toggleW * tok::sampler_mods_w_ratio + ImGui::GetStyle().ItemSpacing.x * tok::sampler_mods_w_ratio_2;
       const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - modsW, rowScreenPos.y));
       bool loopBool = n->loop;
@@ -465,9 +465,9 @@ namespace app
          ImGui::TextColored(tok::RoleV4(tok::col::text_secondary), "%s", status);
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_body_dummy_h));
       DrawSamplerWaveform(n, 140.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_body_dummy_h));
 
       DrawSamplerParamGrid(n);
 
@@ -512,7 +512,7 @@ namespace app
             partIdx = i;
 
       const float gap = ImGui::GetStyle().ItemSpacing.x;
-      const float thirdW3 = (AudioFullWidth() - gap * 2.0f) / 3.0f;
+      const float thirdW3 = (AudioFullWidth() - gap * tok::sampler_generate_samples_body_ratio) / tok::sampler_third_w3_ratio;
       AudioBareDropdown("genPart", partNames, partIdx, [n](int i) { PushUndoCheckpoint(); n->part = (int)kParts[i]; }, thirdW3);
       if (ImGui::IsItemHovered())
          SetAudioReadout("part", "synths, keys, leads, pads, plucks, textures, bass, drums, kicks, snares, hats, toms, percussion, fx or foley");
@@ -579,7 +579,7 @@ namespace app
 
       {
          // loop / rev / p-p, the sampler's own playback toggles, in thirds.
-         const float thirdW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
+         const float thirdW = (AudioFullWidth() - gap * tok::sampler_generate_samples_body_ratio) / tok::sampler_third_w_ratio;
          bool loopBool = n->loop, reverseBool = n->reverse, pingpongBool = n->pingpong;
          if (AudioToggleButton("loop##genLoop", &loopBool, thirdW))
          {
@@ -600,18 +600,18 @@ namespace app
          }
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_generate_samples_body_dummy_h));
       if (state == State::Empty || state == State::Failed || (state == State::Generating && n->waveformCacheCount == 0))
       {
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         ImGui::Dummy(ImVec2(AudioFullWidth(), 140.0f));
-         EmptyState::Draw(p, ImVec2(p.x + AudioFullWidth(), p.y + 140.0f),
+         ImGui::Dummy(ImVec2(AudioFullWidth(), tok::sampler_generate_samples_body_dummy_h_2));
+         EmptyState::Draw(p, ImVec2(p.x + AudioFullWidth(), p.y + tok::sampler_generate_samples_body_gap),
                           state == State::Generating ? T("Generating") : state == State::Failed ? T("Could not make one") : T("No sample yet"),
                           state == State::Failed ? T("Generate again") : state == State::Generating ? nullptr : T("Pick a part and generate"));
       }
       else
          DrawSamplerWaveform(n, 140.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_generate_samples_body_dummy_h));
 
       DrawSamplerParamGrid(n);
 
@@ -676,7 +676,7 @@ namespace app
 
       // Button strip - the one deliberate full-width row (P1's exception).
       // Load / Record / Audition share the row with the three 44 pt mode toggles at its right edge.
-      const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 5.0f - 44.0f * 3.0f) / 3.0f;
+      const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::sampler_slicer_body_ratio - tok::sampler_slicer_body_ratio_2 * tok::sampler_slicer_body_ratio_3) / tok::sampler_third_w_ratio;
       if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
@@ -711,7 +711,7 @@ namespace app
 
       FormParts::Inline();
       ImGui::BeginDisabled(n->FileName().empty() || n->sliceBy != 0);
-      if (ActionButton::Draw("re-slice", ImVec2(90, 0)))
+      if (ActionButton::Draw("re-slice", ImVec2(tok::sampler_slicer_body_draw_x, 0)))
       {
          PushUndoCheckpoint();
          n->ReSlice();
@@ -720,9 +720,9 @@ namespace app
       if (ImGui::IsItemHovered())
          SetAudioReadout("#", "re-runs transient detection at the current sensitivity");
 
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_slicer_body_dummy_h));
       DrawSlicerWaveform(n, 140.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_slicer_body_dummy_h));
 
       const bool onsetMode = (n->sliceBy == 0);
       const float halfW = AudioHalfWidth();
@@ -823,7 +823,7 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       // Load / Record / Audition share the row with the three 44 pt mode toggles at its right edge.
-      const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 5.0f - 44.0f * 3.0f) / 3.0f;
+      const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::sampler_paul_stretch_body_ratio - tok::sampler_paul_stretch_body_ratio_2 * tok::sampler_paul_stretch_body_ratio_3) / tok::sampler_third_w_ratio;
       if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
@@ -855,7 +855,7 @@ namespace app
       }
 
       FormParts::Inline();
-      const float toggleW = 44.0f;
+      const float toggleW = tok::sampler_toggle_w;
       const float modsW = toggleW;
       const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - modsW, rowScreenPos.y));
@@ -866,9 +866,9 @@ namespace app
          n->loop = loopBool;
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_paul_stretch_body_dummy_h));
       DrawPaulStretchWaveform(n, 130.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_paul_stretch_body_dummy_h));
 
       AudioSlider("stretch", &n->stretch, 1.0f, 1000.0f, "%.1fx", AudioHalfWidth());
       FormParts::Inline();
@@ -954,7 +954,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::sampler_molder_waveform_stroke);
 
       if (hasSample)
       {
@@ -963,8 +963,8 @@ namespace app
          {
             const float x = origin.x + w * (float)i / (float)count;
             const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
+            const float top = midY - n->waveformMax[i] * h * tok::sampler_top_ratio;
+            const float bottom = midY - n->waveformMin[i] * h * tok::sampler_bottom_ratio;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
                               isLight ? tok::Base(tok::col::accent, 210) : tok::Base(tok::col::accent_9, 210));
          }
@@ -980,12 +980,12 @@ namespace app
 
          const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
          dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 230), 2.0f);
+                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 230), tok::sampler_molder_waveform_stroke_2);
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, 235), 2.0f);
+                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, 235), tok::sampler_molder_waveform_stroke_2);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, 235), 2.0f);
+                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, 235), tok::sampler_molder_waveform_stroke_2);
       }
       else
       {
@@ -996,11 +996,11 @@ namespace app
 
       if (hasSample)
       {
-         const float handleW = 10.0f;
+         const float handleW = tok::sampler_handle_w;
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
 
-         const float grip = 8.0f;
+         const float grip = tok::sampler_grip;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const ImU32 startCol = isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok);
@@ -1087,7 +1087,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ActionButton::Draw("Load...", ImVec2(80, 0)))
+      if (ActionButton::Draw("Load...", ImVec2(tok::sampler_molder_body_draw_x, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -1098,7 +1098,7 @@ namespace app
       }
       FormParts::Inline();
       const bool recording = n->IsRecording();
-      if (ActionButton::Draw(recording ? "Stop##molderRec" : "Record##molderRec", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(recording ? "Stop##molderRec" : "Record##molderRec", ImVec2(tok::sampler_molder_body_draw_x_2, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -1108,37 +1108,37 @@ namespace app
       }
 
       FormParts::Inline();
-      if (ActionButton::Draw("Roll", ImVec2(60, 0)))
+      if (ActionButton::Draw("Roll", ImVec2(tok::sampler_molder_body_draw_x_3, 0)))
       {
          PushUndoCheckpoint();
          n->Roll();
       }
       FormParts::Inline();
-      if (ActionButton::Draw("Iterate", ImVec2(70, 0)))
+      if (ActionButton::Draw("Iterate", ImVec2(tok::sampler_molder_body_draw_x_2, 0)))
       {
          PushUndoCheckpoint();
          n->Iterate();
       }
       FormParts::Inline();
-      if (ActionButton::Draw("Reset##molder", ImVec2(60, 0)))
+      if (ActionButton::Draw("Reset##molder", ImVec2(tok::sampler_molder_body_draw_x_3, 0)))
       {
          PushUndoCheckpoint();
          n->Reset();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_molder_body_dummy_h));
       DrawMolderWaveform(n, 90.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_molder_body_dummy_h_2));
       DrawMolderPartialBars(n, 36.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_molder_body_dummy_h_3));
 
       // loop/reverse/ping-pong right-aligned on their own row, anchored off
       // the fixed declared content width rather than GetContentRegionAvail()
       // - see DrawSamplerBody's comment on why (it overlaps the node-editor
       // resize hit-zone otherwise).
       {
-         const float toggleW = 44.0f;
-         const float modsW = toggleW * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+         const float toggleW = tok::sampler_toggle_w;
+         const float modsW = toggleW * tok::sampler_mods_w_ratio + ImGui::GetStyle().ItemSpacing.x * tok::sampler_mods_w_ratio_2;
          const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - modsW, rowScreenPos.y));
          bool loopBool = n->loop;
@@ -1162,7 +1162,7 @@ namespace app
             n->pingpong = pingpongBool;
          }
       }
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_molder_body_dummy_h));
 
       AudioSlider("chaos", &n->chaos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       FormParts::Inline();
@@ -1216,7 +1216,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::sampler_grain_molder_waveform_stroke);
 
       if (hasSample)
       {
@@ -1225,8 +1225,8 @@ namespace app
          {
             const float x = origin.x + w * (float)i / (float)count;
             const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
+            const float top = midY - n->waveformMax[i] * h * tok::sampler_top_ratio;
+            const float bottom = midY - n->waveformMin[i] * h * tok::sampler_bottom_ratio;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
                               isLight ? tok::Base(tok::col::accent_alt_5, 210) : tok::Base(tok::col::accent_alt, 210));
          }
@@ -1245,7 +1245,7 @@ namespace app
          const float activeFrac = (snap.selfActive && snap.selfPos >= 0.0f) ? snap.selfPos : posClamped;
          const float posX = origin.x + w * std::clamp(activeFrac, 0.0f, 1.0f);
          const ImU32 yellowCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 240);
-         dl->AddLine(ImVec2(posX, origin.y), ImVec2(posX, br.y), yellowCol, 2.0f);
+         dl->AddLine(ImVec2(posX, origin.y), ImVec2(posX, br.y), yellowCol, tok::sampler_grain_molder_waveform_stroke_2);
 
          // Polyphonic white playheads moving at different speeds according to incoming pitch
          for (int v = 0; v < snap.count; v++)
@@ -1256,13 +1256,13 @@ namespace app
             const float px = origin.x + w * std::clamp(voice.position, 0.0f, 1.0f);
             const int alpha = (int)(voice.amp * 255.0f);
             const ImU32 whiteCol = isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha);
-            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), whiteCol, 1.5f);
+            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), whiteCol, tok::sampler_grain_molder_waveform_stroke_3);
          }
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, 235), 2.0f);
+                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, 235), tok::sampler_grain_molder_waveform_stroke_2);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, 235), 2.0f);
+                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, 235), tok::sampler_grain_molder_waveform_stroke_2);
       }
       else
       {
@@ -1273,11 +1273,11 @@ namespace app
 
       if (hasSample)
       {
-         const float handleW = 10.0f;
+         const float handleW = tok::sampler_handle_w;
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
 
-         const float grip = 8.0f;
+         const float grip = tok::sampler_grip;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const ImU32 startCol = isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok);
@@ -1323,7 +1323,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ActionButton::Draw("Load...##grainMolder", ImVec2(80, 0)))
+      if (ActionButton::Draw("Load...##grainMolder", ImVec2(tok::sampler_grain_molder_body_draw_x, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -1334,7 +1334,7 @@ namespace app
       }
       FormParts::Inline();
       const bool recording = n->IsRecording();
-      if (ActionButton::Draw(recording ? "Stop##gmRec" : "Record##gmRec", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(recording ? "Stop##gmRec" : "Record##gmRec", ImVec2(tok::sampler_grain_molder_body_draw_x_2, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -1345,7 +1345,7 @@ namespace app
 
       FormParts::Inline();
       const bool playing = n->IsPlaying();
-      if (ActionButton::Draw(playing ? "Stop##gmAud" : "Audition##gmAud", ImVec2(80, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(playing ? "Stop##gmAud" : "Audition##gmAud", ImVec2(tok::sampler_grain_molder_body_draw_x, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
@@ -1355,8 +1355,8 @@ namespace app
 
       // loop/rev/p-p toggles right-aligned on header row
       FormParts::Inline();
-      const float toggleW = 44.0f;
-      const float modsW = toggleW * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+      const float toggleW = tok::sampler_toggle_w;
+      const float modsW = toggleW * tok::sampler_mods_w_ratio + ImGui::GetStyle().ItemSpacing.x * tok::sampler_mods_w_ratio_2;
       const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - modsW, rowScreenPos.y));
       bool loopBool = n->loop;
@@ -1398,9 +1398,9 @@ namespace app
          ImGui::TextColored(tok::RoleV4(tok::col::text_secondary), "%s", status);
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_grain_molder_body_dummy_h));
       DrawGrainMolderWaveform(n, 130.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_grain_molder_body_dummy_h));
 
       // Row 1: grain | amount
       AudioSlider("grain", &n->grain, 10.0f, 500.0f, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
@@ -1471,7 +1471,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ActionButton::Draw("Load...", ImVec2(80, 0)))
+      if (ActionButton::Draw("Load...", ImVec2(tok::sampler_granular_body_draw_x, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -1482,7 +1482,7 @@ namespace app
       }
       FormParts::Inline();
       const bool recording = n->IsRecording();
-      if (ActionButton::Draw(recording ? "Stop##granRec" : "Record##granRec", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(recording ? "Stop##granRec" : "Record##granRec", ImVec2(tok::sampler_granular_body_draw_x_2, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -1507,9 +1507,9 @@ namespace app
          n->loop = loopBool;
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_granular_body_dummy_h));
       DrawGranularWaveform(n, 130.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_granular_body_dummy_h));
 
       // Row 1: Position & Scan
       if (AudioSlider("pos", &n->position, n->start, n->end, "%.3f", AudioHalfWidth()))
@@ -1628,13 +1628,13 @@ namespace app
          snprintf(header, sizeof(header), "lane %d - %s", lane + 1, DrumPatterns::LaneRole(lane)); // role the groove library gives this lane
       else
       {
-         std::string trimmed = fn.size() > 20 ? fn.substr(0, 19) + "." : fn;
+         std::string trimmed = fn.size() > tok::sampler_trimmed_limit ? fn.substr(0, 19) + "." : fn;
          snprintf(header, sizeof(header), "lane %d - %s", lane + 1, trimmed.c_str());
       }
       BeginAudioSection(header);
 
       {
-         const float btnW = 20.0f;
+         const float btnW = tok::sampler_btn_w;
          const float rowY = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - btnW, rowY));
          const bool clearClicked = ActionButton::Draw("##clearlane", ImVec2(btnW, 0));
@@ -1643,7 +1643,7 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.65f;
+            const float iconSize = (bmax.y - bmin.y) * tok::sampler_icon_size_ratio;
             const ImU32 col = ImGui::IsItemHovered() ? tok::Role(tok::col::state_err) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
             glyph::DrawX(dl, center, iconSize, col);
          }
@@ -1655,7 +1655,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
          char chokeLabel[16];
          snprintf(chokeLabel, sizeof(chokeLabel), n->laneChoke[lane] == 0 ? "off" : "%d", n->laneChoke[lane]);
-         if (NodeDropdownField(chokeLabel, ImVec2(92.0f, 0), "choke"))
+         if (NodeDropdownField(chokeLabel, ImVec2(tok::sampler_drum_lane_card_node_dropdown_field_x, 0), "choke"))
          {
             PushUndoCheckpoint();
             n->laneChoke[lane] = (n->laneChoke[lane] + 1) % 4;
@@ -1664,7 +1664,7 @@ namespace app
       }
 
       DrawDrumLaneWaveform(n, lane, 84.0f);
-      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_lane_card_dummy_h));
 
       // Horizontal sliders, two per row, rather than a knob row - each is
       // shorter than a knob-plus-caption, and the height that frees up goes
@@ -1842,7 +1842,7 @@ namespace app
    {
       float w = minW;
       for (int i = 0; i < count; i++)
-         w = std::max(w, ImGui::CalcTextSize(labels[i]).x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f);
+         w = std::max(w, ImGui::CalcTextSize(labels[i]).x + ImGui::GetStyle().FramePadding.x * tok::sampler_drum_pill_cell_w_ratio + tok::space_1);
       return std::ceil(w);
    }
 
@@ -1863,7 +1863,7 @@ namespace app
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
-            ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(bmax.x - 5.0f, bmin.y + 5.0f), 2.5f,
+            ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(bmax.x - tok::space_1_25, bmin.y + tok::space_1_25), tok::sampler_drum_segmented_pill_r,
                                                         tok::Role(tok::col::role_modulation));
          }
       }
@@ -1905,19 +1905,19 @@ namespace app
          for (int lane = 0; lane < 4; lane++)
          {
             DrawDrumLaneCard(n, lane);
-            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+            ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_body_dummy_h));
          }
          EndAudioColumn();
          BeginAudioColumn(1);
          for (int lane = 4; lane < DrumSequencerNode::kNumLanes; lane++)
          {
             DrawDrumLaneCard(n, lane);
-            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+            ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_body_dummy_h));
          }
          EndAudioColumn();
          EndAudioColumns();
       }
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_body_dummy_h_2));
 
       // ---- groove picker: ONE row. category | groove | < > | A B C pill.
       // The dropdowns share the remaining width, the nav buttons and the part
@@ -1928,10 +1928,10 @@ namespace app
          const float gap = ImGui::GetStyle().ItemSpacing.x;
          static const char* const kParts[3] = { "A", "B", "C" };
          const float pcw = DrumPillCellW(kParts, 3, 24.0f);
-         const float pillW = pcw * 3.0f + 2.0f;
+         const float pillW = pcw * tok::sampler_pill_w_ratio + tok::space_0_5;
          const float navW = pcw;
-         const float dropW = AudioFullWidth() - pillW - navW * 2.0f - gap * 4.0f;
-         const float catW = std::floor(dropW * 0.34f);
+         const float dropW = AudioFullWidth() - pillW - navW * tok::sampler_drop_w_ratio - gap * tok::sampler_drop_w_ratio_2;
+         const float catW = std::floor(dropW * tok::sampler_drum_sequencer_body_ratio);
          const float grvW = dropW - catW;
          const int curCat = grooveIdx >= 0 ? gl.IndexOfCategory(gl.cats[(size_t)grooveIdx]) : -1;
          const int part = std::clamp(n->patternPart, 0, 2);
@@ -2013,7 +2013,7 @@ namespace app
          if (grooveIdx < 0)
             ImGui::EndDisabled();
       }
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_body_dummy_h_2));
 
       // ---- step grid: the visualizer, and the primary editable control ----
       {
@@ -2026,11 +2026,11 @@ namespace app
          const int page = std::clamp(n->editPage, 0, (steps - 1) / pageSteps);
          const int pageFirst = page * pageSteps;
          const int pageCols = std::min(gridCols, steps - pageFirst);
-         const float toggleW = 24.0f; // the small button's own padding makes it wider than 20, which put S under the first step cell
-         const float gutterW = toggleW * 3.0f + 2.0f * 2.0f + 6.0f; // R | M | S (82px)
-         const float rightGutterW = 32.0f; // Output pin gutter on the right
-         const float rowH = 28.0f;
-         const float rowGap = 2.0f;
+         const float toggleW = tok::sampler_toggle_w_2; // the small button's own padding makes it wider than 20, which put S under the first step cell
+         const float gutterW = toggleW * tok::sampler_gutter_w_ratio + tok::sampler_gutter_w_ratio_2 * tok::sampler_gutter_w_ratio_2 + tok::space_1_5; // R | M | S (82px)
+         const float rightGutterW = tok::sampler_right_gutter_w; // Output pin gutter on the right
+         const float rowH = tok::sampler_row_h;
+         const float rowGap = tok::space_0_5;
          const float cellGap = 1.0f;
          const float stepsW = gAudioBodyW - gutterW - rightGutterW;
          const float cellW = (stepsW - cellGap * (float)(gridCols - 1)) / (float)gridCols;
@@ -2056,14 +2056,14 @@ namespace app
                PushUndoCheckpoint();
                n->RandomizeLane(lane);
             }
-            FormParts::Inline(0.0f, 2.0f);
+            FormParts::Inline(0.0f, tok::sampler_drum_sequencer_body_inline_layout);
             bool muteBool = n->laneMute[lane];
             if (AudioMuteButton("M##mute", &muteBool, toggleW, rowH))
             {
                PushUndoCheckpoint();
                n->laneMute[lane] = muteBool;
             }
-            FormParts::Inline(0.0f, 2.0f);
+            FormParts::Inline(0.0f, tok::sampler_drum_sequencer_body_inline_layout);
             bool soloBool = n->laneSolo[lane];
             if (AudioSoloButton("S##solo", &soloBool, toggleW, rowH))
             {
@@ -2122,7 +2122,7 @@ namespace app
                }
                if (isBar && s > 0)
                   dl->AddLine(ImVec2(x0 - cellGap * 0.5f, y0), ImVec2(x0 - cellGap * 0.5f, y0 + rowH),
-                              isLight ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::edge_lo_2), 1.0f);
+                              isLight ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::edge_lo_2), tok::sampler_drum_sequencer_body_stroke);
                if (s == curStep)
                   StepCell::PlayheadOutline(dl, cMin, cMax);
 
@@ -2135,7 +2135,7 @@ namespace app
             const int pinId = gn.OutputPinId(1 + lane);
 
             ed::BeginPin(pinId, ed::PinKind::Output);
-            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            ed::PinPivotAlignment(ImVec2(tok::sampler_drum_sequencer_body_pin_pivot_alignment_x, tok::sampler_drum_sequencer_body_pin_pivot_alignment_y));
             const ImVec2 pinCenter(pinX, pinY);
             const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
@@ -2150,8 +2150,8 @@ namespace app
             gDrumGridDrag.active = false;
 
          ImGui::SetCursorScreenPos(
-            ImVec2(origin.x, origin.y + (float)DrumSequencerNode::kNumLanes * (rowH + rowGap) + 4.0f));
-         ImGui::Dummy(ImVec2(gAudioBodyW, 1.0f));
+            ImVec2(origin.x, origin.y + (float)DrumSequencerNode::kNumLanes * (rowH + rowGap) + tok::space_1));
+         ImGui::Dummy(ImVec2(gAudioBodyW, tok::sampler_drum_sequencer_body_dummy_h_3));
 
          // ---- grid stat line: left readout, compact '1-16 | 17-32' pill
          // right-aligned. Always drawn (greyed via BeginDisabled at <= 16
@@ -2160,7 +2160,7 @@ namespace app
          {
             static const char* const kPages[2] = { "1-16", "17-32" };
             const float pgw = DrumPillCellW(kPages, 2, 24.0f);
-            const float pillW = pgw * 2.0f + 1.0f;
+            const float pillW = pgw * tok::sampler_pill_w_ratio_2 + 1.0f;
             const bool paged = steps > pageSteps;
             const int playPage = (n->run && paged) ? curStep / pageSteps : -1;
             const float startX = ImGui::GetCursorPosX();
@@ -2177,7 +2177,7 @@ namespace app
                ImGui::EndDisabled();
          }
       }
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_body_dummy_h_2));
 
       // ---- global controls: rate + 3 pattern knobs on top, then the four
       // offset knobs that compose on top of every lane's own value
@@ -2189,7 +2189,7 @@ namespace app
       // already does, so it was folded away rather than kept as a
       // confusable second control with the same effect.
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(tok::sampler_drum_sequencer_body_audio_knob_row_layout);
          row.Dropdown("rate", MusicTime::RateDivisionList(), n->rate,
                       [n](int i) { PushUndoCheckpoint(); n->rate = i; });
          row.KnobInt("steps", &n->numSteps, 1, DrumSequencerNode::kMaxSteps);
@@ -2198,17 +2198,17 @@ namespace app
          row.End();
       }
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(tok::sampler_drum_sequencer_body_audio_knob_row_layout);
          row.Knob("transient", &n->globalTransient, -1.0f, 1.0f, "%.2f");
          row.Knob("decay", &n->globalDecay, -1.0f, 1.0f, "%.2f");
          row.Knob("pitch", &n->globalPitch, -24.0f, 24.0f, "%.1f st");
          row.Knob("pan", &n->globalPan, -1.0f, 1.0f, "%.2f");
          row.End();
       }
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_body_dummy_h_2));
       {
          const float gap = ImGui::GetStyle().ItemSpacing.x;
-         const float btnW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
+         const float btnW = (AudioFullWidth() - gap * tok::sampler_drum_sequencer_body_ratio_2) / tok::sampler_btn_w_ratio;
          AudioToggleButton(n->run ? "Stop##drumrun" : "Run##drumrun", &n->run, btnW);
          FormParts::Inline();
          if (ActionButton::Draw("Randomise", ImVec2(btnW, 0)))
@@ -2311,7 +2311,7 @@ namespace app
       AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::sampler_looper_wave_stroke);
 
       const float len = n->LengthSeconds();
       const float tgt = n->TargetSeconds();
@@ -2335,11 +2335,11 @@ namespace app
                const bool isBar = std::fmod((double)b, bar) < 1e-6;
                const ImU32 tc = isLight ? IM_COL32(60, 70, 100, isBar ? 90 : 55) : IM_COL32(200, 210, 235, isBar ? 70 : 38);
                if (isBar)
-                  dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), tc, 1.0f);
+                  dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), tc, tok::sampler_looper_wave_stroke);
                else
                {
-                  dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + 6.0f), tc, 1.0f);
-                  dl->AddLine(ImVec2(x, br.y - 6.0f), ImVec2(x, br.y), tc, 1.0f);
+                  dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + tok::space_1_5), tc, tok::sampler_looper_wave_stroke);
+                  dl->AddLine(ImVec2(x, br.y - tok::space_1_5), ImVec2(x, br.y), tc, tok::sampler_looper_wave_stroke);
                }
             }
          }
@@ -2355,9 +2355,9 @@ namespace app
             if (total * (float)c / (float)LooperNode::kWaveCols >= len)
                break;
             const float x = origin.x + colW * (float)c;
-            const float top = midY - n->waveMax[c] * h * 0.45f;
-            const float bot = midY - n->waveMin[c] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, std::min(top, midY - 0.5f)), ImVec2(x + std::max(1.0f, colW), std::max(bot, midY + 0.5f)), col);
+            const float top = midY - n->waveMax[c] * h * tok::sampler_top_ratio;
+            const float bot = midY - n->waveMin[c] * h * tok::sampler_bot_ratio;
+            dl->AddRectFilled(ImVec2(x, std::min(top, midY - tok::px_align)), ImVec2(x + std::max(1.0f, colW), std::max(bot, midY + tok::px_align)), col);
          }
       }
 
@@ -2365,14 +2365,14 @@ namespace app
       {
          const float x = origin.x + w * std::clamp(n->Position01(), 0.0f, 1.0f);
          dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y),
-                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 240), 2.0f);
+                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 240), tok::sampler_looper_wave_stroke_2);
       }
       else if (st == LooperNode::kRecording)
       {
          const float f = tgt > 0.0f ? std::clamp(len / tgt, 0.0f, 1.0f) : 1.0f;
          const float x = origin.x + w * f;
          dl->AddRectFilled(origin, ImVec2(x, br.y), IM_COL32(220, 70, 70, isLight ? 26 : 34));
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), recCol, 2.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), recCol, tok::sampler_looper_wave_stroke_2);
       }
 
       if (st == LooperNode::kEmpty)
@@ -2404,7 +2404,7 @@ namespace app
          const bool dubActive = st == LooperNode::kOverdubbing;
          const float gapX = ImGui::GetStyle().ItemSpacing.x;
          const float cellW = (gAudioContentW + gapX) / (float)LooperNode::kNumButtons;
-         const float btnW = std::min(70.0f, cellW - 16.0f - gapX);
+         const float btnW = std::min(tok::sampler_looper_body_bound, cellW - tok::space_4 - gapX);
          const float x0 = gAudioContentX;
          const float y0 = ImGui::GetCursorScreenPos().y;
          const float rowH = ImGui::GetFrameHeight();
@@ -2423,9 +2423,9 @@ namespace app
          ImGui::Dummy(ImVec2(gAudioContentW, rowH));
       }
 
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_looper_body_dummy_h));
       DrawLooperWave(n, 140.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_looper_body_dummy_h));
 
       // Same rows, ranges and formats as the Sampler. Draw order is the pin
       // numbering: append only.
@@ -2440,7 +2440,7 @@ namespace app
       AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
 
       {
-         AudioKnobRow row(3, 20.0f, 8.0f, false);
+         AudioKnobRow row(tok::sampler_looper_body_audio_knob_row_layout, tok::sampler_looper_body_audio_knob_row_layout_2, tok::sampler_looper_body_audio_knob_row_layout_3, false);
          std::vector<std::string> takeOptions;
          takeOptions.push_back("free");
          for (const std::string& s : MusicTime::RateDivisionList())
@@ -2650,7 +2650,7 @@ namespace app
          {
             for (int col = 0; col < 4; col++)
             {
-               const int pad = (3 - row) * 4 + col;
+               const int pad = (tok::sampler_mpc_body_gap - row) * tok::sampler_pad_ratio + col;
                char id[16];
                snprintf(id, sizeof(id), "pad%d", pad + 1);
                ImGui::SetCursorScreenPos(ImVec2(x0 + (float)col * (cellW + gap), y0 + (float)row * (side + gap)));
@@ -2676,10 +2676,10 @@ namespace app
                         fill = isLight ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::edge_lo);
                      if (lit)
                         fill = green;
-                     dl->AddRectFilled(mn, mx, fill, 6.0f);
+                     dl->AddRectFilled(mn, mx, fill, tok::sampler_mpc_body_radius);
                      const ImU32 selCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4);
                      const ImU32 edge = isLight ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::surface_lo_2, 200);
-                     dl->AddRect(mn, mx, isSel ? selCol : edge, 6.0f, 0, isSel ? 2.0f : 1.0f);
+                     dl->AddRect(mn, mx, isSel ? selCol : edge, tok::sampler_mpc_body_radius, 0, isSel ? tok::sampler_mpc_body_stroke : tok::sampler_mpc_body_stroke_2);
 
                      const ImU32 ink = lit ? tok::Base(tok::col::ink_white)
                                            : (isLoaded ? (isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::surface_hi))
@@ -2691,7 +2691,7 @@ namespace app
                      const float lh = AudioLabelFontSize();
                      char num[16];
                      snprintf(num, sizeof(num), "%d", pad + 1);
-                     AudioLabelText(dl, ImVec2(mn.x + 5.0f, mn.y + 3.0f), ink, num);
+                     AudioLabelText(dl, ImVec2(mn.x + tok::space_1_25, mn.y + tok::space_0_75), ink, num);
                      // Mode tag; a synced pad also shows its division ("loop 1/8").
                      // An empty pad has no mode to report yet, so it shows only its number.
                      char tag[32];
@@ -2702,28 +2702,28 @@ namespace app
                      if (isLoaded)
                      {
                         const ImVec2 ts = AudioLabelSize(tag);
-                        AudioLabelText(dl, ImVec2(mx.x - ts.x - 5.0f, mn.y + 3.0f), dim, tag);
+                        AudioLabelText(dl, ImVec2(mx.x - ts.x - tok::space_1_25, mn.y + tok::space_0_75), dim, tag);
                      }
                      if (isLoaded)
                      {
                         // Waveform, drawn as the Sampler draws its own: bars
                         // at 0.45 of the box either side of the mid line, no
                         // auto-gain.
-                        const float wx0 = mn.x + 5.0f, wx1 = mx.x - 5.0f;
-                        const float wTop = mn.y + lh + 7.0f, wBot = mx.y - lh - 7.0f;
+                        const float wx0 = mn.x + tok::space_1_25, wx1 = mx.x - tok::space_1_25;
+                        const float wTop = mn.y + lh + tok::sampler_w_top_gap, wBot = mx.y - lh - 7.0f;
                         AudioViz::Peaks(dl, n->padPeaks[pad], ImVec2(wx0, wTop), wx1 - wx0, wBot - wTop, 0.0, 1.0, lit);
                         const float cur = n->PadCursor(pad);
                         if (n->PadPlaying(pad) && cur >= 0.0f)
                         {
                            const float px = wx0 + (wx1 - wx0) * std::clamp(cur, 0.0f, 1.0f);
-                           dl->AddLine(ImVec2(px, wTop), ImVec2(px, wBot), tok::Role(tok::col::ink_white, 230), 1.5f);
+                           dl->AddLine(ImVec2(px, wTop), ImVec2(px, wBot), tok::Role(tok::col::ink_white, 230), tok::sampler_mpc_body_stroke_3);
                         }
                         std::string nm = n->PadName(pad);
                         const size_t dot = nm.find_last_of('.');
                         if (dot != std::string::npos && dot > 0)
                            nm.resize(dot);
-                        dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 16.0f, mx.y - 1.0f), true);
-                        AudioLabelText(dl, ImVec2(mn.x + 5.0f, mx.y - lh - 4.0f), dim, nm.c_str());
+                        dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - tok::space_4, mx.y - 1.0f), true);
+                        AudioLabelText(dl, ImVec2(mn.x + tok::space_1_25, mx.y - lh - tok::space_1), dim, nm.c_str());
                         dl->PopClipRect();
                      }
                      else
@@ -2734,11 +2734,11 @@ namespace app
                      }
                      // Modulation indicator: an orange dot at the bottom right
                      // of any pad with a bound param (any of its nine).
-                     modDot = ImVec2(mx.x - 8.0f, mx.y - 8.0f);
+                     modDot = ImVec2(mx.x - tok::space_2, mx.y - tok::space_2);
                      if (anyMod)
                      {
-                        dl->AddCircleFilled(modDot, 4.0f, isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
-                        dl->AddCircle(modDot, 4.0f, isLight ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::surface_lo), 12, 1.0f);
+                        dl->AddCircleFilled(modDot, tok::sampler_mpc_body_r, isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
+                        dl->AddCircle(modDot, tok::sampler_mpc_body_r, isLight ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::surface_lo), tok::sampler_mpc_body_segments, 1.0f);
                      }
                      dl->PopClipRect();
                   },
@@ -2764,9 +2764,9 @@ namespace app
             }
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, 4.0f * side + 3.0f * gap));
+         ImGui::Dummy(ImVec2(gAudioContentW, tok::sampler_mpc_body_ratio * side + tok::sampler_mpc_body_ratio_2 * gap));
       }
-      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::sampler_mpc_body_dummy_h));
 
       // Selected pad: header, waveform (also the drop target), Load / Folder /
       // Clear, then Sampler-style slider rows for that pad's params.
@@ -2781,7 +2781,7 @@ namespace app
 
          {
             const float w = AudioFullWidth();
-            const float h = 90.0f;
+            const float h = tok::sampler_h;
             const ImVec2 origin = ImGui::GetCursorScreenPos();
             const ImVec2 br(origin.x + w, origin.y + h);
             n->waveRect[0] = origin.x; n->waveRect[1] = origin.y; n->waveRect[2] = br.x; n->waveRect[3] = br.y;
@@ -2795,7 +2795,7 @@ namespace app
             AudioViz::Fill(dl, origin, br);
             dl->PushClipRect(origin, br, true);
             const float midY = origin.y + h * 0.5f;
-            dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+            dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::sampler_mpc_body_stroke_2);
             if (has)
             {
                AudioViz::Peaks(dl, n->padPeaks[cur], origin, w, h);
@@ -2804,7 +2804,7 @@ namespace app
                {
                   const float px = origin.x + w * std::clamp(at, 0.0f, 1.0f);
                   dl->AddLine(ImVec2(px, origin.y), ImVec2(px, origin.y + h),
-                              tok::U32(isLight ? tok::pal::c_282C38FF : tok::pal::c_FFFFFFEB), 1.5f);
+                              tok::U32(isLight ? tok::pal::c_282C38FF : tok::pal::c_FFFFFFEB), tok::sampler_mpc_body_stroke_3);
                }
                if (hov && !n->padPeaks[cur].Empty())
                {
@@ -2821,9 +2821,9 @@ namespace app
             if (!has && hov)
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          }
-         ImGui::Dummy(ImVec2(0.0f, 6.0f));
+         ImGui::Dummy(ImVec2(0.0f, tok::sampler_mpc_body_dummy_h));
 
-         const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+         const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::sampler_mpc_body_ratio_3) / tok::sampler_third_w_ratio;
          if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
             openLoadPad = cur;
          FormParts::Inline();
@@ -2844,7 +2844,7 @@ namespace app
             n->ClearPad(cur);
          }
          ImGui::EndDisabled();
-         ImGui::Dummy(ImVec2(0.0f, 6.0f));
+         ImGui::Dummy(ImVec2(0.0f, tok::sampler_mpc_body_dummy_h));
 
          // Same rows, ranges and formats as the Sampler; float ids are fixed
          // per (pad, param) so the drawn pad can change without moving a cable.

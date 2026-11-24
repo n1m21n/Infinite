@@ -116,7 +116,7 @@ namespace app
    }
 
 
-   bool DrawMiniCurveWidget(const char* strId, float* curve, float liveInput01 = -1.0f, float width = 50.0f)
+   bool DrawMiniCurveWidget(const char* strId, float* curve, float liveInput01 = -1.0f, float width = tok::mod_matrix_width)
    {
       bool changed = false;
       if (curve == nullptr)
@@ -137,7 +137,7 @@ namespace app
          const float deltaY = ImGui::GetIO().MouseDelta.y;
          if (deltaY != 0.0f)
          {
-            *curve = std::clamp(*curve + deltaY * 0.015f, -1.0f, 1.0f);
+            *curve = std::clamp(*curve + deltaY * tok::mod_matrix_mini_curve_widget_ratio, -1.0f, 1.0f);
             if (std::abs(*curve) < 0.02f)
                *curve = 0.0f;
             changed = true;
@@ -202,17 +202,17 @@ namespace app
 
       const ImU32 bgCol = tok::U32(hovered ? tok::curvebox_bg_hover : tok::curvebox_bg, isLight);
       const ImU32 borderCol = tok::U32(active ? tok::curvebox_border_active : hovered ? tok::curvebox_border_hover : tok::curvebox_border, isLight);
-      dl->AddRectFilled(pos, maxPos, bgCol, 3.0f);
-      dl->AddRect(pos, maxPos, borderCol, 3.0f, 0, 1.0f);
+      dl->AddRectFilled(pos, maxPos, bgCol, tok::mod_matrix_mini_curve_widget_radius);
+      dl->AddRect(pos, maxPos, borderCol, tok::mod_matrix_mini_curve_widget_radius, 0, tok::mod_matrix_mini_curve_widget_stroke);
 
-      const float padX = 4.0f;
-      const float padY = 3.0f;
-      const float plotW = w - padX * 2.0f;
-      const float plotH = h - padY * 2.0f;
+      const float padX = tok::space_1;
+      const float padY = tok::space_0_75;
+      const float plotW = w - padX * tok::mod_matrix_plot_w_ratio;
+      const float plotH = h - padY * tok::mod_matrix_plot_h_ratio;
       const ImVec2 plotMin(pos.x + padX, pos.y + padY);
 
       const ImU32 refCol = tok::U32(tok::curvebox_ref, isLight);
-      dl->AddLine(ImVec2(plotMin.x, plotMin.y + plotH), ImVec2(plotMin.x + plotW, plotMin.y), refCol, 1.0f);
+      dl->AddLine(ImVec2(plotMin.x, plotMin.y + plotH), ImVec2(plotMin.x + plotW, plotMin.y), refCol, tok::mod_matrix_mini_curve_widget_stroke);
 
       auto evalPt = [&](float xNorm) -> ImVec2 {
          const float yNorm = ApplyModulationCurve(xNorm, *curve);
@@ -235,14 +235,14 @@ namespace app
 
       const ImVec2 midPt = evalPt(0.5f);
       const ImU32 dotCol = tok::U32(isCurved ? tok::curve_dot_bent : tok::curve_dot_idle, isLight);
-      dl->AddCircleFilled(midPt, (hovered || active) ? 3.0f : 2.0f, dotCol);
+      dl->AddCircleFilled(midPt, (hovered || active) ? tok::mod_matrix_mini_curve_widget_r : tok::mod_matrix_mini_curve_widget_r_2, dotCol);
 
       if (liveInput01 >= 0.0f && liveInput01 <= 1.0f)
       {
          const ImVec2 livePt = evalPt(liveInput01);
          const ImU32 liveCol = tok::U32(tok::curve_live, isLight);
-         dl->AddCircleFilled(livePt, 3.5f, liveCol);
-         dl->AddCircle(livePt, 3.5f, tok::U32(tok::curve_live_ring, isLight), 0, 1.0f);
+         dl->AddCircleFilled(livePt, tok::mod_matrix_mini_curve_widget_r_3, liveCol);
+         dl->AddCircle(livePt, tok::mod_matrix_mini_curve_widget_r_3, tok::U32(tok::curve_live_ring, isLight), 0, 1.0f);
       }
 
       if (isCurved)
@@ -252,7 +252,7 @@ namespace app
          ImFont* font = ImGui::GetFont();
          const float tinySize = UiType::Px(UiType::Size::Caption);
          const ImU32 valCol = tok::U32(tok::curve_value_text, isLight);
-         dl->AddText(font, tinySize, ImVec2(pos.x + 2.0f, pos.y + 1.0f), valCol, valBuf);
+         dl->AddText(font, tinySize, ImVec2(pos.x + tok::space_0_5, pos.y + 1.0f), valCol, valBuf);
       }
 
       ImGui::PopID();
@@ -272,10 +272,10 @@ namespace app
 
       if (hist.count >= 2)
       {
-         const float padX = 2.0f;
-         const float padY = 2.0f;
-         const float plotW = width - padX * 2.0f;
-         const float plotH = height - padY * 2.0f;
+         const float padX = tok::space_0_5;
+         const float padY = tok::space_0_5;
+         const float plotW = width - padX * tok::mod_matrix_plot_w_ratio;
+         const float plotH = height - padY * tok::mod_matrix_plot_h_ratio;
 
          const int N = hist.count;
          const int start = (hist.head - N + SparklineHistory::kCap) % SparklineHistory::kCap;
@@ -289,10 +289,10 @@ namespace app
             float y = pos.y + padY + (1.0f - val) * plotH;
             ImVec2 pt(x, y);
             if (i > 0)
-               dl->AddLine(prevPt, pt, lineCol, 1.0f);
+               dl->AddLine(prevPt, pt, lineCol, tok::mod_matrix_sparkline_mini_graph_stroke);
             prevPt = pt;
          }
-         dl->AddCircleFilled(prevPt, 2.0f, lineCol);
+         dl->AddCircleFilled(prevPt, tok::mod_matrix_sparkline_mini_graph_r, lineCol);
       }
       ImGui::Dummy(ImVec2(width, height));
    }
@@ -303,7 +303,7 @@ namespace app
    {
       const float cx = std::round(cell.x + cellH * 0.5f);
       const float cy = cell.y + cellH * 0.5f;
-      ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - 1.5f, cy - 8.0f), ImVec2(cx + 1.5f, cy + 8.0f), col, 1.5f);
+      ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - tok::mod_matrix_kind_rail_gap, cy - tok::space_2), ImVec2(cx + tok::mod_matrix_kind_rail_gap, cy + tok::space_2), col, tok::mod_matrix_kind_rail_radius);
    }
 
    // Next column with text baseline aligned to the frame-height controls (Lo/Hi wells, chips) in the same row.
@@ -338,7 +338,7 @@ namespace app
                                        ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
          // Library look: no grid, no zebra; only a hairline under the header. Rows breathe (5 pt cell padding).
          const ImVec4 tcol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(tok::space_2, 5.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(tok::space_2, tok::space_1_25));
          ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(0, 0, 0, 0));
          ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(tcol.x, tcol.y, tcol.z, 0.10f));
          ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, ImVec4(0, 0, 0, 0));
@@ -352,7 +352,7 @@ namespace app
          // for it, so the loop's own target kept receding. Pinning the
          // height to this panel's available height (captured above, before
          // the table exists) gives the loop a stable target to fill to.
-         if (ListRow::BeginTable("##modmatrixtable", 12, flags, ImVec2(0.0f, panelSize.y)))
+         if (ListRow::BeginTable("##modmatrixtable", tok::mod_matrix_table_begin_table_layout, flags, ImVec2(0.0f, panelSize.y)))
          {
             // Fixed, non-resizable widths rather than the stretch/drag
             // behaviour ImGui tables default to - dragging columns around
@@ -371,18 +371,18 @@ namespace app
             const float wCurve = vertical ? 42.0f : 50.0f;
 
             ImGui::TableSetupScrollFreeze(0, 1);
-            ImGui::TableSetupColumn("##en", ImGuiTableColumnFlags_WidthFixed, 18.0f);
+            ImGui::TableSetupColumn("##en", ImGuiTableColumnFlags_WidthFixed, tok::mod_matrix_table_col_w);
             ImGui::TableSetupColumn(L("Source"), ImGuiTableColumnFlags_WidthFixed, wCol);
             ImGui::TableSetupColumn(L("Destination"), ImGuiTableColumnFlags_WidthFixed, wCol);
             ImGui::TableSetupColumn(L("Parameter"), ImGuiTableColumnFlags_WidthFixed, wCol);
             ImGui::TableSetupColumn(L("Value"), ImGuiTableColumnFlags_WidthFixed, wCol);
-            ImGui::TableSetupColumn(L("Confidence"), ImGuiTableColumnFlags_WidthFixed, vertical ? 45.0f : 75.0f);
+            ImGui::TableSetupColumn(L("Confidence"), ImGuiTableColumnFlags_WidthFixed, vertical ? tok::mod_matrix_table_col_w_2 : tok::mod_matrix_table_col_w_3);
             ImGui::TableSetupColumn(L("Lo"), ImGuiTableColumnFlags_WidthFixed, wCol);
             ImGui::TableSetupColumn(L("Hi"), ImGuiTableColumnFlags_WidthFixed, wCol);
-            ImGui::TableSetupColumn("##inv", ImGuiTableColumnFlags_WidthFixed, 30.0f);
+            ImGui::TableSetupColumn("##inv", ImGuiTableColumnFlags_WidthFixed, tok::mod_matrix_table_col_w_4);
             ImGui::TableSetupColumn(L("Curve"), ImGuiTableColumnFlags_WidthFixed, wCurve);
-            ImGui::TableSetupColumn(L("Signal"), ImGuiTableColumnFlags_WidthFixed, vertical ? 42.0f : 55.0f);
-            ImGui::TableSetupColumn("##unbind", ImGuiTableColumnFlags_WidthFixed, 20.0f);
+            ImGui::TableSetupColumn(L("Signal"), ImGuiTableColumnFlags_WidthFixed, vertical ? tok::mod_matrix_table_col_w_5 : tok::mod_matrix_table_col_w_6);
+            ImGui::TableSetupColumn("##unbind", ImGuiTableColumnFlags_WidthFixed, tok::mod_matrix_table_col_w_7);
             {
                UiType::Scope hs(UiType::Size::Body, UiType::Weight::Semibold);
                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tcol.x, tcol.y, tcol.z, 0.6f));
@@ -584,7 +584,7 @@ namespace app
                auto& hist = gModMatrixSparklines[{dstIndex, dstParam}];
                hist.Push(liveSig01);
                DrawSparklineMiniGraph("##sigspark", hist, isPred ? tok::U32(tok::prediction) : tok::U32(tok::modulation),
-                                      vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
+                                      vertical ? 42.0f : tok::mod_matrix_table_draw_sparkline_mini_graph_arg, ImGui::GetFrameHeight());
 
                // Unbind
                NextCell();
@@ -615,7 +615,7 @@ namespace app
                   const ImVec2 bmin = ImGui::GetItemRectMin();
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-                  const float iconSize = (bmax.y - bmin.y) * 0.6f;
+                  const float iconSize = (bmax.y - bmin.y) * tok::mod_matrix_icon_size_ratio;
                   // Unhovered colour blends TextDisabled toward Text rather
                   // than using TextDisabled at full strength: the zebra alt
                   // row (t.text at low alpha) sits closer to TextDisabled's
@@ -626,8 +626,8 @@ namespace app
                   const ImVec4 disabled4 = ImGui::GetStyle().Colors[ImGuiCol_TextDisabled];
                   const ImVec4 text4 = ImGui::GetStyle().Colors[ImGuiCol_Text];
                   const ImU32 idleCol = IM_COL32(
-                     (int)((disabled4.x * 0.6f + text4.x * 0.4f) * 255.0f),
-                     (int)((disabled4.y * 0.6f + text4.y * 0.4f) * 255.0f),
+                     (int)((disabled4.x * tok::mod_matrix_table_ratio + text4.x * tok::mod_matrix_table_ratio_2) * tok::mod_matrix_table_ratio_3),
+                     (int)((disabled4.y * tok::mod_matrix_table_ratio + text4.y * tok::mod_matrix_table_ratio_2) * tok::mod_matrix_table_ratio_3),
                      (int)((disabled4.z * 0.6f + text4.z * 0.4f) * 255.0f),
                      255);
                   const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover) : idleCol;
@@ -740,7 +740,7 @@ namespace app
                auto& histE = gModMatrixSparklines[{dstIndex, dstParam + 2000000}];
                histE.Push(liveExprSig01);
                DrawSparklineMiniGraph("##exprspark", histE, tok::U32(tok::expression),
-                                      vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
+                                      vertical ? 42.0f : tok::mod_matrix_table_draw_sparkline_mini_graph_arg, ImGui::GetFrameHeight());
 
                bool unboundExpr = false;
                NextCell();
@@ -758,7 +758,7 @@ namespace app
                   const ImVec2 bmin = ImGui::GetItemRectMin();
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-                  const float iconSize = (bmax.y - bmin.y) * 0.6f;
+                  const float iconSize = (bmax.y - bmin.y) * tok::mod_matrix_icon_size_ratio;
                   const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover)
                                                             : ImGui::GetColorU32(ImGuiCol_TextDisabled);
                   glyph::DrawX(dl, center, iconSize, col);
@@ -873,7 +873,7 @@ namespace app
                auto& histR = gModMatrixSparklines[{dstIndex, dstParam + 4000000}];
                histR.Push(liveRecSig01);
                DrawSparklineMiniGraph("##recspark", histR, tok::U32(tok::record),
-                                      vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
+                                      vertical ? 42.0f : tok::mod_matrix_table_draw_sparkline_mini_graph_arg, ImGui::GetFrameHeight());
 
                bool unboundRec = false;
                NextCell();
@@ -890,7 +890,7 @@ namespace app
                   const ImVec2 bmin = ImGui::GetItemRectMin();
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-                  const float iconSize = (bmax.y - bmin.y) * 0.6f;
+                  const float iconSize = (bmax.y - bmin.y) * tok::mod_matrix_icon_size_ratio;
                   const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover)
                                                             : ImGui::GetColorU32(ImGuiCol_TextDisabled);
                   glyph::DrawX(dl, center, iconSize, col);
@@ -926,7 +926,7 @@ namespace app
                ImGui::GetScrollMaxX() > 0.0f ? ImGui::GetStyle().ScrollbarSize : 0.0f;
             const float visibleH = ImGui::GetWindowHeight() - scrollbarH;
             float rowH = ImGui::GetTextLineHeightWithSpacing() +
-                         ImGui::GetStyle().CellPadding.y * 2.0f;
+                         ImGui::GetStyle().CellPadding.y * tok::mod_matrix_row_h_ratio;
             // Row 0 is the header: nothing after it means no bindings at all, and the ruled filler gets a message.
             const bool noBindings = ImGui::TableGetRowIndex() <= 0;
             int guard = 0;
@@ -937,7 +937,7 @@ namespace app
                for (int col = 0; col < 12; ++col)
                {
                   NextCell();
-                  ImGui::Dummy(ImVec2(1.0f, ImGui::GetTextLineHeight()));
+                  ImGui::Dummy(ImVec2(tok::mod_matrix_table_dummy_w, ImGui::GetTextLineHeight()));
                }
                const float after = ImGui::GetCursorPosY();
                if (after <= before)
@@ -1117,7 +1117,7 @@ namespace app
    void DrawModMatrixFloating()
    {
       bool open = true;
-      if (BeginFloatingPanel((std::string(T("Modulation Matrix")) + "###modmatrixfloat").c_str(), &open, ImVec2(760.0f, 420.0f)))
+      if (BeginFloatingPanel((std::string(T("Modulation Matrix")) + "###modmatrixfloat").c_str(), &open, ImVec2(tok::mod_matrix_floating_begin_floating_panel_x, tok::mod_matrix_floating_begin_floating_panel_y)))
          DrawModMatrixTable();
       EndFloatingPanel();
       if (!open)

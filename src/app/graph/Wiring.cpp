@@ -1784,9 +1784,9 @@ namespace app
    // ApplyTheme's ed::GetStyle() call above.
    ImVec2 FindFreeSpawnPosition(const ImVec2& center)
    {
-      const float kFootprintW = 260.0f;
-      const float kFootprintH = 300.0f;
-      const float kMargin = 24.0f;
+      const float kFootprintW = 260.0f;  // ui-audit-ok: canvas placement footprint, patch data
+      const float kFootprintH = 300.0f;  // ui-audit-ok: canvas placement footprint, patch data
+      const float kMargin = 24.0f;  // ui-audit-ok: canvas placement footprint, patch data
 
       ed::EditorContext* prevEditor = ed::GetCurrentEditor();
       if (gEditor != nullptr)

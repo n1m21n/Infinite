@@ -105,7 +105,7 @@ namespace app
             static ImVec2 lastPos;
             const double now = ImGui::GetTime();
             const bool chain = now - lastAt < 20.0 && FindNodeByIndex(sLastSpawnIndex) != nullptr;
-            const ImVec2 want = chain ? ImVec2(lastPos.x + 320.0f, lastPos.y) : gViewCenterCanvas;
+            const ImVec2 want = chain ? ImVec2(lastPos.x + 320.0f, lastPos.y) : gViewCenterCanvas;  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
             const ImVec2 at = FindFreeSpawnPosition(want);
             x = at.x, y = at.y;
             lastAt = now, lastPos = at;
@@ -226,7 +226,7 @@ namespace app
          {
             json entry = { { "value", kv.second } };
             // Saved keys carry the member's type letter ("f strength"); the controls and the chat know the bare name.
-            const std::string bare = kv.first.size() > 2 && kv.first[1] == ' ' ? kv.first.substr(2) : kv.first;
+            const std::string bare = kv.first.size() > 2 && kv.first[1] == ' ' ? kv.first.substr(2) : kv.first;  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
             const int param = ParamIndexOfKeyOnNode(*gn, bare);
             if (param >= 0)
                if (const ParamRef* ref = Modulation::Instance().KnownParam(gn->index, param))
@@ -373,12 +373,12 @@ namespace app
          std::string warning;
          if (auto* cw = dynamic_cast<ICookWarningSource*>(gn->node.get()))
             warning = cw->CookWarning();
-         outResult = { {"verts", (long long)m.vertices.size()}, {"tris", (long long)(m.indices.size() / 3)},
+         outResult = { {"verts", (long long)m.vertices.size()}, {"tris", (long long)(m.indices.size() / 3)},  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
                        {"indexCount", (long long)m.indices.size()}, {"nonFinite", nonFinite},
                        {"badIndex", badIndex}, {"points", pc ? (long long)pc->size() : 0LL},
-                       {"pointsBad", cloudBad}, {"curvePoints", cv ? (long long)(cv->points.size() / 3) : 0LL},
+                       {"pointsBad", cloudBad}, {"curvePoints", cv ? (long long)(cv->points.size() / 3) : 0LL},  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
                        {"curveBad", curveBad},
-                       {"maskMismatch", (!m.faceMask.empty() && m.faceMask.size() != m.indices.size() / 3) ? 1 : 0},
+                       {"maskMismatch", (!m.faceMask.empty() && m.faceMask.size() != m.indices.size() / 3) ? 1 : 0},  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
                        {"warning", warning} };
          return true;
       }
@@ -638,14 +638,14 @@ namespace app
             }
             ed::EditorContext* prevEditor = ed::GetCurrentEditor();
             ed::SetCurrentEditor(gEditor);
-            at = ed::GetNodePosition(gn->NodeId()) + ImVec2(24.0f, 48.0f);
+            at = ed::GetNodePosition(gn->NodeId()) + ImVec2(24.0f, 48.0f);  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
             ed::SetCurrentEditor(prevEditor);
          }
          else
             at = FindFreeSpawnPosition(gViewCenterCanvas);
          gDropAtCanvas = true;
          gDropCanvasPos = at;
-         gDropPos = ImVec2(-1e6f, -1e6f); // off every panel, so only the canvas takes it
+         gDropPos = ImVec2(-1e6f, -1e6f); // off every panel, so only the canvas takes it  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
          gDroppedFiles.insert(gDroppedFiles.end(), paths.begin(), paths.end());
          outResult = { { "files", (int)paths.size() } };
          return true;
@@ -952,7 +952,7 @@ namespace app
                {
                   const std::string text = value.get<std::string>();
                   const size_t dot = text.find('.');
-                  if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)
+                  if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
                   {
                      const int at = atoi(text.substr(1, dot - 1).c_str());
                      const std::string field = text.substr(dot + 1);
@@ -1041,7 +1041,7 @@ namespace app
                   {
                      const std::string text = value.get<std::string>();
                      const size_t dot = text.find('.');
-                     if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)
+                     if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
                      {
                         const int at = atoi(text.substr(1, dot - 1).c_str());
                         const std::string field = text.substr(dot + 1);

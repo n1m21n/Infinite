@@ -83,7 +83,7 @@ namespace app
       // The title starts where the tab labels start (window pad + kNavInset), so "Settings" sits over "Appearance".
       constexpr float kNavInset = tok::space_2;
       FloatingWindow::Spec spec;
-      spec.size = ImVec2(740, 560);
+      spec.size = ImVec2(tok::settings_window_x, tok::settings_window_y);
       spec.placeCond = ImGuiCond_Appearing;
       spec.titleInset = kNavInset;
       const bool settingsVisible = FloatingWindow::Begin(L("Settings"), open, spec);
@@ -135,11 +135,11 @@ namespace app
       float navW = 0.0f;
       for (const char* tab : kTabs)
          navW = std::max(navW, ImGui::CalcTextSize(T(tab)).x);
-      navW += kNavInset * 2.0f;
+      navW += kNavInset * tok::settings_nav_w_ratio;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
       // The well's top lines up with the first card's: the body spends two item spacings (Spacing, then the card's
       // lead-in Dummy) before a card's well starts. Tiles sit kPad inside it; a little air between tabs.
-      const float wellTop = ImGui::GetStyle().ItemSpacing.y * 2.0f;
+      const float wellTop = ImGui::GetStyle().ItemSpacing.y * tok::settings_well_top_ratio;
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + wellTop + SectionCard::kPad);
       const ImVec2 oldItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::row_gap);  // tabs on the same 24 + 3 pitch as the setting rows
@@ -180,7 +180,7 @@ namespace app
          const ImVec2 a(navMin.x - pad, navMin.y + wellTop), b(navMax.x + pad, navMax.y - pad);
          SectionCard::Well(a, b);
       }
-      FormParts::Inline(0.0f, ImGui::GetStyle().ItemSpacing.x + SectionCard::kPad * 2.0f);   // nav well, a gap, then the card column
+      FormParts::Inline(0.0f, ImGui::GetStyle().ItemSpacing.x + SectionCard::kPad * tok::settings_window_ratio);   // nav well, a gap, then the card column
       const ImVec2 oldWindowPadding = ImGui::GetStyle().WindowPadding;
       ImGui::GetStyle().WindowPadding = ImVec2(tok::space_4, 0.0f);
       ImGui::BeginChild("##SettingsBody", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
@@ -213,15 +213,15 @@ namespace app
                   ImVec2 p1(p0.x + sz, p0.y + sz);
                   const CategoryColors::Color& c = swatchCols[s];
                   const ImVec2 mid((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f);   // filled circle, like the Clip Settings Color Tint
-                  dl->AddCircleFilled(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), 48);
+                  dl->AddCircleFilled(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), tok::settings_window_segments);
                   // Outline in the text colour: a preset's background colour can match the popup it sits on, and the swatch would vanish.
-                  { const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text); dl->AddCircle(mid, sz * 0.5f - 0.5f, ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.45f)), 48, 1.0f); }
+                  { const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text); dl->AddCircle(mid, sz * tok::settings_window_ratio_2 - tok::px_align, ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.45f)), tok::settings_window_segments, 1.0f); }
                }
             };
 
-            const float kSwatchSz = 15.0f;
-            const float kSwatchGap = 4.0f;
-            const float kSwatchStripW = 3 * kSwatchSz + 2 * kSwatchGap;
+            const float kSwatchSz = tok::settings_swatch_sz;
+            const float kSwatchGap = tok::space_1;
+            const float kSwatchStripW = tok::settings_swatch_strip_w_ratio * kSwatchSz + tok::settings_swatch_strip_w_ratio_2 * kSwatchGap;
 
             static float sHeaderSwatchX = 0.0f;   // the list's swatches line up under the header swatch beside the combo (set last frame)
             if (FormParts::BeginCombo(L("Preset"), presets[currentPreset].c_str(), 240.0f))
@@ -238,7 +238,7 @@ namespace app
                   const ImVec2 rMax = ImGui::GetItemRectMax();
                   const float y = rMin.y + (rMax.y - rMin.y - kSwatchSz) * 0.5f;
                   // One column for every row: from the popup's content edge, not from each row's own rect (the selected row differs).
-                  const float x = sHeaderSwatchX > 0.0f ? sHeaderSwatchX : ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - 8.0f - kSwatchStripW;
+                  const float x = sHeaderSwatchX > 0.0f ? sHeaderSwatchX : ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - tok::space_2 - kSwatchStripW;
                   drawThemeSwatches(ImVec2(x, y), kSwatchSz, kSwatchGap, CategoryColors::UiThemeForPreset(i));
                }
                FormParts::EndCombo();
@@ -265,7 +265,7 @@ namespace app
             // Node Module Category Colors
             FormParts::Section(T("Node Module Category Colors"));
             const std::vector<std::string>& catNames = CategoryColors::CategoryNames();
-            if (ListRow::BeginTable("CatColorsTbl", 2, ImGuiTableFlags_None))
+            if (ListRow::BeginTable("CatColorsTbl", tok::settings_window_begin_table_layout, ImGuiTableFlags_None))
             {
                ImGui::TableSetupColumn("Col1", ImGuiTableColumnFlags_WidthStretch);
                ImGui::TableSetupColumn("Col2", ImGuiTableColumnFlags_WidthStretch);
@@ -285,7 +285,7 @@ namespace app
                   {
                      CategoryColors::SaveAppearanceOverrides();
                   }
-                  FormParts::Inline(0.0f, 6.0f);
+                  FormParts::Inline(0.0f, tok::settings_window_inline_layout);
                   ImGui::TextUnformatted(cat.c_str());
                }
                ImGui::EndTable();
@@ -295,7 +295,7 @@ namespace app
             // Cable Category Colors
             FormParts::Section(T("Cable Category Colors"));
             const std::vector<std::string>& cableNames = CategoryColors::CableTypeNames();
-            if (ListRow::BeginTable("CableColorsTbl", 2, ImGuiTableFlags_None))
+            if (ListRow::BeginTable("CableColorsTbl", tok::settings_window_begin_table_layout, ImGuiTableFlags_None))
             {
                ImGui::TableSetupColumn("Col1", ImGuiTableColumnFlags_WidthStretch);
                ImGui::TableSetupColumn("Col2", ImGuiTableColumnFlags_WidthStretch);
@@ -315,7 +315,7 @@ namespace app
                   {
                      CategoryColors::SaveAppearanceOverrides();
                   }
-                  FormParts::Inline(0.0f, 6.0f);
+                  FormParts::Inline(0.0f, tok::settings_window_inline_layout);
                   ImGui::TextUnformatted(cableNames[i].c_str());
                }
                ImGui::EndTable();
@@ -792,7 +792,7 @@ namespace app
             }
 
             ImGui::Spacing();
-            if (FormParts::Button(L("Apply audio settings"), ImVec2(180, 0)))
+            if (FormParts::Button(L("Apply audio settings"), ImVec2(tok::settings_window_button_w, 0)))
             {
                const bool wasRunning = AudioEngine::Instance().SampleRate() > 0.0;
                if (wasRunning)
@@ -1074,13 +1074,13 @@ namespace app
             };
 
             ImGui::Spacing();
-            ImGui::SetNextItemWidth(220.0f);
+            ImGui::SetNextItemWidth(tok::settings_window_set_next_item_width_w);
             FormParts::BareCombo("##fieldtopic", &sSelectedSection, kSections, IM_ARRAYSIZE(kSections), 220.0f);
-            FormParts::Inline(0.0f, 8.0f);
+            FormParts::Inline(0.0f, tok::settings_window_inline_layout_2);
             FormParts::SearchInput("##fieldsearch", "Search functions / syntax...", sFilterBuf, sizeof(sFilterBuf), 220.0f);
             if (sFilterBuf[0] != '\0')
             {
-               FormParts::Inline(0.0f, 6.0f);
+               FormParts::Inline(0.0f, tok::settings_window_inline_layout);
                const float btnW = ImGui::GetFrameHeight();
                if (ActionButton::Draw("##clearfieldsearch", ImVec2(btnW, 0)))
                   sFilterBuf[0] = '\0';
@@ -1088,7 +1088,7 @@ namespace app
                const ImVec2 bmin = ImGui::GetItemRectMin();
                const ImVec2 bmax = ImGui::GetItemRectMax();
                const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-               const float iconSize = (bmax.y - bmin.y) * 0.65f;
+               const float iconSize = (bmax.y - bmin.y) * tok::settings_icon_size_ratio;
                const ImU32 col = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
                glyph::DrawX(dl, center, iconSize, col);
             }
@@ -1147,12 +1147,12 @@ namespace app
             if ((sSelectedSection == 0 || sSelectedSection == 2) && MatchesFilter("domains reserved frame element pixel sample graph age note"))
             {
                FormParts::Heading(T("2. Domains & Reserved Names"));
-               if (ListRow::BeginTable("##domainstbl", 4, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+               if (ListRow::BeginTable("##domainstbl", tok::settings_window_begin_table_layout_2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
-                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, 80.0f);
-                  ImGui::TableSetupColumn("Rate / Backend", ImGuiTableColumnFlags_WidthStretch, 140.0f);
-                  ImGui::TableSetupColumn("Reserved Names", ImGuiTableColumnFlags_WidthStretch, 220.0f);
-                  ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch, 360.0f);
+                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w);
+                  ImGui::TableSetupColumn("Rate / Backend", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_2);
+                  ImGui::TableSetupColumn("Reserved Names", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_3);
+                  ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_4);
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("%s", T("frame"));
@@ -1228,11 +1228,11 @@ namespace app
             if ((sSelectedSection == 0 || sSelectedSection == 5) && MatchesFilter("operators math functions sin cos lerp mix step rand noise sh bend pinch mirror skew formant"))
             {
                FormParts::Heading(T("5. Operators & Built-in Math Functions"));
-               if (ListRow::BeginTable("##opstbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+               if (ListRow::BeginTable("##opstbl", tok::settings_window_begin_table_layout_3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
-                  ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthStretch, 140.0f);
-                  ImGui::TableSetupColumn("Functions / Operators", ImGuiTableColumnFlags_WidthStretch, 240.0f);
-                  ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch, 360.0f);
+                  ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_2);
+                  ImGui::TableSetupColumn("Functions / Operators", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_5);
+                  ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_4);
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("%s", T("Operators"));
@@ -1309,11 +1309,11 @@ namespace app
                ImGui::TextWrapped("%s", T("Field allows data-dependent branching (unlike Kronos, which forbids it entirely). Every branch has a real cost that depends on the domain it runs in - always know which domain you're in before you branch."));
                DrawCodeBox("if (P.y > 0.5) { Cd = vec3(1, 0, 0) }", "cb_if_stmt");
 
-               if (ListRow::BeginTable("##branchtbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+               if (ListRow::BeginTable("##branchtbl", tok::settings_window_begin_table_layout_3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
-                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, 90.0f);
-                  ImGui::TableSetupColumn("Lowering", ImGuiTableColumnFlags_WidthStretch, 140.0f);
-                  ImGui::TableSetupColumn("Cost", ImGuiTableColumnFlags_WidthStretch, 300.0f);
+                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_6);
+                  ImGui::TableSetupColumn("Lowering", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_2);
+                  ImGui::TableSetupColumn("Cost", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_7);
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("%s", T("frame"));
@@ -1453,7 +1453,7 @@ namespace app
 
                char nameBuf[64];
                snprintf(nameBuf, sizeof(nameBuf), "%s", g.name.c_str());
-               ImGui::SetNextItemWidth(130.0f);
+               ImGui::SetNextItemWidth(tok::settings_window_set_next_item_width_w_2);
                FieldWell::PushStyle();
                const bool nameEdited = FieldWell::InputText("##name", nameBuf, sizeof(nameBuf));
                FieldWell::PopStyle();
@@ -1471,7 +1471,7 @@ namespace app
 
                char exprBuf[512];
                snprintf(exprBuf, sizeof(exprBuf), "%s", g.expr.c_str());
-               ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 150.0f);
+               ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - tok::settings_window_gap);
                FieldWell::PushStyle();
                const bool exprEdited = FieldWell::InputText("##expr", exprBuf, sizeof(exprBuf));
                FieldWell::PopStyle();
@@ -1509,7 +1509,7 @@ namespace app
                   const ImVec2 bmin = ImGui::GetItemRectMin();
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-                  const float iconSize = (bmax.y - bmin.y) * 0.65f;
+                  const float iconSize = (bmax.y - bmin.y) * tok::settings_icon_size_ratio;
                   const ImU32 col = ImGui::IsItemHovered() ? tok::Role(tok::col::state_err) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
                   glyph::DrawX(dl, center, iconSize, col);
                }
@@ -1529,7 +1529,7 @@ namespace app
             }
 
             ImGui::Spacing();
-            if (FormParts::Button(L("Add global"), ImVec2(110, 0)))
+            if (FormParts::Button(L("Add global"), ImVec2(tok::settings_window_button_w_2, 0)))
             {
                PushUndoCheckpoint();
                char name[32];
@@ -1539,7 +1539,7 @@ namespace app
                SaveDefaultExprGlobals();
             }
             FormParts::Inline();
-            if (FormParts::Button(L("Presets..."), ImVec2(110, 0)))
+            if (FormParts::Button(L("Presets..."), ImVec2(tok::settings_window_button_w_2, 0)))
             {
                ImGui::OpenPopup("ExprPresetsMenuSettings");
             }
@@ -1549,12 +1549,12 @@ namespace app
                const ImVec2 bmin = ImGui::GetItemRectMin();
                ImGui::SetNextWindowPos(ImVec2(bmin.x, ImGui::GetItemRectMax().y + tok::space_1));
                const ImGuiViewport* vp = ImGui::GetMainViewport();
-               const float room = vp->Pos.y + vp->Size.y - ImGui::GetItemRectMax().y - 16.0f;
-               ImGui::SetNextWindowSizeConstraints(ImVec2(400.0f, 0.0f), ImVec2(400.0f, std::clamp(room, 160.0f, 320.0f)));
+               const float room = vp->Pos.y + vp->Size.y - ImGui::GetItemRectMax().y - tok::space_4;
+               ImGui::SetNextWindowSizeConstraints(ImVec2(tok::settings_window_set_next_window_size_constraints_x, 0.0f), ImVec2(tok::settings_window_set_next_window_size_constraints_x, std::clamp(room, tok::settings_window_bound, tok::settings_window_bound_2)));
             }
             if (MenuParts::BeginPopup("ExprPresetsMenuSettings"))
             {
-               constexpr float kNameW = 110.0f;   // name column; the formula follows, dimmed and clipped
+               constexpr float kNameW = tok::settings_name_w;   // name column; the formula follows, dimmed and clipped
                std::string currentCategory;
                for (const ExprGlobals::Preset& p : ExprGlobals::Presets())
                {
@@ -1576,7 +1576,7 @@ namespace app
                      const float ty = std::floor((mn.y + mx.y - ImGui::GetTextLineHeight()) * 0.5f);
                      const ImVec4 tc = ImGui::GetStyleColorVec4(ImGuiCol_Text);
                      const float right = mx.x - MenuParts::kTextInset;
-                     dl->AddText(ImVec2(mn.x + 4.0f, ty), ImGui::GetColorU32(tc), p.name.c_str());
+                     dl->AddText(ImVec2(mn.x + tok::space_1, ty), ImGui::GetColorU32(tc), p.name.c_str());
                      dl->PushClipRect(ImVec2(mn.x + kNameW, mn.y), ImVec2(right, mx.y), true);
                      dl->AddText(ImVec2(mn.x + kNameW, ty), ImGui::GetColorU32(ImVec4(tc.x, tc.y, tc.z, 0.5f)), p.expr.c_str());
                      dl->PopClipRect();
@@ -1628,7 +1628,7 @@ namespace app
             const Extensions::State& ex = Extensions::GetState();
             const bool busy = !ex.busyId.empty() || ex.catalogLoading;
 
-            const float btnW = 96.0f; // one action-button width for every row in this tab
+            const float btnW = tok::settings_btn_w; // one action-button width for every row in this tab
             ImGui::Spacing();
             if (!Platform::PluginModeActive() && // the plugin updates with the installer, not in place
                 UpdateCheck::GetStatus() == UpdateCheck::Status::UpdateAvailable)

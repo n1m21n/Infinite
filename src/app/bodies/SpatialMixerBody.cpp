@@ -12,7 +12,7 @@ namespace app
 {
    namespace
    {
-      constexpr float kEdgeMetres = 10.0f; // stage edge; radius mapping is sqrt so 1-2 m stay grabbable
+      constexpr float kEdgeMetres = tok::spatial_mixer_edge_metres; // stage edge; radius mapping is sqrt so 1-2 m stay grabbable
 
       float RadiusFracFromDist(float d) { return std::sqrt(std::clamp(d, 0.0f, kEdgeMetres) / kEdgeMetres); }
       float DistFromRadiusFrac(float f) { return std::clamp(f * f * kEdgeMetres, 0.2f, kEdgeMetres); }
@@ -20,7 +20,7 @@ namespace app
       ImU32 DotColor(int slot, float alpha)
       {
          const ImColor c = ImColor::HSV(std::fmod((float)slot * 0.137f + 0.02f, 1.0f), 0.55f, IsThemeLight() ? 0.75f : 0.95f);
-         return IM_COL32((int)(c.Value.x * 255), (int)(c.Value.y * 255), (int)(c.Value.z * 255), (int)(alpha * 255));
+         return IM_COL32((int)(c.Value.x * tok::spatial_mixer_dot_color_ratio), (int)(c.Value.y * tok::spatial_mixer_dot_color_ratio), (int)(c.Value.z * 255), (int)(alpha * 255));
       }
    }
 
@@ -57,10 +57,10 @@ namespace app
       else
          snprintf(stat, sizeof(stat), "0 in \xE2\x86\x92 binaural (idle)");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_body_dummy_h));
 
       // ---- stage ---------------------------------------------------------
-      const float stageW = gAudioContentW, stageH = 280.0f;
+      const float stageW = gAudioContentW, stageH = tok::spatial_mixer_stage_h;
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
       const ImVec2 centre(p0.x + stageW * 0.5f, p0.y + stageH * 0.5f);
       const float R = std::min(stageW, stageH) * 0.5f - 14.0f;
@@ -69,15 +69,15 @@ namespace app
       const ImU32 line = light ? tok::Base(tok::col::ink_black, 45) : tok::Base(tok::col::ink_white, 40);
       const ImU32 text = light ? tok::Base(tok::col::ink_black, 150) : tok::Base(tok::col::ink_white, 150);
       dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? tok::Base(tok::col::ink_black, 14) : tok::Base(tok::col::ink_white, 10), tok::radius_control);
-      dl->AddCircle(centre, R, line, 64);
+      dl->AddCircle(centre, R, line, tok::spatial_mixer_body_segments);
       for (float m : { 1.0f, 2.0f })
-         dl->AddCircle(centre, R * RadiusFracFromDist(m), line, 48);
+         dl->AddCircle(centre, R * RadiusFracFromDist(m), line, tok::spatial_mixer_body_segments_2);
       dl->AddLine(ImVec2(centre.x - R, centre.y), ImVec2(centre.x + R, centre.y), line);
       dl->AddLine(ImVec2(centre.x, centre.y - R), ImVec2(centre.x, centre.y + R), line);
-      dl->AddText(ImVec2(centre.x - 3.0f, p0.y + 2.0f), text, "F");
-      dl->AddText(ImVec2(centre.x - 3.0f, p0.y + stageH - ImGui::GetTextLineHeight() - 2.0f), text, "B");
-      dl->AddText(ImVec2(p0.x + 5.0f, centre.y - 7.0f), text, "L");
-      dl->AddText(ImVec2(p0.x + stageW - 12.0f, centre.y - 7.0f), text, "R");
+      dl->AddText(ImVec2(centre.x - tok::space_0_75, p0.y + tok::space_0_5), text, "F");
+      dl->AddText(ImVec2(centre.x - tok::space_0_75, p0.y + stageH - ImGui::GetTextLineHeight() - tok::space_0_5), text, "B");
+      dl->AddText(ImVec2(p0.x + tok::space_1_25, centre.y - tok::spatial_mixer_body_gap), text, "L");
+      dl->AddText(ImVec2(p0.x + stageW - tok::space_3, centre.y - tok::spatial_mixer_body_gap), text, "R");
 
       // Listener seen from above, facing up (towards F): shoulders, neck, head
       // and ears - the same view as the reference body mesh. Facing is shown by F.
@@ -88,19 +88,19 @@ namespace app
          const ImU32 rim = light ? tok::Base(tok::col::edge_lo_2) : tok::Base(tok::col::surface_mid_3);
          const float cx = centre.x, cy = centre.y;
          // shoulders: wide rounded slab behind the head
-         dl->AddEllipseFilled(ImVec2(cx, cy + 15.0f), ImVec2(30.0f, 10.0f), skin, 0.0f, 32);
-         dl->AddEllipse(ImVec2(cx, cy + 15.0f), ImVec2(30.0f, 10.0f), rim, 0.0f, 32, 1.0f);
+         dl->AddEllipseFilled(ImVec2(cx, cy + tok::spatial_mixer_body_gap_2), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x, tok::spatial_mixer_body_add_ellipse_filled_y), skin, 0.0f, tok::spatial_mixer_body_segments_5);
+         dl->AddEllipse(ImVec2(cx, cy + tok::spatial_mixer_body_gap_2), ImVec2(tok::spatial_mixer_body_add_ellipse_x, tok::spatial_mixer_body_add_ellipse_y), rim, 0.0f, tok::spatial_mixer_body_segments_5, 1.0f);
          // neck
-         dl->AddEllipseFilled(ImVec2(cx, cy + 8.0f), ImVec2(6.0f, 7.0f), shade, 0.0f, 16);
+         dl->AddEllipseFilled(ImVec2(cx, cy + tok::space_2), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_2, tok::spatial_mixer_body_add_ellipse_filled_y_2), shade, 0.0f, tok::spatial_mixer_body_segments_4);
          // ears (behind the head outline)
-         dl->AddEllipseFilled(ImVec2(cx - 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), skin, 0.0f, 12);
-         dl->AddEllipseFilled(ImVec2(cx + 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), skin, 0.0f, 12);
-         dl->AddEllipse(ImVec2(cx - 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), rim, 0.0f, 12, 1.0f);
-         dl->AddEllipse(ImVec2(cx + 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), rim, 0.0f, 12, 1.0f);
+         dl->AddEllipseFilled(ImVec2(cx - tok::spatial_mixer_body_gap_3, cy + 1.0f), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_3, tok::spatial_mixer_body_add_ellipse_filled_y_3), skin, 0.0f, tok::spatial_mixer_body_segments_6);
+         dl->AddEllipseFilled(ImVec2(cx + tok::spatial_mixer_body_gap_3, cy + 1.0f), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_3, tok::spatial_mixer_body_add_ellipse_filled_y_3), skin, 0.0f, tok::spatial_mixer_body_segments_6);
+         dl->AddEllipse(ImVec2(cx - tok::spatial_mixer_body_gap_3, cy + 1.0f), ImVec2(tok::spatial_mixer_body_add_ellipse_x_2, tok::spatial_mixer_body_add_ellipse_y_2), rim, 0.0f, tok::spatial_mixer_body_segments_6, 1.0f);
+         dl->AddEllipse(ImVec2(cx + tok::spatial_mixer_body_gap_3, cy + 1.0f), ImVec2(tok::spatial_mixer_body_add_ellipse_x_2, tok::spatial_mixer_body_add_ellipse_y_2), rim, 0.0f, tok::spatial_mixer_body_segments_6, 1.0f);
          // head: oval, lit from the front
-         dl->AddEllipseFilled(ImVec2(cx, cy), ImVec2(11.0f, 14.0f), skin, 0.0f, 32);
-         dl->AddEllipseFilled(ImVec2(cx, cy - 3.0f), ImVec2(7.0f, 8.0f), skinHi, 0.0f, 24);
-         dl->AddEllipse(ImVec2(cx, cy), ImVec2(11.0f, 14.0f), rim, 0.0f, 32, 1.3f);
+         dl->AddEllipseFilled(ImVec2(cx, cy), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_4, tok::spatial_mixer_body_add_ellipse_filled_y_4), skin, 0.0f, tok::spatial_mixer_body_segments_5);
+         dl->AddEllipseFilled(ImVec2(cx, cy - tok::space_0_75), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_5, tok::spatial_mixer_body_add_ellipse_filled_y_5), skinHi, 0.0f, tok::spatial_mixer_body_segments_3);
+         dl->AddEllipse(ImVec2(cx, cy), ImVec2(tok::spatial_mixer_body_add_ellipse_x_3, tok::spatial_mixer_body_add_ellipse_y_3), rim, 0.0f, tok::spatial_mixer_body_segments_5, tok::spatial_mixer_body_stroke_3);
       }
 
       // ---- dots ----------------------------------------------------------
@@ -123,7 +123,7 @@ namespace app
          if (!n->inputs[s].IsConnected())
             continue;
          const ImVec2 d = dotPos(s);
-         if ((mouse.x - d.x) * (mouse.x - d.x) + (mouse.y - d.y) * (mouse.y - d.y) <= 11.0f * 11.0f)
+         if ((mouse.x - d.x) * (mouse.x - d.x) + (mouse.y - d.y) * (mouse.y - d.y) <= tok::spatial_mixer_body_ratio * 11.0f)
             hot = s;
       }
 
@@ -149,12 +149,12 @@ namespace app
             const int s = sDragSlot;
             if (ImGui::GetIO().KeyAlt)
             {
-               n->gainDb[s] = std::clamp(n->gainDb[s] - ImGui::GetIO().MouseDelta.y * 0.25f, -60.0f, 12.0f);
+               n->gainDb[s] = std::clamp(n->gainDb[s] - ImGui::GetIO().MouseDelta.y * tok::spatial_mixer_body_ratio_2, -60.0f, 12.0f);
             }
             else
             {
                const float dx = mouse.x - centre.x, dy = mouse.y - centre.y;
-               float az = std::atan2(dx, -dy) * 57.29578f;
+               float az = std::atan2(dx, -dy) * tok::spatial_mixer_az_ratio;
                if (ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeySuper)
                   az = std::round(az / 15.0f) * 15.0f;
                n->azimuth[s] = az;
@@ -176,14 +176,14 @@ namespace app
          const ImVec2 d = dotPos(s);
          const bool silent = n->mute[s];
          const float elScale = 1.0f + 0.4f * (n->elevation[s] / 90.0f);
-         const float r = 7.0f * elScale;
+         const float r = tok::spatial_mixer_r_ratio * elScale;
          const float lvl = std::clamp(n->ChannelLevel(s), 0.0f, 1.0f);
          if (hot == s || n->selected == s)
-            dl->AddCircle(d, r + 5.0f, text, 24, 1.5f);
+            dl->AddCircle(d, r + tok::space_1_25, text, tok::spatial_mixer_body_segments_3, tok::spatial_mixer_body_stroke);
          if (lvl > 0.002f)
-            dl->AddCircle(d, r + 2.0f + lvl * 4.0f, DotColor(s, 0.5f), 24, 2.0f);
-         dl->AddCircleFilled(d, r, DotColor(s, silent ? 0.25f : 1.0f), 24);
-         dl->AddCircle(d, r, light ? tok::Base(tok::col::ink_black, 120) : tok::Base(tok::col::ink_white, 120), 24, 1.0f);
+            dl->AddCircle(d, r + tok::space_0_5 + lvl * tok::spatial_mixer_body_ratio_3, DotColor(s, 0.5f), tok::spatial_mixer_body_segments_3, tok::spatial_mixer_body_stroke_2);
+         dl->AddCircleFilled(d, r, DotColor(s, silent ? 0.25f : 1.0f), tok::spatial_mixer_body_segments_3);
+         dl->AddCircle(d, r, light ? tok::Base(tok::col::ink_black, 120) : tok::Base(tok::col::ink_white, 120), tok::spatial_mixer_body_segments_3, 1.0f);
          char lab[16];
          snprintf(lab, sizeof(lab), "%d", s + 1);
          const ImVec2 ts = ImGui::CalcTextSize(lab);
@@ -202,7 +202,7 @@ namespace app
          }
       }
 
-      ImGui::SetCursorScreenPos(ImVec2(p0.x, p0.y + stageH + 6.0f));
+      ImGui::SetCursorScreenPos(ImVec2(p0.x, p0.y + stageH + tok::space_1_5));
 
       // ---- source strip --------------------------------------------------
       for (int s = 0; s < pins; s++)
@@ -212,12 +212,12 @@ namespace app
          ImGui::PushID(s);
          const ImVec2 rp = ImGui::GetCursorScreenPos();
          for (int k = 0; k < 5; k++)   // lane param ordinals: see laneParam below
-            NoteHiddenParamAnchor(gn.index, 3 + s * 5 + k, ImVec2(rp.x + 8.0f, rp.y + ImGui::GetFrameHeight() * 0.5f));
+            NoteHiddenParamAnchor(gn.index, 3 + s * 5 + k, ImVec2(rp.x + tok::space_2, rp.y + ImGui::GetFrameHeight() * 0.5f));
          const float ty = ImGui::GetStyle().FramePadding.y;   // centre text against the taller H/M/S buttons
-         dl->AddCircleFilled(ImVec2(rp.x + 8.0f, rp.y + ty + ImGui::GetTextLineHeight() * 0.5f), 5.0f, DotColor(s, 1.0f), 16);
-         ImGui::SetCursorScreenPos(ImVec2(rp.x + 20.0f, rp.y + ty));
+         dl->AddCircleFilled(ImVec2(rp.x + tok::space_2, rp.y + ty + ImGui::GetTextLineHeight() * 0.5f), tok::spatial_mixer_body_r, DotColor(s, 1.0f), tok::spatial_mixer_body_segments_4);
+         ImGui::SetCursorScreenPos(ImVec2(rp.x + tok::spatial_mixer_body_gap_4, rp.y + ty));
          const bool sel = (n->selected == s);
-         if (ListRow::Selectable(("in " + std::to_string(s + 1)).c_str(), sel, 0, ImVec2(80.0f, 0.0f)))
+         if (ListRow::Selectable(("in " + std::to_string(s + 1)).c_str(), sel, 0, ImVec2(tok::spatial_mixer_body_selectable_w, 0.0f)))
             n->selected = s;
          // Right-aligned cluster in screen space: dB readout, then H M S as equal
          // fixed-width buttons ending on the content edge. Window-relative
@@ -225,14 +225,14 @@ namespace app
          {
             // ActionButton widens a button to its label plus 2 x space_2, so size the slot from the widest label
             // (M) or the three tiles overlap at larger UI scales.
-            const float bw = std::max(22.0f, ImGui::CalcTextSize("M").x + 2.0f * tok::space_2), gap = 3.0f;
+            const float bw = std::max(22.0f, ImGui::CalcTextSize("M").x + tok::spatial_mixer_body_ratio_4 * tok::space_2), gap = tok::space_0_75;
             const float right = gAudioContentX + gAudioContentW;
-            const float x0 = right - 3.0f * bw - 2.0f * gap;
+            const float x0 = right - tok::spatial_mixer_x0_ratio * bw - tok::spatial_mixer_x0_ratio_2 * gap;
             const float y = rp.y;
             char db[24];
             snprintf(db, sizeof(db), "%s", UiFmt::DbOffset(n->gainDb[s]).c);
             const float tw = ImGui::CalcTextSize(db).x;
-            ImGui::SetCursorScreenPos(ImVec2(x0 - 8.0f - tw, y + ty));
+            ImGui::SetCursorScreenPos(ImVec2(x0 - tok::space_2 - tw, y + ty));
             ImGui::TextUnformatted(db);
             ImGui::SetCursorScreenPos(ImVec2(x0, y));
             if (LaneToggle("H", n->headLocked[s], bw))
@@ -248,7 +248,7 @@ namespace app
                PushUndoCheckpoint();
                n->mute[s] = !n->mute[s];
             }
-            ImGui::SetCursorScreenPos(ImVec2(x0 + 2.0f * (bw + gap), y));
+            ImGui::SetCursorScreenPos(ImVec2(x0 + tok::spatial_mixer_body_ratio_4 * (bw + gap), y));
             if (LaneToggle("S", n->solo[s], bw))
             {
                PushUndoCheckpoint();
@@ -257,7 +257,7 @@ namespace app
          }
          ImGui::PopID();
       }
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_body_dummy_h));
 
       // ---- knobs: selected object, then master ---------------------------
       const int sel = n->selected;
@@ -268,7 +268,7 @@ namespace app
       // drawn one), so a cable keeps driving a lane that is off screen - the
       // same mechanism as the EQ's hidden bands.
       static constexpr int kLaneBase = 3;
-      auto laneParam = [](int lane, int k) { return kLaneBase + lane * 5 + k; };
+      auto laneParam = [](int lane, int k) { return kLaneBase + lane * tok::spatial_mixer_body_ratio_5 + k; };
       auto laneName = [](int lane, const char* what) { return "in " + std::to_string(lane + 1) + " " + what; };
       {
          const bool savedRegisterOnly = gParamRegisterOnly;
@@ -291,7 +291,7 @@ namespace app
          gParamRegisterOnly = savedRegisterOnly;
       }
       {
-         AudioKnobRow row(4, kKnobLarge);
+         AudioKnobRow row(tok::spatial_mixer_body_audio_knob_row_layout, kKnobLarge);
          const auto az = laneName(sel, "azimuth"), el = laneName(sel, "elevation"), di = laneName(sel, "distance"),
                     wi = laneName(sel, "width"), lv = laneName(sel, "level");
          row.Knob("azimuth", &n->azimuth[sel], -180.0f, 180.0f, "%.0f deg", kKnobLarge, false, false,
@@ -303,7 +303,7 @@ namespace app
          row.Knob("width", &n->width[sel], 0.0f, 1.0f, "%.2f", kKnobLarge, false, false, AudioWidgetStyle::Knob,
                   nullptr, nullptr, laneParam(sel, 3), wi.c_str());
          row.End();
-         AudioKnobRow row2(4, kKnobSmall);
+         AudioKnobRow row2(tok::spatial_mixer_body_audio_knob_row_layout, kKnobSmall);
          row2.Knob("level", &n->gainDb[sel], -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true, false,
                    AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 4), lv.c_str());
          row2.Knob("room", &n->room, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr,
@@ -318,7 +318,7 @@ namespace app
 
       // ---- master: head tracking, limiter, hrtf, meter --------------------
       {
-         const float half = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+         const float half = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / tok::spatial_mixer_half_ratio;
          const bool trackOk = HeadTracker::Supported(HeadTracker::kHeadphones);
          const std::vector<std::string> trackNames = { "head: off", trackOk ? "head: AirPods" : "head: AirPods (macOS)" };
          AudioBareDropdown("##spatialTrack", trackNames, std::clamp(n->trackMode, 0, 1),
@@ -358,7 +358,7 @@ namespace app
          if (ImGui::IsItemHovered())
             SetAudioReadout("meter", "short-term loudness, true peak (click to reset), limiter reduction");
       }
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_body_dummy_h));
       DrawSpatialExportPanel(n);
       EndAudioBody();
    }

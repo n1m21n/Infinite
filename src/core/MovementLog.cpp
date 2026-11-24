@@ -798,7 +798,7 @@ void Start(const std::string& customDir)
       for (const auto& entry : std::filesystem::directory_iterator(dir, ec))
       {
          const std::string name = entry.path().filename().string();
-         if (entry.is_regular_file(ec) && name.size() > 7 && name.compare(name.size() - 7, 7, ".mlog.z") == 0 &&
+         if (entry.is_regular_file(ec) && name.size() > 7 && name.compare(name.size() - 7, 7, ".mlog.z") == 0 &&  // ui-audit-ok: binary log format, not a screen quantity
              SessionStem(name) > lastConsumed)
             pending.push_back(entry.path());
       }
@@ -1084,7 +1084,7 @@ void Capture(double t, bool isNormalFrame)
          pos = (*ref.value - ref.minValue) / (ref.maxValue - ref.minValue);
       }
       pos = std::clamp(pos, 0.0f, 1.0f);
-      uint16_t q = static_cast<uint16_t>(std::lround(pos * 65535.0f));
+      uint16_t q = static_cast<uint16_t>(std::lround(pos * 65535.0f));  // ui-audit-ok: binary log format, not a screen quantity
 
       // Re-baseline on mark/epoch change without emitting VAL
       if (state.lastEpoch != sCurrentEpoch)
@@ -1166,7 +1166,7 @@ bool ReadFile(const std::string& path, const std::function<bool(const Record&)>&
    size_t fileSize = static_cast<size_t>(file.tellg());
    file.seekg(0, std::ios::beg);
 
-   if (fileSize < 8)
+   if (fileSize < 8)  // ui-audit-ok: binary log format, not a screen quantity
       return false;
 
    std::vector<uint8_t> decompressedData;
@@ -1185,7 +1185,7 @@ bool ReadFile(const std::string& path, const std::function<bool(const Record&)>&
       file.read(reinterpret_cast<char*>(compressed.data()), fileSize);
       file.close();
 
-      if (compressed.size() < 4)
+      if (compressed.size() < 4)  // ui-audit-ok: binary log format, not a screen quantity
          return false;
 
       uint32_t rawSize = static_cast<uint32_t>(compressed[0]) |
@@ -1196,7 +1196,7 @@ bool ReadFile(const std::string& path, const std::function<bool(const Record&)>&
       decompressedData.resize(rawSize);
       uLong uncmpLen = rawSize;
       int status = mz_uncompress(decompressedData.data(), &uncmpLen,
-                                 compressed.data() + 4, static_cast<uLong>(compressed.size() - 4));
+                                 compressed.data() + 4, static_cast<uLong>(compressed.size() - 4));  // ui-audit-ok: binary log format, not a screen quantity
       if (status != MZ_OK || uncmpLen != rawSize)
          return false;
 

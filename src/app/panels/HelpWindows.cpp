@@ -964,10 +964,10 @@ namespace app
          {
             char tableId[96];
             snprintf(tableId, sizeof(tableId), "%stbl_%s", idPrefix, s.category);
-            if (ListRow::BeginTable(tableId, 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+            if (ListRow::BeginTable(tableId, tok::help_windows_shortcuts_table_body_begin_table_layout, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
             {
-               ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, 150.0f);
-               ImGui::TableSetupColumn(T("Shortcut"), ImGuiTableColumnFlags_WidthFixed, 180.0f);
+               ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, tok::help_windows_shortcuts_table_body_col_w);
+               ImGui::TableSetupColumn(T("Shortcut"), ImGuiTableColumnFlags_WidthFixed, tok::help_windows_shortcuts_table_body_col_w_2);
                // Explicit weight: with SizingStretchProp and no weight, a hidden first frame gave the column a NaN weight
                // (0/0), which reached the window content size (UBSan float-to-int, NAVTEST).
                ImGui::TableSetupColumn(T("Description"), ImGuiTableColumnFlags_WidthStretch, 1.0f);
@@ -1011,7 +1011,7 @@ namespace app
       // Centering on first appearance matches Settings for the same reason
       // (see DrawSettingsWindow).
       FloatingWindow::Spec spec;   // same 16 pt inset as Settings; cards reach 8 pt into it
-      spec.size = ImVec2(680, 520);
+      spec.size = ImVec2(tok::help_windows_shortcuts_window_x, tok::help_windows_shortcuts_window_y);
       spec.placeCond = ImGuiCond_Appearing;
       const bool shortcutsVisible = FloatingWindow::Begin("All Shortcuts", open, spec);
       if (!shortcutsVisible)
@@ -1036,7 +1036,7 @@ namespace app
       // which is why it kept rendering with the wrong backdrop/border in
       // light mode instead of the theme's actual panel colour.
       FloatingWindow::Spec spec;   // same 16 pt inset as Settings
-      spec.size = ImVec2(720, 620);
+      spec.size = ImVec2(tok::help_windows_window_x, tok::help_windows_window_y);
       spec.placeCond = ImGuiCond_Appearing;
       const bool helpVisible = FloatingWindow::Begin("Infinite - help & module reference", open, spec);
       if (!helpVisible)
@@ -1062,7 +1062,7 @@ namespace app
       SectionCard::Begin();
       if (PanelKit::FoldHeader(L("Controls"), true, true))
       {
-         if (ListRow::BeginTable("controls", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+         if (ListRow::BeginTable("controls", tok::help_windows_window_begin_table_layout, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
          {
             ImGui::TableSetupColumn(T("Action"));
             ImGui::TableSetupColumn(T("How"));

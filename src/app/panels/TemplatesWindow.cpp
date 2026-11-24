@@ -45,7 +45,7 @@ std::vector<Entry>& Entries()
          std::string part;
          while (std::getline(ss, part, '|'))
             f.push_back(part);
-         if (f.size() >= 4)
+         if (f.size() >= tok::templates_entries_limit)
             sEntries.push_back({ f[0], f[1], f[2], f[3] });
       }
    }
@@ -100,12 +100,12 @@ namespace
    float CardHeight(float w)
    {
       const float textH = ImGui::GetTextLineHeight();
-      return tok::space_2 + (w - 2.0f * tok::space_2) + tok::space_2 + textH + 2.0f + textH * 2.0f + tok::space_2;
+      return tok::space_2 + (w - tok::templates_card_height_ratio * tok::space_2) + tok::space_2 + textH + tok::space_0_5 + textH * tok::templates_card_height_ratio + tok::space_2;
    }
 
    bool Card(const Entry& e, float w)
    {
-      const float thumb = w - 2.0f * tok::space_2;
+      const float thumb = w - tok::templates_thumb_ratio * tok::space_2;
       const float textH = ImGui::GetTextLineHeight();
       const float h = CardHeight(w);
       const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -125,8 +125,8 @@ namespace
       const float ty = t0.y + thumb + tok::space_2;
       dl->PushClipRect(ImVec2(p.x + tok::space_2, ty), ImVec2(p.x + w - tok::space_2, p.y + h), true);
       dl->AddText(ImVec2(p.x + tok::space_2, ty), ImGui::GetColorU32(ImGuiCol_Text), e.title.c_str());
-      dl->AddText(nullptr, 0.0f, ImVec2(p.x + tok::space_2, ty + textH + 2.0f), ImGui::GetColorU32(ImGuiCol_TextDisabled),
-                  e.blurb.c_str(), nullptr, w - 2.0f * tok::space_2);
+      dl->AddText(nullptr, 0.0f, ImVec2(p.x + tok::space_2, ty + textH + tok::space_0_5), ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                  e.blurb.c_str(), nullptr, w - tok::templates_card_ratio * tok::space_2);
       dl->PopClipRect();
       if (hovered)
          ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -138,7 +138,7 @@ namespace
 void DrawTemplatesWindow(bool* open)
 {
    FloatingWindow::Spec spec;
-   spec.size = ImVec2(740, 560);
+   spec.size = ImVec2(tok::templates_window_x, tok::templates_window_y);
    spec.placeCond = ImGuiCond_Appearing;
    const bool visible = FloatingWindow::Begin(L("Template library"), open, spec);
    if (!visible)
@@ -150,7 +150,7 @@ void DrawTemplatesWindow(bool* open)
    ImGui::TextDisabled("%s", T("Opens as an untitled copy. The original is never changed."));
    ImGui::Spacing();
 
-   constexpr float kCardW = 150.0f;
+   constexpr float kCardW = tok::templates_card_w;
    const std::vector<Entry>& entries = Entries();
    const float avail = ImGui::GetContentRegionAvail().x;
    const float gap = ImGui::GetStyle().ItemSpacing.x;

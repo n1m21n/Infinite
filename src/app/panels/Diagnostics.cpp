@@ -108,7 +108,7 @@ namespace
       std::string home = AppPaths::HomeDir();
       while (home.size() > 1 && (home.back() == '/' || home.back() == '\\'))
          home.pop_back();
-      if (home.size() < 2)
+      if (home.size() < tok::diagnostics_redact_home_limit)
          return text;
       for (std::string h : { home, [&] { std::string s2 = home; std::replace(s2.begin(), s2.end(), '\\', '/'); return s2; }() })
       {

@@ -35,9 +35,9 @@ namespace app
 
       const float midY = origin.y + h * 0.5f;
       for (int i = 1; i < 8; i++)
-         dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
-                     ScopeGridCol(), 1.0f);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+         dl->AddLine(ImVec2(origin.x + w * i / tok::field_params_wavetable_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::field_params_wavetable_scope_ratio, br.y),
+                     ScopeGridCol(), tok::field_params_wavetable_scope_stroke);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::field_params_wavetable_scope_stroke);
 
       if (n->scopeCacheCount > 1)
       {
@@ -50,17 +50,17 @@ namespace app
             {
                const float t = (float)i / (float)(count - 1);
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
-               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_wavetable_scope_ratio_2));
             }
             const ImU32 strokeCol = isLight
                ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
                : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
-            dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
+            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_wavetable_scope_stroke_2 : tok::field_params_wavetable_scope_stroke_3);
          }
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1), ScopeTextCol(), "idle");
       }
 
       dl->PopClipRect();
@@ -93,9 +93,9 @@ namespace app
 
       const float midY = origin.y + h * 0.5f;
       for (int i = 1; i < 8; i++)
-         dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
-                     ScopeGridCol(), 1.0f);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+         dl->AddLine(ImVec2(origin.x + w * i / tok::field_params_sample_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::field_params_sample_scope_ratio, br.y),
+                     ScopeGridCol(), tok::field_params_sample_scope_stroke);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::field_params_sample_scope_stroke);
 
       if (n->scopeCacheCount > 1)
       {
@@ -108,17 +108,17 @@ namespace app
             {
                const float t = (float)i / (float)(count - 1);
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
-               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_sample_scope_ratio_2));
             }
             const ImU32 strokeCol = isLight
                ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
                : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
-            dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
+            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_sample_scope_stroke_2 : tok::field_params_sample_scope_stroke_3);
          }
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1), ScopeTextCol(), "idle");
       }
 
       dl->PopClipRect();
@@ -142,7 +142,7 @@ namespace app
       AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
       for (int i = 1; i < 4; i++)
-         dl->AddLine(ImVec2(origin.x, origin.y + h * i / 4.0f), ImVec2(br.x, origin.y + h * i / 4.0f), ScopeGridCol(), 1.0f);
+         dl->AddLine(ImVec2(origin.x, origin.y + h * i / tok::field_params_spectral_spectrum_ratio), ImVec2(br.x, origin.y + h * i / tok::field_params_spectral_spectrum_ratio), ScopeGridCol(), tok::field_params_spectral_spectrum_stroke);
 
       if (valid)
       {
@@ -159,12 +159,12 @@ namespace app
             dl->AddRectFilled(ImVec2(origin.x + i * bw, yFor(in[i])), ImVec2(origin.x + (i + 1) * bw, br.y), fillCol);
          dl->PathClear();
          for (int i = 0; i < kB; i++)
-            dl->PathLineTo(ImVec2(origin.x + (i + 0.5f) * bw, yFor(out[i])));
-         dl->PathStroke(strokeCol, 0, 1.6f);
+            dl->PathLineTo(ImVec2(origin.x + (i + tok::field_params_spectral_spectrum_bias) * bw, yFor(out[i])));
+         dl->PathStroke(strokeCol, 0, tok::field_params_spectral_spectrum_stroke_2);
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1), ScopeTextCol(), "idle");
       }
 
       dl->PopClipRect();
@@ -197,9 +197,9 @@ namespace app
 
       const float midY = origin.y + h * 0.5f;
       for (int i = 1; i < 8; i++)
-         dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
-                     ScopeGridCol(), 1.0f);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+         dl->AddLine(ImVec2(origin.x + w * i / tok::field_params_synth_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::field_params_synth_scope_ratio, br.y),
+                     ScopeGridCol(), tok::field_params_synth_scope_stroke);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::field_params_synth_scope_stroke);
 
       if (n->scopeCacheCount > 1)
       {
@@ -212,17 +212,17 @@ namespace app
             {
                const float t = (float)i / (float)(count - 1);
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
-               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_synth_scope_ratio_2));
             }
             const ImU32 strokeCol = isLight
                ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
                : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
-            dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
+            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_synth_scope_stroke_2 : tok::field_params_synth_scope_stroke_3);
          }
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1), ScopeTextCol(), "idle");
       }
 
       dl->PopClipRect();
@@ -248,8 +248,8 @@ namespace app
       const double startBeat = nowBeat - kWindowBeats;
 
       for (int i = 1; i < 8; i++)
-         dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
-                     ScopeGridCol(), 1.0f);
+         dl->AddLine(ImVec2(origin.x + w * i / tok::field_params_notes_roll_ratio, origin.y), ImVec2(origin.x + w * i / tok::field_params_notes_roll_ratio, br.y),
+                     ScopeGridCol(), tok::field_params_notes_roll_stroke);
 
       float lo = 127.0f, hi = 0.0f;
       int visible = 0;
@@ -264,7 +264,7 @@ namespace app
 
       if (visible == 0)
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1), ScopeTextCol(), "idle");
       }
       else
       {
@@ -275,14 +275,14 @@ namespace app
             hi = mid + 5.5f;
          }
          const bool isLight = IsThemeLight();
-         const float barH = std::max(2.0f, h / (hi - lo + 2.0f));
-         const float barW = std::max(2.0f, w / (float)(kWindowBeats * 8.0));
+         const float barH = std::max(tok::field_params_notes_roll_bound, h / (hi - lo + tok::field_params_notes_roll_bias));
+         const float barW = std::max(tok::field_params_notes_roll_bound, w / (float)(kWindowBeats * tok::field_params_notes_roll_ratio_2));
          for (int i = 0; i < n->RollCount(); i++)
          {
             const auto& r = n->RollAt(i);
             if (r.beat < startBeat || r.beat > nowBeat + 0.01) continue;
             const float x = origin.x + (float)((r.beat - startBeat) / kWindowBeats) * w;
-            const float y = br.y - barH - ((r.note - lo + 1.0f) / (hi - lo + 2.0f)) * (h - barH);
+            const float y = br.y - barH - ((r.note - lo + 1.0f) / (hi - lo + tok::field_params_notes_roll_bias)) * (h - barH);
             const float v = std::max(0.15f, std::min(1.0f, r.vel));
             const ImU32 col = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
             ImVec4 c = ImGui::ColorConvertU32ToFloat4(col);

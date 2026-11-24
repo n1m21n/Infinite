@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/UiInteract.h"
@@ -460,7 +461,7 @@ void DrawFramePump(FrameCtx& fc)
       // One memory line in log.txt every five minutes. A process that dies after half an hour of use from memory
       // growth leaves a log with a climb in it; one that does not leaves a flat line, and either answers the report.
       {
-         static double sNextMemLogS = 300.0;
+         static double sNextMemLogS = tok::stage_frame_pump_next_mem_log_s;
          const double nowS = glfwGetTime();
          if (nowS >= sNextMemLogS)
          {
@@ -533,7 +534,7 @@ void DrawFramePump(FrameCtx& fc)
 #ifndef NDEBUG
       // INFINITE_PREDBINDTEST: synthetic plain-drag then Shift-drag on the Shape's "size x" slider,
       // which a stub predictor drives. Aimed from the slider's rect as drawn last frame.
-      if (getenv("INFINITE_PREDBINDTEST") != nullptr && frameId >= 50 && gNodes.size() > 3)
+      if (getenv("INFINITE_PREDBINDTEST") != nullptr && frameId >= 50 && gNodes.size() > tok::stage_frame_pump_limit)
       {
          ImGuiIO& tio = ImGui::GetIO();
          tio.ConfigInputTrickleEventQueue = false;

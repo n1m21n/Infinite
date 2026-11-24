@@ -148,7 +148,7 @@ namespace app
       ImGui::PushID(paramIndex + 5000);
 
       ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      ed::PinPivotAlignment(ImVec2(tok::mod_slider_pin_pivot_alignment_x, tok::mod_slider_pin_pivot_alignment_y));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float box = tok::pin_box;
       // Centred on the slider track's frame height, same fix and same
@@ -174,10 +174,10 @@ namespace app
       // rowMin starts after the pin box + its SameLine gap, not at the pin
       // itself - see the matching comment on DrawDiscreteParamPin's push.
       gParamPinScreenList.push_back({ nodeIndex, paramIndex, curGn ? curGn->typeName : "", paramName ? paramName : "", c,
-                                      ImVec2(p.x + box + 4.0f, p.y), ImVec2(p.x + width, p.y + box + 4.0f) });
+                                      ImVec2(p.x + box + tok::space_1, p.y), ImVec2(p.x + width, p.y + box + tok::space_1) });
       if (paramIndex == gPredTestSizeXParam && nodeIndex == gPredTestNodeIndex)
          gPredTestSliderCanvas = ImVec4(p.x + box + 4.0f, p.y, p.x + width, p.y + box + 4.0f);
-      ImGui::SetCursorScreenPos(ImVec2(origin.x + box + 4.0f, origin.y));
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + box + tok::space_1, origin.y));
 
       // Double-clicking swaps the slider for a text field so an exact value
       // (or, prefixed with '=', an expression) can be typed. ImGui's built-in
@@ -188,7 +188,7 @@ namespace app
       bool changed = false;
       if (typing && !modulated)
       {
-         ImGui::SetNextItemWidth(width - box - 4.0f);
+         ImGui::SetNextItemWidth(width - box - tok::space_1);
          if (gTypedParamJustOpened == editKey)
          {
             UiInteract::FocusHere();
@@ -355,7 +355,7 @@ namespace app
                ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::role_modulation));
                ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::edge_hi));
             }
-            ImGui::SetNextItemWidth(width - box - 4.0f);
+            ImGui::SetNextItemWidth(width - box - tok::space_1);
             const bool moved = ImGui::SliderFloat(label, &shown, minV, maxV, fmt,
                                                   ro ? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None);
             ImGui::PopStyleColor(3);
@@ -368,7 +368,7 @@ namespace app
          EndPredictorGrab(grab, gref);
          {
             const ImVec2 imin = ImGui::GetItemRectMin(), imax = ImGui::GetItemRectMax();
-            DrawPredictorDecor(gref, imin.x, std::min(imax.x, imin.x + width - box - 4.0f), imax.y - 3.0f);
+            DrawPredictorDecor(gref, imin.x, std::min(imax.x, imin.x + width - box - 4.0f), imax.y - tok::space_0_75);
          }
          DrawModulationBindingMenu(nodeIndex, paramIndex, ImGui::IsItemHovered());
       }
@@ -407,7 +407,7 @@ namespace app
                ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::role_expression_6));
                ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::edge_hi));
             }
-            ImGui::SetNextItemWidth(width - box - 4.0f);
+            ImGui::SetNextItemWidth(width - box - tok::space_1);
             ImGui::SliderFloat(label, &shown, minV, maxV, fmt);
             ImGui::PopStyleColor(3);
          }
@@ -468,7 +468,7 @@ namespace app
                   ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::edge_hi));
                }
             }
-            ImGui::SetNextItemWidth(width - box - 4.0f);
+            ImGui::SetNextItemWidth(width - box - tok::space_1);
             changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
             if (recording)
                ImGui::PopStyleColor(6);
@@ -542,7 +542,7 @@ namespace app
                   ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::edge_hi));
                }
             }
-            ImGui::SetNextItemWidth(width - box - 4.0f);
+            ImGui::SetNextItemWidth(width - box - tok::space_1);
             const bool sliderChanged = ImGui::SliderFloat(label, &shown, minV, maxV, fmt);
             if (!locked)
                changed = sliderChanged;
@@ -589,7 +589,7 @@ namespace app
       if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
          StateRing::Draw(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), StateRing::Kind::Learn, isLight, tok::radius_control);
       changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, ImGui::GetItemRectMin(),
-                          ImVec2(std::min(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().x + (width - box - 4.0f)), ImGui::GetItemRectMax().y),
+                          ImVec2(std::min(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().x + (width - box - tok::space_1)), ImGui::GetItemRectMax().y),
                           false) || changed;
       ImGui::PopID();
       return changed;
@@ -712,8 +712,8 @@ namespace app
          fillColor = tok::Role(tok::col::state_err);
 
       const float cx = p.x + cell * 0.5f;
-      const float top = p.y + 4.0f;
-      const float bottom = p.y + height - 4.0f;
+      const float top = p.y + tok::space_1;
+      const float bottom = p.y + height - tok::space_1;
       const float t = ValueToPos01(*value);
       const float capY = bottom - t * (bottom - top);
       const float capYLo = hasRange ? bottom - ValueToPos01(rangeLo) * (bottom - top) : 0.0f;
@@ -725,7 +725,7 @@ namespace app
       int nTicks = 0;
       if (valueToPos == nullptr)
          for (int i = 0; i <= 4; i++)
-            tickY[nTicks++] = bottom - (float)i * 0.25f * (bottom - top);
+            tickY[nTicks++] = bottom - (float)i * tok::mod_tick_y_ratio * (bottom - top);
       else
          for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
             tickY[nTicks++] = bottom - std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f) * (bottom - top);
@@ -738,7 +738,7 @@ namespace app
       const ImU32 capTextCol = isLight
          ? (readOnly ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::edge_lo))
          : (readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_mid_2));
-      const float capTextY = p.y + height + 4.0f;
+      const float capTextY = p.y + height + tok::space_1;
       dl->PushClipRect(ImVec2(p.x, capTextY), ImVec2(p.x + cell, capTextY + textH), true);
       dl->AddText(ImVec2(cx - textSize.x * 0.5f, capTextY), capTextCol, caption);
       dl->PopClipRect();
@@ -799,8 +799,8 @@ namespace app
    {
       FadeIfDisabled fadeIfDisabled;
       const float kTwoPi = 6.28318530717958647692f;
-      const float aMin = 0.75f * kTwoPi * 0.5f; // 135 deg
-      const float aMax = 2.25f * kTwoPi * 0.5f; // 405 deg (270 deg sweep)
+      const float aMin = tok::mod_a_min_ratio * kTwoPi * 0.5f; // 135 deg
+      const float aMax = tok::mod_a_max_ratio * kTwoPi * 0.5f; // 405 deg (270 deg sweep)
 
       const float cell = cellW > 0.0f ? cellW : diameter;
       const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -837,7 +837,7 @@ namespace app
          // stuck. Always full speed.
          const float speed = 1.0f;
          const float posNow = ValueToPos01(*value);
-         const float nextPos = std::clamp(posNow - ImGui::GetIO().MouseDelta.y * speed / 200.0f, 0.0f, 1.0f);
+         const float nextPos = std::clamp(posNow - ImGui::GetIO().MouseDelta.y * speed / tok::mod_knob_float_ratio, 0.0f, 1.0f);
          const float next = Pos01ToValue(nextPos);
          if (next != *value)
          {
@@ -850,7 +850,7 @@ namespace app
       // makes a row of mixed large/small knobs read as a rack strip instead
       // of a ragged left-packed list.
       const ImVec2 center(p.x + cell * 0.5f, p.y + diameter * 0.5f);
-      const float radius = diameter * 0.5f - 2.0f;
+      const float radius = diameter * 0.5f - tok::space_0_5;
       const float t = ValueToPos01(*value);
       const float angle = aMin + t * (aMax - aMin);
       // Modulation range band (item 6): the lo..hi span this knob is bound
@@ -869,35 +869,35 @@ namespace app
          // hover ring below, just larger radius / lower alpha / offset down.
          // Kept dark even in light mode so it still reads as a shadow, not
          // a glow.
-         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::Role(tok::col::surface_lo, 16), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::Role(tok::col::surface_lo, 22), 32);
-         dl->AddCircleFilled(center, radius, tok::Role(tok::col::surface_hi), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::Role(tok::col::ink_white), 32);
-         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
+         const ImVec2 shadowCenter(center.x, center.y + tok::mod_knob_float_gap);
+         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::surface_lo, 16), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::mod_knob_float_gap_2, tok::Role(tok::col::surface_lo, 22), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(center, radius, tok::Role(tok::col::surface_hi), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - tok::px_align), radius - tok::space_0_75, tok::Role(tok::col::ink_white), tok::mod_knob_float_segments);
+         dl->PathArcTo(center, radius + tok::mod_knob_float_gap_3, aMin, aMax, tok::mod_knob_float_segments);
          // The guide ring covers the knob's whole travel, not just the
          // value-proportional fill arc below - tinting it when recording is
          // what makes the state readable at a glance regardless of where the
          // value happens to sit (a knob near its low end barely shows any
          // fill arc at all otherwise).
-         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::surface_hi), 0, 3.0f);
+         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::surface_hi), 0, tok::mod_knob_float_stroke);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
-            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
-            dl->PathStroke(rangeCol, 0, 5.0f);
+            dl->PathArcTo(center, radius + tok::mod_knob_float_gap_3, std::min(angleLo, angleHi), std::max(angleLo, angleHi), tok::mod_knob_float_segments);
+            dl->PathStroke(rangeCol, 0, tok::mod_knob_float_stroke_2);
          }
          if (t > 0.0f)
          {
-            dl->PathArcTo(center, radius + 2.5f, aMin, angle, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
+            dl->PathArcTo(center, radius + tok::mod_knob_float_gap_3, aMin, angle, tok::mod_knob_float_segments);
+            dl->PathStroke(fillColor, 0, tok::mod_knob_float_stroke);
          }
-         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
-         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_lo), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_mid_2), 32, 1.0f);
+         const ImVec2 tipIn(center.x + cosf(angle) * (radius * tok::mod_knob_float_ratio_2), center.y + sinf(angle) * (radius * tok::mod_knob_float_ratio_2));
+         const ImVec2 tipOut(center.x + cosf(angle) * (radius - tok::space_0_75), center.y + sinf(angle) * (radius - tok::space_0_75));
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_lo), tok::mod_knob_float_stroke_3);
+         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_mid_2), tok::mod_knob_float_segments, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::Role(tok::col::ink_black, 30), 32, 3.0f);
+            dl->AddCircle(center, radius + tok::mod_knob_float_gap_3, tok::Role(tok::col::ink_black, 30), tok::mod_knob_float_segments, tok::mod_knob_float_stroke);
       }
       else
       {
@@ -905,30 +905,30 @@ namespace app
          // shadow needs a touch more alpha than the light-theme version to
          // still separate the bezel from the body - same two-layer fake-blur
          // idiom, tuned darker/stronger for this background.
-         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::Role(tok::col::ink_black, 45), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::Role(tok::col::ink_black, 60), 32);
-         dl->AddCircleFilled(center, radius, tok::Role(tok::col::edge_lo), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::Role(tok::col::surface_deep), 32);
-         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo), 0, 3.0f);
+         const ImVec2 shadowCenter(center.x, center.y + tok::mod_knob_float_gap);
+         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::ink_black, 45), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::mod_knob_float_gap_2, tok::Role(tok::col::ink_black, 60), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(center, radius, tok::Role(tok::col::edge_lo), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - tok::px_align), radius - tok::space_0_75, tok::Role(tok::col::surface_deep), tok::mod_knob_float_segments);
+         dl->PathArcTo(center, radius + tok::mod_knob_float_gap_3, aMin, aMax, tok::mod_knob_float_segments);
+         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo), 0, tok::mod_knob_float_stroke);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
-            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
-            dl->PathStroke(rangeCol, 0, 5.0f);
+            dl->PathArcTo(center, radius + tok::mod_knob_float_gap_3, std::min(angleLo, angleHi), std::max(angleLo, angleHi), tok::mod_knob_float_segments);
+            dl->PathStroke(rangeCol, 0, tok::mod_knob_float_stroke_2);
          }
          if (t > 0.0f)
          {
-            dl->PathArcTo(center, radius + 2.5f, aMin, angle, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
+            dl->PathArcTo(center, radius + tok::mod_knob_float_gap_3, aMin, angle, tok::mod_knob_float_segments);
+            dl->PathStroke(fillColor, 0, tok::mod_knob_float_stroke);
          }
-         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
-         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::surface_hi) : tok::Role(tok::col::edge_hi), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo_2), 32, 1.0f);
+         const ImVec2 tipIn(center.x + cosf(angle) * (radius * tok::mod_knob_float_ratio_2), center.y + sinf(angle) * (radius * tok::mod_knob_float_ratio_2));
+         const ImVec2 tipOut(center.x + cosf(angle) * (radius - tok::space_0_75), center.y + sinf(angle) * (radius - tok::space_0_75));
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::surface_hi) : tok::Role(tok::col::edge_hi), tok::mod_knob_float_stroke_3);
+         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo_2), tok::mod_knob_float_segments, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::Role(tok::col::ink_white, 40), 32, 3.0f);
+            dl->AddCircle(center, radius + tok::mod_knob_float_gap_3, tok::Role(tok::col::ink_white, 40), tok::mod_knob_float_segments, tok::mod_knob_float_stroke);
       }
 
       // The knob's permanent caption is the param *name*, not its value - a
@@ -944,7 +944,7 @@ namespace app
          const ImU32 capCol = isLight
             ? (readOnly ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::edge_lo))
             : (readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_mid_2));
-         const float capY = p.y + diameter + 4.0f;
+         const float capY = p.y + diameter + tok::space_1;
          if (textSize.x <= cell)
          {
             dl->AddText(ImVec2(center.x - textSize.x * 0.5f, capY), capCol, caption);
@@ -995,9 +995,9 @@ namespace app
    {
       FadeIfDisabled fadeIfDisabled;
       const float kTwoPi = 6.28318530717958647692f;
-      const float aMin = 0.75f * kTwoPi * 0.5f; // 135 deg
-      const float aMax = 2.25f * kTwoPi * 0.5f; // 405 deg
-      const float aMid = 1.50f * kTwoPi * 0.5f; // 270 deg (12 o'clock center)
+      const float aMin = tok::mod_a_min_ratio * kTwoPi * 0.5f; // 135 deg
+      const float aMax = tok::mod_a_max_ratio * kTwoPi * 0.5f; // 405 deg
+      const float aMid = tok::mod_a_mid_ratio * kTwoPi * 0.5f; // 270 deg (12 o'clock center)
 
       const float cell = cellW > 0.0f ? cellW : diameter;
       const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -1035,7 +1035,7 @@ namespace app
          // stuck. Always full speed.
          const float speed = 1.0f;
          const float posNow = ValueToPos01(*value);
-         const float nextPos = std::clamp(posNow - ImGui::GetIO().MouseDelta.y * speed / 200.0f, 0.0f, 1.0f);
+         const float nextPos = std::clamp(posNow - ImGui::GetIO().MouseDelta.y * speed / tok::mod_bipolar_knob_float_ratio, 0.0f, 1.0f);
          const float next = Pos01ToValue(nextPos);
          if (next != *value)
          {
@@ -1051,7 +1051,7 @@ namespace app
          fillColor = tok::Role(tok::col::state_err);
 
       const ImVec2 center(p.x + cell * 0.5f, p.y + diameter * 0.5f);
-      const float radius = diameter * 0.5f - 2.0f;
+      const float radius = diameter * 0.5f - tok::space_0_5;
       const float t = ValueToPos01(*value);
       const float angle = aMin + t * (aMax - aMin);
       const float angleLo = hasRange ? aMin + ValueToPos01(rangeLo) * (aMax - aMin) : 0.0f;
@@ -1064,81 +1064,81 @@ namespace app
          // Soft under-knob shadow - see KnobFloat's identical treatment
          // above for the rationale (fake-blur via layered low-alpha circles,
          // offset down so the bezel reads as sitting above the panel).
-         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::Role(tok::col::surface_lo, 16), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::Role(tok::col::surface_lo, 22), 32);
-         dl->AddCircleFilled(center, radius, tok::Role(tok::col::surface_hi), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::Role(tok::col::ink_white), 32);
-         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::surface_hi), 0, 3.0f);
+         const ImVec2 shadowCenter(center.x, center.y + tok::mod_bipolar_knob_float_gap);
+         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::surface_lo, 16), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::mod_bipolar_knob_float_gap_2, tok::Role(tok::col::surface_lo, 22), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(center, radius, tok::Role(tok::col::surface_hi), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - tok::px_align), radius - tok::space_0_75, tok::Role(tok::col::ink_white), tok::mod_bipolar_knob_float_segments);
+         dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, aMin, aMax, tok::mod_bipolar_knob_float_segments);
+         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::surface_hi), 0, tok::mod_bipolar_knob_float_stroke);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
-            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
-            dl->PathStroke(rangeCol, 0, 5.0f);
+            dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, std::min(angleLo, angleHi), std::max(angleLo, angleHi), tok::mod_bipolar_knob_float_segments);
+            dl->PathStroke(rangeCol, 0, tok::mod_bipolar_knob_float_stroke_2);
          }
 
          // Center tick
-         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::Role(tok::col::text_secondary), 1.5f);
+         dl->AddLine(ImVec2(center.x, center.y - radius - tok::space_1_25), ImVec2(center.x, center.y - radius), tok::Role(tok::col::text_secondary), tok::mod_bipolar_knob_float_stroke_3);
 
          // Arc from center (12 o'clock) to current angle
          if (angle < aMid)
          {
-            dl->PathArcTo(center, radius + 2.5f, angle, aMid, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
+            dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, angle, aMid, tok::mod_bipolar_knob_float_segments);
+            dl->PathStroke(fillColor, 0, tok::mod_bipolar_knob_float_stroke);
          }
          else if (angle > aMid)
          {
-            dl->PathArcTo(center, radius + 2.5f, aMid, angle, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
+            dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, aMid, angle, tok::mod_bipolar_knob_float_segments);
+            dl->PathStroke(fillColor, 0, tok::mod_bipolar_knob_float_stroke);
          }
 
-         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
-         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_lo), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_mid_2), 32, 1.0f);
+         const ImVec2 tipIn(center.x + cosf(angle) * (radius * tok::mod_bipolar_knob_float_ratio_2), center.y + sinf(angle) * (radius * tok::mod_bipolar_knob_float_ratio_2));
+         const ImVec2 tipOut(center.x + cosf(angle) * (radius - tok::space_0_75), center.y + sinf(angle) * (radius - tok::space_0_75));
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_lo), tok::mod_bipolar_knob_float_stroke_4);
+         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_mid_2), tok::mod_bipolar_knob_float_segments, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::Role(tok::col::ink_black, 30), 32, 3.0f);
+            dl->AddCircle(center, radius + tok::mod_bipolar_knob_float_gap_3, tok::Role(tok::col::ink_black, 30), tok::mod_bipolar_knob_float_segments, tok::mod_bipolar_knob_float_stroke);
       }
       else
       {
          // Dark theme: slightly stronger alpha than the light version, same
          // rationale as KnobFloat's dark branch above.
-         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::Role(tok::col::ink_black, 45), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::Role(tok::col::ink_black, 60), 32);
-         dl->AddCircleFilled(center, radius, tok::Role(tok::col::edge_lo), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::Role(tok::col::surface_deep), 32);
-         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo), 0, 3.0f);
+         const ImVec2 shadowCenter(center.x, center.y + tok::mod_bipolar_knob_float_gap);
+         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::ink_black, 45), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::mod_bipolar_knob_float_gap_2, tok::Role(tok::col::ink_black, 60), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(center, radius, tok::Role(tok::col::edge_lo), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - tok::px_align), radius - tok::space_0_75, tok::Role(tok::col::surface_deep), tok::mod_bipolar_knob_float_segments);
+         dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, aMin, aMax, tok::mod_bipolar_knob_float_segments);
+         dl->PathStroke(activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo), 0, tok::mod_bipolar_knob_float_stroke);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
-            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
-            dl->PathStroke(rangeCol, 0, 5.0f);
+            dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, std::min(angleLo, angleHi), std::max(angleLo, angleHi), tok::mod_bipolar_knob_float_segments);
+            dl->PathStroke(rangeCol, 0, tok::mod_bipolar_knob_float_stroke_2);
          }
 
          // Center tick
-         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::Role(tok::col::edge_lo_3), 1.5f);
+         dl->AddLine(ImVec2(center.x, center.y - radius - tok::space_1_25), ImVec2(center.x, center.y - radius), tok::Role(tok::col::edge_lo_3), tok::mod_bipolar_knob_float_stroke_3);
 
          // Arc from center (12 o'clock) to current angle
          if (angle < aMid)
          {
-            dl->PathArcTo(center, radius + 2.5f, angle, aMid, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
+            dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, angle, aMid, tok::mod_bipolar_knob_float_segments);
+            dl->PathStroke(fillColor, 0, tok::mod_bipolar_knob_float_stroke);
          }
          else if (angle > aMid)
          {
-            dl->PathArcTo(center, radius + 2.5f, aMid, angle, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
+            dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, aMid, angle, tok::mod_bipolar_knob_float_segments);
+            dl->PathStroke(fillColor, 0, tok::mod_bipolar_knob_float_stroke);
          }
 
-         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
-         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_hi), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo_2), 32, 1.0f);
+         const ImVec2 tipIn(center.x + cosf(angle) * (radius * tok::mod_bipolar_knob_float_ratio_2), center.y + sinf(angle) * (radius * tok::mod_bipolar_knob_float_ratio_2));
+         const ImVec2 tipOut(center.x + cosf(angle) * (radius - tok::space_0_75), center.y + sinf(angle) * (radius - tok::space_0_75));
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_hi), tok::mod_bipolar_knob_float_stroke_4);
+         dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo_2), tok::mod_bipolar_knob_float_segments, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::Role(tok::col::ink_white, 40), 32, 3.0f);
+            dl->AddCircle(center, radius + tok::mod_bipolar_knob_float_gap_3, tok::Role(tok::col::ink_white, 40), tok::mod_bipolar_knob_float_segments, tok::mod_bipolar_knob_float_stroke);
       }
 
       // rowH has always reserved room for a caption here; nothing ever drew
@@ -1150,7 +1150,7 @@ namespace app
          const ImU32 capCol = isLight
             ? (readOnly ? tok::Base(tok::col::edge_mid) : tok::Base(tok::col::edge_lo))
             : (readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_mid_2));
-         const float capY = p.y + diameter + 4.0f;
+         const float capY = p.y + diameter + tok::space_1;
          if (textSize.x <= cell)
          {
             dl->AddText(ImVec2(center.x - textSize.x * 0.5f, capY), capCol, caption);
@@ -1341,11 +1341,11 @@ namespace app
          // The field is wider than the knob, so centred on the cell it slid under the
          // modulation pin (drawn after it, at the knob's left) and the pin hid the first
          // characters. It starts right of the pin instead - same pinX formula as below.
-         const float pinRight = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - tok::pin_box - 8.0f) +
-                                tok::pin_box + 4.0f;
-         const float fieldL = std::max(cellOrigin.x + 3.0f, pinRight);
-         const float fieldR = cellOrigin.x + cell - 3.0f;
-         const float fieldW = std::min(fieldR - fieldL, 96.0f);
+         const float pinRight = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - tok::pin_box - tok::space_2) +
+                                tok::pin_box + tok::space_1;
+         const float fieldL = std::max(cellOrigin.x + tok::space_0_75, pinRight);
+         const float fieldR = cellOrigin.x + cell - tok::space_0_75;
+         const float fieldW = std::min(fieldR - fieldL, tok::mod_knob_bound);
          const float fieldH = ImGui::GetFrameHeight();
          ImGui::SetCursorScreenPos(ImVec2(fieldL + (fieldR - fieldL - fieldW) * 0.5f,
                                           cellOrigin.y + (diameter - fieldH) * 0.5f));
@@ -1444,7 +1444,7 @@ namespace app
             changed = true;
          }
          EndPredictorGrab(grab, ref);
-         DrawPredictorDecor(ref, ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + 2.0f);
+         DrawPredictorDecor(ref, ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + tok::space_0_5);
          DrawModulationBindingMenu(nodeIndex, paramIndex, ImGui::IsItemHovered());
       }
       else if (hasExpr && !exprErrored)
@@ -1517,11 +1517,11 @@ namespace app
          // 8px of clear space between the pin's ring and the widget's outer
          // arc. At the old 2px the two visually touched and read as one
          // control with a wart on it rather than as a knob and its pin.
-         const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - 8.0f);
+         const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - tok::space_2);
          const ImVec2 pinTL(pinX, cellOrigin.y + (diameter - box) * 0.5f);  // centred on the knob (node-ui-pillars P2)
          ImGui::SetCursorScreenPos(pinTL);
          ed::BeginPin(pinId, ed::PinKind::Input);
-         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+         ed::PinPivotAlignment(ImVec2(tok::mod_knob_pin_pivot_alignment_x, tok::mod_knob_pin_pivot_alignment_y));
          ImGui::Dummy(ImVec2(box, box));
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(pinTL.x + box * 0.5f, pinTL.y + box * 0.5f);
@@ -1531,13 +1531,13 @@ namespace app
          gPinAnchors[pinId] = c;
          GraphNode* curGn = FindNodeByIndex(nodeIndex);
          ParamPinScreenInfo pinInfo{ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
-                                      cellOrigin, ImVec2(cellOrigin.x + cell, cellOrigin.y + diameter + 16.0f) };
+                                      cellOrigin, ImVec2(cellOrigin.x + cell, cellOrigin.y + diameter + tok::space_4) };
          const bool roundWidget = (style != AudioWidgetStyle::VFader && style != AudioWidgetStyle::VFaderDb);
          if (roundWidget)
          {
             pinInfo.isCircle = true;
             pinInfo.shapeCenter = ImVec2(cellOrigin.x + cell * 0.5f, cellOrigin.y + diameter * 0.5f);
-            pinInfo.shapeRadius = diameter * 0.5f + 2.0f;
+            pinInfo.shapeRadius = diameter * 0.5f + tok::space_0_5;
          }
          gParamPinScreenList.push_back(pinInfo);
          // Put the cursor back without SetCursorScreenPos: as the last call before EndGroup it counts as
@@ -1548,9 +1548,9 @@ namespace app
       {
          const bool kbCircle = (style != AudioWidgetStyle::VFader && style != AudioWidgetStyle::VFaderDb);
          const float kcx = cellOrigin.x + cell * 0.5f;
-         const ImVec2 kmin = kbCircle ? ImVec2(kcx - diameter * 0.5f, cellOrigin.y) : ImVec2(kcx - 7.0f, cellOrigin.y);
+         const ImVec2 kmin = kbCircle ? ImVec2(kcx - diameter * 0.5f, cellOrigin.y) : ImVec2(kcx - tok::mod_knob_gap, cellOrigin.y);
          const ImVec2 kmax = kbCircle ? ImVec2(kcx + diameter * 0.5f, cellOrigin.y + diameter)
-                                      : ImVec2(kcx + 7.0f, cellOrigin.y + diameter);
+                                      : ImVec2(kcx + tok::mod_knob_gap, cellOrigin.y + diameter);
          if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
          {
             if (kbCircle)
@@ -1636,7 +1636,7 @@ namespace app
       ImGui::PushID(colorIndex + 9000);
 
       ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      ed::PinPivotAlignment(ImVec2(tok::mod_color_swatch_pin_pivot_alignment_x, tok::mod_color_swatch_pin_pivot_alignment_y));
       const ImVec2 rowStart = ImGui::GetCursorScreenPos();
       const float box = tok::pin_box;
       // centred on the face, like every param pin (P2)
@@ -1648,12 +1648,12 @@ namespace app
       PinDot::Swatch(dl, c, isBound, IsThemeLight());
       ExpandPinHit(c, p.x + box);
       ed::EndPin();
-      ImGui::SetCursorScreenPos(ImVec2(rowStart.x + box + 4.0f, rowStart.y));
+      ImGui::SetCursorScreenPos(ImVec2(rowStart.x + box + tok::space_1, rowStart.y));
 
       char boundCaption[96];
       snprintf(boundCaption, sizeof(boundCaption), "%s  #%d", label, bound.swatchIndex + 1);
       const ImVec4 boundTint = ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pin_colour_bound, IsThemeLight()));
-      if (ColourChip::DrawRow(label, isBound ? boundCaption : label, col, std::max(24.0f, kParamWidth - (tok::pin_box + 4.0f)),
+      if (ColourChip::DrawRow(label, isBound ? boundCaption : label, col, std::max(tok::mod_color_swatch_bound, kParamWidth - (tok::pin_box + tok::space_1)),
                               isBound ? &boundTint : nullptr))
       {
          if (isBound)
@@ -1704,10 +1704,10 @@ namespace app
 
       auto stub = [&](int pinId)
       {
-         ImGui::SetCursorScreenPos(ImVec2(anchor.x - 0.5f, anchor.y - 0.5f));
+         ImGui::SetCursorScreenPos(ImVec2(anchor.x - tok::px_align, anchor.y - tok::px_align));
          ed::BeginPin(pinId, ed::PinKind::Input);
-         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-         ImGui::Dummy(ImVec2(1.0f, 1.0f));
+         ed::PinPivotAlignment(ImVec2(tok::mod_collapsed_binding_pins_pin_pivot_alignment_x, tok::mod_collapsed_binding_pins_pin_pivot_alignment_y));
+         ImGui::Dummy(ImVec2(tok::mod_collapsed_binding_pins_dummy_w, tok::mod_collapsed_binding_pins_dummy_h));
          ed::EndPin();
       };
 
@@ -1756,18 +1756,18 @@ namespace app
    // the node instead of stopping a third of the way across (v3 §1b).
    void NodeSeparator(const char* label, float width)
    {
-      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::mod_node_separator_dummy_h));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const float y = origin.y + 6.0f;
+      const float y = origin.y + tok::space_1_5;
       const ImU32 col = ImGui::GetColorU32(ImGuiCol_Border, 0.6f);   // themed hairline: reads in light and dark
 
       if (label != nullptr && label[0] != '\0')
       {
          const ImVec2 textSize = ImGui::CalcTextSize(label);
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + 10.0f, y), col);
-         dl->AddText(ImVec2(origin.x + 16.0f, origin.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), label);
-         const float lineStart = origin.x + 22.0f + textSize.x;
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + tok::space_2_5, y), col);
+         dl->AddText(ImVec2(origin.x + tok::space_4, origin.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), label);
+         const float lineStart = origin.x + tok::mod_line_start_gap + textSize.x;
          if (lineStart < origin.x + width)
             dl->AddLine(ImVec2(lineStart, y), ImVec2(origin.x + width, y), col);
          ImGui::Dummy(ImVec2(width, textSize.y));
@@ -1775,9 +1775,9 @@ namespace app
       else
       {
          dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + width, y), col);
-         ImGui::Dummy(ImVec2(width, 8.0f));
+         ImGui::Dummy(ImVec2(width, tok::mod_node_separator_dummy_h_2));
       }
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::mod_node_separator_dummy_h_3));
    }
 
 
@@ -1792,7 +1792,7 @@ namespace app
    // and an emoji would not render in a non-emoji face.
    bool EyeToggle(bool shown)
    {
-      return GlyphToggle::Draw("##eye", IconsInfinite::EyeOff, IconsInfinite::Eye, shown, 26.0f);
+      return GlyphToggle::Draw("##eye", IconsInfinite::EyeOff, IconsInfinite::Eye, shown, tok::mod_eye_toggle_draw);
    }
 
 
@@ -1853,7 +1853,7 @@ namespace app
    // rendering an IEC 60417-5009 power symbol.
    bool BypassToggle(bool bypassed)
    {
-      return GlyphToggle::Draw("##bypass", IconsInfinite::Power, IconsInfinite::PowerFill, !bypassed, 22.0f, true);
+      return GlyphToggle::Draw("##bypass", IconsInfinite::Power, IconsInfinite::PowerFill, !bypassed, tok::mod_bypass_toggle_draw, true);
    }
 
 
@@ -1911,14 +1911,14 @@ namespace app
    float CachedCentreOffset(const INode* node, float contentW)
    {
       auto it = gNodeWidthCache.find(node);
-      return it == gNodeWidthCache.end() ? 0.0f : std::max(0.0f, (it->second - 16.0f - contentW) * 0.5f);
+      return it == gNodeWidthCache.end() ? 0.0f : std::max(0.0f, (it->second - tok::space_4 - contentW) * 0.5f);
    }
    float WideNodeCentreOffset(const INode* node, float contentW)
    {
       float nodeW = kWideNodeWidth;
       auto it = gNodeWidthCache.find(node);
       if (it != gNodeWidthCache.end())
-         nodeW = it->second - 16.0f;   // 16 = node padding left + right; the real width, not a floor, or a narrow node centres off to the right
+         nodeW = it->second - tok::space_4;   // 16 = node padding left + right; the real width, not a floor, or a narrow node centres off to the right
       return std::max(0.0f, (nodeW - contentW) * 0.5f);
    }
 
@@ -1929,12 +1929,12 @@ namespace app
    void DrawPin(int pinId, ed::PinKind kind, const char* label, bool labelFirst)
    {
       ed::BeginPin(pinId, kind);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      ed::PinPivotAlignment(ImVec2(tok::mod_pin_pin_pivot_alignment_x, tok::mod_pin_pin_pivot_alignment_y));
 
       if (labelFirst && label != nullptr && label[0] != '\0')
       {
          ImGui::TextDisabled("%s", label);
-         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::SameLine(0.0f, tok::space_1);
       }
 
       ImVec2 p = ImGui::GetCursorScreenPos();
@@ -1950,7 +1950,7 @@ namespace app
 
       if (!labelFirst && label != nullptr && label[0] != '\0')
       {
-         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::SameLine(0.0f, tok::space_1);
          ImGui::TextDisabled("%s", label);
       }
       ed::EndPin();

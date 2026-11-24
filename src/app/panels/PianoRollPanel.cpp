@@ -46,11 +46,11 @@ namespace app
 
 namespace
 {
-   constexpr float kMinHeight = 240.0f;
+   constexpr float kMinHeight = tok::piano_roll_min_height;
    constexpr float kIconW = tok::control_h;
-   constexpr float kKeysW = 44.0f, kRulerH = 16.0f, kStripH = 10.0f;
-   constexpr float kInspectorW = UiDensity::kInspectorW + 2.0f * tok::space_2;   // one compact strip
-   constexpr float kMinKeyH = 5.0f, kMaxKeyH = 32.0f;
+   constexpr float kKeysW = tok::piano_roll_keys_w, kRulerH = tok::piano_roll_ruler_h, kStripH = tok::piano_roll_strip_h;
+   constexpr float kInspectorW = UiDensity::kInspectorW + tok::piano_roll_inspector_w_ratio * tok::space_2;   // one compact strip
+   constexpr float kMinKeyH = tok::piano_roll_min_key_h, kMaxKeyH = tok::piano_roll_max_key_h;
    constexpr double kMinPxPerTick = 0.002, kMaxPxPerTick = 2.0;
    using Arrange::Tick;
 
@@ -361,7 +361,7 @@ namespace
          lo = hi = 60;
       const int span = std::abs(std::max(0, s.rowOf[(size_t)lo]) - std::max(0, s.rowOf[(size_t)hi])) + 3;
       const float floor = page.drumRows ? 18.0f : kMinKeyH;
-      s.keyH = std::clamp(std::min(page.drumRows ? 22.0f : 12.0f, rollH / (float)span), floor, kMaxKeyH);
+      s.keyH = std::clamp(std::min(page.drumRows ? tok::piano_roll_fit_rows_bound : tok::piano_roll_fit_rows_bound_2, rollH / (float)span), floor, kMaxKeyH);
       const int mid = std::max(0, s.rowOf[(size_t)((lo + hi) / 2)]);
       s.topRow = (float)mid - rollH / s.keyH * 0.5f;
       s.fitH = rollH;
@@ -382,7 +382,7 @@ namespace
          t0 = 0;
          t1 = 4 * Arrange::kTicksPerBar;
       }
-      s.pxPerTick = std::clamp((double)rollW * 0.95 / (double)(t1 - t0), kMinPxPerTick, kMaxPxPerTick);
+      s.pxPerTick = std::clamp((double)rollW * tok::piano_roll_fit_view_ratio / (double)(t1 - t0), kMinPxPerTick, kMaxPxPerTick);
       s.viewTick = (double)t0;
       FitRows(page, rollH);
    }
@@ -587,7 +587,7 @@ namespace
             continue;
          const ImVec4 col = ClipColor(c, page);
          const bool on = s.clips.count(c.id) != 0;
-         dl->AddRectFilled(ImVec2(cx0, y0), ImVec2(cx1, y1), WithAlpha(col, c.enabled ? (on ? 0.85f : 0.55f) : 0.2f), tok::radius_control);
+         dl->AddRectFilled(ImVec2(cx0, y0), ImVec2(cx1, y1), WithAlpha(col, c.enabled ? (on ? tok::piano_roll_clip_strip_assign : tok::piano_roll_clip_strip_assign_2) : 0.2f), tok::radius_control);
          if (on)
             dl->AddRect(ImVec2(cx0, y0), ImVec2(cx1, y1), Tint(0.9f), tok::radius_control);
          if (!c.enabled || LinkedNode(page) == nullptr)
@@ -634,17 +634,17 @@ namespace
          if (page.drumRows)
          {
             dl->AddRectFilled(ImVec2(kx0, y), ImVec2(kx1, y1 - 1.0f), Tint(0.1f));
-            if (s.keyH >= 9.0f)
+            if (s.keyH >= tok::piano_roll_keys_limit)
             {
                const char* name = DrumName(p);
-               dl->AddText(ImVec2(kx0 + 3.0f, y + (s.keyH - ImGui::GetFontSize()) * 0.5f), Tint(0.8f), name != nullptr ? name : PitchName(p).c_str());
+               dl->AddText(ImVec2(kx0 + tok::space_0_75, y + (s.keyH - ImGui::GetFontSize()) * 0.5f), Tint(0.8f), name != nullptr ? name : PitchName(p).c_str());
             }
             continue;
          }
          const bool black = IsBlackKey(p);
-         dl->AddRectFilled(ImVec2(kx0, y), ImVec2(black ? kx0 + (kx1 - kx0) * 0.62f : kx1, y1 - 1.0f), Tint(black ? 0.42f : 0.1f));
-         if (p % 12 == 0 && s.keyH >= 9.0f)
-            dl->AddText(ImVec2(kx1 - 24.0f, y + (s.keyH - ImGui::GetFontSize()) * 0.5f), Tint(0.8f), PitchName(p).c_str());
+         dl->AddRectFilled(ImVec2(kx0, y), ImVec2(black ? kx0 + (kx1 - kx0) * tok::piano_roll_keys_ratio : kx1, y1 - 1.0f), Tint(black ? 0.42f : 0.1f));
+         if (p % 12 == 0 && s.keyH >= tok::piano_roll_keys_limit)
+            dl->AddText(ImVec2(kx1 - tok::space_5, y + (s.keyH - ImGui::GetFontSize()) * 0.5f), Tint(0.8f), PitchName(p).c_str());
       }
       dl->PopClipRect();
    }
@@ -708,21 +708,21 @@ namespace
             if (row < 0)
                return;
             const float y = a.RowY((float)row), x0 = a.TickX((double)pl.start);
-            const float x1 = page.drumRows ? x0 + DrumHitW() : std::max(x0 + 2.0f, a.TickX((double)pl.end));
+            const float x1 = page.drumRows ? x0 + DrumHitW() : std::max(x0 + tok::space_0_5, a.TickX((double)pl.end));
             if (x1 < a.x0 || x0 > a.x1 || y + s.keyH < a.rollY || y > a.rollB)
                return;
             const bool sel = s.notes.count({ c.id, pl.note->id }) != 0;
             float depth = 0.3f + 0.7f * (float)pl.note->vel / 127.0f;
             if (!editing || pl.repeat)
                depth *= 0.35f;
-            const ImVec2 p0(x0, y + 0.5f), p1(x1, y + s.keyH - 0.5f);
-            const float round = std::min(tok::radius_control * 0.5f, s.keyH * 0.25f);
+            const ImVec2 p0(x0, y + tok::px_align), p1(x1, y + s.keyH - tok::px_align);
+            const float round = std::min(tok::radius_control * 0.5f, s.keyH * tok::piano_roll_clips_and_notes_ratio);
             dl->AddRectFilled(p0, p1, WithAlpha(col, depth), round);
             dl->AddRect(p0, p1, sel ? Tint(1.0f) : WithAlpha(col, editing && !pl.repeat ? 1.0f : 0.45f), round);
             if (pl.note->mute || !c.enabled)
                DrawArrangeHatch(dl, p0, p1, Tint(0.45f), 4.0f);
             if (page.scaleSnap && !InScale(pl.note->pitch))
-               dl->AddCircleFilled(ImVec2(x0 + 3.0f, y + s.keyH * 0.5f), 1.5f, Tint(0.9f));
+               dl->AddCircleFilled(ImVec2(x0 + tok::space_0_75, y + s.keyH * 0.5f), tok::piano_roll_clips_and_notes_r, Tint(0.9f));
          });
       }
    }
@@ -732,7 +732,7 @@ namespace
       return PanelKit::IconChip(id, glyphStr, on, tip, kIconW, PanelKit::Chip(), green ? ActionButton::Kind::Go : ActionButton::Kind::Plain);
    }
 
-   float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_3; }
+   float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + tok::piano_roll_text_w_ratio * tok::space_3; }
 
    bool TextChip(const char* label, bool on = false, ActionButton::Kind kind = ActionButton::Kind::Plain)
    {
@@ -1079,7 +1079,7 @@ namespace
 
    void VelocityRamp(std::vector<Arrange::Note>& notes)
    {
-      if (notes.size() < 2)
+      if (notes.size() < tok::piano_roll_velocity_ramp_limit)
          return;
       const float from = notes.front().vel, to = notes.back().vel;
       const float span = (float)(notes.back().start - notes.front().start);
@@ -1418,8 +1418,8 @@ namespace
       }
       if (hi <= lo)
          return;
-      s.pxPerTick = std::clamp((double)rollW * 0.9 / (double)(hi - lo), kMinPxPerTick, kMaxPxPerTick);
-      s.viewTick = std::max(0.0, (double)lo - (double)rollW * 0.05 / s.pxPerTick);
+      s.pxPerTick = std::clamp((double)rollW * tok::piano_roll_zoom_to_selection_ratio / (double)(hi - lo), kMinPxPerTick, kMaxPxPerTick);
+      s.viewTick = std::max(0.0, (double)lo - (double)rollW * tok::piano_roll_zoom_to_selection_ratio_2 / s.pxPerTick);
    }
 
    void SetLoopFromSelection(const Arrange::Lane& page)
@@ -1576,7 +1576,7 @@ namespace
       if (!haveMidi)
          ImGui::EndDisabled();
       FormParts::Inline(0.0f, tok::space_1);
-      const float devW = 132.0f;
+      const float devW = tok::piano_roll_dev_w;
       ImVec2 bmin, bmax;
       if (PickerFace("##pianoRecDevice", devLabel.c_str(), devW, T("Which MIDI controller Record listens to"), bmin, bmax))
          ImGui::OpenPopup("##pianoRecDeviceMenu");
@@ -1740,14 +1740,14 @@ namespace
             if (row < 0 || m.y < a.RowY((float)row) || m.y >= a.RowY((float)row + 1.0f))
                return;
             const float x0 = a.TickX((double)pl.start);
-            const float x1 = page.drumRows ? x0 + DrumHitW() : std::max(x0 + 2.0f, a.TickX((double)pl.end));
+            const float x1 = page.drumRows ? x0 + DrumHitW() : std::max(x0 + tok::space_0_5, a.TickX((double)pl.end));
             if (m.x < x0 || m.x > x1)
                return;
             hit.clip = c.id;
             hit.note = *pl.note;
             hit.start = pl.start;
             hit.end = pl.end;
-            const float margin = std::min(5.0f, (x1 - x0) * 0.3f);
+            const float margin = std::min(tok::piano_roll_hit_note_bound, (x1 - x0) * tok::piano_roll_hit_note_ratio);
             hit.edge = page.drumRows ? 0 : m.x > x1 - margin ? 1 : m.x < x0 + margin ? -1 : 0;
             found = true;
          });
@@ -2226,7 +2226,7 @@ namespace
       }
       else if (s.drag == Drag::Range)
       {
-         if (std::fabs(m.x - s.dragFrom.x) < 3.0f)
+         if (std::fabs(m.x - s.dragFrom.x) < tok::piano_roll_end_drag_limit)
             s.rangeStart = s.rangeEnd = 0;
       }
       else if (s.drag == Drag::Scrub)
@@ -2306,7 +2306,7 @@ namespace
          s.clips.insert(c->id);
       }
       const float x0 = a.TickX((double)c->start), x1 = a.TickX((double)(c->start + c->length));
-      const bool left = m.x < x0 + 5.0f, right = m.x > x1 - 5.0f;
+      const bool left = m.x < x0 + tok::space_1_25, right = m.x > x1 - tok::space_1_25;
       const Tick anchor = right ? c->start + c->length : c->start;
       s.paintClip = c->id;
       BeginDrag(left ? Drag::TrimStart : right ? Drag::TrimEnd : Drag::MoveClips, page, m, tick, 0, anchor);
@@ -2329,7 +2329,7 @@ namespace
       // An edge scrolled out of the view isn't drawn, so it can't be grabbed either.
       const auto grabs = [&](Tick t) {
          const float x = a.TickX((double)t);
-         return x >= a.x0 - 0.5f && x <= a.x1 + 0.5f && std::fabs(m.x - x) <= TimeRuler::kEdgeHit;
+         return x >= a.x0 - tok::px_align && x <= a.x1 + tok::px_align && std::fabs(m.x - x) <= TimeRuler::kEdgeHit;
       };
       if (loop.enabled && grabs(loop.start))
          BeginDrag(Drag::LoopStart, page, m, tick, 0, loop.start);
@@ -2415,8 +2415,8 @@ namespace
       {
          ImGui::AlignTextToFramePadding();
          ImGui::TextUnformatted(label);
-         FormParts::Inline(84.0f);
-         ImGui::SetNextItemWidth(112.0f);
+         FormParts::Inline(tok::piano_roll_note_field_inline_layout);
+         ImGui::SetNextItemWidth(tok::piano_roll_note_field_set_next_item_width_w);
          changed = FieldWell::Slider((std::string("##m") + label).c_str(), &v, lo, hi, mixed ? T("mixed") : fmt, flags);
       }
       else
@@ -2469,8 +2469,8 @@ namespace
       {
          ImGui::AlignTextToFramePadding();
          ImGui::TextUnformatted(label);
-         FormParts::Inline(84.0f);
-         ImGui::SetNextItemWidth(112.0f);
+         FormParts::Inline(tok::piano_roll_clip_field_inline_layout);
+         ImGui::SetNextItemWidth(tok::piano_roll_clip_field_set_next_item_width_w);
          changed = FieldWell::Slider((std::string("##m") + label).c_str(), &v, lo, hi, fmt);
       }
       else
@@ -3188,7 +3188,7 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       Areas a;
-      const float inspectorBase = std::min(kInspectorW, avail.x * 0.4f);
+      const float inspectorBase = std::min(kInspectorW, avail.x * tok::piano_roll_page_ratio);
       const float inspectorW = s.settingsOpen || s.genOpen
          ? inspectorBase : 0.0f;
       a.x0 = origin.x + kKeysW;
@@ -3197,7 +3197,7 @@ namespace
       a.stripY = a.rulerY + kRulerH;
       a.rollY = a.stripY + kStripH;
       a.rollB = origin.y + avail.y;
-      if (a.rollB - a.rollY < 8.0f || a.x1 - a.x0 < 8.0f)
+      if (a.rollB - a.rollY < tok::piano_roll_page_limit || a.x1 - a.x0 < tok::piano_roll_page_limit)
          return;
       if (s.drag == Drag::None) // rows stay put under a drag: fold would pull them out from under the pointer
          BuildRows(page);
@@ -3209,7 +3209,7 @@ namespace
          s.rangeStart = s.rangeEnd = 0;
          FitView(page, a.x1 - a.x0, a.rollB - a.rollY);
       }
-      else if ((s.refitRows || (s.autoFit && std::abs(a.rollB - a.rollY - s.fitH) > 0.5f)) && s.drag == Drag::None)
+      else if ((s.refitRows || (s.autoFit && std::abs(a.rollB - a.rollY - s.fitH) > tok::piano_roll_page_limit_2)) && s.drag == Drag::None)
          FitRows(page, a.rollB - a.rollY);
       s.refitRows = false;
       PruneSelection(page);
@@ -3239,14 +3239,14 @@ namespace
          else if (cmdOrCtrl && wheelY != 0.0f)
          {
             if (io.KeyAlt)
-               s.keyH = std::clamp(s.keyH * std::pow(1.1f, wheelY), kMinKeyH, kMaxKeyH);
+               s.keyH = std::clamp(s.keyH * std::pow(tok::piano_roll_page_pow_maths, wheelY), kMinKeyH, kMaxKeyH);
             else
                ZoomX(std::pow(1.15, (double)wheelY), mouse.x, a.x0);
          }
          else
          {
-            s.topRow -= wheelY * 3.0f;
-            s.viewTick -= (double)wheelX * 30.0 / s.pxPerTick;
+            s.topRow -= wheelY * tok::piano_roll_top_row_ratio;
+            s.viewTick -= (double)wheelX * tok::piano_roll_view_tick_ratio / s.pxPerTick;
          }
       }
       ClampView(a.rollB - a.rollY);
@@ -3282,7 +3282,7 @@ namespace
          s.openFunctions = false;
          ImGui::OpenPopup("##pianoFx");
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(220.0f, 0.0f), ImVec2(280.0f, MenuParts::ListMaxH()));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::piano_roll_page_set_next_window_size_constraints_x, 0.0f), ImVec2(tok::piano_roll_page_set_next_window_size_constraints_x_2, MenuParts::ListMaxH()));
       if (MenuParts::BeginPopup("##pianoFx"))
       {
          DrawContextMenu(page);

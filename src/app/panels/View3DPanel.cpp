@@ -53,9 +53,9 @@ using I18n::L;
 using I18n::T;
 
 bool gView3DOpen = false;
-float gView3DHeight = 420.0f;
+float gView3DHeight = tok::view3d_view3_d_height;
 int gView3DDock = 0;
-float gView3DWidth = 620.0f;
+float gView3DWidth = tok::view3d_view3_d_width;
 int gView3DDockBack = 0;
 bool gView3DClaimedKeys = false;
 ImVec2 gView3DRectMin, gView3DRectMax;
@@ -64,9 +64,9 @@ namespace
 {
    constexpr float kSideW = UiDensity::kInspectorW + tok::control_h + tok::space_3;   // tab rail + one compact strip
    constexpr float kPi = 3.14159265f;
-   constexpr float kFov = 45.0f;
+   constexpr float kFov = tok::view3d_fov;
    constexpr float kIconW = tok::control_h;
-   constexpr float kGizmoPx = 84.0f;
+   constexpr float kGizmoPx = tok::view3d_gizmo_px;
 
    // Overlay colours are Blender's factory theme, not the app's: a 3D viewport is
    // read against the picture, and every one of these has one job there.
@@ -124,7 +124,7 @@ namespace
    float sTarget[3] = { 0, 0, 0 };
    bool sLockActive = false;       // the orbit pivot follows the active item
    // One orbit speed for drag and trackpad: 0.4 degrees per pixel, the Blender default.
-   constexpr float kOrbitPerPixel = 0.4f * 3.14159265f / 180.0f;
+   constexpr float kOrbitPerPixel = tok::view3d_orbit_per_pixel_ratio * 3.14159265f / 180.0f;
    float RotStep();
    void TogglePose(Scene3DNode* scene);
    void PoseIk(Scene3DNode* scene, bool clear);
@@ -433,10 +433,10 @@ namespace
       {
          // The lens sees the render's shape; the rest of the panel looks past its edge.
          const float renderAspect = (float)std::max(1, scene->GetOutputWidth()) / (float)std::max(1, scene->GetOutputHeight());
-         float fw = w * 0.92f, fh = fw / renderAspect;
-         if (fh > h * 0.92f)
+         float fw = w * tok::view3d_fw_ratio, fh = fw / renderAspect;
+         if (fh > h * tok::view3d_cam_ratio)
          {
-            fh = h * 0.92f;
+            fh = h * tok::view3d_fh_ratio;
             fw = fh * renderAspect;
          }
          fw *= sCamZoom;
@@ -452,8 +452,8 @@ namespace
          sCam.proj.m[13] *= fh / h;
          for (int i = 0; i < 4; i++)
          {
-            sCam.proj.m[i * 4 + 0] += 2.0f * sCamPan.x / w * sCam.proj.m[i * 4 + 3];
-            sCam.proj.m[i * 4 + 1] -= 2.0f * sCamPan.y / h * sCam.proj.m[i * 4 + 3];
+            sCam.proj.m[i * 4 + 0] += tok::view3d_m_ratio * sCamPan.x / w * sCam.proj.m[i * 4 + 3];
+            sCam.proj.m[i * 4 + 1] -= tok::view3d_m_ratio * sCamPan.y / h * sCam.proj.m[i * 4 + 3];
          }
          sCam.ortho = lens->projection != 0;
       }
@@ -655,7 +655,7 @@ namespace
    void ViewAxisNow(int which)
    {
       LeaveCamera();
-      const float top = 1.5697f;
+      const float top = tok::view3d_top;
       const float az[6] = { 0.0f, kPi, kPi * 0.5f, kPi * 0.5f, kPi * 0.5f, -kPi * 0.5f };
       const float el[6] = { 0.0f, 0.0f, top, -top, 0.0f, 0.0f };
       sRoll = 0.0f;
@@ -681,10 +681,10 @@ namespace
       const float x = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
       const float y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
       const float w = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
-      if (w < 0.01f)
+      if (w < tok::view3d_project_limit)
          return false;
-      out.x = sCam.mn.x + (x / w * 0.5f + 0.5f) * (sCam.mx.x - sCam.mn.x);
-      out.y = sCam.mn.y + (0.5f - y / w * 0.5f) * (sCam.mx.y - sCam.mn.y);
+      out.x = sCam.mn.x + (x / w * tok::view3d_project_ratio + tok::view3d_project_bias) * (sCam.mx.x - sCam.mn.x);
+      out.y = sCam.mn.y + (tok::view3d_project_bias - y / w * 0.5f) * (sCam.mx.y - sCam.mn.y);
       return true;
    }
 
@@ -702,8 +702,8 @@ namespace
    // The mouse as a world ray.
    void MouseRay(ImVec2 mouse, float o[3], float d[3])
    {
-      const float nx = (mouse.x - sCam.mn.x) / std::max(1.0f, sCam.mx.x - sCam.mn.x) * 2.0f - 1.0f;
-      const float ny = 1.0f - (mouse.y - sCam.mn.y) / std::max(1.0f, sCam.mx.y - sCam.mn.y) * 2.0f;
+      const float nx = (mouse.x - sCam.mn.x) / std::max(1.0f, sCam.mx.x - sCam.mn.x) * tok::view3d_nx_ratio - 1.0f;
+      const float ny = 1.0f - (mouse.y - sCam.mn.y) / std::max(1.0f, sCam.mx.y - sCam.mn.y) * tok::view3d_ny_ratio;
       const Mat4 inv = Mat4::Inverse(sCam.viewProj);
       const float* m = inv.m;
       const float w = m[3] * nx + m[7] * ny - m[11] + m[15];
@@ -928,9 +928,9 @@ namespace
    {
       const float len = std::max(1e-6f, std::sqrt(qin[0] * qin[0] + qin[1] * qin[1] + qin[2] * qin[2] + qin[3] * qin[3]));
       const float w = qin[0] / len, x = qin[1] / len, y = qin[2] / len, z = qin[3] / len;
-      const float d[3][3] = { { 1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w) },
-                              { 2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w) },
-                              { 2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y) } };
+      const float d[3][3] = { { 1 - tok::view3d_set_quaternion_ratio * (y * y + z * z), tok::view3d_set_quaternion_ratio * (x * y - z * w), tok::view3d_set_quaternion_ratio * (x * z + y * w) },
+                              { tok::view3d_set_quaternion_ratio * (x * y + z * w), 1 - tok::view3d_set_quaternion_ratio * (x * x + z * z), tok::view3d_set_quaternion_ratio * (y * z - x * w) },
+                              { tok::view3d_set_quaternion_ratio * (x * z - y * w), tok::view3d_set_quaternion_ratio * (y * z + x * w), 1 - tok::view3d_set_quaternion_ratio * (x * x + y * y) } };
       float r[3][3];
       Swap3(d, r, false);
       EulerFrom(r, engineDeg);
@@ -951,7 +951,7 @@ namespace
    void QuaternionFromAxisAngle(const float aa[4], float q[4])
    {
       const float an = std::max(1e-6f, std::sqrt(aa[1] * aa[1] + aa[2] * aa[2] + aa[3] * aa[3]));
-      const float h = aa[0] * kPi / 360.0f, sh = std::sin(h) / an;
+      const float h = aa[0] * kPi / tok::view3d_h_ratio, sh = std::sin(h) / an;
       q[0] = std::cos(h); q[1] = aa[1] * sh; q[2] = aa[2] * sh; q[3] = aa[3] * sh;
    }
 
@@ -1061,7 +1061,7 @@ namespace
    // How strongly an item at `dist` from the selection follows: 1 at it, 0 at the size.
    float Falloff(float dist)
    {
-      const float size = std::max(0.01f, sSet->propSize);
+      const float size = std::max(tok::view3d_falloff_bound, sSet->propSize);
       if (dist >= size && sSet->propFalloff != 5)
          return 0.0f;
       const float u = std::clamp(1.0f - dist / size, 0.0f, 1.0f);
@@ -1229,7 +1229,7 @@ namespace
             factor = 1.0f + (d.x * sx + d.y * sy) / std::max(1.0f, sx * sx + sy * sy);
          }
          else if (sOp.gizmo)
-            factor = 1.0f + (d.x - d.y) / 120.0f;
+            factor = 1.0f + (d.x - d.y) / tok::view3d_factor_ratio;
          else
          {
             const float d0 = std::max(4.0f, std::hypot(sOp.start.x - c.x, sOp.start.y - c.y));
@@ -1259,7 +1259,7 @@ namespace
          }
          else if (sSet->snapTarget != 0 && !sOp.centers.empty())
          {
-            const size_t n = sOp.centers.size() / 3;
+            const size_t n = sOp.centers.size() / 3;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
             for (int k = 0; k < 3; k++)
             {
                float lo = 1e30f, hi = -1e30f, sum = 0.0f;
@@ -1492,7 +1492,7 @@ namespace
          sTarget[k] = (lo[k] + hi[k]) * 0.5f;
          size = std::max(size, hi[k] - lo[k]);
       }
-      sDist = std::max(0.5f, size * 1.8f);
+      sDist = std::max(0.5f, size * tok::view3d_frame_items_now_ratio);
    }
 
    void FrameItems(Scene3DNode* scene, bool all)
@@ -1910,7 +1910,7 @@ namespace
    void FollowActive(Scene3DNode* scene, bool clear)
    {
       const int active = sSel.empty() ? 0 : sSel.back();
-      if (active == 0 || (!clear && sSel.size() < 2))
+      if (active == 0 || (!clear && sSel.size() < tok::view3d_follow_active_limit))
          return;
       PushUndoCheckpoint(clear ? "Clear follow in 3D View" : "Follow in 3D View");
       for (int id : sSel)
@@ -1929,7 +1929,7 @@ namespace
 
    void CopyTransformsFromActive(Scene3DNode* scene)
    {
-      const Item* a = sSel.size() < 2 ? nullptr : scene->FindItem(sSel.back());
+      const Item* a = sSel.size() < tok::view3d_a_limit ? nullptr : scene->FindItem(sSel.back());
       if (a == nullptr)
          return;
       PushUndoCheckpoint("Copy transforms");
@@ -1978,7 +1978,7 @@ namespace
    // Align every selected item to the active one along a display axis: 0 min, 1 centre, 2 max of the active's box.
    void AlignSelected(Scene3DNode* scene, int displayAxis)
    {
-      const Item* a = sSel.size() < 2 ? nullptr : scene->FindItem(sSel.back());
+      const Item* a = sSel.size() < tok::view3d_a_limit ? nullptr : scene->FindItem(sSel.back());
       if (a == nullptr)
          return;
       float ac[3];
@@ -2166,7 +2166,7 @@ namespace
       if (MenuParts::Item(T("Active Camera"), nullptr, false, scene->activeCamera != 0)) SelectActiveCamera(scene);
       if (MenuParts::SubMenu(T("Select Pattern"), true))
       {
-         ImGui::SetNextItemWidth(160.0f);
+         ImGui::SetNextItemWidth(tok::view3d_select_items_set_next_item_width_w);
          if (FieldWell::InputText("##v3dpattern", sPattern, sizeof(sPattern), ImGuiInputTextFlags_EnterReturnsTrue))
             SelectPattern(scene);
          if (MenuParts::Item(T("Select")))
@@ -2404,7 +2404,7 @@ namespace
          if (pressed(ImGuiKey_Backspace) && !sOp.typed.empty())
             sOp.typed.pop_back();
          if (sSet->proportional && (pressed(ImGuiKey_PageUp) || pressed(ImGuiKey_PageDown)))
-            sSet->propSize = std::clamp(sSet->propSize * (pressed(ImGuiKey_PageUp) ? 1.1f : 1.0f / 1.1f), 0.05f, 500.0f);
+            sSet->propSize = std::clamp(sSet->propSize * (pressed(ImGuiKey_PageUp) ? tok::view3d_keys_assign : 1.0f / tok::view3d_keys_ratio), tok::view3d_keys_bound, tok::view3d_keys_bound_2);
          ApplyOp(scene, mouse);
          if (pressed(ImGuiKey_Escape) || (!sOp.gizmo && MenuParts::RightPressed()))
             CancelOp(scene);
@@ -2670,10 +2670,10 @@ namespace
          const float mx0 = sCam.mn.x, mx1 = sCam.mx.x, my0 = sCam.mn.y, my1 = sCam.mx.y;
          ImVec2 p = io.MousePos;
          const float w = mx1 - mx0, h = my1 - my0;
-         if (w > 40.0f && h > 40.0f)
+         if (w > tok::view3d_navigation_limit && h > tok::view3d_navigation_limit)
          {
-            if (p.x < mx0 + 2.0f) p.x += w - 4.0f; else if (p.x > mx1 - 2.0f) p.x -= w - 4.0f;
-            if (p.y < my0 + 2.0f) p.y += h - 4.0f; else if (p.y > my1 - 2.0f) p.y -= h - 4.0f;
+            if (p.x < mx0 + 2.0f) p.x += w - tok::space_1; else if (p.x > mx1 - 2.0f) p.x -= w - tok::space_1;
+            if (p.y < my0 + 2.0f) p.y += h - tok::space_1; else if (p.y > my1 - 2.0f) p.y -= h - tok::space_1;
             if (p.x != io.MousePos.x || p.y != io.MousePos.y)
             {
                ImGuiIO& wio = ImGui::GetIO();
@@ -2684,16 +2684,16 @@ namespace
          }
       }
       if (hovered && sOp.mode != 0 && sSet->proportional && io.MouseWheel != 0.0f)
-         sSet->propSize = std::clamp(sSet->propSize * std::pow(1.1f, -io.MouseWheel), 0.05f, 500.0f);
+         sSet->propSize = std::clamp(sSet->propSize * std::pow(tok::view3d_navigation_pow_maths, -io.MouseWheel), tok::view3d_navigation_bound, tok::view3d_navigation_bound_2);
       else if (hovered && (io.MouseWheel != 0.0f || io.MouseWheelH != 0.0f))
       {
          const WheelNav nav = ClassifyWheel(io.MouseWheelH, io.MouseWheel, io.KeyShift, io.KeyCtrl, io.KeySuper);
          if (nav.use == WheelUse::Zoom)
             Zoom(std::pow(1.0f / 1.2f, sSet->invertZoom ? -nav.dy : nav.dy), &io.MousePos);   // a wheel notch is 1.2x
          else if (nav.use == WheelUse::Pan)
-            Pan(nav.dx * 10.0f, nav.dy * 10.0f);   // GLFW hands a trackpad over as pixels / 10: the scene follows the fingers 1:1
+            Pan(nav.dx * tok::view3d_navigation_ratio, nav.dy * tok::view3d_navigation_ratio);   // GLFW hands a trackpad over as pixels / 10: the scene follows the fingers 1:1
          else
-            OrbitBy(scene, nav.dx * 10.0f * kOrbitPerPixel, nav.dy * 10.0f * kOrbitPerPixel);
+            OrbitBy(scene, nav.dx * tok::view3d_navigation_ratio * kOrbitPerPixel, nav.dy * tok::view3d_navigation_ratio * kOrbitPerPixel);
       }
       // GLFW never forwards a trackpad pinch, so it comes from the platform, not the wheel.
       const double pinch = hovered ? TrackpadPinchThisFrame() : 0.0;
@@ -2708,8 +2708,8 @@ namespace
          {
             Orbited();
             EyeFromOrbit(eye);
-            sAz += io.MouseDelta.x * 0.005f;
-            sEl = std::clamp(sEl + io.MouseDelta.y * 0.005f, -1.5697f, 1.5697f);
+            sAz += io.MouseDelta.x * tok::view3d_az_ratio;
+            sEl = std::clamp(sEl + io.MouseDelta.y * tok::view3d_navigation_ratio_2, -1.5697f, 1.5697f);
             float next[3];
             EyeFromOrbit(next);
             for (int k = 0; k < 3; k++)
@@ -2741,7 +2741,7 @@ namespace
       const float* m = sCam.viewProj.m;
       const float wa = m[3] * a[0] + m[7] * a[1] + m[11] * a[2] + m[15];
       const float wb = m[3] * b[0] + m[7] * b[1] + m[11] * b[2] + m[15];
-      const float eps = 0.02f;
+      const float eps = tok::view3d_eps;
       if (wa < eps && wb < eps)
          return;
       float p[3], q[3];
@@ -2782,7 +2782,7 @@ namespace
       {
          const float t = (float)i / n * 2.0f * kPi;
          float q[3] = { c[0], c[1], c[2] };
-         const int o = 3 - a - b;
+         const int o = tok::view3d_o_gap - a - b;
          q[o] += fixed;
          q[a] += std::cos(t) * h[a];
          q[b] += std::sin(t) * h[b];
@@ -2900,7 +2900,7 @@ namespace
          if (Project(c, sp))
          {
             const std::string nm = ItemName(it);
-            dl->AddText(ImVec2(sp.x + 8.0f, sp.y - 16.0f), col, nm.c_str());
+            dl->AddText(ImVec2(sp.x + tok::space_2, sp.y - tok::space_4), col, nm.c_str());
          }
       }
    }
@@ -2940,8 +2940,8 @@ namespace
             return false;
          const float dist = std::hypot(mouse.x - sp.x, mouse.y - sp.y);
          const bool hot = canGrab && dist < 8.0f;
-         dl->AddCircleFilled(sp, hot || (sHandle.kind == kind && sHandle.id == it->id) ? 6.0f : 4.5f, col, 16);
-         dl->AddCircle(sp, 6.5f, Hex(0x000000, 0.6f), 16, 1.0f);
+         dl->AddCircleFilled(sp, hot || (sHandle.kind == kind && sHandle.id == it->id) ? tok::view3d_item_handles_r : tok::view3d_item_handles_r_2, col, tok::view3d_item_handles_segments);
+         dl->AddCircle(sp, tok::view3d_item_handles_r_3, Hex(0x000000, 0.6f), tok::view3d_item_handles_segments, 1.0f);
          if (hot && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && sHandle.kind == 0)
          {
             PushUndoCheckpoint("Drag handle");
@@ -2964,7 +2964,7 @@ namespace
       const ImU32 hcol = Hex(0xE8C840);
       if (cam != nullptr && sSet->gizmoCamLens)
       {
-         const float dpt = 2.0f * cam->displaySize;
+         const float dpt = tok::view3d_dpt_ratio * cam->displaySize;
          float w[3];
          at(dpt * std::tan(cam->fov * 0.5f * kPi / 180.0f), 0, -dpt, w);
          if (handle(3, w, hcol))
@@ -2997,15 +2997,15 @@ namespace
          {
             float w[3];
             for (int k = 0; k < 3; k++)
-               w[k] = c[k] + (light->type == 4 ? aim[k] + u[k] * std::tan(light->spotAngle * kPi / 180.0f) : u[k] * light->areaWidth * 0.5f);
+               w[k] = c[k] + (light->type == 4 ? aim[k] + u[k] * std::tan(light->spotAngle * kPi / tok::view3d_item_handles_ratio) : u[k] * light->areaWidth * 0.5f);
             if (handle(1, w, hcol))
             {
                const float tip[3] = { c[0] + aim[0], c[1] + aim[1], c[2] + aim[2] };
                const float x = std::abs(LineParam(light->type == 4 ? tip : c, u, o, d));
                if (light->type == 4)
-                  light->spotAngle = std::clamp(std::atan(x) * 180.0f / kPi, 1.0f, 89.0f);
+                  light->spotAngle = std::clamp(std::atan(x) * tok::view3d_item_handles_ratio / kPi, 1.0f, 89.0f);
                else
-                  light->areaWidth = std::clamp(x * 2.0f, 0.05f, 20.0f);
+                  light->areaWidth = std::clamp(x * tok::view3d_item_handles_ratio_2, tok::view3d_item_handles_bound, tok::view3d_item_handles_bound_2);
                scene->Commit();
             }
          }
@@ -3035,13 +3035,13 @@ namespace
       for (int i = 0; i < 8; i++)
       {
          const float a0 = (float)i / 8.0f * 2.0f * kPi, a1 = (float)(i + 1) / 8.0f * 2.0f * kPi;
-         dl->PathArcTo(s, 9.0f, a0, a1, 6);
-         dl->PathStroke(i % 2 == 0 ? Hex(0xFF3030) : Hex(0xFFFFFF), 0, 1.5f);
+         dl->PathArcTo(s, tok::view3d_cursor_r, a0, a1, tok::view3d_cursor_segments);
+         dl->PathStroke(i % tok::view3d_cursor_path_stroke_draw == 0 ? Hex(0xFF3030) : Hex(0xFFFFFF), 0, tok::view3d_cursor_stroke);
       }
       for (int i = 0; i < 4; i++)
       {
-         const ImVec2 d(i == 0 ? 1.0f : i == 1 ? -1.0f : 0.0f, i == 2 ? 1.0f : i == 3 ? -1.0f : 0.0f);
-         dl->AddLine(ImVec2(s.x + d.x * 6.0f, s.y + d.y * 6.0f), ImVec2(s.x + d.x * 14.0f, s.y + d.y * 14.0f), Hex(0x000000, 0.8f), 1.0f);
+         const ImVec2 d(i == 0 ? 1.0f : i == 1 ? -1.0f : 0.0f, i == tok::view3d_cursor_y ? 1.0f : i == tok::view3d_cursor_y_2 ? -1.0f : 0.0f);
+         dl->AddLine(ImVec2(s.x + d.x * tok::view3d_cursor_ratio, s.y + d.y * tok::view3d_cursor_ratio), ImVec2(s.x + d.x * tok::view3d_cursor_ratio_2, s.y + d.y * tok::view3d_cursor_ratio_2), Hex(0x000000, 0.8f), tok::view3d_cursor_stroke_2);
       }
    }
 
@@ -3139,7 +3139,7 @@ namespace
                continue;
          }
          const float x = 1.0f - d / r;
-         hits.push_back({ (unsigned int)i, 0.15f * x * x * (3.0f - 2.0f * x) });
+         hits.push_back({ (unsigned int)i, 0.15f * x * x * (3.0f - tok::view3d_paint_weights_ratio * x) });
       }
       arm->Paint(hits, bone, target);
       sPose.lastDab = mouse;
@@ -3254,8 +3254,8 @@ namespace
       auto bone = [&](int owner, ImVec2 a, ImVec2 b)
       {
          const bool sel = owner == sPose.joint;
-         dl->AddLine(a, b, Hex(0x000000, 0.6f), 4.0f);
-         dl->AddLine(a, b, sel ? Hex(kActive) : Hex(kWire, 0.85f), 2.0f);
+         dl->AddLine(a, b, Hex(0x000000, 0.6f), tok::view3d_pose_stroke);
+         dl->AddLine(a, b, sel ? Hex(kActive) : Hex(kWire, 0.85f), tok::view3d_pose_stroke_2);
          const float d = SegDist(mouse, a, b);
          if (d < hotDist)
          {
@@ -3274,7 +3274,7 @@ namespace
          {
             float m[16], tip[3], h[3];
             model->JointMatrix(j, m);
-            const float len = 0.08f;
+            const float len = tok::view3d_len;
             const float local[3] = { m[12] + m[4] * len, m[13] + m[5] * len, m[14] + m[6] * len };
             TransformBy(world, local, tip);
             ImVec2 t;
@@ -3292,13 +3292,13 @@ namespace
             hotDist = 0.0f;
             hotJoint = j;
          }
-         dl->AddCircleFilled(heads[j], j == sPose.joint ? 4.5f : 3.5f, j == sPose.joint ? Hex(kActive) : Hex(kWire), 12);
-         dl->AddCircle(heads[j], 5.0f, Hex(0x000000, 0.6f), 12, 1.0f);
+         dl->AddCircleFilled(heads[j], j == sPose.joint ? tok::view3d_pose_r : tok::view3d_pose_r_2, j == sPose.joint ? Hex(kActive) : Hex(kWire), tok::view3d_pose_segments);
+         dl->AddCircle(heads[j], tok::view3d_pose_r_3, Hex(0x000000, 0.6f), tok::view3d_pose_segments, 1.0f);
       }
       if (sPose.joint >= 0 && sPose.joint < count && shown[sPose.joint])
       {
          const std::string& name = model->JointName(sPose.joint);
-         dl->AddText(ImVec2(heads[sPose.joint].x + 8.0f, heads[sPose.joint].y - 18.0f), Hex(kHotHandle), name.c_str());
+         dl->AddText(ImVec2(heads[sPose.joint].x + tok::space_2, heads[sPose.joint].y - tok::view3d_pose_gap), Hex(kHotHandle), name.c_str());
       }
       // The IK goal: a line from the reaching joint to its target.
       if (model->Pose().ikOn && model->Pose().ikJoint >= 0 && model->Pose().ikJoint < count && shown[model->Pose().ikJoint])
@@ -3308,19 +3308,19 @@ namespace
          TransformBy(world, model->Pose().ikTarget, t);
          if (Project(t, tp))
          {
-            dl->AddLine(heads[model->Pose().ikJoint], tp, Hex(kHotHandle, 0.8f), 1.5f);
-            dl->AddCircle(tp, 6.0f, Hex(kHotHandle), 16, 1.5f);
+            dl->AddLine(heads[model->Pose().ikJoint], tp, Hex(kHotHandle, 0.8f), tok::view3d_pose_stroke_3);
+            dl->AddCircle(tp, tok::view3d_pose_r_4, Hex(kHotHandle), tok::view3d_pose_segments_2, tok::view3d_pose_stroke_3);
          }
       }
-      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), sPose.paint ? T("Weight Paint") : T("Pose Mode"));
+      dl->AddText(ImVec2(sCam.mn.x + tok::space_3, sCam.mx.y - tok::view3d_pose_gap_2), Hex(kActive), sPose.paint ? T("Weight Paint") : T("Pose Mode"));
       if (sPose.paint && hovered)
-         dl->AddCircle(mouse, sPose.radius, Hex(kWire, 0.9f), 48, 1.5f);
+         dl->AddCircle(mouse, sPose.radius, Hex(kWire, 0.9f), tok::view3d_pose_segments_3, tok::view3d_pose_stroke_3);
 
       if (sPose.stroking)
       {
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) || paintBone < 0)
             sPose.stroking = false;
-         else if (std::hypot(mouse.x - sPose.lastDab.x, mouse.y - sPose.lastDab.y) >= 2.0f)
+         else if (std::hypot(mouse.x - sPose.lastDab.x, mouse.y - sPose.lastDab.y) >= tok::view3d_pose_limit)
             PaintWeights(arm, world, mouse, paintBone, (io.KeyCtrl || io.KeySuper) ? 0.0f : 1.0f);
          return true;
       }
@@ -3363,9 +3363,9 @@ namespace
          // [ and ] size the brush; a click on a bone picks it, anywhere else paints
          // (Ctrl takes weight away).
          if (pressed(ImGuiKey_LeftBracket))
-            sPose.radius = std::max(4.0f, sPose.radius / 1.15f);
+            sPose.radius = std::max(tok::view3d_pose_bound, sPose.radius / tok::view3d_pose_ratio);
          if (pressed(ImGuiKey_RightBracket))
-            sPose.radius = std::min(400.0f, sPose.radius * 1.15f);
+            sPose.radius = std::min(tok::view3d_pose_bound_2, sPose.radius * tok::view3d_pose_ratio);
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
          {
             if (hotJoint >= 0)
@@ -3603,22 +3603,22 @@ namespace
       // The bar: brushes, then X Y Z symmetry, bottom left.
       bool onBar = false;
       {
-         float x = sCam.mn.x + 12.0f;
-         const float y = sCam.mx.y - 54.0f, h = ImGui::GetFontSize() + 8.0f;
+         float x = sCam.mn.x + tok::space_3;
+         const float y = sCam.mx.y - tok::view3d_y_gap, h = ImGui::GetFontSize() + tok::space_2;
          auto pill = [&](const char* label, bool on) {
             const ImVec2 ts = ImGui::CalcTextSize(label);
-            const ImVec2 a(x, y), b(x + ts.x + 14.0f, y + h);
+            const ImVec2 a(x, y), b(x + ts.x + tok::space_3_5, y + h);
             const bool hot = hovered && mouse.x >= a.x && mouse.x < b.x && mouse.y >= a.y && mouse.y < b.y;
             dl->AddRectFilled(a, b, Hex(on ? kSelected : 0x000000, hot || on ? 0.85f : 0.45f), h * 0.5f);
-            dl->AddText(ImVec2(a.x + 7.0f, a.y + 4.0f), Hex(0xFFFFFF), label);
-            x = b.x + 4.0f;
+            dl->AddText(ImVec2(a.x + tok::view3d_sculpt_gap, a.y + tok::space_1), Hex(0xFFFFFF), label);
+            x = b.x + tok::space_1;
             onBar = onBar || hot;
             return hot && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
          };
          for (int b = 0; b < Sculpt::kBrushCount; b++)
             if (pill(Sculpt::BrushName(b), sSculpt.brush == b))
                sSculpt.brush = b;
-         x += 8.0f;
+         x += tok::view3d_x;
          const char* axes[3] = { "X", "Y", "Z" };
          for (int k = 0; k < 3; k++)
             if (pill(axes[kDisp[k]], (sSculpt.symmetry >> k & 1) != 0))
@@ -3627,17 +3627,17 @@ namespace
       char label[96];
       if (ok) snprintf(label, sizeof(label), "Sculpt Mode   %s   %s", UiFmt::Px(sSculpt.radius).c, UiFmt::F2(sSculpt.strength).c);
       else snprintf(label, sizeof(label), "Sculpt Mode   Topology changed");
-      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), label);
+      dl->AddText(ImVec2(sCam.mn.x + tok::space_3, sCam.mx.y - tok::view3d_sculpt_gap_2), Hex(kActive), label);
 
       // F / Shift+F: drag the radius or strength, click to keep, Esc to undo.
       if (sSculpt.adjust != 0)
       {
          const float dist = std::hypot(mouse.x - sSculpt.adjustAt.x, mouse.y - sSculpt.adjustAt.y);
          if (sSculpt.adjust == 'r')
-            sSculpt.radius = std::clamp(dist, 2.0f, 1000.0f);
+            sSculpt.radius = std::clamp(dist, tok::view3d_sculpt_bound, tok::view3d_sculpt_bound_2);
          else
             sSculpt.strength = std::clamp(dist / 200.0f, 0.0f, 1.0f);
-         dl->AddCircle(sSculpt.adjustAt, sSculpt.adjust == 'r' ? sSculpt.radius : sSculpt.strength * 200.0f, Hex(kHotHandle), 64, 1.5f);
+         dl->AddCircle(sSculpt.adjustAt, sSculpt.adjust == 'r' ? sSculpt.radius : sSculpt.strength * tok::view3d_sculpt_ratio, Hex(kHotHandle), tok::view3d_sculpt_segments, tok::view3d_sculpt_stroke);
          if (pressed(ImGuiKey_Escape) || MenuParts::RightPressed())
          {
             (sSculpt.adjust == 'r' ? sSculpt.radius : sSculpt.strength) = sSculpt.adjustBefore;
@@ -3691,7 +3691,7 @@ namespace
       }
 
       if (hovered && !onBar)
-         dl->AddCircle(mouse, sSculpt.radius, io.KeyCtrl ? Hex(0x60A0FF) : Hex(kHotHandle, 0.9f), 64, 1.5f);
+         dl->AddCircle(mouse, sSculpt.radius, io.KeyCtrl ? Hex(0x60A0FF) : Hex(kHotHandle, 0.9f), tok::view3d_sculpt_segments, tok::view3d_sculpt_stroke);
       if (sSculpt.stroking || !hovered || io.WantTextInput)
          return true;
       const bool command = io.KeyCtrl || io.KeySuper;
@@ -3714,7 +3714,7 @@ namespace
          {
             sSculpt.adjust = io.KeyShift ? 's' : 'r';
             sSculpt.adjustBefore = io.KeyShift ? sSculpt.strength : sSculpt.radius;
-            const float r = io.KeyShift ? sSculpt.strength * 200.0f : sSculpt.radius;
+            const float r = io.KeyShift ? sSculpt.strength * tok::view3d_r_ratio : sSculpt.radius;
             sSculpt.adjustAt = ImVec2(mouse.x - r, mouse.y);
             return true;
          }
@@ -4287,7 +4287,7 @@ namespace
       {
          ImVec2 dir;
          const float px = ScreenAlong(sEdit.normal, dir);
-         const float t = px > 2.0f ? (md.x * dir.x + md.y * dir.y) / px : -md.y * unit;
+         const float t = px > tok::view3d_t_limit ? (md.x * dir.x + md.y * dir.y) / px : -md.y * unit;
          const float d = hasTyped ? typed : t / WorldScale(world);
          snprintf(line, sizeof(line), "extrude %s", UiFmt::G5(d).c);
          sEdit.readout = std::string("Extrude   ") + std::to_string(d);
@@ -4348,25 +4348,25 @@ namespace
          {
             ImVec2 s;
             if (vis[v] && Project(&sEdit.pos[v * 3], s))
-               dl->AddCircleFilled(s, 3.0f, fits && sel.point[v] ? Hex(kSelected) : Hex(0x000000, 0.9f));
+               dl->AddCircleFilled(s, tok::view3d_edit_r, fits && sel.point[v] ? Hex(kSelected) : Hex(0x000000, 0.9f));
          }
       }
 
       // The bar: Points Edges Faces, bottom left.
       bool onBar = false;
       {
-         float x = sCam.mn.x + 12.0f;
-         const float y = sCam.mx.y - 54.0f, h = ImGui::GetFontSize() + 8.0f;
+         float x = sCam.mn.x + tok::space_3;
+         const float y = sCam.mx.y - tok::view3d_y_gap, h = ImGui::GetFontSize() + tok::space_2;
          const char* names[3] = { T("Points"), T("Edges"), T("Faces") };
          for (int i = 0; i < 3; i++)
          {
             const ImVec2 ts = ImGui::CalcTextSize(names[i]);
-            const ImVec2 a(x, y), b(x + ts.x + 14.0f, y + h);
+            const ImVec2 a(x, y), b(x + ts.x + tok::space_3_5, y + h);
             const bool hot = hovered && mouse.x >= a.x && mouse.x < b.x && mouse.y >= a.y && mouse.y < b.y;
             const bool on = sEdit.mode == i + 1;
             dl->AddRectFilled(a, b, Hex(on ? kSelected : 0x000000, hot || on ? 0.85f : 0.45f), h * 0.5f);
-            dl->AddText(ImVec2(a.x + 7.0f, a.y + 4.0f), Hex(0xFFFFFF), names[i]);
-            x = b.x + 4.0f;
+            dl->AddText(ImVec2(a.x + tok::view3d_edit_gap, a.y + tok::space_1), Hex(0xFFFFFF), names[i]);
+            x = b.x + tok::space_1;
             onBar = onBar || hot;
             if (hot && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && sEdit.op == 0 && !on)
             {
@@ -4387,7 +4387,7 @@ namespace
          const std::string lock = sEdit.axis < 0 ? "" : std::string("   ") + (sEdit.plane ? "not " : "only ") + axisName[sEdit.axis];
          snprintf(label, sizeof(label), "%s%s", sEdit.readout.c_str(), lock.c_str());
       }
-      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), node->CookWarning().empty() ? label : node->CookWarning().c_str());
+      dl->AddText(ImVec2(sCam.mn.x + tok::space_3, sCam.mx.y - tok::view3d_edit_gap_2), Hex(kActive), node->CookWarning().empty() ? label : node->CookWarning().c_str());
 
       if (sEdit.op != 0)
       {
@@ -4429,7 +4429,7 @@ namespace
       // A press becomes a click or, dragged past a few pixels, a box.
       if (sEdit.pressed)
       {
-         const bool boxing = std::hypot(mouse.x - sEdit.pressAt.x, mouse.y - sEdit.pressAt.y) > 4.0f;
+         const bool boxing = std::hypot(mouse.x - sEdit.pressAt.x, mouse.y - sEdit.pressAt.y) > tok::view3d_boxing_limit;
          if (boxing)
          {
             const ImVec2 lo(std::min(mouse.x, sEdit.pressAt.x), std::min(mouse.y, sEdit.pressAt.y));
@@ -4505,12 +4505,12 @@ namespace
       const float aspect = (float)std::max(1, scene->GetOutputWidth()) / (float)std::max(1, scene->GetOutputHeight());
       const float depth = std::max(0.01f, lens->displaySize);
       const bool ortho = lens->projection != 0;
-      const float h = ortho ? lens->orthoHeight : depth * std::tan(lens->fov * 0.5f * kPi / 180.0f), w = h * aspect;
+      const float h = ortho ? lens->orthoHeight : depth * std::tan(lens->fov * 0.5f * kPi / tok::view3d_camera_shape_ratio), w = h * aspect;
       float c[4][3];
       const float xs[4] = { -w, w, w, -w }, ys[4] = { -h, -h, h, h };
       for (int i = 0; i < 4; i++)
       {
-         const float big = std::max(w, h) * 2.0f;
+         const float big = std::max(w, h) * tok::view3d_big_ratio;
          const float p[3] = { xs[i] + lens->shiftX * big, ys[i] + lens->shiftY * big, -depth };
          TransformBy(world, p, c[i]);
          const float flat[3] = { p[0], p[1], 0.0f };
@@ -4521,7 +4521,7 @@ namespace
       for (int i = 0; i < 4; i++)
          Line3D(dl, c[i], c[(i + 1) % 4], col, 1.5f);
       float tri[3][3];
-      const float tx[3] = { -w * 0.5f, w * 0.5f, 0.0f }, ty[3] = { h * 1.1f, h * 1.1f, h * 1.6f };
+      const float tx[3] = { -w * 0.5f, w * 0.5f, 0.0f }, ty[3] = { h * tok::view3d_camera_shape_ratio_2, h * tok::view3d_camera_shape_ratio_2, h * tok::view3d_camera_shape_ratio_3 };
       for (int i = 0; i < 3; i++)
       {
          const float p[3] = { tx[i], ty[i], -depth };
@@ -4546,9 +4546,9 @@ namespace
          Line3D(dl, a, b, mist);
          ImVec2 sa, sb;
          if (Project(a, sa))
-            dl->AddCircleFilled(sa, 3.0f, mist);
+            dl->AddCircleFilled(sa, tok::view3d_camera_shape_r, mist);
          if (Project(b, sb))
-            dl->AddCircle(sb, 4.0f, mist, 12, 1.5f);
+            dl->AddCircle(sb, tok::view3d_camera_shape_r_2, mist, tok::view3d_camera_shape_segments, tok::view3d_camera_shape_stroke);
       }
       if (lens->showLimits)   // the clip range along the view, and where it focuses
       {
@@ -4560,9 +4560,9 @@ namespace
          Line3D(dl, n, f, limit);
          ImVec2 sn, sf;
          if (Project(n, sn))
-            dl->AddCircleFilled(sn, 3.0f, limit);
+            dl->AddCircleFilled(sn, tok::view3d_camera_shape_r, limit);
          if (Project(f, sf))
-            dl->AddCircleFilled(sf, 3.0f, limit);
+            dl->AddCircleFilled(sf, tok::view3d_camera_shape_r, limit);
          if (it.id == scene->activeCamera && scene->settings.fStop > 0.0f)
          {
             float fp[3];
@@ -4570,8 +4570,8 @@ namespace
             along(scene->Look().focusDistance, fp);
             if (Project(fp, sp))
             {
-               dl->AddLine(ImVec2(sp.x - 5, sp.y - 5), ImVec2(sp.x + 5, sp.y + 5), limit, 1.5f);
-               dl->AddLine(ImVec2(sp.x - 5, sp.y + 5), ImVec2(sp.x + 5, sp.y - 5), limit, 1.5f);
+               dl->AddLine(ImVec2(sp.x - tok::space_1_25, sp.y - tok::space_1_25), ImVec2(sp.x + tok::space_1_25, sp.y + tok::space_1_25), limit, tok::view3d_camera_shape_stroke);
+               dl->AddLine(ImVec2(sp.x - tok::space_1_25, sp.y + tok::space_1_25), ImVec2(sp.x + tok::space_1_25, sp.y - tok::space_1_25), limit, tok::view3d_camera_shape_stroke);
             }
          }
       }
@@ -4589,13 +4589,13 @@ namespace
       if (!scene->ItemLightAim(it, aim))
          return;
       const int type = light->type;
-      dl->AddCircleFilled(s, 4.0f, ImGui::ColorConvertFloat4ToU32(ImVec4(light->color[0], light->color[1], light->color[2], 1.0f)), 16);
-      dl->AddCircle(s, 7.0f, col, 24, 1.5f);
+      dl->AddCircleFilled(s, tok::view3d_light_shape_r, ImGui::ColorConvertFloat4ToU32(ImVec4(light->color[0], light->color[1], light->color[2], 1.0f)), tok::view3d_light_shape_segments);
+      dl->AddCircle(s, tok::view3d_light_shape_r_2, col, tok::view3d_light_shape_segments_2, tok::view3d_light_shape_stroke);
       if (type != 4 && type != 5)
          for (int i = 0; i < 8; i++)
          {
             const float a = (float)i / 8.0f * 2.0f * kPi, cs = std::cos(a), sn = std::sin(a);
-            dl->AddLine(ImVec2(s.x + cs * 10.0f, s.y + sn * 10.0f), ImVec2(s.x + cs * 15.0f, s.y + sn * 15.0f), col);
+            dl->AddLine(ImVec2(s.x + cs * tok::view3d_light_shape_ratio, s.y + sn * tok::view3d_light_shape_ratio), ImVec2(s.x + cs * tok::view3d_light_shape_ratio_2, s.y + sn * tok::view3d_light_shape_ratio_2), col);
          }
       float u[3], v[3];
       const float ref[3] = { std::abs(aim[1]) > 0.9f ? 1.0f : 0.0f, std::abs(aim[1]) > 0.9f ? 0.0f : 1.0f, 0.0f };
@@ -4609,7 +4609,7 @@ namespace
       }
       if (type == 4)
       {
-         const float len = 1.0f, r = len * std::tan(light->spotAngle * kPi / 180.0f);
+         const float len = 1.0f, r = len * std::tan(light->spotAngle * kPi / tok::view3d_light_shape_ratio_3);
          // Inner ring where the blend ends, as the shader's smoothstep places it.
          const float cosOuter = std::cos(light->spotAngle * kPi / 180.0f);
          const float cosInner = std::min(1.0f, cosOuter + (1.0f - cosOuter) * light->spotPenumbra);
@@ -4639,7 +4639,7 @@ namespace
       if (type == 4 && light->showCone)   // the whole volume the spot lights, as a faint shell
       {
          const float len = light->useCutoff ? light->cutoffDistance : std::max(0.05f, light->distance);
-         const float r = len * std::tan(light->spotAngle * kPi / 180.0f);
+         const float r = len * std::tan(light->spotAngle * kPi / tok::view3d_light_shape_ratio_3);
          const ImU32 fill = (col & 0x00FFFFFF) | 0x26000000;
          ImVec2 prev;
          bool prevOk = false;
@@ -4669,7 +4669,7 @@ namespace
          for (int i = 0; i < nPts; i++)
          {
             float x, y;
-            if (nPts == 4) { x = (i == 1 || i == 2) ? hw : -hw; y = i < 2 ? -hh : hh; }
+            if (nPts == 4) { x = (i == 1 || i == tok::view3d_light_shape_limit) ? hw : -hw; y = i < tok::view3d_y_limit ? -hh : hh; }
             else { const float a = 6.2831853f * float(i) / float(nPts); x = std::cos(a) * hw; y = std::sin(a) * hh; }
             for (int k = 0; k < 3; k++)
                c[i][k] = p[k] + u[k] * x + v[k] * y;
@@ -4698,7 +4698,7 @@ namespace
       ImVec2 c;
       if (sTool == 0 || !Project(at, c))
          return -1;
-      const float len = UnitAt(at) * kGizmoPx * sSet->gizmoSize / 75.0f;
+      const float len = UnitAt(at) * kGizmoPx * sSet->gizmoSize / tok::view3d_len_ratio;
       int hot = -1;
       float best = 9.0f;
       const ImU32 white = Hex(kHotHandle);
@@ -4730,7 +4730,7 @@ namespace
                const bool front = Dot(off, sCam.fwd) <= 0.0f;
                if (ok && prevOk)
                {
-                  dl->AddLine(prev, s, tone(a, a, front ? 1.0f : 0.25f), front ? 2.5f : 1.5f);
+                  dl->AddLine(prev, s, tone(a, a, front ? 1.0f : 0.25f), front ? tok::view3d_gizmo_stroke : tok::view3d_gizmo_stroke_2);
                   const float dist = SegDist(mouse, prev, s);
                   if (front && dist < best)
                   {
@@ -4742,8 +4742,8 @@ namespace
                prevOk = ok;
             }
          }
-         const float r = kGizmoPx * 1.2f;
-         dl->AddCircle(c, r, sHot == 3 ? white : Hex(kHotHandle, 0.6f), 64, 1.5f);
+         const float r = kGizmoPx * tok::view3d_r_ratio_2;
+         dl->AddCircle(c, r, sHot == tok::view3d_gizmo_add_circle_draw ? white : Hex(kHotHandle, 0.6f), tok::view3d_gizmo_segments, tok::view3d_gizmo_stroke_2);
          const float dist = std::abs(std::hypot(mouse.x - c.x, mouse.y - c.y) - r);
          if (dist < best)
             hot = 3;
@@ -4770,7 +4770,7 @@ namespace
             }
             if (!ok)
                continue;
-            dl->AddConvexPolyFilled(q, 4, sHot == 4 + n ? white : AxisColor(n, 0.55f));
+            dl->AddConvexPolyFilled(q, tok::view3d_gizmo_add_convex_poly_filled_draw, sHot == tok::view3d_gizmo_gap + n ? white : AxisColor(n, 0.55f));
             if (ImTriangleContainsPoint(q[0], q[1], q[2], mouse) || ImTriangleContainsPoint(q[0], q[2], q[3], mouse))
             {
                hot = 4 + n;
@@ -4790,21 +4790,21 @@ namespace
          const float dx = s.x - c.x, dy = s.y - c.y, l = std::max(1.0f, std::hypot(dx, dy));
          const ImVec2 dir(dx / l, dy / l), side(-dy / l, dx / l);
          const ImU32 col = tone(a, a, fade);
-         dl->AddLine(ImVec2(c.x + dir.x * 14.0f, c.y + dir.y * 14.0f), s, col, 2.5f);
+         dl->AddLine(ImVec2(c.x + dir.x * tok::view3d_gizmo_ratio, c.y + dir.y * tok::view3d_gizmo_ratio), s, col, tok::view3d_gizmo_stroke);
          if (sTool == 1)
-            dl->AddTriangleFilled(ImVec2(s.x + dir.x * 16.0f, s.y + dir.y * 16.0f), ImVec2(s.x + side.x * 6.0f, s.y + side.y * 6.0f),
-                                  ImVec2(s.x - side.x * 6.0f, s.y - side.y * 6.0f), col);
+            dl->AddTriangleFilled(ImVec2(s.x + dir.x * tok::view3d_gizmo_ratio_2, s.y + dir.y * tok::view3d_gizmo_ratio_2), ImVec2(s.x + side.x * tok::view3d_gizmo_ratio_3, s.y + side.y * tok::view3d_gizmo_ratio_3),
+                                  ImVec2(s.x - side.x * tok::view3d_gizmo_ratio_3, s.y - side.y * tok::view3d_gizmo_ratio_3), col);
          else
-            dl->AddRectFilled(ImVec2(s.x - 5, s.y - 5), ImVec2(s.x + 5, s.y + 5), col);
-         const float dist = SegDist(mouse, c, ImVec2(s.x + dir.x * 16.0f, s.y + dir.y * 16.0f));
-         if (dist < best && std::hypot(mouse.x - c.x, mouse.y - c.y) > 12.0f)
+            dl->AddRectFilled(ImVec2(s.x - tok::space_1_25, s.y - tok::space_1_25), ImVec2(s.x + tok::space_1_25, s.y + tok::space_1_25), col);
+         const float dist = SegDist(mouse, c, ImVec2(s.x + dir.x * tok::view3d_gizmo_ratio_2, s.y + dir.y * tok::view3d_gizmo_ratio_2));
+         if (dist < best && std::hypot(mouse.x - c.x, mouse.y - c.y) > tok::view3d_gizmo_limit)
          {
             best = dist;
             hot = a;
          }
       }
-      dl->AddCircle(c, 9.0f, sHot == 3 ? white : Hex(kHotHandle, 0.75f), 24, 1.5f);
-      if (std::hypot(mouse.x - c.x, mouse.y - c.y) <= 11.0f)
+      dl->AddCircle(c, tok::view3d_gizmo_r, sHot == tok::view3d_gizmo_add_circle_draw ? white : Hex(kHotHandle, 0.75f), tok::view3d_gizmo_segments_2, tok::view3d_gizmo_stroke_2);
+      if (std::hypot(mouse.x - c.x, mouse.y - c.y) <= tok::view3d_gizmo_limit_2)
          hot = 3;
       return active ? hot : -1;
    }
@@ -4812,15 +4812,15 @@ namespace
    // Top right: the three axes as they stand now. Click a ball for that view, drag to orbit.
    int DrawNavGizmo(ImDrawList* dl, ImVec2 mn, ImVec2 mx, ImVec2 mouse, bool hovered, bool& onDisc)
    {
-      const float pad = 52.0f * sSet->miniSize / 80.0f;
+      const float pad = tok::view3d_pad_ratio * sSet->miniSize / tok::view3d_pad_ratio_2;
       const ImVec2 c(mx.x - pad, mn.y + pad);
-      const float r = 34.0f * sSet->miniSize / 80.0f;
-      const float ballK = sSet->gizmoNavSize / 80.0f;
+      const float r = tok::view3d_r_ratio_3 * sSet->miniSize / tok::view3d_r_ratio_4;
+      const float ballK = sSet->gizmoNavSize / tok::view3d_ball_k_ratio;
       hovered = hovered && sSet->miniAxes == 2;
       const int firstVtx = dl->VtxBuffer.Size;
-      onDisc = hovered && std::hypot(mouse.x - c.x, mouse.y - c.y) < r + 12.0f;
+      onDisc = hovered && std::hypot(mouse.x - c.x, mouse.y - c.y) < r + tok::space_3;
       if (onDisc || sNavDrag)
-         dl->AddCircleFilled(c, r + 12.0f, Hex(kHotHandle, 0.10f), 48);
+         dl->AddCircleFilled(c, r + tok::space_3, Hex(kHotHandle, 0.10f), tok::view3d_nav_gizmo_segments);
       struct Ball { float depth; ImVec2 at; int axis; bool neg; };
       std::vector<Ball> balls;
       for (int a = 0; a < 3; a++)
@@ -4836,18 +4836,18 @@ namespace
       int hit = -1;
       for (const Ball& b : balls)
       {
-         const bool hot = onDisc && std::hypot(mouse.x - b.at.x, mouse.y - b.at.y) < 10.0f;
+         const bool hot = onDisc && std::hypot(mouse.x - b.at.x, mouse.y - b.at.y) < tok::view3d_hot_limit;
          if (hot)
             hit = b.axis * 2 + ((b.neg != (b.axis == 2)) ? 1 : 0);   // ViewAxis counts engine sides  // ui-audit-ok: axis index
-         const float size = (b.neg ? 7.0f : 9.0f) * ballK;
+         const float size = (b.neg ? tok::view3d_nav_gizmo_assign : tok::view3d_nav_gizmo_assign_2) * ballK;
          if (b.neg)
          {
-            dl->AddCircleFilled(b.at, size, AxisColor(b.axis, hot ? 0.9f : 0.35f), 24);
-            dl->AddCircle(b.at, size, AxisColor(b.axis), 24, 1.5f);
+            dl->AddCircleFilled(b.at, size, AxisColor(b.axis, hot ? 0.9f : 0.35f), tok::view3d_nav_gizmo_segments_2);
+            dl->AddCircle(b.at, size, AxisColor(b.axis), tok::view3d_nav_gizmo_segments_2, tok::view3d_nav_gizmo_stroke);
             continue;
          }
-         dl->AddLine(c, b.at, AxisColor(b.axis), 2.0f);
-         dl->AddCircleFilled(b.at, size, hot ? Hex(kHotHandle) : AxisColor(b.axis), 24);
+         dl->AddLine(c, b.at, AxisColor(b.axis), tok::view3d_nav_gizmo_stroke_2);
+         dl->AddCircleFilled(b.at, size, hot ? Hex(kHotHandle) : AxisColor(b.axis), tok::view3d_nav_gizmo_segments_2);
          const char label[2] = { (char)('X' + kDisp[b.axis]), 0 };
          const ImVec2 ts = ImGui::CalcTextSize(label);
          dl->AddText(ImVec2(b.at.x - ts.x * 0.5f, b.at.y - ts.y * 0.5f), Hex(0x000000), label);
@@ -4865,7 +4865,7 @@ namespace
    // small; geometry goes by its box, hit by the ray itself.
    // Everything under the pointer, nearest first: markers, then boxes.
    // Clicking again on the same spot steps to the next one back, as in Blender.
-   ImVec2 sPickAt(-100, -100);
+   ImVec2 sPickAt(-tok::view3d_x_2, -tok::view3d_y);
    int sPicked = 0;
 
    int Pick(Scene3DNode* scene, ImVec2 mouse, bool cycle = false)
@@ -4882,7 +4882,7 @@ namespace
          if (scene->ItemPoint(it, p))
          {
             const float depth = (p[0] - sCam.eye[0]) * sCam.fwd[0] + (p[1] - sCam.eye[1]) * sCam.fwd[1] + (p[2] - sCam.eye[2]) * sCam.fwd[2];
-            if (Project(p, s) && std::hypot(mouse.x - s.x, mouse.y - s.y) < 14.0f)
+            if (Project(p, s) && std::hypot(mouse.x - s.x, mouse.y - s.y) < tok::view3d_pick_limit)
                markers.push_back({ depth, it.id });
          }
          else if (scene->ItemBounds(it.id, lo, hi))
@@ -4914,7 +4914,7 @@ namespace
       int pick = hits[0];
       if (cycle)
       {
-         const bool same = std::hypot(mouse.x - sPickAt.x, mouse.y - sPickAt.y) < 4.0f;
+         const bool same = std::hypot(mouse.x - sPickAt.x, mouse.y - sPickAt.y) < tok::view3d_same_limit;
          const auto at = std::find(hits.begin(), hits.end(), sPicked);
          if (same && at != hits.end() && Selected(sPicked))
             pick = *(at + 1 == hits.end() ? hits.begin() : at + 1);
@@ -4949,7 +4949,7 @@ namespace
          }
          char text[96];
          snprintf(text, sizeof(text), T("Objects %d/%d   Cameras %d   Lights %d"), (int)sSel.size(), geo + cams + lights, cams, lights);
-         dl->AddText(ImVec2(mn.x + tok::space_3, mn.y + tok::space_2 + (sSet->textInfo ? ImGui::GetTextLineHeightWithSpacing() * 2.0f : 0.0f)),
+         dl->AddText(ImVec2(mn.x + tok::space_3, mn.y + tok::space_2 + (sSet->textInfo ? ImGui::GetTextLineHeightWithSpacing() * tok::view3d_overlay_text_ratio : 0.0f)),
                      Hex(0xFFFFFF, 0.6f), text);
       }
       if (sSet->showPerf || sSet->showFps)
@@ -5038,8 +5038,8 @@ namespace
       }
       if (sSet->safe && sSet->safeCenter)   // Blender's centre-cut margins: title 17.5% / 5%, action 15% / 5%
       {
-         dl->AddRect(ImVec2(a.x + w * 0.15f, a.y + h * 0.05f), ImVec2(b.x - w * 0.15f, b.y - h * 0.05f), guide);
-         dl->AddRect(ImVec2(a.x + w * 0.175f, a.y + h * 0.05f), ImVec2(b.x - w * 0.175f, b.y - h * 0.05f), guide);
+         dl->AddRect(ImVec2(a.x + w * tok::view3d_camera_guides_ratio, a.y + h * tok::view3d_camera_guides_ratio_2), ImVec2(b.x - w * tok::view3d_camera_guides_ratio, b.y - h * tok::view3d_camera_guides_ratio_2), guide);
+         dl->AddRect(ImVec2(a.x + w * tok::view3d_camera_guides_ratio_3, a.y + h * tok::view3d_camera_guides_ratio_2), ImVec2(b.x - w * tok::view3d_camera_guides_ratio_3, b.y - h * tok::view3d_camera_guides_ratio_2), guide);
       }
       if (sSet->diagonal)
       {
@@ -5061,10 +5061,10 @@ namespace
             {
                const ImVec2 r(end.x - c.x, end.y - c.y);
                float s = 1e9f;
-               if (r.x > 1e-6f) s = std::min(s, (b.x - c.x) / r.x);
-               if (r.x < -1e-6f) s = std::min(s, (a.x - c.x) / r.x);
-               if (r.y > 1e-6f) s = std::min(s, (b.y - c.y) / r.y);
-               if (r.y < -1e-6f) s = std::min(s, (a.y - c.y) / r.y);
+               if (r.x > tok::view3d_camera_guides_limit) s = std::min(s, (b.x - c.x) / r.x);
+               if (r.x < -tok::view3d_camera_guides_if_arith) s = std::min(s, (a.x - c.x) / r.x);
+               if (r.y > tok::view3d_camera_guides_limit) s = std::min(s, (b.y - c.y) / r.y);
+               if (r.y < -tok::view3d_camera_guides_if_arith) s = std::min(s, (a.y - c.y) / r.y);
                end = ImVec2(c.x + r.x * s, c.y + r.y * s);
             }
             dl->AddLine(c, end, guide);
@@ -5094,24 +5094,24 @@ namespace
          DashedRect(dl, ImVec2(mid.x - gw * 0.5f, mid.y - gh * 0.5f), ImVec2(mid.x + gw * 0.5f, mid.y + gh * 0.5f), guide);
       }
       if (cam->showName)
-         dl->AddText(ImVec2(a.x + 6.0f, b.y - ImGui::GetFontSize() - 4.0f), Hex(kWire, 0.9f), ItemName(*active).c_str());
+         dl->AddText(ImVec2(a.x + tok::space_1_5, b.y - ImGui::GetFontSize() - tok::space_1), Hex(kWire, 0.9f), ItemName(*active).c_str());
    }
 
    // Along the bottom edge: drag to zoom, drag to pan, camera view, then the lock or the projection.
    void DrawToolpad(ImDrawList* dl, Scene3DNode* scene, ImVec2 mn, ImVec2 mx, ImVec2 mouse, bool hovered, bool& onPad)
    {
       const ImGuiIO& io = ImGui::GetIO();
-      const float r = 15.0f, y = mx.y - r - 12.0f;
+      const float r = tok::view3d_r, y = mx.y - r - tok::space_3;
       const char* icons[4] = { IconsInfinite::Zoom, IconsInfinite::Hand, IconsInfinite::ViewCamera,
                                sCameraView ? IconsInfinite::Lock : sOrtho ? IconsInfinite::ViewOrtho : IconsInfinite::ViewPersp };
       const char* tips[4] = { T("Zoom: drag"), T("Pan: drag"), T("Camera view (0)"),
                               sCameraView ? T("Lock camera to view") : sOrtho ? T("Orthographic: click for perspective (5)") : T("Perspective: click for orthographic (5)") };
       for (int i = 0; i < 4; i++)
       {
-         const ImVec2 c(mx.x - r - 12.0f - (float)(3 - i) * (r * 2.0f + 6.0f), y);
+         const ImVec2 c(mx.x - r - tok::space_3 - (float)(tok::view3d_toolpad_bias - i) * (r * tok::view3d_toolpad_ratio + tok::view3d_toolpad_bias_2), y);
          const bool hot = hovered && std::hypot(mouse.x - c.x, mouse.y - c.y) <= r;
          const bool on = (i == 2 && sCameraView) || (i == 3 && sCameraView && sLockCam) || sPadDrag == i + 1;
-         dl->AddCircleFilled(c, r, Hex(on ? kSelected : 0x000000, hot || on ? 0.85f : 0.4f), 32);
+         dl->AddCircleFilled(c, r, Hex(on ? kSelected : 0x000000, hot || on ? 0.85f : 0.4f), tok::view3d_toolpad_segments);
          glyph::Draw(dl, c, tok::icon_control, Hex(0xFFFFFF), icons[i]);
          if (!hot)
             continue;
@@ -5308,7 +5308,7 @@ namespace
             ImVec2 os;
             scene->ItemCenter(it, oc);
             if (Project(oc, os))
-               dl->AddCircleFilled(os, 2.5f, Hex(0xFFA040, 0.8f));
+               dl->AddCircleFilled(os, tok::view3d_viewport_r, Hex(0xFFA040, 0.8f));
          }
          if (it.visible)
             DrawItemExtras(dl, scene, it, col);
@@ -5532,13 +5532,13 @@ namespace
          ImVec2 a, b;
          if (Project(sMeasureA, a) && Project(sMeasureB, b))
          {
-            dl->AddLine(a, b, Hex(0xFFD040, 0.95f), 2.0f);
-            dl->AddCircleFilled(a, 3.0f, Hex(0xFFD040));
-            dl->AddCircleFilled(b, 3.0f, Hex(0xFFD040));
+            dl->AddLine(a, b, Hex(0xFFD040, 0.95f), tok::view3d_viewport_stroke);
+            dl->AddCircleFilled(a, tok::view3d_viewport_r_2, Hex(0xFFD040));
+            dl->AddCircleFilled(b, tok::view3d_viewport_r_2, Hex(0xFFD040));
             const float dx = sMeasureB[0] - sMeasureA[0], dy = -(sMeasureB[2] - sMeasureA[2]), dz = sMeasureB[1] - sMeasureA[1];
             char text[96];
             snprintf(text, sizeof(text), "%s  (X %s  Y %s  Z %s)", UiFmt::F3(std::sqrt(dx * dx + dy * dy + dz * dz)).c, UiFmt::F2(dx).c, UiFmt::F2(dy).c, UiFmt::F2(dz).c);
-            dl->AddText(ImVec2((a.x + b.x) * 0.5f + 8.0f, (a.y + b.y) * 0.5f - 18.0f), Hex(0xFFFFFF, 0.95f), text);
+            dl->AddText(ImVec2((a.x + b.x) * 0.5f + tok::space_2, (a.y + b.y) * 0.5f - tok::view3d_viewport_gap), Hex(0xFFFFFF, 0.95f), text);
          }
          if (Keymap::Cancel(false) || sTool != 0 || sSelMode != 3)
             sMeasured = sMeasuring = false;
@@ -5548,13 +5548,13 @@ namespace
          ImVec2 a, b;
          if (Project(r.a, a) && Project(r.b, b))
          {
-            dl->AddLine(a, b, Hex(0xFFD040, 0.95f), 2.0f);
-            dl->AddCircleFilled(a, 3.0f, Hex(0xFFD040));
-            dl->AddCircleFilled(b, 3.0f, Hex(0xFFD040));
+            dl->AddLine(a, b, Hex(0xFFD040, 0.95f), tok::view3d_viewport_stroke);
+            dl->AddCircleFilled(a, tok::view3d_viewport_r_2, Hex(0xFFD040));
+            dl->AddCircleFilled(b, tok::view3d_viewport_r_2, Hex(0xFFD040));
             const float dx = r.b[0] - r.a[0], dy = -(r.b[2] - r.a[2]), dz = r.b[1] - r.a[1];
             char text[64];
             snprintf(text, sizeof(text), "%s", UiFmt::F3(std::sqrt(dx * dx + dy * dy + dz * dz)).c);
-            dl->AddText(ImVec2((a.x + b.x) * 0.5f + 8.0f, (a.y + b.y) * 0.5f - 18.0f), Hex(0xFFFFFF, 0.95f), text);
+            dl->AddText(ImVec2((a.x + b.x) * 0.5f + tok::space_2, (a.y + b.y) * 0.5f - tok::view3d_viewport_gap), Hex(0xFFFFFF, 0.95f), text);
          }
       }
       if (sTool == 0 && sSelMode == 3 && hovered && !sRulers.empty() && Keymap::KeyPressed(Keymap::Act::DeleteAlt))
@@ -5564,7 +5564,7 @@ namespace
          // Circle select: the wheel sizes the brush, a drag selects, shift or ctrl keeps what was selected.
          if (io.MouseWheel != 0.0f)
             sCircleR = std::clamp(sCircleR * std::pow(1.1f, io.MouseWheel), 8.0f, 400.0f);
-         dl->AddCircle(mouse, sCircleR, Hex(0xFFFFFF, 0.8f), 48, 1.5f);
+         dl->AddCircle(mouse, sCircleR, Hex(0xFFFFFF, 0.8f), tok::view3d_viewport_segments, tok::view3d_viewport_stroke_2);
          if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && !sNavDrag)
             for (const Item& it : scene->Items())
             {
@@ -5582,7 +5582,7 @@ namespace
          if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
          {
             const ImVec2 last = sLassoPts.back();
-            if ((mouse.x - last.x) * (mouse.x - last.x) + (mouse.y - last.y) * (mouse.y - last.y) > 9.0f)
+            if ((mouse.x - last.x) * (mouse.x - last.x) + (mouse.y - last.y) * (mouse.y - last.y) > tok::view3d_viewport_limit)
                sLassoPts.push_back(mouse);
             const size_t n = sLassoPts.size();
             for (size_t i = 0; i < n; i++)
@@ -5591,7 +5591,7 @@ namespace
          else
          {
             sLasso = false;
-            if (sLassoPts.size() > 2)
+            if (sLassoPts.size() > tok::view3d_viewport_limit_2)
             {
                if (!io.KeyShift)
                   sSel.clear();
@@ -5637,7 +5637,7 @@ namespace
       {
          const ImVec2 lo(std::min(sPressAt.x, mouse.x), std::min(sPressAt.y, mouse.y));
          const ImVec2 hi(std::max(sPressAt.x, mouse.x), std::max(sPressAt.y, mouse.y));
-         const bool dragged = hi.x - lo.x > 4.0f || hi.y - lo.y > 4.0f;
+         const bool dragged = hi.x - lo.x > tok::view3d_dragged_limit || hi.y - lo.y > tok::view3d_dragged_limit;
          if (dragged)
          {
             dl->AddRectFilled(lo, hi, Hex(0xFFFFFF, 0.06f));
@@ -5727,10 +5727,10 @@ namespace
          const char* orient = sOp.axis < 0 && sOp.plane < 0 ? "" : sOp.orient == 1 ? T("Local ") : sOp.orient == 2 ? T("View ") : T("Global ");
          snprintf(line, sizeof(line), "%s %s%s%s", sOp.mode == 'g' ? T("Move") : sOp.mode == 'r' ? T("Rotate") : T("Scale"), orient,
                   sOp.axis < 0 ? "" : sOp.axis == 0 ? "X " : sOp.axis == 1 ? "Z " : "Y ", sOp.typed.c_str());
-         dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - 24), Hex(0xFFFFFF, 0.95f), line);
+         dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - tok::space_5), Hex(0xFFFFFF, 0.95f), line);
       }
       else if (sZoomArmed)
-         dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - 24), Hex(0xFFFFFF, 0.95f), T("Drag a box to zoom into"));
+         dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - tok::space_5), Hex(0xFFFFFF, 0.95f), T("Drag a box to zoom into"));
       if (scene->Items().empty())
       {
          const char* head = T("Nothing in the 3D View yet");
@@ -5820,11 +5820,11 @@ namespace
       if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (Ctrl+`)"))) sOverlays = !sOverlays;
       ActionButton::RowNext();
       // Pinned right like the Sample Studio's Convert.
-      const float rightX = startX + availW - 2.0f * kIconW - tok::space_1;
+      const float rightX = startX + availW - tok::view3d_right_x_ratio * kIconW - tok::space_1;
       if (scene->panelOnly)
       {
          const char* convertL = L("Convert##v3dconvert");
-         const float convertW = ImGui::CalcTextSize(convertL, ImGui::FindRenderedTextEnd(convertL)).x + 2.0f * tok::space_3;
+         const float convertW = ImGui::CalcTextSize(convertL, ImGui::FindRenderedTextEnd(convertL)).x + tok::view3d_convert_w_ratio * tok::space_3;
          ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX - tok::space_1 - convertW));
          if (ActionButton::Draw(convertL, ImVec2(convertW, PanelKit::Chip())))
             sPending.what = Pending::ConvertScene;
@@ -5867,7 +5867,7 @@ namespace
       return ConnectNodes(selfIndex, 0, spawned->index, 0, error) ? out : nullptr;
    }
 
-   float sFieldW = 180.0f;
+   float sFieldW = tok::view3d_field_w;
    std::string sCard;   // the open card: rows share labels across cards ("Strength" in Shadows and AO)
 
    std::string RowId(const char* label) { return FormParts::Id((sCard + "/" + label).c_str()); }
@@ -5881,7 +5881,7 @@ namespace
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetFrameHeight();
       // A label longer than its column ends in an ellipsis and shows whole in a tip, never cut mid-letter.
-      const float room = FieldLabelW() - ImGui::GetCursorPosX() - 4.0f;
+      const float room = FieldLabelW() - ImGui::GetCursorPosX() - tok::space_1;
       const std::string full = FormParts::Visible(text), shown = app::TruncateWithEllipsis(full, room);
       ImGui::PushClipRect(p, ImVec2(p.x + room, p.y + h), true);
       ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", shown.c_str());
@@ -6063,14 +6063,14 @@ namespace
       float x = p.x;
       if (enable != nullptr)
       {
-         ImGui::SetCursorScreenPos(ImVec2(x, p.y + (fh - ImGui::GetTextLineHeight() - 2.0f) * 0.5f));
+         ImGui::SetCursorScreenPos(ImVec2(x, p.y + (fh - ImGui::GetTextLineHeight() - tok::space_0_5) * 0.5f));
          bool on = *enable;
          if (CheckBox::Box("##on", &on))
          {
             PushUndoCheckpoint("Edit in 3D View");
             *enable = on;
          }
-         x += 22.0f;
+         x += tok::view3d_x_3;
       }
       // The name opens the window; the gear sits at the right end, lit while the window is open.
       ImGui::SetCursorScreenPos(ImVec2(x, p.y));
@@ -6094,8 +6094,8 @@ namespace
          ImVec2 ia, ib;
          glyph::InkBox(gc, 16.0f, IconsInfinite::Sliders, ia, ib);
          const float m = std::max(ib.x - ia.x, ib.y - ia.y);
-         const float ink = std::round(CheckBox::Size() * 0.72f);
-         glyph::Draw(dl, gc, m > 1.0f ? std::round(16.0f * ink / m) : 16.0f,
+         const float ink = std::round(CheckBox::Size() * tok::view3d_win_card_ratio);
+         glyph::Draw(dl, gc, m > 1.0f ? std::round(tok::view3d_win_card_ratio_2 * ink / m) : tok::view3d_win_card_draw,
                      open ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : text, IconsInfinite::Sliders);
       }
       ImGui::PopID();
@@ -6103,7 +6103,7 @@ namespace
          // The window's compact column: label then well, at the strip's fixed width (no stretching).
          UiDensity::Compact compact;
          const float keep = sFieldW;
-         sFieldW = SettingsWindow::Width() - FieldLabelW() - 2.0f * ImGui::GetStyle().WindowPadding.x;
+         sFieldW = SettingsWindow::Width() - FieldLabelW() - tok::view3d_field_w_ratio * ImGui::GetStyle().WindowPadding.x;
          body();
          sFieldW = keep;
          compact.End();
@@ -6199,7 +6199,7 @@ namespace
       // Fills the tab below the search box, then scrolls.
       const int count = (int)scene->Items().size();
       const float step = rowH + ImGui::GetStyle().ItemSpacing.y;
-      const int shown = std::min(count, std::max(2, (int)((roomH - 90.0f) / step)));
+      const int shown = std::min(count, std::max(2, (int)((roomH - tok::view3d_outliner_gap) / step)));
       const bool scrolls = count > shown;
       if (count > 0)
          ImGui::BeginChild("##v3dlist", ImVec2(availW, step * (float)shown));
@@ -6277,13 +6277,13 @@ namespace
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImU32 text = ImGui::GetColorU32(missing || !it.visible ? ImGuiCol_TextDisabled : ImGuiCol_Text);
          const float midY = p.y + rowH * 0.5f;
-         glyph::Draw(dl, ImVec2(p.x + 12.0f, midY), tok::icon_control, text, KindGlyph(scene, it));
+         glyph::Draw(dl, ImVec2(p.x + tok::space_3, midY), tok::icon_control, text, KindGlyph(scene, it));
          const std::string name = ItemName(it);
          const std::string shown = it.group != 0 ? name + "  (" + T("Group") + " " + std::to_string(it.group) + ")" : name;
          if (sRename == it.id)
          {
-            ImGui::SetCursorScreenPos(ImVec2(p.x + 24.0f, midY - ImGui::GetFrameHeight() * 0.5f));
-            ImGui::SetNextItemWidth(availW - 72.0f);
+            ImGui::SetCursorScreenPos(ImVec2(p.x + tok::space_5, midY - ImGui::GetFrameHeight() * 0.5f));
+            ImGui::SetNextItemWidth(availW - tok::view3d_outliner_gap_2);
             if (sRenameFocus)
                UiInteract::FocusHere();
             const bool enter = FieldWell::InputText("##rename", sRenameBuf, sizeof(sRenameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
@@ -6301,12 +6301,12 @@ namespace
          }
          else
          {
-            dl->PushClipRect(p, ImVec2(p.x + availW - 44.0f, p.y + rowH), true);
-            dl->AddText(ImVec2(p.x + 26.0f, midY - ImGui::GetTextLineHeight() * 0.5f), text, shown.c_str());
+            dl->PushClipRect(p, ImVec2(p.x + availW - tok::view3d_outliner_gap_3, p.y + rowH), true);
+            dl->AddText(ImVec2(p.x + tok::view3d_outliner_gap_4, midY - ImGui::GetTextLineHeight() * 0.5f), text, shown.c_str());
             dl->PopClipRect();
          }
          if (it.id == scene->activeCamera)
-            glyph::Draw(dl, ImVec2(p.x + availW - 36.0f, midY), tok::icon_control, ImGui::GetColorU32(AccentEmphasisSelected()), IconsInfinite::ViewCamera);
+            glyph::Draw(dl, ImVec2(p.x + availW - tok::view3d_outliner_gap_5, midY), tok::icon_control, ImGui::GetColorU32(AccentEmphasisSelected()), IconsInfinite::ViewCamera);
          float colX = availW - tok::control_h;
          if (lf.colRender)
          {
@@ -6318,7 +6318,7 @@ namespace
                it.render = !it.render;
                scene->Commit();
             }
-            glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_control, text, it.render ? IconsInfinite::ViewCamera : IconsInfinite::EyeOff);
+            glyph::Draw(dl, ImVec2(p.x + colX + tok::space_3, midY), tok::icon_control, text, it.render ? IconsInfinite::ViewCamera : IconsInfinite::EyeOff);
          }
          if (lf.colSelect)
          {
@@ -6330,7 +6330,7 @@ namespace
                it.hideSelect = !it.hideSelect;
                scene->Commit();
             }
-            glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_control, text, it.hideSelect ? IconsInfinite::EyeOff : IconsInfinite::Cube);
+            glyph::Draw(dl, ImVec2(p.x + colX + tok::space_3, midY), tok::icon_control, text, it.hideSelect ? IconsInfinite::EyeOff : IconsInfinite::Cube);
          }
          ImGui::SetCursorScreenPos(ImVec2(p.x + availW - tok::control_h, p.y));
          if (UiInteract::Hit("##eye", ImVec2(tok::control_h, rowH)))
@@ -6341,7 +6341,7 @@ namespace
          }
          if (ImGui::IsItemHovered())
             HelpTip("%s", it.visible ? T("Hide (H)") : T("Show (Alt+H shows everything)"));
-         glyph::Draw(dl, ImVec2(p.x + availW - 12.0f, midY), tok::icon_control, text, it.visible ? IconsInfinite::Eye : IconsInfinite::EyeOff);
+         glyph::Draw(dl, ImVec2(p.x + availW - tok::space_3, midY), tok::icon_control, text, it.visible ? IconsInfinite::Eye : IconsInfinite::EyeOff);
          ImGui::SetCursorScreenPos(ImVec2(p.x, p.y + rowH));
          ImGui::Dummy(ImVec2(0.0f, 0.0f));
          ImGui::PopID();
@@ -6823,7 +6823,7 @@ namespace
          const bool radians = sSet->rotUnits == 1;
          if (radians)
             for (float& r : rot)
-               r *= 0.0174532925f;
+               r *= tok::view3d_r_2;
          ComboRow(T("Rotation mode"), &sItemRotMode, { T("XYZ Euler"), T("Quaternion"), T("Axis Angle") }, "Rotation mode");
          bool rotEdited = false;
          if (sItemRotMode != 0)
@@ -6857,7 +6857,7 @@ namespace
          {
             if (radians)
                for (float& r : rot)
-                  r *= 57.2957795f;
+                  r *= tok::view3d_r_3;
             FromDisplayRotation(rot, item->rot);
             rotEdited = true;
          }
@@ -6959,7 +6959,7 @@ namespace
             unsigned bits[3];
             for (int a = 0; a < 3; a++)
             {
-               bits[a] = (1u << kDisp[a]) << (row * 3);
+               bits[a] = (1u << kDisp[a]) << (row * tok::view3d_object_tab_ratio);
                on[a] = (item->lock & bits[a]) != 0;
             }
             const int hit = PanelKit::CheckGrid((std::string("##v3dlock") + std::to_string(row)).c_str(), axes, on, 3);  // ui-audit-ok: axis count
@@ -7218,7 +7218,7 @@ namespace
       {
          sBall = new PreviewBall();
          sRender = new Render3DNode();
-         sRender->width = sRender->height = 192.0f;
+         sRender->width = sRender->height = tok::view3d_height;
          sRender->camDistance = 2.6f;
          sRender->camAzimuth = 35.0f;
          sRender->camElevation = 20.0f;
@@ -7613,9 +7613,9 @@ namespace
             Undoable("Edit in 3D View");
             FieldWell::PopStyle();
             if (cw)
-               KeepingLenses(scene, [&] { scene->renderW = (float)std::clamp(w, 16, 8192); });
+               KeepingLenses(scene, [&] { scene->renderW = (float)std::clamp(w, tok::view3d_output_tab_bound, tok::view3d_output_tab_bound_2); });
             if (ch)
-               KeepingLenses(scene, [&] { scene->renderH = (float)std::clamp(h, 16, 8192); });
+               KeepingLenses(scene, [&] { scene->renderH = (float)std::clamp(h, tok::view3d_output_tab_bound, tok::view3d_output_tab_bound_2); });
          }
          FloatRow(T("Resolution %"), &sSet->percent, 1.0f, 200.0f, "%.0f%%");
          FieldLabel(T("Final size"));
@@ -7828,7 +7828,7 @@ namespace
                if (ImGui::DragFloat4("##v3dcursorrot", aa, 0.5f, 0.0f, 0.0f, "%.2f"))
                {
                   const float an = std::max(1e-6f, std::sqrt(aa[1] * aa[1] + aa[2] * aa[2] + aa[3] * aa[3]));
-                  const float h = aa[0] * kPi / 360.0f, sh = std::sin(h) / an;
+                  const float h = aa[0] * kPi / tok::view3d_h_ratio, sh = std::sin(h) / an;
                   const float nq[4] = { std::cos(h), aa[1] * sh, aa[2] * sh, aa[3] * sh };
                   SetCursorQuaternion(nq);
                }
@@ -7949,9 +7949,9 @@ namespace
                             : sTab == kMaterialTab ? T("Material") : sTab == 5 ? T("Viewport") : T("3D View");
          SectionCard::Title(name);
       }
-      FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
+      FormParts::Inline(availW - tok::space_4 + ImGui::GetStyle().WindowPadding.x);
       {
-         const float sz = 16.0f;
+         const float sz = tok::view3d_sz;
          if (UiInteract::Hit("##closev3dside", ImVec2(sz, sz)))
             sSideOpen = false;
          const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
@@ -7995,7 +7995,7 @@ namespace
       ActionButton::RowNext();
       BeginCardColumn("##v3dprops", ImGuiChildFlags_None);
       availW = std::floor(ImGui::GetContentRegionAvail().x);
-      sFieldW = std::max(60.0f, availW - FieldLabelW());
+      sFieldW = std::max(tok::view3d_side_bound, availW - FieldLabelW());
       sCard.clear();
       if (sTab == kSceneTab) DrawOutliner(scene, availW, ImGui::GetContentRegionAvail().y);
       else if (sTab == 0) DrawRenderTab(scene);
@@ -8173,8 +8173,8 @@ namespace
    {
       GraphNode* self = SceneGraphNode();
       ImVec2 at = self != nullptr ? NodePos(*self) : ImVec2(0, 0);
-      at.x -= 360.0f;
-      at.y += 200.0f * (float)scene->Items().size();
+      at.x -= tok::view3d_x_4;
+      at.y += tok::view3d_y_ratio * (float)scene->Items().size();
       return at;
    }
 
@@ -8490,8 +8490,8 @@ namespace
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
       const float sideBase = std::min(kSideW, avail.x * 0.5f);
       const float sideW = sSideOpen ? sideBase : 0.0f;
-      const float viewW = std::max(120.0f, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
-      DrawViewport(scene, ImVec2(viewW, std::max(80.0f, avail.y)));
+      const float viewW = std::max(tok::view3d_panel_bound, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
+      DrawViewport(scene, ImVec2(viewW, std::max(tok::view3d_panel_bound_2, avail.y)));
       if (sSideOpen)
       {
          ActionButton::RowNext();
@@ -8720,7 +8720,7 @@ std::string View3DJourneyQuery(const std::string& q)
          return "no edit mesh";
       std::set<std::tuple<long, long, long>> pts;
       for (const Vertex& v : node->GetMesh().vertices)
-         pts.insert({ std::lround(v.px * 1000.0f), std::lround(v.py * 1000.0f), std::lround(v.pz * 1000.0f) });
+         pts.insert({ std::lround(v.px * tok::view3d_view3_d_journey_query_ratio), std::lround(v.py * tok::view3d_view3_d_journey_query_ratio), std::lround(v.pz * 1000.0f) });
       return std::to_string(pts.size());
    }
    char b[32];

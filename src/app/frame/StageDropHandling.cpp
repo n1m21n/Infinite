@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "core/Notices.h"
+#include "app/ui/design/Tokens.gen.h"
 #include "ColorSpace.h"
 #include <algorithm>
 #include <cmath>
@@ -50,7 +51,7 @@ void ApplyGltfUvTransform(MappingNode* mp, const GltfImport::GltfDecodePackage& 
    // stores it is Mapping's R(rot) S uv + t with t = (sin r sy + ox, 1 - cos r sy - oy).
    const float r = tp.uvRotation, sx = tp.uvScale[0], sy = tp.uvScale[1];
    mp->scaleX = sx; mp->scaleY = sy;
-   mp->rotateZ = r * 57.2957795f;
+   mp->rotateZ = r * tok::stage_drop_handling_rotate_z_ratio;
    mp->translateX = std::sin(r) * sy + tp.uvOffset[0];
    mp->translateY = 1.0f - std::cos(r) * sy - tp.uvOffset[1];
 }
@@ -98,7 +99,7 @@ std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
          ConnectNodes(modelIndex, 0, materialIndex, 0, wireErr);
       FindNodeByIndex(modelIndex)->showParams = parts == 1;
 
-      float rowH = 200.0f;
+      float rowH = tok::stage_drop_handling_row_h;
       const GltfImport::GltfDecodePackage* pkg = file != nullptr ? file->Part(n) : nullptr;
       if (pkg != nullptr)
       {
@@ -134,7 +135,7 @@ std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
                   ->LoadFromDecoded(m.img->pixels, m.img->width, m.img->height, "gltf://" + path + "#" + slot);
                ConnectNodes(texNode->index, 0, materialIndex, 1 + m.mapIndex, wireErr);
             }
-            texY += 160.0f;
+            texY += tok::stage_drop_handling_tex_y;
          }
          // glTF samples maps with REPEAT unless a sampler says otherwise; the Material's default is clamp, which
          // smears the edge texels across any uv outside 0..1 (tiled cloth, scaled uvs).

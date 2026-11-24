@@ -36,8 +36,8 @@ namespace app
       const bool active = ImGui::IsItemActive();
 
       // R12: plotted values and handles live in an inset box so nothing touches or crosses the frame.
-      const float pad = 6.0f;
-      const float inner = size - 2.0f * pad;
+      const float pad = tok::space_1_5;
+      const float inner = size - tok::param_inner_ratio * pad;
       auto toScreen = [&](float x, float y) {
          return ImVec2(origin.x + pad + x * inner, origin.y + pad + (1.0f - y) * inner);
       };
@@ -115,7 +115,7 @@ namespace app
          dl->AddLine(ImVec2(origin.x + pad + inner * f, origin.y), ImVec2(origin.x + pad + inner * f, br.y), ScopeGridCol());
          dl->AddLine(ImVec2(origin.x, origin.y + pad + inner * f), ImVec2(br.x, origin.y + pad + inner * f), ScopeGridCol());
       }
-      dl->AddLine(toScreen(0.0f, 0.0f), toScreen(1.0f, 1.0f), ScopeMidLineCol()); // identity reference
+      dl->AddLine(toScreen(0.0f, 0.0f), toScreen(tok::param_curve_editor_to_screen_arg, tok::param_curve_editor_to_screen_arg), ScopeMidLineCol()); // identity reference
       if (crosshair)
       {
          ImVec2 mid = toScreen(0.5f, 0.5f);
@@ -123,26 +123,26 @@ namespace app
          dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), isLight ? tok::Base(tok::col::edge_lo_3, 200) : tok::Base(tok::col::edge_mid, 200));
       }
 
-      const int kSegments = 64;
+      const int kSegments = tok::param_segments;
       for (int i = 1; i <= kSegments; i++)
       {
          float x0 = (float)(i - 1) / kSegments;
          float x1 = (float)i / kSegments;
          dl->AddLine(toScreen(x0, shape.Evaluate(x0)),
-                     toScreen(x1, shape.Evaluate(x1)), lineCol, 1.8f);
+                     toScreen(x1, shape.Evaluate(x1)), lineCol, tok::param_curve_editor_stroke);
       }
       for (int i = 0; i < (int)pts.size(); i++)
       {
          ImVec2 sp = toScreen(pts[i].x, pts[i].y);
-         dl->AddCircleFilled(sp, i == nearest ? 6.0f : 4.5f, lineCol);
-         dl->AddCircle(sp, i == nearest ? 6.0f : 4.5f, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, 1.5f);
+         dl->AddCircleFilled(sp, i == nearest ? tok::param_curve_editor_r : tok::param_curve_editor_r_2, lineCol);
+         dl->AddCircle(sp, i == nearest ? tok::param_curve_editor_r : tok::param_curve_editor_r_2, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, tok::param_curve_editor_stroke_2);
       }
       if (liveX >= 0.0f)
       {
          float clampedX = std::min(1.0f, std::max(0.0f, liveX));
          ImVec2 dot = toScreen(clampedX, shape.Evaluate(clampedX));
-         dl->AddCircleFilled(dot, 5.0f, isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
-         dl->AddCircle(dot, 5.0f, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, 1.5f);
+         dl->AddCircleFilled(dot, tok::param_curve_editor_r_3, isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
+         dl->AddCircle(dot, tok::param_curve_editor_r_3, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, tok::param_curve_editor_stroke_2);
       }
       AudioViz::Border(dl, origin, br);
    }
@@ -183,7 +183,7 @@ namespace app
       ImGui::TextDisabled("%s", statusBuf);
 
       const char* learnLabel = learning ? "Stop Learning" : (hasLearned ? "Learn Again" : "Learn");
-      if (ActionButton::Draw(learnLabel, ImVec2(hasLearned && !learning ? 95 : 120, 0)))
+      if (ActionButton::Draw(learnLabel, ImVec2(hasLearned && !learning ? tok::param_predictive_coloring_params_draw_x : tok::param_predictive_coloring_params_draw_x_2, 0)))
       {
          PushUndoCheckpoint();
          n->SetLearning(!learning);
@@ -191,7 +191,7 @@ namespace app
       if (hasLearned && !learning)
       {
          FormParts::Inline();
-         if (ActionButton::Draw("Reset", ImVec2(50, 0)))
+         if (ActionButton::Draw("Reset", ImVec2(tok::param_predictive_coloring_params_draw_x_3, 0)))
          {
             PushUndoCheckpoint();
             n->ResetProfile();
@@ -241,7 +241,7 @@ namespace app
    // vertical line is where the shape is now.
    static void DrawMSEGEditor(MSEGNode* n, ImU32 lineCol)
    {
-      const float width = kPreviewSize, height = 120.0f;
+      const float width = kPreviewSize, height = tok::param_height_2;
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImGui::PushID(n);
       UiInteract::Hit("##mseg", ImVec2(width, height));
@@ -249,8 +249,8 @@ namespace app
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
 
-      const float pad = 6.0f;
-      const float innerW = width - 2.0f * pad, innerH = height - 2.0f * pad;
+      const float pad = tok::space_1_5;
+      const float innerW = width - tok::param_inner_w_ratio * pad, innerH = height - tok::param_inner_h_ratio * pad;
       auto toScreen = [&](float x, float y) {
          return ImVec2(origin.x + pad + x * innerW, origin.y + pad + (1.0f - y) * innerH);
       };
@@ -283,7 +283,7 @@ namespace app
       {
          best = 8.0f;
          for (int i = 0; i + 1 < (int)pts.size(); i++)
-            if (pts[i].interp == ModShapes::kInterpBend && pts[i + 1].x - pts[i].x > 0.02f && dist(bendHandle(i)) < best)
+            if (pts[i].interp == ModShapes::kInterpBend && pts[i + 1].x - pts[i].x > tok::param_mseg_editor_limit && dist(bendHandle(i)) < best)
             {
                best = dist(bendHandle(i));
                nearBend = i;
@@ -325,7 +325,7 @@ namespace app
          if (sDragBend && sDragIndex + 1 < (int)pts.size())
          {
             const float rising = pts[sDragIndex + 1].y >= pts[sDragIndex].y ? 1.0f : -1.0f;
-            pts[sDragIndex].curve = std::clamp(sDragStartCurve + rising * (sDragStartY - mouse.y) / 50.0f, -1.0f, 1.0f);
+            pts[sDragIndex].curve = std::clamp(sDragStartCurve + rising * (sDragStartY - mouse.y) / tok::param_mseg_editor_ratio, -1.0f, 1.0f);
          }
          else if (!sDragBend)
          {
@@ -362,22 +362,22 @@ namespace app
       for (int i = 1; i <= kSteps; i++)
       {
          const float x0 = (float)(i - 1) / kSteps, x1 = (float)i / kSteps;
-         dl->AddLine(toScreen(x0, n->Evaluate(x0)), toScreen(x1, n->Evaluate(x1)), lineCol, 1.8f);
+         dl->AddLine(toScreen(x0, n->Evaluate(x0)), toScreen(x1, n->Evaluate(x1)), lineCol, tok::param_mseg_editor_stroke);
       }
       for (int i = 0; i + 1 < (int)pts.size(); i++)
-         if (pts[i].interp == ModShapes::kInterpBend && pts[i + 1].x - pts[i].x > 0.02f)
-            dl->AddCircle(bendHandle(i), i == nearBend ? 4.5f : 3.0f, lineCol, 0, 1.2f);
+         if (pts[i].interp == ModShapes::kInterpBend && pts[i + 1].x - pts[i].x > tok::param_mseg_editor_limit)
+            dl->AddCircle(bendHandle(i), i == nearBend ? tok::param_mseg_editor_r : tok::param_mseg_editor_r_2, lineCol, 0, tok::param_mseg_editor_stroke_2);
       for (int i = 0; i < (int)pts.size(); i++)
       {
          const ImVec2 sp = toScreen(pts[i].x, pts[i].y);
-         dl->AddCircleFilled(sp, i == nearPoint ? 6.0f : 4.5f, lineCol);
-         dl->AddCircle(sp, i == nearPoint ? 6.0f : 4.5f, ring, 0, 1.5f);
+         dl->AddCircleFilled(sp, i == nearPoint ? tok::param_mseg_editor_r_3 : tok::param_mseg_editor_r, lineCol);
+         dl->AddCircle(sp, i == nearPoint ? tok::param_mseg_editor_r_3 : tok::param_mseg_editor_r, ring, 0, tok::param_mseg_editor_stroke_3);
       }
       const float px = n->Position();
       const ImU32 liveCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation);
       dl->AddLine(ImVec2(toScreen(px, 0).x, origin.y), ImVec2(toScreen(px, 0).x, br.y), (liveCol & 0x00FFFFFF) | 0x80000000);
-      dl->AddCircleFilled(toScreen(px, n->Evaluate(px)), 4.0f, liveCol);
-      dl->AddCircle(toScreen(px, n->Evaluate(px)), 4.0f, ring, 0, 1.5f);
+      dl->AddCircleFilled(toScreen(px, n->Evaluate(px)), tok::param_mseg_editor_r_4, liveCol);
+      dl->AddCircle(toScreen(px, n->Evaluate(px)), tok::param_mseg_editor_r_4, ring, 0, tok::param_mseg_editor_stroke_3);
       AudioViz::Border(dl, origin, br);
    }
 
@@ -613,37 +613,37 @@ namespace app
    void DrawPalettePreview(PaletteNode* n)
    {
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const float h = 118.0f;
+      const float h = tok::param_h_2;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
                         tok::Role(tok::col::surface_deep), tok::radius_control);
 
       const int count = std::max(1, n->SwatchCount());
-      const float pad = 6.0f;
-      const float chipW = (kPreviewSize - pad * 2.0f) / (float)count;
-      const float chipH = 60.0f;
+      const float pad = tok::space_1_5;
+      const float chipW = (kPreviewSize - pad * tok::param_palette_preview_ratio) / (float)count;
+      const float chipH = tok::param_chip_h;
       for (int i = 0; i < count; i++)
       {
          float rgb[3];
          n->GetSwatch(i, rgb);
          const ImVec2 tl(origin.x + pad + chipW * (float)i, origin.y + pad);
-         const ImVec2 br(tl.x + chipW - 2.0f, tl.y + chipH);
+         const ImVec2 br(tl.x + chipW - tok::space_0_5, tl.y + chipH);
          dl->AddRectFilled(tl, br,
-                           IM_COL32((int)(rgb[0] * 255.0f), (int)(rgb[1] * 255.0f),
-                                    (int)(rgb[2] * 255.0f), 255),
-                           3.0f);
+                           IM_COL32((int)(rgb[0] * tok::param_palette_preview_ratio_2), (int)(rgb[1] * tok::param_palette_preview_ratio_2),
+                                    (int)(rgb[2] * tok::param_palette_preview_ratio_2), 255),
+                           tok::param_palette_preview_radius);
 
          // How much of the reference each swatch actually covers. Without it a
          // one-percent accent looks exactly as important as the colour half the
          // photo is made of, which is the wrong thing to build a look on.
          const float weight = n->SwatchWeight(i);
-         dl->AddRectFilled(ImVec2(tl.x, br.y + 4.0f),
-                           ImVec2(tl.x + (chipW - 2.0f) * std::min(1.0f, weight), br.y + 7.0f),
+         dl->AddRectFilled(ImVec2(tl.x, br.y + tok::space_1),
+                           ImVec2(tl.x + (chipW - tok::space_0_5) * std::min(1.0f, weight), br.y + tok::param_palette_preview_gap),
                            tok::Role(tok::col::text_secondary));
 
          char idx[16];
          snprintf(idx, sizeof(idx), "%d", i + 1);
-         dl->AddText(ImVec2(tl.x + 2.0f, br.y + 9.0f), tok::Role(tok::col::edge_mid), idx);
+         dl->AddText(ImVec2(tl.x + tok::space_0_5, br.y + tok::param_palette_preview_gap_2), tok::Role(tok::col::edge_mid), idx);
       }
 
       const char* status;
@@ -653,7 +653,7 @@ namespace app
          status = "from file";
       else
          status = "choose a photo or cable 'ref'";
-      dl->AddText(ImVec2(origin.x + pad, origin.y + h - 18.0f),
+      dl->AddText(ImVec2(origin.x + pad, origin.y + h - tok::param_palette_preview_gap_3),
                   tok::Role(tok::col::edge_mid), status);
 
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
@@ -747,11 +747,11 @@ namespace app
    void DrawColorRampEditor(ColorRampNode* n)
    {
       const float size = kPreviewSize;
-      const float barH = 26.0f;
-      const float trackH = 22.0f;
-      const float gap = 4.0f;
-      const float pad = 7.0f; // R12: stop handles (radius up to 7) stay inside the frame
-      const float inner = size - 2.0f * pad;
+      const float barH = tok::param_bar_h;
+      const float trackH = tok::param_track_h;
+      const float gap = tok::space_1;
+      const float pad = tok::param_pad; // R12: stop handles (radius up to 7) stay inside the frame
+      const float inner = size - tok::param_inner_ratio * pad;
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -771,13 +771,13 @@ namespace app
          ImU32 col1 = IM_COL32((int)(c1[0] * 255), (int)(c1[1] * 255), (int)(c1[2] * 255), 255);
          dl->AddRectFilledMultiColor(tl, br, col0, col1, col1, col0);
       }
-      dl->AddRect(ImVec2(origin.x + pad, origin.y), ImVec2(origin.x + size - pad, origin.y + barH), tok::Role(tok::col::edge_lo_2), 3.0f);
+      dl->AddRect(ImVec2(origin.x + pad, origin.y), ImVec2(origin.x + size - pad, origin.y + barH), tok::Role(tok::col::edge_lo_2), tok::param_color_ramp_editor_radius);
 
       // stop track
       ImVec2 trackOrigin(origin.x, origin.y + barH + gap);
       ImVec2 trackBr(origin.x + size, trackOrigin.y + trackH);
-      dl->AddRectFilled(trackOrigin, trackBr, tok::Role(tok::col::surface_deep), 3.0f);
-      dl->AddRect(trackOrigin, trackBr, tok::Role(tok::col::edge_lo_2), 3.0f);
+      dl->AddRectFilled(trackOrigin, trackBr, tok::Role(tok::col::surface_deep), tok::param_color_ramp_editor_radius);
+      dl->AddRect(trackOrigin, trackBr, tok::Role(tok::col::edge_lo_2), tok::param_color_ramp_editor_radius);
 
       ImGui::SetCursorScreenPos(trackOrigin);
       UiInteract::Hit("##colorramp", ImVec2(size, trackH));
@@ -857,12 +857,12 @@ namespace app
          const bool isSel = (sSelNode == n && sSelIndex == i);
          ImU32 fill = IM_COL32((int)(n->stopColor[i][0] * 255), (int)(n->stopColor[i][1] * 255),
                                (int)(n->stopColor[i][2] * 255), 255);
-         float r = (i == nearest || isSel) ? 7.0f : 5.5f;
-         ImVec2 tip(x, trackOrigin.y + 2.0f);
-         dl->AddTriangleFilled(ImVec2(x - r, tip.y + r * 1.6f), ImVec2(x + r, tip.y + r * 1.6f), tip,
+         float r = (i == nearest || isSel) ? tok::param_r : tok::param_r_2;
+         ImVec2 tip(x, trackOrigin.y + tok::space_0_5);
+         dl->AddTriangleFilled(ImVec2(x - r, tip.y + r * tok::param_color_ramp_editor_ratio), ImVec2(x + r, tip.y + r * tok::param_color_ramp_editor_ratio), tip,
                                isSel ? tok::Role(tok::col::role_solo) : tok::Role(tok::col::surface_hi));
-         ImVec2 chipTl(x - r * 0.6f, tip.y + r * 1.6f + 1.0f);
-         dl->AddRectFilled(chipTl, ImVec2(chipTl.x + r * 1.2f, chipTl.y + 5.0f), fill);
+         ImVec2 chipTl(x - r * tok::param_color_ramp_editor_ratio_2, tip.y + r * tok::param_color_ramp_editor_ratio + 1.0f);
+         dl->AddRectFilled(chipTl, ImVec2(chipTl.x + r * tok::param_color_ramp_editor_ratio_3, chipTl.y + tok::space_1_25), fill);
       }
 
       ImGui::SetCursorScreenPos(ImVec2(origin.x, trackBr.y + gap));
@@ -886,7 +886,7 @@ namespace app
          char label[32];
          snprintf(label, sizeof(label), "stop %d", rank + 1);
          ColorSwatch(label, n->stopColor[idx], n);
-         ImGui::SameLine(size - 18.0f);
+         ImGui::SameLine(size - tok::param_color_ramp_editor_gap);
          ImGui::BeginDisabled(n->stopCount <= 2);
          if (GlyphToggle::Draw("##delstop", IconsInfinite::Close, IconsInfinite::Close, false))
          {
@@ -904,7 +904,7 @@ namespace app
       if (ActionButton::Draw("+ stop", ImVec2(size, 0)))
       {
          PushUndoCheckpoint();
-         float x = n->stopCount > 0 ? std::min(1.0f, n->stopPos[order[n->stopCount - 1]] + 0.1f) : 0.5f;
+         float x = n->stopCount > 0 ? std::min(1.0f, n->stopPos[order[n->stopCount - 1]] + tok::param_color_ramp_editor_gap_2) : tok::param_x;
          float seedColor[3];
          n->Evaluate(x, seedColor);
          n->AddStop(x, seedColor);
@@ -931,14 +931,14 @@ namespace app
 
       gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
-      const float gutter = 16.0f;
+      const float gutter = tok::param_gutter;
 
       // Color swatch + Result meter (header, full width)
       ImVec4 col(r, g, b, 1.0f);
-      ImGui::ColorButton("##ImageAnalyzeSwatch", col, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoDragDrop, ImVec2(24, 24));
+      ImGui::ColorButton("##ImageAnalyzeSwatch", col, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoDragDrop, ImVec2(tok::param_image_analyze_params_color_button_w, tok::param_image_analyze_params_color_button_h));
       ImGui::SameLine();
       ImGui::BeginGroup();
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::param_image_analyze_params_dummy_h));
       ImGui::Text("Result: %s", UiFmt::F3(res).c);
       ImGui::EndGroup();
 
@@ -1004,7 +1004,7 @@ namespace app
 
       ImGui::EndGroup();
 
-      NodeSeparator("outputs", colW * 2 + gutter);
+      NodeSeparator("outputs", colW * tok::param_image_analyze_params_ratio + gutter);
       DrawOutputMeters(n, colW, 2, gutter);
    }
 
@@ -1014,7 +1014,7 @@ namespace app
    static void DrawTrackPreview(TrackNodeBase* n, float w)
    {
       const float aspect = std::max(0.5f, std::min(2.0f, n->PreviewAspect()));
-      const float h = std::min(w / aspect, w * 0.8f);
+      const float h = std::min(w / aspect, w * tok::param_track_preview_ratio);
       const float iw = std::min(w, h * aspect);
       const ImVec2 tl = ImGui::GetCursorScreenPos();
       ImGui::Dummy(ImVec2(w, h));
@@ -1035,7 +1035,7 @@ namespace app
       Thumb::Add(dl, (ImTextureID)(intptr_t)tex, a, b, ImVec2(mir ? 1.f : 0.f, 1.f), ImVec2(mir ? 0.f : 1.f, 0.f));
       std::vector<float> xy;
       n->GetOverlay(xy);
-      const int np = (int)xy.size() / 2;
+      const int np = (int)xy.size() / tok::param_np_ratio;
       if (np > 0)
       {
          auto pt = [&](int i) { return ImVec2(a.x + (mir ? 1.f - xy[i * 2] : xy[i * 2]) * iw, a.y + xy[i * 2 + 1] * h); };
@@ -1043,15 +1043,15 @@ namespace app
          const ImU32 ink = tok::U32(tok::action_go, CategoryColors::IsThemeLight());
          for (const auto& l : n->OverlayLines())
             if (l.first < np && l.second < np)
-               dl->AddLine(pt(l.first), pt(l.second), shadow, 3.0f);
+               dl->AddLine(pt(l.first), pt(l.second), shadow, tok::param_track_preview_stroke);
          for (const auto& l : n->OverlayLines())
             if (l.first < np && l.second < np)
-               dl->AddLine(pt(l.first), pt(l.second), ink, 1.5f);
+               dl->AddLine(pt(l.first), pt(l.second), ink, tok::param_track_preview_stroke_2);
          for (int i = 0; i < np; i++)
          {
             const bool key = n->OverlayKeyPoint(i);
-            dl->AddCircleFilled(pt(i), key ? 4.0f : 2.0f, shadow, 10);
-            dl->AddCircleFilled(pt(i), key ? 3.0f : 1.2f, key ? ImGui::GetColorU32(ImGuiCol_Text) : ink, 10);
+            dl->AddCircleFilled(pt(i), key ? tok::param_track_preview_r : tok::param_track_preview_r_2, shadow, tok::param_track_preview_segments);
+            dl->AddCircleFilled(pt(i), key ? tok::param_track_preview_r_3 : tok::param_track_preview_r_4, key ? ImGui::GetColorU32(ImGuiCol_Text) : ink, tok::param_track_preview_segments);
          }
       }
       dl->PopClipRect();
@@ -1060,13 +1060,13 @@ namespace app
    void DrawTrackParams(TrackNodeBase* n)
    {
       const float colW = kParamWidth;
-      const float gutter = 16.0f;
+      const float gutter = tok::param_gutter;
       if (n->PackMissing())
          ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", T("Install the Tracking pack: Settings > Extensions"));
       else
          ImGui::TextDisabled("%s", n->Status().c_str());
 
-      NodeSeparator("tracking", colW * 2 + gutter);
+      NodeSeparator("tracking", colW * tok::param_track_params_ratio + gutter);
       ImGui::BeginGroup();
       DrawTrackPreview(n, colW);
       ImGui::EndGroup();
@@ -1077,7 +1077,7 @@ namespace app
       ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f", colW);
       ImGui::EndGroup();
 
-      NodeSeparator("outputs", colW * 2 + gutter);
+      NodeSeparator("outputs", colW * tok::param_track_params_ratio + gutter);
       DrawOutputMeters(n, colW, 2, gutter);
    }
 
@@ -1089,17 +1089,17 @@ namespace app
 
       const float w = kPreviewSize;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const float pillH = 16.0f;
-      const float scopeH = 68.0f;
-      const float totalH = pillH + 4.0f + scopeH;
+      const float pillH = tok::param_pill_h;
+      const float scopeH = tok::param_scope_h;
+      const float totalH = pillH + tok::space_1 + scopeH;
       ImGui::Dummy(ImVec2(w, totalH));
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       // 1. 4-Electrode Contact Quality Pill Bar (TP9 | AF7 | AF8 | TP10)
       static constexpr const char* kPillNames[4] = { "TP9", "AF7", "AF8", "TP10" };
       static constexpr int kChanMap[4] = { 2, 0, 1, 3 };
-      const float pillGap = 4.0f;
-      const float pillW = (w - pillGap * 3.0f) * 0.25f;
+      const float pillGap = tok::space_1;
+      const float pillW = (w - pillGap * tok::param_brain_source_body_ratio) * tok::param_pill_w_ratio;
       for (int p = 0; p < 4; ++p)
       {
          const float q = snap.contactQuality[kChanMap[p]];
@@ -1110,35 +1110,35 @@ namespace app
             fillCol = tok::Role(tok::col::state_err);
          else if (q < 0.75f)
             fillCol = tok::Role(tok::col::role_modulation);
-         dl->AddRectFilled(p0, p1, tok::Role(tok::col::ink_white, 18), 3.0f);
-         dl->AddRectFilled(p0, ImVec2(p0.x + pillW * std::clamp(q, 0.05f, 1.0f), p1.y),
-                           (fillCol & 0x00FFFFFFu) | 0x55000000u, 3.0f);
+         dl->AddRectFilled(p0, p1, tok::Role(tok::col::ink_white, 18), tok::param_brain_source_body_radius);
+         dl->AddRectFilled(p0, ImVec2(p0.x + pillW * std::clamp(q, tok::param_brain_source_body_bound, 1.0f), p1.y),
+                           (fillCol & 0x00FFFFFFu) | 0x55000000u, tok::param_brain_source_body_radius);
          const ImVec2 ts = ImGui::CalcTextSize(kPillNames[p]);
          dl->AddText(ImVec2(p0.x + (pillW - ts.x) * 0.5f, p0.y + (pillH - ts.y) * 0.5f),
                      ImGui::GetColorU32(ImGuiCol_Text), kPillNames[p]);
       }
 
       // 2. Dual-Layer Live Micro-Scope (Top: frontal/temporal traces; Bottom: 5 cortical bands)
-      const ImVec2 sTl(origin.x, origin.y + pillH + 4.0f);
+      const ImVec2 sTl(origin.x, origin.y + pillH + tok::space_1);
       const ImVec2 sBr(origin.x + w, sTl.y + scopeH);
       AudioViz::Fill(dl, sTl, sBr);
       dl->PushClipRect(sTl, sBr, true);
 
-      const float traceTop = sTl.y + 4.0f;
-      const float traceH = 34.0f;
+      const float traceTop = sTl.y + tok::space_1;
+      const float traceH = tok::param_trace_h;
       const float midY = traceTop + traceH * 0.5f;
       const ImU32 frontCol = tok::Role(tok::col::state_ok_2);
       const ImU32 tempCol = tok::Role(tok::col::role_modulation);
       for (int i = 1; i < Bci::kTraceSamples; ++i)
       {
-         const float x0 = sTl.x + 4.0f + ((float)(i - 1) / (float)(Bci::kTraceSamples - 1)) * (w - 8.0f);
-         const float x1 = sTl.x + 4.0f + ((float)i / (float)(Bci::kTraceSamples - 1)) * (w - 8.0f);
-         const float y0f = midY - std::clamp(snap.traceFrontal[i - 1], -1.0f, 1.0f) * (traceH * 0.45f);
-         const float y1f = midY - std::clamp(snap.traceFrontal[i], -1.0f, 1.0f) * (traceH * 0.45f);
-         const float y0t = midY - std::clamp(snap.traceTemporal[i - 1], -1.0f, 1.0f) * (traceH * 0.45f);
-         const float y1t = midY - std::clamp(snap.traceTemporal[i], -1.0f, 1.0f) * (traceH * 0.45f);
-         dl->AddLine(ImVec2(x0, y0t), ImVec2(x1, y1t), (tempCol & 0x00FFFFFFu) | 0x99000000u, 1.1f);
-         dl->AddLine(ImVec2(x0, y0f), ImVec2(x1, y1f), frontCol, 1.4f);
+         const float x0 = sTl.x + tok::space_1 + ((float)(i - 1) / (float)(Bci::kTraceSamples - 1)) * (w - tok::space_2);
+         const float x1 = sTl.x + tok::space_1 + ((float)i / (float)(Bci::kTraceSamples - 1)) * (w - tok::space_2);
+         const float y0f = midY - std::clamp(snap.traceFrontal[i - 1], -1.0f, 1.0f) * (traceH * tok::param_brain_source_body_ratio_2);
+         const float y1f = midY - std::clamp(snap.traceFrontal[i], -1.0f, 1.0f) * (traceH * tok::param_brain_source_body_ratio_2);
+         const float y0t = midY - std::clamp(snap.traceTemporal[i - 1], -1.0f, 1.0f) * (traceH * tok::param_brain_source_body_ratio_2);
+         const float y1t = midY - std::clamp(snap.traceTemporal[i], -1.0f, 1.0f) * (traceH * tok::param_brain_source_body_ratio_2);
+         dl->AddLine(ImVec2(x0, y0t), ImVec2(x1, y1t), (tempCol & 0x00FFFFFFu) | 0x99000000u, tok::param_brain_source_body_stroke);
+         dl->AddLine(ImVec2(x0, y0f), ImVec2(x1, y1f), frontCol, tok::param_brain_source_body_stroke_2);
       }
 
       // Flash badge when Blink / Wink / Jaw fires
@@ -1147,37 +1147,37 @@ namespace app
          const char* tag = snap.blinkFlash > 0.15f ? "BLINK"
                          : (snap.jawLFlash > 0.15f ? "JAW L"
                          : (snap.jawRFlash > 0.15f ? "JAW R" : "WINK"));
-         dl->AddText(ImVec2(sTl.x + 6.0f, sTl.y + 3.0f), tok::Role(tok::col::role_modulation), tag);
+         dl->AddText(ImVec2(sTl.x + tok::space_1_5, sTl.y + tok::space_0_75), tok::Role(tok::col::role_modulation), tag);
       }
 
       // Bottom 5 detrended cortical band bars (d, t, a, b, g) + 1/f slope readout
-      const float barAreaTop = traceTop + traceH + 4.0f;
-      const float barAreaH = (sBr.y - 4.0f) - barAreaTop;
-      const float bw = (w - 64.0f) / 5.0f;
+      const float barAreaTop = traceTop + traceH + tok::space_1;
+      const float barAreaH = (sBr.y - tok::space_1) - barAreaTop;
+      const float bw = (w - tok::param_brain_source_body_gap) / tok::param_bw_ratio;
       for (int b = 0; b < Bci::kBandCount; ++b)
       {
          const float p = std::clamp(snap.bandPower[b], 0.0f, 1.0f);
-         const float bx0 = sTl.x + 4.0f + (float)b * bw;
+         const float bx0 = sTl.x + tok::space_1 + (float)b * bw;
          const float bx1 = bx0 + bw - 3.0f;
-         const float by1 = sBr.y - 4.0f;
+         const float by1 = sBr.y - tok::space_1;
          const float by0 = by1 - std::max(2.0f, p * barAreaH);
          dl->AddRectFilled(ImVec2(bx0, by0), ImVec2(bx1, by1),
-                           b == 2 ? frontCol : tempCol, 2.0f);
+                           b == tok::param_brain_source_body_add_rect_filled_draw ? frontCol : tempCol, tok::param_brain_source_body_radius_2);
       }
       char slopeBuf[32];
       snprintf(slopeBuf, sizeof(slopeBuf), "1/f^%s", UiFmt::F1(snap.aperiodicSlope).c);
-      dl->AddText(ImVec2(sBr.x - 54.0f, barAreaTop + 4.0f), ImGui::GetColorU32(ImGuiCol_TextDisabled), slopeBuf);
+      dl->AddText(ImVec2(sBr.x - tok::param_brain_source_body_gap_2, barAreaTop + tok::space_1), ImGui::GetColorU32(ImGuiCol_TextDisabled), slopeBuf);
       dl->PopClipRect();
       AudioViz::Border(dl, sTl, sBr);
 
       // 3. Action row: Calibrate (30 s open, 30 s closed, 12 s blinks) + Rec Take + Synthetic Gesture triggers
-      const float btnW = (w - 4.0f) * 0.5f;
+      const float btnW = (w - tok::space_1) * 0.5f;
       if (ActionButton::Draw(snap.calibrating ? "Cancel Cal##bciCal" : "Calibrate##bciCal", ImVec2(btnW, 0)))
       {
          if (snap.calibrating) n->CancelCalibration();
          else n->StartCalibration();
       }
-      ImGui::SameLine(0.0f, 4.0f);
+      ImGui::SameLine(0.0f, tok::space_1);
       const char* recLabel = n->IsRecordingTake() ? "Stop Take##bciRec" : (n->HasTake() ? "Re-Record##bciRec" : "Rec Take##bciRec");
       if (ActionButton::Draw(recLabel, ImVec2(btnW, 0)))
       {
@@ -1195,13 +1195,13 @@ namespace app
 
       if (n->device == BrainSourceNode::kDeviceSynthetic)
       {
-         const float gBtnW = (w - 12.0f) * 0.25f;
+         const float gBtnW = (w - tok::space_3) * tok::param_btn_w_ratio;
          if (ActionButton::Draw("Blink##bciB", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::Blink);
-         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::SameLine(0.0f, tok::space_1);
          if (ActionButton::Draw("Wink L##bciWL", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::WinkLeft);
-         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::SameLine(0.0f, tok::space_1);
          if (ActionButton::Draw("Jaw L##bciJL", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::JawLeft);
-         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::SameLine(0.0f, tok::space_1);
          if (ActionButton::Draw("Jaw R##bciJR", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::JawRight);
       }
    }
@@ -1210,19 +1210,19 @@ namespace app
    void DrawBrainSourceParams(BrainSourceNode* n)
    {
       const float colW = kParamWidth;
-      const float gutter = 16.0f;
+      const float gutter = tok::param_gutter;
       if (n->PackMissing())
          ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "%s", T("Install the BCI pack: Settings > Extensions (synthetic fallback active)"));
       else
          ImGui::TextDisabled("%s", n->Status().c_str());
 
-      NodeSeparator("acquisition", colW * 2 + gutter);
+      NodeSeparator("acquisition", colW * tok::param_brain_source_params_ratio + gutter);
       DropdownButton("device", BrainSourceNode::DeviceNames(), n->device, [n](int i) { PushUndoCheckpoint(); n->device = i; });
       if (n->device == BrainSourceNode::kDeviceCsvReplay)
       {
          char pathBuf[512];
          snprintf(pathBuf, sizeof(pathBuf), "%s", n->csvPath.c_str());
-         ImGui::SetNextItemWidth(colW * 2 + gutter);
+         ImGui::SetNextItemWidth(colW * tok::param_brain_source_params_ratio_2 + gutter);
          if (FieldWell::InputTextWithHint("csv file", "/path/to/heroic_muse2.csv", pathBuf, sizeof(pathBuf),
                                           ImGuiInputTextFlags_EnterReturnsTrue))
          {
@@ -1246,7 +1246,7 @@ namespace app
       ModCheckbox("play baked take", &n->playTake);
       ImGui::EndDisabled();
 
-      NodeSeparator("24 neural & somatic outputs", colW * 2 + gutter);
+      NodeSeparator("24 neural & somatic outputs", colW * tok::param_brain_source_params_ratio + gutter);
       DrawOutputMeters(n, colW, 2, gutter);
    }
 

@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "plugin/engine/HostAudio.h"
+#include "app/ui/design/Tokens.gen.h"
 #include "plugin/engine/PluginView.h"
 #include "plugin/ipc/PluginFrames.h"
 #include "app/graph/LearningLog.h"
@@ -1265,8 +1266,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    mainWindowHints.scaleToMonitor = gHeadlessTestWindow ? GLFW_FALSE : GLFW_TRUE;
    if (LauncherCard::Enabled())
       glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-   const int initW = Platform::PluginModeActive() ? 64 : 1600;
-   const int initH = Platform::PluginModeActive() ? 64 : 1000;
+   const int initW = Platform::PluginModeActive() ? tok::startup_init_w : tok::startup_init_w_2;
+   const int initH = Platform::PluginModeActive() ? tok::startup_init_h : tok::startup_init_h_2;
    window = glfwCreateWindow(initW, initH, "Infinite", nullptr, nullptr);
    if (!window)
    {
@@ -1592,7 +1593,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    style.SelectableRounding = style.FrameRounding; // was a vendored ImGui patch before 1.92
    style.GrabRounding = tok::radius_control;
    style.WindowRounding = tok::radius_control;
-   style.ItemSpacing = ImVec2(6, tok::row_gap);   // owner 2026-11-16: row gap 3 (Block 4b shot 1)
+   style.ItemSpacing = ImVec2(tok::startup_init_app_x, tok::row_gap);   // owner 2026-11-16: row gap 3 (Block 4b shot 1)
 #ifndef NDEBUG
    // Block 4b row-pitch shots: the same panels at another row gap, without a rebuild per value.
    if (const char* rg = getenv("INFINITE_ROW_GAP"))
@@ -1607,7 +1608,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    style.PopupRounding = tok::radius_container;   // containers: popover, menu, card, dialog
    style.ScrollbarRounding = 10.0f;
    // 12 pt track with a 3 pt inset: a 6 pt pill with an even gutter on both sides.
-   style.ScrollbarSize = 12.0f;
+   style.ScrollbarSize = tok::startup_scrollbar_size;
    style.ScrollbarPadding = 3.0f;
    // No ScaleAllSizes: style metrics are in points, and the point scale (ApplyUiScale above)
    // grows them together with every other size on screen.
@@ -1919,7 +1920,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          const std::string cat = bar == std::string::npos ? "Utility" : spec.substr(0, bar);
          std::string rest = bar == std::string::npos ? spec : spec.substr(bar + 1);
          int cols = 5;
-         float dx = 480.0f, dy = 620.0f;
+         float dx = 480.0f, dy = 620.0f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
          if (const char* g = getenv("INFINITE_GALLERYGRID"))
             sscanf(g, "%d,%f,%f", &cols, &dx, &dy);
          int i = 0;
@@ -3407,13 +3408,13 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          particles->maxParticles = 10;
          particles->emitRate = 4.0f;
          particles->emitShape = ParticleSystemNode::kSphere;
-         particles->emitRadius = 1.6f;
+         particles->emitRadius = 1.6f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
          particles->lifetime = 60.0f;
          particles->lifetimeRandom = 8.0f;
          particles->initialSpeed = 0.15f;
          particles->speedRandom = 0.10f;
          particles->spread = 1.0f; // omnidirectional - "floating", not "launched"
-         particles->gravityX = 0.0f; particles->gravityY = -0.02f; particles->gravityZ = 0.0f;
+         particles->gravityX = 0.0f; particles->gravityY = -0.02f; particles->gravityZ = 0.0f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
          particles->drag = 0.15f;
          particles->turbulence = 0.35f;
          particles->turbulenceScale = 0.8f;
@@ -3456,7 +3457,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          render->camera = cam;
          render->lights[0] = keyLight;
          render->lights[1] = fillLight;
-         render->width = 1280.0f; render->height = 720.0f;
+         render->width = 1280.0f; render->height = 720.0f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
          render->samples = 2; render->tonemap = 1; render->exposure = 1.1f;
          // A dark teal, not pure black: the warm cube light/emission needs a cool
          // backdrop to read as graded contrast rather than glowing blobs on a void.
@@ -3638,8 +3639,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          t->wordWrap = true;
          t->fitToBox = true;
          t->align = 3;
-         t->scaleX = 1.4f;
-         t->scaleY = 2.2f;
+         t->scaleX = 1.4f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         t->scaleY = 2.2f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
          gNodes[0].showParams = true;
          printf("TEXTFIT fixture: %zu nodes spawned\n", gNodes.size());
       }
@@ -3657,7 +3658,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          cv->AddPoint(CurvesNode::kRGB, 0.35f, 0.75f);
          cv->AddPoint(CurvesNode::kRGB, 0.7f, 0.2f);
          auto* tr = static_cast<TrailsNode*>(gNodes[3].node.get());
-         tr->zoom = 1.02f; tr->rotate = 0.5730f; tr->decay = 0.96f;
+         tr->zoom = 1.02f; tr->rotate = 0.5730f; tr->decay = 0.96f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
          auto* rd = static_cast<ReactionDiffusionNode*>(gNodes[0].node.get());
          rd->ApplyPreset(0);
          rd->stepsPerFrame = 24.0f;
@@ -3682,7 +3683,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          cv->AddPoint(CurvesNode::kRGB, 0.35f, 0.75f);
          cv->AddPoint(CurvesNode::kRGB, 0.7f, 0.2f);
          auto* tr = static_cast<TrailsNode*>(gNodes[3].node.get());
-         tr->zoom = 1.02f; tr->rotate = 0.5730f; tr->decay = 0.96f;
+         tr->zoom = 1.02f; tr->rotate = 0.5730f; tr->decay = 0.96f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
          auto* rd = static_cast<ReactionDiffusionNode*>(gNodes[0].node.get());
          rd->ApplyPreset(0);
          rd->stepsPerFrame = 24.0f;
@@ -3700,8 +3701,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          gNodes[1].showParams = true;
          gNodes[2].showParams = true;
          gNodes[3].showParams = true;
-         static_cast<MacroXYNode*>(gNodes[3].node.get())->padX = 0.32f;
-         static_cast<MacroXYNode*>(gNodes[3].node.get())->padY = 0.68f;
+         static_cast<MacroXYNode*>(gNodes[3].node.get())->padX = 0.32f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         static_cast<MacroXYNode*>(gNodes[3].node.get())->padY = 0.68f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
       }
       else if (getenv("INFINITE_SHOWCASE2") != nullptr)
       {
@@ -3731,7 +3732,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          auto* shape = static_cast<ShapeNode*>(gNodes[0].node.get());
          shape->shapeType = 6;
          shape->sides = 7;
-         shape->size = 0.36f;
+         shape->size = 0.36f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
          shape->fillColor[0] = 1.0f; shape->fillColor[1] = 0.42f; shape->fillColor[2] = 0.2f;
          auto* txt = static_cast<TextNode*>(gNodes[2].node.get());
          txt->text = "INFINITE";
@@ -4554,7 +4555,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       {
          gPerfPanelOpen = true;
          gPerfEditMode = o.find("perfedit") != std::string::npos;
-         gPerfPanelHeight = 620.0f;
+         gPerfPanelHeight = tok::startup_perf_panel_height;
          for (int k = 0; k < 10; ++k)
             AddPerfElementToCurrentPage(k);
          if (gPerfEditMode)
@@ -4576,7 +4577,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       if (o.find("arrangedemo") != std::string::npos)
       {
          gArrangePanelOpen = true;
-         gArrangePanelHeight = o.find("arrshort") != std::string::npos ? 480.0f : 900.0f;   // arrshort: Clip Settings overflows into columns
+         gArrangePanelHeight = o.find("arrshort") != std::string::npos ? tok::startup_arrange_panel_height : tok::startup_arrange_panel_height_2;   // arrshort: Clip Settings overflows into columns
          size_t firstAudio = 0;
          while (firstAudio < gArrange.lanes.size() && gArrange.lanes[firstAudio].type != Arrange::kLaneAudio) ++firstAudio;
          if (firstAudio + 1 < gArrange.lanes.size()) gArrange.lanes[firstAudio + 1].solo = true;
@@ -4609,7 +4610,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             tgroup = Arrange::GroupSelectedLanes(gArrange, {gArrange.lanes[firstAudio].id, gArrange.lanes[firstAudio + 1].id});
          }
          if (o.find("arrzoom") != std::string::npos) gArrangePixelsPerBeat *= 2.5f;
-         if (o.find("arrwide") != std::string::npos) gArrangePanelWidth = 900.0f;
+         if (o.find("arrwide") != std::string::npos) gArrangePanelWidth = tok::startup_arrange_panel_width;
          if (o.find("arrmulti") != std::string::npos)
          {
             gArrangeSel.insert(intro); gArrangeSel.insert(overlay); gArrangeSel.insert(sel);

@@ -74,12 +74,12 @@ namespace app
 
 namespace
 {
-   constexpr float kMinHeight = 180.0f;
-   constexpr float kSettingsW = UiDensity::kInspectorW + 2.0f * tok::space_3;   // one compact strip
+   constexpr float kMinHeight = tok::sample_studio_min_height;
+   constexpr float kSettingsW = UiDensity::kInspectorW + tok::sample_studio_settings_w_ratio * tok::space_3;   // one compact strip
    constexpr double kRate = GenerateSamplesNode::kLoopRate;
-   constexpr int kPaletteSize = 12;
+   constexpr int kPaletteSize = tok::sample_studio_palette_size;
    constexpr size_t kUndoDepth = 64;
-   constexpr float kOverviewH = 14.0f, kRulerH = 16.0f, kTabH = 14.0f, kFadeHandleY = 5.0f;
+   constexpr float kOverviewH = tok::sample_studio_overview_h, kRulerH = tok::sample_studio_ruler_h, kTabH = tok::sample_studio_tab_h, kFadeHandleY = tok::sample_studio_fade_handle_y;
 
    ImU32 AccentU32(float alpha)
    {
@@ -361,9 +361,9 @@ namespace
          return;
       }
       const double a = (double)s.doc.slices[(size_t)idx.front()].start, b = (double)s.doc.EndOf(idx.back());
-      const double pad = (b - a) * 0.05;
+      const double pad = (b - a) * tok::sample_studio_pad_ratio;
       s.viewStart = a - pad;
-      s.viewLen = b - a + 2.0 * pad;
+      s.viewLen = b - a + tok::sample_studio_view_len_ratio * pad;
       ClampView();
    }
 
@@ -640,7 +640,7 @@ namespace
          PluginEngine::HostTapRemoveRef();
       else
          Platform::AudioInputCaptureRemoveRef();
-      if (keep && s.recL.size() > 1024)
+      if (keep && s.recL.size() > tok::sample_studio_stop_recording_limit)
       {
          const double sr = AudioEngine::Instance().SampleRate() > 0.0 ? AudioEngine::Instance().SampleRate() : kRate;
          auto a = std::make_shared<SourceAudio>();
@@ -1031,7 +1031,7 @@ namespace
 
    bool WriteAudio(const std::string& path, const std::vector<float>& l, const std::vector<float>& r, AudioFileWriter::Format fmt, int bits)
    {
-      std::vector<float> inter(l.size() * 2);
+      std::vector<float> inter(l.size() * tok::sample_studio_write_audio_ratio);
       for (size_t i = 0; i < l.size(); i++)
       {
          inter[i * 2] = l[i];
@@ -1124,7 +1124,7 @@ namespace
    {
       const Studio& s = S();
       std::vector<float> f;
-      if (res.laidFrames <= 0 || res.outStart.size() < 2)
+      if (res.laidFrames <= 0 || res.outStart.size() < tok::sample_studio_slice_fractions_limit)
          return f;
       const double laid = (double)res.laidFrames;
       for (size_t i = 0; i + 1 < res.outStart.size(); i++)
@@ -1141,7 +1141,7 @@ namespace
       }
       if (res.bounced)
          for (float& x : f)
-            x *= 0.5f;
+            x *= tok::sample_studio_x;
       return f;
    }
 
@@ -1176,8 +1176,8 @@ namespace
          if (auto* grp = dynamic_cast<GroupNode*>(ggn->node.get()))
          {
             grp->label = std::string(SampleStyles::At(s.take->card).name) + " " + SampleStyles::PartName(s.take->recipe.part);
-            grp->width = 8.0f;
-            grp->height = 8.0f;
+            grp->width = tok::sample_studio_width;
+            grp->height = tok::sample_studio_height;
             gGroupMembers[grp] = std::set<int>(res.newIndices.begin(), res.newIndices.end());
          }
       gSuppressUndoCheckpoints = false;
@@ -1396,7 +1396,7 @@ namespace
    }
 
    // A Shift+arrow step of a slice's Length, landing exactly on 1x on the way through.
-   static float Mould(float r) { return std::fabs(r - 1.0f) < 0.02f ? 1.0f : std::clamp(r, 0.25f, 4.0f); }
+   static float Mould(float r) { return std::fabs(r - 1.0f) < tok::sample_studio_mould_limit ? 1.0f : std::clamp(r, tok::sample_studio_mould_bound, tok::sample_studio_mould_bound_2); }
 
    void SelectStep(int dir)
    {
@@ -1455,7 +1455,7 @@ namespace
       // Source frame -> as heard, and back (identity before the first slice and past the end marker).
       double W(double f) const
       {
-         if (src.size() < 2 || f <= src.front())
+         if (src.size() < tok::sample_studio_w_limit || f <= src.front())
             return f;
          if (f >= src.back())
             return warped.back() + (f - src.back());
@@ -1465,7 +1465,7 @@ namespace
       }
       double Unwarp(double v) const
       {
-         if (src.size() < 2 || v <= warped.front())
+         if (src.size() < tok::sample_studio_unwarp_limit || v <= warped.front())
             return v;
          if (v >= warped.back())
             return src.back() + (v - warped.back());
@@ -1518,7 +1518,7 @@ namespace
       const float w = mx.x - mn.x;
       ImGui::SetCursorScreenPos(mn);
       UiInteract::Hit("##studioOverview", ImVec2(w, mx.y - mn.y));
-      dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_FrameBg, 0.6f), 3.0f);
+      dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_FrameBg, 0.6f), tok::sample_studio_overview_radius);
       const double total = (double)Frames();
       if (total <= 0.0)
          return;
@@ -1531,17 +1531,17 @@ namespace
          HelpTip("%s", T("Drag to move the view; double-click to see it all"));
       if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          ViewAll();
-      const float mid = (mn.y + mx.y) * 0.5f, amp = (mx.y - mn.y) * 0.45f;
+      const float mid = (mn.y + mx.y) * 0.5f, amp = (mx.y - mn.y) * tok::sample_studio_amp_ratio;
       const ImU32 col = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.6f);
       for (int x = 0; x < (int)w; x++)
       {
          float lo, hi;
          RangeMinMax((int64_t)(total * x / w), (int64_t)(total * (x + 1) / w), lo, hi);
-         dl->AddLine(ImVec2(mn.x + x + 0.5f, mid - hi * amp), ImVec2(mn.x + x + 0.5f, mid - lo * amp + 1.0f), col);
+         dl->AddLine(ImVec2(mn.x + x + tok::px_align, mid - hi * amp), ImVec2(mn.x + x + tok::px_align, mid - lo * amp + tok::space_0_25), col);
       }
       const float va = mn.x + (float)(s.viewStart / total) * w, vb = mn.x + (float)((s.viewStart + s.viewLen) / total) * w;
-      dl->AddRectFilled(ImVec2(va, mn.y), ImVec2(std::max(va + 2.0f, vb), mx.y), AccentU32(0.18f), tok::radius_cell);
-      dl->AddRect(ImVec2(va, mn.y), ImVec2(std::max(va + 2.0f, vb), mx.y), AccentU32(0.7f), tok::radius_cell);
+      dl->AddRectFilled(ImVec2(va, mn.y), ImVec2(std::max(va + tok::space_0_5, vb), mx.y), AccentU32(0.18f), tok::radius_cell);
+      dl->AddRect(ImVec2(va, mn.y), ImVec2(std::max(va + tok::space_0_5, vb), mx.y), AccentU32(0.7f), tok::radius_cell);
    }
 
    // The marker under x: kind 0 a slice start (its index), kind 1 the end marker. -1 when none is within reach.
@@ -1613,12 +1613,12 @@ namespace
          const int64_t a = s.doc.slices[(size_t)i].start, b = s.doc.EndOf(i);
          if (g.XOf((double)b) - g.XOf((double)a) < 16.0f)
             continue;
-         if (std::fabs(g.XOf((double)(a + FadeFrames(i, true))) - m.x) < 6.0f)
+         if (std::fabs(g.XOf((double)(a + FadeFrames(i, true))) - m.x) < tok::sample_studio_fade_handle_at_limit)
          {
             index = i;
             return 2;
          }
-         if (std::fabs(g.XOf((double)(b - FadeFrames(i, false))) - m.x) < 6.0f)
+         if (std::fabs(g.XOf((double)(b - FadeFrames(i, false))) - m.x) < tok::sample_studio_fade_handle_at_limit)
          {
             index = i;
             return 3;
@@ -1640,7 +1640,7 @@ namespace
       for (int h = 2; h <= 3; h++)
       {
          const float x0 = h == 2 ? g.XOf((double)a) : g.XOf((double)(b - fo)), x1 = h == 2 ? g.XOf((double)(a + fi)) : g.XOf((double)b);
-         if ((h == 2 ? fi : fo) <= 0 || m.x < x0 || m.x > x1 || x1 - x0 < 2.0f)
+         if ((h == 2 ? fi : fo) <= 0 || m.x < x0 || m.x > x1 || x1 - x0 < tok::sample_studio_fade_curve_at_limit)
             continue;
          const float u = (m.x - x0) / (x1 - x0), env = std::pow(h == 2 ? u : 1.0f - u, e);
          if (std::fabs(m.y - (bottom - (bottom - hy) * env)) < 8.0f)
@@ -1874,7 +1874,7 @@ namespace
       const int fade = hovered || active ? FadeHandleAt(g, io.MousePos, fidx) : -1;
       const int near = fade < 0 && (hovered || active) ? MarkerAt(g, io.MousePos.x, idx) : -1;
       const int curve = fade < 0 && near < 0 && hovered && io.KeyShift ? FadeCurveAt(g, io.MousePos, cidx) : -1;
-      const bool inTabs = io.MousePos.y < g.mn.y + kTabH + 2.0f;
+      const bool inTabs = io.MousePos.y < g.mn.y + kTabH + tok::space_0_5;
       const bool dbl = hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
       // Shift on a cut (not the sample's start) stretches the slice before it instead of moving the cut.
       const bool stretchHere = near >= 0 && io.KeyShift && (near == 1 || idx > 0);
@@ -1997,7 +1997,7 @@ namespace
             }
          }
       }
-      if (active && s.dragKind >= 0 && !s.dragMoved && std::fabs(io.MousePos.x - s.dragX) + std::fabs(io.MousePos.y - s.dragY) > 3.0f)
+      if (active && s.dragKind >= 0 && !s.dragMoved && std::fabs(io.MousePos.x - s.dragX) + std::fabs(io.MousePos.y - s.dragY) > tok::sample_studio_wave_input_limit)
       {
          s.dragMoved = true;
          if (s.dragKind != 4 && s.dragSnap)
@@ -2029,7 +2029,7 @@ namespace
       {
          char buf[24];
          snprintf(buf, sizeof(buf), "%s", UiFmt::Ratio(s.doc.slices[(size_t)s.dragIndex].p.lengthRatio).c);
-         ImGui::GetForegroundDrawList()->AddText(ImVec2(io.MousePos.x + 14.0f, io.MousePos.y - 22.0f), ImGui::GetColorU32(ImGuiCol_Text), buf);
+         ImGui::GetForegroundDrawList()->AddText(ImVec2(io.MousePos.x + tok::space_3_5, io.MousePos.y - tok::sample_studio_wave_input_gap), ImGui::GetColorU32(ImGuiCol_Text), buf);
       }
       if (active && s.dragMoved && (s.dragKind == 0 || s.dragKind == 1))
       {
@@ -2047,7 +2047,7 @@ namespace
          SliceParams& p = s.doc.slices[(size_t)s.dragIndex].p;
          const int64_t a = s.doc.slices[(size_t)s.dragIndex].start, b = s.doc.EndOf(s.dragIndex);
          if (io.KeyShift || s.dragCurveOnly)
-            p.fadeCurve = std::clamp(s.dragCurve + (io.MousePos.y - s.dragY) / 80.0f, -1.0f, 1.0f);
+            p.fadeCurve = std::clamp(s.dragCurve + (io.MousePos.y - s.dragY) / tok::sample_studio_wave_input_ratio, -1.0f, 1.0f);
          else
          {
             // Length while Shift is up; the curve's drag starts again from here when Shift goes down.
@@ -2293,7 +2293,7 @@ namespace
          UiInteract::Hit("##studioWave", size);
          gSampleStudioClaimedKeys = ImGui::IsItemHovered() && !ImGui::GetIO().WantTextInput;
          FieldWell::Draw(dl, mn, mx, false, false);
-         const float mid = (mn.y + mx.y) * 0.5f, amp = (mx.y - mn.y) * 0.45f;
+         const float mid = (mn.y + mx.y) * 0.5f, amp = (mx.y - mn.y) * tok::sample_studio_amp_ratio;
          const size_t n = s.recL.size();
          const int cols = std::max(1, (int)size.x);
          const ImU32 col = tok::U32(tok::action_record, CategoryColors::IsThemeLight());
@@ -2308,7 +2308,7 @@ namespace
                hi = std::max(hi, s.recL[i]);
             }
             peak = std::max(peak, std::max(hi, -lo));
-            dl->AddLine(ImVec2(mn.x + (float)x + 0.5f, mid - hi * amp), ImVec2(mn.x + (float)x + 0.5f, mid - lo * amp + 1.0f), col);
+            dl->AddLine(ImVec2(mn.x + (float)x + tok::px_align, mid - hi * amp), ImVec2(mn.x + (float)x + tok::px_align, mid - lo * amp + tok::space_0_25), col);
          }
          dl->AddLine(ImVec2(mn.x, mid), ImVec2(mx.x, mid), ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.25f));
          const double secs = (double)n / (AudioEngine::Instance().SampleRate() > 0.0 ? AudioEngine::Instance().SampleRate() : kRate);
@@ -2319,7 +2319,7 @@ namespace
             snprintf(buf, sizeof buf, "%s", T("Waiting for the audio input (allow the microphone if macOS asks)"));
          else
             snprintf(buf, sizeof buf, "%s %d:%s", T("Recording"), (int)secs / 60, UiFmt::SecField1(std::fmod(secs, 60.0)).c);
-         dl->AddText(ImVec2(mn.x + 12.0f, mn.y + 8.0f), ImGui::GetColorU32(ImGuiCol_Text), buf);
+         dl->AddText(ImVec2(mn.x + tok::space_3, mn.y + tok::space_2), ImGui::GetColorU32(ImGuiCol_Text), buf);
          return;
       }
       if (!s.src)
@@ -2331,7 +2331,7 @@ namespace
          if (s.busy)
          {
             const float f = std::clamp(s.gen->Progress(), 0.0f, 1.0f);
-            dl->AddRectFilled(ImVec2(mn.x, mx.y - 2.0f), ImVec2(mn.x + size.x * f, mx.y), ImGui::GetColorU32(AccentEmphasisSelected()));
+            dl->AddRectFilled(ImVec2(mn.x, mx.y - tok::space_0_5), ImVec2(mn.x + size.x * f, mx.y), ImGui::GetColorU32(AccentEmphasisSelected()));
          }
          const char* hint = T("Generate a take, open a file, or drop a sample here");
          const ImVec2 ts = ImGui::CalcTextSize(hint);
@@ -2343,7 +2343,7 @@ namespace
 
       DrawOverview(dl, mn, ImVec2(mx.x, mn.y + kOverviewH));
       WaveGeom g;
-      g.mn = ImVec2(mn.x, mn.y + kOverviewH + kRulerH + 2.0f);
+      g.mn = ImVec2(mn.x, mn.y + kOverviewH + kRulerH + tok::space_0_5);
       g.mx = mx;
       g.Build();
       DrawRuler(dl, ImVec2(mn.x, mn.y + kOverviewH + 1.0f), ImVec2(mx.x, mn.y + kOverviewH + kRulerH + 1.0f), g);
@@ -2376,7 +2376,7 @@ namespace
 
       FieldWell::Draw(dl, g.mn, g.mx, false, false);
       dl->PushClipRect(g.mn, g.mx, true);
-      const float w = g.mx.x - g.mn.x, top = g.mn.y + kTabH, mid = (top + g.mx.y) * 0.5f, amp = (g.mx.y - top) * 0.46f * s.level;
+      const float w = g.mx.x - g.mn.x, top = g.mn.y + kTabH, mid = (top + g.mx.y) * 0.5f, amp = (g.mx.y - top) * tok::sample_studio_amp_ratio_2 * s.level;
       const int64_t n = Frames();
 
       // Slice regions: a wash in the slice's colour, stronger when selected.
@@ -2458,7 +2458,7 @@ namespace
                if (la > lb)
                   std::swap(la, lb);
                LaidMinMax((int64_t)la, std::max((int64_t)la + 1, (int64_t)std::ceil(lb)), lo, hi);
-               const float r = std::clamp(k / was, 0.0f, 8.0f);
+               const float r = std::clamp(k / was, 0.0f, tok::sample_studio_wave_bound);
                lo *= r;
                hi *= r;
             }
@@ -2475,8 +2475,8 @@ namespace
                lo *= k;
                hi *= k;
             }
-            const float px = g.mn.x + (float)x + 0.5f;
-            dl->AddLine(ImVec2(px, mid - hi * amp), ImVec2(px, mid - lo * amp + 1.0f), audible(a) ? waveCol : mutedCol);
+            const float px = g.mn.x + (float)x + tok::px_align;
+            dl->AddLine(ImVec2(px, mid - hi * amp), ImVec2(px, mid - lo * amp + tok::space_0_25), audible(a) ? waveCol : mutedCol);
          }
       }
       else
@@ -2490,9 +2490,9 @@ namespace
             const ImVec2 p(g.XOf((double)f), mid - v * amp);
             const ImU32 c = audible(f) ? waveCol : mutedCol;
             if (f > a)
-               dl->AddLine(prev, p, c, 1.2f);
+               dl->AddLine(prev, p, c, tok::sample_studio_wave_stroke);
             if (fpp < 0.25)
-               dl->AddCircleFilled(p, 2.5f, c);
+               dl->AddCircleFilled(p, tok::sample_studio_wave_r, c);
             prev = p;
          }
       }
@@ -2507,13 +2507,13 @@ namespace
             continue;
          const bool sel = IsSel(s.doc.slices[(size_t)i].id);
          const ImU32 c = i == 0 ? acc : SliceColour(s.doc, i);
-         dl->AddLine(ImVec2(x, g.mn.y), ImVec2(x, g.mx.y), c, sel || i == 0 ? 2.0f : 1.0f);
+         dl->AddLine(ImVec2(x, g.mn.y), ImVec2(x, g.mx.y), c, sel || i == 0 ? tok::sample_studio_wave_stroke_2 : tok::sample_studio_wave_stroke_3);
          const std::string lab = SliceLabel(s.doc, i);
          const ImVec2 ts = ImGui::CalcTextSize(lab.c_str());
-         const float tabW = std::min(ts.x + 8.0f, std::max(14.0f, xn - x - 1.0f));
+         const float tabW = std::min(ts.x + tok::space_2, std::max(tok::sample_studio_wave_bound_2, xn - x - 1.0f));
          dl->AddRectFilled(ImVec2(x, g.mn.y), ImVec2(x + tabW, g.mn.y + kTabH), SliceColour(s.doc, i, sel ? 0.95f : 0.6f), tok::radius_cell);
          dl->PushClipRect(ImVec2(x, g.mn.y), ImVec2(x + tabW, g.mn.y + kTabH), true);
-         dl->AddText(ImVec2(x + 4.0f, g.mn.y + (kTabH - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_WindowBg), lab.c_str());
+         dl->AddText(ImVec2(x + tok::space_1, g.mn.y + (kTabH - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_WindowBg), lab.c_str());
          dl->PopClipRect();
          const SliceParams& p = s.doc.slices[(size_t)i].p;
          // Small state letters after the tab: muted, solo, reversed, stretched.
@@ -2526,13 +2526,13 @@ namespace
             flags += "R ";
          if (p.lengthRatio != 1.0f)
             flags += "T ";
-         if (!flags.empty() && xn - x - tabW > 30.0f)
-            dl->AddText(ImVec2(x + tabW + 3.0f, g.mn.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), flags.c_str());
+         if (!flags.empty() && xn - x - tabW > tok::sample_studio_wave_limit)
+            dl->AddText(ImVec2(x + tabW + tok::space_0_75, g.mn.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), flags.c_str());
       }
       {
          const float x = g.XOf((double)s.doc.endFrame);
-         dl->AddLine(ImVec2(x, g.mn.y), ImVec2(x, g.mx.y), acc, 2.0f);
-         dl->AddTriangleFilled(ImVec2(x, g.mn.y), ImVec2(x - 8.0f, g.mn.y), ImVec2(x, g.mn.y + 8.0f), acc);
+         dl->AddLine(ImVec2(x, g.mn.y), ImVec2(x, g.mx.y), acc, tok::sample_studio_wave_stroke_2);
+         dl->AddTriangleFilled(ImVec2(x, g.mn.y), ImVec2(x - tok::space_2, g.mn.y), ImVec2(x, g.mn.y + tok::space_2), acc);
       }
 
       // Fades: the curve over each slice that has one, and handles at the slice's top corners (hovered or selected
@@ -2563,7 +2563,7 @@ namespace
                   const float env = std::pow(in ? u : 1.0f - u, e);
                   const ImVec2 pt(x0 + (x1 - x0) * u, bottom - (bottom - hy) * env);
                   if (k > 0)
-                     dl->AddLine(prev, pt, cl, 1.0f);
+                     dl->AddLine(prev, pt, cl, tok::sample_studio_wave_stroke_3);
                   prev = pt;
                }
             };
@@ -2578,8 +2578,8 @@ namespace
             {
                const float x = h == 2 ? g.XOf((double)(a + fi)) : g.XOf((double)(b - fo));
                const bool hot = (hoverFade == h && hoverIdx == i) || (s.dragKind == h && s.dragIndex == i);
-               const float r = hot ? 4.5f : 3.5f;
-               dl->AddRectFilled(ImVec2(x - r, hy - r), ImVec2(x + r, hy + r), hot ? ImGui::GetColorU32(ImGuiCol_Text) : c, 1.5f);
+               const float r = hot ? tok::sample_studio_r : tok::sample_studio_r_2;
+               dl->AddRectFilled(ImVec2(x - r, hy - r), ImVec2(x + r, hy + r), hot ? ImGui::GetColorU32(ImGuiCol_Text) : c, tok::sample_studio_wave_radius);
             }
          }
       }
@@ -2587,11 +2587,11 @@ namespace
       if (s.dragKind == 4 && s.dragMoved && s.dragIndex >= 0 && s.dragLast < s.doc.Count())
       {
          const float xa = g.XOf((double)s.doc.slices[(size_t)s.dragIndex].start), xb = g.XOf((double)s.doc.EndOf(s.dragLast));
-         dl->AddRect(ImVec2(xa, top), ImVec2(xb, g.mx.y), ImGui::GetColorU32(ImGuiCol_Text, 0.5f), 2.0f, 0, 1.5f);
+         dl->AddRect(ImVec2(xa, top), ImVec2(xb, g.mx.y), ImGui::GetColorU32(ImGuiCol_Text, 0.5f), tok::sample_studio_wave_radius_2, 0, tok::sample_studio_wave_stroke_4);
          if (s.dropAt >= 0)
          {
             const float x = g.XOf((double)(s.dropAt < s.doc.Count() ? s.doc.slices[(size_t)s.dropAt].start : s.doc.endFrame));
-            dl->AddLine(ImVec2(x, g.mn.y), ImVec2(x, g.mx.y), ImGui::GetColorU32(ImGuiCol_Text), 3.0f);
+            dl->AddLine(ImVec2(x, g.mn.y), ImVec2(x, g.mx.y), ImGui::GetColorU32(ImGuiCol_Text), tok::sample_studio_wave_stroke_5);
          }
       }
       // The scissors: where a click cuts.
@@ -2599,7 +2599,7 @@ namespace
       {
          const float x = g.XOf((double)GridFrame(g.FrameAt(ImGui::GetIO().MousePos.x)));
          for (float y = g.mn.y; y < g.mx.y; y += 6.0f)
-            dl->AddLine(ImVec2(x, y), ImVec2(x, std::min(g.mx.y, y + 3.0f)), ImGui::GetColorU32(ImGuiCol_Text), 1.0f);
+            dl->AddLine(ImVec2(x, y), ImVec2(x, std::min(g.mx.y, y + tok::space_0_75)), ImGui::GetColorU32(ImGuiCol_Text), tok::sample_studio_wave_stroke_3);
       }
 
       // The hand: drag the wave to pan; the pointer shows the active tool.
@@ -2633,7 +2633,7 @@ namespace
       else if (s.headFrame >= 0.0)
          headX = g.XOfW(s.headFrame);
       if (s.job || s.onsetJob || s.busy)
-         dl->AddRectFilled(ImVec2(g.mn.x, g.mx.y - 2.0f), ImVec2(g.mn.x + w * (s.busy ? std::clamp(s.gen->Progress(), 0.0f, 1.0f) : 1.0f), g.mx.y),
+         dl->AddRectFilled(ImVec2(g.mn.x, g.mx.y - tok::space_0_5), ImVec2(g.mn.x + w * (s.busy ? std::clamp(s.gen->Progress(), 0.0f, 1.0f) : 1.0f), g.mx.y),
                            AccentU32(s.busy ? 1.0f : 0.4f));
       dl->PopClipRect();
       // Over the ruler too, so it sits on the same mark in all three panels.
@@ -2725,14 +2725,14 @@ namespace
       {
          bool m = e.mute, so = e.solo;
          SectionCard::RowLabel(T("Play"));
-         if (AudioToggleButton(L("Mute##sliceMute"), &m, fieldW / 3.0f - 3.0f, 0.0f))
+         if (AudioToggleButton(L("Mute##sliceMute"), &m, fieldW / tok::sample_studio_slice_inspector_ratio - 3.0f, 0.0f))
             t.Changed(true);
-         FormParts::Inline(0.0f, 3.0f);
-         if (AudioToggleButton(L("Solo##sliceSolo"), &so, fieldW / 3.0f - 3.0f, 0.0f))
+         FormParts::Inline(0.0f, tok::sample_studio_slice_inspector_inline_layout);
+         if (AudioToggleButton(L("Solo##sliceSolo"), &so, fieldW / tok::sample_studio_slice_inspector_ratio - 3.0f, 0.0f))
             t.Changed(true);
-         FormParts::Inline(0.0f, 3.0f);
+         FormParts::Inline(0.0f, tok::sample_studio_slice_inspector_inline_layout);
          bool rv = e.reverse;
-         if (AudioToggleButton(L("Rev##sliceRev"), &rv, fieldW / 3.0f, 0.0f))
+         if (AudioToggleButton(L("Rev##sliceRev"), &rv, fieldW / tok::sample_studio_slice_inspector_ratio, 0.0f))
             t.Changed(true);
          e.mute = m;
          e.solo = so;
@@ -2892,7 +2892,7 @@ namespace
       UiDensity::Compact compact;
       SectionCard::BeginWindow();
       const float availW = ImGui::GetContentRegionAvail().x;
-      const float fieldW = std::max(60.0f, availW - SectionCard::LabelW());
+      const float fieldW = std::max(tok::sample_studio_settings_bound, availW - SectionCard::LabelW());
 
       PruneSelection();
       char title[64];
@@ -2903,9 +2903,9 @@ namespace
       else
          snprintf(title, sizeof(title), "%d %s", (int)s.sel.size(), T("slices"));
       SectionCard::Title(title);
-      FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
+      FormParts::Inline(availW - tok::space_4 + ImGui::GetStyle().WindowPadding.x);
       {
-         const float sz = 16.0f;
+         const float sz = tok::sample_studio_sz;
          if (UiInteract::Hit("##closestudiosettings", ImVec2(sz, sz)))
             s.settingsOpen = false;
          const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
@@ -2937,7 +2937,7 @@ namespace
 
    constexpr float kIconW = tok::control_h;
 
-   float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_3; }
+   float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + tok::sample_studio_text_w_ratio * tok::space_3; }
 
    // An icon chip in the Timeline's toolbar grammar (the kit's chip, one glyph size per chip size).
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, bool green = false)
@@ -2969,14 +2969,14 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImU32 tc = ImGui::GetColorU32(ImGuiCol_Text);
       const float cy = (bmin.y + bmax.y) * 0.5f;
-      const std::string value = app::TruncateWithEllipsis(items[(size_t)std::clamp(cur, 0, (int)items.size() - 1)], w - 2.0f * tok::space_3);
+      const std::string value = app::TruncateWithEllipsis(items[(size_t)std::clamp(cur, 0, (int)items.size() - 1)], w - 2.0f * tok::space_3);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
       dl->AddText(ImVec2(bmin.x + tok::space_3, cy - ImGui::GetFontSize() * 0.5f), tc, value.c_str());
 
       const float k = sOpenId == pid ? std::clamp((float)((ImGui::GetTime() - sOpenedAt) * 1000.0 / tok::motion_on), 0.0f, 1.0f) : 1.0f;
       const float e = 1.0f - (1.0f - k) * (1.0f - k) * (1.0f - k);
       const float rowH = ImGui::GetFrameHeight();
       ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1 + (1.0f - e) * tok::space_2));
-      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(160.0f, w), 0.0f), ImVec2(280.0f, rowH * 9.5f + tok::space_3 * 2.0f));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(tok::sample_studio_picker_chip_bound, w), 0.0f), ImVec2(tok::sample_studio_picker_chip_set_next_window_size_constraints_x, rowH * tok::sample_studio_picker_chip_ratio + tok::space_3 * tok::sample_studio_picker_chip_ratio_2));
       const float savedAlpha = ImGui::GetStyle().Alpha;
       ImGui::GetStyle().Alpha = savedAlpha * e;
       bool changed = false;
@@ -3048,8 +3048,8 @@ namespace
       const float x0 = ImGui::GetCursorScreenPos().x;
       const float in = tok::space_1, between = tok::space_3;
       // The pickers give up width first, then the input picker goes (Settings still has it): the bar never scrolls.
-      const float roomy = std::clamp((w - 1165.0f) / 100.0f, 0.0f, 1.0f);
-      const bool showInput = w >= 1165.0f;
+      const float roomy = std::clamp((w - tok::sample_studio_toolbar_gap) / tok::sample_studio_toolbar_ratio, 0.0f, 1.0f);
+      const bool showInput = w >= tok::sample_studio_show_input_limit;
 
       // Make: open a file, generate (again), instrument, snap to scale, bars.
       if (IconChip("##studioOpen", IconsInfinite::Folder, false, T("Open an audio file (or drop one on the Studio)")))
@@ -3215,8 +3215,8 @@ namespace
       // Sample Audio: the twin of Session's and the Timeline's chip.
       const bool studioMode = gAudioMode == AudioMode::Studio;
       const char* audioL = T("Audio");
-      const float audioW = ImGui::CalcTextSize(audioL).x + 2.0f * tok::space_2;
-      const float rightW = TextW(exportL) + TextW(convertL) + audioW + kIconW + 3.0f * in;
+      const float audioW = ImGui::CalcTextSize(audioL).x + tok::sample_studio_audio_w_ratio * tok::space_2;
+      const float rightW = TextW(exportL) + TextW(convertL) + audioW + kIconW + tok::sample_studio_right_w_ratio * in;
       FormParts::Inline(0.0f, 0.0f);
       ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x + between, x0 + w - rightW), ImGui::GetCursorScreenPos().y));
       ImGui::BeginDisabled(!has || s.busy);
@@ -3401,11 +3401,11 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
-      const float h = std::max(40.0f, avail.y);
+      const float h = std::max(tok::sample_studio_bound, avail.y);
       const float gap = ImGui::GetStyle().ItemSpacing.x;
       const float panelW = kSettingsW;
       const float settingsW = s.settingsOpen ? panelW + gap : 0.0f;
-      DrawWave(origin, ImVec2(std::max(40.0f, avail.x - settingsW), h));
+      DrawWave(origin, ImVec2(std::max(tok::sample_studio_bound, avail.x - settingsW), h));
       if (s.settingsOpen)
       {
          ImGui::SetCursorScreenPos(ImVec2(origin.x + avail.x - panelW, origin.y));
@@ -3437,7 +3437,7 @@ namespace
       std::string o;
       for (size_t i = 0; i < v.size(); i++)
       {
-         if (v[i] == '%' && i + 2 < v.size())
+         if (v[i] == '%' && i + tok::sample_studio_unesc_gap < v.size())
          {
             o += (char)strtol(v.substr(i + 1, 2).c_str(), nullptr, 16);
             i += 2;

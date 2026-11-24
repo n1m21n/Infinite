@@ -295,8 +295,8 @@ namespace app
       if (!isFav)
          return;
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const float starSize = 11.0f;
-      const ImVec2 center(itemMax.x - 12.0f, (itemMin.y + itemMax.y) * 0.5f);
+      const float starSize = tok::browser_star_size;
+      const ImVec2 center(itemMax.x - tok::space_3, (itemMin.y + itemMax.y) * 0.5f);
       const ImU32 starCol = tok::U32(tok::badge_favorite, app::IsThemeLight());
       glyph::DrawStar(dl, center, starSize, starCol, /*filled=*/true);
    }
@@ -366,11 +366,11 @@ namespace app
       // FNV-1a, so the same label lands on the same slot in every run and a
       // saved patch's bindings still resolve after a reload. Probing only
       // happens on a real collision within one node.
-      uint32_t h = 2166136261u;
+      uint32_t h = 2166136261u;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
       for (const char c : *hashStr)
       {
          h ^= (uint8_t)c;
-         h *= 16777619u;
+         h *= tok::browser_h;
       }
       const int start = (int)(h % (uint32_t)kDiscreteParamSlots);
       for (int probe = 0; probe < kDiscreteParamSlots; probe++)

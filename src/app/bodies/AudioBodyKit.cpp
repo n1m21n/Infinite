@@ -31,11 +31,11 @@ namespace app
 
       const bool isLight = IsThemeLight();
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float h = ImGui::GetTextLineHeight() + 6.0f;
+      const float h = ImGui::GetTextLineHeight() + tok::space_1_5;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(p, ImVec2(p.x + width, p.y + h),
-                        isLight ? tok::Base(tok::col::ink_black, 12) : tok::Base(tok::col::ink_white, 10), 3.0f);
-      const float textY = p.y + 3.0f;
+                        isLight ? tok::Base(tok::col::ink_black, 12) : tok::Base(tok::col::ink_white, 10), tok::audio_begin_body_radius);
+      const float textY = p.y + tok::space_0_75;
       // Both texts are fitted to the strip: a long status string (a device
       // error, a file name) used to run out past the node's right edge. The
       // hovered-param readout wins its side; the idle stat gets what's left
@@ -57,7 +57,7 @@ namespace app
       std::string readoutFit;
       if (!readout.empty())
       {
-         readoutFit = fitText(readout.c_str(), width - 16.0f);
+         readoutFit = fitText(readout.c_str(), width - tok::space_4);
          readoutW = ImGui::CalcTextSize(readoutFit.c_str()).x;
       }
       // One status grammar (R10): "<what> · <state>". Legacy " - " / "  -  " separators become the middle dot,
@@ -74,7 +74,7 @@ namespace app
          for (;;)
          {
             while (!s.empty() && s.back() == ' ') s.pop_back();
-            if (s.size() >= 2 && s.compare(s.size() - 2, 2, "\xC2\xB7") == 0) { s.resize(s.size() - 2); continue; }
+            if (s.size() >= tok::audio_begin_body_limit && s.compare(s.size() - 2, 2, "\xC2\xB7") == 0) { s.resize(s.size() - 2); continue; }
             break;
          }
          return s;
@@ -82,19 +82,19 @@ namespace app
       if (idleStat != nullptr && idleStat[0] != '\0')
       {
          const std::string idleNorm = normaliseStat(idleStat);
-         const float idleMax = width - 14.0f - (readoutW > 0.0f ? readoutW + 14.0f : 0.0f);
+         const float idleMax = width - tok::space_3_5 - (readoutW > 0.0f ? readoutW + tok::space_3_5 : 0.0f);
          const std::string idleFit = fitText(idleNorm.c_str(), idleMax);
          if (!idleFit.empty())
-            dl->AddText(ImVec2(p.x + 7.0f, textY),
+            dl->AddText(ImVec2(p.x + tok::audio_begin_body_gap, textY),
                         isLight ? tok::Base(tok::col::surface_lo_2) : tok::Base(tok::col::edge_mid),
                         idleFit.c_str());
       }
       if (!readoutFit.empty())
-         dl->AddText(ImVec2(p.x + width - 8.0f - readoutW, textY),
+         dl->AddText(ImVec2(p.x + width - tok::space_2 - readoutW, textY),
                      isLight ? tok::Base(tok::col::surface_lo) : tok::Base(tok::col::edge_hi),
                      readoutFit.c_str());
       ImGui::Dummy(ImVec2(width, h));
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::audio_begin_body_dummy_h));
    }
 
 
@@ -111,7 +111,7 @@ namespace app
 
 
    // Gutter between columns, so two panels never share an edge.
-   const float kAudioColumnGap = 12.0f;
+   const float kAudioColumnGap = tok::space_3;
 
 
    void BeginAudioColumn(int index)
@@ -190,27 +190,27 @@ namespace app
       if (cached > 0.0f)
       {
          dl->AddRectFilled(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                           isLight ? tok::Base(tok::col::ink_black, 10) : tok::Base(tok::col::ink_white, 9), 5.0f);
+                           isLight ? tok::Base(tok::col::ink_black, 10) : tok::Base(tok::col::ink_white, 9), tok::audio_begin_section_radius);
          dl->AddRect(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                     isLight ? tok::Base(tok::col::ink_black, 20) : tok::Base(tok::col::ink_white, 16), 5.0f);
+                     isLight ? tok::Base(tok::col::ink_black, 20) : tok::Base(tok::col::ink_white, 16), tok::audio_begin_section_radius);
       }
 
-      const float headerH = ImGui::GetTextLineHeight() + 4.0f;
-      dl->AddText(ImVec2(gAudioBodyX + kAudioSectionPad, p.y + 3.0f),
-                  isLight ? IM_COL32((int)(gAudioTint.r * 180.0f), (int)(gAudioTint.g * 180.0f),
-                                     (int)(gAudioTint.b * 180.0f), 255)
-                          : IM_COL32((int)(gAudioTint.r * 255.0f), (int)(gAudioTint.g * 255.0f),
-                                     (int)(gAudioTint.b * 255.0f), 210),
+      const float headerH = ImGui::GetTextLineHeight() + tok::space_1;
+      dl->AddText(ImVec2(gAudioBodyX + kAudioSectionPad, p.y + tok::space_0_75),
+                  isLight ? IM_COL32((int)(gAudioTint.r * tok::audio_begin_section_ratio), (int)(gAudioTint.g * tok::audio_begin_section_ratio),
+                                     (int)(gAudioTint.b * tok::audio_begin_section_ratio), 255)
+                          : IM_COL32((int)(gAudioTint.r * tok::audio_begin_section_ratio_2), (int)(gAudioTint.g * tok::audio_begin_section_ratio_2),
+                                     (int)(gAudioTint.b * tok::audio_begin_section_ratio_2), 210),
                   label);
-      const float ruleY = p.y + headerH + 2.0f;
+      const float ruleY = p.y + headerH + tok::space_0_5;
       dl->AddLine(ImVec2(gAudioBodyX + kAudioSectionPad, ruleY),
                   ImVec2(gAudioBodyX + gAudioBodyW - kAudioSectionPad, ruleY),
-                  isLight ? tok::Base(tok::col::ink_black, 22) : tok::Base(tok::col::ink_white, 18), 1.0f);
-      ImGui::Dummy(ImVec2(gAudioBodyW, headerH + 4.0f));
+                  isLight ? tok::Base(tok::col::ink_black, 22) : tok::Base(tok::col::ink_white, 18), tok::audio_begin_section_stroke);
+      ImGui::Dummy(ImVec2(gAudioBodyW, headerH + tok::space_1));
 
       ImGui::Indent(kAudioSectionPad);
       gAudioContentX = gAudioBodyX + kAudioSectionPad;
-      gAudioContentW = gAudioBodyW - 2.0f * kAudioSectionPad;
+      gAudioContentW = gAudioBodyW - tok::audio_content_w_ratio * kAudioSectionPad;
    }
 
 
@@ -223,7 +223,7 @@ namespace app
       gAudioSectionIndex++;
       gAudioContentX = gAudioBodyX;
       gAudioContentW = gAudioBodyW;
-      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::audio_end_section_dummy_h));
    }
 
 
@@ -301,15 +301,15 @@ namespace app
          const float valueW = ImGui::CalcTextSize(value).x;
          const float lh = ImGui::GetTextLineHeight();
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(p.x, p.y + lh * 0.5f - 1.5f),
-                                                   ImVec2(p.x + 8.0f, p.y + lh * 0.5f + 1.5f),
+         ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(p.x, p.y + lh * 0.5f - tok::audio_drift_legend_gap),
+                                                   ImVec2(p.x + tok::space_2, p.y + lh * 0.5f + tok::audio_drift_legend_gap),
                                                    DriftLineColor(i, 230), 1.0f);
-         ImGui::Dummy(ImVec2(11.0f, lh));
+         ImGui::Dummy(ImVec2(tok::audio_drift_legend_dummy_w, lh));
          ImGui::SameLine(0.0f, 0.0f);
          // Truncate the name by hand rather than clipping or wrapping: a wrapped label would
          // push the value onto its own line and desync the swatch column from the row it names.
          std::string label = DriftDestinationLabel(key);
-         const float avail = w - 11.0f - valueW - 6.0f;
+         const float avail = w - tok::audio_avail_gap - valueW - tok::space_1_5;
          if (ImGui::CalcTextSize(label.c_str()).x > avail)
          {
             while (label.size() > 1 && ImGui::CalcTextSize((label + "..").c_str()).x > avail)
@@ -331,7 +331,7 @@ namespace app
    void DrawDriftMeter(DriftNode* n, int nodeIndex)
    {
       const float w = kPreviewSize;
-      const float h = 90.0f; // same as DrawModulatorMeter, so the node header keeps its height
+      const float h = tok::audio_h; // same as DrawModulatorMeter, so the node header keeps its height
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       AudioViz::Fill(dl, origin, ImVec2(origin.x + w, origin.y + h));
@@ -340,7 +340,7 @@ namespace app
       for (int q = 1; q < 4; q++)
       {
          const float gy = origin.y + h - (q * 0.25f) * h;
-         dl->AddLine(ImVec2(origin.x, gy), ImVec2(origin.x + w, gy), ScopeMidLineCol(), q == 2 ? 1.0f : 0.5f);
+         dl->AddLine(ImVec2(origin.x, gy), ImVec2(origin.x + w, gy), ScopeMidLineCol(), q == tok::audio_drift_meter_stroke ? tok::audio_drift_meter_stroke_2 : tok::audio_drift_meter_stroke_3);
       }
 
       const uint64_t sourceUid = UidForIndex(nodeIndex);
@@ -400,13 +400,13 @@ namespace app
             // Oldest first: head is the next write slot, so the ring starts `filled` behind it.
             const int idx = (tr.head - tr.filled + i + kDriftTraceLen * 2) % kDriftTraceLen;
             const float x = origin.x + w * (float)i / (float)(kDriftTraceLen - 1);
-            const float y = origin.y + h - 2.0f - std::clamp(tr.v[idx], 0.0f, 1.0f) * (h - 4.0f);
+            const float y = origin.y + h - tok::space_0_5 - std::clamp(tr.v[idx], 0.0f, 1.0f) * (h - tok::space_1);
             const ImVec2 p(x, y);
             if (i > 0)
-               dl->AddLine(prev, p, col, 1.4f);
+               dl->AddLine(prev, p, col, tok::audio_drift_meter_stroke_4);
             prev = p;
          }
-         dl->AddCircleFilled(prev, 2.0f, col);
+         dl->AddCircleFilled(prev, tok::audio_drift_meter_r, col);
       }
       dl->PopClipRect();
       AudioViz::Border(dl, origin, ImVec2(origin.x + w, origin.y + h));
@@ -503,7 +503,7 @@ namespace app
       const bool learning = n->IsLearning();
       const float w = kPreviewSize;
       const float h = ImGui::GetFrameHeight();
-      if (ActionButton::Draw(learning ? "Stop##predModLearn" : "Learn##predModLearn", ImVec2(w * 0.3f, h)))
+      if (ActionButton::Draw(learning ? "Stop##predModLearn" : "Learn##predModLearn", ImVec2(w * tok::audio_predictive_modulator_params_ratio, h)))
       {
          PushUndoCheckpoint();
          n->SetLearning(!learning);
@@ -516,9 +516,9 @@ namespace app
          // spectral radius instead, since "how close to unstable" is the one number worth
          // surfacing about a finished fit.
          const ImVec2 p0 = ImGui::GetCursorScreenPos();
-         const float mw = w - w * 0.3f - ImGui::GetStyle().ItemSpacing.x;
+         const float mw = w - w * tok::audio_mw_ratio - ImGui::GetStyle().ItemSpacing.x;
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::Role(tok::col::ink_white, 14), 3.0f);
+         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::Role(tok::col::ink_white, 14), tok::audio_predictive_modulator_params_radius);
          char label[64];
          const int pct = n->LearningPercent();
          if (learning)
@@ -541,7 +541,7 @@ namespace app
          // label would otherwise draw straight past the node's edge instead of just past mw.
          dl->PushClipRect(p0, ImVec2(p0.x + mw, p0.y + h), true);
          const ImVec2 lsz = ImGui::CalcTextSize(label);
-         dl->AddText(ImVec2(p0.x + 6.0f, p0.y + (h - lsz.y) * 0.5f), tok::Role(tok::col::surface_mid, 200), label);
+         dl->AddText(ImVec2(p0.x + tok::space_1_5, p0.y + (h - lsz.y) * 0.5f), tok::Role(tok::col::surface_mid, 200), label);
          dl->PopClipRect();
          ImGui::Dummy(ImVec2(mw, h));
       }
@@ -621,14 +621,14 @@ namespace app
                                                           /*momentary=*/true);
       if (h.registered && !h.draw)
          return h.driven && h.value >= 0.5f;
-      const float pinW = 16.0f;
+      const float pinW = tok::audio_pin_w;
       const ImVec2 start = ImGui::GetCursorScreenPos();
       float btnW = totalW;
       if (h.registered)
       {
          DrawDiscreteParamPin(h, id, pinW, height);
          ImGui::SetCursorScreenPos(ImVec2(start.x + pinW, start.y));
-         btnW = std::max(20.0f, totalW - pinW);
+         btnW = std::max(tok::audio_gate_button_bound, totalW - pinW);
       }
       ImGui::PushID(id);
       if (h.modulated)
@@ -663,7 +663,7 @@ namespace app
                                                           /*momentary=*/true);
       if (h.registered && !h.draw)
          return h.driven && h.value >= 0.5f;
-      const float pinW = 16.0f;
+      const float pinW = tok::audio_pin_w;
       const float height = ImGui::GetFrameHeight();
       const ImVec2 start = ImGui::GetCursorScreenPos();
       if (h.registered)
@@ -894,7 +894,7 @@ namespace app
             gWaveZoom.erase(zit);
          else
          {
-            const double margin = 0.05 * (double)(*end - *start);
+            const double margin = tok::audio_margin_ratio * (double)(*end - *start);
             WaveZoom z;
             z.a = std::max(0.0, (double)*start - margin);
             z.b = std::min(1.0, (double)*end + margin);
@@ -909,7 +909,7 @@ namespace app
       AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::audio_trim_wave_stroke);
 
       const ImU32 startCol = isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok);
       const ImU32 endCol = isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink);
@@ -931,7 +931,7 @@ namespace app
          {
             const float px = toX(std::clamp(playhead, 0.0f, 1.0f));
             dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                        isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 240), 2.0f);
+                        isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 240), tok::audio_trim_wave_stroke_2);
          }
          // One cursor per sounding voice, fading with the voice.
          for (int v = 0; v < numCursors; v++)
@@ -941,19 +941,19 @@ namespace app
             const float px = toX(std::clamp(cursors[v].pos, 0.0f, 1.0f));
             const int alpha = (int)(std::clamp(cursors[v].alpha, 0.0f, 1.0f) * 235.0f) + 20;
             dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                        isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha), 1.5f);
+                        isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha), tok::audio_trim_wave_stroke_3);
          }
          if (trim)
          {
-            dl->AddLine(ImVec2(toX(*start), origin.y), ImVec2(toX(*start), br.y), startCol, 2.0f);
-            dl->AddLine(ImVec2(toX(*end), origin.y), ImVec2(toX(*end), br.y), endCol, 2.0f);
+            dl->AddLine(ImVec2(toX(*start), origin.y), ImVec2(toX(*start), br.y), startCol, tok::audio_trim_wave_stroke_2);
+            dl->AddLine(ImVec2(toX(*end), origin.y), ImVec2(toX(*end), br.y), endCol, tok::audio_trim_wave_stroke_2);
          }
          if (zit != gWaveZoom.end())
          {
             char z[24];
             snprintf(z, sizeof(z), "%s", UiFmt::Ratio(1.0 / (b - a)).c);
             const ImVec2 zs = AudioLabelSize(z);
-            AudioLabelText(dl, ImVec2(br.x - zs.x - 5.0f, origin.y + 3.0f), ScopeTextCol(), z);
+            AudioLabelText(dl, ImVec2(br.x - zs.x - tok::space_1_25, origin.y + tok::space_0_75), ScopeTextCol(), z);
          }
       }
       else
@@ -974,8 +974,8 @@ namespace app
       {
          // Triangle grips top and bottom of each marker, kept a few pixels in from the edge so
          // they stay grabbable at start = 0 / end = 1, where the line sits on the border.
-         const float grip = 8.0f;
-         const float handleW = 10.0f;
+         const float grip = tok::audio_grip;
+         const float handleW = tok::audio_handle_w;
          for (int which = 0; which < 2; which++)
          {
             float* v = which == 0 ? start : end;
@@ -1004,7 +1004,7 @@ namespace app
                // Shift = a tenth of the speed; rebase on every change so neither switch jumps.
                if (fine != gHandleGrab.fine)
                   gHandleGrab = { hid, *v, mouseX, fine };
-               const float perPx = (float)((b - a) / w) * (fine ? 0.1f : 1.0f);
+               const float perPx = (float)((b - a) / w) * (fine ? tok::audio_trim_wave_assign : 1.0f);
                const float want = gHandleGrab.value + (mouseX - gHandleGrab.mouseX) * perPx;
                *v = which == 0 ? std::clamp(want, 0.0f, *end - 0.01f) : std::clamp(want, *start + 0.01f, 1.0f);
             }

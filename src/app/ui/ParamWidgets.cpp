@@ -55,7 +55,7 @@ namespace app
       const int frame = ImGui::GetFrameCount();
       if (frame != sLastFrame + 1 && frame != sLastFrame)   // ui-audit-ok: frame counter
          sRestSince = ImGui::GetTime();
-      if (std::fabs(mp.x - sRestPos.x) > 2.0f || std::fabs(mp.y - sRestPos.y) > 2.0f)
+      if (std::fabs(mp.x - sRestPos.x) > tok::param_help_tip_limit || std::fabs(mp.y - sRestPos.y) > tok::param_help_tip_limit)
       {
          sRestPos = mp;
          sRestSince = ImGui::GetTime();
@@ -393,7 +393,7 @@ namespace app
       FormatAudioParam(valBuf, sizeof(valBuf), fmt, *value);
       const float textY = r0.y + (r1.y - r0.y - ImGui::GetTextLineHeight()) * 0.5f;
       const ImVec2 valSize = AudioLabelSize(valBuf);
-      const float valX = r1.x - 7.0f - valSize.x;
+      const float valX = r1.x - tok::param_val_x_gap - valSize.x;
       dl->PushClipRect(r0, r1, true);
       ImU32 valCol, nameCol;
       if (vividState)
@@ -426,8 +426,8 @@ namespace app
       }
       AudioLabelText(dl, ImVec2(valX, textY), valCol, valBuf);
 
-      dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - 6.0f), r1.y), true);
-      AudioLabelText(dl, ImVec2(r0.x + 7.0f, textY), nameCol, name.c_str());
+      dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - tok::space_1_5), r1.y), true);
+      AudioLabelText(dl, ImVec2(r0.x + tok::param_audio_slider_float_gap, textY), nameCol, name.c_str());
       dl->PopClipRect();
       dl->PopClipRect();
 
@@ -442,8 +442,8 @@ namespace app
    // slider's pin gutter blank so the row's edges line up with the sliders above it.
    void OutputMeterRow(const char* label, float v, float width)
    {
-      const float inset = tok::pin_box + 4.0f;
-      const float w = std::max(24.0f, width - inset);
+      const float inset = tok::pin_box + tok::space_1;
+      const float w = std::max(tok::param_output_meter_row_bound, width - inset);
       const bool isLight = IsThemeLight();
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetFrameHeight();
@@ -466,13 +466,13 @@ namespace app
       char valBuf[16];
       snprintf(valBuf, sizeof(valBuf), "%s", UiFmt::F2(v).c);
       const float textY = r0.y + (h - ImGui::GetTextLineHeight()) * 0.5f;
-      const float valX = r1.x - 7.0f - AudioLabelSize(valBuf).x;
+      const float valX = r1.x - tok::param_val_x_gap - AudioLabelSize(valBuf).x;
       const ImU32 valCol = isLight ? tok::Base(tok::col::surface_lo_2) : tok::Base(tok::col::surface_hi);
       const ImU32 nameCol = isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid_2);
       dl->PushClipRect(r0, r1, true);
       AudioLabelText(dl, ImVec2(valX, textY), valCol, valBuf);
-      dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - 6.0f), r1.y), true);
-      AudioLabelText(dl, ImVec2(r0.x + 7.0f, textY), nameCol, label);
+      dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - tok::space_1_5), r1.y), true);
+      AudioLabelText(dl, ImVec2(r0.x + tok::param_output_meter_row_gap, textY), nameCol, label);
       dl->PopClipRect();
       dl->PopClipRect();
    }
@@ -499,7 +499,7 @@ namespace app
          OutputMeterRow(node->OutputLabel(o), mod != nullptr ? mod->Value01() : 0.0f, colW);
       }
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + (float)rows * rowH));
-      ImGui::Dummy(ImVec2(1.0f, 0.0f));
+      ImGui::Dummy(ImVec2(tok::param_output_meters_dummy_w, 0.0f));
    }
 
 
@@ -528,14 +528,14 @@ namespace app
 
       void FadeInactive(ImDrawList* dl, int start)
       {
-         constexpr float kGrey = 0.85f;   // how far colours move to their own grey
-         constexpr float kAlpha = 0.65f;  // on top of ImGui's own DisabledAlpha for its parts
+         constexpr float kGrey = tok::param_grey;   // how far colours move to their own grey
+         constexpr float kAlpha = tok::param_alpha;  // on top of ImGui's own DisabledAlpha for its parts
          for (int i = start; i < dl->VtxBuffer.Size; i++)
          {
             ImU32& c = dl->VtxBuffer[i].col;
             const float r = (float)((c >> IM_COL32_R_SHIFT) & 0xFF), g = (float)((c >> IM_COL32_G_SHIFT) & 0xFF);
             const float b = (float)((c >> IM_COL32_B_SHIFT) & 0xFF), a = (float)((c >> IM_COL32_A_SHIFT) & 0xFF);
-            const float y = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            const float y = tok::param_y_ratio * r + tok::param_y_ratio_2 * g + tok::param_y_ratio_3 * b;
             auto mix = [&](float v) { return (ImU32)std::lround(v + (y - v) * kGrey); };
             c = IM_COL32(mix(r), mix(g), mix(b), (ImU32)std::lround(a * kAlpha));
          }
@@ -725,7 +725,7 @@ namespace app
       gDrawnParamPins.insert(pinId);
 
       ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      ed::PinPivotAlignment(ImVec2(tok::param_discrete_pin_pin_pivot_alignment_x, tok::param_discrete_pin_pin_pivot_alignment_y));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float box = tok::pin_box;
       const ImVec2 p = controlHeight > 0.0f
@@ -746,9 +746,9 @@ namespace app
       // starting it at the pin left the highlight overhanging past the
       // widget's real left edge by the pin's own width.
       gParamPinScreenList.push_back({ h.nodeIndex, h.paramIndex, curGn ? curGn->typeName : "",
-                                      StripParamLabel(label), c, ImVec2(p.x + box + 4.0f, p.y),
-                                      ImVec2(p.x + width, p.y + box + 4.0f) });
-      ImGui::SetCursorScreenPos(ImVec2(origin.x + box + 4.0f, origin.y));
+                                      StripParamLabel(label), c, ImVec2(p.x + box + tok::space_1, p.y),
+                                      ImVec2(p.x + width, p.y + box + tok::space_1) });
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + box + tok::space_1, origin.y));
    }
 
 
@@ -793,7 +793,7 @@ namespace app
          if (!h.draw)
             return; // registered so the modulator keeps writing; just not drawn
          DrawDiscreteParamPin(h, label, width, ImGui::GetFrameHeight());
-         width = std::max(24.0f, width - 16.0f); // the pin ate 12px + 4px of the row (DrawDiscreteParamPin's box)
+         width = std::max(tok::param_dropdown_button_bound, width - tok::space_4); // the pin ate 12px + 4px of the row (DrawDiscreteParamPin's box)
       }
 
       const std::string caption = options[safeCurrent] + "##" + label;
@@ -804,10 +804,10 @@ namespace app
          // Segments only when every option's text fits its cell; otherwise the labels print over each other,
          // so fall back to the dropdown face (same hit item, same behaviour).
          const float pad = tok::space_2;
-         const float labelW = inner.empty() ? 0.0f : std::min(ImGui::CalcTextSize(inner.c_str()).x, width * 0.4f - pad) + 2.0f * pad;
-         const float cellW = (width - 2.0f - (inner.empty() ? 2.0f : labelW)) / (float)options.size();
+         const float labelW = inner.empty() ? 0.0f : std::min(ImGui::CalcTextSize(inner.c_str()).x, width * tok::param_dropdown_button_ratio - pad) + tok::param_label_w_ratio * pad;
+         const float cellW = (width - tok::space_0_5 - (inner.empty() ? tok::param_dropdown_button_assign : labelW)) / (float)options.size();
          for (const std::string& o : options)
-            if (ImGui::CalcTextSize(o.c_str()).x + 2.0f > cellW)
+            if (ImGui::CalcTextSize(o.c_str()).x + tok::space_0_5 > cellW)
             {
                segmented = false;
                break;
@@ -908,8 +908,8 @@ namespace app
          dl->AddText(ImVec2(p.x + box + st.ItemInnerSpacing.x, p.y + st.FramePadding.y), ImGui::GetColorU32(ImGuiCol_Text), label, end);
       }
       if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible)
-         dl->AddRect(ImVec2(bp.x - 2, bp.y - 2), ImVec2(bp.x + CheckBox::Size() + 2, bp.y + CheckBox::Size() + 2),
-                     ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + 2.0f, 0, 1.5f);
+         dl->AddRect(ImVec2(bp.x - tok::space_0_5, bp.y - tok::space_0_5), ImVec2(bp.x + CheckBox::Size() + tok::space_0_5, bp.y + CheckBox::Size() + tok::space_0_5),
+                     ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_control + tok::space_0_5, 0, tok::param_node_checkbox_stroke);
       return clicked;
    }
 

@@ -317,21 +317,21 @@ namespace app
       for (const std::string& folder : scanner.Folders())
       {
          ImGui::PushID(folder.c_str());
-         const float btnW = 24.0f;
+         const float btnW = tok::library_btn_w;
          // A folder row: click opens it in the list below, drag loads it as a kit; the full path on hover.
          const bool missing = scanner.IsFolderMissing(folder);
-         const float rowW = panelW - 2.0f * btnW - 8.0f;
+         const float rowW = panelW - tok::library_row_w_ratio * btnW - tok::space_2;
          std::string label = FolderDisplayName(folder);
          if (missing)
             label += T("  (not found)");
          const LibraryParts::RowResult row =
-            LibraryParts::FolderRow("folder", TruncateWithEllipsis(label, std::max(20.0f, rowW - 64.0f)), missing, rowW);
+            LibraryParts::FolderRow("folder", TruncateWithEllipsis(label, std::max(tok::library_search_panel_bound, rowW - tok::library_search_panel_gap)), missing, rowW);
          if (row.clicked && !missing)
             browseDir = folder;
          MaybeStartFolderDrag(folder, mediaKind);
          if (row.hovered && !gSampleDragActive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
             Tip::Show("%s", folder.c_str());
-         ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
+         ImGui::SameLine(panelW - tok::library_search_panel_ratio * btnW - tok::space_1);
          if (LibraryParts::IconButton("refreshfolder", LibraryParts::Icon::Refresh, !scanning))
             folderToScan = folder;
          ImGui::SameLine(panelW - btnW);
@@ -342,7 +342,7 @@ namespace app
       if (!folderToRemove.empty())
          scanner.RemoveFolder(folderToRemove);
 
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      ImGui::Dummy(ImVec2(0.0f, tok::library_search_panel_dummy_h));
       {
          const bool clicked = LibraryParts::ActionButton("refreshall", T("Refresh all"), LibraryParts::Icon::Refresh, !scanning);
          if (clicked)
@@ -463,7 +463,7 @@ namespace app
       // hundred one-shot rows is the point of this panel, and the default
       // spacing wastes a row's worth of height every 4-5 entries.
       const ImVec2 savedItemSpacing = ImGui::GetStyle().ItemSpacing;
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(savedItemSpacing.x, 2.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(savedItemSpacing.x, tok::space_0_5));
       LibraryParts::BeginWell("##librarypanellist");
       if (filtered.empty() && numFolders == 0 && !browseDir.empty())
       {
@@ -505,7 +505,7 @@ namespace app
                ImGui::PushID(folder.c_str());
                const float availW = ImGui::GetContentRegionAvail().x;
                const std::string name = FolderDisplayName(folder);
-               if (LibraryParts::FolderRow("sub", TruncateWithEllipsis(name, std::max(20.0f, availW - 48.0f))).clicked)
+               if (LibraryParts::FolderRow("sub", TruncateWithEllipsis(name, std::max(tok::library_search_panel_bound, availW - tok::library_search_panel_gap_2))).clicked)
                   browseDir = folder;
                MaybeStartFolderDrag(folder, mediaKind);
                ImGui::PopID();
@@ -526,7 +526,7 @@ namespace app
             const bool isPlaying = (gPreviewingSamplePath == entry.path);
             // Smaller than a full frame-height button - at full size the
             // icon dominated the row next to the filename text.
-            const float btnH = rowH * 0.7f;
+            const float btnH = rowH * tok::library_btn_h_ratio;
             const float btnW = btnH; // square, tighter than a wide text label
             const float rowStartY = ImGui::GetCursorPosY();
             const ImVec2 rowScreenMin = ImGui::GetCursorScreenPos();
@@ -560,7 +560,7 @@ namespace app
                const ImVec2 bmax = ImGui::GetItemRectMax();
                const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
                const ImU32 iconCol = (ImGui::IsItemHovered() || isPlaying) ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-               const float iconSize = btnH * 0.85f;
+               const float iconSize = btnH * tok::library_icon_size_ratio;
                if (isPlaying)
                   glyph::DrawPlayerPause(dl, center, iconSize, iconCol);
                else
@@ -609,7 +609,7 @@ namespace app
          const float availW = ImGui::GetContentRegionAvail().x;
          // Reserved unconditionally (not just when isFav) so a row's text
          // doesn't reflow when its favourite state toggles.
-         const float badgeReserve = 40.0f;
+         const float badgeReserve = tok::library_badge_reserve;
          const std::string rowLabel = TruncateWithEllipsis(entry.fileName, std::max(20.0f, availW - badgeReserve));
          LibraryParts::Row("row", rowLabel, nullptr, isFav);
          if (!mediaKind && getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
@@ -1090,7 +1090,7 @@ namespace app
             label += "  -  " + entry.manufacturer;
 
          const float availW = ImGui::GetContentRegionAvail().x;
-         const float badgeReserve = 40.0f;
+         const float badgeReserve = tok::library_badge_reserve;
          const std::string rowLabel = TruncateWithEllipsis(label, std::max(20.0f, availW - badgeReserve));
          LibraryParts::Row("row", rowLabel, nullptr, isFav);
          if (!testRowCaptured && getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
@@ -1289,8 +1289,8 @@ namespace app
 
             const bool isFav = gBrowserFavorites.IsFavoriteFieldPreset(entry.name);
             const float availW = ImGui::GetContentRegionAvail().x;
-            const float badgeReserve = 40.0f;
-            const float catTagReserve = 70.0f;
+            const float badgeReserve = tok::library_badge_reserve;
+            const float catTagReserve = tok::library_cat_tag_reserve;
 
             const std::string rowLabel = TruncateWithEllipsis(entry.name, std::max(20.0f, availW - badgeReserve - catTagReserve));
             if (LibraryParts::Row("row", rowLabel, nullptr, isFav).clicked)
@@ -1305,7 +1305,7 @@ namespace app
             // Category badge on the right
             const float catTextW = ImGui::CalcTextSize(entry.category.c_str()).x;
             ImDrawList* dl = ImGui::GetWindowDrawList();
-            dl->AddText(ImVec2(selMax.x - badgeReserve - catTextW - 6.0f, selMin.y + (selMax.y - selMin.y - ImGui::GetTextLineHeight()) * 0.5f),
+            dl->AddText(ImVec2(selMax.x - badgeReserve - catTextW - tok::space_1_5, selMin.y + (selMax.y - selMin.y - ImGui::GetTextLineHeight()) * 0.5f),
                         ImGui::GetColorU32(ImGuiCol_TextDisabled), entry.category.c_str());
 
             if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, tok::drag_threshold))

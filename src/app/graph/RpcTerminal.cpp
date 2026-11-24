@@ -25,7 +25,7 @@ namespace app
          int param = ParamIndexOfKeyOnNode(gn, key);
          if (param < 0)
             param = ParamIndexOfKeyOnNode(gn, "p." + key);
-         if (param < 0 && key.size() > 2 && key[1] == ' ')
+         if (param < 0 && key.size() > 2 && key[1] == ' ')  // ui-audit-ok: key parsing, not a screen quantity
             param = ParamIndexOfKeyOnNode(gn, key.substr(2));
          if (param >= 0)
          {

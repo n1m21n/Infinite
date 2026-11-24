@@ -341,21 +341,21 @@ namespace app
       if (key == "panelView3DOpen")
          gView3DOpen = (val != "0");
       else if (key == "panelView3DH")
-         gView3DHeight = std::max(300.0f, std::strtof(val.c_str(), nullptr));
+         gView3DHeight = std::max(tok::patch_io_view_dock_read_key_bound, std::strtof(val.c_str(), nullptr));
       else if (key == "panelView3DDock")
          gView3DDock = std::clamp(atoi(val.c_str()), 0, 4);
       else if (key == "panelView3DW")
-         gView3DWidth = std::max(320.0f, std::strtof(val.c_str(), nullptr));
+         gView3DWidth = std::max(tok::patch_io_view_dock_read_key_bound_2, std::strtof(val.c_str(), nullptr));
       else if (key == "panelView3DDockBack")
          gView3DDockBack = std::clamp(atoi(val.c_str()), 0, 3);
       else if (key == "panelView2DOpen")
          gView2DOpen = (val != "0");
       else if (key == "panelView2DH")
-         gView2DHeight = std::max(300.0f, std::strtof(val.c_str(), nullptr));
+         gView2DHeight = std::max(tok::patch_io_view_dock_read_key_bound, std::strtof(val.c_str(), nullptr));
       else if (key == "panelView2DDock")
          gView2DDock = std::clamp(atoi(val.c_str()), 0, 4);
       else if (key == "panelView2DW")
-         gView2DWidth = std::max(320.0f, std::strtof(val.c_str(), nullptr));
+         gView2DWidth = std::max(tok::patch_io_view_dock_read_key_bound_2, std::strtof(val.c_str(), nullptr));
       else if (key == "panelView2DDockBack")
          gView2DDockBack = std::clamp(atoi(val.c_str()), 0, 3);
       else
@@ -520,35 +520,35 @@ namespace app
          else if (key == "panelHistoryOpen")
             gHistoryOpen = (val != "0");
          else if (key == "panelHistoryW")
-            gHistoryWidth = std::max(220.0f, std::strtof(val.c_str(), nullptr));
+            gHistoryWidth = std::max(tok::patch_io_load_workspace_settings_bound, std::strtof(val.c_str(), nullptr));
          else if (key == "panelStudioOpen")
             gSampleStudioOpen = (val != "0");
          else if (key == "panelStudioH")
-            gSampleStudioHeight = std::max(180.0f, std::strtof(val.c_str(), nullptr));
+            gSampleStudioHeight = std::max(tok::patch_io_load_workspace_settings_bound_2, std::strtof(val.c_str(), nullptr));
          else if (key == "panelPianoRollOpen")
             gPianoRollOpen = (val != "0");
          else if (key == "panelPianoRollH")
-            gPianoRollHeight = std::max(240.0f, std::strtof(val.c_str(), nullptr));
+            gPianoRollHeight = std::max(tok::patch_io_load_workspace_settings_bound_3, std::strtof(val.c_str(), nullptr));
          else if (key == "panelPianoRollDock")
             gPianoRollDock = (val == "3") ? 3 : 0;
          else if (key == "panelDrumsOpen")
             gDrumPanelOpen = (val != "0");
          else if (key == "panelDrumsH")
-            gDrumPanelHeight = std::max(240.0f, std::strtof(val.c_str(), nullptr));
+            gDrumPanelHeight = std::max(tok::patch_io_load_workspace_settings_bound_3, std::strtof(val.c_str(), nullptr));
          else if (key == "panelDrumsDock")
             gDrumPanelDock = (val == "3") ? 3 : 0;
          else if (key == "panelCurveEditorOpen")
             gCurveEditorOpen = (val != "0");
          else if (key == "panelCurveEditorH")
-            gCurveEditorHeight = std::max(220.0f, std::strtof(val.c_str(), nullptr));
+            gCurveEditorHeight = std::max(tok::patch_io_load_workspace_settings_bound, std::strtof(val.c_str(), nullptr));
          else if (key == "panelCurveEditorW")
-            gCurveEditorWidth = std::max(360.0f, std::strtof(val.c_str(), nullptr));
+            gCurveEditorWidth = std::max(tok::patch_io_load_workspace_settings_bound_4, std::strtof(val.c_str(), nullptr));
          else if (key == "panelCurveEditorDock")
             gCurveEditorDock = atoi(val.c_str()) == 3 ? 3 : 0; // bottom or top only
          else if (key == "panelFieldPatcherOpen")
             gFieldPatcherOpen = (val != "0");
          else if (key == "panelFieldPatcherH")
-            gFieldPatcherHeight = std::max(220.0f, std::strtof(val.c_str(), nullptr));
+            gFieldPatcherHeight = std::max(tok::patch_io_load_workspace_settings_bound, std::strtof(val.c_str(), nullptr));
          else if (key == "panelRailOrder")
             gRailOrder = val;
          else if (key == "panelFieldPatcherDock")
@@ -560,13 +560,13 @@ namespace app
             gTerminalOpen = gTerminalOpenInApp && !Platform::PluginModeActive();
          }
          else if (key == "panelTerminalH")
-            gTerminalHeight = std::max(160.0f, std::strtof(val.c_str(), nullptr));
+            gTerminalHeight = std::max(tok::patch_io_load_workspace_settings_bound_5, std::strtof(val.c_str(), nullptr));
          else if (key == "panelTerminalDock")
             gTerminalDock = std::clamp(atoi(val.c_str()), 0, 3);
          else if (key == "panelTerminalFloat")
             gTerminalFloating = (val == "1");
          else if (key == "panelTerminalW")
-            gTerminalWidth = std::max(280.0f, std::strtof(val.c_str(), nullptr));
+            gTerminalWidth = std::max(tok::patch_io_load_workspace_settings_bound_6, std::strtof(val.c_str(), nullptr));
          else if (ViewDockReadKey(key, val))
             ;
          else if (key == "panelView2DTools")
@@ -1242,8 +1242,8 @@ namespace app
       gViewportPanelOpen = false;
       gViewportPanelNodes.clear();
       gViewportPanelDock = 1;
-      gViewportPanelWidth = 320.0f;
-      gViewportPanelHeight = 260.0f;
+      gViewportPanelWidth = tok::patch_io_viewport_panel_width;
+      gViewportPanelHeight = tok::patch_io_viewport_panel_height;
       gPerfLayout = Patch::PerfLayoutRecord(); // a new patch starts with one empty Performance page
       gPerfActivePage = 0;
       gNextIndex = 1;
