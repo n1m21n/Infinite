@@ -10774,11 +10774,11 @@ namespace
             a = nullptr;
       }
       // New / delete up top, where the layer list starts (the same actions as the strip below).
-      if (IconChip("##v2dnl", IconsInfinite::Plus, false, T("New layer")))
+      if (IconChip("##v2dnl", IconsInfinite::Brush, false, T("New layer")))
          sPending.what = Pending::AddPaint;
       FormParts::Inline(0.0f, tok::space_1);
       ImGui::BeginDisabled(sSel.empty());
-      if (IconChip("##v2ddl", IconsInfinite::Close, false, T("Delete layer")))
+      if (IconChip("##v2ddl", IconsInfinite::Trash, false, T("Delete layer")))
          sPending.what = Pending::Delete;
       ImGui::EndDisabled();
       // The blend / opacity / lock rows above already took their height: the list gets what is left less the strip
@@ -10869,7 +10869,7 @@ namespace
       if (IconChip("##v2ddup", IconsInfinite::Copy, false, Sc(T("Duplicate (Ctrl+J)"))))
          sPending.what = Pending::Duplicate;
       FormParts::Inline(0.0f, tok::space_1);
-      if (IconChip("##v2ddel", IconsInfinite::Close, false, T("Delete layer")))
+      if (IconChip("##v2ddel", IconsInfinite::Trash, false, T("Delete layer")))
          sPending.what = Pending::Delete;
       ImGui::EndDisabled();
    }
