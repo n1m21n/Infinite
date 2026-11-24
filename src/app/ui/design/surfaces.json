@@ -253,7 +253,10 @@
    "trim_wave_assign": 0.1,
    "trim_wave_stroke": 1.0,
    "trim_wave_stroke_2": 2.0,
-   "trim_wave_stroke_3": 1.5
+   "trim_wave_stroke_3": 1.5,
+   "tune_fine_w": 104.0,
+   "tune_oct_w": 74.0,
+   "tune_semi_w": 82.0
   },
   "audio_node": {
    "analog_body_bound": 70.0,
@@ -269,6 +272,7 @@
    "plugin_body_draw_x": 64.0,
    "plugin_body_draw_x_2": 70.0,
    "plugin_body_dummy_h": 4.0,
+   "plugin_pick_btn_w": 70.0,
    "spatial_export_panel_ratio": 2.0,
    "third_ratio": 3.0,
    "unload_w": 60.0,
@@ -344,6 +348,7 @@
    "composer_hit_x_2": 20.0,
    "composer_hit_y": 24.0,
    "composer_hit_y_2": 20.0,
+   "composer_picker_h": 22.0,
    "composer_ratio": 2.0,
    "composer_text_alpha_10": 0.1,
    "composer_text_alpha_11": 0.06,
@@ -412,6 +417,7 @@
    "pill_gap": 7.0,
    "pill_ratio": 2.0,
    "pill_text_alpha_2": 0.06,
+   "popup_border": 1.0,
    "progress_card_dummy_w": 1.0,
    "progress_card_input_text_multiline_y": 120.0,
    "progress_card_text_alpha_2": 0.8,
@@ -1104,6 +1110,23 @@
    "table_ratio_3": 255.0,
    "width": 50.0
   },
+  "node": {
+   "audio_narrow_width": 200.0,
+   "audio_time_viz_h": 150.0,
+   "audio_wide_width": 960.0,
+   "audio_width": 440.0,
+   "border_w_cook_warning": 2.5,
+   "border_w_hairline": 1.0,
+   "border_w_live_issue": 2.0,
+   "dimmed_alpha": 0.55,
+   "fader_h": 138.0,
+   "fader_meter_pad": 6.0,
+   "fader_meter_w": 8.0,
+   "fader_w": 22.0,
+   "preview_size": 190.0,
+   "viewport_size": 340.0,
+   "wide_width": 476.0
+  },
   "note": {
    "arp_gate_grid_bound": 46.0,
    "arpeggiator_body_dummy_h": 4.0,
@@ -1656,6 +1679,7 @@
    "page_set_next_window_size_constraints_x_2": 280.0,
    "ruler_h": 16.0,
    "ruler_tint_alpha_2": 0.22,
+   "start_key_h": 12.0,
    "strip_h": 10.0,
    "text_w_ratio": 2.0,
    "top_row_ratio": 3.0
@@ -1984,6 +2008,7 @@
    "tex_y": 160.0
   },
   "stage_floating": {
+   "bg_alpha": 0.95,
    "bound": 8.0,
    "dummy_w": 400.0,
    "dummy_w_2": 420.0,
@@ -2574,6 +2599,7 @@
    "pick_limit": 14.0,
    "pose_bound": 4.0,
    "pose_bound_2": 400.0,
+   "pose_brush_radius": 40.0,
    "pose_gap": 18.0,
    "pose_gap_2": 26.0,
    "pose_hex_alpha_10": 0.7,
@@ -2604,6 +2630,7 @@
    "same_limit": 4.0,
    "sculpt_bound": 2.0,
    "sculpt_bound_2": 1000.0,
+   "sculpt_brush_radius": 50.0,
    "sculpt_gap": 7.0,
    "sculpt_gap_2": 26.0,
    "sculpt_hex_alpha_4": 0.85,
@@ -2726,7 +2753,9 @@
    "render_width": 1920,
    "render_width_2": 3840,
    "render_width_3": 1280,
-   "render_width_4": 1080
+   "render_width_4": 1080,
+   "thumb_h": 54,
+   "thumb_w": 96
   },
   "arrange_session_grid": {
    "edge_hi_alpha_2": 220,

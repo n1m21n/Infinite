@@ -3,6 +3,7 @@
 // layers; the nodes themselves are only read, so a layer keeps animating under
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "app/AppCommon.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/components/ListRow.h"
@@ -1387,7 +1388,7 @@ namespace
       sModNext = {};
    }
 
-   bool DragRow(const char* label, float* v, float speed, const char* fmt, float lo = -1e6f, float hi = 1e6f)
+   bool DragRow(const char* label, float* v, float speed, const char* fmt, float lo = -1e6f, float hi = 1e6f)   // ui-audit-ok: declaration default, an unbounded drag
    {
       fmt = RowSlot(label, fmt);
       FieldWell::PushStyle();
@@ -1431,7 +1432,7 @@ namespace
    }
 
    // Two or three numbers on one row ("Position  X 120  Y 80"); returns a bit per field that changed.
-   int DragMulti(const char* label, float* const* v, const char* const* fmts, int n, float speed, float lo = -1e6f, float hi = 1e6f,
+   int DragMulti(const char* label, float* const* v, const char* const* fmts, int n, float speed, float lo = -1e6f, float hi = 1e6f,   // ui-audit-ok: declaration default, an unbounded drag
                  const Layer* modLayer = nullptr, const int* modFields = nullptr)
    {
       FieldLabel(label);
@@ -2136,7 +2137,7 @@ namespace
       changed |= ColorRow(T("Stop"), g.c);
       changed |= SliderRow(T("Stop alpha"), &g.c[3], 0.0f, 1.0f, "%.2f");
       float loc = g.t * 100.0f;
-      if (SliderRow(T("Location"), &loc, 0.0f, 100.0f, "%.0f%%"))
+      if (SliderRow(T("Location"), &loc, params::view2d::loc_lo, params::view2d::loc_hi, "%.0f%%"))
       {
          g.t = loc / 100.0f;
          changed = true;
@@ -2365,9 +2366,9 @@ namespace
             sAdjOut = std::clamp(sAdjOut, 0, 2);
          }
          float* q = p + (mono ? 0 : sAdjOut) * 3;
-         SliderRow(T("Red"), &q[0], -2.0f, 2.0f, "%.2f");
-         SliderRow(T("Green"), &q[1], -2.0f, 2.0f, "%.2f");
-         SliderRow(T("Blue"), &q[2], -2.0f, 2.0f, "%.2f");
+         SliderRow(T("Red"), &q[0], params::view2d::q_0_lo, params::view2d::q_0_hi, "%.2f");
+         SliderRow(T("Green"), &q[1], params::view2d::q_1_lo, params::view2d::q_1_hi, "%.2f");
+         SliderRow(T("Blue"), &q[2], params::view2d::q_2_lo, params::view2d::q_2_hi, "%.2f");
       }
       if (t == S::kAdjBlackWhite)
       {
@@ -2394,22 +2395,22 @@ namespace
       }
       if (t == S::kAdjSplitToning)
       {
-         SliderRow(T("Hi Hue"), &p[0], 0.0f, 360.0f, "%.0f°");
+         SliderRow(T("Hi Hue"), &p[0], params::view2d::p_0_lo, params::view2d::p_0_hi, "%.0f°");
          SliderRow(T("Hi Sat"), &p[1], 0.0f, 1.0f, "%.2f");
-         SliderRow(T("Shad Hue"), &p[2], 0.0f, 360.0f, "%.0f°");
+         SliderRow(T("Shad Hue"), &p[2], params::view2d::p_2_lo, params::view2d::p_2_hi, "%.0f°");
          SliderRow(T("Shad Sat"), &p[3], 0.0f, 1.0f, "%.2f");
          SliderRow(T("Balance"), &p[4], 0.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjRecolour)
       {
-         SliderRow(T("Hue"), &p[0], 0.0f, 360.0f, "%.0f°");
+         SliderRow(T("Hue"), &p[0], params::view2d::p_0_lo, params::view2d::p_0_hi, "%.0f°");
          SliderRow(T("Saturation"), &p[1], 0.0f, 1.0f, "%.2f");
          SliderRow(T("Lightness"), &p[2], -1.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjNormals)
       {
-         SliderRow(T("Rotation"), &p[0], -180.0f, 180.0f, "%.0f°");
-         SliderRow(T("Scale"), &p[1], 0.0f, 2.0f, "%.2f");
+         SliderRow(T("Rotation"), &p[0], params::view2d::p_0_2_lo, params::view2d::p_0_2_hi, "%.0f°");
+         SliderRow(T("Scale"), &p[1], params::view2d::p_1_lo, params::view2d::p_1_hi, "%.2f");
          bool fx = p[2] > 0.5f, fy = p[3] > 0.5f;
          if (BoolRow(T("Flip X"), &fx))
             p[2] = fx ? 1.0f : 0.0f;
@@ -2418,14 +2419,14 @@ namespace
       }
       if (t == S::kAdjToneCompression)
       {
-         SliderRow(T("Exposure"), &p[0], 0.0f, 2.0f, "%.2f");
-         SliderRow(T("Gamma"), &p[1], 0.0f, 2.0f, "%.2f");
+         SliderRow(T("Exposure"), &p[0], params::view2d::p_0_3_lo, params::view2d::p_0_3_hi, "%.2f");
+         SliderRow(T("Gamma"), &p[1], params::view2d::p_1_lo, params::view2d::p_1_hi, "%.2f");
          SliderRow(T("Colour"), &p[2], 0.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjToneStretch)
       {
          SliderRow(T("Stretch"), &p[0], 0.0f, 1.0f, "%.3f");
-         SliderRow(T("Gamma"), &p[1], 0.0f, 2.0f, "%.2f");
+         SliderRow(T("Gamma"), &p[1], params::view2d::p_1_lo, params::view2d::p_1_hi, "%.2f");
          SliderRow(T("Compression"), &p[2], 0.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjLookup)
@@ -3598,7 +3599,7 @@ namespace
       };
       float x = 0, y = 0;
       at(0.0f, x, y);
-      st.Begin(f, b, x, y, 0.3f);
+      st.Begin(f, b, x, y, 0.3f);   // ui-audit-ok: preview stroke pen pressure (model value)
       for (int k = 1; k <= 48; k++)
       {
          const float u = (float)k / 48.0f;
@@ -3647,7 +3648,7 @@ namespace
          return;
       float pct = sFillOpacity * 100.0f;
       ImGui::SetNextItemWidth(tok::view2d_fill_dialog_set_next_item_width_w);
-      if (FieldWell::Slider("##v2dfillop", &pct, 1.0f, 100.0f, "%.0f%%"))
+      if (FieldWell::Slider("##v2dfillop", &pct, params::view2d::pct_lo, params::view2d::pct_hi, "%.0f%%"))
          sFillOpacity = std::clamp(pct / 100.0f, 0.01f, 1.0f);
       static const char* kWith[5] = { "Foreground", "Background", "Black", "White", "50% Grey" };
       for (int i = 0; i < 5; i++)
@@ -4292,7 +4293,7 @@ namespace
       const BrushEngine::Brush& b = sBrush;
       float to[2];
       if (sPenN < 2 || b.stabiliser > 0 || b.smoothing > 0.0f
-          || !BrushEngine::Stroke::Predict(sPen[0], sPen[1], 8.0f, std::max(tok::view2d_predicted_bound, b.size * tok::view2d_predicted_ratio), to))
+          || !BrushEngine::Stroke::Predict(sPen[0], sPen[1], 8.0f, std::max(tok::view2d_predicted_bound, b.size * tok::view2d_predicted_ratio), to))   // ui-audit-ok: model value (prediction lookahead samples / handle index modulo / visible items)
          return;
       const ImVec2 a = ToScreen(doc, sPen[1][0], sPen[1][1]), c = ToScreen(doc, to[0], to[1]);
       const float w = std::max(1.0f, b.size * sZoom);
@@ -7013,7 +7014,7 @@ namespace
          if (panTool)
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          else if (hoverHandle >= 0 && hoverHandle < 8)
-            ImGui::SetMouseCursor((hoverHandle % 4) == 1 ? ImGuiMouseCursor_ResizeNS : (hoverHandle % 4) == 3 ? ImGuiMouseCursor_ResizeEW
+            ImGui::SetMouseCursor((hoverHandle % 4) == 1 ? ImGuiMouseCursor_ResizeNS : (hoverHandle % 4) == 3 ? ImGuiMouseCursor_ResizeEW   // ui-audit-ok: model value (prediction lookahead samples / handle index modulo / visible items)
                                   : (hoverHandle == 0 || hoverHandle == 4) ? ImGuiMouseCursor_ResizeNWSE : ImGuiMouseCursor_ResizeNESW);
          else if (hoverHandle == 8)
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
@@ -7723,7 +7724,7 @@ namespace
       // Always on the bar, greyed without a selection, so the bar never changes shape under the pointer.
       BarDivider();
       ImGui::BeginDisabled(!doc->HasSelection());
-      BarSlider("##v2dselmod", &sSelModPx, 1.0f, 100.0f, "%.0f px", kWellL);
+      BarSlider("##v2dselmod", &sSelModPx, params::view2d::sel_mod_px_lo, params::view2d::sel_mod_px_hi, "%.0f px", kWellL);
       static const char* kOps[5] = { "Expand##v2dsm0", "Contract##v2dsm1", "Smooth##v2dsm2", "Border##v2dsm3", "Feather##v2dsm5" };
       static const char* kUndo[5] = { "Expand selection", "Contract selection", "Smooth selection", "Border selection", "Feather selection" };
       static const int kOp[5] = { 0, 1, 2, 3, 5 };
@@ -7880,9 +7881,9 @@ namespace
       {
          static const char* kProfiles[4] = { "Flat", "Round", "Ridge", "Ribbon" };
          MoreCombo(T("Profile"), &b.profile, kProfiles, 4);
-         MorePct(T("Depth"), &b.depth, 0.0f, 300.0f);
-         MoreSlider(T("Light"), &b.lightAz, -180.0f, 180.0f, "%.0f°");
-         MoreSlider(T("Light height"), &b.lightEl, 5.0f, 90.0f, "%.0f°");
+         MorePct(T("Depth"), &b.depth, params::view2d::depth_lo, params::view2d::depth_hi);
+         MoreSlider(T("Light"), &b.lightAz, params::view2d::light_az_lo, params::view2d::light_az_hi, "%.0f°");
+         MoreSlider(T("Light height"), &b.lightEl, params::view2d::light_el_lo, params::view2d::light_el_hi, "%.0f°");
       }
       MoreHeader(T("Texture"), false, false);
       static const char* kGrains[4] = { "Off", "Paper", "Weave", "Noise" };
@@ -7891,8 +7892,8 @@ namespace
       {
          static const char* kGrainModes[3] = { "Multiply", "Subtract", "Height" };
          MoreCombo(T("Grain mode"), &b.grainMode, kGrainModes, 3);
-         MorePct(T("Grain scale"), &b.grainScale, 10.0f, 800.0f);
-         MorePct(T("Grain depth"), &b.grainDepth, 0.0f, 100.0f);
+         MorePct(T("Grain scale"), &b.grainScale, params::view2d::grain_scale_lo, params::view2d::grain_scale_hi);
+         MorePct(T("Grain depth"), &b.grainDepth, params::view2d::grain_depth_lo, params::view2d::grain_depth_hi);
       }
       MoreHeader(T("Dual tip"), false, false);
       static std::vector<const char*> tips;
@@ -7907,8 +7908,8 @@ namespace
          b.dualTip = d - 1;
       if (b.dualTip >= 0)
       {
-         MorePct(T("Second size"), &b.dualScale, 5.0f, 200.0f);
-         MorePct(T("Second scatter"), &b.dualScatter, 0.0f, 200.0f);
+         MorePct(T("Second size"), &b.dualScale, params::view2d::dual_scale_lo, params::view2d::dual_scale_hi);
+         MorePct(T("Second scatter"), &b.dualScatter, params::view2d::dual_scatter_lo, params::view2d::dual_scatter_hi);
       }
       MoreHeader(T("Colour"), false, false);
       static const char* kAlong[3] = { "Flat", "Along", "Across" };
@@ -7918,11 +7919,11 @@ namespace
          FieldLabel(T("Second colour"));
          ImGui::ColorEdit3("##v2dcolb", b.colorB, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
          if (b.colorAlong == 1)
-            MoreSlider(T("Repeat"), &b.colorPeriod, 10.0f, 2000.0f, "%.0f px");
+            MoreSlider(T("Repeat"), &b.colorPeriod, params::view2d::color_period_lo, params::view2d::color_period_hi, "%.0f px");
       }
-      MorePct(T("Wet mix"), &b.wet, 0.0f, 100.0f);
+      MorePct(T("Wet mix"), &b.wet, params::view2d::wet_lo, params::view2d::wet_hi);
       if (b.wet > 0.0f)
-         MorePct(T("Refill"), &b.refill, 0.0f, 100.0f);
+         MorePct(T("Refill"), &b.refill, params::view2d::refill_lo, params::view2d::refill_hi);
    }
 
    // A canvas node feeds the brush: its picture as the tip, the canvas grain, or the colour (Rebelle's custom
@@ -7980,7 +7981,7 @@ namespace
    {
       // Shown as Affinity shows it, a share of the colour range (kept 0..255 inside, as patches and the wand read it).
       float tol = (float)sTolerance * (100.0f / 255.0f);
-      BarSlider("##v2dtol", &tol, 0.0f, 100.0f, "Tolerance %.0f%%", kWellL);
+      BarSlider("##v2dtol", &tol, params::view2d::tol_lo, params::view2d::tol_hi, "Tolerance %.0f%%", kWellL);
       sTolerance = std::clamp((int)std::lround(tol * 2.55f), 0, 255);  // ui-audit-ok: percent to 0-255
       if (TextChip(L("Contiguous##v2dcont"), sContiguous, T("Only touching pixels")))
          sContiguous = !sContiguous;
@@ -8014,7 +8015,7 @@ namespace
             float n = (float)d.symN;
             FieldLabel(T("Spokes"));
             ImGui::SetNextItemWidth(sFieldW);
-            if (FieldWell::Slider("##v2dsymn", &n, 2.0f, 32.0f, "%.0f"))
+            if (FieldWell::Slider("##v2dsymn", &n, params::Scene2D::n_lo, params::Scene2D::n_hi, "%.0f"))
             {
                d.symN = std::clamp((int)std::lround(n), 2, 32);
                Touch();
@@ -8033,11 +8034,11 @@ namespace
       if (RetouchTool(sTool))
       {
          BrushEngine::Brush& b = ToolBrush();
-         BarSlider("##v2drsize", &b.size, 1.0f, 1000.0f, "Size %.0f px", kWellL);
+         BarSlider("##v2drsize", &b.size, params::view2d::size_lo, params::view2d::size_hi, "Size %.0f px", kWellL);
          float hard = b.hardness * 100.0f, op = b.opacity * 100.0f, flow = b.flow * 100.0f;
-         BarSlider("##v2drhard", &hard, 0.0f, 100.0f, "Hardness %.0f%%", kWellL);
-         BarSlider("##v2drop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
-         BarSlider("##v2drflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", kWellL);
+         BarSlider("##v2drhard", &hard, params::view2d::hard_lo, params::view2d::hard_hi, "Hardness %.0f%%", kWellL);
+         BarSlider("##v2drop", &op, params::view2d::op_lo, params::view2d::op_hi, "Opacity %.0f%%", kWellL);
+         BarSlider("##v2drflow", &flow, params::view2d::flow_lo, params::view2d::flow_hi, "Flow %.0f%%", kWellL);
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
          b.flow = flow / 100.0f;
@@ -8078,7 +8079,7 @@ namespace
          {
             gap();
             float tol = b.keyTolerance * 100.0f;
-            BarSlider("##v2dkeytol", &tol, 0.0f, 100.0f, "Tolerance %.0f%%", kWellL);
+            BarSlider("##v2dkeytol", &tol, params::view2d::tol_lo, params::view2d::tol_hi, "Tolerance %.0f%%", kWellL);
             b.keyTolerance = tol / 100.0f;
          }
          if (sTool == kClone || sTool == kHeal)
@@ -8090,10 +8091,10 @@ namespace
             if (TextChip(L("All layers##v2dcloneall"), sCloneAll, T("Copy from the whole picture")))
                sCloneAll = !sCloneAll;
             gap();
-            BarSlider("##v2dsrot", &b.sourceRotate, -180.0f, 180.0f, "Rotation %.0f°", kWellM);
+            BarSlider("##v2dsrot", &b.sourceRotate, params::view2d::source_rotate_lo, params::view2d::source_rotate_hi, "Rotation %.0f°", kWellM);
             next();
             float sc = b.sourceScale * 100.0f;
-            BarSlider("##v2dsscale", &sc, 10.0f, 400.0f, "Scale %.0f%%", kWellM);
+            BarSlider("##v2dsscale", &sc, params::view2d::sc_lo, params::view2d::sc_hi, "Scale %.0f%%", kWellM);
             b.sourceScale = sc / 100.0f;
             next();
             if (TextChip(L("Flip X##v2dsflipx"), b.sourceFlipX, nullptr))
@@ -8114,12 +8115,12 @@ namespace
          BarMore("##v2drmore", [&]()
          {
             MoreHeader(T("Tip"), true);
-            MorePct(T("Spacing"), &b.spacing, 1.0f, 200.0f);
-            MorePct(T("Roundness"), &b.roundness, 5.0f, 100.0f);
-            MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f°");
-            MorePct(T("Smoothing"), &b.smoothing, 0.0f, 100.0f);
+            MorePct(T("Spacing"), &b.spacing, params::view2d::spacing_lo, params::view2d::spacing_hi);
+            MorePct(T("Roundness"), &b.roundness, params::view2d::roundness_lo, params::view2d::roundness_hi);
+            MoreSlider(T("Angle"), &b.angle, params::view2d::angle_lo, params::view2d::angle_hi, "%.0f°");
+            MorePct(T("Smoothing"), &b.smoothing, params::view2d::smoothing_lo, params::view2d::smoothing_hi);
             float stab = (float)b.stabiliser;
-            MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
+            MoreSlider(T("Stabiliser"), &stab, params::view2d::stab_lo, params::view2d::stab_hi, "%.0f");
             b.stabiliser = (int)std::lround(stab);
             MoreCheck(T("Wet edges"), &b.wetEdges);
             MoreHeader(T("Pen & tilt"));
@@ -8127,7 +8128,7 @@ namespace
                Pairs g;
                MoreCheck(T("Size"), &b.pressureSize);
                MoreCheck(T("Opacity"), &b.pressureOpacity);
-               MoreSlider(T("Response"), &b.pressureCurve, 0.25f, 3.0f, "%.2f");
+               MoreSlider(T("Response"), &b.pressureCurve, params::view2d::pressure_curve_lo, params::view2d::pressure_curve_hi, "%.2f");
                MoreCheck(T("Tilt size"), &b.tiltSize);
                MoreCheck(T("Tilt angle"), &b.tiltAngle);
                MoreCheck(T("Tilt flatness"), &b.tiltRound);
@@ -8183,25 +8184,25 @@ namespace
          if (brush)
             ModNextParam(kBrushSizeParam);
          ModBegin();
-         BarSlider("##v2dsize", &b.size, 1.0f, 1000.0f, "Size %.0f px", kWellL);
+         BarSlider("##v2dsize", &b.size, params::view2d::size_lo, params::view2d::size_hi, "Size %.0f px", kWellL);
          ModEnd();
          float hard = b.hardness * 100.0f, op = b.opacity * 100.0f, flow = b.flow * 100.0f;
-         BarSlider("##v2dhard", &hard, 0.0f, 100.0f, "Hardness %.0f%%", kWellL);
+         BarSlider("##v2dhard", &hard, params::view2d::hard_lo, params::view2d::hard_hi, "Hardness %.0f%%", kWellL);
          if (brush)
             ModNextParam(kBrushOpacityParam);
          ModBegin();
-         BarSlider("##v2dop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
+         BarSlider("##v2dop", &op, params::view2d::op_lo, params::view2d::op_hi, "Opacity %.0f%%", kWellL);
          ModEnd();
          if (brush)
             ModNextParam(kBrushFlowParam);
          ModBegin();
-         BarSlider("##v2dflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", kWellL);
+         BarSlider("##v2dflow", &flow, params::view2d::flow_lo, params::view2d::flow_hi, "Flow %.0f%%", kWellL);
          ModEnd();
          b.hardness = hard / 100.0f;
          b.opacity = op / 100.0f;
          b.flow = flow / 100.0f;
          float smooth = b.smoothing * 100.0f;
-         BarSlider("##v2dsmooth", &smooth, 0.0f, 100.0f, "Smoothing %.0f%%", kWellL);
+         BarSlider("##v2dsmooth", &smooth, params::view2d::smooth_lo, params::view2d::smooth_hi, "Smoothing %.0f%%", kWellL);
          b.smoothing = smooth / 100.0f;
          gap();
          SymmetryChip(doc);
@@ -8211,25 +8212,25 @@ namespace
             MoreHeader(T("Tip"), true);
             {
                Pairs g;
-               MorePct(T("Spacing"), &b.spacing, 1.0f, 200.0f);
-               MorePct(T("Roundness"), &b.roundness, 5.0f, 100.0f);
-               MoreSlider(T("Angle"), &b.angle, -180.0f, 180.0f, "%.0f°");
+               MorePct(T("Spacing"), &b.spacing, params::view2d::spacing_lo, params::view2d::spacing_hi);
+               MorePct(T("Roundness"), &b.roundness, params::view2d::roundness_lo, params::view2d::roundness_hi);
+               MoreSlider(T("Angle"), &b.angle, params::view2d::angle_lo, params::view2d::angle_hi, "%.0f°");
                MoreCheck(T("Hard edge"), &b.pencil);
             }
             MoreHeader(T("Dynamics"));
             {
                Pairs g;
                float scatterY = b.scatterY < 0.0f ? b.jitter : b.scatterY;
-               MorePct(T("Scatter"), &b.jitter, 0.0f, 200.0f);
-               MorePct(T("Scatter Y"), &scatterY, 0.0f, 200.0f);
+               MorePct(T("Scatter"), &b.jitter, params::view2d::jitter_lo, params::view2d::jitter_hi);
+               MorePct(T("Scatter Y"), &scatterY, params::view2d::scatter_y_lo, params::view2d::scatter_y_hi);
                if (std::fabs(scatterY - (b.scatterY < 0.0f ? b.jitter : b.scatterY)) > tok::view2d_pixel_bar_limit)
                   b.scatterY = scatterY;
-               MoreSlider(T("Taper in"), &b.taperIn, 0.0f, 1000.0f, "%.0f px");
-               MoreSlider(T("Taper out"), &b.taperOut, 0.0f, 1000.0f, "%.0f px");
+               MoreSlider(T("Taper in"), &b.taperIn, params::view2d::taper_in_lo, params::view2d::taper_in_hi, "%.0f px");
+               MoreSlider(T("Taper out"), &b.taperOut, params::view2d::taper_out_lo, params::view2d::taper_out_hi, "%.0f px");
                float stab = (float)b.stabiliser;
-               MoreSlider(T("Stabiliser"), &stab, 0.0f, 32.0f, "%.0f");
+               MoreSlider(T("Stabiliser"), &stab, params::view2d::stab_lo, params::view2d::stab_hi, "%.0f");
                b.stabiliser = (int)std::lround(stab);
-               MorePct(T("Accumulation"), &b.accumulation, 0.0f, 100.0f);
+               MorePct(T("Accumulation"), &b.accumulation, params::view2d::accumulation_lo, params::view2d::accumulation_hi);
                MoreSlider(T("Airbrush"), &b.airbrushRate, 0.0f, 1.0f, "%.2f");
                MoreCheck(T("Adaptive smooth"), &b.oneEuro);
                MoreCheck(T("Catch up"), &b.catchUp);
@@ -8242,7 +8243,7 @@ namespace
                ImGui::SetNextItemWidth(sFieldW);
                ModNextParam(kBrushHueParam);
                ModBegin();
-               FieldWell::Slider("##v2dhue", &sBrushHue, -180.0f, 180.0f, "%+.0f");
+               FieldWell::Slider("##v2dhue", &sBrushHue, params::view2d::brush_hue_lo, params::view2d::brush_hue_hi, "%+.0f");
                ModEnd();
             }
             MoreHeader(T("Jitter"), false, false);
@@ -8250,17 +8251,17 @@ namespace
                // The header names the set, so each well says only what jitters.
                Pairs g;
                ImGui::PushID("jit");
-               MorePct(T("Size"), &b.sizeJitter, 0.0f, 100.0f);
-               MorePct(T("Flow"), &b.opacityJitter, 0.0f, 100.0f);
-               MorePct(T("Hardness"), &b.hardJitter, 0.0f, 100.0f);
-               MorePct(T("Rotation"), &b.angleJitter, 0.0f, 100.0f);
-               MorePct(T("Shape"), &b.roundJitter, 0.0f, 100.0f);
-               MorePct(T("Accumulation"), &b.accumJitter, 0.0f, 100.0f);
+               MorePct(T("Size"), &b.sizeJitter, params::view2d::size_jitter_lo, params::view2d::size_jitter_hi);
+               MorePct(T("Flow"), &b.opacityJitter, params::view2d::opacity_jitter_lo, params::view2d::opacity_jitter_hi);
+               MorePct(T("Hardness"), &b.hardJitter, params::view2d::hard_jitter_lo, params::view2d::hard_jitter_hi);
+               MorePct(T("Rotation"), &b.angleJitter, params::view2d::angle_jitter_lo, params::view2d::angle_jitter_hi);
+               MorePct(T("Shape"), &b.roundJitter, params::view2d::round_jitter_lo, params::view2d::round_jitter_hi);
+               MorePct(T("Accumulation"), &b.accumJitter, params::view2d::accum_jitter_lo, params::view2d::accum_jitter_hi);
                if (brush)
                {
-                  MorePct(T("Hue"), &b.hueJitter, 0.0f, 100.0f);
-                  MorePct(T("Saturation"), &b.satJitter, 0.0f, 100.0f);
-                  MorePct(T("Brightness"), &b.valJitter, 0.0f, 100.0f);
+                  MorePct(T("Hue"), &b.hueJitter, params::view2d::hue_jitter_lo, params::view2d::hue_jitter_hi);
+                  MorePct(T("Saturation"), &b.satJitter, params::view2d::sat_jitter_lo, params::view2d::sat_jitter_hi);
+                  MorePct(T("Brightness"), &b.valJitter, params::view2d::val_jitter_lo, params::view2d::val_jitter_hi);
                }
                ImGui::PopID();
             }
@@ -8269,7 +8270,7 @@ namespace
                Pairs g;
                MoreCheck(T("Size"), &b.pressureSize);
                MoreCheck(T("Opacity"), &b.pressureOpacity);
-               MoreSlider(T("Response"), &b.pressureCurve, 0.25f, 3.0f, "%.2f");
+               MoreSlider(T("Response"), &b.pressureCurve, params::view2d::pressure_curve_lo, params::view2d::pressure_curve_hi, "%.2f");
                MoreCheck(T("Tilt size"), &b.tiltSize);
                MoreCheck(T("Tilt angle"), &b.tiltAngle);
                MoreCheck(T("Tilt flatness"), &b.tiltRound);
@@ -8299,7 +8300,7 @@ namespace
                if (b.mode == BrushEngine::kComb)
                {
                   float tines = (float)b.tines;
-                  MoreSlider(T("Tines"), &tines, 1.0f, 16.0f, "%.0f");
+                  MoreSlider(T("Tines"), &tines, params::view2d::tines_lo, params::view2d::tines_hi, "%.0f");
                   b.tines = std::clamp((int)std::lround(tines), 1, 16);
                }
                MoreCheck(T("Lock alpha"), &b.lockAlpha);
@@ -8321,18 +8322,18 @@ namespace
       else if (sTool == kMixer || sTool == kSelBrush)
       {
          BrushEngine::Brush& b = ToolBrush();
-         BarSlider("##v2dxsize", &b.size, 1.0f, 1000.0f, "Size %.0f px", kWellL);
+         BarSlider("##v2dxsize", &b.size, params::view2d::size_lo, params::view2d::size_hi, "Size %.0f px", kWellL);
          float hard = b.hardness * 100.0f;
-         BarSlider("##v2dxhard", &hard, 0.0f, 100.0f, "Hardness %.0f%%", kWellL);
+         BarSlider("##v2dxhard", &hard, params::view2d::hard_lo, params::view2d::hard_hi, "Hardness %.0f%%", kWellL);
          b.hardness = hard / 100.0f;
          if (sTool == kMixer)
          {
             float op = b.opacity * 100.0f, flow = b.flow * 100.0f, wet = b.wet * 100.0f, refill = b.refill * 100.0f;
-            BarSlider("##v2dxop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
-            BarSlider("##v2dxflow", &flow, 1.0f, 100.0f, "Flow %.0f%%", kWellL);
+            BarSlider("##v2dxop", &op, params::view2d::op_lo, params::view2d::op_hi, "Opacity %.0f%%", kWellL);
+            BarSlider("##v2dxflow", &flow, params::view2d::flow_lo, params::view2d::flow_hi, "Flow %.0f%%", kWellL);
             gap();
-            BarSlider("##v2dxwet", &wet, 0.0f, 100.0f, "Wet %.0f%%", kWellL);
-            BarSlider("##v2dxrefill", &refill, 0.0f, 100.0f, "Refill %.0f%%", kWellL);
+            BarSlider("##v2dxwet", &wet, params::view2d::wet_lo, params::view2d::wet_hi, "Wet %.0f%%", kWellL);
+            BarSlider("##v2dxrefill", &refill, params::view2d::refill_lo, params::view2d::refill_hi, "Refill %.0f%%", kWellL);
             b.opacity = op / 100.0f;
             b.flow = flow / 100.0f;
             b.wet = wet / 100.0f;
@@ -8371,7 +8372,7 @@ namespace
          }
       }
       else if (sTool == kBlemish)
-         BarSlider("##v2dblemsize", &sBlemishSize, 2.0f, 500.0f, "Size %.0f px", kWellL);
+         BarSlider("##v2dblemsize", &sBlemishSize, params::view2d::blemish_size_lo, params::view2d::blemish_size_hi, "Size %.0f px", kWellL);
       else if (sTool == kFloodErase)
          MatchChips();
       else if (sTool == kObjectSel)
@@ -8441,7 +8442,7 @@ namespace
             sFillKind = k + 1;
          gap();
          float op = sGradOpacity * 100.0f;
-         BarSlider("##v2dgop", &op, 1.0f, 100.0f, "Opacity %.0f%%", kWellL);
+         BarSlider("##v2dgop", &op, params::view2d::op_lo, params::view2d::op_hi, "Opacity %.0f%%", kWellL);
          sGradOpacity = op / 100.0f;
          next();
          if (TextChip(L("Reverse##v2dgrev"), sGradReverse, T("Background colour to foreground")))
@@ -8464,7 +8465,7 @@ namespace
          gap();
          SelOpChips("v2dop");
          gap();
-         BarSlider("##v2dfeather", &sFeather, 0.0f, 250.0f, "Feather %.0f px", kWellL);
+         BarSlider("##v2dfeather", &sFeather, params::view2d::feather_lo, params::view2d::feather_hi, "Feather %.0f px", kWellL);
          if (m)
          {
             next();
@@ -8479,9 +8480,9 @@ namespace
             if (sMarqueeRatio == 4)
             {
                next();
-               BarSlider("##v2dmfw", &sMarqueeFixed[0], 1.0f, 8192.0f, "W %.0f px", kWellM);
+               BarSlider("##v2dmfw", &sMarqueeFixed[0], params::view2d::marquee_fixed_0_lo, params::view2d::marquee_fixed_0_hi, "W %.0f px", kWellM);
                next();
-               BarSlider("##v2dmfh", &sMarqueeFixed[1], 1.0f, 8192.0f, "H %.0f px", kWellM);
+               BarSlider("##v2dmfh", &sMarqueeFixed[1], params::view2d::marquee_fixed_1_lo, params::view2d::marquee_fixed_1_hi, "H %.0f px", kWellM);
             }
          }
          SelModChips(doc);
@@ -8490,7 +8491,7 @@ namespace
       {
          static const char* kSample[3] = { "Point", "3x3 average", "5x5 average" };
          int si = sPickSize / tok::view2d_si_ratio;
-         if (BarCombo("##v2dpsize", &si, kSample, 3, kWellL))
+         if (BarCombo("##v2dpsize", &si, kSample, 3, kWellL))   // ui-audit-ok: model value (prediction lookahead samples / handle index modulo / visible items)
             sPickSize = si * tok::view2d_pick_size_ratio + 1;
          gap();
          static const char* kFrom[2] = { "All layers", "Current layer" };
@@ -8574,7 +8575,7 @@ namespace
          if (t.fillType >= 1 && t.fillType <= 4)
          {
             if (t.fillType != 2)
-               changed |= SliderRow(T("Angle##v2dvfa"), &t.fillAngle, -180.0f, 180.0f, "%.0f°");
+               changed |= SliderRow(T("Angle##v2dvfa"), &t.fillAngle, params::view2d::fill_angle_lo, params::view2d::fill_angle_hi, "%.0f°");
             const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
             if (GradientRows("##v2dvfillstops", t.fillStops, t.fillC, white))
                changed = true;
@@ -8639,7 +8640,7 @@ namespace
       }
       next();
       ImGui::SetNextItemWidth(kWellS);
-      changed |= FieldWell::Slider("##v2dvwidth", &t.width, 0.0f, 200.0f, "%.0f px");
+      changed |= FieldWell::Slider("##v2dvwidth", &t.width, params::view2d::width_lo, params::view2d::width_hi, "%.0f px");
       if (ImGui::IsItemActivated())
          undo();
       next();
@@ -8669,18 +8670,18 @@ namespace
          pick("Align", &t.align, { "Centre", "Inside", "Outside" });
          ImGui::TextDisabled("%s", T("Dash"));
          ImGui::SetNextItemWidth(kWellL);
-         changed |= FieldWell::Slider("##v2dvdash", &t.dash, 0.0f, 200.0f, t.dash > 0.0f ? "Dash %.0f" : "Solid");
+         changed |= FieldWell::Slider("##v2dvdash", &t.dash, params::view2d::dash_lo, params::view2d::dash_hi, t.dash > 0.0f ? "Dash %.0f" : "Solid");
          if (ImGui::IsItemActivated())
             undo();
          FormParts::Inline(0.0f, tok::space_1);
          ImGui::BeginDisabled(t.dash <= 0.0f);
          ImGui::SetNextItemWidth(kWellL);
-         changed |= FieldWell::Slider("##v2dvgap", &t.gap, 0.0f, 200.0f, "Gap %.0f");
+         changed |= FieldWell::Slider("##v2dvgap", &t.gap, params::view2d::gap_lo, params::view2d::gap_hi, "Gap %.0f");
          if (ImGui::IsItemActivated())
             undo();
          FormParts::Inline(0.0f, tok::space_1);
          ImGui::SetNextItemWidth(kWellL);
-         changed |= FieldWell::Slider("##v2dvphase", &t.dashPhase, -200.0f, 200.0f, "Phase %.0f");
+         changed |= FieldWell::Slider("##v2dvphase", &t.dashPhase, params::view2d::dash_phase_lo, params::view2d::dash_phase_hi, "Phase %.0f");
          if (ImGui::IsItemActivated())
             undo();
          FormParts::Inline(0.0f, tok::space_1);
@@ -8694,7 +8695,7 @@ namespace
          if (t.join == 0)
          {
             ImGui::SetNextItemWidth(kWellL);
-            changed |= FieldWell::Slider("##v2dvmiter", &t.miter, 1.0f, 100.0f, "Miter %.1f");
+            changed |= FieldWell::Slider("##v2dvmiter", &t.miter, params::view2d::miter_lo, params::view2d::miter_hi, "Miter %.1f");
             if (ImGui::IsItemActivated())
                undo();
          }
@@ -8703,7 +8704,7 @@ namespace
          if (t.arrowS > 0 || t.arrowE > 0)
          {
             ImGui::SetNextItemWidth(kWellL);
-            changed |= FieldWell::Slider("##v2dvarrow", &t.arrowSize, 1.0f, 20.0f, "Head %.1f\xC3\x97");
+            changed |= FieldWell::Slider("##v2dvarrow", &t.arrowSize, params::view2d::arrow_size_lo, params::view2d::arrow_size_hi, "Head %.1f\xC3\x97");
             if (ImGui::IsItemActivated())
                undo();
          }
@@ -8765,11 +8766,11 @@ namespace
          // Absolute: the radius in px; off, in % of the shape's short side (kept in px either way).
          const float side = std::max(1.0f, std::min(std::fabs(t.x1 - t.x0), std::fabs(t.y1 - t.y0)));
          if (sRadiusAbs || picked == nullptr)
-            changed |= FieldWell::Slider("##v2dvrad", &t.radius, 0.0f, 500.0f, "Radius %.0f");
+            changed |= FieldWell::Slider("##v2dvrad", &t.radius, params::view2d::radius_lo, params::view2d::radius_hi, "Radius %.0f");
          else
          {
             float pct = t.radius / side * 100.0f;
-            if (FieldWell::Slider("##v2dvradp", &pct, 0.0f, 50.0f, "Radius %.0f%%"))
+            if (FieldWell::Slider("##v2dvradp", &pct, params::view2d::pct_2_lo, params::view2d::pct_2_hi, "Radius %.0f%%"))
             {
                t.radius = pct * side / tok::view2d_radius_ratio;
                changed = true;
@@ -8793,7 +8794,7 @@ namespace
                ImGui::TextDisabled("%s", T(kCorner[c]));
                float r = t.CornerR(c);
                ImGui::SetNextItemWidth(kWellL);
-               if (FieldWell::Slider(("##v2dvcr" + std::to_string(c)).c_str(), &r, 0.0f, 500.0f, "%.0f"))
+               if (FieldWell::Slider(("##v2dvcr" + std::to_string(c)).c_str(), &r, params::view2d::r_lo, params::view2d::r_hi, "%.0f"))
                {
                   t.cornerR[c] = r;
                   changed = true;
@@ -8830,7 +8831,7 @@ namespace
          gap();
          float sides = (float)t.sides;
          ImGui::SetNextItemWidth(kWellL);
-         if (FieldWell::Slider("##v2dvsides", &sides, 3.0f, 64.0f, star ? "Points %.0f" : "Sides %.0f"))
+         if (FieldWell::Slider("##v2dvsides", &sides, params::view2d::sides_lo, params::view2d::sides_hi, star ? "Points %.0f" : "Sides %.0f"))
          {
             t.sides = (int)std::lround(sides);
             changed = true;
@@ -8841,7 +8842,7 @@ namespace
          {
             next();
             ImGui::SetNextItemWidth(kWellL);
-            changed |= FieldWell::Slider("##v2dvinner", &t.inner, 0.05f, 1.0f, "Inner %.2f");
+            changed |= FieldWell::Slider("##v2dvinner", &t.inner, params::view2d::inner_lo, params::view2d::inner_hi, "Inner %.2f");
             if (ImGui::IsItemActivated())
                undo();
          }
@@ -8852,7 +8853,7 @@ namespace
          gap();
          float w = std::fabs(t.x1 - t.x0), h = std::fabs(t.y1 - t.y0);
          ImGui::SetNextItemWidth(kWellM);
-         if (FieldWell::Slider("##v2dvw", &w, 1.0f, 8192.0f, "W %.0f"))
+         if (FieldWell::Slider("##v2dvw", &w, params::view2d::w_lo, params::view2d::w_hi, "W %.0f"))
          {
             const float lo = std::min(t.x0, t.x1);
             t.x0 = lo;
@@ -8863,7 +8864,7 @@ namespace
             undo();
          next();
          ImGui::SetNextItemWidth(kWellM);
-         if (FieldWell::Slider("##v2dvh", &h, 1.0f, 8192.0f, "H %.0f"))
+         if (FieldWell::Slider("##v2dvh", &h, params::view2d::h_lo, params::view2d::h_hi, "H %.0f"))
          {
             const float lo = std::min(t.y0, t.y1);
             t.y0 = lo;
@@ -9234,17 +9235,17 @@ namespace
       changed |= FontPicker("##v2dfont", font, 2.0f * kWellM, undo);
       next();
       ImGui::SetNextItemWidth(kWellM);
-      changed |= FieldWell::Slider("##v2dfsize", &size, 4.0f, 800.0f, "%.0f px");
+      changed |= FieldWell::Slider("##v2dfsize", &size, params::view2d::size_2_lo, params::view2d::size_2_hi, "%.0f px");
       if (ImGui::IsItemActivated())
          undo();
       next();
       ImGui::SetNextItemWidth(kWellL);
-      changed |= FieldWell::Slider("##v2dlead", &leading, 0.5f, 3.0f, "Leading %.2f");
+      changed |= FieldWell::Slider("##v2dlead", &leading, params::view2d::leading_lo, params::view2d::leading_hi, "Leading %.2f");
       if (ImGui::IsItemActivated())
          undo();
       next();
       ImGui::SetNextItemWidth(kWellL);
-      changed |= FieldWell::Slider("##v2dtrack", &tracking, -100.0f, 400.0f, "Tracking %.0f");
+      changed |= FieldWell::Slider("##v2dtrack", &tracking, params::view2d::tracking_lo, params::view2d::tracking_hi, "Tracking %.0f");
       if (ImGui::IsItemActivated())
          undo();
       gap();
@@ -10699,7 +10700,7 @@ namespace
          float pct = a->opacity * 100.0f;
          ModNext(*a, Scene2DNode::kLfOpacity);
          ModBegin();
-         if (FieldWell::Slider("##v2dopacity", &pct, 0.0f, 100.0f, "Opacity %.0f%%"))
+         if (FieldWell::Slider("##v2dopacity", &pct, 0.0f, params::view2d::pct_hi, "Opacity %.0f%%"))
          {
             a->opacity = pct / 100.0f;
             Touch();
@@ -10711,7 +10712,7 @@ namespace
          float fillPct = a->fill * 100.0f;
          ModNext(*a, Scene2DNode::kLfFill);
          ModBegin();
-         if (FieldWell::Slider("##v2dfill", &fillPct, 0.0f, 100.0f, "Fill %.0f%%"))
+         if (FieldWell::Slider("##v2dfill", &fillPct, params::view2d::fill_pct_lo, params::view2d::fill_pct_hi, "Fill %.0f%%"))
          {
             a->fill = fillPct / 100.0f;
             Touch();
@@ -10887,7 +10888,7 @@ namespace
       if (ComboRow(T("Label"), &label, { T("None"), T("Red"), T("Orange"), T("Yellow"), T("Green"), T("Blue"), T("Violet"), T("Grey") }))
          l->label = label;
       BoolRow(T("Clip to layer below"), &l->clip);
-      SliderRow(T("Gamma"), &l->blendGamma, 0.1f, 10.0f, "%.2f");
+      SliderRow(T("Gamma"), &l->blendGamma, params::view2d::blend_gamma_lo, params::view2d::blend_gamma_hi, "%.2f");
       if (l->kind == Kind::Vector || l->kind == Kind::Text || l->kind == Kind::Node)
          ComboRow(T("Antialias"), &l->aaMode, { T("Default"), T("On"), T("Off") });
       {
@@ -10922,10 +10923,10 @@ namespace
          ComboRow(T("Material"), &l->reliefMat, { T("Plasticine"), T("Metal"), T("Chrome"), T("Ink stipple") });
          {
             Pairs g;
-            SliderRow(T("Light"), &l->reliefLight, -180.0f, 180.0f, "%.0f°");
-            SliderRow(T("Light height"), &l->reliefElev, 5.0f, 90.0f, "%.0f°");
+            SliderRow(T("Light"), &l->reliefLight, params::view2d::relief_light_lo, params::view2d::relief_light_hi, "%.0f°");
+            SliderRow(T("Light height"), &l->reliefElev, params::view2d::relief_elev_lo, params::view2d::relief_elev_hi, "%.0f°");
          }
-         SliderRow(T("Depth"), &l->reliefDepth, 0.0f, 40.0f, "%.1f px");
+         SliderRow(T("Depth"), &l->reliefDepth, params::view2d::relief_depth_lo, params::view2d::relief_depth_hi, "%.1f px");
       }
       if (l->kind == Kind::Fill)
       {
@@ -10963,7 +10964,7 @@ namespace
          if (type == 1 || type == 3 || type == 4 || type == 5)
          {
             ModNext(*l, Scene2DNode::kLfFillAngle);
-            SliderRow(T("Angle"), &l->fillAngle, -180.0f, 180.0f, "%.0f°");
+            SliderRow(T("Angle"), &l->fillAngle, params::view2d::fill_angle_lo, params::view2d::fill_angle_hi, "%.0f°");
          }
       }
       if (l->kind == Kind::Adjust)
@@ -11044,14 +11045,14 @@ namespace
          {
             Pairs g;
             ModNext(*l, Scene2DNode::kLfFontSize);
-            SliderRow(T("Size"), &l->fontSize, 4.0f, 800.0f, "%.0f px");
+            SliderRow(T("Size"), &l->fontSize, params::view2d::font_size_lo, params::view2d::font_size_hi, "%.0f px");
             ModNext(*l, Scene2DNode::kLfLeading);
-            SliderRow(T("Leading"), &l->leading, 0.5f, 3.0f, "%.2f");
+            SliderRow(T("Leading"), &l->leading, params::view2d::leading_lo, params::view2d::leading_hi, "%.2f");
             ModNext(*l, Scene2DNode::kLfTracking);
-            SliderRow(T("Tracking"), &l->tracking, -100.0f, 400.0f, "%.0f");
+            SliderRow(T("Tracking"), &l->tracking, params::view2d::tracking_lo, params::view2d::tracking_hi, "%.0f");
          }
          ColorRow(T("Colour"), l->textC);
-         DragRow(T("Box width"), &l->boxW, 1.0f, "%.0f px", 0.0f, 8192.0f);
+         DragRow(T("Box width"), &l->boxW, 1.0f, "%.0f px", params::view2d::box_w_lo, params::view2d::box_w_hi);
          // Character: lines, band, position and stretch.
          if (l->underline)
          {
@@ -11069,7 +11070,7 @@ namespace
          BoolRow(T("Outline"), &l->outline);
          if (l->outline)
          {
-            SliderRow(T("Outline width"), &l->outlineW, 0.0f, 50.0f, "%.1f px");
+            SliderRow(T("Outline width"), &l->outlineW, params::view2d::outline_w_lo, params::view2d::outline_w_hi, "%.1f px");
             ColorRow(T("Outline colour"), l->outlineC);
          }
          {
@@ -11077,7 +11078,7 @@ namespace
             BoolRow(T("No break"), &l->noBreak);
             BoolRow(T("Optical align"), &l->optical);
          }
-         SliderRow(T("Offset X"), &l->offsetX, -400.0f, 400.0f, "%.0f px");
+         SliderRow(T("Offset X"), &l->offsetX, params::view2d::offset_x_lo, params::view2d::offset_x_hi, "%.0f px");
          {
             // OpenType language tag (e.g. tr, nl, sr-Latn); empty = none.
             char buf[24];
@@ -11101,23 +11102,23 @@ namespace
          if (l->highlight)
             ColorRow(T("Band"), l->highlightC);
          ComboRow(T("Position"), &l->script, { T("Normal"), T("Superscript"), T("Subscript") });
-         SliderRow(T("Baseline"), &l->baseShift, -400.0f, 400.0f, "%.0f px");
+         SliderRow(T("Baseline"), &l->baseShift, params::view2d::base_shift_lo, params::view2d::base_shift_hi, "%.0f px");
          {
             Pairs g;
-            SliderRow(T("Width"), &l->textSX, 0.1f, 4.0f, "%.2f\xC3\x97");
-            SliderRow(T("Height"), &l->textSY, 0.1f, 4.0f, "%.2f\xC3\x97");
+            SliderRow(T("Width"), &l->textSX, params::view2d::text_sx_lo, params::view2d::text_sx_hi, "%.2f\xC3\x97");
+            SliderRow(T("Height"), &l->textSY, params::view2d::text_sy_lo, params::view2d::text_sy_hi, "%.2f\xC3\x97");
          }
          // Paragraph: a new line starts one.
          {
             Pairs g;
-            SliderRow(T("Indent left"), &l->indentL, 0.0f, 1000.0f, "%.0f px");
-            SliderRow(T("Indent right"), &l->indentR, 0.0f, 1000.0f, "%.0f px");
+            SliderRow(T("Indent left"), &l->indentL, params::view2d::indent_l_lo, params::view2d::indent_l_hi, "%.0f px");
+            SliderRow(T("Indent right"), &l->indentR, params::view2d::indent_r_lo, params::view2d::indent_r_hi, "%.0f px");
          }
-         SliderRow(T("First line"), &l->indentFirst, -500.0f, 1000.0f, "%.0f px");
+         SliderRow(T("First line"), &l->indentFirst, params::view2d::indent_first_lo, params::view2d::indent_first_hi, "%.0f px");
          {
             Pairs g;
-            SliderRow(T("Above"), &l->spaceBefore, 0.0f, 500.0f, "%.0f px");
-            SliderRow(T("Below"), &l->spaceAfter, 0.0f, 500.0f, "%.0f px");
+            SliderRow(T("Above"), &l->spaceBefore, params::view2d::space_before_lo, params::view2d::space_before_hi, "%.0f px");
+            SliderRow(T("Below"), &l->spaceAfter, params::view2d::space_after_lo, params::view2d::space_after_hi, "%.0f px");
          }
          FieldLabel("");
          if (TextChip(L("Convert to shapes##v2dtoshapes"), false, T("Outlines as a vector layer"), sFieldW))
@@ -11136,7 +11137,7 @@ namespace
             float* const pos[2] = { &l->x, &l->y };
             const char* const fmts[2] = { "X %.0f", "Y %.0f" };
             const int mf[2] = { Scene2DNode::kLfX, Scene2DNode::kLfY };
-            DragMulti(T("Position"), pos, fmts, 2, 1.0f, -1e6f, 1e6f, l, mf);
+            DragMulti(T("Position"), pos, fmts, params::view2d::position_speed, params::view2d::position_lo, params::view2d::position_hi, params::view2d::position_def, l, mf);
          }
          float bw = 1, bh = 1;
          doc->LayerBox(*l, bw, bh);
@@ -11144,7 +11145,7 @@ namespace
          {
             float* const size[2] = { &wpx, &hpx };
             const char* const fmts[2] = { "W %.0f", "H %.0f" };
-            const int c = DragMulti(T("Size"), size, fmts, 2, 1.0f);
+            const int c = DragMulti(T("Size"), size, fmts, params::view2d::size_speed, 1.0f);
             if (c & 1)
                l->sx = bw > 0 ? wpx / bw : 1.0f;
             if (c & 2)
@@ -11156,7 +11157,7 @@ namespace
             float* const pp[2] = { &pct[0], &pct[1] };
             const char* const pf[2] = { "W %.1f%%", "H %.1f%%" };
             const int mf[2] = { Scene2DNode::kLfScaleX, Scene2DNode::kLfScaleY };
-            const int c = DragMulti(T("Scale"), pp, pf, 2, 0.5f, 0.1f, 10000.0f, l, mf);
+            const int c = DragMulti(T("Scale"), pp, pf, params::view2d::scale_speed, params::view2d::scale_lo, params::view2d::scale_hi, params::view2d::scale_def, l, mf);
             if (c != 0)
             {
                if (sLockScale)
@@ -11182,9 +11183,9 @@ namespace
             float* const rot[3] = { &l->rx, &l->ry, &l->angle };
             const char* const fmts[3] = { "X %.0f°", "Y %.0f°", "Z %.0f°" };
             const int mf[3] = { Scene2DNode::kLfRotX, Scene2DNode::kLfRotY, Scene2DNode::kLfAngle };
-            DragMulti(T("Rotate"), rot, fmts, 3, 0.5f, -360.0f, 360.0f, l, mf);
+            DragMulti(T("Rotate"), rot, fmts, params::view2d::rotate_speed, params::view2d::rotate_lo, params::view2d::rotate_hi, params::view2d::rotate_def, l, mf);
             float* const ori[3] = { &l->orient[0], &l->orient[1], &l->orient[2] };
-            DragMulti(T("Orient"), ori, fmts, 3, 0.5f, -360.0f, 360.0f);
+            DragMulti(T("Orient"), ori, fmts, params::view2d::orient_speed, params::view2d::orient_lo, params::view2d::orient_hi, params::view2d::orient_def);
             DragRow(T("Anchor depth"), &l->az, 1.0f, "%.0f px");
          }
          else
@@ -11192,8 +11193,8 @@ namespace
             ModNext(*l, Scene2DNode::kLfAngle);
             {
                Pairs g;
-               DragRow(T("Angle"), &l->angle, 0.5f, "%.1f°", -180.0f, 180.0f);
-               DragRow(T("Shear"), &l->shear, 0.5f, "%.1f°", -80.0f, 80.0f);
+               DragRow(T("Angle"), &l->angle, params::view2d::angle_speed, "%.1f°", params::view2d::angle_lo, params::view2d::angle_hi);
+               DragRow(T("Shear"), &l->shear, params::view2d::shear_speed, "%.1f°", params::view2d::shear_lo, params::view2d::shear_hi);
             }
          }
          int anchor = (int)std::lround(l->ay * 2.0f) * 3 + (int)std::lround(l->ax * 2.0f);
@@ -11627,7 +11628,7 @@ namespace
             return;
          if (band >= 0)   // Audio Color Ramp's per-band gain, behind More
          {
-            SliderRow((std::string(T("Gain")) + " " + std::to_string(band + 1)).c_str(), &v, 0.0f, 2.0f, "%.2f");
+            SliderRow((std::string(T("Gain")) + " " + std::to_string(band + 1)).c_str(), &v, params::view2d::gain_lo, params::view2d::gain_hi, "%.2f");
             return;
          }
          if (h != nullptr && h->hi > h->lo)
@@ -11941,7 +11942,7 @@ namespace
                         if (pd.format.find("rad") != std::string::npos)
                         {
                            float deg = *pv * 57.29578f;
-                           if (SliderRow(T(plabel.c_str()), &deg, pd.minVal * 57.29578f, pd.maxVal * 57.29578f, "%.0f\xC2\xB0"))
+                           if (SliderRow(T(plabel.c_str()), &deg, pd.minVal * 57.29578f, pd.maxVal * 57.29578f, "%.0f\xC2\xB0"))   // ui-audit-ok: radians to degrees
                               *pv = deg / 57.29578f;
                            return;
                         }
@@ -12573,22 +12574,22 @@ namespace
       {
          if (primary)
             ModNext(l, fb + 2);
-         SliderRow(T("Angle"), &f.angle, -180.0f, 180.0f, "%.0f°");
+         SliderRow(T("Angle"), &f.angle, params::view2d::angle_lo, params::view2d::angle_hi, "%.0f°");
       }
       if (t == S::kFxShadow || t == S::kFxInner || t == S::kFxBevel || t == S::kFxSatin)
       {
          if (primary)
             ModNext(l, fb + 1);
          if (t == S::kFxBevel)
-            SliderRow(T("Depth"), &f.dist, 0.0f, 200.0f, "%.0f%%");
+            SliderRow(T("Depth"), &f.dist, params::view2d::dist_lo, params::view2d::dist_hi, "%.0f%%");
          else
-            SliderRow(T("Distance"), &f.dist, 0.0f, 200.0f, "%.0f px");
+            SliderRow(T("Distance"), &f.dist, params::view2d::dist_lo, params::view2d::dist_hi, "%.0f px");
       }
       if (t != S::kFxOverlay && t != S::kFxGradient)
       {
          if (primary)
             ModNext(l, fb);
-         SliderRow(T(t == S::kFxStroke ? "Width" : t == S::kFxPattern ? "Scale" : "Size"), &f.size, 0.0f, 200.0f, "%.0f px");
+         SliderRow(T(t == S::kFxStroke ? "Width" : t == S::kFxPattern ? "Scale" : "Size"), &f.size, params::view2d::size_3_lo, params::view2d::size_3_hi, "%.0f px");
       }
       if (t == S::kFxShadow || t == S::kFxInner || t == S::kFxGlow || t == S::kFxInnerGlow)
          SliderRow(T("Spread"), &f.spread, 0.0f, 1.0f, "%.2f");
@@ -12959,7 +12960,7 @@ namespace
          float wh[2] = { (float)sCanvasW, (float)sCanvasH };
          float* const p[2] = { &wh[0], &wh[1] };
          const char* const fmts[2] = { "W %.0f", "H %.0f" };
-         const int c = DragMulti(T("Size"), p, fmts, 2, 1.0f, 1.0f, 16384.0f);
+         const int c = DragMulti(T("Size"), p, fmts, params::view2d::size_speed, 1.0f, 1.0f, params::view2d::size_def);
          sCanvasW = (int)std::lround(wh[0]);
          sCanvasH = (int)std::lround(wh[1]);
          if ((c & 1) && d.ratioLock)
@@ -12981,7 +12982,7 @@ namespace
          float wh[2] = { (float)sImageW, (float)sImageH };
          float* const p[2] = { &wh[0], &wh[1] };
          const char* const fmts[2] = { "W %.0f", "H %.0f" };
-         const int c = DragMulti(T("Size##img"), p, fmts, 2, 1.0f, 1.0f, 16384.0f);
+         const int c = DragMulti(T("Size##img"), p, fmts, params::view2d::size_speed, 1.0f, 1.0f, params::view2d::size_def);
          sImageW = (int)std::lround(wh[0]);
          sImageH = (int)std::lround(wh[1]);
          if (c & 1)
@@ -13014,10 +13015,10 @@ namespace
       }
       if (d.grid)
       {
-         DragRow(T("Grid size"), &d.gridSize, 1.0f, "%.0f px", 2.0f, 4096.0f);
+         DragRow(T("Grid size"), &d.gridSize, 1.0f, "%.0f px", params::view2d::grid_size_lo, params::view2d::grid_size_hi);
          FieldLabel(T("Subdivisions"));
          ImGui::SetNextItemWidth(sFieldW);
-         if (FieldWell::Slider("##v2dsub", &d.gridSubdiv, 1, 16, "%d"))
+         if (FieldWell::Slider("##v2dsub", &d.gridSubdiv, params::view2d::grid_subdiv_lo, params::view2d::grid_subdiv_hi, "%d"))
             Touch();
          UndoOnActivate();
       }
@@ -13049,7 +13050,7 @@ namespace
       if (OutputNode* o = sImageFormat == 1 ? FindOutput() : nullptr)
       {
          float q = (float)std::clamp(o->jpegQuality, 1, 100);
-         if (SliderRow(T("Quality"), &q, 1.0f, 100.0f, "%.0f"))
+         if (SliderRow(T("Quality"), &q, params::view2d::q_lo, params::view2d::q_hi, "%.0f"))
             o->jpegQuality = (int)std::lround(q);
       }
       ImGui::BeginDisabled(gOfflineRender.active);
@@ -13061,8 +13062,8 @@ namespace
       ComboRow(T("Video"), &sVideoFormat, { "MP4", "MOV" });
       {
          Pairs g;
-         DragRow(T("Frame rate"), &d.fps, 0.1f, "%.0f fps", 1.0f, 240.0f);
-         DragRow(T("Length"), &d.seconds, 0.1f, "%.1f s", 0.1f, 3600.0f);
+         DragRow(T("Frame rate"), &d.fps, params::view2d::fps_speed, "%.0f fps", params::view2d::fps_lo, params::view2d::fps_hi);
+         DragRow(T("Length"), &d.seconds, params::view2d::seconds_speed, "%.1f s", params::view2d::seconds_lo, params::view2d::seconds_hi);
       }
       ImGui::BeginDisabled(gOfflineRender.active);
       if (ActionButton::Draw(L("Render Animation##v2danim"), ImVec2(availW, 0)))
@@ -17057,10 +17058,10 @@ static void RegisterBrushParams(const GraphNode& gn)
       return;
    const bool was = gParamRegisterOnly;
    gParamRegisterOnly = true;
-   ModSlider("Brush size", &sBrush.size, 1.0f, 1000.0f, "%.0f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushSizeParam);
-   ModSlider("Brush opacity", &sBrush.opacity, 0.01f, 1.0f, "%.2f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushOpacityParam);
-   ModSlider("Brush flow", &sBrush.flow, 0.01f, 1.0f, "%.2f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushFlowParam);
-   ModSlider("Brush hue", &sBrushHue, -180.0f, 180.0f, "%.0f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushHueParam);
+   ModSlider("Brush size", &sBrush.size, params::view2d::size_lo, params::view2d::size_hi, "%.0f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushSizeParam);
+   ModSlider("Brush opacity", &sBrush.opacity, params::view2d::opacity_lo, params::view2d::opacity_hi, "%.2f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushOpacityParam);
+   ModSlider("Brush flow", &sBrush.flow, params::view2d::flow_2_lo, params::view2d::flow_2_hi, "%.2f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushFlowParam);
+   ModSlider("Brush hue", &sBrushHue, params::view2d::brush_hue_lo, params::view2d::brush_hue_hi, "%.0f", kParamWidth, false, 0.0f, nullptr, nullptr, kBrushHueParam);
    gParamRegisterOnly = was;
 }
 

@@ -9,6 +9,7 @@
 //           (Lane, Step or Kit). Lanes are generic: the name is the loaded sample, "Empty" otherwise.
 // Drawn in the Mixer's language: FrameBg wells, one SliderGrab accent, ring/dot LEDs, no bevels.
 #include "app/frame/CanvasLink.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
@@ -1053,8 +1054,8 @@ namespace app
          SectionCard::Begin(T("Sound"));
          {
             KnobRow r(4);
-            r.Knob("tune", &n->lanePitch[lane], -24.0f, 24.0f, "%+.1f st", col, true);
-            r.Knob("fine", &n->laneFineTune[lane], -50.0f, 50.0f, "%+.0f c", col, true);
+            r.Knob("tune", &n->lanePitch[lane], params::DrumSequencer::lane_pitch_lo, params::DrumSequencer::lane_pitch_hi, "%+.1f st", col, true);
+            r.Knob("fine", &n->laneFineTune[lane], params::DrumSequencer::lane_fine_tune_lo, params::DrumSequencer::lane_fine_tune_hi, "%+.0f c", col, true);
             r.Knob("decay", &n->laneDecay[lane], 0.0f, 1.0f, "%.2f", col);
             r.Knob("attack", &n->laneTransient[lane], -1.0f, 1.0f, "%+.2f", col, true);
             r.End();
@@ -1063,8 +1064,8 @@ namespace app
             KnobRow r(4);
             r.Knob("level", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", col);
             r.Knob("pan", &n->lanePan[lane], -1.0f, 1.0f, "%+.2f", col, true);
-            r.Knob("acc tune", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%+.1f st", col, true);
-            r.Knob("acc level", &n->laneAccentLevel[lane], 0.0f, 12.0f, "%+.1f dB", col);
+            r.Knob("acc tune", &n->laneAccentPitch[lane], params::DrumSequencer::lane_accent_pitch_lo, params::DrumSequencer::lane_accent_pitch_hi, "%+.1f st", col, true);
+            r.Knob("acc level", &n->laneAccentLevel[lane], params::DrumSequencer::lane_accent_level_lo, params::DrumSequencer::lane_accent_level_hi, "%+.1f dB", col);
             r.End();
          }
 
@@ -1247,7 +1248,7 @@ namespace app
             KnobRow r(4);
             r.Knob("attack", &n->globalTransient, -1.0f, 1.0f, "%+.2f", col, true);
             r.Knob("decay", &n->globalDecay, -1.0f, 1.0f, "%+.2f", col, true);
-            r.Knob("tune", &n->globalPitch, -24.0f, 24.0f, "%+.1f st", col, true);
+            r.Knob("tune", &n->globalPitch, params::DrumSequencer::global_pitch_lo, params::DrumSequencer::global_pitch_hi, "%+.1f st", col, true);
             r.Knob("pan", &n->globalPan, -1.0f, 1.0f, "%+.2f", col, true);
             r.End();
          }
@@ -1289,7 +1290,7 @@ namespace app
          }
          {
             KnobRow r(3);
-            r.Knob("velocity", &vel, 0.05f, 1.0f, "%.2f", col);
+            r.Knob("velocity", &vel, params::drum::vel_lo, params::drum::vel_hi, "%.2f", col);
             float pct = n->stepProb[lane][s] * 100.0f;
             const float before = n->stepProb[lane][s];
             r.Raw("chance", &pct, 0.0f, 100.0f, "%.0f%%", col);
@@ -1297,7 +1298,7 @@ namespace app
             UndoOnActivate(&n->stepProb[lane][s], before);
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Chance the hit plays each time round"));
-            r.Knob("nudge", &n->stepNudge[lane][s], -0.48f, 0.48f, "%+.2f", col, true);
+            r.Knob("nudge", &n->stepNudge[lane][s], params::DrumSequencer::step_nudge_lo, params::DrumSequencer::step_nudge_hi, "%+.2f", col, true);
             r.End();
          }
          SectionCard::Begin(T("Condition"));

@@ -1181,7 +1181,7 @@ namespace app
          std::string title;
          std::string code;
          std::vector<std::string> lines;
-         double copiedAt = -10.0;
+         double copiedAt = -10.0;   // ui-audit-ok: "never" time sentinel
       } sCodeView;
 
       void NewChat()
@@ -4623,7 +4623,7 @@ namespace app
          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
          ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_container);
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, tok::space_0_5));
-         ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, tok::chat_popup_border);
       }
 
       void EndMenuStyle() { ImGui::PopStyleVar(4); }
@@ -4827,7 +4827,7 @@ namespace app
       struct ComposerGeom
       {
          float padX = 0.0f, padV = 0.0f, tile = 24.0f, fieldW = 0.0f, wrapW = 0.0f, textH = 0.0f, chipsH = 0.0f, rowTop = 0.0f, rowH = 0.0f,
-               wellH = 0.0f, pickerH = 22.0f, totalH = 0.0f;
+               wellH = 0.0f, pickerH = tok::chat_composer_picker_h, totalH = 0.0f;
          int lines = 1;
       };
       ComposerGeom Geom(float width)

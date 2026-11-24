@@ -1,5 +1,6 @@
 // Filter, EQ, dynamics, delay, reverb and drive bodies + visualizers (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
@@ -457,8 +458,8 @@ namespace app
             PushUndoCheckpoint();
             *n->ParamPtr("type") = (float)i;
          });
-         row.Knob("freq", n->ParamPtr("freq"), 20.0f, 20000.0f, "%.0f Hz", kKnobLarge);
-         row.Knob("Q", n->ParamPtr("q"), 0.1f, 18.0f, "%.2f", kKnobLarge);
+         row.Knob("freq", n->ParamPtr("freq"), params::fx::freq_lo, params::fx::freq_hi, "%.0f Hz", kKnobLarge);
+         row.Knob("Q", n->ParamPtr("q"), params::fx::q_lo, params::fx::q_hi, "%.2f", kKnobLarge);
 
          // The analogue models have no gain; their cell is drive instead.
          // Drive has its own ordinal past every auto-numbered control here,
@@ -475,7 +476,7 @@ namespace app
             const bool gainLive = AudioFilterDsp::UsesGain(type);
             if (!gainLive)
                ImGui::BeginDisabled();
-            row.Knob("gain", n->ParamPtr("gain"), -24.0f, 24.0f, "%.1f dB", kKnobLarge);
+            row.Knob("gain", n->ParamPtr("gain"), params::fx::gain_lo, params::fx::gain_hi, "%.1f dB", kKnobLarge);
             if (!gainLive)
                ImGui::EndDisabled();
          }
@@ -867,10 +868,10 @@ namespace app
          PushUndoCheckpoint();
          *n->ParamPtr(kEqTypeParam[b]) = (float)i;
       });
-      row.Knob("freq", n->ParamPtr(kEqFreqParam[b]), 20.0f, 20000.0f, "%.0f Hz", kKnobLarge,
+      row.Knob("freq", n->ParamPtr(kEqFreqParam[b]), params::fx::freq_lo, params::fx::freq_hi, "%.0f Hz", kKnobLarge,
                /*dbTaper=*/false, /*freqTaper=*/false, AudioWidgetStyle::Knob, nullptr, nullptr,
                EqBandKnobParam(b, 0), kEqBandKnobName[b][0]);
-      row.Knob("Q", n->ParamPtr(kEqQParam[b]), 0.1f, 18.0f, "%.2f", kKnobLarge,
+      row.Knob("Q", n->ParamPtr(kEqQParam[b]), params::fx::q_lo, params::fx::q_hi, "%.2f", kKnobLarge,
                /*dbTaper=*/false, /*freqTaper=*/false, AudioWidgetStyle::Knob, nullptr, nullptr,
                EqBandKnobParam(b, 1), kEqBandKnobName[b][1]);
 
@@ -881,7 +882,7 @@ namespace app
       const bool greyGain = !EqDsp::UsesGain(type) && !gParamRegisterOnly;
       if (greyGain)
          ImGui::BeginDisabled();
-      row.Knob("gain", n->ParamPtr(kEqGainParam[b]), -24.0f, 24.0f, "%.1f dB", kKnobLarge,
+      row.Knob("gain", n->ParamPtr(kEqGainParam[b]), params::fx::gain_lo, params::fx::gain_hi, "%.1f dB", kKnobLarge,
                /*dbTaper=*/false, /*freqTaper=*/false, AudioWidgetStyle::Knob, nullptr, nullptr,
                EqBandKnobParam(b, 2), kEqBandKnobName[b][2]);
       if (greyGain)
@@ -1176,16 +1177,16 @@ namespace app
             PushUndoCheckpoint();
             *n->ParamPtr("style") = (float)i;
          });
-         row.Knob("threshold", n->ParamPtr("threshold"), -60.0f, 0.0f, "%.1f dB", kKnobLarge);
-         row.Knob("ratio", n->ParamPtr("ratio"), 1.0f, 20.0f, "%.1f:1", kKnobLarge);
-         row.Knob("attack", n->ParamPtr("attack"), 0.05f, 200.0f, "%.2f ms", kKnobLarge);
+         row.Knob("threshold", n->ParamPtr("threshold"), params::fx::threshold_lo, params::fx::threshold_hi, "%.1f dB", kKnobLarge);
+         row.Knob("ratio", n->ParamPtr("ratio"), params::fx::ratio_lo, params::fx::ratio_hi, "%.1f:1", kKnobLarge);
+         row.Knob("attack", n->ParamPtr("attack"), params::fx::attack_lo, params::fx::attack_hi, "%.2f ms", kKnobLarge);
          row.End();
       }
       {
          AudioKnobRow row(tok::fx_dynamics_body_audio_knob_row_layout, kKnobLarge);
          row.index++; // under the style dropdown
-         row.Knob("release", n->ParamPtr("release"), 5.0f, 2000.0f, "%.0f ms", kKnobLarge);
-         row.Knob("makeup", n->ParamPtr("makeup"), -12.0f, 24.0f, "%.1f dB", kKnobLarge);
+         row.Knob("release", n->ParamPtr("release"), params::fx::release_lo, params::fx::release_hi, "%.0f ms", kKnobLarge);
+         row.Knob("makeup", n->ParamPtr("makeup"), params::fx::makeup_lo, params::fx::makeup_hi, "%.1f dB", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
@@ -1256,10 +1257,10 @@ namespace app
 
       {
          AudioKnobRow row(tok::fx_limiter_body_audio_knob_row_layout);
-         row.Knob("threshold", n->ParamPtr("threshold"), -30.0f, 0.0f, "%.1f dB", kKnobLarge);
-         row.Knob("release", n->ParamPtr("release"), 5.0f, 1000.0f, "%.0f ms", kKnobLarge);
-         row.Knob("in gain", n->ParamPtr("inGain"), -12.0f, 24.0f, "%.1f dB");
-         row.Knob("out gain", n->ParamPtr("outGain"), -24.0f, 12.0f, "%.1f dB");
+         row.Knob("threshold", n->ParamPtr("threshold"), params::fx::threshold_2_lo, params::fx::threshold_2_hi, "%.1f dB", kKnobLarge);
+         row.Knob("release", n->ParamPtr("release"), params::fx::release_lo, params::fx::release_2_hi, "%.0f ms", kKnobLarge);
+         row.Knob("in gain", n->ParamPtr("inGain"), params::fx::in_gain_lo, params::fx::in_gain_hi, "%.1f dB");
+         row.Knob("out gain", n->ParamPtr("outGain"), params::fx::out_gain_lo, params::fx::out_gain_hi, "%.1f dB");
          row.End();
       }
 
@@ -1362,9 +1363,9 @@ namespace app
       {
          AudioKnobRow row(tok::fx_delay_body_audio_knob_row_layout);
          ImGui::BeginDisabled(sync && !gParamRegisterOnly);
-         row.Knob("time", n->ParamPtr("timeMs"), 1.0f, 2000.0f, "%.0f ms", kKnobLarge);
+         row.Knob("time", n->ParamPtr("timeMs"), params::fx::time_lo, params::fx::time_hi, "%.0f ms", kKnobLarge);
          ImGui::EndDisabled();
-         row.Knob("feedback", n->ParamPtr("feedback"), 0.0f, 110.0f, "%.0f%%", kKnobLarge);
+         row.Knob("feedback", n->ParamPtr("feedback"), params::fx::feedback_lo, params::fx::feedback_hi, "%.0f%%", kKnobLarge);
          row.Knob("tone", n->ParamPtr("tone"), -1.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
@@ -1521,13 +1522,13 @@ namespace app
       {
          AudioKnobRow row(tok::fx_reverb_body_audio_knob_row_layout);
          row.Knob("size", n->ParamPtr("size"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("decay", n->ParamPtr("decay"), 0.1f, 20.0f, "%.2f s", kKnobLarge);
+         row.Knob("decay", n->ParamPtr("decay"), params::fx::decay_lo, params::fx::decay_hi, "%.2f s", kKnobLarge);
          row.Knob("damping", n->ParamPtr("damping"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
       {
          AudioKnobRow row(tok::fx_reverb_body_audio_knob_row_layout);
-         row.Knob("predelay", n->ParamPtr("predelay"), 0.0f, 500.0f, "%.0f ms", kKnobLarge);
+         row.Knob("predelay", n->ParamPtr("predelay"), params::fx::predelay_lo, params::fx::predelay_hi, "%.0f ms", kKnobLarge);
          row.Knob("width", n->ParamPtr("width"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
@@ -1632,7 +1633,7 @@ namespace app
       // matching Dynamics/Delay/Reverb's grammar.
       {
          AudioKnobRow row(tok::fx_drive_body_audio_knob_row_layout);
-         row.Knob("drive", n->ParamPtr("drive"), 0.0f, 40.0f, "%.1f dB", kKnobLarge);
+         row.Knob("drive", n->ParamPtr("drive"), params::fx::drive_lo, params::fx::drive_hi, "%.1f dB", kKnobLarge);
          row.Knob("bias", n->ParamPtr("bias"), -1.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("tone", n->ParamPtr("tone"), -1.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
@@ -1640,7 +1641,7 @@ namespace app
       {
          AudioKnobRow row(tok::fx_drive_body_audio_knob_row_layout);
          row.Knob("color", n->ParamPtr("color"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("output", n->ParamPtr("output"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
+         row.Knob("output", n->ParamPtr("output"), params::fx::output_lo, params::fx::output_hi, "%.1f dB", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
@@ -1759,10 +1760,10 @@ namespace app
          const bool fbLive = routing == SaturatorDsp::kFeedback;
          if (!fbLive)
             ImGui::BeginDisabled();
-         row.Knob("feedback", n->ParamPtr("feedback"), 0.0f, 0.95f, "%.2f");
+         row.Knob("feedback", n->ParamPtr("feedback"), params::fx::feedback_2_lo, params::fx::feedback_2_hi, "%.2f");
          if (!fbLive)
             ImGui::EndDisabled();
-         row.Knob("output", n->ParamPtr("output"), -24.0f, 12.0f, "%.1f dB");
+         row.Knob("output", n->ParamPtr("output"), params::fx::output_lo, params::fx::output_hi, "%.1f dB");
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f");
          row.End();
       }
@@ -1902,7 +1903,7 @@ namespace app
             *n->ParamPtr("table") = (float)i;
          });
          row.Knob("position", n->ParamPtr("position"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("drive", n->ParamPtr("drive"), 0.0f, 24.0f, "%.1f dB", kKnobLarge);
+         row.Knob("drive", n->ParamPtr("drive"), params::fx::drive_2_lo, params::fx::drive_2_hi, "%.1f dB", kKnobLarge);
          row.Knob("stereo", n->ParamPtr("stereo"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
@@ -1910,7 +1911,7 @@ namespace app
          AudioKnobRow row(tok::fx_wavetable_shaper_body_audio_knob_row_layout);
          row.Knob("bias", n->ParamPtr("bias"), -1.0f, 1.0f, "%.2f", kKnobSmall);
          row.Knob("smooth", n->ParamPtr("smooth"), 0.0f, 1.0f, "%.2f", kKnobSmall);
-         row.Knob("output", n->ParamPtr("output"), -24.0f, 12.0f, "%.1f dB", kKnobSmall);
+         row.Knob("output", n->ParamPtr("output"), params::fx::output_lo, params::fx::output_hi, "%.1f dB", kKnobSmall);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobSmall);
          row.End();
       }
@@ -2024,9 +2025,9 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::fx_stereo_body_dummy_h));
 
       AudioKnobRow row(tok::fx_stereo_body_audio_knob_row_layout);
-      row.Knob("width", n->ParamPtr("width"), 0.0f, 2.0f, "%.2f", kKnobLarge);
+      row.Knob("width", n->ParamPtr("width"), params::fx::width_lo, params::fx::width_hi, "%.2f", kKnobLarge);
       row.Knob("pan", n->ParamPtr("pan"), -1.0f, 1.0f, "%.2f", kKnobLarge);
-      row.Knob("bass mono", n->ParamPtr("bassMono"), 0.0f, 500.0f, "%.0f Hz", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewBassMono);
+      row.Knob("bass mono", n->ParamPtr("bassMono"), params::fx::bass_mono_lo, params::fx::bass_mono_hi, "%.0f Hz", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewBassMono);
       row.End();
 
       EndAudioBody();
@@ -2087,11 +2088,11 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::fx_pitch_shift_body_dummy_h));
 
       AudioKnobRow row(tok::fx_pitch_shift_body_audio_knob_row_layout);
-      row.Knob("pitch", n->ParamPtr("pitch"), -24.0f, 24.0f, "%+.1f st", kKnobLarge);
+      row.Knob("pitch", n->ParamPtr("pitch"), params::fx::pitch_lo, params::fx::pitch_hi, "%+.1f st", kKnobLarge);
       {
          // Spectral mode has no grains: the knob would do nothing.
          ImGui::BeginDisabled(spectral && !gParamRegisterOnly);
-         row.Knob("grain", n->ParamPtr("grain"), 10.0f, 250.0f, "%.0f ms", kKnobLarge);
+         row.Knob("grain", n->ParamPtr("grain"), params::fx::grain_lo, params::fx::grain_hi, "%.0f ms", kKnobLarge);
          ImGui::EndDisabled();
       }
       row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);

@@ -3,6 +3,7 @@
 // tabs, strips (name, trim, pan, fader | meter, M S Ã), the master strip, group strips that fold
 // open, canvas-selection follow, and the empty state.
 #include "app/ui/design/UiFmt.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/PanelKit.h"
@@ -814,7 +815,7 @@ namespace app
          const float t = hi > lo ? (*v - lo) / (hi - lo) : 0.0f;
          const float ang = Lerp(a0, a1, t);
          // value arc, from the left stop (unipolar) or from the centre (bipolar)
-         const float from = bipolar ? Lerp(a0, a1, 0.5f) : a0;
+         const float from = bipolar ? Lerp(a0, a1, 0.5f) : a0;   // ui-audit-ok: midpoint of a bipolar range
          dl->PathArcTo(c, R + tok::mixer_pot_gap, a0, a1, tok::mixer_pot_segments);
          dl->PathStroke(Lo(tok::mixer_pot_lo_alpha_4), 0, tok::mixer_pot_stroke);
          if (std::fabs(ang - from) > 0.01f)
@@ -1017,7 +1018,7 @@ namespace app
          const float cell = cw * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(cx, y));
          float before = m->trimDb[s];
-         Pot("##trim", &m->trimDb[s], -24.0f, 24.0f, 0.0f, true, cell, col, T("TRIM"));
+         Pot("##trim", &m->trimDb[s], params::Mixer::trim_db_lo, params::Mixer::trim_db_hi, 0.0f, true, cell, col, T("TRIM"));
          UndoOnActivate(&m->trimDb[s], before);
          if (ImGui::IsItemHovered())
             HelpTip(T("%s %s"), T("Trim"), UiFmt::Tr(UiFmt::DbOffset(m->trimDb[s])).c);

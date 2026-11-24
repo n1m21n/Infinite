@@ -1,5 +1,6 @@
 // Field node parameter bodies and scopes (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "app/panels/FieldPatcherPanel.h"
@@ -344,9 +345,9 @@ namespace app
          }
       }
 
-      ModSliderInt("max elements", &n->maxElements, 100, 200000);
+      ModSliderInt("max elements", &n->maxElements, params::FieldElement::max_elements_lo, params::FieldElement::max_elements_hi);
       if (!n->input)
-         ModSliderInt("generate count", &n->generateCount, 1, 100000);
+         ModSliderInt("generate count", &n->generateCount, params::FieldElement::generate_count_lo, params::FieldElement::generate_count_hi);
 
       {
          bool publish = n->publishScalarOutput;
@@ -436,8 +437,8 @@ namespace app
       if (!n->valueMode || gParamRegisterOnly)
       {
          DropdownButton("topology", kTopologies, n->topology, [n](int i) { n->topology = i; });
-         ModSliderInt("count", &n->count, 1, 100000);
-         ModSliderInt("max elements", &n->maxElements, 100, 200000);
+         ModSliderInt("count", &n->count, params::FieldPrimitive::count_lo, params::FieldPrimitive::count_hi);
+         ModSliderInt("max elements", &n->maxElements, params::FieldPrimitive::max_elements_lo, params::FieldPrimitive::max_elements_hi);
       }
 
       if (!n->valueMode || gParamRegisterOnly)
@@ -611,7 +612,7 @@ namespace app
 
       {
          int voices = n->maxVoices;
-         if (ModSliderInt("voices", &voices, 1, 16))
+         if (ModSliderInt("voices", &voices, params::field_params::voices_lo, params::field_params::voices_hi))
          {
             n->maxVoices = voices;
          }
@@ -685,7 +686,7 @@ namespace app
 
       {
          int root = n->root;
-         if (ModSliderInt("root", &root, 0, 11))
+         if (ModSliderInt("root", &root, params::field_params::root_lo, params::field_params::root_hi))
             n->root = root;
          int scale = n->scale;
          if (ModSliderInt("scale", &scale, 0, MusicTime::kNumScaleTypes - 1))
@@ -835,8 +836,8 @@ namespace app
          n->domain = i;
          n->Apply();
       });
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModSlider("width", &n->width, params::FieldPixel::width_lo, params::FieldPixel::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::FieldPixel::height_lo, params::FieldPixel::height_hi, "%.0f");
       ModCheckbox("animate", &n->animate);
 
       {

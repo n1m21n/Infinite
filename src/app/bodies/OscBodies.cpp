@@ -1,5 +1,6 @@
 // Oscillator, wavetable, ADSR, equation and spectral-synth bodies (moved verbatim from main.cpp).
 #include "app/ui/design/components/EmptyState.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/TokenColors.h"
@@ -1254,14 +1255,14 @@ namespace app
          y += rowH;
       }
       ImGui::SetCursorScreenPos(ImVec2(fieldsX, y));
-      AudioSlider("attack", attackMs, 0.0f, 4000.0f, "%.0f ms", halfW, SkewAttack100Taper::PosToValue, SkewAttack100Taper::ValueToPos);
+      AudioSlider("attack", attackMs, params::osc::attack_lo, params::osc::attack_hi, "%.0f ms", halfW, SkewAttack100Taper::PosToValue, SkewAttack100Taper::ValueToPos);
       ImGui::SameLine();
-      AudioSlider("decay", decayMs, 0.0f, 4000.0f, "%.0f ms", halfW, SkewDecay300Taper::PosToValue, SkewDecay300Taper::ValueToPos);
+      AudioSlider("decay", decayMs, params::osc::decay_lo, params::osc::decay_hi, "%.0f ms", halfW, SkewDecay300Taper::PosToValue, SkewDecay300Taper::ValueToPos);
       y += rowH;
       ImGui::SetCursorScreenPos(ImVec2(fieldsX, y));
       AudioSlider("sustain", sustain, 0.0f, 1.0f, "%.3f", halfW);
       ImGui::SameLine();
-      AudioSlider("release", releaseMs, 0.0f, 4000.0f, "%.0f ms", halfW, SkewRelease400Taper::PosToValue, SkewRelease400Taper::ValueToPos);
+      AudioSlider("release", releaseMs, params::osc::release_lo, params::osc::release_hi, "%.0f ms", halfW, SkewRelease400Taper::PosToValue, SkewRelease400Taper::ValueToPos);
 
       // Close the row at whichever side is taller, so EndAudioSection measures
       // the panel rather than just the field stack.
@@ -1335,15 +1336,15 @@ namespace app
             SetAudioReadout("wavetable", Wavetable::TableName(eng.table));
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + onW + gap + tableW + gap, y));
-         AudioSlider("fine", &eng.fine, -50.0f, 50.0f, "%.1f c", fineW);
+         AudioSlider("fine", &eng.fine, params::osc::fine_lo, params::osc::fine_hi, "%.1f c", fineW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
-         AudioBareDropdown("wtOct", OctaveNames(), eng.octave + 4,
-                           [&eng](int i) { PushUndoCheckpoint(); eng.octave = i - 4; }, octW);
+         AudioBareDropdown("wtOct", OctaveNames(), eng.octave - params::osc::octave_lo,
+                           [&eng](int i) { PushUndoCheckpoint(); eng.octave = i + params::osc::octave_lo; }, octW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
-         AudioBareDropdown("wtSemi", SemiNames(), eng.semi + 12,
-                           [&eng](int i) { PushUndoCheckpoint(); eng.semi = i - 12; }, semiW);
+         AudioBareDropdown("wtSemi", SemiNames(), eng.semi - params::osc::semi_lo,
+                           [&eng](int i) { PushUndoCheckpoint(); eng.semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
@@ -1366,7 +1367,7 @@ namespace app
          row.Knob("position", &eng.position, 0.0f, 1.0f, "%.3f");
          row.KnobInt("unison", &eng.unison, 1, WavetableNode::kMaxUnison);
          ImGui::BeginDisabled((eng.unison <= 1) && !gParamRegisterOnly);
-         row.Knob("detune", &eng.detune, 0.0f, 100.0f, "%.1f c");
+         row.Knob("detune", &eng.detune, params::osc::detune_lo, params::osc::detune_hi, "%.1f c");
          ImGui::EndDisabled();
          row.End();
       }
@@ -1377,7 +1378,7 @@ namespace app
 
          row.DropdownKnob("wtFilter", SynthModes::FilterTypeList(), eng.filterType,
                           [&eng](int i) { PushUndoCheckpoint(); eng.filterType = i; },
-                          "filter", &eng.cutoff, 20.0f, 18000.0f, "%.0f Hz", filterOff);
+                          "filter", &eng.cutoff, params::osc::cutoff_lo, params::osc::cutoff_hi, "%.0f Hz", filterOff);
          row.DropdownKnob("wtWarp", SynthModes::WarpModeList(e), eng.warpMode,
                           [&eng](int i) { PushUndoCheckpoint(); eng.warpMode = i; },
                           "warp", &eng.warpAmount, 0.0f, 1.0f, "%.3f", warpOff);
@@ -1397,7 +1398,7 @@ namespace app
          ImGui::SameLine();
          if (!ratioLive)
             ImGui::BeginDisabled();
-         AudioSlider("warp ratio", &eng.warpRatio, 0.25f, 16.0f, "%.2f", AudioHalfWidth());
+         AudioSlider("warp ratio", &eng.warpRatio, params::osc::warp_ratio_lo, params::osc::warp_ratio_hi, "%.2f", AudioHalfWidth());
          if (!ratioLive)
             ImGui::EndDisabled();
          AudioSlider("stereo width", &eng.stereoWidth, 0.0f, 1.0f, "%.3f", AudioHalfWidth());
@@ -1478,23 +1479,23 @@ namespace app
          // rather than hidden so the row never reflows (§5).
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->frequency, 20.0f, 8000.0f, "%.0f Hz");
+         row.Knob("freq", &n->frequency, params::Wavetable::frequency_lo, params::Wavetable::frequency_hi, "%.0f Hz");
          if (noteDriven)
             ImGui::EndDisabled();
-         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
+         row.Knob("glide", &n->glide, params::Wavetable::glide_lo, params::Wavetable::glide_hi, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
          // This knob is the manual/global bend - a Pitch Bend node wired
          // into the note chain upstream doesn't touch it at all, it rides
          // in on each note's own bendSemitones field instead (see
          // NoteEvent.h) and adds additively with whatever this knob is set
          // to. Drag this one directly for a bend with nothing patched.
-         row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
+         row.Knob("bend", &n->pitchBend, params::Wavetable::pitch_bend_lo, params::Wavetable::pitch_bend_hi, "%+.2f st");
          // fmMode picks phase modulation (cheap, always-stable sideband FM)
          // vs linear through-zero FM (DX7/Serum/Operator-style, can self-
          // modulate harder and run the carrier backward at high depth) - the
          // depth knob's meaning depends on it, so they read as one control.
          row.DropdownKnob("wtFmMode", { "pm", "fm" }, n->fmMode,
                           [n](int i) { PushUndoCheckpoint(); n->fmMode = i; },
-                          "fm depth", &n->fmDepth, 0.0f, 2.0f, "%.2f");
+                          "fm depth", &n->fmDepth, params::Wavetable::fm_depth_lo, params::Wavetable::fm_depth_hi, "%.2f");
          row.End();
       }
       EndAudioSection();
@@ -1652,15 +1653,15 @@ namespace app
                            [n](int i) { PushUndoCheckpoint(); n->waveform = i; }, waveW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + waveW + gap, y));
-         AudioSlider("fine", &eng.fine, -50.0f, 50.0f, "%.1f c", fineW);
+         AudioSlider("fine", &eng.fine, params::osc::fine_lo, params::osc::fine_hi, "%.1f c", fineW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
-         AudioBareDropdown("oscOct", OctaveNames(), eng.octave + 4,
-                           [&eng](int i) { PushUndoCheckpoint(); eng.octave = i - 4; }, octW);
+         AudioBareDropdown("oscOct", OctaveNames(), eng.octave - params::osc::octave_lo,
+                           [&eng](int i) { PushUndoCheckpoint(); eng.octave = i + params::osc::octave_lo; }, octW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
-         AudioBareDropdown("oscSemi", SemiNames(), eng.semi + 12,
-                           [&eng](int i) { PushUndoCheckpoint(); eng.semi = i - 12; }, semiW);
+         AudioBareDropdown("oscSemi", SemiNames(), eng.semi - params::osc::semi_lo,
+                           [&eng](int i) { PushUndoCheckpoint(); eng.semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
@@ -1678,7 +1679,7 @@ namespace app
          row.Knob("phase", &eng.phase, 0.0f, 1.0f, "%.3f");
          row.KnobInt("unison", &eng.unison, 1, OscillatorNode::kMaxUnison);
          ImGui::BeginDisabled((eng.unison <= 1) && !gParamRegisterOnly);
-         row.Knob("detune", &eng.detune, 0.0f, 100.0f, "%.1f c");
+         row.Knob("detune", &eng.detune, params::osc::detune_lo, params::osc::detune_hi, "%.1f c");
          ImGui::EndDisabled();
          row.End();
       }
@@ -1688,11 +1689,11 @@ namespace app
 
          row.DropdownKnob("oscFilter", SynthModes::FilterTypeList(), eng.filterType,
                           [&eng](int i) { PushUndoCheckpoint(); eng.filterType = i; },
-                          "filter", &eng.cutoff, 20.0f, 18000.0f, "%.0f Hz", filterOff);
+                          "filter", &eng.cutoff, params::osc::cutoff_lo, params::osc::cutoff_hi, "%.0f Hz", filterOff);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
          row.Knob("reso", &eng.resonance, 0.0f, 1.0f, "%.3f");
          ImGui::EndDisabled();
-         row.Knob("sync", &eng.warpRatio, 1.0f, 16.0f, "%.2f");
+         row.Knob("sync", &eng.warpRatio, 1.0f, params::osc::warp_ratio_hi, "%.2f");
          row.Knob("pan", &eng.pan, -1.0f, 1.0f, "%.2f");
          row.End();
       }
@@ -1712,16 +1713,16 @@ namespace app
          AudioKnobRow row(tok::osc_oscillator_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->frequency, 20.0f, 8000.0f, "%.0f Hz");
+         row.Knob("freq", &n->frequency, params::Oscillator::frequency_lo, params::Oscillator::frequency_hi, "%.0f Hz");
          if (noteDriven)
             ImGui::EndDisabled();
-         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide150);
-         row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
+         row.Knob("glide", &n->glide, params::Oscillator::glide_lo, params::Oscillator::glide_hi, "%.2f s", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide150);
+         row.Knob("bend", &n->pitchBend, params::Oscillator::pitch_bend_lo, params::Oscillator::pitch_bend_hi, "%+.2f st");
          // fmMode picks phase modulation vs linear through-zero FM - see the
          // Wavetable master row's identical control for why they're paired.
          row.DropdownKnob("oscFmMode", { "pm", "fm" }, n->fmMode,
                           [n](int i) { PushUndoCheckpoint(); n->fmMode = i; },
-                          "fm depth", &n->fmDepth, 0.0f, 2.0f, "%.2f");
+                          "fm depth", &n->fmDepth, params::Oscillator::fm_depth_lo, params::Oscillator::fm_depth_hi, "%.2f");
          row.End();
       }
       EndAudioSection();
@@ -1761,15 +1762,15 @@ namespace app
                            }, matW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + matW + gap, y));
-         AudioSlider("fine", &n->fine, -50.0f, 50.0f, "%.1f c", fineW);
+         AudioSlider("fine", &n->fine, params::Metallic::fine_lo, params::Metallic::fine_hi, "%.1f c", fineW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
-         AudioBareDropdown("metalOct", OctaveNames(), n->octave + 4,
-                           [n](int i) { PushUndoCheckpoint(); n->octave = i - 4; }, octW);
+         AudioBareDropdown("metalOct", OctaveNames(), n->octave - params::osc::octave_lo,
+                           [n](int i) { PushUndoCheckpoint(); n->octave = i + params::osc::octave_lo; }, octW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
-         AudioBareDropdown("metalSemi", SemiNames(), n->semi + 12,
-                           [n](int i) { PushUndoCheckpoint(); n->semi = i - 12; }, semiW);
+         AudioBareDropdown("metalSemi", SemiNames(), n->semi - params::osc::semi_lo,
+                           [n](int i) { PushUndoCheckpoint(); n->semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
@@ -1798,9 +1799,9 @@ namespace app
       BeginAudioSection("physical acoustics");
       {
          AudioKnobRow row(tok::osc_metallic_body_audio_knob_row_layout);
-         row.Knob("transient", &n->transient, 0.05f, 2.0f, "%.2f");
-         row.Knob("decay", &n->decay, 0.05f, 10.0f, "%.2f s");
-         row.Knob("stiffness", &n->stiffness, 0.0f, 2.0f, "%.2f");
+         row.Knob("transient", &n->transient, params::Metallic::transient_lo, params::Metallic::transient_hi, "%.2f");
+         row.Knob("decay", &n->decay, params::Metallic::decay_lo, params::Metallic::decay_hi, "%.2f s");
+         row.Knob("stiffness", &n->stiffness, params::Metallic::stiffness_lo, params::Metallic::stiffness_hi, "%.2f");
          row.Knob("width", &n->width, 0.0f, 1.0f, "%.2f");
          row.End();
       }
@@ -1817,12 +1818,12 @@ namespace app
          row.DropdownKnob("metalFilter", MetallicDsp::FilterModeDisplayList(),
                           MetallicDsp::FilterModeToDisplayIndex(n->filterType),
                           [n](int displayIdx) { PushUndoCheckpoint(); n->filterType = MetallicDsp::DisplayIndexToFilterMode(displayIdx); },
-                          "filter", &n->filterCutoff, 20.0f, 18000.0f, "%.0f Hz", filterOff);
+                          "filter", &n->filterCutoff, params::Metallic::filter_cutoff_lo, params::Metallic::filter_cutoff_hi, "%.0f Hz", filterOff);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
          row.Knob("reso", &n->filterResonance, 0.0f, 1.0f, "%.2f");
          ImGui::EndDisabled();
          row.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
-         row.Knob("volume", &n->volume, 0.0f, 2.0f, "%.2f");
+         row.Knob("volume", &n->volume, params::Metallic::volume_lo, params::Metallic::volume_hi, "%.2f");
          row.End();
       }
       EndAudioSection();
@@ -1835,7 +1836,7 @@ namespace app
          AudioKnobRow row(tok::osc_metallic_body_audio_knob_row_layout_2);
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->frequency, 20.0f, 4000.0f, "%.0f Hz");
+         row.Knob("freq", &n->frequency, params::Metallic::frequency_lo, params::Metallic::frequency_hi, "%.0f Hz");
          if (noteDriven)
             ImGui::EndDisabled();
          row.Knob("glide", &n->glide, 0.0f, 1.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
@@ -1936,10 +1937,10 @@ namespace app
             const ImVec2 rowTop = ImGui::GetCursorScreenPos();
             const float levelX = rowTop.x + sliderW + gap + checkW + gap;
             if (op.fixed)
-               AudioSlider("freq", &op.freq, 1.0f, 8000.0f, "%.0f Hz", sliderW, FrequencyTaper::PosToValue,
+               AudioSlider("freq", &op.freq, params::osc::freq_lo, params::osc::freq_hi, "%.0f Hz", sliderW, FrequencyTaper::PosToValue,
                            FrequencyTaper::ValueToPos);
             else
-               AudioSlider("ratio", &op.ratio, 0.5f, 16.0f, "%.2f", sliderW);
+               AudioSlider("ratio", &op.ratio, params::osc::ratio_lo, params::osc::ratio_hi, "%.2f", sliderW);
             // Every cell is placed from the row's own origin, so each operator lines up exactly.
             ImGui::SetCursorScreenPos(ImVec2(rowTop.x + sliderW + gap, rowTop.y));
             ModCheckbox("fixed", &op.fixed);
@@ -2042,17 +2043,17 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::osc_partials_body_dummy_h));
       {
          AudioKnobRow row(tok::osc_partials_body_audio_knob_row_layout);
-         row.Knob("pitch", &n->pitch, -24.0f, 24.0f, "%+.1f st");
-         row.Knob("formant", &n->formant, -12.0f, 12.0f, "%+.1f st");
-         row.Knob("partials", &n->partials, 1.0f, 48.0f, "%.0f");
+         row.Knob("pitch", &n->pitch, params::Partials::pitch_lo, params::Partials::pitch_hi, "%+.1f st");
+         row.Knob("formant", &n->formant, params::Partials::formant_lo, params::Partials::formant_hi, "%+.1f st");
+         row.Knob("partials", &n->partials, params::Partials::partials_lo, params::Partials::partials_hi, "%.0f");
          row.Knob("morph", &n->morph, 0.0f, 1.0f, "%.2f");
          row.End();
       }
       {
          AudioKnobRow row(tok::osc_partials_body_audio_knob_row_layout);
-         row.Knob("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
-         row.Knob("noise", &n->noise, 0.0f, 2.0f, "%.2f");
-         row.Knob("release", &n->release, 1.0f, 5000.0f, "%.0f ms", kKnobSmall, false, false,
+         row.Knob("speed", &n->speed, params::Partials::speed_lo, params::Partials::speed_hi, "%.2fx");
+         row.Knob("noise", &n->noise, params::Partials::noise_lo, params::Partials::noise_hi, "%.2f");
+         row.Knob("release", &n->release, params::Partials::release_lo, params::Partials::release_hi, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
          row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
@@ -2099,7 +2100,7 @@ namespace app
             PushUndoCheckpoint();
             n->exciter = i;
          });
-         row.Knob("position", &n->position, 0.02f, 0.5f, "%.2f");
+         row.Knob("position", &n->position, params::String::position_lo, params::String::position_hi, "%.2f");
          row.Knob("stiffness", &n->stiffness, 0.0f, 1.0f, "%.2f");
          row.End();
       }
@@ -2115,8 +2116,8 @@ namespace app
       }
       {
          AudioKnobRow row(tok::osc_string_body_audio_knob_row_layout);
-         row.Knob("decay", &n->decay, 0.05f, 20.0f, "%.2f s");
-         row.Knob("release", &n->release, 1.0f, 5000.0f, "%.0f ms", kKnobSmall, false, false,
+         row.Knob("decay", &n->decay, params::String::decay_lo, params::String::decay_hi, "%.2f s");
+         row.Knob("release", &n->release, params::String::release_lo, params::String::release_hi, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
          row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
@@ -2200,8 +2201,8 @@ namespace app
       {
          AudioKnobRow row(tok::osc_wind_body_audio_knob_row_layout);
          row.Knob("vibrato", &n->vibrato, 0.0f, 1.0f, "%.2f");
-         row.Knob("attack", &n->attack, 1.0f, 2000.0f, "%.0f ms");
-         row.Knob("release", &n->release, 1.0f, 5000.0f, "%.0f ms", kKnobSmall, false, false,
+         row.Knob("attack", &n->attack, params::Wind::attack_lo, params::Wind::attack_hi, "%.0f ms");
+         row.Knob("release", &n->release, params::Wind::release_lo, params::Wind::release_hi, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
          row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
@@ -2270,7 +2271,7 @@ namespace app
          AudioKnobRow row(tok::osc_piano_body_audio_knob_row_layout_2);
          row.Knob(electric ? "bell" : "stiffness", &n->stiffness, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "stiffness");
          row.Knob(electric ? "speaker" : "body", &n->body, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "body");
-         row.Knob("release", &n->release, 10.0f, 2000.0f, "%.0f ms", kKnobSmall, false, false,
+         row.Knob("release", &n->release, params::Piano::release_lo, params::Piano::release_hi, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
          row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
@@ -2370,15 +2371,15 @@ namespace app
          ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h));
          const float y2 = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
-         AudioSlider("fine", &n->fine, -50.0f, 50.0f, "%.1f c", fineW);
+         AudioSlider("fine", &n->fine, params::WaveTerrain::fine_lo, params::WaveTerrain::fine_hi, "%.1f c", fineW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y2));
-         AudioBareDropdown("wtOct", OctaveNames(), n->octave + 4,
-                           [n](int i) { PushUndoCheckpoint(); n->octave = i - 4; }, octW);
+         AudioBareDropdown("wtOct", OctaveNames(), n->octave - params::osc::octave_lo,
+                           [n](int i) { PushUndoCheckpoint(); n->octave = i + params::osc::octave_lo; }, octW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y2));
-         AudioBareDropdown("wtSemi", SemiNames(), n->semi + 12,
-                           [n](int i) { PushUndoCheckpoint(); n->semi = i - 12; }, semiW);
+         AudioBareDropdown("wtSemi", SemiNames(), n->semi - params::osc::semi_lo,
+                           [n](int i) { PushUndoCheckpoint(); n->semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
@@ -2475,16 +2476,16 @@ namespace app
          AudioKnobRow row1(tok::osc_wave_terrain_body_audio_knob_row_layout);
          row1.Knob("centerX", &n->centerX, 0.0f, 1.0f, "%.2f");
          row1.Knob("centerY", &n->centerY, 0.0f, 1.0f, "%.2f");
-         row1.Knob("radiusX", &n->radiusX, 0.01f, 1.0f, "%.2f");
-         row1.Knob("radiusY", &n->radiusY, 0.01f, 1.0f, "%.2f");
+         row1.Knob("radiusX", &n->radiusX, params::WaveTerrain::radius_x_lo, params::WaveTerrain::radius_x_hi, "%.2f");
+         row1.Knob("radiusY", &n->radiusY, params::WaveTerrain::radius_y_lo, params::WaveTerrain::radius_y_hi, "%.2f");
          row1.End();
 
          ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h_3));
          AudioKnobRow row2(tok::osc_wave_terrain_body_audio_knob_row_layout);
-         row2.Knob("ratioA", &n->ratioA, 1.0f, 16.0f, "%.0f");
-         row2.Knob("ratioB", &n->ratioB, 1.0f, 16.0f, "%.0f");
-         row2.Knob("rotation", &n->rotation, 0.0f, 360.0f, "%.0f deg");
-         row2.Knob("speed", &n->scanSpeed, -4.0f, 4.0f, "%.2f");
+         row2.Knob("ratioA", &n->ratioA, params::WaveTerrain::ratio_a_lo, params::WaveTerrain::ratio_a_hi, "%.0f");
+         row2.Knob("ratioB", &n->ratioB, params::WaveTerrain::ratio_b_lo, params::WaveTerrain::ratio_b_hi, "%.0f");
+         row2.Knob("rotation", &n->rotation, params::WaveTerrain::rotation_lo, params::WaveTerrain::rotation_hi, "%.0f deg");
+         row2.Knob("speed", &n->scanSpeed, params::WaveTerrain::scan_speed_lo, params::WaveTerrain::scan_speed_hi, "%.2f");
          row2.End();
       }
       EndAudioSection();
@@ -2495,11 +2496,11 @@ namespace app
       BeginAudioSection("voice & filter");
       {
          AudioKnobRow row1(tok::osc_wave_terrain_body_audio_knob_row_layout);
-         row1.Knob("volume", &n->volume, 0.0f, 2.0f, "%.2f");
+         row1.Knob("volume", &n->volume, params::WaveTerrain::volume_lo, params::WaveTerrain::volume_hi, "%.2f");
          row1.Knob("pan", &n->pan, -1.0f, 1.0f, "%.2f");
          row1.KnobInt("unison", &n->unison, 1, WaveTerrainNode::kMaxUnison);
          ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
-         row1.Knob("detune", &n->detune, 0.0f, 100.0f, "%.1f c");
+         row1.Knob("detune", &n->detune, params::WaveTerrain::detune_lo, params::WaveTerrain::detune_hi, "%.1f c");
          ImGui::EndDisabled();
          row1.End();
 
@@ -2508,7 +2509,7 @@ namespace app
          AudioKnobRow row2(tok::osc_wave_terrain_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row2.DropdownKnob("wtFilter", WaveTerrainNode::FilterTypeNames(), n->filterType,
                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
-                          "cutoff", &n->cutoff, 20.0f, 20000.0f, "%.0f Hz", filterOff);
+                          "cutoff", &n->cutoff, params::WaveTerrain::cutoff_lo, params::WaveTerrain::cutoff_hi, "%.0f Hz", filterOff);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
          row2.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f");
          ImGui::EndDisabled();
@@ -2534,10 +2535,10 @@ namespace app
          AudioKnobRow row(tok::osc_wave_terrain_body_audio_knob_row_layout_2);
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->frequency, 20.0f, 4000.0f, "%.0f Hz");
+         row.Knob("freq", &n->frequency, params::WaveTerrain::frequency_lo, params::WaveTerrain::frequency_hi, "%.0f Hz");
          if (noteDriven)
             ImGui::EndDisabled();
-         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
+         row.Knob("glide", &n->glide, params::WaveTerrain::glide_lo, params::WaveTerrain::glide_hi, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
          row.End();
       }
       EndAudioSection();
@@ -2698,15 +2699,15 @@ namespace app
          ImGui::Dummy(ImVec2(0.0f, tok::osc_equation_body_dummy_h));
          const float y2 = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
-         AudioSlider("fine", &n->fine, -50.0f, 50.0f, "%.1f c", fineW);
+         AudioSlider("fine", &n->fine, params::Equation::fine_lo, params::Equation::fine_hi, "%.1f c", fineW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y2));
-         AudioBareDropdown("eqOct", OctaveNames(), n->octave + 4,
-                           [n](int i) { PushUndoCheckpoint(); n->octave = i - 4; }, octW);
+         AudioBareDropdown("eqOct", OctaveNames(), n->octave - params::osc::octave_lo,
+                           [n](int i) { PushUndoCheckpoint(); n->octave = i + params::osc::octave_lo; }, octW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y2));
-         AudioBareDropdown("eqSemi", SemiNames(), n->semi + 12,
-                           [n](int i) { PushUndoCheckpoint(); n->semi = i - 12; }, semiW);
+         AudioBareDropdown("eqSemi", SemiNames(), n->semi - params::osc::semi_lo,
+                           [n](int i) { PushUndoCheckpoint(); n->semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
@@ -2750,11 +2751,11 @@ namespace app
       BeginAudioSection("voice & filter");
       {
          AudioKnobRow row1(tok::osc_equation_body_audio_knob_row_layout);
-         row1.Knob("volume", &n->volume, 0.0f, 2.0f, "%.2f");
+         row1.Knob("volume", &n->volume, params::Equation::volume_lo, params::Equation::volume_hi, "%.2f");
          row1.Knob("pan", &n->pan, -1.0f, 1.0f, "%.2f");
          row1.KnobInt("unison", &n->unison, 1, EquationNode::kMaxUnison);
          ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
-         row1.Knob("detune", &n->detune, 0.0f, 100.0f, "%.1f c");
+         row1.Knob("detune", &n->detune, params::Equation::detune_lo, params::Equation::detune_hi, "%.1f c");
          ImGui::EndDisabled();
          row1.End();
 
@@ -2763,7 +2764,7 @@ namespace app
          AudioKnobRow row2(tok::osc_equation_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row2.DropdownKnob("eqFilter", EquationNode::FilterTypeNames(), n->filterType,
                            [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
-                           "cutoff", &n->cutoff, 20.0f, 20000.0f, "%.0f Hz", filterOff);
+                           "cutoff", &n->cutoff, params::Equation::cutoff_lo, params::Equation::cutoff_hi, "%.0f Hz", filterOff);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
          row2.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f");
          ImGui::EndDisabled();
@@ -2861,15 +2862,15 @@ namespace app
          const float gap = tok::space_1;
          const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         AudioSlider("fine", &n->fine, -50.0f, 50.0f, "%.1f c", fineW);
+         AudioSlider("fine", &n->fine, params::ImageSpectralSynth::fine_lo, params::ImageSpectralSynth::fine_hi, "%.1f c", fineW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
-         AudioBareDropdown("specOct", OctaveNames(), n->octave + 4,
-                           [n](int i) { PushUndoCheckpoint(); n->octave = i - 4; }, octW);
+         AudioBareDropdown("specOct", OctaveNames(), n->octave - params::osc::octave_lo,
+                           [n](int i) { PushUndoCheckpoint(); n->octave = i + params::osc::octave_lo; }, octW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
-         AudioBareDropdown("specSemi", SemiNames(), n->semi + 12,
-                           [n](int i) { PushUndoCheckpoint(); n->semi = i - 12; }, semiW);
+         AudioBareDropdown("specSemi", SemiNames(), n->semi - params::osc::semi_lo,
+                           [n](int i) { PushUndoCheckpoint(); n->semi = i + params::osc::semi_lo; }, semiW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
@@ -2998,10 +2999,10 @@ namespace app
          }
          else
          {
-            row.Knob("speed", &n->scanSpeed, 0.05f, 10.0f, "%.2fx");
+            row.Knob("speed", &n->scanSpeed, params::ImageSpectralSynth::scan_speed_lo, params::ImageSpectralSynth::scan_speed_hi, "%.2fx");
          }
-         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
-         row.Knob("width", &n->stereoWidth, 0.0f, 2.0f, "%.2f");
+         row.Knob("glide", &n->glide, params::ImageSpectralSynth::glide_lo, params::ImageSpectralSynth::glide_hi, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
+         row.Knob("width", &n->stereoWidth, params::ImageSpectralSynth::stereo_width_lo, params::ImageSpectralSynth::stereo_width_hi, "%.2f");
          row.End();
       }
       EndAudioSection();
@@ -3056,20 +3057,20 @@ namespace app
          // Row 3 Knobs: Frequency Boundaries & Pitch
          ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h));
          AudioKnobRow row1(tok::osc_image_spectral_synth_body_audio_knob_row_layout_2);
-         row1.Knob("minHz", &n->minFreq, 20.0f, 2000.0f, "%.0f Hz");
-         row1.Knob("maxHz", &n->maxFreq, 500.0f, 20000.0f, "%.0f Hz");
-         row1.Knob("rootHz", &n->rootFreq, 20.0f, 2000.0f, "%.0f Hz");
+         row1.Knob("minHz", &n->minFreq, params::ImageSpectralSynth::min_freq_lo, params::ImageSpectralSynth::min_freq_hi, "%.0f Hz");
+         row1.Knob("maxHz", &n->maxFreq, params::ImageSpectralSynth::max_freq_lo, params::ImageSpectralSynth::max_freq_hi, "%.0f Hz");
+         row1.Knob("rootHz", &n->rootFreq, params::ImageSpectralSynth::root_freq_lo, params::ImageSpectralSynth::root_freq_hi, "%.0f Hz");
          row1.KnobInt("unison", &n->unison, 1, ImageSpectralSynthNode::kMaxUnison);
          row1.End();
 
          // Row 4 Knobs: Conditioning & Gain
          ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h_3));
          AudioKnobRow row2(tok::osc_image_spectral_synth_body_audio_knob_row_layout_2);
-         row2.Knob("gain", &n->brightness, 0.0f, 3.0f, "%.2f");
-         row2.Knob("thresh", &n->threshold, 0.0f, 0.5f, "%.2f");
-         row2.Knob("contrast", &n->contrast, 0.2f, 4.0f, "%.2f");
+         row2.Knob("gain", &n->brightness, params::ImageSpectralSynth::brightness_lo, params::ImageSpectralSynth::brightness_hi, "%.2f");
+         row2.Knob("thresh", &n->threshold, params::ImageSpectralSynth::threshold_lo, params::ImageSpectralSynth::threshold_hi, "%.2f");
+         row2.Knob("contrast", &n->contrast, params::ImageSpectralSynth::contrast_lo, params::ImageSpectralSynth::contrast_hi, "%.2f");
          ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
-         row2.Knob("detune", &n->detune, 0.0f, 50.0f, "%.1f c");
+         row2.Knob("detune", &n->detune, params::ImageSpectralSynth::detune_lo, params::ImageSpectralSynth::detune_hi, "%.1f c");
          ImGui::EndDisabled();
          row2.End();
       }
@@ -3081,10 +3082,10 @@ namespace app
       BeginAudioSection("voice & filter");
       {
          AudioKnobRow row1(tok::osc_image_spectral_synth_body_audio_knob_row_layout_2);
-         row1.Knob("volume", &n->volume, 0.0f, 2.0f, "%.2f");
+         row1.Knob("volume", &n->volume, params::ImageSpectralSynth::volume_lo, params::ImageSpectralSynth::volume_hi, "%.2f");
          row1.Knob("pan", &n->pan, -1.0f, 1.0f, "%.2f");
          row1.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
-         row1.Knob("fine", &n->fine, -50.0f, 50.0f, "%.1f c");
+         row1.Knob("fine", &n->fine, params::ImageSpectralSynth::fine_lo, params::ImageSpectralSynth::fine_hi, "%.1f c");
          row1.End();
 
          ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h_3));
@@ -3092,7 +3093,7 @@ namespace app
          AudioKnobRow row2(tok::osc_image_spectral_synth_body_audio_knob_row_layout_2, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row2.DropdownKnob("specFilter", ImageSpectralSynthNode::FilterTypeNames(), n->filterType,
                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
-                          "cutoff", &n->cutoff, 20.0f, 20000.0f, "%.0f Hz", filterOff);
+                          "cutoff", &n->cutoff, params::ImageSpectralSynth::cutoff_lo, params::ImageSpectralSynth::cutoff_hi, "%.0f Hz", filterOff);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
          row2.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f");
          ImGui::EndDisabled();

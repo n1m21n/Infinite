@@ -17,12 +17,12 @@ class Scene2DNode;
 namespace app
 {
    // Every node renders its output at this size, square, above its params.
-   inline const float kPreviewSize = 190.0f;
+   inline const float kPreviewSize = tok::node_preview_size;
 
 
    // Render 3D's preview is a viewport you actually work in - orbiting and
    // framing a scene through a thumbnail is not workable.
-   inline const float kViewportSize = 340.0f;
+   inline const float kViewportSize = tok::node_viewport_size;
 
 extern float gViewportPanelWidth;
 
@@ -59,14 +59,14 @@ extern float gViewportPanelHeight;
    // Two sanctioned widths, nothing else: a full node, and a narrow one for
    // a node with <=2 params (Gain, Audio Out) so §7's "a one-param
    // node is visually smaller" is true instead of aspirational.
-   inline const float kAudioNodeWidth = 440.0f;
+   inline const float kAudioNodeWidth = tok::node_audio_width;
 
 
-   inline const float kAudioNarrowWidth = 200.0f;
+   inline const float kAudioNarrowWidth = tok::node_audio_narrow_width;
 
 
    // Two-column layout width for large 3D nodes (Render 3D, Material)
-   inline const float kWideNodeWidth = 476.0f;
+   inline const float kWideNodeWidth = tok::node_wide_width;
 
 
    // A third width, for a node that is genuinely two parallel instruments
@@ -76,7 +76,7 @@ extern float gViewportPanelHeight;
    // modulator patched to engine A's attack drove engine B's the moment the
    // tab flipped. Two columns fixes the height and the aliasing at once,
    // because every param of both engines is now drawn every frame.
-   inline const float kAudioWideWidth = 960.0f;
+   inline const float kAudioWideWidth = tok::node_audio_wide_width;
 
 
    // Knobs come in two sizes so a row has a visual hierarchy: large for the
@@ -114,12 +114,12 @@ extern float gViewportPanelHeight;
    // One number per control, read by every node. A fader is the Mixer / Gain
    // fader everywhere (Macro Slider included); a knob caption always sits
    // kKnobCaptionGap under the cap. Do not write these as literals in a body.
-   inline const float kFaderH = 138.0f;          // vertical fader travel box (Mixer, Gain, Macro Slider)
-   inline const float kFaderW = 22.0f;           // fader hit width; handle drawn 18 x 12 (VFader.h)
-   inline const float kFaderMeterW = 8.0f;       // level meter beside a fader (signal faders only)
+   inline const float kFaderH = tok::node_fader_h;          // vertical fader travel box (Mixer, Gain, Macro Slider)
+   inline const float kFaderW = tok::node_fader_w;           // fader hit width; handle drawn 18 x 12 (VFader.h)
+   inline const float kFaderMeterW = tok::node_fader_meter_w;       // level meter beside a fader (signal faders only)
    inline const float kFaderMeterDx = 14.0f;     // meter left edge, from the fader's cell centre
-   inline const float kFaderMeterPad = 6.0f;     // meter inset top/bottom of the fader box
-   inline const float kKnobCaptionGap = 4.0f;    // cap bottom to caption top
+   inline const float kFaderMeterPad = tok::node_fader_meter_pad;     // meter inset top/bottom of the fader box
+   inline const float kKnobCaptionGap = tok::space_1;    // cap bottom to caption top
 
 
    inline const float kKnobLarge = kKnobStd;
@@ -137,14 +137,14 @@ extern float gViewportPanelHeight;
    // own. AudioFilter's frequency response keeps its own taller 190px (a
    // curve read for precision at a glance needs more vertical resolution
    // than these three, which are read for overall shape).
-   inline const float kAudioTimeVizH = 150.0f;
+   inline const float kAudioTimeVizH = tok::node_audio_time_viz_h;
 
 
    // Inset padding inside a section panel (AudioSection).
-   inline const float kAudioSectionPad = 8.0f;
+   inline const float kAudioSectionPad = tok::space_2;
 
 
-   inline const float kPinRadius = 7.0f;
+   inline const float kPinRadius = tok::pin_r_cable;
 
 
    inline const float kPinHit = tok::hit_min;
@@ -582,7 +582,7 @@ bool IsHeadlessProcess();
       int audioSource = kArrangeAudioTimeline;
       int videoSource = kArrangeVideoTimeline;
       uint64_t canvasVideoUid = 0; // only when videoSource == kArrangeVideoCanvas
-      int width = 1920, height = 1080, fps = 60;
+      int width = 1920, height = 1080, fps = 60;   // ui-audit-ok: saved settings default (data, not a screen size)
       int sampleRate = 48000;
       int format = 0;              // 0 = mp4, 1 = mov, 2 = wav
       std::string path;
@@ -1357,7 +1357,7 @@ extern bool gMinimapEnabled;
       int monitorIndex = -1;   // display it was last placed on by us
       std::string monitorName; // that display's name, to find it again after a hot-plug
       std::string returnToMonitor; // set when its fullscreen display vanished: go fullscreen there again when it is back
-      int windowedX = 100, windowedY = 100, windowedW = 1280, windowedH = 720; // restore box
+      int windowedX = 100, windowedY = 100, windowedW = 1280, windowedH = 720; // restore box   // ui-audit-ok: saved settings default (data, not a screen size)
    };
 
 extern std::vector<ProjectorWindow> gProjectorWindows;
@@ -3814,7 +3814,7 @@ const std::vector<std::string>& WavetableNames();
 const std::vector<std::string>& OctaveNames();
 
 // One size for the header tuning selectors (oct / semi / fine) in every synth, so the headers line up node to node.
-constexpr float kTuneOctW = 74.0f, kTuneSemiW = 82.0f, kTuneFineW = 104.0f;
+constexpr float kTuneOctW = tok::audio_tune_oct_w, kTuneSemiW = tok::audio_tune_semi_w, kTuneFineW = tok::audio_tune_fine_w;
 
 void AudioBareDropdown(const char* id, const std::vector<std::string>& options, int current,
                           std::function<void(int)> onSelect, float width,
@@ -4768,10 +4768,10 @@ void ArrangeDrawSampleTempoInfo(const Arrange::Clip& c);
 extern std::map<uint64_t, ArrangeClipThumb> gArrangeClipThumbs;
 
 
-   inline constexpr int kArrangeThumbW = 96;
+   inline constexpr int kArrangeThumbW = tok::arrange_thumb_w;
 
 
-   inline constexpr int kArrangeThumbH = 54;
+   inline constexpr int kArrangeThumbH = tok::arrange_thumb_h;
 
 void ArrangeSyncClipVisuals();
 

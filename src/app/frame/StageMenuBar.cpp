@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/ReorderDrag.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
@@ -385,12 +386,12 @@ void DrawMenuBar(FrameCtx& fc)
                      if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
                      {
                         FieldWell::Slider(L("Width"), &gViewportPanelWidth,
-                                           kViewportPanelMinWidth, 900.0f, "%.0f px");
+                                           kViewportPanelMinWidth, params::stage_menu_bar::viewport_panel_width_lo, "%.0f px");
                      }
                      else
                      {
                         FieldWell::Slider(L("Height"), &gViewportPanelHeight,
-                                           kViewportPanelMinHeight, 800.0f, "%.0f px");
+                                           kViewportPanelMinHeight, params::stage_menu_bar::viewport_panel_height_lo, "%.0f px");
                      }
                      MenuParts::Separator();
                      if (!gViewportPanelNodes.empty() && MenuParts::Item(L("Clear Cards")))
@@ -418,12 +419,12 @@ void DrawMenuBar(FrameCtx& fc)
                      if (gModMatrixDock == 1 || gModMatrixDock == 2)
                      {
                         FieldWell::Slider(L("Width"), &gModMatrixWidth,
-                                           kModMatrixMinWidth, 900.0f, "%.0f px");
+                                           kModMatrixMinWidth, params::stage_menu_bar::mod_matrix_width_lo, "%.0f px");
                      }
                      else
                      {
                         FieldWell::Slider(L("Height"), &gModMatrixHeight,
-                                           kModMatrixMinHeight, 800.0f, "%.0f px");
+                                           kModMatrixMinHeight, params::stage_menu_bar::mod_matrix_height_lo, "%.0f px");
                      }
                   }
                   ImGui::EndMenu();
@@ -438,9 +439,9 @@ void DrawMenuBar(FrameCtx& fc)
                      FieldWell::PushStyle(); MixerPanelDockCombo(); FieldWell::PopStyle();
                      ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
                      if (gMixerPanelDock == 1 || gMixerPanelDock == 2)
-                        FieldWell::Slider(L("Width"), &gMixerPanelWidth, kMixerPanelMinWidth, 1600.0f, "%.0f px");
+                        FieldWell::Slider(L("Width"), &gMixerPanelWidth, kMixerPanelMinWidth, params::stage_menu_bar::mixer_panel_width_lo, "%.0f px");
                      else if (gMixerPanelDock != kDockFloating)
-                        FieldWell::Slider(L("Height"), &gMixerPanelHeight, kMixerPanelMinHeight, 800.0f, "%.0f px");
+                        FieldWell::Slider(L("Height"), &gMixerPanelHeight, kMixerPanelMinHeight, params::stage_menu_bar::mixer_panel_height_lo, "%.0f px");
                   }
                   ImGui::EndMenu();
                }
@@ -458,12 +459,12 @@ void DrawMenuBar(FrameCtx& fc)
                      if (gPerfPanelDock == 1 || gPerfPanelDock == 2)
                      {
                         FieldWell::Slider(L("Width"), &gPerfPanelWidth,
-                                           kPerfPanelMinWidth, 900.0f, "%.0f px");
+                                           kPerfPanelMinWidth, params::stage_menu_bar::perf_panel_width_lo, "%.0f px");
                      }
                      else
                      {
                         FieldWell::Slider(L("Height"), &gPerfPanelHeight,
-                                           kPerfPanelMinHeight, 800.0f, "%.0f px");
+                                           kPerfPanelMinHeight, params::stage_menu_bar::perf_panel_height_lo, "%.0f px");
                      }
                      MenuParts::Check(L("Edit Mode"), &gPerfEditMode);
                   }
@@ -502,7 +503,7 @@ void DrawMenuBar(FrameCtx& fc)
                      }
                      ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
                      FieldWell::Slider(L("Height"), &gArrangePanelHeight,
-                                        kArrangePanelMinHeight, 800.0f, "%.0f px");
+                                        kArrangePanelMinHeight, params::stage_menu_bar::arrange_panel_height_lo, "%.0f px");
                   }
                   ImGui::EndMenu();
                }
@@ -513,7 +514,7 @@ void DrawMenuBar(FrameCtx& fc)
                   if (gSessionPanelOpen)
                   {
                      ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
-                     FieldWell::Slider(L("Height"), &gSessionPanelHeight, kSessionPanelMinHeight, 800.0f, "%.0f px");
+                     FieldWell::Slider(L("Height"), &gSessionPanelHeight, kSessionPanelMinHeight, params::stage_menu_bar::session_panel_height_lo, "%.0f px");
                   }
                   ImGui::EndMenu();
                }
@@ -538,7 +539,7 @@ void DrawMenuBar(FrameCtx& fc)
                      }
                      FieldWell::PopStyle();
                      ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
-                     FieldWell::Slider(L("Height"), &height, 200.0f, 800.0f, "%.0f px");
+                     FieldWell::Slider(L("Height"), &height, params::stage_menu_bar::height_lo, params::stage_menu_bar::height_hi, "%.0f px");
                   }
                   ImGui::EndMenu();
                };
@@ -564,9 +565,9 @@ void DrawMenuBar(FrameCtx& fc)
                      FieldWell::PopStyle();
                      ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
                      if (dock == 1 || dock == 2)
-                        FieldWell::Slider(L("Width"), &width, 320.0f, 1600.0f, "%.0f px");
+                        FieldWell::Slider(L("Width"), &width, params::stage_menu_bar::width_lo, params::stage_menu_bar::width_hi, "%.0f px");
                      else if (dock != 4)
-                        FieldWell::Slider(L("Height"), &height, 300.0f, 800.0f, "%.0f px");
+                        FieldWell::Slider(L("Height"), &height, params::stage_menu_bar::height_2_lo, params::stage_menu_bar::height_2_hi, "%.0f px");
                   }
                   ImGui::EndMenu();
                };
@@ -592,9 +593,9 @@ void DrawMenuBar(FrameCtx& fc)
                      FieldWell::PopStyle();
                      ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
                      if (gTerminalDock == 1 || gTerminalDock == 2)
-                        FieldWell::Slider(L("Width"), &gTerminalWidth, 280.0f, 1400.0f, "%.0f px");
+                        FieldWell::Slider(L("Width"), &gTerminalWidth, params::stage_menu_bar::terminal_width_lo, params::stage_menu_bar::terminal_width_hi, "%.0f px");
                      else
-                        FieldWell::Slider(L("Height"), &gTerminalHeight, 160.0f, 800.0f, "%.0f px");
+                        FieldWell::Slider(L("Height"), &gTerminalHeight, params::stage_menu_bar::terminal_height_lo, params::stage_menu_bar::terminal_height_hi, "%.0f px");
                   }
                   ImGui::EndMenu();
                }
@@ -616,7 +617,7 @@ void DrawMenuBar(FrameCtx& fc)
                      }
                      FieldWell::PopStyle();
                      ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
-                     FieldWell::Slider(L("Height"), &gCurveEditorHeight, 220.0f, 800.0f, "%.0f px");
+                     FieldWell::Slider(L("Height"), &gCurveEditorHeight, params::stage_menu_bar::curve_editor_height_lo, params::stage_menu_bar::curve_editor_height_hi, "%.0f px");
                   }
                   ImGui::EndMenu();
                }
@@ -638,7 +639,7 @@ void DrawMenuBar(FrameCtx& fc)
                      }
                      FieldWell::PopStyle();
                      ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
-                     FieldWell::Slider(L("Height"), &gFieldPatcherHeight, 220.0f, 800.0f, "%.0f px");
+                     FieldWell::Slider(L("Height"), &gFieldPatcherHeight, params::stage_menu_bar::field_patcher_height_lo, params::stage_menu_bar::field_patcher_height_hi, "%.0f px");
                   }
                   ImGui::EndMenu();
                }
@@ -1131,7 +1132,7 @@ void DrawMenuBar(FrameCtx& fc)
                         transport.SetTimeSignature(std::clamp(parsed, 1, 99), tsDen);
                   },
                   nullptr);
-            TD::Value("##tsSlash", sx + numW, slashW, wellMin.y, "/", 0.5f);
+            TD::Value("##tsSlash", sx + numW, slashW, wellMin.y, "/", 0.5f);   // ui-audit-ok: centre alignment (half)
             Field(TopBarField::TsDen, "##tsDenField", sx + numW + slashW, denW, denShown, denShown, false,
                   [&](float dy) {
                      sDragAccumY += dy;

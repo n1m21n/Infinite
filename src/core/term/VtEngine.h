@@ -50,7 +50,7 @@ public:
     struct Options {
         int cols = 80;
         int rows = 24;
-        int scrollback = 10000;
+        int scrollback = 10000;   // ui-audit-ok: terminal scrollback lines
         uint32_t palette[16] = {};  // all zero = libvterm's
         uint32_t foreground = PackRgb(229, 229, 229);
         uint32_t background = PackRgb(0, 0, 0);
@@ -114,7 +114,7 @@ private:
     bool LineAt(int64_t line, std::vector<Cell>* cells, bool* continuation) const;
 
     std::deque<Line> scrollback_;
-    int scrollbackLimit_ = 10000;
+    int scrollbackLimit_ = 10000;   // ui-audit-ok: terminal scrollback lines
     int64_t pushed_ = 0;
     int cursorRow_ = 0;
     int cursorCol_ = 0;

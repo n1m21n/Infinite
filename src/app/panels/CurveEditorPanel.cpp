@@ -2,6 +2,7 @@
 // MSEG node, following the canvas selection. The node is the model: every edit goes through MSEGNode and
 // core/CurveEdit.h, and is a patch undo step. The panel keeps only its view: pages, zoom, tool and selection.
 #include "app/frame/CanvasLink.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
@@ -115,7 +116,7 @@ namespace
       bool snap = true;
       int gridBeats = MusicTime::kSixteenth;
       int gridSeconds = 2, gridFrames = 0;   // ui-audit-ok: model default
-      float thinning = 0.01f;       // Draw: how far (shape units) the points may stray from the stroke
+      float thinning = 0.01f;       // Draw: how far (shape units) the points may stray from the stroke   // ui-audit-ok: curve thinning tolerance (model value)
       std::vector<int> sel;         // selected point indices, ascending
       size_t selCount = 0;          // the node's point count the selection was made against
       Drag drag = Drag::None;
@@ -2182,7 +2183,7 @@ namespace
             n.rateMode = mode;
          switch (n.rateMode)
          {
-         case LFONode::kRateBeats: FloatRow(T("Length"), &n.rateBeats, 0.0625f, 256.0f, "%.3g beats", ImGuiSliderFlags_Logarithmic); break;
+         case LFONode::kRateBeats: FloatRow(T("Length"), &n.rateBeats, params::MSEG::rate_beats_lo, params::MSEG::rate_beats_hi, "%.3g beats", ImGuiSliderFlags_Logarithmic); break;
          case LFONode::kRateSynced:
          {
             int div = MusicTime::NearestRateDivision(n.rateBeats);
@@ -2190,15 +2191,15 @@ namespace
                n.rateBeats = (float)MusicTime::BeatsFor((MusicTime::RateDivision)div);
             break;
          }
-         case LFONode::kRateHz: FloatRow(T("Rate"), &n.rateHz, 0.01f, 40.0f, "%.2f Hz", ImGuiSliderFlags_Logarithmic); break;
-         case MSEGNode::kRateSeconds: FloatRow(T("Length"), &n.lengthSec, 0.01f, 600.0f, "%.2f s", ImGuiSliderFlags_Logarithmic); break;
+         case LFONode::kRateHz: FloatRow(T("Rate"), &n.rateHz, params::MSEG::rate_hz_lo, params::MSEG::rate_hz_hi, "%.2f Hz", ImGuiSliderFlags_Logarithmic); break;
+         case MSEGNode::kRateSeconds: FloatRow(T("Length"), &n.lengthSec, params::MSEG::length_sec_lo, params::MSEG::length_sec_hi, "%.2f s", ImGuiSliderFlags_Logarithmic); break;
          default:
-            FloatRow(T("Length"), &n.lengthFrames, 1.0f, 100000.0f, "%.0f frames", ImGuiSliderFlags_Logarithmic);
+            FloatRow(T("Length"), &n.lengthFrames, params::MSEG::length_frames_lo, params::MSEG::length_frames_hi, "%.0f frames", ImGuiSliderFlags_Logarithmic);
             n.lengthFrames = std::max(1.0f, std::round(n.lengthFrames));
-            FloatRow(T("FPS"), &n.fps, 1.0f, 240.0f, "%.3g");
+            FloatRow(T("FPS"), &n.fps, params::MSEG::fps_lo, params::MSEG::fps_hi, "%.3g");
             break;
          }
-         FloatRow(T("Speed"), &n.speed, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
+         FloatRow(T("Speed"), &n.speed, params::MSEG::speed_lo, params::MSEG::speed_hi, "%.2fx", ImGuiSliderFlags_Logarithmic);
          static const std::vector<std::string> kPlay = { "Repeat", "Once", "Ping-pong" };
          int play = n.play;
          if (ComboRow(T("Play"), &play, kPlay, "Curve Play"))
@@ -2312,10 +2313,10 @@ namespace
          ImGui::TextUnformatted(T(ChosenName().c_str()));
          FieldLabel(T("Seed"));
          ImGui::SetNextItemWidth(sFieldW);
-         FieldWell::Slider(RowId("Seed").c_str(), &s.seed, 1, 999, "%d");
+         FieldWell::Slider(RowId("Seed").c_str(), &s.seed, params::curve_editor::seed_lo, params::curve_editor::seed_hi, "%d");
          FieldLabel(T("Steps"));
          ImGui::SetNextItemWidth(sFieldW);
-         FieldWell::Slider(RowId("Steps").c_str(), &s.steps, 1, 64, "%d");
+         FieldWell::Slider(RowId("Steps").c_str(), &s.steps, params::curve_editor::steps_lo, params::curve_editor::steps_hi, "%d");
          FieldLabel(T("Pulses"));
          ImGui::SetNextItemWidth(sFieldW);
          FieldWell::Slider(RowId("Pulses").c_str(), &s.pulses, 0, s.steps, "%d");
@@ -2324,7 +2325,7 @@ namespace
       if (s.tool == Tool::Draw && Card(T("Draw")))
       {
          float pct = s.thinning * 100.0f;
-         if (FloatRow(T("Thinning"), &pct, 0.1f, 10.0f, "%.1f%%", ImGuiSliderFlags_Logarithmic))
+         if (FloatRow(T("Thinning"), &pct, params::curve_editor::pct_lo, params::curve_editor::pct_hi, "%.1f%%", ImGuiSliderFlags_Logarithmic))
             s.thinning = pct / 100.0f;
       }
 

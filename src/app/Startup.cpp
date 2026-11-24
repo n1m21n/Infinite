@@ -3635,7 +3635,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          auto* t = static_cast<TextNode*>(gNodes[0].node.get());
          t->text = "naman is a weirdo and this line is deliberately long enough to need several rows";
          t->fontName = "Verdana";
-         t->fontSize = 300.0f;   // absurd on purpose: fitting must rein it in
+         t->fontSize = 300.0f;   // absurd on purpose: fitting must rein it in   // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
          t->wordWrap = true;
          t->fitToBox = true;
          t->align = 3;
@@ -3736,7 +3736,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          shape->fillColor[0] = 1.0f; shape->fillColor[1] = 0.42f; shape->fillColor[2] = 0.2f;
          auto* txt = static_cast<TextNode*>(gNodes[2].node.get());
          txt->text = "INFINITE";
-         txt->fontSize = 150.0f;
+         txt->fontSize = 150.0f;   // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
 
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[3], 0)->Connect(gNodes[1].node.get());

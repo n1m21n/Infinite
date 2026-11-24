@@ -1,5 +1,6 @@
 // Settings window (moved verbatim from main.cpp).
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/ListRow.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/PanelKit.h"
@@ -325,7 +326,7 @@ namespace app
             // Node Card Styling
             FormParts::Section(T("Node Card Styling"));
             float opacity = CategoryColors::GetNodeOpacity();
-            if (FormParts::SliderFloat(L("Node Opacity"), &opacity, 0.10f, 1.00f, UiFmt::Spec::F2, ImGuiSliderFlags_AlwaysClamp))
+            if (FormParts::SliderFloat(L("Node Opacity"), &opacity, params::settings::opacity_lo, params::settings::opacity_hi, UiFmt::Spec::F2, ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetNodeOpacity(opacity, isLight, false);
             }
@@ -335,7 +336,7 @@ namespace app
             }
 
             float rounding = CategoryColors::GetNodeRounding();
-            if (FormParts::SliderFloat(L("Node Corner Radius"), &rounding, 0.0f, 24.0f, UiFmt::Px, 0, ImGuiSliderFlags_AlwaysClamp))
+            if (FormParts::SliderFloat(L("Node Corner Radius"), &rounding, params::settings::rounding_lo, params::settings::rounding_hi, UiFmt::Px, 0, ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetNodeRounding(rounding, false);
                ApplyTheme();
@@ -346,7 +347,7 @@ namespace app
             }
 
             float tintWeight = CategoryColors::GetTintWeight();
-            if (FormParts::SliderFloat(L("Tint"), &tintWeight, 0.0f, 0.50f, UiFmt::Spec::F2, ImGuiSliderFlags_AlwaysClamp))
+            if (FormParts::SliderFloat(L("Tint"), &tintWeight, params::settings::tint_weight_lo, params::settings::tint_weight_hi, UiFmt::Spec::F2, ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetTintWeight(tintWeight, isLight, false);
             }
@@ -358,7 +359,7 @@ namespace app
             ImGui::Spacing();
             FormParts::Section(T("Display"));
             float uiScale = CategoryColors::GetUiScale();
-            if (FormParts::SliderFloat(L("UI Scale"), &uiScale, 0.5f, 2.0f, UiFmt::Spec::Ratio, ImGuiSliderFlags_AlwaysClamp))
+            if (FormParts::SliderFloat(L("UI Scale"), &uiScale, params::settings::ui_scale_lo, params::settings::ui_scale_hi, UiFmt::Spec::Ratio, ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetUiScale(uiScale, false);
             }
@@ -463,10 +464,10 @@ namespace app
                ApplyTheme();
                SaveWorkspaceSettings();
             }
-            FormParts::SliderFloat(L("Grid size"), &gGridSnap, 5.0f, 100.0f, UiFmt::Px, 0);
+            FormParts::SliderFloat(L("Grid size"), &gGridSnap, params::settings::grid_snap_lo, params::settings::grid_snap_hi, UiFmt::Px, 0);
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
-            FormParts::SliderFloat(L("Zoom sensitivity"), &gZoomSensitivity, 0.05f, 1.5f, UiFmt::Spec::F2);
+            FormParts::SliderFloat(L("Zoom sensitivity"), &gZoomSensitivity, params::settings::zoom_sensitivity_lo, params::settings::zoom_sensitivity_hi, UiFmt::Spec::F2);
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
 
@@ -489,10 +490,10 @@ namespace app
                      }
                   FormParts::EndCombo();
                }
-               FormParts::SliderFloat(L("Size"), &gMinimapSize, 120.0f, 360.0f, UiFmt::Px, 0);
+               FormParts::SliderFloat(L("Size"), &gMinimapSize, params::settings::minimap_size_lo, params::settings::minimap_size_hi, UiFmt::Px, 0);
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
-               FormParts::SliderFloat(L("Opacity"), &gMinimapOpacity, 0.2f, 1.0f, UiFmt::Spec::F2);
+               FormParts::SliderFloat(L("Opacity"), &gMinimapOpacity, params::settings::minimap_opacity_lo, params::settings::minimap_opacity_hi, UiFmt::Spec::F2);
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
             }
@@ -873,7 +874,7 @@ namespace app
             if (FormParts::Switch(L("Autosave enabled"), &gAutosaveEnabled))
                SaveGeneralSettings();
             int seconds = gAutosaveSeconds;
-            if (FormParts::SliderInt(L("Autosave interval"), &seconds, 15, 300, T("%d sec")))
+            if (FormParts::SliderInt(L("Autosave interval"), &seconds, params::settings::seconds_lo, params::settings::seconds_hi, T("%d sec")))
                gAutosaveSeconds = seconds;
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveGeneralSettings();
@@ -1875,22 +1876,22 @@ namespace app
                if (FormParts::Combo(L("Mini axes"), &v.miniAxes, items.c_str()))
                   SaveWorkspaceSettings();
             }
-            FormParts::SliderFloat(L("Mini axes size"), &v.miniSize, 40.0f, 160.0f, UiFmt::Spec::F0);
+            FormParts::SliderFloat(L("Mini axes size"), &v.miniSize, params::settings::mini_size_lo, params::settings::mini_size_hi, UiFmt::Spec::F0);
             saved();
             FormParts::SliderFloat(L("Mini axes brightness"), &v.miniBright, 0.0f, 1.0f, UiFmt::Spec::F2);
             saved();
-            FormParts::SliderFloat(L("Navigation gizmo size"), &v.gizmoNavSize, 40.0f, 160.0f, UiFmt::Spec::F0);
+            FormParts::SliderFloat(L("Navigation gizmo size"), &v.gizmoNavSize, params::settings::gizmo_nav_size_lo, params::settings::gizmo_nav_size_hi, UiFmt::Spec::F0);
             saved();
-            FormParts::SliderFloat(L("Transform gizmo size"), &v.gizmoSize, 40.0f, 160.0f, UiFmt::Spec::F0);
+            FormParts::SliderFloat(L("Transform gizmo size"), &v.gizmoSize, params::settings::gizmo_size_lo, params::settings::gizmo_size_hi, UiFmt::Spec::F0);
             saved();
             SectionCard::End();
             ImGui::Spacing();
             FormParts::Section(T("Navigation"));
-            FormParts::SliderFloat(L("Smooth view"), &v.smoothTime, 0.0f, 1.0f, UiFmt::Sec, 2);
+            FormParts::SliderFloat(L("Smooth view"), &v.smoothTime, 0.0f, 1.0f, UiFmt::Sec, params::settings::smooth_time_def);
             saved();
-            FormParts::SliderFloat(L("Rotation step"), &v.rotStep, 1.0f, 90.0f, UiFmt::Spec::F0);
+            FormParts::SliderFloat(L("Rotation step"), &v.rotStep, params::settings::rot_step_lo, params::settings::rot_step_hi, UiFmt::Spec::F0);
             saved();
-            FormParts::SliderFloat(L("Orbit sensitivity"), &v.orbitSens, 0.1f, 5.0f, UiFmt::Spec::F2);
+            FormParts::SliderFloat(L("Orbit sensitivity"), &v.orbitSens, params::settings::orbit_sens_lo, params::settings::orbit_sens_hi, UiFmt::Spec::F2);
             saved();
             if (FormParts::Switch(L("Auto perspective"), &v.autoPerspective))
                SaveWorkspaceSettings();

@@ -1,5 +1,6 @@
 // Audio node body building blocks: columns, sections, knob rows, drift meters, gates (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/UiInteract.h"
 #include <unordered_map>
 #include "app/AppShared.h"
@@ -417,10 +418,10 @@ namespace app
 
    void DrawDriftParams(GraphNode& gn, DriftNode* n)
    {
-      ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
-      ModSlider("stray", &n->stray, 0.25f, 4.0f, "%.2f");
-      ModSlider("momentum", &n->momentum, 0.0f, 4.0f, "%.2fs");
-      ModSlider("smoothing", &n->smoothness, 0.0f, 0.95f, "%.2f");
+      ModSlider("speed", &n->speed, params::Drift::speed_lo, params::Drift::speed_hi, "%.2fx");
+      ModSlider("stray", &n->stray, params::Drift::stray_lo, params::Drift::stray_hi, "%.2f");
+      ModSlider("momentum", &n->momentum, params::Drift::momentum_lo, params::Drift::momentum_hi, "%.2fs");
+      ModSlider("smoothing", &n->smoothness, params::Drift::smoothness_lo, params::Drift::smoothness_hi, "%.2f");
       ModSlider("depth", &n->depth, 0.0f, 1.0f, "%.2f");
       // `low`/`high` used to sit here, writing rangeLo/rangeHi/rangeOverride: ONE range clamped
       // onto every destination at once. That is meaningless on this node - each destination has
@@ -550,7 +551,7 @@ namespace app
       // (how many lagged copies of the one input signal DMD gets to fit a transition matrix
       // against), an implementation detail of "how", not a UI/UX decision - it stays fixed at
       // n->rank's own default from here on, the same "no params" treatment Drift got.
-      ModSlider("speed", &n->speed, 0.1f, 10.0f, "%.2fx");
+      ModSlider("speed", &n->speed, params::PredictiveModulator::speed_lo, params::PredictiveModulator::speed_hi, "%.2fx");
       ModSlider("low", &n->low, 0.0f, 1.0f, "%.2f");
       ModSlider("high", &n->high, 0.0f, 1.0f, "%.2f");
       if (n->input == nullptr)

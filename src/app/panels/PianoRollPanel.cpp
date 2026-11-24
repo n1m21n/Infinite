@@ -2,6 +2,7 @@
 // MIDI lane. A page edits the lane's clips and notes through the Arrange note ops; the linked Piano Roll node plays
 // them. Edits are timeline undo entries; page add and delete touch a node too, so they are patch undo steps.
 #include "app/AppShared.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/frame/CanvasLink.h"
@@ -101,7 +102,7 @@ namespace
       uint64_t viewedLane = 0;   // the page the view was last fitted to
       double pxPerTick = 0.06;
       double viewTick = 0.0;     // tick at the roll's left edge
-      float keyH = 12.0f;
+      float keyH = tok::piano_roll_start_key_h;
       float topRow = 0.0f;       // row at the roll's top edge
       bool follow = false;
       bool fold = false;
@@ -165,7 +166,7 @@ namespace
       bool dragCopies = false;   // Alt: the originals stay, copies travel
       Tick lastLength = Arrange::kPPQ / 4;
       int lastVelocity = 100;
-      int lastDivision = 16;
+      int lastDivision = 16;   // ui-audit-ok: grid division default (1/16)
       Tick rangeStart = 0, rangeEnd = 0; // the ruler selection (empty = none)
       int soundingPitch = -1;
       double soundingUntil = 0.0;
@@ -2504,7 +2505,7 @@ namespace
       State& s = S();
       SectionCard::Begin(T("Quantise"));
       FormParts::SliderFloat(T("Strength"), &s.quant.strength, 0.0f, 1.0f, UiFmt::Spec::F2);
-      FormParts::SliderFloat(T("Swing"), &s.quant.swing, 0.0f, 0.75f, UiFmt::Spec::F2);
+      FormParts::SliderFloat(T("Swing"), &s.quant.swing, params::piano_roll::swing_lo, params::piano_roll::swing_hi, UiFmt::Spec::F2);
       FormParts::Switch(T("Ends"), &s.quant.ends);
       const char* what = !s.notes.empty() ? T("Quantise selection") : !s.clips.empty() ? T("Quantise clip") : T("Quantise page");
       if (ActionButton::Draw(what, ImVec2(-1.0f, 0.0f)))
@@ -2515,9 +2516,9 @@ namespace
    {
       State& s = S();
       SectionCard::Begin(T("Functions"));
-      FormParts::SliderFloat(T("Strum"), &s.strumTicks, 0.0f, 240.0f, T("%.0f ticks"));
-      FormParts::SliderFloat(T("Time spread"), &s.humanizeTime, 0.0f, 120.0f, T("%.0f ticks"));
-      FormParts::SliderFloat(T("Vel spread"), &s.humanizeVel, 0.0f, 40.0f, UiFmt::Spec::F0);
+      FormParts::SliderFloat(T("Strum"), &s.strumTicks, params::piano_roll::strum_ticks_lo, params::piano_roll::strum_ticks_hi, T("%.0f ticks"));
+      FormParts::SliderFloat(T("Time spread"), &s.humanizeTime, params::piano_roll::humanize_time_lo, params::piano_roll::humanize_time_hi, T("%.0f ticks"));
+      FormParts::SliderFloat(T("Vel spread"), &s.humanizeVel, params::piano_roll::humanize_vel_lo, params::piano_roll::humanize_vel_hi, UiFmt::Spec::F0);
    }
 
    void DrawNoteInspector(Arrange::Lane& page)
@@ -2527,15 +2528,15 @@ namespace
       SectionCard::Begin(s.notes.size() == 1 ? T("Note") : T("Notes"));
       const auto beats = [](Tick t) { return (float)t / (float)Arrange::kPPQ; };
       const auto ticks = [](float b) { return (Tick)std::lround(b * (float)Arrange::kPPQ); };
-      NoteField(page, T("Pitch"), 0.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.pitch; },
+      NoteField(page, T("Pitch"), params::piano_roll::note_inspector_lo, params::piano_roll::note_inspector_hi, "%.0f", [](const Note& n) { return (float)n.pitch; },
                 [](Note& n, float v) { n.pitch = (uint8_t)std::lround(v); });
-      NoteField(page, T("Start"), 0.0f, 256.0f, "%.3f", [&](const Note& n) { return beats(n.start); },
+      NoteField(page, T("Start"), params::piano_roll::note_inspector_2_lo, params::piano_roll::note_inspector_2_hi, "%.3f", [&](const Note& n) { return beats(n.start); },
                 [&](Note& n, float v) { n.start = ticks(v); }, ImGuiSliderFlags_Logarithmic);
-      NoteField(page, T("Length"), 0.015f, 64.0f, "%.3f", [&](const Note& n) { return beats(n.length); },
+      NoteField(page, T("Length"), params::piano_roll::note_inspector_3_lo, params::piano_roll::note_inspector_3_hi, "%.3f", [&](const Note& n) { return beats(n.length); },
                 [&](Note& n, float v) { n.length = std::max<Tick>(1, ticks(v)); }, ImGuiSliderFlags_Logarithmic);
-      NoteField(page, T("Velocity"), 1.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.vel; },
+      NoteField(page, T("Velocity"), 1.0f, params::piano_roll::note_inspector_hi, "%.0f", [](const Note& n) { return (float)n.vel; },
                 [](Note& n, float v) { n.vel = (uint8_t)std::lround(v); });
-      NoteField(page, T("Release"), 0.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.relVel; },
+      NoteField(page, T("Release"), params::piano_roll::note_inspector_lo, params::piano_roll::note_inspector_hi, "%.0f", [](const Note& n) { return (float)n.relVel; },
                 [](Note& n, float v) { n.relVel = (uint8_t)std::lround(v); });
       NoteField(page, T("Chance"), 0.0f, 1.0f, "%.2f", [](const Note& n) { return n.chance; }, [](Note& n, float v) { n.chance = v; });
       bool allMuted = true;
@@ -2564,7 +2565,7 @@ namespace
             }
          });
       SectionCard::Begin(T("Expression at start"));
-      NoteField(page, T("Bend"), -12.0f, 12.0f, "%.2f st", [&](const Note& n) { return ExprAtStart(n.bend); },
+      NoteField(page, T("Bend"), params::piano_roll::note_inspector_4_lo, params::piano_roll::note_inspector_4_hi, "%.2f st", [&](const Note& n) { return ExprAtStart(n.bend); },
                 [&](Note& n, float v) { SetExprAtStart(n.bend, v); });
       NoteField(page, T("Pressure"), 0.0f, 1.0f, "%.2f", [&](const Note& n) { return ExprAtStart(n.pressure); },
                 [&](Note& n, float v) { SetExprAtStart(n.pressure, v); });
@@ -2653,7 +2654,7 @@ namespace
       if (loop)
       {
          float beats = (float)c0->loopLength / (float)Arrange::kPPQ;
-         const bool changed = FormParts::SliderFloat(T("Length"), &beats, 0.25f, 64.0f, T("%.2f beats"), ImGuiSliderFlags_Logarithmic);
+         const bool changed = FormParts::SliderFloat(T("Length"), &beats, params::piano_roll::beats_lo, params::piano_roll::beats_hi, T("%.2f beats"), ImGuiSliderFlags_Logarithmic);
          if (ImGui::IsItemActivated())
             ArrangeGestureBegin();
          if (changed)
@@ -3407,12 +3408,12 @@ namespace
          using Note = Arrange::Note;
          UiDensity::Compact compact;
          s.menuCompact = true;
-         NoteField(page, T("Velocity"), 1.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.vel; },
+         NoteField(page, T("Velocity"), params::piano_roll::context_menu_lo, params::piano_roll::context_menu_hi, "%.0f", [](const Note& n) { return (float)n.vel; },
                    [](Note& n, float v) { n.vel = (uint8_t)std::lround(v); });
-         NoteField(page, T("Release"), 0.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.relVel; },
+         NoteField(page, T("Release"), 0.0f, params::piano_roll::context_menu_hi, "%.0f", [](const Note& n) { return (float)n.relVel; },
                    [](Note& n, float v) { n.relVel = (uint8_t)std::lround(v); });
          NoteField(page, T("Chance"), 0.0f, 1.0f, "%.2f", [](const Note& n) { return n.chance; }, [](Note& n, float v) { n.chance = v; });
-         NoteField(page, T("Bend"), -12.0f, 12.0f, "%.2f st", [&](const Note& n) { return ExprAtStart(n.bend); },
+         NoteField(page, T("Bend"), params::piano_roll::context_menu_2_lo, params::piano_roll::context_menu_2_hi, "%.2f st", [&](const Note& n) { return ExprAtStart(n.bend); },
                    [&](Note& n, float v) { SetExprAtStart(n.bend, v); });
          NoteField(page, T("Pressure"), 0.0f, 1.0f, "%.2f", [&](const Note& n) { return ExprAtStart(n.pressure); },
                    [&](Note& n, float v) { SetExprAtStart(n.pressure, v); });

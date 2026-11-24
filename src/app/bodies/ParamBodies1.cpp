@@ -1,5 +1,6 @@
 // Generic node parameter bodies, part 1 (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/UiInteract.h"
@@ -95,12 +96,12 @@ namespace app
 
       DropdownButton("transition", SlideshowNode::TransitionNames(), n->transition,
                      [n](int i) { n->transition = i; });
-      ModSlider("hold", &n->holdDuration, 0.05f, 60.0f, "%.2f s");
-      ModSlider("transition time", &n->transitionDuration, 0.0f, 15.0f, "%.2f s");
+      ModSlider("hold", &n->holdDuration, params::Slideshow::hold_duration_lo, params::Slideshow::hold_duration_hi, "%.2f s");
+      ModSlider("transition time", &n->transitionDuration, params::Slideshow::transition_duration_lo, params::Slideshow::transition_duration_hi, "%.2f s");
       DropdownButton("fit", SlideshowNode::FitModeNames(), n->fitMode,
                      [n](int i) { n->fitMode = i; });
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModSlider("width", &n->width, params::Slideshow::width_lo, params::Slideshow::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::Slideshow::height_lo, params::Slideshow::height_hi, "%.0f");
 
       PushTextWrapWidth(kPreviewSize);
       if (!n->LastError().empty())
@@ -281,7 +282,7 @@ namespace app
 
    void DrawOscReceiveParams(OscReceiveNode* n)
    {
-      ModSliderInt("port", &n->port, 1, 65535);
+      ModSliderInt("port", &n->port, params::OscReceive::port_lo, params::OscReceive::port_hi);
       ImGui::SetNextItemWidth(kParamWidth);
       FieldWell::InputText("address", &n->address);
       ModSlider("low", &n->low, 0.0f, 1.0f);
@@ -293,11 +294,11 @@ namespace app
    {
       ImGui::SetNextItemWidth(kParamWidth);
       FieldWell::InputText("host", &n->host);
-      ModSliderInt("port", &n->port, 1, 65535);
+      ModSliderInt("port", &n->port, params::OscSend::port_lo, params::OscSend::port_hi);
       ImGui::SetNextItemWidth(kParamWidth);
       FieldWell::InputText("address", &n->address);
-      ModSlider("epsilon", &n->epsilon, 0.0f, 0.1f, "%.4f");
-      ModSlider("interval (ms)", &n->intervalMs, 1.0f, 1000.0f, "%.0f");
+      ModSlider("epsilon", &n->epsilon, params::OscSend::epsilon_lo, params::OscSend::epsilon_hi, "%.4f");
+      ModSlider("interval (ms)", &n->intervalMs, params::OscSend::interval_ms_lo, params::OscSend::interval_ms_hi, "%.0f");
       if (n->LastSent() < 0.0f)
          ImGui::TextDisabled("not sent yet");
       else
@@ -311,11 +312,11 @@ namespace app
       DropdownButton("source", kSources, n->source, [n](int i) { n->source = i; }, kParamWidth);
       if (n->source == 1)
       {
-         ModSlider("sun elevation", &n->skyElevation, 0.0f, 90.0f, "%.1f\xC2\xB0");
-         ModSlider("sun azimuth", &n->skyAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0");
-         ModSlider("turbidity", &n->turbidity, 1.7f, 10.0f);
-         ModSlider("intensity", &n->intensity, 0.0f, 8.0f);
-         ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
+         ModSlider("sun elevation", &n->skyElevation, params::Environment::sky_elevation_lo, params::Environment::sky_elevation_hi, "%.1f\xC2\xB0");
+         ModSlider("sun azimuth", &n->skyAzimuth, params::Environment::sky_azimuth_lo, params::Environment::sky_azimuth_hi, "%.1f\xC2\xB0");
+         ModSlider("turbidity", &n->turbidity, params::Environment::turbidity_lo, params::Environment::turbidity_hi);
+         ModSlider("intensity", &n->intensity, params::Environment::intensity_lo, params::Environment::intensity_hi);
+         ModSlider("rotation", &n->rotation, params::Environment::rotation_lo, params::Environment::rotation_hi, "%.1f\xC2\xB0");
          return;
       }
       if (ActionButton::Draw("Choose HDRI...", ImVec2(kPreviewSize, 0)))
@@ -341,10 +342,10 @@ namespace app
          PopTextWrapWidth();
       }
 
-      ModSlider("intensity", &n->intensity, 0.0f, 8.0f);
-      ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("intensity", &n->intensity, params::Environment::intensity_lo, params::Environment::intensity_hi);
+      ModSlider("rotation", &n->rotation, params::Environment::rotation_lo, params::Environment::rotation_hi, "%.1f\xC2\xB0");
       // Skewed so half the travel covers 0..5, where most skies' suns are cut; the rest reaches 100.
-      ModSlider("sun threshold", &n->sunThreshold, 0.0f, 100.0f, "%.3f", kParamWidth, false, 0.0f,
+      ModSlider("sun threshold", &n->sunThreshold, params::Environment::sun_threshold_lo, params::Environment::sun_threshold_hi, "%.3f", kParamWidth, false, 0.0f,
                 [](float p, float lo, float hi) { return SkewTaperMath::PosToValue(p, lo, hi, 5.0f); },
                 [](float v, float lo, float hi) { return SkewTaperMath::ValueToPos(v, lo, hi, 5.0f); });
    }
@@ -362,35 +363,35 @@ namespace app
 
       DropdownButton("shape", ShapeNode::ShapeNames(), n->shapeType,
                      [n](int i) { n->shapeType = i; });
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
-      ModSlider("size x", &n->sizeX, 0.01f, 1.0f);
-      ModSlider("size y", &n->sizeY, 0.01f, 1.0f);
+      ModSlider("width", &n->width, params::Shape::width_lo, params::Shape::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::Shape::height_lo, params::Shape::height_hi, "%.0f");
+      ModSlider("size x", &n->sizeX, params::Shape::size_x_lo, params::Shape::size_x_hi);
+      ModSlider("size y", &n->sizeY, params::Shape::size_y_lo, params::Shape::size_y_hi);
       // The three shape-dependent controls take fixed ordinals above the always-drawn ones (0..10), so
       // switching shape never moves rotation / pos / fill and the type-level key join stays true.
       if (usesCorner)
       {
          FixedParamOrdinal at(11);
-         ModSlider("corner/thick", &n->cornerRadius, 0.0f, 0.3f);
+         ModSlider("corner/thick", &n->cornerRadius, params::Shape::corner_radius_lo, params::Shape::corner_radius_hi);
       }
       if (usesSides)
       {
          FixedParamOrdinal at(12);
-         ModSliderInt("sides", &n->sides, 3, 20);
+         ModSliderInt("sides", &n->sides, params::Shape::sides_lo, params::Shape::sides_hi);
       }
       if (usesInner)
       {
          FixedParamOrdinal at(13);
-         ModSlider("inner ratio", &n->innerRatio, 0.05f, 1.0f);
+         ModSlider("inner ratio", &n->innerRatio, params::Shape::inner_ratio_lo, params::Shape::inner_ratio_hi);
       }
-      ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("rotation", &n->rotation, params::Shape::rotation_lo, params::Shape::rotation_hi, "%.1f\xC2\xB0");
       ModSlider("pos x", &n->posX, 0.0f, 1.0f);
       ModSlider("pos y", &n->posY, 0.0f, 1.0f);
       ColorSwatch("fill", n->fillColor, n);
       ModSlider("fill opacity", &n->fillOpacity, 0.0f, 1.0f);
-      ModSlider("stroke width", &n->strokeWidth, 0.0f, 0.1f);
+      ModSlider("stroke width", &n->strokeWidth, params::Shape::stroke_width_lo, params::Shape::stroke_width_hi);
       ColorSwatch("stroke", n->strokeColor, n);
-      ModSlider("feather", &n->feather, 0.0f, 0.1f);
+      ModSlider("feather", &n->feather, params::Shape::feather_lo, params::Shape::feather_hi);
       ColorSwatch("bg", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
    }
@@ -428,8 +429,8 @@ namespace app
          PopTextWrapWidth();
       }
 
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModSlider("width", &n->width, params::Formula::width_lo, params::Formula::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::Formula::height_lo, params::Formula::height_hi, "%.0f");
       if (n->IsShadertoy())
       {
          const std::vector<FormulaNode::Knob>& knobs = n->Knobs();
@@ -476,32 +477,32 @@ namespace app
       }
       DropdownButton("font", fonts, fontIdx, [n, &fonts](int i) { n->fontName = fonts[i]; });
 
-      ModSlider("size", &n->fontSize, 8.0f, 300.0f);
+      ModSlider("size", &n->fontSize, params::Text::font_size_lo, params::Text::font_size_hi);
       ColorSwatch("colour", n->color, n);
-      ModSlider("tracking", &n->tracking, -10.0f, 40.0f);
+      ModSlider("tracking", &n->tracking, params::Text::tracking_lo, params::Text::tracking_hi);
       ModSlider("pos x", &n->posX, 0.0f, 1.0f);
       ModSlider("pos y", &n->posY, 0.0f, 1.0f);
       DropdownButton("align", AlignOptions(), n->align, [n](int i) { n->align = i; });
-      ModSlider("scale x", &n->scaleX, 0.1f, 4.0f);
-      ModSlider("scale y", &n->scaleY, 0.1f, 4.0f);
+      ModSlider("scale x", &n->scaleX, params::Text::scale_x_lo, params::Text::scale_x_hi);
+      ModSlider("scale y", &n->scaleY, params::Text::scale_y_lo, params::Text::scale_y_hi);
       ModCheckbox("word wrap", &n->wordWrap);
       if (n->wordWrap)
       {
-         ModSlider("box width", &n->wrapWidth, 0.1f, 1.0f);
-         ModSlider("box height", &n->wrapHeight, 0.1f, 1.0f);
+         ModSlider("box width", &n->wrapWidth, params::Text::wrap_width_lo, params::Text::wrap_width_hi);
+         ModSlider("box height", &n->wrapHeight, params::Text::wrap_height_lo, params::Text::wrap_height_hi);
          ModCheckbox("fit text to box", &n->fitToBox);
          if (n->fitToBox)
             ImGui::TextDisabled("size is a maximum - fitted to %s pt", UiFmt::F0(n->FittedSize()).c);
-         ModSlider("line spacing", &n->lineSpacing, 0.5f, 2.5f);
+         ModSlider("line spacing", &n->lineSpacing, params::Text::line_spacing_lo, params::Text::line_spacing_hi);
       }
-      ModSlider("outline", &n->outlineWidth, 0.0f, 20.0f);
+      ModSlider("outline", &n->outlineWidth, params::Text::outline_width_lo, params::Text::outline_width_hi);
       if (n->outlineWidth > 0.0f)
       {
          ColorSwatch("outline colour", n->outlineColor, n);
          ModCheckbox("outline only", &n->outlineOnly);
       }
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModSlider("width", &n->width, params::Text::width_lo, params::Text::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::Text::height_lo, params::Text::height_hi, "%.0f");
    }
 
 
@@ -526,7 +527,7 @@ namespace app
                              UiFmt::Sec(n->Position()).c, UiFmt::Sec(n->Duration()).c);
       }
       ModCheckbox("loop", &n->loop);
-      ModSlider("speed", &n->speed, -2.0f, 4.0f);
+      ModSlider("speed", &n->speed, params::VideoSource::speed_lo, params::VideoSource::speed_hi);
       {
          double dur = n->Duration();
          float sliderMax = (dur > 0.0) ? (float)dur : 1.0f;
@@ -610,11 +611,11 @@ namespace app
       ModCheckbox("match input res", &n->matchInput);
       if (!n->matchInput)
       {
-         ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-         ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+         ModSlider("width", &n->width, params::Fit::width_lo, params::Fit::width_hi, "%.0f");
+         ModSlider("height", &n->height, params::Fit::height_lo, params::Fit::height_hi, "%.0f");
       }
-      ModSlider("offset X", &n->offsetX, -4096.0f, 4096.0f, "%.0f px");
-      ModSlider("offset Y", &n->offsetY, -4096.0f, 4096.0f, "%.0f px");
+      ModSlider("offset X", &n->offsetX, params::Fit::offset_x_lo, params::Fit::offset_x_hi, "%.0f px");
+      ModSlider("offset Y", &n->offsetY, params::Fit::offset_y_lo, params::Fit::offset_y_hi, "%.0f px");
       ColorSwatch("bg", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
    }
@@ -783,8 +784,8 @@ namespace app
 
       if (!n->matchInput)
       {
-         ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f", colW);
-         ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f", colW);
+         ModSlider("width", &n->width, params::Projection::width_lo, params::Projection::width_hi, "%.0f", colW);
+         ModSlider("height", &n->height, params::Projection::height_lo, params::Projection::height_hi, "%.0f", colW);
       }
 
       if (n->mode == 1) // Mesh Grid
@@ -794,12 +795,12 @@ namespace app
          // checkpoint that used to follow each slider captured the grid AFTER
          // the drag, so the first Undo restored the edited size (a no-op).
          int gw = n->gridW;
-         if (ModSliderInt("grid X", &gw, 2, 8, 100.0f))
+         if (ModSliderInt("grid X", &gw, params::param::gw_lo, params::param::gw_hi, params::param::gw_def))
             n->SetGridSize(gw, n->gridH);
 
          ImGui::SameLine(0.0f, tok::space_4);
          int gh = n->gridH;
-         if (ModSliderInt("grid Y", &gh, 2, 8, 100.0f))
+         if (ModSliderInt("grid Y", &gh, params::param::gh_lo, params::param::gh_hi, params::param::gh_def))
             n->SetGridSize(n->gridW, gh);
       }
 
@@ -871,7 +872,7 @@ namespace app
                      [rateMode](int i) { PushUndoCheckpoint(); *rateMode = i; });
       if (*rateMode == LFONode::kRateBeats)
       {
-         ModSlider("rate", rateBeats, 0.05f, 32.0f, "%.2f beats");
+         ModSlider("rate", rateBeats, params::param::rate_lo, params::param::rate_hi, "%.2f beats");
       }
       else
       {
@@ -891,7 +892,7 @@ namespace app
       if (*rateMode == LFONode::kRateHz)
       {
          FixedParamOrdinal at(hzOrdinal);
-         ModSlider("rate (Hz)", rateHz, 0.01f, 40.0f, "%.2f Hz", kParamWidth, false, 0.0f,
+         ModSlider("rate (Hz)", rateHz, params::param::rate_hz_lo, params::param::rate_hz_hi, "%.2f Hz", kParamWidth, false, 0.0f,
                    LogTaper::PosToValue, LogTaper::ValueToPos);
       }
       else
@@ -928,7 +929,7 @@ namespace app
       if (n->shape == 5 && n->maths >= 1)
       {
          FixedParamOrdinal at(5);
-         ModSlider("seed", &n->seed, 0.0f, 200.0f, "%.0f", kParamWidth, false, 1.0f);
+         ModSlider("seed", &n->seed, params::LFO::seed_lo, params::LFO::seed_hi, "%.0f", kParamWidth, false, 1.0f);
       }
       else
       {
@@ -944,7 +945,7 @@ namespace app
       ModSlider("smooth", &n->smooth, 0.0f, 1.0f);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
-      ModSlider("seed", &n->seed, 0.0f, 200.0f, "%.0f", kParamWidth, false, 1.0f);
+      ModSlider("seed", &n->seed, params::Random::seed_lo, params::Random::seed_hi, "%.0f", kParamWidth, false, 1.0f);
       DrawPerVoiceCheckbox(&n->voice);
    }
 
@@ -1154,7 +1155,7 @@ namespace app
          // Step number label below column
          char label[16];
          snprintf(label, sizeof(label), "%d", i + 1);
-         const float labelFontSize = count <= 8 ? ImGui::GetFontSize()
+         const float labelFontSize = count <= 8 ? ImGui::GetFontSize()   // ui-audit-ok: cell count above which the label shrinks to fit
                                                  : std::clamp(cellW * tok::type_fit_frac, tok::type_min, ImGui::GetFontSize());
          const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
          const ImU32 stepNumCol = isCurrent
@@ -1189,7 +1190,7 @@ namespace app
       DrawPatternStepGrid(n);
 
       ModSliderInt("length", &n->length, 1, PatternNode::kSteps);
-      ModSlider("beats / step", &n->stepBeats, 0.05f, 8.0f);
+      ModSlider("beats / step", &n->stepBeats, params::Pattern::step_beats_lo, params::Pattern::step_beats_hi);
       ModCheckbox("glide between steps", &n->smoothSteps);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
@@ -1207,7 +1208,7 @@ namespace app
          ModSlider("B (no cable)", &n->constantB, 0.0f, 1.0f);
       else
          ImGui::TextDisabled("B: patched");
-      ModSlider("gain", &n->gain, -4.0f, 4.0f);
+      ModSlider("gain", &n->gain, params::Math::gain_lo, params::Math::gain_hi);
       ModSlider("offset", &n->offset, -1.0f, 1.0f);
       ModCheckbox("clamp to 0..1", &n->clampOutput);
    }
@@ -1225,7 +1226,7 @@ namespace app
       else
          ImGui::TextDisabled("B: patched");
       if (n->op == 4 || n->op == 5) // == or !=
-         ModSlider("tolerance", &n->tolerance, 0.0f, 0.1f);
+         ModSlider("tolerance", &n->tolerance, params::Compare::tolerance_lo, params::Compare::tolerance_hi);
    }
 
 
@@ -1320,18 +1321,18 @@ namespace app
       else
          ImGui::TextDisabled("in B: patched");
 
-      ModSlider("high thresh", &n->highThresh, 0.05f, 0.99f);
-      ModSlider("low thresh", &n->lowThresh, 0.01f, 0.95f);
-      ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f");
+      ModSlider("high thresh", &n->highThresh, params::LogicGate::high_thresh_lo, params::LogicGate::high_thresh_hi);
+      ModSlider("low thresh", &n->lowThresh, params::LogicGate::low_thresh_lo, params::LogicGate::low_thresh_hi);
+      ModSlider("hold ms", &n->holdMs, params::LogicGate::hold_ms_lo, params::LogicGate::hold_ms_hi, "%.0f");
       const bool needsPulse = (n->op == LogicGateNode::kOpRisingEdge);
       const bool needsRefrac = (n->op == LogicGateNode::kOpRisingEdge || n->op == LogicGateNode::kOpToggle);
       ImGui::BeginDisabled(!needsPulse && !gParamRegisterOnly);
-      ModSlider("pulse ms", &n->pulseMs, 10.0f, 500.0f, "%.0f");
+      ModSlider("pulse ms", &n->pulseMs, params::LogicGate::pulse_ms_lo, params::LogicGate::pulse_ms_hi, "%.0f");
       ImGui::EndDisabled();
       ImGui::BeginDisabled(!needsRefrac && !gParamRegisterOnly);
-      ModSlider("refractory ms", &n->refractoryMs, 0.0f, 1000.0f, "%.0f");
+      ModSlider("refractory ms", &n->refractoryMs, params::LogicGate::refractory_ms_lo, params::LogicGate::refractory_ms_hi, "%.0f");
       ImGui::EndDisabled();
-      ModSlider("min presence", &n->minPresence, 0.0f, 0.9f);
+      ModSlider("min presence", &n->minPresence, params::LogicGate::min_presence_lo, params::LogicGate::min_presence_hi);
    }
 
 
@@ -1344,9 +1345,9 @@ namespace app
          PushUndoCheckpoint();
          n->ClearAnchors();
       }
-      ModSlider("kernel width", &n->sigma, 0.08f, 1.2f);
+      ModSlider("kernel width", &n->sigma, params::BrainSculpt::sigma_lo, params::BrainSculpt::sigma_hi);
       ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f);
-      ModSlider("regularization", &n->regularization, 0.0f, 0.5f);
+      ModSlider("regularization", &n->regularization, params::BrainSculpt::regularization_lo, params::BrainSculpt::regularization_hi);
    }
 
 
@@ -1356,10 +1357,10 @@ namespace app
          ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
       else
          ImGui::TextDisabled("in: patched");
-      ModSlider("in low", &n->inLow, -4.0f, 4.0f);
-      ModSlider("in high", &n->inHigh, -4.0f, 4.0f);
-      ModSlider("out low", &n->outLow, -4.0f, 4.0f);
-      ModSlider("out high", &n->outHigh, -4.0f, 4.0f);
+      ModSlider("in low", &n->inLow, params::RangeToRange::in_low_lo, params::RangeToRange::in_low_hi);
+      ModSlider("in high", &n->inHigh, params::RangeToRange::in_high_lo, params::RangeToRange::in_high_hi);
+      ModSlider("out low", &n->outLow, params::RangeToRange::out_low_lo, params::RangeToRange::out_low_hi);
+      ModSlider("out high", &n->outHigh, params::RangeToRange::out_high_lo, params::RangeToRange::out_high_hi);
       ModCheckbox("clamp to out range", &n->clampOutput);
    }
 
@@ -1376,14 +1377,14 @@ namespace app
       static const std::vector<std::string> kModes = { "amount", "time", "spring" };
       DropdownButton("mode", n->maths >= 1 ? kModes : kLegacyModes, n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; });
       if (n->mode == SmoothNode::kTime)
-         ModSlider("time (s)", &n->timeConstant, 0.001f, 5.0f);
+         ModSlider("time (s)", &n->timeConstant, params::Smooth::time_constant_lo, params::Smooth::time_constant_hi);
       else if (n->mode == SmoothNode::kSpring)
       {
-         ModSlider("frequency (Hz)", &n->frequency, 0.1f, 20.0f);
-         ModSlider("damping", &n->damping, 0.0f, 2.0f);
+         ModSlider("frequency (Hz)", &n->frequency, params::Smooth::frequency_lo, params::Smooth::frequency_hi);
+         ModSlider("damping", &n->damping, params::Smooth::damping_lo, params::Smooth::damping_hi);
       }
       else
-         ModSlider("amount", &n->amount, 0.0f, 0.99f);
+         ModSlider("amount", &n->amount, params::Smooth::amount_lo, params::Smooth::amount_hi);
    }
 
 
@@ -1393,8 +1394,8 @@ namespace app
          ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
       else
          ImGui::TextDisabled("in: patched");
-      ModSlider("low", &n->low, -4.0f, 4.0f);
-      ModSlider("high", &n->high, -4.0f, 4.0f);
+      ModSlider("low", &n->low, params::Invert::low_lo, params::Invert::low_hi);
+      ModSlider("high", &n->high, params::Invert::high_lo, params::Invert::high_hi);
    }
 
 
@@ -1411,23 +1412,23 @@ namespace app
    void DrawNoiseParams(NoiseNode* n)
    {
       DropdownButton("type", NoiseNode::TypeNames(), n->noiseType, [n](int i) { n->noiseType = i; });
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
-      ModSlider("scale", &n->scale, 0.5f, 60.0f);
+      ModSlider("width", &n->width, params::Noise::width_lo, params::Noise::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::Noise::height_lo, params::Noise::height_hi, "%.0f");
+      ModSlider("scale", &n->scale, params::Noise::scale_lo, params::Noise::scale_hi);
       // Octaves, lacunarity and gain only shape the fractal types (and the colour channels of the
       // plain ones, which are fractal); the other types ignore them.
       const int nt = n->noiseType;
       const bool fractal = nt == 1 || nt == 2 || nt == 8 || nt == 9 || (n->colorNoise && nt <= 4);
       ImGui::BeginDisabled(!fractal && !gParamRegisterOnly);
-      ModSlider("octaves", &n->octaves, 1.0f, 8.0f, "%.0f");
-      ModSlider("lacunarity", &n->lacunarity, 1.0f, 4.0f);
-      ModSlider("gain", &n->gain, 0.1f, 0.9f);
+      ModSlider("octaves", &n->octaves, params::Noise::octaves_lo, params::Noise::octaves_hi, "%.0f");
+      ModSlider("lacunarity", &n->lacunarity, params::Noise::lacunarity_lo, params::Noise::lacunarity_hi);
+      ModSlider("gain", &n->gain, params::Noise::gain_lo, params::Noise::gain_hi);
       ImGui::EndDisabled();
-      ModSlider("warp", &n->warp, 0.0f, 2.0f);
-      ModSlider("speed", &n->speed, -2.0f, 2.0f);
-      ModSlider("contrast", &n->contrast, 0.1f, 4.0f);
-      ModSlider("brightness", &n->brightness, -0.5f, 0.5f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
+      ModSlider("warp", &n->warp, params::Noise::warp_lo, params::Noise::warp_hi);
+      ModSlider("speed", &n->speed, params::Noise::speed_lo, params::Noise::speed_hi);
+      ModSlider("contrast", &n->contrast, params::Noise::contrast_lo, params::Noise::contrast_hi);
+      ModSlider("brightness", &n->brightness, params::Noise::brightness_lo, params::Noise::brightness_hi);
+      ModSlider("seed", &n->seed, params::Noise::seed_lo, params::Noise::seed_hi, "%.0f", kParamWidth, false, 1.0f);
       ModCheckbox("rgb noise", &n->colorNoise);
       if (!n->colorNoise)
       {
@@ -1440,36 +1441,36 @@ namespace app
    void DrawTextureParams(TextureNode* n)
    {
       DropdownButton("type", TextureNode::TypeNames(), n->textureType, [n](int i) { n->textureType = i; });
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
-      ModSlider("scale", &n->scale, 0.5f, 60.0f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
+      ModSlider("width", &n->width, params::Texture::width_lo, params::Texture::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::Texture::height_lo, params::Texture::height_hi, "%.0f");
+      ModSlider("scale", &n->scale, params::Texture::scale_lo, params::Texture::scale_hi);
+      ModSlider("seed", &n->seed, params::Texture::seed_lo, params::Texture::seed_hi, "%.0f", kParamWidth, false, 1.0f);
 
       if (n->textureType == 0) // Voronoi
       {
          DropdownButton("distance", TextureNode::VoronoiDistanceNames(), n->voronoiDistance, [n](int i) { n->voronoiDistance = i; });
          DropdownButton("feature", TextureNode::VoronoiFeatureNames(), n->voronoiFeature, [n](int i) { n->voronoiFeature = i; });
          if (n->voronoiDistance == 3)
-            ModSlider("minkowski exponent", &n->voronoiMinkowskiExponent, 0.1f, 8.0f);
+            ModSlider("minkowski exponent", &n->voronoiMinkowskiExponent, params::Texture::voronoi_minkowski_exponent_lo, params::Texture::voronoi_minkowski_exponent_hi);
          if (n->voronoiFeature == 2)
-            ModSlider("smoothness", &n->voronoiSmoothness, 0.001f, 1.0f);
+            ModSlider("smoothness", &n->voronoiSmoothness, params::Texture::voronoi_smoothness_lo, params::Texture::voronoi_smoothness_hi);
          ModSlider("randomness", &n->voronoiRandomness, 0.0f, 1.0f);
          ModCheckbox("cell color", &n->voronoiCellColor);
       }
       else if (n->textureType == 1) // Brick
       {
-         ModSlider("brick width", &n->brickWidth, 0.05f, 2.0f);
-         ModSlider("row height", &n->brickHeight, 0.05f, 2.0f);
+         ModSlider("brick width", &n->brickWidth, params::Texture::brick_width_lo, params::Texture::brick_width_hi);
+         ModSlider("row height", &n->brickHeight, params::Texture::brick_height_lo, params::Texture::brick_height_hi);
          ModSlider("row offset", &n->brickRowOffset, 0.0f, 1.0f);
-         ModSlider("mortar size", &n->brickMortarSize, 0.0f, 0.2f);
+         ModSlider("mortar size", &n->brickMortarSize, params::Texture::brick_mortar_size_lo, params::Texture::brick_mortar_size_hi);
          ModSlider("mortar smooth", &n->brickMortarSmooth, 0.0f, 1.0f);
-         ModSlider("bias", &n->brickBias, -0.5f, 0.5f);
+         ModSlider("bias", &n->brickBias, params::Texture::brick_bias_lo, params::Texture::brick_bias_hi);
          ColorSwatch("mortar", n->mortarColor, n);
       }
       else if (n->textureType == 2) // Magic
       {
-         ModSlider("depth", &n->magicDepth, 1.0f, 10.0f, "%.0f");
-         ModSlider("distortion", &n->magicDistortion, 0.0f, 4.0f);
+         ModSlider("depth", &n->magicDepth, params::Texture::magic_depth_lo, params::Texture::magic_depth_hi, "%.0f");
+         ModSlider("distortion", &n->magicDistortion, params::Texture::magic_distortion_lo, params::Texture::magic_distortion_hi);
       }
       else if (n->textureType == 3) // Wave
       {
@@ -1477,21 +1478,21 @@ namespace app
          if (n->waveType == 0)
             DropdownButton("bands direction", TextureNode::WaveBandsDirectionNames(), n->waveBandsDirection, [n](int i) { n->waveBandsDirection = i; });
          DropdownButton("profile", TextureNode::WaveProfileNames(), n->waveProfile, [n](int i) { n->waveProfile = i; });
-         ModSlider("distortion", &n->waveDistortion, 0.0f, 4.0f);
-         ModSlider("detail", &n->waveDetail, 1.0f, 8.0f, "%.0f");
-         ModSlider("detail scale", &n->waveDetailScale, 0.1f, 8.0f);
+         ModSlider("distortion", &n->waveDistortion, params::Texture::wave_distortion_lo, params::Texture::wave_distortion_hi);
+         ModSlider("detail", &n->waveDetail, params::Texture::wave_detail_lo, params::Texture::wave_detail_hi, "%.0f");
+         ModSlider("detail scale", &n->waveDetailScale, params::Texture::wave_detail_scale_lo, params::Texture::wave_detail_scale_hi);
          ModSlider("phase offset", &n->wavePhaseOffset, 0.0f, 1.0f);
       }
       else if (n->textureType == 4) // Musgrave
       {
          DropdownButton("musgrave type", TextureNode::MusgraveTypeNames(), n->musgraveType, [n](int i) { n->musgraveType = i; });
-         ModSlider("dimension", &n->musgraveDimension, 0.0f, 4.0f);
-         ModSlider("lacunarity", &n->musgraveLacunarity, 1.001f, 6.0f);
-         ModSlider("octaves", &n->musgraveOctaves, 1.0f, 8.0f, "%.0f");
+         ModSlider("dimension", &n->musgraveDimension, params::Texture::musgrave_dimension_lo, params::Texture::musgrave_dimension_hi);
+         ModSlider("lacunarity", &n->musgraveLacunarity, params::Texture::musgrave_lacunarity_lo, params::Texture::musgrave_lacunarity_hi);
+         ModSlider("octaves", &n->musgraveOctaves, params::Texture::musgrave_octaves_lo, params::Texture::musgrave_octaves_hi, "%.0f");
          if (n->musgraveType == 3)
-            ModSlider("gain", &n->musgraveGain, 0.0f, 4.0f);
+            ModSlider("gain", &n->musgraveGain, params::Texture::musgrave_gain_lo, params::Texture::musgrave_gain_hi);
          if (n->musgraveType >= 2)
-            ModSlider("offset", &n->musgraveOffset, 0.0f, 4.0f);
+            ModSlider("offset", &n->musgraveOffset, params::Texture::musgrave_offset_lo, params::Texture::musgrave_offset_hi);
       }
       else if (n->textureType == 5) // Checker
       {
@@ -1503,25 +1504,25 @@ namespace app
       }
       else if (n->textureType == 7) // Clouds
       {
-         ModSlider("depth", &n->cloudsDepth, 1.0f, 8.0f, "%.0f");
+         ModSlider("depth", &n->cloudsDepth, params::Texture::clouds_depth_lo, params::Texture::clouds_depth_hi, "%.0f");
          ModCheckbox("hard", &n->cloudsHard);
       }
       else if (n->textureType == 8) // Marble
       {
          DropdownButton("marble type", TextureNode::MarbleTypeNames(), n->marbleType, [n](int i) { n->marbleType = i; });
-         ModSlider("turbulence", &n->marbleTurbulence, 0.0f, 20.0f);
-         ModSlider("noise scale", &n->marbleNoiseScale, 0.1f, 8.0f);
-         ModSlider("noise depth", &n->marbleNoiseDepth, 1.0f, 8.0f, "%.0f");
+         ModSlider("turbulence", &n->marbleTurbulence, params::Texture::marble_turbulence_lo, params::Texture::marble_turbulence_hi);
+         ModSlider("noise scale", &n->marbleNoiseScale, params::Texture::marble_noise_scale_lo, params::Texture::marble_noise_scale_hi);
+         ModSlider("noise depth", &n->marbleNoiseDepth, params::Texture::marble_noise_depth_lo, params::Texture::marble_noise_depth_hi, "%.0f");
       }
       else // Wood
       {
          DropdownButton("wood type", TextureNode::WoodTypeNames(), n->woodType, [n](int i) { n->woodType = i; });
-         ModSlider("turbulence", &n->woodTurbulence, 0.0f, 20.0f);
-         ModSlider("noise scale", &n->woodNoiseScale, 0.1f, 8.0f);
+         ModSlider("turbulence", &n->woodTurbulence, params::Texture::wood_turbulence_lo, params::Texture::wood_turbulence_hi);
+         ModSlider("noise scale", &n->woodNoiseScale, params::Texture::wood_noise_scale_lo, params::Texture::wood_noise_scale_hi);
       }
 
-      ModSlider("contrast", &n->contrast, 0.1f, 4.0f);
-      ModSlider("brightness", &n->brightness, -0.5f, 0.5f);
+      ModSlider("contrast", &n->contrast, params::Texture::contrast_lo, params::Texture::contrast_hi);
+      ModSlider("brightness", &n->brightness, params::Texture::brightness_lo, params::Texture::brightness_hi);
       if (n->textureType != 1 && !(n->textureType == 0 && n->voronoiCellColor) && n->textureType != 2)
       {
          ColorSwatch("low", n->lowColor, n);
@@ -1534,9 +1535,9 @@ namespace app
    {
       ImGui::BeginDisabled(n->manual && !gParamRegisterOnly);   // manual pins the slot; the clock is unused
       DropdownButton("unit", SwitcherNode::UnitNames(), n->unit, [n](int i) { n->unit = i; });
-      ModSlider("every", &n->interval, 0.05f, 32.0f);
+      ModSlider("every", &n->interval, params::Switcher::interval_lo, params::Switcher::interval_hi);
       ImGui::EndDisabled();
-      ModSlider("crossfade", &n->crossfade, 0.0f, 0.99f);
+      ModSlider("crossfade", &n->crossfade, params::Switcher::crossfade_lo, params::Switcher::crossfade_hi);
       ModCheckbox("manual", &n->manual);
       if (n->manual)
       {
@@ -1678,8 +1679,8 @@ namespace app
       }
       ModCheckbox("auto iterate", &n->autoIterate);
       if (n->autoIterate)
-         ModSlider("steps / beat", &n->stepsPerBeat, 0.05f, 16.0f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
+         ModSlider("steps / beat", &n->stepsPerBeat, params::Resynth::steps_per_beat_lo, params::Resynth::steps_per_beat_hi);
+      ModSlider("seed", &n->seed, params::Resynth::seed_lo, params::Resynth::seed_hi, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -1974,7 +1975,7 @@ namespace app
       MacroHostSlotField(n->hostSlot, kMacroWideCell);
       // Clamped to 8 because the body only ever draws 8 segments - a count of
       // 16 used to leave half the selector unreachable.
-      ModSliderInt("count", &n->count, 2, 8);
+      ModSliderInt("count", &n->count, params::MacroRadioSelector::count_lo, params::MacroRadioSelector::count_hi);
    }
 
 
@@ -2017,7 +2018,7 @@ namespace app
    {
       MacroNameField(n->label, kMacroWideCell);
       MacroHostSlotField(n->hostSlot, kMacroWideCell);
-      ModSlider("rate", &n->rateBeats, 0.05f, 4.0f, "%.2f beats");
+      ModSlider("rate", &n->rateBeats, params::MacroStepGate::rate_beats_lo, params::MacroStepGate::rate_beats_hi, "%.2f beats");
    }
 
 
@@ -2089,7 +2090,7 @@ namespace app
       }
       else
       {
-         ModSlider("hold", &n->hold, 0.02f, 2.0f);
+         ModSlider("hold", &n->hold, params::MidiTrigger::hold_lo, params::MidiTrigger::hold_hi);
          ModCheckbox("velocity sensitive", &n->velocitySensitive);
       }
    }
@@ -2161,7 +2162,7 @@ namespace app
       if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * tok::param_macro_xy_params_ratio, 0)))
          n->ClearPath();
       ModCheckbox("loop", &n->loopPath);
-      ModSlider("speed", &n->speed, 0.05f, 4.0f);
+      ModSlider("speed", &n->speed, params::MacroXY::speed_lo, params::MacroXY::speed_hi);
       if (Platform::PluginModeActive())
       {
          MacroHostSlotField(n->hostSlot, kPreviewSize * tok::param_macro_xy_params_ratio_2, "##hostslotx", "x slot");

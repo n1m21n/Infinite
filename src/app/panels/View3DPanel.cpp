@@ -2,6 +2,7 @@
 // the Scene3DNode's placements; the nodes themselves are only ever read, so a
 // source keeps animating under whatever arrangement is made on top of it.
 #include "core/FactoryPresets.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/components/ListRow.h"
 #include "app/ui/design/UiInteract.h"
@@ -145,7 +146,7 @@ namespace
       // circle of this many pixels, one undo step per stroke.
       bool paint = false;
       bool stroking = false;
-      float radius = 40.0f;
+      float radius = tok::view3d_pose_brush_radius;
       ImVec2 lastDab;
    } sPose;
    void ToggleSculpt(Scene3DNode* scene);
@@ -157,8 +158,8 @@ namespace
       bool on = false;
       int item = 0;
       int brush = Sculpt::kDraw;
-      float radius = 50.0f;          // screen pixels, Blender's default
-      float strength = 0.5f;
+      float radius = tok::view3d_sculpt_brush_radius;          // screen pixels, Blender's default
+      float strength = 0.5f;   // ui-audit-ok: brush strength default (model value)
       int symmetry = 1;              // X on, as in Blender
       bool stroking = false;
       ImVec2 last;
@@ -2530,8 +2531,8 @@ namespace
       else if (command && !io.KeyAlt)
       {
          if (digit(1)) ViewAxis(5);
-         else if (digit(3)) ViewAxis(1);
-         else if (digit(7)) ViewAxis(3);
+         else if (digit(3)) ViewAxis(1);   // ui-audit-ok: numpad view key
+         else if (digit(7)) ViewAxis(3);   // ui-audit-ok: numpad view key
       }
       const bool plain = !command && !io.KeyAlt;
       if (plain && !io.KeyShift)
@@ -2562,19 +2563,19 @@ namespace
          else if (pressed(ImGuiKey_Z)) sShading = (Shading)(((int)sShading + 1) % 3);
          else if (digit(0)) ToggleCamera(scene);
          else if (digit(1)) ViewAxis(4);
-         else if (digit(3)) ViewAxis(0);
-         else if (digit(7)) ViewAxis(2);
-         else if (digit(5))
+         else if (digit(3)) ViewAxis(0);   // ui-audit-ok: numpad view key
+         else if (digit(7)) ViewAxis(2);   // ui-audit-ok: numpad view key
+         else if (digit(5))   // ui-audit-ok: numpad view key
          {
             sOrtho = !sOrtho;
             sAutoOrtho = false;
          }
-         else if (digit(9))
+         else if (digit(9))   // ui-audit-ok: numpad view key
             GlideTo([&] { OrbitBy(scene, kPi, 0.0f); });
-         else if (digit(2) || digit(8))
-            GlideTo([&] { OrbitBy(scene, 0.0f, digit(8) ? RotStep() : -RotStep()); });
-         else if (digit(4) || digit(6))
-            GlideTo([&] { OrbitBy(scene, digit(6) ? RotStep() : -RotStep(), 0.0f); });
+         else if (digit(2) || digit(8))   // ui-audit-ok: numpad view key
+            GlideTo([&] { OrbitBy(scene, 0.0f, digit(8) ? RotStep() : -RotStep()); });   // ui-audit-ok: numpad view key
+         else if (digit(4) || digit(6))   // ui-audit-ok: numpad view key
+            GlideTo([&] { OrbitBy(scene, digit(6) ? RotStep() : -RotStep(), 0.0f); });   // ui-audit-ok: numpad view key
          else if (pressed(ImGuiKey_A))
          {
             sSel.clear();
@@ -6455,45 +6456,45 @@ namespace
       ColorRow(T("Colour"), light->color, "Light colour");
       BoolRow(T("Temperature"), &light->useTemperature);
       if (light->useTemperature)
-         FloatRow(T("Kelvin"), &light->temperature, 800.0f, 20000.0f, "%.0f K");
-      FloatRow(T("Strength"), &light->intensity, 0.0f, 20.0f, "%.2f");
-      FloatRow(T("Exposure"), &light->exposure, -10.0f, 10.0f, "%.2f");
+         FloatRow(T("Kelvin"), &light->temperature, params::Light::temperature_lo, params::Light::temperature_hi, "%.0f K");
+      FloatRow(T("Strength"), &light->intensity, params::Light::intensity_2_lo, params::Light::intensity_2_hi, "%.2f");
+      FloatRow(T("Exposure"), &light->exposure, params::Light::exposure_2_lo, params::Light::exposure_2_hi, "%.2f");
       if (light->type != 3)
       {
-         FloatRow(T("Orbit"), &light->azimuth, -180.0f, 180.0f, "%.1f");
-         FloatRow(T("Elevation"), &light->elevation, -90.0f, 90.0f, "%.1f");
+         FloatRow(T("Orbit"), &light->azimuth, params::Light::azimuth_lo, params::Light::azimuth_hi, "%.1f");
+         FloatRow(T("Elevation"), &light->elevation, params::Light::elevation_2_lo, params::Light::elevation_2_hi, "%.1f");
       }
       if (light->type == 1 || light->type == 4 || light->type == 5)
-         FloatRow(T("Distance"), &light->distance, 0.05f, 100.0f, "%.2f");
+         FloatRow(T("Distance"), &light->distance, params::Light::distance_2_lo, params::Light::distance_2_hi, "%.2f");
       if (light->type == 4)
       {
-         FloatRow(T("Cone"), &light->spotAngle, 1.0f, 89.0f, "%.1f");
+         FloatRow(T("Cone"), &light->spotAngle, params::Light::spot_angle_2_lo, params::Light::spot_angle_2_hi, "%.1f");
          FloatRow(T("Blend"), &light->spotPenumbra, 0.0f, 1.0f, "%.2f");
          BoolRow(T("Show cone"), &light->showCone);
       }
       if (light->type == 5)
       {
-         FloatRow(T("Width"), &light->areaWidth, 0.05f, 20.0f, "%.2f");
-         FloatRow(T("Height"), &light->areaHeight, 0.05f, 20.0f, "%.2f");
+         FloatRow(T("Width"), &light->areaWidth, params::Light::area_width_lo, params::Light::area_width_2_hi, "%.2f");
+         FloatRow(T("Height"), &light->areaHeight, params::Light::area_height_lo, params::Light::area_height_2_hi, "%.2f");
          ComboRow(T("Shape"), &light->areaShape, std::vector<std::string>{ T("Rectangle"), T("Disc") }, "Light shape");
-         FloatRow(T("Spread"), &light->areaSpread, 1.0f, 180.0f, "%.0f");
+         FloatRow(T("Spread"), &light->areaSpread, params::Light::area_spread_lo, params::Light::area_spread_hi, "%.0f");
          BoolRow(T("Normalize"), &light->normalize);
       }
       if (light->type == 1 || light->type == 4 || light->type == 5)
       {
-         FloatRow(T("Falloff"), &light->falloff, 0.0f, 4.0f, "%.2f");
+         FloatRow(T("Falloff"), &light->falloff, params::Light::falloff_lo, params::Light::falloff_hi, "%.2f");
          Checks("##checks3", {
             { T("Soft falloff"), &light->softFalloff },
             { T("Custom distance"), &light->useCutoff },
          });
          if (light->useCutoff)
-            FloatRow(T("Cutoff"), &light->cutoffDistance, 0.01f, 100.0f, "%.2f");
+            FloatRow(T("Cutoff"), &light->cutoffDistance, params::Light::cutoff_distance_lo, params::Light::cutoff_distance_hi, "%.2f");
       }
-      FloatRow(T("Diffuse"), &light->diffuse, 0.0f, 2.0f, "%.2f");
+      FloatRow(T("Diffuse"), &light->diffuse, params::Light::diffuse_lo, params::Light::diffuse_hi, "%.2f");
       if (light->type != 3)
       {
-         FloatRow(T("Specular"), &light->specular, 0.0f, 2.0f, "%.2f");
-         FloatRow(T("Transmission"), &light->transmission, 0.0f, 2.0f, "%.2f");
+         FloatRow(T("Specular"), &light->specular, params::Light::specular_lo, params::Light::specular_hi, "%.2f");
+         FloatRow(T("Transmission"), &light->transmission, params::Light::transmission_lo, params::Light::transmission_hi, "%.2f");
       }
       if (light->type != 1 && light->type != 3)
       {
@@ -6507,10 +6508,10 @@ namespace
          if (casts)
          {
             BoolRow(T("Shadow"), &light->castShadow);
-            FloatRow(T("Radius"), &light->shadowRadius, 0.0f, 5.0f, "%.2f");
-            FloatRow(T("Filter"), &light->shadowFilter, 0.0f, 10.0f, "%.2f");
+            FloatRow(T("Radius"), &light->shadowRadius, params::Light::shadow_radius_lo, params::Light::shadow_radius_hi, "%.2f");
+            FloatRow(T("Filter"), &light->shadowFilter, params::Light::shadow_filter_lo, params::Light::shadow_filter_hi, "%.2f");
             ComboRow(T("Resolution"), &light->shadowRes, { T("From the look"), "1024", "2048", "4096" });
-            FloatRow(T("Clip start"), &light->shadowClip, 0.05f, 20.0f, "%.2f");
+            FloatRow(T("Clip start"), &light->shadowClip, params::Light::shadow_clip_lo, params::Light::shadow_clip_hi, "%.2f");
          }
          PointAtCursor(scene, item, availW);
       }
@@ -6604,10 +6605,10 @@ namespace
    void DrawCameraCards(Scene3DNode* scene, Item* item, CameraNode* cam, float availW)
    {
       WinCard(T("View"), nullptr, [&]() {
-         FloatRow(T("Distance"), &cam->distance, 0.05f, 100.0f, "%.2f");
-         FloatRow(T("Orbit"), &cam->azimuth, -180.0f, 180.0f, "%.1f");
-         FloatRow(T("Elevation"), &cam->elevation, -90.0f, 90.0f, "%.1f");
-         FloatRow(T("Roll"), &cam->roll, -180.0f, 180.0f, "%.1f");
+         FloatRow(T("Distance"), &cam->distance, params::Camera::distance_2_lo, params::Camera::distance_2_hi, "%.2f");
+         FloatRow(T("Orbit"), &cam->azimuth, params::Camera::azimuth_lo, params::Camera::azimuth_hi, "%.1f");
+         FloatRow(T("Elevation"), &cam->elevation, params::Camera::elevation_2_lo, params::Camera::elevation_2_hi, "%.1f");
+         FloatRow(T("Roll"), &cam->roll, params::Camera::roll_lo, params::Camera::roll_hi, "%.1f");
          {
             float* v[3] = { &cam->targetX, &cam->targetY, &cam->targetZ };
             const char* fmt[3] = { "X %.2f", "Y %.2f", "Z %.2f" };
@@ -6625,11 +6626,11 @@ namespace
             if (sLensUnit == 0)
             {
                float mm = cam->FocalLength(RenderAspect(scene));
-               if (FloatRow(T("Focal length"), &mm, 1.0f, 300.0f, "%.0f mm"))
+               if (FloatRow(T("Focal length"), &mm, params::view3d::mm_lo, params::view3d::mm_hi, "%.0f mm"))
                   cam->SetFocalLength(mm, RenderAspect(scene));
             }
             else
-               FloatRow(T("Field of view"), &cam->fov, 1.0f, 170.0f, "%.1f");
+               FloatRow(T("Field of view"), &cam->fov, params::Camera::fov_2_lo, params::Camera::fov_2_hi, "%.1f");
             static const std::vector<std::string> kUnits = { "Millimeters", "Field of view" };
             std::vector<std::string> units;
             for (const std::string& n : kUnits)
@@ -6637,10 +6638,10 @@ namespace
             ComboRow(T("Lens unit"), &sLensUnit, units);
          }
          else
-            FloatRow(T("Scale"), &cam->orthoHeight, 0.01f, 100.0f, "%.2f");
+            FloatRow(T("Scale"), &cam->orthoHeight, params::Camera::ortho_height_2_lo, params::Camera::ortho_height_2_hi, "%.2f");
          FloatPairRow(T("Shift"), &cam->shiftX, &cam->shiftY, -2.0f, 2.0f, "X %.3f", "Y %.3f");
-         FloatRow(T("Clip start"), &cam->nearPlane, 0.001f, 10.0f, "%.3f");
-         FloatRow(T("Clip end"), &cam->farPlane, 1.0f, 10000.0f, "%.0f");
+         FloatRow(T("Clip start"), &cam->nearPlane, params::Camera::near_plane_2_lo, params::Camera::near_plane_2_hi, "%.3f");
+         FloatRow(T("Clip end"), &cam->farPlane, params::Camera::far_plane_2_lo, params::Camera::far_plane_2_hi, "%.0f");
             });
       WinCard(T("Camera"), nullptr, [&]() {
          // Blender holds the focal length while the sensor changes; the view angle follows.
@@ -6667,7 +6668,7 @@ namespace
          }
          float* side = cam->sensorFit == 2 ? &cam->sensorHeight : &cam->sensorWidth;
          float sensor = *side;
-         if (FloatRow(cam->sensorFit == 0 ? T("Sensor") : cam->sensorFit == 1 ? T("Width") : T("Height"), &sensor, 1.0f, 100.0f, "%.0f mm"))
+         if (FloatRow(cam->sensorFit == 0 ? T("Sensor") : cam->sensorFit == 1 ? T("Width") : T("Height"), &sensor, params::view3d::sensor_lo, params::view3d::sensor_hi, "%.0f mm"))
          {
             *side = sensor;
             cam->SetFocalLength(mm, RenderAspect(scene));
@@ -6686,7 +6687,7 @@ namespace
          PointAtCursor(scene, item, availW);
             });
       WinCard(T("Viewport Display"), nullptr, [&]() {
-         FloatRow(T("Size"), &cam->displaySize, 0.01f, 10.0f, "%.2f");
+         FloatRow(T("Size"), &cam->displaySize, params::Camera::display_size_lo, params::Camera::display_size_hi, "%.2f");
          Checks("##checks4", {
             { T("Limits"), &cam->showLimits },
             { T("Mist"), &cam->showMist },
@@ -6729,8 +6730,8 @@ namespace
             }
             edit |= ComboRow(T("Frame method"), &back.fit, { T("Stretch"), T("Fit"), T("Crop") });
             edit |= FloatPairRow(T("Offset"), &back.offset[0], &back.offset[1], -2.0f, 2.0f, "X %.3f", "Y %.3f");
-            edit |= FloatRow(T("Rotation"), &back.rotation, -180.0f, 180.0f, "%.1f");
-            edit |= FloatRow(T("Scale"), &back.scale, 0.01f, 10.0f, "%.3f");
+            edit |= FloatRow(T("Rotation"), &back.rotation, params::view3d::rotation_lo, params::view3d::rotation_hi, "%.1f");
+            edit |= FloatRow(T("Scale"), &back.scale, params::view3d::scale_lo, params::view3d::scale_hi, "%.3f");
             edit |= BoolRow(T("Flip horizontally"), &back.flipX);
             edit |= BoolRow(T("Flip vertically"), &back.flipY);
             ImGui::EndDisabled();
@@ -6767,15 +6768,15 @@ namespace
             scene->Commit();
          }
          ImGui::BeginDisabled(scene->focusItem != 0);
-         FloatRow(T("Distance"), &look.focusDistance, 0.05f, 100.0f, "%.2f");
+         FloatRow(T("Distance"), &look.focusDistance, params::Render3D::focus_distance_2_lo, params::Render3D::focus_distance_2_hi, "%.2f");
          ImGui::EndDisabled();
          float stop = set.fStop > 0.0f ? set.fStop : 2.8f;
-         if (FloatRow(T("F-Stop"), &stop, 0.7f, 128.0f, "%.1f"))
+         if (FloatRow(T("F-Stop"), &stop, params::view3d::stop_lo, params::view3d::stop_hi, "%.1f"))
             set.fStop = stop;
          if (IntInputRow(T("Blades"), &look.dofBlades))
             look.dofBlades = look.dofBlades < 3 ? (look.dofBlades > 0 ? 3 : 0) : std::min(look.dofBlades, 16);
-         FloatRow(T("Rotation"), &look.dofRotation, -180.0f, 180.0f, "%.0f");
-         FloatRow(T("Ratio"), &look.dofRatio, 0.01f, 2.0f, "%.2f");
+         FloatRow(T("Rotation"), &look.dofRotation, params::Render3D::dof_rotation_lo, params::Render3D::dof_rotation_hi, "%.0f");
+         FloatRow(T("Ratio"), &look.dofRatio, params::Render3D::dof_ratio_lo, params::Render3D::dof_ratio_hi, "%.2f");
          ImGui::EndDisabled();
       });
       if (dof != was)
@@ -7281,9 +7282,9 @@ namespace
          ComboRow(T("Shading"), &mat->shading, GeometryNode::ShadingNames(), "Material shading");
          ColorRow(T("Colour"), mat->color, "Material colour");
          FloatRow(T("Metallic"), &mat->metallic, 0.0f, 1.0f, "%.2f");
-         FloatRow(T("Roughness"), &mat->roughness, 0.02f, 1.0f, "%.2f");
+         FloatRow(T("Roughness"), &mat->roughness, params::Material::roughness_lo, params::Material::roughness_hi, "%.2f");
          FloatRow(T("Specular"), &mat->specular, 0.0f, 1.0f, "%.2f");
-         FloatRow(T("IOR"), &mat->ior, 1.0f, 3.0f, "%.2f");
+         FloatRow(T("IOR"), &mat->ior, params::Material::ior_lo, params::Material::ior_hi, "%.2f");
          FloatRow(T("Opacity"), &mat->opacity, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Transmission"), &mat->transmission, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Clearcoat"), &mat->clearcoat, 0.0f, 1.0f, "%.2f");
@@ -7292,7 +7293,7 @@ namespace
             });
       InlineCard(T("Emission"), [&]() {
          ColorRow(T("Colour"), mat->emissionColor, "Material emission colour");
-         FloatRow(T("Strength"), &mat->emission, 0.0f, 8.0f, "%.2f");
+         FloatRow(T("Strength"), &mat->emission, params::Material::emission_lo, params::Material::emission_hi, "%.2f");
             });
       WinCard(T("Maps"), nullptr, [&]() {
          static const char* const kMaps[kMapCount] = { "Base colour", "Roughness", "Metallic", "Normal",
@@ -7329,7 +7330,7 @@ namespace
             }
          }
          if (mat->MapInput(kMapNormal).IsConnected())
-            FloatRow(T("Normal strength"), &mat->normalStrength, 0.0f, 4.0f, "%.2f");
+            FloatRow(T("Normal strength"), &mat->normalStrength, params::Material::normal_strength_lo, params::Material::normal_strength_hi, "%.2f");
             });
    }
 
@@ -7358,7 +7359,7 @@ namespace
          {
             if (ColorRow(T("Colour"), scene->worldColor, "3D View world"))
                scene->Commit();
-            if (FloatRow(T("Strength"), &scene->worldStrength, 0.0f, 10.0f, "%.3f", "3D View world"))
+            if (FloatRow(T("Strength"), &scene->worldStrength, params::Scene3D::world_strength_lo, params::Scene3D::world_strength_hi, "%.3f", "3D View world"))
                scene->Commit();
          }
          if (env == nullptr && ActionButton::Draw(L("Load HDRI..."), ImVec2(-1.0f, 0)))
@@ -7372,27 +7373,27 @@ namespace
          {
             if (ActionButton::Draw(L("Load HDRI..."), ImVec2(-1.0f, 0)))
                sPending.what = Pending::PickHdri;
-            FloatRow(T("Rotation"), &env->rotation, -180.0f, 180.0f, "%.0f");
-            FloatRow(T("Strength"), &env->intensity, 0.0f, 10.0f, "%.3f");
+            FloatRow(T("Rotation"), &env->rotation, params::view3d::rotation_lo, params::view3d::rotation_hi, "%.0f");
+            FloatRow(T("Strength"), &env->intensity, params::view3d::intensity_lo, params::view3d::intensity_hi, "%.3f");
             Scene3DNode::Settings& set = scene->settings;
             if (BoolRow(T("Background colour"), &set.backdropOn))
                scene->Commit();
             if (set.backdropOn && ColorRow(T("Colour"), set.backdrop, "3D View world"))
                scene->Commit();
-            FloatRow(T("Sun threshold"), &env->sunThreshold, 0.0f, 100.0f, "%.1f");
+            FloatRow(T("Sun threshold"), &env->sunThreshold, params::view3d::sun_threshold_lo, params::view3d::sun_threshold_hi, "%.1f");
             if (env->sunThreshold > 0.0f)
             {
-               FloatRow(T("Sun angle"), &env->sunAngle, 0.0f, 10.0f, "%.2f");
+               FloatRow(T("Sun angle"), &env->sunAngle, params::view3d::sun_angle_lo, params::view3d::sun_angle_hi, "%.2f");
                BoolRow(T("Sun shadow"), &env->sunShadow);
                ComboRow(T("Sun resolution"), &env->sunShadowRes, { T("From the look"), "1024", "2048", "4096" });
-               FloatRow(T("Sun filter"), &env->sunShadowFilter, 0.0f, 10.0f, "%.2f");
+               FloatRow(T("Sun filter"), &env->sunShadowFilter, params::view3d::sun_shadow_filter_lo, params::view3d::sun_shadow_filter_hi, "%.2f");
             }
          }
             });
       Render3DNode& look = scene->Look();
       InlineCard(T("Light"), [&]() {
          ColorRow(T("Ambient"), look.ambientColor);
-         FloatRow(T("Reflections"), &look.envIntensity, 0.0f, 3.0f, "%.2f");
+         FloatRow(T("Reflections"), &look.envIntensity, params::Render3D::env_intensity_lo, params::Render3D::env_intensity_hi, "%.2f");
             });
    }
 
@@ -7506,7 +7507,7 @@ namespace
          FieldLabel(T("Render"));
          ImGui::SetNextItemWidth(sFieldW);
          const int was = look.supersample;
-         FieldWell::Slider("##v3dsuper", &look.supersample, 1, 64, "%d");
+         FieldWell::Slider("##v3dsuper", &look.supersample, params::Render3D::supersample_lo, params::Render3D::supersample_hi, "%d");
          UndoableFrom(&look.supersample, was, "Edit in 3D View");
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Samples per frame when rendering out."));
@@ -7514,12 +7515,12 @@ namespace
       WinCard(T("Shadows"), &look.shadowsEnabled, [&]() {
          ComboRow(T("Quality"), &look.shadowQuality, Render3DNode::ShadowQualityNames());
          FloatRow(T("Strength"), &look.shadowStrength, 0.0f, 1.0f, "%.2f");
-         FloatRow(T("Softness"), &look.shadowSoftness, 0.0f, 4.0f, "%.2f");
-         FloatRow(T("Bias"), &look.shadowBias, 0.0002f, 0.02f, "%.4f");
+         FloatRow(T("Softness"), &look.shadowSoftness, params::Render3D::shadow_softness_lo, params::Render3D::shadow_softness_hi, "%.2f");
+         FloatRow(T("Bias"), &look.shadowBias, params::Render3D::shadow_bias_lo, params::Render3D::shadow_bias_hi, "%.4f");
       });
       InlineCard(T("Ambient Occlusion"), [&]() {
          FloatRow(T("Strength"), &look.aoStrength, 0.0f, 1.0f, "%.2f");
-         FloatRow(T("Distance"), &look.aoRadius, 0.05f, 3.0f, "%.2f");
+         FloatRow(T("Distance"), &look.aoRadius, params::Render3D::ao_radius_lo, params::Render3D::ao_radius_hi, "%.2f");
       });
       WinCard(T("Shading"), nullptr, [&]() {
          ComboRow(T("Mode"), &look.viewShading, Render3DNode::ViewShadingNames());
@@ -7532,7 +7533,7 @@ namespace
             {
                BoolRow(T("World space"), &look.studioWorld);
                if (look.studioWorld)
-                  FloatRow(T("Rotation"), &look.studioRotation, -180.0f, 180.0f, "%.0f");
+                  FloatRow(T("Rotation"), &look.studioRotation, params::Render3D::studio_rotation_lo, params::Render3D::studio_rotation_hi, "%.0f");
                BoolRow(T("Specular"), &look.solidSpecular);
             }
             ComboRow(T("Colour"), &look.solidColor, Render3DNode::SolidColorNames());
@@ -7550,30 +7551,30 @@ namespace
          ComboRow(T("Type"), &look.cavityType, Render3DNode::CavityTypeNames());
          if (look.cavityType != 1)
          {
-            FloatRow(T("Ridge"), &look.cavityRidge, 0.0f, 2.5f, "%.2f");
-            FloatRow(T("Valley"), &look.cavityValley, 0.0f, 2.5f, "%.2f");
-            FloatRow(T("Distance"), &look.cavityDistance, 0.01f, 2.0f, "%.2f");
+            FloatRow(T("Ridge"), &look.cavityRidge, params::Render3D::cavity_ridge_lo, params::Render3D::cavity_ridge_hi, "%.2f");
+            FloatRow(T("Valley"), &look.cavityValley, params::Render3D::cavity_valley_lo, params::Render3D::cavity_valley_hi, "%.2f");
+            FloatRow(T("Distance"), &look.cavityDistance, params::Render3D::cavity_distance_lo, params::Render3D::cavity_distance_hi, "%.2f");
          }
          if (look.cavityType != 0)
          {
-            FloatRow(T("Curvature ridge"), &look.curvatureRidge, 0.0f, 2.0f, "%.2f");
-            FloatRow(T("Curvature valley"), &look.curvatureValley, 0.0f, 2.0f, "%.2f");
+            FloatRow(T("Curvature ridge"), &look.curvatureRidge, params::Render3D::curvature_ridge_lo, params::Render3D::curvature_ridge_hi, "%.2f");
+            FloatRow(T("Curvature valley"), &look.curvatureValley, params::Render3D::curvature_valley_lo, params::Render3D::curvature_valley_hi, "%.2f");
          }
       });
       WinCard(T("Bloom"), nullptr, [&]() {
          FloatRow(T("Strength"), &look.bloom, 0.0f, 1.0f, "%.2f");
-         FloatRow(T("Threshold"), &look.bloomThreshold, 0.5f, 8.0f, "%.2f");
+         FloatRow(T("Threshold"), &look.bloomThreshold, params::Render3D::bloom_threshold_lo, params::Render3D::bloom_threshold_hi, "%.2f");
          FloatRow(T("Radius"), &look.bloomRadius, 0.0f, 1.0f, "%.2f");
       });
       WinCard(T("Motion Blur"), &look.motionBlur, [&]() {
          ComboRow(T("Position"), &look.motionPosition, Render3DNode::MotionPositionNames());
-         FloatRow(T("Shutter"), &look.motionShutter, 0.0f, 2.0f, "%.2f");
-         FloatRow(T("Max blur"), &look.motionMax, 1.0f, 256.0f, "%.0f px");
+         FloatRow(T("Shutter"), &look.motionShutter, params::Render3D::motion_shutter_lo, params::Render3D::motion_shutter_hi, "%.2f");
+         FloatRow(T("Max blur"), &look.motionMax, params::Render3D::motion_max_lo, params::Render3D::motion_max_hi, "%.0f px");
       });
       WinCard(T("Film"), nullptr, [&]() {
          BoolRow(T("Transparent"), &sSet->transparent);
-         FloatRow(T("Filter size"), &sSet->filterSize, 0.0f, 4.0f, "%.2f px");
-         FloatRow(T("Dither"), &sSet->dither, 0.0f, 2.0f, "%.2f");
+         FloatRow(T("Filter size"), &sSet->filterSize, params::view3d::filter_size_lo, params::view3d::filter_size_hi, "%.2f px");
+         FloatRow(T("Dither"), &sSet->dither, params::view3d::dither_lo, params::view3d::dither_hi, "%.2f");
          BoolRow(T("Simplify"), &sSet->simplify);
       });
       WinCard(T("Render Region"), nullptr, [&]() {
@@ -7587,8 +7588,8 @@ namespace
       });
       WinCard(T("Colour Management"), nullptr, [&]() {
          ComboRow(T("View"), &look.tonemap, Render3DNode::TonemapNames());
-         FloatRow(T("Exposure"), &look.exposure, 0.1f, 4.0f, "%.2f");
-         FloatRow(T("Gamma"), &sSet->gamma, 0.2f, 3.0f, "%.2f");
+         FloatRow(T("Exposure"), &look.exposure, params::Render3D::exposure_lo, params::Render3D::exposure_hi, "%.2f");
+         FloatRow(T("Gamma"), &sSet->gamma, params::view3d::gamma_lo, params::view3d::gamma_hi, "%.2f");
          ComboRow(T("Look"), &sSet->look, std::vector<std::string>{ T("None"), T("Low contrast"), T("Medium contrast"), T("High contrast"), T("Faded") });
       });
    }
@@ -7617,7 +7618,7 @@ namespace
             if (ch)
                KeepingLenses(scene, [&] { scene->renderH = (float)std::clamp(h, tok::view3d_output_tab_bound, tok::view3d_output_tab_bound_2); });
          }
-         FloatRow(T("Resolution %"), &sSet->percent, 1.0f, 200.0f, "%.0f%%");
+         FloatRow(T("Resolution %"), &sSet->percent, params::view3d::percent_lo, params::view3d::percent_hi, "%.0f%%");
          FieldLabel(T("Final size"));
          char finalSize[32];
          snprintf(finalSize, sizeof(finalSize), "%d x %d", (int)(scene->renderW * sSet->percent / 100.0f), (int)(scene->renderH * sSet->percent / 100.0f));
@@ -7627,7 +7628,7 @@ namespace
          int rate = (int)(std::find(kRates.begin(), kRates.end(), (int)sSet->fps) - kRates.begin());
          if (ComboRow(T("Frame rate"), &rate, kRateNames))
             sSet->fps = (float)kRates[rate];
-         FloatRow(T("Base"), &sSet->fpsBase, 1.0f, 1.01f, "%.3f");
+         FloatRow(T("Base"), &sSet->fpsBase, params::view3d::fps_base_lo, params::view3d::fps_base_hi, "%.3f");
          FloatPairRow(T("Pixel aspect"), &sSet->pixelAspect[0], &sSet->pixelAspect[1], 0.1f, 10.0f, "X %.2f", "Y %.2f");
             });
       WinCard(T("Frame Range"), nullptr, [&]() {
@@ -7662,7 +7663,7 @@ namespace
             Undoable("Edit in 3D View");
          }
          BoolRow(T("Labels"), &sSet->stampLabels);
-         FloatRow(T("Font size"), &sSet->stampSize, 6.0f, 96.0f, "%.0f");
+         FloatRow(T("Font size"), &sSet->stampSize, params::view3d::stamp_size_lo, params::view3d::stamp_size_hi, "%.0f");
          ColorRow(T("Text"), sSet->stampFg);
          ColorRow(T("Background"), sSet->stampBg);
       });
@@ -7676,25 +7677,25 @@ namespace
             FloatRow(T("Alpha threshold"), &look.passThreshold, 0.0f, 1.0f, "%.2f");
          if (look.renderPass == 5)
          {
-            FloatRow(T("Mist start"), &look.mistStart, 0.0f, 100.0f, "%.2f");
-            FloatRow(T("Mist depth"), &look.mistDepth, 0.01f, 200.0f, "%.2f");
+            FloatRow(T("Mist start"), &look.mistStart, params::Render3D::mist_start_lo, params::Render3D::mist_start_hi, "%.2f");
+            FloatRow(T("Mist depth"), &look.mistDepth, params::Render3D::mist_depth_lo, params::Render3D::mist_depth_hi, "%.2f");
             ComboRow(T("Falloff"), &look.mistFalloff, Render3DNode::MistFalloffNames());
             FloatRow(T("Intensity"), &look.mistIntensity, 0.0f, 1.0f, "%.2f");
-            FloatRow(T("Height"), &look.mistHeight, 0.0f, 100.0f, "%.2f");
+            FloatRow(T("Height"), &look.mistHeight, params::Render3D::mist_height_lo, params::Render3D::mist_height_hi, "%.2f");
          }
          ComboRow(T("Projection"), &look.projection, Render3DNode::ProjectionNames());
          if (look.projection == Render3DNode::kEquirect || look.projection == Render3DNode::kCylindrical)
          {
-            FloatRow(T("Min latitude"), &look.latMin, -90.0f, 90.0f, "%.0f");
-            FloatRow(T("Max latitude"), &look.latMax, -90.0f, 90.0f, "%.0f");
-            FloatRow(T("Min longitude"), &look.lonMin, -180.0f, 180.0f, "%.0f");
-            FloatRow(T("Max longitude"), &look.lonMax, -180.0f, 180.0f, "%.0f");
+            FloatRow(T("Min latitude"), &look.latMin, params::Render3D::lat_min_lo, params::Render3D::lat_min_hi, "%.0f");
+            FloatRow(T("Max latitude"), &look.latMax, params::Render3D::lat_max_lo, params::Render3D::lat_max_hi, "%.0f");
+            FloatRow(T("Min longitude"), &look.lonMin, params::Render3D::lon_min_lo, params::Render3D::lon_min_hi, "%.0f");
+            FloatRow(T("Max longitude"), &look.lonMax, params::Render3D::lon_max_lo, params::Render3D::lon_max_hi, "%.0f");
          }
          if (look.projection == Render3DNode::kFisheye)
          {
             ComboRow(T("Lens"), &look.fisheyeLens, Render3DNode::FisheyeLensNames());
-            FloatRow(T("Dome angle"), &look.domeAngle, 60.0f, 360.0f, "%.0f");
-            FloatRow(T("Dome tilt"), &look.domeTilt, 0.0f, 90.0f, "%.0f");
+            FloatRow(T("Dome angle"), &look.domeAngle, params::Render3D::dome_angle_lo, params::Render3D::dome_angle_hi, "%.0f");
+            FloatRow(T("Dome tilt"), &look.domeTilt, params::Render3D::dome_tilt_lo, params::Render3D::dome_tilt_hi, "%.0f");
          }
             });
       ImGui::BeginDisabled(gOfflineRender.active || scene->activeCamera == 0);
@@ -7750,14 +7751,14 @@ namespace
             ComboRow(T("Length"), &set.lengthUnit, std::vector<std::string>{ T("Meters"), T("Centimeters"), T("Millimeters"), T("Kilometers") });
          if (set.unitSystem == 2)
             ComboRow(T("Length"), &set.lengthUnit, std::vector<std::string>{ T("Feet"), T("Inches"), T("Yards") });
-         FloatRow(T("Unit scale"), &set.unitScale, 0.001f, 1000.0f, "%.3f");
+         FloatRow(T("Unit scale"), &set.unitScale, params::view3d::unit_scale_lo, params::view3d::unit_scale_hi, "%.3f");
          ComboRow(T("Rotation"), &set.rotUnits, std::vector<std::string>{ T("Degrees"), T("Radians") });
             });
       WinCard(T("Snap"), nullptr, [&]() {
          BoolRow(T("On"), &set.snap);
-         FloatRow(T("Move"), &set.snapMove, 0.01f, 5.0f, "%.2f");
-         FloatRow(T("Rotate"), &set.snapRot, 1.0f, 90.0f, "%.0f");
-         FloatRow(T("Scale"), &set.snapScale, 0.01f, 1.0f, "%.2f");
+         FloatRow(T("Move"), &set.snapMove, params::view3d::snap_move_lo, params::view3d::snap_move_hi, "%.2f");
+         FloatRow(T("Rotate"), &set.snapRot, params::view3d::snap_rot_lo, params::view3d::snap_rot_hi, "%.0f");
+         FloatRow(T("Scale"), &set.snapScale, params::view3d::snap_scale_lo, params::view3d::snap_scale_hi, "%.2f");
          Checks("##checks7", {
             { T("To other objects"), &set.snapObjects },
             { T("Use for move"), &set.snapTranslate },
@@ -7765,7 +7766,7 @@ namespace
             { T("Use for scale"), &set.snapScaleOn },
             { T("Absolute increment"), &set.snapAbsolute },
          });
-         FloatRow(T("Rotate precision"), &set.snapRotFine, 0.1f, 15.0f, "%.1f");
+         FloatRow(T("Rotate precision"), &set.snapRotFine, params::view3d::snap_rot_fine_lo, params::view3d::snap_rot_fine_hi, "%.1f");
          ComboRow(T("Snap target"), &set.snapTarget, std::vector<std::string>{ T("Closest"), T("Center"), T("Median"), T("Active") });
          Checks("##checks8", {
             { T("Selectable only"), &set.snapSelectable },
@@ -7775,7 +7776,7 @@ namespace
       WinCard(T("Proportional Editing"), nullptr, [&]() {
          BoolRow(T("On (O)"), &set.proportional);
          ComboRow(T("Falloff"), &set.propFalloff, std::vector<std::string>{ T("Smooth"), T("Sphere"), T("Root"), T("Linear"), T("Sharp"), T("Constant") });
-         FloatRow(T("Size"), &set.propSize, 0.05f, 50.0f, "%.2f");
+         FloatRow(T("Size"), &set.propSize, params::view3d::prop_size_lo, params::view3d::prop_size_hi, "%.2f");
          BoolRow(T("Projected from view"), &set.projectedProp);
             });
       WinCard(T("Placement"), nullptr, [&]() {
@@ -7793,7 +7794,7 @@ namespace
          ImGui::SetNextItemWidth(sFieldW);
          FieldWell::PushStyle();
          float cur[3] = { set.cursor[0], -set.cursor[2], set.cursor[1] };
-         if (ImGui::DragFloat3("##v3dcursor", cur, 0.01f, 0.0f, 0.0f, "%.2f"))
+         if (ImGui::DragFloat3("##v3dcursor", cur, params::view3d::v3dcursor_speed, 0.0f, 0.0f, "%.2f"))
          {
             set.cursor[0] = cur[0]; set.cursor[2] = -cur[1]; set.cursor[1] = cur[2];
          }
@@ -7807,7 +7808,7 @@ namespace
          {
             float disp[3];
             ToDisplayRotation(set.cursorRot, disp);
-            if (ImGui::DragFloat3("##v3dcursorrot", disp, 0.5f, 0.0f, 0.0f, "%.1f"))
+            if (ImGui::DragFloat3("##v3dcursorrot", disp, params::view3d::v3dcursorrot_speed, 0.0f, 0.0f, "%.1f"))
                FromDisplayRotation(disp, set.cursorRot);
          }
          else
@@ -7844,9 +7845,9 @@ namespace
          ImGui::EndDisabled();
             });
       WinCard(T("View"), nullptr, [&]() {
-         FloatRow(T("Focal length"), &set.viewLens, 10.0f, 250.0f, "%.0f mm");
-         FloatRow(T("Clip start"), &set.clipStart, 0.001f, 10.0f, "%.3f");
-         FloatRow(T("Clip end"), &set.clipEnd, 10.0f, 10000.0f, "%.0f");
+         FloatRow(T("Focal length"), &set.viewLens, params::view3d::view_lens_lo, params::view3d::view_lens_hi, "%.0f mm");
+         FloatRow(T("Clip start"), &set.clipStart, params::view3d::clip_start_lo, params::view3d::clip_start_hi, "%.3f");
+         FloatRow(T("Clip end"), &set.clipEnd, params::view3d::clip_end_lo, params::view3d::clip_end_hi, "%.0f");
          BoolRow(T("Lock to 3D cursor"), &set.lockCursor);
             });
       WinCard(T("Viewport Visibility"), nullptr, [&]() {
@@ -7874,7 +7875,7 @@ namespace
          BoolRow(T("Orthographic grid"), &set.orthoGrid);
          FieldLabel(T("Axes"));
          Checks("##gridaxes", { { "X", &set.axisX }, { "Y", &set.axisY }, { "Z", &set.axisZ } });
-         FloatRow(T("Scale"), &set.gridScale, 0.001f, 1000.0f, "%.3f");
+         FloatRow(T("Scale"), &set.gridScale, params::view3d::grid_scale_lo, params::view3d::grid_scale_hi, "%.3f");
          if (IntInputRow(T("Lines"), &set.gridLines))
             set.gridLines = std::clamp(set.gridLines, 1, 200);
          if (IntInputRow(T("Subdivisions"), &set.gridSubdiv))
@@ -7894,8 +7895,8 @@ namespace
          FloatRow(T("Opacity"), &set.passAlpha, 0.0f, 1.0f, "%.2f");
       });
       WinCard(T("Safe Areas"), &set.safe, [&]() {
-         FloatRow(T("Title"), &set.safeTitle, 0.0f, 0.3f, "%.3f");
-         FloatRow(T("Action"), &set.safeAction, 0.0f, 0.3f, "%.3f");
+         FloatRow(T("Title"), &set.safeTitle, params::view3d::safe_title_lo, params::view3d::safe_title_hi, "%.3f");
+         FloatRow(T("Action"), &set.safeAction, params::view3d::safe_action_lo, params::view3d::safe_action_hi, "%.3f");
          BoolRow(T("Center-cut"), &set.safeCenter);
       });
       WinCard(T("Composition Guides"), nullptr, [&]() {

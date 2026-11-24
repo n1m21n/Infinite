@@ -152,6 +152,9 @@ FAMILY = {
     "format": (),   # set from the string, not the call
 }
 CALL_FAMILY = {name: fam for fam, names in FAMILY.items() for name in names}
+# families whose numbers are not design values (owner 2026-11-24): a node's canvas spot is patch data and stays with
+# the patch; an ImGui id or a style-stack pop count is bookkeeping, never drawn
+DATA_FAMILY = {"canvas_pos": "patch_data", "id_stack": "id_stack"}
 TEXT_CALLS = {"Text", "TextDisabled", "TextWrapped", "TextUnformatted", "BulletText", "TextColored", "LabelText", "SeparatorText",
               "MenuItem", "BeginMenu", "Selectable", "Button", "SmallButton", "Checkbox", "RadioButton", "CollapsingHeader",
               "TreeNode", "TreeNodeEx", "SetTooltip", "SetItemTooltip", "BeginCombo", "Combo", "BeginTabItem", "OpenPopup",
@@ -378,6 +381,8 @@ def scan_file(rel, src):
             allowed.bump("unit_conv", t.line); continue   # a colour channel between 0-1 and 0-255
         if call in STRUCTURE_CALLS:
             allowed.bump("structure", t.line); continue
+        if CALL_FAMILY.get(call) in DATA_FAMILY:
+            allowed.bump(DATA_FAMILY[CALL_FAMILY[call]], t.line); continue
         st = stmt_text(i)
         cat = None
         if call in CALL_FAMILY:
@@ -396,7 +401,7 @@ def scan_file(rel, src):
                 elif prev is not None and prev.text in ("<", ">", "<=", ">=", "==", "!="): cat = "compare"
                 elif prev is not None and prev.text in ("=", "+=", "-=", "*=", "/=", "return", "?", ":"): cat = "assign"
                 else: cat = "arith"
-        if cat in LOGIC_CATS or cat in ("timing", "hit", "value_format", "const_def") or cat.startswith("call:"):
+        if cat in LOGIC_CATS or cat in ("timing", "hit", "value_format", "const_def", "member_default") or cat.startswith("call:"):
             r = logic_reason(toks, match, i, t, v, prev, nxt, paren, st, stmt_lhs(stmt_start, i), cat, rel)
             if r: allowed.bump(r, t.line); continue
         findings.append((cat, call or "-", t.text if not neg else "-" + t.text, st[:110]) + where)
@@ -550,7 +555,7 @@ def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs, cat, rel=""):
         return "unit_conv"
     # no screen quantity beside it (no geometry call, no position/size name, no tok:: value): an offset into a byte
     # buffer, a count, an argc, a threshold on a model value. A design number always sits next to one.
-    if cat != "const_def" or not UI_DIRS.match(rel):
+    if cat not in ("const_def", "member_default") or not UI_DIRS.match(rel):
         return "no_geometry"
     return None
 

@@ -1,6 +1,7 @@
 // Sketch node body: Edit button, error line, size, and the knobs that the script's
 // param() calls declared (modulatable like Field's, see docs/plans/sketch/README.md).
 #include "app/AppShared.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
 
@@ -33,8 +34,8 @@ namespace app
          }
       }
 
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+      ModSlider("width", &n->width, params::Sketch::width_lo, params::Sketch::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::Sketch::height_lo, params::Sketch::height_hi, "%.0f");
       ModCheckbox("animate", &n->animate);
 
       DrawFieldParamSliders(n);

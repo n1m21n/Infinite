@@ -11,6 +11,7 @@
 // The engine is a private Generate Samples node (never in the graph, never cooked): a take made here and one made
 // on the node are the same sound for the same recipe. Snap to scale re-renders the take's own seed pinned.
 #include "app/frame/CanvasLink.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
@@ -147,7 +148,7 @@ namespace
       // Recipe for the next Generate.
       int part = 0;   // index into kParts
       int barsIdx = 1;
-      float variation = 0.5f;
+      float variation = 0.5f;   // ui-audit-ok: analysis setting default (model value)
       bool followScale = false;
       // The source and the edit.
       std::shared_ptr<const SourceAudio> src;
@@ -188,7 +189,7 @@ namespace
       std::optional<Clip> clip;
       int auditions = 0; // slices sent to the preview voice (MENUALIVETEST reads it)
       std::shared_ptr<OnsetJob> onsetJob;
-      int onsetMax = 16;
+      int onsetMax = 16;   // ui-audit-ok: analysis setting default (model value)
       // An auto-slice that would replace hand-placed slices waits here for the confirm dialog.
       std::function<void()> pendingReplace;
       bool replaceConfirmed = false, openReplaceConfirm = false;
@@ -2717,7 +2718,7 @@ namespace
 
       SectionCard::Begin(T("Level"));
       Row(T("Gain"), fieldW);
-      FieldWell::Slider("##sliceGain", &e.gainDb, -60.0f, 12.0f, "%+.1f dB");
+      FieldWell::Slider("##sliceGain", &e.gainDb, params::sample_studio::gain_db_lo, params::sample_studio::gain_db_hi, "%+.1f dB");
       t.Item();
       Row(T("Pan"), fieldW);
       FieldWell::Slider("##slicePan", &e.pan, -1.0f, 1.0f, "%+.2f");
@@ -2741,11 +2742,11 @@ namespace
 
       SectionCard::Begin(T("Pitch"));
       Row(T("Pitch"), fieldW);
-      if (FieldWell::Slider("##slicePitch", &e.pitchSt, -48.0f, 48.0f, "%+.0f st"))
+      if (FieldWell::Slider("##slicePitch", &e.pitchSt, params::sample_studio::pitch_st_lo, params::sample_studio::pitch_st_hi, "%+.0f st"))
          e.pitchSt = std::round(e.pitchSt);
       t.Item();
       Row(T("Fine"), fieldW);
-      FieldWell::Slider("##sliceFine", &e.fineCt, -100.0f, 100.0f, "%+.0f ct");
+      FieldWell::Slider("##sliceFine", &e.fineCt, params::sample_studio::fine_ct_lo, params::sample_studio::fine_ct_hi, "%+.0f ct");
       t.Item();
 
       SectionCard::Begin(T("Time"));
@@ -2756,7 +2757,7 @@ namespace
             HelpTip("%s", T("The slice keeps its span: Length plays it slower (cut at the slice's end) or faster (then silence, or Fill). Off: no stretch; repitch: moves the pitch too; beats and tonal: same pitch. Shift+Left/Right on the wave moulds the selected slices"));
       }
       Row(T("Length"), fieldW);
-      FieldWell::Slider("##sliceLen", &e.lengthRatio, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
+      FieldWell::Slider("##sliceLen", &e.lengthRatio, params::sample_studio::length_ratio_lo, params::sample_studio::length_ratio_hi, "%.2fx", ImGuiSliderFlags_Logarithmic);
       t.Item();
       SectionCard::RowLabel(T("Grid"));
       {
@@ -2782,10 +2783,10 @@ namespace
 
       SectionCard::Begin(T("Fade"));
       Row(T("In"), fieldW);
-      FieldWell::Slider("##sliceFadeIn", &e.fadeInMs, 0.0f, 500.0f, "%.0f ms");
+      FieldWell::Slider("##sliceFadeIn", &e.fadeInMs, params::sample_studio::fade_in_ms_lo, params::sample_studio::fade_in_ms_hi, "%.0f ms");
       t.Item();
       Row(T("Out"), fieldW);
-      FieldWell::Slider("##sliceFadeOut", &e.fadeOutMs, 0.0f, 500.0f, "%.0f ms");
+      FieldWell::Slider("##sliceFadeOut", &e.fadeOutMs, params::sample_studio::fade_out_ms_lo, params::sample_studio::fade_out_ms_hi, "%.0f ms");
       t.Item();
       Row(T("Curve"), fieldW);
       FieldWell::Slider("##sliceFadeCurve", &e.fadeCurve, -1.0f, 1.0f, "%+.2f");
@@ -2817,29 +2818,29 @@ namespace
 
       SectionCard::Begin(T("Pitch"));
       Row(T("Pitch"), fieldW);
-      if (FieldWell::Slider("##studiopitch", &w.pitch, -24.0f, 24.0f, "%+.0f st"))
+      if (FieldWell::Slider("##studiopitch", &w.pitch, params::sample_studio::pitch_lo, params::sample_studio::pitch_hi, "%+.0f st"))
          w.pitch = std::round(w.pitch);
       t.Item();
       Row(T("Fine"), fieldW);
-      FieldWell::Slider("##studiofine", &w.fine, -100.0f, 100.0f, "%+.0f ct");
+      FieldWell::Slider("##studiofine", &w.fine, params::sample_studio::fine_lo, params::sample_studio::fine_hi, "%+.0f ct");
       t.Item();
 
       SectionCard::Begin(T("Speed"));
       Row(T("Speed"), fieldW);
-      FieldWell::Slider("##studiospeed", &w.speed, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
+      FieldWell::Slider("##studiospeed", &w.speed, params::sample_studio::speed_lo, params::sample_studio::speed_hi, "%.2fx", ImGuiSliderFlags_Logarithmic);
       t.Item();
 
       SectionCard::Begin(T("Fade"));
       Row(T("In"), fieldW);
-      FieldWell::Slider("##studiofadein", &w.fadeInMs, 0.0f, 1000.0f, "%.0f ms");
+      FieldWell::Slider("##studiofadein", &w.fadeInMs, params::sample_studio::fade_in_ms_2_lo, params::sample_studio::fade_in_ms_2_hi, "%.0f ms");
       t.Item();
       Row(T("Out"), fieldW);
-      FieldWell::Slider("##studiofadeout", &w.fadeOutMs, 0.0f, 1000.0f, "%.0f ms");
+      FieldWell::Slider("##studiofadeout", &w.fadeOutMs, params::sample_studio::fade_out_ms_2_lo, params::sample_studio::fade_out_ms_2_hi, "%.0f ms");
       t.Item();
 
       SectionCard::Begin(T("Level"));
       Row(T("Gain"), fieldW);
-      FieldWell::Slider("##studiogain", &w.gainDb, -48.0f, 24.0f, "%+.1f dB");
+      FieldWell::Slider("##studiogain", &w.gainDb, params::sample_studio::gain_db_2_lo, params::sample_studio::gain_db_2_hi, "%+.1f dB");
       t.Item();
       SectionCard::RowLabel("");
       if (ActionButton::Draw(L("Normalise##studioNorm"), ImVec2(fieldW, 0.0f)))

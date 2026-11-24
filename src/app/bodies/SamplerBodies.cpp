@@ -1,5 +1,6 @@
 // Sampler, slicer, molder, granular, drum sequencer, looper and MPC bodies (moved verbatim from main.cpp).
 #include "app/ui/design/components/StepCell.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/EmptyState.h"
@@ -263,7 +264,7 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::sampler_gain_body_dummy_h));
 
       AudioKnobRow row(1, kKnobLarge);
-      row.Knob("gain", &n->gainDb, -60.0f, 12.0f, "%.1f dB", kKnobLarge, /*dbTaper=*/true);
+      row.Knob("gain", &n->gainDb, params::Gain::gain_db_lo, params::Gain::gain_db_hi, "%.1f dB", kKnobLarge, /*dbTaper=*/true);
       row.End();
       EndAudioBody();
    }
@@ -294,10 +295,10 @@ namespace app
       // fields - the picture is for "roughly where", these are for "exactly
       // where", and each stays in sync with the other since both write the
       // same n->start/n->end.
-      AudioSlider("finetune", &n->finetune, -50.0f, 50.0f, "%.0f c", AudioHalfWidth());
+      AudioSlider("finetune", &n->finetune, params::Sampler::finetune_lo, params::Sampler::finetune_hi, "%.0f c", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
-      AudioSlider("speed", &n->speed, -2.0f, 2.0f, "%.2fx", AudioHalfWidth());
+      AudioSlider("pitch", &n->pitch, params::Sampler::pitch_lo, params::Sampler::pitch_hi, "%.1f st", AudioHalfWidth());
+      AudioSlider("speed", &n->speed, params::Sampler::speed_lo, params::Sampler::speed_hi, "%.2fx", AudioHalfWidth());
       FormParts::Inline();
       AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
@@ -314,16 +315,16 @@ namespace app
       if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->position = std::clamp(n->position, n->start, n->end);
       FormParts::Inline();
-      AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
+      AudioSlider("decay", &n->decay, params::Sampler::decay_lo, params::Sampler::decay_hi, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
       // fade in / fade out close the grid as a pair. They are ms lengths
       // applied at the start and end of every pass through the range (loop
       // lap, ping-pong leg, one-shot), so they are always live - no greying.
       // Draw order is the pin numbering: they take the ordinals the old
       // single "loop xfade" row used (8) and the next (9).
-      AudioSlider("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+      AudioSlider("fade in", &n->fadeIn, params::Sampler::fade_in_lo, params::Sampler::fade_in_hi, "%.0f ms", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+      AudioSlider("fade out", &n->fadeOut, params::Sampler::fade_out_lo, params::Sampler::fade_out_hi, "%.0f ms", AudioHalfWidth());
    }
 
 
@@ -760,29 +761,29 @@ namespace app
       }
       FormParts::Inline();
       ImGui::BeginDisabled(!onsetMode);
-      AudioSlider("sensitivity", &n->sensitivity, 0.0f, 100.0f, "%.0f %%", halfW);
+      AudioSlider("sensitivity", &n->sensitivity, params::Slicer::sensitivity_lo, params::Slicer::sensitivity_hi, "%.0f %%", halfW);
       ImGui::EndDisabled();
 
-      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", halfW);
+      AudioSlider("pitch", &n->pitch, params::Slicer::pitch_lo, params::Slicer::pitch_hi, "%.1f st", halfW);
       FormParts::Inline();
-      AudioSlider("finetune", &n->finetune, -100.0f, 100.0f, "%.0f c", halfW);
+      AudioSlider("finetune", &n->finetune, params::Slicer::finetune_lo, params::Slicer::finetune_hi, "%.0f c", halfW);
 
       // attack extends the hidden 2 ms de-click ramp rather than adding a
       // second envelope, so 0 is exactly the old (instant) behaviour. The
       // skew puts 100 ms at 12 o'clock over the 0..500 throw.
-      AudioSlider("attack", &n->attack, 0.0f, 500.0f, "%.1f ms", halfW,
+      AudioSlider("attack", &n->attack, params::Slicer::attack_lo, params::Slicer::attack_hi, "%.1f ms", halfW,
                   SkewAttack100Taper::PosToValue, SkewAttack100Taper::ValueToPos);
       FormParts::Inline();
       // decay owns the ENVELOPE only. The top of its throw is a no-decay
       // detent - the slice holds at full level after its attack. Where it
       // stops is `crossthrough`'s business, not decay's.
       const char* decayFmt = (n->decay >= SlicerNode::kDecayInfinite) ? "hold" : "%.0f ms";
-      AudioSlider("decay", &n->decay, 5.0f, 5000.0f, decayFmt, halfW, LogTaper::PosToValue,
+      AudioSlider("decay", &n->decay, params::Slicer::decay_lo, params::Slicer::decay_hi, decayFmt, halfW, LogTaper::PosToValue,
                   LogTaper::ValueToPos);
 
       // speed is exponential (linear in log2) so 1.0x sits at the middle of
       // the 0.25..4 throw instead of a quarter of the way along it.
-      AudioSlider("speed", &n->speed, 0.25f, 4.0f, "%.2fx", halfW, LogTaper::PosToValue,
+      AudioSlider("speed", &n->speed, params::Slicer::speed_lo, params::Slicer::speed_hi, "%.2fx", halfW, LogTaper::PosToValue,
                   LogTaper::ValueToPos);
       FormParts::Inline();
       AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", halfW);
@@ -870,7 +871,7 @@ namespace app
       DrawPaulStretchWaveform(n, 130.0f, AudioFullWidth());
       ImGui::Dummy(ImVec2(0.0f, tok::sampler_paul_stretch_body_dummy_h));
 
-      AudioSlider("stretch", &n->stretch, 1.0f, 1000.0f, "%.1fx", AudioHalfWidth());
+      AudioSlider("stretch", &n->stretch, params::PaulStretch::stretch_lo, params::PaulStretch::stretch_hi, "%.1fx", AudioHalfWidth());
       FormParts::Inline();
       AudioSlider("phase rand", &n->phaseRand, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
@@ -884,13 +885,13 @@ namespace app
                            n->windowSizeIndex = idx;
                         }, AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("volume", &n->volume, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+      AudioSlider("volume", &n->volume, params::PaulStretch::volume_lo, params::PaulStretch::volume_hi, "%.2f", AudioHalfWidth());
 
-      AudioSlider("pitch", &n->pitchShift, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      AudioSlider("pitch", &n->pitchShift, params::PaulStretch::pitch_shift_lo, params::PaulStretch::pitch_shift_hi, "%.1f st", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("finetune", &n->fineTune, -100.0f, 100.0f, "%.0f c", AudioHalfWidth());
+      AudioSlider("finetune", &n->fineTune, params::PaulStretch::fine_tune_lo, params::PaulStretch::fine_tune_hi, "%.0f c", AudioHalfWidth());
 
-      AudioSlider("freq shift", &n->freqShift, -1000.0f, 1000.0f, "%.0f Hz", AudioHalfWidth());
+      AudioSlider("freq shift", &n->freqShift, params::PaulStretch::freq_shift_lo, params::PaulStretch::freq_shift_hi, "%.0f Hz", AudioHalfWidth());
       FormParts::Inline();
       // Int params go through AudioSliderInt, never a float copy on the
       // stack: the slider registers the pointer it is given, and next frame's
@@ -898,7 +899,7 @@ namespace app
       AudioSliderInt("unison", &n->unison, 1, 8, AudioHalfWidth(), "%.0f v");
 
       ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
-      AudioSlider("detune", &n->detune, 0.0f, 100.0f, "%.1f c", AudioHalfWidth());
+      AudioSlider("detune", &n->detune, params::PaulStretch::detune_lo, params::PaulStretch::detune_hi, "%.1f c", AudioHalfWidth());
       ImGui::EndDisabled();
       FormParts::Inline();
       if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
@@ -1166,7 +1167,7 @@ namespace app
 
       AudioSlider("chaos", &n->chaos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      AudioSlider("pitch", &n->pitch, params::Molder::pitch_lo, params::Molder::pitch_hi, "%.1f st", AudioHalfWidth());
 
       AudioSlider("tone", &n->tone, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       FormParts::Inline();
@@ -1178,7 +1179,7 @@ namespace app
 
       AudioSlider("time", &n->time, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("level", &n->level, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+      AudioSlider("level", &n->level, params::Molder::level_lo, params::Molder::level_hi, "%.2f", AudioHalfWidth());
 
       if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->start = std::min(n->start, n->end - 0.01f);
@@ -1403,7 +1404,7 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, tok::sampler_grain_molder_body_dummy_h));
 
       // Row 1: grain | amount
-      AudioSlider("grain", &n->grain, 10.0f, 500.0f, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
+      AudioSlider("grain", &n->grain, params::GrainMolder::grain_lo, params::GrainMolder::grain_hi, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
       FormParts::Inline();
       AudioSlider("amount", &n->amount, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
@@ -1450,12 +1451,12 @@ namespace app
       if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->position = std::clamp(n->position, n->start, n->end);
       FormParts::Inline();
-      AudioSlider("level", &n->level, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+      AudioSlider("level", &n->level, params::GrainMolder::level_lo, params::GrainMolder::level_hi, "%.2f", AudioHalfWidth());
 
       // Row 5: pitch | decay
-      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      AudioSlider("pitch", &n->pitch, params::GrainMolder::pitch_lo, params::GrainMolder::pitch_hi, "%.1f st", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
+      AudioSlider("decay", &n->decay, params::GrainMolder::decay_lo, params::GrainMolder::decay_hi, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
       EndAudioBody();
    }
@@ -1518,12 +1519,12 @@ namespace app
          n->Seek(n->position);
       }
       FormParts::Inline();
-      AudioSlider("scan", &n->scan, -4.0f, 4.0f, "%.2fx", AudioHalfWidth());
+      AudioSlider("scan", &n->scan, params::Granular::scan_lo, params::Granular::scan_hi, "%.2fx", AudioHalfWidth());
 
       // Row 2: Grain Size & Density
-      AudioSlider("size", &n->grainLength, 5.0f, 1000.0f, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
+      AudioSlider("size", &n->grainLength, params::Granular::grain_length_lo, params::Granular::grain_length_hi, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
       FormParts::Inline();
-      AudioSlider("density", &n->density, 1.0f, 100.0f, "%.0f Hz", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
+      AudioSlider("density", &n->density, params::Granular::density_lo, params::Granular::density_hi, "%.0f Hz", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
       // Row 3: Random Position (Spray) & Random Length
       AudioSlider("spray", &n->randomPos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
@@ -1531,12 +1532,12 @@ namespace app
       AudioSlider("rnd size", &n->randomLength, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
       // Row 4: Random Pitch & Pitch Shift
-      AudioSlider("pitch", &n->pitchShift, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      AudioSlider("pitch", &n->pitchShift, params::Granular::pitch_shift_lo, params::Granular::pitch_shift_hi, "%.1f st", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("rnd pitch", &n->randomPitch, 0.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      AudioSlider("rnd pitch", &n->randomPitch, params::Granular::random_pitch_lo, params::Granular::random_pitch_hi, "%.1f st", AudioHalfWidth());
 
       // Row 5: Fine Tune & Reverse Probability
-      AudioSlider("finetune", &n->fineTune, -100.0f, 100.0f, "%.0f c", AudioHalfWidth());
+      AudioSlider("finetune", &n->fineTune, params::Granular::fine_tune_lo, params::Granular::fine_tune_hi, "%.0f c", AudioHalfWidth());
       FormParts::Inline();
       AudioSlider("reverse", &n->reverseProb, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
 
@@ -1555,12 +1556,12 @@ namespace app
       // Row 7: Master Pan & Width
       AudioSlider("pan", &n->pan, -1.0f, 1.0f, "%.2f", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("width", &n->width, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+      AudioSlider("width", &n->width, params::Granular::width_lo, params::Granular::width_hi, "%.2f", AudioHalfWidth());
 
       // Row 8: Dry/Wet Mix & Volume
       AudioSlider("mix", &n->mix, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("volume", &n->volume, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+      AudioSlider("volume", &n->volume, params::Granular::volume_lo, params::Granular::volume_hi, "%.2f", AudioHalfWidth());
 
       // Row 9: Trim Start & End
       if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
@@ -1676,9 +1677,9 @@ namespace app
          AudioSlider("transient", &n->laneTransient[lane], -1.0f, 1.0f, "%.2f", half);
          FormParts::Inline();
          AudioSlider("decay", &n->laneDecay[lane], 0.0f, 1.0f, "%.2f", half);
-         AudioSlider("pitch", &n->lanePitch[lane], -24.0f, 24.0f, "%.1f st", half);
+         AudioSlider("pitch", &n->lanePitch[lane], params::DrumSequencer::lane_pitch_lo, params::DrumSequencer::lane_pitch_hi, "%.1f st", half);
          FormParts::Inline();
-         AudioSlider("fine tune", &n->laneFineTune[lane], -50.0f, 50.0f, "%.0f c", half);
+         AudioSlider("fine tune", &n->laneFineTune[lane], params::DrumSequencer::lane_fine_tune_lo, params::DrumSequencer::lane_fine_tune_hi, "%.0f c", half);
          AudioSlider("volume", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", half);
          FormParts::Inline();
          AudioSlider("pan", &n->lanePan[lane], -1.0f, 1.0f, "%.2f", half);
@@ -1691,11 +1692,11 @@ namespace app
          char accentName[40], levelName[40];
          snprintf(accentName, sizeof(accentName), "lane %d accent", lane + 1);
          snprintf(levelName, sizeof(levelName), "lane %d accent vol", lane + 1);
-         AudioSlider("accent", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%+.1f st", half, nullptr,
-                     nullptr, 300 + lane, accentName);
+         AudioSlider("accent", &n->laneAccentPitch[lane], params::DrumSequencer::lane_accent_pitch_lo, params::DrumSequencer::lane_accent_pitch_hi, "%+.1f st", half, nullptr,
+                     nullptr, 300 + lane, accentName);   // ui-audit-ok: modulation param id base for the lane
          FormParts::Inline();
-         AudioSlider("accent vol", &n->laneAccentLevel[lane], 0.0f, 12.0f, "%+.1f dB", half, nullptr,
-                     nullptr, 310 + lane, levelName);
+         AudioSlider("accent vol", &n->laneAccentLevel[lane], params::DrumSequencer::lane_accent_level_lo, params::DrumSequencer::lane_accent_level_hi, "%+.1f dB", half, nullptr,
+                     nullptr, 310 + lane, levelName);   // ui-audit-ok: modulation param id base for the lane
       }
 
       EndAudioSection();
@@ -2201,7 +2202,7 @@ namespace app
          AudioKnobRow row(tok::sampler_drum_sequencer_body_audio_knob_row_layout);
          row.Knob("transient", &n->globalTransient, -1.0f, 1.0f, "%.2f");
          row.Knob("decay", &n->globalDecay, -1.0f, 1.0f, "%.2f");
-         row.Knob("pitch", &n->globalPitch, -24.0f, 24.0f, "%.1f st");
+         row.Knob("pitch", &n->globalPitch, params::DrumSequencer::global_pitch_lo, params::DrumSequencer::global_pitch_hi, "%.1f st");
          row.Knob("pan", &n->globalPan, -1.0f, 1.0f, "%.2f");
          row.End();
       }
@@ -2429,15 +2430,15 @@ namespace app
 
       // Same rows, ranges and formats as the Sampler. Draw order is the pin
       // numbering: append only.
-      AudioSlider("finetune", &n->finetune, -50.0f, 50.0f, "%.0f c", AudioHalfWidth());
+      AudioSlider("finetune", &n->finetune, params::Looper::finetune_lo, params::Looper::finetune_hi, "%.0f c", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
-      AudioSlider("speed", &n->speed, -2.0f, 2.0f, "%.2fx", AudioHalfWidth());
+      AudioSlider("pitch", &n->pitch, params::Looper::pitch_lo, params::Looper::pitch_hi, "%.1f st", AudioHalfWidth());
+      AudioSlider("speed", &n->speed, params::Looper::speed_lo, params::Looper::speed_hi, "%.2fx", AudioHalfWidth());
       FormParts::Inline();
       AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
-      AudioSlider("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+      AudioSlider("fade in", &n->fadeIn, params::Looper::fade_in_lo, params::Looper::fade_in_hi, "%.0f ms", AudioHalfWidth());
       FormParts::Inline();
-      AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+      AudioSlider("fade out", &n->fadeOut, params::Looper::fade_out_lo, params::Looper::fade_out_hi, "%.0f ms", AudioHalfWidth());
 
       {
          AudioKnobRow row(tok::sampler_looper_body_audio_knob_row_layout, tok::sampler_looper_body_audio_knob_row_layout_2, tok::sampler_looper_body_audio_knob_row_layout_3, false);
@@ -2543,7 +2544,7 @@ namespace app
       {
          const MpcNode::ParamInfo& info = MpcNode::Info(k);
          const std::string name = MpcParamName(pad, k);
-         ModSlider(info.name, n->PadParamPtr(pad, k), info.lo, info.hi, info.fmt, 100.0f, /*audioStyle=*/true, 0.0f,
+         ModSlider(info.name, n->PadParamPtr(pad, k), info.lo, info.hi, info.fmt, params::sampler::register_mpc_pad_floats_lo, /*audioStyle=*/true, params::sampler::register_mpc_pad_floats_hi,
                    nullptr, nullptr, MpcNode::ParamId(pad, k), name.c_str());
       }
       gParamRegisterOnly = saved;

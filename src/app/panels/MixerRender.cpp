@@ -3,6 +3,7 @@
 // (plugin latency skipped, length + tail kept). Fast takes pump the engine offline through the
 // same recorder, a few milliseconds per frame so the panel stays alive and Cancel works.
 #include "app/ui/design/components/FormParts.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/ActionButton.h"
@@ -52,7 +53,7 @@ namespace app
          double rate = 0.0, savedHeadlessRate = 0.0, startSec = 0.0;
          int64_t lengthFrames = 0, tailFrames = 0, skip = 0;
          int64_t done = 0, total = 0, step = 0;
-         int bits = 16;
+         int bits = 16;   // ui-audit-ok: export bit depth default
          const char* ext = "wav";
          std::string name;
          std::vector<Take> takes;
@@ -606,10 +607,10 @@ namespace app
       {
          FormParts::Label("##lenval");
          ImGui::SetNextItemWidth(FormParts::ControlW());
-         FieldWell::Slider("##lenval", &s.length, 1.0f, s.lengthUnit == 1 ? 256.0f : 600.0f, s.lengthUnit == 1 ? "%.0f" : "%.0f s");
+         FieldWell::Slider("##lenval", &s.length, params::mixer::length_lo, s.lengthUnit == 1 ? params::mixer::length_bars_hi : params::mixer::length_secs_hi, s.lengthUnit == 1 ? "%.0f" : "%.0f s");
          s.length = std::clamp(s.lengthUnit == 1 ? std::round(s.length) : s.length, 1.0f, 3600.0f);
       }
-      FormParts::SliderFloat(T("Tail"), &s.tail, 0.0f, 30.0f, UiFmt::Sec, 1);
+      FormParts::SliderFloat(T("Tail"), &s.tail, params::mixer::tail_lo, params::mixer::tail_hi, UiFmt::Sec, 1);
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Extra time after the length, with the transport stopped, so reverbs and delays ring out."));
       ImGui::BeginDisabled(s.lengthUnit == 3);

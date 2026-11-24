@@ -897,7 +897,7 @@ namespace app
       if (clicked)
          *value = !*value;
       const float hv = UiAnim::Hover(iid, hovered, tok::motion_hover_in, tok::motion_hover_out);
-      const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, *value, tok::motion_on, tok::motion_off);
+      const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, *value, tok::motion_on, tok::motion_off);   // ui-audit-ok: hash mixing constant for the animation id
       const ImVec4 amber = IsThemeLight() ? tok::BaseV4(tok::col::state_warn) : tok::BaseV4(tok::col::role_modulation);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 bp(p.x + (box - CheckBox::Size()) * 0.5f, p.y + (box - CheckBox::Size()) * 0.5f);

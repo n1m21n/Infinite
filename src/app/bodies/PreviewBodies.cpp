@@ -1,5 +1,6 @@
 // Comment, group, draw and preview node bodies (moved verbatim from main.cpp).
 #include "nodes/ImageSourceNode.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
@@ -548,11 +549,11 @@ namespace app
       gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the canvas and the buttons
       const float halfW = (kPreviewSize - tok::space_1) * 0.5f;
       DropdownButton("brush", DrawNode::BrushNames(), n->brush, [n](int i) { n->brush = i; });
-      ModSlider("size", &n->brushSize, 0.002f, 0.5f);
-      ModSlider("opacity", &n->opacity, 0.02f, 1.0f);
-      ModSlider("hardness", &n->hardness, 0.0f, 0.98f);
-      ModSlider("spacing", &n->spacing, 0.02f, 1.0f);
-      ModSlider("jitter", &n->jitter, 0.0f, 2.0f);
+      ModSlider("size", &n->brushSize, params::Draw::brush_size_lo, params::Draw::brush_size_hi);
+      ModSlider("opacity", &n->opacity, params::Draw::opacity_lo, params::Draw::opacity_hi);
+      ModSlider("hardness", &n->hardness, params::Draw::hardness_lo, params::Draw::hardness_hi);
+      ModSlider("spacing", &n->spacing, params::Draw::spacing_lo, params::Draw::spacing_hi);
+      ModSlider("jitter", &n->jitter, params::Draw::jitter_lo, params::Draw::jitter_hi);
       ColorSwatch("colour", n->color, n);
       ModCheckbox("eraser", &n->eraser);
       if (ActionButton::Draw("Clear canvas", ImVec2(kPreviewSize, 0)))
@@ -592,11 +593,11 @@ namespace app
          }
       }
       ModCheckbox("loop replay", &n->loopPlayback);
-      ModSlider("replay speed", &n->playSpeed, 0.1f, 4.0f);
+      ModSlider("replay speed", &n->playSpeed, params::Draw::play_speed_lo, params::Draw::play_speed_hi);
       if (ActionButton::Draw("clear recording", ImVec2(kPreviewSize, 0)))
          n->ClearRecording();
-      ModSlider("canvas w", &n->canvasWidth, 64.0f, 4096.0f, "%.0f");
-      ModSlider("canvas h", &n->canvasHeight, 64.0f, 4096.0f, "%.0f");
+      ModSlider("canvas w", &n->canvasWidth, params::Draw::canvas_width_lo, params::Draw::canvas_width_hi, "%.0f");
+      ModSlider("canvas h", &n->canvasHeight, params::Draw::canvas_height_lo, params::Draw::canvas_height_hi, "%.0f");
    }
 
 

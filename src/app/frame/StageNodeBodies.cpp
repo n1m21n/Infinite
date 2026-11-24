@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include <unordered_map>
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/Tip.h"
@@ -204,19 +205,19 @@ void DrawNodeBodies(FrameCtx& fc)
             if (hasCookWarning)
             {
                ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(tok::V4(tok::stage_node_bodies_col_4)));
-               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.5f);
+               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, tok::node_border_w_cook_warning);
             }
             else if (hasLiveIssue)
             {
                ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(tok::V4(tok::stage_node_bodies_col_5)));
-               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.0f);
+               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, tok::node_border_w_live_issue);
             }
             else
             {
                // Hairline: the category tint fill carries identity; selection (the editor's own colour) is the loud state.
                ed::PushStyleColor(ed::StyleColor_NodeBorder,
                                   ImColor(catColor.r, catColor.g, catColor.b, isLight ? tok::stage_node_bodies_im_color_alpha_3 : tok::stage_node_bodies_im_color_alpha_4));
-               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 1.0f);
+               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, tok::node_border_w_hairline);
             }
          }
 
@@ -226,7 +227,7 @@ void DrawNodeBodies(FrameCtx& fc)
          // A node in an off group reads like a bypassed one: it is not cooking.
          const bool dimmed = gn.node->bypassed || gn.node->blockOff;
          if (dimmed)
-            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.55f);
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * tok::node_dimmed_alpha);
 
          const bool isAudioBody = IsAudioBodyNode(gn.node.get());
          auto* mixerNode = dynamic_cast<MixerNode*>(gn.node.get());
@@ -1315,7 +1316,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   // reads it, so say plainly that the take owns them.
                   ImGui::BeginDisabled(n->IsRecording());
                   ImGui::SetNextItemWidth(kParamWidth);
-                  ImGui::SliderInt("##recfps", &n->recordFps, 1, 60, T("%d fps"));
+                  ImGui::SliderInt("##recfps", &n->recordFps, params::Output::record_fps_lo, params::Output::record_fps_hi, T("%d fps"));
 
                   ModCheckbox(L("include audio"), &n->includeAudio);
                   ImGui::EndDisabled();

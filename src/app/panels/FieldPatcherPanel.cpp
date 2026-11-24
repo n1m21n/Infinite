@@ -4,6 +4,7 @@
 // `# @boxes v1` header that keeps positions), sets the node's code, compiles it and is one patch undo step. A
 // failed compile leaves the node on its last good program; the footer names the error.
 #include "app/ui/design/components/Wire.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/panels/FieldPatcherPanel.h"
@@ -877,7 +878,7 @@ namespace
       {
          float v = (float)b.numberValue;
          ImGui::SetNextItemWidth(tok::field_patcher_box_set_next_item_width_w_2);
-         if (ImGui::DragFloat("##num", &v, 0.01f, 0.0f, 0.0f, UiFmt::Spec::G3))
+         if (ImGui::DragFloat("##num", &v, params::field_patcher::num_speed, 0.0f, 0.0f, UiFmt::Spec::G3))
          {
             b.numberValue = v;
             char buf[32];
@@ -1383,11 +1384,11 @@ namespace
                FieldWell::InputText(T("name"), &b->varName);
                edited |= ImGui::IsItemDeactivatedAfterEdit();
                float lo = (float)b->minVal, hi = (float)b->maxVal, d = (float)b->numberValue;
-               ImGui::DragFloat(T("default"), &d, 0.01f);
+               ImGui::DragFloat(T("default"), &d, params::field_patcher::default_speed);
                edited |= ImGui::IsItemDeactivatedAfterEdit();
-               ImGui::DragFloat(T("min"), &lo, 0.01f);
+               ImGui::DragFloat(T("min"), &lo, params::field_patcher::lo_speed);
                edited |= ImGui::IsItemDeactivatedAfterEdit();
-               ImGui::DragFloat(T("max"), &hi, 0.01f);
+               ImGui::DragFloat(T("max"), &hi, params::field_patcher::hi_speed);
                edited |= ImGui::IsItemDeactivatedAfterEdit();
                b->numberValue = d;
                b->minVal = lo;
@@ -1404,7 +1405,7 @@ namespace
             else if (b->specId == "number")
             {
                float v = (float)b->numberValue;
-               ImGui::DragFloat(T("value"), &v, 0.01f);
+               ImGui::DragFloat(T("value"), &v, params::field_patcher::value_speed);
                if (ImGui::IsItemEdited())
                {
                   b->numberValue = v;

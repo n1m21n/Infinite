@@ -2,6 +2,7 @@
 // stage with the listener's head at the centre and one draggable dot per
 // connected input, a source strip, and a knob row for the selected object.
 #include "app/ui/design/TokenColors.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/ListRow.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
@@ -294,24 +295,24 @@ namespace app
          AudioKnobRow row(tok::spatial_mixer_body_audio_knob_row_layout, kKnobLarge);
          const auto az = laneName(sel, "azimuth"), el = laneName(sel, "elevation"), di = laneName(sel, "distance"),
                     wi = laneName(sel, "width"), lv = laneName(sel, "level");
-         row.Knob("azimuth", &n->azimuth[sel], -180.0f, 180.0f, "%.0f deg", kKnobLarge, false, false,
+         row.Knob("azimuth", &n->azimuth[sel], params::SpatialMixer::azimuth_lo, params::SpatialMixer::azimuth_hi, "%.0f deg", kKnobLarge, false, false,
                   AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 0), az.c_str());
-         row.Knob("elevation", &n->elevation[sel], -90.0f, 90.0f, "%.0f deg", kKnobLarge, false, false,
+         row.Knob("elevation", &n->elevation[sel], params::SpatialMixer::elevation_lo, params::SpatialMixer::elevation_hi, "%.0f deg", kKnobLarge, false, false,
                   AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 1), el.c_str());
-         row.Knob("distance", &n->distance[sel], 0.2f, kEdgeMetres, "%.1f m", kKnobLarge, false, false,
+         row.Knob("distance", &n->distance[sel], params::SpatialMixer::distance_lo, kEdgeMetres, "%.1f m", kKnobLarge, false, false,
                   AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 2), di.c_str());
          row.Knob("width", &n->width[sel], 0.0f, 1.0f, "%.2f", kKnobLarge, false, false, AudioWidgetStyle::Knob,
                   nullptr, nullptr, laneParam(sel, 3), wi.c_str());
          row.End();
          AudioKnobRow row2(tok::spatial_mixer_body_audio_knob_row_layout, kKnobSmall);
-         row2.Knob("level", &n->gainDb[sel], -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true, false,
+         row2.Knob("level", &n->gainDb[sel], params::SpatialMixer::gain_db_lo, params::SpatialMixer::gain_db_hi, "%.1f dB", kKnobSmall, /*dbTaper=*/true, false,
                    AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 4), lv.c_str());
          row2.Knob("room", &n->room, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr,
                    nullptr, 0);
-         row2.Knob("bass mono", &n->bassHz, 0.0f, 300.0f, "%.0f Hz", kKnobSmall, false, false,
+         row2.Knob("bass mono", &n->bassHz, params::SpatialMixer::bass_hz_lo, params::SpatialMixer::bass_hz_hi, "%.0f Hz", kKnobSmall, false, false,
                    AudioWidgetStyle::Knob, nullptr, nullptr, 1);
-         row2.Knob("out", &n->outDb, -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true, false,
-                   AudioWidgetStyle::Knob, nullptr, nullptr, 2);
+         row2.Knob("out", &n->outDb, params::SpatialMixer::out_db_lo, params::SpatialMixer::out_db_hi, "%.1f dB", kKnobSmall, /*dbTaper=*/true, false,
+                   AudioWidgetStyle::Knob, nullptr, nullptr, params::SpatialMixer::out_db_def);
          row2.End();
       }
       gParamCounter = kLaneBase + SpatialMixerNode::kMaxSlots * 5;

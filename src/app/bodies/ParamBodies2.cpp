@@ -1,5 +1,6 @@
 // Generic node parameter bodies, part 2: curves, palettes, ramps, analyze (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/UiInteract.h"
@@ -451,16 +452,16 @@ namespace app
          Tip::Show("engine: %s", Platform::MattingBackend().c_str());
       PopTextWrapWidth();
 
-      ModSlider("feather", &n->feather, 0.0f, 4.0f);
+      ModSlider("feather", &n->feather, params::RemoveBg::feather_lo, params::RemoveBg::feather_hi);
       ModSlider("threshold", &n->threshold, 0.0f, 1.0f);
-      ModSlider("edge contrast", &n->contrast, 0.5f, 8.0f);
+      ModSlider("edge contrast", &n->contrast, params::RemoveBg::contrast_lo, params::RemoveBg::contrast_hi);
       ColorSwatch("bg", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
 
       ModCheckbox("auto refresh (video)", &n->autoRefresh);
       if (n->autoRefresh)
       {
-         ModSlider("every N frames", &n->refreshFrames, 1.0f, 120.0f, "%.0f");
+         ModSlider("every N frames", &n->refreshFrames, params::RemoveBg::refresh_frames_lo, params::RemoveBg::refresh_frames_hi, "%.0f");
       }
    }
 
@@ -474,12 +475,12 @@ namespace app
    {
       static const std::vector<std::string> kBlends = { "Max", "Add", "Screen" };
       DropdownButton("blend", kBlends, n->blendMode, [n](int i) { n->blendMode = i; });
-      ModSlider("decay", &n->decay, 0.5f, 0.999f);
-      ModSlider("zoom", &n->zoom, 0.9f, 1.1f);
-      ModSlider("rotate", &n->rotate, -5.7296f, 5.7296f, "%.1f\xC2\xB0");
-      ModSlider("drift x", &n->driftX, -0.02f, 0.02f);
-      ModSlider("drift y", &n->driftY, -0.02f, 0.02f);
-      ModSlider("hue shift", &n->hueShift, -0.05f, 0.05f);
+      ModSlider("decay", &n->decay, params::Trails::decay_lo, params::Trails::decay_hi);
+      ModSlider("zoom", &n->zoom, params::Trails::zoom_lo, params::Trails::zoom_hi);
+      ModSlider("rotate", &n->rotate, params::Trails::rotate_lo, params::Trails::rotate_hi, "%.1f\xC2\xB0");
+      ModSlider("drift x", &n->driftX, params::Trails::drift_x_lo, params::Trails::drift_x_hi);
+      ModSlider("drift y", &n->driftY, params::Trails::drift_y_lo, params::Trails::drift_y_hi);
+      ModSlider("hue shift", &n->hueShift, params::Trails::hue_shift_lo, params::Trails::hue_shift_hi);
       if (ActionButton::Draw("Clear", ImVec2(kPreviewSize, 0)))
          n->Clear();
    }
@@ -491,10 +492,10 @@ namespace app
       static const std::vector<std::string> kRes = { "Full", "Half", "Quarter" };
       DropdownButton("view", kViews, n->view, [n](int i) { n->view = i; });
       DropdownButton("resolution", kRes, n->resolution, [n](int i) { n->resolution = i; });
-      ModSlider("gain", &n->gain, 0.0f, 8.0f);
+      ModSlider("gain", &n->gain, params::OpticalFlow::gain_lo, params::OpticalFlow::gain_hi);
       ModSliderInt("levels", &n->levels, 1, OpticalFlowNode::kMaxLevels);
-      ModSliderInt("window", &n->window, 1, 6);
-      ModSliderInt("iterations", &n->iterations, 1, 6);
+      ModSliderInt("window", &n->window, params::OpticalFlow::window_lo, params::OpticalFlow::window_hi);
+      ModSliderInt("iterations", &n->iterations, params::OpticalFlow::iterations_lo, params::OpticalFlow::iterations_hi);
    }
 
 
@@ -502,7 +503,7 @@ namespace app
    {
       static const std::vector<std::string> kRes = { "Full", "Half", "Quarter" };
       DropdownButton("resolution", kRes, n->resolution, [n](int i) { n->resolution = i; });
-      ModSliderInt("length", &n->length, 2, TimeMachineNode::kMaxLength);
+      ModSliderInt("length", &n->length, params::TimeMachine::length_lo, TimeMachineNode::kMaxLength);
       ModCheckbox("invert", &n->invert);
    }
 
@@ -513,13 +514,13 @@ namespace app
       DropdownButton("view", FluidNode::ViewNames(), n->view, [n](int i) { n->view = i; });
       DropdownButton("resolution", kRes, n->resolution, [n](int i) { n->resolution = i; });
       DropdownButton("stirrer", FluidNode::StirrerNames(), n->stirrer, [n](int i) { n->stirrer = i; });
-      ModSlider("stirrer strength", &n->stirrerStrength, 0.0f, 4.0f);
-      ModSlider("stirrer size", &n->stirrerSize, 0.01f, 0.3f, "%.3f");
-      ModSlider("force gain", &n->forceGain, 0.0f, 8.0f);
-      ModSlider("swirl", &n->vorticity, 0.0f, 2.0f);
-      ModSlider("viscosity", &n->viscosity, 0.0f, 0.2f, "%.3f");
-      ModSlider("damping", &n->velocityDamping, 0.0f, 0.1f, "%.3f");
-      ModSlider("dye fade", &n->dyeFade, 0.0f, 0.1f, "%.3f");
+      ModSlider("stirrer strength", &n->stirrerStrength, params::Fluid::stirrer_strength_lo, params::Fluid::stirrer_strength_hi);
+      ModSlider("stirrer size", &n->stirrerSize, params::Fluid::stirrer_size_lo, params::Fluid::stirrer_size_hi, "%.3f");
+      ModSlider("force gain", &n->forceGain, params::Fluid::force_gain_lo, params::Fluid::force_gain_hi);
+      ModSlider("swirl", &n->vorticity, params::Fluid::vorticity_lo, params::Fluid::vorticity_hi);
+      ModSlider("viscosity", &n->viscosity, params::Fluid::viscosity_lo, params::Fluid::viscosity_hi, "%.3f");
+      ModSlider("damping", &n->velocityDamping, params::Fluid::velocity_damping_lo, params::Fluid::velocity_damping_hi, "%.3f");
+      ModSlider("dye fade", &n->dyeFade, params::Fluid::dye_fade_lo, params::Fluid::dye_fade_hi, "%.3f");
       ModSlider("image refresh", &n->refresh, 0.0f, 1.0f, "%.3f");
       ModSliderInt("pressure iterations", &n->pressureIterations, 1, FluidNode::kMaxPressureIterations);
       if (ActionButton::Draw("Reset", ImVec2(kPreviewSize, 0)))
@@ -530,19 +531,19 @@ namespace app
    void DrawVolumeParams(VolumeNode* n)
    {
       DropdownButton("shape", VolumeNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
-      ModSlider("density", &n->density, 0.0f, 8.0f);
-      ModSlider("size", &n->size, 0.05f, 6.0f);
-      ModSlider("height", &n->height, 0.1f, 10.0f);
-      ModSlider("center x", &n->centerX, -6.0f, 6.0f);
-      ModSlider("center y", &n->centerY, -6.0f, 6.0f);
-      ModSlider("center z", &n->centerZ, -6.0f, 6.0f);
-      ModSlider("noise scale", &n->noiseScale, 0.1f, 6.0f);
+      ModSlider("density", &n->density, params::Volume::density_lo, params::Volume::density_hi);
+      ModSlider("size", &n->size, params::Volume::size_lo, params::Volume::size_hi);
+      ModSlider("height", &n->height, params::Volume::height_lo, params::Volume::height_hi);
+      ModSlider("center x", &n->centerX, params::Volume::center_x_lo, params::Volume::center_x_hi);
+      ModSlider("center y", &n->centerY, params::Volume::center_y_lo, params::Volume::center_y_hi);
+      ModSlider("center z", &n->centerZ, params::Volume::center_z_lo, params::Volume::center_z_hi);
+      ModSlider("noise scale", &n->noiseScale, params::Volume::noise_scale_lo, params::Volume::noise_scale_hi);
       ModSlider("noise amount", &n->noiseAmount, 0.0f, 1.0f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f");
-      ModSlider("wind x", &n->windX, -2.0f, 2.0f);
-      ModSlider("wind y", &n->windY, -2.0f, 2.0f);
-      ModSlider("wind z", &n->windZ, -2.0f, 2.0f);
-      ModSlider("speed", &n->speed, 0.0f, 4.0f);
+      ModSlider("seed", &n->seed, params::Volume::seed_lo, params::Volume::seed_hi, "%.0f");
+      ModSlider("wind x", &n->windX, params::Volume::wind_x_lo, params::Volume::wind_x_hi);
+      ModSlider("wind y", &n->windY, params::Volume::wind_y_lo, params::Volume::wind_y_hi);
+      ModSlider("wind z", &n->windZ, params::Volume::wind_z_lo, params::Volume::wind_z_hi);
+      ModSlider("speed", &n->speed, params::Volume::speed_lo, params::Volume::speed_hi);
       ColorSwatch("colour", n->color, n);
       // Lighting, quality and the own-camera rows sit behind "show more" (GraphNode::showAdvancedParams, saved
       // with the patch). They are still registered in the same order, so indices, modulation, expressions and
@@ -565,22 +566,22 @@ namespace app
          ImGui::PopID();
          gParamRegisterOnly = savedRegisterOnly || !open;
          ColorSwatch("light colour", n->lightColor, n);
-         ModSlider("light azimuth", &n->lightAzimuth, -180.0f, 180.0f, "%.0f");
-         ModSlider("light elevation", &n->lightElevation, -90.0f, 90.0f, "%.0f");
-         ModSlider("light", &n->lightIntensity, 0.0f, 4.0f);
-         ModSlider("ambient", &n->ambient, 0.0f, 2.0f);
+         ModSlider("light azimuth", &n->lightAzimuth, params::Volume::light_azimuth_lo, params::Volume::light_azimuth_hi, "%.0f");
+         ModSlider("light elevation", &n->lightElevation, params::Volume::light_elevation_lo, params::Volume::light_elevation_hi, "%.0f");
+         ModSlider("light", &n->lightIntensity, params::Volume::light_intensity_lo, params::Volume::light_intensity_hi);
+         ModSlider("ambient", &n->ambient, params::Volume::ambient_lo, params::Volume::ambient_hi);
          ModSlider("scatter", &n->scatter, 0.0f, 1.0f);
-         ModSlider("anisotropy", &n->anisotropy, -0.9f, 0.9f);
-         ModSliderInt("light steps", &n->lightSteps, 0, 16);
-         ModSliderInt("steps", &n->steps, 8, 256);
-         ModSliderInt("render steps", &n->renderSteps, 16, 512);
-         ModSlider("max distance", &n->maxDistance, 1.0f, 100.0f, "%.0f");
+         ModSlider("anisotropy", &n->anisotropy, params::Volume::anisotropy_lo, params::Volume::anisotropy_hi);
+         ModSliderInt("light steps", &n->lightSteps, params::Volume::light_steps_lo, params::Volume::light_steps_hi);
+         ModSliderInt("steps", &n->steps, params::Volume::steps_lo, params::Volume::steps_hi);
+         ModSliderInt("render steps", &n->renderSteps, params::Volume::render_steps_lo, params::Volume::render_steps_hi);
+         ModSlider("max distance", &n->maxDistance, params::Volume::max_distance_lo, params::Volume::max_distance_hi, "%.0f");
          if (open)
             ImGui::TextDisabled("own camera (no Render 3D input):");
-         ModSlider("cam azimuth", &n->camAzimuth, -180.0f, 180.0f, "%.0f");
-         ModSlider("cam elevation", &n->camElevation, -89.0f, 89.0f, "%.0f");
-         ModSlider("cam distance", &n->camDistance, 0.5f, 30.0f);
-         ModSlider("fov", &n->fov, 10.0f, 120.0f, "%.0f");
+         ModSlider("cam azimuth", &n->camAzimuth, params::Volume::cam_azimuth_lo, params::Volume::cam_azimuth_hi, "%.0f");
+         ModSlider("cam elevation", &n->camElevation, params::Volume::cam_elevation_lo, params::Volume::cam_elevation_hi, "%.0f");
+         ModSlider("cam distance", &n->camDistance, params::Volume::cam_distance_lo, params::Volume::cam_distance_hi);
+         ModSlider("fov", &n->fov, params::Volume::fov_lo, params::Volume::fov_hi, "%.0f");
          gParamRegisterOnly = savedRegisterOnly;
       }
    }
@@ -590,15 +591,15 @@ namespace app
    {
       DropdownButton("preset", ReactionDiffusionNode::PresetNames(), n->preset,
                      [n](int i) { n->ApplyPreset(i); });
-      ModSlider("feed", &n->feed, 0.01f, 0.09f, "%.4f");
-      ModSlider("kill", &n->kill, 0.03f, 0.08f, "%.4f");
-      ModSlider("diffuse A", &n->diffuseA, 0.2f, 1.5f);
-      ModSlider("diffuse B", &n->diffuseB, 0.1f, 1.0f);
-      ModSlider("steps / frame", &n->stepsPerFrame, 1.0f, 32.0f, "%.0f");
+      ModSlider("feed", &n->feed, params::ReactionDiffusion::feed_lo, params::ReactionDiffusion::feed_hi, "%.4f");
+      ModSlider("kill", &n->kill, params::ReactionDiffusion::kill_lo, params::ReactionDiffusion::kill_hi, "%.4f");
+      ModSlider("diffuse A", &n->diffuseA, params::ReactionDiffusion::diffuse_a_lo, params::ReactionDiffusion::diffuse_a_hi);
+      ModSlider("diffuse B", &n->diffuseB, params::ReactionDiffusion::diffuse_b_lo, params::ReactionDiffusion::diffuse_b_hi);
+      ModSlider("steps / frame", &n->stepsPerFrame, params::ReactionDiffusion::steps_per_frame_lo, params::ReactionDiffusion::steps_per_frame_hi, "%.0f");
       ImGui::TextDisabled("with an input connected:");
       ModSlider("source influence", &n->sourceInfluence, 0.0f, 1.0f);
-      ModSlider("width", &n->width, 64.0f, 2048.0f, "%.0f");
-      ModSlider("height", &n->height, 64.0f, 2048.0f, "%.0f");
+      ModSlider("width", &n->width, params::ReactionDiffusion::width_lo, params::ReactionDiffusion::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::ReactionDiffusion::height_lo, params::ReactionDiffusion::height_hi, "%.0f");
       ColorSwatch("low", n->lowColor, n);
       ColorSwatch("high", n->highColor, n);
       if (ActionButton::Draw("Reseed", ImVec2(kPreviewSize, 0)))
@@ -680,30 +681,30 @@ namespace app
          ImGui::TextDisabled("%s", file.c_str());
          PopTextWrapWidth();
       }
-      ModSliderInt("swatches", &n->swatchCount, 2, PaletteNode::kMaxSwatches);
+      ModSliderInt("swatches", &n->swatchCount, params::Palette::swatch_count_lo, PaletteNode::kMaxSwatches);
       DropdownButton("order", PaletteNode::SortNames(), n->sortMode,
                      [n](int i) { PushUndoCheckpoint(); n->sortMode = i; });
 
       NodeSeparator("extract");
-      ModSlider("min chroma", &n->minChroma, 0.0f, 0.2f);
+      ModSlider("min chroma", &n->minChroma, params::Palette::min_chroma_lo, params::Palette::min_chroma_hi);
       ModCheckbox("include neutrals", &n->includeNeutrals);
-      ModSlider("seed", &n->seed, 0.0f, 64.0f, "%.1f");
-      ModSliderInt("sample", &n->sampleSize, 16, 256);
+      ModSlider("seed", &n->seed, params::Palette::seed_lo, params::Palette::seed_hi, "%.1f");
+      ModSliderInt("sample", &n->sampleSize, params::Palette::sample_size_lo, params::Palette::sample_size_hi);
       ModCheckbox("live", &n->live);
       // Drawn whether or not Live is on: hiding a modulatable slider behind a
       // checkbox renumbers every pin after it, which silently repoints this
       // node's modulation the moment the box is ticked.
-      ModSlider("rate", &n->sampleRate, 1.0f, 60.0f, "%.0f");
+      ModSlider("rate", &n->sampleRate, params::Palette::sample_rate_lo, params::Palette::sample_rate_hi, "%.0f");
       if (ActionButton::Draw("Re-extract", ImVec2(kPreviewSize, 0)))
          n->RequestExtract();
 
       // Shaping runs on the stored cluster centres, so these are live: they
       // re-grade the palette without re-clustering the photo behind it.
       NodeSeparator("shape");
-      ModSlider("hue", &n->hueShift, -0.5f, 0.5f);
-      ModSlider("saturation", &n->saturation, 0.0f, 2.0f);
-      ModSlider("brightness", &n->brightness, -0.4f, 0.4f);
-      ModSlider("spread", &n->spread, 0.0f, 2.0f);
+      ModSlider("hue", &n->hueShift, params::Palette::hue_shift_lo, params::Palette::hue_shift_hi);
+      ModSlider("saturation", &n->saturation, params::Palette::saturation_lo, params::Palette::saturation_hi);
+      ModSlider("brightness", &n->brightness, params::Palette::brightness_lo, params::Palette::brightness_hi);
+      ModSlider("spread", &n->spread, params::Palette::spread_lo, params::Palette::spread_hi);
 
       NodeSeparator("strip output");
       DropdownButton("blend", PaletteNode::StripNames(), n->stripMode,
@@ -716,17 +717,17 @@ namespace app
    {
       DropdownButton("type", RampNode::TypeNames(), n->type, [n](int i) { n->type = i; });
       DropdownButton("repeat", RampNode::RepeatNames(), n->repeat, [n](int i) { n->repeat = i; });
-      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
-      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
-      ModSlider("angle", &n->angle, -180.0f, 180.0f, "%.1f\xC2\xB0");
-      ModSlider("center x", &n->centerX, -0.5f, 1.5f);
-      ModSlider("center y", &n->centerY, -0.5f, 1.5f);
-      ModSlider("scale", &n->scale, 0.05f, 8.0f);
+      ModSlider("width", &n->width, params::Ramp::width_lo, params::Ramp::width_hi, "%.0f");
+      ModSlider("height", &n->height, params::Ramp::height_lo, params::Ramp::height_hi, "%.0f");
+      ModSlider("angle", &n->angle, params::Ramp::angle_lo, params::Ramp::angle_hi, "%.1f\xC2\xB0");
+      ModSlider("center x", &n->centerX, params::Ramp::center_x_lo, params::Ramp::center_x_hi);
+      ModSlider("center y", &n->centerY, params::Ramp::center_y_lo, params::Ramp::center_y_hi);
+      ModSlider("scale", &n->scale, params::Ramp::scale_lo, params::Ramp::scale_hi);
       ModSlider("offset", &n->offset, -1.0f, 1.0f);
-      ModSlider("gamma", &n->gamma, 0.1f, 4.0f);
+      ModSlider("gamma", &n->gamma, params::Ramp::gamma_lo, params::Ramp::gamma_hi);
       ModSlider("dither", &n->dither, 0.0f, 1.0f);
 
-      ModSliderInt("stops", &n->stopCount, 2, RampNode::kStops);
+      ModSliderInt("stops", &n->stopCount, params::Ramp::stop_count_lo, RampNode::kStops);
       for (int i = 0; i < n->stopCount; i++)
       {
          ImGui::PushID(i);
@@ -956,7 +957,7 @@ namespace app
          ModSlider("probe U", &n->probeU, 0.0f, 1.0f, "%.3f", colW);
          ModSlider("probe V", &n->probeV, 0.0f, 1.0f, "%.3f", colW);
          if (n->sampleMode == ImageAnalyzeNode::kBoxRegion)
-            ModSlider("radius", &n->probeRadius, 0.01f, 0.5f, "%.3f", colW);
+            ModSlider("radius", &n->probeRadius, params::ImageAnalyze::probe_radius_lo, params::ImageAnalyze::probe_radius_hi, "%.3f", colW);
       }
 
       NodeSeparator("operation", colW);
@@ -985,9 +986,9 @@ namespace app
       }
 
       NodeSeparator("sampling", colW);
-      ModSlider("smoothing", &n->smoothing, 0.0f, 0.99f, "%.3f", colW);
-      ModSlider("samples / sec", &n->sampleRate, 1.0f, 60.0f, "%.0f", colW);
-      ModSliderInt("sample res", &n->sampleSize, 8, 256, colW);
+      ModSlider("smoothing", &n->smoothing, params::ImageAnalyze::smoothing_lo, params::ImageAnalyze::smoothing_hi, "%.3f", colW);
+      ModSlider("samples / sec", &n->sampleRate, params::ImageAnalyze::sample_rate_lo, params::ImageAnalyze::sample_rate_hi, "%.0f", colW);
+      ModSliderInt("sample res", &n->sampleSize, params::ImageAnalyze::sample_size_lo, params::ImageAnalyze::sample_size_hi, colW);
 
       ImGui::EndGroup();
 
@@ -996,9 +997,9 @@ namespace app
       ImGui::BeginGroup();
 
       NodeSeparator("shaping", colW);
-      ModSlider("gain", &n->gain, 0.0f, 8.0f, "%.3f", colW);
+      ModSlider("gain", &n->gain, params::ImageAnalyze::gain_lo, params::ImageAnalyze::gain_hi, "%.3f", colW);
       ModSlider("offset", &n->offset, -1.0f, 1.0f, "%.3f", colW);
-      ModSlider("power", &n->power, 0.1f, 5.0f, "%.3f", colW);
+      ModSlider("power", &n->power, params::ImageAnalyze::power_lo, params::ImageAnalyze::power_hi, "%.3f", colW);
       ModCheckbox("invert", &n->invert);
       ModCheckbox("clamp 0..1", &n->clamp01);
 
@@ -1074,7 +1075,7 @@ namespace app
       ImGui::BeginGroup();
       ModCheckbox("mirror", &n->mirror);
       ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f, "%.2f", colW);
-      ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f", colW);
+      ModSlider("hold ms", &n->holdMs, params::param::hold_ms_lo, params::param::hold_ms_hi, "%.0f", colW);
       ImGui::EndGroup();
 
       NodeSeparator("outputs", colW * tok::param_track_params_ratio + gutter);
@@ -1239,7 +1240,7 @@ namespace app
       DropdownButton("blink filter", BrainSourceNode::BlinkModeNames(), n->blinkMode, [n](int i) { PushUndoCheckpoint(); n->blinkMode = i; });
       DropdownButton("image", BrainSourceNode::ImageModeNames(), n->imageMode, [n](int i) { PushUndoCheckpoint(); n->imageMode = i; });
       ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f, "%.2f", colW);
-      ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f", colW);
+      ModSlider("hold ms", &n->holdMs, params::BrainSource::hold_ms_lo, params::BrainSource::hold_ms_hi, "%.0f", colW);
       ModCheckbox("artifact blanking", &n->artifactBlanking);
       ModCheckbox("startle guard", &n->startleGuard);
       ImGui::BeginDisabled(!n->HasTake() && !gParamRegisterOnly);

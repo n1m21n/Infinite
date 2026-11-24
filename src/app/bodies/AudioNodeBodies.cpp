@@ -1,5 +1,6 @@
 // Plugin, audio-out, analog and audio-node dispatch bodies (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "app/ui/design/UiFmt.h"
@@ -111,7 +112,7 @@ namespace app
          // AudioBareDropdown defers the popup to the once-per-frame draw at
          // canvas scale instead (see its own comment).
          AudioBareDropdown("##pluginparampick", names, sPickIndex, [](int i) { sPickIndex = i; },
-                           gAudioContentW - 70.0f - ImGui::GetStyle().ItemSpacing.x);
+                           gAudioContentW - tok::audio_node_plugin_pick_btn_w - ImGui::GetStyle().ItemSpacing.x);
          ImGui::SameLine();
          if (ActionButton::Draw("map", ImVec2(tok::audio_node_plugin_body_draw_x_2, 0)))
          {
@@ -157,7 +158,7 @@ namespace app
             if (n->Configuring())
             {
                const float unmapBtnW = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * tok::audio_node_unmap_btn_w_ratio + tok::space_0_5;
-               ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW - unmapBtnW - 4.0f, /*audioStyle=*/true);
+               ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW - unmapBtnW - tok::space_1, /*audioStyle=*/true);
                ImGui::SameLine(0.0f, tok::space_0_5);
                ImGui::PushID(i + 40000);
                ImGui::PushStyleColor(ImGuiCol_Button, tok::RoleV4(tok::col::ink_black, 0.0f));
@@ -533,13 +534,13 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          AudioBareDropdown(waveId.c_str(), waveList, wave, [&wave](int i) { PushUndoCheckpoint(); wave = i; }, waveW);
          ImGui::SetCursorScreenPos(ImVec2(x0 + waveW + gap, y));
-         AudioSlider("fine", &fine, -50.0f, 50.0f, "%.1f c", fineW);
+         AudioSlider("fine", &fine, params::audio_node::fine_lo, params::audio_node::fine_hi, "%.1f c", fineW);
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
-         AudioBareDropdown(octId.c_str(), OctaveNames(), std::clamp((int)std::lround(oct), -4, 4) + 4,
-                           [&oct](int i) { PushUndoCheckpoint(); oct = (float)(i - 4); }, octW);
+         AudioBareDropdown(octId.c_str(), OctaveNames(), std::clamp((int)std::lround(oct), params::audio_node::octave_lo, params::audio_node::octave_hi) - params::audio_node::octave_lo,
+                           [&oct](int i) { PushUndoCheckpoint(); oct = (float)(i + params::audio_node::octave_lo); }, octW);
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
-         AudioBareDropdown(semiId.c_str(), semiNames24, std::clamp((int)std::lround(semi), -24, 24) + 24,
-                           [&semi](int i) { PushUndoCheckpoint(); semi = (float)(i - 24); }, semiW);
+         AudioBareDropdown(semiId.c_str(), semiNames24, std::clamp((int)std::lround(semi), params::audio_node::semi_lo, params::audio_node::semi_hi) - params::audio_node::semi_lo,
+                           [&semi](int i) { PushUndoCheckpoint(); semi = (float)(i + params::audio_node::semi_lo); }, semiW);
          ImGui::PopID();
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
@@ -559,8 +560,8 @@ namespace app
       {
          // Row 4: pw, voices, spread, fm
          AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
-         row.Knob("pw", &n->pw1, 0.01f, 0.99f, "%.2f");
-         row.Knob("voices", &n->voices, 1.0f, 7.0f, "%.0f");
+         row.Knob("pw", &n->pw1, params::Analog::pw1_lo, params::Analog::pw1_hi, "%.2f");
+         row.Knob("voices", &n->voices, params::Analog::voices_lo, params::Analog::voices_hi, "%.0f");
          ImGui::BeginDisabled((n->voices < 1.5f) && !gParamRegisterOnly);
          row.Knob("spread", &n->spread, 0.0f, 1.0f, "%.2f");
          ImGui::EndDisabled();
@@ -570,7 +571,7 @@ namespace app
       {
          // Row 5: detune, mix (default 50%), sub, noise
          AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
-         row.Knob("detune", &n->detune, 0.0f, 100.0f, "%.1f c");
+         row.Knob("detune", &n->detune, params::Analog::detune_lo, params::Analog::detune_hi, "%.1f c");
          row.Knob("mix", &n->oscMix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("sub", &n->sub, 0.0f, 1.0f, "%.2f");
          row.Knob("noise", &n->noise, 0.0f, 1.0f, "%.2f");
@@ -587,7 +588,7 @@ namespace app
          AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row.DropdownKnob("analogFlt", filterNames, n->filterType,
                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
-                          "filter", &n->cutoff, 20.0f, 18000.0f, "%.0f Hz", filterOff, kKnobLarge, true);
+                          "filter", &n->cutoff, params::Analog::cutoff_lo, params::Analog::cutoff_hi, "%.0f Hz", filterOff, kKnobLarge, true);
          ImGui::BeginDisabled((filterOff) && !gParamRegisterOnly);
          row.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f", kKnobLarge);
          ImGui::EndDisabled();
@@ -614,12 +615,12 @@ namespace app
          AudioKnobRow row(tok::audio_node_analog_body_audio_knob_row_layout);
          if (noteDriven)
             ImGui::BeginDisabled();
-         row.Knob("freq", &n->freq, 20.0f, 8000.0f, "%.0f Hz", kKnobLarge);
+         row.Knob("freq", &n->freq, params::Analog::freq_lo, params::Analog::freq_hi, "%.0f Hz", kKnobLarge);
          if (noteDriven)
             ImGui::EndDisabled();
          row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
-         row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
+         row.Knob("glide", &n->glide, params::Analog::glide_lo, params::Analog::glide_hi, "%.2f s", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewGlide150);
+         row.Knob("bend", &n->pitchBend, params::Analog::pitch_bend_lo, params::Analog::pitch_bend_hi, "%+.2f st");
          row.End();
       }
       EndAudioSection();

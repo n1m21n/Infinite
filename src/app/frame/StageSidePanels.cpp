@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/UiFmt.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/FloatingWindow.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -990,7 +991,7 @@ void DrawSidePanels(FrameCtx& fc)
                      q = i;
                FormParts::EndCombo();
             }
-            FormParts::SliderFloat(L("Fade"), &ShowSetFadeMs(), 0.0f, 8000.0f, UiFmt::Ms, 0);
+            FormParts::SliderFloat(L("Fade"), &ShowSetFadeMs(), params::stage_side::show_set_fade_ms_lo, params::stage_side::show_set_fade_ms_hi, UiFmt::Ms, 0);
             EditorHint(T("A switch lands on the quantize grid; the old patch fades out over the fade time"));
 
             SectionCard::Begin(T("Launch"));

@@ -96,7 +96,7 @@ int DrawFloating(FrameCtx& fc)
       {
          const ImGuiViewport* vp = ImGui::GetMainViewport();
          ImGui::SetNextWindowPos(ImVec2(vp->GetCenter().x, vp->Pos.y + tok::stage_floating_gap), ImGuiCond_Always, ImVec2(tok::stage_floating_set_next_window_pos_x, 0.0f));
-         ImGui::SetNextWindowBgAlpha(0.95f);
+         ImGui::SetNextWindowBgAlpha(tok::stage_floating_bg_alpha);
          if (ImGui::Begin("##patchchangedondisk", nullptr,
                           ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))

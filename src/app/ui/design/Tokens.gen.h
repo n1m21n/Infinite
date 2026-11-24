@@ -532,6 +532,9 @@ namespace tok
    constexpr float audio_trim_wave_stroke = 1.0f;
    constexpr float audio_trim_wave_stroke_2 = 2.0f;
    constexpr float audio_trim_wave_stroke_3 = 1.5f;
+   constexpr float audio_tune_fine_w = 104.0f;
+   constexpr float audio_tune_oct_w = 74.0f;
+   constexpr float audio_tune_semi_w = 82.0f;
    constexpr float audio_node_analog_body_bound = 70.0f;
    constexpr float audio_node_analog_body_dummy_h = 4.0f;
    constexpr float audio_node_analog_body_dummy_h_2 = 2.0f;
@@ -545,6 +548,7 @@ namespace tok
    constexpr float audio_node_plugin_body_draw_x = 64.0f;
    constexpr float audio_node_plugin_body_draw_x_2 = 70.0f;
    constexpr float audio_node_plugin_body_dummy_h = 4.0f;
+   constexpr float audio_node_plugin_pick_btn_w = 70.0f;
    constexpr float audio_node_spatial_export_panel_ratio = 2.0f;
    constexpr float audio_node_third_ratio = 3.0f;
    constexpr float audio_node_unload_w = 60.0f;
@@ -614,6 +618,7 @@ namespace tok
    constexpr float chat_composer_hit_x_2 = 20.0f;
    constexpr float chat_composer_hit_y = 24.0f;
    constexpr float chat_composer_hit_y_2 = 20.0f;
+   constexpr float chat_composer_picker_h = 22.0f;
    constexpr float chat_composer_ratio = 2.0f;
    constexpr float chat_composer_text_alpha_10 = 0.1f;
    constexpr float chat_composer_text_alpha_11 = 0.06f;
@@ -682,6 +687,7 @@ namespace tok
    constexpr float chat_pill_gap = 7.0f;
    constexpr float chat_pill_ratio = 2.0f;
    constexpr float chat_pill_text_alpha_2 = 0.06f;
+   constexpr float chat_popup_border = 1.0f;
    constexpr float chat_progress_card_dummy_w = 1.0f;
    constexpr float chat_progress_card_input_text_multiline_y = 120.0f;
    constexpr float chat_progress_card_text_alpha_2 = 0.8f;
@@ -1341,6 +1347,21 @@ namespace tok
    constexpr float mod_matrix_table_ratio_2 = 0.4f;
    constexpr float mod_matrix_table_ratio_3 = 255.0f;
    constexpr float mod_matrix_width = 50.0f;
+   constexpr float node_audio_narrow_width = 200.0f;
+   constexpr float node_audio_time_viz_h = 150.0f;
+   constexpr float node_audio_wide_width = 960.0f;
+   constexpr float node_audio_width = 440.0f;
+   constexpr float node_border_w_cook_warning = 2.5f;
+   constexpr float node_border_w_hairline = 1.0f;
+   constexpr float node_border_w_live_issue = 2.0f;
+   constexpr float node_dimmed_alpha = 0.55f;
+   constexpr float node_fader_h = 138.0f;
+   constexpr float node_fader_meter_pad = 6.0f;
+   constexpr float node_fader_meter_w = 8.0f;
+   constexpr float node_fader_w = 22.0f;
+   constexpr float node_preview_size = 190.0f;
+   constexpr float node_viewport_size = 340.0f;
+   constexpr float node_wide_width = 476.0f;
    constexpr float note_arp_gate_grid_bound = 46.0f;
    constexpr float note_arpeggiator_body_dummy_h = 4.0f;
    constexpr float note_audio_in_body_dummy_h = 2.0f;
@@ -1880,6 +1901,7 @@ namespace tok
    constexpr float piano_roll_page_set_next_window_size_constraints_x_2 = 280.0f;
    constexpr float piano_roll_ruler_h = 16.0f;
    constexpr float piano_roll_ruler_tint_alpha_2 = 0.22f;
+   constexpr float piano_roll_start_key_h = 12.0f;
    constexpr float piano_roll_strip_h = 10.0f;
    constexpr float piano_roll_text_w_ratio = 2.0f;
    constexpr float piano_roll_top_row_ratio = 3.0f;
@@ -2192,6 +2214,7 @@ namespace tok
    constexpr float stage_drop_handling_rotate_z_ratio = 57.2957795f;
    constexpr float stage_drop_handling_row_h = 200.0f;
    constexpr float stage_drop_handling_tex_y = 160.0f;
+   constexpr float stage_floating_bg_alpha = 0.95f;
    constexpr float stage_floating_bound = 8.0f;
    constexpr float stage_floating_dummy_w = 400.0f;
    constexpr float stage_floating_dummy_w_2 = 420.0f;
@@ -2752,6 +2775,7 @@ namespace tok
    constexpr float view3d_pick_limit = 14.0f;
    constexpr float view3d_pose_bound = 4.0f;
    constexpr float view3d_pose_bound_2 = 400.0f;
+   constexpr float view3d_pose_brush_radius = 40.0f;
    constexpr float view3d_pose_gap = 18.0f;
    constexpr float view3d_pose_gap_2 = 26.0f;
    constexpr float view3d_pose_hex_alpha_10 = 0.7f;
@@ -2782,6 +2806,7 @@ namespace tok
    constexpr float view3d_same_limit = 4.0f;
    constexpr float view3d_sculpt_bound = 2.0f;
    constexpr float view3d_sculpt_bound_2 = 1000.0f;
+   constexpr float view3d_sculpt_brush_radius = 50.0f;
    constexpr float view3d_sculpt_gap = 7.0f;
    constexpr float view3d_sculpt_gap_2 = 26.0f;
    constexpr float view3d_sculpt_hex_alpha_4 = 0.85f;
@@ -2897,6 +2922,8 @@ namespace tok
    constexpr int arrange_render_width_2 = 3840;
    constexpr int arrange_render_width_3 = 1280;
    constexpr int arrange_render_width_4 = 1080;
+   constexpr int arrange_thumb_h = 54;
+   constexpr int arrange_thumb_w = 96;
    constexpr int arrange_session_grid_edge_hi_alpha_2 = 220;
    constexpr int arrange_session_grid_ink_black_alpha_2 = 45;
    constexpr int arrange_session_grid_ink_white_alpha_3 = 38;

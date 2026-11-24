@@ -1,6 +1,7 @@
 // VMPC body: the MPC card's layout (4x4 square pads, the selected pad's editor
 // below), with a clip's filmstrip where the MPC draws a waveform.
 #include "app/ui/design/components/EmptyState.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/UiInteract.h"
@@ -81,7 +82,7 @@ namespace app
          {
             const VmpcNode::ParamInfo& info = VmpcNode::Info(k);
             const std::string name = VmpcParamName(pad, k);
-            ModSlider(info.name, n->PadParamPtr(pad, k), info.lo, info.hi, info.fmt, 100.0f, /*audioStyle=*/true, 0.0f,
+            ModSlider(info.name, n->PadParamPtr(pad, k), info.lo, info.hi, info.fmt, params::vmpc::register_pad_floats_lo, /*audioStyle=*/true, params::vmpc::register_pad_floats_hi,
                       nullptr, nullptr, VmpcNode::ParamId(pad, k), name.c_str());
          }
          gParamRegisterOnly = saved;
@@ -459,7 +460,7 @@ namespace app
          row.Dropdown("transition##vmpctrans", VmpcTransitionList(), n->transition,
                       [n](int i) { PushUndoCheckpoint(); n->transition = i; });
          ImGui::BeginDisabled(n->transition == VmpcNode::kCut);
-         row.Knob("time", &n->transitionMs, 0.0f, 2000.0f, "%.0f ms", kKnobSmall, false, false,
+         row.Knob("time", &n->transitionMs, params::Vmpc::transition_ms_lo, params::Vmpc::transition_ms_hi, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::Knob, nullptr, nullptr, VmpcNode::kTimeParamId, "transition time");
          ImGui::EndDisabled();
          bool changed = false;

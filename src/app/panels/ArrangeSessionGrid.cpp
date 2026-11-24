@@ -5,6 +5,7 @@
 // The idea comes from Ricardo Palmieri's Infinite-Turbo fork; this is a fresh
 // implementation.
 #include "app/ui/design/components/MenuParts.h"
+#include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
@@ -531,7 +532,7 @@ namespace app
          }
          else
             std::snprintf(tempoFmt, sizeof tempoFmt, "%s", T("Tempo: unchanged"));
-         ImGui::DragFloat("##scenetempo", &sSceneTempoEdit, 0.25f, 0.0f, 300.0f, tempoFmt, ImGuiSliderFlags_NoRoundToFormat);
+         ImGui::DragFloat("##scenetempo", &sSceneTempoEdit, params::arrange_session_grid::scene_tempo_edit_speed, params::arrange_session_grid::scene_tempo_edit_lo, params::arrange_session_grid::scene_tempo_edit_hi, tempoFmt, ImGuiSliderFlags_NoRoundToFormat);
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Launching this scene sets the project tempo. 0 leaves the tempo alone."));
          if (ImGui::IsItemDeactivatedAfterEdit())
