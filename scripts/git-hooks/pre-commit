@@ -1,0 +1,16 @@
+#!/bin/bash
+# Before a commit that touches UI code or the design tools: the design ratchet may not rise (owner 2026-11-24).
+# tools/design/ratchet.py: literal colours, raw widgets, size literals, popups, the ui_audit categories and the
+# ui-audit-ok tag count may only go down. Runs on the working tree (~12 s). No bypass switch.
+# Installed for every worktree by scripts/git-hooks/install.sh (a launcher in the shared .git/hooks).
+set -uo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+if git diff --cached --name-only --diff-filter=ACMRD | grep -Eq '^(src/app/|src/core/|tools/design/)'; then
+  out=$(cd "$ROOT" && python3 tools/design/ratchet.py 2>&1); rc=$?
+  if [[ $rc -ne 0 ]]; then
+    echo "$out" | grep -E 'RATCHET|stale|differs|FAIL|Error' >&2
+    echo "pre-commit: BLOCKED - design ratchet went up (python3 tools/design/ratchet.py). Use a token or a kit part." >&2
+    exit 1
+  fi
+fi
+exit 0
