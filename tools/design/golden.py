@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Render the component gallery (INFINITE_UIGALLERY) in light and dark and diff against goldens.
+"""Render the UI golden pages in light and dark and diff against goldens.
 usage:
-  golden.py [--update] [--binary PATH] [--render-out DIR]
+  golden.py [--update] [--binary PATH] [--render-out DIR] [--pages gallery,bodies,...]
   golden.py --compare CAND_DIR GOLD_DIR
 
-Goldens live at tests/ui-golden/<platform>/gallery-{light,dark}.png (macos, windows, linux).
-Text rasterization differs per OS, so each platform keeps its own goldens. Exit 1 on any difference
-above the tolerance (top 64 px, the live menu bar, is ignored) (mean abs channel diff 0.05, or more
-than 0.02 % of pixels changed by > 24).
+Pages (ui-formalisation section 7): the component gallery (INFINITE_UIGALLERY), six node bodies with their params
+open (the Block C pilots and one per family), Settings, Mixer and the Drums panel (a compact inspector strip).
+Goldens live at tests/ui-golden/<platform>/<page>-{light,dark}.png (macos, windows, linux). Text rasterization
+differs per OS, so each platform keeps its own goldens; a page with no golden on a platform is skipped there.
+The top 64 px (the live menu bar) is ignored. Tolerance: the gallery draws on a flat window, so mean abs channel
+diff 0.05 and at most 0.02 % of pixels changed by > 24; pages over the node canvas carry its grid's sub-pixel
+shimmer (two runs of one binary: mean ~0.25, <= 0.02 % > 24 - panel_shots.py), so mean 0.5 and 0.05 %.
+Exit 1 on any page past its tolerance. Blocking in the hygiene harness (run-infinite-hygiene, ui group).
 """
 import argparse, os, platform, subprocess, sys, tempfile
 from PIL import Image, ImageChops
@@ -30,7 +34,26 @@ def default_binary():
     return os.path.join(ROOT, "build-linux/Infinite")
 
 
-def diff_images(cand_path, gold_path, diff_out):
+# page -> (env, tolerance). Themes: the gallery picks its own (INFINITE_UIGALLERY=light|dark); the others take the
+# theme as the first INFINITE_OPENPANELS word.
+PAGES = {
+    "gallery": (lambda mode: {"INFINITE_UIGALLERY": mode}, "flat"),
+    "bodies": (lambda mode: {"INFINITE_NODEGALLERY": "*|Shape,Audio Filter,Chorus,Oscillator,Arpeggiator,Cube",
+                             "INFINITE_GALLERYGRID": "3,520,760", "INFINITE_GALLERYPARAMS": "1",
+                             "INFINITE_OPENPANELS": mode, "INFINITE_SCREENSHOT_FRAME": "40"}, "canvas"),
+    "settings": (lambda mode: {"INFINITE_OPENPANELS": mode + ",settingswin,settingsgeneral"}, "canvas"),
+    # The Mixer and Drums pages spawn their node first: without one they show only an empty state.
+    "mixer": (lambda mode: {"INFINITE_NODEGALLERY": "*|Mixer,Oscillator,Chorus", "INFINITE_GALLERYGRID": "3,520,760",
+                            "INFINITE_OPENPANELS": mode + ",mixer", "INFINITE_SCREENSHOT_FRAME": "40"}, "canvas"),
+    "drums": (lambda mode: {"INFINITE_NODEGALLERY": "*|Drum Sequencer", "INFINITE_GALLERYGRID": "3,520,760",
+                            "INFINITE_OPENPANELS": mode + ",drums", "INFINITE_SCREENSHOT_FRAME": "40"}, "live"),
+}
+# live: the fixture's transport plays, so the Drum Sequencer's playhead column (node and panel) sits on a wall-time
+# step - about 0.2 % of pixels run to run. A moved control or row shifts far more than 0.4 %.
+TOL = {"flat": (0.05, 0.0002), "canvas": (0.5, 0.0005), "live": (0.5, 0.004)}
+
+
+def diff_images(cand_path, gold_path, diff_out, tol="flat"):
     a, b = Image.open(cand_path).convert("RGB"), Image.open(gold_path).convert("RGB")
     if a.size != b.size:
         return False, f"size {a.size} != golden {b.size}"
@@ -40,7 +63,7 @@ def diff_images(cand_path, gold_path, diff_out):
     n = a.size[0] * a.size[1]
     mean = sum(i * c for i, c in enumerate(hist)) / n
     big = sum(hist[25:]) / n
-    ok = mean <= 0.05 and big <= 0.0002
+    ok = mean <= TOL[tol][0] and big <= TOL[tol][1]
     if not ok and diff_out:
         d.point(lambda v: 255 if v > 24 else 0).save(diff_out)
     return ok, f"mean diff {mean:.4f}, pixels >24: {big*100:.4f}%  {'ok' if ok else 'DIFFERS'}"
@@ -48,17 +71,21 @@ def diff_images(cand_path, gold_path, diff_out):
 
 def compare_dirs(cand_dir, gold_dir):
     bad = 0
-    for mode in ("light", "dark"):
-        cand = os.path.join(cand_dir, f"gallery-{mode}.png")
-        gold = os.path.join(gold_dir, f"gallery-{mode}.png")
-        if not os.path.exists(cand):
-            print(f"{mode}: missing candidate {cand}"); bad += 1; continue
-        if not os.path.exists(gold):
-            print(f"{mode}: missing golden {gold}"); bad += 1; continue
-        ok, msg = diff_images(cand, gold, os.path.join(cand_dir, f"diff-{mode}.png"))
-        print(f"{mode}: {msg}")
-        if not ok:
-            bad += 1
+    for page, (_, tol) in PAGES.items():
+        for mode in ("light", "dark"):
+            name = f"{page}-{mode}"
+            cand = os.path.join(cand_dir, name + ".png")
+            gold = os.path.join(gold_dir, name + ".png")
+            if not os.path.exists(gold):
+                if page == "gallery":
+                    print(f"{name}: missing golden {gold}"); bad += 1
+                continue
+            if not os.path.exists(cand):
+                print(f"{name}: missing candidate {cand}"); bad += 1; continue
+            ok, msg = diff_images(cand, gold, os.path.join(cand_dir, f"diff-{name}.png"), tol)
+            print(f"{name}: {msg}")
+            if not ok:
+                bad += 1
     return 1 if bad else 0
 
 
@@ -67,6 +94,7 @@ def main():
     ap.add_argument("--update", action="store_true", help="Write/overwrite goldens for this platform")
     ap.add_argument("--binary", default=None, help="Path to Infinite binary")
     ap.add_argument("--render-out", default=None, help="Also save rendered PNGs into this directory (CI artifacts)")
+    ap.add_argument("--pages", default="", help="Comma list of pages (default: all): " + ",".join(PAGES))
     ap.add_argument("--compare", nargs=2, metavar=("CAND_DIR", "GOLD_DIR"), help="Compare two directories without rendering")
     args = ap.parse_args()
 
@@ -80,28 +108,36 @@ def main():
     if args.render_out:
         os.makedirs(args.render_out, exist_ok=True)
 
+    pages = [p for p in (args.pages.split(",") if args.pages else PAGES) if p]
     bad = 0
-    for mode in ("light", "dark"):
-        tmp_dir = tempfile.mkdtemp()
-        out = os.path.join(args.render_out, f"gallery-{mode}.png") if args.render_out else os.path.join(tmp_dir, f"gallery-{mode}.png")
-        env = dict(os.environ, INFINITE_UIGALLERY=mode, INFINITE_NO_UPDATE_CHECK="1",
-                   INFINITE_SCREENSHOT_FRAME="20", IMAGERESYNTH_SCREENSHOT=out)
-        subprocess.run([exe], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-        if not os.path.exists(out):
-            print(f"{mode}: render failed"); bad += 1; continue
-        gold = os.path.join(gdir, f"gallery-{mode}.png")
-        if args.update:
-            Image.open(out).convert("RGB").save(gold, optimize=True)
-            print(f"{mode}: golden written ({gold})")
-            continue
-        if not os.path.exists(gold):
-            print(f"{mode}: no committed golden at {gold}; rendered to {out}")
-            continue
-        ok, msg = diff_images(out, gold, os.path.join(os.path.dirname(out), f"diff-{mode}.png"))
-        print(f"{mode}: {msg}")
-        if not ok:
-            print("  diff image:", os.path.join(os.path.dirname(out), f"diff-{mode}.png"))
-            bad += 1
+    tmp_dir = tempfile.mkdtemp()
+    for page in pages:
+        envf, tol = PAGES[page]
+        for mode in ("light", "dark"):
+            name = f"{page}-{mode}"
+            gold = os.path.join(gdir, name + ".png")
+            if not args.update and not args.render_out and not os.path.exists(gold):
+                continue   # no golden for this page on this platform: nothing to compare, skip the launch
+            out = os.path.join(args.render_out or tmp_dir, name + ".png")
+            env = dict(os.environ, INFINITE_NO_UPDATE_CHECK="1", INFINITE_SCREENSHOT_FRAME="20",
+                       IMAGERESYNTH_SCREENSHOT=out)
+            env.update(envf(mode))
+            subprocess.run([exe], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+                           timeout=180)
+            if not os.path.exists(out):
+                print(f"{name}: render failed"); bad += 1; continue
+            if args.update:
+                Image.open(out).convert("RGB").save(gold, optimize=True)
+                print(f"{name}: golden written ({gold})")
+                continue
+            if not os.path.exists(gold):
+                print(f"{name}: no committed golden at {gold}; rendered to {out}")
+                continue
+            ok, msg = diff_images(out, gold, os.path.join(os.path.dirname(out), f"diff-{name}.png"), tol)
+            print(f"{name}: {msg}")
+            if not ok:
+                print("  diff image:", os.path.join(os.path.dirname(out), f"diff-{name}.png"))
+                bad += 1
     return 1 if bad else 0
 
 

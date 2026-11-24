@@ -47,6 +47,19 @@ Two widths exist. There is no third:
 ## Skeleton for a new audio node body
 
 ```cpp
+// The node's controls are a params::Row table (src/app/graph/ParamDesc.h, ui-formalisation Block C): a new knob is
+// one row here, never a hand row.Knob / ModSlider call in the body.
+namespace
+{
+   using FooRow = params::Row<FooNode>;
+   const FooRow kFooRows[] = {
+      FooRow::Choice<&FooNode::mode>("mode", &FooDsp::ModeNames).Undo(),
+      FooRow::Knob<&FooNode::cutoff>("cutoff", 20.0f, 20000.0f).Fmt("%.0f Hz").Size(kKnobLarge),
+      FooRow::Knob<&FooNode::res>("res", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge),
+      FooRow::Knob<&FooNode::drive>("drive", 0.0f, 1.0f).Fmt("%.2f"),   // kKnobSmall
+   };
+}
+
 void DrawFooBody(GraphNode& gn, FooNode* n)
 {
    char stat[64];
@@ -58,10 +71,7 @@ void DrawFooBody(GraphNode& gn, FooNode* n)
 
    {                                      // Tier 1: prefer 2 rows of 4
       AudioKnobRow row(4);
-      row.Dropdown("mode", kModes, n->mode, [n](int i){ PushUndoCheckpoint(); n->mode = i; });
-      row.Knob("cutoff", &n->cutoff, 20.0f, 20000.0f, "%.0f Hz", kKnobLarge);
-      row.Knob("res",    &n->res,    0.0f, 1.0f,      "%.2f",    kKnobLarge);
-      row.Knob("drive",  &n->drive,  0.0f, 1.0f,      "%.2f");   // kKnobSmall
+      Ui::DrawKnobs(row, n, kFooRows);    // cells left to right; .Cell(k) pins one, .If / .LiveIf show or grey it
       row.End();
    }
 

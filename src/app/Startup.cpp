@@ -1933,7 +1933,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             const std::string name = rest.substr(pos, comma - pos);
             if (!name.empty())
             {
-               GraphNode* spawned = SpawnNode(name.c_str(), cat.c_str(), (float)(i % cols) * dx, (float)(i / cols) * dy);
+               // "*" as the category: each node in its own family, so one page can mix families (the golden body page).
+               const std::string nodeCat = cat == "*" ? NodeFactory::Instance().CategoryOf(name) : cat;
+               GraphNode* spawned = SpawnNode(name.c_str(), nodeCat.c_str(), (float)(i % cols) * dx, (float)(i / cols) * dy);
                if (spawned != nullptr && getenv("INFINITE_GALLERYPARAMS") != nullptr)
                   spawned->showParams = true;   // review shots of the "show params" panel
                i++;
