@@ -167,6 +167,12 @@ STRUCTURE_CALLS = {"static_assert", "alignas", "sizeof", "reserve", "resize", "c
 TEST_FUNC = re.compile(r"(SelfCheck|SelfTest|Test|AffinityAb|AuditState|Bench|Probe|Census|Fuzz)", re.I)
 HARNESS = re.compile(r'getenv\s*\(\s*"[^"]*(TEST|BENCH|PROBE|AUDIT|CENSUS)|\bargv\b|\bargc\b')
 I18N_WRAP = {"L", "T", "TC", "LC", "TList", "I18N_KEY", "HelpT"}
+SHORTCUT = re.compile(r"^(?:\+?(?:Shift|Alt|Ctrl|Cmd|Opt)\+)*\+?(?:[A-Z0-9]|F\d{1,2}|Backspace|Delete|Tab|Esc|Enter|Home|End|PgUp|PgDn|"
+                      r"Space|Click|Double-click(?: top)?)$")
+# the same English-by-design scope as tools/i18n/lint.py (decision D2): node bodies' param names and values
+I18N_ENGLISH = ("src/app/bodies/", "src/app/ui/ParamWidgets.cpp")
+ID_CALLS = {"OpenPopup", "BeginPopup", "BeginPopupModal", "BeginPopupContextItem", "BeginPopupContextWindow", "IsPopupOpen",
+            "PushID", "GetID", "BeginChild", "BeginTable", "BeginTabBar", "BeginListBox", "BeginContextItem"}   # an id, never shown
 # a theme is read from what the statement calls, or from the name of the variable it sets (never from any word in it)
 THEME = [
     ("timing", re.compile(r"\b(GetTime|DeltaTime|steady_clock|system_clock|milliseconds|microseconds|sleep_for|wait_for)\b"),
@@ -227,6 +233,7 @@ def scan_file(rel, src):
     harness_stack = []  # inside a self-test function or a getenv("..TEST")/argv block
     stmt_start = 0
     in_kit = rel.startswith(KIT)
+    ok_lines = {n for n, l in enumerate(src.split("\n"), 1) if "i18n-ok" in l}
 
     def func_name():
         for _, nm in reversed(funcs):
@@ -327,6 +334,12 @@ def scan_file(rel, src):
                 allowed.bump("id", t.line); continue
             if wrapped or (prev is not None and prev.text in I18N_WRAP):
                 allowed.bump("i18n", t.line); continue
+            if call in ID_CALLS:
+                allowed.bump("id", t.line); continue
+            if call in ("Item", "MenuItem") and SHORTCUT.match(s):   # a menu row's key hint: key names, never translated
+                allowed.bump("shortcut", t.line); continue
+            if rel.startswith(I18N_ENGLISH) or t.line in ok_lines:
+                allowed.bump("english", t.line); continue
             findings.append(("label", call, "", s[:80]) + where)
             continue
 
