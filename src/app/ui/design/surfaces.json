@@ -16,6 +16,7 @@
    }
   },
   "app_shared": {
+   "spacing": "{gap.panel}",
    "own_size": {
     "audio_solo_button_w": 26.0,
     "width": 44.0
@@ -28,9 +29,6 @@
     "field_device_controls_ratio": 2.0,
     "in_label_scale": 3.0,
     "pos": 0.5
-   },
-   "off_scale": {
-    "spacing": 7.0
    }
   },
   "app_state": {
@@ -64,6 +62,8 @@
    "panel_content_col_6_alpha": "{opacity.4}",
    "panel_content_radius": "{radius.micro}",
    "window_bg_alpha": "{opacity.35}",
+   "clip_settings_child_gap": "{gap.block}",
+   "mix_knob_gap": "{gap.panel}",
    "own_size": {
     "active_w": 72.0,
     "apply_bottom": 56.0,
@@ -161,9 +161,7 @@
    },
    "off_scale": {
     "alpha": 0.27,
-    "clip_settings_child_gap": 18.0,
     "line_stroke_md": 1.6,
-    "mix_knob_gap": 9.0,
     "panel_content_stroke": 1.4
    }
   },
@@ -184,6 +182,9 @@
    "ring_alpha": "{opacity.30}",
    "stop_square_radius": "{radius.micro}",
    "stroke": "{stroke.medium}",
+   "gx_gap": "{gap.panel}",
+   "panel_content_gap": "{gap.group}",
+   "tl_inset": "{gap.group}",
    "own_size": {
     "add_col_w": 40.0,
     "badge_w": 30.0,
@@ -243,10 +244,7 @@
    },
    "off_scale": {
     "alpha": 0.22,
-    "gx_gap": 9.0,
-    "panel_content_gap": 6.5,
-    "panel_content_stroke": 1.4,
-    "tl_inset": 5.5
+    "panel_content_stroke": 1.4
    }
   },
   "arrange_support1": {
@@ -282,6 +280,9 @@
    "predictive_modulator_params_radius": "{radius.chip}",
    "trim_wave_line_stroke_lg": "{stroke.emphasis}",
    "trim_wave_line_stroke_sm": "{stroke.medium}",
+   "avail_gap": "{gap.section}",
+   "begin_body_gap": "{gap.panel}",
+   "drift_legend_gap": "{gap.hair}",
    "own_size": {
     "drift_meter_r": 2.0,
     "grip": 8.0,
@@ -309,9 +310,6 @@
     "trim_wave_limit_sm": 0.01
    },
    "off_scale": {
-    "avail_gap": 11.0,
-    "begin_body_gap": 7.0,
-    "drift_legend_gap": 1.5,
     "drift_meter_line_stroke_lg": 1.4
    }
   },
@@ -376,6 +374,25 @@
    "outline_alpha_lg": "{opacity.45}",
    "outline_alpha_sm": "{opacity.35}",
    "step_row_stroke": "{stroke.emphasis}",
+   "agent_label_gap": "{gap.page}",
+   "chip_gap": "{gap.tight}",
+   "code_pane_gap": "{gap.block}",
+   "composer_gap": "{gap.section}",
+   "fs_inset": "{gap.page}",
+   "gutter": "{gap.block}",
+   "header_gap": "{gap.block}",
+   "menu_row_gap": "{gap.panel}",
+   "menu_row_inset": "{gap.block}",
+   "pick_card_gap": "{gap.section}",
+   "pill_gap": "{gap.panel}",
+   "queue_gap": "{gap.panel}",
+   "reply_height_gap": "{gap.panel}",
+   "text_end_gap": "{gap.panel}",
+   "tx_gap": "{gap.panel}",
+   "user_gap": "{gap.page}",
+   "user_inset": "{gap.page}",
+   "w_gap": "{gap.page}",
+   "x_gap": "{gap.page}",
    "own_size": {
     "avatar_r_lg": 11.0,
     "avatar_r_md": 9.0,
@@ -555,29 +572,10 @@
     "with_code_limit": 640.0
    },
    "off_scale": {
-    "agent_label_gap": 22.0,
     "category_alpha": 0.24,
-    "chip_gap": 2.5,
-    "code_pane_gap": 18.0,
-    "composer_gap": 11.0,
     "dot_alpha_sm": 0.63,
     "fill_alpha_lg": 0.92,
-    "fs_inset": 22.0,
-    "gutter": 18.0,
-    "header_gap": 18.0,
-    "menu_row_gap": 9.0,
-    "menu_row_inset": 18.0,
-    "pick_card_gap": 11.0,
-    "pill_gap": 7.0,
-    "queue_gap": 7.0,
-    "reply_height_gap": 7.0,
-    "shade_alpha": 0.47,
-    "text_end_gap": 7.0,
-    "tx_gap": 7.0,
-    "user_gap": 20.0,
-    "user_inset": 20.0,
-    "w_gap": 20.0,
-    "x_gap": 22.0
+    "shade_alpha": 0.47
    }
   },
   "check_box": {
@@ -623,6 +621,7 @@
    }
   },
   "code_block": {
+   "inset": "{gap.block}",
    "ratio": {
     "h_ratio": 2.0,
     "y": 0.06
@@ -630,9 +629,6 @@
    "limit": {
     "max": 18.0,
     "text_w_min": 2.0
-   },
-   "off_scale": {
-    "inset": 18.0
    }
   },
   "colour_chip": {
@@ -736,6 +732,13 @@
    "screw_stroke": "{stroke.rule}",
    "scribble_row_radius": "{radius.chip}",
    "text_alpha_sm": "{opacity.70}",
+   "chassis_gap": "{gap.panel}",
+   "console_meter_gap": "{gap.hair}",
+   "face_gap": "{gap.group}",
+   "face_side_gap": "{gap.group}",
+   "key_cap_gap": "{gap.tight}",
+   "pot_gap": "{gap.tight}",
+   "scribble_row_gap": "{gap.panel}",
    "own_size": {
     "dot_r_lg": 2.6,
     "dot_r_sm": 1.6,
@@ -780,18 +783,11 @@
    },
    "off_scale": {
     "cap_lo_alpha": 0.72,
-    "chassis_gap": 9.0,
-    "console_meter_gap": 1.5,
     "console_meter_radius": 0.5,
-    "face_gap": 6.5,
-    "face_side_gap": 6.5,
     "fill_alpha_lg": 0.78,
     "fill_alpha_sm": 0.22,
-    "key_cap_gap": 2.5,
     "line_alpha": 0.33,
-    "line_stroke_lg": 2.2,
-    "pot_gap": 2.5,
-    "scribble_row_gap": 9.0
+    "line_stroke_lg": 2.2
    }
   },
   "dialog": {
@@ -840,6 +836,8 @@
    "node_color_alpha": "{opacity.35}",
    "outline_radius": "{radius.cell}",
    "outline_stroke": "{stroke.medium}",
+   "grid_gap": "{gap.item}",
+   "labels_gap": "{gap.panel}",
    "own_size": {
     "cell_w": 30.0,
     "desk_key_min_w_lg": 70.0,
@@ -883,9 +881,7 @@
     "panel_limit": 60.0
    },
    "off_scale": {
-    "dot_alpha": 0.22,
-    "grid_gap": 4.5,
-    "labels_gap": 9.0
+    "dot_alpha": 0.22
    }
   },
   "empty_state": {
@@ -969,15 +965,13 @@
   },
   "filter_bar": {
    "dir_button_stroke": "{stroke.medium}",
+   "cross_gap": "{gap.item}",
    "ratio": {
     "dir_button_im_vec4_scale": 0.3,
     "dir_button_ratio": 4.0
    },
    "maths": {
     "well_limit": 0.001
-   },
-   "off_scale": {
-    "cross_gap": 3.5
    }
   },
   "find_overlay": {
@@ -1044,6 +1038,12 @@
    "stereo_visualizer_stroke": "{stroke.rule}",
    "transient_shaper_visualizer_stroke": "{stroke.medium}",
    "wavetable_shaper_visualizer_stroke": "{stroke.rule}",
+   "chorus_visualizer_gap": "{gap.hair}",
+   "flanger_visualizer_gap": "{gap.hair}",
+   "formant_filter_visualizer_gap": "{gap.page}",
+   "frequency_shifter_visualizer_gap": "{gap.panel}",
+   "resonator_bank_visualizer_gap": "{gap.page}",
+   "stereo_visualizer_gap": "{gap.page}",
    "own_size": {
     "arrow_sz": 3.0,
     "audio_filter_visualizer_r": 5.0,
@@ -1136,24 +1136,18 @@
     "audio_filter_visualizer_stroke": 1.8,
     "audio_spectrum_stroke": 1.2,
     "bitcrush_visualizer_stroke": 1.8,
-    "chorus_visualizer_gap": 1.5,
     "convolution_space_visualizer_path_stroke": 1.8,
     "drive_visualizer_path_stroke": 1.8,
     "eq_visualizer_stroke": 1.8,
-    "flanger_visualizer_gap": 1.4,
     "flanger_visualizer_path_stroke": 2.2,
-    "formant_filter_visualizer_gap": 20.0,
-    "frequency_shifter_visualizer_gap": 7.0,
     "frequency_shifter_visualizer_line_stroke_lg": 1.8,
     "frequency_shifter_visualizer_line_stroke_sm": 1.2,
     "gain_computer_visualizer_path_stroke": 1.8,
     "phaser_visualizer_path_stroke": 1.6,
-    "resonator_bank_visualizer_gap": 22.0,
     "reverb_visualizer_path_stroke": 1.8,
     "ring_mod_visualizer_path_stroke": 1.8,
     "ring_stroke_sm": 1.2,
     "saturator_visualizer_path_stroke": 1.6,
-    "stereo_visualizer_gap": 20.0,
     "stereo_visualizer_path_stroke": 1.8,
     "transient_shaper_visualizer_path_stroke": 1.8,
     "tremolo_visualizer_path_stroke": 1.4,
@@ -1171,6 +1165,8 @@
    "line_stroke_sm": "{stroke.rule}",
    "table_grid_radius": "{radius.container}",
    "table_grid_stroke": "{stroke.medium}",
+   "layer_stack_gap": "{gap.section}",
+   "table_grid_gap": "{gap.panel}",
    "own_size": {
     "bar_h": 64.0,
     "cell_h": 34.0,
@@ -1199,10 +1195,6 @@
    "limit": {
     "cell_w_u_res": 3.0,
     "layer_block_rows": 3.0
-   },
-   "off_scale": {
-    "layer_stack_gap": 11.0,
-    "table_grid_gap": 9.0
    }
   },
   "glyph_draw": {
@@ -1318,6 +1310,7 @@
    "outline_stroke_sm": "{stroke.medium}",
    "radius": "{radius.cell}",
    "stroke": "{stroke.rule}",
+   "gap": "{gap.hair}",
    "own_size": {
     "max_x": 1000000000.0,
     "max_y": 1000000000.0,
@@ -1329,9 +1322,6 @@
    "ratio": {
     "h_ratio": 0.72,
     "ratio": 2.0
-   },
-   "off_scale": {
-    "gap": 1.5
    }
   },
   "mixer": {
@@ -1348,6 +1338,10 @@
    "pot_stroke": "{stroke.bold}",
    "scribble_radius": "{radius.chip}",
    "text_alpha_sm": "{opacity.70}",
+   "desk_fader_gap": "{gap.panel}",
+   "insert_chip_gap": "{gap.section}",
+   "pot_gap": "{gap.tight}",
+   "scribble_gap": "{gap.panel}",
    "own_size": {
     "cap_h": 17.0,
     "cap_w": 24.0,
@@ -1408,12 +1402,8 @@
     "strip_fader_h_min": 6.0
    },
    "off_scale": {
-    "desk_fader_gap": 7.0,
     "fill_alpha_sm": 0.59,
-    "insert_chip_gap": 11.0,
-    "line_stroke_lg": 2.2,
-    "pot_gap": 2.5,
-    "scribble_gap": 7.0
+    "line_stroke_lg": 2.2
    }
   },
   "mod": {
@@ -1421,6 +1411,10 @@
    "knob_float_stroke": "{stroke.heavy}",
    "line_stroke_lg": "{stroke.emphasis}",
    "line_stroke_sm": "{stroke.medium}",
+   "bipolar_knob_float_gap": "{gap.hair}",
+   "knob_float_gap": "{gap.hair}",
+   "knob_gap": "{gap.panel}",
+   "line_start_gap": "{gap.page}",
    "own_size": {
     "arc_r": 2.5,
     "bypass_cap_y": 22.0,
@@ -1460,10 +1454,6 @@
     "field_w_max": 96.0
    },
    "off_scale": {
-    "bipolar_knob_float_gap": 1.5,
-    "knob_float_gap": 1.5,
-    "knob_gap": 7.0,
-    "line_start_gap": 22.0,
     "path_stroke": 5.0
    }
   },
@@ -1472,6 +1462,7 @@
    "mini_curve_widget_radius": "{radius.chip}",
    "mini_curve_widget_stroke": "{stroke.rule}",
    "sparkline_mini_graph_stroke": "{stroke.rule}",
+   "kind_rail_gap": "{gap.hair}",
    "own_size": {
     "dot_r_lg": 3.5,
     "dot_r_sm": 2.0,
@@ -1510,9 +1501,6 @@
     "table_ratio": 0.6,
     "table_y_lg": 0.6,
     "table_y_sm": 0.1
-   },
-   "off_scale": {
-    "kind_rail_gap": 1.5
    }
   },
   "mode_banner": {
@@ -1557,6 +1545,12 @@
    "sequencer_body_radius": "{radius.chip}",
    "sequencer_body_stroke": "{stroke.medium}",
    "velocity_curve_chart_stroke": "{stroke.rule}",
+   "label_row_h_gap": "{gap.panel}",
+   "predictive_notes_body_gap": "{gap.panel}",
+   "predictive_quantize_body_gap": "{gap.panel}",
+   "predictive_rhythm_body_gap": "{gap.panel}",
+   "predictive_velocity_body_gap": "{gap.panel}",
+   "sequencer_body_gap": "{gap.tight}",
    "own_size": {
     "check_w": 84.0,
     "chord_h": 30.0,
@@ -1612,14 +1606,8 @@
     "w_min": 280.0
    },
    "off_scale": {
-    "label_row_h_gap": 9.0,
     "outline_thickness": 5.0,
-    "path_stroke": 1.8,
-    "predictive_notes_body_gap": 7.0,
-    "predictive_quantize_body_gap": 7.0,
-    "predictive_rhythm_body_gap": 7.0,
-    "predictive_velocity_body_gap": 7.0,
-    "sequencer_body_gap": 2.5
+    "path_stroke": 1.8
    }
   },
   "notice_card": {
@@ -1665,6 +1653,11 @@
    "wavetable_frames_line_stroke": "{stroke.rule}",
    "wind_diagram_line_stroke": "{stroke.emphasis}",
    "wind_diagram_stroke": "{stroke.medium}",
+   "equation_visualizer_gap": "{gap.section}",
+   "granular_waveform_gap": "{gap.tight}",
+   "pad_x": "{gap.panel}",
+   "trace_w_gap": "{gap.page}",
+   "wavetable_frames_gap": "{gap.page}",
    "own_size": {
     "check_w": 84.0,
     "col": 6.0,
@@ -1765,11 +1758,9 @@
    },
    "off_scale": {
     "editable_adsr_radius": 3.2,
-    "equation_visualizer_gap": 13.0,
     "equation_visualizer_path_stroke_md": 3.5,
     "equation_visualizer_path_stroke_sm": 1.8,
     "fm_scope_path_stroke": 1.6,
-    "granular_waveform_gap": 2.5,
     "granular_waveform_glow_alpha": 80.0,
     "image_spectral_synth_line_stroke_lg": 6.0,
     "image_spectral_synth_scope_path_stroke_sm": 1.6,
@@ -1779,29 +1770,24 @@
     "oscillator_scope_path_stroke_sm": 1.6,
     "oscillator_waveform_path_stroke_lg": 4.5,
     "oscillator_waveform_path_stroke_sm": 1.8,
-    "pad_x": 7.0,
     "peaks_alpha_sm": 0.44,
     "piano_diagram_stroke": 1.2,
     "radius": 4.8,
     "ring_stroke": 1.4,
-    "trace_w_gap": 20.0,
     "wave_terrain_body_stroke": 0.97,
     "wave_terrain_line_stroke_lg": 3.5,
     "wave_terrain_line_stroke_sm": 1.6,
     "wave_terrain_scope_path_stroke_sm": 1.6,
-    "wavetable_frames_gap": 20.0,
     "wavetable_frames_stroke": 2.2
    }
   },
   "page_picker": {
+   "colour_row_gap": "{gap.hair}",
    "own_size": {
     "colour_row": 1.5
    },
    "ratio": {
     "w_ratio": 2.0
-   },
-   "off_scale": {
-    "colour_row_gap": 1.5
    }
   },
   "panel": {
@@ -1831,6 +1817,13 @@
    "ring_stroke_lg": "{stroke.emphasis}",
    "ring_stroke_md": "{stroke.medium}",
    "track_preview_stroke": "{stroke.heavy}",
+   "audio_slider_float_gap": "{gap.panel}",
+   "color_ramp_editor_gap": "{gap.block}",
+   "fx_pad_r": "{gap.panel}",
+   "output_meter_row_gap": "{gap.panel}",
+   "pad": "{gap.panel}",
+   "palette_preview_gap": "{gap.panel}",
+   "val_x_gap": "{gap.panel}",
    "own_size": {
     "bar_h": 26.0,
     "bar_w": 44.0,
@@ -1926,21 +1919,14 @@
     "text_colored_limit": 0.6
    },
    "off_scale": {
-    "audio_slider_float_gap": 7.0,
     "brain_source_body_stroke": 1.1,
-    "color_ramp_editor_gap": 18.0,
     "curve_editor_stroke": 1.8,
-    "fx_pad_r": 9.0,
     "fx_pad_stroke": 1.6,
     "line_stroke_lg": 1.6,
     "line_stroke_sm": 1.4,
     "macro_xy_body_stroke": 1.6,
     "mseg_editor_stroke": 1.8,
-    "output_meter_row_gap": 7.0,
-    "pad": 7.0,
-    "palette_preview_gap": 7.0,
-    "ring_stroke_sm": 1.2,
-    "val_x_gap": 7.0
+    "ring_stroke_sm": 1.2
    }
   },
   "patch_io": {
@@ -1978,6 +1964,10 @@
    "panel_content_col_4_alpha": "{opacity.4}",
    "ring_stroke": "{stroke.emphasis}",
    "tick_col_well_alpha": "{opacity.20}",
+   "center_y_gap": "{gap.page}",
+   "element_gap": "{gap.block}",
+   "slider_w_gap": "{gap.block}",
+   "start_y_gap": "{gap.page}",
    "own_size": {
     "cancel_bottom": 68.0,
     "control_bottom": 100.0,
@@ -2053,14 +2043,10 @@
    },
    "off_scale": {
     "alpha": 0.27,
-    "center_y_gap": 20.0,
-    "element_gap": 18.0,
     "element_stroke": 1.2,
     "element_well_col_alpha_lg": 0.28,
     "line_stroke_lg": 1.6,
-    "modulator_meter_stroke": 1.6,
-    "slider_w_gap": 18.0,
-    "start_y_gap": 20.0
+    "modulator_meter_stroke": 1.6
    }
   },
   "piano_roll": {
@@ -2206,6 +2192,7 @@
    "slice_colour_alpha_sm": "{opacity.20}",
    "slice_colour_alpha_xs": "{opacity.7}",
    "wave_radius": "{radius.micro}",
+   "wave_input_gap": "{gap.page}",
    "own_size": {
     "edit_selected_hi": 4.0,
     "fade_handle_y": 5.0,
@@ -2265,7 +2252,6 @@
    },
    "off_scale": {
     "accent_alpha_sm": 0.18,
-    "wave_input_gap": 22.0,
     "wave_stroke": 1.2
    }
   },
@@ -2279,6 +2265,7 @@
    "mpc_body_stroke": "{stroke.emphasis}",
    "outline_stroke": "{stroke.rule}",
    "drum_sequencer_gutter_w": "{gap.hair}",
+   "w_top_gap": "{gap.panel}",
    "own_size": {
     "a_drop_w": 4.0,
     "audio_meter_spacer_h": 4.0,
@@ -2360,9 +2347,6 @@
    "limit": {
     "bar_w_max": 36.0,
     "btn_w_max": 70.0
-   },
-   "off_scale": {
-    "w_top_gap": 7.0
    }
   },
   "scrollbar": {
@@ -2428,6 +2412,7 @@
    "dot_color_alpha_lg": "{opacity.50}",
    "dot_color_alpha_sm": "{opacity.25}",
    "ring_stroke": "{stroke.emphasis}",
+   "body_gap": "{gap.panel}",
    "own_size": {
     "body_add_ellipse_filled_x": 30.0,
     "body_add_ellipse_filled_y": 10.0,
@@ -2470,9 +2455,6 @@
    },
    "maths": {
     "a_ratio": 0.017453292
-   },
-   "off_scale": {
-    "body_gap": 7.0
    }
   },
   "splash_screen": {
@@ -2771,6 +2753,8 @@
   },
   "terminal": {
    "body_radius": "{radius.micro}",
+   "c_inset": "{gap.section}",
+   "tab_row_gap": "{gap.page}",
    "own_size": {
     "chatface_x": 22.0,
     "floating_gap": 120.0,
@@ -2794,10 +2778,6 @@
     "min": 24.0,
     "px_min": 8.0,
     "search_row_max": 280.0
-   },
-   "off_scale": {
-    "c_inset": 11.0,
-    "tab_row_gap": 20.0
    }
   },
   "terminal_draw": {
@@ -2858,6 +2838,7 @@
    "line_stroke_xs": "{stroke_scale.1_25}",
    "loop_band_stroke": "{stroke.bold}",
    "playhead_stroke": "{stroke.medium}",
+   "loop_band_gap": "{gap.hair}",
    "own_size": {
     "ticks_lg": 6.0,
     "ticks_sm": 4.0
@@ -2868,7 +2849,6 @@
    },
    "off_scale": {
     "label_color_im_gui_col_text_alpha": 0.62,
-    "loop_band_gap": 1.5,
     "tick_color_im_gui_col_text_alpha": 0.38
    }
   },
@@ -2959,6 +2939,14 @@
    "vector_overlay_line_alpha_md": "{opacity.70}",
    "vector_overlay_line_alpha_sm": "{opacity.45}",
    "vector_overlay_stroke": "{stroke.medium}",
+   "canvas_gap": "{gap.item}",
+   "context_bar_items_gap": "{gap.hair}",
+   "fg_bg_tile_gap": "{gap.tight}",
+   "r0_inset": "{gap.hair}",
+   "tool_cursor_gap": "{gap.block}",
+   "tool_overlays_gap": "{gap.hair}",
+   "tool_picker_gap": "{gap.block}",
+   "vector_overlay_gap": "{gap.item}",
    "own_size": {
     "a1": 1.2,
     "adjust_windows_gap": 48.0,
@@ -3176,18 +3164,10 @@
    },
    "off_scale": {
     "adj_extras_stroke": 1.2,
-    "canvas_gap": 3.5,
-    "context_bar_items_gap": 1.25,
     "curve_stroke": 1.2,
-    "fg_bg_tile_gap": 2.5,
     "fill_opacity_lo": 0.01,
-    "r0_inset": 1.5,
     "ring_stroke_sm": 1.2,
-    "swatch_strip_stroke": 1.2,
-    "tool_cursor_gap": 15.0,
-    "tool_overlays_gap": 1.5,
-    "tool_picker_gap": 18.0,
-    "vector_overlay_gap": 3.5
+    "swatch_strip_stroke": 1.2
    }
   },
   "view3d": {
@@ -3237,6 +3217,10 @@
    "viewport_stroke": "{stroke.emphasis}",
    "wire_alpha_lg": "{opacity.80}",
    "wire_alpha_sm": "{opacity.30}",
+   "edit_gap": "{gap.panel}",
+   "pose_gap": "{gap.block}",
+   "sculpt_gap": "{gap.panel}",
+   "viewport_gap": "{gap.block}",
    "own_size": {
     "area_width_hi": 20.0,
     "area_width_v": 2.0,
@@ -3385,11 +3369,7 @@
     "object_tab_r_sm": 0.0174532925
    },
    "off_scale": {
-    "arrow_alpha": 0.22,
-    "edit_gap": 7.0,
-    "pose_gap": 18.0,
-    "sculpt_gap": 7.0,
-    "viewport_gap": 18.0
+    "arrow_alpha": 0.22
    }
   },
   "viewport": {
@@ -3424,6 +3404,7 @@
    "body_stroke": "{stroke.emphasis}",
    "line_stroke": "{stroke.medium}",
    "outline_stroke": "{stroke.rule}",
+   "pmn_inset": "{gap.panel}",
    "own_size": {
     "body_r": 4.0,
     "h": 90.0,
@@ -3435,9 +3416,6 @@
    "ratio": {
     "body_ratio": 4.0,
     "third_w_ratio": 3.0
-   },
-   "off_scale": {
-    "pmn_inset": 7.0
    }
   }
  },
@@ -3564,11 +3542,11 @@
    "outline_alpha_lg": "{opacity8.8}",
    "text_alpha_lg": "{opacity8.100}",
    "trim_wave_ink_white_alpha": "{opacity8.55}",
+   "alpha_gap": "{opacity8.8}",
    "limit": {
     "begin_body_limit": 2
    },
    "off_scale": {
-    "alpha_gap": 20,
     "drift_meter_drift_line_color_alpha": 210,
     "fill_alpha_lg": 14,
     "fill_alpha_md": 12,
@@ -4114,6 +4092,7 @@
    "paul_stretch_waveform_line_alpha_sm": "{opacity8.90}",
    "ring_alpha": "{opacity8.90}",
    "slicer_waveform_state_ok_deep_lo_alpha": "{opacity8.90}",
+   "alpha_gap": "{opacity8.8}",
    "own_size": {
     "core_lo_shade_lg_u8": 130,
     "core_lo_shade_md": 120,
@@ -4147,7 +4126,6 @@
     "editable_adsr_segments": 14
    },
    "off_scale": {
-    "alpha_gap": 20,
     "audio_viz_alpha_lg": 210,
     "audio_viz_alpha_md": 200,
     "audio_viz_alpha_sm": 175,
@@ -4583,6 +4561,7 @@
    "canvas_ink_alpha": "{opacity8.90}",
    "crop_overlay_dim_2_alpha": "{opacity8.55}",
    "doc_rect_alpha": "{opacity8.90}",
+   "layer_rows_gap": "{gap.block}",
    "own_size": {
     "anchor": 4,
     "audit_doc_h": 540,
@@ -4657,7 +4636,6 @@
     "canvas_select_alpha": 40,
     "canvas_shade_alpha": 120,
     "ink_alpha": 160,
-    "layer_rows_gap": 18,
     "line_alpha_lg": 220,
     "line_alpha_md": 200,
     "line_alpha_sm": 70,

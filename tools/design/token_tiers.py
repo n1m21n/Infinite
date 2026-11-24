@@ -105,6 +105,26 @@ SYSTEM_TO_JOB = {
     "radius_dialog": "{radius.dialog}",
 }
 
+# Step C: off-scale spacing snap table (100 tokens -> Tier-2 gap.* jobs; 18->16, 20->24 keeps 4/8pt rhythm pure).
+SPACE_SNAP = {
+    1.25: "{gap.hair}",    # 2
+    1.4:  "{gap.hair}",    # 2
+    1.5:  "{gap.hair}",    # 2
+    2.5:  "{gap.tight}",   # 3
+    3.5:  "{gap.item}",    # 4
+    4.5:  "{gap.item}",    # 4
+    5.5:  "{gap.group}",   # 6
+    6.5:  "{gap.group}",   # 6
+    7.0:  "{gap.panel}",   # 8
+    9.0:  "{gap.panel}",   # 8
+    11.0: "{gap.section}", # 12
+    13.0: "{gap.section}", # 12
+    15.0: "{gap.block}",   # 16
+    18.0: "{gap.block}",   # 16
+    20.0: "{gap.page}",    # 24
+    22.0: "{gap.page}",    # 24
+}
+
 
 def step_key(v, scale=1.0):
     v = round(v * scale, 6)
@@ -161,7 +181,7 @@ def kind(key, v, group="surface"):
                 "lines", "chars", "items", "decimals", "digits", "segments", "octaves", "taps", "ms", "s", "sec", "hz",
                 "rate", "period", "hold", "delay", "speed", "deg", "angle"):
         return "limit"
-    if last in ("alpha", "opacity", "a"):
+    if last in ("alpha", "opacity", "a") or (group == "surface_i" and "alpha" in words):
         if group != "surface_i" and 0 < v <= 1:
             return "opacity"
         if group != "surface_i" and 1 < v <= 4:
@@ -264,7 +284,7 @@ def resolve(value, tok):
     return float(cur) if isinstance(cur, (int, float)) else cur
 
 
-def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=False):
+def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=False, snap_space=False):
     """Rewrite one surface's entries into aliases + buckets (refile re-checks own_size; use_jobs lifts exact primitive aliases to Tier 2 jobs)."""
     out, buckets = {}, {}
     for k, v in entries.items():
@@ -278,6 +298,10 @@ def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=
                     where, val = place(kk, vv, prim, group)
                     if where == "alias":
                         out[kk] = PRIM_TO_JOB.get(val, val) if use_jobs else val; continue
+                    if snap_space and k == "off_scale" and isinstance(vv, (int, float)) and kind(kk, float(vv), group) == "space":
+                        snapped = SPACE_SNAP.get(float(vv))
+                        if snapped:
+                            out[kk] = snapped; continue
                     if refile and k == "own_size" and where != "own_size":
                         buckets.setdefault(where, {})[kk] = val; continue
                 buckets.setdefault(k, {})[kk] = vv
@@ -376,7 +400,7 @@ def dumps(obj):
     return re.sub(r"\[\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+)\s*\]", r"[\1, \2, \3, \4]", s) + "\n"
 
 
-def apply(tok, sj, refile=False, use_jobs=False):
+def apply(tok, sj, refile=False, use_jobs=False, snap_space=False):
     b = tok["base"]
     # 1. primitive ladders (space exists; radius gains numeric steps beside its semantic 'cell'; opacity8 mirrors opacity)
     all_ladders = {**LADDERS, "opacity8": LADDERS["opacity"]}
@@ -429,7 +453,7 @@ def apply(tok, sj, refile=False, use_jobs=False):
     # 4. surfaces
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
-            sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS, group=g, refile=refile, use_jobs=use_jobs)
+            sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS, group=g, refile=refile, use_jobs=use_jobs, snap_space=snap_space)
     return tok, sj
 
 
@@ -462,8 +486,9 @@ def main():
     sj = json.loads(SURF.read_text())
     refile = "--refile" in sys.argv
     use_jobs = "--jobs" in sys.argv
-    if "--apply" in sys.argv or refile or use_jobs:
-        tok, sj = apply(tok, sj, refile=refile, use_jobs=use_jobs)
+    snap_space = "--snap-space" in sys.argv
+    if "--apply" in sys.argv or refile or use_jobs or snap_space:
+        tok, sj = apply(tok, sj, refile=refile, use_jobs=use_jobs or snap_space, snap_space=snap_space)
         TOK.write_text(json.dumps(tok, indent=1, ensure_ascii=False) + "\n")
         SURF.write_text(dumps(sj))
         print("wrote tokens.json, surfaces.json")
