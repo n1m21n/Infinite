@@ -324,8 +324,8 @@ namespace app
       const bool isLight = IsThemeLight();
       // The same recessed well as every other field (FieldWell): tint, hover, border and rounding come from there.
       FieldWell::PushStyle(ImGui::GetID(label));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::ink_black, 0f));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::RoleV4(tok::col::ink_black, 0f));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::RoleV4(tok::col::ink_black, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::RoleV4(tok::col::ink_black, 0.0f));
 
       auto ValueToPos01 = [&](float v) -> float
       {

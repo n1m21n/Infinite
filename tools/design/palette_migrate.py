@@ -219,7 +219,9 @@ def main():
                 if extra:
                     return mt.group(0)
                 a = af if af is not None else a8 / 255.0
-                return f"tok::{'BaseV4' if explicit else 'RoleV4'}({tokn}, {a:g}f)"
+                lit = f"{a:g}"
+                lit = lit if "." in lit else lit + ".0"
+                return f"tok::{'BaseV4' if explicit else 'RoleV4'}({tokn}, {lit}f)"
 
             nl = rx.sub(sub, l)
             if nl != l:

@@ -145,8 +145,8 @@ void DrawPopupsB(FrameCtx& fc)
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-      ImGui::PushStyleColor(ImGuiCol_PopupBg, tok::RoleV4(tok::col::ink_black, 0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, tok::RoleV4(tok::col::ink_black, 0f));
+      ImGui::PushStyleColor(ImGuiCol_PopupBg, tok::RoleV4(tok::col::ink_black, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::RoleV4(tok::col::ink_black, 0.0f));
 
       if (ImGui::BeginPopup("##commentedit", ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                                              ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar))
@@ -169,7 +169,7 @@ void DrawPopupsB(FrameCtx& fc)
 
             const float fontScale = CommentFontScale(c->fontSize);
             ImGui::PushStyleColor(ImGuiCol_Text, textCol);
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::ink_black, 0f));
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::RoleV4(tok::col::ink_black, 0.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * commentZoom, 8.0f * commentZoom));
             // The one scrollbar look, inked black on a light note and white on a dark one (4 colours + 1 var,

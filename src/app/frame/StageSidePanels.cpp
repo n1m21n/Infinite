@@ -224,8 +224,8 @@ void DrawSidePanels(FrameCtx& fc)
          // clearly visible dark line in light mode. Suppressed the same way the
          // menu-bar/canvas seam was: make the two colors it reads transparent
          // for just this call.
-         ImGui::PushStyleColor(ImGuiCol_Border, tok::RoleV4(tok::col::ink_black, 0f));
-         ImGui::PushStyleColor(ImGuiCol_BorderShadow, tok::RoleV4(tok::col::ink_black, 0f));
+         ImGui::PushStyleColor(ImGuiCol_Border, tok::RoleV4(tok::col::ink_black, 0.0f));
+         ImGui::PushStyleColor(ImGuiCol_BorderShadow, tok::RoleV4(tok::col::ink_black, 0.0f));
          ed::End();
          ImGui::PopStyleColor(2);
          ImGui::PopStyleVar();

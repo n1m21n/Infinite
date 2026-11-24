@@ -160,7 +160,7 @@ namespace app
                ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW - unmapBtnW - 4.0f, /*audioStyle=*/true);
                ImGui::SameLine(0.0f, 2.0f);
                ImGui::PushID(i + 40000);
-               ImGui::PushStyleColor(ImGuiCol_Button, tok::RoleV4(tok::col::ink_black, 0f));
+               ImGui::PushStyleColor(ImGuiCol_Button, tok::RoleV4(tok::col::ink_black, 0.0f));
                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::RoleV4(tok::col::state_err_hover));
                ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::RoleV4(tok::col::state_err_10));
                if (ActionButton::Draw("x"))

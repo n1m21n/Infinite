@@ -188,7 +188,7 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::dropdown_hover, isLight));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::dropdown_active, isLight));
       ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::dropdown_text, isLight));
-      ImGui::PushStyleColor(ImGuiCol_Border, tok::BaseV4(tok::col::ink_black, 0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::BaseV4(tok::col::ink_black, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
@@ -232,7 +232,7 @@ namespace app
       // Border size is zeroed here too (not just the colour) so no outline is
       // rasterized at all - a transparent 1px border still antialiases against
       // the rounded corner and was itself the corner-bleed users saw.
-      ImGui::PushStyleColor(ImGuiCol_Border, tok::BaseV4(tok::col::ink_black, 0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::BaseV4(tok::col::ink_black, 0.0f));
       ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, isLight ? 0.06f : 0.22f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
@@ -279,7 +279,7 @@ namespace app
       // Opaque: at 0.97 the bright chat text behind Settings read through as ghost lines.
       const ImVec4 bg = ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 1.0f);
       ImGui::PushStyleColor(isChild ? ImGuiCol_ChildBg : ImGuiCol_WindowBg, bg);
-      ImGui::PushStyleColor(ImGuiCol_Border, tok::RoleV4(tok::col::ink_black, 0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::RoleV4(tok::col::ink_black, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
    }
