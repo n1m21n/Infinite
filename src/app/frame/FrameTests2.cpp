@@ -79,7 +79,8 @@ void FrameTest_ARRANGEMARKERTEST(int frameId, GLFWwindow* window)
             aOk = aOk && ArrangeEdit([&]() { Arrange::RenameMarker(gArrange, m2, "Verse 1"); });
             aOk = aOk && gArrange.revision > rev && findMk(m2)->name == "Verse 1"; rev = gArrange.revision;
             const uint32_t blue = ArrangeMarkerRGBA(kArrangePalette[6].col);
-            aOk = aOk && blue == 0x3B82F6FFu && ArrangeEdit([&]() { Arrange::RecolorMarker(gArrange, m2, blue); });
+            // Palette entries are theme role tokens now: pin "a real colour, not the default", not a hex.
+            aOk = aOk && blue != kArrangeDefaultMarkerRGBA && (blue & 0xFFu) == 0xFFu && ArrangeEdit([&]() { Arrange::RecolorMarker(gArrange, m2, blue); });
             aOk = aOk && gArrange.revision > rev && findMk(m2)->color == blue; rev = gArrange.revision;
             // A no-op edit pushes nothing and leaves revision alone.
             const size_t undoNoop = gUndoStack.size();

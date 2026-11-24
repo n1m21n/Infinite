@@ -2634,7 +2634,7 @@ uint32_t ArrangeMarkerRGBA(ImU32 col);
       { "Blue",    tok::Role(tok::col::accent) },
       { "Purple",  tok::Role(tok::col::role_expression) },
       { "Magenta", tok::Role(tok::col::viz_magenta) },
-      { "Rose",    tok::Role(tok::col::state_err) }
+      { "Rose",    tok::Role(tok::col::viz_pink) }
    };
 
 
