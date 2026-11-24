@@ -2756,7 +2756,7 @@ namespace
       if (FormParts::Combo(T("Bars"), &barsAt, "1\0" "2\0" "4\0" "8\0"))
          g.bars = barChoices[barsAt];
       int form = (int)g.form;
-      if (FormParts::Combo(T("Form"), &form, TList("None\0" "AABA\0" "ABAB\0" "AAAB\0")))
+      if (FormParts::Combo(T("Form"), &form, I18n::TList("None\0" "AABA\0" "ABAB\0" "AAAB\0")))
          g.form = (NoteGen::Form)form;
       FormParts::Label(T("Seed"));
       int seed = (int)g.seed;
@@ -2782,7 +2782,7 @@ namespace
       if (g.type == NoteGen::Type::Bass)
       {
          int role = g.bassRole + 1;
-         if (FormParts::Combo(T("Role"), &role, TList("Style\0" "Long\0" "Rolling\0" "Melodic\0" "Funk\0" "Wobble\0" "Trap 808\0" "Acid\0")))
+         if (FormParts::Combo(T("Role"), &role, I18n::TList("Style\0" "Long\0" "Rolling\0" "Melodic\0" "Funk\0" "Wobble\0" "Trap 808\0" "Acid\0")))
             g.bassRole = role - 1;
       }
       FormParts::Switch(T("Personal"), &g.personal);
