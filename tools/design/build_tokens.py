@@ -15,11 +15,11 @@ ALIAS = token_tiers.ALIAS
 
 
 def cval(v, ty):
-    """A token's C++ initialiser: an alias names its primitive (same value, the tier stays visible), else the literal."""
+    """A token's C++ initialiser: an alias names its primitive or job token (same value, tier stays visible), else the literal."""
     if isinstance(v, str) and ALIAS.match(v):
         m = ALIAS.match(v); g, k = m.group(1), m.group(2)
         ref = f"{g}_{k}"
-        ref_ty = "int" if g in token_tiers.INT_PRIMITIVE_GROUPS else "float"
+        ref_ty = "int" if g in token_tiers.INT_ALIAS_GROUPS else "float"
         return ref if ty == ref_ty else f"static_cast<{ty}>({ref})"
     if ty == "float": return f"{float(v)}f"
     if ty == "int": return str(int(v))
@@ -69,8 +69,8 @@ def build():
         for k, v, dep in entries(b[group]):
             if group == "radius" and k in prim["radius"]: continue
             L.append(line("float", f"{group}_{k}", v, dep))
-    # Optional groups, emitted as <group>_<key>: opacities, stroke weights and the per-component size groups.
-    for group in ("alpha", "stroke", "drag", "ruler", "fader", "topbar", "fold", "desk", "motion_s", "motion_rate", "motion_hz"):
+    # Optional groups, emitted as <group>_<key>: opacities, stroke weights, spacing jobs, and per-component size groups.
+    for group in ("alpha", "stroke", "gap", "drag", "ruler", "fader", "topbar", "fold", "desk", "motion_s", "motion_rate", "motion_hz"):
         for k, v, dep in entries(b.get(group, {})):
             L.append(line("float", f"{group}_{k}", v, dep))
     for k, v, dep in entries(b.get("alpha8", {})):
@@ -81,6 +81,8 @@ def build():
     L.append(f"   constexpr float bar_h = {float(b['bar_h'])}f;")
     # The UI system sheet: one value per part (control height, list row, icon, radius ...), shared by every surface.
     for k, v, dep in entries(b.get("system", {})):
+        if cval(v, "float") == k:
+            continue
         L.append(line("float", k, v, dep))
     if "system" in b:
         L.append("   static_assert(control_h >= hit_min, \"a control is never smaller than the hit minimum\");")

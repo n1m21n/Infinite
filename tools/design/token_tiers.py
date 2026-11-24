@@ -43,6 +43,67 @@ LADDERS = {
 }
 PRIMITIVE_GROUPS = ("space", "radius", "stroke_scale", "opacity", "opacity8")
 INT_PRIMITIVE_GROUPS = ("opacity8",)
+INT_ALIAS_GROUPS = ("opacity8", "alpha8")
+JOB_GROUPS = ("stroke", "radius", "gap", "alpha", "alpha8")
+
+# Tier 2 shared job tokens: primitive -> canonical job alias (zero visual change; Step B).
+JOB_TOKENS = {
+    "stroke": {
+        "_doc": "Line weights in pt (Tier 2 semantic jobs aliasing stroke_scale)",
+        "fine": "{stroke_scale.0_5}",
+        "rule": "{stroke_scale.1}",
+        "medium": "{stroke_scale.1_5}",
+        "emphasis": "{stroke_scale.2}",
+        "bold": "{stroke_scale.2_5}",
+        "heavy": "{stroke_scale.3}",
+        "wide": "{stroke_scale.4}",
+    },
+    "radius": {
+        "xs": "{radius.1}",
+        "micro": "{radius.1_5}",
+        "cell": "{radius.2}",
+        "sm": "{radius.2_5}",
+        "chip": "{radius.3}",
+        "card": "{radius.4}",
+        "pill": "{radius.5}",
+        "control": "{radius.6}",
+        "container": "{radius.8}",
+        "dialog": "{radius.12}",
+    },
+    "gap": {
+        "_doc": "Spacing jobs (Tier 2 semantic jobs aliasing space)",
+        "px": "{space.0_25}",
+        "hair": "{space.0_5}",
+        "tight": "{space.0_75}",
+        "item": "{space.1}",
+        "gutter": "{space.1_25}",
+        "group": "{space.1_5}",
+        "panel": "{space.2}",
+        "label": "{space.2_5}",
+        "section": "{space.3}",
+        "inset": "{space.3_5}",
+        "block": "{space.4}",
+        "page": "{space.5}",
+    },
+}
+
+# Primitive alias -> Tier 2 job alias mapping (exact value match, semantic scale-tiered families only).
+PRIM_TO_JOB = {}
+for _jg, _jkv in JOB_TOKENS.items():
+    for _jk, _jv in _jkv.items():
+        if not _jk.startswith("_"):
+            PRIM_TO_JOB[_jv] = "{%s.%s}" % (_jg, _jk)
+
+SYSTEM_TO_JOB = {
+    "row_gap": "{gap.item}",
+    "section_gap": "{gap.section}",
+    "pad_panel": "{gap.panel}",
+    "switch_inset": "{gap.tight}",
+    "empty_plate_pad": "{gap.item}",
+    "radius_control": "{radius.control}",
+    "radius_container": "{radius.container}",
+    "radius_dialog": "{radius.dialog}",
+}
 
 
 def step_key(v, scale=1.0):
@@ -163,17 +224,48 @@ def flatten_surfaces(sj):
     return out
 
 
+def jobs(tok):
+    """{group: {key: value}} for Tier 2 shared job tokens in tokens.json."""
+    b = tok["base"]
+    out = {}
+    for g in JOB_GROUPS:
+        src = b.get(g, {})
+        out[g] = {}
+        for k, v in src.items():
+            if k.startswith("_") or is_bucket(k, v):
+                continue
+            if g == "radius" and re.fullmatch(r"[0-9_]+", k):
+                continue
+            out[g][k] = v
+    return out
+
+
 def resolve(value, tok):
-    """An alias string -> its number; anything else unchanged."""
-    if isinstance(value, str):
-        m = ALIAS.match(value)
-        if m:
-            return float(tok["base"][m.group(1)][m.group(2)])
-    return value
+    """Follow alias chain (Tier 3 -> Tier 2 -> Tier 1) to its numeric value; anything else unchanged."""
+    seen = set()
+    cur = value
+    while isinstance(cur, str):
+        m = ALIAS.match(cur)
+        if not m:
+            return cur
+        key = (m.group(1), m.group(2))
+        if key in seen:
+            raise ValueError(f"alias cycle at {cur}")
+        seen.add(key)
+        grp = tok["base"].get(key[0], {})
+        if key[1] in grp:
+            cur = grp[key[1]]
+        elif "off_scale" in grp and key[1] in grp["off_scale"]:
+            cur = grp["off_scale"][key[1]]
+        else:
+            raise KeyError(f"broken alias {cur}")
+        if isinstance(cur, dict) and "value" in cur:
+            cur = cur["value"]
+    return float(cur) if isinstance(cur, (int, float)) else cur
 
 
-def tier_surface(entries, prim, colour, group="surface", refile=False):
-    """Rewrite one surface's entries into aliases + buckets (keeps existing aliases and buckets; refile re-checks own_size)."""
+def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=False):
+    """Rewrite one surface's entries into aliases + buckets (refile re-checks own_size; use_jobs lifts exact primitive aliases to Tier 2 jobs)."""
     out, buckets = {}, {}
     for k, v in entries.items():
         if k.startswith("_"):
@@ -185,20 +277,20 @@ def tier_surface(entries, prim, colour, group="surface", refile=False):
                 if k == "off_scale" or (refile and k == "own_size" and isinstance(vv, (int, float))):
                     where, val = place(kk, vv, prim, group)
                     if where == "alias":
-                        out[kk] = val; continue
+                        out[kk] = PRIM_TO_JOB.get(val, val) if use_jobs else val; continue
                     if refile and k == "own_size" and where != "own_size":
                         buckets.setdefault(where, {})[kk] = val; continue
                 buckets.setdefault(k, {})[kk] = vv
             continue
         if isinstance(v, str) and ALIAS.match(v):
-            out[k] = v; continue
+            out[k] = PRIM_TO_JOB.get(v, v) if use_jobs else v; continue
         if colour:
             buckets.setdefault("own_colour", {})[k] = v; continue
         if isinstance(v, str):          # hex words in a numeric group (never expected)
             buckets.setdefault("own_colour", {})[k] = v; continue
         where, val = place(k, v, prim, group)
         if where == "alias":
-            out[k] = val
+            out[k] = PRIM_TO_JOB.get(val, val) if use_jobs else val
         else:
             buckets.setdefault(where, {})[k] = val
     for w in WHY:
@@ -210,6 +302,21 @@ def tier_surface(entries, prim, colour, group="surface", refile=False):
 def lint(tok, sj):
     bad = []
     prim = primitives(tok)
+    job = jobs(tok)
+
+    def check_alias(where, v):
+        m = ALIAS.match(v)
+        g, k = m.group(1), m.group(2)
+        in_prim = g in prim and k in prim[g]
+        in_job = g in job and k in job[g]
+        if not (in_prim or in_job):
+            bad.append(f"{where}: alias {v} is neither a primitive nor a job token")
+            return
+        try:
+            resolve(v, tok)
+        except (ValueError, KeyError) as e:
+            bad.append(f"{where}: {e}")
+
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
             for k, v in kv.items():
@@ -225,16 +332,15 @@ def lint(tok, sj):
                                 bad.append(f"{g}.{s}.own_size.{kk} = {vv}: misfiled (belongs in {where})")
                     continue
                 if isinstance(v, str) and ALIAS.match(v):
-                    m = ALIAS.match(v)
-                    if m.group(1) not in prim or m.group(2) not in prim[m.group(1)]:
-                        bad.append(f"{g}.{s}.{k}: alias {v} is not a primitive")
+                    check_alias(f"{g}.{s}.{k}", v)
                     continue
                 bad.append(f"{g}.{s}.{k} = {v}: raw value with no alias and no why bucket")
-    for g in ("alpha", "alpha8", "stroke"):
+    for g in ("alpha", "alpha8", "stroke", "gap"):
         for k, v in tok["base"].get(g, {}).items():
             if k.startswith("_") or is_bucket(k, v):
                 continue
             if isinstance(v, str) and ALIAS.match(v):
+                check_alias(f"base.{g}.{k}", v)
                 continue
             if isinstance(v, dict) and "value" in v:
                 continue
@@ -243,7 +349,9 @@ def lint(tok, sj):
 
 
 def count(sj, tok):
-    c = {"alias": 0}
+    prim = primitives(tok)
+    job = jobs(tok)
+    c = {"alias": 0, "alias_job": 0, "alias_prim": 0}
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
             for k, v in kv.items():
@@ -253,6 +361,11 @@ def count(sj, tok):
                     c[k] = c.get(k, 0) + len([x for x in v if not x.startswith("_")])
                 elif isinstance(v, str) and ALIAS.match(v):
                     c["alias"] += 1
+                    m = ALIAS.match(v)
+                    if m.group(1) in job and m.group(2) in job[m.group(1)]:
+                        c["alias_job"] += 1
+                    else:
+                        c["alias_prim"] += 1
                 else:
                     c["raw"] = c.get("raw", 0) + 1
     return c
@@ -263,7 +376,7 @@ def dumps(obj):
     return re.sub(r"\[\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+)\s*\]", r"[\1, \2, \3, \4]", s) + "\n"
 
 
-def apply(tok, sj, refile=False):
+def apply(tok, sj, refile=False, use_jobs=False):
     b = tok["base"]
     # 1. primitive ladders (space exists; radius gains numeric steps beside its semantic 'cell'; opacity8 mirrors opacity)
     all_ladders = {**LADDERS, "opacity8": LADDERS["opacity"]}
@@ -279,7 +392,21 @@ def apply(tok, sj, refile=False):
         b[g].setdefault("_doc", d)
         b[g] = {"_doc": b[g]["_doc"], **{k: v for k, v in b[g].items() if k != "_doc"}}
     prim = primitives(tok)
-    # 2. tokens.json semantic groups alias the ladders where they can
+    # 2. Tier 2 shared job tokens (Step B): seed canonical stroke, radius, gap jobs and wire system.* to them
+    if use_jobs:
+        for g, kv in JOB_TOKENS.items():
+            grp = b.setdefault(g, {})
+            for k, v in kv.items():
+                if k == "_doc":
+                    grp.setdefault("_doc", v)
+                else:
+                    grp.setdefault(k, v)
+        sys_grp = b.get("system", {})
+        for k, alias in SYSTEM_TO_JOB.items():
+            if k in sys_grp and isinstance(sys_grp[k], (int, float)):
+                if float(sys_grp[k]) == float(resolve(alias, tok)):
+                    sys_grp[k] = alias
+    # 3. tokens.json semantic groups alias the ladders where they can
     for g, ladder in (("alpha", "opacity"), ("alpha8", "opacity8"), ("stroke", "stroke_scale"), ("radius", "radius")):
         if g not in b:
             continue
@@ -299,16 +426,18 @@ def apply(tok, sj, refile=False):
                 b[g][k] = "{%s.%s}" % (ladder, hit); del b[g]["off_scale"][k]
         if g in b and b[g].get("off_scale") == {}:
             del b[g]["off_scale"]
-    # 3. surfaces
+    # 4. surfaces
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
-            sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS, group=g, refile=refile)
+            sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS, group=g, refile=refile, use_jobs=use_jobs)
     return tok, sj
 
 
 def report(tok, sj):
     c = count(sj, tok)
-    print("surface tokens by tier:", ", ".join(f"{k} {v}" for k, v in sorted(c.items(), key=lambda kv: -kv[1])))
+    top = {k: v for k, v in c.items() if k not in ("alias_job", "alias_prim")}
+    print("surface tokens by tier:", ", ".join(f"{k} {v}" for k, v in sorted(top.items(), key=lambda kv: -kv[1])),
+          f"(aliases: {c['alias_job']} job, {c['alias_prim']} prim)")
     off = []
     for g in NUM_GROUPS:
         for s, kv in sj.get(g, {}).items():
@@ -332,8 +461,9 @@ def main():
     tok = json.loads(TOK.read_text())
     sj = json.loads(SURF.read_text())
     refile = "--refile" in sys.argv
-    if "--apply" in sys.argv or refile:
-        tok, sj = apply(tok, sj, refile=refile)
+    use_jobs = "--jobs" in sys.argv
+    if "--apply" in sys.argv or refile or use_jobs:
+        tok, sj = apply(tok, sj, refile=refile, use_jobs=use_jobs)
         TOK.write_text(json.dumps(tok, indent=1, ensure_ascii=False) + "\n")
         SURF.write_text(dumps(sj))
         print("wrote tokens.json, surfaces.json")
@@ -344,7 +474,7 @@ def main():
         if bad:
             print(f"{len(bad)} token(s) failed tier lint: run tools/design/token_tiers.py --refile")
             return 1
-        print("token tiers: every semantic token aliases a primitive or says why")
+        print("token tiers: every semantic token aliases a primitive or job token, or says why")
         return 0
     report(tok, sj)
     return 0
