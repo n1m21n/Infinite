@@ -352,9 +352,12 @@ namespace app
             c.nodes.push_back(n);
          }
          if (sCat.types.empty())
+         {
             for (const std::string& cat : NodeFactory::Instance().GetCategories())
                for (const std::string& t : NodeFactory::Instance().GetNodesInCategory(cat))
-                  c.types.push_back({ t, cat });
+                  if (IsUserSpawnable(t))
+                     c.types.push_back({ t, cat });
+         }
          else
             c.types = sCat.types;
          json sel;
