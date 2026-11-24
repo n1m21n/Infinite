@@ -823,7 +823,7 @@ namespace app
             dl->PathStroke(col, 0, 2.5f);
          }
          dl->AddCircleFilled(ImVec2(c.x, c.y + 1.5f), R, Lo(130), 28);        // drop shadow
-         dl->AddCircleFilled(c, R, Role(tok::desk_knurl), 28);                                   // skirt
+         dl->AddCircleFilled(c, R, DeskParts::Role(tok::desk_knurl), 28);                                   // skirt
          for (int i = 0; i < 24; i++)                                               // knurl
          {
             const float a = (float)i / 24.0f * 2.0f * IM_PI;
@@ -928,7 +928,7 @@ namespace app
       bool Scribble(ImDrawList* dl, ImVec2 p, float w, const char* name, int number, ImU32 col, bool dim, const StripRef* strip)
       {
          const ImVec2 q(p.x + w, p.y + kScribbleH);
-         dl->AddRectFilled(p, q, Role(tok::desk_scribble_bg), 3.0f);
+         dl->AddRectFilled(p, q, DeskParts::Role(tok::desk_scribble_bg), 3.0f);
          dl->AddRectFilled(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, p.y + 5), Tint(col, 0.95f, 255), 2.0f, ImDrawFlags_RoundCornersTop);
          dl->AddRect(p, q, Ink(34), 3.0f);
          ImGui::SetCursorScreenPos(p);
@@ -946,7 +946,7 @@ namespace app
          const ImVec2 ts = ImGui::CalcTextSize(name);
          const float tx = p.x + std::max(4.0f, (w - ts.x) * 0.5f);
          dl->PushClipRect(ImVec2(p.x + 3.0f, p.y), ImVec2(q.x - 3.0f, q.y), true);
-         dl->AddText(ImVec2(tx, p.y + 17.0f), Role(tok::desk_scribble_text, dim ? 110 : 255), name);
+         dl->AddText(ImVec2(tx, p.y + 17.0f), DeskParts::Role(tok::desk_scribble_text, dim ? 110 : 255), name);
          dl->PopClipRect();
          if (hovered && ts.x > w - 8.0f && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
             HelpTip("%s", name);
@@ -1120,7 +1120,7 @@ namespace app
          {
             const float dispH = kPotRowH;
             const ImVec2 dp(cx, y);
-            dl->AddRectFilled(dp, ImVec2(dp.x + cw, dp.y + dispH), Role(tok::desk_well), tok::radius_cell);
+            dl->AddRectFilled(dp, ImVec2(dp.x + cw, dp.y + dispH), DeskParts::Role(tok::desk_well), tok::radius_cell);
             dl->AddRect(dp, ImVec2(dp.x + cw, dp.y + dispH), Hi(30), tok::radius_cell);
             ImGui::SetCursorScreenPos(dp);
             if (UiInteract::Hit("##loud", ImVec2(cw, dispH)))
