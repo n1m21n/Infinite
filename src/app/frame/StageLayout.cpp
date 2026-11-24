@@ -351,10 +351,17 @@ void DrawLayout(FrameCtx& fc)
       {
          const float room = std::max(tok::dock_field_min_h, Ui::AvailH() - topBottom - tok::dock_canvas_min_h);
          gFieldPatcherHeight = std::clamp(gFieldPatcherHeight, tok::dock_field_min_h, room);
-         gFieldPatcherShownHeight = gFieldPatcherMaximised ? std::max(tok::dock_field_min_h, Ui::AvailH() - topBottom - tok::dock_maximised_margin)
-                                                           : gFieldPatcherHeight;
-         topBottom += gFieldPatcherShownHeight;
-         topBottomRows++;
+         // Maximised, the patcher takes the canvas row (the view-fill path below), so it reserves no row of its own.
+         // It used to reserve the window less a margin while the canvas kept its 150 px minimum: a canvas strip sat
+         // above the patcher and the patcher's bottom ran off the window. A filling 2D/3D view wins the row.
+         if (view3DFill || view2DFill)
+            gFieldPatcherMaximised = false;
+         if (!gFieldPatcherMaximised)
+         {
+            gFieldPatcherShownHeight = gFieldPatcherHeight;
+            topBottom += gFieldPatcherShownHeight;
+            topBottomRows++;
+         }
       }
       else
          gFieldPatcherMaximised = false;
@@ -401,19 +408,25 @@ void DrawLayout(FrameCtx& fc)
          DrawView2DDocked("##view2d_top", ImVec2(0, gView2DHeight));
       if (gCurveEditorOpen && gCurveEditorDock == 3)
          DrawCurveEditorDocked("##curveeditor_top", ImVec2(0, gCurveEditorHeight));
-      if (gFieldPatcherOpen && gFieldPatcherDock == 3)
+      if (gFieldPatcherOpen && gFieldPatcherDock == 3 && !gFieldPatcherMaximised)
          DrawFieldPatcherDocked("##fieldpatcher_top", ImVec2(0, gFieldPatcherShownHeight));
       if (TerminalDocked() && gTerminalDock == 3)
          DrawTerminalDocked("##terminal_top", ImVec2(0, gTerminalHeight));
       // Fill: the view gets the canvas's row. The canvas row is then laid out below the window (clipped, no pointer),
       // so the graph keeps cooking for the view; the bottom rows resume right under the view (StageSidePanels).
-      fc.viewFill = view3DFill || view2DFill;
+      const bool fieldFill = gFieldPatcherOpen && gFieldPatcherMaximised;
+      fc.viewFill = view3DFill || view2DFill || fieldFill;
       if (fc.viewFill)
       {
          if (view3DFill)
             DrawView3DDocked("##view3d_fill", ImVec2(0, graphHeight));
-         else
+         else if (view2DFill)
             DrawView2DDocked("##view2d_fill", ImVec2(0, graphHeight));
+         else
+         {
+            gFieldPatcherShownHeight = graphHeight;
+            DrawFieldPatcherDocked("##fieldpatcher_fill", ImVec2(0, graphHeight));
+         }
          {
             // Full means full: the margins around the filling view are painted solid, so nothing behind (the
             // canvas's cables, the stage backdrop) shows through. The parent's draw list sits under the view's child.

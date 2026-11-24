@@ -5,6 +5,7 @@
 #include "plugin/ipc/PluginFrames.h"
 #include "app/graph/LearningLog.h"
 #include "app/panels/CurveEditorPanel.h"
+#include "app/panels/FieldPatcherPanel.h"
 #include "platform/PluginCrashGuard.h"
 namespace app { void LoadUserFonts(); }
 #include "core/CliSetup.h"
@@ -4536,6 +4537,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gTerminalOpen = o.find("terminal") != std::string::npos;
       gCurveEditorOpen = o.find("curveeditor") != std::string::npos;
       gDrumPanelOpen = o.find("drums") != std::string::npos;
+      // "fieldpatcher": the Field Patcher docked; "fieldmax": maximised (review shots of the fill layout).
+      gFieldPatcherOpen = o.find("fieldpatcher") != std::string::npos || o.find("fieldmax") != std::string::npos;
+      gFieldPatcherMaximised = o.find("fieldmax") != std::string::npos;
       if (o.find("chatcode") != std::string::npos)
          ChatShotOpenCode();
       gShotNodeMenu = o.find("nodemenu") != std::string::npos;

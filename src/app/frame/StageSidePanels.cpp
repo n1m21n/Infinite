@@ -239,7 +239,9 @@ void DrawSidePanels(FrameCtx& fc)
             ImGuiWindow* w = ImGui::GetCurrentWindow();
             ImDrawList* bl = w->DrawList;
             bl->PushClipRect(w->Rect().Min, w->Rect().Max, false);
-            bl->AddRectFilled(w->Rect().Min, w->Rect().Max, ImGui::GetColorU32(ImGuiCol_WindowBg));
+            // From under the top bar: a maximised Field Patcher fills too but keeps the bar (a filling view hides it,
+            // so its InnerRect starts at the window top and nothing changes there).
+            bl->AddRectFilled(ImVec2(w->Pos.x, w->InnerRect.Min.y), w->Rect().Max, ImGui::GetColorU32(ImGuiCol_WindowBg));
             bl->PopClipRect();
          }
       }
@@ -736,7 +738,7 @@ void DrawSidePanels(FrameCtx& fc)
       if (gCurveEditorOpen && gCurveEditorDock == 0)
          DrawCurveEditorDocked("##curveeditor_bottom", ImVec2(0, gCurveEditorHeight));
       // Field Patcher (View > Field Patcher or Shift+F): boxes for Field nodes, bottom or top.
-      if (gFieldPatcherOpen && gFieldPatcherDock == 0)
+      if (gFieldPatcherOpen && gFieldPatcherDock == 0 && !gFieldPatcherMaximised)
          DrawFieldPatcherDocked("##fieldpatcher_bottom", ImVec2(0, gFieldPatcherShownHeight));
       // Terminal (View > Terminal or Ctrl+`) docked at the bottom; the other sides draw with their row.
       if (TerminalDocked() && gTerminalDock == 0)
