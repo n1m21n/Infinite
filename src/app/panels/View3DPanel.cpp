@@ -563,7 +563,7 @@ namespace
       for (int i = 2; i < 6; i++)
          move = std::max(move, std::abs(to[i] - here[i]));
       const float turn = std::max(std::abs(to[0] - here[0]), std::abs(to[1] - here[1]));
-      float dur = sSet->smoothTime;
+      float dur = gView3DPrefs.smoothTime;
       if (move < 1e-5f)
          dur *= turn / kPi;   // a small turn is quick, a half turn takes the full time
       if (dur < 0.012f || (turn < 1e-5f && move < 1e-5f))
@@ -581,7 +581,7 @@ namespace
       (void)from;
    }
 
-   float RotStep() { return std::clamp(sSet->rotStep, 1.0f, 90.0f) * 3.14159265f / 180.0f; }
+   float RotStep() { return std::clamp(gView3DPrefs.rotStep, 1.0f, 90.0f) * 3.14159265f / 180.0f; }
 
    // The view from before the camera, so toggling the camera off goes back to it (orbiting out starts at the camera).
    struct { bool set = false; float view[6]; float roll; bool ortho; } sPreCam;
@@ -664,7 +664,7 @@ namespace
       sEl = el[which];
       sViewName = which;
       sGridAxis = which / 2;
-      if (sSet->autoPerspective)
+      if (gView3DPrefs.autoPerspective)
       {
          sAutoOrtho = sAutoOrtho || !sOrtho;
          sOrtho = true;
@@ -770,7 +770,7 @@ namespace
          for (int k = 0; k < 3; k++)
             sTarget[k] += sCam.fwd[k] * (sDist - want);
       float o[3], d[3], h[3];
-      if (mouse == nullptr || !sSet->zoomToMouse)
+      if (mouse == nullptr || !gView3DPrefs.zoomToMouse)
          return;
       MouseRay(*mouse, o, d);
       if (PlaneHit(sTarget, sCam.fwd, o, d, h))
@@ -816,7 +816,7 @@ namespace
       if (!fromCamera)
          sRoll = 0.0f;   // the turn that leaves a camera keeps its roll, so nothing snaps; the next one levels it
       float p[3];
-      const bool around = sSet->orbitSelection && SelectionCenter(scene, p);
+      const bool around = gView3DPrefs.orbitSelection && SelectionCenter(scene, p);
       float eye[3], local[3] = { 0, 0, 0 };
       Mat4 v = OrbitView();
       if (around)
@@ -2663,9 +2663,9 @@ namespace
          if (io.KeyShift)
             Pan(io.MouseDelta.x, io.MouseDelta.y);
          else
-            OrbitBy(scene, io.MouseDelta.x * kOrbitPerPixel * sSet->orbitSens, io.MouseDelta.y * kOrbitPerPixel * sSet->orbitSens);
+            OrbitBy(scene, io.MouseDelta.x * kOrbitPerPixel * gView3DPrefs.orbitSens, io.MouseDelta.y * kOrbitPerPixel * gView3DPrefs.orbitSens);
       }
-      if (sSet->continuousGrab && (hovered || sNavDrag) && orbitDrag)
+      if (gView3DPrefs.continuousGrab && (hovered || sNavDrag) && orbitDrag)
       {
          // The pointer wraps at the view's edge so a drag can go on turning.
          const float mx0 = sCam.mn.x, mx1 = sCam.mx.x, my0 = sCam.mn.y, my1 = sCam.mx.y;
@@ -2690,7 +2690,7 @@ namespace
       {
          const WheelNav nav = ClassifyWheel(io.MouseWheelH, io.MouseWheel, io.KeyShift, io.KeyCtrl, io.KeySuper);
          if (nav.use == WheelUse::Zoom)
-            Zoom(std::pow(1.0f / 1.2f, sSet->invertZoom ? -nav.dy : nav.dy), &io.MousePos);   // a wheel notch is 1.2x
+            Zoom(std::pow(1.0f / 1.2f, gView3DPrefs.invertZoom ? -nav.dy : nav.dy), &io.MousePos);   // a wheel notch is 1.2x
          else if (nav.use == WheelUse::Pan)
             Pan(nav.dx * tok::view3d_navigation_ratio, nav.dy * tok::view3d_navigation_ratio);   // GLFW hands a trackpad over as pixels / 10: the scene follows the fingers 1:1
          else
@@ -4699,7 +4699,7 @@ namespace
       ImVec2 c;
       if (sTool == 0 || !Project(at, c))
          return -1;
-      const float len = UnitAt(at) * kGizmoPx * sSet->gizmoSize / tok::view3d_len_ratio;
+      const float len = UnitAt(at) * kGizmoPx * gView3DPrefs.gizmoSize / tok::view3d_len_ratio;
       int hot = -1;
       float best = 9.0f;
       const ImU32 white = Hex(kHotHandle);
@@ -4813,11 +4813,11 @@ namespace
    // Top right: the three axes as they stand now. Click a ball for that view, drag to orbit.
    int DrawNavGizmo(ImDrawList* dl, ImVec2 mn, ImVec2 mx, ImVec2 mouse, bool hovered, bool& onDisc)
    {
-      const float pad = tok::view3d_pad_ratio * sSet->miniSize / tok::view3d_nav_gizmo_scale_lg;
+      const float pad = tok::view3d_pad_ratio * gView3DPrefs.miniSize / tok::view3d_nav_gizmo_scale_lg;
       const ImVec2 c(mx.x - pad, mn.y + pad);
-      const float r = tok::view3d_nav_gizmo_scale_sm * sSet->miniSize / tok::view3d_nav_gizmo_scale_lg;
-      const float ballK = sSet->gizmoNavSize / tok::view3d_ball_k_ratio;
-      hovered = hovered && sSet->miniAxes == 2;
+      const float r = tok::view3d_nav_gizmo_scale_sm * gView3DPrefs.miniSize / tok::view3d_nav_gizmo_scale_lg;
+      const float ballK = gView3DPrefs.gizmoNavSize / tok::view3d_ball_k_ratio;
+      hovered = hovered && gView3DPrefs.miniAxes == 2;
       const int firstVtx = dl->VtxBuffer.Size;
       onDisc = hovered && std::hypot(mouse.x - c.x, mouse.y - c.y) < r + tok::space_3;
       if (onDisc || sNavDrag)
@@ -4856,7 +4856,7 @@ namespace
       for (int i = firstVtx; i < dl->VtxBuffer.Size; i++)
       {
          ImU32& col = dl->VtxBuffer[i].col;
-         const ImU32 al = (ImU32)(((col >> IM_COL32_A_SHIFT) & 0xFF) * std::clamp(sSet->miniBright, 0.0f, 1.0f));
+         const ImU32 al = (ImU32)(((col >> IM_COL32_A_SHIFT) & 0xFF) * std::clamp(gView3DPrefs.miniBright, 0.0f, 1.0f));
          col = (col & ~IM_COL32_A_MASK) | (al << IM_COL32_A_SHIFT);
       }
       return hit;
@@ -5348,7 +5348,7 @@ namespace
       const bool canGrab = hovered && sOp.mode == 0 && !sBoxOn;
       bool onNav = false;
       int navBall = -1;
-      if (sSet->gizmoNav && sSet->miniAxes > 0)
+      if (sSet->gizmoNav && gView3DPrefs.miniAxes > 0)
          navBall = DrawNavGizmo(dl, mn, mx, mouse, hovered && sOp.mode == 0, onNav);
       bool onPad = false;
       if (sSet->gizmoMove)
@@ -8425,24 +8425,6 @@ namespace
             }
       }
       sSet = scene != nullptr ? &scene->settings : &sNoScene;
-      if (scene != nullptr)
-      {
-         // The user's 3D View habits (Settings > 3D View) win over what the patch saved.
-         const View3DPrefs& p = gView3DPrefs;
-         scene->settings.miniAxes = p.miniAxes;
-         scene->settings.miniSize = p.miniSize;
-         scene->settings.miniBright = p.miniBright;
-         scene->settings.gizmoNavSize = p.gizmoNavSize;
-         scene->settings.gizmoSize = p.gizmoSize;
-         scene->settings.smoothTime = p.smoothTime;
-         scene->settings.rotStep = p.rotStep;
-         scene->settings.autoPerspective = p.autoPerspective;
-         scene->settings.continuousGrab = p.continuousGrab;
-         scene->settings.orbitSens = p.orbitSens;
-         scene->settings.zoomToMouse = p.zoomToMouse;
-         scene->settings.orbitSelection = p.orbitSelection;
-         scene->settings.invertZoom = p.invertZoom;
-      }
       if (scene == nullptr)
       {
          gView3DClaimedKeys = false;

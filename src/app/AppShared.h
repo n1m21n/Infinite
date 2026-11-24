@@ -1378,8 +1378,9 @@ extern float gMinimapSize;
 
 extern float gMinimapOpacity;
 
-// 3D View habits (Settings > 3D View): the user's, not the scene's, so they hold in every patch. Applied onto each
-// scene's Scene3DNode::Settings as the 3D View draws it.
+// 3D View habits (Settings > 3D View): the user's, not the scene's, so they hold in every patch. The 3D View reads
+// them here; it never writes them into the scene (that changed the patch on draw with no edit). Older patches still
+// carry the copies in Scene3DNode::Settings, which are kept for the save format and not read.
 struct View3DPrefs
 {
    int miniAxes = 2;
