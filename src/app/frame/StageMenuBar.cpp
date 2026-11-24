@@ -1260,7 +1260,7 @@ void DrawMenuBar(FrameCtx& fc)
          static double sSmoothedMs = 0.0;
          sSmoothedMs = (sSmoothedMs <= 0.0)
                           ? gLastFrameMs
-                          : sSmoothedMs * 0.9 + gLastFrameMs * 0.1;
+                          : sSmoothedMs * 0.9 + gLastFrameMs * 0.1;   // ui-audit-ok: frame time smoothing
          const double fps = sSmoothedMs > 0.0001 ? 1000.0 / sSmoothedMs : 0.0;
 
          char readout[80];

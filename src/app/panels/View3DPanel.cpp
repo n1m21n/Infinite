@@ -492,7 +492,7 @@ namespace
    {
       bool on = false, orthoAtEnd = false;
       double t0 = 0.0;
-      float dur = 0.2f;
+      float dur = tok::motion_s_glide;
       float src[6] = {}, dst[6] = {};   // az, el, dist, target xyz
    } sGlide;
 
@@ -2715,7 +2715,7 @@ namespace
             for (int k = 0; k < 3; k++)
                sTarget[k] += eye[k] - next[k];
          }
-         const float speed = sDist * io.DeltaTime * (io.KeyShift ? 2.5f : 1.0f);
+         const float speed = sDist * io.DeltaTime * (io.KeyShift ? 2.5f : 1.0f);  // ui-audit-ok: shift speeds navigation
          const float f = (ImGui::IsKeyDown(ImGuiKey_W) ? 1.0f : 0.0f) - (ImGui::IsKeyDown(ImGuiKey_S) ? 1.0f : 0.0f);
          const float r = (ImGui::IsKeyDown(ImGuiKey_D) ? 1.0f : 0.0f) - (ImGui::IsKeyDown(ImGuiKey_A) ? 1.0f : 0.0f);
          const float u = (ImGui::IsKeyDown(ImGuiKey_E) ? 1.0f : 0.0f) - (ImGui::IsKeyDown(ImGuiKey_Q) ? 1.0f : 0.0f);
@@ -6022,7 +6022,7 @@ namespace
       FieldLabel(label);
       const bool changed = FormParts::ColorDot(RowId(label).c_str(), rgb, 15.0f, ImGui::GetFrameHeight());
       static float sLast = -1.0f;
-      if (changed && ImGui::GetTime() - sLast > 1.0f)   // one drag across the picker, one undo
+      if (changed && ImGui::GetTime() - sLast > tok::motion_s_undo_merge)   // one drag across the picker, one undo
          PushUndoCheckpoint(undo);
       if (changed)
          sLast = (float)ImGui::GetTime();

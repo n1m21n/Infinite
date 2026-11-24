@@ -70,6 +70,8 @@ namespace tok
    constexpr float alpha_veil_live = 0.82f;
    constexpr float alpha_ghost = 0.94f;
    constexpr float alpha_edge_strong = 0.9f;
+   constexpr float alpha_pulse_floor = 0.55f;
+   constexpr float alpha_pulse_depth = 0.45f;
    constexpr float stroke_rule = 1.0f;
    constexpr float stroke_ring = 1.5f;
    constexpr float stroke_cross = 1.5f;
@@ -77,6 +79,7 @@ namespace tok
    constexpr float stroke_focus = 2.0f;
    constexpr float stroke_focus_gap = 2.0f;
    constexpr float stroke_wire = 2.0f;
+   constexpr float stroke_caret = 1.5f;
    constexpr float drag_threshold_fine = 2.0f;
    constexpr float drag_threshold = 4.0f;
    constexpr float drag_threshold_tile = 6.0f;
@@ -115,6 +118,14 @@ namespace tok
    constexpr float motion_s_caret_idle = 0.6f;
    constexpr float motion_s_caret_period = 1.06f;
    constexpr float motion_s_caret_on = 0.53f;
+   constexpr float motion_s_undo_merge = 1.0f;
+   constexpr float motion_s_rescan = 1.0f;
+   constexpr float motion_s_rescan_slow = 2.0f;
+   constexpr float motion_s_save_settle = 1.0f;
+   constexpr float motion_s_edit_settle = 0.3f;
+   constexpr float motion_s_ask_hold = 6.0f;
+   constexpr float motion_s_blink_period = 1.0f;
+   constexpr float motion_s_glide = 0.2f;
    constexpr float motion_rate_flash_decay = 4.0f;
    constexpr float motion_rate_pad_decay = 6.0f;
    constexpr float motion_rate_peak_fall = 14.0f;
@@ -128,6 +139,9 @@ namespace tok
    constexpr int alpha8_cursor_shadow = 200;
    constexpr int alpha8_plate_dark = 120;
    constexpr int alpha8_plate_light = 150;
+   constexpr int alpha8_threshold_light = 200;
+   constexpr int alpha8_threshold_dark = 190;
+   constexpr int alpha8_flash = 220;
    constexpr float motion_hover_in = 125.0f;
    constexpr float motion_hover_out = 188.0f;
    constexpr float motion_press = 0.0f;

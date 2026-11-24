@@ -3107,7 +3107,7 @@ namespace app
          else
          {
             sDragAccum += ImGui::GetIO().MouseDelta.y;
-            const float threshold = rowHeight * 3.0f; // one full layer block
+            const float threshold = rowHeight * 3.0f; // one full layer block  // ui-audit-ok: three rows (a layer block)
             while (sDragAccum > threshold && sDragSlot < LayerStackNode::kSlots - 1)
             {
                n->SwapLayers(sDragSlot, sDragSlot + 1);

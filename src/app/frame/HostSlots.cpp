@@ -191,7 +191,7 @@ namespace
 
    constexpr float kEps = 1e-5f;
    constexpr int kEndAfterQuietFrames = 15;
-   constexpr int kHoldFrames = 30; // ~0.5 s at 60 fps
+   constexpr int kHoldFrames = 30; // ~0.5 s at 60 fps  // ui-audit-ok: host slot hold frames
 }
 
 void HostSlotsFrame()

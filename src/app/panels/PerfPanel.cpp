@@ -1172,7 +1172,7 @@ namespace app
 
          if (flash > 0.0f)
          {
-            ImU32 flashCol = (themeTint & 0x00FFFFFF) | ((ImU32)(flash * 220.0f) << 24);
+            ImU32 flashCol = (themeTint & 0x00FFFFFF) | ((ImU32)(flash * (float)tok::alpha8_flash) << 24);
             dl->AddCircleFilled(center, r * (0.6f + 0.4f * flash), flashCol, 32);
             dl->AddCircle(center, r + 2.0f * (1.0f - flash), (themeTint & 0x00FFFFFF) | ((ImU32)(flash * 255.0f) << 24), 32, 2.0f);
          }

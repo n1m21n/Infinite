@@ -441,7 +441,7 @@ namespace app
       job.wasPlaying = tr.IsPlaying();
       if (startMode == 2)
          tr.Seek(startAt);
-      job.startSec = startMode == 2 ? startAt : tr.Seconds();
+      job.startSec = startMode == 2 ? startAt : tr.Seconds();   // ui-audit-ok: render start mode
       tr.SetOfflineMode(true, job.rate);
       tr.SetPlaying(true);
       tr.SetOfflineVideoTime(job.startSec);
@@ -497,7 +497,7 @@ namespace app
          while (sJob.done < sJob.total)
          {
             PumpFastStep();
-            if (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() > 0.010)
+            if (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() > 0.010)   // ui-audit-ok: render tick budget
                break;
          }
          if (sJob.done >= sJob.total)

@@ -997,7 +997,7 @@ namespace app
                FormParts::Inline();
                static double sLearnSizedAt = -10.0; // walking the folder every frame would cost; once a second
                static float sLearnMB = 0.0f;
-               if (ImGui::GetTime() - sLearnSizedAt > 1.0)
+               if (ImGui::GetTime() - sLearnSizedAt > tok::motion_s_rescan)
                {
                   sLearnMB = (float)LearningLog::FolderBytes() / (1024.0f * 1024.0f);
                   sLearnSizedAt = ImGui::GetTime();

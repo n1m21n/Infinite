@@ -1997,7 +1997,7 @@ namespace
       static double sLast = -1.0;
       static ImGuiID sLastRow = 0;
       const ImGuiID row = ImGui::GetID(label);
-      if (changed && (row != sLastRow || ImGui::GetTime() - sLast > 1.0))
+      if (changed && (row != sLastRow || ImGui::GetTime() - sLast > tok::motion_s_undo_merge))
          PushUndoCheckpoint(kUndo);
       if (changed)
       {
@@ -3321,7 +3321,7 @@ namespace
    {
       static std::string last;
       static double at = -10.0;
-      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr || ImGui::GetTime() - at < 1.0)
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr || ImGui::GetTime() - at < tok::motion_s_save_settle)
          return;
       at = ImGui::GetTime();
       const std::string now = BrushText();
@@ -3616,7 +3616,7 @@ namespace
       if (sRasterAsk == 0)
          return;
       const Layer* l = doc->FindLayer(sRasterAsk);
-      if (l == nullptr || (l->kind != Kind::Text && l->kind != Kind::Vector) || ImGui::GetTime() - sRasterAskAt > 6.0)
+      if (l == nullptr || (l->kind != Kind::Text && l->kind != Kind::Vector) || ImGui::GetTime() - sRasterAskAt > tok::motion_s_ask_hold)
       {
          sRasterAsk = 0;
          return;
@@ -4447,7 +4447,7 @@ namespace
          return false;
       const ImU32 white = tok::U32(tok::canvas_ink), black = tok::U32(tok::canvas_shade);
       constexpr float kDash = 4.0f;
-      const float march = std::fmod((float)ImGui::GetTime() * tok::motion_rate_ants, kDash * 2.0f);
+      const float march = std::fmod((float)ImGui::GetTime() * tok::motion_rate_ants, kDash * 2.0f);  // ui-audit-ok: dash period (two dashes)
       for (const Seg& sg : segs)
       {
          const ImVec2 a = ToScreen(doc, sg.ax, sg.ay), b = ToScreen(doc, sg.bx, sg.by);
@@ -6464,9 +6464,9 @@ namespace
          for (const std::array<float, 4>& r : sTextMarks.sel)
             dl->AddQuadFilled(BoxScreen(doc, *l, r[0], r[1]), BoxScreen(doc, *l, r[2], r[1]), BoxScreen(doc, *l, r[2], r[3]),
                               BoxScreen(doc, *l, r[0], r[3]), Hex(kOutline, 0.35f));
-         if (std::fmod(ImGui::GetTime(), 1.0) < tok::motion_s_blink_on)
+         if (std::fmod(ImGui::GetTime(), (double)tok::motion_s_blink_period) < tok::motion_s_blink_on)
             dl->AddLine(BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[1]),
-                        BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[2]), Hex(kOutline), 1.5f);
+                        BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[2]), Hex(kOutline), tok::stroke_caret);
       }
       sEditMn = ImGui::GetItemRectMin();
       sEditMx = ImGui::GetItemRectMax();
@@ -8546,7 +8546,7 @@ namespace
       {
          // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
          static double sAt = -1.0;
-         if (ImGui::GetTime() - sAt > 1.0)
+         if (ImGui::GetTime() - sAt > tok::motion_s_undo_merge)
             undo();
          sAt = ImGui::GetTime();
          changed = true;
@@ -8632,7 +8632,7 @@ namespace
       {
          // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
          static double sAt = -1.0;
-         if (ImGui::GetTime() - sAt > 1.0)
+         if (ImGui::GetTime() - sAt > tok::motion_s_undo_merge)
             undo();
          sAt = ImGui::GetTime();
          changed = true;
@@ -9270,7 +9270,7 @@ namespace
       {
          // One undo step per colour edit, as ColorRow: the first change in a second pushes it.
          static double sAt = -1.0;
-         if (ImGui::GetTime() - sAt > 1.0)
+         if (ImGui::GetTime() - sAt > tok::motion_s_undo_merge)
             undo();
          sAt = ImGui::GetTime();
          changed = true;

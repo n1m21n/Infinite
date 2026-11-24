@@ -817,7 +817,7 @@ namespace app
 
    void RefreshLiveIssues()
    {
-      if (gLiveIssueDoneSerial == gLiveIssueSerial || ImGui::GetTime() - gLiveIssueEditTime < 0.3)
+      if (gLiveIssueDoneSerial == gLiveIssueSerial || ImGui::GetTime() - gLiveIssueEditTime < tok::motion_s_edit_settle)
          return;
       gLiveIssueDoneSerial = gLiveIssueSerial;
       gLiveIssues.clear();

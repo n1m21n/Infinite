@@ -1951,7 +1951,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
                                       "Spec Blur", "Key-Snap", "Spectrum Slide", "Shape Resonator",
                                       "Convolution Reverb", "Saturator" };
          const int kCount = (int)(sizeof(kFx) / sizeof(kFx[0]));
-         const int page = atoi(gallery) == 2 ? 1 : 0;
+         const int page = atoi(gallery) == 2 ? 1 : 0;   // ui-audit-ok: gallery page index
          for (int i = 0; i < 14 && page * 14 + i < kCount; i++)
             SpawnNode(kFx[page * 14 + i], "AudioEffects", (float)(i % 5) * 480.0f, (float)(i / 5) * 620.0f);
       }
@@ -4597,7 +4597,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          const uint64_t intro = addClip(0, 0, 2, "Intro");
          const uint64_t sel = addClip(0, 3, 3, "Clip B");
          const uint64_t overlay = addClip(1, 1, 4, "Overlay");
-         const uint64_t drums = addClip(firstAudio, 0, 3, "Drums");
+         const uint64_t drums = addClip(firstAudio, 0, 3, "Drums");   // ui-audit-ok: demo clip index
          const uint64_t bass = addClip(firstAudio + 1, 2, 4, "Bass");
          // Variants: arrgroup (clip group + track group), arrtrack / arrtgroup (track / track-group inspector),
          // arrmulti (several clips selected), arrzoom (zoomed in so clips are wide), arrwide (wider panel).

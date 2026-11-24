@@ -652,10 +652,10 @@ bool ArrangeRenderBusy();
    // kAudioRecoveryWindowMs rolling window, so a flapping device or a burst
    // of notifications on wake can't spawn overlapping restarts or loop
    // forever - see PollAudioRecovery's comment for how these are used.
-   inline constexpr double kAudioRecoveryMinIntervalMs = 500.0;
+   inline constexpr double kAudioRecoveryMinIntervalMs = 500.0;   // ui-audit-ok: audio recovery policy
 
 
-   inline constexpr double kAudioRecoveryWindowMs = 10000.0;
+   inline constexpr double kAudioRecoveryWindowMs = 10000.0;   // ui-audit-ok: audio recovery policy
 
 
    inline constexpr int kAudioRecoveryMaxAttemptsPerWindow = 5;
@@ -1383,7 +1383,7 @@ extern float gMinimapOpacity;
 struct View3DPrefs
 {
    int miniAxes = 2;
-   float miniSize = 80.0f, miniBright = 1.0f, gizmoNavSize = 80.0f, gizmoSize = 75.0f, smoothTime = 0.2f, rotStep = 15.0f;
+   float miniSize = 80.0f, miniBright = 1.0f, gizmoNavSize = 80.0f, gizmoSize = 75.0f, smoothTime = 0.2f, rotStep = 15.0f;  // ui-audit-ok: view settings defaults
    bool autoPerspective = true, continuousGrab = true;
    float orbitSens = 1.0f;
    bool zoomToMouse = false, orbitSelection = false, invertZoom = false;
@@ -3807,7 +3807,7 @@ void PublishWtTestRect();
    };
 
 ADSRLayout ComputeADSRLayout(ImVec2 origin, float w, float h, float attackMs, float decayMs,
-                                       float sustain, float releaseMs, float maxTimeMs = 4000.0f);
+                                       float sustain, float releaseMs, float maxTimeMs = 4000.0f);   // ui-audit-ok: ADSR model range
 
 const std::vector<std::string>& WavetableNames();
 
@@ -4086,7 +4086,7 @@ extern std::map<int, FilterCurveCache> gFilterCurveCache;
 extern int gFilterCurveRecomputes;
 
  // self-test visibility only
-   inline const double kFilterCurveMotionSec = 0.05;
+   inline const double kFilterCurveMotionSec = 0.05;  // ui-audit-ok: curve smoothing time constant
 
 
    inline const int kFilterCurveFullPoints = 160;
@@ -6367,7 +6367,7 @@ int ProjectorMonitorIndex(GLFWwindow* w);
          if (hz == refreshHz)
             return;
          refreshHz = hz;
-         baseIntervals = hz > 0.0 ? std::max(1, (int)std::floor(hz / 60.0 + 0.02)) : 1;
+         baseIntervals = hz > 0.0 ? std::max(1, (int)std::floor(hz / 60.0 + 0.02)) : 1;   // ui-audit-ok: display pacer maths
          intervals = baseIntervals;
          workMs.clear();
       }

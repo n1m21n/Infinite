@@ -23,7 +23,7 @@ namespace
    // Both inputs are already smoothed; a level drops only below 80% of its threshold, so a value sitting on a line does
    // not flicker.
    constexpr float kFrameMs = 1000.0f / 60.0f;
-   constexpr float kVideoAmber = 0.12f, kVideoRed = 0.30f, kAudioAmber = 0.10f, kAudioRed = 0.25f, kHold = 0.8f;
+   constexpr float kVideoAmber = 0.12f, kVideoRed = 0.30f, kAudioAmber = 0.10f, kAudioRed = 0.25f, kHold = 0.8f;  // ui-audit-ok: frame budget thresholds
 
    int Level(float share, bool audio, int prev)
    {

@@ -88,7 +88,7 @@ void DrawPresent(FrameCtx& fc)
          const int fps = gTargetFps > 0 ? std::min(gTargetFps, 60) : 60;
          const double deadline = gFrameStart + 1.0 / (double)fps;
          while (glfwGetTime() < deadline && !PluginEngine::ParkPending())
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));   // ui-audit-ok: frame pacing
       }
       else if (gTargetFps > 0 && !gVsync && !FrameClockActive() && !HeadlessJobActive())
       {
@@ -100,7 +100,7 @@ void DrawPresent(FrameCtx& fc)
             // sleeping through it - see local-prompts/02-plugin-editor-lag.md.
             while (glfwGetTime() < deadline)
                if (!Platform::PumpPluginEditorEvents())
-                  std::this_thread::sleep_for(std::chrono::microseconds(200));
+                  std::this_thread::sleep_for(std::chrono::microseconds(200));   // ui-audit-ok: frame pacing
          }
          else
          {

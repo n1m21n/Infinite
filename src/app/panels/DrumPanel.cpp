@@ -327,7 +327,7 @@ namespace app
                n->stepNudge[l][N + i] = n->stepNudge[l][i];
             }
          n->numSteps = N * 2;
-         n->editPage = N * 2 > kPageSteps ? 1 : 0;
+         n->editPage = N * 2 > kPageSteps ? 1 : 0;   // ui-audit-ok: pattern doubling
       }
 
       void DrawFillMenu(DrumSequencerNode* n)

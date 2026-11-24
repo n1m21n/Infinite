@@ -114,7 +114,7 @@ namespace
       Tool tool = Tool::Select;
       bool snap = true;
       int gridBeats = MusicTime::kSixteenth;
-      int gridSeconds = 2, gridFrames = 0;
+      int gridSeconds = 2, gridFrames = 0;   // ui-audit-ok: model default
       float thinning = 0.01f;       // Draw: how far (shape units) the points may stray from the stroke
       std::vector<int> sel;         // selected point indices, ascending
       size_t selCount = 0;          // the node's point count the selection was made against
@@ -128,7 +128,7 @@ namespace
       CurveEdit::XY lineFrom {};
       float bendBase = 0.0f, bendSign = 1.0f;
       bool strokePending = false;   // a press on the empty panel made this page: its stroke starts next frame
-      int preset = 0, seed = 1, pulses = 5, steps = 8;
+      int preset = 0, seed = 1, pulses = 5, steps = 8;   // ui-audit-ok: model default
       CurveEdit::Points userPreset;
       std::string presetName;
    };
@@ -1263,7 +1263,7 @@ namespace
          std::vector<int> touched;
          for (int i=1;i+1<(int)n.points.size();++i)
             if (std::hypot(a.X(n.points[i].x)-m.x,a.Y(n.points[i].y)-m.y)<kEraseR*2) touched.push_back(i);
-         CurveEdit::Smooth(n.points,touched,std::min(1.f,ImGui::GetIO().DeltaTime*8));
+         CurveEdit::Smooth(n.points,touched,std::min(1.f,ImGui::GetIO().DeltaTime*8));   // ui-audit-ok: smoothing rate
          n.Normalize(); break;
       }
       case Drag::Transform:
@@ -2054,7 +2054,7 @@ namespace
             RecStop(true); // Overwrite is one pass
             break;
          }
-         r.clock += std::clamp((double)ImGui::GetIO().DeltaTime, 0.0, 0.1);
+         r.clock += std::clamp((double)ImGui::GetIO().DeltaTime, 0.0, 0.1);   // ui-audit-ok: record clock guard
          break;
       }
       default: break;

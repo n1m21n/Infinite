@@ -969,7 +969,7 @@ namespace app
                {
                   // Waiting for a canvas node: the same cue as the Timeline's
                   // target - a pulsing outline, steady under Reduce Motion.
-                  const float ap = UiAnim::ReduceMotion() ? 1.0f : 0.55f + 0.45f * std::sin((float)ImGui::GetTime() * tok::motion_rate_pulse);
+                  const float ap = UiAnim::ReduceMotion() ? 1.0f : tok::alpha_pulse_floor + tok::alpha_pulse_depth * std::sin((float)ImGui::GetTime() * tok::motion_rate_pulse);
                   dl->AddRect(ImVec2(a.x - 2.0f, a.y - 2.0f), ImVec2(b.x + 2.0f, b.y + 2.0f),
                               WithAlpha(tok::Role(tok::col::ink_white), ap), tok::radius_control, 0, 2.5f);
                   HelpTip("%s", T("Click a node on the canvas to assign it. Esc cancels."));

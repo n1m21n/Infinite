@@ -394,8 +394,8 @@ def scan_file(rel, src):
                 elif prev is not None and prev.text in ("<", ">", "<=", ">=", "==", "!="): cat = "compare"
                 elif prev is not None and prev.text in ("=", "+=", "-=", "*=", "/=", "return", "?", ":"): cat = "assign"
                 else: cat = "arith"
-        if cat in LOGIC_CATS or cat.startswith("call:"):
-            r = logic_reason(toks, match, i, t, v, prev, nxt, paren, st, stmt_lhs(stmt_start, i))
+        if cat in LOGIC_CATS or cat == "timing" or cat.startswith("call:"):
+            r = logic_reason(toks, match, i, t, v, prev, nxt, paren, st, stmt_lhs(stmt_start, i), cat)
             if r: allowed.bump(r, t.line); continue
         findings.append((cat, call or "-", t.text if not neg else "-" + t.text, st[:110]) + where)
     return findings, allowed, rawcalls
@@ -455,12 +455,29 @@ GEOM_NAME = re.compile(
     r"(?:space|radius|hit|pin|icon|bar|stroke|row|page|dock|cell|ruler|fader|topbar|fold|compact|desk|arrange|chat|drag|type)_\w+)$")
 GEOM_CTX = {"ImVec2", "ImRect", "SetNextItemWidth", "PushItemWidth", "Dummy", "InvisibleButton", "BeginChild", "SetCursorPos",
             "SetCursorPosX", "SetCursorPosY", "SetCursorScreenPos", "SameLine", "IsMouseHoveringRect", "ItemSize", "ItemAdd"}
-DOMAIN = re.compile(
-    r"(?i)(?:^|_|(?<=[a-z]))(?:db|hz|khz|freq\w*|cutoff|reso\w*|gain|bpm|tempo|beat\w*|bars?|ppq|ticks?|sample\w*|sr|semi\w*|"
-    r"notes?|midi|pitch|cents|octave\w*|phase\w*|vel\w*|velocity|param\w*|ratio|lufs|rms|peak|amp\w*|level|lvl|mag\w*|bin\w*|"
-    r"fft\w*|q|depth|rate|decay|attack|release|sustain|feedback|drive|mix|wet|dry|detune|pan|voice\w*|chan\w*|ch|bus\w*|"
-    r"frame\w*|fps|chord\w*|step\w*|bank|preset\w*|count|n|num\w*|idx|index|kind|mode|type|op|state|dock|ref|tab|page|"
-    r"version|ver|seed|hash|rgb|hue|sat|lum|luma|gamma|exposure|scale|uiScale|t|u|v|k|i|j|s|f|e|nt)(?=$|_|[A-Z0-9])")
+DSP_WORDS = {"db", "hz", "khz", "freq", "frequency", "cutoff", "reso", "resonance", "gain", "bpm", "tempo", "beat", "beats", "bar",
+             "bars", "ppq", "tick", "ticks", "sample", "samples", "sr", "semi", "semis", "semitone", "semitones", "note", "notes",
+             "midi", "pitch", "cents", "octave", "octaves", "phase", "vel", "velocity", "param", "ratio", "lufs", "rms", "peak",
+             "amp", "amplitude", "level", "lvl", "mag", "bin", "bins", "fft", "depth", "rate", "decay", "attack", "release",
+             "sustain", "feedback", "drive", "wet", "dry", "detune", "pan", "voice", "voices", "chan", "channel", "channels", "bus",
+             "fps", "chord", "q", "hardness", "humanize", "lifetime", "emission", "weight", "exposure", "gamma"}
+MODEL_WORDS = {"count", "num", "idx", "index", "kind", "mode", "type", "op", "state", "dock", "ref", "tab", "version", "seed",
+               "hash", "rgb", "hue", "sat", "lum", "luma", "step", "steps", "bank", "preset", "frame", "frames", "mix", "port",
+               "joint", "band", "lane", "page", "unit", "units", "orient", "sel", "handle", "pc", "val", "value", "raw"}
+LONE = {"t", "u", "v", "k", "i", "j", "n", "s", "f", "e", "nt", "m", "c", "d"}
+
+
+def _words(name):
+    return {w.lower() for w in re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+", name)}
+
+
+def is_domain(name, dsp_only=False):
+    ws = _words(name.lstrip("gsk") if re.match(r"^[gsk][A-Z]", name) else name)
+    if ws & DSP_WORDS: return True
+    if dsp_only: return False
+    return bool(ws & MODEL_WORDS) or name in LONE
+
+
 UNIT_CONV = {100.0, 1000.0, 60.0, 12.0, 3600.0, 1e3, 1e6, 1e9, 1024.0, 255.0, 256.0, 127.0, 128.0, 440.0, 69.0, 24.0, 48.0, 96.0,
              44100.0, 48000.0, 360.0, 180.0, 90.0}
 PI = (3.14159, 6.28318, 1.5707)
@@ -492,7 +509,7 @@ def _neigh(toks, match, i):
     return out
 
 
-def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs):
+def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs, cat):
     names = _neigh(toks, match, i) + ([lhs] if lhs else [])
     bitop = {"<<", ">>", "&", "|", "^", "%", "~", "&=", "|="}
     if t.text.lower().startswith("0x") or (prev is not None and prev.text in bitop) or (nxt is not None and nxt.text in bitop):
@@ -501,11 +518,13 @@ def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs):
         return None
     if any(GEOM_NAME.match(n) for n in names) or "tok ::" in st and not names:
         return None
-    if v is not None and float(v).is_integer() and prev is not None and prev.text in ("==", "!="):
+    if v is not None and float(v).is_integer() and prev is not None and prev.text in ("==", "!=") and cat != "timing":
         return "mode"
+    if cat == "timing" and v is not None and abs(v) == 1.0 and not (prev is not None and prev.text in ("<", ">", "<=", ">=")):
+        return "0/1/-1"   # a full-scale 1 in an animation statement (clamp to 1, the reduce-motion value), not a 1 s hold
     if v is not None and 0 < abs(v) < 0.01:
         return "epsilon"
-    if any(DOMAIN.search(n) for n in names):
+    if any(is_domain(n, cat == "timing") for n in names) or ("Param (" in st and cat != "timing"):
         return "domain"
     if v is not None and (abs(v) in UNIT_CONV or any(abs(abs(v) - p) < 1e-3 for p in PI)):
         return "unit_conv"

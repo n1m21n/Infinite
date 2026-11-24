@@ -616,7 +616,7 @@ namespace
    {
       static std::vector<Platform::AudioDeviceInfo> sInputs;
       static double sListedAt = -10.0;
-      if (ImGui::GetTime() - sListedAt > 1.0)
+      if (ImGui::GetTime() - sListedAt > tok::motion_s_rescan)
       {
          sListedAt = ImGui::GetTime();
          sInputs.clear();

@@ -131,7 +131,7 @@ namespace app
       std::vector<Run> sRetry;
 
       // A turn with no output at all for this long is stuck (a long render still prints its tool call first).
-      constexpr double kTurnSilentSeconds = 15.0 * 60.0;
+      constexpr double kTurnSilentSeconds = 15.0 * 60.0;   // ui-audit-ok: agent polling
 
       // What the chat knows about each agent: can it take a turn, and a setup running in the background.
       struct AgentState
@@ -194,8 +194,8 @@ namespace app
       }
 
       bool OnMac() { return CliSetup::CurrentOs() == CliSetup::Os::kMac; }
-      constexpr double kStatusCheckSeconds = 30.0;    // a status check that takes longer is stopped
-      constexpr double kStatusRecheckSeconds = 300.0;  // a signed-in agent is checked again this often
+      constexpr double kStatusCheckSeconds = 30.0;    // a status check that takes longer is stopped  // ui-audit-ok: agent polling
+      constexpr double kStatusRecheckSeconds = 300.0;  // a signed-in agent is checked again this often  // ui-audit-ok: agent polling
 
       chat::Thread sThread;
       std::vector<EntryUi> sUi;
@@ -1033,7 +1033,7 @@ namespace app
             return;
          std::vector<chat::AgentEvent> drop;
          o.probe->Poll(drop);
-         const bool late = ImGui::GetTime() - o.probeAt > 25.0;
+         const bool late = ImGui::GetTime() - o.probeAt > 25.0;   // ui-audit-ok: agent polling
          if (!o.probe->Done() && !late)
             return;
          if (!o.probe->Done())
@@ -1086,7 +1086,7 @@ namespace app
             sOnboard.leftSinceSignUp = sOnboard.leftSinceSignUp || away;
             // The sign-up page never took the front (another screen, a slow browser): do not wait for a return
             // that will not come.
-            if (!sOnboard.leftSinceSignUp && ImGui::GetTime() - sOnboard.signUpAt > 5.0)
+            if (!sOnboard.leftSinceSignUp && ImGui::GetTime() - sOnboard.signUpAt > 5.0)   // ui-audit-ok: agent polling
                for (auto& [id, st] : sAgents)
                   if (st.signInOnFocus && st.setup == nullptr && st.login == nullptr)
                   {
@@ -2487,7 +2487,7 @@ namespace app
                return &it->second;
             // Not readable last time: look again once a second, in case it was still being written.
             static double sLastLook = 0.0;
-            if (ImGui::GetTime() - sLastLook < 1.0 || FileSize(path) == it->second.bytes)
+            if (ImGui::GetTime() - sLastLook < tok::motion_s_rescan || FileSize(path) == it->second.bytes)
                return nullptr;
             sLastLook = ImGui::GetTime();
             sTextures.erase(it);
@@ -2874,7 +2874,7 @@ namespace app
       VideoLook& VideoFor(const std::string& path)
       {
          VideoLook& v = sVideos[path];
-         if (v.tried && (v.tex != 0 || ImGui::GetTime() - v.lookedAt < 1.0 || FileSize(path) == v.bytes))
+         if (v.tried && (v.tex != 0 || ImGui::GetTime() - v.lookedAt < tok::motion_s_rescan || FileSize(path) == v.bytes))
             return v;
          v.tried = true;
          v.lookedAt = ImGui::GetTime();

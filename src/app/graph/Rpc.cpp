@@ -388,7 +388,7 @@ namespace app
          // Any note source in the patch plays `notes` (MIDI numbers, default a C major triad) from time zero
          // for 60% of the render. This stops the live audio device and leaves it stopped; it exists so the
          // dimming audit can ask "did that control change the sound". Same loop as the headless audio take.
-         const double seconds = std::clamp(params.value("seconds", 0.5), 0.05, 4.0);
+         const double seconds = std::clamp(params.value("seconds", 0.5), 0.05, 4.0);   // ui-audit-ok: rpc argument range
          std::vector<int> notes = params.value("notes", std::vector<int>{ 60, 64, 67 });
          if (AudioEngine::Instance().SampleRate() > 0.0)
             AudioEngine::Instance().Stop();
@@ -1104,7 +1104,7 @@ namespace app
 
          const AudioEngine::CheckWindow w = AudioEngine::Instance().ReadCheckWindow();
          const bool playing = Transport::Instance().IsPlaying();
-         const double windowMs = sCheckWindowStart.time_since_epoch().count() == 0 ? -1.0
+         const double windowMs = sCheckWindowStart.time_since_epoch().count() == 0 ? -1.0   // ui-audit-ok: rpc sentinel
             : std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - sCheckWindowStart).count();
          const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
          const bool heard = audioOn && w.resetLanded && w.samples > 0;

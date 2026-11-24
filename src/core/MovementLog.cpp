@@ -212,7 +212,7 @@ static std::string sLastConsumed;            // newest session stem whose rows a
 static bool sBacklogRemains = false;          // startup replay hit its time budget
 static double sLastStatsSnapT = -1.0;
 constexpr double kStatsSnapshotIntervalSec = 60.0;
-constexpr double kCatchUpBudgetSec = 1.5;    // startup replay of unconsumed session files
+constexpr double kCatchUpBudgetSec = 1.5;    // startup replay of unconsumed session files  // ui-audit-ok: log writer budget
 
 static std::atomic<uint64_t> sRetentionCapBytes{1024ULL * 1024ULL * 1024ULL}; // Default 1 GB
 
@@ -629,7 +629,7 @@ static void WriterThreadFunc(const std::string& logDir, const std::string& fileP
    {
       {
          std::unique_lock<std::mutex> lock(sWriterMutex);
-         sWriterCv.wait_for(lock, std::chrono::seconds(2), [] {
+         sWriterCv.wait_for(lock, std::chrono::seconds(2), [] {   // ui-audit-ok: log writer wait
             return !sRunning.load(std::memory_order_relaxed) || sRing.Size() >= 128 ||
                    sStatsPending.load(std::memory_order_relaxed);
          });

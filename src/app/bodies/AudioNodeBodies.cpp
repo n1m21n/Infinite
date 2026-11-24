@@ -364,7 +364,7 @@ namespace app
          }
          if (ImGui::GetTime() - sLastOverTime < tok::motion_s_clip_hold)
             ImGui::TextColored(tok::RoleV4(tok::col::text_warn), "clipping +%s - lower the level",
-                               UiFmt::Db(20.0f * std::log10(std::max(1.0f, AudioEngine::Instance().MasterOverPeak()))).c);
+                               UiFmt::Db(20.0f * std::log10(std::max(1.0f, AudioEngine::Instance().MasterOverPeak()))).c);   // ui-audit-ok: dB value
       }
 
       EndAudioBody();

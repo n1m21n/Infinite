@@ -966,8 +966,8 @@ namespace app
 
          float bestScore = -1.0f;
          float bestBpm = 0.0f;
-         const double minIoiSec = 0.15; // 400 BPM
-         const double maxIoiSec = 2.0;  // 30 BPM
+         const double minIoiSec = 0.15; // 400 BPM  // ui-audit-ok: tempo estimation
+         const double maxIoiSec = 2.0;  // 30 BPM  // ui-audit-ok: tempo estimation
 
          for (float candidateBpm = 60.0f; candidateBpm <= 200.0f; candidateBpm += 0.5f)
          {

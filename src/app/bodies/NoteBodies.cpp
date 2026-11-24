@@ -848,7 +848,7 @@ namespace app
    void DrawMidiOutParams(MidiOutNode* n)
    {
       // The device list is a live OS query, so it is refreshed on a slow timer, not every frame.
-      if (ImGui::GetTime() - n->devicesListedAt > 2.0)
+      if (ImGui::GetTime() - n->devicesListedAt > tok::motion_s_rescan_slow)
       {
          n->RefreshDeviceList();
          n->devicesListedAt = ImGui::GetTime();

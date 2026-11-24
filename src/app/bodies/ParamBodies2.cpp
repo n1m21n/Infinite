@@ -548,7 +548,7 @@ namespace app
       // with the patch). They are still registered in the same order, so indices, modulation, expressions and
       // the matrix are unchanged; a folded row with a cable, expression or palette binding opens the section.
       {
-         constexpr int kFoldedParams = 14; // light azimuth .. fov
+         constexpr int kFoldedParams = 14; // light azimuth .. fov  // ui-audit-ok: param count
          GraphNode* gn = FindNodeByIndex(gCurrentNodeIndex);
          const bool savedRegisterOnly = gParamRegisterOnly;
          const bool pinned = gn != nullptr && gn->showAdvancedParams;
