@@ -338,7 +338,7 @@ void BrainSourceNode::AppendImageColumn(const Bci::TelemetrySnapshot& snap)
       uint8_t* p = mPixels.data() + ((size_t)y * kImgW + (kImgW - 1)) * 4;
       p[0] = rgb[0]; p[1] = rgb[1]; p[2] = rgb[2]; p[3] = 255;
    };
-   uint8_t rgb[3];
+   uint8_t rgb[3] = {};
    const uint8_t grey[3] = { 96, 96, 96 }, gap[3] = { 0, 0, 0 };
    if (snap.imageState >= 0.0f)
       InfernoRgb(snap.imageState, rgb);
