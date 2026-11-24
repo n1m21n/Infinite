@@ -8,6 +8,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <optional>
 #include "app/AppShared.h"
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -405,4 +406,28 @@ namespace FormParts
       FieldWell::PopStyle();
       return r;
    }
+}
+
+// Block B layout scope for forms (UiScope.h holds the rest; this lives here so UiScope.h stays dependency-free).
+namespace Ui
+{
+   // A settings form: the label column + control grammar of FormParts. `narrow` is the inspector strip's column
+   // (FormParts::Narrow); the default keeps the Settings columns. Rows draw exactly as FormParts::Label did.
+   struct FormGrid
+   {
+      explicit FormGrid(bool narrow = false)
+      {
+         if (narrow)
+            scope.emplace();
+      }
+      FormGrid(const FormGrid&) = delete;
+      FormGrid& operator=(const FormGrid&) = delete;
+
+   private:
+      std::optional<FormParts::Narrow> scope;
+   };
+   // One form row: the dimmed label in the label column; the control drawn next sits in the control column.
+   inline void FormRow(const char* label) { FormParts::Label(label); }
+   // A row with no label: the control starts in the control column.
+   inline void FormSkipLabel() { ImGui::SetCursorPosX(FormParts::gLabelW); }
 }

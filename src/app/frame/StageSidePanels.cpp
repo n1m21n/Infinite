@@ -12,6 +12,7 @@
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/UiScope.h"
 #include "app/frame/FrameCtx.h"
 #include "app/frame/CanvasLink.h"
 #include "app/panels/CurveEditorPanel.h"
@@ -359,33 +360,33 @@ void DrawSidePanels(FrameCtx& fc)
       // Right-docked viewport panel, chained via SameLine after the canvas
       if (viewportRight)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
          DrawViewportPanelDocked("##viewportpanel_right", ImVec2(gViewportPanelWidth, graphHeight));
       }
 
       // Right-docked matrix panel
       if (matrixRight)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
          DrawModMatrixDocked("##modmatrix_right", ImVec2(gModMatrixWidth, graphHeight));
       }
       if (gMixerPanelOpen && gMixerPanelDock == 1)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
          DrawMixerPanelDocked("##mixerpanel_right", ImVec2(gMixerPanelWidth, graphHeight));
       }
 
       // Right-docked performance matrix
       if (perfRight)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
          DrawPerfPanelDocked("##perfpanel_right", ImVec2(gPerfPanelWidth, graphHeight));
       }
 
       // Right-docked arrangement timeline
       if (arrangeRight)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
          DrawArrangePanelDocked("##arrangepanel_right", ImVec2(gArrangePanelWidth, graphHeight));
       }
 
@@ -397,12 +398,12 @@ void DrawSidePanels(FrameCtx& fc)
       }
       if (gView3DOpen && gView3DDock == 1)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
          DrawView3DDocked("##view3d_right", ImVec2(gView3DWidth, graphHeight));
       }
       if (gView2DOpen && gView2DDock == 1)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
          DrawView2DDocked("##view2d_right", ImVec2(gView2DWidth, graphHeight));
       }
 
@@ -416,7 +417,7 @@ void DrawSidePanels(FrameCtx& fc)
       // Always sticks to the rightmost edge of the window
       if (gNodePanelOpen)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
          PushDockedPanelStyle(/*isChild=*/true);
          PanelFrame::BeginCard("##nodepanel", ImVec2(kNodePanelWidth, graphHeight));
          PopDockedPanelStyle();
@@ -442,9 +443,9 @@ void DrawSidePanels(FrameCtx& fc)
             if (hit >= 0)
                gSearchPanelMode = kModes[hit];
             ImGui::SetCursorScreenPos(cp);
-            ImGui::Dummy(ImVec2(r.w, r.h));
+            Ui::Claim(ImVec2(r.w, r.h));
          }
-         ImGui::Dummy(ImVec2(0, tok::space_3));
+         Ui::Spacer(Ui::Space::S3);
 
          if (gSearchPanelMode == 0)
          {
@@ -822,7 +823,7 @@ void DrawSidePanels(FrameCtx& fc)
                const UiLayout::Rect r{ cp.x, cp.y, ImGui::GetContentRegionAvail().x, 28.0f };
                const int hit = PillGroup::Draw("st.tabs", r, segs, count, sel);
                ImGui::SetCursorScreenPos(cp);
-               ImGui::Dummy(ImVec2(r.w, r.h));
+               Ui::Claim(ImVec2(r.w, r.h));
                if (hit >= 0 && passes[hit] != stTab)
                {
                   drafts[stTab] = stBuf;

@@ -69,6 +69,7 @@
 #include <sstream>
 #include <thread>
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -3399,7 +3400,7 @@ namespace
             s.status.clear();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      Ui::Spacer(Ui::Space::S1);
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const float h = std::max(tok::sample_studio_min, avail.y);

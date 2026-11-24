@@ -9,6 +9,7 @@
 #include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiScope.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -157,7 +158,7 @@ namespace app
       const float controlHeight = ImGui::GetFrameHeight();
       const ImVec2 p = ImVec2(origin.x, origin.y + (controlHeight - box) * 0.5f);
       ImGui::SetCursorScreenPos(p);
-      ImGui::Dummy(ImVec2(box, box));
+      Ui::Claim(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();
@@ -1522,7 +1523,7 @@ namespace app
          ImGui::SetCursorScreenPos(pinTL);
          ed::BeginPin(pinId, ed::PinKind::Input);
          ed::PinPivotAlignment(ImVec2(tok::mod_knob_pin_pivot_alignment_x, tok::mod_knob_pin_pivot_alignment_y));
-         ImGui::Dummy(ImVec2(box, box));
+         Ui::Claim(ImVec2(box, box));
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(pinTL.x + box * 0.5f, pinTL.y + box * 0.5f);
          PinDot::Param(dl, c, pinState, IsThemeLight());
@@ -1642,7 +1643,7 @@ namespace app
       // centred on the face, like every param pin (P2)
       ImGui::SetCursorScreenPos(ImVec2(rowStart.x, rowStart.y + (ImGui::GetFrameHeight() - box) * 0.5f));
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      ImGui::Dummy(ImVec2(box, box));
+      Ui::Claim(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       PinDot::Swatch(dl, c, isBound, IsThemeLight());
@@ -1756,7 +1757,7 @@ namespace app
    // the node instead of stopping a third of the way across (v3 §1b).
    void NodeSeparator(const char* label, float width)
    {
-      ImGui::Dummy(ImVec2(0.0f, tok::mod_spacer_h_md));
+      Ui::Spacer(Ui::Space::S0_75);
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float y = origin.y + tok::space_1_5;
@@ -1770,14 +1771,14 @@ namespace app
          const float lineStart = origin.x + tok::mod_line_start_gap + textSize.x;
          if (lineStart < origin.x + width)
             dl->AddLine(ImVec2(lineStart, y), ImVec2(origin.x + width, y), col);
-         ImGui::Dummy(ImVec2(width, textSize.y));
+         Ui::Claim(ImVec2(width, textSize.y));
       }
       else
       {
          dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + width, y), col);
          ImGui::Dummy(ImVec2(width, tok::mod_spacer_h_lg));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::mod_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S0_5);
    }
 
 
@@ -1934,11 +1935,11 @@ namespace app
       if (labelFirst && label != nullptr && label[0] != '\0')
       {
          ImGui::TextDisabled("%s", label);
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
       }
 
       ImVec2 p = ImGui::GetCursorScreenPos();
-      ImGui::Dummy(ImVec2(kPinHit, kPinHit));
+      Ui::Claim(ImVec2(kPinHit, kPinHit));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(p.x + kPinHit * 0.5f, p.y + kPinHit * 0.5f);
       const bool isLight = IsThemeLight();
@@ -1950,7 +1951,7 @@ namespace app
 
       if (!labelFirst && label != nullptr && label[0] != '\0')
       {
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          ImGui::TextDisabled("%s", label);
       }
       ed::EndPin();

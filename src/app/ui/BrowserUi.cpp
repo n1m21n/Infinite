@@ -4,6 +4,7 @@
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/components/FilterBar.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiScope.h"
 #include "app/AppShared.h"
 #include "platform/AppPaths.h"
 
@@ -228,10 +229,10 @@ namespace app
       const BrowserFilterState before = state;
 
       LibraryParts::SearchField("browserquery", searchHint, state.query, sizeof(state.query));
-      ImGui::Dummy(ImVec2(0, tok::space_3));
+      Ui::Spacer(Ui::Space::S3);
 
       FilterBar::Draw("browserfilter", state, sortNames, typeNames, T("Sort"), T("Filter"));
-      ImGui::Dummy(ImVec2(0, tok::space_3));
+      Ui::Spacer(Ui::Space::S3);
 
       return strcmp(before.query, state.query) != 0 || before.sortMode != state.sortMode ||
              before.typeFilter != state.typeFilter || before.descending != state.descending;

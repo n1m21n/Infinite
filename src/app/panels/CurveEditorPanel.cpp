@@ -25,6 +25,7 @@
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/TimeRuler.h"
 #include "app/ui/design/components/ToolCursor.h"
+#include "app/ui/design/UiScope.h"
 #include "audio/MusicTime.h"
 #include "core/CurveEdit.h"
 #include "core/CurveLibrary.h"
@@ -2660,7 +2661,7 @@ namespace
 
       const bool side = gCurveEditorDock == 1 || gCurveEditorDock == 2;
       DrawHeader(gn, n, side);
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));   // breathing room between the header chips and the ruler / side card
+      Ui::Spacer(Ui::Space::S1);   // breathing room between the header chips and the ruler / side card
       if (n == nullptr)
       {
          const ImVec2 avail = ImGui::GetContentRegionAvail();

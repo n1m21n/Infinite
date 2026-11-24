@@ -14,6 +14,7 @@
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiType.h"
+#include "app/ui/design/UiScope.h"
 #include "app/frame/FrameCtx.h"
 #include "app/panels/CurveEditorPanel.h"
 
@@ -600,7 +601,7 @@ void DrawPopupsB(FrameCtx& fc)
          bool enterPressed = FieldWell::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
                                                   sizeof(gFieldDeviceSave.nameBuf),
                                                   ImGuiInputTextFlags_EnterReturnsTrue);
-         ImGui::SameLine(0.0f, tok::space_2);
+         Ui::SameRow(Ui::Space::S2);
          bool doSave = enterPressed || ChipButton::Draw(L("Save##fielddevicesaveconfirm"), true, ImGui::GetFrameHeight());
          if (doSave && gFieldDeviceSave.nameBuf[0] != '\0')
          {

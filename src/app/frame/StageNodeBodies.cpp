@@ -12,6 +12,7 @@
 #include "app/ui/design/components/NodeHeader.h"
 #include "app/frame/FrameCtx.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -351,7 +352,7 @@ void DrawNodeBodies(FrameCtx& fc)
             const int instanceIdx = GetNodeInstanceIndex(gn, &instanceTotal);
             if (instanceTotal > 1)
             {
-               ImGui::SameLine(0.0f, tok::space_1);
+               Ui::SameRow(Ui::Space::S1);
                ImGui::TextDisabled("#%d", instanceIdx);
             }
             // One header row: title, instance number, then the category dimmed to its right.
@@ -394,7 +395,7 @@ void DrawNodeBodies(FrameCtx& fc)
              dynamic_cast<MacroToggleNode*>(gn.node.get()) || dynamic_cast<MacroTriggerNode*>(gn.node.get()) ||
              dynamic_cast<MacroNumBoxNode*>(gn.node.get()) || dynamic_cast<MacroRadioSelectorNode*>(gn.node.get()) ||
              dynamic_cast<MacroStepGateNode*>(gn.node.get()))
-            ImGui::Dummy(ImVec2(0.0f, tok::stage_node_spacer_h_xl));
+            Ui::Spacer(Ui::Space::S2_5);
          if (multiOutModulator || externalSender)
             ; // these draw their own meters / status in the params panel
          else if (auto* macroKnob = dynamic_cast<MacroKnobNode*>(gn.node.get()))
@@ -477,7 +478,7 @@ void DrawNodeBodies(FrameCtx& fc)
             const float boxW = isWide ? kWideNodeWidth : kPreviewSize;
             ImVec2 origin = ImGui::GetCursorScreenPos();
             const float h = tok::stage_node_h;
-            ImGui::Dummy(ImVec2(boxW, h));
+            Ui::Claim(ImVec2(boxW, h));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + boxW, origin.y + h);
             AudioViz::Fill(dl, origin, br);
@@ -596,7 +597,7 @@ void DrawNodeBodies(FrameCtx& fc)
             // an empty preview box.
             auto* geo = static_cast<GeometryNode*>(gn.node.get());
             ImVec2 origin = ImGui::GetCursorScreenPos();
-            ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize * tok::stage_node_spacer_h_xs));
+            Ui::Claim(ImVec2(kPreviewSize, kPreviewSize * tok::stage_node_spacer_h_xs));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + kPreviewSize, origin.y + kPreviewSize * tok::stage_node_spacer_h_xs);
             AudioViz::Fill(dl, origin, br);
@@ -747,7 +748,7 @@ void DrawNodeBodies(FrameCtx& fc)
          const bool bypassOnOutputRow = isMacroNode && !isComment && CanBypass(gn) && !gn.hasModulatedParams &&
                                         !gn.hasPaletteColors;
          if (bypassOnOutputRow)
-            ImGui::Dummy(ImVec2(0.0f, tok::stage_node_spacer_h_md));   // the gap the toggle row gave; also ends the body on an item, not a SetCursorPos
+            Ui::Spacer(Ui::Space::S1);   // the gap the toggle row gave; also ends the body on an item, not a SetCursorPos
          if (!isAudioBody && !isComment && !bypassOnOutputRow)
          {
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + tok::space_1);
@@ -772,7 +773,7 @@ void DrawNodeBodies(FrameCtx& fc)
             if (CanBypass(gn))
             {
                if (!isMacroNode)
-                  ImGui::SameLine();
+                  Ui::SameRow();
                drawBypassToggle();
             }
             // Mini viewport toggle, only for nodes that actually have a mesh to
@@ -783,7 +784,7 @@ void DrawNodeBodies(FrameCtx& fc)
             // than no toggle.
             if (geoSourceForViewport != nullptr && HasUsefulMiniViewport(gn.node.get()))
             {
-               ImGui::SameLine();
+               Ui::SameRow();
                if (ViewportToggle(gn.showMiniViewport))
                   gn.showMiniViewport = !gn.showMiniViewport;
             }
@@ -797,7 +798,7 @@ void DrawNodeBodies(FrameCtx& fc)
                // and whether any of it is bipolar (swinging around the knob)
                // rather than absolute (overriding it) - see 00-modulation-
                // polarity.md.
-               ImGui::SameLine();
+               Ui::SameRow();
                const char* tagText = gn.hasBipolarParams ? "mod\xc2\xb1" : "mod";
                const ImVec2 txtSz = ImGui::CalcTextSize(tagText);
                const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -807,13 +808,13 @@ void DrawNodeBodies(FrameCtx& fc)
                                  isLight ? tok::Base(tok::col::surface_hi_light, tok::stage_node_fill_alpha_lg) : tok::Base(tok::col::surface_lo_light_cool_fixed, tok::stage_node_fill_alpha_sm), tok::stage_node_bodies_radius);
                dl->AddText(ImVec2(p.x + tok::space_1, p.y + 1.0f),
                            isLight ? tok::Base(tok::col::text_warn_deep_fixed) : tok::Base(tok::col::role_modulation), tagText);
-               ImGui::Dummy(tagSz);
+               Ui::Claim(tagSz);
                modTagMin = p;
                modTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
             }
             if (palTag)
             {
-               ImGui::SameLine();
+               Ui::SameRow();
                const char* tagText = "pal";
                const ImVec2 txtSz = ImGui::CalcTextSize(tagText);
                const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -823,7 +824,7 @@ void DrawNodeBodies(FrameCtx& fc)
                                  isLight ? tok::Base(tok::col::accent_alt_light_warm_fixed, tok::stage_node_fill_alpha_lg) : tok::Base(tok::col::surface_lo_light_warm_fixed, tok::stage_node_fill_alpha_sm), tok::stage_node_bodies_radius);
                dl->AddText(ImVec2(p.x + tok::space_1, p.y + 1.0f),
                            isLight ? tok::Base(tok::col::state_ok_deep_lo) : tok::Base(tok::col::viz_teal_light_muted), tagText);
-               ImGui::Dummy(tagSz);
+               Ui::Claim(tagSz);
                palTagMin = p;
                palTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
             }
@@ -1235,7 +1236,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   }
                   if (pngActive)
                      PopSelectedButtonColors();
-                  ImGui::SameLine();
+                  Ui::SameRow();
 
                   const bool jpgActive = (n->imageFormat == 1);
                   if (jpgActive)
@@ -1256,7 +1257,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   if (ActionButton::Draw(L("Export Image"), ImVec2(kPreviewSize, 0)))
                      ExportImage(n, n->exportImagePath, std::clamp(n->jpegQuality, 1, 100));
 
-                  ImGui::Dummy(ImVec2(0, tok::stage_node_spacer_h_md));
+                  Ui::Spacer(Ui::Space::S1);
 
                   char vidBuf[512];
                   snprintf(vidBuf, sizeof(vidBuf), "%s", n->recordVideoPath.c_str());
@@ -1289,7 +1290,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   }
                   if (mp4Active)
                      PopSelectedButtonColors();
-                  ImGui::SameLine();
+                  Ui::SameRow();
 
                   const bool movActive = (n->videoFormat == 1);
                   if (movActive)
@@ -1376,7 +1377,7 @@ void DrawNodeBodies(FrameCtx& fc)
                      const int dropped = n->DroppedFrames();
                      if (pending > 0)
                      {
-                        ImGui::SameLine();
+                        Ui::SameRow();
                         ImGui::TextDisabled(T("(%d pending)"), pending);
                      }
                      if (dropped > 0)
@@ -1402,7 +1403,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   // Inside a DAW the DAW bounces: no offline take.
                   if (!Platform::PluginModeActive())
                   {
-                     ImGui::Dummy(ImVec2(0, tok::stage_node_spacer_h_lg));
+                     Ui::Spacer(Ui::Space::S2);
                      NodeSeparator();
                      ImGui::TextDisabled("%s", T("Offline Render"));
 
@@ -1448,7 +1449,7 @@ void DrawNodeBodies(FrameCtx& fc)
                            n->offlineDurationSeconds = preset;
                         ImGui::PopID();
                         if (preset != 60)
-                           ImGui::SameLine();
+                           Ui::SameRow();
                      }
 
                      ImGui::SetNextItemWidth(kParamWidth);
@@ -1519,7 +1520,7 @@ void DrawNodeBodies(FrameCtx& fc)
             // Drawing the same pin id through ed::BeginPin() twice in one
             // frame is not something imgui-node-editor supports.
             // Section gap: the out pins are their own group, never flush against the last param row.
-            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            Ui::Spacer(Ui::Space::S2);
             auto* geoTable = dynamic_cast<GeometryTableNode*>(gn.node.get());
             auto* drumSeq = dynamic_cast<DrumSequencerNode*>(gn.node.get());
             const int outputs = geoTable != nullptr ? 4 : (drumSeq != nullptr ? 1 : std::max(1, gn.node->OutputCount()));

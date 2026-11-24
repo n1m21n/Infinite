@@ -11,6 +11,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/components/BusyLine.h"
 #include "app/ui/design/components/LibraryParts.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -342,7 +343,7 @@ namespace app
       if (!folderToRemove.empty())
          scanner.RemoveFolder(folderToRemove);
 
-      ImGui::Dummy(ImVec2(0.0f, tok::library_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
       {
          const bool clicked = LibraryParts::ActionButton("refreshall", T("Refresh all"), LibraryParts::Icon::Refresh, !scanning);
          if (clicked)
@@ -594,7 +595,7 @@ namespace app
                   }
                }
             }
-            ImGui::SameLine();
+            Ui::SameRow();
             // Back to the row's actual top, not the button's centered
             // offset, so the Selectable spans the full row height and the
             // clipper's fixed row-height assumption keeps holding.
@@ -846,7 +847,7 @@ namespace app
             if (ActionButton::Draw(L("Remove")))
                gPluginScanner.RemoveFolder(folder);
             ImGui::PopID();
-            ImGui::SameLine();
+            Ui::SameRow();
             ImGui::TextWrapped("%s", folder.c_str());
          }
          if (ActionButton::Draw(L("Add VST3 folder..."), ImVec2(-1.0f, 0)))

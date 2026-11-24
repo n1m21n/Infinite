@@ -16,6 +16,7 @@
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiScope.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -1265,7 +1266,7 @@ namespace app
 
          for (int b = 0; b < count; b++)
          {
-            if (b > 0) ImGui::SameLine();
+            if (b > 0) Ui::SameRow();
             float bx = cellPos.x + tok::space_2 + b * (btnW + tok::space_0_75);
             ImGui::SetCursorScreenPos(ImVec2(bx, startY));
             ImGui::PushID(b + 300);
@@ -2129,7 +2130,7 @@ namespace app
          if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::Height(), tok::perf_cancel_bottom))
             gPerfMidiLearnIdx = -1;
          ImGui::SetCursorScreenPos(ImVec2(sp.x, sp.y));
-         ImGui::Dummy(ImVec2(stripW, stripH + tok::space_2));
+         Ui::Claim(ImVec2(stripW, stripH + tok::space_2));
       }
 
       // ---- Sticky Header Toolbar ----
@@ -2147,7 +2148,7 @@ namespace app
       // Add Control button in Edit Mode
       if (gPerfEditMode)
       {
-         ImGui::SameLine();
+         Ui::SameRow();
          if (ChipButton::Draw(L("+ Add Control"), false, kPerfChipH, tok::perf_control_bottom))
             ImGui::OpenPopup("##perfaddcontrolmenu");
 
@@ -2169,7 +2170,7 @@ namespace app
       }
 
       // Page Tabs (a wider gap separates them from the mode controls)
-      ImGui::SameLine(0.0f, tok::space_4);
+      Ui::SameRow(Ui::Space::S4);
       // No cursor-Y fudge: the page-tab and "+" buttons below now take an
       // explicit 24px height, matching "Edit Mode"/"Perform"/"+ Add
       // Control" exactly, so they already share the same baseline without
@@ -2404,7 +2405,7 @@ namespace app
       // Dynamic canvas dummy that only expands if elements actually overflow window
       if (maxElemX > 0.0f || maxElemY > 0.0f)
       {
-         ImGui::Dummy(ImVec2(maxElemX, maxElemY));
+         Ui::Claim(ImVec2(maxElemX, maxElemY));
       }
       EndChildSafe();
    }
@@ -2462,7 +2463,7 @@ namespace app
       {
          grip();
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
       }
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
@@ -2485,7 +2486,7 @@ namespace app
       if (!gripFirst)
       {
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
          grip();
       }
       // Zeroed only around EndChild, which is where ImGui charges the gap
@@ -2615,7 +2616,7 @@ namespace app
             dl->AddLine(ImVec2(origin.x, y1line), ImVec2(origin.x + kPreviewSize, y1line), hairlineCol, tok::perf_line_stroke_md);
       }
       AudioViz::Border(dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + h), outOfContract ? lineCol : 0);
-      ImGui::Dummy(ImVec2(kPreviewSize, h));
+      Ui::Claim(ImVec2(kPreviewSize, h));
       ImGui::Text("%s", UiFmt::F3(value).c);
    }
 

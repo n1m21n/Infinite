@@ -3,6 +3,7 @@
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiScope.h"
 #include "app/frame/FrameCtx.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "core/CliSetup.h"
@@ -711,7 +712,7 @@ void DrawPopupsA(FrameCtx& fc)
                // either the current value or the keystroke.
                drawRangeField(0, "##lo", "##lotyped", isInt ? "lo %.0f" : "lo %.3f",
                               destRef->minValue, destRef->maxValue, lo);
-               ImGui::SameLine();
+               Ui::SameRow();
                drawRangeField(1, "##hi", "##hityped", isInt ? "hi %.0f" : "hi %.3f",
                               destRef->minValue, destRef->maxValue, hi);
 
@@ -786,7 +787,7 @@ void DrawPopupsA(FrameCtx& fc)
                }
                drawRangeField(0, "##elo", "##elotyped", isInt ? "lo %.0f" : "lo %.3f",
                               destRef->minValue, destRef->maxValue, lo);
-               ImGui::SameLine();
+               Ui::SameRow();
                drawRangeField(1, "##ehi", "##ehityped", isInt ? "hi %.0f" : "hi %.3f",
                               destRef->minValue, destRef->maxValue, hi);
                if (rangeChanged)
@@ -849,7 +850,7 @@ void DrawPopupsA(FrameCtx& fc)
                   hi = defHi;
                }
                drawRangeField(0, "##rlo", "##rlotyped", isInt ? "lo %.0f" : "lo %.3f", defLo, defHi, lo);
-               ImGui::SameLine();
+               Ui::SameRow();
                drawRangeField(1, "##rhi", "##rhityped", isInt ? "hi %.0f" : "hi %.3f", defLo, defHi, hi);
                if (rangeChanged)
                   rec.SetPlaybackRange(nodeIndex, paramIndex, lo, hi);

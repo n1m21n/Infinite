@@ -12,6 +12,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -294,7 +295,7 @@ namespace app
          }
          dl->AddCircleFilled(prevPt, tok::mod_matrix_sparkline_mini_graph_r, lineCol);
       }
-      ImGui::Dummy(ImVec2(width, height));
+      Ui::Claim(ImVec2(width, height));
    }
 
 
@@ -455,7 +456,7 @@ namespace app
                                           : tok::U32(tok::inert);
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
-               ImGui::Dummy(ImVec2(dotH, dotH));
+               Ui::Claim(ImVec2(dotH, dotH));
                if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                {
                   PushUndoCheckpoint();
@@ -662,7 +663,7 @@ namespace app
                NextCell();
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
-               ImGui::Dummy(ImVec2(dotH, dotH));
+               Ui::Claim(ImVec2(dotH, dotH));
                KindRail(dotCursor, dotH, tok::U32(tok::expression));
 
                NextCell();
@@ -792,7 +793,7 @@ namespace app
                NextCell();
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
-               ImGui::Dummy(ImVec2(dotH, dotH));
+               Ui::Claim(ImVec2(dotH, dotH));
                KindRail(dotCursor, dotH, tok::U32(tok::record));
 
                NextCell();
@@ -1057,7 +1058,7 @@ namespace app
       {
          grip();
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
       }
 
       // Both branches now pass an explicit, fixed height rather than 0
@@ -1090,7 +1091,7 @@ namespace app
       if (!gripFirst)
       {
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
          grip();
       }
       // Zeroed only around EndChild, which is where ImGui charges the gap

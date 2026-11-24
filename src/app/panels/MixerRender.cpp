@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <vector>
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -636,12 +637,12 @@ namespace app
       }
       if (ImGui::IsItemHovered())
          HelpTip("%s", dir.c_str());
-      ImGui::SameLine(0.0f, tok::space_1);
+      Ui::SameRow(Ui::Space::S1);
       if (ActionButton::Draw(T("Reveal##folder")))
          Platform::RevealInFileManager(dir);
       ImGui::EndDisabled();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      Ui::Spacer(Ui::Space::S1);
       const float w = std::max(1.0f, ImGui::GetContentRegionAvail().x);
       if (active)
       {

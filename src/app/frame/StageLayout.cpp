@@ -5,6 +5,7 @@
 #include "app/panels/CurveEditorPanel.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -431,27 +432,27 @@ void DrawLayout(FrameCtx& fc)
       if (viewportLeft)
       {
          DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
       }
       if (matrixLeft)
       {
          DrawModMatrixDocked("##modmatrix_left", ImVec2(gModMatrixWidth, graphHeight));
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
       }
       if (gMixerPanelOpen && gMixerPanelDock == 2)
       {
          DrawMixerPanelDocked("##mixerpanel_left", ImVec2(gMixerPanelWidth, graphHeight));
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
       }
       if (perfLeft)
       {
          DrawPerfPanelDocked("##perfpanel_left", ImVec2(gPerfPanelWidth, graphHeight));
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
       }
       if (arrangeLeft)
       {
          DrawArrangePanelDocked("##arrangepanel_left", ImVec2(gArrangePanelWidth, graphHeight));
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
       }
       if (TerminalDocked() && (gTerminalDock == 1 || gTerminalDock == 2))
          gTerminalWidth = std::clamp(gTerminalWidth, tok::dock_terminal_min_w, std::max(tok::dock_terminal_min_w, ImGui::GetContentRegionAvail().x - tok::dock_canvas_keep_w));
@@ -463,12 +464,12 @@ void DrawLayout(FrameCtx& fc)
       if (gView3DOpen && gView3DDock == 2)
       {
          DrawView3DDocked("##view3d_left", ImVec2(gView3DWidth, graphHeight));
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
       }
       if (gView2DOpen && gView2DDock == 2)
       {
          DrawView2DDocked("##view2d_left", ImVec2(gView2DWidth, graphHeight));
-         ImGui::SameLine(0.0f, 0.0f);
+         Ui::SameRow(Ui::Space::None);
       }
 
       // Cleared here rather than at the top of the frame: a top/left-docked

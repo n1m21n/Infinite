@@ -16,6 +16,7 @@
 #include "app/ui/design/components/Switch.h"
 #include "app/ui/design/components/TextButton.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/UiScope.h"
 #include "core/CliSetup.h"
 #include "core/chat/ChatThread.h"
 #include "core/chat/Onboarding.h"
@@ -66,7 +67,7 @@ namespace app
             dl->AddCircleFilled(c, r * tok::cli_setup_section_line_x, tok::U32(tok::action_learn, light));
          else
             dl->AddLine(ImVec2(c.x - r * tok::cli_setup_section_line_x, c.y), ImVec2(c.x + r * tok::cli_setup_section_line_x, c.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), tok::cli_setup_section_step_icon_stroke);
-         ImGui::Dummy(ImVec2(size, size));
+         Ui::Claim(ImVec2(size, size));
       }
    }
 
@@ -125,7 +126,7 @@ namespace app
          const float rowW = ImGui::GetContentRegionAvail().x;
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), rowH * tok::cli_setup_section_chat_avatar_r, a.id);
-         ImGui::Dummy(ImVec2(rowH, rowH));
+         Ui::Claim(ImVec2(rowH, rowH));
          FormParts::Inline(0.0f, tok::space_2);
          value(info.status, !info.ready);
          if (!info.action.empty())  // Cancel shows while a sign-in waits
@@ -305,7 +306,7 @@ namespace app
          if (MenuParts::BeginPopup("##clearchats"))
          {
             ImGui::TextUnformatted(T("Delete every saved chat?"));
-            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            Ui::Spacer(Ui::Space::S2);
             const float cancelW = std::max(tok::cli_setup_section_cancel_w_min, ImGui::CalcTextSize(T("Cancel")).x + tok::cli_setup_section_ratio * tok::space_2);
             const float deleteW = std::max(tok::cli_setup_section_cancel_w_min, ImGui::CalcTextSize(T("Delete")).x + tok::cli_setup_section_ratio * tok::space_2);
             const float total = cancelW + tok::space_2 + deleteW;
@@ -325,7 +326,7 @@ namespace app
          ImGui::PopStyleVar();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      Ui::Spacer(Ui::Space::S1);
       SectionCard::End();
 
       // Custom OpenAI-compatible agent (Ollama, DeepSeek, OpenRouter, custom base URL).
@@ -460,7 +461,7 @@ namespace app
          }
          ImGui::EndDisabled();
 
-         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         Ui::Spacer(Ui::Space::S1);
          SectionCard::End();
       }
    }

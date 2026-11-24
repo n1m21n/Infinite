@@ -64,6 +64,7 @@
 #include <string>
 #include <vector>
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -1244,7 +1245,7 @@ namespace
       ImGui::GetWindowDrawList()->AddText(tp, ImGui::GetColorU32(dim ? ImGuiCol_TextDisabled : ImGuiCol_Text), text);
       UiAudit::NoteInk(2, tp, ImVec2(tp.x + sz.x, tp.y + sz.y), 0.0f, text);
       ImGui::SetCursorScreenPos(ImVec2(p.x, rowTop));
-      ImGui::Dummy(ImVec2(sz.x, rowH));
+      Ui::Claim(ImVec2(sz.x, rowH));
    }
 
    bool TextChip(const char* label, bool on, const char* tip, float w = 0.0f)
@@ -1274,7 +1275,7 @@ namespace
          const ImVec2 tp(p.x, std::round((p.y + (rowH - sz.y) * 0.5f) * px) / px);
          ImGui::GetWindowDrawList()->AddText(tp, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_label)), shown.c_str());
          UiAudit::NoteInk(3, tp, ImVec2(tp.x + sz.x, tp.y + sz.y), 0.0f, full.c_str());
-         ImGui::Dummy(ImVec2(sz.x, rowH));
+         Ui::Claim(ImVec2(sz.x, rowH));
       }
       else
       {
@@ -9070,7 +9071,7 @@ namespace
             ImGui::GetWindowDrawList()->AddText(ImVec2(fa.x + ImGui::GetStyle().FramePadding.x, fa.y + ImGui::GetStyle().FramePadding.y),
                                                 ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::view2d_font_picker_y)), T("Search"));
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::view2d_spacer_h_lg));
+         Ui::Spacer(Ui::Space::S0_5);
          std::string want = sFontFind;
          std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
          const std::string* hovered = nullptr;
@@ -9544,7 +9545,7 @@ namespace
          const char* b = T("All");
          const float pad = tok::view2d_essentials_scale * tok::space_2;
          const float wa = ImGui::CalcTextSize(a).x + pad, wb = ImGui::CalcTextSize(b).x + pad;
-         ImGui::SameLine();
+         Ui::SameRow();
          const float x = ImGui::GetWindowContentRegionMax().x - wa - wb - tok::space_1;
          if (x > ImGui::GetCursorPosX())
             ImGui::SetCursorPosX(x);
@@ -9606,7 +9607,7 @@ namespace
                   UiAudit::NoteInk(0, tp, ImVec2(tp.x + ImGui::CalcTextSize(name).x, tp.y + ImGui::GetTextLineHeight()));
                   ImGui::PopID();
                }
-               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+               Ui::Spacer(Ui::Space::S1);
             }
          }
          ImGui::EndTable();
@@ -11799,7 +11800,7 @@ namespace
    // A muted group title inside a settings window ("Mix", "More"): no fold, the window shows everything.
    void WinSection(const char* text)
    {
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      Ui::Spacer(Ui::Space::S1);
       ImGui::TextDisabled("%s", text);
    }
 
@@ -13211,7 +13212,7 @@ namespace
             DrawOutputTab(doc, w);
          }
          SectionCard::End();   // close the last card first, so the room below is not inside it
-         ImGui::Dummy(ImVec2(0.0f, tok::space_5));   // room under the last card so a scroll never ends on the edge
+         Ui::Spacer(Ui::Space::S5);   // room under the last card so a scroll never ends on the edge
          ImGui::PopStyleVar(2);
          SectionCard::EndWindow();
          EndChildSafe();

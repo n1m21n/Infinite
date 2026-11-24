@@ -41,6 +41,7 @@
 #include <string>
 #include <vector>
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -465,14 +466,14 @@ namespace app
                   ImGui::OpenPopup("##drumGroove");
                ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
                DrawGrooveMenu(n);
-               ImGui::SameLine(0.0f, tok::space_1);
+               Ui::SameRow(Ui::Space::S1);
             }
             if (ChipButton::Draw(side == 0 ? "<##groovePrev" : ">##grooveNext", false, tok::control_h) && count > 0)
                ApplyDrumGroove(n, cur < 0 ? 0 : (cur + (side == 0 ? count - 1 : 1)) % count, n->patternPart);
             if (ImGui::IsItemHovered())
                HelpTip("%s", side == 0 ? T("Previous groove") : T("Next groove"));
             if (side == 0)
-               ImGui::SameLine(0.0f, tok::space_1);
+               Ui::SameRow(Ui::Space::S1);
          }
       }
 
@@ -587,7 +588,7 @@ namespace app
          DrumSequencerNode* n = current >= 0 ? DrumOf(pages[current]) : nullptr;
          if (n != nullptr)
          {
-            ImGui::SameLine(0.0f, tok::space_3);
+            Ui::SameRow(Ui::Space::S3);
             if (ChipButton::Draw((std::string(T("Run")) + "##run").c_str(), n->run, tok::control_h))
             {
                n->run = !n->run;
@@ -596,20 +597,20 @@ namespace app
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Run this sequencer's steps (the transport keeps going)"));
 
-            ImGui::SameLine(0.0f, tok::space_3);
+            Ui::SameRow(Ui::Space::S3);
             DrawGrooveChips(n);
 
             // D4: step pages, a dot on the one the playhead is on.
             const bool paged = n->numSteps > kPageSteps;
             const int play = PlayStep(n);
-            ImGui::SameLine(0.0f, tok::space_3);
+            Ui::SameRow(Ui::Space::S3);
             if (!paged)
                ImGui::BeginDisabled();
             static const char* kPages[2] = { "1-16##p0", "17-32##p1" };
             for (int p = 0; p < 2; p++)
             {
                if (p > 0)
-                  ImGui::SameLine(0.0f, tok::space_1);
+                  Ui::SameRow(Ui::Space::S1);
                if (ChipButton::Draw(kPages[p], paged && n->editPage == p, tok::control_h))
                   n->editPage = p;
                if (paged && play >= 0 && play / kPageSteps == p)
@@ -620,20 +621,20 @@ namespace app
             }
             if (!paged)
                ImGui::EndDisabled();
-            ImGui::SameLine(0.0f, tok::space_3);
+            Ui::SameRow(Ui::Space::S3);
             DrawFillChip(n);
-            ImGui::SameLine(0.0f, tok::space_1);
+            Ui::SameRow(Ui::Space::S1);
             DrawFillMenu(n);
 
             // Inspector pages pinned right.
             const char* kTabs[3] = { T("Lane"), T("Step"), T("Kit") };
             const float tabsW = TextW(kTabs[0]) + TextW(kTabs[1]) + TextW(kTabs[2]) + tok::drum_tabs_w_ratio * tok::space_1;
-            ImGui::SameLine();
+            Ui::SameRow();
             ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x, origin.x + width - tabsW), origin.y));
             for (int t = 0; t < 3; t++)
             {
                if (t > 0)
-                  ImGui::SameLine(0.0f, tok::space_1);
+                  Ui::SameRow(Ui::Space::S1);
                if (ChipButton::Draw(kTabs[t], sTab == t, tok::control_h))
                   sTab = t;
             }
@@ -1031,7 +1032,7 @@ namespace app
          const float bw = (w - tok::drum_lane_inspector_ratio * tok::space_1) / tok::drum_bw_ratio;
          if (DeskKey(T("Play"), false, bw, 0.0f))
             Hit(n, lane, kDefaultVel);
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          if (DeskKey(T("Load"), false, bw, 0.0f))
          {
             const std::string path = Platform::OpenAudioDialog();
@@ -1041,7 +1042,7 @@ namespace app
                n->LoadFileToLane(lane, path);
             }
          }
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          if (DeskKey(T("Clear"), false, bw, 0.0f))
          {
             PushUndoCheckpoint("Drums clear sample");
@@ -1093,7 +1094,7 @@ namespace app
          for (int f = 0; f < 3; f++)
          {
             if (f > 0)
-               ImGui::SameLine(0.0f, tok::space_0_25);
+               Ui::SameRow(Ui::Space::S0_25);
             if (DeskKey(kFilt[f], n->laneFilter[lane] == f, tok::drum_desk_key_min_w_md, tok::control_h) && n->laneFilter[lane] != f)
             {
                PushUndoCheckpoint("Drums filter");
@@ -1113,7 +1114,7 @@ namespace app
          for (int c = 0; c < 4; c++)
          {
             if (c > 0)
-               ImGui::SameLine(0.0f, tok::space_0_25);
+               Ui::SameRow(Ui::Space::S0_25);
             if (DeskKey(kChoke[c], n->laneChoke[lane] == c, tok::drum_desk_key_min_w_sm, tok::control_h) && n->laneChoke[lane] != c)
             {
                PushUndoCheckpoint("Drums choke");
@@ -1125,7 +1126,7 @@ namespace app
          SectionCard::RowLabel(T("Mix"));
          if (DeskParts::Key("M##im", "M", n->laneMute[lane], tok::U32(tok::desk_led_red), ImVec2(tok::control_h, tok::control_h)) && (n->laneMute[lane] = !n->laneMute[lane], true))
             PanelKit::UndoOnToggle(&n->laneMute[lane], "Drums");
-         ImGui::SameLine(0.0f, tok::space_0_25);
+         Ui::SameRow(Ui::Space::S0_25);
          if (DeskParts::Key("S##is", "S", n->laneSolo[lane], tok::U32(tok::desk_led_yellow), ImVec2(tok::control_h, tok::control_h)) && (n->laneSolo[lane] = !n->laneSolo[lane], true))
             PanelKit::UndoOnToggle(&n->laneSolo[lane], "Drums");
          ImGui::PopID();
@@ -1205,7 +1206,7 @@ namespace app
          for (int p = 0; p < 3; p++)
          {
             if (p > 0)
-               ImGui::SameLine(0.0f, tok::space_0_25);
+               Ui::SameRow(Ui::Space::S0_25);
             if (DeskKey(kParts[p], current >= 0 && n->patternPart == p, tok::drum_desk_key_min_w_sm, tok::control_h) && current >= 0)
                ApplyDrumGroove(n, current, p);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -1258,7 +1259,7 @@ namespace app
             PushUndoCheckpoint("Drums randomise");
             n->Randomize();
          }
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          if (DeskKey(T("Clear"), false, bw, 0.0f))
          {
             PushUndoCheckpoint("Drums clear");
@@ -1308,7 +1309,7 @@ namespace app
             // Rows: none + Fill pair + 1st pair | 1:2 2:2 1:3 2:3 3:3 | 1:4 .. 4:4
             const bool rowStart = c == 0 || c == 5 || c == 10;
             if (!rowStart)
-               ImGui::SameLine(0.0f, tok::space_0_25);
+               Ui::SameRow(Ui::Space::S0_25);
             char id[24];
             snprintf(id, sizeof id, "%s##cd%d", DrumSequencerNode::CondName(c), c);
             if (DeskKey(id, n->stepCond[lane][s] == c, cw, tok::control_h) && n->stepCond[lane][s] != c)

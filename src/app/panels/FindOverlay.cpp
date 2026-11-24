@@ -6,6 +6,7 @@
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/UiScope.h"
 #include "nodes/UtilityNodes.h"
 
 namespace app
@@ -150,7 +151,7 @@ void DrawFind()
          if (pickNow) sJumpTo = sMatches[sCurrent];
       }
       sFocusField = pickNow;   // Enter ends the edit; take the caret straight back
-      ImGui::Dummy(ImVec2(0, tok::find_overlay_spacer_h));
+      Ui::Spacer(Ui::Space::S0_5);
       if (sBuf[0] == '\0')
          ImGui::TextDisabled("%s", T("Type to find. Up/Down step, Enter jumps, Esc closes."));
       else if (sMatches.empty())

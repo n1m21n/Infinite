@@ -10,6 +10,7 @@
 #include "app/ui/design/components/DropdownField.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
+#include "app/ui/design/UiScope.h"
 #include "app/AppShared.h"
 #include "imgui_internal.h"
 
@@ -450,7 +451,7 @@ namespace app
       const float h = ImGui::GetFrameHeight();
       const ImVec2 r0(p0.x + inset, p0.y);
       const ImVec2 r1(r0.x + w, p0.y + h);
-      ImGui::Dummy(ImVec2(width, h));
+      Ui::Claim(ImVec2(width, h));
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
       FieldWell::Draw(dl, r0, r1, false, false);
@@ -733,7 +734,7 @@ namespace app
          ? ImVec2(origin.x, origin.y + (controlHeight - box) * 0.5f)
          : origin;
       ImGui::SetCursorScreenPos(p);
-      ImGui::Dummy(ImVec2(box, box));
+      Ui::Claim(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();

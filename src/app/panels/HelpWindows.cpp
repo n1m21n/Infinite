@@ -6,6 +6,7 @@
 #include "app/ui/design/components/SectionCard.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/UiScope.h"
 
 // The Terminal's own keys (copy, paste, find, tabs, clear): Cmd on macOS, Ctrl+Shift elsewhere,
 // so plain Ctrl still reaches the shell (TerminalPanel.cpp HandleKeyboard).
@@ -923,7 +924,7 @@ namespace app
       char filterId[64];
       snprintf(filterId, sizeof(filterId), "##%sfilter", idPrefix);
       FormParts::SearchInput(filterId, "Filter shortcuts...", filterBuf, sizeof(filterBuf), 250.0f);
-      ImGui::SameLine();
+      Ui::SameRow();
       if (filterBuf[0] != '\0' && FormParts::Button(L("Clear")))
          filterBuf[0] = '\0';
 

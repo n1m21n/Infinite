@@ -90,6 +90,11 @@ namespace SectionCard
    }
 
    // A card with no title.
+   // A column beside a body of cards (the Settings tab list) starts level with the first card's well: the body spends
+   // two item spacings (a Spacing, then the card's lead-in Dummy) before a well starts, and content sits kPad inside it.
+   inline float FirstWellTop() { return ImGui::GetStyle().ItemSpacing.y * tok::settings_well_top_ratio; }
+   inline void AlignWithFirstWell() { ImGui::SetCursorPosY(ImGui::GetCursorPosY() + FirstWellTop() + kPad); }
+
    inline void Begin()
    {
       End();

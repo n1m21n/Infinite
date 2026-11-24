@@ -14,6 +14,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -223,7 +224,7 @@ namespace app
       if (ChipButton::Draw(L("Cancel"), false, 0.0f, tok::arrange_cancel_bottom_lg))
          n->RequestFinishOfflineRender(true);
       ImGui::EndDisabled();
-      ImGui::SameLine(0.0f, tok::space_2);
+      Ui::SameRow(Ui::Space::S2);
       ImGui::BeginDisabled(qTotal <= 1);
       if (ChipButton::Draw(L("Cancel All"), false, 0.0f, tok::arrange_cancel_bottom_lg))
          ArrangeRenderCancelAll();
@@ -291,7 +292,7 @@ namespace app
       if (ChipButton::Draw(L("Cancel"), false, 0.0f, tok::arrange_cancel_bottom_lg))
          ArrangeRenderCancelActive();
       ImGui::EndDisabled();
-      ImGui::SameLine(0.0f, tok::space_2);
+      Ui::SameRow(Ui::Space::S2);
       ImGui::BeginDisabled(qTotal <= 1);
       if (ChipButton::Draw(L("Cancel All"), false, 0.0f, tok::arrange_cancel_bottom_lg))
          ArrangeRenderCancelAll();
@@ -405,7 +406,7 @@ namespace app
    static void InspectorNote(const char* text)
    {
       InspectorCardEnd();
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      Ui::Spacer(Ui::Space::S1);
       UiType::Scope s(UiType::Size::Body, UiType::Weight::Regular);
       ImGui::PushTextWrapPos(0.0f);
       ImGui::TextDisabled("%s", text);
@@ -529,7 +530,7 @@ namespace app
             });
          }
 
-         ImGui::SameLine();
+         Ui::SameRow();
          if (ChipButton::Draw(clip->enabled ? L("Active###clipbypassbtn") : L("Bypassed###clipbypassbtn"), clip->enabled, 0.0f, activeW))
          {
             ArrangeEdit([&]() {
@@ -907,7 +908,7 @@ namespace app
                const float half = std::floor((ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f);
                if (ChipButton::Draw(L("Reassign..."), false, 0.0f, half))
                   gArrangeAssigningClipId = clipId;
-               ImGui::SameLine();
+               Ui::SameRow();
                if (ChipButton::Draw(L("Clear Source"), false, 0.0f, half))
                {
                   ArrangeEdit([&]() {
@@ -1022,7 +1023,7 @@ namespace app
          }
 
          InspectorCardEnd();
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         Ui::Spacer(Ui::Space::S2);
          if (ChipButton::Draw(L("Delete Selected Clips"), false, 0.0f, ImGui::GetContentRegionAvail().x))
          {
             ArrangeEdit([&]() {
@@ -1151,7 +1152,7 @@ namespace app
             });
 
             InspectorCardEnd();
-            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            Ui::Spacer(Ui::Space::S2);
             if (ChipButton::Draw(L("Duplicate Track"), false, 0.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
@@ -1202,7 +1203,7 @@ namespace app
             });
 
             InspectorCardEnd();
-            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            Ui::Spacer(Ui::Space::S2);
             if (ChipButton::Draw(L("Add Video Track to Group"), false, 0.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {

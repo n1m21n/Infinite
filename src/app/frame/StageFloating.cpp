@@ -8,6 +8,7 @@
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/LibraryParts.h"
+#include "app/ui/design/UiScope.h"
 #include "core/MediaCollect.h"
 #include "core/SelfUpdate.h"
 #include "core/Notices.h"
@@ -75,7 +76,7 @@ int DrawFloating(FrameCtx& fc)
                      continue;
                   ImGui::PushID(i);
                   ImGui::ColorEdit4("##col", (float*)&style.Colors[i], ImGuiColorEditFlags_AlphaBar);
-                  ImGui::SameLine();
+                  Ui::SameRow();
                   ImGui::TextUnformatted(name);
                   ImGui::PopID();
                }
@@ -102,13 +103,13 @@ int DrawFloating(FrameCtx& fc)
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
          {
             ImGui::TextUnformatted(T("File changed on disk."));
-            ImGui::SameLine();
+            Ui::SameRow();
             if (ActionButton::Draw(L("Reload")))
             {
                if (LoadPatchFromImpl(gPatchWatchPath, true))
                   gPatchChangedOnDisk = false;
             }
-            ImGui::SameLine();
+            Ui::SameRow();
             if (ActionButton::Draw(L("Keep mine")))
                gPatchChangedOnDisk = false;
          }
@@ -192,11 +193,11 @@ int DrawFloating(FrameCtx& fc)
             const float s = 96.0f;
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - s) * 0.5f);
             const ImVec2 p = ImGui::GetCursorScreenPos();
-            ImGui::Dummy(ImVec2(s, s));
+            Ui::Claim(ImVec2(s, s));
             Thumb::AddRounded(ImGui::GetWindowDrawList(), tex, p, ImVec2(p.x + s, p.y + s), ImVec2(0, 0), ImVec2(1, 1),
                                                         IM_COL32_WHITE, 20.0f);
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         Ui::Spacer(Ui::Space::S2);
          {
             UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
             Centered("Infinite", false);
@@ -215,12 +216,12 @@ int DrawFloating(FrameCtx& fc)
             snprintf(build, sizeof(build), T("build %s, %s"), __DATE__, kind);
             Centered(build, true);
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::space_3));
+         Ui::Spacer(Ui::Space::S3);
          const auto Credit = [&](const char* role, const char* names)
          {
             DialogParts::Message(role);
             ImGui::TextUnformatted(names);
-            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            Ui::Spacer(Ui::Space::S2);
          };
          Credit(T("Author"), "Naman Soni");
          Credit(T("Contributors"), "Ricardo Palmieri");
@@ -250,7 +251,7 @@ int DrawFloating(FrameCtx& fc)
                x += w + tok::space_4;
             }
             ImGui::SetCursorPos(ImVec2(x0, y + lineH));
-            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+            Ui::Spacer(Ui::Space::S1);
          }
          const int pick = DialogParts::Buttons({ L("Check for updates"), L("Website"), L("Close") });
          if (pick == 0)
@@ -278,13 +279,13 @@ int DrawFloating(FrameCtx& fc)
          ImGui::Dummy(ImVec2(tok::stage_floating_spacer_w_sm, 0.0f));
          DialogParts::Title(T("Collect diagnostics"));
          DialogParts::Message(T("System info, logs, settings (home folder hidden) and recent crash reports go into one zip on your Desktop. Nothing is sent anywhere."));
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         Ui::Spacer(Ui::Space::S2);
          if (gPatchPath.empty())
             ImGui::BeginDisabled();
          FormParts::Switch(L("Include the open patch"), &sIncludePatch);
          if (gPatchPath.empty())
             ImGui::EndDisabled();
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         Ui::Spacer(Ui::Space::S2);
          const int pick = DialogParts::Buttons({ L("Collect"), L("Cancel") });
          if (pick == 0)
          {
@@ -311,7 +312,7 @@ int DrawFloating(FrameCtx& fc)
          ImGui::Dummy(ImVec2(tok::stage_floating_spacer_w_lg, 0.0f));
          DialogParts::Title(T("Save with media"));
          DialogParts::Message(T("Copies every file this patch reads into a \"<name> media\" folder next to it, and saves the patch pointing there, so the two move together. The originals stay where they are."));
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         Ui::Spacer(Ui::Space::S2);
          int copies = 0, twice = 0, missing = 0;
          for (const MediaCollect::Item& item : sMediaPlan)
          {
@@ -344,12 +345,12 @@ int DrawFloating(FrameCtx& fc)
                dl->AddText(p, item.state == MediaCollect::State::Duplicate ? dimCol : textCol, name.c_str());
                dl->PopClipRect();
                dl->AddText(ImVec2(p.x + w - stateW, p.y), stateCol, state);
-               ImGui::Dummy(ImVec2(w, rowH));
+               Ui::Claim(ImVec2(w, rowH));
                if (ImGui::IsItemHovered())
                   Tip::Show("%s", item.source.c_str());
             }
             LibraryParts::EndWell();
-            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+            Ui::Spacer(Ui::Space::S1);
             std::string summary = std::to_string(copies) + T(" to copy");
             if (twice > 0)
                summary += ", " + std::to_string(twice) + T(" used twice (copied once)");
@@ -357,7 +358,7 @@ int DrawFloating(FrameCtx& fc)
                summary += ", " + std::to_string(missing) + T(" missing (kept as they are)");
             ImGui::TextDisabled("%s", summary.c_str());
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         Ui::Spacer(Ui::Space::S2);
          const int pick = DialogParts::Buttons({ L("Save..."), L("Cancel") });
          if (pick == 0)
          {

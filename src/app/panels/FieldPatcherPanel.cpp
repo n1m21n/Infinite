@@ -23,6 +23,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PagePicker.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/UiScope.h"
 #include "core/Modulation.h"
 #include "core/Patch.h"
 #include "core/field/FieldBoxGraph.h"
@@ -1525,7 +1526,7 @@ namespace
       const float dy = std::max(0.0f, (ChipButton::Height() - ImGui::GetTextLineHeight()) * 0.5f);
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + dy);
       ImGui::TextDisabled("%s", buf);
-      ImGui::SameLine(0.0f, tok::space_2);
+      Ui::SameRow(Ui::Space::S2);
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() - dy);
    }
 
@@ -1654,7 +1655,7 @@ namespace
             ImGui::TextColored(*col, "%s", t);
          else
             ImGui::TextDisabled("%s", t);
-         ImGui::SameLine(0.0f, tok::space_3);
+         Ui::SameRow(Ui::Space::S3);
       };
       ImGui::SetCursorPosY(y0);
       if (p.uid == 0)
@@ -1671,7 +1672,7 @@ namespace
                Export(p);
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Place this page as a node"));
-            ImGui::SameLine(0.0f, tok::space_3);
+            Ui::SameRow(Ui::Space::S3);
          }
          else
             text(T("Add an outlet to make a node"));

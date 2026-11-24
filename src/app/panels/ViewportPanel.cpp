@@ -9,6 +9,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/FloatingWindow.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -388,7 +389,7 @@ namespace app
          }
       }
 
-      ImGui::Dummy(imageSize);
+      Ui::Claim(imageSize);
       EndChildSafe();
       PopDockedPanelStyle();
 
@@ -459,7 +460,7 @@ namespace app
          }
 
          if (!first && horizontal)
-            ImGui::SameLine(0.0f, tok::space_2);
+            Ui::SameRow(Ui::Space::S2);
          first = false;
 
          DrawViewportPanelCard(*gn, ImVec2(box, box));
@@ -576,7 +577,7 @@ namespace app
       {
          grip();
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
       }
 
       // The grip and the content sit on one layout axis with ImGui's item
@@ -603,7 +604,7 @@ namespace app
       if (!gripFirst)
       {
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
          grip();
       }
       // Zeroed only around EndChild, which is where ImGui charges the gap

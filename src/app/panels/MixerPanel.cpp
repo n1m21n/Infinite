@@ -20,6 +20,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/DeskParts.h"
+#include "app/ui/design/UiScope.h"
 #include "audio/AudioEngine.h"
 #include "core/CategoryColors.h"
 
@@ -2098,7 +2099,7 @@ namespace app
       {
          grip();
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
       }
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
@@ -2123,7 +2124,7 @@ namespace app
       if (!gripFirst)
       {
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
          grip();
       }
       // Zeroed only around EndChild so no ItemSpacing strip shows between this panel and the next row.

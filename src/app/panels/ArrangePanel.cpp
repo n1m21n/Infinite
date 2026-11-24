@@ -21,6 +21,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -498,9 +499,9 @@ namespace app
             SectionCard::RowLabel(T("Markers"));
             ImGui::SetNextItemWidth((fieldW - tok::space_5 - tok::arrange_render_dialogs_ratio * tok::space_1) * 0.5f);
             WellCombo("##arrMarkA", &sArrangeRenderMarkerA, markerItems.c_str());
-            ImGui::SameLine(0.0f, tok::space_1);
+            Ui::SameRow(Ui::Space::S1);
             ImGui::TextDisabled("->");
-            ImGui::SameLine(0.0f, tok::space_1);
+            Ui::SameRow(Ui::Space::S1);
             ImGui::SetNextItemWidth((fieldW - tok::space_5 - tok::arrange_render_dialogs_ratio * tok::space_1) * 0.5f);
             WellCombo("##arrMarkB", &sArrangeRenderMarkerB, markerItems.c_str());
          }
@@ -526,9 +527,9 @@ namespace app
          };
          SectionCard::RowLabel(T("Custom"));
          tickField("##arrRangeStart", rset.renderRangeStart);
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          ImGui::TextDisabled("->");
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          tickField("##arrRangeEnd", rset.renderRangeEnd);
       }
       currentRange(rangeA, rangeB);
@@ -565,9 +566,9 @@ namespace app
          ImGui::SetNextItemWidth((fieldW - tok::space_3 - tok::arrange_render_dialogs_ratio * tok::space_1) * 0.5f);
          if (FieldWell::InputInt("##arrResW", &rset.renderWidth, 0, 0))
             gPatchDirty = true;
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          ImGui::TextDisabled("%s", T("x"));
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          ImGui::SetNextItemWidth((fieldW - tok::space_3 - tok::arrange_render_dialogs_ratio * tok::space_1) * 0.5f);
          if (FieldWell::InputInt("##arrResH", &rset.renderHeight, 0, 0))
             gPatchDirty = true;
@@ -589,7 +590,7 @@ namespace app
       ImGui::SetNextItemWidth(fieldW - tok::arrange_render_dialogs_gap);
       if (FieldWell::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
          sArrangeRenderFileName = renderNameBuf;
-      ImGui::SameLine(0.0f, tok::space_1);
+      Ui::SameRow(Ui::Space::S1);
       ImGui::TextDisabled("%s", renderExtension());
 
       char renderFolderBuf[512];
@@ -615,7 +616,7 @@ namespace app
             rset.renderFormat = 0;
             gPatchDirty = true;
          }
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          if (ChipButton::Draw(L(".mov##arrRenderMov"), fmtActive == 1, tok::control_h, tok::arrange_mp4_bottom))
          {
             rset.renderFormat = 1;
@@ -623,7 +624,7 @@ namespace app
          }
       }
       SectionCard::End();
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      Ui::Spacer(Ui::Space::S1);
 
       // Builds the job the two submit buttons share, so "Render Now"
       // and "Add to Queue" can never disagree about what was asked
@@ -677,7 +678,7 @@ namespace app
          ImGui::CloseCurrentPopup();
       }
       ImGui::EndDisabled();
-      ImGui::SameLine(0.0f, tok::space_2);
+      Ui::SameRow(Ui::Space::S2);
       if (ChipButton::Draw(L("Cancel"), false, tok::control_h, tok::arrange_cancel_bottom_sm))
          ImGui::CloseCurrentPopup();
       SectionCard::EndWindow();
@@ -1210,7 +1211,7 @@ namespace app
          // Inside a DAW the host's transport plays and rewinds: no buttons here.
          if (!Platform::PluginModeActive())
          {
-         ImGui::SameLine(0.0f, tok::space_4);
+         Ui::SameRow(Ui::Space::S4);
          const bool arrangeIsPlaying = tr.IsPlaying();
          PushToolbarChip(arrangeIsPlaying, /*green=*/true);
          if (ActionButton::Draw("##arrangeplaybtn", ImVec2(tok::control_h, tok::control_h)))
@@ -1230,7 +1231,7 @@ namespace app
                glyph::DrawPlayerPlay(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          PushToolbarChip(false);
          const bool rewindClicked = ActionButton::Draw("##arrangerewindbtn", ImVec2(tok::control_h, tok::control_h));
          PopToolbarChip();
@@ -1252,7 +1253,7 @@ namespace app
          // fields speak (Settings::timeDisplay, saved with the patch). A view
          // change only - every position stays in ticks. The selected half
          // takes the shared "selected" accent tint; the other stays quiet.
-         ImGui::SameLine(0.0f, tok::space_4);
+         Ui::SameRow(Ui::Space::S4);
          {
             const int shownUnit = gArrange.settings.timeDisplay;
             static const PillGroup::Segment kUnitSegs[2] = { { "arrange.unit.bars", "Bars" }, { "arrange.unit.time", "Time" } };
@@ -1267,7 +1268,7 @@ namespace app
          }
 
          // Tool Selector (Select A, Trim T, Range R, Blade B, Zoom Z, Hand H)
-         ImGui::SameLine(0.0f, tok::space_4);
+         Ui::SameRow(Ui::Space::S4);
          const bool toolNonDefault = (gArrangeTool != ArrangeTool::Select);
          PushToolbarChip(toolNonDefault);
          const float toolBtnW = tok::arrange_tool_btn_w;
@@ -1357,7 +1358,7 @@ namespace app
          // the same musical grid at any zoom and any tempo. It covers clip
          // move/trim, marker drags, the ruler scrub, the loop drag and the
          // arrow-key nudge.
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          const bool snapWasOn = gArrange.settings.snapDivision > 0;
          PushToolbarChip(snapWasOn);
          if (ActionButton::Draw("##arrangesnapbtn", ImVec2(tok::control_h, tok::control_h)))
@@ -1383,7 +1384,7 @@ namespace app
          // RateDivision entries (names and lengths from that one table -
          // rhythmic-quantization-standard); this list only says which of
          // them a timeline grid offers, mapped onto snapDivision/snapTriplet.
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          {
             using GridChoice = ArrangeGridChoice;
             const auto& kGridChoices = kArrangeGridChoices;
@@ -1419,7 +1420,7 @@ namespace app
          // unless Settings > DAW sync gives the loop to Infinite.
          if (!Platform::PluginModeActive() || Transport::Instance().OwnLoop())
          {
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          const Arrange::LoopRange loopNow = gArrange.settings.loop; // the loop as of this frame
          const bool loopWasOn = loopNow.enabled; // see snapWasOn above
          PushToolbarChip(loopWasOn);
@@ -1439,7 +1440,7 @@ namespace app
          }
 
          // Add Marker (M): drops one at the playhead, on the snap grid.
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          PushToolbarChip(false);
          const bool markerClicked = ActionButton::Draw("##arrangemarkerbtn", ImVec2(tok::control_h, tok::control_h));
          PopToolbarChip();
@@ -1460,7 +1461,7 @@ namespace app
          // to the Inspector toggle below - both act on the header column/row
          // layout, and are the two icons most likely to be reached for
          // together.
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          {
             bool anyResized = false;
             for (const Arrange::Lane& lane : gArrange.lanes)
@@ -1573,7 +1574,7 @@ namespace app
          MenuParts::EndPopup();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));   // toolbar to hairline = seam to toolbar (grip + space_1)
+      Ui::Spacer(Ui::Space::S1);   // toolbar to hairline = seam to toolbar (grip + space_1)
       ImGui::Separator();
 
       // Layout: Global Viewport Monitor alongside / above timeline lanes
@@ -1682,7 +1683,7 @@ namespace app
                Thumb::Add(monDl, (ImTextureID)(intptr_t)tex, monOrigin, monBR, ImVec2(0, 1), ImVec2(1, 0));
          }
 
-         ImGui::Dummy(monAvail);
+         Ui::Claim(monAvail);
 
          // Right-click anywhere on the monitor to reach the Viewport Position menu
          // (Dock Left / Dock Right).
@@ -1695,7 +1696,7 @@ namespace app
       if (showVp && !gArrangeViewportOnRight)
       {
          drawViewportMonitor();
-         ImGui::SameLine();
+         Ui::SameRow();
       }
 
       // ---- Timeline body (ruler + lanes) ----
@@ -2603,7 +2604,7 @@ namespace app
 
          glyph::DrawFolder(dl, ImVec2(indentX + tok::arrange_glyph_x, rowTop + kLaneHeight * 0.5f), tok::arrange_folder, tint);
 
-         ImGui::SameLine(0.0f, tok::space_1_5);
+         Ui::SameRow(Ui::Space::S1_5);
 
          const float grpNameW = std::max(tok::text_min_w, rulerStartX - ImGui::GetCursorScreenPos().x - tok::space_5);
          if (gArrangeRenamingLaneId == groupId)
@@ -2668,7 +2669,7 @@ namespace app
             }
          }
 
-         ImGui::SameLine(0.0f, tok::space_0_5);
+         Ui::SameRow(Ui::Space::S0_5);
          const int memberCount = (int)Arrange::LanesInTrackGroup(gArrange, groupId).size();
          ImGui::TextDisabled("(%d)", memberCount);
 
@@ -3012,7 +3013,7 @@ namespace app
                ImGui::SameLine(0.0f, kMixGap);
                bool mute = lane.mute;
                mixGesture(MixToggle("##lanemute", "M", &mute, kMixCtl, app::AccentEmphasisSelected()), [&] { lane.mute = mute; });
-               ImGui::SameLine(0.0f, tok::space_1_5);
+               Ui::SameRow(Ui::Space::S1_5);
                float pan = lane.pan;
                const bool panChanged = BipolarKnobFloat("##lanepan", &pan, -1.0f, 1.0f, "%.2f", kMixCtl, mixFill,
                                                         false, 0.0f, -1, -1, false, 0.0f, 0.0f, false,
@@ -4309,7 +4310,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(scrollTL);
-      ImGui::Dummy(ImVec2(avail.x, totalH));
+      Ui::Claim(ImVec2(avail.x, totalH));
 
       EndChildSafe();
 
@@ -4337,13 +4338,13 @@ namespace app
 
       if (showVp && gArrangeViewportOnRight)
       {
-         ImGui::SameLine();
+         Ui::SameRow();
          drawViewportMonitor();
       }
 
       if (gArrangeClipSettingsPanelOpen)
       {
-         ImGui::SameLine();
+         Ui::SameRow();
          DrawArrangeClipSettingsChild(kSettingsW);
       }
    }
@@ -4392,7 +4393,7 @@ namespace app
       {
          grip();
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
       }
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
@@ -4413,7 +4414,7 @@ namespace app
       if (!gripFirst)
       {
          if (vertical)
-            ImGui::SameLine();
+            Ui::SameRow();
          grip();
       }
 

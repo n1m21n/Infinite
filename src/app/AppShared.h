@@ -9,6 +9,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppCommon.h"
 #include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/UiScope.h"
 #include "platform/AppPaths.h"
 #include "audio/WavePeaks.h"
 
@@ -2983,14 +2984,14 @@ void DrawShapeParams(ShapeNode* n);
          };
          gFieldDeviceSave.justOpened = true;
       }
-      ImGui::SameLine();
+      Ui::SameRow();
       if (ActionButton::Draw(("Export##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
          const std::string path = Platform::SaveDeviceDialog("Untitled.field");
          if (!path.empty())
             Field::SaveToFieldFile(path, n->ToDeviceFile());
       }
-      ImGui::SameLine();
+      Ui::SameRow();
       if (ActionButton::Draw(("Import##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
          const std::string path = Platform::OpenDeviceDialog();
@@ -3604,7 +3605,7 @@ void EndAudioSection();
          if (gParamRegisterOnly)
             return;
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, rowH + tok::space_1 + tok::space_0_5));  // row gap: a caption never touches the next row's knob
+         Ui::Claim(ImVec2(gAudioContentW, rowH + tok::space_1 + tok::space_0_5));  // row gap: a caption never touches the next row's knob
       }
    };
 

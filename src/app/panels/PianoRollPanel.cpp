@@ -24,6 +24,7 @@
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/TimeRuler.h"
 #include "app/ui/design/components/ToolCursor.h"
+#include "app/ui/design/UiScope.h"
 #include "arrange/ArrangeModel.h"
 #include "audio/MidiFile.h"
 #include "audio/MusicTime.h"
@@ -2804,7 +2805,7 @@ namespace
       FormParts::Inline(0.0f, tok::space_1);
       if (TextChip(T("Generate"), s.genOpen))
          s.genOpen = true;
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      Ui::Spacer(Ui::Space::S1);
       if (s.genOpen)
          DrawGenerateCard();
       else if (!s.notes.empty())
@@ -3185,7 +3186,7 @@ namespace
          const ImVec2 room = ImGui::GetContentRegionAvail();
          DrawToolbar(page, room.x - kKeysW, room.y - toolbarH - kRulerH - kStripH);
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));   // toolbar to ruler = seam to toolbar (grip + space_1)
+      Ui::Spacer(Ui::Space::S1);   // toolbar to ruler = seam to toolbar (grip + space_1)
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       Areas a;

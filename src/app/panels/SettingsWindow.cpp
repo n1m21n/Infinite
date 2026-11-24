@@ -18,6 +18,7 @@
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -138,10 +139,8 @@ namespace app
          navW = std::max(navW, ImGui::CalcTextSize(T(tab)).x);
       navW += kNavInset * tok::settings_nav_w_ratio;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
-      // The well's top lines up with the first card's: the body spends two item spacings (Spacing, then the card's
-      // lead-in Dummy) before a card's well starts. Tiles sit kPad inside it; a little air between tabs.
-      const float wellTop = ImGui::GetStyle().ItemSpacing.y * tok::settings_well_top_ratio;
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + wellTop + SectionCard::kPad);
+      // The tab list starts level with the first card's well; a little air between tabs.
+      SectionCard::AlignWithFirstWell();
       const ImVec2 oldItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::row_gap);  // tabs on the same 24 + 3 pitch as the setting rows
       // Inside a DAW: the host owns audio and MIDI devices, there is no plugin hosting and no shell, so the Audio,
@@ -156,7 +155,7 @@ namespace app
          const bool sel = (i == sTab);
          const float h = ImGui::GetFrameHeight();
          const ImVec2 p = ImGui::GetCursorScreenPos();
-         const float w = ImGui::GetContentRegionAvail().x;
+         const float w = Ui::AvailW();
          ImGui::PushID(i);
          if (UiInteract::Hit("##tab", ImVec2(w, h)))
             sTab = i;
@@ -178,7 +177,7 @@ namespace app
          // The section list sits in its own well, the same one the cards use, kPad outside the tiles all round.
          const ImVec2 navMin = ImGui::GetItemRectMin(), navMax = ImGui::GetItemRectMax();
          constexpr float pad = SectionCard::kPad;
-         const ImVec2 a(navMin.x - pad, navMin.y + wellTop), b(navMax.x + pad, navMax.y - pad);
+         const ImVec2 a(navMin.x - pad, navMin.y + SectionCard::FirstWellTop()), b(navMax.x + pad, navMax.y - pad);
          SectionCard::Well(a, b);
       }
       FormParts::Inline(0.0f, ImGui::GetStyle().ItemSpacing.x + SectionCard::kPad * tok::settings_window_ratio);   // nav well, a gap, then the card column
@@ -253,9 +252,9 @@ namespace app
                const float rowH = ImGui::GetFrameHeight();
                const float y = cursor.y + (rowH - kSwatchSz) * 0.5f;
                drawThemeSwatches(ImVec2(cursor.x, y), kSwatchSz, kSwatchGap, CategoryColors::UiThemeForPreset(currentPreset));
-               ImGui::Dummy(ImVec2(kSwatchStripW, rowH));
+               Ui::Claim(ImVec2(kSwatchStripW, rowH));
             }
-            ImGui::SetCursorPosX(FormParts::kLabelW);
+            Ui::FormSkipLabel();
             if (FormParts::Button(L("Reset to Defaults")))
             {
                CategoryColors::ResetAllAppearanceBoth();
@@ -1472,7 +1471,7 @@ namespace app
 
                char exprBuf[512];
                snprintf(exprBuf, sizeof(exprBuf), "%s", g.expr.c_str());
-               ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - tok::settings_window_gap);
+               Ui::FillNextLeaving(tok::settings_window_gap);   // room for the live value and the remove button
                FieldWell::PushStyle();
                const bool exprEdited = FieldWell::InputText("##expr", exprBuf, sizeof(exprBuf));
                FieldWell::PopStyle();
@@ -1493,16 +1492,14 @@ namespace app
                // numeric column should) and the button sits at a constant x,
                // so nothing downstream of a variable-width string can move.
                const float btnW = ImGui::GetFrameHeight();
-               const float btnX = ImGui::GetWindowContentRegionMax().x - btnW;
-               const float valueRightX = btnX - ImGui::GetStyle().ItemSpacing.x;
 
                char valueText[32];
                snprintf(valueText, sizeof(valueText), "%s", UiFmt::F4(g.value).c);
                FormParts::Inline();
-               ImGui::SetCursorPosX(valueRightX - ImGui::CalcTextSize(valueText).x);
+               Ui::AlignRight(ImGui::CalcTextSize(valueText).x + ImGui::GetStyle().ItemSpacing.x + btnW);
                ImGui::TextDisabled("%s", valueText);
                FormParts::Inline();
-               ImGui::SetCursorPosX(btnX);
+               Ui::AlignRight(btnW);
                {
                   if (ActionButton::Draw("##removeexprglobal", ImVec2(btnW, 0)))
                      removeAt = (int)i;
@@ -1640,7 +1637,7 @@ namespace app
                FormParts::Inline(ImGui::GetWindowContentRegionMax().x - btnW);
                if (ActionButton::Draw(L("Update##extApp"), ImVec2(btnW, 0), ActionButton::Kind::Primary))
                   gShowUpdateCheckModal = true;
-               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+               Ui::Spacer(Ui::Space::S1);
             }
             FormParts::Section(T("Extensions"));
 
@@ -1694,28 +1691,28 @@ namespace app
                }
                if (working)
                {
-                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  Ui::Spacer(Ui::Space::S1);
                   if (ex.progress >= 0.0f)
                      SectionCard::Progress(ex.progress, btnX - ImGui::GetCursorPosX() - tok::space_2);
                   else
                      ImGui::TextDisabled("%s...", T(ex.busyLabel.c_str()));
                }
-               const float y1 = ImGui::GetCursorPosY();
-               ImGui::SetCursorPos(ImVec2(btnX, y0));
-               if (working && ex.busyLabel == "Downloading")
                {
-                  if (ActionButton::Draw(L("Cancel##extCancel"), ImVec2(btnW, 0)))
-                     Extensions::CancelInstall();
+                  Ui::Aside aside(y0, btnW);   // the action sits top-right beside the name and status
+                  if (working && ex.busyLabel == "Downloading")
+                  {
+                     if (ActionButton::Draw(L("Cancel##extCancel"), ImVec2(btnW, 0)))
+                        Extensions::CancelInstall();
+                  }
+                  else if ((!have || update) && offer)
+                  {
+                     ImGui::BeginDisabled(busy);
+                     if (ActionButton::Draw(have ? L("Update##extAct") : L("Install##extAct"), ImVec2(btnW, 0), ActionButton::Kind::Primary))
+                        Extensions::InstallAsync(*offer);
+                     ImGui::EndDisabled();
+                  }
                }
-               else if ((!have || update) && offer)
-               {
-                  ImGui::BeginDisabled(busy);
-                  if (ActionButton::Draw(have ? L("Update##extAct") : L("Install##extAct"), ImVec2(btnW, 0), ActionButton::Kind::Primary))
-                     Extensions::InstallAsync(*offer);
-                  ImGui::EndDisabled();
-               }
-               ImGui::SetCursorPosY(std::max(y1, ImGui::GetCursorPosY()));
-               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+               Ui::Spacer(Ui::Space::S1);
                ImGui::PopID();
             };
 
@@ -1743,7 +1740,7 @@ namespace app
             if (!ex.catalogLoaded && !ex.catalogLoading && !ex.catalogError.empty())
                ImGui::TextColored(tok::RoleV4(tok::col::text_err_light_muted), "%s",
                                   T("Can't reach the extension catalog. Check your connection and try again."));
-            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+            Ui::Spacer(Ui::Space::S1);
             ImGui::BeginDisabled(busy);
             if (FormParts::Button(L("Check for updates##extCheck")))
             {
@@ -1807,7 +1804,7 @@ namespace app
             const char* const kExe = "/opt/Infinite/Infinite";
 #endif
             FormParts::BareCombo("##refTopic", &sRef, kRef, IM_ARRAYSIZE(kRef), FormParts::kControlW);
-            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            Ui::Spacer(Ui::Space::S2);
             LibraryParts::BeginWell("##terminalref", 380.0f);
             FormParts::PushReferenceStyle();
             ImGui::PushTextWrapPos(0.0f);

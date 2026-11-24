@@ -22,6 +22,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiScope.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -628,7 +629,7 @@ namespace app
          if (ActionButton::Draw(L("+ Audio Track##sessadda"), ImVec2(tok::arrange_session_grid_video_track_x, 0)))
             AddTrackOfType(Arrange::kLaneAudio);
          ImGui::SetCursorScreenPos(o);
-         ImGui::Dummy(avail);
+         Ui::Claim(avail);
          gArrangePendingBrowserDrop.pending = false;
          return;
       }
@@ -1145,7 +1146,7 @@ namespace app
       DrawTrackMenu();
 
       ImGui::SetCursorScreenPos(o);
-      ImGui::Dummy(ImVec2(gridW, footerTop + kFooterH - o.y));
+      Ui::Claim(ImVec2(gridW, footerTop + kFooterH - o.y));
       (void)mouse;
       (void)gridHovered;
       EndChildSafe();
@@ -1622,7 +1623,7 @@ namespace app
             if (tex != 0)
                Thumb::Add(dl, (ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
          }
-         ImGui::Dummy(avail);
+         Ui::Claim(avail);
          EndChildSafe();
       }
 

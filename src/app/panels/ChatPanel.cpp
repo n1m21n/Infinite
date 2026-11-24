@@ -47,6 +47,7 @@
 #include "stb_image_write.h"
 #include "lunasvg.h"
 #include "app/ui/design/AgentLogos.gen.h"
+#include "app/ui/design/UiScope.h"
 
 #include <algorithm>
 #include <cctype>
@@ -3052,7 +3053,7 @@ namespace app
                   if (LineCount(b.text) > kInlineCodeLines)
                   {
                      DrawCodeChip(T("Code"), b.text, cid);
-                     ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                     Ui::Spacer(Ui::Space::S1);
                      break;
                   }
                   CodeBlock::Draw(b.text.c_str(), cid);
@@ -3060,21 +3061,21 @@ namespace app
                }
                case chat::Block::Kind::Audio:
                   DrawAudio(b.text, width);
-                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  Ui::Spacer(Ui::Space::S1);
                   break;
                case chat::Block::Kind::Image:
                   DrawImage(b.text, width);
                   DrawReveal(b.text);
-                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  Ui::Spacer(Ui::Space::S1);
                   break;
                case chat::Block::Kind::Video:
                   DrawVideo(b.text, width);
                   DrawReveal(b.text);
-                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  Ui::Spacer(Ui::Space::S1);
                   break;
                case chat::Block::Kind::File:
                   DrawFile(b.text, width);
-                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  Ui::Spacer(Ui::Space::S1);
                   break;
                default:
                {
@@ -3233,7 +3234,7 @@ namespace app
          for (int node : nodes)
          {
             const chat::CatalogNode* cn = sCat.Node(node);
-            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            Ui::Spacer(Ui::Space::S2);
             {
                chat::Seg chip;
                chip.kind = chat::Seg::Kind::Node;
@@ -3242,7 +3243,7 @@ namespace app
                const ImVec2 p = ImGui::GetCursorScreenPos();
                const float h = DrawFlow({ chip }, p, inner, id * 100 + 90 + node, ImGui::GetColorU32(ImGuiCol_Text));
                ImGui::SetCursorScreenPos(p);
-               ImGui::Dummy(ImVec2(inner, h + tok::space_2));
+               Ui::Claim(ImVec2(inner, h + tok::space_2));
             }
             const ImVec2 o = ImGui::GetCursorScreenPos();
             int k = 0;
@@ -3327,7 +3328,7 @@ namespace app
             const ImU32 accent = e.undone ? Dim() : (e.ok ? ImGui::GetColorU32(AccentEmphasisSelected()) : Red());
             glyph::Draw(dl, ImVec2(h.x + tok::space_1_5, h.y + headH * 0.5f), tok::icon_control, accent, IconsInfinite::Bolt);
             dl->AddText(ImVec2(h.x + tok::space_4, std::round(h.y + (headH - ImGui::GetFontSize()) * 0.5f)), Dim(), e.undone ? T("Undone") : (e.ok ? T("Changed") : T("Did not run")));
-            ImGui::Dummy(ImVec2(inner, headH + tok::space_1));
+            Ui::Claim(ImVec2(inner, headH + tok::space_1));
          }
          const ImU32 col = e.undone ? Dim() : ImGui::GetColorU32(ImGuiCol_Text);
          const size_t cap = 8;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
@@ -3355,14 +3356,14 @@ namespace app
             }
             const float h = segs.empty() ? rowH : DrawFlow(segs, p, inner, id * tok::chat_change_ratio + (int)i, col);
             ImGui::SetCursorScreenPos(p);
-            ImGui::Dummy(ImVec2(inner, h));
+            Ui::Claim(ImVec2(inner, h));
             if (!l.code.empty() && !e.undone)
             {
                char cid[40];
                std::snprintf(cid, sizeof cid, "##chcode%d_%d", id, (int)i);
-               ImGui::Dummy(ImVec2(0.0f, tok::chat_spacer_h));
+               Ui::Spacer(Ui::Space::S0_5);
                DrawCodeChip(CodeTitle(l), l.code, cid);
-               ImGui::Dummy(ImVec2(0.0f, tok::chat_spacer_h));
+               Ui::Spacer(Ui::Space::S0_5);
             }
          }
          DrawChangeKnobs(e, knobs, inner, id);
@@ -3414,7 +3415,7 @@ namespace app
          dl->AddRectFilled(at, ImVec2(at.x + width, at.y + h), TextTint(tok::chat_change_fill_shade), tok::radius_control);
          dl->ChannelsMerge();
          ImGui::SetCursorScreenPos(at);
-         ImGui::Dummy(ImVec2(width, h));
+         Ui::Claim(ImVec2(width, h));
       }
 
       // What the agent did, folded to one quiet row: "Made 3 changes · 1 failed", or "Working… 12s" with the
@@ -3507,7 +3508,7 @@ namespace app
                ImGui::PopStyleColor();
                if (monoRow)
                   ImGui::PopFont();
-               ImGui::Dummy(ImVec2(width, lineH));
+               Ui::Claim(ImVec2(width, lineH));
             }
          }
          ImGui::Dummy(ImVec2(width, tok::chat_spacer_h));
@@ -3570,7 +3571,7 @@ namespace app
          if (!e.files.empty())
             y += tok::chat_y;
          ImGui::SetCursorScreenPos(origin);
-         ImGui::Dummy(ImVec2(width, y - origin.y));
+         Ui::Claim(ImVec2(width, y - origin.y));
       }
 
       // A glass card: the same well and hairline the composer uses.
@@ -3611,7 +3612,7 @@ namespace app
          GlassCard(c.at, c.width, bottom - c.at.y);
          c.split.Merge(dl);
          ImGui::SetCursorScreenPos(c.at);
-         ImGui::Dummy(ImVec2(c.width, bottom - c.at.y));
+         Ui::Claim(ImVec2(c.width, bottom - c.at.y));
       }
 
       // Wrapped text at the card's left edge, one item tall.
@@ -3622,7 +3623,7 @@ namespace app
          const ImVec2 sz = ImGui::CalcTextSize(text.c_str(), nullptr, false, w);
          ImGui::GetWindowDrawList()->AddText(nullptr, 0.0f, p, col, text.c_str(), nullptr, w);
          ImGui::SetCursorScreenPos(p);
-         ImGui::Dummy(ImVec2(w, sz.y));
+         Ui::Claim(ImVec2(w, sz.y));
       }
 
       void CardTitle(const Card& c, const std::string& text)
@@ -3692,7 +3693,7 @@ namespace app
          dl->AddText(ImVec2(p.x + size + tok::space_2, p.y + (rowH - ImGui::GetFontSize()) * 0.5f),
                      state == S::kPending ? Dim() : (done ? TextTint(tok::chat_step_row_shade) : ImGui::GetColorU32(ImGuiCol_Text)), label.c_str());
          ImGui::SetCursorScreenPos(p);
-         ImGui::Dummy(ImVec2(c.inner, rowH));
+         Ui::Claim(ImVec2(c.inner, rowH));
       }
 
       // Several setup steps shown as one row: failed wins, then all done, then running.
@@ -4298,7 +4299,7 @@ namespace app
          const float width = ImGui::GetContentRegionAvail().x;
          const bool setup = DrawSetup(width);
          if (setup && !sThread.entries.empty())
-            ImGui::Dummy(ImVec2(0.0f, tok::space_3));
+            Ui::Spacer(Ui::Space::S3);
          if (!setup && sThread.entries.empty())
             DrawEmpty(width);
          if (sUi.size() != sThread.entries.size())
@@ -4393,7 +4394,7 @@ namespace app
          // Two or more agents at work: their avatars side by side, with a short count.
          if (sRuns.size() > 1)
          {
-            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            Ui::Spacer(Ui::Space::S2);
             ImDrawList* wd = ImGui::GetWindowDrawList();
             const ImVec2 wat = ImGui::GetCursorScreenPos();
             const float r = tok::chat_r, step = r * tok::chat_step_ratio + tok::space_1;
@@ -4406,9 +4407,9 @@ namespace app
             char buf[64];
             std::snprintf(buf, sizeof buf, T("%d working"), (int)sRuns.size());
             wd->AddText(ImVec2(x + tok::space_1, wat.y + (r * tok::chat_messages_ratio + tok::chat_messages_inset - ImGui::GetFontSize()) * 0.5f), Dim(), buf);
-            ImGui::Dummy(ImVec2(width, r * tok::chat_messages_ratio + tok::space_0_5));
+            Ui::Claim(ImVec2(width, r * tok::chat_messages_ratio + tok::space_0_5));
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         Ui::Spacer(Ui::Space::S2);
          if (sScrollToEnd)
          {
             ImGui::SetScrollHereY(1.0f);
@@ -5281,7 +5282,7 @@ namespace app
                const std::string& l = sCodeView.lines[(size_t)i];
                cl->AddText(ImVec2(o.x + gutter, y), ImGui::GetColorU32(ImGuiCol_Text), l.c_str(), l.c_str() + l.size());
                ImGui::SetCursorScreenPos(ImVec2(o.x, y));
-               ImGui::Dummy(ImVec2(gutter + textW, lineH));
+               Ui::Claim(ImVec2(gutter + textW, lineH));
             }
          clip.End();
          ImGui::PopFont();
@@ -5517,7 +5518,7 @@ namespace app
       ImGui::GetWindowDrawList()->AddRectFilled(mn, ImVec2(mn.x + avail.x, mn.y + avail.y), tok::U32(tok::terminal_bg, Light()), tok::radius_control);
       const float width = avail.x;
       DrawHeader(width);
-      ImGui::Dummy(ImVec2(0.0f, tok::space_2));  // air under the header, as in Claude
+      Ui::Spacer(Ui::Space::S2);  // air under the header, as in Claude
       const float composerW = std::min(width - tok::chat_body_ratio * tok::space_3, tok::chat_composer_w_max);
       // The composer's height is known before it draws: the log takes the rest.
       const float composerH = Geom(composerW).totalH;
