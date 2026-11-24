@@ -230,7 +230,7 @@ void DrawMenuBar(FrameCtx& fc)
             const bool hov = ImGui::IsItemHovered();
             if (const ImTextureID tex = BrandLogoTexture())
                Thumb::AddRounded(ImGui::GetWindowDrawList(), tex, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
-                  ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(ImVec4(1, 1, 1, hov ? 1.0f : 0.92f)), 5.0f);
+                  ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(tok::V4(tok::stage_menu_bar_col_2, hov ? 1.0f : 0.92f)), 5.0f);
             if (hov)
                HelpTip("%s", T("About Infinite"));
             ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_2, p0.y));
@@ -733,7 +733,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (sMenuMidYPtr != nullptr)
                *sMenuMidYPtr = mid;
             menuDl->AddRectFilled(ImVec2(menuGroupP.x - tok::space_0_5, mid - tok::control_h * 0.5f), ImVec2(menuGroupMaxX + tok::space_0_5, mid + tok::control_h * 0.5f),
-               ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.06f)), tok::radius_control);
+               ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, tok::stage_menu_bar_alpha_4)), tok::radius_control);
          }
          menuDl->ChannelsMerge();
 
@@ -742,11 +742,11 @@ void DrawMenuBar(FrameCtx& fc)
 
          // Top bar controls styling: clean, symmetrical, unboxed with pixel-perfect alignment.
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::RoleV4(tok::col::ink_white, 0.08f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::RoleV4(tok::col::ink_white, 0.16f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_ink_white_alpha_3));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_ink_white_alpha_4));
          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::RoleV4(tok::col::ink_white, 0.08f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::RoleV4(tok::col::ink_white, 0.16f));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_ink_white_alpha_3));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_ink_white_alpha_4));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
          ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
          // 24 pt controls (tok::control_h) on one centre line; the cursor Y below pins them in the bar.
@@ -1317,7 +1317,7 @@ void DrawMenuBar(FrameCtx& fc)
                const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
                ImDrawList* dl = ImGui::GetWindowDrawList();
                const ImVec4 ac = ImGui::GetStyleColorVec4(ImGuiCol_CheckMark);
-               dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(ac.x, ac.y, ac.z, hov ? 0.28f : 0.16f)), tok::radius_control);
+               dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(ac.x, ac.y, ac.z, hov ? tok::stage_menu_bar_alpha_5 : tok::stage_menu_bar_alpha_6)), tok::radius_control);
                const ImU32 fg = ImGui::GetColorU32(ac);
                glyph::Draw(dl, c, tok::icon_lg, fg, IconsInfinite::Download);
                StatusDot::OnLastItem(StatusDot::State::Error);

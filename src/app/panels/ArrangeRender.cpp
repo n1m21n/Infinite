@@ -153,7 +153,7 @@ namespace app
       // clicks without needing per-panel disable flags scattered elsewhere.
       ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
       ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, 0.35f));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, tok::arrange_offline_render_progress_window_ink_black_alpha_2));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("##OfflineRenderBlocker", nullptr,
@@ -248,7 +248,7 @@ namespace app
       ImGuiIO& io = ImGui::GetIO();
       ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
       ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, 0.35f));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, tok::arrange_wav_render_progress_window_ink_black_alpha_2));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("##ArrangeWavRenderBlocker", nullptr,

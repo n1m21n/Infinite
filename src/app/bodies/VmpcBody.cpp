@@ -278,8 +278,8 @@ namespace app
                         {
                            // Progress through the clip along the picture's bottom edge.
                            const float px = pmn.x + (pmx.x - pmn.x) * std::clamp(cur, 0.0f, 1.0f);
-                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(pmx.x, pmx.y), tok::Role(tok::col::ink_black, 140));
-                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(px, pmx.y), tok::Role(tok::col::ink_white, 230));
+                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(pmx.x, pmx.y), tok::Role(tok::col::ink_black, tok::vmpc_body_ink_black_alpha_2));
+                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(px, pmx.y), tok::Role(tok::col::ink_white, tok::vmpc_body_ink_white_alpha_3));
                         }
                         std::string nm = n->PadName(pad);
                         const size_t dot = nm.find_last_of('.');
@@ -367,8 +367,8 @@ namespace app
                if (b < a)
                   std::swap(a, b);
                const float xa = origin.x + w * a, xb = origin.x + w * b;
-               dl->AddRectFilled(origin, ImVec2(xa, br.y), tok::Role(tok::col::ink_black, 140));
-               dl->AddRectFilled(ImVec2(xb, origin.y), br, tok::Base(tok::col::ink_black, 140));
+               dl->AddRectFilled(origin, ImVec2(xa, br.y), tok::Role(tok::col::ink_black, tok::vmpc_body_ink_black_alpha_2));
+               dl->AddRectFilled(ImVec2(xb, origin.y), br, tok::Base(tok::col::ink_black, tok::vmpc_body_ink_black_alpha_2));
                const ImU32 edgeCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4);
                dl->AddLine(ImVec2(xa, origin.y), ImVec2(xa, br.y), edgeCol, tok::vmpc_body_stroke);
                dl->AddLine(ImVec2(xb, origin.y), ImVec2(xb, br.y), edgeCol, tok::vmpc_body_stroke);
@@ -376,7 +376,7 @@ namespace app
                if (n->PadPlaying(cur) && at >= 0.0f)
                {
                   const float px = origin.x + w * std::clamp(at, 0.0f, 1.0f);
-                  dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), tok::Role(tok::col::ink_white, 235), tok::vmpc_body_stroke_3);
+                  dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), tok::Role(tok::col::ink_white, tok::vmpc_body_ink_white_alpha_4), tok::vmpc_body_stroke_3);
                }
                if (hov)
                {

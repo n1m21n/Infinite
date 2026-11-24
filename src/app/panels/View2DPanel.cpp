@@ -303,7 +303,7 @@ namespace
 
    ImU32 Hex(unsigned rgb, float a = 1.0f)
    {
-      return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, (int)(std::clamp(a, 0.0f, 1.0f) * 255.0f));
+      return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, (int)(std::clamp(a, 0.0f, 1.0f) * 255.0f));  // ui-audit-ok: channel mask / bit packing, not a colour value
    }
 
    GraphNode* DocGraphNode()
@@ -1216,7 +1216,7 @@ namespace
       const float ink = std::round(HeaderMark() * 0.72f);   // a little under the on box, as the 3D View's gear
       const float gs = InkFit(c, g, ink);
       const ImU32 col = lit ? ImGui::GetColorU32(app::AccentEmphasisSelected())
-                            : ImGui::GetColorU32(ImGuiCol_Text, 0.9f);
+                            : ImGui::GetColorU32(ImGuiCol_Text, tok::view2d_header_icon_text_alpha_2);
       glyph::Draw(dl, c, gs, col, g);
       ImVec2 imn, imx;
       glyph::InkBox(c, gs, g, imn, imx);
@@ -1270,14 +1270,14 @@ namespace
          const ImVec2 sz = ImGui::CalcTextSize(shown.c_str());
          const float px = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.y);
          const ImVec2 tp(p.x, std::round((p.y + (rowH - sz.y) * 0.5f) * px) / px);
-         ImGui::GetWindowDrawList()->AddText(tp, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.72f)), shown.c_str());
+         ImGui::GetWindowDrawList()->AddText(tp, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_label)), shown.c_str());
          UiAudit::NoteInk(3, tp, ImVec2(tp.x + sz.x, tp.y + sz.y), 0.0f, full.c_str());
          ImGui::Dummy(ImVec2(sz.x, rowH));
       }
       else
       {
          ImGui::AlignTextToFramePadding();
-         ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", shown.c_str());
+         ImGui::TextColored(ImVec4(t.x, t.y, t.z, tok::alpha_label), "%s", shown.c_str());
          UiAudit::NoteInk(3, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0.0f, full.c_str());
       }
       if (shown != full && ImGui::IsItemHovered())
@@ -1573,10 +1573,10 @@ namespace
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float rr = tok::radius_control * 0.5f;
-      dl->AddRectFilledMultiColor(ImVec2(x0, barT), ImVec2(x1, barB), IM_COL32(0, 0, 0, 255), IM_COL32(255, 255, 255, 255),
-                                  IM_COL32(255, 255, 255, 255), IM_COL32(0, 0, 0, 255));
+      dl->AddRectFilledMultiColor(ImVec2(x0, barT), ImVec2(x1, barB), tok::U32(tok::view2d_blend_if_ramp_col_3), tok::U32(tok::view2d_blend_if_ramp_col_4),
+                                  tok::U32(tok::view2d_blend_if_ramp_col_4), tok::U32(tok::view2d_blend_if_ramp_col_3));
       // What does not pass: veiled outside the outer handles, fading across the soft ranges.
-      const ImU32 veil = ImGui::GetColorU32(ImGuiCol_WindowBg, 0.78f), clear = ImGui::GetColorU32(ImGuiCol_WindowBg, 0.0f);
+      const ImU32 veil = ImGui::GetColorU32(ImGuiCol_WindowBg, tok::view2d_blend_if_ramp_window_bg_alpha_2), clear = ImGui::GetColorU32(ImGuiCol_WindowBg, 0.0f);
       if (xOf(b[0]) > x0)
          dl->AddRectFilled(ImVec2(x0, barT), ImVec2(xOf(b[0]), barB), veil);
       if (xOf(b[1]) > xOf(b[0]))
@@ -1588,10 +1588,10 @@ namespace
       dl->AddRect(ImVec2(x0, barT), ImVec2(x1, barB), FormParts::EdgeCol(), rr);
 
       // Handles: a joined pair is one triangle; a split pair is two halves, each pointing at its own spot.
-      const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text, 0.85f), lit = ImGui::GetColorU32(app::AccentEmphasisSelected());
+      const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text, tok::view2d_blend_if_ramp_text_alpha_2), lit = ImGui::GetColorU32(app::AccentEmphasisSelected());
       for (int pair = 0; pair < 2; pair++)
       {
-         const ImU32 fill = pair == 0 ? IM_COL32(20, 20, 20, 255) : IM_COL32(235, 235, 235, 255);
+         const ImU32 fill = pair == 0 ? tok::U32(tok::view2d_fill_3) : tok::U32(tok::view2d_fill_4);
          for (int half = 0; half < 2; half++)
          {
             const int k = pair * 2 + half;
@@ -1717,7 +1717,7 @@ namespace
    void HistogramUnder(ImDrawList* dl, ImVec2 p0, ImVec2 p1, const std::vector<float>& bins)
    {
       const int n = (int)bins.size();
-      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Border, 0.55f);
+      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Border, tok::view2d_histogram_under_border_alpha_2);
       for (int i = 0; i < n; i++)
       {
          const float x0 = p0.x + (p1.x - p0.x) * i / n, x1 = p0.x + (p1.x - p0.x) * (i + 1) / n;
@@ -1756,14 +1756,14 @@ namespace
       if (hist != nullptr && !hist->empty())
          HistogramUnder(dl, p0, p1, *hist);
       // 4x4 grid + subtle diagonal identity reference line.
-      const ImU32 gridCol = ImGui::GetColorU32(ImGuiCol_Border, 0.55f);
+      const ImU32 gridCol = ImGui::GetColorU32(ImGuiCol_Border, tok::view2d_curve_editor_border_alpha_3);
       for (int i = 1; i < 4; i++)
       {
          const float fx = p0.x + w * i / 4.0f, fy = p0.y + h * i / 4.0f;
          dl->AddLine(ImVec2(fx, p0.y), ImVec2(fx, p1.y), gridCol);
          dl->AddLine(ImVec2(p0.x, fy), ImVec2(p1.x, fy), gridCol);
       }
-      dl->AddLine(ImVec2(p0.x, p1.y), ImVec2(p1.x, p0.y), ImGui::GetColorU32(ImGuiCol_Border, 0.8f), tok::view2d_curve_editor_stroke);
+      dl->AddLine(ImVec2(p0.x, p1.y), ImVec2(p1.x, p0.y), ImGui::GetColorU32(ImGuiCol_Border, tok::view2d_curve_editor_border_alpha_4), tok::view2d_curve_editor_stroke);
       const auto ToScreen = [&](float x, float y) { return ImVec2(p0.x + x * w, p1.y - y * h); };
       const ImVec2 m = ImGui::GetIO().MousePos;
       const float mx = std::clamp((m.x - p0.x) / std::max(1.0f, w), 0.0f, 1.0f);
@@ -1880,7 +1880,7 @@ namespace
             ImVec2 gline[64];
             for (int i = 0; i < 64; i++)
                gline[i] = ToScreen(i / 63.0f, glut[i]);
-            dl->AddPolyline(gline, tok::view2d_curve_editor_add_polyline_draw, CurveChannelColor(ch + 1, 0.35f), 0, 1.0f);
+            dl->AddPolyline(gline, tok::view2d_curve_editor_add_polyline_draw, CurveChannelColor(ch + 1, tok::view2d_curve_editor_curve_channel_color_alpha_2), 0, 1.0f);
          }
       }
       constexpr int kSamples = 128;
@@ -1899,10 +1899,10 @@ namespace
          const bool selPt = (sCurveSelLayer == key && i == sCurveSel);
          const bool hovPt = ImGui::IsItemHovered() && i == near;
          const float r = (activePt || hovPt) ? tok::view2d_r : tok::view2d_r_2;
-         const ImU32 ptCol = (activePt && pullOff) ? ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.5f) : curveCol;
+         const ImU32 ptCol = (activePt && pullOff) ? ImGui::GetColorU32(ImGuiCol_TextDisabled, tok::view2d_curve_editor_text_disabled_alpha_2) : curveCol;
          dl->AddCircleFilled(q, r, ptCol);
          if (selPt || activePt)
-            dl->AddCircle(q, r + tok::space_0_5, ImGui::GetColorU32(ImGuiCol_Text, 0.85f), 0, tok::view2d_curve_editor_stroke_3);
+            dl->AddCircle(q, r + tok::space_0_5, ImGui::GetColorU32(ImGuiCol_Text, tok::view2d_curve_editor_text_alpha_2), 0, tok::view2d_curve_editor_stroke_3);
       }
       dl->AddRect(p0, p1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_control);
       // Compact live In / Out coordinate readout when hovering or dragging.
@@ -4256,7 +4256,7 @@ namespace
       ImGui::SetMouseCursor(ImGuiMouseCursor_None);
       for (int pass = 0; pass < 2; pass++)
       {
-         const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, 170) : tok::U32(tok::canvas_ink);
+         const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, tok::view2d_tool_cursor_canvas_shade_alpha_3) : tok::U32(tok::canvas_ink);
          const float th = pass == 0 ? 3.0f : 1.0f;
          dl->AddLine(ImVec2(mouse.x - tok::space_2, mouse.y), ImVec2(mouse.x - tok::space_0_5, mouse.y), col, th);
          dl->AddLine(ImVec2(mouse.x + tok::space_0_5, mouse.y), ImVec2(mouse.x + tok::space_2, mouse.y), col, th);
@@ -4267,7 +4267,7 @@ namespace
       for (int dx = -1; dx <= 1; dx++)
          for (int dy = -1; dy <= 1; dy++)
             if (dx != 0 || dy != 0)
-               glyph::Draw(dl, ImVec2(badge.x + dx, badge.y + dy), tok::icon_control, tok::U32(tok::canvas_shade, 200), g);
+               glyph::Draw(dl, ImVec2(badge.x + dx, badge.y + dy), tok::icon_control, tok::U32(tok::canvas_shade, tok::view2d_tool_cursor_canvas_shade_alpha_4), g);
       glyph::Draw(dl, badge, tok::icon_control, tok::U32(tok::canvas_ink), g);
    }
 
@@ -4296,7 +4296,7 @@ namespace
          return;
       const ImVec2 a = ToScreen(doc, sPen[1][0], sPen[1][1]), c = ToScreen(doc, to[0], to[1]);
       const float w = std::max(1.0f, b.size * sZoom);
-      const ImU32 col = ImGui::ColorConvertFloat4ToU32(ImVec4(sFg[0], sFg[1], sFg[2], 0.6f * b.opacity));
+      const ImU32 col = ImGui::ColorConvertFloat4ToU32(ImVec4(sFg[0], sFg[1], sFg[2], tok::view2d_predicted_scale_2 * b.opacity));
       dl->PushClipRect(sViewMn, sViewMx, true);
       dl->AddLine(a, c, col, w);
       dl->AddCircleFilled(c, w * 0.5f, col);
@@ -4311,12 +4311,12 @@ namespace
       auto ring = [&](float rr, float alpha)
       {
          dl->AddCircle(mouse, rr, IM_COL32(0, 0, 0, (int)(tok::view2d_brush_cursor_ratio * alpha)), tok::view2d_brush_cursor_segments, tok::view2d_brush_cursor_stroke);
-         dl->AddCircle(mouse, rr, IM_COL32(255, 255, 255, (int)(tok::view2d_brush_cursor_ratio_2 * alpha)), tok::view2d_brush_cursor_segments, 1.0f);
+         dl->AddCircle(mouse, rr, tok::U32(tok::view2d_brush_cursor_col_2, (int)(tok::view2d_brush_cursor_ratio_2 * alpha)), tok::view2d_brush_cursor_segments, 1.0f);
       };
       if (r < tok::view2d_brush_cursor_limit)
       {
-         dl->AddLine(ImVec2(mouse.x - tok::space_1_5, mouse.y), ImVec2(mouse.x + tok::space_1_5, mouse.y), tok::U32(tok::canvas_shade, 200), tok::view2d_brush_cursor_stroke);
-         dl->AddLine(ImVec2(mouse.x, mouse.y - tok::space_1_5), ImVec2(mouse.x, mouse.y + tok::space_1_5), tok::U32(tok::canvas_shade, 200), tok::view2d_brush_cursor_stroke);
+         dl->AddLine(ImVec2(mouse.x - tok::space_1_5, mouse.y), ImVec2(mouse.x + tok::space_1_5, mouse.y), tok::U32(tok::canvas_shade, tok::view2d_brush_cursor_canvas_shade_alpha_2), tok::view2d_brush_cursor_stroke);
+         dl->AddLine(ImVec2(mouse.x, mouse.y - tok::space_1_5), ImVec2(mouse.x, mouse.y + tok::space_1_5), tok::U32(tok::canvas_shade, tok::view2d_brush_cursor_canvas_shade_alpha_2), tok::view2d_brush_cursor_stroke);
          dl->AddLine(ImVec2(mouse.x - tok::space_1_5, mouse.y), ImVec2(mouse.x + tok::space_1_5, mouse.y), tok::U32(tok::canvas_ink));
          dl->AddLine(ImVec2(mouse.x, mouse.y - tok::space_1_5), ImVec2(mouse.x, mouse.y + tok::space_1_5), tok::U32(tok::canvas_ink));
          return;
@@ -5366,7 +5366,7 @@ namespace
                const bool ok = GizmoPoint(doc, at, dir, c, kGizmoPx, q);
                if (ok && prevOk)
                {
-                  dl->AddLine(prev, q, tone(a, 1.0f), tok::view2d_gizmo3_d_stroke);
+                  dl->AddLine(prev, q, tone(a, tok::view2d_gizmo3_d_tone_alpha_2), tok::view2d_gizmo3_d_stroke);
                   const float d = SegDist2D(mouse, prev, q);
                   if (d < best)
                   {
@@ -5415,7 +5415,7 @@ namespace
             hot = a;
          }
       }
-      dl->AddCircle(c, tok::view2d_gizmo3_d_r_2, held == tok::view2d_gizmo3_d_add_circle_draw || (held < 0 && sGizmoHot == 3) ? white : tok::U32(tok::canvas_ink, 190), tok::view2d_gizmo3_d_segments, tok::view2d_gizmo3_d_stroke_2);
+      dl->AddCircle(c, tok::view2d_gizmo3_d_r_2, held == tok::view2d_gizmo3_d_add_circle_draw || (held < 0 && sGizmoHot == 3) ? white : tok::U32(tok::canvas_ink, tok::view2d_gizmo3_d_canvas_ink_alpha_2), tok::view2d_gizmo3_d_segments, tok::view2d_gizmo3_d_stroke_2);
       if (std::hypot(mouse.x - c.x, mouse.y - c.y) <= tok::view2d_gizmo3_d_limit_2)
          hot = 3;
       return hot;
@@ -5707,7 +5707,7 @@ namespace
       const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
       const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
       // Darken dims what falls outside; Reveal off hides it.
-      const ImU32 dim = !sCropReveal ? Hex(kPasteboard) : IM_COL32(0, 0, 0, sCropDarken ? 140 : 0);
+      const ImU32 dim = !sCropReveal ? Hex(kPasteboard) : tok::U32(tok::view2d_dim_2, sCropDarken ? tok::view2d_crop_overlay_dim_2_alpha : 0);
       const float far = 1e6f;
       const float band[4][4] = { { -far, -far, far, y0 }, { -far, y1, far, far }, { -far, y0, x0, y1 }, { x1, y0, far, y1 } };
       ImVec2 q[4];
@@ -5716,12 +5716,12 @@ namespace
          DocRect(doc, b[0], b[1], b[2], b[3], q);
          dl->AddQuadFilled(q[0], q[1], q[2], q[3], dim);
       }
-      AddDocRect(dl, doc, x0, y0, x1, y1, tok::U32(tok::canvas_ink, 230));
+      AddDocRect(dl, doc, x0, y0, x1, y1, tok::U32(tok::canvas_ink, tok::view2d_crop_overlay_canvas_ink_alpha_3));
       for (int i = 1; i < 3 && sCropThirds; i++)
       {
          const float x = x0 + (x1 - x0) * i / tok::view2d_x_ratio, y = y0 + (y1 - y0) * i / tok::view2d_y_ratio;
-         dl->AddLine(ToScreen(doc, x, y0), ToScreen(doc, x, y1), tok::U32(tok::canvas_ink, 70));
-         dl->AddLine(ToScreen(doc, x0, y), ToScreen(doc, x1, y), tok::U32(tok::canvas_ink, 70));
+         dl->AddLine(ToScreen(doc, x, y0), ToScreen(doc, x, y1), tok::U32(tok::canvas_ink, tok::view2d_crop_overlay_canvas_ink_alpha_4));
+         dl->AddLine(ToScreen(doc, x0, y), ToScreen(doc, x1, y), tok::U32(tok::canvas_ink, tok::view2d_crop_overlay_canvas_ink_alpha_4));
       }
       for (int i = 0; i < 8; i++)
       {
@@ -6211,7 +6211,7 @@ namespace
             for (size_t k = 0; k + 1 < ln.size(); k += 2)
                q.push_back(BoxScreen(doc, *l, ln[k], ln[k + 1]));
             if (q.size() >= tok::view2d_vector_overlay_limit)
-               dl->AddPolyline(q.data(), (int)q.size(), Hex(kOutline, picked ? 1.0f : 0.45f), ImDrawFlags_None, picked ? tok::view2d_vector_overlay_stroke : 1.0f);
+               dl->AddPolyline(q.data(), (int)q.size(), Hex(kOutline, picked ? 1.0f : tok::view2d_vector_overlay_outline_alpha_4), ImDrawFlags_None, picked ? tok::view2d_vector_overlay_stroke : 1.0f);
          }
          if (!picked || sTool == kShape)
             continue;
@@ -6234,7 +6234,7 @@ namespace
                for (int k = 1; k < 3; k++)
                   if (std::fabs(p[k * 2] - p[0]) + std::fabs(p[k * 2 + 1] - p[1]) > 0.01f)
                   {
-                     dl->AddLine(BoxScreen(doc, *l, p[0], p[1]), BoxScreen(doc, *l, p[k * 2], p[k * 2 + 1]), Hex(kOutline, 0.8f));
+                     dl->AddLine(BoxScreen(doc, *l, p[0], p[1]), BoxScreen(doc, *l, p[k * 2], p[k * 2 + 1]), Hex(kOutline, tok::view2d_vector_overlay_outline_alpha_5));
                      dot(p[k * 2], p[k * 2 + 1], false);
                   }
                dot(p[0], p[1], true);
@@ -6252,7 +6252,7 @@ namespace
          if (s.Anchors() > 0 && !s.closed)
          {
             const float* p = &s.pts[(size_t)(s.Anchors() - 1) * 6];
-            dl->AddLine(BoxScreen(doc, *l, p[0], p[1]), mouse, Hex(kOutline, 0.7f), tok::view2d_vector_overlay_stroke_2);
+            dl->AddLine(BoxScreen(doc, *l, p[0], p[1]), mouse, Hex(kOutline, tok::view2d_vector_overlay_outline_alpha_6), tok::view2d_vector_overlay_stroke_2);
          }
       }
    }
@@ -6463,7 +6463,7 @@ namespace
          UpdateTextMarks(doc, *l, bw, bh, st->GetCursorPos(), st->GetSelectionStart(), st->GetSelectionEnd());
          for (const std::array<float, 4>& r : sTextMarks.sel)
             dl->AddQuadFilled(BoxScreen(doc, *l, r[0], r[1]), BoxScreen(doc, *l, r[2], r[1]), BoxScreen(doc, *l, r[2], r[3]),
-                              BoxScreen(doc, *l, r[0], r[3]), Hex(kOutline, 0.35f));
+                              BoxScreen(doc, *l, r[0], r[3]), Hex(kOutline, tok::view2d_text_editor_outline_alpha_2));
          if (std::fmod(ImGui::GetTime(), (double)tok::motion_s_blink_period) < tok::motion_s_blink_on)
             dl->AddLine(BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[1]),
                         BoxScreen(doc, *l, sTextMarks.caret[0], sTextMarks.caret[2]), Hex(kOutline), tok::stroke_caret);
@@ -6722,7 +6722,7 @@ namespace
             const int y0 = std::max(0, (int)std::floor(std::min({ c0.y, c1.y, c2.y, c3.y })));
             const int y1 = std::min(d.h, (int)std::ceil(std::max({ c0.y, c1.y, c2.y, c3.y })));
             const float al = std::min(0.22f, (sZoom - 8.0f) / 24.0f * 0.22f + 0.08f);
-            const ImU32 gc = IM_COL32(200, 200, 200, (int)(al * 255.0f));
+            const ImU32 gc = tok::U32(tok::view2d_gc_2, (int)(al * 255.0f));
             if (x1 - x0 < tok::view2d_canvas_limit_2 && y1 - y0 < tok::view2d_canvas_limit_2)
             {
                for (int x = x0; x <= x1; x++)
@@ -6737,9 +6737,9 @@ namespace
          if (const unsigned ants = doc->SelectionOverlay((float)ImGui::GetTime(), doc->quickMask))
             Thumb::AddQuad(dl, (ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       if (ViewTurned())
-         dl->AddPolyline(pq, tok::view2d_canvas_add_polyline_draw, tok::U32(tok::canvas_shade, 120), ImDrawFlags_Closed, 1.0f);
+         dl->AddPolyline(pq, tok::view2d_canvas_add_polyline_draw, tok::U32(tok::canvas_shade, tok::view2d_canvas_shade_alpha), ImDrawFlags_Closed, 1.0f);
       else
-         dl->AddRect(ImVec2(a.x - tok::space_0_25, a.y - tok::space_0_25), ImVec2(b.x + tok::space_0_25, b.y + tok::space_0_25), tok::U32(tok::canvas_shade, 120));
+         dl->AddRect(ImVec2(a.x - tok::space_0_25, a.y - tok::space_0_25), ImVec2(b.x + tok::space_0_25, b.y + tok::space_0_25), tok::U32(tok::canvas_shade, tok::view2d_canvas_shade_alpha));
 
       if (d.grid && d.gridSize > 0.0f)
       {
@@ -6748,10 +6748,10 @@ namespace
          {
             int n = 0;
             for (float x = 0; x <= d.w + 0.01f; x += sub, n++)
-               dl->AddLine(ToScreen(doc, x, 0), ToScreen(doc, x, (float)d.h), Hex(kGrid, n % std::max(tok::view2d_canvas_bound, d.gridSubdiv) == 0 ? 0.55f : 0.2f));
+               dl->AddLine(ToScreen(doc, x, 0), ToScreen(doc, x, (float)d.h), Hex(kGrid, n % std::max(tok::view2d_canvas_bound, d.gridSubdiv) == 0 ? tok::view2d_canvas_hex_alpha_4 : tok::view2d_canvas_hex_alpha_5));
             n = 0;
             for (float y = 0; y <= d.h + 0.01f; y += sub, n++)
-               dl->AddLine(ToScreen(doc, 0, y), ToScreen(doc, (float)d.w, y), Hex(kGrid, n % std::max(tok::view2d_canvas_bound, d.gridSubdiv) == 0 ? 0.55f : 0.2f));
+               dl->AddLine(ToScreen(doc, 0, y), ToScreen(doc, (float)d.w, y), Hex(kGrid, n % std::max(tok::view2d_canvas_bound, d.gridSubdiv) == 0 ? tok::view2d_canvas_hex_alpha_4 : tok::view2d_canvas_hex_alpha_5));
          }
       }
       if (d.guidesOn)
@@ -6766,7 +6766,7 @@ namespace
       if (d.symmetry > 0 && (sTool == kBrush || sTool == kEraser || sTool == kMixer || RetouchTool(sTool)))
       {
          const float cx = d.w * 0.5f, cy = d.h * 0.5f;
-         const ImU32 col = Hex(kGuide, 0.7f);
+         const ImU32 col = Hex(kGuide, tok::view2d_canvas_hex_alpha_6);
          if (d.symmetry == 1 || d.symmetry == 3)
             dl->AddLine(ToScreen(doc, cx, 0), ToScreen(doc, cx, (float)d.h), col);
          if (d.symmetry == 2 || d.symmetry == 3)
@@ -6874,7 +6874,7 @@ namespace
             dl->AddLine(ToScreen(doc, -tok::view2d_canvas_to_screen_arg, y), ToScreen(doc, tok::view2d_canvas_to_screen_arg, y), Hex(kSmart));
       }
       // Shapes being dragged out by the pixel tools.
-      const ImU32 ink = tok::U32(tok::canvas_ink, 230), shade = tok::U32(tok::canvas_shade, 160);
+      const ImU32 ink = tok::U32(tok::canvas_ink, tok::view2d_canvas_ink_alpha), shade = tok::U32(tok::canvas_shade, tok::view2d_canvas_shade_alpha_2);
       DrawToolOverlays(doc, dl, ink, shade);
       if (sOp.kind == 9)
       {
@@ -6917,8 +6917,8 @@ namespace
       {
          ImVec2 q[4];
          DocRect(doc, sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, q);
-         dl->AddQuadFilled(q[0], q[1], q[2], q[3], tok::U32(tok::canvas_select, 40));
-         dl->AddPolyline(q, tok::view2d_canvas_add_polyline_draw, tok::U32(tok::canvas_select, 220), ImDrawFlags_Closed, 1.0f);
+         dl->AddQuadFilled(q[0], q[1], q[2], q[3], tok::U32(tok::canvas_select, tok::view2d_canvas_select_alpha));
+         dl->AddPolyline(q, tok::view2d_canvas_add_polyline_draw, tok::U32(tok::canvas_select, tok::view2d_canvas_select_alpha_2), ImDrawFlags_Closed, 1.0f);
       }
       if (sOp.kind == 8)
       {
@@ -7027,7 +7027,7 @@ namespace
          const float r = tok::view2d_r_3, a0 = -2.6f, a1 = tok::view2d_a1;
          for (int pass = 0; pass < 2; pass++)
          {
-            const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, 200) : tok::U32(tok::canvas_ink);
+            const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, tok::view2d_canvas_shade_alpha_3) : tok::U32(tok::canvas_ink);
             const float th = pass == 0 ? 3.5f : 1.5f;
             dl->PathArcTo(c, r, a0, a1, tok::view2d_canvas_segments_2);
             dl->PathStroke(col, 0, th);
@@ -7056,7 +7056,7 @@ namespace
          dl->PushClipRect(sViewMn, sViewMx, true);
          for (int pass = 0; pass < 2; pass++)
          {
-            const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, 170) : tok::U32(tok::canvas_ink);
+            const ImU32 col = pass == 0 ? tok::U32(tok::canvas_shade, tok::view2d_canvas_shade_alpha_4) : tok::U32(tok::canvas_ink);
             const float th = pass == 0 ? 3.0f : 1.0f;
             dl->AddLine(ImVec2(src.x - tok::view2d_canvas_gap_2, src.y), ImVec2(src.x + tok::view2d_canvas_gap_2, src.y), col, th);
             dl->AddLine(ImVec2(src.x, src.y - tok::view2d_canvas_gap_2), ImVec2(src.x, src.y + tok::view2d_canvas_gap_2), col, th);
@@ -9029,7 +9029,7 @@ namespace
    void DimHeader(const char* text)
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.5f));
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, tok::view2d_dim_header_alpha_2));
       ImGui::TextUnformatted(text);
       ImGui::PopStyleColor();
    }
@@ -9066,7 +9066,7 @@ namespace
             const ImVec2 fa = ImGui::GetItemRectMin();
             const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
             ImGui::GetWindowDrawList()->AddText(ImVec2(fa.x + ImGui::GetStyle().FramePadding.x, fa.y + ImGui::GetStyle().FramePadding.y),
-                                                ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.4f)), T("Search"));
+                                                ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::view2d_font_picker_alpha_2)), T("Search"));
          }
          ImGui::Dummy(ImVec2(0.0f, tok::view2d_font_picker_dummy_h));
          std::string want = sFontFind;
@@ -9597,7 +9597,7 @@ namespace
                   ImDrawList* pdl = ImGui::GetWindowDrawList();
                   if (ImGui::IsItemHovered())
                      pdl->AddRectFilled(rp, ImVec2(rp.x + rw, rp.y + rh), ImGui::GetColorU32(ImGuiCol_HeaderHovered), tok::radius_control);
-                  const ImU32 ink = ImGui::GetColorU32(on ? ImGuiCol_Text : ImGuiCol_TextDisabled, on ? 1.0f : 0.6f);
+                  const ImU32 ink = ImGui::GetColorU32(on ? ImGuiCol_Text : ImGuiCol_TextDisabled, on ? 1.0f : tok::view2d_tool_picker_alpha_2);
                   glyph::Draw(pdl, ImVec2(rp.x + tok::space_1 + tok::space_2, rp.y + rh * 0.5f), tok::icon_control, ink, kTools[idx].glyph);
                   const ImVec2 tp(rp.x + tok::space_1 + tok::view2d_tool_picker_gap + tok::space_2, rp.y + (rh - ImGui::GetTextLineHeight()) * 0.5f);
                   pdl->AddText(tp, ink, name);
@@ -9964,7 +9964,7 @@ namespace
             const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
             const ImVec2 c((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImU32 col = ImGui::GetColorU32(sSel.size() < 3 ? ImGuiCol_TextDisabled : ImGuiCol_Text);
+            const ImU32 col = ImGui::GetColorU32(sSel.size() < tok::view2d_context_bar_items_level_2 ? ImGuiCol_TextDisabled : ImGuiCol_Text);
             const float ks = tok::view2d_ks_ratio * tok::icon_control / tok::view2d_ks_ratio_2;
             for (int k = -1; k <= 1; k++)
             {
@@ -10271,7 +10271,7 @@ namespace
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const bool sel = Selected(id);
          if (sel)
-            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), ImGui::GetColorU32(ImGuiCol_Header, Active(doc) == l ? 1.0f : 0.6f), tok::view2d_layer_rows_radius);
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), ImGui::GetColorU32(ImGuiCol_Header, Active(doc) == l ? 1.0f : tok::view2d_layer_rows_header_alpha_2), tok::view2d_layer_rows_radius);
          if (l->label > 0 && l->label < 8)
             dl->AddRectFilled(ImVec2(p.x, p.y + tok::space_0_75), ImVec2(p.x + tok::space_0_75, p.y + rowH - tok::space_0_75), kLabelCol[l->label]);
          // Eye: Alt-click shows only this one.
@@ -11823,7 +11823,7 @@ namespace
       const bool hov = ImGui::IsItemHovered();
       if (hov && tip != nullptr)
          HelpTip("%s", tip);
-      const ImU32 col = ImGui::GetColorU32(on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !on ? 1.0f : 0.85f);
+      const ImU32 col = ImGui::GetColorU32(on ? ImGuiCol_Text : ImGuiCol_TextDisabled, hov || !on ? 1.0f : tok::view2d_card_title_alpha_2);
       const std::string shown = app::TruncateWithEllipsis(title, std::max(16.0f, nameW - tok::space_0_5));
       ImGui::GetWindowDrawList()->AddText(ImVec2(np.x, np.y + (fh - ImGui::GetFontSize()) * 0.5f), col, shown.c_str());
       return np;
@@ -13823,7 +13823,7 @@ namespace
                bytes.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
             if (unsigned char* img = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &w, &h, &ch, 4))
             {
-               const std::vector<uint8_t> rgba(img, img + (size_t)w * h * 4);
+               const std::vector<uint8_t> rgba(img, img + (size_t)w * h * tok::view2d_drop_files_rgba_scale_2);
                stbi_image_free(img);
                const size_t slash = path.find_last_of("/\\");
                std::string name = slash == std::string::npos ? path : path.substr(slash + 1);

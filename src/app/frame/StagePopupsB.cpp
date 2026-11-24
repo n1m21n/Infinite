@@ -164,8 +164,8 @@ void DrawPopupsB(FrameCtx& fc)
             const bool isLight = CategoryColors::IsThemeLight();
             const float* col = c->color;
             const ImVec4 textCol = isLight
-               ? ImVec4(30.0f / 255.0f, 36.0f / 255.0f, 48.0f / 255.0f, 1.0f)
-               : ImVec4(col[0] * 0.5f + 0.5f, col[1] * 0.5f + 0.5f, col[2] * 0.5f + 0.5f, 1.0f);
+               ? tok::V4(tok::stage_popups_b_text_col)
+               : ImVec4(col[0] * tok::stage_popups_b_scale_2 + tok::stage_popups_b_offset_2, col[1] * tok::stage_popups_b_scale_2 + tok::stage_popups_b_offset_2, col[2] * tok::stage_popups_b_scale_2 + tok::stage_popups_b_offset_2, 1.0f);
 
             const float fontScale = CommentFontScale(c->fontSize);
             ImGui::PushStyleColor(ImGuiCol_Text, textCol);
@@ -779,7 +779,7 @@ void DrawPopupsB(FrameCtx& fc)
                sTrashSeen = now;
             ImDrawList* dl = ImGui::GetForegroundDrawList();
             const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-            const ImU32 fg = ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.95f));
+            const ImU32 fg = ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, tok::stage_popups_b_alpha_2));
             dl->AddCircleFilled(c, r, ImGui::GetColorU32(over ? ImGuiCol_ButtonHovered : ImGuiCol_PopupBg), tok::stage_popups_b_segments);
             dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_Border), tok::stage_popups_b_segments, 1.0f);
             glyph::Draw(dl, c, tok::icon_md * k, fg, IconsInfinite::Trash);

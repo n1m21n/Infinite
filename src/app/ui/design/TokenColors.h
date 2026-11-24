@@ -30,6 +30,9 @@ namespace tok
 
    constexpr ImVec4 V4(const Rgbaf& c) { return ImVec4(c.r, c.g, c.b, c.a); }
 
+   // A surface colour at the call site's opacity (0-1).
+   constexpr ImVec4 V4(const Rgbaf& c, float alpha) { return ImVec4(c.r, c.g, c.b, alpha); }
+
    constexpr ImVec4 V4(const Rgba8& c) { return ImVec4(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f); }
 
    constexpr ImVec4 V4(const Pair8& p, bool light) { return V4(light ? p.light : p.dark); }
@@ -47,6 +50,12 @@ namespace tok
    {
       const Rgbaf& c = light ? p.light : p.dark;
       return ImVec4(c.r, c.g, c.b, c.a);
+   }
+
+   constexpr ImVec4 V4(const Pairf& p, bool light, float alpha)
+   {
+      const Rgbaf& c = light ? p.light : p.dark;
+      return ImVec4(c.r, c.g, c.b, alpha);
    }
 
    // Palette roles (tok::col, owner 2026-11-24). Role / RoleV4 follow the theme (dark or light side); Base / BaseV4

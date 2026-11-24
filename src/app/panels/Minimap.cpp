@@ -74,14 +74,14 @@ namespace app
       dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h),
                         IM_COL32((int)(t.panelBg.r * tok::minimap_ratio_4), (int)(t.panelBg.g * tok::minimap_ratio_4), (int)(t.panelBg.b * tok::minimap_ratio_4), (int)(gMinimapOpacity * tok::minimap_ratio_4)), tok::radius_control);
       dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h),
-                  IM_COL32((int)(t.border.r * tok::minimap_ratio_4), (int)(t.border.g * tok::minimap_ratio_4), (int)(t.border.b * tok::minimap_ratio_4), 200), tok::radius_control, 0, tok::minimap_stroke);
+                  IM_COL32((int)(t.border.r * tok::minimap_ratio_4), (int)(t.border.g * tok::minimap_ratio_4), (int)(t.border.b * tok::minimap_ratio_4), tok::minimap_alpha_2), tok::radius_control, 0, tok::minimap_stroke);
 
       for (const GraphNode& gn : gNodes)
       {
          const ImVec2 a = toMinimap(ImVec2(gn.liveX, gn.liveY));
          const ImVec2 b = toMinimap(ImVec2(gn.liveX + kNodeW, gn.liveY + kNodeH));
          const bool selected = ed::IsNodeSelected(gn.NodeId());
-         dl->AddRectFilled(a, b, selected ? tok::Role(tok::col::role_modulation, 230) : tok::Role(tok::col::accent_17, 200), tok::radius_cell);
+         dl->AddRectFilled(a, b, selected ? tok::Role(tok::col::role_modulation, tok::minimap_role_modulation_alpha_2) : tok::Role(tok::col::accent_17, tok::minimap_accent_17_alpha_2), tok::radius_cell);
          if (FindIsMatch(gn.index))
             dl->AddRect(ImVec2(a.x - tok::minimap_gap, a.y - tok::minimap_gap), ImVec2(b.x + tok::minimap_gap, b.y + tok::minimap_gap),
                         ImGui::GetColorU32(AccentEmphasisSelected()), tok::minimap_radius, 0, tok::minimap_stroke_2);
@@ -103,7 +103,7 @@ namespace app
          dl->PushClipRect(origin, ImVec2(origin.x + w, origin.y + h), true);
          const ImVec2 a = toMinimap(viewWorldTL);
          const ImVec2 b = toMinimap(viewWorldBR);
-         dl->AddRect(a, b, isLight ? tok::Base(tok::col::edge_lo, 220) : tok::Base(tok::col::ink_white, 220), tok::minimap_radius, 0, tok::minimap_stroke_3);
+         dl->AddRect(a, b, isLight ? tok::Base(tok::col::edge_lo, tok::minimap_edge_lo_alpha_2) : tok::Base(tok::col::ink_white, tok::minimap_ink_white_alpha_2), tok::minimap_radius, 0, tok::minimap_stroke_3);
          dl->PopClipRect();
       }
 

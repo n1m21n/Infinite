@@ -158,7 +158,7 @@ namespace app
             return ImGui::ColorConvertFloat4ToU32(ImVec4(c.colorR, c.colorG, c.colorB, 1.0f));
          if (active)
             return isVideo ? tok::Role(tok::col::role_expression) : tok::Role(tok::col::viz_teal);
-         return isVideo ? tok::Role(tok::col::role_expression, 210) : tok::Role(tok::col::state_ok_4, 210);
+         return isVideo ? tok::Role(tok::col::role_expression, tok::arrange_session_grid_slot_fill_role_expression_alpha_2) : tok::Role(tok::col::state_ok_4, tok::arrange_session_grid_slot_fill_state_ok_4_alpha_2);
       }
 
       ImU32 LabelOn(ImU32 fill)
@@ -218,7 +218,7 @@ namespace app
       // starting at twelve o'clock (the MPC pad ring).
       void DrawProgressRing(ImDrawList* dl, ImVec2 c, float r, float progress, ImU32 col)
       {
-         dl->AddCircle(c, r, WithAlpha(col, 0.30f), tok::arrange_session_grid_progress_ring_segments, tok::arrange_session_grid_progress_ring_stroke);
+         dl->AddCircle(c, r, WithAlpha(col, tok::arrange_session_grid_progress_ring_alpha_2), tok::arrange_session_grid_progress_ring_segments, tok::arrange_session_grid_progress_ring_stroke);
          const float a0 = -IM_PI * 0.5f;
          const float a1 = a0 + std::clamp(progress, 0.0f, 1.0f) * 2.0f * IM_PI;
          if (a1 > a0 + 0.02f)
@@ -649,7 +649,7 @@ namespace app
       // ---- corner: the scene column's header (Record and Stop All live in the toolbar) ----
       {
          const float th = ImGui::GetTextLineHeight();
-         dl->AddText(ImVec2(o.x + kGap + tok::arrange_session_grid_gap_3, o.y + (kHeaderH - th) * 0.5f), TextCol(0.55f), T("Scenes"));
+         dl->AddText(ImVec2(o.x + kGap + tok::arrange_session_grid_gap_3, o.y + (kHeaderH - th) * 0.5f), TextCol(tok::arrange_session_grid_text_col_alpha_18), T("Scenes"));
       }
 
       // ---- track headers ----
@@ -658,7 +658,7 @@ namespace app
          const Arrange::Lane& lane = gArrange.lanes[(size_t)li];
          const float x0 = o.x + kSceneColW + colW * (float)li;
          const ImVec2 a(x0 + kGap, o.y + kGap), b(x0 + colW - kGap, o.y + kHeaderH - kGap);
-         dl->AddRectFilled(a, b, TextCol(0.06f), tok::radius_control);
+         dl->AddRectFilled(a, b, TextCol(tok::arrange_session_grid_text_col_alpha_19), tok::radius_control);
          const std::string name = lane.name.empty() ? (lane.type == Arrange::kLaneVideo ? T("Video") : T("Audio"))
                                                     : lane.name;
          const float th = ImGui::GetTextLineHeight();
@@ -666,7 +666,7 @@ namespace app
             continue;
          dl->PushClipRect(a, ImVec2(b.x - tok::space_1, b.y), true);
          dl->AddText(ImVec2(a.x + tok::arrange_session_grid_gap_3, (a.y + b.y - th) * 0.5f),
-                     Arrange::LaneEffectivelyEnabled(gArrange, lane) ? TextCol(0.92f) : TextCol(0.40f), name.c_str());
+                     Arrange::LaneEffectivelyEnabled(gArrange, lane) ? TextCol(tok::arrange_session_grid_text_col_alpha_20) : TextCol(tok::arrange_session_grid_text_col_alpha_21), name.c_str());
          dl->PopClipRect();
       }
 
@@ -787,7 +787,7 @@ namespace app
             HelpTip("%s", rowHasClip ? T("Click to launch this row on every track, click again to stop it. Drag to reorder. Right-click for its tempo and what plays next.")
                                      : T("Right-click to rename this scene or set its tempo"));
          ImGui::PopID();
-         dl->AddRectFilled(a, b, TextCol(hov ? 0.10f : 0.05f), tok::radius_control);
+         dl->AddRectFilled(a, b, TextCol(hov ? tok::arrange_session_grid_text_col_alpha_22 : tok::arrange_session_grid_text_col_alpha_23), tok::radius_control);
          const float cy = (a.y + b.y) * 0.5f;
          // Scene state: playing = every filled cell of the row is running (a ring sweeps with the clip),
          // queued = the launch is waiting for the quantize point (the play glyph pulses on the beat).
@@ -802,14 +802,14 @@ namespace app
                break;
             }
          if (sSelScene == row)
-            dl->AddRect(a, b, TextCol(0.70f), tok::radius_control, 0, tok::arrange_session_grid_stroke);
+            dl->AddRect(a, b, TextCol(tok::arrange_session_grid_text_col_alpha_24), tok::radius_control, 0, tok::arrange_session_grid_stroke);
          if (rowPlaying)
-            dl->AddRectFilled(a, b, WithAlpha(tok::Role(tok::col::ink_white), 0.10f), tok::radius_control);
+            dl->AddRectFilled(a, b, WithAlpha(tok::Role(tok::col::ink_white), tok::arrange_session_grid_alpha_5), tok::radius_control);
          if (rowPlaying)
-            DrawProgressRing(dl, ImVec2(a.x + tok::arrange_session_grid_gap_4, cy), tok::arrange_session_grid_draw_progress_ring_arg, rowProgress, TextCol(0.95f));
+            DrawProgressRing(dl, ImVec2(a.x + tok::arrange_session_grid_gap_4, cy), tok::arrange_session_grid_draw_progress_ring_arg, rowProgress, TextCol(tok::arrange_session_grid_text_col_alpha_25));
          else
             glyph::DrawPlayerPlay(dl, ImVec2(a.x + tok::arrange_session_grid_gap_4, cy), tok::icon_control,
-                                  rowQueued ? WithAlpha(TextCol(0.95f), pulse) : (rowHasClip ? TextCol(0.85f) : TextCol(0.25f)), true);
+                                  rowQueued ? WithAlpha(TextCol(tok::arrange_session_grid_text_col_alpha_25), pulse) : (rowHasClip ? TextCol(tok::arrange_session_grid_text_col_alpha_26) : TextCol(tok::arrange_session_grid_text_col_alpha_27)), true);
          const std::string label = SceneLabel(row);
          const float th = ImGui::GetTextLineHeight();
          float rightEdge = b.x - tok::space_1_5;
@@ -818,11 +818,11 @@ namespace app
             char tbuf[24];
             snprintf(tbuf, sizeof(tbuf), "%s", UiFmt::F0(gArrange.scenes[(size_t)row].tempo).c);
             const ImVec2 ts = ImGui::CalcTextSize(tbuf);
-            dl->AddText(ImVec2(rightEdge - ts.x, cy - th * 0.5f), TextCol(0.55f), tbuf);
+            dl->AddText(ImVec2(rightEdge - ts.x, cy - th * 0.5f), TextCol(tok::arrange_session_grid_text_col_alpha_18), tbuf);
             rightEdge -= ts.x + tok::space_1_5;
          }
          dl->PushClipRect(a, ImVec2(rightEdge, b.y), true);
-         dl->AddText(ImVec2(a.x + tok::arrange_session_grid_gap_5, cy - th * 0.5f), realScene ? TextCol(0.85f) : TextCol(0.35f), label.c_str());
+         dl->AddText(ImVec2(a.x + tok::arrange_session_grid_gap_5, cy - th * 0.5f), realScene ? TextCol(tok::arrange_session_grid_text_col_alpha_26) : TextCol(tok::arrange_session_grid_text_col_alpha_28), label.c_str());
          dl->PopClipRect();
       }
 
@@ -832,7 +832,7 @@ namespace app
          const int target = std::clamp((int)std::floor((ImGui::GetMousePos().y - bodyTop) / kRowH), 0, std::max(0, rows - 1));
          const float ly = bodyTop + kRowH * (float)(target + (target > sSceneDragFrom ? 1 : 0));
          if (target != sSceneDragFrom)
-            dl->AddRectFilled(ImVec2(o.x + kGap, ly - 1.0f), ImVec2(o.x + kSceneColW - kGap, ly + 1.0f), TextCol(0.9f), 1.0f);
+            dl->AddRectFilled(ImVec2(o.x + kGap, ly - 1.0f), ImVec2(o.x + kSceneColW - kGap, ly + 1.0f), TextCol(tok::arrange_session_grid_text_col_alpha_29), 1.0f);
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
          {
             MoveScene(sSceneDragFrom, target);
@@ -846,7 +846,7 @@ namespace app
          const int target = std::clamp((int)std::floor((ImGui::GetMousePos().x - o.x - kSceneColW) / colW), 0, laneCount - 1);
          const float lx = o.x + kSceneColW + colW * (float)(target + (target > sTrackDragFrom ? 1 : 0));
          if (target != sTrackDragFrom)
-            dl->AddRectFilled(ImVec2(lx - 1.0f, o.y + kGap), ImVec2(lx + 1.0f, o.y + kHeaderH - kGap), TextCol(0.9f), 1.0f);
+            dl->AddRectFilled(ImVec2(lx - 1.0f, o.y + kGap), ImVec2(lx + 1.0f, o.y + kHeaderH - kGap), TextCol(tok::arrange_session_grid_text_col_alpha_29), 1.0f);
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
          {
             if (target != sTrackDragFrom)
@@ -954,17 +954,17 @@ namespace app
                   fill = isLight ? tok::Base(tok::col::edge_mid_2, 220) : tok::Base(tok::col::edge_lo_2, 220);
                dl->AddRectFilled(a, b, fill, tok::radius_control);
                if (muted)
-                  DrawArrangeHatch(dl, a, b, isLight ? tok::Base(tok::col::ink_black, 45) : tok::Base(tok::col::ink_white, 38));
-               const ImU32 ink = muted ? TextCol(0.55f) : LabelOn(fill);
+                  DrawArrangeHatch(dl, a, b, isLight ? tok::Base(tok::col::ink_black, tok::arrange_session_grid_ink_black_alpha_2) : tok::Base(tok::col::ink_white, tok::arrange_session_grid_ink_white_alpha_3));
+               const ImU32 ink = muted ? TextCol(tok::arrange_session_grid_text_col_alpha_18) : LabelOn(fill);
                if (st.playing)
-                  dl->AddRect(a, b, tok::Role(tok::col::ink_white, 240), tok::radius_control, 0, tok::arrange_session_grid_stroke);
+                  dl->AddRect(a, b, tok::Role(tok::col::ink_white, tok::arrange_session_grid_ink_white_alpha_4), tok::radius_control, 0, tok::arrange_session_grid_stroke);
                else if (hov)
-                  dl->AddRect(a, b, tok::Role(tok::col::edge_hi, 220), tok::radius_control, 0, tok::arrange_session_grid_stroke_2);
+                  dl->AddRect(a, b, tok::Role(tok::col::edge_hi, tok::arrange_session_grid_edge_hi_alpha_2), tok::radius_control, 0, tok::arrange_session_grid_stroke_2);
                const ImVec2 ic(a.x + tok::arrange_session_grid_gap_4, cy);
                if (st.playing)
                   DrawProgressRing(dl, ic, tok::arrange_session_grid_draw_progress_ring_arg, st.progress, tok::Role(tok::col::ink_white));
                else
-                  glyph::DrawPlayerPlay(dl, ic, tok::icon_control, WithAlpha(ink, st.queued ? pulse : 0.85f), !st.queued);
+                  glyph::DrawPlayerPlay(dl, ic, tok::icon_control, WithAlpha(ink, st.queued ? pulse : tok::arrange_session_grid_ink_alpha_4), !st.queued);
                if (gArrangeAssigningClipId == ss->clip.id)
                {
                   // Waiting for a canvas node: the same cue as the Timeline's
@@ -981,23 +981,23 @@ namespace app
                      gArrangeFlashClipId = 0;
                   else
                      dl->AddRect(ImVec2(a.x - tok::space_0_5, a.y - tok::space_0_5), ImVec2(b.x + tok::space_0_5, b.y + tok::space_0_5),
-                                 IM_COL32(255, 255, 255, (int)(tok::arrange_session_grid_ratio_2 * (tok::arrange_session_grid_bias - ft / tok::arrange_session_grid_ratio_3))), tok::radius_control, 0, tok::arrange_session_grid_stroke_3);
+                                 tok::U32(tok::arrange_session_grid_col_2, (int)(tok::arrange_session_grid_ratio_2 * (tok::arrange_session_grid_bias - ft / tok::arrange_session_grid_ratio_3))), tok::radius_control, 0, tok::arrange_session_grid_stroke_3);
                }
                if (st.queued)
-                  dl->AddRect(a, b, WithAlpha(tok::Role(tok::col::ink_white), 0.9f * pulse), tok::radius_control, 0, tok::arrange_session_grid_stroke);
+                  dl->AddRect(a, b, WithAlpha(tok::Role(tok::col::ink_white), tok::arrange_session_grid_with_alpha_scale_2 * pulse), tok::radius_control, 0, tok::arrange_session_grid_stroke);
                if (st.upNext)
                {
                   // Up next (a follow action is about to start this clip): a steady inner outline and a chevron.
                   dl->AddRect(ImVec2(a.x + tok::space_0_5, a.y + tok::space_0_5), ImVec2(b.x - tok::space_0_5, b.y - tok::space_0_5),
-                              WithAlpha(tok::Role(tok::col::ink_white), 0.75f), tok::radius_control, 0, tok::arrange_session_grid_stroke_2);
-                  glyph::DrawChevronDown(dl, ImVec2(b.x - tok::space_3_5, a.y + tok::space_2), tok::icon_control, WithAlpha(ink, 0.9f));
+                              WithAlpha(tok::Role(tok::col::ink_white), tok::arrange_session_grid_alpha_6), tok::radius_control, 0, tok::arrange_session_grid_stroke_2);
+                  glyph::DrawChevronDown(dl, ImVec2(b.x - tok::space_3_5, a.y + tok::space_2), tok::icon_control, WithAlpha(ink, tok::arrange_session_grid_ink_alpha_5));
                }
                const std::string label = SlotLabel(ss->clip);
                const float badgeW = ss->followAction != Arrange::kFollowNone ? tok::arrange_session_grid_badge_w : 0.0f;
                dl->PushClipRect(a, ImVec2(b.x - tok::space_1_5 - badgeW, b.y), true);
                dl->AddText(ImVec2(a.x + tok::arrange_session_grid_gap_5, cy - th * 0.5f), ink, label.c_str());
                dl->PopClipRect();
-               DrawFollowBadge(dl, ImVec2(b.x - tok::space_1_5, cy), *ss, WithAlpha(ink, 0.8f));
+               DrawFollowBadge(dl, ImVec2(b.x - tok::space_1_5, cy), *ss, WithAlpha(ink, tok::arrange_session_grid_ink_alpha_6));
                if (hov)
                   HelpTip("%s", muted ? (src == nullptr ? T("This slot's source is missing") : T("This slot is inactive"))
                                       : T("Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions."));
@@ -1006,12 +1006,12 @@ namespace app
             {
                // Empty: a quiet recess. While the track plays, the cell is a
                // stop button, and says so on hover.
-               dl->AddRectFilled(a, b, TextCol(hov ? 0.08f : 0.035f), tok::radius_control);
+               dl->AddRectFilled(a, b, TextCol(hov ? tok::arrange_session_grid_text_col_alpha_30 : tok::arrange_session_grid_text_col_alpha_31), tok::radius_control);
                if (hov)
                {
                   // A plus: a double-click adds an unassigned clip to this cell.
                   const ImVec2 pc((a.x + b.x) * 0.5f, cy);
-                  const ImU32 pcol = TextCol(0.55f);
+                  const ImU32 pcol = TextCol(tok::arrange_session_grid_text_col_alpha_18);
                   dl->AddLine(ImVec2(pc.x - tok::space_1_5, pc.y), ImVec2(pc.x + tok::space_1_5, pc.y), pcol, tok::arrange_session_grid_stroke);
                   dl->AddLine(ImVec2(pc.x, pc.y - tok::space_1_5), ImVec2(pc.x, pc.y + tok::space_1_5), pcol, tok::arrange_session_grid_stroke);
                   HelpTip("%s", isVideo ? T("Double-click to add a clip. Click selects the cell to paste into. You can also drop a video or image file here.")
@@ -1022,7 +1022,7 @@ namespace app
             // The keyboard cursor / selected clip.
             if ((ss != nullptr && gArrangeSel.count(ss->clip.id) != 0) || (laneId == sCurLaneId && row == sCurRow))
                dl->AddRect(ImVec2(a.x - tok::space_0_25, a.y - tok::space_0_25), ImVec2(b.x + tok::space_0_25, b.y + tok::space_0_25),
-                           WithAlpha(TextCol(1.0f), gSessionClaimedKeys ? 0.9f : 0.45f), tok::radius_control, 0, tok::arrange_session_grid_stroke);
+                           WithAlpha(TextCol(tok::arrange_session_grid_text_col_alpha_32), gSessionClaimedKeys ? tok::arrange_session_grid_alpha_7 : tok::arrange_session_grid_alpha_8), tok::radius_control, 0, tok::arrange_session_grid_stroke);
             if (ss != nullptr && gArrangeRenamingClipId == ss->clip.id)
             {
                static uint64_t sRenameFocusedId = 0;
@@ -1092,7 +1092,7 @@ namespace app
                ArrangeSessionStopLane(laneId);
             const bool hov = ImGui::IsItemHovered();
             ImGui::EndDisabled();
-            dl->AddRectFilled(a, b, TextCol(canStop ? (hov ? tok::arrange_session_grid_assign : tok::arrange_session_grid_assign_2) : 0.03f), tok::radius_control);
+            dl->AddRectFilled(a, b, TextCol(canStop ? (hov ? tok::arrange_session_grid_assign : tok::arrange_session_grid_assign_2) : tok::arrange_session_grid_text_col_alpha_33), tok::radius_control);
             const float alpha = !canStop ? 0.22f : (ls.stopQueued ? 0.9f * pulse : 0.85f);
             DrawStopSquare(dl, ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), 9.0f, TextCol(alpha));
             if (hov)
@@ -1115,12 +1115,12 @@ namespace app
          {
             const float x0 = o.x + kSceneColW + colW * (float)li, y0 = bodyTop + kRowH * (float)row;
             dl->AddRect(ImVec2(x0 + kGap - tok::space_0_25, y0 + kGap - tok::space_0_25), ImVec2(x0 + colW - kGap + tok::space_0_25, y0 + kRowH - kGap + tok::space_0_25),
-                        TextCol(0.95f), tok::radius_control, 0, tok::arrange_session_grid_stroke_4);
+                        TextCol(tok::arrange_session_grid_text_col_alpha_25), tok::radius_control, 0, tok::arrange_session_grid_stroke_4);
          }
          if (srcLane != nullptr && SlotOf(*srcLane, sDrag.row) != nullptr)
          {
             const std::string label = SlotLabel(srcLane->slots[(size_t)sDrag.row].clip);
-            ImGui::GetForegroundDrawList()->AddText(ImVec2(mouse.x + tok::space_3_5, mouse.y + tok::space_1), TextCol(fits ? 0.95f : 0.45f),
+            ImGui::GetForegroundDrawList()->AddText(ImVec2(mouse.x + tok::space_3_5, mouse.y + tok::space_1), TextCol(fits ? tok::arrange_session_grid_text_col_alpha_25 : tok::arrange_session_grid_text_col_alpha_34),
                                                     (copy ? "+ " + label : label).c_str());
          }
          ImGui::SetMouseCursor(fits ? ImGuiMouseCursor_Hand : ImGuiMouseCursor_NotAllowed);
@@ -1135,8 +1135,8 @@ namespace app
          sDrag = {};
 
       // Hairline under the headers and above the stop row: the grid's frame.
-      dl->AddLine(ImVec2(o.x, bodyTop - tok::px_align), ImVec2(o.x + gridW, bodyTop - tok::px_align), TextCol(0.10f), tok::arrange_session_grid_stroke_2);
-      dl->AddLine(ImVec2(o.x, footerTop + tok::px_align), ImVec2(o.x + gridW, footerTop + tok::px_align), TextCol(0.10f), tok::arrange_session_grid_stroke_2);
+      dl->AddLine(ImVec2(o.x, bodyTop - tok::px_align), ImVec2(o.x + gridW, bodyTop - tok::px_align), TextCol(tok::arrange_session_grid_text_col_alpha_22), tok::arrange_session_grid_stroke_2);
+      dl->AddLine(ImVec2(o.x, footerTop + tok::px_align), ImVec2(o.x + gridW, footerTop + tok::px_align), TextCol(tok::arrange_session_grid_text_col_alpha_22), tok::arrange_session_grid_stroke_2);
 
       DrawSlotMenu();
       DrawSceneMenu();
@@ -1578,7 +1578,7 @@ namespace app
       ImU32 RecordDotCol()
       {
          const tok::Rgba8& c = IsThemeLight() ? tok::action_record.light : tok::action_record.dark;
-         return IM_COL32(c.r, c.g, c.b, 255);
+         return IM_COL32(c.r, c.g, c.b, tok::arrange_session_grid_record_dot_col_alpha_2);
       }
 
       // Session Audio on: the launched clips own the output (starting the device if it is off). Off hands audio
@@ -1876,7 +1876,7 @@ namespace app
          ImGui::EndDisabled();
          if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             HelpTip("%s", T("Stop All (.): every track stops at the next quantize point"));
-         glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, WithAlpha(iconCol, anyLaunched ? 1.0f : 0.35f),
+         glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_control, WithAlpha(iconCol, anyLaunched ? 1.0f : tok::arrange_session_grid_panel_content_icon_col_alpha_2),
                      IconsInfinite::StopFill);
          nextTo(tok::space_1);
 

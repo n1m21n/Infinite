@@ -603,7 +603,7 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope  -  drag the handles", "##analogAmpEnv", &n->attack,
                         &n->decay, &n->sustain, &n->release, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::accent_alt, 245));
+                        tok::Role(tok::col::accent_alt, tok::audio_node_analog_body_accent_alt_alpha_2));
       ImGui::PopID();
 
       ImGui::Dummy(ImVec2(0.0f, tok::audio_node_analog_body_dummy_h_2));

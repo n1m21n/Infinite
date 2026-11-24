@@ -66,9 +66,9 @@ namespace app
       const float R = std::min(stageW, stageH) * 0.5f - 14.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      const ImU32 line = light ? tok::Base(tok::col::ink_black, 45) : tok::Base(tok::col::ink_white, 40);
+      const ImU32 line = light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_body_ink_black_alpha_5) : tok::Base(tok::col::ink_white, tok::spatial_mixer_body_ink_white_alpha_4);
       const ImU32 text = light ? tok::Base(tok::col::ink_black, 150) : tok::Base(tok::col::ink_white, 150);
-      dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? tok::Base(tok::col::ink_black, 14) : tok::Base(tok::col::ink_white, 10), tok::radius_control);
+      dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_body_ink_black_alpha_6) : tok::Base(tok::col::ink_white, tok::spatial_mixer_body_ink_white_alpha_5), tok::radius_control);
       dl->AddCircle(centre, R, line, tok::spatial_mixer_body_segments);
       for (float m : { 1.0f, 2.0f })
          dl->AddCircle(centre, R * RadiusFracFromDist(m), line, tok::spatial_mixer_body_segments_2);
@@ -181,13 +181,13 @@ namespace app
          if (hot == s || n->selected == s)
             dl->AddCircle(d, r + tok::space_1_25, text, tok::spatial_mixer_body_segments_3, tok::spatial_mixer_body_stroke);
          if (lvl > 0.002f)
-            dl->AddCircle(d, r + tok::space_0_5 + lvl * tok::spatial_mixer_body_ratio_3, DotColor(s, 0.5f), tok::spatial_mixer_body_segments_3, tok::spatial_mixer_body_stroke_2);
-         dl->AddCircleFilled(d, r, DotColor(s, silent ? 0.25f : 1.0f), tok::spatial_mixer_body_segments_3);
-         dl->AddCircle(d, r, light ? tok::Base(tok::col::ink_black, 120) : tok::Base(tok::col::ink_white, 120), tok::spatial_mixer_body_segments_3, 1.0f);
+            dl->AddCircle(d, r + tok::space_0_5 + lvl * tok::spatial_mixer_body_ratio_3, DotColor(s, tok::spatial_mixer_body_dot_color_alpha_3), tok::spatial_mixer_body_segments_3, tok::spatial_mixer_body_stroke_2);
+         dl->AddCircleFilled(d, r, DotColor(s, silent ? tok::spatial_mixer_body_dot_color_alpha_4 : 1.0f), tok::spatial_mixer_body_segments_3);
+         dl->AddCircle(d, r, light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_body_ink_black_alpha_7) : tok::Base(tok::col::ink_white, tok::spatial_mixer_body_ink_white_alpha_6), tok::spatial_mixer_body_segments_3, 1.0f);
          char lab[16];
          snprintf(lab, sizeof(lab), "%d", s + 1);
          const ImVec2 ts = ImGui::CalcTextSize(lab);
-         dl->AddText(ImVec2(d.x - ts.x * 0.5f, d.y - ts.y * 0.5f), tok::Role(tok::col::ink_black, 220), lab);
+         dl->AddText(ImVec2(d.x - ts.x * 0.5f, d.y - ts.y * 0.5f), tok::Role(tok::col::ink_black, tok::spatial_mixer_body_ink_black_alpha_8), lab);
       }
 
       // Readout: hover or selected object.

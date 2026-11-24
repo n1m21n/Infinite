@@ -818,7 +818,7 @@ namespace app
    // Marker colours are RGBA8 packed 0xRRGGBBAA (Arrange::Marker::color).
    ImU32 ArrangeMarkerColU32(uint32_t rgba)
    {
-      return IM_COL32((rgba >> 24) & 0xFF, (rgba >> 16) & 0xFF, (rgba >> 8) & 0xFF, rgba & 0xFF);
+      return IM_COL32((rgba >> 24) & 0xFF, (rgba >> 16) & 0xFF, (rgba >> 8) & 0xFF, rgba & 0xFF);  // ui-audit-ok: channel mask / bit packing, not a colour value
    }
 
    uint32_t ArrangeMarkerRGBA(ImU32 col)

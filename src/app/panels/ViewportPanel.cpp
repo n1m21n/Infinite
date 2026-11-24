@@ -80,7 +80,7 @@ namespace app
       ApplyViewHotkeys(cam.azimuth, cam.elevation);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     tok::Role(tok::col::accent_2, 200), tok::viewport_mini_radius, 0, tok::viewport_mini_stroke);
+                     tok::Role(tok::col::accent_2, tok::viewport_mini_accent_2_alpha_2), tok::viewport_mini_radius, 0, tok::viewport_mini_stroke);
    }
 
 
@@ -219,7 +219,7 @@ namespace app
          const bool hot = ImGui::IsItemHovered();
          ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          if (hot)
-            dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, ImGui::IsItemActive() ? 0.12f : 0.07f)),
+            dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, ImGui::IsItemActive() ? tok::viewport_panel_card_alpha_3 : tok::viewport_panel_card_alpha_4)),
                               tok::radius_control);
          t.w *= hot ? 1.0f : tok::viewport_w_2;
          glyph::DrawX(dl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tile * 0.5f, ImGui::GetColorU32(t));
@@ -277,7 +277,7 @@ namespace app
          // matching drag-orbit just above on this same gNodeCameras entry.
          ApplyViewHotkeys(cam.azimuth, cam.elevation);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_control, 0, tok::viewport_panel_card_stroke);
+            dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, tok::viewport_panel_card_check_mark_alpha_2), tok::radius_control, 0, tok::viewport_panel_card_stroke);
          // Layout cursor already sits at origin+imageSize from the
          // InvisibleButton above; the trailing Dummy(imageSize) below is
          // shared with the non-geometry branch, so rewind rather than
@@ -383,7 +383,7 @@ namespace app
             // this render's "orbit"/"elevation" sliders (main.cpp ~23053).
             ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-               dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_control, 0, tok::viewport_panel_card_stroke);
+               dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, tok::viewport_panel_card_check_mark_alpha_2), tok::radius_control, 0, tok::viewport_panel_card_stroke);
             ImGui::SetCursorScreenPos(origin);
          }
       }

@@ -725,7 +725,7 @@ namespace app
       gDrawnParamPins.insert(pinId);
 
       ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(tok::param_discrete_pin_pin_pivot_alignment_x, tok::param_discrete_pin_pin_pivot_alignment_y));
+      ed::PinPivotAlignment(ImVec2(tok::param_discrete_pin_pivot_alignment_x, tok::param_discrete_pin_pivot_alignment_y));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float box = tok::pin_box;
       const ImVec2 p = controlHeight > 0.0f

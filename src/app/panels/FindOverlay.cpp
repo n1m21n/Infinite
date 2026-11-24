@@ -193,7 +193,7 @@ void DrawFind()
          const ImVec2 p2 = ed::CanvasToScreen(ImVec2(cp.x + cs.x, cp.y + cs.y));
          const bool cur = i == sCurrent;
          dl->AddRect(ImVec2(p.x - tok::space_0_75, p.y - tok::space_0_75), ImVec2(p2.x + tok::space_0_75, p2.y + tok::space_0_75),
-                     ImGui::GetColorU32(ImVec4(a.x, a.y, a.z, cur ? 1.0f : 0.6f)), tok::find_overlay_radius, 0, cur ? tok::find_overlay_stroke : tok::find_overlay_stroke_2);
+                     ImGui::GetColorU32(ImVec4(a.x, a.y, a.z, cur ? tok::find_overlay_alpha_3 : tok::find_overlay_alpha_4)), tok::find_overlay_radius, 0, cur ? tok::find_overlay_stroke : tok::find_overlay_stroke_2);
       }
       dl->PopClipRect();
    }

@@ -133,12 +133,12 @@ namespace app
       {
          return IM_COL32((int)(std::clamp(elem.colorR, 0.0f, 1.0f) * 255.0f),
                          (int)(std::clamp(elem.colorG, 0.0f, 1.0f) * 255.0f),
-                         (int)(std::clamp(elem.colorB, 0.0f, 1.0f) * 255.0f), 255);
+                         (int)(std::clamp(elem.colorB, 0.0f, 1.0f) * 255.0f), tok::perf_get_element_color_alpha_2);
       }
       if (dstNode != nullptr)
       {
          const CategoryColors::Color& c = CategoryColors::ColorFor(dstNode->category);
-         return IM_COL32((int)(c.r * tok::perf_get_element_color_ratio), (int)(c.g * 255.0f), (int)(c.b * 255.0f), 255);
+         return IM_COL32((int)(c.r * tok::perf_get_element_color_ratio), (int)(c.g * 255.0f), (int)(c.b * 255.0f), tok::perf_get_element_color_alpha_2);
       }
       return isLight ? tok::Base(tok::col::surface_lo_2) : tok::Base(tok::col::text_secondary);
    }
@@ -402,17 +402,17 @@ namespace app
       ImU32 themeTint = GetPerfElementColor(elem, dstNode, isLight);
       const float kCardR = tok::radius_container;
       const ImVec4 uiText = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      const ImU32 cardBg = isLight ? ImGui::GetColorU32(ImVec4(1, 1, 1, 0.62f))
-                                   : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.06f));
-      const ImU32 cardHair = isLight ? ImGui::GetColorU32(ImVec4(0, 0, 0, 0.07f))
-                                     : ImGui::GetColorU32(ImVec4(1, 1, 1, 0.08f));
+      const ImU32 cardBg = isLight ? ImGui::GetColorU32(tok::V4(tok::perf_element_col_5))
+                                   : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, tok::perf_element_alpha_4));
+      const ImU32 cardHair = isLight ? ImGui::GetColorU32(tok::V4(tok::perf_element_col_6))
+                                     : ImGui::GetColorU32(tok::V4(tok::perf_element_col_7));
 
       // One recessed-well fill for every field-like control (NumBox, XY pad, step off, selector off, toggle off).
       auto wellCol = [&](float a) { return ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, a)); };
 
       dl->AddRectFilled(cellPos, cardBR, cardBg, kCardR);
       if (gPerfEditMode)
-         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.22f)), kCardR, 0, tok::perf_element_stroke);
+         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, tok::perf_element_alpha_5)), kCardR, 0, tok::perf_element_stroke);
       if (gPerfMidiLearnIdx == (int)elemIdx)
          StateRing::Draw(dl, cellPos, cardBR, StateRing::Kind::Learn, isLight, kCardR);
       else if (gPerfEditMode && gPerfSelection.count(elemIdx) > 0)
@@ -449,7 +449,7 @@ namespace app
       // No bar and no dot: a quiet caption, like the Library section headers.
       const float titleX = cellPos.x + tok::space_2;
       ImVec2 titlePos(titleX, cellPos.y + tok::space_0_75);
-      ImU32 textCol = ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.65f));
+      ImU32 textCol = ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, tok::perf_element_alpha_6));
 
       // In Edit Mode, full card invisible button handles right-click popup and dragging
       if (gPerfEditMode)
@@ -905,20 +905,20 @@ namespace app
             if (next != v) { v = next; sliderMoved = true; }
          }
          const float capX = left + toPos(v) * (right - left);
-         const ImU32 tickCol = wellCol(0.2f);
+         const ImU32 tickCol = wellCol(tok::perf_element_well_col_alpha_11);
          for (int i = 0; i <= 4; i++)
          {
             const float x = left + (float)i * tok::perf_x_ratio * (right - left);
             dl->AddLine(ImVec2(x, cy - tok::space_3), ImVec2(x, cy - tok::perf_element_gap_4), tickCol, tok::perf_element_stroke_2);
             dl->AddLine(ImVec2(x, cy + tok::perf_element_gap_4), ImVec2(x, cy + tok::space_3), tickCol, tok::perf_element_stroke_2);
          }
-         dl->AddRectFilled(ImVec2(left - tok::space_1, cy - tok::space_0_75), ImVec2(right + tok::space_1, cy + tok::space_0_75), wellCol(0.12f), tok::perf_element_radius);
+         dl->AddRectFilled(ImVec2(left - tok::space_1, cy - tok::space_0_75), ImVec2(right + tok::space_1, cy + tok::space_0_75), wellCol(tok::perf_element_well_col_alpha_12), tok::perf_element_radius);
          if (capX > left)
             dl->AddRectFilled(ImVec2(left - tok::space_1, cy - tok::space_0_5), ImVec2(capX, cy + tok::space_0_5), fillCol, tok::radius_cell);
          const ImVec2 cTL(capX - tok::space_1_5, cy - tok::perf_element_gap_4), cBR(capX + tok::space_1_5, cy + tok::perf_element_gap_4);
-         dl->AddRectFilled(cTL, cBR, isLight ? ImGui::GetColorU32(ImVec4(1, 1, 1, 0.95f)) : wellCol(0.28f), tok::perf_element_radius);
-         dl->AddRect(cTL, cBR, wellCol(sActive ? 0.5f : (sHover ? tok::perf_element_assign : tok::perf_element_assign_2)), tok::perf_element_radius);
-         dl->AddLine(ImVec2(capX, cy - tok::perf_element_gap_6), ImVec2(capX, cy + tok::perf_element_gap_6), wellCol(0.8f), tok::perf_element_stroke_3);
+         dl->AddRectFilled(cTL, cBR, isLight ? ImGui::GetColorU32(tok::V4(tok::perf_element_col_8)) : wellCol(tok::perf_element_well_col_alpha_13), tok::perf_element_radius);
+         dl->AddRect(cTL, cBR, wellCol(sActive ? tok::perf_element_well_col_alpha_14 : (sHover ? tok::perf_element_assign : tok::perf_element_assign_2)), tok::perf_element_radius);
+         dl->AddLine(ImVec2(capX, cy - tok::perf_element_gap_6), ImVec2(capX, cy + tok::perf_element_gap_6), wellCol(tok::perf_element_well_col_alpha_15), tok::perf_element_stroke_3);
          if (sHover || sActive)
          {
             char valBuf[48];
@@ -1040,14 +1040,14 @@ namespace app
             valY = newY;
          }
 
-         dl->AddRectFilled(origin, padBR, wellCol(0.07f), tok::radius_control);
-         dl->AddLine(ImVec2(origin.x + padSize * 0.5f, origin.y + tok::space_1), ImVec2(origin.x + padSize * 0.5f, padBR.y - tok::space_1), wellCol(0.10f));
-         dl->AddLine(ImVec2(origin.x + tok::space_1, origin.y + padSize * 0.5f), ImVec2(padBR.x - tok::space_1, origin.y + padSize * 0.5f), wellCol(0.10f));
+         dl->AddRectFilled(origin, padBR, wellCol(tok::perf_element_well_col_alpha_16), tok::radius_control);
+         dl->AddLine(ImVec2(origin.x + padSize * 0.5f, origin.y + tok::space_1), ImVec2(origin.x + padSize * 0.5f, padBR.y - tok::space_1), wellCol(tok::perf_element_well_col_alpha_17));
+         dl->AddLine(ImVec2(origin.x + tok::space_1, origin.y + padSize * 0.5f), ImVec2(padBR.x - tok::space_1, origin.y + padSize * 0.5f), wellCol(tok::perf_element_well_col_alpha_17));
 
          float normX = kpX.valueToPos ? kpX.valueToPos(valX, minX, maxX) : ((maxX > minX) ? std::clamp((valX - minX) / (maxX - minX), 0.0f, 1.0f) : 0.0f);
          float normY = kpY.valueToPos ? kpY.valueToPos(valY, minY, maxY) : ((maxY > minY) ? std::clamp((valY - minY) / (maxY - minY), 0.0f, 1.0f) : 0.0f);
          ImVec2 orbPos(origin.x + normX * padSize, origin.y + (1.0f - normY) * padSize);
-         dl->AddCircleFilled(orbPos, tok::perf_element_r, (themeTint & 0x00FFFFFF) | 0x33000000);
+         dl->AddCircleFilled(orbPos, tok::perf_element_r, (themeTint & 0x00FFFFFF) | 0x33000000);  // ui-audit-ok: channel mask / bit packing, not a colour value
          dl->AddCircleFilled(orbPos, tok::perf_element_r_2, themeTint);
       }
       else if (elem.kind == 5) // Momentary Trigger / Bang (1x1)
@@ -1167,7 +1167,7 @@ namespace app
          }
 
          float r = padSize * tok::perf_r_ratio;
-         ImU32 baseCol = wellCol(0.08f);
+         ImU32 baseCol = wellCol(tok::perf_element_well_col_alpha_18);
          dl->AddCircleFilled(center, r, baseCol, tok::perf_element_segments);
 
          if (flash > 0.0f)
@@ -1178,10 +1178,10 @@ namespace app
          }
          else
          {
-            dl->AddCircleFilled(center, r * tok::perf_element_ratio_5, (themeTint & 0x00FFFFFF) | 0x88000000, tok::perf_element_segments);
+            dl->AddCircleFilled(center, r * tok::perf_element_ratio_5, (themeTint & 0x00FFFFFF) | 0x88000000, tok::perf_element_segments);  // ui-audit-ok: channel mask / bit packing, not a colour value
          }
          if (hovered)
-            dl->AddCircle(center, r + tok::space_0_5, wellCol(0.25f), tok::perf_element_segments, tok::perf_element_stroke);
+            dl->AddCircle(center, r + tok::space_0_5, wellCol(tok::perf_element_well_col_alpha_19), tok::perf_element_segments, tok::perf_element_stroke);
       }
       else if (elem.kind == 6) // Digital Number Box (1x1)
       {
@@ -1197,7 +1197,7 @@ namespace app
          ImVec2 bTL(centerX, centerY);
          ImVec2 bBR(centerX + boxW, centerY + boxH);
 
-         dl->AddRectFilled(bTL, bBR, wellCol(0.07f), tok::radius_control);
+         dl->AddRectFilled(bTL, bBR, wellCol(tok::perf_element_well_col_alpha_16), tok::radius_control);
 
          ImGui::SetCursorScreenPos(bTL);
          float v = dragSeed(val);
@@ -1387,12 +1387,12 @@ namespace app
 
             ImU32 stepBg = isOn
                ? themeTint
-               : wellCol(0.08f);
+               : wellCol(tok::perf_element_well_col_alpha_18);
 
             dl->AddRectFilled(sTL, sBR, stepBg, tok::radius_control);
 
             if (isCurrent && Transport::Instance().IsPlaying())
-               dl->AddRectFilled(ImVec2(sx + tok::space_0_5, sBR.y + tok::space_0_75), ImVec2(sx + stepW - tok::space_0_5, sBR.y + tok::space_1_25), wellCol(0.85f), 1.0f);
+               dl->AddRectFilled(ImVec2(sx + tok::space_0_5, sBR.y + tok::space_0_75), ImVec2(sx + stepW - tok::space_0_5, sBR.y + tok::space_1_25), wellCol(tok::perf_element_well_col_alpha_20), 1.0f);
          }
       }
 
@@ -1423,7 +1423,7 @@ namespace app
          if (anyTarget && allBypassed)
          {
             const ImVec2 bodyTL(cellPos.x, cellPos.y + tok::perf_element_gap);
-            dl->AddRectFilled(bodyTL, cardBR, isLight ? tok::Base(tok::col::ink_white, 150) : tok::Base(tok::col::edge_deep, 160),
+            dl->AddRectFilled(bodyTL, cardBR, isLight ? tok::Base(tok::col::ink_white, tok::perf_element_ink_white_alpha_2) : tok::Base(tok::col::edge_deep, tok::perf_element_edge_deep_alpha_2),
                               kCardR, ImDrawFlags_RoundCornersBottom);
             const char* tag = "bypassed";
             const ImVec2 tagSize = ImGui::CalcTextSize(tag);
@@ -2098,8 +2098,8 @@ namespace app
          const float stripW = ImGui::GetContentRegionAvail().x;
          ImDrawList* sdl = ImGui::GetWindowDrawList();
          // Same recessed well as the Library list: neutral, no accent colour.
-         sdl->AddRectFilled(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(ImVec4(0, 0, 0, isLightT ? 0.04f : 0.27f)), tok::radius_container);
-         sdl->AddRect(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_container);
+         sdl->AddRectFilled(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(tok::V4(tok::perf_panel_content_col_4, isLightT ? tok::perf_panel_content_col_4_alpha : tok::perf_panel_content_col_4_alpha_2)), tok::radius_container);
+         sdl->AddRect(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(tok::V4(tok::perf_panel_content_col_3, isLightT)), tok::radius_container);
          const float cy = sp.y + stripH * 0.5f;
          const std::string axisStr = (gPerfMidiLearnAxis == 1) ? " \xC2\xB7 Y axis" : (elem.kind == 4 ? " \xC2\xB7 X axis" : "");
          const bool pad = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7);
@@ -2110,11 +2110,11 @@ namespace app
          float tx = sp.x + tok::space_3;
          {
             UiType::Scope ts(UiType::Size::Body, UiType::Weight::Semibold);
-            sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.6f)), head.c_str());
+            sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, tok::perf_panel_content_alpha_4)), head.c_str());
             tx += ImGui::CalcTextSize(head.c_str()).x + tok::space_2;
             if (!target.empty())
             {
-               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.9f)), target.c_str());
+               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, tok::perf_panel_content_alpha_5)), target.c_str());
                tx += ImGui::CalcTextSize(target.c_str()).x;
             }
             tx += tok::space_3;
@@ -2123,7 +2123,7 @@ namespace app
             UiType::Scope ts(UiType::Size::Body);
             const float room = sp.x + stripW - tok::perf_room_gap - tx;
             if (ImGui::CalcTextSize(hint).x <= room)
-               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.4f)), hint);
+               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, tok::perf_panel_content_alpha_6)), hint);
          }
          ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - tok::perf_panel_content_gap, sp.y + (stripH - ChipButton::Height()) * 0.5f));
          if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::Height(), tok::perf_panel_content_draw))

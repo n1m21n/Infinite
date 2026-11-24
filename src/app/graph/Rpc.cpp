@@ -1219,7 +1219,7 @@ namespace app
          const float scaleX = ImGui::GetIO().DisplayFramebufferScale.x;
          const float scaleY = ImGui::GetIO().DisplayFramebufferScale.y;
 
-         const int pad = params.value("padding", 12);
+         const int pad = params.value("padding", 12);  // ui-audit-ok: RPC request default (the caller's padding), not this app's layout
          const int x0 = std::max(0, (int)std::floor(screenMin.x * scaleX) - pad);
          const int y0 = std::max(0, (int)std::floor(screenMin.y * scaleY) - pad);
          const int x1 = std::min(fbW, (int)std::ceil(screenMax.x * scaleX) + pad);
@@ -1232,14 +1232,14 @@ namespace app
             return false;
          }
 
-         std::vector<unsigned char> full((size_t)fbW * fbH * 4);
+         std::vector<unsigned char> full((size_t)fbW * fbH * 4);  // ui-audit-ok: RGBA bytes per pixel
          glReadBuffer(GL_FRONT);
          glReadPixels(0, 0, fbW, fbH, GL_RGBA, GL_UNSIGNED_BYTE, full.data());
 
          // full[] is OpenGL's bottom-up row order; x0/y0/x1/y1 are top-down
          // screen-space. Flip per row while cropping instead of flipping the
          // whole framebuffer first.
-         std::vector<unsigned char> crop((size_t)cropW * cropH * 4);
+         std::vector<unsigned char> crop((size_t)cropW * cropH * 4);  // ui-audit-ok: RGBA bytes per pixel
          for (int row = 0; row < cropH; ++row)
          {
             const int srcY = fbH - 1 - (y0 + row);

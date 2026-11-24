@@ -53,7 +53,7 @@ namespace app
             const float y = midY - amp * sinf(tok::fx_chorus_visualizer_ratio * (float)M_PI * (t * tok::fx_chorus_visualizer_ratio + phaseOffset));
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(isLight ? IM_COL32(30, 110, 230, alpha) : IM_COL32(150, 214, 255, alpha), 0, tok::fx_chorus_visualizer_gap + feedback * tok::fx_chorus_visualizer_ratio_2);
+         dl->PathStroke(tok::U32(tok::fx_chorus_visualizer_col_2, isLight, alpha), 0, tok::fx_chorus_visualizer_gap + feedback * tok::fx_chorus_visualizer_ratio_2);
       }
 
       char buf[24];
@@ -206,7 +206,7 @@ namespace app
             const float y = midY - envelope - ripple;
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(isLight ? IM_COL32(30, 110, 230, alpha) : IM_COL32(150, 214, 255, alpha), 0, tok::fx_flanger_visualizer_gap + std::fabs(feedback) * tok::fx_flanger_visualizer_ratio_4);
+         dl->PathStroke(tok::U32(tok::fx_flanger_visualizer_col_2, isLight, alpha), 0, tok::fx_flanger_visualizer_gap + std::fabs(feedback) * tok::fx_flanger_visualizer_ratio_4);
       };
       drawWet(0.0f, 235);
       drawWet(n->Param("spread") * 0.5f, 120);
@@ -358,7 +358,7 @@ namespace app
             const float y = br.y - tok::space_1_5 - mag * (h - tok::space_4);
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(isLight ? IM_COL32(30, 110, 230, alpha) : IM_COL32(150, 214, 255, alpha), 0, tok::fx_phaser_visualizer_stroke_2);
+         dl->PathStroke(tok::U32(tok::fx_phaser_visualizer_col_2, isLight, alpha), 0, tok::fx_phaser_visualizer_stroke_2);
       };
       drawTrace(1.0f, 235);
       if (spread > 0.01f)
@@ -502,12 +502,12 @@ namespace app
 
       for (int i = 0; i < kNumSteps - 1; i++)
          dl->AddQuadFilled(pts[i], pts[i + 1], ImVec2(pts[i + 1].x, baseY), ImVec2(pts[i].x, baseY),
-                            isLight ? tok::Base(tok::col::role_expression_9, 80) : tok::Base(tok::col::role_expression_14, 110));
+                            isLight ? tok::Base(tok::col::role_expression_9, tok::fx_bitcrush_visualizer_role_expression_9_alpha_2) : tok::Base(tok::col::role_expression_14, tok::fx_bitcrush_visualizer_role_expression_14_alpha_2));
 
       dl->PathClear();
       for (int i = 0; i < kNumSteps; i++)
          dl->PathLineTo(pts[i]);
-      dl->PathStroke(isLight ? tok::Base(tok::col::role_expression, 245) : tok::Base(tok::col::role_expression_3, 245), 0, tok::fx_bitcrush_visualizer_stroke);
+      dl->PathStroke(isLight ? tok::Base(tok::col::role_expression, tok::fx_bitcrush_visualizer_role_expression_alpha_2) : tok::Base(tok::col::role_expression_3, tok::fx_bitcrush_visualizer_role_expression_3_alpha_2), 0, tok::fx_bitcrush_visualizer_stroke);
 
       AudioViz::End(vizFrame);
 
@@ -630,7 +630,7 @@ namespace app
          const float y = TsVizDbToY(ampDb, origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent, 60) : tok::Base(tok::col::accent_alt, 60), 0, tok::fx_transient_shaper_visualizer_stroke);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::fx_transient_shaper_visualizer_accent_alpha_2) : tok::Base(tok::col::accent_alt, tok::fx_transient_shaper_visualizer_accent_alt_alpha_3), 0, tok::fx_transient_shaper_visualizer_stroke);
 
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
@@ -651,11 +651,11 @@ namespace app
             peakY = y;
          }
       }
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245), 0, tok::fx_transient_shaper_visualizer_stroke_2);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_transient_shaper_visualizer_accent_alt_alpha_4), 0, tok::fx_transient_shaper_visualizer_stroke_2);
 
       const float transientAmount = std::clamp(n->ExtraMeterValue(0), 0.0f, 1.0f);
       dl->AddCircleFilled(ImVec2(peakX, peakY), tok::space_0_75 + transientAmount * tok::fx_transient_shaper_visualizer_ratio,
-                          isLight ? tok::Base(tok::col::state_warn, 230) : tok::Base(tok::col::role_modulation, 230));
+                          isLight ? tok::Base(tok::col::state_warn, tok::fx_transient_shaper_visualizer_state_warn_alpha_2) : tok::Base(tok::col::role_modulation, tok::fx_transient_shaper_visualizer_role_modulation_alpha_2));
 
       AudioViz::End(vizFrame);
 
@@ -807,7 +807,7 @@ namespace app
          const float y = midY - v * amp;
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245), 0, tok::fx_ring_mod_visualizer_stroke_2);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_ring_mod_visualizer_accent_alt_alpha_2), 0, tok::fx_ring_mod_visualizer_stroke_2);
 
       AudioViz::End(vizFrame);
 
@@ -925,7 +925,7 @@ namespace app
 
          // Input partial tick (upper row)
          dl->AddLine(ImVec2(xIn, topY - tok::fx_frequency_shifter_visualizer_gap), ImVec2(xIn, topY + tok::space_0_75),
-                     isLight ? tok::Base(tok::col::surface_lo_2, 220) : tok::Base(tok::col::accent_13, 210), tok::fx_frequency_shifter_visualizer_stroke_2);
+                     isLight ? tok::Base(tok::col::surface_lo_2, tok::fx_frequency_shifter_visualizer_surface_lo_2_alpha_2) : tok::Base(tok::col::accent_13, tok::fx_frequency_shifter_visualizer_accent_13_alpha_2), tok::fx_frequency_shifter_visualizer_stroke_2);
 
          // Shifted partial tick (lower row)
          dl->AddLine(ImVec2(xOutL, botY - tok::space_0_75), ImVec2(xOutL, botY + tok::fx_frequency_shifter_visualizer_gap), arrowCol, tok::fx_frequency_shifter_visualizer_stroke_3);
@@ -973,7 +973,7 @@ namespace app
 
       const ImVec2 textSz = ImGui::CalcTextSize(valBuf);
       dl->AddText(ImVec2(br.x - textSz.x - tok::space_2_5, origin.y + tok::space_2),
-                  isLight ? tok::Base(tok::col::edge_lo, 240) : tok::Base(tok::col::edge_hi, 240), valBuf);
+                  isLight ? tok::Base(tok::col::edge_lo, tok::fx_frequency_shifter_visualizer_edge_lo_alpha_2) : tok::Base(tok::col::edge_hi, tok::fx_frequency_shifter_visualizer_edge_hi_alpha_2), valBuf);
 
       AudioViz::End(vizFrame);
 
@@ -1087,12 +1087,12 @@ namespace app
       }
       for (int i = 0; i < kNumPoints - 1; i++)
          dl->AddQuadFilled(envPts[i], envPts[i + 1], ImVec2(envPts[i + 1].x, br.y), ImVec2(envPts[i].x, br.y),
-                            isLight ? tok::Base(tok::col::accent, 45) : tok::Base(tok::col::accent_alt, 60));
+                            isLight ? tok::Base(tok::col::accent, tok::fx_tremolo_visualizer_accent_alpha_3) : tok::Base(tok::col::accent_alt, tok::fx_tremolo_visualizer_accent_alt_alpha_4));
 
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
          dl->PathLineTo(envPts[i]);
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245), 0, tok::fx_tremolo_visualizer_stroke);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_tremolo_visualizer_accent_alt_alpha_5), 0, tok::fx_tremolo_visualizer_stroke);
 
       if (stereoPhaseCycles > 0.0f)
       {
@@ -1103,7 +1103,7 @@ namespace app
             const float x = origin.x + (float)i / (float)(kNumPoints - 1) * w;
             dl->PathLineTo(ImVec2(x, envelopeY(phase)));
          }
-         dl->PathStroke(isLight ? tok::Base(tok::col::accent, 110) : tok::Base(tok::col::accent_alt, 110), 0, tok::fx_tremolo_visualizer_stroke_2);
+         dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::fx_tremolo_visualizer_accent_alpha_4) : tok::Base(tok::col::accent_alt, tok::fx_tremolo_visualizer_accent_alt_alpha_6), 0, tok::fx_tremolo_visualizer_stroke_2);
       }
 
       AudioViz::End(vizFrame);
@@ -1206,7 +1206,7 @@ namespace app
          const float x = freqToX(formants[i]);
          const float peakY = br.y - tok::space_1_5 - weights[i] * (h - tok::fx_formant_filter_visualizer_gap);
          dl->AddLine(ImVec2(x, br.y - tok::space_1_5), ImVec2(x, peakY),
-                     isLight ? tok::Base(tok::col::accent, 230) : tok::Base(tok::col::accent_alt, 220), tok::fx_formant_filter_visualizer_stroke_2);
+                     isLight ? tok::Base(tok::col::accent, tok::fx_formant_filter_visualizer_accent_alpha_2) : tok::Base(tok::col::accent_alt, tok::fx_formant_filter_visualizer_accent_alt_alpha_2), tok::fx_formant_filter_visualizer_stroke_2);
          dl->AddText(ImVec2(x - tok::fx_formant_filter_visualizer_gap_2, peakY - tok::space_3_5), ScopeTextCol(), kFormantLabels[i]);
       }
 
@@ -1991,7 +1991,7 @@ namespace app
          dl->AddLine(ImVec2(x, br.y - tok::space_1), ImVec2(x, br.y - tok::space_1 - rel * (h - tok::space_3_5)), lineCol, tok::fx_shape_resonator_visualizer_stroke_2);
       }
       if (solving || count == 0)
-         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), isLight ? tok::Base(tok::col::edge_lo, 160) : tok::Base(tok::col::ink_white, 150),
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), isLight ? tok::Base(tok::col::edge_lo, tok::fx_shape_resonator_visualizer_edge_lo_alpha_2) : tok::Base(tok::col::ink_white, tok::fx_shape_resonator_visualizer_ink_white_alpha_2),
                      solving ? "solving shape..." : "no modes");
 
       AudioViz::End(vizFrame);
@@ -2084,7 +2084,7 @@ namespace app
          dl->PathStroke(lineCol, 0, tok::fx_convolution_space_visualizer_stroke_2);
       }
       if (building || count == 0)
-         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), isLight ? tok::Base(tok::col::edge_lo, 160) : tok::Base(tok::col::ink_white, 150),
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), isLight ? tok::Base(tok::col::edge_lo, tok::fx_convolution_space_visualizer_edge_lo_alpha_2) : tok::Base(tok::col::ink_white, tok::fx_convolution_space_visualizer_ink_white_alpha_2),
                      "building space...");
 
       AudioViz::End(vizFrame);

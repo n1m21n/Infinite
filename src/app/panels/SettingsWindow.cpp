@@ -164,12 +164,12 @@ namespace app
          const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          if (sel || hov)
-            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 0.14f : 0.08f)),
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? tok::settings_window_alpha_6 : tok::settings_window_alpha_7)),
                               tok::radius_control);
          const char* label = T(kTabs[i]); // drawn text, not a widget label: L() would add the "###id" part
          const ImVec2 ts = ImGui::CalcTextSize(label);
          dl->AddText(ImVec2(p.x + kNavInset, p.y + (h - ts.y) * 0.5f),
-                     ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : 0.75f)), label);
+                     ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : tok::settings_window_alpha_8)), label);
       }
       ImGui::GetStyle().ItemSpacing = oldItemSpacing;
       EndChildSafe();
@@ -215,7 +215,7 @@ namespace app
                   const ImVec2 mid((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f);   // filled circle, like the Clip Settings Color Tint
                   dl->AddCircleFilled(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), tok::settings_window_segments);
                   // Outline in the text colour: a preset's background colour can match the popup it sits on, and the swatch would vanish.
-                  { const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text); dl->AddCircle(mid, sz * tok::settings_window_ratio_2 - tok::px_align, ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.45f)), tok::settings_window_segments, 1.0f); }
+                  { const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text); dl->AddCircle(mid, sz * tok::settings_window_ratio_2 - tok::px_align, ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, tok::settings_window_alpha_9)), tok::settings_window_segments, 1.0f); }
                }
             };
 
@@ -1578,7 +1578,7 @@ namespace app
                      const float right = mx.x - MenuParts::kTextInset;
                      dl->AddText(ImVec2(mn.x + tok::space_1, ty), ImGui::GetColorU32(tc), p.name.c_str());
                      dl->PushClipRect(ImVec2(mn.x + kNameW, mn.y), ImVec2(right, mx.y), true);
-                     dl->AddText(ImVec2(mn.x + kNameW, ty), ImGui::GetColorU32(ImVec4(tc.x, tc.y, tc.z, 0.5f)), p.expr.c_str());
+                     dl->AddText(ImVec2(mn.x + kNameW, ty), ImGui::GetColorU32(ImVec4(tc.x, tc.y, tc.z, tok::settings_window_alpha_10)), p.expr.c_str());
                      dl->PopClipRect();
                   }
                   if (picked)

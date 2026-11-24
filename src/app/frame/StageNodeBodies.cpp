@@ -203,19 +203,19 @@ void DrawNodeBodies(FrameCtx& fc)
                                        nodeAlpha));
             if (hasCookWarning)
             {
-               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0.95f, 0.25f, 0.2f, 0.9f));
+               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(tok::V4(tok::stage_node_bodies_col_4)));
                ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.5f);
             }
             else if (hasLiveIssue)
             {
-               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0.95f, 0.65f, 0.15f, 0.9f));
+               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(tok::V4(tok::stage_node_bodies_col_5)));
                ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.0f);
             }
             else
             {
                // Hairline: the category tint fill carries identity; selection (the editor's own colour) is the loud state.
                ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                                  ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.55f : 0.40f));
+                                  ImColor(catColor.r, catColor.g, catColor.b, isLight ? tok::stage_node_bodies_im_color_alpha_3 : tok::stage_node_bodies_im_color_alpha_4));
                ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 1.0f);
             }
          }
@@ -355,8 +355,8 @@ void DrawNodeBodies(FrameCtx& fc)
             }
             // One header row: title, instance number, then the category dimmed to its right.
             const ImVec4 catText = isLight
-               ? ImVec4(catColor.r * 0.75f, catColor.g * 0.75f, catColor.b * 0.75f, 1.0f)
-               : ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f, catColor.b * 0.6f + 0.4f, 0.75f);
+               ? ImVec4(catColor.r * tok::stage_node_bodies_scale_3, catColor.g * tok::stage_node_bodies_scale_3, catColor.b * tok::stage_node_bodies_scale_3, 1.0f)
+               : ImVec4(catColor.r * tok::stage_node_bodies_scale_4 + tok::stage_node_bodies_offset_2, catColor.g * tok::stage_node_bodies_scale_4 + tok::stage_node_bodies_offset_2, catColor.b * tok::stage_node_bodies_scale_4 + tok::stage_node_bodies_offset_2, tok::stage_node_bodies_alpha_2);
             NodeHeader::Category(gn.category.c_str(), catText);
             if (const NodeIssue issue = gn.node->Issue())
             {
@@ -803,7 +803,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const ImVec2 tagSz(txtSz.x + tok::space_2, txtSz.y + tok::space_0_5);
                ImDrawList* dl = ImGui::GetWindowDrawList();
                dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
-                                 isLight ? tok::Base(tok::col::surface_hi_4, 200) : tok::Base(tok::col::surface_lo_4, 180), tok::stage_node_bodies_radius);
+                                 isLight ? tok::Base(tok::col::surface_hi_4, tok::stage_node_bodies_surface_hi_4_alpha_2) : tok::Base(tok::col::surface_lo_4, tok::stage_node_bodies_surface_lo_4_alpha_2), tok::stage_node_bodies_radius);
                dl->AddText(ImVec2(p.x + tok::space_1, p.y + 1.0f),
                            isLight ? tok::Base(tok::col::text_warn_2) : tok::Base(tok::col::role_modulation), tagText);
                ImGui::Dummy(tagSz);
@@ -819,7 +819,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const ImVec2 tagSz(txtSz.x + tok::space_2, txtSz.y + tok::space_0_5);
                ImDrawList* dl = ImGui::GetWindowDrawList();
                dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
-                                 isLight ? tok::Base(tok::col::accent_alt_6, 200) : tok::Base(tok::col::surface_lo_5, 180), tok::stage_node_bodies_radius);
+                                 isLight ? tok::Base(tok::col::accent_alt_6, tok::stage_node_bodies_accent_alt_6_alpha_2) : tok::Base(tok::col::surface_lo_5, tok::stage_node_bodies_surface_lo_5_alpha_2), tok::stage_node_bodies_radius);
                dl->AddText(ImVec2(p.x + tok::space_1, p.y + 1.0f),
                            isLight ? tok::Base(tok::col::state_ok_8) : tok::Base(tok::col::viz_teal_8), tagText);
                ImGui::Dummy(tagSz);
@@ -1370,7 +1370,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   {
                      if (ActionButton::Draw(L("Stop recording"), ImVec2(kPreviewSize, 0), ActionButton::Kind::Record))
                         n->RequestStopRecording();
-                     ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), T("REC  %d frames"), n->RecordedFrames());
+                     ImGui::TextColored(tok::V4(tok::stage_node_bodies_col_6), T("REC  %d frames"), n->RecordedFrames());
                      const int pending = n->PendingFrames();
                      const int dropped = n->DroppedFrames();
                      if (pending > 0)

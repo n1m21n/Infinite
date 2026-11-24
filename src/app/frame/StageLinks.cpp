@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/Wire.h"
+#include "app/ui/design/TokenColors.h"
 #include <unordered_map>
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
@@ -223,7 +224,7 @@ void DrawLinks(FrameCtx& fc)
                CategoryColors::Color c = CategoryColors::CableColorFor(CategoryColors::CableType::Modulation);
                if (source->category == "Prediction" || dynamic_cast<IPredictor*>(source->node.get()) != nullptr)
                   c = CategoryColors::ColorFor("Prediction");
-               const ImU32 col = ImColor(c.r, c.g, c.b, 0.8f);
+               const ImU32 col = ImColor(c.r, c.g, c.b, tok::stage_links_im_color_alpha_2);
                const ImVec2 a = from->second, b = to->second;
                const float dx = std::max(tok::stage_links_bound, std::fabs(b.x - a.x) * 0.5f);
                const ImVec2 c1(a.x + dx, a.y), c2(b.x - dx, b.y);
@@ -635,7 +636,7 @@ void DrawLinks(FrameCtx& fc)
                }
                else if (!valid)
                {
-                  ed::RejectNewItem(ImColor(255, 80, 80), 2.0f);
+                  ed::RejectNewItem(ImColor(tok::U32(tok::stage_links_col_2)), tok::stage_links_reject_new_item_arg);
                   if (rejectReason != nullptr)
                   {
                      // Suspended: a tooltip submitted between ed::Begin and

@@ -692,7 +692,7 @@ namespace app
          {
             ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
             ImVec2 pB = toScreen(node->points[r][c + 1].x, node->points[r][c + 1].y);
-            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, 200), tok::param_projection_handle_overlay_stroke);
+            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, tok::param_projection_handle_overlay_role_modulation_alpha_3), tok::param_projection_handle_overlay_stroke);
          }
       }
       for (int c = 0; c < gw; ++c)
@@ -701,7 +701,7 @@ namespace app
          {
             ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
             ImVec2 pB = toScreen(node->points[r + 1][c].x, node->points[r + 1][c].y);
-            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, 200), tok::param_projection_handle_overlay_stroke);
+            dl->AddLine(pA, pB, tok::Role(tok::col::role_modulation, tok::param_projection_handle_overlay_role_modulation_alpha_3), tok::param_projection_handle_overlay_stroke);
          }
       }
 
@@ -712,8 +712,8 @@ namespace app
          ImVec2 pTR = toScreen(node->points[0][1].x, node->points[0][1].y);
          ImVec2 pBR = toScreen(node->points[1][1].x, node->points[1][1].y);
          ImVec2 pBL = toScreen(node->points[1][0].x, node->points[1][0].y);
-         dl->AddLine(pTL, pBR, tok::Role(tok::col::role_modulation, 70), tok::param_projection_handle_overlay_stroke_2);
-         dl->AddLine(pTR, pBL, tok::Role(tok::col::role_modulation, 70), tok::param_projection_handle_overlay_stroke_2);
+         dl->AddLine(pTL, pBR, tok::Role(tok::col::role_modulation, tok::param_projection_handle_overlay_role_modulation_alpha_4), tok::param_projection_handle_overlay_stroke_2);
+         dl->AddLine(pTR, pBL, tok::Role(tok::col::role_modulation, tok::param_projection_handle_overlay_role_modulation_alpha_4), tok::param_projection_handle_overlay_stroke_2);
       }
 
       // Draw circular pin handles
@@ -729,7 +729,7 @@ namespace app
             dl->AddCircleFilled(pt, tok::param_projection_handle_overlay_r, tok::Role(tok::col::role_modulation));
             dl->AddCircle(pt, tok::param_projection_handle_overlay_r_2, tok::Role(tok::col::surface_deep), 0, tok::param_projection_handle_overlay_stroke);
             if (isDragged || isHovered)
-               dl->AddCircle(pt, tok::param_projection_handle_overlay_r_3, tok::Role(tok::col::ink_white, 240), 0, tok::param_projection_handle_overlay_stroke_3);
+               dl->AddCircle(pt, tok::param_projection_handle_overlay_r_3, tok::Role(tok::col::ink_white, tok::param_projection_handle_overlay_ink_white_alpha_2), 0, tok::param_projection_handle_overlay_stroke_3);
          }
       }
    }
@@ -1095,12 +1095,12 @@ namespace app
          if (isCurrent)
          {
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? tok::Base(tok::col::role_modulation, 50) : tok::Base(tok::col::role_modulation, 35), tok::radius_cell);
+                              isLight ? tok::Base(tok::col::role_modulation, tok::param_pattern_step_grid_role_modulation_alpha_3) : tok::Base(tok::col::role_modulation, tok::param_pattern_step_grid_role_modulation_alpha_4), tok::radius_cell);
          }
          else if (isHoveredCol)
          {
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? tok::Base(tok::col::ink_black, 10) : tok::Base(tok::col::ink_white, 12), tok::radius_cell);
+                              isLight ? tok::Base(tok::col::ink_black, tok::param_pattern_step_grid_ink_black_alpha_2) : tok::Base(tok::col::ink_white, tok::param_pattern_step_grid_ink_white_alpha_2), tok::radius_cell);
          }
 
          const float v = std::clamp(n->steps[i], 0.0f, 1.0f);
@@ -1276,7 +1276,7 @@ namespace app
       const float yHi = yOf(hi);
       const float yLo = yOf(lo);
       dl->AddRectFilled(ImVec2(origin.x + pad, yHi), ImVec2(origin.x + w - pad, yLo),
-                        isLight ? tok::Base(tok::col::ink_black, 20) : tok::Base(tok::col::ink_white, 10));
+                        isLight ? tok::Base(tok::col::ink_black, tok::param_logic_gate_body_ink_black_alpha_2) : tok::Base(tok::col::ink_white, tok::param_logic_gate_body_ink_white_alpha_3));
       dl->AddLine(ImVec2(origin.x + pad, yHi), ImVec2(origin.x + w - pad, yHi),
                   tok::Role(tok::col::state_ok_2), tok::param_logic_gate_body_stroke);
       dl->AddLine(ImVec2(origin.x + pad, yLo), ImVec2(origin.x + w - pad, yLo),
@@ -1296,13 +1296,13 @@ namespace app
       const float barW = tok::param_bar_w;
       const ImVec2 barTl(origin.x + pad, origin.y + pad);
       const ImVec2 barBr(barTl.x + barW, barTl.y + tok::space_1);
-      dl->AddRectFilled(barTl, barBr, tok::Role(tok::col::ink_white, 24), tok::param_logic_gate_body_radius);
+      dl->AddRectFilled(barTl, barBr, tok::Role(tok::col::ink_white, tok::param_logic_gate_body_ink_white_alpha_4), tok::param_logic_gate_body_radius);
       if (hold01 > 0.01f)
          dl->AddRectFilled(barTl, ImVec2(barTl.x + barW * hold01, barBr.y), tok::Role(tok::col::state_ok_2), tok::param_logic_gate_body_radius);
 
       const bool high = val > 0.5f;
       const ImVec2 ledPos(origin.x + w - pad - tok::space_1_5, origin.y + pad + tok::space_1_5);
-      dl->AddCircleFilled(ledPos, tok::param_logic_gate_body_r, high ? tok::Role(tok::col::state_ok_2) : tok::Role(tok::col::ink_white, 24));
+      dl->AddCircleFilled(ledPos, tok::param_logic_gate_body_r, high ? tok::Role(tok::col::state_ok_2) : tok::Role(tok::col::ink_white, tok::param_logic_gate_body_ink_white_alpha_4));
       AudioViz::Border(dl, origin, br);
    }
 
@@ -1584,7 +1584,7 @@ namespace app
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 170), tok::param_fx_pad_stroke);
+         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, tok::param_fx_pad_accent_alpha_2) : tok::Base(tok::col::accent_2, tok::param_fx_pad_accent_2_alpha_2), tok::param_fx_pad_stroke);
       }
 
       // Corner labels: the pad blends between these four named effects, so it is
@@ -2122,7 +2122,7 @@ namespace app
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 170), tok::param_macro_xy_body_stroke);
+         dl->AddLine(a, b, isLight ? tok::Base(tok::col::accent, tok::param_macro_xy_body_accent_alpha_2) : tok::Base(tok::col::accent_2, tok::param_macro_xy_body_accent_2_alpha_2), tok::param_macro_xy_body_stroke);
       }
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
       ImU32 orbColor = n->IsRecordingPath() ? tok::Base(tok::col::text_err)

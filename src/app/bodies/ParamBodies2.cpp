@@ -119,8 +119,8 @@ namespace app
       if (crosshair)
       {
          ImVec2 mid = toScreen(0.5f, 0.5f);
-         dl->AddLine(ImVec2(mid.x, origin.y), ImVec2(mid.x, br.y), isLight ? tok::Base(tok::col::edge_lo_3, 200) : tok::Base(tok::col::edge_mid, 200));
-         dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), isLight ? tok::Base(tok::col::edge_lo_3, 200) : tok::Base(tok::col::edge_mid, 200));
+         dl->AddLine(ImVec2(mid.x, origin.y), ImVec2(mid.x, br.y), isLight ? tok::Base(tok::col::edge_lo_3, tok::param_curve_editor_edge_lo_3_alpha_2) : tok::Base(tok::col::edge_mid, tok::param_curve_editor_edge_mid_alpha_2));
+         dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), isLight ? tok::Base(tok::col::edge_lo_3, tok::param_curve_editor_edge_lo_3_alpha_2) : tok::Base(tok::col::edge_mid, tok::param_curve_editor_edge_mid_alpha_2));
       }
 
       const int kSegments = tok::param_segments;
@@ -207,7 +207,7 @@ namespace app
          snprintf(confText, sizeof(confText), "learning - %s", UiFmt::Pct((int)std::round(badgeVal * 100.0f)).c);
       else
          snprintf(confText, sizeof(confText), "%s conf", UiFmt::Pct((int)std::round(badgeVal * 100.0f)).c);
-      ImGui::TextColored(badgeVal > 0.6f ? (isLight ? tok::BaseV4(tok::col::state_ok_3) : tok::BaseV4(tok::col::text_ok_2))
+      ImGui::TextColored(badgeVal > tok::param_predictive_coloring_params_text_colored_level_2 ? (isLight ? tok::BaseV4(tok::col::state_ok_3) : tok::BaseV4(tok::col::text_ok_2))
                                     : (isLight ? tok::BaseV4(tok::col::text_warn_2) : tok::BaseV4(tok::col::text_modulation_2)),
                          "%s", confText);
 
@@ -354,7 +354,7 @@ namespace app
       {
          const float a = std::clamp(std::min(n->loopStart, n->loopEnd), 0.0f, 1.0f);
          const float b = std::clamp(std::max(n->loopStart, n->loopEnd), 0.0f, 1.0f);
-         dl->AddRectFilled(ImVec2(toScreen(a, 0).x, origin.y), ImVec2(toScreen(b, 0).x, br.y), (lineCol & 0x00FFFFFF) | 0x1E000000);
+         dl->AddRectFilled(ImVec2(toScreen(a, 0).x, origin.y), ImVec2(toScreen(b, 0).x, br.y), (lineCol & 0x00FFFFFF) | 0x1E000000);  // ui-audit-ok: channel mask / bit packing, not a colour value
          dl->AddLine(ImVec2(toScreen(a, 0).x, origin.y), ImVec2(toScreen(a, 0).x, br.y), ScopeMidLineCol());
          dl->AddLine(ImVec2(toScreen(b, 0).x, origin.y), ImVec2(toScreen(b, 0).x, br.y), ScopeMidLineCol());
       }
@@ -375,7 +375,7 @@ namespace app
       }
       const float px = n->Position();
       const ImU32 liveCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation);
-      dl->AddLine(ImVec2(toScreen(px, 0).x, origin.y), ImVec2(toScreen(px, 0).x, br.y), (liveCol & 0x00FFFFFF) | 0x80000000);
+      dl->AddLine(ImVec2(toScreen(px, 0).x, origin.y), ImVec2(toScreen(px, 0).x, br.y), (liveCol & 0x00FFFFFF) | 0x80000000);  // ui-audit-ok: channel mask / bit packing, not a colour value
       dl->AddCircleFilled(toScreen(px, n->Evaluate(px)), tok::param_mseg_editor_r_4, liveCol);
       dl->AddCircle(toScreen(px, n->Evaluate(px)), tok::param_mseg_editor_r_4, ring, 0, tok::param_mseg_editor_stroke_3);
       AudioViz::Border(dl, origin, br);
@@ -630,7 +630,7 @@ namespace app
          const ImVec2 br(tl.x + chipW - tok::space_0_5, tl.y + chipH);
          dl->AddRectFilled(tl, br,
                            IM_COL32((int)(rgb[0] * tok::param_palette_preview_ratio_2), (int)(rgb[1] * tok::param_palette_preview_ratio_2),
-                                    (int)(rgb[2] * tok::param_palette_preview_ratio_2), 255),
+                                    (int)(rgb[2] * tok::param_palette_preview_ratio_2), tok::param_palette_preview_alpha_2),
                            tok::param_palette_preview_radius);
 
          // How much of the reference each swatch actually covers. Without it a
@@ -670,7 +670,7 @@ namespace app
       if (!n->LastError().empty())
       {
          PushTextWrapWidth(kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::param_palette_params_col_2), "%s", n->LastError().c_str());
          PopTextWrapWidth();
       }
       else if (!n->LoadedPath().empty())
@@ -767,8 +767,8 @@ namespace app
          n->Evaluate(t1, c1);
          ImVec2 tl(origin.x + pad + t0 * inner, origin.y);
          ImVec2 br(origin.x + pad + t1 * inner + (i + 1 == kSegments ? 0.0f : 1.0f), origin.y + barH);
-         ImU32 col0 = IM_COL32((int)(c0[0] * 255), (int)(c0[1] * 255), (int)(c0[2] * 255), 255);
-         ImU32 col1 = IM_COL32((int)(c1[0] * 255), (int)(c1[1] * 255), (int)(c1[2] * 255), 255);
+         ImU32 col0 = IM_COL32((int)(c0[0] * 255), (int)(c0[1] * 255), (int)(c0[2] * 255), tok::param_color_ramp_editor_alpha_2);
+         ImU32 col1 = IM_COL32((int)(c1[0] * 255), (int)(c1[1] * 255), (int)(c1[2] * 255), tok::param_color_ramp_editor_alpha_2);
          dl->AddRectFilledMultiColor(tl, br, col0, col1, col1, col0);
       }
       dl->AddRect(ImVec2(origin.x + pad, origin.y), ImVec2(origin.x + size - pad, origin.y + barH), tok::Role(tok::col::edge_lo_2), tok::param_color_ramp_editor_radius);
@@ -856,7 +856,7 @@ namespace app
          float x = toScreenX(n->stopPos[i]);
          const bool isSel = (sSelNode == n && sSelIndex == i);
          ImU32 fill = IM_COL32((int)(n->stopColor[i][0] * 255), (int)(n->stopColor[i][1] * 255),
-                               (int)(n->stopColor[i][2] * 255), 255);
+                               (int)(n->stopColor[i][2] * 255), tok::param_color_ramp_editor_alpha_2);
          float r = (i == nearest || isSel) ? tok::param_r : tok::param_r_2;
          ImVec2 tip(x, trackOrigin.y + tok::space_0_5);
          dl->AddTriangleFilled(ImVec2(x - r, tip.y + r * tok::param_color_ramp_editor_ratio), ImVec2(x + r, tip.y + r * tok::param_color_ramp_editor_ratio), tip,
@@ -1110,9 +1110,9 @@ namespace app
             fillCol = tok::Role(tok::col::state_err);
          else if (q < 0.75f)
             fillCol = tok::Role(tok::col::role_modulation);
-         dl->AddRectFilled(p0, p1, tok::Role(tok::col::ink_white, 18), tok::param_brain_source_body_radius);
+         dl->AddRectFilled(p0, p1, tok::Role(tok::col::ink_white, tok::param_brain_source_body_ink_white_alpha_2), tok::param_brain_source_body_radius);
          dl->AddRectFilled(p0, ImVec2(p0.x + pillW * std::clamp(q, tok::param_brain_source_body_bound, 1.0f), p1.y),
-                           (fillCol & 0x00FFFFFFu) | 0x55000000u, tok::param_brain_source_body_radius);
+                           (fillCol & 0x00FFFFFFu) | 0x55000000u, tok::param_brain_source_body_radius);  // ui-audit-ok: channel mask / bit packing, not a colour value
          const ImVec2 ts = ImGui::CalcTextSize(kPillNames[p]);
          dl->AddText(ImVec2(p0.x + (pillW - ts.x) * 0.5f, p0.y + (pillH - ts.y) * 0.5f),
                      ImGui::GetColorU32(ImGuiCol_Text), kPillNames[p]);
@@ -1137,7 +1137,7 @@ namespace app
          const float y1f = midY - std::clamp(snap.traceFrontal[i], -1.0f, 1.0f) * (traceH * tok::param_brain_source_body_ratio_2);
          const float y0t = midY - std::clamp(snap.traceTemporal[i - 1], -1.0f, 1.0f) * (traceH * tok::param_brain_source_body_ratio_2);
          const float y1t = midY - std::clamp(snap.traceTemporal[i], -1.0f, 1.0f) * (traceH * tok::param_brain_source_body_ratio_2);
-         dl->AddLine(ImVec2(x0, y0t), ImVec2(x1, y1t), (tempCol & 0x00FFFFFFu) | 0x99000000u, tok::param_brain_source_body_stroke);
+         dl->AddLine(ImVec2(x0, y0t), ImVec2(x1, y1t), (tempCol & 0x00FFFFFFu) | 0x99000000u, tok::param_brain_source_body_stroke);  // ui-audit-ok: channel mask / bit packing, not a colour value
          dl->AddLine(ImVec2(x0, y0f), ImVec2(x1, y1f), frontCol, tok::param_brain_source_body_stroke_2);
       }
 

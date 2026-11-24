@@ -374,6 +374,8 @@ def scan_file(rel, src):
             allowed.bump("0/1/-1", t.line); continue
         if v == 0.5 and ((prev is not None and prev.text in ("*", "/")) or (nxt is not None and nxt.text in ("*", "/"))):
             allowed.bump("half", t.line); continue
+        if v == 255.0 and ((prev is not None and prev.text in ("*", "/")) or (nxt is not None and nxt.text in ("*", "/"))):
+            allowed.bump("unit_conv", t.line); continue   # a colour channel between 0-1 and 0-255
         if call in STRUCTURE_CALLS:
             allowed.bump("structure", t.line); continue
         st = stmt_text(i)

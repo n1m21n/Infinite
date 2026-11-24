@@ -148,8 +148,8 @@ void DrawPopupsA(FrameCtx& fc)
             view3DItems(*gn);
             MenuParts::Separator();
             ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, 0.25f));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, 0.4f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_3));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_4));
             if (MenuParts::Item(L("Delete Group"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -241,8 +241,8 @@ void DrawPopupsA(FrameCtx& fc)
             }
             MenuParts::Separator();
             ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, 0.25f));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, 0.4f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_3));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_4));
             if (MenuParts::Item(L("Delete Note"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -471,8 +471,8 @@ void DrawPopupsA(FrameCtx& fc)
 
             // Destructive Action: Delete Node with HIG danger hover styling
             ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, 0.25f));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, 0.4f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_3));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_4));
             if (MenuParts::Item(L("Delete Node"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))

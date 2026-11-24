@@ -340,7 +340,7 @@ namespace app
          const ImVec4 tcol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(tok::space_2, tok::space_1_25));
          ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(tcol.x, tcol.y, tcol.z, 0.10f));
+         ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(tcol.x, tcol.y, tcol.z, tok::mod_matrix_table_alpha_3));
          ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, ImVec4(0, 0, 0, 0));
          // An explicit, fixed outer_size.y - with ScrollY and the default
          // (0,0), ImGui auto-extends the table's own height to fit its
@@ -385,7 +385,7 @@ namespace app
             ImGui::TableSetupColumn("##unbind", ImGuiTableColumnFlags_WidthFixed, tok::mod_matrix_table_col_w_7);
             {
                UiType::Scope hs(UiType::Size::Body, UiType::Weight::Semibold);
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tcol.x, tcol.y, tcol.z, 0.6f));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tcol.x, tcol.y, tcol.z, tok::mod_matrix_table_alpha_4));
                ImGui::TableHeadersRow();
                ImGui::PopStyleColor();
             }
@@ -515,7 +515,7 @@ namespace app
                   const float t = std::clamp(conf, 0.0f, 1.0f);
                   const ImU32 col = IM_COL32((int)std::round(148.0f + (34.0f - 148.0f) * t),
                                              (int)std::round(163.0f + (197.0f - 163.0f) * t),
-                                             (int)std::round(184.0f + (94.0f - 184.0f) * t), 255);
+                                             (int)std::round(184.0f + (94.0f - 184.0f) * t), tok::mod_matrix_table_alpha_2);
                   ImGui::PushStyleColor(ImGuiCol_Text, col);
                   ImGui::Text("%s", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
                   ImGui::PopStyleColor();
@@ -629,7 +629,7 @@ namespace app
                      (int)((disabled4.x * tok::mod_matrix_table_ratio + text4.x * tok::mod_matrix_table_ratio_2) * tok::mod_matrix_table_ratio_3),
                      (int)((disabled4.y * tok::mod_matrix_table_ratio + text4.y * tok::mod_matrix_table_ratio_2) * tok::mod_matrix_table_ratio_3),
                      (int)((disabled4.z * 0.6f + text4.z * 0.4f) * 255.0f),
-                     255);
+                     tok::mod_matrix_table_alpha_2);
                   const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover) : idleCol;
                   glyph::DrawX(dl, center, iconSize, col);
                }

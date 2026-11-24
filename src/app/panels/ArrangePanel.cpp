@@ -35,12 +35,12 @@ namespace app
          if (clicked) *v = !*v;
          const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
          const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         const ImVec4 bg = *v ? onCol : ImVec4(t.x, t.y, t.z, 0.06f + 0.05f * hv);
+         const ImVec4 bg = *v ? onCol : ImVec4(t.x, t.y, t.z, tok::arrange_mix_toggle_offset_2 + tok::arrange_mix_toggle_scale_2 * hv);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(p, ImVec2(p.x + sz, p.y + sz), ImGui::GetColorU32(bg), tok::radius_control);
          const ImVec2 ts = ImGui::CalcTextSize(letter);
          dl->AddText(ImVec2(std::round(p.x + (sz - ts.x) * 0.5f), std::round(p.y + (sz - ts.y) * 0.5f) - 1.0f),
-                     ImGui::GetColorU32(*v ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.8f)), letter);
+                     ImGui::GetColorU32(*v ? tok::V4(tok::arrange_mix_toggle_col_2) : ImVec4(t.x, t.y, t.z, tok::arrange_mix_toggle_alpha_2)), letter);
          return clicked;
       }
 
@@ -1714,8 +1714,8 @@ namespace app
          const ImVec2 w1(w0.x + (timelineChildWidth < 0.0f ? wa.x + timelineChildWidth : wa.x), w0.y + wa.y);
          const bool wellLight = IsThemeLight();
          ImDrawList* wdl = ImGui::GetWindowDrawList();
-         wdl->AddRectFilled(w0, w1, ImGui::GetColorU32(ImVec4(0, 0, 0, wellLight ? 0.04f : 0.27f)), tok::radius_container);
-         wdl->AddRect(w0, w1, ImGui::GetColorU32(wellLight ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_container);
+         wdl->AddRectFilled(w0, w1, ImGui::GetColorU32(tok::V4(tok::arrange_panel_content_col_6, wellLight ? tok::arrange_panel_content_col_6_alpha : tok::arrange_panel_content_col_6_alpha_2)), tok::radius_container);
+         wdl->AddRect(w0, w1, ImGui::GetColorU32(wellLight ? tok::V4(tok::arrange_panel_content_col_7) : tok::V4(tok::arrange_panel_content_col_8)), tok::radius_container);
       }
       PushDockedPanelStyle(/*isChild=*/true);
       ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
@@ -1821,8 +1821,8 @@ namespace app
       // The ruler and lanes share the well: no fills of their own, hairlines and ticks derived from the text colour.
       const ImU32 rulerBg = 0;
       const ImU32 markerStripBg = 0;
-      const ImU32 tickCol = ImGui::GetColorU32(ImGuiCol_Text, 0.38f);
-      const ImU32 hairCol = ImGui::GetColorU32(ImGuiCol_Text, 0.08f);
+      const ImU32 tickCol = ImGui::GetColorU32(ImGuiCol_Text, tok::arrange_panel_content_text_alpha_3);
+      const ImU32 hairCol = ImGui::GetColorU32(ImGuiCol_Text, tok::arrange_panel_content_text_alpha_4);
 
       // Header-column corner, level with the ruler (above the first track
       // row) - otherwise blank/unstyled, reading as a hole next to the
@@ -1872,7 +1872,7 @@ namespace app
             const bool dragged = gArrangeMarkerDragId == mk.id;
             dl->AddRectFilled(f0, f1, fcol, tok::arrange_panel_content_radius_2, ImDrawFlags_RoundCornersRight);
             // A hairline edge so a pale flag still reads on the light ruler.
-            dl->AddRect(f0, f1, dragged ? tok::Base(tok::col::ink_white, 230) : IM_COL32(0, 0, 0, isLight ? 110 : 150),
+            dl->AddRect(f0, f1, dragged ? tok::Base(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_9) : tok::U32(tok::arrange_panel_content_col_9, isLight ? tok::arrange_panel_content_col_9_alpha : tok::arrange_panel_content_col_9_alpha_2),
                         tok::arrange_panel_content_radius_2, ImDrawFlags_RoundCornersRight, dragged ? tok::arrange_panel_content_stroke_3 : tok::arrange_panel_content_stroke_2);
             dl->AddLine(ImVec2(fx, pinnedTopY), ImVec2(fx, rulerPos.y + rulerSize.y), fcol, tok::arrange_panel_content_stroke_3);
 
@@ -2561,7 +2561,7 @@ namespace app
          {
             const ImVec4 gt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
             dl->AddRectFilled(ImVec2(headerStartX, rowTop), ImVec2(rulerStartX + rulerWidth, rowTop + kLaneHeight),
-                              ImGui::GetColorU32(ImVec4(gt.x, gt.y, gt.z, 0.05f)));
+                              ImGui::GetColorU32(ImVec4(gt.x, gt.y, gt.z, tok::arrange_panel_content_alpha_5)));
          }
          dl->AddLine(ImVec2(headerStartX, rowTop + kLaneHeight), ImVec2(rulerStartX + rulerWidth, rowTop + kLaneHeight),
                      tickCol, tok::arrange_panel_content_stroke_2);
@@ -2573,7 +2573,7 @@ namespace app
          for (int d = 0; d < depth; d++)
          {
             const float lineX = headerStartX + tok::space_1_5 + (float)d * kGroupIndent;
-            dl->AddLine(ImVec2(lineX, rowTop), ImVec2(lineX, rowTop + kLaneHeight), tint & 0x60FFFFFFu, tok::arrange_panel_content_stroke_2);
+            dl->AddLine(ImVec2(lineX, rowTop), ImVec2(lineX, rowTop + kLaneHeight), tint & 0x60FFFFFFu, tok::arrange_panel_content_stroke_2);  // ui-audit-ok: channel mask / bit packing, not a colour value
          }
 
          const bool grpRowSelected = gArrangeRowSel.count(groupId) != 0;
@@ -2878,15 +2878,15 @@ namespace app
          {
             const ImVec4 selA = AccentEmphasisSelected();
             dl->AddRectFilled(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f),
-                              ImGui::GetColorU32(ImVec4(selA.x, selA.y, selA.z, 0.28f)), tok::radius_control);
+                              ImGui::GetColorU32(ImVec4(selA.x, selA.y, selA.z, tok::arrange_panel_content_alpha_6)), tok::radius_control);
          }
 
          // Beat/bar grid lines through the lane body
          for (const ArrangeGridLine& gl : arrangeGridLines)
          {
             const ImU32 gridCol = isLight
-               ? IM_COL32(0, 0, 0, gl.isMajor ? 34 : 12)
-               : IM_COL32(255, 255, 255, gl.isMajor ? 32 : 10);
+               ? tok::U32(tok::arrange_grid_col_3, gl.isMajor ? tok::arrange_panel_content_grid_col_3_alpha : tok::arrange_panel_content_grid_col_3_alpha_2)
+               : tok::U32(tok::arrange_grid_col_4, gl.isMajor ? tok::arrange_panel_content_grid_col_4_alpha : tok::arrange_panel_content_grid_col_4_alpha_2);
             dl->AddLine(ImVec2(gl.x, curY), ImVec2(gl.x, curY + rowH), gridCol, tok::arrange_panel_content_stroke_2);
          }
 
@@ -2898,7 +2898,7 @@ namespace app
          for (int d = 0; d < laneDepth; d++)
          {
             const float lineX = headerStartX + tok::space_1_5 + (float)d * kGroupIndent;
-            dl->AddLine(ImVec2(lineX, curY), ImVec2(lineX, curY + rowH), tok::Role(tok::col::ink_white, 24), tok::arrange_panel_content_stroke_2);
+            dl->AddLine(ImVec2(lineX, curY), ImVec2(lineX, curY + rowH), tok::Role(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_10), tok::arrange_panel_content_stroke_2);
          }
 
          // Old full sizes for mixer controls
@@ -3058,12 +3058,12 @@ namespace app
                   const ImVec4 ot = ImGui::GetStyleColorVec4(ImGuiCol_Text);
                   const float hot = ImGui::IsItemHovered() || ImGui::IsItemActive() ? 0.04f : 0.0f;
                   const ImVec2 oe(op.x + kMixStripW, op.y + kMixCtl);
-                  dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.06f + hot)), tok::radius_control);
+                  dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, tok::arrange_panel_content_offset_2 + hot)), tok::radius_control);
                   const float fx = op.x + kMixStripW * std::clamp(pct / 100.0f, 0.0f, 1.0f);
                   if (fx > op.x + 1.0f)
                   {
                      dl->PushClipRect(op, ImVec2(fx, oe.y), true);
-                     dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.12f)), tok::radius_control);
+                     dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, tok::arrange_panel_content_alpha_7)), tok::radius_control);
                      dl->PopClipRect();
                   }
                   char opTxt[16];
@@ -3071,7 +3071,7 @@ namespace app
                   UiType::Scope opScope(UiType::Size::Caption, UiType::Weight::Medium);
                   const ImVec2 otz = ImGui::CalcTextSize(opTxt);
                   dl->AddText(ImVec2(std::round(op.x + (kMixStripW - otz.x) * 0.5f), std::round(op.y + (kMixCtl - otz.y) * 0.5f)),
-                              ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.85f)), opTxt);
+                              ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, tok::arrange_panel_content_alpha_8)), opTxt);
                }
                mixGesture(opChanged, [&] { lane.opacity = std::clamp(pct / 100.0f, 0.0f, 1.0f); });
             }
@@ -3318,10 +3318,10 @@ namespace app
             // A Color Tint is drawn at full opacity in both states so the clip always
             // shows exactly the palette swatch the user picked, not a blended-down shade.
             ImU32 clipBaseCol = hasTint
-               ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), 255)
+               ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), tok::arrange_panel_content_alpha_2)
                : (isVideo ? tok::Role(tok::col::role_expression, 210) : tok::Role(tok::col::state_ok_4, 210));
             ImU32 clipActiveCol = hasTint
-               ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), 255)
+               ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), tok::arrange_panel_content_alpha_2)
                : (isVideo ? tok::Role(tok::col::role_expression) : tok::Role(tok::col::viz_teal));
             const bool muted = !clip.enabled || offline || laneSilenced;
             if (muted)
@@ -3343,7 +3343,7 @@ namespace app
                               clipActive ? clipActiveCol : clipBaseCol, tok::radius_control);
             if (muted)
                DrawArrangeHatch(dl, ImVec2(cLeft, cTop), ImVec2(cRight, cBottom),
-                                isLight ? tok::Base(tok::col::ink_black, 45) : tok::Base(tok::col::ink_white, 38));
+                                isLight ? tok::Base(tok::col::ink_black, tok::arrange_panel_content_ink_black_alpha_6) : tok::Base(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_11));
             if (grouped)
                dl->AddRectFilled(ImVec2(cLeft, cTop), ImVec2(cRight, cTop + tok::space_1), ArrangeGroupColor(clip.groupId),
                                  tok::arrange_panel_content_radius_3, ImDrawFlags_RoundCornersTop);
@@ -3360,7 +3360,7 @@ namespace app
                const ImU32 waveCol = muted ? tok::Role(tok::col::ink_white, 60) : tok::Role(tok::col::ink_white, 115);
                dl->PushClipRect(ImVec2(cLeft + 1.0f, cTop + 1.0f), ImVec2(cRight - 1.0f, cBottom - 1.0f), true);
                dl->AddLine(ImVec2(cLeft + tok::space_0_25, midY), ImVec2(cRight - tok::space_0_25, midY),
-                           tok::Role(tok::col::ink_white, 45), tok::arrange_panel_content_stroke_2);
+                           tok::Role(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_12), tok::arrange_panel_content_stroke_2);
                // Audio Sample: a static peak array computed once at import
                // from the fully-decoded source file - see
                // ArrangePollMediaImports. Audio Clip: unchanged, the
@@ -3439,7 +3439,7 @@ namespace app
                   // convention every other AddImage of a node texture uses.
                   Thumb::Add(dl, (ImTextureID)(intptr_t)thumbIt->second.fbo.tex, tl, br,
                                ImVec2(0, 1), ImVec2(1, 0));
-                  dl->AddRect(tl, br, tok::Role(tok::col::ink_black, 140), tok::radius_cell);
+                  dl->AddRect(tl, br, tok::Role(tok::col::ink_black, tok::arrange_panel_content_ink_black_alpha_7), tok::radius_cell);
                   dl->PopClipRect();
                   thumbRight = br.x;
                }
@@ -3453,15 +3453,15 @@ namespace app
                {
                   const float fInX = tickToX(clip.start + clip.fadeIn);
                   dl->AddTriangleFilled(ImVec2(clipX0, cTop), ImVec2(clipX0, cBottom), ImVec2(fInX, cTop),
-                                        tok::Role(tok::col::ink_black, 50));
-                  dl->AddLine(ImVec2(clipX0, cBottom), ImVec2(fInX, cTop), tok::Role(tok::col::ink_white, 150), tok::arrange_panel_content_stroke_3);
+                                        tok::Role(tok::col::ink_black, tok::arrange_panel_content_ink_black_alpha_8));
+                  dl->AddLine(ImVec2(clipX0, cBottom), ImVec2(fInX, cTop), tok::Role(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_13), tok::arrange_panel_content_stroke_3);
                }
                if (clip.fadeOut > 0)
                {
                   const float fOutX = tickToX(clip.End() - clip.fadeOut);
                   dl->AddTriangleFilled(ImVec2(fOutX, cTop), ImVec2(clipX1, cBottom), ImVec2(clipX1, cTop),
-                                        tok::Role(tok::col::ink_black, 50));
-                  dl->AddLine(ImVec2(fOutX, cTop), ImVec2(clipX1, cBottom), tok::Role(tok::col::ink_white, 150), tok::arrange_panel_content_stroke_3);
+                                        tok::Role(tok::col::ink_black, tok::arrange_panel_content_ink_black_alpha_8));
+                  dl->AddLine(ImVec2(fOutX, cTop), ImVec2(clipX1, cBottom), tok::Role(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_13), tok::arrange_panel_content_stroke_3);
                }
                dl->PopClipRect();
             }
@@ -3480,7 +3480,7 @@ namespace app
                {
                   const float midY = (cTop + cBottom) * 0.5f;
                   dl->AddText(ImVec2(cLeft + (cWidth - ts.x) * 0.5f, midY - ts.y * 0.5f),
-                              tok::Role(tok::col::ink_white, 200), loadingLabel);
+                              tok::Role(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_14), loadingLabel);
                }
             }
 
@@ -3495,7 +3495,7 @@ namespace app
                {
                   const int a = (int)(255.0f * (1.0f - t / 1.2f));
                   dl->AddRect(ImVec2(cLeft - tok::space_0_5, cTop - tok::space_0_5), ImVec2(cRight + tok::space_0_5, cBottom + tok::space_0_5),
-                              IM_COL32(255, 255, 255, a), tok::arrange_panel_content_radius_4, 0, tok::arrange_panel_content_stroke_5);
+                              tok::U32(tok::arrange_panel_content_col_10, a), tok::arrange_panel_content_radius_4, 0, tok::arrange_panel_content_stroke_5);
                }
             }
 
@@ -3503,7 +3503,7 @@ namespace app
             if (clipHovered && bladeCuts)
             {
                const float bx = tickToX(bladeTick);
-               dl->AddLine(ImVec2(bx, cTop), ImVec2(bx, cBottom), tok::Role(tok::col::ink_white, 235), tok::arrange_panel_content_stroke_3);
+               dl->AddLine(ImVec2(bx, cTop), ImVec2(bx, cBottom), tok::Role(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_15), tok::arrange_panel_content_stroke_3);
             }
 
             // Trim handle marks
@@ -3606,9 +3606,9 @@ namespace app
                if (gx1 > gx0)
                {
                   dl->AddRectFilled(ImVec2(gx0, curY + tok::space_0_5), ImVec2(gx1, curY + rowH - tok::space_0_5),
-                                    tok::Role(tok::col::viz_teal, 50), tok::arrange_panel_content_radius_2);
+                                    tok::Role(tok::col::viz_teal, tok::arrange_panel_content_viz_teal_alpha_3), tok::arrange_panel_content_radius_2);
                   dl->AddRect(ImVec2(gx0, curY + tok::space_0_5), ImVec2(gx1, curY + rowH - tok::space_0_5),
-                              tok::Role(tok::col::viz_teal, 200), tok::arrange_panel_content_radius_2, 0, tok::arrange_panel_content_stroke_3);
+                              tok::Role(tok::col::viz_teal, tok::arrange_panel_content_viz_teal_alpha_4), tok::arrange_panel_content_radius_2, 0, tok::arrange_panel_content_stroke_3);
                }
                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && gArrangeDrag.mode == kArrangeDragNone)
                {
@@ -3782,11 +3782,11 @@ namespace app
             {
                const ImVec2 r0(rMinX, rMinY);
                const ImVec2 r1(rMaxX, rMaxY);
-               dl->AddRectFilled(r0, r1, tok::Role(tok::col::accent, 22));
-               dl->AddRect(r0, r1, tok::Role(tok::col::accent_4, 110), 0.0f, 0, tok::arrange_panel_content_stroke_2);
+               dl->AddRectFilled(r0, r1, tok::Role(tok::col::accent, tok::arrange_panel_content_accent_alpha_2));
+               dl->AddRect(r0, r1, tok::Role(tok::col::accent_4, tok::arrange_panel_content_accent_4_alpha_2), 0.0f, 0, tok::arrange_panel_content_stroke_2);
                // Subtle vertical boundary lines at x0 and x1
-               dl->AddLine(ImVec2(r0.x, r0.y), ImVec2(r0.x, r1.y), tok::Role(tok::col::ink_white, 120), tok::arrange_panel_content_stroke_2);
-               dl->AddLine(ImVec2(r1.x, r0.y), ImVec2(r1.x, r1.y), tok::Role(tok::col::ink_white, 120), tok::arrange_panel_content_stroke_2);
+               dl->AddLine(ImVec2(r0.x, r0.y), ImVec2(r0.x, r1.y), tok::Role(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_16), tok::arrange_panel_content_stroke_2);
+               dl->AddLine(ImVec2(r1.x, r0.y), ImVec2(r1.x, r1.y), tok::Role(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_16), tok::arrange_panel_content_stroke_2);
             }
          }
       }
@@ -3817,8 +3817,8 @@ namespace app
                const float x1 = std::min(rulerStartX + rulerWidth, tickToX(b));
                if (x1 <= x0)
                   continue;
-               dl->AddRectFilled(ImVec2(x0, y + tok::space_0_75), ImVec2(x1, y + rowH - tok::space_0_75), tok::Role(tok::col::state_err, 105), tok::arrange_panel_content_radius_2);
-               dl->AddRect(ImVec2(x0, y + tok::space_0_75), ImVec2(x1, y + rowH - tok::space_0_75), tok::Role(tok::col::state_err, 235), tok::arrange_panel_content_radius_2, 0, tok::arrange_panel_content_stroke_3);
+               dl->AddRectFilled(ImVec2(x0, y + tok::space_0_75), ImVec2(x1, y + rowH - tok::space_0_75), tok::Role(tok::col::state_err, tok::arrange_panel_content_state_err_alpha_3), tok::arrange_panel_content_radius_2);
+               dl->AddRect(ImVec2(x0, y + tok::space_0_75), ImVec2(x1, y + rowH - tok::space_0_75), tok::Role(tok::col::state_err, tok::arrange_panel_content_state_err_alpha_4), tok::arrange_panel_content_radius_2, 0, tok::arrange_panel_content_stroke_3);
             }
          }
       }
@@ -3846,7 +3846,7 @@ namespace app
             // outline) - the highlight was reading louder than the
             // selection itself needed.
             if (x1 > x0 && y1 > y0)
-               dl->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), ArrangeGroupColor(gid, 130), tok::arrange_panel_content_radius_4, 0, tok::arrange_panel_content_stroke_2);
+               dl->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), ArrangeGroupColor(gid, tok::arrange_panel_content_arrange_group_color_alpha_2), tok::arrange_panel_content_radius_4, 0, tok::arrange_panel_content_stroke_2);
          }
       }
 
@@ -3859,14 +3859,14 @@ namespace app
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
-            glyph::DrawScissors(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), tok::arrange_panel_content_draw_scissors_arg, tok::Role(tok::col::ink_black, 200), tok::arrange_panel_content_draw_scissors_arg_2);
+            glyph::DrawScissors(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), tok::arrange_panel_content_draw_scissors_arg, tok::Role(tok::col::ink_black, tok::arrange_panel_content_ink_black_alpha_9), tok::arrange_panel_content_draw_scissors_arg_2);
             glyph::DrawScissors(fg, mouse, tok::arrange_panel_content_draw_scissors_arg, tok::Role(tok::col::ink_white), tok::arrange_panel_content_draw_scissors_arg_3);
          }
          else if (gArrangeTool == ArrangeTool::Pencil)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
-            glyph::DrawPencil(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), tok::arrange_panel_content_draw_pencil_arg, tok::Role(tok::col::ink_black, 200), tok::arrange_panel_content_draw_pencil_arg_2);
+            glyph::DrawPencil(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), tok::arrange_panel_content_draw_pencil_arg, tok::Role(tok::col::ink_black, tok::arrange_panel_content_ink_black_alpha_9), tok::arrange_panel_content_draw_pencil_arg_2);
             glyph::DrawPencil(fg, mouse, tok::arrange_panel_content_draw_pencil_arg, tok::Role(tok::col::ink_white), tok::arrange_panel_content_draw_pencil_arg_3);
          }
          else if (gArrangeTool == ArrangeTool::Zoom)
@@ -3874,7 +3874,7 @@ namespace app
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
             const bool zoomOut = ImGui::GetIO().KeyAlt || ImGui::IsMouseDown(ImGuiMouseButton_Right);
-            glyph::DrawZoom(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), tok::arrange_panel_content_draw_zoom_arg, tok::Role(tok::col::ink_black, 200), tok::arrange_panel_content_draw_zoom_arg_2);
+            glyph::DrawZoom(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), tok::arrange_panel_content_draw_zoom_arg, tok::Role(tok::col::ink_black, tok::arrange_panel_content_ink_black_alpha_9), tok::arrange_panel_content_draw_zoom_arg_2);
             glyph::DrawZoom(fg, mouse, tok::arrange_panel_content_draw_zoom_arg, tok::Role(tok::col::ink_white), tok::arrange_panel_content_draw_zoom_arg_3);
             // Draw + or - indicator inside the magnifying glass center
             const ImVec2 zc(mouse.x - tok::space_0_5, mouse.y - tok::space_0_5);
@@ -4205,8 +4205,8 @@ namespace app
             for (const ArrangeGridLine& gl : arrangeGridLines)
             {
                const ImU32 gridCol = isLight
-                  ? IM_COL32(0, 0, 0, gl.isMajor ? 34 : 12)
-                  : IM_COL32(255, 255, 255, gl.isMajor ? 32 : 10);
+                  ? tok::U32(tok::arrange_grid_col_3, gl.isMajor ? tok::arrange_panel_content_grid_col_3_alpha : tok::arrange_panel_content_grid_col_3_alpha_2)
+                  : tok::U32(tok::arrange_grid_col_4, gl.isMajor ? tok::arrange_panel_content_grid_col_4_alpha : tok::arrange_panel_content_grid_col_4_alpha_2);
                dl->AddLine(ImVec2(gl.x, lanesContentBottom), ImVec2(gl.x, emptyGridBottom), gridCol, tok::arrange_panel_content_stroke_2);
             }
             const ImU32 emptyGridLine = hairCol;
@@ -4255,7 +4255,7 @@ namespace app
                lx = gx - tok::space_1_5 - ts.x;
             const ImVec2 l0(lx - tok::space_0_75, kTickStripTop + kRulerHeight - kMarkerStripH + tok::space_0_5);
             dl->AddRectFilled(l0, ImVec2(l0.x + ts.x + tok::space_1_5, l0.y + ts.y + tok::space_0_5),
-                              isLight ? tok::Base(tok::col::ink_white, 230) : tok::Base(tok::col::surface_deep, 230), tok::arrange_panel_content_radius_2);
+                              isLight ? tok::Base(tok::col::ink_white, tok::arrange_panel_content_ink_white_alpha_9) : tok::Base(tok::col::surface_deep, tok::arrange_panel_content_surface_deep_alpha_3), tok::arrange_panel_content_radius_2);
             dl->AddText(ImVec2(lx, l0.y + 1.0f), ImGui::GetColorU32(ImGuiCol_Text), ghostLabel.c_str());
          }
       }
@@ -4323,13 +4323,13 @@ namespace app
          ImDrawList* odl = ImGui::GetWindowDrawList();
          const ImVec2 a = gArrangePanelRectMin, b = gArrangePanelRectMax;
          odl->PushClipRect(a, b, true);
-         odl->AddRectFilled(a, b, tok::Role(tok::col::ink_black, 110));
+         odl->AddRectFilled(a, b, tok::Role(tok::col::ink_black, tok::arrange_panel_content_ink_black_alpha_10));
          const char* lockText = T("Rendering - timeline locked");
          const ImVec2 ts = ImGui::CalcTextSize(lockText);
          const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
          const ImVec2 t0(c.x - ts.x * 0.5f, c.y - ts.y * 0.5f);
          odl->AddRectFilled(ImVec2(t0.x - tok::space_3, t0.y - tok::arrange_panel_content_gap_6), ImVec2(t0.x + ts.x + tok::space_3, t0.y + ts.y + tok::arrange_panel_content_gap_6),
-                            tok::Role(tok::col::surface_deep, 225), tok::arrange_panel_content_radius_4);
+                            tok::Role(tok::col::surface_deep, tok::arrange_panel_content_surface_deep_alpha_4), tok::arrange_panel_content_radius_4);
          odl->AddText(t0, tok::Role(tok::col::edge_hi), lockText);
          odl->PopClipRect();
       }

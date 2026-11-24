@@ -41,7 +41,7 @@ namespace
       ImGui::PopID();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       if (current)
-         dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), ImGui::GetColorU32(ImGuiCol_Header, 0.30f), tok::radius_control);
+         dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), ImGui::GetColorU32(ImGuiCol_Header, tok::history_row_header_alpha_2), tok::radius_control);
       else if (hovered)
          dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), ImGui::GetColorU32(ImGuiCol_FrameBgHovered), tok::radius_control);
       const ImU32 col = ImGui::GetColorU32(dim ? ImGuiCol_TextDisabled : ImGuiCol_Text);

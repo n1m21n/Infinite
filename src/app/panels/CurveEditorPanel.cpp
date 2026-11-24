@@ -646,9 +646,9 @@ namespace
       // The 3D View's axis colours, as the user reads them: X red, Y green, Z blue.
       static constexpr unsigned kAxisHex[3] = { 0xFF3352, 0x8BDC00, 0x2890FF };
       if (axis < 0 || axis >= 3)
-         return Tint(0.5f);
+         return Tint(tok::curve_editor_axis_col_tint_alpha_2);
       const unsigned h = kAxisHex[axis];
-      return IM_COL32((h >> 16) & 255, (h >> 8) & 255, h & 255, 255);
+      return IM_COL32((h >> 16) & 255, (h >> 8) & 255, h & 255, tok::curve_editor_axis_col_alpha_2);  // ui-audit-ok: channel mask / bit packing, not a colour value
    }
 
    // The value axis in the first target's own units: its high at the top line, its low at the bottom.
@@ -668,8 +668,8 @@ namespace
          std::snprintf(hi, sizeof hi, "%s %s", ref->name.c_str(), UiFmt::G3(src.hi).c);
          std::snprintf(lo, sizeof lo, "%s", UiFmt::G3(src.lo).c);
          const float fh = ImGui::GetFontSize();
-         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(1.0f) + tok::space_0_5), Tint(0.45f), hi);
-         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(0.0f) - fh - tok::space_0_5), Tint(0.45f), lo);
+         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(1.0f) + tok::space_0_5), Tint(tok::curve_editor_units_labels_tint_alpha_2), hi);
+         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(0.0f) - fh - tok::space_0_5), Tint(tok::curve_editor_units_labels_tint_alpha_2), lo);
          return;
       }
    }
@@ -678,13 +678,13 @@ namespace
    {
       const State& s = S();
       const ImVec2 mn(a.x0, a.y0), mx(a.x1, a.y1), m = ImGui::GetIO().MousePos;
-      dl->AddRectFilled(mn, mx, Tint(0.03f));
+      dl->AddRectFilled(mn, mx, Tint(tok::curve_editor_graph_tint_alpha_11));
       dl->PushClipRect(mn, mx, true);
       // Outside the shape: shaded, the curve does not run there.
       if (s.v0 < 0.0f)
-         dl->AddRectFilled(mn, ImVec2(a.X(0.0f), a.y1), Tint(0.04f));
+         dl->AddRectFilled(mn, ImVec2(a.X(0.0f), a.y1), Tint(tok::curve_editor_graph_tint_alpha_12));
       if (s.v1 > 1.0f)
-         dl->AddRectFilled(ImVec2(a.X(1.0f), a.y0), mx, Tint(0.04f));
+         dl->AddRectFilled(ImVec2(a.X(1.0f), a.y0), mx, Tint(tok::curve_editor_graph_tint_alpha_12));
       // Grid: time steps (thinned until 6 px apart), value eighths.
       const double step = GridStep(n);
       if (step > 0.0)
@@ -694,10 +694,10 @@ namespace
             drawn *= 2.0;
          const double first = std::ceil(std::max(0.0f, s.v0) / drawn) * drawn;
          for (double u = first; u <= std::min(1.0f, s.v1) + 1e-9; u += drawn)
-            dl->AddLine(ImVec2(a.X((float)u), a.y0), ImVec2(a.X((float)u), a.y1), Tint(0.06f));
+            dl->AddLine(ImVec2(a.X((float)u), a.y0), ImVec2(a.X((float)u), a.y1), Tint(tok::curve_editor_graph_tint_alpha_13));
       }
       for (int i = 0; i <= 8; i++)
-         dl->AddLine(ImVec2(a.x0, a.Y(i / tok::curve_editor_graph_ratio)), ImVec2(a.x1, a.Y(i / tok::curve_editor_graph_ratio)), Tint(i % 4 == 0 ? 0.12f : 0.05f));
+         dl->AddLine(ImVec2(a.x0, a.Y(i / tok::curve_editor_graph_ratio)), ImVec2(a.x1, a.Y(i / tok::curve_editor_graph_ratio)), Tint(i % tok::curve_editor_graph_tint_alpha_14 == 0 ? tok::curve_editor_graph_tint_alpha_15 : tok::curve_editor_graph_tint_alpha_16));
       if (n.loop)
       {
          const float lo = std::clamp(std::min(n.loopStart, n.loopEnd), 0.0f, 1.0f);
@@ -708,7 +708,7 @@ namespace
          for (GraphNode* g : ModePages())
             if (g->uid != s.page)
                if (const MSEGNode* other = AsMseg(g); other->motionGroup == 0 || other->motionGroup != n.motionGroup)
-                  DrawCurve(dl, a, *other, Tint(0.16f), 1.2f);
+                  DrawCurve(dl, a, *other, Tint(tok::curve_editor_graph_tint_alpha_17), tok::curve_editor_graph_draw_curve_arg);
       // A motion group: the sibling channels behind this one, X red, Y green, Z blue.
       if (n.motionGroup != 0)
          for (GraphNode& g : gNodes)
@@ -735,14 +735,14 @@ namespace
          if (ShowsLeft(n, i))
          {
             const ImVec2 h = a.P(p.x + p.lx, p.y + p.ly);
-            dl->AddLine(c, h, Tint(0.45f), tok::curve_editor_graph_stroke);
-            dl->AddCircleFilled(h, tok::curve_editor_graph_r, Tint(0.8f));
+            dl->AddLine(c, h, Tint(tok::curve_editor_graph_tint_alpha_18), tok::curve_editor_graph_stroke);
+            dl->AddCircleFilled(h, tok::curve_editor_graph_r, Tint(tok::curve_editor_graph_tint_alpha_19));
          }
          if (ShowsRight(n, i))
          {
             const ImVec2 h = a.P(p.x + p.rx, p.y + p.ry);
-            dl->AddLine(c, h, Tint(0.45f), tok::curve_editor_graph_stroke);
-            dl->AddCircleFilled(h, tok::curve_editor_graph_r, Tint(0.8f));
+            dl->AddLine(c, h, Tint(tok::curve_editor_graph_tint_alpha_18), tok::curve_editor_graph_stroke);
+            dl->AddCircleFilled(h, tok::curve_editor_graph_r, Tint(tok::curve_editor_graph_tint_alpha_19));
          }
       }
       // Points; selected ones in the live colour.
@@ -771,11 +771,11 @@ namespace
       if (s.drag == Drag::Marquee)
       {
          const ImVec2 r0(std::min(m.x, s.from.x), std::min(m.y, s.from.y)), r1(std::max(m.x, s.from.x), std::max(m.y, s.from.y));
-         dl->AddRectFilled(r0, r1, (selCol & 0x00FFFFFF) | 0x22000000);
+         dl->AddRectFilled(r0, r1, (selCol & 0x00FFFFFF) | 0x22000000);  // ui-audit-ok: channel mask / bit packing, not a colour value
          dl->AddRect(r0, r1, selCol);
       }
       dl->PopClipRect();
-      dl->AddRect(mn, mx, Tint(0.10f));
+      dl->AddRect(mn, mx, Tint(tok::curve_editor_graph_tint_alpha_20));
    }
 
    int PointAt(const Areas& a, const MSEGNode& n, ImVec2 m)
@@ -1686,7 +1686,7 @@ namespace
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetFrameHeight();
       ImGui::PushClipRect(p, ImVec2(p.x + FieldLabelW() - ImGui::GetCursorPosX() - tok::space_1, p.y + h), true);
-      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", text);
+      ImGui::TextColored(ImVec4(t.x, t.y, t.z, tok::alpha_label), "%s", text);
       ImGui::PopClipRect();
       FormParts::Inline(FieldLabelW());
    }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include "app/ui/design/TokenColors.h"
 #include "app/ui/design/Tokens.gen.h"
 
 #include <algorithm>
@@ -145,7 +146,7 @@ namespace Splash
                             (int)(stops[i].b + (stops[i + 1].b - stops[i].b) * k), (int)(alpha * 255.0f));
          }
       }
-      return IM_COL32(0xA9, 0xCD, 0xF1, (int)(alpha * 255.0f));
+      return IM_COL32(tok::splash_screen_brand_color_rgb_4, tok::splash_screen_brand_color_rgb_5, tok::splash_screen_brand_color_rgb_6, (int)(alpha * 255.0f));
    }
 
    // Draws the overlay. Returns true while it is still up this frame.
@@ -253,7 +254,7 @@ namespace Splash
 
       // dim the app behind the card, then the card with a soft shadow
       if (!st.cardOnly)
-         dl->AddRectFilled(ImVec2(0, 0), ImVec2(W, H), IM_COL32(6, 8, 16, (int)(tok::splash_screen_draw_ratio_5 * alpha)));
+         dl->AddRectFilled(ImVec2(0, 0), ImVec2(W, H), tok::U32(tok::splash_screen_draw_col_3, (int)(tok::splash_screen_draw_ratio_5 * alpha)));
       for (int i = st.cardOnly ? 0 : 6; i >= 1; --i)
          dl->AddRectFilled(ImVec2(x0 - i * tok::splash_screen_draw_ratio_6 * sc, y0 - i * tok::splash_screen_draw_ratio_7 * sc + tok::splash_screen_draw_ratio_8 * sc),
                            ImVec2(x1 + i * tok::splash_screen_draw_ratio_6 * sc, y1 + i * tok::splash_screen_draw_ratio_7 * sc + tok::splash_screen_draw_ratio_8 * sc), IM_COL32(0, 0, 0, (int)(tok::splash_screen_draw_ratio_9 * alpha)),
@@ -266,8 +267,8 @@ namespace Splash
          dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y0 + rounding * tok::splash_screen_draw_ratio_10), top, rounding, ImDrawFlags_RoundCornersTop);
          dl->AddRectFilled(ImVec2(x0, y1 - rounding * tok::splash_screen_draw_ratio_10), ImVec2(x1, y1), bot, rounding, ImDrawFlags_RoundCornersBottom);
          dl->AddRectFilledMultiColor(ImVec2(x0, y0 + rounding * tok::splash_screen_draw_ratio_10), ImVec2(x1, y1 - rounding * tok::splash_screen_draw_ratio_10),
-                                     cardCol(y0 + rounding * 2.0f, alpha), cardCol(y0 + rounding * 2.0f, alpha),
-                                     cardCol(y1 - rounding * 2.0f, alpha), cardCol(y1 - rounding * 2.0f, alpha));
+                                     cardCol(y0 + rounding * tok::splash_screen_draw_card_col_scale_2, alpha), cardCol(y0 + rounding * tok::splash_screen_draw_card_col_scale_2, alpha),
+                                     cardCol(y1 - rounding * tok::splash_screen_draw_card_col_scale_2, alpha), cardCol(y1 - rounding * tok::splash_screen_draw_card_col_scale_2, alpha));
       }
 
       // --- logo: stroke draws itself in, then a bead rides the loop ----------------------
@@ -330,11 +331,11 @@ namespace Splash
          const ImVec2 q = Lemniscate(twoPi * (e - std::floor(e)));
          const ImVec2 c(cx + q.x * A, cy + q.y * A);
          const float r = strokeW * tok::splash_screen_r_ratio;
-         dl->AddCircleFilled(c, r, mixBg(IM_COL32(0xC2, 0x59, 0x3F, (int)(tok::splash_screen_draw_ratio_11 * fadeIn)), c.y), tok::splash_screen_draw_segments_2);
+         dl->AddCircleFilled(c, r, mixBg(IM_COL32(tok::splash_screen_draw_rgb_9, tok::splash_screen_draw_rgb_10, tok::splash_screen_draw_rgb_11, (int)(tok::splash_screen_draw_ratio_11 * fadeIn)), c.y), tok::splash_screen_draw_segments_2);
          dl->AddCircleFilled(ImVec2(c.x - r * tok::splash_screen_draw_ratio_12, c.y - r * tok::splash_screen_draw_ratio_13), r * tok::splash_screen_draw_ratio_14,
-                             mixBg(IM_COL32(0xF9, 0xA5, 0x8F, (int)(tok::splash_screen_draw_ratio_11 * fadeIn)), c.y), tok::splash_screen_draw_segments_2);
+                             mixBg(IM_COL32(tok::splash_screen_draw_rgb_12, tok::splash_screen_draw_rgb_13, tok::splash_screen_draw_rgb_14, (int)(tok::splash_screen_draw_ratio_11 * fadeIn)), c.y), tok::splash_screen_draw_segments_2);
          dl->AddCircleFilled(ImVec2(c.x - r * tok::splash_screen_draw_ratio_15, c.y - r * tok::splash_screen_draw_ratio_16), r * tok::splash_screen_draw_ratio_17,
-                             mixBg(IM_COL32(255, 255, 255, (int)(tok::splash_screen_draw_ratio_18 * fadeIn)), c.y), tok::splash_screen_draw_segments_3);
+                             mixBg(tok::U32(tok::splash_screen_draw_col_4, (int)(tok::splash_screen_draw_ratio_18 * fadeIn)), c.y), tok::splash_screen_draw_segments_3);
       }
 
       // --- bottom left: credits; bottom right: version -----------------------------------
@@ -345,7 +346,7 @@ namespace Splash
          // One quiet footer line, like Bitwig's. Names are not shown for now (Credits() is kept for later).
          const float fs = 8.5f * sc;
          // The font has no trademark glyph, so "TM" is drawn as a small raised superscript.
-         const ImU32 footCol = IM_COL32(0x8F, 0x98, 0xB8, (int)(210.0f * textA));
+         const ImU32 footCol = IM_COL32(tok::splash_screen_draw_rgb_14, tok::splash_screen_draw_rgb_15, tok::splash_screen_draw_rgb_16, (int)(210.0f * textA));
          const float fy = y1 - pad - fs;
          float fx = x0 + pad;
          dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "Infinite");   // i18n-ok: brand mark, never translated
@@ -364,8 +365,8 @@ namespace Splash
          {
             const float frac = (float)st.tasksDone / (float)st.tasksTotal;
             const float w = tok::splash_screen_w_ratio * sc, lx = cx - w * 0.5f, ly = cy + A * 0.5f + 34.0f * sc;
-            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w, ly), mixBg(IM_COL32(0x8F, 0x98, 0xB8, 60), ly), tok::splash_screen_draw_stroke);
-            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w * frac, ly), mixBg(BrandColor(0.5f, 1.0f), ly), tok::splash_screen_draw_stroke_2);
+            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w, ly), mixBg(IM_COL32(tok::splash_screen_draw_rgb_14, tok::splash_screen_draw_rgb_15, tok::splash_screen_draw_rgb_16, tok::splash_screen_draw_alpha_2), ly), tok::splash_screen_draw_stroke);
+            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w * frac, ly), mixBg(BrandColor(tok::splash_screen_draw_brand_color_level_2, tok::splash_screen_draw_brand_color_alpha_2), ly), tok::splash_screen_draw_stroke_2);
          }
       }
 

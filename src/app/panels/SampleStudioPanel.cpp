@@ -233,7 +233,7 @@ namespace
       const int c = d.slices[(size_t)i].colour >= 0 ? d.slices[(size_t)i].colour : i;
       const float h = (float)(c % kPaletteSize) / (float)kPaletteSize;
       float r, g, b;
-      ImGui::ColorConvertHSVtoRGB(h, 0.55f, 0.88f, r, g, b);
+      ImGui::ColorConvertHSVtoRGB(h, tok::sample_studio_slice_colour_hsv_sat_2, tok::sample_studio_slice_colour_hsv_val_2, r, g, b);
       return ImGui::GetColorU32(ImVec4(r, g, b, alpha));
    }
 
@@ -1518,7 +1518,7 @@ namespace
       const float w = mx.x - mn.x;
       ImGui::SetCursorScreenPos(mn);
       UiInteract::Hit("##studioOverview", ImVec2(w, mx.y - mn.y));
-      dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_FrameBg, 0.6f), tok::sample_studio_overview_radius);
+      dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_FrameBg, tok::sample_studio_overview_frame_bg_alpha_2), tok::sample_studio_overview_radius);
       const double total = (double)Frames();
       if (total <= 0.0)
          return;
@@ -1532,7 +1532,7 @@ namespace
       if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          ViewAll();
       const float mid = (mn.y + mx.y) * 0.5f, amp = (mx.y - mn.y) * tok::sample_studio_amp_ratio;
-      const ImU32 col = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.6f);
+      const ImU32 col = ImGui::GetColorU32(ImGuiCol_TextDisabled, tok::sample_studio_overview_text_disabled_alpha_2);
       for (int x = 0; x < (int)w; x++)
       {
          float lo, hi;
@@ -1540,8 +1540,8 @@ namespace
          dl->AddLine(ImVec2(mn.x + x + tok::px_align, mid - hi * amp), ImVec2(mn.x + x + tok::px_align, mid - lo * amp + tok::space_0_25), col);
       }
       const float va = mn.x + (float)(s.viewStart / total) * w, vb = mn.x + (float)((s.viewStart + s.viewLen) / total) * w;
-      dl->AddRectFilled(ImVec2(va, mn.y), ImVec2(std::max(va + tok::space_0_5, vb), mx.y), AccentU32(0.18f), tok::radius_cell);
-      dl->AddRect(ImVec2(va, mn.y), ImVec2(std::max(va + tok::space_0_5, vb), mx.y), AccentU32(0.7f), tok::radius_cell);
+      dl->AddRectFilled(ImVec2(va, mn.y), ImVec2(std::max(va + tok::space_0_5, vb), mx.y), AccentU32(tok::sample_studio_overview_accent_u32_alpha_3), tok::radius_cell);
+      dl->AddRect(ImVec2(va, mn.y), ImVec2(std::max(va + tok::space_0_5, vb), mx.y), AccentU32(tok::sample_studio_overview_accent_u32_alpha_4), tok::radius_cell);
    }
 
    // The marker under x: kind 0 a slice start (its index), kind 1 the end marker. -1 when none is within reach.
@@ -2203,7 +2203,7 @@ namespace
          const int c = i - 1;
          const float h = (float)((c < 0 ? pi : c) % kPaletteSize) / (float)kPaletteSize;
          float r, gg, b;
-         ImGui::ColorConvertHSVtoRGB(h, c < 0 ? 0.0f : 0.55f, 0.88f, r, gg, b);
+         ImGui::ColorConvertHSVtoRGB(h, c < 0 ? 0.0f : tok::sample_studio_slice_colours_hsv_sat_2, tok::sample_studio_slice_colours_hsv_val_2, r, gg, b);
          cols[i] = ImGui::GetColorU32(ImVec4(r, gg, b, 1.0f));
          names[i] = c < 0 ? T("By position") : T("Slice colour");
       }
@@ -2310,7 +2310,7 @@ namespace
             peak = std::max(peak, std::max(hi, -lo));
             dl->AddLine(ImVec2(mn.x + (float)x + tok::px_align, mid - hi * amp), ImVec2(mn.x + (float)x + tok::px_align, mid - lo * amp + tok::space_0_25), col);
          }
-         dl->AddLine(ImVec2(mn.x, mid), ImVec2(mx.x, mid), ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.25f));
+         dl->AddLine(ImVec2(mn.x, mid), ImVec2(mx.x, mid), ImGui::GetColorU32(ImGuiCol_TextDisabled, tok::sample_studio_wave_text_disabled_alpha_6));
          const double secs = (double)n / (AudioEngine::Instance().SampleRate() > 0.0 ? AudioEngine::Instance().SampleRate() : kRate);
          char buf[160];
          if (!s.recErr.empty())
@@ -2386,10 +2386,10 @@ namespace
          if (xb < g.mn.x || xa > g.mx.x)
             continue;
          const bool sel = IsSel(s.doc.slices[(size_t)i].id);
-         dl->AddRectFilled(ImVec2(xa, top), ImVec2(xb, g.mx.y), SliceColour(s.doc, i, sel ? 0.20f : 0.07f));
+         dl->AddRectFilled(ImVec2(xa, top), ImVec2(xb, g.mx.y), SliceColour(s.doc, i, sel ? tok::sample_studio_wave_slice_colour_alpha_5 : tok::sample_studio_wave_slice_colour_alpha_6));
       }
       // Outside the start and end markers: dimmed.
-      const ImU32 shade = ImGui::GetColorU32(ImGuiCol_WindowBg, 0.55f);
+      const ImU32 shade = ImGui::GetColorU32(ImGuiCol_WindowBg, tok::sample_studio_wave_window_bg_alpha_2);
       dl->AddRectFilled(ImVec2(g.mn.x, top), ImVec2(std::max(g.mn.x, g.XOf((double)s.doc.StartFrame())), g.mx.y), shade);
       dl->AddRectFilled(ImVec2(std::min(g.mx.x, g.XOf((double)s.doc.endFrame)), top), ImVec2(g.mx.x, g.mx.y), shade);
 
@@ -2403,14 +2403,14 @@ namespace
             {
                const float x = g.XOfW(b * fpb);
                const bool bar = std::fabs(std::fmod(b, 4.0)) < 1e-6, beat = std::fabs(b - std::round(b)) < 1e-6;
-               dl->AddLine(ImVec2(x, top), ImVec2(x, g.mx.y), ImGui::GetColorU32(ImGuiCol_TextDisabled, bar ? 0.28f : beat ? 0.14f : 0.06f));
+               dl->AddLine(ImVec2(x, top), ImVec2(x, g.mx.y), ImGui::GetColorU32(ImGuiCol_TextDisabled, bar ? tok::sample_studio_wave_text_disabled_alpha_7 : beat ? tok::sample_studio_wave_text_disabled_alpha_8 : tok::sample_studio_wave_text_disabled_alpha_9));
             }
       }
-      dl->AddLine(ImVec2(g.mn.x, mid), ImVec2(g.mx.x, mid), ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.15f));
+      dl->AddLine(ImVec2(g.mn.x, mid), ImVec2(g.mx.x, mid), ImGui::GetColorU32(ImGuiCol_TextDisabled, tok::sample_studio_wave_text_disabled_alpha_10));
 
       // The waveform: min/max columns, a line through the samples when zoomed in, dots on them when deeper still.
       const double fpp = s.viewLen / w;
-      const ImU32 waveCol = ImGui::GetColorU32(ImGuiCol_Text, 0.78f), mutedCol = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.35f);
+      const ImU32 waveCol = ImGui::GetColorU32(ImGuiCol_Text, tok::sample_studio_wave_text_alpha_3), mutedCol = ImGui::GetColorU32(ImGuiCol_TextDisabled, tok::alpha_disabled);
       const bool anySolo = s.doc.AnySolo();
       // The source frame drawn at `f`: a reversed slice shows back to front. Outside the slices (before the start
       // marker, past the end one) the source shows as it is.
@@ -2511,7 +2511,7 @@ namespace
          const std::string lab = SliceLabel(s.doc, i);
          const ImVec2 ts = ImGui::CalcTextSize(lab.c_str());
          const float tabW = std::min(ts.x + tok::space_2, std::max(tok::sample_studio_wave_bound_2, xn - x - 1.0f));
-         dl->AddRectFilled(ImVec2(x, g.mn.y), ImVec2(x + tabW, g.mn.y + kTabH), SliceColour(s.doc, i, sel ? 0.95f : 0.6f), tok::radius_cell);
+         dl->AddRectFilled(ImVec2(x, g.mn.y), ImVec2(x + tabW, g.mn.y + kTabH), SliceColour(s.doc, i, sel ? tok::sample_studio_wave_slice_colour_alpha_7 : tok::sample_studio_wave_slice_colour_alpha_8), tok::radius_cell);
          dl->PushClipRect(ImVec2(x, g.mn.y), ImVec2(x + tabW, g.mn.y + kTabH), true);
          dl->AddText(ImVec2(x + tok::space_1, g.mn.y + (kTabH - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_WindowBg), lab.c_str());
          dl->PopClipRect();
@@ -2587,7 +2587,7 @@ namespace
       if (s.dragKind == 4 && s.dragMoved && s.dragIndex >= 0 && s.dragLast < s.doc.Count())
       {
          const float xa = g.XOf((double)s.doc.slices[(size_t)s.dragIndex].start), xb = g.XOf((double)s.doc.EndOf(s.dragLast));
-         dl->AddRect(ImVec2(xa, top), ImVec2(xb, g.mx.y), ImGui::GetColorU32(ImGuiCol_Text, 0.5f), tok::sample_studio_wave_radius_2, 0, tok::sample_studio_wave_stroke_4);
+         dl->AddRect(ImVec2(xa, top), ImVec2(xb, g.mx.y), ImGui::GetColorU32(ImGuiCol_Text, tok::sample_studio_wave_text_alpha_4), tok::sample_studio_wave_radius_2, 0, tok::sample_studio_wave_stroke_4);
          if (s.dropAt >= 0)
          {
             const float x = g.XOf((double)(s.dropAt < s.doc.Count() ? s.doc.slices[(size_t)s.dropAt].start : s.doc.endFrame));
@@ -2634,7 +2634,7 @@ namespace
          headX = g.XOfW(s.headFrame);
       if (s.job || s.onsetJob || s.busy)
          dl->AddRectFilled(ImVec2(g.mn.x, g.mx.y - tok::space_0_5), ImVec2(g.mn.x + w * (s.busy ? std::clamp(s.gen->Progress(), 0.0f, 1.0f) : 1.0f), g.mx.y),
-                           AccentU32(s.busy ? 1.0f : 0.4f));
+                           AccentU32(s.busy ? 1.0f : tok::sample_studio_wave_accent_u32_alpha_2));
       dl->PopClipRect();
       // Over the ruler too, so it sits on the same mark in all three panels.
       const float rulerTop = mn.y + kOverviewH + 1.0f;

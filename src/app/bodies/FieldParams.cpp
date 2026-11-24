@@ -318,7 +318,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_element_col_2), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -395,7 +395,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_primitive_col_2), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -486,7 +486,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_sample_col_2), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -551,7 +551,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_spectral_col_2), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -589,7 +589,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_synth_col_2), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -664,7 +664,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_notes_col_2), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -747,7 +747,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_graph_col_2), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -804,7 +804,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_pixel_col_2), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 

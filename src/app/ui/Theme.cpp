@@ -159,7 +159,7 @@ namespace app
                              ImVec4(std::min(accent.x * tok::theme_push_primary_button_style_ratio, 1.0f), std::min(accent.y * tok::theme_push_primary_button_style_ratio, 1.0f),
                                     std::min(accent.z * 1.1f, 1.0f), 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                             ImVec4(accent.x * 0.82f, accent.y * 0.82f, accent.z * 0.82f, 1.0f));
+                             ImVec4(accent.x * tok::theme_push_primary_button_style_scale_2, accent.y * tok::theme_push_primary_button_style_scale_2, accent.z * tok::theme_push_primary_button_style_scale_2, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::ink_white));
       ActionButton::Scoped() = ActionButton::Kind::Primary;
    }
@@ -233,7 +233,7 @@ namespace app
       // rasterized at all - a transparent 1px border still antialiases against
       // the rounded corner and was itself the corner-bleed users saw.
       ImGui::PushStyleColor(ImGuiCol_Border, tok::BaseV4(tok::col::ink_black, 0.0f));
-      ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, isLight ? 0.06f : 0.22f));
+      ImGui::PushStyleColor(ImGuiCol_BorderShadow, tok::V4(tok::theme_push_elevated_panel_style_col_2, isLight ? 0.06f : tok::theme_push_elevated_panel_style_col_2_alpha));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
       // Top-level floating windows (Settings, Formula/Field-*-editor) use the
@@ -427,14 +427,14 @@ namespace app
       }
       style.Colors[ImGuiCol_WindowBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_ChildBg] = vec(t.panelBg, 0.0f);
-      style.Colors[ImGuiCol_PopupBg] = vec(t.panelBg, 0.98f);
+      style.Colors[ImGuiCol_PopupBg] = vec(t.panelBg, tok::theme_apply_panel_bg_alpha_4);
       style.Colors[ImGuiCol_Border] = vec(t.border);
       style.Colors[ImGuiCol_FrameBg] = shade(t.panelBg, 0.08f);
       style.Colors[ImGuiCol_FrameBgHovered] = shade(t.panelBg, 0.14f);
       style.Colors[ImGuiCol_FrameBgActive] = shade(t.panelBg, 0.24f);
       style.Colors[ImGuiCol_TitleBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_TitleBgActive] = vec(t.windowBg);
-      style.Colors[ImGuiCol_TitleBgCollapsed] = vec(t.windowBg, 0.75f);
+      style.Colors[ImGuiCol_TitleBgCollapsed] = vec(t.windowBg, tok::theme_apply_window_bg_alpha_3);
       // Was t.panelBg, which reads as a hard horizontal seam against the
       // node-editor canvas immediately below it: the canvas' own background
       // (ed::StyleColor_Bg below) resolves to windowBg once its alpha is
@@ -465,7 +465,7 @@ namespace app
          }
       }
       style.Colors[ImGuiCol_CheckMark] = ctrlAccent;
-      style.Colors[ImGuiCol_SliderGrab] = ImVec4(ctrlAccent.x, ctrlAccent.y, ctrlAccent.z, 0.85f);
+      style.Colors[ImGuiCol_SliderGrab] = ImVec4(ctrlAccent.x, ctrlAccent.y, ctrlAccent.z, tok::theme_apply_alpha_2);
       style.Colors[ImGuiCol_SliderGrabActive] = ctrlAccent;
       // Idle Button was pinned to the exact same color as the panel it sits
       // on (panelBg, no offset) - a button was distinguishable from plain
@@ -475,15 +475,15 @@ namespace app
       // visible fill at rest, a step below Hovered's 0.18.
       style.Colors[ImGuiCol_Button] = shade(t.panelBg, 0.08f);
       style.Colors[ImGuiCol_ButtonHovered] = shade(t.panelBg, 0.18f);
-      style.Colors[ImGuiCol_ButtonActive] = isLight ? shade(t.panelBg, 0.32f) : vec(t.accent, 0.65f);
+      style.Colors[ImGuiCol_ButtonActive] = isLight ? shade(t.panelBg, 0.32f) : vec(t.accent, tok::theme_apply_accent_alpha_6);
       style.Colors[ImGuiCol_Header] = kEmphasisSelected;
       style.Colors[ImGuiCol_HeaderHovered] = kEmphasisHover;
       style.Colors[ImGuiCol_HeaderActive] = kEmphasisPressed;
       style.Colors[ImGuiCol_Separator] = vec(t.border);
-      style.Colors[ImGuiCol_SeparatorHovered] = vec(t.accent, 0.6f);
+      style.Colors[ImGuiCol_SeparatorHovered] = vec(t.accent, tok::theme_apply_accent_alpha_7);
       style.Colors[ImGuiCol_SeparatorActive] = vec(t.accent);
-      style.Colors[ImGuiCol_ResizeGrip] = vec(t.border, 0.4f);
-      style.Colors[ImGuiCol_ResizeGripHovered] = vec(t.accent, 0.6f);
+      style.Colors[ImGuiCol_ResizeGrip] = vec(t.border, tok::theme_apply_vec_alpha_4);
+      style.Colors[ImGuiCol_ResizeGripHovered] = vec(t.accent, tok::theme_apply_accent_alpha_7);
       style.Colors[ImGuiCol_ResizeGripActive] = vec(t.accent);
       // Tabs and browser-panel mode rows are the same affordance wearing two
       // widget types, so they share the ladder exactly: unselected panelBg,
@@ -531,7 +531,7 @@ namespace app
       // submenus and the handful of deliberately-bordered children, which
       // push their own size back locally (the Field reference code boxes).
       style.ChildBorderSize = 0.0f;
-      style.Colors[ImGuiCol_TextSelectedBg] = vec(t.accent, 0.35f);
+      style.Colors[ImGuiCol_TextSelectedBg] = vec(t.accent, tok::theme_apply_accent_alpha_8);
       style.Colors[ImGuiCol_DragDropTarget] = vec(t.accent);
       style.Colors[ImGuiCol_NavHighlight] = vec(t.accent);
       // Table colors default to ImGui's built-in dark style and were never
@@ -541,9 +541,9 @@ namespace app
       // theme like every other chrome color above.
       style.Colors[ImGuiCol_TableHeaderBg] = shade(t.panelBg, 0.16f);
       style.Colors[ImGuiCol_TableBorderStrong] = vec(t.border);
-      style.Colors[ImGuiCol_TableBorderLight] = vec(t.border, 0.5f);
+      style.Colors[ImGuiCol_TableBorderLight] = vec(t.border, tok::theme_apply_vec_alpha_5);
       style.Colors[ImGuiCol_TableRowBg] = vec(t.windowBg, 0.0f);
-      style.Colors[ImGuiCol_TableRowBgAlt] = vec(t.text, isLight ? 0.03f : 0.04f);
+      style.Colors[ImGuiCol_TableRowBgAlt] = vec(t.text, isLight ? tok::theme_apply_text_alpha_3 : tok::theme_apply_text_alpha_4);
 
       // The node-graph canvas itself is drawn by imgui-node-editor from its
       // own style table, not ImGui's - Bg/Grid are the two slots visible
@@ -556,19 +556,19 @@ namespace app
       ed::EditorContext* prevEditor = ed::GetCurrentEditor();
       ed::SetCurrentEditor(gEditor);
       ed::Style& edStyle = ed::GetStyle();
-      edStyle.Colors[ed::StyleColor_Bg] = vec(t.windowBg, isLight ? 1.0f : 0.784f);
+      edStyle.Colors[ed::StyleColor_Bg] = vec(t.windowBg, isLight ? 1.0f : tok::theme_apply_window_bg_alpha_4);
       edStyle.Colors[ed::StyleColor_Grid] = vec(t.border, !gShowCanvasGrid ? 0.0f : (isLight ? 0.16f : 0.12f));
-      edStyle.Colors[ed::StyleColor_NodeBg] = vec(t.panelBg, isLight ? 0.95f : 0.80f);
-      edStyle.Colors[ed::StyleColor_NodeBorder] = vec(t.border, isLight ? 0.70f : 0.40f);
+      edStyle.Colors[ed::StyleColor_NodeBg] = vec(t.panelBg, isLight ? tok::theme_apply_panel_bg_alpha_5 : tok::theme_apply_panel_bg_alpha_6);
+      edStyle.Colors[ed::StyleColor_NodeBorder] = vec(t.border, isLight ? tok::theme_apply_vec_alpha_6 : tok::theme_apply_vec_alpha_4);
       edStyle.NodeRounding = CategoryColors::GetNodeRounding();
       // N4: backdrops use the group radius token; N3/N5: hover, selection and marquee all speak accent.
       edStyle.GroupRounding = tok::radius_container;
-      edStyle.Colors[ed::StyleColor_HovLinkBorder] = vec(t.accent, 0.90f);
+      edStyle.Colors[ed::StyleColor_HovLinkBorder] = vec(t.accent, tok::theme_apply_accent_alpha_9);
       edStyle.Colors[ed::StyleColor_SelLinkBorder] = vec(t.accent, 1.0f);
-      edStyle.Colors[ed::StyleColor_NodeSelRect] = vec(t.accent, 0.08f);
-      edStyle.Colors[ed::StyleColor_NodeSelRectBorder] = vec(t.accent, 0.60f);
-      edStyle.Colors[ed::StyleColor_LinkSelRect] = vec(t.accent, 0.08f);
-      edStyle.Colors[ed::StyleColor_LinkSelRectBorder] = vec(t.accent, 0.60f);
+      edStyle.Colors[ed::StyleColor_NodeSelRect] = vec(t.accent, tok::theme_apply_accent_alpha_10);
+      edStyle.Colors[ed::StyleColor_NodeSelRectBorder] = vec(t.accent, tok::theme_apply_accent_alpha_7);
+      edStyle.Colors[ed::StyleColor_LinkSelRect] = vec(t.accent, tok::theme_apply_accent_alpha_10);
+      edStyle.Colors[ed::StyleColor_LinkSelRectBorder] = vec(t.accent, tok::theme_apply_accent_alpha_7);
       edStyle.GridSpacing = gGridSnap;
       ed::SetCurrentEditor(prevEditor);
    }

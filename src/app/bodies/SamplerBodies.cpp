@@ -966,7 +966,7 @@ namespace app
             const float top = midY - n->waveformMax[i] * h * tok::sampler_top_ratio;
             const float bottom = midY - n->waveformMin[i] * h * tok::sampler_bottom_ratio;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::Base(tok::col::accent, 210) : tok::Base(tok::col::accent_9, 210));
+                              isLight ? tok::Base(tok::col::accent, tok::sampler_molder_waveform_accent_alpha_2) : tok::Base(tok::col::accent_9, tok::sampler_molder_waveform_accent_9_alpha_2));
          }
 
          // Dim whatever the start/end range excludes.
@@ -980,12 +980,12 @@ namespace app
 
          const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
          dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 230), tok::sampler_molder_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::sampler_molder_waveform_role_modulation_alpha_2), tok::sampler_molder_waveform_stroke_2);
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, 235), tok::sampler_molder_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, tok::sampler_molder_waveform_state_ok_alpha_2), tok::sampler_molder_waveform_stroke_2);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, 235), tok::sampler_molder_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, tok::sampler_molder_waveform_viz_pink_alpha_2), tok::sampler_molder_waveform_stroke_2);
       }
       else
       {
@@ -1061,7 +1061,7 @@ namespace app
             const float frac = std::clamp(n->partialBars[i] / maxAmp, 0.0f, 1.0f);
             const float top = br.y - frac * h;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, br.y),
-                              isLight ? tok::Base(tok::col::role_expression, 200) : tok::Base(tok::col::role_expression_3, 200));
+                              isLight ? tok::Base(tok::col::role_expression, tok::sampler_molder_partial_bars_role_expression_alpha_2) : tok::Base(tok::col::role_expression_3, tok::sampler_molder_partial_bars_role_expression_3_alpha_2));
          }
       }
       else
@@ -1228,7 +1228,7 @@ namespace app
             const float top = midY - n->waveformMax[i] * h * tok::sampler_top_ratio;
             const float bottom = midY - n->waveformMin[i] * h * tok::sampler_bottom_ratio;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::Base(tok::col::accent_alt_5, 210) : tok::Base(tok::col::accent_alt, 210));
+                              isLight ? tok::Base(tok::col::accent_alt_5, tok::sampler_grain_molder_waveform_accent_alt_5_alpha_2) : tok::Base(tok::col::accent_alt, tok::sampler_grain_molder_waveform_accent_alt_alpha_2));
          }
 
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
@@ -1255,14 +1255,14 @@ namespace app
                continue;
             const float px = origin.x + w * std::clamp(voice.position, 0.0f, 1.0f);
             const int alpha = (int)(voice.amp * 255.0f);
-            const ImU32 whiteCol = isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha);
+            const ImU32 whiteCol = tok::U32(tok::sampler_white_col_2, isLight, alpha);
             dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), whiteCol, tok::sampler_grain_molder_waveform_stroke_3);
          }
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, 235), tok::sampler_grain_molder_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, tok::sampler_grain_molder_waveform_state_ok_alpha_2), tok::sampler_grain_molder_waveform_stroke_2);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, 235), tok::sampler_grain_molder_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, tok::sampler_grain_molder_waveform_viz_pink_alpha_2), tok::sampler_grain_molder_waveform_stroke_2);
       }
       else
       {
@@ -2333,7 +2333,7 @@ namespace app
             {
                const float x = origin.x + w * (float)b / (float)nb;
                const bool isBar = std::fmod((double)b, bar) < 1e-6;
-               const ImU32 tc = isLight ? IM_COL32(60, 70, 100, isBar ? 90 : 55) : IM_COL32(200, 210, 235, isBar ? 70 : 38);
+               const ImU32 tc = isLight ? tok::U32(tok::sampler_tc_3, isBar ? tok::sampler_looper_wave_tc_3_alpha : tok::sampler_looper_wave_tc_3_alpha_2) : tok::U32(tok::sampler_tc_4, isBar ? tok::sampler_looper_wave_tc_4_alpha : tok::sampler_looper_wave_tc_4_alpha_2);
                if (isBar)
                   dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), tc, tok::sampler_looper_wave_stroke);
                else
@@ -2365,13 +2365,13 @@ namespace app
       {
          const float x = origin.x + w * std::clamp(n->Position01(), 0.0f, 1.0f);
          dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y),
-                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 240), tok::sampler_looper_wave_stroke_2);
+                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::sampler_looper_wave_role_modulation_alpha_2), tok::sampler_looper_wave_stroke_2);
       }
       else if (st == LooperNode::kRecording)
       {
          const float f = tgt > 0.0f ? std::clamp(len / tgt, 0.0f, 1.0f) : 1.0f;
          const float x = origin.x + w * f;
-         dl->AddRectFilled(origin, ImVec2(x, br.y), IM_COL32(220, 70, 70, isLight ? 26 : 34));
+         dl->AddRectFilled(origin, ImVec2(x, br.y), tok::U32(tok::sampler_looper_wave_col_2, isLight ? tok::sampler_looper_wave_col_2_alpha : tok::sampler_looper_wave_col_2_alpha_2));
          dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), recCol, tok::sampler_looper_wave_stroke_2);
       }
 
@@ -2716,7 +2716,7 @@ namespace app
                         if (n->PadPlaying(pad) && cur >= 0.0f)
                         {
                            const float px = wx0 + (wx1 - wx0) * std::clamp(cur, 0.0f, 1.0f);
-                           dl->AddLine(ImVec2(px, wTop), ImVec2(px, wBot), tok::Role(tok::col::ink_white, 230), tok::sampler_mpc_body_stroke_3);
+                           dl->AddLine(ImVec2(px, wTop), ImVec2(px, wBot), tok::Role(tok::col::ink_white, tok::sampler_mpc_body_ink_white_alpha_2), tok::sampler_mpc_body_stroke_3);
                         }
                         std::string nm = n->PadName(pad);
                         const size_t dot = nm.find_last_of('.');
@@ -2804,7 +2804,7 @@ namespace app
                {
                   const float px = origin.x + w * std::clamp(at, 0.0f, 1.0f);
                   dl->AddLine(ImVec2(px, origin.y), ImVec2(px, origin.y + h),
-                              tok::U32(isLight ? tok::pal::c_282C38FF : tok::pal::c_FFFFFFEB), tok::sampler_mpc_body_stroke_3);
+                              tok::U32(tok::sampler_mpc_pad_playhead, isLight), tok::sampler_mpc_body_stroke_3);
                }
                if (hov && !n->padPeaks[cur].Empty())
                {

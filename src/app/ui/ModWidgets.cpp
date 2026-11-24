@@ -176,7 +176,7 @@ namespace app
       gParamPinScreenList.push_back({ nodeIndex, paramIndex, curGn ? curGn->typeName : "", paramName ? paramName : "", c,
                                       ImVec2(p.x + box + tok::space_1, p.y), ImVec2(p.x + width, p.y + box + tok::space_1) });
       if (paramIndex == gPredTestSizeXParam && nodeIndex == gPredTestNodeIndex)
-         gPredTestSliderCanvas = ImVec4(p.x + box + 4.0f, p.y, p.x + width, p.y + box + 4.0f);
+         gPredTestSliderCanvas = ImVec4(p.x + box + tok::mod_slider_offset_2, p.y, p.x + width, p.y + box + tok::mod_slider_offset_2);
       ImGui::SetCursorScreenPos(ImVec2(origin.x + box + tok::space_1, origin.y));
 
       // Double-clicking swaps the slider for a text field so an exact value
@@ -870,8 +870,8 @@ namespace app
          // Kept dark even in light mode so it still reads as a shadow, not
          // a glow.
          const ImVec2 shadowCenter(center.x, center.y + tok::mod_knob_float_gap);
-         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::surface_lo, 16), tok::mod_knob_float_segments);
-         dl->AddCircleFilled(shadowCenter, radius + tok::mod_knob_float_gap_2, tok::Role(tok::col::surface_lo, 22), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::surface_lo, tok::mod_knob_float_surface_lo_alpha_3), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::mod_knob_float_gap_2, tok::Role(tok::col::surface_lo, tok::mod_knob_float_surface_lo_alpha_4), tok::mod_knob_float_segments);
          dl->AddCircleFilled(center, radius, tok::Role(tok::col::surface_hi), tok::mod_knob_float_segments);
          dl->AddCircleFilled(ImVec2(center.x, center.y - tok::px_align), radius - tok::space_0_75, tok::Role(tok::col::ink_white), tok::mod_knob_float_segments);
          dl->PathArcTo(center, radius + tok::mod_knob_float_gap_3, aMin, aMax, tok::mod_knob_float_segments);
@@ -897,7 +897,7 @@ namespace app
          dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_lo), tok::mod_knob_float_stroke_3);
          dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_mid_2), tok::mod_knob_float_segments, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + tok::mod_knob_float_gap_3, tok::Role(tok::col::ink_black, 30), tok::mod_knob_float_segments, tok::mod_knob_float_stroke);
+            dl->AddCircle(center, radius + tok::mod_knob_float_gap_3, tok::Role(tok::col::ink_black, tok::mod_knob_float_ink_black_alpha_4), tok::mod_knob_float_segments, tok::mod_knob_float_stroke);
       }
       else
       {
@@ -906,8 +906,8 @@ namespace app
          // still separate the bezel from the body - same two-layer fake-blur
          // idiom, tuned darker/stronger for this background.
          const ImVec2 shadowCenter(center.x, center.y + tok::mod_knob_float_gap);
-         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::ink_black, 45), tok::mod_knob_float_segments);
-         dl->AddCircleFilled(shadowCenter, radius + tok::mod_knob_float_gap_2, tok::Role(tok::col::ink_black, 60), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::ink_black, tok::mod_knob_float_ink_black_alpha_5), tok::mod_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::mod_knob_float_gap_2, tok::Role(tok::col::ink_black, tok::mod_knob_float_ink_black_alpha_6), tok::mod_knob_float_segments);
          dl->AddCircleFilled(center, radius, tok::Role(tok::col::edge_lo), tok::mod_knob_float_segments);
          dl->AddCircleFilled(ImVec2(center.x, center.y - tok::px_align), radius - tok::space_0_75, tok::Role(tok::col::surface_deep), tok::mod_knob_float_segments);
          dl->PathArcTo(center, radius + tok::mod_knob_float_gap_3, aMin, aMax, tok::mod_knob_float_segments);
@@ -928,7 +928,7 @@ namespace app
          dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::surface_hi) : tok::Role(tok::col::edge_hi), tok::mod_knob_float_stroke_3);
          dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo_2), tok::mod_knob_float_segments, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + tok::mod_knob_float_gap_3, tok::Role(tok::col::ink_white, 40), tok::mod_knob_float_segments, tok::mod_knob_float_stroke);
+            dl->AddCircle(center, radius + tok::mod_knob_float_gap_3, tok::Role(tok::col::ink_white, tok::mod_knob_float_ink_white_alpha_2), tok::mod_knob_float_segments, tok::mod_knob_float_stroke);
       }
 
       // The knob's permanent caption is the param *name*, not its value - a
@@ -1065,8 +1065,8 @@ namespace app
          // above for the rationale (fake-blur via layered low-alpha circles,
          // offset down so the bezel reads as sitting above the panel).
          const ImVec2 shadowCenter(center.x, center.y + tok::mod_bipolar_knob_float_gap);
-         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::surface_lo, 16), tok::mod_bipolar_knob_float_segments);
-         dl->AddCircleFilled(shadowCenter, radius + tok::mod_bipolar_knob_float_gap_2, tok::Role(tok::col::surface_lo, 22), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::surface_lo, tok::mod_bipolar_knob_float_surface_lo_alpha_3), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::mod_bipolar_knob_float_gap_2, tok::Role(tok::col::surface_lo, tok::mod_bipolar_knob_float_surface_lo_alpha_4), tok::mod_bipolar_knob_float_segments);
          dl->AddCircleFilled(center, radius, tok::Role(tok::col::surface_hi), tok::mod_bipolar_knob_float_segments);
          dl->AddCircleFilled(ImVec2(center.x, center.y - tok::px_align), radius - tok::space_0_75, tok::Role(tok::col::ink_white), tok::mod_bipolar_knob_float_segments);
          dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, aMin, aMax, tok::mod_bipolar_knob_float_segments);
@@ -1098,15 +1098,15 @@ namespace app
          dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_lo), tok::mod_bipolar_knob_float_stroke_4);
          dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_mid_2), tok::mod_bipolar_knob_float_segments, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + tok::mod_bipolar_knob_float_gap_3, tok::Role(tok::col::ink_black, 30), tok::mod_bipolar_knob_float_segments, tok::mod_bipolar_knob_float_stroke);
+            dl->AddCircle(center, radius + tok::mod_bipolar_knob_float_gap_3, tok::Role(tok::col::ink_black, tok::mod_bipolar_knob_float_ink_black_alpha_4), tok::mod_bipolar_knob_float_segments, tok::mod_bipolar_knob_float_stroke);
       }
       else
       {
          // Dark theme: slightly stronger alpha than the light version, same
          // rationale as KnobFloat's dark branch above.
          const ImVec2 shadowCenter(center.x, center.y + tok::mod_bipolar_knob_float_gap);
-         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::ink_black, 45), tok::mod_bipolar_knob_float_segments);
-         dl->AddCircleFilled(shadowCenter, radius + tok::mod_bipolar_knob_float_gap_2, tok::Role(tok::col::ink_black, 60), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::space_0_5, tok::Role(tok::col::ink_black, tok::mod_bipolar_knob_float_ink_black_alpha_5), tok::mod_bipolar_knob_float_segments);
+         dl->AddCircleFilled(shadowCenter, radius + tok::mod_bipolar_knob_float_gap_2, tok::Role(tok::col::ink_black, tok::mod_bipolar_knob_float_ink_black_alpha_6), tok::mod_bipolar_knob_float_segments);
          dl->AddCircleFilled(center, radius, tok::Role(tok::col::edge_lo), tok::mod_bipolar_knob_float_segments);
          dl->AddCircleFilled(ImVec2(center.x, center.y - tok::px_align), radius - tok::space_0_75, tok::Role(tok::col::surface_deep), tok::mod_bipolar_knob_float_segments);
          dl->PathArcTo(center, radius + tok::mod_bipolar_knob_float_gap_3, aMin, aMax, tok::mod_bipolar_knob_float_segments);
@@ -1138,7 +1138,7 @@ namespace app
          dl->AddLine(tipIn, tipOut, readOnly ? tok::Role(tok::col::edge_mid) : tok::Role(tok::col::edge_hi), tok::mod_bipolar_knob_float_stroke_4);
          dl->AddCircle(center, radius, activeTint ? tok::Role(tok::col::state_err_pressed) : tok::Role(tok::col::edge_lo_2), tok::mod_bipolar_knob_float_segments, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + tok::mod_bipolar_knob_float_gap_3, tok::Role(tok::col::ink_white, 40), tok::mod_bipolar_knob_float_segments, tok::mod_bipolar_knob_float_stroke);
+            dl->AddCircle(center, radius + tok::mod_bipolar_knob_float_gap_3, tok::Role(tok::col::ink_white, tok::mod_bipolar_knob_float_ink_white_alpha_2), tok::mod_bipolar_knob_float_segments, tok::mod_bipolar_knob_float_stroke);
       }
 
       // rowH has always reserved room for a caption here; nothing ever drew
@@ -1760,7 +1760,7 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float y = origin.y + tok::space_1_5;
-      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Border, 0.6f);   // themed hairline: reads in light and dark
+      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Border, tok::mod_node_separator_border_alpha_2);   // themed hairline: reads in light and dark
 
       if (label != nullptr && label[0] != '\0')
       {
@@ -1929,7 +1929,7 @@ namespace app
    void DrawPin(int pinId, ed::PinKind kind, const char* label, bool labelFirst)
    {
       ed::BeginPin(pinId, kind);
-      ed::PinPivotAlignment(ImVec2(tok::mod_pin_pin_pivot_alignment_x, tok::mod_pin_pin_pivot_alignment_y));
+      ed::PinPivotAlignment(ImVec2(tok::mod_pin_pivot_alignment_x, tok::mod_pin_pivot_alignment_y));
 
       if (labelFirst && label != nullptr && label[0] != '\0')
       {

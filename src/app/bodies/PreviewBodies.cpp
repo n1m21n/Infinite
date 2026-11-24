@@ -112,30 +112,30 @@ namespace app
       const ImU32 bgCol = isLight
          ? IM_COL32((int)(224 + n->color[0] * 28),
                     (int)(227 + n->color[1] * 25),
-                    (int)(232 + n->color[2] * 20), 245)
+                    (int)(232 + n->color[2] * 20), tok::preview_comment_alpha_7)
          : IM_COL32((int)(16 + n->color[0] * 36),
                     (int)(18 + n->color[1] * 36),
-                    (int)(24 + n->color[2] * 36), 235);
+                    (int)(24 + n->color[2] * 36), tok::preview_comment_alpha_8);
       const ImU32 borderCol = isLight
          ? IM_COL32((int)(n->color[0] * 180 + 40),
                     (int)(n->color[1] * 180 + 40),
-                    (int)(n->color[2] * 180 + 40), 160)
+                    (int)(n->color[2] * 180 + 40), tok::preview_comment_alpha_9)
          : IM_COL32((int)(n->color[0] * 200 + 55),
                     (int)(n->color[1] * 200 + 55),
-                    (int)(n->color[2] * 200 + 55), 180);
+                    (int)(n->color[2] * 200 + 55), tok::preview_comment_alpha_10);
 
       dl->AddRectFilled(origin, br, bgCol, tok::preview_comment_radius);
       // Header accent bar (Apple Notes / sticky card feel)
       dl->AddRectFilled(origin, ImVec2(br.x, origin.y + tok::space_1),
                         IM_COL32((int)(n->color[0] * tok::preview_comment_ratio), (int)(n->color[1] * tok::preview_comment_ratio),
-                                 (int)(n->color[2] * tok::preview_comment_ratio), 220), tok::preview_comment_radius, ImDrawFlags_RoundCornersTop);
+                                 (int)(n->color[2] * tok::preview_comment_ratio), tok::preview_comment_alpha_11), tok::preview_comment_radius, ImDrawFlags_RoundCornersTop);
       dl->AddRect(origin, br, borderCol, tok::preview_comment_radius, 0, tok::preview_comment_stroke);
 
       const ImU32 textCol = isLight
          ? tok::Base(tok::col::surface_lo)
          : IM_COL32((int)((n->color[0] * 0.5f + 0.5f) * 255),
                     (int)((n->color[1] * 0.5f + 0.5f) * 255),
-                    (int)((n->color[2] * 0.5f + 0.5f) * 255), 255);
+                    (int)((n->color[2] * 0.5f + 0.5f) * 255), tok::preview_comment_alpha_12);
       // Clipped to the box so a note longer than its height is cut off at the
       // edge instead of spilling over the card.
       dl->PushClipRect(origin, br, true);
@@ -160,8 +160,8 @@ namespace app
 
       // Draw bottom-right resize grip indicator (3 diagonal grip lines)
       const ImU32 gripCol = isLight
-         ? IM_COL32((int)(n->color[0] * 120 + 40), (int)(n->color[1] * 120 + 40), (int)(n->color[2] * 120 + 40), 160)
-         : IM_COL32((int)(n->color[0] * 160 + 60), (int)(n->color[1] * 160 + 60), (int)(n->color[2] * 160 + 60), 160);
+         ? IM_COL32((int)(n->color[0] * 120 + 40), (int)(n->color[1] * 120 + 40), (int)(n->color[2] * 120 + 40), tok::preview_comment_alpha_9)
+         : IM_COL32((int)(n->color[0] * tok::preview_comment_scale_2 + 60), (int)(n->color[1] * tok::preview_comment_scale_2 + 60), (int)(n->color[2] * tok::preview_comment_scale_2 + 60), tok::preview_comment_alpha_9);
       for (int i = 0; i < 3; i++)
       {
          const float offset = tok::space_1 + (float)i * 4.0f;
@@ -497,12 +497,12 @@ namespace app
       ImGui::SameLine();
       if (isLight)
          ImGui::PushStyleColor(ImGuiCol_Text,
-                               ImVec4(n->color[0] * 0.70f, n->color[1] * 0.70f,
-                                      n->color[2] * 0.70f, 1.0f));
+                               ImVec4(n->color[0] * tok::preview_group_node_scale_3, n->color[1] * tok::preview_group_node_scale_3,
+                                      n->color[2] * tok::preview_group_node_scale_3, 1.0f));
       else
          ImGui::PushStyleColor(ImGuiCol_Text,
-                               ImVec4(n->color[0] * 0.4f + 0.6f, n->color[1] * 0.4f + 0.6f,
-                                      n->color[2] * 0.4f + 0.6f, 1.0f));
+                               ImVec4(n->color[0] * tok::preview_group_node_scale_4 + tok::preview_group_node_offset_2, n->color[1] * tok::preview_group_node_scale_4 + tok::preview_group_node_offset_2,
+                                      n->color[2] * tok::preview_group_node_scale_4 + tok::preview_group_node_offset_2, 1.0f));
       if (n->renaming)
       {
          if (n->renameJustStarted)
@@ -510,7 +510,7 @@ namespace app
             UiInteract::FocusHere();
             n->renameJustStarted = false;
          }
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0.35f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::preview_group_node_col_2));
          ImGui::SetNextItemWidth(std::max(tok::preview_group_node_bound, n->width - tok::preview_group_node_gap));
          if (FieldWell::InputText("##grouprename", &n->label, ImGuiInputTextFlags_EnterReturnsTrue) ||
              ImGui::IsItemDeactivated())
@@ -737,7 +737,7 @@ namespace app
 
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     tok::Role(tok::col::accent_2, 200), tok::preview_radius, 0, tok::preview_stroke);
+                     tok::Role(tok::col::accent_2, tok::preview_accent_2_alpha_2), tok::preview_radius, 0, tok::preview_stroke);
    }
 
 
@@ -843,7 +843,7 @@ namespace app
             const float top = midY - fgn->waveformMax[i] * h * tok::preview_top_ratio;
             const float bottom = midY - fgn->waveformMin[i] * h * tok::preview_bottom_ratio;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::Base(tok::col::accent, 200) : tok::Base(tok::col::accent_11, 175));
+                              isLight ? tok::Base(tok::col::accent, tok::preview_field_graph_waveform_accent_alpha_2) : tok::Base(tok::col::accent_11, tok::preview_field_graph_waveform_accent_11_alpha_2));
          }
       }
       else

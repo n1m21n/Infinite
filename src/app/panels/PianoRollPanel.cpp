@@ -269,7 +269,7 @@ namespace
          return ImVec4(c.colorR, c.colorG, c.colorB, 1.0f);
       float hue = std::fmod((float)(c.id % 4096) * 0.61803399f + (float)PageIndex(page) * 0.083f, 1.0f);
       float r, g, b;
-      ImGui::ColorConvertHSVtoRGB(hue, 0.55f, 0.88f, r, g, b);
+      ImGui::ColorConvertHSVtoRGB(hue, tok::piano_roll_clip_color_hsv_sat_2, tok::piano_roll_clip_color_hsv_val_2, r, g, b);
       return ImVec4(r, g, b, 1.0f);
    }
 
@@ -568,7 +568,7 @@ namespace
       const TimeRuler::Axis axis = RulerAxis(a);
       TimeRuler::Background(dl, axis, a.rulerY);
       if (S().rangeEnd > S().rangeStart)
-         dl->AddRectFilled(ImVec2(a.TickX((double)S().rangeStart), a.rulerY), ImVec2(a.TickX((double)S().rangeEnd), a.rulerY + kRulerH), Tint(0.22f));
+         dl->AddRectFilled(ImVec2(a.TickX((double)S().rangeStart), a.rulerY), ImVec2(a.TickX((double)S().rangeEnd), a.rulerY + kRulerH), Tint(tok::piano_roll_ruler_tint_alpha_2));
       if (gArrange.settings.timeDisplay == 1)
          TimeRuler::DrawUnits(dl, axis, a.rulerY, 60.0 / std::max(1.0, (double)Transport::Instance().Tempo()), 0.1,
                               [](double sec, double step) { return ArrangeFormatSeconds(sec, step < 1.0); });
@@ -587,15 +587,15 @@ namespace
             continue;
          const ImVec4 col = ClipColor(c, page);
          const bool on = s.clips.count(c.id) != 0;
-         dl->AddRectFilled(ImVec2(cx0, y0), ImVec2(cx1, y1), WithAlpha(col, c.enabled ? (on ? tok::piano_roll_clip_strip_assign : tok::piano_roll_clip_strip_assign_2) : 0.2f), tok::radius_control);
+         dl->AddRectFilled(ImVec2(cx0, y0), ImVec2(cx1, y1), WithAlpha(col, c.enabled ? (on ? tok::piano_roll_clip_strip_assign : tok::piano_roll_clip_strip_assign_2) : tok::piano_roll_clip_strip_alpha_2), tok::radius_control);
          if (on)
-            dl->AddRect(ImVec2(cx0, y0), ImVec2(cx1, y1), Tint(0.9f), tok::radius_control);
+            dl->AddRect(ImVec2(cx0, y0), ImVec2(cx1, y1), Tint(tok::piano_roll_clip_strip_tint_alpha_4), tok::radius_control);
          if (!c.enabled || LinkedNode(page) == nullptr)
-            DrawArrangeHatch(dl, ImVec2(cx0, y0), ImVec2(cx1, y1), Tint(0.25f));
+            DrawArrangeHatch(dl, ImVec2(cx0, y0), ImVec2(cx1, y1), Tint(tok::piano_roll_clip_strip_tint_alpha_5));
          if (!c.name.empty())
          {
             dl->PushClipRect(ImVec2(cx0, y0), ImVec2(cx1, y1), true);
-            dl->AddText(ImVec2(cx0 + tok::space_1, (y0 + y1 - ImGui::GetFontSize()) * 0.5f), Tint(0.95f), c.name.c_str());
+            dl->AddText(ImVec2(cx0 + tok::space_1, (y0 + y1 - ImGui::GetFontSize()) * 0.5f), Tint(tok::piano_roll_clip_strip_tint_alpha_6), c.name.c_str());
             dl->PopClipRect();
          }
       }
@@ -633,18 +633,18 @@ namespace
          const int p = s.rows[(size_t)r];
          if (page.drumRows)
          {
-            dl->AddRectFilled(ImVec2(kx0, y), ImVec2(kx1, y1 - 1.0f), Tint(0.1f));
+            dl->AddRectFilled(ImVec2(kx0, y), ImVec2(kx1, y1 - 1.0f), Tint(tok::piano_roll_keys_tint_alpha_4));
             if (s.keyH >= tok::piano_roll_keys_limit)
             {
                const char* name = DrumName(p);
-               dl->AddText(ImVec2(kx0 + tok::space_0_75, y + (s.keyH - ImGui::GetFontSize()) * 0.5f), Tint(0.8f), name != nullptr ? name : PitchName(p).c_str());
+               dl->AddText(ImVec2(kx0 + tok::space_0_75, y + (s.keyH - ImGui::GetFontSize()) * 0.5f), Tint(tok::piano_roll_keys_tint_alpha_5), name != nullptr ? name : PitchName(p).c_str());
             }
             continue;
          }
          const bool black = IsBlackKey(p);
-         dl->AddRectFilled(ImVec2(kx0, y), ImVec2(black ? kx0 + (kx1 - kx0) * tok::piano_roll_keys_ratio : kx1, y1 - 1.0f), Tint(black ? 0.42f : 0.1f));
+         dl->AddRectFilled(ImVec2(kx0, y), ImVec2(black ? kx0 + (kx1 - kx0) * tok::piano_roll_keys_ratio : kx1, y1 - 1.0f), Tint(black ? tok::piano_roll_keys_tint_alpha_6 : tok::piano_roll_keys_tint_alpha_4));
          if (p % 12 == 0 && s.keyH >= tok::piano_roll_keys_limit)
-            dl->AddText(ImVec2(kx1 - tok::space_5, y + (s.keyH - ImGui::GetFontSize()) * 0.5f), Tint(0.8f), PitchName(p).c_str());
+            dl->AddText(ImVec2(kx1 - tok::space_5, y + (s.keyH - ImGui::GetFontSize()) * 0.5f), Tint(tok::piano_roll_keys_tint_alpha_5), PitchName(p).c_str());
       }
       dl->PopClipRect();
    }
@@ -663,12 +663,12 @@ namespace
          const int p = s.rows[(size_t)r];
          const bool snapping = page.scaleSnap && !page.drumRows;
          if ((p - root + 120) % 12 == 0)
-            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), AccentU32(snapping ? 0.26f : 0.12f));
+            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), AccentU32(snapping ? tok::piano_roll_grid_accent_u32_alpha_4 : tok::piano_roll_grid_accent_u32_alpha_5));
          else if (InScale(p))
-            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), snapping ? AccentU32(0.13f) : Tint(0.045f));
+            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), snapping ? AccentU32(tok::piano_roll_grid_accent_u32_alpha_6) : Tint(tok::piano_roll_grid_tint_alpha_6));
          else if (snapping) // notes cannot land here: a dark lane
-            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), IM_COL32(0, 0, 0, lightTheme ? 22 : 70));
-         dl->AddLine(ImVec2(a.x0, y), ImVec2(a.x1, y), Tint(p % 12 == 11 ? 0.16f : 0.04f));
+            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), tok::U32(tok::piano_roll_grid_col_2, lightTheme ? tok::piano_roll_grid_col_2_alpha : tok::piano_roll_grid_col_2_alpha_2));
+         dl->AddLine(ImVec2(a.x0, y), ImVec2(a.x1, y), Tint(p % tok::piano_roll_grid_tint_alpha_7 == tok::piano_roll_grid_tint_alpha_8 ? tok::piano_roll_grid_tint_alpha_9 : tok::piano_roll_grid_tint_alpha_10));
       }
       Tick grid = ArrangeSnapGridTicks();
       if (grid <= 0)
@@ -700,9 +700,9 @@ namespace
             continue;
          const bool editing = s.clips.empty() || s.clips.count(c.id) != 0;
          const ImVec4 col = ClipColor(c, page);
-         dl->AddRectFilled(ImVec2(std::max(a.x0, cx0), a.rollY), ImVec2(std::min(a.x1, cx1), a.rollB), WithAlpha(col, editing ? 0.09f : 0.04f));
+         dl->AddRectFilled(ImVec2(std::max(a.x0, cx0), a.rollY), ImVec2(std::min(a.x1, cx1), a.rollB), WithAlpha(col, editing ? tok::piano_roll_clips_and_notes_alpha_5 : tok::piano_roll_clips_and_notes_alpha_6));
          if (offline)
-            DrawArrangeHatch(dl, ImVec2(std::max(a.x0, cx0), a.rollY), ImVec2(std::min(a.x1, cx1), a.rollB), Tint(0.07f));
+            DrawArrangeHatch(dl, ImVec2(std::max(a.x0, cx0), a.rollY), ImVec2(std::min(a.x1, cx1), a.rollB), Tint(tok::piano_roll_clips_and_notes_tint_alpha_5));
          ForEachPlaced(c, [&](const Placed& pl) {
             const int row = s.rowOf[(size_t)std::clamp((int)pl.note->pitch + c.transpose, 0, 127)];
             if (row < 0)
@@ -718,11 +718,11 @@ namespace
             const ImVec2 p0(x0, y + tok::px_align), p1(x1, y + s.keyH - tok::px_align);
             const float round = std::min(tok::radius_control * 0.5f, s.keyH * tok::piano_roll_clips_and_notes_ratio);
             dl->AddRectFilled(p0, p1, WithAlpha(col, depth), round);
-            dl->AddRect(p0, p1, sel ? Tint(1.0f) : WithAlpha(col, editing && !pl.repeat ? 1.0f : 0.45f), round);
+            dl->AddRect(p0, p1, sel ? Tint(tok::piano_roll_clips_and_notes_tint_alpha_6) : WithAlpha(col, editing && !pl.repeat ? tok::piano_roll_clips_and_notes_alpha_7 : tok::piano_roll_clips_and_notes_alpha_8), round);
             if (pl.note->mute || !c.enabled)
-               DrawArrangeHatch(dl, p0, p1, Tint(0.45f), 4.0f);
+               DrawArrangeHatch(dl, p0, p1, Tint(tok::piano_roll_clips_and_notes_tint_alpha_7), tok::piano_roll_clips_and_notes_draw_arrange_hatch_arg);
             if (page.scaleSnap && !InScale(pl.note->pitch))
-               dl->AddCircleFilled(ImVec2(x0 + tok::space_0_75, y + s.keyH * 0.5f), tok::piano_roll_clips_and_notes_r, Tint(0.9f));
+               dl->AddCircleFilled(ImVec2(x0 + tok::space_0_75, y + s.keyH * 0.5f), tok::piano_roll_clips_and_notes_r, Tint(tok::piano_roll_clips_and_notes_tint_alpha_8));
          });
       }
    }
@@ -3310,8 +3310,8 @@ namespace
       {
          const ImVec2 p0(std::min(mouse.x, s.dragFrom.x), std::min(mouse.y, s.dragFrom.y));
          const ImVec2 p1(std::max(mouse.x, s.dragFrom.x), std::max(mouse.y, s.dragFrom.y));
-         dl->AddRectFilled(p0, p1, AccentU32(0.15f));
-         dl->AddRect(p0, p1, AccentU32(0.8f));
+         dl->AddRectFilled(p0, p1, AccentU32(tok::piano_roll_page_accent_u32_alpha_3));
+         dl->AddRect(p0, p1, AccentU32(tok::piano_roll_page_accent_u32_alpha_4));
       }
       dl->PopClipRect();
       DrawKeys(dl, a, page);

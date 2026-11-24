@@ -175,7 +175,7 @@ namespace app
          const float v = std::min(1.0f, levels.bands[i] * n->gain);
          dl->AddRectFilled(ImVec2(origin.x + i * bw + 1, origin.y + h - v * h),
                            ImVec2(origin.x + (i + 1) * bw - 1, origin.y + h),
-                           tok::Role(tok::col::accent_2, 235));
+                           tok::Role(tok::col::accent_2, tok::geometry_params_audio_analyze_accent_2_alpha_2));
       }
       if (!n->input.IsConnected() && !Platform::AudioIsRunning())
          AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + bodyW, origin.y + h)}, "idle");
@@ -2187,7 +2187,7 @@ namespace app
             float h = barH * tok::geometry_params_h_ratio + (barH * tok::geometry_params_audio_color_ramp_editor_ratio) * lvl;
             ImU32 col = IM_COL32((int)(std::clamp(n->bandColor[b][0], 0.0f, 1.0f) * 255),
                                  (int)(std::clamp(n->bandColor[b][1], 0.0f, 1.0f) * 255),
-                                 (int)(std::clamp(n->bandColor[b][2], 0.0f, 1.0f) * 255), 255);
+                                 (int)(std::clamp(n->bandColor[b][2], 0.0f, 1.0f) * 255), tok::geometry_params_audio_color_ramp_editor_alpha_2);
             dl->AddRectFilled(ImVec2(x0, origin.y + barH - h), ImVec2(x1, origin.y + barH - 1.0f), col);
          }
          prevX = nextX;
@@ -2207,7 +2207,7 @@ namespace app
             float mag = std::clamp(spec[bin] * 2.5f, 0.0f, 1.0f);
             pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - tok::space_1)));
          }
-         dl->AddPolyline(pts.data(), (int)pts.size(), tok::Role(tok::col::ink_white, 130), false, tok::geometry_params_audio_color_ramp_editor_stroke);
+         dl->AddPolyline(pts.data(), (int)pts.size(), tok::Role(tok::col::ink_white, tok::geometry_params_audio_color_ramp_editor_ink_white_alpha_2), false, tok::geometry_params_audio_color_ramp_editor_stroke);
       }
 
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::Role(tok::col::edge_lo_2), tok::geometry_params_audio_color_ramp_editor_radius);
@@ -3056,7 +3056,7 @@ namespace app
          {
             dl->AddRectFilled(headerPos,
                               ImVec2(headerPos.x + kPreviewSize, headerPos.y + rowHeight),
-                              dragging ? tok::Role(tok::col::surface_lo_2, 200) : tok::Role(tok::col::edge_lo, 160), tok::geometry_params_layer_stack_radius);
+                              dragging ? tok::Role(tok::col::surface_lo_2, tok::geometry_params_layer_stack_surface_lo_2_alpha_2) : tok::Role(tok::col::edge_lo, tok::geometry_params_layer_stack_edge_lo_alpha_2), tok::geometry_params_layer_stack_radius);
          }
          // grip dots, so the header reads as draggable
          for (int d = 0; d < 3; d++)

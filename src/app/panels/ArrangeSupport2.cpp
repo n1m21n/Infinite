@@ -14,7 +14,7 @@ namespace app
       h ^= h >> 29;
       const float hue = (float)(h % 360ull) / tok::arrange_support2_hue_ratio;
       float r, g, b;
-      ImGui::ColorConvertHSVtoRGB(hue, 0.65f, 0.95f, r, g, b);
+      ImGui::ColorConvertHSVtoRGB(hue, tok::arrange_support2_group_color_hsv_sat_2, tok::arrange_support2_group_color_hsv_val_2, r, g, b);
       return IM_COL32((int)(r * tok::arrange_support2_group_color_ratio), (int)(g * 255.0f), (int)(b * 255.0f), alpha);
    }
 

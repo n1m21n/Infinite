@@ -687,7 +687,7 @@ namespace
       case Field::ValueKind::Vec3:
       case Field::ValueKind::Vec2: return ImGui::GetColorU32(ImGuiCol_ButtonActive, a);
       case Field::ValueKind::PerPoint: return ImGui::GetColorU32(ImGuiCol_PlotLinesHovered, a);
-      default: return ImGui::GetColorU32(ImGuiCol_Text, 0.55f * a);
+      default: return ImGui::GetColorU32(ImGuiCol_Text, tok::field_patcher_kind_col_text_scale_2 * a);
       }
    }
 

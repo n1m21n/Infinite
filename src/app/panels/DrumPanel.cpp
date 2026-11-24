@@ -456,7 +456,7 @@ namespace app
                const float ty = (bmin.y + bmax.y - ImGui::GetFontSize()) * 0.5f;
                const float tailW = ImGui::CalcTextSize(tail).x;
                const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-               dl->AddText(ImVec2(bmax.x - tok::space_3 - tailW, ty), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, t.w * 0.6f)), tail);
+               dl->AddText(ImVec2(bmax.x - tok::space_3 - tailW, ty), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, t.w * tok::drum_groove_chips_scale_2)), tail);
                dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_3 - tailW - tok::space_2, bmax.y), true);
                dl->AddText(ImVec2(bmin.x + tok::space_3, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
                dl->PopClipRect();
@@ -676,7 +676,7 @@ namespace app
             const bool loaded = !n->FileName(lane).empty();
             const bool sel = lane == sLane;
             // The lane is a horizontal channel strip: graphite housing, the colour cap down its left edge.
-            DeskParts::FaceSide(dl, ImVec2(p.x, y - tok::space_0_5), ImVec2(x1, y + rowH + tok::space_0_5), NodeColor(gn, loaded ? 1.0f : 0.35f), sel);
+            DeskParts::FaceSide(dl, ImVec2(p.x, y - tok::space_0_5), ImVec2(x1, y + rowH + tok::space_0_5), NodeColor(gn, loaded ? 1.0f : tok::drum_labels_node_color_alpha_2), sel);
             const ImVec2 mn(p.x + tok::drum_labels_gap, y), mx(scribbleX1, y + rowH);
             ImGui::SetCursorScreenPos(mn);
             UiInteract::Hit("##label", ImVec2(mx.x - mn.x, rowH));
@@ -687,7 +687,7 @@ namespace app
             DeskParts::ScribbleRow(dl, mn, mx, name.c_str(), lane + 1, NodeColor(gn, loaded ? 1.0f : 0.35f), !loaded);
             if (hov)
             {
-               dl->AddRect(mn, mx, DeskParts::Ink(70), tok::drum_labels_radius);
+               dl->AddRect(mn, mx, DeskParts::Ink(tok::drum_labels_ink_alpha_2), tok::drum_labels_radius);
                HelpTip(T("%s %d: %s\n%s"), T("Lane"), lane + 1, name.c_str(), T("Click to play and select (Alt = accent). Keys 1-8 too."));
             }
             float x = scribbleX1 + pad;
@@ -760,16 +760,16 @@ namespace app
                dl->AddText(ImGui::GetFont(), rfs, ImVec2(x0 + (g.cellW - ts.x) * 0.5f, p.y + tok::space_0_5), DeskParts::Ink((beat || now ? tok::drum_grid_assign : tok::drum_grid_assign_2) * (inPat ? tok::drum_grid_assign_3 : tok::drum_grid_assign_4) / 255), num);
             // engraved tick under the number, longer on the beat (like the fader scale)
             dl->AddLine(ImVec2(x0 + g.cellW * 0.5f, p.y + tok::space_0_75 + rfs), ImVec2(x0 + g.cellW * 0.5f, p.y + tok::space_0_75 + rfs + (beat ? tok::drum_grid_assign_5 : tok::drum_grid_assign_6)),
-                        DeskParts::Ink(inPat ? (beat ? tok::drum_grid_assign_7 : tok::drum_grid_assign_8) : 50), tok::drum_grid_stroke);
+                        DeskParts::Ink(inPat ? (beat ? tok::drum_grid_assign_7 : tok::drum_grid_assign_8) : tok::drum_grid_ink_alpha_4), tok::drum_grid_stroke);
             // Chase light: one LED per step, the playing one lit (TR step LEDs).
             if (inPat)
             {
                const ImU32 chase = tok::U32(tok::desk_led_red);
                const ImVec2 lc(x0 + g.cellW * 0.5f, p.y + kRulerH - tok::space_1);
-               dl->AddCircleFilled(lc, tok::drum_grid_r, DeskParts::Tint(chase, 0.22f), tok::drum_grid_segments);
+               dl->AddCircleFilled(lc, tok::drum_grid_r, DeskParts::Tint(chase, tok::drum_grid_tint_shade_2), tok::drum_grid_segments);
                if (now)
                {
-                  dl->AddCircleFilled(lc, tok::drum_grid_r_2, tok::U32(tok::desk_led_red, 60), tok::drum_grid_segments_2);
+                  dl->AddCircleFilled(lc, tok::drum_grid_r_2, tok::U32(tok::desk_led_red, tok::drum_grid_desk_led_red_alpha_2), tok::drum_grid_segments_2);
                   dl->AddCircleFilled(lc, tok::drum_grid_r, chase, tok::drum_grid_segments);
                }
             }
@@ -859,7 +859,7 @@ namespace app
 
          // Keys: raised caps on a recessed tray. A lit key glows in the accent, brightness = velocity;
          // a top line = accent; the bar under the cap shows nudge.
-         const ImU32 badgeText = ImGui::GetColorU32(ImVec4(1, 1, 1, 0.92f));
+         const ImU32 badgeText = ImGui::GetColorU32(tok::V4(tok::drum_grid_col_3));
          for (int lane = 0; lane < kLanes; lane++)
          {
             const float y0 = gridY + (float)lane * (rowH + kRowGap);
@@ -872,7 +872,7 @@ namespace app
                const ImVec2 cMin(x0, y0), cMax(x0 + g.cellW, y0 + rowH);
                if (s >= len)
                {
-                  dl->AddRectFilled(cMin, cMax, DeskParts::Lo(90), tok::drum_grid_radius);
+                  dl->AddRectFilled(cMin, cMax, DeskParts::Lo(tok::drum_grid_lo_alpha_2), tok::drum_grid_radius);
                   continue;
                }
                const bool hov = overCell && hl == lane && hs == s;
@@ -888,17 +888,17 @@ namespace app
                   DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, lit, kTrLed, nullptr, true, 0.0f, TrKey(s, 0.75f + 0.35f * lit));
                   if (now)
                   {
-                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(90), tok::drum_grid_radius);
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(tok::drum_grid_ink_alpha_5), tok::drum_grid_radius);
                      dl->AddRect(cMin, cMax, DeskParts::Ink(), tok::drum_grid_radius, 0, tok::drum_grid_stroke_2);
                   }
                   const float nudge = n->stepNudge[lane][s];
                   if (std::fabs(nudge) > 0.001f)
                   {
                      const float cx = (x0 + cMax.x) * 0.5f + nudge * (g.cellW - tok::space_1_5);
-                     dl->AddRectFilled(ImVec2(cx - tok::space_0_5, cMax.y - tok::drum_grid_gap), ImVec2(cx + tok::space_0_5, cMax.y - tok::space_0_75), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.9f)), 1.0f);
+                     dl->AddRectFilled(ImVec2(cx - tok::space_0_5, cMax.y - tok::drum_grid_gap), ImVec2(cx + tok::space_0_5, cMax.y - tok::space_0_75), ImGui::GetColorU32(tok::V4(tok::drum_grid_col_4)), 1.0f);
                   }
                   if (accent)
-                     dl->AddRectFilled(ImVec2(x0 + tok::space_0_75, cMax.y - tok::drum_grid_gap_2), ImVec2(cMax.x - tok::space_0_75, cMax.y - tok::space_0_5), ImGui::GetColorU32(ImVec4(1, 1, 1, 0.9f)), 1.0f);
+                     dl->AddRectFilled(ImVec2(x0 + tok::space_0_75, cMax.y - tok::drum_grid_gap_2), ImVec2(cMax.x - tok::space_0_75, cMax.y - tok::space_0_5), ImGui::GetColorU32(tok::V4(tok::drum_grid_col_4)), 1.0f);
                   const int cond = n->stepCond[lane][s];
                   char badge[8] = "";
                   if (cond != 0)
@@ -921,8 +921,8 @@ namespace app
                   DeskParts::KeyCap(dl, cMin, cMax, hov, pressed, 0.0f, kTrLed, nullptr, true, 0.0f, TrKey(s, 0.38f));
                   if (now)
                   {
-                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(50), tok::drum_grid_radius);
-                     dl->AddRect(cMin, cMax, DeskParts::Ink(200), tok::drum_grid_radius, 0, tok::drum_grid_stroke_2);
+                     dl->AddRectFilled(cMin, cMax, DeskParts::Ink(tok::drum_grid_ink_alpha_4), tok::drum_grid_radius);
+                     dl->AddRect(cMin, cMax, DeskParts::Ink(tok::drum_grid_ink_alpha_6), tok::drum_grid_radius, 0, tok::drum_grid_stroke_2);
                   }
                }
                if (sTab == kTabStep && lane == sLane && s == sStep)
@@ -982,7 +982,7 @@ namespace app
             legend[k] = (char)toupper((unsigned char)label[k]);
          legend[k] = '\0';
          const float w = std::max(minW, ImGui::CalcTextSize(legend).x + tok::space_4);
-         return DeskParts::Key(label, legend, on, Accent(1.0f), ImVec2(w, h > 0.0f ? h : tok::drum_desk_key_key_y));
+         return DeskParts::Key(label, legend, on, Accent(1.0f), ImVec2(w, h > 0.0f ? h : tok::drum_desk_key_y));
       }
 
       void DrawLaneInspector(GraphNode* gn, DrumSequencerNode* n)
@@ -1334,8 +1334,8 @@ namespace app
          ImGui::BeginChild("##drumInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
          UiDensity::Compact compact;
          // Text and cards inside the desk use the desk tones (light desk in light mode).
-         ImGui::PushStyleColor(ImGuiCol_Text, DeskParts::Ink(228));
-         ImGui::PushStyleColor(ImGuiCol_TextDisabled, DeskParts::Ink(140));
+         ImGui::PushStyleColor(ImGuiCol_Text, DeskParts::Ink(tok::drum_inspector_ink_alpha_3));
+         ImGui::PushStyleColor(ImGuiCol_TextDisabled, DeskParts::Ink(tok::drum_inspector_ink_alpha_4));
          SectionCard::S().desk = true;
          SectionCard::S().deskCap = NodeColor(gn);
          SectionCard::BeginWindow();

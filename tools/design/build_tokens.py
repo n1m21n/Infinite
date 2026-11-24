@@ -63,6 +63,18 @@ def build():
                     L.append(f"   constexpr {ty} {s}_{k} = {cv(v)};")
     r = t["roles"]
     L += ["", "   struct Rgba8 { unsigned char r, g, b, a; };", "   struct Rgbaf { float r, g, b, a; };", "   struct Pair8 { Rgba8 dark, light; };", "   struct Pairf { Rgbaf dark, light; };"]
+    # Per-surface colours (owner rule B): a colour gets a role token of its own unless an existing one has the same
+    # value AND the same job. Rgba8 0-255, Rgbaf exact floats, pairs are [dark, light]; hex rgb words stay unsigned.
+    c8 = lambda c: "{" + ", ".join(str(int(x)) for x in c) + "}"
+    cf = lambda c: "{" + ", ".join(f"{float(x)}f" for x in c) + "}"
+    for grp, ty, cv in (("surface_hex", "unsigned", lambda v: f"{v}u"), ("surface_rgba8", "Rgba8", c8),
+                        ("surface_rgbaf", "Rgbaf", cf),
+                        ("surface_pair8", "Pair8", lambda v: f"{{ {c8(v['dark'])}, {c8(v['light'])} }}"),
+                        ("surface_pairf", "Pairf", lambda v: f"{{ {cf(v['dark'])}, {cf(v['light'])} }}")):
+        for s, kv in surfaces.get(grp, {}).items():
+            for k, v in kv.items():
+                if not k.startswith("_"):
+                    L.append(f"   constexpr {ty} {s}_{k} = {cv(v)};")
     for k, v in r["pairs"].items():
         d, l = v["dark"], v["light"]
         L.append(f"   constexpr Pair8 {ident(k)} = {{ {{{d[0]}, {d[1]}, {d[2]}, {d[3]}}}, {{{l[0]}, {l[1]}, {l[2]}, {l[3]}}} }};")

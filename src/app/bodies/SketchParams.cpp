@@ -21,7 +21,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::sketch_params_col_2), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 

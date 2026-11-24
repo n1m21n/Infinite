@@ -104,7 +104,7 @@ void DrawCookOverlay()
    // CanvasToScreen, and the on-screen scale is its inverse.
    const float scale = 1.0f / std::max(0.001f, ed::GetCurrentZoom());
    const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
-   const ImU32 pillBg = ImGui::GetColorU32(ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.92f));
+   const ImU32 pillBg = ImGui::GetColorU32(ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, tok::cook_overlay_alpha_2));
    const ImU32 pillText = ImGui::GetColorU32(ImVec4(t.text.r, t.text.g, t.text.b, 1.0f));
    const bool light = CategoryColors::IsThemeLight();
    // A fixed size: the current font size here still carries the canvas zoom, so the number grew and shrank with it.

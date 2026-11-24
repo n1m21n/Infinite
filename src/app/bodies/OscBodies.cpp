@@ -234,7 +234,7 @@ namespace app
             const float x0 = origin.x + w * std::clamp(slices[i], 0.0f, 1.0f);
             const float x1 = origin.x + w * ((i + 1 < sliceCount) ? std::clamp(slices[i + 1], 0.0f, 1.0f) : 1.0f);
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? tok::Base(tok::col::ink_black, 14) : tok::Base(tok::col::ink_white, 12));
+                              isLight ? tok::Base(tok::col::ink_black, tok::osc_slicer_waveform_ink_black_alpha_2) : tok::Base(tok::col::ink_white, tok::osc_slicer_waveform_ink_white_alpha_2));
          }
 
          AudioViz::Peaks(dl, n->wavePeaks, origin, w, h);
@@ -248,7 +248,7 @@ namespace app
             const float px = origin.x + w * std::clamp(snap.voices[v].position, 0.0f, 1.0f);
             const int alpha = (int)(std::clamp(snap.voices[v].amp, 0.0f, 1.0f) * 235.0f) + 20;
             dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                        isLight ? IM_COL32(230, 140, 20, alpha) : IM_COL32(255, 200, 90, alpha), tok::osc_slicer_waveform_stroke_2);
+                        tok::U32(tok::osc_slicer_waveform_col_2, isLight, alpha), tok::osc_slicer_waveform_stroke_2);
          }
 
          // Slice markers, plus the note each slice answers to when it fits.
@@ -334,7 +334,7 @@ namespace app
       if (hasSample)
       {
          AudioViz::Peaks(dl, n->wavePeaks, origin, w, h, tok::osc_paul_stretch_waveform_peaks_arg,
-                         isLight ? tok::Base(tok::col::accent, 210) : tok::Base(tok::col::accent_9, 210));
+                         isLight ? tok::Base(tok::col::accent, tok::osc_paul_stretch_waveform_accent_alpha_2) : tok::Base(tok::col::accent_9, tok::osc_paul_stretch_waveform_accent_9_alpha_2));
 
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
@@ -346,12 +346,12 @@ namespace app
 
          const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
          dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 230), tok::osc_paul_stretch_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::osc_paul_stretch_waveform_role_modulation_alpha_2), tok::osc_paul_stretch_waveform_stroke_2);
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, 235), tok::osc_paul_stretch_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, tok::osc_paul_stretch_waveform_state_ok_alpha_2), tok::osc_paul_stretch_waveform_stroke_2);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, 235), tok::osc_paul_stretch_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, tok::osc_paul_stretch_waveform_viz_pink_alpha_2), tok::osc_paul_stretch_waveform_stroke_2);
       }
       else
       {
@@ -441,7 +441,7 @@ namespace app
       if (hasSample)
       {
          AudioViz::Peaks(dl, n->wavePeaks, origin, w, h, tok::osc_granular_waveform_peaks_arg,
-                         isLight ? tok::Base(tok::col::accent, 200) : tok::Base(tok::col::accent_11, 175));
+                         isLight ? tok::Base(tok::col::accent, tok::osc_granular_waveform_accent_alpha_2) : tok::Base(tok::col::accent_11, tok::osc_granular_waveform_accent_11_alpha_2));
 
          const float startX = origin.x + w * s;
          const float endX = origin.x + w * e;
@@ -466,35 +466,35 @@ namespace app
             // Outer glow
             const int glowAlpha = (int)(gr.amp * 80.0f);
             dl->AddCircleFilled(ImVec2(gx, gy), radius + tok::osc_granular_waveform_gap,
-                                isLight ? IM_COL32(20, 120, 230, glowAlpha) : IM_COL32(100, 220, 255, glowAlpha));
+                                tok::U32(tok::osc_granular_waveform_col_5, isLight, glowAlpha));
 
             // Core grain dot
             const int coreAlpha = std::min(255, (int)(gr.amp * 255.0f));
             dl->AddCircleFilled(ImVec2(gx, gy), radius,
-                                isLight ? IM_COL32(20, 80, 200, coreAlpha) : IM_COL32(230, 248, 255, coreAlpha));
+                                tok::U32(tok::osc_granular_waveform_col_6, isLight, coreAlpha));
 
             // Small direction indicator / velocity streak
             const float dirLen = (gr.pitchRatio > 1.05f ? 4.0f : (gr.pitchRatio < 0.95f ? -4.0f : 0.0f));
             if (std::abs(dirLen) > 0.1f)
             {
                dl->AddLine(ImVec2(gx - dirLen, gy), ImVec2(gx + dirLen, gy),
-                           isLight ? IM_COL32(210, 130, 20, (int)(gr.amp * tok::osc_granular_waveform_ratio_2)) : IM_COL32(255, 235, 160, (int)(gr.amp * tok::osc_granular_waveform_ratio_3)), tok::osc_granular_waveform_stroke_2);
+                           isLight ? tok::U32(tok::osc_granular_waveform_col_7, (int)(gr.amp * tok::osc_granular_waveform_ratio_2)) : tok::U32(tok::osc_granular_waveform_col_8, (int)(gr.amp * tok::osc_granular_waveform_ratio_3)), tok::osc_granular_waveform_stroke_2);
             }
          }
 
          // Current playing playhead (pos) strictly within [s, e]
          const float px = origin.x + w * std::clamp(n->Playhead(), s, e);
          dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 235), tok::osc_granular_waveform_stroke_3);
+                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::osc_granular_waveform_role_modulation_alpha_2), tok::osc_granular_waveform_stroke_3);
          const float pGrip = tok::osc_p_grip;
          const ImU32 pCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation);
          dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, origin.y), ImVec2(px + pGrip * 0.5f, origin.y), ImVec2(px, origin.y + pGrip), pCol);
          dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, br.y), ImVec2(px + pGrip * 0.5f, br.y), ImVec2(px, br.y - pGrip), pCol);
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, 235), tok::osc_granular_waveform_stroke_3);
+                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, tok::osc_granular_waveform_state_ok_alpha_2), tok::osc_granular_waveform_stroke_3);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, 235), tok::osc_granular_waveform_stroke_3);
+                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, tok::osc_granular_waveform_viz_pink_alpha_2), tok::osc_granular_waveform_stroke_3);
       }
       else
       {
@@ -676,8 +676,8 @@ namespace app
          }
          const int alpha = isCurrent ? 255 : (int)(40.0f + focus * 120.0f);
          const ImU32 frameStroke = isLight
-            ? (isCurrent ? tok::Base(tok::col::accent) : IM_COL32(70, 115, 175, alpha))
-            : (isCurrent ? tok::Role(tok::col::accent_alt) : IM_COL32(96, 150, 205, alpha));
+            ? (isCurrent ? tok::Base(tok::col::accent) : tok::U32(tok::osc_wavetable_frames_col_5, alpha))
+            : (isCurrent ? tok::Role(tok::col::accent_alt) : tok::U32(tok::osc_wavetable_frames_col_6, alpha));
          dl->PathStroke(Fade(frameStroke), 0, isCurrent ? tok::osc_wavetable_frames_stroke : 1.0f);
       }
 
@@ -685,7 +685,7 @@ namespace app
       // picture, and nothing says it can be dragged.
       const float handleX = origin.x + tok::space_2_5 + std::clamp(eng.position, 0.0f, 1.0f) * (w - tok::osc_wavetable_frames_gap);
       dl->AddLine(ImVec2(handleX, origin.y + tok::space_0_75), ImVec2(handleX, br.y - tok::space_0_75),
-                  isLight ? IM_COL32(0, 0, 0, hovered ? 120 : 60) : IM_COL32(255, 255, 255, hovered ? 90 : 42), tok::osc_wavetable_frames_stroke_2);
+                  isLight ? tok::U32(tok::osc_wavetable_frames_col_7, hovered ? tok::osc_wavetable_frames_col_7_alpha : tok::osc_wavetable_frames_col_7_alpha_2) : tok::U32(tok::osc_wavetable_frames_col_8, hovered ? tok::osc_wavetable_frames_col_8_alpha : tok::osc_wavetable_frames_col_8_alpha_2), tok::osc_wavetable_frames_stroke_2);
       const ImU32 triCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt);
       dl->AddTriangleFilled(ImVec2(handleX - tok::space_1_25, br.y - tok::space_0_5), ImVec2(handleX + tok::space_1_25, br.y - tok::space_0_5),
                             ImVec2(handleX, br.y - tok::osc_wavetable_frames_gap_2), Fade(triCol));
@@ -820,7 +820,7 @@ namespace app
 
       // Subtle sustain gate vertical zone highlight
       dl->AddRectFilled(ImVec2(layout.pD.x, layout.topY), ImVec2(layout.pS.x, layout.baseY),
-                        isLight ? tok::Base(tok::col::ink_black, 8) : tok::Base(tok::col::ink_white, 6));
+                        isLight ? tok::Base(tok::col::ink_black, tok::osc_editable_adsr_ink_black_alpha_2) : tok::Base(tok::col::ink_white, tok::osc_editable_adsr_ink_white_alpha_2));
 
       // Latch nearest handle on press and support smooth dragging
       static int sHeld = -1;
@@ -1015,10 +1015,10 @@ namespace app
 
          // Outer halo on hover/drag
          if (isHot)
-            dl->AddCircleFilled(handlePts[i], radius + tok::space_0_75, (color & 0x00FFFFFFu) | 0x40000000u, tok::osc_editable_adsr_segments);
+            dl->AddCircleFilled(handlePts[i], radius + tok::space_0_75, (color & 0x00FFFFFFu) | 0x40000000u, tok::osc_editable_adsr_segments);  // ui-audit-ok: channel mask / bit packing, not a colour value
 
          dl->AddCircleFilled(handlePts[i], radius, isLight ? tok::Base(tok::col::ink_white) : tok::Base(tok::col::ink_white), tok::osc_editable_adsr_segments);
-         dl->AddCircle(handlePts[i], radius, isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_deep, 230), tok::osc_editable_adsr_segments, tok::osc_editable_adsr_stroke_3);
+         dl->AddCircle(handlePts[i], radius, isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_deep, tok::osc_editable_adsr_edge_deep_alpha_2), tok::osc_editable_adsr_segments, tok::osc_editable_adsr_stroke_3);
       }
 
       dl->PopClipRect();
@@ -1040,7 +1040,7 @@ namespace app
          const ImVec2 labelPos = highSustain ? ImVec2(origin.x + (br.x - origin.x - tsz.x) * tok::osc_editable_adsr_ratio, br.y - tok::space_1 - tsz.y)
                                              : ImVec2(br.x - tok::space_1_5 - tsz.x, origin.y + tok::space_1);
          dl->AddText(labelPos,
-                     isLight ? tok::Base(tok::col::edge_lo_2, 160) : tok::Base(tok::col::text_secondary, 140), timeText);
+                     isLight ? tok::Base(tok::col::edge_lo_2, tok::osc_editable_adsr_edge_lo_2_alpha_2) : tok::Base(tok::col::text_secondary, tok::osc_editable_adsr_text_secondary_alpha_2), timeText);
       }
 
       // Rich Readout & Status info
@@ -1410,19 +1410,19 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope  -  drag the handles", "##wtAmpEnv", &eng.ampAttack,
                         &eng.ampDecay, &eng.ampSustain, &eng.ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::accent_alt, 245));
+                        tok::Role(tok::col::accent_alt, tok::osc_wavetable_engine_column_accent_alt_alpha_2));
       ImGui::PopID();
 
       ImGui::PushID("pitch");
       DrawEnvelopePanel("pitch envelope  -  drag the handles", "##wtPitchEnv", &eng.pitchAttack,
                         &eng.pitchDecay, &eng.pitchSustain, &eng.pitchRelease, &eng.pitchAmount,
-                        -tok::osc_wavetable_engine_column_draw_envelope_panel_arg, tok::osc_wavetable_engine_column_draw_envelope_panel_arg, "%.1f st", tok::Role(tok::col::role_modulation, 235));
+                        -tok::osc_wavetable_engine_column_draw_envelope_panel_arg, tok::osc_wavetable_engine_column_draw_envelope_panel_arg, "%.1f st", tok::Role(tok::col::role_modulation, tok::osc_wavetable_engine_column_role_modulation_alpha_2));
       ImGui::PopID();
 
       ImGui::PushID("filter");
       DrawEnvelopePanel("filter envelope  -  drag the handles", "##wtFiltEnv", &eng.filterAttack,
                         &eng.filterDecay, &eng.filterSustain, &eng.filterRelease, &eng.filterAmount,
-                        -tok::osc_wavetable_engine_column_draw_envelope_panel_arg_2, tok::osc_wavetable_engine_column_draw_envelope_panel_arg_2, "%.2f oct", tok::Role(tok::col::viz_teal_4, 235));
+                        -tok::osc_wavetable_engine_column_draw_envelope_panel_arg_2, tok::osc_wavetable_engine_column_draw_envelope_panel_arg_2, "%.2f oct", tok::Role(tok::col::viz_teal_4, tok::osc_wavetable_engine_column_viz_teal_4_alpha_2));
       ImGui::PopID();
 
       ImGui::PopID();
@@ -1601,13 +1601,13 @@ namespace app
       dl->PathClear();
       for (const auto& p : pts)
          dl->PathLineTo(p);
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent, 45) : tok::Base(tok::col::accent_2, 50), 0, tok::osc_oscillator_waveform_stroke_2);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::osc_oscillator_waveform_accent_alpha_2) : tok::Base(tok::col::accent_2, tok::osc_oscillator_waveform_accent_2_alpha_2), 0, tok::osc_oscillator_waveform_stroke_2);
 
       // Core trace
       dl->PathClear();
       for (const auto& p : pts)
          dl->PathLineTo(p);
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245), 0, tok::osc_oscillator_waveform_stroke_3);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::osc_oscillator_waveform_accent_alt_alpha_2), 0, tok::osc_oscillator_waveform_stroke_3);
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
@@ -1701,7 +1701,7 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope  -  drag the handles", "##oscAmpEnv", &eng.ampAttack,
                         &eng.ampDecay, &eng.ampSustain, &eng.ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::accent_alt, 245));
+                        tok::Role(tok::col::accent_alt, tok::osc_oscillator_body_accent_alt_alpha_2));
       ImGui::PopID();
 
       ImGui::Dummy(ImVec2(0.0f, tok::osc_oscillator_body_dummy_h_2));
@@ -1876,7 +1876,7 @@ namespace app
             const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
             f.dl->PathLineTo(ImVec2(f.origin.x + t * w, midY - v * h * tok::osc_fm_scope_ratio));
          }
-         f.dl->PathStroke(IsThemeLight() ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, 240), 0, tok::osc_fm_scope_stroke_2);
+         f.dl->PathStroke(IsThemeLight() ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::osc_fm_scope_role_modulation_alpha_2), 0, tok::osc_fm_scope_stroke_2);
       }
       else
       {
@@ -1947,7 +1947,7 @@ namespace app
             AudioSlider("level", &op.level, 0.0f, 1.0f, "%.2f", rowTop.x + full - levelX);
             ImGui::SetCursorScreenPos(ImVec2(rowTop.x, rowTop.y + ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y));
             DrawEnvelopeFields("##fmEnv", &op.attack, &op.decay, &op.sustain, &op.release, nullptr, 0.0f,
-                               1.0f, "%.2f", tok::Role(tok::col::accent_alt, 245), nullptr);
+                               1.0f, "%.2f", tok::Role(tok::col::accent_alt, tok::osc_fm_body_accent_alt_alpha_2), nullptr);
             op.decay = std::max(1.0f, op.decay);
             op.release = std::max(1.0f, op.release);
          }
@@ -2321,9 +2321,9 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, y));
             }
             if (pass == 0)
-               dl->PathStroke(isLight ? tok::Base(tok::col::accent_alt_5, 45) : tok::Base(tok::col::accent_alt_4, 45), 0, tok::osc_wave_terrain_scope_stroke_2);
+               dl->PathStroke(isLight ? tok::Base(tok::col::accent_alt_5, tok::osc_wave_terrain_scope_accent_alt_5_alpha_2) : tok::Base(tok::col::accent_alt_4, tok::osc_wave_terrain_scope_accent_alt_4_alpha_2), 0, tok::osc_wave_terrain_scope_stroke_2);
             else
-               dl->PathStroke(isLight ? tok::Base(tok::col::accent_6, 240) : tok::Base(tok::col::accent_alt_2, 240), 0, tok::osc_wave_terrain_scope_stroke_3);
+               dl->PathStroke(isLight ? tok::Base(tok::col::accent_6, tok::osc_wave_terrain_scope_accent_6_alpha_2) : tok::Base(tok::col::accent_alt_2, tok::osc_wave_terrain_scope_accent_alt_2_alpha_2), 0, tok::osc_wave_terrain_scope_stroke_3);
          }
       }
       dl->PopClipRect();
@@ -2447,10 +2447,10 @@ namespace app
                pts[i] = ImVec2(baseX + t * traceW, baseY - traceH * 0.5f - s * traceH * 0.5f);
             }
 
-            const ImU32 glow = IM_COL32(40, 200, 220, (int)(30 + 40 * prox));
+            const ImU32 glow = tok::U32(tok::osc_glow_2, (int)(30 + 40 * prox));
             const bool isLight = IsThemeLight();
-            const ImU32 coreLo = isLight ? IM_COL32(0, 130, 190, (int)(70 + 120 * prox))
-                                          : IM_COL32(60, 210, 255, (int)(70 + 130 * prox));
+            const ImU32 coreLo = isLight ? tok::U32(tok::osc_core_lo_3, (int)(70 + 120 * prox))
+                                          : tok::U32(tok::osc_core_lo_4, (int)(70 + 130 * prox));
             const ImU32 coreHi = isLight ? tok::Base(tok::col::accent_15) : tok::Base(tok::col::accent_alt_6);
             const ImU32 core = prox > 0.97f ? coreHi : coreLo;
 
@@ -2459,11 +2459,11 @@ namespace app
          }
 
          dl->PopClipRect();
-         dl->AddRect(origin, containerBr, tok::Role(tok::col::edge_lo, 180), tok::osc_wave_terrain_body_radius, 0, tok::osc_wave_terrain_body_stroke_5);
+         dl->AddRect(origin, containerBr, tok::Role(tok::col::edge_lo, tok::osc_wave_terrain_body_edge_lo_alpha_2), tok::osc_wave_terrain_body_radius, 0, tok::osc_wave_terrain_body_stroke_5);
 
          char label[64];
          snprintf(label, sizeof(label), "wavetable  -  frame %s / %d", UiFmt::F2(n->position * (frameCount - 1)).c, frameCount - 1);
-         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), tok::Role(tok::col::text_secondary, 200), label);
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), tok::Role(tok::col::text_secondary, tok::osc_wave_terrain_body_text_secondary_alpha_2), label);
 
          ImGui::Dummy(ImVec2(containerW, previewH));
       }
@@ -2523,7 +2523,7 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope", "##wtAmpEnv", &n->ampAttack,
                         &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::accent_alt_4, 240));
+                        tok::Role(tok::col::accent_alt_4, tok::osc_wave_terrain_body_accent_alt_4_alpha_2));
       ImGui::PopID();
 
       ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h_2));
@@ -2612,7 +2612,7 @@ namespace app
             const float sy = midY - n->scopeCache[i] * scaleY * tok::osc_sy_ratio;
             dl->PathLineTo(ImVec2(origin.x + t * w, sy));
          }
-         dl->PathStroke(isLight ? tok::Base(tok::col::accent_alt_5, 50) : tok::Base(tok::col::accent_alt_2, 60), 0, tok::osc_equation_visualizer_stroke_3);
+         dl->PathStroke(isLight ? tok::Base(tok::col::accent_alt_5, tok::osc_equation_visualizer_accent_alt_5_alpha_2) : tok::Base(tok::col::accent_alt_2, tok::osc_equation_visualizer_accent_alt_2_alpha_3), 0, tok::osc_equation_visualizer_stroke_3);
       }
 
       const auto& curve = n->PreviewCurve();
@@ -2626,7 +2626,7 @@ namespace app
             const float cy = midY - std::clamp(curve[i], -tok::osc_equation_visualizer_bound, tok::osc_equation_visualizer_bound) * scaleY;
             dl->PathLineTo(ImVec2(origin.x + t * w, cy));
          }
-         dl->PathStroke(isLight ? tok::Base(tok::col::accent, 60) : tok::Base(tok::col::accent_alt_8, 75), 0, tok::osc_equation_visualizer_stroke_4);
+         dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::osc_equation_visualizer_accent_alpha_3) : tok::Base(tok::col::accent_alt_8, tok::osc_equation_visualizer_accent_alt_8_alpha_2), 0, tok::osc_equation_visualizer_stroke_4);
 
          dl->PathClear();
          for (int i = 0; i < nPts; i++)
@@ -2635,7 +2635,7 @@ namespace app
             const float cy = midY - std::clamp(curve[i], -tok::osc_equation_visualizer_bound, tok::osc_equation_visualizer_bound) * scaleY;
             dl->PathLineTo(ImVec2(origin.x + t * w, cy));
          }
-         dl->PathStroke(isLight ? tok::Base(tok::col::accent, 240) : tok::Base(tok::col::accent_alt_2, 250), 0, tok::osc_equation_visualizer_stroke_5);
+         dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::osc_equation_visualizer_accent_alpha_4) : tok::Base(tok::col::accent_alt_2, tok::osc_equation_visualizer_accent_alt_2_alpha_4), 0, tok::osc_equation_visualizer_stroke_5);
       }
 
       if (!n->LastError().empty())
@@ -2644,7 +2644,7 @@ namespace app
          const ImVec2 txtSz = ImGui::CalcTextSize(errText.c_str());
          const ImVec2 pillBr(br.x - tok::space_1_5, origin.y + tok::space_1_5 + txtSz.y + tok::space_1);
          const ImVec2 pillTl(pillBr.x - txtSz.x - tok::space_2_5, origin.y + tok::space_1_5);
-         dl->AddRectFilled(pillTl, pillBr, tok::Role(tok::col::state_err_9, 230), tok::osc_equation_visualizer_radius);
+         dl->AddRectFilled(pillTl, pillBr, tok::Role(tok::col::state_err_9, tok::osc_equation_visualizer_state_err_9_alpha_2), tok::osc_equation_visualizer_radius);
          dl->AddText(ImVec2(pillTl.x + tok::space_1_25, pillTl.y + tok::space_0_5), tok::Role(tok::col::edge_hi), errText.c_str());
       }
       else
@@ -2653,8 +2653,8 @@ namespace app
          const ImVec2 txtSz = ImGui::CalcTextSize(tag);
          const ImVec2 pillBr(br.x - tok::space_1_5, origin.y + tok::space_1_5 + txtSz.y + tok::space_1);
          const ImVec2 pillTl(pillBr.x - txtSz.x - tok::space_2, origin.y + tok::space_1_5);
-         dl->AddRectFilled(pillTl, pillBr, isLight ? tok::Base(tok::col::edge_hi, 200) : tok::Base(tok::col::surface_lo, 200), tok::osc_equation_visualizer_radius);
-         dl->AddText(ImVec2(pillTl.x + tok::space_1, pillTl.y + tok::space_0_5), isLight ? tok::Base(tok::col::text_accent, 240) : tok::Base(tok::col::accent_alt_4, 240), tag);
+         dl->AddRectFilled(pillTl, pillBr, isLight ? tok::Base(tok::col::edge_hi, tok::osc_equation_visualizer_edge_hi_alpha_2) : tok::Base(tok::col::surface_lo, tok::osc_equation_visualizer_surface_lo_alpha_2), tok::osc_equation_visualizer_radius);
+         dl->AddText(ImVec2(pillTl.x + tok::space_1, pillTl.y + tok::space_0_5), isLight ? tok::Base(tok::col::text_accent, tok::osc_equation_visualizer_text_accent_alpha_2) : tok::Base(tok::col::accent_alt_4, tok::osc_equation_visualizer_accent_alt_4_alpha_2), tag);
       }
 
       AudioViz::End(vizFrame);
@@ -2778,7 +2778,7 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope", "##eqAmpEnv", &n->ampAttack,
                         &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::accent_alt_4, 240));
+                        tok::Role(tok::col::accent_alt_4, tok::osc_equation_body_accent_alt_4_alpha_2));
       ImGui::PopID();
 
       EndAudioBody();
@@ -2827,9 +2827,9 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, y));
             }
             if (pass == 0)
-               dl->PathStroke(isLight ? tok::Base(tok::col::viz_teal, 45) : tok::Base(tok::col::viz_teal_3, 45), 0, tok::osc_image_spectral_synth_scope_stroke_2);
+               dl->PathStroke(isLight ? tok::Base(tok::col::viz_teal, tok::osc_image_spectral_synth_scope_viz_teal_alpha_3) : tok::Base(tok::col::viz_teal_3, tok::osc_image_spectral_synth_scope_viz_teal_3_alpha_2), 0, tok::osc_image_spectral_synth_scope_stroke_2);
             else
-               dl->PathStroke(isLight ? tok::Base(tok::col::viz_teal, 240) : tok::Base(tok::col::viz_teal_2, 240), 0, tok::osc_image_spectral_synth_scope_stroke_3);
+               dl->PathStroke(isLight ? tok::Base(tok::col::viz_teal, tok::osc_image_spectral_synth_scope_viz_teal_alpha_4) : tok::Base(tok::col::viz_teal_2, tok::osc_image_spectral_synth_scope_viz_teal_2_alpha_2), 0, tok::osc_image_spectral_synth_scope_stroke_3);
          }
       }
       dl->PopClipRect();
@@ -2886,7 +2886,7 @@ namespace app
 
          // Background panel
          dl->AddRectFilled(origin, containerBr, tok::Role(tok::col::surface_deep), tok::radius_control);
-         dl->AddRect(origin, containerBr, tok::Role(tok::col::edge_lo, 180), tok::osc_image_spectral_synth_body_radius, 0, tok::osc_image_spectral_synth_body_stroke);
+         dl->AddRect(origin, containerBr, tok::Role(tok::col::edge_lo, tok::osc_image_spectral_synth_body_edge_lo_alpha_2), tok::osc_image_spectral_synth_body_radius, 0, tok::osc_image_spectral_synth_body_stroke);
 
          const float imgSize = previewH - tok::space_2;
          const float imgX = origin.x + (containerW - imgSize) * 0.5f;
@@ -2897,7 +2897,7 @@ namespace app
          if (n->GetOutputTexture() != 0)
          {
             Thumb::Add(dl, (ImTextureID)(intptr_t)n->GetOutputTexture(), imgTl, imgBr, ImVec2(0, 1), ImVec2(1, 0));
-            dl->AddRect(imgTl, imgBr, tok::Role(tok::col::viz_teal_3, 140), tok::osc_image_spectral_synth_body_radius_2, 0, tok::osc_image_spectral_synth_body_stroke);
+            dl->AddRect(imgTl, imgBr, tok::Role(tok::col::viz_teal_3, tok::osc_image_spectral_synth_body_viz_teal_3_alpha_4), tok::osc_image_spectral_synth_body_radius_2, 0, tok::osc_image_spectral_synth_body_stroke);
          }
 
          // Dynamic Glowing Neon Laser Scanhead Overlay (drawn cleanly on top of image every frame)
@@ -2905,9 +2905,9 @@ namespace app
          const float laserX = imgTl.x + std::clamp(playhead, 0.0f, 1.0f) * imgSize;
 
          // Outer cyan glow
-         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::viz_teal_3, 50), tok::osc_image_spectral_synth_body_stroke_2);
+         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::viz_teal_3, tok::osc_image_spectral_synth_body_viz_teal_3_alpha_5), tok::osc_image_spectral_synth_body_stroke_2);
          // Mid cyan glow
-         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::viz_teal_2, 130), tok::osc_image_spectral_synth_body_stroke_3);
+         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::viz_teal_2, tok::osc_image_spectral_synth_body_viz_teal_2_alpha_2), tok::osc_image_spectral_synth_body_stroke_3);
          // Sharp core laser line
          dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::ink_white), tok::osc_image_spectral_synth_body_stroke_4);
 
@@ -2921,7 +2921,7 @@ namespace app
          for (int i = 0; i < 5; i++)
          {
             const float ty = imgTl.y + (float)i * (imgSize / tok::osc_image_spectral_synth_body_ratio_2) - tok::space_1_5;
-            dl->AddText(ImVec2(origin.x + tok::space_1, ty), tok::Role(tok::col::text_secondary, 180), freqLabels[i]);
+            dl->AddText(ImVec2(origin.x + tok::space_1, ty), tok::Role(tok::col::text_secondary, tok::osc_image_spectral_synth_body_text_secondary_alpha_2), freqLabels[i]);
          }
 
          // Invisible button for interactive mouse scrubbing across spectrogram
@@ -3105,7 +3105,7 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope", "##specAmpEnv", &n->ampAttack,
                         &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::viz_teal_3, 240));
+                        tok::Role(tok::col::viz_teal_3, tok::osc_image_spectral_synth_body_viz_teal_3_alpha_6));
       ImGui::PopID();
 
       ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h_2));

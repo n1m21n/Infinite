@@ -1210,7 +1210,7 @@ namespace app
          const float y = std::pow(x, curve);
          dl->PathLineTo(ImVec2(origin.x + x * w, br.y - y * h));
       }
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245), 0, tok::note_velocity_curve_chart_stroke_2);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::note_velocity_curve_chart_accent_alt_alpha_2), 0, tok::note_velocity_curve_chart_stroke_2);
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
@@ -1487,7 +1487,7 @@ namespace app
          const ImVec2 p0 = ImGui::GetCursorScreenPos();
          const float mw = w - (w * tok::note_predictive_notes_body_ratio - 2.0f) - ImGui::GetStyle().ItemSpacing.x;
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::Role(tok::col::ink_white, 14), tok::note_predictive_notes_body_radius);
+         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::Role(tok::col::ink_white, tok::note_predictive_notes_body_ink_white_alpha_2), tok::note_predictive_notes_body_radius);
          const auto& c = n->Curve();
          if (c.size() >= tok::note_predictive_notes_body_limit)
          {
@@ -1500,7 +1500,7 @@ namespace app
                const float x1 = p0.x + mw * (float)i / (float)(c.size() - 1);
                const float y0 = p0.y + h - tok::space_0_75 - (h - tok::space_1_5) * std::clamp(c[i - 1] / hi, 0.0f, 1.0f);
                const float y1 = p0.y + h - tok::space_0_75 - (h - tok::space_1_5) * std::clamp(c[i] / hi, 0.0f, 1.0f);
-               dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), tok::Role(tok::col::state_ok, 230), tok::note_predictive_notes_body_stroke);
+               dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), tok::Role(tok::col::state_ok, tok::note_predictive_notes_body_state_ok_alpha_2), tok::note_predictive_notes_body_stroke);
             }
          }
          if (c.size() < tok::note_predictive_notes_body_limit)
@@ -1910,7 +1910,7 @@ namespace app
             if (pitchHovered)
             {
                dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, origin.y + pitchH),
-                                 isLight ? tok::Base(tok::col::ink_black, 10) : tok::Base(tok::col::ink_white, 12), tok::radius_cell);
+                                 isLight ? tok::Base(tok::col::ink_black, tok::note_sequencer_body_ink_black_alpha_2) : tok::Base(tok::col::ink_white, tok::note_sequencer_body_ink_white_alpha_2), tok::radius_cell);
             }
 
             // Pitch bar stem (from cap to bottom of pitch area)
@@ -2008,7 +2008,7 @@ namespace app
             else
             {
                DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy1),
-                                isLight ? tok::Base(tok::col::edge_mid, 180) : tok::Base(tok::col::surface_lo_2, 180), "OFF", fontVelSz);
+                                isLight ? tok::Base(tok::col::edge_mid, tok::note_sequencer_body_edge_mid_alpha_2) : tok::Base(tok::col::surface_lo_2, tok::note_sequencer_body_surface_lo_2_alpha_2), "OFF", fontVelSz);
             }
 
             // Playhead column outline
@@ -2119,7 +2119,7 @@ namespace app
             const double len = t1 - t0;
             const float noteH = std::max(tok::note_piano_roll_body_bound, (h - tok::space_1_5) / (float)(hi - lo + 1));
             const ImU32 on = IM_COL32((int)(gAudioTint.r * tok::note_piano_roll_body_ratio), (int)(gAudioTint.g * 255.0f),
-                                      (int)(gAudioTint.b * 255.0f), 220);
+                                      (int)(gAudioTint.b * 255.0f), tok::note_piano_roll_body_alpha_2);
             dl->PushClipRect(origin, br, true);
             // A dense page draws at most ~2 notes per pixel column's worth.
             const size_t step = std::max<size_t>(1, s->notes.size() / 4096);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
@@ -2135,7 +2135,7 @@ namespace app
             if (ph >= t0 && ph <= t1)
             {
                const float x = origin.x + (float)((ph - t0) / len) * w;
-               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? tok::Base(tok::col::edge_lo, 230) : tok::Base(tok::col::edge_hi, 230), tok::note_piano_roll_body_stroke);
+               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? tok::Base(tok::col::edge_lo, tok::note_piano_roll_body_edge_lo_alpha_2) : tok::Base(tok::col::edge_hi, tok::note_piano_roll_body_edge_hi_alpha_2), tok::note_piano_roll_body_stroke);
             }
             dl->PopClipRect();
          }
@@ -2216,7 +2216,7 @@ namespace app
             const int hi = std::min(127, (int)song->highNote + 1);
             const float noteH = std::max(tok::note_midi_file_body_bound, (h - tok::space_1_5) / (float)(hi - lo + 1));
             const ImU32 on = IM_COL32((int)(gAudioTint.r * tok::note_midi_file_body_ratio), (int)(gAudioTint.g * 255.0f),
-                                      (int)(gAudioTint.b * 255.0f), 220);
+                                      (int)(gAudioTint.b * 255.0f), tok::note_midi_file_body_alpha_2);
             // Pair each on with the next off of the same note and track.
             std::vector<std::pair<uint8_t, double>> open[128];
             dl->PushClipRect(origin, br, true);
@@ -2241,7 +2241,7 @@ namespace app
             if (ph >= 0.0)
             {
                const float x = origin.x + (float)(std::min(ph, len) / len) * w;
-               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? tok::Base(tok::col::edge_lo, 230) : tok::Base(tok::col::edge_hi, 230), tok::note_midi_file_body_stroke);
+               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? tok::Base(tok::col::edge_lo, tok::note_midi_file_body_edge_lo_alpha_2) : tok::Base(tok::col::edge_hi, tok::note_midi_file_body_edge_hi_alpha_2), tok::note_midi_file_body_stroke);
             }
             dl->PopClipRect();
          }
@@ -2831,7 +2831,7 @@ namespace app
       const ::ModShapes::Ahdsr shape = n->Shape();
       DrawEnvelopePanel("envelope  -  drag the handles", "##envAdsr", &n->attackMs, &n->decayMs,
                         &n->sustainLevel, &n->releaseMs, nullptr, 0.0f, 0.0f, "%.2f",
-                        tok::Role(tok::col::accent_alt, 245), &shape);
+                        tok::Role(tok::col::accent_alt, tok::note_envelope_body_accent_alt_alpha_2), &shape);
       ImGui::Dummy(ImVec2(0.0f, tok::note_envelope_body_dummy_h));
 
       // Hold at the peak, then each moving stage's bend: 0 straight,
