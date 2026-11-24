@@ -3,6 +3,7 @@
 // layers; the nodes themselves are only read, so a layer keeps animating under
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "app/AppCommon.h"
+#include "app/ui/design/ColourMath.h"
 #include "app/graph/NodeParams.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/components/Thumb.h"
@@ -7119,7 +7120,7 @@ namespace
             if (x.adjType == Scene2DNode::kAdjCurves)
             {
                const int ch = std::clamp(AdjChannel(key), 0, 3);
-               const float v = ch == 0 ? 0.2126f * c[0] + 0.7152f * c[1] + 0.0722f * c[2] : c[ch - 1];
+               const float v = ch == 0 ? ColourMath::Luma709(c[0], c[1], c[2]) : c[ch - 1];
                std::vector<float>& cv = ch == 0 ? x.curve : x.curveCh[ch - 1];
                sOp.hx = std::clamp(v, 0.0f, 1.0f);
                sOp.hy = CurveAt(cv, sOp.hx);

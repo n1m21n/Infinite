@@ -1,5 +1,6 @@
 // Theme: colours, scope palette, panel/button/dropdown styles, ApplyTheme (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/ui/design/ColourMath.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/Scrollbar.h"
 #include "app/ui/design/TokenColors.h"
@@ -27,7 +28,7 @@ namespace app
    bool IsThemeLight()
    {
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
-      return (tok::theme_is_light_ratio * t.windowBg.r + tok::theme_return_scale * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
+      return (ColourMath::Luma709(t.windowBg.r, t.windowBg.g, t.windowBg.b) > 0.5f);
    }
 
 
@@ -373,7 +374,7 @@ namespace app
       auto vec = [](const CategoryColors::Color& c, float a = 1.0f) {
          return ImVec4(c.r, c.g, c.b, a);
       };
-      const float lum = tok::theme_lum_ratio * t.windowBg.r + tok::theme_lum_scale * t.windowBg.g + 0.0722f * t.windowBg.b;
+      const float lum = ColourMath::Luma709(t.windowBg.r, t.windowBg.g, t.windowBg.b);
       const bool isLight = (lum > 0.5f);
 
       auto shade = [isLight](const CategoryColors::Color& c, float amt) {
@@ -409,10 +410,7 @@ namespace app
       // G15: dim text keeps 4.5:1 against the panel in every theme, ported presets included. The dim colour
       // is pulled toward full text colour only as far as needed, so themes that already pass are unchanged.
       {
-         auto lum = [](float r, float g, float b) {
-            auto f = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
-            return 0.2126f * f(r) + tok::theme_apply_ratio * f(g) + 0.0722f * f(b);
-         };
+         auto lum = [](float r, float g, float b) { return ColourMath::RelativeLuminance(r, g, b); };
          auto ratio = [](float a, float b) { return (std::max(a, b) + 0.05f) / (std::min(a, b) + 0.05f); };
          const float panelL = lum(t.panelBg.r, t.panelBg.g, t.panelBg.b);
          float k = 0.0f;
@@ -451,10 +449,7 @@ namespace app
       // as far as needed, so themes whose accent already passes are unchanged.
       ImVec4 ctrlAccent = vec(t.accent);
       {
-         auto lum = [](float r, float g, float b) {
-            auto f = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
-            return 0.2126f * f(r) + tok::theme_apply_ratio * f(g) + 0.0722f * f(b);
-         };
+         auto lum = [](float r, float g, float b) { return ColourMath::RelativeLuminance(r, g, b); };
          const float panelL = lum(t.panelBg.r, t.panelBg.g, t.panelBg.b);
          for (float k = 0.0f; k < 1.0f; k += 0.05f)
          {

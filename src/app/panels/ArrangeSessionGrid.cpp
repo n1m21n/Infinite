@@ -5,6 +5,7 @@
 // The idea comes from Ricardo Palmieri's Infinite-Turbo fork; this is a fresh
 // implementation.
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/ColourMath.h"
 #include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/UiInteract.h"
@@ -165,7 +166,7 @@ namespace app
       ImU32 LabelOn(ImU32 fill)
       {
          const ImVec4 f = ImGui::ColorConvertU32ToFloat4(fill);
-         const float lum = (tok::arrange_session_grid_label_on_ratio * f.x + tok::arrange_session_grid_lum_scale_lg * f.y + tok::arrange_session_grid_lum_scale_sm * f.z) * 255.0f;
+         const float lum = ColourMath::Luma601(f.x, f.y, f.z) * 255.0f;
          return lum > 150.0f ? tok::Role(tok::col::surface_deep) : tok::Role(tok::col::ink_white);
       }
 

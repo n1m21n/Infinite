@@ -1,5 +1,6 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/ColourMath.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/Tip.h"
@@ -535,7 +536,7 @@ namespace app
             ImU32& c = dl->VtxBuffer[i].col;
             const float r = (float)((c >> IM_COL32_R_SHIFT) & 0xFF), g = (float)((c >> IM_COL32_G_SHIFT) & 0xFF);
             const float b = (float)((c >> IM_COL32_B_SHIFT) & 0xFF), a = (float)((c >> IM_COL32_A_SHIFT) & 0xFF);
-            const float y = tok::param_y_ratio * r + tok::param_fade_inactive_scale_lg * g + tok::param_fade_inactive_scale_sm * b;
+            const float y = ColourMath::Luma709(r, g, b);
             auto mix = [&](float v) { return (ImU32)std::lround(v + (y - v) * kGrey); };
             c = IM_COL32(mix(r), mix(g), mix(b), (ImU32)std::lround(a * kAlpha));
          }

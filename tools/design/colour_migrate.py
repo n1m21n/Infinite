@@ -19,7 +19,7 @@ Every value stays exact. A literal nothing here can place is printed and left.
 import json, os, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import ui_audit  # noqa: E402
+import ui_audit, token_tiers, subprocess  # noqa: E402
 import size_migrate as sm  # noqa: E402
 
 ROOT = ui_audit.ROOT
@@ -62,7 +62,7 @@ def main():
         if only_file is not None and f[4] != only_file: continue
         by_file.setdefault(f[4], []).append(f)
 
-    sj = json.loads(sm.SURF.read_text())
+    sj = token_tiers.flatten_surfaces(json.loads(sm.SURF.read_text()))
     kinds = {"float": "surface", "int": "surface_i", "double": "surface_d", "hex": "surface_hex",
              "rgba8": "surface_rgba8", "rgbaf": "surface_rgbaf", "pair8": "surface_pair8", "pairf": "surface_pairf"}
     groups = {k: sj.setdefault(g, {}) for k, g in kinds.items()}
@@ -331,6 +331,7 @@ def main():
         for kind, g in groups.items():
             sj[kinds[kind]] = {s: dict(sorted(kv.items())) for s, kv in sorted(g.items())}
         sm.SURF.write_text(compact_json(sj) + "\n")
+        subprocess.run([sys.executable, str(sm.ROOT / "tools/design/token_tiers.py"), "--apply"], check=True)   # re-tier: buckets + aliases
     for k in sorted(stats): print(f"  {k:<10} {stats[k]}")
     print(f"colour_migrate: {done} placed, {skipped} skipped, {deferred} wait for the next run (inside a rewritten colour)")
 

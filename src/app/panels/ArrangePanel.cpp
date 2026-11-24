@@ -1,5 +1,6 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
 #include "app/ui/design/components/PanelKit.h"
+#include "app/ui/design/ColourMath.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/components/ListRow.h"
 #include "app/ui/design/UiInteract.h"
@@ -1867,8 +1868,8 @@ namespace app
             const ImVec2 f0(fx, pinnedTopY + 1.0f);
             const ImVec2 f1(fx + flagW, kTickStripTop - 1.0f);
             const ImU32 fcol = ArrangeMarkerColU32(mk.color);
-            const float lum = 0.299f * (float)((mk.color >> 24) & 0xFF) + tok::arrange_lum_ratio * (float)((mk.color >> 16) & 0xFF) +
-                              tok::arrange_lum_scale * (float)((mk.color >> 8) & 0xFF);
+            const float lum = ColourMath::Luma601((float)((mk.color >> 24) & 0xFF), (float)((mk.color >> 16) & 0xFF),
+                                                   (float)((mk.color >> 8) & 0xFF));
             const bool dragged = gArrangeMarkerDragId == mk.id;
             dl->AddRectFilled(f0, f1, fcol, tok::arrange_fill_radius_sm, ImDrawFlags_RoundCornersRight);
             // A hairline edge so a pale flag still reads on the light ruler.

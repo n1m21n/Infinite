@@ -18,7 +18,7 @@ named steps in value order (xs, sm, md, lg, xl), never a number.
 import json, os, re, sys, collections
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import ui_audit  # noqa: E402
+import ui_audit, token_tiers, subprocess  # noqa: E402
 import size_migrate as sm  # noqa: E402
 
 ROOT = ui_audit.ROOT
@@ -84,7 +84,7 @@ def parse_decls():
 
 
 def load_tokens():
-    d = json.loads(SURF.read_text())
+    d = token_tiers.flatten_surfaces(json.loads(SURF.read_text()))
     toks = {}   # full name -> (group, surf, key)
     for g in GROUPS:
         for surf, kv in d.get(g, {}).items():
@@ -403,6 +403,7 @@ def main():
             if isinstance(d[g][surf], dict): d[g][surf] = dict(sorted(d[g][surf].items()))
     import colour_migrate
     SURF.write_text(colour_migrate.compact_json(d).rstrip("\n") + "\n")
+    subprocess.run([sys.executable, str(ROOT / "tools/design/token_tiers.py"), "--apply"], check=True)   # re-tier: buckets + aliases
     rx = re.compile(r"\btok::(" + "|".join(sorted(map(re.escape, rename), key=len, reverse=True)) + r")\b")
     for f in files:
         s = open(f, encoding="utf-8").read()

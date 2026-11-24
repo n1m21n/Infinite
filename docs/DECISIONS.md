@@ -4,6 +4,8 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-11-24 Owner: UI formalisation plan signed off (sections 1-7, internal/plans/ui-formalisation.md): product code carries no visual decisions; blocks A token tiers + layout-call ratchet, B enum-only layout scopes, C declared param tables + blocking goldens; zero visual change, patches byte-identical.
+- 2026-11-24 Agent (inside the signed-off plan): colour roles are the colour primitives; the value-named palette (`tok::pal::`) is retired and build_tokens.py refuses it. Raw layout calls outside the kit (SameLine, SetCursorPos*, Dummy, GetContentRegionAvail) are a per-file ratchet that may only fall; canvas placement is tagged `// ui-layout: canvas`.
 - 2026-11-24 Owner: node-body labels stay English ("it can"): ui_audit allows the 351 in src/app/bodies/ and ParamWidgets.cpp with the reason "node body, English by owner decision 2026-11-24"; every other surface's words still go through I18n.
 - 2026-11-24 Owner: every on/off row is box first, label right, on every surface (Settings, panels, node bodies, dialogs); one shared check row in the design kit, no label-left variant.
 - 2026-11-24 Owner: every number with a unit on screen goes through one formatter, `UiFmt` (src/app/ui/design/UiFmt.h), with one rule per unit (internal/plans/ui-unit-table.md, defaults approved): one space before the unit except %, x and °; dB signed only for offsets; Hz becomes kHz at 1 kHz; always "BPM".

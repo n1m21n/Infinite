@@ -16,7 +16,7 @@ build_tokens.py afterwards.
 import json, os, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import ui_audit  # noqa: E402
+import ui_audit, token_tiers, subprocess  # noqa: E402
 
 ROOT = ui_audit.ROOT
 SURF = ROOT / "src/app/ui/design/surfaces.json"
@@ -281,7 +281,7 @@ def main():
         if want(f[0]) and (not f[4].startswith(ui_audit.KIT) or ui_audit.kit_ok(f[4])) and (only_file is None or f[4] == only_file):
             by_file.setdefault(f[4], []).append(f)
 
-    sj = json.loads(SURF.read_text()) if SURF.exists() else {"_doc": SURF_DOC}
+    sj = token_tiers.flatten_surfaces(json.loads(SURF.read_text())) if SURF.exists() else {"_doc": SURF_DOC}
     groups = {"float": sj.setdefault("surface", {}), "int": sj.setdefault("surface_i", {}), "double": sj.setdefault("surface_d", {}),
               "hex": sj.setdefault("surface_hex", {})}
     existing = set(re.findall(r"constexpr \w+ (\w+) =", GEN.read_text()))
@@ -440,6 +440,7 @@ def main():
         for k, g in (("surface", "float"), ("surface_i", "int"), ("surface_d", "double")):
             sj[k] = dict(sorted(groups[g].items()))
         SURF.write_text(json.dumps(sj, indent=1) + "\n")
+        subprocess.run([sys.executable, str(ROOT / "tools/design/token_tiers.py"), "--apply"], check=True)   # re-tier: buckets + aliases
     for k in sorted(stats): print(f"  {k[0]:<14} {k[1]:<9} {stats[k]}")
     ntok = sum(len(kv) for g in groups.values() for kv in g.values())
     print(f"size_migrate: {done} literals moved, {skipped} skipped, {ntok} semantic tokens")

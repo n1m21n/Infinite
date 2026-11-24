@@ -1,12 +1,46 @@
 #!/usr/bin/env python3
 """tokens.json -> Tokens.gen.h. Usage: build_tokens.py [--check]  (--check fails if the header is stale)."""
-import json, pathlib, sys
+import json, pathlib, re, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import token_tiers
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "src/app/ui/design/tokens.json"
 OUT = ROOT / "src/app/ui/design/Tokens.gen.h"
 
 def ident(s): return s.replace(".", "_")
+
+
+ALIAS = token_tiers.ALIAS
+
+
+def cval(v, ty):
+    """A token's C++ initialiser: an alias names its primitive (same value, the tier stays visible), else the literal."""
+    if isinstance(v, str) and ALIAS.match(v):
+        m = ALIAS.match(v); ref = f"{m.group(1)}_{m.group(2)}"
+        return ref if ty == "float" else f"static_cast<{ty}>({ref})"
+    if ty == "float": return f"{float(v)}f"
+    if ty == "int": return str(int(v))
+    if ty == "double": return repr(float(v))
+    return str(v)
+
+
+def entries(kv):
+    """(key, value, deprecated-or-None) for a group, why buckets flattened (the bucket never shows in the name)."""
+    for k, v in kv.items():
+        if k.startswith("_"): continue
+        if token_tiers.is_bucket(k, v):
+            for kk, vv in v.items():
+                if not kk.startswith("_"): yield kk, vv, None
+        elif isinstance(v, dict) and "value" in v:
+            yield k, v["value"], v.get("deprecated")
+        else:
+            yield k, v, None
+
+
+def line(ty, name, v, dep=None):
+    d = f'[[deprecated("{dep}")]] ' if dep else ""
+    return f"   {d}constexpr {ty} {name} = {cval(v, ty)};"
 
 def build():
     t = json.loads(SRC.read_text())
@@ -15,52 +49,54 @@ def build():
     b = t["base"]
     sp = SRC.parent / "surfaces.json"
     surfaces = json.loads(sp.read_text()) if sp.exists() else {}
-    for group in ("space", "radius", "type", "icon", "pin"):
-        for k, v in b[group].items():
-            if not k.startswith("_"):
-                L.append(f"   constexpr float {group}_{k} = {float(v)}f;")
+    bad = token_tiers.lint(t, surfaces)
+    if bad:
+        sys.exit("token tiers broken (run tools/design/token_tiers.py --lint):\n  " + "\n  ".join(bad[:20]))
+    # Tier 1, primitives: the value-named ladders every semantic size, radius, stroke and opacity aliases.
+    L.append("   // primitives (tools/design/token_tiers.py): ladders the semantic tokens below alias")
+    prim = token_tiers.primitives(t)
+    for group in token_tiers.PRIMITIVE_GROUPS:
+        for k, v in prim[group].items():
+            L.append(f"   constexpr float {group}_{k} = {float(v)}f;")
+    L.append("   // semantic")
+    for group in ("radius", "type", "icon", "pin"):
+        for k, v, dep in entries(b[group]):
+            if group == "radius" and k in prim["radius"]: continue
+            L.append(line("float", f"{group}_{k}", v, dep))
     # Optional groups, emitted as <group>_<key>: opacities, stroke weights and the per-component size groups.
     for group in ("alpha", "stroke", "drag", "ruler", "fader", "topbar", "fold", "desk", "motion_s", "motion_rate", "motion_hz"):
-        for k, v in b.get(group, {}).items():
-            if not k.startswith("_"):
-                L.append(f"   constexpr float {group}_{k} = {float(v)}f;")
-    for k, v in b.get("alpha8", {}).items():
-        if not k.startswith("_"):
-            L.append(f"   constexpr int alpha8_{k} = {int(v)};")
-    for k, v in b["motion_ms"].items():
-        L.append(f"   constexpr float motion_{k} = {float(v)}f;")
+        for k, v, dep in entries(b.get(group, {})):
+            L.append(line("float", f"{group}_{k}", v, dep))
+    for k, v, dep in entries(b.get("alpha8", {})):
+        L.append(line("int", f"alpha8_{k}", v, dep))
+    for k, v, dep in entries(b["motion_ms"]):
+        L.append(line("float", f"motion_{k}", v, dep))
     L.append(f"   constexpr float hit_min = {float(b['hit_min'])}f;")
     L.append(f"   constexpr float bar_h = {float(b['bar_h'])}f;")
     # The UI system sheet: one value per part (control height, list row, icon, radius ...), shared by every surface.
-    for k, v in b.get("system", {}).items():
-        if not k.startswith("_"):
-            L.append(f"   constexpr float {k} = {float(v)}f;")
+    for k, v, dep in entries(b.get("system", {})):
+        L.append(line("float", k, v, dep))
     if "system" in b:
         L.append("   static_assert(control_h >= hit_min, \"a control is never smaller than the hit minimum\");")
         L.append("   static_assert(row_h == control_h, \"a list row is one control tall\");")
     # Compact density: the settings strips and More.. popovers (UiDensity::Compact reads these).
-    for k, v in b.get("compact", {}).items():
-        if not k.startswith("_"):
-            L.append(f"   constexpr float compact_{k} = {float(v)}f;")
+    for k, v, dep in entries(b.get("compact", {})):
+        L.append(line("float", f"compact_{k}", v, dep))
     if "compact" in b:
         L.append("   static_assert(compact_row > compact_text, \"a compact row fits its text\");")
     # The page strip (PagePicker): chip widths, colour dot and swatch.
-    for k, v in b.get("page", {}).items():
-        if not k.startswith("_"):
-            L.append(f"   constexpr float page_{k} = {float(v)}f;")
+    for k, v, dep in entries(b.get("page", {})):
+        L.append(line("float", f"page_{k}", v, dep))
     # Docked panels (StageLayout): each panel's floor and the room the canvas keeps.
     for grp in ("dock", "cell", "hit", "arrange", "chat", "perf"):   # panel floors, knob-row cells, per-panel layout
-        for k, v in b.get(grp, {}).items():
-            if not k.startswith("_"):
-                L.append(f"   constexpr float {grp}_{k} = {float(v)}f;")
+        for k, v, dep in entries(b.get(grp, {})):
+            L.append(line("float", f"{grp}_{k}", v, dep))
     # Per-surface semantic sizes (owner rule A1): a thing's own width, height, radius, stroke, count or ratio,
     # named for what it is; emitted as <surface>_<name> in the literal's own C++ type.
-    for grp, ty, cv in (("surface", "float", lambda v: f"{float(v)}f"), ("surface_i", "int", lambda v: str(int(v))),
-                        ("surface_d", "double", lambda v: repr(float(v)))):
+    for grp, ty in (("surface", "float"), ("surface_i", "int"), ("surface_d", "double")):
         for s, kv in surfaces.get(grp, {}).items():
-            for k, v in kv.items():
-                if not k.startswith("_"):
-                    L.append(f"   constexpr {ty} {s}_{k} = {cv(v)};")
+            for k, v, dep in entries(kv):
+                L.append(line(ty, f"{s}_{k}", v, dep))
     r = t["roles"]
     L += ["", "   struct Rgba8 { unsigned char r, g, b, a; };", "   struct Rgbaf { float r, g, b, a; };", "   struct Pair8 { Rgba8 dark, light; };", "   struct Pairf { Rgbaf dark, light; };"]
     # Per-surface colours (owner rule B): a colour gets a role token of its own unless an existing one has the same
@@ -72,9 +108,8 @@ def build():
                         ("surface_pair8", "Pair8", lambda v: f"{{ {c8(v['dark'])}, {c8(v['light'])} }}"),
                         ("surface_pairf", "Pairf", lambda v: f"{{ {cf(v['dark'])}, {cf(v['light'])} }}")):
         for s, kv in surfaces.get(grp, {}).items():
-            for k, v in kv.items():
-                if not k.startswith("_"):
-                    L.append(f"   constexpr {ty} {s}_{k} = {cv(v)};")
+            for k, v, dep in entries(kv):
+                L.append(f"   constexpr {ty} {s}_{k} = {cv(v)};")
     for k, v in r["pairs"].items():
         d, l = v["dark"], v["light"]
         L.append(f"   constexpr Pair8 {ident(k)} = {{ {{{d[0]}, {d[1]}, {d[2]}, {d[3]}}}, {{{l[0]}, {l[1]}, {l[2]}, {l[3]}}} }};")
@@ -94,13 +129,9 @@ def build():
         d, l = v["dark"], v["light"]
         L.append(f"      constexpr Pair8 {ident(k)} = {{ {{{d[0]}, {d[1]}, {d[2]}, {d[3]}}}, {{{l[0]}, {l[1]}, {l[2]}, {l[3]}}} }};")
     L += ["   }"]
-    L += ["", "   namespace pal", "   {"]
-    for k, v in t.get("palette", {}).items():
-        L.append(f"      constexpr Rgba8 {k} = {{{v[0]}, {v[1]}, {v[2]}, {v[3]}}};")
-    L += ["   }", "", "   namespace palf", "   {"]
-    for k, v in t.get("palette_f", {}).items():
-        L.append(f"      constexpr Rgbaf {k} = {{{v[0]}f, {v[1]}f, {v[2]}f, {v[3]}f}};")
-    L += ["   }", "}", ""]
+    if t.get("palette") or t.get("palette_f"):
+        sys.exit("tokens.json: the value-named palette is retired (2026-11-24); give the colour a role in roles.col")
+    L += ["}", ""]
     return "\n".join(L)
 
 if __name__ == "__main__":

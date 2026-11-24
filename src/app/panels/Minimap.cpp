@@ -1,5 +1,6 @@
 // Minimap (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/ColourMath.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
 
@@ -66,7 +67,7 @@ namespace app
       };
 
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
-      const bool isLight = (tok::minimap_is_light_scale_sm * t.windowBg.r + tok::minimap_is_light_scale_lg * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
+      const bool isLight = (ColourMath::Luma709(t.windowBg.r, t.windowBg.g, t.windowBg.b) > 0.5f);
 
       // The graph window's own list (drawn while the editor is suspended): above the nodes, under every popup and
       // panel. The foreground list painted it over the Field Patcher's page menu.

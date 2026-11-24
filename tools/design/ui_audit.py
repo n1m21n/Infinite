@@ -722,6 +722,15 @@ def report(findings, allowed, raw, out):
         fam[f][name] += n
     for f, c in sorted(fam.items(), key=lambda kv: -sum(kv[1].values())):
         L.append(f"| {f} | {sum(c.values())} | " + ", ".join(f"{k} {v}" for k, v in c.most_common(4)) + " |")
+    per, canvas = layout_calls()
+    tot = collections.Counter()
+    for d in per.values(): tot.update(d)
+    L += [f"\n## Raw layout calls outside the kit (layout_call ratchet)\n",
+          f"{sum(tot.values())} calls in {len(per)} files (" + ", ".join(f"{k} {v}" for k, v in tot.most_common()) +
+          f"); canvas-tagged {canvas}. Target 0: panels lay out through UiScope.h (Block B).\n",
+          "| file | calls |", "|---|---|"]
+    for f, d in sorted(per.items(), key=lambda kv: -sum(kv[1].values()))[:25]:
+        L.append(f"| {f} | {sum(d.values())} |")
     L.append("\n## Findings by category, then file\n")
     for cat, fs in sorted(by_cat.items(), key=lambda kv: -len(kv[1])):
         L.append(f"\n### {cat} ({len(fs)})\n")
@@ -750,18 +759,64 @@ def ratchet(mode):
         raw["audit"] = {k: min(v, old.get(k, v)) for k, v in cur.items()}
     if mode == "reset" or old_ok is None: raw["audit_ok"] = oks
     elif mode == "update": raw["audit_ok"] = min(oks, old_ok)
-    if mode in ("reset", "update"):
-        STORE.write_text(json.dumps(raw, indent=1) + "\n"); return 0
+    seeding = "layout_call" not in raw   # a new ratchet seeds from the current tree on its first run
+    lbad = layout_ratchet(raw, mode)
+    if mode in ("reset", "update") or seeding:
+        STORE.write_text(json.dumps(raw, indent=1) + "\n")
+        if mode in ("reset", "update"): return 0
     if old is None:
         print("ui_audit: no 'audit' baseline yet: run ui_audit.py --ratchet --update"); return 0
     bad = [(k, v, old.get(k, 0)) for k, v in cur.items() if v > old.get(k, 0)]
     print(f"ui_audit: {sum(cur.values())} findings outside the kit (stored {sum(old.values())}), {len(cur)} categories; "
           f"ui-audit-ok tags {oks} (stored {old_ok})")
     for k, v, a in bad: print(f"RATCHET: ui_audit category {k} has {v} (allowed {a}): use a token or a kit part")
+    for b in lbad: print(b)
     if old_ok is not None and oks > old_ok:
         print(f"RATCHET: {oks} ui-audit-ok tags (allowed {old_ok}): a new literal gets a token or a kit part, not a tag")
         return 1
-    return 1 if bad else 0
+    return 1 if (bad or lbad) else 0
+
+
+# ---------------------------------------------------------------- layout calls (ui-formalisation Block A)
+# Hand layout outside the kit: the panel places its own cursor instead of a layout scope (Block B) doing it.
+# SetCursorScreenPos is not counted: custom canvas drawing places itself (node canvas, timeline, viewports).
+# A call that is canvas placement on purpose carries `// ui-layout: canvas` (counted apart, may only go down).
+LAYOUT_CALLS = ("SameLine", "SetCursorPos", "SetCursorPosX", "SetCursorPosY", "Dummy", "GetContentRegionAvail")
+LAYOUT_TAG = re.compile(r"//\s*ui-layout:\s*canvas\b")
+LAYOUT_RX = re.compile(r"\bImGui::(" + "|".join(LAYOUT_CALLS) + r")\s*\(")
+
+
+def layout_calls():
+    """{file: {call: n}} for raw layout calls outside the kit, plus {'canvas': n} tagged ones."""
+    per, canvas = {}, 0
+    for rel, src in ui_files():
+        if rel.startswith(KIT): continue
+        code = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), src, flags=re.S)
+        for line in code.split("\n"):
+            hits = LAYOUT_RX.findall(line.split("//")[0])
+            if not hits: continue
+            if LAYOUT_TAG.search(line): canvas += len(hits); continue
+            d = per.setdefault(rel, {})
+            for h in hits: d[h] = d.get(h, 0) + 1
+    return per, canvas
+
+
+def layout_ratchet(raw, mode):
+    per, canvas = layout_calls()
+    cur = {f: sum(d.values()) for f, d in sorted(per.items())}
+    old = raw.get("layout_call")
+    if mode == "reset" or old is None:
+        raw["layout_call"] = cur; raw["layout_canvas"] = canvas; return []
+    if mode == "update":
+        raw["layout_call"] = {f: min(v, old.get(f, v)) for f, v in cur.items()}
+        raw["layout_canvas"] = min(canvas, raw.get("layout_canvas", canvas)); return []
+    bad = [f"RATCHET: {f} has {v} raw layout calls (allowed {old.get(f, 0)}): use a layout scope (UiScope.h)"
+           for f, v in cur.items() if v > old.get(f, 0)]
+    if canvas > raw.get("layout_canvas", 0):
+        bad.append(f"RATCHET: {canvas} `ui-layout: canvas` tags (allowed {raw.get('layout_canvas', 0)})")
+    print(f"ui_audit: {sum(cur.values())} raw layout calls outside the kit (stored {sum(old.values())}) in {len(cur)} files; "
+          f"canvas-tagged {canvas}")
+    return bad
 
 
 def ok_count():
