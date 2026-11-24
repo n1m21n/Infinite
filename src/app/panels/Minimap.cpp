@@ -2,6 +2,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/ColourMath.h"
 #include "app/ui/design/UiInteract.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -70,8 +71,12 @@ namespace app
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
       const bool isLight = (ColourMath::Luma709(t.windowBg.r, t.windowBg.g, t.windowBg.b) > 0.5f);
 
-      // The graph window's own list (drawn while the editor is suspended): above the nodes, under every popup and
-      // panel. The foreground list painted it over the Field Patcher's page menu.
+      // Own transparent overlay window (drawn while the editor is suspended): has its own draw list so
+      // imgui-node-editor's splitter never overwrites or clips it, while every popup and menu still renders above it.
+      if (gGraphScreenSize.x < w + pad || gGraphScreenSize.y < h + pad)
+         return;
+      if (!PanelFrame::BeginOverlay("##minimap_overlay", origin, ImVec2(w, h)))
+         return;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h),
                         IM_COL32((int)(t.panelBg.r * tok::minimap_shade), (int)(t.panelBg.g * tok::minimap_shade), (int)(t.panelBg.b * tok::minimap_shade), (int)(gMinimapOpacity * tok::minimap_shade)), tok::radius_control);
@@ -135,6 +140,7 @@ namespace app
             ed::NavigateToSelection(false, 0.0f);
          }
       }
+      PanelFrame::EndOverlay();
    }
    // ui-content-end
 }

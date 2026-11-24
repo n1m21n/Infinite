@@ -96,4 +96,28 @@ namespace PanelFrame
       ImGui::PopStyleColor();
    }
    inline void EndRail() { EndChildSafe(); }
+
+   // Borderless, transparent, non-stealing overlay window (its own draw list above the canvas, below popups).
+   inline bool BeginOverlay(const char* id, ImVec2 pos, ImVec2 size)
+   {
+      ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
+      ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                     ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBackground;
+      const bool open = ImGui::Begin(id, nullptr, flags);
+      if (!open)
+      {
+         ImGui::End();
+         ImGui::PopStyleVar(2);
+      }
+      return open;
+   }
+   inline void EndOverlay()
+   {
+      ImGui::End();
+      ImGui::PopStyleVar(2);
+   }
 }
