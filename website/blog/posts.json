@@ -18,6 +18,15 @@
   "url": "https://infinitedevices.org/blog/export-a-music-video-in-infinite.html"
  },
  {
+  "slug": "procedural-game-audio-sfx-synthesis-headless-dsp",
+  "title": "Procedural game audio and SFX synthesis in a headless node graph",
+  "description": "How game developers synthesise procedural SFX, physical-modelling foley, and deterministic WAV variations in Infinite using Field kernels, Python, and CLI.",
+  "date": "2026-11-24",
+  "updated": "2026-11-24",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/procedural-game-audio-sfx-synthesis-headless-dsp.html"
+ },
+ {
   "slug": "make-your-first-beat-and-synth-bassline",
   "title": "Make your first beat and synth bassline",
   "description": "Build a drum groove, patch a warm synth bassline, add space with Reverb and Delay, and mix everything to your speakers in Infinite.",

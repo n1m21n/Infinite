@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Resonant Vowel Formant FX",
+    "author": "Infinite",
+    "description": "Three-band parallel state-variable formant filter bank that morphs between A-E-I-O-U vocal resonances with LFO sweep and warm tube saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float vowelRate = 0.35 [0.05, 3.5];\nparam float vowelSpan = 0.82 [0.1, 1.0];\nparam float resonance = 0.24 [0.08, 0.65];\nparam float drive = 1.45 [0.6, 2.8];\nparam float mix = 0.82 [0.0, 1.0];\nstate float lfo = 0;\nstate float b1 = 0; state float l1 = 0;\nstate float b2 = 0; state float l2 = 0;\nstate float b3 = 0; state float l3 = 0;\n\nlfo = (lfo + vowelRate / sr) % 1.0;\nv = 0.5 + 0.5 * sin(6.2831853 * lfo) * vowelSpan;\n\nf1Hz = 310.0 + v * 460.0;\nf2Hz = 840.0 + (1.0 - v) * 1380.0;\nf3Hz = 2350.0 + v * 580.0;\n\ng1 = clamp(2.0 * sin(3.14159265 * f1Hz / sr), 0.02, 0.85);\ng2 = clamp(2.0 * sin(3.14159265 * f2Hz / sr), 0.02, 0.85);\ng3 = clamp(2.0 * sin(3.14159265 * f3Hz / sr), 0.02, 0.85);\n\nsat = (in * drive) / (1.0 + abs(in * drive) * 0.65);\n\nh1 = sat - l1 - resonance * b1; b1 = b1 + g1 * h1; l1 = l1 + g1 * b1;\nh2 = sat - l2 - resonance * b2; b2 = b2 + g2 * h2; l2 = l2 + g2 * b2;\nh3 = sat - l3 - resonance * b3; b3 = b3 + g3 * h3; l3 = l3 + g3 * b3;\n\nformant = (b1 * 0.58 + b2 * 0.42 + b3 * 0.24);\nout = (in * (1.0 - mix) + formant * mix) * 0.65;\n",
+    "params": {
+      "vowelRate": 0.35,
+      "vowelSpan": 0.82,
+      "resonance": 0.24,
+      "drive": 1.45,
+      "mix": 0.82
+    }
+  }
+}

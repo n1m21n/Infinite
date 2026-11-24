@@ -3819,7 +3819,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "cz-phase-distortion-brass-synth",
+      "name": "CZ Phase Distortion Brass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Casio CZ-inspired cosine-windowed phase distortion synthesizer with envelope-swept resonant knee, sub-harmonic reinforcement, and warm saturation.",
+      "price": 0,
+      "preview": "assets/templates/cz-phase-distortion-brass-synth.webp",
+      "file": "assets/templates/cz-phase-distortion-brass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "glottal-formant-choir-synth",
+      "name": "Glottal Formant Choir Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Pitch-tracked glottal pulse and three-band parallel state-variable vowel formant synthesizer with subtle vibrato and warm saturation.",
+      "price": 0,
+      "preview": "assets/templates/glottal-formant-choir-synth.webp",
+      "file": "assets/templates/glottal-formant-choir-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "six-stage-allpass-phaser-fx",
+      "name": "Six-Stage Allpass Phaser FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Six-stage cascaded first-order allpass phaser with LFO-swept notch combs, asymmetric diode feedback saturation, and lush phase dispersion.",
+      "price": 0,
+      "preview": "assets/templates/six-stage-allpass-phaser-fx.webp",
+      "file": "assets/templates/six-stage-allpass-phaser-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "resonant-vowel-formant-fx",
+      "name": "Resonant Vowel Formant FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Three-band parallel state-variable formant filter bank that morphs between A-E-I-O-U vocal resonances with LFO sweep and warm tube saturation.",
+      "price": 0,
+      "preview": "assets/templates/resonant-vowel-formant-fx.webp",
+      "file": "assets/templates/resonant-vowel-formant-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 229
+  "count": 237
 }

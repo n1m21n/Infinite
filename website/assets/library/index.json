@@ -12786,7 +12786,221 @@
       "file": "assets/library/pixel/cruz-diez-chromosaturation-moire.field",
       "preview": "assets/library/previews/cruz-diez-chromosaturation-moire.jpg",
       "bytes": 1884
+    },
+    {
+      "id": "cosmatesque-quincunx-pavement",
+      "name": "Cosmatesque Quincunx Pavement",
+      "kind": "Generator",
+      "tags": [
+        "cosmatesque",
+        "mosaic",
+        "opus-sectile",
+        "marble",
+        "tessellation",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Roman opus sectile marble pavement with a five-roundel quincunx, braided guilloche stone bands, porphyry and serpentine triangles, and travertine border inlays.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/cosmatesque-quincunx-pavement.js",
+      "preview": "assets/library/previews/cosmatesque-quincunx-pavement.jpg",
+      "bytes": 4055
+    },
+    {
+      "id": "cosmatesque-octagram-medallion",
+      "name": "Cosmatesque Octagram Medallion",
+      "kind": "Generator",
+      "tags": [
+        "cosmatesque",
+        "octagram",
+        "mosaic",
+        "marble",
+        "geometry",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Concentric Roman Cosmati eight-pointed marble star medallion framed by stepped chevron stone friezes, serpentine chevrons, and golden ochre tesserae.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/cosmatesque-octagram-medallion.js",
+      "preview": "assets/library/previews/cosmatesque-octagram-medallion.jpg",
+      "bytes": 2604
+    },
+    {
+      "id": "candela-manantiales-flower-3d",
+      "name": "Candela Manantiales Flower 3D",
+      "kind": "Generator",
+      "tags": [
+        "candela",
+        "hypar",
+        "architecture",
+        "concrete",
+        "shell",
+        "procedural",
+        "3d"
+      ],
+      "description": "Eight-petal intersecting hyperbolic paraboloid concrete vault inspired by Felix Candela's Los Manantiales, with doubly-ruled ribs and cobalt curtain mullions.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/candela-manantiales-flower-3d.js",
+      "preview": "assets/library/previews/candela-manantiales-flower-3d.jpg",
+      "bytes": 1510
+    },
+    {
+      "id": "candela-umbrella-cantilever-3d",
+      "name": "Candela Umbrella Cantilever 3D",
+      "kind": "Generator",
+      "tags": [
+        "candela",
+        "umbrella",
+        "cantilever",
+        "concrete",
+        "architecture",
+        "procedural",
+        "3d"
+      ],
+      "description": "Clustered inverted hyperbolic paraboloid concrete umbrella columns with ruled timber-formwork striations and cantilevered saddle canopies.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/candela-umbrella-cantilever-3d.js",
+      "preview": "assets/library/previews/candela-umbrella-cantilever-3d.jpg",
+      "bytes": 1673
+    },
+    {
+      "id": "cz-phase-distortion-brass-synth",
+      "name": "CZ Phase Distortion Brass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "phase-distortion",
+        "formant",
+        "audio",
+        "dsp"
+      ],
+      "description": "Casio CZ-inspired cosine-windowed phase distortion synthesizer with envelope-swept resonant knee, sub-harmonic reinforcement, and warm saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/cz-phase-distortion-brass-synth.inf",
+      "preview": "assets/library/previews/cz-phase-distortion-brass-synth.jpg",
+      "bytes": 2064
+    },
+    {
+      "id": "glottal-formant-choir-synth",
+      "name": "Glottal Formant Choir Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "phase-distortion",
+        "formant",
+        "audio",
+        "dsp"
+      ],
+      "description": "Pitch-tracked glottal pulse and three-band parallel state-variable vowel formant synthesizer with subtle vibrato and warm saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/glottal-formant-choir-synth.inf",
+      "preview": "assets/library/previews/glottal-formant-choir-synth.jpg",
+      "bytes": 2042
+    },
+    {
+      "id": "six-stage-allpass-phaser-fx",
+      "name": "Six-Stage Allpass Phaser FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "phaser",
+        "allpass",
+        "formant",
+        "audio",
+        "dsp"
+      ],
+      "description": "Six-stage cascaded first-order allpass phaser with LFO-swept notch combs, asymmetric diode feedback saturation, and lush phase dispersion.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/six-stage-allpass-phaser-fx.inf",
+      "preview": "assets/library/previews/six-stage-allpass-phaser-fx.jpg",
+      "bytes": 2206
+    },
+    {
+      "id": "resonant-vowel-formant-fx",
+      "name": "Resonant Vowel Formant FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "phaser",
+        "allpass",
+        "formant",
+        "audio",
+        "dsp"
+      ],
+      "description": "Three-band parallel state-variable formant filter bank that morphs between A-E-I-O-U vocal resonances with LFO sweep and warm tube saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/resonant-vowel-formant-fx.inf",
+      "preview": "assets/library/previews/resonant-vowel-formant-fx.jpg",
+      "bytes": 2291
+    },
+    {
+      "id": "turrell-skyspace-ganzfeld",
+      "name": "Turrell Skyspace Ganzfeld",
+      "kind": "Generator",
+      "tags": [
+        "turrell",
+        "ganzfeld",
+        "light",
+        "aperture",
+        "minimal",
+        "shader",
+        "pixel"
+      ],
+      "description": "Concentric elliptical Ganzfeld light apertures in velvety crimson, luminous amber-gold, and warm ivory with atmospheric grain.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/turrell-skyspace-ganzfeld.field",
+      "preview": "assets/library/previews/turrell-skyspace-ganzfeld.jpg",
+      "bytes": 1715
+    },
+    {
+      "id": "gabo-ruled-perspex-waves",
+      "name": "Gabo Ruled Perspex Waves",
+      "kind": "Generator",
+      "tags": [
+        "gabo",
+        "pevsner",
+        "constructivism",
+        "ruled-surface",
+        "strings",
+        "shader",
+        "pixel"
+      ],
+      "description": "Constructivist Naum Gabo and Antoine Pevsner ruled-surface tensioned string families in brushed steel, warm bronze, and deep gunmetal.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/gabo-ruled-perspex-waves.field",
+      "preview": "assets/library/previews/gabo-ruled-perspex-waves.jpg",
+      "bytes": 1950
     }
   ],
-  "count": 610
+  "count": 630
 }

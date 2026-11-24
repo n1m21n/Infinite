@@ -4756,6 +4756,98 @@
       "groove": 0.35,
       "fill": 0.2,
       "gain": -8.5
+    },
+    {
+      "id": "casio_cz_phase_distortion",
+      "family": "electronic",
+      "bpm": [
+        108,
+        124
+      ],
+      "swing": 0.04,
+      "scale": [
+        0,
+        1,
+        4
+      ],
+      "drums": {},
+      "bass": "0...0...3...5...",
+      "fx": [
+        "Chorus",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.35,
+      "refs": [
+        "Casio CZ-101 cosine-windowed phase distortion resonant brass and glass harmonics"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 8.0
+      },
+      "notefx": [],
+      "motif": "resonant_brass_arp",
+      "groove": 0.3
+    },
+    {
+      "id": "six_stage_allpass_phaser",
+      "family": "experimental",
+      "bpm": [
+        96,
+        118
+      ],
+      "swing": 0.08,
+      "scale": [
+        1,
+        3,
+        9
+      ],
+      "drums": {},
+      "bass": "0..3.5..0..7.5..",
+      "fx": [
+        "Field Effect",
+        "Phaser",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Six-stage cascaded allpass phaser and parallel vowel formant filter bank"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 12.0
+      },
+      "notefx": [],
+      "motif": "sweeping_allpass_comb",
+      "groove": 0.4
     }
   ]
 }

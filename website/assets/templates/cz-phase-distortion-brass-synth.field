@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "CZ Phase Distortion Brass Synth",
+    "author": "Infinite",
+    "description": "Casio CZ-inspired cosine-windowed phase distortion synthesizer with envelope-swept resonant knee, sub-harmonic reinforcement, and warm saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float pdDepth = 0.68 [0.05, 0.94];\nparam float resHarm = 3.5 [1.0, 9.0];\nparam float subMix = 0.24 [0.0, 0.6];\nparam float envDecay = 0.9994 [0.997, 0.9998];\nparam float drive = 1.35 [0.6, 2.8];\nstate float p = 0; state float pSub = 0; state float env = 0; state float dc = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.035, env * envDecay);\np = (p + clamp(freq, 30.0, 5200.0) / sr) % 1.0;\npSub = (pSub + clamp(freq * 0.5, 20.0, 2600.0) / sr) % 1.0;\n\n# Cosine-windowed phase distortion with dynamic knee\nknee = clamp(0.5 - pdDepth * 0.45 * env, 0.04, 0.50);\npw = if(p < knee, p * 0.5 / knee, 0.5 + (p - knee) * 0.5 / (1.0 - knee));\nwin = 0.5 - 0.5 * cos(6.2831853 * p);\nresOsc = cos(6.2831853 * resHarm * pw) * win;\nfund = cos(6.2831853 * pw);\nsub = sin(6.2831853 * pSub);\n\nraw = (fund * 0.55 + resOsc * 0.55 + sub * subMix) * env;\ndc = dc + 0.002 * (raw - dc);\nclean = (raw - dc) * drive;\nout = (clean / (1.0 + abs(clean) * 0.72)) * 0.56;\n",
+    "params": {
+      "pdDepth": 0.68,
+      "resHarm": 3.5,
+      "subMix": 0.24,
+      "envDecay": 0.9994,
+      "drive": 1.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

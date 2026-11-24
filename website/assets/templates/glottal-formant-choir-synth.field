@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Glottal Formant Choir Synth",
+    "author": "Infinite",
+    "description": "Pitch-tracked glottal pulse and three-band parallel state-variable vowel formant synthesizer with subtle vibrato and warm saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float vowel = 0.42 [0.0, 1.0];\nparam float formantQ = 0.28 [0.08, 0.65];\nparam float vibDepth = 0.006 [0.0, 0.025];\nparam float brilliance = 0.65 [0.1, 1.0];\nparam float drive = 1.4 [0.6, 2.8];\nstate float p = 0; state float lfo = 0; state float env = 0;\nstate float bp = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.025, env * 0.9994);\nlfo = (lfo + 5.2 / sr) % 1.0;\np = (p + clamp(freq * (1.0 + sin(6.2831853 * lfo) * vibDepth), 40.0, 4200.0) / sr) % 1.0;\n\n# FOF-style raised-cosine glottal burst + harmonic formant carrier\nwin = 0.5 - 0.5 * cos(6.2831853 * p);\nfof = sin(6.2831853 * (3.0 + vowel * 5.0) * p) * win;\nsrc = (sin(6.2831853 * p) * 0.5 + fof * brilliance) * env;\n\ng = clamp(2.0 * sin(3.14159265 * (550.0 + vowel * 1350.0) / sr), 0.02, 0.85);\nhp = src - lp - formantQ * bp;\nbp = bp + g * hp;\nlp = lp + g * bp;\n\nmixSig = (bp * 0.68 + lp * 0.42) * drive;\nout = (mixSig / (1.0 + abs(mixSig) * 0.72)) * 0.70;\n",
+    "params": {
+      "vowel": 0.42,
+      "formantQ": 0.28,
+      "vibDepth": 0.006,
+      "brilliance": 0.65,
+      "drive": 1.4
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

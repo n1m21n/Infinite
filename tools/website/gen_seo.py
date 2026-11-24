@@ -178,7 +178,7 @@ def main():
         posts = []
     blog_pages = [("blog/", 0.8)] + [("blog/" + q["slug"] + ".html", 0.7) for q in posts if "slug" in q]
     embed_pages = [("embeds/" + i["slug"] + ".html", 0.7) for i in json.load(open(os.path.join(W, "embeds/embeds.json")))["items"]]
-    pages = [("", 1.0), ("manual/", 0.9), ("manual/headless/", 0.8), ("manual/field/", 0.8), ("library.html", 0.8), ("samples/", 0.9), ("visualizer/", 0.9), ("3d/", 0.9), ("sfx/", 0.9), ("piano/", 0.7)] + blog_pages + embed_pages + [("plugin.html", 0.9), ("buy.html", 0.9), ("releases.html", 0.7), ("developers.html", 0.7), ("chat.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("privacy.html", 0.3), ("refund.html", 0.3), ("terms.html", 0.3), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3), ("llms.txt", 0.6), ("llms-full.txt", 0.5)]
+    pages = [("", 1.0), ("manual/", 0.9), ("manual/headless/", 0.8), ("manual/field/", 0.8), ("library.html", 0.8), ("samples/", 0.9), ("visualizer/", 0.9), ("3d/", 0.9), ("sfx/", 0.9), ("piano/", 0.7)] + blog_pages + embed_pages + [("plugin.html", 0.9), ("buy.html", 0.9), ("releases.html", 0.7), ("developers.html", 0.7), ("game-developers.html", 0.7), ("chat.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("privacy.html", 0.3), ("refund.html", 0.3), ("terms.html", 0.3), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3), ("llms.txt", 0.6), ("llms-full.txt", 0.5)]
     seen = set(); urls = []
     for u, pr in pages + [(f"library/{i['id']}.html", 0.5) for i in its] + [(u, 0.8 if u == "nodes/" else 0.5) for u in gen_nodes.sitemap_paths()]:
         if u not in seen:   # one <loc> per page: the same page can come from more than one list
@@ -310,7 +310,7 @@ def main():
         f"- [Developers]({BASE}developers.html): headless command line, Python SDK and the twelve MCP tools, with what each needs",
         f"- [Infinite chat]({BASE}chat.html): the built-in chat that edits the open patch through your Claude, ChatGPT or Gemini account; direct commands, undo, speed and sign-in",
         f"- [Philosophy]({BASE}philosophy.html): why Infinite is a node graph, how it protects flow state, how machines should work with people, and its design principles",
-        f"- [Infinite for artists]({BASE}artists.html), [musicians]({BASE}musicians.html), [VJs]({BASE}vjs.html), [creative coders]({BASE}creative-coders.html): one page per audience with starting patches",
+        f"- [Infinite for artists]({BASE}artists.html), [musicians]({BASE}musicians.html), [VJs]({BASE}vjs.html), [creative coders]({BASE}creative-coders.html), [game developers]({BASE}game-developers.html): one page per audience with starting patches",
         f"- [Nodes]({BASE}nodes/): every node in the palette, one page each with its inputs, outputs, controls and a downloadable patch",
         f"- [Embeds]({BASE}embeds/): audio-reactive WebGL visuals to put on any page with one iframe",
         "- [Download](https://github.com/n1m21n/Infinite/releases/latest): installers for macOS, Windows and Linux",
@@ -325,7 +325,14 @@ def main():
         "- **Mixer & Drum Sequencer**: hardware-desk panels with graphite strips, scribble strips, knurled pots, LED meters, trig conditions, probability, FILL, per-lane length, and drum kits per groove.", "",
         "## File formats", "",
         "- `.inf` and `.infinite`: a patch. A line-based text file listing nodes and cables. Open it with File, Open in Infinite.",
-        "- `.field`: a Field device (a small program for a Field node). Import it into a Field Pixel node, or copy its code.", ""
+        "- `.field`: a Field device (a small program for a Field node). Import it into a Field Pixel node, or copy its code.", "",
+        "## Game Developers", "",
+        f"- [Infinite for Game Developers]({BASE}game-developers.html): dedicated hub for procedural SFX, foley synthesis, GLSL/3D prototyping, and deterministic headless asset pipelines.",
+        f"- [Procedural Game Audio & SFX Blog Guide]({BASE}blog/procedural-game-audio-sfx-synthesis-headless-dsp.html): physical-modelling foley (Metallic, String, Wind, Piano), 24-tap BLEP Analog, Field Synth/Effect, and batch WAV export via CLI/Python/MCP.",
+        f"- Instant Background Ambient Sound Design (Free with Credit): use [Nocturne Generative Piano & Ambient Engine]({BASE}piano/) (`piano-engine.js`, `ambient-engine.js`, `water-audio.js`) or [Sample Generator WASM]({BASE}samples/) (`infinite_gen_wasm`, supports `?embed=1`) for unlimited ambient pads, textures, loops, and drums in any key and scale (`.wav` at `-14 LUFS` / `-1 dBTP` + `.inf`). Free for personal and commercial games with credit: `\"sample from Infinite by Naman Soni (n1m21n), infinitedevices.org\"`.",
+        f"- Browser tools for game assets: [SFX & Soundscape Maker]({BASE}sfx/) (laser, coin, jump, explosion, click, rain, cyber hum, lo-fi pad to `.wav` + `.inf`) and [3D Text & Logo Loop Maker]({BASE}3d/).",
+        "- 3D & Shader pipeline: import USD/OBJ/PLY/STL/glTF/GLB, render PBR materials & passes (`depth`, `normal`, `albedo`, `mask`, `id`), and author GLSL/vertex modifiers in Field Pixel and Field Modifier.",
+        "- Pipeline & Live Sync: deterministic headless CLI (`--validate`, `--frame --batch`, `--render`, `--audio-summary`), `infinite-daw` Python SDK, 12 MCP tools (`npx -y infinite-engine init`), OSC/MIDI/NDI/Spout/Syphon, VST3/AU plugin, and MIT-licensed core source.", ""
     ]
 
     # llms.txt: Curated concise index (capabilities & agent install first)

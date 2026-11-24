@@ -99,7 +99,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Developers](https://infinitedevices.org/developers.html): headless command line, Python SDK and the twelve MCP tools, with what each needs
 - [Infinite chat](https://infinitedevices.org/chat.html): the built-in chat that edits the open patch through your Claude, ChatGPT or Gemini account; direct commands, undo, speed and sign-in
 - [Philosophy](https://infinitedevices.org/philosophy.html): why Infinite is a node graph, how it protects flow state, how machines should work with people, and its design principles
-- [Infinite for artists](https://infinitedevices.org/artists.html), [musicians](https://infinitedevices.org/musicians.html), [VJs](https://infinitedevices.org/vjs.html), [creative coders](https://infinitedevices.org/creative-coders.html): one page per audience with starting patches
+- [Infinite for artists](https://infinitedevices.org/artists.html), [musicians](https://infinitedevices.org/musicians.html), [VJs](https://infinitedevices.org/vjs.html), [creative coders](https://infinitedevices.org/creative-coders.html), [game developers](https://infinitedevices.org/game-developers.html): one page per audience with starting patches
 - [Nodes](https://infinitedevices.org/nodes/): every node in the palette, one page each with its inputs, outputs, controls and a downloadable patch
 - [Embeds](https://infinitedevices.org/embeds/): audio-reactive WebGL visuals to put on any page with one iframe
 - [Download](https://github.com/n1m21n/Infinite/releases/latest): installers for macOS, Windows and Linux
@@ -119,6 +119,15 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 - `.inf` and `.infinite`: a patch. A line-based text file listing nodes and cables. Open it with File, Open in Infinite.
 - `.field`: a Field device (a small program for a Field node). Import it into a Field Pixel node, or copy its code.
+
+## Game Developers
+
+- [Infinite for Game Developers](https://infinitedevices.org/game-developers.html): dedicated hub for procedural SFX, foley synthesis, GLSL/3D prototyping, and deterministic headless asset pipelines.
+- [Procedural Game Audio & SFX Blog Guide](https://infinitedevices.org/blog/procedural-game-audio-sfx-synthesis-headless-dsp.html): physical-modelling foley (Metallic, String, Wind, Piano), 24-tap BLEP Analog, Field Synth/Effect, and batch WAV export via CLI/Python/MCP.
+- Instant Background Ambient Sound Design (Free with Credit): use [Nocturne Generative Piano & Ambient Engine](https://infinitedevices.org/piano/) (`piano-engine.js`, `ambient-engine.js`, `water-audio.js`) or [Sample Generator WASM](https://infinitedevices.org/samples/) (`infinite_gen_wasm`, supports `?embed=1`) for unlimited ambient pads, textures, loops, and drums in any key and scale (`.wav` at `-14 LUFS` / `-1 dBTP` + `.inf`). Free for personal and commercial games with credit: `"sample from Infinite by Naman Soni (n1m21n), infinitedevices.org"`.
+- Browser tools for game assets: [SFX & Soundscape Maker](https://infinitedevices.org/sfx/) (laser, coin, jump, explosion, click, rain, cyber hum, lo-fi pad to `.wav` + `.inf`) and [3D Text & Logo Loop Maker](https://infinitedevices.org/3d/).
+- 3D & Shader pipeline: import USD/OBJ/PLY/STL/glTF/GLB, render PBR materials & passes (`depth`, `normal`, `albedo`, `mask`, `id`), and author GLSL/vertex modifiers in Field Pixel and Field Modifier.
+- Pipeline & Live Sync: deterministic headless CLI (`--validate`, `--frame --batch`, `--render`, `--audio-summary`), `infinite-daw` Python SDK, 12 MCP tools (`npx -y infinite-engine init`), OSC/MIDI/NDI/Spout/Syphon, VST3/AU plugin, and MIT-licensed core source.
 
 ## Credit
 
@@ -381,6 +390,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Gamelan Ombak Metallophone Synth](https://infinitedevices.org/library/gamelan-ombak-metallophone-synth.html): Struck bronze gamelan metallophone with paired ombak beating detune, inharmonic bar partials, mallet transient, and bamboo tube resonator. (file: https://infinitedevices.org/assets/templates/gamelan-ombak-metallophone-synth.inf)
 - [EMT Spring Tank Dispersion FX](https://infinitedevices.org/library/emt-spring-tank-dispersion-fx.html): Cascaded allpass spring-coil dispersion network with mechanical chirp, magnetic pickup saturation, and damped metallic feedback tail. (file: https://infinitedevices.org/assets/templates/emt-spring-tank-dispersion-fx.inf)
 - [Leslie Baffle Doppler Horn FX](https://infinitedevices.org/library/leslie-baffle-doppler-horn-fx.html): Dual-rotor horn and drum crossover Doppler processor with asymmetric rotation, phase-modulated cabinet reflections, and tube preamp saturation. (file: https://infinitedevices.org/assets/templates/leslie-baffle-doppler-horn-fx.inf)
+- [CZ Phase Distortion Brass Synth](https://infinitedevices.org/library/cz-phase-distortion-brass-synth.html): Casio CZ-inspired cosine-windowed phase distortion synthesizer with envelope-swept resonant knee, sub-harmonic reinforcement, and warm saturation. (file: https://infinitedevices.org/assets/templates/cz-phase-distortion-brass-synth.inf)
+- [Glottal Formant Choir Synth](https://infinitedevices.org/library/glottal-formant-choir-synth.html): Pitch-tracked glottal pulse and three-band parallel state-variable vowel formant synthesizer with subtle vibrato and warm saturation. (file: https://infinitedevices.org/assets/templates/glottal-formant-choir-synth.inf)
+- [Six-Stage Allpass Phaser FX](https://infinitedevices.org/library/six-stage-allpass-phaser-fx.html): Six-stage cascaded first-order allpass phaser with LFO-swept notch combs, asymmetric diode feedback saturation, and lush phase dispersion. (file: https://infinitedevices.org/assets/templates/six-stage-allpass-phaser-fx.inf)
+- [Resonant Vowel Formant FX](https://infinitedevices.org/library/resonant-vowel-formant-fx.html): Three-band parallel state-variable formant filter bank that morphs between A-E-I-O-U vocal resonances with LFO sweep and warm tube saturation. (file: https://infinitedevices.org/assets/templates/resonant-vowel-formant-fx.inf)
 
 ## Library: Community
 
@@ -804,7 +817,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 145 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 147 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -821,4 +834,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 130 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 132 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
