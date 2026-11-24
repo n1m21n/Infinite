@@ -67,7 +67,7 @@ namespace app
          for (int b = 0; b < 8; b++)
          {
             h ^= (v >> (b * 8)) & 0xffull;
-            h *= tok::arrange_support1_h;
+            h *= tok::arrange_clip_thumb_h;
          }
       return h;
    }
@@ -1331,7 +1331,7 @@ namespace app
    bool ArrangeCanGroupSelection()
    {
       const std::vector<uint64_t> ids = Arrange::ExpandSelectionToGroups(gArrange, ArrangeSelectionIds());
-      if (ids.size() < tok::arrange_support1_can_group_selection_limit)
+      if (ids.size() < tok::arrange_group_min_clips)
          return false;
       uint64_t only = 0;
       for (uint64_t id : ids)
@@ -1970,7 +1970,7 @@ namespace app
       // Resolve drop tick position from screenPos.x
       const double startBeat = std::max(0.0, gArrangeScrollBeats);
       const double ppb = std::max(1.0, (double)gArrangePixelsPerBeat);
-      const float rulerStart = (sArrangeLastRulerStartX > 0.0f) ? sArrangeLastRulerStartX : (gArrangePanelRectMin.x + tok::arrange_support1_add_file_to_timeline_at_gap);
+      const float rulerStart = (sArrangeLastRulerStartX > 0.0f) ? sArrangeLastRulerStartX : (gArrangePanelRectMin.x + tok::arrange_drop_clip_w);
       const double dropBeat = std::max(0.0, startBeat + (double)(screenPos.x - rulerStart) / ppb);
       Arrange::Tick dropTick = Arrange::BeatsToTicks(dropBeat);
       const Arrange::Tick gridTicks = ArrangeSnapGridTicks();

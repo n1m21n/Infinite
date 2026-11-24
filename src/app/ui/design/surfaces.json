@@ -75,6 +75,7 @@
     "bw": 13.0,
     "cancel_bottom_lg": 100.0,
     "cancel_bottom_sm": 88.0,
+    "drop_clip_w": 300.0,
     "field_w_lg": 120.0,
     "field_w_sm": 56.0,
     "fill_y": 7.0,
@@ -109,6 +110,7 @@
     "tool_btn_w": 30.0,
     "total_h_gap": 40.0,
     "track_x": 120.0,
+    "unique_clip_w": 60.0,
     "ur": 104.0,
     "v_lg": 100.0,
     "window_w": 344.0,
@@ -118,7 +120,11 @@
    },
    "ratio": {
     "audio_btn_w_ratio": 2.0,
+    "group_color_ratio": 255.0,
     "hair_col_color_alpha_mul": 0.08,
+    "hue_ratio": 360.0,
+    "hue_sat": 0.65,
+    "hue_val": 0.95,
     "icon_size_ratio": 0.65,
     "mix_strip_w_ratio": 4.0,
     "mix_toggle_y_lg": 0.8,
@@ -130,6 +136,9 @@
     "render_btn_w_ratio": 2.0,
     "render_dialogs_ratio": 2.0,
     "scale": 1.2,
+    "slider_ratio": 2.0,
+    "slider_text_x": 0.5,
+    "slider_text_y": 0.5,
     "tick_col_color_alpha_mul": 0.38,
     "v": 0.25,
     "w": 0.28,
@@ -154,6 +163,7 @@
     "panel_content_limit": 0.01,
     "ruler_width_min": 10.0,
     "text_limit": 150.0,
+    "unique_clip_limit": 1000000000.0,
     "zone_limit_lg": 0.7,
     "zone_limit_md": 0.5,
     "zone_limit_sm": 0.3
@@ -161,7 +171,8 @@
    "maths": {
     "has_tint_limit": 0.001,
     "limit_xs": 0.001
-   }
+   },
+   "hatch_stroke": "{stroke.rule}"
   },
   "arrange_session_grid": {
    "fill_alpha": "{opacity.10}",
@@ -241,29 +252,6 @@
     "limit": 36.0,
     "min_lg": 28.0,
     "min_sm": 20.0
-   }
-  },
-  "arrange_support1": {
-   "own_size": {
-    "add_file_to_timeline_at_gap": 300.0
-   }
-  },
-  "arrange_support2": {
-   "hatch_stroke": "{stroke.rule}",
-   "own_size": {
-    "make_clip_source_unique_gap": 60.0
-   },
-   "ratio": {
-    "group_color_ratio": 255.0,
-    "hue_ratio": 360.0,
-    "hue_sat": 0.65,
-    "hue_val": 0.95,
-    "slider_float_ratio": 2.0,
-    "slider_float_render_text_clipped_x": 0.5,
-    "slider_float_render_text_clipped_y": 0.5
-   },
-   "limit": {
-    "make_clip_source_unique_limit": 1000000000.0
    }
   },
   "audio": {
@@ -1186,7 +1174,7 @@
     "a_ratio": 0.41,
     "dot_x": 0.8,
     "metronome_ratio": 3.2,
-    "top_for_ratio": 0.3,
+    "top_ratio": 0.3,
     "u_ratio": 20.0
    }
   },
@@ -2752,7 +2740,7 @@
   "text_button": {
    "outline_stroke": "{stroke.emphasis}",
    "ratio": {
-    "width_for_ratio": 2.0
+    "pad_ratio": 2.0
    }
   },
   "theme": {
@@ -3426,6 +3414,7 @@
    "own_size": {
     "clip_border_col_lg": 235,
     "clip_border_col_sm": 190,
+    "clip_thumb_h": 1099511628211,
     "dialogs_height_lg": 2160,
     "dialogs_height_md": 1920,
     "dialogs_height_sm": 720,
@@ -3438,10 +3427,16 @@
     "render_height": 1080,
     "render_width": 1920,
     "thumb_h": 54,
+    "thumb_out_h": 1080,
+    "thumb_out_w": 1920,
+    "thumb_pos": 3,
     "thumb_w": 96,
     "zone": 2
    },
    "limit": {
+    "bpm_sample_limit": 4,
+    "group_min_clips": 2,
+    "hue_period": 360,
     "mon_w_min": 16
    }
   },
@@ -3458,25 +3453,6 @@
     "min_rows": 6,
     "progress_ring_segments": 24,
     "request_w_min": 16
-   }
-  },
-  "arrange_support1": {
-   "own_size": {
-    "h": 1099511628211
-   },
-   "limit": {
-    "can_group_selection_limit": 2
-   }
-  },
-  "arrange_support2": {
-   "own_size": {
-    "out_h": 1080,
-    "out_w": 1920,
-    "pos": 3
-   },
-   "limit": {
-    "estimate_sample_bpm_limit": 4,
-    "hue_period": 360
    }
   },
   "audio": {
@@ -3535,10 +3511,10 @@
     "change_ratio": 100
    },
    "limit": {
+    "anim_min_frames": 2,
     "audio_segments": 32,
     "candidates_limit": 40,
     "gif_limit": 6,
-    "texture_for_limit": 2,
     "video_segments": 32
    }
   },

@@ -16,7 +16,7 @@ namespace glyph
    // AddText snaps its origin to whole pixels, so the drawn centre can differ from `center` by up to half a pixel.
    inline float TopFor(ImFont* font, ImVec2 center, float size)
    {
-      return center.y + tok::glyph_draw_top_for_ratio * size - (float)(int)(font->GetFontBaked(size)->Ascent + 0.5f);
+      return center.y + tok::glyph_draw_top_ratio * size - (float)(int)(font->GetFontBaked(size)->Ascent + 0.5f);
    }
 
    // The centre a glyph is really drawn at: draw backing shapes (discs, tiles) here so they sit concentric with it.

@@ -27,7 +27,9 @@ GROUPS = ("surface", "surface_i", "surface_d", "surface_hex", "surface_rgba8", "
 # a provenance name: a running number, an argument position, a draw-call kind, or a statement kind left from the
 # first cut (bound / assign / limit / bias / draw / dummy / arith / maths / if_arith)
 BAD = re.compile(r"(_\d+$|(^|_)arg(_|$)|(^|_)draw(_x|_y)?(_|$)|(^|_)(bound|assign|bias|arith|if_arith|maths|pow_maths)(_|$)|"
-                 r"(^|_)(dummy_[wh]|set_next_\w+|im_col32|im_color|u32)(_|$))")
+                 r"(^|_)(dummy_[wh]|set_next_\w+|im_col32|im_color|u32)(_|$)|"
+                 r"(^|_)for(_|$)|(^|_)(can_group|add_file_to|make_clip_source|estimate_sample|render_text_clipped)(_|$))")
+BAD_SURF = re.compile(r"support\d+")
 STEPS = {1: [""], 2: ["sm", "lg"], 3: ["sm", "md", "lg"], 4: ["xs", "sm", "md", "lg"], 5: ["xs", "sm", "md", "lg", "xl"],
          6: ["xxs", "xs", "sm", "md", "lg", "xl"], 7: ["xxs", "xs", "sm", "md", "lg", "xl", "xxl"],
          8: ["xxs", "xs", "sm", "md", "lg", "xl", "xxl", "xxxl"], 9: ["xxxs", "xxs", "xs", "sm", "md", "lg", "xl", "xxl", "xxxl"]}
@@ -278,7 +280,7 @@ def main():
     d, toks = load_tokens()
     TOKNAMES.update(toks); TOKNAMES.update(k for (_, _, k) in toks.values())
     base_scale = {f"space_{x}" for x in ("0_25", "0_5", "0_75", "1_5", "2_5")}
-    bad = {n for n, (g, s, k) in toks.items() if BAD.search(k)}
+    bad = {n for n, (g, s, k) in toks.items() if BAD.search(k) or BAD_SURF.search(s)}
     if lint:
         # a surface token named for where it sits (file, function, argument position, step number), and a numbered
         # colour role (accent_2): both must be 0 (ratchet.py runs this)

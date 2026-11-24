@@ -14,10 +14,10 @@ namespace app
    {
       uint64_t h = groupId * 0x9E3779B97F4A7C15ull;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
       h ^= h >> 29;
-      const float hue = (float)(h % tok::arrange_support2_hue_period) / tok::arrange_support2_hue_ratio;
+      const float hue = (float)(h % tok::arrange_hue_period) / tok::arrange_hue_ratio;
       float r, g, b;
-      ImGui::ColorConvertHSVtoRGB(hue, tok::arrange_support2_hue_sat, tok::arrange_support2_hue_val, r, g, b);
-      return IM_COL32((int)(r * tok::arrange_support2_group_color_ratio), (int)(g * 255.0f), (int)(b * 255.0f), alpha);
+      ImGui::ColorConvertHSVtoRGB(hue, tok::arrange_hue_sat, tok::arrange_hue_val, r, g, b);
+      return IM_COL32((int)(r * tok::arrange_group_color_ratio), (int)(g * 255.0f), (int)(b * 255.0f), alpha);
    }
 
 
@@ -28,7 +28,7 @@ namespace app
       dl->PushClipRect(a, b, true);
       const float h = b.y - a.y;
       for (float x = a.x - h; x < b.x; x += spacing)
-         dl->AddLine(ImVec2(x, b.y), ImVec2(x + h, a.y), col, tok::arrange_support2_hatch_stroke);
+         dl->AddLine(ImVec2(x, b.y), ImVec2(x + h, a.y), col, tok::arrange_hatch_stroke);
       dl->PopClipRect();
    }
 
@@ -304,7 +304,7 @@ namespace app
       }
 
       const ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
-      const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + ImVec2(w, label_size.y + style.FramePadding.y * tok::arrange_support2_slider_float_ratio));
+      const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + ImVec2(w, label_size.y + style.FramePadding.y * tok::arrange_slider_ratio));
       const ImRect total_bb(frame_bb.Min, frame_bb.Max + ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0.0f));
 
       const bool temp_input_allowed = (flags & ImGuiSliderFlags_NoInput) == 0;
@@ -412,7 +412,7 @@ namespace app
       const char* value_buf_end = value_buf + ImGui::DataTypeFormatString(value_buf, IM_ARRAYSIZE(value_buf), ImGuiDataType_Float, v, format);
       if (g.LogEnabled)
          ImGui::LogSetNextTextDecoration("{", "}");
-      ImGui::RenderTextClipped(frame_bb.Min, frame_bb.Max, value_buf, value_buf_end, NULL, ImVec2(tok::arrange_support2_slider_float_render_text_clipped_x, tok::arrange_support2_slider_float_render_text_clipped_y));
+      ImGui::RenderTextClipped(frame_bb.Min, frame_bb.Max, value_buf, value_buf_end, NULL, ImVec2(tok::arrange_slider_text_x, tok::arrange_slider_text_y));
 
       if (label_size.x > 0.0f)
          ImGui::RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y), label);
@@ -656,8 +656,8 @@ namespace app
             }
          }
       }
-      outW = tok::arrange_support2_out_w;
-      outH = tok::arrange_support2_out_h;
+      outW = tok::arrange_thumb_out_w;
+      outH = tok::arrange_thumb_out_h;
    }
 
 
@@ -908,7 +908,7 @@ namespace app
                      return val;
                } catch (...) {}
             }
-            pos += tok::arrange_support2_pos;
+            pos += tok::arrange_thumb_pos;
          }
       }
 
@@ -960,7 +960,7 @@ namespace app
       std::atomic<bool> abortFlag{false};
       SlicerDsp::Detect(mono.data(), maxAnalyzeFrames, sr, params, onsets, strengths, &abortFlag);
 
-      if (onsets.size() >= tok::arrange_support2_estimate_sample_bpm_limit)
+      if (onsets.size() >= tok::arrange_bpm_sample_limit)
       {
          std::vector<double> onsetTimes(onsets.size());
          for (size_t i = 0; i < onsets.size(); i++)
@@ -1291,9 +1291,9 @@ namespace app
       ed::SetCurrentEditor(prevEditor);
       // The editor reports FLT_MAX for a node it has never drawn (its bounds are still empty); fall back to where
       // the node was placed so the copy does not land at FLT_MAX.
-      if (!(std::fabs(origPos.x) < tok::arrange_support2_make_clip_source_unique_limit) || !(std::fabs(origPos.y) < tok::arrange_support2_make_clip_source_unique_limit))
+      if (!(std::fabs(origPos.x) < tok::arrange_unique_clip_limit) || !(std::fabs(origPos.y) < tok::arrange_unique_clip_limit))
          origPos = ImVec2(srcNode->spawnX, srcNode->spawnY);
-      const ImVec2 pos = FindFreeSpawnPosition(ImVec2(origPos.x + tok::arrange_support2_make_clip_source_unique_gap, origPos.y + tok::arrange_support2_make_clip_source_unique_gap));
+      const ImVec2 pos = FindFreeSpawnPosition(ImVec2(origPos.x + tok::arrange_unique_clip_w, origPos.y + tok::arrange_unique_clip_w));
 
       GraphNode* copy = SpawnNode(typeName, category, pos.x, pos.y);
       if (copy == nullptr)

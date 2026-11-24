@@ -51,6 +51,6 @@ namespace TextButton
    inline float WidthFor(const char* label)
    {
       UiType::Scope ts(UiType::Size::Body, UiType::Weight::Medium);
-      return std::ceil(ImGui::CalcTextSize(label).x) + tok::space_3 * tok::text_button_width_for_ratio;
+      return std::ceil(ImGui::CalcTextSize(label).x) + tok::space_3 * tok::text_button_pad_ratio;
    }
 }

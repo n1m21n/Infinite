@@ -2523,7 +2523,7 @@ namespace app
                t.endsMs.push_back(end);
             }
             t.id = t.frames.empty() ? 0 : t.frames[0];
-            if (t.frames.size() < tok::chat_texture_for_limit)
+            if (t.frames.size() < tok::chat_anim_min_frames)
                t.frames.clear(), t.endsMs.clear();
             stbi_image_free(px);
             std::free(delays);  // stb allocates with malloc
