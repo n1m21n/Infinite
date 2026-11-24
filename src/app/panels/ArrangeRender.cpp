@@ -280,7 +280,7 @@ namespace app
       else
          ImGui::Text(T("%s of %s at %s"), UiFmt::Tr(UiFmt::Sec((double)done / gArrangeWavRender.sampleRate)).c,
                      UiFmt::Tr(UiFmt::Sec((double)total / gArrangeWavRender.sampleRate)).c,
-                     (int)llround(gArrangeWavRender.sampleRate));
+                     UiFmt::Tr(UiFmt::Hz(gArrangeWavRender.sampleRate)).c);
       // "Job 2 of 4" while a run works through the queue; silent for a lone
       // take, where the count would only be noise.
       int qIdx = 0, qTotal = 0;

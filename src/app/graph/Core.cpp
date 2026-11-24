@@ -563,7 +563,7 @@ namespace app
    {
       // Plugin engine mode (src/plugin/engine/HostAudio.h) is headless too: hidden window, no
       // splash, autosave, control port or update check.
-      // Any INFINITE_<NAME>TEST self-test run and the UI audit too: it holds the main thread for minutes, so a Dock icon and a
+      // Any INFINITE_<NAME>TEST self-test run, the UI audit and the crawler too: it holds the main thread for minutes, so a Dock icon and a
       // window only show the owner a beachball they end up force-quitting.
       static const bool sSelfTest = []()
       {
@@ -572,7 +572,7 @@ namespace app
             const std::string kv(*e);
             const size_t eq = kv.find('=');
             const std::string k = kv.substr(0, eq);
-            if (k == "INFINITE_UIAUDIT" ||
+            if (k == "INFINITE_UIAUDIT" || k == "INFINITE_CRAWL" ||   // the crawler too: no window, no Dock icon
                 (k.rfind("INFINITE_", 0) == 0 && k.size() > 13 && k.compare(k.size() - 4, 4, "TEST") == 0))  // ui-audit-ok: bytes (string length test, not a screen quantity)
                return true;
          }
