@@ -37,14 +37,14 @@ ALIAS = re.compile(r"^\{([a-z_0-9]+)\.([a-z_0-9]+)\}$")
 # The primitive ladders. space already exists in tokens.json; the others are added by --apply.
 LADDERS = {
     "radius": [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 12],
-    "stroke_scale": [0.5, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4],
+    "stroke_scale": [0.5, 1, 1.5, 2, 2.5, 3, 4],
     "opacity": [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.1, 0.12, 0.14, 0.15, 0.16, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
                 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1],
 }
 PRIMITIVE_GROUPS = ("space", "radius", "stroke_scale", "opacity", "opacity8")
 INT_PRIMITIVE_GROUPS = ("opacity8",)
 INT_ALIAS_GROUPS = ("opacity8", "alpha8")
-JOB_GROUPS = ("stroke", "radius", "gap", "alpha", "alpha8")
+JOB_GROUPS = ("stroke", "radius", "gap", "alpha", "alpha8", "hit")
 
 # Tier 2 shared job tokens: primitive -> canonical job alias (zero visual change; Step B).
 JOB_TOKENS = {
@@ -124,6 +124,33 @@ SPACE_SNAP = {
     20.0: "{gap.page}",    # 24
     22.0: "{gap.page}",    # 24
 }
+
+# Step D1: off-scale stroke & radius snap tables + pruned sub-pixel stroke aliases (1.25, 1.75).
+STROKE_SNAP = {
+    0.97: "{stroke.rule}",     # 1.0
+    1.1:  "{stroke.rule}",     # 1.0
+    1.2:  "{stroke.rule}",     # 1.0
+    1.25: "{stroke.rule}",     # 1.0 (pruned sub-pixel stop)
+    1.4:  "{stroke.medium}",   # 1.5
+    1.6:  "{stroke.medium}",   # 1.5
+    1.75: "{stroke.emphasis}", # 2.0 (pruned sub-pixel stop)
+    1.8:  "{stroke.emphasis}", # 2.0
+    2.2:  "{stroke.emphasis}", # 2.0
+    3.5:  "{stroke.wide}",     # 4.0
+    4.5:  "{stroke.wide}",     # 4.0
+    5.0:  "{stroke.wide}",     # 4.0
+    6.0:  "{stroke.wide}",     # 4.0
+}
+STROKE_ALIAS_PRUNE = {
+    "{stroke_scale.1_25}": "{stroke.rule}",
+    "{stroke_scale.1_75}": "{stroke.emphasis}",
+}
+RADIUS_SNAP = {
+    0.5: "{radius.xs}",   # 1.0
+    3.2: "{radius.chip}", # 3.0
+    4.8: "{radius.pill}", # 5.0
+}
+HIT_RECT_RX = re.compile(r"(?:^|_)hit_(?:x|y|w|h)$")
 
 
 def step_key(v, scale=1.0):
@@ -284,7 +311,7 @@ def resolve(value, tok):
     return float(cur) if isinstance(cur, (int, float)) else cur
 
 
-def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=False, snap_space=False):
+def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=False, snap_space=False, snap_d1=False, hit_min=20.0):
     """Rewrite one surface's entries into aliases + buckets (refile re-checks own_size; use_jobs lifts exact primitive aliases to Tier 2 jobs)."""
     out, buckets = {}, {}
     for k, v in entries.items():
@@ -294,6 +321,8 @@ def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=
             for kk, vv in v.items():
                 if kk.startswith("_"):
                     buckets.setdefault(k, {})[kk] = vv; continue
+                if snap_d1 and k == "own_size" and isinstance(vv, (int, float)) and HIT_RECT_RX.search(kk) and float(vv) < hit_min:
+                    out[kk] = "{hit.target}"; continue
                 if k == "off_scale" or (refile and k == "own_size" and isinstance(vv, (int, float))):
                     where, val = place(kk, vv, prim, group)
                     if where == "alias":
@@ -302,11 +331,18 @@ def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=
                         snapped = SPACE_SNAP.get(float(vv))
                         if snapped:
                             out[kk] = snapped; continue
+                    if snap_d1 and k == "off_scale" and isinstance(vv, (int, float)):
+                        kd = kind(kk, float(vv), group)
+                        snapped = STROKE_SNAP.get(float(vv)) if kd == "stroke" else (RADIUS_SNAP.get(float(vv)) if kd == "radius" else None)
+                        if snapped:
+                            out[kk] = snapped; continue
                     if refile and k == "own_size" and where != "own_size":
                         buckets.setdefault(where, {})[kk] = val; continue
                 buckets.setdefault(k, {})[kk] = vv
             continue
         if isinstance(v, str) and ALIAS.match(v):
+            if snap_d1 and v in STROKE_ALIAS_PRUNE:
+                v = STROKE_ALIAS_PRUNE[v]
             out[k] = PRIM_TO_JOB.get(v, v) if use_jobs else v; continue
         if colour:
             buckets.setdefault("own_colour", {})[k] = v; continue
@@ -341,6 +377,7 @@ def lint(tok, sj):
         except (ValueError, KeyError) as e:
             bad.append(f"{where}: {e}")
 
+    hit_min = float(tok["base"].get("hit_min", 20))
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
             for k, v in kv.items():
@@ -351,12 +388,20 @@ def lint(tok, sj):
                         for kk, vv in v.items():
                             if kk.startswith("_") or not isinstance(vv, (int, float)):
                                 continue
+                            if HIT_RECT_RX.search(kk) and float(vv) < hit_min:
+                                bad.append(f"{g}.{s}.own_size.{kk} = {vv}: hit target below hit_min ({hit_min})")
                             where, _ = place(kk, vv, prim, g)
                             if where != "own_size":
                                 bad.append(f"{g}.{s}.own_size.{kk} = {vv}: misfiled (belongs in {where})")
                     continue
                 if isinstance(v, str) and ALIAS.match(v):
                     check_alias(f"{g}.{s}.{k}", v)
+                    if HIT_RECT_RX.search(k):
+                        try:
+                            if float(resolve(v, tok)) < hit_min:
+                                bad.append(f"{g}.{s}.{k}: hit target below hit_min ({hit_min})")
+                        except (ValueError, KeyError):
+                            pass
                     continue
                 bad.append(f"{g}.{s}.{k} = {v}: raw value with no alias and no why bucket")
     for g in ("alpha", "alpha8", "stroke", "gap"):
@@ -400,7 +445,7 @@ def dumps(obj):
     return re.sub(r"\[\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+)\s*\]", r"[\1, \2, \3, \4]", s) + "\n"
 
 
-def apply(tok, sj, refile=False, use_jobs=False, snap_space=False):
+def apply(tok, sj, refile=False, use_jobs=False, snap_space=False, snap_d1=False):
     b = tok["base"]
     # 1. primitive ladders (space exists; radius gains numeric steps beside its semantic 'cell'; opacity8 mirrors opacity)
     all_ladders = {**LADDERS, "opacity8": LADDERS["opacity"]}
@@ -408,6 +453,16 @@ def apply(tok, sj, refile=False, use_jobs=False, snap_space=False):
         grp = b.setdefault(g, {})
         for k, v in ladder_keys(g, vals).items():
             grp.setdefault(k, v)
+    if snap_d1:
+        for obsolete in ("1_25", "1_75"):
+            b.get("stroke_scale", {}).pop(obsolete, None)
+        b.setdefault("hit", {}).setdefault("target", float(b.get("hit_min", 20)))
+        for k, v in list(b.get("stroke", {}).get("off_scale", {}).items()):
+            if float(v) in STROKE_SNAP:
+                b["stroke"][k] = STROKE_SNAP[float(v)]
+                del b["stroke"]["off_scale"][k]
+        if b.get("stroke", {}).get("off_scale") == {}:
+            del b["stroke"]["off_scale"]
     grp_doc = {"radius": "Primitive radius ladder (numeric keys) + semantic radii that alias it",
                "stroke_scale": "Primitive stroke-weight ladder; semantic weights live in 'stroke' and alias it",
                "opacity": "Primitive opacity ladder in percent (opacity.12 = 0.12); semantic alphas live in 'alpha' and alias it",
@@ -451,9 +506,11 @@ def apply(tok, sj, refile=False, use_jobs=False, snap_space=False):
         if g in b and b[g].get("off_scale") == {}:
             del b[g]["off_scale"]
     # 4. surfaces
+    hit_min = float(b.get("hit_min", 20))
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
-            sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS, group=g, refile=refile, use_jobs=use_jobs, snap_space=snap_space)
+            sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS, group=g, refile=refile, use_jobs=use_jobs,
+                                    snap_space=snap_space, snap_d1=snap_d1, hit_min=hit_min)
     return tok, sj
 
 
@@ -487,8 +544,10 @@ def main():
     refile = "--refile" in sys.argv
     use_jobs = "--jobs" in sys.argv
     snap_space = "--snap-space" in sys.argv
-    if "--apply" in sys.argv or refile or use_jobs or snap_space:
-        tok, sj = apply(tok, sj, refile=refile, use_jobs=use_jobs or snap_space, snap_space=snap_space)
+    snap_d1 = "--snap-d1" in sys.argv
+    if "--apply" in sys.argv or refile or use_jobs or snap_space or snap_d1:
+        tok, sj = apply(tok, sj, refile=refile, use_jobs=use_jobs or snap_space or snap_d1,
+                        snap_space=snap_space, snap_d1=snap_d1)
         TOK.write_text(json.dumps(tok, indent=1, ensure_ascii=False) + "\n")
         SURF.write_text(dumps(sj))
         print("wrote tokens.json, surfaces.json")

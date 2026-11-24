@@ -99,6 +99,8 @@ def build():
     for grp in ("dock", "cell", "hit", "arrange", "chat", "perf"):   # panel floors, knob-row cells, per-panel layout
         for k, v, dep in entries(b.get(grp, {})):
             L.append(line("float", f"{grp}_{k}", v, dep))
+    if "target" in b.get("hit", {}):
+        L.append("   static_assert(hit_target >= hit_min, \"shared hit target respects hit_min\");")
     # Per-surface semantic sizes (owner rule A1): a thing's own width, height, radius, stroke, count or ratio,
     # named for what it is; emitted as <surface>_<name> in the literal's own C++ type.
     for grp, ty in (("surface", "float"), ("surface_i", "int"), ("surface_d", "double")):

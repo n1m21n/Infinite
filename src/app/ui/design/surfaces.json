@@ -64,6 +64,8 @@
    "window_bg_alpha": "{opacity.35}",
    "clip_settings_child_gap": "{gap.block}",
    "mix_knob_gap": "{gap.panel}",
+   "line_stroke_md": "{stroke.medium}",
+   "panel_content_stroke": "{stroke.medium}",
    "own_size": {
     "active_w": 72.0,
     "apply_bottom": 56.0,
@@ -160,9 +162,7 @@
     "limit_xs": 0.001
    },
    "off_scale": {
-    "alpha": 0.27,
-    "line_stroke_md": 1.6,
-    "panel_content_stroke": 1.4
+    "alpha": 0.27
    }
   },
   "arrange_session_grid": {
@@ -185,6 +185,7 @@
    "gx_gap": "{gap.panel}",
    "panel_content_gap": "{gap.group}",
    "tl_inset": "{gap.group}",
+   "panel_content_stroke": "{stroke.medium}",
    "own_size": {
     "add_col_w": 40.0,
     "badge_w": 30.0,
@@ -243,8 +244,7 @@
     "min_sm": 20.0
    },
    "off_scale": {
-    "alpha": 0.22,
-    "panel_content_stroke": 1.4
+    "alpha": 0.22
    }
   },
   "arrange_support1": {
@@ -283,6 +283,7 @@
    "avail_gap": "{gap.section}",
    "begin_body_gap": "{gap.panel}",
    "drift_legend_gap": "{gap.hair}",
+   "drift_meter_line_stroke_lg": "{stroke.medium}",
    "own_size": {
     "drift_meter_r": 2.0,
     "grip": 8.0,
@@ -308,9 +309,6 @@
    "limit": {
     "btn_w_min": 20.0,
     "trim_wave_limit_sm": 0.01
-   },
-   "off_scale": {
-    "drift_meter_line_stroke_lg": 1.4
    }
   },
   "audio_node": {
@@ -393,6 +391,7 @@
    "user_inset": "{gap.page}",
    "w_gap": "{gap.page}",
    "x_gap": "{gap.page}",
+   "header_hit_y": "{hit.target}",
    "own_size": {
     "avatar_r_lg": 11.0,
     "avatar_r_md": 9.0,
@@ -418,7 +417,6 @@
     "geom_chips_h": 26.0,
     "glyph": 22.0,
     "h": 26.0,
-    "header_hit_y": 18.0,
     "header_tools_x": 2.0,
     "line_polyline_lg": 3.0,
     "line_polyline_sm": 2.0,
@@ -653,6 +651,9 @@
    "line_stroke": "{stroke.emphasis}",
    "ring_stroke": "{stroke.medium}",
    "take_stroke": "{stroke.emphasis}",
+   "bend_curve_stroke": "{stroke.wide}",
+   "group_curve_stroke": "{stroke.medium}",
+   "thick": "{stroke.rule}",
    "own_size": {
     "erase_r": 9.0,
     "field_w": 160.0,
@@ -707,11 +708,6 @@
    },
    "maths": {
     "release_limit_sm": 0.0001
-   },
-   "off_scale": {
-    "bend_curve_stroke": 5.0,
-    "group_curve_stroke": 1.4,
-    "thick": 1.2
    }
   },
   "desk": {
@@ -739,6 +735,8 @@
    "key_cap_gap": "{gap.tight}",
    "pot_gap": "{gap.tight}",
    "scribble_row_gap": "{gap.panel}",
+   "console_meter_radius": "{radius.xs}",
+   "line_stroke_lg": "{stroke.emphasis}",
    "own_size": {
     "dot_r_lg": 2.6,
     "dot_r_sm": 1.6,
@@ -783,11 +781,9 @@
    },
    "off_scale": {
     "cap_lo_alpha": 0.72,
-    "console_meter_radius": 0.5,
     "fill_alpha_lg": 0.78,
     "fill_alpha_sm": 0.22,
-    "line_alpha": 0.33,
-    "line_stroke_lg": 2.2
+    "line_alpha": 0.33
    }
   },
   "dialog": {
@@ -897,6 +893,8 @@
    "spectral_spectrum_stroke": "{stroke.rule}",
    "synth_scope_stroke": "{stroke.rule}",
    "wavetable_scope_stroke": "{stroke.rule}",
+   "path_stroke_lg": "{stroke.wide}",
+   "path_stroke_sm": "{stroke.medium}",
    "own_size": {
     "notes_roll_bar_h": 2.0
    },
@@ -911,10 +909,6 @@
    },
    "limit": {
     "bar_h_min": 2.0
-   },
-   "off_scale": {
-    "path_stroke_lg": 4.5,
-    "path_stroke_sm": 1.6
    }
   },
   "field_patcher": {
@@ -1044,6 +1038,26 @@
    "frequency_shifter_visualizer_gap": "{gap.panel}",
    "resonator_bank_visualizer_gap": "{gap.page}",
    "stereo_visualizer_gap": "{gap.page}",
+   "audio_filter_visualizer_stroke": "{stroke.emphasis}",
+   "audio_spectrum_stroke": "{stroke.rule}",
+   "bitcrush_visualizer_stroke": "{stroke.emphasis}",
+   "convolution_space_visualizer_path_stroke": "{stroke.emphasis}",
+   "drive_visualizer_path_stroke": "{stroke.emphasis}",
+   "eq_visualizer_stroke": "{stroke.emphasis}",
+   "flanger_visualizer_path_stroke": "{stroke.emphasis}",
+   "frequency_shifter_visualizer_line_stroke_lg": "{stroke.emphasis}",
+   "frequency_shifter_visualizer_line_stroke_sm": "{stroke.rule}",
+   "gain_computer_visualizer_path_stroke": "{stroke.emphasis}",
+   "phaser_visualizer_path_stroke": "{stroke.medium}",
+   "reverb_visualizer_path_stroke": "{stroke.emphasis}",
+   "ring_mod_visualizer_path_stroke": "{stroke.emphasis}",
+   "ring_stroke_sm": "{stroke.rule}",
+   "saturator_visualizer_path_stroke": "{stroke.medium}",
+   "stereo_visualizer_path_stroke": "{stroke.emphasis}",
+   "transient_shaper_visualizer_path_stroke": "{stroke.emphasis}",
+   "tremolo_visualizer_path_stroke": "{stroke.medium}",
+   "tremolo_visualizer_stroke": "{stroke.emphasis}",
+   "wavetable_shaper_visualizer_path_stroke": "{stroke.emphasis}",
    "own_size": {
     "arrow_sz": 3.0,
     "audio_filter_visualizer_r": 5.0,
@@ -1131,28 +1145,6 @@
    "maths": {
     "cosf_t": 3.141592653589793,
     "prev_y_min": 1e-06
-   },
-   "off_scale": {
-    "audio_filter_visualizer_stroke": 1.8,
-    "audio_spectrum_stroke": 1.2,
-    "bitcrush_visualizer_stroke": 1.8,
-    "convolution_space_visualizer_path_stroke": 1.8,
-    "drive_visualizer_path_stroke": 1.8,
-    "eq_visualizer_stroke": 1.8,
-    "flanger_visualizer_path_stroke": 2.2,
-    "frequency_shifter_visualizer_line_stroke_lg": 1.8,
-    "frequency_shifter_visualizer_line_stroke_sm": 1.2,
-    "gain_computer_visualizer_path_stroke": 1.8,
-    "phaser_visualizer_path_stroke": 1.6,
-    "reverb_visualizer_path_stroke": 1.8,
-    "ring_mod_visualizer_path_stroke": 1.8,
-    "ring_stroke_sm": 1.2,
-    "saturator_visualizer_path_stroke": 1.6,
-    "stereo_visualizer_path_stroke": 1.8,
-    "transient_shaper_visualizer_path_stroke": 1.8,
-    "tremolo_visualizer_path_stroke": 1.4,
-    "tremolo_visualizer_stroke": 1.8,
-    "wavetable_shaper_visualizer_path_stroke": 1.8
    }
   },
   "geometry_params": {
@@ -1342,6 +1334,8 @@
    "insert_chip_gap": "{gap.section}",
    "pot_gap": "{gap.tight}",
    "scribble_gap": "{gap.panel}",
+   "insert_chip_hit_x": "{hit.target}",
+   "line_stroke_lg": "{stroke.emphasis}",
    "own_size": {
     "cap_h": 17.0,
     "cap_w": 24.0,
@@ -1349,7 +1343,6 @@
     "dot_y": 1.5,
     "fill_y": 2.5,
     "free_canvas_spot_gap": 420.0,
-    "insert_chip_hit_x": 12.0,
     "insert_chip_r": 2.5,
     "insert_inset": 220.0,
     "insert_row_h": 14.0,
@@ -1402,8 +1395,7 @@
     "strip_fader_h_min": 6.0
    },
    "off_scale": {
-    "fill_alpha_sm": 0.59,
-    "line_stroke_lg": 2.2
+    "fill_alpha_sm": 0.59
    }
   },
   "mod": {
@@ -1415,6 +1407,7 @@
    "knob_float_gap": "{gap.hair}",
    "knob_gap": "{gap.panel}",
    "line_start_gap": "{gap.page}",
+   "path_stroke": "{stroke.wide}",
    "own_size": {
     "arc_r": 2.5,
     "bypass_cap_y": 22.0,
@@ -1452,9 +1445,6 @@
     "color_swatch_min": 24.0,
     "fade_if_disabled_limit": 0.999,
     "field_w_max": 96.0
-   },
-   "off_scale": {
-    "path_stroke": 5.0
    }
   },
   "mod_matrix": {
@@ -1551,6 +1541,8 @@
    "predictive_rhythm_body_gap": "{gap.panel}",
    "predictive_velocity_body_gap": "{gap.panel}",
    "sequencer_body_gap": "{gap.tight}",
+   "outline_thickness": "{stroke.wide}",
+   "path_stroke": "{stroke.emphasis}",
    "own_size": {
     "check_w": 84.0,
     "chord_h": 30.0,
@@ -1604,10 +1596,6 @@
     "cap_h_min": 15.0,
     "h_min": 1.5,
     "w_min": 280.0
-   },
-   "off_scale": {
-    "outline_thickness": 5.0,
-    "path_stroke": 1.8
    }
   },
   "notice_card": {
@@ -1658,6 +1646,26 @@
    "pad_x": "{gap.panel}",
    "trace_w_gap": "{gap.page}",
    "wavetable_frames_gap": "{gap.page}",
+   "editable_adsr_radius": "{radius.chip}",
+   "equation_visualizer_path_stroke_md": "{stroke.wide}",
+   "equation_visualizer_path_stroke_sm": "{stroke.emphasis}",
+   "fm_scope_path_stroke": "{stroke.medium}",
+   "image_spectral_synth_line_stroke_lg": "{stroke.wide}",
+   "image_spectral_synth_scope_path_stroke_sm": "{stroke.medium}",
+   "metallic_scope_path_stroke_lg": "{stroke.wide}",
+   "metallic_scope_path_stroke_sm": "{stroke.medium}",
+   "oscillator_scope_path_stroke_lg": "{stroke.wide}",
+   "oscillator_scope_path_stroke_sm": "{stroke.medium}",
+   "oscillator_waveform_path_stroke_lg": "{stroke.wide}",
+   "oscillator_waveform_path_stroke_sm": "{stroke.emphasis}",
+   "piano_diagram_stroke": "{stroke.rule}",
+   "radius": "{radius.pill}",
+   "ring_stroke": "{stroke.medium}",
+   "wave_terrain_body_stroke": "{stroke.rule}",
+   "wave_terrain_line_stroke_lg": "{stroke.wide}",
+   "wave_terrain_line_stroke_sm": "{stroke.medium}",
+   "wave_terrain_scope_path_stroke_sm": "{stroke.medium}",
+   "wavetable_frames_stroke": "{stroke.emphasis}",
    "own_size": {
     "check_w": 84.0,
     "col": 6.0,
@@ -1757,28 +1765,8 @@
     "wave_w_min": 70.0
    },
    "off_scale": {
-    "editable_adsr_radius": 3.2,
-    "equation_visualizer_path_stroke_md": 3.5,
-    "equation_visualizer_path_stroke_sm": 1.8,
-    "fm_scope_path_stroke": 1.6,
     "granular_waveform_glow_alpha": 80.0,
-    "image_spectral_synth_line_stroke_lg": 6.0,
-    "image_spectral_synth_scope_path_stroke_sm": 1.6,
-    "metallic_scope_path_stroke_lg": 4.5,
-    "metallic_scope_path_stroke_sm": 1.6,
-    "oscillator_scope_path_stroke_lg": 4.5,
-    "oscillator_scope_path_stroke_sm": 1.6,
-    "oscillator_waveform_path_stroke_lg": 4.5,
-    "oscillator_waveform_path_stroke_sm": 1.8,
-    "peaks_alpha_sm": 0.44,
-    "piano_diagram_stroke": 1.2,
-    "radius": 4.8,
-    "ring_stroke": 1.4,
-    "wave_terrain_body_stroke": 0.97,
-    "wave_terrain_line_stroke_lg": 3.5,
-    "wave_terrain_line_stroke_sm": 1.6,
-    "wave_terrain_scope_path_stroke_sm": 1.6,
-    "wavetable_frames_stroke": 2.2
+    "peaks_alpha_sm": 0.44
    }
   },
   "page_picker": {
@@ -1824,6 +1812,14 @@
    "pad": "{gap.panel}",
    "palette_preview_gap": "{gap.panel}",
    "val_x_gap": "{gap.panel}",
+   "brain_source_body_stroke": "{stroke.rule}",
+   "curve_editor_stroke": "{stroke.emphasis}",
+   "fx_pad_stroke": "{stroke.medium}",
+   "line_stroke_lg": "{stroke.medium}",
+   "line_stroke_sm": "{stroke.medium}",
+   "macro_xy_body_stroke": "{stroke.medium}",
+   "mseg_editor_stroke": "{stroke.emphasis}",
+   "ring_stroke_sm": "{stroke.rule}",
    "own_size": {
     "bar_h": 26.0,
     "bar_w": 44.0,
@@ -1917,16 +1913,6 @@
     "pattern_step_grid_limit": 18.0,
     "pattern_step_grid_limit_lg": 30.0,
     "text_colored_limit": 0.6
-   },
-   "off_scale": {
-    "brain_source_body_stroke": 1.1,
-    "curve_editor_stroke": 1.8,
-    "fx_pad_stroke": 1.6,
-    "line_stroke_lg": 1.6,
-    "line_stroke_sm": 1.4,
-    "macro_xy_body_stroke": 1.6,
-    "mseg_editor_stroke": 1.8,
-    "ring_stroke_sm": 1.2
    }
   },
   "patch_io": {
@@ -1968,6 +1954,9 @@
    "element_gap": "{gap.block}",
    "slider_w_gap": "{gap.block}",
    "start_y_gap": "{gap.page}",
+   "element_stroke": "{stroke.rule}",
+   "line_stroke_lg": "{stroke.medium}",
+   "modulator_meter_stroke": "{stroke.medium}",
    "own_size": {
     "cancel_bottom": 68.0,
     "control_bottom": 100.0,
@@ -2043,10 +2032,7 @@
    },
    "off_scale": {
     "alpha": 0.27,
-    "element_stroke": 1.2,
-    "element_well_col_alpha_lg": 0.28,
-    "line_stroke_lg": 1.6,
-    "modulator_meter_stroke": 1.6
+    "element_well_col_alpha_lg": 0.28
    }
   },
   "piano_roll": {
@@ -2136,6 +2122,7 @@
    "paintable_stroke": "{stroke.emphasis}",
    "radius": "{radius.card}",
    "stroke": "{stroke.emphasis}",
+   "comment_stroke": "{stroke.rule}",
    "own_size": {
     "cluster_offset_y": 40.0,
     "comment_hi_lg": 1600.0,
@@ -2169,7 +2156,6 @@
     "zoom_min": 0.01
    },
    "off_scale": {
-    "comment_stroke": 1.2,
     "group_node_bg_alpha_lg": 0.13
    }
   },
@@ -2193,6 +2179,7 @@
    "slice_colour_alpha_xs": "{opacity.7}",
    "wave_radius": "{radius.micro}",
    "wave_input_gap": "{gap.page}",
+   "wave_stroke": "{stroke.rule}",
    "own_size": {
     "edit_selected_hi": 4.0,
     "fade_handle_y": 5.0,
@@ -2251,8 +2238,7 @@
     "wave_limit": 30.0
    },
    "off_scale": {
-    "accent_alpha_sm": 0.18,
-    "wave_stroke": 1.2
+    "accent_alpha_sm": 0.18
    }
   },
   "sampler": {
@@ -2835,7 +2821,7 @@
    "line_stroke_lg": "{stroke.heavy}",
    "line_stroke_md": "{stroke.emphasis}",
    "line_stroke_sm": "{stroke.medium}",
-   "line_stroke_xs": "{stroke_scale.1_25}",
+   "line_stroke_xs": "{stroke.rule}",
    "loop_band_stroke": "{stroke.bold}",
    "playhead_stroke": "{stroke.medium}",
    "loop_band_gap": "{gap.hair}",
@@ -2894,6 +2880,7 @@
    "tone_alpha_sm": "{opacity.14}",
    "tone_alpha_xl": "{opacity.80}",
    "tone_alpha_xs": "{opacity.10}",
+   "line_stroke_lg": "{stroke.medium}",
    "own_size": {
     "line_x": 9.0
    },
@@ -2902,7 +2889,6 @@
     "w": 0.8
    },
    "off_scale": {
-    "line_stroke_lg": 1.6,
     "tone_alpha_md": 0.18
    }
   },
@@ -2931,7 +2917,7 @@
    "outline_radius": "{radius.xs}",
    "ring_stroke_lg": "{stroke.medium}",
    "screen_ants_stroke": "{stroke.rule}",
-   "tick_cross_stroke": "{stroke_scale.1_75}",
+   "tick_cross_stroke": "{stroke.emphasis}",
    "tone_alpha": "{opacity.100}",
    "tool_overlays_stroke": "{stroke.bold}",
    "tool_strip_stroke": "{stroke.rule}",
@@ -2947,6 +2933,12 @@
    "tool_overlays_gap": "{gap.hair}",
    "tool_picker_gap": "{gap.block}",
    "vector_overlay_gap": "{gap.item}",
+   "layer_rows_hit_x": "{hit.target}",
+   "layer_rows_hit_y": "{hit.target}",
+   "adj_extras_stroke": "{stroke.rule}",
+   "curve_stroke": "{stroke.rule}",
+   "ring_stroke_sm": "{stroke.rule}",
+   "swatch_strip_stroke": "{stroke.rule}",
    "own_size": {
     "a1": 1.2,
     "adjust_windows_gap": 48.0,
@@ -2979,8 +2971,6 @@
     "gizmo_px": 80.0,
     "h": 16.0,
     "hist_h": 44.0,
-    "layer_rows_hit_x": 18.0,
-    "layer_rows_hit_y": 18.0,
     "layer_rows_x": 28.0,
     "layer_rows_x_md": 22.0,
     "layer_rows_x_sm": 13.0,
@@ -3163,11 +3153,7 @@
     "scale_group_min": 0.001
    },
    "off_scale": {
-    "adj_extras_stroke": 1.2,
-    "curve_stroke": 1.2,
-    "fill_opacity_lo": 0.01,
-    "ring_stroke_sm": 1.2,
-    "swatch_strip_stroke": 1.2
+    "fill_opacity_lo": 0.01
    }
   },
   "view3d": {
