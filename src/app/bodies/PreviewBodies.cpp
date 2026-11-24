@@ -58,7 +58,7 @@ namespace app
       if (!node->HasStrokes())
          AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize)}, "draw here");
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
-                  tok::Role(tok::col::accent_12), tok::preview_paintable_radius, 0, tok::preview_paintable_stroke);
+                  tok::Role(tok::col::accent_muted_hi), tok::preview_paintable_radius, 0, tok::preview_paintable_stroke);
    }
 
 
@@ -70,8 +70,8 @@ namespace app
       {
          case 0: return baseFontSize * tok::preview_comment_font_size_ratio;  // Small (~13px)
          case 1: default: return baseFontSize; // Normal (~15px)
-         case 2: return baseFontSize * tok::preview_comment_font_size_ratio_2;  // Large (~20px)
-         case 3: return baseFontSize * tok::preview_comment_font_size_ratio_3;  // Extra Large (~28px)
+         case 2: return baseFontSize * tok::preview_comment_font_size_scale_sm;  // Large (~20px)
+         case 3: return baseFontSize * tok::preview_comment_font_size_scale_lg;  // Extra Large (~28px)
       }
    }
 
@@ -98,8 +98,8 @@ namespace app
    // screen space, exactly like the colour picker and the dropdowns.
    void DrawCommentPreview(CommentNode* n)
    {
-      const float w = std::max(tok::preview_comment_bound, n->width);
-      const float h = std::max(tok::preview_comment_bound_2, n->height);
+      const float w = std::max(tok::preview_comment_min_lg, n->width);
+      const float h = std::max(tok::preview_comment_min_sm, n->height);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + w, origin.y + h);
@@ -113,30 +113,30 @@ namespace app
       const ImU32 bgCol = isLight
          ? IM_COL32((int)(224 + n->color[0] * 28),
                     (int)(227 + n->color[1] * 25),
-                    (int)(232 + n->color[2] * 20), tok::preview_comment_alpha_7)
+                    (int)(232 + n->color[2] * 20), tok::preview_bg_col_alpha_lg)
          : IM_COL32((int)(16 + n->color[0] * 36),
                     (int)(18 + n->color[1] * 36),
-                    (int)(24 + n->color[2] * 36), tok::preview_comment_alpha_8);
+                    (int)(24 + n->color[2] * 36), tok::preview_bg_col_alpha_sm);
       const ImU32 borderCol = isLight
          ? IM_COL32((int)(n->color[0] * 180 + 40),
                     (int)(n->color[1] * 180 + 40),
-                    (int)(n->color[2] * 180 + 40), tok::preview_comment_alpha_9)
+                    (int)(n->color[2] * 180 + 40), tok::preview_grip_col_alpha)
          : IM_COL32((int)(n->color[0] * 200 + 55),
                     (int)(n->color[1] * 200 + 55),
-                    (int)(n->color[2] * 200 + 55), tok::preview_comment_alpha_10);
+                    (int)(n->color[2] * 200 + 55), tok::preview_border_col_alpha);
 
       dl->AddRectFilled(origin, br, bgCol, tok::preview_comment_radius);
       // Header accent bar (Apple Notes / sticky card feel)
       dl->AddRectFilled(origin, ImVec2(br.x, origin.y + tok::space_1),
                         IM_COL32((int)(n->color[0] * tok::preview_comment_ratio), (int)(n->color[1] * tok::preview_comment_ratio),
-                                 (int)(n->color[2] * tok::preview_comment_ratio), tok::preview_comment_alpha_11), tok::preview_comment_radius, ImDrawFlags_RoundCornersTop);
+                                 (int)(n->color[2] * tok::preview_comment_ratio), tok::preview_fill_alpha_lg), tok::preview_comment_radius, ImDrawFlags_RoundCornersTop);
       dl->AddRect(origin, br, borderCol, tok::preview_comment_radius, 0, tok::preview_comment_stroke);
 
       const ImU32 textCol = isLight
          ? tok::Base(tok::col::surface_lo)
          : IM_COL32((int)((n->color[0] * 0.5f + 0.5f) * 255),
                     (int)((n->color[1] * 0.5f + 0.5f) * 255),
-                    (int)((n->color[2] * 0.5f + 0.5f) * 255), tok::preview_comment_alpha_12);
+                    (int)((n->color[2] * 0.5f + 0.5f) * 255), tok::preview_comment_alpha);
       // Clipped to the box so a note longer than its height is cut off at the
       // edge instead of spilling over the card.
       dl->PushClipRect(origin, br, true);
@@ -161,8 +161,8 @@ namespace app
 
       // Draw bottom-right resize grip indicator (3 diagonal grip lines)
       const ImU32 gripCol = isLight
-         ? IM_COL32((int)(n->color[0] * 120 + 40), (int)(n->color[1] * 120 + 40), (int)(n->color[2] * 120 + 40), tok::preview_comment_alpha_9)
-         : IM_COL32((int)(n->color[0] * tok::preview_comment_scale_2 + 60), (int)(n->color[1] * tok::preview_comment_scale_2 + 60), (int)(n->color[2] * tok::preview_comment_scale_2 + 60), tok::preview_comment_alpha_9);
+         ? IM_COL32((int)(n->color[0] * 120 + 40), (int)(n->color[1] * 120 + 40), (int)(n->color[2] * 120 + 40), tok::preview_grip_col_alpha)
+         : IM_COL32((int)(n->color[0] * tok::preview_grip_col_shade + 60), (int)(n->color[1] * tok::preview_grip_col_shade + 60), (int)(n->color[2] * tok::preview_grip_col_shade + 60), tok::preview_grip_col_alpha);
       for (int i = 0; i < 3; i++)
       {
          const float offset = tok::space_1 + (float)i * 4.0f;
@@ -197,10 +197,10 @@ namespace app
       }
       if (gripActive)
       {
-         const float zoom = std::max(tok::preview_comment_bound_3, ed::GetCurrentZoom());
+         const float zoom = std::max(tok::preview_zoom_min, ed::GetCurrentZoom());
          ImGuiIO& io = ImGui::GetIO();
-         n->width = std::clamp(n->width + io.MouseDelta.x / zoom, tok::preview_comment_bound, tok::preview_comment_bound_4);
-         n->height = std::clamp(n->height + io.MouseDelta.y / zoom, tok::preview_comment_bound_2, tok::preview_comment_bound_5);
+         n->width = std::clamp(n->width + io.MouseDelta.x / zoom, tok::preview_comment_min_lg, tok::preview_comment_hi_lg);
+         n->height = std::clamp(n->height + io.MouseDelta.y / zoom, tok::preview_comment_min_sm, tok::preview_comment_hi_sm);
          gPatchDirty = true;
       }
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + h));
@@ -480,7 +480,7 @@ namespace app
       ImGui::BeginGroup();
       // The same power glyph as a node's: lit while the group plays. A live
       // control, like node power, so it is not an undo step.
-      if (GlyphToggle::Draw("##grouppower", IconsInfinite::Power, IconsInfinite::PowerFill, n->on, tok::preview_group_node_draw, true))
+      if (GlyphToggle::Draw("##grouppower", IconsInfinite::Power, IconsInfinite::PowerFill, n->on, tok::preview_grouppower_cap_y, true))
          n->on = !n->on;
       if (ImGui::IsItemHovered())
          HelpTip("%s", n->on ? T("Turn the group off: its nodes stop cooking and go silent") : T("Turn the group on"));
@@ -498,12 +498,12 @@ namespace app
       ImGui::SameLine();
       if (isLight)
          ImGui::PushStyleColor(ImGuiCol_Text,
-                               ImVec4(n->color[0] * tok::preview_group_node_scale_3, n->color[1] * tok::preview_group_node_scale_3,
-                                      n->color[2] * tok::preview_group_node_scale_3, 1.0f));
+                               ImVec4(n->color[0] * tok::preview_group_node_y_lg, n->color[1] * tok::preview_group_node_y_lg,
+                                      n->color[2] * tok::preview_group_node_y_lg, 1.0f));
       else
          ImGui::PushStyleColor(ImGuiCol_Text,
-                               ImVec4(n->color[0] * tok::preview_group_node_scale_4 + tok::preview_group_node_offset_2, n->color[1] * tok::preview_group_node_scale_4 + tok::preview_group_node_offset_2,
-                                      n->color[2] * tok::preview_group_node_scale_4 + tok::preview_group_node_offset_2, 1.0f));
+                               ImVec4(n->color[0] * tok::preview_group_node_y_sm + tok::preview_group_node_y_md, n->color[1] * tok::preview_group_node_y_sm + tok::preview_group_node_y_md,
+                                      n->color[2] * tok::preview_group_node_y_sm + tok::preview_group_node_y_md, 1.0f));
       if (n->renaming)
       {
          if (n->renameJustStarted)
@@ -511,8 +511,8 @@ namespace app
             UiInteract::FocusHere();
             n->renameJustStarted = false;
          }
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::preview_group_node_col_2));
-         ImGui::SetNextItemWidth(std::max(tok::preview_group_node_bound, n->width - tok::preview_group_node_gap));
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::preview_frame_bg_shade));
+         ImGui::SetNextItemWidth(std::max(tok::preview_grouprename_min, n->width - tok::preview_group_node_gap));
          if (FieldWell::InputText("##grouprename", &n->label, ImGuiInputTextFlags_EnterReturnsTrue) ||
              ImGui::IsItemDeactivated())
             n->renaming = false;
@@ -538,9 +538,9 @@ namespace app
       ed::PopStyleColor(4);
 
       const ImVec2 total = ed::GetNodeSize(gn.NodeId());
-      n->width = std::max(tok::preview_group_node_bound_2, total.x);
+      n->width = std::max(tok::preview_group_node_min, total.x);
       n->headerH = headerSize.y + ImGui::GetStyle().ItemSpacing.y;
-      n->height = std::max(tok::preview_group_node_bound, total.y - n->headerH);
+      n->height = std::max(tok::preview_grouprename_min, total.y - n->headerH);
    }
 
 
@@ -738,7 +738,7 @@ namespace app
 
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     tok::Role(tok::col::accent_2, tok::preview_accent_2_alpha_2), tok::preview_radius, 0, tok::preview_stroke);
+                     tok::Role(tok::col::accent_pale_muted_warm, tok::preview_outline_alpha), tok::preview_radius, 0, tok::preview_stroke);
    }
 
 
@@ -844,7 +844,7 @@ namespace app
             const float top = midY - fgn->waveformMax[i] * h * tok::preview_top_ratio;
             const float bottom = midY - fgn->waveformMin[i] * h * tok::preview_bottom_ratio;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::Base(tok::col::accent, tok::preview_field_graph_waveform_accent_alpha_2) : tok::Base(tok::col::accent_11, tok::preview_field_graph_waveform_accent_11_alpha_2));
+                              isLight ? tok::Base(tok::col::accent, tok::preview_fill_alpha_md) : tok::Base(tok::col::accent_pale_muted_lo, tok::preview_fill_alpha_sm));
          }
       }
       else

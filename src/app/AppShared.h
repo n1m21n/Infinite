@@ -2626,7 +2626,7 @@ uint32_t ArrangeMarkerRGBA(ImU32 col);
       { "Orange",  tok::Role(tok::col::state_warn) },
       { "Amber",   tok::Role(tok::col::text_warn) },
       { "Emerald", tok::Role(tok::col::viz_teal) },
-      { "Cyan",    tok::Role(tok::col::accent_alt_7) },
+      { "Cyan",    tok::Role(tok::col::accent_alt_dark_warm_fixed) },
       { "Blue",    tok::Role(tok::col::accent) },
       { "Purple",  tok::Role(tok::col::role_expression) },
       { "Magenta", tok::Role(tok::col::viz_magenta) },
@@ -3373,7 +3373,7 @@ void EndAudioSection();
          // The parameter name sits inside the face (dim, left) whenever it fits beside the value.
          const std::string inName = StripParamLabel(label);
          const char* inLabel = (!inName.empty() &&
-                                btnW >= ImGui::CalcTextSize(options[safe].c_str()).x + ImGui::CalcTextSize(inName.c_str()).x + tok::app_shared_dropdown_ratio_2 * tok::space_2)
+                                btnW >= ImGui::CalcTextSize(options[safe].c_str()).x + ImGui::CalcTextSize(inName.c_str()).x + tok::app_shared_in_label_scale * tok::space_2)
                                   ? inName.c_str() : nullptr;
          PushDropdownStyle();
          if (h.modulated)
@@ -3708,11 +3708,11 @@ bool DrawGateButton(const char* id, float totalW, float height, const GatePainte
 
 bool DrawGateControl(const char* id, const char* label, float btnW, int style, bool lit);
 
-bool AudioSoloButton(const char* label, bool* value, float width = tok::app_shared_width_2, float height = 0.0f);
+bool AudioSoloButton(const char* label, bool* value, float width = tok::app_shared_audio_solo_button_w, float height = 0.0f);
 
-bool AudioMuteButton(const char* label, bool* value, float width = tok::app_shared_width_2, float height = 0.0f);
+bool AudioMuteButton(const char* label, bool* value, float width = tok::app_shared_audio_solo_button_w, float height = 0.0f);
 
-bool AudioSmallButton(const char* label, float width = tok::app_shared_width_2, float height = 0.0f);
+bool AudioSmallButton(const char* label, float width = tok::app_shared_audio_solo_button_w, float height = 0.0f);
 
 bool IsAudioBodyNode(INode* node);
 

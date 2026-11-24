@@ -1266,8 +1266,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    mainWindowHints.scaleToMonitor = gHeadlessTestWindow ? GLFW_FALSE : GLFW_TRUE;
    if (LauncherCard::Enabled())
       glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-   const int initW = Platform::PluginModeActive() ? tok::startup_init_w : tok::startup_init_w_2;
-   const int initH = Platform::PluginModeActive() ? tok::startup_init_h : tok::startup_init_h_2;
+   const int initW = Platform::PluginModeActive() ? tok::startup_init_w : tok::startup_init_app_w;
+   const int initH = Platform::PluginModeActive() ? tok::startup_init_h : tok::startup_init_app_h;
    window = glfwCreateWindow(initW, initH, "Infinite", nullptr, nullptr);
    if (!window)
    {
@@ -4577,7 +4577,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       if (o.find("arrangedemo") != std::string::npos)
       {
          gArrangePanelOpen = true;
-         gArrangePanelHeight = o.find("arrshort") != std::string::npos ? tok::startup_arrange_panel_height : tok::startup_arrange_panel_height_2;   // arrshort: Clip Settings overflows into columns
+         gArrangePanelHeight = o.find("arrshort") != std::string::npos ? tok::startup_arrange_panel_height : tok::startup_arrshort_arrange_height;   // arrshort: Clip Settings overflows into columns
          size_t firstAudio = 0;
          while (firstAudio < gArrange.lanes.size() && gArrange.lanes[firstAudio].type != Arrange::kLaneAudio) ++firstAudio;
          if (firstAudio + 1 < gArrange.lanes.size()) gArrange.lanes[firstAudio + 1].solo = true;

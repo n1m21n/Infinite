@@ -688,7 +688,7 @@ namespace
       case Field::ValueKind::Vec3:
       case Field::ValueKind::Vec2: return ImGui::GetColorU32(ImGuiCol_ButtonActive, a);
       case Field::ValueKind::PerPoint: return ImGui::GetColorU32(ImGuiCol_PlotLinesHovered, a);
-      default: return ImGui::GetColorU32(ImGuiCol_Text, tok::field_patcher_kind_col_text_scale_2 * a);
+      default: return ImGui::GetColorU32(ImGuiCol_Text, tok::field_patcher_color_alpha_mul * a);
       }
    }
 
@@ -764,7 +764,7 @@ namespace
          s.search[0] = 0; // a stale query from last time would open on an empty list
          UiInteract::FocusHere();
       }
-      ImGui::Dummy(ImVec2(tok::field_patcher_pick_menu_dummy_w, 0.0f));
+      ImGui::Dummy(ImVec2(tok::field_patcher_spacer_w_lg, 0.0f));
       LibraryParts::SearchField("fpSearch", T("Search boxes"), s.search, sizeof(s.search));
       const bool enter = Keymap::Enter(false);
       MenuParts::Separator();
@@ -850,7 +850,7 @@ namespace
          State& rs = S();
          if (rs.boxNameFocus)
             UiInteract::FocusHere(), rs.boxNameFocus = false;
-         ImGui::SetNextItemWidth(tok::field_patcher_box_set_next_item_width_w);
+         ImGui::SetNextItemWidth(tok::field_patcher_w_lg);
          const bool enter = FieldWell::InputText("##fpBoxName", rs.boxNameBuf, sizeof(rs.boxNameBuf), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
          if (enter || ImGui::IsItemDeactivated())
          {
@@ -877,7 +877,7 @@ namespace
       if (b.specId == "number")
       {
          float v = (float)b.numberValue;
-         ImGui::SetNextItemWidth(tok::field_patcher_box_set_next_item_width_w_2);
+         ImGui::SetNextItemWidth(tok::field_patcher_w_sm);
          if (ImGui::DragFloat("##num", &v, params::field_patcher::num_speed, 0.0f, 0.0f, UiFmt::Spec::G3))
          {
             b.numberValue = v;
@@ -892,7 +892,7 @@ namespace
       {
          Field::ParamEntry* e = h.params != nullptr ? h.params->Find(b.varName) : nullptr;
          float v = e != nullptr ? e->value : (float)b.numberValue;
-         ImGui::SetNextItemWidth(tok::field_patcher_box_set_next_item_width_w_3);
+         ImGui::SetNextItemWidth(tok::field_patcher_w_md);
          if (ImGui::SliderFloat("##knob", &v, (float)b.minVal, (float)b.maxVal, UiFmt::Spec::G3))
          {
             if (e != nullptr)
@@ -931,7 +931,7 @@ namespace
             ed::EndPin();
          }
          else
-            ImGui::Dummy(ImVec2(tok::field_patcher_box_dummy_w, ImGui::GetTextLineHeight()));
+            ImGui::Dummy(ImVec2(tok::field_patcher_spacer_w_sm, ImGui::GetTextLineHeight()));
          if (r < (int)b.outlets.size())
          {
             FormParts::Inline(0.0f, tok::field_patcher_box_inline_layout);
@@ -1079,7 +1079,7 @@ namespace
          for (Field::BoxNode& b : p.graph.boxes)
          {
             const ImVec2 at = ed::GetNodePosition(b.id);
-            if (std::fabs(at.x - b.x) > tok::field_patcher_canvas_limit_2 || std::fabs(at.y - b.y) > tok::field_patcher_canvas_limit_2)
+            if (std::fabs(at.x - b.x) > tok::field_patcher_canvas_limit_sm || std::fabs(at.y - b.y) > tok::field_patcher_canvas_limit_sm)
             {
                b.x = at.x;
                b.y = at.y;
@@ -1251,7 +1251,7 @@ namespace
          for (Field::BoxNode& b : p.graph.boxes)
          {
             const ImVec2 at = ed::GetNodePosition(b.id);
-            if (at.x < tok::field_patcher_canvas_limit_3)
+            if (at.x < tok::field_patcher_canvas_limit_lg)
             {
                b.x = at.x;
                b.y = at.y;
@@ -1342,7 +1342,7 @@ namespace
             s.codeBufFor = src;
          }
          const ImVec2 avail = ImGui::GetContentRegionAvail();
-         FieldWell::InputTextMultiline("##fpCode", &s.codeBuf, ImVec2(avail.x, std::max(tok::field_patcher_inspector_bound, avail.y)), ImGuiInputTextFlags_WordWrap);
+         FieldWell::InputTextMultiline("##fpCode", &s.codeBuf, ImVec2(avail.x, std::max(tok::field_patcher_edit_code_box_min, avail.y)), ImGuiInputTextFlags_WordWrap);
          s.codeEditing = ImGui::IsItemActive();
          if (ImGui::IsItemDeactivatedAfterEdit() && s.codeBuf != src)
          {
@@ -1374,7 +1374,7 @@ namespace
             if (b->specId == "code")
             {
                const ImVec2 avail = ImGui::GetContentRegionAvail();
-               FieldWell::InputTextMultiline("##fpRaw", &b->rawCode, ImVec2(avail.x, std::max(tok::field_patcher_inspector_bound, avail.y)), ImGuiInputTextFlags_WordWrap);
+               FieldWell::InputTextMultiline("##fpRaw", &b->rawCode, ImVec2(avail.x, std::max(tok::field_patcher_edit_code_box_min, avail.y)), ImGuiInputTextFlags_WordWrap);
                if (ImGui::IsItemDeactivatedAfterEdit())
                   Commit(p, h, "Edit Code Box");
             }
@@ -1780,7 +1780,7 @@ namespace
       DrawRail(*p, h, bodyH);
       FormParts::Inline(0.0f, gap);
       const float inspW = std::min(kInspectorW, avail.x * tok::field_patcher_panel_ratio);
-      const float canvasW = std::max(tok::field_patcher_panel_bound, avail.x - tok::control_h - inspW - tok::field_patcher_panel_ratio_2 * gap);
+      const float canvasW = std::max(tok::field_patcher_canvas_w_min_lg, avail.x - tok::control_h - inspW - tok::field_patcher_canvas_w_min_sm * gap);
       ImGui::BeginChild("##fpCanvasWrap", ImVec2(canvasW, bodyH), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       DrawCanvas(*p, h, ImVec2(canvasW, bodyH));
       EndChildSafe();

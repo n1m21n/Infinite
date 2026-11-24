@@ -58,7 +58,7 @@ namespace app
       else
          snprintf(stat, sizeof(stat), "0 in \xE2\x86\x92 binaural (idle)");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_spacer_h));
 
       // ---- stage ---------------------------------------------------------
       const float stageW = gAudioContentW, stageH = tok::spatial_mixer_stage_h;
@@ -67,12 +67,12 @@ namespace app
       const float R = std::min(stageW, stageH) * 0.5f - 14.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      const ImU32 line = light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_body_ink_black_alpha_5) : tok::Base(tok::col::ink_white, tok::spatial_mixer_body_ink_white_alpha_4);
+      const ImU32 line = light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_line_alpha_lg) : tok::Base(tok::col::ink_white, tok::spatial_mixer_line_alpha_sm);
       const ImU32 text = light ? tok::Base(tok::col::ink_black, 150) : tok::Base(tok::col::ink_white, 150);
-      dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_body_ink_black_alpha_6) : tok::Base(tok::col::ink_white, tok::spatial_mixer_body_ink_white_alpha_5), tok::radius_control);
+      dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_fill_alpha_lg) : tok::Base(tok::col::ink_white, tok::spatial_mixer_fill_alpha_sm), tok::radius_control);
       dl->AddCircle(centre, R, line, tok::spatial_mixer_body_segments);
       for (float m : { 1.0f, 2.0f })
-         dl->AddCircle(centre, R * RadiusFracFromDist(m), line, tok::spatial_mixer_body_segments_2);
+         dl->AddCircle(centre, R * RadiusFracFromDist(m), line, tok::spatial_mixer_ring_segments_lg);
       dl->AddLine(ImVec2(centre.x - R, centre.y), ImVec2(centre.x + R, centre.y), line);
       dl->AddLine(ImVec2(centre.x, centre.y - R), ImVec2(centre.x, centre.y + R), line);
       dl->AddText(ImVec2(centre.x - tok::space_0_75, p0.y + tok::space_0_5), text, "F");
@@ -83,25 +83,25 @@ namespace app
       // Listener seen from above, facing up (towards F): shoulders, neck, head
       // and ears - the same view as the reference body mesh. Facing is shown by F.
       {
-         const ImU32 skin = light ? tok::Base(tok::col::text_secondary) : tok::Base(tok::col::edge_lo_3);
-         const ImU32 skinHi = light ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::accent_hover);
-         const ImU32 shade = light ? tok::Base(tok::col::surface_mid_2) : tok::Base(tok::col::accent_16);
-         const ImU32 rim = light ? tok::Base(tok::col::edge_lo_2) : tok::Base(tok::col::surface_mid_3);
+         const ImU32 skin = light ? tok::Base(tok::col::text_secondary) : tok::Base(tok::col::edge_lo_pale);
+         const ImU32 skinHi = light ? tok::Base(tok::col::edge_mid_light_fixed) : tok::Base(tok::col::accent_hover);
+         const ImU32 shade = light ? tok::Base(tok::col::surface_mid_deep) : tok::Base(tok::col::accent_dark_muted_lo);
+         const ImU32 rim = light ? tok::Base(tok::col::edge_lo_light) : tok::Base(tok::col::surface_mid_alt);
          const float cx = centre.x, cy = centre.y;
          // shoulders: wide rounded slab behind the head
-         dl->AddEllipseFilled(ImVec2(cx, cy + tok::spatial_mixer_body_gap_2), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x, tok::spatial_mixer_body_add_ellipse_filled_y), skin, 0.0f, tok::spatial_mixer_body_segments_5);
-         dl->AddEllipse(ImVec2(cx, cy + tok::spatial_mixer_body_gap_2), ImVec2(tok::spatial_mixer_body_add_ellipse_x, tok::spatial_mixer_body_add_ellipse_y), rim, 0.0f, tok::spatial_mixer_body_segments_5, 1.0f);
+         dl->AddEllipseFilled(ImVec2(cx, cy + tok::spatial_mixer_ellipse_filled_y_xl), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x, tok::spatial_mixer_body_add_ellipse_filled_y), skin, 0.0f, tok::spatial_mixer_ellipse_filled_rot_lg);
+         dl->AddEllipse(ImVec2(cx, cy + tok::spatial_mixer_ellipse_filled_y_xl), ImVec2(tok::spatial_mixer_body_add_ellipse_x, tok::spatial_mixer_body_add_ellipse_y), rim, 0.0f, tok::spatial_mixer_ellipse_filled_rot_lg, 1.0f);
          // neck
-         dl->AddEllipseFilled(ImVec2(cx, cy + tok::space_2), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_2, tok::spatial_mixer_body_add_ellipse_filled_y_2), shade, 0.0f, tok::spatial_mixer_body_segments_4);
+         dl->AddEllipseFilled(ImVec2(cx, cy + tok::space_2), ImVec2(tok::spatial_mixer_ellipse_filled_x_sm, tok::spatial_mixer_ellipse_filled_y_sm), shade, 0.0f, tok::spatial_mixer_ellipse_filled_rot_md);
          // ears (behind the head outline)
-         dl->AddEllipseFilled(ImVec2(cx - tok::spatial_mixer_body_gap_3, cy + 1.0f), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_3, tok::spatial_mixer_body_add_ellipse_filled_y_3), skin, 0.0f, tok::spatial_mixer_body_segments_6);
-         dl->AddEllipseFilled(ImVec2(cx + tok::spatial_mixer_body_gap_3, cy + 1.0f), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_3, tok::spatial_mixer_body_add_ellipse_filled_y_3), skin, 0.0f, tok::spatial_mixer_body_segments_6);
-         dl->AddEllipse(ImVec2(cx - tok::spatial_mixer_body_gap_3, cy + 1.0f), ImVec2(tok::spatial_mixer_body_add_ellipse_x_2, tok::spatial_mixer_body_add_ellipse_y_2), rim, 0.0f, tok::spatial_mixer_body_segments_6, 1.0f);
-         dl->AddEllipse(ImVec2(cx + tok::spatial_mixer_body_gap_3, cy + 1.0f), ImVec2(tok::spatial_mixer_body_add_ellipse_x_2, tok::spatial_mixer_body_add_ellipse_y_2), rim, 0.0f, tok::spatial_mixer_body_segments_6, 1.0f);
+         dl->AddEllipseFilled(ImVec2(cx - tok::spatial_mixer_ellipse_filled_x_xl, cy + 1.0f), ImVec2(tok::spatial_mixer_ellipse_filled_x_xs, tok::spatial_mixer_ellipse_filled_y_xs), skin, 0.0f, tok::spatial_mixer_ellipse_filled_rot_sm);
+         dl->AddEllipseFilled(ImVec2(cx + tok::spatial_mixer_ellipse_filled_x_xl, cy + 1.0f), ImVec2(tok::spatial_mixer_ellipse_filled_x_xs, tok::spatial_mixer_ellipse_filled_y_xs), skin, 0.0f, tok::spatial_mixer_ellipse_filled_rot_sm);
+         dl->AddEllipse(ImVec2(cx - tok::spatial_mixer_ellipse_filled_x_xl, cy + 1.0f), ImVec2(tok::spatial_mixer_ellipse_x_sm, tok::spatial_mixer_ellipse_y_sm), rim, 0.0f, tok::spatial_mixer_ellipse_filled_rot_sm, 1.0f);
+         dl->AddEllipse(ImVec2(cx + tok::spatial_mixer_ellipse_filled_x_xl, cy + 1.0f), ImVec2(tok::spatial_mixer_ellipse_x_sm, tok::spatial_mixer_ellipse_y_sm), rim, 0.0f, tok::spatial_mixer_ellipse_filled_rot_sm, 1.0f);
          // head: oval, lit from the front
-         dl->AddEllipseFilled(ImVec2(cx, cy), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_4, tok::spatial_mixer_body_add_ellipse_filled_y_4), skin, 0.0f, tok::spatial_mixer_body_segments_5);
-         dl->AddEllipseFilled(ImVec2(cx, cy - tok::space_0_75), ImVec2(tok::spatial_mixer_body_add_ellipse_filled_x_5, tok::spatial_mixer_body_add_ellipse_filled_y_5), skinHi, 0.0f, tok::spatial_mixer_body_segments_3);
-         dl->AddEllipse(ImVec2(cx, cy), ImVec2(tok::spatial_mixer_body_add_ellipse_x_3, tok::spatial_mixer_body_add_ellipse_y_3), rim, 0.0f, tok::spatial_mixer_body_segments_5, tok::spatial_mixer_body_stroke_3);
+         dl->AddEllipseFilled(ImVec2(cx, cy), ImVec2(tok::spatial_mixer_ellipse_filled_x_lg, tok::spatial_mixer_ellipse_filled_y_lg), skin, 0.0f, tok::spatial_mixer_ellipse_filled_rot_lg);
+         dl->AddEllipseFilled(ImVec2(cx, cy - tok::space_0_75), ImVec2(tok::spatial_mixer_ellipse_filled_x_md, tok::spatial_mixer_ellipse_filled_y_md), skinHi, 0.0f, tok::spatial_mixer_ring_segments_sm);
+         dl->AddEllipse(ImVec2(cx, cy), ImVec2(tok::spatial_mixer_ellipse_x_lg, tok::spatial_mixer_ellipse_y_lg), rim, 0.0f, tok::spatial_mixer_ellipse_filled_rot_lg, tok::spatial_mixer_ellipse_segments);
       }
 
       // ---- dots ----------------------------------------------------------
@@ -150,7 +150,7 @@ namespace app
             const int s = sDragSlot;
             if (ImGui::GetIO().KeyAlt)
             {
-               n->gainDb[s] = std::clamp(n->gainDb[s] - ImGui::GetIO().MouseDelta.y * tok::spatial_mixer_body_ratio_2, -60.0f, 12.0f);
+               n->gainDb[s] = std::clamp(n->gainDb[s] - ImGui::GetIO().MouseDelta.y * tok::spatial_mixer_v, -60.0f, 12.0f);
             }
             else
             {
@@ -180,15 +180,15 @@ namespace app
          const float r = tok::spatial_mixer_r_ratio * elScale;
          const float lvl = std::clamp(n->ChannelLevel(s), 0.0f, 1.0f);
          if (hot == s || n->selected == s)
-            dl->AddCircle(d, r + tok::space_1_25, text, tok::spatial_mixer_body_segments_3, tok::spatial_mixer_body_stroke);
+            dl->AddCircle(d, r + tok::space_1_25, text, tok::spatial_mixer_ring_segments_sm, tok::spatial_mixer_body_stroke);
          if (lvl > 0.002f)
-            dl->AddCircle(d, r + tok::space_0_5 + lvl * tok::spatial_mixer_body_ratio_3, DotColor(s, tok::spatial_mixer_body_dot_color_alpha_3), tok::spatial_mixer_body_segments_3, tok::spatial_mixer_body_stroke_2);
-         dl->AddCircleFilled(d, r, DotColor(s, silent ? tok::spatial_mixer_body_dot_color_alpha_4 : 1.0f), tok::spatial_mixer_body_segments_3);
-         dl->AddCircle(d, r, light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_body_ink_black_alpha_7) : tok::Base(tok::col::ink_white, tok::spatial_mixer_body_ink_white_alpha_6), tok::spatial_mixer_body_segments_3, 1.0f);
+            dl->AddCircle(d, r + tok::space_0_5 + lvl * tok::spatial_mixer_ring_r, DotColor(s, tok::spatial_mixer_dot_color_alpha_lg), tok::spatial_mixer_ring_segments_sm, tok::spatial_mixer_ring_stroke);
+         dl->AddCircleFilled(d, r, DotColor(s, silent ? tok::spatial_mixer_dot_color_alpha_sm : 1.0f), tok::spatial_mixer_ring_segments_sm);
+         dl->AddCircle(d, r, light ? tok::Base(tok::col::ink_black, tok::spatial_mixer_ring_alpha) : tok::Base(tok::col::ink_white, tok::spatial_mixer_ring_alpha), tok::spatial_mixer_ring_segments_sm, 1.0f);
          char lab[16];
          snprintf(lab, sizeof(lab), "%d", s + 1);
          const ImVec2 ts = ImGui::CalcTextSize(lab);
-         dl->AddText(ImVec2(d.x - ts.x * 0.5f, d.y - ts.y * 0.5f), tok::Role(tok::col::ink_black, tok::spatial_mixer_body_ink_black_alpha_8), lab);
+         dl->AddText(ImVec2(d.x - ts.x * 0.5f, d.y - ts.y * 0.5f), tok::Role(tok::col::ink_black, tok::spatial_mixer_text_alpha), lab);
       }
 
       // Readout: hover or selected object.
@@ -215,8 +215,8 @@ namespace app
          for (int k = 0; k < 5; k++)   // lane param ordinals: see laneParam below
             NoteHiddenParamAnchor(gn.index, 3 + s * 5 + k, ImVec2(rp.x + tok::space_2, rp.y + ImGui::GetFrameHeight() * 0.5f));
          const float ty = ImGui::GetStyle().FramePadding.y;   // centre text against the taller H/M/S buttons
-         dl->AddCircleFilled(ImVec2(rp.x + tok::space_2, rp.y + ty + ImGui::GetTextLineHeight() * 0.5f), tok::spatial_mixer_body_r, DotColor(s, 1.0f), tok::spatial_mixer_body_segments_4);
-         ImGui::SetCursorScreenPos(ImVec2(rp.x + tok::spatial_mixer_body_gap_4, rp.y + ty));
+         dl->AddCircleFilled(ImVec2(rp.x + tok::space_2, rp.y + ty + ImGui::GetTextLineHeight() * 0.5f), tok::spatial_mixer_body_r, DotColor(s, 1.0f), tok::spatial_mixer_ellipse_filled_rot_md);
+         ImGui::SetCursorScreenPos(ImVec2(rp.x + tok::spatial_mixer_x, rp.y + ty));
          const bool sel = (n->selected == s);
          if (ListRow::Selectable(("in " + std::to_string(s + 1)).c_str(), sel, 0, ImVec2(tok::spatial_mixer_body_selectable_w, 0.0f)))
             n->selected = s;
@@ -226,9 +226,9 @@ namespace app
          {
             // ActionButton widens a button to its label plus 2 x space_2, so size the slot from the widest label
             // (M) or the three tiles overlap at larger UI scales.
-            const float bw = std::max(22.0f, ImGui::CalcTextSize("M").x + tok::spatial_mixer_body_ratio_4 * tok::space_2), gap = tok::space_0_75;
+            const float bw = std::max(22.0f, ImGui::CalcTextSize("M").x + tok::spatial_mixer_m_min * tok::space_2), gap = tok::space_0_75;
             const float right = gAudioContentX + gAudioContentW;
-            const float x0 = right - tok::spatial_mixer_x0_ratio * bw - tok::spatial_mixer_x0_ratio_2 * gap;
+            const float x0 = right - tok::spatial_mixer_x0_ratio * bw - tok::spatial_mixer_x0_scale * gap;
             const float y = rp.y;
             char db[24];
             snprintf(db, sizeof(db), "%s", UiFmt::DbOffset(n->gainDb[s]).c);
@@ -249,7 +249,7 @@ namespace app
                PushUndoCheckpoint();
                n->mute[s] = !n->mute[s];
             }
-            ImGui::SetCursorScreenPos(ImVec2(x0 + tok::spatial_mixer_body_ratio_4 * (bw + gap), y));
+            ImGui::SetCursorScreenPos(ImVec2(x0 + tok::spatial_mixer_m_min * (bw + gap), y));
             if (LaneToggle("S", n->solo[s], bw))
             {
                PushUndoCheckpoint();
@@ -258,7 +258,7 @@ namespace app
          }
          ImGui::PopID();
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_spacer_h));
 
       // ---- knobs: selected object, then master ---------------------------
       const int sel = n->selected;
@@ -269,7 +269,7 @@ namespace app
       // drawn one), so a cable keeps driving a lane that is off screen - the
       // same mechanism as the EQ's hidden bands.
       static constexpr int kLaneBase = 3;
-      auto laneParam = [](int lane, int k) { return kLaneBase + lane * tok::spatial_mixer_body_ratio_5 + k; };
+      auto laneParam = [](int lane, int k) { return kLaneBase + lane * tok::spatial_mixer_scale + k; };
       auto laneName = [](int lane, const char* what) { return "in " + std::to_string(lane + 1) + " " + what; };
       {
          const bool savedRegisterOnly = gParamRegisterOnly;
@@ -359,7 +359,7 @@ namespace app
          if (ImGui::IsItemHovered())
             SetAudioReadout("meter", "short-term loudness, true peak (click to reset), limiter reduction");
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_spacer_h));
       DrawSpatialExportPanel(n);
       EndAudioBody();
    }

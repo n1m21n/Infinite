@@ -684,8 +684,8 @@ namespace
       const float w = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
       if (w < tok::view3d_project_limit)
          return false;
-      out.x = sCam.mn.x + (x / w * tok::view3d_project_ratio + tok::view3d_project_bias) * (sCam.mx.x - sCam.mn.x);
-      out.y = sCam.mn.y + (tok::view3d_project_bias - y / w * 0.5f) * (sCam.mx.y - sCam.mn.y);
+      out.x = sCam.mn.x + (x / w * tok::view3d_project_ratio + tok::view3d_project_inset) * (sCam.mx.x - sCam.mn.x);
+      out.y = sCam.mn.y + (tok::view3d_project_inset - y / w * 0.5f) * (sCam.mx.y - sCam.mn.y);
       return true;
    }
 
@@ -1062,7 +1062,7 @@ namespace
    // How strongly an item at `dist` from the selection follows: 1 at it, 0 at the size.
    float Falloff(float dist)
    {
-      const float size = std::max(tok::view3d_falloff_bound, sSet->propSize);
+      const float size = std::max(tok::view3d_falloff_min, sSet->propSize);
       if (dist >= size && sSet->propFalloff != 5)
          return 0.0f;
       const float u = std::clamp(1.0f - dist / size, 0.0f, 1.0f);
@@ -2167,7 +2167,7 @@ namespace
       if (MenuParts::Item(T("Active Camera"), nullptr, false, scene->activeCamera != 0)) SelectActiveCamera(scene);
       if (MenuParts::SubMenu(T("Select Pattern"), true))
       {
-         ImGui::SetNextItemWidth(tok::view3d_select_items_set_next_item_width_w);
+         ImGui::SetNextItemWidth(tok::view3d_field_w_md);
          if (FieldWell::InputText("##v3dpattern", sPattern, sizeof(sPattern), ImGuiInputTextFlags_EnterReturnsTrue))
             SelectPattern(scene);
          if (MenuParts::Item(T("Select")))
@@ -2405,7 +2405,7 @@ namespace
          if (pressed(ImGuiKey_Backspace) && !sOp.typed.empty())
             sOp.typed.pop_back();
          if (sSet->proportional && (pressed(ImGuiKey_PageUp) || pressed(ImGuiKey_PageDown)))
-            sSet->propSize = std::clamp(sSet->propSize * (pressed(ImGuiKey_PageUp) ? tok::view3d_keys_assign : 1.0f / tok::view3d_keys_ratio), tok::view3d_keys_bound, tok::view3d_keys_bound_2);
+            sSet->propSize = std::clamp(sSet->propSize * (pressed(ImGuiKey_PageUp) ? tok::view3d_keys_prop_size : 1.0f / tok::view3d_keys_ratio), tok::view3d_prop_size_lo, tok::view3d_prop_size_hi);
          ApplyOp(scene, mouse);
          if (pressed(ImGuiKey_Escape) || (!sOp.gizmo && MenuParts::RightPressed()))
             CancelOp(scene);
@@ -2685,7 +2685,7 @@ namespace
          }
       }
       if (hovered && sOp.mode != 0 && sSet->proportional && io.MouseWheel != 0.0f)
-         sSet->propSize = std::clamp(sSet->propSize * std::pow(tok::view3d_navigation_pow_maths, -io.MouseWheel), tok::view3d_navigation_bound, tok::view3d_navigation_bound_2);
+         sSet->propSize = std::clamp(sSet->propSize * std::pow(tok::view3d_navigation_prop_size, -io.MouseWheel), tok::view3d_prop_size_lo, tok::view3d_prop_size_hi);
       else if (hovered && (io.MouseWheel != 0.0f || io.MouseWheelH != 0.0f))
       {
          const WheelNav nav = ClassifyWheel(io.MouseWheelH, io.MouseWheel, io.KeyShift, io.KeyCtrl, io.KeySuper);
@@ -2710,7 +2710,7 @@ namespace
             Orbited();
             EyeFromOrbit(eye);
             sAz += io.MouseDelta.x * tok::view3d_az_ratio;
-            sEl = std::clamp(sEl + io.MouseDelta.y * tok::view3d_navigation_ratio_2, -1.5697f, 1.5697f);
+            sEl = std::clamp(sEl + io.MouseDelta.y * tok::view3d_el_v, -1.5697f, 1.5697f);
             float next[3];
             EyeFromOrbit(next);
             for (int k = 0; k < 3; k++)
@@ -2837,7 +2837,7 @@ namespace
          ImVec2 a, b;
          scene->ItemCenter(*target, tc);
          if (Project(c, a) && Project(tc, b))
-            DashedLine(dl, a, b, Hex(tok::view3d_item_extras_hex_rgb_3, tok::view3d_item_extras_hex_alpha_3));   // relationship line, follower to target
+            DashedLine(dl, a, b, Hex(tok::view3d_dashed_line_shade, tok::view3d_dashed_line_alpha));   // relationship line, follower to target
       }
       if (it.showBounds)
       {
@@ -2846,7 +2846,7 @@ namespace
          {
             const float m[3] = { (lo[0] + hi[0]) * 0.5f, (lo[1] + hi[1]) * 0.5f, (lo[2] + hi[2]) * 0.5f };
             const float h[3] = { (hi[0] - lo[0]) * 0.5f, (hi[1] - lo[1]) * 0.5f, (hi[2] - lo[2]) * 0.5f };
-            const ImU32 bc = Hex(tok::view3d_item_extras_hex_rgb_4, tok::view3d_item_extras_hex_alpha_4);
+            const ImU32 bc = Hex(tok::view3d_bc_shade, tok::view3d_bc_alpha);
             switch (it.boundsType)
             {
             case 1:
@@ -2941,8 +2941,8 @@ namespace
             return false;
          const float dist = std::hypot(mouse.x - sp.x, mouse.y - sp.y);
          const bool hot = canGrab && dist < 8.0f;
-         dl->AddCircleFilled(sp, hot || (sHandle.kind == kind && sHandle.id == it->id) ? tok::view3d_item_handles_r : tok::view3d_item_handles_r_2, col, tok::view3d_item_handles_segments);
-         dl->AddCircle(sp, tok::view3d_item_handles_r_3, Hex(0x000000, tok::view3d_item_handles_hex_alpha_2), tok::view3d_item_handles_segments, 1.0f);
+         dl->AddCircleFilled(sp, hot || (sHandle.kind == kind && sHandle.id == it->id) ? tok::view3d_item_handles_r : tok::view3d_dot_r_lg, col, tok::view3d_item_handles_segments);
+         dl->AddCircle(sp, tok::view3d_handles_ring_r, Hex(0x000000, tok::view3d_ring_alpha_sm), tok::view3d_item_handles_segments, 1.0f);
          if (hot && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && sHandle.kind == 0)
          {
             PushUndoCheckpoint("Drag handle");
@@ -2962,7 +2962,7 @@ namespace
       }
       Normalize(right);
       Normalize(axis);
-      const ImU32 hcol = Hex(tok::view3d_item_handles_hex_rgb_4);
+      const ImU32 hcol = Hex(tok::view3d_hcol_shade);
       if (cam != nullptr && sSet->gizmoCamLens)
       {
          const float dpt = tok::view3d_dpt_ratio * cam->displaySize;
@@ -2981,7 +2981,7 @@ namespace
       {
          float w[3];
          at(0, 0, -scene->Look().focusDistance, w);
-         if (handle(tok::view3d_item_handles_handle_arg, w, Hex(tok::view3d_item_handles_hex_rgb_5)))
+         if (handle(tok::view3d_handles_lg, w, Hex(tok::view3d_handles_shade_sm)))
          {
             scene->Look().focusDistance = std::clamp(LineParam(c, axis, o, d), 0.05f, 100.0f);
             scene->Commit();
@@ -3006,7 +3006,7 @@ namespace
                if (light->type == 4)
                   light->spotAngle = std::clamp(std::atan(x) * tok::view3d_item_handles_ratio / kPi, 1.0f, 89.0f);
                else
-                  light->areaWidth = std::clamp(x * tok::view3d_item_handles_ratio_2, tok::view3d_item_handles_bound, tok::view3d_item_handles_bound_2);
+                  light->areaWidth = std::clamp(x * tok::view3d_area_width_v, tok::view3d_area_width_lo, tok::view3d_area_width_hi);
                scene->Commit();
             }
          }
@@ -3016,7 +3016,7 @@ namespace
             const float reach = std::max(1.5f, light->distance * 0.5f);  // ui-audit-ok: world-space reach
             for (int k = 0; k < 3; k++)
                w[k] = c[k] + aim[k] * reach;
-            if (handle(tok::view3d_item_handles_handle_arg_2, w, Hex(tok::view3d_item_handles_hex_rgb_6)))
+            if (handle(tok::view3d_handles_sm, w, Hex(tok::view3d_handles_shade_lg)))
             {
                float hit[3];
                if (PlaneHit(w, sCam.fwd, o, d, hit) && scene->AimAt(*it, hit))
@@ -3037,12 +3037,12 @@ namespace
       {
          const float a0 = (float)i / 8.0f * 2.0f * kPi, a1 = (float)(i + 1) / 8.0f * 2.0f * kPi;
          dl->PathArcTo(s, tok::view3d_cursor_r, a0, a1, tok::view3d_cursor_segments);
-         dl->PathStroke(i % tok::view3d_cursor_path_stroke_draw == 0 ? Hex(tok::view3d_cursor_hex_rgb_3) : Hex(tok::view3d_cursor_hex_rgb_4), 0, tok::view3d_cursor_stroke);
+         dl->PathStroke(i % tok::view3d_path_period == 0 ? Hex(tok::view3d_path_shade_sm) : Hex(tok::view3d_path_shade_lg), 0, tok::view3d_cursor_stroke);
       }
       for (int i = 0; i < 4; i++)
       {
-         const ImVec2 d(i == 0 ? 1.0f : i == 1 ? -1.0f : 0.0f, i == tok::view3d_cursor_y ? 1.0f : i == tok::view3d_cursor_y_2 ? -1.0f : 0.0f);
-         dl->AddLine(ImVec2(s.x + d.x * tok::view3d_cursor_ratio, s.y + d.y * tok::view3d_cursor_ratio), ImVec2(s.x + d.x * tok::view3d_cursor_ratio_2, s.y + d.y * tok::view3d_cursor_ratio_2), Hex(0x000000, tok::view3d_cursor_hex_alpha_2), tok::view3d_cursor_stroke_2);
+         const ImVec2 d(i == 0 ? 1.0f : i == 1 ? -1.0f : 0.0f, i == tok::view3d_cursor_y ? 1.0f : i == tok::view3d_d_limit ? -1.0f : 0.0f);
+         dl->AddLine(ImVec2(s.x + d.x * tok::view3d_cursor_ratio, s.y + d.y * tok::view3d_cursor_ratio), ImVec2(s.x + d.x * tok::view3d_line_x_sm, s.y + d.y * tok::view3d_line_x_sm), Hex(0x000000, tok::view3d_cursor_line_alpha), tok::view3d_line_stroke_sm);
       }
    }
 
@@ -3255,8 +3255,8 @@ namespace
       auto bone = [&](int owner, ImVec2 a, ImVec2 b)
       {
          const bool sel = owner == sPose.joint;
-         dl->AddLine(a, b, Hex(0x000000, tok::view3d_pose_hex_alpha_6), tok::view3d_pose_stroke);
-         dl->AddLine(a, b, sel ? Hex(kActive) : Hex(kWire, tok::view3d_pose_hex_alpha_7), tok::view3d_pose_stroke_2);
+         dl->AddLine(a, b, Hex(0x000000, tok::view3d_pose_line_alpha_xs), tok::view3d_pose_stroke);
+         dl->AddLine(a, b, sel ? Hex(kActive) : Hex(kWire, tok::view3d_pose_line_alpha_lg), tok::view3d_line_stroke_lg);
          const float d = SegDist(mouse, a, b);
          if (d < hotDist)
          {
@@ -3293,8 +3293,8 @@ namespace
             hotDist = 0.0f;
             hotJoint = j;
          }
-         dl->AddCircleFilled(heads[j], j == sPose.joint ? tok::view3d_pose_r : tok::view3d_pose_r_2, j == sPose.joint ? Hex(kActive) : Hex(kWire), tok::view3d_pose_segments);
-         dl->AddCircle(heads[j], tok::view3d_pose_r_3, Hex(0x000000, tok::view3d_pose_hex_alpha_6), tok::view3d_pose_segments, 1.0f);
+         dl->AddCircleFilled(heads[j], j == sPose.joint ? tok::view3d_pose_r : tok::view3d_dot_r_md, j == sPose.joint ? Hex(kActive) : Hex(kWire), tok::view3d_pose_segments);
+         dl->AddCircle(heads[j], tok::view3d_pose_ring_r_sm, Hex(0x000000, tok::view3d_pose_line_alpha_xs), tok::view3d_pose_segments, 1.0f);
       }
       if (sPose.joint >= 0 && sPose.joint < count && shown[sPose.joint])
       {
@@ -3309,13 +3309,13 @@ namespace
          TransformBy(world, model->Pose().ikTarget, t);
          if (Project(t, tp))
          {
-            dl->AddLine(heads[model->Pose().ikJoint], tp, Hex(kHotHandle, tok::view3d_pose_hex_alpha_8), tok::view3d_pose_stroke_3);
-            dl->AddCircle(tp, tok::view3d_pose_r_4, Hex(kHotHandle), tok::view3d_pose_segments_2, tok::view3d_pose_stroke_3);
+            dl->AddLine(heads[model->Pose().ikJoint], tp, Hex(kHotHandle, tok::view3d_pose_line_alpha_md), tok::view3d_ring_stroke);
+            dl->AddCircle(tp, tok::view3d_pose_ring_r_lg, Hex(kHotHandle), tok::view3d_ring_segments_sm, tok::view3d_ring_stroke);
          }
       }
-      dl->AddText(ImVec2(sCam.mn.x + tok::space_3, sCam.mx.y - tok::view3d_pose_gap_2), Hex(kActive), sPose.paint ? T("Weight Paint") : T("Pose Mode"));
+      dl->AddText(ImVec2(sCam.mn.x + tok::space_3, sCam.mx.y - tok::view3d_text_y), Hex(kActive), sPose.paint ? T("Weight Paint") : T("Pose Mode"));
       if (sPose.paint && hovered)
-         dl->AddCircle(mouse, sPose.radius, Hex(kWire, tok::view3d_pose_hex_alpha_9), tok::view3d_pose_segments_3, tok::view3d_pose_stroke_3);
+         dl->AddCircle(mouse, sPose.radius, Hex(kWire, tok::view3d_ring_alpha_lg), tok::view3d_ring_segments_lg, tok::view3d_ring_stroke);
 
       if (sPose.stroking)
       {
@@ -3335,7 +3335,7 @@ namespace
             EndPoseTurn(model, false);
             return true;
          }
-         dl->AddLine(c, mouse, Hex(kWire, tok::view3d_pose_hex_alpha_10));
+         dl->AddLine(c, mouse, Hex(kWire, tok::view3d_pose_line_alpha_sm));
          const float angle = std::atan2(mouse.y - c.y, mouse.x - c.x) - sPose.startAngle;
          const float half = angle * 0.5f;
          const float turn[4] = { sPose.axis[0] * std::sin(half), sPose.axis[1] * std::sin(half), sPose.axis[2] * std::sin(half), std::cos(half) };
@@ -3364,9 +3364,9 @@ namespace
          // [ and ] size the brush; a click on a bone picks it, anywhere else paints
          // (Ctrl takes weight away).
          if (pressed(ImGuiKey_LeftBracket))
-            sPose.radius = std::max(tok::view3d_pose_bound, sPose.radius / tok::view3d_pose_ratio);
+            sPose.radius = std::max(tok::view3d_pose_min, sPose.radius / tok::view3d_pose_ratio);
          if (pressed(ImGuiKey_RightBracket))
-            sPose.radius = std::min(tok::view3d_pose_bound_2, sPose.radius * tok::view3d_pose_ratio);
+            sPose.radius = std::min(tok::view3d_pose_max, sPose.radius * tok::view3d_pose_ratio);
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
          {
             if (hotJoint >= 0)
@@ -3610,8 +3610,8 @@ namespace
             const ImVec2 ts = ImGui::CalcTextSize(label);
             const ImVec2 a(x, y), b(x + ts.x + tok::space_3_5, y + h);
             const bool hot = hovered && mouse.x >= a.x && mouse.x < b.x && mouse.y >= a.y && mouse.y < b.y;
-            dl->AddRectFilled(a, b, Hex(on ? kSelected : 0x000000, hot || on ? tok::view3d_sculpt_hex_alpha_4 : tok::view3d_sculpt_hex_alpha_5), h * 0.5f);
-            dl->AddText(ImVec2(a.x + tok::view3d_sculpt_gap, a.y + tok::space_1), Hex(tok::view3d_sculpt_hex_rgb_3), label);
+            dl->AddRectFilled(a, b, Hex(on ? kSelected : 0x000000, hot || on ? tok::view3d_fill_alpha_lg : tok::view3d_fill_alpha_md), h * 0.5f);
+            dl->AddText(ImVec2(a.x + tok::view3d_sculpt_gap, a.y + tok::space_1), Hex(tok::view3d_text_shade), label);
             x = b.x + tok::space_1;
             onBar = onBar || hot;
             return hot && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
@@ -3628,14 +3628,14 @@ namespace
       char label[96];
       if (ok) snprintf(label, sizeof(label), "Sculpt Mode   %s   %s", UiFmt::Px(sSculpt.radius).c, UiFmt::F2(sSculpt.strength).c);
       else snprintf(label, sizeof(label), "Sculpt Mode   Topology changed");
-      dl->AddText(ImVec2(sCam.mn.x + tok::space_3, sCam.mx.y - tok::view3d_sculpt_gap_2), Hex(kActive), label);
+      dl->AddText(ImVec2(sCam.mn.x + tok::space_3, sCam.mx.y - tok::view3d_text_y), Hex(kActive), label);
 
       // F / Shift+F: drag the radius or strength, click to keep, Esc to undo.
       if (sSculpt.adjust != 0)
       {
          const float dist = std::hypot(mouse.x - sSculpt.adjustAt.x, mouse.y - sSculpt.adjustAt.y);
          if (sSculpt.adjust == 'r')
-            sSculpt.radius = std::clamp(dist, tok::view3d_sculpt_bound, tok::view3d_sculpt_bound_2);
+            sSculpt.radius = std::clamp(dist, tok::view3d_sculpt_lo, tok::view3d_sculpt_hi);
          else
             sSculpt.strength = std::clamp(dist / 200.0f, 0.0f, 1.0f);
          dl->AddCircle(sSculpt.adjustAt, sSculpt.adjust == 'r' ? sSculpt.radius : sSculpt.strength * tok::view3d_sculpt_ratio, Hex(kHotHandle), tok::view3d_sculpt_segments, tok::view3d_sculpt_stroke);
@@ -3692,7 +3692,7 @@ namespace
       }
 
       if (hovered && !onBar)
-         dl->AddCircle(mouse, sSculpt.radius, io.KeyCtrl ? Hex(tok::view3d_sculpt_hex_rgb_4) : Hex(kHotHandle, tok::view3d_sculpt_hex_alpha_6), tok::view3d_sculpt_segments, tok::view3d_sculpt_stroke);
+         dl->AddCircle(mouse, sSculpt.radius, io.KeyCtrl ? Hex(tok::view3d_ring_shade) : Hex(kHotHandle, tok::view3d_ring_alpha_lg), tok::view3d_sculpt_segments, tok::view3d_sculpt_stroke);
       if (sSculpt.stroking || !hovered || io.WantTextInput)
          return true;
       const bool command = io.KeyCtrl || io.KeySuper;
@@ -4332,7 +4332,7 @@ namespace
          ImVec2 a, b, c;
          if (sel.face[f] && sEdit.front[f] && Project(&sEdit.pos[m.indices[f * 3] * 3], a) &&
              Project(&sEdit.pos[m.indices[f * 3 + 1] * 3], b) && Project(&sEdit.pos[m.indices[f * 3 + 2] * 3], c))
-            dl->AddTriangleFilled(a, b, c, Hex(kSelected, tok::view3d_edit_hex_alpha_9));
+            dl->AddTriangleFilled(a, b, c, Hex(kSelected, tok::view3d_arrow_alpha));
       }
       for (size_t e = 0; e * 2 < sEdit.edges.size(); e++)
       {
@@ -4340,7 +4340,7 @@ namespace
             continue;
          const unsigned int va = sEdit.edges[e * 2], vb = sEdit.edges[e * 2 + 1];
          const bool on = fits && sel.point[va] && sel.point[vb];
-         Line3D(dl, &sEdit.pos[va * 3], &sEdit.pos[vb * 3], on ? Hex(kSelected) : Hex(0x000000, tok::view3d_edit_hex_alpha_10), on ? 2.0f : 1.0f);
+         Line3D(dl, &sEdit.pos[va * 3], &sEdit.pos[vb * 3], on ? Hex(kSelected) : Hex(0x000000, tok::view3d_line3_d_alpha), on ? 2.0f : 1.0f);
       }
       if (sEdit.mode == 1)
       {
@@ -4349,7 +4349,7 @@ namespace
          {
             ImVec2 s;
             if (vis[v] && Project(&sEdit.pos[v * 3], s))
-               dl->AddCircleFilled(s, tok::view3d_edit_r, fits && sel.point[v] ? Hex(kSelected) : Hex(0x000000, tok::view3d_edit_hex_alpha_11));
+               dl->AddCircleFilled(s, tok::view3d_edit_r, fits && sel.point[v] ? Hex(kSelected) : Hex(0x000000, tok::view3d_dot_alpha_lg));
          }
       }
 
@@ -4365,8 +4365,8 @@ namespace
             const ImVec2 a(x, y), b(x + ts.x + tok::space_3_5, y + h);
             const bool hot = hovered && mouse.x >= a.x && mouse.x < b.x && mouse.y >= a.y && mouse.y < b.y;
             const bool on = sEdit.mode == i + 1;
-            dl->AddRectFilled(a, b, Hex(on ? kSelected : 0x000000, hot || on ? tok::view3d_edit_hex_alpha_12 : tok::view3d_edit_hex_alpha_13), h * 0.5f);
-            dl->AddText(ImVec2(a.x + tok::view3d_edit_gap, a.y + tok::space_1), Hex(tok::view3d_edit_hex_rgb_2), names[i]);
+            dl->AddRectFilled(a, b, Hex(on ? kSelected : 0x000000, hot || on ? tok::view3d_fill_alpha_lg : tok::view3d_fill_alpha_md), h * 0.5f);
+            dl->AddText(ImVec2(a.x + tok::view3d_edit_gap, a.y + tok::space_1), Hex(tok::view3d_text_shade), names[i]);
             x = b.x + tok::space_1;
             onBar = onBar || hot;
             if (hot && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && sEdit.op == 0 && !on)
@@ -4388,7 +4388,7 @@ namespace
          const std::string lock = sEdit.axis < 0 ? "" : std::string("   ") + (sEdit.plane ? "not " : "only ") + axisName[sEdit.axis];
          snprintf(label, sizeof(label), "%s%s", sEdit.readout.c_str(), lock.c_str());
       }
-      dl->AddText(ImVec2(sCam.mn.x + tok::space_3, sCam.mx.y - tok::view3d_edit_gap_2), Hex(kActive), node->CookWarning().empty() ? label : node->CookWarning().c_str());
+      dl->AddText(ImVec2(sCam.mn.x + tok::space_3, sCam.mx.y - tok::view3d_text_y), Hex(kActive), node->CookWarning().empty() ? label : node->CookWarning().c_str());
 
       if (sEdit.op != 0)
       {
@@ -4421,7 +4421,7 @@ namespace
          EditUpdate(node, world, mouse);
          ImVec2 pc;
          if (sEdit.op != 'g' && Project(sEdit.pivot, pc))
-            dl->AddLine(pc, mouse, Hex(kWire, tok::view3d_edit_hex_alpha_14));
+            dl->AddLine(pc, mouse, Hex(kWire, tok::view3d_edit_line_alpha));
          if (pressed(ImGuiKey_Enter) || pressed(ImGuiKey_KeypadEnter) || ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             sEdit.op = 0;
          return true;
@@ -4435,8 +4435,8 @@ namespace
          {
             const ImVec2 lo(std::min(mouse.x, sEdit.pressAt.x), std::min(mouse.y, sEdit.pressAt.y));
             const ImVec2 hi(std::max(mouse.x, sEdit.pressAt.x), std::max(mouse.y, sEdit.pressAt.y));
-            dl->AddRectFilled(lo, hi, Hex(tok::view3d_edit_hex_rgb_2, tok::view3d_edit_hex_alpha_15));
-            dl->AddRect(lo, hi, Hex(tok::view3d_edit_hex_rgb_2, tok::view3d_edit_hex_alpha_16));
+            dl->AddRectFilled(lo, hi, Hex(tok::view3d_text_shade, tok::view3d_fill_alpha_sm));
+            dl->AddRect(lo, hi, Hex(tok::view3d_text_shade, tok::view3d_outline_alpha));
          }
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
          {
@@ -4522,7 +4522,7 @@ namespace
       for (int i = 0; i < 4; i++)
          Line3D(dl, c[i], c[(i + 1) % 4], col, 1.5f);
       float tri[3][3];
-      const float tx[3] = { -w * 0.5f, w * 0.5f, 0.0f }, ty[3] = { h * tok::view3d_camera_shape_ratio_2, h * tok::view3d_camera_shape_ratio_2, h * tok::view3d_camera_shape_ratio_3 };
+      const float tx[3] = { -w * 0.5f, w * 0.5f, 0.0f }, ty[3] = { h * tok::view3d_camera_shape_scale_sm, h * tok::view3d_camera_shape_scale_sm, h * tok::view3d_camera_shape_scale_lg };
       for (int i = 0; i < 3; i++)
       {
          const float p[3] = { tx[i], ty[i], -depth };
@@ -4543,13 +4543,13 @@ namespace
          float a[3], b[3];
          along(look.mistStart, a);
          along(look.mistStart + look.mistDepth, b);
-         const ImU32 mist = Hex(tok::view3d_camera_shape_hex_rgb_3, tok::view3d_camera_shape_hex_alpha_2);
+         const ImU32 mist = Hex(tok::view3d_mist_shade, tok::view3d_mist_alpha);
          Line3D(dl, a, b, mist);
          ImVec2 sa, sb;
          if (Project(a, sa))
             dl->AddCircleFilled(sa, tok::view3d_camera_shape_r, mist);
          if (Project(b, sb))
-            dl->AddCircle(sb, tok::view3d_camera_shape_r_2, mist, tok::view3d_camera_shape_segments, tok::view3d_camera_shape_stroke);
+            dl->AddCircle(sb, tok::view3d_camera_shape_ring_r, mist, tok::view3d_camera_shape_segments, tok::view3d_camera_shape_stroke);
       }
       if (lens->showLimits)   // the clip range along the view, and where it focuses
       {
@@ -4557,7 +4557,7 @@ namespace
          float n[3], f[3];
          along(lens->nearPlane, n);
          along(lens->farPlane, f);
-         const ImU32 limit = Hex(tok::view3d_camera_shape_hex_rgb_4, tok::view3d_camera_shape_hex_alpha_2);
+         const ImU32 limit = Hex(tok::view3d_camera_shape_shade, tok::view3d_mist_alpha);
          Line3D(dl, n, f, limit);
          ImVec2 sn, sf;
          if (Project(n, sn))
@@ -4591,12 +4591,12 @@ namespace
          return;
       const int type = light->type;
       dl->AddCircleFilled(s, tok::view3d_light_shape_r, ImGui::ColorConvertFloat4ToU32(ImVec4(light->color[0], light->color[1], light->color[2], 1.0f)), tok::view3d_light_shape_segments);
-      dl->AddCircle(s, tok::view3d_light_shape_r_2, col, tok::view3d_light_shape_segments_2, tok::view3d_light_shape_stroke);
+      dl->AddCircle(s, tok::view3d_light_shape_ring_r, col, tok::view3d_ring_segments_md, tok::view3d_light_shape_stroke);
       if (type != 4 && type != 5)
          for (int i = 0; i < 8; i++)
          {
             const float a = (float)i / 8.0f * 2.0f * kPi, cs = std::cos(a), sn = std::sin(a);
-            dl->AddLine(ImVec2(s.x + cs * tok::view3d_light_shape_ratio, s.y + sn * tok::view3d_light_shape_ratio), ImVec2(s.x + cs * tok::view3d_light_shape_ratio_2, s.y + sn * tok::view3d_light_shape_ratio_2), col);
+            dl->AddLine(ImVec2(s.x + cs * tok::view3d_light_shape_ratio, s.y + sn * tok::view3d_light_shape_ratio), ImVec2(s.x + cs * tok::view3d_line_x_lg, s.y + sn * tok::view3d_line_x_lg), col);
          }
       float u[3], v[3];
       const float ref[3] = { std::abs(aim[1]) > 0.9f ? 1.0f : 0.0f, std::abs(aim[1]) > 0.9f ? 0.0f : 1.0f, 0.0f };
@@ -4610,7 +4610,7 @@ namespace
       }
       if (type == 4)
       {
-         const float len = 1.0f, r = len * std::tan(light->spotAngle * kPi / tok::view3d_light_shape_ratio_3);
+         const float len = 1.0f, r = len * std::tan(light->spotAngle * kPi / tok::view3d_tan_scale);
          // Inner ring where the blend ends, as the shader's smoothstep places it.
          const float cosOuter = std::cos(light->spotAngle * kPi / 180.0f);
          const float cosInner = std::min(1.0f, cosOuter + (1.0f - cosOuter) * light->spotPenumbra);
@@ -4640,7 +4640,7 @@ namespace
       if (type == 4 && light->showCone)   // the whole volume the spot lights, as a faint shell
       {
          const float len = light->useCutoff ? light->cutoffDistance : std::max(0.05f, light->distance);
-         const float r = len * std::tan(light->spotAngle * kPi / tok::view3d_light_shape_ratio_3);
+         const float r = len * std::tan(light->spotAngle * kPi / tok::view3d_tan_scale);
          const ImU32 fill = (col & 0x00FFFFFF) | 0x26000000;
          ImVec2 prev;
          bool prevOk = false;
@@ -4731,7 +4731,7 @@ namespace
                const bool front = Dot(off, sCam.fwd) <= 0.0f;
                if (ok && prevOk)
                {
-                  dl->AddLine(prev, s, tone(a, a, front ? tok::view3d_gizmo_tone_alpha_3 : tok::view3d_gizmo_tone_alpha_4), front ? tok::view3d_gizmo_stroke : tok::view3d_gizmo_stroke_2);
+                  dl->AddLine(prev, s, tone(a, a, front ? tok::view3d_tone_alpha_lg : tok::view3d_tone_alpha_sm), front ? tok::view3d_gizmo_stroke : tok::view3d_ring_stroke);
                   const float dist = SegDist(mouse, prev, s);
                   if (front && dist < best)
                   {
@@ -4743,8 +4743,8 @@ namespace
                prevOk = ok;
             }
          }
-         const float r = kGizmoPx * tok::view3d_r_ratio_2;
-         dl->AddCircle(c, r, sHot == tok::view3d_gizmo_add_circle_draw ? white : Hex(kHotHandle, tok::view3d_gizmo_hex_alpha_3), tok::view3d_gizmo_segments, tok::view3d_gizmo_stroke_2);
+         const float r = kGizmoPx * tok::view3d_gizmo_scale;
+         dl->AddCircle(c, r, sHot == tok::view3d_ring_limit ? white : Hex(kHotHandle, tok::view3d_ring_alpha_sm), tok::view3d_gizmo_segments, tok::view3d_ring_stroke);
          const float dist = std::abs(std::hypot(mouse.x - c.x, mouse.y - c.y) - r);
          if (dist < best)
             hot = 3;
@@ -4771,7 +4771,7 @@ namespace
             }
             if (!ok)
                continue;
-            dl->AddConvexPolyFilled(q, tok::view3d_gizmo_add_convex_poly_filled_draw, sHot == tok::view3d_gizmo_gap + n ? white : AxisColor(n, tok::view3d_gizmo_axis_color_alpha_2));
+            dl->AddConvexPolyFilled(q, tok::view3d_fill_num_points, sHot == tok::view3d_gizmo_gap + n ? white : AxisColor(n, tok::view3d_axis_color_alpha_md));
             if (ImTriangleContainsPoint(q[0], q[1], q[2], mouse) || ImTriangleContainsPoint(q[0], q[2], q[3], mouse))
             {
                hot = 4 + n;
@@ -4793,19 +4793,19 @@ namespace
          const ImU32 col = tone(a, a, fade);
          dl->AddLine(ImVec2(c.x + dir.x * tok::view3d_gizmo_ratio, c.y + dir.y * tok::view3d_gizmo_ratio), s, col, tok::view3d_gizmo_stroke);
          if (sTool == 1)
-            dl->AddTriangleFilled(ImVec2(s.x + dir.x * tok::view3d_gizmo_ratio_2, s.y + dir.y * tok::view3d_gizmo_ratio_2), ImVec2(s.x + side.x * tok::view3d_gizmo_ratio_3, s.y + side.y * tok::view3d_gizmo_ratio_3),
-                                  ImVec2(s.x - side.x * tok::view3d_gizmo_ratio_3, s.y - side.y * tok::view3d_gizmo_ratio_3), col);
+            dl->AddTriangleFilled(ImVec2(s.x + dir.x * tok::view3d_arrow_x_lg, s.y + dir.y * tok::view3d_arrow_x_lg), ImVec2(s.x + side.x * tok::view3d_arrow_x_sm, s.y + side.y * tok::view3d_arrow_x_sm),
+                                  ImVec2(s.x - side.x * tok::view3d_arrow_x_sm, s.y - side.y * tok::view3d_arrow_x_sm), col);
          else
             dl->AddRectFilled(ImVec2(s.x - tok::space_1_25, s.y - tok::space_1_25), ImVec2(s.x + tok::space_1_25, s.y + tok::space_1_25), col);
-         const float dist = SegDist(mouse, c, ImVec2(s.x + dir.x * tok::view3d_gizmo_ratio_2, s.y + dir.y * tok::view3d_gizmo_ratio_2));
+         const float dist = SegDist(mouse, c, ImVec2(s.x + dir.x * tok::view3d_arrow_x_lg, s.y + dir.y * tok::view3d_arrow_x_lg));
          if (dist < best && std::hypot(mouse.x - c.x, mouse.y - c.y) > tok::view3d_gizmo_limit)
          {
             best = dist;
             hot = a;
          }
       }
-      dl->AddCircle(c, tok::view3d_gizmo_r, sHot == tok::view3d_gizmo_add_circle_draw ? white : Hex(kHotHandle, tok::view3d_gizmo_hex_alpha_4), tok::view3d_gizmo_segments_2, tok::view3d_gizmo_stroke_2);
-      if (std::hypot(mouse.x - c.x, mouse.y - c.y) <= tok::view3d_gizmo_limit_2)
+      dl->AddCircle(c, tok::view3d_gizmo_r, sHot == tok::view3d_ring_limit ? white : Hex(kHotHandle, tok::view3d_ring_alpha_md), tok::view3d_ring_segments_md, tok::view3d_ring_stroke);
+      if (std::hypot(mouse.x - c.x, mouse.y - c.y) <= tok::view3d_gizmo_limit_sm)
          hot = 3;
       return active ? hot : -1;
    }
@@ -4813,15 +4813,15 @@ namespace
    // Top right: the three axes as they stand now. Click a ball for that view, drag to orbit.
    int DrawNavGizmo(ImDrawList* dl, ImVec2 mn, ImVec2 mx, ImVec2 mouse, bool hovered, bool& onDisc)
    {
-      const float pad = tok::view3d_pad_ratio * sSet->miniSize / tok::view3d_pad_ratio_2;
+      const float pad = tok::view3d_pad_ratio * sSet->miniSize / tok::view3d_nav_gizmo_scale_lg;
       const ImVec2 c(mx.x - pad, mn.y + pad);
-      const float r = tok::view3d_r_ratio_3 * sSet->miniSize / tok::view3d_r_ratio_4;
+      const float r = tok::view3d_nav_gizmo_scale_sm * sSet->miniSize / tok::view3d_nav_gizmo_scale_lg;
       const float ballK = sSet->gizmoNavSize / tok::view3d_ball_k_ratio;
       hovered = hovered && sSet->miniAxes == 2;
       const int firstVtx = dl->VtxBuffer.Size;
       onDisc = hovered && std::hypot(mouse.x - c.x, mouse.y - c.y) < r + tok::space_3;
       if (onDisc || sNavDrag)
-         dl->AddCircleFilled(c, r + tok::space_3, Hex(kHotHandle, tok::view3d_nav_gizmo_hex_alpha_2), tok::view3d_nav_gizmo_segments);
+         dl->AddCircleFilled(c, r + tok::space_3, Hex(kHotHandle, tok::view3d_dot_alpha_xs), tok::view3d_nav_gizmo_segments);
       struct Ball { float depth; ImVec2 at; int axis; bool neg; };
       std::vector<Ball> balls;
       for (int a = 0; a < 3; a++)
@@ -4840,15 +4840,15 @@ namespace
          const bool hot = onDisc && std::hypot(mouse.x - b.at.x, mouse.y - b.at.y) < tok::view3d_hot_limit;
          if (hot)
             hit = b.axis * 2 + ((b.neg != (b.axis == 2)) ? 1 : 0);   // ViewAxis counts engine sides  // ui-audit-ok: axis index
-         const float size = (b.neg ? tok::view3d_nav_gizmo_assign : tok::view3d_nav_gizmo_assign_2) * ballK;
+         const float size = (b.neg ? tok::view3d_nav_gizmo_sm : tok::view3d_nav_gizmo_lg) * ballK;
          if (b.neg)
          {
-            dl->AddCircleFilled(b.at, size, AxisColor(b.axis, hot ? tok::view3d_nav_gizmo_axis_color_alpha_3 : tok::view3d_nav_gizmo_axis_color_alpha_4), tok::view3d_nav_gizmo_segments_2);
-            dl->AddCircle(b.at, size, AxisColor(b.axis), tok::view3d_nav_gizmo_segments_2, tok::view3d_nav_gizmo_stroke);
+            dl->AddCircleFilled(b.at, size, AxisColor(b.axis, hot ? tok::view3d_axis_color_alpha_lg : tok::view3d_axis_color_alpha_sm), tok::view3d_dot_segments);
+            dl->AddCircle(b.at, size, AxisColor(b.axis), tok::view3d_dot_segments, tok::view3d_nav_gizmo_stroke);
             continue;
          }
-         dl->AddLine(c, b.at, AxisColor(b.axis), tok::view3d_nav_gizmo_stroke_2);
-         dl->AddCircleFilled(b.at, size, hot ? Hex(kHotHandle) : AxisColor(b.axis), tok::view3d_nav_gizmo_segments_2);
+         dl->AddLine(c, b.at, AxisColor(b.axis), tok::view3d_line_stroke_lg);
+         dl->AddCircleFilled(b.at, size, hot ? Hex(kHotHandle) : AxisColor(b.axis), tok::view3d_dot_segments);
          const char label[2] = { (char)('X' + kDisp[b.axis]), 0 };
          const ImVec2 ts = ImGui::CalcTextSize(label);
          dl->AddText(ImVec2(b.at.x - ts.x * 0.5f, b.at.y - ts.y * 0.5f), Hex(0x000000), label);
@@ -4866,7 +4866,7 @@ namespace
    // small; geometry goes by its box, hit by the ray itself.
    // Everything under the pointer, nearest first: markers, then boxes.
    // Clicking again on the same spot steps to the next one back, as in Blender.
-   ImVec2 sPickAt(-tok::view3d_x_2, -tok::view3d_y);
+   ImVec2 sPickAt(-tok::view3d_pick_at_inset, -tok::view3d_y);
    int sPicked = 0;
 
    int Pick(Scene3DNode* scene, ImVec2 mouse, bool cycle = false)
@@ -4935,7 +4935,7 @@ namespace
       float y = mn.y + tok::space_2;
       auto line = [&](const std::string& text, float alpha)
       {
-         dl->AddText(ImVec2(mn.x + tok::space_3, y), Hex(tok::view3d_overlay_text_hex_rgb_2, alpha), text.c_str());
+         dl->AddText(ImVec2(mn.x + tok::space_3, y), Hex(tok::view3d_text_shade, alpha), text.c_str());
          y += ImGui::GetTextLineHeightWithSpacing();
       };
       if (sSet->stats)
@@ -4951,7 +4951,7 @@ namespace
          char text[96];
          snprintf(text, sizeof(text), T("Objects %d/%d   Cameras %d   Lights %d"), (int)sSel.size(), geo + cams + lights, cams, lights);
          dl->AddText(ImVec2(mn.x + tok::space_3, mn.y + tok::space_2 + (sSet->textInfo ? ImGui::GetTextLineHeightWithSpacing() * tok::view3d_overlay_text_ratio : 0.0f)),
-                     Hex(tok::view3d_overlay_text_hex_rgb_2, tok::view3d_overlay_text_hex_alpha_2), text);
+                     Hex(tok::view3d_text_shade, tok::view3d_text_alpha_md), text);
       }
       if (sSet->showPerf || sSet->showFps)
       {
@@ -4963,7 +4963,7 @@ namespace
             snprintf(text, sizeof(text), "%s", UiFmt::Ms(1000.0f / std::max(1.0f, fps)).c);
          else
             snprintf(text, sizeof(text), "%s fps", UiFmt::F0(fps).c);
-         dl->AddText(ImVec2(sCam.mx.x - ImGui::CalcTextSize(text).x - tok::space_3, mn.y + tok::space_2), Hex(tok::view3d_overlay_text_hex_rgb_2, tok::view3d_overlay_text_hex_alpha_2), text);
+         dl->AddText(ImVec2(sCam.mx.x - ImGui::CalcTextSize(text).x - tok::space_3, mn.y + tok::space_2), Hex(tok::view3d_text_shade, tok::view3d_text_alpha_md), text);
       }
       if (!sSet->textInfo)
          return;
@@ -5011,7 +5011,7 @@ namespace
       const ImVec2 a = sCam.frameMn, b = sCam.frameMx;
       const float w = b.x - a.x, h = b.y - a.y;
       const float* gc = sSet->guideColor;
-      const ImU32 edge = Hex(0x000000, tok::view3d_camera_guides_hex_alpha_2), guide = ImGui::ColorConvertFloat4ToU32(ImVec4(gc[0], gc[1], gc[2], tok::view3d_camera_guides_alpha_2));
+      const ImU32 edge = Hex(0x000000, tok::view3d_edge_alpha), guide = ImGui::ColorConvertFloat4ToU32(ImVec4(gc[0], gc[1], gc[2], tok::view3d_edge_y));
       DashedRect(dl, a, b, edge);
       auto cross = [&](float fx, float fy)
       {
@@ -5039,8 +5039,8 @@ namespace
       }
       if (sSet->safe && sSet->safeCenter)   // Blender's centre-cut margins: title 17.5% / 5%, action 15% / 5%
       {
-         dl->AddRect(ImVec2(a.x + w * tok::view3d_camera_guides_ratio, a.y + h * tok::view3d_camera_guides_ratio_2), ImVec2(b.x - w * tok::view3d_camera_guides_ratio, b.y - h * tok::view3d_camera_guides_ratio_2), guide);
-         dl->AddRect(ImVec2(a.x + w * tok::view3d_camera_guides_ratio_3, a.y + h * tok::view3d_camera_guides_ratio_2), ImVec2(b.x - w * tok::view3d_camera_guides_ratio_3, b.y - h * tok::view3d_camera_guides_ratio_2), guide);
+         dl->AddRect(ImVec2(a.x + w * tok::view3d_camera_guides_ratio, a.y + h * tok::view3d_outline_y), ImVec2(b.x - w * tok::view3d_camera_guides_ratio, b.y - h * tok::view3d_outline_y), guide);
+         dl->AddRect(ImVec2(a.x + w * tok::view3d_outline_x, a.y + h * tok::view3d_outline_y), ImVec2(b.x - w * tok::view3d_outline_x, b.y - h * tok::view3d_outline_y), guide);
       }
       if (sSet->diagonal)
       {
@@ -5063,9 +5063,9 @@ namespace
                const ImVec2 r(end.x - c.x, end.y - c.y);
                float s = 1e9f;
                if (r.x > tok::view3d_camera_guides_limit) s = std::min(s, (b.x - c.x) / r.x);
-               if (r.x < -tok::view3d_camera_guides_if_arith) s = std::min(s, (a.x - c.x) / r.x);
+               if (r.x < -tok::view3d_camera_guides_inset) s = std::min(s, (a.x - c.x) / r.x);
                if (r.y > tok::view3d_camera_guides_limit) s = std::min(s, (b.y - c.y) / r.y);
-               if (r.y < -tok::view3d_camera_guides_if_arith) s = std::min(s, (a.y - c.y) / r.y);
+               if (r.y < -tok::view3d_camera_guides_inset) s = std::min(s, (a.y - c.y) / r.y);
                end = ImVec2(c.x + r.x * s, c.y + r.y * s);
             }
             dl->AddLine(c, end, guide);
@@ -5095,7 +5095,7 @@ namespace
          DashedRect(dl, ImVec2(mid.x - gw * 0.5f, mid.y - gh * 0.5f), ImVec2(mid.x + gw * 0.5f, mid.y + gh * 0.5f), guide);
       }
       if (cam->showName)
-         dl->AddText(ImVec2(a.x + tok::space_1_5, b.y - ImGui::GetFontSize() - tok::space_1), Hex(kWire, tok::view3d_camera_guides_hex_alpha_2), ItemName(*active).c_str());
+         dl->AddText(ImVec2(a.x + tok::space_1_5, b.y - ImGui::GetFontSize() - tok::space_1), Hex(kWire, tok::view3d_edge_alpha), ItemName(*active).c_str());
    }
 
    // Along the bottom edge: drag to zoom, drag to pan, camera view, then the lock or the projection.
@@ -5109,11 +5109,11 @@ namespace
                               sCameraView ? T("Lock camera to view") : sOrtho ? T("Orthographic: click for perspective (5)") : T("Perspective: click for orthographic (5)") };
       for (int i = 0; i < 4; i++)
       {
-         const ImVec2 c(mx.x - r - tok::space_3 - (float)(tok::view3d_toolpad_bias - i) * (r * tok::view3d_toolpad_ratio + tok::view3d_toolpad_bias_2), y);
+         const ImVec2 c(mx.x - r - tok::space_3 - (float)(tok::view3d_toolpad_inset_i - i) * (r * tok::view3d_toolpad_ratio + tok::view3d_toolpad_inset), y);
          const bool hot = hovered && std::hypot(mouse.x - c.x, mouse.y - c.y) <= r;
          const bool on = (i == 2 && sCameraView) || (i == 3 && sCameraView && sLockCam) || sPadDrag == i + 1;
-         dl->AddCircleFilled(c, r, Hex(on ? kSelected : 0x000000, hot || on ? tok::view3d_toolpad_hex_alpha_3 : tok::view3d_toolpad_hex_alpha_4), tok::view3d_toolpad_segments);
-         glyph::Draw(dl, c, tok::icon_control, Hex(tok::view3d_toolpad_hex_rgb_2), icons[i]);
+         dl->AddCircleFilled(c, r, Hex(on ? kSelected : 0x000000, hot || on ? tok::view3d_dot_alpha_md : tok::view3d_dot_alpha_sm), tok::view3d_toolpad_segments);
+         glyph::Draw(dl, c, tok::icon_control, Hex(tok::view3d_toolpad_shade), icons[i]);
          if (!hot)
             continue;
          onPad = true;
@@ -5292,7 +5292,7 @@ namespace
       {
          const bool sel = Selected(it.id);
          const bool active = !sSel.empty() && sSel.back() == it.id;
-         const ImU32 col = active ? Hex(kActive) : sel ? Hex(kSelected) : Hex(kWire, it.visible ? tok::view3d_viewport_hex_alpha_8 : tok::view3d_viewport_hex_alpha_9);
+         const ImU32 col = active ? Hex(kActive) : sel ? Hex(kSelected) : Hex(kWire, it.visible ? tok::view3d_wire_alpha_lg : tok::view3d_wire_alpha_sm);
          float p[3];
          const Kind kind = scene->ItemKind(it);
          const bool looking = sCameraView && it.id == scene->activeCamera;
@@ -5309,7 +5309,7 @@ namespace
             ImVec2 os;
             scene->ItemCenter(it, oc);
             if (Project(oc, os))
-               dl->AddCircleFilled(os, tok::view3d_viewport_r, Hex(tok::view3d_viewport_hex_rgb_4, tok::view3d_viewport_hex_alpha_8));
+               dl->AddCircleFilled(os, tok::view3d_viewport_r, Hex(tok::view3d_dot_shade_sm, tok::view3d_wire_alpha_lg));
          }
          if (it.visible)
             DrawItemExtras(dl, scene, it, col);
@@ -5322,7 +5322,7 @@ namespace
             {
                GraphNode* lg = sSet->lightColors ? FindNodeByUid(it.uid) : nullptr;
                auto* ln = lg != nullptr ? dynamic_cast<LightNode*>(lg->node.get()) : nullptr;
-               DrawLightShape(dl, scene, it, p, ln != nullptr && !sel ? ImGui::ColorConvertFloat4ToU32(ImVec4(ln->color[0], ln->color[1], ln->color[2], tok::view3d_viewport_alpha_2)) : col);
+               DrawLightShape(dl, scene, it, p, ln != nullptr && !sel ? ImGui::ColorConvertFloat4ToU32(ImVec4(ln->color[0], ln->color[1], ln->color[2], tok::view3d_viewport_y)) : col);
             }
          }
          else if (sel && sSet->outlineSel)
@@ -5379,7 +5379,7 @@ namespace
             Line3D(dl, a, b, AxisColor(sOp.axis), 1.5f);
          }
          if (onScreen && sOp.mode != 'g')
-            dl->AddLine(c, mouse, Hex(kWire, tok::view3d_viewport_hex_alpha_10));
+            dl->AddLine(c, mouse, Hex(kWire, tok::view3d_viewport_line_alpha_lg));
       }
 
       // The nav ball and tool pad sit above Pose, Sculpt and Edit: a press on them is theirs, not a stroke or a box select.
@@ -5533,13 +5533,13 @@ namespace
          ImVec2 a, b;
          if (Project(sMeasureA, a) && Project(sMeasureB, b))
          {
-            dl->AddLine(a, b, Hex(tok::view3d_viewport_hex_rgb_5, tok::view3d_viewport_hex_alpha_11), tok::view3d_viewport_stroke);
-            dl->AddCircleFilled(a, tok::view3d_viewport_r_2, Hex(tok::view3d_viewport_hex_rgb_5));
-            dl->AddCircleFilled(b, tok::view3d_viewport_r_2, Hex(tok::view3d_viewport_hex_rgb_5));
+            dl->AddLine(a, b, Hex(tok::view3d_dot_shade_lg, tok::view3d_text_alpha_lg), tok::view3d_viewport_stroke);
+            dl->AddCircleFilled(a, tok::view3d_dot_r_sm, Hex(tok::view3d_dot_shade_lg));
+            dl->AddCircleFilled(b, tok::view3d_dot_r_sm, Hex(tok::view3d_dot_shade_lg));
             const float dx = sMeasureB[0] - sMeasureA[0], dy = -(sMeasureB[2] - sMeasureA[2]), dz = sMeasureB[1] - sMeasureA[1];
             char text[96];
             snprintf(text, sizeof(text), "%s  (X %s  Y %s  Z %s)", UiFmt::F3(std::sqrt(dx * dx + dy * dy + dz * dz)).c, UiFmt::F2(dx).c, UiFmt::F2(dy).c, UiFmt::F2(dz).c);
-            dl->AddText(ImVec2((a.x + b.x) * 0.5f + tok::space_2, (a.y + b.y) * 0.5f - tok::view3d_viewport_gap), Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_11), text);
+            dl->AddText(ImVec2((a.x + b.x) * 0.5f + tok::space_2, (a.y + b.y) * 0.5f - tok::view3d_viewport_gap), Hex(tok::view3d_text_shade, tok::view3d_text_alpha_lg), text);
          }
          if (Keymap::Cancel(false) || sTool != 0 || sSelMode != 3)
             sMeasured = sMeasuring = false;
@@ -5549,13 +5549,13 @@ namespace
          ImVec2 a, b;
          if (Project(r.a, a) && Project(r.b, b))
          {
-            dl->AddLine(a, b, Hex(tok::view3d_viewport_hex_rgb_5, tok::view3d_viewport_hex_alpha_11), tok::view3d_viewport_stroke);
-            dl->AddCircleFilled(a, tok::view3d_viewport_r_2, Hex(tok::view3d_viewport_hex_rgb_5));
-            dl->AddCircleFilled(b, tok::view3d_viewport_r_2, Hex(tok::view3d_viewport_hex_rgb_5));
+            dl->AddLine(a, b, Hex(tok::view3d_dot_shade_lg, tok::view3d_text_alpha_lg), tok::view3d_viewport_stroke);
+            dl->AddCircleFilled(a, tok::view3d_dot_r_sm, Hex(tok::view3d_dot_shade_lg));
+            dl->AddCircleFilled(b, tok::view3d_dot_r_sm, Hex(tok::view3d_dot_shade_lg));
             const float dx = r.b[0] - r.a[0], dy = -(r.b[2] - r.a[2]), dz = r.b[1] - r.a[1];
             char text[64];
             snprintf(text, sizeof(text), "%s", UiFmt::F3(std::sqrt(dx * dx + dy * dy + dz * dz)).c);
-            dl->AddText(ImVec2((a.x + b.x) * 0.5f + tok::space_2, (a.y + b.y) * 0.5f - tok::view3d_viewport_gap), Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_11), text);
+            dl->AddText(ImVec2((a.x + b.x) * 0.5f + tok::space_2, (a.y + b.y) * 0.5f - tok::view3d_viewport_gap), Hex(tok::view3d_text_shade, tok::view3d_text_alpha_lg), text);
          }
       }
       if (sTool == 0 && sSelMode == 3 && hovered && !sRulers.empty() && Keymap::KeyPressed(Keymap::Act::DeleteAlt))
@@ -5565,7 +5565,7 @@ namespace
          // Circle select: the wheel sizes the brush, a drag selects, shift or ctrl keeps what was selected.
          if (io.MouseWheel != 0.0f)
             sCircleR = std::clamp(sCircleR * std::pow(1.1f, io.MouseWheel), 8.0f, 400.0f);
-         dl->AddCircle(mouse, sCircleR, Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_8), tok::view3d_viewport_segments, tok::view3d_viewport_stroke_2);
+         dl->AddCircle(mouse, sCircleR, Hex(tok::view3d_text_shade, tok::view3d_wire_alpha_lg), tok::view3d_viewport_segments, tok::view3d_ring_stroke);
          if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && !sNavDrag)
             for (const Item& it : scene->Items())
             {
@@ -5587,12 +5587,12 @@ namespace
                sLassoPts.push_back(mouse);
             const size_t n = sLassoPts.size();
             for (size_t i = 0; i < n; i++)
-               dl->AddLine(sLassoPts[i], sLassoPts[(i + 1) % n], Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_10));
+               dl->AddLine(sLassoPts[i], sLassoPts[(i + 1) % n], Hex(tok::view3d_text_shade, tok::view3d_viewport_line_alpha_lg));
          }
          else
          {
             sLasso = false;
-            if (sLassoPts.size() > tok::view3d_viewport_limit_2)
+            if (sLassoPts.size() > tok::view3d_viewport_limit_sm)
             {
                if (!io.KeyShift)
                   sSel.clear();
@@ -5641,8 +5641,8 @@ namespace
          const bool dragged = hi.x - lo.x > tok::view3d_dragged_limit || hi.y - lo.y > tok::view3d_dragged_limit;
          if (dragged)
          {
-            dl->AddRectFilled(lo, hi, Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_12));
-            dl->AddRect(lo, hi, Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_10));
+            dl->AddRectFilled(lo, hi, Hex(tok::view3d_text_shade, tok::view3d_fill_alpha_sm));
+            dl->AddRect(lo, hi, Hex(tok::view3d_text_shade, tok::view3d_viewport_line_alpha_lg));
          }
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
          {
@@ -5717,7 +5717,7 @@ namespace
             ImVec2 q;
             const bool ok = Project(p, q);
             if (ok && havePrev)
-               dl->AddLine(prev, q, Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_13));
+               dl->AddLine(prev, q, Hex(tok::view3d_text_shade, tok::view3d_viewport_line_alpha_sm));
             prev = q;
             havePrev = ok;
          }
@@ -5728,18 +5728,18 @@ namespace
          const char* orient = sOp.axis < 0 && sOp.plane < 0 ? "" : sOp.orient == 1 ? T("Local ") : sOp.orient == 2 ? T("View ") : T("Global ");
          snprintf(line, sizeof(line), "%s %s%s%s", sOp.mode == 'g' ? T("Move") : sOp.mode == 'r' ? T("Rotate") : T("Scale"), orient,
                   sOp.axis < 0 ? "" : sOp.axis == 0 ? "X " : sOp.axis == 1 ? "Z " : "Y ", sOp.typed.c_str());
-         dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - tok::space_5), Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_11), line);
+         dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - tok::space_5), Hex(tok::view3d_text_shade, tok::view3d_text_alpha_lg), line);
       }
       else if (sZoomArmed)
-         dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - tok::space_5), Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_11), T("Drag a box to zoom into"));
+         dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - tok::space_5), Hex(tok::view3d_text_shade, tok::view3d_text_alpha_lg), T("Drag a box to zoom into"));
       if (scene->Items().empty())
       {
          const char* head = T("Nothing in the 3D View yet");
          const char* hint = T("Shift+A adds a camera, a light or a node from the canvas");
          const ImVec2 hs = ImGui::CalcTextSize(head), ts = ImGui::CalcTextSize(hint);
          const float midY = (mn.y + mx.y) * 0.5f;
-         dl->AddText(ImVec2((mn.x + mx.x - hs.x) * 0.5f, midY - hs.y - tok::space_1), Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_8), head);
-         dl->AddText(ImVec2((mn.x + mx.x - ts.x) * 0.5f, midY + tok::space_1), Hex(tok::view3d_viewport_hex_rgb_6, tok::view3d_viewport_hex_alpha_14), hint);
+         dl->AddText(ImVec2((mn.x + mx.x - hs.x) * 0.5f, midY - hs.y - tok::space_1), Hex(tok::view3d_text_shade, tok::view3d_wire_alpha_lg), head);
+         dl->AddText(ImVec2((mn.x + mx.x - ts.x) * 0.5f, midY + tok::space_1), Hex(tok::view3d_text_shade, tok::view3d_text_alpha_sm), hint);
       }
       dl->PopClipRect();
    }
@@ -6071,7 +6071,7 @@ namespace
             PushUndoCheckpoint("Edit in 3D View");
             *enable = on;
          }
-         x += tok::view3d_x_3;
+         x += tok::view3d_win_card_x;
       }
       // The name opens the window; the gear sits at the right end, lit while the window is open.
       ImGui::SetCursorScreenPos(ImVec2(x, p.y));
@@ -6096,7 +6096,7 @@ namespace
          glyph::InkBox(gc, 16.0f, IconsInfinite::Sliders, ia, ib);
          const float m = std::max(ib.x - ia.x, ib.y - ia.y);
          const float ink = std::round(CheckBox::Size() * tok::view3d_win_card_ratio);
-         glyph::Draw(dl, gc, m > 1.0f ? std::round(tok::view3d_win_card_ratio_2 * ink / m) : tok::view3d_win_card_draw,
+         glyph::Draw(dl, gc, m > 1.0f ? std::round(tok::view3d_win_card_strum_frames * ink / m) : tok::view3d_win_card_top,
                      open ? ImGui::GetColorU32(app::AccentEmphasisSelected()) : text, IconsInfinite::Sliders);
       }
       ImGui::PopID();
@@ -6284,7 +6284,7 @@ namespace
          if (sRename == it.id)
          {
             ImGui::SetCursorScreenPos(ImVec2(p.x + tok::space_5, midY - ImGui::GetFrameHeight() * 0.5f));
-            ImGui::SetNextItemWidth(availW - tok::view3d_outliner_gap_2);
+            ImGui::SetNextItemWidth(availW - tok::view3d_field_w_sm);
             if (sRenameFocus)
                UiInteract::FocusHere();
             const bool enter = FieldWell::InputText("##rename", sRenameBuf, sizeof(sRenameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
@@ -6302,12 +6302,12 @@ namespace
          }
          else
          {
-            dl->PushClipRect(p, ImVec2(p.x + availW - tok::view3d_outliner_gap_3, p.y + rowH), true);
-            dl->AddText(ImVec2(p.x + tok::view3d_outliner_gap_4, midY - ImGui::GetTextLineHeight() * 0.5f), text, shown.c_str());
+            dl->PushClipRect(p, ImVec2(p.x + availW - tok::view3d_clip_rect_x, p.y + rowH), true);
+            dl->AddText(ImVec2(p.x + tok::view3d_text_x, midY - ImGui::GetTextLineHeight() * 0.5f), text, shown.c_str());
             dl->PopClipRect();
          }
          if (it.id == scene->activeCamera)
-            glyph::Draw(dl, ImVec2(p.x + availW - tok::view3d_outliner_gap_5, midY), tok::icon_control, ImGui::GetColorU32(AccentEmphasisSelected()), IconsInfinite::ViewCamera);
+            glyph::Draw(dl, ImVec2(p.x + availW - tok::view3d_outliner_x, midY), tok::icon_control, ImGui::GetColorU32(AccentEmphasisSelected()), IconsInfinite::ViewCamera);
          float colX = availW - tok::control_h;
          if (lf.colRender)
          {
@@ -6824,7 +6824,7 @@ namespace
          const bool radians = sSet->rotUnits == 1;
          if (radians)
             for (float& r : rot)
-               r *= tok::view3d_r_2;
+               r *= tok::view3d_object_tab_r_sm;
          ComboRow(T("Rotation mode"), &sItemRotMode, { T("XYZ Euler"), T("Quaternion"), T("Axis Angle") }, "Rotation mode");
          bool rotEdited = false;
          if (sItemRotMode != 0)
@@ -6858,7 +6858,7 @@ namespace
          {
             if (radians)
                for (float& r : rot)
-                  r *= tok::view3d_r_3;
+                  r *= tok::view3d_object_tab_r_lg;
             FromDisplayRotation(rot, item->rot);
             rotEdited = true;
          }
@@ -7614,9 +7614,9 @@ namespace
             Undoable("Edit in 3D View");
             FieldWell::PopStyle();
             if (cw)
-               KeepingLenses(scene, [&] { scene->renderW = (float)std::clamp(w, tok::view3d_output_tab_bound, tok::view3d_output_tab_bound_2); });
+               KeepingLenses(scene, [&] { scene->renderW = (float)std::clamp(w, tok::view3d_w_lo, tok::view3d_w_hi); });
             if (ch)
-               KeepingLenses(scene, [&] { scene->renderH = (float)std::clamp(h, tok::view3d_output_tab_bound, tok::view3d_output_tab_bound_2); });
+               KeepingLenses(scene, [&] { scene->renderH = (float)std::clamp(h, tok::view3d_w_lo, tok::view3d_w_hi); });
          }
          FloatRow(T("Resolution %"), &sSet->percent, params::view3d::percent_lo, params::view3d::percent_hi, "%.0f%%");
          FieldLabel(T("Final size"));
@@ -7996,7 +7996,7 @@ namespace
       ActionButton::RowNext();
       BeginCardColumn("##v3dprops", ImGuiChildFlags_None);
       availW = std::floor(ImGui::GetContentRegionAvail().x);
-      sFieldW = std::max(tok::view3d_side_bound, availW - FieldLabelW());
+      sFieldW = std::max(tok::view3d_field_w_min, availW - FieldLabelW());
       sCard.clear();
       if (sTab == kSceneTab) DrawOutliner(scene, availW, ImGui::GetContentRegionAvail().y);
       else if (sTab == 0) DrawRenderTab(scene);
@@ -8174,7 +8174,7 @@ namespace
    {
       GraphNode* self = SceneGraphNode();
       ImVec2 at = self != nullptr ? NodePos(*self) : ImVec2(0, 0);
-      at.x -= tok::view3d_x_4;
+      at.x -= tok::view3d_spawn_spot_x;
       at.y += tok::view3d_y_ratio * (float)scene->Items().size();
       return at;
    }
@@ -8491,8 +8491,8 @@ namespace
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
       const float sideBase = std::min(kSideW, avail.x * 0.5f);
       const float sideW = sSideOpen ? sideBase : 0.0f;
-      const float viewW = std::max(tok::view3d_panel_bound, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
-      DrawViewport(scene, ImVec2(viewW, std::max(tok::view3d_panel_bound_2, avail.y)));
+      const float viewW = std::max(tok::view3d_view_w_min, avail.x - sideW - (sSideOpen ? gapX : 0.0f));
+      DrawViewport(scene, ImVec2(viewW, std::max(tok::view3d_min, avail.y)));
       if (sSideOpen)
       {
          ActionButton::RowNext();

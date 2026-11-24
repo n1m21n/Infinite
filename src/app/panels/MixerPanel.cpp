@@ -518,7 +518,7 @@ namespace app
                for (int i = 0; i < 12; i++)
                {
                   const unsigned c = kPalette[i];
-                  dots[i] = IM_COL32((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, tok::mixer_strip_name_actions_rgb_2);  // ui-audit-ok: channel mask / bit packing, not a colour value
+                  dots[i] = IM_COL32((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, tok::mixer_strip_name_actions_alpha_hex);  // ui-audit-ok: channel mask / bit packing, not a colour value
                   if (m->chColor[r.slot] == c)
                      cur = i;
                }
@@ -769,13 +769,13 @@ namespace app
       using DeskParts::kPotRowH;
       using DeskParts::kPlateH;
 
-      ImU32 RgbToU32(unsigned rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, tok::mixer_rgb_to_u32_alpha_2); }  // ui-audit-ok: channel mask / bit packing, not a colour value
+      ImU32 RgbToU32(unsigned rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, tok::mixer_strip_name_actions_alpha_u8); }  // ui-audit-ok: channel mask / bit packing, not a colour value
 
 
       float StripFaderH(float h, bool sends)
       {
          return std::max(kMinFaderH, h - tok::mixer_strip_fader_h_ratio * kCardPad - kScribbleH - kPotRowH - (sends ? kSendH + tok::space_0_5 : 0.0f) - kButtonsH -
-                                         tok::mixer_strip_fader_h_ratio * kPlateH - tok::mixer_strip_fader_h_ratio_2 * kRowGap);
+                                         tok::mixer_strip_fader_h_ratio * kPlateH - tok::mixer_strip_fader_h_min * kRowGap);
       }
 
       void DrawScrew(ImDrawList* dl, ImVec2 c) { DeskParts::Screw(dl, c); }
@@ -817,31 +817,31 @@ namespace app
          // value arc, from the left stop (unipolar) or from the centre (bipolar)
          const float from = bipolar ? Lerp(a0, a1, 0.5f) : a0;   // ui-audit-ok: midpoint of a bipolar range
          dl->PathArcTo(c, R + tok::mixer_pot_gap, a0, a1, tok::mixer_pot_segments);
-         dl->PathStroke(Lo(tok::mixer_pot_lo_alpha_4), 0, tok::mixer_pot_stroke);
+         dl->PathStroke(Lo(tok::mixer_pot_lo_alpha_md), 0, tok::mixer_pot_stroke);
          if (std::fabs(ang - from) > 0.01f)
          {
             dl->PathArcTo(c, R + tok::mixer_pot_gap, std::min(from, ang), std::max(from, ang), tok::mixer_pot_segments);
             dl->PathStroke(col, 0, tok::mixer_pot_stroke);
          }
-         dl->AddCircleFilled(ImVec2(c.x, c.y + tok::mixer_pot_gap_2), R, Lo(tok::mixer_pot_lo_alpha_5), tok::mixer_pot_segments_2);        // drop shadow
-         dl->AddCircleFilled(c, R, DeskParts::Role(tok::desk_knurl), tok::mixer_pot_segments_2);                                   // skirt
+         dl->AddCircleFilled(ImVec2(c.x, c.y + tok::mixer_dot_y), R, Lo(tok::mixer_pot_lo_alpha_sm), tok::mixer_dot_segments_lg);        // drop shadow
+         dl->AddCircleFilled(c, R, DeskParts::Role(tok::desk_knurl), tok::mixer_dot_segments_lg);                                   // skirt
          for (int i = 0; i < 24; i++)                                               // knurl
          {
             const float a = (float)i / 24.0f * 2.0f * IM_PI;
-            dl->AddLine(ImVec2(c.x + cosf(a) * (R - tok::mixer_pot_bias), c.y + sinf(a) * (R - tok::mixer_pot_bias)), ImVec2(c.x + cosf(a) * (R - tok::mixer_pot_bias_2), c.y + sinf(a) * (R - tok::mixer_pot_bias_2)),
-                        Hi(hovered || active ? tok::mixer_pot_hi_alpha_3 : tok::mixer_pot_hi_alpha_4), tok::mixer_pot_stroke_2);
+            dl->AddLine(ImVec2(c.x + cosf(a) * (R - tok::mixer_pot_inset_lg), c.y + sinf(a) * (R - tok::mixer_pot_inset_lg)), ImVec2(c.x + cosf(a) * (R - tok::mixer_pot_inset_sm), c.y + sinf(a) * (R - tok::mixer_pot_inset_sm)),
+                        Hi(hovered || active ? tok::mixer_pot_hi_alpha_lg : tok::mixer_pot_hi_alpha_sm), tok::mixer_line_stroke_sm);
          }
          const float cr = R - 4.0f;
          const ImU32 pot = tok::U32(tok::desk_pot);
          dl->AddCircleFilled(c, cr, pot, tok::mixer_pot_segments);                                       // cap
-         dl->AddCircleFilled(ImVec2(c.x - 1.0f, c.y - tok::mixer_pot_gap_2), cr - tok::mixer_pot_gap_2, Tint(pot, tok::mixer_pot_tint_shade_3), tok::mixer_pot_segments);
-         dl->AddCircleFilled(ImVec2(c.x - tok::mixer_pot_gap_2, c.y - tok::mixer_pot_gap), cr - tok::space_1, Tint(pot, tok::mixer_pot_tint_shade_4), tok::mixer_pot_segments_3);
-         dl->AddCircle(c, cr, Lo(tok::mixer_pot_lo_alpha_6), tok::mixer_pot_segments, 1.0f);
-         dl->AddLine(ImVec2(c.x + cosf(ang) * tok::mixer_pot_ratio, c.y + sinf(ang) * tok::mixer_pot_ratio), ImVec2(c.x + cosf(ang) * (cr - tok::mixer_pot_bias_2), c.y + sinf(ang) * (cr - tok::mixer_pot_bias_2)),
-                     col, tok::mixer_pot_stroke_3);
+         dl->AddCircleFilled(ImVec2(c.x - 1.0f, c.y - tok::mixer_dot_y), cr - tok::mixer_dot_y, Tint(pot, tok::mixer_dot_alpha_sm), tok::mixer_pot_segments);
+         dl->AddCircleFilled(ImVec2(c.x - tok::mixer_dot_y, c.y - tok::mixer_pot_gap), cr - tok::space_1, Tint(pot, tok::mixer_dot_alpha_lg), tok::mixer_dot_segments_sm);
+         dl->AddCircle(c, cr, Lo(tok::mixer_pot_lo_alpha_lg), tok::mixer_pot_segments, 1.0f);
+         dl->AddLine(ImVec2(c.x + cosf(ang) * tok::mixer_pot_ratio, c.y + sinf(ang) * tok::mixer_pot_ratio), ImVec2(c.x + cosf(ang) * (cr - tok::mixer_pot_inset_sm), c.y + sinf(ang) * (cr - tok::mixer_pot_inset_sm)),
+                     col, tok::mixer_line_stroke_lg);
          const float fs = UiType::Px(UiType::Size::Caption);
          const float tw = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, tag).x;
-         dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + (cellW - tw) * 0.5f, p.y + kPotD + tok::space_0_75), Ink(tok::mixer_pot_ink_alpha_2), tag);
+         dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + (cellW - tw) * 0.5f, p.y + kPotD + tok::space_0_75), Ink(tok::mixer_text_shade_md), tag);
          return changed;
       }
 
@@ -889,32 +889,32 @@ namespace app
          {
             const float y = bottom - pos01(kMarks[i]) * (bottom - top);
             const bool zero = kMarks[i] == 0.0f;
-            dl->AddLine(ImVec2(p.x + scaleW - tok::space_1_25, y), ImVec2(p.x + scaleW - tok::space_0_25, y), Ink(zero ? tok::mixer_desk_fader_ink_alpha_6 : tok::mixer_desk_fader_ink_alpha_7), tok::mixer_desk_fader_stroke);
+            dl->AddLine(ImVec2(p.x + scaleW - tok::space_1_25, y), ImVec2(p.x + scaleW - tok::space_0_25, y), Ink(zero ? tok::mixer_line_shade_lg : tok::mixer_line_shade_md), tok::mixer_desk_fader_stroke);
             const float tw = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, kLabels[i]).x;
-            dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + scaleW - tok::mixer_desk_fader_gap - tw, y - fs * 0.5f), Ink(zero ? tok::mixer_desk_fader_ink_alpha_8 : tok::mixer_desk_fader_ink_alpha_9), kLabels[i]);
+            dl->AddText(ImGui::GetFont(), fs, ImVec2(p.x + scaleW - tok::mixer_desk_fader_gap - tw, y - fs * 0.5f), Ink(zero ? tok::mixer_text_shade_lg : tok::mixer_text_shade_sm), kLabels[i]);
          }
          // slot, with a colour fill below the cap
-         dl->AddRectFilled(ImVec2(slotX - tok::space_0_75, top - tok::space_1), ImVec2(slotX + tok::space_0_75, bottom + tok::space_1), Lo(tok::mixer_desk_fader_lo_alpha_5), tok::mixer_desk_fader_radius);
-         dl->AddRect(ImVec2(slotX - tok::space_0_75, top - tok::space_1), ImVec2(slotX + tok::space_0_75, bottom + tok::space_1), Hi(tok::mixer_desk_fader_hi_alpha_5), tok::mixer_desk_fader_radius);
-         dl->AddRectFilled(ImVec2(slotX - 1.0f, capY), ImVec2(slotX + 1.0f, bottom + tok::space_0_75), Tint(col, tok::mixer_desk_fader_tint_shade_5, tok::mixer_desk_fader_tint_alpha_2), 1.0f);
+         dl->AddRectFilled(ImVec2(slotX - tok::space_0_75, top - tok::space_1), ImVec2(slotX + tok::space_0_75, bottom + tok::space_1), Lo(tok::mixer_desk_fader_lo_alpha_lg), tok::mixer_desk_fader_radius);
+         dl->AddRect(ImVec2(slotX - tok::space_0_75, top - tok::space_1), ImVec2(slotX + tok::space_0_75, bottom + tok::space_1), Hi(tok::mixer_desk_fader_hi_alpha_xs), tok::mixer_desk_fader_radius);
+         dl->AddRectFilled(ImVec2(slotX - 1.0f, capY), ImVec2(slotX + 1.0f, bottom + tok::space_0_75), Tint(col, tok::mixer_fill_alpha_md, tok::mixer_fill_alpha_sm_u8), 1.0f);
          const float y0 = bottom - pos01(0.0f) * (bottom - top);
-         dl->AddLine(ImVec2(slotX - tok::space_1_5, y0), ImVec2(slotX + tok::space_1_5, y0), Ink(tok::mixer_desk_fader_ink_alpha_10), tok::mixer_desk_fader_stroke);
+         dl->AddLine(ImVec2(slotX - tok::space_1_5, y0), ImVec2(slotX + tok::space_1_5, y0), Ink(tok::mixer_line_shade_sm), tok::mixer_desk_fader_stroke);
          // cap
          const ImVec2 a(slotX - capW * 0.5f, capY - capH * 0.5f), b(slotX + capW * 0.5f, capY + capH * 0.5f);
-         dl->AddRectFilled(ImVec2(a.x, a.y + tok::mixer_desk_fader_gap_2), ImVec2(b.x, b.y + tok::mixer_desk_fader_gap_2), Lo(tok::mixer_desk_fader_lo_alpha_6), tok::mixer_desk_fader_radius);
-         const ImU32 metal = tok::U32(tok::desk_metal), capTop = Tint(metal, active ? tok::mixer_desk_fader_tint_shade_6 : hovered ? tok::mixer_desk_fader_tint_shade_7 : 1.0f);
-         dl->AddRectFilledMultiColor(a, b, capTop, capTop, Tint(metal, tok::mixer_desk_fader_tint_shade_8), Tint(metal, tok::mixer_desk_fader_tint_shade_8));
-         dl->AddRect(a, b, Lo(tok::mixer_desk_fader_lo_alpha_7), tok::mixer_desk_fader_radius, 0, tok::mixer_desk_fader_stroke);
-         dl->AddLine(ImVec2(a.x + tok::mixer_desk_fader_gap_3, a.y + tok::mixer_desk_fader_gap_3), ImVec2(b.x - tok::mixer_desk_fader_gap_3, a.y + tok::mixer_desk_fader_gap_3), Hi(tok::mixer_desk_fader_hi_alpha_6), tok::mixer_desk_fader_stroke);
+         dl->AddRectFilled(ImVec2(a.x, a.y + tok::mixer_fill_y), ImVec2(b.x, b.y + tok::mixer_fill_y), Lo(tok::mixer_desk_fader_lo_alpha_sm), tok::mixer_desk_fader_radius);
+         const ImU32 metal = tok::U32(tok::desk_metal), capTop = Tint(metal, active ? tok::mixer_metal_alpha_lg : hovered ? tok::mixer_metal_alpha_sm : 1.0f);
+         dl->AddRectFilledMultiColor(a, b, capTop, capTop, Tint(metal, tok::mixer_fill_alpha_sm), Tint(metal, tok::mixer_fill_alpha_sm));
+         dl->AddRect(a, b, Lo(tok::mixer_desk_fader_lo_alpha_md), tok::mixer_desk_fader_radius, 0, tok::mixer_desk_fader_stroke);
+         dl->AddLine(ImVec2(a.x + tok::mixer_line_x, a.y + tok::mixer_line_x), ImVec2(b.x - tok::mixer_line_x, a.y + tok::mixer_line_x), Hi(tok::mixer_desk_fader_hi_alpha_md), tok::mixer_desk_fader_stroke);
          for (int i = -2; i <= 2; i++) // grip ridges
          {
             const float gy = capY + (float)i * 3.0f + (i > 0 ? 1.5f : -1.5f) * 0.0f;
             if (i == 0)
                continue;
-            dl->AddLine(ImVec2(a.x + tok::space_0_75, gy), ImVec2(b.x - tok::space_0_75, gy), Lo(tok::mixer_desk_fader_lo_alpha_8), tok::mixer_desk_fader_stroke);
-            dl->AddLine(ImVec2(a.x + tok::space_0_75, gy + tok::space_0_25), ImVec2(b.x - tok::space_0_75, gy + tok::space_0_25), Hi(tok::mixer_desk_fader_hi_alpha_7), tok::mixer_desk_fader_stroke);
+            dl->AddLine(ImVec2(a.x + tok::space_0_75, gy), ImVec2(b.x - tok::space_0_75, gy), Lo(tok::mixer_desk_fader_lo_alpha_xs), tok::mixer_desk_fader_stroke);
+            dl->AddLine(ImVec2(a.x + tok::space_0_75, gy + tok::space_0_25), ImVec2(b.x - tok::space_0_75, gy + tok::space_0_25), Hi(tok::mixer_desk_fader_hi_alpha_sm), tok::mixer_desk_fader_stroke);
          }
-         dl->AddLine(ImVec2(a.x + tok::space_0_5, capY), ImVec2(b.x - tok::space_0_5, capY), Hi(tok::mixer_desk_fader_hi_alpha_8), tok::mixer_desk_fader_stroke_2);
+         dl->AddLine(ImVec2(a.x + tok::space_0_5, capY), ImVec2(b.x - tok::space_0_5, capY), Hi(tok::mixer_desk_fader_hi_alpha_lg), tok::mixer_line_stroke_md);
          // meter
          ImGui::PushID("mtr");
          DeskParts::ConsoleMeter(p.x + w - meterW, p.y, meterW, h, level, true);
@@ -930,24 +930,24 @@ namespace app
       {
          const ImVec2 q(p.x + w, p.y + kScribbleH);
          dl->AddRectFilled(p, q, DeskParts::Role(tok::desk_scribble_bg), tok::mixer_scribble_radius);
-         dl->AddRectFilled(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, p.y + tok::space_1_25), Tint(col, tok::mixer_scribble_tint_shade_4, tok::mixer_scribble_tint_alpha_2), tok::mixer_scribble_radius_2, ImDrawFlags_RoundCornersTop);
-         dl->AddRect(p, q, Ink(tok::mixer_scribble_ink_alpha_3), tok::mixer_scribble_radius);
+         dl->AddRectFilled(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, p.y + tok::space_1_25), Tint(col, tok::mixer_fill_alpha_lg, tok::mixer_fill_alpha_lg_u8), tok::mixer_fill_radius, ImDrawFlags_RoundCornersTop);
+         dl->AddRect(p, q, Ink(tok::mixer_outline_shade_sm), tok::mixer_scribble_radius);
          ImGui::SetCursorScreenPos(p);
          bool clicked = UiInteract::Hit("##name", ImVec2(w, kScribbleH));
          const bool hovered = ImGui::IsItemHovered();
          if (strip != nullptr && StripNameActions(dl, p, w, name, *strip, clicked))
             clicked = false;
          if (hovered)
-            dl->AddRect(p, q, Ink(tok::mixer_scribble_ink_alpha_4), tok::mixer_scribble_radius);
+            dl->AddRect(p, q, Ink(tok::mixer_outline_shade_lg), tok::mixer_scribble_radius);
          char num[16];
          snprintf(num, sizeof(num), "%d", number);
          const float nfs = UiType::Px(UiType::Size::Caption);
          if (number > 0)
-            dl->AddText(ImGui::GetFont(), nfs, ImVec2(p.x + tok::space_1, p.y + tok::mixer_scribble_gap), Tint(col, app::IsThemeLight() ? tok::mixer_scribble_tint_shade_5 : tok::mixer_scribble_tint_shade_6), num);
+            dl->AddText(ImGui::GetFont(), nfs, ImVec2(p.x + tok::space_1, p.y + tok::mixer_scribble_gap), Tint(col, app::IsThemeLight() ? tok::mixer_text_alpha_sm : tok::mixer_text_alpha_lg), num);
          const ImVec2 ts = ImGui::CalcTextSize(name);
          const float tx = p.x + std::max(4.0f, (w - ts.x) * 0.5f);
          dl->PushClipRect(ImVec2(p.x + tok::space_0_75, p.y), ImVec2(q.x - tok::space_0_75, q.y), true);
-         dl->AddText(ImVec2(tx, p.y + tok::mixer_scribble_gap_2), DeskParts::Role(tok::desk_scribble_text, dim ? tok::mixer_scribble_desk_scribble_text_alpha_3 : tok::mixer_scribble_desk_scribble_text_alpha_4), name);
+         dl->AddText(ImVec2(tx, p.y + tok::mixer_text_y), DeskParts::Role(tok::desk_scribble_text, dim ? tok::mixer_text_alpha_sm_u8 : tok::mixer_text_alpha_lg_u8), name);
          dl->PopClipRect();
          if (hovered && ts.x > w - tok::space_2 && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
             HelpTip("%s", name);
@@ -1069,7 +1069,7 @@ namespace app
          }
          if (ImGui::IsItemHovered())
             HelpTip("%s", m->soloSafe[s] ? T("Solo safe (right-click)") : T("Solo (Alt-click: clear all, right-click: solo safe)"));
-         ImGui::SetCursorScreenPos(ImVec2(cx + tok::mixer_strip_ratio * (bw + tok::mixer_strip_bias), y));
+         ImGui::SetCursorScreenPos(ImVec2(cx + tok::mixer_strip_ratio * (bw + tok::mixer_ph_inset), y));
          if (Key("##ph", "\xC3\x98", m->phase[s], tok::U32(tok::desk_led_blue), ImVec2(bw, kButtonsH)))
          {
             PushUndoCheckpoint("Mixer strip");
@@ -1122,7 +1122,7 @@ namespace app
             const float dispH = kPotRowH;
             const ImVec2 dp(cx, y);
             dl->AddRectFilled(dp, ImVec2(dp.x + cw, dp.y + dispH), DeskParts::Role(tok::desk_well), tok::radius_cell);
-            dl->AddRect(dp, ImVec2(dp.x + cw, dp.y + dispH), Hi(tok::mixer_master_hi_alpha_3), tok::radius_cell);
+            dl->AddRect(dp, ImVec2(dp.x + cw, dp.y + dispH), Hi(tok::mixer_master_hi_alpha_sm), tok::radius_cell);
             ImGui::SetCursorScreenPos(dp);
             if (UiInteract::Hit("##loud", ImVec2(cw, dispH)))
                m->ResetMeters();
@@ -1142,7 +1142,7 @@ namespace app
                const float colX = dp.x + (i % 2) * (cw * 0.5f);
                const float ry = dp.y + (i / 2) * rowH + (rowH - fs) * 0.5f;
                const bool over = i == 0 && vals[0] > -1.0f; // above -1 dBTP: likely to clip once encoded
-               dl->AddText(ImGui::GetFont(), fs, ImVec2(colX + tok::space_0_75, ry), Hi(tok::mixer_master_hi_alpha_4), tags[i]);
+               dl->AddText(ImGui::GetFont(), fs, ImVec2(colX + tok::space_0_75, ry), Hi(tok::mixer_master_hi_alpha_lg), tags[i]);
                const float tw = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, txt).x;
                dl->AddText(ImGui::GetFont(), fs, ImVec2(colX + cw * 0.5f - tok::space_0_75 - tw, ry),
                            tok::U32(over ? tok::desk_readout_over : tok::desk_readout), txt);
@@ -1393,7 +1393,7 @@ namespace app
                   x += stripW + kStripGap;
                }
                ImGui::SetCursorScreenPos(base);
-               ImGui::Dummy(ImVec2(std::max(tok::mixer_panel_content_bound, x - base.x - kStripGap), colH));
+               ImGui::Dummy(ImVec2(std::max(tok::mixer_min, x - base.x - kStripGap), colH));
                gMixerStripsMin = wmn;
                gMixerStripsMax = ImVec2(wmn.x + ImGui::GetWindowWidth(), wmn.y + ImGui::GetWindowHeight());
             }
@@ -1739,8 +1739,8 @@ namespace app
       if (mGn == nullptr)
          return -1;
       const bool master = slot == kMixerMasterSlot;
-      const float x = mGn->liveX + (master ? tok::mixer_panel_insert_add_gap + tok::mixer_panel_insert_add_ratio * (float)ch.fx.size() : -tok::mixer_panel_insert_add_arith);
-      const float y = mGn->liveY + (master ? 0.0f : tok::mixer_panel_insert_add_ratio_2 * (float)slot);
+      const float x = mGn->liveX + (master ? tok::mixer_panel_insert_add_gap + tok::mixer_panel_insert_add_ratio * (float)ch.fx.size() : -tok::mixer_insert_inset);
+      const float y = mGn->liveY + (master ? 0.0f : tok::mixer_insert_scale * (float)slot);
       UndoScope undo("Add insert");
       GraphNode* fx = SpawnNode(fxType, "AudioEffects", x, y);
       if (fx == nullptr || fx->node->AudioInputSlot(0) == nullptr)

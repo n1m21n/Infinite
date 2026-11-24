@@ -48,7 +48,7 @@ namespace app
          EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(gn.node.get(), T("No geometry")));
       }
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                  tok::Role(tok::col::edge_lo_2), tok::radius_control);
+                  tok::Role(tok::col::edge_lo_light), tok::radius_control);
 
       // Same drag-to-orbit / scroll-to-zoom feel as DrawPreview's embedded
       // Render3DNode viewport. Orbit rotates this node's own entry in
@@ -80,7 +80,7 @@ namespace app
       ApplyViewHotkeys(cam.azimuth, cam.elevation);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     tok::Role(tok::col::accent_2, tok::viewport_mini_accent_2_alpha_2), tok::viewport_mini_radius, 0, tok::viewport_mini_stroke);
+                     tok::Role(tok::col::accent_pale_muted_warm, tok::viewport_outline_alpha), tok::viewport_mini_radius, 0, tok::viewport_mini_stroke);
    }
 
 
@@ -192,7 +192,7 @@ namespace app
       const float titleH = ViewportPanelTitleHeight();
       const float pad = kViewportCardPad;
       // The render's own box: the card minus its padding and title row.
-      const ImVec2 imageSize(std::max(tok::viewport_panel_card_bound, cardSize.x - pad * tok::viewport_panel_card_ratio), std::max(tok::viewport_panel_card_bound, cardSize.y - titleH - pad));
+      const ImVec2 imageSize(std::max(tok::viewport_card_min, cardSize.x - pad * tok::viewport_panel_card_ratio), std::max(tok::viewport_card_min, cardSize.y - titleH - pad));
       char childId[32];
       snprintf(childId, sizeof(childId), "##viewportcard%d", gn.index);
       PushDockedPanelStyle(/*isChild=*/true);
@@ -219,9 +219,9 @@ namespace app
          const bool hot = ImGui::IsItemHovered();
          ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          if (hot)
-            dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, ImGui::IsItemActive() ? tok::viewport_panel_card_alpha_3 : tok::viewport_panel_card_alpha_4)),
+            dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, ImGui::IsItemActive() ? tok::viewport_card_y_lg : tok::viewport_card_y_sm)),
                               tok::radius_control);
-         t.w *= hot ? 1.0f : tok::viewport_w_2;
+         t.w *= hot ? 1.0f : tok::viewport_card_w;
          glyph::DrawX(dl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tile * 0.5f, ImGui::GetColorU32(t));
       }
       {
@@ -262,7 +262,7 @@ namespace app
          if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
          {
             const ImVec2 drag = ImGui::GetIO().MouseDelta;
-            viewport.Orbit(cam, drag.x * tok::viewport_panel_card_ratio_2, drag.y * tok::viewport_panel_card_ratio_2);
+            viewport.Orbit(cam, drag.x * tok::viewport_orbit_d_azimuth, drag.y * tok::viewport_orbit_d_azimuth);
          }
          if (ImGui::IsItemHovered())
          {
@@ -277,7 +277,7 @@ namespace app
          // matching drag-orbit just above on this same gNodeCameras entry.
          ApplyViewHotkeys(cam.azimuth, cam.elevation);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, tok::viewport_panel_card_check_mark_alpha_2), tok::radius_control, 0, tok::viewport_panel_card_stroke);
+            dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, tok::viewport_color_alpha_mul), tok::radius_control, 0, tok::viewport_panel_card_stroke);
          // Layout cursor already sits at origin+imageSize from the
          // InvisibleButton above; the trailing Dummy(imageSize) below is
          // shared with the non-geometry branch, so rewind rather than
@@ -368,7 +368,7 @@ namespace app
             {
                const ImVec2 drag = ImGui::GetIO().MouseDelta;
                *azimuth -= drag.x * tok::viewport_azimuth_ratio;
-               *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * tok::viewport_panel_card_ratio_2, 85.9437f));
+               *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * tok::viewport_orbit_d_azimuth, 85.9437f));
             }
             if (ImGui::IsItemHovered())
             {
@@ -383,7 +383,7 @@ namespace app
             // this render's "orbit"/"elevation" sliders (main.cpp ~23053).
             ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-               dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, tok::viewport_panel_card_check_mark_alpha_2), tok::radius_control, 0, tok::viewport_panel_card_stroke);
+               dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, tok::viewport_color_alpha_mul), tok::radius_control, 0, tok::viewport_panel_card_stroke);
             ImGui::SetCursorScreenPos(origin);
          }
       }

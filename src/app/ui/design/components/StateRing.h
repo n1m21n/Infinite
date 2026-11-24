@@ -16,7 +16,7 @@ namespace StateRing
       constexpr float kOutset = 2.0f;
       constexpr float kWeight = tok::stroke_ring;
       ImU32 col = kind == Kind::Learn ? (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation))
-                                      : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4));
+                                      : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo));
       if (kind == Kind::Learn)
       {
          const float pulse = UiAnim::ReduceMotion() ? 1.0f : 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 5.0f);
@@ -32,7 +32,7 @@ namespace StateRing
    inline void DrawCircle(ImDrawList* dl, ImVec2 c, float r, Kind kind, bool isLight)
    {
       ImU32 col = kind == Kind::Learn ? (isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation))
-                                      : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4));
+                                      : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo));
       if (kind == Kind::Learn)
       {
          const float pulse = UiAnim::ReduceMotion() ? 1.0f : 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 5.0f);

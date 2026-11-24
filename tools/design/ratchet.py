@@ -250,8 +250,10 @@ def main():
                 rawend.append(f"{f.relative_to(ROOT)}:{i}")
     for x in rawend: print(f"RATCHET: {x} calls ImGui::EndChild(): use EndChildSafe()")
     print(f"ratchet: raw EndChild {len(rawend)} (allowed 0)")
+    # Token names say the job (owner 2026-11-24): no _arg_N / _draw_x / _ratio_N / trailing-number names: always 0.
+    rn = subprocess.run([sys.executable, str(ROOT / "tools/design/token_names.py"), "--lint"])
     ra = subprocess.run(audit)   # per-category counts from the tokenizer scan (tools/design/ui_audit.py)
-    return 1 if bad or badw or badz or badf or badr or badp or badl or rawend or r.returncode or ra.returncode else 0
+    return 1 if bad or badw or badz or badf or badr or badp or badl or rawend or r.returncode or ra.returncode or rn.returncode else 0
 
 if __name__ == "__main__":
     sys.exit(main())

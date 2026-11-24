@@ -66,31 +66,31 @@ namespace app
       };
 
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
-      const bool isLight = (tok::minimap_ratio_2 * t.windowBg.r + tok::minimap_ratio_3 * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
+      const bool isLight = (tok::minimap_is_light_scale_sm * t.windowBg.r + tok::minimap_is_light_scale_lg * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
 
       // The graph window's own list (drawn while the editor is suspended): above the nodes, under every popup and
       // panel. The foreground list painted it over the Field Patcher's page menu.
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h),
-                        IM_COL32((int)(t.panelBg.r * tok::minimap_ratio_4), (int)(t.panelBg.g * tok::minimap_ratio_4), (int)(t.panelBg.b * tok::minimap_ratio_4), (int)(gMinimapOpacity * tok::minimap_ratio_4)), tok::radius_control);
+                        IM_COL32((int)(t.panelBg.r * tok::minimap_shade), (int)(t.panelBg.g * tok::minimap_shade), (int)(t.panelBg.b * tok::minimap_shade), (int)(gMinimapOpacity * tok::minimap_shade)), tok::radius_control);
       dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h),
-                  IM_COL32((int)(t.border.r * tok::minimap_ratio_4), (int)(t.border.g * tok::minimap_ratio_4), (int)(t.border.b * tok::minimap_ratio_4), tok::minimap_alpha_2), tok::radius_control, 0, tok::minimap_stroke);
+                  IM_COL32((int)(t.border.r * tok::minimap_shade), (int)(t.border.g * tok::minimap_shade), (int)(t.border.b * tok::minimap_shade), tok::minimap_outline_alpha_sm), tok::radius_control, 0, tok::minimap_stroke);
 
       for (const GraphNode& gn : gNodes)
       {
          const ImVec2 a = toMinimap(ImVec2(gn.liveX, gn.liveY));
          const ImVec2 b = toMinimap(ImVec2(gn.liveX + kNodeW, gn.liveY + kNodeH));
          const bool selected = ed::IsNodeSelected(gn.NodeId());
-         dl->AddRectFilled(a, b, selected ? tok::Role(tok::col::role_modulation, tok::minimap_role_modulation_alpha_2) : tok::Role(tok::col::accent_17, tok::minimap_accent_17_alpha_2), tok::radius_cell);
+         dl->AddRectFilled(a, b, selected ? tok::Role(tok::col::role_modulation, tok::minimap_fill_alpha_lg) : tok::Role(tok::col::accent_light_muted, tok::minimap_fill_alpha_sm), tok::radius_cell);
          if (FindIsMatch(gn.index))
             dl->AddRect(ImVec2(a.x - tok::minimap_gap, a.y - tok::minimap_gap), ImVec2(b.x + tok::minimap_gap, b.y + tok::minimap_gap),
-                        ImGui::GetColorU32(AccentEmphasisSelected()), tok::minimap_radius, 0, tok::minimap_stroke_2);
+                        ImGui::GetColorU32(AccentEmphasisSelected()), tok::minimap_radius, 0, tok::minimap_outline_stroke_lg);
          if (selected)
          {
             // Selection must read as more than a hue swap (HIG focus/selection
             // guidance) - add a bright outline so it's legible for colorblind
             // users and in poor viewing conditions, on top of the color change.
-            dl->AddRect(a, b, isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::ink_white), tok::minimap_radius, 0, tok::minimap_stroke_3);
+            dl->AddRect(a, b, isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::ink_white), tok::minimap_radius, 0, tok::minimap_outline_stroke_sm);
          }
       }
 
@@ -103,7 +103,7 @@ namespace app
          dl->PushClipRect(origin, ImVec2(origin.x + w, origin.y + h), true);
          const ImVec2 a = toMinimap(viewWorldTL);
          const ImVec2 b = toMinimap(viewWorldBR);
-         dl->AddRect(a, b, isLight ? tok::Base(tok::col::edge_lo, tok::minimap_edge_lo_alpha_2) : tok::Base(tok::col::ink_white, tok::minimap_ink_white_alpha_2), tok::minimap_radius, 0, tok::minimap_stroke_3);
+         dl->AddRect(a, b, isLight ? tok::Base(tok::col::edge_lo, tok::minimap_outline_alpha_lg) : tok::Base(tok::col::ink_white, tok::minimap_outline_alpha_lg), tok::minimap_radius, 0, tok::minimap_outline_stroke_sm);
          dl->PopClipRect();
       }
 

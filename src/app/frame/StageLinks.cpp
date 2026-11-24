@@ -224,9 +224,9 @@ void DrawLinks(FrameCtx& fc)
                CategoryColors::Color c = CategoryColors::CableColorFor(CategoryColors::CableType::Modulation);
                if (source->category == "Prediction" || dynamic_cast<IPredictor*>(source->node.get()) != nullptr)
                   c = CategoryColors::ColorFor("Prediction");
-               const ImU32 col = ImColor(c.r, c.g, c.b, tok::stage_links_im_color_alpha_2);
+               const ImU32 col = ImColor(c.r, c.g, c.b, tok::stage_links_prediction_alpha);
                const ImVec2 a = from->second, b = to->second;
-               const float dx = std::max(tok::stage_links_bound, std::fabs(b.x - a.x) * 0.5f);
+               const float dx = std::max(tok::stage_links_dx_min, std::fabs(b.x - a.x) * 0.5f);
                const ImVec2 c1(a.x + dx, a.y), c2(b.x - dx, b.y);
                ImDrawList* ddl = ImGui::GetWindowDrawList();
                // Dashes by arc length, so dash size does not stretch with the cable.
@@ -636,7 +636,7 @@ void DrawLinks(FrameCtx& fc)
                }
                else if (!valid)
                {
-                  ed::RejectNewItem(ImColor(tok::U32(tok::stage_links_col_2)), tok::stage_links_reject_new_item_arg);
+                  ed::RejectNewItem(ImColor(tok::U32(tok::stage_links_ed_shade)), tok::stage_links_reject_new_stroke);
                   if (rejectReason != nullptr)
                   {
                      // Suspended: a tooltip submitted between ed::Begin and
@@ -878,7 +878,7 @@ void DrawLinks(FrameCtx& fc)
             if (dirKey(dx, dy))
             {
                burstUndo();
-               gKbNudge = ((dx > 0.0f || dy < 0.0f) ? tok::stage_links_assign : -10);
+               gKbNudge = ((dx > 0.0f || dy < 0.0f) ? tok::stage_links_kb_nudge : -10);
             }
          }
 

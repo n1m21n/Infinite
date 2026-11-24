@@ -1036,7 +1036,7 @@ void DrawKeyboard(FrameCtx& fc)
             ImVec2 p = ed::GetNodePosition(gn.NodeId());
             ImVec2 snapped(std::round(p.x / gGridSnap) * gGridSnap,
                            std::round(p.y / gGridSnap) * gGridSnap);
-            if (std::fabs(snapped.x - p.x) > tok::stage_keyboard_limit_2 || std::fabs(snapped.y - p.y) > tok::stage_keyboard_limit_2)
+            if (std::fabs(snapped.x - p.x) > tok::stage_keyboard_limit_sm || std::fabs(snapped.y - p.y) > tok::stage_keyboard_limit_sm)
                ed::SetNodePosition(gn.NodeId(), snapped);
          }
       }

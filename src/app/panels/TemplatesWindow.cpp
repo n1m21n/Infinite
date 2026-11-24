@@ -115,13 +115,13 @@ namespace
       ImGui::PopID();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hovered ? tok::templates_card_alpha_3 : tok::alpha_card)), tok::radius_container);
+      dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hovered ? tok::templates_card_y_lg : tok::alpha_card)), tok::radius_container);
       const ImVec2 t0(p.x + tok::space_2, p.y + tok::space_2);
       if (const unsigned int tex = ThumbTexture(e.slug); tex != 0)
          Thumb::AddRounded(dl, (ImTextureID)(intptr_t)tex, t0, ImVec2(t0.x + thumb, t0.y + thumb), ImVec2(0, 0), ImVec2(1, 1),
                              IM_COL32_WHITE, tok::radius_control);
       else
-         dl->AddRectFilled(t0, ImVec2(t0.x + thumb, t0.y + thumb), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::templates_card_alpha_4)), tok::radius_control);
+         dl->AddRectFilled(t0, ImVec2(t0.x + thumb, t0.y + thumb), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::templates_card_y_sm)), tok::radius_control);
       const float ty = t0.y + thumb + tok::space_2;
       dl->PushClipRect(ImVec2(p.x + tok::space_2, ty), ImVec2(p.x + w - tok::space_2, p.y + h), true);
       dl->AddText(ImVec2(p.x + tok::space_2, ty), ImGui::GetColorU32(ImGuiCol_Text), e.title.c_str());

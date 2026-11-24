@@ -56,16 +56,16 @@ namespace app
          if (s.Green())
          {
             const ImU32 col = tok::U32(tok::action_go, light);
-            dl->AddPolyline(std::array<ImVec2, tok::cli_setup_section_step_icon_add_polyline_draw>{ ImVec2(c.x - r, c.y), ImVec2(c.x - r * tok::cli_setup_section_step_icon_ratio, c.y + r * tok::cli_setup_section_step_icon_ratio_2), ImVec2(c.x + r, c.y - r * tok::cli_setup_section_step_icon_ratio_3) }.data(), tok::cli_setup_section_step_icon_add_polyline_draw_2, col, 0, tok::cli_setup_section_step_icon_add_polyline_draw_3);
+            dl->AddPolyline(std::array<ImVec2, tok::cli_setup_section_line_num_points>{ ImVec2(c.x - r, c.y), ImVec2(c.x - r * tok::cli_setup_section_step_icon_ratio, c.y + r * tok::cli_setup_section_read_file_y), ImVec2(c.x + r, c.y - r * tok::cli_setup_section_line_x) }.data(), tok::cli_setup_section_line_polyline_lg, col, 0, tok::cli_setup_section_line_polyline_sm);
          }
          else if (s.state == S::kFailed)
             glyph::Draw(dl, c, size, tok::U32(tok::action_record, light), IconsInfinite::Error);
          else if (s.state == S::kRepair)
             glyph::Draw(dl, c, size, tok::U32(tok::action_learn, light), IconsInfinite::Warning);
          else if (s.state == S::kRunning)
-            dl->AddCircleFilled(c, r * tok::cli_setup_section_step_icon_ratio_3, tok::U32(tok::action_learn, light));
+            dl->AddCircleFilled(c, r * tok::cli_setup_section_line_x, tok::U32(tok::action_learn, light));
          else
-            dl->AddLine(ImVec2(c.x - r * tok::cli_setup_section_step_icon_ratio_3, c.y), ImVec2(c.x + r * tok::cli_setup_section_step_icon_ratio_3, c.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), tok::cli_setup_section_step_icon_stroke);
+            dl->AddLine(ImVec2(c.x - r * tok::cli_setup_section_line_x, c.y), ImVec2(c.x + r * tok::cli_setup_section_line_x, c.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), tok::cli_setup_section_step_icon_stroke);
          ImGui::Dummy(ImVec2(size, size));
       }
    }
@@ -124,7 +124,7 @@ namespace app
          FormParts::Label(L(a.name));
          const float rowW = ImGui::GetContentRegionAvail().x;
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), rowH * tok::cli_setup_section_ratio_2, a.id);
+         ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), rowH * tok::cli_setup_section_chat_avatar_r, a.id);
          ImGui::Dummy(ImVec2(rowH, rowH));
          FormParts::Inline(0.0f, tok::space_2);
          value(info.status, !info.ready);
@@ -189,7 +189,7 @@ namespace app
             const long long total = u.input + u.cached + u.output;
             std::string line = std::to_string(u.turns) + " " + T(u.turns == 1 ? "turn" : "turns") + " · " + chat::TokenCount(total) + " " + T("tokens");
             if (total > 0)
-               line += " · " + std::to_string((int)(tok::cli_setup_section_ratio_3 * (double)u.cached / (double)total)) + "% " + T("cached");
+               line += " · " + std::to_string((int)(tok::cli_setup_section_line_scale * (double)u.cached / (double)total)) + "% " + T("cached");
             if (u.cost > 0.0)
             {
                char c[32];
@@ -306,8 +306,8 @@ namespace app
          {
             ImGui::TextUnformatted(T("Delete every saved chat?"));
             ImGui::Dummy(ImVec2(0.0f, tok::space_2));
-            const float cancelW = std::max(tok::cli_setup_section_bound, ImGui::CalcTextSize(T("Cancel")).x + tok::cli_setup_section_ratio * tok::space_2);
-            const float deleteW = std::max(tok::cli_setup_section_bound, ImGui::CalcTextSize(T("Delete")).x + tok::cli_setup_section_ratio * tok::space_2);
+            const float cancelW = std::max(tok::cli_setup_section_cancel_w_min, ImGui::CalcTextSize(T("Cancel")).x + tok::cli_setup_section_ratio * tok::space_2);
+            const float deleteW = std::max(tok::cli_setup_section_cancel_w_min, ImGui::CalcTextSize(T("Delete")).x + tok::cli_setup_section_ratio * tok::space_2);
             const float total = cancelW + tok::space_2 + deleteW;
             const float avail = ImGui::GetContentRegionAvail().x;
             if (avail > total)
@@ -493,7 +493,7 @@ namespace app
       // One centred column, never wider than reads well; every control is a design component.
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const float availW = ImGui::GetContentRegionAvail().x;
-      const float colW = std::min(tok::cli_setup_section_terminal_welcome_bound, std::max(tok::cli_setup_section_terminal_welcome_bound_2, availW - tok::cli_setup_section_terminal_welcome_ratio * tok::space_4));
+      const float colW = std::min(tok::cli_setup_section_col_w_max, std::max(tok::cli_setup_section_col_w_min, availW - tok::cli_setup_section_terminal_welcome_ratio * tok::space_4));
       const float x = origin.x + (availW - colW) * 0.5f;
       const float rowH = ImGui::GetFrameHeight() + tok::space_1;
       float y = origin.y + tok::space_5;

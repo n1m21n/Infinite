@@ -231,7 +231,7 @@ void DrawMenuBar(FrameCtx& fc)
             const bool hov = ImGui::IsItemHovered();
             if (const ImTextureID tex = BrandLogoTexture())
                Thumb::AddRounded(ImGui::GetWindowDrawList(), tex, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
-                  ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(tok::V4(tok::stage_menu_bar_col_2, hov ? 1.0f : 0.92f)), 5.0f);
+                  ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(tok::V4(tok::stage_menu_bar_tex_shade, hov ? 1.0f : 0.92f)), 5.0f);
             if (hov)
                HelpTip("%s", T("About Infinite"));
             ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_2, p0.y));
@@ -380,9 +380,9 @@ void DrawMenuBar(FrameCtx& fc)
                   MenuParts::Check(L("Show viewport panel"), &gViewportPanelOpen);
                   if (gViewportPanelOpen)
                   {
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle(); ViewportPanelDockCombo(); FieldWell::PopStyle();
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
                      {
                         FieldWell::Slider(L("Width"), &gViewportPanelWidth,
@@ -413,9 +413,9 @@ void DrawMenuBar(FrameCtx& fc)
                   MenuParts::Check(L("Show modulation matrix"), &gModMatrixOpen);
                   if (gModMatrixOpen)
                   {
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle(); ModMatrixDockCombo(); FieldWell::PopStyle();
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      if (gModMatrixDock == 1 || gModMatrixDock == 2)
                      {
                         FieldWell::Slider(L("Width"), &gModMatrixWidth,
@@ -435,9 +435,9 @@ void DrawMenuBar(FrameCtx& fc)
                   MenuParts::Check(L("Show Mixer"), &gMixerPanelOpen);
                   if (gMixerPanelOpen)
                   {
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle(); MixerPanelDockCombo(); FieldWell::PopStyle();
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      if (gMixerPanelDock == 1 || gMixerPanelDock == 2)
                         FieldWell::Slider(L("Width"), &gMixerPanelWidth, kMixerPanelMinWidth, params::stage_menu_bar::mixer_panel_width_lo, "%.0f px");
                      else if (gMixerPanelDock != kDockFloating)
@@ -453,9 +453,9 @@ void DrawMenuBar(FrameCtx& fc)
                   MenuParts::Check(L("Show Performance Matrix"), &gPerfPanelOpen);
                   if (gPerfPanelOpen)
                   {
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle(); PerfPanelDockCombo(); FieldWell::PopStyle();
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      if (gPerfPanelDock == 1 || gPerfPanelDock == 2)
                      {
                         FieldWell::Slider(L("Width"), &gPerfPanelWidth,
@@ -480,7 +480,7 @@ void DrawMenuBar(FrameCtx& fc)
                      // side dock would fight the ruler's own horizontal axis.
                      // Saved with the document (Settings.dockSide); not undoable.
                      int dockSide = gArrange.settings.dockSide == 1 ? 1 : 0;
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle();
                      static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
                      bool dockChanged = false;
@@ -501,7 +501,7 @@ void DrawMenuBar(FrameCtx& fc)
                         gArrange.revision++; // a model field like any other (WP5b)
                         gPatchDirty = true;
                      }
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::Slider(L("Height"), &gArrangePanelHeight,
                                         kArrangePanelMinHeight, params::stage_menu_bar::arrange_panel_height_lo, "%.0f px");
                   }
@@ -513,7 +513,7 @@ void DrawMenuBar(FrameCtx& fc)
                   MenuParts::Check(L("Show Session"), &gSessionPanelOpen);
                   if (gSessionPanelOpen)
                   {
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::Slider(L("Height"), &gSessionPanelHeight, kSessionPanelMinHeight, params::stage_menu_bar::session_panel_height_lo, "%.0f px");
                   }
                   ImGui::EndMenu();
@@ -526,7 +526,7 @@ void DrawMenuBar(FrameCtx& fc)
                   MenuParts::Check(show, &open);
                   if (open)
                   {
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle();
                      static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
                      int side = dock == 3 ? 1 : 0;
@@ -538,7 +538,7 @@ void DrawMenuBar(FrameCtx& fc)
                         MenuParts::EndCombo();
                      }
                      FieldWell::PopStyle();
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::Slider(L("Height"), &height, params::stage_menu_bar::height_lo, params::stage_menu_bar::height_hi, "%.0f px");
                   }
                   ImGui::EndMenu();
@@ -553,7 +553,7 @@ void DrawMenuBar(FrameCtx& fc)
                   {
                      static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Fill") };
                      const int dock = which == 2 ? gView2DDock : gView3DDock;
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle();
                      if (MenuParts::BeginCombo(dockId, T(kDockNames[dock])))
                      {
@@ -563,7 +563,7 @@ void DrawMenuBar(FrameCtx& fc)
                         MenuParts::EndCombo();
                      }
                      FieldWell::PopStyle();
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      if (dock == 1 || dock == 2)
                         FieldWell::Slider(L("Width"), &width, params::stage_menu_bar::width_lo, params::stage_menu_bar::width_hi, "%.0f px");
                      else if (dock != 4)
@@ -581,7 +581,7 @@ void DrawMenuBar(FrameCtx& fc)
                   if (gTerminalOpen)
                   {
                      static const char* kTerminalDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle();
                      if (MenuParts::BeginCombo("##terminaldock", T(kTerminalDocks[gTerminalDock])))
                      {
@@ -591,7 +591,7 @@ void DrawMenuBar(FrameCtx& fc)
                         MenuParts::EndCombo();
                      }
                      FieldWell::PopStyle();
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      if (gTerminalDock == 1 || gTerminalDock == 2)
                         FieldWell::Slider(L("Width"), &gTerminalWidth, params::stage_menu_bar::terminal_width_lo, params::stage_menu_bar::terminal_width_hi, "%.0f px");
                      else
@@ -606,7 +606,7 @@ void DrawMenuBar(FrameCtx& fc)
                   {
                      static const char* kCurveDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
                      static const int kCurveDockCodes[] = { 0, 3 };
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle();
                      if (MenuParts::BeginCombo("##curvedock", T(kCurveDocks[gCurveEditorDock == 3 ? 1 : 0])))
                      {
@@ -616,7 +616,7 @@ void DrawMenuBar(FrameCtx& fc)
                         MenuParts::EndCombo();
                      }
                      FieldWell::PopStyle();
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::Slider(L("Height"), &gCurveEditorHeight, params::stage_menu_bar::curve_editor_height_lo, params::stage_menu_bar::curve_editor_height_hi, "%.0f px");
                   }
                   ImGui::EndMenu();
@@ -628,7 +628,7 @@ void DrawMenuBar(FrameCtx& fc)
                   {
                      static const char* kPatcherDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
                      static const int kPatcherDockCodes[] = { 0, 3 };
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::PushStyle();
                      if (MenuParts::BeginCombo("##patcherdock", T(kPatcherDocks[gFieldPatcherDock == 3 ? 1 : 0])))
                      {
@@ -638,7 +638,7 @@ void DrawMenuBar(FrameCtx& fc)
                         MenuParts::EndCombo();
                      }
                      FieldWell::PopStyle();
-                     ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w);
+                     ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_lg);
                      FieldWell::Slider(L("Height"), &gFieldPatcherHeight, params::stage_menu_bar::field_patcher_height_lo, params::stage_menu_bar::field_patcher_height_hi, "%.0f px");
                   }
                   ImGui::EndMenu();
@@ -734,7 +734,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (sMenuMidYPtr != nullptr)
                *sMenuMidYPtr = mid;
             menuDl->AddRectFilled(ImVec2(menuGroupP.x - tok::space_0_5, mid - tok::control_h * 0.5f), ImVec2(menuGroupMaxX + tok::space_0_5, mid + tok::control_h * 0.5f),
-               ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, tok::stage_menu_bar_alpha_4)), tok::radius_control);
+               ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, tok::stage_menu_bar_y_sm)), tok::radius_control);
          }
          menuDl->ChannelsMerge();
 
@@ -743,11 +743,11 @@ void DrawMenuBar(FrameCtx& fc)
 
          // Top bar controls styling: clean, symmetrical, unboxed with pixel-perfect alignment.
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_ink_white_alpha_3));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_ink_white_alpha_4));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_frame_bg_hovered_alpha));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_frame_bg_active_alpha));
          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_ink_white_alpha_3));
-         ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_ink_white_alpha_4));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_frame_bg_hovered_alpha));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::RoleV4(tok::col::ink_white, tok::stage_menu_bar_frame_bg_active_alpha));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
          ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
          // 24 pt controls (tok::control_h) on one centre line; the cursor Y below pins them in the bar.
@@ -771,7 +771,7 @@ void DrawMenuBar(FrameCtx& fc)
             }
             ImGui::Dummy(ImVec2(w, tok::control_h));
             Readout::Draw(key, UiLayout::Rect { p.x, p.y, w, tok::control_h }, text, text, UiType::Size::Body,
-                          UiType::Weight::Regular, Readout::Align::Left, dim ? tok::stage_menu_bar_draw : 1.0f);
+                          UiType::Weight::Regular, Readout::Align::Left, dim ? tok::stage_menu_bar_ticks : 1.0f);
          };
 
          auto& SectionBreak = TopBarParts::SectionBreak;
@@ -1034,7 +1034,7 @@ void DrawMenuBar(FrameCtx& fc)
                   sFieldJustOpened = false;
                }
                const float textW = ImGui::CalcTextSize(sFieldText).x;
-               const float padX = std::max(tok::stage_menu_bar_bound, std::floor((fieldW - textW) * 0.5f));
+               const float padX = std::max(tok::stage_menu_bar_pad_x_min, std::floor((fieldW - textW) * 0.5f));
                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padX, std::max(0.0f, std::floor((fieldH - ImGui::GetFontSize()) * 0.5f))));
                FieldWell::PushTypedEditStyle();
                const bool entered = FieldWell::InputText(id, sFieldText, sizeof(sFieldText),
@@ -1221,7 +1221,7 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::PushStyleColor(ImGuiCol_FrameBg, base.Colors[ImGuiCol_FrameBg]);
                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
-               ImGui::SetNextItemWidth(tok::stage_menu_bar_set_next_item_width_w_2);
+               ImGui::SetNextItemWidth(tok::stage_menu_bar_field_w_sm);
                const bool volChanged = FieldWell::Slider(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
                ImGui::PopStyleColor(3);
                if (volChanged)
@@ -1318,7 +1318,7 @@ void DrawMenuBar(FrameCtx& fc)
                const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
                ImDrawList* dl = ImGui::GetWindowDrawList();
                const ImVec4 ac = ImGui::GetStyleColorVec4(ImGuiCol_CheckMark);
-               dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(ac.x, ac.y, ac.z, hov ? tok::stage_menu_bar_alpha_5 : tok::stage_menu_bar_alpha_6)), tok::radius_control);
+               dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(ac.x, ac.y, ac.z, hov ? tok::stage_menu_bar_y_lg : tok::stage_menu_bar_y_md)), tok::radius_control);
                const ImU32 fg = ImGui::GetColorU32(ac);
                glyph::Draw(dl, c, tok::icon_lg, fg, IconsInfinite::Download);
                StatusDot::OnLastItem(StatusDot::State::Error);

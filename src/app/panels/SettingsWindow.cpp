@@ -165,12 +165,12 @@ namespace app
          const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          if (sel || hov)
-            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? tok::settings_window_alpha_6 : tok::settings_window_alpha_7)),
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? tok::settings_window_y_xs : tok::settings_window_y_xxs)),
                               tok::radius_control);
          const char* label = T(kTabs[i]); // drawn text, not a widget label: L() would add the "###id" part
          const ImVec2 ts = ImGui::CalcTextSize(label);
          dl->AddText(ImVec2(p.x + kNavInset, p.y + (h - ts.y) * 0.5f),
-                     ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : tok::settings_window_alpha_8)), label);
+                     ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : tok::settings_window_y_lg)), label);
       }
       ImGui::GetStyle().ItemSpacing = oldItemSpacing;
       EndChildSafe();
@@ -216,13 +216,13 @@ namespace app
                   const ImVec2 mid((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f);   // filled circle, like the Clip Settings Color Tint
                   dl->AddCircleFilled(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), tok::settings_window_segments);
                   // Outline in the text colour: a preset's background colour can match the popup it sits on, and the swatch would vanish.
-                  { const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text); dl->AddCircle(mid, sz * tok::settings_window_ratio_2 - tok::px_align, ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, tok::settings_window_alpha_9)), tok::settings_window_segments, 1.0f); }
+                  { const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text); dl->AddCircle(mid, sz * tok::settings_ring_r - tok::px_align, ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, tok::settings_window_y_sm)), tok::settings_window_segments, 1.0f); }
                }
             };
 
             const float kSwatchSz = tok::settings_swatch_sz;
             const float kSwatchGap = tok::space_1;
-            const float kSwatchStripW = tok::settings_swatch_strip_w_ratio * kSwatchSz + tok::settings_swatch_strip_w_ratio_2 * kSwatchGap;
+            const float kSwatchStripW = tok::settings_swatch_strip_w_ratio * kSwatchSz + tok::settings_theme_preset_palette_swatch_strip_w * kSwatchGap;
 
             static float sHeaderSwatchX = 0.0f;   // the list's swatches line up under the header swatch beside the combo (set last frame)
             if (FormParts::BeginCombo(L("Preset"), presets[currentPreset].c_str(), 240.0f))
@@ -1075,9 +1075,9 @@ namespace app
             };
 
             ImGui::Spacing();
-            ImGui::SetNextItemWidth(tok::settings_window_set_next_item_width_w);
+            ImGui::SetNextItemWidth(tok::settings_field_w_lg);
             FormParts::BareCombo("##fieldtopic", &sSelectedSection, kSections, IM_ARRAYSIZE(kSections), 220.0f);
-            FormParts::Inline(0.0f, tok::settings_window_inline_layout_2);
+            FormParts::Inline(0.0f, tok::settings_inline_catalog);
             FormParts::SearchInput("##fieldsearch", "Search functions / syntax...", sFilterBuf, sizeof(sFilterBuf), 220.0f);
             if (sFilterBuf[0] != '\0')
             {
@@ -1148,12 +1148,12 @@ namespace app
             if ((sSelectedSection == 0 || sSelectedSection == 2) && MatchesFilter("domains reserved frame element pixel sample graph age note"))
             {
                FormParts::Heading(T("2. Domains & Reserved Names"));
-               if (ListRow::BeginTable("##domainstbl", tok::settings_window_begin_table_layout_2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+               if (ListRow::BeginTable("##domainstbl", tok::settings_table_columns_lg, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
                   ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w);
-                  ImGui::TableSetupColumn("Rate / Backend", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_2);
-                  ImGui::TableSetupColumn("Reserved Names", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_3);
-                  ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_4);
+                  ImGui::TableSetupColumn("Rate / Backend", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_column_col_w_xs);
+                  ImGui::TableSetupColumn("Reserved Names", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_column_col_w_sm);
+                  ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_column_col_w_xl);
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("%s", T("frame"));
@@ -1229,11 +1229,11 @@ namespace app
             if ((sSelectedSection == 0 || sSelectedSection == 5) && MatchesFilter("operators math functions sin cos lerp mix step rand noise sh bend pinch mirror skew formant"))
             {
                FormParts::Heading(T("5. Operators & Built-in Math Functions"));
-               if (ListRow::BeginTable("##opstbl", tok::settings_window_begin_table_layout_3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+               if (ListRow::BeginTable("##opstbl", tok::settings_table_columns_sm, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
-                  ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_2);
-                  ImGui::TableSetupColumn("Functions / Operators", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_5);
-                  ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_4);
+                  ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_column_col_w_xs);
+                  ImGui::TableSetupColumn("Functions / Operators", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_column_col_w_md);
+                  ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_column_col_w_xl);
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("%s", T("Operators"));
@@ -1310,11 +1310,11 @@ namespace app
                ImGui::TextWrapped("%s", T("Field allows data-dependent branching (unlike Kronos, which forbids it entirely). Every branch has a real cost that depends on the domain it runs in - always know which domain you're in before you branch."));
                DrawCodeBox("if (P.y > 0.5) { Cd = vec3(1, 0, 0) }", "cb_if_stmt");
 
-               if (ListRow::BeginTable("##branchtbl", tok::settings_window_begin_table_layout_3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+               if (ListRow::BeginTable("##branchtbl", tok::settings_table_columns_sm, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
-                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_6);
-                  ImGui::TableSetupColumn("Lowering", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_2);
-                  ImGui::TableSetupColumn("Cost", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_col_w_7);
+                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_column_col_w_xxs);
+                  ImGui::TableSetupColumn("Lowering", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_column_col_w_xs);
+                  ImGui::TableSetupColumn("Cost", ImGuiTableColumnFlags_WidthStretch, tok::settings_window_column_col_w_lg);
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("%s", T("frame"));
@@ -1454,7 +1454,7 @@ namespace app
 
                char nameBuf[64];
                snprintf(nameBuf, sizeof(nameBuf), "%s", g.name.c_str());
-               ImGui::SetNextItemWidth(tok::settings_window_set_next_item_width_w_2);
+               ImGui::SetNextItemWidth(tok::settings_field_w_sm);
                FieldWell::PushStyle();
                const bool nameEdited = FieldWell::InputText("##name", nameBuf, sizeof(nameBuf));
                FieldWell::PopStyle();
@@ -1516,7 +1516,7 @@ namespace app
                }
 
                if (!g.error.empty())
-                  ImGui::TextColored(tok::RoleV4(tok::col::text_err_3), "   %s", g.error.c_str());
+                  ImGui::TextColored(tok::RoleV4(tok::col::text_err_light_muted), "   %s", g.error.c_str());
 
                ImGui::PopID();
             }
@@ -1530,7 +1530,7 @@ namespace app
             }
 
             ImGui::Spacing();
-            if (FormParts::Button(L("Add global"), ImVec2(tok::settings_window_button_w_2, 0)))
+            if (FormParts::Button(L("Add global"), ImVec2(tok::settings_button_w, 0)))
             {
                PushUndoCheckpoint();
                char name[32];
@@ -1540,7 +1540,7 @@ namespace app
                SaveDefaultExprGlobals();
             }
             FormParts::Inline();
-            if (FormParts::Button(L("Presets..."), ImVec2(tok::settings_window_button_w_2, 0)))
+            if (FormParts::Button(L("Presets..."), ImVec2(tok::settings_button_w, 0)))
             {
                ImGui::OpenPopup("ExprPresetsMenuSettings");
             }
@@ -1551,7 +1551,7 @@ namespace app
                ImGui::SetNextWindowPos(ImVec2(bmin.x, ImGui::GetItemRectMax().y + tok::space_1));
                const ImGuiViewport* vp = ImGui::GetMainViewport();
                const float room = vp->Pos.y + vp->Size.y - ImGui::GetItemRectMax().y - tok::space_4;
-               ImGui::SetNextWindowSizeConstraints(ImVec2(tok::settings_window_set_next_window_size_constraints_x, 0.0f), ImVec2(tok::settings_window_set_next_window_size_constraints_x, std::clamp(room, tok::settings_window_bound, tok::settings_window_bound_2)));
+               ImGui::SetNextWindowSizeConstraints(ImVec2(tok::settings_window_w, 0.0f), ImVec2(tok::settings_window_w, std::clamp(room, tok::settings_window_lo, tok::settings_window_hi)));
             }
             if (MenuParts::BeginPopup("ExprPresetsMenuSettings"))
             {
@@ -1579,7 +1579,7 @@ namespace app
                      const float right = mx.x - MenuParts::kTextInset;
                      dl->AddText(ImVec2(mn.x + tok::space_1, ty), ImGui::GetColorU32(tc), p.name.c_str());
                      dl->PushClipRect(ImVec2(mn.x + kNameW, mn.y), ImVec2(right, mx.y), true);
-                     dl->AddText(ImVec2(mn.x + kNameW, ty), ImGui::GetColorU32(ImVec4(tc.x, tc.y, tc.z, tok::settings_window_alpha_10)), p.expr.c_str());
+                     dl->AddText(ImVec2(mn.x + kNameW, ty), ImGui::GetColorU32(ImVec4(tc.x, tc.y, tc.z, tok::settings_window_y_md)), p.expr.c_str());
                      dl->PopClipRect();
                   }
                   if (picked)
@@ -1739,9 +1739,9 @@ namespace app
                ImGui::TextDisabled("%s", T("No packs to download right now. You can install one from a file."));
 
             if (!ex.message.empty() && ex.messageIsError)
-               ImGui::TextColored(tok::RoleV4(tok::col::text_err_3), "%s", ex.message.c_str());
+               ImGui::TextColored(tok::RoleV4(tok::col::text_err_light_muted), "%s", ex.message.c_str());
             if (!ex.catalogLoaded && !ex.catalogLoading && !ex.catalogError.empty())
-               ImGui::TextColored(tok::RoleV4(tok::col::text_err_3), "%s",
+               ImGui::TextColored(tok::RoleV4(tok::col::text_err_light_muted), "%s",
                                   T("Can't reach the extension catalog. Check your connection and try again."));
             ImGui::Dummy(ImVec2(0.0f, tok::space_1));
             ImGui::BeginDisabled(busy);

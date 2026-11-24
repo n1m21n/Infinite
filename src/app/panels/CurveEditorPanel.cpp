@@ -647,9 +647,9 @@ namespace
       // The 3D View's axis colours, as the user reads them: X red, Y green, Z blue.
       static constexpr unsigned kAxisHex[3] = { 0xFF3352, 0x8BDC00, 0x2890FF };
       if (axis < 0 || axis >= 3)
-         return Tint(tok::curve_editor_axis_col_tint_alpha_2);
+         return Tint(tok::curve_editor_axis_col_shade);
       const unsigned h = kAxisHex[axis];
-      return IM_COL32((h >> 16) & 255, (h >> 8) & 255, h & 255, tok::curve_editor_axis_col_alpha_2);  // ui-audit-ok: channel mask / bit packing, not a colour value
+      return IM_COL32((h >> 16) & 255, (h >> 8) & 255, h & 255, tok::curve_editor_axis_col_alpha);  // ui-audit-ok: channel mask / bit packing, not a colour value
    }
 
    // The value axis in the first target's own units: its high at the top line, its low at the bottom.
@@ -669,8 +669,8 @@ namespace
          std::snprintf(hi, sizeof hi, "%s %s", ref->name.c_str(), UiFmt::G3(src.hi).c);
          std::snprintf(lo, sizeof lo, "%s", UiFmt::G3(src.lo).c);
          const float fh = ImGui::GetFontSize();
-         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(1.0f) + tok::space_0_5), Tint(tok::curve_editor_units_labels_tint_alpha_2), hi);
-         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(0.0f) - fh - tok::space_0_5), Tint(tok::curve_editor_units_labels_tint_alpha_2), lo);
+         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(1.0f) + tok::space_0_5), Tint(tok::curve_editor_text_shade), hi);
+         dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(0.0f) - fh - tok::space_0_5), Tint(tok::curve_editor_text_shade), lo);
          return;
       }
    }
@@ -679,13 +679,13 @@ namespace
    {
       const State& s = S();
       const ImVec2 mn(a.x0, a.y0), mx(a.x1, a.y1), m = ImGui::GetIO().MousePos;
-      dl->AddRectFilled(mn, mx, Tint(tok::curve_editor_graph_tint_alpha_11));
+      dl->AddRectFilled(mn, mx, Tint(tok::curve_editor_fill_shade_sm));
       dl->PushClipRect(mn, mx, true);
       // Outside the shape: shaded, the curve does not run there.
       if (s.v0 < 0.0f)
-         dl->AddRectFilled(mn, ImVec2(a.X(0.0f), a.y1), Tint(tok::curve_editor_graph_tint_alpha_12));
+         dl->AddRectFilled(mn, ImVec2(a.X(0.0f), a.y1), Tint(tok::curve_editor_fill_shade_lg));
       if (s.v1 > 1.0f)
-         dl->AddRectFilled(ImVec2(a.X(1.0f), a.y0), mx, Tint(tok::curve_editor_graph_tint_alpha_12));
+         dl->AddRectFilled(ImVec2(a.X(1.0f), a.y0), mx, Tint(tok::curve_editor_fill_shade_lg));
       // Grid: time steps (thinned until 6 px apart), value eighths.
       const double step = GridStep(n);
       if (step > 0.0)
@@ -695,10 +695,10 @@ namespace
             drawn *= 2.0;
          const double first = std::ceil(std::max(0.0f, s.v0) / drawn) * drawn;
          for (double u = first; u <= std::min(1.0f, s.v1) + 1e-9; u += drawn)
-            dl->AddLine(ImVec2(a.X((float)u), a.y0), ImVec2(a.X((float)u), a.y1), Tint(tok::curve_editor_graph_tint_alpha_13));
+            dl->AddLine(ImVec2(a.X((float)u), a.y0), ImVec2(a.X((float)u), a.y1), Tint(tok::curve_editor_line_shade_sm));
       }
       for (int i = 0; i <= 8; i++)
-         dl->AddLine(ImVec2(a.x0, a.Y(i / tok::curve_editor_graph_ratio)), ImVec2(a.x1, a.Y(i / tok::curve_editor_graph_ratio)), Tint(i % tok::curve_editor_graph_tint_alpha_14 == 0 ? tok::curve_editor_graph_tint_alpha_15 : tok::curve_editor_graph_tint_alpha_16));
+         dl->AddLine(ImVec2(a.x0, a.Y(i / tok::curve_editor_graph_ratio)), ImVec2(a.x1, a.Y(i / tok::curve_editor_graph_ratio)), Tint(i % tok::curve_editor_line_period == 0 ? tok::curve_editor_line_shade_md : tok::curve_editor_line_shade_xs));
       if (n.loop)
       {
          const float lo = std::clamp(std::min(n.loopStart, n.loopEnd), 0.0f, 1.0f);
@@ -709,7 +709,7 @@ namespace
          for (GraphNode* g : ModePages())
             if (g->uid != s.page)
                if (const MSEGNode* other = AsMseg(g); other->motionGroup == 0 || other->motionGroup != n.motionGroup)
-                  DrawCurve(dl, a, *other, Tint(tok::curve_editor_graph_tint_alpha_17), tok::curve_editor_graph_draw_curve_arg);
+                  DrawCurve(dl, a, *other, Tint(tok::curve_editor_shade), tok::curve_editor_thick);
       // A motion group: the sibling channels behind this one, X red, Y green, Z blue.
       if (n.motionGroup != 0)
          for (GraphNode& g : gNodes)
@@ -736,14 +736,14 @@ namespace
          if (ShowsLeft(n, i))
          {
             const ImVec2 h = a.P(p.x + p.lx, p.y + p.ly);
-            dl->AddLine(c, h, Tint(tok::curve_editor_graph_tint_alpha_18), tok::curve_editor_graph_stroke);
-            dl->AddCircleFilled(h, tok::curve_editor_graph_r, Tint(tok::curve_editor_graph_tint_alpha_19));
+            dl->AddLine(c, h, Tint(tok::curve_editor_line_shade_lg), tok::curve_editor_graph_stroke);
+            dl->AddCircleFilled(h, tok::curve_editor_graph_r, Tint(tok::curve_editor_dot_shade));
          }
          if (ShowsRight(n, i))
          {
             const ImVec2 h = a.P(p.x + p.rx, p.y + p.ry);
-            dl->AddLine(c, h, Tint(tok::curve_editor_graph_tint_alpha_18), tok::curve_editor_graph_stroke);
-            dl->AddCircleFilled(h, tok::curve_editor_graph_r, Tint(tok::curve_editor_graph_tint_alpha_19));
+            dl->AddLine(c, h, Tint(tok::curve_editor_line_shade_lg), tok::curve_editor_graph_stroke);
+            dl->AddCircleFilled(h, tok::curve_editor_graph_r, Tint(tok::curve_editor_dot_shade));
          }
       }
       // Points; selected ones in the live colour.
@@ -751,21 +751,21 @@ namespace
       {
          const ImVec2 c = a.P(n.points[i].x, n.points[i].y);
          const bool on = std::binary_search(s.sel.begin(), s.sel.end(), i);
-         const float r = i == hover ? tok::curve_editor_r : tok::curve_editor_r_2;
+         const float r = i == hover ? tok::curve_editor_r : tok::curve_editor_graph_r_lg;
          dl->AddCircleFilled(c, r, on ? selCol : line);
-         dl->AddCircle(c, r, ring, 0, tok::curve_editor_graph_stroke_2);
+         dl->AddCircle(c, r, ring, 0, tok::curve_editor_ring_stroke);
       }
       // Gestures in progress.
       if (s.drag == Drag::Stroke)
          for (size_t i = 1; i < s.stroke.size(); i++)
-            dl->AddLine(a.P(s.stroke[i - 1].x, s.stroke[i - 1].y), a.P(s.stroke[i].x, s.stroke[i].y), selCol, tok::curve_editor_graph_stroke_3);
+            dl->AddLine(a.P(s.stroke[i - 1].x, s.stroke[i - 1].y), a.P(s.stroke[i].x, s.stroke[i].y), selCol, tok::curve_editor_line_stroke);
       if (s.drag == Drag::Line)
       {
          const CurveEdit::XY to = MouseXY(a, true, n);
-         dl->AddLine(a.P(s.lineFrom.x, s.lineFrom.y), a.P(to.x, to.y), selCol, tok::curve_editor_graph_stroke_3);
+         dl->AddLine(a.P(s.lineFrom.x, s.lineFrom.y), a.P(to.x, to.y), selCol, tok::curve_editor_line_stroke);
       }
       if (s.tool == Tool::Eraser && ImGui::IsMouseHoveringRect(mn, mx))
-         dl->AddCircle(m, kEraseR, selCol, 0, tok::curve_editor_graph_stroke_2);
+         dl->AddCircle(m, kEraseR, selCol, 0, tok::curve_editor_ring_stroke);
       // Where the node is reading now, and a take in progress.
       TimeRuler::Playhead(dl, a.X(n.Position()), a.y0, a.y1, a.x0, a.x1);
       DrawTake(dl, a, selCol);
@@ -776,7 +776,7 @@ namespace
          dl->AddRect(r0, r1, selCol);
       }
       dl->PopClipRect();
-      dl->AddRect(mn, mx, Tint(tok::curve_editor_graph_tint_alpha_20));
+      dl->AddRect(mn, mx, Tint(tok::curve_editor_outline_shade));
    }
 
    int PointAt(const Areas& a, const MSEGNode& n, ImVec2 m)
@@ -1172,7 +1172,7 @@ namespace
       case Drag::Stroke:
       {
          const std::vector<CurveEdit::XY> run = CurveEdit::Simplify(CurveEdit::CleanStroke(s.stroke), s.thinning);
-         if (run.size() >= tok::curve_editor_release_limit && run.back().x - run.front().x > tok::curve_editor_release_limit_2)
+         if (run.size() >= tok::curve_editor_release_limit && run.back().x - run.front().x > tok::curve_editor_release_limit_sm)
          {
             PushUndoCheckpoint("Draw Curve");
             CurveEdit::ReplaceRange(n.points, run, ModShapes::kInterpLinear, MSEGNode::kMaxPoints);
@@ -1187,7 +1187,7 @@ namespace
          CurveEdit::XY p0 = s.lineFrom, p1 = MouseXY(a, true, n);
          if (p1.x < p0.x)
             std::swap(p0, p1);
-         if (p1.x - p0.x > tok::curve_editor_release_limit_2)
+         if (p1.x - p0.x > tok::curve_editor_release_limit_sm)
          {
             PushUndoCheckpoint("Line Curve");
             CurveEdit::ReplaceRange(n.points, { p0, p1 }, ModShapes::kInterpLinear, MSEGNode::kMaxPoints);
@@ -1392,7 +1392,7 @@ namespace
             if(command==4)
                for(size_t i=1;i+1<n.points.size();++i)
                   if(S().sel.empty() || std::binary_search(S().sel.begin(),S().sel.end(),(int)i))
-                     n.points[i].y=std::clamp(n.points[i].y+(CurveLibrary::Random(S().seed,(unsigned)i)-tok::curve_editor_menu_bias)*tok::curve_editor_menu_ratio_2,0.f,1.f);
+                     n.points[i].y=std::clamp(n.points[i].y+(CurveLibrary::Random(S().seed,(unsigned)i)-tok::curve_editor_menu_inset)*tok::curve_editor_menu_v,0.f,1.f);
             n.Normalize(); ClearSelection();
          }
       MenuParts::Separator();
@@ -2363,7 +2363,7 @@ namespace
       FormParts::BeginChildPadX("##ceProps", SectionCard::Pad());
       SectionCard::BeginWindow();
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
-      sFieldW = std::max(tok::curve_editor_side_bound, ImGui::GetContentRegionAvail().x - FieldLabelW());
+      sFieldW = std::max(tok::curve_editor_field_w_min, ImGui::GetContentRegionAvail().x - FieldLabelW());
       DrawInspector(gn, n);
       SectionCard::EndWindow();
       EndChildSafe();
@@ -2452,7 +2452,7 @@ namespace
    }
 
    const char* AssignLabel() { return T("Assign"); }
-   float AssignW() { return ImGui::CalcTextSize(AssignLabel()).x + tok::curve_editor_assign_w_ratio * tok::space_3; }
+   float AssignW() { return ImGui::CalcTextSize(AssignLabel()).x + tok::curve_editor_library_menu_scale * tok::space_3; }
    float GridW(const MSEGNode& n)
    {
       float w = 0.0f;
@@ -2687,7 +2687,7 @@ namespace
          }
          const ImVec2 avail = ImGui::GetContentRegionAvail();
          const float spacing = ImGui::GetStyle().ItemSpacing.y;
-         const float graphH = s.sideOpen ? std::max(tok::curve_editor_panel_bound, avail.y * 0.5f) : std::max(1.0f, avail.y);
+         const float graphH = s.sideOpen ? std::max(tok::curve_editor_graph_h_min, avail.y * 0.5f) : std::max(1.0f, avail.y);
          DrawGraphArea(*n, ImVec2(avail.x, graphH));
          if (s.sideOpen)
             DrawSide(*gn, *n, ImVec2(avail.x, std::max(1.0f, avail.y - graphH - spacing)));
@@ -2701,7 +2701,7 @@ namespace
       EndChildSafe();
       FormParts::Inline(0.0f, gap);
       const float sideW = s.sideOpen ? std::min(kSideW, avail.x * tok::curve_editor_panel_ratio) : 0.0f;
-      const float graphW = std::max(tok::curve_editor_panel_bound_2, avail.x - kIconW - gap - (s.sideOpen ? sideW + gap : 0.0f));
+      const float graphW = std::max(tok::curve_editor_graph_w_min, avail.x - kIconW - gap - (s.sideOpen ? sideW + gap : 0.0f));
       DrawGraphArea(*n, ImVec2(graphW, bodyH));
       if (s.sideOpen)
       {

@@ -418,11 +418,11 @@ namespace app
          // board in both themes per feedback that every one of these read too
          // faint.
          valCol = isLight
-            ? (readOnly ? tok::Base(tok::col::surface_lo_2) : tok::Base(tok::col::edge_deep))
+            ? (readOnly ? tok::Base(tok::col::surface_lo_pale_fixed) : tok::Base(tok::col::edge_deep))
             : (readOnly ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::edge_hi));
          nameCol = isLight
-            ? (readOnly ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::surface_lo_2))
-            : (readOnly ? tok::Role(tok::col::edge_mid_2) : tok::Role(tok::col::surface_hi));
+            ? (readOnly ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::surface_lo_pale_fixed))
+            : (readOnly ? tok::Role(tok::col::edge_mid_light_fixed) : tok::Role(tok::col::surface_hi));
       }
       AudioLabelText(dl, ImVec2(valX, textY), valCol, valBuf);
 
@@ -443,7 +443,7 @@ namespace app
    void OutputMeterRow(const char* label, float v, float width)
    {
       const float inset = tok::pin_box + tok::space_1;
-      const float w = std::max(tok::param_output_meter_row_bound, width - inset);
+      const float w = std::max(tok::param_output_meter_row_min, width - inset);
       const bool isLight = IsThemeLight();
       const ImVec2 p0 = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetFrameHeight();
@@ -467,8 +467,8 @@ namespace app
       snprintf(valBuf, sizeof(valBuf), "%s", UiFmt::F2(v).c);
       const float textY = r0.y + (h - ImGui::GetTextLineHeight()) * 0.5f;
       const float valX = r1.x - tok::param_val_x_gap - AudioLabelSize(valBuf).x;
-      const ImU32 valCol = isLight ? tok::Base(tok::col::surface_lo_2) : tok::Base(tok::col::surface_hi);
-      const ImU32 nameCol = isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid_2);
+      const ImU32 valCol = isLight ? tok::Base(tok::col::surface_lo_pale_fixed) : tok::Base(tok::col::surface_hi);
+      const ImU32 nameCol = isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::edge_mid_light_fixed);
       dl->PushClipRect(r0, r1, true);
       AudioLabelText(dl, ImVec2(valX, textY), valCol, valBuf);
       dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - tok::space_1_5), r1.y), true);
@@ -499,7 +499,7 @@ namespace app
          OutputMeterRow(node->OutputLabel(o), mod != nullptr ? mod->Value01() : 0.0f, colW);
       }
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + (float)rows * rowH));
-      ImGui::Dummy(ImVec2(tok::param_output_meters_dummy_w, 0.0f));
+      ImGui::Dummy(ImVec2(tok::param_spacer_w, 0.0f));
    }
 
 
@@ -535,7 +535,7 @@ namespace app
             ImU32& c = dl->VtxBuffer[i].col;
             const float r = (float)((c >> IM_COL32_R_SHIFT) & 0xFF), g = (float)((c >> IM_COL32_G_SHIFT) & 0xFF);
             const float b = (float)((c >> IM_COL32_B_SHIFT) & 0xFF), a = (float)((c >> IM_COL32_A_SHIFT) & 0xFF);
-            const float y = tok::param_y_ratio * r + tok::param_y_ratio_2 * g + tok::param_y_ratio_3 * b;
+            const float y = tok::param_y_ratio * r + tok::param_fade_inactive_scale_lg * g + tok::param_fade_inactive_scale_sm * b;
             auto mix = [&](float v) { return (ImU32)std::lround(v + (y - v) * kGrey); };
             c = IM_COL32(mix(r), mix(g), mix(b), (ImU32)std::lround(a * kAlpha));
          }
@@ -793,7 +793,7 @@ namespace app
          if (!h.draw)
             return; // registered so the modulator keeps writing; just not drawn
          DrawDiscreteParamPin(h, label, width, ImGui::GetFrameHeight());
-         width = std::max(tok::param_dropdown_button_bound, width - tok::space_4); // the pin ate 12px + 4px of the row (DrawDiscreteParamPin's box)
+         width = std::max(tok::param_dropdown_button_min, width - tok::space_4); // the pin ate 12px + 4px of the row (DrawDiscreteParamPin's box)
       }
 
       const std::string caption = options[safeCurrent] + "##" + label;
@@ -805,7 +805,7 @@ namespace app
          // so fall back to the dropdown face (same hit item, same behaviour).
          const float pad = tok::space_2;
          const float labelW = inner.empty() ? 0.0f : std::min(ImGui::CalcTextSize(inner.c_str()).x, width * tok::param_dropdown_button_ratio - pad) + tok::param_label_w_ratio * pad;
-         const float cellW = (width - tok::space_0_5 - (inner.empty() ? tok::param_dropdown_button_assign : labelW)) / (float)options.size();
+         const float cellW = (width - tok::space_0_5 - (inner.empty() ? tok::param_dropdown_button_cell_w : labelW)) / (float)options.size();
          for (const std::string& o : options)
             if (ImGui::CalcTextSize(o.c_str()).x + tok::space_0_5 > cellW)
             {
@@ -871,10 +871,10 @@ namespace app
       // stops competing with it, the checked state can and should be the
       // loudest thing in an unchecked row of quiet frames. See P10.
       ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? tok::BaseV4(tok::col::surface_hi) : tok::BaseV4(tok::col::edge_lo));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? tok::BaseV4(tok::col::surface_hi) : tok::BaseV4(tok::col::edge_lo_2));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? tok::BaseV4(tok::col::surface_mid) : tok::BaseV4(tok::col::surface_lo_2));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? tok::BaseV4(tok::col::surface_hi) : tok::BaseV4(tok::col::edge_lo_light));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? tok::BaseV4(tok::col::surface_mid) : tok::BaseV4(tok::col::surface_lo_pale_fixed));
       ImGui::PushStyleColor(ImGuiCol_CheckMark, isLight ? tok::BaseV4(tok::col::accent) : tok::BaseV4(tok::col::accent_alt));
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::BaseV4(tok::col::edge_mid_2) : tok::BaseV4(tok::col::edge_lo));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::BaseV4(tok::col::edge_mid_light_fixed) : tok::BaseV4(tok::col::edge_lo));
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::BaseV4(tok::col::edge_lo) : tok::BaseV4(tok::col::edge_hi));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
@@ -934,11 +934,11 @@ namespace app
    {
       const bool isLight = IsThemeLight();
       ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? tok::BaseV4(tok::col::surface_hi) : tok::BaseV4(tok::col::edge_lo));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? tok::BaseV4(tok::col::surface_hi) : tok::BaseV4(tok::col::edge_lo_2));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? tok::BaseV4(tok::col::surface_mid) : tok::BaseV4(tok::col::surface_lo_2));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? tok::BaseV4(tok::col::surface_hi) : tok::BaseV4(tok::col::edge_lo_light));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? tok::BaseV4(tok::col::surface_mid) : tok::BaseV4(tok::col::surface_lo_pale_fixed));
       ImGui::PushStyleColor(ImGuiCol_SliderGrab, isLight ? tok::BaseV4(tok::col::accent) : tok::BaseV4(tok::col::accent_alt));
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, isLight ? tok::BaseV4(tok::col::accent) : tok::BaseV4(tok::col::accent_alt));
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::BaseV4(tok::col::edge_mid_2) : tok::BaseV4(tok::col::edge_lo));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::BaseV4(tok::col::edge_mid_light_fixed) : tok::BaseV4(tok::col::edge_lo));
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::BaseV4(tok::col::edge_lo) : tok::BaseV4(tok::col::edge_hi));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_control);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);

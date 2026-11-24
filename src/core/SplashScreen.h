@@ -114,7 +114,7 @@ namespace Splash
    inline float EaseInOutCubic(float x)
    {
       x = Clamp01(x);
-      return x < tok::splash_screen_ease_in_out_cubic_limit ? tok::splash_screen_ease_in_out_cubic_ratio * x * x * x : 1.0f - std::pow(-tok::splash_screen_ease_in_out_cubic_ratio_2 * x + tok::space_0_5, tok::splash_screen_ease_in_out_cubic_pow_maths) * 0.5f;
+      return x < tok::splash_screen_ease_in_out_cubic_limit ? tok::splash_screen_ease_in_out_cubic_ratio * x * x * x : 1.0f - std::pow(-tok::splash_screen_ease_in_out_cubic_scale * x + tok::space_0_5, tok::splash_screen_ease_in_out_cubic) * 0.5f;
    }
    inline float Smooth(float x)
    {
@@ -146,7 +146,7 @@ namespace Splash
                             (int)(stops[i].b + (stops[i + 1].b - stops[i].b) * k), (int)(alpha * 255.0f));
          }
       }
-      return IM_COL32(tok::splash_screen_brand_color_rgb_4, tok::splash_screen_brand_color_rgb_5, tok::splash_screen_brand_color_rgb_6, (int)(alpha * 255.0f));
+      return IM_COL32(tok::splash_screen_brand_color_shade, tok::splash_screen_brand_color_alpha_sm, tok::splash_screen_brand_color_alpha_lg, (int)(alpha * 255.0f));
    }
 
    // Draws the overlay. Returns true while it is still up this frame.
@@ -209,8 +209,8 @@ namespace Splash
       }
 
       // --- layout: a card about 600 x 380 points ----------------------------------------
-      const float sc = st.cardOnly ? std::min(W / tok::splash_screen_draw_ratio, H / tok::splash_screen_draw_ratio_2)
-                                   : std::max(0.7f, std::min(1.4f, std::min(W / tok::splash_screen_draw_ratio_3, H / tok::splash_screen_draw_ratio_4)));
+      const float sc = st.cardOnly ? std::min(W / tok::splash_screen_sc_max_md, H / tok::splash_screen_sc_max_xs)
+                                   : std::max(0.7f, std::min(1.4f, std::min(W / tok::splash_screen_sc_max_lg, H / tok::splash_screen_sc_max_sm)));
       const float cardW = st.cardOnly ? W : tok::splash_screen_card_w_ratio * sc, cardH = st.cardOnly ? H : tok::splash_screen_card_h_ratio * sc;
       const float x0 = st.cardOnly ? 0.0f : std::floor((W - cardW) * 0.5f);
       const float y0 = st.cardOnly ? 0.0f : std::floor((H - cardH) * 0.5f);
@@ -254,21 +254,21 @@ namespace Splash
 
       // dim the app behind the card, then the card with a soft shadow
       if (!st.cardOnly)
-         dl->AddRectFilled(ImVec2(0, 0), ImVec2(W, H), tok::U32(tok::splash_screen_draw_col_3, (int)(tok::splash_screen_draw_ratio_5 * alpha)));
+         dl->AddRectFilled(ImVec2(0, 0), ImVec2(W, H), tok::U32(tok::splash_screen_fill_shade, (int)(tok::splash_screen_shade_sm * alpha)));
       for (int i = st.cardOnly ? 0 : 6; i >= 1; --i)
-         dl->AddRectFilled(ImVec2(x0 - i * tok::splash_screen_draw_ratio_6 * sc, y0 - i * tok::splash_screen_draw_ratio_7 * sc + tok::splash_screen_draw_ratio_8 * sc),
-                           ImVec2(x1 + i * tok::splash_screen_draw_ratio_6 * sc, y1 + i * tok::splash_screen_draw_ratio_7 * sc + tok::splash_screen_draw_ratio_8 * sc), IM_COL32(0, 0, 0, (int)(tok::splash_screen_draw_ratio_9 * alpha)),
-                           rounding + i * tok::splash_screen_draw_ratio_6 * sc);
+         dl->AddRectFilled(ImVec2(x0 - i * tok::splash_screen_fill_x * sc, y0 - i * tok::splash_screen_fill_y_md * sc + tok::splash_screen_fill_y_lg * sc),
+                           ImVec2(x1 + i * tok::splash_screen_fill_x * sc, y1 + i * tok::splash_screen_fill_y_md * sc + tok::splash_screen_fill_y_lg * sc), IM_COL32(0, 0, 0, (int)(tok::splash_screen_shade_xs * alpha)),
+                           rounding + i * tok::splash_screen_fill_x * sc);
       {
          // Rounded card with a vertical gradient: clip the gradient rect to the rounded shape by
          // drawing a solid rounded rect, then a gradient inset by the corner radius in the middle.
          const ImU32 top = cardCol(y0, alpha), bot = cardCol(y1, alpha);
          dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), cardCol((y0 + y1) * 0.5f, alpha), rounding);
-         dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y0 + rounding * tok::splash_screen_draw_ratio_10), top, rounding, ImDrawFlags_RoundCornersTop);
-         dl->AddRectFilled(ImVec2(x0, y1 - rounding * tok::splash_screen_draw_ratio_10), ImVec2(x1, y1), bot, rounding, ImDrawFlags_RoundCornersBottom);
-         dl->AddRectFilledMultiColor(ImVec2(x0, y0 + rounding * tok::splash_screen_draw_ratio_10), ImVec2(x1, y1 - rounding * tok::splash_screen_draw_ratio_10),
-                                     cardCol(y0 + rounding * tok::splash_screen_draw_card_col_scale_2, alpha), cardCol(y0 + rounding * tok::splash_screen_draw_card_col_scale_2, alpha),
-                                     cardCol(y1 - rounding * tok::splash_screen_draw_card_col_scale_2, alpha), cardCol(y1 - rounding * tok::splash_screen_draw_card_col_scale_2, alpha));
+         dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y0 + rounding * tok::splash_screen_fill_y_sm), top, rounding, ImDrawFlags_RoundCornersTop);
+         dl->AddRectFilled(ImVec2(x0, y1 - rounding * tok::splash_screen_fill_y_sm), ImVec2(x1, y1), bot, rounding, ImDrawFlags_RoundCornersBottom);
+         dl->AddRectFilledMultiColor(ImVec2(x0, y0 + rounding * tok::splash_screen_fill_y_sm), ImVec2(x1, y1 - rounding * tok::splash_screen_fill_y_sm),
+                                     cardCol(y0 + rounding * tok::splash_screen_card_col_scale, alpha), cardCol(y0 + rounding * tok::splash_screen_card_col_scale, alpha),
+                                     cardCol(y1 - rounding * tok::splash_screen_card_col_scale, alpha), cardCol(y1 - rounding * tok::splash_screen_card_col_scale, alpha));
       }
 
       // --- logo: stroke draws itself in, then a bead rides the loop ----------------------
@@ -318,7 +318,7 @@ namespace Splash
          {
             const ImVec2 hq = Lemniscate(twoPi * draw);
             dl->AddCircleFilled(ImVec2(cx + hq.x * A, cy + hq.y * A), hw,
-                                mixBg(BrandColor((hq.x + 1.0f) * 0.5f, 1.0f), cy + hq.y * A), tok::splash_screen_draw_segments);
+                                mixBg(BrandColor((hq.x + 1.0f) * 0.5f, 1.0f), cy + hq.y * A), tok::splash_screen_dot_segments_lg);
          }
       }
 
@@ -331,11 +331,11 @@ namespace Splash
          const ImVec2 q = Lemniscate(twoPi * (e - std::floor(e)));
          const ImVec2 c(cx + q.x * A, cy + q.y * A);
          const float r = strokeW * tok::splash_screen_r_ratio;
-         dl->AddCircleFilled(c, r, mixBg(IM_COL32(tok::splash_screen_draw_rgb_9, tok::splash_screen_draw_rgb_10, tok::splash_screen_draw_rgb_11, (int)(tok::splash_screen_draw_ratio_11 * fadeIn)), c.y), tok::splash_screen_draw_segments_2);
-         dl->AddCircleFilled(ImVec2(c.x - r * tok::splash_screen_draw_ratio_12, c.y - r * tok::splash_screen_draw_ratio_13), r * tok::splash_screen_draw_ratio_14,
-                             mixBg(IM_COL32(tok::splash_screen_draw_rgb_12, tok::splash_screen_draw_rgb_13, tok::splash_screen_draw_rgb_14, (int)(tok::splash_screen_draw_ratio_11 * fadeIn)), c.y), tok::splash_screen_draw_segments_2);
-         dl->AddCircleFilled(ImVec2(c.x - r * tok::splash_screen_draw_ratio_15, c.y - r * tok::splash_screen_draw_ratio_16), r * tok::splash_screen_draw_ratio_17,
-                             mixBg(tok::U32(tok::splash_screen_draw_col_4, (int)(tok::splash_screen_draw_ratio_18 * fadeIn)), c.y), tok::splash_screen_draw_segments_3);
+         dl->AddCircleFilled(c, r, mixBg(IM_COL32(tok::splash_screen_mix_bg_shade_md, tok::splash_screen_mix_bg_alpha_md, tok::splash_screen_mix_bg_alpha_sm, (int)(tok::splash_screen_shade_lg * fadeIn)), c.y), tok::splash_screen_dot_segments_md);
+         dl->AddCircleFilled(ImVec2(c.x - r * tok::splash_screen_dot_x_sm, c.y - r * tok::splash_screen_dot_y_sm), r * tok::splash_screen_dot_r_lg,
+                             mixBg(IM_COL32(tok::splash_screen_mix_bg_shade_lg, tok::splash_screen_mix_bg_alpha_lg, tok::splash_screen_mix_bg_shade_sm, (int)(tok::splash_screen_shade_lg * fadeIn)), c.y), tok::splash_screen_dot_segments_md);
+         dl->AddCircleFilled(ImVec2(c.x - r * tok::splash_screen_dot_x_lg, c.y - r * tok::splash_screen_dot_y_lg), r * tok::splash_screen_dot_r_sm,
+                             mixBg(tok::U32(tok::splash_screen_mix_bg_shade, (int)(tok::splash_screen_shade_md * fadeIn)), c.y), tok::splash_screen_dot_segments_sm);
       }
 
       // --- bottom left: credits; bottom right: version -----------------------------------
@@ -346,12 +346,12 @@ namespace Splash
          // One quiet footer line, like Bitwig's. Names are not shown for now (Credits() is kept for later).
          const float fs = 8.5f * sc;
          // The font has no trademark glyph, so "TM" is drawn as a small raised superscript.
-         const ImU32 footCol = IM_COL32(tok::splash_screen_draw_rgb_14, tok::splash_screen_draw_rgb_15, tok::splash_screen_draw_rgb_16, (int)(210.0f * textA));
+         const ImU32 footCol = IM_COL32(tok::splash_screen_mix_bg_shade_sm, tok::splash_screen_foot_col_alpha_sm, tok::splash_screen_foot_col_alpha_lg, (int)(210.0f * textA));
          const float fy = y1 - pad - fs;
          float fx = x0 + pad;
          dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "Infinite");   // i18n-ok: brand mark, never translated
          fx += font->CalcTextSizeA(fs, FLT_MAX, 0.0f, "Infinite").x + 1.0f * sc;
-         dl->AddText(font, fs * tok::splash_screen_draw_ratio_19, ImVec2(fx, fy - fs * tok::splash_screen_draw_ratio_20), mixBg(footCol, fy), "TM");   // i18n-ok: brand mark, never translated
+         dl->AddText(font, fs * tok::splash_screen_text_font_size, ImVec2(fx, fy - fs * tok::splash_screen_text_y), mixBg(footCol, fy), "TM");   // i18n-ok: brand mark, never translated
          fx += font->CalcTextSizeA(fs * 0.55f, FLT_MAX, 0.0f, "TM").x;
          dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "   |   Made in India   |   Open source (MIT license)");   // i18n-ok: brand footer, never translated
          const std::string ver = std::string("v") + INFINITE_VERSION_STRING;
@@ -365,8 +365,8 @@ namespace Splash
          {
             const float frac = (float)st.tasksDone / (float)st.tasksTotal;
             const float w = tok::splash_screen_w_ratio * sc, lx = cx - w * 0.5f, ly = cy + A * 0.5f + 34.0f * sc;
-            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w, ly), mixBg(IM_COL32(tok::splash_screen_draw_rgb_14, tok::splash_screen_draw_rgb_15, tok::splash_screen_draw_rgb_16, tok::splash_screen_draw_alpha_2), ly), tok::splash_screen_draw_stroke);
-            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w * frac, ly), mixBg(BrandColor(tok::splash_screen_draw_brand_color_level_2, tok::splash_screen_draw_brand_color_alpha_2), ly), tok::splash_screen_draw_stroke_2);
+            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w, ly), mixBg(IM_COL32(tok::splash_screen_mix_bg_shade_sm, tok::splash_screen_foot_col_alpha_sm, tok::splash_screen_foot_col_alpha_lg, tok::splash_screen_mix_bg_alpha), ly), tok::splash_screen_line_stroke_sm);
+            dl->AddLine(ImVec2(lx, ly), ImVec2(lx + w * frac, ly), mixBg(BrandColor(tok::splash_screen_brand_color_u, tok::splash_screen_brand_color_alpha), ly), tok::splash_screen_line_stroke_lg);
          }
       }
 

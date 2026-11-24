@@ -221,11 +221,11 @@ namespace app
       if (MenuParts::BeginPopup("##sharepatch"))
       {
          ImGui::TextDisabled("%s", T("Share patch as:"));
-         ImGui::SetNextItemWidth(tok::patch_share_popup_set_next_item_width_w);
+         ImGui::SetNextItemWidth(tok::patch_share_field_w);
          ImGui::InputText("##sharename", gSharePatch.nameBuf, sizeof(gSharePatch.nameBuf));
-         ImGui::SetNextItemWidth(tok::patch_share_popup_set_next_item_width_w);
+         ImGui::SetNextItemWidth(tok::patch_share_field_w);
          ImGui::InputTextWithHint("##shareauthor", T("Author (optional)"), gSharePatch.authorBuf, sizeof(gSharePatch.authorBuf));
-         ImGui::SetNextItemWidth(tok::patch_share_popup_set_next_item_width_w);
+         ImGui::SetNextItemWidth(tok::patch_share_field_w);
          ImGui::InputTextWithHint("##sharedesc", T("One line about it (optional)"), gSharePatch.descBuf, sizeof(gSharePatch.descBuf));
          ImGui::TextDisabled("%s", T("File paths are removed; media is not included."));
          if (ChipButton::Draw(L("Choose folder and share##sharepatchgo"), true, ImGui::GetFrameHeight()) && gSharePatch.nameBuf[0] != '\0')

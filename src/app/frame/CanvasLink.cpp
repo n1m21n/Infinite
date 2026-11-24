@@ -170,7 +170,7 @@ namespace CanvasLink
       }
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 mp = ImGui::GetMousePos();
-      const ImU32 dim = ImGui::GetColorU32(ImGuiCol_WindowBg, tok::canvas_link_hook_window_bg_alpha_2);
+      const ImU32 dim = ImGui::GetColorU32(ImGuiCol_WindowBg, tok::canvas_link_dim_color_alpha_mul);
       const bool params = sArmed.target == Target::Param;
       const bool onCanvas = PointerOnCanvas();
       GraphNode* hovered = nullptr;

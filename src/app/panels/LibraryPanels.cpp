@@ -325,7 +325,7 @@ namespace app
          if (missing)
             label += T("  (not found)");
          const LibraryParts::RowResult row =
-            LibraryParts::FolderRow("folder", TruncateWithEllipsis(label, std::max(tok::library_search_panel_bound, rowW - tok::library_search_panel_gap)), missing, rowW);
+            LibraryParts::FolderRow("folder", TruncateWithEllipsis(label, std::max(tok::library_search_min_sm, rowW - tok::library_search_panel_gap)), missing, rowW);
          if (row.clicked && !missing)
             browseDir = folder;
          MaybeStartFolderDrag(folder, mediaKind);
@@ -342,7 +342,7 @@ namespace app
       if (!folderToRemove.empty())
          scanner.RemoveFolder(folderToRemove);
 
-      ImGui::Dummy(ImVec2(0.0f, tok::library_search_panel_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::library_spacer_h));
       {
          const bool clicked = LibraryParts::ActionButton("refreshall", T("Refresh all"), LibraryParts::Icon::Refresh, !scanning);
          if (clicked)
@@ -505,7 +505,7 @@ namespace app
                ImGui::PushID(folder.c_str());
                const float availW = ImGui::GetContentRegionAvail().x;
                const std::string name = FolderDisplayName(folder);
-               if (LibraryParts::FolderRow("sub", TruncateWithEllipsis(name, std::max(tok::library_search_panel_bound, availW - tok::library_search_panel_gap_2))).clicked)
+               if (LibraryParts::FolderRow("sub", TruncateWithEllipsis(name, std::max(tok::library_search_min_sm, availW - tok::library_search_min_lg))).clicked)
                   browseDir = folder;
                MaybeStartFolderDrag(folder, mediaKind);
                ImGui::PopID();

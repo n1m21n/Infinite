@@ -51,12 +51,12 @@ namespace app
             {
                const float t = (float)i / (float)(count - 1);
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
-               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_wavetable_scope_ratio_2));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_path_line_to_y));
             }
             const ImU32 strokeCol = isLight
                ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
-               : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
-            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_wavetable_scope_stroke_2 : tok::field_params_wavetable_scope_stroke_3);
+               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, 46) : tok::Role(tok::col::accent_alt, 245));
+            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_path_stroke_lg : tok::field_params_path_stroke_sm);
          }
       }
       else
@@ -109,12 +109,12 @@ namespace app
             {
                const float t = (float)i / (float)(count - 1);
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
-               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_sample_scope_ratio_2));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_path_line_to_y));
             }
             const ImU32 strokeCol = isLight
                ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
-               : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
-            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_sample_scope_stroke_2 : tok::field_params_sample_scope_stroke_3);
+               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, 46) : tok::Role(tok::col::accent_alt, 245));
+            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_path_stroke_lg : tok::field_params_path_stroke_sm);
          }
       }
       else
@@ -153,15 +153,15 @@ namespace app
             return br.y - t * h;
          };
          const bool isLight = IsThemeLight();
-         const ImU32 fillCol = isLight ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent_2, 46);
+         const ImU32 fillCol = isLight ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent_pale_muted_warm, 46);
          const ImU32 strokeCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
          const float bw = w / (float)kB;
          for (int i = 0; i < kB; i++)
             dl->AddRectFilled(ImVec2(origin.x + i * bw, yFor(in[i])), ImVec2(origin.x + (i + 1) * bw, br.y), fillCol);
          dl->PathClear();
          for (int i = 0; i < kB; i++)
-            dl->PathLineTo(ImVec2(origin.x + (i + tok::field_params_spectral_spectrum_bias) * bw, yFor(out[i])));
-         dl->PathStroke(strokeCol, 0, tok::field_params_spectral_spectrum_stroke_2);
+            dl->PathLineTo(ImVec2(origin.x + (i + tok::field_params_spectral_spectrum_inset) * bw, yFor(out[i])));
+         dl->PathStroke(strokeCol, 0, tok::field_params_path_stroke_sm);
       }
       else
       {
@@ -213,12 +213,12 @@ namespace app
             {
                const float t = (float)i / (float)(count - 1);
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
-               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_synth_scope_ratio_2));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::field_params_path_line_to_y));
             }
             const ImU32 strokeCol = isLight
                ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
-               : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
-            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_synth_scope_stroke_2 : tok::field_params_synth_scope_stroke_3);
+               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, 46) : tok::Role(tok::col::accent_alt, 245));
+            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::field_params_path_stroke_lg : tok::field_params_path_stroke_sm);
          }
       }
       else
@@ -276,14 +276,14 @@ namespace app
             hi = mid + 5.5f;
          }
          const bool isLight = IsThemeLight();
-         const float barH = std::max(tok::field_params_notes_roll_bound, h / (hi - lo + tok::field_params_notes_roll_bias));
-         const float barW = std::max(tok::field_params_notes_roll_bound, w / (float)(kWindowBeats * tok::field_params_notes_roll_ratio_2));
+         const float barH = std::max(tok::field_params_bar_h_min, h / (hi - lo + tok::field_params_notes_roll_bar_h));
+         const float barW = std::max(tok::field_params_bar_h_min, w / (float)(kWindowBeats * tok::field_params_notes_roll_bar_w));
          for (int i = 0; i < n->RollCount(); i++)
          {
             const auto& r = n->RollAt(i);
             if (r.beat < startBeat || r.beat > nowBeat + 0.01) continue;
             const float x = origin.x + (float)((r.beat - startBeat) / kWindowBeats) * w;
-            const float y = br.y - barH - ((r.note - lo + 1.0f) / (hi - lo + tok::field_params_notes_roll_bias)) * (h - barH);
+            const float y = br.y - barH - ((r.note - lo + 1.0f) / (hi - lo + tok::field_params_notes_roll_bar_h)) * (h - barH);
             const float v = std::max(0.15f, std::min(1.0f, r.vel));
             const ImU32 col = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 245);
             ImVec4 c = ImGui::ColorConvertU32ToFloat4(col);
@@ -319,7 +319,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::field_params_element_col_2), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_element_shade), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -396,7 +396,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::field_params_primitive_col_2), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_primitive_shade), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -487,7 +487,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::field_params_sample_col_2), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_sample_shade), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -552,7 +552,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::field_params_spectral_col_2), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_spectral_shade), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -590,7 +590,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::field_params_synth_col_2), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_synth_shade), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -665,7 +665,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::field_params_notes_col_2), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_notes_shade), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -748,7 +748,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::field_params_graph_col_2), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_graph_shade), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 
@@ -805,7 +805,7 @@ namespace app
          if (!n->LastError().empty())
          {
             PushTextWrapWidth(kPreviewSize);
-            ImGui::TextColored(tok::V4(tok::field_params_pixel_col_2), "%s", n->LastError().c_str());
+            ImGui::TextColored(tok::V4(tok::field_params_pixel_shade), "%s", n->LastError().c_str());
             PopTextWrapWidth();
          }
 

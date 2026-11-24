@@ -536,13 +536,13 @@ namespace app
          if (tex != ImTextureID{})
          {
             const ImVec2 mn(std::round(c.x - half), std::round(c.y - half));
-            Thumb::Add(dl, tex, mn, ImVec2(mn.x + half * tok::chat_avatar_ratio_2, mn.y + half * tok::chat_avatar_ratio_2));
+            Thumb::Add(dl, tex, mn, ImVec2(mn.x + half * tok::chat_thumb_strum_frames, mn.y + half * tok::chat_thumb_strum_frames));
          }
          else
          {
             // No mark: its first letter on a neutral tile, the icon tile's shape.
-            const ImVec2 a(std::round(c.x - r), std::round(c.y - r)), b(a.x + std::round(r * tok::chat_avatar_ratio_2), a.y + std::round(r * tok::chat_avatar_ratio_2));
-            dl->AddRectFilled(a, b, TextTint(tok::chat_avatar_text_alpha_2), std::min(tok::radius_control, r * 0.5f));
+            const ImVec2 a(std::round(c.x - r), std::round(c.y - r)), b(a.x + std::round(r * tok::chat_thumb_strum_frames), a.y + std::round(r * tok::chat_thumb_strum_frames));
+            dl->AddRectFilled(a, b, TextTint(tok::chat_avatar_fill_shade), std::min(tok::radius_control, r * 0.5f));
             const char name[2] = { (char)std::toupper((unsigned char)AgentName(id)[0]), 0 };
             UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Semibold);
             const ImVec2 ts = ImGui::CalcTextSize(name);
@@ -697,7 +697,7 @@ namespace app
          if (s.login == nullptr || !s.needsCode)
             return;
          const float btnW = ImGui::CalcTextSize(T("Submit")).x + tok::chat_btn_w_ratio * tok::space_2;
-         ImGui::SetNextItemWidth(std::max(tok::chat_code_entry_bound, width - btnW - tok::space_1));
+         ImGui::SetNextItemWidth(std::max(tok::chat_signincode_min, width - btnW - tok::space_1));
          const bool enter = ImGui::InputTextWithHint("##signincode", T("Paste the code"), &s.codeInput, ImGuiInputTextFlags_EnterReturnsTrue);
          FormParts::Inline(0.0f, tok::space_1);
          const bool press = ChipButton::Draw(T("Submit"), true, tok::control_h);
@@ -1774,16 +1774,16 @@ namespace app
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const float inset = tok::radius_control * tok::chat_inset_ratio;  // the composer's corner: the tray meets its straight edge
          const ImVec2 t0(at.x + inset, at.y), t1(at.x + width - inset, at.y + QueueHeight());
-         dl->AddRectFilled(t0, t1, TextTint(tok::chat_queue_text_alpha_5), tok::radius_control * tok::chat_queue_ratio, ImDrawFlags_RoundCornersTop);
+         dl->AddRectFilled(t0, t1, TextTint(tok::chat_queue_fill_shade_sm), tok::radius_control * tok::chat_queue_ratio, ImDrawFlags_RoundCornersTop);
          {  // open outline (no bottom edge: the tray sits on the composer)
             const float r = tok::radius_control * tok::chat_r_ratio;
             const ImVec2 a(t0.x + tok::px_align, t0.y + tok::px_align), b(t1.x - tok::px_align, t1.y);
             dl->PathClear();
             dl->PathLineTo(ImVec2(a.x, b.y));
-            dl->PathArcTo(ImVec2(a.x + r, a.y + r), r, IM_PI, IM_PI * tok::chat_queue_ratio_2);
-            dl->PathArcTo(ImVec2(b.x - r, a.y + r), r, IM_PI * tok::chat_queue_ratio_2, IM_PI * tok::chat_queue_ratio);
+            dl->PathArcTo(ImVec2(a.x + r, a.y + r), r, IM_PI, IM_PI * tok::chat_arc_scale);
+            dl->PathArcTo(ImVec2(b.x - r, a.y + r), r, IM_PI * tok::chat_arc_scale, IM_PI * tok::chat_queue_ratio);
             dl->PathLineTo(ImVec2(b.x, b.y));
-            dl->PathStroke(TextTint(tok::chat_queue_text_alpha_6), ImDrawFlags_None, 1.0f);
+            dl->PathStroke(TextTint(tok::chat_path_shade), ImDrawFlags_None, 1.0f);
          }
          const float leftC = std::floor(t0.x + tok::space_3 + tok::chat_queue_gap);
          const float rightC = std::floor(t1.x - tok::space_3 - tok::chat_queue_gap);
@@ -1807,13 +1807,13 @@ namespace app
                drop = (int)i;
             const float cy = std::floor(p.y + kQueueRowH * 0.5f);
             if (hot)
-               dl->AddRectFilled(ImVec2(p.x + tok::space_0_75, p.y), ImVec2(p.x + rowW - tok::space_0_75, p.y + kQueueRowH), TextTint(tok::chat_queue_text_alpha_7), tok::radius_control);
+               dl->AddRectFilled(ImVec2(p.x + tok::space_0_75, p.y), ImVec2(p.x + rowW - tok::space_0_75, p.y + kQueueRowH), TextTint(tok::chat_queue_fill_shade_lg), tok::radius_control);
             glyph::Draw(dl, ImVec2(leftC, cy), tok::icon_control, Dim(), IconsInfinite::History);
             const float tx = leftC + tok::chat_tx_gap + tok::space_2, ty = cy - ImGui::GetFontSize() * 0.5f;
             std::string one = sQueue[i].text.substr(0, sQueue[i].text.find('\n'));
             if (!sQueue[i].files.empty())
                one += (one.empty() ? "" : "  ") + std::string("+") + std::to_string(sQueue[i].files.size());
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(tok::chat_queue_text_alpha_8)));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(tok::chat_queue_shade)));
             const float textEnd = rightC - tok::chat_text_end_gap - tok::space_2;
             ImGui::RenderTextEllipsis(dl, ImVec2(tx, ty), ImVec2(textEnd, p.y + kQueueRowH), textEnd, one.c_str(), nullptr, nullptr);
             ImGui::PopStyleColor();
@@ -2298,9 +2298,9 @@ namespace app
          const float hv = UiAnim::Hover(ImGui::GetItemID(), hovered, tok::motion_hover_in, tok::motion_hover_out);
          const ImU32 accent = ImGui::GetColorU32(AccentEmphasisSelected());
          const ImU32 ink = done || !live ? Dim() : ImGui::GetColorU32(ImGuiCol_Text);
-         dl->AddRectFilled(at, ImVec2(at.x + sz.x, at.y + sz.y), done || !live ? TextTint(tok::chat_action_text_alpha_2) : WithAlpha(accent, tok::chat_action_accent_offset_3 + tok::chat_action_accent_scale_3 * hv), sz.y * 0.5f);
+         dl->AddRectFilled(at, ImVec2(at.x + sz.x, at.y + sz.y), done || !live ? TextTint(tok::chat_action_fill_shade) : WithAlpha(accent, tok::chat_fill_alpha_xs + tok::chat_fill_alpha_sm * hv), sz.y * 0.5f);
          if (!done && live)
-            dl->AddRect(at, ImVec2(at.x + sz.x, at.y + sz.y), WithAlpha(accent, tok::chat_action_accent_offset_4 + tok::chat_action_accent_scale_4 * hv), sz.y * 0.5f);
+            dl->AddRect(at, ImVec2(at.x + sz.x, at.y + sz.y), WithAlpha(accent, tok::chat_outline_alpha_lg + tok::chat_outline_alpha_sm * hv), sz.y * 0.5f);
          glyph::Draw(dl, ImVec2(at.x + tok::space_1 + tok::icon_control * 0.5f + 1.0f, at.y + sz.y * 0.5f), tok::icon_control, done ? Dim() : accent,
                      done ? IconsInfinite::Snap : ActionGlyph(s));
          dl->AddText(ImVec2(at.x + tok::chat_action_ratio * tok::space_1 + tok::icon_control + 1.0f, at.y + (lineH - ts.y) * 0.5f), ink, s.text.c_str());
@@ -2330,7 +2330,7 @@ namespace app
             return;
          }
          const ImU32 cat = n != nullptr ? CategoryU32(n->category) : TextTint(1.0f);
-         dl->AddRectFilled(at, ImVec2(at.x + sz.x, at.y + sz.y), WithAlpha(cat, tok::chat_chip_with_alpha_offset_2 + tok::chat_chip_with_alpha_scale_2 * hv), tok::radius_cell);
+         dl->AddRectFilled(at, ImVec2(at.x + sz.x, at.y + sz.y), WithAlpha(cat, tok::chat_fill_alpha_md + tok::chat_fill_alpha_xs * hv), tok::radius_cell);
          const chat::CatalogParam* p = s.kind == chat::Seg::Kind::Param && n != nullptr ? n->Find(s.key) : nullptr;
          if (p != nullptr && (p->modulated || p->expression))
             dl->AddCircleFilled(ImVec2(at.x + sz.x - tok::chat_chip_gap, at.y + tok::chat_chip_gap), tok::chat_chip_r, tok::U32(p->modulated ? tok::pin_mod : tok::pin_expr, Light()));
@@ -2450,7 +2450,7 @@ namespace app
                   const float hw = widthOf(head);
                   const ImVec2 hp(origin.x + x, origin.y + y + (lineH - fsz) * 0.5f);
                   if (s.kind == chat::Seg::Kind::Code)
-                     dl->AddRectFilled(ImVec2(hp.x - tok::space_0_5, origin.y + y + 1.0f), ImVec2(hp.x + hw + tok::space_0_5, origin.y + y + lineH - 1.0f), TextTint(tok::chat_flow_text_alpha_2), tok::radius_cell);
+                     dl->AddRectFilled(ImVec2(hp.x - tok::space_0_5, origin.y + y + 1.0f), ImVec2(hp.x + hw + tok::space_0_5, origin.y + y + lineH - 1.0f), TextTint(tok::chat_flow_fill_shade), tok::radius_cell);
                   dl->AddText(font, fsz, hp, s.dim ? Dim() : col, head.c_str());
                   record(head, ImVec2(origin.x + x, origin.y + y), hw, font);
                   word = word.substr(cut);
@@ -2459,7 +2459,7 @@ namespace app
                }
                const ImVec2 p(origin.x + x, origin.y + y + (lineH - fsz) * 0.5f);
                if (s.kind == chat::Seg::Kind::Code)
-                  dl->AddRectFilled(ImVec2(p.x - tok::space_0_5, origin.y + y + 1.0f), ImVec2(p.x + w + tok::space_0_5, origin.y + y + lineH - 1.0f), TextTint(tok::chat_flow_text_alpha_2), tok::radius_cell);
+                  dl->AddRectFilled(ImVec2(p.x - tok::space_0_5, origin.y + y + 1.0f), ImVec2(p.x + w + tok::space_0_5, origin.y + y + lineH - 1.0f), TextTint(tok::chat_flow_fill_shade), tok::radius_cell);
                dl->AddText(font, fsz, p, s.dim ? Dim() : col, word.c_str());
                if (!word.empty())
                   record(word, ImVec2(origin.x + x, origin.y + y), w, font);
@@ -2614,9 +2614,9 @@ namespace app
          const bool folderHot = ImGui::IsItemHovered() && exists;
          ImGui::PopID();
 
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + cardH), TextTint(hot ? tok::chat_audio_text_alpha_5 : tok::chat_audio_text_alpha_6), tok::radius_control * tok::chat_audio_ratio);
-         dl->AddRect(at, ImVec2(at.x + width, at.y + cardH), TextTint(tok::chat_audio_text_alpha_5), tok::radius_control * tok::chat_audio_ratio);
-         dl->AddCircleFilled(bc, btn * 0.5f, exists ? WithAlpha(accent, hot ? tok::chat_audio_accent_alpha_3 : tok::chat_audio_accent_alpha_4) : TextTint(tok::chat_audio_text_alpha_5), tok::chat_audio_segments);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + cardH), TextTint(hot ? tok::chat_audio_fill_shade_md : tok::chat_audio_fill_shade_sm), tok::radius_control * tok::chat_audio_ratio);
+         dl->AddRect(at, ImVec2(at.x + width, at.y + cardH), TextTint(tok::chat_audio_fill_shade_md), tok::radius_control * tok::chat_audio_ratio);
+         dl->AddCircleFilled(bc, btn * 0.5f, exists ? WithAlpha(accent, hot ? tok::chat_dot_alpha_lg : tok::chat_dot_alpha_md) : TextTint(tok::chat_audio_fill_shade_md), tok::chat_audio_segments);
          const ImU32 onAccent = IM_COL32_WHITE;  // as on Send
          if (playing)
             glyph::DrawPlayerPause(dl, bc, btn * 0.36f, onAccent);
@@ -2656,21 +2656,21 @@ namespace app
                const float v = look.peaks[std::min((int)(u * look.peaks.size()), (int)look.peaks.size() - 1)];
                const float h = std::max(1.0f, v * half);
                const float x = x0 + i * step;
-               dl->AddRectFilled(ImVec2(x, mid - h), ImVec2(x + tok::space_0_5, mid + h), u <= played ? accent : TextTint(tok::chat_audio_text_alpha_7), 1.0f);
+               dl->AddRectFilled(ImVec2(x, mid - h), ImVec2(x + tok::space_0_5, mid + h), u <= played ? accent : TextTint(tok::chat_audio_fill_shade_lg), 1.0f);
             }
          }
          else
-            dl->AddLine(ImVec2(x0, mid), ImVec2(x1, mid), TextTint(tok::chat_audio_text_alpha_8));
+            dl->AddLine(ImVec2(x0, mid), ImVec2(x1, mid), TextTint(tok::chat_line_shade_lg));
 
          const ImVec2 fc(folderX + folder * 0.5f, at.y + cardH * 0.5f);
          if (folderHot)
-            dl->AddRectFilled(ImVec2(folderX, fc.y - folder * 0.5f), ImVec2(folderX + folder, fc.y + folder * 0.5f), TextTint(tok::chat_audio_text_alpha_5), tok::radius_control);
+            dl->AddRectFilled(ImVec2(folderX, fc.y - folder * 0.5f), ImVec2(folderX + folder, fc.y + folder * 0.5f), TextTint(tok::chat_audio_fill_shade_md), tok::radius_control);
          glyph::Draw(dl, fc, tok::icon_control, folderHot ? text : Dim(), IconsInfinite::Folder);
          if (folderHot)
             Tip::Show("%s", T("Show in folder"));
          const ImVec2 sc(samplerX + folder * 0.5f, at.y + cardH * 0.5f);
          if (samplerHot)
-            dl->AddRectFilled(ImVec2(samplerX, sc.y - folder * 0.5f), ImVec2(samplerX + folder, sc.y + folder * 0.5f), TextTint(tok::chat_audio_text_alpha_5), tok::radius_control);
+            dl->AddRectFilled(ImVec2(samplerX, sc.y - folder * 0.5f), ImVec2(samplerX + folder, sc.y + folder * 0.5f), TextTint(tok::chat_audio_fill_shade_md), tok::radius_control);
          glyph::Draw(dl, sc, tok::icon_control, samplerHot ? text : Dim(), IconsInfinite::Waveform);
          if (samplerHot)
             Tip::Show("%s", T("Open in a Sampler"));
@@ -2749,7 +2749,7 @@ namespace app
          const bool clicked = UiInteract::Hit("##file", ImVec2(width, rowH)) && exists;
          ImGui::PopID();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? tok::chat_file_text_alpha_3 : tok::chat_file_text_alpha_4), tok::radius_control);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? tok::chat_file_fill_shade_lg : tok::chat_file_fill_shade_sm), tok::radius_control);
          glyph::Draw(dl, ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), tok::icon_control, Dim(), IconsInfinite::Library);
          const std::string name = std::filesystem::path(path).filename().string();
          const std::string shown = exists ? name : name + "  " + T("(missing)");
@@ -2793,7 +2793,7 @@ namespace app
          const ImVec2 at = ImGui::GetCursorScreenPos();
          Thumb::Image((ImTextureID)(intptr_t)FrameOf(*t), ImVec2(w * s, h * s));
          const bool hot = ImGui::IsItemHovered();
-         ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + w * s, at.y + h * s), TextTint(hot ? tok::chat_image_text_alpha_3 : tok::chat_image_text_alpha_4), tok::radius_control);
+         ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + w * s, at.y + h * s), TextTint(hot ? tok::chat_outline_shade_lg : tok::chat_outline_shade_sm), tok::radius_control);
          if (hot)
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          if (ImGui::IsItemClicked())
@@ -2820,13 +2820,13 @@ namespace app
          if (ImGui::Begin("##chatimageview", nullptr, flags))
          {
             ImDrawList* dl = ImGui::GetWindowDrawList();
-            dl->AddRectFilled(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), WithAlpha(tok::U32(tok::terminal_bg, Light()), tok::chat_image_viewer_alpha_2));
-            const float fit = std::min({ 1.0f, vp->Size.x * tok::chat_image_viewer_ratio / (float)t->w, vp->Size.y * tok::chat_image_viewer_ratio_2 / (float)t->h });
+            dl->AddRectFilled(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), WithAlpha(tok::U32(tok::terminal_bg, Light()), tok::chat_fill_alpha_lg));
+            const float fit = std::min({ 1.0f, vp->Size.x * tok::chat_image_viewer_ratio / (float)t->w, vp->Size.y * tok::chat_image_viewer_scale / (float)t->h });
             const ImVec2 sz(std::floor(t->w * fit), std::floor(t->h * fit));
             const ImVec2 p0(std::floor(vp->Pos.x + (vp->Size.x - sz.x) * 0.5f), std::floor(vp->Pos.y + (vp->Size.y - sz.y) * 0.5f));
             const ImVec2 p1(p0.x + sz.x, p0.y + sz.y);
             Thumb::AddRounded(dl, (ImTextureID)(intptr_t)FrameOf(*t), p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, tok::radius_control);
-            dl->AddRect(p0, p1, TextTint(tok::chat_image_viewer_text_alpha_2), tok::radius_control);
+            dl->AddRect(p0, p1, TextTint(tok::chat_outline_shade_sm), tok::radius_control);
             const std::string name = std::filesystem::path(sViewing).filename().string();
             char size[32];
             std::snprintf(size, sizeof size, "%d × %d", t->w, t->h);
@@ -2930,17 +2930,17 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          // Frames come row-flipped for GL: draw them with v running bottom to top.
          Thumb::AddRounded(dl, (ImTextureID)(intptr_t)v->tex, at, end, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_control);
-         dl->AddRect(at, end, TextTint(hot ? tok::chat_video_text_alpha_3 : tok::chat_video_text_alpha_4), tok::radius_control);
+         dl->AddRect(at, end, TextTint(hot ? tok::chat_outline_shade_lg : tok::chat_outline_shade_sm), tok::radius_control);
          const bool playing = v->handle != nullptr;
          const ImVec2 c(std::floor((at.x + end.x) * 0.5f), std::floor((at.y + end.y) * 0.5f));
-         const ImU32 shade = WithAlpha(IM_COL32_BLACK, tok::chat_video_black_alpha_3);
+         const ImU32 shade = WithAlpha(IM_COL32_BLACK, tok::chat_shade_alpha);
          if (!playing || hot)
          {
-            dl->AddCircleFilled(c, tok::chat_video_r, hot ? WithAlpha(IM_COL32_BLACK, tok::chat_video_black_alpha_4) : shade, tok::chat_video_segments);
+            dl->AddCircleFilled(c, tok::chat_video_r, hot ? WithAlpha(IM_COL32_BLACK, tok::chat_dot_alpha_sm) : shade, tok::chat_video_segments);
             if (playing)
                glyph::DrawPlayerPause(dl, c, 8.0f, IM_COL32_WHITE);
             else
-               glyph::DrawPlayerPlay(dl, ImVec2(c.x + tok::space_0_5, c.y), tok::chat_video_draw_player_play_arg, IM_COL32_WHITE, true);
+               glyph::DrawPlayerPlay(dl, ImVec2(c.x + tok::space_0_5, c.y), tok::chat_player_play_size, IM_COL32_WHITE, true);
          }
          // Length (or where it is, while it plays) in a pill at the bottom right.
          const int secs = (int)std::lround(playing ? std::fmod(ImGui::GetTime() - v->started, std::max(0.001, v->seconds)) : v->seconds);
@@ -3026,7 +3026,7 @@ namespace app
          if (hot)
             Tip::Show("%s", on ? T("Close code") : T("Open code"));
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), TextTint(hot ? tok::chat_code_chip_text_alpha_3 : tok::chat_code_chip_text_alpha_4), tok::radius_control);
+         dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), TextTint(hot ? tok::chat_code_chip_fill_shade_lg : tok::chat_code_chip_fill_shade_sm), tok::radius_control);
          if (on)
             dl->AddRect(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(AccentEmphasisSelected()), tok::radius_control);
          const ImU32 fg = on ? ImGui::GetColorU32(AccentEmphasisSelected()) : (hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim());
@@ -3083,7 +3083,7 @@ namespace app
                   if (b.kind == chat::Block::Kind::Bullet)
                   {
                      indent = tok::space_4;
-                     ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(at.x + tok::space_1_25, at.y + std::floor(ImGui::GetTextLineHeight() * 0.5f + tok::chat_blocks_bias)), tok::chat_blocks_r, TextTint(tok::chat_blocks_text_alpha_2));
+                     ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(at.x + tok::space_1_25, at.y + std::floor(ImGui::GetTextLineHeight() * 0.5f + tok::chat_blocks_u_res)), tok::chat_blocks_r, TextTint(tok::chat_dot_shade));
                   }
                   float h;
                   if (b.kind == chat::Block::Kind::Heading)
@@ -3109,9 +3109,9 @@ namespace app
          float h = 0.0f;
          {
             Weight cap(UiType::Weight::Medium);
-            h = std::max(ImGui::GetTextLineHeight(), tok::chat_agent_label_bound);
+            h = std::max(ImGui::GetTextLineHeight(), tok::chat_agent_label_min);
          }
-         DrawAvatar(dl, ImVec2(at.x + tok::space_2, at.y + h * 0.5f), tok::chat_agent_label_draw_avatar_arg, e.agent);
+         DrawAvatar(dl, ImVec2(at.x + tok::space_2, at.y + h * 0.5f), tok::chat_avatar_r_sm, e.agent);
          Weight cap(UiType::Weight::Medium);
          const float ty = at.y + (h - ImGui::GetTextLineHeight()) * 0.5f;
          dl->AddText(ImVec2(at.x + tok::chat_agent_label_gap, ty), AgentTint(e.agent), AgentName(e.agent));
@@ -3304,7 +3304,7 @@ namespace app
             }
             const int rows = (k + perRow - 1) / perRow;
             ImGui::SetCursorScreenPos(o);
-            ImGui::Dummy(ImVec2(inner, (float)rows * cellH + (float)(rows - tok::chat_change_knobs_bias) * tok::space_2));
+            ImGui::Dummy(ImVec2(inner, (float)rows * cellH + (float)(rows - tok::chat_change_knobs_inset) * tok::space_2));
          }
       }
 
@@ -3360,9 +3360,9 @@ namespace app
             {
                char cid[40];
                std::snprintf(cid, sizeof cid, "##chcode%d_%d", id, (int)i);
-               ImGui::Dummy(ImVec2(0.0f, tok::chat_change_dummy_h));
+               ImGui::Dummy(ImVec2(0.0f, tok::chat_spacer_h));
                DrawCodeChip(CodeTitle(l), l.code, cid);
-               ImGui::Dummy(ImVec2(0.0f, tok::chat_change_dummy_h));
+               ImGui::Dummy(ImVec2(0.0f, tok::chat_spacer_h));
             }
          }
          DrawChangeKnobs(e, knobs, inner, id);
@@ -3377,7 +3377,7 @@ namespace app
          }
          for (const std::string& l : e.lines)
          {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(e.undone ? Dim() : TextTint(tok::chat_change_text_alpha_3)));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(e.undone ? Dim() : TextTint(tok::chat_change_shade)));
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + inner);
             ImGui::TextUnformatted(l.c_str());
             ImGui::PopTextWrapPos();
@@ -3411,7 +3411,7 @@ namespace app
             ImGui::PopID();
          }
          dl->ChannelsSetCurrent(0);
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + h), TextTint(tok::chat_change_text_alpha_4), tok::radius_control);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + h), TextTint(tok::chat_change_fill_shade), tok::radius_control);
          dl->ChannelsMerge();
          ImGui::SetCursorScreenPos(at);
          ImGui::Dummy(ImVec2(width, h));
@@ -3428,7 +3428,7 @@ namespace app
          const bool any = !v.rows.empty();
          // One size ladder: the header reads at body size, like the agent's name and words; the steps under it are captions.
          Weight body(UiType::Weight::Medium);
-         const float rowH = std::max(ImGui::GetTextLineHeight(), tok::chat_steps_bound) + tok::space_1;
+         const float rowH = std::max(ImGui::GetTextLineHeight(), tok::chat_row_h_min) + tok::space_1;
          const float gutter = tok::chat_gutter;
          ImGui::PushID(id);
          if (UiInteract::Hit("##steps", ImVec2(width, rowH)) && any && !running)
@@ -3448,7 +3448,7 @@ namespace app
          float tx = at.x + gutter;
          if (named)
          {
-            DrawAvatar(dl, ImVec2(tx + tok::space_2, cy), tok::chat_steps_draw_avatar_arg, e.agent);
+            DrawAvatar(dl, ImVec2(tx + tok::space_2, cy), tok::chat_avatar_r_sm, e.agent);
             tx += 22.0f;
             const char* name = AgentName(e.agent);
             dl->AddText(ImVec2(tx, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), AgentTint(e.agent), name);
@@ -3494,7 +3494,7 @@ namespace app
                const float x0 = p.x + gutter, x1 = p.x + width;
                if (r.failed)
                   glyph::Draw(dl, ImVec2(p.x + gutter * 0.5f, p.y + lineH * 0.5f), tok::icon_control, Red(), IconsInfinite::Close);
-               const ImU32 col = r.failed ? Red() : (r.note ? TextTint(tok::chat_steps_text_alpha_2) : Dim());
+               const ImU32 col = r.failed ? Red() : (r.note ? TextTint(tok::chat_steps_shade) : Dim());
                const bool words = !r.phrase.empty();
                std::string one = words ? r.phrase : r.text.substr(0, r.text.find('\n'));
                if (words && r.times > 1)
@@ -3510,7 +3510,7 @@ namespace app
                ImGui::Dummy(ImVec2(width, lineH));
             }
          }
-         ImGui::Dummy(ImVec2(width, tok::chat_steps_dummy_h));
+         ImGui::Dummy(ImVec2(width, tok::chat_spacer_h));
       }
 
       void DrawUser(const Entry& e, float width, int id)
@@ -3548,7 +3548,7 @@ namespace app
             dl->ChannelsSetCurrent(1);
             const float h = DrawFlow(segs, ImVec2(box.x + tok::space_2, box.y + tok::space_1 + 1.0f), w - tok::chat_user_ratio * tok::space_2, id, ImGui::GetColorU32(ImGuiCol_Text));
             dl->ChannelsSetCurrent(0);
-            dl->AddRectFilled(box, ImVec2(box.x + w, box.y + h + tok::chat_user_ratio * tok::space_1 + tok::space_0_5), TextTint(tok::chat_user_text_alpha_4), tok::radius_control);
+            dl->AddRectFilled(box, ImVec2(box.x + w, box.y + h + tok::chat_user_ratio * tok::space_1 + tok::space_0_5), TextTint(tok::chat_user_fill_shade), tok::radius_control);
             dl->ChannelsMerge();
             y += h + tok::chat_y_ratio * tok::space_1 + tok::space_0_5;
          }
@@ -3557,14 +3557,14 @@ namespace app
          for (size_t i = e.files.size(); i-- > 0;)
          {
             const std::string name = app::TruncateWithEllipsis(std::filesystem::path(AppPaths::FsPath(e.files[i])).filename().u8string(),
-                                                               std::max(40.0f, width * tok::chat_user_ratio_2 - tok::chat_user_ratio * tok::space_2));
+                                                               std::max(40.0f, width * tok::chat_name_min - tok::chat_user_ratio * tok::space_2));
             const float w = ImGui::CalcTextSize(name.c_str()).x + tok::chat_w_ratio * tok::space_2;
-            if (x - w < origin.x + width * tok::chat_user_ratio_3 && x < origin.x + width)
+            if (x - w < origin.x + width * tok::chat_user_scale && x < origin.x + width)
                x = origin.x + width, y += tok::chat_y;
             x -= w;
             const ImVec2 p(x, y + tok::space_0_75);
-            dl->AddRect(p, ImVec2(p.x + w, p.y + tok::chat_user_gap), TextTint(tok::chat_user_text_alpha_5), tok::radius_control);
-            dl->AddText(ImVec2(p.x + tok::space_2, p.y + (tok::chat_user_bias - ImGui::GetFontSize()) * 0.5f), TextTint(tok::chat_user_text_alpha_6), name.c_str());
+            dl->AddRect(p, ImVec2(p.x + w, p.y + tok::chat_user_gap), TextTint(tok::chat_outline_shade_md), tok::radius_control);
+            dl->AddText(ImVec2(p.x + tok::space_2, p.y + (tok::chat_user_inset - ImGui::GetFontSize()) * 0.5f), TextTint(tok::chat_text_shade_sm), name.c_str());
             x -= tok::space_1;
          }
          if (!e.files.empty())
@@ -3577,8 +3577,8 @@ namespace app
       void GlassCard(ImVec2 at, float width, float height)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), TextTint(tok::chat_glass_card_text_alpha_3), tok::radius_control + tok::space_1);
-         dl->AddRect(at, ImVec2(at.x + width, at.y + height), TextTint(tok::chat_glass_card_text_alpha_4), tok::radius_control + tok::space_1, 0, tok::chat_glass_card_stroke);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), TextTint(tok::chat_glass_card_fill_shade), tok::radius_control + tok::space_1);
+         dl->AddRect(at, ImVec2(at.x + width, at.y + height), TextTint(tok::chat_outline_shade_xs), tok::radius_control + tok::space_1, 0, tok::chat_glass_card_stroke);
       }
 
       // ── First run (docs/CHAT.md, First run) ─────────────────────────────────
@@ -3629,7 +3629,7 @@ namespace app
       {
          Weight s(UiType::Weight::Semibold);
          CardText(c, text, ImGui::GetColorU32(ImGuiCol_Text));
-         ImGui::Dummy(ImVec2(tok::chat_card_title_dummy_w, tok::space_1));
+         ImGui::Dummy(ImVec2(tok::chat_spacer_w, tok::space_1));
       }
 
       // A row of buttons at the card's left edge; returns the index pressed, or -1.
@@ -3670,15 +3670,15 @@ namespace app
       void StepRow(const Card& c, CliSetup::StepState state, const std::string& label)
       {
          using S = CliSetup::StepState;
-         const float rowH = tok::chat_row_h_2, size = tok::chat_size;
+         const float rowH = tok::chat_step_row_h, size = tok::chat_size;
          const ImVec2 p(c.x, ImGui::GetCursorScreenPos().y);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 m(p.x + size * 0.5f, p.y + rowH * 0.5f);
-         const float r = size * tok::chat_r_ratio_2;
+         const float r = size * tok::chat_step_row_scale;
          const bool light = Light();
          if (state == S::kOk || state == S::kSkipped)
-            dl->AddPolyline(std::array<ImVec2, tok::chat_step_row_add_polyline_draw>{ ImVec2(m.x - r, m.y), ImVec2(m.x - r * tok::chat_step_row_ratio, m.y + r * tok::chat_step_row_ratio_2), ImVec2(m.x + r, m.y - r * tok::chat_step_row_ratio_3) }.data(), tok::chat_step_row_add_polyline_draw_2,
-                            tok::U32(tok::action_go, light), 0, tok::chat_step_row_add_polyline_draw_3);
+            dl->AddPolyline(std::array<ImVec2, tok::chat_line_num_points>{ ImVec2(m.x - r, m.y), ImVec2(m.x - r * tok::chat_step_row_ratio, m.y + r * tok::chat_step_row_y), ImVec2(m.x + r, m.y - r * tok::chat_line_x) }.data(), tok::chat_line_polyline_lg,
+                            tok::U32(tok::action_go, light), 0, tok::chat_line_polyline_sm);
          else if (state == S::kFailed)
             glyph::Draw(dl, m, size, Red(), IconsInfinite::Error);
          else if (state == S::kRunning)
@@ -3687,10 +3687,10 @@ namespace app
             BusyLine::Spinner();
          }
          else
-            dl->AddLine(ImVec2(m.x - r * tok::chat_step_row_ratio_3, m.y), ImVec2(m.x + r * tok::chat_step_row_ratio_3, m.y), Dim(), tok::chat_step_row_stroke);
+            dl->AddLine(ImVec2(m.x - r * tok::chat_line_x, m.y), ImVec2(m.x + r * tok::chat_line_x, m.y), Dim(), tok::chat_step_row_stroke);
          const bool done = state == S::kOk || state == S::kSkipped;
          dl->AddText(ImVec2(p.x + size + tok::space_2, p.y + (rowH - ImGui::GetFontSize()) * 0.5f),
-                     state == S::kPending ? Dim() : (done ? TextTint(tok::chat_step_row_text_alpha_2) : ImGui::GetColorU32(ImGuiCol_Text)), label.c_str());
+                     state == S::kPending ? Dim() : (done ? TextTint(tok::chat_step_row_shade) : ImGui::GetColorU32(ImGuiCol_Text)), label.c_str());
          ImGui::SetCursorScreenPos(p);
          ImGui::Dummy(ImVec2(c.inner, rowH));
       }
@@ -3774,7 +3774,7 @@ namespace app
          Card c;
          BeginCard(c, width);
          CardTitle(c, T("Who do you want to talk to?"));
-         const float rowH = tok::chat_row_h_3;
+         const float rowH = tok::chat_pick_card_row_h;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          for (const CliSetup::Agent& a : CliSetup::Agents())
          {
@@ -3795,17 +3795,17 @@ namespace app
             if (click)
                o.pick = a.id;
             if (on || hot)
-               dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), TextTint(on ? tok::chat_pick_card_text_alpha_2 : tok::alpha_card), tok::radius_control);
-            DrawAvatar(dl, ImVec2(c.x + tok::chat_pick_card_gap, p.y + rowH * 0.5f), tok::chat_pick_card_draw_avatar_arg, a.id);
+               dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), TextTint(on ? tok::chat_pick_card_fill_shade : tok::alpha_card), tok::radius_control);
+            DrawAvatar(dl, ImVec2(c.x + tok::chat_pick_card_gap, p.y + rowH * 0.5f), tok::chat_avatar_r_lg, a.id);
             const float ty = p.y + (rowH - ImGui::GetFontSize()) * 0.5f;
-            dl->AddText(ImVec2(c.x + tok::chat_pick_card_gap_2, ty), usable ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), a.name);
+            dl->AddText(ImVec2(c.x + tok::chat_text_x_lg, ty), usable ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), a.name);
             {
                // What the account needs, or why this row cannot be used here.
                const std::string tag = usable ? chat::PlanTag(a.id) : std::string(T("Needs a browser"));
                dl->AddText(ImVec2(c.x + c.inner - ImGui::CalcTextSize(tag.c_str()).x, ty), Dim(), tag.c_str());
             }
             ImGui::SetCursorScreenPos(ImVec2(c.x, p.y + rowH + tok::space_0_5));
-            ImGui::Dummy(ImVec2(tok::chat_pick_card_dummy_w, 0.0f));
+            ImGui::Dummy(ImVec2(tok::chat_spacer_w, 0.0f));
          }
          for (const chat::Problem& p : chat::CheckMachine(o.facts))
             if (!p.blocks)
@@ -3876,7 +3876,7 @@ namespace app
          const bool in = s.ready.signedIn && !s.authBroken;
          const S signIn = in ? S::kOk : (signingIn ? S::kRunning : (!s.loginError.empty() ? S::kFailed : S::kPending));
          StepRow(c, signIn, T("Sign in"));
-         ImGui::Dummy(ImVec2(tok::chat_progress_card_dummy_w, tok::space_1));
+         ImGui::Dummy(ImVec2(tok::chat_spacer_w, tok::space_1));
 
          bool back = false;
          if (!setting && s.failed)
@@ -3932,7 +3932,7 @@ namespace app
                CardText(c, T("Finish in your browser…"), Dim());
             // No browser here: the address to open on another device.
             if (!o.facts.browser && !s.loginUrl.empty())
-               CardText(c, s.loginUrl, TextTint(tok::chat_progress_card_text_alpha_2));
+               CardText(c, s.loginUrl, TextTint(tok::chat_card_text_shade));
             const bool url = !s.loginUrl.empty();
             const char* again = o.facts.browser ? T("Open page again") : T("Copy address");
             const int b = url ? CardButtons(c, { { again, false }, { T("Cancel"), false } }) : CardButtons(c, { { T("Cancel"), false } });
@@ -4016,20 +4016,20 @@ namespace app
          {
             UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
             const ImVec2 ts = ImGui::CalcTextSize(hello);
-            ImGui::GetWindowDrawList()->AddText(ImVec2(mn.x + (ImGui::GetWindowWidth() - ts.x) * 0.5f, mn.y + h * tok::chat_empty_ratio), TextTint(tok::chat_empty_text_alpha_2), hello);
+            ImGui::GetWindowDrawList()->AddText(ImVec2(mn.x + (ImGui::GetWindowWidth() - ts.x) * 0.5f, mn.y + h * tok::chat_empty_ratio), TextTint(tok::chat_text_shade_lg), hello);
          }
          // Later: each fills the composer, nothing is sent until Enter. First time: each is sent at once.
          const char* ideas[3] = { T("Add a Noise and wire it to the output"), T("Make the colours drift slowly"), T("Explain this patch") };
          if (first)
             for (int i = 0; i < 3; i++)
                ideas[i] = T(chat::FirstIdeas()[(size_t)i].label);
-         float y = mn.y + h * tok::chat_y_ratio_2 + tok::chat_y_gap;
+         float y = mn.y + h * tok::chat_empty_scale + tok::chat_y_gap;
          for (int i = 0; i < 3; i++)
          {
-            const float w = std::min(width, ImGui::CalcTextSize(ideas[i]).x + tok::chat_empty_ratio_2 * tok::space_3);
+            const float w = std::min(width, ImGui::CalcTextSize(ideas[i]).x + tok::chat_empty_max * tok::space_3);
             ImGui::SetCursorScreenPos(ImVec2(mn.x + (ImGui::GetWindowWidth() - w) * 0.5f, y));
             ImGui::PushID(i);
-            if (ChipButton::Draw(ideas[i], first && i == 0, tok::chat_empty_draw, w, !first))
+            if (ChipButton::Draw(ideas[i], first && i == 0, tok::chat_empty_top, w, !first))
             {
                if (first)
                {
@@ -4044,7 +4044,7 @@ namespace app
                }
             }
             ImGui::PopID();
-            y += tok::chat_y_2;
+            y += tok::chat_empty_y;
          }
       }
 
@@ -4199,7 +4199,7 @@ namespace app
                const Piece& hp = sPieces[(size_t)idx[(size_t)hi.piece]];
                const Piece& lp = sPieces[(size_t)idx[(size_t)lo.piece]];
                const float h = ChipButton::Height(), pad = tok::space_0_75;
-               const float w = ImGui::CalcTextSize(T("Copy")).x + ImGui::CalcTextSize(T("Reply")).x + tok::chat_w_ratio_2 * tok::space_2 + tok::chat_w_ratio_3 * pad;
+               const float w = ImGui::CalcTextSize(T("Copy")).x + ImGui::CalcTextSize(T("Reply")).x + tok::chat_selection_scale_lg * tok::space_2 + tok::chat_selection_scale_sm * pad;
                ImVec2 at(XOf(hp, hi.ch) - w * 0.5f, hp.max.y + tok::space_1);
                if (at.y + h + tok::chat_selection_ratio * pad > win->InnerRect.Max.y)
                   at.y = lp.min.y - h - tok::chat_y_ratio * pad - tok::space_1;
@@ -4219,11 +4219,11 @@ namespace app
                   const ImRect& r = k == 0 ? copyR : replyR;
                   const bool hov = r.Contains(m);
                   const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-                  dl->AddRectFilled(r.Min, r.Max, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? tok::chat_selection_alpha_4 : tok::chat_selection_alpha_5)), tok::radius_control);
+                  dl->AddRectFilled(r.Min, r.Max, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? tok::chat_selection_y_md : tok::chat_selection_y_sm)), tok::radius_control);
                   const char* label = k == 0 ? T("Copy") : T("Reply");
                   const ImVec2 ts = ImGui::CalcTextSize(label);
                   dl->AddText(ImVec2(std::round(r.Min.x + (r.GetWidth() - ts.x) * 0.5f), std::round(r.Min.y + (h - ts.y) * 0.5f)),
-                              ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 1.0f : tok::chat_selection_alpha_6)), label);
+                              ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 1.0f : tok::chat_selection_y_lg)), label);
                   if (hov && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                      sPillPress = k + 1;
                   if (hov && sPillPress == k + 1 && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
@@ -4405,7 +4405,7 @@ namespace app
             }
             char buf[64];
             std::snprintf(buf, sizeof buf, T("%d working"), (int)sRuns.size());
-            wd->AddText(ImVec2(x + tok::space_1, wat.y + (r * tok::chat_messages_ratio + tok::chat_messages_bias - ImGui::GetFontSize()) * 0.5f), Dim(), buf);
+            wd->AddText(ImVec2(x + tok::space_1, wat.y + (r * tok::chat_messages_ratio + tok::chat_messages_inset - ImGui::GetFontSize()) * 0.5f), Dim(), buf);
             ImGui::Dummy(ImVec2(width, r * tok::chat_messages_ratio + tok::space_0_5));
          }
          ImGui::Dummy(ImVec2(0.0f, tok::space_2));
@@ -4441,12 +4441,12 @@ namespace app
             if (sp.kind == chat::SpanKind::Node && sp.node >= 0)
             {
                const chat::CatalogNode* n = sCat.Node(sp.node);
-               col = n != nullptr ? WithAlpha(CategoryU32(n->category), tok::chat_tints_alpha_2) : 0;
+               col = n != nullptr ? WithAlpha(CategoryU32(n->category), tok::chat_category_alpha) : 0;
             }
             else if (sp.kind == chat::SpanKind::Param && sp.node >= 0)
-               col = TextTint(tok::chat_tints_text_alpha_2);
+               col = TextTint(tok::chat_tints_shade);
             else if (sp.kind == chat::SpanKind::Agent && (sp.key == "agent" || Ready(sp.key)))
-               col = WithAlpha(tok::U32(tok::pin_pred, Light()), tok::chat_tints_alpha_2);
+               col = WithAlpha(tok::U32(tok::pin_pred, Light()), tok::chat_category_alpha);
             if (col == 0 || sp.end > sInput.size())
                continue;
             for (size_t li = 0; li < lines.size(); li++)
@@ -4484,7 +4484,7 @@ namespace app
             sDropHovered = false;
             return;
          }
-         const float rowH = tok::chat_row_h_4;
+         const float rowH = tok::chat_dropdown_row_h;
          const int shown = std::min<int>((int)sCands.size(), 8);
          const float h = rowH * (float)shown + tok::chat_h_ratio * tok::space_1;
          ImGui::SetNextWindowPos(ImVec2(anchor.x, anchor.y - tok::space_1), ImGuiCond_Always, ImVec2(0.0f, 1.0f));
@@ -4515,7 +4515,7 @@ namespace app
                   sPick = i, sPickByKey = false;
                if (i == sPick && !c.info)
                {
-                  dl->AddRectFilled(at, ImVec2(at.x + rowW, at.y + rowH), TextTint(EnterPicks() ? tok::chat_dropdown_text_alpha_3 : tok::chat_dropdown_text_alpha_4), tok::radius_control);
+                  dl->AddRectFilled(at, ImVec2(at.x + rowW, at.y + rowH), TextTint(EnterPicks() ? tok::chat_dropdown_fill_shade_lg : tok::chat_dropdown_fill_shade_sm), tok::radius_control);
                   if (sPickByKey && (at.y < ImGui::GetWindowPos().y || at.y + rowH > ImGui::GetWindowPos().y + ImGui::GetWindowHeight()))
                   {
                      ImGui::SetScrollHereY(at.y < ImGui::GetWindowPos().y ? 0.0f : 1.0f);
@@ -4639,18 +4639,18 @@ namespace app
       // One row: [avatar] label ........ sub  [check]. True when pressed (and enabled).
       bool MenuRow(const char* id, float w, const char* label, const char* sub, bool chosen, bool enabled, const std::string& avatar)
       {
-         const float h = tok::chat_h_2;
+         const float h = tok::chat_menu_row_h;
          const ImVec2 p = ImGui::GetCursorScreenPos();
          const bool pressed = UiInteract::Hit(id, ImVec2(w, h)) && enabled;
          const bool hot = ImGui::IsItemHovered() && enabled;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          if (hot)
-            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), TextTint(tok::chat_menu_row_text_alpha_2), tok::radius_control);
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), TextTint(tok::chat_menu_row_fill_shade), tok::radius_control);
          float x = p.x + tok::space_2;
          if (!avatar.empty())
          {
-            DrawAvatar(dl, ImVec2(x + tok::chat_menu_row_gap, p.y + h * 0.5f), tok::chat_menu_row_draw_avatar_arg, avatar);
-            x += tok::chat_x_gap_2 + tok::space_2;
+            DrawAvatar(dl, ImVec2(x + tok::chat_menu_row_gap, p.y + h * 0.5f), tok::chat_avatar_r_md, avatar);
+            x += tok::chat_menu_row_inset + tok::space_2;
          }
          const float ty = p.y + (h - ImGui::GetFontSize()) * 0.5f;
          const float right = p.x + w - tok::space_2 - tok::space_3_5;
@@ -4684,7 +4684,7 @@ namespace app
             UiType::Scope cap(UiType::Size::Caption);
             capFs = ImGui::GetFontSize();
          }
-         return std::max(tok::chat_reply_height_bound, tok::space_1_5 + capFs + tok::space_0_5 + ImGui::GetFontSize() + tok::chat_reply_height_gap) + tok::space_1_5;
+         return std::max(tok::chat_reply_height_min, tok::space_1_5 + capFs + tok::space_0_5 + ImGui::GetFontSize() + tok::chat_reply_height_gap) + tok::space_1_5;
       }
 
       std::vector<chat::Model>& ModelsOf(const std::string& agent)
@@ -4790,9 +4790,9 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
          if (hot)
-            dl->AddRectFilled(mn, mx, TextTint(tok::chat_pill_text_alpha_2), tok::radius_control);
+            dl->AddRectFilled(mn, mx, TextTint(tok::chat_pill_fill_shade), tok::radius_control);
          if (!avatar.empty())
-            DrawAvatar(dl, ImVec2(mn.x + tok::space_2 + tok::chat_pill_gap, mn.y + h * 0.5f), tok::chat_pill_draw_avatar_arg, avatar);
+            DrawAvatar(dl, ImVec2(mn.x + tok::space_2 + tok::chat_pill_gap, mn.y + h * 0.5f), tok::chat_avatar_r_xs, avatar);
          dl->AddText(ImVec2(mn.x + tok::space_2 + av, mn.y + (h - ImGui::GetFontSize()) * 0.5f), hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), text.c_str());
          if (clicked)
             ImGui::OpenPopup(std::string(id).append("menu").c_str());
@@ -4836,11 +4836,11 @@ namespace app
          const float fs = ImGui::GetFontSize();
          g.padX = tok::space_2;
          g.padV = tok::space_2;
-         g.fieldW = std::max(tok::chat_geom_bound, width - tok::chat_geom_ratio * (g.padX + g.tile + tok::space_2));
+         g.fieldW = std::max(tok::chat_field_w_min, width - tok::chat_geom_ratio * (g.padX + g.tile + tok::space_2));
          g.wrapW = std::max(1.0f, g.fieldW - ImGui::GetStyle().ScrollbarSize);
          g.lines = VisualLines(g.wrapW);
-         g.textH = fs * (float)std::clamp(g.lines, 1, tok::chat_geom_bound_2) + tok::space_1;
-         g.chipsH = ReplyHeight() + (sAttach.empty() ? 0.0f : tok::chat_geom_assign);
+         g.textH = fs * (float)std::clamp(g.lines, 1, tok::chat_text_h_hi) + tok::space_1;
+         g.chipsH = ReplyHeight() + (sAttach.empty() ? 0.0f : tok::chat_geom_chips_h);
          g.rowTop = g.chipsH > 0.0f ? tok::space_3 + g.chipsH : g.padV;
          // The icons sit on the last text line's centre; the row is tall enough for both.
          g.rowH = std::max(g.tile, g.textH - tok::space_0_5 - fs * 0.5f + g.tile * 0.5f);
@@ -4858,7 +4858,7 @@ namespace app
          bool clicked = false;
          Pill("##chatmodel", cur, cur.empty() ? std::string(T("Set up first")) : ModelFace(cur), right, y, h, clicked, room);
          ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-         ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + tok::chat_picker_ratio * tok::space_2, 0.0f), ImVec2(menuW + tok::chat_picker_ratio * tok::space_2, tok::chat_picker_set_next_window_size_constraints_y));
+         ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + tok::chat_picker_ratio * tok::space_2, 0.0f), ImVec2(menuW + tok::chat_picker_ratio * tok::space_2, tok::chat_window_h));
          BeginMenuStyle();
          if (MenuParts::BeginPopup("##chatmodelmenu"))
          {
@@ -4939,8 +4939,8 @@ namespace app
          const float replyH = ReplyHeight();
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + wellH), TextTint(tok::chat_composer_text_alpha_9), tok::radius_control * tok::chat_composer_ratio);
-         dl->AddRect(at, ImVec2(at.x + width, at.y + wellH), TextTint(tok::chat_composer_text_alpha_10), tok::radius_control * tok::chat_composer_ratio);
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + wellH), TextTint(tok::chat_composer_fill_shade_sm), tok::radius_control * tok::chat_composer_ratio);
+         dl->AddRect(at, ImVec2(at.x + width, at.y + wellH), TextTint(tok::chat_composer_fill_shade_lg), tok::radius_control * tok::chat_composer_ratio);
 
          // Reply: a glass card inside the well, an accent edge, who it quotes in one line, a close mark.
          if (replyH > 0.0f)
@@ -4952,8 +4952,8 @@ namespace app
             }
             const ImVec2 a(at.x + pad, at.y + pad), b(at.x + width - pad, at.y + pad + replyH - tok::space_1_5);
             const float r = tok::radius_control + tok::space_0_5;
-            dl->AddRectFilled(a, b, TextTint(tok::chat_composer_text_alpha_11), r);
-            dl->AddRect(a, b, TextTint(tok::chat_composer_text_alpha_12), r);
+            dl->AddRectFilled(a, b, TextTint(tok::chat_composer_fill_shade_xs), r);
+            dl->AddRect(a, b, TextTint(tok::chat_outline_shade_sm), r);
             dl->AddRectFilled(ImVec2(a.x + tok::space_2, a.y + tok::space_2), ImVec2(a.x + tok::chat_composer_gap, b.y - tok::space_2), ImGui::GetColorU32(ImGuiCol_CheckMark), tok::radius_cell);
             std::string one = sReplyTo;
             for (char& c : one)
@@ -4961,11 +4961,11 @@ namespace app
                   c = ' ';
             {
                UiType::Scope cap(UiType::Size::Caption);
-               dl->AddText(ImVec2(a.x + tok::chat_composer_gap_2, a.y + tok::space_1_5), Dim(), T("Replying to"));
+               dl->AddText(ImVec2(a.x + tok::chat_text_x_sm, a.y + tok::space_1_5), Dim(), T("Replying to"));
             }
-            ImGui::RenderTextEllipsis(dl, ImVec2(a.x + tok::chat_composer_gap_2, a.y + tok::space_2 + capFs), ImVec2(b.x - tok::chat_composer_gap_3, b.y), b.x - tok::chat_composer_gap_3, one.c_str(), nullptr, nullptr);
+            ImGui::RenderTextEllipsis(dl, ImVec2(a.x + tok::chat_text_x_sm, a.y + tok::space_2 + capFs), ImVec2(b.x - tok::chat_text_ellipsis_x, b.y), b.x - tok::chat_text_ellipsis_x, one.c_str(), nullptr, nullptr);
             const float midY = (a.y + b.y) * 0.5f;
-            ImGui::SetCursorScreenPos(ImVec2(b.x - tok::chat_composer_gap_4, midY - tok::space_3));
+            ImGui::SetCursorScreenPos(ImVec2(b.x - tok::chat_unreply_x, midY - tok::space_3));
             const bool close = UiInteract::Hit("##unreply", ImVec2(tok::chat_composer_hit_x, tok::chat_composer_hit_y));
             glyph::Draw(dl, ImVec2(b.x - tok::space_3_5, midY), tok::icon_control, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
             if (close)
@@ -4978,25 +4978,25 @@ namespace app
          for (size_t i = 0; i < sAttach.size(); i++)
          {
             const std::string name = std::filesystem::path(AppPaths::FsPath(sAttach[i])).filename().u8string();
-            const float w = std::min(ImGui::CalcTextSize(name.c_str()).x, tok::chat_composer_bound) + tok::space_2 + tok::chat_w_gap;
+            const float w = std::min(ImGui::CalcTextSize(name.c_str()).x, tok::chat_composer_max) + tok::space_2 + tok::chat_w_gap;
             // No room for the next chip: the rest are counted, every path in the tooltip, so none goes unseen.
             const std::string more = "+" + std::to_string(sAttach.size() - i);
             const float moreW = ImGui::CalcTextSize(more.c_str()).x + tok::chat_more_w_ratio * tok::space_2;
             if (x + w + (i + 1 < sAttach.size() ? moreW + tok::space_1 : 0.0f) > at.x + width - pad)
             {
                const ImVec2 p(x, at.y + pad + replyH);
-               dl->AddRectFilled(p, ImVec2(p.x + moreW, p.y + tok::chat_composer_gap_5), TextTint(tok::chat_composer_text_alpha_13), tok::radius_control);
-               dl->AddText(ImVec2(p.x + tok::space_2, p.y + (tok::chat_composer_bias - fs) * 0.5f), Dim(), more.c_str());
+               dl->AddRectFilled(p, ImVec2(p.x + moreW, p.y + tok::chat_fill_y), TextTint(tok::chat_composer_fill_shade_md), tok::radius_control);
+               dl->AddText(ImVec2(p.x + tok::space_2, p.y + (tok::chat_fs_inset - fs) * 0.5f), Dim(), more.c_str());
                break;
             }
             const ImVec2 p(x, at.y + pad + replyH);
-            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + tok::chat_composer_gap_5), TextTint(tok::chat_composer_text_alpha_13), tok::radius_control);
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + tok::chat_fill_y), TextTint(tok::chat_composer_fill_shade_md), tok::radius_control);
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-            ImGui::RenderTextEllipsis(dl, ImVec2(p.x + tok::space_2, p.y + (tok::chat_composer_bias - fs) * 0.5f), ImVec2(p.x + w - tok::chat_composer_gap_2, p.y + tok::chat_composer_gap_5), p.x + w - tok::chat_composer_gap_2, name.c_str(), nullptr, nullptr);
+            ImGui::RenderTextEllipsis(dl, ImVec2(p.x + tok::space_2, p.y + (tok::chat_fs_inset - fs) * 0.5f), ImVec2(p.x + w - tok::chat_text_x_sm, p.y + tok::chat_fill_y), p.x + w - tok::chat_text_x_sm, name.c_str(), nullptr, nullptr);
             ImGui::PopStyleColor();
-            ImGui::SetCursorScreenPos(ImVec2(p.x + w - tok::chat_composer_gap_2, p.y + 1.0f));
+            ImGui::SetCursorScreenPos(ImVec2(p.x + w - tok::chat_text_x_sm, p.y + 1.0f));
             ImGui::PushID((int)i);
-            if (UiInteract::Hit("##unattach", ImVec2(tok::chat_composer_hit_x_2, tok::chat_composer_hit_y_2)))
+            if (UiInteract::Hit("##unattach", ImVec2(tok::chat_ui_interact_x, tok::chat_ui_interact_y)))
                remove = (int)i;
             const ImU32 mark = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim();
             ImGui::PopID();
@@ -5078,10 +5078,10 @@ namespace app
             const bool hot = ImGui::IsItemHovered();
             if (hot)
             {
-               dl->AddRectFilled(ImVec2(ac.x - sendW * 0.5f, ac.y - sendW * 0.5f), ImVec2(ac.x + sendW * 0.5f, ac.y + sendW * 0.5f), TextTint(tok::chat_composer_text_alpha_10), tok::radius_control);
+               dl->AddRectFilled(ImVec2(ac.x - sendW * 0.5f, ac.y - sendW * 0.5f), ImVec2(ac.x + sendW * 0.5f, ac.y + sendW * 0.5f), TextTint(tok::chat_composer_fill_shade_lg), tok::radius_control);
                Tip::Show("%s", T("Attach files"));
             }
-            glyph::Draw(dl, ac, tok::icon_control, hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(tok::chat_composer_text_alpha_14), IconsInfinite::Plus);
+            glyph::Draw(dl, ac, tok::icon_control, hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(tok::chat_composer_shade_lg), IconsInfinite::Plus);
          }
          // Send and Stop: Send fills with the accent once there is something to send; Stop is a neutral tile
          // while an agent works.
@@ -5092,7 +5092,7 @@ namespace app
          {
             const bool stop = UiInteract::Hit("##chatstop", ImVec2(sendW, sendW));
             const bool hot = ImGui::IsItemHovered();
-            dl->AddRectFilled(tileMn, tileMx, TextTint(hot ? tok::chat_composer_text_alpha_15 : tok::chat_composer_text_alpha_10), tok::radius_control);
+            dl->AddRectFilled(tileMn, tileMx, TextTint(hot ? tok::chat_composer_fill_shade_xl : tok::chat_composer_fill_shade_lg), tok::radius_control);
             glyph::Draw(dl, sc, tok::icon_control, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::StopFill);
             if (hot)
                Tip::Show("%s", T("Stop"));
@@ -5115,7 +5115,7 @@ namespace app
             const bool hot = ImGui::IsItemHovered();
             if (canSend)
                dl->AddRectFilled(tileMn, tileMx, ImGui::GetColorU32(hot ? AccentEmphasisHover() : AccentEmphasisSelected()), tok::radius_control);
-            glyph::Draw(dl, sc, tok::icon_control, canSend ? tok::Role(tok::col::ink_white) : TextTint(tok::chat_composer_text_alpha_16), IconsInfinite::Send);
+            glyph::Draw(dl, sc, tok::icon_control, canSend ? tok::Role(tok::col::ink_white) : TextTint(tok::chat_composer_shade_sm), IconsInfinite::Send);
             if (hot && canSend)
                Tip::Show("%s", T("Send"));
             if (clicked && canSend)
@@ -5154,8 +5154,8 @@ namespace app
       {
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + w, at.y + h), TextTint(tok::chat_rail_text_alpha_5), tok::radius_control);
-         dl->AddLine(ImVec2(at.x + w - tok::px_align, at.y), ImVec2(at.x + w - tok::px_align, at.y + h), TextTint(tok::chat_rail_text_alpha_6));
+         dl->AddRectFilled(at, ImVec2(at.x + w, at.y + h), TextTint(tok::chat_rail_fill_shade_sm), tok::radius_control);
+         dl->AddLine(ImVec2(at.x + w - tok::px_align, at.y), ImVec2(at.x + w - tok::px_align, at.y + h), TextTint(tok::chat_line_shade_sm));
          const float pad = tok::space_2;
          const float rowW = w - tok::chat_row_w_ratio * pad - 1.0f;
          ImGui::SetCursorScreenPos(ImVec2(at.x + pad, at.y + pad));
@@ -5166,7 +5166,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(at.x + pad, ImGui::GetCursorScreenPos().y + tok::space_2));
          std::string needle = sHistoryFilter;
          std::transform(needle.begin(), needle.end(), needle.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-         ImGui::BeginChild("##railList", ImVec2(rowW, std::max(tok::chat_rail_bound, at.y + h - ImGui::GetCursorScreenPos().y - pad)), false, ImGuiWindowFlags_NoBackground);
+         ImGui::BeginChild("##railList", ImVec2(rowW, std::max(tok::chat_rail_min, at.y + h - ImGui::GetCursorScreenPos().y - pad)), false, ImGuiWindowFlags_NoBackground);
          std::string removeId;
          if (sHistory.empty())
             ImGui::TextDisabled("%s", T("No saved chats"));
@@ -5188,7 +5188,7 @@ namespace app
             ImDrawList* cd = ImGui::GetWindowDrawList();
             const bool current = t.id == sThread.id;
             if (hot || current)
-               cd->AddRectFilled(p, ImVec2(p.x + rw, p.y + rh), TextTint(current ? tok::chat_rail_text_alpha_7 : tok::chat_rail_text_alpha_8), tok::radius_control);
+               cd->AddRectFilled(p, ImVec2(p.x + rw, p.y + rh), TextTint(current ? tok::chat_rail_fill_shade_lg : tok::chat_rail_fill_shade_md), tok::radius_control);
             const float ty = p.y + (rh - ImGui::GetFontSize()) * 0.5f;
             const std::string age = Age(t.updated);
             const float aw = ImGui::CalcTextSize(age.c_str()).x;
@@ -5224,16 +5224,16 @@ namespace app
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), tok::U32(tok::terminal_bg, Light()), tok::radius_control);
-         const float rowH = tok::chat_row_h_2;
+         const float rowH = tok::chat_step_row_h;
          {
             Weight s(UiType::Weight::Medium);
-            const float right = at.x + width - tok::space_1 - tok::chat_right_ratio * tok::chat_right_ratio_2 - tok::space_2;
+            const float right = at.x + width - tok::space_1 - tok::chat_right_ratio * tok::chat_right_scale - tok::space_2;
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ImGui::RenderTextEllipsis(dl, ImVec2(at.x + tok::space_3, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), ImVec2(right, at.y + rowH), right,
                                       sCodeView.title.c_str(), nullptr, nullptr);
             ImGui::PopStyleColor();
          }
-         ImGui::SetCursorScreenPos(ImVec2(at.x + width - tok::space_1 - tok::chat_code_pane_ratio * tok::chat_code_pane_ratio_2 - tok::space_0_5, at.y + (rowH - tok::chat_code_pane_gap) * 0.5f));
+         ImGui::SetCursorScreenPos(ImVec2(at.x + width - tok::space_1 - tok::chat_code_pane_ratio * tok::chat_code_pane_x - tok::space_0_5, at.y + (rowH - tok::chat_code_pane_gap) * 0.5f));
          const double now = ImGui::GetTime();
          if (GlyphToggle::Draw("##codecopy", IconsInfinite::Copy, IconsInfinite::Copy, false))
          {
@@ -5247,7 +5247,7 @@ namespace app
             sCodeView.open = false;
          if (ImGui::IsItemHovered())
             Tip::Show("%s", T("Close"));
-         dl->AddLine(ImVec2(at.x, at.y + rowH - tok::px_align), ImVec2(at.x + width, at.y + rowH - tok::px_align), TextTint(tok::chat_code_pane_text_alpha_2));
+         dl->AddLine(ImVec2(at.x, at.y + rowH - tok::px_align), ImVec2(at.x + width, at.y + rowH - tok::px_align), TextTint(tok::chat_line_shade_sm));
 
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH));
          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
@@ -5291,7 +5291,7 @@ namespace app
       void DrawHeader(float width)
       {
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         const float rowH = tok::chat_row_h_2;
+         const float rowH = tok::chat_step_row_h;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const char* title = sThread.title.empty() ? T("New chat") : sThread.title.c_str();
          // Past chats on the left before the title; Terminal and New chat on the right, each set the same
@@ -5307,7 +5307,7 @@ namespace app
          if (ImGui::IsItemHovered())
             Tip::Show("%s", T("Chats"));
          const float titleX = ImGui::GetItemRectMax().x + tok::space_2;
-         const float toolsX = at.x + width - tok::space_1 - tok::chat_tools_x_ratio * glyph - tok::chat_tools_x_ratio_2 * gap;
+         const float toolsX = at.x + width - tok::space_1 - tok::chat_tools_x_ratio * glyph - tok::chat_header_tools_x * gap;
          ImGui::SetCursorScreenPos(ImVec2(toolsX, glyphY));
          {  // Pop out / dock back: a window with an arrow leaving it (or coming home)
             const ImVec2 o = ImGui::GetCursorScreenPos();
@@ -5315,8 +5315,8 @@ namespace app
                gTerminalFloating = !gTerminalFloating;
             const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
             const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-            const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::chat_header_offset_2 + 0.5f * hv));
-            const ImVec2 c(std::floor(o.x + glyph * tok::chat_header_ratio) + tok::px_align, std::floor(o.y + tok::chat_header_gap_2) + tok::px_align);
+            const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::chat_header_y + 0.5f * hv));
+            const ImVec2 c(std::floor(o.x + glyph * tok::chat_header_ratio) + tok::px_align, std::floor(o.y + tok::chat_header_u_res) + tok::px_align);
             glyph::Draw(dl, c, tok::icon_md, col, gTerminalFloating ? IconsInfinite::Dock : IconsInfinite::PopOut);
             if (ImGui::IsItemHovered())
                Tip::Show("%s", gTerminalFloating ? T("Dock") : T("Pop out"));
@@ -5341,7 +5341,7 @@ namespace app
          }
 
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH));
-         dl->AddLine(ImVec2(at.x, at.y + rowH - tok::px_align), ImVec2(at.x + width, at.y + rowH - tok::px_align), TextTint(tok::chat_header_text_alpha_2));
+         dl->AddLine(ImVec2(at.x, at.y + rowH - tok::px_align), ImVec2(at.x + width, at.y + rowH - tok::px_align), TextTint(tok::chat_line_shade_sm));
       }
    }
 
@@ -5518,11 +5518,11 @@ namespace app
       const float width = avail.x;
       DrawHeader(width);
       ImGui::Dummy(ImVec2(0.0f, tok::space_2));  // air under the header, as in Claude
-      const float composerW = std::min(width - tok::chat_body_ratio * tok::space_3, tok::chat_body_bound);
+      const float composerW = std::min(width - tok::chat_body_ratio * tok::space_3, tok::chat_composer_w_max);
       // The composer's height is known before it draws: the log takes the rest.
       const float composerH = Geom(composerW).totalH;
       const float queueH = QueueHeight();
-      DrawMessages(std::max(tok::chat_body_bound_2, ImGui::GetContentRegionAvail().y - composerH - queueH - tok::space_4));
+      DrawMessages(std::max(tok::chat_min, ImGui::GetContentRegionAvail().y - composerH - queueH - tok::space_4));
       const ImVec2 c = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(mn.x + (width - composerW) * 0.5f, c.y + tok::space_1));
       if (!sQueue.empty())

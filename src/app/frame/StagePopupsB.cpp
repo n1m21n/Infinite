@@ -165,7 +165,7 @@ void DrawPopupsB(FrameCtx& fc)
             const float* col = c->color;
             const ImVec4 textCol = isLight
                ? tok::V4(tok::stage_popups_b_text_col)
-               : ImVec4(col[0] * tok::stage_popups_b_scale_2 + tok::stage_popups_b_offset_2, col[1] * tok::stage_popups_b_scale_2 + tok::stage_popups_b_offset_2, col[2] * tok::stage_popups_b_scale_2 + tok::stage_popups_b_offset_2, 1.0f);
+               : ImVec4(col[0] * tok::stage_popups_b_y_sm + tok::stage_popups_b_y_sm, col[1] * tok::stage_popups_b_y_sm + tok::stage_popups_b_y_sm, col[2] * tok::stage_popups_b_y_sm + tok::stage_popups_b_y_sm, 1.0f);
 
             const float fontScale = CommentFontScale(c->fontSize);
             ImGui::PushStyleColor(ImGuiCol_Text, textCol);
@@ -252,12 +252,12 @@ void DrawPopupsB(FrameCtx& fc)
          MenuParts::EndPopup();
       }
 
-      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x, 0), ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_2, tok::stage_popups_b_set_next_window_size_constraints_y));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_window_w_sm, 0), ImVec2(tok::stage_popups_b_window_w_lg, tok::stage_popups_b_window_h_sm));
       if (searchPopupCentered)
       {
          const ImVec2 center = ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f,
                                       gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
-         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(tok::stage_popups_b_set_next_window_pos_x, tok::stage_popups_b_set_next_window_pos_y));
+         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(tok::stage_popups_b_window_x, tok::stage_popups_b_window_y));
       }
       if (MenuParts::BeginPopup("search"))
       {
@@ -373,7 +373,7 @@ void DrawPopupsB(FrameCtx& fc)
                      return ok;
                   });
                }
-               ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_3, 0), ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_2, tok::stage_popups_b_set_next_window_size_constraints_y));
+               ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_window_w_xxs, 0), ImVec2(tok::stage_popups_b_window_w_lg, tok::stage_popups_b_window_h_sm));
                if (!anyCompatible)
                   ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
                const bool openCat = MenuParts::SubMenu(DisplayName(category).c_str());
@@ -518,11 +518,11 @@ void DrawPopupsB(FrameCtx& fc)
          dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(opt.c_str()).x);
       for (const std::string& cat : gDropdown.categories)
          dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(cat.c_str()).x);
-      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * tok::stage_popups_b_ratio_2
-                                                 + dropdownTextPadX * tok::stage_popups_b_ratio_2
+      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * tok::stage_popups_b_dropdown_clamp_v
+                                                 + dropdownTextPadX * tok::stage_popups_b_dropdown_clamp_v
                                                  + ImGui::GetStyle().ScrollbarSize,
-                                              tok::stage_popups_b_bound, tok::stage_popups_b_bound_2);
-      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_4, ImMin(tok::stage_popups_b_bound_3, ImGui::GetMainViewport()->Size.y - tok::stage_popups_b_gap)));
+                                              tok::stage_popups_b_dropdown_clamp_lo, tok::stage_popups_b_dropdown_clamp_hi);
+      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(tok::stage_popups_b_window_w_md, ImMin(tok::stage_popups_b_min_max, ImGui::GetMainViewport()->Size.y - tok::stage_popups_b_gap)));
       const bool ddOpen = MenuParts::BeginPopup("##dropdown");
       if (ddOpen)
       {
@@ -596,7 +596,7 @@ void DrawPopupsB(FrameCtx& fc)
       if (MenuParts::BeginPopup("##fielddevicesave"))
       {
          ImGui::TextDisabled("%s", T("Save device as:"));
-         ImGui::SetNextItemWidth(tok::stage_popups_b_set_next_item_width_w);
+         ImGui::SetNextItemWidth(tok::stage_popups_b_field_w);
          bool enterPressed = FieldWell::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
                                                   sizeof(gFieldDeviceSave.nameBuf),
                                                   ImGuiInputTextFlags_EnterReturnsTrue);
@@ -639,7 +639,7 @@ void DrawPopupsB(FrameCtx& fc)
             : ed::CanvasToScreen(gAudioDropPicker.canvasPos);
          ImGui::SetNextWindowPos(popupPos, ImGuiCond_Appearing);
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_5, 0), ImVec2(tok::stage_popups_b_set_next_window_size_constraints_x_6, tok::stage_popups_b_set_next_window_size_constraints_y_2));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_window_w_xs, 0), ImVec2(tok::stage_popups_b_window_w_xl, tok::stage_popups_b_window_h_lg));
       if (MenuParts::BeginPopup("##audiodroppicker"))
       {
          if (gAudioDropPicker.paths.empty())
@@ -775,11 +775,11 @@ void DrawPopupsB(FrameCtx& fc)
             const ImVec2 m = ImGui::GetMousePos();
             const bool over = (m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= (r + tok::space_0_5) * (r + tok::space_0_5);
             // Stays while the cursor is on the button (or just beside it); gone ~0.1 s after the cursor leaves both.
-            if ((m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= tok::stage_popups_b_ratio_3 * 20.0f)
+            if ((m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= tok::stage_popups_b_limit * 20.0f)
                sTrashSeen = now;
             ImDrawList* dl = ImGui::GetForegroundDrawList();
             const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-            const ImU32 fg = ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, tok::stage_popups_b_alpha_2));
+            const ImU32 fg = ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, tok::stage_popups_b_y_md));
             dl->AddCircleFilled(c, r, ImGui::GetColorU32(over ? ImGuiCol_ButtonHovered : ImGuiCol_PopupBg), tok::stage_popups_b_segments);
             dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_Border), tok::stage_popups_b_segments, 1.0f);
             glyph::Draw(dl, c, tok::icon_md * k, fg, IconsInfinite::Trash);

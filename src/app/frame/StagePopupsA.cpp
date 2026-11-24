@@ -91,9 +91,9 @@ void DrawPopupsA(FrameCtx& fc)
          view2DAddFrom = gn.index;
    };
 
-      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_set_next_window_size_constraints_x, ImMax(tok::stage_popups_a_bound, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_gap))); // popups: capped width, scroll past the window
+      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_window_w_md, ImMax(tok::stage_popups_a_max_min, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_gap))); // popups: capped width, scroll past the window
       if (gShotNodeMenu)  // review shots: a fixed spot, not wherever the mouse happens to be
-         ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->Pos.x + tok::stage_popups_a_gap_2, ImGui::GetMainViewport()->Pos.y + tok::stage_popups_a_gap_2));
+         ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->Pos.x + tok::stage_popups_a_window_x, ImGui::GetMainViewport()->Pos.y + tok::stage_popups_a_window_x));
       if (MenuParts::BeginPopup("##nodecontext"))
       {
          GraphNode* gn = FindNodeByIndex(gContextMenuNodeIndex);
@@ -148,8 +148,8 @@ void DrawPopupsA(FrameCtx& fc)
             view3DItems(*gn);
             MenuParts::Separator();
             ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_3));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_4));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_hovered_alpha));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_active_alpha));
             if (MenuParts::Item(L("Delete Group"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -241,8 +241,8 @@ void DrawPopupsA(FrameCtx& fc)
             }
             MenuParts::Separator();
             ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_3));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_4));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_hovered_alpha));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_active_alpha));
             if (MenuParts::Item(L("Delete Note"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -471,8 +471,8 @@ void DrawPopupsA(FrameCtx& fc)
 
             // Destructive Action: Delete Node with HIG danger hover styling
             ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_3));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_state_err_alpha_4));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_hovered_alpha));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_active_alpha));
             if (MenuParts::Item(L("Delete Node"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -503,7 +503,7 @@ void DrawPopupsA(FrameCtx& fc)
          ImGui::OpenPopup("##nodehelp");
          gOpenNodeHelpPopup = false;
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_a_set_next_window_size_constraints_x_2, 0), ImVec2(tok::stage_popups_a_set_next_window_size_constraints_x_3, FLT_MAX));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_a_window_w_sm, 0), ImVec2(tok::stage_popups_a_window_w_lg, FLT_MAX));
       if (MenuParts::BeginPopup("##nodehelp"))
       {
          gNodeHelpShown = true;
@@ -521,7 +521,7 @@ void DrawPopupsA(FrameCtx& fc)
          {
             ImGui::TextUnformatted(NodeTitle(*gn).c_str());
             MenuParts::Separator();
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::stage_popups_a_gap_3);
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::stage_popups_a_text_wrap_local_pos_x);
             ImGui::TextWrapped("%s", HelpT(NodeHelpText(*gn)));
             ImGui::PopTextWrapPos();
          }
@@ -540,7 +540,7 @@ void DrawPopupsA(FrameCtx& fc)
          gModRangeTypedPendingInit = false;
          gModRangeTypedNoAutoSelect = false;
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_set_next_window_size_constraints_x, ImMax(tok::stage_popups_a_bound, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_gap))); // popups: capped width, scroll past the window
+      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_window_w_md, ImMax(tok::stage_popups_a_max_min, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_gap))); // popups: capped width, scroll past the window
       const bool modbindOpen = MenuParts::BeginPopup("##modbind");
       if (modbindOpen)
       {

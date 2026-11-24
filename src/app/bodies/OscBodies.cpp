@@ -51,12 +51,12 @@ namespace app
             {
                const float t = (float)i / (float)(count - 1);
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
-               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::osc_oscillator_scope_ratio_2));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::osc_path_line_to_y_lg));
             }
             const ImU32 strokeCol = isLight
                ? (pass == 0 ? tok::Base(tok::col::accent, 50) : tok::Base(tok::col::accent))
-               : (pass == 0 ? tok::Role(tok::col::accent_2, 46) : tok::Role(tok::col::accent_alt, 245));
-            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::osc_oscillator_scope_stroke_2 : tok::osc_oscillator_scope_stroke_3);
+               : (pass == 0 ? tok::Role(tok::col::accent_pale_muted_warm, 46) : tok::Role(tok::col::accent_alt, 245));
+            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::osc_oscillator_scope_path_stroke_lg : tok::osc_oscillator_scope_path_stroke_sm);
          }
       }
       else
@@ -109,12 +109,12 @@ namespace app
             {
                const float t = (float)i / (float)(count - 1);
                const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
-               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::osc_metallic_scope_ratio_2));
+               dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * tok::osc_path_line_to_y_sm));
             }
             const ImU32 strokeCol = isLight
                ? (pass == 0 ? tok::Base(tok::col::state_warn, 50) : tok::Base(tok::col::state_warn))
                : (pass == 0 ? tok::Role(tok::col::role_modulation, 48) : tok::Role(tok::col::role_modulation, 240));
-            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::osc_metallic_scope_stroke_2 : tok::osc_metallic_scope_stroke_3);
+            dl->PathStroke(strokeCol, 0, pass == 0 ? tok::osc_metallic_scope_path_stroke_lg : tok::osc_metallic_scope_path_stroke_sm);
          }
       }
       else
@@ -235,7 +235,7 @@ namespace app
             const float x0 = origin.x + w * std::clamp(slices[i], 0.0f, 1.0f);
             const float x1 = origin.x + w * ((i + 1 < sliceCount) ? std::clamp(slices[i + 1], 0.0f, 1.0f) : 1.0f);
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? tok::Base(tok::col::ink_black, tok::osc_slicer_waveform_ink_black_alpha_2) : tok::Base(tok::col::ink_white, tok::osc_slicer_waveform_ink_white_alpha_2));
+                              isLight ? tok::Base(tok::col::ink_black, tok::osc_slicer_waveform_fill_alpha_lg) : tok::Base(tok::col::ink_white, tok::osc_slicer_waveform_fill_alpha_sm));
          }
 
          AudioViz::Peaks(dl, n->wavePeaks, origin, w, h);
@@ -249,15 +249,15 @@ namespace app
             const float px = origin.x + w * std::clamp(snap.voices[v].position, 0.0f, 1.0f);
             const int alpha = (int)(std::clamp(snap.voices[v].amp, 0.0f, 1.0f) * 235.0f) + 20;
             dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                        tok::U32(tok::osc_slicer_waveform_col_2, isLight, alpha), tok::osc_slicer_waveform_stroke_2);
+                        tok::U32(tok::osc_line_shade, isLight, alpha), tok::osc_slicer_waveform_line_stroke_lg);
          }
 
          // Slice markers, plus the note each slice answers to when it fits.
-         const ImU32 markerCol = isLight ? tok::Base(tok::col::state_ok_8, 230) : tok::Base(tok::col::viz_teal_4, 220);
+         const ImU32 markerCol = isLight ? tok::Base(tok::col::state_ok_deep_lo, 230) : tok::Base(tok::col::viz_teal_light, 220);
          for (int i = 0; i < sliceCount; i++)
          {
             const float x = origin.x + w * std::clamp(slices[i], 0.0f, 1.0f);
-            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), markerCol, i == 0 ? tok::osc_slicer_waveform_stroke : tok::osc_slicer_waveform_stroke_3);
+            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), markerCol, i == 0 ? tok::osc_slicer_waveform_stroke : tok::osc_slicer_waveform_line_stroke_sm);
 
             const float nextX = origin.x + w * ((i + 1 < sliceCount) ? std::clamp(slices[i + 1], 0.0f, 1.0f) : 1.0f);
             const int note = SlicerNode::kBaseNote + i;
@@ -334,8 +334,8 @@ namespace app
 
       if (hasSample)
       {
-         AudioViz::Peaks(dl, n->wavePeaks, origin, w, h, tok::osc_paul_stretch_waveform_peaks_arg,
-                         isLight ? tok::Base(tok::col::accent, tok::osc_paul_stretch_waveform_accent_alpha_2) : tok::Base(tok::col::accent_9, tok::osc_paul_stretch_waveform_accent_9_alpha_2));
+         AudioViz::Peaks(dl, n->wavePeaks, origin, w, h, tok::osc_peaks_alpha_lg,
+                         isLight ? tok::Base(tok::col::accent, tok::osc_audio_viz_alpha_lg) : tok::Base(tok::col::accent_pale_muted_cool, tok::osc_audio_viz_alpha_lg));
 
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
@@ -347,12 +347,12 @@ namespace app
 
          const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
          dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::osc_paul_stretch_waveform_role_modulation_alpha_2), tok::osc_paul_stretch_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::osc_paul_stretch_waveform_line_alpha_sm), tok::osc_paul_stretch_waveform_line_stroke);
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, tok::osc_paul_stretch_waveform_state_ok_alpha_2), tok::osc_paul_stretch_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_ok_deep_vivid) : tok::Base(tok::col::state_ok, tok::osc_paul_stretch_waveform_line_alpha_lg), tok::osc_paul_stretch_waveform_line_stroke);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, tok::osc_paul_stretch_waveform_viz_pink_alpha_2), tok::osc_paul_stretch_waveform_stroke_2);
+                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, tok::osc_paul_stretch_waveform_line_alpha_lg), tok::osc_paul_stretch_waveform_line_stroke);
       }
       else
       {
@@ -364,14 +364,14 @@ namespace app
 
       if (hasSample)
       {
-         const float handleW = tok::osc_handle_w_2;
+         const float handleW = tok::osc_paul_stretch_waveform_w;
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
 
          const float grip = tok::osc_grip;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok);
+         const ImU32 startCol = isLight ? tok::Base(tok::col::state_ok_deep_vivid) : tok::Base(tok::col::state_ok);
          const ImU32 endCol = isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
@@ -441,8 +441,8 @@ namespace app
 
       if (hasSample)
       {
-         AudioViz::Peaks(dl, n->wavePeaks, origin, w, h, tok::osc_granular_waveform_peaks_arg,
-                         isLight ? tok::Base(tok::col::accent, tok::osc_granular_waveform_accent_alpha_2) : tok::Base(tok::col::accent_11, tok::osc_granular_waveform_accent_11_alpha_2));
+         AudioViz::Peaks(dl, n->wavePeaks, origin, w, h, tok::osc_peaks_alpha_sm,
+                         isLight ? tok::Base(tok::col::accent, tok::osc_audio_viz_alpha_md) : tok::Base(tok::col::accent_pale_muted_lo, tok::osc_audio_viz_alpha_sm));
 
          const float startX = origin.x + w * s;
          const float endX = origin.x + w * e;
@@ -467,35 +467,35 @@ namespace app
             // Outer glow
             const int glowAlpha = (int)(gr.amp * 80.0f);
             dl->AddCircleFilled(ImVec2(gx, gy), radius + tok::osc_granular_waveform_gap,
-                                tok::U32(tok::osc_granular_waveform_col_5, isLight, glowAlpha));
+                                tok::U32(tok::osc_dot_shade_sm, isLight, glowAlpha));
 
             // Core grain dot
             const int coreAlpha = std::min(255, (int)(gr.amp * 255.0f));
             dl->AddCircleFilled(ImVec2(gx, gy), radius,
-                                tok::U32(tok::osc_granular_waveform_col_6, isLight, coreAlpha));
+                                tok::U32(tok::osc_dot_shade_lg, isLight, coreAlpha));
 
             // Small direction indicator / velocity streak
             const float dirLen = (gr.pitchRatio > 1.05f ? 4.0f : (gr.pitchRatio < 0.95f ? -4.0f : 0.0f));
             if (std::abs(dirLen) > 0.1f)
             {
                dl->AddLine(ImVec2(gx - dirLen, gy), ImVec2(gx + dirLen, gy),
-                           isLight ? tok::U32(tok::osc_granular_waveform_col_7, (int)(gr.amp * tok::osc_granular_waveform_ratio_2)) : tok::U32(tok::osc_granular_waveform_col_8, (int)(gr.amp * tok::osc_granular_waveform_ratio_3)), tok::osc_granular_waveform_stroke_2);
+                           isLight ? tok::U32(tok::osc_line_shade_sm, (int)(gr.amp * tok::osc_granular_waveform_shade_lg)) : tok::U32(tok::osc_line_shade_md, (int)(gr.amp * tok::osc_granular_waveform_shade_sm)), tok::osc_granular_waveform_line_stroke_sm);
             }
          }
 
          // Current playing playhead (pos) strictly within [s, e]
          const float px = origin.x + w * std::clamp(n->Playhead(), s, e);
          dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::osc_granular_waveform_role_modulation_alpha_2), tok::osc_granular_waveform_stroke_3);
+                     isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::osc_granular_waveform_line_alpha), tok::osc_granular_waveform_line_stroke_lg);
          const float pGrip = tok::osc_p_grip;
          const ImU32 pCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation);
          dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, origin.y), ImVec2(px + pGrip * 0.5f, origin.y), ImVec2(px, origin.y + pGrip), pCol);
          dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, br.y), ImVec2(px + pGrip * 0.5f, br.y), ImVec2(px, br.y - pGrip), pCol);
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok, tok::osc_granular_waveform_state_ok_alpha_2), tok::osc_granular_waveform_stroke_3);
+                     isLight ? tok::Base(tok::col::state_ok_deep_vivid) : tok::Base(tok::col::state_ok, tok::osc_granular_waveform_line_alpha), tok::osc_granular_waveform_line_stroke_lg);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, tok::osc_granular_waveform_viz_pink_alpha_2), tok::osc_granular_waveform_stroke_3);
+                     isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink, tok::osc_granular_waveform_line_alpha), tok::osc_granular_waveform_line_stroke_lg);
       }
       else
       {
@@ -507,14 +507,14 @@ namespace app
 
       if (hasSample)
       {
-         const float handleW = tok::osc_handle_w_2;
+         const float handleW = tok::osc_paul_stretch_waveform_w;
          const float startX = origin.x + w * s;
          const float endX = origin.x + w * e;
 
          const float grip = tok::osc_grip;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? tok::Base(tok::col::state_ok_3) : tok::Base(tok::col::state_ok);
+         const ImU32 startCol = isLight ? tok::Base(tok::col::state_ok_deep_vivid) : tok::Base(tok::col::state_ok);
          const ImU32 endCol = isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
@@ -653,7 +653,7 @@ namespace app
       // amount, so the stack reads as depth rather than as overlaid curves.
       const float headroom = 20.0f;
       const float stepX = (w * tok::osc_wavetable_frames_ratio) / (float)(Wavetable::kFrames - 1);
-      const float stepY = (h - headroom - tok::osc_wavetable_frames_bias) / (float)(Wavetable::kFrames - 1);
+      const float stepY = (h - headroom - tok::osc_wavetable_frames_step_y) / (float)(Wavetable::kFrames - 1);
       const float traceW = w - stepX * (float)(Wavetable::kFrames - 1) - tok::osc_trace_w_gap;
       const float amp = (h - headroom) * 0.17f;
       const float selected = std::clamp(eng.position, 0.0f, 1.0f) * (float)(Wavetable::kFrames - 1);
@@ -677,8 +677,8 @@ namespace app
          }
          const int alpha = isCurrent ? 255 : (int)(40.0f + focus * 120.0f);
          const ImU32 frameStroke = isLight
-            ? (isCurrent ? tok::Base(tok::col::accent) : tok::U32(tok::osc_wavetable_frames_col_5, alpha))
-            : (isCurrent ? tok::Role(tok::col::accent_alt) : tok::U32(tok::osc_wavetable_frames_col_6, alpha));
+            ? (isCurrent ? tok::Base(tok::col::accent) : tok::U32(tok::osc_frame_stroke_shade_sm, alpha))
+            : (isCurrent ? tok::Role(tok::col::accent_alt) : tok::U32(tok::osc_frame_stroke_shade_lg, alpha));
          dl->PathStroke(Fade(frameStroke), 0, isCurrent ? tok::osc_wavetable_frames_stroke : 1.0f);
       }
 
@@ -686,21 +686,21 @@ namespace app
       // picture, and nothing says it can be dragged.
       const float handleX = origin.x + tok::space_2_5 + std::clamp(eng.position, 0.0f, 1.0f) * (w - tok::osc_wavetable_frames_gap);
       dl->AddLine(ImVec2(handleX, origin.y + tok::space_0_75), ImVec2(handleX, br.y - tok::space_0_75),
-                  isLight ? tok::U32(tok::osc_wavetable_frames_col_7, hovered ? tok::osc_wavetable_frames_col_7_alpha : tok::osc_wavetable_frames_col_7_alpha_2) : tok::U32(tok::osc_wavetable_frames_col_8, hovered ? tok::osc_wavetable_frames_col_8_alpha : tok::osc_wavetable_frames_col_8_alpha_2), tok::osc_wavetable_frames_stroke_2);
+                  isLight ? tok::U32(tok::osc_line_shade_xs, hovered ? tok::osc_wavetable_frames_col_7_alpha : tok::osc_wavetable_frames_line_alpha_lg) : tok::U32(tok::osc_line_shade_lg, hovered ? tok::osc_wavetable_frames_col_8_alpha : tok::osc_wavetable_frames_line_alpha_sm), tok::osc_wavetable_frames_line_stroke);
       const ImU32 triCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt);
       dl->AddTriangleFilled(ImVec2(handleX - tok::space_1_25, br.y - tok::space_0_5), ImVec2(handleX + tok::space_1_25, br.y - tok::space_0_5),
-                            ImVec2(handleX, br.y - tok::osc_wavetable_frames_gap_2), Fade(triCol));
+                            ImVec2(handleX, br.y - tok::osc_text_x_sm), Fade(triCol));
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br, hovered ? tok::Role(tok::col::accent_hover) : 0);
-      dl->AddText(ImVec2(origin.x + tok::osc_wavetable_frames_gap_2, origin.y + tok::space_1_25),
-                  Fade(isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::accent_13)),
+      dl->AddText(ImVec2(origin.x + tok::osc_text_x_sm, origin.y + tok::space_1_25),
+                  Fade(isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::accent_pale_muted_hi)),
                   Wavetable::TableName(eng.table));
       char posText[24];
       snprintf(posText, sizeof(posText), "%s", UiFmt::F3(eng.position).c);
       const ImVec2 sz = ImGui::CalcTextSize(posText);
-      dl->AddText(ImVec2(br.x - tok::osc_wavetable_frames_gap_2 - sz.x, origin.y + tok::space_1_25),
-                  isLight ? tok::Base(tok::col::edge_lo_2) : tok::Base(tok::col::text_secondary), posText);
+      dl->AddText(ImVec2(br.x - tok::osc_text_x_sm - sz.x, origin.y + tok::space_1_25),
+                  isLight ? tok::Base(tok::col::edge_lo_light) : tok::Base(tok::col::text_secondary), posText);
       if (hovered)
          SetAudioReadout("position", posText);
    }
@@ -714,7 +714,7 @@ namespace app
       const float padY = tok::space_1_25;
       l.x0 = origin.x + padX;
       const float xEnd = origin.x + w - padX;
-      const float usableW = std::max(tok::osc_compute_adsr_layout_bound, xEnd - l.x0);
+      const float usableW = std::max(tok::osc_usable_w_min, xEnd - l.x0);
       l.topY = origin.y + padY;
       l.baseY = origin.y + h - padY;
       l.spanY = std::max(1.0f, l.baseY - l.topY);
@@ -821,7 +821,7 @@ namespace app
 
       // Subtle sustain gate vertical zone highlight
       dl->AddRectFilled(ImVec2(layout.pD.x, layout.topY), ImVec2(layout.pS.x, layout.baseY),
-                        isLight ? tok::Base(tok::col::ink_black, tok::osc_editable_adsr_ink_black_alpha_2) : tok::Base(tok::col::ink_white, tok::osc_editable_adsr_ink_white_alpha_2));
+                        isLight ? tok::Base(tok::col::ink_black, tok::osc_editable_adsr_fill_alpha_lg) : tok::Base(tok::col::ink_white, tok::osc_editable_adsr_fill_alpha_sm));
 
       // Latch nearest handle on press and support smooth dragging
       static int sHeld = -1;
@@ -943,7 +943,7 @@ namespace app
       // stack of coincident interpolated points at the same x antialiases
       // into a fuzzy vertical bar instead of a crisp vertical edge.
       curvePts.push_back(ImVec2(layout.x0, layout.baseY));
-      if (layout.pA.x - layout.x0 >= tok::osc_editable_adsr_limit_2)
+      if (layout.pA.x - layout.x0 >= tok::osc_editable_adsr_limit_sm)
       {
          const int kAttSteps = shape ? 16 : 6;
          for (int i = 1; i < kAttSteps; i++)
@@ -957,7 +957,7 @@ namespace app
       curvePts.push_back(layout.pA);
 
       // 2. Decay.
-      if (layout.pD.x - layout.pA.x >= tok::osc_editable_adsr_limit_2)
+      if (layout.pD.x - layout.pA.x >= tok::osc_editable_adsr_limit_sm)
       {
          const int kDecSteps = shape ? 20 : 10;
          for (int i = 1; i < kDecSteps; i++)
@@ -975,7 +975,7 @@ namespace app
       curvePts.push_back(layout.pS);
 
       // 4. Release.
-      if (layout.pR.x - layout.pS.x >= tok::osc_editable_adsr_limit_2)
+      if (layout.pR.x - layout.pS.x >= tok::osc_editable_adsr_limit_sm)
       {
          const int kRelSteps = shape ? 16 : 10;
          for (int i = 1; i < kRelSteps; i++)
@@ -1002,7 +1002,7 @@ namespace app
       dl->PathClear();
       for (const ImVec2& pt : curvePts)
          dl->PathLineTo(pt);
-      dl->PathStroke(color, 0, tok::osc_editable_adsr_stroke_2);
+      dl->PathStroke(color, 0, tok::osc_editable_adsr_path_stroke);
 
       // Draw interactive handles
       const ImVec2 handlePts[4] = { layout.pA, layout.pD, layout.pS, layout.pR };
@@ -1012,14 +1012,14 @@ namespace app
       {
          const bool isHot = (active && (sHeld == i || (sHeld == 2 && (i == 1 || i == 2)))) ||
                             (!active && (hoveredHandle == i || (hoveredHandle == 2 && (i == 1 || i == 2))));
-         const float radius = isHot ? tok::osc_radius : tok::osc_radius_2;
+         const float radius = isHot ? tok::osc_radius : tok::osc_editable_adsr_radius;
 
          // Outer halo on hover/drag
          if (isHot)
             dl->AddCircleFilled(handlePts[i], radius + tok::space_0_75, (color & 0x00FFFFFFu) | 0x40000000u, tok::osc_editable_adsr_segments);  // ui-audit-ok: channel mask / bit packing, not a colour value
 
          dl->AddCircleFilled(handlePts[i], radius, isLight ? tok::Base(tok::col::ink_white) : tok::Base(tok::col::ink_white), tok::osc_editable_adsr_segments);
-         dl->AddCircle(handlePts[i], radius, isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_deep, tok::osc_editable_adsr_edge_deep_alpha_2), tok::osc_editable_adsr_segments, tok::osc_editable_adsr_stroke_3);
+         dl->AddCircle(handlePts[i], radius, isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_deep, tok::osc_ring_alpha), tok::osc_editable_adsr_segments, tok::osc_ring_stroke);
       }
 
       dl->PopClipRect();
@@ -1041,7 +1041,7 @@ namespace app
          const ImVec2 labelPos = highSustain ? ImVec2(origin.x + (br.x - origin.x - tsz.x) * tok::osc_editable_adsr_ratio, br.y - tok::space_1 - tsz.y)
                                              : ImVec2(br.x - tok::space_1_5 - tsz.x, origin.y + tok::space_1);
          dl->AddText(labelPos,
-                     isLight ? tok::Base(tok::col::edge_lo_2, tok::osc_editable_adsr_edge_lo_2_alpha_2) : tok::Base(tok::col::text_secondary, tok::osc_editable_adsr_text_secondary_alpha_2), timeText);
+                     isLight ? tok::Base(tok::col::edge_lo_light, tok::osc_editable_adsr_text_alpha_lg) : tok::Base(tok::col::text_secondary, tok::osc_editable_adsr_text_alpha_sm), timeText);
       }
 
       // Rich Readout & Status info
@@ -1164,7 +1164,7 @@ namespace app
             return;
          DrawDiscreteParamPin(h, id, width, ImGui::GetFrameHeight());
          // The pin consumes pin_box + 4; the field takes the rest so pin + field fill exactly the cell and the next cell on the row starts where a slider's would.
-         width = std::max(tok::osc_audio_bare_dropdown_bound, width - (tok::pin_box + tok::space_1));
+         width = std::max(tok::osc_audio_bare_dropdown_min, width - (tok::pin_box + tok::space_1));
       }
 
       const std::string caption = options[safe] + "##" + id;
@@ -1224,7 +1224,7 @@ namespace app
       // the track is 18px narrower than the cell - sizing the cell against the
       // text alone (what 0.44, then 0.52, did) leaves the text overlapping
       // even though the arithmetic looked right.
-      const float fieldsW = std::clamp(full * tok::osc_envelope_fields_ratio, tok::osc_envelope_fields_bound, tok::osc_envelope_fields_bound_2);
+      const float fieldsW = std::clamp(full * tok::osc_envelope_fields_ratio, tok::osc_fields_w_lo, tok::osc_fields_w_hi);
       const float curveW = full - fieldsW - gap;
       const float halfW = (fieldsW - gap) * 0.5f;
       const float rowH = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y;
@@ -1314,7 +1314,7 @@ namespace app
          const float onW = tok::space_3_5 + tok::space_1 + ImGui::GetFrameHeight();
          const float gap = ImGui::GetStyle().ItemSpacing.x;
          const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
-         const float tableW = std::max(tok::osc_wavetable_engine_column_bound, w - onW - octW - semiW - fineW - gap * tok::osc_wavetable_engine_column_ratio);
+         const float tableW = std::max(tok::osc_table_w_min, w - onW - octW - semiW - fineW - gap * tok::osc_wavetable_engine_column_ratio);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          bool on = eng.on;
@@ -1349,7 +1349,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wavetable_engine_column_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // The engine's picture, and its primary control: dragging across it
       // scrubs `position`, and the `position` knob below moves the highlight
@@ -1357,7 +1357,7 @@ namespace app
       // column never changes height.
       DrawWavetableFrames(eng, "##wtFrames", 150.0f, gAudioContentW, !eng.on);
       PublishWtTestRect();
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wavetable_engine_column_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
 
       // Two rows of four, per the sketch. Row two's first two cells pair a
       // mode dropdown with the knob that mode reads.
@@ -1411,19 +1411,19 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope  -  drag the handles", "##wtAmpEnv", &eng.ampAttack,
                         &eng.ampDecay, &eng.ampSustain, &eng.ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::accent_alt, tok::osc_wavetable_engine_column_accent_alt_alpha_2));
+                        tok::Role(tok::col::accent_alt, tok::osc_envelope_alpha_lg));
       ImGui::PopID();
 
       ImGui::PushID("pitch");
       DrawEnvelopePanel("pitch envelope  -  drag the handles", "##wtPitchEnv", &eng.pitchAttack,
                         &eng.pitchDecay, &eng.pitchSustain, &eng.pitchRelease, &eng.pitchAmount,
-                        -tok::osc_wavetable_engine_column_draw_envelope_panel_arg, tok::osc_wavetable_engine_column_draw_envelope_panel_arg, "%.1f st", tok::Role(tok::col::role_modulation, tok::osc_wavetable_engine_column_role_modulation_alpha_2));
+                        -tok::osc_envelope_amount_lo_lg, tok::osc_envelope_amount_lo_lg, "%.1f st", tok::Role(tok::col::role_modulation, tok::osc_envelope_alpha_sm));
       ImGui::PopID();
 
       ImGui::PushID("filter");
       DrawEnvelopePanel("filter envelope  -  drag the handles", "##wtFiltEnv", &eng.filterAttack,
                         &eng.filterDecay, &eng.filterSustain, &eng.filterRelease, &eng.filterAmount,
-                        -tok::osc_wavetable_engine_column_draw_envelope_panel_arg_2, tok::osc_wavetable_engine_column_draw_envelope_panel_arg_2, "%.2f oct", tok::Role(tok::col::viz_teal_4, tok::osc_wavetable_engine_column_viz_teal_4_alpha_2));
+                        -tok::osc_envelope_amount_lo_sm, tok::osc_envelope_amount_lo_sm, "%.2f oct", tok::Role(tok::col::viz_teal_light, tok::osc_envelope_alpha_sm));
       ImGui::PopID();
 
       ImGui::PopID();
@@ -1467,10 +1467,10 @@ namespace app
       }
       EndAudioColumns();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wavetable_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
       BeginAudioSection("master");
       DrawWavetableScope(n, 48.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wavetable_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_md));
       {
          AudioKnobRow row(tok::osc_wavetable_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row.Knob("mix  a-b", &n->mix, 0.0f, 1.0f, "%.2f");
@@ -1593,7 +1593,7 @@ namespace app
          for (int i = 0; i <= kSteps; i++)
          {
             const float t = (float)i / (float)kSteps;
-            const float y = sinf(tok::osc_oscillator_waveform_ratio_2 * (float)M_PI * (cycles * t + phase));
+            const float y = sinf(tok::osc_sinf_pulse_phase * (float)M_PI * (cycles * t + phase));
             pts.push_back(ImVec2(origin.x + t * w, midY - y * amp));
          }
       }
@@ -1602,13 +1602,13 @@ namespace app
       dl->PathClear();
       for (const auto& p : pts)
          dl->PathLineTo(p);
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::osc_oscillator_waveform_accent_alpha_2) : tok::Base(tok::col::accent_2, tok::osc_oscillator_waveform_accent_2_alpha_2), 0, tok::osc_oscillator_waveform_stroke_2);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::osc_oscillator_waveform_path_alpha_sm) : tok::Base(tok::col::accent_pale_muted_warm, tok::osc_oscillator_waveform_path_alpha_md), 0, tok::osc_oscillator_waveform_path_stroke_lg);
 
       // Core trace
       dl->PathClear();
       for (const auto& p : pts)
          dl->PathLineTo(p);
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::osc_oscillator_waveform_accent_alt_alpha_2), 0, tok::osc_oscillator_waveform_stroke_3);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::osc_oscillator_waveform_path_alpha_lg), 0, tok::osc_oscillator_waveform_path_stroke_sm);
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
@@ -1644,7 +1644,7 @@ namespace app
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = tok::space_1_25;
          const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
-         const float waveW = std::max(tok::osc_oscillator_body_bound, w - octW - semiW - fineW - gap * tok::osc_oscillator_body_ratio);
+         const float waveW = std::max(tok::osc_wave_w_min, w - octW - semiW - fineW - gap * tok::osc_oscillator_body_ratio);
          static const std::vector<std::string> kOscWaveNames = SynthModes::WaveformTypeSubset(
             { SynthModes::kWaveSine, SynthModes::kWaveTriangle, SynthModes::kWaveSaw, SynthModes::kWaveSquare });
 
@@ -1666,11 +1666,11 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_oscillator_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Waveform display
       DrawOscillatorWaveform(n->waveform, n->engine.phase, 100.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_oscillator_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
 
       // Two knob rows of four
       {
@@ -1702,13 +1702,13 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope  -  drag the handles", "##oscAmpEnv", &eng.ampAttack,
                         &eng.ampDecay, &eng.ampSustain, &eng.ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::accent_alt, tok::osc_oscillator_body_accent_alt_alpha_2));
+                        tok::Role(tok::col::accent_alt, tok::osc_envelope_alpha_lg));
       ImGui::PopID();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_oscillator_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
       BeginAudioSection("master");
       DrawOscillatorScope(n, 48.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_oscillator_body_dummy_h_3));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_md));
       {
          AudioKnobRow row(tok::osc_oscillator_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          if (noteDriven)
@@ -1752,7 +1752,7 @@ namespace app
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = tok::space_1_25;
          const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
-         const float matW = std::max(tok::osc_metallic_body_bound, w - octW - semiW - fineW - gap * tok::osc_metallic_body_ratio);
+         const float matW = std::max(tok::osc_mat_w_min, w - octW - semiW - fineW - gap * tok::osc_metallic_body_ratio);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          AudioBareDropdown("metalMat", MetallicDsp::MaterialList(), n->material,
@@ -1775,7 +1775,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_metallic_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Scope Visualizer with Strike Trigger Button
       {
@@ -1793,7 +1793,7 @@ namespace app
             n->TriggerStrike();
          }
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_metallic_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
 
       // Section 1: Physical Acoustic Properties (Transient, Decay, Stiffness, Width)
       BeginAudioSection("physical acoustics");
@@ -1807,7 +1807,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_metallic_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Section 2: Resonator Filter & Body Drive
       BeginAudioSection("filter & drive");
@@ -1828,12 +1828,12 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_metallic_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Section 3: Master Pitch / Portamento
       BeginAudioSection("pitch & glide");
       {
-         AudioKnobRow row(tok::osc_metallic_body_audio_knob_row_layout_2);
+         AudioKnobRow row(tok::osc_row_layout_sm);
          if (noteDriven)
             ImGui::BeginDisabled();
          row.Knob("freq", &n->frequency, params::Metallic::frequency_lo, params::Metallic::frequency_hi, "%.0f Hz");
@@ -1877,7 +1877,7 @@ namespace app
             const float v = std::max(-1.0f, std::min(1.0f, n->scopeCache[i]));
             f.dl->PathLineTo(ImVec2(f.origin.x + t * w, midY - v * h * tok::osc_fm_scope_ratio));
          }
-         f.dl->PathStroke(IsThemeLight() ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::osc_fm_scope_role_modulation_alpha_2), 0, tok::osc_fm_scope_stroke_2);
+         f.dl->PathStroke(IsThemeLight() ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation, tok::osc_fm_scope_path_alpha), 0, tok::osc_fm_scope_path_stroke);
       }
       else
       {
@@ -1897,7 +1897,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFMScope(n, 52.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_fm_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       {
          AudioKnobRow row(tok::osc_fm_body_audio_knob_row_layout);
          row.Dropdown("algorithm", FMDsp::AlgorithmList(), n->algorithm, [n](int i) {
@@ -1921,7 +1921,7 @@ namespace app
       {
          FMNode::Operator& op = n->ops[o];
          const bool carrier = ((alg.carriers >> o) & 1) != 0;
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_fm_body_dummy_h));
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
          ImGui::PushID(o);
          // Each operator's "fixed" checkbox is a discrete param: without a
          // scope all four hash to one pin id (PINDUPTEST).
@@ -1948,7 +1948,7 @@ namespace app
             AudioSlider("level", &op.level, 0.0f, 1.0f, "%.2f", rowTop.x + full - levelX);
             ImGui::SetCursorScreenPos(ImVec2(rowTop.x, rowTop.y + ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y));
             DrawEnvelopeFields("##fmEnv", &op.attack, &op.decay, &op.sustain, &op.release, nullptr, 0.0f,
-                               1.0f, "%.2f", tok::Role(tok::col::accent_alt, tok::osc_fm_body_accent_alt_alpha_2), nullptr);
+                               1.0f, "%.2f", tok::Role(tok::col::accent_alt, tok::osc_envelope_fields_alpha), nullptr);
             op.decay = std::max(1.0f, op.decay);
             op.release = std::max(1.0f, op.release);
          }
@@ -1973,7 +1973,7 @@ namespace app
          for (int i = 0; i < count; i++)
             peak = std::max(peak, n->bars[i]);
          const bool light = IsThemeLight();
-         const ImU32 on = light ? tok::Base(tok::col::role_expression, 200) : tok::Base(tok::col::role_expression_3, 200);
+         const ImU32 on = light ? tok::Base(tok::col::role_expression, 200) : tok::Base(tok::col::role_expression_pale_muted_mid, 200);
          const ImU32 off = light ? tok::Base(tok::col::ink_white, 140) : tok::Base(tok::col::ink_black, 130);
          const float barW = w / (float)PartialsNode::kBarCount;
          for (int i = 0; i < count; i++)
@@ -2038,9 +2038,9 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_partials_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       DrawPartialsBars(n, 52.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_partials_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       {
          AudioKnobRow row(tok::osc_partials_body_audio_knob_row_layout);
          row.Knob("pitch", &n->pitch, params::Partials::pitch_lo, params::Partials::pitch_hi, "%+.1f st");
@@ -2074,10 +2074,10 @@ namespace app
       const float midY = origin.y + h * 0.5f;
       const float x0 = origin.x + pad, x1 = br.x - pad;
       const ImU32 line = ScopeMidLineCol();
-      const ImU32 trace = IsThemeLight() ? tok::Base(tok::col::accent_6, 240) : tok::Base(tok::col::accent_alt_2, 240);
+      const ImU32 trace = IsThemeLight() ? tok::Base(tok::col::accent_light_muted_warm, 240) : tok::Base(tok::col::accent_alt_vivid_warm_hi, 240);
       dl->AddLine(ImVec2(x0, origin.y + tok::space_1), ImVec2(x0, br.y - tok::space_1), line, tok::osc_string_diagram_stroke);
       dl->AddLine(ImVec2(x1, origin.y + tok::space_1), ImVec2(x1, br.y - tok::space_1), line, tok::osc_string_diagram_stroke);
-      dl->AddLine(ImVec2(x0, midY), ImVec2(x1, midY), trace, tok::osc_string_diagram_stroke_2);
+      dl->AddLine(ImVec2(x0, midY), ImVec2(x1, midY), trace, tok::osc_string_diagram_line_stroke);
       const float px = x1 - std::clamp(n->position, 0.0f, 1.0f) * (x1 - x0);
       dl->AddCircleFilled(ImVec2(px, midY), tok::osc_string_diagram_r, trace);
       AudioViz::Border(dl, origin, br);
@@ -2091,7 +2091,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%d voice%s", voices, voices == 1 ? "" : "s");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawStringDiagram(n, 28.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_string_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       // 3 x 3: selectors stacked in the left column (exciter, body type), the
       // string's knobs beside the exciter, the body's beside its type.
       {
@@ -2153,7 +2153,7 @@ namespace app
       const float midY = origin.y + h * 0.5f;
       const float x0 = origin.x + pad, x1 = br.x - pad;
       const ImU32 line = ScopeMidLineCol();
-      const ImU32 trace = IsThemeLight() ? tok::Base(tok::col::accent_6, 240) : tok::Base(tok::col::accent_alt_2, 240);
+      const ImU32 trace = IsThemeLight() ? tok::Base(tok::col::accent_light_muted_warm, 240) : tok::Base(tok::col::accent_alt_vivid_warm_hi, 240);
       const float r0 = tok::osc_r0, rMax = h * 0.5f - 3.0f;
       ImVec2 top[17], bot[17];
       for (int k = 0; k <= 16; k++)
@@ -2163,16 +2163,16 @@ namespace app
          if (n->instrument == WindNode::kSax)
             r = r0 + (rMax * tok::osc_wind_diagram_ratio - r0) * t;
          else if (n->instrument == WindNode::kBrass)
-            r = r0 + (rMax - r0) * std::pow(t, tok::osc_wind_diagram_pow_maths);
+            r = r0 + (rMax - r0) * std::pow(t, tok::osc_wind_diagram);
          else if (n->instrument == WindNode::kClarinet)
-            r = t > tok::osc_r_limit ? r0 + (rMax * 0.5f - r0) * (t - tok::osc_wind_diagram_bias) / tok::osc_r_ratio : r0;
+            r = t > tok::osc_r_limit ? r0 + (rMax * 0.5f - r0) * (t - tok::osc_wind_diagram_inset) / tok::osc_r_ratio : r0;
          const float x = x0 + (x1 - x0) * t;
          top[k] = ImVec2(x, midY - r);
          bot[k] = ImVec2(x, midY + r);
       }
-      dl->AddPolyline(top, tok::osc_wind_diagram_add_polyline_draw, trace, 0, tok::osc_wind_diagram_stroke);
-      dl->AddPolyline(bot, tok::osc_wind_diagram_add_polyline_draw, trace, 0, tok::osc_wind_diagram_stroke);
-      dl->AddLine(ImVec2(x0, midY - r0 - tok::space_0_75), ImVec2(x0, midY + r0 + tok::space_0_75), line, tok::osc_wind_diagram_stroke_2);
+      dl->AddPolyline(top, tok::osc_line_num_points, trace, 0, tok::osc_wind_diagram_stroke);
+      dl->AddPolyline(bot, tok::osc_line_num_points, trace, 0, tok::osc_wind_diagram_stroke);
+      dl->AddLine(ImVec2(x0, midY - r0 - tok::space_0_75), ImVec2(x0, midY + r0 + tok::space_0_75), line, tok::osc_wind_diagram_line_stroke);
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
@@ -2184,7 +2184,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%d voice%s", voices, voices == 1 ? "" : "s");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawWindDiagram(n, 28.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wind_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       // 2 x 4: the instrument in the left column, then how it is blown;
       // the breath's shape in time and the level below.
       {
@@ -2223,12 +2223,12 @@ namespace app
       const float pad = tok::space_2_5;
       const float x0 = origin.x + pad, x1 = br.x - pad;
       const ImU32 line = ScopeMidLineCol();
-      const ImU32 trace = IsThemeLight() ? tok::Base(tok::col::accent_6, 240) : tok::Base(tok::col::accent_alt_2, 240);
+      const ImU32 trace = IsThemeLight() ? tok::Base(tok::col::accent_light_muted_warm, 240) : tok::Base(tok::col::accent_alt_vivid_warm_hi, 240);
       const float spread = tok::space_0_75 + tok::osc_spread_ratio * n->detune;
       const float y0 = origin.y + h * tok::osc_y0_ratio;
       for (int k = -1; k <= 1; k++)
          dl->AddLine(ImVec2(x0, y0 + k * spread), ImVec2(x1, y0 + k * spread), trace, tok::osc_piano_diagram_stroke);
-      dl->AddLine(ImVec2(x0, y0 - tok::osc_piano_diagram_ratio * spread), ImVec2(x0, y0 + tok::osc_piano_diagram_ratio * spread), line, tok::osc_piano_diagram_stroke_2);
+      dl->AddLine(ImVec2(x0, y0 - tok::osc_piano_diagram_ratio * spread), ImVec2(x0, y0 + tok::osc_piano_diagram_ratio * spread), line, tok::osc_piano_diagram_line_stroke);
       const float hx = x0 + (x1 - x0) * tok::osc_hx_ratio;
       const float lift = n->ActiveVoices() > 0 ? 2.0f : 6.0f;
       const float hw = tok::space_1 + tok::osc_hw_ratio * n->hardness;
@@ -2244,7 +2244,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%d voice%s", voices, voices == 1 ? "" : "s");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawPianoDiagram(n, 28.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_piano_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       // 2 x 4 under the model: the hammer and the strings' sound, then their
       // tuning, the soundboard, the dampers and the level. An electric reads
       // the same knobs as its pickup, fork and speaker.
@@ -2260,7 +2260,7 @@ namespace app
          row.End();
       }
       {
-         AudioKnobRow row(tok::osc_piano_body_audio_knob_row_layout_2);
+         AudioKnobRow row(tok::osc_row_layout_lg);
          row.Knob("hardness", &n->hardness, 0.0f, 1.0f, "%.2f");
          row.Knob(electric ? "pickup" : "tone", &n->tone, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "tone");
          row.Knob("decay", &n->decay, 0.0f, 1.0f, "%.2f");
@@ -2268,7 +2268,7 @@ namespace app
          row.End();
       }
       {
-         AudioKnobRow row(tok::osc_piano_body_audio_knob_row_layout_2);
+         AudioKnobRow row(tok::osc_row_layout_lg);
          row.Knob(electric ? "bell" : "stiffness", &n->stiffness, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "stiffness");
          row.Knob(electric ? "speaker" : "body", &n->body, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "body");
          row.Knob("release", &n->release, params::Piano::release_lo, params::Piano::release_hi, "%.0f ms", kKnobSmall, false, false,
@@ -2318,13 +2318,13 @@ namespace app
             for (int i = 0; i < count; i++)
             {
                const float t = (float)i / (float)(count - 1);
-               const float y = midY - n->scopeCache[i] * (h * tok::osc_wave_terrain_scope_ratio_2);
+               const float y = midY - n->scopeCache[i] * (h * tok::osc_wave_terrain_scope_scale);
                dl->PathLineTo(ImVec2(origin.x + t * w, y));
             }
             if (pass == 0)
-               dl->PathStroke(isLight ? tok::Base(tok::col::accent_alt_5, tok::osc_wave_terrain_scope_accent_alt_5_alpha_2) : tok::Base(tok::col::accent_alt_4, tok::osc_wave_terrain_scope_accent_alt_4_alpha_2), 0, tok::osc_wave_terrain_scope_stroke_2);
+               dl->PathStroke(isLight ? tok::Base(tok::col::accent_alt_deep, tok::osc_wave_terrain_scope_path_alpha_sm) : tok::Base(tok::col::accent_alt_vivid_warm_lo, tok::osc_wave_terrain_scope_path_alpha_sm), 0, tok::osc_wave_terrain_scope_path_stroke_lg);
             else
-               dl->PathStroke(isLight ? tok::Base(tok::col::accent_6, tok::osc_wave_terrain_scope_accent_6_alpha_2) : tok::Base(tok::col::accent_alt_2, tok::osc_wave_terrain_scope_accent_alt_2_alpha_2), 0, tok::osc_wave_terrain_scope_stroke_3);
+               dl->PathStroke(isLight ? tok::Base(tok::col::accent_light_muted_warm, tok::osc_wave_terrain_scope_path_alpha_lg) : tok::Base(tok::col::accent_alt_vivid_warm_hi, tok::osc_wave_terrain_scope_path_alpha_lg), 0, tok::osc_wave_terrain_scope_path_stroke_sm);
          }
       }
       dl->PopClipRect();
@@ -2368,7 +2368,7 @@ namespace app
          // Selectors on their own row; tuning row below is the same size as every synth header.
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h));
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
          const float y2 = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          AudioSlider("fine", &n->fine, params::WaveTerrain::fine_lo, params::WaveTerrain::fine_hi, "%.1f c", fineW);
@@ -2384,7 +2384,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Baked Wavetable Stack - the node bakes the incoming texture into an
       // 8-frame band-limited wavetable bank every rebuild (orbit-sampled ->
@@ -2410,7 +2410,7 @@ namespace app
          const float stackDx = tok::osc_stack_dx;
          const float stackDy = tok::osc_stack_dy;
          const float traceW = containerW - stackDx * (frameCount - 1) - tok::space_3;
-         const float traceH = (previewH - stackDy * (frameCount - 1) - tok::osc_wave_terrain_body_bias) * tok::osc_trace_h_ratio;
+         const float traceH = (previewH - stackDy * (frameCount - 1) - tok::osc_wave_terrain_trace_h) * tok::osc_trace_h_ratio;
          constexpr int kPlotPoints = tok::osc_plot_points;
 
          auto sampleFrame = [n](int frame, float t) -> float {
@@ -2448,27 +2448,27 @@ namespace app
                pts[i] = ImVec2(baseX + t * traceW, baseY - traceH * 0.5f - s * traceH * 0.5f);
             }
 
-            const ImU32 glow = tok::U32(tok::osc_glow_2, (int)(30 + 40 * prox));
+            const ImU32 glow = tok::U32(tok::osc_glow_shade, (int)(30 + 40 * prox));
             const bool isLight = IsThemeLight();
-            const ImU32 coreLo = isLight ? tok::U32(tok::osc_core_lo_3, (int)(70 + 120 * prox))
-                                          : tok::U32(tok::osc_core_lo_4, (int)(70 + 130 * prox));
-            const ImU32 coreHi = isLight ? tok::Base(tok::col::accent_15) : tok::Base(tok::col::accent_alt_6);
+            const ImU32 coreLo = isLight ? tok::U32(tok::osc_core_lo_shade_sm, (int)(70 + 120 * prox))
+                                          : tok::U32(tok::osc_core_lo_shade_lg, (int)(70 + 130 * prox));
+            const ImU32 coreHi = isLight ? tok::Base(tok::col::accent_dark_muted_hi) : tok::Base(tok::col::accent_alt_light_warm_fixed);
             const ImU32 core = prox > 0.97f ? coreHi : coreLo;
 
-            dl->AddPolyline(pts, kPlotPoints, glow, 0, prox > tok::osc_wave_terrain_body_stroke ? tok::osc_wave_terrain_body_stroke_2 : tok::osc_wave_terrain_body_stroke_3);
-            dl->AddPolyline(pts, kPlotPoints, core, 0, prox > tok::osc_wave_terrain_body_stroke ? tok::osc_wave_terrain_body_stroke_4 : 1.0f);
+            dl->AddPolyline(pts, kPlotPoints, glow, 0, prox > tok::osc_wave_terrain_body_stroke ? tok::osc_wave_terrain_line_stroke_lg : tok::osc_wave_terrain_line_stroke_md);
+            dl->AddPolyline(pts, kPlotPoints, core, 0, prox > tok::osc_wave_terrain_body_stroke ? tok::osc_wave_terrain_line_stroke_sm : 1.0f);
          }
 
          dl->PopClipRect();
-         dl->AddRect(origin, containerBr, tok::Role(tok::col::edge_lo, tok::osc_wave_terrain_body_edge_lo_alpha_2), tok::osc_wave_terrain_body_radius, 0, tok::osc_wave_terrain_body_stroke_5);
+         dl->AddRect(origin, containerBr, tok::Role(tok::col::edge_lo, tok::osc_outline_alpha_lg), tok::osc_wave_terrain_body_radius, 0, tok::osc_outline_stroke);
 
          char label[64];
          snprintf(label, sizeof(label), "wavetable  -  frame %s / %d", UiFmt::F2(n->position * (frameCount - 1)).c, frameCount - 1);
-         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), tok::Role(tok::col::text_secondary, tok::osc_wave_terrain_body_text_secondary_alpha_2), label);
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), tok::Role(tok::col::text_secondary, tok::osc_wave_terrain_text_alpha), label);
 
          ImGui::Dummy(ImVec2(containerW, previewH));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
 
       // Section 1: Terrain Trajectory & Geometry
       BeginAudioSection("orbit & terrain geometry");
@@ -2480,7 +2480,7 @@ namespace app
          row1.Knob("radiusY", &n->radiusY, params::WaveTerrain::radius_y_lo, params::WaveTerrain::radius_y_hi, "%.2f");
          row1.End();
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h_3));
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
          AudioKnobRow row2(tok::osc_wave_terrain_body_audio_knob_row_layout);
          row2.Knob("ratioA", &n->ratioA, params::WaveTerrain::ratio_a_lo, params::WaveTerrain::ratio_a_hi, "%.0f");
          row2.Knob("ratioB", &n->ratioB, params::WaveTerrain::ratio_b_lo, params::WaveTerrain::ratio_b_hi, "%.0f");
@@ -2490,7 +2490,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Section 2: Synth Voice & Timbre
       BeginAudioSection("voice & filter");
@@ -2504,7 +2504,7 @@ namespace app
          ImGui::EndDisabled();
          row1.End();
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h_3));
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
          const bool filterOff = (n->filterType == 0);
          AudioKnobRow row2(tok::osc_wave_terrain_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row2.DropdownKnob("wtFilter", WaveTerrainNode::FilterTypeNames(), n->filterType,
@@ -2520,19 +2520,19 @@ namespace app
       EndAudioSection();
 
       // Interactive ADSR Envelopes
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope", "##wtAmpEnv", &n->ampAttack,
                         &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::accent_alt_4, tok::osc_wave_terrain_body_accent_alt_4_alpha_2));
+                        tok::Role(tok::col::accent_alt_vivid_warm_lo, tok::osc_envelope_alpha_md));
       ImGui::PopID();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
       BeginAudioSection("master & scope");
       DrawWaveTerrainScope(n, 48.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_wave_terrain_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       {
-         AudioKnobRow row(tok::osc_wave_terrain_body_audio_knob_row_layout_2);
+         AudioKnobRow row(tok::osc_row_layout_sm);
          if (noteDriven)
             ImGui::BeginDisabled();
          row.Knob("freq", &n->frequency, params::WaveTerrain::frequency_lo, params::WaveTerrain::frequency_hi, "%.0f Hz");
@@ -2556,7 +2556,7 @@ namespace app
       const bool isLight = IsThemeLight();
 
       const ImU32 gridCol = isLight ? tok::Base(tok::col::surface_hi, 180) : tok::Base(tok::col::edge_lo, 180);
-      const ImU32 axisCol = isLight ? tok::Base(tok::col::text_secondary, 240) : tok::Base(tok::col::surface_lo_2, 240);
+      const ImU32 axisCol = isLight ? tok::Base(tok::col::text_secondary, 240) : tok::Base(tok::col::surface_lo_pale_fixed, 240);
       const ImU32 textCol = isLight ? tok::Base(tok::col::edge_mid, 200) : tok::Base(tok::col::edge_mid, 200);
 
       const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
@@ -2580,8 +2580,8 @@ namespace app
          dl->AddLine(ImVec2(gx, origin.y), ImVec2(gx, br.y), gridCol, tok::osc_equation_visualizer_stroke);
       }
 
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), axisCol, tok::osc_equation_visualizer_stroke_2);
-      dl->AddLine(ImVec2(originX, origin.y), ImVec2(originX, br.y), axisCol, tok::osc_equation_visualizer_stroke_2);
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), axisCol, tok::osc_equation_visualizer_line_stroke);
+      dl->AddLine(ImVec2(originX, origin.y), ImVec2(originX, br.y), axisCol, tok::osc_equation_visualizer_line_stroke);
 
       dl->AddText(ImVec2(origin.x + tok::space_1, midY - scaleY - 1.0f), textCol, "+1");
       dl->AddText(ImVec2(origin.x + tok::space_1, midY + scaleY - tok::osc_equation_visualizer_gap), textCol, "-1");
@@ -2594,7 +2594,7 @@ namespace app
       {
          dl->AddText(ImVec2(origin.x + tok::space_5, br.y - tok::osc_equation_visualizer_gap), textCol, "-pi");
          dl->AddText(ImVec2(originX + tok::space_0_75, br.y - tok::osc_equation_visualizer_gap), textCol, "0");
-         dl->AddText(ImVec2(br.x - tok::osc_equation_visualizer_gap_2, br.y - tok::osc_equation_visualizer_gap), textCol, "+pi");
+         dl->AddText(ImVec2(br.x - tok::osc_text_x_lg, br.y - tok::osc_equation_visualizer_gap), textCol, "+pi");
       }
       else
       {
@@ -2613,7 +2613,7 @@ namespace app
             const float sy = midY - n->scopeCache[i] * scaleY * tok::osc_sy_ratio;
             dl->PathLineTo(ImVec2(origin.x + t * w, sy));
          }
-         dl->PathStroke(isLight ? tok::Base(tok::col::accent_alt_5, tok::osc_equation_visualizer_accent_alt_5_alpha_2) : tok::Base(tok::col::accent_alt_2, tok::osc_equation_visualizer_accent_alt_2_alpha_3), 0, tok::osc_equation_visualizer_stroke_3);
+         dl->PathStroke(isLight ? tok::Base(tok::col::accent_alt_deep, tok::osc_equation_visualizer_path_alpha_xs) : tok::Base(tok::col::accent_alt_vivid_warm_hi, tok::osc_equation_visualizer_path_alpha_sm), 0, tok::osc_equation_visualizer_path_stroke_md);
       }
 
       const auto& curve = n->PreviewCurve();
@@ -2624,19 +2624,19 @@ namespace app
          for (int i = 0; i < nPts; i++)
          {
             const float t = (float)i / (float)(nPts - 1);
-            const float cy = midY - std::clamp(curve[i], -tok::osc_equation_visualizer_bound, tok::osc_equation_visualizer_bound) * scaleY;
+            const float cy = midY - std::clamp(curve[i], -tok::osc_cy_lo, tok::osc_cy_lo) * scaleY;
             dl->PathLineTo(ImVec2(origin.x + t * w, cy));
          }
-         dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::osc_equation_visualizer_accent_alpha_3) : tok::Base(tok::col::accent_alt_8, tok::osc_equation_visualizer_accent_alt_8_alpha_2), 0, tok::osc_equation_visualizer_stroke_4);
+         dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::osc_equation_visualizer_path_alpha_sm) : tok::Base(tok::col::accent_alt_dark_vivid, tok::osc_equation_visualizer_path_alpha_md), 0, tok::osc_equation_visualizer_path_stroke_lg);
 
          dl->PathClear();
          for (int i = 0; i < nPts; i++)
          {
             const float t = (float)i / (float)(nPts - 1);
-            const float cy = midY - std::clamp(curve[i], -tok::osc_equation_visualizer_bound, tok::osc_equation_visualizer_bound) * scaleY;
+            const float cy = midY - std::clamp(curve[i], -tok::osc_cy_lo, tok::osc_cy_lo) * scaleY;
             dl->PathLineTo(ImVec2(origin.x + t * w, cy));
          }
-         dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::osc_equation_visualizer_accent_alpha_4) : tok::Base(tok::col::accent_alt_2, tok::osc_equation_visualizer_accent_alt_2_alpha_4), 0, tok::osc_equation_visualizer_stroke_5);
+         dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::osc_equation_visualizer_path_alpha_lg) : tok::Base(tok::col::accent_alt_vivid_warm_hi, tok::osc_equation_visualizer_path_alpha_xl), 0, tok::osc_equation_visualizer_path_stroke_sm);
       }
 
       if (!n->LastError().empty())
@@ -2645,7 +2645,7 @@ namespace app
          const ImVec2 txtSz = ImGui::CalcTextSize(errText.c_str());
          const ImVec2 pillBr(br.x - tok::space_1_5, origin.y + tok::space_1_5 + txtSz.y + tok::space_1);
          const ImVec2 pillTl(pillBr.x - txtSz.x - tok::space_2_5, origin.y + tok::space_1_5);
-         dl->AddRectFilled(pillTl, pillBr, tok::Role(tok::col::state_err_9, tok::osc_equation_visualizer_state_err_9_alpha_2), tok::osc_equation_visualizer_radius);
+         dl->AddRectFilled(pillTl, pillBr, tok::Role(tok::col::state_err_dark, tok::osc_equation_visualizer_fill_alpha_lg), tok::osc_equation_visualizer_radius);
          dl->AddText(ImVec2(pillTl.x + tok::space_1_25, pillTl.y + tok::space_0_5), tok::Role(tok::col::edge_hi), errText.c_str());
       }
       else
@@ -2654,8 +2654,8 @@ namespace app
          const ImVec2 txtSz = ImGui::CalcTextSize(tag);
          const ImVec2 pillBr(br.x - tok::space_1_5, origin.y + tok::space_1_5 + txtSz.y + tok::space_1);
          const ImVec2 pillTl(pillBr.x - txtSz.x - tok::space_2, origin.y + tok::space_1_5);
-         dl->AddRectFilled(pillTl, pillBr, isLight ? tok::Base(tok::col::edge_hi, tok::osc_equation_visualizer_edge_hi_alpha_2) : tok::Base(tok::col::surface_lo, tok::osc_equation_visualizer_surface_lo_alpha_2), tok::osc_equation_visualizer_radius);
-         dl->AddText(ImVec2(pillTl.x + tok::space_1, pillTl.y + tok::space_0_5), isLight ? tok::Base(tok::col::text_accent, tok::osc_equation_visualizer_text_accent_alpha_2) : tok::Base(tok::col::accent_alt_4, tok::osc_equation_visualizer_accent_alt_4_alpha_2), tag);
+         dl->AddRectFilled(pillTl, pillBr, isLight ? tok::Base(tok::col::edge_hi, tok::osc_equation_visualizer_fill_alpha_sm) : tok::Base(tok::col::surface_lo, tok::osc_equation_visualizer_fill_alpha_sm), tok::osc_equation_visualizer_radius);
+         dl->AddText(ImVec2(pillTl.x + tok::space_1, pillTl.y + tok::space_0_5), isLight ? tok::Base(tok::col::text_accent, tok::osc_equation_visualizer_text_alpha) : tok::Base(tok::col::accent_alt_vivid_warm_lo, tok::osc_equation_visualizer_text_alpha), tag);
       }
 
       AudioViz::End(vizFrame);
@@ -2696,7 +2696,7 @@ namespace app
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_equation_body_dummy_h));
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
          const float y2 = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          AudioSlider("fine", &n->fine, params::Equation::fine_lo, params::Equation::fine_hi, "%.1f c", fineW);
@@ -2712,11 +2712,11 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_equation_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Interactive Cartesian X-Y Visualizer
       DrawEquationVisualizer(n, 128.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_equation_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Formula Input Field
       {
@@ -2731,7 +2731,7 @@ namespace app
             n->CompileEquation();
          }
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_equation_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Section 1: Function Knobs (A, B, C, D)
       BeginAudioSection("function parameters");
@@ -2745,7 +2745,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_equation_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Section 2: Synth Voice & Filter
       BeginAudioSection("voice & filter");
@@ -2759,7 +2759,7 @@ namespace app
          ImGui::EndDisabled();
          row1.End();
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_equation_body_dummy_h_2));
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
          const bool filterOff = (n->filterType == 0);
          AudioKnobRow row2(tok::osc_equation_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row2.DropdownKnob("eqFilter", EquationNode::FilterTypeNames(), n->filterType,
@@ -2775,11 +2775,11 @@ namespace app
       EndAudioSection();
 
       // Section 3: Amp Envelope
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_equation_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope", "##eqAmpEnv", &n->ampAttack,
                         &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::accent_alt_4, tok::osc_equation_body_accent_alt_4_alpha_2));
+                        tok::Role(tok::col::accent_alt_vivid_warm_lo, tok::osc_envelope_alpha_md));
       ImGui::PopID();
 
       EndAudioBody();
@@ -2824,13 +2824,13 @@ namespace app
             for (int i = 0; i < count; i++)
             {
                const float t = (float)i / (float)(count - 1);
-               const float y = midY - n->scopeCache[i] * (h * tok::osc_image_spectral_synth_scope_ratio_2);
+               const float y = midY - n->scopeCache[i] * (h * tok::osc_image_spectral_synth_scope_scale);
                dl->PathLineTo(ImVec2(origin.x + t * w, y));
             }
             if (pass == 0)
-               dl->PathStroke(isLight ? tok::Base(tok::col::viz_teal, tok::osc_image_spectral_synth_scope_viz_teal_alpha_3) : tok::Base(tok::col::viz_teal_3, tok::osc_image_spectral_synth_scope_viz_teal_3_alpha_2), 0, tok::osc_image_spectral_synth_scope_stroke_2);
+               dl->PathStroke(isLight ? tok::Base(tok::col::viz_teal, tok::osc_image_spectral_synth_scope_path_alpha_sm) : tok::Base(tok::col::viz_teal_pale_cool_lo, tok::osc_image_spectral_synth_scope_path_alpha_sm), 0, tok::osc_image_spectral_synth_scope_path_stroke_lg);
             else
-               dl->PathStroke(isLight ? tok::Base(tok::col::viz_teal, tok::osc_image_spectral_synth_scope_viz_teal_alpha_4) : tok::Base(tok::col::viz_teal_2, tok::osc_image_spectral_synth_scope_viz_teal_2_alpha_2), 0, tok::osc_image_spectral_synth_scope_stroke_3);
+               dl->PathStroke(isLight ? tok::Base(tok::col::viz_teal, tok::osc_image_spectral_synth_scope_path_alpha_lg) : tok::Base(tok::col::viz_teal_pale_cool_hi, tok::osc_image_spectral_synth_scope_path_alpha_lg), 0, tok::osc_image_spectral_synth_scope_path_stroke_sm);
          }
       }
       dl->PopClipRect();
@@ -2875,7 +2875,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Live Spectrogram Viewport with Neon Laser Scanhead Overlay
       {
@@ -2887,7 +2887,7 @@ namespace app
 
          // Background panel
          dl->AddRectFilled(origin, containerBr, tok::Role(tok::col::surface_deep), tok::radius_control);
-         dl->AddRect(origin, containerBr, tok::Role(tok::col::edge_lo, tok::osc_image_spectral_synth_body_edge_lo_alpha_2), tok::osc_image_spectral_synth_body_radius, 0, tok::osc_image_spectral_synth_body_stroke);
+         dl->AddRect(origin, containerBr, tok::Role(tok::col::edge_lo, tok::osc_outline_alpha_lg), tok::osc_image_spectral_synth_body_radius, 0, tok::osc_image_spectral_synth_body_stroke);
 
          const float imgSize = previewH - tok::space_2;
          const float imgX = origin.x + (containerW - imgSize) * 0.5f;
@@ -2898,7 +2898,7 @@ namespace app
          if (n->GetOutputTexture() != 0)
          {
             Thumb::Add(dl, (ImTextureID)(intptr_t)n->GetOutputTexture(), imgTl, imgBr, ImVec2(0, 1), ImVec2(1, 0));
-            dl->AddRect(imgTl, imgBr, tok::Role(tok::col::viz_teal_3, tok::osc_image_spectral_synth_body_viz_teal_3_alpha_4), tok::osc_image_spectral_synth_body_radius_2, 0, tok::osc_image_spectral_synth_body_stroke);
+            dl->AddRect(imgTl, imgBr, tok::Role(tok::col::viz_teal_pale_cool_lo, tok::osc_outline_alpha_sm), tok::osc_outline_radius, 0, tok::osc_image_spectral_synth_body_stroke);
          }
 
          // Dynamic Glowing Neon Laser Scanhead Overlay (drawn cleanly on top of image every frame)
@@ -2906,23 +2906,23 @@ namespace app
          const float laserX = imgTl.x + std::clamp(playhead, 0.0f, 1.0f) * imgSize;
 
          // Outer cyan glow
-         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::viz_teal_3, tok::osc_image_spectral_synth_body_viz_teal_3_alpha_5), tok::osc_image_spectral_synth_body_stroke_2);
+         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::viz_teal_pale_cool_lo, tok::osc_image_spectral_synth_line_alpha_sm), tok::osc_image_spectral_synth_line_stroke_lg);
          // Mid cyan glow
-         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::viz_teal_2, tok::osc_image_spectral_synth_body_viz_teal_2_alpha_2), tok::osc_image_spectral_synth_body_stroke_3);
+         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::viz_teal_pale_cool_hi, tok::osc_image_spectral_synth_line_alpha_lg), tok::osc_image_spectral_synth_line_stroke_md);
          // Sharp core laser line
-         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::ink_white), tok::osc_image_spectral_synth_body_stroke_4);
+         dl->AddLine(ImVec2(laserX, imgTl.y), ImVec2(laserX, imgBr.y), tok::Role(tok::col::ink_white), tok::osc_image_spectral_synth_line_stroke_sm);
 
          // Top & Bottom laser pointer diamond markers
          const float triSize = tok::osc_tri_size;
-         dl->AddTriangleFilled(ImVec2(laserX - triSize, imgTl.y), ImVec2(laserX + triSize, imgTl.y), ImVec2(laserX, imgTl.y + triSize * tok::osc_image_spectral_synth_body_ratio), tok::Role(tok::col::viz_teal_2));
-         dl->AddTriangleFilled(ImVec2(laserX - triSize, imgBr.y), ImVec2(laserX + triSize, imgBr.y), ImVec2(laserX, imgBr.y - triSize * tok::osc_image_spectral_synth_body_ratio), tok::Role(tok::col::viz_teal_2));
+         dl->AddTriangleFilled(ImVec2(laserX - triSize, imgTl.y), ImVec2(laserX + triSize, imgTl.y), ImVec2(laserX, imgTl.y + triSize * tok::osc_image_spectral_synth_body_ratio), tok::Role(tok::col::viz_teal_pale_cool_hi));
+         dl->AddTriangleFilled(ImVec2(laserX - triSize, imgBr.y), ImVec2(laserX + triSize, imgBr.y), ImVec2(laserX, imgBr.y - triSize * tok::osc_image_spectral_synth_body_ratio), tok::Role(tok::col::viz_teal_pale_cool_hi));
 
          // Frequency ticks along left margin
          const char* freqLabels[5] = { "16k", "4k", "1k", "250", "40" };
          for (int i = 0; i < 5; i++)
          {
-            const float ty = imgTl.y + (float)i * (imgSize / tok::osc_image_spectral_synth_body_ratio_2) - tok::space_1_5;
-            dl->AddText(ImVec2(origin.x + tok::space_1, ty), tok::Role(tok::col::text_secondary, tok::osc_image_spectral_synth_body_text_secondary_alpha_2), freqLabels[i]);
+            const float ty = imgTl.y + (float)i * (imgSize / tok::osc_ty_scale) - tok::space_1_5;
+            dl->AddText(ImVec2(origin.x + tok::space_1, ty), tok::Role(tok::col::text_secondary, tok::osc_image_spectral_synth_text_alpha), freqLabels[i]);
          }
 
          // Invisible button for interactive mouse scrubbing across spectrogram
@@ -2940,7 +2940,7 @@ namespace app
          ImGui::SetCursorScreenPos(origin);
          ImGui::Dummy(ImVec2(containerW, previewH));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
 
       // Section 1: Transport & Scanning
       BeginAudioSection("transport & scanning");
@@ -2951,11 +2951,11 @@ namespace app
          const float gap = tok::space_1;
          const bool isBpm = (n->scanMode == SpectralAdditiveDsp::kScanBpmSync);
          const bool isManual = (n->scanMode == SpectralAdditiveDsp::kScanManual);
-         const float modeW = isBpm ? (w * tok::osc_image_spectral_synth_body_ratio_3) : (isManual ? (w * tok::osc_image_spectral_synth_body_ratio_4) : (w * tok::osc_image_spectral_synth_body_ratio_5));
-         const float rateW = isBpm ? (w * tok::osc_image_spectral_synth_body_ratio_6) : 0.0f;
+         const float modeW = isBpm ? (w * tok::osc_image_spectral_synth_mode_w_sm) : (isManual ? (w * tok::osc_image_spectral_synth_mode_w_lg) : (w * tok::osc_image_spectral_synth_mode_w_md));
+         const float rateW = isBpm ? (w * tok::osc_image_spectral_synth_rate_w) : 0.0f;
          const bool isOneShot = (n->scanMode == SpectralAdditiveDsp::kScanOneShot);
          const float trigW = isOneShot ? tok::osc_trig_w : 0.0f;
-         const float dirW = isManual ? 0.0f : std::max(tok::osc_image_spectral_synth_body_bound, (w - modeW - (isBpm ? (rateW + gap) : 0.0f) - (isOneShot ? (trigW + gap) : 0.0f) - gap));
+         const float dirW = isManual ? 0.0f : std::max(tok::osc_dir_w_min, (w - modeW - (isBpm ? (rateW + gap) : 0.0f) - (isOneShot ? (trigW + gap) : 0.0f) - gap));
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          AudioBareDropdown("specMode", ImageSpectralSynthNode::ScanModeNames(), n->scanMode,
@@ -2991,7 +2991,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h_3));
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
          AudioKnobRow row(tok::osc_image_spectral_synth_body_audio_knob_row_layout);
          if (isManual)
          {
@@ -3007,7 +3007,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Section 2: Frequency & Partials Spectrum
       BeginAudioSection("frequency & partials");
@@ -3032,7 +3032,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h_3));
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
 
          // Row 2 Dropdown + Invert Button: Color Mode + Invert Toggle
          y = ImGui::GetCursorScreenPos().y;
@@ -3055,8 +3055,8 @@ namespace app
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
 
          // Row 3 Knobs: Frequency Boundaries & Pitch
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h));
-         AudioKnobRow row1(tok::osc_image_spectral_synth_body_audio_knob_row_layout_2);
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+         AudioKnobRow row1(tok::osc_row1_layout);
          row1.Knob("minHz", &n->minFreq, params::ImageSpectralSynth::min_freq_lo, params::ImageSpectralSynth::min_freq_hi, "%.0f Hz");
          row1.Knob("maxHz", &n->maxFreq, params::ImageSpectralSynth::max_freq_lo, params::ImageSpectralSynth::max_freq_hi, "%.0f Hz");
          row1.Knob("rootHz", &n->rootFreq, params::ImageSpectralSynth::root_freq_lo, params::ImageSpectralSynth::root_freq_hi, "%.0f Hz");
@@ -3064,8 +3064,8 @@ namespace app
          row1.End();
 
          // Row 4 Knobs: Conditioning & Gain
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h_3));
-         AudioKnobRow row2(tok::osc_image_spectral_synth_body_audio_knob_row_layout_2);
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
+         AudioKnobRow row2(tok::osc_row1_layout);
          row2.Knob("gain", &n->brightness, params::ImageSpectralSynth::brightness_lo, params::ImageSpectralSynth::brightness_hi, "%.2f");
          row2.Knob("thresh", &n->threshold, params::ImageSpectralSynth::threshold_lo, params::ImageSpectralSynth::threshold_hi, "%.2f");
          row2.Knob("contrast", &n->contrast, params::ImageSpectralSynth::contrast_lo, params::ImageSpectralSynth::contrast_hi, "%.2f");
@@ -3076,21 +3076,21 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
 
       // Section 3: Voice & Filter
       BeginAudioSection("voice & filter");
       {
-         AudioKnobRow row1(tok::osc_image_spectral_synth_body_audio_knob_row_layout_2);
+         AudioKnobRow row1(tok::osc_row1_layout);
          row1.Knob("volume", &n->volume, params::ImageSpectralSynth::volume_lo, params::ImageSpectralSynth::volume_hi, "%.2f");
          row1.Knob("pan", &n->pan, -1.0f, 1.0f, "%.2f");
          row1.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
          row1.Knob("fine", &n->fine, params::ImageSpectralSynth::fine_lo, params::ImageSpectralSynth::fine_hi, "%.1f c");
          row1.End();
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h_3));
+         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
          const bool filterOff = (n->filterType == 0);
-         AudioKnobRow row2(tok::osc_image_spectral_synth_body_audio_knob_row_layout_2, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
+         AudioKnobRow row2(tok::osc_row1_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row2.DropdownKnob("specFilter", ImageSpectralSynthNode::FilterTypeNames(), n->filterType,
                           [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
                           "cutoff", &n->cutoff, params::ImageSpectralSynth::cutoff_lo, params::ImageSpectralSynth::cutoff_hi, "%.0f Hz", filterOff);
@@ -3102,14 +3102,14 @@ namespace app
       EndAudioSection();
 
       // Interactive ADSR Envelopes
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope", "##specAmpEnv", &n->ampAttack,
                         &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
-                        tok::Role(tok::col::viz_teal_3, tok::osc_image_spectral_synth_body_viz_teal_3_alpha_6));
+                        tok::Role(tok::col::viz_teal_pale_cool_lo, tok::osc_envelope_alpha_md));
       ImGui::PopID();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_image_spectral_synth_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
       BeginAudioSection("master & scope");
       DrawImageSpectralSynthScope(n, 48.0f, gAudioContentW);
       EndAudioSection();

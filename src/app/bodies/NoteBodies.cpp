@@ -130,7 +130,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s   %s - idle", UiFmt::DbOffset(n->gainDb).c, inputDesc.c_str());
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_audio_in_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_sm));
 
       {
          PushDropdownStyle();
@@ -163,7 +163,7 @@ namespace app
          PopDropdownStyle();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_audio_in_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
 
       const float faderH = kFaderH;
       const float stripTop = ImGui::GetCursorScreenPos().y;
@@ -190,7 +190,7 @@ namespace app
    void DrawMixerBody(GraphNode& gn, MixerNode* n)
    {
       const int count = std::clamp(n->numChannels, 0, (int)MixerNode::kMaxSlots);
-      const float bodyW = std::max(tok::note_mixer_body_bound, (float)count * tok::note_mixer_body_ratio);
+      const float bodyW = std::max(tok::note_w_min, (float)count * tok::note_mixer_body_ratio);
       char stat[64];
       if (count > 0)
       {
@@ -203,7 +203,7 @@ namespace app
          snprintf(stat, sizeof(stat), "0 in \xe2\x86\x92 0 out \xc2\xb7 idle");
 
       BeginAudioBody(gn.index, gn.category, bodyW, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_mixer_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
 
       // Channels param control
       {
@@ -218,13 +218,13 @@ namespace app
          ImGui::TextDisabled("channels");
          FormParts::Inline();
          int next = ch;
-         if (ActionButton::Draw("-##mixCh", ImVec2(btnH * tok::note_mixer_body_ratio_2, btnH)))
+         if (ActionButton::Draw("-##mixCh", ImVec2(btnH * tok::note_mixer_x, btnH)))
             next = ch - 1;
          FormParts::Inline(0.0f, gap);
          ImGui::AlignTextToFramePadding();
          ImGui::Text("%d", ch);
          FormParts::Inline(0.0f, gap);
-         if (ActionButton::Draw("+##mixCh", ImVec2(btnH * tok::note_mixer_body_ratio_2, btnH)))
+         if (ActionButton::Draw("+##mixCh", ImVec2(btnH * tok::note_mixer_x, btnH)))
             next = ch + 1;
          // The body's "+" stops at kBodySlots; a console the panel widened past it keeps its count.
          next = std::clamp(next, 0, std::max(ch, (int)MixerNode::kBodySlots));
@@ -234,7 +234,7 @@ namespace app
             n->numChannels = next;
             RebuildAudioTopology();
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::note_mixer_body_dummy_h));
+         ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
       }
 
       if (count > 0)
@@ -247,8 +247,8 @@ namespace app
          // and sit inside each fader's own cell.
          for (int i = 0; i < count; i++)
          {
-            const float cx = gAudioContentX + ((float)i + tok::note_mixer_body_bias) * cellW;
-            DrawStripMeter(cx + kFaderMeterDx, stripTop + kFaderMeterPad, kFaderMeterW, faderH - tok::note_mixer_body_ratio_3 * kFaderMeterPad, n->ChannelLevel(i));
+            const float cx = gAudioContentX + ((float)i + tok::note_cx_inset) * cellW;
+            DrawStripMeter(cx + kFaderMeterDx, stripTop + kFaderMeterPad, kFaderMeterW, faderH - tok::note_strip_meter_h * kFaderMeterPad, n->ChannelLevel(i));
          }
 
          {
@@ -264,11 +264,11 @@ namespace app
 
          // Solo (S) and Mute (M) row
          {
-            const float btnW = std::min((cellW - tok::space_2) * 0.5f, tok::note_mixer_body_bound_2);
+            const float btnW = std::min((cellW - tok::space_2) * 0.5f, tok::note_btn_w_max);
             const float rowY = ImGui::GetCursorScreenPos().y;
             for (int i = 0; i < count; i++)
             {
-               const float cx = gAudioContentX + ((float)i + tok::note_mixer_body_bias) * cellW;
+               const float cx = gAudioContentX + ((float)i + tok::note_cx_inset) * cellW;
                const float sX = cx - btnW - tok::space_0_5;
                const float mX = cx + tok::space_0_5;
 
@@ -351,7 +351,7 @@ namespace app
       else
          snprintf(stat, sizeof(stat), "%d bands \xC2\xB7 LR4, sum flat", bands);
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_splitter_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
       {
          static const std::vector<std::string> kModes = { "copy", "2 bands", "3 bands", "4 bands" };
          AudioKnobRow row(tok::note_splitter_body_audio_knob_row_layout);
@@ -404,7 +404,7 @@ namespace app
 
       const int whiteCount = 7 * octaves;
       const float keyW = (w - tok::space_1) / (float)whiteCount;
-      const ImU32 ringCol = ringGood ? tok::Role(tok::col::accent_2) : tok::Role(tok::col::text_err);
+      const ImU32 ringCol = ringGood ? tok::Role(tok::col::accent_pale_muted_warm) : tok::Role(tok::col::text_err);
 
       for (int o = 0; o < octaves; o++)
       {
@@ -413,7 +413,7 @@ namespace app
             const int note = lowNote + o * 12 + kWhiteOffsets[k];
             const bool on = note >= 0 && note < 128 && held[note];
             const float x = origin.x + tok::space_0_5 + (float)(o * tok::note_midi_keyboard_ratio + k) * keyW;
-            const ImU32 whiteCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_2, 245))
+            const ImU32 whiteCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_warm, 245))
                                       : (isLight ? tok::Base(tok::col::ink_white) : tok::Base(tok::col::surface_hi));
             dl->AddRectFilled(ImVec2(x + tok::px_align, origin.y + tok::space_0_75), ImVec2(x + keyW - tok::px_align, br.y - tok::space_0_75),
                               whiteCol, tok::radius_cell);
@@ -429,12 +429,12 @@ namespace app
             const int note = lowNote + o * 12 + kBlackOffsets[k];
             const bool on = note >= 0 && note < 128 && held[note];
             const float x = origin.x + tok::space_0_5 + ((float)(o * tok::note_midi_keyboard_ratio) + kBlackSlot[k] + 1.0f) * keyW - keyW * tok::note_x_ratio;
-            const ImU32 blackCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_8))
-                                      : (isLight ? tok::Base(tok::col::surface_lo_3) : tok::Base(tok::col::edge_deep));
-            dl->AddRectFilled(ImVec2(x, origin.y + tok::space_0_75), ImVec2(x + keyW * tok::note_midi_keyboard_ratio_2, origin.y + h * tok::note_midi_keyboard_ratio_3),
+            const ImU32 blackCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_mid))
+                                      : (isLight ? tok::Base(tok::col::surface_lo_light) : tok::Base(tok::col::edge_deep));
+            dl->AddRectFilled(ImVec2(x, origin.y + tok::space_0_75), ImVec2(x + keyW * tok::note_fill_x, origin.y + h * tok::note_fill_y),
                               blackCol, tok::radius_cell);
             if (note == ringNote)
-               dl->AddRect(ImVec2(x, origin.y + tok::space_0_75), ImVec2(x + keyW * tok::note_midi_keyboard_ratio_2, origin.y + h * tok::note_midi_keyboard_ratio_3),
+               dl->AddRect(ImVec2(x, origin.y + tok::space_0_75), ImVec2(x + keyW * tok::note_fill_x, origin.y + h * tok::note_fill_y),
                           ringCol, tok::note_midi_keyboard_radius, 0, tok::note_midi_keyboard_stroke);
          }
       }
@@ -467,7 +467,7 @@ namespace app
       const int last = n->LastNote();
       const int lowNote = last >= 0 ? std::clamp((last / 12) * 12 - 12, 0, 108) : 48;
       DrawMidiKeyboard(held, lowNote, 3);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_midi_notes_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_lg));
 
       {
          AudioKnobRow row(tok::note_midi_notes_body_audio_knob_row_layout, kKnobLarge);
@@ -567,7 +567,7 @@ namespace app
    // (drag included), or -1 when nothing is pressed.
    int DrawInteractiveKeyboard(const bool held[128], int lowNote, int octaves)
    {
-      const float w = gAudioBodyW, h = tok::note_h_2;
+      const float w = gAudioBodyW, h = tok::note_interactive_keyboard_h;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
@@ -599,8 +599,8 @@ namespace app
                for (int k = 0; k < 5; k++)
                {
                   const int note = lowNote + o * 12 + kBlackOffsets[k];
-                  const float x = origin.x + tok::space_0_5 + ((float)(o * tok::note_interactive_keyboard_ratio_2) + kBlackSlot[k] + 1.0f) * keyW - keyW * tok::note_x_ratio;
-                  if (mouse.x >= x && mouse.x < x + keyW * tok::note_interactive_keyboard_ratio_3)
+                  const float x = origin.x + tok::space_0_5 + ((float)(o * tok::note_interactive_keyboard_scale) + kBlackSlot[k] + 1.0f) * keyW - keyW * tok::note_x_ratio;
+                  if (mouse.x >= x && mouse.x < x + keyW * tok::note_fill_scale)
                   {
                      hitNote = note;
                      break;
@@ -621,8 +621,8 @@ namespace app
          {
             const int note = lowNote + o * 12 + kWhiteOffsets[k];
             const bool on = note >= 0 && note < 128 && held[note];
-            const float x = origin.x + tok::space_0_5 + (float)(o * tok::note_interactive_keyboard_ratio_2 + k) * keyW;
-            const ImU32 whiteCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_2, 245))
+            const float x = origin.x + tok::space_0_5 + (float)(o * tok::note_interactive_keyboard_scale + k) * keyW;
+            const ImU32 whiteCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_warm, 245))
                                       : (isLight ? tok::Base(tok::col::ink_white) : tok::Base(tok::col::surface_hi));
             dl->AddRectFilled(ImVec2(x + tok::px_align, origin.y + tok::space_0_75), ImVec2(x + keyW - tok::px_align, br.y - tok::space_0_75),
                               whiteCol, tok::radius_cell);
@@ -634,10 +634,10 @@ namespace app
          {
             const int note = lowNote + o * 12 + kBlackOffsets[k];
             const bool on = note >= 0 && note < 128 && held[note];
-            const float x = origin.x + tok::space_0_5 + ((float)(o * tok::note_interactive_keyboard_ratio_2) + kBlackSlot[k] + 1.0f) * keyW - keyW * tok::note_x_ratio;
-            const ImU32 blackCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_8))
-                                      : (isLight ? tok::Base(tok::col::surface_lo_3) : tok::Base(tok::col::edge_deep));
-            dl->AddRectFilled(ImVec2(x, origin.y + tok::space_0_75), ImVec2(x + keyW * tok::note_interactive_keyboard_ratio_3, origin.y + h * tok::note_interactive_keyboard_ratio),
+            const float x = origin.x + tok::space_0_5 + ((float)(o * tok::note_interactive_keyboard_scale) + kBlackSlot[k] + 1.0f) * keyW - keyW * tok::note_x_ratio;
+            const ImU32 blackCol = on ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_mid))
+                                      : (isLight ? tok::Base(tok::col::surface_lo_light) : tok::Base(tok::col::edge_deep));
+            dl->AddRectFilled(ImVec2(x, origin.y + tok::space_0_75), ImVec2(x + keyW * tok::note_fill_scale, origin.y + h * tok::note_interactive_keyboard_ratio),
                               blackCol, tok::radius_cell);
          }
       }
@@ -742,7 +742,7 @@ namespace app
          }
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_keyboard_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_lg));
 
       {
          AudioKnobRow row(tok::note_keyboard_body_audio_knob_row_layout, kKnobLarge);
@@ -756,7 +756,7 @@ namespace app
          // above it (P1 corollary) with the rest deliberately skipped (P6) -
          // the same "bottom left" shape as the other AudioEffects checkbox
          // rows (e.g. DrawChorusBody's "analog" row).
-         AudioKnobRow row(tok::note_keyboard_body_audio_knob_row_layout, tok::note_keyboard_body_audio_knob_row_layout_2, 0.0f, false);
+         AudioKnobRow row(tok::note_keyboard_body_audio_knob_row_layout, tok::note_row_layout_lg, 0.0f, false);
          row.Checkbox("numpad##kbToggle", &n->computerKeyboardEnabled);
          row.Skip();
          row.Skip();
@@ -1017,12 +1017,12 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawNoteFilterVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_filter_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_lg));
 
       {
          // Selectors on their own row, left-aligned on the same 3-cell grid as the knobs below (P1, P3): a dropdown
          // is at most 112 wide in any cell, so the scale name is no more clipped here than in a 2-cell row.
-         AudioKnobRow sel(tok::note_filter_body_audio_knob_row_layout, tok::note_filter_body_audio_knob_row_layout_2, tok::note_filter_body_audio_knob_row_layout_3, false);
+         AudioKnobRow sel(tok::note_filter_body_audio_knob_row_layout, tok::note_sel_layout_lg, tok::note_sel_layout_sm, false);
          if (n->useGlobalScale)
             ImGui::BeginDisabled();
          sel.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
@@ -1211,7 +1211,7 @@ namespace app
          const float y = std::pow(x, curve);
          dl->PathLineTo(ImVec2(origin.x + x * w, br.y - y * h));
       }
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::note_velocity_curve_chart_accent_alt_alpha_2), 0, tok::note_velocity_curve_chart_stroke_2);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::note_path_alpha), 0, tok::note_path_stroke);
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
@@ -1227,7 +1227,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       DrawVelocityCurveChart(n->curve);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_velocity_curve_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
       AudioKnobRow row(1, kKnobLarge);
       row.Knob("curve", &n->curve, params::VelocityCurve::curve_lo, params::VelocityCurve::curve_hi, "%.2f", kKnobLarge);
       row.End();
@@ -1257,7 +1257,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%s", options[safeDiv].c_str());
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      AudioKnobRow row(1, tok::note_quantizer_body_audio_knob_row_layout, tok::note_quantizer_body_audio_knob_row_layout_2, false);
+      AudioKnobRow row(1, tok::note_quantizer_body_audio_knob_row_layout, tok::note_row_layout_sm, false);
       row.Dropdown("grid", options, safeDiv, [n](int i) {
          PushUndoCheckpoint();
          n->div = i;
@@ -1307,7 +1307,7 @@ namespace app
          const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - tok::note_predictive_quantize_body_gap, statusPos.y + tok::space_0_75),
-                     tok::Role(tok::col::state_ok_2), confBadge);
+                     tok::Role(tok::col::state_ok_dark_vivid_hi), confBadge);
       }
 
       {
@@ -1342,7 +1342,7 @@ namespace app
          const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - tok::note_predictive_velocity_body_gap, statusPos.y + tok::space_0_75),
-                     tok::Role(tok::col::state_ok_2), confBadge);
+                     tok::Role(tok::col::state_ok_dark_vivid_hi), confBadge);
       }
 
       {
@@ -1386,7 +1386,7 @@ namespace app
          const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - tok::note_predictive_rhythm_body_gap, statusPos.y + tok::space_0_75),
-                     tok::Role(tok::col::state_ok_2), confBadge);
+                     tok::Role(tok::col::state_ok_dark_vivid_hi), confBadge);
       }
 
       {
@@ -1471,7 +1471,7 @@ namespace app
          const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddText(ImVec2(statusPos.x + kAudioNodeWidth - bsz.x - tok::note_predictive_notes_body_gap, statusPos.y + tok::space_0_75),
-                     tok::Role(tok::col::state_ok_2), confBadge);
+                     tok::Role(tok::col::state_ok_dark_vivid_hi), confBadge);
       }
 
       {
@@ -1488,7 +1488,7 @@ namespace app
          const ImVec2 p0 = ImGui::GetCursorScreenPos();
          const float mw = w - (w * tok::note_predictive_notes_body_ratio - 2.0f) - ImGui::GetStyle().ItemSpacing.x;
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::Role(tok::col::ink_white, tok::note_predictive_notes_body_ink_white_alpha_2), tok::note_predictive_notes_body_radius);
+         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::Role(tok::col::ink_white, tok::note_fill_alpha_lg), tok::note_predictive_notes_body_radius);
          const auto& c = n->Curve();
          if (c.size() >= tok::note_predictive_notes_body_limit)
          {
@@ -1501,7 +1501,7 @@ namespace app
                const float x1 = p0.x + mw * (float)i / (float)(c.size() - 1);
                const float y0 = p0.y + h - tok::space_0_75 - (h - tok::space_1_5) * std::clamp(c[i - 1] / hi, 0.0f, 1.0f);
                const float y1 = p0.y + h - tok::space_0_75 - (h - tok::space_1_5) * std::clamp(c[i] / hi, 0.0f, 1.0f);
-               dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), tok::Role(tok::col::state_ok, tok::note_predictive_notes_body_state_ok_alpha_2), tok::note_predictive_notes_body_stroke);
+               dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), tok::Role(tok::col::state_ok, tok::note_line_alpha), tok::note_predictive_notes_body_stroke);
             }
          }
          if (c.size() < tok::note_predictive_notes_body_limit)
@@ -1512,11 +1512,11 @@ namespace app
             snprintf(confStr, sizeof(confStr), "%s", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
             const ImVec2 csz = ImGui::CalcTextSize(confStr);
             dl->AddText(ImVec2(p0.x + mw - csz.x - tok::space_1_5, p0.y + (h - csz.y) * 0.5f),
-                        tok::Role(tok::col::state_ok_2), confStr);
+                        tok::Role(tok::col::state_ok_dark_vivid_hi), confStr);
          }
          ImGui::Dummy(ImVec2(mw, h));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::note_predictive_notes_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
       {
          AudioKnobRow row(tok::note_predictive_notes_body_audio_knob_row_layout);
          row.Knob("stray", &n->stray, 0.0f, 1.0f, "%.2f", kKnobSmall);
@@ -1588,9 +1588,9 @@ namespace app
             const bool isActive = (i == active);
             ImU32 col = tok::Base(tok::col::edge_lo); // unconnected darkest
             if (isActive)
-               col = tok::Role(tok::col::accent_2); // active lit
+               col = tok::Role(tok::col::accent_pale_muted_warm); // active lit
             else if (isConnected)
-               col = tok::Role(tok::col::accent_14); // connected dim
+               col = tok::Role(tok::col::accent_muted_lo); // connected dim
             dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f, col);
          }
          ImGui::Dummy(ImVec2(w, dia + tok::space_1_5));
@@ -1606,7 +1606,7 @@ namespace app
       }
 
       {
-         AudioKnobRow row(tok::note_switcher_body_audio_knob_row_layout, tok::note_switcher_body_audio_knob_row_layout_2, 0.0f, false);
+         AudioKnobRow row(tok::note_switcher_body_audio_knob_row_layout, tok::note_row_layout_lg, 0.0f, false);
          row.Checkbox("manual##switcherManual", &n->manual);
          row.End();
       }
@@ -1651,7 +1651,7 @@ namespace app
             const float cx = origin.x + gap * (float)(o + 1) + dia * (float)o + dia * 0.5f;
             const bool lit = (mask & (1 << o)) != 0;
             dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f,
-                                lit ? tok::Role(tok::col::accent_2) : tok::Role(tok::col::edge_lo));
+                                lit ? tok::Role(tok::col::accent_pale_muted_warm) : tok::Role(tok::col::edge_lo));
          }
          ImGui::Dummy(ImVec2(w, dia + tok::space_1_5));
       }
@@ -1679,7 +1679,7 @@ namespace app
       const float gap = tok::space_0_75;
       const float w = gAudioBodyW;
       const float cellW = (w - gap * (float)(steps - 1)) / (float)steps;
-      const float h = std::min(cellW, tok::note_arp_gate_grid_bound);
+      const float h = std::min(cellW, tok::note_arp_gate_grid_max);
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const int playStep = n->CurrentGridStep();
@@ -1761,7 +1761,7 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       DrawArpGateGrid(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_arpeggiator_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
 
       {
          AudioKnobRow row(tok::note_arpeggiator_body_audio_knob_row_layout);
@@ -1843,14 +1843,14 @@ namespace app
             const float lineY = origin.y + (float)(kHigh - octNote) * noteH;
             const bool isMiddleC = (octNote == 60);
             const ImU32 lineCol = isMiddleC
-               ? (isLight ? tok::Base(tok::col::edge_mid_2, 220) : tok::Base(tok::col::edge_lo_2, 220))
+               ? (isLight ? tok::Base(tok::col::edge_mid_light_fixed, 220) : tok::Base(tok::col::edge_lo_light, 220))
                : (isLight ? tok::Base(tok::col::surface_hi, 150) : tok::Base(tok::col::surface_lo, 150));
-            dl->AddLine(ImVec2(origin.x + tok::space_0_5, lineY), ImVec2(br.x - tok::space_0_5, lineY), lineCol, isMiddleC ? tok::note_sequencer_body_stroke : tok::note_sequencer_body_stroke_2);
+            dl->AddLine(ImVec2(origin.x + tok::space_0_5, lineY), ImVec2(br.x - tok::space_0_5, lineY), lineCol, isMiddleC ? tok::note_sequencer_body_stroke : tok::note_line_stroke);
          }
 
          // Divider line between pitch matrix and velocity lane
          dl->AddLine(ImVec2(origin.x, origin.y + pitchH), ImVec2(br.x, origin.y + pitchH),
-                     isLight ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::edge_lo), tok::note_sequencer_body_stroke_2);
+                     isLight ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::edge_lo), tok::note_line_stroke);
 
          // ---- 3) Step Columns ----
          for (int i = 0; i < steps; i++)
@@ -1903,7 +1903,7 @@ namespace app
             const int dispOct = dispNote / 12 - 1;
 
             const float noteTopY = origin.y + (float)(kHigh - dispNote) * noteH;
-            const float capH = std::max(tok::note_sequencer_body_bound, noteH + tok::note_sequencer_body_gap);
+            const float capH = std::max(tok::note_cap_h_min, noteH + tok::note_sequencer_body_gap);
             const float capTop = std::clamp(noteTopY - (capH - noteH) * 0.5f, origin.y, origin.y + pitchH - capH);
             const float capBot = capTop + capH;
 
@@ -1911,7 +1911,7 @@ namespace app
             if (pitchHovered)
             {
                dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, origin.y + pitchH),
-                                 isLight ? tok::Base(tok::col::ink_black, tok::note_sequencer_body_ink_black_alpha_2) : tok::Base(tok::col::ink_white, tok::note_sequencer_body_ink_white_alpha_2), tok::radius_cell);
+                                 isLight ? tok::Base(tok::col::ink_black, tok::note_fill_alpha_sm) : tok::Base(tok::col::ink_white, tok::note_fill_alpha_md), tok::radius_cell);
             }
 
             // Pitch bar stem (from cap to bottom of pitch area)
@@ -1931,10 +1931,10 @@ namespace app
                const ImU32 capCol = isCurrent
                   ? (isLight ? tok::Base(tok::col::text_warn) : tok::Base(tok::col::role_modulation))
                   : (pitchActive
-                        ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_2))
-                        : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4)));
+                        ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_warm))
+                        : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo)));
                const ImU32 capBorder = isCurrent
-                  ? (isLight ? tok::Base(tok::col::role_solo) : tok::Base(tok::col::role_solo_2))
+                  ? (isLight ? tok::Base(tok::col::role_solo) : tok::Base(tok::col::role_solo_alt))
                   : (isLight ? tok::Base(tok::col::accent_alt, 200) : tok::Base(tok::col::accent_alt, 180));
 
                dl->AddRectFilled(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capCol, tok::note_sequencer_body_radius);
@@ -1950,13 +1950,13 @@ namespace app
             else
             {
                const ImU32 capCol = isLight ? tok::Base(tok::col::surface_hi, 200) : tok::Base(tok::col::edge_lo, 200);
-               const ImU32 capBorder = isLight ? tok::Base(tok::col::edge_mid_2, 180) : tok::Base(tok::col::edge_lo_2, 180);
+               const ImU32 capBorder = isLight ? tok::Base(tok::col::edge_mid_light_fixed, 180) : tok::Base(tok::col::edge_lo_light, 180);
                dl->AddRectFilled(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), capCol, tok::note_sequencer_body_radius);
                dl->AddRect(ImVec2(x0 + tok::space_0_25, capTop), ImVec2(x1 - tok::space_0_25, capBot), capBorder, tok::note_sequencer_body_radius);
 
                char noteStr[16];
                snprintf(noteStr, sizeof(noteStr), "%s%d", NoteNameList()[dispPc].c_str(), dispOct);
-               const ImU32 txtCol = isLight ? tok::Base(tok::col::edge_mid, 200) : tok::Base(tok::col::edge_lo_3, 180);
+               const ImU32 txtCol = isLight ? tok::Base(tok::col::edge_mid, 200) : tok::Base(tok::col::edge_lo_pale, 180);
                DrawTextCentered(ImVec2(x0 + 1.0f, capTop), ImVec2(x1 - 1.0f, capBot), txtCol, noteStr, fontCapSz);
             }
 
@@ -1998,7 +1998,7 @@ namespace app
                const float vFillTop = vy1 - n->stepVelocity[i] * (velH - tok::space_0_5) - 1.0f;
                const ImU32 vCol = isCurrent
                   ? (isLight ? tok::Base(tok::col::text_warn) : tok::Base(tok::col::role_modulation))
-                  : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4));
+                  : (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo));
                dl->AddRectFilled(ImVec2(x0 + 1.0f, vFillTop), ImVec2(x1 - 1.0f, vy1 - 1.0f), vCol, tok::radius_cell);
 
                char vStr[16];
@@ -2009,7 +2009,7 @@ namespace app
             else
             {
                DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy1),
-                                isLight ? tok::Base(tok::col::edge_mid, tok::note_sequencer_body_edge_mid_alpha_2) : tok::Base(tok::col::surface_lo_2, tok::note_sequencer_body_surface_lo_2_alpha_2), "OFF", fontVelSz);
+                                isLight ? tok::Base(tok::col::edge_mid, tok::note_text_centered_alpha) : tok::Base(tok::col::surface_lo_pale_fixed, tok::note_text_centered_alpha), "OFF", fontVelSz);
             }
 
             // Playhead column outline
@@ -2070,7 +2070,7 @@ namespace app
       }
 
       {
-         ImGui::Dummy(ImVec2(0.0f, tok::note_sequencer_body_dummy_h));
+         ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
          AudioKnobRow row(tok::note_sequencer_body_audio_knob_row_layout);
          DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
          row.KnobInt("steps", &n->steps, 1, NoteSequencerNode::kMaxSteps);
@@ -2096,7 +2096,7 @@ namespace app
 
       {
          const float w = gAudioBodyW;
-         const float h = tok::note_h_3;
+         const float h = tok::note_piano_roll_h;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          const ImVec2 br(origin.x + w, origin.y + h);
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2118,9 +2118,9 @@ namespace app
             lo = std::max(0, lo - 1);
             hi = std::min(127, hi + 1);
             const double len = t1 - t0;
-            const float noteH = std::max(tok::note_piano_roll_body_bound, (h - tok::space_1_5) / (float)(hi - lo + 1));
+            const float noteH = std::max(tok::note_h_min, (h - tok::space_1_5) / (float)(hi - lo + 1));
             const ImU32 on = IM_COL32((int)(gAudioTint.r * tok::note_piano_roll_body_ratio), (int)(gAudioTint.g * 255.0f),
-                                      (int)(gAudioTint.b * 255.0f), tok::note_piano_roll_body_alpha_2);
+                                      (int)(gAudioTint.b * 255.0f), tok::note_on_alpha);
             dl->PushClipRect(origin, br, true);
             // A dense page draws at most ~2 notes per pixel column's worth.
             const size_t step = std::max<size_t>(1, s->notes.size() / 4096);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
@@ -2136,7 +2136,7 @@ namespace app
             if (ph >= t0 && ph <= t1)
             {
                const float x = origin.x + (float)((ph - t0) / len) * w;
-               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? tok::Base(tok::col::edge_lo, tok::note_piano_roll_body_edge_lo_alpha_2) : tok::Base(tok::col::edge_hi, tok::note_piano_roll_body_edge_hi_alpha_2), tok::note_piano_roll_body_stroke);
+               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? tok::Base(tok::col::edge_lo, tok::note_line_alpha) : tok::Base(tok::col::edge_hi, tok::note_line_alpha), tok::note_piano_roll_body_stroke);
             }
             dl->PopClipRect();
          }
@@ -2148,7 +2148,7 @@ namespace app
             PianoRollOpenPage(n->laneId);
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_piano_roll_body_dummy_h)); // the skeleton's gap under the visualizer
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md)); // the skeleton's gap under the visualizer
 
       {
          AudioKnobRow row(tok::note_piano_roll_body_audio_knob_row_layout);
@@ -2159,7 +2159,7 @@ namespace app
          row.End();
       }
       {
-         AudioKnobRow row(tok::note_piano_roll_body_audio_knob_row_layout, tok::note_piano_roll_body_audio_knob_row_layout_2, 0.0f, false);
+         AudioKnobRow row(tok::note_piano_roll_body_audio_knob_row_layout, tok::note_row_layout_lg, 0.0f, false);
          row.Checkbox("thru", &n->thru);
          row.Skip();
          row.Skip();
@@ -2186,7 +2186,7 @@ namespace app
          snprintf(stat, sizeof(stat), "no file");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ActionButton::Draw("Load...", ImVec2(tok::note_midi_file_body_draw_x, 0)))
+      if (ActionButton::Draw("Load...", ImVec2(tok::note_load_x, 0)))
       {
          const std::string path = Platform::OpenMidiDialog();
          if (!path.empty())
@@ -2204,7 +2204,7 @@ namespace app
 
       {
          const float w = gAudioBodyW;
-         const float h = tok::note_h_3;
+         const float h = tok::note_piano_roll_h;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          const ImVec2 br(origin.x + w, origin.y + h);
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2215,9 +2215,9 @@ namespace app
             const double len = n->LoopBeats();
             const int lo = std::max(0, (int)song->lowNote - 1);
             const int hi = std::min(127, (int)song->highNote + 1);
-            const float noteH = std::max(tok::note_midi_file_body_bound, (h - tok::space_1_5) / (float)(hi - lo + 1));
+            const float noteH = std::max(tok::note_h_min, (h - tok::space_1_5) / (float)(hi - lo + 1));
             const ImU32 on = IM_COL32((int)(gAudioTint.r * tok::note_midi_file_body_ratio), (int)(gAudioTint.g * 255.0f),
-                                      (int)(gAudioTint.b * 255.0f), tok::note_midi_file_body_alpha_2);
+                                      (int)(gAudioTint.b * 255.0f), tok::note_on_alpha);
             // Pair each on with the next off of the same note and track.
             std::vector<std::pair<uint8_t, double>> open[128];
             dl->PushClipRect(origin, br, true);
@@ -2242,7 +2242,7 @@ namespace app
             if (ph >= 0.0)
             {
                const float x = origin.x + (float)(std::min(ph, len) / len) * w;
-               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? tok::Base(tok::col::edge_lo, tok::note_midi_file_body_edge_lo_alpha_2) : tok::Base(tok::col::edge_hi, tok::note_midi_file_body_edge_hi_alpha_2), tok::note_midi_file_body_stroke);
+               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? tok::Base(tok::col::edge_lo, tok::note_line_alpha) : tok::Base(tok::col::edge_hi, tok::note_line_alpha), tok::note_midi_file_body_stroke);
             }
             dl->PopClipRect();
          }
@@ -2251,7 +2251,7 @@ namespace app
          ImGui::Dummy(ImVec2(w, h));
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_midi_file_body_dummy_h)); // the skeleton's gap under the visualizer
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md)); // the skeleton's gap under the visualizer
 
       {
          // Four knobs a row (five cells put each mod pin against its neighbour's knob), the checkbox bottom-left
@@ -2264,7 +2264,7 @@ namespace app
          row.End();
       }
       {
-         AudioKnobRow row(tok::note_midi_file_body_audio_knob_row_layout, tok::note_midi_file_body_audio_knob_row_layout_2, 0.0f, false);
+         AudioKnobRow row(tok::note_midi_file_body_audio_knob_row_layout, tok::note_row_layout_lg, 0.0f, false);
          row.Checkbox("loop", &n->loop);
          row.Skip();
          row.Skip();
@@ -2457,7 +2457,7 @@ namespace app
          const int match = n->MatchingProgression();
          const int progIdx = n->mode != ChorderNode::kProgression ? 0 : (match >= 0 ? match + 1 : customIdx);
 
-         AudioKnobRow row(tok::note_chorder_body_audio_knob_row_layout, tok::note_chorder_body_audio_knob_row_layout_2, 0.0f, false); // selectors only: a dropdown's height, no caption line
+         AudioKnobRow row(tok::note_chorder_body_audio_knob_row_layout, tok::note_row_layout_lg, 0.0f, false); // selectors only: a dropdown's height, no caption line
          if (n->useGlobalScale)
             ImGui::BeginDisabled();
          row.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
@@ -2486,10 +2486,10 @@ namespace app
                       },
                       progCats);
          row.End();
-         ImGui::Dummy(ImVec2(0.0f, tok::note_chorder_body_dummy_h));
+         ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
       }
       {
-         AudioKnobRow row(tok::note_chorder_body_audio_knob_row_layout_3);
+         AudioKnobRow row(tok::note_row_layout);
          // notes = how many notes stack into each chord (3 = triad, 4 = seventh, 5+ = ninth, 11th).
          // length = how many chords the progression strip below plays before it loops.
          // oct up = chance a chord gets one extra tone doubled an octave higher (airier voicing).
@@ -2505,7 +2505,7 @@ namespace app
          row.End();
       }
       {
-         AudioKnobRow row(tok::note_chorder_body_audio_knob_row_layout_3);
+         AudioKnobRow row(tok::note_row_layout);
          row.Knob("strum", &n->strumMs, params::Chorder::strum_ms_lo, params::Chorder::strum_ms_hi, "%.0fms", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewStrum30);
          row.Knob("hu.time", &n->humanizeTimingMs, params::Chorder::humanize_timing_ms_lo, params::Chorder::humanize_timing_ms_hi, "%.0fms", kKnobSmall);
          row.Knob("hu.vel", &n->humanizeVelocity, params::Chorder::humanize_velocity_lo, params::Chorder::humanize_velocity_hi, "%.0f%%", kKnobSmall);
@@ -2586,7 +2586,7 @@ namespace app
          const float w = ImGui::CalcTextSize("in - always on").x;
          const ImVec2 pos = ImGui::GetCursorScreenPos();
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + (gAudioContentW - w) * 0.5f, pos.y + 2.0f));
-         ImGui::TextColored(tok::RoleV4(tok::col::edge_mid_2), "in - always on");
+         ImGui::TextColored(tok::RoleV4(tok::col::edge_mid_light_fixed), "in - always on");
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, pos.y + ImGui::GetTextLineHeightWithSpacing() + 6.0f));
       }
 
@@ -2635,7 +2635,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawNoteCapturerVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_capturer_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
 
       const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::note_capturer_body_ratio) / tok::note_btn_w_ratio;
       if (ActionButton::Draw("Record", ImVec2(btnW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
@@ -2664,7 +2664,7 @@ namespace app
       if (ActionButton::Draw("Clear", ImVec2(btnW, 0)))
          n->ClearRecording();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_capturer_body_dummy_h_2));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_sm));
       {
          // Same 4-cell grid as the Record/Play/Stop/Clear strip above, so
          // `loop` lands directly under Record instead of floating at the
@@ -2672,7 +2672,7 @@ namespace app
          // height (matches the Flanger/Phaser trailing-checkbox-row
          // precedent) since a lone checkbox doesn't need full knob height
          // plus a caption-line reservation.
-         AudioKnobRow row(tok::note_capturer_body_audio_knob_row_layout, tok::note_capturer_body_audio_knob_row_layout_2, tok::note_capturer_body_audio_knob_row_layout_3, false);
+         AudioKnobRow row(tok::note_capturer_body_audio_knob_row_layout, tok::note_row_layout_lg, tok::note_row_layout_sm, false);
          row.Checkbox("loop##capturerLoop", &n->loop);
          row.Skip();
          row.Skip();
@@ -2730,7 +2730,7 @@ namespace app
       {
          const ImVec2 p = ToScreen(bx[i], by[i] - ballShiftY);
          const float flash = std::clamp(bf[i], 0.0f, 1.0f);
-         const ImU32 restCol = isLight ? tok::Base(tok::col::accent, 245) : tok::Base(tok::col::accent_2, 235);
+         const ImU32 restCol = isLight ? tok::Base(tok::col::accent, 245) : tok::Base(tok::col::accent_pale_muted_warm, 235);
          const ImU32 hitCol = isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation);
          const ImU32 col = ImGui::ColorConvertFloat4ToU32(
             ImLerp(ImGui::ColorConvertU32ToFloat4(restCol), ImGui::ColorConvertU32ToFloat4(hitCol), flash));
@@ -2752,7 +2752,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawBouncingBallsVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_bouncing_balls_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_lg));
 
       {
          AudioKnobRow row(tok::note_bouncing_balls_body_audio_knob_row_layout);
@@ -2832,8 +2832,8 @@ namespace app
       const ::ModShapes::Ahdsr shape = n->Shape();
       DrawEnvelopePanel("envelope  -  drag the handles", "##envAdsr", &n->attackMs, &n->decayMs,
                         &n->sustainLevel, &n->releaseMs, nullptr, 0.0f, 0.0f, "%.2f",
-                        tok::Role(tok::col::accent_alt, tok::note_envelope_body_accent_alt_alpha_2), &shape);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_envelope_body_dummy_h));
+                        tok::Role(tok::col::accent_alt, tok::note_envelope_alpha), &shape);
+      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
 
       // Hold at the peak, then each moving stage's bend: 0 straight,
       // positive fast first (a falling decay/release), negative slow first.

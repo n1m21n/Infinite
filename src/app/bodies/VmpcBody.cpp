@@ -228,7 +228,7 @@ namespace app
                         n->selectedPad = pad;
                      const bool hit = lvl || (now - n->padFlash[pad]) < tok::motion_s_pad_flash;
                      const bool lit = playing || hit;
-                     const ImU32 green = isLight ? tok::Base(tok::col::state_ok_4) : tok::Base(tok::col::state_ok_5);
+                     const ImU32 green = isLight ? tok::Base(tok::col::state_ok_deep_mid) : tok::Base(tok::col::state_ok_dark_vivid_lo);
                      ImU32 fill = isLoaded ? (isLight ? tok::Base(tok::col::surface_hi) : tok::Base(tok::col::edge_lo))
                                            : (isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::edge_deep));
                      if (hovered && !lit)
@@ -236,14 +236,14 @@ namespace app
                      if (lit)
                         fill = green;
                      dl->AddRectFilled(mn, mx, fill, tok::vmpc_body_radius);
-                     const ImU32 selCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4);
-                     const ImU32 edge = isLight ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::surface_lo_2, 200);
-                     dl->AddRect(mn, mx, isSel ? selCol : edge, tok::vmpc_body_radius, 0, isSel ? tok::vmpc_body_stroke : tok::vmpc_body_stroke_2);
+                     const ImU32 selCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo);
+                     const ImU32 edge = isLight ? tok::Base(tok::col::edge_mid_light_fixed) : tok::Base(tok::col::surface_lo_pale_fixed, 200);
+                     dl->AddRect(mn, mx, isSel ? selCol : edge, tok::vmpc_body_radius, 0, isSel ? tok::vmpc_body_stroke : tok::vmpc_outline_stroke);
 
                      const ImU32 ink = lit ? tok::Base(tok::col::ink_white)
                                            : (isLoaded ? (isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::surface_hi))
                                                        : tok::Base(tok::col::edge_mid));
-                     const ImU32 dim = lit ? tok::Base(tok::col::ink_white, 190) : (isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::text_secondary));
+                     const ImU32 dim = lit ? tok::Base(tok::col::ink_white, 190) : (isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::text_secondary));
                      dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 1.0f, mx.y - 1.0f), true);
                      const float lh = AudioLabelFontSize();
                      char num[16];
@@ -262,8 +262,8 @@ namespace app
                         // The picture: the filmstrip frame nearest the pad's
                         // position (its window start when idle), in the box
                         // the MPC gives its waveform.
-                        const ImVec2 pmn(mn.x + tok::space_1_25, mn.y + lh + tok::vmpc_body_gap_2);
-                        const ImVec2 pmx(mx.x - tok::space_1_25, mx.y - lh - tok::vmpc_body_gap_2);
+                        const ImVec2 pmn(mn.x + tok::space_1_25, mn.y + lh + tok::vmpc_pmn_inset);
+                        const ImVec2 pmx(mx.x - tok::space_1_25, mx.y - lh - tok::vmpc_pmn_inset);
                         const float cur = n->PadCursor(pad);
                         const float at = cur >= 0.0f ? cur : n->padStart[pad] / 100.0f;
                         if (thumbs != 0)
@@ -279,8 +279,8 @@ namespace app
                         {
                            // Progress through the clip along the picture's bottom edge.
                            const float px = pmn.x + (pmx.x - pmn.x) * std::clamp(cur, 0.0f, 1.0f);
-                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(pmx.x, pmx.y), tok::Role(tok::col::ink_black, tok::vmpc_body_ink_black_alpha_2));
-                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(px, pmx.y), tok::Role(tok::col::ink_white, tok::vmpc_body_ink_white_alpha_3));
+                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(pmx.x, pmx.y), tok::Role(tok::col::ink_black, tok::vmpc_fill_alpha_sm));
+                           dl->AddRectFilled(ImVec2(pmn.x, pmx.y - tok::space_0_5), ImVec2(px, pmx.y), tok::Role(tok::col::ink_white, tok::vmpc_fill_alpha_lg));
                         }
                         std::string nm = n->PadName(pad);
                         const size_t dot = nm.find_last_of('.');
@@ -320,9 +320,9 @@ namespace app
             }
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, tok::vmpc_body_ratio * side + tok::vmpc_body_ratio_2 * gap));
+         ImGui::Dummy(ImVec2(gAudioContentW, tok::vmpc_body_ratio * side + tok::vmpc_spacer_h_sm * gap));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::vmpc_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::vmpc_spacer_h_lg));
 
       // Selected pad: header, filmstrip (also the drop target), Load / Folder /
       // Clear, then the pad's rows.
@@ -368,16 +368,16 @@ namespace app
                if (b < a)
                   std::swap(a, b);
                const float xa = origin.x + w * a, xb = origin.x + w * b;
-               dl->AddRectFilled(origin, ImVec2(xa, br.y), tok::Role(tok::col::ink_black, tok::vmpc_body_ink_black_alpha_2));
-               dl->AddRectFilled(ImVec2(xb, origin.y), br, tok::Base(tok::col::ink_black, tok::vmpc_body_ink_black_alpha_2));
-               const ImU32 edgeCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4);
+               dl->AddRectFilled(origin, ImVec2(xa, br.y), tok::Role(tok::col::ink_black, tok::vmpc_fill_alpha_sm));
+               dl->AddRectFilled(ImVec2(xb, origin.y), br, tok::Base(tok::col::ink_black, tok::vmpc_fill_alpha_sm));
+               const ImU32 edgeCol = isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo);
                dl->AddLine(ImVec2(xa, origin.y), ImVec2(xa, br.y), edgeCol, tok::vmpc_body_stroke);
                dl->AddLine(ImVec2(xb, origin.y), ImVec2(xb, br.y), edgeCol, tok::vmpc_body_stroke);
                const float at = n->PadCursor(cur);
                if (n->PadPlaying(cur) && at >= 0.0f)
                {
                   const float px = origin.x + w * std::clamp(at, 0.0f, 1.0f);
-                  dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), tok::Role(tok::col::ink_white, tok::vmpc_body_ink_white_alpha_4), tok::vmpc_body_stroke_3);
+                  dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), tok::Role(tok::col::ink_white, tok::vmpc_line_alpha), tok::vmpc_line_stroke);
                }
                if (hov)
                {
@@ -391,13 +391,13 @@ namespace app
                EmptyState::DrawCaption(origin, br, n->PadHasPath(cur) ? T("File missing - drop a clip or Clear")
                                                                       : T("No clip loaded"));
             dl->PopClipRect();
-            AudioViz::Border(dl, origin, br, (!has && hov) ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_4)) : 0);
+            AudioViz::Border(dl, origin, br, (!has && hov) ? (isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_pale_muted_xlo)) : 0);
             if (!has && hov)
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::vmpc_body_dummy_h));
+         ImGui::Dummy(ImVec2(0.0f, tok::vmpc_spacer_h_lg));
 
-         const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::vmpc_body_ratio_3) / tok::vmpc_third_w_ratio;
+         const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::vmpc_third_w) / tok::vmpc_third_w_ratio;
          if (ActionButton::Draw("Load...##vmpc", ImVec2(thirdW, 0)))
             openLoadPad = cur;
          FormParts::Inline();
@@ -418,7 +418,7 @@ namespace app
             n->ClearPad(cur);
          }
          ImGui::EndDisabled();
-         ImGui::Dummy(ImVec2(0.0f, tok::vmpc_body_dummy_h));
+         ImGui::Dummy(ImVec2(0.0f, tok::vmpc_spacer_h_lg));
 
          auto slider = [&](int k, float width)
          {

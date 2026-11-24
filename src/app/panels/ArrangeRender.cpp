@@ -153,7 +153,7 @@ namespace app
       // clicks without needing per-panel disable flags scattered elsewhere.
       ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
       ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, tok::arrange_offline_render_progress_window_ink_black_alpha_2));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, tok::arrange_window_bg_alpha));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("##OfflineRenderBlocker", nullptr,
@@ -167,7 +167,7 @@ namespace app
       ImGui::PopStyleColor();
 
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
-                               ImGuiCond_Always, ImVec2(tok::arrange_offline_render_progress_window_set_next_window_pos_x, tok::arrange_offline_render_progress_window_set_next_window_pos_y));
+                               ImGuiCond_Always, ImVec2(tok::arrange_window_x, tok::arrange_window_y));
       PushElevatedPanelStyle(/*isChild=*/false);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
@@ -220,12 +220,12 @@ namespace app
          SectionCard::Progress(frac, 300.0f);
 
       ImGui::BeginDisabled(n->IsOfflineFinalizing());
-      if (ChipButton::Draw(L("Cancel"), false, 0.0f, tok::arrange_offline_render_progress_window_draw))
+      if (ChipButton::Draw(L("Cancel"), false, 0.0f, tok::arrange_cancel_bottom_lg))
          n->RequestFinishOfflineRender(true);
       ImGui::EndDisabled();
       ImGui::SameLine(0.0f, tok::space_2);
       ImGui::BeginDisabled(qTotal <= 1);
-      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, tok::arrange_offline_render_progress_window_draw))
+      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, tok::arrange_cancel_bottom_lg))
          ArrangeRenderCancelAll();
       ImGui::EndDisabled();
 
@@ -248,7 +248,7 @@ namespace app
       ImGuiIO& io = ImGui::GetIO();
       ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
       ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, tok::arrange_wav_render_progress_window_ink_black_alpha_2));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::RoleV4(tok::col::ink_black, tok::arrange_window_bg_alpha));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("##ArrangeWavRenderBlocker", nullptr,
@@ -262,7 +262,7 @@ namespace app
       ImGui::PopStyleColor();
 
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
-                              ImGuiCond_Always, ImVec2(tok::arrange_wav_render_progress_window_set_next_window_pos_x, tok::arrange_wav_render_progress_window_set_next_window_pos_y));
+                              ImGuiCond_Always, ImVec2(tok::arrange_window_x, tok::arrange_window_y));
       PushElevatedPanelStyle(/*isChild=*/false);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
@@ -288,12 +288,12 @@ namespace app
          ImGui::TextDisabled(T("Job %d of %d"), qIdx, qTotal);
       SectionCard::Progress(frac, 300.0f);
       ImGui::BeginDisabled(gArrangeWavRender.cancelRequested);
-      if (ChipButton::Draw(L("Cancel"), false, 0.0f, tok::arrange_wav_render_progress_window_draw))
+      if (ChipButton::Draw(L("Cancel"), false, 0.0f, tok::arrange_cancel_bottom_lg))
          ArrangeRenderCancelActive();
       ImGui::EndDisabled();
       ImGui::SameLine(0.0f, tok::space_2);
       ImGui::BeginDisabled(qTotal <= 1);
-      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, tok::arrange_wav_render_progress_window_draw))
+      if (ChipButton::Draw(L("Cancel All"), false, 0.0f, tok::arrange_cancel_bottom_lg))
          ArrangeRenderCancelAll();
       ImGui::EndDisabled();
       ImGui::End();
@@ -322,10 +322,10 @@ namespace app
       switch (status)
       {
       case kArrangeJobDone:       return tok::RoleV4(tok::col::state_ok);
-      case kArrangeJobFailed:     return tok::RoleV4(tok::col::state_err_11);
-      case kArrangeJobCancelled:  return tok::RoleV4(tok::col::role_solo_4);
+      case kArrangeJobFailed:     return tok::RoleV4(tok::col::state_err_light_muted);
+      case kArrangeJobCancelled:  return tok::RoleV4(tok::col::role_solo_deep);
       case kArrangeJobRendering:
-      case kArrangeJobFinalizing: return tok::RoleV4(tok::col::accent_7);
+      case kArrangeJobFinalizing: return tok::RoleV4(tok::col::accent_pale_muted_xhi);
       default:                    return ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
       }
    }
@@ -460,7 +460,7 @@ namespace app
          clipId = *gArrangeSel.begin();
       Arrange::Clip* clip = clipId != 0 ? Arrange::FindClip(gArrange, clipId) : nullptr;
 
-      const float fieldW = std::max(tok::arrange_clip_settings_child_bound, availW - RowLabelW());
+      const float fieldW = std::max(tok::arrange_field_w_min, availW - RowLabelW());
 
       auto tickField = [&](const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
                            ArrangeTickUnit unit, Arrange::Tick* out) -> bool
@@ -517,7 +517,7 @@ namespace app
          snprintf(nameBuf, sizeof(nameBuf), "%s", clip->name.c_str());
          // Name and Active share a row (Logic's region inspector: name, then the switches beside it).
          const float activeW = tok::arrange_active_w;
-         ImGui::SetNextItemWidth(std::max(tok::arrange_clip_settings_child_bound_2, availW - activeW - ImGui::GetStyle().ItemSpacing.x));
+         ImGui::SetNextItemWidth(std::max(tok::arrange_clipinspname_min, availW - activeW - ImGui::GetStyle().ItemSpacing.x));
          if (FieldWell::InputText("##clipinspname", nameBuf, sizeof(nameBuf)))
          {
             ArrangeEdit([&]() {
@@ -947,10 +947,10 @@ namespace app
          // Multi-clip renaming
          static char sBulkRenameBuf[128] = "Clip";
          SectionHeader(T("Rename All Selected"));
-         ImGui::SetNextItemWidth(availW - tok::arrange_clip_settings_child_gap_2 - tok::space_1);
+         ImGui::SetNextItemWidth(availW - tok::arrange_field_w_sm - tok::space_1);
          FieldWell::InputText("##bulkrenametext", sBulkRenameBuf, sizeof(sBulkRenameBuf));
          FormParts::Inline(0.0f, tok::space_1);
-         if (ChipButton::Draw(L("Apply##bulkapplyrename"), false, ImGui::GetFrameHeight(), tok::arrange_clip_settings_child_draw))
+         if (ChipButton::Draw(L("Apply##bulkapplyrename"), false, ImGui::GetFrameHeight(), tok::arrange_apply_bottom))
          {
             ArrangeEdit([&]() {
                int idx = 1;

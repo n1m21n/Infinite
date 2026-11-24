@@ -54,7 +54,7 @@ namespace app
             const float y = midY - amp * sinf(tok::fx_chorus_visualizer_ratio * (float)M_PI * (t * tok::fx_chorus_visualizer_ratio + phaseOffset));
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(tok::U32(tok::fx_chorus_visualizer_col_2, isLight, alpha), 0, tok::fx_chorus_visualizer_gap + feedback * tok::fx_chorus_visualizer_ratio_2);
+         dl->PathStroke(tok::U32(tok::fx_path_shade, isLight, alpha), 0, tok::fx_chorus_visualizer_gap + feedback * tok::fx_chorus_visualizer_path_stroke);
       }
 
       char buf[24];
@@ -90,7 +90,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawChorusVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_chorus_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_chorus_body_audio_knob_row_layout);
@@ -129,7 +129,7 @@ namespace app
          // hash-based addressing AddRateModeCells' own comment documents -
          // any existing patch's modulation binding on the sync control
          // still resolves to this control even though it moved rows.
-         AudioKnobRow row(tok::fx_chorus_body_audio_knob_row_layout, tok::fx_chorus_body_audio_knob_row_layout_2, tok::fx_chorus_body_audio_knob_row_layout_3, false);
+         AudioKnobRow row(tok::fx_chorus_body_audio_knob_row_layout, tok::fx_row_layout_lg, tok::fx_row_layout_sm, false);
          static const std::vector<std::string> kSyncModes = { "Synced", "Free" };
          row.Dropdown("sync to tempo##chorusSync", kSyncModes, sync ? 0 : 1, [n](int i) {
             PushUndoCheckpoint();
@@ -191,7 +191,7 @@ namespace app
       {
          const float t = (float)i / 95.0f;
          const float x = origin.x + t * w;
-         const float y = midY - (h * tok::fx_flanger_visualizer_ratio_2) * sinf(tok::fx_flanger_visualizer_ratio_3 * (float)M_PI * t * rippleFreq);
+         const float y = midY - (h * tok::fx_flanger_visualizer_scale) * sinf(tok::fx_sinf_pulse_phase * (float)M_PI * t * rippleFreq);
          dl->PathLineTo(ImVec2(x, y));
       }
       dl->PathStroke(ScopeMidLineCol(), 0, 1.0f);
@@ -207,7 +207,7 @@ namespace app
             const float y = midY - envelope - ripple;
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(tok::U32(tok::fx_flanger_visualizer_col_2, isLight, alpha), 0, tok::fx_flanger_visualizer_gap + std::fabs(feedback) * tok::fx_flanger_visualizer_ratio_4);
+         dl->PathStroke(tok::U32(tok::fx_path_shade, isLight, alpha), 0, tok::fx_flanger_visualizer_gap + std::fabs(feedback) * tok::fx_flanger_visualizer_path_stroke);
       };
       drawWet(0.0f, 235);
       drawWet(n->Param("spread") * 0.5f, 120);
@@ -244,7 +244,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFlangerVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_flanger_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_flanger_body_audio_knob_row_layout);
@@ -279,7 +279,7 @@ namespace app
          // comment documents - any existing patch's modulation binding on
          // the sync control still resolves to this control even though it
          // moved rows.
-         AudioKnobRow row(tok::fx_flanger_body_audio_knob_row_layout, tok::fx_flanger_body_audio_knob_row_layout_2, tok::fx_flanger_body_audio_knob_row_layout_3, false);
+         AudioKnobRow row(tok::fx_flanger_body_audio_knob_row_layout, tok::fx_row_layout_lg, tok::fx_row_layout_sm, false);
          static const std::vector<std::string> kSyncModes = { "Synced", "Free" };
          row.Dropdown("sync to tempo##flangerSync", kSyncModes, sync ? 0 : 1, [n](int i) {
             PushUndoCheckpoint();
@@ -359,7 +359,7 @@ namespace app
             const float y = br.y - tok::space_1_5 - mag * (h - tok::space_4);
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(tok::U32(tok::fx_phaser_visualizer_col_2, isLight, alpha), 0, tok::fx_phaser_visualizer_stroke_2);
+         dl->PathStroke(tok::U32(tok::fx_path_shade, isLight, alpha), 0, tok::fx_phaser_visualizer_path_stroke);
       };
       drawTrace(1.0f, 235);
       if (spread > 0.01f)
@@ -393,7 +393,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawPhaserVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_phaser_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_phaser_body_audio_knob_row_layout);
@@ -434,7 +434,7 @@ namespace app
          // hash-based addressing AddRateModeCells' own comment documents -
          // any existing patch's modulation binding on the sync control
          // still resolves to this control even though it moved rows.
-         AudioKnobRow row(tok::fx_phaser_body_audio_knob_row_layout, tok::fx_phaser_body_audio_knob_row_layout_2, tok::fx_phaser_body_audio_knob_row_layout_3, false);
+         AudioKnobRow row(tok::fx_phaser_body_audio_knob_row_layout, tok::fx_row_layout_lg, tok::fx_row_layout_sm, false);
          static const std::vector<std::string> kSyncModes = { "Synced", "Free" };
          row.Dropdown("sync to tempo##phaserSync", kSyncModes, sync ? 0 : 1, [n](int i) {
             PushUndoCheckpoint();
@@ -503,12 +503,12 @@ namespace app
 
       for (int i = 0; i < kNumSteps - 1; i++)
          dl->AddQuadFilled(pts[i], pts[i + 1], ImVec2(pts[i + 1].x, baseY), ImVec2(pts[i].x, baseY),
-                            isLight ? tok::Base(tok::col::role_expression_9, tok::fx_bitcrush_visualizer_role_expression_9_alpha_2) : tok::Base(tok::col::role_expression_14, tok::fx_bitcrush_visualizer_role_expression_14_alpha_2));
+                            isLight ? tok::Base(tok::col::role_expression_alt, tok::fx_bitcrush_visualizer_fill_alpha_sm) : tok::Base(tok::col::role_expression_light_muted_lo, tok::fx_bitcrush_visualizer_fill_alpha_lg));
 
       dl->PathClear();
       for (int i = 0; i < kNumSteps; i++)
          dl->PathLineTo(pts[i]);
-      dl->PathStroke(isLight ? tok::Base(tok::col::role_expression, tok::fx_bitcrush_visualizer_role_expression_alpha_2) : tok::Base(tok::col::role_expression_3, tok::fx_bitcrush_visualizer_role_expression_3_alpha_2), 0, tok::fx_bitcrush_visualizer_stroke);
+      dl->PathStroke(isLight ? tok::Base(tok::col::role_expression, tok::fx_bitcrush_visualizer_path_alpha) : tok::Base(tok::col::role_expression_pale_muted_mid, tok::fx_bitcrush_visualizer_path_alpha), 0, tok::fx_bitcrush_visualizer_stroke);
 
       AudioViz::End(vizFrame);
 
@@ -533,7 +533,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawBitcrushVisualizer(n, sampleRate);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_bitcrush_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       AudioKnobRow row(tok::fx_bitcrush_body_audio_knob_row_layout);
       // Labelled "downsample" (not "rate") to match the BLEASS-style
@@ -545,7 +545,7 @@ namespace app
       row.End();
 
       {
-         AudioKnobRow row(tok::fx_bitcrush_body_audio_knob_row_layout, tok::fx_bitcrush_body_audio_knob_row_layout_2, tok::fx_bitcrush_body_audio_knob_row_layout_3, false);
+         AudioKnobRow row(tok::fx_bitcrush_body_audio_knob_row_layout, tok::fx_row_layout_lg, tok::fx_row_layout_sm, false);
          bool analogBool = analog;
          bool analogBoolUserChanged = false;
          if (row.Checkbox("analog##bitcrushAnalog", &analogBool, &analogBoolUserChanged))
@@ -631,7 +631,7 @@ namespace app
          const float y = TsVizDbToY(ampDb, origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::fx_transient_shaper_visualizer_accent_alpha_2) : tok::Base(tok::col::accent_alt, tok::fx_transient_shaper_visualizer_accent_alt_alpha_3), 0, tok::fx_transient_shaper_visualizer_stroke);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::fx_transient_shaper_visualizer_path_alpha_sm) : tok::Base(tok::col::accent_alt, tok::fx_transient_shaper_visualizer_path_alpha_sm), 0, tok::fx_transient_shaper_visualizer_stroke);
 
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
@@ -652,11 +652,11 @@ namespace app
             peakY = y;
          }
       }
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_transient_shaper_visualizer_accent_alt_alpha_4), 0, tok::fx_transient_shaper_visualizer_stroke_2);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_transient_shaper_visualizer_path_alpha_lg), 0, tok::fx_transient_shaper_visualizer_path_stroke);
 
       const float transientAmount = std::clamp(n->ExtraMeterValue(0), 0.0f, 1.0f);
       dl->AddCircleFilled(ImVec2(peakX, peakY), tok::space_0_75 + transientAmount * tok::fx_transient_shaper_visualizer_ratio,
-                          isLight ? tok::Base(tok::col::state_warn, tok::fx_transient_shaper_visualizer_state_warn_alpha_2) : tok::Base(tok::col::role_modulation, tok::fx_transient_shaper_visualizer_role_modulation_alpha_2));
+                          isLight ? tok::Base(tok::col::state_warn, tok::fx_dot_alpha_sm) : tok::Base(tok::col::role_modulation, tok::fx_dot_alpha_sm));
 
       AudioViz::End(vizFrame);
 
@@ -678,7 +678,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawTransientShaperVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_transient_shaper_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_transient_shaper_body_audio_knob_row_layout);
@@ -700,7 +700,7 @@ namespace app
    void DrawStutterGateGrid(AudioEffectNode* n, int steps)
    {
       const float w = gAudioBodyW;
-      const float h = tok::fx_h_2;
+      const float h = tok::fx_stutter_gate_grid_h;
       const float gap = tok::space_0_75;
       const float cellW = (w - gap * (float)(steps - 1)) / (float)steps;
       const ImVec2 rowOrigin = ImGui::GetCursorScreenPos();
@@ -744,7 +744,7 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       DrawStutterGateGrid(n, steps);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_stutter_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          // "sync" folded into the row itself (was a standalone checkbox
@@ -808,7 +808,7 @@ namespace app
          const float y = midY - v * amp;
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_ring_mod_visualizer_accent_alt_alpha_2), 0, tok::fx_ring_mod_visualizer_stroke_2);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_ring_mod_visualizer_path_alpha), 0, tok::fx_ring_mod_visualizer_path_stroke);
 
       AudioViz::End(vizFrame);
 
@@ -832,7 +832,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawRingModVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_ring_mod_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_ring_mod_body_audio_knob_row_layout);
@@ -859,7 +859,7 @@ namespace app
          // height) + hasCaptions=false, so the row doesn't reserve a full
          // knob-height-plus-caption-strip below a control whose label prints
          // inline rather than underneath it.
-         AudioKnobRow row(tok::fx_ring_mod_body_audio_knob_row_layout, tok::fx_ring_mod_body_audio_knob_row_layout_2, tok::fx_ring_mod_body_audio_knob_row_layout_3, false);
+         AudioKnobRow row(tok::fx_ring_mod_body_audio_knob_row_layout, tok::fx_row_layout_lg, tok::fx_row_layout_sm, false);
          bool analogBool = analog;
          bool analogBoolUserChanged = false;
          if (row.Checkbox("analog##ringModAnalog", &analogBool, &analogBoolUserChanged))
@@ -917,7 +917,7 @@ namespace app
       const ImU32 arrowCol = (shift > 0.5f)
          ? (isLight ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 230))
          : ((shift < -0.5f) ? (isLight ? tok::Base(tok::col::state_err, 240) : tok::Base(tok::col::text_err, 230))
-                            : (isLight ? tok::Base(tok::col::edge_lo_3, 200) : tok::Base(tok::col::text_secondary, 180)));
+                            : (isLight ? tok::Base(tok::col::edge_lo_pale, 200) : tok::Base(tok::col::text_secondary, 180)));
 
       for (int i = 0; i < kNumPartials; i++)
       {
@@ -926,13 +926,13 @@ namespace app
 
          // Input partial tick (upper row)
          dl->AddLine(ImVec2(xIn, topY - tok::fx_frequency_shifter_visualizer_gap), ImVec2(xIn, topY + tok::space_0_75),
-                     isLight ? tok::Base(tok::col::surface_lo_2, tok::fx_frequency_shifter_visualizer_surface_lo_2_alpha_2) : tok::Base(tok::col::accent_13, tok::fx_frequency_shifter_visualizer_accent_13_alpha_2), tok::fx_frequency_shifter_visualizer_stroke_2);
+                     isLight ? tok::Base(tok::col::surface_lo_pale_fixed, tok::fx_frequency_shifter_visualizer_line_alpha_lg) : tok::Base(tok::col::accent_pale_muted_hi, tok::fx_frequency_shifter_visualizer_line_alpha_sm), tok::fx_frequency_shifter_visualizer_line_stroke_md);
 
          // Shifted partial tick (lower row)
-         dl->AddLine(ImVec2(xOutL, botY - tok::space_0_75), ImVec2(xOutL, botY + tok::fx_frequency_shifter_visualizer_gap), arrowCol, tok::fx_frequency_shifter_visualizer_stroke_3);
+         dl->AddLine(ImVec2(xOutL, botY - tok::space_0_75), ImVec2(xOutL, botY + tok::fx_frequency_shifter_visualizer_gap), arrowCol, tok::fx_frequency_shifter_visualizer_line_stroke_lg);
 
          // Connecting arrow from input to shifted partial
-         dl->AddLine(ImVec2(xIn, topY + tok::space_0_75), ImVec2(xOutL, botY - tok::space_0_75), arrowCol, tok::fx_frequency_shifter_visualizer_stroke_4);
+         dl->AddLine(ImVec2(xIn, topY + tok::space_0_75), ImVec2(xOutL, botY - tok::space_0_75), arrowCol, tok::fx_frequency_shifter_visualizer_line_stroke_sm);
          if (std::fabs(dxL) > 1.5f || std::fabs(topY - botY) > tok::fx_frequency_shifter_visualizer_limit)
          {
             const float arrowSz = tok::fx_arrow_sz;
@@ -949,9 +949,9 @@ namespace app
             const float xOutR = xIn + dxR;
             const ImU32 spreadCol = (shift + spread > 0.5f)
                ? (isLight ? tok::Base(tok::col::state_warn, 140) : tok::Base(tok::col::role_modulation, 120))
-               : ((shift + spread < -0.5f) ? (isLight ? tok::Base(tok::col::viz_pink_4, 140) : tok::Base(tok::col::viz_pink_5, 120))
-                                           : (isLight ? tok::Base(tok::col::edge_lo_3, 120) : tok::Base(tok::col::text_secondary, 100)));
-            dl->AddLine(ImVec2(xOutR, botY - tok::space_0_5), ImVec2(xOutR, botY + tok::space_1_5), spreadCol, tok::fx_frequency_shifter_visualizer_stroke_4);
+               : ((shift + spread < -0.5f) ? (isLight ? tok::Base(tok::col::viz_pink_dark, 140) : tok::Base(tok::col::viz_pink_light, 120))
+                                           : (isLight ? tok::Base(tok::col::edge_lo_pale, 120) : tok::Base(tok::col::text_secondary, 100)));
+            dl->AddLine(ImVec2(xOutR, botY - tok::space_0_5), ImVec2(xOutR, botY + tok::space_1_5), spreadCol, tok::fx_frequency_shifter_visualizer_line_stroke_sm);
          }
       }
 
@@ -974,7 +974,7 @@ namespace app
 
       const ImVec2 textSz = ImGui::CalcTextSize(valBuf);
       dl->AddText(ImVec2(br.x - textSz.x - tok::space_2_5, origin.y + tok::space_2),
-                  isLight ? tok::Base(tok::col::edge_lo, tok::fx_frequency_shifter_visualizer_edge_lo_alpha_2) : tok::Base(tok::col::edge_hi, tok::fx_frequency_shifter_visualizer_edge_hi_alpha_2), valBuf);
+                  isLight ? tok::Base(tok::col::edge_lo, tok::fx_frequency_shifter_visualizer_text_alpha) : tok::Base(tok::col::edge_hi, tok::fx_frequency_shifter_visualizer_text_alpha), valBuf);
 
       AudioViz::End(vizFrame);
 
@@ -1001,7 +1001,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFrequencyShifterVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_frequency_shifter_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          const int range = std::clamp((int)(n->Param("range") + 0.5f), 0, 1);
@@ -1023,7 +1023,7 @@ namespace app
       }
 
       {
-         AudioKnobRow row(tok::fx_frequency_shifter_body_audio_knob_row_layout, tok::fx_frequency_shifter_body_audio_knob_row_layout_2, tok::fx_frequency_shifter_body_audio_knob_row_layout_3, false);
+         AudioKnobRow row(tok::fx_frequency_shifter_body_audio_knob_row_layout, tok::fx_row_layout_lg, tok::fx_row_layout_sm, false);
          bool analogBool = analog;
          bool analogBoolUserChanged = false;
          if (row.Checkbox("analog##freqShiftAnalog", &analogBool, &analogBoolUserChanged))
@@ -1088,12 +1088,12 @@ namespace app
       }
       for (int i = 0; i < kNumPoints - 1; i++)
          dl->AddQuadFilled(envPts[i], envPts[i + 1], ImVec2(envPts[i + 1].x, br.y), ImVec2(envPts[i].x, br.y),
-                            isLight ? tok::Base(tok::col::accent, tok::fx_tremolo_visualizer_accent_alpha_3) : tok::Base(tok::col::accent_alt, tok::fx_tremolo_visualizer_accent_alt_alpha_4));
+                            isLight ? tok::Base(tok::col::accent, tok::fx_tremolo_visualizer_fill_alpha_sm) : tok::Base(tok::col::accent_alt, tok::fx_tremolo_visualizer_fill_alpha_lg));
 
       dl->PathClear();
       for (int i = 0; i < kNumPoints; i++)
          dl->PathLineTo(envPts[i]);
-      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_tremolo_visualizer_accent_alt_alpha_5), 0, tok::fx_tremolo_visualizer_stroke);
+      dl->PathStroke(isLight ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, tok::fx_tremolo_visualizer_path_alpha_lg), 0, tok::fx_tremolo_visualizer_stroke);
 
       if (stereoPhaseCycles > 0.0f)
       {
@@ -1104,7 +1104,7 @@ namespace app
             const float x = origin.x + (float)i / (float)(kNumPoints - 1) * w;
             dl->PathLineTo(ImVec2(x, envelopeY(phase)));
          }
-         dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::fx_tremolo_visualizer_accent_alpha_4) : tok::Base(tok::col::accent_alt, tok::fx_tremolo_visualizer_accent_alt_alpha_6), 0, tok::fx_tremolo_visualizer_stroke_2);
+         dl->PathStroke(isLight ? tok::Base(tok::col::accent, tok::fx_tremolo_visualizer_path_alpha_sm) : tok::Base(tok::col::accent_alt, tok::fx_tremolo_visualizer_path_alpha_sm), 0, tok::fx_tremolo_visualizer_path_stroke);
       }
 
       AudioViz::End(vizFrame);
@@ -1136,7 +1136,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawTremoloVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_tremolo_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          // Selector column left (shape v), knobs right (depth, stereo).
@@ -1207,8 +1207,8 @@ namespace app
          const float x = freqToX(formants[i]);
          const float peakY = br.y - tok::space_1_5 - weights[i] * (h - tok::fx_formant_filter_visualizer_gap);
          dl->AddLine(ImVec2(x, br.y - tok::space_1_5), ImVec2(x, peakY),
-                     isLight ? tok::Base(tok::col::accent, tok::fx_formant_filter_visualizer_accent_alpha_2) : tok::Base(tok::col::accent_alt, tok::fx_formant_filter_visualizer_accent_alt_alpha_2), tok::fx_formant_filter_visualizer_stroke_2);
-         dl->AddText(ImVec2(x - tok::fx_formant_filter_visualizer_gap_2, peakY - tok::space_3_5), ScopeTextCol(), kFormantLabels[i]);
+                     isLight ? tok::Base(tok::col::accent, tok::fx_formant_filter_visualizer_line_alpha_lg) : tok::Base(tok::col::accent_alt, tok::fx_formant_filter_visualizer_line_alpha_sm), tok::fx_formant_filter_visualizer_line_stroke);
+         dl->AddText(ImVec2(x - tok::fx_text_x, peakY - tok::space_3_5), ScopeTextCol(), kFormantLabels[i]);
       }
 
       AudioViz::End(vizFrame);
@@ -1234,7 +1234,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFormantFilterVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_formant_filter_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       AudioKnobRow row(tok::fx_formant_filter_body_audio_knob_row_layout);
       row.Knob("vowel", n->ParamPtr("vowel"), params::fx::vowel_lo, params::fx::vowel_hi, "%.2f", kKnobLarge);
@@ -1311,23 +1311,23 @@ namespace app
          const float freqRatio = std::min(rootFreq / f_i, 1.0f);
          const float decay_i = std::clamp(decay * powf(freqRatio, damp), 0.05f, decay);
          const float q_i = std::clamp(0.4547f * f_i * decay_i, 0.5f, 500.0f);
-         const float normH = std::clamp(log10f(q_i) / log10f(500.0f), tok::fx_resonator_bank_visualizer_bound, tok::fx_resonator_bank_visualizer_bound_2);
+         const float normH = std::clamp(log10f(q_i) / log10f(500.0f), tok::fx_norm_h_lo, tok::fx_norm_h_hi);
          const float peakY = br.y - tok::space_3_5 - normH * (h - tok::fx_resonator_bank_visualizer_gap);
          // Damped partials fade as well as shrink, so raising damp visibly
          // tilts the whole spectrum down and out to the right.
          const float alphaScale = std::clamp(decay_i / std::max(decay, 0.0001f), 0.25f, 1.0f);
 
-         const float pos = (numPoles > 1) ? ((float)i / (float)(numPoles - 1) - tok::fx_resonator_bank_visualizer_bias) * spread + tok::px_align : tok::fx_pos;
+         const float pos = (numPoles > 1) ? ((float)i / (float)(numPoles - 1) - tok::fx_resonator_bank_visualizer_inset) * spread + tok::px_align : tok::fx_pos;
          const ImU32 baseCol = (pos < tok::fx_resonator_bank_visualizer_limit)
-            ? (isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_2, 220))
-            : ((pos > tok::fx_resonator_bank_visualizer_limit_2)
+            ? (isLight ? tok::Base(tok::col::accent, 220) : tok::Base(tok::col::accent_pale_muted_warm, 220))
+            : ((pos > tok::fx_base_col_limit)
                ? (isLight ? tok::Base(tok::col::state_err, 220) : tok::Base(tok::col::state_warn, 220))
                : (isLight ? tok::Base(tok::col::viz_teal, 220) : tok::Base(tok::col::state_ok, 220)));
          const unsigned baseAlpha = (baseCol >> IM_COL32_A_SHIFT) & 0xFF;
          const ImU32 stemCol = (baseCol & ~IM_COL32_A_MASK) |
             (((unsigned)(baseAlpha * alphaScale)) << IM_COL32_A_SHIFT);
 
-         dl->AddLine(ImVec2(x, br.y - tok::space_3_5), ImVec2(x, peakY), stemCol, tok::fx_resonator_bank_visualizer_stroke_2);
+         dl->AddLine(ImVec2(x, br.y - tok::space_3_5), ImVec2(x, peakY), stemCol, tok::fx_resonator_bank_visualizer_line_stroke);
          dl->AddCircleFilled(ImVec2(x, peakY), tok::fx_resonator_bank_visualizer_r, stemCol);
       }
 
@@ -1365,7 +1365,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawResonatorBankVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_resonator_bank_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_resonator_bank_body_audio_knob_row_layout, kKnobLarge);
@@ -1390,7 +1390,7 @@ namespace app
       }
 
       {
-         AudioKnobRow row(tok::fx_resonator_bank_body_audio_knob_row_layout, tok::fx_resonator_bank_body_audio_knob_row_layout_2, tok::fx_resonator_bank_body_audio_knob_row_layout_3, false);
+         AudioKnobRow row(tok::fx_resonator_bank_body_audio_knob_row_layout, tok::fx_row_layout_lg, tok::fx_row_layout_sm, false);
          bool analogBool = analog;
          bool analogBoolUserChanged = false;
          if (row.Checkbox("analog##resonatorAnalog", &analogBool, &analogBoolUserChanged))
@@ -1431,11 +1431,11 @@ namespace app
       const float threshLinear = powf(10.0f, thresholdDb / 20.0f);
       const float threshY1 = midY - threshLinear * (h * tok::fx_cycle_shaper_visualizer_ratio);
       const float threshY2 = midY + threshLinear * (h * tok::fx_cycle_shaper_visualizer_ratio);
-      const ImU32 threshCol = isLight ? tok::Base(tok::col::state_err_8, 100) : tok::Base(tok::col::state_err_pressed, 100);
+      const ImU32 threshCol = isLight ? tok::Base(tok::col::state_err_muted, 100) : tok::Base(tok::col::state_err_pressed, 100);
       dl->AddLine(ImVec2(origin.x, threshY1), ImVec2(br.x, threshY1), threshCol, tok::fx_cycle_shaper_visualizer_stroke);
       dl->AddLine(ImVec2(origin.x, threshY2), ImVec2(br.x, threshY2), threshCol, tok::fx_cycle_shaper_visualizer_stroke);
 
-      const ImU32 waveCol = isLight ? tok::Base(tok::col::accent_6, 240) : tok::Base(tok::col::accent_2, 240);
+      const ImU32 waveCol = isLight ? tok::Base(tok::col::accent_light_muted_warm, 240) : tok::Base(tok::col::accent_pale_muted_warm, 240);
       const int kPlotPoints = 128;
       ImVec2 pts[kPlotPoints];
 
@@ -1452,15 +1452,15 @@ namespace app
             case 1: y = (s >= 0.0f ? 1.0f : -1.0f); break;
             case 2:
             default:
-               y = (tok::fx_cycle_shaper_visualizer_ratio_2 / (float)M_PI) * asinf(std::clamp(s, -1.0f, 1.0f));
+               y = (tok::fx_cycle_shaper_visualizer_scale_lg / (float)M_PI) * asinf(std::clamp(s, -1.0f, 1.0f));
                break;
          }
 
-         pts[i] = ImVec2(origin.x + t * w, midY - y * (h * tok::fx_cycle_shaper_visualizer_ratio_3));
+         pts[i] = ImVec2(origin.x + t * w, midY - y * (h * tok::fx_cycle_shaper_visualizer_scale_sm));
       }
 
       for (int i = 0; i < kPlotPoints - 1; i++)
-         dl->AddLine(pts[i], pts[i + 1], waveCol, tok::fx_cycle_shaper_visualizer_stroke_2);
+         dl->AddLine(pts[i], pts[i + 1], waveCol, tok::fx_cycle_shaper_visualizer_line_stroke);
 
       AudioViz::End(vizFrame);
 
@@ -1489,7 +1489,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawCycleShaperVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_cycle_shaper_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_cycle_shaper_body_audio_knob_row_layout);
@@ -1506,7 +1506,7 @@ namespace app
       }
 
       {
-         AudioKnobRow row(tok::fx_cycle_shaper_body_audio_knob_row_layout, tok::fx_cycle_shaper_body_audio_knob_row_layout_2, tok::fx_cycle_shaper_body_audio_knob_row_layout_3, false);
+         AudioKnobRow row(tok::fx_cycle_shaper_body_audio_knob_row_layout, tok::fx_row_layout_lg, tok::fx_row_layout_sm, false);
          bool analogBool = analog;
          bool analogBoolUserChanged = false;
          if (row.Checkbox("analog##cycleShaperAnalog", &analogBool, &analogBoolUserChanged))
@@ -1543,9 +1543,9 @@ namespace app
          return origin.x + std::clamp(norm, 0.0f, 1.0f) * w;
       };
 
-      dl->AddLine(ImVec2(hzToX(tok::fx_spec_blur_visualizer_hz_to_x_arg), origin.y), ImVec2(hzToX(tok::fx_spec_blur_visualizer_hz_to_x_arg), br.y), ScopeGridCol(), tok::fx_spec_blur_visualizer_stroke);
-      dl->AddLine(ImVec2(hzToX(tok::fx_spec_blur_visualizer_hz_to_x_arg_2), origin.y), ImVec2(hzToX(tok::fx_spec_blur_visualizer_hz_to_x_arg_2), br.y), ScopeGridCol(), tok::fx_spec_blur_visualizer_stroke);
-      dl->AddLine(ImVec2(hzToX(tok::fx_spec_blur_visualizer_hz_to_x_arg_3), origin.y), ImVec2(hzToX(tok::fx_spec_blur_visualizer_hz_to_x_arg_3), br.y), ScopeGridCol(), tok::fx_spec_blur_visualizer_stroke);
+      dl->AddLine(ImVec2(hzToX(tok::fx_hz_to_x_sm), origin.y), ImVec2(hzToX(tok::fx_hz_to_x_sm), br.y), ScopeGridCol(), tok::fx_spec_blur_visualizer_stroke);
+      dl->AddLine(ImVec2(hzToX(tok::fx_hz_to_x_md), origin.y), ImVec2(hzToX(tok::fx_hz_to_x_md), br.y), ScopeGridCol(), tok::fx_spec_blur_visualizer_stroke);
+      dl->AddLine(ImVec2(hzToX(tok::fx_hz_to_x_lg), origin.y), ImVec2(hzToX(tok::fx_hz_to_x_lg), br.y), ScopeGridCol(), tok::fx_spec_blur_visualizer_stroke);
 
       SpecBlurSpectrumState& st = sSpecBlurSpectrums[n];
       const int winSize = tok::fx_win_size;
@@ -1592,15 +1592,15 @@ namespace app
          const float mag = st.smoothed[bin];
          const float db = 20.0f * log10f(std::max(mag, 1e-4f));
          // Map -60 dB .. 0 dB to height
-         const float normY = std::clamp((db + tok::fx_spec_blur_visualizer_bias) / tok::fx_spec_blur_visualizer_ratio, 0.0f, 1.0f);
-         pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * tok::fx_spec_blur_visualizer_ratio_2) - tok::space_0_5);
+         const float normY = std::clamp((db + tok::fx_spec_blur_visualizer_norm_y) / tok::fx_spec_blur_visualizer_ratio, 0.0f, 1.0f);
+         pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * tok::fx_spec_blur_visualizer_scale) - tok::space_0_5);
          peak = std::max(peak, normY);
       }
       if (peak < 0.02f)
          AudioViz::IdleLabel(vizFrame);
 
       const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, 45) : tok::Base(tok::col::role_expression, 45);
-      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_2, 240);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_pale, 240);
 
       for (int i = 0; i < kPlotPoints - 1; i++)
       {
@@ -1610,8 +1610,8 @@ namespace app
             ImVec2(pts[i + 1].x, br.y),
             ImVec2(pts[i].x, br.y)
          };
-         dl->AddConvexPolyFilled(quad, tok::fx_spec_blur_visualizer_add_convex_poly_filled_draw, fillCol);
-         dl->AddLine(pts[i], pts[i + 1], lineCol, tok::fx_spec_blur_visualizer_stroke_2);
+         dl->AddConvexPolyFilled(quad, tok::fx_fill_num_points, fillCol);
+         dl->AddLine(pts[i], pts[i + 1], lineCol, tok::fx_spec_blur_visualizer_line_stroke);
       }
 
       AudioViz::End(vizFrame);
@@ -1643,7 +1643,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawSpecBlurVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spec_blur_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_spec_blur_body_audio_knob_row_layout, kKnobLarge);
@@ -1655,7 +1655,7 @@ namespace app
       }
 
       {
-         AudioKnobRow row(tok::fx_spec_blur_body_audio_knob_row_layout, tok::fx_spec_blur_body_audio_knob_row_layout_2, 0.0f, false);
+         AudioKnobRow row(tok::fx_spec_blur_body_audio_knob_row_layout, tok::fx_row_layout_lg, 0.0f, false);
          bool freezeBool = freeze;
          bool freezeBoolUserChanged = false;
          if (row.Checkbox("freeze##specBlurFreeze", &freezeBool, &freezeBoolUserChanged))
@@ -1728,8 +1728,8 @@ namespace app
             if (hz < loHz || hz > hiHz)
                continue;
             const float x = hzToX(hz);
-            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), tier == tok::fx_key_snap_visualizer_add_line_draw ? rootCol : (tier == 1 ? noteCol : offCol),
-                        tier == tok::fx_key_snap_visualizer_stroke ? tok::fx_key_snap_visualizer_stroke_2 : tok::fx_key_snap_visualizer_stroke_3);
+            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), tier == tok::fx_line_limit ? rootCol : (tier == 1 ? noteCol : offCol),
+                        tier == tok::fx_key_snap_visualizer_stroke ? tok::fx_key_snap_visualizer_line_stroke_lg : tok::fx_key_snap_visualizer_line_stroke_sm);
          }
       }
 
@@ -1770,15 +1770,15 @@ namespace app
          const float hz = powf(10.0f, logLo + frac * logSpan);
          const int bin = std::clamp((int)(hz * (float)winSize / (float)sr), 1, 511);
          const float db = 20.0f * log10f(std::max(st.smoothed[bin], 1e-4f));
-         const float normY = std::clamp((db + tok::fx_key_snap_visualizer_bias) / tok::fx_key_snap_visualizer_ratio, 0.0f, 1.0f);
-         pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * tok::fx_key_snap_visualizer_ratio_2) - tok::space_0_5);
+         const float normY = std::clamp((db + tok::fx_key_snap_visualizer_norm_y) / tok::fx_key_snap_visualizer_ratio, 0.0f, 1.0f);
+         pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * tok::fx_key_snap_visualizer_scale) - tok::space_0_5);
       }
       const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, 45) : tok::Base(tok::col::role_expression, 45);
-      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_2, 240);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_pale, 240);
       for (int i = 0; i < kPlotPoints - 1; i++)
       {
          ImVec2 quad[4] = { pts[i], pts[i + 1], ImVec2(pts[i + 1].x, br.y), ImVec2(pts[i].x, br.y) };
-         dl->AddConvexPolyFilled(quad, tok::fx_key_snap_visualizer_add_convex_poly_filled_draw, fillCol);
+         dl->AddConvexPolyFilled(quad, tok::fx_fill_num_points, fillCol);
          dl->AddLine(pts[i], pts[i + 1], lineCol, tok::fx_key_snap_visualizer_stroke);
       }
 
@@ -1806,7 +1806,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawKeySnapVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_key_snap_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_key_snap_body_audio_knob_row_layout, kKnobLarge);
@@ -1818,7 +1818,7 @@ namespace app
 
 
       {
-         AudioKnobRow row(tok::fx_key_snap_body_audio_knob_row_layout, tok::fx_key_snap_body_audio_knob_row_layout_2, 0.0f, false);
+         AudioKnobRow row(tok::fx_key_snap_body_audio_knob_row_layout, tok::fx_row_layout_lg, 0.0f, false);
          if (globalKey)
             ImGui::BeginDisabled();
          row.Dropdown("scale", MusicTime::ScaleTypeList(), (int)lroundf(n->Param("scale")),
@@ -1901,19 +1901,19 @@ namespace app
          const float hz = powf(10.0f, logLo + frac * logSpan);
          const int bin = std::clamp((int)(hz * (float)winSize / (float)sr), 1, 511);
          const float db = 20.0f * log10f(std::max(st.smoothed[bin], 1e-4f));
-         const float normY = std::clamp((db + tok::fx_spectrum_slide_visualizer_bias) / tok::fx_spectrum_slide_visualizer_ratio, 0.0f, 1.0f);
-         pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * tok::fx_spectrum_slide_visualizer_ratio_2) - tok::space_1_5);
+         const float normY = std::clamp((db + tok::fx_spectrum_slide_visualizer_norm_y) / tok::fx_spectrum_slide_visualizer_ratio, 0.0f, 1.0f);
+         pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * tok::fx_spectrum_slide_visualizer_scale) - tok::space_1_5);
          peak = std::max(peak, normY);
       }
       if (peak < 0.02f)
          AudioViz::IdleLabel(vizFrame);
       const ImU32 fillCol = isLight ? tok::Base(tok::col::role_expression, 45) : tok::Base(tok::col::role_expression, 45);
-      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_2, 240);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 240) : tok::Base(tok::col::role_expression_pale, 240);
       for (int i = 0; i < kPlotPoints - 1; i++)
       {
          ImVec2 quad[4] = { pts[i], pts[i + 1], ImVec2(pts[i + 1].x, br.y), ImVec2(pts[i].x, br.y) };
-         dl->AddConvexPolyFilled(quad, tok::fx_spectrum_slide_visualizer_add_convex_poly_filled_draw, fillCol);
-         dl->AddLine(pts[i], pts[i + 1], lineCol, tok::fx_spectrum_slide_visualizer_stroke_2);
+         dl->AddConvexPolyFilled(quad, tok::fx_fill_num_points, fillCol);
+         dl->AddLine(pts[i], pts[i + 1], lineCol, tok::fx_spectrum_slide_visualizer_line_stroke);
       }
 
       // A -> B track along the bottom edge with the slide position on it.
@@ -1944,7 +1944,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawSpectrumSlideVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spectrum_slide_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_spectrum_slide_body_audio_knob_row_layout, kKnobLarge);
@@ -1982,17 +1982,17 @@ namespace app
       const float decay = std::clamp(n->Param("decay"), 0.02f, 20.0f);
       const float damping = std::clamp(n->Param("damping"), 0.0f, 1.0f);
       const float tune = std::max(n->Param("tune"), 20.0f);
-      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 230) : tok::Base(tok::col::role_expression_2, 230);
+      const ImU32 lineCol = isLight ? tok::Base(tok::col::role_expression, 230) : tok::Base(tok::col::role_expression_pale, 230);
       for (int i = 0; i < count; i++)
       {
          // Line height = how long this mode rings relative to the longest.
          const float t60 = decay * powf(tune / freqs[i], damping * 1.5f);
          const float rel = std::clamp(log10f(t60 / 0.02f) / log10f(20.0f / 0.02f), 0.05f, 1.0f);
          const float x = origin.x + (log10f(freqs[i]) - logLo) / logSpan * w;
-         dl->AddLine(ImVec2(x, br.y - tok::space_1), ImVec2(x, br.y - tok::space_1 - rel * (h - tok::space_3_5)), lineCol, tok::fx_shape_resonator_visualizer_stroke_2);
+         dl->AddLine(ImVec2(x, br.y - tok::space_1), ImVec2(x, br.y - tok::space_1 - rel * (h - tok::space_3_5)), lineCol, tok::fx_shape_resonator_visualizer_line_stroke);
       }
       if (solving || count == 0)
-         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), isLight ? tok::Base(tok::col::edge_lo, tok::fx_shape_resonator_visualizer_edge_lo_alpha_2) : tok::Base(tok::col::ink_white, tok::fx_shape_resonator_visualizer_ink_white_alpha_2),
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), isLight ? tok::Base(tok::col::edge_lo, tok::fx_shape_resonator_visualizer_text_alpha_lg) : tok::Base(tok::col::ink_white, tok::fx_shape_resonator_visualizer_text_alpha_sm),
                      solving ? "solving shape..." : "no modes");
 
       AudioViz::End(vizFrame);
@@ -2021,7 +2021,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawShapeResonatorVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_shape_resonator_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       {
          AudioKnobRow row(tok::fx_shape_resonator_body_audio_knob_row_layout, kKnobLarge);
@@ -2080,12 +2080,12 @@ namespace app
          for (int i = 0; i < count; i++)
          {
             const float level = std::clamp(1.0f - env[i] / kFloorDb, 0.0f, 1.0f);
-            dl->PathLineTo(ImVec2(origin.x + ((float)i + tok::fx_convolution_space_visualizer_bias) / (float)count * w, br.y - tok::space_0_75 - level * (h - tok::space_1_5)));
+            dl->PathLineTo(ImVec2(origin.x + ((float)i + tok::fx_convolution_space_visualizer_inset) / (float)count * w, br.y - tok::space_0_75 - level * (h - tok::space_1_5)));
          }
-         dl->PathStroke(lineCol, 0, tok::fx_convolution_space_visualizer_stroke_2);
+         dl->PathStroke(lineCol, 0, tok::fx_convolution_space_visualizer_path_stroke);
       }
       if (building || count == 0)
-         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), isLight ? tok::Base(tok::col::edge_lo, tok::fx_convolution_space_visualizer_edge_lo_alpha_2) : tok::Base(tok::col::ink_white, tok::fx_convolution_space_visualizer_ink_white_alpha_2),
+         dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), isLight ? tok::Base(tok::col::edge_lo, tok::fx_convolution_space_visualizer_text_alpha_lg) : tok::Base(tok::col::ink_white, tok::fx_convolution_space_visualizer_text_alpha_sm),
                      "building space...");
 
       AudioViz::End(vizFrame);
@@ -2122,7 +2122,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawConvolutionSpaceVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_convolution_reverb_body_dummy_h));
+      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
 
       // A loaded file is used as it is: the design controls stay in place, greyed.
       const bool designOff = hasFile && !(fileError && !fileError->empty());

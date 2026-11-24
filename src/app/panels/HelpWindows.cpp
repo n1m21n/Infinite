@@ -967,7 +967,7 @@ namespace app
             if (ListRow::BeginTable(tableId, tok::help_windows_shortcuts_table_body_begin_table_layout, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
             {
                ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, tok::help_windows_shortcuts_table_body_col_w);
-               ImGui::TableSetupColumn(T("Shortcut"), ImGuiTableColumnFlags_WidthFixed, tok::help_windows_shortcuts_table_body_col_w_2);
+               ImGui::TableSetupColumn(T("Shortcut"), ImGuiTableColumnFlags_WidthFixed, tok::help_windows_column_col_w);
                // Explicit weight: with SizingStretchProp and no weight, a hidden first frame gave the column a NaN weight
                // (0/0), which reached the window content size (UBSan float-to-int, NAVTEST).
                ImGui::TableSetupColumn(T("Description"), ImGuiTableColumnFlags_WidthStretch, 1.0f);

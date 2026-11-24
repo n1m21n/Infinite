@@ -44,7 +44,7 @@ namespace
          const float sx = l ? -1.0f : 1.0f, sy = u ? -1.0f : 1.0f;
          dl->PathLineTo(ImVec2(ax, ay));
          dl->PathLineTo(ImVec2(cx + sx * radius, cy));
-         dl->PathBezierQuadraticCurveTo(ImVec2(cx, cy), ImVec2(cx, cy + sy * radius), tok::terminal_draw_box_path_bezier_quadratic_curve_to_draw);
+         dl->PathBezierQuadraticCurveTo(ImVec2(cx, cy), ImVec2(cx, cy + sy * radius), tok::terminal_draw_box_corner_segments);
          dl->PathLineTo(ImVec2(bx, by));
          dl->PathStroke(c, 0, light);
          return;
@@ -129,7 +129,7 @@ namespace
       for (int i = 0; i < 8; ++i)
          if (bits & (1 << i))
          {
-            const float cx = x + w * (kCol[i] == 0 ? tok::terminal_draw_braille_assign : tok::terminal_draw_braille_assign_2), cy = y + h * (tok::terminal_draw_braille_bias + tok::terminal_draw_braille_ratio_2 * (float)kRow[i]);
+            const float cx = x + w * (kCol[i] == 0 ? tok::terminal_draw_braille_dot_col_left : tok::terminal_draw_braille_dot_col_right), cy = y + h * (tok::terminal_draw_braille_dot_row_first + tok::terminal_draw_braille_dot_row_step * (float)kRow[i]);
             Rect(dl, Snap(cx - dot * 0.5f), Snap(cy - dot * 0.5f), Snap(cx - dot * 0.5f) + dot, Snap(cy - dot * 0.5f) + dot, c);
          }
    }

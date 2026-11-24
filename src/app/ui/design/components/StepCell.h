@@ -29,7 +29,7 @@ namespace StepCell
                            r);
       const ImU32 edge = playhead ? (light ? tok::Base(tok::col::state_warn, 240) : tok::Base(tok::col::role_modulation, 230))
                                   : (hovered ? (light ? tok::Base(tok::col::accent) : tok::Base(tok::col::accent_alt, 200))
-                                             : (light ? tok::Base(tok::col::edge_mid_2) : tok::Base(tok::col::edge_lo_2)));
+                                             : (light ? tok::Base(tok::col::edge_mid_light_fixed) : tok::Base(tok::col::edge_lo_light)));
       dl->AddRect(mn, mx, edge, r, 0, playhead ? 2.0f : 1.0f);
    }
 }

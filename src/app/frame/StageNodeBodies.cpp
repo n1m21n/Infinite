@@ -115,14 +115,14 @@ void DrawNodeBodies(FrameCtx& fc)
          // position later in the frame when the context is gone.
          {
             const ImVec2 live = ed::GetNodePosition(gn.NodeId());
-            if (std::isfinite(live.x) && std::abs(live.x) <= tok::stage_node_bodies_limit && live.x > -tok::stage_node_bodies_if_arith)
+            if (std::isfinite(live.x) && std::abs(live.x) <= tok::stage_node_bodies_limit && live.x > -tok::stage_node_inset)
                gn.liveX = live.x;
-            else if (!std::isfinite(gn.liveX) || std::abs(gn.liveX) > tok::stage_node_bodies_limit || gn.liveX <= -tok::stage_node_bodies_if_arith)
+            else if (!std::isfinite(gn.liveX) || std::abs(gn.liveX) > tok::stage_node_bodies_limit || gn.liveX <= -tok::stage_node_inset)
                gn.liveX = gn.spawnX;
 
-            if (std::isfinite(live.y) && std::abs(live.y) <= tok::stage_node_bodies_limit && live.y > -tok::stage_node_bodies_if_arith)
+            if (std::isfinite(live.y) && std::abs(live.y) <= tok::stage_node_bodies_limit && live.y > -tok::stage_node_inset)
                gn.liveY = live.y;
-            else if (!std::isfinite(gn.liveY) || std::abs(gn.liveY) > tok::stage_node_bodies_limit || gn.liveY <= -tok::stage_node_bodies_if_arith)
+            else if (!std::isfinite(gn.liveY) || std::abs(gn.liveY) > tok::stage_node_bodies_limit || gn.liveY <= -tok::stage_node_inset)
                gn.liveY = gn.spawnY;
          }
 
@@ -204,19 +204,19 @@ void DrawNodeBodies(FrameCtx& fc)
                                        nodeAlpha));
             if (hasCookWarning)
             {
-               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(tok::V4(tok::stage_node_bodies_col_4)));
+               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(tok::V4(tok::stage_node_border_shade_sm)));
                ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, tok::node_border_w_cook_warning);
             }
             else if (hasLiveIssue)
             {
-               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(tok::V4(tok::stage_node_bodies_col_5)));
+               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(tok::V4(tok::stage_node_border_shade_lg)));
                ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, tok::node_border_w_live_issue);
             }
             else
             {
                // Hairline: the category tint fill carries identity; selection (the editor's own colour) is the loud state.
                ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                                  ImColor(catColor.r, catColor.g, catColor.b, isLight ? tok::stage_node_bodies_im_color_alpha_3 : tok::stage_node_bodies_im_color_alpha_4));
+                                  ImColor(catColor.r, catColor.g, catColor.b, isLight ? tok::stage_node_border_alpha_lg : tok::stage_node_border_alpha_sm));
                ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, tok::node_border_w_hairline);
             }
          }
@@ -254,7 +254,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   snprintf(label, sizeof(label), "%d", slot + 1);
 
                const float pinW = kPinHit + tok::space_1 + ImGui::CalcTextSize(label).x;
-               const float pinX = topRowPos.x + ((float)slot + tok::stage_node_bodies_bias) * cellW - pinW * 0.5f;
+               const float pinX = topRowPos.x + ((float)slot + tok::stage_node_pin_x) * cellW - pinW * 0.5f;
                ImGui::SetCursorPos(ImVec2(pinX, topRowPos.y));
                DrawPin(gn.InputPinId(slot), ed::PinKind::Input, label);
             }
@@ -262,13 +262,13 @@ void DrawNodeBodies(FrameCtx& fc)
          }
          else
          {
-            const float pinSpacing = (inputs > tok::stage_node_bodies_limit_2) ? tok::space_2 : tok::space_3;
+            const float pinSpacing = (inputs > tok::stage_node_pin_spacing_limit) ? tok::space_2 : tok::space_3;
             // A long pin header (Render 3D: 9 pins, Material: 9) would otherwise set the node's width and leave an
             // empty strip beside the params columns. Wrap it into rows no wider than two param columns.
             // Shadertoy's four iChannel pins show as ch0..ch3 in a 2x2 block: the full names in one row were wider than
             // the whole param column and stretched every slider and dropdown below to match.
             const bool channelPins = dynamic_cast<FormulaNode*>(gn.node.get()) != nullptr && gn.node->InputLabel(0) != nullptr;
-            const float wrapW = channelPins ? tok::stage_node_wrap_w_ratio * (kPinHit + tok::stage_node_bodies_bias_2 + tok::stage_node_bodies_bias_3) + tok::space_3 : kParamWidth * tok::stage_node_wrap_w_ratio + tok::space_4 + tok::stage_node_wrap_w_gap;
+            const float wrapW = channelPins ? tok::stage_node_wrap_w_ratio * (kPinHit + tok::stage_node_wrap_w_sm + tok::stage_node_wrap_w_lg) + tok::space_3 : kParamWidth * tok::stage_node_wrap_w_ratio + tok::space_4 + tok::stage_node_wrap_w_gap;
             float rowUsed = 0.0f;
             for (int slot = 0; slot < inputs; slot++)
             {
@@ -306,7 +306,7 @@ void DrawNodeBodies(FrameCtx& fc)
             bool* globalScalePtr = GetNodeGlobalScaleFlag(gn.node.get());
             if (CanRestart(gn.node.get()))
             {
-               ImGui::SetCursorPos(ImVec2(topRowPos.x + expectedW - (globalScalePtr != nullptr ? tok::stage_node_bodies_assign : tok::stage_node_bodies_assign_2), topRowPos.y));
+               ImGui::SetCursorPos(ImVec2(topRowPos.x + expectedW - (globalScalePtr != nullptr ? tok::stage_node_value_lg : tok::stage_node_value_sm), topRowPos.y));
                RestartToggle(gn.node.get());
             }
             if (globalScalePtr != nullptr)
@@ -319,14 +319,14 @@ void DrawNodeBodies(FrameCtx& fc)
                }
             }
 
-            ImGui::SetCursorPos(ImVec2(topRowPos.x + expectedW - tok::stage_node_bodies_gap_2, topRowPos.y));
+            ImGui::SetCursorPos(ImVec2(topRowPos.x + expectedW - tok::stage_node_x, topRowPos.y));
             if (CanBypass(gn) && BypassToggle(gn.node->bypassed))
             {
                PushUndoCheckpoint();
                gn.node->bypassed = !gn.node->bypassed;
                RebuildAudioTopology();
             }
-            maxInputY = std::max(maxInputY, topRowPos.y + tok::stage_node_bodies_gap_3);
+            maxInputY = std::max(maxInputY, topRowPos.y + tok::stage_node_max_input_y_min);
          }
 
          if (isComment)
@@ -356,8 +356,8 @@ void DrawNodeBodies(FrameCtx& fc)
             }
             // One header row: title, instance number, then the category dimmed to its right.
             const ImVec4 catText = isLight
-               ? ImVec4(catColor.r * tok::stage_node_bodies_scale_3, catColor.g * tok::stage_node_bodies_scale_3, catColor.b * tok::stage_node_bodies_scale_3, 1.0f)
-               : ImVec4(catColor.r * tok::stage_node_bodies_scale_4 + tok::stage_node_bodies_offset_2, catColor.g * tok::stage_node_bodies_scale_4 + tok::stage_node_bodies_offset_2, catColor.b * tok::stage_node_bodies_scale_4 + tok::stage_node_bodies_offset_2, tok::stage_node_bodies_alpha_2);
+               ? ImVec4(catColor.r * tok::stage_node_cat_text_y_lg, catColor.g * tok::stage_node_cat_text_y_lg, catColor.b * tok::stage_node_cat_text_y_lg, 1.0f)
+               : ImVec4(catColor.r * tok::stage_node_cat_text_y_md + tok::stage_node_cat_text_y_sm, catColor.g * tok::stage_node_cat_text_y_md + tok::stage_node_cat_text_y_sm, catColor.b * tok::stage_node_cat_text_y_md + tok::stage_node_cat_text_y_sm, tok::stage_node_cat_text_y_lg);
             NodeHeader::Category(gn.category.c_str(), catText);
             if (const NodeIssue issue = gn.node->Issue())
             {
@@ -394,7 +394,7 @@ void DrawNodeBodies(FrameCtx& fc)
              dynamic_cast<MacroToggleNode*>(gn.node.get()) || dynamic_cast<MacroTriggerNode*>(gn.node.get()) ||
              dynamic_cast<MacroNumBoxNode*>(gn.node.get()) || dynamic_cast<MacroRadioSelectorNode*>(gn.node.get()) ||
              dynamic_cast<MacroStepGateNode*>(gn.node.get()))
-            ImGui::Dummy(ImVec2(0.0f, tok::stage_node_bodies_dummy_h));
+            ImGui::Dummy(ImVec2(0.0f, tok::stage_node_spacer_h_xl));
          if (multiOutModulator || externalSender)
             ; // these draw their own meters / status in the params panel
          else if (auto* macroKnob = dynamic_cast<MacroKnobNode*>(gn.node.get()))
@@ -570,11 +570,11 @@ void DrawNodeBodies(FrameCtx& fc)
             dl->AddText(ImVec2(origin.x + tok::space_3, origin.y + tok::space_2_5),
                         isLight ? tok::Base(tok::col::surface_lo) : tok::Base(tok::col::surface_hi),
                         NodeTitleWithInstance(gn).c_str());
-            dl->AddText(ImVec2(origin.x + tok::space_3, origin.y + tok::stage_node_bodies_gap_4),
-                        isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid), line);
+            dl->AddText(ImVec2(origin.x + tok::space_3, origin.y + tok::stage_node_text_y_sm),
+                        isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::edge_mid), line);
             // R11: scene nodes (camera / light / particles) get a small gizmo on the right instead of an empty box.
-            const ImU32 gz = isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid);
-            const ImVec2 gc(br.x - tok::stage_node_bodies_gap_5, origin.y + h * 0.5f);
+            const ImU32 gz = isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::edge_mid);
+            const ImVec2 gc(br.x - tok::stage_node_gc_inset, origin.y + h * 0.5f);
             if (dynamic_cast<CameraNode*>(gn.node.get()) != nullptr)
             {
                glyph::Draw(dl, gc, tok::icon_gizmo, gz, IconsInfinite::ViewCamera);
@@ -596,9 +596,9 @@ void DrawNodeBodies(FrameCtx& fc)
             // an empty preview box.
             auto* geo = static_cast<GeometryNode*>(gn.node.get());
             ImVec2 origin = ImGui::GetCursorScreenPos();
-            ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize * tok::stage_node_bodies_ratio_2));
+            ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize * tok::stage_node_spacer_h_xs));
             ImDrawList* dl = ImGui::GetWindowDrawList();
-            ImVec2 br(origin.x + kPreviewSize, origin.y + kPreviewSize * tok::stage_node_bodies_ratio_2);
+            ImVec2 br(origin.x + kPreviewSize, origin.y + kPreviewSize * tok::stage_node_spacer_h_xs);
             AudioViz::Fill(dl, origin, br);
             AudioViz::Border(dl, origin, br);
             const std::string& name = GeometryNode::ShapeNames()[
@@ -607,10 +607,10 @@ void DrawNodeBodies(FrameCtx& fc)
                         isLight ? tok::Base(tok::col::surface_lo) : tok::Base(tok::col::surface_hi), name.c_str());
             char tris[48];
             snprintf(tris, sizeof(tris), "%s triangles", UiFmt::Count((long long)(geo->TriangleCount())).c);
-            dl->AddText(ImVec2(origin.x + tok::space_3, origin.y + tok::stage_node_bodies_gap_6),
-                        isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid), tris);
-            dl->AddText(ImVec2(origin.x + tok::space_3, origin.y + tok::stage_node_bodies_gap_7),
-                        isLight ? tok::Base(tok::col::edge_lo_3) : tok::Base(tok::col::edge_mid), T("geometry -> Render 3D"));
+            dl->AddText(ImVec2(origin.x + tok::space_3, origin.y + tok::stage_node_text_y_md),
+                        isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::edge_mid), tris);
+            dl->AddText(ImVec2(origin.x + tok::space_3, origin.y + tok::stage_node_text_y_lg),
+                        isLight ? tok::Base(tok::col::edge_lo_pale) : tok::Base(tok::col::edge_mid), T("geometry -> Render 3D"));
          }
          else if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
             DrawPaintablePreview(draw);
@@ -747,7 +747,7 @@ void DrawNodeBodies(FrameCtx& fc)
          const bool bypassOnOutputRow = isMacroNode && !isComment && CanBypass(gn) && !gn.hasModulatedParams &&
                                         !gn.hasPaletteColors;
          if (bypassOnOutputRow)
-            ImGui::Dummy(ImVec2(0.0f, tok::stage_node_bodies_dummy_h_2));   // the gap the toggle row gave; also ends the body on an item, not a SetCursorPos
+            ImGui::Dummy(ImVec2(0.0f, tok::stage_node_spacer_h_md));   // the gap the toggle row gave; also ends the body on an item, not a SetCursorPos
          if (!isAudioBody && !isComment && !bypassOnOutputRow)
          {
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + tok::space_1);
@@ -804,9 +804,9 @@ void DrawNodeBodies(FrameCtx& fc)
                const ImVec2 tagSz(txtSz.x + tok::space_2, txtSz.y + tok::space_0_5);
                ImDrawList* dl = ImGui::GetWindowDrawList();
                dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
-                                 isLight ? tok::Base(tok::col::surface_hi_4, tok::stage_node_bodies_surface_hi_4_alpha_2) : tok::Base(tok::col::surface_lo_4, tok::stage_node_bodies_surface_lo_4_alpha_2), tok::stage_node_bodies_radius);
+                                 isLight ? tok::Base(tok::col::surface_hi_light, tok::stage_node_fill_alpha_lg) : tok::Base(tok::col::surface_lo_light_cool_fixed, tok::stage_node_fill_alpha_sm), tok::stage_node_bodies_radius);
                dl->AddText(ImVec2(p.x + tok::space_1, p.y + 1.0f),
-                           isLight ? tok::Base(tok::col::text_warn_2) : tok::Base(tok::col::role_modulation), tagText);
+                           isLight ? tok::Base(tok::col::text_warn_deep_fixed) : tok::Base(tok::col::role_modulation), tagText);
                ImGui::Dummy(tagSz);
                modTagMin = p;
                modTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
@@ -820,9 +820,9 @@ void DrawNodeBodies(FrameCtx& fc)
                const ImVec2 tagSz(txtSz.x + tok::space_2, txtSz.y + tok::space_0_5);
                ImDrawList* dl = ImGui::GetWindowDrawList();
                dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
-                                 isLight ? tok::Base(tok::col::accent_alt_6, tok::stage_node_bodies_accent_alt_6_alpha_2) : tok::Base(tok::col::surface_lo_5, tok::stage_node_bodies_surface_lo_5_alpha_2), tok::stage_node_bodies_radius);
+                                 isLight ? tok::Base(tok::col::accent_alt_light_warm_fixed, tok::stage_node_fill_alpha_lg) : tok::Base(tok::col::surface_lo_light_warm_fixed, tok::stage_node_fill_alpha_sm), tok::stage_node_bodies_radius);
                dl->AddText(ImVec2(p.x + tok::space_1, p.y + 1.0f),
-                           isLight ? tok::Base(tok::col::state_ok_8) : tok::Base(tok::col::viz_teal_8), tagText);
+                           isLight ? tok::Base(tok::col::state_ok_deep_lo) : tok::Base(tok::col::viz_teal_light_muted), tagText);
                ImGui::Dummy(tagSz);
                palTagMin = p;
                palTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
@@ -1256,7 +1256,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   if (ActionButton::Draw(L("Export Image"), ImVec2(kPreviewSize, 0)))
                      ExportImage(n, n->exportImagePath, std::clamp(n->jpegQuality, 1, 100));
 
-                  ImGui::Dummy(ImVec2(0, tok::stage_node_bodies_dummy_h_2));
+                  ImGui::Dummy(ImVec2(0, tok::stage_node_spacer_h_md));
 
                   char vidBuf[512];
                   snprintf(vidBuf, sizeof(vidBuf), "%s", n->recordVideoPath.c_str());
@@ -1371,7 +1371,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   {
                      if (ActionButton::Draw(L("Stop recording"), ImVec2(kPreviewSize, 0), ActionButton::Kind::Record))
                         n->RequestStopRecording();
-                     ImGui::TextColored(tok::V4(tok::stage_node_bodies_col_6), T("REC  %d frames"), n->RecordedFrames());
+                     ImGui::TextColored(tok::V4(tok::stage_node_shade), T("REC  %d frames"), n->RecordedFrames());
                      const int pending = n->PendingFrames();
                      const int dropped = n->DroppedFrames();
                      if (pending > 0)
@@ -1402,7 +1402,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   // Inside a DAW the DAW bounces: no offline take.
                   if (!Platform::PluginModeActive())
                   {
-                     ImGui::Dummy(ImVec2(0, tok::stage_node_bodies_dummy_h_3));
+                     ImGui::Dummy(ImVec2(0, tok::stage_node_spacer_h_lg));
                      NodeSeparator();
                      ImGui::TextDisabled("%s", T("Offline Render"));
 
@@ -1443,7 +1443,7 @@ void DrawNodeBodies(FrameCtx& fc)
                      {
                         ImGui::PushID(preset);
                         const bool selected = n->offlineDurationSeconds == preset;
-                        if (ActionButton::Draw((std::to_string(preset) + "s").c_str(), ImVec2(kParamWidth * tok::stage_node_bodies_ratio_3, 0),
+                        if (ActionButton::Draw((std::to_string(preset) + "s").c_str(), ImVec2(kParamWidth * tok::stage_node_s_x, 0),
                                                selected ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
                            n->offlineDurationSeconds = preset;
                         ImGui::PopID();
@@ -1528,7 +1528,7 @@ void DrawNodeBodies(FrameCtx& fc)
             for (int o = 0; o < outputs; o++)
             {
                pinW[o] = kPinHit + tok::space_1 + ImGui::CalcTextSize(gn.node->OutputLabel(o)).x;
-               itemW += pinW[o] + (o ? tok::stage_node_bodies_assign_3 : 0.0f);
+               itemW += pinW[o] + (o ? tok::stage_node_w_lg : 0.0f);
             }
             if (itemW <= contentW)
             {
@@ -1538,9 +1538,9 @@ void DrawNodeBodies(FrameCtx& fc)
                   // Bypass at the row's left edge, level with the output pin; the pad shrinks by its footprint.
                   drawBypassToggle();
                   ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y));   // beside the toggle; the pad Dummy follows
-                  pad = std::max(0.0f, pad - tok::stage_node_bodies_gap_2);
+                  pad = std::max(0.0f, pad - tok::stage_node_x);
                }
-               ImGui::Dummy(ImVec2(pad, tok::stage_node_bodies_dummy_h_4));
+               ImGui::Dummy(ImVec2(pad, tok::stage_node_spacer_h_sm));
                for (int o = 0; o < outputs; o++)
                {
                   ImGui::SameLine(0.0f, o == 0 ? 0.0f : tok::space_2_5);
@@ -1567,7 +1567,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawPin(gn.OutputPinId(o), ed::PinKind::Output, gn.node->OutputLabel(o), true);
                }
                ImGui::SetCursorScreenPos(ImVec2(gridOrigin.x, gridOrigin.y + (float)((outputs + cols - 1) / cols) * rowH));
-               ImGui::Dummy(ImVec2(contentW, tok::stage_node_bodies_dummy_h_4));
+               ImGui::Dummy(ImVec2(contentW, tok::stage_node_spacer_h_sm));
             }
          }
 
