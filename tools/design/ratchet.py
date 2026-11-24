@@ -255,6 +255,25 @@ def main():
                 rawend.append(f"{f.relative_to(ROOT)}:{i}")
     for x in rawend: print(f"RATCHET: {x} calls ImGui::EndChild(): use EndChildSafe()")
     print(f"ratchet: raw EndChild {len(rawend)} (allowed 0)")
+    # Drawing to GetWindowDrawList() directly inside ed::Suspend() collides with imgui-node-editor's splitter
+    # (Minimap bug 2026-11-24): must open PanelFrame::BeginOverlay / ImGui::Begin first. Always 0.
+    bad_susp = []
+    for f in sorted((ROOT / "src/app").rglob("*.[ch]*")):
+        in_susp = has_win = False
+        for i, line in enumerate(f.read_text(errors="ignore").splitlines(), 1):
+            s = line.split("//", 1)[0]
+            if "ed::Suspend(" in s:
+                in_susp, has_win = True, False
+            elif in_susp:
+                if "ed::Resume(" in s:
+                    in_susp = has_win = False
+                else:
+                    if "ImGui::Begin(" in s or "PanelFrame::BeginOverlay(" in s or "BeginPopup(" in s:
+                        has_win = True
+                    if "GetWindowDrawList()" in s and not has_win:
+                        bad_susp.append(f"{f.relative_to(ROOT)}:{i}")
+    for x in bad_susp: print(f"RATCHET: {x} calls GetWindowDrawList() inside ed::Suspend() without BeginOverlay/Begin")
+    print(f"ratchet: raw Suspend GetWindowDrawList {len(bad_susp)} (allowed 0)")
     # Token names say the job (owner 2026-11-24): no _arg_N / _draw_x / _ratio_N / trailing-number names: always 0.
     rn = subprocess.run([sys.executable, str(ROOT / "tools/design/token_names.py"), "--lint"])
     ra = subprocess.run(audit)   # per-category counts from the tokenizer scan (tools/design/ui_audit.py)
@@ -266,7 +285,7 @@ def main():
     rc = subprocess.run([sys.executable, str(ROOT / "tools/design/content_report.py"), "--check"])
     print(f"ratchet: content regions {sum(cur_cr.values())} (stored {sum(old_cr.values())})")
     if badc or rc.returncode: badl.append("content")
-    return 1 if bad or badw or badz or badf or badr or badp or badl or rawend or r.returncode or ra.returncode or rn.returncode else 0
+    return 1 if bad or badw or badz or badf or badr or badp or badl or rawend or bad_susp or r.returncode or ra.returncode or rn.returncode else 0
 
 if __name__ == "__main__":
     sys.exit(main())

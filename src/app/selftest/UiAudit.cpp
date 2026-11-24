@@ -570,6 +570,9 @@ namespace
                                          nb->box.Min.y - r.bb.Min.y, r.bb.Max.y - nb->box.Max.y });
             if (out > 0.5f)
                Add("text overflow", state, r, "%.0f px past the node edge", out);
+            // Single-column Shade nodes must never stretch sliders past kParamWidthBase (2026-11-24 pin-wrap guard).
+            if (sn != nullptr && scope.rfind("Shade ", 0) == 0 && r.bb.GetWidth() > kParamWidthBase + 2.0f)
+               Add("slider too wide", state, r, "slider %.0f px > %.0f", r.bb.GetWidth(), kParamWidthBase);
          }
 
          // P1: a control in an AudioKnobRow stays inside its cell.

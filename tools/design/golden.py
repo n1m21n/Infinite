@@ -48,6 +48,14 @@ PAGES = {
     "drums": (lambda mode: {"INFINITE_NODEGALLERY": "*|Drum Sequencer", "INFINITE_GALLERYGRID": "3,520,760",
                             "INFINITE_GALLERYSTOP": "1",
                             "INFINITE_OPENPANELS": mode + ",drums", "INFINITE_SCREENSHOT_FRAME": "40"}, "canvas"),
+    # Shader nodes (single-column width guard) + Minimap overlay guard.
+    "shaders": (lambda mode: {"INFINITE_NODEGALLERY": "*|Shade Brick,Shade Mix,Shade Map Range,Shade Vector Math,Shade Noise,Shade Ramp",
+                              "INFINITE_GALLERYGRID": "3,520,760", "INFINITE_GALLERYPARAMS": "1",
+                              "INFINITE_OPENPANELS": mode + ",minimap", "INFINITE_SCREENSHOT_FRAME": "40"}, "canvas"),
+    "view3d": (lambda mode: {"INFINITE_NODEGALLERY": "*|Cube", "INFINITE_GALLERYGRID": "3,520,760",
+                             "INFINITE_OPENPANELS": mode + ",view3d", "INFINITE_SCREENSHOT_FRAME": "40"}, "canvas"),
+    "curve": (lambda mode: {"INFINITE_OPENPANELS": mode + ",curveeditor", "INFINITE_SCREENSHOT_FRAME": "40"}, "canvas"),
+    "arrange": (lambda mode: {"INFINITE_OPENPANELS": mode + ",arrange", "INFINITE_SCREENSHOT_FRAME": "40"}, "canvas"),
 }
 # The gallery fixture starts the transport; INFINITE_GALLERYSTOP holds it stopped on the Drums page so the Drum
 # Sequencer's playhead column can't land on a different step run to run.
