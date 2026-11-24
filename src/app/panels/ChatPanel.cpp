@@ -303,8 +303,8 @@ namespace app
          std::mt19937_64 g(((uint64_t)rd() << 32) ^ rd());
          char buf[40];
          const uint64_t a = g(), b = g();
-         std::snprintf(buf, sizeof buf, "%08x-%04x-4%03x-%04x-%012llx", (unsigned)(a >> 32), (unsigned)(a >> 16) & 0xFFFF, (unsigned)a & 0xFFF,
-                       (unsigned)((b >> 48) & 0x3FFF) | 0x8000, (unsigned long long)(b & 0xFFFFFFFFFFFFull));
+         std::snprintf(buf, sizeof buf, "%s-%s-4%s-%s-%s", UiFmt::Hex8((unsigned)(a >> 32)).c, UiFmt::Hex4((unsigned)(a >> 16) & 0xFFFF).c, UiFmt::Hex3((unsigned)a & 0xFFF).c,
+                       UiFmt::Hex4((unsigned)((b >> 48) & 0x3FFF) | 0x8000).c, UiFmt::Hex12((unsigned long long)(b & 0xFFFFFFFFFFFFull)).c);
          return buf;
       }
 
@@ -1862,7 +1862,7 @@ namespace app
          if (integer)
             std::snprintf(buf, sizeof buf, "%d", (int)std::lround(v));
          else
-            std::snprintf(buf, sizeof buf, "%.4g", v);
+            std::snprintf(buf, sizeof buf, "%s", UiFmt::G4(v).c);
          return buf;
       }
 
@@ -2630,7 +2630,7 @@ namespace app
          if (look.seconds > 0.0f)
          {
             const int s = (int)std::lround(look.seconds);
-            std::snprintf(dur, sizeof dur, "%d:%02d", s / 60, s % 60);
+            std::snprintf(dur, sizeof dur, "%d:%s", s / 60, UiFmt::Pad2(s % 60).c);
          }
          const float durW = dur[0] ? ImGui::CalcTextSize(dur).x : 0.0f;
          const float x1 = samplerX - tok::space_2 - (durW > 0.0f ? durW + tok::space_3 : 0.0f);
@@ -2945,7 +2945,7 @@ namespace app
          // Length (or where it is, while it plays) in a pill at the bottom right.
          const int secs = (int)std::lround(playing ? std::fmod(ImGui::GetTime() - v->started, std::max(0.001, v->seconds)) : v->seconds);
          char dur[32];
-         std::snprintf(dur, sizeof dur, "%d:%02d", secs / 60, secs % 60);
+         std::snprintf(dur, sizeof dur, "%d:%s", secs / 60, UiFmt::Pad2(secs % 60).c);
          const ImVec2 ds = ImGui::CalcTextSize(dur);
          const ImVec2 d1(end.x - tok::space_2, end.y - tok::space_2), d0(d1.x - ds.x - 2.0f * tok::space_1 - 2.0f, d1.y - ds.y - 4.0f);
          dl->AddRectFilled(d0, d1, shade, (d1.y - d0.y) * 0.5f);

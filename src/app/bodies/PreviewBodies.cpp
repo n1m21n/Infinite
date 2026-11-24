@@ -583,7 +583,7 @@ namespace app
       {
          ImGui::TextDisabled("%zu marks over %s", n->RecordedStamps(), UiFmt::Beats(n->RecordedLength()).c);
          if (n->IsPlayingBack())
-            ImGui::TextColored(tok::RoleV4(tok::col::state_ok), "playhead %.1f", n->PlayheadBeats());
+            ImGui::TextColored(tok::RoleV4(tok::col::state_ok), "playhead %s", UiFmt::F1(n->PlayheadBeats()).c);
          if (n->RecordingCapped())
          {
             PushTextWrapWidth(kPreviewSize);

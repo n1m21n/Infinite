@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/frame/FrameCtx.h"
@@ -465,8 +466,8 @@ void DrawFramePump(FrameCtx& fc)
          {
             sNextMemLogS = nowS + 300.0;
             char line[160];
-            snprintf(line, sizeof(line), "[mem] %.0f min: footprint %.0f MB, resident %.0f MB, %zu nodes",
-                     nowS / 60.0, Platform::ProcessFootprintMb(), Platform::ProcessRssMb(), gNodes.size());
+            snprintf(line, sizeof(line), "[mem] %s min: footprint %s MB, resident %s MB, %zu nodes",
+                     UiFmt::F0(nowS / 60.0).c, UiFmt::F0(Platform::ProcessFootprintMb()).c, UiFmt::F0(Platform::ProcessRssMb()).c, gNodes.size());
             Platform::AppendLogLine(line);
          }
       }

@@ -2,6 +2,7 @@
 // CliSetup::Describe() says; reads only status.json, never terminal text, and spawns nothing itself:
 // the buttons hand one line to a new Terminal tab.
 #include "app/AppShared.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -192,7 +193,7 @@ namespace app
             if (u.cost > 0.0)
             {
                char c[32];
-               std::snprintf(c, sizeof c, " · $%.2f", u.cost);
+               std::snprintf(c, sizeof c, " · $%s", UiFmt::F2(u.cost).c);
                line += c;
             }
             const std::string label = std::string(a.name) + " " + T("usage");

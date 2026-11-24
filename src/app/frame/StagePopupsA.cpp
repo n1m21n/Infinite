@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
@@ -644,7 +645,7 @@ void DrawPopupsA(FrameCtx& fc)
                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                {
                   char seed[64];
-                  snprintf(seed, sizeof(seed), step >= 1.0f ? "%.0f" : "%.3f", v);
+                  snprintf(seed, sizeof(seed), step >= 1.0f ? UiFmt::Spec::F0 : UiFmt::Spec::F3, v);
                   gModRangeTypedField = field;
                   gModRangeTypedText = seed;
                   gModRangeTypedJustOpened = true;

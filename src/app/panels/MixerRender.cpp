@@ -280,7 +280,7 @@ namespace app
          char num[16];
          if (counted)
          {
-            snprintf(num, sizeof(num), "%03d", i);
+            snprintf(num, sizeof(num), "%s", UiFmt::Pad3(i).c);
             Replace(name, "{take}", num);
          }
          else if (i > 1)

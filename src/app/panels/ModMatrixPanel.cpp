@@ -248,7 +248,7 @@ namespace app
       if (isCurved)
       {
          char valBuf[16];
-         snprintf(valBuf, sizeof(valBuf), "%+.2f", *curve);
+         snprintf(valBuf, sizeof(valBuf), "%s", UiFmt::SF2(*curve).c);
          ImFont* font = ImGui::GetFont();
          const float tinySize = UiType::Px(UiType::Size::Caption);
          const ImU32 valCol = tok::U32(tok::curve_value_text, isLight);
@@ -490,7 +490,7 @@ namespace app
                // destination hasn't registered a float* to read this frame.
                NextCell();
                if (frameRef != nullptr && frameRef->value != nullptr)
-                  ImGui::Text(isInt ? "%.0f" : "%.3f", *frameRef->value);
+                  ImGui::Text(isInt ? UiFmt::Spec::F0 : UiFmt::Spec::F3, *frameRef->value);
                else
                   ImGui::TextUnformatted("--");
 
@@ -688,7 +688,7 @@ namespace app
                }
                NextCell();
                if (frameRef != nullptr && frameRef->value != nullptr)
-                  ImGui::Text(isIntE ? "%.0f" : "%.3f", *frameRef->value);
+                  ImGui::Text(isIntE ? UiFmt::Spec::F0 : UiFmt::Spec::F3, *frameRef->value);
                else
                   ImGui::TextUnformatted("--");
 
@@ -818,8 +818,8 @@ namespace app
                }
                NextCell();
                if (frameRef != nullptr && frameRef->value != nullptr)
-                  ImGui::Text(isIntR ? T("%.0f (%.2fx)") : T("%.3f (%.2fx)"), *frameRef->value,
-                              rec.PlaybackSpeedFor(dstIndex, dstParam));
+                  ImGui::Text("%s (%s)", (isIntR ? UiFmt::F0(*frameRef->value) : UiFmt::F3(*frameRef->value)).c,
+                              UiFmt::Ratio(rec.PlaybackSpeedFor(dstIndex, dstParam)).c);
                else
                   ImGui::TextUnformatted("--");
 

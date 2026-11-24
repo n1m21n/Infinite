@@ -816,7 +816,7 @@ namespace app
          if (realScene && gArrange.scenes[(size_t)row].tempo > 0.0f)
          {
             char tbuf[24];
-            snprintf(tbuf, sizeof(tbuf), "%.0f", gArrange.scenes[(size_t)row].tempo);
+            snprintf(tbuf, sizeof(tbuf), "%s", UiFmt::F0(gArrange.scenes[(size_t)row].tempo).c);
             const ImVec2 ts = ImGui::CalcTextSize(tbuf);
             dl->AddText(ImVec2(rightEdge - ts.x, cy - th * 0.5f), TextCol(0.55f), tbuf);
             rightEdge -= ts.x + 6.0f;

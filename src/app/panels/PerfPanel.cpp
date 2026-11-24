@@ -1,5 +1,6 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
 #include "app/ui/design/components/ColourChip.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
@@ -1214,7 +1215,7 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0, 0, 0, 0));
          ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-         const bool numMoved = ImGui::DragFloat("##numbox", &v, speed, minV, maxV, (std::abs(maxV - minV) > 10.0f) ? "%.1f" : "%.3f");
+         const bool numMoved = ImGui::DragFloat("##numbox", &v, speed, minV, maxV, (std::abs(maxV - minV) > 10.0f) ? UiFmt::Spec::F1 : UiFmt::Spec::F3);
          ImGui::PopStyleVar();
          ImGui::PopStyleColor(4);
          PopSliderStyle();
@@ -2615,7 +2616,7 @@ namespace app
       }
       AudioViz::Border(dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + h), outOfContract ? lineCol : 0);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
-      ImGui::Text("%.3f", value);
+      ImGui::Text("%s", UiFmt::F3(value).c);
    }
 
    void DrawPerfPanelFloating()

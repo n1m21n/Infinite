@@ -105,7 +105,7 @@ namespace
          if (exe.empty())
             return std::string();
          char name[32];
-         snprintf(name, sizeof(name), "%016llx", (unsigned long long)std::hash<std::string>{}(exe));
+         snprintf(name, sizeof(name), "%016llx", (unsigned long long)std::hash<std::string>{}(exe));   // ui-audit-ok: folder name, not on screen
          const std::string out = AppPaths::AppSupportDir() + "/term-bin/" + name;
          std::error_code ec;
          std::filesystem::create_directories(AppPaths::FsPath(out), ec);

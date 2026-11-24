@@ -80,11 +80,11 @@ namespace app
       const bool analog = n->Param("analog") != 0.0f;
       char stat[112];
       if (sync)
-         snprintf(stat, sizeof(stat), "%.0f taps - %s - %s wet%s", n->Param("taps"),
+         snprintf(stat, sizeof(stat), "%s taps - %s - %s wet%s", UiFmt::F0(n->Param("taps")).c,
                   MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), UiFmt::PctOf(n->mix).c,
                   analog ? " - analog" : "");
       else
-         snprintf(stat, sizeof(stat), "%.0f taps - %s - %s wet%s", n->Param("taps"), UiFmt::Hz(n->Param("rate")).c,
+         snprintf(stat, sizeof(stat), "%s taps - %s - %s wet%s", UiFmt::F0(n->Param("taps")).c, UiFmt::Hz(n->Param("rate")).c,
                   UiFmt::PctOf(n->mix).c, analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
@@ -369,7 +369,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[80];
-         snprintf(buf, sizeof(buf), "%s +/- %.1f oct, %d notches", UiFmt::Hz(cutoff).c, depth, notches);
+         snprintf(buf, sizeof(buf), "%s +/- %s oct, %d notches", UiFmt::Hz(cutoff).c, UiFmt::F1(depth).c, notches);
          SetAudioReadout("phaser", buf);
       }
 
@@ -383,11 +383,11 @@ namespace app
       const bool analog = n->Param("analog") != 0.0f;
       char stat[112];
       if (sync)
-         snprintf(stat, sizeof(stat), "%.0f-stage - %s - %s wet%s", n->Param("order"),
+         snprintf(stat, sizeof(stat), "%s-stage - %s - %s wet%s", UiFmt::F0(n->Param("order")).c,
                   MusicTime::RateDivisionName((int)(n->Param("rateDiv") + 0.5f)), UiFmt::PctOf(n->mix).c,
                   analog ? " - analog" : "");
       else
-         snprintf(stat, sizeof(stat), "%.0f-stage - %s - %s wet%s", n->Param("order"), UiFmt::Hz(n->Param("cutoff")).c,
+         snprintf(stat, sizeof(stat), "%s-stage - %s - %s wet%s", UiFmt::F0(n->Param("order")).c, UiFmt::Hz(n->Param("cutoff")).c,
                   UiFmt::PctOf(n->mix).c, analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
@@ -512,7 +512,7 @@ namespace app
       AudioViz::End(vizFrame);
 
       char buf[48];
-      snprintf(buf, sizeof(buf), "%s - %.0f bit", UiFmt::Hz(rateHz).c, bits);
+      snprintf(buf, sizeof(buf), "%s - %s bit", UiFmt::Hz(rateHz).c, UiFmt::F0(bits).c);
       if (ImGui::IsMouseHoveringRect(origin, br))
          SetAudioReadout("bitcrush", buf);
 
@@ -524,7 +524,7 @@ namespace app
    {
       const bool analog = n->Param("analog") != 0.0f;
       char stat[96];
-      snprintf(stat, sizeof(stat), "%s - %.0f bit - %s wet%s", UiFmt::Hz(n->Param("rate")).c, n->Param("bits"),
+      snprintf(stat, sizeof(stat), "%s - %s bit - %s wet%s", UiFmt::Hz(n->Param("rate")).c, UiFmt::F0(n->Param("bits")).c,
                UiFmt::PctOf(n->mix).c, analog ? " - analog" : "");
 
       const double sampleRate =
@@ -1215,7 +1215,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "F1 %.0f - F2 %.0f - F3 %s", f.f1, f.f2, UiFmt::Hz(f.f3).c);
+         snprintf(buf, sizeof(buf), "F1 %s - F2 %s - F3 %s", UiFmt::F0(f.f1).c, UiFmt::F0(f.f2).c, UiFmt::Hz(f.f3).c);
          SetAudioReadout("formant filter", buf);
       }
 
@@ -1229,7 +1229,7 @@ namespace app
       const int vowelIdx = std::clamp((int)(n->Param("vowel") + 0.5f), 0, 4);
 
       char stat[64];
-      snprintf(stat, sizeof(stat), "%s - Q %.1f - %s wet", kVowelNames[vowelIdx], n->Param("q"), UiFmt::PctOf(n->mix).c);
+      snprintf(stat, sizeof(stat), "%s - Q %s - %s wet", kVowelNames[vowelIdx], UiFmt::F1(n->Param("q")).c, UiFmt::PctOf(n->mix).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFormantFilterVisualizer(n);
@@ -1271,9 +1271,9 @@ namespace app
          dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
          char hzStr[16];
          if (hz >= 1000.0f)
-            snprintf(hzStr, sizeof(hzStr), "%.0fk", hz / 1000.0f);
+            snprintf(hzStr, sizeof(hzStr), "%sk", UiFmt::F0(hz / 1000.0f).c);
          else
-            snprintf(hzStr, sizeof(hzStr), "%.0f", hz);
+            snprintf(hzStr, sizeof(hzStr), "%s", UiFmt::F0(hz).c);
          dl->AddText(ImVec2(x + 2.0f, br.y - 12.0f), ScopeTextCol(), hzStr);
       }
 
@@ -1622,7 +1622,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "blur: %s - tilt: %+.2f%s", UiFmt::Ms(blurTime).c, tilt, freeze ? " (frozen)" : "");
+         snprintf(buf, sizeof(buf), "blur: %s - tilt: %s%s", UiFmt::Ms(blurTime).c, UiFmt::SF2(tilt).c, freeze ? " (frozen)" : "");
          SetAudioReadout("spec blur", buf);
       }
 
@@ -1638,7 +1638,7 @@ namespace app
       const bool analog = n->Param("analog") > 0.5f;
 
       char stat[80];
-      snprintf(stat, sizeof(stat), "%s - diff: %.2f%s%s", UiFmt::Ms(blurTime).c, diffusion, freeze ? " - frozen" : "", analog ? " - analog" : "");
+      snprintf(stat, sizeof(stat), "%s - diff: %s%s%s", UiFmt::Ms(blurTime).c, UiFmt::F2(diffusion).c, freeze ? " - frozen" : "", analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawSpecBlurVisualizer(n);

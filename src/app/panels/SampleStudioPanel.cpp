@@ -1097,7 +1097,7 @@ namespace
          if (l.empty())
             continue;
          char num[16];
-         snprintf(num, sizeof(num), "%02d", i + 1);
+         snprintf(num, sizeof(num), "%s", UiFmt::Pad2(i + 1).c);
          const std::string name = base + "-" + num + (s.doc.slices[(size_t)i].name.empty() ? "" : "-" + FileSafe(s.doc.slices[(size_t)i].name));
          const std::string path = folder.empty() ? AudioRecordings::GenerateFilePath(name, "wav") : folder + "/" + name + ".wav";
          if (WriteAudio(path, l, r, AudioFileWriter::Format::Wav, 24))
@@ -1507,7 +1507,7 @@ namespace
       else
          TimeRuler::DrawUnits(dl, axis, mn.y, fpb, 1.0, [](double f, double) {
             char buf[32];
-            snprintf(buf, sizeof(buf), "%.0f", f);
+            snprintf(buf, sizeof(buf), "%s", UiFmt::F0(f).c);
             return std::string(buf);
          });
    }
@@ -2318,7 +2318,7 @@ namespace
          else if (!Platform::AudioInputCaptureIsRunning())
             snprintf(buf, sizeof buf, "%s", T("Waiting for the audio input (allow the microphone if macOS asks)"));
          else
-            snprintf(buf, sizeof buf, "%s %d:%04.1f", T("Recording"), (int)secs / 60, std::fmod(secs, 60.0));
+            snprintf(buf, sizeof buf, "%s %d:%s", T("Recording"), (int)secs / 60, UiFmt::SecField1(std::fmod(secs, 60.0)).c);
          dl->AddText(ImVec2(mn.x + 12.0f, mn.y + 8.0f), ImGui::GetColorU32(ImGuiCol_Text), buf);
          return;
       }
@@ -3423,7 +3423,7 @@ namespace
          if (c == ' ' || c == '%' || c == '=' || c == '\n' || c == '\r' || c == '\t')
          {
             char b[16];
-            snprintf(b, sizeof(b), "%%%02X", (unsigned char)c);
+            snprintf(b, sizeof(b), "%%%s", UiFmt::HexU2((unsigned char)c).c);
             o += b;
          }
          else
@@ -3461,9 +3461,9 @@ std::string SampleStudioSerialize()
       const SampleStyles::Recipe& r = s.take->recipe;
       char b[512];
       snprintf(b, sizeof(b),
-               "gen style=%s seed=%u var=%.9g bars=%d bpm=%.9g key=%d scale=%d part=%d personal=%d tone=%.9g energy=%.9g space=%.9g mood=%.9g card=%d follow=%d\n",
-               Esc(r.style).c_str(), (unsigned)r.seed, (double)r.variation, r.bars, (double)r.bpm, r.key, r.scale, (int)r.part,
-               r.personal ? 1 : 0, (double)r.tone, (double)r.energy, (double)r.space, (double)r.mood, s.take->card, s.followScale ? 1 : 0);
+               "gen style=%s seed=%u var=%s bars=%d bpm=%s key=%d scale=%d part=%d personal=%d tone=%s energy=%s space=%s mood=%s card=%d follow=%d\n",
+               Esc(r.style).c_str(), (unsigned)r.seed, UiFmt::G9((double)r.variation).c, r.bars, UiFmt::G9((double)r.bpm).c, r.key, r.scale, (int)r.part,
+               r.personal ? 1 : 0, UiFmt::G9((double)r.tone).c, UiFmt::G9((double)r.energy).c, UiFmt::G9((double)r.space).c, UiFmt::G9((double)r.mood).c, s.take->card, s.followScale ? 1 : 0);
       out += b;
    }
    else

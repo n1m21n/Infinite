@@ -154,10 +154,8 @@ the settings directory	папку настроек
 version %s is available (you have %s) - click to download	доступна версия %s (у вас %s) — нажмите, чтобы скачать
 volume	громкость
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	xruns=%llu за сессию\n%llu запоздавших блоков (рендер не уложился в срок)\n%llu сообщено аудиоустройством
-%.0f (%.2fx)	=en
 %.1f dB	=en
 %s of %s at %s	%s из %s, %s
-%.3f (%.2fx)	=en
 %d frames @ %dfps	%d кадров при %d fps
 %d frames dropped - encoder can't keep up	Пропущено кадров: %d — кодировщик не справляется
 %d in group	%d в группе
@@ -482,7 +480,7 @@ Steep Log (-0.85)	Крутой лог. (-0.85)
 Step Gate (3x1)	=en
 Step Gate Ribbon (3x1)	=en
 Stop recording	Остановить запись
-Stretched x%.3f to %s	Растянуто x%.3f до %s
+Stretched x%s to %s	Растянуто x%s до %s
 Suggested	Рекомендуемые
 Switch display to Bars / Beats (BBT)	Переключить отображение на такты / доли (BBT)
 Switch display to Time (Minutes:Seconds)	Переключить отображение на время (минуты:секунды)
@@ -3357,7 +3355,7 @@ Now	Сейчас
 Nudge	Сдвиг
 Offbeats	Офбиты
 Offset	Смещение
-%s   %s   W %.0f  H %.0f	%s   %s   Ш %.0f  В %.0f
+%s   %s   W %s  H %s	%s   %s   Ш %s  В %s
 Layer styles	Стили слоя
 Metal	Металл
 Midtones	Средние тона

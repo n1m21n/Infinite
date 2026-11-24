@@ -464,7 +464,7 @@ namespace app
       }
 
       char valBuf[16];
-      snprintf(valBuf, sizeof(valBuf), "%.2f", v);
+      snprintf(valBuf, sizeof(valBuf), "%s", UiFmt::F2(v).c);
       const float textY = r0.y + (h - ImGui::GetTextLineHeight()) * 0.5f;
       const float valX = r1.x - 7.0f - AudioLabelSize(valBuf).x;
       const ImU32 valCol = isLight ? tok::Base(tok::col::surface_lo_2) : tok::Base(tok::col::surface_hi);

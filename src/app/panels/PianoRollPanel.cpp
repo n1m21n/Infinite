@@ -2,6 +2,7 @@
 // MIDI lane. A page edits the lane's clips and notes through the Arrange note ops; the linked Piano Roll node plays
 // them. Edits are timeline undo entries; page add and delete touch a node too, so they are patch undo steps.
 #include "app/AppShared.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/frame/CanvasLink.h"
 #include "app/graph/NoteGen.h"
@@ -2502,8 +2503,8 @@ namespace
    {
       State& s = S();
       SectionCard::Begin(T("Quantise"));
-      FormParts::SliderFloat(T("Strength"), &s.quant.strength, 0.0f, 1.0f, "%.2f");
-      FormParts::SliderFloat(T("Swing"), &s.quant.swing, 0.0f, 0.75f, "%.2f");
+      FormParts::SliderFloat(T("Strength"), &s.quant.strength, 0.0f, 1.0f, UiFmt::Spec::F2);
+      FormParts::SliderFloat(T("Swing"), &s.quant.swing, 0.0f, 0.75f, UiFmt::Spec::F2);
       FormParts::Switch(T("Ends"), &s.quant.ends);
       const char* what = !s.notes.empty() ? T("Quantise selection") : !s.clips.empty() ? T("Quantise clip") : T("Quantise page");
       if (ActionButton::Draw(what, ImVec2(-1.0f, 0.0f)))
@@ -2516,7 +2517,7 @@ namespace
       SectionCard::Begin(T("Functions"));
       FormParts::SliderFloat(T("Strum"), &s.strumTicks, 0.0f, 240.0f, T("%.0f ticks"));
       FormParts::SliderFloat(T("Time spread"), &s.humanizeTime, 0.0f, 120.0f, T("%.0f ticks"));
-      FormParts::SliderFloat(T("Vel spread"), &s.humanizeVel, 0.0f, 40.0f, "%.0f");
+      FormParts::SliderFloat(T("Vel spread"), &s.humanizeVel, 0.0f, 40.0f, UiFmt::Spec::F0);
    }
 
    void DrawNoteInspector(Arrange::Lane& page)
@@ -2730,7 +2731,7 @@ namespace
    {
       const float step = (hi - lo) * 0.05f;
       float shown = *v < 0.0f ? lo - step : *v;
-      if (FormParts::SliderFloat(label, &shown, lo - step, hi, *v < 0.0f ? T("style") : "%.2f"))
+      if (FormParts::SliderFloat(label, &shown, lo - step, hi, *v < 0.0f ? T("style") : UiFmt::Spec::F2))
          *v = shown < lo ? -1.0f : shown;
    }
 
@@ -2762,9 +2763,9 @@ namespace
       if (FieldWell::InputInt("##pianoGenSeed", &seed))
          g.seed = (uint32_t)std::max(0, seed);
       FormParts::Switch(T("Lock seed"), &s.seedLock);
-      FormParts::SliderFloat(T("Creativity"), &g.creativity, 0.0f, 1.0f, "%.2f");
-      FormParts::SliderFloat(T("Energy"), &g.energy, -1.0f, 1.0f, "%.2f");
-      FormParts::SliderFloat(T("Mood"), &g.mood, -1.0f, 1.0f, "%.2f");
+      FormParts::SliderFloat(T("Creativity"), &g.creativity, 0.0f, 1.0f, UiFmt::Spec::F2);
+      FormParts::SliderFloat(T("Energy"), &g.energy, -1.0f, 1.0f, UiFmt::Spec::F2);
+      FormParts::SliderFloat(T("Mood"), &g.mood, -1.0f, 1.0f, UiFmt::Spec::F2);
       StyleSlider(T("Density"), &g.density, 0.0f, 1.0f);
       StyleSlider(T("Swing"), &g.swing, 0.0f, 0.75f);
       StyleSlider(T("Gate"), &g.gate, 0.1f, 1.0f);

@@ -2002,8 +2002,8 @@ namespace
       if (a == nullptr)
          return;
       char buf[256];
-      snprintf(buf, sizeof(buf), "infinite-transform %g %g %g %g %g %g %g %g %g", a->pos[0], a->pos[1], a->pos[2], a->rot[0],
-               a->rot[1], a->rot[2], a->scale[0], a->scale[1], a->scale[2]);
+      snprintf(buf, sizeof(buf), "infinite-transform %s %s %s %s %s %s %s %s %s", UiFmt::G(a->pos[0]).c, UiFmt::G(a->pos[1]).c, UiFmt::G(a->pos[2]).c, UiFmt::G(a->rot[0]).c,
+               UiFmt::G(a->rot[1]).c, UiFmt::G(a->rot[2]).c, UiFmt::G(a->scale[0]).c, UiFmt::G(a->scale[1]).c, UiFmt::G(a->scale[2]).c);
       ImGui::SetClipboardText(buf);
    }
 
@@ -3625,7 +3625,7 @@ namespace
                sSculpt.symmetry ^= 1 << k;
       }
       char label[96];
-      if (ok) snprintf(label, sizeof(label), "Sculpt Mode   %s   %.2f", UiFmt::Px(sSculpt.radius).c, sSculpt.strength);
+      if (ok) snprintf(label, sizeof(label), "Sculpt Mode   %s   %s", UiFmt::Px(sSculpt.radius).c, UiFmt::F2(sSculpt.strength).c);
       else snprintf(label, sizeof(label), "Sculpt Mode   Topology changed");
       dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), label);
 
@@ -4243,10 +4243,10 @@ namespace
             for (int k = 0; k < 3; k++)
                m[k] = k == ax ? typed : 0.0f;
          }
-         snprintf(line, sizeof(line), "move %.5g %.5g %.5g", m[0], m[1], m[2]);
+         snprintf(line, sizeof(line), "move %s %s %s", UiFmt::G5(m[0]).c, UiFmt::G5(m[1]).c, UiFmt::G5(m[2]).c);
          // The op line stays in the engine's order (saved patches replay it); the readout is what the user sees.
          char shown[96];
-         snprintf(shown, sizeof(shown), "Move   X %.3f   Y %.3f   Z %.3f", m[0], -m[2], m[1]);
+         snprintf(shown, sizeof(shown), "Move   X %s   Y %s   Z %s", UiFmt::F3(m[0]).c, UiFmt::F3(-m[2]).c, UiFmt::F3(m[1]).c);
          sEdit.readout = shown;
       }
       else if (sEdit.op == 'r')
@@ -4265,9 +4265,9 @@ namespace
          float m[3];
          LinearBy(inv, w, m);
          Normalize(m);
-         snprintf(line, sizeof(line), "rotate %.5g %.5g %.5g %.5g", m[0], m[1], m[2], deg);
+         snprintf(line, sizeof(line), "rotate %s %s %s %s", UiFmt::G5(m[0]).c, UiFmt::G5(m[1]).c, UiFmt::G5(m[2]).c, UiFmt::G5(deg).c);
          char shown[96];
-         snprintf(shown, sizeof(shown), "Rotate   %s about X %.2f  Y %.2f  Z %.2f", UiFmt::Deg(deg).c, m[0], -m[2], m[1]);
+         snprintf(shown, sizeof(shown), "Rotate   %s about X %s  Y %s  Z %s", UiFmt::Deg(deg).c, UiFmt::F2(m[0]).c, UiFmt::F2(-m[2]).c, UiFmt::F2(m[1]).c);
          sEdit.readout = shown;
       }
       else if (sEdit.op == 's')
@@ -4278,9 +4278,9 @@ namespace
          if (sEdit.axis >= 0)
             for (int k = 0; k < 3; k++)
                s[k] = (k == sEdit.axis) != sEdit.plane ? f : 1.0f;
-         snprintf(line, sizeof(line), "scale %.5g %.5g %.5g", s[0], s[1], s[2]);
+         snprintf(line, sizeof(line), "scale %s %s %s", UiFmt::G5(s[0]).c, UiFmt::G5(s[1]).c, UiFmt::G5(s[2]).c);
          char shown[96];
-         snprintf(shown, sizeof(shown), "Scale   X %.3f   Y %.3f   Z %.3f", s[0], s[2], s[1]);
+         snprintf(shown, sizeof(shown), "Scale   X %s   Y %s   Z %s", UiFmt::F3(s[0]).c, UiFmt::F3(s[2]).c, UiFmt::F3(s[1]).c);
          sEdit.readout = shown;
       }
       else if (sEdit.op == 'e')
@@ -4289,7 +4289,7 @@ namespace
          const float px = ScreenAlong(sEdit.normal, dir);
          const float t = px > 2.0f ? (md.x * dir.x + md.y * dir.y) / px : -md.y * unit;
          const float d = hasTyped ? typed : t / WorldScale(world);
-         snprintf(line, sizeof(line), "extrude %.5g", d);
+         snprintf(line, sizeof(line), "extrude %s", UiFmt::G5(d).c);
          sEdit.readout = std::string("Extrude   ") + std::to_string(d);
       }
       else if (sEdit.op == 'i')
@@ -4297,7 +4297,7 @@ namespace
          const float d0 = std::hypot(sEdit.start.x - pc.x, sEdit.start.y - pc.y);
          const float d = std::hypot(mouse.x - pc.x, mouse.y - pc.y);
          const float in = hasTyped ? std::max(0.0f, typed) : std::max(0.0f, d0 - d) * unit / WorldScale(world);
-         snprintf(line, sizeof(line), "inset %.5g", in);
+         snprintf(line, sizeof(line), "inset %s", UiFmt::G5(in).c);
          sEdit.readout = std::string("Inset   ") + std::to_string(in);
       }
       node->ops = WithOp(sEdit.before, line);
@@ -4957,11 +4957,11 @@ namespace
          char text[64];
          const float fps = ImGui::GetIO().Framerate;
          if (sSet->showPerf && sSet->showFps)
-            snprintf(text, sizeof(text), "%.0f fps   %s", fps, UiFmt::Ms(1000.0f / std::max(1.0f, fps)).c);
+            snprintf(text, sizeof(text), "%s fps   %s", UiFmt::F0(fps).c, UiFmt::Ms(1000.0f / std::max(1.0f, fps)).c);
          else if (sSet->showPerf)
             snprintf(text, sizeof(text), "%s", UiFmt::Ms(1000.0f / std::max(1.0f, fps)).c);
          else
-            snprintf(text, sizeof(text), "%.0f fps", fps);
+            snprintf(text, sizeof(text), "%s fps", UiFmt::F0(fps).c);
          dl->AddText(ImVec2(sCam.mx.x - ImGui::CalcTextSize(text).x - tok::space_3, mn.y + tok::space_2), Hex(0xFFFFFF, 0.6f), text);
       }
       if (!sSet->textInfo)
@@ -5537,7 +5537,7 @@ namespace
             dl->AddCircleFilled(b, 3.0f, Hex(0xFFD040));
             const float dx = sMeasureB[0] - sMeasureA[0], dy = -(sMeasureB[2] - sMeasureA[2]), dz = sMeasureB[1] - sMeasureA[1];
             char text[96];
-            snprintf(text, sizeof(text), "%.3f  (X %.2f  Y %.2f  Z %.2f)", std::sqrt(dx * dx + dy * dy + dz * dz), dx, dy, dz);
+            snprintf(text, sizeof(text), "%s  (X %s  Y %s  Z %s)", UiFmt::F3(std::sqrt(dx * dx + dy * dy + dz * dz)).c, UiFmt::F2(dx).c, UiFmt::F2(dy).c, UiFmt::F2(dz).c);
             dl->AddText(ImVec2((a.x + b.x) * 0.5f + 8.0f, (a.y + b.y) * 0.5f - 18.0f), Hex(0xFFFFFF, 0.95f), text);
          }
          if (Keymap::Cancel(false) || sTool != 0 || sSelMode != 3)
@@ -5553,7 +5553,7 @@ namespace
             dl->AddCircleFilled(b, 3.0f, Hex(0xFFD040));
             const float dx = r.b[0] - r.a[0], dy = -(r.b[2] - r.a[2]), dz = r.b[1] - r.a[1];
             char text[64];
-            snprintf(text, sizeof(text), "%.3f", std::sqrt(dx * dx + dy * dy + dz * dz));
+            snprintf(text, sizeof(text), "%s", UiFmt::F3(std::sqrt(dx * dx + dy * dy + dz * dz)).c);
             dl->AddText(ImVec2((a.x + b.x) * 0.5f + 8.0f, (a.y + b.y) * 0.5f - 18.0f), Hex(0xFFFFFF, 0.95f), text);
          }
       }
@@ -8727,7 +8727,7 @@ std::string View3DJourneyQuery(const std::string& q)
    const int axis = q == "obj.x" ? 0 : q == "obj.y" ? 1 : q == "obj.z" ? 2 : -1;
    if (axis < 0)
       return "unknown query " + q;
-   std::snprintf(b, sizeof b, "%.3f", it->pos[axis]);
+   std::snprintf(b, sizeof b, "%s", UiFmt::F3(it->pos[axis]).c);
    return b;
 }
 #endif

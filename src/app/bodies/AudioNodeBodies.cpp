@@ -213,7 +213,7 @@ namespace app
       for (int i = 1; i < 1000; i++)
       {
          char name[256];
-         snprintf(name, sizeof(name), "Infinite-%s-%03d.%s", base.c_str(), i, ext.c_str());
+         snprintf(name, sizeof(name), "Infinite-%s-%s.%s", base.c_str(), UiFmt::Pad3(i).c, ext.c_str());
          if (dir.empty())
             return name;
          struct stat st;
@@ -513,7 +513,7 @@ namespace app
          for (int i = -24; i <= 24; i++)
          {
             char b[16];
-            snprintf(b, sizeof(b), "semi %+d", i);
+            snprintf(b, sizeof(b), "semi %s", UiFmt::SInt(i).c);
             v.push_back(b);
          }
          return v;

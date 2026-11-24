@@ -325,7 +325,7 @@ namespace app
             // Node Card Styling
             FormParts::Section(T("Node Card Styling"));
             float opacity = CategoryColors::GetNodeOpacity();
-            if (FormParts::SliderFloat(L("Node Opacity"), &opacity, 0.10f, 1.00f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
+            if (FormParts::SliderFloat(L("Node Opacity"), &opacity, 0.10f, 1.00f, UiFmt::Spec::F2, ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetNodeOpacity(opacity, isLight, false);
             }
@@ -346,7 +346,7 @@ namespace app
             }
 
             float tintWeight = CategoryColors::GetTintWeight();
-            if (FormParts::SliderFloat(L("Tint"), &tintWeight, 0.0f, 0.50f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
+            if (FormParts::SliderFloat(L("Tint"), &tintWeight, 0.0f, 0.50f, UiFmt::Spec::F2, ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetTintWeight(tintWeight, isLight, false);
             }
@@ -358,7 +358,7 @@ namespace app
             ImGui::Spacing();
             FormParts::Section(T("Display"));
             float uiScale = CategoryColors::GetUiScale();
-            if (FormParts::SliderFloat(L("UI Scale"), &uiScale, 0.5f, 2.0f, T("%.2fx"), ImGuiSliderFlags_AlwaysClamp))
+            if (FormParts::SliderFloat(L("UI Scale"), &uiScale, 0.5f, 2.0f, UiFmt::Spec::Ratio, ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetUiScale(uiScale, false);
             }
@@ -466,7 +466,7 @@ namespace app
             FormParts::SliderFloat(L("Grid size"), &gGridSnap, 5.0f, 100.0f, UiFmt::Px, 0);
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
-            FormParts::SliderFloat(L("Zoom sensitivity"), &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
+            FormParts::SliderFloat(L("Zoom sensitivity"), &gZoomSensitivity, 0.05f, 1.5f, UiFmt::Spec::F2);
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
 
@@ -492,7 +492,7 @@ namespace app
                FormParts::SliderFloat(L("Size"), &gMinimapSize, 120.0f, 360.0f, UiFmt::Px, 0);
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
-               FormParts::SliderFloat(L("Opacity"), &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
+               FormParts::SliderFloat(L("Opacity"), &gMinimapOpacity, 0.2f, 1.0f, UiFmt::Spec::F2);
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
             }
@@ -1496,7 +1496,7 @@ namespace app
                const float valueRightX = btnX - ImGui::GetStyle().ItemSpacing.x;
 
                char valueText[32];
-               snprintf(valueText, sizeof(valueText), "%.4f", g.value);
+               snprintf(valueText, sizeof(valueText), "%s", UiFmt::F4(g.value).c);
                FormParts::Inline();
                ImGui::SetCursorPosX(valueRightX - ImGui::CalcTextSize(valueText).x);
                ImGui::TextDisabled("%s", valueText);
@@ -1875,22 +1875,22 @@ namespace app
                if (FormParts::Combo(L("Mini axes"), &v.miniAxes, items.c_str()))
                   SaveWorkspaceSettings();
             }
-            FormParts::SliderFloat(L("Mini axes size"), &v.miniSize, 40.0f, 160.0f, "%.0f");
+            FormParts::SliderFloat(L("Mini axes size"), &v.miniSize, 40.0f, 160.0f, UiFmt::Spec::F0);
             saved();
-            FormParts::SliderFloat(L("Mini axes brightness"), &v.miniBright, 0.0f, 1.0f, "%.2f");
+            FormParts::SliderFloat(L("Mini axes brightness"), &v.miniBright, 0.0f, 1.0f, UiFmt::Spec::F2);
             saved();
-            FormParts::SliderFloat(L("Navigation gizmo size"), &v.gizmoNavSize, 40.0f, 160.0f, "%.0f");
+            FormParts::SliderFloat(L("Navigation gizmo size"), &v.gizmoNavSize, 40.0f, 160.0f, UiFmt::Spec::F0);
             saved();
-            FormParts::SliderFloat(L("Transform gizmo size"), &v.gizmoSize, 40.0f, 160.0f, "%.0f");
+            FormParts::SliderFloat(L("Transform gizmo size"), &v.gizmoSize, 40.0f, 160.0f, UiFmt::Spec::F0);
             saved();
             SectionCard::End();
             ImGui::Spacing();
             FormParts::Section(T("Navigation"));
             FormParts::SliderFloat(L("Smooth view"), &v.smoothTime, 0.0f, 1.0f, UiFmt::Sec, 2);
             saved();
-            FormParts::SliderFloat(L("Rotation step"), &v.rotStep, 1.0f, 90.0f, "%.0f");
+            FormParts::SliderFloat(L("Rotation step"), &v.rotStep, 1.0f, 90.0f, UiFmt::Spec::F0);
             saved();
-            FormParts::SliderFloat(L("Orbit sensitivity"), &v.orbitSens, 0.1f, 5.0f, "%.2f");
+            FormParts::SliderFloat(L("Orbit sensitivity"), &v.orbitSens, 0.1f, 5.0f, UiFmt::Spec::F2);
             saved();
             if (FormParts::Switch(L("Auto perspective"), &v.autoPerspective))
                SaveWorkspaceSettings();

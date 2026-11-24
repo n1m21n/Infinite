@@ -4,6 +4,7 @@
 // `# @boxes v1` header that keeps positions), sets the node's code, compiles it and is one patch undo step. A
 // failed compile leaves the node on its last good program; the footer names the error.
 #include "app/ui/design/components/Wire.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/Keymap.h"
@@ -876,11 +877,11 @@ namespace
       {
          float v = (float)b.numberValue;
          ImGui::SetNextItemWidth(84.0f);
-         if (ImGui::DragFloat("##num", &v, 0.01f, 0.0f, 0.0f, "%.3g"))
+         if (ImGui::DragFloat("##num", &v, 0.01f, 0.0f, 0.0f, UiFmt::Spec::G3))
          {
             b.numberValue = v;
             char buf[32];
-            std::snprintf(buf, sizeof(buf), "%g", v);
+            std::snprintf(buf, sizeof(buf), "%s", UiFmt::G(v).c);
             b.literalText = buf;
          }
          if (ImGui::IsItemDeactivatedAfterEdit())
@@ -891,7 +892,7 @@ namespace
          Field::ParamEntry* e = h.params != nullptr ? h.params->Find(b.varName) : nullptr;
          float v = e != nullptr ? e->value : (float)b.numberValue;
          ImGui::SetNextItemWidth(110.0f);
-         if (ImGui::SliderFloat("##knob", &v, (float)b.minVal, (float)b.maxVal, "%.3g"))
+         if (ImGui::SliderFloat("##knob", &v, (float)b.minVal, (float)b.maxVal, UiFmt::Spec::G3))
          {
             if (e != nullptr)
                e->value = v; // live: the param moves without a recompile
@@ -914,7 +915,7 @@ namespace
       }
       else if ((b.specId == "value_out" || b.specId == "pulse_out") && h.publish != nullptr)
       {
-         ImGui::TextDisabled("%.3f", h.publish->Value01());
+         ImGui::TextDisabled("%s", UiFmt::F3(h.publish->Value01()).c);
       }
 
       // Pins: inlets left, outlets right, coloured by kind.
@@ -1408,7 +1409,7 @@ namespace
                {
                   b->numberValue = v;
                   char buf[32];
-                  std::snprintf(buf, sizeof(buf), "%g", v);
+                  std::snprintf(buf, sizeof(buf), "%s", UiFmt::G(v).c);
                   b->literalText = buf;
                }
                if (ImGui::IsItemDeactivatedAfterEdit())

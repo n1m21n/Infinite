@@ -301,7 +301,7 @@ namespace app
       if (n->LastSent() < 0.0f)
          ImGui::TextDisabled("not sent yet");
       else
-         ImGui::TextDisabled("last sent: %.3f", n->LastSent());
+         ImGui::TextDisabled("last sent: %s", UiFmt::F3(n->LastSent()).c);
    }
 
 
@@ -491,7 +491,7 @@ namespace app
          ModSlider("box height", &n->wrapHeight, 0.1f, 1.0f);
          ModCheckbox("fit text to box", &n->fitToBox);
          if (n->fitToBox)
-            ImGui::TextDisabled("size is a maximum - fitted to %.0f pt", n->FittedSize());
+            ImGui::TextDisabled("size is a maximum - fitted to %s pt", UiFmt::F0(n->FittedSize()).c);
          ModSlider("line spacing", &n->lineSpacing, 0.5f, 2.5f);
       }
       ModSlider("outline", &n->outlineWidth, 0.0f, 20.0f);
@@ -1136,9 +1136,9 @@ namespace app
          {
             char valStr[16];
             if (cellW >= 30.0f)
-               snprintf(valStr, sizeof(valStr), "%.2f", v);
+               snprintf(valStr, sizeof(valStr), "%s", UiFmt::F2(v).c);
             else
-               snprintf(valStr, sizeof(valStr), "%.1f", v);
+               snprintf(valStr, sizeof(valStr), "%s", UiFmt::F1(v).c);
 
             const float fontValSz = count <= 8 ? 9.5f : 8.5f;
             const ImU32 txtCol = isCurrent ? tok::Role(tok::col::surface_deep) : tok::Role(tok::col::surface_deep);
@@ -1174,7 +1174,7 @@ namespace app
       PushTextWrapWidth(size);
       if (hoverStep >= 0)
       {
-         ImGui::TextDisabled("step %d: %.2f", hoverStep + 1, n->steps[hoverStep]);
+         ImGui::TextDisabled("step %d: %s", hoverStep + 1, UiFmt::F2(n->steps[hoverStep]).c);
       }
       else
       {
@@ -1924,7 +1924,7 @@ namespace app
       FieldWell::PushStyle(ImGui::GetID("##macronumboxdrag"));
       ImGui::SetNextItemWidth(boxW);
       ImGui::DragFloat("##macronumboxdrag", &n->value, speed, 0.0f, 0.0f,
-                       (std::abs(n->value) >= 10.0f) ? "%.1f" : "%.3f");
+                       (std::abs(n->value) >= 10.0f) ? UiFmt::Spec::F1 : UiFmt::Spec::F3);
       FieldWell::PopStyle();
 
       MacroBodyEnd(origin, kMacroCell, boxH, n->label.empty() ? std::string("value") : n->label);
@@ -2136,7 +2136,7 @@ namespace app
 
    void DrawMacroXYParams(MacroXYNode* n)
    {
-      ImGui::TextDisabled("x %.3f   y %.3f", n->padX, n->padY);
+      ImGui::TextDisabled("x %s   y %s", UiFmt::F3(n->padX).c, UiFmt::F3(n->padY).c);
 
       if (n->IsRecordingPath())
       {

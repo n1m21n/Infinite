@@ -4178,7 +4178,7 @@ namespace
       for (const Rgb& r : list)
       {
          auto byte = [](float f) { return (unsigned)std::lround(std::clamp(f, 0.0f, 1.0f) * 255.0f); };
-         std::snprintf(hex, sizeof(hex), "%02x%02x%02x", byte(r.c[0]), byte(r.c[1]), byte(r.c[2]));
+         std::snprintf(hex, sizeof(hex), "%s%s%s", UiFmt::Hex2(byte(r.c[0])).c, UiFmt::Hex2(byte(r.c[1])).c, UiFmt::Hex2(byte(r.c[2])).c);
          s += (s.empty() ? "" : ",") + std::string(hex);
       }
       gView2DSwatches = s;
@@ -6360,8 +6360,8 @@ namespace
    void UpdateTextMarks(Scene2DNode* doc, const Layer& l, float bw, float bh, int cursor, int selA, int selB)
    {
       char num[160];
-      std::snprintf(num, sizeof(num), "|%d|%d|%d|%.2f|%.2f|%.2f|%d|%d|%.1f|%.1f|", cursor, selA, selB, l.fontSize, l.tracking, l.boxW, l.align,
-                    (int)(l.bold | (l.italic << 1) | (l.caps << 3)), bw, bh);
+      std::snprintf(num, sizeof(num), "|%d|%d|%d|%s|%s|%s|%d|%d|%s|%s|", cursor, selA, selB, UiFmt::F2(l.fontSize).c, UiFmt::F2(l.tracking).c, UiFmt::F2(l.boxW).c, l.align,
+                    (int)(l.bold | (l.italic << 1) | (l.caps << 3)), UiFmt::F1(bw).c, UiFmt::F1(bh).c);
       const std::string key = l.text + num + l.font;
       if (key == sTextMarks.key)
          return;
@@ -8419,8 +8419,8 @@ namespace
          {
             const float dx = sMeasureB.x - sMeasureA.x, dy = sMeasureB.y - sMeasureA.y;
             ImGui::AlignTextToFramePadding();
-            ImGui::Text(T("%s   %s   W %.0f  H %.0f"), UiFmt::Tr(UiFmt::Px(std::hypot(dx, dy))).c, UiFmt::Rad(std::atan2(-dy, dx)).c, std::fabs(dx),
-                        std::fabs(dy));
+            ImGui::Text(T("%s   %s   W %s  H %s"), UiFmt::Tr(UiFmt::Px(std::hypot(dx, dy))).c, UiFmt::Rad(std::atan2(-dy, dx)).c,
+                        UiFmt::F0(std::fabs(dx)).c, UiFmt::F0(std::fabs(dy)).c);
             next();
             if (TextChip(L("Clear##v2dmclear"), false, nullptr))
                sMeasureOn = false;
@@ -10158,7 +10158,7 @@ namespace
       FormParts::Inline(0.0f, tok::space_3);
       char buf[200];
       if (sMouseIn)
-         std::snprintf(buf, sizeof(buf), "%d x %d   %.0f, %.0f   %s", d.w, d.h, sMouseDoc.x, sMouseDoc.y, UiFmt::Ms(doc->CookMs()).c);
+         std::snprintf(buf, sizeof(buf), "%d x %d   %s, %s   %s", d.w, d.h, UiFmt::F0(sMouseDoc.x).c, UiFmt::F0(sMouseDoc.y).c, UiFmt::Ms(doc->CookMs()).c);
       else
          std::snprintf(buf, sizeof(buf), "%d x %d   %s", d.w, d.h, UiFmt::Ms(doc->CookMs()).c);
       CentredText(row0Y, buf);
@@ -16646,7 +16646,7 @@ std::string View2DAuditRanges()
       auto bad = [&](const char* what, float v, float lo, float hi) {
          if (!(v >= lo && v <= hi))
          {
-            snprintf(buf, sizeof buf, "layer %d %s = %g (%g..%g)", l.id, what, v, lo, hi);
+            snprintf(buf, sizeof buf, "layer %d %s = %s (%s..%s)", l.id, what, UiFmt::G(v).c, UiFmt::G(lo).c, UiFmt::G(hi).c);
             return true;
          }
          return false;
@@ -16669,7 +16669,7 @@ std::string View2DAuditRanges()
       if (!(b->size >= 1.0f && b->size <= 5000.0f) || !(b->hardness >= 0 && b->hardness <= 1) || !(b->opacity >= 0 && b->opacity <= 1) ||
           !(b->flow >= 0 && b->flow <= 1))
       {
-         snprintf(buf, sizeof buf, "brush size %g hardness %g opacity %g flow %g", b->size, b->hardness, b->opacity, b->flow);
+         snprintf(buf, sizeof buf, "brush size %s hardness %s opacity %s flow %s", UiFmt::G(b->size).c, UiFmt::G(b->hardness).c, UiFmt::G(b->opacity).c, UiFmt::G(b->flow).c);
          return buf;
       }
    return std::string();
@@ -16706,7 +16706,7 @@ namespace
    std::string Fmt3(const float* c)
    {
       char b[64];
-      std::snprintf(b, sizeof b, "%.2f %.2f %.2f", c[0], c[1], c[2]);
+      std::snprintf(b, sizeof b, "%s %s %s", UiFmt::F2(c[0]).c, UiFmt::F2(c[1]).c, UiFmt::F2(c[2]).c);
       return b;
    }
 }
@@ -16977,7 +16977,7 @@ std::string View2DJourneyQuery(const std::string& q)
          hi[0] = std::max(hi[0], sMeshPts[k * 2]), hi[1] = std::max(hi[1], sMeshPts[k * 2 + 1]);
       }
       char b[96];
-      std::snprintf(b, sizeof b, "%.0f %.0f %.0f %.0f", lo[0], lo[1], hi[0], hi[1]);
+      std::snprintf(b, sizeof b, "%s %s %s %s", UiFmt::F0(lo[0]).c, UiFmt::F0(lo[1]).c, UiFmt::F0(hi[0]).c, UiFmt::F0(hi[1]).c);
       return b;
    }
    if (what == "shape.fill.at")   // shape.fill.at NAME: that vector layer's top item fill

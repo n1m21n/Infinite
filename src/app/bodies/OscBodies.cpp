@@ -696,7 +696,7 @@ namespace app
                   Fade(isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::accent_13)),
                   Wavetable::TableName(eng.table));
       char posText[24];
-      snprintf(posText, sizeof(posText), "%.3f", eng.position);
+      snprintf(posText, sizeof(posText), "%s", UiFmt::F3(eng.position).c);
       const ImVec2 sz = ImGui::CalcTextSize(posText);
       dl->AddText(ImVec2(br.x - 9.0f - sz.x, origin.y + 5.0f),
                   isLight ? tok::Base(tok::col::edge_lo_2) : tok::Base(tok::col::text_secondary), posText);
@@ -1050,11 +1050,11 @@ namespace app
          if (activeHandle == 0)
             snprintf(buf, sizeof(buf), "Attack: %s", UiFmt::Ms(*attackMs).c);
          else if (activeHandle == 1 || activeHandle == 2)
-            snprintf(buf, sizeof(buf), "Decay: %s | Sustain: %.2f", UiFmt::Ms(*decayMs).c, *sustain);
+            snprintf(buf, sizeof(buf), "Decay: %s | Sustain: %s", UiFmt::Ms(*decayMs).c, UiFmt::F2(*sustain).c);
          else if (activeHandle == 3)
             snprintf(buf, sizeof(buf), "Release: %s", UiFmt::Ms(*releaseMs).c);
          else
-            snprintf(buf, sizeof(buf), "A:%s  D:%s  S:%.2f  R:%s", UiFmt::Ms(*attackMs).c, UiFmt::Ms(*decayMs).c, *sustain, UiFmt::Ms(*releaseMs).c);
+            snprintf(buf, sizeof(buf), "A:%s  D:%s  S:%s  R:%s", UiFmt::Ms(*attackMs).c, UiFmt::Ms(*decayMs).c, UiFmt::F2(*sustain).c, UiFmt::Ms(*releaseMs).c);
 
          SetAudioReadout("ADSR", buf);
       }
@@ -1100,7 +1100,7 @@ namespace app
          for (int i = -4; i <= 4; i++)
          {
             char b[16];
-            snprintf(b, sizeof(b), "oct %+d", i);
+            snprintf(b, sizeof(b), "oct %s", UiFmt::SInt(i).c);
             names.push_back(b);
          }
       }
@@ -1116,7 +1116,7 @@ namespace app
          for (int i = -12; i <= 12; i++)
          {
             char b[16];
-            snprintf(b, sizeof(b), "semi %+d", i);
+            snprintf(b, sizeof(b), "semi %s", UiFmt::SInt(i).c);
             names.push_back(b);
          }
       }
@@ -2462,7 +2462,7 @@ namespace app
          dl->AddRect(origin, containerBr, tok::Role(tok::col::edge_lo, 180), 4.0f, 0, 1.0f);
 
          char label[64];
-         snprintf(label, sizeof(label), "wavetable  -  frame %.2f / %d", n->position * (frameCount - 1), frameCount - 1);
+         snprintf(label, sizeof(label), "wavetable  -  frame %s / %d", UiFmt::F2(n->position * (frameCount - 1)).c, frameCount - 1);
          dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 6.0f), tok::Role(tok::col::text_secondary, 200), label);
 
          ImGui::Dummy(ImVec2(containerW, previewH));

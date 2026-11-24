@@ -1,5 +1,6 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include "app/panels/FieldPatcherPanel.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/components/PanelRail.h"
 #include <algorithm>
 #include <cmath>
@@ -666,14 +667,14 @@ namespace app
       if (sTestRun)
          return;
       char buf[256];
-      std::snprintf(buf, sizeof buf, "%d%d%d%d%d%d%d%d|%d%d%d%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
+      std::snprintf(buf, sizeof buf, "%d%d%d%d%d%d%d%d|%d%d%d%d%d%d|%s %s %s %s %s %s %s %s %s %s %s", gNodePanelOpen, gViewportPanelOpen,
                     gModMatrixOpen, gPerfPanelOpen, gHistoryOpen, gSampleStudioOpen, gPianoRollOpen, gTerminalOpen, gViewportPanelDock, gModMatrixDock, gPerfPanelDock,
                     gSampleStudioDock, gPianoRollDock, gTerminalDock,
-                    gViewportPanelWidth, gViewportPanelHeight, gModMatrixWidth, gModMatrixHeight, gPerfPanelWidth,
-                    gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight, gPianoRollHeight, gTerminalHeight, gTerminalWidth);
-      std::snprintf(buf + std::strlen(buf), sizeof buf - std::strlen(buf), "|%d%d %.0f %.0f", gMixerPanelOpen, gMixerPanelDock,
-                    gMixerPanelWidth, gMixerPanelHeight);
-      std::snprintf(buf + std::strlen(buf), sizeof buf - std::strlen(buf), "|%d%d %.0f", gDrumPanelOpen, gDrumPanelDock, gDrumPanelHeight);
+                    UiFmt::F0(gViewportPanelWidth).c, UiFmt::F0(gViewportPanelHeight).c, UiFmt::F0(gModMatrixWidth).c, UiFmt::F0(gModMatrixHeight).c, UiFmt::F0(gPerfPanelWidth).c,
+                    UiFmt::F0(gPerfPanelHeight).c, UiFmt::F0(gHistoryWidth).c, UiFmt::F0(gSampleStudioHeight).c, UiFmt::F0(gPianoRollHeight).c, UiFmt::F0(gTerminalHeight).c, UiFmt::F0(gTerminalWidth).c);
+      std::snprintf(buf + std::strlen(buf), sizeof buf - std::strlen(buf), "|%d%d %s %s", gMixerPanelOpen, gMixerPanelDock,
+                    UiFmt::F0(gMixerPanelWidth).c, UiFmt::F0(gMixerPanelHeight).c);
+      std::snprintf(buf + std::strlen(buf), sizeof buf - std::strlen(buf), "|%d%d %s", gDrumPanelOpen, gDrumPanelDock, UiFmt::F0(gDrumPanelHeight).c);
       static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
       static std::string sSeen = buf;
       static double sSeenAt = 0.0;

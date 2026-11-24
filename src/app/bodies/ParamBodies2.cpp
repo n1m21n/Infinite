@@ -939,7 +939,7 @@ namespace app
       ImGui::SameLine();
       ImGui::BeginGroup();
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
-      ImGui::Text("Result: %.3f", res);
+      ImGui::Text("Result: %s", UiFmt::F3(res).c);
       ImGui::EndGroup();
 
       // --- Left Column ---
@@ -1165,7 +1165,7 @@ namespace app
                            b == 2 ? frontCol : tempCol, 2.0f);
       }
       char slopeBuf[32];
-      snprintf(slopeBuf, sizeof(slopeBuf), "1/f^%.1f", snap.aperiodicSlope);
+      snprintf(slopeBuf, sizeof(slopeBuf), "1/f^%s", UiFmt::F1(snap.aperiodicSlope).c);
       dl->AddText(ImVec2(sBr.x - 54.0f, barAreaTop + 4.0f), ImGui::GetColorU32(ImGuiCol_TextDisabled), slopeBuf);
       dl->PopClipRect();
       AudioViz::Border(dl, sTl, sBr);

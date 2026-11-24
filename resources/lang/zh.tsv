@@ -154,10 +154,8 @@ the settings directory	设置目录
 version %s is available (you have %s) - click to download	版本 %s 已发布（当前为 %s）——点击下载
 volume	音量
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	本次会话 xruns=%llu\n%llu 个延迟块（渲染超出时限）\n%llu 个由音频设备报告
-%.0f (%.2fx)	=en
 %.1f dB	=en
 %s of %s at %s	%s / %s，%s
-%.3f (%.2fx)	=en
 %d frames @ %dfps	%d 帧 @ %d fps
 %d frames dropped - encoder can't keep up	丢弃了 %d 帧——编码器跟不上
 %d in group	组内 %d 个
@@ -482,7 +480,7 @@ Steep Log (-0.85)	陡峭对数 (-0.85)
 Step Gate (3x1)	=en
 Step Gate Ribbon (3x1)	=en
 Stop recording	停止录制
-Stretched x%.3f to %s	已拉伸 x%.3f 至 %s
+Stretched x%s to %s	已拉伸 x%s 至 %s
 Suggested	推荐
 Switch display to Bars / Beats (BBT)	将显示切换为小节 / 拍（BBT）
 Switch display to Time (Minutes:Seconds)	将显示切换为时间（分:秒）
@@ -3357,7 +3355,7 @@ Now	现在
 Nudge	微调
 Offbeats	反拍
 Offset	偏移
-%s   %s   W %.0f  H %.0f	%s   %s   宽 %.0f  高 %.0f
+%s   %s   W %s  H %s	%s   %s   宽 %s  高 %s
 Layer styles	图层样式
 Metal	金属
 Midtones	中间调

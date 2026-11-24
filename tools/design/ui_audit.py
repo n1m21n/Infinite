@@ -164,7 +164,7 @@ KEYWORDS = {"if", "while", "switch", "return", "sizeof", "decltype", "alignof", 
             "noexcept", "defined"}
 STRUCTURE_CALLS = {"static_assert", "alignas", "sizeof", "reserve", "resize", "copy", "copy_n", "fill", "fill_n", "memcpy", "memset",
                    "substr", "at", "erase", "assign", "compare", "find", "rfind", "bitset", "array", "get", "make_index_sequence"}
-TEST_FUNC = re.compile(r"(SelfCheck|SelfTest|Test|AffinityAb|AuditState|Bench|Probe|Census|Fuzz)", re.I)
+TEST_FUNC = re.compile(r"(SelfCheck|SelfTest|Test|AffinityAb|Audit\w*State|Bench|Probe|Census|Fuzz)", re.I)
 HARNESS = re.compile(r'getenv\s*\(\s*"[^"]*(TEST|BENCH|PROBE|AUDIT|CENSUS)|\bargv\b|\bargc\b')
 I18N_WRAP = {"L", "T", "TC", "LC", "TList", "I18N_KEY", "HelpT"}
 SHORTCUT = re.compile(r"^(?:\+?(?:Shift|Alt|Ctrl|Cmd|Opt)\+)*\+?(?:[A-Z0-9]|F\d{1,2}|Backspace|Delete|Tab|Esc|Enter|Home|End|PgUp|PgDn|"
@@ -185,9 +185,12 @@ THEME = [
 ]
 FMT = re.compile(r"%[-+ #0]*\d*(?:\.\d+)?(?:hh|h|ll|l|z|j|t|L)?[diouxXeEfgGaAcsp]")
 
+PLAIN_SPEC = re.compile(r"%(?:hh|h|ll|l|z|j|t)?[sdiuc]")   # no width, precision or sign: the number's look is not chosen here
+
 def fmt_category(s):
-    specs = FMT.findall(s)
-    return specs
+    if s.startswith("##"): return []   # an id ("##row%p"), never shown
+    # "%%" is a percent sign; "% o" / "% to" is prose ("10% to 100%"), not a space-flag spec
+    return [x for x in FMT.findall(s.replace("%%", "")) if not x.startswith("% ")]
 
 # ---------------------------------------------------------------- scan
 def ui_files():
@@ -237,6 +240,8 @@ def scan_file(rel, src):
     for n, l in enumerate(src.split("\n"), 1):   # // i18n-ok lines and i18n-skip-begin/end regions, as tools/i18n/lint.py
         skipping = (skipping or "i18n-skip-begin" in l) and "i18n-skip-end" not in l
         if skipping or "i18n-ok" in l: ok_lines.add(n)
+    # `// ui-audit-ok: <reason>` on a line: not on screen (a file name, a log line); the reason is required
+    off_lines = {n for n, l in enumerate(src.split("\n"), 1) if re.search(r"//\s*ui-audit-ok:\s*\S", l)}
 
     def func_name():
         for _, nm in reversed(funcs):
@@ -314,6 +319,8 @@ def scan_file(rel, src):
             continue
         if harness_stack and harness_stack[-1]:
             allowed.bump("test", t.line); continue
+        if t.line in off_lines:
+            allowed.bump("off_screen", t.line); continue
         call = paren[-1][0] if paren else ""
         qual = paren[-1][3] if paren else ""
         in_for = any(p[2] for p in paren)
@@ -327,7 +334,13 @@ def scan_file(rel, src):
             wrapped = any(p[0] in I18N_WRAP for p in paren)
             specs = fmt_category(s)
             if specs and (call in TEXT_CALLS or call in PRINTF_CALLS or call in I18N_WRAP or any(p[0] in TEXT_CALLS | PRINTF_CALLS for p in paren)):
-                findings.append(("format", call or "-", " ".join(specs), s[:80]) + where)
+                if all(PLAIN_SPEC.fullmatch(x) for x in specs):   # a %s / %d slot in a sentence: no design value in it
+                    allowed.bump("placeholder", t.line)
+                elif call in I18N_WRAP and any(p[0] in FAMILY["slider"] for p in paren):
+                    # a slider's own display format with a translated unit word ("%.0f ticks"): ImGui prints the value
+                    allowed.bump("widget_format", t.line)
+                else:
+                    findings.append(("format", call or "-", " ".join(specs), s[:80]) + where)
                 for um in ([] if ("=%" in s or s.startswith("[")) else UNIT_SPEC.finditer(s)):   # a number printed with its unit: UiFmt's job (owner 2026-11-24)
                     findings.append(("unit", call or "-", um.group(0), s[:80]) + where)
             visible = call in TEXT_CALLS and re.search(r"[A-Za-z]", re.sub(r"\\x[0-9A-Fa-f]{2}|\\[nt]", "", FMT.sub("", s.split("##")[0])))

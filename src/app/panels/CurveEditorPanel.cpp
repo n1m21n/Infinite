@@ -2,6 +2,7 @@
 // MSEG node, following the canvas selection. The node is the model: every edit goes through MSEGNode and
 // core/CurveEdit.h, and is a patch undo step. The panel keeps only its view: pages, zoom, tool and selection.
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/panels/CurveEditorPanel.h"
@@ -590,7 +591,7 @@ namespace
             if (frame > 0 && frame % fps == 0) // whole seconds read as timecode
             {
                char tc[64];
-               std::snprintf(tc, sizeof tc, "%lld:%02lld", frame / fps / 60, (frame / fps) % 60);
+               std::snprintf(tc, sizeof tc, "%lld:%s", frame / fps / 60, UiFmt::Pad2((frame / fps) % 60).c);
                return std::string(tc);
             }
             return std::to_string(frame);
@@ -664,8 +665,8 @@ namespace
          if (ref == nullptr)
             return;
          char hi[48], lo[48];
-         std::snprintf(hi, sizeof hi, "%s %.3g", ref->name.c_str(), src.hi);
-         std::snprintf(lo, sizeof lo, "%.3g", src.lo);
+         std::snprintf(hi, sizeof hi, "%s %s", ref->name.c_str(), UiFmt::G3(src.hi).c);
+         std::snprintf(lo, sizeof lo, "%s", UiFmt::G3(src.lo).c);
          const float fh = ImGui::GetFontSize();
          dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(1.0f) + 2.0f), Tint(0.45f), hi);
          dl->AddText(ImVec2(a.x0 + tok::space_2, a.Y(0.0f) - fh - 2.0f), Tint(0.45f), lo);

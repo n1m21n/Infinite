@@ -1,5 +1,6 @@
 // Cable / slot compatibility, connect, schema probe, cluster links, spawn (moved verbatim from main.cpp).
 #include "core/Notices.h"
+#include "app/ui/design/UiFmt.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -1294,7 +1295,7 @@ namespace app
       static std::string F(float v)
       {
          char b[48];
-         std::snprintf(b, sizeof(b), "%.9g", v);
+         std::snprintf(b, sizeof(b), "%s", UiFmt::G9(v).c);
          return b;
       }
       void Float(const char* n, float& v) override { out.push_back({ n, 'f', F(v) }); }

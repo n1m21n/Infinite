@@ -196,8 +196,8 @@ namespace app
          if (n->inputs[s].IsConnected() && (hot >= 0 || sDragNode == gn.index))
          {
             char r[96];
-            snprintf(r, sizeof(r), "in %d  az %.0f  el %.0f  %.1f m  %s", s + 1, n->azimuth[s],
-                     n->elevation[s], n->distance[s], UiFmt::DbOffset(n->gainDb[s]).c);
+            snprintf(r, sizeof(r), "in %d  az %s  el %s  %s m  %s", s + 1, UiFmt::F0(n->azimuth[s]).c,
+                     UiFmt::F0(n->elevation[s]).c, UiFmt::F1(n->distance[s]).c, UiFmt::DbOffset(n->gainDb[s]).c);
             gAudioReadout[gn.index] = r;
          }
       }

@@ -839,7 +839,7 @@ namespace app
 
    void DrawVelocityToCVParams(VelocityToCVNode* n)
    {
-      ImGui::TextDisabled("velocity: %.2f", n->Value01());
+      ImGui::TextDisabled("velocity: %s", UiFmt::F2(n->Value01()).c);
       ModSlider("range low", &n->rangeLow, 0.0f, 1.0f);
       ModSlider("range high", &n->rangeHigh, 0.0f, 1.0f);
    }
@@ -2001,7 +2001,7 @@ namespace app
                dl->AddRectFilled(ImVec2(x0 + 1.0f, vFillTop), ImVec2(x1 - 1.0f, vy1 - 1.0f), vCol, tok::radius_cell);
 
                char vStr[16];
-               snprintf(vStr, sizeof(vStr), "%.0f", n->stepVelocity[i] * 100.0f);
+               snprintf(vStr, sizeof(vStr), "%s", UiFmt::F0(n->stepVelocity[i] * 100.0f).c);
                const ImU32 txtVCol = (isLight && !isCurrent) ? tok::Base(tok::col::ink_white) : tok::Base(tok::col::surface_deep);
                DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy1), txtVCol, vStr, fontVelSz);
             }
@@ -2795,7 +2795,7 @@ namespace app
    {
       const float lvl = n->CurrentLevel();
       char stat[64];
-      snprintf(stat, sizeof(stat), "mod %.2f", lvl);
+      snprintf(stat, sizeof(stat), "mod %s", UiFmt::F2(lvl).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
@@ -2821,7 +2821,7 @@ namespace app
    void DrawEnvelopeBody(GraphNode& gn, EnvelopeNode* n)
    {
       char stat[64];
-      snprintf(stat, sizeof(stat), "level %.2f", n->Value01());
+      snprintf(stat, sizeof(stat), "level %s", UiFmt::F2(n->Value01()).c);
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       // Same editable-ADSR panel the wavetable engines use (DrawEditableADSR /
       // DrawEnvelopePanel) rather than a bespoke read-only shape - one

@@ -33,9 +33,9 @@ namespace UiFmt
       }
       inline const char* Spec(int decimals, bool sign)
       {
-         static const char* plain[] = { "%.0f%s", "%.1f%s", "%.2f%s", "%.3f%s" };
-         static const char* signd[] = { "%+.0f%s", "%+.1f%s", "%+.2f%s", "%+.3f%s" };
-         const int d = decimals < 0 ? 0 : decimals > 3 ? 3 : decimals;
+         static const char* plain[] = { "%.0f%s", "%.1f%s", "%.2f%s", "%.3f%s", "%.4f%s" };
+         static const char* signd[] = { "%+.0f%s", "%+.1f%s", "%+.2f%s", "%+.3f%s", "%+.4f%s" };
+         const int d = decimals < 0 ? 0 : decimals > 4 ? 4 : decimals;
          return sign ? signd[d] : plain[d];
       }
       inline Str Num(double v, int decimals, const char* unit, bool sign = false)
@@ -176,5 +176,58 @@ namespace UiFmt
       }
       s.c[o] = 0;
       return s;
+   }
+
+   // A number with no unit of its own (Q, a 0..1 position, a ratio of two params), at a chosen precision.
+   // F<n>: n places; SF<n>: signed; G / G<n>: shortest form, n significant digits (%g); Pad<n>: an integer
+   // zero-padded to n digits (clock fields, indices); Hex<n> / HexU<n>: lower / upper case hex, n digits.
+   inline Str F0(double v) { return detail::Num(v, 0, ""); }
+   inline Str F1(double v) { return detail::Num(v, 1, ""); }
+   inline Str F2(double v) { return detail::Num(v, 2, ""); }
+   inline Str F3(double v) { return detail::Num(v, 3, ""); }
+   inline Str F4(double v) { return detail::Num(v, 4, ""); }
+   inline Str SF0(double v) { return detail::Num(v, 0, "", true); }
+   inline Str SF1(double v) { return detail::Num(v, 1, "", true); }
+   inline Str SF2(double v) { return detail::Num(v, 2, "", true); }
+   inline Str SInt(long long n) { Str s; std::snprintf(s.c, sizeof s.c, "%+lld", n); return s; }
+   namespace detail
+   {
+      inline Str G(double v, int digits) { Str s; std::snprintf(s.c, sizeof s.c, "%.*g", digits, v); return s; }
+      inline Str Pad(long long n, int w) { Str s; std::snprintf(s.c, sizeof s.c, "%0*lld", w, n); return s; }
+      inline Str Hex(unsigned long long n, int w, bool upper)
+      {
+         Str s;
+         std::snprintf(s.c, sizeof s.c, upper ? "%0*llX" : "%0*llx", w, n);
+         return s;
+      }
+   }
+   inline Str G(double v) { return detail::G(v, 6); }
+   inline Str G3(double v) { return detail::G(v, 3); }
+   inline Str G4(double v) { return detail::G(v, 4); }
+   inline Str G5(double v) { return detail::G(v, 5); }
+   inline Str G9(double v) { return detail::G(v, 9); }
+   inline Str Pad2(long long n) { return detail::Pad(n, 2); }
+   inline Str Pad3(long long n) { return detail::Pad(n, 3); }
+   inline Str Hex2(unsigned long long n) { return detail::Hex(n, 2, false); }
+   inline Str Hex3(unsigned long long n) { return detail::Hex(n, 3, false); }
+   inline Str Hex4(unsigned long long n) { return detail::Hex(n, 4, false); }
+   inline Str Hex8(unsigned long long n) { return detail::Hex(n, 8, false); }
+   inline Str Hex12(unsigned long long n) { return detail::Hex(n, 12, false); }
+   inline Str HexU2(unsigned long long n) { return detail::Hex(n, 2, true); }
+   // The seconds field of an m:ss clock with places: "05.25" (two), "07.5" (one).
+   inline Str SecField2(double s) { Str o; std::snprintf(o.c, sizeof o.c, "%05.2f", s); return o; }
+   inline Str SecField1(double s) { Str o; std::snprintf(o.c, sizeof o.c, "%04.1f", s); return o; }
+
+   // The same precisions as a widget display format (ImGui sliders and drags print the number themselves).
+   namespace Spec
+   {
+      inline constexpr const char* F0 = "%.0f";
+      inline constexpr const char* F1 = "%.1f";
+      inline constexpr const char* F2 = "%.2f";
+      inline constexpr const char* F3 = "%.3f";
+      inline constexpr const char* F4 = "%.4f";
+      inline constexpr const char* G = "%g";
+      inline constexpr const char* G3 = "%.3g";
+      inline constexpr const char* Ratio = "%.2fx";   // as UiFmt::Ratio
    }
 }

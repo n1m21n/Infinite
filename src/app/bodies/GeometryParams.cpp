@@ -213,7 +213,7 @@ namespace app
          DropdownButton("shape", PathNode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
       float p[3];
       n->CurrentPoint(p);
-      ImGui::TextDisabled("t %.2f   (%.2f, %.2f, %.2f)", n->Progress(), p[0], p[1], p[2]);
+      ImGui::TextDisabled("t %s   (%s, %s, %s)", UiFmt::F2(n->Progress()).c, UiFmt::F2(p[0]).c, UiFmt::F2(p[1]).c, UiFmt::F2(p[2]).c);
 
       NodeSeparator("motion");
       ModSlider("speed / beat", &n->speed, -2.0f, 2.0f);
@@ -290,7 +290,7 @@ namespace app
             const int outputIndex = 4 + r * 3 + a;
 
             char buf[16];
-            snprintf(buf, sizeof(buf), "%.2f", n->DisplayValue(outputIndex));
+            snprintf(buf, sizeof(buf), "%s", UiFmt::F2(n->DisplayValue(outputIndex)).c);
             const ImVec2 textSize = ImGui::CalcTextSize(buf);
             dl->AddText(ImVec2(cellMin.x + (cellW - textSize.x) * 0.5f,
                                cellMin.y + (cellH - textSize.y) * 0.5f), textCol, buf);
@@ -525,7 +525,7 @@ namespace app
          // so the radius is set outright. Never both.
          if (n->targetInput != nullptr)
          {
-            ImGui::TextDisabled("radius %.3f (from target)", n->ResolvedRadius());
+            ImGui::TextDisabled("radius %s (from target)", UiFmt::F3(n->ResolvedRadius()).c);
             ModSlider("radius scale", &n->radiusScale, 0.05f, 3.0f);
          }
          else
@@ -2300,9 +2300,9 @@ namespace app
          float f0 = (b == 0) ? 20.0f : AudioColorRampNode::PosToFreq(n->crossoverPos[b - 1]);
          float f1 = (b == n->bandCount - 1) ? 20000.0f : AudioColorRampNode::PosToFreq(n->crossoverPos[b]);
          if (f1 >= 1000.0f)
-            snprintf(label, sizeof(label), "B%d (%.0f-%.1fk)", b + 1, f0, f1 / 1000.0f);
+            snprintf(label, sizeof(label), "B%d (%s-%sk)", b + 1, UiFmt::F0(f0).c, UiFmt::F1(f1 / 1000.0f).c);
          else
-            snprintf(label, sizeof(label), "B%d (%.0f-%.0fHz)", b + 1, f0, f1);
+            snprintf(label, sizeof(label), "B%d (%s-%sHz)", b + 1, UiFmt::F0(f0).c, UiFmt::F0(f1).c);
 
          ColorSwatch(label, n->bandColor[b], n);
          ImGui::PopID();

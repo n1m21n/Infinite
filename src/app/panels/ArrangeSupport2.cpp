@@ -73,9 +73,9 @@ namespace app
       const double ss = sec - (double)mm * 60.0;
       char buf[32];
       if (centis)
-         snprintf(buf, sizeof(buf), "%d:%05.2f", mm, ss);
+         snprintf(buf, sizeof(buf), "%d:%s", mm, UiFmt::SecField2(ss).c);
       else
-         snprintf(buf, sizeof(buf), "%d:%02d", mm, (int)std::floor(ss + 1e-6));
+         snprintf(buf, sizeof(buf), "%d:%s", mm, UiFmt::Pad2((int)std::floor(ss + 1e-6)).c);
       return buf;
    }
 
@@ -501,7 +501,7 @@ namespace app
             if (unit == ArrangeTickUnit::FadeMs)
             {
                char buf[32];
-               snprintf(buf, sizeof(buf), "%.0f", v0);
+               snprintf(buf, sizeof(buf), "%s", UiFmt::F0(v0).c);
                seed = buf;
             }
             else if (bars)
@@ -509,7 +509,7 @@ namespace app
             else
             {
                char buf[32];
-               snprintf(buf, sizeof(buf), "%.2f", v0);
+               snprintf(buf, sizeof(buf), "%s", UiFmt::F2(v0).c);
                seed = buf;
             }
             ArrangeTypedEditOpen(id, seed, /*selectAll=*/true);

@@ -60,9 +60,9 @@ namespace app
          if (db <= -99.0f)
             snprintf(buf, size, "-inf");
          else if (db > 0.05f)
-            snprintf(buf, size, "+%.1f", db);
+            snprintf(buf, size, "+%s", UiFmt::F1(db).c);
          else
-            snprintf(buf, size, "%.1f", db);
+            snprintf(buf, size, "%s", UiFmt::F1(db).c);
       }
    }
 
@@ -129,7 +129,7 @@ namespace app
          dl->AddLine(ImVec2(lx, ty), ImVec2(lx + barW, ty), lineCol, 1.0f);
          dl->AddLine(ImVec2(rx, ty), ImVec2(rx + barW, ty), lineCol, 1.0f);
          char buf[8];
-         snprintf(buf, sizeof(buf), "%.0f", db);
+         snprintf(buf, sizeof(buf), "%s", UiFmt::F0(db).c);
          const ImVec2 ts = textSize(buf);
          text(ImVec2(scaleCx - ts.x * 0.5f, ty - ts.y * 0.5f), ScopeTextCol(), buf);
       }
@@ -2099,7 +2099,7 @@ namespace app
                   const float t = 1.0f - std::clamp((my - y0) / rowH, 0.0f, 1.0f);
                   vel = std::clamp(0.05f + t * 0.95f, 0.05f, 1.0f);
                   char buf[32];
-                  snprintf(buf, sizeof(buf), "%.2f", vel);
+                  snprintf(buf, sizeof(buf), "%s", UiFmt::F2(vel).c);
                   SetAudioReadout("velocity", buf);
                }
                else if (gDrumGridDrag.active && !isOrigin && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
@@ -2244,7 +2244,7 @@ namespace app
       if (std::fabs(bars - std::round(bars)) < 0.02 && bars >= 0.98)
          snprintf(len, sizeof(len), "%d bar%s", (int)std::lround(bars), std::lround(bars) == 1 ? "" : "s");
       else
-         snprintf(len, sizeof(len), "%.2f bars", bars);
+         snprintf(len, sizeof(len), "%s bars", UiFmt::F2(bars).c);
       const bool unity = n->AtUnity();
       char drift[64] = "";
       if (!unity)

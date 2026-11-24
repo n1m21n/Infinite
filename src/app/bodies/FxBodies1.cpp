@@ -87,9 +87,9 @@ namespace app
 
          char buf[8];
          if (f < 1000.0f)
-            snprintf(buf, sizeof(buf), "%.0f", f);
+            snprintf(buf, sizeof(buf), "%s", UiFmt::F0(f).c);
          else
-            snprintf(buf, sizeof(buf), "%.0fk", f / 1000.0f);
+            snprintf(buf, sizeof(buf), "%sk", UiFmt::F0(f / 1000.0f).c);
 
          if (f <= kFilterVizMinHz)
             dl->AddText(ImVec2(origin.x + 3.0f, textY), ScopeTextCol(), buf);
@@ -115,7 +115,7 @@ namespace app
             if (db == 0.0f)
                snprintf(buf, sizeof(buf), "0");
             else
-               snprintf(buf, sizeof(buf), "%+.0f", db);
+               snprintf(buf, sizeof(buf), "%s", UiFmt::SF0(db).c);
             dl->AddText(ImVec2(origin.x + 3.0f, y - (db == 0.0f ? 14.0f : 1.0f)), ScopeTextCol(), buf);
          }
       }
@@ -407,7 +407,7 @@ namespace app
       if (isNear)
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%s  %s  Q %.2f", UiFmt::Hz(freq).c, UiFmt::DbOffset(gain).c, q);
+         snprintf(buf, sizeof(buf), "%s  %s  Q %s", UiFmt::Hz(freq).c, UiFmt::DbOffset(gain).c, UiFmt::F2(q).c);
          SetAudioReadout("filter", buf);
       }
       // No trailing Dummy here: the InvisibleButton above already reserved
@@ -440,8 +440,8 @@ namespace app
       const float q = n->Param("q");
 
       char stat[80];
-      snprintf(stat, sizeof(stat), "%s - %s - Q %.2f", AudioFilterDsp::TypeName(type),
-               UiFmt::Hz(freq).c, q);
+      snprintf(stat, sizeof(stat), "%s - %s - Q %s", AudioFilterDsp::TypeName(type),
+               UiFmt::Hz(freq).c, UiFmt::F2(q).c);
 
       const double sampleRate = AudioEngine::Instance().SampleRate() > 0.0
                                    ? AudioEngine::Instance().SampleRate()
@@ -686,8 +686,8 @@ namespace app
          else
             snprintf(freqBuf, sizeof(freqBuf), "%s", UiFmt::Hz(bands[selected].freq).c);
          char capBuf[80];
-         snprintf(capBuf, sizeof(capBuf), "band %d \xC2\xB7 %s \xC2\xB7 %s \xC2\xB7 Q %.2f", selected + 1,
-                  freqBuf, UiFmt::DbOffset(bands[selected].gain).c, bands[selected].q);
+         snprintf(capBuf, sizeof(capBuf), "band %d \xC2\xB7 %s \xC2\xB7 %s \xC2\xB7 Q %s", selected + 1,
+                  freqBuf, UiFmt::DbOffset(bands[selected].gain).c, UiFmt::F2(bands[selected].q).c);
          dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 4.0f), ScopeTextCol(), capBuf);
       }
 
@@ -847,8 +847,8 @@ namespace app
       {
          const int b = dragBand;
          char buf[80];
-         snprintf(buf, sizeof(buf), "band %d  %s  %s  Q %.2f  %s", b + 1, UiFmt::Hz(bands[b].freq).c,
-                  UiFmt::DbOffset(bands[b].gain).c, bands[b].q, bands[b].on ? "on" : "off");
+         snprintf(buf, sizeof(buf), "band %d  %s  %s  Q %s  %s", b + 1, UiFmt::Hz(bands[b].freq).c,
+                  UiFmt::DbOffset(bands[b].gain).c, UiFmt::F2(bands[b].q).c, bands[b].on ? "on" : "off");
          SetAudioReadout("eq", buf);
       }
       // No trailing Dummy: the InvisibleButton above already reserved this
@@ -1053,7 +1053,7 @@ namespace app
          dl->AddLine(ImVec2(origin.x, y), ImVec2(curveBr.x, y),
                      db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
          char tickBuf[8];
-         snprintf(tickBuf, sizeof(tickBuf), "%.0f", db);
+         snprintf(tickBuf, sizeof(tickBuf), "%s", UiFmt::F0(db).c);
          dl->AddText(ImVec2(origin.x + 3.0f, y - (db == 0.0f ? 14.0f : 1.0f)), ScopeTextCol(), tickBuf);
       }
 
@@ -1142,12 +1142,12 @@ namespace app
             if (ratio >= kLimiterVizRatio)
                snprintf(buf, sizeof(buf), "%s in, -%s GR, limit", UiFmt::Db(liveInDb).c, UiFmt::Db(liveGrDb).c);
             else
-               snprintf(buf, sizeof(buf), "%s in, -%s GR, %.0f:1", UiFmt::Db(liveInDb).c, UiFmt::Db(liveGrDb).c, ratio);
+               snprintf(buf, sizeof(buf), "%s in, -%s GR, %s:1", UiFmt::Db(liveInDb).c, UiFmt::Db(liveGrDb).c, UiFmt::F0(ratio).c);
          }
          else if (ratio >= kLimiterVizRatio)
             snprintf(buf, sizeof(buf), "ceiling %s", UiFmt::Db(threshold + makeupDb).c);
          else
-            snprintf(buf, sizeof(buf), "%s in -> %s out, %.0f:1", UiFmt::Db(threshold).c, UiFmt::Db(threshold + makeupDb).c, ratio);
+            snprintf(buf, sizeof(buf), "%s in -> %s out, %s:1", UiFmt::Db(threshold).c, UiFmt::Db(threshold + makeupDb).c, UiFmt::F0(ratio).c);
          SetAudioReadout(readoutKey, buf);
       }
 
@@ -1160,8 +1160,8 @@ namespace app
       const bool analog = n->Param("analog") != 0.0f;
       const int style = std::clamp((int)std::lround(n->Param("style")), 0, DynamicsDsp::kNumStyles - 1);
       char stat[96];
-      snprintf(stat, sizeof(stat), "%s %.0f:1 @ %s%s", DynamicsDsp::StyleList()[style].c_str(),
-               n->Param("ratio"), UiFmt::Db(n->Param("threshold")).c, analog ? " - warm" : "");
+      snprintf(stat, sizeof(stat), "%s %s:1 @ %s%s", DynamicsDsp::StyleList()[style].c_str(),
+               UiFmt::F0(n->Param("ratio")).c, UiFmt::Db(n->Param("threshold")).c, analog ? " - warm" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawGainComputerVisualizer("dynamics", n->Param("threshold"), n->Param("ratio"), n->Param("makeup"), 0.0f,
@@ -1609,7 +1609,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%s drive, bias %.2f", UiFmt::Db(driveDb).c, bias);
+         snprintf(buf, sizeof(buf), "%s drive, bias %s", UiFmt::Db(driveDb).c, UiFmt::F2(bias).c);
          SetAudioReadout("drive", buf);
       }
 
@@ -1862,7 +1862,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[80];
-         snprintf(buf, sizeof(buf), "%s, position %.2f, %s drive", Wavetable::TableName(table), position,
+         snprintf(buf, sizeof(buf), "%s, position %s, %s drive", Wavetable::TableName(table), UiFmt::F2(position).c,
                    UiFmt::Db(driveDb).c);
          SetAudioReadout("wavetable shaper", buf);
       }
@@ -2006,7 +2006,7 @@ namespace app
       {
          char buf[48];
          const float corr = std::clamp(n->ExtraMeterValue(0), -1.0f, 1.0f);
-         snprintf(buf, sizeof(buf), "width %.2f - pan %+.2f - corr %.2f", width, pan, corr);
+         snprintf(buf, sizeof(buf), "width %s - pan %s - corr %s", UiFmt::F2(width).c, UiFmt::SF2(pan).c, UiFmt::F2(corr).c);
          SetAudioReadout("stereo", buf);
       }
 
@@ -2017,7 +2017,7 @@ namespace app
    void DrawStereoBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[80];
-      snprintf(stat, sizeof(stat), "width %.2f - pan %.2f", n->Param("width"), n->Param("pan"));
+      snprintf(stat, sizeof(stat), "width %s - pan %s", UiFmt::F2(n->Param("width")).c, UiFmt::F2(n->Param("pan")).c);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawStereoVisualizer(n);

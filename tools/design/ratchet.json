@@ -602,7 +602,6 @@
   "cursor": 1,
   "draw": 914,
   "font": 5,
-  "format": 1254,
   "hit": 16,
   "id_stack": 74,
   "key": 12,
@@ -615,8 +614,7 @@
   "slider": 48,
   "style_var": 5,
   "timing": 132,
-  "unit": 1,
-  "value_format": 43,
+  "value_format": 32,
   "window": 2
  }
 }

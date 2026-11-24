@@ -1026,7 +1026,7 @@ namespace app
          Pot("##pan", &m->pan[s], -1.0f, 1.0f, 0.0f, true, cell, col, T("PAN"));
          UndoOnActivate(&m->pan[s], before);
          if (ImGui::IsItemHovered())
-            HelpTip("%s %+.0f", T("Pan"), m->pan[s] * 100.0f);
+            HelpTip("%s %s", T("Pan"), UiFmt::SF0(m->pan[s] * 100.0f).c);
          y += kPotRowH + kRowGap;
 
          // Aux sends, only once the console has send buses.
@@ -1088,7 +1088,7 @@ namespace app
          if (m->gainDb[s] <= -60.0f)
             snprintf(val, sizeof(val), "-inf");
          else
-            snprintf(val, sizeof(val), "%+.1f", m->gainDb[s]);
+            snprintf(val, sizeof(val), "%s", UiFmt::SF1(m->gainDb[s]).c);
          Plate(dl, ImVec2(cx, y), cw, val, tok::U32(m->mute[s] ? tok::desk_readout_over : tok::desk_readout));
 
          ImGui::PopID();
@@ -1137,7 +1137,7 @@ namespace app
                if (vals[i] <= -99.0f)
                   snprintf(txt, sizeof(txt), "-inf");
                else
-                  snprintf(txt, sizeof(txt), "%.1f", vals[i]);
+                  snprintf(txt, sizeof(txt), "%s", UiFmt::F1(vals[i]).c);
                const float colX = dp.x + (i % 2) * (cw * 0.5f);
                const float ry = dp.y + (i / 2) * rowH + (rowH - fs) * 0.5f;
                const bool over = i == 0 && vals[0] > -1.0f; // above -1 dBTP: likely to clip once encoded
@@ -1174,7 +1174,7 @@ namespace app
          if (m->masterDb <= -60.0f)
             snprintf(val, sizeof(val), "-inf");
          else
-            snprintf(val, sizeof(val), "%+.1f", m->masterDb);
+            snprintf(val, sizeof(val), "%s", UiFmt::SF1(m->masterDb).c);
          Plate(dl, ImVec2(cx, y), cw, val, tok::U32(tok::desk_readout));
          ImGui::PopID();
          gMixerMasterMin = p;

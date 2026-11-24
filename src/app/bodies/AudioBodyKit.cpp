@@ -297,7 +297,7 @@ namespace app
          if (!n->ReadSlotForUI(i, pos, key))
             continue;
          char value[16];
-         snprintf(value, sizeof(value), "%.2f", pos);
+         snprintf(value, sizeof(value), "%s", UiFmt::F2(pos).c);
          const float valueW = ImGui::CalcTextSize(value).x;
          const float lh = ImGui::GetTextLineHeight();
          const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -467,7 +467,7 @@ namespace app
          // so a knob that was merely left alone while the transport ran reported thousands of
          // "samples" beside a confidence percentage derived from almost none of them.
          const double moves = n->IndependentSamplesForUI(i);
-         ImGui::TextDisabled("%s: %.0f moves, %s learned", DriftDestinationLabel(key).c_str(), moves,
+         ImGui::TextDisabled("%s: %s moves, %s learned", DriftDestinationLabel(key).c_str(), UiFmt::F0(moves).c,
                              UiFmt::Pct(confidence).c);
       }
    }
@@ -485,7 +485,7 @@ namespace app
          ImGui::TextDisabled("drag onto knobs to drive gesture");
          return;
       }
-      ImGui::TextDisabled("gesture %.2f", n->gesture);
+      ImGui::TextDisabled("gesture %s", UiFmt::F2(n->gesture).c);
       // Real explained variance of the axis this node rides, floor to ceiling. The old
       // clamp(.., 10, 99) invented a 10% floor for a patch with no recorded movement at all,
       // which read as "it knows something" when it knew nothing.
@@ -534,7 +534,7 @@ namespace app
                snprintf(label, sizeof(label), "stopped early - %s, Learn again", UiFmt::Pct(pct).c);
          }
          else if (n->HasFit())
-            snprintf(label, sizeof(label), "fit - radius %.2f", n->SpectralRadius());
+            snprintf(label, sizeof(label), "fit - radius %s", UiFmt::F2(n->SpectralRadius()).c);
          else
             snprintf(label, sizeof(label), "wire input, press Learn");
          // Clip to the meter's own box - AddText doesn't wrap or clip on its own, so a longer

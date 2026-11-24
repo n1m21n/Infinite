@@ -1089,8 +1089,8 @@ void DrawMenuBar(FrameCtx& fc)
          {
             const float bpm = transport.Tempo();
             char shown[32], edit[32];
-            snprintf(shown, sizeof(shown), "%.1f", bpm);
-            snprintf(edit, sizeof(edit), "%.1f", bpm);
+            snprintf(shown, sizeof(shown), "%s", UiFmt::F1(bpm).c);
+            snprintf(edit, sizeof(edit), "%s", UiFmt::F1(bpm).c);
             Field(TopBarField::Bpm, "##bpmField", wellMin.x, tempoCellW, shown, edit, true,
                   [&](float dy) {
                      const float speed = ImGui::GetIO().KeyShift ? 0.05f : 0.25f;
@@ -1264,7 +1264,7 @@ void DrawMenuBar(FrameCtx& fc)
          const double fps = sSmoothedMs > 0.0001 ? 1000.0 / sSmoothedMs : 0.0;
 
          char readout[80];
-         snprintf(readout, sizeof(readout), "%.1f fps   %s", fps, UiFmt::Ms(sSmoothedMs).c);
+         snprintf(readout, sizeof(readout), "%s fps   %s", UiFmt::F1(fps).c, UiFmt::Ms(sSmoothedMs).c);
 
          const bool audioEngineOn = AudioEngine::Instance().SampleRate() > 0.0;
          const double audioLoad = AudioEngine::Instance().LastBlockLoad();
@@ -1381,7 +1381,7 @@ void DrawMenuBar(FrameCtx& fc)
                      const std::string name = PluginEngine::SlotName(i);
                      if (name.empty())
                         continue;
-                     ImGui::Text("%02d  %s", i + 1, name.c_str());
+                     ImGui::Text("%s  %s", UiFmt::Pad2(i + 1).c, name.c_str());
                      shown++;
                   }
                   if (shown == 0)
