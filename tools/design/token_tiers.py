@@ -151,6 +151,25 @@ RADIUS_SNAP = {
 }
 HIT_RECT_RX = re.compile(r"(?:^|_)hit_(?:x|y|w|h)$")
 
+# Step G: canonical fixed colour roles for deduplicating own_colour (surface_rgba8 / surface_rgbaf).
+FIXED_COL_8 = {
+    (255, 255, 255, 255): "{fixed.white}",
+    (0, 0, 0, 255):       "{fixed.black}",
+}
+FIXED_COL_F = {
+    (1.0, 1.0, 1.0, 1.0): "{fixed_f.white}",
+    (0.0, 0.0, 0.0, 1.0): "{fixed_f.black}",
+    (1.0, 0.4, 0.4, 1.0): "{fixed_f.error}",
+}
+
+
+def col_role_alias(group, v):
+    if group == "surface_rgba8" and isinstance(v, list) and len(v) == 4:
+        return FIXED_COL_8.get(tuple(int(x) for x in v))
+    if group == "surface_rgbaf" and isinstance(v, list) and len(v) == 4:
+        return FIXED_COL_F.get(tuple(round(float(x), 4) for x in v))
+    return None
+
 
 def step_key(v, scale=1.0):
     v = round(v * scale, 6)
@@ -288,8 +307,19 @@ def jobs(tok):
     return out
 
 
+def col_roles(tok):
+    r = tok.get("roles", {})
+    out = {"fixed": {}, "fixed_f": {}}
+    for k, v in r.get("fixed", {}).items():
+        if k.startswith("fixed."):
+            out["fixed"][k[6:]] = v
+    for k, v in r.get("fixed_f", {}).items():
+        out["fixed_f"][k] = v
+    return out
+
+
 def resolve(value, tok):
-    """Follow alias chain (Tier 3 -> Tier 2 -> Tier 1) to its numeric value; anything else unchanged."""
+    """Follow alias chain (Tier 3 -> Tier 2 -> Tier 1, or colour role) to its value; anything else unchanged."""
     seen = set()
     cur = value
     while isinstance(cur, str):
@@ -300,6 +330,11 @@ def resolve(value, tok):
         if key in seen:
             raise ValueError(f"alias cycle at {cur}")
         seen.add(key)
+        if key[0] in ("fixed", "fixed_f"):
+            cr = col_roles(tok)
+            if key[1] in cr[key[0]]:
+                return cr[key[0]][key[1]]
+            raise KeyError(f"broken colour role alias {cur}")
         grp = tok["base"].get(key[0], {})
         if key[1] in grp:
             cur = grp[key[1]]
@@ -318,7 +353,7 @@ def nearest_ladder_alias(val, ladder_dict, ladder_name):
     return "{%s.%s}" % (ladder_name, best_k)
 
 
-def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=False, snap_space=False, snap_d1=False, snap_d2=False, old_prim=None, hit_min=20.0):
+def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=False, snap_space=False, snap_d1=False, snap_d2=False, snap_cols=False, old_prim=None, hit_min=20.0):
     """Rewrite one surface's entries into aliases + buckets (refile re-checks own_size; use_jobs lifts exact primitive aliases to Tier 2 jobs)."""
     out, buckets = {}, {}
     for k, v in entries.items():
@@ -328,6 +363,10 @@ def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=
             for kk, vv in v.items():
                 if kk.startswith("_"):
                     buckets.setdefault(k, {})[kk] = vv; continue
+                if snap_cols and k == "own_colour":
+                    ca = col_role_alias(group, vv)
+                    if ca:
+                        out[kk] = ca; continue
                 if snap_d1 and k == "own_size" and isinstance(vv, (int, float)) and HIT_RECT_RX.search(kk) and float(vv) < hit_min:
                     out[kk] = "{hit.target}"; continue
                 if k == "off_scale" or (refile and k == "own_size" and isinstance(vv, (int, float))):
@@ -379,14 +418,16 @@ def lint(tok, sj):
     bad = []
     prim = primitives(tok)
     job = jobs(tok)
+    cr = col_roles(tok)
 
     def check_alias(where, v):
         m = ALIAS.match(v)
         g, k = m.group(1), m.group(2)
         in_prim = g in prim and k in prim[g]
         in_job = g in job and k in job[g]
-        if not (in_prim or in_job):
-            bad.append(f"{where}: alias {v} is neither a primitive nor a job token")
+        in_col = g in cr and k in cr[g]
+        if not (in_prim or in_job or in_col):
+            bad.append(f"{where}: alias {v} is neither a primitive, job token, nor colour role")
             return
         try:
             resolve(v, tok)
@@ -400,6 +441,12 @@ def lint(tok, sj):
                 if k.startswith("_"):
                     continue
                 if is_bucket(k, v):
+                    if k == "own_colour" and g in ("surface_rgba8", "surface_rgbaf"):
+                        for kk, vv in v.items():
+                            if kk.startswith("_"): continue
+                            ca = col_role_alias(g, vv)
+                            if ca:
+                                bad.append(f"{g}.{s}.own_colour.{kk}: duplicate raw colour (use {ca})")
                     if k == "own_size" and g in NUM_GROUPS:
                         for kk, vv in v.items():
                             if kk.startswith("_") or not isinstance(vv, (int, float)):
@@ -463,8 +510,15 @@ def dumps(obj):
     return re.sub(r"\[\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+)\s*\]", r"[\1, \2, \3, \4]", s) + "\n"
 
 
-def apply(tok, sj, refile=False, use_jobs=False, snap_space=False, snap_d1=False, snap_d2=False):
+def apply(tok, sj, refile=False, use_jobs=False, snap_space=False, snap_d1=False, snap_d2=False, snap_cols=False):
     b = tok["base"]
+    if snap_cols:
+        r = tok.setdefault("roles", {})
+        r.setdefault("fixed", {}).setdefault("fixed.white", [255, 255, 255, 255])
+        r.setdefault("fixed", {}).setdefault("fixed.black", [0, 0, 0, 255])
+        r.setdefault("fixed_f", {}).setdefault("white", [1.0, 1.0, 1.0, 1.0])
+        r.setdefault("fixed_f", {}).setdefault("black", [0.0, 0.0, 0.0, 1.0])
+        r.setdefault("fixed_f", {}).setdefault("error", [1.0, 0.4, 0.4, 1.0])
     old_prim = primitives(tok)
     # 1. primitive ladders (space exists; radius gains numeric steps beside its semantic 'cell'; opacity8 mirrors opacity)
     all_ladders = {**LADDERS, "opacity8": LADDERS["opacity"]}
@@ -543,7 +597,8 @@ def apply(tok, sj, refile=False, use_jobs=False, snap_space=False, snap_d1=False
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
             sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS, group=g, refile=refile, use_jobs=use_jobs,
-                                    snap_space=snap_space, snap_d1=snap_d1, snap_d2=snap_d2, old_prim=old_prim, hit_min=hit_min)
+                                    snap_space=snap_space, snap_d1=snap_d1, snap_d2=snap_d2, snap_cols=snap_cols,
+                                    old_prim=old_prim, hit_min=hit_min)
     return tok, sj
 
 
@@ -579,9 +634,10 @@ def main():
     snap_space = "--snap-space" in sys.argv
     snap_d1 = "--snap-d1" in sys.argv
     snap_d2 = "--snap-d2" in sys.argv
-    if "--apply" in sys.argv or refile or use_jobs or snap_space or snap_d1 or snap_d2:
+    snap_cols = "--colours" in sys.argv
+    if "--apply" in sys.argv or refile or use_jobs or snap_space or snap_d1 or snap_d2 or snap_cols:
         tok, sj = apply(tok, sj, refile=refile, use_jobs=use_jobs or snap_space or snap_d1 or snap_d2,
-                        snap_space=snap_space, snap_d1=snap_d1, snap_d2=snap_d2)
+                        snap_space=snap_space, snap_d1=snap_d1, snap_d2=snap_d2, snap_cols=snap_cols)
         TOK.write_text(json.dumps(tok, indent=1, ensure_ascii=False) + "\n")
         SURF.write_text(dumps(sj))
         print("wrote tokens.json, surfaces.json")

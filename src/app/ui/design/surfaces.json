@@ -4735,17 +4735,13 @@
  },
  "surface_rgba8": {
   "arrange": {
-   "own_colour": {
-    "grid_col_shade_lg": [255, 255, 255, 255],
-    "grid_col_shade_sm": [0, 0, 0, 255],
-    "outline_shade_lg": [255, 255, 255, 255],
-    "outline_shade_sm": [0, 0, 0, 255]
-   }
+   "grid_col_shade_lg": "{fixed.white}",
+   "grid_col_shade_sm": "{fixed.black}",
+   "outline_shade_lg": "{fixed.white}",
+   "outline_shade_sm": "{fixed.black}"
   },
   "arrange_session_grid": {
-   "own_colour": {
-    "outline_shade": [255, 255, 255, 255]
-   }
+   "outline_shade": "{fixed.white}"
   },
   "dialog": {
    "own_colour": {
@@ -4753,10 +4749,8 @@
    }
   },
   "empty_state": {
-   "own_colour": {
-    "caption_col": [0, 0, 0, 255],
-    "fill_shade": [255, 255, 255, 255]
-   }
+   "caption_col": "{fixed.black}",
+   "fill_shade": "{fixed.white}"
   },
   "fx": {
    "own_colour": {
@@ -4768,22 +4762,20 @@
    }
   },
   "osc": {
+   "line_shade_lg": "{fixed.white}",
+   "line_shade_xs": "{fixed.black}",
    "own_colour": {
     "core_lo_shade_lg": [60, 210, 255, 255],
     "core_lo_shade_sm": [0, 130, 190, 255],
     "frame_stroke_shade_lg": [96, 150, 205, 255],
     "frame_stroke_shade_sm": [70, 115, 175, 255],
     "glow_shade": [40, 200, 220, 255],
-    "line_shade_lg": [255, 255, 255, 255],
     "line_shade_md": [255, 235, 160, 255],
-    "line_shade_sm": [210, 130, 20, 255],
-    "line_shade_xs": [0, 0, 0, 255]
+    "line_shade_sm": [210, 130, 20, 255]
    }
   },
   "piano_roll": {
-   "own_colour": {
-    "fill_shade": [0, 0, 0, 255]
-   }
+   "fill_shade": "{fixed.black}"
   },
   "sampler": {
    "own_colour": {
@@ -4793,11 +4785,11 @@
    }
   },
   "splash_screen": {
+   "mix_bg_shade": "{fixed.white}",
    "own_colour": {
     "card_bottom_shade": [35, 39, 70, 255],
     "card_top_shade": [21, 26, 47, 255],
-    "fill_shade": [6, 8, 16, 255],
-    "mix_bg_shade": [255, 255, 255, 255]
+    "fill_shade": [6, 8, 16, 255]
    }
   },
   "stage_links": {
@@ -4811,34 +4803,32 @@
    }
   },
   "tool_cursor": {
-   "own_colour": {
-    "badge_col": [255, 255, 255, 255]
-   }
+   "badge_col": "{fixed.white}"
   },
   "view2d": {
+   "dim_shade": "{fixed.black}",
+   "fill_shade_lg": "{fixed.white}",
+   "fill_shade_xs": "{fixed.black}",
+   "ring_shade": "{fixed.white}",
    "own_colour": {
-    "dim_shade": [0, 0, 0, 255],
-    "fill_shade_lg": [255, 255, 255, 255],
     "fill_shade_md": [235, 235, 235, 255],
     "fill_shade_sm": [20, 20, 20, 255],
-    "fill_shade_xs": [0, 0, 0, 255],
-    "gc_shade": [200, 200, 200, 255],
-    "ring_shade": [255, 255, 255, 255]
+    "gc_shade": [200, 200, 200, 255]
    }
   }
  },
  "surface_rgbaf": {
   "action_button": {
+   "ink_shade_lg": "{fixed_f.white}",
    "own_colour": {
-    "ink_shade_lg": [1.0, 1.0, 1.0, 1.0],
     "ink_shade_sm": [0.1, 0.1, 0.12, 1.0]
    }
   },
   "arrange": {
+   "mix_toggle_shade": "{fixed_f.white}",
+   "shade_md": "{fixed_f.black}",
    "own_colour": {
-    "mix_toggle_shade": [1.0, 1.0, 1.0, 1.0],
     "shade_lg": [1.0, 1.0, 1.0, 0.04],
-    "shade_md": [0.0, 0.0, 0.0, 1.0],
     "shade_sm": [0.0, 0.0, 0.0, 0.055]
    }
   },
@@ -4849,34 +4839,28 @@
    }
   },
   "field_params": {
-   "own_colour": {
-    "element_shade": [1.0, 0.4, 0.4, 1.0],
-    "graph_shade": [1.0, 0.4, 0.4, 1.0],
-    "notes_shade": [1.0, 0.4, 0.4, 1.0],
-    "pixel_shade": [1.0, 0.4, 0.4, 1.0],
-    "primitive_shade": [1.0, 0.4, 0.4, 1.0],
-    "sample_shade": [1.0, 0.4, 0.4, 1.0],
-    "spectral_shade": [1.0, 0.4, 0.4, 1.0],
-    "synth_shade": [1.0, 0.4, 0.4, 1.0]
-   }
+   "element_shade": "{fixed_f.error}",
+   "graph_shade": "{fixed_f.error}",
+   "notes_shade": "{fixed_f.error}",
+   "pixel_shade": "{fixed_f.error}",
+   "primitive_shade": "{fixed_f.error}",
+   "sample_shade": "{fixed_f.error}",
+   "spectral_shade": "{fixed_f.error}",
+   "synth_shade": "{fixed_f.error}"
   },
   "library": {
-   "own_colour": {
-    "well_shade": [0.0, 0.0, 0.0, 1.0]
-   }
+   "well_shade": "{fixed_f.black}"
   },
   "param": {
-   "own_colour": {
-    "palette_shade": [1.0, 0.4, 0.4, 1.0]
-   }
+   "palette_shade": "{fixed_f.error}"
   },
   "perf": {
+   "shade_rgbaf": "{fixed_f.black}",
    "own_colour": {
     "card_bg_shade": [1.0, 1.0, 1.0, 0.62],
     "card_hair_shade_lg": [1.0, 1.0, 1.0, 0.08],
     "card_hair_shade_sm": [0.0, 0.0, 0.0, 0.07],
-    "element_shade": [1.0, 1.0, 1.0, 0.95],
-    "shade_rgbaf": [0.0, 0.0, 0.0, 1.0]
+    "element_shade": [1.0, 1.0, 1.0, 0.95]
    }
   },
   "preview": {
@@ -4885,19 +4869,13 @@
    }
   },
   "sketch3_d_params": {
-   "own_colour": {
-    "shade": [1.0, 0.4, 0.4, 1.0]
-   }
+   "shade": "{fixed_f.error}"
   },
   "sketch_params": {
-   "own_colour": {
-    "shade": [1.0, 0.4, 0.4, 1.0]
-   }
+   "shade": "{fixed_f.error}"
   },
   "stage_menu_bar": {
-   "own_colour": {
-    "tex_shade": [1.0, 1.0, 1.0, 1.0]
-   }
+   "tex_shade": "{fixed_f.white}"
   },
   "stage_node": {
    "own_colour": {
@@ -4907,9 +4885,7 @@
    }
   },
   "theme": {
-   "own_colour": {
-    "border_shadow_shade": [0.0, 0.0, 0.0, 1.0]
-   }
+   "border_shadow_shade": "{fixed_f.black}"
   },
   "ui_gallery": {
    "own_colour": {

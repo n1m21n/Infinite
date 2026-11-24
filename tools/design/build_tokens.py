@@ -111,28 +111,35 @@ def build():
                 L.append(line(t2, f"{s}_{k}", v, dep))
     r = t["roles"]
     L += ["", "   struct Rgba8 { unsigned char r, g, b, a; };", "   struct Rgbaf { float r, g, b, a; };", "   struct Pair8 { Rgba8 dark, light; };", "   struct Pairf { Rgbaf dark, light; };"]
-    # Per-surface colours (owner rule B): a colour gets a role token of its own unless an existing one has the same
-    # value AND the same job. Rgba8 0-255, Rgbaf exact floats, pairs are [dark, light]; hex rgb words stay unsigned.
     c8 = lambda c: "{" + ", ".join(str(int(x)) for x in c) + "}"
     cf = lambda c: "{" + ", ".join(f"{float(x)}f" for x in c) + "}"
-    for grp, ty, cv in (("surface_hex", "unsigned", lambda v: f"{v}u"), ("surface_rgba8", "Rgba8", c8),
-                        ("surface_rgbaf", "Rgbaf", cf),
-                        ("surface_pair8", "Pair8", lambda v: f"{{ {c8(v['dark'])}, {c8(v['light'])} }}"),
-                        ("surface_pairf", "Pairf", lambda v: f"{{ {cf(v['dark'])}, {cf(v['light'])} }}")):
-        for s, kv in surfaces.get(grp, {}).items():
-            for k, v, dep in entries(kv):
-                L.append(f"   constexpr {ty} {s}_{k} = {cv(v)};")
     for k, v in r["pairs"].items():
         d, l = v["dark"], v["light"]
         L.append(f"   constexpr Pair8 {ident(k)} = {{ {{{d[0]}, {d[1]}, {d[2]}, {d[3]}}}, {{{l[0]}, {l[1]}, {l[2]}, {l[3]}}} }};")
     for k, v in r.get("fixed", {}).items():
         L.append(f"   constexpr Rgba8 {ident(k)} = {{{v[0]}, {v[1]}, {v[2]}, {v[3]}}};")
+    for k, v in r.get("fixed_f", {}).items():
+        L.append(f"   constexpr Rgbaf fixed_f_{ident(k)} = {cf(v)};")
     for k, v in r["pairs_f"].items():
         d, l = v["dark"], v["light"]
         f = lambda c: "{" + ", ".join(f"{x}f" for x in c) + "}"
         L.append(f"   constexpr Pairf {ident(k)} = {{ {f(d)}, {f(l)} }};")
     for k, v in r["accent_ladder"].items():
         L.append(f"   constexpr float accent_{k} = {v}f;")
+    # Per-surface colours (owner rule B): a colour gets a role token of its own unless an existing one has the same
+    # value AND the same job. Rgba8 0-255, Rgbaf exact floats, pairs are [dark, light]; hex rgb words stay unsigned.
+    for grp, ty, cv in (("surface_hex", "unsigned", lambda v: f"{v}u"), ("surface_rgba8", "Rgba8", c8),
+                        ("surface_rgbaf", "Rgbaf", cf),
+                        ("surface_pair8", "Pair8", lambda v: f"{{ {c8(v['dark'])}, {c8(v['light'])} }}"),
+                        ("surface_pairf", "Pairf", lambda v: f"{{ {cf(v['dark'])}, {cf(v['light'])} }}")):
+        for s, kv in surfaces.get(grp, {}).items():
+            for k, v, dep in entries(kv):
+                if isinstance(v, str) and ALIAS.match(v):
+                    m = ALIAS.match(v)
+                    rhs = f"{m.group(1)}_{m.group(2)}"
+                else:
+                    rhs = cv(v)
+                L.append(f"   constexpr {ty} {s}_{k} = {rhs};")
     # Palette roles (owner 2026-11-24): a dark + light pair each; tok::Role picks by theme, tok::Base keeps dark.
     L += ["", "   namespace col", "   {"]
     for k, v in r.get("col", {}).items():
