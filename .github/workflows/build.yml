@@ -465,6 +465,25 @@ jobs:
           if ($missing) { Write-Error ("Not shipped: " + ($missing -join "; ")); exit 1 }
           Write-Host "OK: every VC++ runtime DLL imported by a shipped DLL is bundled."
 
+      # Every DLL in the zip (ours and bundled third-party ones such as
+      # onnxruntime.dll) may import the VC++ runtime. Assert each one it names
+      # is shipped beside the exe, so a clean Windows never shows a
+      # "VCRUNTIME140_1.dll was not found" dialog.
+      - name: Assert bundled DLLs find their VC++ runtime
+        shell: pwsh
+        run: |
+          $dir = "dist/Infinite"
+          $missing = @()
+          foreach ($f in Get-ChildItem $dir -Filter *.dll) {
+            $ascii = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($f.FullName))
+            [regex]::Matches($ascii, '(?i)(msvcp|vcruntime|concrt|vccorlib)\w*\.dll') |
+              ForEach-Object { $_.Value.ToLower() } | Sort-Object -Unique |
+              Where-Object { -not (Test-Path (Join-Path $dir $_)) } |
+              ForEach-Object { $missing += "$($f.Name) -> $_" }
+          }
+          if ($missing) { Write-Error ("Not shipped: " + ($missing -join "; ")); exit 1 }
+          Write-Host "OK: every VC++ runtime DLL imported by a shipped DLL is bundled."
+
       - name: Upload unsigned artifact
         id: upload-unsigned
         if: matrix.arch == 'x64' && env.SIGNPATH_API_TOKEN != ''
