@@ -394,6 +394,9 @@ def scan_file(rel, src):
                 elif prev is not None and prev.text in ("<", ">", "<=", ">=", "==", "!="): cat = "compare"
                 elif prev is not None and prev.text in ("=", "+=", "-=", "*=", "/=", "return", "?", ":"): cat = "assign"
                 else: cat = "arith"
+        if cat in LOGIC_CATS or cat.startswith("call:"):
+            r = logic_reason(toks, match, i, t, v, prev, nxt, paren, st, stmt_lhs(stmt_start, i))
+            if r: allowed.bump(r, t.line); continue
         findings.append((cat, call or "-", t.text if not neg else "-" + t.text, st[:110]) + where)
     return findings, allowed, rawcalls
 
@@ -436,6 +439,78 @@ WIDGET_OF = {n: f for f, ns in WIDGET_FAMILY.items() for n in ns}
 # ("key=%d", "[tag] ...") are not on screen and are not counted.
 UNIT_SPEC = re.compile(r"(?<![=%])%[-+ #0]*\d*(?:\.\d+)?(?:l|ll|z)?[dfgiu](?: ?(?:kHz|Hz|dB|LUFS|ms|BPM|bpm|px|MB|KB)(?![A-Za-z])"
                        r"| ?s(?![A-Za-z0-9])|%%| ?st(?![A-Za-z])|\\xC2\\xB0|\u00b0)")
+
+# ---------------------------------------------------------------- logic vs design (arith/compare/assign/clamp/maths/call:*)
+# A number is a design value when it sits next to a screen quantity (a position, width, padding, font height, a tok::
+# value, an ImVec2); otherwise it is the program's own logic and is allowed with the reason it has:
+#   bits (masks, shifts, byte maths), mode (== a kind/enum/count), epsilon (a guard below 0.01), domain (dB, Hz, BPM,
+#   notes, samples, params: the model's units), unit_conv (100 %, 1000 ms, 60 s, 12 semitones, pi).
+LOGIC_CATS = {"arith", "compare", "assign", "clamp", "maths"}
+GEOM_NAME = re.compile(
+    r"^(?:x|y|w|h|[xy][0-9]|cx|cy|px|py|dx|dy|r|rad|radius|width|height|size|pad|gap|top|bot|bottom|left|right|avail|origin|pos|"
+    r"mouse|bb|tl|br|area|rect|cell|row|lane|line|indent|inset|margin|spacing|thick|stroke|thickness|scroll\w*|zoom|"
+    r"\w*(?:W|H|X|Y|Pad|Width|Height|Size|Gap|Inset|Margin|Radius|Rad|Px|Top|Left|Right|Bottom|Rect|Pos|Spacing|Indent|Thick|Stroke)|"
+    r"Get(?:FontSize|FrameHeight\w*|TextLineHeight\w*|ContentRegion\w*|Cursor\w*|Window\w*|ItemRect\w*|MousePos\w*|Scroll\w*)|"
+    r"CalcTextSize|ItemSpacing|FramePadding|WindowPadding|ItemInnerSpacing|FontSize|MousePos|DisplaySize|ImVec2|ImRect|"
+    r"(?:space|radius|hit|pin|icon|bar|stroke|row|page|dock|cell|ruler|fader|topbar|fold|compact|desk|arrange|chat|drag|type)_\w+)$")
+GEOM_CTX = {"ImVec2", "ImRect", "SetNextItemWidth", "PushItemWidth", "Dummy", "InvisibleButton", "BeginChild", "SetCursorPos",
+            "SetCursorPosX", "SetCursorPosY", "SetCursorScreenPos", "SameLine", "IsMouseHoveringRect", "ItemSize", "ItemAdd"}
+DOMAIN = re.compile(
+    r"(?i)(?:^|_|(?<=[a-z]))(?:db|hz|khz|freq\w*|cutoff|reso\w*|gain|bpm|tempo|beat\w*|bars?|ppq|ticks?|sample\w*|sr|semi\w*|"
+    r"notes?|midi|pitch|cents|octave\w*|phase\w*|vel\w*|velocity|param\w*|ratio|lufs|rms|peak|amp\w*|level|lvl|mag\w*|bin\w*|"
+    r"fft\w*|q|depth|rate|decay|attack|release|sustain|feedback|drive|mix|wet|dry|detune|pan|voice\w*|chan\w*|ch|bus\w*|"
+    r"frame\w*|fps|chord\w*|step\w*|bank|preset\w*|count|n|num\w*|idx|index|kind|mode|type|op|state|dock|ref|tab|page|"
+    r"version|ver|seed|hash|rgb|hue|sat|lum|luma|gamma|exposure|scale|uiScale|t|u|v|k|i|j|s|f|e|nt)(?=$|_|[A-Z0-9])")
+UNIT_CONV = {100.0, 1000.0, 60.0, 12.0, 3600.0, 1e3, 1e6, 1e9, 1024.0, 255.0, 256.0, 127.0, 128.0, 440.0, 69.0, 24.0, 48.0, 96.0,
+             44100.0, 48000.0, 360.0, 180.0, 90.0}
+PI = (3.14159, 6.28318, 1.5707)
+
+
+def _neigh(toks, match, i):
+    """identifiers the number is combined with: the operand just before and just after it (a call or cast counts by name)"""
+    out = []
+    k = i - 1
+    if k >= 0 and toks[k].text == "-" and (k == 0 or toks[k - 1].text in UNARY_PREV): k -= 1
+    if k >= 0 and toks[k].kind == "op" and toks[k].text in ("+", "-", "*", "/", "<", ">", "<=", ">=", "==", "!=", "=", "+=", "-=",
+                                                          "*=", "/=", "?", ":", "&", "|", "<<", ">>", "%", "^"):
+        k -= 1
+        if k >= 0 and toks[k].text == ")" and k in match:
+            o = match[k]
+            if o >= 1 and toks[o - 1].kind == "id": out.append(toks[o - 1].text)
+            j = k - 1
+            while j > o and toks[j].kind != "id": j -= 1
+            if j > o: out.append(toks[j].text)
+        elif k >= 0 and toks[k].kind == "id": out.append(toks[k].text)
+    k = i + 1
+    if k < len(toks) and toks[k].kind == "id" and toks[k].text in ("f", "F"): k += 1
+    if k < len(toks) and toks[k].kind == "op" and toks[k].text in ("+", "-", "*", "/", "<", ">", "<=", ">=", "&", "|", "<<", ">>", "%"):
+        k += 1
+        while k < len(toks) and toks[k].text in ("(", "-", "!"): k += 1
+        j = k
+        while j + 2 < len(toks) and toks[j].kind == "id" and toks[j + 1].text in (".", "->", "::") and toks[j + 2].kind == "id": j += 2
+        if j < len(toks) and toks[j].kind == "id": out.append(toks[j].text)
+    return out
+
+
+def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs):
+    names = _neigh(toks, match, i) + ([lhs] if lhs else [])
+    bitop = {"<<", ">>", "&", "|", "^", "%", "~", "&=", "|="}
+    if t.text.lower().startswith("0x") or (prev is not None and prev.text in bitop) or (nxt is not None and nxt.text in bitop):
+        return "bits"
+    if any(p[0] in GEOM_CTX or CALL_FAMILY.get(p[0]) in ("draw", "layout", "window", "style_var") for p in paren):
+        return None
+    if any(GEOM_NAME.match(n) for n in names) or "tok ::" in st and not names:
+        return None
+    if v is not None and float(v).is_integer() and prev is not None and prev.text in ("==", "!="):
+        return "mode"
+    if v is not None and 0 < abs(v) < 0.01:
+        return "epsilon"
+    if any(DOMAIN.search(n) for n in names):
+        return "domain"
+    if v is not None and (abs(v) in UNIT_CONV or any(abs(abs(v) - p) < 1e-3 for p in PI)):
+        return "unit_conv"
+    return None
+
 
 def run(files=None):
     all_f, allowed, raw = [], collections.Counter(), collections.Counter()
