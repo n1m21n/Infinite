@@ -41,7 +41,7 @@ namespace app
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / tok::field_params_wavetable_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::field_params_wavetable_scope_ratio, br.y),
                      ScopeGridCol(), tok::field_params_wavetable_scope_stroke);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::field_params_wavetable_scope_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (n->scopeCacheCount > 1)
       {
@@ -101,7 +101,7 @@ namespace app
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / tok::field_params_sample_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::field_params_sample_scope_ratio, br.y),
                      ScopeGridCol(), tok::field_params_sample_scope_stroke);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::field_params_sample_scope_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (n->scopeCacheCount > 1)
       {
@@ -209,7 +209,7 @@ namespace app
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / tok::field_params_synth_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::field_params_synth_scope_ratio, br.y),
                      ScopeGridCol(), tok::field_params_synth_scope_stroke);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::field_params_synth_scope_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (n->scopeCacheCount > 1)
       {

@@ -5,6 +5,7 @@
 // defaults), so a migrated body draws the same pixels, the same ImGui IDs and the same modulation ordinals.
 //
 //   Ui::DrawParams(n, kShapeRows);              // a stacked body: every row, top to bottom
+//   Ui::DrawParams(n, kRows, n->on);            // ... greyed out while the third argument is false
 //   Ui::DrawParam(n, kShapeRows[3]);            // one row, where hand code still sits around it
 //   Ui::DrawKnobs(row, n, kChorusRows);         // knob rows into an AudioKnobRow's cells, left to right
 //   Ui::RegisterParams(n, nodeIndex, kRows);    // ParamRefs for every shown slider, no ImGui at all
@@ -136,6 +137,22 @@ namespace Ui
    {
       for (const params::Row<N>& r : rows)
          DrawParam(n, r);
+   }
+
+   // The same, greyed out while `live` is false: the table's "enabled when" for a condition that belongs to the call
+   // site (another node's state, a connected input) rather than to one row. Same rule as a row's LiveIf.
+   template <class N>
+   bool DrawParam(N* n, const params::Row<N>& r, bool live)
+   {
+      detail::RowLive scope(live);
+      return DrawParam(n, r);
+   }
+
+   template <class N, size_t K>
+   void DrawParams(N* n, const params::Row<N> (&rows)[K], bool live)
+   {
+      detail::RowLive scope(live);
+      DrawParams(n, rows);
    }
 
    // Knob rows into the row's cells, left to right from its current index. Custom rows get the node and may

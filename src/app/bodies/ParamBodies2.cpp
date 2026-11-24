@@ -455,9 +455,7 @@ namespace app
       Ui::DrawParam(n, MSEGParamsRow::Toggle<&MSEGNode::loop>("loop"));
       PopCheckboxStyle();
       // Drawn either way so the two keep their slots; they do nothing with loop off.
-      ImGui::BeginDisabled(!n->loop);
-      Ui::DrawParams(n, kMSEGParamsRows);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kMSEGParamsRows, n->loop);
       DrawPerVoiceCheckbox(&n->voice);
       PushCheckboxStyle();
       Ui::DrawParam(n, MSEGParamsRow::Toggle<&MSEGNode::freeRun>("free run"));
@@ -1402,9 +1400,7 @@ namespace app
          }
       }
       Ui::DrawParams(n, kBrainSourceParamsRows);
-      ImGui::BeginDisabled(!n->HasTake() && !gParamRegisterOnly);
-      Ui::DrawParam(n, BrainSourceParamsRow::Toggle<&BrainSourceNode::playTake>("play baked take"));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, BrainSourceParamsRow::Toggle<&BrainSourceNode::playTake>("play baked take"), n->HasTake());
 
       NodeSeparator("24 neural & somatic outputs", colW * tok::param_brain_source_params_ratio + gutter);
       DrawOutputMeters(n, colW, 2, gutter);

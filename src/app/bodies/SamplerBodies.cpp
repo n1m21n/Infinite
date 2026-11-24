@@ -123,8 +123,8 @@ namespace app
       for (float db : kMinor)
       {
          const float ty = std::floor(yOf(db)) + 0.5f;
-         dl->AddLine(ImVec2(lx + barW + tok::space_0_5, ty), ImVec2(lx + barW + tok::space_1_25, ty), ScopeMidLineCol(), tok::sampler_audio_meter_visualizer_stroke);
-         dl->AddLine(ImVec2(rx - tok::space_1_25, ty), ImVec2(rx - tok::space_0_5, ty), ScopeMidLineCol(), tok::sampler_audio_meter_visualizer_stroke);
+         AudioViz::MidLine(dl, lx + barW + tok::space_0_5, lx + barW + tok::space_1_25, ty);
+         AudioViz::MidLine(dl, rx - tok::space_1_25, rx - tok::space_0_5, ty);
       }
       for (float db : kLabelled)
       {
@@ -965,7 +965,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::sampler_molder_waveform_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (hasSample)
       {
@@ -1231,7 +1231,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::sampler_grain_molder_waveform_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (hasSample)
       {
@@ -2339,7 +2339,7 @@ namespace app
       AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::sampler_looper_wave_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       const float len = n->LengthSeconds();
       const float tgt = n->TargetSeconds();
@@ -2824,7 +2824,7 @@ namespace app
             AudioViz::Fill(dl, origin, br);
             dl->PushClipRect(origin, br, true);
             const float midY = origin.y + h * 0.5f;
-            dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::sampler_outline_stroke);
+            AudioViz::MidLine(dl, origin.x, br.x, midY);
             if (has)
             {
                AudioViz::Peaks(dl, n->padPeaks[cur], origin, w, h);

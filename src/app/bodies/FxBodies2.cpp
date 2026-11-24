@@ -34,7 +34,7 @@ namespace app
       const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::fx_chorus_visualizer_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       const int taps = n->Param("taps") >= 2.5f ? 3 : 2;
       const float spread = std::clamp(n->Param("spread"), 0.0f, 1.0f);
@@ -852,7 +852,7 @@ namespace app
       const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::fx_ring_mod_visualizer_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       const int waveform = std::clamp((int)(n->Param("waveform") + 0.5f), 0, (int)DspMath::kWaveSquare);
       const float amp = h * 0.5f - 6.0f;

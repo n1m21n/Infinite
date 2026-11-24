@@ -927,7 +927,7 @@ namespace app
       AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::audio_trim_wave_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       const ImU32 startCol = isLight ? tok::Base(tok::col::state_ok_deep_vivid) : tok::Base(tok::col::state_ok);
       const ImU32 endCol = isLight ? tok::Base(tok::col::state_err) : tok::Base(tok::col::viz_pink);

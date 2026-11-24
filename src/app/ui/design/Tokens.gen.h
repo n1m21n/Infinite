@@ -567,7 +567,6 @@ namespace tok
    constexpr float audio_predictive_modulator_params_radius = radius_3;
    constexpr float audio_trim_wave_line_stroke_lg = stroke_scale_2;
    constexpr float audio_trim_wave_line_stroke_sm = stroke_scale_1_5;
-   constexpr float audio_trim_wave_stroke = stroke_scale_1;
    constexpr float audio_drift_meter_r = 2.0f;
    constexpr float audio_grip = 8.0f;
    constexpr float audio_h = 90.0f;
@@ -1117,7 +1116,6 @@ namespace tok
    constexpr float form_room_ratio = 2.0f;
    constexpr float fx_audio_filter_visualizer_path_stroke = stroke_scale_1_5;
    constexpr float fx_chorus_visualizer_path_stroke = stroke_scale_1_5;
-   constexpr float fx_chorus_visualizer_stroke = stroke_scale_1;
    constexpr float fx_convolution_space_visualizer_stroke = stroke_scale_1;
    constexpr float fx_cycle_shaper_visualizer_line_stroke = stroke_scale_2;
    constexpr float fx_cycle_shaper_visualizer_stroke = stroke_scale_1;
@@ -1140,7 +1138,6 @@ namespace tok
    constexpr float fx_resonator_bank_visualizer_line_stroke = stroke_scale_2;
    constexpr float fx_resonator_bank_visualizer_stroke = stroke_scale_1;
    constexpr float fx_reverb_visualizer_stroke = stroke_scale_1;
-   constexpr float fx_ring_mod_visualizer_stroke = stroke_scale_1;
    constexpr float fx_ring_stroke_lg = stroke_scale_1_5;
    constexpr float fx_saturator_visualizer_stroke = stroke_scale_1;
    constexpr float fx_shape_resonator_visualizer_line_stroke = stroke_scale_2;
@@ -1618,10 +1615,8 @@ namespace tok
    constexpr float osc_equation_visualizer_path_stroke_lg = stroke_scale_4;
    constexpr float osc_equation_visualizer_radius = radius_3;
    constexpr float osc_equation_visualizer_stroke = stroke_scale_1;
-   constexpr float osc_fm_scope_stroke = stroke_scale_1;
    constexpr float osc_granular_waveform_line_stroke_lg = stroke_scale_2;
    constexpr float osc_granular_waveform_line_stroke_sm = stroke_scale_1_5;
-   constexpr float osc_granular_waveform_stroke = stroke_scale_1;
    constexpr float osc_image_spectral_synth_body_radius = radius_4;
    constexpr float osc_image_spectral_synth_body_stroke = stroke_scale_1;
    constexpr float osc_image_spectral_synth_line_stroke_md = stroke_scale_3;
@@ -1634,7 +1629,6 @@ namespace tok
    constexpr float osc_outline_radius = radius_2;
    constexpr float osc_outline_stroke = stroke_scale_1;
    constexpr float osc_paul_stretch_waveform_line_stroke = stroke_scale_2;
-   constexpr float osc_paul_stretch_waveform_stroke = stroke_scale_1;
    constexpr float osc_peaks_alpha_lg = opacity_45;
    constexpr float osc_piano_diagram_line_stroke = stroke_scale_2;
    constexpr float osc_slicer_waveform_line_stroke_lg = stroke_scale_2;
@@ -2060,7 +2054,6 @@ namespace tok
    constexpr float pin_dot_cable_stroke = stroke_scale_1_5;
    constexpr float pin_dot_param_stroke = stroke_scale_2;
    constexpr float preview_comment_radius = radius_6;
-   constexpr float preview_field_graph_waveform_stroke = stroke_scale_1;
    constexpr float preview_group_node_bg_alpha_sm = opacity_8;
    constexpr float preview_group_node_border_alpha_lg = opacity_80;
    constexpr float preview_group_node_border_alpha_sm = opacity_65;
@@ -2166,11 +2159,9 @@ namespace tok
    constexpr float sample_studio_wave_stroke = 1.2f;
    constexpr float sampler_audio_meter_visualizer_stroke = stroke_scale_1;
    constexpr float sampler_drum_sequencer_body_stroke = stroke_scale_1;
-   constexpr float sampler_grain_molder_waveform_stroke = stroke_scale_1;
    constexpr float sampler_line_stroke_lg = stroke_scale_2;
    constexpr float sampler_line_stroke_sm = stroke_scale_1_5;
    constexpr float sampler_looper_wave_stroke = stroke_scale_1;
-   constexpr float sampler_molder_waveform_stroke = stroke_scale_1;
    constexpr float sampler_mpc_body_radius = radius_6;
    constexpr float sampler_mpc_body_stroke = stroke_scale_2;
    constexpr float sampler_outline_stroke = stroke_scale_1;

@@ -1021,9 +1021,7 @@ namespace app
       DrawModRateControls(&n->rateMode, &n->rateBeats, &n->rateHz, 4);
       Ui::DrawParams(n, kLFOParamsRows);
       // Per voice, each note starts the cycle: phase from does not apply.
-      ImGui::BeginDisabled(n->voice);
-      Ui::DrawParam(n, LFOParamsRow::Choice<&LFONode::phaseMode>("phase from", &LFONode::PhaseModeNames).Undo());
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, LFOParamsRow::Choice<&LFONode::phaseMode>("phase from", &LFONode::PhaseModeNames).Undo(), !n->voice);
       // Seed only means something for S&H (shape 5) on the new maths.
       if (n->shape == 5 && n->maths >= 1)
       {
@@ -1481,12 +1479,8 @@ namespace app
       Ui::DrawParams(n, kLogicGateParamsRows2);
       const bool needsPulse = (n->op == LogicGateNode::kOpRisingEdge);
       const bool needsRefrac = (n->op == LogicGateNode::kOpRisingEdge || n->op == LogicGateNode::kOpToggle);
-      ImGui::BeginDisabled(!needsPulse && !gParamRegisterOnly);
-      Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::pulseMs>("pulse ms", params::LogicGate::pulse_ms_lo, params::LogicGate::pulse_ms_hi).Fmt("%.0f"));
-      ImGui::EndDisabled();
-      ImGui::BeginDisabled(!needsRefrac && !gParamRegisterOnly);
-      Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::refractoryMs>("refractory ms", params::LogicGate::refractory_ms_lo, params::LogicGate::refractory_ms_hi).Fmt("%.0f"));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::pulseMs>("pulse ms", params::LogicGate::pulse_ms_lo, params::LogicGate::pulse_ms_hi).Fmt("%.0f"), needsPulse);
+      Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::refractoryMs>("refractory ms", params::LogicGate::refractory_ms_lo, params::LogicGate::refractory_ms_hi).Fmt("%.0f"), needsRefrac);
       Ui::DrawParam(n, LogicGateParamsRow::Slider<&LogicGateNode::minPresence>("min presence", params::LogicGate::min_presence_lo, params::LogicGate::min_presence_hi));
    }
 
@@ -1636,9 +1630,7 @@ namespace app
       // plain ones, which are fractal); the other types ignore them.
       const int nt = n->noiseType;
       const bool fractal = nt == 1 || nt == 2 || nt == 8 || nt == 9 || (n->colorNoise && nt <= 4);
-      ImGui::BeginDisabled(!fractal && !gParamRegisterOnly);
-      Ui::DrawParams(n, kNoiseParamsRows2);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kNoiseParamsRows2, fractal);
       Ui::DrawParams(n, kNoiseParamsRows3);
       if (!n->colorNoise)
       {
@@ -1796,9 +1788,7 @@ namespace app
 
    void DrawSwitcherParams(SwitcherNode* n)
    {
-      ImGui::BeginDisabled(n->manual && !gParamRegisterOnly);   // manual pins the slot; the clock is unused
-      Ui::DrawParams(n, kSwitcherParamsRows1);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kSwitcherParamsRows1, !n->manual);
       Ui::DrawParams(n, kSwitcherParamsRows2);
       if (n->manual)
       {

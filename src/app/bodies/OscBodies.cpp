@@ -41,7 +41,7 @@ namespace app
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / tok::osc_oscillator_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::osc_oscillator_scope_ratio, br.y),
                      ScopeGridCol(), tok::osc_oscillator_scope_stroke);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::osc_oscillator_scope_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (n->scopeCacheCount > 1)
       {
@@ -101,7 +101,7 @@ namespace app
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / tok::osc_metallic_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::osc_metallic_scope_ratio, br.y),
                      ScopeGridCol(), tok::osc_metallic_scope_stroke);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::osc_metallic_scope_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (n->scopeCacheCount > 1)
       {
@@ -231,7 +231,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::osc_slicer_waveform_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (hasSample)
       {
@@ -339,7 +339,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::osc_paul_stretch_waveform_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (hasSample)
       {
@@ -448,7 +448,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::osc_granular_waveform_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (hasSample)
       {
@@ -1539,7 +1539,7 @@ namespace app
       const float amp = (h * 0.5f) - tok::space_3;
 
       // Horizontal center line
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::osc_oscillator_waveform_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       // Vertical grid ticks
       for (int i = 1; i < 4; i++)
@@ -1904,7 +1904,7 @@ namespace app
       const float w = gAudioContentW;
       const AudioViz::Frame f = AudioViz::Begin(w, h);
       const float midY = f.origin.y + h * 0.5f;
-      f.dl->AddLine(ImVec2(f.origin.x, midY), ImVec2(f.br.x, midY), ScopeMidLineCol(), tok::osc_fm_scope_stroke);
+      AudioViz::MidLine(f.dl, f.origin.x, f.br.x, midY);
       if (n->scopeCacheCount > 1 && n->ActiveVoices() > 0)
       {
          const int count = n->scopeCacheCount;
@@ -2402,7 +2402,7 @@ namespace app
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / tok::osc_wave_terrain_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::osc_wave_terrain_scope_ratio, br.y),
                      ScopeGridCol(), tok::osc_wave_terrain_scope_stroke);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::osc_wave_terrain_scope_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (n->scopeCacheCount > 1)
       {
@@ -2940,7 +2940,7 @@ namespace app
       for (int i = 1; i < 8; i++)
          dl->AddLine(ImVec2(origin.x + w * i / tok::osc_image_spectral_synth_scope_ratio, origin.y), ImVec2(origin.x + w * i / tok::osc_image_spectral_synth_scope_ratio, br.y),
                      ScopeGridCol(), tok::osc_image_spectral_synth_scope_stroke);
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::osc_image_spectral_synth_scope_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (n->scopeCacheCount > 1)
       {

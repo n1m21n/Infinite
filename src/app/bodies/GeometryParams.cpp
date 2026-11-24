@@ -598,9 +598,7 @@ namespace app
    void DrawGroup3DParams(Group3DNode* n)
    {
       Ui::DrawParams(n, kGroup3DParamsRows1);
-      ImGui::BeginDisabled(n->rotX == 0.0f && n->rotY == 0.0f && n->rotZ == 0.0f && n->scale == 1.0f && !gParamRegisterOnly);
-      Ui::DrawParams(n, kGroup3DParamsRows2);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kGroup3DParamsRows2, !(n->rotX == 0.0f && n->rotY == 0.0f && n->rotZ == 0.0f && n->scale == 1.0f));
    }
 
 
@@ -615,9 +613,7 @@ namespace app
 
    void DrawSwitcher3DParams(Switcher3DNode* n)
    {
-      ImGui::BeginDisabled(n->manual && !gParamRegisterOnly);   // manual pins the slot; the clock is unused
-      Ui::DrawParams(n, kSwitcher3DParamsRows);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kSwitcher3DParamsRows, !n->manual);
       Ui::DrawParam(n, Switcher3DParamsRow::Toggle<&Switcher3DNode::manual>("manual"));
       if (n->manual)
       {
@@ -721,9 +717,7 @@ namespace app
       }
 
       NodeSeparator("collider");
-      ImGui::BeginDisabled(n->collider == nullptr);
-      Ui::DrawParams(n, kClothParamsRows4);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kClothParamsRows4, n->collider != nullptr);
    }
 
 
@@ -1086,24 +1080,15 @@ namespace app
       NodeSeparator("normal map", colW);
       ImGui::BeginDisabled(!n->MapInput(kMapNormal).IsConnected());
       Ui::DrawParams(n, kMaterialParamsRows1);
-      ImGui::BeginDisabled(n->detailScale <= 0.0f);
-      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::detailStrength>("detail strength", params::Material::detail_strength_lo, params::Material::detail_strength_hi));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::detailStrength>("detail strength", params::Material::detail_strength_lo, params::Material::detail_strength_hi), !(n->detailScale <= 0.0f));
       ImGui::EndDisabled();
 
       NodeSeparator("surface", colW);
-      ImGui::BeginDisabled(ptOnly);
-      Ui::DrawParam(n, MaterialParamsRow::Choice<&MaterialNode::shading>("shading", &GeometryNode::ShadingNames));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, MaterialParamsRow::Choice<&MaterialNode::shading>("shading", &GeometryNode::ShadingNames), !ptOnly);
       Ui::DrawParams(n, kMaterialParamsRows2);
-      ImGui::BeginDisabled(pbrUnused);
-      Ui::DrawParams(n, kMaterialParamsRows3);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kMaterialParamsRows3, !pbrUnused);
       Ui::DrawParams(n, kMaterialParamsRows4);
-      ImGui::BeginDisabled(!(n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha ||
-                             n->MapInput(kMapOpacity).IsConnected()));
-      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::alphaCutoff>("alpha cutoff", 0.0f, 1.0f));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::alphaCutoff>("alpha cutoff", 0.0f, 1.0f), n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha || n->MapInput(kMapOpacity).IsConnected());
 
       ImGui::BeginDisabled(pbrUnused);
       NodeSeparator("emission", colW);
@@ -1113,13 +1098,9 @@ namespace app
       ImGui::BeginDisabled(pbrUnused);
       NodeSeparator("coat & sheen", colW);
       Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::clearcoat>("clearcoat", 0.0f, 1.0f));
-      ImGui::BeginDisabled(!(n->clearcoat > 0.0f || n->MapInput(kMapClearcoat).IsConnected()));
-      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::clearcoatRoughness>("coat roughness", params::Material::clearcoat_roughness_lo, params::Material::clearcoat_roughness_hi));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::clearcoatRoughness>("coat roughness", params::Material::clearcoat_roughness_lo, params::Material::clearcoat_roughness_hi), n->clearcoat > 0.0f || n->MapInput(kMapClearcoat).IsConnected());
       Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::sheen>("sheen", 0.0f, 1.0f));
-      ImGui::BeginDisabled(!(n->sheen > 0.0f || n->MapInput(kMapSheen).IsConnected()));
-      Ui::DrawParams(n, kMaterialParamsRows6);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kMaterialParamsRows6, n->sheen > 0.0f || n->MapInput(kMapSheen).IsConnected());
       ImGui::EndDisabled();
 
       ImGui::EndGroup();
@@ -1132,26 +1113,18 @@ namespace app
       NodeSeparator("optics", colW);
       ImGui::BeginDisabled(ptOnly);
       Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::anisotropy>("anisotropy", -1.0f, 1.0f));
-      ImGui::BeginDisabled(n->anisotropy == 0.0f);
-      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::anisotropyRotation>("aniso rotation", 0.0f, 1.0f));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::anisotropyRotation>("aniso rotation", 0.0f, 1.0f), n->anisotropy != 0.0f);
       Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::iridescence>("iridescence", 0.0f, 1.0f));
-      ImGui::BeginDisabled(n->iridescence <= 0.0f);
-      Ui::DrawParams(n, kMaterialParamsRows7);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kMaterialParamsRows7, !(n->iridescence <= 0.0f));
       ImGui::EndDisabled();
       Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::transmission>("transmission", 0.0f, 1.0f));
       ImGui::BeginDisabled(n->transmission <= 0.0f);
       Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::transmissionRoughness>("trans rough", 0.0f, 1.0f));
-      ImGui::BeginDisabled(ptOnly);
-      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::dispersion>("dispersion", 0.0f, 1.0f));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::dispersion>("dispersion", 0.0f, 1.0f), !ptOnly);
       ImGui::EndDisabled();
       ImGui::BeginDisabled(ptOnly);
       Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::subsurface>("subsurface", 0.0f, 1.0f));
-      ImGui::BeginDisabled(n->subsurface <= 0.0f);
-      Ui::DrawParams(n, kMaterialParamsRows8);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kMaterialParamsRows8, !(n->subsurface <= 0.0f));
       Ui::DrawParam(n, MaterialParamsRow::Slider<&MaterialNode::translucency>("translucency", 0.0f, 1.0f));
       ImGui::EndDisabled();
       ImGui::EndDisabled();
@@ -1162,9 +1135,7 @@ namespace app
       DropdownButton("model", kModels, n->model, [n](int i) { n->model = i; }, colW);
       ImGui::BeginDisabled(n->model != 1 && !gParamRegisterOnly);
       DropdownButton("hair colour", kHairColour, n->hairColour, [n](int i) { n->hairColour = i; }, colW);
-      ImGui::BeginDisabled(n->hairColour != 0 && !gParamRegisterOnly);
-      Ui::DrawParams(n, kMaterialParamsRows9);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kMaterialParamsRows9, n->hairColour == 0);
       Ui::DrawParams(n, kMaterialParamsRows10);
       ImGui::EndDisabled();
       if (n->model == 1 && !gParamRegisterOnly)
@@ -2278,9 +2249,7 @@ namespace app
          // profiles built from `sides` alone): dim it rather than offer a
          // dead slider.
          const bool detailUnused = n->shape == 10 || (n->shape >= 14 && n->shape <= 16) || n->shape >= 20;
-         ImGui::BeginDisabled(detailUnused && !gParamRegisterOnly);
-         Ui::DrawParam(n, GeometryParamsRow::SliderInt<&GeometryNode::detail>("detail", params::Geometry::detail_lo, params::Geometry::detail_hi));
-         ImGui::EndDisabled();
+         Ui::DrawParam(n, GeometryParamsRow::SliderInt<&GeometryNode::detail>("detail", params::Geometry::detail_lo, params::Geometry::detail_hi), !detailUnused);
       }
       Ui::DrawParam(n, GeometryParamsRow::Slider<&GeometryNode::bevel>("bevel", 0.0f, 1.0f));
       if (n->shape == 13) // supershape
@@ -2291,9 +2260,7 @@ namespace app
          Ui::DrawParam(n, GeometryParamsRow::SliderInt<&GeometryNode::bevelSegments>("bevel segments", params::Geometry::bevel_segments_lo, params::Geometry::bevel_segments_hi));
       {
          const bool sidesUnused = n->shape == 0 || n->shape == 1 || n->shape == 3 || (n->shape >= 14 && n->shape <= 19);
-         ImGui::BeginDisabled(sidesUnused && !gParamRegisterOnly);
-         Ui::DrawParam(n, GeometryParamsRow::SliderInt<&GeometryNode::sides>("sides", params::Geometry::sides_lo, params::Geometry::sides_hi));
-         ImGui::EndDisabled();
+         Ui::DrawParam(n, GeometryParamsRow::SliderInt<&GeometryNode::sides>("sides", params::Geometry::sides_lo, params::Geometry::sides_hi), !sidesUnused);
       }
       // `tube` and `n2` are reused as the second and third form parameter by
       // several primitives, so each one is labelled for the shape in front of
@@ -2580,9 +2547,7 @@ namespace app
             {
             const bool pivotUnused = n->rotX == 0.0f && n->rotY == 0.0f && n->rotZ == 0.0f && n->spin == 0.0f
                && n->scaleX == 1.0f && n->scaleY == 1.0f && n->scaleZ == 1.0f;
-            ImGui::BeginDisabled(pivotUnused && !gParamRegisterOnly);   // pivot only matters once something rotates or scales
-            Ui::DrawParams(n, kGeometryOpParamsRows2);
-            ImGui::EndDisabled();
+            Ui::DrawParams(n, kGeometryOpParamsRows2, !pivotUnused);
             }
             Ui::DrawParam(n, GeometryOpParamsRow::Slider<&GeometryOpNode::spin>("spin / beat", params::geometry_params::spin_lo, params::geometry_params::spin_hi));
             break;
@@ -2626,9 +2591,7 @@ namespace app
             break;
          case GeometryOpNode::kMirror:
             Ui::DrawParams(n, kGeometryOpParamsRows12);
-            ImGui::BeginDisabled(!n->keepOriginal && !gParamRegisterOnly); // the seam only exists when both halves are kept
-            Ui::DrawParam(n, GeometryOpParamsRow::Toggle<&GeometryOpNode::weldSeam>("weld seam"));
-            ImGui::EndDisabled();
+            Ui::DrawParam(n, GeometryOpParamsRow::Toggle<&GeometryOpNode::weldSeam>("weld seam"), n->keepOriginal);
             break;
          case GeometryOpNode::kSelect:
          {
@@ -2751,9 +2714,7 @@ namespace app
          NodeSeparator("noise");
          Ui::DrawParams(n, kDisplacementParamsRows1);
          // Detail and grain only shape the octave types.
-         ImGui::BeginDisabled(n->noiseType != 1 && n->noiseType != 3 && !gParamRegisterOnly);
-         Ui::DrawParams(n, kDisplacementParamsRows2);
-         ImGui::EndDisabled();
+         Ui::DrawParams(n, kDisplacementParamsRows2, !(n->noiseType != 1 && n->noiseType != 3));
          Ui::DrawParam(n, DisplacementParamsRow::SliderInt<&DisplacementNode::seed>("seed", params::Displacement::seed_lo, params::Displacement::seed_hi));
       }
       Ui::DrawParams(n, kDisplacementParamsRows3);
@@ -2814,9 +2775,7 @@ namespace app
          ImGui::TextDisabled("%s triangles", UiFmt::Count((long long)(n->TriangleCount())).c);
 
       Ui::DrawParams(n, kAudioDisplacementParamsRows1);
-      ImGui::BeginDisabled(n->mode != AudioDisplacementNode::kModeAcousticRipples && !gParamRegisterOnly);   // only the ripple falloff reads it
-      Ui::DrawParam(n, AudioDisplacementParamsRow::Slider<&AudioDisplacementNode::damping>("damping", params::AudioDisplacement::damping_lo, params::AudioDisplacement::damping_hi));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, AudioDisplacementParamsRow::Slider<&AudioDisplacementNode::damping>("damping", params::AudioDisplacement::damping_lo, params::AudioDisplacement::damping_hi), n->mode == AudioDisplacementNode::kModeAcousticRipples);
       Ui::DrawParams(n, kAudioDisplacementParamsRows2);
 
       if (n->mode == AudioDisplacementNode::kModeDirectionalAxis)
@@ -3269,12 +3228,8 @@ namespace app
    {
       Ui::DrawParams(n, kLightParamsRows1);
       // Every row is always drawn; a row the chosen type does not use is greyed, so the node never changes size.
-      ImGui::BeginDisabled(!(n->type == 1 || n->type == 4 || n->type == 5));
-      Ui::DrawParam(n, LightParamsRow::Slider<&LightNode::distance>("distance", params::Light::distance_lo, params::Light::distance_hi));
-      ImGui::EndDisabled();
-      ImGui::BeginDisabled(n->type != 4);
-      Ui::DrawParams(n, kLightParamsRows2);
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, LightParamsRow::Slider<&LightNode::distance>("distance", params::Light::distance_lo, params::Light::distance_hi), n->type == 1 || n->type == 4 || n->type == 5);
+      Ui::DrawParams(n, kLightParamsRows2, n->type == 4);
       ImGui::BeginDisabled(n->type != 5);
       Ui::DrawParams(n, kLightParamsRows3);
       { static const std::vector<std::string> kShapes = { "Rectangle", "Disc" };
@@ -3299,15 +3254,11 @@ namespace app
       }
       ImGui::EndDisabled();
       Ui::DrawParams(n, kLightParamsRows4);
-      ImGui::BeginDisabled(!n->useTemperature);
-      Ui::DrawParam(n, LightParamsRow::Slider<&LightNode::temperature>("kelvin", params::Light::temperature_lo, params::Light::temperature_hi).Fmt("%.0f K"));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, LightParamsRow::Slider<&LightNode::temperature>("kelvin", params::Light::temperature_lo, params::Light::temperature_hi).Fmt("%.0f K"), n->useTemperature);
       Ui::DrawParams(n, kLightParamsRows5);
       ImGui::BeginDisabled(!(n->type == 1 || n->type == 4 || n->type == 5));
       Ui::DrawParams(n, kLightParamsRows6);
-      ImGui::BeginDisabled(!n->useCutoff);
-      Ui::DrawParam(n, LightParamsRow::Slider<&LightNode::cutoffDistance>("cutoff distance", params::Light::cutoff_distance_lo, params::Light::cutoff_distance_hi));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, LightParamsRow::Slider<&LightNode::cutoffDistance>("cutoff distance", params::Light::cutoff_distance_lo, params::Light::cutoff_distance_hi), n->useCutoff);
       ImGui::EndDisabled();
       Ui::DrawParams(n, kLightParamsRows7);
    }
@@ -3606,14 +3557,10 @@ namespace app
       sections.push_back([&]() {
       NodeSeparator("output", colW);
       // Path trace renders the beauty pass of a perspective or orthographic camera only.
-      ImGui::BeginDisabled(n->renderPass != 0 || n->SolidActive() || n->PanoActive());
-      Ui::DrawParam(n, Render3DParamsRow::Choice<&Render3DNode::engine>("engine", &Render3DNode::EngineNames));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, Render3DParamsRow::Choice<&Render3DNode::engine>("engine", &Render3DNode::EngineNames), !(n->renderPass != 0 || n->SolidActive() || n->PanoActive()));
       Ui::DrawParam(n, Render3DParamsRow::Choice<&Render3DNode::renderPass>("pass", &Render3DNode::RenderPassNames));
       // Row 7.3: depth, normal, albedo, mask and id as extra outputs beside the image.
-      ImGui::BeginDisabled(n->renderPass != 0 || n->PanoActive());
-      Ui::DrawParam(n, Render3DParamsRow::Toggle<&Render3DNode::passes>("passes"));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, Render3DParamsRow::Toggle<&Render3DNode::passes>("passes"), !(n->renderPass != 0 || n->PanoActive()));
       if (n->passes && n->renderPass == 0)
          Ui::DrawParam(n, Render3DParamsRow::SliderInt<&Render3DNode::passMask>("mask index", params::Render3D::pass_mask_lo, params::Render3D::pass_mask_hi));
       if (n->renderPass >= 1 && n->renderPass <= 9)
@@ -3626,9 +3573,7 @@ namespace app
       // its input hands it, so a 4000px PNG needs 4000 set here or it is an
       // upscale of a smaller render.
       Ui::DrawParams(n, kRender3DParamsRows2);
-      ImGui::BeginDisabled(pt);
-      Ui::DrawParam(n, Render3DParamsRow::Choice<&Render3DNode::samples>("antialias", &Render3DNode::SampleNames));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, Render3DParamsRow::Choice<&Render3DNode::samples>("antialias", &Render3DNode::SampleNames), !pt);
       // The requested sample count is clamped by both the driver and a memory
       // budget, so say what actually happened when they disagree.
       if (n->ActiveSamples() != wantedAa && ImGui::IsItemHovered())
@@ -3636,9 +3581,7 @@ namespace app
       Ui::DrawParams(n, kRender3DParamsRows3);
       // HDR lights the scene in float and tonemaps once at the end, so bloom
       // sees light above white. Only the beauty pass has light to keep.
-      ImGui::BeginDisabled(n->renderPass != 0 || pt);
-      Ui::DrawParam(n, Render3DParamsRow::Toggle<&Render3DNode::hdr>("hdr"));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, Render3DParamsRow::Toggle<&Render3DNode::hdr>("hdr"), !(n->renderPass != 0 || pt));
       Ui::DrawParams(n, kRender3DParamsRows4);
       hideBegin(0, 0, {"16-bit float output"});
       Ui::DrawParam(n, Render3DParamsRow::Toggle<&Render3DNode::floatOutput>("16-bit float output"));
@@ -3664,14 +3607,10 @@ namespace app
             Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::domeAngle>("dome angle", params::Render3D::dome_angle_lo, params::Render3D::dome_angle_hi).Fmt("%.0f\xC2\xB0"));
          else
          {
-            ImGui::BeginDisabled(n->projection != Render3DNode::kPerspective);
-            Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::fov>("fov", params::Render3D::fov_lo, params::Render3D::fov_hi));
-            ImGui::EndDisabled();
+            Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::fov>("fov", params::Render3D::fov_lo, params::Render3D::fov_hi), n->projection == Render3DNode::kPerspective);
          }
          hideBegin(1, 0, {}, n->projection == Render3DNode::kFisheye);
-         ImGui::BeginDisabled(n->projection != Render3DNode::kFisheye);
-         Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::domeTilt>("dome tilt", params::Render3D::dome_tilt_lo, params::Render3D::dome_tilt_hi).Fmt("%.0f\xC2\xB0"));
-         ImGui::EndDisabled();
+         Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::domeTilt>("dome tilt", params::Render3D::dome_tilt_lo, params::Render3D::dome_tilt_hi).Fmt("%.0f\xC2\xB0"), n->projection == Render3DNode::kFisheye);
          hideEnd();
          if (n->projection == Render3DNode::kFisheye)
             Ui::DrawParam(n, Render3DParamsRow::Choice<&Render3DNode::fisheyeLens>("lens", &Render3DNode::FisheyeLensNames));
@@ -3694,9 +3633,7 @@ namespace app
 
       sections.push_back([&]() {
       NodeSeparator("raster", colW);
-      ImGui::BeginDisabled(pt);
-      Ui::DrawParams(n, kRender3DParamsRows8);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kRender3DParamsRows8, !pt);
       });
 
       sections.push_back([&]() {
@@ -3706,12 +3643,8 @@ namespace app
             patchedLights++;
       snprintf(label, sizeof(label), patchedLights > 0 ? "light - %d from Light nodes" : "light", patchedLights);
       NodeSeparator(label, colW);
-      ImGui::BeginDisabled(patchedLights > 0);
-      Ui::DrawParams(n, kRender3DParamsRows9);
-      ImGui::EndDisabled();
-      ImGui::BeginDisabled(pt);
-      Ui::DrawParams(n, kRender3DParamsRows10);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kRender3DParamsRows9, !(patchedLights > 0));
+      Ui::DrawParams(n, kRender3DParamsRows10, !pt);
       });
 
       sections.push_back([&]() {
@@ -3734,21 +3667,15 @@ namespace app
       const bool envConnected = n->envInput.IsConnected();
       NodeSeparator(envConnected ? "environment - from an HDRI node" : "environment", colW);
       Ui::DrawParam(n, Render3DParamsRow::Toggle<&Render3DNode::envAsBackground>("use as background"));
-      ImGui::BeginDisabled(envConnected);
-      Ui::DrawParams(n, kRender3DParamsRows12);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kRender3DParamsRows12, !envConnected);
       Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::envIntensity>("env intensity", params::Render3D::env_intensity_lo, params::Render3D::env_intensity_hi));
       });
 
       sections.push_back([&]() {
       NodeSeparator("quality", colW);
-      ImGui::BeginDisabled(pt);
-      Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::aoStrength>("ambient occlusion", 0.0f, 1.0f));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::aoStrength>("ambient occlusion", 0.0f, 1.0f), !pt);
       hideBegin(1, 0, {});
-      ImGui::BeginDisabled(n->aoStrength <= 0.0f || pt);
-      Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::aoRadius>("occlusion radius", params::Render3D::ao_radius_lo, params::Render3D::ao_radius_hi));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::aoRadius>("occlusion radius", params::Render3D::ao_radius_lo, params::Render3D::ao_radius_hi), !(n->aoStrength <= 0.0f || pt));
       hideEnd();
       Ui::DrawParam(n, Render3DParamsRow::Choice<&Render3DNode::viewShading>("shading", &Render3DNode::ViewShadingNames));
       if (n->viewShading == 1)
@@ -3759,9 +3686,7 @@ namespace app
          if (n->solidLighting == 0)
          {
             Ui::DrawParam(n, Render3DParamsRow::Toggle<&Render3DNode::studioWorld>("studio world space"));
-            ImGui::BeginDisabled(!n->studioWorld);
-            Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::studioRotation>("studio rotation", params::Render3D::studio_rotation_lo, params::Render3D::studio_rotation_hi).Fmt("%.0f"));
-            ImGui::EndDisabled();
+            Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::studioRotation>("studio rotation", params::Render3D::studio_rotation_lo, params::Render3D::studio_rotation_hi).Fmt("%.0f"), n->studioWorld);
             Ui::DrawParam(n, Render3DParamsRow::Toggle<&Render3DNode::solidSpecular>("solid specular"));
          }
          Ui::DrawParam(n, Render3DParamsRow::Choice<&Render3DNode::solidColor>("solid color", &Render3DNode::SolidColorNames));
@@ -3770,9 +3695,7 @@ namespace app
       }
       hideBegin(5, 0, {"cavity", "cavity type"});
       Ui::DrawParam(n, Render3DParamsRow::Toggle<&Render3DNode::cavity>("cavity"));
-      ImGui::BeginDisabled(!n->cavity);
-      Ui::DrawParams(n, kRender3DParamsRows13);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kRender3DParamsRows13, n->cavity);
       hideEnd();
       Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::fogDensity>("fog", params::Render3D::fog_density_lo, params::Render3D::fog_density_hi));
       if (n->fogDensity > 0.0f)
@@ -3785,20 +3708,14 @@ namespace app
       Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::dofAperture>("depth of field", params::Render3D::dof_aperture_lo, params::Render3D::dof_aperture_hi));  // 16: a 100 mm macro at f/2.8
       ImGui::EndDisabled();
       hideBegin(8, 0, {});   // focus distance, aperture x3, cat eye, distortion, CA, offline supersample
-      ImGui::BeginDisabled(n->dofAperture <= 0.0f || n->PanoActive());
-      Ui::DrawParams(n, kRender3DParamsRows15);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kRender3DParamsRows15, !(n->dofAperture <= 0.0f || n->PanoActive()));
       Ui::DrawParams(n, kRender3DParamsRows16);
-      ImGui::BeginDisabled(pt);   // path trace takes its samples from the path trace section
-      Ui::DrawParam(n, Render3DParamsRow::SliderInt<&Render3DNode::supersample>("offline supersample", params::Render3D::supersample_lo, params::Render3D::supersample_hi));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, Render3DParamsRow::SliderInt<&Render3DNode::supersample>("offline supersample", params::Render3D::supersample_lo, params::Render3D::supersample_hi), !pt);
       hideEnd();
       ImGui::BeginDisabled(!n->LiveActive() && (!n->HdrActive() || pt)); // the live engine blooms its own picture (row 6.3)
       Ui::DrawParam(n, Render3DParamsRow::Slider<&Render3DNode::bloom>("bloom", 0.0f, 1.0f));
       hideBegin(2, 0, {});
-      ImGui::BeginDisabled(n->bloom <= 0.0f);
-      Ui::DrawParams(n, kRender3DParamsRows17);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kRender3DParamsRows17, !(n->bloom <= 0.0f));
       hideEnd();
       ImGui::EndDisabled();
       ImGui::BeginDisabled(n->PanoActive() || pt); // a panorama has no previous frame to smear from
@@ -3814,9 +3731,7 @@ namespace app
       // Last, so the two new sliders take the next ordinals and no earlier one moves.
       sections.push_back([&]() {
       NodeSeparator("path trace", colW);
-      ImGui::BeginDisabled(!pt);
-      Ui::DrawParams(n, kRender3DParamsRows19);
-      ImGui::EndDisabled();
+      Ui::DrawParams(n, kRender3DParamsRows19, pt);
       });
 
       const size_t splitAt = pinned ? 5 : 4;

@@ -852,7 +852,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), tok::preview_field_graph_waveform_stroke);
+      AudioViz::MidLine(dl, origin.x, br.x, midY);
 
       if (fgn->waveformCacheCount > 0)
       {

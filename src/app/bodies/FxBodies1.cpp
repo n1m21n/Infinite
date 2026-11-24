@@ -2052,7 +2052,7 @@ namespace app
          dl->PathStroke(ScopeGridCol(), 0, 1.0f);
       }
       dl->AddLine(ImVec2(apex.x, apex.y), ImVec2(apex.x, apex.y - radius), ScopeMidLineCol(), tok::fx_stereo_visualizer_stroke);
-      dl->AddLine(ImVec2(apex.x - radius, apex.y), ImVec2(apex.x + radius, apex.y), ScopeMidLineCol(), tok::fx_stereo_visualizer_stroke);
+      AudioViz::MidLine(dl, apex.x - radius, apex.x + radius, apex.y);
 
       static const char* kDbLabels[] = { "0", "-6", "-12", "-18", "-24" };
       for (int i = 0; i < kNumRings; i++)

@@ -988,9 +988,7 @@ namespace app
          }
       }
 
-      ImGui::BeginDisabled(n->input != nullptr);
-      Ui::DrawParam(n, CVRecorderParamsRow::Slider<&CVRecorderNode::constantIn>("in (no cable)", 0.0f, 1.0f));
-      ImGui::EndDisabled();
+      Ui::DrawParam(n, CVRecorderParamsRow::Slider<&CVRecorderNode::constantIn>("in (no cable)", 0.0f, 1.0f), n->input == nullptr);
 
       Ui::DrawParams(n, kCVRecorderParamsRows);
    }

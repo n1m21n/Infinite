@@ -33,6 +33,12 @@ namespace AudioViz
    }
    inline Frame Begin(float w, float h) { return Begin(ImGui::GetCursorScreenPos(), w, h); }
 
+   // The scope's zero line: one dim horizontal stroke from x0 to x1 at y (every waveform and scope shares it).
+   inline void MidLine(ImDrawList* dl, float x0, float x1, float y)
+   {
+      dl->AddLine(ImVec2(x0, y), ImVec2(x1, y), app::ScopeMidLineCol(), tok::stroke_scale_1);
+   }
+
    // The two halves of the frame for visualizers that manage their own clip (viewers with several layers).
    inline void Fill(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx)
    {
