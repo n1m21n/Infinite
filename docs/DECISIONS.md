@@ -4,6 +4,7 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-11-24 Owner: node-body labels stay English ("it can"): ui_audit allows the 351 in src/app/bodies/ and ParamWidgets.cpp with the reason "node body, English by owner decision 2026-11-24"; every other surface's words still go through I18n.
 - 2026-11-24 Owner: every on/off row is box first, label right, on every surface (Settings, panels, node bodies, dialogs); one shared check row in the design kit, no label-left variant.
 - 2026-11-24 Owner: every number with a unit on screen goes through one formatter, `UiFmt` (src/app/ui/design/UiFmt.h), with one rule per unit (internal/plans/ui-unit-table.md, defaults approved): one space before the unit except %, x and °; dB signed only for offsets; Hz becomes kHz at 1 kHz; always "BPM".
 - 2026-11-23 Owner: the 2D View side panel is rebuilt around one Look stack per layer (adjustments, effects and styles in one list, one Add sheet, one Mix line, More for rare rows) and a 4-icon rail; plan signed off ("plan everything and then fix"), `internal/plans/2d-view/look-stack.md`. Develop strip and canvas handles wait for the owner.

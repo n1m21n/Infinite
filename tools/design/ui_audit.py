@@ -173,7 +173,7 @@ I18N_WRAP = {"L", "T", "TC", "LC", "TList", "I18N_KEY", "HelpT"}
 SHORTCUT = re.compile(r"^(?:\+?(?:Shift|Alt|Ctrl|Cmd|Opt)\+)*\+?(?:[A-Z0-9]|F\d{1,2}|Backspace|Delete|Tab|Esc|Enter|Home|End|PgUp|PgDn|"
                       r"Space|Click|Double-click(?: top)?)$")
 # the same English-by-design scope as tools/i18n/lint.py (decision D2): node bodies' param names and values
-I18N_ENGLISH = ("src/app/bodies/", "src/app/ui/ParamWidgets.cpp")
+I18N_ENGLISH = ("src/app/bodies/", "src/app/ui/ParamWidgets.cpp")   # node body, English by owner decision 2026-11-24 (docs/DECISIONS.md)
 ID_CALLS = {"OpenPopup", "BeginPopup", "BeginPopupModal", "BeginPopupContextItem", "BeginPopupContextWindow", "IsPopupOpen",
             "PushID", "GetID", "BeginChild", "BeginTable", "BeginTabBar", "BeginListBox", "BeginContextItem"}   # an id, never shown
 # a theme is read from what the statement calls, or from the name of the variable it sets (never from any word in it)
@@ -197,13 +197,13 @@ def fmt_category(s):
 
 # ---------------------------------------------------------------- scan
 def ui_files():
-    for base in ("src",):
+    # every source file under src/app and src/core (owner 2026-11-24): a file with no screen values comes back clean
+    for base in ("src/app", "src/core"):
         for f in sorted((ROOT / base).rglob("*")):
-            if f.suffix not in (".cpp", ".h", ".mm", ".hpp"): continue
+            if f.suffix not in (".cpp", ".h", ".mm", ".hpp", ".inl"): continue
             rel = str(f.relative_to(ROOT))
             if SKIP.search(rel): continue
-            t = f.read_text(errors="ignore")
-            if UI_FILE.search(t): yield rel, t
+            yield rel, f.read_text(errors="ignore")
 
 STMT_END = {";", "{", "}"}
 UNARY_PREV = {"(", ",", "=", "return", "?", ":", "[", "{", "+", "-", "*", "/", "<", ">", "<=", ">=", "==", "!=", "&&", "||",
@@ -408,6 +408,11 @@ def scan_file(rel, src):
             r = logic_reason(toks, match, i, t, v, prev, nxt, paren, st, stmt_lhs(stmt_start, i), cat, rel)
             if r: allowed.bump(r, t.line); continue
         findings.append((cat, call or "-", t.text if not neg else "-" + t.text, st[:110]) + where)
+    if not UI_FILE.search(src):
+        # no screen API in the file (engine maths, file formats, CLI, the param tables, the theme source): nothing it holds
+        # is drawn from here, so every literal is allowed and counted, and the file comes back clean (owner 2026-11-24)
+        for f in findings: allowed.bump("no_screen", f[5])
+        findings = []
     return findings, allowed, rawcalls
 
 WIDGET_FAMILY = {
