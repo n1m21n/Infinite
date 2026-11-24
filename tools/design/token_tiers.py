@@ -38,8 +38,7 @@ ALIAS = re.compile(r"^\{([a-z_0-9]+)\.([a-z_0-9]+)\}$")
 LADDERS = {
     "radius": [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 12],
     "stroke_scale": [0.5, 1, 1.5, 2, 2.5, 3, 4],
-    "opacity": [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.1, 0.12, 0.14, 0.15, 0.16, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
-                0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1],
+    "opacity": [0.04, 0.06, 0.08, 0.1, 0.12, 0.16, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1],
 }
 PRIMITIVE_GROUPS = ("space", "radius", "stroke_scale", "opacity", "opacity8")
 INT_PRIMITIVE_GROUPS = ("opacity8",)
@@ -311,7 +310,13 @@ def resolve(value, tok):
     return float(cur) if isinstance(cur, (int, float)) else cur
 
 
-def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=False, snap_space=False, snap_d1=False, hit_min=20.0):
+def nearest_ladder_alias(val, ladder_dict, ladder_name):
+    """Snap a numeric value to the nearest step in a primitive ladder."""
+    best_k = min(ladder_dict, key=lambda k: (abs(float(ladder_dict[k]) - float(val)), float(ladder_dict[k])))
+    return "{%s.%s}" % (ladder_name, best_k)
+
+
+def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=False, snap_space=False, snap_d1=False, snap_d2=False, old_prim=None, hit_min=20.0):
     """Rewrite one surface's entries into aliases + buckets (refile re-checks own_size; use_jobs lifts exact primitive aliases to Tier 2 jobs)."""
     out, buckets = {}, {}
     for k, v in entries.items():
@@ -336,6 +341,10 @@ def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=
                         snapped = STROKE_SNAP.get(float(vv)) if kd == "stroke" else (RADIUS_SNAP.get(float(vv)) if kd == "radius" else None)
                         if snapped:
                             out[kk] = snapped; continue
+                    if snap_d2 and k == "off_scale" and isinstance(vv, (int, float)):
+                        kd = kind(kk, float(vv), group)
+                        if kd in ("opacity", "opacity8"):
+                            out[kk] = nearest_ladder_alias(vv, prim[kd], kd); continue
                     if refile and k == "own_size" and where != "own_size":
                         buckets.setdefault(where, {})[kk] = val; continue
                 buckets.setdefault(k, {})[kk] = vv
@@ -343,6 +352,11 @@ def tier_surface(entries, prim, colour, group="surface", refile=False, use_jobs=
         if isinstance(v, str) and ALIAS.match(v):
             if snap_d1 and v in STROKE_ALIAS_PRUNE:
                 v = STROKE_ALIAS_PRUNE[v]
+            if snap_d2 and old_prim is not None:
+                m = ALIAS.match(v)
+                ag, ak = m.group(1), m.group(2)
+                if ag in ("opacity", "opacity8") and ak not in prim[ag] and ak in old_prim.get(ag, {}):
+                    v = nearest_ladder_alias(old_prim[ag][ak], prim[ag], ag)
             out[k] = PRIM_TO_JOB.get(v, v) if use_jobs else v; continue
         if colour:
             buckets.setdefault("own_colour", {})[k] = v; continue
@@ -445,11 +459,16 @@ def dumps(obj):
     return re.sub(r"\[\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+),\s*([-0-9.eE]+)\s*\]", r"[\1, \2, \3, \4]", s) + "\n"
 
 
-def apply(tok, sj, refile=False, use_jobs=False, snap_space=False, snap_d1=False):
+def apply(tok, sj, refile=False, use_jobs=False, snap_space=False, snap_d1=False, snap_d2=False):
     b = tok["base"]
+    old_prim = primitives(tok)
     # 1. primitive ladders (space exists; radius gains numeric steps beside its semantic 'cell'; opacity8 mirrors opacity)
     all_ladders = {**LADDERS, "opacity8": LADDERS["opacity"]}
     for g, vals in all_ladders.items():
+        if snap_d2 and g in ("opacity", "opacity8"):
+            doc = b.get(g, {}).get("_doc")
+            b[g] = ({**({"_doc": doc} if doc else {}), **ladder_keys(g, vals)})
+            continue
         grp = b.setdefault(g, {})
         for k, v in ladder_keys(g, vals).items():
             grp.setdefault(k, v)
@@ -491,7 +510,14 @@ def apply(tok, sj, refile=False, use_jobs=False, snap_space=False, snap_d1=False
             continue
         cast = int if ladder in INT_PRIMITIVE_GROUPS else float
         for k, v in list(b[g].items()):
-            if k.startswith("_") or not isinstance(v, (int, float)) or (g == "radius" and re.fullmatch(r"[0-9_]+", k)):
+            if k.startswith("_") or (g == "radius" and re.fullmatch(r"[0-9_]+", k)):
+                continue
+            if snap_d2 and ladder in ("opacity", "opacity8") and isinstance(v, str) and ALIAS.match(v):
+                m = ALIAS.match(v)
+                if m.group(1) == ladder and m.group(2) not in prim[ladder] and m.group(2) in old_prim.get(ladder, {}):
+                    b[g][k] = nearest_ladder_alias(old_prim[ladder][m.group(2)], prim[ladder], ladder)
+                continue
+            if not isinstance(v, (int, float)):
                 continue
             hit = next((pk for pk, pv in prim[ladder].items() if pv == cast(v)), None)
             if hit is not None:
@@ -500,6 +526,9 @@ def apply(tok, sj, refile=False, use_jobs=False, snap_space=False, snap_d1=False
                 b[g].setdefault("off_scale", {})[k] = v
                 del b[g][k]
         for k, v in list(b[g].get("off_scale", {}).items()):
+            if snap_d2 and ladder in ("opacity", "opacity8"):
+                b[g][k] = nearest_ladder_alias(v, prim[ladder], ladder); del b[g]["off_scale"][k]
+                continue
             hit = next((pk for pk, pv in prim[ladder].items() if pv == cast(v)), None)
             if hit is not None:
                 b[g][k] = "{%s.%s}" % (ladder, hit); del b[g]["off_scale"][k]
@@ -510,7 +539,7 @@ def apply(tok, sj, refile=False, use_jobs=False, snap_space=False, snap_d1=False
     for g in NUM_GROUPS + COL_GROUPS:
         for s, kv in sj.get(g, {}).items():
             sj[g][s] = tier_surface(kv, prim, g in COL_GROUPS, group=g, refile=refile, use_jobs=use_jobs,
-                                    snap_space=snap_space, snap_d1=snap_d1, hit_min=hit_min)
+                                    snap_space=snap_space, snap_d1=snap_d1, snap_d2=snap_d2, old_prim=old_prim, hit_min=hit_min)
     return tok, sj
 
 
@@ -545,9 +574,10 @@ def main():
     use_jobs = "--jobs" in sys.argv
     snap_space = "--snap-space" in sys.argv
     snap_d1 = "--snap-d1" in sys.argv
-    if "--apply" in sys.argv or refile or use_jobs or snap_space or snap_d1:
-        tok, sj = apply(tok, sj, refile=refile, use_jobs=use_jobs or snap_space or snap_d1,
-                        snap_space=snap_space, snap_d1=snap_d1)
+    snap_d2 = "--snap-d2" in sys.argv
+    if "--apply" in sys.argv or refile or use_jobs or snap_space or snap_d1 or snap_d2:
+        tok, sj = apply(tok, sj, refile=refile, use_jobs=use_jobs or snap_space or snap_d1 or snap_d2,
+                        snap_space=snap_space, snap_d1=snap_d1, snap_d2=snap_d2)
         TOK.write_text(json.dumps(tok, indent=1, ensure_ascii=False) + "\n")
         SURF.write_text(dumps(sj))
         print("wrote tokens.json, surfaces.json")
