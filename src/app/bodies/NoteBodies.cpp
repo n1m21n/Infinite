@@ -302,7 +302,7 @@ namespace app
 
          {
             // A knob a size down: at kKnobStd the input dot sat on the ring in an 80 px cell.
-            const float panDia = std::min(kKnobStd, cellW - tok::note_mixer_body_gap);
+            const float panDia = std::min(kKnobStd, cellW - tok::note_mixer_body_span);
             AudioKnobRow row(count, panDia);
             for (int i = 0; i < count; i++)
             {
@@ -1352,7 +1352,7 @@ namespace app
          return;
       char badge[32];
       snprintf(badge, sizeof(badge), "%s conf", UiFmt::Pct((int)std::round(conf * 100.0f)).c);
-      const float maxW = bodyW - ImGui::CalcTextSize(badge).x - tok::note_max_w_gap;
+      const float maxW = bodyW - ImGui::CalcTextSize(badge).x - tok::note_max_w_span;
       std::string out = stat;
       if (ImGui::CalcTextSize(out.c_str()).x <= maxW)
          return;

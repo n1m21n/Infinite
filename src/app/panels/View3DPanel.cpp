@@ -3611,7 +3611,7 @@ namespace
       bool onBar = false;
       {
          float x = sCam.mn.x + tok::space_3;
-         const float y = sCam.mx.y - tok::view3d_y_gap, h = ImGui::GetFontSize() + tok::space_2;
+         const float y = sCam.mx.y - tok::view3d_y_span, h = ImGui::GetFontSize() + tok::space_2;
          auto pill = [&](const char* label, bool on) {
             const ImVec2 ts = ImGui::CalcTextSize(label);
             const ImVec2 a(x, y), b(x + ts.x + tok::space_3_5, y + h);
@@ -4365,7 +4365,7 @@ namespace
       bool onBar = false;
       {
          float x = sCam.mn.x + tok::space_3;
-         const float y = sCam.mx.y - tok::view3d_y_gap, h = ImGui::GetFontSize() + tok::space_2;
+         const float y = sCam.mx.y - tok::view3d_y_span, h = ImGui::GetFontSize() + tok::space_2;
          const char* names[3] = { T("Points"), T("Edges"), T("Faces") };
          for (int i = 0; i < 3; i++)
          {
@@ -6221,7 +6221,7 @@ namespace
       // Fills the tab below the search box, then scrolls.
       const int count = (int)scene->Items().size();
       const float step = rowH + ImGui::GetStyle().ItemSpacing.y;
-      const int shown = std::min(count, std::max(2, (int)((roomH - tok::view3d_outliner_gap) / step)));
+      const int shown = std::min(count, std::max(2, (int)((roomH - tok::view3d_outliner_span) / step)));
       const bool scrolls = count > shown;
       if (count > 0)
          ImGui::BeginChild("##v3dlist", ImVec2(availW, step * (float)shown));

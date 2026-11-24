@@ -326,7 +326,7 @@ namespace app
          if (missing)
             label += T("  (not found)");
          const LibraryParts::RowResult row =
-            LibraryParts::FolderRow("folder", TruncateWithEllipsis(label, std::max(tok::library_search_min_sm, rowW - tok::library_search_panel_gap)), missing, rowW);
+            LibraryParts::FolderRow("folder", TruncateWithEllipsis(label, std::max(tok::library_search_min_sm, rowW - tok::library_search_panel_span)), missing, rowW);
          if (row.clicked && !missing)
             browseDir = folder;
          MaybeStartFolderDrag(folder, mediaKind);

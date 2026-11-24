@@ -1200,7 +1200,7 @@ namespace app
             y = any ? std::min(y, gn.liveY) : gn.liveY;
             any = true;
          }
-         return any ? ImVec2(x + tok::mixer_free_canvas_spot_gap, y) : ImVec2(0.0f, 0.0f);
+         return any ? ImVec2(x + tok::mixer_free_canvas_spot_span, y) : ImVec2(0.0f, 0.0f);
       }
 
       bool sPendingAdd = false;   // header "+" and the empty page's New Mixer land at the top of the next frame
@@ -1594,7 +1594,7 @@ namespace app
       {
          if (wrap)
          {
-            const int newTop = SpawnAt("Mixer", mGn->liveX + tok::mixer_panel_new_send_fx_gap, mGn->liveY);
+            const int newTop = SpawnAt("Mixer", mGn->liveX + tok::mixer_panel_new_send_fx_span, mGn->liveY);
             GraphNode* outGn = FindNodeByIndex(outIndex);
             GraphNode* topGn = FindNodeByIndex(newTop);
             mGn = FindNodeByIndex(mixerIndex);
@@ -1740,7 +1740,7 @@ namespace app
       if (mGn == nullptr)
          return -1;
       const bool master = slot == kMixerMasterSlot;
-      const float x = mGn->liveX + (master ? tok::mixer_panel_insert_add_gap + tok::mixer_panel_insert_add_ratio * (float)ch.fx.size() : -tok::mixer_insert_inset);
+      const float x = mGn->liveX + (master ? tok::mixer_panel_insert_add_span + tok::mixer_panel_insert_add_ratio * (float)ch.fx.size() : -tok::mixer_insert_inset);
       const float y = mGn->liveY + (master ? 0.0f : tok::mixer_insert_scale * (float)slot);
       UndoScope undo("Add insert");
       GraphNode* fx = SpawnNode(fxType, "AudioEffects", x, y);
@@ -1897,7 +1897,7 @@ namespace app
                           T("Turn its sends off first."));
             return -1;
          }
-      const float x = mGn->liveX - tok::mixer_x_gap, y = mGn->liveY + tok::mixer_y_ratio * (float)*sel.begin();
+      const float x = mGn->liveX - tok::mixer_x_span, y = mGn->liveY + tok::mixer_y_ratio * (float)*sel.begin();
       UndoScope undo("Group strips");
       GraphNode* gGn = SpawnNode("Mixer", "Utility", x, y);
       m = MixerAt(mixerIndex); // spawning may move gNodes
@@ -2017,7 +2017,7 @@ namespace app
       if (feeds.empty() || feeds.size() > (size_t)MixerNode::kMaxSlots)
          return false;
       GraphNode* first = FindNodeByIndex(outs[0]);
-      const ImVec2 at(first->liveX - tok::mixer_panel_create_from_audio_outs_gap, first->liveY);
+      const ImVec2 at(first->liveX - tok::mixer_panel_create_from_audio_outs_span, first->liveY);
 
       PushUndoCheckpoint("Create Mixer from Audio Outs");
       const bool wasSuppressed = gSuppressUndoCheckpoints;

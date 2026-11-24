@@ -622,7 +622,7 @@ namespace app
          const ImVec2 o = ImGui::GetCursorScreenPos();
          EmptyState::Draw(o, ImVec2(o.x + avail.x, o.y + avail.y), T("No tracks yet"),
                           T("Add a track, then add clips to its cells or drop audio and video files onto them."));
-         ImGui::SetCursorScreenPos(ImVec2(o.x + avail.x * 0.5f - tok::arrange_session_grid_gap, o.y + avail.y * 0.5f + tok::arrange_session_grid_y));
+         ImGui::SetCursorScreenPos(ImVec2(o.x + avail.x * 0.5f - tok::arrange_session_grid_span, o.y + avail.y * 0.5f + tok::arrange_session_grid_y));
          if (ActionButton::Draw(L("+ Video Track##sessaddv"), ImVec2(tok::arrange_session_grid_video_track_x, 0)))
             AddTrackOfType(Arrange::kLaneVideo);
          ImGui::SetCursorScreenPos(ImVec2(o.x + avail.x * 0.5f + tok::space_1_25, o.y + avail.y * 0.5f + tok::arrange_session_grid_y));

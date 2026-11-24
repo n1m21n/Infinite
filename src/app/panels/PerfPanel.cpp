@@ -854,7 +854,7 @@ namespace app
          auto [val, kp] = getParamRef(elem.dstIndex, elem.dstParam, elem.value);
          float minV = kp.minValue, maxV = kp.maxValue;
          if (minV >= maxV) { minV = 0.0f; maxV = 1.0f; }
-         float faderH = cardSize.y - tok::perf_fader_h_gap;
+         float faderH = cardSize.y - tok::perf_fader_h_span;
          float centerX = cellPos.x + cardSize.x * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(centerX - tok::space_4, cellPos.y + tok::perf_origin_y));
 
@@ -1343,7 +1343,7 @@ namespace app
          }
 
          float areaW = cardSize.x - tok::space_4;
-         float stepH = cardSize.y - tok::perf_step_h_gap;
+         float stepH = cardSize.y - tok::perf_step_h_span;
          float stepW = (areaW - tok::perf_element_step_w * tok::perf_element_btn_w) / tok::perf_step_w_ratio;
          float startY = cellPos.y + tok::perf_element_start_y;
 
@@ -1961,7 +1961,7 @@ namespace app
       }
       if (srcIndex < 0)
       {
-         float sx = dest->spawnX - tok::perf_sx_gap;
+         float sx = dest->spawnX - tok::perf_sx_span;
          float sy = dest->spawnY;
          if (gEditor != nullptr)
          {
@@ -1969,7 +1969,7 @@ namespace app
             ed::SetCurrentEditor(gEditor);
             const ImVec2 p = ed::GetNodePosition(dest->NodeId());
             ed::SetCurrentEditor(prev);
-            const ImVec2 spot = FindFreeSpawnPosition(ImVec2(p.x - tok::perf_param_midi_learn_commit_gap, p.y));
+            const ImVec2 spot = FindFreeSpawnPosition(ImVec2(p.x - tok::perf_param_midi_learn_commit_span, p.y));
             sx = spot.x;
             sy = spot.y;
          }
@@ -2044,7 +2044,7 @@ namespace app
       const std::string target = dest->typeName + " > " + ((known != nullptr && !known->name.empty()) ? known->name : std::string("parameter"));
       // The shared mode strip (ModeBanner), as the canvas pick uses: under the top bar, centred.
       const ImGuiViewport* vp = ImGui::GetMainViewport();
-      if (ModeBanner::Float("##midilearn.banner", ImVec2(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + tok::perf_param_midi_learn_banner_gap), L("MIDI learn"), target.c_str()))
+      if (ModeBanner::Float("##midilearn.banner", ImVec2(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + tok::perf_param_midi_learn_banner_span), L("MIDI learn"), target.c_str()))
          MidiLearnCancelAll();
    }
 
@@ -2122,11 +2122,11 @@ namespace app
          }
          {
             UiType::Scope ts(UiType::Size::Body);
-            const float room = sp.x + stripW - tok::perf_room_gap - tx;
+            const float room = sp.x + stripW - tok::perf_room_span - tx;
             if (ImGui::CalcTextSize(hint).x <= room)
                sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, tok::perf_y_sm)), hint);
          }
-         ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - tok::perf_panel_content_gap, sp.y + (stripH - ChipButton::Height()) * 0.5f));
+         ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - tok::perf_panel_content_span, sp.y + (stripH - ChipButton::Height()) * 0.5f));
          if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::Height(), tok::perf_cancel_bottom))
             gPerfMidiLearnIdx = -1;
          ImGui::SetCursorScreenPos(ImVec2(sp.x, sp.y));

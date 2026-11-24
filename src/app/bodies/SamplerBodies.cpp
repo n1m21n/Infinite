@@ -615,7 +615,7 @@ namespace app
       {
          const ImVec2 p = ImGui::GetCursorScreenPos();
          Ui::Claim(ImVec2(AudioFullWidth(), tok::sampler_generate_samples_spacer_h_lg));
-         EmptyState::Draw(p, ImVec2(p.x + AudioFullWidth(), p.y + tok::sampler_generate_samples_body_gap),
+         EmptyState::Draw(p, ImVec2(p.x + AudioFullWidth(), p.y + tok::sampler_generate_samples_body_span),
                           state == State::Generating ? T("Generating") : state == State::Failed ? T("Could not make one") : T("No sample yet"),
                           state == State::Failed ? T("Generate again") : state == State::Generating ? nullptr : T("Pick a part and generate"));
       }

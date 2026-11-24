@@ -143,7 +143,7 @@ namespace DialogParts
       }
       else
          dl->AddText(ImVec2(tx, c.y - lh * 0.5f), ImGui::GetColorU32(ImGuiCol_TextDisabled), what);
-      ImGui::Dummy(ImVec2(A * tok::dialog_spacer_w + sw + tok::space_4 + tok::dialog_progress_gap, rowH));
+      ImGui::Dummy(ImVec2(A * tok::dialog_spacer_w + sw + tok::space_4 + tok::dialog_progress_span, rowH));
    }
 
    // Right-aligned row; returns the clicked index or -1. The last label is the primary action.

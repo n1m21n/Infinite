@@ -553,7 +553,7 @@ void DrawSidePanels(FrameCtx& fc)
                   const bool isFav = gBrowserFavorites.IsFavoriteModule(match.first);
                   const float availW = Ui::AvailW();
                   const std::string rowLabel =
-                     TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - tok::stage_side_panels_gap));
+                     TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - tok::stage_side_panels_span));
                   const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
                   if (row.clicked)
                   {
@@ -615,7 +615,7 @@ void DrawSidePanels(FrameCtx& fc)
                      const bool isFav = gBrowserFavorites.IsFavoriteModule(name);
                      const float availW = Ui::AvailW();
                      const std::string rowLabel =
-                        TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - tok::stage_side_panels_gap));
+                        TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - tok::stage_side_panels_span));
                      const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
                      if (row.clicked)
                      {

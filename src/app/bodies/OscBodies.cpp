@@ -2570,7 +2570,7 @@ namespace app
                pts[i] = ImVec2(baseX + t * traceW, baseY - traceH * 0.5f - s * traceH * 0.5f);
             }
 
-            const ImU32 glow = tok::U32(tok::osc_glow_shade, (int)(tok::osc_wave_terrain_body_gap + tok::osc_wave_terrain_body_ratio * prox));
+            const ImU32 glow = tok::U32(tok::osc_glow_shade, (int)(tok::osc_wave_terrain_body_n + tok::osc_wave_terrain_body_ratio * prox));
             const bool isLight = IsThemeLight();
             const ImU32 coreLo = isLight ? tok::U32(tok::osc_core_lo_shade_sm, (int)(tok::osc_core_lo_shade_sm_u8 + tok::osc_core_lo_shade_md * prox))
                                           : tok::U32(tok::osc_core_lo_shade_lg, (int)(tok::osc_core_lo_shade_sm_u8 + tok::osc_core_lo_shade_lg_u8 * prox));

@@ -386,7 +386,7 @@ namespace
       if (Scene2DNode* d = FindDoc())
          return d;
       const ImVec2 at = NodePos(near);
-      return MakeDoc(at.x + tok::view2d_ensure_doc_gap, at.y, "");
+      return MakeDoc(at.x + tok::view2d_ensure_doc_span, at.y, "");
    }
 
    bool Selected(int id) { return std::find(sSel.begin(), sSel.end(), id) != sSel.end(); }
@@ -537,7 +537,7 @@ namespace
 
    void FitView(Scene2DNode* doc)
    {
-      const float vw = std::max(40.0f, sViewMx.x - sViewMn.x - tok::view2d_fit_view_gap), vh = std::max(40.0f, sViewMx.y - sViewMn.y - tok::view2d_fit_view_gap);
+      const float vw = std::max(40.0f, sViewMx.x - sViewMn.x - tok::view2d_fit_view_span), vh = std::max(40.0f, sViewMx.y - sViewMn.y - tok::view2d_fit_view_span);
       // A turned document fits by its turned box.
       const float co = std::fabs(std::cos(sViewAngle)), si = std::fabs(std::sin(sViewAngle));
       const float bw = co * doc->Doc().w + si * doc->Doc().h, bh = si * doc->Doc().w + co * doc->Doc().h;
@@ -5498,7 +5498,7 @@ namespace
          float r = (a == 0 ? l0.rx : a == 1 ? l0.ry : l0.angle) + deg;
          if (snap)
             r = std::round(r / tok::view2d_drag_gizmo3_d_ratio) * tok::view2d_drag_gizmo3_d_scale;
-         *v = std::fmod(r + tok::view2d_drag_gizmo3_d_gap, 360.0f) - tok::view2d_v_gap;
+         *v = std::fmod(r + tok::view2d_drag_gizmo3_d_span, 360.0f) - tok::view2d_v_span;
       }
       else
       {
@@ -8185,7 +8185,7 @@ namespace
                {
                   const ImVec2 rmx = ImGui::GetItemRectMax(), rmn = ImGui::GetItemRectMin();
                   const float cy = (rmn.y + rmx.y) * 0.5f;
-                  Thumb::Add(ImGui::GetWindowDrawList(), (ImTextureID)(intptr_t)thumb, ImVec2(rmx.x - tok::view2d_pixel_bar_gap - tok::space_2, cy - tok::space_3),
+                  Thumb::Add(ImGui::GetWindowDrawList(), (ImTextureID)(intptr_t)thumb, ImVec2(rmx.x - tok::view2d_pixel_bar_span - tok::space_2, cy - tok::space_3),
                                                        ImVec2(rmx.x - tok::space_2, cy + tok::space_3), ImVec2(0, 1), ImVec2(1, 0));
                }
                if (chose)
@@ -11481,7 +11481,7 @@ namespace
    {
       if (x == 0.0f && y == 0.0f)
          if (GraphNode* host = DocGraphNode())
-            x = host->liveX - tok::view2d_x_gap, y = host->liveY + tok::view2d_y_gap;
+            x = host->liveX - tok::view2d_x_span, y = host->liveY + tok::view2d_y_span;
       GraphNode* gn = SpawnNode(ne.type, ne.category, x, y);   // checkpoints the undo itself
       if (gn == nullptr)
          return 0;
@@ -12424,7 +12424,7 @@ namespace
       for (GraphNode& gn : gNodes)
          if (gn.node.get() == doc)
             host = &gn;
-      const float x = host != nullptr ? host->liveX - tok::view2d_x_gap : 0.0f, y = host != nullptr ? host->liveY + tok::view2d_y_gap : 0.0f;
+      const float x = host != nullptr ? host->liveX - tok::view2d_x_span : 0.0f, y = host != nullptr ? host->liveY + tok::view2d_y_span : 0.0f;
       if (const uint64_t uid = SpawnEffectNode(ne, x, y))
       {
          Scene2DNode::Effect e;
@@ -12753,7 +12753,7 @@ namespace
             continue;
          const std::string title = l->name.empty() ? std::string(T(Scene2DNode::AdjName(l->adjType))) : l->name;
          ImGui::PushID(l->id);
-         SettingsWindow::Draw(winKey, title.c_str(), WinAt(ImGui::GetWindowPos().y + tok::view2d_adjust_windows_gap), [&]() {
+         SettingsWindow::Draw(winKey, title.c_str(), WinAt(ImGui::GetWindowPos().y + tok::view2d_adjust_windows_span), [&]() {
             MoreRows mr;
             float lo = 0, hi = 1;
             Scene2DNode::AdjRange(l->adjType, lo, hi);
@@ -13409,19 +13409,19 @@ namespace
       {
       case Pending::NewDoc:
          PushUndoCheckpoint("New document");
-         MakeDoc(at.x, at.y + tok::view2d_run_pending_gap, "");
+         MakeDoc(at.x, at.y + tok::view2d_run_pending_span, "");
          break;
       case Pending::DuplicateDoc:
       {
          PushUndoCheckpoint("Duplicate document");
-         MakeDoc(at.x, at.y + tok::view2d_run_pending_gap, DocTextWithoutSelection(doc->DocText()));
+         MakeDoc(at.x, at.y + tok::view2d_run_pending_span, DocTextWithoutSelection(doc->DocText()));
          break;
       }
       case Pending::DeleteDoc: DeleteDoc(doc); break;
       case Pending::OpenFile:
          if (!AuditNoDialog())
             for (const std::string& path : Platform::OpenFilesDialog(T("Open"), { "psd", "ora" }))
-               OpenLayeredFile(path, ImVec2(at.x, at.y + tok::view2d_run_pending_gap));
+               OpenLayeredFile(path, ImVec2(at.x, at.y + tok::view2d_run_pending_span));
          break;
       case Pending::ExportPsd:
       case Pending::ExportOra:
@@ -13806,7 +13806,7 @@ namespace
       float row = 0.0f;
       for (const std::string& path : files)
       {
-         const ImVec2 spot(base.x - tok::view2d_drop_files_gap, base.y + row);
+         const ImVec2 spot(base.x - tok::view2d_drop_files_span, base.y + row);
          row += tok::view2d_row;
          if (HasExtension(path, kSvg))
          {

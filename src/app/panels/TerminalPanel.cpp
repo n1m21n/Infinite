@@ -736,7 +736,7 @@ namespace
          std::string title = tab.name.empty() ? TabTitle(snap.get()) : tab.name;
          if (title.size() > tok::terminal_tab_row_limit)
             title = title.substr(0, 27) + "...";
-         const float width = ImGui::CalcTextSize(title.c_str()).x + tok::terminal_width_gap;
+         const float width = ImGui::CalcTextSize(title.c_str()).x + tok::terminal_width_span;
          ImGui::PushID(i);
          ImGui::SetCursorScreenPos(ImVec2(x, start.y));
          UiInteract::Hit("##tab", ImVec2(width, kTabRowH));
@@ -801,7 +801,7 @@ namespace
    void DrawSearchRow(Tab& tab, const term::Snapshot* snap)
    {
       const float width = Ui::AvailW();
-      ImGui::SetNextItemWidth(std::min(tok::terminal_search_row_max, width - tok::terminal_search_row_gap));
+      ImGui::SetNextItemWidth(std::min(tok::terminal_search_row_max, width - tok::terminal_search_row_span));
       if (sSearchFocus)
       {
          UiInteract::FocusHere();
@@ -1180,11 +1180,11 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
 void DrawTerminalFloating()
 {
    const ImGuiViewport* vp = ImGui::GetMainViewport();
-   ImGui::SetNextWindowSize(ImVec2(tok::terminal_window_w, std::min(tok::terminal_floating_max, vp->WorkSize.y - tok::terminal_floating_gap)), ImGuiCond_FirstUseEver);
+   ImGui::SetNextWindowSize(ImVec2(tok::terminal_window_w, std::min(tok::terminal_floating_max, vp->WorkSize.y - tok::terminal_floating_span)), ImGuiCond_FirstUseEver);
    // Review shots (tools/chat-shots --float-width): hold the window at one width.
    static const char* shotW = std::getenv("INFINITE_CHATSHOT_FLOATW");
    if (shotW != nullptr)
-      ImGui::SetNextWindowSize(ImVec2(std::max(kMinWidth, (float)std::atof(shotW)), std::min(tok::terminal_floating_max, vp->WorkSize.y - tok::terminal_floating_gap)), ImGuiCond_Always);
+      ImGui::SetNextWindowSize(ImVec2(std::max(kMinWidth, (float)std::atof(shotW)), std::min(tok::terminal_floating_max, vp->WorkSize.y - tok::terminal_floating_span)), ImGuiCond_Always);
    // A workspace window: the terminal keeps Esc for the shell, and draws its own inset.
    FloatingWindow::Spec spec;
    spec.center = false;

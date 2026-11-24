@@ -92,7 +92,7 @@ void DrawPopupsA(FrameCtx& fc)
          view2DAddFrom = gn.index;
    };
 
-      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_window_w_md, ImMax(tok::stage_popups_a_max_min, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_gap))); // popups: capped width, scroll past the window
+      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_window_w_md, ImMax(tok::stage_popups_a_max_min, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_span))); // popups: capped width, scroll past the window
       if (gShotNodeMenu)  // review shots: a fixed spot, not wherever the mouse happens to be
          ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->Pos.x + tok::stage_popups_a_window_x, ImGui::GetMainViewport()->Pos.y + tok::stage_popups_a_window_x));
       if (MenuParts::BeginPopup("##nodecontext"))
@@ -231,7 +231,7 @@ void DrawPopupsA(FrameCtx& fc)
                         const ImVec2 gp = ed::GetNodePosition(ownerGn->NodeId());
                         const ImVec2 gs = ed::GetNodeSize(ownerGn->NodeId());
                         const ImVec2 mp = ed::GetNodePosition(gn->NodeId());
-                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + tok::stage_popups_a_gap));
+                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + tok::stage_popups_a_span));
                      }
                   }
                }
@@ -454,7 +454,7 @@ void DrawPopupsA(FrameCtx& fc)
                         const ImVec2 gp = ed::GetNodePosition(ownerGn->NodeId());
                         const ImVec2 gs = ed::GetNodeSize(ownerGn->NodeId());
                         const ImVec2 mp = ed::GetNodePosition(gn->NodeId());
-                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + tok::stage_popups_a_gap));
+                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + tok::stage_popups_a_span));
                      }
                   }
                }
@@ -529,7 +529,7 @@ void DrawPopupsA(FrameCtx& fc)
          gModRangeTypedPendingInit = false;
          gModRangeTypedNoAutoSelect = false;
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_window_w_md, ImMax(tok::stage_popups_a_max_min, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_gap))); // popups: capped width, scroll past the window
+      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(tok::stage_popups_a_window_w_md, ImMax(tok::stage_popups_a_max_min, ImGui::GetMainViewport()->Size.y - tok::stage_popups_a_span))); // popups: capped width, scroll past the window
       const bool modbindOpen = MenuParts::BeginPopup("##modbind");
       if (modbindOpen)
       {

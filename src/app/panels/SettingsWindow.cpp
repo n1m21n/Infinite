@@ -1471,7 +1471,7 @@ namespace app
 
                char exprBuf[512];
                snprintf(exprBuf, sizeof(exprBuf), "%s", g.expr.c_str());
-               Ui::FillNextLeaving(tok::settings_window_gap);   // room for the live value and the remove button
+               Ui::FillNextLeaving(tok::settings_window_span);   // room for the live value and the remove button
                FieldWell::PushStyle();
                const bool exprEdited = FieldWell::InputText("##expr", exprBuf, sizeof(exprBuf));
                FieldWell::PopStyle();

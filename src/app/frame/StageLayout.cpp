@@ -440,7 +440,7 @@ void DrawLayout(FrameCtx& fc)
          }
          fc.viewFillResume = ImGui::GetCursorPos();
          fc.viewFillMax = ImGui::GetCurrentWindow()->DC.CursorMaxPos;
-         ImGui::SetCursorPosY(fc.viewFillResume.y + ImGui::GetIO().DisplaySize.y + tok::stage_layout_gap); // ui-layout: canvas (the view-fill row steps around the off-window canvas)
+         ImGui::SetCursorPosY(fc.viewFillResume.y + ImGui::GetIO().DisplaySize.y + tok::stage_layout_span); // ui-layout: canvas (the view-fill row steps around the off-window canvas)
       }
       if (viewportLeft)
       {

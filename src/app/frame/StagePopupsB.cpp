@@ -514,7 +514,7 @@ void DrawPopupsB(FrameCtx& fc)
                                                  + dropdownTextPadX * tok::stage_popups_b_dropdown_clamp_v
                                                  + ImGui::GetStyle().ScrollbarSize,
                                               tok::stage_popups_b_dropdown_clamp_lo, tok::stage_popups_b_dropdown_clamp_hi);
-      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(tok::stage_popups_b_window_w_md, ImMin(tok::stage_popups_b_min_max, ImGui::GetMainViewport()->Size.y - tok::stage_popups_b_gap)));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(tok::stage_popups_b_window_w_md, ImMin(tok::stage_popups_b_min_max, ImGui::GetMainViewport()->Size.y - tok::stage_popups_b_span)));
       const bool ddOpen = MenuParts::BeginPopup("##dropdown");
       if (ddOpen)
       {

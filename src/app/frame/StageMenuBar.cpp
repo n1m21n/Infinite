@@ -309,7 +309,7 @@ void DrawMenuBar(FrameCtx& fc)
             {
                MenuParts::Separator();
                // Wrapped at a fixed width: a long status line must never widen the menu.
-               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::stage_menu_bar_gap);
+               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::stage_menu_bar_span);
                if (!gPatchPath.empty())
                {
                   const std::string base = AppPaths::FsPath(gPatchPath).filename().u8string();

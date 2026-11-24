@@ -587,7 +587,7 @@ namespace app
       SectionCard::RowLabel(T("Name"));
       char renderNameBuf[256];
       snprintf(renderNameBuf, sizeof(renderNameBuf), "%s", sArrangeRenderFileName.c_str());
-      ImGui::SetNextItemWidth(fieldW - tok::arrange_render_dialogs_gap);
+      ImGui::SetNextItemWidth(fieldW - tok::arrange_render_dialogs_span);
       if (FieldWell::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
          sArrangeRenderFileName = renderNameBuf;
       Ui::SameRow(Ui::Space::S1);
@@ -1099,7 +1099,7 @@ namespace app
             const bool timelineMode = gAudioMode == AudioMode::Timeline;
             const char* audioLabel = T("Audio");
             const float audioBtnW = ImGui::CalcTextSize(audioLabel).x + tok::arrange_audio_btn_w_ratio * tok::space_2;
-            const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - tok::arrange_panel_content_gap - tok::space_1 - audioBtnW, panelOrigin.y); // the inspector toggle holds the corner
+            const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - tok::arrange_panel_content_span - tok::space_1 - audioBtnW, panelOrigin.y); // the inspector toggle holds the corner
             const ImVec2 savedCursor = ImGui::GetCursorScreenPos();
             ImGui::SetCursorScreenPos(audioBtnPos);
             if (ChipButton::Draw(audioLabel, timelineMode, tok::control_h))
@@ -1493,7 +1493,7 @@ namespace app
 
          // Inspector / Clip Settings toggle. Icon is the edit/pencil
          // glyph for clip/track settings.
-         ImGui::SetCursorScreenPos(ImVec2(panelOrigin.x + panelSize.x - tok::arrange_panel_content_gap, panelOrigin.y));
+         ImGui::SetCursorScreenPos(ImVec2(panelOrigin.x + panelSize.x - tok::arrange_panel_content_span, panelOrigin.y));
          const bool inspectorWasOpen = gArrangeClipSettingsPanelOpen;
          PushToolbarChip(inspectorWasOpen);
          if (ActionButton::Draw("##clipsettingstoggle", ImVec2(tok::control_h, tok::control_h)))
@@ -4274,7 +4274,7 @@ namespace app
       }
 
       // Expand dummy to define scroll area
-      const float totalH = lanesContentBottom - scrollTL.y + tok::arrange_total_h_gap;
+      const float totalH = lanesContentBottom - scrollTL.y + tok::arrange_total_h_span;
 
       // Empty space below lanes: click clears selection, right click opens Add Track menu
       const bool mouseBelowLanes = mouse.x >= headerStartX && mouse.x < headerStartX + avail.x &&

@@ -650,7 +650,7 @@ void DrawKeyboard(FrameCtx& fc)
                      const ImVec2 gp = ed::GetNodePosition(ownerGn->NodeId());
                      const ImVec2 gs = ed::GetNodeSize(ownerGn->NodeId());
                      const ImVec2 mp = ed::GetNodePosition(gn->NodeId());
-                     ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + tok::stage_keyboard_gap));
+                     ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + tok::stage_keyboard_span));
                   }
                }
             }

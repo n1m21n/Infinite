@@ -1303,7 +1303,7 @@ namespace app
       // Bottom 5 detrended cortical band bars (d, t, a, b, g) + 1/f slope readout
       const float barAreaTop = traceTop + traceH + tok::space_1;
       const float barAreaH = (sBr.y - tok::space_1) - barAreaTop;
-      const float bw = (w - tok::param_brain_source_body_gap) / tok::param_bw_ratio;
+      const float bw = (w - tok::param_brain_source_body_span) / tok::param_bw_ratio;
       for (int b = 0; b < Bci::kBandCount; ++b)
       {
          const float p = std::clamp(snap.bandPower[b], 0.0f, 1.0f);

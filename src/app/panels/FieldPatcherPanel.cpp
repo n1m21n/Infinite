@@ -676,7 +676,7 @@ namespace
       box = id / kPinStride;
       const int r = id % kPinStride;
       out = r >= tok::field_patcher_out_limit;
-      pin = out ? r - tok::field_patcher_pin_gap : r - 1;
+      pin = out ? r - tok::field_patcher_pin_n : r - 1;
    }
 
    ImU32 KindCol(Field::ValueKind k, float a = 1.0f)
@@ -911,7 +911,7 @@ namespace
          std::string text = b.rawCode;
          if (text.size() > tok::field_patcher_box_limit)
             text = text.substr(0, 160) + " …";
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::field_patcher_box_gap);
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::field_patcher_box_span);
          ImGui::TextDisabled("%s", text.c_str());
          ImGui::PopTextWrapPos();
       }
@@ -1119,7 +1119,7 @@ namespace
             ImVec2 tl(tok::field_patcher_canvas_x, tok::field_patcher_canvas_y);
             for (const Field::BoxNode& b : s.clipBoxes)
                tl = ImVec2(std::min(tl.x, b.x), std::min(tl.y, b.y));
-            changed = PasteBoxes(p, ImVec2(tl.x + tok::field_patcher_canvas_gap, tl.y + tok::field_patcher_canvas_gap)) > 0;
+            changed = PasteBoxes(p, ImVec2(tl.x + tok::field_patcher_canvas_span, tl.y + tok::field_patcher_canvas_span)) > 0;
          }
          else if (cmd && Keymap::KeyPressed(Keymap::Act::SelectAllCmd))
             SelectAllBoxes(p);
@@ -1211,7 +1211,7 @@ namespace
             ImVec2 tl(tok::field_patcher_canvas_x, tok::field_patcher_canvas_y);
             for (const Field::BoxNode& b : s.clipBoxes)
                tl = ImVec2(std::min(tl.x, b.x), std::min(tl.y, b.y));
-            if (PasteBoxes(p, ImVec2(tl.x + tok::field_patcher_canvas_gap, tl.y + tok::field_patcher_canvas_gap)) > 0)
+            if (PasteBoxes(p, ImVec2(tl.x + tok::field_patcher_canvas_span, tl.y + tok::field_patcher_canvas_span)) > 0)
                Commit(p, h, "Duplicate Boxes"), changed = false;
          }
          MenuParts::Separator();

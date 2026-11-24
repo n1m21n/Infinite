@@ -165,7 +165,7 @@ namespace app
       static const std::vector<float> sHann = [] {
          std::vector<float> w(1024);
          for (int i = 0; i < 1024; i++)
-            w[i] = 0.5f * (1.0f - cosf(tok::fx_audio_spectrum_ratio * tok::fx_cosf_t * (float)i / (float)(tok::fx_audio_spectrum_gap - 1)));
+            w[i] = 0.5f * (1.0f - cosf(tok::fx_audio_spectrum_ratio * tok::fx_cosf_t * (float)i / (float)(tok::fx_audio_spectrum_n - 1)));
          return w;
       }();
       float re[1024];
@@ -1313,7 +1313,7 @@ namespace app
    {
       const float w = gAudioBodyW;
       const float h = kAudioTimeVizH;
-      const float barsH = h - tok::fx_bars_h_gap;
+      const float barsH = h - tok::fx_bars_h_span;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();

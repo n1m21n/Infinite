@@ -4024,7 +4024,7 @@ namespace app
          if (first)
             for (int i = 0; i < 3; i++)
                ideas[i] = T(chat::FirstIdeas()[(size_t)i].label);
-         float y = mn.y + h * tok::chat_empty_scale + tok::chat_y_gap;
+         float y = mn.y + h * tok::chat_empty_scale + tok::chat_y_span;
          for (int i = 0; i < 3; i++)
          {
             const float w = std::min(width, ImGui::CalcTextSize(ideas[i]).x + tok::chat_empty_max * tok::space_3);

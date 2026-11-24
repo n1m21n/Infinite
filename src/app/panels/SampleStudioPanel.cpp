@@ -3054,7 +3054,7 @@ namespace
       const float x0 = ImGui::GetCursorScreenPos().x;
       const float in = tok::space_1, between = tok::space_3;
       // The pickers give up width first, then the input picker goes (Settings still has it): the bar never scrolls.
-      const float roomy = std::clamp((w - tok::sample_studio_toolbar_gap) / tok::sample_studio_toolbar_ratio, 0.0f, 1.0f);
+      const float roomy = std::clamp((w - tok::sample_studio_toolbar_span) / tok::sample_studio_toolbar_ratio, 0.0f, 1.0f);
       const bool showInput = w >= tok::sample_studio_show_input_limit;
 
       // Make: open a file, generate (again), instrument, snap to scale, bars.

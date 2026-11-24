@@ -209,7 +209,7 @@ namespace app
       ArrangeRenderQueuePosition(qIdx, qTotal);
       if (qTotal > 1 && qIdx > 0)
          ImGui::TextDisabled(T("Job %d of %d"), qIdx, qTotal);
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::arrange_offline_render_progress_window_gap);
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::arrange_offline_render_progress_window_span);
       ImGui::TextDisabled("%s", n->recordVideoPath.c_str());
       ImGui::PopTextWrapPos();
       // A cancelled take's progress bar is meaningless - it would sit frozen
@@ -1355,7 +1355,7 @@ namespace app
          DialogParts::Title(sRenderNoticeClipped ? T("Audio clipped") : T("Render failed"));
          DialogParts::Message(sRenderNoticeClipped ? T("The file was written, but its audio went over full scale and is clipped.")
                                                    : T("The render stopped before it finished. Your patch was not changed."));
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::arrange_render_fail_notice_gap);
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tok::arrange_render_fail_notice_span);
          DialogParts::Message(gArrangeRenderFailNotice.c_str());
          ImGui::PopTextWrapPos();
          if (DialogParts::Buttons({ L("OK") }) == 0)

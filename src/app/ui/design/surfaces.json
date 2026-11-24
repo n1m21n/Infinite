@@ -67,6 +67,7 @@
    "line_stroke_md": "{stroke.medium}",
    "panel_content_stroke": "{stroke.medium}",
    "alpha": "{opacity.30}",
+   "hatch_stroke": "{stroke.rule}",
    "own_size": {
     "active_w": 72.0,
     "apply_bottom": 56.0,
@@ -92,23 +93,23 @@
     "max_lane_height": 160.0,
     "mp4_bottom": 56.0,
     "now_bottom": 140.0,
-    "offline_render_progress_window_gap": 300.0,
-    "panel_content_gap": 30.0,
+    "offline_render_progress_window_span": 300.0,
     "panel_content_hit_x": 28.0,
     "panel_content_hit_y": 20.0,
     "panel_content_r": 4.0,
+    "panel_content_span": 30.0,
     "pencil_lg": 20.0,
     "pencil_md": 3.2,
     "pencil_sm": 1.8,
-    "render_dialogs_gap": 36.0,
-    "render_fail_notice_gap": 400.0,
+    "render_dialogs_span": 36.0,
+    "render_fail_notice_span": 400.0,
     "scissors_lg": 20.0,
     "scissors_md": 3.2,
     "scissors_sm": 1.8,
     "sz": 16.0,
     "text_wrap_local_pos_x": 400.0,
     "tool_btn_w": 30.0,
-    "total_h_gap": 40.0,
+    "total_h_span": 40.0,
     "track_x": 120.0,
     "unique_clip_w": 60.0,
     "ur": 104.0,
@@ -171,8 +172,7 @@
    "maths": {
     "has_tint_limit": 0.001,
     "limit_xs": 0.001
-   },
-   "hatch_stroke": "{stroke.rule}"
+   }
   },
   "arrange_session_grid": {
    "fill_alpha": "{opacity.10}",
@@ -202,7 +202,6 @@
     "col_max_w": 176.0,
     "col_min_w": 112.0,
     "field_w": 200.0,
-    "gap": 130.0,
     "line_x": 3.5,
     "line_y": 2.5,
     "mon_w_hi": 320.0,
@@ -211,6 +210,7 @@
     "progress_ring_x": 13.0,
     "scene_col_w": 136.0,
     "shade_lg": 255.0,
+    "span": 130.0,
     "text_x_lg": 26.0,
     "text_x_sm": 9.0,
     "video_track_x": 125.0,
@@ -268,6 +268,9 @@
    "begin_body_gap": "{gap.panel}",
    "drift_legend_gap": "{gap.hair}",
    "drift_meter_line_stroke_lg": "{stroke.medium}",
+   "spacer_h_lg": "{gap.tight}",
+   "spacer_h_sm": "{gap.hair}",
+   "spacer_w": "{gap.section}",
    "own_size": {
     "drift_meter_r": 2.0,
     "grip": 8.0,
@@ -275,9 +278,6 @@
     "handle_w": 10.0,
     "pin_w": 16.0,
     "shade": 255.0,
-    "spacer_h_lg": 3.0,
-    "spacer_h_sm": 2.0,
-    "spacer_w": 11.0,
     "tune_fine_w": 104.0,
     "tune_oct_w": 74.0,
     "tune_semi_w": 82.0
@@ -296,12 +296,12 @@
    }
   },
   "audio_node": {
+   "spacer_h_lg": "{gap.item}",
+   "spacer_h_sm": "{gap.hair}",
    "own_size": {
     "close_x": 64.0,
     "map_x": 70.0,
     "plugin_pick_btn_w": 70.0,
-    "spacer_h_lg": 4.0,
-    "spacer_h_sm": 2.0,
     "unload_w": 60.0
    },
    "ratio": {
@@ -380,6 +380,8 @@
    "dot_alpha_sm": "{opacity.60}",
    "fill_alpha_lg": "{opacity.90}",
    "shade_alpha": "{opacity.50}",
+   "spacer_h": "{gap.hair}",
+   "spacer_w": "{gap.px}",
    "own_size": {
     "avatar_r_lg": 11.0,
     "avatar_r_md": 9.0,
@@ -389,7 +391,6 @@
     "btn": 32.0,
     "card_h": 52.0,
     "chip_r": 2.0,
-    "code_pane_inline_layout": 2.0,
     "code_pane_x": 22.0,
     "composer_hit_x": 24.0,
     "composer_hit_y": 24.0,
@@ -420,8 +421,6 @@
     "rh": 28.0,
     "row_h": 30.0,
     "size": 16.0,
-    "spacer_h": 2.0,
-    "spacer_w": 1.0,
     "step_row_h": 26.0,
     "text_ellipsis_x": 30.0,
     "text_x_lg": 30.0,
@@ -433,7 +432,7 @@
     "window_h": 460.0,
     "x": 12.0,
     "y": 24.0,
-    "y_gap": 40.0
+    "y_span": 40.0
    },
    "ratio": {
     "action_fill_shade": 0.05,
@@ -541,6 +540,7 @@
    "limit": {
     "agent_label_min": 16.0,
     "blocks_u_res": 2.0,
+    "code_pane_inline_layout": 2.0,
     "composer_max": 160.0,
     "composer_w_max": 760.0,
     "empty_max": 2.0,
@@ -769,9 +769,9 @@
   "dialog": {
    "progress_im_vec4_alpha": "{opacity.10}",
    "a": "{opacity8.20}",
+   "spacer_w": "{gap.hair}",
    "own_size": {
-    "progress_gap": 110.0,
-    "spacer_w": 2.0
+    "progress_span": 110.0
    },
    "ratio": {
     "buttons_ratio": 2.0,
@@ -890,9 +890,9 @@
   "field_patcher": {
    "canvas_kind_col_alpha": "{opacity.90}",
    "own_size": {
-    "box_gap": 240.0,
     "box_inline_layout": 24.0,
-    "canvas_gap": 40.0,
+    "box_span": 240.0,
+    "canvas_span": 40.0,
     "canvas_x": 1000000000.0,
     "canvas_y": 1000000000.0,
     "height": 380.0,
@@ -948,8 +948,8 @@
    "outline_stroke": "{stroke.medium}",
    "radius": "{radius.control}",
    "stroke": "{stroke.heavy}",
+   "spacer_h": "{gap.hair}",
    "own_size": {
-    "spacer_h": 2.0,
     "w": 340.0,
     "y_lg": 1.0
    },
@@ -965,9 +965,7 @@
    }
   },
   "form": {
-   "own_size": {
-    "spacer_h": 1.0
-   },
+   "spacer_h": "{gap.px}",
    "ratio": {
     "room_ratio": 2.0
    }
@@ -1034,11 +1032,12 @@
    "tremolo_visualizer_path_stroke": "{stroke.medium}",
    "tremolo_visualizer_stroke": "{stroke.emphasis}",
    "wavetable_shaper_visualizer_path_stroke": "{stroke.emphasis}",
+   "spacer_h": "{gap.item}",
    "own_size": {
     "arrow_sz": 3.0,
     "audio_filter_visualizer_r": 5.0,
     "bar_half_w": 2.5,
-    "bars_h_gap": 30.0,
+    "bars_h_span": 30.0,
     "dot_r": 3.6,
     "filter_graticule_label_y": 14.0,
     "gain_computer_visualizer": 14.0,
@@ -1053,8 +1052,6 @@
     "prev_y_audio_spectrum_db_to_y": 20.0,
     "resonator_bank_visualizer_r": 3.0,
     "row_layout_lg": 20.0,
-    "row_layout_sm": 8.0,
-    "spacer_h": 4.0,
     "spec_blur_visualizer_norm_y": 60.0,
     "spectrum_slide_visualizer_norm_y": 60.0,
     "spectrum_slide_visualizer_r": 2.5,
@@ -1116,6 +1113,7 @@
     "frequency_shifter_visualizer_limit": 5.0,
     "line_limit": 2.0,
     "resonator_bank_visualizer_limit": 0.45,
+    "row_layout_sm": 8.0,
     "stereo_visualizer_max": 26.0
    },
    "maths": {
@@ -1226,14 +1224,14 @@
    "search_field_stroke": "{stroke.rule}",
    "section_header_im_vec4_alpha": "{opacity.60}",
    "well_alpha": "{opacity.30}",
+   "spacer_h": "{gap.item}",
    "own_size": {
     "badge_reserve": 40.0,
     "btn_w": 24.0,
     "cat_tag_reserve": 70.0,
     "r": 3.5,
     "row_r": 3.0,
-    "search_panel_gap": 64.0,
-    "spacer_h": 4.0
+    "search_panel_span": 64.0
    },
    "ratio": {
     "a_gap": 0.55,
@@ -1317,7 +1315,7 @@
     "content_max_w": 92.0,
     "dot_y": 1.5,
     "fill_y": 2.5,
-    "free_canvas_spot_gap": 420.0,
+    "free_canvas_spot_span": 420.0,
     "insert_chip_r": 2.5,
     "insert_inset": 220.0,
     "insert_row_h": 14.0,
@@ -1325,12 +1323,12 @@
     "meter_w": 12.0,
     "min_fader_h": 40.0,
     "min_strip_w": 76.0,
-    "panel_create_from_audio_outs_gap": 300.0,
+    "panel_create_from_audio_outs_span": 300.0,
     "panel_floating_begin_floating_panel_x": 760.0,
     "panel_floating_begin_floating_panel_y": 360.0,
     "panel_height": 300.0,
-    "panel_insert_add_gap": 260.0,
-    "panel_new_send_fx_gap": 320.0,
+    "panel_insert_add_span": 260.0,
+    "panel_new_send_fx_span": 320.0,
     "panel_width": 520.0,
     "plus_w": 16.0,
     "scale_w": 22.0,
@@ -1340,7 +1338,7 @@
     "strip_face_w": 112.0,
     "strip_w": 92.0,
     "text_y": 17.0,
-    "x_gap": 320.0
+    "x_span": 320.0
    },
    "ratio": {
     "a0_ratio": 0.75,
@@ -1380,16 +1378,16 @@
    "knob_gap": "{gap.panel}",
    "line_start_gap": "{gap.page}",
    "path_stroke": "{stroke.wide}",
+   "spacer_h_lg": "{gap.panel}",
+   "spacer_h_md": "{gap.tight}",
+   "spacer_h_sm": "{gap.hair}",
+   "spacer_h_xs": "{gap.px}",
+   "spacer_w": "{gap.px}",
    "own_size": {
     "arc_r": 2.5,
     "bypass_cap_y": 22.0,
     "eye_cap_y": 26.0,
-    "pred_test_slider_canvas_x": 4.0,
-    "spacer_h_lg": 8.0,
-    "spacer_h_md": 3.0,
-    "spacer_h_sm": 2.0,
-    "spacer_h_xs": 1.0,
-    "spacer_w": 1.0
+    "pred_test_slider_canvas_x": 4.0
    },
    "ratio": {
     "a_max_ratio": 2.25,
@@ -1425,6 +1423,7 @@
    "mini_curve_widget_stroke": "{stroke.rule}",
    "sparkline_mini_graph_stroke": "{stroke.rule}",
    "kind_rail_gap": "{gap.hair}",
+   "spacer_w": "{gap.px}",
    "own_size": {
     "dot_r_lg": 3.5,
     "dot_r_sm": 2.0,
@@ -1432,7 +1431,6 @@
     "floating_begin_floating_panel_y": 420.0,
     "idle_col_shade_lg": 255.0,
     "mini_curve_widget_r": 3.0,
-    "spacer_w": 1.0,
     "sparkline_mini_graph_r": 2.0,
     "sparkline_mini_graph_w": 55.0,
     "table_col_w": 18.0,
@@ -1515,6 +1513,9 @@
    "sequencer_body_gap": "{gap.tight}",
    "outline_thickness": "{stroke.wide}",
    "path_stroke": "{stroke.emphasis}",
+   "spacer_h_lg": "{gap.gutter}",
+   "spacer_h_md": "{gap.item}",
+   "spacer_h_sm": "{gap.hair}",
    "own_size": {
     "check_w": 84.0,
     "chord_h": 30.0,
@@ -1523,19 +1524,14 @@
     "interactive_keyboard_h": 64.0,
     "learn_w": 84.0,
     "load_x": 90.0,
-    "max_w_gap": 36.0,
-    "mixer_body_gap": 36.0,
+    "max_w_span": 36.0,
+    "mixer_body_span": 36.0,
     "mixer_x": 1.4,
     "piano_roll_h": 96.0,
     "pitch_h": 170.0,
     "quantizer_body_audio_knob_row_layout": 20.0,
     "row_layout_lg": 20.0,
-    "row_layout_sm": 8.0,
     "sel_layout_lg": 20.0,
-    "sel_layout_sm": 8.0,
-    "spacer_h_lg": 5.0,
-    "spacer_h_md": 4.0,
-    "spacer_h_sm": 2.0,
     "strip_meter_h": 2.0,
     "type_h": 18.0,
     "vel_h": 22.0
@@ -1567,6 +1563,8 @@
     "btn_w_max": 26.0,
     "cap_h_min": 15.0,
     "h_min": 1.5,
+    "row_layout_sm": 8.0,
+    "sel_layout_sm": 8.0,
     "w_min": 280.0
    }
   },
@@ -1640,6 +1638,10 @@
    "wavetable_frames_stroke": "{stroke.emphasis}",
    "granular_waveform_glow_alpha": "{opacity8.30}",
    "peaks_alpha_sm": "{opacity.40}",
+   "spacer_h_lg": "{gap.group}",
+   "spacer_h_md": "{gap.gutter}",
+   "spacer_h_sm": "{gap.item}",
+   "spacer_h_xs": "{gap.tight}",
    "own_size": {
     "check_w": 84.0,
     "col": 6.0,
@@ -1660,10 +1662,6 @@
     "preview_h": 140.0,
     "r0": 2.5,
     "scope_h": 58.0,
-    "spacer_h_lg": 6.0,
-    "spacer_h_md": 5.0,
-    "spacer_h_sm": 4.0,
-    "spacer_h_xs": 3.0,
     "stack_dx": 10.0,
     "stack_dy": 8.0,
     "strike_btn_w": 70.0,
@@ -1790,10 +1788,12 @@
    "macro_xy_body_stroke": "{stroke.medium}",
    "mseg_editor_stroke": "{stroke.emphasis}",
    "ring_stroke_sm": "{stroke.rule}",
+   "spacer_h": "{gap.item}",
+   "spacer_w": "{gap.px}",
    "own_size": {
     "bar_h": 26.0,
     "bar_w": 44.0,
-    "brain_source_body_gap": 64.0,
+    "brain_source_body_span": 64.0,
     "btn_h": 30.0,
     "btn_w": 72.0,
     "cap_h": 14.0,
@@ -1828,8 +1828,6 @@
     "ring_r_md": 7.0,
     "ring_r_sm": 3.0,
     "scope_h": 68.0,
-    "spacer_h": 4.0,
-    "spacer_w": 1.0,
     "text_x": 54.0,
     "text_y_lg": 18.0,
     "text_y_sm": 9.0,
@@ -1942,7 +1940,7 @@
     "element_raw_snap_y": 10.0,
     "element_start_y": 22.0,
     "element_step_w": 7.0,
-    "fader_h_gap": 30.0,
+    "fader_h_span": 30.0,
     "get_element_cell_span_x": 2.0,
     "get_element_cell_span_y": 2.0,
     "h": 30.0,
@@ -1951,16 +1949,16 @@
     "modulator_meter_h": 90.0,
     "modulator_meter_r": 3.0,
     "origin_y": 22.0,
-    "panel_content_gap": 76.0,
+    "panel_content_span": 76.0,
     "panel_floating_begin_floating_panel_x": 640.0,
     "panel_floating_begin_floating_panel_y": 420.0,
-    "param_midi_learn_banner_gap": 44.0,
-    "param_midi_learn_commit_gap": 320.0,
+    "param_midi_learn_banner_span": 44.0,
+    "param_midi_learn_commit_span": 320.0,
     "ring_r": 2.0,
-    "room_gap": 84.0,
-    "step_h_gap": 30.0,
+    "room_span": 84.0,
+    "step_h_span": 30.0,
     "strip_h": 30.0,
-    "sx_gap": 320.0,
+    "sx_span": 320.0,
     "window_h": 480.0,
     "window_w_lg": 240.0,
     "window_w_sm": 180.0
@@ -2097,7 +2095,7 @@
     "grip_size": 20.0,
     "group_node_color_button_h": 14.0,
     "group_node_color_button_w": 14.0,
-    "group_node_gap": 40.0,
+    "group_node_span": 40.0,
     "grouppower_cap_y": 22.0,
     "h": 100.0,
     "margin": 60.0
@@ -2153,10 +2151,9 @@
     "overview_h": 14.0,
     "r": 4.5,
     "ruler_h": 16.0,
-    "slice_inspector_inline_layout": 3.0,
     "sz": 16.0,
     "tab_h": 14.0,
-    "toolbar_gap": 1165.0,
+    "toolbar_span": 1165.0,
     "wave_hi": 8.0,
     "wave_r": 2.5,
     "wave_r_lg": 3.5,
@@ -2198,6 +2195,7 @@
     "mould_limit": 0.02,
     "picker_chip_min": 160.0,
     "show_input_limit": 1165.0,
+    "slice_inspector_inline_layout": 3.0,
     "tab_w_min": 14.0,
     "wave_input_limit": 3.0,
     "wave_limit": 30.0
@@ -2214,39 +2212,40 @@
    "outline_stroke": "{stroke.rule}",
    "drum_sequencer_gutter_w": "{gap.hair}",
    "w_top_gap": "{gap.panel}",
+   "audio_meter_spacer_h": "{gap.item}",
+   "blend_audio_spacer_h": "{gap.item}",
+   "drum_lane_card_spacer_h": "{gap.tight}",
+   "drum_sequencer_spacer_h_lg": "{gap.item}",
+   "drum_sequencer_spacer_h_md": "{gap.hair}",
+   "drum_sequencer_spacer_h_sm": "{gap.px}",
+   "gain_spacer_h": "{gap.item}",
+   "generate_samples_spacer_h_sm": "{gap.group}",
+   "grain_molder_spacer_h": "{gap.group}",
+   "granular_spacer_h": "{gap.item}",
+   "looper_spacer_h": "{gap.group}",
+   "molder_spacer_h_lg": "{gap.group}",
+   "molder_spacer_h_md": "{gap.item}",
+   "molder_spacer_h_sm": "{gap.tight}",
+   "mpc_spacer_h_lg": "{gap.group}",
+   "mpc_spacer_h_sm": "{gap.tight}",
+   "paul_stretch_spacer_h": "{gap.group}",
+   "slicer_spacer_h": "{gap.group}",
+   "spacer_h": "{gap.group}",
    "own_size": {
     "a_drop_w": 4.0,
-    "audio_meter_spacer_h": 4.0,
-    "blend_audio_spacer_h": 4.0,
     "btn_w": 20.0,
     "drum_lane_card_node_dropdown_field_x": 92.0,
-    "drum_lane_card_spacer_h": 3.0,
     "drum_segmented_pill_r": 2.5,
-    "drum_sequencer_body_inline_layout": 2.0,
     "drum_sequencer_pill_w": 2.0,
-    "drum_sequencer_spacer_h_lg": 4.0,
-    "drum_sequencer_spacer_h_md": 2.0,
-    "drum_sequencer_spacer_h_sm": 1.0,
     "drum_sequencer_toggle_w": 24.0,
-    "gain_spacer_h": 4.0,
-    "generate_samples_body_gap": 140.0,
+    "generate_samples_body_span": 140.0,
     "generate_samples_spacer_h_lg": 140.0,
-    "generate_samples_spacer_h_sm": 6.0,
-    "grain_molder_spacer_h": 6.0,
-    "granular_spacer_h": 4.0,
     "grip": 8.0,
     "h": 90.0,
     "handle_w": 10.0,
     "load_x": 80.0,
-    "looper_spacer_h": 6.0,
-    "molder_spacer_h_lg": 6.0,
-    "molder_spacer_h_md": 4.0,
-    "molder_spacer_h_sm": 3.0,
     "mpc_body_r": 4.0,
-    "mpc_spacer_h_lg": 6.0,
-    "mpc_spacer_h_sm": 3.0,
     "mpc_third_w": 2.0,
-    "paul_stretch_spacer_h": 6.0,
     "paul_stretch_third_w_lg": 44.0,
     "paul_stretch_third_w_sm": 3.0,
     "re_slice_x": 90.0,
@@ -2254,13 +2253,10 @@
     "roll_x": 60.0,
     "row_h": 28.0,
     "row_layout_lg": 20.0,
-    "row_layout_sm": 8.0,
     "s_mods_w": 2.0,
     "scale_w": 34.0,
-    "slicer_spacer_h": 6.0,
     "slicer_third_w_lg": 44.0,
     "slicer_third_w_sm": 3.0,
-    "spacer_h": 6.0,
     "stop_btn_w": 2.0,
     "stop_x": 70.0,
     "third_w_lg": 44.0,
@@ -2294,7 +2290,9 @@
    },
    "limit": {
     "bar_w_max": 36.0,
-    "btn_w_max": 70.0
+    "btn_w_max": 70.0,
+    "drum_sequencer_body_inline_layout": 2.0,
+    "row_layout_sm": 8.0
    }
   },
   "scrollbar": {
@@ -2333,10 +2331,9 @@
     "window_column_col_w_xl": 360.0,
     "window_column_col_w_xs": 140.0,
     "window_column_col_w_xxs": 90.0,
-    "window_gap": 150.0,
     "window_hi": 320.0,
-    "window_inline_layout": 6.0,
     "window_lo": 160.0,
+    "window_span": 150.0,
     "window_w": 400.0,
     "window_x": 740.0,
     "window_y": 560.0
@@ -2353,6 +2350,9 @@
     "window_y_sm": 0.45,
     "window_y_xs": 0.14,
     "window_y_xxs": 0.08
+   },
+   "limit": {
+    "window_inline_layout": 6.0
    }
   },
   "spatial_mixer": {
@@ -2361,6 +2361,7 @@
    "dot_color_alpha_sm": "{opacity.20}",
    "ring_stroke": "{stroke.emphasis}",
    "body_gap": "{gap.panel}",
+   "spacer_h": "{gap.item}",
    "own_size": {
     "body_add_ellipse_filled_x": 30.0,
     "body_add_ellipse_filled_y": 10.0,
@@ -2384,7 +2385,6 @@
     "ellipse_y_lg": 14.0,
     "ellipse_y_sm": 5.0,
     "ring_r": 4.0,
-    "spacer_h": 4.0,
     "stage_h": 280.0,
     "x": 20.0
    },
@@ -2465,9 +2465,9 @@
   "stage_floating": {
    "bg_alpha": "{opacity.95}",
    "own_size": {
-    "gap": 48.0,
     "spacer_w_lg": 420.0,
     "spacer_w_sm": 400.0,
+    "span": 48.0,
     "text_wrap_local_pos_x": 400.0,
     "w": 400.0
    },
@@ -2481,8 +2481,8 @@
   },
   "stage_keyboard": {
    "own_size": {
-    "gap": 40.0,
-    "pad": 32.0
+    "pad": 32.0,
+    "span": 40.0
    },
    "ratio": {
     "gh_ratio": 2.0,
@@ -2495,8 +2495,8 @@
   },
   "stage_layout": {
    "own_size": {
-    "gap": 4000.0,
-    "node_panel_width": 360.0
+    "node_panel_width": 360.0,
+    "span": 4000.0
    }
   },
   "stage_links": {
@@ -2525,7 +2525,7 @@
    "own_size": {
     "field_w_lg": 150.0,
     "field_w_sm": 120.0,
-    "gap": 260.0
+    "span": 260.0
    },
    "ratio": {
     "field_h_ratio": 2.0,
@@ -2547,27 +2547,27 @@
    "bodies_radius": "{radius.chip}",
    "border_alpha_lg": "{opacity.60}",
    "border_alpha_sm": "{opacity.40}",
+   "spacer_h_lg": "{gap.panel}",
+   "spacer_h_md": "{gap.item}",
+   "spacer_h_sm": "{gap.px}",
+   "spacer_h_xl": "{gap.label}",
    "own_size": {
-    "bodies_gap": 44.0,
+    "bodies_span": 44.0,
     "bodies_x": 200.0,
     "bodies_y": 150.0,
     "cull_margin": 64.0,
     "gc_inset": 30.0,
     "h": 52.0,
     "inset": 2000000000.0,
-    "spacer_h_lg": 8.0,
-    "spacer_h_md": 4.0,
-    "spacer_h_sm": 1.0,
-    "spacer_h_xl": 10.0,
     "text_y_lg": 54.0,
     "text_y_md": 34.0,
     "text_y_sm": 28.0,
     "value_lg": 66.0,
     "value_sm": 44.0,
     "w_lg": 10.0,
-    "wrap_w_gap": 48.0,
     "wrap_w_lg": 24.0,
     "wrap_w_sm": 4.0,
+    "wrap_w_span": 48.0,
     "x": 22.0
    },
    "ratio": {
@@ -2589,7 +2589,7 @@
   },
   "stage_popups_a": {
    "own_size": {
-    "gap": 40.0,
+    "span": 40.0,
     "text_wrap_local_pos_x": 380.0,
     "width": 90.0,
     "window_w_lg": 420.0,
@@ -2607,7 +2607,7 @@
     "dropdown_clamp_lo": 160.0,
     "dropdown_clamp_v": 2.0,
     "field_w": 220.0,
-    "gap": 40.0,
+    "span": 40.0,
     "window_h_lg": 480.0,
     "window_h_sm": 440.0,
     "window_w_lg": 320.0,
@@ -2637,7 +2637,7 @@
     "apply_x": 120.0,
     "field_well_h_lg": 70.0,
     "field_well_h_sm": 35.0,
-    "panels_gap": 64.0,
+    "panels_span": 64.0,
     "paste_svg_x": 100.0,
     "sketch_preset_dropdown_x": 220.0,
     "window_h_lg": 520.0,
@@ -2703,16 +2703,16 @@
    "tab_row_gap": "{gap.page}",
    "own_size": {
     "chatface_x": 22.0,
-    "floating_gap": 120.0,
+    "floating_span": 120.0,
     "floating_x": 480.0,
     "floating_y": 80.0,
     "line_height": 1.3,
     "min_height": 160.0,
     "min_width": 280.0,
-    "search_row_gap": 90.0,
+    "search_row_span": 90.0,
     "tab_row_r": 3.0,
     "text_x": 19.0,
-    "width_gap": 44.0,
+    "width_span": 44.0,
     "window_w": 440.0
    },
    "ratio": {
@@ -2795,9 +2795,7 @@
    }
   },
   "top_bar": {
-   "own_size": {
-    "spacer_w": 1.0
-   }
+   "spacer_w": "{gap.px}"
   },
   "transport_display": {
    "a": "{opacity.12}",
@@ -2894,9 +2892,12 @@
    "ring_stroke_sm": "{stroke.rule}",
    "swatch_strip_stroke": "{stroke.rule}",
    "fill_opacity_lo": "{opacity.4}",
+   "spacer_h_lg": "{gap.hair}",
+   "spacer_h_sm": "{gap.px}",
+   "spacer_w": "{gap.px}",
    "own_size": {
     "a1": 1.2,
-    "adjust_windows_gap": 48.0,
+    "adjust_windows_span": 48.0,
     "arrow_x_lg": 14.0,
     "arrow_x_md": 5.5,
     "arrow_x_sm": 1.5,
@@ -2914,14 +2915,14 @@
     "curve_y": 6.5,
     "dash": 4.0,
     "dot_r": 3.0,
-    "drag_gizmo3_d_gap": 540.0,
-    "drop_files_gap": 360.0,
-    "ensure_doc_gap": 340.0,
+    "drag_gizmo3_d_span": 540.0,
+    "drop_files_span": 360.0,
+    "ensure_doc_span": 340.0,
     "field_w": 160.0,
     "fill_x_lg": 7.0,
     "fill_x_sm": 4.5,
     "fill_y": 5.0,
-    "fit_view_gap": 48.0,
+    "fit_view_span": 48.0,
     "gizmo3_d_r": 5.0,
     "gizmo_px": 80.0,
     "h": 16.0,
@@ -2937,7 +2938,7 @@
     "mk": 6.0,
     "mk_h": 10.0,
     "open_in_d_view_x": 160.0,
-    "pixel_bar_gap": 96.0,
+    "pixel_bar_span": 96.0,
     "pos_hi": 4.0,
     "pre_w": 84.0,
     "r": 5.0,
@@ -2945,12 +2946,9 @@
     "row": 200.0,
     "ruler": 18.0,
     "rulers": 4.0,
-    "run_pending_gap": 300.0,
+    "run_pending_span": 300.0,
     "sel_mod_px": 4.0,
     "size": 40.0,
-    "spacer_h_lg": 2.0,
-    "spacer_h_sm": 1.0,
-    "spacer_w": 1.0,
     "sq": 16.0,
     "text_y": 9.0,
     "tick_cross_x": 2.0,
@@ -2959,7 +2957,7 @@
     "ui_interact_x": 12.0,
     "ui_interact_y": 16.0,
     "v2_apply": 20.0,
-    "v_gap": 180.0,
+    "v_span": 180.0,
     "vector_overlay_r": 3.0,
     "view2_d_height": 460.0,
     "view2_d_width": 620.0,
@@ -2968,8 +2966,8 @@
     "window_w_lg": 300.0,
     "window_w_sm": 260.0,
     "x": 14.0,
-    "x_gap": 300.0,
-    "y_gap": 200.0
+    "x_span": 300.0,
+    "y_span": 200.0
    },
    "ratio": {
     "a_ratio": 2.0,
@@ -3194,7 +3192,7 @@
     "nav_gizmo_lg": 9.0,
     "nav_gizmo_sm": 7.0,
     "navigation_prop_size": 1.1,
-    "outliner_gap": 90.0,
+    "outliner_span": 90.0,
     "outliner_x": 36.0,
     "pick_at_inset": 100.0,
     "pose_brush_radius": 40.0,
@@ -3218,7 +3216,7 @@
     "win_card_x": 22.0,
     "x": 8.0,
     "y": 100.0,
-    "y_gap": 54.0
+    "y_span": 54.0
    },
    "ratio": {
     "a_ratio": 6.2831853,
@@ -3341,11 +3339,11 @@
    "line_stroke": "{stroke.medium}",
    "outline_stroke": "{stroke.rule}",
    "pmn_inset": "{gap.panel}",
+   "spacer_h_lg": "{gap.group}",
+   "spacer_h_sm": "{gap.tight}",
    "own_size": {
     "body_r": 4.0,
     "h": 90.0,
-    "spacer_h_lg": 6.0,
-    "spacer_h_sm": 3.0,
     "third_w": 2.0,
     "v": 100.0
    },
@@ -3479,7 +3477,7 @@
   },
   "audio_node": {
    "envelope_alpha": "{opacity8.95}",
-   "own_size": {
+   "limit": {
     "analog_body_audio_knob_row_layout": 4
    }
   },
@@ -3643,7 +3641,7 @@
   },
   "field_patcher": {
    "own_size": {
-    "pin_gap": 64
+    "pin_n": 64
    },
    "limit": {
     "box_limit": 160,
@@ -3768,21 +3766,29 @@
    "tremolo_visualizer_path_alpha_lg": "{opacity8.95}",
    "tremolo_visualizer_path_alpha_sm": "{opacity8.40}",
    "own_size": {
-    "audio_filter_body_audio_knob_row_layout": 4,
-    "audio_spectrum_gap": 1024,
-    "bitcrush_body_audio_knob_row_layout": 3,
-    "chorus_body_audio_knob_row_layout": 3,
+    "audio_spectrum_n": 1024,
     "chorus_visualizer_hi": 255,
     "chorus_visualizer_lo": 60,
     "chorus_visualizer_v_lg": 150,
     "chorus_visualizer_v_sm": 40,
+    "fill_num_points": 4,
+    "plot_points": 160,
+    "wavetable_shaper_visualizer_lg": 200,
+    "wavetable_shaper_visualizer_sm": 150,
+    "win_size": 1024
+   },
+   "limit": {
+    "audio_filter_body_audio_knob_row_layout": 4,
+    "audio_filter_visualizer_segments": 12,
+    "bitcrush_body_audio_knob_row_layout": 3,
+    "chorus_body_audio_knob_row_layout": 3,
     "convolution_reverb_body_audio_knob_row_layout": 4,
     "cycle_shaper_body_audio_knob_row_layout": 4,
     "delay_body_audio_knob_row_layout": 4,
     "drive_body_audio_knob_row_layout": 3,
     "dynamics_body_audio_knob_row_layout": 4,
     "eq_body_audio_knob_row_layout": 4,
-    "fill_num_points": 4,
+    "eq_visualizer_segments": 12,
     "flanger_body_audio_knob_row_layout": 3,
     "formant_filter_body_audio_knob_row_layout": 3,
     "frequency_shifter_body_audio_knob_row_layout": 4,
@@ -3790,7 +3796,6 @@
     "limiter_body_audio_knob_row_layout": 4,
     "phaser_body_audio_knob_row_layout": 3,
     "pitch_shift_body_audio_knob_row_layout": 3,
-    "plot_points": 160,
     "resonator_bank_body_audio_knob_row_layout": 4,
     "reverb_body_audio_knob_row_layout": 3,
     "ring_mod_body_audio_knob_row_layout": 3,
@@ -3801,18 +3806,11 @@
     "spec_blur_body_audio_knob_row_layout": 4,
     "spectrum_slide_body_audio_knob_row_layout": 2,
     "stereo_body_audio_knob_row_layout": 3,
+    "stereo_visualizer_segments": 32,
     "stutter_body_audio_knob_row_layout": 3,
     "transient_shaper_body_audio_knob_row_layout": 3,
     "tremolo_body_audio_knob_row_layout": 3,
-    "wavetable_shaper_body_audio_knob_row_layout": 4,
-    "wavetable_shaper_visualizer_lg": 200,
-    "wavetable_shaper_visualizer_sm": 150,
-    "win_size": 1024
-   },
-   "limit": {
-    "audio_filter_visualizer_segments": 12,
-    "eq_visualizer_segments": 12,
-    "stereo_visualizer_segments": 32
+    "wavetable_shaper_body_audio_knob_row_layout": 4
    }
   },
   "geometry_params": {
@@ -3836,7 +3834,7 @@
    }
   },
   "help_windows": {
-   "own_size": {
+   "limit": {
     "shortcuts_table_body_begin_table_layout": 3,
     "window_begin_table_layout": 2
    }
@@ -3911,7 +3909,7 @@
   },
   "mod_matrix": {
    "idle_col_alpha": "{opacity8.100}",
-   "own_size": {
+   "limit": {
     "table_begin_table_layout": 12
    }
   },
@@ -3943,21 +3941,29 @@
    "stem_col_alpha_sm": "{opacity8.40}",
    "text_centered_alpha": "{opacity8.70}",
    "own_size": {
+    "high": 84,
+    "low": 36
+   },
+   "ratio": {
+    "interactive_keyboard_scale": 7,
+    "midi_keyboard_ratio": 7
+   },
+   "limit": {
     "arpeggiator_body_audio_knob_row_layout": 3,
     "audio_to_cv_body_audio_knob_row_layout": 2,
     "bouncing_balls_body_audio_knob_row_layout": 3,
+    "bouncing_balls_visualizer_segments": 48,
     "capturer_body_audio_knob_row_layout": 4,
     "chorder_body_audio_knob_row_layout": 4,
     "echo_body_audio_knob_row_layout": 2,
     "filter_body_audio_knob_row_layout": 3,
-    "high": 84,
     "humanizer_body_audio_knob_row_layout": 2,
     "keyboard_body_audio_knob_row_layout": 3,
-    "low": 36,
     "midi_file_body_audio_knob_row_layout": 4,
     "midi_notes_body_audio_knob_row_layout": 3,
     "piano_roll_body_audio_knob_row_layout": 4,
     "predictive_notes_body_audio_knob_row_layout": 4,
+    "predictive_notes_body_limit": 2,
     "predictive_rhythm_body_audio_knob_row_layout": 2,
     "random_generator_body_audio_knob_row_layout": 4,
     "router_body_audio_knob_row_layout": 2,
@@ -3965,14 +3971,6 @@
     "sequencer_body_audio_knob_row_layout": 4,
     "splitter_body_audio_knob_row_layout": 4,
     "switcher_body_audio_knob_row_layout": 2
-   },
-   "ratio": {
-    "interactive_keyboard_scale": 7,
-    "midi_keyboard_ratio": 7
-   },
-   "limit": {
-    "bouncing_balls_visualizer_segments": 48,
-    "predictive_notes_body_limit": 2
    }
   },
   "osc": {
@@ -4055,24 +4053,9 @@
     "core_lo_shade_lg_u8": 130,
     "core_lo_shade_md": 120,
     "core_lo_shade_sm_u8": 70,
-    "equation_body_audio_knob_row_layout": 4,
-    "fm_body_audio_knob_row_layout": 3,
-    "image_spectral_synth_body_audio_knob_row_layout": 3,
     "line_num_points": 17,
-    "metallic_body_audio_knob_row_layout": 4,
-    "oscillator_body_audio_knob_row_layout": 4,
-    "partials_body_audio_knob_row_layout": 4,
-    "piano_body_audio_knob_row_layout": 2,
     "plot_points": 160,
-    "row1_layout": 4,
-    "row_layout_lg": 4,
-    "row_layout_sm": 2,
-    "string_body_audio_knob_row_layout": 3,
-    "wave_terrain_body_audio_knob_row_layout": 4,
-    "wave_terrain_body_gap": 30,
-    "wavetable_body_audio_knob_row_layout": 6,
-    "wavetable_engine_column_audio_knob_row_layout": 4,
-    "wind_body_audio_knob_row_layout": 4
+    "wave_terrain_body_n": 30
    },
    "ratio": {
     "fade": 90,
@@ -4081,7 +4064,22 @@
    },
    "limit": {
     "core_alpha_max": 255,
-    "editable_adsr_segments": 14
+    "editable_adsr_segments": 14,
+    "equation_body_audio_knob_row_layout": 4,
+    "fm_body_audio_knob_row_layout": 3,
+    "image_spectral_synth_body_audio_knob_row_layout": 3,
+    "metallic_body_audio_knob_row_layout": 4,
+    "oscillator_body_audio_knob_row_layout": 4,
+    "partials_body_audio_knob_row_layout": 4,
+    "piano_body_audio_knob_row_layout": 2,
+    "row1_layout": 4,
+    "row_layout_lg": 4,
+    "row_layout_sm": 2,
+    "string_body_audio_knob_row_layout": 3,
+    "wave_terrain_body_audio_knob_row_layout": 4,
+    "wavetable_body_audio_knob_row_layout": 6,
+    "wavetable_engine_column_audio_knob_row_layout": 4,
+    "wind_body_audio_knob_row_layout": 4
    }
   },
   "page_picker": {
@@ -4197,7 +4195,7 @@
     "comment_bg_col_shade_xxs": 18,
     "comment_bg_col_shade_xxxl": 232,
     "comment_bg_col_shade_xxxs": 16,
-    "comment_gap": 224,
+    "comment_n": 224,
     "grip_col_shade": 160,
     "grip_col_shade_md": 120,
     "grip_col_shade_sm": 60
@@ -4253,14 +4251,14 @@
    "mpc_body_surface_lo_pale_fixed_alpha": "{opacity8.80}",
    "tc_alpha_lg": "{opacity8.20}",
    "own_size": {
-    "drum_sequencer_body_audio_knob_row_layout": 4,
-    "lane_choke": 4,
-    "looper_body_audio_knob_row_layout": 3
+    "lane_choke": 4
    },
    "ratio": {
     "pad_ratio": 4
    },
    "limit": {
+    "drum_sequencer_body_audio_knob_row_layout": 4,
+    "looper_body_audio_knob_row_layout": 3,
     "mpc_body_segments": 12,
     "trimmed_limit": 20
    }
@@ -4268,10 +4266,10 @@
   "settings": {
    "own_size": {
     "table_columns_lg": 4,
-    "table_columns_sm": 3,
-    "window_begin_table_layout": 2
+    "table_columns_sm": 3
    },
    "limit": {
+    "window_begin_table_layout": 2,
     "window_segments": 48
    }
   },
@@ -4285,7 +4283,6 @@
    "ring_alpha": "{opacity8.50}",
    "text_alpha": "{opacity8.85}",
    "own_size": {
-    "body_audio_knob_row_layout": 4,
     "ellipse_filled_rot_lg": 32,
     "ellipse_filled_rot_md": 16,
     "ellipse_filled_rot_sm": 12
@@ -4295,6 +4292,7 @@
     "scale": 5
    },
    "limit": {
+    "body_audio_knob_row_layout": 4,
     "body_segments": 64,
     "ring_segments_lg": 48,
     "ring_segments_sm": 24
@@ -4466,7 +4464,6 @@
     "line_num_points_sm": 3,
     "strip_columns": 2,
     "strip_w_n": 4,
-    "tool_picker_begin_table_layout": 3,
     "w": 96
    },
    "ratio": {
@@ -4506,6 +4503,7 @@
     "ring_segments": 16,
     "run_pending_limit": 2,
     "tool_overlays_segments": 48,
+    "tool_picker_begin_table_layout": 3,
     "v2_check_limit": 2,
     "v2_color_limit": 3,
     "v2_color_limit_lg": 4,
@@ -4564,13 +4562,11 @@
    "body_ink_white_alpha": "{opacity8.70}",
    "body_surface_lo_pale_fixed_alpha": "{opacity8.80}",
    "line_alpha": "{opacity8.90}",
-   "own_size": {
-    "body_audio_knob_row_layout": 4
-   },
    "ratio": {
     "pad_ratio": 4
    },
    "limit": {
+    "body_audio_knob_row_layout": 4,
     "body_segments": 12
    }
   }

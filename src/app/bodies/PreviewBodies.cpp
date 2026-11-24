@@ -115,7 +115,7 @@ namespace app
 
       const bool isLight = IsThemeLight();
       const ImU32 bgCol = isLight
-         ? IM_COL32((int)(tok::preview_comment_gap + n->color[0] * tok::preview_comment_bg_col_shade_lg),
+         ? IM_COL32((int)(tok::preview_comment_n + n->color[0] * tok::preview_comment_bg_col_shade_lg),
                     (int)(tok::preview_comment_bg_col_shade_xxl + n->color[1] * tok::preview_comment_bg_col_shade_md),
                     (int)(tok::preview_comment_bg_col_shade_xxxl + n->color[2] * tok::preview_comment_bg_col_shade_xs), tok::preview_bg_col_alpha_lg)
          : IM_COL32((int)(tok::preview_comment_bg_col_shade_xxxs + n->color[0] * tok::preview_comment_bg_col_shade_xl),
@@ -516,7 +516,7 @@ namespace app
             n->renameJustStarted = false;
          }
          ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::preview_frame_bg_shade));
-         ImGui::SetNextItemWidth(std::max(tok::preview_grouprename_min, n->width - tok::preview_group_node_gap));
+         ImGui::SetNextItemWidth(std::max(tok::preview_grouprename_min, n->width - tok::preview_group_node_span));
          if (FieldWell::InputText("##grouprename", &n->label, ImGuiInputTextFlags_EnterReturnsTrue) ||
              ImGui::IsItemDeactivated())
             n->renaming = false;

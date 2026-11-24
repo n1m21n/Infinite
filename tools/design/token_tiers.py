@@ -179,7 +179,7 @@ def primitives(tok):
 
 # ---------------------------------------------------------------- what kind of value is this?
 LAST_SKIP = {"sm", "lg", "md", "xs", "xl", "xxs", "xxl", "lo", "hi", "u8", "n", "alt", "2", "3", "4"}
-SPACE_WORDS = {"gap", "pad", "inset", "spacing", "gutter", "margin", "indent", "padding"}
+SPACE_WORDS = {"gap", "pad", "inset", "spacing", "gutter", "margin", "indent", "padding", "spacer"}
 DIR_SUFFIX = {"x", "y", "l", "r", "t", "b", "w", "h", "i"}
 
 
@@ -206,6 +206,8 @@ def kind(key, v, group="surface"):
     if last in ("frames", "count", "rows", "cols", "steps", "limit", "res", "max", "min", "cap", "floor", "threshold",
                 "lines", "chars", "items", "decimals", "digits", "segments", "octaves", "taps", "ms", "s", "sec", "hz",
                 "rate", "period", "hold", "delay", "speed", "deg", "angle"):
+        return "limit"
+    if last == "layout" and 1 <= v <= 12 and float(v).is_integer():
         return "limit"
     if last in ("alpha", "opacity", "a") or (group == "surface_i" and "alpha" in words):
         if group != "surface_i" and 0 < v <= 1:
@@ -404,6 +406,8 @@ def lint(tok, sj):
                                 continue
                             if HIT_RECT_RX.search(kk) and float(vv) < hit_min:
                                 bad.append(f"{g}.{s}.own_size.{kk} = {vv}: hit target below hit_min ({hit_min})")
+                            if (kk == "gap" or kk.endswith("_gap")) and float(vv) > 24:
+                                bad.append(f"{g}.{s}.own_size.{kk} = {vv}: large size/count (>24) misnamed _gap")
                             where, _ = place(kk, vv, prim, g)
                             if where != "own_size":
                                 bad.append(f"{g}.{s}.own_size.{kk} = {vv}: misfiled (belongs in {where})")
