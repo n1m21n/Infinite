@@ -1425,7 +1425,8 @@ namespace
          }
       }
       ModBegin();
-      const bool changed = ImGui::DragFloat(wid.c_str(), v, speed, lo, hi, fmt);
+      // AlwaysClamp: a typed number obeys the range too, not only a drag (Shear 99999 stayed in the layer otherwise).
+      const bool changed = ImGui::DragFloat(wid.c_str(), v, speed, lo, hi, fmt, ImGuiSliderFlags_AlwaysClamp);
       ModEnd();
       FieldWell::PopStyle();
       UndoOnActivate();
@@ -1451,7 +1452,7 @@ namespace
          if (modLayer != nullptr && modFields != nullptr && modFields[i] >= 0)
             ModNext(*modLayer, modFields[i]);
          ModBegin();
-         if (ImGui::DragFloat("##v", v[i], speed, lo, hi, fmts[i]))
+         if (ImGui::DragFloat("##v", v[i], speed, lo, hi, fmts[i], ImGuiSliderFlags_AlwaysClamp))
             changed |= 1 << i;
          ModEnd();
          UndoOnActivate();
@@ -10927,7 +10928,7 @@ namespace
          {
             float* b = side == 0 ? l->bifT : l->bifU;
             ImGui::PushID(side);
-            FieldLabel(side == 0 ? T("This layer") : T("Underlying"));
+            FieldLabel(side == 0 ? T("This layer") : T("Underlying"), ImGui::GetFrameHeight() + ImGui::GetTextLineHeight());   // the ramp's height
             if (BlendIfRamp("##bif", b, sFieldW))
                Touch();
             ImGui::PopID();
