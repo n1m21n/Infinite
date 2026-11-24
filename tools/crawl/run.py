@@ -22,14 +22,15 @@ BASELINE = os.path.join(ROOT, "tools/crawl/baseline.tsv")
 # only when a surface is 1.5x slower than stored, or over 100 ms with nothing stored.
 SLOW_BASE = os.path.join(ROOT, "tools/crawl/slow_baseline.tsv")
 
-# Source file substring -> surface name substring, for --changed.
+# Source file substring -> surface name substring, for --changed. The 2D View maps to its first state only: its ~100
+# states take hours, and the pre-push 2D stage (golden_view2d audit + journeys) already walks them.
 SOURCES = {
     "MixerPanel": "panel-Mixer", "Drum": "panel-Drums", "SettingsPanel": "panel-Settings", "SettingsWindow": "panel-Settings", "Help": "panel-Help",
     "Shortcuts": "panel-Shortcuts", "Templates": "panel-Templates", "History": "panel-History",
     "PianoRoll": "panel-Piano Roll", "CurveEditor": "panel-Curve Editor", "SampleStudio": "panel-Sample Studio",
     "ShowSet": "panel-Show Set", "NodePanel": "panel-Library", "Library": "panel-Library", "ViewportPanel": "panel-Viewport",
     "Arrange": "panel-Arrange", "ModMatrix": "panel-Mod Matrix", "PerfPanel": "panel-Performance",
-    "View3D": "v3d", "View2D": "v2d", "nodes/": "node-", "PanelKit": "panel-", "components/": "panel-",
+    "View3D": "v3d", "View2D": "v2d-00", "nodes/": "node-", "PanelKit": "panel-", "components/": "panel-",
 }
 
 

@@ -243,8 +243,50 @@ namespace GLUtil
       return &sScratch.back().fbo;
    }
 
+   namespace
+   {
+      struct RetiredGl
+      {
+         unsigned int tex = 0;
+         unsigned int fbo = 0;
+         unsigned long long frame = 0;
+      };
+      std::vector<RetiredGl> sRetired;
+   }
+
+   void RetireFbo(Fbo& fbo)
+   {
+      if (fbo.tex != 0 || fbo.fbo != 0)
+         sRetired.push_back({ fbo.tex, fbo.fbo, sScratchFrame });
+      fbo = Fbo();
+   }
+
+   void RetireTexture(unsigned int& tex)
+   {
+      if (tex != 0)
+         sRetired.push_back({ tex, 0, sScratchFrame });
+      tex = 0;
+   }
+
    void EndFrameScratchFbos()
    {
+      for (size_t i = 0; i < sRetired.size();)
+      {
+         if (sRetired[i].frame < sScratchFrame)
+         {
+            if (sRetired[i].tex != 0)
+            {
+               Bench::GpuMem::ReleaseTexture(sRetired[i].tex);
+               glDeleteTextures(1, &sRetired[i].tex);
+            }
+            if (sRetired[i].fbo != 0)
+               glDeleteFramebuffers(1, &sRetired[i].fbo);
+            sRetired[i] = sRetired.back();
+            sRetired.pop_back();
+         }
+         else
+            i++;
+      }
       ++sScratchFrame;
       for (size_t i = 0; i < sScratch.size();)
       {

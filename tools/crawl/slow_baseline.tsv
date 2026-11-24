@@ -1,5 +1,5 @@
 surface	slow_ms
-panel-Arrange	1292
+panel-Arrange	3196
 panel-Curve Editor	435
 panel-Drums	441
 panel-Help	0
@@ -8,13 +8,16 @@ panel-Library	758
 panel-Mixer	408
 panel-Mod Matrix	0
 panel-Performance	685
-panel-Piano Roll	1235
-panel-Sample Studio	1665
-panel-Settings	0
+panel-Piano Roll	1813
+panel-Sample Studio	2058
+panel-Settings	194
 panel-Shortcuts	0
-panel-Show Set	249
+panel-Show Set	549
 panel-Templates	0
 panel-Viewport	0
+v2d-00	1883
+v2d-02	768
+v2d-06	820
 v3d-Light	957
 v3d-Material	1062
 v3d-Object	1049

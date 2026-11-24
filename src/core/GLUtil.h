@@ -68,6 +68,14 @@ namespace GLUtil
    // size ages out here; no per-node refcount to leak on delete or undo).
    void EndFrameScratchFbos();
 
+   // Free a render target or texture at the end of the NEXT frame instead of
+   // now. For per-frame state pruned mid-frame (a deleted 2D layer) whose
+   // texture name the UI may already have queued as a thumbnail this frame:
+   // deleting it at once makes ImGui's render bind a dead name
+   // (GL_INVALID_OPERATION). Main GL context only, like the scratch pool.
+   void RetireFbo(Fbo& fbo);
+   void RetireTexture(unsigned int& tex);
+
    // Process-wide count of render-target (re)allocations: every time
    // EnsureFbo actually creates a texture+FBO, plus any other owner of a
    // render target (NodeViewport) that reports its own through

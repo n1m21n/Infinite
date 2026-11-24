@@ -3611,7 +3611,7 @@ void Scene2DNode::CookIfNeeded(int frameId)
       const Layer* l = FindConst(it->first);
       if (l == nullptr || !l->relief)
       {
-         GLUtil::DestroyFbo(it->second);
+         GLUtil::RetireFbo(it->second);
          it = mRelief.erase(it);
       }
       else
@@ -3657,7 +3657,7 @@ void Scene2DNode::CookIfNeeded(int frameId)
    for (auto it = mLayerOut.begin(); it != mLayerOut.end();)
       if (std::find(outs.begin(), outs.end(), it->first) == outs.end())
       {
-         GLUtil::DestroyFbo(it->second);
+         GLUtil::RetireFbo(it->second);
          it = mLayerOut.erase(it);
       }
       else

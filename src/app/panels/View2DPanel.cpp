@@ -7701,9 +7701,17 @@ namespace
    // ui-content-end
 
    // Between two groups of a bar: space_2, a 1 px hairline as tall as the chips' inner area, space_2 (Photopea's divider).
+   // The context bar's group ends (each BarDivider), from the bar's left edge, gathered while sBarCutting: a bar too
+   // wide for its room is cut on one of last frame's, so it never shows half a chip.
+   std::vector<float> sBarCuts, sBarCutsPrev;
+   bool sBarCutting = false;
+   float sBarCutX0 = 0.0f;
+
    void BarDivider()
    {
       const float top = ImGui::GetItemRectMin().y;
+      if (sBarCutting)
+         sBarCuts.push_back(ImGui::GetItemRectMax().x - sBarCutX0);
       FormParts::Inline(0.0f, tok::space_2);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float x = std::round(p.x) + tok::px_align;
@@ -9908,7 +9916,8 @@ namespace
          bool autoSel = sAutoSelect;
          // Checkbox and label sit on the chips' centre line; the cursor then returns to the row's top edge.
          const ImVec2 row0 = ImGui::GetCursorScreenPos();
-         ImGui::SetCursorScreenPos(ImVec2(row0.x, row0.y + (sRowH - CheckBox::Size()) * 0.5f));
+         // In by the box's hit margin, so the hit area starts on the bar's edge, not past it.
+         ImGui::SetCursorScreenPos(ImVec2(row0.x + CheckBox::HitMargin(), row0.y + (sRowH - CheckBox::Size()) * 0.5f));
          if (CheckBox::Box("##v2dauto", &autoSel))
             sAutoSelect = autoSel;
          ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_1, row0.y));
@@ -10090,11 +10099,20 @@ namespace
       const float barX = ImGui::GetCursorScreenPos().x;
       if (overflow)
       {
-         const float clipW = std::max(0.0f, barRoom - chipW(L("More..##v2dmore")) - tok::space_1);
-         ImGui::BeginChild("##v2dbarclip", ImVec2(clipW, sRowH), ImGuiChildFlags_None,
+         const float room = std::max(0.0f, barRoom - chipW(L("More..##v2dmore")) - tok::space_1);
+         float clipW = 0.0f;   // the last whole group that fits; none fits: the bar is all in More..
+         for (float c : sBarCutsPrev)
+            if (c <= room)
+               clipW = std::max(clipW, c);
+         ImGui::BeginChild("##v2dbarclip", ImVec2(std::max(1.0f, clipW), sRowH), ImGuiChildFlags_None,
                            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
          const ImGuiID before = ImGui::GetItemID();
+         sBarCuts.clear();
+         sBarCutting = true;
+         sBarCutX0 = barX;
          DrawContextBar(doc);
+         sBarCutting = false;
+         sBarCutsPrev.swap(sBarCuts);
          sBarW = ImGui::GetItemID() != before ? ImGui::GetItemRectMax().x - barX : 0.0f;   // an empty bar (Pick) is 0 wide, not the last item's edge
          EndChildSafe();
          FormParts::Inline(0.0f, tok::space_1);
@@ -10110,7 +10128,12 @@ namespace
       else
       {
          const ImGuiID before = ImGui::GetItemID();
+         sBarCuts.clear();
+         sBarCutting = true;
+         sBarCutX0 = barX;
          DrawContextBar(doc);
+         sBarCutting = false;
+         sBarCutsPrev.swap(sBarCuts);
          sBarW = ImGui::GetItemID() != before ? ImGui::GetItemRectMax().x - barX : 0.0f;   // an empty bar (Pick) is 0 wide, not the last item's edge
       }
       FormParts::Inline();

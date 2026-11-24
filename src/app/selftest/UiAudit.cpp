@@ -59,6 +59,7 @@ namespace
       bool widget = false;     // ItemInfo came (a real control, not a bare ItemAdd)
       bool disabled = false;
       bool overlapOk = false;  // SetNextItemAllowOverlap: built to sit over or under another item
+      bool scrollsX = false;   // its window scrolls sideways: a part past the edge is reached by scrolling, not cut
       bool checkable = false;  // ImGui's own checkbox/radio (the label sits inside the item's rect)
       bool inputable = false;  // takes typed text (drags and sliders after a double-click, input fields)
       float labelW = 0;        // visible label text
@@ -121,6 +122,7 @@ void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb
    r.id = id;
    r.bb = bb;
    r.clip = ctx->CurrentWindow->ClipRect;
+   r.scrollsX = ctx->CurrentWindow->ScrollMax.x > 0.0f;
    r.window = BaseName(ctx->CurrentWindow->Name);
    r.disabled = (item->ItemFlags & ImGuiItemFlags_Disabled) != 0;
    r.overlapOk = (item->ItemFlags & ImGuiItemFlags_AllowOverlap) != 0;
@@ -382,6 +384,12 @@ namespace
    }
 
    // UiInteract items carry a key ("lib.modules", "##grip") as their ImGui label; it is never drawn.
+   // "Open PSD or ORA..." opens a file dialog, which the crawl stubs (INFINITE_NO_DIALOGS): not an option to judge.
+   bool OpensDialog(const std::string& l)
+   {
+      const std::string shown = l.substr(0, l.find("##"));
+      return shown.size() >= 3 && shown.compare(shown.size() - 3, 3, "...") == 0;
+   }
    bool IdLike(const std::string& l) { return l.rfind("##", 0) == 0 || (l.find('.') != std::string::npos && l.find(' ') == std::string::npos); }
 
    // A control in an AudioKnobRow cell: its caption is drawn by the row and cut with an ellipsis, never spilled.
@@ -541,7 +549,7 @@ namespace
             if (std::fabs(o.bb.Min.x - r.bb.Min.x) > 0.5f || std::fabs(o.bb.Min.y - r.bb.Min.y) > 0.5f)
                Add("duplicate id", state, r, "also at %.0f,%.0f", o.bb.Min.x, o.bb.Min.y);
          }
-         if (r.bb.Min.x < r.clip.Min.x - 0.5f || r.bb.Max.x > r.clip.Max.x + 0.5f)
+         if (!r.scrollsX && (r.bb.Min.x < r.clip.Min.x - 0.5f || r.bb.Max.x > r.clip.Max.x + 0.5f))
             Add("clipped", state, r, "%.0f px of %.0f cut", std::max(0.0f, r.clip.Min.x - r.bb.Min.x) +
                 std::max(0.0f, r.bb.Max.x - r.clip.Max.x), r.bb.GetWidth());
          // A splitter grip is long and thin by design: hit along its length, so only its short side is small.
@@ -621,8 +629,11 @@ namespace
          for (size_t i = 0; i < items.size(); i++)
             for (size_t j = i + 1; j < items.size(); j++)
             {
-               const ImRect& a = items[i]->bb;
-               const ImRect& b = items[j]->bb;
+               // What shows: a canvas node under the top bar, or a table row scrolled under its frozen header, is
+               // clipped away there and takes no click, so it overlaps nothing.
+               ImRect a = items[i]->bb, b = items[j]->bb;
+               a.ClipWithFull(items[i]->clip);
+               b.ClipWithFull(items[j]->clip);
                const float ox = std::min(a.Max.x, b.Max.x) - std::max(a.Min.x, b.Min.x);
                const float oy = std::min(a.Max.y, b.Max.y) - std::max(a.Min.y, b.Min.y);
                if (ox > 2.0f && oy > 2.0f && !a.Contains(b) && !b.Contains(a) && items[i]->id != items[j]->id &&
@@ -1165,7 +1176,7 @@ namespace
             Add("click does not toggle", k.state, r, "first click changed nothing");
          if (k.popups > 0)
             Add("more than one popup", k.state, r, "a checkbox click opened %d popups", k.popups);
-         if (Fingerprint() != k.fp0 || (sOnlyV2D && app::View2DAuditPanelState() != k.ps0))
+         if (Fingerprint() != k.fp0 || app::View2DAuditPanelState() != k.ps0)
             Add("toggle does not return", k.state, r, "near: %s", FirstDiff(k.fp0, Fingerprint()).c_str());
          return;
       }
@@ -1254,10 +1265,11 @@ namespace
       case Kind::Toggle:
          switch (k.step++)
          {
-         case 0: k.fp0 = Fingerprint(); if (sOnlyV2D) k.ps0 = app::View2DAuditPanelState(); sMouse = c; break;
+         // Panel state too: a 2D View box such as Auto-select is a tool setting, not the document.
+         case 0: k.fp0 = Fingerprint(); k.ps0 = app::View2DAuditPanelState(); sMouse = c; break;
          case 1: sButton = 1; break;
          case 2: sButton = 0; break;
-         case 5: k.fp1 = Fingerprint(); if (sOnlyV2D) k.ps1 = app::View2DAuditPanelState(); k.popups = OpenPopups(); CloseAllPopups(); sButton = 1; break;
+         case 5: k.fp1 = Fingerprint(); k.ps1 = app::View2DAuditPanelState(); k.popups = OpenPopups(); CloseAllPopups(); sButton = 1; break;
          case 6: sButton = 0; break;
          case 9: sMouse = ImVec2(-10000.0f, -10000.0f); break;
          case 11: Judge(k); sPoking = false; break;
@@ -1318,7 +1330,8 @@ namespace
                const std::string pn = pw != nullptr ? BaseName(pw->Name) : std::string();
                std::set<ImGuiID> got;
                for (const Rec& r : sLast)
-                  if (r.widget && !r.disabled && r.window == pn && sOnLast.count(r.id) == 0 && got.insert(r.id).second && r.bb.GetWidth() > 2 && !IdLike(r.label))
+                  if (r.widget && !r.disabled && r.window == pn && sOnLast.count(r.id) == 0 && got.insert(r.id).second && r.bb.GetWidth() > 2 && !IdLike(r.label) &&
+                      !OpensDialog(r.label))
                      k.opts.push_back({ r.id, r.bb });
                if (k.opts.empty())
                   for (const Rec& r : sLast)
@@ -2517,8 +2530,14 @@ namespace
          st.slowMs = (float)ms;
          st.slowAt = at;
       }
-      for (int n = 0; n < 8 && glGetError() != GL_NO_ERROR; n++)
+      for (int n = 0; n < 8; n++)
+      {
+         const GLenum e = glGetError();
+         if (e == GL_NO_ERROR)
+            break;
          st.glErr++;
+         printf("CRAWL GL error 0x%x on %s at %s\n", (unsigned)e, surface.c_str(), at);   // the step, to find the call
+      }
    }
 }
 

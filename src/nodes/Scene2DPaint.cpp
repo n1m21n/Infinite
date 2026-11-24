@@ -822,7 +822,7 @@ void Scene2DNode::SyncSurfaces()
       {
          if (std::find(keep.begin(), keep.end(), it->first) == keep.end() && !(mStroke.Active() && it->first == mPaintId))
          {
-            GLUtil::DestroyFbo(it->second.fbo);
+            GLUtil::RetireFbo(it->second.fbo); // its thumbnail may be queued this frame
             it = m->erase(it);
          }
          else

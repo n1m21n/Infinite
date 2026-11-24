@@ -47,12 +47,15 @@ namespace CheckBox
       dl->PathStroke(col, 0, tok::stroke_mark);
    }
 
+   // G16: the hit area around the box, past the box on each side.
+   inline float HitMargin() { return (std::max(UiDensity::M().row, Size() + tok::space_1) - Size()) * 0.5f; }
+
    // A box on its own line position; returns true when toggled. `id` must be unique in the window.
    inline bool Box(const char* id, bool* v)
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
       // G16: hit area 24x24 around the 16 box; layout keeps the 16 box (Dummy below).
-      const float kHit = std::max(UiDensity::M().row, Size() + tok::space_1);
+      const float kHit = Size() + 2.0f * HitMargin();
       ImGui::SetCursorScreenPos(ImVec2(p.x - (kHit - Size()) * 0.5f, p.y - (kHit - Size()) * 0.5f));
       const bool clicked = ImGui::InvisibleButton(id, ImVec2(kHit, kHit));
       const bool hovered = ImGui::IsItemHovered();

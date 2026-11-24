@@ -1,23 +1,4 @@
 check	state	window	label	detail
-click does nothing	dark panel-Settings	Settings###Settings/##SettingsNav	##tab	no value, panel state, picture or popup changed
-click does nothing	dark panel-Settings	Settings###Settings/##SettingsBody	Reset to Defaults###Reset to Defaults	no value, panel state, picture or popup changed
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Source	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_3D	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Shader	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Compositing	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Effects	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Modulators	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Prediction	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Macros	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Utility	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Notes	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Synths	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_AudioEffects	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_0	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_1	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_2	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_3	2 of 2 options changed nothing
-option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_4	2 of 2 options changed nothing
 click does nothing	dark panel-Shortcuts	All Shortcuts	Action	no value, panel state, picture or popup changed
 click does nothing	dark panel-Shortcuts	All Shortcuts	Shortcut	no value, panel state, picture or popup changed
 click does nothing	dark panel-Shortcuts	All Shortcuts	Description	no value, panel state, picture or popup changed
@@ -37,17 +18,6 @@ click does nothing	dark panel-Show Set p2	Show Set###Show Set	Next###Next	Next
 slow frame	dark panel-Show Set	panel-Show Set	frame	249 ms at Add file...###Add file...
 click does nothing	dark panel-Library	Infinite/##nodepanel	lib.modules	no value, panel state, picture or popup changed
 slow frame	dark panel-Library	panel-Library	frame	757 ms at Add VST3 folder...###Add VST3 folder...
-no undo step	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	Render	changed the document with no undo step, near: :-1,"renderFolder":"","renderFormat":0,"renderFp -> :-1,"renderFolder":"/var/folders/kp/f5nw7sj16t16
-option changes nothing	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	Render	2 of 2 options changed nothing
-click does nothing	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	arrange.unit.bars	no value, panel state, picture or popup changed
-no undo step	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	arrange.unit.time	changed the document with no undo step, near: false,"timeDisplay":0,"zoom":1.0},"audio":[{"dst -> false,"timeDisplay":1,"zoom":1.0},"audio":[{"dst
-option changes nothing	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	##arrangetoolmodepicker	7 of 7 options changed nothing
-no undo step	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	##arrangesnapbtn	changed the document with no undo step, near: :0.0,"snapDivision":4,"snapTriplet":false,"timeD -> :0.0,"snapDivision":0,"snapTriplet":false,"timeD
-no undo step	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	##arrangeloopbtn	changed the document with no undo step, near: de":0,"loopEnabled":false,"loopEnd":0,"loopStart -> de":0,"loopEnabled":true,"loopEnd":0,"loopStart"
-undo does not restore	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	##arrangemarkerbtn	near: pStart":0,"nextId":10,"renderAudioSource":-1,"re -> pStart":0,"nextId":11,"renderAudioSource":-1,"re
-undo does not restore	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent_77D339FC/##arrangetimelinescroll	+ Add Track###+ Add Track	near: pStart":0,"nextId":11,"renderAudioSource":-1,"re -> pStart":0,"nextId":12,"renderAudioSource":-1,"re
-undo does not restore	dark panel-Arrange r2	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	Off##arrgriddiv	near: :0.0,"snapDivision":0,"snapTriplet":false,"timeD -> :0.0,"snapDivision":16,"snapTriplet":true,"timeD
-slow frame	dark panel-Arrange	panel-Arrange	frame	1291 ms at poking
 clipped	dark panel-Mod Matrix	Infinite/##modmatrix_bottom_6EB5D5FF/##modmatrixpanelcontent_0619EF88/##modmatrixtable	Confidence###Confidence	65 px of 91 cut
 click does nothing	dark panel-Mod Matrix	Infinite/##modmatrix_bottom_6EB5D5FF/##modmatrixpanelcontent_0619EF88/##modmatrixtable	Source###Source	no value, panel state, picture or popup changed
 click does nothing	dark panel-Mod Matrix	Infinite/##modmatrix_bottom_6EB5D5FF/##modmatrixpanelcontent_0619EF88/##modmatrixtable	Destination###Destination	no value, panel state, picture or popup changed
@@ -72,3 +42,60 @@ slow frame	dark v3d-Object	v3d-Object	frame	1049 ms at ##v3dadd
 slow frame	dark v3d-Light	v3d-Light	frame	956 ms at ##v3dadd
 slow frame	dark v3d-Material	v3d-Material	frame	1061 ms at ##v3dadd
 slow frame	dark v3d-Viewport	v3d-Viewport	frame	951 ms at ##v3dadd
+overlap	dark home	Infinite	##as_resonance	with ##transportplay, 11 x 18
+overlap	dark home	Infinite	##as_warp ratio	with ##transportrewind, 11 x 18
+click does nothing	dark panel-Settings	Settings###Settings/##SettingsNav	##tab	no value, panel state, picture or popup changed
+click does nothing	dark panel-Settings	Settings###Settings/##SettingsBody	Reset to Defaults###Reset to Defaults	no value, panel state, picture or popup changed
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Source	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_3D	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Shader	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Compositing	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Effects	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Modulators	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Prediction	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Macros	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Utility	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Notes	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_Synths	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##catcol_AudioEffects	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_0	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_1	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_2	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_3	2 of 2 options changed nothing
+option changes nothing	dark panel-Settings	Settings###Settings/##SettingsBody	##cablecol_4	2 of 2 options changed nothing
+slow frame	dark panel-Settings	panel-Settings	frame	194 ms at ##Node Opacity###Node Opacity
+click does nothing	dark panel-Help	Infinite - help & module reference	##sec	no value, panel state, picture or popup changed
+click does nothing	dark panel-Help	Infinite - help & module reference	Action	no value, panel state, picture or popup changed
+click does nothing	dark panel-Help	Infinite - help & module reference	How	no value, panel state, picture or popup changed
+undo does not restore	dark panel-Piano Roll	Infinite/##pianoroll_top_2A8B20CB/##pianopanelcontent	##add	near: opStart":0,"nextId":9,"renderAudioSource":-1,"re -> opStart":0,"nextId":10,"renderAudioSource":-1,"r
+slow frame	dark panel-Piano Roll	panel-Piano Roll	frame	1813 ms at poking
+click does nothing	dark panel-Sample Studio	Infinite/##samplestudio_bottom_B2C57DA0/##studiopanelcontent	##studioOpen	Open an audio file (or drop one on the Studio)
+click does nothing	dark panel-Sample Studio	Infinite/##samplestudio_bottom_B2C57DA0/##studiopanelcontent	##studioRewind	Return to Start
+click does nothing	dark panel-Sample Studio	Infinite/##samplestudio_bottom_B2C57DA0/##studiopanelcontent	studio.unit.bars	no value, panel state, picture or popup changed
+option changes nothing	dark panel-Sample Studio	Infinite/##samplestudio_bottom_B2C57DA0/##studiopanelcontent	##studioPart	11 of 11 options changed nothing
+click does nothing	dark panel-Sample Studio r2	Infinite/##samplestudio_bottom_B2C57DA0/##studiopanelcontent	##studioPlay	Play the edit (pauses the canvas audio)
+option changes nothing	dark panel-Sample Studio r2	Infinite/##samplestudio_bottom_B2C57DA0/##studiopanelcontent	##studioToolPicker	6 of 6 options changed nothing
+slow frame	dark panel-Sample Studio	panel-Sample Studio	frame	2058 ms at ##studioOpen
+click does nothing	dark panel-Show Set	Show Set###Show Set	Add file...###Add file...	Add file...
+click does nothing	dark panel-Show Set	Show Set###Show Set	Open set...###Open set...	Open set...
+click does nothing	dark panel-Show Set	Show Set###Show Set	Save set...###Save set...	Save set...
+click does nothing	dark panel-Show Set	Show Set###Show Set	Previous###Previous	Previous
+click does nothing	dark panel-Show Set	Show Set###Show Set	Next###Next	Next
+slow frame	dark panel-Show Set	panel-Show Set	frame	549 ms at Add file...###Add file...
+no undo step	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	Render	changed the document with no undo step, near: :-1,"renderFolder":"","renderFormat":0,"renderFp -> :-1,"renderFolder":"/var/folders/kp/f5nw7sj16t16
+option changes nothing	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	Render	2 of 2 options changed nothing
+no undo step	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	arrange.unit.time	changed the document with no undo step, near: false,"timeDisplay":0,"zoom":1.0},"audio":[{"dst -> false,"timeDisplay":1,"zoom":1.0},"audio":[{"dst
+option changes nothing	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	##arrangetoolmodepicker	7 of 7 options changed nothing
+no undo step	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	##arrangesnapbtn	changed the document with no undo step, near: :0.0,"snapDivision":4,"snapTriplet":false,"timeD -> :0.0,"snapDivision":0,"snapTriplet":false,"timeD
+no undo step	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	##arrangeloopbtn	changed the document with no undo step, near: de":0,"loopEnabled":false,"loopEnd":0,"loopStart -> de":0,"loopEnabled":true,"loopEnd":15360,"loopSt
+undo does not restore	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	##arrangemarkerbtn	near: pStart":0,"nextId":10,"renderAudioSource":-1,"re -> pStart":0,"nextId":11,"renderAudioSource":-1,"re
+undo does not restore	dark panel-Arrange	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent_77D339FC/##arrangetimelinescroll	+ Add Track###+ Add Track	near: pStart":0,"nextId":11,"renderAudioSource":-1,"re -> pStart":0,"nextId":12,"renderAudioSource":-1,"re
+undo does not restore	dark panel-Arrange r2	Infinite/##arrangepanel_bottom_96C3ABEF/##arrangepanelinnercontent	Off##arrgriddiv	near: :0.0,"snapDivision":0,"snapTriplet":false,"timeD -> :0.0,"snapDivision":16,"snapTriplet":true,"timeD
+slow frame	dark panel-Arrange	panel-Arrange	frame	3196 ms at Audio
+click does not toggle	dark v2d-00	Infinite/##view2d_bottom_D360CB41/##view2dcontent	##v2dauto	first click changed nothing
+no undo step	dark v2d-00	Infinite/##view2d_bottom_D360CB41/##view2dcontent_269A0E8F/##v2dside_E726B2A3/##v2dlayers_00C75D84/##v2dlayers	##open	changed the document with no undo step, near:  0 0 1 -1 1 1 0 0 0 0\\nxf 9 480 270 1 1 0 0.5 0 ->  0 0 1 -1 1 1 0 0 0 1\\nxf 9 480 270 1 1 0 0.5 0
+slow frame	dark v2d-00	v2d-00	frame	1882 ms at poking
+GL error	dark v2d-00	v2d-00	gl	1
+click does not toggle	dark v2d-02	Infinite/##view2d_bottom_D360CB41/##view2dcontent_269A0E8F/##v2dbarclip	##v2dauto	first click changed nothing
+slow frame	dark v2d-02	v2d-02	frame	767 ms at Render###Render##v2drender
+slow frame	dark v2d-06	v2d-06	frame	819 ms at ##v2ddocmenu

@@ -937,7 +937,10 @@ void DrawSidePanels(FrameCtx& fc)
 
             SectionCard::Begin(T("Edit"));
             if (rowBtn(L("Add current patch"), IconsInfinite::Plus, 2))
-               ShowSetAddCurrent();
+               ShowSetAddCurrent(); // unsaved: refuses and says why in the status line
+            // An unsaved patch has no file to add: say so before the click, not only after.
+            if (gPatchPath.empty() && ImGui::IsItemHovered())
+               Tip::Show("%s", T("Save the patch before adding it to the show set"));
             FormParts::Inline();
             if (rowBtn(L("Add file..."), IconsInfinite::Folder, 1))
             {

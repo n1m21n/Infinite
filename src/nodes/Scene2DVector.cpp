@@ -1557,8 +1557,7 @@ void Scene2DNode::SyncRasters()
          const bool keep = l != nullptr && (m == &mVec ? (l->kind == Kind::Vector || l->kind == Kind::Text) : l->hasVMask);
          if (!keep)
          {
-            if (it->second.tex != 0)
-               glDeleteTextures(1, &it->second.tex);
+            GLUtil::RetireTexture(it->second.tex); // its thumbnail may be queued this frame
             it = m->erase(it);
          }
          else
