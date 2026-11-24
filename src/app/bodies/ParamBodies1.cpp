@@ -16,6 +16,7 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "platform/AppPaths.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -24,7 +25,7 @@ namespace app
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const ImVec2 sz(kPreviewSize, tok::param_empty_block_y);
-      ImGui::Dummy(sz);
+      Ui::Claim(sz);
       EmptyState::Draw(p, ImVec2(p.x + sz.x, p.y + sz.y), message, hint);
    }
 
@@ -848,7 +849,7 @@ namespace app
 
       // Reserve space so the eye toggle and params below aren't drawn over the preview!
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(size, size));
+      Ui::Claim(ImVec2(size, size));
    }
    // ui-content-end
 
@@ -889,7 +890,7 @@ namespace app
          if (ModSliderInt("grid X", &gw, params::param::gw_lo, params::param::gw_hi, params::param::gw_def))
             n->SetGridSize(gw, n->gridH);
 
-         ImGui::SameLine(0.0f, tok::space_4);
+         Ui::SameRow(Ui::Space::S4);
          int gh = n->gridH;
          if (ModSliderInt("grid Y", &gh, params::param::gh_lo, params::param::gh_hi, params::param::gh_def))
             n->SetGridSize(n->gridW, gh);
@@ -1410,7 +1411,7 @@ namespace app
       const float innerW = w - tok::param_inner_w_ratio * pad;
       const float innerH = h - tok::param_inner_h_ratio * pad;
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
       const ImVec2 br(origin.x + w, origin.y + h);
       AudioViz::Fill(dl, origin, br);
 
@@ -1900,7 +1901,7 @@ namespace app
          if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0)))
             n->StartRecording();
       }
-      ImGui::SameLine();
+      Ui::SameRow();
       if (n->IsPlayingPath())
       {
          if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0)))
@@ -1915,7 +1916,7 @@ namespace app
       if (n->Path().size() >= tok::param_resynth_params_limit)
       {
          Ui::DrawParam(n, ResynthParamsRow::Toggle<&ResynthNode::loopPath>("loop path"));
-         ImGui::SameLine();
+         Ui::SameRow();
       }
       if (ActionButton::Draw("clear"))
          n->ClearPath();
@@ -1927,7 +1928,7 @@ namespace app
       ImGui::TextDisabled("generation %d", n->Generation());
       if (ActionButton::Draw("Iterate", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0)))
          n->StepOnce();
-      ImGui::SameLine();
+      Ui::SameRow();
       if (ActionButton::Draw("Reset", ImVec2(kPreviewSize * tok::param_resynth_params_ratio, 0)))
          n->Reset();
       if (ActionButton::Draw("Randomise FX", ImVec2(kPreviewSize, 0)))
@@ -2016,7 +2017,7 @@ namespace app
          }
       }
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(cellW, contentH + tok::space_1 + textH));
+      Ui::Claim(ImVec2(cellW, contentH + tok::space_1 + textH));
    }
 
 
@@ -2458,7 +2459,7 @@ namespace app
       {
          n->StartRecording();
       }
-      ImGui::SameLine();
+      Ui::SameRow();
       if (n->IsPlayingPath())
       {
          if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * tok::param_macro_xy_params_ratio, 0)))
@@ -2468,7 +2469,7 @@ namespace app
       {
          n->PlayPath();
       }
-      ImGui::SameLine();
+      Ui::SameRow();
       if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * tok::param_macro_xy_params_ratio, 0)))
          n->ClearPath();
       Ui::DrawParams(n, kMacroXYParamsRows);

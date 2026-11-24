@@ -2323,6 +2323,8 @@ void PopPrimaryButtonStyle();
 void PushDropdownStyle();
 // Closed face of a node dropdown (field well + value + chevron); returns true when clicked.
 bool NodeDropdownField(const char* caption, ImVec2 size, const char* label = nullptr);
+// The same face while a cable drives it: modulation colour, no clicks.
+void NodeDropdownDriven(const char* caption, ImVec2 size, const char* label = nullptr);
 
 void PopDropdownStyle();
 
@@ -3380,12 +3382,7 @@ void EndAudioSection();
          PushDropdownStyle();
          if (h.modulated)
          {
-            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::BaseV4(tok::col::text_modulation)
-                                                                : tok::BaseV4(tok::col::role_modulation));
-            ImGui::BeginDisabled();
-            NodeDropdownField(caption.c_str(), ImVec2(btnW, 0), inLabel);
-            ImGui::EndDisabled();
-            ImGui::PopStyleColor();
+            NodeDropdownDriven(caption.c_str(), ImVec2(btnW, 0), inLabel);
             DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
                                       ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
                                                                  ImGui::GetItemRectMax()));
@@ -3478,12 +3475,7 @@ void EndAudioSection();
                PushDropdownStyle();
                if (h.modulated)
                {
-                  ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::BaseV4(tok::col::text_modulation)
-                                                                      : tok::BaseV4(tok::col::role_modulation));
-                  ImGui::BeginDisabled();
-                  NodeDropdownField(caption.c_str(), ImVec2(btnW, 0));
-                  ImGui::EndDisabled();
-                  ImGui::PopStyleColor();
+                  NodeDropdownDriven(caption.c_str(), ImVec2(btnW, 0));
                   DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
                                             ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
                                                                        ImGui::GetItemRectMax()));

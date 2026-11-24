@@ -1355,6 +1355,8 @@ namespace tok
    constexpr float library_search_min_lg = 48.0f;
    constexpr float library_search_min_sm = 20.0f;
    constexpr float library_well_alpha = 0.27f;
+   constexpr float menu_danger_hover_alpha = opacity_25;
+   constexpr float menu_danger_press_alpha = opacity_40;
    constexpr float menu_list_max_h_ratio = 2.0f;
    constexpr float minimap_outline_stroke_lg = stroke_scale_2;
    constexpr float minimap_outline_stroke_sm = stroke_scale_1_5;
@@ -2454,8 +2456,6 @@ namespace tok
    constexpr float stage_node_wrap_w_ratio = 2.0f;
    constexpr float stage_node_bodies_limit = 1000000.0f;
    constexpr float stage_node_max_input_y_min = 18.0f;
-   constexpr float stage_popups_a_header_active_alpha = opacity_40;
-   constexpr float stage_popups_a_header_hovered_alpha = opacity_25;
    constexpr float stage_popups_a_gap = 40.0f;
    constexpr float stage_popups_a_text_wrap_local_pos_x = 380.0f;
    constexpr float stage_popups_a_width = 90.0f;

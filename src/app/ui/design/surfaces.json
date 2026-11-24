@@ -1308,6 +1308,8 @@
    }
   },
   "menu": {
+   "danger_hover_alpha": "{opacity.25}",
+   "danger_press_alpha": "{opacity.40}",
    "ratio": {
     "list_max_h_ratio": 2.0
    }
@@ -2665,8 +2667,6 @@
    }
   },
   "stage_popups_a": {
-   "header_active_alpha": "{opacity.40}",
-   "header_hovered_alpha": "{opacity.25}",
    "own_size": {
     "gap": 40.0,
     "text_wrap_local_pos_x": 380.0,

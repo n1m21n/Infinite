@@ -771,6 +771,18 @@ namespace app
    }
 
 
+   void NodeDropdownDriven(const char* caption, ImVec2 size, const char* label)
+   {
+      // a cable owns the value: the button shows it in the modulation colour and takes no clicks
+      ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::BaseV4(tok::col::text_modulation)
+                                                          : tok::BaseV4(tok::col::role_modulation));
+      ImGui::BeginDisabled();
+      DropdownField::Draw(caption, size, label);
+      ImGui::EndDisabled();
+      ImGui::PopStyleColor();
+   }
+
+
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
                        bool showCaption, bool segmented)

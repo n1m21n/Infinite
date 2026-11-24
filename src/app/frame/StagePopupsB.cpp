@@ -315,12 +315,7 @@ void DrawPopupsB(FrameCtx& fc)
          const bool dimByPort = !isModulatorCable && !suggestedSet.empty();
          auto drawMenuItem = [&](const char* label, const char* shortcut, bool dimmed) -> bool
          {
-            if (dimmed)
-               ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            const bool picked = MenuParts::Item(label, shortcut);
-            if (dimmed)
-               ImGui::PopStyleColor();
-            return picked;
+            return MenuParts::QuietItem(label, shortcut, dimmed);
          };
 
          if (q.empty())
@@ -375,11 +370,7 @@ void DrawPopupsB(FrameCtx& fc)
                   });
                }
                ImGui::SetNextWindowSizeConstraints(ImVec2(tok::stage_popups_b_window_w_xxs, 0), ImVec2(tok::stage_popups_b_window_w_lg, tok::stage_popups_b_window_h_sm));
-               if (!anyCompatible)
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-               const bool openCat = MenuParts::SubMenu(DisplayName(category).c_str());
-               if (!anyCompatible)
-                  ImGui::PopStyleColor();
+               const bool openCat = MenuParts::QuietSubMenu(DisplayName(category).c_str(), !anyCompatible);
                if (openCat)
                {
                   for (const std::string& name : catNodes)

@@ -11,6 +11,7 @@
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -326,9 +327,9 @@ namespace app
             }
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, tok::vmpc_body_ratio * side + tok::vmpc_spacer_h_sm * gap));
+         Ui::Claim(ImVec2(gAudioContentW, tok::vmpc_body_ratio * side + tok::vmpc_spacer_h_sm * gap));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::vmpc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // Selected pad: header, filmstrip (also the drop target), Load / Folder /
       // Clear, then the pad's rows.
@@ -401,7 +402,7 @@ namespace app
             if (!has && hov)
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::vmpc_spacer_h_lg));
+         Ui::Spacer(Ui::Space::S1_5);
 
          const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::vmpc_third_w) / tok::vmpc_third_w_ratio;
          if (ActionButton::Draw("Load...##vmpc", ImVec2(thirdW, 0)))
@@ -424,7 +425,7 @@ namespace app
             n->ClearPad(cur);
          }
          ImGui::EndDisabled();
-         ImGui::Dummy(ImVec2(0.0f, tok::vmpc_spacer_h_lg));
+         Ui::Spacer(Ui::Space::S1_5);
 
          auto slider = [&](int k, float width)
          {

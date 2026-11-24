@@ -148,10 +148,7 @@ void DrawPopupsA(FrameCtx& fc)
             }
             view3DItems(*gn);
             MenuParts::Separator();
-            ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_hovered_alpha));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_active_alpha));
-            if (MenuParts::Item(L("Delete Group"), "Backspace"))
+            if (MenuParts::DangerItem(L("Delete Group"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
@@ -160,7 +157,6 @@ void DrawPopupsA(FrameCtx& fc)
                }
                gRequestDelete = true;
             }
-            ImGui::PopStyleColor(3);
          }
          else if (auto* c = dynamic_cast<CommentNode*>(gn->node.get()))
          {
@@ -241,10 +237,7 @@ void DrawPopupsA(FrameCtx& fc)
                }
             }
             MenuParts::Separator();
-            ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_hovered_alpha));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_active_alpha));
-            if (MenuParts::Item(L("Delete Note"), "Backspace"))
+            if (MenuParts::DangerItem(L("Delete Note"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
@@ -253,7 +246,6 @@ void DrawPopupsA(FrameCtx& fc)
                }
                gRequestDelete = true;
             }
-            ImGui::PopStyleColor(3);
          }
          else
          {
@@ -471,10 +463,7 @@ void DrawPopupsA(FrameCtx& fc)
             MenuParts::Separator();
 
             // Destructive Action: Delete Node with HIG danger hover styling
-            ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_hovered_alpha));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::stage_popups_a_header_active_alpha));
-            if (MenuParts::Item(L("Delete Node"), "Backspace"))
+            if (MenuParts::DangerItem(L("Delete Node"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
@@ -483,7 +472,6 @@ void DrawPopupsA(FrameCtx& fc)
                }
                gRequestDelete = true;
             }
-            ImGui::PopStyleColor(3);
          }
          MenuParts::EndPopup();
       }

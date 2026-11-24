@@ -14,6 +14,7 @@
 #include "app/ui/design/Glyphs.gen.h"
 #include "platform/AppPaths.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -757,7 +758,7 @@ namespace app
 
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
                   tok::Role(tok::col::edge_lo_light), tok::radius_control);
-      ImGui::Dummy(ImVec2(kPreviewSize, h));
+      Ui::Claim(ImVec2(kPreviewSize, h));
    }
    // ui-content-end
 
@@ -1084,9 +1085,9 @@ namespace app
       // Color swatch + Result meter (header, full width)
       ImVec4 col(r, g, b, 1.0f);
       ImGui::ColorButton("##ImageAnalyzeSwatch", col, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoDragDrop, ImVec2(tok::param_image_analyze_params_color_button_w, tok::param_image_analyze_params_color_button_h));
-      ImGui::SameLine();
+      Ui::SameRow();
       ImGui::BeginGroup();
-      ImGui::Dummy(ImVec2(0.0f, tok::param_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
       ImGui::Text("Result: %s", UiFmt::F3(res).c);
       ImGui::EndGroup();
 
@@ -1159,7 +1160,7 @@ namespace app
       const float h = std::min(w / aspect, w * tok::param_track_preview_ratio);
       const float iw = std::min(w, h * aspect);
       const ImVec2 tl = ImGui::GetCursorScreenPos();
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(tl.x + w, tl.y + h);
       dl->AddRectFilled(tl, br, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
@@ -1243,7 +1244,7 @@ namespace app
       const float pillH = tok::param_pill_h;
       const float scopeH = tok::param_scope_h;
       const float totalH = pillH + tok::space_1 + scopeH;
-      ImGui::Dummy(ImVec2(w, totalH));
+      Ui::Claim(ImVec2(w, totalH));
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       // 1. 4-Electrode Contact Quality Pill Bar (TP9 | AF7 | AF8 | TP10)
@@ -1328,7 +1329,7 @@ namespace app
          if (snap.calibrating) n->CancelCalibration();
          else n->StartCalibration();
       }
-      ImGui::SameLine(0.0f, tok::space_1);
+      Ui::SameRow(Ui::Space::S1);
       const char* recLabel = n->IsRecordingTake() ? "Stop Take##bciRec" : (n->HasTake() ? "Re-Record##bciRec" : "Rec Take##bciRec");
       if (ActionButton::Draw(recLabel, ImVec2(btnW, 0)))
       {
@@ -1348,11 +1349,11 @@ namespace app
       {
          const float gBtnW = (w - tok::space_3) * tok::param_btn_w_ratio;
          if (ActionButton::Draw("Blink##bciB", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::Blink);
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          if (ActionButton::Draw("Wink L##bciWL", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::WinkLeft);
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          if (ActionButton::Draw("Jaw L##bciJL", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::JawLeft);
-         ImGui::SameLine(0.0f, tok::space_1);
+         Ui::SameRow(Ui::Space::S1);
          if (ActionButton::Draw("Jaw R##bciJR", ImVec2(gBtnW, 0))) n->TriggerSyntheticGesture(Bci::GestureKind::JawRight);
       }
    }

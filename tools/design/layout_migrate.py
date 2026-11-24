@@ -18,7 +18,9 @@ G may be a literal or a tok:: name; tok:: names are resolved from Tokens.gen.h. 
 a computed gap, cursor placement, avail maths) is listed for review and left alone: those need a Row with tracks or
 a `// ui-layout: canvas` tag by hand.
 
-    python3 tools/design/layout_migrate.py [--dry] [--file src/...]
+    python3 tools/design/layout_migrate.py [--dry] [--file src/...] [--bodies]
+
+--bodies also covers src/app/bodies/ and src/nodes/ (ui-violator-cleanup Block 2): the same pixel-no-op rules.
 """
 import os, re, struct, sys, collections
 
@@ -156,9 +158,13 @@ def add_include(text):
 def main():
     dry = "--dry" in sys.argv
     only = sys.argv[sys.argv.index("--file") + 1] if "--file" in sys.argv else None
+    scope, skip = SCOPE, SKIP
+    if "--bodies" in sys.argv:
+        scope = (*SCOPE, "src/app/bodies/", "src/nodes/")
+        skip = tuple(s for s in SKIP if s != "src/app/bodies/")
     total, leftover = collections.Counter(), collections.Counter()
     for rel, src in ui_audit.ui_files():
-        if not rel.startswith(SCOPE) or rel.startswith(SKIP) or (only and rel != only):
+        if not rel.startswith(scope) or rel.startswith(skip) or (only and rel != only):
             continue
         new, hits, left = migrate(src)
         leftover[rel] = len(left)

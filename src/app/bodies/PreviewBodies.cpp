@@ -15,6 +15,7 @@
 #include "app/ui/design/DrawParam.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -109,7 +110,7 @@ namespace app
 
       // Reserved first: this is what the node measures itself against and what
       // the double-click/hover/type hit-tests.
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
 
       const bool isLight = IsThemeLight();
@@ -498,7 +499,7 @@ namespace app
          gColor.label = "colour";
          gColor.justOpened = true;
       }
-      ImGui::SameLine();
+      Ui::SameRow();
       if (isLight)
          ImGui::PushStyleColor(ImGuiCol_Text,
                                ImVec4(n->color[0] * tok::preview_group_node_y_lg, n->color[1] * tok::preview_group_node_y_lg,
@@ -588,7 +589,7 @@ namespace app
       {
          n->StartRecording();
       }
-      ImGui::SameLine(0.0f, tok::space_1);
+      Ui::SameRow(Ui::Space::S1);
       if (n->IsPlayingBack())
       {
          if (ActionButton::Draw("Stop", ImVec2(halfW, 0)))
@@ -708,7 +709,7 @@ namespace app
       // the same mechanism the in-node sliders already rely on.
       if (render == nullptr)
       {
-         ImGui::Dummy(ImVec2(size, size));
+         Ui::Claim(ImVec2(size, size));
          return;
       }
 
@@ -874,7 +875,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 }

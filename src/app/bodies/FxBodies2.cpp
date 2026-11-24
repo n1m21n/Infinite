@@ -8,6 +8,7 @@
 #include "app/ui/design/components/StepCell.h"
 #include "audio/dsp/ConvolutionKernel.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -73,7 +74,7 @@ namespace app
          SetAudioReadout("chorus", hover);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -107,7 +108,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawChorusVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_chorus_body_audio_knob_row_layout);
@@ -238,7 +239,7 @@ namespace app
          SetAudioReadout("flanger", hover);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -272,7 +273,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFlangerVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_flanger_body_audio_knob_row_layout);
@@ -398,7 +399,7 @@ namespace app
          SetAudioReadout("phaser", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -431,7 +432,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawPhaserVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_phaser_body_audio_knob_row_layout);
@@ -552,7 +553,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
          SetAudioReadout("bitcrush", buf);
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -579,7 +580,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawBitcrushVisualizer(n, sampleRate);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       AudioKnobRow row(tok::fx_bitcrush_body_audio_knob_row_layout);
       // Labelled "downsample" (not "rate") to match the BLEASS-style
@@ -712,7 +713,7 @@ namespace app
          SetAudioReadout("transient shaper", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -734,7 +735,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawTransientShaperVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_transient_shaper_body_audio_knob_row_layout);
@@ -779,7 +780,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(rowOrigin);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
 
 
@@ -803,7 +804,7 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       DrawStutterGateGrid(n, steps);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          // "sync" folded into the row itself (was a standalone checkbox
@@ -879,7 +880,7 @@ namespace app
          SetAudioReadout("ring mod", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -902,7 +903,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawRingModVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_ring_mod_body_audio_knob_row_layout);
@@ -1053,7 +1054,7 @@ namespace app
          SetAudioReadout("freq shift", valBuf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1077,7 +1078,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFrequencyShifterVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          const int range = std::clamp((int)(n->Param("range") + 0.5f), 0, 1);
@@ -1202,7 +1203,7 @@ namespace app
          SetAudioReadout("tremolo", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1223,7 +1224,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawTremoloVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          // Selector column left (shape v), knobs right (depth, stereo).
@@ -1307,7 +1308,7 @@ namespace app
          SetAudioReadout("formant filter", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1332,7 +1333,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFormantFilterVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       AudioKnobRow row(tok::fx_formant_filter_body_audio_knob_row_layout);
       Ui::DrawKnobs(row, n, kFormantFilterBodyRows);
@@ -1441,7 +1442,7 @@ namespace app
          SetAudioReadout("resonator bank", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1479,7 +1480,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawResonatorBankVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_resonator_bank_body_audio_knob_row_layout, kKnobLarge);
@@ -1582,7 +1583,7 @@ namespace app
          SetAudioReadout("cycle shaper", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1610,7 +1611,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawCycleShaperVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_cycle_shaper_body_audio_knob_row_layout);
@@ -1747,7 +1748,7 @@ namespace app
          SetAudioReadout("spec blur", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1775,7 +1776,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawSpecBlurVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_spec_blur_body_audio_knob_row_layout, kKnobLarge);
@@ -1920,7 +1921,7 @@ namespace app
          snprintf(buf, sizeof(buf), "%s %s", NoteNameList()[root].c_str(), MusicTime::ScaleTable(scale).name);
          SetAudioReadout("key-snap", buf);
       }
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1947,7 +1948,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawKeySnapVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_key_snap_body_audio_knob_row_layout, kKnobLarge);
@@ -2072,7 +2073,7 @@ namespace app
          snprintf(buf, sizeof(buf), "%s of the way from input to 'to'", UiFmt::PctOf(slide).c);
          SetAudioReadout("spectrum slide", buf);
       }
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2094,7 +2095,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawSpectrumSlideVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_spectrum_slide_body_audio_knob_row_layout, kKnobLarge);
@@ -2152,7 +2153,7 @@ namespace app
          snprintf(buf, sizeof(buf), "%s modes, line height = ring time", UiFmt::Count((long long)(count)).c);
          SetAudioReadout("shape modes", buf);
       }
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2187,7 +2188,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawShapeResonatorVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_shape_resonator_body_audio_knob_row_layout, kKnobLarge);
@@ -2258,7 +2259,7 @@ namespace app
          snprintf(buf, sizeof(buf), "%s, 0 to -72 dB", UiFmt::Sec(seconds).c);
          SetAudioReadout("impulse response", buf);
       }
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2300,7 +2301,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawConvolutionSpaceVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // A loaded file is used as it is: the design controls stay in place, greyed.
       const bool designOff = hasFile && !(fileError && !fileError->empty());

@@ -6,6 +6,7 @@
 #include "app/ui/design/DrawParam.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -484,7 +485,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawAudioFilterVisualizer(n, sampleRate);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_audio_filter_body_audio_knob_row_layout);
@@ -951,7 +952,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawEqVisualizer(n, sampleRate);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       const int selBand = std::clamp((int)(n->Param("selectedBand") + 0.5f), 0, 4);
 
@@ -1165,7 +1166,7 @@ namespace app
          SetAudioReadout(readoutKey, buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1196,7 +1197,7 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawGainComputerVisualizer("dynamics", n->Param("threshold"), n->Param("ratio"), n->Param("makeup"), 0.0f,
                                  { n->ExtraMeterValue(0), n->ExtraMeterValue(1) }, DynamicsDsp::KneeDb(style));
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // Style, threshold, ratio, attack on top; release, makeup, mix under
       // them, the style's slot empty below it so the knobs line up.
@@ -1289,7 +1290,7 @@ namespace app
       const float outDb = n->ExtraMeterValue(1);
       const float inDb = outDb - inGain + gr - outGain;
       DrawGainComputerVisualizer("limiter", n->Param("threshold"), kLimiterVizRatio, outGain, inGain, { inDb, gr });
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::fx_limiter_body_audio_knob_row_layout);
@@ -1365,7 +1366,7 @@ namespace app
          SetAudioReadout("delay", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1407,7 +1408,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawDelayVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // A strict 4 x 3 grid. Row 1 is the delay itself (time, feedback, tone, mix); row 2 is the
       // tape character (wow, flutter, saturation, diffusion), all four grey together until tape is on;
@@ -1548,7 +1549,7 @@ namespace app
          SetAudioReadout("reverb", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1577,7 +1578,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawReverbVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // Tier 1: size, decay, damping, predelay, width, mix - one mode
       // (algorithmic FDN, no engine dropdown). Two rows of 3, matching
@@ -1677,7 +1678,7 @@ namespace app
          SetAudioReadout("drive", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1704,7 +1705,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawDriveVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // Tier 1 only: drive, bias, tone, color, output, mix - one processing
       // mode (tanh blended toward arctan via `color`), no curve dropdown.
@@ -1780,7 +1781,7 @@ namespace app
          SetAudioReadout("routing", SaturatorDsp::RoutingList()[(size_t)routing].c_str());
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1802,7 +1803,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawSaturatorVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // One column per stage: its curve over its amount.
       static const char* kModel[3] = { "model1", "model2", "model3" };
@@ -1954,7 +1955,7 @@ namespace app
          SetAudioReadout("wavetable shaper", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1989,7 +1990,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawWavetableShaperVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // Tier 1 only: table, position, drive, stereo, bias, smooth, output,
       // mix - one processing mode. `table` is the curve's identity (a
@@ -2110,7 +2111,7 @@ namespace app
          SetAudioReadout("stereo", buf);
       }
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2131,7 +2132,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawStereoVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       AudioKnobRow row(tok::fx_stereo_body_audio_knob_row_layout);
       Ui::DrawKnobs(row, n, kStereoBodyRows);
@@ -2177,7 +2178,7 @@ namespace app
       if (ImGui::IsMouseHoveringRect(origin, br))
          SetAudioReadout("pitch shifter", buf);
 
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2200,7 +2201,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawPitchShiftVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::fx_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       AudioKnobRow row(tok::fx_pitch_shift_body_audio_knob_row_layout);
       Ui::DrawKnob(row, n, PitchShiftBodyRow::Knob("pitch", [](AudioEffectNode* n) { return n->ParamPtr("pitch"); }, params::fx::pitch_lo, params::fx::pitch_hi).Fmt("%+.1f st").Size(kKnobLarge));

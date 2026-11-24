@@ -10,6 +10,7 @@
 #include "core/ModShapes.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -68,7 +69,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -128,7 +129,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -305,7 +306,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -415,7 +416,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -562,7 +563,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1185,12 +1186,7 @@ namespace app
       const std::string caption = options[safe] + "##" + id;
       if (h.modulated)
       {
-         ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::BaseV4(tok::col::text_modulation)
-                                                             : tok::BaseV4(tok::col::role_modulation));
-         ImGui::BeginDisabled();
-         NodeDropdownField(caption.c_str(), ImVec2(width, 0));
-         ImGui::EndDisabled();
-         ImGui::PopStyleColor();
+         NodeDropdownDriven(caption.c_str(), ImVec2(width, 0));
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
                                    ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
                                                               ImGui::GetItemRectMax()));
@@ -1271,18 +1267,18 @@ namespace app
       }
       ImGui::SetCursorScreenPos(ImVec2(fieldsX, y));
       AudioSlider("attack", attackMs, params::osc::attack_lo, params::osc::attack_hi, "%.0f ms", halfW, SkewAttack100Taper::PosToValue, SkewAttack100Taper::ValueToPos);
-      ImGui::SameLine();
+      Ui::SameRow();
       AudioSlider("decay", decayMs, params::osc::decay_lo, params::osc::decay_hi, "%.0f ms", halfW, SkewDecay300Taper::PosToValue, SkewDecay300Taper::ValueToPos);
       y += rowH;
       ImGui::SetCursorScreenPos(ImVec2(fieldsX, y));
       AudioSlider("sustain", sustain, 0.0f, 1.0f, "%.3f", halfW);
-      ImGui::SameLine();
+      Ui::SameRow();
       AudioSlider("release", releaseMs, params::osc::release_lo, params::osc::release_hi, "%.0f ms", halfW, SkewRelease400Taper::PosToValue, SkewRelease400Taper::ValueToPos);
 
       // Close the row at whichever side is taller, so EndAudioSection measures
       // the panel rather than just the field stack.
       ImGui::SetCursorScreenPos(ImVec2(top.x, std::max(top.y + curveH, y + rowH)));
-      ImGui::Dummy(ImVec2(full, 0.0f));
+      Ui::Claim(ImVec2(full, 0.0f));
    }
 
 
@@ -1364,7 +1360,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // The engine's picture, and its primary control: dragging across it
       // scrubs `position`, and the `position` knob below moves the highlight
@@ -1372,7 +1368,7 @@ namespace app
       // column never changes height.
       DrawWavetableFrames(eng, "##wtFrames", 150.0f, gAudioContentW, !eng.on);
       PublishWtTestRect();
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // Two rows of four, per the sketch. Row two's first two cells pair a
       // mode dropdown with the knob that mode reads.
@@ -1410,14 +1406,14 @@ namespace app
       {
          const bool ratioLive = SynthModes::WarpUsesRatio(eng.warpMode);
          AudioSlider("resonance", &eng.resonance, 0.0f, 1.0f, "%.3f", AudioHalfWidth());
-         ImGui::SameLine();
+         Ui::SameRow();
          if (!ratioLive)
             ImGui::BeginDisabled();
          AudioSlider("warp ratio", &eng.warpRatio, params::osc::warp_ratio_lo, params::osc::warp_ratio_hi, "%.2f", AudioHalfWidth());
          if (!ratioLive)
             ImGui::EndDisabled();
          AudioSlider("stereo width", &eng.stereoWidth, 0.0f, 1.0f, "%.3f", AudioHalfWidth());
-         ImGui::SameLine();
+         Ui::SameRow();
          AudioSlider("phase random", &eng.phaseRandomize, 0.0f, 1.0f, "%.3f", AudioHalfWidth());
       }
       EndAudioSection();
@@ -1491,10 +1487,10 @@ namespace app
       }
       EndAudioColumns();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
       BeginAudioSection("master");
       DrawWavetableScope(n, 48.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1_25);
       {
          AudioKnobRow row(tok::osc_wavetable_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          Ui::DrawKnobs(row, n, kWavetableBodyRows);
@@ -1636,7 +1632,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1696,11 +1692,11 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Waveform display
       DrawOscillatorWaveform(n->waveform, n->engine.phase, 100.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // Two knob rows of four
       {
@@ -1735,10 +1731,10 @@ namespace app
                         tok::Role(tok::col::accent_alt, tok::osc_envelope_alpha_lg));
       ImGui::PopID();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
       BeginAudioSection("master");
       DrawOscillatorScope(n, 48.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1_25);
       {
          AudioKnobRow row(tok::osc_oscillator_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          if (noteDriven)
@@ -1820,7 +1816,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Scope Visualizer with Strike Trigger Button
       {
@@ -1838,7 +1834,7 @@ namespace app
             n->TriggerStrike();
          }
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // Section 1: Physical Acoustic Properties (Transient, Decay, Stiffness, Width)
       BeginAudioSection("physical acoustics");
@@ -1849,7 +1845,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Section 2: Resonator Filter & Body Drive
       BeginAudioSection("filter & drive");
@@ -1869,7 +1865,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Section 3: Master Pitch / Portamento
       BeginAudioSection("pitch & glide");
@@ -1926,7 +1922,7 @@ namespace app
          AudioViz::IdleLabel(f, "play notes");
       }
       AudioViz::End(f);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1949,7 +1945,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawFMScope(n, 52.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       {
          AudioKnobRow row(tok::osc_fm_body_audio_knob_row_layout);
          row.Dropdown("algorithm", FMDsp::AlgorithmList(), n->algorithm, [n](int i) {
@@ -1972,7 +1968,7 @@ namespace app
       {
          FMNode::Operator& op = n->ops[o];
          const bool carrier = ((alg.carriers >> o) & 1) != 0;
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+         Ui::Spacer(Ui::Space::S1);
          ImGui::PushID(o);
          // Each operator's "fixed" checkbox is a discrete param: without a
          // scope all four hash to one pin id (PINDUPTEST).
@@ -2044,7 +2040,7 @@ namespace app
          AudioViz::IdleLabel(f, n->IsAnalyzing() ? "analyzing..." : "drop a sample here");
       }
       AudioViz::End(f);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
 
 
@@ -2104,9 +2100,9 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       DrawPartialsBars(n, 52.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       {
          AudioKnobRow row(tok::osc_partials_body_audio_knob_row_layout);
          Ui::DrawKnobs(row, n, kPartialsBodyRows1);
@@ -2144,7 +2140,7 @@ namespace app
       const float px = x1 - std::clamp(n->position, 0.0f, 1.0f) * (x1 - x0);
       dl->AddCircleFilled(ImVec2(px, midY), tok::osc_string_diagram_r, trace);
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2172,7 +2168,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%d voice%s", voices, voices == 1 ? "" : "s");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawStringDiagram(n, 28.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       // 3 x 3: selectors stacked in the left column (exciter, body type), the
       // string's knobs beside the exciter, the body's beside its type.
       {
@@ -2253,7 +2249,7 @@ namespace app
       dl->AddPolyline(bot, tok::osc_line_num_points, trace, 0, tok::osc_wind_diagram_stroke);
       dl->AddLine(ImVec2(x0, midY - r0 - tok::space_0_75), ImVec2(x0, midY + r0 + tok::space_0_75), line, tok::osc_wind_diagram_line_stroke);
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2278,7 +2274,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%d voice%s", voices, voices == 1 ? "" : "s");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawWindDiagram(n, 28.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       // 2 x 4: the instrument in the left column, then how it is blown;
       // the breath's shape in time and the level below.
       {
@@ -2326,7 +2322,7 @@ namespace app
       const float hw = tok::space_1 + tok::osc_hw_ratio * n->hardness;
       dl->AddRectFilled(ImVec2(hx - hw, y0 + spread + lift), ImVec2(hx + hw, br.y - tok::space_0_75), trace, tok::radius_cell);
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2342,7 +2338,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%d voice%s", voices, voices == 1 ? "" : "s");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawPianoDiagram(n, 28.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       // 2 x 4 under the model: the hammer and the strings' sound, then their
       // tuning, the soundboard, the dampers and the level. An electric reads
       // the same knobs as its pickup, fork and speaker.
@@ -2428,7 +2424,7 @@ namespace app
       }
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2494,7 +2490,7 @@ namespace app
          // Selectors on their own row; tuning row below is the same size as every synth header.
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+         Ui::Spacer(Ui::Space::S1);
          const float y2 = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          AudioSlider("fine", &n->fine, params::WaveTerrain::fine_lo, params::WaveTerrain::fine_hi, "%.1f c", fineW);
@@ -2510,7 +2506,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Baked Wavetable Stack - the node bakes the incoming texture into an
       // 8-frame band-limited wavetable bank every rebuild (orbit-sampled ->
@@ -2592,9 +2588,9 @@ namespace app
          snprintf(label, sizeof(label), "wavetable  -  frame %s / %d", UiFmt::F2(n->position * (frameCount - 1)).c, frameCount - 1);
          dl->AddText(ImVec2(origin.x + tok::space_2, origin.y + tok::space_1_5), tok::Role(tok::col::text_secondary, tok::osc_wave_terrain_text_alpha), label);
 
-         ImGui::Dummy(ImVec2(containerW, previewH));
+         Ui::Claim(ImVec2(containerW, previewH));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // Section 1: Terrain Trajectory & Geometry
       BeginAudioSection("orbit & terrain geometry");
@@ -2603,14 +2599,14 @@ namespace app
          Ui::DrawKnobs(row1, n, kWaveTerrainBodyRows1);
          row1.End();
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
+         Ui::Spacer(Ui::Space::S0_75);
          AudioKnobRow row2(tok::osc_wave_terrain_body_audio_knob_row_layout);
          Ui::DrawKnobs(row2, n, kWaveTerrainBodyRows2);
          row2.End();
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Section 2: Synth Voice & Timbre
       BeginAudioSection("voice & filter");
@@ -2622,7 +2618,7 @@ namespace app
          ImGui::EndDisabled();
          row1.End();
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
+         Ui::Spacer(Ui::Space::S0_75);
          const bool filterOff = (n->filterType == 0);
          AudioKnobRow row2(tok::osc_wave_terrain_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row2.DropdownKnob("wtFilter", WaveTerrainNode::FilterTypeNames(), n->filterType,
@@ -2637,17 +2633,17 @@ namespace app
       EndAudioSection();
 
       // Interactive ADSR Envelopes
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope", "##wtAmpEnv", &n->ampAttack,
                         &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
                         tok::Role(tok::col::accent_alt_vivid_warm_lo, tok::osc_envelope_alpha_md));
       ImGui::PopID();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
       BeginAudioSection("master & scope");
       DrawWaveTerrainScope(n, 48.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       {
          AudioKnobRow row(tok::osc_row_layout_sm);
          if (noteDriven)
@@ -2777,7 +2773,7 @@ namespace app
       }
 
       AudioViz::End(vizFrame);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2831,7 +2827,7 @@ namespace app
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+         Ui::Spacer(Ui::Space::S1);
          const float y2 = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          AudioSlider("fine", &n->fine, params::Equation::fine_lo, params::Equation::fine_hi, "%.1f c", fineW);
@@ -2847,11 +2843,11 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Interactive Cartesian X-Y Visualizer
       DrawEquationVisualizer(n, 128.0f, gAudioContentW);
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Formula Input Field
       {
@@ -2866,7 +2862,7 @@ namespace app
             n->CompileEquation();
          }
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Section 1: Function Knobs (A, B, C, D)
       BeginAudioSection("function parameters");
@@ -2877,7 +2873,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Section 2: Synth Voice & Filter
       BeginAudioSection("voice & filter");
@@ -2889,7 +2885,7 @@ namespace app
          ImGui::EndDisabled();
          row1.End();
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
+         Ui::Spacer(Ui::Space::S0_75);
          const bool filterOff = (n->filterType == 0);
          AudioKnobRow row2(tok::osc_equation_body_audio_knob_row_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row2.DropdownKnob("eqFilter", EquationNode::FilterTypeNames(), n->filterType,
@@ -2905,7 +2901,7 @@ namespace app
       EndAudioSection();
 
       // Section 3: Amp Envelope
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope", "##eqAmpEnv", &n->ampAttack,
                         &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
@@ -2966,7 +2962,7 @@ namespace app
       }
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -3029,7 +3025,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Live Spectrogram Viewport with Neon Laser Scanhead Overlay
       {
@@ -3092,9 +3088,9 @@ namespace app
          }
 
          ImGui::SetCursorScreenPos(origin);
-         ImGui::Dummy(ImVec2(containerW, previewH));
+         Ui::Claim(ImVec2(containerW, previewH));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // Section 1: Transport & Scanning
       BeginAudioSection("transport & scanning");
@@ -3145,7 +3141,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
+         Ui::Spacer(Ui::Space::S0_75);
          AudioKnobRow row(tok::osc_image_spectral_synth_body_audio_knob_row_layout);
          if (isManual)
          {
@@ -3161,7 +3157,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Section 2: Frequency & Partials Spectrum
       BeginAudioSection("frequency & partials");
@@ -3186,7 +3182,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
+         Ui::Spacer(Ui::Space::S0_75);
 
          // Row 2 Dropdown + Invert Button: Color Mode + Invert Toggle
          y = ImGui::GetCursorScreenPos().y;
@@ -3209,13 +3205,13 @@ namespace app
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
 
          // Row 3 Knobs: Frequency Boundaries & Pitch
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+         Ui::Spacer(Ui::Space::S1);
          AudioKnobRow row1(tok::osc_row1_layout);
          Ui::DrawKnobs(row1, n, kImageSpectralSynthBodyRows1);
          row1.End();
 
          // Row 4 Knobs: Conditioning & Gain
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
+         Ui::Spacer(Ui::Space::S0_75);
          AudioKnobRow row2(tok::osc_row1_layout);
          Ui::DrawKnobs(row2, n, kImageSpectralSynthBodyRows2);
          ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
@@ -3225,7 +3221,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
 
       // Section 3: Voice & Filter
       BeginAudioSection("voice & filter");
@@ -3234,7 +3230,7 @@ namespace app
          Ui::DrawKnobs(row1, n, kImageSpectralSynthBodyRows3);
          row1.End();
 
-         ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_xs));
+         Ui::Spacer(Ui::Space::S0_75);
          const bool filterOff = (n->filterType == 0);
          AudioKnobRow row2(tok::osc_row1_layout, kKnobLarge, ImGui::GetFrameHeight() + tok::space_1_25);
          row2.DropdownKnob("specFilter", ImageSpectralSynthNode::FilterTypeNames(), n->filterType,
@@ -3248,14 +3244,14 @@ namespace app
       EndAudioSection();
 
       // Interactive ADSR Envelopes
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1);
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope", "##specAmpEnv", &n->ampAttack,
                         &n->ampDecay, &n->ampSustain, &n->ampRelease, nullptr, 0.0f, 0.0f, nullptr,
                         tok::Role(tok::col::viz_teal_pale_cool_lo, tok::osc_envelope_alpha_md));
       ImGui::PopID();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::osc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
       BeginAudioSection("master & scope");
       DrawImageSpectralSynthScope(n, 48.0f, gAudioContentW);
       EndAudioSection();

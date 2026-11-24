@@ -5,6 +5,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/DrawParam.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -56,7 +57,7 @@ namespace app
       if (ImGui::IsItemHovered())
          SetAudioReadout("editor", editorOpen ? "open" : "closed");
 
-      ImGui::SameLine();
+      Ui::SameRow();
       bool bypass = n->bypass;
       if (AudioToggleButton("bypass", &bypass, 66.0f))
       {
@@ -64,7 +65,7 @@ namespace app
          n->bypass = bypass;
       }
 
-      ImGui::SameLine();
+      Ui::SameRow();
       bool configuring = n->Configuring();
       if (!ready)
          ImGui::BeginDisabled();
@@ -81,7 +82,7 @@ namespace app
       if (n->HasPlugin())
       {
          const float unloadW = tok::audio_node_unload_w;
-         ImGui::SameLine();
+         Ui::SameRow();
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - unloadW,
                                           ImGui::GetCursorScreenPos().y));
          if (ActionButton::Draw("unload", ImVec2(unloadW, 0)))
@@ -91,7 +92,7 @@ namespace app
          }
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1);
 
       // --- fallback parameter picker ---
       // Learn alone is not enough: plenty of plugin editors don't notify the
@@ -114,7 +115,7 @@ namespace app
          // canvas scale instead (see its own comment).
          AudioBareDropdown("##pluginparampick", names, sPickIndex, [](int i) { sPickIndex = i; },
                            gAudioContentW - tok::audio_node_plugin_pick_btn_w - ImGui::GetStyle().ItemSpacing.x);
-         ImGui::SameLine();
+         Ui::SameRow();
          if (ActionButton::Draw("map", ImVec2(tok::audio_node_map_x, 0)))
          {
             PushUndoCheckpoint();
@@ -147,7 +148,7 @@ namespace app
       {
          AudioPluginNode::Mapping& m = n->mappings[i];
          if ((i % 2) == 1)
-            ImGui::SameLine();
+            Ui::SameRow();
 
          if (m.assigned)
          {
@@ -160,7 +161,7 @@ namespace app
             {
                const float unmapBtnW = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * tok::audio_node_unmap_btn_w_ratio + tok::space_0_5;
                ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW - unmapBtnW - tok::space_1, /*audioStyle=*/true);
-               ImGui::SameLine(0.0f, tok::space_0_5);
+               Ui::SameRow(Ui::Space::S0_5);
                ImGui::PushID(i + 40000);
                ImGui::PushStyleColor(ImGuiCol_Button, tok::RoleV4(tok::col::ink_black, 0.0f));
                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::RoleV4(tok::col::state_err_hover));
@@ -254,7 +255,7 @@ namespace app
       }
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1);
 
       const bool canRecord = !Platform::PluginModeActive(); // inside a DAW the DAW records
       // Format selector: WAV | FLAC | MP3
@@ -276,10 +277,10 @@ namespace app
          if (active)
             PopSelectedButtonColors();
          if (i < 2)
-            ImGui::SameLine();
+            Ui::SameRow();
       }
       ImGui::EndDisabled();
-      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S0_5);
       }
 
       // Live: skip alignment against other Audio Outs (see AudioOutputNode::live).
@@ -299,7 +300,7 @@ namespace app
          if (ImGui::IsItemHovered())
             SetAudioReadout("live", n->live ? "not delayed to match other outputs" : "aligned with other outputs");
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S0_5);
 
       // Record/Stop is the only control that ever starts or stops a
       // recording - Choose... below only ever changes where the *next*
@@ -325,7 +326,7 @@ namespace app
       if (!recording && !audioOn && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          Tip::Show("press Start Audio in the toolbar first");
       ImGui::EndDisabled();
-      ImGui::SameLine();
+      Ui::SameRow();
 
       ImGui::BeginDisabled(recording);
       if (ActionButton::Draw("Choose...##audioOutChoose", ImVec2(btnW, 0)))
@@ -399,7 +400,7 @@ namespace app
          }
          if (active)
             PopSelectedButtonColors();
-         ImGui::SameLine();
+         Ui::SameRow();
       }
       const bool wasBit24 = n->bit24;   // Push and Pop must read the same value: the click flips it between them
       if (wasBit24)
@@ -430,7 +431,7 @@ namespace app
          PopSelectedButtonColors();
       if (ImGui::IsItemHovered())
          SetAudioReadout("live", n->live ? "not delayed to match other outputs" : "aligned with other outputs");
-      ImGui::SameLine();
+      Ui::SameRow();
       const bool wasStereo = (n->renderMode == 1);
       if (wasStereo)
          PushSelectedButtonColors();
@@ -461,7 +462,7 @@ namespace app
          }
       }
       ImGui::EndDisabled();
-      ImGui::SameLine();
+      Ui::SameRow();
       ImGui::BeginDisabled(recording);
       if (ActionButton::Draw("Choose...##spatialChoose", ImVec2(btnW, 0)))
       {
@@ -570,7 +571,7 @@ namespace app
          ImGui::PopID();
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
-         ImGui::Dummy(ImVec2(0.0f, tok::audio_node_spacer_h_lg));
+         Ui::Spacer(Ui::Space::S1);
       };
       tuningHeader("1", n->wave1, n->fine1, n->semi1, n->oct1);
       tuningHeader("2", n->wave2, n->fine2, n->semi2, n->oct2);
@@ -598,7 +599,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S0_5);
 
       // Filter section
       BeginAudioSection("filter");
@@ -616,7 +617,7 @@ namespace app
       }
       EndAudioSection();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S0_5);
 
       // Envelope section (interactive ADSR curve panel with parameter sliders)
       ImGui::PushID("amp");
@@ -625,7 +626,7 @@ namespace app
                         tok::Role(tok::col::accent_alt, tok::audio_node_envelope_alpha));
       ImGui::PopID();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::audio_node_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S0_5);
 
       // Output section
       BeginAudioSection("output");

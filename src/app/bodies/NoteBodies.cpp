@@ -15,6 +15,7 @@
 #include "app/ui/design/components/StepCell.h"
 #include "audio/NoteTheory.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -131,7 +132,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s   %s - idle", UiFmt::DbOffset(n->gainDb).c, inputDesc.c_str());
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S0_5);
 
       {
          PushDropdownStyle();
@@ -164,7 +165,7 @@ namespace app
          PopDropdownStyle();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
 
       const float faderH = kFaderH;
       const float stripTop = ImGui::GetCursorScreenPos().y;
@@ -204,7 +205,7 @@ namespace app
          snprintf(stat, sizeof(stat), "0 in \xe2\x86\x92 0 out \xc2\xb7 idle");
 
       BeginAudioBody(gn.index, gn.category, bodyW, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
 
       // Channels param control
       {
@@ -235,7 +236,7 @@ namespace app
             n->numChannels = next;
             RebuildAudioTopology();
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+         Ui::Spacer(Ui::Space::S1);
       }
 
       if (count > 0)
@@ -352,7 +353,7 @@ namespace app
       else
          snprintf(stat, sizeof(stat), "%d bands \xC2\xB7 LR4, sum flat", bands);
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
       {
          static const std::vector<std::string> kModes = { "copy", "2 bands", "3 bands", "4 bands" };
          AudioKnobRow row(tok::note_splitter_body_audio_knob_row_layout);
@@ -443,7 +444,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -480,7 +481,7 @@ namespace app
       const int last = n->LastNote();
       const int lowNote = last >= 0 ? std::clamp((last / 12) * 12 - 12, 0, 108) : 48;
       DrawMidiKeyboard(held, lowNote, 3);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_25);
 
       {
          AudioKnobRow row(tok::note_midi_notes_body_audio_knob_row_layout, kKnobLarge);
@@ -765,7 +766,7 @@ namespace app
          }
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_25);
 
       {
          AudioKnobRow row(tok::note_keyboard_body_audio_knob_row_layout, kKnobLarge);
@@ -1082,7 +1083,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawNoteFilterVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_25);
 
       {
          // Selectors on their own row, left-aligned on the same 3-cell grid as the knobs below (P1, P3): a dropdown
@@ -1279,7 +1280,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1297,7 +1298,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       DrawVelocityCurveChart(n->curve);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
       AudioKnobRow row(1, kKnobLarge);
       Ui::DrawKnob(row, n, VelocityCurveBodyRow::Knob<&VelocityCurveNode::curve>("curve", params::VelocityCurve::curve_lo, params::VelocityCurve::curve_hi).Fmt("%.2f").Size(kKnobLarge));
       row.End();
@@ -1599,7 +1600,7 @@ namespace app
             PushUndoCheckpoint();
             n->SetLearning(!learning);
          }
-         ImGui::SameLine();
+         Ui::SameRow();
          // Learning meter: how much the model beats a memoryless one, per captured bar.
          const ImVec2 p0 = ImGui::GetCursorScreenPos();
          const float mw = w - (w * tok::note_predictive_notes_body_ratio - 2.0f) - ImGui::GetStyle().ItemSpacing.x;
@@ -1630,9 +1631,9 @@ namespace app
             dl->AddText(ImVec2(p0.x + mw - csz.x - tok::space_1_5, p0.y + (h - csz.y) * 0.5f),
                         tok::Role(tok::col::state_ok_dark_vivid_hi), confStr);
          }
-         ImGui::Dummy(ImVec2(mw, h));
+         Ui::Claim(ImVec2(mw, h));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
       {
          AudioKnobRow row(tok::note_predictive_notes_body_audio_knob_row_layout);
          Ui::DrawKnobs(row, n, kPredictiveNotesBodyRows1);
@@ -1710,7 +1711,7 @@ namespace app
                col = tok::Role(tok::col::accent_muted_lo); // connected dim
             dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f, col);
          }
-         ImGui::Dummy(ImVec2(w, dia + tok::space_1_5));
+         Ui::Claim(ImVec2(w, dia + tok::space_1_5));
       }
 
       {
@@ -1775,7 +1776,7 @@ namespace app
             dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f,
                                 lit ? tok::Role(tok::col::accent_pale_muted_warm) : tok::Role(tok::col::edge_lo));
          }
-         ImGui::Dummy(ImVec2(w, dia + tok::space_1_5));
+         Ui::Claim(ImVec2(w, dia + tok::space_1_5));
       }
 
       {
@@ -1849,7 +1850,7 @@ namespace app
          gArpGateDrag.active = false;
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
 
 
@@ -1888,7 +1889,7 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       DrawArpGateGrid(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
 
       {
          AudioKnobRow row(tok::note_arpeggiator_body_audio_knob_row_layout);
@@ -2206,7 +2207,7 @@ namespace app
       }
 
       {
-         ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+         Ui::Spacer(Ui::Space::S1);
          AudioKnobRow row(tok::note_sequencer_body_audio_knob_row_layout);
          DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
          Ui::DrawKnobs(row, n, kNoteSequencerBodyRows);
@@ -2286,13 +2287,13 @@ namespace app
          }
          else
             AudioViz::IdleLabel(AudioViz::Frame{dl, origin, br}, n->laneId == 0 ? "link a Piano Roll page" : "empty page");
-         ImGui::Dummy(ImVec2(w, h));
+         Ui::Claim(ImVec2(w, h));
          // Double-click the preview: the panel, on this node's page.
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             PianoRollOpenPage(n->laneId);
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md)); // the skeleton's gap under the visualizer
+      Ui::Spacer(Ui::Space::S1); // the skeleton's gap under the visualizer
 
       {
          AudioKnobRow row(tok::note_piano_roll_body_audio_knob_row_layout);
@@ -2352,7 +2353,7 @@ namespace app
       }
       if (!n->path.empty())
       {
-         ImGui::SameLine();
+         Ui::SameRow();
          ImGui::TextDisabled("%s", n->path.substr(n->path.find_last_of("/\\") == std::string::npos ? 0 : n->path.find_last_of("/\\") + 1).c_str());
       }
 
@@ -2402,10 +2403,10 @@ namespace app
          }
          else
             AudioViz::IdleLabel(AudioViz::Frame{dl, origin, br}, "drop a .mid file");
-         ImGui::Dummy(ImVec2(w, h));
+         Ui::Claim(ImVec2(w, h));
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md)); // the skeleton's gap under the visualizer
+      Ui::Spacer(Ui::Space::S1); // the skeleton's gap under the visualizer
 
       {
          // Four knobs a row (five cells put each mod pin against its neighbour's knob), the checkbox bottom-left
@@ -2584,7 +2585,7 @@ namespace app
       UiType::Pop();
       (void)light;
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, chordH + gap + typeH + tok::space_1));
+      Ui::Claim(ImVec2(w, chordH + gap + typeH + tok::space_1));
    }
 
 
@@ -2657,7 +2658,7 @@ namespace app
                       },
                       progCats);
          row.End();
-         ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+         Ui::Spacer(Ui::Space::S1);
       }
       {
          AudioKnobRow row(tok::note_row_layout);
@@ -2714,7 +2715,7 @@ namespace app
       }
       UiType::Pop();
       ImGui::SetCursorScreenPos(ImVec2(x0, y0 + btnH + 6.0f));
-      ImGui::Dummy(ImVec2(0.0f, 0.0f)); // the moved cursor must end on an item or ImGui flags the window growing
+      Ui::Settle(); // the moved cursor must end on an item or ImGui flags the window growing
    }
 
 
@@ -2810,7 +2811,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawNoteCapturerVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
 
       const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::note_capturer_body_ratio) / tok::note_btn_w_ratio;
       if (ActionButton::Draw("Record", ImVec2(btnW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
@@ -2818,7 +2819,7 @@ namespace app
          if (recording) n->StopRecording();
          else n->StartRecording();
       }
-      ImGui::SameLine();
+      Ui::SameRow();
 
       ImGui::BeginDisabled(n->RecordedCount() == 0 && !playing);
       if (ActionButton::Draw("Play", ImVec2(btnW, 0), (playing) ? ActionButton::Kind::Go : ActionButton::Kind::Plain))
@@ -2827,19 +2828,19 @@ namespace app
          else n->StartPlayback();
       }
       ImGui::EndDisabled();
-      ImGui::SameLine();
+      Ui::SameRow();
 
       if (ActionButton::Draw("Stop", ImVec2(btnW, 0)))
       {
          n->StopRecording();
          n->StopPlayback();
       }
-      ImGui::SameLine();
+      Ui::SameRow();
 
       if (ActionButton::Draw("Clear", ImVec2(btnW, 0)))
          n->ClearRecording();
 
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S0_5);
       {
          // Same 4-cell grid as the Record/Play/Stop/Clear strip above, so
          // `loop` lands directly under Record instead of floating at the
@@ -2916,7 +2917,7 @@ namespace app
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
       ImGui::SetCursorScreenPos(rowOrigin);
-      ImGui::Dummy(ImVec2(fullW, h));
+      Ui::Claim(ImVec2(fullW, h));
    }
    // ui-content-end
 
@@ -2943,7 +2944,7 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawBouncingBallsVisualizer(n);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_25);
 
       {
          AudioKnobRow row(tok::note_bouncing_balls_body_audio_knob_row_layout);
@@ -3029,7 +3030,7 @@ namespace app
       DrawEnvelopePanel("envelope  -  drag the handles", "##envAdsr", &n->attackMs, &n->decayMs,
                         &n->sustainLevel, &n->releaseMs, nullptr, 0.0f, 0.0f, "%.2f",
                         tok::Role(tok::col::accent_alt, tok::note_envelope_alpha), &shape);
-      ImGui::Dummy(ImVec2(0.0f, tok::note_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
 
       // Hold at the peak, then each moving stage's bend: 0 straight,
       // positive fast first (a falling decay/release), negative slow first.

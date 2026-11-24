@@ -9,6 +9,7 @@
 #include "app/ui/design/DrawParam.h"
 #include "platform/HeadTracker.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -68,7 +69,7 @@ namespace app
       else
          snprintf(stat, sizeof(stat), "0 in \xE2\x86\x92 binaural (idle)");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // ---- stage ---------------------------------------------------------
       const float stageW = gAudioContentW, stageH = tok::spatial_mixer_stage_h;
@@ -268,7 +269,7 @@ namespace app
          }
          ImGui::PopID();
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // ---- knobs: selected object, then master ---------------------------
       const int sel = n->selected;
@@ -336,7 +337,7 @@ namespace app
                               gPatchDirty = true;
                            },
                            half);
-         ImGui::SameLine();
+         Ui::SameRow();
          ImGui::BeginDisabled(n->trackMode == 0);
          if (ActionButton::Draw("recenter##spatialRecenter", ImVec2(half, 0)))
             n->RecenterHead();
@@ -347,7 +348,7 @@ namespace app
          AudioToggleButton("limit##spatialLimit", &n->limiter, half);
          if (ImGui::IsItemHovered())
             SetAudioReadout("limiter", n->limiter ? "true-peak ceiling -1 dB on the output" : "off: output can clip");
-         ImGui::SameLine();
+         Ui::SameRow();
          bool model = n->hrtf == 1;
          if (AudioToggleButton(model ? "model##spatialHrtf" : "KEMAR##spatialHrtf", &model, half))
          {
@@ -366,7 +367,7 @@ namespace app
          if (ImGui::IsItemHovered())
             SetAudioReadout("meter", "short-term loudness, true peak (click to reset), limiter reduction");
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::spatial_mixer_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
       DrawSpatialExportPanel(n);
       EndAudioBody();
    }

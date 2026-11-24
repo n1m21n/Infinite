@@ -13175,13 +13175,14 @@ namespace
          { "##v2dt3", IconsInfinite::Crop, "Document", 3, 4 },
       };
       sTab = std::clamp(sTab, 0, 6);
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, tok::space_1));
-      ImGui::BeginGroup();
-      for (int i = 0; i < 5; i++)
-         if (IconChip(kTabs[i].id, kTabs[i].icon, sTab == kTabs[i].tab || sTab == kTabs[i].alt, T(kTabs[i].tip)))
-            sTab = kTabs[i].tab;
-      ImGui::EndGroup();
-      ImGui::PopStyleVar();
+      {
+         Ui::Stack stack(Ui::Space::S1);
+         ImGui::BeginGroup();
+         for (int i = 0; i < 5; i++)
+            if (IconChip(kTabs[i].id, kTabs[i].icon, sTab == kTabs[i].tab || sTab == kTabs[i].alt, T(kTabs[i].tip)))
+               sTab = kTabs[i].tab;
+         ImGui::EndGroup();
+      }
       ActionButton::RowNext();
 
       sChip = SideChip();

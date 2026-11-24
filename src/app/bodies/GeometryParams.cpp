@@ -12,6 +12,7 @@
 #include "app/ui/design/DrawParam.h"
 #include "platform/AppPaths.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -119,14 +120,14 @@ namespace app
          {
             n->Play();
          }
-         ImGui::SameLine();
+         Ui::SameRow();
          if (ActionButton::Draw("Restart", ImVec2(kPreviewSize * tok::geometry_params_audio_file_ratio, 0)))
             n->Restart();
 
          Ui::DrawParams(n, kAudioFileParamsRows);
 
          const Platform::AudioLevels& lv = n->Levels();
-         ImGui::Text("level "); ImGui::SameLine();
+         ImGui::Text("level "); Ui::SameRow();
          ImGui::ProgressBar(std::min(1.0f, lv.rms * n->gain), ImVec2(kPreviewSize * tok::geometry_params_audio_file_w, 0), "");
       }
    }
@@ -189,7 +190,7 @@ namespace app
       const Platform::AudioLevels& levels = n->Levels();
       ImVec2 origin = ImGui::GetCursorScreenPos();
       const float h = tok::geometry_params_h;
-      ImGui::Dummy(ImVec2(bodyW, h));
+      Ui::Claim(ImVec2(bodyW, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::Role(tok::col::surface_deep), tok::geometry_params_audio_analyze_radius);
       const float bw = bodyW / (float)Platform::kAudioBands;
@@ -359,7 +360,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + gridH));
-      ImGui::Dummy(ImVec2(gridW, 0.0f));
+      Ui::Claim(ImVec2(gridW, 0.0f));
    }
 
 
@@ -1628,9 +1629,9 @@ namespace app
    {
       ImGui::TextDisabled("generation %d, %s triangles", n->Generation(), UiFmt::Count((long long)(n->TriangleCount())).c);
       if (ActionButton::Draw("step")) n->StepOnce();
-      ImGui::SameLine();
+      Ui::SameRow();
       if (ActionButton::Draw("reset")) n->Reset();
-      ImGui::SameLine();
+      Ui::SameRow();
       if (ActionButton::Draw("randomise")) n->Randomise();
 
       NodeSeparator("evolve");
@@ -3292,7 +3293,7 @@ namespace app
          }
          if (has)
          {
-            ImGui::SameLine();
+            Ui::SameRow();
             if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * tok::geometry_params_clear_x, 0))) { PushUndoCheckpoint(); n->iesFile.clear(); }
          }
       }
@@ -3530,7 +3531,7 @@ namespace app
    {
       const int connected = (int)n->FlattenedGeometry().size();
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
-      ImGui::SameLine(0.0f, tok::space_4);
+      Ui::SameRow(Ui::Space::S4);
       if (n->LastGpuBytes() > 0)
          ImGui::TextDisabled("%s triangles in %zu draw calls, %s GPU", UiFmt::Count((long long)(n->LastTriangleCount())).c, n->LastDrawCalls(), UiFmt::MB((double)n->LastGpuBytes() / 1048576.0).c);
       else
@@ -3543,7 +3544,7 @@ namespace app
          if (textSize.x < fixedW)
          {
             ImGui::SetCursorScreenPos(ImVec2(textMin.x + textSize.x, textMin.y));
-            ImGui::Dummy(ImVec2(fixedW - textSize.x, textSize.y));
+            Ui::Claim(ImVec2(fixedW - textSize.x, textSize.y));
          }
       }
       if (!n->EngineError().empty())

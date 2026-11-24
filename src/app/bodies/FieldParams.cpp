@@ -7,6 +7,7 @@
 #include "app/panels/FieldPatcherPanel.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -68,7 +69,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -128,7 +129,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -176,7 +177,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -236,7 +237,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -304,7 +305,7 @@ namespace app
 
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 

@@ -14,6 +14,7 @@
 #include "core/Notices.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
+#include "app/ui/design/UiScope.h"
 
 namespace app
 {
@@ -240,7 +241,7 @@ namespace app
          snprintf(stat, sizeof(stat), "no signal");
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_audio_meter_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // Three kKnobLarge knob rows tall - 1.5x Limiter's gain-reduction
       // meter (two rows, DrawLimiterBody). At the Limiter's height the
@@ -264,7 +265,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%s \xc2\xb7 %s", UiFmt::DbOffset(n->gainDb).c,
                n->Level() > 0.0005f ? "passing" : "silent");
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_gain_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       AudioKnobRow row(1, kKnobLarge);
       row.Knob("gain", &n->gainDb, params::Gain::gain_db_lo, params::Gain::gain_db_hi, "%.1f dB", kKnobLarge, /*dbTaper=*/true);
@@ -284,7 +285,7 @@ namespace app
       const int pctB = (int)std::lround(n->blend * 100.0f);
       snprintf(stat, sizeof(stat), "A <-> B   %s", UiFmt::Pct(pctB).c);
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_blend_audio_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       AudioKnobRow row(1, kKnobLarge);
       Ui::DrawKnob(row, n, BlendAudioBodyRow::Knob<&BlendAudioNode::blend>("blend", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge));
@@ -474,9 +475,9 @@ namespace app
          ImGui::TextColored(tok::RoleV4(tok::col::text_secondary), "%s", status);
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
       DrawSamplerWaveform(n, 140.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
 
       DrawSamplerParamGrid(n);
 
@@ -609,7 +610,7 @@ namespace app
          }
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_generate_samples_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1_5);
       if (state == State::Empty || state == State::Failed || (state == State::Generating && n->waveformCacheCount == 0))
       {
          const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -620,7 +621,7 @@ namespace app
       }
       else
          DrawSamplerWaveform(n, 140.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_generate_samples_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S1_5);
 
       DrawSamplerParamGrid(n);
 
@@ -729,9 +730,9 @@ namespace app
       if (ImGui::IsItemHovered())
          SetAudioReadout("#", "re-runs transient detection at the current sensitivity");
 
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_slicer_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
       DrawSlicerWaveform(n, 140.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_slicer_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
 
       const bool onsetMode = (n->sliceBy == 0);
       const float halfW = AudioHalfWidth();
@@ -875,9 +876,9 @@ namespace app
          n->loop = loopBool;
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_paul_stretch_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
       DrawPaulStretchWaveform(n, 130.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_paul_stretch_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
 
       AudioSlider("stretch", &n->stretch, params::PaulStretch::stretch_lo, params::PaulStretch::stretch_hi, "%.1fx", AudioHalfWidth());
       FormParts::Inline();
@@ -1043,7 +1044,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1086,7 +1087,7 @@ namespace app
       // Dummy spacer and the seed/gen/f0/harm readout) renders on top of it
       // instead of below it.
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1139,11 +1140,11 @@ namespace app
          n->Reset();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_molder_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
       DrawMolderWaveform(n, 90.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_molder_spacer_h_sm));
+      Ui::Spacer(Ui::Space::S0_75);
       DrawMolderPartialBars(n, 36.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_molder_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // loop/reverse/ping-pong right-aligned on their own row, anchored off
       // the fixed declared content width rather than GetContentRegionAvail()
@@ -1175,7 +1176,7 @@ namespace app
             n->pingpong = pingpongBool;
          }
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_molder_spacer_h_md));
+      Ui::Spacer(Ui::Space::S1);
 
       AudioSlider("chaos", &n->chaos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
       FormParts::Inline();
@@ -1324,7 +1325,7 @@ namespace app
       }
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -1413,9 +1414,9 @@ namespace app
          ImGui::TextColored(tok::RoleV4(tok::col::text_secondary), "%s", status);
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_grain_molder_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
       DrawGrainMolderWaveform(n, 130.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_grain_molder_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // Row 1: grain | amount
       AudioSlider("grain", &n->grain, params::GrainMolder::grain_lo, params::GrainMolder::grain_hi, "%.0f ms", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
@@ -1522,9 +1523,9 @@ namespace app
          n->loop = loopBool;
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_granular_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
       DrawGranularWaveform(n, 130.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_granular_spacer_h));
+      Ui::Spacer(Ui::Space::S1);
 
       // Row 1: Position & Scan
       if (AudioSlider("pos", &n->position, n->start, n->end, "%.3f", AudioHalfWidth()))
@@ -1679,7 +1680,7 @@ namespace app
       }
 
       DrawDrumLaneWaveform(n, lane, 84.0f);
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_lane_card_spacer_h));
+      Ui::Spacer(Ui::Space::S0_75);
 
       // Horizontal sliders, two per row, rather than a knob row - each is
       // shorter than a knob-plus-caption, and the height that frees up goes
@@ -1936,19 +1937,19 @@ namespace app
          for (int lane = 0; lane < 4; lane++)
          {
             DrawDrumLaneCard(n, lane);
-            ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_spacer_h_lg));
+            Ui::Spacer(Ui::Space::S1);
          }
          EndAudioColumn();
          BeginAudioColumn(1);
          for (int lane = 4; lane < DrumSequencerNode::kNumLanes; lane++)
          {
             DrawDrumLaneCard(n, lane);
-            ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_spacer_h_lg));
+            Ui::Spacer(Ui::Space::S1);
          }
          EndAudioColumn();
          EndAudioColumns();
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_spacer_h_md));
+      Ui::Spacer(Ui::Space::S0_5);
 
       // ---- groove picker: ONE row. category | groove | < > | A B C pill.
       // The dropdowns share the remaining width, the nav buttons and the part
@@ -2044,7 +2045,7 @@ namespace app
          if (grooveIdx < 0)
             ImGui::EndDisabled();
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_spacer_h_md));
+      Ui::Spacer(Ui::Space::S0_5);
 
       // ---- step grid: the visualizer, and the primary editable control ----
       {
@@ -2208,7 +2209,7 @@ namespace app
                ImGui::EndDisabled();
          }
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_spacer_h_md));
+      Ui::Spacer(Ui::Space::S0_5);
 
       // ---- global controls: rate + 3 pattern knobs on top, then the four
       // offset knobs that compose on top of every lane's own value
@@ -2231,7 +2232,7 @@ namespace app
          Ui::DrawKnobs(row, n, kDrumSequencerBodyRows2);
          row.End();
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_drum_sequencer_spacer_h_md));
+      Ui::Spacer(Ui::Space::S0_5);
       {
          const float gap = ImGui::GetStyle().ItemSpacing.x;
          const float btnW = (AudioFullWidth() - gap * tok::sampler_stop_btn_w) / tok::sampler_btn_w_ratio;
@@ -2408,7 +2409,7 @@ namespace app
          EmptyState::DrawCaption(origin, br, T("Waiting for the next grid line"));
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
-      ImGui::Dummy(ImVec2(w, h));
+      Ui::Claim(ImVec2(w, h));
    }
    // ui-content-end
 
@@ -2448,12 +2449,12 @@ namespace app
             n->SetButtonLevel(b, DrawGateControl(kIds[b], label, btnW, style, lit));
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, rowH));
+         Ui::Claim(ImVec2(gAudioContentW, rowH));
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_looper_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
       DrawLooperWave(n, 140.0f, AudioFullWidth());
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_looper_spacer_h));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // Same rows, ranges and formats as the Sampler. Draw order is the pin
       // numbering: append only.
@@ -2792,9 +2793,9 @@ namespace app
             }
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, tok::sampler_mpc_body_ratio * side + tok::sampler_mpc_spacer_h_sm * gap));
+         Ui::Claim(ImVec2(gAudioContentW, tok::sampler_mpc_body_ratio * side + tok::sampler_mpc_spacer_h_sm * gap));
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::sampler_mpc_spacer_h_lg));
+      Ui::Spacer(Ui::Space::S1_5);
 
       // Selected pad: header, waveform (also the drop target), Load / Folder /
       // Clear, then Sampler-style slider rows for that pad's params.
@@ -2849,7 +2850,7 @@ namespace app
             if (!has && hov)
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          }
-         ImGui::Dummy(ImVec2(0.0f, tok::sampler_mpc_spacer_h_lg));
+         Ui::Spacer(Ui::Space::S1_5);
 
          const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * tok::sampler_mpc_third_w) / tok::sampler_third_w_ratio;
          if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
@@ -2872,7 +2873,7 @@ namespace app
             n->ClearPad(cur);
          }
          ImGui::EndDisabled();
-         ImGui::Dummy(ImVec2(0.0f, tok::sampler_mpc_spacer_h_lg));
+         Ui::Spacer(Ui::Space::S1_5);
 
          // Same rows, ranges and formats as the Sampler; float ids are fixed
          // per (pad, param) so the drawn pad can change without moving a cable.

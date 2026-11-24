@@ -138,6 +138,29 @@ namespace MenuParts
       return r;
    }
 
+   // A destructive row (Delete Node / Group / Note): error-red label and a red hover, so the one action that loses work
+   // reads as different from its neighbours (HIG danger style).
+   inline bool DangerItem(const char* label, const char* shortcut = nullptr)
+   {
+      ImGui::PushStyleColor(ImGuiCol_Text, tok::RoleV4(tok::col::text_err));
+      ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::RoleV4(tok::col::state_err, tok::menu_danger_hover_alpha));
+      ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::RoleV4(tok::col::state_err, tok::menu_danger_press_alpha));
+      const bool r = Item(label, shortcut);
+      ImGui::PopStyleColor(3);
+      return r;
+   }
+
+   // A row that still works but is not suggested here (a node that takes no input from the dragged cable): muted ink.
+   inline bool QuietItem(const char* label, const char* shortcut, bool quiet)
+   {
+      if (quiet)
+         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+      const bool r = Item(label, shortcut);
+      if (quiet)
+         ImGui::PopStyleColor();
+      return r;
+   }
+
    // Toggle row: the app checkbox at the left edge, label after it; the menu stays open.
    inline bool Check(const char* label, bool* v)
    {
@@ -181,6 +204,17 @@ namespace MenuParts
       // Item rect is the parent row. An open submenu has become the current window, so the wash goes to the parent's draw list.
       Wash(enabled && (open || ImGui::IsItemHovered()), false, open, parent);
       ProbeNote(label, true, enabled, parent);
+      return open;
+   }
+
+   // The submenu row muted like QuietItem when nothing inside it is suggested.
+   inline bool QuietSubMenu(const char* label, bool quiet)
+   {
+      if (quiet)
+         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+      const bool open = SubMenu(label);
+      if (quiet)
+         ImGui::PopStyleColor();
       return open;
    }
 
