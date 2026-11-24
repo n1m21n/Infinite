@@ -160,6 +160,13 @@ std::string UiAudit::NearMiss(const char* label)
    return out.empty() ? "no near miss in " + std::to_string(sLast.size()) + " items" : out;
 }
 
+void UiAudit::NoteName(const char* label)
+{
+   if (sCur.empty() || label == nullptr || !sCur.back().label.empty())
+      return;
+   sCur.back().label = label;
+}
+
 bool UiAudit::FindItem(const char* label, const char* inWindow, int nth, ImVec2* mn, ImVec2* mx)
 {
    const std::string want = label != nullptr ? label : "";

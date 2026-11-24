@@ -26,6 +26,9 @@ namespace UiAudit
    // Journeys (src/app/selftest/Journeys.cpp): the rect last frame of the nth (0-based) item whose label is `label`
    // (or whose icon tip is), in a window whose name contains `inWindow` (null or empty: any). Needs the item hooks on.
    bool FindItem(const char* label, const char* inWindow, int nth, ImVec2* mn, ImVec2* mx);
+   // Names the last item for FindItem only (a dropdown, whose ImGui code registers no label): the audit does not
+   // count it as a control to check or poke.
+   void NoteName(const char* label);
    // Labels last frame that share `label`'s visible text or ## id: what a failed lookup nearly matched.
    std::string NearMiss(const char* label);
 #else
@@ -37,6 +40,7 @@ namespace UiAudit
    inline void NoteInk(int, ImVec2, ImVec2, float = 0.0f, const char* = nullptr, const char* = nullptr) {}
    inline void NoteOn() {}
    inline bool FindItem(const char*, const char*, int, ImVec2*, ImVec2*) { return false; }
+   inline void NoteName(const char*) {}
    inline std::string NearMiss(const char*) { return {}; }
 #endif
 }
