@@ -1132,7 +1132,7 @@ void DrawMenuBar(FrameCtx& fc)
                         transport.SetTimeSignature(std::clamp(parsed, 1, 99), tsDen);
                   },
                   nullptr);
-            TD::Value("##tsSlash", sx + numW, slashW, wellMin.y, "/", 0.5f);   // ui-audit-ok: centre alignment (half)
+            TD::Value("##tsSlash", sx + numW, slashW, wellMin.y, "/", tok::stage_menu_bar_time_sig_slash_alpha);
             Field(TopBarField::TsDen, "##tsDenField", sx + numW + slashW, denW, denShown, denShown, false,
                   [&](float dy) {
                      sDragAccumY += dy;
@@ -1261,7 +1261,7 @@ void DrawMenuBar(FrameCtx& fc)
          static double sSmoothedMs = 0.0;
          sSmoothedMs = (sSmoothedMs <= 0.0)
                           ? gLastFrameMs
-                          : sSmoothedMs * 0.9 + gLastFrameMs * 0.1;   // ui-audit-ok: frame time smoothing
+                          : sSmoothedMs * 0.9 + gLastFrameMs * 0.1;   // ui-audit-ok: timing (frame time smoothing)
          const double fps = sSmoothedMs > 0.0001 ? 1000.0 / sSmoothedMs : 0.0;
 
          char readout[80];

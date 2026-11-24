@@ -1047,7 +1047,7 @@ namespace app
          float normX = kpX.valueToPos ? kpX.valueToPos(valX, minX, maxX) : ((maxX > minX) ? std::clamp((valX - minX) / (maxX - minX), 0.0f, 1.0f) : 0.0f);
          float normY = kpY.valueToPos ? kpY.valueToPos(valY, minY, maxY) : ((maxY > minY) ? std::clamp((valY - minY) / (maxY - minY), 0.0f, 1.0f) : 0.0f);
          ImVec2 orbPos(origin.x + normX * padSize, origin.y + (1.0f - normY) * padSize);
-         dl->AddCircleFilled(orbPos, tok::perf_element_r, (themeTint & 0x00FFFFFF) | tok::perf_element_alpha);  // ui-audit-ok: channel mask / bit packing, not a colour value
+         dl->AddCircleFilled(orbPos, tok::perf_element_r, (themeTint & 0x00FFFFFF) | tok::perf_element_alpha);  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
          dl->AddCircleFilled(orbPos, tok::perf_dot_r_lg, themeTint);
       }
       else if (elem.kind == 5) // Momentary Trigger / Bang (1x1)
@@ -1178,7 +1178,7 @@ namespace app
          }
          else
          {
-            dl->AddCircleFilled(center, r * tok::perf_dot_r_sm, (themeTint & 0x00FFFFFF) | tok::perf_dot_alpha, tok::perf_element_segments);  // ui-audit-ok: channel mask / bit packing, not a colour value
+            dl->AddCircleFilled(center, r * tok::perf_dot_r_sm, (themeTint & 0x00FFFFFF) | tok::perf_dot_alpha, tok::perf_element_segments);  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
          }
          if (hovered)
             dl->AddCircle(center, r + tok::space_0_5, wellCol(tok::perf_element_well_col_alpha_md), tok::perf_element_segments, tok::perf_element_stroke);

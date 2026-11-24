@@ -1016,7 +1016,7 @@ namespace app
 
          // Outer halo on hover/drag
          if (isHot)
-            dl->AddCircleFilled(handlePts[i], radius + tok::space_0_75, (color & 0x00FFFFFFu) | tok::osc_editable_adsr_alpha, tok::osc_editable_adsr_segments);  // ui-audit-ok: channel mask / bit packing, not a colour value
+            dl->AddCircleFilled(handlePts[i], radius + tok::space_0_75, (color & 0x00FFFFFFu) | tok::osc_editable_adsr_alpha, tok::osc_editable_adsr_segments);  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
 
          dl->AddCircleFilled(handlePts[i], radius, isLight ? tok::Base(tok::col::ink_white) : tok::Base(tok::col::ink_white), tok::osc_editable_adsr_segments);
          dl->AddCircle(handlePts[i], radius, isLight ? tok::Base(tok::col::edge_lo) : tok::Base(tok::col::edge_deep, tok::osc_ring_alpha), tok::osc_editable_adsr_segments, tok::osc_ring_stroke);

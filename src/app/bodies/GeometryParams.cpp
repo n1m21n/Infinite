@@ -1747,8 +1747,8 @@ namespace app
       }
       if (n->shape == 7 || n->shape == 12)
       {
-         ModSliderInt(n->shape == 12 ? "turns" : "knot p", &n->knotP, params::Geometry::knot_p_lo, params::Geometry::knot_p_hi);   // ui-audit-ok: shape id 12 (helix) relabels the knot controls
-         ModSliderInt(n->shape == 12 ? "height" : "knot q", &n->knotQ, params::Geometry::knot_q_lo, params::Geometry::knot_q_hi);   // ui-audit-ok: shape id 12 (helix) relabels the knot controls
+         ModSliderInt(n->shape == 12 ? "turns" : "knot p", &n->knotP, params::Geometry::knot_p_lo, params::Geometry::knot_p_hi);   // ui-audit-ok: index (shape id 12 (helix) relabels the knot controls)
+         ModSliderInt(n->shape == 12 ? "height" : "knot q", &n->knotQ, params::Geometry::knot_q_lo, params::Geometry::knot_q_hi);   // ui-audit-ok: index (shape id 12 (helix) relabels the knot controls)
       }
    }
 
@@ -2448,7 +2448,7 @@ namespace app
             const int group = c / 3;
             const std::string full = names[i] + " " + Scene3DNode::MotionChannelName(c);
             ModSlider(Scene3DNode::MotionChannelName(c), &it->motion[c], kLo[group], kHi[group], kFmt[group], kParamWidth,
-                      false, 0.0f, nullptr, nullptr, Scene3DNode::kMotionParamBase + (it->motionSlot - 1) * 9 + c, full.c_str());   // ui-audit-ok: motion param id layout, 9 channels per slot
+                      false, 0.0f, nullptr, nullptr, Scene3DNode::kMotionParamBase + (it->motionSlot - 1) * 9 + c, full.c_str());   // ui-audit-ok: index (motion param id layout, 9 channels per slot)
          }
       }
       gParamRegisterOnly = keptOnly;

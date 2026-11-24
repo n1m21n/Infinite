@@ -126,7 +126,7 @@ namespace LauncherCard
          ImGuiIO& io = ImGui::GetIO();
          io.IniFilename = nullptr;
          io.LogFilename = nullptr;
-         ImFont* font = fontPath.empty() ? nullptr : io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 32.0f);   // ui-audit-ok: launcher card font raster size (its own window, before the UI scale exists)
+         ImFont* font = fontPath.empty() ? nullptr : io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 32.0f);   // ui-audit-ok: core (launcher card font raster size (its own window, before the UI scale exists))
          if (!font)
             io.Fonts->AddFontDefault();
          rendererUp = ImGui_ImplOpenGL3_Init("#version 150");

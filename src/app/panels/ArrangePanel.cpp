@@ -2573,7 +2573,7 @@ namespace app
          for (int d = 0; d < depth; d++)
          {
             const float lineX = headerStartX + tok::space_1_5 + (float)d * kGroupIndent;
-            dl->AddLine(ImVec2(lineX, rowTop), ImVec2(lineX, rowTop + kLaneHeight), tint & tok::arrange_panel_content_alpha_mask, tok::arrange_line_stroke_xs);  // ui-audit-ok: channel mask / bit packing, not a colour value
+            dl->AddLine(ImVec2(lineX, rowTop), ImVec2(lineX, rowTop + kLaneHeight), tint & tok::arrange_panel_content_alpha_mask, tok::arrange_line_stroke_xs);  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
          }
 
          const bool grpRowSelected = gArrangeRowSel.count(groupId) != 0;

@@ -311,9 +311,9 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
       else if (tickDt > 0.0)
       {
          const double want = std::min(tickDt, 0.05) + transport.LastBlockSeconds();
-         sDelay = sDelay > 0.0 ? sDelay + (want - sDelay) * 0.1 : want;   // ui-audit-ok: modulation delay smoothing
+         sDelay = sDelay > 0.0 ? sDelay + (want - sDelay) * 0.1 : want;   // ui-audit-ok: timing (modulation delay smoothing)
       }
-      const double delay = std::clamp(sDelay, 0.002, 0.25);   // ui-audit-ok: modulation delay smoothing
+      const double delay = std::clamp(sDelay, 0.002, 0.25);   // ui-audit-ok: timing (modulation delay smoothing)
       // Plugin offline slot lock: a served frame ramps over exactly one grid step from the
       // parked position; a frame between served ones leaves that stamp alone.
       if (transport.FramePinned())

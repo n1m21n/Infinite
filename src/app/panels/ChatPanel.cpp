@@ -131,7 +131,7 @@ namespace app
       std::vector<Run> sRetry;
 
       // A turn with no output at all for this long is stuck (a long render still prints its tool call first).
-      constexpr double kTurnSilentSeconds = 15.0 * 60.0;   // ui-audit-ok: agent polling
+      constexpr double kTurnSilentSeconds = 15.0 * 60.0;   // ui-audit-ok: timing (agent polling)
 
       // What the chat knows about each agent: can it take a turn, and a setup running in the background.
       struct AgentState
@@ -194,8 +194,8 @@ namespace app
       }
 
       bool OnMac() { return CliSetup::CurrentOs() == CliSetup::Os::kMac; }
-      constexpr double kStatusCheckSeconds = 30.0;    // a status check that takes longer is stopped  // ui-audit-ok: agent polling
-      constexpr double kStatusRecheckSeconds = 300.0;  // a signed-in agent is checked again this often  // ui-audit-ok: agent polling
+      constexpr double kStatusCheckSeconds = 30.0;    // a status check that takes longer is stopped  // ui-audit-ok: timing (agent polling)
+      constexpr double kStatusRecheckSeconds = 300.0;  // a signed-in agent is checked again this often  // ui-audit-ok: timing (agent polling)
 
       chat::Thread sThread;
       std::vector<EntryUi> sUi;
@@ -303,7 +303,7 @@ namespace app
          std::mt19937_64 g(((uint64_t)rd() << 32) ^ rd());
          char buf[40];
          const uint64_t a = g(), b = g();
-         std::snprintf(buf, sizeof buf, "%s-%s-4%s-%s-%s", UiFmt::Hex8((unsigned)(a >> 32)).c, UiFmt::Hex4((unsigned)(a >> 16) & 0xFFFF).c, UiFmt::Hex3((unsigned)a & 0xFFF).c,  // ui-audit-ok: bit packing of a UUID
+         std::snprintf(buf, sizeof buf, "%s-%s-4%s-%s-%s", UiFmt::Hex8((unsigned)(a >> 32)).c, UiFmt::Hex4((unsigned)(a >> 16) & 0xFFFF).c, UiFmt::Hex3((unsigned)a & 0xFFF).c,  // ui-audit-ok: mask (bit packing of a UUID)
                        UiFmt::Hex4((unsigned)((b >> 48) & 0x3FFF) | 0x8000).c, UiFmt::Hex12((unsigned long long)(b & 0xFFFFFFFFFFFFull)).c);
          return buf;
       }
@@ -1033,7 +1033,7 @@ namespace app
             return;
          std::vector<chat::AgentEvent> drop;
          o.probe->Poll(drop);
-         const bool late = ImGui::GetTime() - o.probeAt > 25.0;   // ui-audit-ok: agent polling
+         const bool late = ImGui::GetTime() - o.probeAt > 25.0;   // ui-audit-ok: timing (agent polling)
          if (!o.probe->Done() && !late)
             return;
          if (!o.probe->Done())
@@ -1086,7 +1086,7 @@ namespace app
             sOnboard.leftSinceSignUp = sOnboard.leftSinceSignUp || away;
             // The sign-up page never took the front (another screen, a slow browser): do not wait for a return
             // that will not come.
-            if (!sOnboard.leftSinceSignUp && ImGui::GetTime() - sOnboard.signUpAt > 5.0)   // ui-audit-ok: agent polling
+            if (!sOnboard.leftSinceSignUp && ImGui::GetTime() - sOnboard.signUpAt > 5.0)   // ui-audit-ok: timing (agent polling)
                for (auto& [id, st] : sAgents)
                   if (st.signInOnFocus && st.setup == nullptr && st.login == nullptr)
                   {
@@ -1181,7 +1181,7 @@ namespace app
          std::string title;
          std::string code;
          std::vector<std::string> lines;
-         double copiedAt = -10.0;   // ui-audit-ok: "never" time sentinel
+         double copiedAt = -10.0;   // ui-audit-ok: sentinel ("never" time sentinel)
       } sCodeView;
 
       void NewChat()
@@ -2517,7 +2517,7 @@ namespace app
             int end = 0;
             for (int i = 0; i < std::min(count, 120); i++)
             {
-               t.frames.push_back(upload(px + (size_t)t.w * t.h * 4 * i, t.w, t.h));  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+               t.frames.push_back(upload(px + (size_t)t.w * t.h * 4 * i, t.w, t.h));  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
                end += delays != nullptr && delays[i] > 10 ? delays[i] : 100;  // browsers play a 0-10 ms delay at 100 ms
                t.endsMs.push_back(end);
             }
@@ -2886,7 +2886,7 @@ namespace app
          v.w = Platform::VideoWidth(h), v.h = Platform::VideoHeight(h);
          v.seconds = Platform::VideoDuration(h);
          // A frame a little in: the very first is often black.
-         if (v.w > 0 && v.h > 0 && Platform::VideoFrameAtExact(h, std::min(1.0, v.seconds * 0.2), v.px) && v.px.size() >= (size_t)v.w * v.h * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+         if (v.w > 0 && v.h > 0 && Platform::VideoFrameAtExact(h, std::min(1.0, v.seconds * 0.2), v.px) && v.px.size() >= (size_t)v.w * v.h * 4)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
             UploadVideoFrame(v);
          Platform::VideoClose(h);
          return v;
@@ -2920,7 +2920,7 @@ namespace app
          if (v->handle != nullptr)
          {
             const double t = v->seconds > 0.0 ? std::fmod(ImGui::GetTime() - v->started, v->seconds) : 0.0;
-            if (Platform::VideoFrameAt(v->handle, t, v->px) && v->px.size() >= (size_t)v->w * v->h * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+            if (Platform::VideoFrameAt(v->handle, t, v->px) && v->px.size() >= (size_t)v->w * v->h * 4)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
                UploadVideoFrame(*v);
          }
          ImGui::PushID(rawPath.c_str());
@@ -3330,7 +3330,7 @@ namespace app
             ImGui::Dummy(ImVec2(inner, headH + tok::space_1));
          }
          const ImU32 col = e.undone ? Dim() : ImGui::GetColorU32(ImGuiCol_Text);
-         const size_t cap = 8;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+         const size_t cap = 8;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
          const size_t shown = ui.open ? e.changes.size() : std::min(e.changes.size(), cap);
          const std::vector<KnobCell> knobs = KnobCells(e, shown);
          for (size_t i = 0; i < shown; i++)

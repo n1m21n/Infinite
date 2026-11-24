@@ -116,7 +116,7 @@ namespace
       bool snap = true;
       int gridBeats = MusicTime::kSixteenth;
       int gridSeconds = 2, gridFrames = 0;   // ui-audit-ok: model default
-      float thinning = 0.01f;       // Draw: how far (shape units) the points may stray from the stroke   // ui-audit-ok: curve thinning tolerance (model value)
+      float thinning = 0.01f;       // Draw: how far (shape units) the points may stray from the stroke   // ui-audit-ok: model (curve thinning tolerance (model value))
       std::vector<int> sel;         // selected point indices, ascending
       size_t selCount = 0;          // the node's point count the selection was made against
       Drag drag = Drag::None;
@@ -649,7 +649,7 @@ namespace
       if (axis < 0 || axis >= 3)
          return Tint(tok::curve_editor_axis_col_shade);
       const unsigned h = kAxisHex[axis];
-      return IM_COL32((h >> 16) & 255, (h >> 8) & 255, h & 255, tok::curve_editor_axis_col_alpha);  // ui-audit-ok: channel mask / bit packing, not a colour value
+      return IM_COL32((h >> 16) & 255, (h >> 8) & 255, h & 255, tok::curve_editor_axis_col_alpha);  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
    }
 
    // The value axis in the first target's own units: its high at the top line, its low at the bottom.
@@ -772,7 +772,7 @@ namespace
       if (s.drag == Drag::Marquee)
       {
          const ImVec2 r0(std::min(m.x, s.from.x), std::min(m.y, s.from.y)), r1(std::max(m.x, s.from.x), std::max(m.y, s.from.y));
-         dl->AddRectFilled(r0, r1, (selCol & 0x00FFFFFF) | tok::curve_editor_fill_alpha);  // ui-audit-ok: channel mask / bit packing, not a colour value
+         dl->AddRectFilled(r0, r1, (selCol & 0x00FFFFFF) | tok::curve_editor_fill_alpha);  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
          dl->AddRect(r0, r1, selCol);
       }
       dl->PopClipRect();
@@ -1264,7 +1264,7 @@ namespace
          std::vector<int> touched;
          for (int i=1;i+1<(int)n.points.size();++i)
             if (std::hypot(a.X(n.points[i].x)-m.x,a.Y(n.points[i].y)-m.y)<kEraseR*2) touched.push_back(i);
-         CurveEdit::Smooth(n.points,touched,std::min(1.f,ImGui::GetIO().DeltaTime*8));   // ui-audit-ok: smoothing rate
+         CurveEdit::Smooth(n.points,touched,std::min(1.f,ImGui::GetIO().DeltaTime*8));   // ui-audit-ok: timing (smoothing rate)
          n.Normalize(); break;
       }
       case Drag::Transform:
@@ -2055,7 +2055,7 @@ namespace
             RecStop(true); // Overwrite is one pass
             break;
          }
-         r.clock += std::clamp((double)ImGui::GetIO().DeltaTime, 0.0, 0.1);   // ui-audit-ok: record clock guard
+         r.clock += std::clamp((double)ImGui::GetIO().DeltaTime, 0.0, 0.1);   // ui-audit-ok: timing (record clock guard)
          break;
       }
       default: break;

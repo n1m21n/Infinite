@@ -582,7 +582,7 @@ bool IsHeadlessProcess();
       int audioSource = kArrangeAudioTimeline;
       int videoSource = kArrangeVideoTimeline;
       uint64_t canvasVideoUid = 0; // only when videoSource == kArrangeVideoCanvas
-      int width = 1920, height = 1080, fps = 60;   // ui-audit-ok: saved settings default (data, not a screen size)
+      int width = 1920, height = 1080, fps = 60;   // ui-audit-ok: setting (render output size, data, not a screen size)
       int sampleRate = 48000;
       int format = 0;              // 0 = mp4, 1 = mov, 2 = wav
       std::string path;
@@ -652,10 +652,10 @@ bool ArrangeRenderBusy();
    // kAudioRecoveryWindowMs rolling window, so a flapping device or a burst
    // of notifications on wake can't spawn overlapping restarts or loop
    // forever - see PollAudioRecovery's comment for how these are used.
-   inline constexpr double kAudioRecoveryMinIntervalMs = 500.0;   // ui-audit-ok: audio recovery policy
+   inline constexpr double kAudioRecoveryMinIntervalMs = 500.0;   // ui-audit-ok: model (audio recovery policy)
 
 
-   inline constexpr double kAudioRecoveryWindowMs = 10000.0;   // ui-audit-ok: audio recovery policy
+   inline constexpr double kAudioRecoveryWindowMs = 10000.0;   // ui-audit-ok: model (audio recovery policy)
 
 
    inline constexpr int kAudioRecoveryMaxAttemptsPerWindow = 5;
@@ -1357,7 +1357,7 @@ extern bool gMinimapEnabled;
       int monitorIndex = -1;   // display it was last placed on by us
       std::string monitorName; // that display's name, to find it again after a hot-plug
       std::string returnToMonitor; // set when its fullscreen display vanished: go fullscreen there again when it is back
-      int windowedX = 100, windowedY = 100, windowedW = 1280, windowedH = 720; // restore box   // ui-audit-ok: saved settings default (data, not a screen size)
+      int windowedX = tok::app_window_restore_x, windowedY = tok::app_window_restore_y, windowedW = tok::app_window_restore_w, windowedH = tok::app_window_restore_h; // restore box
    };
 
 extern std::vector<ProjectorWindow> gProjectorWindows;
@@ -1383,7 +1383,7 @@ extern float gMinimapOpacity;
 struct View3DPrefs
 {
    int miniAxes = 2;
-   float miniSize = 80.0f, miniBright = 1.0f, gizmoNavSize = 80.0f, gizmoSize = 75.0f, smoothTime = 0.2f, rotStep = 15.0f;  // ui-audit-ok: view settings defaults
+   float miniSize = tok::view3d_mini_size_default, miniBright = 1.0f, gizmoNavSize = tok::view3d_gizmo_nav_size_default, gizmoSize = tok::view3d_gizmo_size_default, smoothTime = 0.2f, rotStep = 15.0f;  // ui-audit-ok: setting (saved view settings defaults)
    bool autoPerspective = true, continuousGrab = true;
    float orbitSens = 1.0f;
    bool zoomToMouse = false, orbitSelection = false, invertZoom = false;
@@ -3807,7 +3807,7 @@ void PublishWtTestRect();
    };
 
 ADSRLayout ComputeADSRLayout(ImVec2 origin, float w, float h, float attackMs, float decayMs,
-                                       float sustain, float releaseMs, float maxTimeMs = 4000.0f);   // ui-audit-ok: ADSR model range
+                                       float sustain, float releaseMs, float maxTimeMs = 4000.0f);   // ui-audit-ok: model (ADSR model range)
 
 const std::vector<std::string>& WavetableNames();
 
@@ -4086,7 +4086,7 @@ extern std::map<int, FilterCurveCache> gFilterCurveCache;
 extern int gFilterCurveRecomputes;
 
  // self-test visibility only
-   inline const double kFilterCurveMotionSec = 0.05;  // ui-audit-ok: curve smoothing time constant
+   inline const double kFilterCurveMotionSec = 0.05;  // ui-audit-ok: timing (curve smoothing time constant)
 
 
    inline const int kFilterCurveFullPoints = 160;
@@ -4393,7 +4393,7 @@ std::vector<uint8_t> EncodePng16(int w, int h, const uint16_t* rgba, int level);
       ~PngSequenceWriter() { Finish(); }
       void Submit(std::string path, int w, int h, std::vector<unsigned char> rgba8, std::vector<uint16_t> rgba16, int level)
       {
-         const size_t bytes = rgba8.size() + rgba16.size() * 2;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+         const size_t bytes = rgba8.size() + rgba16.size() * 2;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
          std::unique_lock<std::mutex> lock(mMutex);
          mSpace.wait(lock, [&] { return mQueued == 0 || mQueued + bytes <= mBudget; });
          mQueued += bytes;
@@ -4842,7 +4842,7 @@ uint64_t AddNodeToArrangeSession(int nodeIndex, int laneType = -1, int srcOutput
 
 bool ArrangeAssignClipSource(uint64_t clipId, uint64_t uid);
 
-ImU32 ArrangeGroupColor(uint64_t groupId, int alpha = 255);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+ImU32 ArrangeGroupColor(uint64_t groupId, int alpha = tok::alpha_opaque);
 
 void DrawArrangeHatch(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float spacing = tok::app_shared_spacing);
 
@@ -6367,7 +6367,7 @@ int ProjectorMonitorIndex(GLFWwindow* w);
          if (hz == refreshHz)
             return;
          refreshHz = hz;
-         baseIntervals = hz > 0.0 ? std::max(1, (int)std::floor(hz / 60.0 + 0.02)) : 1;   // ui-audit-ok: display pacer maths
+         baseIntervals = hz > 0.0 ? std::max(1, (int)std::floor(hz / 60.0 + 0.02)) : 1;   // ui-audit-ok: timing (display pacer maths)
          intervals = baseIntervals;
          workMs.clear();
       }
@@ -6740,7 +6740,7 @@ void RunView2DTest();
 // is global, and the tile store encodes paint tiles on a worker thread, so a set flag stores them upside down.
 inline void FlipRowsRgba8(std::vector<unsigned char>& px, int w, int h)
 {
-   const size_t row = (size_t)w * 4;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+   const size_t row = (size_t)w * 4;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
    std::vector<unsigned char> tmp(row);
    for (int y = 0; y < h / 2; y++)
    {

@@ -1693,10 +1693,10 @@ namespace app
          snprintf(accentName, sizeof(accentName), "lane %d accent", lane + 1);
          snprintf(levelName, sizeof(levelName), "lane %d accent vol", lane + 1);
          AudioSlider("accent", &n->laneAccentPitch[lane], params::DrumSequencer::lane_accent_pitch_lo, params::DrumSequencer::lane_accent_pitch_hi, "%+.1f st", half, nullptr,
-                     nullptr, 300 + lane, accentName);   // ui-audit-ok: modulation param id base for the lane
+                     nullptr, 300 + lane, accentName);   // ui-audit-ok: index (modulation param id base for the lane)
          FormParts::Inline();
          AudioSlider("accent vol", &n->laneAccentLevel[lane], params::DrumSequencer::lane_accent_level_lo, params::DrumSequencer::lane_accent_level_hi, "%+.1f dB", half, nullptr,
-                     nullptr, 310 + lane, levelName);   // ui-audit-ok: modulation param id base for the lane
+                     nullptr, 310 + lane, levelName);   // ui-audit-ok: index (modulation param id base for the lane)
       }
 
       EndAudioSection();

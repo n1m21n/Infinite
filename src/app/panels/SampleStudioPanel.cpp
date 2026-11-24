@@ -148,7 +148,7 @@ namespace
       // Recipe for the next Generate.
       int part = 0;   // index into kParts
       int barsIdx = 1;
-      float variation = 0.5f;   // ui-audit-ok: analysis setting default (model value)
+      float variation = 0.5f;   // ui-audit-ok: model (analysis setting default (model value))
       bool followScale = false;
       // The source and the edit.
       std::shared_ptr<const SourceAudio> src;
@@ -189,7 +189,7 @@ namespace
       std::optional<Clip> clip;
       int auditions = 0; // slices sent to the preview voice (MENUALIVETEST reads it)
       std::shared_ptr<OnsetJob> onsetJob;
-      int onsetMax = 16;   // ui-audit-ok: analysis setting default (model value)
+      int onsetMax = 16;   // ui-audit-ok: model (analysis setting default (model value))
       // An auto-slice that would replace hand-placed slices waits here for the confirm dialog.
       std::function<void()> pendingReplace;
       bool replaceConfirmed = false, openReplaceConfirm = false;
@@ -2970,7 +2970,7 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImU32 tc = ImGui::GetColorU32(ImGuiCol_Text);
       const float cy = (bmin.y + bmax.y) * 0.5f;
-      const std::string value = app::TruncateWithEllipsis(items[(size_t)std::clamp(cur, 0, (int)items.size() - 1)], w - 2.0f * tok::space_3);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      const std::string value = app::TruncateWithEllipsis(items[(size_t)std::clamp(cur, 0, (int)items.size() - 1)], w - 2.0f * tok::space_3);  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
       dl->AddText(ImVec2(bmin.x + tok::space_3, cy - ImGui::GetFontSize() * 0.5f), tc, value.c_str());
 
       const float k = sOpenId == pid ? std::clamp((float)((ImGui::GetTime() - sOpenedAt) * 1000.0 / tok::motion_on), 0.0f, 1.0f) : 1.0f;

@@ -1096,7 +1096,7 @@ void DrawKeyboard(FrameCtx& fc)
             ImGui::OpenPopup("##nodecontext");
          }
          // Review shots (INFINITE_OPENPANELS=nodemenu): the first node's menu stays open once the canvas has nodes.
-         if (gShotNodeMenu && !gNodes.empty() && ImGui::GetTime() > 5.0 && !ImGui::IsPopupOpen("##nodecontext"))   // ui-audit-ok: screenshot harness delay
+         if (gShotNodeMenu && !gNodes.empty() && ImGui::GetTime() > 5.0 && !ImGui::IsPopupOpen("##nodecontext"))   // ui-audit-ok: timing (screenshot harness delay)
          {
             gContextMenuNodeIndex = gNodes.front().index;
             ImGui::OpenPopup("##nodecontext");

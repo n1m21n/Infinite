@@ -105,7 +105,7 @@ namespace
          if (exe.empty())
             return std::string();
          char name[32];
-         snprintf(name, sizeof(name), "%016llx", (unsigned long long)std::hash<std::string>{}(exe));   // ui-audit-ok: folder name, not on screen
+         snprintf(name, sizeof(name), "%016llx", (unsigned long long)std::hash<std::string>{}(exe));   // ui-audit-ok: log (folder name, not on screen)
          const std::string out = AppPaths::AppSupportDir() + "/term-bin/" + name;
          std::error_code ec;
          std::filesystem::create_directories(AppPaths::FsPath(out), ec);
@@ -253,7 +253,7 @@ namespace
       const term::Cell* cells = snap.cells.data() + (size_t)row * (size_t)snap.cols;
       std::string line;
       for (int i = 0; i < snap.cols; ++i)
-         line += cells[i].ch >= 0x21 && cells[i].ch < 0x7F ? (char)cells[i].ch : ' ';  // ui-audit-ok: byte range of printable ASCII in scrollback
+         line += cells[i].ch >= 0x21 && cells[i].ch < 0x7F ? (char)cells[i].ch : ' ';  // ui-audit-ok: bytes (byte range of printable ASCII in scrollback)
       for (const char* scheme : { "https://", "http://" })
       {
          size_t at = 0;

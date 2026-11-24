@@ -328,7 +328,7 @@ void DrawPopupsB(FrameCtx& fc)
             // keeps the same height and category-first layout as the normal node picker.
             if (!gLinkDragSuggestions.empty())
             {
-               constexpr size_t kMaxInlineSuggestions = 8;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+               constexpr size_t kMaxInlineSuggestions = 8;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
                const size_t nShow = std::min(gLinkDragSuggestions.size(), kMaxInlineSuggestions);
                ImGui::TextDisabled("%s", T("Suggested"));
                for (size_t i = 0; i < nShow; ++i)

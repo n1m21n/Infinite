@@ -159,7 +159,7 @@ namespace
       int item = 0;
       int brush = Sculpt::kDraw;
       float radius = tok::view3d_sculpt_brush_radius;          // screen pixels, Blender's default
-      float strength = 0.5f;   // ui-audit-ok: brush strength default (model value)
+      float strength = 0.5f;   // ui-audit-ok: model (brush strength default (model value))
       int symmetry = 1;              // X on, as in Blender
       bool stroking = false;
       ImVec2 last;
@@ -1260,7 +1260,7 @@ namespace
          }
          else if (sSet->snapTarget != 0 && !sOp.centers.empty())
          {
-            const size_t n = sOp.centers.size() / 3;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+            const size_t n = sOp.centers.size() / 3;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
             for (int k = 0; k < 3; k++)
             {
                float lo = 1e30f, hi = -1e30f, sum = 0.0f;
@@ -2531,8 +2531,8 @@ namespace
       else if (command && !io.KeyAlt)
       {
          if (digit(1)) ViewAxis(5);
-         else if (digit(3)) ViewAxis(1);   // ui-audit-ok: numpad view key
-         else if (digit(7)) ViewAxis(3);   // ui-audit-ok: numpad view key
+         else if (digit(3)) ViewAxis(1);   // ui-audit-ok: key (numpad view key)
+         else if (digit(7)) ViewAxis(3);   // ui-audit-ok: key (numpad view key)
       }
       const bool plain = !command && !io.KeyAlt;
       if (plain && !io.KeyShift)
@@ -2563,19 +2563,19 @@ namespace
          else if (pressed(ImGuiKey_Z)) sShading = (Shading)(((int)sShading + 1) % 3);
          else if (digit(0)) ToggleCamera(scene);
          else if (digit(1)) ViewAxis(4);
-         else if (digit(3)) ViewAxis(0);   // ui-audit-ok: numpad view key
-         else if (digit(7)) ViewAxis(2);   // ui-audit-ok: numpad view key
-         else if (digit(5))   // ui-audit-ok: numpad view key
+         else if (digit(3)) ViewAxis(0);   // ui-audit-ok: key (numpad view key)
+         else if (digit(7)) ViewAxis(2);   // ui-audit-ok: key (numpad view key)
+         else if (digit(5))   // ui-audit-ok: key (numpad view key)
          {
             sOrtho = !sOrtho;
             sAutoOrtho = false;
          }
-         else if (digit(9))   // ui-audit-ok: numpad view key
+         else if (digit(9))   // ui-audit-ok: key (numpad view key)
             GlideTo([&] { OrbitBy(scene, kPi, 0.0f); });
-         else if (digit(2) || digit(8))   // ui-audit-ok: numpad view key
-            GlideTo([&] { OrbitBy(scene, 0.0f, digit(8) ? RotStep() : -RotStep()); });   // ui-audit-ok: numpad view key
-         else if (digit(4) || digit(6))   // ui-audit-ok: numpad view key
-            GlideTo([&] { OrbitBy(scene, digit(6) ? RotStep() : -RotStep(), 0.0f); });   // ui-audit-ok: numpad view key
+         else if (digit(2) || digit(8))   // ui-audit-ok: key (numpad view key)
+            GlideTo([&] { OrbitBy(scene, 0.0f, digit(8) ? RotStep() : -RotStep()); });   // ui-audit-ok: key (numpad view key)
+         else if (digit(4) || digit(6))   // ui-audit-ok: key (numpad view key)
+            GlideTo([&] { OrbitBy(scene, digit(6) ? RotStep() : -RotStep(), 0.0f); });   // ui-audit-ok: key (numpad view key)
          else if (pressed(ImGuiKey_A))
          {
             sSel.clear();
@@ -2716,7 +2716,7 @@ namespace
             for (int k = 0; k < 3; k++)
                sTarget[k] += eye[k] - next[k];
          }
-         const float speed = sDist * io.DeltaTime * (io.KeyShift ? 2.5f : 1.0f);  // ui-audit-ok: shift speeds navigation
+         const float speed = sDist * io.DeltaTime * (io.KeyShift ? 2.5f : 1.0f);  // ui-audit-ok: key (shift speeds navigation)
          const float f = (ImGui::IsKeyDown(ImGuiKey_W) ? 1.0f : 0.0f) - (ImGui::IsKeyDown(ImGuiKey_S) ? 1.0f : 0.0f);
          const float r = (ImGui::IsKeyDown(ImGuiKey_D) ? 1.0f : 0.0f) - (ImGui::IsKeyDown(ImGuiKey_A) ? 1.0f : 0.0f);
          const float u = (ImGui::IsKeyDown(ImGuiKey_E) ? 1.0f : 0.0f) - (ImGui::IsKeyDown(ImGuiKey_Q) ? 1.0f : 0.0f);
@@ -4655,7 +4655,7 @@ namespace
             if (ok && prevOk)
             {
                dl->AddTriangleFilled(s, prev, qs, fill);
-               dl->AddLine(prev, qs, col & tok::view3d_light_shape_alpha_mask);  // ui-audit-ok: channel mask / bit packing, not a colour value
+               dl->AddLine(prev, qs, col & tok::view3d_light_shape_alpha_mask);  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
             }
             prev = qs;
             prevOk = ok;
@@ -4839,7 +4839,7 @@ namespace
       {
          const bool hot = onDisc && std::hypot(mouse.x - b.at.x, mouse.y - b.at.y) < tok::view3d_hot_limit;
          if (hot)
-            hit = b.axis * 2 + ((b.neg != (b.axis == 2)) ? 1 : 0);   // ViewAxis counts engine sides  // ui-audit-ok: axis index
+            hit = b.axis * 2 + ((b.neg != (b.axis == 2)) ? 1 : 0);   // ViewAxis counts engine sides  // ui-audit-ok: index (axis index)
          const float size = (b.neg ? tok::view3d_nav_gizmo_sm : tok::view3d_nav_gizmo_lg) * ballK;
          if (b.neg)
          {
@@ -6963,7 +6963,7 @@ namespace
                bits[a] = (1u << kDisp[a]) << (row * tok::view3d_object_tab_ratio);
                on[a] = (item->lock & bits[a]) != 0;
             }
-            const int hit = PanelKit::CheckGrid((std::string("##v3dlock") + std::to_string(row)).c_str(), axes, on, 3);  // ui-audit-ok: axis count
+            const int hit = PanelKit::CheckGrid((std::string("##v3dlock") + std::to_string(row)).c_str(), axes, on, 3);  // ui-audit-ok: model (axis count)
             if (hit >= 0)
             {
                PushUndoCheckpoint("Lock in 3D View");

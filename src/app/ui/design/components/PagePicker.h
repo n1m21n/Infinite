@@ -133,7 +133,7 @@ namespace PagePicker
 #define PAGEPICKER_PROBE(stmt)
 #endif
 
-   inline ImU32 U32(unsigned int rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, tok::page_picker_probe_row_alpha); }  // ui-audit-ok: channel mask / bit packing, not a colour value
+   inline ImU32 U32(unsigned int rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, tok::page_picker_probe_row_alpha); }  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
 
    inline float ChipW(const Entry& e)
    {

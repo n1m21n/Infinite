@@ -366,7 +366,7 @@ namespace app
       // FNV-1a, so the same label lands on the same slot in every run and a
       // saved patch's bindings still resolve after a reload. Probing only
       // happens on a real collision within one node.
-      uint32_t h = 2166136261u;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      uint32_t h = 2166136261u;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
       for (const char c : *hashStr)
       {
          h ^= (uint8_t)c;

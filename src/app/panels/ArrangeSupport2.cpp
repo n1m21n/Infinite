@@ -10,7 +10,7 @@ namespace app
    // A stable per-group colour, so a group reads as one thing on every lane.
    ImU32 ArrangeGroupColor(uint64_t groupId, int alpha)
    {
-      uint64_t h = groupId * 0x9E3779B97F4A7C15ull;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      uint64_t h = groupId * 0x9E3779B97F4A7C15ull;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
       h ^= h >> 29;
       const float hue = (float)(h % tok::arrange_support2_hue_period) / tok::arrange_support2_hue_ratio;
       float r, g, b;
@@ -891,7 +891,7 @@ namespace app
             }
 
             // Forward search for number after "bpm"
-            size_t startAfter = pos + 3;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+            size_t startAfter = pos + 3;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
             while (startAfter < lowerPath.size() && (lowerPath[startAfter] == ' ' || lowerPath[startAfter] == '_' || lowerPath[startAfter] == '-'))
                startAfter++;
             if (startAfter < lowerPath.size() && std::isdigit((unsigned char)lowerPath[startAfter]))
@@ -966,8 +966,8 @@ namespace app
 
          float bestScore = -1.0f;
          float bestBpm = 0.0f;
-         const double minIoiSec = 0.15; // 400 BPM  // ui-audit-ok: tempo estimation
-         const double maxIoiSec = 2.0;  // 30 BPM  // ui-audit-ok: tempo estimation
+         const double minIoiSec = 0.15; // 400 BPM  // ui-audit-ok: timing (tempo estimation)
+         const double maxIoiSec = 2.0;  // 30 BPM  // ui-audit-ok: timing (tempo estimation)
 
          for (float candidateBpm = 60.0f; candidateBpm <= 200.0f; candidateBpm += 0.5f)
          {

@@ -60,7 +60,7 @@ namespace app
    // stale display bucket that the next playback pass overwrites anyway.
    uint64_t ArrangeClipShape(uint64_t srcUid, int srcOutput, Arrange::Tick start, Arrange::Tick length)
    {
-      uint64_t h = 1469598103934665603ull;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      uint64_t h = 1469598103934665603ull;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
       const uint64_t parts[4] = { srcUid, (uint64_t)(int64_t)srcOutput,
                                   (uint64_t)(int64_t)start, (uint64_t)(int64_t)length };
       for (uint64_t v : parts)

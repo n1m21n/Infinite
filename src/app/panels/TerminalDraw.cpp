@@ -27,7 +27,7 @@ namespace
 
    void Box(ImDrawList* dl, int index, float x, float y, float w, float h, ImU32 c)
    {
-      const char* arms = kBox + index * 4;   // ui-audit-ok: box table stride
+      const char* arms = kBox + index * 4;   // ui-audit-ok: index (box table stride)
       const int l = arms[0] - '0', r = arms[1] - '0', u = arms[2] - '0', d = arms[3] - '0';
       const float x1 = x + w, y1 = y + h;
       const float light = std::fmax(1.0f, Snap(h / tok::terminal_draw_box_ratio));

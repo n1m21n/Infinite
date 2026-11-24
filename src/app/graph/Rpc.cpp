@@ -105,7 +105,7 @@ namespace app
             static ImVec2 lastPos;
             const double now = ImGui::GetTime();
             const bool chain = now - lastAt < 20.0 && FindNodeByIndex(sLastSpawnIndex) != nullptr;
-            const ImVec2 want = chain ? ImVec2(lastPos.x + 320.0f, lastPos.y) : gViewCenterCanvas;  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
+            const ImVec2 want = chain ? ImVec2(lastPos.x + 320.0f, lastPos.y) : gViewCenterCanvas;  // ui-audit-ok: rpc (RPC parsing and canvas spawn spots, patch data)
             const ImVec2 at = FindFreeSpawnPosition(want);
             x = at.x, y = at.y;
             lastAt = now, lastPos = at;
@@ -226,7 +226,7 @@ namespace app
          {
             json entry = { { "value", kv.second } };
             // Saved keys carry the member's type letter ("f strength"); the controls and the chat know the bare name.
-            const std::string bare = kv.first.size() > 2 && kv.first[1] == ' ' ? kv.first.substr(2) : kv.first;  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
+            const std::string bare = kv.first.size() > 2 && kv.first[1] == ' ' ? kv.first.substr(2) : kv.first;  // ui-audit-ok: rpc (RPC parsing and canvas spawn spots, patch data)
             const int param = ParamIndexOfKeyOnNode(*gn, bare);
             if (param >= 0)
                if (const ParamRef* ref = Modulation::Instance().KnownParam(gn->index, param))
@@ -373,12 +373,12 @@ namespace app
          std::string warning;
          if (auto* cw = dynamic_cast<ICookWarningSource*>(gn->node.get()))
             warning = cw->CookWarning();
-         outResult = { {"verts", (long long)m.vertices.size()}, {"tris", (long long)(m.indices.size() / 3)},  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
+         outResult = { {"verts", (long long)m.vertices.size()}, {"tris", (long long)(m.indices.size() / 3)},  // ui-audit-ok: rpc (RPC parsing and canvas spawn spots, patch data)
                        {"indexCount", (long long)m.indices.size()}, {"nonFinite", nonFinite},
                        {"badIndex", badIndex}, {"points", pc ? (long long)pc->size() : 0LL},
-                       {"pointsBad", cloudBad}, {"curvePoints", cv ? (long long)(cv->points.size() / 3) : 0LL},  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
+                       {"pointsBad", cloudBad}, {"curvePoints", cv ? (long long)(cv->points.size() / 3) : 0LL},  // ui-audit-ok: rpc (RPC parsing and canvas spawn spots, patch data)
                        {"curveBad", curveBad},
-                       {"maskMismatch", (!m.faceMask.empty() && m.faceMask.size() != m.indices.size() / 3) ? 1 : 0},  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
+                       {"maskMismatch", (!m.faceMask.empty() && m.faceMask.size() != m.indices.size() / 3) ? 1 : 0},  // ui-audit-ok: rpc (RPC parsing and canvas spawn spots, patch data)
                        {"warning", warning} };
          return true;
       }
@@ -638,14 +638,14 @@ namespace app
             }
             ed::EditorContext* prevEditor = ed::GetCurrentEditor();
             ed::SetCurrentEditor(gEditor);
-            at = ed::GetNodePosition(gn->NodeId()) + ImVec2(24.0f, 48.0f);  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
+            at = ed::GetNodePosition(gn->NodeId()) + ImVec2(24.0f, 48.0f);  // ui-audit-ok: rpc (RPC parsing and canvas spawn spots, patch data)
             ed::SetCurrentEditor(prevEditor);
          }
          else
             at = FindFreeSpawnPosition(gViewCenterCanvas);
          gDropAtCanvas = true;
          gDropCanvasPos = at;
-         gDropPos = ImVec2(-1e6f, -1e6f); // off every panel, so only the canvas takes it  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
+         gDropPos = ImVec2(-1e6f, -1e6f); // off every panel, so only the canvas takes it  // ui-audit-ok: rpc (RPC parsing and canvas spawn spots, patch data)
          gDroppedFiles.insert(gDroppedFiles.end(), paths.begin(), paths.end());
          outResult = { { "files", (int)paths.size() } };
          return true;
@@ -952,7 +952,7 @@ namespace app
                {
                   const std::string text = value.get<std::string>();
                   const size_t dot = text.find('.');
-                  if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
+                  if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)  // ui-audit-ok: rpc (RPC parsing and canvas spawn spots, patch data)
                   {
                      const int at = atoi(text.substr(1, dot - 1).c_str());
                      const std::string field = text.substr(dot + 1);
@@ -1041,7 +1041,7 @@ namespace app
                   {
                      const std::string text = value.get<std::string>();
                      const size_t dot = text.find('.');
-                     if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)  // ui-audit-ok: RPC parsing and canvas spawn spots, patch data
+                     if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)  // ui-audit-ok: rpc (RPC parsing and canvas spawn spots, patch data)
                      {
                         const int at = atoi(text.substr(1, dot - 1).c_str());
                         const std::string field = text.substr(dot + 1);
@@ -1112,7 +1112,7 @@ namespace app
             problems.push_back({ {"code", "W_AUDIO_OFF"},
                                  {"message", "audio is off, so nothing in this patch can sound; loading a patch does not turn it on"},
                                  {"hint", "tell the user to turn audio on (New Synth, the Mixer's audio button, or Settings > Audio); do not change the patch for this"} });
-         const auto db = [](float a) { return a > 1e-9f ? 20.0 * std::log10((double)a) : -180.0; };  // ui-audit-ok: dB maths on a model value
+         const auto db = [](float a) { return a > 1e-9f ? 20.0 * std::log10((double)a) : -180.0; };  // ui-audit-ok: unit (dB maths on a model value)
          if (heard && w.nonFinite > 0)
             problems.push_back({ {"code", "E_AUDIO_NAN"}, {"samples", w.nonFinite},
                                  {"message", "the output carried NaN/inf samples (a node is blowing up; the device hears silence or a burst)"},
@@ -1219,7 +1219,7 @@ namespace app
          const float scaleX = ImGui::GetIO().DisplayFramebufferScale.x;
          const float scaleY = ImGui::GetIO().DisplayFramebufferScale.y;
 
-         const int pad = params.value("padding", 12);  // ui-audit-ok: RPC request default (the caller's padding), not this app's layout
+         const int pad = params.value("padding", 12);  // ui-audit-ok: rpc (RPC request default (the caller's padding), not this app's layout)
          const int x0 = std::max(0, (int)std::floor(screenMin.x * scaleX) - pad);
          const int y0 = std::max(0, (int)std::floor(screenMin.y * scaleY) - pad);
          const int x1 = std::min(fbW, (int)std::ceil(screenMax.x * scaleX) + pad);
@@ -1232,14 +1232,14 @@ namespace app
             return false;
          }
 
-         std::vector<unsigned char> full((size_t)fbW * fbH * 4);  // ui-audit-ok: RGBA bytes per pixel
+         std::vector<unsigned char> full((size_t)fbW * fbH * 4);  // ui-audit-ok: bytes (RGBA bytes per pixel)
          glReadBuffer(GL_FRONT);
          glReadPixels(0, 0, fbW, fbH, GL_RGBA, GL_UNSIGNED_BYTE, full.data());
 
          // full[] is OpenGL's bottom-up row order; x0/y0/x1/y1 are top-down
          // screen-space. Flip per row while cropping instead of flipping the
          // whole framebuffer first.
-         std::vector<unsigned char> crop((size_t)cropW * cropH * 4);  // ui-audit-ok: RGBA bytes per pixel
+         std::vector<unsigned char> crop((size_t)cropW * cropH * 4);  // ui-audit-ok: bytes (RGBA bytes per pixel)
          for (int row = 0; row < cropH; ++row)
          {
             const int srcY = fbH - 1 - (y0 + row);

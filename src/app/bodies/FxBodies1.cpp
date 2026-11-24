@@ -26,7 +26,7 @@ namespace app
    // dates from the settled-sine MagnitudeDb, when a full 160-point sweep
    // measured ~10-15ms at Q=18/48kHz - full kFilterCurveFullPoints
    // resolution always returns the instant the drag ends.
-   const double kFilterCurveThrottleSec = 0.08;   // ui-audit-ok: redraw throttle
+   const double kFilterCurveThrottleSec = 0.08;   // ui-audit-ok: timing (redraw throttle)
  // ~12.5 Hz cap on the full recompute while dragging
    const int kFilterCurveDragPoints = 48;
 
@@ -1306,7 +1306,7 @@ namespace app
 
       const float barHalfW = tok::fx_bar_half_w;
       const float feedback = std::min(1.0f, n->Param("feedback") / 100.0f); // visualize decay only
-      const float windowSeconds = std::max(0.006f, baseSeconds * 6.0f);   // ui-audit-ok: signal window shown
+      const float windowSeconds = std::max(0.006f, baseSeconds * 6.0f);   // ui-audit-ok: timing (seconds of signal shown)
       float amp = 1.0f;
       float t = baseSeconds;
       for (int tapIdx = 0; tapIdx < 24 && amp > 0.02f && t < windowSeconds; tapIdx++)
@@ -1452,7 +1452,7 @@ namespace app
       const float predelaySeconds = n->Param("predelay") * 0.001f;
       const float decaySeconds = std::max(0.05f, n->Param("decay"));
       const float dampFrac = std::clamp(n->Param("damping"), 0.0f, 1.0f);
-      const float windowSeconds = 5.0f;   // ui-audit-ok: signal window shown
+      const float windowSeconds = 5.0f;   // ui-audit-ok: timing (seconds of signal shown)
 
       for (int sec = 1; sec < (int)windowSeconds; sec++)
       {

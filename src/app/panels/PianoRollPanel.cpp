@@ -166,7 +166,7 @@ namespace
       bool dragCopies = false;   // Alt: the originals stay, copies travel
       Tick lastLength = Arrange::kPPQ / 4;
       int lastVelocity = 100;
-      int lastDivision = 16;   // ui-audit-ok: grid division default (1/16)
+      int lastDivision = 16;   // ui-audit-ok: model (grid division default (1/16))
       Tick rangeStart = 0, rangeEnd = 0; // the ruler selection (empty = none)
       int soundingPitch = -1;
       double soundingUntil = 0.0;

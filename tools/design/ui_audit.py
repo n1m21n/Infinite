@@ -244,9 +244,14 @@ def scan_file(rel, src):
         skipping = (skipping or "i18n-skip-begin" in l) and "i18n-skip-end" not in l
         if skipping or "i18n-ok" in l: ok_lines.add(n)
     # `// ui-audit-ok: <reason>` on a line: not on screen (a file name, a log line); the reason is required
-    off_lines = {n for n, l in enumerate(src.split("\n"), 1) if re.search(r"//\s*ui-audit-ok:\s*\S", l)}
-    # a tag excuses a literal that reaches a colour or a pixel only when its reason says the value is data, not a look
-    data_lines = {n for n, l in enumerate(src.split("\n"), 1) if re.search(r"//\s*ui-audit-ok:.*" + DATA_REASON, l)}
+    # (owner 2026-11-24) the reason's first word must be one of OK_WORDS; any other reason is a `bad_ok` finding and
+    # excuses nothing. A valid tag never excuses a literal that reaches a colour, alpha, position or size (design_sink).
+    off_lines, bad_ok = {}, []
+    for n, l in enumerate(src.split("\n"), 1):
+        m = OK_TAG.search(l)
+        if not m: continue
+        if m.group(1) in OK_WORDS: off_lines[n] = m.group(1)
+        else: bad_ok.append(("bad_ok", "-", m.group(1) or "(none)", "ui-audit-ok reason must be one of " + ", ".join(sorted(OK_WORDS)), rel, n, "-"))
 
     def func_name():
         for _, nm in reversed(funcs):
@@ -324,8 +329,9 @@ def scan_file(rel, src):
             continue
         if harness_stack and harness_stack[-1]:
             allowed.bump("test", t.line); continue
-        if t.line in off_lines and not (t.kind == "num" and (alpha_mask(t.text) or (t.line not in data_lines and
-                design_sink(paren, stmt_text(i), _neigh(toks, match, i) + [stmt_lhs(stmt_start, i)])))):
+        if t.line in off_lines and not (t.kind == "num" and (alpha_mask(t.text) or (not selector(toks, match, i) and
+                design_sink(paren, stmt_text(i), [] if off_lines[t.line] in DATA_WORDS else
+                            _neigh(toks, match, i) + [stmt_lhs(stmt_start, i)], toks, i, off_lines[t.line] in DATA_WORDS)))):
             allowed.bump("off_screen", t.line); continue
         call = paren[-1][0] if paren else ""
         qual = paren[-1][3] if paren else ""
@@ -413,7 +419,7 @@ def scan_file(rel, src):
         # is drawn from here, so every literal is allowed and counted, and the file comes back clean (owner 2026-11-24)
         for f in findings: allowed.bump("no_screen", f[5])
         findings = []
-    return findings, allowed, rawcalls
+    return findings + bad_ok, allowed, rawcalls
 
 WIDGET_FAMILY = {
     "button": ("Button", "SmallButton", "ArrowButton", "ImageButton", "InvisibleButton"),
@@ -479,6 +485,51 @@ COLOUR_NAME = re.compile(r"^(?:a|alpha|fade|opacity|tint|shade|col|colour|color|
 PIXEL_NAME = re.compile(r"^(?:tile|tiles|tileW|tileH|\w*Tile)$")
 
 
+# The only reasons a `// ui-audit-ok: <word> [note]` tag may give (owner 2026-11-24). Each names a value that is data,
+# never a look; the optional note after the word says which.
+OK_WORDS = {
+    "patch_data",   # values a patch saves or the startup/demo patch builds (node params, canvas spots)
+    "model",        # a model value or default: counts, ranges, modes, settings defaults
+    "index",        # an index, id, stride or slot layout
+    "mask",         # a channel mask or bit packing
+    "hash",         # hash salt / mixing / offset for an id
+    "unit",         # unit maths: dB, degrees, percent, 0-255 <-> 0-1
+    "bytes",        # byte / buffer / string-length arithmetic
+    "sentinel",     # a bounds or "never" sentinel
+    "timing",       # polling, pacing, smoothing, budgets, frame counters
+    "key",          # a key code or key parsing
+    "rpc",          # RPC parsing, defaults and ranges
+    "log",          # a log format, file or folder name
+    "core",         # src/core cannot include the app tokens
+    "world",        # a 3D world-space quantity, not screen pixels
+    "count",        # how many of something: lines, segments, cells, voices
+    "setting",      # a default the user's settings file saves (render size, OS window restore box)
+}
+# Words that name data by what the value is: for these a variable's name ending in Col / Alpha / Tile (a guess) does not
+# make the literal a design value; only a colour / geometry / draw call it is an argument of does.
+DATA_WORDS = {"count", "setting", "patch_data", "index", "mask", "hash", "unit", "bytes", "sentinel", "key", "rpc", "log", "core"}
+SEL_OPS = {"&", "|", "^", "<<", ">>", "%", "==", "!=", "<", ">", "<=", ">=", "&=", "|=", "^=", "<<=", ">>="}
+
+
+def selector(toks, match, i):
+    """the literal picks or extracts (an operand of a bit / modulo / compare op, or inside [ ]): it is never itself the
+    colour or pixel value, so a colour or draw call around it does not make it one"""
+    k = i - 1
+    if k >= 0 and toks[k].text == "-": k -= 1
+    if k >= 0 and toks[k].text in SEL_OPS: return True
+    if i + 1 < len(toks) and toks[i + 1].text in SEL_OPS: return True
+    d = 0
+    for j in range(i - 1, max(-1, i - 200), -1):
+        t = toks[j].text
+        if t in (")", "]", "}"): d += 1
+        elif t in ("(", "[", "{"):
+            if d == 0: return t == "["
+            d -= 1
+        elif t in (";",) and d == 0: return False
+    return False
+
+
+OK_TAG = re.compile(r"//\s*ui-audit-ok:?\s*([A-Za-z_]*)")
 DATA_REASON = (r"(?:patch data|byte|buffer|binary|log format|RPC|parsing|saved setting|settings default|off screen|bytes per pixel|"
                r"scrollback|param id|string length|model value|\bdB\b|sentinel|core cannot|bit packing|channel mask|hash|protocol|file)")
 ANGLE = re.compile(r"\b(?:kPi|kTau|cos|sin|cosf|sinf|atan2?f?|angle|ang|theta|deg|rad)\b")
@@ -500,14 +551,33 @@ def alpha_mask(text):
 COLOUR_ARG = {"TextColored": 0, "PushStyleColor": 1}   # calls where only one argument is the colour
 
 
-def design_sink(paren, st, names):
-    """'colour' or 'pixel' when the literal's value ends up on screen as a colour or a position / size, else ''"""
+def _arg_index(toks, open_i, i):
+    """which argument (0-based) of the call opened at toks[open_i] the token i sits in"""
+    d, n = 0, 0
+    for j in range(open_i + 1, i):
+        t = toks[j].text
+        if t in "([{": d += 1
+        elif t in ")]}": d -= 1
+        elif t == "," and d == 0: n += 1
+    return n
+
+
+DATA_PIXEL_SKIP = {"ImVec2", "ImRect"}   # a vector type is not a screen sink by itself: canvas spots, sentinels
+
+
+def design_sink(paren, st, names, toks=None, i=None, data=False):
+    """'colour' or 'pixel' when the literal's value ends up on screen as a colour or a position / size, else ''.
+    data=True (a ui-audit-ok line with a data word): ImVec2 / ImRect alone and a kit Draw() argument are not sinks; an
+    ImDrawList Add* call, a layout / window / style call and every colour sink still are."""
     for p in paren:
-        if p[0] in COLOUR_ARG and p[2] != COLOUR_ARG[p[0]]: continue   # TextColored's text, not its colour
+        if p[0] in COLOUR_ARG and toks is not None and _arg_index(toks, p[1], i) != COLOUR_ARG[p[0]]: continue   # TextColored's text
         if p[0] in COLOUR_SINK or (p[0] == "ImVec4" and re.search(r"Col|col|colour|color", st)): return "colour"
     if any(COLOUR_NAME.match(n) for n in names if n and not (n == "a" and ANGLE.search(st))): return "colour"
     for p in paren:
-        if p[0] in GEOM_CTX or CALL_FAMILY.get(p[0]) in ("draw", "layout", "window", "style_var"): return "pixel"
+        fam = CALL_FAMILY.get(p[0])
+        if fam in ("layout", "window", "style_var") and p[3][:1].islower(): continue   # st.Begin: a member call, not ImGui::Begin
+        if data and (p[0] in DATA_PIXEL_SKIP or (fam == "draw" and not p[0].startswith("Add"))): continue
+        if p[0] in GEOM_CTX or fam in ("draw", "layout", "window", "style_var"): return "pixel"
     if any(GEOM_NAME.match(n) or PIXEL_NAME.match(n) for n in names if n): return "pixel"
     return ""
 
@@ -593,7 +663,7 @@ def logic_reason(toks, match, i, t, v, prev, nxt, paren, st, lhs, cat, rel=""):
         or (v in (8, 16, 24, 32) and nxt is not None and nxt.text in (")",) and "SHIFT" in st)
     if unpack:
         return "bits"   # a channel shift / byte mask: unpacking a colour, not choosing one
-    if design_sink(paren, st, names):
+    if design_sink(paren, st, names, toks, i):
         return None
     if t.text.lower().startswith("0x") or (prev is not None and prev.text in bitop) or (nxt is not None and nxt.text in bitop):
         return "bits"
@@ -670,20 +740,32 @@ def ratchet(mode):
     for f in findings:
         if not f[4].startswith(KIT): cur["call" if f[0].startswith("call:") else f[0]] += 1   # one bucket for unnamed calls
     cur = dict(sorted(cur.items()))
+    oks = ok_count()   # every `// ui-audit-ok:` tag in the scanned files, kit included: may only go down (owner 2026-11-24)
     raw = json.loads(STORE.read_text()) if STORE.exists() else {}
     old = raw.get("audit")
+    old_ok = raw.get("audit_ok")
     if mode == "reset" or (mode == "update" and old is None):
         raw["audit"] = cur
     elif mode == "update":
         raw["audit"] = {k: min(v, old.get(k, v)) for k, v in cur.items()}
+    if mode == "reset" or old_ok is None: raw["audit_ok"] = oks
+    elif mode == "update": raw["audit_ok"] = min(oks, old_ok)
     if mode in ("reset", "update"):
         STORE.write_text(json.dumps(raw, indent=1) + "\n"); return 0
     if old is None:
         print("ui_audit: no 'audit' baseline yet: run ui_audit.py --ratchet --update"); return 0
     bad = [(k, v, old.get(k, 0)) for k, v in cur.items() if v > old.get(k, 0)]
-    print(f"ui_audit: {sum(cur.values())} findings outside the kit (stored {sum(old.values())}), {len(cur)} categories")
+    print(f"ui_audit: {sum(cur.values())} findings outside the kit (stored {sum(old.values())}), {len(cur)} categories; "
+          f"ui-audit-ok tags {oks} (stored {old_ok})")
     for k, v, a in bad: print(f"RATCHET: ui_audit category {k} has {v} (allowed {a}): use a token or a kit part")
+    if old_ok is not None and oks > old_ok:
+        print(f"RATCHET: {oks} ui-audit-ok tags (allowed {old_ok}): a new literal gets a token or a kit part, not a tag")
+        return 1
     return 1 if bad else 0
+
+
+def ok_count():
+    return sum(1 for _, src in ui_files() for l in src.split("\n") if OK_TAG.search(l))
 
 def main():
     a = sys.argv[1:]

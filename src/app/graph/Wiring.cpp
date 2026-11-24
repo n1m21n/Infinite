@@ -1675,7 +1675,7 @@ namespace app
       const unsigned kindKey = (srcIsModulator ? 1u : 0u) | (srcPalette != nullptr ? 2u : 0u) | (srcGeometry != nullptr ? 4u : 0u) |
                                (dynamic_cast<MaterialNode*>(srcGeometry) != nullptr ? 8u : 0u) | (srcCamera != nullptr ? 16u : 0u) |
                                (srcLight != nullptr ? 32u : 0u) | (srcIsEnvironment ? 64u : 0u) | (srcIsAudioNode ? 128u : 0u) |
-                               (srcIsNoteSource ? 256u : 0u) | (srcIsPredictor ? 512u : 0u) | (srcIsShade ? 1024u : 0u);  // ui-audit-ok: bit packing of a cable kind key
+                               (srcIsNoteSource ? 256u : 0u) | (srcIsPredictor ? 512u : 0u) | (srcIsShade ? 1024u : 0u);  // ui-audit-ok: mask (bit packing of a cable kind key)
       static std::map<unsigned, std::vector<std::pair<std::string, std::string>>> sByKind;
       static size_t sTypeCount = 0;
       size_t typeCount = 0;
@@ -1784,9 +1784,9 @@ namespace app
    // ApplyTheme's ed::GetStyle() call above.
    ImVec2 FindFreeSpawnPosition(const ImVec2& center)
    {
-      const float kFootprintW = 260.0f;  // ui-audit-ok: canvas placement footprint, patch data
-      const float kFootprintH = 300.0f;  // ui-audit-ok: canvas placement footprint, patch data
-      const float kMargin = 24.0f;  // ui-audit-ok: canvas placement footprint, patch data
+      const float kFootprintW = 260.0f;  // ui-audit-ok: patch_data (canvas placement footprint, patch data)
+      const float kFootprintH = 300.0f;  // ui-audit-ok: patch_data (canvas placement footprint, patch data)
+      const float kMargin = 24.0f;  // ui-audit-ok: patch_data (canvas placement footprint, patch data)
 
       ed::EditorContext* prevEditor = ed::GetCurrentEditor();
       if (gEditor != nullptr)

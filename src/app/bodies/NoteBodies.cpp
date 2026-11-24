@@ -611,7 +611,7 @@ namespace app
          if (hitNote < 0)
          {
             const int col = std::clamp((int)((mouse.x - origin.x - tok::space_0_5) / keyW), 0, whiteCount - 1);
-            hitNote = lowNote + (col / 7) * 12 + kWhiteOffsets[col % 7];  // ui-audit-ok: model value: 7 white keys and 12 semitones per octave
+            hitNote = lowNote + (col / 7) * 12 + kWhiteOffsets[col % 7];  // ui-audit-ok: index (white-key column to note: 7 white keys, 12 semitones per octave)
          }
       }
 
@@ -687,7 +687,7 @@ namespace app
 
       const int baseNote = (n->baseOctave + 1) * 12;
       const int lowNote = std::clamp(baseNote, 0, 103);   // fixed - never recentres under an active click
-      const int hit = DrawInteractiveKeyboard(held, lowNote, 3);  // ui-audit-ok: octave count
+      const int hit = DrawInteractiveKeyboard(held, lowNote, 3);  // ui-audit-ok: model (octave count)
 
       if (hit != n->mMouseNote)
       {
@@ -2123,7 +2123,7 @@ namespace app
                                       (int)(gAudioTint.b * 255.0f), tok::note_on_alpha);
             dl->PushClipRect(origin, br, true);
             // A dense page draws at most ~2 notes per pixel column's worth.
-            const size_t step = std::max<size_t>(1, s->notes.size() / 4096);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+            const size_t step = std::max<size_t>(1, s->notes.size() / 4096);  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
             for (size_t i = 0; i < s->notes.size(); i += step)
             {
                const Arrange::SchedNote& e = s->notes[i];

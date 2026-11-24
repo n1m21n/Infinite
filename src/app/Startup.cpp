@@ -1920,7 +1920,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          const std::string cat = bar == std::string::npos ? "Utility" : spec.substr(0, bar);
          std::string rest = bar == std::string::npos ? spec : spec.substr(bar + 1);
          int cols = 5;
-         float dx = 480.0f, dy = 620.0f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         float dx = 480.0f, dy = 620.0f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
          if (const char* g = getenv("INFINITE_GALLERYGRID"))
             sscanf(g, "%d,%f,%f", &cols, &dx, &dy);
          int i = 0;
@@ -1952,7 +1952,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
                                       "Spec Blur", "Key-Snap", "Spectrum Slide", "Shape Resonator",
                                       "Convolution Reverb", "Saturator" };
          const int kCount = (int)(sizeof(kFx) / sizeof(kFx[0]));
-         const int page = atoi(gallery) == 2 ? 1 : 0;   // ui-audit-ok: gallery page index
+         const int page = atoi(gallery) == 2 ? 1 : 0;   // ui-audit-ok: index (gallery page index)
          for (int i = 0; i < 14 && page * 14 + i < kCount; i++)
             SpawnNode(kFx[page * 14 + i], "AudioEffects", (float)(i % 5) * 480.0f, (float)(i / 5) * 620.0f);
       }
@@ -3408,20 +3408,20 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          particles->maxParticles = 10;
          particles->emitRate = 4.0f;
          particles->emitShape = ParticleSystemNode::kSphere;
-         particles->emitRadius = 1.6f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         particles->emitRadius = 1.6f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
          particles->lifetime = 60.0f;
          particles->lifetimeRandom = 8.0f;
          particles->initialSpeed = 0.15f;
          particles->speedRandom = 0.10f;
          particles->spread = 1.0f; // omnidirectional - "floating", not "launched"
-         particles->gravityX = 0.0f; particles->gravityY = -0.02f; particles->gravityZ = 0.0f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         particles->gravityX = 0.0f; particles->gravityY = -0.02f; particles->gravityZ = 0.0f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
          particles->drag = 0.15f;
          particles->turbulence = 0.35f;
          particles->turbulenceScale = 0.8f;
          particles->startSize = 1.0f;
          particles->endSize = 1.0f; // constant - reads as floating cubes, not dying particles
-         particles->startColor[0] = 1.0f; particles->startColor[1] = 0.55f; particles->startColor[2] = 0.25f;  // ui-audit-ok: demo patch data (node param values the patch saves)
-         particles->endColor[0] = 0.25f; particles->endColor[1] = 0.55f; particles->endColor[2] = 1.0f;  // ui-audit-ok: demo patch data (node param values the patch saves)
+         particles->startColor[0] = 1.0f; particles->startColor[1] = 0.55f; particles->startColor[2] = 0.25f;  // ui-audit-ok: patch_data (demo patch data (node param values the patch saves))
+         particles->endColor[0] = 0.25f; particles->endColor[1] = 0.55f; particles->endColor[2] = 1.0f;  // ui-audit-ok: patch_data (demo patch data (node param values the patch saves))
          particles->seed = 4.0f;
 
          auto* inst = static_cast<InstanceOnPointsNode*>(gNodes[3].node.get());
@@ -3433,7 +3433,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          inst->alignToNormal = true; // orients each cube along its drift direction
          inst->metallic = 0.35f;
          inst->roughness = 0.35f;
-         inst->emissionColor[0] = 1.0f; inst->emissionColor[1] = 0.85f; inst->emissionColor[2] = 0.6f;  // ui-audit-ok: demo patch data (node param values the patch saves)
+         inst->emissionColor[0] = 1.0f; inst->emissionColor[1] = 0.85f; inst->emissionColor[2] = 0.6f;  // ui-audit-ok: patch_data (demo patch data (node param values the patch saves))
          inst->emission = 0.02f; // let lighting and bloom's own threshold define the highlights,
                                   // not a flat self-glow blowing out the whole surface
          inst->seed = 9.0f;
@@ -3444,12 +3444,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
          auto* keyLight = static_cast<LightNode*>(gNodes[5].node.get());
          keyLight->azimuth = 51.5662f; keyLight->elevation = 57.2958f;
-         keyLight->color[0] = 1.0f; keyLight->color[1] = 0.92f; keyLight->color[2] = 0.8f;  // ui-audit-ok: demo patch data (node param values the patch saves)
+         keyLight->color[0] = 1.0f; keyLight->color[1] = 0.92f; keyLight->color[2] = 0.8f;  // ui-audit-ok: patch_data (demo patch data (node param values the patch saves))
          keyLight->intensity = 1.4f; keyLight->orbitPerBeat = 0.02f;
 
          auto* fillLight = static_cast<LightNode*>(gNodes[6].node.get());
          fillLight->azimuth = -126.0507f; fillLight->elevation = 28.6479f;
-         fillLight->color[0] = 0.55f; fillLight->color[1] = 0.7f; fillLight->color[2] = 1.0f;  // ui-audit-ok: demo patch data (node param values the patch saves)
+         fillLight->color[0] = 0.55f; fillLight->color[1] = 0.7f; fillLight->color[2] = 1.0f;  // ui-audit-ok: patch_data (demo patch data (node param values the patch saves))
          fillLight->intensity = 0.6f; fillLight->orbitPerBeat = -0.015f; // drifts the opposite way for parallax
 
          auto* render = static_cast<Render3DNode*>(gNodes[7].node.get());
@@ -3457,16 +3457,16 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          render->camera = cam;
          render->lights[0] = keyLight;
          render->lights[1] = fillLight;
-         render->width = 1280.0f; render->height = 720.0f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         render->width = 1280.0f; render->height = 720.0f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
          render->samples = 2; render->tonemap = 1; render->exposure = 1.1f;
          // A dark teal, not pure black: the warm cube light/emission needs a cool
          // backdrop to read as graded contrast rather than glowing blobs on a void.
-         render->bgColor[0] = 0.03f; render->bgColor[1] = 0.045f; render->bgColor[2] = 0.07f;  // ui-audit-ok: demo patch data (node param values the patch saves)
+         render->bgColor[0] = 0.03f; render->bgColor[1] = 0.045f; render->bgColor[2] = 0.07f;  // ui-audit-ok: patch_data (demo patch data (node param values the patch saves))
          render->envSky[0] = 0.14f; render->envSky[1] = 0.20f; render->envSky[2] = 0.32f;
          render->envHorizon[0] = 0.07f; render->envHorizon[1] = 0.09f; render->envHorizon[2] = 0.13f;
          render->envGround[0] = 0.02f; render->envGround[1] = 0.025f; render->envGround[2] = 0.035f;
          render->envIntensity = 0.9f;
-         render->ambientColor[0] = 0.10f; render->ambientColor[1] = 0.16f; render->ambientColor[2] = 0.26f;  // ui-audit-ok: demo patch data (node param values the patch saves)
+         render->ambientColor[0] = 0.10f; render->ambientColor[1] = 0.16f; render->ambientColor[2] = 0.26f;  // ui-audit-ok: patch_data (demo patch data (node param values the patch saves))
          render->rimIntensity = 0.5f;
          render->shadowsEnabled = true;
          render->shadowQuality = 1;
@@ -3635,12 +3635,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          auto* t = static_cast<TextNode*>(gNodes[0].node.get());
          t->text = "naman is a weirdo and this line is deliberately long enough to need several rows";
          t->fontName = "Verdana";
-         t->fontSize = 300.0f;   // absurd on purpose: fitting must rein it in   // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         t->fontSize = 300.0f;   // absurd on purpose: fitting must rein it in   // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
          t->wordWrap = true;
          t->fitToBox = true;
          t->align = 3;
-         t->scaleX = 1.4f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
-         t->scaleY = 2.2f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         t->scaleX = 1.4f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
+         t->scaleY = 2.2f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
          gNodes[0].showParams = true;
          printf("TEXTFIT fixture: %zu nodes spawned\n", gNodes.size());
       }
@@ -3658,7 +3658,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          cv->AddPoint(CurvesNode::kRGB, 0.35f, 0.75f);
          cv->AddPoint(CurvesNode::kRGB, 0.7f, 0.2f);
          auto* tr = static_cast<TrailsNode*>(gNodes[3].node.get());
-         tr->zoom = 1.02f; tr->rotate = 0.5730f; tr->decay = 0.96f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         tr->zoom = 1.02f; tr->rotate = 0.5730f; tr->decay = 0.96f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
          auto* rd = static_cast<ReactionDiffusionNode*>(gNodes[0].node.get());
          rd->ApplyPreset(0);
          rd->stepsPerFrame = 24.0f;
@@ -3683,7 +3683,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          cv->AddPoint(CurvesNode::kRGB, 0.35f, 0.75f);
          cv->AddPoint(CurvesNode::kRGB, 0.7f, 0.2f);
          auto* tr = static_cast<TrailsNode*>(gNodes[3].node.get());
-         tr->zoom = 1.02f; tr->rotate = 0.5730f; tr->decay = 0.96f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         tr->zoom = 1.02f; tr->rotate = 0.5730f; tr->decay = 0.96f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
          auto* rd = static_cast<ReactionDiffusionNode*>(gNodes[0].node.get());
          rd->ApplyPreset(0);
          rd->stepsPerFrame = 24.0f;
@@ -3701,8 +3701,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          gNodes[1].showParams = true;
          gNodes[2].showParams = true;
          gNodes[3].showParams = true;
-         static_cast<MacroXYNode*>(gNodes[3].node.get())->padX = 0.32f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
-         static_cast<MacroXYNode*>(gNodes[3].node.get())->padY = 0.68f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         static_cast<MacroXYNode*>(gNodes[3].node.get())->padX = 0.32f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
+         static_cast<MacroXYNode*>(gNodes[3].node.get())->padY = 0.68f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
       }
       else if (getenv("INFINITE_SHOWCASE2") != nullptr)
       {
@@ -3732,11 +3732,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          auto* shape = static_cast<ShapeNode*>(gNodes[0].node.get());
          shape->shapeType = 6;
          shape->sides = 7;
-         shape->size = 0.36f;  // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
-         shape->fillColor[0] = 1.0f; shape->fillColor[1] = 0.42f; shape->fillColor[2] = 0.2f;  // ui-audit-ok: demo patch data (node param values the patch saves)
+         shape->size = 0.36f;  // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
+         shape->fillColor[0] = 1.0f; shape->fillColor[1] = 0.42f; shape->fillColor[2] = 0.2f;  // ui-audit-ok: patch_data (demo patch data (node param values the patch saves))
          auto* txt = static_cast<TextNode*>(gNodes[2].node.get());
          txt->text = "INFINITE";
-         txt->fontSize = 150.0f;   // ui-audit-ok: demo patch data (node values and canvas spots stay with the patch)
+         txt->fontSize = 150.0f;   // ui-audit-ok: patch_data (demo patch data (node values and canvas spots stay with the patch))
 
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
          CableFor(gNodes[3], 0)->Connect(gNodes[1].node.get());
@@ -4598,7 +4598,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          const uint64_t intro = addClip(0, 0, 2, "Intro");
          const uint64_t sel = addClip(0, 3, 3, "Clip B");
          const uint64_t overlay = addClip(1, 1, 4, "Overlay");
-         const uint64_t drums = addClip(firstAudio, 0, 3, "Drums");   // ui-audit-ok: demo clip index
+         const uint64_t drums = addClip(firstAudio, 0, 3, "Drums");   // ui-audit-ok: patch_data (demo clip index)
          const uint64_t bass = addClip(firstAudio + 1, 2, 4, "Bass");
          // Variants: arrgroup (clip group + track group), arrtrack / arrtgroup (track / track-group inspector),
          // arrmulti (several clips selected), arrzoom (zoomed in so clips are wide), arrwide (wider panel).

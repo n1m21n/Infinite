@@ -607,7 +607,7 @@ namespace app
       const float attackDb = n->Param("attack");
       const float sustainDb = n->Param("sustain");
 
-      const float kWindowSec = 0.4f;   // ui-audit-ok: signal window shown
+      const float kWindowSec = 0.4f;   // ui-audit-ok: timing (seconds of signal shown)
       const int kNumPoints = 96;
 
       auto envAt = [](float t) {

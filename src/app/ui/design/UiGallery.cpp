@@ -70,9 +70,9 @@ namespace UiGallery
          static const PillGroup::Segment segs2[] = { { "g.pg2.a", "Live" }, { "g.pg2.b", "Arrange" }, { "g.pg2.c", "Mix" } };
          static const PillGroup::Segment segs3[] = { { "g.pg3.a", "Live" }, { "g.pg3.b", "Arrange" }, { "g.pg3.c", "Mix" } };
          const auto c = UiLayout::Row(sec[5], { UiLayout::Fixed(tok::ui_gallery_fixed_g_pg1_size), UiLayout::Fixed(tok::ui_gallery_fixed_g_pg1_size), UiLayout::Fixed(tok::ui_gallery_fixed_g_pg1_size) }, gap);
-         PillGroup::Draw("g.pg1", c[0], segs, 3, 0);  // ui-audit-ok: model value: demo segment count
-         PillGroup::Draw("g.pg2", c[1], segs2, 3, 1);  // ui-audit-ok: model value: demo segment count
-         PillGroup::Draw("g.pg3", c[2], segs3, 3, 2);  // ui-audit-ok: model value: demo segment count
+         PillGroup::Draw("g.pg1", c[0], segs, 3, 0);  // ui-audit-ok: count (demo segment count)
+         PillGroup::Draw("g.pg2", c[1], segs2, 3, 1);  // ui-audit-ok: count (demo segment count)
+         PillGroup::Draw("g.pg3", c[2], segs3, 3, 2);  // ui-audit-ok: count (demo segment count)
       }
       Heading(sec[6], "READOUT - tabular digits (same width for 1111 and 0000)");
       {

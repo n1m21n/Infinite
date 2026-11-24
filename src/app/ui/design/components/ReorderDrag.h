@@ -355,7 +355,7 @@ namespace ReorderDrag
          // The gap it will land in: the item, veiled, with a faint accent edge.
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImGuiCol_WindowBg, tok::alpha_veil_live), tok::radius_control);
-         dl->AddRect(mn, mx, (AccentCol() & 0x00FFFFFFu) | tok::reorder_drag_item_alpha, tok::radius_control, 0, tok::stroke_rule);  // ui-audit-ok: channel mask / bit packing, not a colour value
+         dl->AddRect(mn, mx, (AccentCol() & 0x00FFFFFFu) | tok::reorder_drag_item_alpha, tok::radius_control, 0, tok::stroke_rule);  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
          // The ghost: the item's size, held where it was grabbed.
          const ImGuiIO& io = ImGui::GetIO();
          const ImVec2 size(std::max(mx.x - mn.x, 1.0f), std::max(mx.y - mn.y, 1.0f));

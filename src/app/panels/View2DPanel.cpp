@@ -190,7 +190,7 @@ namespace
    bool sCropDarken = true, sCropReveal = true;   // crop: dim outside the box; show it at all
    bool sSelBrushSub = false;      // selection brush: takes away (Alt flips it)
    bool sSelBrushSoft = true;      // selection brush: soft edges (off: hard)
-   int sTolerance = 32;  // ui-audit-ok: colour tolerance default (0-255)
+   int sTolerance = 32;  // ui-audit-ok: unit (colour tolerance default (0-255))
    bool sContiguous = true, sAllLayers = false;
    int sImageFormat = 0, sVideoFormat = 0;   // the Render tab's default file types
    bool sSurfacePaint = true;      // brush / eraser / eyedropper work on a 3D object's surface
@@ -304,7 +304,7 @@ namespace
 
    ImU32 Hex(unsigned rgb, float a = 1.0f)
    {
-      return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, (int)(std::clamp(a, 0.0f, 1.0f) * 255.0f));  // ui-audit-ok: channel mask / bit packing, not a colour value
+      return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, (int)(std::clamp(a, 0.0f, 1.0f) * 255.0f));  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
    }
 
    GraphNode* DocGraphNode()
@@ -478,7 +478,7 @@ namespace
    {
       const unsigned v = (unsigned)(intptr_t)cmd->UserCallbackData;
       glBindTexture(GL_TEXTURE_2D, v & 0x7FFFFFFFu);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (v & tok::view2d_mag_filter_cb_alpha) ? GL_NEAREST : GL_LINEAR);  // ui-audit-ok: bit packing: the nearest-filter flag bit on a texture id
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (v & tok::view2d_mag_filter_cb_alpha) ? GL_NEAREST : GL_LINEAR);  // ui-audit-ok: mask (bit packing: the nearest-filter flag bit on a texture id)
    }
    bool ViewTurned() { return std::fabs(sViewAngle) > 1e-4f; }
    ImVec2 ToScreen(Scene2DNode* doc, float x, float y)
@@ -777,7 +777,7 @@ namespace
             return e.rgba.empty() ? nullptr : &e.rgba;
       cache.erase(std::remove_if(cache.begin(), cache.end(), [&](const Entry& e) { return e.frame != now || e.id == id; }), cache.end());
       Entry e{ id, now, {} };
-      if (!doc->RenderLayerAlone(id, ++sInkFrame, e.rgba) || e.rgba.size() != (size_t)doc->Doc().w * doc->Doc().h * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      if (!doc->RenderLayerAlone(id, ++sInkFrame, e.rgba) || e.rgba.size() != (size_t)doc->Doc().w * doc->Doc().h * 4)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
          e.rgba.clear();
       cache.push_back(std::move(e));
       return cache.back().rgba.empty() ? nullptr : &cache.back().rgba;
@@ -803,7 +803,7 @@ namespace
       const int step = std::max(1, std::max(x1 - x0, y1 - y0) / tok::view2d_ink_in_ratio);
       for (int y = y0; y <= y1; y += step)
          for (int x = x0; x <= x1; x += step)
-            if ((*px)[((size_t)y * w + x) * 4 + 3] > 8)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+            if ((*px)[((size_t)y * w + x) * 4 + 3] > 8)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
                return true;
       return false;
    }
@@ -1388,7 +1388,7 @@ namespace
       sModNext = {};
    }
 
-   bool DragRow(const char* label, float* v, float speed, const char* fmt, float lo = -1e6f, float hi = 1e6f)   // ui-audit-ok: declaration default, an unbounded drag
+   bool DragRow(const char* label, float* v, float speed, const char* fmt, float lo = -1e6f, float hi = 1e6f)   // ui-audit-ok: sentinel (declaration default, an unbounded drag)
    {
       fmt = RowSlot(label, fmt);
       FieldWell::PushStyle();
@@ -1432,7 +1432,7 @@ namespace
    }
 
    // Two or three numbers on one row ("Position  X 120  Y 80"); returns a bit per field that changed.
-   int DragMulti(const char* label, float* const* v, const char* const* fmts, int n, float speed, float lo = -1e6f, float hi = 1e6f,   // ui-audit-ok: declaration default, an unbounded drag
+   int DragMulti(const char* label, float* const* v, const char* const* fmts, int n, float speed, float lo = -1e6f, float hi = 1e6f,   // ui-audit-ok: sentinel (declaration default, an unbounded drag)
                  const Layer* modLayer = nullptr, const int* modFields = nullptr)
    {
       FieldLabel(label);
@@ -2186,7 +2186,7 @@ namespace
    {
       const int n = (int)c.size() / tok::view2d_n_ratio;
       for (int i = 0; i < n; i++)
-         if (std::fabs(c[(size_t)i * 2] - x) < 0.03f)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+         if (std::fabs(c[(size_t)i * 2] - x) < 0.03f)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
             return i;
       if (n >= 16)
          return -1;
@@ -3599,7 +3599,7 @@ namespace
       };
       float x = 0, y = 0;
       at(0.0f, x, y);
-      st.Begin(f, b, x, y, 0.3f);   // ui-audit-ok: preview stroke pen pressure (model value)
+      st.Begin(f, b, x, y, 0.3f);   // ui-audit-ok: model (preview stroke pen pressure (model value))
       for (int k = 1; k <= 48; k++)
       {
          const float u = (float)k / 48.0f;
@@ -4417,7 +4417,7 @@ namespace
       struct Seg { float ax, ay, bx, by; };
       static std::vector<Seg> segs;
       segs.clear();
-      constexpr size_t kMaxSegs = 40000;  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      constexpr size_t kMaxSegs = 40000;  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
       for (int y = y0; y <= y1 && segs.size() < kMaxSegs; y++)   // horizontal edges, between rows y-1 and y
          for (int x = x0; x < x1;)
          {
@@ -4448,7 +4448,7 @@ namespace
          return false;
       const ImU32 white = tok::U32(tok::canvas_ink), black = tok::U32(tok::canvas_shade);
       constexpr float kDash = tok::view2d_dash;
-      const float march = std::fmod((float)ImGui::GetTime() * tok::motion_rate_ants, kDash * 2.0f);  // ui-audit-ok: dash period (two dashes)
+      const float march = std::fmod((float)ImGui::GetTime() * tok::motion_rate_ants, kDash * 2.0f);  // ui-audit-ok: count (dash period: two dashes)
       for (const Seg& sg : segs)
       {
          const ImVec2 a = ToScreen(doc, sg.ax, sg.ay), b = ToScreen(doc, sg.bx, sg.by);
@@ -4488,7 +4488,7 @@ namespace
       Entry e{ l.id, l.tiles, false, { 0, 0, bw, bh } };
       std::vector<uint8_t> px;
       int w = 0, h = 0;
-      if (doc->ReadPaint(l.id, px, w, h) && w > 0 && h > 0 && px.size() >= (size_t)w * h * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      if (doc->ReadPaint(l.id, px, w, h) && w > 0 && h > 0 && px.size() >= (size_t)w * h * 4)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
       {
          int x0 = w, y0 = h, x1 = -1, y1 = -1;
          for (int y = 0; y < h; y++)
@@ -4903,7 +4903,7 @@ namespace
       else
       {
          // An edge slides along itself: both its corners move by the drag along the edge.
-         const int a = h == 1 ? 0 : h == 3 ? 1 : h == 5 ? 2 : 3, b = (a + 1) % 4;  // ui-audit-ok: model value: corner handle index
+         const int a = h == 1 ? 0 : h == 3 ? 1 : h == 5 ? 2 : 3, b = (a + 1) % 4;  // ui-audit-ok: index (corner handle index)
          if (sOp.warpStyle == 2)
          {
             pull(a, dx, dy);   // distort: the edge goes where it is dragged
@@ -6706,7 +6706,7 @@ namespace
          // for every other user of the texture.
          const bool pixels = sZoom >= 2.0f;
          if (pixels)
-            dl->AddCallback(&MagFilterCb, (void*)(intptr_t)(tex | tok::view2d_canvas_alpha));  // ui-audit-ok: bit packing: the nearest-filter flag bit on a texture id
+            dl->AddCallback(&MagFilterCb, (void*)(intptr_t)(tex | tok::view2d_canvas_alpha));  // ui-audit-ok: mask (bit packing: the nearest-filter flag bit on a texture id)
          Thumb::AddQuad(dl, (ImTextureID)(intptr_t)tex, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
          if (pixels)
          {
@@ -7982,7 +7982,7 @@ namespace
       // Shown as Affinity shows it, a share of the colour range (kept 0..255 inside, as patches and the wand read it).
       float tol = (float)sTolerance * (100.0f / 255.0f);
       BarSlider("##v2dtol", &tol, params::view2d::tol_lo, params::view2d::tol_hi, "Tolerance %.0f%%", kWellL);
-      sTolerance = std::clamp((int)std::lround(tol * 2.55f), 0, 255);  // ui-audit-ok: percent to 0-255
+      sTolerance = std::clamp((int)std::lround(tol * 2.55f), 0, 255);  // ui-audit-ok: unit (percent to 0-255)
       if (TextChip(L("Contiguous##v2dcont"), sContiguous, T("Only touching pixels")))
          sContiguous = !sContiguous;
       FormParts::Inline(0.0f, tok::space_1);
@@ -8035,7 +8035,7 @@ namespace
       {
          BrushEngine::Brush& b = ToolBrush();
          BarSlider("##v2drsize", &b.size, params::view2d::size_lo, params::view2d::size_hi, "Size %.0f px", kWellL);
-         float hard = b.hardness * tok::view2d_hard_ratio, op = b.opacity * 100.0f, flow = b.flow * 100.0f;  // ui-audit-ok: model value: 0-1 brush param shown as percent
+         float hard = b.hardness * tok::view2d_hard_ratio, op = b.opacity * 100.0f, flow = b.flow * 100.0f;  // ui-audit-ok: unit (0-1 brush param shown as percent)
          BarSlider("##v2drhard", &hard, params::view2d::hard_lo, params::view2d::hard_hi, "Hardness %.0f%%", kWellL);
          BarSlider("##v2drop", &op, params::view2d::op_lo, params::view2d::op_hi, "Opacity %.0f%%", kWellL);
          BarSlider("##v2drflow", &flow, params::view2d::flow_lo, params::view2d::flow_hi, "Flow %.0f%%", kWellL);
@@ -8186,7 +8186,7 @@ namespace
          ModBegin();
          BarSlider("##v2dsize", &b.size, params::view2d::size_lo, params::view2d::size_hi, "Size %.0f px", kWellL);
          ModEnd();
-         float hard = b.hardness * tok::view2d_hard_ratio, op = b.opacity * 100.0f, flow = b.flow * 100.0f;  // ui-audit-ok: model value: 0-1 brush param shown as percent
+         float hard = b.hardness * tok::view2d_hard_ratio, op = b.opacity * 100.0f, flow = b.flow * 100.0f;  // ui-audit-ok: unit (0-1 brush param shown as percent)
          BarSlider("##v2dhard", &hard, params::view2d::hard_lo, params::view2d::hard_hi, "Hardness %.0f%%", kWellL);
          if (brush)
             ModNextParam(kBrushOpacityParam);
@@ -8966,7 +8966,7 @@ namespace
       // Target: the UI font's cap height, in screen points.
       const float k = std::clamp(ImGui::GetFontSize() * tok::type_cap_em / capPx, 0.0f, 4.0f);   // probe px -> points
       const int w = nx1 - nx0 + 1, h = ny1 - ny0 + 1;
-      std::vector<unsigned char> out((size_t)w * h * 4);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      std::vector<unsigned char> out((size_t)w * h * 4);  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
       for (int y = 0; y < h; y++)
          for (int x = 0; x < w; x++)
          {
@@ -11370,7 +11370,7 @@ namespace
       static int sStampFrame = 1 << 25;
       std::vector<uint8_t> rgba;
       const int W = doc->Doc().w, H = doc->Doc().h;
-      if (set.empty() || !doc->RenderSet(set, ++sStampFrame, rgba) || rgba.size() < (size_t)W * H * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      if (set.empty() || !doc->RenderSet(set, ++sStampFrame, rgba) || rgba.size() < (size_t)W * H * 4)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
          return 0;
       if (cutToSelection && doc->HasSelection())
       {
@@ -11401,7 +11401,7 @@ namespace
       static int sClipFrame = 1 << 26;
       std::vector<uint8_t> rgba;
       const int W = doc->Doc().w, H = doc->Doc().h;
-      if (!doc->RenderSet(set, ++sClipFrame, rgba) || rgba.size() < (size_t)W * H * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      if (!doc->RenderSet(set, ++sClipFrame, rgba) || rgba.size() < (size_t)W * H * 4)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
          return;
       int x0 = W, y0 = H, x1 = -1, y1 = -1;
       for (int y = 0; y < H; y++)
@@ -11411,7 +11411,7 @@ namespace
       if (x1 < x0)
          return;
       const int w = x1 - x0 + 1, h = y1 - y0 + 1;
-      std::vector<uint8_t> crop((size_t)w * h * 4);  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      std::vector<uint8_t> crop((size_t)w * h * 4);  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
       for (int y = 0; y < h; y++)
          std::memcpy(&crop[(size_t)y * w * 4], &rgba[((size_t)(y0 + y) * W + x0) * 4], (size_t)w * 4);
       std::vector<uint8_t> png;
@@ -11444,7 +11444,7 @@ namespace
          rgba.assign(img, img + (size_t)w * h * 4);
          stbi_image_free(img);
       }
-      if (w <= 0 || h <= 0 || rgba.size() < (size_t)w * h * 4)  // ui-audit-ok: byte / buffer arithmetic, not a screen quantity
+      if (w <= 0 || h <= 0 || rgba.size() < (size_t)w * h * 4)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
          return false;
       Layer* a = Active(doc);
       PushUndoCheckpoint("Paste");
@@ -11942,7 +11942,7 @@ namespace
                         if (pd.format.find("rad") != std::string::npos)
                         {
                            float deg = *pv * 57.29578f;
-                           if (SliderRow(T(plabel.c_str()), &deg, pd.minVal * 57.29578f, pd.maxVal * 57.29578f, "%.0f\xC2\xB0"))   // ui-audit-ok: radians to degrees
+                           if (SliderRow(T(plabel.c_str()), &deg, pd.minVal * 57.29578f, pd.maxVal * 57.29578f, "%.0f\xC2\xB0"))   // ui-audit-ok: unit (radians to degrees)
                               *pv = deg / 57.29578f;
                            return;
                         }

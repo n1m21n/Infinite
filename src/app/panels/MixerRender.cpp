@@ -53,7 +53,7 @@ namespace app
          double rate = 0.0, savedHeadlessRate = 0.0, startSec = 0.0;
          int64_t lengthFrames = 0, tailFrames = 0, skip = 0;
          int64_t done = 0, total = 0, step = 0;
-         int bits = 16;   // ui-audit-ok: export bit depth default
+         int bits = 16;   // ui-audit-ok: model (export bit depth default)
          const char* ext = "wav";
          std::string name;
          std::vector<Take> takes;
@@ -442,7 +442,7 @@ namespace app
       job.wasPlaying = tr.IsPlaying();
       if (startMode == 2)
          tr.Seek(startAt);
-      job.startSec = startMode == 2 ? startAt : tr.Seconds();   // ui-audit-ok: render start mode
+      job.startSec = startMode == 2 ? startAt : tr.Seconds();   // ui-audit-ok: model (render start mode)
       tr.SetOfflineMode(true, job.rate);
       tr.SetPlaying(true);
       tr.SetOfflineVideoTime(job.startSec);
@@ -498,7 +498,7 @@ namespace app
          while (sJob.done < sJob.total)
          {
             PumpFastStep();
-            if (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() > 0.010)   // ui-audit-ok: render tick budget
+            if (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() > 0.010)   // ui-audit-ok: timing (render tick budget)
                break;
          }
          if (sJob.done >= sJob.total)

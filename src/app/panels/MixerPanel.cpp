@@ -518,7 +518,7 @@ namespace app
                for (int i = 0; i < 12; i++)
                {
                   const unsigned c = kPalette[i];
-                  dots[i] = IM_COL32((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, tok::mixer_strip_name_actions_alpha_hex);  // ui-audit-ok: channel mask / bit packing, not a colour value
+                  dots[i] = IM_COL32((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, tok::mixer_strip_name_actions_alpha_hex);  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
                   if (m->chColor[r.slot] == c)
                      cur = i;
                }
@@ -769,7 +769,7 @@ namespace app
       using DeskParts::kPotRowH;
       using DeskParts::kPlateH;
 
-      ImU32 RgbToU32(unsigned rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, tok::mixer_strip_name_actions_alpha_u8); }  // ui-audit-ok: channel mask / bit packing, not a colour value
+      ImU32 RgbToU32(unsigned rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, tok::mixer_strip_name_actions_alpha_u8); }  // ui-audit-ok: mask (channel mask / bit packing, not a colour value)
 
 
       float StripFaderH(float h, bool sends)
@@ -815,7 +815,7 @@ namespace app
          const float t = hi > lo ? (*v - lo) / (hi - lo) : 0.0f;
          const float ang = Lerp(a0, a1, t);
          // value arc, from the left stop (unipolar) or from the centre (bipolar)
-         const float from = bipolar ? Lerp(a0, a1, 0.5f) : a0;   // ui-audit-ok: midpoint of a bipolar range
+         const float from = bipolar ? Lerp(a0, a1, 0.5f) : a0;   // ui-audit-ok: model (midpoint of a bipolar range)
          dl->PathArcTo(c, R + tok::mixer_pot_gap, a0, a1, tok::mixer_pot_segments);
          dl->PathStroke(Lo(tok::mixer_pot_lo_alpha_md), 0, tok::mixer_pot_stroke);
          if (std::fabs(ang - from) > 0.01f)

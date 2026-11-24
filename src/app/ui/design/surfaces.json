@@ -293,6 +293,9 @@
   "audio_viz": {
    "amp_ratio": 0.45
   },
+  "border": {
+   "hairline": 1.0
+  },
   "browser": {
    "star_size": 11.0
   },
@@ -705,6 +708,9 @@
    "sw_ratio": 0.257,
    "window_x": 0.5,
    "window_y": 0.5
+  },
+  "dialog_progress": {
+   "brand_color_u": 0.5
   },
   "dropdown_field": {
    "max_label_ratio": 0.4,
@@ -2233,6 +2239,7 @@
    "tempo_cell_w_ratio": 2.0,
    "tex_shade_alpha": 0.92,
    "ticks": 0.5,
+   "time_sig_slash_alpha": 0.5,
    "y_lg": 0.28,
    "y_md": 0.16,
    "y_sm": 0.06
@@ -2805,10 +2812,12 @@
    "gizmo_inset": 0.93,
    "gizmo_limit": 12.0,
    "gizmo_limit_sm": 11.0,
+   "gizmo_nav_size_default": 80.0,
    "gizmo_px": 84.0,
    "gizmo_r": 9.0,
    "gizmo_ratio": 14.0,
    "gizmo_scale": 1.2,
+   "gizmo_size_default": 75.0,
    "gizmo_stroke": 2.5,
    "gizmo_v": 0.05,
    "h_ratio": 360.0,
@@ -2832,6 +2841,7 @@
    "line_x_sm": 14.0,
    "m_ratio": 2.0,
    "min": 80.0,
+   "mini_size_default": 80.0,
    "mist_alpha": 0.9,
    "nav_gizmo_lg": 9.0,
    "nav_gizmo_scale_lg": 80.0,
@@ -2961,15 +2971,18 @@
    "third_w": 2.0,
    "third_w_ratio": 3.0,
    "v": 100.0
-  },
-  "border": {
-   "hairline": 1.0
-  },
-  "dialog_progress": {
-   "brand_color_u": 0.5
   }
  },
  "surface_i": {
+  "alpha": {
+   "opaque": 255
+  },
+  "app_window": {
+   "restore_h": 720,
+   "restore_w": 1280,
+   "restore_x": 100,
+   "restore_y": 100
+  },
   "arrange": {
    "arrow_alpha": 50,
    "clip_base_col_alpha": 255,
@@ -3803,6 +3816,9 @@
    "init_h": 64,
    "init_w": 64
   },
+  "state_ring": {
+   "target_alpha": 34
+  },
   "status_dot": {
    "on_last_item_segments": 12
   },
@@ -3840,29 +3856,29 @@
    "playhead_ghost_alpha": 120
   },
   "ui_gallery": {
+   "button_cell_w": 78,
+   "controls_section_h": 44,
+   "divider_h_cell_w": 160,
+   "divider_v_cell_w": 16,
    "fixed_g_pg1_size": 240,
    "fixed_g_ro_a_size": 90,
    "fixed_search_size": 28,
    "inset": 28,
-   "section_heading_h": 14,
-   "type_section_h": 100,
-   "top_bar_section_h": 36,
-   "controls_section_h": 44,
-   "divider_v_cell_w": 16,
-   "divider_h_cell_w": 160,
-   "type_header_row_h": 14,
-   "type_caption_row_h": 18,
-   "type_body_row_h": 22,
-   "type_display_row_h": 34,
-   "type_cell_w": 220,
-   "pos_readout_w": 130,
-   "tempo_readout_w": 84,
-   "sig_readout_w": 36,
    "key_readout_w": 72,
    "perf_readout_w": 110,
    "pin_cell_w": 32,
-   "button_cell_w": 78,
-   "switch_cell_w": 40
+   "pos_readout_w": 130,
+   "section_heading_h": 14,
+   "sig_readout_w": 36,
+   "switch_cell_w": 40,
+   "tempo_readout_w": 84,
+   "top_bar_section_h": 36,
+   "type_body_row_h": 22,
+   "type_caption_row_h": 18,
+   "type_cell_w": 220,
+   "type_display_row_h": 34,
+   "type_header_row_h": 14,
+   "type_section_h": 100
   },
   "view2d": {
    "anchor": 4,
@@ -3995,12 +4011,6 @@
    "fill_alpha_sm": 140,
    "line_alpha": 235,
    "pad_ratio": 4
-  },
-  "state_ring": {
-   "target_alpha": 34
-  },
-  "alpha": {
-   "opaque": 255
   }
  },
  "surface_d": {

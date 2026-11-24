@@ -53,7 +53,7 @@ namespace app
       static int sLastFrame = -10;
       const ImVec2 mp = ImGui::GetIO().MousePos;
       const int frame = ImGui::GetFrameCount();
-      if (frame != sLastFrame + 1 && frame != sLastFrame)   // ui-audit-ok: frame counter
+      if (frame != sLastFrame + 1 && frame != sLastFrame)   // ui-audit-ok: timing (frame counter)
          sRestSince = ImGui::GetTime();
       if (std::fabs(mp.x - sRestPos.x) > tok::param_help_tip_limit || std::fabs(mp.y - sRestPos.y) > tok::param_help_tip_limit)
       {

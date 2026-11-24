@@ -47,7 +47,7 @@ namespace app
       std::string names;
       for (size_t i = 0; i < gSkippedNodeTypes.size() && i < 4; ++i)
          names += (i ? ", " : "") + gSkippedNodeTypes[i];
-      if (gSkippedNodeTypes.size() > 4)  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+      if (gSkippedNodeTypes.size() > 4)  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
          names += ", ...";
       Notices::Post(Notices::Level::Warning, "patch.skipped",
                     "Opened " + PatchFileName(path) + " without " + std::to_string(gSkippedNodeTypes.size()) +
@@ -237,7 +237,7 @@ namespace app
          for (const Patch::GestureRecord& g : data.gestures)
          {
             GraphNode* dst = resolve(g.dstIndex);
-            if (dst == nullptr || g.samples.size() < 2)  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+            if (dst == nullptr || g.samples.size() < 2)  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
                continue;
             GestureRecorder::Playback pb;
             pb.speed = g.speed;
@@ -330,7 +330,7 @@ namespace app
       }
       gPerfLayout = data.perfLayout;
       if (gPerfLayout.cellSize < Patch::PerfLayoutRecord::kMinCellSize || gPerfLayout.cellSize > Patch::PerfLayoutRecord::kMaxCellSize)
-         gPerfLayout.cellSize = 76;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+         gPerfLayout.cellSize = 76;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
       gPerfLayout.pageCount = std::clamp(gPerfLayout.pageCount, 1, Patch::PerfLayoutRecord::kMaxPages);
       if (gPerfActivePage >= gPerfLayout.pageCount) gPerfActivePage = gPerfLayout.pageCount - 1;
 
@@ -433,7 +433,7 @@ namespace app
          if (gn == nullptr || gn->hiddenFromCanvas)
             continue;
          const ImVec2 s = ed::GetNodeSize(gn->NodeId());
-         if (s.x > 1.0f && s.x < 20000.0f && s.y > 1.0f && s.y < 20000.0f)  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+         if (s.x > 1.0f && s.x < 20000.0f && s.y > 1.0f && s.y < 20000.0f)  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
             measured[rec.index] = { s.x, s.y };
          else
             allMeasured = false;
@@ -448,7 +448,7 @@ namespace app
       float dx = 0.0f, dy = 0.0f;
       if (p.centre)
       {
-         float minX = 1e30f, minY = 1e30f, maxX = -1e30f, maxY = -1e30f;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+         float minX = 1e30f, minY = 1e30f, maxX = -1e30f, maxY = -1e30f;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
          for (const auto& entry : pos)
          {
             auto ms = measured.find(entry.first);
@@ -549,7 +549,7 @@ namespace app
          const PatchSchema::TypeSchema* ts = SchemaFor(n->typeName);
          char tag = 0;
          for (size_t i = 0; i < n->params.size(); i++)
-            if (n->params[i].first.size() > 2 && n->params[i].first.substr(2) == key)  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+            if (n->params[i].first.size() > 2 && n->params[i].first.substr(2) == key)  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
                tag = n->params[i].first[0];
          if (tag == 0 && ts != nullptr)
             for (const PatchSchema::ParamInfo& pi : ts->params)
@@ -583,7 +583,7 @@ namespace app
             data.hasKeyRefs = true; // a dropdown option name, resolved once a node of the type is drawn
          bool replaced = false;
          for (auto& pr : n->params)
-            if (pr.first.size() > 2 && pr.first.substr(2) == key)  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+            if (pr.first.size() > 2 && pr.first.substr(2) == key)  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
             {
                pr.second = value;
                replaced = true;
@@ -1104,12 +1104,12 @@ namespace app
             gn->hiddenFromCanvas = false;
       }
 
-      constexpr float kUnpackOriginX = 60.0f;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
-      constexpr float kUnpackOriginY = 60.0f;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
-      constexpr float kUnpackDX = 580.0f;      // = FieldGraphNode.cpp's kAutoPlaceDX  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+      constexpr float kUnpackOriginX = 60.0f;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
+      constexpr float kUnpackOriginY = 60.0f;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
+      constexpr float kUnpackDX = 580.0f;      // = FieldGraphNode.cpp's kAutoPlaceDX  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
       constexpr float kUnpackDXWide = 1080.0f; // = kAutoPlaceDXWide
       constexpr float kUnpackDYMin = 160.0f;   // owner's Δy, kept as a floor
-      constexpr float kUnpackRowMargin = 40.0f;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+      constexpr float kUnpackRowMargin = 40.0f;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
 
       const Field::GraphPlan& plan = target->LastPlan();
       std::map<std::string, int> depthByKey = Field::ComputeEmitDepths(plan);
@@ -1210,9 +1210,9 @@ namespace app
       ed::EditorContext* prevEditor = ed::GetCurrentEditor();
       ed::SetCurrentEditor(gEditor);
 
-      constexpr float kUnpackOriginY = 60.0f;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+      constexpr float kUnpackOriginY = 60.0f;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
       constexpr float kUnpackDYMin = 160.0f;
-      constexpr float kUnpackRowMargin = 40.0f;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+      constexpr float kUnpackRowMargin = 40.0f;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
       constexpr float kAudioNodeWidthFallback = 440.0f;
       constexpr float kAudioWideWidthFallback = 960.0f;
 
@@ -1228,7 +1228,7 @@ namespace app
          ImVec2 s = ed::GetNodeSize(gn->NodeId());
          posByIndex[idx] = p;
          sizeByIndex[idx] = s;
-         bool valid = s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+         bool valid = s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
          if (!valid)
             allValid = false;
       }
@@ -1283,7 +1283,7 @@ namespace app
             continue;
          ImVec2 p = ed::GetNodePosition(gn->NodeId());
          ImVec2 s = sizeByIndex[idx];
-         if (!(s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f))  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+         if (!(s.x > 1.0f && s.x < 5000.0f && s.y > 1.0f && s.y < 5000.0f))  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
             s = ImVec2(IsWideAutoPlaceType(gn->typeName) ? kAudioWideWidthFallback : kAudioNodeWidthFallback,
                        kUnpackDYMin);
          if (!any)
@@ -1305,12 +1305,12 @@ namespace app
       {
          // Same kPad/kHeader padding numbers as the selection-wrap handler
          // (doc §4.2 step 6: reuse, don't invent new padding).
-         const float kPad = 32.0f;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+         const float kPad = 32.0f;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
          const float kHeader = 24.0f;
          const float gx = bmin.x - kPad;
          const float gy = bmin.y - kPad - kHeader;
-         const float gw = (bmax.x - bmin.x) + kPad * 2.0f;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
-         const float gh = (bmax.y - bmin.y) + kPad * 2.0f + kHeader;  // ui-audit-ok: canvas placement and bounds sentinels, patch data
+         const float gw = (bmax.x - bmin.x) + kPad * 2.0f;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
+         const float gh = (bmax.y - bmin.y) + kPad * 2.0f + kHeader;  // ui-audit-ok: patch_data (canvas placement and bounds sentinels, patch data)
 
          if (GraphNode* ggn = SpawnNode("Group", "Compositing", gx, gy))
          {
