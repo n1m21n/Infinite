@@ -1850,7 +1850,7 @@ namespace app
                const std::string headless = exe + " --frame hello.inf 0 pics/\n" + exe + " --render hello.inf hello.mp4 --duration 4 --fps 30";
                CodeBlock::Draw(headless.c_str(), "cb_headless");
 #if !defined(_WIN32) && !defined(__APPLE__)
-               ImGui::TextDisabled("%s", "%s", T("xvfb-run -a ..."));
+               ImGui::TextDisabled("%s", T("xvfb-run -a ..."));
 #endif
                // i18n-skip-end
                ImGui::Spacing();
