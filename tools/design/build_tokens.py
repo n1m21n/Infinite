@@ -96,7 +96,9 @@ def build():
     for grp, ty in (("surface", "float"), ("surface_i", "int"), ("surface_d", "double")):
         for s, kv in surfaces.get(grp, {}).items():
             for k, v, dep in entries(kv):
-                L.append(line(ty, f"{s}_{k}", v, dep))
+                # past int range the hand literal was a long (a hash multiplier): a 64-bit type on every OS, not a wrapped int
+                t2 = "long long" if ty == "int" and isinstance(v, int) and not -2**31 <= v < 2**31 else ty
+                L.append(line(t2, f"{s}_{k}", v, dep))
     r = t["roles"]
     L += ["", "   struct Rgba8 { unsigned char r, g, b, a; };", "   struct Rgbaf { float r, g, b, a; };", "   struct Pair8 { Rgba8 dark, light; };", "   struct Pairf { Rgbaf dark, light; };"]
     # Per-surface colours (owner rule B): a colour gets a role token of its own unless an existing one has the same

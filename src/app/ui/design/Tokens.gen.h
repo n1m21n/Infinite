@@ -3169,7 +3169,7 @@ namespace tok
    constexpr int arrange_session_grid_min_rows = 6;
    constexpr int arrange_session_grid_progress_ring_segments = 24;
    constexpr int arrange_session_grid_request_w_min = 16;
-   constexpr int arrange_support1_h = 1099511628211;
+   constexpr long long arrange_support1_h = 1099511628211;
    constexpr int arrange_support1_can_group_selection_limit = 2;
    constexpr int arrange_support2_out_h = 1080;
    constexpr int arrange_support2_out_w = 1920;
@@ -3257,7 +3257,7 @@ namespace tok
    constexpr int desk_scribble_row_scribble_text_alpha = 110;
    constexpr int desk_scribble_row_tint_alpha = 255;
    constexpr int desk_text_alpha = 255;
-   constexpr int desk_hsh_scale = 2654435761;
+   constexpr long long desk_hsh_scale = 2654435761;
    constexpr int desk_dot_segments_lg = 28;
    constexpr int desk_dot_segments_md = 20;
    constexpr int desk_dot_segments_sm = 8;
