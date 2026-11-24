@@ -120,8 +120,11 @@ def main():
             if not args.update and not args.render_out and not os.path.exists(gold):
                 continue   # no golden for this page on this platform: nothing to compare, skip the launch
             out = os.path.join(args.render_out or tmp_dir, name + ".png")
+            # Fresh HOME per launch: the app otherwise reads the owner's saved layout (drawer height, imgui.ini,
+            # workspace settings) and a golden changes with whatever the last real session left behind.
+            home = tempfile.mkdtemp(dir=tmp_dir)
             env = dict(os.environ, INFINITE_NO_UPDATE_CHECK="1", INFINITE_SCREENSHOT_FRAME="20",
-                       IMAGERESYNTH_SCREENSHOT=out)
+                       IMAGERESYNTH_SCREENSHOT=out, HOME=home)
             env.update(envf(mode))
             subprocess.run([exe], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
                            timeout=180)
