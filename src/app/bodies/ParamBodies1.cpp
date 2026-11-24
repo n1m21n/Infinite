@@ -9,6 +9,7 @@
 #include "app/ui/design/components/FormParts.h"
 #include "plugin/engine/HostAudio.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/StepCell.h"
 #include "app/ui/design/components/Switch.h"
@@ -351,49 +352,42 @@ namespace app
    }
 
 
+   // Not every shape uses corner/sides/inner ratio - e.g. a Circle has no corners and no sides, a Triangle's side
+   // count is fixed at 3. Those rows show only for the shapes that use them. Keep in sync with the uShape switch in
+   // ShapeNode.cpp's fragment shader. The three take fixed ordinals above the always-drawn ones (0..10), so switching
+   // shape never moves rotation / pos / fill and the type-level key join stays true.
+   namespace
+   {
+      using ShapeRow = params::Row<ShapeNode>;
+      bool ShapeUsesCorner(const ShapeNode& n) { return n.shapeType == 3 || n.shapeType == 7 || n.shapeType == 9 || n.shapeType == 18; }
+      bool ShapeUsesSides(const ShapeNode& n) { return n.shapeType == 5 || n.shapeType == 6 || n.shapeType == 14 || n.shapeType == 19; }
+      bool ShapeUsesInner(const ShapeNode& n) { return n.shapeType == 6 || n.shapeType == 14 || n.shapeType == 15 || n.shapeType == 16; }
+
+      const ShapeRow kShapeRows[] = {
+         ShapeRow::Choice<&ShapeNode::shapeType>("shape", &ShapeNode::ShapeNames),
+         ShapeRow::Slider<&ShapeNode::width>("width", params::Shape::width_lo, params::Shape::width_hi).Fmt("%.0f"),
+         ShapeRow::Slider<&ShapeNode::height>("height", params::Shape::height_lo, params::Shape::height_hi).Fmt("%.0f"),
+         ShapeRow::Slider<&ShapeNode::sizeX>("size x", params::Shape::size_x_lo, params::Shape::size_x_hi),
+         ShapeRow::Slider<&ShapeNode::sizeY>("size y", params::Shape::size_y_lo, params::Shape::size_y_hi),
+         ShapeRow::Slider<&ShapeNode::cornerRadius>("corner/thick", params::Shape::corner_radius_lo, params::Shape::corner_radius_hi).At(11).If(ShapeUsesCorner),
+         ShapeRow::SliderInt<&ShapeNode::sides>("sides", params::Shape::sides_lo, params::Shape::sides_hi).At(12).If(ShapeUsesSides),
+         ShapeRow::Slider<&ShapeNode::innerRatio>("inner ratio", params::Shape::inner_ratio_lo, params::Shape::inner_ratio_hi).At(13).If(ShapeUsesInner),
+         ShapeRow::Slider<&ShapeNode::rotation>("rotation", params::Shape::rotation_lo, params::Shape::rotation_hi).Fmt("%.1f\xC2\xB0"),
+         ShapeRow::Slider<&ShapeNode::posX>("pos x", 0.0f, 1.0f),
+         ShapeRow::Slider<&ShapeNode::posY>("pos y", 0.0f, 1.0f),
+         ShapeRow::Colour<&ShapeNode::fillColor>("fill"),
+         ShapeRow::Slider<&ShapeNode::fillOpacity>("fill opacity", 0.0f, 1.0f),
+         ShapeRow::Slider<&ShapeNode::strokeWidth>("stroke width", params::Shape::stroke_width_lo, params::Shape::stroke_width_hi),
+         ShapeRow::Colour<&ShapeNode::strokeColor>("stroke"),
+         ShapeRow::Slider<&ShapeNode::feather>("feather", params::Shape::feather_lo, params::Shape::feather_hi),
+         ShapeRow::Colour<&ShapeNode::bgColor>("bg"),
+         ShapeRow::Slider<&ShapeNode::bgOpacity>("bg opacity", 0.0f, 1.0f),
+      };
+   }
+
    void DrawShapeParams(ShapeNode* n)
    {
-      // Not every shape uses corner/sides/inner ratio - e.g. a Circle has no
-      // corners and no sides, a Triangle's side count is fixed at 3. Hide the
-      // params a shape ignores so the panel doesn't show dead controls.
-      // Keep in sync with the uShape switch in ShapeNode.cpp's fragment shader.
-      const bool usesCorner = n->shapeType == 3 || n->shapeType == 7 || n->shapeType == 9 || n->shapeType == 18;
-      const bool usesSides = n->shapeType == 5 || n->shapeType == 6 || n->shapeType == 14 || n->shapeType == 19;
-      const bool usesInner = n->shapeType == 6 || n->shapeType == 14 || n->shapeType == 15 || n->shapeType == 16;
-
-      DropdownButton("shape", ShapeNode::ShapeNames(), n->shapeType,
-                     [n](int i) { n->shapeType = i; });
-      ModSlider("width", &n->width, params::Shape::width_lo, params::Shape::width_hi, "%.0f");
-      ModSlider("height", &n->height, params::Shape::height_lo, params::Shape::height_hi, "%.0f");
-      ModSlider("size x", &n->sizeX, params::Shape::size_x_lo, params::Shape::size_x_hi);
-      ModSlider("size y", &n->sizeY, params::Shape::size_y_lo, params::Shape::size_y_hi);
-      // The three shape-dependent controls take fixed ordinals above the always-drawn ones (0..10), so
-      // switching shape never moves rotation / pos / fill and the type-level key join stays true.
-      if (usesCorner)
-      {
-         FixedParamOrdinal at(11);
-         ModSlider("corner/thick", &n->cornerRadius, params::Shape::corner_radius_lo, params::Shape::corner_radius_hi);
-      }
-      if (usesSides)
-      {
-         FixedParamOrdinal at(12);
-         ModSliderInt("sides", &n->sides, params::Shape::sides_lo, params::Shape::sides_hi);
-      }
-      if (usesInner)
-      {
-         FixedParamOrdinal at(13);
-         ModSlider("inner ratio", &n->innerRatio, params::Shape::inner_ratio_lo, params::Shape::inner_ratio_hi);
-      }
-      ModSlider("rotation", &n->rotation, params::Shape::rotation_lo, params::Shape::rotation_hi, "%.1f\xC2\xB0");
-      ModSlider("pos x", &n->posX, 0.0f, 1.0f);
-      ModSlider("pos y", &n->posY, 0.0f, 1.0f);
-      ColorSwatch("fill", n->fillColor, n);
-      ModSlider("fill opacity", &n->fillOpacity, 0.0f, 1.0f);
-      ModSlider("stroke width", &n->strokeWidth, params::Shape::stroke_width_lo, params::Shape::stroke_width_hi);
-      ColorSwatch("stroke", n->strokeColor, n);
-      ModSlider("feather", &n->feather, params::Shape::feather_lo, params::Shape::feather_hi);
-      ColorSwatch("bg", n->bgColor, n);
-      ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
+      Ui::DrawParams(n, kShapeRows);
    }
 
 

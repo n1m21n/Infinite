@@ -3,6 +3,7 @@
 #include "app/graph/NodeParams.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/AppShared.h"
+#include "app/ui/design/DrawParam.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/UiFmt.h"
 
@@ -434,6 +435,33 @@ namespace app
    // auto-numbered controls (freq, Q, gain, mix, env, rate).
    const int kAudioFilterDriveParam = 16;
 
+   namespace
+   {
+      using FxRow = params::Row<AudioEffectNode>;
+      int AudioFilterType(const AudioEffectNode& n) { return (int)(n.Param("type") + 0.5f); }
+      bool AudioFilterIsModel(const AudioEffectNode& n) { return AudioFilterDsp::IsModel(AudioFilterType(n)); }
+      bool AudioFilterHasGain(const AudioEffectNode& n) { return !AudioFilterIsModel(n); }
+      bool AudioFilterGainLive(const AudioEffectNode& n) { return AudioFilterDsp::UsesGain(AudioFilterType(n)); }
+
+      // After the type dropdown. The analogue models have no gain; their cell is drive instead. Drive has its own
+      // ordinal past every auto-numbered control here, and gain keeps its place in the count while drive shows, so
+      // swapping the cell never moves a binding between the two and mix/env/rate keep theirs.
+      const FxRow kAudioFilterMainRows[] = {
+         FxRow::Knob("freq", [](AudioEffectNode* n) { return n->ParamPtr("freq"); }, params::fx::freq_lo, params::fx::freq_hi).Fmt("%.0f Hz").Size(kKnobLarge),
+         FxRow::Knob("Q", [](AudioEffectNode* n) { return n->ParamPtr("q"); }, params::fx::q_lo, params::fx::q_hi).Fmt("%.2f").Size(kKnobLarge),
+         FxRow::Knob("drive", [](AudioEffectNode* n) { return n->ParamPtr("drive"); }, 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge).At(kAudioFilterDriveParam).Named("drive").If(AudioFilterIsModel),
+         FxRow::Knob("gain", [](AudioEffectNode* n) { return n->ParamPtr("gain"); }, params::fx::gain_lo, params::fx::gain_hi).Fmt("%.1f dB").Size(kKnobLarge).If(AudioFilterHasGain).Keep().LiveIf(AudioFilterGainLive),
+      };
+
+      // 4 cells: selector column left (sync v, rate), knobs right (env, mix) - mix stays bottom-right (P4). Mix and
+      // env are drawn first and second (their ordinals, as before "output gain" was removed) into cells 3 and 2;
+      // AddRateModeCells fills cells 0-1 after them.
+      const FxRow kAudioFilterOutputRows[] = {
+         FxRow::Knob<&AudioEffectNode::mix>("mix", 0.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge).Cell(3),
+         FxRow::Knob("env", [](AudioEffectNode* n) { return n->ParamPtr("envAmount"); }, -1.0f, 1.0f).Fmt("%.2f").Size(kKnobLarge).Cell(2),
+      };
+   }
+
    void DrawAudioFilterBody(GraphNode& gn, AudioEffectNode* n)
    {
       const int type = (int)(n->Param("type") + 0.5f);
@@ -458,28 +486,7 @@ namespace app
             PushUndoCheckpoint();
             *n->ParamPtr("type") = (float)i;
          });
-         row.Knob("freq", n->ParamPtr("freq"), params::fx::freq_lo, params::fx::freq_hi, "%.0f Hz", kKnobLarge);
-         row.Knob("Q", n->ParamPtr("q"), params::fx::q_lo, params::fx::q_hi, "%.2f", kKnobLarge);
-
-         // The analogue models have no gain; their cell is drive instead.
-         // Drive has its own ordinal past every auto-numbered control here,
-         // so swapping the cell never moves a binding between the two.
-         if (AudioFilterDsp::IsModel(type))
-         {
-            row.Knob("drive", n->ParamPtr("drive"), 0.0f, 1.0f, "%.2f", kKnobLarge, /*dbTaper=*/false,
-                     /*freqTaper=*/false, AudioWidgetStyle::Knob, nullptr, nullptr, kAudioFilterDriveParam,
-                     "drive");
-            gParamCounter++; // gain's ordinal, kept so mix/env/rate keep theirs
-         }
-         else
-         {
-            const bool gainLive = AudioFilterDsp::UsesGain(type);
-            if (!gainLive)
-               ImGui::BeginDisabled();
-            row.Knob("gain", n->ParamPtr("gain"), params::fx::gain_lo, params::fx::gain_hi, "%.1f dB", kKnobLarge);
-            if (!gainLive)
-               ImGui::EndDisabled();
-         }
+         Ui::DrawKnobs(row, n, kAudioFilterMainRows);
          row.End();
       }
 
@@ -499,10 +506,7 @@ namespace app
          // reasoning DrawChorusBody uses for its near-identical layout
          // problem.
          AudioKnobRow row(tok::fx_audio_filter_body_audio_knob_row_layout);
-         row.index = 3;
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.index = 2;
-         row.Knob("env", n->ParamPtr("envAmount"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+         Ui::DrawKnobs(row, n, kAudioFilterOutputRows);
          row.index = 0;
          AddRateModeCells(row, n, "sync to tempo##filterSync");
          row.End();
