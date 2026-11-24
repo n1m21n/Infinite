@@ -87,7 +87,8 @@ namespace tok
    constexpr float icon_lg = 20.0f;
    constexpr float icon_sm = 14.0f;
    constexpr float icon_md = 18.0f;
-   constexpr float icon_row = 13.0f;
+   constexpr float icon_control = 16.0f;
+   constexpr float icon_row = 14.0f;
    constexpr float icon_xs = 12.0f;
    constexpr float icon_xxs = 10.0f;
    constexpr float icon_chip_ratio = 0.72f;
@@ -189,7 +190,7 @@ namespace tok
    constexpr float desk_tag_em = 0.72f;
    constexpr float desk_plate_em = 0.86f;
    constexpr float desk_number_em = 0.78f;
-   constexpr float motion_s_pad_flash = 0.14f;
+   constexpr float motion_s_pad_flash = 0.125f;
    constexpr float motion_s_spring = 0.35f;
    constexpr float motion_s_clip_hold = 3.0f;
    constexpr float motion_s_hint = 2.5f;
@@ -198,7 +199,7 @@ namespace tok
    constexpr float motion_s_confirm = 4.0f;
    constexpr float motion_s_highlight = 1.5f;
    constexpr float motion_s_highlight_long = 2.0f;
-   constexpr float motion_s_trash_grace = 0.12f;
+   constexpr float motion_s_trash_grace = 0.125f;
    constexpr float motion_s_undo_burst = 0.6f;
    constexpr float motion_s_history_step = 0.25f;
    constexpr float motion_s_blink_on = 0.6f;
@@ -212,7 +213,7 @@ namespace tok
    constexpr float motion_s_edit_settle = 0.3f;
    constexpr float motion_s_ask_hold = 6.0f;
    constexpr float motion_s_blink_period = 1.0f;
-   constexpr float motion_s_glide = 0.2f;
+   constexpr float motion_s_glide = 0.188f;
    constexpr float motion_rate_flash_decay = 4.0f;
    constexpr float motion_rate_pad_decay = 6.0f;
    constexpr float motion_rate_peak_fall = 14.0f;
@@ -247,7 +248,6 @@ namespace tok
    constexpr float row_gap = gap_item;
    constexpr float section_gap = gap_section;
    constexpr float pad_panel = gap_panel;
-   constexpr float icon_control = 16.0f;
    constexpr float button_min_w = 56.0f;
    constexpr float dialog_button_min_w = 72.0f;
    constexpr float dropdown_w_s = 96.0f;

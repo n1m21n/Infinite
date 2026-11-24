@@ -43,7 +43,7 @@ LADDERS = {
 PRIMITIVE_GROUPS = ("space", "radius", "stroke_scale", "opacity", "opacity8")
 INT_PRIMITIVE_GROUPS = ("opacity8",)
 INT_ALIAS_GROUPS = ("opacity8", "alpha8")
-JOB_GROUPS = ("stroke", "radius", "gap", "alpha", "alpha8", "hit")
+JOB_GROUPS = ("stroke", "radius", "gap", "alpha", "alpha8", "hit", "icon")
 
 # Tier 2 shared job tokens: primitive -> canonical job alias (zero visual change; Step B).
 JOB_TOKENS = {
