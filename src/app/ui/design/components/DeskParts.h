@@ -19,7 +19,7 @@ namespace DeskParts
    inline ImU32 Role(const tok::Pair8& p, int a) { return tok::U32(p, app::IsThemeLight(), a); }
    inline ImU32 Hi(int a) { return tok::U32(tok::desk_light, a); }
    inline ImU32 Lo(int a) { return tok::U32(tok::desk_shadow, a); }
-   inline ImU32 Ink(int a = 255) { return Role(tok::desk_legend, a); }
+   inline ImU32 Ink(int a = 255) { return DeskParts::Role(tok::desk_legend, a); }
    inline ImU32 Tint(ImU32 c, float k, int a = 255) // k < 1 darkens, k > 1 lightens
    {
       const float r = std::min(255.0f, (float)(c & 0xFF) * k), g = std::min(255.0f, (float)((c >> 8) & 0xFF) * k),
@@ -38,7 +38,7 @@ namespace DeskParts
    // The console chassis behind the faces: a dark steel bed with a lit top rail.
    inline void Chassis(ImDrawList* dl, ImVec2 p, ImVec2 q)
    {
-      dl->AddRectFilled(p, q, Role(tok::desk_chassis), 5.0f);
+      dl->AddRectFilled(p, q, DeskParts::Role(tok::desk_chassis), 5.0f);
       dl->AddRectFilledMultiColor(ImVec2(p.x + 1, p.y + 1), ImVec2(q.x - 1, p.y + 9), Hi(22), Hi(22), Hi(0), Hi(0));
       dl->AddRect(p, q, Lo(200), 5.0f, 0, 1.0f);
    }
@@ -48,7 +48,7 @@ namespace DeskParts
    inline void Face(ImDrawList* dl, ImVec2 p, ImVec2 q, ImU32 cap, bool lit)
    {
       const float r = 3.0f;
-      dl->AddRectFilledMultiColor(p, q, Role(tok::desk_strip), Role(tok::desk_strip), Role(tok::desk_strip_edge), Role(tok::desk_strip_edge));
+      dl->AddRectFilledMultiColor(p, q, DeskParts::Role(tok::desk_strip), DeskParts::Role(tok::desk_strip), DeskParts::Role(tok::desk_strip_edge), DeskParts::Role(tok::desk_strip_edge));
       dl->PushClipRect(p, q, true);
       for (float x = p.x + 1.0f; x < q.x; x += 2.0f)
       {
@@ -74,8 +74,8 @@ namespace DeskParts
       const float dip = down ? 1.0f : 0.0f;
       const ImVec2 a(p.x, p.y + dip), b(q.x, q.y - 1.0f + dip);
       // cap != 0: a coloured key plastic (TR step keys), lit from above: lighter top, darker foot, a bevel line under the face.
-      const ImU32 capHi = cap != 0 ? Tint(cap, 1.08f) : Role(tok::desk_cap_hi);
-      const ImU32 capLo = cap != 0 ? Tint(cap, 0.72f) : Role(tok::desk_cap);
+      const ImU32 capHi = cap != 0 ? Tint(cap, 1.08f) : DeskParts::Role(tok::desk_cap_hi);
+      const ImU32 capLo = cap != 0 ? Tint(cap, 0.72f) : DeskParts::Role(tok::desk_cap);
       const ImU32 top = hovered ? Tint(capHi, 1.14f) : capHi;
       dl->AddRectFilledMultiColor(a, b, top, top, capLo, capLo);
       if (cap != 0)
@@ -122,7 +122,7 @@ namespace DeskParts
    inline void FaceSide(ImDrawList* dl, ImVec2 p, ImVec2 q, ImU32 cap, bool lit)
    {
       const float r = 3.0f;
-      dl->AddRectFilledMultiColor(p, q, Role(tok::desk_strip), Role(tok::desk_strip), Role(tok::desk_strip_edge), Role(tok::desk_strip_edge));
+      dl->AddRectFilledMultiColor(p, q, DeskParts::Role(tok::desk_strip), DeskParts::Role(tok::desk_strip), DeskParts::Role(tok::desk_strip_edge), DeskParts::Role(tok::desk_strip_edge));
       dl->PushClipRect(p, q, true);
       for (float x = p.x + 1.0f; x < q.x; x += 2.0f)
       {
@@ -169,7 +169,7 @@ namespace DeskParts
          dl->PathStroke(col, 0, 2.5f);
       }
       dl->AddCircleFilled(ImVec2(c.x, c.y + 1.5f), R, Lo(130), 28);
-      dl->AddCircleFilled(c, R, Role(tok::desk_knurl), 28);
+      dl->AddCircleFilled(c, R, DeskParts::Role(tok::desk_knurl), 28);
       for (int i = 0; i < 24; i++)
       {
          const float a = (float)i / 24.0f * 2.0f * IM_PI;
@@ -193,7 +193,7 @@ namespace DeskParts
    inline void Plate(ImDrawList* dl, ImVec2 p, float w, const char* text, ImU32 ink = tok::U32(tok::desk_readout))
    {
       const ImVec2 q(p.x + w, p.y + kPlateH);
-      dl->AddRectFilled(p, q, Role(tok::desk_well), tok::radius_cell);
+      dl->AddRectFilled(p, q, DeskParts::Role(tok::desk_well), tok::radius_cell);
       dl->AddRect(p, q, Hi(30), tok::radius_cell);
       const float fs = ImGui::GetFontSize() * tok::desk_plate_em;
       const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, text);
@@ -203,7 +203,7 @@ namespace DeskParts
    // The scribble inset, horizontal: dark glass, the number in the strip colour, then the name. Drawing only.
    inline void ScribbleRow(ImDrawList* dl, ImVec2 p, ImVec2 q, const char* name, int number, ImU32 col, bool dim)
    {
-      dl->AddRectFilled(p, q, Role(tok::desk_scribble_bg), 3.0f);
+      dl->AddRectFilled(p, q, DeskParts::Role(tok::desk_scribble_bg), 3.0f);
       dl->AddRectFilled(ImVec2(p.x + 1, p.y + 1), ImVec2(p.x + 5, q.y - 1), Tint(col, 0.95f, 255), 2.0f, ImDrawFlags_RoundCornersLeft);
       dl->AddRect(p, q, Ink(34), 3.0f);
       char num[16];
@@ -212,7 +212,7 @@ namespace DeskParts
       const float cy = (p.y + q.y) * 0.5f;
       dl->AddText(ImGui::GetFont(), nfs, ImVec2(p.x + 9.0f, cy - nfs * 0.5f), Tint(col, app::IsThemeLight() ? 0.7f : 1.25f), num);
       dl->PushClipRect(ImVec2(p.x + 3.0f, p.y), ImVec2(q.x - 3.0f, q.y), true);
-      dl->AddText(ImVec2(p.x + 21.0f, cy - ImGui::GetTextLineHeight() * 0.5f), Role(tok::desk_scribble_text, dim ? 110 : 255), name);
+      dl->AddText(ImVec2(p.x + 21.0f, cy - ImGui::GetTextLineHeight() * 0.5f), DeskParts::Role(tok::desk_scribble_text, dim ? 110 : 255), name);
       dl->PopClipRect();
    }
 
@@ -222,7 +222,7 @@ namespace DeskParts
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 tl(x, y), br(x + w, y + h);
-      dl->AddRectFilled(tl, br, Role(tok::desk_meter_off), tok::radius_cell);
+      dl->AddRectFilled(tl, br, DeskParts::Role(tok::desk_meter_off), tok::radius_cell);
       const float db = level > 1e-4f ? 20.0f * log10f(level) : -120.0f;
       auto frac = [](float d) { return std::clamp((d + 60.0f) / 60.0f, 0.0f, 1.0f); };
       const float seg = 3.0f, gap = 1.0f, step = seg + gap;

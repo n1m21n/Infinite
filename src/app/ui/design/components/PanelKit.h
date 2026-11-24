@@ -355,7 +355,7 @@ namespace PanelKit
    inline void UndoOnToggle(bool* v, const char* what)
    {
       *v = !*v;
-      PushUndoCheckpoint(what);
+      app::PushUndoCheckpoint(what);
       *v = !*v;
    }
 }
