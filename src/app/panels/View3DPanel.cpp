@@ -3312,7 +3312,7 @@ namespace
             dl->AddCircle(tp, 6.0f, Hex(kHotHandle), 16, 1.5f);
          }
       }
-      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), sPose.paint ? "Weight Paint" : "Pose Mode");
+      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), sPose.paint ? T("Weight Paint") : T("Pose Mode"));
       if (sPose.paint && hovered)
          dl->AddCircle(mouse, sPose.radius, Hex(kWire, 0.9f), 48, 1.5f);
 

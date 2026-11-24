@@ -736,7 +736,7 @@ namespace app
       // ---- add scene row ----
       {
          ImGui::SetCursorScreenPos(ImVec2(o.x + kGap, bodyTop + kRowH * (float)rows + kGap));
-         if (ActionButton::Draw("+ Scene##sessaddscene", ImVec2(kSceneColW - 2.0f * kGap, kRowH - 2.0f * kGap)))
+         if (ActionButton::Draw(L("+ Scene##sessaddscene"), ImVec2(kSceneColW - 2.0f * kGap, kRowH - 2.0f * kGap)))
             ArrangeEdit([&]() {
                while ((int)gArrange.scenes.size() < rows + 1)
                   gArrange.scenes.push_back(Arrange::Scene{});

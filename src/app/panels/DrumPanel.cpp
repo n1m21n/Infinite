@@ -416,7 +416,7 @@ namespace app
       void DrawFillChip(DrumSequencerNode* n)
       {
          static bool sLatched = false;
-         const bool clicked = ChipButton::Draw("FILL##fillkey", n->fill, tok::control_h);
+         const bool clicked = ChipButton::Draw(L("FILL##fillkey"), n->fill, tok::control_h);
          const bool held = ImGui::IsItemActive();
          if (clicked && ImGui::GetIO().KeyShift)
             sLatched = !sLatched;
@@ -837,7 +837,7 @@ namespace app
             {
                float& v = n->stepVel[sDrag.lane][sDrag.step];
                v = std::clamp(sDrag.startVel + (sDrag.startY - m.y) * 0.006f, 0.05f, 1.0f);
-               Tip::Show("%s %.2f%s", T("velocity"), v, v >= 0.99f ? "  (accent)" : "");
+               Tip::Show("%s %.2f%s", T("velocity"), v, v >= 0.99f ? T("  (accent)") : "");
             }
             else if (overCell && (sDrag.mode == Drag::PaintOn || sDrag.mode == Drag::PaintOff || sDrag.mode == Drag::Erase))
             {

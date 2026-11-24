@@ -12307,9 +12307,9 @@ namespace
          std::error_code ec;
          std::filesystem::create_directories(EffPresetDir(), ec);
          std::ofstream f(AppPaths::FsPath(EffPresetDir() + "/" + name + ".inf2dfx"));
-         f << Scene2DNode::EffectsText(l) << "\n--params\n" << EffectParamsText(l);
+         f << Scene2DNode::EffectsText(l) << L("\n--params\n") << EffectParamsText(l);
          if (l.AnyFx())
-            f << "\n--styles\n" << Scene2DNode::StyleText(l);
+            f << L("\n--styles\n") << Scene2DNode::StyleText(l);
          rescan();
       }
       WinSection(T("Saved"));

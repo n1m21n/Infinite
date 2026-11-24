@@ -65,7 +65,7 @@ int DrawFloating(FrameCtx& fc)
             ImGuiStyle& style = ImGui::GetStyle();
             ImGui::TextDisabled("%s", T("Live-editing this ImGuiStyle for inspection only - not saved."));
             static char colorFilter[64] = "";
-            FieldWell::InputTextWithHint("##colorfilter", "filter colors...", colorFilter, sizeof(colorFilter));
+            FieldWell::InputTextWithHint("##colorfilter", T("filter colors..."), colorFilter, sizeof(colorFilter));
             if (ImGui::BeginChild("##colorlist"))
             {
                for (int i = 0; i < ImGuiCol_COUNT; i++)

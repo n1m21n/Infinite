@@ -1054,8 +1054,8 @@ void DrawKeyboard(FrameCtx& fc)
       if (gGlobalScaleTooltipHovered)
       {
          Tip::Begin();
-         ImGui::TextUnformatted(gGlobalScaleTooltipEnabled ? "Global Scale: ON (click to disable)"
-                                                            : "Global Scale: OFF (click to enable)");
+         ImGui::TextUnformatted(gGlobalScaleTooltipEnabled ? T("Global Scale: ON (click to disable)")
+                                                            : T("Global Scale: OFF (click to enable)"));
          Tip::End();
       }
 

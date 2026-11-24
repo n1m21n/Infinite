@@ -2514,8 +2514,8 @@ namespace
    {
       State& s = S();
       SectionCard::Begin(T("Functions"));
-      FormParts::SliderFloat(T("Strum"), &s.strumTicks, 0.0f, 240.0f, "%.0f ticks");
-      FormParts::SliderFloat(T("Time spread"), &s.humanizeTime, 0.0f, 120.0f, "%.0f ticks");
+      FormParts::SliderFloat(T("Strum"), &s.strumTicks, 0.0f, 240.0f, T("%.0f ticks"));
+      FormParts::SliderFloat(T("Time spread"), &s.humanizeTime, 0.0f, 120.0f, T("%.0f ticks"));
       FormParts::SliderFloat(T("Vel spread"), &s.humanizeVel, 0.0f, 40.0f, "%.0f");
    }
 
@@ -2652,7 +2652,7 @@ namespace
       if (loop)
       {
          float beats = (float)c0->loopLength / (float)Arrange::kPPQ;
-         const bool changed = FormParts::SliderFloat(T("Length"), &beats, 0.25f, 64.0f, "%.2f beats", ImGuiSliderFlags_Logarithmic);
+         const bool changed = FormParts::SliderFloat(T("Length"), &beats, 0.25f, 64.0f, T("%.2f beats"), ImGuiSliderFlags_Logarithmic);
          if (ImGui::IsItemActivated())
             ArrangeGestureBegin();
          if (changed)
@@ -2754,7 +2754,7 @@ namespace
       if (FormParts::Combo(T("Bars"), &barsAt, "1\0" "2\0" "4\0" "8\0"))
          g.bars = barChoices[barsAt];
       int form = (int)g.form;
-      if (FormParts::Combo(T("Form"), &form, "None\0" "AABA\0" "ABAB\0" "AAAB\0"))
+      if (FormParts::Combo(T("Form"), &form, TList("None\0" "AABA\0" "ABAB\0" "AAAB\0")))
          g.form = (NoteGen::Form)form;
       FormParts::Label(T("Seed"));
       int seed = (int)g.seed;
@@ -2780,7 +2780,7 @@ namespace
       if (g.type == NoteGen::Type::Bass)
       {
          int role = g.bassRole + 1;
-         if (FormParts::Combo(T("Role"), &role, "Style\0" "Long\0" "Rolling\0" "Melodic\0" "Funk\0" "Wobble\0" "Trap 808\0" "Acid\0"))
+         if (FormParts::Combo(T("Role"), &role, TList("Style\0" "Long\0" "Rolling\0" "Melodic\0" "Funk\0" "Wobble\0" "Trap 808\0" "Acid\0")))
             g.bassRole = role - 1;
       }
       FormParts::Switch(T("Personal"), &g.personal);

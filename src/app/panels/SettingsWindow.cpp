@@ -358,7 +358,7 @@ namespace app
             ImGui::Spacing();
             FormParts::Section(T("Display"));
             float uiScale = CategoryColors::GetUiScale();
-            if (FormParts::SliderFloat(L("UI Scale"), &uiScale, 0.5f, 2.0f, "%.2fx", ImGuiSliderFlags_AlwaysClamp))
+            if (FormParts::SliderFloat(L("UI Scale"), &uiScale, 0.5f, 2.0f, T("%.2fx"), ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetUiScale(uiScale, false);
             }
@@ -873,7 +873,7 @@ namespace app
             if (FormParts::Switch(L("Autosave enabled"), &gAutosaveEnabled))
                SaveGeneralSettings();
             int seconds = gAutosaveSeconds;
-            if (FormParts::SliderInt(L("Autosave interval"), &seconds, 15, 300, "%d sec"))
+            if (FormParts::SliderInt(L("Autosave interval"), &seconds, 15, 300, T("%d sec")))
                gAutosaveSeconds = seconds;
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveGeneralSettings();
@@ -1133,7 +1133,7 @@ namespace app
             // Section 1: Core Principles
             if ((sSelectedSection == 0 || sSelectedSection == 1) && MatchesFilter("principles primitive kernel inferred rates bare names"))
             {
-               FormParts::Heading("1. Core Principles");
+               FormParts::Heading(T("1. Core Principles"));
                FormParts::Bullet("One Primitive: A kernel is a body of code run once per element of its domain.");
                FormParts::Bullet("Inferred Rates: There is no @rate keyword. The compiler infers domain rates automatically from dependencies.");
                FormParts::Bullet("Bare Names: Never use '@' sigils. Plain names are used everywhere (e.g. P.y += bass * 2, never @P.y).");
@@ -1146,7 +1146,7 @@ namespace app
             // Section 2: Domains & Reserved Names
             if ((sSelectedSection == 0 || sSelectedSection == 2) && MatchesFilter("domains reserved frame element pixel sample graph age note"))
             {
-               FormParts::Heading("2. Domains & Reserved Names");
+               FormParts::Heading(T("2. Domains & Reserved Names"));
                if (ListRow::BeginTable("##domainstbl", 4, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
                   ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, 80.0f);
@@ -1155,30 +1155,30 @@ namespace app
                   ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch, 360.0f);
                   ImGui::TableHeadersRow();
 
-                  ImGui::TableNextColumn(); ImGui::Text("frame");
-                  ImGui::TableNextColumn(); ImGui::TextDisabled("60 fps / Bytecode VM");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "t, dt, frame, age, pi");
-                  ImGui::TableNextColumn(); ImGui::Text("Time in seconds, delta time, global frame counter, cooks since this node's state was cleared (seed a simulation when age == 0), pi.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("frame"));
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("%s", T("60 fps / Bytecode VM"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("t, dt, frame, age, pi"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Time in seconds, delta time, global frame counter, cooks since this node's state was cleared (seed a simulation when age == 0), pi."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("element");
-                  ImGui::TableNextColumn(); ImGui::TextDisabled("60 x N / Bytecode VM");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "P, N, uv, Cd, i, count");
-                  ImGui::TableNextColumn(); ImGui::Text("Position (vec3), Normal (vec3), UV (vec2), Color (vec3), vertex index, total count.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("element"));
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("%s", T("60 x N / Bytecode VM"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("P, N, uv, Cd, i, count"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Position (vec3), Normal (vec3), UV (vec2), Color (vec3), vertex index, total count."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("pixel");
-                  ImGui::TableNextColumn(); ImGui::TextDisabled("60 x W x H / GLSL");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "uv, xy, col, res, aspect, alpha, age");
-                  ImGui::TableNextColumn(); ImGui::Text("Normalized UV [0..1], Pixel XY, Output color (vec3), Screen resolution, aspect ratio, output alpha.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("pixel"));
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("%s", T("60 x W x H / GLSL"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("uv, xy, col, res, aspect, alpha, age"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Normalized UV [0..1], Pixel XY, Output color (vec3), Screen resolution, aspect ratio, output alpha."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("sample");
-                  ImGui::TableNextColumn(); ImGui::TextDisabled("48 kHz / Register VM");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "in, out, sr, n, freq, gate, noteOn, notePitch, noteVel");
-                  ImGui::TableNextColumn(); ImGui::Text("Audio in/out, sample rate (sr), sample index (n), voice note Hz (freq), gate (1.0/0.0), the latest note event. Field Notes adds noteNum and beat.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("sample"));
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("%s", T("48 kHz / Register VM"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("in, out, sr, n, freq, gate, noteOn, notePitch, noteVel"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Audio in/out, sample rate (sr), sample index (n), voice note Hz (freq), gate (1.0/0.0), the latest note event. Field Notes adds noteNum and beat."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("graph");
-                  ImGui::TableNextColumn(); ImGui::TextDisabled("Edit time / Interpreter");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "(none)");
-                  ImGui::TableNextColumn(); ImGui::Text("Node graph metaprogramming: emit(), connect(), set(), place().");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("graph"));
+                  ImGui::TableNextColumn(); ImGui::TextDisabled("%s", T("Edit time / Interpreter"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("(none)"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Node graph metaprogramming: emit(), connect(), set(), place()."));
 
                   ImGui::EndTable();
                }
@@ -1188,36 +1188,36 @@ namespace app
             // Section 3: Declarations
             if ((sSelectedSection == 0 || sSelectedSection == 3) && MatchesFilter("declarations param state attrib output input image img offset sampling table geometry audio pin"))
             {
-               FormParts::Heading("3. Declarations");
-               ImGui::TextColored(app::AccentEmphasisSelected(), "param <type> <name> = <default> [<min>, <max>]");
-               ImGui::TextWrapped("Declares an exposed control that auto-creates an interactive, modulatable knob/slider in the node UI.");
+               FormParts::Heading(T("3. Declarations"));
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("param <type> <name> = <default> [<min>, <max>]"));
+               ImGui::TextWrapped("%s", T("Declares an exposed control that auto-creates an interactive, modulatable knob/slider in the node UI."));
                DrawCodeBox("param float cutoff = 0.5 [0, 1]\nparam float resonance = 1.2 [0.1, 4.0]", "cb_param");
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "state <type> <name> = <init>");
-               ImGui::TextWrapped("Persistent delay cell (one execution unit of memory). Essential for feedback loops, filters, and integrators.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("state <type> <name> = <init>"));
+               ImGui::TextWrapped("%s", T("Persistent delay cell (one execution unit of memory). Essential for feedback loops, filters, and integrators."));
                DrawCodeBox("state float z = 0\nz += (in - z) * cutoff\nout = z", "cb_state");
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "input pixel image img; img(coord)");
-               ImGui::TextWrapped("Field Pixel: img is the current-pixel RGBA input. img(vec2) samples it at normalized coordinates, clamped to the source's edge texel centres. Filtering follows the source sampler (normally linear). Only a declared image input is callable; col is the RGB output. No connected image reads transparent black.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("input pixel image img; img(coord)"));
+               ImGui::TextWrapped("%s", T("Field Pixel: img is the current-pixel RGBA input. img(vec2) samples it at normalized coordinates, clamped to the source's edge texel centres. Filtering follows the source sampler (normally linear). Only a declared image input is callable; col is the RGB output. No connected image reads transparent black."));
                DrawCodeBox("input pixel image img;\nc = img(uv + vec2(1.0 / res.x, 0));\ncol = c.rgb; alpha = c.a;", "cb_imageoffset");
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "attrib <type> <name> = <init>");
-               ImGui::TextWrapped("Declares custom per-element attributes living on geometry points or vertices.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("attrib <type> <name> = <init>"));
+               ImGui::TextWrapped("%s", T("Declares custom per-element attributes living on geometry points or vertices."));
                DrawCodeBox("attrib float heat = 0\nheat += bass * 0.1\nCd = vec3(heat, 0.2, 1.0 - heat)", "cb_attrib");
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "state <type> <name>[<size>] = <init>");
-               ImGui::TextWrapped("A state table: a fixed-size array of cells, indexed with name[idx]. The size is a compile-time integer literal; a table cannot be read as a bare name.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("state <type> <name>[<size>] = <init>"));
+               ImGui::TextWrapped("%s", T("A state table: a fixed-size array of cells, indexed with name[idx]. The size is a compile-time integer literal; a table cannot be read as a bare name."));
                DrawCodeBox("state float hist[16] = 0\nhist[frame % 16] = level", "cb_table");
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "output <domain> <type> <name> = <expr>   /   input <domain> <type> <name>");
-               ImGui::TextWrapped("Adds a pin to the node. Types are the scalar and vector types plus three pin types: geometry (input only, a whole mesh), audio (a sample-domain float) and image (a pixel-domain vec4). An output frame float becomes a modulation source.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("output <domain> <type> <name> = <expr>   /   input <domain> <type> <name>"));
+               ImGui::TextWrapped("%s", T("Adds a pin to the node. Types are the scalar and vector types plus three pin types: geometry (input only, a whole mesh), audio (a sample-domain float) and image (a pixel-domain vec4). An output frame float becomes a modulation source."));
                DrawCodeBox("output frame float level = 0.5 + 0.5 * sin(t)\ninput pixel image img", "cb_pins");
             }
 
             // Section 4: Types & Vectors
             if ((sSelectedSection == 0 || sSelectedSection == 4) && MatchesFilter("types vectors vec2 vec3 vec4 swizzle rank polymorphism"))
             {
-               FormParts::Heading("4. Types & Rank Polymorphism");
+               FormParts::Heading(T("4. Types & Rank Polymorphism"));
                FormParts::Bullet("Types: float, int, bool, vec2, vec3, vec4.");
                FormParts::Bullet("Swizzling: Components .x .y .z .w and .r .g .b .a. Multi-component swizzles like P.xz or col.bgr are supported.");
                FormParts::Bullet("Rank Polymorphism: Scalars implicitly broadcast across all vector lanes when combined.");
@@ -1227,7 +1227,7 @@ namespace app
             // Section 5: Operators & Math Functions
             if ((sSelectedSection == 0 || sSelectedSection == 5) && MatchesFilter("operators math functions sin cos lerp mix step rand noise sh bend pinch mirror skew formant"))
             {
-               FormParts::Heading("5. Operators & Built-in Math Functions");
+               FormParts::Heading(T("5. Operators & Built-in Math Functions"));
                if (ListRow::BeginTable("##opstbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
                   ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthStretch, 140.0f);
@@ -1235,37 +1235,37 @@ namespace app
                   ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch, 360.0f);
                   ImGui::TableHeadersRow();
 
-                  ImGui::TableNextColumn(); ImGui::Text("Operators");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Operators"));
                   ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", "+ - * / % ^, += -= *= /=");
-                  ImGui::TableNextColumn(); ImGui::Text("^ is right-associative power (2^3 == 8).");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("^ is right-associative power (2^3 == 8)."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("Logic & Compare");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Logic & Compare"));
                   ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "== != < <= > >=, && || !");
-                  ImGui::TableNextColumn(); ImGui::Text("Standard boolean comparisons and logic gates.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Standard boolean comparisons and logic gates."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("Trigonometry");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "sin, cos, tan, atan2");
-                  ImGui::TableNextColumn(); ImGui::Text("Standard trig functions (radians).");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Trigonometry"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("sin, cos, tan, atan2"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Standard trig functions (radians)."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("Math Utilities");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "abs, sign, floor, ceil, round, fract, mod, fmod, clamp, lerp, mix");
-                  ImGui::TableNextColumn(); ImGui::Text("lerp(a, b, t) and mix(a, b, t) are linear interpolation; mod and fmod are the floating-point remainder.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Math Utilities"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("abs, sign, floor, ceil, round, fract, mod, fmod, clamp, lerp, mix"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("lerp(a, b, t) and mix(a, b, t) are linear interpolation; mod and fmod are the floating-point remainder."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("Advanced Math");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "step, smoothstep, pow, sqrt, exp, log, min, max, if(c, a, b)");
-                  ImGui::TableNextColumn(); ImGui::Text("Threshold and Hermite interpolation, exponents, roots, min/max bounds, a select that evaluates both sides.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Advanced Math"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("step, smoothstep, pow, sqrt, exp, log, min, max, if(c, a, b)"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Threshold and Hermite interpolation, exponents, roots, min/max bounds, a select that evaluates both sides."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("Vector Math");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "length, distance, normalize, dot, cross");
-                  ImGui::TableNextColumn(); ImGui::Text("Vector norms, distance between points, dot/cross products.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Vector Math"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("length, distance, normalize, dot, cross"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Vector norms, distance between points, dot/cross products."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("Pure Randomness");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "rand, noise, sh");
-                  ImGui::TableNextColumn(); ImGui::Text("f() f(speed) f(min, max) f(min, max, speed, seed). rand jumps, noise glides, sh samples and holds. Deterministic in time and seed.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Pure Randomness"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("rand, noise, sh"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("f() f(speed) f(min, max) f(min, max, speed, seed). rand jumps, noise glides, sh samples and holds. Deterministic in time and seed."));
 
-                  ImGui::TableNextColumn(); ImGui::Text("Phase Shapes");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "bend, pinch, mirror, skew, formant");
-                  ImGui::TableNextColumn(); ImGui::Text("shape(phase, amount): warps a 0..1 phase the way Wavetable's warps do. Amount 0 (ratio 1 for formant) leaves it unchanged.");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("Phase Shapes"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("bend, pinch, mirror, skew, formant"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("shape(phase, amount): warps a 0..1 phase the way Wavetable's warps do. Amount 0 (ratio 1 for formant) leaves it unchanged."));
 
                   ImGui::EndTable();
                }
@@ -1275,38 +1275,38 @@ namespace app
             // Section 6: Domain Transfer Operators
             if ((sSelectedSection == 0 || sSelectedSection == 6) && MatchesFilter("transfers reduce rms mean resample downsample map broadcast"))
             {
-               FormParts::Heading("6. Domain Transfer Operators");
-               ImGui::TextWrapped("element, pixel and sample are mutually incomparable domains - they never join implicitly. Every crossing between them goes through frame, either explicitly (reduce/resample/downsample) or via a reduce.");
+               FormParts::Heading(T("6. Domain Transfer Operators"));
+               ImGui::TextWrapped("%s", T("element, pixel and sample are mutually incomparable domains - they never join implicitly. Every crossing between them goes through frame, either explicitly (reduce/resample/downsample) or via a reduce."));
                ImGui::Spacing();
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "reduce.<op>(x) - many to one, written explicitly");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("reduce.<op>(x) - many to one, written explicitly"));
                FormParts::Bullet("Ops: reduce.sum, reduce.rms, reduce.mean, reduce.min, reduce.max.");
                FormParts::Bullet("reduce.rms(in, loHz, hiHz) : 3-arg band-limited RMS, Sample domain only (Sample -> Frame).");
                FormParts::Bullet("Sample -> Frame only compiles inside a Field Synth/Effect (sample) kernel - 'in' is a sample-domain name, unreadable from element/pixel.");
                FormParts::Bullet("In the sample domain, reduce.rms(in, loHz, hiHz) is output-only: write it as 'output frame float name = reduce.rms(in, lo, hi)' (max one per kernel). The result cannot be read back into that same kernel's per-sample lines - it is a pin, driven onto another node's param through the modulation matrix.");
                DrawCodeBox("# inside a sample-domain kernel (Field Synth / Field Effect)\noutput frame float bass = reduce.rms(in, 20, 200)   # exposed as a pin, not usable below\nout = in   # per-sample processing is independent of the line above", "cb_reduce");
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "map(N) { ... } - one kernel invocation per lane, explicit");
-               ImGui::TextWrapped("Runs the body N times, once per lane, inside element or pixel kernels (the body domain must be the same or finer than the surrounding one). Cost is N x the body. The lane index inside the body is map_index; N must be a compile-time constant (1-64).");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("map(N) { ... } - one kernel invocation per lane, explicit"));
+               ImGui::TextWrapped("%s", T("Runs the body N times, once per lane, inside element or pixel kernels (the body domain must be the same or finer than the surrounding one). Cost is N x the body. The lane index inside the body is map_index; N must be a compile-time constant (1-64)."));
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "broadcast - one to many, implicit, NEVER written");
-               ImGui::TextWrapped("Coarse \xE2\x86\x92 fine happens automatically via rate inference. Writing broadcast(...) is a compile error.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("broadcast - one to many, implicit, NEVER written"));
+               ImGui::TextWrapped("%s", T("Coarse \xE2\x86\x92 fine happens automatically via rate inference. Writing broadcast(...) is a compile error."));
                DrawCodeBox("amount = 0.5 + 0.5 * sin(t)   # frame domain\nP.y += amount                  # element domain reads it, no syntax needed", "cb_broadcast");
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "resample(x, Domain) - read domain A while standing in domain B");
-               ImGui::TextWrapped("Domain is a bare identifier: frame, element, pixel or sample. Samples rather than aggregates, so fine \xE2\x86\x92 coarse can alias - prefer reduce.rms for levels/envelopes.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("resample(x, Domain) - read domain A while standing in domain B"));
+               ImGui::TextWrapped("%s", T("Domain is a bare identifier: frame, element, pixel or sample. Samples rather than aggregates, so fine \xE2\x86\x92 coarse can alias - prefer reduce.rms for levels/envelopes."));
                DrawCodeBox("level = resample(lfo, sample)   # frame -> sample, held for the block", "cb_resample");
 
-               ImGui::TextColored(app::AccentEmphasisSelected(), "downsample(x, k) - run at a fraction of the ambient rate");
-               ImGui::TextWrapped("k must be a compile-time constant integer literal >= 1. A non-constant k is refused at compile time.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("downsample(x, k) - run at a fraction of the ambient rate"));
+               ImGui::TextWrapped("%s", T("k must be a compile-time constant integer literal >= 1. A non-constant k is refused at compile time."));
                DrawCodeBox("slow = downsample(lfo, 32)   # evaluates lfo once every 32 samples", "cb_downsample");
             }
 
             // Section 7: Branching & Control Flow
             if ((sSelectedSection == 0 || sSelectedSection == 7) && MatchesFilter("branching if else for loop control flow predication cost"))
             {
-               FormParts::Heading("7. Branching, Loops & Control Flow");
-               ImGui::TextWrapped("Field allows data-dependent branching (unlike Kronos, which forbids it entirely). Every branch has a real cost that depends on the domain it runs in - always know which domain you're in before you branch.");
+               FormParts::Heading(T("7. Branching, Loops & Control Flow"));
+               ImGui::TextWrapped("%s", T("Field allows data-dependent branching (unlike Kronos, which forbids it entirely). Every branch has a real cost that depends on the domain it runs in - always know which domain you're in before you branch."));
                DrawCodeBox("if (P.y > 0.5) { Cd = vec3(1, 0, 0) }", "cb_if_stmt");
 
                if (ListRow::BeginTable("##branchtbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
@@ -1316,46 +1316,46 @@ namespace app
                   ImGui::TableSetupColumn("Cost", ImGuiTableColumnFlags_WidthStretch, 300.0f);
                   ImGui::TableHeadersRow();
 
-                  ImGui::TableNextColumn(); ImGui::Text("frame");
-                  ImGui::TableNextColumn(); ImGui::Text("real branch");
-                  ImGui::TableNextColumn(); FormParts::Heading("free");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("frame"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("real branch"));
+                  ImGui::TableNextColumn(); FormParts::Heading(T("free"));
 
-                  ImGui::TableNextColumn(); ImGui::Text("element");
-                  ImGui::TableNextColumn(); ImGui::Text("real branch");
-                  ImGui::TableNextColumn(); ImGui::Text("breaks vectorization of the batch");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("element"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("real branch"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("breaks vectorization of the batch"));
 
-                  ImGui::TableNextColumn(); ImGui::Text("sample");
-                  ImGui::TableNextColumn(); ImGui::Text("real branch");
-                  ImGui::TableNextColumn(); ImGui::Text("mispredict risk on the audio thread");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("sample"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("real branch"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("mispredict risk on the audio thread"));
 
-                  ImGui::TableNextColumn(); ImGui::Text("pixel");
-                  ImGui::TableNextColumn(); ImGui::Text("predication");
-                  ImGui::TableNextColumn(); ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "always pays the sum of both sides (GPU evaluates both)");
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("pixel"));
+                  ImGui::TableNextColumn(); ImGui::Text("%s", T("predication"));
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::RoleV4(tok::col::role_modulation), "%s", T("always pays the sum of both sides (GPU evaluates both)"));
 
                   ImGui::EndTable();
                }
                ImGui::Spacing();
-               ImGui::TextWrapped("The function form if(cond, a, b) also exists (from the '=' parameter-expression language) and always evaluates both branches with no short-circuit - it is not the same construct as the statement form above, but both are valid Field/expression syntax.");
+               ImGui::TextWrapped("%s", T("The function form if(cond, a, b) also exists (from the '=' parameter-expression language) and always evaluates both branches with no short-circuit - it is not the same construct as the statement form above, but both are valid Field/expression syntax."));
                ImGui::Spacing();
-               ImGui::TextColored(app::AccentEmphasisSelected(), "for (init; cond; step) { ... }");
-               ImGui::TextWrapped("Loops are bounded. In the sample domain the bounds must be compile-time integer constants and the loop is unrolled (with a cap); a Field Graph loop stops at an iteration limit.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("for (init; cond; step) { ... }"));
+               ImGui::TextWrapped("%s", T("Loops are bounded. In the sample domain the bounds must be compile-time integer constants and the loop is unrolled (with a cap); a Field Graph loop stops at an iteration limit."));
                DrawCodeBox("for (k = 0; k < 4; k += 1) { P.y += sin(P.x * (k + 1) + t) * 0.1 / (k + 1) }", "cb_for");
             }
 
             // Section 8: Field Synth, Effect & Notes
             if ((sSelectedSection == 0 || sSelectedSection == 8) && MatchesFilter("sample synth effect notes delay tick deg note noteNum beat arp"))
             {
-               FormParts::Heading("8. Field Synth, Effect & Notes (sample domain)");
-               ImGui::TextWrapped("Sample kernels run on the audio thread. They have a smaller function set: abs, floor, ceil, clamp, lerp, min, max, pow, sqrt, exp, log, sin, cos, tan, if, plus the calls below.");
+               FormParts::Heading(T("8. Field Synth, Effect & Notes (sample domain)"));
+               ImGui::TextWrapped("%s", T("Sample kernels run on the audio thread. They have a smaller function set: abs, floor, ceil, clamp, lerp, min, max, pow, sqrt, exp, log, sin, cos, tan, if, plus the calls below."));
                ImGui::Spacing();
-               ImGui::TextColored(app::AccentEmphasisSelected(), "delay(x, samples)");
-               ImGui::TextWrapped("A delay line; the length is a positive integer literal. Total delay memory per kernel is capped.");
-               ImGui::TextColored(app::AccentEmphasisSelected(), "tick(division)");
-               ImGui::TextWrapped("1.0 on the sample where the transport crosses a beat division (1/16, 1/8, 1/4...), else 0.");
-               ImGui::TextColored(app::AccentEmphasisSelected(), "deg(degree)");
-               ImGui::TextWrapped("MIDI note of a scale degree in the project key and scale (top bar).");
-               ImGui::TextColored(app::AccentEmphasisSelected(), "note(pitch, vel, len)   - Field Notes only");
-               ImGui::TextWrapped("A statement that sends a note out of the node's notes pin; len is in beats (0 = as long as the incoming note). rand() with no arguments is also Field Notes only. noteNum is the incoming note number, beat the transport position in beats.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("delay(x, samples)"));
+               ImGui::TextWrapped("%s", T("A delay line; the length is a positive integer literal. Total delay memory per kernel is capped."));
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("tick(division)"));
+               ImGui::TextWrapped("%s", T("1.0 on the sample where the transport crosses a beat division (1/16, 1/8, 1/4...), else 0."));
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("deg(degree)"));
+               ImGui::TextWrapped("%s", T("MIDI note of a scale degree in the project key and scale (top bar)."));
+               ImGui::TextColored(app::AccentEmphasisSelected(), "%s", T("note(pitch, vel, len)   - Field Notes only"));
+               ImGui::TextWrapped("%s", T("A statement that sends a note out of the node's notes pin; len is in beats (0 = as long as the incoming note). rand() with no arguments is also Field Notes only. noteNum is the incoming note number, beat the transport position in beats."));
                DrawCodeBox("# Field Notes: Euclidean rhythm on the scale root\nparam float hits = 5 [1, 16]\nstate float step = 0\nif (tick(1/16) > 0.5) {\n   on = floor((step + 1) * hits / 16 + 0.001) - floor(step * hits / 16 + 0.001)\n   note(deg(0), 0.9 * on, 1/16)\n   step = (step + 1) % 16\n}", "cb_notes");
                DrawCodeBox("# Field Effect: feedback echo\nparam float fb = 0.4 [0, 0.9]\nstate float y = 0\ny = in + delay(y, 12000) * fb\nout = y", "cb_delay");
             }
@@ -1363,35 +1363,35 @@ namespace app
             // Section 9: Field Graph
             if ((sSelectedSection == 0 || sSelectedSection == 9) && MatchesFilter("graph metaprogramming emit connect set place"))
             {
-               FormParts::Heading("9. Field Graph (graph domain)");
-               ImGui::TextWrapped("Runs at edit time and builds nodes on the canvas. emit(\"Node Name\", key) adds a node and returns a handle (the key keeps it stable across re-runs), connect(a, outPin, b, inPin) patches a cable, set(handle, \"param\", value) sets a param, place(handle, x, y) positions it. Nodes it made are updated, not duplicated, when you apply again.");
+               FormParts::Heading(T("9. Field Graph (graph domain)"));
+               ImGui::TextWrapped("%s", T("Runs at edit time and builds nodes on the canvas. emit(\"Node Name\", key) adds a node and returns a handle (the key keeps it stable across re-runs), connect(a, outPin, b, inPin) patches a cable, set(handle, \"param\", value) sets a param, place(handle, x, y) positions it. Nodes it made are updated, not duplicated, when you apply again."));
                DrawCodeBox("seq = emit(\"Note Sequencer\", 0)\nsynth = emit(\"Wavetable\", 1)\nout = emit(\"Audio Out\", 2)\nconnect(seq, 0, synth, 0)\nconnect(synth, 0, out, 0)\nplace(seq, -200, 0)\nplace(out, 200, 0)", "cb_graph");
             }
 
             // Section 10: Canonical Recipes
             if ((sSelectedSection == 0 || sSelectedSection == 10) && MatchesFilter("recipes synth filter ripple sdf resonator glow example templates"))
             {
-               FormParts::Heading("10. Canonical Recipes");
-               ImGui::TextWrapped("Ready-to-use starting points - copy into a Field node's editor and adjust the param ranges.");
+               FormParts::Heading(T("10. Canonical Recipes"));
+               ImGui::TextWrapped("%s", T("Ready-to-use starting points - copy into a Field node's editor and adjust the param ranges."));
                ImGui::Spacing();
 
-               FormParts::Heading("Audio Synth: Sine Oscillator (Field Synth Node)");
+               FormParts::Heading(T("Audio Synth: Sine Oscillator (Field Synth Node)"));
                DrawCodeBox("state float phase = 0\nphase = phase + freq / sr\nphase = phase - floor(phase)\nout = sin(phase * 6.283185) * gate", "cb_recipe_synth");
 
-               FormParts::Heading("Audio Effect: 1-Pole Lowpass Filter (Field Effect Node)");
+               FormParts::Heading(T("Audio Effect: 1-Pole Lowpass Filter (Field Effect Node)"));
                DrawCodeBox("param float cutoff = 0.25 [0.01, 0.99]\nstate float z = 0\nz += (in - z) * cutoff\nout = z", "cb_recipe_filter");
 
-               FormParts::Heading("Audio Effect: Expose a Bass Level (Field Effect Node, reduce.rms)");
-               ImGui::TextWrapped("reduce.rms(in, lo, hi) is output-only in v1: it must be its own 'output frame float <name> = reduce.rms(in, lo, hi)' declaration (at most one per kernel), and that value cannot be read back into this same kernel's per-sample lines - it can only be exposed as a pin and driven onto another node's param through the modulation matrix. Signal processing on 'in' happens independently, in ordinary per-sample lines.");
+               FormParts::Heading(T("Audio Effect: Expose a Bass Level (Field Effect Node, reduce.rms)"));
+               ImGui::TextWrapped("%s", T("reduce.rms(in, lo, hi) is output-only in v1: it must be its own 'output frame float <name> = reduce.rms(in, lo, hi)' declaration (at most one per kernel), and that value cannot be read back into this same kernel's per-sample lines - it can only be exposed as a pin and driven onto another node's param through the modulation matrix. Signal processing on 'in' happens independently, in ordinary per-sample lines."));
                DrawCodeBox("param float boost = 1.5 [0.5, 4.0]\noutput frame float bass = reduce.rms(in, 20.0, 200.0)\nout = in * boost", "cb_recipe_wah");
 
-               FormParts::Heading("Geometry Deformer: Wave Ripple (Field Modifier Node)");
+               FormParts::Heading(T("Geometry Deformer: Wave Ripple (Field Modifier Node)"));
                DrawCodeBox("param float speed = 2.0 [0, 10]\nparam float height = 0.3 [0, 2]\ndist = length(P.xz)\nP.y += sin(dist * 4.0 - t * speed) * height\nCd = vec3(0.5 + 0.5 * sin(P.y * 5.0), 0.4, 0.8)", "cb_recipe_geom");
 
-               FormParts::Heading("Pixel Shader: Radial Glow SDF (Field Pixel Node)");
+               FormParts::Heading(T("Pixel Shader: Radial Glow SDF (Field Pixel Node)"));
                DrawCodeBox("param float radius = 0.3 [0.05, 0.8]\np = uv - vec2(0.5, 0.5)\nd = length(p) - radius\nglow = clamp(0.02 / (abs(d) + 0.02), 0.0, 1.0)\ncol = vec3(glow * 0.9, glow * 0.4, glow * 1.0)", "cb_recipe_pixel");
 
-               ImGui::TextWrapped("Want geometry or pixels to react to audio? A single kernel can't read 'in' from an element or pixel domain - drive a param from an audio-analysis node through the modulation matrix instead, and reference the param (e.g. 'height' above) from within the geometry/pixel kernel.");
+               ImGui::TextWrapped("%s", T("Want geometry or pixels to react to audio? A single kernel can't read 'in' from an element or pixel domain - drive a param from an audio-analysis node through the modulation matrix instead, and reference the param (e.g. 'height' above) from within the geometry/pixel kernel."));
             }
 
             // i18n-skip-end
@@ -1412,18 +1412,18 @@ namespace app
             if (PanelKit::FoldHeader(L("Language Reference"), false, false))
             {
                // i18n-skip-begin: expression vocabulary
-               ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !   . (swizzle)");
-               ImGui::TextDisabled("functions   sin cos tan atan2 abs sign sqrt exp log pow");
-               ImGui::TextDisabled("            floor ceil round fract mod fmod min max clamp lerp mix");
-               ImGui::TextDisabled("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)");
-               ImGui::TextDisabled("            length normalize distance dot cross");
-               ImGui::TextDisabled("            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)");
-               ImGui::TextDisabled("            phase shapes: bend pinch mirror skew formant (phase, amount)");
-               ImGui::TextDisabled("vectors     vec2(x,y) vec3(x,y,z) vec4(x,y,z,w) or splat vec3(1)");
-               ImGui::TextDisabled("            swizzles: .xy .xyz .xyzw or .rg .rgb .rgba (e.g. P.xz, Cd.bgr)");
-               ImGui::TextDisabled("bound       t = transport seconds, pi");
-               ImGui::TextDisabled("in a param  lo / hi = that param's own range, plus its siblings");
-               ImGui::TextDisabled("            a sibling of the same name shadows a global");
+               ImGui::TextDisabled("%s", T("operators   + - * / % ^   < <= > >= == !=   && || !   . (swizzle)"));
+               ImGui::TextDisabled("%s", T("functions   sin cos tan atan2 abs sign sqrt exp log pow"));
+               ImGui::TextDisabled("%s", T("            floor ceil round fract mod fmod min max clamp lerp mix"));
+               ImGui::TextDisabled("%s", T("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)"));
+               ImGui::TextDisabled("%s", T("            length normalize distance dot cross"));
+               ImGui::TextDisabled("%s", T("            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)"));
+               ImGui::TextDisabled("%s", T("            phase shapes: bend pinch mirror skew formant (phase, amount)"));
+               ImGui::TextDisabled("%s", T("vectors     vec2(x,y) vec3(x,y,z) vec4(x,y,z,w) or splat vec3(1)"));
+               ImGui::TextDisabled("%s", T("            swizzles: .xy .xyz .xyzw or .rg .rgb .rgba (e.g. P.xz, Cd.bgr)"));
+               ImGui::TextDisabled("%s", T("bound       t = transport seconds, pi"));
+               ImGui::TextDisabled("%s", T("in a param  lo / hi = that param's own range, plus its siblings"));
+               ImGui::TextDisabled("%s", T("            a sibling of the same name shadows a global"));
                // i18n-skip-end
             }
 
@@ -1852,7 +1852,7 @@ namespace app
                const std::string headless = exe + " --frame hello.inf 0 pics/\n" + exe + " --render hello.inf hello.mp4 --duration 4 --fps 30";
                CodeBlock::Draw(headless.c_str(), "cb_headless");
 #if !defined(_WIN32) && !defined(__APPLE__)
-               ImGui::TextDisabled("%s", "xvfb-run -a ...");
+               ImGui::TextDisabled("%s", "%s", T("xvfb-run -a ..."));
 #endif
                // i18n-skip-end
                ImGui::Spacing();

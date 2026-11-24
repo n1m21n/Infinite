@@ -962,7 +962,7 @@ namespace app
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f - btnSize) * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(centerX, centerY));
 
-         const bool toggleClicked = ActionButton::Draw(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize),
+         const bool toggleClicked = ActionButton::Draw(curVal ? L("ON") : L("OFF"), ImVec2(btnSize, btnSize),
                                                        curVal ? ActionButton::Kind::Selected : ActionButton::Kind::Plain);
          if (toggleClicked)
          {
@@ -2068,7 +2068,7 @@ namespace app
          return;
       }
       const Modulation::Source cur = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
-      if (MenuParts::Item(cur.nodeIndex >= 0 ? "Re-learn MIDI" : "MIDI learn"))
+      if (MenuParts::Item(cur.nodeIndex >= 0 ? L("Re-learn MIDI") : L("MIDI learn")))
          StartParamMidiLearn(nodeIndex, paramIndex);
    }
 

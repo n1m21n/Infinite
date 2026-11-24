@@ -233,7 +233,10 @@ def scan_file(rel, src):
     harness_stack = []  # inside a self-test function or a getenv("..TEST")/argv block
     stmt_start = 0
     in_kit = rel.startswith(KIT)
-    ok_lines = {n for n, l in enumerate(src.split("\n"), 1) if "i18n-ok" in l}
+    ok_lines, skipping = set(), False
+    for n, l in enumerate(src.split("\n"), 1):   # // i18n-ok lines and i18n-skip-begin/end regions, as tools/i18n/lint.py
+        skipping = (skipping or "i18n-skip-begin" in l) and "i18n-skip-end" not in l
+        if skipping or "i18n-ok" in l: ok_lines.add(n)
 
     def func_name():
         for _, nm in reversed(funcs):
@@ -327,15 +330,18 @@ def scan_file(rel, src):
                 findings.append(("format", call or "-", " ".join(specs), s[:80]) + where)
                 for um in ([] if ("=%" in s or s.startswith("[")) else UNIT_SPEC.finditer(s)):   # a number printed with its unit: UiFmt's job (owner 2026-11-24)
                     findings.append(("unit", call or "-", um.group(0), s[:80]) + where)
-            visible = call in TEXT_CALLS and re.search(r"[A-Za-z]", FMT.sub("", s.split("##")[0]))
+            visible = call in TEXT_CALLS and re.search(r"[A-Za-z]", re.sub(r"\\x[0-9A-Fa-f]{2}|\\[nt]", "", FMT.sub("", s.split("##")[0])))
             if not visible:
                 continue
             if s.startswith("##") or ("###" in s and s.split("###")[0] == ""):
                 allowed.bump("id", t.line); continue
             if wrapped or (prev is not None and prev.text in I18N_WRAP):
                 allowed.bump("i18n", t.line); continue
-            if call in ID_CALLS:
+            if call in ID_CALLS or (re.fullmatch(r"[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*", s) and call not in ("Text", "TextUnformatted", "TextWrapped")):
+                # a dotted lower-case name ("lib.tabs", "row") is a widget id, not words
                 allowed.bump("id", t.line); continue
+            if call == "Begin":   # a window title is also the window's saved id (imgui.ini): translating it loses the layout
+                allowed.bump("window_id", t.line); continue
             if call in ("Item", "MenuItem") and SHORTCUT.match(s):   # a menu row's key hint: key names, never translated
                 allowed.bump("shortcut", t.line); continue
             if rel.startswith(I18N_ENGLISH) or t.line in ok_lines:

@@ -52,7 +52,7 @@ namespace app
       {
          const bool au = f.find("Components") != std::string::npos;
          ImGui::PushID(f.c_str());
-         FormParts::Label(au ? "AU" : "VST3");
+         FormParts::Label(au ? L("AU") : L("VST3"));
          ImGui::AlignTextToFramePadding();
          ImGui::TextDisabled("%s", f.c_str());
          if (ImGui::IsItemHovered())

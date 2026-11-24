@@ -347,11 +347,11 @@ namespace Splash
          const ImU32 footCol = IM_COL32(0x8F, 0x98, 0xB8, (int)(210.0f * textA));
          const float fy = y1 - pad - fs;
          float fx = x0 + pad;
-         dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "Infinite");
+         dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "Infinite");   // i18n-ok: brand mark, never translated
          fx += font->CalcTextSizeA(fs, FLT_MAX, 0.0f, "Infinite").x + 1.0f * sc;
-         dl->AddText(font, fs * 0.55f, ImVec2(fx, fy - fs * 0.12f), mixBg(footCol, fy), "TM");
+         dl->AddText(font, fs * 0.55f, ImVec2(fx, fy - fs * 0.12f), mixBg(footCol, fy), "TM");   // i18n-ok: brand mark, never translated
          fx += font->CalcTextSizeA(fs * 0.55f, FLT_MAX, 0.0f, "TM").x;
-         dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "   |   Made in India   |   Open source (MIT license)");
+         dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "   |   Made in India   |   Open source (MIT license)");   // i18n-ok: brand footer, never translated
          const std::string ver = std::string("v") + INFINITE_VERSION_STRING;
          const float vfs = 8.5f * sc;
          const ImVec2 vsz = font->CalcTextSizeA(vfs, FLT_MAX, 0.0f, ver.c_str());

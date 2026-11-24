@@ -1315,7 +1315,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   // reads it, so say plainly that the take owns them.
                   ImGui::BeginDisabled(n->IsRecording());
                   ImGui::SetNextItemWidth(kParamWidth);
-                  ImGui::SliderInt("##recfps", &n->recordFps, 1, 60, "%d fps");
+                  ImGui::SliderInt("##recfps", &n->recordFps, 1, 60, T("%d fps"));
 
                   ModCheckbox(L("include audio"), &n->includeAudio);
                   ImGui::EndDisabled();

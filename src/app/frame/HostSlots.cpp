@@ -336,11 +336,11 @@ void DrawParamHostAutomationMenuItem(int nodeIndex, int paramIndex)
    if (slot < 0)
    {
       ImGui::BeginDisabled();
-      MenuParts::Item("Host automation (slots full)");
+      MenuParts::Item(L("Host automation (slots full)"));
       ImGui::EndDisabled();
       return;
    }
-   if (MenuParts::Item("Host automation"))
+   if (MenuParts::Item(L("Host automation")))
    {
       PushUndoCheckpoint("Host automation");
       gHostParams.push_back({ gn->uid, paramIndex, slot, std::string() });

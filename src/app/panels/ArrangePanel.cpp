@@ -609,13 +609,13 @@ namespace app
       {
          const int fmtActive = rset.renderFormat == 1 ? 1 : 0;
          SectionCard::RowLabel(T("Format"));
-         if (ChipButton::Draw(".mp4##arrRenderMp4", fmtActive == 0, tok::control_h, 56.0f))
+         if (ChipButton::Draw(L(".mp4##arrRenderMp4"), fmtActive == 0, tok::control_h, 56.0f))
          {
             rset.renderFormat = 0;
             gPatchDirty = true;
          }
          ImGui::SameLine(0.0f, tok::space_1);
-         if (ChipButton::Draw(".mov##arrRenderMov", fmtActive == 1, tok::control_h, 56.0f))
+         if (ChipButton::Draw(L(".mov##arrRenderMov"), fmtActive == 1, tok::control_h, 56.0f))
          {
             rset.renderFormat = 1;
             gPatchDirty = true;
@@ -3022,7 +3022,7 @@ namespace app
                   if (std::fabs(lane.pan) < 0.005f)
                      Tip::Show("%s", T("C"));
                   else
-                     Tip::Show("%s %d", lane.pan < 0.0f ? "L" : "R", (int)std::lround(std::fabs(lane.pan) * 100.0f));
+                     Tip::Show("%s %d", lane.pan < 0.0f ? T("L") : T("R"), (int)std::lround(std::fabs(lane.pan) * 100.0f));
                }
                ImGui::SameLine(0.0f, kMixKnobGap);
                float gainDb = lane.gainDb;

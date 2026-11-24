@@ -530,7 +530,7 @@ namespace app
          }
 
          ImGui::SameLine();
-         if (ChipButton::Draw(clip->enabled ? "Active###clipbypassbtn" : "Bypassed###clipbypassbtn", clip->enabled, 0.0f, activeW))
+         if (ChipButton::Draw(clip->enabled ? L("Active###clipbypassbtn") : L("Bypassed###clipbypassbtn"), clip->enabled, 0.0f, activeW))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
