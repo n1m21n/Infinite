@@ -1,5 +1,14 @@
 [
  {
+  "slug": "aliasing-free-virtual-analog-dsp-blep-zdf-oversampling",
+  "title": "Aliasing-free virtual analog DSP: BLEP, 4x oversampling, and ZDF",
+  "description": "How Infinite's Analog synth combines 24-tap BLEP/BLAMP oscillators, 4x half-band oversampling, ADAA drive, and 4-lane SIMD ZDF filters below -80 dB aliasing.",
+  "date": "2026-11-24",
+  "updated": "2026-11-24",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/aliasing-free-virtual-analog-dsp-blep-zdf-oversampling.html"
+ },
+ {
   "slug": "export-a-music-video-in-infinite",
   "title": "Export a music video from your patch in Infinite",
   "description": "Load a track or build a beat, patch audio-reactive visuals, and export a synced MP4 or MOV music video in Infinite using live recording or Offline Render.",
