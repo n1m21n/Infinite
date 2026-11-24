@@ -4059,7 +4059,7 @@ namespace tok
    constexpr unsigned splash_screen_mix_bg_shade_md = 0xC2u;
    constexpr unsigned splash_screen_mix_bg_shade_sm = 0x8Fu;
    constexpr unsigned view2d_canvas_alpha = 0x80000000u;
-   constexpr unsigned view2d_mag_filter_cb_alpha = 0x80000000u;
+   constexpr unsigned view2d_nearest_filter_bit = 0x80000000u;
    constexpr unsigned view3d_bc_shade = 0xFFFFFFu;
    constexpr unsigned view3d_camera_shape_shade = 0xE8C840u;
    constexpr unsigned view3d_dashed_line_shade = 0x8FB0FFu;

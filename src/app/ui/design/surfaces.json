@@ -4844,7 +4844,7 @@
   "view2d": {
    "own_colour": {
     "canvas_alpha": "0x80000000",
-    "mag_filter_cb_alpha": "0x80000000"
+    "nearest_filter_bit": "0x80000000"
    }
   },
   "view3d": {

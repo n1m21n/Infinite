@@ -479,7 +479,7 @@ namespace
    {
       const unsigned v = (unsigned)(intptr_t)cmd->UserCallbackData;
       glBindTexture(GL_TEXTURE_2D, v & 0x7FFFFFFFu);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (v & tok::view2d_mag_filter_cb_alpha) ? GL_NEAREST : GL_LINEAR);  // ui-audit-ok: mask (bit packing: the nearest-filter flag bit on a texture id)
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (v & tok::view2d_nearest_filter_bit) ? GL_NEAREST : GL_LINEAR);  // ui-audit-ok: mask (bit packing: the nearest-filter flag bit on a texture id)
    }
    bool ViewTurned() { return std::fabs(sViewAngle) > 1e-4f; }
    ImVec2 ToScreen(Scene2DNode* doc, float x, float y)
@@ -2187,7 +2187,7 @@ namespace
    {
       const int n = (int)c.size() / tok::view2d_n_ratio;
       for (int i = 0; i < n; i++)
-         if (std::fabs(c[(size_t)i * 2] - x) < 0.03f)  // ui-audit-ok: bytes (byte / buffer arithmetic, not a screen quantity)
+         if (std::fabs(c[(size_t)i * 2] - x) < 0.03f)  // ui-audit-ok: model (curve point pick tolerance, in curve units 0-1)
             return i;
       if (n >= 16)
          return -1;
