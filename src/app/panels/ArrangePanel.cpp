@@ -8,6 +8,7 @@
 #include "app/ui/design/components/Tip.h"
 #include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/ToolCursor.h"
@@ -1575,7 +1576,7 @@ namespace app
       }
 
       Ui::Spacer(Ui::Space::S1);   // toolbar to hairline = seam to toolbar (grip + space_1)
-      ImGui::Separator();
+      Divider::Rule();
 
       // Layout: Global Viewport Monitor alongside / above timeline lanes
       const bool isWide = panelSize.x >= tok::arrange_wide_w;

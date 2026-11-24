@@ -26,6 +26,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/ReorderDrag.h"
 #include "app/ui/design/components/SectionCard.h"
@@ -3669,7 +3670,7 @@ namespace
    // Selections kept with the document under a name.
    void SelectionMenu(Scene2DNode* doc)
    {
-      if (!ImGui::BeginMenu(T("Selection")))
+      if (!MenuParts::SubMenu(T("Selection")))
          return;
       if (MenuParts::Item(T("Save Selection"), nullptr, false, doc->HasSelection()))
       {
@@ -3686,7 +3687,7 @@ namespace
          Touch();
       }
       for (const std::string& name : doc->SavedSelections())
-         if (ImGui::BeginMenu(name.c_str()))
+         if (MenuParts::SubMenu(name.c_str()))
          {
             static const char* kHow[4] = { "Load", "Add", "Subtract", "Intersect" };
             for (int op = 0; op < 4; op++)
@@ -8176,7 +8177,7 @@ namespace
                if (!erase && presets[i].group != nullptr && (group == nullptr || std::strcmp(group, presets[i].group) != 0))
                {
                   if (group != nullptr)
-                     ImGui::Separator();
+                     MenuParts::Separator();
                   group = presets[i].group;
                   ImGui::TextDisabled("%s", T(group));
                }
@@ -8606,7 +8607,7 @@ namespace
          {
             // Bitmap: an image file, placed in the shape's box. Opacity is the fill colour's alpha.
             const std::string shown = t.fillImage.empty() ? std::string(T("Choose image")) : t.fillImage.substr(t.fillImage.find_last_of("/\\") + 1);
-            if (ImGui::Button((shown + "##v2dvfimg").c_str()))
+            if (ActionButton::Draw((shown + "##v2dvfimg").c_str(), ImVec2(0.0f, 0.0f), ActionButton::Kind::Plain))
             {
                const std::string path = Platform::OpenImageDialog();
                if (!path.empty())
@@ -8835,7 +8836,7 @@ namespace
                   }
                }
             }
-            if (ImGui::Button(T("Same for all##v2dvcrall")))
+            if (ActionButton::Draw(T("Same for all##v2dvcrall"), ImVec2(0.0f, 0.0f), ActionButton::Kind::Plain))
             {
                undo();
                for (int c = 0; c < 4; c++)
@@ -10957,7 +10958,7 @@ namespace
          {
             const std::string shown = l->fillImage.empty() ? std::string(T("Choose image")) : l->fillImage.substr(l->fillImage.find_last_of("/\\") + 1);
             FieldLabel(T("Image"));
-            if (ImGui::Button((shown + "##v2dfillimg").c_str(), ImVec2(sFieldW, 0.0f)))
+            if (ActionButton::Draw((shown + "##v2dfillimg").c_str(), ImVec2(sFieldW, 0.0f), ActionButton::Kind::Plain))
             {
                const std::string path = Platform::OpenImageDialog();
                if (!path.empty())
@@ -12718,7 +12719,7 @@ namespace
                if (l->fxMore[(size_t)m].first != t)
                   continue;
                ImGui::PushID(100 + m);
-               ImGui::Separator();
+               Divider::Rule();
                Scene2DNode::Fx& g = l->fxMore[(size_t)m].second;
                BoolRow(T("On"), &g.on);
                FxRows(*l, t, g, false);

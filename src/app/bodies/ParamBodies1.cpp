@@ -3,6 +3,7 @@
 #include "app/graph/NodeParams.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/BusyLine.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/components/PanelKit.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -2330,7 +2331,7 @@ namespace app
          ImGui::Text("bound: %s", n->BindingLabel().c_str());
          PopTextWrapWidth();
       }
-      ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
+      BusyLine::Bar(n->Value01(), kParamWidth, 0.0f, "");
 
       Ui::DrawParams(n, kMidiCCParamsRows);
    }
@@ -2373,7 +2374,7 @@ namespace app
          ImGui::Text("bound: %s", n->BindingLabel().c_str());
          PopTextWrapWidth();
       }
-      ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
+      BusyLine::Bar(n->Value01(), kParamWidth, 0.0f, "");
 
       if (n->mode == MidiTriggerNode::kKeyboard)
       {

@@ -35,6 +35,13 @@ namespace BusyLine
       ImGui::Dummy(ImVec2(size, h));
    }
 
+   // Standalone progress bar (replaces raw ImGui::ProgressBar calls).
+   inline void Bar(float fraction, float width = -1.0f, float height = 0.0f, const char* overlay = nullptr)
+   {
+      const float f = fraction < 0.0f ? 0.0f : (fraction > 1.0f ? 1.0f : fraction);
+      ImGui::ProgressBar(f, ImVec2(width, height), overlay);
+   }
+
    // `progress` 0..1, or < 0 for "no total known". `count` >= 0 appends "(n)". Returns true when Cancel is clicked.
    inline bool Draw(const char* what, float progress = -1.0f, int count = -1, bool cancellable = false)
    {

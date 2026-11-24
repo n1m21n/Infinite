@@ -7,6 +7,7 @@
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/BusyLine.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/DrawParam.h"
@@ -109,7 +110,7 @@ namespace app
       if (n->IsLoaded())
       {
          const double dur = std::max(0.001, n->Duration());
-         ImGui::ProgressBar((float)(n->Position() / dur), ImVec2(kPreviewSize, 0));
+         BusyLine::Bar((float)(n->Position() / dur), kPreviewSize, 0.0f, nullptr);
          ImGui::TextDisabled("%s / %s", UiFmt::Sec(n->Position()).c, UiFmt::Sec(dur).c);
 
          if (n->IsPlaying())
@@ -129,7 +130,7 @@ namespace app
 
          const Platform::AudioLevels& lv = n->Levels();
          ImGui::Text("level "); Ui::SameRow();
-         ImGui::ProgressBar(std::min(1.0f, lv.rms * n->gain), ImVec2(kPreviewSize * tok::geometry_params_audio_file_w, 0), "");
+         BusyLine::Bar(std::min(1.0f, lv.rms * n->gain), kPreviewSize * tok::geometry_params_audio_file_w, 0.0f, "");
       }
    }
 

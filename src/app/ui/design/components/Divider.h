@@ -22,4 +22,15 @@ namespace Divider
       ImGui::GetWindowDrawList()->AddLine(ImVec2(r.x + inset, y), ImVec2(r.Right() - inset, y),
                                           ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_divider)), tok::stroke_rule);
    }
+   // Flow-layout horizontal hairline across the current content region (replaces ImGui::Separator()).
+   inline void Rule(float inset = 0.0f)
+   {
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float w = ImGui::GetContentRegionAvail().x;
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const float y = std::round(p.y);
+      ImGui::GetWindowDrawList()->AddLine(ImVec2(p.x + inset, y), ImVec2(p.x + w - inset, y),
+                                          ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, tok::alpha_divider)), tok::stroke_rule);
+      ImGui::Dummy(ImVec2(0.0f, tok::stroke_rule));
+   }
 }

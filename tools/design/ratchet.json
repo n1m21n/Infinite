@@ -8,7 +8,7 @@
   "src/app/frame/StageNodeBodies.cpp": 1,
   "src/app/frame/StagePopupsB.cpp": 10,
   "src/app/frame/StageSidePanels.cpp": 5,
-  "src/app/panels/ArrangePanel.cpp": 15,
+  "src/app/panels/ArrangePanel.cpp": 14,
   "src/app/panels/ArrangeRender.cpp": 11,
   "src/app/panels/ChatPanel.cpp": 23,
   "src/app/panels/CliSetupSection.cpp": 1,
@@ -18,7 +18,7 @@
   "src/app/panels/ModMatrixPanel.cpp": 11,
   "src/app/panels/PerfPanel.cpp": 5,
   "src/app/panels/SettingsWindow.cpp": 1,
-  "src/app/panels/View2DPanel.cpp": 26,
+  "src/app/panels/View2DPanel.cpp": 21,
   "src/app/panels/View3DPanel.cpp": 1,
   "src/app/panels/ViewportPanel.cpp": 1
  },
@@ -43,9 +43,7 @@
   "alphas": {
    "src/app/frame/FrameTestsGpuPoints.cpp": 1
   },
-  "ctl_buttons": {
-   "src/app/panels/View2DPanel.cpp": 3
-  },
+  "ctl_buttons": {},
   "ctl_canvas_pins": {
    "src/app/bodies/GeometryParams.cpp": 3,
    "src/app/bodies/SamplerBodies.cpp": 2,
@@ -236,9 +234,7 @@
    "src/app/graph/PatchIO.cpp": 1
   },
   "ctl_knobs": {},
-  "ctl_menus": {
-   "src/app/panels/View2DPanel.cpp": 2
-  },
+  "ctl_menus": {},
   "ctl_meters": {
    "src/app/AppShared.h": 3,
    "src/app/bodies/NoteBodies.cpp": 2,
@@ -252,15 +248,9 @@
    "src/app/frame/StagePopupsB.cpp": 1,
    "src/app/panels/ArrangePanel.cpp": 1
   },
-  "ctl_progress": {
-   "src/app/bodies/GeometryParams.cpp": 2,
-   "src/app/bodies/ParamBodies1.cpp": 2
-  },
+  "ctl_progress": {},
   "ctl_scrollbar_style": {},
-  "ctl_separators": {
-   "src/app/panels/ArrangePanel.cpp": 1,
-   "src/app/panels/View2DPanel.cpp": 2
-  },
+  "ctl_separators": {},
   "ctl_sliders": {
    "src/app/bodies/GeometryParams.cpp": 2,
    "src/app/bodies/ParamBodies1.cpp": 1,
