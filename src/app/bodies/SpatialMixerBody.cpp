@@ -49,7 +49,7 @@ namespace app
       char stat[112];
       const bool tracked = n->trackMode == 1 && n->HeadTracked();
       if (n->IsRecording())
-         snprintf(stat, sizeof(stat), "REC %s %d-bit  %s", n->formatIndex == 1 ? "FLAC" : "WAV", n->bit24 ? 24 : 16,
+         snprintf(stat, sizeof(stat), "REC %s %d-bit  %s", n->formatIndex == 1 ? "FLAC" : "WAV", n->bit24 ? 24 : 16,  // ui-audit-ok: bit depth
                   UiFmt::Sec(n->ElapsedSeconds()).c);
       else if (connected > 0)
          snprintf(stat, sizeof(stat), "%d in -> %s%s  %s", connected, n->renderMode == 1 ? "stereo" : "binaural",

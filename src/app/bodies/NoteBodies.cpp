@@ -686,7 +686,7 @@ namespace app
 
       const int baseNote = (n->baseOctave + 1) * 12;
       const int lowNote = std::clamp(baseNote, 0, 103);   // fixed - never recentres under an active click
-      const int hit = DrawInteractiveKeyboard(held, lowNote, 3);
+      const int hit = DrawInteractiveKeyboard(held, lowNote, 3);  // ui-audit-ok: octave count
 
       if (hit != n->mMouseNote)
       {

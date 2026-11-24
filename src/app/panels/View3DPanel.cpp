@@ -3012,7 +3012,7 @@ namespace
          if (sSet->gizmoLightLook && light->type != 1 && light->type != 3)
          {
             float w[3];
-            const float reach = std::max(1.5f, light->distance * 0.5f);
+            const float reach = std::max(1.5f, light->distance * 0.5f);  // ui-audit-ok: world-space reach
             for (int k = 0; k < 3; k++)
                w[k] = c[k] + aim[k] * reach;
             if (handle(2, w, Hex(0xE86840)))
@@ -4838,7 +4838,7 @@ namespace
       {
          const bool hot = onDisc && std::hypot(mouse.x - b.at.x, mouse.y - b.at.y) < 10.0f;
          if (hot)
-            hit = b.axis * 2 + ((b.neg != (b.axis == 2)) ? 1 : 0);   // ViewAxis counts engine sides
+            hit = b.axis * 2 + ((b.neg != (b.axis == 2)) ? 1 : 0);   // ViewAxis counts engine sides  // ui-audit-ok: axis index
          const float size = (b.neg ? 7.0f : 9.0f) * ballK;
          if (b.neg)
          {
@@ -5372,7 +5372,7 @@ namespace
          {
             float axis[3];
             OpAxis(sOp.before.back(), axis);
-            const float reach = sDist * 40.0f;
+            const float reach = sDist * 40.0f;  // ui-audit-ok: world-space reach
             const float a[3] = { sOp.pivot[0] - axis[0] * reach, sOp.pivot[1] - axis[1] * reach, sOp.pivot[2] - axis[2] * reach };
             const float b[3] = { sOp.pivot[0] + axis[0] * reach, sOp.pivot[1] + axis[1] * reach, sOp.pivot[2] + axis[2] * reach };
             Line3D(dl, a, b, AxisColor(sOp.axis), 1.5f);
@@ -6962,7 +6962,7 @@ namespace
                bits[a] = (1u << kDisp[a]) << (row * 3);
                on[a] = (item->lock & bits[a]) != 0;
             }
-            const int hit = PanelKit::CheckGrid((std::string("##v3dlock") + std::to_string(row)).c_str(), axes, on, 3);
+            const int hit = PanelKit::CheckGrid((std::string("##v3dlock") + std::to_string(row)).c_str(), axes, on, 3);  // ui-audit-ok: axis count
             if (hit >= 0)
             {
                PushUndoCheckpoint("Lock in 3D View");

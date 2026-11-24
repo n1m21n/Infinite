@@ -189,7 +189,7 @@ namespace
    bool sCropDarken = true, sCropReveal = true;   // crop: dim outside the box; show it at all
    bool sSelBrushSub = false;      // selection brush: takes away (Alt flips it)
    bool sSelBrushSoft = true;      // selection brush: soft edges (off: hard)
-   int sTolerance = 32;
+   int sTolerance = 32;  // ui-audit-ok: colour tolerance default (0-255)
    bool sContiguous = true, sAllLayers = false;
    int sImageFormat = 0, sVideoFormat = 0;   // the Render tab's default file types
    bool sSurfacePaint = true;      // brush / eraser / eyedropper work on a 3D object's surface
@@ -7981,7 +7981,7 @@ namespace
       // Shown as Affinity shows it, a share of the colour range (kept 0..255 inside, as patches and the wand read it).
       float tol = (float)sTolerance * (100.0f / 255.0f);
       BarSlider("##v2dtol", &tol, 0.0f, 100.0f, "Tolerance %.0f%%", kWellL);
-      sTolerance = std::clamp((int)std::lround(tol * 2.55f), 0, 255);
+      sTolerance = std::clamp((int)std::lround(tol * 2.55f), 0, 255);  // ui-audit-ok: percent to 0-255
       if (TextChip(L("Contiguous##v2dcont"), sContiguous, T("Only touching pixels")))
          sContiguous = !sContiguous;
       FormParts::Inline(0.0f, tok::space_1);

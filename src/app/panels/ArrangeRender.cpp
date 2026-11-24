@@ -489,7 +489,7 @@ namespace app
                   selected = i;
             }
          }
-         const int hit = FieldWell::SwatchRow(cols, names, n, selected, 15.0f);
+         const int hit = FieldWell::SwatchRow(cols, names, n, selected, tok::page_swatch_compact);
          if (hit >= 0) onSelect(hit);
       };
       auto paletteRGB = [](int i) {

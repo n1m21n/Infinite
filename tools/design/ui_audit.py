@@ -394,7 +394,7 @@ def scan_file(rel, src):
                 elif prev is not None and prev.text in ("<", ">", "<=", ">=", "==", "!="): cat = "compare"
                 elif prev is not None and prev.text in ("=", "+=", "-=", "*=", "/=", "return", "?", ":"): cat = "assign"
                 else: cat = "arith"
-        if cat in LOGIC_CATS or cat == "timing" or cat.startswith("call:"):
+        if cat in LOGIC_CATS or cat in ("timing", "hit", "value_format") or cat.startswith("call:"):
             r = logic_reason(toks, match, i, t, v, prev, nxt, paren, st, stmt_lhs(stmt_start, i), cat)
             if r: allowed.bump(r, t.line); continue
         findings.append((cat, call or "-", t.text if not neg else "-" + t.text, st[:110]) + where)
@@ -479,7 +479,7 @@ def is_domain(name, dsp_only=False):
 
 
 UNIT_CONV = {100.0, 1000.0, 60.0, 12.0, 3600.0, 1e3, 1e6, 1e9, 1024.0, 255.0, 256.0, 127.0, 128.0, 440.0, 69.0, 24.0, 48.0, 96.0,
-             44100.0, 48000.0, 360.0, 180.0, 90.0}
+             44100.0, 48000.0, 360.0, 180.0, 90.0, 86400.0, 1048576.0, 1900.0, 20.0}
 PI = (3.14159, 6.28318, 1.5707)
 
 

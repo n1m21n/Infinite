@@ -218,6 +218,7 @@ namespace tok
    constexpr float page_rename_min_w = 96.0f;
    constexpr float page_dot = 8.0f;
    constexpr float page_swatch = 16.0f;
+   constexpr float page_swatch_compact = 15.0f;
    constexpr float page_strip_max_w = 360.0f;
    constexpr float page_wheel_step = 40.0f;
    constexpr float dock_canvas_min_h = 150.0f;
