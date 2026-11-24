@@ -3,6 +3,7 @@
 // layers; the nodes themselves are only read, so a layer keeps animating under
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
 #include "app/AppCommon.h"
+#include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/components/ListRow.h"
 #include "app/ui/design/UiInteract.h"
@@ -4184,11 +4185,10 @@ namespace
    }
 
    // A row of colour chips; a click returns its index, a right click its index in `removed`.
-   int ColourChips(const char* id, const std::vector<Rgb>& list, bool addChip, int* removed)
+   int SwatchStrip(const char* id, const std::vector<Rgb>& list, bool addChip, int* removed)
    {
       const float sq = 16.0f, gap = 3.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImU32 edge = ImGui::GetColorU32(ImGuiCol_TextDisabled);
       int picked = -1;
       ImGui::PushID(id);
       const int n = (int)list.size() + (addChip ? 1 : 0);
@@ -4202,7 +4202,7 @@ namespace
          if (i < (int)list.size())
          {
             const float* c = list[i].c;
-            dl->AddRectFilled(p, ImVec2(p.x + sq, p.y + sq), ImGui::GetColorU32(ImVec4(c[0], c[1], c[2], 1.0f)), tok::radius_cell);
+            ColourChip::Swatch(dl, p, sq, c, ImGui::IsItemHovered());
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
                picked = i;
             if (removed != nullptr && MenuParts::ContextClicked())
@@ -4216,8 +4216,8 @@ namespace
             dl->AddLine(ImVec2(c.x, c.y - 4), ImVec2(c.x, c.y + 4), ink, 1.2f);
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
                picked = i;
+            ColourChip::Swatch(dl, p, sq, nullptr, ImGui::IsItemHovered());
          }
-         dl->AddRect(p, ImVec2(p.x + sq, p.y + sq), ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : edge, tok::radius_cell);
          ImGui::PopID();
       }
       ImGui::PopID();
@@ -9459,7 +9459,7 @@ namespace
 
    // Foreground over background in one tile, Photoshop's corner layout. Click either square for its picker;
    // the small corner arrow swaps (X), the tiny pair resets (D).
-   void ColourChips()
+   void FgBgTile()
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float t = PanelKit::Chip(), sq = std::round(t * 0.6f);
@@ -9478,12 +9478,8 @@ namespace
       }
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImU32 edge = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-      auto square = [&](ImVec2 a, const float* c) {
-         dl->AddRectFilled(a, ImVec2(a.x + sq, a.y + sq), ImGui::GetColorU32(ImVec4(c[0], c[1], c[2], 1.0f)), tok::radius_cell);
-         dl->AddRect(a, ImVec2(a.x + sq, a.y + sq), edge, tok::radius_cell);
-      };
-      square(ImVec2(p.x + t - sq, p.y + t - sq), sBg);
-      square(p, sFg);
+      ColourChip::Swatch(dl, ImVec2(p.x + t - sq, p.y + t - sq), sq, sBg);
+      ColourChip::Swatch(dl, p, sq, sFg);
       const ImU32 ink = ImGui::GetColorU32(ImGuiCol_Text);
       // swap: a bent arrow in the top-right corner
       const ImVec2 s0(p.x + sq + 2.5f, p.y + 2.5f);
@@ -9501,7 +9497,7 @@ namespace
             if (!sRecentCols.empty())
             {
                ImGui::TextDisabled("%s", T("Recent"));
-               const int r = ColourChips("##recent", sRecentCols, false, nullptr);
+               const int r = SwatchStrip("##recent", sRecentCols, false, nullptr);
                if (r >= 0)
                {
                   std::copy(sRecentCols[r].c, sRecentCols[r].c + 3, col);
@@ -9511,7 +9507,7 @@ namespace
             ImGui::TextDisabled("%s", T("Swatches"));
             std::vector<Rgb> sw = Swatches();
             int removed = -1;
-            const int k = ColourChips("##swatches", sw, true, &removed);
+            const int k = SwatchStrip("##swatches", sw, true, &removed);
             if (k == (int)sw.size())
             {
                if (std::none_of(sw.begin(), sw.end(), [&](const Rgb& r) { return SameColour(r.c, col); }))
@@ -9668,7 +9664,7 @@ namespace
       if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && MenuParts::RightPressed())
          openPicker = true;
       ImGui::Dummy(ImVec2(w, 0.0f));
-      ColourChips();
+      FgBgTile();
       if (cols == 1)
          ImGui::Dummy(ImVec2(w, 0.0f));
       else

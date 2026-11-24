@@ -11,6 +11,7 @@
 // The engine is a private Generate Samples node (never in the graph, never cooked): a take made here and one made
 // on the node are the same sound for the same recipe. Snap to scale re-renders the take's own seed pinned.
 #include "app/frame/CanvasLink.h"
+#include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/AppShared.h"
@@ -2189,39 +2190,41 @@ namespace
          s.recording ? StopRecording(true) : StartRecording();
    }
 
-   // The palette as small chips, the first "by position"; a click colours the selection. True when one was picked.
-   bool ColourChips(int pi, int perRow, bool rowLabels)
+   // The palette as the kit's colour dots (ColourChip::Dots), the first "by position"; a click colours the selection.
+   // With rowLabels each row after the first sits behind an empty row label (the inspector grid). True when one was picked.
+   bool SliceColours(int pi, int perRow, bool rowLabels)
    {
       Studio& s = S();
-      bool picked = false;
-      const float d = 14.0f;
-      for (int c = -1; c < kPaletteSize; c++)
+      constexpr int n = kPaletteSize + 1;
+      ImU32 cols[n];
+      const char* names[n];
+      for (int i = 0; i < n; i++)
       {
-         if ((c + 1) % perRow != 0)
-            FormParts::Inline(0.0f, 3.0f);
-         else if (c > -1 && rowLabels)
-            SectionCard::RowLabel("");
-         ImGui::PushID(c);
-         const ImVec2 p = ImGui::GetCursorScreenPos();
-         if (UiInteract::Hit("##col", ImVec2(d, d)))
-         {
-            PushUndo();
-            for (int i : SelectedIndices())
-               s.doc.slices[(size_t)i].colour = c;
-            picked = true;
-         }
-         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const int c = i - 1;
          const float h = (float)((c < 0 ? pi : c) % kPaletteSize) / (float)kPaletteSize;
          float r, gg, b;
          ImGui::ColorConvertHSVtoRGB(h, c < 0 ? 0.0f : 0.55f, 0.88f, r, gg, b);
-         dl->AddCircleFilled(ImVec2(p.x + d * 0.5f, p.y + d * 0.5f), d * 0.42f, ImGui::GetColorU32(ImVec4(r, gg, b, 1.0f)));
-         if (pi >= 0 && pi < s.doc.Count() && s.doc.slices[(size_t)pi].colour == c)
-            dl->AddCircle(ImVec2(p.x + d * 0.5f, p.y + d * 0.5f), d * 0.5f, ImGui::GetColorU32(ImGuiCol_Text), 0, 1.5f);
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", c < 0 ? T("By position") : T("Slice colour"));
-         ImGui::PopID();
+         cols[i] = ImGui::GetColorU32(ImVec4(r, gg, b, 1.0f));
+         names[i] = c < 0 ? T("By position") : T("Slice colour");
       }
-      return picked;
+      const int selected = (pi >= 0 && pi < s.doc.Count()) ? s.doc.slices[(size_t)pi].colour + 1 : -1;
+      int hit = -1;
+      for (int off = 0; off < n; off += perRow)
+      {
+         if (off > 0 && rowLabels)
+            SectionCard::RowLabel("");
+         ImGui::PushID(off);
+         const int k = ColourChip::Dots(cols + off, names + off, std::min(perRow, n - off), selected - off, perRow);
+         ImGui::PopID();
+         if (k >= 0)
+            hit = off + k;
+      }
+      if (hit < 0)
+         return false;
+      PushUndo();
+      for (int i : SelectedIndices())
+         s.doc.slices[(size_t)i].colour = hit - 1;
+      return true;
    }
 
    void DrawWaveContextMenu(double frame)
@@ -2243,7 +2246,7 @@ namespace
          EditSelected([](SliceParams& p) { p.reverse = !p.reverse; });
       if (MenuParts::SubMenu(T("Colour"), any))
       {
-         if (ColourChips(s.doc.IndexOfId(s.primary), 7, false))
+         if (SliceColours(s.doc.IndexOfId(s.primary), 7, false))
             ImGui::CloseCurrentPopup();
          ImGui::EndMenu();
       }
@@ -2705,7 +2708,7 @@ namespace
          }
       }
       SectionCard::RowLabel(T("Colour"));
-      ColourChips(pi, 7, true);
+      SliceColours(pi, 7, true);
       SectionCard::RowLabel("");
       if (ActionButton::Draw(L("Convert to node##sliceToSampler"), ImVec2(fieldW, 0.0f)))
          SelectedToSamplers();

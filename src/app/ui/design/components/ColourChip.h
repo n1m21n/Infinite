@@ -22,6 +22,16 @@ namespace ColourChip
       return clicked;
    }
 
+   // A small square swatch (swatch strips, the foreground / background tile): the colour at tok::radius_cell with an
+   // edge in the disabled-text tone, the text tone when `lit` (hovered). Paint only; the caller owns the hit area.
+   inline void Swatch(ImDrawList* dl, ImVec2 p, float sq, const float* rgb, bool lit = false)
+   {
+      const ImVec2 q(p.x + sq, p.y + sq);
+      if (rgb != nullptr)
+         dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), tok::radius_cell);
+      dl->AddRect(p, q, ImGui::GetColorU32(lit ? ImGuiCol_Text : ImGuiCol_TextDisabled), tok::radius_cell);
+   }
+
    // A colour param row: the field well with the caption inside on the left and a fixed-size rounded swatch on the
    // right (same grammar as the slider and dropdown faces). One hit item over the whole face. `labelTint` (optional)
    // recolours the caption, used for a palette-bound colour.
