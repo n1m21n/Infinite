@@ -863,6 +863,114 @@ void Scene2DNode::RemovePixelMask(int id)
    }
 }
 
+bool Scene2DNode::AddFilterMask(int id)
+{
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind == Kind::Group || l->kind == Kind::Adjust || l->effects.empty())
+      return false;
+   if (!l->HasFilterMask())
+   {
+      l->fmw = std::clamp(mDoc.w, 1, GLUtil::kMaxTargetSide);
+      l->fmh = std::clamp(mDoc.h, 1, GLUtil::kMaxTargetSide);
+      l->fmtiles.assign((size_t)Cols(l->fmw) * Cols(l->fmh), "-");   // "-" loads white: the effects everywhere
+   }
+   Commit();
+   return true;
+}
+
+void Scene2DNode::RemoveFilterMask(int id)
+{
+   if (Layer* l = FindLayer(id))
+   {
+      l->fmw = l->fmh = 0;
+      l->fmtiles.clear();
+      Commit();
+   }
+}
+
+bool Scene2DNode::FilterMaskPixels(int id, std::vector<uint8_t>& out)
+{
+   SyncSurfaces();
+   const Layer* l = FindConst(id);
+   auto it = mFxMasks.find(id);
+   if (l == nullptr || !l->HasFilterMask() || it == mFxMasks.end() || it->second.fbo.fbo == 0)
+      return false;
+   const int w = l->fmw, h = l->fmh;
+   std::vector<uint8_t> px;
+   ReadRect(it->second.fbo, 0, 0, w, h, px);
+   if (px.size() != (size_t)w * h * 4)
+      return false;
+   out.resize((size_t)w * h);
+   for (size_t i = 0; i < out.size(); i++)
+      out[i] = px[i * 4];
+   return true;
+}
+
+// The filter mask's new grey, `next` (w x h), blended in through the selection (soft edges kept) when there is one.
+bool Scene2DNode::StoreFilterMask(int id, const std::vector<uint8_t>& was, std::vector<uint8_t> next)
+{
+   Layer* l = FindLayer(id);
+   auto it = mFxMasks.find(id);
+   if (l == nullptr || it == mFxMasks.end() || next.size() != was.size())
+      return false;
+   const int w = l->fmw, h = l->fmh;
+   if (mSelAny && mSel.size() == next.size())
+      for (size_t i = 0; i < next.size(); i++)
+         next[i] = (uint8_t)((next[i] * mSel[i] + was[i] * (255 - mSel[i]) + 127) / 255);
+   std::vector<uint8_t> px((size_t)w * h * 4);
+   for (size_t i = 0; i < next.size(); i++)
+   {
+      px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = next[i];
+      px[i * 4 + 3] = 255;
+   }
+   WriteRect(it->second.fbo, 0, 0, w, h, px.data());
+   const int all[4] = { 0, 0, w, h };
+   StoreTiles(it->second, l->fmtiles, all);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::FillFilterMask(int id, float grey)
+{
+   std::vector<uint8_t> m;
+   if (!FilterMaskPixels(id, m))
+      return false;
+   const uint8_t g = (uint8_t)std::lround(std::clamp(grey, 0.0f, 1.0f) * 255.0f);
+   return StoreFilterMask(id, m, std::vector<uint8_t>(m.size(), g));
+}
+
+bool Scene2DNode::BlurFilterMask(int id, float sigma)
+{
+   std::vector<uint8_t> m;
+   const Layer* l = FindConst(id);
+   if (sigma <= 0.0f || !FilterMaskPixels(id, m) || l == nullptr)
+      return false;
+   std::vector<uint8_t> b = m;
+   SelectMaths::AdjustEdge(b, l->fmw, l->fmh, 0.0f, sigma, 0.0f, 0.0f);
+   return StoreFilterMask(id, m, std::move(b));
+}
+
+int Scene2DNode::FilterMaskToLayer(int id, int above)
+{
+   std::vector<uint8_t> m;
+   const Layer* l = FindConst(id);
+   if (l == nullptr || !FilterMaskPixels(id, m))
+      return 0;
+   const int w = l->fmw, h = l->fmh;
+   const bool cut = mSelAny && mSel.size() == m.size();
+   std::vector<uint8_t> rgba((size_t)w * h * 4);
+   for (int y = 0; y < h; y++)   // bottom-first mask to the top-down picture a file layer takes
+      for (int x = 0; x < w; x++)
+      {
+         const size_t s = (size_t)(h - 1 - y) * w + x, d = ((size_t)y * w + x) * 4;
+         rgba[d] = rgba[d + 1] = rgba[d + 2] = m[s];
+         rgba[d + 3] = cut ? mSel[s] : 255;
+      }
+   const int nid = AddFileLayer(0, "Filter Mask", 0, 0, w, h, rgba, above);
+   Commit();
+   return nid;
+}
+
 bool Scene2DNode::MaskFromSelection(int id)
 {
    if (!AddPixelMask(id) || !EnsurePaintShaders())
@@ -1017,7 +1125,7 @@ Scene2DNode::Surface* Scene2DNode::SyncSurface(std::map<int, Surface>& in, int i
 {
    if (w <= 0 || h <= 0)
       return nullptr;
-   const bool mask = &in == &mMasks;
+   const bool mask = &in == &mMasks || &in == &mFxMasks;
    Surface& s = in[id];
    if (s.fbo.w != w || s.fbo.h != h || s.fbo.tex == 0)
    {
@@ -1049,7 +1157,7 @@ Scene2DNode::Surface* Scene2DNode::SyncSurface(std::map<int, Surface>& in, int i
 
 void Scene2DNode::SyncSurfaces()
 {
-   std::vector<int> paintIds, maskIds;
+   std::vector<int> paintIds, maskIds, fxIds;
    for (const Layer& l : mLayers)
    {
       if ((l.kind == Kind::Paint || l.HasSkin()) && SyncSurface(mSurfaces, l.id, l.pw, l.ph, l.tiles) != nullptr)
@@ -1060,10 +1168,12 @@ void Scene2DNode::SyncSurfaces()
       }
       if (l.HasPixelMask() && SyncSurface(mMasks, l.id, l.mw, l.mh, l.mtiles) != nullptr)
          maskIds.push_back(l.id);
+      if (l.HasFilterMask() && SyncSurface(mFxMasks, l.id, l.fmw, l.fmh, l.fmtiles) != nullptr)
+         fxIds.push_back(l.id);
    }
-   for (auto* m : { &mSurfaces, &mMasks })
+   for (auto* m : { &mSurfaces, &mMasks, &mFxMasks })
    {
-      const std::vector<int>& keep = m == &mSurfaces ? paintIds : maskIds;
+      const std::vector<int>& keep = m == &mSurfaces ? paintIds : m == &mMasks ? maskIds : fxIds;
       for (auto it = m->begin(); it != m->end();)
       {
          if (std::find(keep.begin(), keep.end(), it->first) == keep.end() && !(mStroke.Active() && it->first == mPaintId))
@@ -1105,6 +1215,17 @@ bool Scene2DNode::DocToSurface(const Layer& l, int target, float x, float y, flo
       sx = x;
       sy = (float)mDoc.h - y;
       scale = 1.0f;
+      return true;
+   }
+   if (target == 3)
+   {
+      // The filter mask lies over the document, stretched if the canvas changed size since it was made.
+      if (l.fmw <= 0 || l.fmh <= 0 || mDoc.w <= 0 || mDoc.h <= 0)
+         return false;
+      const float kx = (float)l.fmw / mDoc.w, ky = (float)l.fmh / mDoc.h;
+      sx = x * kx;
+      sy = (float)l.fmh - y * ky;
+      scale = std::sqrt(kx * ky);
       return true;
    }
    float bw = 1, bh = 1;
@@ -1223,8 +1344,10 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
          return false;
       if (target == 1 && !l->HasPixelMask())
          return false;
+      if (target == 3 && !l->HasFilterMask())
+         return false;
       SyncSurfaces();
-      auto& m = target == 0 ? mSurfaces : mMasks;
+      auto& m = target == 0 ? mSurfaces : target == 3 ? mFxMasks : mMasks;
       auto it = m.find(id);
       if (it == m.end())
          return false;
@@ -1278,7 +1401,12 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
    }
    // Paint lands only inside the selection, resampled to the surface when it is placed differently.
    unsigned sel = 0;
-   if (target != 2 && mSelAny && EnsurePaintShaders())
+   if (target == 3 && mSelAny && surf->w == mDoc.w && surf->h == mDoc.h)
+   {
+      UploadSelection();   // the filter mask is document-sized: the selection lies on it as it is
+      sel = mSelTex.tex;
+   }
+   else if (target != 2 && mSelAny && EnsurePaintShaders())
    {
       UploadSelection();
       if (GLUtil::EnsureFbo(mSelScratch, surf->w, surf->h, GL_RGBA8, "Scene2DSelResample"))
@@ -1390,7 +1518,7 @@ void Scene2DNode::EndPaint()
       return;
    }
    Layer* l = FindLayer(mPaintId);
-   auto& m = mPaintTarget == 0 ? mSurfaces : mMasks;
+   auto& m = mPaintTarget == 0 ? mSurfaces : mPaintTarget == 3 ? mFxMasks : mMasks;
    auto it = m.find(mPaintId);
    if (l == nullptr || it == m.end())
    {
@@ -1422,7 +1550,7 @@ void Scene2DNode::EndPaint()
    }
    if (dirty[2] > dirty[0] && dirty[3] > dirty[1])
    {
-      StoreTiles(it->second, mPaintTarget == 0 ? l->tiles : l->mtiles, dirty);
+      StoreTiles(it->second, mPaintTarget == 0 ? l->tiles : mPaintTarget == 3 ? l->fmtiles : l->mtiles, dirty);
       Commit();
    }
    mPaintId = 0;

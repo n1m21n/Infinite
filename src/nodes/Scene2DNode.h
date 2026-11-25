@@ -272,6 +272,11 @@ public:
       int mw = 0, mh = 0;
       std::vector<std::string> mtiles;
       bool HasPixelMask() const { return mw > 0 && mh > 0; }
+      // Filter mask (a layer with an effect stack): grey at document size, white keeps the effects, black shows the
+      // layer as it was. Painted as target 3; applies on top of the node Mask-from when both are set.
+      int fmw = 0, fmh = 0;
+      std::vector<std::string> fmtiles;
+      bool HasFilterMask() const { return fmw > 0 && fmh > 0; }
       // Node layers with a 3D object: a painted skin laid over its surface by UV (pw x ph, same tiles).
       // skinMirror: bit 0/1/2 mirror strokes across the object's X / Y / Z.
       bool HasSkin() const { return kind == Kind::Node && pw > 0 && ph > 0 && !tiles.empty(); }
@@ -530,7 +535,20 @@ public:
    unsigned MaskViewTexture(int id);
    // The layer's pixel mask through its box at document size (bottom row first, 0..255).
    bool MaskInDoc(int id, std::vector<uint8_t>& out);
-   // Painting on a layer (target 0) or its pixel mask (1) or the quick mask (2).
+   // Filter mask: added white (the effects everywhere) on a layer with an effect stack; false otherwise.
+   bool AddFilterMask(int id);
+   void RemoveFilterMask(int id);
+   // The filter mask's grey, document size, bottom row first (0..255).
+   bool FilterMaskPixels(int id, std::vector<uint8_t>& out);
+   // Clear / Fill with the filter mask targeted: grey (0..1) laid in the selection (soft edges kept), or everywhere
+   // without one. One commit.
+   bool FillFilterMask(int id, float grey);
+   // Gaussian blur of the filter mask (sigma px), inside the selection when there is one: feathers its edges.
+   bool BlurFilterMask(int id, float sigma);
+   // Copy with the filter mask targeted: a new paint layer of the mask's grey (opaque), cut to the selection. The
+   // layer mask is never part of it. 0 = no filter mask.
+   int FilterMaskToLayer(int id, int above);
+   // Painting on a layer (target 0) or its pixel mask (1) or the quick mask (2) or its filter mask (3).
    // Points are document pixels. EndPaint stores the touched tiles and commits.
    bool BeginPaint(int id, int target, const BrushEngine::Brush& b, float x, float y, float pressure);
    void PaintTo(float x, float y, float pressure);
@@ -958,7 +976,8 @@ private:
    void UploadSelection();
    void ApplyFill(Surface& s, int sw, int sh, const Layer& l, unsigned coverage, const float colA[4], const float colB[4],
                   int kind, const float p0[2], const float p1[2], float opacity);
-   std::map<int, Surface> mSurfaces, mMasks;
+   std::map<int, Surface> mSurfaces, mMasks, mFxMasks;
+   bool StoreFilterMask(int id, const std::vector<uint8_t>& was, std::vector<uint8_t> next);
    std::map<int, std::vector<std::string>> mUndoTiles;   // the Undo brush's source per paint layer
    std::map<int, Surface> mUndoSurf;
    unsigned mWarpProgram = 0;

@@ -212,6 +212,8 @@ namespace
    bool sSurfaceStroke = false;    // the stroke now running paints a surface
    int sSkinSide = 2;              // 0..3: 512 .. 4096 px, for the next new skin
    bool sEditMask = false;         // the brush paints the active layer's pixel mask
+   bool sEditFxMask = false;       // the brush paints the active layer's filter mask (its effect stack's mask)
+   float sFxMaskBlur = 8.0f;       // px: Blur on the filter mask (Gaussian sigma)
    int sMaskView = 0;              // Mask view (backslash): the layer whose pixel mask shows as a red overlay, 0 = off
 
    // Backslash: the active layer's pixel mask as a red overlay, and back. Without a mask it does nothing.
@@ -313,7 +315,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ApplyMask, InvertMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ApplyMask, InvertMask, AddFxMask, RemoveFxMask, BlurFxMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -2685,6 +2687,19 @@ namespace
    {
       if (doc->quickMask || PaintRefused(doc))
          return false;
+      // The filter mask targeted: Clear hides the effects in the selection (black), a fill lays the colour's grey.
+      if (const Layer* fa = Active(doc); sEditFxMask && fa != nullptr && fa->HasFilterMask())
+      {
+         const float* c = how == 1 ? sFg : how == 2 ? sBg : nullptr;
+         const float g = how == 0 || how == 3 ? 0.0f : how == 4 ? 1.0f : c != nullptr ? (c[0] + c[1] + c[2]) / 3.0f : 0.5f;
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint(how == 0 ? "Clear" : "Fill");
+         const bool ok = doc->FillFilterMask(fa->id, g);
+         if (!ok)
+            gUndoStack.resize(undo0);
+         Touch();
+         return ok;
+      }
       if (how == 0)
          TargetSelection(doc);
       const Layer* a = Active(doc);
@@ -3514,6 +3529,13 @@ namespace
       Touch();
    }
 
+   // A mask (pixel or filter) is what the brush and the edit commands act on.
+   bool MaskEditing() { return sEditMask || sEditFxMask; }
+   bool MaskTargeted(const Layer* a)
+   {
+      return a != nullptr && ((sEditMask && a->HasPixelMask()) || (sEditFxMask && a->HasFilterMask()));
+   }
+
    int PaintTarget(Scene2DNode* doc, int& target, bool make)
    {
       if (doc->quickMask)
@@ -3525,6 +3547,11 @@ namespace
       if (sEditMask && a != nullptr && a->HasPixelMask())
       {
          target = 1;
+         return a->id;
+      }
+      if (sEditFxMask && a != nullptr && a->HasFilterMask())
+      {
+         target = 3;
          return a->id;
       }
       target = 0;
@@ -3560,9 +3587,9 @@ namespace
       if (doc->quickMask)
          return false;
       const Layer* a = Active(doc);
-      if (a == nullptr || (a->kind != Kind::Paint && !(sEditMask && a->HasPixelMask())))
+      if (a == nullptr || (a->kind != Kind::Paint && !MaskTargeted(a)))
          return false;
-      return !doc->Shown(*a) || (!sEditMask && (LockOf(doc, *a) & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) != 0);
+      return !doc->Shown(*a) || (!MaskEditing() && (LockOf(doc, *a) & (Scene2DNode::kLockPixels | Scene2DNode::kLockAll)) != 0);
    }
 
    int sRasterAsk = 0;             // the text or vector layer a pixel tool was tried on
@@ -3846,7 +3873,7 @@ namespace
          return;   // Alt-click sets the source first
       }
       // A 3D object under the brush takes the paint on its surface (by UV) instead of a flat layer.
-      if (Layer* a = Active(doc); a != nullptr && sSurfacePaint && !sEditMask && (sTool == kBrush || sTool == kEraser) &&
+      if (Layer* a = Active(doc); a != nullptr && sSurfacePaint && !MaskEditing() && (sTool == kBrush || sTool == kEraser) &&
                                   doc->CanSurfacePaint(a->id))
       {
          Scene2DNode::SurfacePoint sp;
@@ -3865,7 +3892,7 @@ namespace
             }
          }
       }
-      if (sTool == kInpaint && !doc->quickMask && !sEditMask)
+      if (sTool == kInpaint && !doc->quickMask && !MaskEditing())
       {
          // Remove: the stroke is kept as points; the fill runs on release (or on Apply when strokes wait).
          Scene2DNode::RemoveStroke st;
@@ -3920,7 +3947,7 @@ namespace
       if (!painter && !doc->quickMask)
       {
          Layer* a = Active(doc);
-         if (a != nullptr && a->kind == Kind::Group && !sEditMask)
+         if (a != nullptr && a->kind == Kind::Group && !MaskEditing())
          {
             std::vector<int> targets;
             for (const Layer& l : doc->Layers())
@@ -3978,7 +4005,7 @@ namespace
          }
          const bool live = a != nullptr && (a->kind == Kind::Node || a->kind == Kind::Text || a->kind == Kind::Vector) &&
                            !(a->kind == Kind::Node && a->HasSkin());
-         if (live && !sEditMask && sTool == kEraser)
+         if (live && !MaskEditing() && sTool == kEraser)
          {
             PushUndoCheckpoint("Erase");
             if (!a->HasPixelMask())
@@ -3993,15 +4020,15 @@ namespace
             sOp.docStart = at;
             return;
          }
-         if (live && !sEditMask && sTool == kClone)
+         if (live && !MaskEditing() && sTool == kClone)
             cloneAbove = true;
-         else if (live && !sEditMask)
+         else if (live && !MaskEditing())
          {
             PushUndoCheckpoint("Rasterise a copy");
             RasterCopy(doc, a->id);
          }
          a = Active(doc);
-         if (!cloneAbove && (a == nullptr || (a->kind != Kind::Paint && !(sEditMask && a->HasPixelMask()))))
+         if (!cloneAbove && (a == nullptr || (a->kind != Kind::Paint && !MaskTargeted(a))))
             return;
       }
       PushUndoCheckpoint(sTool == kEraser ? "Erase" : RetouchTool(sTool) ? "Retouch" : "Paint");
@@ -4122,7 +4149,7 @@ namespace
       const size_t undo0 = gUndoStack.size();
       PushUndoCheckpoint("Fill");
       // The matrix: on a shape the bucket sets its fill, on text its colour (the live layer stays live).
-      if (Layer* a = Active(doc); a != nullptr && !doc->quickMask && !sEditMask)
+      if (Layer* a = Active(doc); a != nullptr && !doc->quickMask && !MaskEditing())
       {
          if (a->kind == Kind::Text)
          {
@@ -4159,7 +4186,7 @@ namespace
       // A node, text or vector layer (or none) has no pixels to flood: the region is found in the picture and
       // filled on a new paint layer above (Affinity's Source: current and below). Nothing landed, no layer.
       const Layer* was = Active(doc);
-      const bool fresh = !doc->quickMask && !(sEditMask && was != nullptr && was->HasPixelMask()) &&
+      const bool fresh = !doc->quickMask && !MaskTargeted(was) &&
                          (was == nullptr || was->kind != Kind::Paint);
       const int wasId = was != nullptr ? was->id : 0;   // the layer list may move when a layer is added
       int target = 0;
@@ -7486,7 +7513,7 @@ namespace
          const bool targets = sTool == kWand || sTool == kFill || sTool == kEraser || sTool == kFloodErase || sTool == kBgErase ||
                               sTool == kBlemish || sTool == kObjectSel || sTool == kPerspective ||
                               (sTool == kMeshWarp && !NearMeshHandle(doc, mouse));
-         if (targets && !rangePick && !(inRulerTop || inRulerLeft) && !io.KeyAlt && !sEditMask && !doc->quickMask)
+         if (targets && !rangePick && !(inRulerTop || inRulerLeft) && !io.KeyAlt && !MaskEditing() && !doc->quickMask)
             ToolTargetAt(doc, sMouseDoc);
          if (rangePick)
          {
@@ -11113,7 +11140,7 @@ namespace
             if (UiInteract::Hit("##pthumb", tsz))
             {
                SelectOnly(id);
-               sEditMask = false;
+               sEditMask = sEditFxMask = false;
                sVecTarget = 0;
             }
             if (!aimMask && !aimVMask && Active(doc) == l)
@@ -11160,6 +11187,7 @@ namespace
                {
                   SelectOnly(id);
                   sEditMask = true;
+                  sEditFxMask = false;
                   sVecTarget = 0;
                }
             }
@@ -11173,7 +11201,10 @@ namespace
                if (!Selected(id))
                   SelectOnly(id);
                if (MenuParts::Item(T("Paint Mask"), nullptr, aimMask))
+               {
                   sEditMask = true;
+                  sEditFxMask = false;
+               }
                if (MenuParts::Item(l->pmaskOn ? T("Disable Mask") : T("Enable Mask"), nullptr))
                {
                   PushUndoCheckpoint(l->pmaskOn ? "Turn mask off" : "Turn mask on");
@@ -11213,7 +11244,7 @@ namespace
                else
                {
                   SelectOnly(id);
-                  sEditMask = false;
+                  sEditMask = sEditFxMask = false;
                   sVecTarget = 1;
                   sItem = l->vmask.empty() ? -1 : (int)l->vmask.size() - 1;
                   sItemLayer = id;
@@ -11231,7 +11262,7 @@ namespace
                   SelectOnly(id);
                if (MenuParts::Item(T("Edit Vector Mask"), nullptr, aimVMask))
                {
-                  sEditMask = false;
+                  sEditMask = sEditFxMask = false;
                   sVecTarget = 1;
                   sItem = l->vmask.empty() ? -1 : (int)l->vmask.size() - 1;
                   sItemLayer = id;
@@ -11429,7 +11460,7 @@ namespace
                {
                   if (MenuParts::Item(T("Edit Vector Mask"), nullptr, sVecTarget == 1 && Active(doc) == l))
                   {
-                     sEditMask = false;
+                     sEditMask = sEditFxMask = false;
                      sVecTarget = 1;
                      sItem = l->vmask.empty() ? -1 : (int)l->vmask.size() - 1;
                      sItemLayer = l->id;
@@ -12351,9 +12382,13 @@ namespace
       if (cutToSelection && doc->HasSelection())
       {
          const std::vector<uint8_t>& m = doc->SelectionPixels();
-         if (m.size() == (size_t)W * H)
-            for (size_t i = 0; i < m.size(); i++)
-               rgba[i * 4 + 3] = (uint8_t)(rgba[i * 4 + 3] * m[i] / 255);
+         if (m.size() == (size_t)W * H)   // the render is top-down, the selection bottom row first
+            for (int y = 0; y < H; y++)
+               for (int x = 0; x < W; x++)
+               {
+                  uint8_t& a = rgba[((size_t)y * W + x) * 4 + 3];
+                  a = (uint8_t)(a * m[(size_t)(H - 1 - y) * W + x] / 255);
+               }
       }
       bool any = false;
       for (size_t i = 3; i < rgba.size() && !any; i += 4)
@@ -13570,7 +13605,32 @@ namespace
       FormParts::Inline(0.0f, tok::space_1);
       EffectPresets(l, preW);
       if (!l.effects.empty())
+      {
          NodeRow(T("Mask from"), &l.effMaskUid, true, "effmask" + std::to_string(l.id));
+         // The painted filter mask: black brings the layer back as it was there.
+         if (!l.HasFilterMask())
+         {
+            if (TextChip(L("Paint a mask##v2dfmadd"), false, T("Add a filter mask to paint where the effects show")))
+               sPending.what = Pending::AddFxMask;
+         }
+         else
+         {
+            const bool aim = sEditFxMask && Active(doc) == &l;
+            if (TextChip(L("Paint mask##v2dfmpaint"), aim, T("The brush paints the filter mask")))
+            {
+               SelectOnly(l.id);
+               sEditFxMask = !aim;
+               sEditMask = false;
+            }
+            FormParts::Inline(0.0f, tok::space_1);
+            if (TextChip(L("Blur##v2dfmblur"), false, T("Blur the filter mask: feathers its edges")))
+               sPending.what = Pending::BlurFxMask;
+            FormParts::Inline(0.0f, tok::space_1);
+            if (TextChip(L("Delete##v2dfmdel"), false, T("Delete the filter mask")))
+               sPending.what = Pending::RemoveFxMask;
+            BarSlider("##v2dfmblurpx", &sFxMaskBlur, params::view2d::feather_lo, params::view2d::feather_hi, "Blur %.0f px", kWellL);
+         }
+      }
       for (int i : ReorderDrag::Order("V2DEFF", (int)l.effects.size()))
       {
          ReorderDrag::Flow(i);
@@ -14645,6 +14705,27 @@ namespace
          break;
       case Pending::Copy:
       case Pending::Cut:
+         // The filter mask targeted: its grey is what is copied (never the layer mask); a cut hides the effects there.
+         if (Layer* fa = Active(doc); sEditFxMask && fa != nullptr && fa->HasFilterMask() && !doc->quickMask)
+         {
+            const bool cut = todo.what == Pending::Cut;
+            const size_t undo0 = gUndoStack.size();
+            PushUndoCheckpoint(cut ? "Cut" : "Copy");
+            const int src = fa->id;
+            if (const int nid = doc->FilterMaskToLayer(src, src))
+            {
+               ClipToOs(doc, { nid });
+               sClip = doc->CopyLayers({ nid });
+               sPasteCount = -1;
+               doc->RemoveLayer(nid);
+               SelectOnly(src);
+               if (cut)
+                  doc->FillFilterMask(src, 0.0f);
+            }
+            else
+               gUndoStack.resize(undo0);
+            break;
+         }
          // The layer the user picked is the one copied. A new selection already picked the layer it covers; re-targeting
          // here made a leftover selection copy the same top layer's pixels again whatever layer was picked since.
          if (SelectionActsOnPixels(doc))
@@ -14715,7 +14796,8 @@ namespace
          {
             PushUndoCheckpoint("Add layer mask");
             doc->AddPixelMask(a->id);
-            sEditMask = true;   // like Photoshop: the new mask is what the brush paints
+            sEditMask = true;
+            sEditFxMask = false;          // like Photoshop: the new mask is what the brush paints
          }
          break;
       case Pending::MaskFromSel:
@@ -14725,6 +14807,7 @@ namespace
             doc->MaskFromSelection(a->id);
             doc->Deselect();
             sEditMask = true;
+            sEditFxMask = false;
          }
          break;
       case Pending::ApplyMask:
@@ -14733,8 +14816,39 @@ namespace
             const size_t undo0 = gUndoStack.size();
             PushUndoCheckpoint("Apply layer mask");
             if (doc->ApplyPixelMask(a->id))
-               sEditMask = false;
+               sEditMask = sEditFxMask = false;
             else
+               gUndoStack.resize(undo0);
+         }
+         break;
+      case Pending::AddFxMask:
+         if (Layer* a = Active(doc))
+         {
+            const size_t undo0 = gUndoStack.size();
+            PushUndoCheckpoint("Add filter mask");
+            if (doc->AddFilterMask(a->id))
+            {
+               sEditFxMask = true;   // like the layer mask: the new mask is what the brush paints
+               sEditMask = false;
+            }
+            else
+               gUndoStack.resize(undo0);
+         }
+         break;
+      case Pending::RemoveFxMask:
+         if (Layer* a = Active(doc); a != nullptr && a->HasFilterMask())
+         {
+            PushUndoCheckpoint("Delete filter mask");
+            doc->RemoveFilterMask(a->id);
+            sEditFxMask = false;
+         }
+         break;
+      case Pending::BlurFxMask:
+         if (Layer* a = Active(doc))
+         {
+            const size_t undo0 = gUndoStack.size();
+            PushUndoCheckpoint("Blur filter mask");
+            if (!doc->BlurFilterMask(a->id, sFxMaskBlur))
                gUndoStack.resize(undo0);
          }
          break;
@@ -14752,7 +14866,7 @@ namespace
          {
             PushUndoCheckpoint("Delete layer mask");
             doc->RemovePixelMask(a->id);
-            sEditMask = false;
+            sEditMask = sEditFxMask = false;
          }
          break;
       case Pending::ToDraw:
@@ -16532,9 +16646,184 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          ToggleMaskView(doc);
          doc->RemovePixelMask(r);
          expect("parity: the view ends with its layer or mask (mask)", MaskViewLayer(doc) == 0);
-         sEditMask = false;
+         sEditMask = sEditFxMask = false;
          for (int id : { r, q, p })
             doc->RemoveLayer(id);
+         doc->Deselect();
+         doc->Commit();
+      }
+      // ledger-gaps Block A: the painted filter mask. A red layer under an Invert effect shows cyan; black on its
+      // filter mask brings the red back there. A layer mask hides the bottom band, so a copy can tell the two apart.
+      {
+         const float red[3] = { 1, 0, 0 };
+         const int Wi = (int)W, Hi = (int)H;
+         const int p = doc->AddPaintLayer();
+         doc->SelectAll();
+         doc->FillPixels(p, red, 1.0f);
+         doc->SelectRect(0, 0, W, H - 60, Scene2DNode::kSelNew, 0, false);
+         doc->MaskFromSelection(p);
+         doc->Deselect();
+         doc->FindLayer(p)->effects.push_back(NewNativeEffect(Scene2DNode::kAdjInvert));
+         doc->Commit();
+         SelectOnly(p);
+         sEditMask = sEditFxMask = false;
+         auto fmAt = [&](int x, int y) {
+            std::vector<uint8_t> m;
+            return doc->FilterMaskPixels(p, m) ? (int)m[(size_t)(Hi - 1 - y) * Wi + x] : -1;
+         };
+         auto isRed = [&](const std::vector<uint8_t>& px, int x, int y) {
+            const uint8_t* c = &px[((size_t)(Hi - 1 - y) * Wi + x) * 4];
+            return c[0] > 200 && c[1] < 60 && c[2] < 60;
+         };
+         auto isCyan = [&](const std::vector<uint8_t>& px, int x, int y) {
+            const uint8_t* c = &px[((size_t)(Hi - 1 - y) * Wi + x) * 4];
+            return c[0] < 60 && c[1] > 200 && c[2] > 200;
+         };
+         auto layerRed = [&](int x, int y) {
+            std::vector<uint8_t> px;
+            int pw = 0, ph = 0;
+            if (!doc->ReadPaint(p, px, pw, ph) || x >= pw || y >= ph)
+               return false;
+            const uint8_t* c = &px[((size_t)(ph - 1 - y) * pw + x) * 4];
+            return c[0] > 250 && c[1] < 5 && c[3] == 255;
+         };
+         size_t u0 = gUndoStack.size();
+         sPending.what = Pending::AddFxMask;
+         RunPending(doc);
+         const std::vector<uint8_t> fx0 = picture(doc);
+         expect("filter mask: added white, the brush targets it, one undo step",
+                doc->FindLayer(p)->HasFilterMask() && sEditFxMask && !sEditMask && fmAt(200, 100) == 255 &&
+                gUndoStack.size() == u0 + 1 && gUndoStack.back().label == "Add filter mask" && isCyan(fx0, 200, 100));
+         int target = -1;
+         expect("parity: a shown filter mask takes the paint", PaintTarget(doc, target, false) == p && target == 3);
+         // A black stroke through the real canvas path.
+         const int keepTool = sTool;
+         float keepFg[3];
+         std::copy(sFg, sFg + 3, keepFg);
+         sTool = kBrush;
+         BrushEngine::Brush& br = ToolBrush();
+         const BrushEngine::Brush keepBrush = br;
+         br.mode = 0;
+         br.size = 40.0f;
+         br.hardness = 1.0f;
+         br.opacity = br.flow = 1.0f;
+         br.pressureSize = br.pressureOpacity = false;
+         br.lockAlpha = false;
+         sFg[0] = sFg[1] = sFg[2] = 0.0f;
+         sHaveLast = false;
+         u0 = gUndoStack.size();
+         const float sx0 = 100.0f, sy0 = 100.0f, sy1 = 200.0f;
+         BeginStroke(doc, ImVec2(sx0, sy0), false);
+         for (int i = 1; i <= 32; i++)
+            doc->PaintTo(100.0f + 200.0f * i / 32.0f, 100.0f, 1.0f);
+         EndStroke(doc);
+         const std::vector<uint8_t> fx1 = picture(doc);
+         expect("parity: painting the filter mask hides the filters there in one undo step",
+                fmAt(200, 100) == 0 && fmAt(200, 300) == 255 && isRed(fx1, 200, 100) && isCyan(fx1, 200, 300) &&
+                layerRed(200, 100) && gUndoStack.size() == u0 + 1);
+         // Clear and Cut with the filter mask targeted act on the mask, never on the layer's colour pixels.
+         doc->SelectRect(W - 300, 300, W - 100, 400, Scene2DNode::kSelNew, 0, false);
+         const bool cleared = ClearOrFill(doc, 0);
+         const std::vector<uint8_t> fx2 = picture(doc);
+         doc->SelectRect(W - 300, 500, W - 100, 600, Scene2DNode::kSelNew, 0, false);
+         sPending.what = Pending::Cut;
+         RunPending(doc);
+         expect("parity: a shown filter mask wins over color selection for cut and clear",
+                cleared && fmAt(Wi - 200, 350) == 0 && layerRed(Wi - 200, 350) && isRed(fx2, Wi - 200, 350) && isCyan(fx2, Wi - 400, 350) &&
+                fmAt(Wi - 200, 550) == 0 && layerRed(Wi - 200, 550) && sClip.size() == 1 && Active(doc) == doc->FindLayer(p));
+         // Copy where the layer mask hides (the bottom band) but the filter mask is white: the clip is the white grey,
+         // opaque, with no layer mask riding along.
+         doc->SelectRect(W - 300, H - 40, W - 100, H - 10, Scene2DNode::kSelNew, 0, false);
+         sPending.what = Pending::Copy;
+         RunPending(doc);
+         bool clipOk = sClip.size() == 1 && sClip[0].kind == Kind::Paint && !sClip[0].HasPixelMask() && !sClip[0].HasFilterMask();
+         if (clipOk)
+         {
+            const std::vector<int> pasted = doc->PasteLayers(sClip, p, 0, 0);
+            std::vector<uint8_t> px;
+            int pw = 0, ph = 0;
+            clipOk = pasted.size() == 1 && doc->ReadPaint(pasted[0], px, pw, ph) && pw == Wi && ph == Hi;
+            if (clipOk)
+            {
+               const uint8_t* in = &px[((size_t)(ph - 1 - (Hi - 25)) * pw + (Wi - 200)) * 4];
+               const uint8_t* out = &px[((size_t)(ph - 1 - 100) * pw + 200) * 4];
+               clipOk = in[0] == 255 && in[3] == 255 && out[3] == 0;
+            }
+            for (int id : pasted)
+               doc->RemoveLayer(id);
+         }
+         expect("parity: copying the filter mask never copies the layer mask", clipOk);
+         // Blur: a hard edge in the mask goes soft.
+         doc->SelectRect(0, 700, W / 2, H - 60, Scene2DNode::kSelNew, 0, false);
+         doc->FillFilterMask(p, 0.0f);
+         doc->Deselect();
+         const int hard = fmAt(Wi / 2 + 2, 800);
+         sFxMaskBlur = 8.0f;
+         u0 = gUndoStack.size();
+         sPending.what = Pending::BlurFxMask;
+         RunPending(doc);
+         const int soft = fmAt(Wi / 2 + 2, 800);
+         expect("parity: blurring the filter mask feathers it", hard == 255 && soft > 20 && soft < 235 && fmAt(200, 800) == 0 &&
+                                                               fmAt(Wi - 200, 800) == 255 && gUndoStack.size() == u0 + 1 &&
+                                                               gUndoStack.back().label == "Blur filter mask");
+         // A node layer (smart object) with the filter mask targeted: the brush paints the mask and the layer stays a
+         // live node layer (no rasterised copy, no new layer); Duplicate still copies the whole layer with its mask.
+         Layer& nl = doc->AddLayer(Kind::Node, 0, p);
+         const int n = nl.id;
+         nl.effects.push_back(NewNativeEffect(Scene2DNode::kAdjInvert));
+         doc->Commit();
+         SelectOnly(n);
+         sPending.what = Pending::AddFxMask;
+         RunPending(doc);
+         const size_t layers0 = doc->Layers().size();
+         sHaveLast = false;
+         BeginStroke(doc, ImVec2(sx0, sy1), false);
+         doc->PaintTo(300, 200, 1.0f);
+         EndStroke(doc);
+         std::vector<uint8_t> nm;
+         const bool painted = doc->FilterMaskPixels(n, nm) && nm[(size_t)(Hi - 1 - 200) * Wi + 200] == 0;
+         sPending.what = Pending::Duplicate;
+         RunPending(doc);
+         const Layer* dup = Active(doc);
+         expect("parity: the filter mask target leaves the smart object commands alone",
+                painted && doc->FindLayer(n) != nullptr && doc->FindLayer(n)->kind == Kind::Node && doc->Layers().size() == layers0 + 1 &&
+                dup != nullptr && dup->id != n && dup->kind == Kind::Node && dup->HasFilterMask() && dup->fmtiles == doc->FindLayer(n)->fmtiles);
+         // Saved and loaded with the document.
+         const std::string text = doc->DocText();
+         expect("filter mask: saved with the document", text.find("fmask " + std::to_string(p) + " ") != std::string::npos);
+         sPending.what = Pending::RemoveFxMask;
+         SelectOnly(p);
+         RunPending(doc);
+         expect("filter mask: delete removes it", !doc->FindLayer(p)->HasFilterMask() && !sEditFxMask);
+         br = keepBrush;
+         std::copy(keepFg, keepFg + 3, sFg);
+         sTool = keepTool;
+         sEditMask = sEditFxMask = false;
+         for (int id : { dup != nullptr ? dup->id : 0, n, p })
+            if (id != 0)
+               doc->RemoveLayer(id);
+         doc->Deselect();
+         doc->Commit();
+      }
+      // Copy Merged with a selection keeps the selected area where it is (the render is top-down, the selection is
+      // not): a selection near the top copies the top.
+      {
+         const float green[3] = { 0, 1, 0 };
+         const int g = doc->AddPaintLayer();
+         doc->SelectAll();
+         doc->FillPixels(g, green, 1.0f);
+         doc->SelectRect(0, 0, W, 100, Scene2DNode::kSelNew, 0, false);
+         doc->Commit();
+         const int m = MergedLayer(doc, { g }, true, 0);
+         std::vector<uint8_t> px;
+         int pw = 0, ph = 0;
+         bool ok = m != 0 && doc->ReadPaint(m, px, pw, ph) && ph == (int)H;
+         if (ok)
+            ok = px[((size_t)(ph - 1 - 50) * pw + 10) * 4 + 3] == 255 && px[((size_t)(ph - 1 - ((int)H - 50)) * pw + 10) * 4 + 3] == 0;
+         expect("copy merged with a selection keeps the selected area in place", ok);
+         for (int id : { m, g })
+            if (id != 0)
+               doc->RemoveLayer(id);
          doc->Deselect();
          doc->Commit();
       }
@@ -18531,7 +18820,7 @@ bool View2DJourneySetup(const std::string& line, std::string* err)
       sTab = 0;
       gView2DDock = 0;
       gPianoRollOpen = false;   // a journey that opened it must not take the next journey's keys
-      sEditMask = false;        // a journey that added a mask left mask editing on; the next one paints the layer
+      sEditMask = sEditFxMask = false;        // a journey that added a mask left mask editing on; the next one paints the layer
       sTextEdit = 0;
       return true;
    }
@@ -19319,7 +19608,7 @@ int View2DAffinityAb(const char* dir)
       doc->Commit();
       SelectOnly(l.id);
       doc->CookIfNeeded(++frame);
-      sEditMask = false;
+      sEditMask = sEditFxMask = false;
       doc->quickMask = false;
       const bool ran = op.run(doc, Active(doc) != nullptr ? Active(doc)->id : 0);
       doc->Deselect();

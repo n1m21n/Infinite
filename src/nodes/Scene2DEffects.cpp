@@ -442,7 +442,22 @@ void Scene2DNode::DrawEffects(const Layer& l, int depth, int frameId, float opac
       m->CookIfNeeded(frameId);
       if (const unsigned mt = m->GetOutputTexture())
          if (cur != orig && EffMix(ping, orig, cur, mt, 1.0f, 0, false))
+         {
             cur = mEff[ping].tex;
+            ping ^= 1;
+         }
+   }
+   // The painted filter mask: black brings the layer back as it was, white keeps the effects (live while painted).
+   if (l.HasFilterMask() && cur != orig)
+   {
+      auto it = mFxMasks.find(l.id);
+      if (it != mFxMasks.end() && it->second.fbo.tex != 0)
+      {
+         const bool live = mStroke.Active() && mPaintId == l.id && mPaintTarget == 3;
+         const unsigned mt = live ? mStroke.DisplayTexture(it->second.fbo) : it->second.fbo.tex;
+         if (EffMix(ping, orig, cur, mt, 1.0f, 0, false))
+            cur = mEff[ping].tex;
+      }
    }
    PassArgs a;
    a.bif = l.HasBlendIf() ? &l : nullptr;

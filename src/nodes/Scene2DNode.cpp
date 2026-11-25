@@ -1325,6 +1325,8 @@ Scene2DNode::~Scene2DNode()
       GLUtil::DestroyFbo(kv.second.fbo);
    for (auto& kv : mMasks)
       GLUtil::DestroyFbo(kv.second.fbo);
+   for (auto& kv : mFxMasks)
+      GLUtil::DestroyFbo(kv.second.fbo);
    for (auto* m : { &mVec, &mVMasks })
       for (auto& kv : *m)
          if (kv.second.tex != 0)
@@ -1382,6 +1384,7 @@ int Scene2DNode::LiveTextures() const
    for (const auto& kv : mRelief) n += kv.second.tex != 0;
    for (const auto& kv : mSurfaces) n += kv.second.fbo.tex != 0;
    for (const auto& kv : mMasks) n += kv.second.fbo.tex != 0;
+   for (const auto& kv : mFxMasks) n += kv.second.fbo.tex != 0;
    for (const auto* m : { &mVec, &mVMasks })
       for (const auto& kv : *m) n += kv.second.tex != 0;
    for (const auto& kv : mDepth)
@@ -2262,6 +2265,12 @@ void Scene2DNode::Serialize()
          for (const std::string& k : l.mtiles) o << " " << k;
          o << "\n";
       }
+      if (l.HasFilterMask())
+      {
+         o << "fmask " << l.id << " " << l.fmw << " " << l.fmh;
+         for (const std::string& k : l.fmtiles) o << " " << k;
+         o << "\n";
+      }
    }
    mText = o.str();
    mParsedText = mText;
@@ -2676,9 +2685,9 @@ void Scene2DNode::Parse()
          }
          else if (key == "tpara")
             s >> l->indentL >> l->indentR >> l->indentFirst >> l->spaceBefore >> l->spaceAfter;
-         else if (key == "paint" || key == "pmask")
+         else if (key == "paint" || key == "pmask" || key == "fmask")
          {
-            const bool mask = key == "pmask";
+            const bool mask = key == "pmask", fx = key == "fmask";
             int on = 1, w = 0, h = 0;
             if (mask)
                s >> on;
@@ -2691,7 +2700,13 @@ void Scene2DNode::Parse()
             while (keys.size() < n && s >> k)
                keys.push_back(TileStore::IsKey(k.data(), k.size()) ? k : "-");
             keys.resize(n, "-");
-            if (mask)
+            if (fx)
+            {
+               l->fmw = w;
+               l->fmh = h;
+               l->fmtiles = keys;
+            }
+            else if (mask)
             {
                l->pmaskOn = on != 0;
                l->mw = w;
@@ -3806,7 +3821,7 @@ void Scene2DNode::TopHashes(const std::vector<const Layer*>& kids, std::vector<u
                h = Mix(h, n->TextureRevision());
                h = Mix(h, (unsigned long long)n->GetOutputWidth() * 65536ull + (unsigned long long)n->GetOutputHeight());
             }
-         if (l.kind == Kind::Paint || l.kind == Kind::Vector || l.kind == Kind::Text || l.HasPixelMask() || l.HasSkin())
+         if (l.kind == Kind::Paint || l.kind == Kind::Vector || l.kind == Kind::Text || l.HasPixelMask() || l.HasFilterMask() || l.HasSkin())
             h = Mix(h, mPaintEdits);
          if (mStroke.Active() && mPaintId == l.id)
             h = Mix(h, (unsigned long long)mStroke.DabCount() + 1ull);
