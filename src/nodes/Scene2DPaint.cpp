@@ -2529,14 +2529,19 @@ namespace
       "in vec2 vUv;\n"
       "out vec4 fragColor;\n"
       "uniform sampler2D uSrc;\n"
-      "uniform vec2 uD[16];\n"   // each grid point's move, in uv, row by row from the top
+      "uniform vec2 uD[144];\n"   // each grid point's move, in uv, row by row from the top (12 x 12 at most)
+      "uniform float uUs[12];\n"  // the grid's column lines, 0 .. 1 across its box
+      "uniform float uVs[12];\n"  // its row lines, 0 .. 1 down
+      "uniform int uNx;\n"
+      "uniform int uNy;\n"
       "uniform vec4 uR;\n"       // the grid's box in uv, y from the top (x0, y0, x1, y1)
       "vec2 disp(vec2 p) {\n"
-      "   vec2 g = clamp((vec2(p.x, 1.0 - p.y) - uR.xy) / max(uR.zw - uR.xy, vec2(1e-6)), 0.0, 1.0) * 3.0;\n"
-      "   ivec2 i = ivec2(min(floor(g), vec2(2.0)));\n"
-      "   vec2 f = g - vec2(i);\n"
-      "   int k = i.y * 4 + i.x;\n"
-      "   return mix(mix(uD[k], uD[k + 1], f.x), mix(uD[k + 4], uD[k + 5], f.x), f.y);\n"
+      "   vec2 g = clamp((vec2(p.x, 1.0 - p.y) - uR.xy) / max(uR.zw - uR.xy, vec2(1e-6)), 0.0, 1.0);\n"
+      "   int i = 0, j = 0;\n"
+      "   for (int k = 1; k < 11; k++) { if (k < uNx - 1 && g.x >= uUs[k]) i = k; if (k < uNy - 1 && g.y >= uVs[k]) j = k; }\n"
+      "   vec2 f = vec2((g.x - uUs[i]) / max(uUs[i + 1] - uUs[i], 1e-6), (g.y - uVs[j]) / max(uVs[j + 1] - uVs[j], 1e-6));\n"
+      "   int k = j * uNx + i;\n"
+      "   return mix(mix(uD[k], uD[k + 1], f.x), mix(uD[k + uNx], uD[k + uNx + 1], f.x), f.y);\n"
       "}\n"
       "void main() {\n"
       "   vec2 p = vUv;\n"
@@ -3821,7 +3826,217 @@ bool Scene2DNode::AiDecodeApply(uint64_t key, int w, int h, const float p[4], bo
    return true;
 }
 
-bool Scene2DNode::MeshRest(int id, float out[32])
+void Scene2DNode::WarpGridRest(WarpGrid& g, const float c[8])
+{
+   g.pts.assign((size_t)g.Count() * 2, 0.0f);
+   for (int j = 0; j < g.Ny(); j++)
+      for (int i = 0; i < g.Nx(); i++)
+      {
+         const float u = g.us[i], v = g.vs[j];
+         const size_t k = ((size_t)j * g.Nx() + i) * 2;
+         // TL TR BR BL
+         g.pts[k] = (1 - v) * ((1 - u) * c[0] + u * c[2]) + v * ((1 - u) * c[6] + u * c[4]);
+         g.pts[k + 1] = (1 - v) * ((1 - u) * c[1] + u * c[3]) + v * ((1 - u) * c[7] + u * c[5]);
+      }
+}
+
+bool Scene2DNode::WarpGridParam(const WarpGrid& g, float x, float y, float& s, float& t)
+{
+   if (g.Nx() < 2 || g.Ny() < 2 || g.pts.size() != (size_t)g.Count() * 2)
+      return false;
+   auto P = [&](int i, int j, int c) { return g.pts[((size_t)j * g.Nx() + i) * 2 + c]; };
+   // Each cell's bilinear map inverted by Newton; the first cell that holds the point wins, else the nearest.
+   float bestErr = 1e30f;
+   for (int j = 0; j + 1 < g.Ny(); j++)
+      for (int i = 0; i + 1 < g.Nx(); i++)
+      {
+         float fu = 0.5f, fv = 0.5f;
+         for (int it = 0; it < 16; it++)
+         {
+            float q[2], du[2], dv[2];
+            for (int c = 0; c < 2; c++)
+            {
+               const float a = P(i, j, c), b = P(i + 1, j, c), d = P(i, j + 1, c), e = P(i + 1, j + 1, c);
+               q[c] = (1 - fv) * ((1 - fu) * a + fu * b) + fv * ((1 - fu) * d + fu * e) - (c == 0 ? x : y);
+               du[c] = (1 - fv) * (b - a) + fv * (e - d);
+               dv[c] = (1 - fu) * (d - a) + fu * (e - b);
+            }
+            const float det = du[0] * dv[1] - du[1] * dv[0];
+            if (std::fabs(det) < 1e-9f)
+               break;
+            fu -= (q[0] * dv[1] - q[1] * dv[0]) / det;
+            fv -= (du[0] * q[1] - du[1] * q[0]) / det;
+         }
+         const float cu = std::clamp(fu, 0.0f, 1.0f), cv = std::clamp(fv, 0.0f, 1.0f);
+         const float err = std::fabs(fu - cu) + std::fabs(fv - cv);
+         if (err < bestErr)
+         {
+            bestErr = err;
+            s = g.us[i] + cu * (g.us[i + 1] - g.us[i]);
+            t = g.vs[j] + cv * (g.vs[j + 1] - g.vs[j]);
+         }
+      }
+   return bestErr < 1e30f;
+}
+
+namespace
+{
+   using WarpGrid = Scene2DNode::WarpGrid;
+   const float kThirds[4] = { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f };
+   const float kLineEps = 1e-4f;    // two grid lines closer than this (in box fractions) are one
+   const float kLossPx = 1e-3f;     // a point this close to where its neighbours put it carries no edit
+
+   bool LinesAre(const std::vector<float>& k, const float* want, int n)
+   {
+      if ((int)k.size() != n)
+         return false;
+      for (int i = 0; i < n; i++)
+         if (std::fabs(k[i] - want[i]) > kLineEps)
+            return false;
+      return true;
+   }
+
+   // A new line at fraction f: column (axis 0) or row (axis 1), its points on the bilinear pieces either side.
+   bool InsertLine(WarpGrid& g, int axis, float f)
+   {
+      std::vector<float>& k = axis == 0 ? g.us : g.vs;
+      if ((int)k.size() >= Scene2DNode::kWarpLinesMax || f <= kLineEps || f >= 1.0f - kLineEps)
+         return false;
+      const int at = (int)(std::upper_bound(k.begin(), k.end(), f) - k.begin());
+      if (std::fabs(k[at - 1] - f) < kLineEps || std::fabs(k[at] - f) < kLineEps)
+         return false;
+      const float w = (f - k[at - 1]) / (k[at] - k[at - 1]);
+      const int nx = g.Nx(), ny = g.Ny();
+      std::vector<float> out;
+      if (axis == 0)
+      {
+         out.reserve((size_t)(nx + 1) * ny * 2);
+         for (int j = 0; j < ny; j++)
+            for (int i = 0; i <= nx; i++)
+               for (int c = 0; c < 2; c++)
+               {
+                  if (i < at)
+                     out.push_back(g.pts[((size_t)j * nx + i) * 2 + c]);
+                  else if (i > at)
+                     out.push_back(g.pts[((size_t)j * nx + i - 1) * 2 + c]);
+                  else
+                     out.push_back((1 - w) * g.pts[((size_t)j * nx + at - 1) * 2 + c] + w * g.pts[((size_t)j * nx + at) * 2 + c]);
+               }
+      }
+      else
+      {
+         out.reserve((size_t)nx * (ny + 1) * 2);
+         for (int j = 0; j <= ny; j++)
+            for (int i = 0; i < nx; i++)
+               for (int c = 0; c < 2; c++)
+               {
+                  if (j < at)
+                     out.push_back(g.pts[((size_t)j * nx + i) * 2 + c]);
+                  else if (j > at)
+                     out.push_back(g.pts[((size_t)(j - 1) * nx + i) * 2 + c]);
+                  else
+                     out.push_back((1 - w) * g.pts[((size_t)(at - 1) * nx + i) * 2 + c] + w * g.pts[((size_t)at * nx + i) * 2 + c]);
+               }
+      }
+      k.insert(k.begin() + at, f);
+      g.pts.swap(out);
+      return true;
+   }
+
+   void RemoveLine(WarpGrid& g, int axis, int at)
+   {
+      const int nx = g.Nx(), ny = g.Ny();
+      std::vector<float> out;
+      for (int j = 0; j < ny; j++)
+         for (int i = 0; i < nx; i++)
+            if ((axis == 0 ? i : j) != at)
+               for (int c = 0; c < 2; c++)
+                  out.push_back(g.pts[((size_t)j * nx + i) * 2 + c]);
+      std::vector<float>& k = axis == 0 ? g.us : g.vs;
+      k.erase(k.begin() + at);
+      g.pts.swap(out);
+   }
+
+   // Whether interior line `at` only carries what its neighbours put there (dropping it loses nothing).
+   bool LineIsPlain(const WarpGrid& g, int axis, int at)
+   {
+      const std::vector<float>& k = axis == 0 ? g.us : g.vs;
+      const float w = (k[at] - k[at - 1]) / (k[at + 1] - k[at - 1]);
+      const int nx = g.Nx(), n = axis == 0 ? g.Ny() : nx;
+      for (int m = 0; m < n; m++)
+         for (int c = 0; c < 2; c++)
+         {
+            auto P = [&](int line) { return axis == 0 ? g.pts[((size_t)m * nx + line) * 2 + c] : g.pts[((size_t)line * nx + m) * 2 + c]; };
+            if (std::fabs(P(at) - ((1 - w) * P(at - 1) + w * P(at + 1))) > kLossPx)
+               return false;
+         }
+      return true;
+   }
+}
+
+bool Scene2DNode::SplitWarpGrid(WarpGrid& moved, WarpGrid& rest, float s, float t, int how)
+{
+   if (moved.us != rest.us || moved.vs != rest.vs || moved.pts.size() != (size_t)moved.Count() * 2 || rest.pts.size() != moved.pts.size())
+      return false;
+   s = std::clamp(s, 0.0f, 1.0f);
+   t = std::clamp(t, 0.0f, 1.0f);
+   bool ok = false;
+   if (how == kWarpSplitRemove)
+   {
+      // The interior line nearest the click, columns winning a tie.
+      auto nearLine = [](const std::vector<float>& k, float v, int& at) {
+         float best = 1e30f;
+         for (int i = 1; i + 1 < (int)k.size(); i++)
+            if (std::fabs(k[i] - v) < best) { best = std::fabs(k[i] - v); at = i; }
+         return best;
+      };
+      int iu = -1, iv = -1;
+      const float du = nearLine(moved.us, s, iu), dv = nearLine(moved.vs, t, iv);
+      const int axis = iu >= 0 && du <= dv ? 0 : iv >= 0 ? 1 : -1;
+      if (axis < 0)
+         return false;
+      RemoveLine(moved, axis, axis == 0 ? iu : iv);
+      RemoveLine(rest, axis, axis == 0 ? iu : iv);
+      // Thirds one way and no lines the other: the Default grid again (its missing thirds put back unbent).
+      const float ends[2] = { 0.0f, 1.0f };
+      const bool cols = LinesAre(moved.us, kThirds, 4) && LinesAre(moved.vs, ends, 2);
+      const bool rows = LinesAre(moved.vs, kThirds, 4) && LinesAre(moved.us, ends, 2);
+      if (cols || rows)
+         for (WarpGrid* g : { &moved, &rest })
+         {
+            InsertLine(*g, cols ? 1 : 0, kThirds[1]);
+            InsertLine(*g, cols ? 1 : 0, kThirds[2]);
+            g->deflt = true;
+         }
+      return true;
+   }
+   // A one-way split of the Default grid: the thirds it replaces go, when no point on them was moved.
+   if (moved.deflt && how != kWarpSplitCross && LinesAre(moved.us, kThirds, 4) && LinesAre(moved.vs, kThirds, 4))
+   {
+      const int axis = how == kWarpSplitH ? 1 : 0;
+      for (int at = 2; at >= 1; at--)
+         if (LineIsPlain(moved, axis, at) && LineIsPlain(rest, axis, at))
+         {
+            RemoveLine(moved, axis, at);
+            RemoveLine(rest, axis, at);
+         }
+   }
+   // A horizontal split line divides rows; a vertical one divides columns.
+   if (how != kWarpSplitH && InsertLine(moved, 0, s))
+   {
+      InsertLine(rest, 0, s);
+      ok = true;
+   }
+   if (how != kWarpSplitV && InsertLine(moved, 1, t))
+   {
+      InsertLine(rest, 1, t);
+      ok = true;
+   }
+   moved.deflt = rest.deflt = false;
+   return ok;
+}
+
+bool Scene2DNode::MeshRest(int id, WarpGrid& out)
 {
    Layers();
    const Layer* l = FindConst(id);
@@ -3837,19 +4052,13 @@ bool Scene2DNode::MeshRest(int id, float out[32])
    }
    else if (l->kind != Kind::Paint || !Corners(*l, c))
       return false;
-   for (int j = 0; j < 4; j++)
-      for (int i = 0; i < 4; i++)
-      {
-         const float u = i / 3.0f, v = j / 3.0f;
-         // TL TR BR BL
-         out[(j * 4 + i) * 2] = (1 - v) * ((1 - u) * c[0] + u * c[2]) + v * ((1 - u) * c[6] + u * c[4]);
-         out[(j * 4 + i) * 2 + 1] = (1 - v) * ((1 - u) * c[1] + u * c[3]) + v * ((1 - u) * c[7] + u * c[5]);
-      }
+   out = WarpGrid();
+   WarpGridRest(out, c);
    return true;
 }
 
-bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store, bool nearest,
-                           const float* rest)
+bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const WarpGrid& moved, bool store, bool nearest,
+                           const WarpGrid* rest)
 {
    Layers();
    Layer* l = FindLayer(id);
@@ -3865,25 +4074,30 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const f
    Surface* src = SyncSurface(mUndoSurf, -id, l->pw, l->ph, from);
    if (mWarpProgram == 0 || src == nullptr)
       return false;
+   const int nx = moved.Nx(), ny = moved.Ny();
+   if (nx < 2 || ny < 2 || nx > kWarpLinesMax || ny > kWarpLinesMax || moved.pts.size() != (size_t)moved.Count() * 2 ||
+       (rest != nullptr && (rest->us != moved.us || rest->vs != moved.vs || rest->pts.size() != moved.pts.size())))
+      return false;
    // Each point's move in surface uv (y up), from where it rests: the grid fitted to the content when `rest` is
    // given, else the whole surface.
-   float d[32], box[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+   std::vector<float> d((size_t)nx * ny * 2);
+   float box[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
    if (rest != nullptr)
    {
       box[0] = box[1] = 1e30f;
       box[2] = box[3] = -1e30f;
    }
-   for (int j = 0; j < 4; j++)
-      for (int i = 0; i < 4; i++)
+   for (int j = 0; j < ny; j++)
+      for (int i = 0; i < nx; i++)
       {
-         const int k = (j * 4 + i) * 2;
+         const size_t k = ((size_t)j * nx + i) * 2;
          float sx = 0, sy = 0, s = 1;
-         DocToSurface(*l, 0, moved[k], moved[k + 1], sx, sy, s);
-         float ru = i / 3.0f, rv = 1.0f - j / 3.0f;
+         DocToSurface(*l, 0, moved.pts[k], moved.pts[k + 1], sx, sy, s);
+         float ru = moved.us[i], rv = 1.0f - moved.vs[j];
          if (rest != nullptr)
          {
             float rx = 0, ry = 0, rs = 1;
-            DocToSurface(*l, 0, rest[k], rest[k + 1], rx, ry, rs);
+            DocToSurface(*l, 0, rest->pts[k], rest->pts[k + 1], rx, ry, rs);
             ru = rx / (float)l->pw;
             rv = ry / (float)l->ph;
             box[0] = std::min(box[0], ru);
@@ -3902,7 +4116,11 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const f
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filt);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filt);
       glUniform1i(GLUtil::UniformLoc(prog, "uSrc"), 0);
-      glUniform2fv(GLUtil::UniformLoc(prog, "uD"), 16, d);
+      glUniform2fv(GLUtil::UniformLoc(prog, "uD"), nx * ny, d.data());
+      glUniform1fv(GLUtil::UniformLoc(prog, "uUs"), nx, moved.us.data());
+      glUniform1fv(GLUtil::UniformLoc(prog, "uVs"), ny, moved.vs.data());
+      glUniform1i(GLUtil::UniformLoc(prog, "uNx"), nx);
+      glUniform1i(GLUtil::UniformLoc(prog, "uNy"), ny);
       glUniform4fv(GLUtil::UniformLoc(prog, "uR"), 1, box);
    });
    if (nearest)

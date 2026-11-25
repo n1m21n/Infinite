@@ -3580,7 +3580,8 @@ namespace
    // Mesh warp: the layer, its pixels when the warp began, and the grid as moved.
    int sMeshId = 0, sMeshPoint = -1;
    std::vector<std::string> sMeshFrom, sMeshStored;
-   float sMeshPts[32] = {}, sMeshPts0[32] = {};
+   Scene2DNode::WarpGrid sMeshG, sMeshG0;   // the grid as pulled, and where its points sat when the warp began
+   int sMeshSplit = -1;            // a Split / Remove Split armed for the next click (Scene2DNode::WarpSplit), -1 none
    ImVec2 sMeshGrab;               // the held point minus the mouse at the press: the point moves by the drag, not to it
 
    BrushEngine::Brush& ToolBrush()
@@ -5294,14 +5295,14 @@ namespace
    // as it was when this warp began, so a second drag does not resample the first.
    // The mesh's rest grid fitted to what the layer draws (its ink box plus a margin), so the handles sit on the picture,
    // not on the page corners. Kept per layer and tiles, since finding the box reads the layer back.
-   bool MeshRestFit(Scene2DNode* doc, const Layer& l, float out[32])
+   bool MeshRestFit(Scene2DNode* doc, const Layer& l, Scene2DNode::WarpGrid& out)
    {
       static int cId = 0;
       static std::vector<std::string> cTiles;
-      static float cPts[32];
+      static Scene2DNode::WarpGrid cGrid;
       if (l.kind == Kind::Paint && cId == l.id && cTiles == l.tiles)
       {
-         std::copy(cPts, cPts + 32, out);
+         out = cGrid;
          return true;
       }
       if (l.kind != Kind::Paint)
@@ -5321,15 +5322,12 @@ namespace
          return doc->MeshRest(l.id, out);
       // On the ink's bounds, as Photoshop's warp grid sits on the layer's bounds.
       const float bx0 = (float)x0, by0 = (float)y0, bx1 = (float)(x1 + 1), by1 = (float)(y1 + 1);
-      for (int j = 0; j < 4; j++)
-         for (int i = 0; i < 4; i++)
-         {
-            out[(j * 4 + i) * 2] = bx0 + (bx1 - bx0) * i / 3.0f;
-            out[(j * 4 + i) * 2 + 1] = by0 + (by1 - by0) * j / 3.0f;
-         }
+      const float c[8] = { bx0, by0, bx1, by0, bx1, by1, bx0, by1 };
+      out = Scene2DNode::WarpGrid();
+      Scene2DNode::WarpGridRest(out, c);
       cId = l.id;
       cTiles = l.tiles;
-      std::copy(out, out + 32, cPts);
+      cGrid = out;
       return true;
    }
 
@@ -5339,9 +5337,9 @@ namespace
       const Layer* al = Active(doc);
       if (al == nullptr || sMeshId != al->id)
          return false;
-      for (int k = 0; k < 16; k++)
+      for (int k = 0; k < sMeshG.Count(); k++)
       {
-         const ImVec2 q = ToScreen(doc, sMeshPts[k * 2], sMeshPts[k * 2 + 1]);
+         const ImVec2 q = ToScreen(doc, sMeshG.pts[k * 2], sMeshG.pts[k * 2 + 1]);
          if (std::hypot(q.x - mouse.x, q.y - mouse.y) < tok::view2d_near_mesh_handle_limit)
             return true;
       }
@@ -5363,18 +5361,28 @@ namespace
          return;
       if (sMeshId != al->id || (al->tiles != sMeshFrom && al->tiles != sMeshStored))
       {
-         if (!MeshRestFit(doc, *al, sMeshPts))
+         if (!MeshRestFit(doc, *al, sMeshG))
             return;
-         std::copy(sMeshPts, sMeshPts + 32, sMeshPts0);
+         sMeshG0 = sMeshG;
          sMeshId = al->id;
          sMeshFrom = al->tiles;
          sMeshStored = al->tiles;
       }
       sMeshPoint = -1;
-      float bd = 10.0f;
-      for (int k = 0; k < 16; k++)
+      // An armed split lands where the click sits on the grid (Photoshop's Split Warp, then a click).
+      if (sMeshSplit >= 0)
       {
-         const ImVec2 q = ToScreen(doc, sMeshPts[k * 2], sMeshPts[k * 2 + 1]);
+         float st[2] = { 0.5f, 0.5f };
+         if (Scene2DNode::WarpGridParam(sMeshG, sMouseDoc.x, sMouseDoc.y, st[0], st[1]))
+            Scene2DNode::SplitWarpGrid(sMeshG, sMeshG0, st[0], st[1], sMeshSplit);
+         sMeshSplit = -1;
+         Touch();
+         return;
+      }
+      float bd = 10.0f;
+      for (int k = 0; k < sMeshG.Count(); k++)
+      {
+         const ImVec2 q = ToScreen(doc, sMeshG.pts[k * 2], sMeshG.pts[k * 2 + 1]);
          const float dd = std::hypot(q.x - mouse.x, q.y - mouse.y);
          if (dd < bd) { bd = dd; sMeshPoint = k; }
       }
@@ -5382,21 +5390,21 @@ namespace
       {
          // Inside the grid but off a handle: the nearest point follows the drag, so pulling on the picture bends it.
          float lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
-         for (int k = 0; k < 16; k++)
+         for (int k = 0; k < sMeshG.Count(); k++)
          {
-            lo[0] = std::min(lo[0], sMeshPts[k * 2]); hi[0] = std::max(hi[0], sMeshPts[k * 2]);
-            lo[1] = std::min(lo[1], sMeshPts[k * 2 + 1]); hi[1] = std::max(hi[1], sMeshPts[k * 2 + 1]);
+            lo[0] = std::min(lo[0], sMeshG.pts[k * 2]); hi[0] = std::max(hi[0], sMeshG.pts[k * 2]);
+            lo[1] = std::min(lo[1], sMeshG.pts[k * 2 + 1]); hi[1] = std::max(hi[1], sMeshG.pts[k * 2 + 1]);
          }
          if (sMouseDoc.x < lo[0] || sMouseDoc.y < lo[1] || sMouseDoc.x > hi[0] || sMouseDoc.y > hi[1])
             return;
          float best = 1e30f;
-         for (int k = 0; k < 16; k++)
+         for (int k = 0; k < sMeshG.Count(); k++)
          {
-            const float dd = std::hypot(sMeshPts[k * 2] - sMouseDoc.x, sMeshPts[k * 2 + 1] - sMouseDoc.y);
+            const float dd = std::hypot(sMeshG.pts[k * 2] - sMouseDoc.x, sMeshG.pts[k * 2 + 1] - sMouseDoc.y);
             if (dd < best) { best = dd; sMeshPoint = k; }
          }
       }
-      sMeshGrab = ImVec2(sMeshPts[sMeshPoint * 2] - sMouseDoc.x, sMeshPts[sMeshPoint * 2 + 1] - sMouseDoc.y);
+      sMeshGrab = ImVec2(sMeshG.pts[sMeshPoint * 2] - sMouseDoc.x, sMeshG.pts[sMeshPoint * 2 + 1] - sMouseDoc.y);
       PushUndoCheckpoint("Mesh warp");
       sOp = Op();
       sOp.kind = 27;
@@ -5406,17 +5414,17 @@ namespace
 
    void MeshDrag(Scene2DNode* doc)
    {
-      if (sMeshPoint < 0 || sMeshPoint >= 16)
+      if (sMeshPoint < 0 || sMeshPoint >= sMeshG.Count())
          return;
-      sMeshPts[sMeshPoint * 2] = sMouseDoc.x + sMeshGrab.x;
-      sMeshPts[sMeshPoint * 2 + 1] = sMouseDoc.y + sMeshGrab.y;
-      if (doc->MeshWarp(sMeshId, sMeshFrom, sMeshPts, false, sMeshNearest, sMeshPts0))
+      sMeshG.pts[sMeshPoint * 2] = sMouseDoc.x + sMeshGrab.x;
+      sMeshG.pts[sMeshPoint * 2 + 1] = sMouseDoc.y + sMeshGrab.y;
+      if (doc->MeshWarp(sMeshId, sMeshFrom, sMeshG, false, sMeshNearest, &sMeshG0))
          Touch();
    }
 
    void MeshRelease(Scene2DNode* doc)
    {
-      if (sMeshPoint >= 0 && doc->MeshWarp(sMeshId, sMeshFrom, sMeshPts, true, sMeshNearest, sMeshPts0))
+      if (sMeshPoint >= 0 && doc->MeshWarp(sMeshId, sMeshFrom, sMeshG, true, sMeshNearest, &sMeshG0))
          if (const Layer* l = doc->FindLayer(sMeshId))
             sMeshStored = l->tiles;
       sMeshPoint = -1;
@@ -5505,21 +5513,24 @@ namespace
       if (sTool == kMeshWarp)
          if (const Layer* al = Active(doc))
          {
-            float pts[32];
+            Scene2DNode::WarpGrid g;
             const bool live = sMeshId == al->id && (al->tiles == sMeshFrom || al->tiles == sMeshStored);
             if (live)
-               std::copy(sMeshPts, sMeshPts + 32, pts);
-            if (live || MeshRestFit(doc, *al, pts))
+               g = sMeshG;
+            if (live || MeshRestFit(doc, *al, g))
             {
-               auto P = [&](int i, int j) { return ToScreen(doc, pts[(j * 4 + i) * 2], pts[(j * 4 + i) * 2 + 1]); };
-               for (int j = 0; j < 4; j++)
-                  for (int i = 0; i < 3; i++)
+               const int nx = g.Nx(), ny = g.Ny();
+               auto P = [&](int i, int j) { return ToScreen(doc, g.pts[(j * nx + i) * 2], g.pts[(j * nx + i) * 2 + 1]); };
+               for (int j = 0; j < ny; j++)
+                  for (int i = 0; i < nx; i++)
                   {
-                     line(P(i, j), P(i + 1, j));
-                     line(P(j, i), P(j, i + 1));
+                     if (i + 1 < nx)
+                        line(P(i, j), P(i + 1, j));
+                     if (j + 1 < ny)
+                        line(P(i, j), P(i, j + 1));
                   }
-               for (int k = 0; k < 16; k++)
-                  dot(P(k % 4, k / 4), 3.5f, live && k == sMeshPoint);
+               for (int k = 0; k < nx * ny; k++)
+                  dot(P(k % nx, k / nx), 3.5f, live && k == sMeshPoint);
             }
          }
       if (sTool == kPerspective)
@@ -9474,6 +9485,16 @@ namespace
       {
          if (TextChip(L("Nearest##v2dmnear"), sMeshNearest, T("Resample nearest neighbour, no smoothing")))
             sMeshNearest = !sMeshNearest;
+         // Photoshop's Split Warp: arm one, then click on the grid where the line goes.
+         static const char* kSplit[4] = { "Split Cross##v2dmsc", "Split H##v2dmsh", "Split V##v2dmsv", "Remove Split##v2dmsr" };
+         static const char* kSplitTip[4] = { "Next click adds a row and a column line", "Next click adds a row line",
+                                             "Next click adds a column line", "Next click removes the nearest split line" };
+         for (int k = 0; k < (int)std::size(kSplit); k++)
+         {
+            gap();
+            if (TextChip(L(kSplit[k]), sMeshSplit == k, T(kSplitTip[k])))
+               sMeshSplit = sMeshSplit == k ? -1 : k;
+         }
       }
       else if (sTool == kStylePick)
       {
@@ -18356,6 +18377,69 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("pick box clipped at the corner", Scene2DNode::PickBox(0, 0, 101, 0.01f, 400, 400, x0, y0, x1, y1) &&
                 x0 == 0 && y0 == 0 && x1 == 400 && y1 == 400);
       }
+      // Mesh warp split (PhotoCraft warp_split_default_grid_tests and warp_remove_split_default_grid_tests): the
+      // 400 x 300 box at 200,150. The Default grid's one-way split keeps the thirds across its line only.
+      {
+         using WG = Scene2DNode::WarpGrid;
+         const float box[8] = { 200, 150, 600, 150, 600, 450, 200, 450 };
+         auto fresh = [&](WG& m, WG& r) { m = WG(); Scene2DNode::WarpGridRest(m, box); r = m; };
+         auto cols = [](const WG& g) { std::vector<float> v; for (int i = 0; i < g.Nx(); i++) v.push_back(g.pts[i * 2]); return v; };
+         auto rows = [](const WG& g) { std::vector<float> v; for (int j = 0; j < g.Ny(); j++) v.push_back(g.pts[(size_t)j * g.Nx() * 2 + 1]); return v; };
+         auto near = [](const std::vector<float>& got, std::vector<float> want) {
+            if (got.size() != want.size())
+               return false;
+            for (size_t i = 0; i < got.size(); i++)
+               if (std::fabs(got[i] - want[i]) > 0.05f)
+                  return false;
+            return true;
+         };
+         auto split = [&](WG& m, WG& r, float x, float y, int how) {
+            float st[2] = { 0, 0 };
+            return Scene2DNode::WarpGridParam(m, x, y, st[0], st[1]) && Scene2DNode::SplitWarpGrid(m, r, st[0], st[1], how);
+         };
+         const std::vector<float> tx = { 200.0f, 200.0f + 400.0f / 3.0f, 200.0f + 800.0f / 3.0f, 600.0f };
+         const std::vector<float> ty = { 150, 250, 350, 450 };
+         WG m, r;
+         fresh(m, r);
+         expect("warp split H of the Default grid", split(m, r, 400, 320, Scene2DNode::kWarpSplitH) &&
+                near(cols(m), tx) && near(rows(m), { 150, 320, 450 }) && near(rows(r), { 150, 320, 450 }));
+         expect("warp split of a split grid adds only its line", split(m, r, 300, 200, Scene2DNode::kWarpSplitV) &&
+                near(cols(m), { tx[0], 300, tx[1], tx[2], tx[3] }) && near(rows(m), { 150, 320, 450 }));
+         fresh(m, r);
+         expect("warp split V of the Default grid", split(m, r, 300, 200, Scene2DNode::kWarpSplitV) &&
+                near(cols(m), { 200, 300, 600 }) && near(rows(m), ty));
+         expect("removing the only V split gives the Default grid back", split(m, r, 300, 300, Scene2DNode::kWarpSplitRemove) &&
+                near(cols(m), tx) && near(rows(m), ty) && m.deflt);
+         fresh(m, r);
+         expect("warp split crosswise keeps both thirds", split(m, r, 300, 320, Scene2DNode::kWarpSplitCross) &&
+                near(cols(m), { tx[0], 300, tx[1], tx[2], tx[3] }) && near(rows(m), { 150, 250, 320, 350, 450 }));
+         fresh(m, r);
+         split(m, r, 400, 320, Scene2DNode::kWarpSplitH);
+         expect("removing the only H split gives the Default grid back", split(m, r, 400, 330, Scene2DNode::kWarpSplitRemove) &&
+                m.Nx() == 4 && m.Ny() == 4 && near(rows(m), ty) && m.deflt);
+         // A 4 x 4 grid that is not the Default one: a horizontal split keeps every section.
+         fresh(m, r);
+         m.deflt = r.deflt = false;
+         expect("warp split H of another grid keeps its rows", split(m, r, 400, 320, Scene2DNode::kWarpSplitH) &&
+                near(rows(m), { 150, 250, 320, 350, 450 }));
+         // A moved point on a row third is kept by the split (nothing is lost); the plain third goes.
+         fresh(m, r);
+         m.pts[(1 * 4 + 1) * 2 + 1] += 20.0f;
+         expect("an edited third survives the split", split(m, r, 400, 400, Scene2DNode::kWarpSplitH) && m.Ny() == 4 &&
+                std::fabs(m.pts[(1 * 4 + 1) * 2 + 1] - 270.0f) < 0.05f);
+         // A new line lies on the bilinear pieces either side, so the picture does not change.
+         fresh(m, r);
+         m.pts[(0 * 4 + 3) * 2] += 60.0f;   // top right corner pulled right
+         m.deflt = r.deflt = false;
+         Scene2DNode::SplitWarpGrid(m, r, 5.0f / 6.0f, 0.5f, Scene2DNode::kWarpSplitV);   // the middle of the last column
+         expect("a split line keeps the picture", m.Nx() == 5 && std::fabs(m.pts[3 * 2] - (tx[2] + 660.0f) * 0.5f) < 0.05f &&
+                std::fabs(r.pts[3 * 2] - (tx[2] + tx[3]) * 0.5f) < 0.05f);
+         // The grid stops at kWarpLinesMax lines a side.
+         fresh(m, r);
+         for (int k = 1; k < 40; k++)
+            split(m, r, 200 + k * 10.0f, 300, Scene2DNode::kWarpSplitV);
+         expect("warp grid lines are capped", m.Nx() == Scene2DNode::kWarpLinesMax && r.Nx() == m.Nx());
+      }
       // Pass Through at 50%: an Invert inside still sees the red below, so red mixes with cyan to grey (Photoshop).
       {
          const int p = doc->AddPaintLayer();
@@ -20063,10 +20147,10 @@ std::string View2DJourneyQuery(const std::string& q)
       if (sMeshId == 0)
          return "none";
       float lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
-      for (int k = 0; k < 16; k++)
+      for (int k = 0; k < sMeshG.Count(); k++)
       {
-         lo[0] = std::min(lo[0], sMeshPts[k * 2]), lo[1] = std::min(lo[1], sMeshPts[k * 2 + 1]);
-         hi[0] = std::max(hi[0], sMeshPts[k * 2]), hi[1] = std::max(hi[1], sMeshPts[k * 2 + 1]);
+         lo[0] = std::min(lo[0], sMeshG.pts[k * 2]), lo[1] = std::min(lo[1], sMeshG.pts[k * 2 + 1]);
+         hi[0] = std::max(hi[0], sMeshG.pts[k * 2]), hi[1] = std::max(hi[1], sMeshG.pts[k * 2 + 1]);
       }
       char b[96];
       std::snprintf(b, sizeof b, "%s %s %s %s", UiFmt::F0(lo[0]).c, UiFmt::F0(lo[1]).c, UiFmt::F0(hi[0]).c, UiFmt::F0(hi[1]).c);

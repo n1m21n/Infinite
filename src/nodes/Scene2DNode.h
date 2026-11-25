@@ -714,13 +714,36 @@ public:
    // One call for the agent and tests: Begin, preview, End(true).
    bool SelectColorRange(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert, int op,
                          bool sampleAll, int layerId);
-   // Mesh warp: a paint layer's pixels pulled through a 4 x 4 grid. `from` is the layer's tiles when the warp
-   // began; `moved` the 16 grid points' document positions, row by row from the layer's top left.
-   // rest: where the 16 points sat when the warp began (document px); null = the whole surface's grid.
-   bool MeshWarp(int id, const std::vector<std::string>& from, const float moved[32], bool store, bool nearest = false,
-                 const float* rest = nullptr);
-   // The grid's rest positions (document px) for a paint layer.
-   bool MeshRest(int id, float out[32]);
+   // Mesh warp grid: lines at rest fractions us (columns) and vs (rows) of the grid's box, both 0 .. 1 with the
+   // ends included; pts the points' document positions, row by row from the top left (us.size() per row).
+   // The Default grid is 4 x 4 at the thirds (Photoshop's one patch with its thirds); `deflt` stays true until a
+   // split changes the lines. Points move by bilinear pieces, so a new line through the grid changes nothing.
+   struct WarpGrid
+   {
+      std::vector<float> us { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f }, vs { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f };
+      std::vector<float> pts;
+      bool deflt = true;
+      int Nx() const { return (int)us.size(); }
+      int Ny() const { return (int)vs.size(); }
+      int Count() const { return Nx() * Ny(); }
+   };
+   static constexpr int kWarpLinesMax = 12;   // grid lines per axis (the shader's arrays)
+   enum WarpSplit { kWarpSplitCross, kWarpSplitH, kWarpSplitV, kWarpSplitRemove };
+   // The grid's points laid at rest between the box corners (TL TR BR BL, document px) on its lines.
+   static void WarpGridRest(WarpGrid& g, const float corners[8]);
+   // Where document point (x, y) sits on the moved grid, as line fractions (s along us, t along vs).
+   static bool WarpGridParam(const WarpGrid& g, float x, float y, float& s, float& t);
+   // Photoshop's Split Warp Crosswise / Horizontally / Vertically at (s, t), or Remove Warp Split nearest to it,
+   // applied to the moved grid and its rest grid alike. A split of the Default grid keeps the thirds across its
+   // line and drops the ones it replaces, when that loses no moved point; removing the only split of such a grid
+   // gives the Default grid back.
+   static bool SplitWarpGrid(WarpGrid& moved, WarpGrid& rest, float s, float t, int how);
+   // Mesh warp: a paint layer's pixels pulled through the grid. `from` is the layer's tiles when the warp began;
+   // `moved` the grid as pulled; `rest` where its points sat when the warp began (null = the whole surface).
+   bool MeshWarp(int id, const std::vector<std::string>& from, const WarpGrid& moved, bool store, bool nearest = false,
+                 const WarpGrid* rest = nullptr);
+   // The Default grid's rest positions (document px) for a paint layer.
+   bool MeshRest(int id, WarpGrid& out);
    // Style picker: blend, opacity, fill and layer effects copied from one layer to another.
    // Style picker parts: which of the style travels.
    enum StylePart { kStStroke = 1, kStFill = 2, kStOpacity = 4, kStEffects = 8, kStCharacter = 16, kStParagraph = 32, kStObject = 64,
