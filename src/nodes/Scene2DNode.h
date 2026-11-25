@@ -519,6 +519,12 @@ public:
    // A turned crop (Photoshop's crop at an angle, Straighten): the picture turns by -deg (degrees, the box's turn
    // clockwise on screen) about the box centre (cx, cy), then the document is cropped to the w x h box. One step.
    void CropRotated(float cx, float cy, float w, float h, float deg);
+   // Perspective Crop: the quad q (TL TR BR BL, document px) becomes the whole w x h document, every layer
+   // carried by the same projective map (a corner warp, so it stays editable). The size a side gets when it is
+   // 0: both 0 is the rectangle the quad shows in perspective (PhotoCraft's free size), one 0 keeps the quad's
+   // mean-edge proportions. False, with nothing changed, when q is not convex or a layer reaches past the horizon.
+   static bool PerspectiveCropSize(const float q[8], float cx, float cy, int w, int h, int& outW, int& outH);
+   bool PerspectiveCrop(const float q[8], int w = 0, int h = 0);
 
    // The whole document as saved, for duplicating and copying it.
    const std::string& DocText() const { return mText; }

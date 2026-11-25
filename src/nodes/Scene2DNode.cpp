@@ -2093,6 +2093,242 @@ void Scene2DNode::CropRotated(float cx, float cy, float w, float h, float deg)
    CropTo(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f);
 }
 
+namespace
+{
+   // Row-major 3x3 homographies in double: the quad maths needs more than float near a steep horizon.
+   using H3 = std::array<double, 9>;
+
+   // The unit square onto quad q (TL TR BR BL), Heckbert's closed form. False when degenerate.
+   bool UnitToQuad(const double q[8], H3& m)
+   {
+      const double x0 = q[0], y0 = q[1], x1 = q[2], y1 = q[3], x2 = q[4], y2 = q[5], x3 = q[6], y3 = q[7];
+      const double sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3;
+      double g = 0, k = 0;
+      if (std::fabs(sx) > 1e-12 || std::fabs(sy) > 1e-12)
+      {
+         const double dx1 = x1 - x2, dx2 = x3 - x2, dy1 = y1 - y2, dy2 = y3 - y2;
+         const double den = dx1 * dy2 - dx2 * dy1;
+         if (std::fabs(den) < 1e-12)
+            return false;
+         g = (sx * dy2 - dx2 * sy) / den;
+         k = (dx1 * sy - sx * dy1) / den;
+      }
+      m = { x1 - x0 + g * x1, x3 - x0 + k * x3, x0, y1 - y0 + g * y1, y3 - y0 + k * y3, y0, g, k, 1.0 };
+      return true;
+   }
+
+   bool Invert3(const H3& m, H3& o)
+   {
+      const double a = m[0], b = m[1], c = m[2], d = m[3], e = m[4], f = m[5], g = m[6], h = m[7], i = m[8];
+      const double A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
+      const double det = a * A + b * B + c * C;
+      if (!std::isfinite(det) || std::fabs(det) < 1e-18)
+         return false;
+      o = { A / det, -(b * i - c * h) / det, (b * f - c * e) / det, B / det, (a * i - c * g) / det, -(a * f - c * d) / det,
+            C / det, -(a * h - b * g) / det, (a * e - b * d) / det };
+      return true;
+   }
+
+   // Every turn the same way, and not a straight angle (PhotoCraft convex_quad, either winding).
+   bool ConvexQuad(const double q[8])
+   {
+      int sign = 0;
+      double area2 = 0;
+      for (int i = 0; i < 4; i++)
+      {
+         const double* a = q + i * 2;
+         const double* b = q + (i + 1) % 4 * 2;
+         const double* c = q + (i + 2) % 4 * 2;
+         const double e1x = b[0] - a[0], e1y = b[1] - a[1], e2x = c[0] - b[0], e2y = c[1] - b[1];
+         const double cross = e1x * e2y - e1y * e2x;
+         if (!std::isfinite(cross) || std::fabs(cross) <= 1e-3 * std::hypot(e1x, e1y) * std::hypot(e2x, e2y))
+            return false;
+         const int s = cross > 0 ? 1 : -1;
+         if (sign != 0 && s != sign)
+            return false;
+         sign = s;
+         area2 += a[0] * b[1] - b[0] * a[1];
+      }
+      return std::fabs(area2) >= 2.0;
+   }
+
+   // The width and aspect ratio of the rectangle q shows, the principal point at (cx, cy) (Zhang and He,
+   // "Whiteboard scanning and image enhancement", 2007, as PhotoCraft's perspective_estimate). False when two
+   // sides are too near parallel to fix the focal length.
+   bool PerspectiveEstimate(const double q[8], double cx, double cy, double& width, double& aspect)
+   {
+      H3 m;
+      if (!UnitToQuad(q, m))
+         return false;
+      const double a = m[0], b = m[1], d = m[3], e = m[4], g = m[6], h = m[7];
+      constexpr double kMinForeshortening = 0.005;
+      if (std::min(std::fabs(g), std::fabs(h)) < kMinForeshortening)
+         return false;
+      const double ux = a - g * cx, uy = d - g * cy, vx = b - h * cx, vy = e - h * cy;
+      const double focal2 = -(ux * vx + uy * vy) / (g * h);
+      if (!std::isfinite(focal2) || focal2 <= 0)
+         return false;
+      const double focal = std::sqrt(focal2);
+      aspect = std::hypot(std::hypot(ux, uy), g * focal) / std::hypot(std::hypot(vx, vy), h * focal);
+      // The widest horizontal scale at a corner, so the nearest part keeps its detail.
+      const double st[4][2] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
+      width = 0;
+      for (int i = 0; i < 4; i++)
+      {
+         const double x = q[i * 2], y = q[i * 2 + 1];
+         width = std::max(width, std::hypot(a - x * g, d - y * g) / (1.0 + g * st[i][0] + h * st[i][1]));
+      }
+      return std::isfinite(width) && std::isfinite(aspect) && aspect > 0;
+   }
+
+   // The estimate, or false when a pixel of click error on any corner swings its proportions over 10 %.
+   bool PerspectiveSize(const double q[8], double cx, double cy, double& w, double& h)
+   {
+      double width = 0, aspect = 1;
+      if (!PerspectiveEstimate(q, cx, cy, width, aspect))
+         return false;
+      constexpr double kMaxAspectSwing = 0.1;
+      for (int c = 0; c < 8; c++)
+         for (double step : { -1.0, 1.0 })
+         {
+            double n[8];
+            std::copy(q, q + 8, n);
+            n[c] += step;
+            double w2 = 0, a2 = 1;
+            if (!PerspectiveEstimate(n, cx, cy, w2, a2) || std::fabs(a2 / aspect - 1.0) > kMaxAspectSwing)
+               return false;
+         }
+      w = width;
+      h = width / aspect;
+      return true;
+   }
+}
+
+bool Scene2DNode::PerspectiveCropSize(const float qf[8], float cx, float cy, int w, int h, int& outW, int& outH)
+{
+   double q[8];
+   std::copy(qf, qf + 8, q);
+   if (!ConvexQuad(q))
+      return false;
+   const auto len = [&](int i, int j) { return std::hypot(q[j * 2] - q[i * 2], q[j * 2 + 1] - q[i * 2 + 1]); };
+   double fw = 0, fh = 0;
+   if (w > 0 && h > 0)
+   {
+      fw = w;
+      fh = h;
+   }
+   else if (w > 0 || h > 0)
+   {
+      // One side given: the other keeps the mean top/bottom by mean left/right proportions.
+      const double meanW = (len(0, 1) + len(3, 2)) * 0.5, meanH = (len(0, 3) + len(1, 2)) * 0.5;
+      if (meanW <= 0 || meanH <= 0)
+         return false;
+      fw = w > 0 ? w : h * meanW / meanH;
+      fh = h > 0 ? h : w * meanH / meanW;
+   }
+   else
+   {
+      // Free: the rectangle shown in perspective when that is recoverable and plausible, else the longest edges.
+      const double edgeW = std::max(len(0, 1), len(3, 2)), edgeH = std::max(len(0, 3), len(1, 2));
+      constexpr double kMaxEstimateRatio = 4.0;
+      const auto plausible = [&](double v, double edge) { return std::isfinite(v) && v >= edge / kMaxEstimateRatio && v <= edge * kMaxEstimateRatio; };
+      double pw = 0, ph = 0;
+      if (PerspectiveSize(q, cx, cy, pw, ph) && plausible(pw, edgeW) && plausible(ph, edgeH))
+      {
+         fw = pw;
+         fh = ph;
+      }
+      else
+      {
+         fw = edgeW;
+         fh = edgeH;
+      }
+   }
+   outW = std::clamp((int)std::lround(fw), 1, GLUtil::kMaxTargetSide);
+   outH = std::clamp((int)std::lround(fh), 1, GLUtil::kMaxTargetSide);
+   return true;
+}
+
+bool Scene2DNode::PerspectiveCrop(const float qf[8], int w, int h)
+{
+   Layers();
+   int W = 0, Hh = 0;
+   if (!PerspectiveCropSize(qf, mDoc.w * 0.5f, mDoc.h * 0.5f, w, h, W, Hh))
+      return false;
+   // Document to output: the inverse of the output rectangle onto the quad.
+   double q[8];
+   std::copy(qf, qf + 8, q);
+   H3 sq, toDoc, toOut;
+   if (!UnitToQuad(q, sq))
+      return false;
+   toDoc = sq;
+   for (int r = 0; r < 3; r++)
+   {
+      toDoc[r * 3] /= W;
+      toDoc[r * 3 + 1] /= Hh;
+   }
+   if (!Invert3(toDoc, toOut))
+      return false;
+   // Points inside the quad come out with a positive w.
+   const double qcx = (q[0] + q[2] + q[4] + q[6]) * 0.25, qcy = (q[1] + q[3] + q[5] + q[7]) * 0.25;
+   if (toOut[6] * qcx + toOut[7] * qcy + toOut[8] < 0)
+      for (double& v : toOut)
+         v = -v;
+   const auto map = [&](double x, double y, float& ox, float& oy) {
+      const double z = toOut[6] * x + toOut[7] * y + toOut[8];
+      if (!(z > 1e-9))
+         return false;
+      ox = (float)((toOut[0] * x + toOut[1] * y + toOut[2]) / z);
+      oy = (float)((toOut[3] * x + toOut[4] * y + toOut[5]) / z);
+      return std::isfinite(ox) && std::isfinite(oy);
+   };
+   // Every layer's new corner warp first, so a layer past the horizon (or a 3D card, whose map moves with the
+   // document size) leaves the document untouched.
+   struct Plan { int index; float warp[8]; };
+   std::vector<Plan> plans;
+   for (int i = 0; i < (int)mLayers.size(); i++)
+   {
+      Layer& l = mLayers[i];
+      if (l.kind == Kind::Fill || l.kind == Kind::Group || l.kind == Kind::Adjust)
+         continue;   // the document itself: they fill the new size as they are
+      if (l.is3d)
+         return false;
+      BakeFit(*this, l);
+      float bw = 1, bh = 1, hNow[9], m[6];
+      LayerBox(l, bw, bh);
+      if (!LayerHomography(l, hNow))
+         return false;
+      LayerMatrix(l, m);
+      Plan p{ i, {} };
+      const float box[8] = { 0, 0, bw, 0, bw, bh, 0, bh };
+      for (int k = 0; k < 4; k++)
+      {
+         const float bx = box[k * 2], by = box[k * 2 + 1];
+         const float z = hNow[6] * bx + hNow[7] * by + hNow[8];
+         if (!(z > 1e-6f))
+            return false;
+         const double dx = (hNow[0] * bx + hNow[1] * by + hNow[2]) / z, dy = (hNow[3] * bx + hNow[4] * by + hNow[5]) / z;
+         float ox = 0, oy = 0;
+         if (!map(dx, dy, ox, oy))
+            return false;
+         // The plain (unwarped) corner, and the pull that puts it where the map sends it.
+         p.warp[k * 2] = ox - (m[0] * bx + m[1] * by + m[2]);
+         p.warp[k * 2 + 1] = oy - (m[3] * bx + m[4] * by + m[5]);
+      }
+      plans.push_back(p);
+   }
+   for (const Plan& p : plans)
+   {
+      Layer& l = mLayers[p.index];
+      l.warpOn = true;
+      std::copy(p.warp, p.warp + 8, l.warp);
+   }
+   mDoc.guidesX.clear();
+   mDoc.guidesY.clear();
+   CropTo(0, 0, (float)W, (float)Hh);
+   return true;
+}
+
 // ---- saved text ---------------------------------------------------------
 
 void Scene2DNode::Commit()

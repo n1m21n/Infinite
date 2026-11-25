@@ -313,6 +313,7 @@ namespace
       float g0[4] = { 0, 0, 0, 0 };   // 20/21: the group box at the start, x0 y0 x1 y1
       size_t undo0 = (size_t)-1;      // the undo depth before this drag's step, so Esc can drop it
       float cropWas[4] = { 0, 0, 0, 0 };   // 5: the crop box before the drag
+      ImVec2 quadWas[4];              // 5: the Perspective Crop quad before the drag
       float zoom0 = 1.0f;             // 19: the zoom as the drag began
       float angle0 = 0.0f;            // 22: the view angle as the turn began
    } sOp;
@@ -329,6 +330,9 @@ namespace
    float sCropAngle = 0.0f;           // the box's turn about its centre, degrees clockwise on screen (Straighten)
    bool sCropStraighten = false;      // the next crop drag draws a line to level, not a box
    const int kCropStraightenDrag = -2;   // sOp.cropHandle while that line is drawn
+   bool sCropPersp = false;           // Perspective Crop: four free corners, the quad becomes the document
+   ImVec2 sCropQuad[4];               // TL TR BR BL, document px; with Perspective on, sOp.cropHandle 0..3 is a corner
+   const float* CropQuadF() { return &sCropQuad[0].x; }
    std::vector<Scene2DNode::Layer> sClip;   // Copy / Cut: the layers waiting to be pasted
    int sPasteCount = 0;                     // each paste of the same copy steps further from the original
    float sZoomVel = 0.0f;                   // smoothed wheel zoom: log-zoom still to apply
@@ -3086,7 +3090,10 @@ namespace
          Touch();
       }
       else if (k == 5)
+      {
          std::copy(sOp.cropWas, sOp.cropWas + 4, sCrop);
+         std::copy(std::begin(sOp.quadWas), std::end(sOp.quadWas), sCropQuad);
+      }
       else if (k == 19)
          sZoom = sOp.zoom0, sPan = sOp.pan0;
       else if (k == 22)
@@ -3099,9 +3106,14 @@ namespace
       return true;
    }
 
-   // A crop box under 2 px on a side is no box (a click without a drag).
+   // A crop box under 2 px on a side is no box (a click without a drag); a Perspective quad must be convex.
    bool CropBoxOk()
    {
+      if (sCropPersp)
+      {
+         int w = 0, h = 0;
+         return Scene2DNode::PerspectiveCropSize(CropQuadF(), 0, 0, 0, 0, w, h);
+      }
       return std::fabs(sCrop[2] - sCrop[0]) >= 2.0f && std::fabs(sCrop[3] - sCrop[1]) >= 2.0f;
    }
 
@@ -3330,8 +3342,13 @@ namespace
       {
          if ((key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter)) && CropBoxOk())
          {
+            const size_t undo0 = gUndoStack.size();
             PushUndoCheckpoint("Crop document");
-            ApplyCrop(doc);
+            if (!ApplyCrop(doc))
+            {
+               gUndoStack.resize(undo0);
+               return;
+            }
             sCropOn = false;
             sTool = kMove;
             sNeedFit = true;
@@ -6144,8 +6161,18 @@ namespace
       return ToScreen(doc, q.x, q.y);
    }
 
-   void ApplyCrop(Scene2DNode* doc)
+   std::string sCropNote;   // why the last Perspective Crop could not apply
+
+   bool ApplyCrop(Scene2DNode* doc)
    {
+      if (sCropPersp)
+      {
+         const bool ok = doc->PerspectiveCrop(CropQuadF());
+         sCropNote = ok ? "" : "A layer reaches past the horizon, or is a 3D card";
+         if (ok)
+            sCropPersp = false;
+         return ok;
+      }
       const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
       const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
       if (std::fabs(sCropAngle) < 1e-3f)
@@ -6154,6 +6181,48 @@ namespace
          doc->CropRotated((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, x1 - x0, y1 - y0, sCropAngle);
       sCropAngle = 0.0f;
       sCropStraighten = false;
+      return true;
+   }
+
+   // Perspective on: the quad starts as the box, turned as it shows.
+   void StartCropQuad()
+   {
+      const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
+      const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
+      const ImVec2 c[4] = { ImVec2(x0, y0), ImVec2(x1, y0), ImVec2(x1, y1), ImVec2(x0, y1) };
+      for (int i = 0; i < (int)std::size(c); i++)
+      {
+         const ImVec2 p = CropTurn(c[i].x, c[i].y, sCropAngle);
+         sCropQuad[i] = ImVec2(std::round(p.x), std::round(p.y));
+      }
+      sCropAngle = 0.0f;
+      sCropStraighten = false;
+   }
+
+   // A point of the quad at box fractions (s, t), bilinear.
+   ImVec2 QuadAt(float s, float t)
+   {
+      const ImVec2* q = sCropQuad;
+      const ImVec2 top(q[0].x + (q[1].x - q[0].x) * s, q[0].y + (q[1].y - q[0].y) * s);
+      const ImVec2 bot(q[3].x + (q[2].x - q[3].x) * s, q[3].y + (q[2].y - q[3].y) * s);
+      return ImVec2(top.x + (bot.x - top.x) * t, top.y + (bot.y - top.y) * t);
+   }
+
+   bool InsideQuad(ImVec2 p)
+   {
+      int sign = 0;
+      const int n = (int)std::size(sCropQuad);
+      for (int i = 0; i < n; i++)
+      {
+         const ImVec2 a = sCropQuad[i], b = sCropQuad[(i + 1) % n];
+         const float c = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+         const int sg = c > 0 ? 1 : (c < 0 ? -1 : 0);
+         if (sg != 0 && sign != 0 && sg != sign)
+            return false;
+         if (sg != 0)
+            sign = sg;
+      }
+      return true;
    }
 
    // Straighten: the drawn line becomes level (or upright, when it is nearer upright), and the box turns with it.
@@ -6167,32 +6236,74 @@ namespace
    // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void DrawCropOverlay(ImDrawList* dl, Scene2DNode* doc)
    {
-      // Document-space box, so it turns with the view; the dim is four document-space bands around it.
+      // Document-space box (or Perspective quad), so it turns with the view; the dim is four bands around it.
       const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
       const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
+      // A box fraction (s, t) to the screen: the turned box, or the quad.
+      auto at = [&](float s, float t) {
+         if (sCropPersp)
+         {
+            const ImVec2 q = QuadAt(s, t);
+            return ToScreen(doc, q.x, q.y);
+         }
+         return CropScreen(doc, x0 + (x1 - x0) * s, y0 + (y1 - y0) * t);
+      };
       // Darken dims what falls outside; Reveal off hides it.
       const ImU32 dim = !sCropReveal ? Hex(kPasteboard) : tok::U32(tok::view2d_dim_shade, sCropDarken ? tok::view2d_crop_overlay_dim_2_alpha : 0);
+      const ImVec2 box[4] = { at(0, 0), at(1, 0), at(1, 1), at(0, 1) };
+      const int n = (int)std::size(box);
+      ImVec2 bands[4][4];
       const float far = 1e6f;
-      const float band[4][4] = { { -far, -far, far, y0 }, { -far, y1, far, far }, { -far, y0, x0, y1 }, { x1, y0, far, y1 } };
-      // The bands and the box turn with the box (Straighten).
-      for (const auto& b : band)
-         dl->AddQuadFilled(CropScreen(doc, b[0], b[1]), CropScreen(doc, b[2], b[1]), CropScreen(doc, b[2], b[3]),
-                           CropScreen(doc, b[0], b[3]), dim);
+      if (sCropPersp)
+      {
+         // Each edge pushed far out from the quad's centre.
+         ImVec2 c(0, 0);
+         for (const ImVec2& p : box)
+            c = ImVec2(c.x + p.x / n, c.y + p.y / n);
+         auto out = [&](ImVec2 p) {
+            const float d = std::max(std::hypot(p.x - c.x, p.y - c.y), tok::stroke_scale_1);
+            return ImVec2(p.x + (p.x - c.x) / d * far, p.y + (p.y - c.y) / d * far);
+         };
+         for (int i = 0; i < n; i++)
+         {
+            const ImVec2 a = box[i], b = box[(i + 1) % n];
+            bands[i][0] = a;
+            bands[i][1] = b;
+            bands[i][2] = out(b);
+            bands[i][3] = out(a);
+         }
+      }
+      else
+      {
+         const float band[4][4] = { { -far, -far, far, y0 }, { -far, y1, far, far }, { -far, y0, x0, y1 }, { x1, y0, far, y1 } };
+         // The bands and the box turn with the box (Straighten).
+         for (int i = 0; i < n; i++)
+         {
+            const float* b = band[i];
+            bands[i][0] = CropScreen(doc, b[0], b[1]);
+            bands[i][1] = CropScreen(doc, b[2], b[1]);
+            bands[i][2] = CropScreen(doc, b[2], b[3]);
+            bands[i][3] = CropScreen(doc, b[0], b[3]);
+         }
+      }
+      for (const auto& b : bands)
+         dl->AddQuadFilled(b[0], b[1], b[2], b[3], dim);
       const ImU32 edge = tok::U32(tok::canvas_ink, tok::view2d_doc_rect_alpha);
-      const ImVec2 box[4] = { CropScreen(doc, x0, y0), CropScreen(doc, x1, y0), CropScreen(doc, x1, y1), CropScreen(doc, x0, y1) };
-      dl->AddPolyline(box, (int)std::size(box), edge, ImDrawFlags_Closed, tok::stroke_scale_1);
+      dl->AddPolyline(box, n, edge, ImDrawFlags_Closed, tok::stroke_scale_1);
       for (int i = 1; i < 3 && sCropThirds; i++)
       {
-         const float x = x0 + (x1 - x0) * i / tok::view2d_x_ratio, y = y0 + (y1 - y0) * i / tok::view2d_y_ratio;
-         dl->AddLine(CropScreen(doc, x, y0), CropScreen(doc, x, y1), tok::U32(tok::canvas_ink, tok::view2d_line_alpha_sm));
-         dl->AddLine(CropScreen(doc, x0, y), CropScreen(doc, x1, y), tok::U32(tok::canvas_ink, tok::view2d_line_alpha_sm));
+         const float f = i / tok::view2d_x_ratio, g = i / tok::view2d_y_ratio;
+         dl->AddLine(at(f, 0), at(f, 1), tok::U32(tok::canvas_ink, tok::view2d_line_alpha_sm));
+         dl->AddLine(at(0, g), at(1, g), tok::U32(tok::canvas_ink, tok::view2d_line_alpha_sm));
       }
       // The Straighten line being drawn.
       if (sOp.kind == 5 && sOp.cropHandle == kCropStraightenDrag)
          dl->AddLine(ToScreen(doc, sOp.docStart.x, sOp.docStart.y), ToScreen(doc, sMouseDoc.x, sMouseDoc.y), tok::U32(tok::canvas_ink), tok::stroke_scale_1);
-      for (int i = 0; i < 8; i++)
+      // Handles: the box's eight, or the quad's four corners.
+      const int handles = sCropPersp ? n : (int)std::size(kHandleAt);
+      for (int i = 0; i < handles; i++)
       {
-         const ImVec2 p = CropScreen(doc, x0 + (x1 - x0) * kHandleAt[i][0], y0 + (y1 - y0) * kHandleAt[i][1]);
+         const ImVec2 p = sCropPersp ? box[i] : at(kHandleAt[i][0], kHandleAt[i][1]);
          dl->AddRectFilled(ImVec2(p.x - tok::space_1, p.y - tok::space_1), ImVec2(p.x + tok::space_1, p.y + tok::space_1), tok::U32(tok::canvas_ink));
       }
    }
@@ -6200,6 +6311,16 @@ namespace
 
    int HoverCropHandle(Scene2DNode* doc, ImVec2 mouse)
    {
+      if (sCropPersp)
+      {
+         for (int i = 0; i < (int)std::size(sCropQuad); i++)
+         {
+            const ImVec2 p = ToScreen(doc, sCropQuad[i].x, sCropQuad[i].y);
+            if (std::fabs(mouse.x - p.x) <= kHandle && std::fabs(mouse.y - p.y) <= kHandle)
+               return i;
+         }
+         return InsideQuad(ToDoc(doc, mouse)) ? tok::view2d_hover_crop : -1;
+      }
       const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
       const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
       for (int i = 0; i < 8; i++)
@@ -6216,6 +6337,16 @@ namespace
    {
       if (sOp.cropHandle == kCropStraightenDrag)
          return;   // the line is drawn from the press to the mouse; it lands on release
+      if (sCropPersp)
+      {
+         // A corner goes where the mouse goes; inside, the whole quad moves.
+         const ImVec2 dq = DocDelta(mouse.x - sOp.start.x, mouse.y - sOp.start.y);
+         std::copy(std::begin(sOp.quadWas), std::end(sOp.quadWas), sCropQuad);
+         for (int i = 0; i < (int)std::size(sCropQuad); i++)
+            if (sOp.cropHandle == tok::view2d_hover_crop || sOp.cropHandle == i)
+               sCropQuad[i] = ImVec2(std::round(sCropQuad[i].x + dq.x), std::round(sCropQuad[i].y + dq.y));
+         return;
+      }
       // The drag in the turned box's own frame.
       const ImVec2 d0 = DocDelta(mouse.x - sOp.start.x, mouse.y - sOp.start.y);
       const float r = -sCropAngle * kPi / tok::view2d_r_ratio;
@@ -8016,7 +8147,17 @@ namespace
             sOp.docStart = sMouseDoc;
             std::copy(sCrop, sCrop + 4, sOp.crop0);
             std::copy(sCrop, sCrop + 4, sOp.cropWas);
-            if (sCropStraighten)
+            std::copy(std::begin(sCropQuad), std::end(sCropQuad), sOp.quadWas);
+            if (sCropPersp)
+            {
+               // Perspective: corners and the quad drag; a press elsewhere does nothing.
+               if (h >= 0)
+               {
+                  sOp.kind = 5;
+                  sOp.cropHandle = h;
+               }
+            }
+            else if (sCropStraighten)
             {
                sOp.kind = 5;
                sOp.cropHandle = kCropStraightenDrag;
@@ -8324,7 +8465,11 @@ namespace
                sCropStraighten = false;
             }
             else if (sOp.kind == 5 && !CropBoxOk())
-               std::copy(sOp.cropWas, sOp.cropWas + 4, sCrop);   // a click without a drag keeps the box there was
+            {
+               // A click without a drag keeps the box there was; a quad dragged inside out springs back.
+               std::copy(sOp.cropWas, sOp.cropWas + 4, sCrop);
+               std::copy(std::begin(sOp.quadWas), std::end(sOp.quadWas), sCropQuad);
+            }
             else if (sOp.kind == 13)
             {
                Layer* pl = Active(doc);
@@ -11295,19 +11440,34 @@ namespace
       else if (sTool == kCrop && sCropOn)
       {
          char dims[64];
-         std::snprintf(dims, sizeof(dims), "%d x %d", (int)std::fabs(sCrop[2] - sCrop[0]), (int)std::fabs(sCrop[3] - sCrop[1]));
+         int qw = 0, qh = 0;
+         if (sCropPersp && Scene2DNode::PerspectiveCropSize(CropQuadF(), doc->Doc().w * 0.5f, doc->Doc().h * 0.5f, 0, 0, qw, qh))
+            std::snprintf(dims, sizeof(dims), "%d x %d", qw, qh);
+         else
+            std::snprintf(dims, sizeof(dims), "%d x %d", (int)std::fabs(sCrop[2] - sCrop[0]), (int)std::fabs(sCrop[3] - sCrop[1]));
          const float rowTop = ImGui::GetCursorScreenPos().y;
          CentredText(rowTop, dims);
          gap();
          static const char* kRatio[7] = { "Free", "Original", "1:1", "4:3", "3:2", "16:9", "9:16" };
-         if (BarCombo("##v2dcratio", &sCropRatio, kRatio, 7, kWellM))
-            FitCropRatio(doc);
+         if (TextChip(L("Perspective##v2dcpersp"), sCropPersp, T("Drag four corners onto a slanted rectangle; it becomes the document")))
+         {
+            if (!sCropPersp)
+               StartCropQuad();
+            sCropPersp = !sCropPersp;
+            sCropNote.clear();
+         }
          next();
-         BarSlider("##v2dcangle", &sCropAngle, params::view2d::crop_angle_lo, params::view2d::crop_angle_hi, "Angle %.1f°", kWellM);
-         next();
-         if (TextChip(L("Straighten##v2dcstr"), sCropStraighten, T("Draw a line along what should be level")))
-            sCropStraighten = !sCropStraighten;
-         next();
+         if (!sCropPersp)
+         {
+            if (BarCombo("##v2dcratio", &sCropRatio, kRatio, (int)std::size(kRatio), kWellM))
+               FitCropRatio(doc);
+            next();
+            BarSlider("##v2dcangle", &sCropAngle, params::view2d::crop_angle_lo, params::view2d::crop_angle_hi, "Angle %.1f°", kWellM);
+            next();
+            if (TextChip(L("Straighten##v2dcstr"), sCropStraighten, T("Draw a line along what should be level")))
+               sCropStraighten = !sCropStraighten;
+            next();
+         }
          if (TextChip(L("Thirds##v2dthirds"), sCropThirds, T("Rule of thirds guides")))
             sCropThirds = !sCropThirds;
          next();
@@ -11317,13 +11477,23 @@ namespace
          if (TextChip(L("Reveal##v2dcrev"), sCropReveal, T("Show outside the crop")))
             sCropReveal = !sCropReveal;
          gap();
+         if (!sCropNote.empty())
+         {
+            ImGui::TextUnformatted(sCropNote.c_str());
+            next();
+         }
          if (TextChip(L("Apply##v2dcropok"), false, T("Crop the document (Enter)")) && CropBoxOk())
          {
+            const size_t undo0 = gUndoStack.size();
             PushUndoCheckpoint("Crop document");
-            ApplyCrop(doc);
-            sCropOn = false;
-            sTool = kMove;
-            sNeedFit = true;
+            if (ApplyCrop(doc))
+            {
+               sCropOn = false;
+               sTool = kMove;
+               sNeedFit = true;
+            }
+            else
+               gUndoStack.resize(undo0);
          }
          next();
          if (TextChip(L("Cancel##v2dcropno"), false, T("Esc")))
@@ -11357,8 +11527,9 @@ namespace
       const float startX = ImGui::GetCursorPosX();
       if (sTool != kCrop)
       {
-         sCropOn = sCropStraighten = false;
+         sCropOn = sCropStraighten = sCropPersp = false;
          sCropAngle = 0.0f;
+         sCropNote.clear();
       }
       if (sTool != kLasso)
          sPoly.clear();
@@ -18543,6 +18714,61 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          sCropAngle = 0.0f;
          expect("straighten levels a line", std::fabs(StraightenAngle(0, 0, 100, 10) - 5.71f) < 0.05f &&
                 std::fabs(StraightenAngle(0, 0, -10, 100) - std::remainder(95.71f, 90.0f)) < 0.05f);
+         if (doc->FindLayer(id) != nullptr)
+         {
+            doc->RemoveLayer(id);
+            doc->Commit();
+         }
+      }
+      // Perspective Crop size (PhotoCraft perspective_crop_size_tests, an 800 x 500 image): a skewed quad shows
+      // a 731 x 588 rectangle, one past the canvas falls back to its longest edges, a rectangle is its own size,
+      // and one given side keeps the mean-edge proportions.
+      {
+         const float skew[8] = { 100, 50, 700, 80, 760, 450, 40, 420 };
+         const float past[8] = { 100, 50, 872, 50, 872, 550, 100, 450 };
+         const float rect[8] = { 100, 50, 700, 50, 700, 450, 100, 450 };
+         const float cross[8] = { 100, 50, 700, 450, 700, 50, 100, 450 };
+         int w = 0, h = 0;
+         expect("perspective crop: skewed quad free size", Scene2DNode::PerspectiveCropSize(skew, 400, 250, 0, 0, w, h) &&
+                std::abs(w - 731) <= 1 && std::abs(h - 588) <= 1);
+         expect("perspective crop: quad past the canvas", Scene2DNode::PerspectiveCropSize(past, 400, 250, 0, 0, w, h) && w == 778 && h == 500);
+         expect("perspective crop: a rectangle keeps its size", Scene2DNode::PerspectiveCropSize(rect, 400, 250, 0, 0, w, h) && w == 600 && h == 400);
+         expect("perspective crop: width alone", Scene2DNode::PerspectiveCropSize(skew, 400, 250, 661, 0, w, h) && w == 661 && h == 375);
+         expect("perspective crop: height alone", Scene2DNode::PerspectiveCropSize(skew, 400, 250, 0, 375, w, h) && w == 661 && h == 375);
+         expect("perspective crop: a crossed quad is refused", !Scene2DNode::PerspectiveCropSize(cross, 400, 250, 0, 0, w, h));
+         // A layer covering the document: the quad's corners land on the new document's corners.
+         Layer& l = doc->AddLayer(Kind::Vector, 0, 0);
+         Scene2DNode::Shape r;
+         r.type = Scene2DNode::Shape::kRect;
+         r.x0 = 0, r.y0 = 0, r.x1 = (float)W, r.y1 = (float)H;
+         l.shapes.push_back(r);
+         const int id = l.id;
+         doc->Commit();
+         const float q[8] = { W * 0.1f, H * 0.1f, W * 0.9f, H * 0.15f, W * 0.95f, H * 0.9f, W * 0.05f, H * 0.85f };
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint("Crop document");
+         const bool ok = doc->PerspectiveCrop(q, 300, 200);
+         const Layer* t = doc->FindLayer(id);
+         float hg[9] = {};
+         bool lands = ok && t != nullptr && t->warpOn && doc->LayerHomography(*t, hg);
+         if (lands)
+         {
+            float m[6];
+            doc->LayerMatrix(*t, m);
+            // Each quad corner's box point (the plain matrix's inverse) now lands on a corner of the new document.
+            const float want[4][2] = { { 0, 0 }, { 300, 0 }, { 300, 200 }, { 0, 200 } };
+            for (int k = 0; k < 4 && lands; k++)
+            {
+               const float det = m[0] * m[4] - m[1] * m[3];
+               const float dx = q[k * 2] - m[2], dy = q[k * 2 + 1] - m[5];
+               const float bx = (m[4] * dx - m[1] * dy) / det, by = (m[0] * dy - m[3] * dx) / det;
+               const float z = hg[6] * bx + hg[7] * by + hg[8];
+               const float ox = (hg[0] * bx + hg[1] * by + hg[2]) / z, oy = (hg[3] * bx + hg[4] * by + hg[5]) / z;
+               lands = about(ox, want[k][0]) && about(oy, want[k][1]);
+            }
+         }
+         expect("perspective crop: the quad becomes the document", ok && doc->Doc().w == 300 && doc->Doc().h == 200 && lands);
+         expect("perspective crop is one undo step", undoBack() && gUndoStack.size() == undo0 && doc->Doc().w == W && doc->Doc().h == H);
          if (doc->FindLayer(id) != nullptr)
          {
             doc->RemoveLayer(id);
