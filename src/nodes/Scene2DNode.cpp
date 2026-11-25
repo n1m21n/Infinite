@@ -2393,6 +2393,16 @@ void Scene2DNode::Serialize()
    }
    for (const SelStore& st : mSelSaved)
       selLine("selsave", st);
+   // Paths: one line per item, "dpath name op closed n x y inX inY outX outY ..."
+   for (const DocPath& p : mPaths)
+      for (const Shape& sh : p.subs)
+      {
+         o << "dpath " << EscapeToken(p.name) << " " << sh.op << " " << +sh.closed << " " << sh.pts.size() / 6;
+         for (float v : sh.pts) o << " " << v;
+         o << "\n";
+      }
+   if (!mClipPath.empty())
+      o << "clippath " << EscapeToken(mClipPath) << "\n";
    for (const Layer& l : mLayers)
    {
       o << "layer " << l.id << " " << (int)l.kind << " " << l.parent << " " << l.uid << " " << +l.visible << " "
@@ -2570,6 +2580,8 @@ void Scene2DNode::Parse()
    mSelStore = SelStore();
    mSelApronStore = ApronStore();
    mSelSaved.clear();
+   mPaths.clear();
+   mClipPath.clear();
    quickMask = false;
    std::map<int, int> alias;   // a repeated layer id: the later layer's new id, for the lines that follow it
    std::istringstream in(mText);
@@ -2641,6 +2653,36 @@ void Scene2DNode::Parse()
             mSelStore = st;
          else if (!st.name.empty())
             mSelSaved.push_back(st);
+      }
+      else if (key == "dpath")
+      {
+         std::string name;
+         Shape sh;
+         int op = 0, closed = 0;
+         size_t n = 0;
+         if (!(s >> name >> op >> closed >> n) || n == 0 || n > (size_t)kTraceShapesMax * 64)
+            continue;
+         sh.type = Shape::kPath;
+         sh.op = std::clamp(op, 0, (int)Shape::kXor);
+         sh.closed = closed != 0;
+         sh.pts.resize(n * 6);
+         bool ok = true;
+         for (float& v : sh.pts)
+            if (!(s >> v) || !std::isfinite(v) || std::fabs(v) > kPathCoordMax)
+               ok = false;
+         if (!ok)
+            continue;
+         name = UnescapeToken(name);
+         auto it = std::find_if(mPaths.begin(), mPaths.end(), [&](const DocPath& p) { return p.name == name; });
+         if (it == mPaths.end())
+            it = mPaths.insert(mPaths.end(), DocPath{ name, {} });
+         it->subs.push_back(std::move(sh));
+      }
+      else if (key == "clippath")
+      {
+         std::string name;
+         if (s >> name)
+            mClipPath = UnescapeToken(name);
       }
       else if (key == "guidesx" || key == "guidesy")
       {

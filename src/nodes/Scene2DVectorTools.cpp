@@ -1189,3 +1189,353 @@ int Scene2DNode::TraceLayer(int id, int frameId, const TraceOpts& o)
    Commit();
    return vid;
 }
+
+// ---- Paths (Paths panel) -----------------------------------------------------------------------------------
+
+const Scene2DNode::DocPath* Scene2DNode::FindPath(const std::string& name) const
+{
+   for (const DocPath& p : mPaths)
+      if (p.name == name)
+         return &p;
+   return nullptr;
+}
+
+namespace
+{
+   bool PathInRange(const std::vector<Scene2DNode::Shape>& subs)
+   {
+      if (subs.empty())
+         return false;
+      for (const Scene2DNode::Shape& s : subs)
+      {
+         if (s.type != Scene2DNode::Shape::kPath || s.pts.size() < 12 || s.pts.size() % 6 != 0)
+            return false;
+         for (float v : s.pts)
+            if (!std::isfinite(v) || std::fabs(v) > Scene2DNode::kPathCoordMax)
+               return false;
+      }
+      return true;
+   }
+}
+
+bool Scene2DNode::SetWorkPath(std::vector<Shape> subs)
+{
+   Layers();
+   if (!PathInRange(subs))
+      return false;
+   auto it = std::find_if(mPaths.begin(), mPaths.end(), [](const DocPath& p) { return p.name == kWorkPath; });
+   if (it == mPaths.end())
+      it = mPaths.insert(mPaths.end(), DocPath{ kWorkPath, {} });
+   it->subs = std::move(subs);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::RenamePath(const std::string& from, const std::string& to)
+{
+   Layers();
+   if (to.empty() || to == kWorkPath || from == to || FindPath(to) != nullptr)
+      return false;
+   auto it = std::find_if(mPaths.begin(), mPaths.end(), [&](const DocPath& p) { return p.name == from; });
+   if (it == mPaths.end())
+      return false;
+   it->name = to;
+   if (mClipPath == from)
+      mClipPath = to;
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::DeletePath(const std::string& name)
+{
+   Layers();
+   auto it = std::find_if(mPaths.begin(), mPaths.end(), [&](const DocPath& p) { return p.name == name; });
+   if (it == mPaths.end())
+      return false;
+   mPaths.erase(it);
+   if (mClipPath == name)
+      mClipPath.clear();
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::SetClippingPath(const std::string& name)
+{
+   Layers();
+   if (!name.empty() && (name == kWorkPath || FindPath(name) == nullptr))
+      return false;
+   mClipPath = name;
+   Commit();
+   return true;
+}
+
+void Scene2DNode::PathPolylines(const DocPath& p, std::vector<std::vector<float>>& lines, std::vector<int>& ops)
+{
+   lines.clear();
+   ops.clear();
+   for (const Shape& s : p.subs)
+   {
+      std::vector<std::vector<float>> o;
+      Outline(s, o);
+      for (auto& line : o)
+         if (line.size() >= 4)
+         {
+            lines.push_back(std::move(line));
+            ops.push_back(s.op);
+         }
+   }
+}
+
+bool Scene2DNode::PathMask(const DocPath& p, std::vector<uint8_t>& out, float feather, bool aa)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   out.assign((size_t)W * H, 0);
+   std::vector<std::vector<float>> lines;
+   std::vector<int> ops;
+   PathPolylines(p, lines, ops);
+   std::vector<uint8_t> t;
+   bool first = true;
+   for (size_t i = 0; i < lines.size(); i++)
+   {
+      if (lines[i].size() < 6)
+         continue;
+      PolygonMask(lines[i], W, H, t, aa);
+      const int op = first && ops[i] != Shape::kSubtract ? Shape::kAdd : ops[i];
+      first = false;
+      for (size_t k = 0; k < out.size(); k++)
+      {
+         const int a = out[k], b = t[k];
+         if (op == Shape::kAdd) out[k] = (uint8_t)std::max(a, b);
+         else if (op == Shape::kSubtract) out[k] = (uint8_t)(a * (255 - b) / 255);
+         else if (op == Shape::kIntersect) out[k] = (uint8_t)std::min(a, b);
+         else out[k] = (uint8_t)std::abs(a - b);
+      }
+   }
+   if (feather > 0.5f)
+      FeatherMask(out, W, H, feather);
+   return std::any_of(out.begin(), out.end(), [](uint8_t v) { return v != 0; });
+}
+
+bool Scene2DNode::PathToSelection(const std::string& name, int op, float feather, bool aa)
+{
+   Layers();
+   const DocPath* p = FindPath(name);
+   std::vector<uint8_t> m;
+   if (p == nullptr || !PathMask(*p, m, feather, aa))
+      return false;
+   CombineSelection(m, op);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::MakeWorkPathFromSelection(float tol)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   if (!mSelAny || mSel.size() != (size_t)W * H)
+      return false;
+   // Half covered and up is inside (Photoshop's Make Work Path reads the selection at 50%).
+   std::vector<int> cls((size_t)W * H);
+   for (int y = 0; y < H; y++)
+      for (int x = 0; x < W; x++)
+         cls[(size_t)y * W + x] = mSel[(size_t)(H - 1 - y) * W + x] >= 128 ? 1 : 0;
+   std::vector<int> lab, area, first;
+   const int regions = LabelRegions(cls, W, H, lab, area, first);
+   std::vector<char> edge(regions, 0);
+   for (int x = 0; x < W; x++)
+      edge[lab[x]] = edge[lab[(size_t)(H - 1) * W + x]] = 1;
+   for (int y = 0; y < H; y++)
+      edge[lab[(size_t)y * W]] = edge[lab[(size_t)y * W + W - 1]] = 1;
+   // Outlines of the selected regions and the holes inside them, biggest first, so each cut follows what it cuts.
+   struct Piece { double filled; std::vector<float> line; bool hole; };
+   std::vector<Piece> pieces;
+   for (int r = 0; r < regions; r++)
+   {
+      const bool in = cls[first[r]] == 1;
+      if (!in && edge[r])
+         continue;
+      std::vector<float> line = TraceOuter(lab, W, H, r, first[r] % W, first[r] / W);
+      if (line.size() < 6)
+         continue;
+      const double filled = PolyArea(line);
+      pieces.push_back({ filled, std::move(line), !in });
+      if ((int)pieces.size() >= kTraceShapesMax)
+         break;
+   }
+   std::stable_sort(pieces.begin(), pieces.end(), [](const Piece& a, const Piece& b) { return a.filled > b.filled; });
+   std::vector<Shape> subs;
+   for (Piece& pc : pieces)
+   {
+      Shape s;
+      s.type = Shape::kPath;
+      s.closed = true;
+      Relax(pc.line);
+      FitPath(pc.line, true, std::max(0.5f, tol), kTraceCornerDeg, s.pts, kTraceWindow);
+      if (s.Anchors() < 2)
+         continue;
+      s.op = pc.hole ? Shape::kSubtract : Shape::kAdd;
+      subs.push_back(std::move(s));
+   }
+   return SetWorkPath(std::move(subs));
+}
+
+bool Scene2DNode::MakeWorkPathFromLayer(int id)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Vector || l->shapes.empty())
+      return false;
+   std::vector<Shape> subs;
+   for (const Shape& s : l->shapes)
+   {
+      Shape p;
+      p.type = Shape::kPath;
+      p.op = s.op;
+      if (s.type == Shape::kPath)
+      {
+         p.pts = s.pts;
+         p.closed = s.closed;
+      }
+      else
+      {
+         // Primitives as their outline, fitted with corners kept (a rectangle is four straight sides).
+         std::vector<std::vector<float>> o;
+         Outline(s, o);
+         if (o.empty() || o[0].size() < 4)
+            continue;
+         p.closed = s.type != Shape::kLine;
+         FitPath(o[0], p.closed, 0.25f, kTraceCornerDeg, p.pts);
+      }
+      if (p.Anchors() < 2)
+         continue;
+      for (size_t i = 0; i + 1 < p.pts.size(); i += 2)
+      {
+         float x = 0, y = 0;
+         BoxToDoc(*l, p.pts[i], p.pts[i + 1], x, y);
+         p.pts[i] = x, p.pts[i + 1] = y;
+      }
+      subs.push_back(std::move(p));
+   }
+   return SetWorkPath(std::move(subs));
+}
+
+bool Scene2DNode::TransformPath(const std::string& name, const float m[6])
+{
+   Layers();
+   auto it = std::find_if(mPaths.begin(), mPaths.end(), [&](const DocPath& p) { return p.name == name; });
+   if (it == mPaths.end())
+      return false;
+   DocPath moved = *it;
+   for (Shape& s : moved.subs)
+      for (size_t i = 0; i + 1 < s.pts.size(); i += 2)
+      {
+         const float x = s.pts[i], y = s.pts[i + 1];
+         s.pts[i] = m[0] * x + m[1] * y + m[2];
+         s.pts[i + 1] = m[3] * x + m[4] * y + m[5];
+      }
+   if (!PathInRange(moved.subs))
+      return false;
+   *it = std::move(moved);
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::FillPath(const std::string& name, int id, const float rgb[3], float opacity, float feather)
+{
+   Layers();
+   const DocPath* p = FindPath(name);
+   Layer* l = FindLayer(id);
+   std::vector<uint8_t> m;
+   if (p == nullptr || l == nullptr || l->kind != Kind::Paint || !PathMask(*p, m, feather, true))
+      return false;
+   // Inside the selection too: the fill runs through the selection, so the path stands in for it for one fill.
+   if (mSelAny && mSel.size() == m.size())
+      for (size_t i = 0; i < m.size(); i++)
+         m[i] = (uint8_t)std::min(m[i], mSel[i]);
+   if (std::none_of(m.begin(), m.end(), [](uint8_t v) { return v != 0; }))
+      return false;
+   std::vector<uint8_t> keepSel = mSel;
+   const bool keepAny = mSelAny;
+   const SelApron keepApron = mSelApron;
+   mSel = std::move(m);
+   mSelAny = true;
+   mSelDirty = true;
+   const bool ok = FillPixels(id, rgb, opacity);
+   mSel = std::move(keepSel);
+   mSelAny = keepAny;
+   mSelApron = keepApron;
+   mSelDirty = true;
+   Commit();
+   return ok;
+}
+
+bool Scene2DNode::StrokePath(const std::string& name, int id, const BrushEngine::Brush& b, bool simulatePressure)
+{
+   Layers();
+   const DocPath* p = FindPath(name);
+   Layer* l = FindLayer(id);
+   if (p == nullptr || l == nullptr || l->kind != Kind::Paint || Painting())
+      return false;
+   std::vector<std::vector<float>> lines;
+   std::vector<int> ops;
+   PathPolylines(*p, lines, ops);
+   bool any = false;
+   for (size_t li = 0; li < lines.size(); li++)
+   {
+      std::vector<float> line = lines[li];
+      if (p->subs.size() == lines.size() && p->subs[li].closed && line.size() >= 4 &&
+          (line[0] != line[line.size() - 2] || line[1] != line[line.size() - 1]))
+      {
+         line.push_back(line[0]);
+         line.push_back(line[1]);
+      }
+      const size_t n = line.size() / 2;
+      if (n < 2)
+         continue;
+      // Simulate Pressure: thin at both ends, full in the middle, by distance along the line.
+      std::vector<float> along(n, 0.0f);
+      for (size_t i = 1; i < n; i++)
+         along[i] = along[i - 1] + (float)std::hypot(line[i * 2] - line[i * 2 - 2], line[i * 2 + 1] - line[i * 2 - 1]);
+      const float len = std::max(along[n - 1], 1e-3f);
+      auto pressure = [&](size_t i) { return simulatePressure ? (float)std::sin(kPiD * along[i] / len) : 1.0f; };
+      BrushEngine::Brush bb = b;
+      if (simulatePressure)
+         bb.pressureSize = true;
+      if (!BeginPaint(id, 0, bb, line[0], line[1], pressure(0)))
+         continue;
+      for (size_t i = 1; i < n; i++)
+         PaintTo(line[i * 2], line[i * 2 + 1], pressure(i));
+      EndPaint();
+      any = true;
+   }
+   return any;
+}
+
+int Scene2DNode::PathToShapeLayer(const std::string& name, int above, const float rgba[4])
+{
+   Layers();
+   const DocPath* found = FindPath(name);
+   if (found == nullptr)
+      return 0;
+   const DocPath p = *found;
+   const int vid = AddVectorLayer(above);
+   Layer* dst = FindLayer(vid);
+   if (dst == nullptr)
+      return 0;
+   for (Shape s : p.subs)
+   {
+      for (size_t i = 0; i + 1 < s.pts.size(); i += 2)
+      {
+         float bx = 0, by = 0;
+         DocToBox(*dst, s.pts[i], s.pts[i + 1], bx, by);
+         s.pts[i] = bx, s.pts[i + 1] = by;
+      }
+      s.fillOn = true;
+      std::copy(rgba, rgba + 4, s.fillC);
+      s.strokeOn = false;
+      dst->shapes.push_back(std::move(s));
+   }
+   dst->name = p.name == kWorkPath ? std::string("Shape") : p.name;
+   Commit();
+   return vid;
+}

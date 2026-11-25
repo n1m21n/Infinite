@@ -3943,6 +3943,103 @@ namespace
       ImGui::EndMenu();
    }
 
+   // Paths kept with the document (Photoshop's Paths panel): the Work Path from the selection or a vector layer,
+   // saved under a name, turned back into a selection, filled or stroked on a paint layer, or made a shape layer.
+   std::string FreePathName(Scene2DNode* doc)
+   {
+      for (int n = 1;; n++)
+      {
+         const std::string c = std::string(T("Path")) + " " + std::to_string(n);
+         if (doc->FindPath(c) == nullptr)
+            return c;
+      }
+   }
+
+   void PathsMenu(Scene2DNode* doc)
+   {
+      if (!MenuParts::SubMenu(T("Paths")))
+         return;
+      Layer* a = Active(doc);
+      if (MenuParts::Item(T("Make Work Path"), nullptr, false, doc->HasSelection()))
+      {
+         PushUndoCheckpoint("Make work path");
+         doc->MakeWorkPathFromSelection();
+         Touch();
+      }
+      if (MenuParts::Item(T("Work Path from Layer"), nullptr, false, a != nullptr && a->kind == Kind::Vector))
+      {
+         PushUndoCheckpoint("Make work path");
+         doc->MakeWorkPathFromLayer(a->id);
+         Touch();
+      }
+      std::vector<std::string> names;
+      for (const Scene2DNode::DocPath& p : doc->Paths())
+         names.push_back(p.name);
+      if (!names.empty())
+         MenuParts::Separator();
+      const bool paint = a != nullptr && a->kind == Kind::Paint;
+      for (const std::string& name : names)
+      {
+         const bool work = name == Scene2DNode::kWorkPath;
+         const bool clip = doc->ClippingPath() == name;
+         if (!MenuParts::SubMenu(name.c_str()))
+            continue;
+         static const char* kHow[4] = { "Make Selection", "Add to Selection", "Subtract from Selection", "Intersect with Selection" };
+         for (int op = 0; op < 4; op++)
+            if (MenuParts::Item(T(kHow[op])))
+            {
+               SelStep("Make selection");
+               doc->PathToSelection(name, op, 0.0f, true);
+            }
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Fill Path"), nullptr, false, paint))
+         {
+            PushUndoCheckpoint("Fill path");
+            doc->FillPath(name, a->id, sFg, sFillOpacity, 0.0f);
+            Touch();
+         }
+         for (int sim = 0; sim < 2; sim++)
+            if (MenuParts::Item(T(sim ? "Stroke Path (Simulate Pressure)" : "Stroke Path"), nullptr, false, paint && !doc->Painting()))
+            {
+               BrushEngine::Brush b = ToolBrush();
+               std::copy(sFg, sFg + 3, b.color);
+               PushUndoCheckpoint("Stroke path");
+               doc->StrokePath(name, a->id, b, sim != 0);
+               Touch();
+            }
+         if (MenuParts::Item(T("Convert to Shape")))
+         {
+            const float col[4] = { sFg[0], sFg[1], sFg[2], 1.0f };
+            PushUndoCheckpoint("Convert path to shape");
+            const int vid = doc->PathToShapeLayer(name, a != nullptr ? a->id : 0, col);
+            if (vid > 0)
+               SelectOnly(vid);
+            Touch();
+         }
+         MenuParts::Separator();
+         if (work && MenuParts::Item(T("Save Path")))
+         {
+            PushUndoCheckpoint("Save path");
+            doc->RenamePath(name, FreePathName(doc));
+            Touch();
+         }
+         if (!work && MenuParts::Item(T("Clipping Path"), nullptr, clip))
+         {
+            PushUndoCheckpoint("Clipping path");
+            doc->SetClippingPath(clip ? std::string() : name);
+            Touch();
+         }
+         if (MenuParts::Item(T("Delete Path")))
+         {
+            PushUndoCheckpoint("Delete path");
+            doc->DeletePath(name);
+            Touch();
+         }
+         ImGui::EndMenu();
+      }
+      ImGui::EndMenu();
+   }
+
    // A live layer's pixels as a new paint layer right above it, the original hidden and kept (Adobe: rasterise a duplicate).
    int RasterCopy(Scene2DNode* doc, int id)
    {
@@ -7470,6 +7567,7 @@ namespace
             }
             MenuParts::Separator();
             SelectionMenu(doc);
+            PathsMenu(doc);
             if (MenuParts::Item(T("Select All Layers"), Sc("Ctrl+A")))
             {
                sSel.clear();
@@ -19067,6 +19165,129 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          const bool read = pixel({ sp }, (int)(W * 0.5f), (int)(H * 0.5f), on) && pixel({ sp }, (int)(W * 0.2f), (int)(H * 0.6f), off);
          expect("shape snap: the stroke is repainted as the shape", repainted && read && on[3] > 200 && off[3] < 20);
          doc->RemoveLayer(sp);
+         doc->Commit();
+      }
+      // Paths: a selected disc becomes the Work Path, comes back as the same selection, is saved, renamed, made the
+      // clipping path (which follows the rename and the delete), fills and strokes a paint layer inside the
+      // selection, moves, and converts to a shape layer while the saved path stays.
+      {
+         using SN = Scene2DNode;
+         const float cx = W * 0.5f, cy = H * 0.5f, r = std::min(W, H) * 0.25f;
+         doc->SelectEllipse(cx - r, cy - r, cx + r, cy + r, SN::kSelNew, 0.0f, false);
+         const std::vector<uint8_t> disc = doc->SelectionPixels();
+         const bool made = doc->MakeWorkPathFromSelection();
+         const SN::DocPath* wp = doc->FindPath(SN::kWorkPath);
+         expect("paths: make work path from the selection", made && wp != nullptr && wp->subs.size() == 1 && wp->subs[0].Anchors() <= 12);
+         doc->Deselect();
+         const bool back = doc->PathToSelection(SN::kWorkPath, SN::kSelNew, 0.0f, true);
+         const std::vector<uint8_t>& sel = doc->SelectionPixels();
+         size_t both = 0, either = 0;
+         double cover = 0;
+         for (size_t i = 0; back && i < sel.size() && i < disc.size(); i++)
+         {
+            both += disc[i] >= 128 && sel[i] >= 128;
+            either += disc[i] >= 128 || sel[i] >= 128;
+            cover += sel[i] / 255.0;
+         }
+         expect("paths: selection -> work path -> selection keeps the shape (IoU >= 0.98)", back && either > 0 && both >= 0.98 * either);
+         expect("paths: the path's selection has the disc's area", back && std::fabs(cover - 3.14159265 * r * r) <= 0.01 * 3.14159265 * r * r);
+         const bool saved = doc->RenamePath(SN::kWorkPath, "Path 1");
+         expect("paths: save path names the work path", saved && doc->FindPath("Path 1") != nullptr && doc->FindPath(SN::kWorkPath) == nullptr);
+         expect("paths: the work path cannot clip", !doc->SetClippingPath(SN::kWorkPath) && !doc->SetClippingPath("nope"));
+         doc->SetClippingPath("Path 1");
+         doc->RenamePath("Path 1", "Disc");
+         expect("paths: the clipping path follows a rename", doc->ClippingPath() == "Disc" && !doc->RenamePath("Disc", SN::kWorkPath));
+         // Fill Path inside a selection: the left half of the disc only, and the selection is the same afterwards.
+         const int fp = doc->AddPaintLayer();
+         doc->SelectRect(0, 0, cx, (float)H, SN::kSelNew, 0.0f, false);
+         const bool fillOk = doc->FillPath("Disc", fp, red, 1.0f, 0.0f);
+         uint8_t in[4] = {}, out[4] = {}, past[4] = {};
+         const bool rd = pixel({ fp }, (int)(cx - r * 0.5f), (int)cy, in) && pixel({ fp }, (int)(cx + r * 0.5f), (int)cy, out) &&
+                         pixel({ fp }, (int)(cx - r * 1.2f), (int)cy, past);
+         expect("paths: fill path on a pixel layer", fillOk && rd && in[3] > 250 && in[0] > 250 && past[3] < 5);
+         expect("paths: fill path stays inside the selection", rd && out[3] < 5 && doc->SelectionAt((int)(cx - r * 0.5f), (int)cy) > 0.99f &&
+                doc->SelectionAt((int)(cx + r * 0.5f), (int)cy) < 0.01f);
+         doc->Deselect();
+         // Stroke Path with the brush: the outline is painted, the middle is not; one undo step.
+         BrushEngine::Brush sb = sBrush;
+         sb.size = 6.0f;
+         sb.opacity = sb.flow = 1.0f;
+         sb.color[0] = 1.0f, sb.color[1] = sb.color[2] = 0.0f;
+         const int spl = doc->AddPaintLayer();
+         const size_t u0 = gUndoStack.size();
+         PushUndoCheckpoint("Stroke path");
+         const bool stroked = doc->StrokePath("Disc", spl, sb, false);
+         doc->Commit();
+         uint8_t rim[4] = {}, mid[4] = {};
+         const bool rs = pixel({ spl }, (int)std::lround(cx + r), (int)cy, rim) && pixel({ spl }, (int)cx, (int)cy, mid);
+         expect("paths: stroke path paints the outline", stroked && rs && rim[3] > 200 && mid[3] < 5);
+         expect("paths: stroke path is one undo step", undoBack() && gUndoStack.size() == u0 && doc->FindPath("Disc") != nullptr);
+         // Simulate Pressure: thin at both ends of an open line, full in the middle.
+         SN::Shape ln;
+         ln.type = SN::Shape::kPath;
+         ln.pts = { W * 0.2f, H * 0.2f, W * 0.2f, H * 0.2f, W * 0.2f, H * 0.2f, W * 0.8f, H * 0.2f, W * 0.8f, H * 0.2f, W * 0.8f, H * 0.2f };
+         doc->SetWorkPath({ ln });
+         sb.size = 20.0f;
+         const int tp2 = doc->AddPaintLayer();
+         doc->StrokePath(SN::kWorkPath, tp2, sb, true);
+         doc->Commit();
+         uint8_t te[4] = {}, tm[4] = {};
+         const bool tr = pixel({ tp2 }, (int)(W * 0.2f) + 3, (int)(H * 0.2f) + 7, te) && pixel({ tp2 }, (int)(W * 0.5f), (int)(H * 0.2f) + 7, tm);
+         expect("paths: stroke path with simulate pressure tapers both ends", tr && tm[3] > 200 && te[3] < 50);
+         // Out of range anchors are refused; a path far past the canvas still fills it, feathered.
+         SN::Shape big;
+         big.type = SN::Shape::kPath;
+         big.closed = true;
+         const float far = 50000.0f;
+         const float corners[4][2] = { { -far, -far }, { far, -far }, { far, far }, { -far, far } };
+         for (const auto& c : corners)
+            for (int k = 0; k < 3; k++)
+               big.pts.push_back(c[0]), big.pts.push_back(c[1]);
+         SN::Shape huge = big;
+         huge.pts[0] = 1.0e9f;
+         expect("paths: anchors out of range are refused", !doc->SetWorkPath({ huge }));
+         std::vector<uint8_t> bm;
+         const bool bigOk = doc->SetWorkPath({ big }) && doc->PathMask(*doc->FindPath(SN::kWorkPath), bm, 8.0f, true);
+         expect("paths: a path past the canvas fills it, feathered", bigOk && bm[(size_t)(H / 2) * W + W / 2] == 255);
+         // A vector layer's hole stays a hole in its path.
+         Layer& hv = doc->AddLayer(Kind::Vector, 0, 0);
+         const int hid = hv.id;
+         SN::Shape outer, hole;
+         outer.type = SN::Shape::kRect;
+         outer.x0 = W * 0.2f, outer.y0 = H * 0.2f, outer.x1 = W * 0.8f, outer.y1 = H * 0.8f;
+         hole = outer;
+         hole.type = SN::Shape::kEllipse;
+         hole.x0 = W * 0.4f, hole.y0 = H * 0.4f, hole.x1 = W * 0.6f, hole.y1 = H * 0.6f;
+         hole.op = SN::Shape::kSubtract;
+         hv.shapes = { outer, hole };
+         doc->Commit();
+         const bool fromLayer = doc->MakeWorkPathFromLayer(hid) && doc->PathToSelection(SN::kWorkPath, SN::kSelNew, 0.0f, true);
+         float hx = 0, hy = 0, rx = 0, ry = 0;
+         doc->BoxToDoc(*doc->FindLayer(hid), W * 0.5f, H * 0.5f, hx, hy);
+         doc->BoxToDoc(*doc->FindLayer(hid), W * 0.3f, H * 0.5f, rx, ry);
+         expect("paths: a shape layer's path keeps its hole", fromLayer && doc->SelectionAt((int)hx, (int)hy) < 0.01f && doc->SelectionAt((int)rx, (int)ry) > 0.99f);
+         doc->Deselect();
+         // Move a saved path; Convert to Shape makes a shape layer and keeps the path; no path, no layer.
+         const float x0 = doc->FindPath("Disc")->subs[0].pts[0];
+         const float shift[6] = { 1, 0, 10, 0, 1, 0 };
+         expect("paths: transform a saved path", doc->TransformPath("Disc", shift) && about(doc->FindPath("Disc")->subs[0].pts[0], x0 + 10.0f));
+         const float col[4] = { 0, 0, 1, 1 };
+         const size_t layers0 = doc->Layers().size();
+         const int sv = doc->PathToShapeLayer("Disc", 0, col);
+         const Layer* svl = doc->FindLayer(sv);
+         expect("paths: convert to shape makes a shape layer and keeps the path", sv != 0 && svl != nullptr && svl->kind == Kind::Vector &&
+                svl->shapes.size() == 1 && svl->shapes[0].fillOn && doc->FindPath("Disc") != nullptr);
+         expect("paths: convert to shape needs a path", doc->PathToShapeLayer("nope", 0, col) == 0 && doc->Layers().size() == layers0 + 1);
+         // Paths are part of the document: undo brings a deleted one back, and its clipping role.
+         PushUndoCheckpoint("Delete path");
+         doc->DeletePath("Disc");
+         expect("paths: delete clears the clipping path", doc->FindPath("Disc") == nullptr && doc->ClippingPath().empty());
+         expect("paths: undo brings a deleted path back", undoBack() && doc->FindPath("Disc") != nullptr && doc->ClippingPath() == "Disc");
+         for (int id : { fp, spl, tp2, hid, sv })
+            if (doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
+         doc->DeletePath("Disc");
+         doc->DeletePath(SN::kWorkPath);
          doc->Commit();
       }
       // Pass Through at 50%: an Invert inside still sees the red below, so red mixes with cyan to grey (Photoshop).

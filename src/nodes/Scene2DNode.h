@@ -886,6 +886,34 @@ public:
    static int TracePixels(const uint8_t* rgba, int w, int h, const TraceOpts& o, std::vector<Shape>& out);
    // The layer drawn alone, traced into a new vector layer above it; the new id, 0 when nothing traced.
    int TraceLayer(int id, int frameId, const TraceOpts& o);
+   // Paths (Photoshop's Paths panel): outlines kept in the document in document px, not drawn. The Work
+   // Path is the unnamed scratch one that Make Work Path writes; Save Path names it. Each path is kPath items applied
+   // in order by their op (a hole is a kSubtract item after the outline it cuts).
+   struct DocPath { std::string name; std::vector<Shape> subs; };
+   static constexpr const char* kWorkPath = "Work Path";
+   static constexpr float kWorkPathTol = 2.0f;            // Make Work Path's tolerance, px (Photoshop's default)
+   static constexpr float kPathCoordMax = 1.0e6f;         // anchors past this many px are refused
+   const std::vector<DocPath>& Paths() const { return mPaths; }
+   const DocPath* FindPath(const std::string& name) const;
+   bool SetWorkPath(std::vector<Shape> subs);             // replaces the Work Path; false when empty or out of range
+   bool RenamePath(const std::string& from, const std::string& to);   // Save Path is a rename of the Work Path
+   bool DeletePath(const std::string& name);
+   bool SetClippingPath(const std::string& name);         // "" clears; the Work Path cannot clip
+   const std::string& ClippingPath() const { return mClipPath; }
+   bool MakeWorkPathFromSelection(float tol = kWorkPathTol);
+   bool MakeWorkPathFromLayer(int id);                    // a vector layer's items, holes kept
+   bool TransformPath(const std::string& name, const float m[6]);   // x' = m0 x + m1 y + m2, y' = m3 x + m4 y + m5
+   // The path as a document-sized mask (bottom row first, 0..255); false when it covers nothing.
+   bool PathMask(const DocPath& p, std::vector<uint8_t>& out, float feather, bool aa);
+   bool PathToSelection(const std::string& name, int op, float feather, bool aa);
+   // Fill / Stroke Path on a paint layer, kept inside the selection when there is one.
+   bool FillPath(const std::string& name, int id, const float rgb[3], float opacity, float feather);
+   bool StrokePath(const std::string& name, int id, const BrushEngine::Brush& b, bool simulatePressure);
+   // Convert to Shape: a new vector layer above `above` holding the path, filled; 0 without that path.
+   int PathToShapeLayer(const std::string& name, int above, const float rgba[4]);
+   static void PathPolylines(const DocPath& p, std::vector<std::vector<float>>& lines, std::vector<int>& ops);
+   static void PolygonMask(const std::vector<float>& xy, int w, int h, std::vector<uint8_t>& out, bool aa);
+   static void FeatherMask(std::vector<uint8_t>& a, int w, int h, float radius);
    static void CopyShapeStyle(const Shape& from, Shape& to);   // fill and stroke, not geometry or op
    // The items as an SVG document (Convert to Sketch node, Copy SVG).
    std::string ToSvg(const Layer& l);
@@ -1155,6 +1183,8 @@ private:
    struct SelStore { std::string name; int w = 0, h = 0; std::vector<std::string> keys; };
    SelStore mSelStore;
    std::vector<SelStore> mSelSaved;
+   std::vector<DocPath> mPaths;       // Paths panel, document px; saved in the doc text
+   std::string mClipPath;             // the saved path export clips to, "" none
    // Off-canvas selection (PhotoCraft selection_off_canvas): a marquee moved past the edge keeps the part outside,
    // so moving it back brings it back; Add and Subtract keep that part, New and Intersect drop it. The apron holds
    // the whole selection top down in document px (x0/y0 may be negative) and mSel stays its on-canvas crop. It

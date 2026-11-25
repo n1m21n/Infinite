@@ -2095,6 +2095,16 @@ namespace
    }
 }
 
+void Scene2DNode::PolygonMask(const std::vector<float>& xy, int w, int h, std::vector<uint8_t>& out, bool aa)
+{
+   FillPolygon(xy, w, h, out, aa);
+}
+
+void Scene2DNode::FeatherMask(std::vector<uint8_t>& a, int w, int h, float radius)
+{
+   Feather(a, w, h, radius);
+}
+
 void Scene2DNode::SelectPolygon(const std::vector<float>& xy, int op, float feather, bool aa)
 {
    Layers();
