@@ -1108,6 +1108,7 @@ Terminal term open|list|read|send|run
   geometry       geometry domains (points, prims, instances, attributes)
   sketch | sketch3d | glsl | expressions | patch   the code languages (same as `code docs`)
   map            which command answers which question, attention, buttons
+  view2d         the 2D View agent surface: look, paint, paths, selections, masks, effects, undo
   visual | sound | film   craft: styles, composition, colour, type, genres, sound design, camera, sync
 Validators: `infinite code check <file>` for Field (.field), Sketch (.sketch.js), Sketch 3D
 (.sketch3d.js, three.js style), GLSL (.glsl), Formula and Equation; `infinite patch check <p.inf>`
@@ -1219,6 +1220,8 @@ terminal daw-plugin daw-sync 3d-view.
          fputs(AgentDocs::kPatchFormat, stdout);
       else if (topic == "geometry")
          fputs(AgentDocs::kGeometryDomains, stdout);
+      else if (topic == "view2d")
+         fputs(TermDocs::kView2D, stdout);
       else if (topic == "map")
          fputs(AgentDocs::kSkillMap, stdout);
       else if (topic == "visual")
@@ -1568,10 +1571,19 @@ map, and the visual, sound and film crafts.
       }
       if (verb == "view2d")
       {
-         // layers | fields | <json call or {op:apply, calls:[...]}> | - (the JSON on stdin)
-         need(1, "view2d layers | fields | '<json>' | -");
-         if (args[0] == "layers" || args[0] == "fields")
+         // layers | fields | look [layer] [max] | undo | redo | <json call or {op:apply, calls:[...]}> | - (the JSON on stdin)
+         need(1, "view2d layers | fields | look [layer] [max] | undo | redo | '<json>' | -");
+         if (args[0] == "layers" || args[0] == "fields" || args[0] == "undo" || args[0] == "redo")
             return call("view2d", { { "op", args[0] } });
+         if (args[0] == "look")
+         {
+            json p = { { "op", "look" } };
+            if (args.size() > 1)
+               p["layer"] = std::atoi(args[1].c_str());
+            if (args.size() > 2)
+               p["max"] = std::atoi(args[2].c_str());
+            return call("view2d", p);
+         }
          std::string text = args[0];
          if (text == "-")
          {

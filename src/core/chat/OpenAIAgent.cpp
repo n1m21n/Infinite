@@ -159,12 +159,22 @@ namespace chat
                } }
             }),
          fn("view2d",
-            "Inspect or edit 2D View (Scene 2D) layers, shapes, text, paint, and effects. Pass op='layers' or op='fields' to inspect, or op='batch' with calls.",
+            "Inspect or edit the 2D View (Scene 2D) document. Reads: op='layers', op='fields' (names, presets, tools, effects, styles, "
+            "limits), op='look' (a PNG of the picture or one layer, with the box that changed since the last look; layer, rect, max). "
+            "Writes: op='apply' with calls [{op, ...}], all checked first and landed as one undo step: add, set, move, remove, select "
+            "(rect, ellipse, all, none, invert, expand, contract, smooth, border, feather, object, subject, color_range, grow, similar, "
+            "depth), fill, stroke (points, pressure, tilt, tool, target), brush, gradient, path (SVG d or points), svg, mask, effect, "
+            "style. op='undo' / op='redo' take back only the agent's own steps. Errors are typed (E_FIELD, E_ENUM, E_LIMIT, ...) "
+            "with the nearest valid names.",
             {
                { "type", "object" },
                { "properties", {
-                  { "op", { { "type", "string" } } },
-                  { "calls", { { "type", "array" }, { "items", { { "type", "object" } } } } }
+                  { "op", { { "type", "string" }, { "enum", { "layers", "fields", "look", "apply", "undo", "redo" } } } },
+                  { "calls", { { "type", "array" }, { "items", { { "type", "object" } } } } },
+                  { "layer", { { "type", "integer" } } },
+                  { "rect", { { "type", "array" }, { "items", { { "type", "number" } } } } },
+                  { "max", { { "type", "integer" } } },
+                  { "label", { { "type", "string" } } }
                } }
             }),
          fn("settings",

@@ -147,4 +147,54 @@ A line in that form becomes a knob, up to 8, in source order, and can be modulat
 ## Formula mode
 The Formula node takes one GLSL expression or short body; `code new formula` starts one.
 )DOC";
+
+   inline const char* kView2D = R"DOC(# 2D View: the agent surface
+Drive the open 2D document with `infinite view2d` (or the chat tool `view2d`). Reads change nothing; writes go through
+a gate that checks every call first, then land as ONE undo step labelled "Agent: <label>". A batch that fails a check
+changes nothing and answers typed errors: {code, call, message, near}. `near` lists the closest valid names.
+
+## Reads
+  infinite view2d layers                  every layer: id, kind, name, parent, fields
+  infinite view2d fields                  field names, blends, presets, tips, tools, effects, styles, gradients, limits
+  infinite view2d look [layer] [max]      a PNG of the picture (or one layer), at most `max` px a side (default 768),
+                                          plus diff.changed [x0, y0, x1, y1]: what moved since the last same look
+  {"op":"look","rect":[x0,y0,x1,y1],"inline":true}   a region; inline answers base64 instead of a file path
+
+## Writes: infinite view2d '[{call}, {call}, ...]'   (or '-' to read the JSON from stdin)
+Document px, 0..1 colours [r, g, b] or [r, g, b, a]. Layer -1 = the batch's last add.
+  add      {"op":"add","kind":"paint|fill|text|group|adjust|node","above":id,"text":...,"type":"Curves"}
+  set      {"op":"set","layer":id,"values":{"Opacity":0.5,"name":"sky","blend":"Multiply","color":[1,0,0]}}
+  move     {"op":"move","layer":id,"target":id,"into":false}
+  remove   {"op":"remove","layer":id}
+  brush    {"op":"brush","preset":"Hard round","size":24,"hardness":0.8,"opacity":1,"flow":1,"spacing":0.1,
+            "tool":"brush|eraser|blur|smudge|clone|heal|dodge|burn|...","tip":"...","pressureSize":true,"color":[..]}
+           the agent's brush, kept between batches
+  stroke   {"op":"stroke","layer":id,"points":[x0,y0,x1,y1,...],"pressure":[p0,p1,...],"tilt":[tx0,ty0,...],
+            "target":"layer|mask|filterMask","sourceOffset":[dx,dy], any brush key to override}
+  fill     {"op":"fill","layer":id,"at":[x,y],"color":[..],"tolerance":32,"contiguous":true,"sampleAll":false}
+  gradient {"op":"gradient","layer":id,"from":[x,y],"to":[x,y],"colors":[[0,0,0],[1,1,1]],
+            "kind":"linear|radial|angle|reflected|diamond","extend":"hold|repeat|reflect","opacity":1}
+  path     {"op":"path","d":"M0 0 L100 0 L50 80 Z","fill":[1,0.8,0],"stroke":false,"width":4,"name":"tri"}
+           or "points":[x0,y0,...] or "anchors":[x,y,inX,inY,outX,outY,...] with "closed"
+  svg      {"op":"svg","svg":"<svg ...>...</svg>","at":[x,y],"scale":1}   editable vector layers, grouped
+  select   {"op":"select","shape":S,"mode":"new|add|subtract|intersect", ...}
+           S: rect / ellipse ("rect"), all, none, invert, expand / contract / smooth / border / feather ("px"),
+           object ("rect" or "at"), subject, color_range ("samples":[[x,y]] or "colors":[[r,g,b]], "fuzziness"),
+           grow / similar ("tolerance"), depth ("near":[lo,hi], 1 nearest; may answer "selection":"analysing")
+  mask     {"op":"mask","layer":id,"action":"add|fromSelection|invert|apply|remove"}
+  effect   {"op":"effect","layer":id,"action":"add|set|remove","name":"Curves","index":0,"amount":..,
+            "points":[x0,y0,...],"levels":[inB,inW,outB,outW],"params":[..],"opacity":1,"blend":"Normal","on":true}
+           `set` with no index on an adjustment layer edits the layer's own settings
+  style    {"op":"style","layer":id,"name":"Drop Shadow","on":true,"color":[..],"angle":120,"distance":10,
+            "size":10,"spread":0,"opacity":0.75,"position":"outside|inside|centre"}
+
+## Undo
+  infinite view2d undo | redo             only the agent's own steps; a user's edit on top answers E_UNDO
+
+## Limits (E_LIMIT)
+256 calls, 40000 stroke points and 64 new layers a batch; svg / path data 1 MB; look 32..2048 px.
+
+## Loop
+look -> decide -> one batch -> look again (diff.changed says where it landed) -> undo if it is wrong.
+)DOC";
 }
