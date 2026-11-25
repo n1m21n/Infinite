@@ -133,7 +133,7 @@ namespace
    enum Tool { kMove = 0, kCrop, kHand, kZoom, kBrush, kEraser, kFill, kPick, kMarquee, kLasso, kWand, kPen, kNode, kShape, kText,
                kGradient, kClone, kHeal, kBlur, kSharpen, kDodge, kBurn, kSponge, kMedian, kUndoBrush, kColourReplace, kMixer,
                kBgErase, kFloodErase, kSelBrush, kObjectSel, kRedEye, kBlemish, kPatch, kInpaint, kMeshWarp, kPerspective, kStylePick,
-               kMeasure, kToolCount };
+               kMeasure, kCAMove, kToolCount };
    int sTool = kMove;
    bool RetouchTool(int t)
    {
@@ -193,6 +193,23 @@ namespace
    bool sObjSoftPending = false;   // the waiting AI selection is feathered when it lands
    bool sRadiusAbs = true;         // shape radius in px (off: % of the short side)
    bool sPatchSrc = false, sPatchClear = false;   // patch: selection is source; transparent
+   bool sPatchCa = false;          // patch: content-aware (the content-aware move's blend, not the heal)
+   // Content-aware move: extend keeps the original; structure 1..7, colour 0..10; Transform On Drop holds the drop
+   // for a scale and turn with a live preview (coarse first, then exact), Enter applies and Esc cancels.
+   bool sCamExtend = false, sCamAll = false, sCamTransform = false;
+   float sCamStructure = 4.0f, sCamColor = 0.0f;
+   struct CamPending
+   {
+      Scene2DNode* doc = nullptr;
+      Scene2DNode::CamParams p;
+      Scene2DNode::CamParams shown;   // the params the preview shows
+      bool haveShown = false;
+      bool exact = false;       // the preview is the full-size solve
+      double changedAt = 0.0;
+      unsigned tex = 0;
+      int tw = 0, th = 0;
+      float r[4] = { 0, 0, 0, 0 };
+   } sCam;
    int sStyleParts = Scene2DNode::kStAll;   // style picker: which parts travel
    int sGradExtend = 0;            // past the ends: 0 pad, 1 repeat, 2 reflect
    bool sGradDither = true;        // breaks up 8-bit banding
@@ -2665,6 +2682,7 @@ namespace
    bool HandleVectorKeys(Scene2DNode* doc);
 
    bool PaintRefused(Scene2DNode* doc);
+   void CamEnd(bool ok);
    bool EnsurePixels(Scene2DNode* doc);
    bool SelectionActsOnPixels(Scene2DNode* doc);
    int PaintTarget(Scene2DNode* doc, int& target, bool make);
@@ -3142,7 +3160,7 @@ namespace
          if (key(ImGuiKey_E)) cycle({ kEraser, kBgErase, kFloodErase });
          if (key(ImGuiKey_G)) cycle({ kFill, kGradient });
          if (key(ImGuiKey_S)) cycle({ kClone, kUndoBrush });
-         if (key(ImGuiKey_J)) cycle({ kHeal, kBlemish, kPatch, kInpaint, kRedEye });
+         if (key(ImGuiKey_J)) cycle({ kHeal, kBlemish, kPatch, kCAMove, kInpaint, kRedEye });
          if (sTool == kInpaint && !sRemoveQueue.empty() && (key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter)))
             RunRemove(doc);
          if (key(ImGuiKey_R)) cycle({ kBlur, kSharpen, kMedian });
@@ -3174,6 +3192,21 @@ namespace
          if (key(ImGuiKey_Escape))
          {
             EndFreeTransform(doc, false);
+            return;
+         }
+      }
+      if (sCam.doc != nullptr && (sCam.doc != doc || sTool != kCAMove))
+         CamEnd(sCam.doc == doc);   // another tool keeps the held drop; another document drops it
+      if (sCam.doc == doc && sOp.kind == 0)
+      {
+         if (key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter))
+         {
+            CamEnd(true);
+            return;
+         }
+         if (key(ImGuiKey_Escape))
+         {
+            CamEnd(false);
             return;
          }
       }
@@ -3859,6 +3892,109 @@ namespace
       if (sPatchSrc)
          doc->ShiftSelection(dx, dy);
       return true;
+   }
+
+   Scene2DNode::CamParams CamParamsNow(float dx, float dy)
+   {
+      Scene2DNode::CamParams p;
+      p.dx = dx;
+      p.dy = dy;
+      p.extend = sCamExtend;
+      p.structure = (int)std::lround(std::clamp(sCamStructure, params::view2d::cam_structure_lo, params::view2d::cam_structure_hi));
+      p.color = (int)std::lround(std::clamp(sCamColor, params::view2d::cam_color_lo, params::view2d::cam_color_hi));
+      p.sampleAll = sCamAll;
+      return p;
+   }
+
+   // A content-aware move (or the Patch tool's content-aware mend) on the layer or mask being painted, one undo step
+   // with the selection; refused with the reason as a notice and no step.
+   bool CamApply(Scene2DNode* doc, Scene2DNode::CamParams p)
+   {
+      int target = 0;
+      const int id = PaintTarget(doc, target, false);
+      std::string err = "Content-aware move works on a pixel layer or a mask";
+      if (id > 0 && target != 2)
+      {
+         p.target = target;
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint(p.patch ? "Patch selection" : p.extend ? "Content-Aware Extend" : "Content-Aware Move");
+         if (doc->ContentAwareMove(id, p, &err))
+         {
+            Touch();
+            return true;
+         }
+         gUndoStack.resize(undo0);
+      }
+      Notices::Post(Notices::Level::Warning, "view2d.camove", T("Can't move the selection"), T(err.c_str()));
+      return false;
+   }
+
+   void CamDropPreview()
+   {
+      if (sCam.tex != 0)
+         glDeleteTextures(1, &sCam.tex);
+      sCam = CamPending();
+   }
+
+   // The held drop let go: applied (ok) or dropped.
+   void CamEnd(bool ok)
+   {
+      Scene2DNode* doc = sCam.doc;
+      const Scene2DNode::CamParams p = sCam.p;
+      CamDropPreview();
+      if (ok && doc != nullptr)
+         CamApply(doc, p);
+   }
+
+   // The held drop's preview: a coarse solve as soon as the settings change, the exact one once they rest.
+   void CamPreviewTick(Scene2DNode* doc)
+   {
+      if (sCam.doc != doc)
+         return;
+      const Scene2DNode::CamParams& p = sCam.p;
+      const Scene2DNode::CamParams& o = sCam.shown;
+      const double now = ImGui::GetTime();
+      const bool changed = !sCam.haveShown || p.dx != o.dx || p.dy != o.dy || p.extend != o.extend || p.structure != o.structure ||
+                           p.color != o.color || p.scaleX != o.scaleX || p.scaleY != o.scaleY || p.rotate != o.rotate;
+      if (changed)
+      {
+         sCam.shown = p;
+         sCam.haveShown = true;
+         sCam.changedAt = now;
+         sCam.exact = false;
+      }
+      else if (sCam.exact || now - sCam.changedAt < tok::motion_s_history_step)
+         return;
+      int target = 0;
+      const int id = PaintTarget(doc, target, false);
+      if (id <= 0 || target == 2)
+         return;
+      Scene2DNode::CamParams q = p;
+      q.target = target;
+      std::vector<uint8_t> rgba;
+      int w = 0, h = 0;
+      float r[4];
+      if (!doc->ContentAwarePreview(id, q, changed ? params::view2d::cam_preview_px : 0, rgba, w, h, r))
+      {
+         if (sCam.tex != 0)
+            glDeleteTextures(1, &sCam.tex);
+         sCam.tex = 0;
+         sCam.exact = true;
+         return;
+      }
+      sCam.exact = !changed;
+      if (sCam.tex == 0)
+         glGenTextures(1, &sCam.tex);
+      glBindTexture(GL_TEXTURE_2D, sCam.tex);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+      glBindTexture(GL_TEXTURE_2D, 0);
+      sCam.tw = w;
+      sCam.th = h;
+      std::copy(r, r + 4, sCam.r);
    }
 
    void BeginStroke(Scene2DNode* doc, ImVec2 at, bool line)
@@ -5221,6 +5357,17 @@ namespace
             const float dx = sMouseDoc.x - sOp.docStart.x, dy = sMouseDoc.y - sOp.docStart.y;
             AddDocRect(dl, doc, lo[0] + dx, lo[1] + dy, hi[0] + dx, hi[1] + dy, shade, 2.5f);
             AddDocRect(dl, doc, lo[0] + dx, lo[1] + dy, hi[0] + dx, hi[1] + dy, ink, 1.0f);
+         }
+      }
+      if (sCam.doc == doc)
+      {
+         CamPreviewTick(doc);
+         if (sCam.tex != 0)
+         {
+            const ImVec2 a0 = ToScreen(doc, sCam.r[0], sCam.r[1]), a1 = ToScreen(doc, sCam.r[2], sCam.r[3]);
+            dl->AddImage((ImTextureID)(intptr_t)sCam.tex, a0, a1);
+            dl->AddRect(a0, a1, shade, 0.0f, 0, tok::view2d_line_stroke_sm + tok::view2d_tool_overlays_gap);
+            dl->AddRect(a0, a1, ink, 0.0f, 0, tok::view2d_line_stroke_sm);
          }
       }
       if (doc->AiSelectWaiting())
@@ -7592,7 +7739,7 @@ namespace
                Touch();
             }
          }
-         else if (sTool == kPatch && !doc->HasSelection())
+         else if ((sTool == kPatch || sTool == kCAMove) && !doc->HasSelection())
          {
             // Patch with nothing selected draws the area to mend freehand first (Photoshop's and Affinity's patch
             // tool); the next drag moves it onto clean pixels.
@@ -7602,10 +7749,12 @@ namespace
             sOp.path = { sMouseDoc.x, sMouseDoc.y };
             sOp.start = mouse;
          }
-         else if (sTool == kObjectSel || sTool == kPatch || sTool == kMeasure)
+         else if (sTool == kObjectSel || sTool == kPatch || sTool == kCAMove || sTool == kMeasure)
          {
+            if (sCam.doc == doc)
+               CamEnd(true);   // a new drag lands the held one first
             sOp = Op();
-            sOp.kind = sTool == kObjectSel ? 24 : sTool == kPatch ? 25 : 26;
+            sOp.kind = sTool == kObjectSel ? 24 : (sTool == kPatch || sTool == kCAMove) ? 25 : 26;
             sOp.docStart = sMouseDoc;
             sOp.start = mouse;
             sOp.selOp = SelOpFor(io);
@@ -8019,7 +8168,27 @@ namespace
                // The selection is mended from where it was dragged to.
                LivePixelCopy(doc);
                Layer* al = Active(doc);
-               if (al != nullptr && al->kind == Kind::Paint)
+               const float cdx = sMouseDoc.x - sOp.docStart.x, cdy = sMouseDoc.y - sOp.docStart.y;
+               if (sTool == kCAMove && sCamTransform)
+               {
+                  // Transform On Drop: held, with a preview, until Enter.
+                  CamDropPreview();
+                  sCam.doc = doc;
+                  sCam.p = CamParamsNow(cdx, cdy);
+               }
+               else if (sTool == kCAMove)
+                  CamApply(doc, CamParamsNow(cdx, cdy));
+               else if (sPatchCa)
+               {
+                  // Content-aware patch: mended from the content there, or (selection is source) its content
+                  // copied there.
+                  Scene2DNode::CamParams p = CamParamsNow(cdx, cdy);
+                  p.extend = true;
+                  p.sampleAll = false;
+                  p.patch = !sPatchSrc;
+                  CamApply(doc, p);   // selection is source: the selection goes with the copy
+               }
+               else if (al != nullptr && al->kind == Kind::Paint)
                {
                   PushUndoCheckpoint("Patch selection");
                   const float pdx = sMouseDoc.x - sOp.docStart.x, pdy = sMouseDoc.y - sOp.docStart.y;
@@ -9127,6 +9296,49 @@ namespace
          next();
          if (TextChip(L("Transparent##v2dpclear"), sPatchClear, T("Blend the patch with what is there")))
             sPatchClear = !sPatchClear;
+         next();
+         if (TextChip(L("Content-Aware##v2dpca"), sPatchCa, T("Blend the patch's edge into what is there instead of healing it")))
+            sPatchCa = !sPatchCa;
+         if (sPatchCa)
+         {
+            gap();
+            BarSlider("##v2dpcastr", &sCamStructure, params::view2d::cam_structure_lo, params::view2d::cam_structure_hi, "Structure %.0f", kWellL);
+            next();
+            BarSlider("##v2dpcacol", &sCamColor, params::view2d::cam_color_lo, params::view2d::cam_color_hi, "Color %.0f", kWellL);
+         }
+      }
+      else if (sTool == kCAMove && sCam.doc == doc)
+      {
+         // The held drop: scale and turn, then Enter.
+         BarSlider("##v2dcasx", &sCam.p.scaleX, params::view2d::cam_scale_lo, params::view2d::cam_scale_hi, "Width %.0f%%", kWellL);
+         next();
+         BarSlider("##v2dcasy", &sCam.p.scaleY, params::view2d::cam_scale_lo, params::view2d::cam_scale_hi, "Height %.0f%%", kWellL);
+         next();
+         BarSlider("##v2dcarot", &sCam.p.rotate, params::view2d::cam_rotate_lo, params::view2d::cam_rotate_hi, "Turn %.0f\xc2\xb0", kWellL);
+         gap();
+         if (TextChip(L("Apply##v2dcaok"), false, T("Apply the move (Enter)")))
+            CamEnd(true);
+         next();
+         if (TextChip(L("Cancel##v2dcano"), false, T("Drop the move (Esc)")))
+            CamEnd(false);
+      }
+      else if (sTool == kCAMove)
+      {
+         if (TextChip(L("Move##v2dcamove"), !sCamExtend, T("The content leaves its place, which is filled")))
+            sCamExtend = false;
+         next();
+         if (TextChip(L("Extend##v2dcaext"), sCamExtend, T("The content is copied; its place stays")))
+            sCamExtend = true;
+         gap();
+         BarSlider("##v2dcastr", &sCamStructure, params::view2d::cam_structure_lo, params::view2d::cam_structure_hi, "Structure %.0f", kWellL);
+         next();
+         BarSlider("##v2dcacol", &sCamColor, params::view2d::cam_color_lo, params::view2d::cam_color_hi, "Color %.0f", kWellL);
+         gap();
+         if (TextChip(L("Sample All Layers##v2dcaall"), sCamAll, T("Move what the picture shows, onto this layer")))
+            sCamAll = !sCamAll;
+         next();
+         if (TextChip(L("Transform On Drop##v2dcatr"), sCamTransform, T("Scale and turn the content before it lands")))
+            sCamTransform = !sCamTransform;
       }
       else if (sTool == kMeshWarp)
       {
@@ -10076,6 +10288,7 @@ namespace
       { kHeal, "##v2dheal", IconsInfinite::Heal, "Healing brush (J). Alt-click sets the source", 2 },
       { kBlemish, "##v2dblemish", IconsInfinite::Blemish, "Blemish removal (J). Click a spot", 2 },
       { kPatch, "##v2dpatch", IconsInfinite::Patch, "Patch (J). Drag the selection to clean pixels", 2 },
+      { kCAMove, "##v2dcamove", IconsInfinite::ContentMove, "Content-aware move (J). Drag the selection; its old place is filled", 2 },
       { kInpaint, "##v2dinpaint", IconsInfinite::Inpaint, "Remove (J). Paint over to remove; a ring takes what it encloses", 2 },
       { kRedEye, "##v2dredeye", IconsInfinite::RedEye, "Red eye (J)", 2 },
       { kBrush, "##v2dbrush", IconsInfinite::Brush, "Brush (B). Alt picks a colour, Shift-click draws a line", 2 },
@@ -10147,7 +10360,7 @@ namespace
          { { "Move", { kMove, kPerspective, kMeshWarp } },
            { "Select", { kMarquee, kLasso, kWand, kSelBrush, kObjectSel } },
            { "Crop and sample", { kCrop, kPick, kStylePick, kMeasure } } },
-         { { "Retouch", { kHeal, kBlemish, kPatch, kInpaint, kRedEye } },
+         { { "Retouch", { kHeal, kBlemish, kPatch, kCAMove, kInpaint, kRedEye } },
            { "Paint", { kBrush, kMixer, kColourReplace, kClone, kUndoBrush } },
            { "Erase", { kEraser, kBgErase, kFloodErase } } },
          { { "Fill and tune", { kGradient, kFill, kBlur, kSharpen, kMedian, kDodge, kBurn, kSponge } },
@@ -16827,6 +17040,217 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->Deselect();
          doc->Commit();
       }
+      // Content-aware move (ledger-gaps section 13 Q1; PhotoCraft content_aware_move tests mirrored). The solve on a
+      // 128 x 64 picture, top row first: a grey ramp with a blue 12 px object at (20, 26), selected (16, 22, 20, 20).
+      {
+         using CP = Scene2DNode::CamParams;
+         const int cw = 128, ch = 64;
+         auto ramp = [&](std::vector<uint8_t>& px) {
+            px.assign((size_t)cw * ch * 4, 255);
+            for (int y = 0; y < ch; y++)
+               for (int x = 0; x < cw; x++)
+                  px[((size_t)y * cw + x) * 4] = px[((size_t)y * cw + x) * 4 + 1] = px[((size_t)y * cw + x) * 4 + 2] = (uint8_t)(60 + x);
+         };
+         auto box = [&](std::vector<uint8_t>& m, int x0, int y0, int w, int h, uint8_t v) {
+            for (int y = y0; y < y0 + h; y++)
+               for (int x = x0; x < x0 + w; x++)
+                  m[(size_t)y * cw + x] = v;
+         };
+         auto paint = [&](std::vector<uint8_t>& px, int x0, int y0, int w, int h, uint8_t r, uint8_t g, uint8_t b) {
+            for (int y = y0; y < y0 + h; y++)
+               for (int x = x0; x < x0 + w; x++)
+               {
+                  uint8_t* c = &px[((size_t)y * cw + x) * 4];
+                  c[0] = r;
+                  c[1] = g;
+                  c[2] = b;
+               }
+         };
+         auto blue = [&](const std::vector<uint8_t>& px, int x, int y) {
+            const uint8_t* c = &px[((size_t)y * cw + x) * 4];
+            return c[2] > 200 && c[0] < 40 && c[1] < 40;
+         };
+         auto allBlue = [&](const std::vector<uint8_t>& px, int x0, int y0, int x1, int y1) {
+            for (int y = y0; y <= y1; y++)
+               for (int x = x0; x <= x1; x++)
+                  if (!blue(px, x, y))
+                     return false;
+            return true;
+         };
+         auto anyBlue = [&](const std::vector<uint8_t>& px, int x0, int y0, int x1, int y1) {
+            for (int y = y0; y <= y1; y++)
+               for (int x = x0; x <= x1; x++)
+                  if (blue(px, x, y))
+                     return true;
+            return false;
+         };
+         std::vector<uint8_t> src, sel((size_t)cw * ch, 0), out, write, selOut;
+         ramp(src);
+         paint(src, 20, 26, 12, 12, 0, 0, 255);
+         box(sel, 16, 22, 20, 20, 255);
+         CP mv;
+         mv.dx = 70;
+         std::string e = Scene2DNode::ContentAwareSolve(src, cw, ch, sel, mv, out, write, selOut);
+         std::vector<uint8_t> shifted((size_t)cw * ch, 0);
+         box(shifted, 86, 22, 20, 20, 255);
+         expect("content-aware move: the object lands, its old place is filled, far pixels and the selection follow",
+                e.empty() && allBlue(out, 93, 30, 98, 35) && !anyBlue(out, 16, 22, 35, 41) &&
+                std::equal(&out[0], &out[4], &src[0]) && std::equal(&out[((size_t)60 * cw + 120) * 4], &out[((size_t)60 * cw + 120) * 4 + 4], &src[((size_t)60 * cw + 120) * 4]) &&
+                selOut == shifted && write[(size_t)30 * cw + 25] != 0 && write[(size_t)5 * cw + 5] == 0);
+         CP ex;
+         ex.extend = true;
+         ex.dx = 60;
+         ex.dy = -10;
+         e = Scene2DNode::ContentAwareSolve(src, cw, ch, sel, ex, out, write, selOut);
+         expect("content-aware extend keeps the original and copies it", e.empty() && allBlue(out, 20, 26, 31, 37) && allBlue(out, 83, 20, 88, 25));
+         std::vector<uint8_t> o3, o7, o2, o1;
+         CP s3 = mv, s7 = mv, s2 = mv, s1 = mv;
+         s3.structure = 3;
+         s7.structure = 7;
+         s2.structure = 2;
+         s1.structure = 1;
+         Scene2DNode::ContentAwareSolve(src, cw, ch, sel, s3, o3, write, selOut);
+         Scene2DNode::ContentAwareSolve(src, cw, ch, sel, s7, o7, write, selOut);
+         Scene2DNode::ContentAwareSolve(src, cw, ch, sel, s2, o2, write, selOut);
+         Scene2DNode::ContentAwareSolve(src, cw, ch, sel, s1, o1, write, selOut);
+         auto same = [&](const std::vector<uint8_t>& a, int x, int y, int sx, int sy) {   // a at (x, y) == src at (sx, sy)
+            return std::equal(&a[((size_t)y * cw + x) * 4], &a[((size_t)y * cw + x) * 4 + 4], &src[((size_t)sy * cw + sx) * 4]);
+         };
+         expect("content-aware move: structure 3 and 7 give the same picture", !o3.empty() && o3 == o7);
+         expect("content-aware move: structure 2 rebuilds the edge and keeps the centre", same(o2, 95, 31, 25, 31) && !same(o2, 87, 31, 17, 31));
+         expect("content-aware move: structure 1 rebuilds the centre too", !o1.empty() && !blue(o1, 95, 31));
+         // Colour: a light left half and a dark right half; the content moved from light to dark.
+         std::vector<uint8_t> two((size_t)cw * ch * 4, 255), sel2((size_t)cw * ch, 0);
+         for (int y = 0; y < ch; y++)
+            for (int x = 0; x < cw; x++)
+               two[((size_t)y * cw + x) * 4] = two[((size_t)y * cw + x) * 4 + 1] = two[((size_t)y * cw + x) * 4 + 2] = x < 64 ? 204 : 51;
+         box(sel2, 10, 20, 20, 20, 255);
+         auto centreAfter = [&](int color) {
+            CP c;
+            c.dx = 80;
+            c.color = color;
+            std::vector<uint8_t> o, w2, s2o;
+            Scene2DNode::ContentAwareSolve(two, cw, ch, sel2, c, o, w2, s2o);
+            return o.empty() ? -1 : (int)o[((size_t)30 * cw + 100) * 4];
+         };
+         const int c0 = centreAfter(0), c3 = centreAfter(3), c10 = centreAfter(10);
+         expect("content-aware move: colour 0 and 3 keep the content, 10 takes its new place's light",
+                std::abs(c0 - 204) <= 2 && std::abs(c3 - 204) <= 2 && std::abs(c10 - 51) <= 8);
+         // An overlapping move to the canvas edge.
+         std::vector<uint8_t> selE((size_t)cw * ch, 0);
+         box(selE, 100, 22, 20, 20, 255);
+         CP ov;
+         ov.dx = 8;
+         expect("content-aware move: an overlapping move to the canvas edge works",
+                Scene2DNode::ContentAwareSolve(src, cw, ch, selE, ov, out, write, selOut).empty() && selOut[(size_t)30 * cw + 127] != 0);
+         // Refusals.
+         auto refused = [&](CP p, const std::vector<uint8_t>& s) { return !Scene2DNode::ContentAwareSolve(src, cw, ch, s, p, out, write, selOut).empty(); };
+         CP bad = mv;
+         int nRef = 0;
+         bad.structure = 0; nRef += refused(bad, sel);
+         bad = mv; bad.structure = 8; nRef += refused(bad, sel);
+         bad = mv; bad.color = 11; nRef += refused(bad, sel);
+         bad = mv; bad.scaleX = 0.5f; nRef += refused(bad, sel);
+         bad = mv; bad.scaleY = 20000; nRef += refused(bad, sel);
+         bad = mv; bad.rotate = 40000; nRef += refused(bad, sel);
+         bad = mv; bad.dx = NAN; nRef += refused(bad, sel);
+         bad = mv; bad.dx = 0; nRef += refused(bad, sel);                    // no offset, no transform
+         bad = mv; bad.dx = 200; nRef += refused(bad, sel);                  // a plain move off the canvas
+         bad = mv; bad.dx = 1000; bad.scaleX = 50; nRef += refused(bad, sel);   // a transformed landing off the canvas
+         bad = mv; nRef += refused(bad, std::vector<uint8_t>((size_t)cw * ch, 0));   // nothing selected
+         bad = mv; bad.patch = true; bad.rotate = 10; nRef += refused(bad, sel);     // patch takes no transform
+         expect("content-aware move refuses bad settings, no offset, off-canvas landings and no selection", nRef == 12);
+         // Transform: a red bar 20 x 4 turned 90 and widened 125% stands upright where it lands.
+         std::vector<uint8_t> bar((size_t)cw * ch * 4, 255), selB((size_t)cw * ch, 0);
+         for (size_t i = 0; i < bar.size(); i += 4)
+            bar[i] = bar[i + 1] = bar[i + 2] = 128;
+         paint(bar, 20, 30, 20, 4, 255, 0, 0);
+         box(selB, 16, 20, 28, 24, 255);
+         CP tr;
+         tr.dx = 50;
+         tr.rotate = 90;
+         tr.scaleX = 125;
+         std::vector<uint8_t> ot;
+         e = Scene2DNode::ContentAwareSolve(bar, cw, ch, selB, tr, ot, write, selOut);
+         auto red = [&](int x, int y) { const uint8_t* c = &ot[((size_t)y * cw + x) * 4]; return c[0] > 200 && c[1] < 60; };
+         expect("content-aware move: rotate 90 with width 125% turns the bar upright", e.empty() && red(80, 24) && red(80, 40) && !red(88, 32) && !red(72, 32));
+         // Patch: the selection over the object is mended from the clean ramp 40 px right; the selection stays.
+         CP pa;
+         pa.patch = true;
+         pa.dx = 40;
+         e = Scene2DNode::ContentAwareSolve(src, cw, ch, sel, pa, out, write, selOut);
+         expect("content-aware patch mends the selection from where it was dragged and keeps the selection",
+                e.empty() && !anyBlue(out, 16, 22, 35, 41) && same(out, 25, 31, 65, 31) && selOut == sel);
+      }
+      // Content-aware move through the tool on the document: one undo step with the selection, a transparent
+      // layer's old place goes clear, and Sample All Layers moves the picture onto an empty layer.
+      {
+         const float grey[3] = { 0.5f, 0.5f, 0.5f }, blueC[3] = { 0, 0, 1 };
+         const int p = doc->AddPaintLayer();
+         doc->SelectAll();
+         doc->FillPixels(p, grey, 1.0f);
+         doc->SelectRect(100, 100, 160, 160, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(p, blueC, 1.0f);
+         doc->SelectRect(90, 90, 170, 170, Scene2DNode::kSelNew, 0, false);
+         SelectOnly(p);
+         doc->Commit();
+         const int keepTool = sTool;
+         const bool keepExt = sCamExtend, keepAll = sCamAll;
+         sTool = kCAMove;
+         sCamExtend = sCamAll = false;
+         const int iw = (int)W, ih = (int)H;
+         auto at = [&](const std::vector<uint8_t>& px, int x, int y) { return &px[((size_t)(ih - 1 - y) * iw + x) * 4]; };
+         const std::string t0 = doc->DocText();
+         size_t u0 = gUndoStack.size();
+         bool ok = CamApply(doc, CamParamsNow(200, 0));
+         std::vector<uint8_t> pic = picture(doc);
+         float lo[2], hi[2];
+         const bool moved = doc->SelectionBounds(lo, hi) && std::fabs(lo[0] - 290) < 1.5f && std::fabs(hi[0] - 370) < 1.5f;
+         expect("content-aware move tool: the object moves, its place is filled, the selection follows, one undo step",
+                ok && at(pic, 330, 130)[2] > 200 && at(pic, 330, 130)[0] < 40 && at(pic, 130, 130)[2] < 200 && moved &&
+                gUndoStack.size() == u0 + 1 && gUndoStack.back().label == "Content-Aware Move");
+         Undo();
+         doc = FindDoc();
+         expect("content-aware move tool: one undo brings back the pixels and the selection", doc != nullptr && doc->DocText() == t0);
+         if (doc == nullptr)
+            return fails;
+         // Refused with nothing selected: no step.
+         doc->Deselect();
+         u0 = gUndoStack.size();
+         expect("content-aware move tool: nothing selected is refused without a step", !CamApply(doc, CamParamsNow(200, 0)) && gUndoStack.size() == u0);
+         // A transparent layer: only the blue square, moved; its old place goes clear.
+         const int t = doc->AddPaintLayer();
+         doc->SelectRect(100, 300, 160, 360, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(t, blueC, 1.0f);
+         doc->SelectRect(90, 290, 170, 370, Scene2DNode::kSelNew, 0, false);
+         SelectOnly(t);
+         doc->Commit();
+         ok = CamApply(doc, CamParamsNow(200, 0));
+         std::vector<uint8_t> tp;
+         int pw = 0, ph = 0;
+         ok = ok && doc->ReadPaint(t, tp, pw, ph) && pw == iw;
+         expect("content-aware move on a transparent layer leaves its old place clear",
+                ok && at(tp, 130, 330)[3] < 8 && at(tp, 330, 330)[3] == 255 && at(tp, 330, 330)[2] > 200);
+         // Sample All Layers onto an empty layer above: the moved object and its fill land there, nothing else.
+         const int s = doc->AddPaintLayer();
+         doc->SelectRect(90, 90, 170, 170, Scene2DNode::kSelNew, 0, false);
+         SelectOnly(s);
+         doc->Commit();
+         sCamAll = true;
+         ok = CamApply(doc, CamParamsNow(200, 0));
+         std::vector<uint8_t> sp;
+         ok = ok && doc->ReadPaint(s, sp, pw, ph) && pw == iw;
+         expect("content-aware move with Sample All Layers paints the picture onto an empty layer, nothing else",
+                ok && at(sp, 330, 130)[3] == 255 && at(sp, 330, 130)[2] > 200 && at(sp, 130, 130)[3] == 255 && at(sp, 130, 130)[2] < 200 &&
+                at(sp, 600 < iw ? 600 : iw - 1, 600 < ih ? 600 : ih - 1)[3] == 0);
+         sTool = keepTool;
+         sCamExtend = keepExt;
+         sCamAll = keepAll;
+         for (int id : { s, t, p })
+            doc->RemoveLayer(id);
+         doc->Deselect();
+         doc->Commit();
+      }
       // ai-tools 1.8 Remove: red marks on a left-to-right grey gradient. The picture after a Remove is compared
       // with the gradient as it was (the read runs bottom row first, so rows compare as they are).
       {
@@ -18385,7 +18809,7 @@ namespace
                                                "Pen", "Node", "Shape", "Text", "Gradient", "Clone", "Heal", "Blur", "Sharpen", "Dodge", "Burn",
                                                "Sponge", "Median", "UndoBrush", "ColourReplace", "PaintMixer", "BgErase", "FloodErase",
                                                "SelBrush", "ObjectSel", "RedEye", "Blemish", "Patch", "Inpaint", "MeshWarp", "Perspective",
-                                               "StylePick", "Measure" };
+                                               "StylePick", "Measure", "ContentMove" };
    uint64_t sAuditDoc = 0;
    int sAuditIds[kAuditKinds - 1] = {};
    int sAuditState = -1;

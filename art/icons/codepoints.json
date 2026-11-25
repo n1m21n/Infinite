@@ -164,5 +164,6 @@
  "check": 59810,
  "dock": 59811,
  "download": 59812,
- "trash": 59813
+ "trash": 59813,
+ "content-move": 59814
 }

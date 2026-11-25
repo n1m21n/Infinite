@@ -2504,6 +2504,493 @@ bool Scene2DNode::PatchSelection(int id, float dx, float dy, bool selIsSource, b
    return true;
 }
 
+// ---- content-aware move --------------------------------------------------------
+// Follows PhotoCraft's content_aware_move rules (read, not copied): the selection's content is placed (scaled and
+// turned about its centre, then offset), a band at its edge is rebuilt as a membrane between the content and what
+// is there, and a move fills the old place with the Remove fill first so nothing ghosts.
+
+namespace
+{
+   // Chamfer (3-4) distance, in px, from every pixel to the nearest seed (seed[i] != 0).
+   void ChamferDist(const std::vector<uint8_t>& seed, int w, int h, std::vector<float>& d)
+   {
+      const float inf = 1e9f;
+      d.assign((size_t)w * h, inf);
+      for (size_t i = 0; i < d.size(); i++)
+         if (seed[i] != 0)
+            d[i] = 0;
+      auto at = [&](int x, int y) -> float& { return d[(size_t)y * w + x]; };
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            float v = at(x, y);
+            if (x > 0) v = std::min(v, at(x - 1, y) + 3);
+            if (y > 0)
+            {
+               v = std::min(v, at(x, y - 1) + 3);
+               if (x > 0) v = std::min(v, at(x - 1, y - 1) + 4);
+               if (x + 1 < w) v = std::min(v, at(x + 1, y - 1) + 4);
+            }
+            at(x, y) = v;
+         }
+      for (int y = h - 1; y >= 0; y--)
+         for (int x = w - 1; x >= 0; x--)
+         {
+            float v = at(x, y);
+            if (x + 1 < w) v = std::min(v, at(x + 1, y) + 3);
+            if (y + 1 < h)
+            {
+               v = std::min(v, at(x, y + 1) + 3);
+               if (x + 1 < w) v = std::min(v, at(x + 1, y + 1) + 4);
+               if (x > 0) v = std::min(v, at(x - 1, y + 1) + 4);
+            }
+            at(x, y) = v;
+         }
+      for (float& v : d)
+         v = v >= inf ? inf : v / 3.0f;
+   }
+
+   // Bilinear RGBA (0..1) at a continuous point (pixel centres at +0.5), clamped to the picture.
+   void Bilerp(const std::vector<uint8_t>& px, int W, int H, float x, float y, float o[4])
+   {
+      x = std::clamp(x - 0.5f, 0.0f, (float)(W - 1));
+      y = std::clamp(y - 0.5f, 0.0f, (float)(H - 1));
+      const int x0 = (int)x, y0 = (int)y, x1 = std::min(W - 1, x0 + 1), y1 = std::min(H - 1, y0 + 1);
+      const float fx = x - x0, fy = y - y0;
+      for (int c = 0; c < 4; c++)
+      {
+         const float a = px[((size_t)y0 * W + x0) * 4 + c], b = px[((size_t)y0 * W + x1) * 4 + c];
+         const float e = px[((size_t)y1 * W + x0) * 4 + c], f = px[((size_t)y1 * W + x1) * 4 + c];
+         o[c] = ((a + (b - a) * fx) * (1 - fy) + (e + (f - e) * fx) * fy) / 255.0f;
+      }
+   }
+
+   std::vector<uint8_t> FlipRows(const std::vector<uint8_t>& in, int w, int h, int ch)
+   {
+      std::vector<uint8_t> out(in.size());
+      const size_t row = (size_t)w * ch;
+      for (int y = 0; y < h; y++)
+         std::memcpy(&out[(size_t)y * row], &in[(size_t)(h - 1 - y) * row], row);
+      return out;
+   }
+}
+
+std::string Scene2DNode::ContentAwareSolve(const std::vector<uint8_t>& src, int W, int H, const std::vector<uint8_t>& sel,
+                                           const CamParams& p, std::vector<uint8_t>& out, std::vector<uint8_t>& write,
+                                           std::vector<uint8_t>& selOut)
+{
+   if (W <= 0 || H <= 0 || src.size() != (size_t)W * H * 4 || sel.size() != (size_t)W * H)
+      return "No picture to move";
+   if (p.structure < 1 || p.structure > 7 || p.color < 0 || p.color > 10 || !std::isfinite(p.dx) || !std::isfinite(p.dy) ||
+       !std::isfinite(p.scaleX) || !std::isfinite(p.scaleY) || !std::isfinite(p.rotate) || std::fabs(p.scaleX) < 1 ||
+       std::fabs(p.scaleY) < 1 || std::fabs(p.scaleX) > 10000 || std::fabs(p.scaleY) > 10000 || std::fabs(p.rotate) > 36000)
+      return "Content-aware move settings out of range";
+   int bx0 = W, by0 = H, bx1 = -1, by1 = -1;
+   for (int y = 0; y < H; y++)
+      for (int x = 0; x < W; x++)
+         if (sel[(size_t)y * W + x] != 0)
+         {
+            bx0 = std::min(bx0, x);
+            by0 = std::min(by0, y);
+            bx1 = std::max(bx1, x);
+            by1 = std::max(by1, y);
+         }
+   if (bx1 < 0)
+      return "Make a selection first";
+   if ((double)(bx1 - bx0 + 1) * (by1 - by0 + 1) > 16.0 * 1024 * 1024)
+      return "The selection is too large to move";
+   const int dx = (int)std::lround(p.dx), dy = (int)std::lround(p.dy);
+   const bool transform = std::fabs(p.scaleX - 100) > 1e-3f || std::fabs(p.scaleY - 100) > 1e-3f || std::fmod(std::fabs(p.rotate), 360.0f) > 1e-3f;
+   if (!transform && dx == 0 && dy == 0)
+      return "Drag the selection to where the content should go";
+   if (p.patch)
+   {
+      // Patch: the content (dx, dy) away is placed into the selection, which stays where it is.
+      if (transform)
+         return "Patch takes no scale or turn";
+      if (bx0 + dx < 0 || by0 + dy < 0 || bx1 + dx >= W || by1 + dy >= H)
+         return "The patch source must stay inside the canvas";
+      std::vector<uint8_t> moved((size_t)W * H, 0);
+      for (int y = by0; y <= by1; y++)
+         for (int x = bx0; x <= bx1; x++)
+            moved[(size_t)(y + dy) * W + x + dx] = sel[(size_t)y * W + x];
+      CamParams q = p;
+      q.patch = false;
+      q.extend = true;
+      q.dx = (float)-dx;
+      q.dy = (float)-dy;
+      std::string e = ContentAwareSolve(src, W, H, moved, q, out, write, selOut);
+      if (e.empty())
+         selOut = sel;
+      return e;
+   }
+   // Placement: about the selection's centre, scale, then turn (clockwise on screen), then offset.
+   const float cx = (bx0 + bx1 + 1) * 0.5f, cy = (by0 + by1 + 1) * 0.5f;
+   const float th = p.rotate * 3.14159265358979f / 180.0f, cs = std::cos(th), sn = std::sin(th);
+   const float sx = p.scaleX / 100.0f, sy = p.scaleY / 100.0f;
+   auto fwd = [&](float x, float y, float& ox, float& oy) {
+      const float u = (x - cx) * sx, v = (y - cy) * sy;
+      ox = cx + dx + u * cs - v * sn;
+      oy = cy + dy + u * sn + v * cs;
+   };
+   auto inv = [&](float x, float y, float& ox, float& oy) {
+      const float u = x - cx - dx, v = y - cy - dy;
+      ox = cx + (u * cs + v * sn) / sx;
+      oy = cy + (-u * sn + v * cs) / sy;
+   };
+   int lx0, ly0, lx1, ly1;
+   if (!transform)
+   {
+      lx0 = bx0 + dx;
+      ly0 = by0 + dy;
+      lx1 = bx1 + dx;
+      ly1 = by1 + dy;
+      if (lx0 < 0 || ly0 < 0 || lx1 >= W || ly1 >= H)
+         return "The moved selection must stay inside the canvas";
+   }
+   else
+   {
+      float fx0 = 1e30f, fy0 = 1e30f, fx1 = -1e30f, fy1 = -1e30f;
+      const float cxs[4] = { (float)bx0, (float)bx1 + 1, (float)bx0, (float)bx1 + 1 }, cys[4] = { (float)by0, (float)by0, (float)by1 + 1, (float)by1 + 1 };
+      for (int k = 0; k < 4; k++)
+      {
+         float ox, oy;
+         fwd(cxs[k], cys[k], ox, oy);
+         fx0 = std::min(fx0, ox);
+         fy0 = std::min(fy0, oy);
+         fx1 = std::max(fx1, ox);
+         fy1 = std::max(fy1, oy);
+      }
+      if (fx1 <= 0 || fy1 <= 0 || fx0 >= W || fy0 >= H)
+         return "The transformed selection must land on the canvas";
+      if ((double)(fx1 - fx0) * (fy1 - fy0) > 16.0 * 1024 * 1024)
+         return "The transformed selection is too large";
+      lx0 = std::max(0, (int)std::floor(fx0));
+      ly0 = std::max(0, (int)std::floor(fy0));
+      lx1 = std::min(W - 1, (int)std::ceil(fx1));
+      ly1 = std::min(H - 1, (int)std::ceil(fy1));
+   }
+   // The base: the picture, with the old place filled first when moving (the paste overwrites what lands on it).
+   std::vector<uint8_t> base = src;
+   if (!p.extend)
+      RemoveRegion(base, W, H, sel);
+   // The landed shape and the selection that follows it.
+   const int side = std::max(1, std::min(lx1 - lx0 + 1, ly1 - ly0 + 1));
+   int bw = p.structure <= 1 ? std::max((int)std::lround(0.3f * side), 12) : p.structure == 2 ? std::max((int)std::lround(0.18f * side), 9) : 6;
+   bw = std::min(bw, 128);
+   const int ring = 6, mg = std::max(bw, ring) + 2;
+   const int X0 = std::max(0, lx0 - mg), Y0 = std::max(0, ly0 - mg), X1 = std::min(W - 1, lx1 + mg), Y1 = std::min(H - 1, ly1 + mg);
+   const int cw = X1 - X0 + 1, ch = Y1 - Y0 + 1;
+   std::vector<uint8_t> land((size_t)cw * ch, 0);
+   selOut.assign((size_t)W * H, 0);
+   for (int y = ly0; y <= ly1; y++)
+      for (int x = lx0; x <= lx1; x++)
+      {
+         float qx, qy;
+         inv(x + 0.5f, y + 0.5f, qx, qy);
+         const int ix = (int)std::floor(qx), iy = (int)std::floor(qy);
+         if (ix < 0 || iy < 0 || ix >= W || iy >= H)
+            continue;
+         const uint8_t v = sel[(size_t)iy * W + ix];
+         selOut[(size_t)y * W + x] = v;
+         land[(size_t)(y - Y0) * cw + x - X0] = v != 0 ? 255 : 0;
+      }
+   // Inner distance (to the nearest pixel not landed, on the canvas) and outer distance (to the landed shape).
+   std::vector<uint8_t> outside(land.size());
+   for (size_t i = 0; i < land.size(); i++)
+      outside[i] = land[i] == 0 ? 255 : 0;
+   std::vector<float> din, dout;
+   ChamferDist(outside, cw, ch, din);
+   ChamferDist(land, cw, ch, dout);
+   // The content at every pixel of the crop, from the original picture through the inverse placement.
+   std::vector<float> cont((size_t)cw * ch * 4);
+   for (int y = 0; y < ch; y++)
+      for (int x = 0; x < cw; x++)
+      {
+         float qx, qy;
+         inv(X0 + x + 0.5f, Y0 + y + 0.5f, qx, qy);
+         Bilerp(src, W, H, qx, qy, &cont[((size_t)y * cw + x) * 4]);
+      }
+   // Colour: above 5 the content takes part of the shift between its old surround and its new one, when that
+   // shift is the same in every channel (a light change, not a different object).
+   float bias[3] = { 0, 0, 0 };
+   if (p.color > 5)
+   {
+      double sc[3] = { 0, 0, 0 }, sb[3] = { 0, 0, 0 };
+      size_t n = 0;
+      for (int y = 0; y < ch; y++)
+         for (int x = 0; x < cw; x++)
+         {
+            const size_t i = (size_t)y * cw + x;
+            if (land[i] != 0 || dout[i] > ring)
+               continue;
+            const size_t gi = ((size_t)(Y0 + y) * W + X0 + x) * 4;
+            for (int c = 0; c < 3; c++)
+            {
+               sc[c] += cont[i * 4 + c];
+               sb[c] += base[gi + c] / 255.0;
+            }
+            n++;
+         }
+      if (n > 0)
+      {
+         float d[3];
+         for (int c = 0; c < 3; c++)
+            d[c] = (float)((sb[c] - sc[c]) / n);
+         const float lo = std::min({ d[0], d[1], d[2] }), hi = std::max({ d[0], d[1], d[2] });
+         if (hi - lo <= 8.0f / 255.0f)
+            for (int c = 0; c < 3; c++)
+               bias[c] = (p.color - 5) / 5.0f * d[c];
+      }
+   }
+   // The membrane: the base outside, the fitted content in the core, the band between them rebuilt.
+   std::vector<float> img((size_t)cw * ch * 4);
+   std::vector<uint8_t> band((size_t)cw * ch, 0);
+   for (int y = 0; y < ch; y++)
+      for (int x = 0; x < cw; x++)
+      {
+         const size_t i = (size_t)y * cw + x, gi = ((size_t)(Y0 + y) * W + X0 + x) * 4;
+         for (int c = 0; c < 3; c++)
+            cont[i * 4 + c] = std::clamp(cont[i * 4 + c] + bias[c], 0.0f, 1.0f);
+         if (land[i] == 0)
+            for (int c = 0; c < 4; c++)
+               img[i * 4 + c] = base[gi + c] / 255.0f;
+         else if (din[i] > bw)
+            std::copy(&cont[i * 4], &cont[i * 4] + 4, &img[i * 4]);
+         else
+            band[i] = 255;
+      }
+   SelectMaths::HarmonicFill(img, 4, band, cw, ch);
+   out = base;
+   write.assign((size_t)W * H, 0);
+   if (!p.extend)
+      for (size_t i = 0; i < sel.size(); i++)
+         if (sel[i] != 0)
+            write[i] = 255;
+   for (int y = 0; y < ch; y++)
+      for (int x = 0; x < cw; x++)
+      {
+         const size_t i = (size_t)y * cw + x, g = (size_t)(Y0 + y) * W + X0 + x;
+         if (land[i] == 0)
+            continue;
+         float t = 1;
+         if (band[i] != 0)
+         {
+            const float r = std::clamp(din[i] / bw, 0.0f, 1.0f);
+            t = p.structure >= 3 ? r : p.structure == 2 ? r * r : 0.0f;
+         }
+         for (int c = 0; c < 4; c++)
+         {
+            const float v = img[i * 4 + c] + (cont[i * 4 + c] - img[i * 4 + c]) * t;
+            out[g * 4 + c] = (uint8_t)std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f);
+         }
+         write[g] = 255;
+      }
+   return "";
+}
+
+// The picture a content-aware move reads and the target it writes, top-down; false (with why) when it cannot.
+bool Scene2DNode::CamSource(int id, const CamParams& p, std::vector<uint8_t>& src, std::vector<uint8_t>& own, std::string* err)
+{
+   auto fail = [&](const char* why) {
+      if (err != nullptr)
+         *err = why;
+      return false;
+   };
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr)
+      return fail("No layer to move on");
+   if (!mSelAny || mSel.size() != (size_t)mDoc.w * mDoc.h)
+      return fail("Make a selection first");
+   SyncSurfaces();
+   const int W = mDoc.w, H = mDoc.h;
+   GLUtil::Fbo* fbo = nullptr;
+   if (p.target == 0)
+   {
+      if (l->kind != Kind::Paint)
+         return fail("Content-aware move works on a pixel layer");
+      if ((EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+         return fail("The layer is locked");
+      float m[6];
+      LayerMatrix(*l, m);
+      const bool aligned = std::fabs(m[0] - 1) < 1e-4f && std::fabs(m[4] - 1) < 1e-4f && std::fabs(m[1]) < 1e-4f &&
+                           std::fabs(m[3]) < 1e-4f && std::fabs(m[2]) < 1e-3f && std::fabs(m[5]) < 1e-3f && l->pw == W && l->ph == H;
+      if (!aligned)
+         return fail("Content-aware move needs a layer the size of the document, not moved or scaled");
+      auto it = mSurfaces.find(id);
+      if (it == mSurfaces.end())
+         return fail("No pixels on this layer");
+      fbo = &it->second.fbo;
+   }
+   else if (p.target == 1 || p.target == 3)
+   {
+      const bool fx = p.target == 3;
+      auto& surfaces = fx ? mFxMasks : mMasks;
+      const int mw = fx ? l->fmw : l->mw, mh = fx ? l->fmh : l->mh;
+      if ((fx ? !l->HasFilterMask() : !l->HasPixelMask()) || (EffectiveLock(*l) & kLockAll) != 0)
+         return fail("No mask to move on");
+      if (mw != W || mh != H)
+         return fail("Content-aware move needs a mask the size of the document");
+      auto it = surfaces.find(id);
+      if (it == surfaces.end())
+         return fail("No mask to move on");
+      fbo = &it->second.fbo;
+   }
+   else
+      return fail("Content-aware move works on pixels or a mask");
+   std::vector<uint8_t> px;
+   ReadRect(*fbo, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return fail("No pixels on this layer");
+   own = FlipRows(px, W, H, 4);
+   if (p.sampleAll && p.target == 0)
+   {
+      if (mOut.fbo == 0 || mOut.w != W || mOut.h != H)
+         return fail("Nothing composed yet to sample");
+      ReadRect(mOut, 0, 0, W, H, px);
+      src = FlipRows(px, W, H, 4);
+   }
+   else
+      src = own;
+   return true;
+}
+
+bool Scene2DNode::ContentAwareMove(int id, const CamParams& p, std::string* err)
+{
+   std::vector<uint8_t> src, own, out, write, selOut;
+   if (!CamSource(id, p, src, own, err))
+      return false;
+   const int W = mDoc.w, H = mDoc.h;
+   const std::vector<uint8_t> sel = FlipRows(mSel, W, H, 1);
+   const std::string e = ContentAwareSolve(src, W, H, sel, p, out, write, selOut);
+   if (!e.empty())
+   {
+      if (err != nullptr)
+         *err = e;
+      return false;
+   }
+   Layer* l = FindLayer(id);
+   const bool lockAlpha = p.target == 0 && (EffectiveLock(*l) & kLockAlpha) != 0;
+   for (size_t i = 0; i < write.size(); i++)
+      if (write[i] != 0)
+      {
+         if (p.target == 0)
+         {
+            const uint8_t a = own[i * 4 + 3];
+            std::copy(&out[i * 4], &out[i * 4] + 4, &own[i * 4]);
+            if (lockAlpha)
+               own[i * 4 + 3] = a;
+         }
+         else
+         {
+            own[i * 4] = own[i * 4 + 1] = own[i * 4 + 2] = out[i * 4];
+            own[i * 4 + 3] = 255;
+         }
+      }
+   const std::vector<uint8_t> px = FlipRows(own, W, H, 4);
+   auto& surfaces = p.target == 0 ? mSurfaces : p.target == 1 ? mMasks : mFxMasks;
+   auto& tiles = p.target == 0 ? l->tiles : p.target == 1 ? l->mtiles : l->fmtiles;
+   Surface& s = surfaces.find(id)->second;
+   WriteRect(s.fbo, 0, 0, W, H, px.data());
+   const int all[4] = { 0, 0, W, H };
+   StoreTiles(s, tiles, all);
+   mSel = FlipRows(selOut, W, H, 1);
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+   StoreSelection();
+   return true;
+}
+
+bool Scene2DNode::ContentAwarePreview(int id, const CamParams& p, int maxArea, std::vector<uint8_t>& rgba, int& pw, int& ph,
+                                      float r[4], std::string* err)
+{
+   std::vector<uint8_t> src, own, out, write, selOut;
+   if (!CamSource(id, p, src, own, err))
+      return false;
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> sel = FlipRows(mSel, W, H, 1);
+   // Coarse: the picture and the selection box-averaged down (the larger of the selection and its landing at most
+   // maxArea px), the offset scaled with them.
+   int w = W, h = H;
+   float f = 1;
+   CamParams q = p;
+   int bx0 = W, by0 = H, bx1 = -1, by1 = -1;
+   for (int y = 0; y < H; y++)
+      for (int x = 0; x < W; x++)
+         if (sel[(size_t)y * W + x] != 0)
+         {
+            bx0 = std::min(bx0, x);
+            by0 = std::min(by0, y);
+            bx1 = std::max(bx1, x);
+            by1 = std::max(by1, y);
+         }
+   const double area = bx1 < 0 ? 0.0 : (double)(bx1 - bx0 + 1) * (by1 - by0 + 1);
+   const double big = std::max(area, area * std::fabs(p.scaleX * p.scaleY) / 1e4);
+   if (maxArea > 0 && big > maxArea)
+   {
+      f = (float)std::sqrt(maxArea / big);
+      w = std::max(1, (int)std::lround(W * f));
+      h = std::max(1, (int)std::lround(H * f));
+      std::vector<uint8_t> s2((size_t)w * h * 4), m2((size_t)w * h);
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            const int x0 = x * W / w, x1 = std::max(x0 + 1, (x + 1) * W / w), y0 = y * H / h, y1 = std::max(y0 + 1, (y + 1) * H / h);
+            uint32_t acc[5] = { 0, 0, 0, 0, 0 }, n = 0;
+            for (int yy = y0; yy < y1; yy++)
+               for (int xx = x0; xx < x1; xx++, n++)
+               {
+                  const size_t i = (size_t)yy * W + xx;
+                  for (int c = 0; c < 4; c++)
+                     acc[c] += src[i * 4 + c];
+                  acc[4] += sel[i];
+               }
+            for (int c = 0; c < 4; c++)
+               s2[((size_t)y * w + x) * 4 + c] = (uint8_t)(acc[c] / n);
+            m2[(size_t)y * w + x] = (uint8_t)(acc[4] / n);
+         }
+      src.swap(s2);
+      sel.swap(m2);
+      q.dx = p.dx * f;
+      q.dy = p.dy * f;
+   }
+   const std::string e = ContentAwareSolve(src, w, h, sel, q, out, write, selOut);
+   if (!e.empty())
+   {
+      if (err != nullptr)
+         *err = e;
+      return false;
+   }
+   int x0 = w, y0 = h, x1 = -1, y1 = -1;
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+         if (write[(size_t)y * w + x] != 0)
+         {
+            x0 = std::min(x0, x);
+            y0 = std::min(y0, y);
+            x1 = std::max(x1, x);
+            y1 = std::max(y1, y);
+         }
+   if (x1 < 0)
+      return false;
+   pw = x1 - x0 + 1;
+   ph = y1 - y0 + 1;
+   rgba.assign((size_t)pw * ph * 4, 0);
+   for (int y = 0; y < ph; y++)
+      for (int x = 0; x < pw; x++)
+      {
+         const size_t g = (size_t)(y0 + y) * w + x0 + x;
+         if (write[g] != 0)
+            std::copy(&out[g * 4], &out[g * 4] + 4, &rgba[((size_t)y * pw + x) * 4]);
+      }
+   r[0] = x0 / f;
+   r[1] = y0 / f;
+   r[2] = (x1 + 1) / f;
+   r[3] = (y1 + 1) / f;
+   return true;
+}
+
 bool Scene2DNode::Blemish(int id, float x, float y, float radius)
 {
    Layers();

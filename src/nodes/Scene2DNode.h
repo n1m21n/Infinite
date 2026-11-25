@@ -610,6 +610,31 @@ public:
    // Patch: the selection mended from where it was dragged to; selIsSource sends its own pixels there instead;
    // transparent keeps half of what was there.
    bool PatchSelection(int id, float dx, float dy, bool selIsSource = false, bool transparent = false);
+   // Content-aware move / extend: the selection's content placed (dx, dy) document px away (scaled and turned
+   // about its centre when asked), its edge blended into what is there; move also fills the old place.
+   // patch: the selection is mended from the content (dx, dy) away instead (the Patch tool's Content-Aware mode).
+   struct CamParams
+   {
+      float dx = 0, dy = 0;
+      bool extend = false;
+      int structure = 4;   // 1..7: how much of the content's edge is rebuilt (1 = the most)
+      int color = 0;       // 0..10: how far the content's colour follows its new place (above 5)
+      float scaleX = 100, scaleY = 100, rotate = 0;   // percent, degrees clockwise
+      bool sampleAll = false;
+      int target = 0;      // 0 pixels, 1 layer mask, 3 filter mask
+      bool patch = false;
+   };
+   // The solve itself, on a top-down RGBA picture and selection (both W x H): out is the result, write the
+   // pixels it changed (255), selOut where the selection goes. Returns "" or why it was refused.
+   static std::string ContentAwareSolve(const std::vector<uint8_t>& src, int W, int H, const std::vector<uint8_t>& sel,
+                                        const CamParams& p, std::vector<uint8_t>& out, std::vector<uint8_t>& write,
+                                        std::vector<uint8_t>& selOut);
+   bool ContentAwareMove(int id, const CamParams& p, std::string* err = nullptr);
+   // The same solve, the document untouched, on a copy scaled so the selection and its landing are at most maxArea
+   // px (0 = full size): rgba (top-down, pw x ph) covers the document rect r (x0, y0, x1, y1), clear outside the
+   // changed pixels.
+   bool ContentAwarePreview(int id, const CamParams& p, int maxArea, std::vector<uint8_t>& rgba, int& pw, int& ph, float r[4],
+                            std::string* err = nullptr);
    // Blemish removal: a disc (document px) healed from the best clean place nearby.
    bool Blemish(int id, float x, float y, float radius);
    // Flood erase: the region the wand would pick at (x, y) cleared; the selection stays as it was.
@@ -971,6 +996,7 @@ private:
    void StoreTiles(Surface& s, std::vector<std::string>& keys, const int dirty[4]);
    void ResetForFile(int w, int h);
    bool DocToSurface(const Layer& l, int target, float x, float y, float& sx, float& sy, float& scale);
+   bool CamSource(int id, const CamParams& p, std::vector<uint8_t>& src, std::vector<uint8_t>& own, std::string* err);
    std::vector<std::array<float, 6>> SurfaceMirrors(const Layer& l, int target);
    bool EnsurePaintShaders();
    void UploadSelection();

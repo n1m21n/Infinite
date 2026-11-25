@@ -2890,6 +2890,15 @@ namespace params
       constexpr float color_period_hi = 2000.0f;
       constexpr float wet_hi = 100.0f;
       constexpr float wet_lo = 0.0f;
+      constexpr float cam_structure_lo = 1.0f;   // content-aware move
+      constexpr float cam_structure_hi = 7.0f;
+      constexpr float cam_color_lo = 0.0f;
+      constexpr float cam_color_hi = 10.0f;
+      constexpr float cam_scale_lo = 1.0f;
+      constexpr float cam_scale_hi = 1000.0f;
+      constexpr float cam_rotate_lo = -180.0f;
+      constexpr float cam_rotate_hi = 180.0f;
+      constexpr int cam_preview_px = 256 * 256;   // a held drop's coarse preview solves at most this many px
       constexpr float refill_hi = 100.0f;
       constexpr float refill_lo = 0.0f;
       constexpr float tol_hi = 100.0f;

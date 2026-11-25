@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE9A5;
+   inline constexpr unsigned kLast = 0xE9A6;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -170,4 +170,5 @@ namespace IconsInfinite
    inline constexpr const char* Dock = "\xee\xa6\xa3"; // U+E9A3 dock
    inline constexpr const char* Download = "\xee\xa6\xa4"; // U+E9A4 download
    inline constexpr const char* Trash = "\xee\xa6\xa5"; // U+E9A5 trash
+   inline constexpr const char* ContentMove = "\xee\xa6\xa6"; // U+E9A6 content-move
 }
