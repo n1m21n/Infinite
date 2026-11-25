@@ -10781,6 +10781,44 @@ namespace
       ImGui::EndMenu();
    }
 
+   static const char* const kCombineNames[4] = { "Unite Shapes", "Subtract Front Shape", "Intersect Shape Areas", "Exclude Overlapping Shapes" };
+
+   // Layer > Combine Shapes with two or more vector layers selected: they merge into the top one (PhotoCraft
+   // combine_shapes_*). One undo step; a refusal (locked layer, untransformable item) leaves nothing behind.
+   int SelectedVectorLayers(Scene2DNode* doc)
+   {
+      int n = 0;
+      for (int id : sSel)
+         if (const Layer* l = doc->FindLayer(id); l != nullptr && l->kind == Kind::Vector)
+            n++;
+      return n;
+   }
+
+   void CombineShapes(Scene2DNode* doc, int op)
+   {
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint(kCombineNames[std::clamp(op, 0, 3)]);
+      const int keep = doc->CombineShapeLayers(sSel, op);
+      if (keep == 0)
+      {
+         gUndoStack.resize(undo0);
+         return;
+      }
+      sSel = { keep };
+      sItem = -1;
+      Touch();
+   }
+
+   void CombineShapesSubMenu(Scene2DNode* doc)
+   {
+      if (!MenuParts::SubMenu(T("Combine Shapes"), SelectedVectorLayers(doc) > 1))
+         return;
+      for (int i = 0; i < 4; i++)
+         if (MenuParts::Item(T(kCombineNames[i])))
+            CombineShapes(doc, i);
+      ImGui::EndMenu();
+   }
+
    // Document crops from a menu: to the selection's box, or Trim to what the layers show (transparent edges cut).
    void CropToSelection(Scene2DNode* doc)
    {
@@ -11720,6 +11758,8 @@ namespace
                sPending.what = Pending::Duplicate;
             if (!adj)
                TransformSubMenu(doc);
+            if (l->kind == Kind::Vector)
+               CombineShapesSubMenu(doc);
             if (l->kind != Kind::Fill && l->kind != Kind::Adjust && MenuParts::Item(T("Select Layer Pixels")))
                SelectLayerPixels(doc, id, Scene2DNode::kSelNew);
             MenuParts::Separator();
@@ -18021,6 +18061,93 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
                 flat && pixel({ vid }, 320, 200, a1) && a1[3] < 4 && pixel({ vid }, 345, 200, a2) && a2[3] > 200);
          doc->RemoveLayer(vid);
          doc->Commit();
+      }
+      // Combine Shapes across layers (PhotoCraft combine_shapes_*): two 40x40 rects overlapping 20x20, the lower one
+      // moved by its layer transform. Each op merges into the top layer (its name, fill and selection), one undo step
+      // brings both back; a paint layer in the selection is left alone; a locked layer refuses without a step.
+      {
+         using Sh = Scene2DNode::Shape;
+         auto rectItem = [](float x0, float y0, float grey) {
+            Sh r;
+            r.type = Sh::kRect;
+            r.x0 = x0, r.y0 = y0, r.x1 = x0 + 40, r.y1 = y0 + 40;
+            for (int c = 0; c < 3; c++)
+               r.fillC[c] = grey;
+            return r;
+         };
+         auto coverage = [&](int id) {
+            std::vector<uint8_t> rgba;
+            if (!doc->RenderSet({ id }, ++sParFrame, rgba) || rgba.size() < (size_t)W * H * 4)
+               return -1.0f;
+            double sum = 0.0;
+            for (size_t i = 3; i < (size_t)W * H * 4; i += 4)
+               sum += rgba[i] / 255.0;
+            return (float)sum;
+         };
+         auto make = [&](int& a, int& b) {
+            Layer& la = doc->AddLayer(Kind::Vector, 0, 0);
+            la.shapes.push_back(rectItem(0, 0, 0.0f));
+            la.x += 10.0f, la.y += 10.0f;   // the layer moves it: shows at 10..50
+            a = la.id;
+            Layer& lb = doc->AddLayer(Kind::Vector, 0, a);
+            lb.name = "Rectangle 2";
+            lb.shapes.push_back(rectItem(30, 30, 0.5f));
+            b = lb.id;
+            doc->Commit();
+         };
+         const float want[4] = { 2800, 1200, 400, 2400 };
+         const std::vector<int> sel0 = sSel;
+         for (int op = 0; op < 4; op++)
+         {
+            int a = 0, b = 0;
+            make(a, b);
+            const size_t n0 = doc->Layers().size(), u0 = gUndoStack.size();
+            sSel = { a, b };
+            CombineShapes(doc, op);
+            const Layer* kb = doc->FindLayer(b);
+            const float cov = coverage(b);
+            const bool ok = doc->FindLayer(a) == nullptr && kb != nullptr && kb->name == "Rectangle 2" && kb->shapes.size() == 2 &&
+                            kb->shapes[0].fillC[0] == 0.5f && kb->shapes[1].op == op && sSel == std::vector<int>{ b } &&
+                            std::fabs(cov - want[op]) < 2.0f && gUndoStack.size() == u0 + 1;
+            printf("    combine op %d covers %.1f px (want %.0f)\n", op, cov, want[op]);
+            expect(op == 0 ? "combine shapes: Unite merges into the top layer" : op == 1 ? "combine shapes: Subtract Front Shape"
+                   : op == 2 ? "combine shapes: Intersect Shape Areas" : "combine shapes: Exclude Overlapping Shapes", ok);
+            if (!undoBack())
+               return fails;
+            expect("combine shapes: one undo brings both layers back", doc->FindLayer(a) != nullptr && doc->Layers().size() == n0);
+            doc->RemoveLayer(a);
+            doc->RemoveLayer(b);
+            doc->Commit();
+         }
+         {
+            int a = 0, b = 0;
+            make(a, b);
+            const int p = doc->AddPaintLayer();
+            sSel = { p, a, b };
+            CombineShapes(doc, 0);
+            expect("combine shapes: a selected paint layer is left alone", doc->FindLayer(p) != nullptr && doc->FindLayer(a) == nullptr &&
+                                                                               std::fabs(coverage(b) - 2800.0f) < 2.0f);
+            doc->RemoveLayer(p);
+            doc->RemoveLayer(b);
+            doc->Commit();
+         }
+         {
+            int a = 0, b = 0;
+            make(a, b);
+            doc->FindLayer(a)->lock = Scene2DNode::kLockAll;
+            const size_t u0 = gUndoStack.size();
+            sSel = { a, b };
+            CombineShapes(doc, 0);
+            const bool lockedOk = doc->FindLayer(a) != nullptr && doc->FindLayer(b)->shapes.size() == 1 && gUndoStack.size() == u0;
+            doc->FindLayer(a)->lock = 0;
+            sSel = { b };
+            const bool single = doc->CombineShapeLayers(sSel, 0) == 0 && doc->FindLayer(a) != nullptr;
+            expect("combine shapes: a locked layer refuses with no step; one layer keeps its own ops", lockedOk && single);
+            doc->RemoveLayer(a);
+            doc->RemoveLayer(b);
+            doc->Commit();
+         }
+         sSel = sel0;
       }
       // Pass Through at 50%: an Invert inside still sees the red below, so red mixes with cyan to grey (Photoshop).
       {

@@ -2102,6 +2102,129 @@ bool Scene2DNode::ImportSvg(int id, const std::string& svgText)
    return true;
 }
 
+void Scene2DNode::CopyShapeStyle(const Shape& from, Shape& to)
+{
+   to.fillOn = from.fillOn;
+   std::copy(from.fillC, from.fillC + 4, to.fillC);
+   to.fillType = from.fillType;
+   to.fillAngle = from.fillAngle;
+   to.fillStops = from.fillStops;
+   to.fillImage = from.fillImage;
+   to.imageMode = from.imageMode;
+   std::copy(&from.meshC[0][0], &from.meshC[0][0] + 16, &to.meshC[0][0]);
+   to.noise = from.noise;
+   to.strokeOn = from.strokeOn;
+   std::copy(from.strokeC, from.strokeC + 4, to.strokeC);
+   to.width = from.width;
+   to.cap = from.cap;
+   to.join = from.join;
+   to.align = from.align;
+   to.dash = from.dash;
+   to.gap = from.gap;
+   to.dashPhase = from.dashPhase;
+   to.balanced = from.balanced;
+   to.miter = from.miter;
+   to.behind = from.behind;
+   to.scaleStroke = from.scaleStroke;
+}
+
+int Scene2DNode::CombineShapeLayers(const std::vector<int>& ids, int op)
+{
+   Layers();
+   if (op < Shape::kAdd || op > Shape::kXor)
+      return 0;
+   // The vector layers among the ids, bottom to top in the stack.
+   std::vector<int> order;
+   for (const Layer& l : mLayers)
+      if (l.kind == Kind::Vector && std::find(ids.begin(), ids.end(), l.id) != ids.end())
+         order.push_back(l.id);
+   if (order.size() < 2)
+      return 0;
+   auto locked = [&](const Layer& l) {
+      unsigned lk = l.lock;
+      for (int p = l.parent, guard = 0; p != 0 && guard < 64; guard++)
+      {
+         const Layer* g = FindConst(p);
+         if (g == nullptr)
+            break;
+         lk |= g->lock;
+         p = g->parent;
+      }
+      return (lk & (kLockAll | kLockPixels)) != 0;
+   };
+   for (int id : order)
+      if (locked(*FindConst(id)))
+         return 0;
+   const int keep = order.back();
+   float t[6];
+   LayerMatrix(*FindConst(keep), t);
+   const float det = t[0] * t[4] - t[1] * t[3];
+   if (!std::isfinite(det) || std::fabs(det) < 1e-8f)
+      return 0;
+   // Inverse of the top layer's box -> document map.
+   const float inv[6] = { t[4] / det, -t[1] / det, (t[1] * t[5] - t[4] * t[2]) / det,
+                          -t[3] / det, t[0] / det, (t[3] * t[2] - t[0] * t[5]) / det };
+   Shape style;
+   if (!FindConst(keep)->shapes.empty())
+      style = FindConst(keep)->shapes.front();
+   std::vector<Shape> merged;
+   for (size_t li = 0; li < order.size(); li++)
+   {
+      const Layer& src = *FindConst(order[li]);
+      float a[6];
+      LayerMatrix(src, a);
+      // m = inv * a: the source box -> the top layer's box.
+      const float m[6] = { inv[0] * a[0] + inv[1] * a[3], inv[0] * a[1] + inv[1] * a[4], inv[0] * a[2] + inv[1] * a[5] + inv[2],
+                           inv[3] * a[0] + inv[4] * a[3], inv[3] * a[1] + inv[4] * a[4], inv[3] * a[2] + inv[4] * a[5] + inv[5] };
+      const float eps = 1e-5f;
+      const bool axial = std::fabs(m[1]) < eps && std::fabs(m[3]) < eps;
+      const bool same = axial && std::fabs(m[0] - 1.0f) < eps && std::fabs(m[4] - 1.0f) < eps;   // a pure move
+      const float k = std::sqrt(std::fabs(m[0] * m[4] - m[1] * m[3]));
+      auto map = [&](float& x, float& y) {
+         const float nx = m[0] * x + m[1] * y + m[2], ny = m[3] * x + m[4] * y + m[5];
+         x = nx;
+         y = ny;
+      };
+      for (size_t j = 0; j < src.shapes.size(); j++)
+      {
+         Shape s = src.shapes[j];
+         if (!same)
+         {
+            if (s.type == Shape::kSvg)
+            {
+               // An SVG item keeps its box; only a move or a positive axis-aligned scale maps it exactly.
+               if (!axial || m[0] <= 0.0f || m[4] <= 0.0f)
+                  return 0;
+            }
+            else if (s.type != Shape::kPath && !ShapeToPath(s))
+               continue;   // an empty live shape draws nothing
+         }
+         if (s.type == Shape::kPath)
+            for (size_t p = 0; p + 1 < s.pts.size(); p += 2)
+               map(s.pts[p], s.pts[p + 1]);
+         else
+         {
+            map(s.x0, s.y0);
+            map(s.x1, s.y1);
+         }
+         if (s.scaleStroke)
+            s.width *= k;
+         if (order[li] != keep)
+            CopyShapeStyle(style, s);
+         if (li > 0)
+            s.op = op;   // the bottom layer's items keep their own ops
+         merged.push_back(std::move(s));
+      }
+   }
+   Layer* top = FindLayer(keep);
+   top->shapes = std::move(merged);
+   for (int id : order)
+      if (id != keep)
+         RemoveLayer(id);
+   Commit();
+   return keep;
+}
+
 unsigned Scene2DNode::VectorMaskTexture(int id)
 {
    Layers();

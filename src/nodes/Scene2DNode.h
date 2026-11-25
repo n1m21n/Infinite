@@ -805,6 +805,12 @@ public:
    static int SplitSegment(Shape& s, int seg, float t);
    static void SubdividePath(Shape& s);
    static void DeformShape(Shape& s, int mode, float amount, float freq);
+   // Layer > Combine Shapes with 2+ vector layers: the lower layers' items move into the top one (mapped through both
+   // layers' transforms, taking its fill and stroke); the bottom layer's items keep their ops, every item above takes
+   // `op`. Non-vector ids are ignored. Returns the kept layer's id, or 0 with nothing changed (under two vector layers,
+   // a locked one, a transform that cannot be inverted, an SVG item that would need a turn).
+   int CombineShapeLayers(const std::vector<int>& ids, int op);
+   static void CopyShapeStyle(const Shape& from, Shape& to);   // fill and stroke, not geometry or op
    // The items as an SVG document (Convert to Sketch node, Copy SVG).
    std::string ToSvg(const Layer& l);
    // An SVG file's text as one item filling (or fitting) the document; false on a parse error.
