@@ -624,6 +624,13 @@ public:
    float LiveDepthAt(float x, float y) const;
    // Full between lo and hi (0 far .. 1 near), falling off over soft, joined by op as Color Range is.
    void DepthPreview(float lo, float hi, float soft, bool invert, int op);
+   // Focus Area (ledger-gaps Block A): the in-focus part of the live picture (SelectMaths::FocusMap / FocusSelect,
+   // the map made once per noise level), joined by op as Color Range is. range and noise 0..1.
+   void FocusPreview(float range, float noise, bool invert, int op);
+   // Select > Grow (contiguous) / Similar (everywhere): the selection plus every pixel within the Magic Wand's
+   // tolerance of a selected colour (SelectMaths::GrowMatch). Reads the layer, or everything with sampleAll.
+   // false = no selection or nothing to read.
+   bool GrowSelection(bool similar, int tolerance, bool sampleAll, int layerId);
    // Tests: a made-up map (document px, top row first) in place of the model's.
    void SetLiveDepth(const std::vector<float>& topDown);
    // Quick Select with edges (the selection brush's Edges mode; ai-tools.md 1.6): each dab is the brush disc grown to
@@ -976,6 +983,10 @@ private:
    bool mLiveSelAny = false;
    bool mQuickDisc = false;           // Quick Select has no picture to read: dabs are the disc alone
    std::vector<float> mLiveDepth;     // the live picture's depth (bottom row first), empty until it arrives
+   std::vector<float> mLiveFocus;     // Focus Area's sharpness map of the live picture, made for mLiveFocusNoise
+   float mLiveFocusNoise = -1.0f;
+   // The document-sized picture a selection command reads (bottom row first): the paint layer, or the composite.
+   bool ReadSelectPicture(bool sampleAll, int layerId, std::vector<uint8_t>& px);
    uint64_t mLiveDepthKey = 0;        // 0 = not asked yet
    void LiveCombine(std::vector<uint8_t>& region, bool invert, int op);
    struct AiWait

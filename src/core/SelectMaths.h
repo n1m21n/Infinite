@@ -92,6 +92,22 @@ namespace SelectMaths
    // from the one below, so wide holes cost a few sweeps per level, not thousands.
    void HarmonicFill(std::vector<float>& img, int ch, const std::vector<uint8_t>& hole, int w, int h);
 
+   // ---- Grow / Similar ------------------------------------------------------------------------------------------
+   // Select > Grow (contiguous) and Select > Similar (everywhere): pixels whose colour is within the Magic Wand's
+   // tolerance of ANY selected pixel's colour (RGBA distance <= tol * sqrt 3, two clear pixels always alike), so two
+   // selected colours never take in the colours between them. Grow floods 4-neighbour from the selected pixels.
+   // sel and out are w x h (selected = >= 128); out is the old selection with the matches added (255).
+   void GrowMatch(const uint8_t* rgba, int w, int h, const std::vector<uint8_t>& sel, int tol, bool contiguous,
+                  std::vector<uint8_t>& out);
+
+   // ---- Focus Area -----------------------------------------------------------------------------------------------
+   // How sharp each pixel's neighbourhood is, 0 (soft) .. 1 (the sharpest detail in the picture): the local mean of
+   // the luma Laplacian's size, less `noise` (0..1, of the picture's own detail) so grain does not read as focus.
+   void FocusMap(const uint8_t* rgba, int w, int h, float noise, std::vector<float>& out);
+   // The in-focus part of a FocusMap: range 0..1 (Photoshop's In-Focus Range: more takes in softer parts), with a
+   // short soft edge.
+   void FocusSelect(const std::vector<float>& map, int w, int h, float range, std::vector<uint8_t>& out);
+
    // ---- Depth --------------------------------------------------------------------------------------------------
    // A selection from a depth map (0 far .. 1 near): full between lo and hi, falling to 0 over `soft` beyond them.
    void DepthSelect(const std::vector<float>& depth, int w, int h, float lo, float hi, float soft, std::vector<uint8_t>& out);

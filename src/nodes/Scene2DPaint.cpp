@@ -2509,22 +2509,62 @@ void Scene2DNode::CombineSelection(const std::vector<uint8_t>& region, int op)
 }
 
 // ---- live selection dialogs (Select and Mask, Color Range) ----------------------------------------------------
-bool Scene2DNode::LiveSelBegin(bool sampleAll, int layerId)
+bool Scene2DNode::ReadSelectPicture(bool sampleAll, int layerId, std::vector<uint8_t>& px)
 {
    Layers();
    const int W = mDoc.w, H = mDoc.h;
-   std::vector<uint8_t> px;
+   px.clear();
    const Layer* l = FindConst(layerId);
    auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
    if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
       ReadRect(it->second.fbo, 0, 0, W, H, px);
    else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
       ReadRect(mOut, 0, 0, W, H, px);
-   if (px.size() != (size_t)W * H * 4)
+   return px.size() == (size_t)W * H * 4;
+}
+
+bool Scene2DNode::GrowSelection(bool similar, int tolerance, bool sampleAll, int layerId)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   if (!mSelAny || mSel.size() != (size_t)W * H || !ReadSelectPicture(sampleAll, layerId, px))
       return false;
+   std::vector<uint8_t> out;
+   SelectMaths::GrowMatch(px.data(), W, H, mSel, tolerance, !similar, out);
+   mSel.swap(out);
+   mSelAny = true;
+   mSelDirty = true;
+   StoreSelection();
+   return true;
+}
+
+void Scene2DNode::FocusPreview(float range, float noise, bool invert, int op)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   if (mLivePic.size() != (size_t)W * H * 4)
+      return;
+   if (mLiveFocus.size() != (size_t)W * H || mLiveFocusNoise != noise)
+   {
+      SelectMaths::FocusMap(mLivePic.data(), W, H, noise, mLiveFocus);
+      mLiveFocusNoise = noise;
+   }
+   std::vector<uint8_t> region;
+   SelectMaths::FocusSelect(mLiveFocus, W, H, range, region);
+   LiveCombine(region, invert, op);
+}
+
+bool Scene2DNode::LiveSelBegin(bool sampleAll, int layerId)
+{
+   std::vector<uint8_t> px;
+   if (!ReadSelectPicture(sampleAll, layerId, px))
+      return false;
+   const int W = mDoc.w, H = mDoc.h;
    mLivePic.swap(px);
    mLiveDepth.clear();
    mLiveDepthKey = 0;
+   mLiveFocus.clear();
+   mLiveFocusNoise = -1.0f;
    mLiveSelAny = mSelAny && mSel.size() == (size_t)W * H;
    mLiveSel = mLiveSelAny ? mSel : std::vector<uint8_t>((size_t)W * H, 0);
    return true;
@@ -2557,6 +2597,9 @@ void Scene2DNode::LiveSelEnd(bool keep)
    mLiveDepth.clear();
    mLiveDepth.shrink_to_fit();
    mLiveDepthKey = 0;
+   mLiveFocus.clear();
+   mLiveFocus.shrink_to_fit();
+   mLiveFocusNoise = -1.0f;
    mSelDirty = true;
    StoreSelection();
 }

@@ -609,59 +609,72 @@ namespace SelectMaths
 
    namespace
    {
-      // Squared Euclidean distance to the nearest pixel where `seed` is true (Felzenszwalb and Huttenlocher 2012).
-      void DistanceSq(const std::vector<uint8_t>& seed, int w, int h, std::vector<float>& d)
+      // The lower envelope of parabolas (Felzenszwalb and Huttenlocher 2012): dd[q] = min_p (q - p)^2 + f[p].
+      // v and z are scratch of len and len + 1.
+      void Envelope(const float* f, float* dd, int len, int* v, float* z)
       {
          const float inf = 1e20f;
-         d.assign((size_t)w * h, inf);
+         int k = 0;
+         v[0] = 0;
+         z[0] = -inf;
+         z[1] = inf;
+         for (int q = 1; q < len; q++)
+         {
+            float s = ((f[q] + (float)q * q) - (f[v[k]] + (float)v[k] * v[k])) / (2.0f * q - 2.0f * v[k]);
+            while (s <= z[k])
+            {
+               k--;
+               s = ((f[q] + (float)q * q) - (f[v[k]] + (float)v[k] * v[k])) / (2.0f * q - 2.0f * v[k]);
+            }
+            k++;
+            v[k] = q;
+            z[k] = s;
+            z[k + 1] = inf;
+         }
+         k = 0;
+         for (int q = 0; q < len; q++)
+         {
+            while (z[k + 1] < q)
+               k++;
+            dd[q] = (float)(q - v[k]) * (q - v[k]) + f[v[k]];
+         }
+      }
+
+      // Squared Euclidean distance to the nearest cell where `seed` is true, on a grid of up to three axes
+      // (n[0] fastest). One envelope pass per axis.
+      void DistanceSqN(const std::vector<uint8_t>& seed, const int n[3], std::vector<float>& d)
+      {
+         d.assign(seed.size(), 1e20f);
          for (size_t i = 0; i < d.size(); i++)
             if (seed[i])
                d[i] = 0.0f;
-         const int n = std::max(w, h);
-         std::vector<float> f(n), dd(n), z(n + 1);
-         std::vector<int> v(n);
-         auto pass = [&](int len) {
-            int k = 0;
-            v[0] = 0;
-            z[0] = -inf;
-            z[1] = inf;
-            for (int q = 1; q < len; q++)
-            {
-               float s = ((f[q] + (float)q * q) - (f[v[k]] + (float)v[k] * v[k])) / (2.0f * q - 2.0f * v[k]);
-               while (s <= z[k])
-               {
-                  k--;
-                  s = ((f[q] + (float)q * q) - (f[v[k]] + (float)v[k] * v[k])) / (2.0f * q - 2.0f * v[k]);
-               }
-               k++;
-               v[k] = q;
-               z[k] = s;
-               z[k + 1] = inf;
-            }
-            k = 0;
-            for (int q = 0; q < len; q++)
-            {
-               while (z[k + 1] < q)
-                  k++;
-               dd[q] = (float)(q - v[k]) * (q - v[k]) + f[v[k]];
-            }
-         };
-         for (int x = 0; x < w; x++)
+         const int len = std::max(n[0], std::max(n[1], n[2]));
+         std::vector<float> f(len), dd(len), z(len + 1);
+         std::vector<int> v(len);
+         const size_t stride[3] = { 1, (size_t)n[0], (size_t)n[0] * n[1] };
+         for (int axis = 0; axis < 3; axis++)
          {
-            for (int y = 0; y < h; y++)
-               f[y] = d[(size_t)y * w + x];
-            pass(h);
-            for (int y = 0; y < h; y++)
-               d[(size_t)y * w + x] = dd[y];
+            if (n[axis] < 2)
+               continue;
+            const size_t lines = d.size() / n[axis], st = stride[axis];
+            for (size_t l = 0; l < lines; l++)
+            {
+               // The line's first cell: l counts the other two axes, fastest first.
+               const size_t lo = l % st, hi = l / st, base = hi * st * n[axis] + lo;
+               for (int q = 0; q < n[axis]; q++)
+                  f[q] = d[base + q * st];
+               Envelope(f.data(), dd.data(), n[axis], v.data(), z.data());
+               for (int q = 0; q < n[axis]; q++)
+                  d[base + q * st] = dd[q];
+            }
          }
-         for (int y = 0; y < h; y++)
-         {
-            for (int x = 0; x < w; x++)
-               f[x] = d[(size_t)y * w + x];
-            pass(w);
-            for (int x = 0; x < w; x++)
-               d[(size_t)y * w + x] = dd[x];
-         }
+      }
+
+      // Squared Euclidean distance to the nearest pixel where `seed` is true.
+      void DistanceSq(const std::vector<uint8_t>& seed, int w, int h, std::vector<float>& d)
+      {
+         const int n[3] = { w, h, 1 };
+         DistanceSqN(seed, n, d);
       }
    }
 
@@ -800,6 +813,186 @@ namespace SelectMaths
          if (worst < 1e-5f)
             break;
       }
+   }
+
+   // ---- Grow / Similar ------------------------------------------------------------------------------------------
+   void GrowMatch(const uint8_t* rgba, int w, int h, const std::vector<uint8_t>& sel, int tol, bool contiguous,
+                  std::vector<uint8_t>& out)
+   {
+      out = sel;
+      if (rgba == nullptr || w <= 0 || h <= 0 || sel.size() != (size_t)w * h)
+         return;
+      const size_t n = sel.size();
+      auto pack = [&](size_t i) {
+         const uint8_t* c = &rgba[i * 4];
+         return (uint32_t)c[0] | (uint32_t)c[1] << 8 | (uint32_t)c[2] << 16 | (uint32_t)c[3] << 24;
+      };
+      // The selected colours, each once, binned on a 64^3 RGB grid (4 levels a cell) by a counting sort.
+      constexpr int kN = 64, kCell = 256 / kN;
+      auto bin = [](uint32_t c) {
+         return (int)((c & 0xFF) / kCell) + kN * ((int)((c >> 8 & 0xFF) / kCell) + kN * (int)((c >> 16 & 0xFF) / kCell));
+      };
+      std::vector<uint32_t> seeds;
+      for (size_t i = 0; i < n; i++)
+         if (sel[i] >= 128)
+            seeds.push_back(pack(i));
+      if (seeds.empty())
+         return;
+      std::sort(seeds.begin(), seeds.end());
+      seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
+      bool clearSeed = false, allOpaque = true;
+      std::vector<int> start(kN * kN * kN + 1, 0);
+      for (uint32_t c : seeds)
+      {
+         clearSeed = clearSeed || (c >> 24) == 0;
+         allOpaque = allOpaque && (c >> 24) == 255;
+         start[bin(c) + 1]++;
+      }
+      for (size_t b = 1; b < start.size(); b++)
+         start[b] += start[b - 1];
+      std::vector<uint32_t> flat(seeds.size());
+      {
+         std::vector<int> at(start.begin(), start.end() - 1);
+         for (uint32_t c : seeds)
+            flat[at[bin(c)]++] = c;
+      }
+      std::vector<uint8_t> occ(kN * kN * kN, 0);
+      std::vector<int> used;
+      for (int b = 0; b < kN * kN * kN; b++)
+         if (start[b + 1] > start[b])
+         {
+            occ[b] = 1;
+            used.push_back(b);
+         }
+      std::vector<float> d2;
+      const int dims[3] = { kN, kN, kN };
+      DistanceSqN(occ, dims, d2);
+      // A cell k cells away holds colours at least kCell k - (kCell - 1) sqrt 3 and at most kCell k + (kCell - 1) sqrt 3 off.
+      const float r = (float)std::clamp(tol, 0, 255) * 1.7320508f, r2 = r * r, slack = (kCell - 1) * 1.7320508f;
+      auto exact = [&](uint32_t q) {
+         const int qb = bin(q), qx = qb % kN, qy = qb / kN % kN, qz = qb / (kN * kN);
+         for (int b : used)
+         {
+            const int dx = b % kN - qx, dy = b / kN % kN - qy, dz = b / (kN * kN) - qz;
+            const float k = std::sqrt((float)(dx * dx + dy * dy + dz * dz));
+            if (kCell * k - slack > r)
+               continue;
+            for (int j = start[b]; j < start[b + 1]; j++)
+            {
+               const uint32_t c = flat[j];
+               int s = 0;
+               for (int ch = 0; ch < 4; ch++)
+               {
+                  const int dd = (int)(q >> (8 * ch) & 0xFF) - (int)(c >> (8 * ch) & 0xFF);
+                  s += dd * dd;
+               }
+               if ((float)s <= r2)
+                  return true;
+            }
+         }
+         return false;
+      };
+      auto match = [&](uint32_t q) {
+         if ((q >> 24) == 0 && clearSeed)
+            return true;   // two clear pixels are alike, whatever RGB they hide (the Magic Wand's rule)
+         const float k = std::sqrt(d2[bin(q)]);
+         if (kCell * k - slack > r)
+            return false;
+         if (allOpaque && (q >> 24) == 255 && kCell * k + slack <= r)
+            return true;
+         return exact(q);
+      };
+      // Each colour is tested once.
+      std::vector<uint32_t> keys;
+      std::vector<uint8_t> verdict;
+      std::vector<uint8_t> ok(n, 0);
+      {
+         std::vector<uint32_t> all(n);
+         for (size_t i = 0; i < n; i++)
+            all[i] = pack(i);
+         keys = all;
+         std::sort(keys.begin(), keys.end());
+         keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+         verdict.resize(keys.size());
+         for (size_t k = 0; k < keys.size(); k++)
+            verdict[k] = match(keys[k]) ? 1 : 0;
+         for (size_t i = 0; i < n; i++)
+            ok[i] = verdict[(size_t)(std::lower_bound(keys.begin(), keys.end(), all[i]) - keys.begin())];
+      }
+      if (!contiguous)
+      {
+         for (size_t i = 0; i < n; i++)
+            if (ok[i])
+               out[i] = 255;
+         return;
+      }
+      std::vector<int> q;
+      for (size_t i = 0; i < n; i++)
+         if (sel[i] >= 128)
+         {
+            out[i] = 255;
+            q.push_back((int)i);
+         }
+      auto push = [&](int j) {
+         if (ok[j] && out[j] != 255)
+         {
+            out[j] = 255;
+            q.push_back(j);
+         }
+      };
+      for (size_t k = 0; k < q.size(); k++)
+      {
+         const int x = q[k] % w, y = q[k] / w;
+         if (x > 0) push(q[k] - 1);
+         if (x + 1 < w) push(q[k] + 1);
+         if (y > 0) push(q[k] - w);
+         if (y + 1 < h) push(q[k] + w);
+      }
+   }
+
+   // ---- Focus Area -----------------------------------------------------------------------------------------------
+   void FocusMap(const uint8_t* rgba, int w, int h, float noise, std::vector<float>& out)
+   {
+      out.assign((size_t)std::max(0, w) * std::max(0, h), 0.0f);
+      if (rgba == nullptr || w < 3 || h < 3)
+         return;
+      const size_t n = (size_t)w * h;
+      std::vector<float> y(n), lap(n, 0.0f);
+      for (size_t i = 0; i < n; i++)
+         y[i] = 0.2126f * rgba[i * 4] + 0.7152f * rgba[i * 4 + 1] + 0.0722f * rgba[i * 4 + 2];
+      for (int r = 1; r + 1 < h; r++)
+         for (int x = 1; x + 1 < w; x++)
+         {
+            const size_t i = (size_t)r * w + x;
+            lap[i] = std::fabs(4.0f * y[i] - y[i - 1] - y[i + 1] - y[i - w] - y[i + w]);
+         }
+      // The local mean over a window about 1/100 of the long side: a region reads as sharp by the detail in it.
+      const int win = std::max(2, std::max(w, h) / 100);
+      BoxMean(lap, out, w, h, win);
+      std::vector<float> sorted(out);
+      const size_t at = (size_t)((sorted.size() - 1) * 0.99);
+      std::nth_element(sorted.begin(), sorted.begin() + at, sorted.end());
+      const float top = sorted[at];
+      if (!(top > 1e-6f))
+      {
+         std::fill(out.begin(), out.end(), 0.0f);
+         return;
+      }
+      const float floor = Clamp01(noise) * top;
+      const float span = std::max(top - floor, 1e-6f);
+      for (float& v : out)
+         v = Clamp01((v - floor) / span);
+   }
+
+   void FocusSelect(const std::vector<float>& map, int w, int h, float range, std::vector<uint8_t>& out)
+   {
+      out.assign((size_t)std::max(0, w) * std::max(0, h), 0);
+      if (map.size() != out.size())
+         return;
+      // Range 0 keeps only the sharpest detail, 1 everything with any; the edge falls off over 0.1.
+      const float t = 1.0f - Clamp01(range), soft = 0.1f;
+      for (size_t i = 0; i < out.size(); i++)
+         out[i] = range >= 1.0f ? 255 : To8((map[i] - t) / soft + 0.5f);
    }
 
    // ---- Depth --------------------------------------------------------------------------------------------------

@@ -232,6 +232,8 @@ namespace
    std::vector<SelectMaths::Sample> sRangeSamples;
    float sDepthNear = 1.0f, sDepthFar = 0.5f, sDepthSoft = 0.1f;   // Depth Select, 0 far .. 1 near
    bool sDepthInvert = false;
+   float sFocusRange = 0.5f, sFocusNoise = 0.1f;   // Focus Area, 0..1
+   bool sFocusInvert = false;
    int sDepthState = 0;                               // LiveDepthPoll: 1 ready, 0 analysing, -1 no model
    int sSelOp = 0;                 // Scene2DNode::SelOp
    std::vector<float> sPoly;       // polygon lasso points so far, document px
@@ -8099,6 +8101,24 @@ namespace
             Touch();
          }
       }
+      // Select > Grow / Similar: the selected colours, within the Magic Wand's tolerance, next to it or anywhere.
+      static const char* kGrow[2] = { "Grow##v2dgrow", "Similar##v2dsimilar" };
+      static const char* kGrowTips[2] = { "Grow: add the touching pixels that match a selected colour (Magic Wand tolerance)",
+                                           "Similar: add every pixel that matches a selected colour (Magic Wand tolerance)" };
+      for (int i = 0; i < 2; i++)
+      {
+         FormParts::Inline(0.0f, tok::space_1);
+         if (TextChip(L(kGrow[i]), false, T(kGrowTips[i])))
+         {
+            Layer* al = Active(doc);
+            const size_t undo0 = gUndoStack.size();
+            PushUndoCheckpoint(i == 0 ? "Grow" : "Similar");
+            if (doc->GrowSelection(i == 1, sTolerance, sAllLayers, al != nullptr ? al->id : 0))
+               Touch();
+            else
+               gUndoStack.resize(undo0);
+         }
+      }
       FormParts::Inline(0.0f, tok::space_1);
       const bool refOpen = sLiveDlg == 1;
       if (TextChip(L("Refine##v2drefine"), refOpen, T("Select and Mask: redraw the selection's edge from the picture")))
@@ -8241,7 +8261,7 @@ namespace
    // Each is a settings window off a chip on every selection tool's bar. Opening one keeps the selection as it was
    // and reads the picture once; every change redraws the selection on the canvas; OK makes it one undo step,
    // Cancel (or the window's close button) puts the old selection back.
-   const char* const kLiveKeys[4] = { "", "v2drefine", "v2drange", "v2ddepth" };
+   const char* const kLiveKeys[5] = { "", "v2drefine", "v2drange", "v2ddepth", "v2dfocus" };
 
    void LivePreview(Scene2DNode* doc)
    {
@@ -8254,6 +8274,8 @@ namespace
          doc->ColorRangePreview(sRangeSamples, sRange, sRangeInvert, sSelOp);
       if (sLiveDlg == 3 && doc->LiveDepthReady())
          doc->DepthPreview(std::min(sDepthFar, sDepthNear), std::max(sDepthFar, sDepthNear), sDepthSoft, sDepthInvert, sSelOp);
+      if (sLiveDlg == 4)
+         doc->FocusPreview(sFocusRange, sFocusNoise, sFocusInvert, sSelOp);
    }
 
    void LiveClose(Scene2DNode* doc, bool keep)
@@ -8263,10 +8285,12 @@ namespace
       SettingsWindow::Close(kLiveKeys[1]);
       SettingsWindow::Close(kLiveKeys[2]);
       SettingsWindow::Close(kLiveKeys[3]);
+      SettingsWindow::Close(kLiveKeys[4]);
       if (!doc->LiveSelActive())
          return;
+      static const char* const kSteps[5] = { "", "Select and Mask", "Color Range", "Depth Select", "Focus Area" };
       if (keep)
-         SelStep(which == 1 ? "Select and Mask" : which == 2 ? "Color Range" : "Depth Select");
+         SelStep(kSteps[std::clamp(which, 1, 4)]);
       doc->LiveSelEnd(keep);
       if (keep && which == 1 && sRefineOut != 0)
          if (Layer* al = Active(doc))
@@ -8430,6 +8454,21 @@ namespace
       OkCancel(doc);
    }
 
+   // Focus Area: the in-focus part of the picture by how much fine detail each region holds.
+   void FocusRows(Scene2DNode* doc)
+   {
+      PanelKit::GridScope::EndRow();
+      ImGui::TextDisabled("%s", T("Selects the sharp parts. More range takes in softer ones"));
+      const float r = sFocusRange, n = sFocusNoise;
+      const bool inv = sFocusInvert;
+      MorePct(T("In-focus range"), &sFocusRange, params::view2d::depth_sel_lo, params::view2d::depth_sel_hi);
+      MorePct(T("Noise level"), &sFocusNoise, params::view2d::depth_sel_lo, params::view2d::depth_sel_hi);
+      MoreCheck(T("Invert"), &sFocusInvert);
+      if (r != sFocusRange || n != sFocusNoise || inv != sFocusInvert)
+         LivePreview(doc);
+      OkCancel(doc);
+   }
+
    void LiveSelDialogs(Scene2DNode* doc)
    {
       sLiveFrame = ImGui::GetFrameCount();
@@ -8441,9 +8480,13 @@ namespace
       const bool depOpen = sLiveDlg == 3;
       if (TextChip(L("Depth##v2ddepth"), depOpen, T("Depth Select: select near or far from the camera")))
          LiveOpen(doc, depOpen ? 0 : 3);
+      FormParts::Inline(0.0f, tok::space_1);
+      const bool focOpen = sLiveDlg == 4;
+      if (TextChip(L("Focus##v2dfocus"), focOpen, T("Focus Area: select the parts in focus")))
+         LiveOpen(doc, focOpen ? 0 : 4);
       const ImVec2 at = ImGui::GetItemRectMax();
-      static const char* const kTitles[4] = { "", "Select and Mask", "Color Range", "Depth Select" };
-      for (int which = 1; which <= 3; which++)
+      static const char* const kTitles[5] = { "", "Select and Mask", "Color Range", "Depth Select", "Focus Area" };
+      for (int which = 1; which <= 4; which++)
          SettingsWindow::Draw(kLiveKeys[which], T(kTitles[which]), ImVec2(at.x, at.y + tok::space_1), [&]()
          {
             MoreRows rows(1);
@@ -8452,8 +8495,10 @@ namespace
                RefineRows(doc);
             else if (which == 2)
                RangeRows(doc);
-            else
+            else if (which == 3)
                DepthRows(doc);
+            else
+               FocusRows(doc);
             sMoreOpen = true;
          });
       // Closed by the window's own button, Esc, or the dialog's buttons: Cancel unless OK already ran.
@@ -16295,6 +16340,71 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          for (int id : { v, aid, g, p })
             if (doc->FindLayer(id) != nullptr)
                doc->RemoveLayer(id);
+         doc->Commit();
+      }
+      // ledger-gaps Block A: Grow / Similar. Columns 0..100 red, 100..200 purple (between red and blue), 200..300 blue,
+      // 300..400 grey, 400..500 red again (not touching the first red).
+      {
+         const int p = doc->AddPaintLayer();
+         const float red[3] = { 1, 0, 0 }, purple[3] = { 0.5f, 0, 0.5f }, blue[3] = { 0, 0, 1 }, grey[3] = { 0.5f, 0.5f, 0.5f };
+         const float* cols[5] = { red, purple, blue, grey, red };
+         for (int k = 0; k < 5; k++)
+         {
+            doc->SelectRect((float)k * 100, 0, (float)(k + 1) * 100, (float)H, Scene2DNode::kSelNew, 0, false);
+            doc->FillPixels(p, cols[k], 1.0f);
+         }
+         doc->Deselect();
+         doc->Commit();
+         picture(doc);
+         expect("parity: grow needs a selection", !doc->GrowSelection(false, 32, false, p));
+         doc->SelectRect(20, 20, 40, 40, Scene2DNode::kSelNew, 0, false);
+         doc->SelectRect(220, 20, 240, 40, Scene2DNode::kSelAdd, 0, false);
+         doc->GrowSelection(false, 32, false, p);
+         expect("parity: grow takes the touching pixels of each selected colour",
+                doc->SelectionAt(50, 500) > 0.95f && doc->SelectionAt(250, 500) > 0.95f && doc->SelectionAt(450, 500) < 0.05f);
+         expect("parity: grow and similar multi color does not select the intermediate hull",
+                doc->SelectionAt(150, 500) < 0.05f && doc->SelectionAt(350, 500) < 0.05f);
+         doc->SelectRect(20, 20, 40, 40, Scene2DNode::kSelNew, 0, false);
+         doc->GrowSelection(true, 32, false, p);
+         expect("parity: similar takes the matching colour everywhere", doc->SelectionAt(50, 500) > 0.95f && doc->SelectionAt(450, 500) > 0.95f &&
+                                                                       doc->SelectionAt(150, 500) < 0.05f && doc->SelectionAt(250, 500) < 0.05f);
+         doc->SelectRect(20, 20, 40, 40, Scene2DNode::kSelNew, 0, false);
+         doc->GrowSelection(true, 255, false, p);
+         expect("parity: similar at full tolerance takes every colour", doc->SelectionAt(150, 500) > 0.95f && doc->SelectionAt(350, 500) > 0.95f);
+         // Focus Area: sharp 3 px checks on the left half, a slow wave on the right.
+         {
+            const int fw = 300, fh = 100;
+            std::vector<uint8_t> f((size_t)fw * fh * 4);
+            for (int y = 0; y < fh; y++)
+               for (int x = 0; x < fw; x++)
+               {
+                  uint8_t* c = &f[((size_t)y * fw + x) * 4];
+                  const int v = x < fw / 2 ? (((x / 3 + y / 3) & 1) != 0 ? 220 : 40) : (int)std::lround(128 + 60 * std::sin(x * 0.02));
+                  c[0] = c[1] = c[2] = (uint8_t)v;
+                  c[3] = 255;
+               }
+            std::vector<float> map;
+            std::vector<uint8_t> sel;
+            SelectMaths::FocusMap(f.data(), fw, fh, 0.1f, map);
+            SelectMaths::FocusSelect(map, fw, fh, 0.5f, sel);
+            int sharp = 0, soft = 0;
+            for (int y = 0; y < fh; y++)
+               for (int x = 0; x < fw; x++)
+               {
+                  sharp += x < fw / 2 - 10 && sel[(size_t)y * fw + x] >= 128;
+                  soft += x > fw / 2 + 10 && sel[(size_t)y * fw + x] >= 128;
+               }
+            expect("parity: focus area command selects the sharp half, not the soft one", sharp > (fw / 2 - 10) * fh * 9 / 10 && soft == 0);
+            SelectMaths::FocusSelect(map, fw, fh, 1.0f, sel);
+            expect("parity: focus area's full range takes everything", std::all_of(sel.begin(), sel.end(), [](uint8_t v) { return v == 255; }));
+         }
+         doc->SelectRect(20, 20, 40, 40, Scene2DNode::kSelNew, 0, false);
+         doc->LiveSelBegin(false, p);
+         doc->FocusPreview(0.5f, 0.1f, false, Scene2DNode::kSelNew);
+         doc->LiveSelEnd(false);
+         expect("parity: a cancelled focus area keeps the old selection", doc->SelectionAt(30, 30) > 0.95f && doc->SelectionAt(60, 60) < 0.05f);
+         doc->Deselect();
+         doc->RemoveLayer(p);
          doc->Commit();
       }
       // ai-tools 1.8 Remove: red marks on a left-to-right grey gradient. The picture after a Remove is compared
