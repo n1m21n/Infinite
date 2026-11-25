@@ -2493,6 +2493,46 @@ void Scene2DNode::LiveCombine(std::vector<uint8_t>& region, bool invert, int op)
    mSelDirty = true;
 }
 
+bool Scene2DNode::QuickSelectBegin(bool sampleAll, int layerId)
+{
+   Layers();
+   const Layer* l = FindConst(layerId);
+   mQuickDisc = !sampleAll && l != nullptr && l->kind == Kind::Group;
+   if (!LiveSelBegin(sampleAll, layerId))
+      return false;
+   mSel = mLiveSel;
+   return true;
+}
+
+void Scene2DNode::QuickSelectDab(float x, float y, float radius, bool subtract)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   if (mLivePic.size() != (size_t)W * H * 4 || mSel.size() != (size_t)W * H)
+      return;
+   std::vector<uint8_t> region;
+   int box[4] = {};
+   SelectMaths::QuickRegion(mQuickDisc ? nullptr : mLivePic.data(), W, H, x, (float)H - y, radius, 2.5f, region, box);
+   for (int yy = 0; yy < box[3]; yy++)
+      for (int xx = 0; xx < box[2]; xx++)
+      {
+         const uint8_t v = region[(size_t)yy * box[2] + xx];
+         if (v == 0)
+            continue;
+         uint8_t& s = mSel[(size_t)(box[1] + yy) * W + box[0] + xx];
+         s = subtract ? (uint8_t)std::min<int>(s, 255 - v) : std::max(s, v);
+      }
+   if (!subtract && !region.empty())
+      mSelAny = true;
+   mSelDirty = true;
+}
+
+void Scene2DNode::QuickSelectEnd()
+{
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   LiveSelEnd(true);
+   mQuickDisc = false;
+}
+
 int Scene2DNode::LiveDepthPoll()
 {
    const int W = mDoc.w, H = mDoc.h;

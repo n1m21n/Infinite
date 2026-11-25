@@ -490,6 +490,85 @@ namespace SelectMaths
          }
    }
 
+   // ---- Quick Select ---------------------------------------------------------------------------------------------
+   void QuickRegion(const uint8_t* rgba, int w, int h, float cx, float cy, float r, float reach, std::vector<uint8_t>& out,
+                    int box[4])
+   {
+      r = std::max(r, 0.5f);
+      const float R = rgba != nullptr ? r * std::max(reach, 1.0f) : r;
+      const int x0 = std::max(0, (int)std::floor(cx - R)), y0 = std::max(0, (int)std::floor(cy - R));
+      const int x1 = std::min(w, (int)std::ceil(cx + R) + 1), y1 = std::min(h, (int)std::ceil(cy + R) + 1);
+      box[0] = x0;
+      box[1] = y0;
+      box[2] = std::max(0, x1 - x0);
+      box[3] = std::max(0, y1 - y0);
+      const int bw = box[2], bh = box[3];
+      out.assign((size_t)bw * bh, 0);
+      if (bw == 0 || bh == 0)
+         return;
+      auto inDisc = [&](int x, int y) { return std::hypot(x + 0.5f - cx, y + 0.5f - cy) <= r; };
+      std::vector<int> queue;
+      for (int y = y0; y < y1; y++)
+         for (int x = x0; x < x1; x++)
+            if (inDisc(x, y))
+            {
+               out[(size_t)(y - y0) * bw + (x - x0)] = 255;
+               queue.push_back((y - y0) * bw + (x - x0));
+            }
+      if (rgba == nullptr || queue.empty())
+         return;
+      std::vector<float> lab((size_t)bw * bh * 3);
+      for (int y = y0; y < y1; y++)
+         for (int x = x0; x < x1; x++)
+         {
+            const uint8_t* c = rgba + ((size_t)y * w + x) * 4;
+            const float rgb[3] = { c[0] / 255.0f, c[1] / 255.0f, c[2] / 255.0f };
+            Lab(rgb, &lab[((size_t)(y - y0) * bw + (x - x0)) * 3]);
+         }
+      double mean[3] = { 0, 0, 0 };
+      for (int i : queue)
+         for (int k = 0; k < 3; k++)
+            mean[k] += lab[(size_t)i * 3 + k];
+      for (double& m : mean)
+         m /= (double)queue.size();
+      double spread = 0.0;
+      for (int i : queue)
+      {
+         const float* l = &lab[(size_t)i * 3];
+         spread += std::sqrt((l[0] - mean[0]) * (l[0] - mean[0]) + (l[1] - mean[1]) * (l[1] - mean[1]) + (l[2] - mean[2]) * (l[2] - mean[2]));
+      }
+      spread /= (double)queue.size();
+      const float tol = (float)std::clamp(10.0 + 2.5 * spread, 10.0, 60.0);   // Delta E from the disc's mean
+      const float step = std::max(6.0f, tol * 0.6f);                         // the most a neighbour may jump
+      auto dist = [&](const float* a, const float* b) {
+         return std::sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]));
+      };
+      const float m[3] = { (float)mean[0], (float)mean[1], (float)mean[2] };
+      const float R2 = R * R;
+      for (size_t qi = 0; qi < queue.size(); qi++)
+      {
+         const int i = queue[qi], x = i % bw, y = i / bw;
+         const float* li = &lab[(size_t)i * 3];
+         const int nx[4] = { x - 1, x + 1, x, x }, ny[4] = { y, y, y - 1, y + 1 };
+         for (int k = 0; k < 4; k++)
+         {
+            if (nx[k] < 0 || ny[k] < 0 || nx[k] >= bw || ny[k] >= bh)
+               continue;
+            const int j = ny[k] * bw + nx[k];
+            if (out[(size_t)j] != 0)
+               continue;
+            const float dx = x0 + nx[k] + 0.5f - cx, dy = y0 + ny[k] + 0.5f - cy;
+            if (dx * dx + dy * dy > R2)
+               continue;
+            const float* lj = &lab[(size_t)j * 3];
+            if (dist(lj, m) > tol || dist(lj, li) > step)
+               continue;
+            out[(size_t)j] = 255;
+            queue.push_back(j);
+         }
+      }
+   }
+
    // ---- Depth --------------------------------------------------------------------------------------------------
    void DepthSelect(const std::vector<float>& depth, int w, int h, float lo, float hi, float soft, std::vector<uint8_t>& out)
    {

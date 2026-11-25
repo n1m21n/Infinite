@@ -69,6 +69,14 @@ namespace SelectMaths
    // CIE L*a*b* (D65) of a display colour 0..1.
    void Lab(const float rgb[3], float lab[3]);
 
+   // ---- Quick Select ---------------------------------------------------------------------------------------------
+   // One dab of an edge-seeking Quick Select: the brush disc, grown into the pixels round it that look like the
+   // disc (CIE76 Delta E to the disc's mean within a tolerance set by the disc's own spread) and stopped where the
+   // colour jumps between neighbours, out to `reach` x the radius. rgba null = the disc alone (nothing to read).
+   // out: box[2] x box[3] (0 or 255), box = x, y, w, h in the picture.
+   void QuickRegion(const uint8_t* rgba, int w, int h, float cx, float cy, float r, float reach, std::vector<uint8_t>& out,
+                    int box[4]);
+
    // ---- Depth --------------------------------------------------------------------------------------------------
    // A selection from a depth map (0 far .. 1 near): full between lo and hi, falling to 0 over `soft` beyond them.
    void DepthSelect(const std::vector<float>& depth, int w, int h, float lo, float hi, float soft, std::vector<uint8_t>& out);

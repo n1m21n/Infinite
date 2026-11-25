@@ -596,6 +596,12 @@ public:
    void DepthPreview(float lo, float hi, float soft, bool invert, int op);
    // Tests: a made-up map (document px, top row first) in place of the model's.
    void SetLiveDepth(const std::vector<float>& topDown);
+   // Quick Select with edges (the selection brush's Edges mode; ai-tools.md 1.6): each dab is the brush disc grown to
+   // the edges round it. The picture it reads: the active paint layer, or everything with sampleAll, an adjustment
+   // or a non-pixel layer; an active group without sampleAll has nothing to read, so a dab is the disc alone.
+   bool QuickSelectBegin(bool sampleAll, int layerId);
+   void QuickSelectDab(float x, float y, float radius, bool subtract);   // document px, top row first
+   void QuickSelectEnd();
    // Lens Blur: true once a depth map asked for by a Lens Blur layer has landed (the canvas redraws then).
    bool LensDepthPoll();
    // Forget a Lens Blur layer's depth so the picture below is analysed again (after it changed).
@@ -938,6 +944,7 @@ private:
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
    std::vector<uint8_t> mLiveSel, mLivePic;   // a live dialog's selection before it and picture (bottom row first)
    bool mLiveSelAny = false;
+   bool mQuickDisc = false;           // Quick Select has no picture to read: dabs are the disc alone
    std::vector<float> mLiveDepth;     // the live picture's depth (bottom row first), empty until it arrives
    uint64_t mLiveDepthKey = 0;        // 0 = not asked yet
    void LiveCombine(std::vector<uint8_t>& region, bool invert, int op);

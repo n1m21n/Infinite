@@ -199,6 +199,8 @@ namespace
    bool sCropDarken = true, sCropReveal = true;   // crop: dim outside the box; show it at all
    bool sSelBrushSub = false;      // selection brush: takes away (Alt flips it)
    bool sSelBrushSoft = true;      // selection brush: soft edges (off: hard)
+   bool sSelBrushEdges = true;     // selection brush: Quick Select, each dab grows to the picture's edges
+   ImVec2 sQuickLast(0.0f, 0.0f);  // where the last Quick Select dab landed (document px)
    int sTolerance = 32;  // ui-audit-ok: unit (colour tolerance default (0-255))
    bool sContiguous = true, sAllLayers = false;
    int sImageFormat = 0, sVideoFormat = 0;   // the Render tab's default file types
@@ -3828,6 +3830,21 @@ namespace
             }
          }
       }
+      if (sTool == kSelBrush && sSelBrushEdges && !doc->quickMask)
+      {
+         // Quick Select: each dab is the brush disc grown to the edges round it (Alt takes away).
+         Layer* al = Active(doc);
+         SelStep("Quick Selection");
+         if (!doc->QuickSelectBegin(sAllLayers, al != nullptr ? al->id : 0))
+            return;
+         doc->QuickSelectDab(at.x, at.y, sSelBrush.size * 0.5f, ImGui::GetIO().KeyAlt != sSelBrushSub);
+         sQuickLast = at;
+         sOp = Op();
+         sOp.kind = 29;
+         sOp.docStart = at;
+         Touch();
+         return;
+      }
       if (sTool == kSelBrush)
       {
          // The selection brush paints the selection itself: white adds, Alt takes away.
@@ -7277,7 +7294,7 @@ namespace
          sPenN = 0;
       else if (sTool == kBrush && !sSurfaceStroke)
          DrawPredicted(doc, dl);
-      if (hovered && !panTool && BrushTool(sTool) && ((!io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7)) || sOp.kind == 28 ||
+      if (hovered && !panTool && BrushTool(sTool) && ((!io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7 || sOp.kind == 29)) || sOp.kind == 28 ||
                                                       (sizeDragHint && sOp.kind == 0)))
       {
          dl->PushClipRect(sViewMn, sViewMx, true);
@@ -7745,6 +7762,18 @@ namespace
                ZoomAt(doc, std::exp((mouse.x - sOp.start.x) * tok::view2d_exp_reach), sOp.start);
             }
          }
+         else if (sOp.kind == 29)
+         {
+            const float r = sSelBrush.size * 0.5f, gap = std::max(1.0f, r * 0.5f);
+            const float dx = sMouseDoc.x - sQuickLast.x, dy = sMouseDoc.y - sQuickLast.y, len = std::hypot(dx, dy);
+            for (int k = 1; (float)k * gap <= len; k++)
+            {
+               const float t = (float)k * gap / len;
+               doc->QuickSelectDab(sQuickLast.x + dx * t, sQuickLast.y + dy * t, r, ImGui::GetIO().KeyAlt != sSelBrushSub);
+            }
+            if (len >= gap)
+               sQuickLast = ImVec2(sQuickLast.x + dx * (std::floor(len / gap) * gap / len), sQuickLast.y + dy * (std::floor(len / gap) * gap / len));
+         }
          else if (sOp.kind == 7)
          {
             if (sSurfaceStroke)
@@ -7820,6 +7849,11 @@ namespace
          {
             if (sOp.kind == 7)
                EndStroke(doc);
+            else if (sOp.kind == 29)
+            {
+               doc->QuickSelectEnd();
+               Touch();
+            }
             else if (sOp.kind == 19 && std::fabs(mouse.x - sOp.start.x) < tok::view2d_canvas_limit_sm)
                ZoomAt(doc, io.KeyAlt ? 0.5f : tok::view2d_zoom_at_ratio, mouse);
             else if (sOp.kind == 5 && !CropBoxOk())
@@ -8864,7 +8898,10 @@ namespace
             if (TextChip(L("Subtract##v2dsbsub"), sSelBrushSub, T("Paint out of the selection (Alt)")))
                sSelBrushSub = true;
             next();
-            if (TextChip(L("Soft edges##v2dsbsoft"), sSelBrushSoft, nullptr))
+            if (TextChip(L("Edges##v2dsbedges"), sSelBrushEdges, T("Quick Select: each dab grows to the picture's edges")))
+               sSelBrushEdges = !sSelBrushEdges;
+            next();
+            if (!sSelBrushEdges && TextChip(L("Soft edges##v2dsbsoft"), sSelBrushSoft, nullptr))
                sSelBrushSoft = !sSelBrushSoft;
             gap();
             SelModChips(doc);
@@ -16121,6 +16158,58 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("ai: cancelled depth select keeps the old selection", doc->SelectionAt(10, 10) > 0.95f);
          doc->Deselect();
          doc->RemoveLayer(p);
+         doc->Commit();
+      }
+      // ai-tools 1.6 Quick Select with edges: a red square (100..200) over green; a dab of radius 12 near its left
+      // edge (it reaches 2.5 x the radius: 90..150 across).
+      {
+         const int p = doc->AddPaintLayer();
+         doc->SelectRect(0, 0, W, H, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(p, green, 1.0f);
+         doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(p, red, 1.0f);
+         doc->Deselect();
+         doc->Commit();
+         picture(doc);
+         auto dab = [&](bool all, int on) {
+            doc->Deselect();
+            if (doc->QuickSelectBegin(all, on))
+            {
+               doc->QuickSelectDab(120, 150, 12, false);
+               doc->QuickSelectEnd();
+            }
+         };
+         auto grew = [&]() { return doc->SelectionAt(102, 150) > 0.9f && doc->SelectionAt(120, 176) > 0.9f && doc->SelectionAt(95, 150) < 0.1f; };
+         dab(false, p);
+         expect("ai: quick select grows to the square's edge and stops there", grew());
+         doc->QuickSelectBegin(false, p);
+         doc->QuickSelectDab(120, 150, 12, true);
+         doc->QuickSelectEnd();
+         expect("ai: quick select's subtract takes the region back out", doc->SelectionAt(120, 150) < 0.1f && doc->SelectionAt(102, 150) < 0.1f);
+         const int g = doc->AddLayer(Kind::Group, 0, p).id;
+         doc->Commit();
+         dab(true, g);
+         expect("parity: a group with sample all layers reads the composite", grew());
+         dab(false, g);
+         expect("parity: a group without sample all layers selects only the brush disc",
+                doc->SelectionAt(120, 150) > 0.9f && doc->SelectionAt(102, 150) < 0.1f);
+         Layer& adj = doc->AddLayer(Kind::Adjust, 0, p);
+         adj.adjType = Scene2DNode::kAdjBrightness;
+         adj.adjAmt = adj.adjTo = 0.0f;
+         const int aid = adj.id;
+         doc->Commit();
+         picture(doc);
+         dab(false, aid);
+         expect("parity: an adjustment layer reads the composite", grew());
+         const int v = doc->AddVectorLayer();
+         doc->Commit();
+         picture(doc);
+         dab(false, v);
+         expect("parity: an artboard or a frame still reads the composite", grew());
+         doc->Deselect();
+         for (int id : { v, aid, g, p })
+            if (doc->FindLayer(id) != nullptr)
+               doc->RemoveLayer(id);
          doc->Commit();
       }
       // ai-tools 1.7 Lens Blur: 4 px black and white stripes; the top half near (in focus), the bottom half far.
