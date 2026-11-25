@@ -51,6 +51,17 @@ namespace AiSelect
    // top-down, 0..255, soft over about one pixel at the edge.
    bool Decode(uint64_t key, const Prompt& prompt, std::vector<uint8_t>& out, std::string& err);
 
+   // ---- Depth (Depth Anything V2 Small, Apache-2.0; ai-tools.md 1.7) ----
+   // A relative depth map of the picture: 0 far .. 1 near, top-down, at the picture's size. It runs on the same
+   // worker as the encoder (latest-only), about 0.3 s on an M2 CPU at 518 px; only one model family is resident at
+   // a time (loading depth drops the SAM encoder, and the other way round), and the last map is kept per key.
+   bool DepthAvailable();
+   void RequestDepth(std::shared_ptr<const Picture> pic, uint64_t key);
+   bool DepthReady(uint64_t key);
+   bool Depth(uint64_t key, std::vector<float>& out, int& w, int& h);
+   // Blocking, on the caller's thread (tests and the eval hook only).
+   bool DepthNow(const Picture& pic, uint64_t key, std::string& err);
+
    // Main thread, once a frame: unloads the models after 60 s idle.
    void Tick(double nowSeconds);
    // Drops the models and the cache now (tests, Settings > Extensions remove).

@@ -40,6 +40,11 @@ namespace AiSelect
          std::vector<std::shared_ptr<Embedding>> cache;
          std::shared_ptr<const Picture> queued;
          uint64_t queuedKey = 0;
+         Tracking::OrtModel* depth = nullptr;
+         std::shared_ptr<const Picture> depthQueued;
+         uint64_t depthQueuedKey = 0, depthKey = 0;
+         int depthW = 0, depthH = 0;
+         std::vector<float> depthMap;
          bool running = false;
          bool quit = false;
          std::string lastError;
@@ -83,6 +88,11 @@ namespace AiSelect
             return false;
          bool gpu = false;
          // CPU for both: Core ML spends minutes compiling these graphs on first load (measured 2026-11-25).
+         if (s.depth)   // one model family resident at a time
+         {
+            s.rt.CloseModel(s.depth);
+            s.depth = nullptr;
+         }
          if (!s.enc && !(s.enc = s.rt.OpenModel(dir + "/models/sam_enc.onnx", false, gpu, err)))
             return false;
          if (!s.dec && !(s.dec = s.rt.OpenModel(dir + "/models/sam_dec.onnx", false, gpu, err)))
@@ -116,6 +126,92 @@ namespace AiSelect
                }
             }
          }
+      }
+
+      // Caller holds S().m.
+      bool EnsureDepth(std::string& err)
+      {
+         State& s = S();
+         if (s.depth)
+            return true;
+         const std::string dir = Extensions::PackDir("select");
+         if (dir.empty()) { err = "the Select pack is not installed"; return false; }
+         if (!s.rt.Load(Tracking::OrtRuntime::PackLibraryPath(dir), err))
+            return false;
+         s.rt.CloseModel(s.enc);   // one model family resident; cached embeddings stay (the decoder is small)
+         s.enc = nullptr;
+         bool gpu = false;
+         s.depth = s.rt.OpenModel(dir + "/models/depth.onnx", false, gpu, err);
+         return s.depth != nullptr;
+      }
+
+      // Depth Anything V2: the long side at 518, both sides whole multiples of 14, aspect kept, ImageNet-normalised.
+      // Its output (relative inverse depth, larger nearer) is stretched to 0..1 and resized to the picture.
+      bool RunDepth(const Picture& p, std::vector<float>& out, std::string& err)
+      {
+         if (p.w < 2 || p.h < 2 || p.rgba.size() < (size_t)p.w * p.h * 4) { err = "empty picture"; return false; }
+         const float sc = 518.0f / std::max(p.w, p.h);
+         const int W = std::max(14, (int)std::lround(p.w * sc / 14.0f) * 14), H = std::max(14, (int)std::lround(p.h * sc / 14.0f) * 14);
+         std::vector<float> chw((size_t)3 * W * H);
+         const size_t plane = (size_t)W * H;
+         for (int y = 0; y < H; y++)
+         {
+            const float sy = std::clamp((y + 0.5f) * p.h / H - 0.5f, 0.0f, (float)(p.h - 1));
+            const int y0 = (int)sy, y1 = std::min(y0 + 1, p.h - 1);
+            const float fy = sy - y0;
+            for (int x = 0; x < W; x++)
+            {
+               const float sx = std::clamp((x + 0.5f) * p.w / W - 0.5f, 0.0f, (float)(p.w - 1));
+               const int x0 = (int)sx, x1 = std::min(x0 + 1, p.w - 1);
+               const float fx = sx - x0;
+               const uint8_t* a = &p.rgba[((size_t)y0 * p.w + x0) * 4];
+               const uint8_t* b = &p.rgba[((size_t)y0 * p.w + x1) * 4];
+               const uint8_t* c = &p.rgba[((size_t)y1 * p.w + x0) * 4];
+               const uint8_t* d = &p.rgba[((size_t)y1 * p.w + x1) * 4];
+               for (int k = 0; k < 3; k++)
+               {
+                  const float top = a[k] + (b[k] - a[k]) * fx, bot = c[k] + (d[k] - c[k]) * fx;
+                  chw[k * plane + (size_t)y * W + x] = ((top + (bot - top) * fy) / 255.0f - kMean[k]) / kStd[k];
+               }
+            }
+         }
+         Tracking::OrtModel* m = nullptr;
+         {
+            std::lock_guard<std::mutex> lk(S().m);
+            if (!EnsureDepth(err))
+               return false;
+            m = S().depth;
+         }
+         Tracking::OrtRuntime::Input in;
+         in.name = "pixel_values";
+         in.shape = { 1, 3, H, W };
+         in.f32 = chw.data();
+         std::vector<Tracking::OrtRuntime::Tensor> outs;
+         if (!S().rt.RunNamed(m, { in }, outs, err))
+            return false;
+         if (outs.empty() || outs[0].shape.size() < 2) { err = "the depth model gave no map"; return false; }
+         const int oh = (int)outs[0].shape[outs[0].shape.size() - 2], ow = (int)outs[0].shape.back();
+         const std::vector<float>& d = outs[0].data;
+         if (oh < 1 || ow < 1 || d.size() < (size_t)ow * oh) { err = "the depth map is the wrong size"; return false; }
+         const auto [lo, hi] = std::minmax_element(d.begin(), d.begin() + (size_t)ow * oh);
+         const float span = std::max(*hi - *lo, 1e-6f);
+         out.assign((size_t)p.w * p.h, 0.0f);
+         for (int y = 0; y < p.h; y++)
+         {
+            const float sy = std::clamp((y + 0.5f) * oh / p.h - 0.5f, 0.0f, (float)(oh - 1));
+            const int y0 = (int)sy, y1 = std::min(y0 + 1, oh - 1);
+            const float fy = sy - y0;
+            for (int x = 0; x < p.w; x++)
+            {
+               const float sx = std::clamp((x + 0.5f) * ow / p.w - 0.5f, 0.0f, (float)(ow - 1));
+               const int x0 = (int)sx, x1 = std::min(x0 + 1, ow - 1);
+               const float fx = sx - x0;
+               const float top = d[(size_t)y0 * ow + x0] + (d[(size_t)y0 * ow + x1] - d[(size_t)y0 * ow + x0]) * fx;
+               const float bot = d[(size_t)y1 * ow + x0] + (d[(size_t)y1 * ow + x1] - d[(size_t)y1 * ow + x0]) * fx;
+               out[(size_t)y * p.w + x] = (top + (bot - top) * fy - *lo) / span;
+            }
+         }
+         return true;
       }
 
       bool Encode(const Picture& p, uint64_t key, std::shared_ptr<Embedding>& out, std::string& err)
@@ -166,9 +262,33 @@ namespace AiSelect
             uint64_t key = 0;
             {
                std::unique_lock<std::mutex> lk(s.m);
-               s.cv.wait(lk, [&] { return s.quit || s.queued != nullptr; });
+               s.cv.wait(lk, [&] { return s.quit || s.queued != nullptr || s.depthQueued != nullptr; });
                if (s.quit)
                   return;
+               if (s.queued == nullptr)
+               {
+                  // A depth job (the encoder's queue goes first: a click waits on it).
+                  std::shared_ptr<const Picture> dp = std::move(s.depthQueued);
+                  const uint64_t dk = s.depthQueuedKey;
+                  s.depthQueued.reset();
+                  s.running = true;
+                  lk.unlock();
+                  std::vector<float> map;
+                  std::string err;
+                  const bool ok = RunDepth(*dp, map, err);
+                  lk.lock();
+                  s.running = false;
+                  s.lastError = ok ? std::string() : err;
+                  if (ok)
+                  {
+                     s.depthMap.swap(map);
+                     s.depthKey = dk;
+                     s.depthW = dp->w;
+                     s.depthH = dp->h;
+                  }
+                  s.lastUse = Now();
+                  continue;
+               }
                pic = std::move(s.queued);
                key = s.queuedKey;
                s.queued.reset();
@@ -248,7 +368,7 @@ namespace AiSelect
    bool Busy()
    {
       std::lock_guard<std::mutex> lk(S().m);
-      return S().running || S().queued != nullptr;
+      return S().running || S().queued != nullptr || S().depthQueued != nullptr;
    }
 
    std::string LastError()
@@ -368,13 +488,14 @@ namespace AiSelect
       (void)nowSeconds;
       State& s = S();
       std::unique_lock<std::mutex> lk(s.m, std::try_to_lock);
-      if (!lk.owns_lock() || s.running || s.queued || (!s.enc && !s.dec && s.cache.empty()))
+      if (!lk.owns_lock() || s.running || s.queued || s.depthQueued || (!s.enc && !s.dec && !s.depth && s.cache.empty()))
          return;
       if (Now() - s.lastUse.load() < kIdleUnload)
          return;
       s.rt.CloseModel(s.enc);
       s.rt.CloseModel(s.dec);
-      s.enc = s.dec = nullptr;
+      s.rt.CloseModel(s.depth);
+      s.enc = s.dec = s.depth = nullptr;
       s.cache.clear();
    }
 
@@ -385,9 +506,67 @@ namespace AiSelect
       if (s.running)
          return;   // the worker still uses the encoder; Tick frees it later
       s.queued.reset();
+      s.depthQueued.reset();
       s.rt.CloseModel(s.enc);
       s.rt.CloseModel(s.dec);
-      s.enc = s.dec = nullptr;
+      s.rt.CloseModel(s.depth);
+      s.enc = s.dec = s.depth = nullptr;
       s.cache.clear();
+      s.depthMap.clear();
+      s.depthKey = 0;
+   }
+
+   bool DepthAvailable()
+   {
+      const std::string dir = Extensions::PackDir("select");
+      return !dir.empty() && Exists(Tracking::OrtRuntime::PackLibraryPath(dir)) && Exists(dir + "/models/depth.onnx");
+   }
+
+   void RequestDepth(std::shared_ptr<const Picture> pic, uint64_t key)
+   {
+      State& s = S();
+      std::lock_guard<std::mutex> lk(s.m);
+      s.lastUse = Now();
+      if ((s.depthKey == key && !s.depthMap.empty()) || (s.depthQueued && s.depthQueuedKey == key))
+         return;
+      if (!s.worker.joinable())
+         s.worker = std::thread(WorkerMain);
+      s.depthQueued = std::move(pic);
+      s.depthQueuedKey = key;
+      s.cv.notify_one();
+   }
+
+   bool DepthReady(uint64_t key)
+   {
+      std::lock_guard<std::mutex> lk(S().m);
+      return S().depthKey == key && !S().depthMap.empty();
+   }
+
+   bool Depth(uint64_t key, std::vector<float>& out, int& w, int& h)
+   {
+      State& s = S();
+      std::lock_guard<std::mutex> lk(s.m);
+      if (s.depthKey != key || s.depthMap.empty())
+         return false;
+      out = s.depthMap;
+      w = s.depthW;
+      h = s.depthH;
+      s.lastUse = Now();
+      return true;
+   }
+
+   bool DepthNow(const Picture& pic, uint64_t key, std::string& err)
+   {
+      std::vector<float> map;
+      if (!RunDepth(pic, map, err))
+         return false;
+      State& s = S();
+      std::lock_guard<std::mutex> lk(s.m);
+      s.depthMap.swap(map);
+      s.depthKey = key;
+      s.depthW = pic.w;
+      s.depthH = pic.h;
+      s.lastUse = Now();
+      return true;
    }
 }
