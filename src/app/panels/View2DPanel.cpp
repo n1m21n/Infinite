@@ -215,7 +215,7 @@ namespace
    float sFeather = 0.0f;
    float sSelModPx = tok::view2d_sel_mod_px;         // Expand / Contract / Smooth / Border, document px
    // Select and Mask / Color Range (ai-tools.md 1.5-1.6): one live dialog at a time, previewing on the canvas.
-   int sLiveDlg = 0;                                  // 0 none, 1 Select and Mask, 2 Color Range
+   int sLiveDlg = 0;                                  // 0 none, 1 Select and Mask, 2 Color Range, 3 Depth
    int sLiveFrame = 0;                                // the last frame its bar drew (a tool change cancels it)
    SelectMaths::RefineParams sRefine;
    bool sRefineDecon = false;
@@ -224,6 +224,9 @@ namespace
    SelectMaths::RangeParams sRange;
    bool sRangeInvert = false;
    std::vector<SelectMaths::Sample> sRangeSamples;
+   float sDepthNear = 1.0f, sDepthFar = 0.5f, sDepthSoft = 0.1f;   // Depth Select, 0 far .. 1 near
+   bool sDepthInvert = false;
+   int sDepthState = 0;                               // LiveDepthPoll: 1 ready, 0 analysing, -1 no model
    int sSelOp = 0;                 // Scene2DNode::SelOp
    std::vector<float> sPoly;       // polygon lasso points so far, document px
    int sPolyOp = 0;
@@ -8114,7 +8117,7 @@ namespace
    // Each is a settings window off a chip on every selection tool's bar. Opening one keeps the selection as it was
    // and reads the picture once; every change redraws the selection on the canvas; OK makes it one undo step,
    // Cancel (or the window's close button) puts the old selection back.
-   const char* const kLiveKeys[3] = { "", "v2drefine", "v2drange" };
+   const char* const kLiveKeys[4] = { "", "v2drefine", "v2drange", "v2ddepth" };
 
    void LivePreview(Scene2DNode* doc)
    {
@@ -8125,6 +8128,8 @@ namespace
       }
       if (sLiveDlg == 2)
          doc->ColorRangePreview(sRangeSamples, sRange, sRangeInvert, sSelOp);
+      if (sLiveDlg == 3 && doc->LiveDepthReady())
+         doc->DepthPreview(std::min(sDepthFar, sDepthNear), std::max(sDepthFar, sDepthNear), sDepthSoft, sDepthInvert, sSelOp);
    }
 
    void LiveClose(Scene2DNode* doc, bool keep)
@@ -8133,10 +8138,11 @@ namespace
       sLiveDlg = 0;
       SettingsWindow::Close(kLiveKeys[1]);
       SettingsWindow::Close(kLiveKeys[2]);
+      SettingsWindow::Close(kLiveKeys[3]);
       if (!doc->LiveSelActive())
          return;
       if (keep)
-         SelStep(which == 1 ? "Select and Mask" : "Color Range");
+         SelStep(which == 1 ? "Select and Mask" : which == 2 ? "Color Range" : "Depth Select");
       doc->LiveSelEnd(keep);
       if (keep && which == 1 && sRefineOut != 0)
          if (Layer* al = Active(doc))
@@ -8161,12 +8167,32 @@ namespace
       SettingsWindow::Opens()[kLiveKeys[which]] = true;
       if (which == 2)
          sRangeSamples.clear();
+      if (which == 3)
+         sDepthState = doc->LiveDepthPoll();
       LivePreview(doc);
    }
 
    // Color Range's eyedropper: a canvas click while the dialog samples colours. Shift adds, Alt subtracts.
    bool RangeClick(Scene2DNode* doc, ImVec2 at, bool add, bool sub)
    {
+      if (sLiveDlg == 3)   // Depth: a click picks the depth there; Shift / Alt stretch the range to take it in
+      {
+         const float d = doc->LiveDepthAt(at.x, at.y);
+         if (d < 0.0f)
+            return true;
+         if (add || sub)
+         {
+            sDepthNear = std::max(sDepthNear, d);
+            sDepthFar = std::min(sDepthFar, d);
+         }
+         else
+         {
+            sDepthNear = std::min(1.0f, d + 0.08f);
+            sDepthFar = std::max(0.0f, d - 0.08f);
+         }
+         LivePreview(doc);
+         return true;
+      }
       if (sLiveDlg != 2 || sRange.range != SelectMaths::Range::Sampled)
          return false;
       SelectMaths::Sample k;
@@ -8250,6 +8276,36 @@ namespace
       OkCancel(doc);
    }
 
+   void DepthRows(Scene2DNode* doc)
+   {
+      if (sDepthState == 0)
+      {
+         sDepthState = doc->LiveDepthPoll();
+         if (sDepthState == 1)
+            LivePreview(doc);
+      }
+      PanelKit::GridScope::EndRow();
+      if (sDepthState < 0)
+      {
+         ImGui::TextDisabled("%s", T("Needs the Select pack's depth model (Settings > Extensions)"));
+         OkCancel(doc);
+         return;
+      }
+      if (sDepthState == 0)
+         ImGui::TextDisabled("%s", T("Analysing depth..."));
+      else
+         ImGui::TextDisabled("%s", T("Click the picture to pick a depth. Shift widens"));
+      const float n = sDepthNear, f = sDepthFar, so = sDepthSoft;
+      const bool inv = sDepthInvert;
+      MorePct(T("Near"), &sDepthNear, params::view2d::depth_sel_lo, params::view2d::depth_sel_hi);
+      MorePct(T("Far"), &sDepthFar, params::view2d::depth_sel_lo, params::view2d::depth_sel_hi);
+      MorePct(T("Softness"), &sDepthSoft, params::view2d::depth_sel_lo, params::view2d::depth_sel_hi);
+      MoreCheck(T("Invert"), &sDepthInvert);
+      if (n != sDepthNear || f != sDepthFar || so != sDepthSoft || inv != sDepthInvert)
+         LivePreview(doc);
+      OkCancel(doc);
+   }
+
    void LiveSelDialogs(Scene2DNode* doc)
    {
       sLiveFrame = ImGui::GetFrameCount();
@@ -8257,16 +8313,23 @@ namespace
       const bool rngOpen = sLiveDlg == 2;
       if (TextChip(L("Range##v2drange"), rngOpen, T("Color Range: select by colour or tone")))
          LiveOpen(doc, rngOpen ? 0 : 2);
+      FormParts::Inline(0.0f, tok::space_1);
+      const bool depOpen = sLiveDlg == 3;
+      if (TextChip(L("Depth##v2ddepth"), depOpen, T("Depth Select: select near or far from the camera")))
+         LiveOpen(doc, depOpen ? 0 : 3);
       const ImVec2 at = ImGui::GetItemRectMax();
-      for (int which = 1; which <= 2; which++)
-         SettingsWindow::Draw(kLiveKeys[which], T(which == 1 ? "Select and Mask" : "Color Range"), ImVec2(at.x, at.y + tok::space_1), [&]()
+      static const char* const kTitles[4] = { "", "Select and Mask", "Color Range", "Depth Select" };
+      for (int which = 1; which <= 3; which++)
+         SettingsWindow::Draw(kLiveKeys[which], T(kTitles[which]), ImVec2(at.x, at.y + tok::space_1), [&]()
          {
             MoreRows rows(1);
             sMoreOpen = true;
             if (which == 1)
                RefineRows(doc);
-            else
+            else if (which == 2)
                RangeRows(doc);
+            else
+               DepthRows(doc);
             sMoreOpen = true;
          });
       // Closed by the window's own button, Esc, or the dialog's buttons: Cancel unless OK already ran.
@@ -16015,6 +16078,23 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("ai: select and mask output makes a masked copy", cl != nullptr && cl->HasPixelMask() && copy != p);
          if (copy != 0)
             doc->RemoveLayer(copy);
+         // ai-tools 1.7 Depth Select on a made-up map: the top half near (0.9), the bottom half far (0.1).
+         doc->Deselect();
+         std::vector<float> dm((size_t)W * H);
+         for (int y = 0; y < H; y++)
+            std::fill(dm.begin() + (size_t)y * W, dm.begin() + (size_t)(y + 1) * W, y < H / 2 ? 0.9f : 0.1f);
+         doc->LiveSelBegin(false, p);
+         doc->SetLiveDepth(dm);
+         expect("ai: depth map reads the right way up", std::fabs(doc->LiveDepthAt(10, 10) - 0.9f) < 1e-4f &&
+                                                        std::fabs(doc->LiveDepthAt(10, (float)H - 10) - 0.1f) < 1e-4f);
+         doc->DepthPreview(0.7f, 1.0f, 0.05f, false, Scene2DNode::kSelNew);
+         doc->LiveSelEnd(true);
+         expect("ai: depth select takes the near half only", doc->SelectionAt(10, 10) > 0.95f && doc->SelectionAt(10, (float)H - 10) < 0.05f);
+         doc->LiveSelBegin(false, p);
+         doc->SetLiveDepth(dm);
+         doc->DepthPreview(0.7f, 1.0f, 0.05f, true, Scene2DNode::kSelNew);
+         doc->LiveSelEnd(false);
+         expect("ai: cancelled depth select keeps the old selection", doc->SelectionAt(10, 10) > 0.95f);
          doc->Deselect();
          doc->RemoveLayer(p);
          doc->Commit();

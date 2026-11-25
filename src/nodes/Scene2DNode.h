@@ -586,6 +586,16 @@ public:
    // Color Range: each pixel's share of the range (samples in document px, top row first) joined by op. With a
    // selection and op New the range is looked for only inside it, as in Photoshop. invert flips the range first.
    void ColorRangePreview(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert, int op);
+   // Depth Select (ai-tools.md 1.7): the live picture's depth map from Depth Anything, asked for once per dialog.
+   // LiveDepthPoll: 1 the map is here, 0 still analysing, -1 no depth model (or it failed).
+   int LiveDepthPoll();
+   bool LiveDepthReady() const { return !mLiveDepth.empty(); }
+   // The map's value (0 far .. 1 near) at a document point, top row first; < 0 when there is none.
+   float LiveDepthAt(float x, float y) const;
+   // Full between lo and hi (0 far .. 1 near), falling off over soft, joined by op as Color Range is.
+   void DepthPreview(float lo, float hi, float soft, bool invert, int op);
+   // Tests: a made-up map (document px, top row first) in place of the model's.
+   void SetLiveDepth(const std::vector<float>& topDown);
    // One call for the agent and tests: Begin, preview, End(true).
    bool SelectColorRange(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert, int op,
                          bool sampleAll, int layerId);
@@ -920,6 +930,9 @@ private:
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
    std::vector<uint8_t> mLiveSel, mLivePic;   // a live dialog's selection before it and picture (bottom row first)
    bool mLiveSelAny = false;
+   std::vector<float> mLiveDepth;     // the live picture's depth (bottom row first), empty until it arrives
+   uint64_t mLiveDepthKey = 0;        // 0 = not asked yet
+   void LiveCombine(std::vector<uint8_t>& region, bool invert, int op);
    struct AiWait
    {
       bool on = false;

@@ -2371,6 +2371,8 @@ bool Scene2DNode::LiveSelBegin(bool sampleAll, int layerId)
    if (px.size() != (size_t)W * H * 4)
       return false;
    mLivePic.swap(px);
+   mLiveDepth.clear();
+   mLiveDepthKey = 0;
    mLiveSelAny = mSelAny && mSel.size() == (size_t)W * H;
    mLiveSel = mLiveSelAny ? mSel : std::vector<uint8_t>((size_t)W * H, 0);
    return true;
@@ -2400,6 +2402,9 @@ void Scene2DNode::LiveSelEnd(bool keep)
    mLivePic.shrink_to_fit();
    mLiveSel.clear();
    mLiveSel.shrink_to_fit();
+   mLiveDepth.clear();
+   mLiveDepth.shrink_to_fit();
+   mLiveDepthKey = 0;
    mSelDirty = true;
    StoreSelection();
 }
@@ -2462,10 +2467,15 @@ void Scene2DNode::ColorRangePreview(const std::vector<SelectMaths::Sample>& s, c
       k.y = (float)H - k.y;
    std::vector<uint8_t> region;
    SelectMaths::ColorRange(mLivePic.data(), W, H, flip, p, region);
+   LiveCombine(region, invert, op);
+}
+
+void Scene2DNode::LiveCombine(std::vector<uint8_t>& region, bool invert, int op)
+{
    if (invert)
       for (uint8_t& v : region)
          v = (uint8_t)(255 - v);
-   if (op == kSelNew && mLiveSelAny)   // Color Range inside a selection looks only there
+   if (op == kSelNew && mLiveSelAny)   // a range inside a selection looks only there
       for (size_t i = 0; i < region.size(); i++)
          region[i] = std::min(region[i], mLiveSel[i]);
    mSel = mLiveSel;
@@ -2481,6 +2491,63 @@ void Scene2DNode::ColorRangePreview(const std::vector<SelectMaths::Sample>& s, c
       }
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
+}
+
+int Scene2DNode::LiveDepthPoll()
+{
+   const int W = mDoc.w, H = mDoc.h;
+   if (!mLiveDepth.empty())
+      return 1;
+   if (mLivePic.size() != (size_t)W * H * 4 || !AiSelect::DepthAvailable())
+      return -1;
+   if (mLiveDepthKey == 0)
+   {
+      auto pic = std::make_shared<AiSelect::Picture>();   // the model takes the picture top row first
+      pic->w = W;
+      pic->h = H;
+      pic->rgba.resize(mLivePic.size());
+      for (int y = 0; y < H; y++)
+         std::memcpy(&pic->rgba[(size_t)y * W * 4], &mLivePic[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+      mLiveDepthKey = AiSelect::KeyOf(*pic) | 1;
+      if (!AiSelect::DepthReady(mLiveDepthKey))
+         AiSelect::RequestDepth(pic, mLiveDepthKey);
+   }
+   if (!AiSelect::DepthReady(mLiveDepthKey))
+      return AiSelect::Busy() ? 0 : -1;
+   std::vector<float> d;
+   int dw = 0, dh = 0;
+   if (!AiSelect::Depth(mLiveDepthKey, d, dw, dh) || dw != W || dh != H)
+      return -1;
+   SetLiveDepth(d);
+   return 1;
+}
+
+void Scene2DNode::SetLiveDepth(const std::vector<float>& topDown)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   if (topDown.size() != (size_t)W * H)
+      return;
+   mLiveDepth.resize(topDown.size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&mLiveDepth[(size_t)y * W], &topDown[(size_t)(H - 1 - y) * W], (size_t)W * sizeof(float));
+}
+
+float Scene2DNode::LiveDepthAt(float x, float y) const
+{
+   const int W = mDoc.w, H = mDoc.h, px = (int)std::floor(x), py = H - 1 - (int)std::floor(y);
+   if (mLiveDepth.size() != (size_t)W * H || px < 0 || py < 0 || px >= W || py >= H)
+      return -1.0f;
+   return mLiveDepth[(size_t)py * W + px];
+}
+
+void Scene2DNode::DepthPreview(float lo, float hi, float soft, bool invert, int op)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   if (mLiveDepth.size() != (size_t)W * H || mLiveSel.size() != (size_t)W * H)
+      return;
+   std::vector<uint8_t> region;
+   SelectMaths::DepthSelect(mLiveDepth, W, H, lo, hi, soft, region);
+   LiveCombine(region, invert, op);
 }
 
 bool Scene2DNode::SelectColorRange(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert,
