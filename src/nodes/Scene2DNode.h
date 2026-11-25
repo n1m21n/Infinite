@@ -39,7 +39,7 @@ public:
                   kAdjBrightness, kAdjContrast, kAdjHue, kAdjSaturation, kAdjExposure, kAdjInvert, kAdjLevels, kAdjCurves,
                   kAdjColorBalance, kAdjVibrance, kAdjSelective, kAdjMixer, kAdjBlackWhite, kAdjPhotoFilter,
                   kAdjShadowsHighlights, kAdjLookup, kAdjWhiteBalance, kAdjSplitToning, kAdjRecolour,
-                  kAdjNormals, kAdjToneCompression, kAdjToneStretch, kAdjNoise, kAdjTexture, kAdjCount };
+                  kAdjNormals, kAdjToneCompression, kAdjToneStretch, kAdjNoise, kAdjTexture, kAdjLensBlur, kAdjCount };
    // adjP layout per type (AdjParamCount): Colour Balance 9 (shadows, mids, highlights rgb, -1..1); Selective
    // Colour 36 (reds, yellows, greens, cyans, blues, magentas, whites, neutrals, blacks x CMYK, -1..1); Channel
    // Mixer 10 (rows R, G, B of R G B, then mono 0/1); Black & White 6 (reds..magentas, -2..3); Photo Filter 1
@@ -596,6 +596,14 @@ public:
    void DepthPreview(float lo, float hi, float soft, bool invert, int op);
    // Tests: a made-up map (document px, top row first) in place of the model's.
    void SetLiveDepth(const std::vector<float>& topDown);
+   // Lens Blur: true once a depth map asked for by a Lens Blur layer has landed (the canvas redraws then).
+   bool LensDepthPoll();
+   // Forget a Lens Blur layer's depth so the picture below is analysed again (after it changed).
+   void LensDepthReset(int layerId);
+   // Lens Blur's state for its rows: 1 depth ready, 0 analysing, -1 no depth model (the blur is even everywhere).
+   int LensDepthState(int layerId) const;
+   // Tests: a made-up depth (document px, top row first, 0 far .. 1 near) for a Lens Blur layer.
+   void SetLensDepth(int layerId, const std::vector<float>& topDown);
    // One call for the agent and tests: Begin, preview, End(true).
    bool SelectColorRange(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert, int op,
                          bool sampleAll, int layerId);
@@ -1012,6 +1020,17 @@ private:
    bool mFxTried = false;
    // Adjustment layers: the picture below, changed, ready for the layer's normal pass.
    GLUtil::Fbo mAdjFbo;
+   // Lens Blur's depth of the picture below each Lens Blur layer (ai-tools.md 1.7), by layer id. Asked for once
+   // (Depth Anything on the AiSelect worker); the layer draws nothing new until it lands. Rows bottom first.
+   struct LensDepth
+   {
+      uint64_t key = 0;
+      unsigned tex = 0;
+      int w = 0, h = 0;
+      bool pending = false, failed = false;
+   };
+   std::map<int, LensDepth> mLensDepth;
+   unsigned LensDepthTex(const Layer& l, unsigned src, bool& wait);
    // Relief paint layers, lit; one per layer, redone each cook.
    std::map<int, GLUtil::Fbo> mRelief;
    unsigned mReliefProgram = 0;
@@ -1062,6 +1081,7 @@ private:
                                unsigned long long global);
 public:
    static bool sBelowCache;          // tests turn it off to compare pictures
+   static bool sLensDepthAuto;       // Lens Blur asks the depth model on its own (tests turn it off: even blur)
    static bool sBatch;               // batched layer passes (tests turn it off to compare pictures)
    static bool sExport;              // drawing for an export: layers marked noExport stay out
    unsigned FillTexture(const std::string& path, int& w, int& h);   // bitmap fill layers: the picture, cached

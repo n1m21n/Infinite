@@ -3099,6 +3099,8 @@ namespace params
       constexpr float tonal_fuzz_lo = 0.0f;
       constexpr float depth_sel_lo = 0.0f;
       constexpr float depth_sel_hi = 100.0f;
+      constexpr float lens_focus_lo = 0.0f;
+      constexpr float lens_focus_hi = 1.0f;
    }
 
    namespace view3d

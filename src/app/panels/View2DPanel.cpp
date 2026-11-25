@@ -1803,6 +1803,7 @@ namespace
       case S::kAdjVibrance: return "Vibrance";
       case S::kAdjNoise: return "Amount";
       case S::kAdjTexture: return "Strength";
+      case S::kAdjLensBlur: return "Radius";
       default: return "Amount";
       }
    }
@@ -2430,6 +2431,27 @@ namespace
          bool inv = p[7] > 0.5f;
          if (BoolRow(T("Invert"), &inv))
             p[7] = inv ? 1.0f : 0.0f;
+      }
+      if (t == S::kAdjLensBlur)
+      {
+         SliderRow(T("Focus"), &p[0], params::view2d::lens_focus_lo, params::view2d::lens_focus_hi, "%.2f");
+         SliderRow(T("Focal range"), &p[1], params::view2d::lens_focus_lo, params::view2d::lens_focus_hi, "%.2f");
+         int iris = std::clamp((int)std::lround(p[2]), 0, 1);
+         if (ComboRow(T("Iris"), &iris, { T("Disc"), T("Hexagon") }))
+            p[2] = (float)iris;
+         if (const Scene2DNode::Layer* me = doc != nullptr ? doc->FindLayer(key) : nullptr; me != nullptr && me->kind == Scene2DNode::Kind::Adjust)
+         {
+            const int st = doc->LensDepthState(key);
+            FieldLabel(T("Depth"));
+            if (st < 0)
+               ImGui::TextDisabled("%s", T("Even blur: no depth model"));
+            else if (ActionButton::Draw((std::string(T(st == 0 ? "Analysing..." : "Re-analyse")) + "##v2dlensdepth").c_str(),
+                                        ImVec2(sFieldW, 0.0f), ActionButton::Kind::Plain) && st == 1)
+            {
+               doc->LensDepthReset(key);
+               Touch();
+            }
+         }
       }
       if (t == S::kAdjLookup)
       {
@@ -6652,6 +6674,8 @@ namespace
       }
       else if (sObjSoftPending && !doc->AiSelectWaiting())
          sObjSoftPending = false;   // the analysis failed or found nothing: nothing to soften
+      if (doc->LensDepthPoll())   // a Lens Blur layer's depth map landed
+         Touch();
       // A live selection dialog whose bar is gone (another tool, another panel layout) is cancelled.
       if (sLiveDlg != 0 && ImGui::GetFrameCount() - sLiveFrame > 2)
          LiveClose(doc, false);
@@ -16096,6 +16120,51 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->LiveSelEnd(false);
          expect("ai: cancelled depth select keeps the old selection", doc->SelectionAt(10, 10) > 0.95f);
          doc->Deselect();
+         doc->RemoveLayer(p);
+         doc->Commit();
+      }
+      // ai-tools 1.7 Lens Blur: 4 px black and white stripes; the top half near (in focus), the bottom half far.
+      {
+         const int p = doc->AddPaintLayer();
+         const float black[3] = { 0, 0, 0 }, white[3] = { 1, 1, 1 };
+         doc->SelectRect(0, 0, W, H, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(p, black, 1.0f);
+         for (int x = 0; x < (int)W; x += 8)
+         {
+            doc->SelectRect((float)x, 0, (float)x + 4, H, Scene2DNode::kSelNew, 0, false);
+            doc->FillPixels(p, white, 1.0f);
+         }
+         doc->Deselect();
+         const bool keepAuto = Scene2DNode::sLensDepthAuto;
+         Scene2DNode::sLensDepthAuto = false;
+         Layer& lb = doc->AddLayer(Kind::Adjust, 0, p);
+         lb.adjType = Scene2DNode::kAdjLensBlur;
+         lb.adjAmt = lb.adjTo = 12.0f;
+         lb.adjP = { 0.9f, 0.05f, 0.0f };
+         const int lid = lb.id;
+         const int iw = (int)W, ih = (int)H;
+         std::vector<float> dm((size_t)iw * ih);
+         for (int y = 0; y < ih; y++)
+            std::fill(dm.begin() + (size_t)y * iw, dm.begin() + (size_t)(y + 1) * iw, y < ih / 2 ? 0.9f : 0.1f);
+         doc->SetLensDepth(lid, dm);
+         doc->Commit();
+         const std::vector<uint8_t> out = picture(doc);
+         auto spread = [&](int docY) {   // the row's red min..max away from the edges (the read runs bottom row first)
+            const int row = ih - 1 - docY;
+            int lo = 255, hi = 0;
+            for (int x = 32; x < iw - 32; x++)
+            {
+               const int v = out.size() == (size_t)iw * ih * 4 ? out[((size_t)row * iw + x) * 4] : 0;
+               lo = std::min(lo, v);
+               hi = std::max(hi, v);
+            }
+            return hi - lo;
+         };
+         expect("ai: lens blur keeps the focus plane sharp", spread(ih / 4) > 220);
+         expect("ai: lens blur blurs the far plane", spread(ih * 3 / 4) < 60);
+         doc->RemoveLayer(lid);
+         doc->LensDepthReset(lid);
+         Scene2DNode::sLensDepthAuto = keepAuto;
          doc->RemoveLayer(p);
          doc->Commit();
       }

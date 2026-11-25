@@ -3207,6 +3207,8 @@ void RunView2DTest()
       Cook(&ref);
       const std::vector<float> plain = Buf(&ref);
       std::string noChange, notNeutral, badAlpha, badFinite, badSave, badEffect;
+      const bool keepLensAuto = S::sLensDepthAuto;
+      S::sLensDepthAuto = false;   // Lens Blur's even blur: no depth model landing between two cooks
       for (int t = 0; t < S::kAdjCount; t++)
       {
          const bool needsFile = t == S::kAdjLookup;   // a .cube file; with none it passes the picture through
@@ -3272,6 +3274,7 @@ void RunView2DTest()
          if (dEff.mean > 0.01f)
             badEffect += nm;
       }
+      S::sLensDepthAuto = keepLensAuto;
       printf("  sweep adj: no change [%s] not neutral [%s] alpha [%s] non-finite [%s] save [%s] effect differs [%s]\n", noChange.c_str(),
              notNeutral.c_str(), badAlpha.c_str(), badFinite.c_str(), badSave.c_str(), badEffect.c_str());
       Check("Sweep: every adjustment changes the picture when set", noChange.empty());

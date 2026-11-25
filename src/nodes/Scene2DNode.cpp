@@ -15,6 +15,7 @@
 #include "Modulation.h"
 #include "NodeViewport.h"
 #include "TileStore.h"
+#include "core/ml/AiSelect.h"
 
 std::function<INode*(uint64_t)> Scene2DNode::ResolveUid;
 std::function<bool(uint64_t, float&, float&)> Scene2DNode::NodeViewOf;
@@ -26,7 +27,8 @@ const char* Scene2DNode::AdjName(int type)
                                                  "Levels", "Curves", "Colour Balance", "Vibrance", "Selective Colour",
                                                  "Channel Mixer", "Black & White", "Photo Filter", "Shadows / Highlights",
                                                  "Colour Lookup", "White Balance", "Split Toning", "Recolour", "Normals",
-                                                 "Tone Compression", "Tone Stretch", "Noise & Grain", "Procedural Texture" };
+                                                 "Tone Compression", "Tone Stretch", "Noise & Grain", "Procedural Texture",
+                                                 "Lens Blur" };
    return kNames[std::clamp(type, 0, kAdjCount - 1)];
 }
 
@@ -35,7 +37,7 @@ const char* Scene2DNode::AdjGroup(int type)
    switch (type)
    {
    case kAdjPixelate: case kAdjHalftone: case kAdjDither: case kAdjThreshold: case kAdjPosterize:
-   case kAdjNoise: case kAdjTexture: return "Stylize";
+   case kAdjNoise: case kAdjTexture: case kAdjLensBlur: return "Stylize";
    case kAdjGradientMap: case kAdjHue: case kAdjSaturation: case kAdjColorBalance: case kAdjVibrance: case kAdjSelective:
    case kAdjMixer: case kAdjBlackWhite: case kAdjPhotoFilter: case kAdjLookup: case kAdjInvert: case kAdjWhiteBalance:
    case kAdjSplitToning: case kAdjRecolour: return "Colour";
@@ -70,6 +72,7 @@ int Scene2DNode::AdjParamCount(int type)
    case kAdjToneStretch: return 3;
    case kAdjNoise: return 6;
    case kAdjTexture: return 8;
+   case kAdjLensBlur: return 3;
    default: return 0;
    }
 }
@@ -115,6 +118,8 @@ std::vector<float> Scene2DNode::AdjParamDefault(int type)
       p = { 2.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.25f };   // mode (Film Grain), size, mono, blend (Soft), seed, clump
    else if (type == kAdjTexture)
       p = { 2.0f, 8.0f, 4.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f };   // pattern (fBm Clouds), scale, octaves, detail, warp, seed, blend (Overlay), invert
+   else if (type == kAdjLensBlur)
+      p = { 0.85f, 0.1f, 0.0f };   // focus depth (0 far .. 1 near), in-focus band, iris (0 disc, 1 hexagon)
    return p;
 }
 
@@ -122,7 +127,7 @@ float Scene2DNode::AdjDefault(int type)
 {
    static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
                                           1.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.25f, 30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-                                          0.25f, 0.5f };
+                                          0.25f, 0.5f, 12.0f };
    return kDef[std::clamp(type, 0, kAdjCount - 1)];
 }
 
@@ -130,10 +135,10 @@ void Scene2DNode::AdjRange(int type, float& lo, float& hi)
 {
    static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f, -1.0f, -1.0f, -180.0f, 0.0f, -4.0f, 0.0f, 0.1f, 0.0f,
                                          0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                                         0.0f, 0.0f };
+                                         0.0f, 0.0f, 0.0f };
    static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f, 1.0f, 1.0f, 180.0f, 2.0f, 4.0f, 1.0f, 4.0f, 1.0f,
                                          1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 200.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-                                         1.0f, 1.0f };
+                                         1.0f, 1.0f, 100.0f };
    const int t = std::clamp(type, 0, kAdjCount - 1);
    lo = kLo[t];
    hi = kHi[t];
@@ -751,7 +756,9 @@ namespace
          "float uP[40];\n"
          "uniform sampler3D uCube;\n"
          "uniform float uCubeN;\n"
-         "uniform sampler2D uBlurL;\n")
+         "uniform sampler2D uBlurL;\n"
+         "uniform sampler2D uDepth;\n"
+         "uniform int uHasDepth;\n")
          + std::string(Scene2DNode::kStopGlsl)
          + GLUtil::kSrgbGlsl +
          "float Lut(float v) { float f = clamp(v, 0.0, 1.0) * 255.0; int i = min(int(f), 254); return mix(uLut4[i >> 2][i & 3], uLut4[(i + 1) >> 2][(i + 1) & 3], f - float(i)); }\n"
@@ -1239,6 +1246,27 @@ namespace
          "      else if (bmode == 3) outc = 1.0 - (1.0 - c) * (1.0 - tc);\n"
          "      else if (bmode == 4) outc = SoftPs(c, tc);\n"
          "      c = mix(c, outc, clamp(uAmt, 0.0, 1.0));\n"
+         "   } else if (uType == 30) {\n"   // lens blur: a depth-driven iris blur, gathered (scatter-as-gather) in linear light
+         "      float focus = uP[0], band = uP[1];\n"
+         "      bool hex = uP[2] > 0.5;\n"
+         "      float dc = uHasDepth == 1 ? texture(uDepth, vUv).r : 0.0;\n"
+         "      float cc = uHasDepth == 1 ? uAmt * clamp((abs(dc - focus) - band) * 2.0, 0.0, 1.0) : uAmt;\n"
+         "      vec3 lc = uLinear == 1 ? max(src.rgb, 0.0) : SrgbDecode(clamp(src.rgb, 0.0, 1.0));\n"
+         "      float w0 = 1.0 / max(cc * cc, 1.0);\n"
+         "      vec3 acc = lc * w0; float wsum = w0;\n"
+         "      if (uAmt >= 0.5) for (int k = 0; k < 96; k++) {\n"
+         "         float th = float(k) * 2.39996323, rr = sqrt((float(k) + 0.5) / 96.0) * uAmt;\n"
+         "         if (hex) { float a = mod(th, 1.0471976) - 0.5235988; rr *= 0.8660254 / cos(a); }\n"
+         "         vec2 o = vec2(cos(th), sin(th)) * rr, q = (px + o) / uDoc;\n"
+         "         if (q.x < 0.0 || q.y < 0.0 || q.x > 1.0 || q.y > 1.0) continue;\n"
+         "         float ds = uHasDepth == 1 ? texture(uDepth, q).r : 0.0;\n"
+         "         float cs = uHasDepth == 1 ? uAmt * clamp((abs(ds - focus) - band) * 2.0, 0.0, 1.0) : uAmt;\n"
+         "         if (ds < dc) cs = min(cs, cc);\n"   // what lies behind never spills over what is in front
+         "         float w = smoothstep(rr - 1.0, rr + 1.0, cs) / max(cs * cs, 1.0);\n"
+         "         vec4 sv = texture(uSrc, q);\n"
+         "         acc += (uLinear == 1 ? max(sv.rgb, 0.0) : SrgbDecode(clamp(sv.rgb, 0.0, 1.0))) * w; wsum += w;\n"
+         "      }\n"
+         "      c = SrgbEncode(max(acc / wsum, 0.0));\n"
          "   }\n"
          "   if (uType == 4 || (uMap == 1 && uType != 29)) c = gradAt(clamp(LumaPs(c), 0.0, 1.0), uColA, uColB).rgb;\n"
          "   c = uHead == 1 && uLinear == 1 ? max(c, 0.0) : clamp(c, 0.0, 1.0);\n"
@@ -1317,6 +1345,9 @@ Scene2DNode::~Scene2DNode()
       GLUtil::DestroyFbo(*f);
    if (mLutTex != 0)
       glDeleteTextures(1, &mLutTex);
+   for (auto& kv : mLensDepth)
+      if (kv.second.tex != 0)
+         glDeleteTextures(1, &kv.second.tex);
    for (unsigned p : { mFillProgram, mAntsProgram, mResampleProgram, mAdjProgram, mReliefProgram, mEffMixProgram, mLumaBlurProgram })
       if (p != 0)
          glDeleteProgram(p);
@@ -3454,6 +3485,10 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       return false;
    const unsigned cube = l.adjType == kAdjLookup && BindLookup(l.adjFile) ? mLutTex : 0;
    const unsigned blurL = l.adjType == kAdjShadowsHighlights ? BlurLuma(src, AdjAmount(l)) : 0;
+   bool lensWait = false;
+   const unsigned depthTex = l.adjType == kAdjLensBlur ? LensDepthTex(l, src, lensWait) : 0;
+   if (lensWait)
+      return false;   // the picture below is being analysed: it shows unblurred until the depth lands
    if (!GLUtil::EnsureFbo(mAdjFbo, mDoc.w, mDoc.h, GLUtil::ImageWorkingFormat(), "Scene2DAdj"))
       return false;
    const unsigned prog = mAdjProgram;
@@ -3494,12 +3529,159 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, blurL);
       glUniform1i(GLUtil::UniformLoc(prog, "uBlurL"), 2);
+      glActiveTexture(GL_TEXTURE3);
+      glBindTexture(GL_TEXTURE_2D, depthTex);
+      glUniform1i(GLUtil::UniformLoc(prog, "uDepth"), 3);
+      glUniform1i(GLUtil::UniformLoc(prog, "uHasDepth"), depthTex != 0 ? 1 : 0);
       glActiveTexture(GL_TEXTURE0);
    });
    glActiveTexture(GL_TEXTURE1);
    glBindTexture(GL_TEXTURE_3D, 0);
    glActiveTexture(GL_TEXTURE0);
    return true;
+}
+
+bool Scene2DNode::sLensDepthAuto = true;
+
+namespace
+{
+   unsigned UploadDepth(unsigned tex, const std::vector<float>& topDown, int w, int h)
+   {
+      std::vector<float> rows((size_t)w * h);   // textures run bottom row first
+      for (int y = 0; y < h; y++)
+         std::memcpy(&rows[(size_t)y * w], &topDown[(size_t)(h - 1 - y) * w], (size_t)w * sizeof(float));
+      if (tex == 0)
+         glGenTextures(1, &tex);
+      glBindTexture(GL_TEXTURE_2D, tex);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, w, h, 0, GL_RED, GL_FLOAT, rows.data());
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      return tex;
+   }
+}
+
+unsigned Scene2DNode::LensDepthTex(const Layer& l, unsigned src, bool& wait)
+{
+   wait = false;
+   const int W = mDoc.w, H = mDoc.h;
+   if (l.id <= 0)
+      return 0;   // an effect copy: the even blur
+   auto it = mLensDepth.find(l.id);
+   if (it != mLensDepth.end() && it->second.tex != 0 && it->second.w == W && it->second.h == H)
+      return it->second.tex;
+   if (!sLensDepthAuto || !AiSelect::DepthAvailable())
+      return 0;
+   LensDepth& d = mLensDepth[l.id];
+   if (d.failed)
+      return 0;
+   if (!d.pending)
+   {
+      std::vector<uint8_t> px((size_t)W * H * 4);
+      glBindTexture(GL_TEXTURE_2D, src);
+      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+      glBindTexture(GL_TEXTURE_2D, 0);
+      auto pic = std::make_shared<AiSelect::Picture>();   // the model takes the picture top row first
+      pic->w = W;
+      pic->h = H;
+      pic->rgba.resize(px.size());
+      for (int y = 0; y < H; y++)
+         std::memcpy(&pic->rgba[(size_t)y * W * 4], &px[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+      d.key = AiSelect::KeyOf(*pic) | 1;
+      d.pending = true;
+      if (!AiSelect::DepthReady(d.key))
+         AiSelect::RequestDepth(pic, d.key);
+   }
+   if (!AiSelect::DepthReady(d.key))
+   {
+      if (AiSelect::Busy())
+      {
+         wait = true;
+         return 0;
+      }
+      d.pending = false;   // the model failed: the even blur, until Re-analyse
+      d.failed = true;
+      return 0;
+   }
+   std::vector<float> map;
+   int dw = 0, dh = 0;
+   d.pending = false;
+   if (!AiSelect::Depth(d.key, map, dw, dh) || dw != W || dh != H)
+   {
+      d.failed = true;
+      return 0;
+   }
+   d.tex = UploadDepth(d.tex, map, W, H);
+   d.w = W;
+   d.h = H;
+   return d.tex;
+}
+
+bool Scene2DNode::LensDepthPoll()
+{
+   bool landed = false;
+   for (auto& kv : mLensDepth)
+   {
+      LensDepth& d = kv.second;
+      if (!d.pending)
+         continue;
+      if (!AiSelect::DepthReady(d.key))
+      {
+         if (!AiSelect::Busy())
+         {
+            d.pending = false;
+            d.failed = true;
+            landed = true;   // redraw with the even blur
+         }
+         continue;
+      }
+      std::vector<float> map;
+      int dw = 0, dh = 0;
+      d.pending = false;
+      landed = true;
+      if (!AiSelect::Depth(d.key, map, dw, dh) || dw != mDoc.w || dh != mDoc.h)
+      {
+         d.failed = true;
+         continue;
+      }
+      d.tex = UploadDepth(d.tex, map, dw, dh);
+      d.w = dw;
+      d.h = dh;
+   }
+   return landed;
+}
+
+void Scene2DNode::LensDepthReset(int layerId)
+{
+   auto it = mLensDepth.find(layerId);
+   if (it == mLensDepth.end())
+      return;
+   if (it->second.tex != 0)
+      glDeleteTextures(1, &it->second.tex);
+   mLensDepth.erase(it);
+}
+
+int Scene2DNode::LensDepthState(int layerId) const
+{
+   auto it = mLensDepth.find(layerId);
+   if (it != mLensDepth.end() && it->second.tex != 0)
+      return 1;
+   if (!AiSelect::DepthAvailable() || (it != mLensDepth.end() && it->second.failed))
+      return -1;
+   return 0;
+}
+
+void Scene2DNode::SetLensDepth(int layerId, const std::vector<float>& topDown)
+{
+   if (topDown.size() != (size_t)mDoc.w * mDoc.h)
+      return;
+   LensDepth& d = mLensDepth[layerId];
+   d.tex = UploadDepth(d.tex, topDown, mDoc.w, mDoc.h);
+   d.w = mDoc.w;
+   d.h = mDoc.h;
+   d.pending = d.failed = false;
 }
 
 std::function<ImageCable*(uint64_t)> Scene2DNode::ImageInputOf;
