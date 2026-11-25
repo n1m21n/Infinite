@@ -6,6 +6,11 @@
   app     score masks written by the app's INFINITE_AIEVAL=1 hook
   ep      EP gate (section 15): CoreML vs CPU masks on S1/S2 must agree (IoU >= 0.99 per picture)
           and loading the CoreML sessions must add <= 600 MB of resident memory
+  s4      trace baseline (ai-tools step 2.0): make 20 own logos / line art + 10 own photo-like
+          pictures, trace each with VTracer and potrace, score SSIM (grey, against the picture),
+          path count and time -> results/s4_baseline.json
+          (needs vtracer, potracer, cairosvg, scikit-image in the venv and
+           DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib for cairo)
   report  print the table for every result file present
 
 Sets (under --data, default ~/Infinite/datasets/ai-eval):
@@ -272,6 +277,127 @@ def cmd_ep(a):
    return 0 if ok else 1
 
 
+# ---------------------------------------------------------------- S4 trace baseline
+def s4_pictures(dst):
+   """30 own pictures: 0-9 flat logos, 10-19 line art, 20-29 photo-like. Seeded, so the set is fixed."""
+   from PIL import ImageFilter
+   dst.mkdir(parents=True, exist_ok=True)
+   rng = random.Random(4)
+   S = 384
+   out = []
+   for i in range(30):
+      path = dst / f"s4_{i:02d}.png"
+      out.append(path)
+      if path.exists():
+         continue
+      if i < 10:
+         bg = tuple(rng.randrange(200, 256) for _ in range(3))
+         im = Image.new("RGB", (S, S), bg)
+         d = ImageDraw.Draw(im)
+         pal = [tuple(rng.randrange(0, 200) for _ in range(3)) for _ in range(rng.randrange(2, 5))]
+         for _ in range(rng.randrange(3, 7)):
+            c = rng.choice(pal)
+            x, y, r = rng.randrange(40, S - 40), rng.randrange(40, S - 40), rng.randrange(20, 110)
+            k = rng.randrange(3)
+            if k == 0:
+               d.ellipse([x - r, y - r, x + r, y + r], fill=c)
+            elif k == 1:
+               d.rounded_rectangle([x - r, y - r // 2, x + r, y + r // 2], radius=r // 4, fill=c)
+            else:
+               n = rng.randrange(3, 8)
+               pts = [(x + r * np.cos(2 * np.pi * j / n), y + r * np.sin(2 * np.pi * j / n)) for j in range(n)]
+               d.polygon(pts, fill=c)
+      elif i < 20:
+         im = Image.new("RGB", (S, S), (255, 255, 255))
+         d = ImageDraw.Draw(im)
+         for _ in range(rng.randrange(6, 14)):
+            pts = [(rng.randrange(20, S - 20), rng.randrange(20, S - 20)) for _ in range(rng.randrange(2, 6))]
+            d.line(pts, fill=(0, 0, 0), width=rng.randrange(2, 9), joint="curve")
+         for _ in range(rng.randrange(1, 4)):
+            x, y, r = rng.randrange(60, S - 60), rng.randrange(60, S - 60), rng.randrange(15, 60)
+            d.ellipse([x - r, y - r, x + r, y + r], outline=(0, 0, 0), width=rng.randrange(2, 6))
+      else:
+         yy, xx = np.mgrid[0:S, 0:S].astype(np.float32) / S
+         a = np.stack([rng.random() * xx + rng.random() * yy + rng.random() * 0.3 for _ in range(3)], -1)
+         im = Image.fromarray(np.clip(a / a.max() * 255, 0, 255).astype(np.uint8))
+         d = ImageDraw.Draw(im)
+         for _ in range(rng.randrange(4, 9)):
+            c = tuple(rng.randrange(0, 256) for _ in range(3))
+            x, y, r = rng.randrange(0, S), rng.randrange(0, S), rng.randrange(30, 140)
+            d.ellipse([x - r, y - r, x + r, y + r], fill=c)
+         im = im.filter(ImageFilter.GaussianBlur(6))
+         n = np.random.default_rng(i).normal(0, 6, (S, S, 3))
+         im = Image.fromarray(np.clip(np.asarray(im, np.float32) + n, 0, 255).astype(np.uint8))
+      im.save(path)
+   return out
+
+
+def s4_raster(svg, w, h):
+   import io
+   import cairosvg
+   png = cairosvg.svg2png(bytestring=svg.encode(), output_width=w, output_height=h, background_color="white")
+   return np.asarray(Image.open(io.BytesIO(png)).convert("L"), np.float32)
+
+
+def s4_potrace_svg(grey):
+   import potrace
+   bm = potrace.Bitmap(grey >= 128)  # potracer inverts: pass the light pixels to trace the dark ones
+   plist = bm.trace(turdsize=2, alphamax=1.0, opticurve=True, opttolerance=0.2)
+   h, w = grey.shape
+   parts = []
+   for curve in plist:
+      sp = curve.start_point
+      d = [f"M{sp.x:.2f},{sp.y:.2f}"]
+      for seg in curve.segments:
+         if seg.is_corner:
+            d.append(f"L{seg.c.x:.2f},{seg.c.y:.2f}L{seg.end_point.x:.2f},{seg.end_point.y:.2f}")
+         else:
+            d.append(f"C{seg.c1.x:.2f},{seg.c1.y:.2f} {seg.c2.x:.2f},{seg.c2.y:.2f} {seg.end_point.x:.2f},{seg.end_point.y:.2f}")
+      parts.append("".join(d) + "Z")
+   svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">'
+          f'<path fill="black" fill-rule="evenodd" d="{"".join(parts)}"/></svg>')
+   return svg, len(plist)
+
+
+def cmd_s4(a):
+   import vtracer
+   from skimage.metrics import structural_similarity
+   pics = s4_pictures(a.data / "s4")
+   kinds = ["logo"] * 10 + ["line"] * 10 + ["photo"] * 10
+   res = {"vtracer": [], "potrace": []}
+   for path, kind in zip(pics, kinds):
+      im = Image.open(path).convert("RGB")
+      w, h = im.size
+      grey = np.asarray(im.convert("L"), np.float32)
+      t = time.perf_counter()
+      svg = vtracer.convert_pixels_to_svg(list(im.convert("RGBA").getdata()), size=(w, h), colormode="color")
+      dt = time.perf_counter() - t
+      n = svg.count("<path")
+      ss = structural_similarity(grey, s4_raster(svg, w, h), data_range=255)
+      res["vtracer"].append([path.name, kind, float(ss), n, dt])
+      t = time.perf_counter()
+      svg, n = s4_potrace_svg(grey)
+      dt = time.perf_counter() - t
+      ss = structural_similarity(grey, s4_raster(svg, w, h), data_range=255)
+      res["potrace"].append([path.name, kind, float(ss), n, dt])
+      print(f"{path.name} {kind:5s}  vtracer SSIM {res['vtracer'][-1][2]:.3f} paths {res['vtracer'][-1][3]:4d}"
+            f"  potrace SSIM {ss:.3f} paths {n:4d}")
+   out = a.data / "results" / "s4_baseline.json"
+   out.parent.mkdir(parents=True, exist_ok=True)
+   out.write_text(json.dumps({"trace": res}, indent=1))
+   s4_print(res)
+   return 0
+
+
+def s4_print(res):
+   for tool, rows in res.items():
+      for kind in ("logo", "line", "photo"):
+         r = [x for x in rows if x[1] == kind]
+         if r:
+            print(f"  {tool:8s} {kind:5s} SSIM mean {np.mean([x[2] for x in r]):.3f}  paths median "
+                  f"{np.median([x[3] for x in r]):6.0f}  time p50 {np.median([x[4] for x in r]) * 1000:7.1f} ms")
+
+
 def stats(v):
    v = np.array(v)
    return f"mean {v.mean():.3f}  median {np.median(v):.3f}  worst {v.min():.3f}  n {len(v)}"
@@ -286,18 +412,20 @@ def cmd_report(a):
             for tk, tv in v.items():
                tv = np.array(tv) * 1000
                print(f"  {tk:22s} p50 {np.median(tv):7.1f} ms  p95 {np.percentile(tv, 95):7.1f} ms")
+         elif k == "trace":
+            s4_print(v)
          elif isinstance(v, list) and v:
             print(f"  {k:22s} IoU {stats([x[1] for x in v])}")
 
 
 def main():
    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-   ap.add_argument("cmd", choices=["build", "models", "app", "ep", "report"])
+   ap.add_argument("cmd", choices=["build", "models", "app", "ep", "s4", "report"])
    ap.add_argument("--data", type=Path, default=DATA)
    ap.add_argument("--save", action="store_true", help="write model masks next to the pictures")
    ap.add_argument("--limit", type=int, default=None, help="ep: only the first N pictures of each set")
    a = ap.parse_args()
-   return {"build": cmd_build, "models": cmd_models, "app": cmd_app, "ep": cmd_ep, "report": cmd_report}[a.cmd](a)
+   return {"build": cmd_build, "models": cmd_models, "app": cmd_app, "ep": cmd_ep, "s4": cmd_s4, "report": cmd_report}[a.cmd](a)
 
 
 if __name__ == "__main__":
