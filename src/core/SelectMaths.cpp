@@ -70,6 +70,44 @@ namespace SelectMaths
       float SrgbToLinear(float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); }
    }
 
+   namespace
+   {
+      // One extended box along a line of n samples `stride` apart: half-width r plus a tap of weight alpha at +-(r + 1).
+      void ExtBoxLine(const float* in, float* out, int n, size_t stride, int r, float alpha)
+      {
+         const float norm = 1.0f / (2.0f * (float)r + 1.0f + 2.0f * alpha);
+         auto at = [&](int i) { return in[(size_t)std::clamp(i, 0, n - 1) * stride]; };
+         double sum = 0.0;
+         for (int k = -r; k <= r; k++)
+            sum += at(k);
+         for (int i = 0; i < n; i++)
+         {
+            out[(size_t)i * stride] = (float)((sum + alpha * (at(i - r - 1) + at(i + r + 1))) * norm);
+            sum += at(i + r + 1) - at(i - r);
+         }
+      }
+   }
+
+   void GaussianBlur(std::vector<float>& v, int w, int h, float sigma)
+   {
+      if (!(sigma > 0.0f) || w < 1 || h < 1 || v.size() != (size_t)w * h)
+         return;
+      constexpr int kPasses = 3;
+      const float s2 = sigma * sigma / (float)kPasses;   // variance each pass adds
+      // Largest whole box not over it (a box of half-width r has variance r (r + 1) / 3), then the end taps' weight.
+      const int r = std::max(0, (int)std::floor((std::sqrt(1.0f + 12.0f * s2) - 1.0f) * 0.5f));
+      const float rr = (float)r, r1 = rr + 1.0f;
+      const float alpha = (2.0f * rr + 1.0f) * (rr * r1 - 3.0f * s2) / (6.0f * (s2 - r1 * r1));
+      std::vector<float> t(v.size());
+      for (int pass = 0; pass < kPasses; pass++)
+      {
+         for (int y = 0; y < h; y++)
+            ExtBoxLine(&v[(size_t)y * w], &t[(size_t)y * w], w, 1, r, alpha);
+         for (int x = 0; x < w; x++)
+            ExtBoxLine(&t[x], &v[x], h, (size_t)w, r, alpha);
+      }
+   }
+
    // ---- Select and Mask ----------------------------------------------------------------------------------------
    void GuidedEdge(const uint8_t* rgba, std::vector<uint8_t>& mask, int w, int h, float radius, bool smart)
    {

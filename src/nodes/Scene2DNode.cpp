@@ -618,6 +618,7 @@ namespace
             "uniform sampler2D uVMask;\n"
             "uniform int uHasVMask;\n"
             "uniform int uVMaskInv;\n"
+            "uniform float uVMaskDensity;\n"
             "uniform sampler2D uGeoDepth;\n"
             "uniform int uHasGeoDepth;\n"
             "uniform vec2 uGeoNF;\n"
@@ -689,7 +690,7 @@ namespace
            "      layer.a *= mix(1.0, clamp(v, 0.0, 1.0), uMaskDensity);\n"
            "   }\n"
            "   if (uHasPMask == 1) layer.a *= texture(uPMask, uv).r;\n"
-           "   if (uHasVMask == 1) { float va = texture(uVMask, uv).a; if (uVMaskInv == 1) va = 1.0 - va; layer.a *= clamp(va, 0.0, 1.0); }\n"
+           "   if (uHasVMask == 1) { float va = texture(uVMask, uv).a; if (uVMaskInv == 1) va = 1.0 - va; va = 1.0 - uVMaskDensity * (1.0 - va); layer.a *= clamp(va, 0.0, 1.0); }\n"
            "   float amt = uOpacity * layer.a;\n"
            "   if (uBif == 1) amt *= bifW(uBifT, gLum(layer.rgb)) * bifW(uBifU, gLum(acc.rgb));\n"
            // Normal over an opaque picture: the hardware blends it (src alpha, one minus src alpha; alpha kept at 1).
@@ -2199,7 +2200,7 @@ void Scene2DNode::Serialize()
       }
       if (l.hasVMask)
       {
-         o << "vmask " << l.id << " " << +l.vmaskOn << " " << +l.vmaskInvert << " " << l.vmaskFeather << "\n";
+         o << "vmask " << l.id << " " << +l.vmaskOn << " " << +l.vmaskInvert << " " << l.vmaskFeather << " " << l.vmaskDensity << "\n";
          for (const Shape& sh : l.vmask)
             shapeLine("vshape", sh);
       }
@@ -2585,12 +2586,14 @@ void Scene2DNode::Parse()
          else if (key == "vmask")
          {
             int on = 1, inv = 0;
-            float feather = 0.0f;
+            float feather = 0.0f, density = 1.0f;
             s >> on;
             if (s >> inv)
                l->vmaskInvert = inv != 0;
-            if (s >> feather)
-               l->vmaskFeather = std::clamp(feather, 0.0f, 128.0f);
+            if (s >> feather)   // a hostile value renders as the nearest valid one (PhotoCraft hostile_values_render)
+               l->vmaskFeather = std::isfinite(feather) ? std::clamp(feather, 0.0f, 128.0f) : 0.0f;
+            if (s >> density)
+               l->vmaskDensity = std::isfinite(density) ? std::clamp(density, 0.0f, 1.0f) : 1.0f;
             l->hasVMask = true;
             l->vmaskOn = on != 0;
          }
@@ -2840,6 +2843,7 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       glUniform1i(GLUtil::UniformLoc(prog, "uVMask"), 4);
       glUniform1i(GLUtil::UniformLoc(prog, "uHasVMask"), a.vmask != 0 ? 1 : 0);
       glUniform1i(GLUtil::UniformLoc(prog, "uVMaskInv"), a.vmaskInvert ? 1 : 0);
+      glUniform1f(GLUtil::UniformLoc(prog, "uVMaskDensity"), a.vmaskDensity);
       glActiveTexture(GL_TEXTURE0);
       glUniform2f(GLUtil::UniformLoc(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
       glUniform3f(GLUtil::UniformLoc(prog, "uInvA"), a.inv[0], a.inv[1], a.inv[2]);
@@ -3325,6 +3329,7 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
          {
             a.vmask = r->tex;
             a.vmaskInvert = l.vmaskInvert;
+            a.vmaskDensity = l.vmaskDensity;
          }
       Pass(depth, a);
       return;
@@ -3431,6 +3436,7 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       {
          a.vmask = r->tex;
          a.vmaskInvert = l.vmaskInvert;
+         a.vmaskDensity = l.vmaskDensity;
       }
    if (!LayerRect(h, a))
       return;

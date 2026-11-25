@@ -9937,6 +9937,18 @@ namespace
             PushUndoCheckpoint("Feather vector mask");
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Vector mask feather radius"));
+         next();
+         ImGui::SetNextItemWidth(kWellM);
+         float dens = a->vmaskDensity * 100.0f;   // shown in whole percents, as Photoshop's Properties
+         if (FieldWell::Slider("##v2dvmd", &dens, params::view2d::fill_pct_lo, params::view2d::fill_pct_hi, "Density %.0f%%"))
+         {
+            a->vmaskDensity = std::round(dens) / 100.0f;
+            Touch();
+         }
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint("Vector mask density");
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("How much the vector mask hides beyond its path"));
       }
       if (changed)
       {
@@ -12555,6 +12567,7 @@ namespace
             BoolRow(T("Vector mask"), &l->vmaskOn);
             BoolRow(T("Invert"), &l->vmaskInvert);
             SliderRow(T("Feather"), &l->vmaskFeather, params::view2d::fill_pct_lo, params::view2d::vmask_feather_hi, "%.0f");
+            SliderRow(T("Density"), &l->vmaskDensity, 0.0f, 1.0f, "%.2f");
             if (TextChip(L("Edit mask##v2dvm"), sVecTarget == 1, T("Pen, shape and node tools edit the mask")))
             {
                sVecTarget = sVecTarget == 1 ? 0 : 1;
@@ -17942,6 +17955,46 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->RemoveLayer(vid);
          doc->Commit();
       }
+      // Soft shapes (PhotoCraft soft_shape_tests): a black fill with a square vector mask at 50..150. Feather is a
+      // Gaussian of sigma = Feather (Photoshop's measured 10 px ramp, within 2 levels); Density 50 % shows the
+      // fill at half beyond the path and full inside; the defaults leave the hard edge.
+      {
+         Layer& fl = doc->AddLayer(Kind::Fill, 0);
+         const int fid = fl.id;
+         for (int c = 0; c < 3; c++)
+            fl.colorA[c] = 0.0f;
+         Scene2DNode::Shape q;
+         q.type = Scene2DNode::Shape::kRect;
+         q.x0 = q.y0 = 50;
+         q.x1 = q.y1 = 150;
+         fl.hasVMask = true;
+         fl.vmask.push_back(q);
+         doc->Commit();
+         auto alphaAt = [&](int x, int y) {
+            uint8_t p[4] = {};
+            return pixel({ fid }, x, y, p) ? (int)p[3] : -1;
+         };
+         const bool hard = alphaAt(49, 100) == 0 && alphaAt(50, 100) == 255 && alphaAt(149, 100) == 255 && alphaAt(150, 100) == 0 &&
+                           alphaAt(100, 10) == 0;
+         expect("soft shape: the defaults keep the hard edge", hard);
+         const int ps[15] = { 249, 242, 232, 216, 195, 170, 142, 113, 85, 60, 39, 23, 13, 6, 2 };   // Photoshop, grey on white
+         if (Layer* f = doc->FindLayer(fid))
+            f->vmaskFeather = 10.0f;
+         doc->Commit();
+         int dev = 0;
+         for (int i = 0; i < 15; i++)
+            dev = std::max(dev, std::abs((255 - alphaAt(30 + 3 * i, 100)) - ps[i]));
+         expect("soft shape: a 10 px feather matches Photoshop's ramp", dev <= 2 && alphaAt(100, 100) == 255);
+         if (Layer* f = doc->FindLayer(fid))
+            f->vmaskFeather = 0.0f, f->vmaskDensity = 0.5f;
+         doc->Commit();
+         auto half = [](int v) { return v >= 126 && v <= 129; };
+         expect("soft shape: Density 50% shows the fill at half beyond the path, full inside",
+                half(alphaAt(20, 100)) && half(alphaAt(49, 100)) && half(alphaAt(100, 10)) && alphaAt(50, 100) == 255 &&
+                    alphaAt(149, 100) == 255);
+         doc->RemoveLayer(fid);
+         doc->Commit();
+      }
       // Arrowhead Concavity (PhotoCraft arrow_concavity_takes_minus_fifty_to_fifty): +50 pulls the triangle's back
       // halfway to its tip, leaving a notch; the tip stays; old out-of-range values load clamped.
       {
@@ -19356,7 +19409,7 @@ std::string View2DAuditRanges()
       };
       if (bad("opacity", l.opacity, 0, 1) || bad("fill", l.fill, 0, 1) || bad("x", l.x, -1e6f, 1e6f) || bad("y", l.y, -1e6f, 1e6f) ||
           bad("scale x", l.sx, -1e4f, 1e4f) || bad("scale y", l.sy, -1e4f, 1e4f) || bad("angle", l.angle, -1e6f, 1e6f) ||
-          bad("mask density", l.maskDensity, 0, 1))
+          bad("mask density", l.maskDensity, 0, 1) || bad("vector mask density", l.vmaskDensity, 0, 1))
          return buf;
       for (int f = 0; f < Scene2DNode::kFxCount; f++)
          if (bad("fx opacity", l.fx[f].c[3], 0, 1) || bad("fx size", l.fx[f].size, 0, 1e4f) || bad("fx spread", l.fx[f].spread, 0, 1))

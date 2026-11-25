@@ -5,6 +5,7 @@
 
 #include "Scene2DNode.h"
 #include "TileStore.h"
+#include "core/SelectMaths.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -1456,49 +1457,18 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
          for (size_t i = 3; i < px.size(); i += 4)
             px[i] = px[i] >= 128 ? 255 : 0;
    };
-   // Separable 3-pass sliding box blur on the alpha channel for feathered vector masks.
+   // Feathered vector masks: a Gaussian of sigma = Feather on the alpha, Photoshop's measured ramp
+   // (PhotoCraft feather_matches_photoshops_ramp: within 1 level).
    auto featherAlpha = [&](std::vector<uint8_t>& px) {
       if (!mask || l.vmaskFeather <= 0.25f || w <= 0 || h <= 0)
          return;
-      const int rad = std::clamp((int)std::lround(l.vmaskFeather), 1, 128);
       const size_t npix = (size_t)w * (size_t)h;
-      std::vector<float> bufA(npix), bufB(npix);
+      std::vector<float> a(npix);
       for (size_t i = 0; i < npix; i++)
-         bufA[i] = (float)px[i * 4 + 3];
-      for (int pass = 0; pass < 3; pass++)
-      {
-         const float denom = (float)(rad * 2 + 1);
-         for (int y = 0; y < h; y++)
-         {
-            const float* row = &bufA[(size_t)y * w];
-            float* dst = &bufB[(size_t)y * w];
-            float acc = 0.0f;
-            for (int k = -rad; k <= rad; k++)
-               acc += row[std::clamp(k, 0, w - 1)];
-            for (int x = 0; x < w; x++)
-            {
-               dst[x] = acc / denom;
-               const int addX = std::min(x + rad + 1, w - 1);
-               const int subX = std::max(x - rad, 0);
-               acc += row[addX] - row[subX];
-            }
-         }
-         for (int x = 0; x < w; x++)
-         {
-            float acc = 0.0f;
-            for (int k = -rad; k <= rad; k++)
-               acc += bufB[(size_t)std::clamp(k, 0, h - 1) * w + x];
-            for (int y = 0; y < h; y++)
-            {
-               bufA[(size_t)y * w + x] = acc / denom;
-               const int addY = std::min(y + rad + 1, h - 1);
-               const int subY = std::max(y - rad, 0);
-               acc += bufB[(size_t)addY * w + x] - bufB[(size_t)subY * w + x];
-            }
-         }
-      }
+         a[i] = (float)px[i * 4 + 3];
+      SelectMaths::GaussianBlur(a, w, h, l.vmaskFeather);
       for (size_t i = 0; i < npix; i++)
-         px[i * 4 + 3] = (uint8_t)std::clamp((int)std::lround(bufA[i]), 0, 255);
+         px[i * 4 + 3] = (uint8_t)std::clamp((int)std::lround(a[i]), 0, 255);
    };
    if (l.kind == Kind::Text && !mask)
    {

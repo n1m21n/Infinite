@@ -287,7 +287,8 @@ public:
       std::vector<Shape> shapes;
       // Vector mask (any layer but a group): inside the items shows. No items shows all.
       bool hasVMask = false, vmaskOn = true, vmaskInvert = false;
-      float vmaskFeather = 0.0f;
+      float vmaskFeather = 0.0f;              // Gaussian sigma, px (Photoshop's mask Feather)
+      float vmaskDensity = 1.0f;              // 0..1: beyond the path the layer shows at 1 - density (Photoshop's Density)
       std::vector<Shape> vmask;
       // Text layers. boxW 0 = point text (no wrap); else wraps at boxW px.
       std::string text, font;
@@ -966,6 +967,7 @@ private:
       unsigned int pmask = 0;       // pixel mask, sampled with the layer
       unsigned int vmask = 0;       // vector mask, alpha
       bool vmaskInvert = false;
+      float vmaskDensity = 1.0f;
       const Layer* fill = nullptr;
       const Layer* bif = nullptr;   // blend if
       float gamma = 1.0f;           // blend gamma / 2.2: colours raised to this while blending

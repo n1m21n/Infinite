@@ -15,6 +15,9 @@ namespace SelectMaths
 {
    // Mean over a (2r + 1)^2 window, edges clamped. Running sums: cost does not grow with r.
    void BoxMean(const std::vector<float>& in, std::vector<float>& out, int w, int h, int r);
+   // Gaussian of exactly `sigma` px, edges clamped: three extended boxes (Gwosdek et al. 2011), whose fractional end
+   // taps make up the variance whole boxes miss, so the cost does not grow with sigma. Photoshop's vector mask feather.
+   void GaussianBlur(std::vector<float>& v, int w, int h, float sigma);
 
    // ---- Select and Mask ----------------------------------------------------------------------------------------
    struct RefineParams
