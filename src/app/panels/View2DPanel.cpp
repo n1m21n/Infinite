@@ -175,7 +175,8 @@ namespace
    void NoteColourUsed(const float* c);   // the recent-colours row, below
    int sFillKind = 1;              // gradient: 1 linear, 2 radial, 3 angle, 4 reflected, 5 diamond
    float sGradOpacity = 1.0f;
-   int sPickSize = 1;              // eyedropper: 1 point, 3 or 5 px square averaged
+   int sPickSize = 1;              // eyedropper: N of the N by N average (1 = point), one of kPickSizes
+   const int kPickSizes[7] = { 1, 3, 5, 11, 31, 51, 101 };
    bool sPickLayer = false;        // eyedropper reads the active paint layer alone
    bool sCloneAligned = true;      // clone / heal: the offset holds across strokes
    bool sCloneAll = false;         // clone / heal: copy from the whole picture
@@ -8233,7 +8234,7 @@ namespace
                std::copy(c, c + 3, sOp.selOp == 1 ? sBg : sFg);
             else
                doc->Pick(sMouseDoc.x, sMouseDoc.y, sOp.selOp == 1 ? sBg : sFg, sPickSize,
-                         sPickLayer && a != nullptr && a->kind == Kind::Paint ? a->id : 0);
+                         sPickLayer && a != nullptr && a->kind == Kind::Paint ? a->id : 0, sZoom);
          }
          else if (sOp.kind == 6)
          {
@@ -9563,10 +9564,11 @@ namespace
       }
       else if (sTool == kPick)
       {
-         static const char* kSample[3] = { "Point", "3x3 average", "5x5 average" };
-         int si = sPickSize / tok::view2d_si_ratio;
-         if (BarCombo("##v2dpsize", &si, kSample, 3, kWellL))   // ui-audit-ok: model value (prediction lookahead samples / handle index modulo / visible items)
-            sPickSize = si * tok::view2d_pick_size_ratio + 1;
+         static const char* kSample[7] = { "Point", "3x3 average", "5x5 average", "11x11 average",
+                                           "31x31 average", "51x51 average", "101x101 average" };
+         int si = (int)(std::find(std::begin(kPickSizes), std::end(kPickSizes), sPickSize) - std::begin(kPickSizes));
+         if (BarCombo("##v2dpsize", &si, kSample, (int)std::size(kSample), kWellL))
+            sPickSize = kPickSizes[std::clamp(si, 0, (int)std::size(kPickSizes) - 1)];
          gap();
          static const char* kFrom[2] = { "All layers", "Current layer" };
          int from = sPickLayer ? 1 : 0;
@@ -18331,6 +18333,28 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          for (int id : { a, b, c })
             doc->RemoveLayer(id);
          doc->Commit();
+      }
+      // Eyedropper sample box (PhotoCraft sample_zoom_box_tests): at 100 % a 3 by 3 is x-1..x+2, a 5 by 5
+      // x-2..x+3; at 50 % a 3 by 3 covers 8 x 8; above 100 % and without a zoom it is the centred square;
+      // a point is one pixel at every zoom; a far zoomed out box is capped and clipped.
+      {
+         int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+         expect("pick box 3 at 100%", Scene2DNode::PickBox(200, 200, 3, 1.0f, 400, 400, x0, y0, x1, y1) &&
+                x0 == 199 && x1 == 203 && y0 == 199 && y1 == 203);
+         expect("pick box 5 at 100%", Scene2DNode::PickBox(200, 200, 5, 1.0f, 400, 400, x0, y0, x1, y1) &&
+                x0 == 198 && x1 == 204);
+         expect("pick box 3 at 50% is 8x8", Scene2DNode::PickBox(200, 200, 3, 0.5f, 400, 400, x0, y0, x1, y1) &&
+                x1 - x0 == 8 && y1 - y0 == 8 && x0 <= 200 && x1 > 200);
+         for (float z : { 2.0f, 3.125f, 128.0f, 0.0f })
+            expect("pick box centred above 100%", Scene2DNode::PickBox(200, 200, 3, z, 400, 400, x0, y0, x1, y1) &&
+                   x0 == 199 && x1 == 202);
+         for (float z : { 0.0f, 0.05f, 0.5f, 1.0f, 4.0f })
+            expect("pick point is one pixel", Scene2DNode::PickBox(200, 200, 1, z, 400, 400, x0, y0, x1, y1) &&
+                   x0 == 200 && x1 == 201);
+         expect("pick box far out is capped", Scene2DNode::PickBox(50000, 50000, 101, 0.01f, 100000, 100000, x0, y0, x1, y1) &&
+                x1 - x0 <= Scene2DNode::kPickBoxMax && y1 - y0 <= Scene2DNode::kPickBoxMax);
+         expect("pick box clipped at the corner", Scene2DNode::PickBox(0, 0, 101, 0.01f, 400, 400, x0, y0, x1, y1) &&
+                x0 == 0 && y0 == 0 && x1 == 400 && y1 == 400);
       }
       // Pass Through at 50%: an Invert inside still sees the red below, so red mixes with cyan to grey (Photoshop).
       {

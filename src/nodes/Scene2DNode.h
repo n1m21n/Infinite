@@ -71,6 +71,8 @@ public:
       bool operator==(const GradStop& o) const { return t == o.t && std::equal(c, c + 4, o.c); }
    };
    static constexpr int kMaxStops = 8;
+   static constexpr int kPickSizeMax = 101;   // the largest eyedropper average (101 by 101)
+   static constexpr int kPickBoxMax = 4096;   // a far zoomed out box is capped here
    static void SortStops(std::vector<GradStop>& st);
    static void GradAt(const std::vector<GradStop>& st, const float a[4], const float b[4], float t, float out[4]);
    static void WriteStops(std::ostream& o, const std::vector<GradStop>& st);   // " n t r g b a ..."
@@ -601,7 +603,12 @@ public:
                  int extend = 0, bool dither = false);
    // The picture's colour (display values) at a document point.
    // size: 1, 3 or 5 px square, averaged. layer: read that paint layer alone (0 = the whole picture).
-   bool Pick(float x, float y, float rgb[3], int size = 1, int layer = 0);
+   // size is the N of an N by N average (1 = point). zoom > 0 and <= 1 sizes the box as Photoshop does:
+   // (N+1) screen pixels, so at 50 % a 3 by 3 covers 8 x 8 document pixels; above 100 % (or zoom 0) it is
+   // the centred N x N square.
+   bool Pick(float x, float y, float rgb[3], int size = 1, int layer = 0, float zoom = 0.0f);
+   // The eyedropper's box in document pixels for pixel (px, py), clipped to w x h; false when empty.
+   static bool PickBox(int px, int py, int size, float zoom, int w, int h, int& x0, int& y0, int& x1, int& y1);
    // ---- retouch (Affinity's photo tools) ---------------------------------
    // The Undo brush paints back the layer as it was when first shown (or when SetUndoSource last ran).
    void SetUndoSource(int id);

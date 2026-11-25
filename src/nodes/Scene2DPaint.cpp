@@ -1906,7 +1906,35 @@ void Scene2DNode::DeleteSavedSelection(const std::string& name)
    Commit();
 }
 
-bool Scene2DNode::Pick(float x, float y, float rgb[3], int size, int layer)
+bool Scene2DNode::PickBox(int px, int py, int size, float zoom, int w, int h, int& x0, int& y0, int& x1, int& y1)
+{
+   size = std::clamp(size, 1, kPickSizeMax);
+   if (size == 1 || !(zoom > 0.0f) || zoom > 1.0f)
+   {
+      const int half = size / 2;
+      x0 = px - half;
+      y0 = py - half;
+      x1 = px + half + 1;
+      y1 = py + half + 1;
+   }
+   else
+   {
+      // (N+1) screen pixels in document pixels, at least N+1; the pixel sits just left of the middle.
+      const int side = (int)std::clamp(std::round((size + 1) / (double)zoom), (double)(size + 1), (double)kPickBoxMax);
+      const int before = (side + 1) / 2 - 1;
+      x0 = px - before;
+      y0 = py - before;
+      x1 = x0 + side;
+      y1 = y0 + side;
+   }
+   x0 = std::max(0, x0);
+   y0 = std::max(0, y0);
+   x1 = std::min(w, x1);
+   y1 = std::min(h, y1);
+   return x1 > x0 && y1 > y0;
+}
+
+bool Scene2DNode::Pick(float x, float y, float rgb[3], int size, int layer, float zoom)
 {
    // Where to read: the picture (y flipped to texture rows) or one paint layer's own pixels.
    const GLUtil::Fbo* src = &mOut;
@@ -1926,9 +1954,17 @@ bool Scene2DNode::Pick(float x, float y, float rgb[3], int size, int layer)
    }
    if (src->fbo == 0 || px < 0 || py < 0 || px >= src->w || py >= src->h)
       return false;
-   const int half = std::clamp(size, 1, 5) / 2;
-   const int x0 = std::max(0, px - half), y0 = std::max(0, py - half);
-   const int x1 = std::min(src->w, px + half + 1), y1 = std::min(src->h, py + half + 1);
+   // The box in document orientation; the picture's rows run bottom up, so flip it back.
+   const bool flip = src == &mOut;
+   int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+   if (!PickBox(px, flip ? src->h - 1 - py : py, size, zoom, src->w, src->h, x0, y0, x1, y1))
+      return false;
+   if (flip)
+   {
+      const int r0 = src->h - y1;
+      y1 = src->h - y0;
+      y0 = r0;
+   }
    std::vector<float> v((size_t)(x1 - x0) * (y1 - y0) * 4, 0.0f);
    GLint prev = 0;
    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
