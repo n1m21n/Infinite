@@ -2760,6 +2760,95 @@
         "Traditional Turkish Battal Ebru floating pigment droplets and combed marbling",
         "Grotesk (Velvetyne) & Azeret Mono (Fontshare) editorial pigment type"
       ]
+    },
+    {
+      "id": "brutalist_anechoic_vault",
+      "taxonomy": "new",
+      "name": "Brutalist Anechoic & Coffered Vault",
+      "palette": [
+        "#232A30",
+        "#7A8284",
+        "#4E5146",
+        "#D9A84E"
+      ],
+      "sources": [
+        "Field Element"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "dub_tape_pingpong_fx"
+      ],
+      "refs": [
+        "Salford University anechoic wedge chamber & brutalist coffered concrete vaults",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) architectural type"
+      ]
+    },
+    {
+      "id": "phosphor_lissajous_scope",
+      "taxonomy": "new",
+      "name": "Tektronix P31 Phosphor Lissajous Scope",
+      "palette": [
+        "#062B47",
+        "#3AFFA8",
+        "#187B6C",
+        "#C8C3B3"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "bode_frequency_shifter_fx"
+      ],
+      "refs": [
+        "Analog CRT oscilloscope P31 phosphor Lissajous harmonic trace & graticule",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) instrument type"
+      ]
+    },
+    {
+      "id": "voronoi_basalt_fracture",
+      "taxonomy": "new",
+      "name": "Voronoi Columnar Basalt Fracture",
+      "palette": [
+        "#1C1E22",
+        "#3A3D42",
+        "#696D73",
+        "#FF6B35"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "polivoks_dual_opamp_synth"
+      ],
+      "refs": [
+        "Devils Postpile hexagonal columnar basalt jointing & glowing mineral seams",
+        "Terminal Grotesque (Velvetyne) & Azeret Mono (Fontshare) geological type"
+      ]
     }
   ]
 }

@@ -745,6 +745,16 @@
       "slug": "ebru-battal-marbling",
       "title": "Ebru Battal Marbling",
       "description": "Turkish Battal Ebru floating pigment marbling. Bass swells the pigment cells, mids drive combed fluid advection, highs crisp the carbon ink veins."
+    },
+    {
+      "slug": "phosphor-lissajous-scope",
+      "title": "Phosphor Lissajous Scope",
+      "description": "Tektronix P31 phosphor CRT oscilloscope Lissajous trace. Bass drives harmonic knot scale, mids modulate phase ratio, highs sharpen phosphor beam bloom."
+    },
+    {
+      "slug": "voronoi-basalt-fracture",
+      "title": "Voronoi Basalt Fracture",
+      "description": "Polygonal Voronoi columnar basalt fracture field. Bass pulses tectonic elevation, mids shift mineral lighting angle, highs ignite ember fissure seams."
     }
   ]
 }

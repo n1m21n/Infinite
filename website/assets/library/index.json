@@ -13214,7 +13214,223 @@
       "file": "assets/library/pixel/ebru-battal-marbling.field",
       "preview": "assets/library/previews/ebru-battal-marbling.jpg",
       "bytes": 1661
+    },
+    {
+      "id": "ukiyoe-contour-archipelago",
+      "name": "Ukiyo-e Contour Archipelago",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "woodblock",
+        "cartography",
+        "contour",
+        "prussian",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Edo-period woodblock bathymetric archipelago with Prussian-blue contour rings, celadon coastal shoals, compass rhumb lines, and a vermilion hanko cartouche.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/ukiyoe-contour-archipelago.js",
+      "preview": "assets/library/previews/ukiyoe-contour-archipelago.jpg",
+      "bytes": 3968
+    },
+    {
+      "id": "ukiyoe-seigaiha-tide-chart",
+      "name": "Ukiyo-e Seigaiha Tide Chart",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "seigaiha",
+        "wave",
+        "woodblock",
+        "japanese",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Layered Japanese seigaiha wave fans modulated by tidal harmonic interference on aged washi paper with Prussian-blue, celadon, and ochre woodblock inks.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/ukiyoe-seigaiha-tide-chart.js",
+      "preview": "assets/library/previews/ukiyoe-seigaiha-tide-chart.jpg",
+      "bytes": 3119
+    },
+    {
+      "id": "anechoic-wedge-chamber-3d",
+      "name": "Anechoic Wedge Chamber 3D",
+      "kind": "Generator",
+      "tags": [
+        "anechoic",
+        "acoustics",
+        "brutalist",
+        "wedges",
+        "architecture",
+        "3d",
+        "sketch"
+      ],
+      "description": "Orthogonal acoustic anechoic chamber with alternating pyramidal absorption wedges, suspended calibration walkway, and sodium-amber datum frame.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/anechoic-wedge-chamber-3d.js",
+      "preview": "assets/library/previews/anechoic-wedge-chamber-3d.jpg",
+      "bytes": 2075
+    },
+    {
+      "id": "brutalist-coffered-oculus-3d",
+      "name": "Brutalist Coffered Oculus 3D",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "coffered",
+        "vault",
+        "concrete",
+        "architecture",
+        "3d",
+        "sketch"
+      ],
+      "description": "Monumental radial coffered concrete vault ribs converging toward a stepped oculus with recessed acoustic bays and a warm sodium-amber light ring.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/brutalist-coffered-oculus-3d.js",
+      "preview": "assets/library/previews/brutalist-coffered-oculus-3d.jpg",
+      "bytes": 1766
+    },
+    {
+      "id": "modal-vibraphone-mallet-synth",
+      "name": "Modal Vibraphone Mallet Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "vibraphone",
+        "polivoks",
+        "audio",
+        "dsp"
+      ],
+      "description": "Struck modal vibraphone resonator with inharmonic bar overtones (1:3.99:9.96), mallet hardness transient, and motor-driven tremolo.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/modal-vibraphone-mallet-synth.inf",
+      "preview": "assets/library/previews/modal-vibraphone-mallet-synth.jpg",
+      "bytes": 2163
+    },
+    {
+      "id": "polivoks-dual-opamp-synth",
+      "name": "Polivoks Dual Op-Amp Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "vibraphone",
+        "polivoks",
+        "audio",
+        "dsp"
+      ],
+      "description": "Detuned dual-oscillator saw/pulse synth with Soviet op-amp resonant state-variable filter sweep, wavefolder grit, and sub-octave drive.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/polivoks-dual-opamp-synth.inf",
+      "preview": "assets/library/previews/polivoks-dual-opamp-synth.jpg",
+      "bytes": 2108
+    },
+    {
+      "id": "dub-tape-dispersion-fx",
+      "name": "Dub Tape Dispersion FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "dub",
+        "tape",
+        "bode",
+        "shifter",
+        "audio",
+        "dsp"
+      ],
+      "description": "Asymmetric tape-saturated dub resonator with capstan wow drift, 4-stage allpass phase dispersion, and damped bandpass feedback.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/dub-tape-dispersion-fx.inf",
+      "preview": "assets/library/previews/dub-tape-dispersion-fx.jpg",
+      "bytes": 2269
+    },
+    {
+      "id": "bode-frequency-shifter-fx",
+      "name": "Bode Frequency Shifter FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "dub",
+        "tape",
+        "bode",
+        "shifter",
+        "audio",
+        "dsp"
+      ],
+      "description": "Single-sideband Hilbert quadrature frequency shifter with dual allpass phase-splitting network, carrier detune, and metallic feedback.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 4,
+      "file": "assets/templates/bode-frequency-shifter-fx.inf",
+      "preview": "assets/library/previews/bode-frequency-shifter-fx.jpg",
+      "bytes": 2171
+    },
+    {
+      "id": "phosphor-lissajous-scope",
+      "name": "Phosphor Lissajous Scope",
+      "kind": "Generator",
+      "tags": [
+        "oscilloscope",
+        "lissajous",
+        "phosphor",
+        "crt",
+        "vector",
+        "shader",
+        "pixel"
+      ],
+      "description": "Tektronix P31 phosphor CRT oscilloscope tracing harmonic Lissajous knots with exponential beam bloom, graticule ticks, and CRT glass vignette.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/phosphor-lissajous-scope.field",
+      "preview": "assets/library/previews/phosphor-lissajous-scope.jpg",
+      "bytes": 2638
+    },
+    {
+      "id": "voronoi-basalt-fracture",
+      "name": "Voronoi Basalt Fracture",
+      "kind": "Generator",
+      "tags": [
+        "voronoi",
+        "basalt",
+        "geology",
+        "fracture",
+        "stone",
+        "shader",
+        "pixel"
+      ],
+      "description": "Polygonal Voronoi columnar basalt fracture field with faceted stone bevels, mineral shadow relief, and glowing ember fissure seams.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/voronoi-basalt-fracture.field",
+      "preview": "assets/library/previews/voronoi-basalt-fracture.jpg",
+      "bytes": 4810
     }
   ],
-  "count": 640
+  "count": 650
 }

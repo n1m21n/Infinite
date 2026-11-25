@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Polivoks Dual Op-Amp Synth",
+    "author": "Infinite",
+    "description": "Detuned dual-oscillator saw/pulse synth with Soviet op-amp resonant state-variable filter sweep, wavefolder grit, and sub-octave drive.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float detune = 0.012 [0.001, 0.04];\nparam float fold = 1.45 [0.5, 3.2];\nparam float cutoffHz = 950.0 [180.0, 4200.0];\nparam float res = 0.62 [0.1, 0.88];\nparam float envAmt = 2200.0 [200.0, 5000.0];\nstate float p1 = 0; state float p2 = 0; state float pSub = 0;\nstate float env = 0; state float bp = 0; state float lp = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.18, env * 0.9980);\n\nf0 = clamp(freq, 40.0, 2200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * (1.0 + detune)) / sr) % 1.0;\npSub = (pSub + (f0 * 0.5) / sr) % 1.0;\n\nraw = ((2.0 * p1 - 1.0) * 0.48 + if(p2 < 0.42, 0.36, -0.36) + sin(6.2831853 * pSub) * 0.52) * fold;\nfolded = sin(raw * 1.35) * 0.72 + (raw / (1.0 + abs(raw))) * 0.28;\n\ng = clamp(2.0 * sin(3.14159265 * clamp(cutoffHz + env * envAmt, 120.0, 9500.0) / sr), 0.02, 0.84);\nq = clamp(1.15 - res * 0.95, 0.14, 1.1);\nbp = clamp(bp + g * (folded - lp - q * bp), -1.6, 1.6);\nbp = bp / (1.0 + abs(bp) * 0.18);\nlp = lp + g * bp;\n\nout = (lp * env / (1.0 + abs(lp * env) * 0.45)) * 0.64;\n",
+    "params": {
+      "detune": 0.012,
+      "fold": 1.45,
+      "cutoffHz": 950.0,
+      "res": 0.62,
+      "envAmt": 2200.0
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

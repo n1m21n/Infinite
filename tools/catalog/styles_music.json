@@ -5059,6 +5059,207 @@
         "gain": -11.0
       },
       "groove": 0.25
+    },
+    {
+      "id": "modal_vibraphone_mallet",
+      "family": "experimental",
+      "bpm": [
+        96,
+        118
+      ],
+      "swing": 0.08,
+      "scale": [
+        6,
+        4
+      ],
+      "drums": {},
+      "bass": "0...4...2...7...",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Modal struck vibraphone bar overtones (1:3.99:9.96) with motor tremolo"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 18.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.55,
+        "octave": 2,
+        "gate": 65,
+        "gain": -9.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "polivoks_dual_opamp_synth",
+      "family": "techno",
+      "bpm": [
+        126,
+        136
+      ],
+      "swing": 0.04,
+      "scale": [
+        5,
+        1
+      ],
+      "drums": {},
+      "bass": "0.0.3.0.5.0.7.0.",
+      "fx": [
+        "Field Effect",
+        "Drive"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [],
+      "glitch": 0.05,
+      "mod": 0.6,
+      "refs": [
+        "Dual-oscillator detuned saw/pulse with Soviet op-amp resonant filter & wavefolder"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          2
+        ],
+        "beats": 2.0,
+        "steps": 2,
+        "strum": 0.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.7,
+        "octave": 1,
+        "gate": 55,
+        "gain": -8.5
+      },
+      "groove": 0.5
+    },
+    {
+      "id": "dub_tape_pingpong_fx",
+      "family": "dub",
+      "bpm": [
+        110,
+        128
+      ],
+      "swing": 0.1,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {},
+      "bass": "0..0..3.0..5..2.",
+      "fx": [
+        "Field Effect",
+        "Delay"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "Asymmetric tape saturation, wow/flutter drift, damped dub ping-pong echo"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 12.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gate": 55,
+        "gain": -10.0
+      },
+      "groove": 0.45
+    },
+    {
+      "id": "bode_frequency_shifter_fx",
+      "family": "experimental",
+      "bpm": [
+        100,
+        122
+      ],
+      "swing": 0.05,
+      "scale": [
+        4,
+        12
+      ],
+      "drums": {},
+      "bass": "0...2...4...6...",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "FM"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.05,
+      "mod": 0.5,
+      "refs": [
+        "Single-sideband Hilbert frequency shifter with metallic inharmonic detune & feedback"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 15.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.45,
+        "octave": 2,
+        "gate": 65,
+        "gain": -10.0
+      },
+      "groove": 0.35
     }
   ]
 }

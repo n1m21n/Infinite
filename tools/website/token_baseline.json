@@ -656,6 +656,14 @@
   "embeds/ebru-battal-marbling.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/phosphor-lissajous-scope.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/voronoi-basalt-fracture.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

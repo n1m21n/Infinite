@@ -3951,7 +3951,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "modal-vibraphone-mallet-synth",
+      "name": "Modal Vibraphone Mallet Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Struck modal vibraphone resonator with inharmonic bar overtones (1:3.99:9.96), mallet hardness transient, and motor-driven tremolo.",
+      "price": 0,
+      "preview": "assets/templates/modal-vibraphone-mallet-synth.webp",
+      "file": "assets/templates/modal-vibraphone-mallet-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "polivoks-dual-opamp-synth",
+      "name": "Polivoks Dual Op-Amp Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Detuned dual-oscillator saw/pulse synth with Soviet op-amp resonant state-variable filter sweep, wavefolder grit, and sub-octave drive.",
+      "price": 0,
+      "preview": "assets/templates/polivoks-dual-opamp-synth.webp",
+      "file": "assets/templates/polivoks-dual-opamp-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dub-tape-dispersion-fx",
+      "name": "Dub Tape Dispersion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Asymmetric tape-saturated dub resonator with capstan wow drift, 4-stage allpass phase dispersion, and damped bandpass feedback.",
+      "price": 0,
+      "preview": "assets/templates/dub-tape-dispersion-fx.webp",
+      "file": "assets/templates/dub-tape-dispersion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "bode-frequency-shifter-fx",
+      "name": "Bode Frequency Shifter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Single-sideband Hilbert quadrature frequency shifter with dual allpass phase-splitting network, carrier detune, and metallic feedback.",
+      "price": 0,
+      "preview": "assets/templates/bode-frequency-shifter-fx.webp",
+      "file": "assets/templates/bode-frequency-shifter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 241
+  "count": 245
 }
