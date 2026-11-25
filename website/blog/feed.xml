@@ -5,8 +5,47 @@
   <link>https://infinitedevices.org/blog/</link>
   <description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
   <language>en-gb</language>
-  <lastBuildDate>Tue, 24 Nov 2026 09:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Wed, 25 Nov 2026 09:00:00 +0000</lastBuildDate>
   <atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item>
+    <title>Build a generative melody and chord progression</title>
+    <link>https://infinitedevices.org/blog/generative-melody-and-chords-in-infinite.html</link>
+    <guid isPermaLink="true">https://infinitedevices.org/blog/generative-melody-and-chords-in-infinite.html</guid>
+    <pubDate>Wed, 25 Nov 2026 09:00:00 +0000</pubDate>
+    <dc:creator>Naman Soni</dc:creator>
+    <category>creative</category>
+    <description>Patch Chorder, Arpeggiator, Random Note Generator, Analog, Delay, and Reverb in Infinite to create evolving chords and melodies without music theory.</description>
+    <content:encoded><![CDATA[<p><img src="https://infinitedevices.org/assets/blog_generative-melody-and-chords-in-infinite.png" alt="Node patch diagram showing Chorder and Arpeggiator feeding Analog, paired with Random Note Generator, Delay, Reverb, Mixer, and Audio Out" /></p>
+<p>You do not need to read sheet music or memorise chord voicings to write an evolving song. In Infinite, you can connect a few note nodes together so the patch chooses tasteful chords, turns them into movement, and keeps every note locked to the same key.</p>
+<p>In this guide, you will patch a self-playing chord progression and generative melody from scratch, send it through a warm synth, and wash it in echo and room space. Every node sits in plain view on the canvas, so you can change the mood in seconds just by turning a knob.</p>
+<h2 id="1-set-up-your-synth-and-speakers-first">1. Set up your synth and speakers first</h2>
+<p>Start on the right side of the canvas so you have room to patch from left to right:</p>
+<ol><li>Drop an <strong>Analog</strong> synth node, a <strong>Mixer</strong> node, and an <strong>Audio Out</strong> node onto the canvas.</li><li>Connect the audio output of <strong>Analog</strong> to the first input of <strong>Mixer</strong>, and connect <strong>Mixer</strong> to <strong>Audio Out</strong>.</li></ol>
+<p>By routing through <strong>Mixer</strong> right away, it is easy to add a second melody voice or a drum groove later without rewiring <strong>Audio Out</strong>.</p>
+<h2 id="2-generate-a-chord-progression-with-chorder">2. Generate a chord progression with Chorder</h2>
+<p>Next, add a <strong>Chorder</strong> node to the left of <strong>Analog</strong> and connect its note output to the note input of <strong>Analog</strong>. Press play on the transport bar at the top of the window. You will immediately hear chords cycling in time with the project tempo.</p>
+<p><strong>Chorder</strong> keeps you in key automatically. On the top row of the node body, pick a <strong>scale</strong> (such as Minor or Dorian) and a <strong>root</strong> note. Then try two ways of working:</p>
+<ul><li><strong>Pick a progression preset.</strong> Open the <strong>chords</strong> dropdown to choose a built-in progression, or click <strong>random</strong> to let <strong>Chorder</strong> walk through natural harmonic changes on its own.</li><li><strong>Shape the voicing.</strong> Turn <strong>notes</strong> up from <code>3</code> to <code>4</code> for lush seventh chords, or raise <strong>oct up</strong> slightly so an extra note occasionally shimmers an octave higher.</li><li><strong>Add human feel.</strong> Turn <strong>strum</strong> up just a touch so the notes in each chord roll slightly rather than landing all at once, and nudge <strong>hu.time</strong> and <strong>hu.vel</strong> so each hit breathes.</li></ul>
+<p>Set <strong>rate</strong> to <code>1 bar</code> or <code>1/2</code> if you want slow, ambient harmonic shifts.</p>
+<h2 id="3-turn-static-chords-into-motion-with-arpeggiator">3. Turn static chords into motion with Arpeggiator</h2>
+<p>Sustained chords sound warm, but breaking them into individual notes creates instant rhythmic momentum.</p>
+<ol><li>Drop an <strong>Arpeggiator</strong> node between <strong>Chorder</strong> and <strong>Analog</strong>.</li><li>Disconnect <strong>Chorder</strong> from <strong>Analog</strong>, connect <strong>Chorder</strong> into <strong>Arpeggiator</strong>, and connect <strong>Arpeggiator</strong> into <strong>Analog</strong>.</li></ol>
+<p>Now every chord <strong>Chorder</strong> plays is broken into a moving pattern. Pick a <strong>mode</strong> such as <strong>Up/Down</strong>, <strong>Converge</strong>, or <strong>Random</strong>, and set <strong>octaves</strong> to <code>2</code> so the pattern climbs into a wider range. Use the <strong>gate</strong> knob to switch between short, plucky notes and overlapping, dreamy phrases. You can also click steps in the gate grid at the top of <strong>Arpeggiator</strong> to add rests and syncopation.</p>
+<h2 id="4-layer-a-generative-melody-with-random-note-generator">4. Layer a generative melody with Random Note Generator</h2>
+<p>Once your chords are rippling along, add an independent lead line that wanders around them without ever hitting a wrong note:</p>
+<ol><li>Add a <strong>Random Note Generator</strong> node and a second <strong>Analog</strong> node below your chord chain.</li><li>Connect <strong>Random Note Generator</strong> to the second <strong>Analog</strong>, and patch that <strong>Analog</strong> into the second input of <strong>Mixer</strong>.</li></ol>
+<p>Set <strong>Random Note Generator</strong> to the same <strong>scale</strong> and <strong>root</strong> as <strong>Chorder</strong> (or enable global scale on the transport bar so both follow one key). Use <strong>lo</strong> and <strong>hi</strong> to keep the melody sitting cleanly above the chords, then adjust <strong>wander</strong> to control how far the melody leaps between steps. Turning up <strong>groove</strong> adds subtle rhythmic swing so the line feels played rather than mechanical.</p>
+<p>If you want to pair this melodic loop with percussion later, our step-by-step guide to <a href="https://infinitedevices.org/blog/make-your-first-beat-and-synth-bassline.html">making your first beat and synth bassline</a> shows how to lock <strong>Drum Sequencer</strong> to the same tempo.</p>
+<h2 id="5-shape-the-synth-and-add-delay-and-reverb">5. Shape the synth and add Delay and Reverb</h2>
+<p>To make both <strong>Analog</strong> voices blend like a finished record, shape their filters and give them space:</p>
+<ul><li>On the chord <strong>Analog</strong>, turn <strong>freq</strong> down to soften the brightness, bring up <strong>spread</strong> and <strong>detune</strong> for width, and switch <strong>analog</strong> on for gentle warmth.</li><li>Insert <strong>Delay</strong> and <strong>Reverb</strong> between <strong>Mixer</strong> and <strong>Audio Out</strong>. In <strong>Delay</strong>, tempo sync is active by default, so a dotted-eighth repeat weaves naturally around your arpeggio. Turn on <strong>bounce</strong> for stereo movement across your headphones.</li><li>In <strong>Reverb</strong>, raise <strong>size</strong> and <strong>decay</strong> for an ambient tail, keeping <strong>mix</strong> balanced so the notes stay clear.</li></ul>
+<p>For more ideas on building instruments and melodic chains, visit the <a href="https://infinitedevices.org/musicians.html">musicians guide</a>.</p>
+<h2 id="6-make-the-patch-evolve-over-time">6. Make the patch evolve over time</h2>
+<p>The real joy of a generative patch is letting it shift slowly while you listen. Drop an <strong>LFO</strong> node onto the canvas, set it to a slow rate such as <code>4 bars</code>, and drag its output onto the <strong>freq</strong> filter knob on <strong>Analog</strong> or the <strong>gate</strong> knob on <strong>Arpeggiator</strong>. An orange modulation dot appears on the knob, opening and closing the tone gradually over several bars.</p>
+<p>Ready to hear it for yourself? <a href="https://infinitedevices.org/download.html">Download Infinite</a> for macOS, Windows, or Linux, or open a starter patch from the <a href="https://infinitedevices.org/library.html">preset library</a> to explore how the nodes fit together.</p>
+<hr />
+<p><em>Originally published at <a href="https://infinitedevices.org/blog/generative-melody-and-chords-in-infinite.html">https://infinitedevices.org/blog/generative-melody-and-chords-in-infinite.html</a>. Infinite is a free, open-source DAW for visuals, music and code: <a href="https://infinitedevices.org">infinitedevices.org</a>.</em></p>]]></content:encoded>
+  </item>
   <item>
     <title>Aliasing-free virtual analog DSP: BLEP, 4x oversampling, and ZDF</title>
     <link>https://infinitedevices.org/blog/aliasing-free-virtual-analog-dsp-blep-zdf-oversampling.html</link>
