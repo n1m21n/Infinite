@@ -1,0 +1,7 @@
+phase 1 run on 200 kernels
+B: 200 kernels, 81 matched in phase 2, witness 87, no witness 113
+  H1 false G1 certificates: 0 []
+  H3 G1 on no-witness: 64/113 = 56.6% (bar 70%)
+  H4 G2 on G1-certified: 58/64 = 90.6% (bar 50%), two-start failures among G2: 0 []
+  two-start failures among G1 without G2: []
+  Float32 bound fails: ['s124-019', 's124-040', 's124-036', 's124-050', 's124-112', 's124-100', 's124-128', 's124-136', 's124-158', 's124-169', 's124-052', 's124-196']

@@ -1,0 +1,44 @@
+{
+ "seed": 20261123,
+ "gmin": 0.0001,
+ "rows": [
+  {
+   "gmax": 0.05,
+   "frozen_limit_k_at_gmax": 3.6318,
+   "linear_switching_witness_k": 3.6318,
+   "linear_cqlf_certified_k": 2.7372,
+   "tanh_sector_k0": "solver error",
+   "tanh_sector_floor_Y10_certified_k": 0.0381,
+   "tanh_sector_floor_Y100_certified_k": 0
+  },
+  {
+   "gmax": 0.2,
+   "frozen_limit_k_at_gmax": 2.8096,
+   "linear_switching_witness_k": 2.8096,
+   "linear_cqlf_certified_k": 2.3428,
+   "tanh_sector_k0": "solver error",
+   "tanh_sector_floor_Y10_certified_k": 0.0342,
+   "tanh_sector_floor_Y100_certified_k": 0
+  },
+  {
+   "gmax": 0.4,
+   "frozen_limit_k_at_gmax": 2.0957,
+   "linear_switching_witness_k": 2.0957,
+   "linear_cqlf_certified_k": 1.9078,
+   "tanh_sector_k0": "solver error",
+   "tanh_sector_floor_Y10_certified_k": 0.0303,
+   "tanh_sector_floor_Y100_certified_k": 0
+  },
+  {
+   "gmax": 0.785,
+   "frozen_limit_k_at_gmax": 1.2881,
+   "linear_switching_witness_k": 1.2852,
+   "linear_cqlf_certified_k": 1.2739,
+   "tanh_sector_k0": "solver error",
+   "tanh_sector_floor_Y10_certified_k": 0.0205,
+   "tanh_sector_floor_Y100_certified_k": 0
+  }
+ ],
+ "two_stage_fixed_g": "LMI infeasible (t=None)",
+ "seconds": 32.71386003494263
+}

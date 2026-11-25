@@ -35,5 +35,6 @@ run emit_sat.py ../corpus/field
 INFINITE_FIELDSTABDUMP=../corpus/field INFINITE_FIELDSTABDUMP_OUT="$W/lmat" INFINITE_FIELDSTABDUMP_SAT=1 "$BIN" >/dev/null 2>&1 || true
 run phase2_compare.py "$W/lmat" ../data/phase4-B-compare.json
 run phase3_score.py B "$JOBS" > ../data/phase4-B.log
+run phase5_figdata.py                                             # figure data; changes no verdict
 mkdir -p "$STUDY/data-rerun"; cp -R "$W/data/." "$STUDY/data-rerun/"
 echo "wrote $STUDY/data-rerun"

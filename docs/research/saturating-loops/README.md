@@ -1,11 +1,11 @@
 ---
 title: "Saturating loops: stability certificates for modulated filters with saturation in the feedback"
 slug: "saturating-loops"
-status: "pre-registered"
+status: "validated"
 owner: "namansoni"
 date: "2026-11-23"
 prior_art: "docs/prior-art/2026-11-23-saturating-loops.md"
-commit_sha: "pending-measurement"
+commit_sha: "3e5c590163a637075a89585d16c4e6d0bd4dafab"
 ---
 
 # Saturating loops
@@ -402,8 +402,9 @@ the ceiling taken at g = 0.785 alone, `data/phase0-t3.json`), against Hélie's t
 as registered.** The reason is the port, not the method. Frozen at fs/8, the explicit filter self-oscillates
 from k = 1.288, below 5/3, so no sound method can reach 5/3 over that range. The oracle's first witness there
 is k = 1.289. The finding that stands: **T3 certifies Hélie's 5/3 automatically, from the kernel's matrices,
-for cutoff ceilings up to g = 0.524**, and stays within 0.01 of Report 2's linear common-P bound at every
-ceiling tested. No certificate lies past a witness.
+for cutoff ceilings up to g = 0.524**. It is within 0.011 of Report 2's linear common-P bound at ceilings
+0.2 and 0.4, and 0.085 and 0.120 below it at 0.05 and 0.785 (corrected 2026-11-25; the first write-up said
+"within 0.01 at every ceiling"). No certificate lies past a witness.
 
 **Phase 2, the Field side** (`src/app/selftest/StabilityTests.cpp`, `scripts/emit_sat.py`,
 `scripts/phase2_compare.py`, `data/phase2-compare.json`). The dump self-test learned a second mode,
@@ -425,6 +426,40 @@ ports.
 - **The gate rejects what the matcher doesn't know.** Three kernels with a nonlinearity outside the
   library on the loop (`exp(s) - 1`, `s/(1 + s²)`, `min(s, -0.5)`) all fail the gate (error 0.06-0.17) and
   are reported out of scope; the same kernel with `clamp(s, -1, 1)` passes at 3.7e-8.
+
+**Phase 3, G scored on extracted matrices** (`scripts/phase3_score.py`, `data/phase3-G.json`, `.log`;
+scorer locked at `2faf6290` before B existed). Field matrices where the kernel compiled (127), the Python model
+for the 73 over the register cap.
+- **H1 holds:** 0 G1 certificates among 73 kernels with a witness.
+- **H3 passes on G:** 94 of 127 no-witness kernels certified (74.0%, bar 70%).
+- **H4 passes on G:** G2 on 94 of 94 G1-certified kernels, 0 two-start failures (worst final ratio 0.0).
+  Caveat: where slope range equals sector (tanh, soft, clamp, abs), T4 is T1's problem, so G2 is inherited
+  for 70 kernels; the 24 with a sin got their own T4 run, all certified.
+- **Float32 bound** holds on 80 of 94 (61 of 64 Field-measured). Failures mean "not proved in Float32".
+
+**Phase 4, blind set B, scored once** (`scripts/gen_sat.py B`, seed 20261124, n ≤ 8, up to 4 saturators,
+30% `if` terms; `data/phase1-B.json`, `data/phase3-B.json`, `data/phase4-B.log`, `data/phase4-B-compare.json`;
+commit `3e5c5901`). 200 kernels, 81 compiled (all 81 match Python within 2.5e-7), 119 over the register cap.
+
+| | G | B (blind) |
+|---|---|---|
+| Kernels with a witness (grows / sticks) | 73 (25 / 48) | 87 (31 / 56) |
+| Frozen check says safe, default knobs / full grid | 64 / 14 | 75 / 25 |
+| Linearise-and-hope (B4) certifies a witness kernel | 2 | 5 |
+| **H1**: G1 certifies a witness kernel | **0** | **0** |
+| **H3**: G1 on no-witness kernels (bar 70%) | **94 / 127 = 74.0%** | **64 / 113 = 56.6%, fails** |
+| **H4**: G2 on G1-certified, two-start failures | 94 / 94, 0 | 58 / 64, 0 |
+| Float32 bound holds | 80 / 94 | 52 / 64 |
+
+- **H3 is not confirmed.** It passed on G and fails on the held-out set.
+- **Why, exploratory (after the score; `data/phase5-corners.json`).** Coverage falls with the saturator
+  count (B: 24 of 34 with one saturator, 8 of 26 with four). Of B's 49 unproved no-witness kernels, 14 have a
+  T1 LMI that is infeasible outright; for 10 of them (3 of 4 on G) some sector corner, each saturator's gain
+  held independently at an end of its sector, is unstable at a fixed knob setting, so no sector-only
+  certificate exists. A real tanh cannot hold those gains apart, and the oracle finds no witness. The other
+  large group (13 on B) is grid-certified covers that did not close, the edge case already seen on G.
+- **H4 passes on B:** the 6 G1-certified B kernels without G2 all contain a sin, whose slope range [−1, 1]
+  is wider than its sector; 10 of the 16 with a sin certified.
 
 **Phases.**
 
@@ -451,13 +486,40 @@ Venv: `~/.venvs/stable-modulation`, reused unchanged; `scripts/requirements.txt`
 | T6 | Per-circuit energy functions (Hélie, port-Hamiltonian) | Proofs for real circuits | By hand, one circuit at a time; not a compiler pass | Reference values only (H2) |
 
 ## 10. Benchmarking against the baseline
-*(After measurement.)*
+
+| | Baseline | The pass | Bar | Verdict |
+|---|---|---|---|---|
+| H1, false certificates on witness kernels | Frozen check (B1a): 64/73 G, 75/87 B false-safe. Linearise-and-hope (B4): 2 G, 5 B | **0 of 169** (L 9, G 73, B 87) | 0 | **Holds**, held-out included |
+| H2, tanh Moog, any-speed k range | Hélie's hand proof, k < 5/3 | k ≤ 1.1406 over the full box (g ≤ 0.785); 5/3 for ceilings up to g = 0.5237 | ≥ 5/3 | **Fails as registered** (the port self-oscillates from k = 1.289 at fs/8) |
+| H3, coverage of no-witness kernels | B4 certifies 112 of 127 on G, but is unsound | G 74.0%, **B 56.6%** | ≥ 70% on G, then B | **Not confirmed** (fails on B) |
+| H4, convergence certificates | none | G 94/94, B 58/64, 0 two-start failures | ≥ 50%, 0 failures | **Holds**, mostly inherited from G1 |
+| H5, compile-time cost | | T1 median 0.61 s G, 0.76 s B, in Python | ≤ 50 ms in C++ | Not scored (no in-app port approved) |
+
+The rule in section 7 ("ships as research when H1-H3 pass") is not met: H2 fails and H3 fails on B. The
+study is published as a mixed result (G4).
 
 ## 11. Critique
-*(After measurement.)*
+
+- **Sector certificates are the bottleneck.** Every G and B certificate came from T1. T1 must hold for
+  every independent choice of saturator gains, including combinations a real saturator cannot hold, and
+  with more saturators more of those corners are unstable. This, not the cell budget, is what B exposed.
+- **T3 is the right tool and barely counted.** Its corners are exact only for knob-affine kernels with a
+  knob-free C (1 of 200 on G). It is what proves the Moog; without a cell cover it cannot help G or B.
+- **The windup finding is the product-relevant one.** The frozen check and linearise-and-hope both call
+  kernels safe that blow up from a start 20-25 dB over full scale. The pass never did.
+- **H4's pass is mostly structural**, since slope equals sector for four of the five shapes; the two-start
+  test is the independent evidence.
+- **The B explanation came after the score.** It changed no verdict and is labelled exploratory.
+- **Who wrote the kernels.** One author wrote L, the generator and the scorer; no user kernels were scored.
 
 ## 12. Next steps
-*(After measurement.)*
+
+| # | Step | Why |
+|---|---|---|
+| N1 | A cell cover for T3's form (V = xᵀPx + 2Σ qᵢ∫φᵢ) so it counts on any kernel | Both shortfalls (H2's full range aside, H3 on B) point to the shape-aware certificate |
+| N2 | Rescore on a fresh blind set (new seed) after N1, pre-registered again | B is spent; a fix judged on B would be tuned to it |
+| N3 | Replace the per-ceiling H2 scoring with a cutoff-dependent resonance bound k(g) | The port's own limit falls below 5/3; a k(g) certificate is what a product would use |
+| N4 | In-app port (H5) only after N1-N2 | Coverage is not yet high enough to ship a "never sticks" promise |
 
 **Checkpoint 2026-11-23 (paused here; resume from this list).** Branch `feature/saturating-loops`, not
 pushed. Phase 0 is done (B2, B3, T1/T3/B4 on L, ceilings vs first witness). Main already carries Report 2's
@@ -469,4 +531,7 @@ exists on both sides as a cherry-pick).
 | Phase 1 | **Done 2026-11-25** (section 8, "Phase 1, corpus G"): H1 holds on G, G1 74.0% on no-witness kernels (calibration), B4 unsound (2 windup kernels) | Open item: a cell cover for T3 so it can count on non-affine kernels |
 | H2 | **Written up 2026-11-25:** fails as registered (1.141 vs 5/3 over g ≤ 0.785); 5/3 certified up to g = 0.524 | Done |
 | T3 on non-injective C | svf-clip shows T3's `x_strict` rule is too strict; a detectability argument could replace it | Optional; T1 covers the case today |
-| Phase 2 | Extend `INFINITE_FIELDSTABDUMP` for saturating kernels | Needs the one build at plan end |
+| Phase 2 | **Done 2026-11-25** (`e23decf6`): L 11/11, G 127/127 match; gate rejects 3 out-of-library loops | Done |
+| Phase 3 | **Done 2026-11-25** (`2faf6290`, scorer locked): H1 0, H3 74.0%, H4 94/94 on G | Done |
+| Phase 4 | **Done 2026-11-25** (`3e5c5901`): B scored once; H1 0, H3 56.6% fails, H4 58/64 | Done |
+| Phase 5 | **Done 2026-11-25**: sections 10-12, `ARTIFACT.md`, `kick-the-tires.sh`, Lab Note (Technical Report 3) | Publish on the owner's OK |

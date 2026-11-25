@@ -1,0 +1,4262 @@
+{
+ "L/moog-tanh": {
+  "pass": true,
+  "max_abs": 2.5999999930803597e-08,
+  "max_rel": 6.499999982700899e-09,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 5,
+  "n": 4,
+  "perm": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "status": "ok",
+  "gate": 1.21e-07
+ },
+ "L/moog-soft": {
+  "pass": true,
+  "max_abs": 2.5999999930803597e-08,
+  "max_rel": 6.499999982700899e-09,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 5,
+  "n": 4,
+  "perm": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "status": "ok",
+  "gate": 1.01e-07
+ },
+ "L/moog-fbsat": {
+  "pass": true,
+  "max_abs": 2.9429999992558464e-08,
+  "max_rel": 7.357499998139616e-09,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.25e-07
+ },
+ "L/diode-fbsat": {
+  "pass": true,
+  "max_abs": 2.5999999930803597e-08,
+  "max_rel": 1.6249999956752248e-09,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.76e-07
+ },
+ "L/korg35-sat": {
+  "pass": true,
+  "max_abs": 1.6999999963296375e-08,
+  "max_rel": 6.79999998531855e-09,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.05e-07
+ },
+ "L/onepole-tanh": {
+  "pass": true,
+  "max_abs": 9.999999994736442e-10,
+  "max_rel": 9.999999994736442e-10,
+  "D_max": 0.0,
+  "points": 5,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 7.34e-08
+ },
+ "L/tdf2-statesat": {
+  "pass": true,
+  "max_abs": 5.000000014021566e-08,
+  "max_rel": 2.7027027102819275e-08,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.15e-07
+ },
+ "L/tdf2-outsat": {
+  "pass": true,
+  "max_abs": 5.000000014021566e-08,
+  "max_rel": 2.7027027102819275e-08,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.17e-07
+ },
+ "L/rossum-2pole": {
+  "pass": true,
+  "max_abs": 5.000000014021566e-08,
+  "max_rel": 2.7027027102819275e-08,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.45e-07
+ },
+ "L/svf-clip": {
+  "pass": true,
+  "max_abs": 3.1000000011438544e-08,
+  "max_rel": 3.1000000011438544e-08,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 9.2e-08
+ },
+ "L/phaser-clip": {
+  "pass": true,
+  "max_abs": 8.700000009298492e-08,
+  "max_rel": 8.700000009298492e-08,
+  "D_max": 0.0,
+  "points": 25,
+  "m": 1,
+  "n": 5,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.57e-07
+ },
+ "G/s122-000": {
+  "pass": true,
+  "max_abs": 9.999999994736442e-08,
+  "max_rel": 9.999999994736442e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.01e-07
+ },
+ "G/s122-001": {
+  "pass": true,
+  "max_abs": 1.1458918991458233e-07,
+  "max_rel": 7.210739718783236e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 9.43e-08
+ },
+ "G/s122-002": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-003": {
+  "pass": true,
+  "max_abs": 1.3142650789887966e-07,
+  "max_rel": 4.0501691414558715e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.59e-07
+ },
+ "G/s122-004": {
+  "pass": true,
+  "max_abs": 8.063846679284836e-08,
+  "max_rel": 8.063846679284836e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.01e-07
+ },
+ "G/s122-005": {
+  "pass": true,
+  "max_abs": 5.338846431612865e-08,
+  "max_rel": 5.338846431612865e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.67e-07
+ },
+ "G/s122-006": {
+  "pass": true,
+  "max_abs": 8.13883795913739e-08,
+  "max_rel": 8.13883795913739e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.56e-07
+ },
+ "G/s122-007": {
+  "pass": true,
+  "max_abs": 1.5087676907832304e-07,
+  "max_rel": 1.390587088398888e-07,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.54e-07
+ },
+ "G/s122-008": {
+  "pass": true,
+  "max_abs": 3.56309174387448e-08,
+  "max_rel": 3.394984888247846e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.19e-07
+ },
+ "G/s122-009": {
+  "pass": true,
+  "max_abs": 4.9033741844617396e-08,
+  "max_rel": 4.9033741844617396e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.22e-07
+ },
+ "G/s122-010": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-011": {
+  "pass": true,
+  "max_abs": 4.2399004196447265e-08,
+  "max_rel": 4.2399004196447265e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.23e-07
+ },
+ "G/s122-012": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-013": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-014": {
+  "pass": true,
+  "max_abs": 1.9000000017754815e-08,
+  "max_rel": 1.9000000017754815e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.12e-07
+ },
+ "G/s122-015": {
+  "pass": true,
+  "max_abs": 6.501634403077716e-08,
+  "max_rel": 6.501634403077716e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.82e-07
+ },
+ "G/s122-016": {
+  "pass": true,
+  "max_abs": 1.022127621430613e-07,
+  "max_rel": 8.473504974586392e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.65e-07
+ },
+ "G/s122-017": {
+  "pass": true,
+  "max_abs": 1.406296297190579e-07,
+  "max_rel": 1.2815036873820235e-07,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 9.33e-08
+ },
+ "G/s122-018": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-019": {
+  "pass": true,
+  "max_abs": 1.399125050260963e-07,
+  "max_rel": 1.1680608641620847e-07,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 2.01e-07
+ },
+ "G/s122-020": {
+  "pass": true,
+  "max_abs": 8.12191578436483e-08,
+  "max_rel": 6.201626544400212e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.85e-07
+ },
+ "G/s122-021": {
+  "pass": true,
+  "max_abs": 1.5638423278563351e-07,
+  "max_rel": 1.488265656431245e-07,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.33e-07
+ },
+ "G/s122-022": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-023": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-024": {
+  "pass": true,
+  "max_abs": 3.028129053062045e-08,
+  "max_rel": 3.028129053062045e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.2e-07
+ },
+ "G/s122-025": {
+  "pass": true,
+  "max_abs": 9.659360333813538e-08,
+  "max_rel": 9.376238255402798e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.01e-07
+ },
+ "G/s122-026": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-027": {
+  "pass": true,
+  "max_abs": 8.84623465591261e-08,
+  "max_rel": 7.887469167469222e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.47e-07
+ },
+ "G/s122-028": {
+  "pass": true,
+  "max_abs": 2.7986972073179572e-08,
+  "max_rel": 2.7986972073179572e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.91e-07
+ },
+ "G/s122-029": {
+  "pass": true,
+  "max_abs": 7.200429374965012e-08,
+  "max_rel": 7.200429374965012e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 6.3e-08
+ },
+ "G/s122-030": {
+  "pass": true,
+  "max_abs": 1.437757680688989e-07,
+  "max_rel": 1.437757680688989e-07,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.78e-07
+ },
+ "G/s122-031": {
+  "pass": true,
+  "max_abs": 5.037723693757101e-08,
+  "max_rel": 5.037723693757101e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.01e-07
+ },
+ "G/s122-032": {
+  "pass": true,
+  "max_abs": 7.569934989959393e-08,
+  "max_rel": 7.569934989959393e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 7.18e-08
+ },
+ "G/s122-033": {
+  "pass": true,
+  "max_abs": 7.703131132963392e-08,
+  "max_rel": 7.703131132963392e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.31e-07
+ },
+ "G/s122-034": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-035": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-036": {
+  "pass": true,
+  "max_abs": 8.337219581378008e-08,
+  "max_rel": 8.337219581378008e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.63e-07
+ },
+ "G/s122-037": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-038": {
+  "pass": true,
+  "max_abs": 1.1910711728013723e-07,
+  "max_rel": 1.1910711728013723e-07,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 7.52e-08
+ },
+ "G/s122-039": {
+  "pass": true,
+  "max_abs": 1.0168526687337476e-07,
+  "max_rel": 9.64330388285296e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.81e-07
+ },
+ "G/s122-040": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-041": {
+  "pass": true,
+  "max_abs": 5.902055832951447e-08,
+  "max_rel": 5.902055832951447e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.74e-07
+ },
+ "G/s122-042": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-043": {
+  "pass": true,
+  "max_abs": 8.855466857027317e-08,
+  "max_rel": 8.855466857027317e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.22e-07
+ },
+ "G/s122-044": {
+  "pass": true,
+  "max_abs": 9.81410448464004e-08,
+  "max_rel": 9.81410448464004e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.97e-07
+ },
+ "G/s122-045": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-046": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-047": {
+  "pass": true,
+  "max_abs": 7.869555040951326e-08,
+  "max_rel": 6.976645653506045e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.61e-07
+ },
+ "G/s122-048": {
+  "pass": true,
+  "max_abs": 6.194278368010231e-08,
+  "max_rel": 6.194278368010231e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.53e-07
+ },
+ "G/s122-049": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-050": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-051": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-052": {
+  "pass": true,
+  "max_abs": 5.8993494034265126e-08,
+  "max_rel": 5.8993494034265126e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 8.7e-08
+ },
+ "G/s122-053": {
+  "pass": true,
+  "max_abs": 5.2483909329659184e-08,
+  "max_rel": 5.2483909329659184e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.29e-07
+ },
+ "G/s122-054": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-055": {
+  "pass": true,
+  "max_abs": 2.3315484076746884e-07,
+  "max_rel": 1.1127741173405088e-07,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 2.81e-07
+ },
+ "G/s122-056": {
+  "pass": true,
+  "max_abs": 4.8951016351495014e-08,
+  "max_rel": 4.8951016351495014e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 8.1e-08
+ },
+ "G/s122-057": {
+  "pass": true,
+  "max_abs": 8.757147584859126e-08,
+  "max_rel": 8.288937812176197e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.04e-07
+ },
+ "G/s122-058": {
+  "pass": true,
+  "max_abs": 5.300513095107817e-08,
+  "max_rel": 5.300513095107817e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.04e-07
+ },
+ "G/s122-059": {
+  "pass": true,
+  "max_abs": 8.444128263285222e-08,
+  "max_rel": 8.444128263285222e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.88e-07
+ },
+ "G/s122-060": {
+  "pass": true,
+  "max_abs": 1.114825447512402e-07,
+  "max_rel": 1.114825447512402e-07,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 9.79e-08
+ },
+ "G/s122-061": {
+  "pass": true,
+  "max_abs": 8.804037765486328e-08,
+  "max_rel": 8.192318341043789e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.82e-07
+ },
+ "G/s122-062": {
+  "pass": true,
+  "max_abs": 6.780774830517089e-08,
+  "max_rel": 6.700010861296403e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 2e-07
+ },
+ "G/s122-063": {
+  "pass": true,
+  "max_abs": 5.517739676275113e-08,
+  "max_rel": 5.517739676275113e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.32e-07
+ },
+ "G/s122-064": {
+  "pass": true,
+  "max_abs": 9.471214035272624e-08,
+  "max_rel": 8.688530150448862e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 5,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 2.04e-07
+ },
+ "G/s122-065": {
+  "pass": true,
+  "max_abs": 1.1354271856056641e-07,
+  "max_rel": 9.87995066678271e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 2.85e-07
+ },
+ "G/s122-066": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-067": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-068": {
+  "pass": true,
+  "max_abs": 7.02652193096398e-08,
+  "max_rel": 6.451692861494485e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.64e-07
+ },
+ "G/s122-069": {
+  "pass": true,
+  "max_abs": 5.049153373182236e-08,
+  "max_rel": 3.500305018454699e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 2.48e-07
+ },
+ "G/s122-070": {
+  "pass": true,
+  "max_abs": 5.0200143486556215e-08,
+  "max_rel": 5.0200143486556215e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.37e-07
+ },
+ "G/s122-071": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-072": {
+  "pass": true,
+  "max_abs": 7.820292804994189e-08,
+  "max_rel": 7.820292804994189e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 8.35e-08
+ },
+ "G/s122-073": {
+  "pass": true,
+  "max_abs": 7.249954980803608e-08,
+  "max_rel": 7.001936019996572e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 8.05e-08
+ },
+ "G/s122-074": {
+  "pass": true,
+  "max_abs": 4.2115028353606476e-08,
+  "max_rel": 4.2115028353606476e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.29e-07
+ },
+ "G/s122-075": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-076": {
+  "pass": true,
+  "max_abs": 5.1064652117904785e-08,
+  "max_rel": 5.1064652117904785e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.09e-07
+ },
+ "G/s122-077": {
+  "pass": true,
+  "max_abs": 1.4533073788847162e-07,
+  "max_rel": 8.885217528143204e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 2.38e-07
+ },
+ "G/s122-078": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-079": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-080": {
+  "pass": true,
+  "max_abs": 3.760936284624705e-08,
+  "max_rel": 3.760936284624705e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 7.36e-08
+ },
+ "G/s122-081": {
+  "pass": true,
+  "max_abs": 2.2936601395961986e-08,
+  "max_rel": 2.2936601395961986e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.29e-07
+ },
+ "G/s122-082": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-083": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-084": {
+  "pass": true,
+  "max_abs": 2.3552389483150193e-07,
+  "max_rel": 1.3750758801679987e-07,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   0,
+   1,
+   2
+  ],
+  "status": "ok",
+  "gate": 2.55e-07
+ },
+ "G/s122-085": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-086": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-087": {
+  "pass": true,
+  "max_abs": 6.555371434568968e-08,
+  "max_rel": 6.364521427772546e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.79e-07
+ },
+ "G/s122-088": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-089": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-090": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-091": {
+  "pass": true,
+  "max_abs": 9.557341595911595e-08,
+  "max_rel": 8.720228748744685e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.06e-07
+ },
+ "G/s122-092": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-093": {
+  "pass": true,
+  "max_abs": 6.17328095309233e-08,
+  "max_rel": 5.8691766581761576e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 5,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.3e-07
+ },
+ "G/s122-094": {
+  "pass": true,
+  "max_abs": 8.281157537481931e-08,
+  "max_rel": 8.281157537481931e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.25e-07
+ },
+ "G/s122-095": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-096": {
+  "pass": true,
+  "max_abs": 1.3469885740136078e-07,
+  "max_rel": 5.587866437420415e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.72e-07
+ },
+ "G/s122-097": {
+  "pass": true,
+  "max_abs": 1.3565523393488377e-07,
+  "max_rel": 1.0314754618674335e-07,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 5,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.45e-07
+ },
+ "G/s122-098": {
+  "pass": true,
+  "max_abs": 8.826687425411706e-08,
+  "max_rel": 8.826687425411706e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.42e-07
+ },
+ "G/s122-099": {
+  "pass": true,
+  "max_abs": 6.947189046258018e-08,
+  "max_rel": 6.434859000476755e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.55e-07
+ },
+ "G/s122-100": {
+  "pass": true,
+  "max_abs": 3.1204085537694937e-08,
+  "max_rel": 3.1204085537694937e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 9.02e-08
+ },
+ "G/s122-101": {
+  "pass": true,
+  "max_abs": 1.0039420469953875e-07,
+  "max_rel": 1.0039420469953875e-07,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.17e-07
+ },
+ "G/s122-102": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-103": {
+  "pass": true,
+  "max_abs": 4.031875044940847e-08,
+  "max_rel": 4.031875044940847e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 9.02e-08
+ },
+ "G/s122-104": {
+  "pass": true,
+  "max_abs": 1.1348017281420653e-07,
+  "max_rel": 1.1348017281420653e-07,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 5.63e-08
+ },
+ "G/s122-105": {
+  "pass": true,
+  "max_abs": 1.1113379572158522e-07,
+  "max_rel": 8.179996371158531e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.56e-07
+ },
+ "G/s122-106": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-107": {
+  "pass": true,
+  "max_abs": 9.23400078206571e-08,
+  "max_rel": 8.690992267264638e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.02e-07
+ },
+ "G/s122-108": {
+  "pass": true,
+  "max_abs": 1.0157260454946027e-07,
+  "max_rel": 9.922467903828928e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.48e-07
+ },
+ "G/s122-109": {
+  "pass": true,
+  "max_abs": 4.266439701527958e-09,
+  "max_rel": 4.266439701527958e-09,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 8.05e-08
+ },
+ "G/s122-110": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-111": {
+  "pass": true,
+  "max_abs": 9.040110371394405e-08,
+  "max_rel": 9.040110371394405e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.13e-07
+ },
+ "G/s122-112": {
+  "pass": true,
+  "max_abs": 4.8676771613465064e-08,
+  "max_rel": 4.8676771613465064e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 5.69e-08
+ },
+ "G/s122-113": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-114": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-115": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-116": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-117": {
+  "pass": true,
+  "max_abs": 6.757089285325257e-08,
+  "max_rel": 6.757089285325257e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.31e-07
+ },
+ "G/s122-118": {
+  "pass": true,
+  "max_abs": 1.6946666064887594e-07,
+  "max_rel": 1.6946666064887594e-07,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.88e-07
+ },
+ "G/s122-119": {
+  "pass": true,
+  "max_abs": 8.930347927815774e-08,
+  "max_rel": 8.017700671598823e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.1e-07
+ },
+ "G/s122-120": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-121": {
+  "pass": true,
+  "max_abs": 4.288897326176766e-08,
+  "max_rel": 4.1653687632179467e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.28e-07
+ },
+ "G/s122-122": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-123": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-124": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-125": {
+  "pass": true,
+  "max_abs": 4.258934149792282e-08,
+  "max_rel": 3.2571957227057185e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.56e-07
+ },
+ "G/s122-126": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-127": {
+  "pass": true,
+  "max_abs": 6.06480347054017e-08,
+  "max_rel": 6.06480347054017e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 9.9e-08
+ },
+ "G/s122-128": {
+  "pass": true,
+  "max_abs": 7.097774479269958e-08,
+  "max_rel": 7.097774479269958e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.54e-07
+ },
+ "G/s122-129": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-130": {
+  "pass": true,
+  "max_abs": 4.2562922963895744e-08,
+  "max_rel": 4.2562922963895744e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.4e-07
+ },
+ "G/s122-131": {
+  "pass": true,
+  "max_abs": 8.159530617835031e-08,
+  "max_rel": 8.159530617835031e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.11e-07
+ },
+ "G/s122-132": {
+  "pass": true,
+  "max_abs": 1.948700436571471e-07,
+  "max_rel": 8.839363726484837e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.74e-07
+ },
+ "G/s122-133": {
+  "pass": true,
+  "max_abs": 6.902624932747514e-08,
+  "max_rel": 6.654850837707139e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.08e-07
+ },
+ "G/s122-134": {
+  "pass": true,
+  "max_abs": 1.0447486110953808e-07,
+  "max_rel": 1.0447486110953808e-07,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.1e-07
+ },
+ "G/s122-135": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-136": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-137": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-138": {
+  "pass": true,
+  "max_abs": 4.651044016590333e-08,
+  "max_rel": 4.651044016590333e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 8.4e-08
+ },
+ "G/s122-139": {
+  "pass": true,
+  "max_abs": 4.6175687939964405e-08,
+  "max_rel": 4.395418291654288e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 2.08e-07
+ },
+ "G/s122-140": {
+  "pass": true,
+  "max_abs": 1.1657455023517116e-07,
+  "max_rel": 8.849684635598656e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.94e-07
+ },
+ "G/s122-141": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-142": {
+  "pass": true,
+  "max_abs": 5.571547834204438e-08,
+  "max_rel": 5.571547834204438e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.3e-07
+ },
+ "G/s122-143": {
+  "pass": true,
+  "max_abs": 8.224686942615023e-08,
+  "max_rel": 8.113429780372717e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 6.7e-08
+ },
+ "G/s122-144": {
+  "pass": true,
+  "max_abs": 5.273212082268497e-08,
+  "max_rel": 5.273212082268497e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 7.55e-08
+ },
+ "G/s122-145": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-146": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-147": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-148": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-149": {
+  "pass": true,
+  "max_abs": 6.100113181251032e-08,
+  "max_rel": 6.100113181251032e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.08e-07
+ },
+ "G/s122-150": {
+  "pass": true,
+  "max_abs": 8.466824952257923e-08,
+  "max_rel": 8.433218731147176e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1e-07
+ },
+ "G/s122-151": {
+  "pass": true,
+  "max_abs": 9.261946121164044e-08,
+  "max_rel": 6.439002305545624e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.23e-07
+ },
+ "G/s122-152": {
+  "pass": true,
+  "max_abs": 8.473696744282222e-08,
+  "max_rel": 6.921401693664491e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.38e-07
+ },
+ "G/s122-153": {
+  "pass": true,
+  "max_abs": 1.1416787748519397e-07,
+  "max_rel": 1.0483270412917388e-07,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 7.38e-08
+ },
+ "G/s122-154": {
+  "pass": true,
+  "max_abs": 6.235541617771734e-08,
+  "max_rel": 6.235541617771734e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.33e-07
+ },
+ "G/s122-155": {
+  "pass": true,
+  "max_abs": 7.92570666874326e-08,
+  "max_rel": 6.579041932352866e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.48e-07
+ },
+ "G/s122-156": {
+  "pass": true,
+  "max_abs": 7.82716276237494e-08,
+  "max_rel": 4.8033831816439686e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.56e-07
+ },
+ "G/s122-157": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-158": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-159": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-160": {
+  "pass": true,
+  "max_abs": 4.256229296784042e-08,
+  "max_rel": 4.256229296784042e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 5.48e-08
+ },
+ "G/s122-161": {
+  "pass": true,
+  "max_abs": 2.8579191346800314e-07,
+  "max_rel": 1.1136789244956556e-07,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.63e-07
+ },
+ "G/s122-162": {
+  "pass": true,
+  "max_abs": 6.326077550689035e-08,
+  "max_rel": 6.326077550689035e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 9.24e-08
+ },
+ "G/s122-163": {
+  "pass": true,
+  "max_abs": 4.657708668753813e-08,
+  "max_rel": 4.657708668753813e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.13e-07
+ },
+ "G/s122-164": {
+  "pass": true,
+  "max_abs": 1.1421171786096806e-07,
+  "max_rel": 9.424825436091705e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 2.42e-07
+ },
+ "G/s122-165": {
+  "pass": true,
+  "max_abs": 4.492076011164414e-08,
+  "max_rel": 4.492076011164414e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 9.66e-08
+ },
+ "G/s122-166": {
+  "pass": true,
+  "max_abs": 5.508634992601458e-08,
+  "max_rel": 5.508634992601458e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 7e-08
+ },
+ "G/s122-167": {
+  "pass": true,
+  "max_abs": 9.812752255200508e-08,
+  "max_rel": 9.462035036986474e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 9.02e-08
+ },
+ "G/s122-168": {
+  "pass": true,
+  "max_abs": 4.060593886134889e-08,
+  "max_rel": 4.060593886134889e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 5.01e-08
+ },
+ "G/s122-169": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-170": {
+  "pass": true,
+  "max_abs": 4.866197866881805e-08,
+  "max_rel": 4.866197866881805e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.16e-07
+ },
+ "G/s122-171": {
+  "pass": true,
+  "max_abs": 7.27940681066741e-08,
+  "max_rel": 7.27940681066741e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 8.92e-08
+ },
+ "G/s122-172": {
+  "pass": true,
+  "max_abs": 4.475662240821521e-08,
+  "max_rel": 4.475662240821521e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.29e-07
+ },
+ "G/s122-173": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-174": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-175": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-176": {
+  "pass": true,
+  "max_abs": 5.0200993556570594e-08,
+  "max_rel": 5.0200993556570594e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 6.88e-08
+ },
+ "G/s122-177": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-178": {
+  "pass": true,
+  "max_abs": 4.4439013024977214e-08,
+  "max_rel": 4.4439013024977214e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.21e-07
+ },
+ "G/s122-179": {
+  "pass": true,
+  "max_abs": 7.019414460796014e-08,
+  "max_rel": 6.779435260999408e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 2.1e-07
+ },
+ "G/s122-180": {
+  "pass": true,
+  "max_abs": 7.965970572065828e-08,
+  "max_rel": 7.965970572065828e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.3e-07
+ },
+ "G/s122-181": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-182": {
+  "pass": true,
+  "max_abs": 5.030474148348674e-08,
+  "max_rel": 5.030474148348674e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 3.29e-07
+ },
+ "G/s122-183": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-184": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-185": {
+  "pass": true,
+  "max_abs": 3.7145794440363034e-08,
+  "max_rel": 3.669957650524415e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.45e-07
+ },
+ "G/s122-186": {
+  "pass": true,
+  "max_abs": 8.522682726219699e-08,
+  "max_rel": 8.522682726219699e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.7e-07
+ },
+ "G/s122-187": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-188": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-189": {
+  "pass": true,
+  "max_abs": 7.375202093484745e-08,
+  "max_rel": 5.5155046801058535e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.47e-07
+ },
+ "G/s122-190": {
+  "pass": true,
+  "max_abs": 6.077088055000957e-08,
+  "max_rel": 6.077088055000957e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.55e-07
+ },
+ "G/s122-191": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-192": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-193": {
+  "pass": true,
+  "max_abs": 9.630409514294058e-08,
+  "max_rel": 9.473202977412345e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.72e-07
+ },
+ "G/s122-194": {
+  "pass": true,
+  "max_abs": 3.584543373236215e-08,
+  "max_rel": 3.584543373236215e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.85e-07
+ },
+ "G/s122-195": {
+  "pass": true,
+  "max_abs": 1.318031666031061e-07,
+  "max_rel": 8.669233613235151e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   0,
+   1,
+   2
+  ],
+  "status": "ok",
+  "gate": 2.27e-07
+ },
+ "G/s122-196": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-197": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-198": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "G/s122-199": {
+  "pass": true,
+  "max_abs": 1.0402036554335581e-07,
+  "max_rel": 5.418484314196403e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 7.18e-08
+ },
+ "B/s124-000": {
+  "pass": true,
+  "max_abs": 1.0302219788371758e-07,
+  "max_rel": 1.0302219788371758e-07,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.57e-07
+ },
+ "B/s124-001": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-002": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-003": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-004": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-005": {
+  "pass": true,
+  "max_abs": 6.412904496322369e-08,
+  "max_rel": 5.586595783819467e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 7.98e-08
+ },
+ "B/s124-006": {
+  "pass": true,
+  "max_abs": 7.543144636690258e-08,
+  "max_rel": 5.4748360557068255e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 5,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.18e-07
+ },
+ "B/s124-007": {
+  "pass": true,
+  "max_abs": 6.95402472827844e-08,
+  "max_rel": 6.95402472827844e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.1e-07
+ },
+ "B/s124-008": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-009": {
+  "pass": true,
+  "max_abs": 7.032759574698844e-08,
+  "max_rel": 6.63570650420038e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.38e-07
+ },
+ "B/s124-010": {
+  "pass": true,
+  "max_abs": 7.507609245394065e-08,
+  "max_rel": 6.849238573872813e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.77e-07
+ },
+ "B/s124-011": {
+  "pass": true,
+  "max_abs": 4.812130782738677e-08,
+  "max_rel": 3.716945740158072e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 4,
+  "n": 2,
+  "perm": [
+   3,
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.53e-07
+ },
+ "B/s124-012": {
+  "pass": true,
+  "max_abs": 4.9493446452331114e-08,
+  "max_rel": 3.314563674705577e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 2.16e-07
+ },
+ "B/s124-013": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-014": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-015": {
+  "pass": true,
+  "max_abs": 8.428182018960229e-08,
+  "max_rel": 4.553051677331932e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   0,
+   1,
+   2
+  ],
+  "status": "ok",
+  "gate": 1.69e-07
+ },
+ "B/s124-016": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-017": {
+  "pass": true,
+  "max_abs": 6.955640707850819e-08,
+  "max_rel": 5.8926305064844795e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.55e-07
+ },
+ "B/s124-018": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-019": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-020": {
+  "pass": true,
+  "max_abs": 3.172132867490518e-08,
+  "max_rel": 3.172132867490518e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.18e-07
+ },
+ "B/s124-021": {
+  "pass": true,
+  "max_abs": 3.244818946868122e-08,
+  "max_rel": 2.8293251026286997e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 4,
+  "n": 3,
+  "perm": [
+   3,
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.46e-07
+ },
+ "B/s124-022": {
+  "pass": true,
+  "max_abs": 1.2510636437923495e-07,
+  "max_rel": 7.009532149877918e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.85e-07
+ },
+ "B/s124-023": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-024": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-025": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-026": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-027": {
+  "pass": true,
+  "max_abs": 3.7351233883597956e-08,
+  "max_rel": 3.6945514753432706e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 3,
+  "perm": [
+   3,
+   0,
+   1,
+   2
+  ],
+  "status": "ok",
+  "gate": 8.9e-08
+ },
+ "B/s124-028": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-029": {
+  "pass": true,
+  "max_abs": 1.848168695861574e-08,
+  "max_rel": 1.848168695861574e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.11e-07
+ },
+ "B/s124-030": {
+  "pass": true,
+  "max_abs": 7.28704868668828e-08,
+  "max_rel": 5.260102359409785e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.33e-07
+ },
+ "B/s124-031": {
+  "pass": true,
+  "max_abs": 3.7633747229648407e-08,
+  "max_rel": 3.7633747229648407e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.76e-07
+ },
+ "B/s124-032": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-033": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-034": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-035": {
+  "pass": true,
+  "max_abs": 5.0980498877972735e-08,
+  "max_rel": 4.6425275702281084e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 3,
+  "perm": [
+   3,
+   0,
+   1,
+   2
+  ],
+  "status": "ok",
+  "gate": 1.28e-07
+ },
+ "B/s124-036": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-037": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-038": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-039": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-040": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-041": {
+  "pass": true,
+  "max_abs": 4.154725541383186e-08,
+  "max_rel": 3.953906703580637e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 2,
+  "perm": [
+   2,
+   3,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 8.55e-08
+ },
+ "B/s124-042": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-043": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-044": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-045": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-046": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-047": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-048": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-049": {
+  "pass": true,
+  "max_abs": 7.725643341727206e-08,
+  "max_rel": 7.725643341727206e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.09e-07
+ },
+ "B/s124-050": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-051": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-052": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-053": {
+  "pass": true,
+  "max_abs": 5.04984200011549e-08,
+  "max_rel": 4.023493766428761e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 2.09e-07
+ },
+ "B/s124-054": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-055": {
+  "pass": true,
+  "max_abs": 6.486300385688537e-08,
+  "max_rel": 6.486300385688537e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.34e-07
+ },
+ "B/s124-056": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-057": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-058": {
+  "pass": true,
+  "max_abs": 6.22683549167391e-08,
+  "max_rel": 6.22683549167391e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.24e-07
+ },
+ "B/s124-059": {
+  "pass": true,
+  "max_abs": 6.11234234337843e-08,
+  "max_rel": 5.4795267136836e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 7.77e-08
+ },
+ "B/s124-060": {
+  "pass": true,
+  "max_abs": 1.3047790425879668e-07,
+  "max_rel": 1.1539680695853972e-07,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 4,
+  "n": 2,
+  "perm": [
+   3,
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.69e-07
+ },
+ "B/s124-061": {
+  "pass": true,
+  "max_abs": 5.142631935572961e-08,
+  "max_rel": 5.142631935572961e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.6e-07
+ },
+ "B/s124-062": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-063": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-064": {
+  "pass": true,
+  "max_abs": 5.8863679708309746e-08,
+  "max_rel": 5.8863679708309746e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.39e-07
+ },
+ "B/s124-065": {
+  "pass": true,
+  "max_abs": 9.326315753011016e-08,
+  "max_rel": 9.265572333365604e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.22e-07
+ },
+ "B/s124-066": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-067": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-068": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-069": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-070": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-071": {
+  "pass": true,
+  "max_abs": 7.554254974340147e-08,
+  "max_rel": 7.554254974340147e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 2,
+  "perm": [
+   2,
+   3,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 8.1e-08
+ },
+ "B/s124-072": {
+  "pass": true,
+  "max_abs": 6.802207075384814e-08,
+  "max_rel": 5.214709212309092e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.46e-07
+ },
+ "B/s124-073": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-074": {
+  "pass": true,
+  "max_abs": 5.488287857513541e-08,
+  "max_rel": 5.488287857513541e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.54e-07
+ },
+ "B/s124-075": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-076": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-077": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-078": {
+  "pass": true,
+  "max_abs": 5.196561603248995e-08,
+  "max_rel": 4.969360747197823e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 2,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 8.41e-08
+ },
+ "B/s124-079": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-080": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-081": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-082": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-083": {
+  "pass": true,
+  "max_abs": 2.3200666832146055e-08,
+  "max_rel": 2.0601598179345776e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 6.04e-08
+ },
+ "B/s124-084": {
+  "pass": true,
+  "max_abs": 1.1549731748772274e-07,
+  "max_rel": 1.1549731748772274e-07,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.21e-07
+ },
+ "B/s124-085": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-086": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-087": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-088": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-089": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-090": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-091": {
+  "pass": true,
+  "max_abs": 1.0620862234134165e-07,
+  "max_rel": 9.560086769367742e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 2.26e-07
+ },
+ "B/s124-092": {
+  "pass": true,
+  "max_abs": 9.59573566161609e-08,
+  "max_rel": 9.59573566161609e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 2e-07
+ },
+ "B/s124-093": {
+  "pass": true,
+  "max_abs": 3.918369129163324e-08,
+  "max_rel": 3.918369129163324e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 8.95e-08
+ },
+ "B/s124-094": {
+  "pass": true,
+  "max_abs": 1.4827645583581628e-07,
+  "max_rel": 1.4827645583581628e-07,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 4,
+  "n": 4,
+  "perm": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "status": "ok",
+  "gate": 2.06e-07
+ },
+ "B/s124-095": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-096": {
+  "pass": true,
+  "max_abs": 4.0999999950663835e-08,
+  "max_rel": 4.0999999950663835e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.01e-07
+ },
+ "B/s124-097": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-098": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-099": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-100": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-101": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-102": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-103": {
+  "pass": true,
+  "max_abs": 7.198883733572359e-08,
+  "max_rel": 6.365414511524475e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 4,
+  "n": 2,
+  "perm": [
+   3,
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.46e-07
+ },
+ "B/s124-104": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-105": {
+  "pass": true,
+  "max_abs": 8.040357812877374e-08,
+  "max_rel": 7.307695847893966e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.42e-07
+ },
+ "B/s124-106": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-107": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-108": {
+  "pass": true,
+  "max_abs": 7.049672673398177e-08,
+  "max_rel": 7.049672673398177e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 9.06e-08
+ },
+ "B/s124-109": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-110": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-111": {
+  "pass": true,
+  "max_abs": 2.462396071489792e-07,
+  "max_rel": 9.81894234307524e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 2.57e-07
+ },
+ "B/s124-112": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-113": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-114": {
+  "pass": true,
+  "max_abs": 4.7064416586195534e-08,
+  "max_rel": 4.7064416586195534e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.02e-07
+ },
+ "B/s124-115": {
+  "pass": true,
+  "max_abs": 6.527132456746187e-08,
+  "max_rel": 4.1970910008039015e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 5,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.1e-07
+ },
+ "B/s124-116": {
+  "pass": true,
+  "max_abs": 5.676700454149142e-08,
+  "max_rel": 5.676700454149142e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 5.98e-08
+ },
+ "B/s124-117": {
+  "pass": true,
+  "max_abs": 3.9375307459010855e-08,
+  "max_rel": 3.9375307459010855e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 4,
+  "perm": [
+   2,
+   3,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 8.36e-08
+ },
+ "B/s124-118": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-119": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-120": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-121": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-122": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-123": {
+  "pass": true,
+  "max_abs": 4.2217613627215655e-08,
+  "max_rel": 4.2217613627215655e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.7e-07
+ },
+ "B/s124-124": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-125": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-126": {
+  "pass": true,
+  "max_abs": 9.999999994736442e-08,
+  "max_rel": 9.999999994736442e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.03e-07
+ },
+ "B/s124-127": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-128": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-129": {
+  "pass": true,
+  "max_abs": 6.602095203867009e-08,
+  "max_rel": 6.602095203867009e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.28e-07
+ },
+ "B/s124-130": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-131": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-132": {
+  "pass": true,
+  "max_abs": 7.899999998617346e-08,
+  "max_rel": 7.899999998617346e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 3,
+  "perm": [
+   3,
+   0,
+   1,
+   2
+  ],
+  "status": "ok",
+  "gate": 7.83e-08
+ },
+ "B/s124-133": {
+  "pass": true,
+  "max_abs": 1.0170572994905314e-07,
+  "max_rel": 7.237924682905078e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 4,
+  "n": 2,
+  "perm": [
+   3,
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.58e-07
+ },
+ "B/s124-134": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-135": {
+  "pass": true,
+  "max_abs": 2.420673600456169e-08,
+  "max_rel": 2.420673600456169e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.14e-07
+ },
+ "B/s124-136": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-137": {
+  "pass": true,
+  "max_abs": 4.367801276217165e-08,
+  "max_rel": 4.136948816298437e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 2,
+  "perm": [
+   3,
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.12e-07
+ },
+ "B/s124-138": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-139": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-140": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-141": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-142": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-143": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-144": {
+  "pass": true,
+  "max_abs": 6.581135136851657e-08,
+  "max_rel": 6.581135136851657e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.89e-07
+ },
+ "B/s124-145": {
+  "pass": true,
+  "max_abs": 8.820019647970412e-08,
+  "max_rel": 8.820019647970412e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 4,
+  "n": 2,
+  "perm": [
+   3,
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.26e-07
+ },
+ "B/s124-146": {
+  "pass": true,
+  "max_abs": 7.946257085666986e-08,
+  "max_rel": 5.8753591861456214e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 2,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.72e-07
+ },
+ "B/s124-147": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-148": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-149": {
+  "pass": true,
+  "max_abs": 1.0554167251264346e-07,
+  "max_rel": 9.691617059033269e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.51e-07
+ },
+ "B/s124-150": {
+  "pass": true,
+  "max_abs": 3.684763372202582e-08,
+  "max_rel": 3.684763372202582e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.08e-07
+ },
+ "B/s124-151": {
+  "pass": true,
+  "max_abs": 5.5039454327499016e-08,
+  "max_rel": 3.577593132512363e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 3,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.05e-07
+ },
+ "B/s124-152": {
+  "pass": true,
+  "max_abs": 5.8755892040629476e-08,
+  "max_rel": 5.8755892040629476e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 2,
+  "perm": [
+   2,
+   3,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 6.32e-08
+ },
+ "B/s124-153": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-154": {
+  "pass": true,
+  "max_abs": 3.7846363598603716e-08,
+  "max_rel": 3.2799464529839395e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.78e-07
+ },
+ "B/s124-155": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-156": {
+  "pass": true,
+  "max_abs": 3.707671786257194e-08,
+  "max_rel": 3.707671786257194e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 4,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.05e-07
+ },
+ "B/s124-157": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-158": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-159": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-160": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-161": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-162": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-163": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-164": {
+  "pass": true,
+  "max_abs": 8.76482209033469e-08,
+  "max_rel": 8.404154218045661e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 3,
+  "perm": [
+   3,
+   0,
+   1,
+   2
+  ],
+  "status": "ok",
+  "gate": 1.05e-07
+ },
+ "B/s124-165": {
+  "pass": true,
+  "max_abs": 9.759788122121194e-08,
+  "max_rel": 9.103627052627859e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.1e-07
+ },
+ "B/s124-166": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-167": {
+  "pass": true,
+  "max_abs": 5.1761694153107385e-08,
+  "max_rel": 4.395461117728425e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.17e-07
+ },
+ "B/s124-168": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-169": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-170": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-171": {
+  "pass": true,
+  "max_abs": 4.4742257558627596e-08,
+  "max_rel": 4.4742257558627596e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 8.63e-08
+ },
+ "B/s124-172": {
+  "pass": true,
+  "max_abs": 5.929270285864874e-08,
+  "max_rel": 5.929270285864874e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 4,
+  "n": 3,
+  "perm": [
+   3,
+   2,
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.52e-07
+ },
+ "B/s124-173": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-174": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-175": {
+  "pass": true,
+  "max_abs": 8.59155491195196e-08,
+  "max_rel": 7.682987894842925e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 2.02e-07
+ },
+ "B/s124-176": {
+  "pass": true,
+  "max_abs": 4.7474757014498437e-08,
+  "max_rel": 4.7474757014498437e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 4,
+  "n": 3,
+  "perm": [
+   3,
+   2,
+   0,
+   1
+  ],
+  "status": "ok",
+  "gate": 1.09e-07
+ },
+ "B/s124-177": {
+  "pass": true,
+  "max_abs": 5.7645141327000715e-08,
+  "max_rel": 5.7645141327000715e-08,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 4,
+  "n": 3,
+  "perm": [
+   3,
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.18e-07
+ },
+ "B/s124-178": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-179": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-180": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-181": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-182": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-183": {
+  "pass": true,
+  "max_abs": 4.823227073291747e-08,
+  "max_rel": 4.823227073291747e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 1,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.32e-07
+ },
+ "B/s124-184": {
+  "pass": true,
+  "max_abs": 1.4957711580443345e-07,
+  "max_rel": 7.511882283637615e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.31e-07
+ },
+ "B/s124-185": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-186": {
+  "pass": true,
+  "max_abs": 1.1563152368943008e-07,
+  "max_rel": 8.831030443052079e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 2,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.54e-07
+ },
+ "B/s124-187": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-188": {
+  "pass": true,
+  "max_abs": 4.3928378157254144e-08,
+  "max_rel": 4.3928378157254144e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 2,
+  "n": 4,
+  "perm": [
+   1,
+   0
+  ],
+  "status": "ok",
+  "gate": 1.04e-07
+ },
+ "B/s124-189": {
+  "pass": true,
+  "max_abs": 1.5575497491759904e-07,
+  "max_rel": 1.447744152343087e-07,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 4,
+  "n": 3,
+  "perm": [
+   3,
+   0,
+   1,
+   2
+  ],
+  "status": "ok",
+  "gate": 9.79e-08
+ },
+ "B/s124-190": {
+  "pass": true,
+  "max_abs": 3.822076188875201e-08,
+  "max_rel": 3.822076188875201e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.62e-07
+ },
+ "B/s124-191": {
+  "pass": true,
+  "max_abs": 2.3227854750729193e-08,
+  "max_rel": 2.227086833961111e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 3,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.43e-07
+ },
+ "B/s124-192": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-193": {
+  "pass": true,
+  "max_abs": 8.186042843583152e-08,
+  "max_rel": 6.770179767832775e-08,
+  "D_max": 0.0,
+  "points": 7,
+  "m": 3,
+  "n": 3,
+  "perm": [
+   1,
+   2,
+   0
+  ],
+  "status": "ok",
+  "gate": 8.34e-08
+ },
+ "B/s124-194": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-195": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-196": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ },
+ "B/s124-197": {
+  "pass": true,
+  "max_abs": 2.1964732921375685e-07,
+  "max_rel": 1.3285227375317173e-07,
+  "D_max": 0.0,
+  "points": 49,
+  "m": 1,
+  "n": 4,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 2.05e-07
+ },
+ "B/s124-198": {
+  "pass": true,
+  "max_abs": 6.897991233767442e-08,
+  "max_rel": 6.897991233767442e-08,
+  "D_max": 0.0,
+  "points": 343,
+  "m": 1,
+  "n": 1,
+  "perm": [
+   0
+  ],
+  "status": "ok",
+  "gate": 1.15e-07
+ },
+ "B/s124-199": {
+  "pass": false,
+  "status": "compile",
+  "line": "status compile n 0 p 0 gate 0 sample-domain kernel exceeds the register cap (128)"
+ }
+}

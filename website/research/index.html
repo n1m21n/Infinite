@@ -45,7 +45,7 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite Research", "url": "https://infinitedevices.org/research/", "description": "Pre-registered technical reports, empirical DSP benchmarks, reproducible artifacts, and open compiler and physics problems from Infinite.", "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/"}, "mainEntity": {"@type": "ItemList", "numberOfItems": 2, "itemListElement": [{"@type": "ListItem", "position": 1, "url": "https://infinitedevices.org/research/stable-modulation.html", "name": "Proven-stable modulation for Field filters"}, {"@type": "ListItem", "position": 2, "url": "https://infinitedevices.org/research/aliasing-aware-field.html", "name": "Aliasing-aware compilation for Field"}]}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite Research", "url": "https://infinitedevices.org/research/", "description": "Pre-registered technical reports, empirical DSP benchmarks, reproducible artifacts, and open compiler and physics problems from Infinite.", "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/"}, "mainEntity": {"@type": "ItemList", "numberOfItems": 3, "itemListElement": [{"@type": "ListItem", "position": 1, "url": "https://infinitedevices.org/research/saturating-loops.html", "name": "Saturating loops: stability certificates for modulated filters with saturation in the feedback"}, {"@type": "ListItem", "position": 2, "url": "https://infinitedevices.org/research/stable-modulation.html", "name": "Proven-stable modulation for Field filters"}, {"@type": "ListItem", "position": 3, "url": "https://infinitedevices.org/research/aliasing-aware-field.html", "name": "Aliasing-aware compilation for Field"}]}}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Research", "item": "https://infinitedevices.org/research/"}]}</script>
   <link rel="stylesheet" href="../system.css?v=39106d58">
   <link rel="stylesheet" href="../scale.css?v=0fc401be">
@@ -63,10 +63,28 @@
         <p class="bm-spec mono">Pre-registered studies · Pinned commits · Raw CSVs &amp; audio</p>
         <p class="lead">Empirical studies, compiler proofs, and honest negative results from building Infinite's audio, visual, and Field engines.</p>
         <div class="bm-actions">
-          <a class="btn btn-primary" href="stable-modulation.html">Read Report 2</a>
+          <a class="btn btn-primary" href="saturating-loops.html">Read Report 3</a>
           <a class="btn btn-ghost" href="../benchmarks.html">Engine benchmarks</a>
           <a class="btn btn-ghost" href="https://github.com/n1m21n/Infinite/blob/main/docs/RESEARCH_STANDARD.md" target="_blank" rel="noopener">Standard</a>
         </div>
+
+        <div class="kick chap">Technical Report 3 · 2026-11-25</div>
+        <article class="bm-card">
+          <div class="chips" style="margin-bottom:12px;">
+            <span class="pill">H1 and H4 confirmed</span>
+            <span class="pill">H3 failed on the blind set (56.6% vs 70% bar)</span>
+            <span class="pill">H2 failed as registered</span>
+            <span class="pill">0 false certificates in 411 kernels</span>
+          </div>
+          <h2><a href="saturating-loops.html" style="color:inherit;text-decoration:none;">Saturating loops: stability certificates for modulated filters with saturation in the feedback</a></h2>
+          <p>Can a compiler prove that a filter with tanh, clipping or soft saturation in its feedback never blows up or sticks, however its knobs move? The pass finds the saturators in Field's compiled code and certifies the loop with sector and Lur'e-Lyapunov energy functions. It never certified any of 169 kernels that can blow up or stick, while linearising the saturators certified 7 that can blow up or stick. Coverage held on generated kernels (74.0%) but fell to 56.6% on the blind set, and the tanh Moog reaches Hélie's 5/3 only for cutoff ceilings up to g = 0.5237.</p>
+          <div class="bm-actions">
+            <a class="btn btn-primary btn-sm" href="saturating-loops.html">Read report</a>
+            <a class="btn btn-ghost btn-sm" href="saturating-loops.pdf">PDF</a>
+            <a class="btn btn-ghost btn-sm" href="saturating-loops/data/provenance.json">Provenance JSON</a>
+            <a class="btn btn-ghost btn-sm" href="https://github.com/n1m21n/Infinite/tree/3e5c590163a637075a89585d16c4e6d0bd4dafab/docs/research/saturating-loops" target="_blank" rel="noopener">Code &amp; data</a>
+          </div>
+        </article>
 
         <div class="kick chap">Technical Report 2 · 2026-11-23</div>
         <article class="bm-card">

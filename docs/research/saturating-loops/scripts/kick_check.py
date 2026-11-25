@@ -15,7 +15,15 @@ os.environ.setdefault("OMP_NUM_THREADS", "1"); os.environ.setdefault("OPENBLAS_N
 import json, pathlib, subprocess, sys, tempfile, warnings
 import multiprocessing as mp
 warnings.filterwarnings("ignore")
-import phase1_G, phase3_score
+import importlib.util
+def _own(name):
+    """This study's module by path: satloops puts Report 2's scripts, which reuse these file names, on sys.path."""
+    spec = importlib.util.spec_from_file_location(name, pathlib.Path(__file__).resolve().parent / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec); sys.modules[name] = mod; spec.loader.exec_module(mod)
+    return mod
+phase3_score = _own("phase3_score")
+phase2_compare = _own("phase2_compare")
+import phase1_G
 
 HERE = pathlib.Path(__file__).resolve().parent.parent
 checks = fails = 0
@@ -56,7 +64,6 @@ def fastest(set_, k):
 def field_checks(bin_, out):
     from emit_sat import kernels
     from emit_field import fmt
-    import phase2_compare
     src = pathlib.Path(tempfile.mkdtemp()) / "field"
     (src / "L").mkdir(parents=True)
     for set_, name, txt, _, grid, _, _ in kernels():

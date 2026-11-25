@@ -1,0 +1,8822 @@
+{
+ "s122-000": {
+  "id": "s122-000",
+  "n": 2,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "abs",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.2555710296658983,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.06
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.17
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.06,
+  "seconds": 0.3
+ },
+ "s122-002": {
+  "id": "s122-002",
+  "n": 4,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.89463501065394,
+  "B1b_radius": 0.9800000000000004,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.26
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.08
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.11,
+  "seconds": 0.6
+ },
+ "s122-003": {
+  "id": "s122-003",
+  "n": 4,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.9116983825558189,
+  "B1b_radius": 1.057980852724466,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.08
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.18
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-2.755577291745254e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.03
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 5.551115123125783e-17,
+   "amplitude": 0.5911600460576532
+  },
+  "oracle_s": 0.57,
+  "seconds": 0.9
+ },
+ "s122-001": {
+  "id": "s122-001",
+  "n": 2,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8582243171317544,
+  "B1b_radius": 0.9754923964735271,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-7.83)",
+   "s": 0.05
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-7.83)",
+   "s": 0.17
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.1648542792904392)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0
+    ],
+    [
+     0.5
+    ],
+    [
+     1.0
+    ],
+    [
+     0.5
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.38253648040077526
+  },
+  "oracle_s": 0.66,
+  "seconds": 0.9
+ },
+ "s122-006": {
+  "id": "s122-006",
+  "n": 3,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8191216672416974,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.09
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.24
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.09
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.07,
+  "seconds": 0.5
+ },
+ "s122-007": {
+  "id": "s122-007",
+  "n": 3,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "abs",
+   "sin"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.27791298766444217,
+  "B1b_radius": 1.1067544764973056,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.08
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.78
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.057097639225171866)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.06
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.04,
+  "seconds": 1.0
+ },
+ "s122-004": {
+  "id": "s122-004",
+  "n": 1,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7010029635193944,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.2
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 44.11
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.21
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.25,
+  "seconds": 44.8
+ },
+ "s122-005": {
+  "id": "s122-005",
+  "n": 4,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "tanh",
+   "sin"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5886140014823721,
+  "B1b_radius": 0.9314821327491641,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.13
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 57.64
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.11
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 58.0
+ },
+ "s122-012": {
+  "id": "s122-012",
+  "n": 5,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.05
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.11
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.07,
+  "seconds": 0.3
+ },
+ "s122-013": {
+  "id": "s122-013",
+  "n": 6,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "abs"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7368177678570852,
+  "B1b_radius": 1.1273940429020093,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.25
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.1912748224455973e-09)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.06
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.16,
+  "seconds": 0.6
+ },
+ "s122-009": {
+  "id": "s122-009",
+  "n": 1,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6041910044770016,
+  "B1b_radius": 0.9342198392423778,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.26
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.46
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.27
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.26,
+  "seconds": 1.2
+ },
+ "s122-010": {
+  "id": "s122-010",
+  "n": 5,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8432074753859631,
+  "B1b_radius": 0.9389175756303257,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.322)",
+   "s": 0.34
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.844)",
+   "s": 0.69
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.11
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.17,
+  "seconds": 1.3
+ },
+ "s122-014": {
+  "id": "s122-014",
+  "n": 1,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "soft"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.24
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.91
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.34
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.29,
+  "seconds": 1.8
+ },
+ "s122-015": {
+  "id": "s122-015",
+  "n": 4,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5443349363146195,
+  "B1b_radius": 0.9831048237811423,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.29
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.67
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.21
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.36,
+  "seconds": 1.5
+ },
+ "s122-017": {
+  "id": "s122-017",
+  "n": 1,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "abs"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.3766375319200272,
+  "B1b_radius": 1.0973798288973273,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.08
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.17
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.16960246004001245)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.04
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.03,
+  "seconds": 0.3
+ },
+ "s122-016": {
+  "id": "s122-016",
+  "n": 4,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8865714122967551,
+  "B1b_radius": 0.9354054827352362,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.36)",
+   "s": 0.34
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.36)",
+   "s": 0.73
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-2.2452083580594463e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.21
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.8,
+  "seconds": 2.1
+ },
+ "s122-020": {
+  "id": "s122-020",
+  "n": 3,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6585633849133233,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.04
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.04
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.06,
+  "seconds": 0.2
+ },
+ "s122-019": {
+  "id": "s122-019",
+  "n": 4,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.421668213817324,
+  "B1b_radius": 0.9517969326742789,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.35
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.62
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.12
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.16,
+  "seconds": 1.3
+ },
+ "s122-008": {
+  "id": "s122-008",
+  "n": 2,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "clamp",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.5246520815022419,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.32)",
+   "s": 0.12
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.32)",
+   "s": 0.83
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.01006059538467748)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.14
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.0,
+     0.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.0,
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 1.0565169749252208
+  },
+  "oracle_s": 3.55,
+  "seconds": 4.6
+ },
+ "s122-023": {
+  "id": "s122-023",
+  "n": 5,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8585530463746235,
+  "B1b_radius": 0.9270680383278517,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.212)",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.241)",
+   "s": 0.05
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.00022156383312045094)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.03
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.06,
+  "seconds": 0.2
+ },
+ "s122-022": {
+  "id": "s122-022",
+  "n": 5,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "clamp",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9800000000000001,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.12
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.18
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.16
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.15,
+  "seconds": 1.6
+ },
+ "s122-025": {
+  "id": "s122-025",
+  "n": 3,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6378324665974127,
+  "B1b_radius": 1.0927666684658734,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.06
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.041224182559681084)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.42,
+  "seconds": 0.5
+ },
+ "s122-021": {
+  "id": "s122-021",
+  "n": 1,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.06002629678379103,
+  "B1b_radius": 1.0507817076195372,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.07
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.31
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.04949388884996251)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.13
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     0.0
+    ],
+    [
+     1.0,
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.516245845744043
+  },
+  "oracle_s": 2.52,
+  "seconds": 3.0
+ },
+ "s122-024": {
+  "id": "s122-024",
+  "n": 2,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.9704053489368027,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.25
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 2.4
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.53
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.49,
+  "seconds": 3.7
+ },
+ "s122-026": {
+  "id": "s122-026",
+  "n": 6,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9476945141851885,
+  "B1b_radius": 0.9442589918614663,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.46
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.08
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.48
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.52,
+  "seconds": 3.5
+ },
+ "s122-029": {
+  "id": "s122-029",
+  "n": 1,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.3503088044433479,
+  "B1b_radius": 0.919812454251036,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.02,
+  "seconds": 0.1
+ },
+ "s122-018": {
+  "id": "s122-018",
+  "n": 6,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "abs"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.5742994059254131,
+  "B1b_radius": 0.9800000000000019,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.98
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 3.16
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.33
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.84,
+  "seconds": 7.3
+ },
+ "s122-031": {
+  "id": "s122-031",
+  "n": 2,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7045112538702032,
+  "B1b_radius": 0.9036349904038903,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.1
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.2
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.07
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.04,
+  "seconds": 0.4
+ },
+ "s122-032": {
+  "id": "s122-032",
+  "n": 2,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "tanh",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.911684167494054,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.17
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.05
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.05,
+  "seconds": 0.3
+ },
+ "s122-027": {
+  "id": "s122-027",
+  "n": 3,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6214369591530251,
+  "B1b_radius": 1.1405778746930308,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.31
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 2.37
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.457459082491829e-09)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.5
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.7108581274883262
+  },
+  "oracle_s": 1.09,
+  "seconds": 4.3
+ },
+ "s122-030": {
+  "id": "s122-030",
+  "n": 1,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "abs"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.26879022507421835,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.22
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.89
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.22
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.29,
+  "seconds": 1.6
+ },
+ "s122-033": {
+  "id": "s122-033",
+  "n": 1,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "abs"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5442295840313113,
+  "B1b_radius": 0.9693541274961263,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.21
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.39
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.2
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.3,
+  "seconds": 1.1
+ },
+ "s122-028": {
+  "id": "s122-028",
+  "n": 3,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "sin",
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9486034830130279,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.26
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 2.49
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.35
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.5,
+  "seconds": 3.6
+ },
+ "s122-036": {
+  "id": "s122-036",
+  "n": 3,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6981313017434403,
+  "B1b_radius": 0.9793939587702258,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.36
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.64
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.23
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.48,
+  "seconds": 1.7
+ },
+ "s122-038": {
+  "id": "s122-038",
+  "n": 2,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.3954762914716369,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.08
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.08,
+  "seconds": 0.2
+ },
+ "s122-034": {
+  "id": "s122-034",
+  "n": 6,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6486485802771982,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.45
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.02
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.45
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.57,
+  "seconds": 3.5
+ },
+ "s122-035": {
+  "id": "s122-035",
+  "n": 6,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7052859061464701,
+  "B1b_radius": 0.939023213712596,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.62
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.16
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.28
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 2.2,
+  "seconds": 4.3
+ },
+ "s122-037": {
+  "id": "s122-037",
+  "n": 4,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "tanh",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.2996487062900548,
+  "B1b_radius": 0.9157084231061531,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.39
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 3.44
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.77
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.09,
+  "seconds": 5.7
+ },
+ "s122-041": {
+  "id": "s122-041",
+  "n": 2,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6122781512122772,
+  "B1b_radius": 0.9755433922288828,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.26
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.13
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.36
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.35,
+  "seconds": 2.1
+ },
+ "s122-042": {
+  "id": "s122-042",
+  "n": 6,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7784491531580695,
+  "B1b_radius": 0.9800000000000004,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.636)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.835)",
+   "s": 0.06
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 0.2
+ },
+ "s122-039": {
+  "id": "s122-039",
+  "n": 3,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "abs",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7955005339201017,
+  "B1b_radius": 1.0925050878035398,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.3
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 2.54
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.35732973181376854)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.38
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     0.5,
+     0.5
+    ],
+    [
+     0.0,
+     0.5,
+     0.3333333333333333
+    ],
+    [
+     0.0,
+     1.0,
+     0.0
+    ],
+    [
+     1.0,
+     0.0,
+     0.5
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 3.137380499250654
+  },
+  "oracle_s": 1.68,
+  "seconds": 4.9
+ },
+ "s122-045": {
+  "id": "s122-045",
+  "n": 6,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.512696350076686,
+  "B1b_radius": 1.1092407548106715,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.09
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.00030374591727640274)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.03
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 6.280369834735101e-16,
+   "amplitude": 10.243043407314518
+  },
+  "oracle_s": 0.62,
+  "seconds": 0.8
+ },
+ "s122-040": {
+  "id": "s122-040",
+  "n": 5,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.33904842638765553,
+  "B1b_radius": 0.9770438687583469,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.08
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 2.34
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.27
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.64,
+  "seconds": 5.3
+ },
+ "s122-047": {
+  "id": "s122-047",
+  "n": 4,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6755822102956183,
+  "B1b_radius": 1.098770099009198,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.27
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.17
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-3.6267789389911376e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.53
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.3333333333333333,
+     0.0,
+     0.0
+    ],
+    [
+     0.16666666666666666,
+     0.0,
+     1.0
+    ],
+    [
+     0.3333333333333333,
+     0.0,
+     0.0
+    ]
+   ]
+  },
+  "oracle_s": 0.82,
+  "seconds": 2.8
+ },
+ "s122-048": {
+  "id": "s122-048",
+  "n": 4,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9303833958849587,
+  "B1b_radius": 0.9624778873715685,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-2.92)",
+   "s": 0.13
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-2.92)",
+   "s": 0.28
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.008653054165980828)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.06
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.15,
+  "seconds": 0.6
+ },
+ "s122-046": {
+  "id": "s122-046",
+  "n": 6,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "abs",
+   "abs"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6854425154179385,
+  "B1b_radius": 0.9799745373868026,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.44
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 2.49
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.36
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.29,
+  "seconds": 4.6
+ },
+ "s122-049": {
+  "id": "s122-049",
+  "n": 5,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6363072982308642,
+  "B1b_radius": 1.0967401822422982,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.12
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.95
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0027896331441106554)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.15
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.12,
+  "seconds": 1.3
+ },
+ "s122-051": {
+  "id": "s122-051",
+  "n": 6,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8941372264286187,
+  "B1b_radius": 1.0035769817338889,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.32
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.67
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0005459279118917381)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.31
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     0.0,
+     0.3333333333333333
+    ],
+    [
+     1.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.28268960271047955
+  },
+  "oracle_s": 2.09,
+  "seconds": 3.4
+ },
+ "s122-052": {
+  "id": "s122-052",
+  "n": 3,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.08
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.06,
+  "seconds": 0.2
+ },
+ "s122-043": {
+  "id": "s122-043",
+  "n": 4,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "abs",
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7702046035238902,
+  "B1b_radius": 1.1116388777340949,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.17
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.00043598093664276333)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.03
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0
+    ],
+    [
+     1.0
+    ],
+    [
+     1.0
+    ],
+    [
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 3.3678091599023947
+  },
+  "oracle_s": 10.5,
+  "seconds": 10.7
+ },
+ "s122-050": {
+  "id": "s122-050",
+  "n": 6,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7228517576968294,
+  "B1b_radius": 0.9771408758400854,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.59
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 3.59
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.42
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 2.46,
+  "seconds": 7.1
+ },
+ "s122-054": {
+  "id": "s122-054",
+  "n": 5,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6698263125414785,
+  "B1b_radius": 0.9800000000000003,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.07
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 2.29
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.39
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.23,
+  "seconds": 5.0
+ },
+ "s122-056": {
+  "id": "s122-056",
+  "n": 2,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.902082347667971,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.04
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.04,
+  "seconds": 0.1
+ },
+ "s122-057": {
+  "id": "s122-057",
+  "n": 2,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "sin",
+   "soft"
+  ],
+  "kinds": [
+   "row",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": true,
+  "B1a_radius": 1.056486100305294,
+  "B1b_radius": 1.056486100305294,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.09
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.02
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.035937893655361375)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.21
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.05386492932115652
+  },
+  "oracle_s": 0.83,
+  "seconds": 2.1
+ },
+ "s122-058": {
+  "id": "s122-058",
+  "n": 2,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.5390215904511286,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.04
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.09
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.07,
+  "seconds": 0.2
+ },
+ "s122-055": {
+  "id": "s122-055",
+  "n": 4,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7658983546727981,
+  "B1b_radius": 0.9380742024721008,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-5.74)",
+   "s": 0.35
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-5.74)",
+   "s": 0.62
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.018095872800359337)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.32
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.5,
+     1.0,
+     0.0
+    ],
+    [
+     1.0,
+     0.3124567828648121,
+     0.0
+    ],
+    [
+     1.0,
+     1.0,
+     1.0
+    ],
+    [
+     0.5,
+     0.0,
+     0.0
+    ]
+   ],
+   "repeats": 2,
+   "residual": 1.8084409628687402e-11,
+   "amplitude": 0.4426312221693325
+  },
+  "oracle_s": 4.67,
+  "seconds": 6.0
+ },
+ "s122-060": {
+  "id": "s122-060",
+  "n": 3,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.453059021371124,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.06
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.07,
+  "seconds": 0.2
+ },
+ "s122-053": {
+  "id": "s122-053",
+  "n": 2,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8955659743952302,
+  "B1b_radius": 0.9249756344772598,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.1
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 10.59
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.1
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.05,
+  "seconds": 10.9
+ },
+ "s122-061": {
+  "id": "s122-061",
+  "n": 3,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6056337464725408,
+  "B1b_radius": 1.0013596631759447,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.3
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.53
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-6.361573856394895e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.23
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.0,
+     1.0,
+     0.3333333333333333
+    ]
+   ]
+  },
+  "oracle_s": 0.56,
+  "seconds": 1.6
+ },
+ "s122-011": {
+  "id": "s122-011",
+  "n": 4,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "clamp",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7557055139819214,
+  "B1b_radius": 0.932803707382167,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.15
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 59.86
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.17
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 60.3
+ },
+ "s122-064": {
+  "id": "s122-064",
+  "n": 5,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7009627420670186,
+  "B1b_radius": 0.9800000000000009,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0376)",
+   "s": 1.47
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.408)",
+   "s": 0.77
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.27
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 1.04,
+  "seconds": 3.5
+ },
+ "s122-065": {
+  "id": "s122-065",
+  "n": 2,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 1.021173483087423,
+  "B1b_radius": 1.061185353479247,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.17
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.040137958754809015)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.03
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.6666666666666666
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.5198151842369617
+  },
+  "oracle_s": 0.62,
+  "seconds": 0.8
+ },
+ "s122-066": {
+  "id": "s122-066",
+  "n": 6,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9379015751732164,
+  "B1b_radius": 0.9795281578643874,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-9.47)",
+   "s": 0.5
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-9.47)",
+   "s": 2.33
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-3.47104169266483e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.68
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     0.0,
+     0.0
+    ],
+    [
+     1.0,
+     0.16666666666666666,
+     1.0
+    ],
+    [
+     0.16666666666666666,
+     1.0,
+     1.0
+    ],
+    [
+     0.3333333333333333,
+     1.0,
+     0.6666666666666666
+    ],
+    [
+     0.6666666666666666,
+     1.0,
+     1.0
+    ],
+    [
+     1.0,
+     0.5,
+     0.0
+    ]
+   ],
+   "repeats": 2,
+   "residual": 0.0,
+   "amplitude": 0.8458881774041436
+  },
+  "oracle_s": 3.47,
+  "seconds": 7.0
+ },
+ "s122-067": {
+  "id": "s122-067",
+  "n": 5,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8614801742068772,
+  "B1b_radius": 0.9765795294998244,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.29
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.24
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0007598833469091448)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.09
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.5,
+     0.0
+    ],
+    [
+     0.5,
+     0.0
+    ],
+    [
+     0.5,
+     0.0
+    ],
+    [
+     0.5,
+     0.0
+    ]
+   ]
+  },
+  "oracle_s": 0.17,
+  "seconds": 0.8
+ },
+ "s122-044": {
+  "id": "s122-044",
+  "n": 4,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "soft"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7238509717773159,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.56
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 74.25
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.36
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.45,
+  "seconds": 75.6
+ },
+ "s122-069": {
+  "id": "s122-069",
+  "n": 4,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "abs"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7572692669635248,
+  "B1b_radius": 0.9158523138731673,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.13
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.27
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.06
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.13,
+  "seconds": 0.6
+ },
+ "s122-059": {
+  "id": "s122-059",
+  "n": 2,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.916306316932818,
+  "B1b_radius": 0.8352247733859369,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.45
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 57.73
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.47
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.31,
+  "seconds": 59.0
+ },
+ "s122-071": {
+  "id": "s122-071",
+  "n": 5,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.9791305675667437,
+  "B1b_radius": 1.1114321676901082,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.36
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 3.23
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.00010965972764216015)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.83
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.19936734423522998
+  },
+  "oracle_s": 2.27,
+  "seconds": 6.7
+ },
+ "s122-072": {
+  "id": "s122-072",
+  "n": 2,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.534465508222012,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.04
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.07,
+  "seconds": 0.2
+ },
+ "s122-073": {
+  "id": "s122-073",
+  "n": 1,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5996067950707434,
+  "B1b_radius": 1.0354214834438258,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.04
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.03
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.06963120592472212)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.3271395828258393
+  },
+  "oracle_s": 0.4,
+  "seconds": 0.5
+ },
+ "s122-074": {
+  "id": "s122-074",
+  "n": 4,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "abs"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.4679284040037374,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.951)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.44
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-8.255287089659486e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.11
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.6666666666666666,
+     0.0
+    ],
+    [
+     0.6666666666666666,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.06,
+  "seconds": 0.7
+ },
+ "s122-075": {
+  "id": "s122-075",
+  "n": 6,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5761777072782899,
+  "B1b_radius": 0.9282551032174915,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.06
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.05,
+  "seconds": 0.2
+ },
+ "s122-076": {
+  "id": "s122-076",
+  "n": 4,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.5567715328560001,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.06
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.07,
+  "seconds": 0.2
+ },
+ "s122-077": {
+  "id": "s122-077",
+  "n": 2,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.9794921777889689,
+  "B1b_radius": 1.1262514446295493,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.29
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 2.26
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-3.999670484674089e-09)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.5
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.5533953715492343
+  },
+  "oracle_s": 0.95,
+  "seconds": 4.0
+ },
+ "s122-078": {
+  "id": "s122-078",
+  "n": 5,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8075054839111231,
+  "B1b_radius": 0.9799999999999988,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.23
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-7.953976367997379e-05)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.04
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.1,
+  "seconds": 0.4
+ },
+ "s122-079": {
+  "id": "s122-079",
+  "n": 5,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7853666686085801,
+  "B1b_radius": 0.9151290373990797,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.16
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.66
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.09
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.19,
+  "seconds": 1.1
+ },
+ "s122-080": {
+  "id": "s122-080",
+  "n": 2,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "clamp",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.14
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.1,
+  "seconds": 0.3
+ },
+ "s122-081": {
+  "id": "s122-081",
+  "n": 1,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "abs"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7984685171584132,
+  "B1b_radius": 0.9233374960633987,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.1
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.18
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.04
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.04,
+  "seconds": 0.4
+ },
+ "s122-082": {
+  "id": "s122-082",
+  "n": 6,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8647964736552457,
+  "B1b_radius": 0.9708159063814243,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-3.69)",
+   "s": 0.45
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.54
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.008350355260555395)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.34
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 2.41,
+  "seconds": 4.7
+ },
+ "s122-083": {
+  "id": "s122-083",
+  "n": 5,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "soft"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.729300525030656,
+  "B1b_radius": 1.0793215581495224,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.08
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.011647734367185188)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ]
+   ]
+  },
+  "oracle_s": 0.6,
+  "seconds": 0.7
+ },
+ "s122-063": {
+  "id": "s122-063",
+  "n": 4,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "abs",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.517585093719203,
+  "B1b_radius": 0.935661941587525,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.33
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 74.86
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.31
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 1.12,
+  "seconds": 76.6
+ },
+ "s122-085": {
+  "id": "s122-085",
+  "n": 5,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8223830429318238,
+  "B1b_radius": 1.0563987979184843,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.04
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.05
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.002784897226876642)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0
+    ],
+    [
+     1.0
+    ],
+    [
+     1.0
+    ],
+    [
+     1.0
+    ],
+    [
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 8.872986207172797
+  },
+  "oracle_s": 0.69,
+  "seconds": 0.8
+ },
+ "s122-084": {
+  "id": "s122-084",
+  "n": 4,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "abs",
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.468290932841674,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-24.4)",
+   "s": 0.15
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-24.6)",
+   "s": 1.29
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-5.976034048907172e-11)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.08
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.6666666666666666,
+     0.0
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.3701756190965087
+  },
+  "oracle_s": 0.71,
+  "seconds": 2.2
+ },
+ "s122-087": {
+  "id": "s122-087",
+  "n": 3,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7500477413265104,
+  "B1b_radius": 0.9076020313769793,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.3
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.56
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.22
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.33,
+  "seconds": 1.4
+ },
+ "s122-088": {
+  "id": "s122-088",
+  "n": 5,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "soft",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7990237726308207,
+  "B1b_radius": 0.9799999999999994,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.2
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.05
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.11,
+  "seconds": 0.4
+ },
+ "s122-089": {
+  "id": "s122-089",
+  "n": 5,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 1.008083136251529,
+  "B1b_radius": 1.100515427256202,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.54
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.004000593840867837)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.07
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.16666666666666666,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     0.6666666666666666,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 1.8385843027689748e-15,
+   "amplitude": 8.647052919237566
+  },
+  "oracle_s": 0.85,
+  "seconds": 1.6
+ },
+ "s122-086": {
+  "id": "s122-086",
+  "n": 5,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "clamp",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6741321293850496,
+  "B1b_radius": 0.9654843876650602,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.45
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 4.62
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.46
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.24,
+  "seconds": 6.8
+ },
+ "s122-091": {
+  "id": "s122-091",
+  "n": 2,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6285205280831381,
+  "B1b_radius": 1.0959966614737504,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.09
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.39
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-6.180057037858244e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.09
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 1.0
+  },
+  "oracle_s": 0.61,
+  "seconds": 1.2
+ },
+ "s122-090": {
+  "id": "s122-090",
+  "n": 6,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9228015427215448,
+  "B1b_radius": 0.9571542399004248,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-18)",
+   "s": 0.42
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-18.9)",
+   "s": 1.78
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.020424760923095524)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.56
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     1.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.16666666666666666,
+     0.0
+    ],
+    [
+     1.0,
+     1.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.16666666666666666,
+     0.0
+    ]
+   ]
+  },
+  "oracle_s": 2.05,
+  "seconds": 4.8
+ },
+ "s122-093": {
+  "id": "s122-093",
+  "n": 5,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "abs",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8945941954605979,
+  "B1b_radius": 1.1053905762611855,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.59
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.7236982585069947e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.13
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.07,
+  "seconds": 0.9
+ },
+ "s122-094": {
+  "id": "s122-094",
+  "n": 3,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8189966587380684,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.29
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.61
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.35
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.4,
+  "seconds": 1.6
+ },
+ "s122-092": {
+  "id": "s122-092",
+  "n": 6,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9080667801090936,
+  "B1b_radius": 0.9770343060736157,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.51
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 3.12
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.94
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.3,
+  "seconds": 5.9
+ },
+ "s122-096": {
+  "id": "s122-096",
+  "n": 4,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "abs",
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6729211931098671,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.04
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.25
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.04
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.08,
+  "seconds": 0.4
+ },
+ "s122-097": {
+  "id": "s122-097",
+  "n": 5,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6028838006648943,
+  "B1b_radius": 1.1223408368502548,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.11
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.26
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0012220645892796304)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.09
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ]
+  },
+  "oracle_s": 0.14,
+  "seconds": 0.6
+ },
+ "s122-095": {
+  "id": "s122-095",
+  "n": 5,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.4624704310075825,
+  "B1b_radius": 0.9294801102372477,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.187)",
+   "s": 0.43
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.19)",
+   "s": 4.12
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.00027223739611382814)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.85
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 1.66,
+  "seconds": 7.1
+ },
+ "s122-099": {
+  "id": "s122-099",
+  "n": 4,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "tanh",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7999824626872818,
+  "B1b_radius": 1.105353269877154,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.15
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-5.161320342464347e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.03
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0
+    ],
+    [
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.7063605665353976
+  },
+  "oracle_s": 0.76,
+  "seconds": 1.0
+ },
+ "s122-100": {
+  "id": "s122-100",
+  "n": 3,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "abs",
+   "abs"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.910641650761198,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.04
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.1
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.07,
+  "seconds": 0.2
+ },
+ "s122-101": {
+  "id": "s122-101",
+  "n": 3,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "sin",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8710204775870194,
+  "B1b_radius": 1.117934893072795,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.93
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0244534503745246)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.1
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     0.5
+    ],
+    [
+     0.0,
+     0.5
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 2.0892876912825216
+  },
+  "oracle_s": 0.81,
+  "seconds": 2.0
+ },
+ "s122-102": {
+  "id": "s122-102",
+  "n": 5,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "abs",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7837106925364329,
+  "B1b_radius": 0.9803854152030561,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-3.75)",
+   "s": 0.17
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.0
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.03576128974648008)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.09
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 1.0960019383039006
+  },
+  "oracle_s": 0.89,
+  "seconds": 2.1
+ },
+ "s122-103": {
+  "id": "s122-103",
+  "n": 3,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5919886740795122,
+  "B1b_radius": 0.9151129535790191,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.09
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.03,
+  "seconds": 0.2
+ },
+ "s122-104": {
+  "id": "s122-104",
+  "n": 2,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.555411846923005,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.04
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.04,
+  "seconds": 0.1
+ },
+ "s122-105": {
+  "id": "s122-105",
+  "n": 4,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "clamp",
+   "sin"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7779223957435619,
+  "B1b_radius": 0.9104360534260401,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.21
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.04,
+  "seconds": 0.3
+ },
+ "s122-106": {
+  "id": "s122-106",
+  "n": 5,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "sin",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7414822579486577,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.47
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 5.17
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.48
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.57,
+  "seconds": 6.7
+ },
+ "s122-068": {
+  "id": "s122-068",
+  "n": 2,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6848463568466179,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.28
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 74.61
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.48
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.49,
+  "seconds": 75.9
+ },
+ "s122-107": {
+  "id": "s122-107",
+  "n": 3,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "abs",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6183494432872686,
+  "B1b_radius": 1.0624794612746762,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.07
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-2.6198904975200988e-09)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.01
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.5993574799052479
+  },
+  "oracle_s": 0.45,
+  "seconds": 0.6
+ },
+ "s122-109": {
+  "id": "s122-109",
+  "n": 1,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.1926749092664397,
+  "B1b_radius": 0.9964267029601965,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.09
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.18
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.05
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.24,
+  "seconds": 0.6
+ },
+ "s122-110": {
+  "id": "s122-110",
+  "n": 6,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "abs",
+   "soft",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9386516722495998,
+  "B1b_radius": 0.9800000000000003,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-4.95)",
+   "s": 0.46
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 3.78
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-8.726105127909145e-05)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 1.0
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     0.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 1.59,
+  "seconds": 6.8
+ },
+ "s122-098": {
+  "id": "s122-098",
+  "n": 3,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.753077476219666,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.13
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 31.0
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.11
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.11,
+  "seconds": 31.4
+ },
+ "s122-112": {
+  "id": "s122-112",
+  "n": 2,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9799999999999999,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.08
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.06,
+  "seconds": 0.2
+ },
+ "s122-113": {
+  "id": "s122-113",
+  "n": 5,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "tanh",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 1.040497581200674,
+  "B1b_radius": 1.0678254976755028,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.14
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0006955773630010702)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.21
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     0.5
+    ],
+    [
+     1.0,
+     0.5
+    ]
+   ],
+   "repeats": 1,
+   "residual": 1.5732516979464565e-17,
+   "amplitude": 0.4773121090788842
+  },
+  "oracle_s": 0.83,
+  "seconds": 2.3
+ },
+ "s122-114": {
+  "id": "s122-114",
+  "n": 5,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.885125560682377,
+  "B1b_radius": 0.9800000000000005,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.18
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0014188570132907903)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.06
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.11,
+  "seconds": 0.4
+ },
+ "s122-115": {
+  "id": "s122-115",
+  "n": 6,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "clamp",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6454206870767387,
+  "B1b_radius": 1.065883284250937,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.16
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.4504875131608705e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.19
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.09,
+  "seconds": 1.6
+ },
+ "s122-116": {
+  "id": "s122-116",
+  "n": 5,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6388780990114998,
+  "B1b_radius": 0.9799999999999993,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.49
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.99
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.41
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 1.7,
+  "seconds": 3.6
+ },
+ "s122-117": {
+  "id": "s122-117",
+  "n": 3,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7768396730430324,
+  "B1b_radius": 1.1046685237197698,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.5
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.06705020587139905)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.07
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.06,
+  "seconds": 0.8
+ },
+ "s122-108": {
+  "id": "s122-108",
+  "n": 2,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.43328237057549185,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.28
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 24.58
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.28
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.45,
+  "seconds": 25.6
+ },
+ "s122-119": {
+  "id": "s122-119",
+  "n": 1,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "abs"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": true,
+  "B1a_radius": 0.4796727630966758,
+  "B1b_radius": 1.1138290506965207,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.19
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.86
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.1939482628268726)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.19
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.10219615893959588
+  },
+  "oracle_s": 0.67,
+  "seconds": 1.9
+ },
+ "s122-120": {
+  "id": "s122-120",
+  "n": 4,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6671532604557352,
+  "B1b_radius": 0.9800000000000012,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.00828)",
+   "s": 0.13
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.143)",
+   "s": 0.5
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0008678485463220331)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.05
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.12,
+  "seconds": 0.8
+ },
+ "s122-062": {
+  "id": "s122-062",
+  "n": 3,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9800000000000001,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.3
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 140.28
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.47
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.42,
+  "seconds": 141.5
+ },
+ "s122-122": {
+  "id": "s122-122",
+  "n": 6,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7729258553573207,
+  "B1b_radius": 0.9799999999999998,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.05
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.16
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.1,
+  "seconds": 0.3
+ },
+ "s122-121": {
+  "id": "s122-121",
+  "n": 3,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "soft",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 1.0757463505367004,
+  "B1b_radius": 1.1023446166608406,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.24
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 2.73
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.022871165780145294)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.5
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.5,
+     0.0,
+     0.16666666666666666
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.13578100222918124
+  },
+  "oracle_s": 1.41,
+  "seconds": 4.9
+ },
+ "s122-124": {
+  "id": "s122-124",
+  "n": 6,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.5564876007957865,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.06
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.05
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-8.302644458917609e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0
+    ],
+    [
+     1.0
+    ],
+    [
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.05,
+  "seconds": 0.2
+ },
+ "s122-123": {
+  "id": "s122-123",
+  "n": 5,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8310724272808427,
+  "B1b_radius": 1.0035167335479787,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.13
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.57
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.1612893138768538e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.16
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 1.0988750685482438
+  },
+  "oracle_s": 0.96,
+  "seconds": 1.8
+ },
+ "s122-125": {
+  "id": "s122-125",
+  "n": 4,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.941248739843476,
+  "B1b_radius": 1.1298860436245197,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.13
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.29
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.015237925251873742)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.08
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     0.5
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 1.735602327786619
+  },
+  "oracle_s": 0.6,
+  "seconds": 1.1
+ },
+ "s122-127": {
+  "id": "s122-127",
+  "n": 2,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.9506900325426327,
+  "B1b_radius": 0.9506900325426327,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.3
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.61
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.34
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.34,
+  "seconds": 1.6
+ },
+ "s122-126": {
+  "id": "s122-126",
+  "n": 5,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "clamp",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6767354362579017,
+  "B1b_radius": 0.9799999999999993,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-70.3)",
+   "s": 0.17
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.21
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-2.6577047913780687e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.15
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     0.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 7.473417450352271e-17,
+   "amplitude": 0.31013467457763366
+  },
+  "oracle_s": 1.28,
+  "seconds": 2.8
+ },
+ "s122-129": {
+  "id": "s122-129",
+  "n": 6,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5724366972344265,
+  "B1b_radius": 1.025272183027067,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.41
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.83
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.00012789383770258044)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.42
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     0.6666666666666666,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 87.4146706676569
+  },
+  "oracle_s": 2.55,
+  "seconds": 5.2
+ },
+ "s122-130": {
+  "id": "s122-130",
+  "n": 2,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.09
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.24
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.05
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 0.5
+ },
+ "s122-131": {
+  "id": "s122-131",
+  "n": 3,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8779040777472741,
+  "B1b_radius": 0.9041415270676246,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.06
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.04,
+  "seconds": 0.1
+ },
+ "s122-132": {
+  "id": "s122-132",
+  "n": 2,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "clamp",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": true,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.04
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.19
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 0.3
+ },
+ "s122-133": {
+  "id": "s122-133",
+  "n": 2,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 1.0372321034810366,
+  "B1b_radius": 1.0372321034810366,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.11
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.21
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-4.256179910049573e-09)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.05
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.5,
+     0.5
+    ]
+   ]
+  },
+  "oracle_s": 0.04,
+  "seconds": 0.4
+ },
+ "s122-134": {
+  "id": "s122-134",
+  "n": 1,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6191182887196742,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.25
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.97
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.33
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.35,
+  "seconds": 1.9
+ },
+ "s122-135": {
+  "id": "s122-135",
+  "n": 5,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "sin",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 1.0278135442067475,
+  "B1b_radius": 1.143743200464071,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.15
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.09
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.01371003036759668)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.13
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     0.3333333333333333
+    ],
+    [
+     0.5,
+     0.3333333333333333
+    ],
+    [
+     0.0,
+     0.3333333333333333
+    ],
+    [
+     0.5,
+     0.3333333333333333
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 3.7588933643273537
+  },
+  "oracle_s": 1.07,
+  "seconds": 2.4
+ },
+ "s122-118": {
+  "id": "s122-118",
+  "n": 1,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7682244648272539,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.19
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 24.6
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.29
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.31,
+  "seconds": 25.4
+ },
+ "s122-137": {
+  "id": "s122-137",
+  "n": 5,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8085506116186864,
+  "B1b_radius": 1.0857751060802316,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.53
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.013848668157502103)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.12
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     0.6666666666666666
+    ],
+    [
+     1.0,
+     0.6666666666666666
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.7026341268718483
+  },
+  "oracle_s": 0.72,
+  "seconds": 1.5
+ },
+ "s122-138": {
+  "id": "s122-138",
+  "n": 4,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9798600298863811,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.05
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.07,
+  "seconds": 0.2
+ },
+ "s122-139": {
+  "id": "s122-139",
+  "n": 4,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7511903598181793,
+  "B1b_radius": 1.004098598359249,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.12
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.27
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0032761819435642146)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.09
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.12,
+  "seconds": 0.6
+ },
+ "s122-140": {
+  "id": "s122-140",
+  "n": 4,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7450898419671373,
+  "B1b_radius": 0.9800000000000003,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.13
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.27
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.07
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.15,
+  "seconds": 0.6
+ },
+ "s122-136": {
+  "id": "s122-136",
+  "n": 5,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9764173154447856,
+  "B1b_radius": 0.9765677538108555,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.47
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 2.92
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.12
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.16,
+  "seconds": 3.7
+ },
+ "s122-141": {
+  "id": "s122-141",
+  "n": 6,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "clamp",
+   "soft"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8710811740552182,
+  "B1b_radius": 1.0682434242154362,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.38
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 3.51
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.004106795719237713)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 1.14
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     1.0,
+     0.5
+    ],
+    [
+     1.0,
+     1.0,
+     0.5
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.852287107759325
+  },
+  "oracle_s": 3.02,
+  "seconds": 8.1
+ },
+ "s122-143": {
+  "id": "s122-143",
+  "n": 1,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "abs"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": true,
+  "B1a_radius": 0.7501865179376627,
+  "B1b_radius": 1.0137127164779869,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.07
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.026871454858449786)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.04
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.20035635977232474
+  },
+  "oracle_s": 0.42,
+  "seconds": 0.6
+ },
+ "s122-144": {
+  "id": "s122-144",
+  "n": 1,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "abs",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6427904043711378,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.07
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.08,
+  "seconds": 0.2
+ },
+ "s122-145": {
+  "id": "s122-145",
+  "n": 5,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8129481230629597,
+  "B1b_radius": 0.9384259557833204,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.259)",
+   "s": 0.41
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.26)",
+   "s": 0.96
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.00016100685402292128)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.25
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 1.87,
+  "seconds": 3.5
+ },
+ "s122-111": {
+  "id": "s122-111",
+  "n": 1,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "soft"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5819357667750191,
+  "B1b_radius": 0.9422491130640193,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.22
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 58.56
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.31
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.28,
+  "seconds": 59.4
+ },
+ "s122-147": {
+  "id": "s122-147",
+  "n": 5,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "abs"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.4196732806028297,
+  "B1b_radius": 0.955841339048368,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.2
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.33
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.07
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.15,
+  "seconds": 0.7
+ },
+ "s122-146": {
+  "id": "s122-146",
+  "n": 6,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9796802483115863,
+  "B1b_radius": 0.9739298859333405,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.69
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.3
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.45
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 2.08,
+  "seconds": 4.5
+ },
+ "s122-149": {
+  "id": "s122-149",
+  "n": 3,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "sin",
+   "clamp",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.45073904483673266,
+  "B1b_radius": 0.9385156672857614,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.29
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 2.91
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.55
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.38,
+  "seconds": 4.1
+ },
+ "s122-150": {
+  "id": "s122-150",
+  "n": 4,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9800000000000002,
+  "B1b_radius": 0.9800000000000002,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.06
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.09
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.08,
+  "seconds": 0.3
+ },
+ "s122-151": {
+  "id": "s122-151",
+  "n": 3,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.2754992880395925,
+  "B1b_radius": 0.9831899720778148,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.12
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 0.3
+ },
+ "s122-148": {
+  "id": "s122-148",
+  "n": 6,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.831568295351035,
+  "B1b_radius": 0.9554946965068465,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.662)",
+   "s": 0.5
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.72
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0006307763340205346)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.95
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 2.07,
+  "seconds": 5.2
+ },
+ "s122-152": {
+  "id": "s122-152",
+  "n": 2,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9800000000000002,
+  "B1b_radius": 0.9800000000000002,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.18
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.05
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.08,
+  "seconds": 0.3
+ },
+ "s122-154": {
+  "id": "s122-154",
+  "n": 4,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "abs",
+   "sin"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.828272937033013,
+  "B1b_radius": 0.9799999999999998,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.647)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.16
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-6.335580807121681e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 1.1102230246251565e-16,
+   "amplitude": 2.166387536006179
+  },
+  "oracle_s": 0.75,
+  "seconds": 1.0
+ },
+ "s122-153": {
+  "id": "s122-153",
+  "n": 2,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5725132486565123,
+  "B1b_radius": 1.0890482930261665,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.11
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.9
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.06644955654625818)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.09
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.1359021813076942
+  },
+  "oracle_s": 0.66,
+  "seconds": 1.8
+ },
+ "s122-156": {
+  "id": "s122-156",
+  "n": 4,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.5820011639733829,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.15
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.59
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.14
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.12,
+  "seconds": 1.0
+ },
+ "s122-157": {
+  "id": "s122-157",
+  "n": 5,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "tanh",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8807368892319442,
+  "B1b_radius": 1.1154158299395,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.12
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.08
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-7.14724339892773e-11)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.14
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     0.5
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.06,
+  "seconds": 1.4
+ },
+ "s122-158": {
+  "id": "s122-158",
+  "n": 5,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "abs",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8384567028080063,
+  "B1b_radius": 0.9800000000000002,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-7.12)",
+   "s": 0.05
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.11
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.022362370716442433)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.0
+    ],
+    [
+     1.0
+    ],
+    [
+     0.0
+    ],
+    [
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.03,
+  "seconds": 0.2
+ },
+ "s122-155": {
+  "id": "s122-155",
+  "n": 4,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8115866407918031,
+  "B1b_radius": 1.0814026423517824,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.28
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.34
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.000115753798621868)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.6
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0,
+     0.3333333333333333,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 5.551115123125783e-17,
+   "amplitude": 1.7441578318201156
+  },
+  "oracle_s": 1.66,
+  "seconds": 3.9
+ },
+ "s122-160": {
+  "id": "s122-160",
+  "n": 3,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.49501804756229295,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.08
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.06,
+  "seconds": 0.2
+ },
+ "s122-161": {
+  "id": "s122-161",
+  "n": 2,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8211505800845131,
+  "B1b_radius": 1.056915449284219,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.02
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.04
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.006703210130706241)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.01
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 2.6093843255609115
+  },
+  "oracle_s": 0.4,
+  "seconds": 0.5
+ },
+ "s122-162": {
+  "id": "s122-162",
+  "n": 3,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "sin",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.5678156208081686,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.21
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.02
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.08,
+  "seconds": 0.3
+ },
+ "s122-163": {
+  "id": "s122-163",
+  "n": 2,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "soft",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.9359638454825457,
+  "B1b_radius": 0.9359638454825457,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.19
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.04
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.04,
+  "seconds": 0.3
+ },
+ "s122-159": {
+  "id": "s122-159",
+  "n": 6,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7187196157059098,
+  "B1b_radius": 1.0630632330209215,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.55
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.00314915845306046)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.18
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.9669322886520897,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 61,
+   "residual": 5.257577713873443e-11,
+   "amplitude": 4.713726982169595
+  },
+  "oracle_s": 1.59,
+  "seconds": 2.5
+ },
+ "s122-164": {
+  "id": "s122-164",
+  "n": 3,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "soft"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.5837777200995673,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.29
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.21
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.37
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.9,
+  "seconds": 2.8
+ },
+ "s122-166": {
+  "id": "s122-166",
+  "n": 1,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "abs",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": true,
+  "B1a_radius": 0.4504546378409297,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.17
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.41
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.03
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.12,
+  "seconds": 0.7
+ },
+ "s122-167": {
+  "id": "s122-167",
+  "n": 4,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "sin"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7875000884242815,
+  "B1b_radius": 1.0370657281275226,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.15
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-7.753226647702856e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.05
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.03574096329887101
+  },
+  "oracle_s": 0.93,
+  "seconds": 1.2
+ },
+ "s122-168": {
+  "id": "s122-168",
+  "n": 1,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.21357013739406114,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.05
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.16
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.19
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.12,
+  "seconds": 0.5
+ },
+ "s122-169": {
+  "id": "s122-169",
+  "n": 6,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "soft"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.838002655502229,
+  "B1b_radius": 1.046782841683975,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.42
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.75
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-8.860597467223761e-05)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.17
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.6196915108032082
+  },
+  "oracle_s": 1.25,
+  "seconds": 2.6
+ },
+ "s122-170": {
+  "id": "s122-170",
+  "n": 2,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9438402230785797,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.13
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.77
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.15
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.11,
+  "seconds": 1.2
+ },
+ "s122-171": {
+  "id": "s122-171",
+  "n": 2,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5470668305339539,
+  "B1b_radius": 0.9643202292059319,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.15
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.29
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.12
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.11,
+  "seconds": 0.7
+ },
+ "s122-172": {
+  "id": "s122-172",
+  "n": 3,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8036964618167071,
+  "B1b_radius": 0.9800000000000006,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.15
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.3
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.1
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.15,
+  "seconds": 0.7
+ },
+ "s122-070": {
+  "id": "s122-070",
+  "n": 2,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "clamp",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8160602943336982,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.29
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 143.18
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.77
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.58,
+  "seconds": 144.8
+ },
+ "s122-173": {
+  "id": "s122-173",
+  "n": 6,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "sin"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6551893453675782,
+  "B1b_radius": 1.0426052887322506,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.2
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.66
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-7.820308899022385e-06)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.26
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     0.8333333333333333
+    ],
+    [
+     1.0,
+     0.8333333333333333
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.5514919814786257
+  },
+  "oracle_s": 1.76,
+  "seconds": 2.9
+ },
+ "s122-174": {
+  "id": "s122-174",
+  "n": 6,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8411800578540509,
+  "B1b_radius": 0.9799999999999988,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.2)",
+   "s": 0.82
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.03)",
+   "s": 3.44
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0015979623895826553)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.36
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 2.35,
+  "seconds": 7.0
+ },
+ "s122-176": {
+  "id": "s122-176",
+  "n": 2,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.05
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.04
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.1,
+  "seconds": 0.2
+ },
+ "s122-177": {
+  "id": "s122-177",
+  "n": 4,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.9862521245896991,
+  "B1b_radius": 1.0901889525274315,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.05
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.31
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.05181813256935128)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.07
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0
+    ],
+    [
+     0.6666666666666666
+    ],
+    [
+     0.5
+    ],
+    [
+     0.3333333333333333
+    ],
+    [
+     0.8333333333333333
+    ],
+    [
+     1.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.7694600210427981
+  },
+  "oracle_s": 2.02,
+  "seconds": 2.5
+ },
+ "s122-175": {
+  "id": "s122-175",
+  "n": 6,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "clamp",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8978281960839457,
+  "B1b_radius": 0.8845659956622403,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.86
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 6.14
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 2.23
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 3.18,
+  "seconds": 12.4
+ },
+ "s122-128": {
+  "id": "s122-128",
+  "n": 2,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7786704271070136,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.27
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 69.01
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.67
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.38,
+  "seconds": 70.3
+ },
+ "s122-179": {
+  "id": "s122-179",
+  "n": 3,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.4780892816439136,
+  "B1b_radius": 0.9234905683450924,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.48
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.86
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.36
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.46,
+  "seconds": 2.2
+ },
+ "s122-180": {
+  "id": "s122-180",
+  "n": 1,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "abs"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8524131411942157,
+  "B1b_radius": 0.9358305538323286,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.19
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.14
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.21
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.29,
+  "seconds": 1.8
+ },
+ "s122-182": {
+  "id": "s122-182",
+  "n": 2,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.5227928368463325,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.11
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.19
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.06
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 0.5
+ },
+ "s122-183": {
+  "id": "s122-183",
+  "n": 6,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "clamp",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 1.0646009266934389,
+  "B1b_radius": 1.0646009266934389,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.59
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.06423859959396534)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.28
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     0.0
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.3,
+  "seconds": 1.3
+ },
+ "s122-181": {
+  "id": "s122-181",
+  "n": 6,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6844661317445057,
+  "B1b_radius": 1.1348110242756577,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.47
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 3.79
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.006739185035638621)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 1.38
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     1.0,
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 2.22,
+  "seconds": 7.9
+ },
+ "s122-184": {
+  "id": "s122-184",
+  "n": 6,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "abs"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.4541977604002265,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.97
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 2.37
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.35
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 2.04,
+  "seconds": 5.7
+ },
+ "s122-185": {
+  "id": "s122-185",
+  "n": 3,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 1.0927416049171594,
+  "B1b_radius": 1.1392735756952663,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.1
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-6.91e+11)",
+   "s": 0.56
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.009637341581104478)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.11
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.0,
+     0.0
+    ]
+   ]
+  },
+  "oracle_s": 0.08,
+  "seconds": 0.9
+ },
+ "s122-186": {
+  "id": "s122-186",
+  "n": 3,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.20423493804578158,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.35
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.74
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.22
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.6,
+  "seconds": 1.9
+ },
+ "s122-187": {
+  "id": "s122-187",
+  "n": 5,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7262904842367094,
+  "B1b_radius": 1.0863690636236951,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.33
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.68
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.8600677291419475e-10)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.24
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     1.0,
+     0.0
+    ],
+    [
+     1.0,
+     1.0,
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 5.078277035967925
+  },
+  "oracle_s": 1.98,
+  "seconds": 3.2
+ },
+ "s122-189": {
+  "id": "s122-189",
+  "n": 3,
+  "d": 1,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "abs"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8777212216296597,
+  "B1b_radius": 1.062672880879245,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.1
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-1.4341897856842496e-09)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.16666666666666666
+    ],
+    [
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 2.4460120821206393
+  },
+  "oracle_s": 0.63,
+  "seconds": 0.8
+ },
+ "s122-190": {
+  "id": "s122-190",
+  "n": 2,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.38660464998459493,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.52
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.82
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.22
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.41,
+  "seconds": 2.0
+ },
+ "s122-188": {
+  "id": "s122-188",
+  "n": 6,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "abs"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6222424649378506,
+  "B1b_radius": 0.9607309365099808,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.53
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.62
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.35
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 2.49,
+  "seconds": 5.0
+ },
+ "s122-142": {
+  "id": "s122-142",
+  "n": 2,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8294392927708937,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.33
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 70.72
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.37
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.38,
+  "seconds": 71.8
+ },
+ "s122-192": {
+  "id": "s122-192",
+  "n": 4,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "sin"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.4954646768752031,
+  "B1b_radius": 0.9799999999999993,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.12
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.26
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.06
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.12,
+  "seconds": 0.6
+ },
+ "s122-191": {
+  "id": "s122-191",
+  "n": 6,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "sin",
+   "sin",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5776341426745168,
+  "B1b_radius": 0.9236768843390136,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.21
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 1.69
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.14
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.18,
+  "seconds": 2.2
+ },
+ "s122-193": {
+  "id": "s122-193",
+  "n": 4,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "sin",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5413078762683604,
+  "B1b_radius": 1.079600273397755,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.27
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 1.27
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.001183355185222026)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.39
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "grows",
+   "seq": [
+    [
+     0.0,
+     1.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "oracle_s": 0.76,
+  "seconds": 2.7
+ },
+ "s122-178": {
+  "id": "s122-178",
+  "n": 3,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.9789754031955769,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.79
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 35.27
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.28
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.78,
+  "seconds": 37.1
+ },
+ "s122-196": {
+  "id": "s122-196",
+  "n": 6,
+  "d": 1,
+  "m": 3,
+  "shapes": [
+   "sin",
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9061366466689952,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-2.29)",
+   "s": 0.03
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-3.28)",
+   "s": 0.3
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.0017852590550930254)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.04
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 0.5
+ },
+ "s122-197": {
+  "id": "s122-197",
+  "n": 5,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "abs",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8565072164101595,
+  "B1b_radius": 1.035096970373849,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.09
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.94
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-5.562608845402063e-11)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.13
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     1.0,
+     0.3333333333333333
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.31458600106404255
+  },
+  "oracle_s": 0.69,
+  "seconds": 1.9
+ },
+ "s122-198": {
+  "id": "s122-198",
+  "n": 5,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7891545716891719,
+  "B1b_radius": 0.9800000000000003,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.15
+  },
+  "T1": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.32
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.08
+  },
+  "G1": "certified",
+  "witness": null,
+  "oracle_s": 0.2,
+  "seconds": 0.8
+ },
+ "s122-199": {
+  "id": "s122-199",
+  "n": 3,
+  "d": 1,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": true,
+  "B1a_radius": 0.9856967988454095,
+  "B1b_radius": 1.0275911476248696,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.04
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 0.05
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-7.632482593929259e-07)",
+   "exact_corners": true,
+   "x_strict": null,
+   "s": 0.02
+  },
+  "G1": "no proof",
+  "witness": {
+   "kind": "sticks",
+   "seq": [
+    [
+     0.0
+    ]
+   ],
+   "repeats": 1,
+   "residual": 0.0,
+   "amplitude": 0.4973625454728596
+  },
+  "oracle_s": 0.37,
+  "seconds": 0.5
+ },
+ "s122-195": {
+  "id": "s122-195",
+  "n": 3,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "soft",
+   "sin"
+  ],
+  "kinds": [
+   "column",
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5559049165416681,
+  "B1b_radius": 0.9976520955993518,
+  "B4": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-13.5)",
+   "s": 0.4
+  },
+  "T1": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-inf)",
+   "s": 2.64
+  },
+  "T3": {
+   "status": "no proof",
+   "reason": "LMI infeasible (t=-0.021123388772638828)",
+   "exact_corners": false,
+   "x_strict": null,
+   "s": 0.63
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 18.18,
+  "seconds": 21.9
+ },
+ "s122-165": {
+  "id": "s122-165",
+  "n": 2,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6965016862814408,
+  "B1b_radius": 0.980501208632008,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.11
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 68.4
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.19
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 68.8
+ },
+ "s122-194": {
+  "id": "s122-194",
+  "n": 4,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8767440715657695,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.12
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 30.28
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.08
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.08,
+  "seconds": 30.6
+ }
+}

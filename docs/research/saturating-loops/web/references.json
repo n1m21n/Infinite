@@ -1,0 +1,65 @@
+{
+  "_comment": "Hélie, Danish et al. and Chowdhury were opened on 2026-11-23 (docs/prior-art/2026-11-23-saturating-loops.md); URLs are their DAFx archive pages, looked up 2026-11-25. Fields a source does not show are left out, never guessed.",
+  "helie2011": {
+    "authors": "T. Hélie",
+    "title": "Lyapunov stability analysis of the Moog ladder filter and dissipativity aspects in numerical solutions",
+    "venue": "Proc. 14th Int. Conf. on Digital Audio Effects (DAFx-11), Paris, pp. 45–52",
+    "year": "2011",
+    "url": "https://dafx.de/paper-archive/details/tCizMZrFjtFalx31fMNO4w"
+  },
+  "danish2021": {
+    "authors": "M. Danish, S. Bilbao and M. Ducceschi",
+    "title": "Applications of port Hamiltonian methods to non-iterative stable simulations of the Korg35 and Moog 4-pole VCF",
+    "venue": "Proc. 24th Int. Conf. on Digital Audio Effects (DAFx20in21), Vienna, pp. 33–40",
+    "year": "2021",
+    "url": "https://dafx.de/paper-archive/details/ojfUk0jbHziKwhyfdoWRYQ"
+  },
+  "chowdhury2020": {
+    "authors": "J. Chowdhury",
+    "title": "Stable structures for nonlinear biquad filters",
+    "venue": "Proc. 23rd Int. Conf. on Digital Audio Effects (DAFx2020), Vienna",
+    "year": "2020",
+    "url": "https://dafx.de/paper-archive/details/9raXmWuilIJyqjkS4A3d8w"
+  },
+  "infinite_report2": {
+    "authors": "N. Soni",
+    "title": "Proven-stable modulation: automatic stability certificates for user-written filters",
+    "venue": "Infinite Research, Technical Report 2",
+    "year": "2026",
+    "url": "https://infinitedevices.org/research/stable-modulation.html"
+  },
+  "mcclellan2026": {
+    "authors": "R. McClellan",
+    "title": "Stability analysis of time-varying virtual analog filters",
+    "venue": "Proc. 29th Int. Conf. on Digital Audio Effects (DAFx26), Cambridge, MA",
+    "year": "2026",
+    "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_28.pdf"
+  },
+  "boyd1994": {
+    "authors": "S. Boyd, L. El Ghaoui, E. Feron and V. Balakrishnan",
+    "title": "Linear Matrix Inequalities in System and Control Theory",
+    "venue": "SIAM Studies in Applied Mathematics, vol. 15",
+    "year": "1994",
+    "url": "https://web.stanford.edu/~boyd/lmibook/"
+  },
+  "cvxpy": {
+    "authors": "S. Diamond and S. Boyd",
+    "title": "CVXPY: a Python-embedded modeling language for convex optimization",
+    "venue": "Journal of Machine Learning Research, vol. 17, no. 83, pp. 1–5 (software version 1.9.3 used here)",
+    "year": "2016",
+    "url": "https://www.cvxpy.org"
+  },
+  "clarabel": {
+    "authors": "P. J. Goulart and Y. Chen",
+    "title": "Clarabel: an interior-point solver for conic programs with quadratic objectives",
+    "venue": "Software",
+    "url": "https://clarabel.org"
+  },
+  "laroche2007": {
+    "authors": "J. Laroche",
+    "title": "On the stability of time-varying recursive filters",
+    "venue": "Journal of the Audio Engineering Society, vol. 55, no. 6, pp. 460–471",
+    "year": "2007",
+    "url": "https://www.aes.org/e-lib/browse.cfm?elib=14168"
+  }
+}

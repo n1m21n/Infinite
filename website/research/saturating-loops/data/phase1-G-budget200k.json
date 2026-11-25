@@ -1,0 +1,706 @@
+{
+ "s122-053": {
+  "id": "s122-053",
+  "n": 2,
+  "d": 2,
+  "m": 1,
+  "shapes": [
+   "soft"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.8955659743952302,
+  "B1b_radius": 0.9249756344772598,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.27
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 110.75
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.14
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 111.2
+ },
+ "s122-004": {
+  "id": "s122-004",
+  "n": 1,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7010029635193944,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.56
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 556.3
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.52
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.27,
+  "seconds": 557.7
+ },
+ "s122-011": {
+  "id": "s122-011",
+  "n": 4,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "clamp",
+   "clamp",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.7557055139819214,
+  "B1b_radius": 0.932803707382167,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.32
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 575.39
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.22
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.06,
+  "seconds": 576.0
+ },
+ "s122-059": {
+  "id": "s122-059",
+  "n": 2,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.916306316932818,
+  "B1b_radius": 0.8352247733859369,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.37
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 529.71
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.44
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.25,
+  "seconds": 530.8
+ },
+ "s122-005": {
+  "id": "s122-005",
+  "n": 4,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "tanh",
+   "sin"
+  ],
+  "kinds": [
+   "row",
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5886140014823721,
+  "B1b_radius": 0.9314821327491641,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.32
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 695.77
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.17
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 696.4
+ },
+ "s122-063": {
+  "id": "s122-063",
+  "n": 4,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "abs",
+   "tanh"
+  ],
+  "kinds": [
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.517585093719203,
+  "B1b_radius": 0.935661941587525,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.31
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 620.45
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.31
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.97,
+  "seconds": 622.0
+ },
+ "s122-068": {
+  "id": "s122-068",
+  "n": 2,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.6848463568466179,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.21
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 612.28
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.41
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.4,
+  "seconds": 613.3
+ },
+ "s122-098": {
+  "id": "s122-098",
+  "n": 3,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.753077476219666,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.09
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 263.89
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.13
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.11,
+  "seconds": 264.2
+ },
+ "s122-108": {
+  "id": "s122-108",
+  "n": 2,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "clamp"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.43328237057549185,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.22
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 212.62
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.27
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.4,
+  "seconds": 213.5
+ },
+ "s122-118": {
+  "id": "s122-118",
+  "n": 1,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7682244648272539,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.39
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 194.96
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.29
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.27,
+  "seconds": 195.9
+ },
+ "s122-062": {
+  "id": "s122-062",
+  "n": 3,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "tanh",
+   "soft",
+   "abs"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.9800000000000001,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.23
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 1165.23
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 1.14
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 1.0,
+  "seconds": 1167.6
+ },
+ "s122-070": {
+  "id": "s122-070",
+  "n": 2,
+  "d": 3,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "clamp",
+   "clamp"
+  ],
+  "kinds": [
+   "row",
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8160602943336982,
+  "B1b_radius": 0.9799999999999999,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.23
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 1351.15
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 1.32
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.97,
+  "seconds": 1353.7
+ },
+ "s122-111": {
+  "id": "s122-111",
+  "n": 1,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "soft"
+  ],
+  "kinds": [
+   "row",
+   "column"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.5819357667750191,
+  "B1b_radius": 0.9422491130640193,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.22
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 716.97
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.73
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.38,
+  "seconds": 718.3
+ },
+ "s122-128": {
+  "id": "s122-128",
+  "n": 2,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "soft",
+   "tanh"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.7786704271070136,
+  "B1b_radius": 0.98,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.23
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 725.63
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.43
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.32,
+  "seconds": 726.6
+ },
+ "s122-178": {
+  "id": "s122-178",
+  "n": 3,
+  "d": 3,
+  "m": 1,
+  "shapes": [
+   "tanh"
+  ],
+  "kinds": [
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.98,
+  "B1b_radius": 0.9789754031955769,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.88
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 256.75
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.28
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.76,
+  "seconds": 258.7
+ },
+ "s122-142": {
+  "id": "s122-142",
+  "n": 2,
+  "d": 3,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8294392927708937,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.72
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 718.04
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.52
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.35,
+  "seconds": 719.6
+ },
+ "s122-165": {
+  "id": "s122-165",
+  "n": 2,
+  "d": 2,
+  "m": 3,
+  "shapes": [
+   "soft",
+   "tanh",
+   "clamp"
+  ],
+  "kinds": [
+   "column",
+   "row",
+   "row"
+  ],
+  "built_frozen_stable": false,
+  "affine": false,
+  "B1a_radius": 0.6965016862814408,
+  "B1b_radius": 0.980501208632008,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.14
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 581.55
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": false,
+   "s": 0.53
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.14,
+  "seconds": 582.4
+ },
+ "s122-194": {
+  "id": "s122-194",
+  "n": 4,
+  "d": 2,
+  "m": 2,
+  "shapes": [
+   "tanh",
+   "soft"
+  ],
+  "kinds": [
+   "column",
+   "row"
+  ],
+  "built_frozen_stable": true,
+  "affine": false,
+  "B1a_radius": 0.8767440715657695,
+  "B1b_radius": 0.9800000000000001,
+  "B4": {
+   "status": "certified",
+   "reason": "",
+   "s": 0.12
+  },
+  "T1": {
+   "status": "grid-certified",
+   "reason": "cover did not close within the cell budget",
+   "s": 355.98
+  },
+  "T3": {
+   "status": "grid-certified",
+   "reason": "",
+   "exact_corners": false,
+   "x_strict": true,
+   "s": 0.2
+  },
+  "G1": "no proof",
+  "witness": null,
+  "oracle_s": 0.09,
+  "seconds": 356.4
+ }
+}

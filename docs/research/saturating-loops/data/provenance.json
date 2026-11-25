@@ -1,0 +1,30 @@
+{
+  "commit_sha": "3e5c590163a637075a89585d16c4e6d0bd4dafab",
+  "commit_note": "Commit holding the last scored output (blind set B). Pre-registration (sections 1-7): bbab01bf; framing 8820bc36. Phase 0: addad62a, 096833e0, d983fedd, 4ae87391 (owner amendments 76416c47 D3, ea480e28 H2 scoring range). Phase 1 on G: 58ccd70a. Phase 2 (dump with saturators cut, one dev build): e23decf6. Phase 3 on G and scorer lock before B existed: 2faf6290. B generated and scored once: 3e5c5901. Phase 5 figure data (phase5-windup.json, phase5-corners.json) comes from scripts/phase5_figdata.py in the commit that adds them; it reads phase 1 and 3 outputs and changes no verdict.",
+  "timestamp_utc": "2026-11-25T07:50:05Z",
+  "os": "macOS 27.2.1 arm64",
+  "cpu": "Apple M2, 8 cores, 8 GB RAM",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.4.1.1), for the dev build that dumps A, B, C, D",
+  "build_flags": "scripts/ibuild.py build --mode dev (CMake Debug, arm64); one build, in phase 2",
+  "python": "3.12.13, numpy 2.5.5, scipy 1.18.1, cvxpy 1.9.3, clarabel 0.11.1 (venv ~/.venvs/stable-modulation, shared with Report 2; scripts/requirements.txt)",
+  "command": "docs/research/saturating-loops/scripts/run_all.sh (every phase into data-rerun/; needs INFINITE_BIN or a dev build). Quick check: scripts/kick-the-tires.sh. Field dump: INFINITE_FIELDSTABDUMP=corpus/field INFINITE_FIELDSTABDUMP_OUT=<dir> INFINITE_FIELDSTABDUMP_SAT=1 Infinite, then scripts/phase2_compare.py <dir> [out.json]. Figures: scripts/phase5_figdata.py.",
+  "seed": 20261122,
+  "seed_note": "Set G: scripts/gen_sat.py G, seed 20261122. Blind set B: scripts/gen_sat.py B, seed 20261124 (generated after the scorer lock). Oracle searches and the two-start test use numpy default_rng with fixed seeds in the scripts.",
+  "outputs": [
+    "phase0-L.json",
+    "phase0-b3.json",
+    "phase0-moog.json",
+    "phase0-t3.json",
+    "phase1-G.json",
+    "phase1-G-budget200k.json",
+    "phase2-compare.json",
+    "phase3-G.json",
+    "phase3-G.log",
+    "phase1-B.json",
+    "phase3-B.json",
+    "phase4-B.log",
+    "phase4-B-compare.json",
+    "phase5-windup.json",
+    "phase5-corners.json"
+  ]
+}

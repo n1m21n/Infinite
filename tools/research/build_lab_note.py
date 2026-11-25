@@ -6,7 +6,7 @@ What: renders docs/research/<slug>/web/note.md as a numbered technical report on
       In note.md:  ## / ### headings are numbered 1, 1.1 ...;  <div data-fig="name"></div> places a figure or table
       from web/figures.py (numbered in order, "Figure n" / "Table n");  [[fig:name]] refers to one;
       [@key] or [@a; @b] cites web/references.json (numbered in order of first citation, listed at the end);
-      {{name}} is a number from figures.numbers(data_dir). Frontmatter: description, abstract, keywords, series,
+      {{name}} is a number from figures.numbers(data_dir), filled in the body, abstract, description and outcome. Frontmatter: description, abstract, keywords, series,
       version, seo_title, prereg_commit (the commit that locked sections 1-7), outcome (the status line). data/ is copied unchanged to website/research/<slug>/data/.
       The page carries TechArticle JSON-LD, <link rel="alternate"> to data/provenance.json, BibTeX, and a provenance
       block pinned to the README's commit_sha. Reading pages default to Paper (BRAND.md 2.2).
@@ -250,7 +250,9 @@ def main():
 
     for k, v in figs.numbers(data_dir).items():
         md = md.replace("{{" + k + "}}", v)
-        note["abstract"] = note.get("abstract", "").replace("{{" + k + "}}", v)
+        for f in ("abstract", "description", "outcome"):
+            if f in note:
+                note[f] = note[f].replace("{{" + k + "}}", v)
     left = re.findall(r"\{\{(\w+)\}\}", md)
     if left:
         print("no number for", left); sys.exit(1)
