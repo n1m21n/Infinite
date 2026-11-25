@@ -35,6 +35,7 @@
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/SettingsWindow.h"
 #include "core/BlendModes.h"
+#include "core/Base64.h"
 #include "core/BrushEngine.h"
 #include "nodes/AudioColorRampNode.h"
 #include "nodes/DrawNode.h"
@@ -7410,6 +7411,7 @@ namespace
    void LiveClose(Scene2DNode* doc, bool keep);
    bool RangeClick(Scene2DNode* doc, ImVec2 at, bool add, bool sub);
    void LiveOpen(Scene2DNode* doc, int which);
+   bool V2DepthTick(Scene2DNode* doc);
    void DrawCanvas(Scene2DNode* doc, ImVec2 size)
    {
       ImGuiIO& io = ImGui::GetIO();
@@ -7425,6 +7427,8 @@ namespace
       else if (sObjSoftPending && !doc->AiSelectWaiting())
          sObjSoftPending = false;   // the analysis failed or found nothing: nothing to soften
       if (doc->LensDepthPoll())   // a Lens Blur layer's depth map landed
+         Touch();
+      if (sLiveDlg == 0 && V2DepthTick(doc))   // an agent's Depth Select whose map was still being made
          Touch();
       // A live selection dialog whose bar is gone (another tool, another panel layout) is cancelled.
       if (sLiveDlg != 0 && ImGui::GetFrameCount() - sLiveFrame > 2)
@@ -16375,6 +16379,406 @@ namespace
       }
    };
 
+   // ---- Block 3 (ai-tools.md 3.1-3.6): look, brush, gradient, path / svg, more selections, masks, the Look stack
+   // (effects, styles, an adjustment layer's own settings) and the gate's limits.
+   constexpr size_t kV2CallsMax = Scene2DNode::kAgentCalls;     // calls in one batch
+   constexpr size_t kV2PointsMax = Scene2DNode::kAgentPoints;   // stroke points (x, y pairs) in one batch
+   constexpr size_t kV2AddsMax = Scene2DNode::kAgentAdds;       // layers one batch may make
+   constexpr size_t kV2TextMax = Scene2DNode::kAgentText;       // svg / path data, bytes
+   constexpr int kV2LookMin = Scene2DNode::kAgentLookMin, kV2LookDefault = Scene2DNode::kAgentLookDefault,
+                 kV2LookMax = Scene2DNode::kAgentLookMax;
+   constexpr size_t kV2RectN = tok::view2d_v2_color_limit_lg;   // a rect's numbers: x0, y0, x1, y1
+
+   // The agent's brush: the last `brush` op's settings, kept between batches as a painter's brush is.
+   BrushEngine::Brush& V2Brush()
+   {
+      static BrushEngine::Brush b = [] {
+         BrushEngine::Brush x;
+         x.hardness = 1.0f;
+         x.size = tok::view2d_v2_apply;   // the size strokes had before the brush op
+         return x;
+      }();
+      return b;
+   }
+
+   struct V2Named
+   {
+      const char* name;
+      int value;
+   };
+   const V2Named kV2Tools[] = { { "brush", BrushEngine::kNormal }, { "eraser", BrushEngine::kErase }, { "behind", BrushEngine::kBehind },
+                                { "multiply", BrushEngine::kMultiply }, { "screen", BrushEngine::kScreen }, { "blur", BrushEngine::kBlur },
+                                { "sharpen", BrushEngine::kSharpen }, { "dodge", BrushEngine::kDodge }, { "burn", BrushEngine::kBurn },
+                                { "clone", BrushEngine::kClone }, { "heal", BrushEngine::kHeal }, { "smudge", BrushEngine::kSmudge },
+                                { "sponge", BrushEngine::kSpongeMode }, { "median", BrushEngine::kMedian }, { "push", BrushEngine::kPush },
+                                { "twirl", BrushEngine::kTwirl }, { "bloat", BrushEngine::kBloat }, { "pinch", BrushEngine::kPinch } };
+   const V2Named kV2Gradients[] = { { "linear", 1 }, { "radial", 2 }, { "angle", 3 }, { "reflected", 4 }, { "diamond", 5 } };
+   const V2Named kV2Extends[] = { { "hold", 0 }, { "repeat", 1 }, { "reflect", 2 } };
+   const V2Named kV2Targets[] = { { "layer", 0 }, { "mask", 1 }, { "filterMask", 3 } };
+   const V2Named kV2StrokePos[] = { { "outside", 0 }, { "inside", 1 }, { "centre", 2 }, { "center", 2 } };
+
+   template <size_t N>
+   int V2Pick(const V2Named (&list)[N], const std::string& s)
+   {
+      for (const V2Named& n : list)
+         if (V2Key(n.name) == V2Key(s))
+            return n.value;
+      return -1;
+   }
+
+   template <size_t N>
+   std::vector<std::string> V2NamesOf(const V2Named (&list)[N])
+   {
+      std::vector<std::string> out;
+      for (const V2Named& n : list)
+         out.push_back(n.name);
+      return out;
+   }
+
+   int V2Index(const std::vector<std::string>& names, const std::string& s)
+   {
+      for (size_t i = 0; i < names.size(); i++)
+         if (V2Key(names[i]) == V2Key(s))
+            return (int)i;
+      return -1;
+   }
+
+   std::vector<std::string> V2PresetNames()
+   {
+      std::vector<std::string> out;
+      for (const auto& p : BrushEngine::Presets())
+         out.push_back(p.name);
+      return out;
+   }
+
+   std::vector<std::string> V2AdjNames()
+   {
+      std::vector<std::string> out;
+      for (int a = 0; a < Scene2DNode::kAdjCount; a++)
+         out.push_back(Scene2DNode::AdjName(a));
+      return out;
+   }
+
+   std::vector<std::string> V2FxNames()
+   {
+      std::vector<std::string> out;
+      for (int f = 0; f < Scene2DNode::kFxCount; f++)
+         out.push_back(Scene2DNode::FxName(f));
+      return out;
+   }
+
+   std::vector<std::string> V2EffBlendNames()
+   {
+      return std::vector<std::string>(std::begin(Scene2DNode::kEffBlendNames), std::end(Scene2DNode::kEffBlendNames));
+   }
+
+   bool V2Pt(const json& v)
+   {
+      return v.is_array() && v.size() == 2 && v[0].is_number() && v[1].is_number() && std::isfinite(v[0].get<float>()) &&
+             std::isfinite(v[1].get<float>());
+   }
+
+   bool V2Nums(const json& v, size_t minN, size_t period)
+   {
+      if (!v.is_array() || v.size() < minN || (period > 1 && v.size() % period != 0))
+         return false;
+      for (const json& x : v)
+         if (!x.is_number() || !std::isfinite(x.get<float>()))
+            return false;
+      return true;
+   }
+
+   // Brush keys a `brush` op or a stroke may carry.
+   const std::vector<std::string> kV2BrushKeys = { "preset", "tool", "tip", "size", "hardness", "opacity", "flow", "spacing", "angle",
+                                                   "roundness", "smoothing", "jitter", "wet", "pressureSize", "pressureOpacity", "color",
+                                                   "taperIn", "taperOut" };
+
+   void V2BrushCheck(size_t i, const json& c, V2Err& err, bool strict)
+   {
+      for (auto it = c.begin(); it != c.end(); ++it)
+      {
+         const std::string& k = it.key();
+         const json& v = it.value();
+         if (k == "op")
+            continue;
+         if (k == "preset")
+         {
+            if (!v.is_string() || V2Index(V2PresetNames(), v.get<std::string>()) < 0)
+               err.Add(i, "E_ENUM", "not a brush preset", V2Near(v.is_string() ? v.get<std::string>() : "", V2PresetNames()));
+         }
+         else if (k == "tool")
+         {
+            if (!v.is_string() || V2Pick(kV2Tools, v.get<std::string>()) < 0)
+               err.Add(i, "E_ENUM", "not a brush tool", V2Near(v.is_string() ? v.get<std::string>() : "", V2NamesOf(kV2Tools)));
+         }
+         else if (k == "tip")
+         {
+            if (!v.is_string() || V2Index(BrushEngine::TipNames(), v.get<std::string>()) < 0)
+               err.Add(i, "E_ENUM", "not a brush tip", V2Near(v.is_string() ? v.get<std::string>() : "", BrushEngine::TipNames()));
+         }
+         else if (k == "pressureSize" || k == "pressureOpacity")
+         {
+            if (!v.is_boolean())
+               err.Add(i, "E_VALUE", "'" + k + "' wants true or false");
+         }
+         else if (k == "color")
+         {
+            float tmp[4];
+            if (!V2Color(v, tmp))
+               err.Add(i, "E_VALUE", "'color' wants [r, g, b], 0..1");
+         }
+         else if (std::find(kV2BrushKeys.begin(), kV2BrushKeys.end(), k) != kV2BrushKeys.end())
+         {
+            if (!v.is_number() || !std::isfinite(v.get<float>()))
+               err.Add(i, "E_VALUE", "'" + k + "' wants a number");
+         }
+         else if (strict)
+            err.Add(i, "E_FIELD", "no brush setting '" + k + "'", V2Near(k, kV2BrushKeys));
+      }
+   }
+
+   void V2BrushFrom(const json& c, BrushEngine::Brush& b)
+   {
+      if (c.contains("preset"))
+      {
+         const int p = V2Index(V2PresetNames(), c["preset"].get<std::string>());
+         if (p >= 0)
+         {
+            float keep[3];
+            std::copy(b.color, b.color + 3, keep);
+            b = BrushEngine::Presets()[(size_t)p].brush;
+            std::copy(keep, keep + 3, b.color);   // a preset is a tip, not a colour
+         }
+      }
+      auto num = [&](const char* k, float& dst, float lo, float hi) {
+         if (c.contains(k) && c[k].is_number())
+            dst = std::clamp(c[k].get<float>(), lo, hi);
+      };
+      num("size", b.size, 1.0f, 5000.0f);
+      num("hardness", b.hardness, 0.0f, 1.0f);
+      num("opacity", b.opacity, 0.0f, 1.0f);
+      num("flow", b.flow, 0.01f, 1.0f);
+      num("spacing", b.spacing, 0.01f, 10.0f);
+      num("angle", b.angle, -360.0f, 360.0f);
+      num("roundness", b.roundness, 0.05f, 1.0f);
+      num("smoothing", b.smoothing, 0.0f, 1.0f);
+      num("jitter", b.jitter, 0.0f, 4.0f);
+      num("wet", b.wet, 0.0f, 1.0f);
+      num("taperIn", b.taperIn, 0.0f, 5000.0f);
+      num("taperOut", b.taperOut, 0.0f, 5000.0f);
+      if (c.contains("tool"))
+         b.mode = std::max(0, V2Pick(kV2Tools, c["tool"].get<std::string>()));
+      if (c.contains("tip"))
+         b.tip = std::max(0, V2Index(BrushEngine::TipNames(), c["tip"].get<std::string>()));
+      if (c.contains("pressureSize"))
+         b.pressureSize = c["pressureSize"].get<bool>();
+      if (c.contains("pressureOpacity"))
+         b.pressureOpacity = c["pressureOpacity"].get<bool>();
+      if (c.contains("color"))
+      {
+         float rgba[4];
+         V2Color(c["color"], rgba);
+         std::copy(rgba, rgba + 3, b.color);
+      }
+   }
+
+   // `look`: the picture (or one layer, or a region) as a PNG no bigger than `max` a side, and what changed since the
+   // last look at the same thing. Rows top first.
+   struct V2LookMemo
+   {
+      std::vector<uint8_t> px;
+      int w = 0, h = 0;
+   };
+   std::map<std::string, V2LookMemo>& V2LookMemos()
+   {
+      static std::map<std::string, V2LookMemo> m;
+      return m;
+   }
+
+   bool V2Look(Scene2DNode* doc, const json& p, json& out, std::string& error)
+   {
+      static int sLookFrame = 1 << 27;
+      auto fail = [&](const char* code, const std::string& msg) {
+         out = { { "ok", false }, { "errors", json::array({ { { "code", code }, { "message", msg } } }) } };
+         return true;
+      };
+      if (doc == nullptr)
+         return fail("E_LAYER", "no 2D document is open");
+      const int W = doc->Doc().w, H = doc->Doc().h;
+      const int layer = p.value("layer", 0);
+      if (layer != 0 && doc->FindLayer(layer) == nullptr)
+         return fail("E_LAYER", "no layer " + std::to_string(layer));
+      int x0 = 0, y0 = 0, x1 = W, y1 = H;
+      if (p.contains("rect"))
+      {
+         const json& r = p["rect"];
+         if (!(V2Nums(r, kV2RectN, kV2RectN) && r.size() == kV2RectN))
+            return fail("E_SHAPE", "'rect' wants [x0, y0, x1, y1] in document px");
+         x0 = (int)std::floor(std::min(r[0].get<float>(), r[2].get<float>()));
+         x1 = (int)std::ceil(std::max(r[0].get<float>(), r[2].get<float>()));
+         y0 = (int)std::floor(std::min(r[1].get<float>(), r[3].get<float>()));
+         y1 = (int)std::ceil(std::max(r[1].get<float>(), r[3].get<float>()));
+      }
+      const int mx = std::clamp(p.value("max", kV2LookDefault), kV2LookMin, kV2LookMax);
+      std::vector<uint8_t> img;
+      int ow = 0, oh = 0;
+      float k = 1.0f;
+      if (!doc->AgentLook(layer, x0, y0, x1, y1, mx, ++sLookFrame, img, ow, oh, k))
+      {
+         if (p.contains("rect"))
+            return fail("E_SHAPE", "'rect' is off the document or empty");
+         error = layer != 0 ? "could not draw layer " + std::to_string(layer) : std::string("the picture is not ready");
+         return true;
+      }
+      x0 = std::clamp(x0, 0, W), x1 = std::clamp(x1, 0, W), y0 = std::clamp(y0, 0, H), y1 = std::clamp(y1, 0, H);
+      // What changed since the last look at the same layer, region and size.
+      const std::string key = std::to_string(layer) + ":" + std::to_string(x0) + "," + std::to_string(y0) + "," + std::to_string(x1) + "," +
+                              std::to_string(y1) + ":" + std::to_string(mx);
+      V2LookMemo& memo = V2LookMemos()[key];
+      json diff = nullptr;
+      if (memo.w == ow && memo.h == oh)
+      {
+         int box[kV2RectN];
+         double mean = 0;
+         const bool moved = Scene2DNode::AgentLookDiff(memo.px, img, ow, oh, box, mean);
+         diff = { { "mean", mean }, { "changed", nullptr } };
+         if (moved)
+            diff["changed"] = { x0 + box[0] / k, y0 + box[1] / k, x0 + box[2] / k, y0 + box[3] / k };
+      }
+      memo.px = img;
+      memo.w = ow;
+      memo.h = oh;
+      std::vector<uint8_t> png;
+      stbi_write_png_to_func([](void* ctx, void* data, int size) {
+         auto* v = (std::vector<uint8_t>*)ctx;
+         v->insert(v->end(), (uint8_t*)data, (uint8_t*)data + size);
+      }, &png, ow, oh, 4, img.data(), ow * 4);
+      if (png.empty())
+      {
+         error = "could not encode the PNG";
+         return true;
+      }
+      out = { { "ok", true }, { "size", { ow, oh } }, { "doc", { W, H } }, { "rect", { x0, y0, x1, y1 } }, { "scale", k }, { "diff", diff } };
+      if (p.value("inline", false))
+         out["png"] = Base64::Encode(png.data(), png.size());
+      else
+      {
+         namespace fs = std::filesystem;
+         fs::path file = p.contains("path") && p["path"].is_string() ? fs::path(p["path"].get<std::string>())
+                                                                      : fs::path(AppPaths::AppSupportDir()) / "Agent" /
+                                                                           ("look" + (layer != 0 ? "-layer" + std::to_string(layer) : std::string()) + ".png");
+         std::error_code ec;
+         fs::create_directories(file.parent_path(), ec);
+         std::ofstream f(file, std::ios::binary);
+         if (!f.write((const char*)png.data(), (std::streamsize)png.size()))
+         {
+            error = "could not write " + file.string();
+            return true;
+         }
+         out["path"] = file.string();
+      }
+      return true;
+   }
+
+   // A `path` op's shapes in document px: SVG path data, a polyline, or anchors with handles.
+   bool V2PathShapes(const json& c, std::vector<Scene2DNode::Shape>& out, std::string& why)
+   {
+      out.clear();
+      if (c.contains("d"))
+      {
+         if (!c["d"].is_string() || c["d"].get<std::string>().size() > kV2TextMax)
+         {
+            why = "'d' wants SVG path data (under 1 MB)";
+            return false;
+         }
+         return Scene2DNode::PathDataToShapes(c["d"].get<std::string>(), out, &why);
+      }
+      const bool anchors = c.contains("anchors");
+      const json& v = anchors ? c["anchors"] : c.contains("points") ? c["points"] : json();
+      if (!V2Nums(v, anchors ? 12 : 4, anchors ? 6 : 2))
+      {
+         why = anchors ? "'anchors' wants [x, y, inX, inY, outX, outY, ...] (two anchors or more)"
+                       : "give 'd' (SVG path data), 'points' [x0, y0, x1, y1, ...] or 'anchors'";
+         return false;
+      }
+      Scene2DNode::Shape s;
+      s.type = Scene2DNode::Shape::kPath;
+      for (size_t k = 0; k < v.size(); k += anchors ? 6 : 2)
+         if (anchors)
+            for (size_t j = 0; j < 6; j++)
+               s.pts.push_back(v[k + j].get<float>());
+         else
+            s.pts.insert(s.pts.end(), { v[k].get<float>(), v[k + 1].get<float>(), v[k].get<float>(), v[k + 1].get<float>(),
+                                        v[k].get<float>(), v[k + 1].get<float>() });
+      s.closed = c.value("closed", false);
+      out.push_back(s);
+      return true;
+   }
+
+   // Fill and stroke for a `path` op: "fill": colour or false, "stroke": colour or false, "width".
+   void V2PathStyle(const json& c, std::vector<Scene2DNode::Shape>& shapes)
+   {
+      for (Scene2DNode::Shape& s : shapes)
+      {
+         float rgba[4];
+         if (c.contains("fill"))
+         {
+            s.fillOn = !c["fill"].is_boolean() && !c["fill"].is_null() && V2Color(c["fill"], rgba);
+            if (s.fillOn)
+               std::copy(rgba, rgba + 4, s.fillC);
+         }
+         else
+            s.fillOn = s.closed;
+         if (c.contains("stroke"))
+         {
+            s.strokeOn = !c["stroke"].is_boolean() && !c["stroke"].is_null() && V2Color(c["stroke"], rgba);
+            if (s.strokeOn)
+               std::copy(rgba, rgba + 4, s.strokeC);
+         }
+         else
+            s.strokeOn = !s.closed;   // an open path with nothing said shows as a line
+         if (c.contains("width"))
+            s.width = std::clamp(c["width"].get<float>(), 0.0f, Scene2DNode::kAgentStrokeMax);
+      }
+   }
+
+   // A Depth Select an agent asked for while the depth map was still being made: finished when it lands.
+   struct V2DepthJob
+   {
+      bool on = false;
+      float lo = Scene2DNode::kAgentDepthLo, hi = 1.0f, soft = Scene2DNode::kAgentDepthSoft;
+      bool invert = false;
+      int op = 0;
+   };
+   V2DepthJob& V2Depth()
+   {
+      static V2DepthJob j;
+      return j;
+   }
+
+   // Finishes a waiting agent Depth Select; true when the selection changed.
+   bool V2DepthTick(Scene2DNode* doc)
+   {
+      V2DepthJob& j = V2Depth();
+      if (!j.on || doc == nullptr || !doc->LiveSelActive())
+      {
+         j.on = false;
+         return false;
+      }
+      const int state = doc->LiveDepthPoll();
+      if (state == 0)
+         return false;
+      j.on = false;
+      if (state < 0)
+      {
+         doc->LiveSelEnd(false);
+         return false;
+      }
+      doc->DepthPreview(j.lo, j.hi, j.soft, j.invert, j.op);
+      doc->LiveSelEnd(true);
+      return true;
+   }
+
    // Shape gate for one call. `made` holds the kinds the batch's earlier adds will make (layer -1 = the last one).
    void V2Check(Scene2DNode* doc, size_t i, const json& c, std::vector<Kind>& made, V2Err& err)
    {
@@ -16525,7 +16929,8 @@ namespace
       {
          const std::string how = c.value("shape", std::string("rect"));
          static const std::vector<std::string> kShapes = { "rect", "ellipse", "all", "none", "invert", "expand", "contract",
-                                                           "smooth", "border", "feather", "object", "subject" };
+                                                           "smooth", "border", "feather", "object", "subject", "color_range",
+                                                           "grow", "similar", "depth" };
          const bool hasRect = c.contains("rect") && c["rect"].is_array() && c["rect"].size() == 4;
          const bool hasAt = c.contains("at") && c["at"].is_array() && c["at"].size() == 2;
          if (std::find(kShapes.begin(), kShapes.end(), how) == kShapes.end())
@@ -16539,10 +16944,40 @@ namespace
          else if ((how == "expand" || how == "contract" || how == "smooth" || how == "border" || how == "feather") &&
                   c.contains("px") && !c["px"].is_number())
             err.Add(i, "E_VALUE", "'px' wants a number, 1..100");
+         else if (how == "color_range")
+         {
+            const bool s = c.contains("samples") && c["samples"].is_array() && !c["samples"].empty();
+            const bool k = c.contains("colors") && c["colors"].is_array() && !c["colors"].empty();
+            if (!s && !k)
+               err.Add(i, "E_SHAPE", "'color_range' wants 'samples' [[x, y], ...] (document px) or 'colors' [[r, g, b], ...]");
+            if (s)
+               for (const json& q : c["samples"])
+                  if (!V2Pt(q))
+                     err.Add(i, "E_SHAPE", "each sample is [x, y] in document px");
+            float tmp[4];
+            if (k)
+               for (const json& q : c["colors"])
+                  if (!V2Color(q, tmp))
+                     err.Add(i, "E_VALUE", "each colour is [r, g, b], 0..1");
+            if (c.contains("fuzziness") && !c["fuzziness"].is_number())
+               err.Add(i, "E_VALUE", "'fuzziness' wants a number, 0..200");
+         }
+         else if ((how == "grow" || how == "similar") && c.contains("tolerance") && !c["tolerance"].is_number())
+            err.Add(i, "E_VALUE", "'tolerance' wants a number, 0..255");
+         else if (how == "depth")
+         {
+            if (c.contains("near") && !(V2Nums(c["near"], 2, 2) && c["near"].size() == 2))
+               err.Add(i, "E_VALUE", "'near' wants [lo, hi]: 1 nearest, 0 farthest");
+            if (!AiSelect::DepthAvailable())
+               err.Add(i, "E_MISSING", "depth needs the depth model (Settings > AI models)");
+         }
       }
       else if (op == "fill" || op == "stroke")
       {
-         if (layerKind("layer", true, kind) && kind != Kind::Paint)
+         const int target = op == "stroke" && c.contains("target") && c["target"].is_string() ? V2Pick(kV2Targets, c["target"].get<std::string>()) : 0;
+         if (target < 0)
+            err.Add(i, "E_ENUM", "'target' wants layer, mask or filterMask", V2NamesOf(kV2Targets));
+         if (layerKind("layer", true, kind) && kind != Kind::Paint && target == 0)
             err.Add(i, "E_FIELD_NA", op + " paints on a paint layer");
          float tmp[4];
          if (c.contains("color") && !V2Color(c["color"], tmp))
@@ -16551,9 +16986,132 @@ namespace
             err.Add(i, "E_SHAPE", "'at' wants [x, y] in document px");
          if (op == "stroke" && !(c.contains("points") && c["points"].is_array() && c["points"].size() >= tok::view2d_v2_check_limit && c["points"].size() % tok::view2d_points_period == 0))
             err.Add(i, "E_SHAPE", "'points' wants [x0, y0, x1, y1, ...] in document px");
+         else if (op == "stroke")
+         {
+            const size_t n = c["points"].size() / tok::view2d_points_period;
+            if (c.contains("pressure") && !(V2Nums(c["pressure"], n, 1) && c["pressure"].size() == n))
+               err.Add(i, "E_SHAPE", "'pressure' wants one number (0..1) per point");
+            if (c.contains("tilt") && !(V2Nums(c["tilt"], 2 * n, 2) && c["tilt"].size() == 2 * n))
+               err.Add(i, "E_SHAPE", "'tilt' wants [tx, ty] per point, -1..1");
+            if (c.contains("sourceOffset") && !V2Pt(c["sourceOffset"]))
+               err.Add(i, "E_SHAPE", "'sourceOffset' wants [dx, dy] in document px (clone and heal)");
+            V2BrushCheck(i, c, err, false);
+         }
+         if (op == "fill" && c.contains("sampleAll") && !c["sampleAll"].is_boolean())
+            err.Add(i, "E_VALUE", "'sampleAll' wants true or false");
+      }
+      else if (op == "brush")
+         V2BrushCheck(i, c, err, true);
+      else if (op == "gradient")
+      {
+         if (layerKind("layer", true, kind) && kind != Kind::Paint)
+            err.Add(i, "E_FIELD_NA", "gradient paints on a paint layer");
+         if (!(c.contains("from") && V2Pt(c["from"])) || !(c.contains("to") && V2Pt(c["to"])))
+            err.Add(i, "E_SHAPE", "'from' and 'to' want [x, y] in document px");
+         float tmp[4];
+         if (c.contains("colors") && (!c["colors"].is_array() || c["colors"].size() != 2 || !V2Color(c["colors"][0], tmp) ||
+                                      !V2Color(c["colors"][1], tmp)))
+            err.Add(i, "E_VALUE", "'colors' wants two colours [[r, g, b], [r, g, b]]");
+         for (const char* k : { "color", "colorB" })
+            if (c.contains(k) && !V2Color(c[k], tmp))
+               err.Add(i, "E_VALUE", std::string("'") + k + "' wants [r, g, b], 0..1");
+         if (c.contains("kind") && (!c["kind"].is_string() || V2Pick(kV2Gradients, c["kind"].get<std::string>()) < 0))
+            err.Add(i, "E_ENUM", "not a gradient kind", V2Near(c["kind"].is_string() ? c["kind"].get<std::string>() : "", V2NamesOf(kV2Gradients)));
+         if (c.contains("extend") && (!c["extend"].is_string() || V2Pick(kV2Extends, c["extend"].get<std::string>()) < 0))
+            err.Add(i, "E_ENUM", "not a way past the ends", V2NamesOf(kV2Extends));
+      }
+      else if (op == "path" || op == "svg")
+      {
+         if (c.contains("above"))
+            layerKind("above", false, kind);
+         if (op == "path")
+         {
+            std::vector<Scene2DNode::Shape> shapes;
+            std::string why;
+            if (!V2PathShapes(c, shapes, why))
+               err.Add(i, "E_SHAPE", why.empty() ? std::string("the path data does not parse") : why);
+            float tmp[4];
+            for (const char* k : { "fill", "stroke" })
+               if (c.contains(k) && !c[k].is_boolean() && !c[k].is_null() && !V2Color(c[k], tmp))
+                  err.Add(i, "E_VALUE", std::string("'") + k + "' wants a colour [r, g, b(, a)] or false");
+            if (c.contains("width") && !c["width"].is_number())
+               err.Add(i, "E_VALUE", "'width' wants a number, px");
+            made.push_back(Kind::Vector);
+         }
+         else
+         {
+            std::vector<Scene2DNode::SvgItem> items;
+            float w = 0, h = 0;
+            std::string why;
+            if (!c.contains("svg") || !c["svg"].is_string() || c["svg"].get<std::string>().size() > kV2TextMax)
+               err.Add(i, "E_SHAPE", "'svg' wants the SVG text (under 1 MB)");
+            else if (!Scene2DNode::SvgToItems(c["svg"].get<std::string>(), items, w, h, &why) || items.empty())
+               err.Add(i, "E_SHAPE", why.empty() ? std::string("no shapes to import in the SVG") : why);
+            if (c.contains("at") && !V2Pt(c["at"]))
+               err.Add(i, "E_SHAPE", "'at' wants [x, y] in document px (the SVG's top left)");
+            if (c.contains("scale") && !(c["scale"].is_number() && c["scale"].get<float>() > 0.0f))
+               err.Add(i, "E_VALUE", "'scale' wants a number above 0");
+            made.push_back(items.size() > 1 ? Kind::Group : Kind::Vector);
+         }
+      }
+      else if (op == "mask")
+      {
+         static const std::vector<std::string> kActs = { "add", "fromSelection", "invert", "apply", "remove" };
+         const std::string a = c.value("action", std::string());
+         layerKind("layer", true, kind);
+         if (V2Index(kActs, a) < 0)
+            err.Add(i, "E_ENUM", "'action' wants one of these", V2Near(a, kActs));
+      }
+      else if (op == "effect")
+      {
+         static const std::vector<std::string> kActs = { "add", "set", "remove" };
+         const std::string a = c.value("action", std::string("add"));
+         Kind lk = Kind::Fill;
+         const bool hasLayer = layerKind("layer", true, lk);
+         if (V2Index(kActs, a) < 0)
+            err.Add(i, "E_ENUM", "'action' wants add, set or remove", V2Near(a, kActs));
+         if (a == "add" && !(c.contains("name") && c["name"].is_string() && V2Index(V2AdjNames(), c["name"].get<std::string>()) >= 0))
+            err.Add(i, "E_ENUM", "'name' wants an adjustment", V2Near(c.value("name", std::string()), V2AdjNames()));
+         if ((a == "remove" || (a == "set" && !(hasLayer && lk == Kind::Adjust))) && !(c.contains("index") && c["index"].is_number_integer()))
+            err.Add(i, "E_SHAPE", "'index' wants the effect's place in the layer's stack (0 = first)");
+         if (hasLayer && c.contains("index") && c["index"].is_number_integer() && c["layer"].get<int>() != -1)
+         {
+            const Layer* l = doc != nullptr ? doc->FindLayer(c["layer"].get<int>()) : nullptr;
+            const int ix = c["index"].get<int>();
+            if (l != nullptr && (ix < 0 || ix >= (int)l->effects.size()))
+               err.Add(i, "E_LAYER", "layer " + std::to_string(l->id) + " has " + std::to_string(l->effects.size()) + " effects");
+         }
+         if (c.contains("blend") && (!c["blend"].is_string() || V2Index(V2EffBlendNames(), c["blend"].get<std::string>()) < 0))
+            err.Add(i, "E_ENUM", "not an effect blend", V2EffBlendNames());
+         if (c.contains("points") && !V2Nums(c["points"], 4, 2))
+            err.Add(i, "E_VALUE", "'points' wants curve points [x0, y0, x1, y1, ...], 0..1");
+         if (c.contains("levels") && !(V2Nums(c["levels"], 4, 4) && c["levels"].size() == 4))
+            err.Add(i, "E_VALUE", "'levels' wants [inBlack, inWhite, outBlack, outWhite], 0..1");
+         if (c.contains("params") && !V2Nums(c["params"], 0, 1))
+            err.Add(i, "E_VALUE", "'params' wants numbers");
+         float tmp[4];
+         for (const char* k : { "colorA", "colorB" })
+            if (c.contains(k) && !V2Color(c[k], tmp))
+               err.Add(i, "E_VALUE", std::string("'") + k + "' wants [r, g, b], 0..1");
+      }
+      else if (op == "style")
+      {
+         layerKind("layer", true, kind);
+         if (!(c.contains("name") && c["name"].is_string() && V2Index(V2FxNames(), c["name"].get<std::string>()) >= 0))
+            err.Add(i, "E_ENUM", "'name' wants a layer style", V2Near(c.value("name", std::string()), V2FxNames()));
+         float tmp[4];
+         if (c.contains("color") && !V2Color(c["color"], tmp))
+            err.Add(i, "E_VALUE", "'color' wants [r, g, b(, a)], 0..1");
+         if (c.contains("position") && (!c["position"].is_string() || V2Pick(kV2StrokePos, c["position"].get<std::string>()) < 0))
+            err.Add(i, "E_ENUM", "'position' wants outside, inside or centre");
+         for (const char* k : { "angle", "distance", "size", "spread", "opacity" })
+            if (c.contains(k) && !c[k].is_number())
+               err.Add(i, "E_VALUE", std::string("'") + k + "' wants a number");
       }
       else
-         err.Add(i, "E_OP", "'" + op + "' is not an op", V2Near(op, { "add", "set", "move", "remove", "select", "fill", "stroke" }));
+         err.Add(i, "E_OP", "'" + op + "' is not an op",
+                 V2Near(op, { "add", "set", "move", "remove", "select", "fill", "stroke", "brush", "gradient", "path", "svg", "mask",
+                              "effect", "style" }));
    }
 
    // Applies one call that passed the gate; false when it still could not (the batch rolls back).
@@ -16687,6 +17245,55 @@ namespace
             if (doc->SelectObjectAi(r[0], r[1], r[2], r[3], sop, all, lid) == 0)
                doc->SelectObject(r[0], r[1], r[2], r[3], sop, all, lid);
          }
+         else if (how == "color_range")
+         {
+            // Samples are document points picked from the picture (or one layer), or colours given outright.
+            const bool all = c.value("allLayers", true);
+            const int lid = c.contains("layer") ? id("layer") : 0;
+            std::vector<SelectMaths::Sample> samples;
+            if (c.contains("samples"))
+               for (const json& q : c["samples"])
+               {
+                  SelectMaths::Sample s;
+                  s.x = q[0].get<float>(), s.y = q[1].get<float>();
+                  if (!doc->Pick(s.x, s.y, s.rgb, 3, all ? 0 : lid))
+                     return false;
+                  samples.push_back(s);
+               }
+            if (c.contains("colors"))
+               for (const json& q : c["colors"])
+               {
+                  SelectMaths::Sample s;
+                  float rgba[4];
+                  V2Color(q, rgba);
+                  std::copy(rgba, rgba + 3, s.rgb);
+                  samples.push_back(s);
+               }
+            SelectMaths::RangeParams rp;
+            rp.fuzziness = std::clamp(c.value("fuzziness", 40.0f), 0.0f, 200.0f);
+            return doc->SelectColorRange(samples, rp, c.value("invert", false), sop, all, lid);
+         }
+         else if (how == "grow" || how == "similar")
+            return doc->GrowSelection(how == "similar", std::clamp(c.value("tolerance", 32), 0, 255), c.value("allLayers", true),
+                                      c.contains("layer") ? id("layer") : 0);
+         else if (how == "depth")
+         {
+            // Near (1) to far (0) on the depth map. The map can take a second: the selection then lands when it is
+            // made, and the reply says "selection": "analysing".
+            const bool all = c.value("allLayers", true);
+            V2DepthJob j;
+            j.on = true;
+            if (c.contains("near"))
+               j.lo = c["near"][0].get<float>(), j.hi = c["near"][1].get<float>();
+            j.soft = std::clamp(c.value("soft", Scene2DNode::kAgentDepthSoft), 0.0f, 1.0f);
+            j.invert = c.value("invert", false);
+            j.op = sop;
+            if (doc->LiveSelActive() || !doc->LiveSelBegin(all, c.contains("layer") ? id("layer") : 0))
+               return false;
+            V2Depth() = j;
+            V2DepthTick(doc);
+            return true;
+         }
          else
          {
             const json& r = c["rect"];
@@ -16703,17 +17310,204 @@ namespace
          const int lid = id("layer");
          if (op == "fill")
             return doc->Bucket(lid, c["at"][0].get<float>(), c["at"][1].get<float>(), rgba, c.value("opacity", 1.0f),
-                               c.value("tolerance", 32), c.value("contiguous", true), false);
-         BrushEngine::Brush b;
-         b.size = c.value("size", tok::view2d_v2_apply);
-         b.hardness = c.value("hardness", 1.0f);
-         std::copy(rgba, rgba + 3, b.color);
+                               c.value("tolerance", 32), c.value("contiguous", true), c.value("sampleAll", false));
+         // The agent's brush with this stroke's overrides; pressure and tilt per point, as a pen sends them.
+         BrushEngine::Brush b = V2Brush();
+         V2BrushFrom(c, b);
+         if (!c.contains("color"))
+            std::copy(V2Brush().color, V2Brush().color + 3, b.color);
+         if (c.contains("sourceOffset"))
+            b.sourceOffset[0] = c["sourceOffset"][0].get<float>(), b.sourceOffset[1] = c["sourceOffset"][1].get<float>();
+         const int target = c.contains("target") ? std::max(0, V2Pick(kV2Targets, c["target"].get<std::string>())) : 0;
          const json& pts = c["points"];
-         if (!doc->BeginPaint(lid, 0, b, pts[0].get<float>(), pts[1].get<float>(), 1.0f))
+         auto pressure = [&](size_t k) { return c.contains("pressure") ? std::clamp(c["pressure"][k].get<float>(), 0.0f, 1.0f) : 1.0f; };
+         auto tilt = [&](size_t k) {
+            if (c.contains("tilt"))
+               doc->SetPaintMeta(c["tilt"][2 * k].get<float>(), c["tilt"][2 * k + 1].get<float>(), 0.0f, (double)k / 120.0);
+         };
+         tilt(0);
+         if (!doc->BeginPaint(lid, target, b, pts[0].get<float>(), pts[1].get<float>(), pressure(0)))
             return false;
-         for (size_t k = 2; k + 1 < pts.size(); k += 2)
-            doc->PaintTo(pts[k].get<float>(), pts[k + 1].get<float>(), 1.0f);
+         for (size_t k = 1; 2 * k + 1 < pts.size(); k++)
+         {
+            tilt(k);
+            doc->PaintTo(pts[2 * k].get<float>(), pts[2 * k + 1].get<float>(), pressure(k));
+         }
          doc->EndPaint();
+         return true;
+      }
+      if (op == "brush")
+      {
+         V2BrushFrom(c, V2Brush());
+         return true;
+      }
+      if (op == "gradient")
+      {
+         float a[4] = { 0, 0, 0, 1 }, b[4] = { 1, 1, 1, 1 };
+         if (c.contains("colors"))
+            V2Color(c["colors"][0], a), V2Color(c["colors"][1], b);
+         if (c.contains("color"))
+            V2Color(c["color"], a);
+         if (c.contains("colorB"))
+            V2Color(c["colorB"], b);
+         const int kind = c.contains("kind") ? V2Pick(kV2Gradients, c["kind"].get<std::string>()) : 1;
+         const int ext = c.contains("extend") ? V2Pick(kV2Extends, c["extend"].get<std::string>()) : 0;
+         return doc->Gradient(id("layer"), c["from"][0].get<float>(), c["from"][1].get<float>(), c["to"][0].get<float>(),
+                              c["to"][1].get<float>(), a, b, kind, std::clamp(c.value("opacity", 1.0f), 0.0f, 1.0f), ext,
+                              c.value("dither", true));
+      }
+      if (op == "path")
+      {
+         std::vector<Scene2DNode::Shape> shapes;
+         std::string why;
+         if (!V2PathShapes(c, shapes, why))
+            return false;
+         V2PathStyle(c, shapes);
+         const int nid = doc->AddPathLayer(shapes, c.contains("above") ? id("above") : 0, c.value("name", std::string()));
+         last = nid;
+         made.push_back(nid);
+         return nid > 0;
+      }
+      if (op == "svg")
+      {
+         const float x = c.contains("at") ? c["at"][0].get<float>() : 0.0f, y = c.contains("at") ? c["at"][1].get<float>() : 0.0f;
+         std::string why;
+         const int nid = doc->ImportSvgEditable(c["svg"].get<std::string>(), c.contains("above") ? id("above") : 0, x, y,
+                                                c.value("scale", 1.0f), &why);
+         last = nid;
+         made.push_back(nid);
+         return nid > 0;
+      }
+      if (op == "mask")
+      {
+         const std::string a = c.value("action", std::string());
+         const int lid = id("layer");
+         if (a == "add")
+            return doc->AddPixelMask(lid);
+         if (a == "fromSelection")
+            return doc->MaskFromSelection(lid);
+         if (a == "invert")
+            return doc->InvertPixelMask(lid);
+         if (a == "apply")
+            return doc->ApplyPixelMask(lid);
+         doc->RemovePixelMask(lid);
+         return true;
+      }
+      if (op == "effect")
+      {
+         Layer* l = doc->FindLayer(id("layer"));
+         if (l == nullptr)
+            return false;
+         const std::string a = c.value("action", std::string("add"));
+         const int ix = c.value("index", -1);
+         if (a == "remove")
+         {
+            if (ix < 0 || ix >= (int)l->effects.size())
+               return false;
+            l->effects.erase(l->effects.begin() + ix);
+            doc->Commit();
+            return true;
+         }
+         Scene2DNode::Effect* e = nullptr;
+         if (a == "add")
+         {
+            l->effects.push_back(NewNativeEffect(V2Index(V2AdjNames(), c["name"].get<std::string>())));
+            e = &l->effects.back();
+         }
+         else if (ix >= 0 && ix < (int)l->effects.size())
+            e = &l->effects[(size_t)ix];
+         // The settings an effect shares with an adjustment layer; `set` without an index edits the layer's own.
+         int* type = e != nullptr ? &e->adjType : &l->adjType;
+         float* amt = e != nullptr ? &e->adjAmt : &l->adjAmt;
+         float* levels = e != nullptr ? e->levels : l->levels;
+         std::vector<float>* curve = e != nullptr ? &e->curve : &l->curve;
+         std::vector<float>* adjP = e != nullptr ? &e->adjP : &l->adjP;
+         float* colA = e != nullptr ? e->colorA : l->colorA;
+         float* colB = e != nullptr ? e->colorB : l->colorB;
+         if (e == nullptr && l->kind != Kind::Adjust)
+            return false;
+         if (a == "set" && c.contains("name"))
+         {
+            const int t = V2Index(V2AdjNames(), c["name"].get<std::string>());
+            if (t >= 0 && t != *type)
+            {
+               *type = t;
+               *amt = Scene2DNode::AdjDefault(t);
+               *adjP = Scene2DNode::AdjParamDefault(t);
+            }
+         }
+         if (c.contains("amount"))
+         {
+            *amt = c["amount"].get<float>();
+            if (e == nullptr)
+               l->adjTo = *amt;
+         }
+         if (c.contains("levels"))
+            for (int k = 0; k < 4; k++)
+               levels[k] = std::clamp(c["levels"][k].get<float>(), 0.0f, 1.0f);
+         if (c.contains("points"))
+         {
+            // Sorted by x with the ends in, as the Curves graph keeps them.
+            std::vector<std::pair<float, float>> p;
+            for (size_t k = 0; k + 1 < c["points"].size(); k += 2)
+               p.push_back({ std::clamp(c["points"][k].get<float>(), 0.0f, 1.0f), std::clamp(c["points"][k + 1].get<float>(), 0.0f, 1.0f) });
+            std::sort(p.begin(), p.end());
+            curve->clear();
+            for (const auto& q : p)
+               curve->insert(curve->end(), { q.first, q.second });
+         }
+         if (c.contains("params"))
+         {
+            const int n = Scene2DNode::AdjParamCount(*type);
+            if ((int)adjP->size() < n)
+               adjP->resize((size_t)n, 0.0f);
+            for (size_t k = 0; k < c["params"].size() && (int)k < n; k++)
+               (*adjP)[k] = c["params"][k].get<float>();
+         }
+         if (c.contains("colorA"))
+            V2Color(c["colorA"], colA);
+         if (c.contains("colorB"))
+            V2Color(c["colorB"], colB);
+         if (e != nullptr)
+         {
+            if (c.contains("opacity"))
+               e->opacity = std::clamp(c["opacity"].get<float>(), 0.0f, 1.0f);
+            if (c.contains("blend"))
+               e->blend = std::max(0, V2Index(V2EffBlendNames(), c["blend"].get<std::string>()));
+            if (c.contains("on"))
+               e->on = c["on"].get<bool>();
+         }
+         doc->Commit();
+         return true;
+      }
+      if (op == "style")
+      {
+         Layer* l = doc->FindLayer(id("layer"));
+         const int f = V2Index(V2FxNames(), c["name"].get<std::string>());
+         if (l == nullptr || f < 0)
+            return false;
+         Scene2DNode::Fx& fx = l->fx[f];
+         fx.on = c.value("on", true);
+         if (c.contains("color"))
+         {
+            const float keep = fx.c[3];
+            V2Color(c["color"], fx.c);
+            if (!(c["color"].is_array() && c["color"].size() == 4))
+               fx.c[3] = keep;
+         }
+         if (c.contains("opacity"))
+            fx.c[3] = std::clamp(c["opacity"].get<float>(), 0.0f, 1.0f);
+         if (c.contains("angle"))
+            fx.angle = c["angle"].get<float>();
+         if (c.contains("distance"))
+            fx.dist = std::max(0.0f, c["distance"].get<float>());
+         if (c.contains("size"))
+            fx.size = std::max(0.0f, c["size"].get<float>());
+         if (c.contains("spread"))
+            fx.spread = std::clamp(c["spread"].get<float>(), 0.0f, 1.0f);
+         if (c.contains("position"))
+            fx.pos = V2Pick(kV2StrokePos, c["position"].get<std::string>());
+         doc->Commit();
          return true;
       }
       return false;
@@ -16737,7 +17531,37 @@ bool View2DRpc(const json& params, json& out, std::string& error)
    }
    if (op == "fields")
    {
-      out = { { "fields", V2FieldNames() }, { "blends", BlendModes::Names() } };
+      out = { { "fields", V2FieldNames() }, { "blends", BlendModes::Names() }, { "presets", V2PresetNames() },
+              { "tips", BrushEngine::TipNames() }, { "tools", V2NamesOf(kV2Tools) }, { "effects", V2AdjNames() },
+              { "effectBlends", V2EffBlendNames() }, { "styles", V2FxNames() }, { "gradients", V2NamesOf(kV2Gradients) },
+              { "brushKeys", kV2BrushKeys },
+              { "limits", { { "calls", kV2CallsMax }, { "points", kV2PointsMax }, { "adds", kV2AddsMax }, { "text", kV2TextMax },
+                            { "look", kV2LookMax } } } };
+      return true;
+   }
+   if (op == "look")
+   {
+      V2DepthTick(doc);
+      return V2Look(doc, params, out, error);
+   }
+   if (op == "undo" || op == "redo")
+   {
+      // Only the agent's own steps: a user's edit on top is theirs to undo.
+      const std::string top = op == "undo" ? UndoLabelAt(0) : RedoLabelAt(0);
+      if (top.rfind("Agent: ", 0) != 0)
+      {
+         out = { { "ok", false },
+                 { "errors", json::array({ { { "code", "E_UNDO" },
+                                             { "message", top.empty() ? "nothing to " + op
+                                                                      : "the last step is not the agent's (" + top + "); the user undoes it" } } }) } };
+         return true;
+      }
+      if (op == "undo")
+         Undo();
+      else
+         Redo();
+      Touch();
+      out = { { "ok", true }, { op, top } };
       return true;
    }
    // Writes: one call or a batch, all through the gate.
@@ -16755,11 +17579,26 @@ bool View2DRpc(const json& params, json& out, std::string& error)
       calls.push_back(params);
    V2Err err;
    std::vector<Kind> made;
+   // Limits: one batch is one undo step a person can still read, and one frame's work.
+   size_t points = 0;
+   for (const json& c : calls)
+      if (c.is_object() && c.contains("points") && c["points"].is_array())
+         points += c["points"].size() / tok::view2d_points_period;
+   if (calls.size() > kV2CallsMax || points > kV2PointsMax)
+   {
+      out = { { "ok", false },
+              { "errors", json::array({ { { "code", "E_LIMIT" },
+                                          { "message", calls.size() > kV2CallsMax ? "a batch takes up to " + std::to_string(kV2CallsMax) + " calls"
+                                                                                  : "a batch takes up to " + std::to_string(kV2PointsMax) + " stroke points" } } }) } };
+      return true;
+   }
    for (size_t i = 0; i < calls.size(); i++)
       if (calls[i].is_object())
          V2Check(doc, i, calls[i], made, err);
       else
          err.Add(i, "E_SHAPE", "each call is an object {op, ...}");
+   if (made.size() > kV2AddsMax)
+      err.Add(calls.size() - 1, "E_LIMIT", "a batch makes up to " + std::to_string(kV2AddsMax) + " layers");
    if (!err.list.empty())
    {
       out = { { "ok", false }, { "errors", err.list } };
@@ -16790,7 +17629,7 @@ bool View2DRpc(const json& params, json& out, std::string& error)
    sSel.erase(std::remove_if(sSel.begin(), sSel.end(), [&](int id) { return doc->FindLayer(id) == nullptr; }), sSel.end());
    Touch();
    out = { { "ok", true }, { "ids", ids }, { "undo", label } };
-   if (doc->AiSelectWaiting())
+   if (doc->AiSelectWaiting() || V2Depth().on)
       out["selection"] = "analysing";
    return true;
 }
@@ -20118,6 +20957,129 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       View2DRpc({ { "op", "apply" }, { "calls", json::array({ { { "op", "select" }, { "shape", "object" } } }) } }, out, err);
       expect("H5: select object without a box or a point is a typed error",
              !out.value("ok", true) && out["errors"].size() == 1 && out["errors"][0]["code"] == "E_SHAPE");
+      if (doc == nullptr)
+         return fails;
+   }
+   // Block 3 (ai-tools.md 3.1-3.6): the agent looks, paints with a pen's pressure, draws paths and SVG, selects by
+   // colour, grows, masks, stacks effects and styles, and undoes only its own steps.
+   {
+      using nlohmann::json;
+      json out;
+      std::string err;
+      auto apply = [&](json calls) {
+         out = json();
+         err.clear();
+         View2DRpc({ { "op", "apply" }, { "label", "block3" }, { "calls", calls } }, out, err);
+         doc = FindDoc();
+         return out.value("ok", false);
+      };
+      auto firstCode = [&]() { return out.contains("errors") && !out["errors"].empty() ? out["errors"][0].value("code", std::string()) : std::string(); };
+      const int W = doc->Doc().w, H = doc->Doc().h;
+      const float cx = W * 0.5f, cy = H * 0.5f;
+      // look: a stroke shows up in the next look's changed box.
+      const bool madePaint = apply(json::array({ { { "op", "add" }, { "kind", "paint" } } }));
+      const int pl = madePaint ? out["ids"][0].get<int>() : 0;
+      json look;
+      View2DRpc({ { "op", "look" }, { "layer", pl }, { "max", 256 }, { "inline", true } }, look, err);
+      expect("B3: look returns a PNG no bigger than max", look.value("ok", false) && look["size"][0].get<int>() <= 256 &&
+                                                            look["size"][1].get<int>() <= 256 && look.value("png", std::string()).size() > 16);
+      apply(json::array({ { { "op", "stroke" }, { "layer", pl }, { "points", { cx - 60, cy, cx + 60, cy } }, { "size", 12 }, { "color", { 1, 0, 0 } } } }));
+      look = json();
+      View2DRpc({ { "op", "look" }, { "layer", pl }, { "max", 256 }, { "inline", true } }, look, err);
+      const json ch = look.contains("diff") && look["diff"].is_object() ? look["diff"].value("changed", json()) : json();
+      const bool boxOk = ch.is_array() && ch.size() == 4 && ch[0].get<float>() < cx - 40 && ch[2].get<float>() > cx + 40 &&
+                         ch[1].get<float>() < cy && ch[3].get<float>() > cy && ch[3].get<float>() - ch[1].get<float>() < 60;
+      expect("B3: look after a stroke reports where it landed", boxOk);
+      // Pressure: with pressureSize on, a ramp from full to light narrows the stroke.
+      apply(json::array({ { { "op", "brush" }, { "preset", "Hard round" }, { "pressureSize", true } },
+                          { { "op", "stroke" }, { "layer", pl }, { "points", { cx - 80, cy + 60, cx, cy + 60, cx + 80, cy + 60 } },
+                            { "pressure", { 1.0, 0.55, 0.1 } }, { "size", 30 }, { "color", { 0, 0, 1 } } } }));
+      std::vector<uint8_t> px;
+      doc->RenderLayerAlone(pl, 1 << 26, px);
+      auto tall = [&](int x) {
+         int n = 0;
+         for (int y = (int)cy + 30; y < (int)cy + 90 && y < H; y++)
+            n += px.size() == (size_t)W * H * 4 && px[((size_t)y * W + x) * 4 + 3] > 128 ? 1 : 0;
+         return n;
+      };
+      expect("B3: a pressure ramp narrows the stroke", tall((int)(cx - 70)) > tall((int)(cx + 70)) + 6);
+      // Brush names are checked; a misspelt preset gets the nearest.
+      apply(json::array({ { { "op", "brush" }, { "preset", "Hard rond" } } }));
+      expect("B3: a misspelt preset is a typed error with the nearest", firstCode() == "E_ENUM" && out["errors"][0]["near"][0] == "Hard round");
+      apply(json::array({ { { "op", "brush" }, { "pressureSize", false } } }));
+      // path: a star from SVG path data lands as one vector layer with its ten corners.
+      const bool star = apply(json::array({ { { "op", "path" }, { "d", "M50 0 L61 35 L98 35 L68 57 L79 91 L50 70 L21 91 L32 57 L2 35 L39 35 Z" },
+                                                { "fill", { 1, 0.8, 0 } } } }));
+      const Layer* sl = star ? doc->FindLayer(out["ids"][0].get<int>()) : nullptr;
+      expect("B3: a path's data lands as a vector layer, corners kept", sl != nullptr && sl->kind == Kind::Vector && sl->shapes.size() == 1 &&
+                                                                         sl->shapes[0].pts.size() == 60 && sl->shapes[0].closed);
+      // svg: two elements become two vector layers in a group.
+      const bool svg = apply(json::array({ { { "op", "svg" }, { "at", { 10, 10 } },
+                                             { "svg", "<svg viewBox='0 0 100 100'><rect x='0' y='0' width='40' height='40' fill='red'/>"
+                                                      "<circle cx='70' cy='70' r='20' fill='#00f'/></svg>" } } }));
+      const Layer* sg = svg ? doc->FindLayer(out["ids"][0].get<int>()) : nullptr;
+      int kids = 0;
+      if (sg != nullptr)
+         for (const Layer& x : doc->Layers())
+            kids += x.parent == sg->id && x.kind == Kind::Vector ? 1 : 0;
+      expect("B3: an SVG lands as editable vector layers in a group", sg != nullptr && sg->kind == Kind::Group && kids == 2);
+      apply(json::array({ { { "op", "svg" }, { "svg", "<svg><text>hi</text></svg>" } } }));
+      expect("B3: an SVG with nothing to import is a typed error", firstCode() == "E_SHAPE");
+      // gradient + color_range: black to white across a paint layer, then select the white end by a sample.
+      const bool grad = apply(json::array({ { { "op", "add" }, { "kind", "paint" } },
+                                            { { "op", "gradient" }, { "layer", -1 }, { "from", { 0, cy } }, { "to", { (float)W, cy } },
+                                              { "colors", { { 0, 0, 0 }, { 1, 1, 1 } } } } }));
+      const int gl = grad ? out["ids"][0].get<int>() : 0;
+      apply(json::array({ { { "op", "select" }, { "shape", "color_range" }, { "layer", gl }, { "allLayers", false },
+                            { "samples", { { W * 0.95f, cy } } }, { "fuzziness", 30 } } }));
+      expect("B3: color range selects the sampled end of a gradient",
+             out.value("ok", false) && doc->SelectionAt((int)(W * 0.95f), (int)cy) > 0.8f && doc->SelectionAt((int)(W * 0.05f), (int)cy) < 0.2f);
+      // grow: a box on the gradient grows along similar tones.
+      apply(json::array({ { { "op", "select" }, { "shape", "rect" }, { "rect", { W * 0.48f, cy - 4, W * 0.52f, cy + 4 } } },
+                          { { "op", "select" }, { "shape", "grow" }, { "tolerance", 40 }, { "layer", gl }, { "allLayers", false } } }));
+      expect("B3: grow reaches past the box", out.value("ok", false) && doc->SelectionAt((int)(W * 0.5f), (int)(cy + 40)) > 0.5f);
+      // depth: answers now, later ("analysing"), or a typed error when there is no model.
+      apply(json::array({ { { "op", "select" }, { "shape", "depth" }, { "near", { 0.5, 1.0 } } } }));
+      expect("B3: depth select answers or says what is missing", out.value("ok", false) || firstCode() == "E_MISSING");
+      // mask: from a selection, then inverted.
+      apply(json::array({ { { "op", "select" }, { "shape", "rect" }, { "rect", { 0, 0, W * 0.5f, (float)H } } },
+                          { { "op", "mask" }, { "layer", gl }, { "action", "fromSelection" } } }));
+      const Layer* ml = doc->FindLayer(gl);
+      expect("B3: mask from a selection", out.value("ok", false) && ml != nullptr && ml->HasPixelMask());
+      // effect: a curves effect with points is one undo step and keeps the points sorted.
+      const size_t u0 = gUndoStack.size();
+      apply(json::array({ { { "op", "effect" }, { "layer", gl }, { "action", "add" }, { "name", "Curves" },
+                            { "points", { 1, 1, 0, 0, 0.5, 0.7 } }, { "opacity", 0.8 } } }));
+      ml = doc->FindLayer(gl);
+      const bool curveOk = ml != nullptr && !ml->effects.empty() && ml->effects.back().curve.size() == 6 &&
+                           ml->effects.back().curve[2] == 0.5f && ml->effects.back().curve[3] == 0.7f && ml->effects.back().opacity == 0.8f;
+      expect("B3: a curves effect lands with its points, one undo step", out.value("ok", false) && curveOk && gUndoStack.size() == u0 + 1);
+      apply(json::array({ { { "op", "effect" }, { "layer", gl }, { "action", "set" }, { "index", 9 }, { "amount", 1 } } }));
+      expect("B3: an effect index past the stack is a typed error", firstCode() == "E_LAYER");
+      // style: a drop shadow switched on with its settings.
+      apply(json::array({ { { "op", "style" }, { "layer", gl }, { "name", "Drop Shadow" }, { "distance", 14 }, { "size", 6 }, { "opacity", 0.5 } } }));
+      ml = doc->FindLayer(gl);
+      expect("B3: a layer style lands", out.value("ok", false) && ml != nullptr && ml->fx[0].on && ml->fx[0].dist == 14.0f && ml->fx[0].c[3] == 0.5f);
+      // Limits.
+      json many = json::array();
+      for (size_t k = 0; k <= kV2CallsMax; k++)
+         many.push_back({ { "op", "select" }, { "shape", "none" } });
+      apply(many);
+      expect("B3: too many calls is E_LIMIT", firstCode() == "E_LIMIT");
+      // Undo: the agent's step undoes over RPC; a user's step on top is refused.
+      json u;
+      View2DRpc({ { "op", "undo" } }, u, err);
+      doc = FindDoc();
+      expect("B3: agent undo takes back the agent's own step", u.value("ok", false));
+      PushUndoCheckpoint("Rename layer");
+      u = json();
+      View2DRpc({ { "op", "undo" } }, u, err);
+      expect("B3: agent undo after a user edit is refused", !u.value("ok", true) && u["errors"][0]["code"] == "E_UNDO");
+      Undo();   // the user's own checkpoint
+      // Clean up: every Block 3 step back off.
+      while (!gUndoStack.empty() && UndoLabelAt(0).rfind("Agent: block3", 0) == 0)
+         Undo();
+      doc = FindDoc();
       if (doc == nullptr)
          return fails;
    }

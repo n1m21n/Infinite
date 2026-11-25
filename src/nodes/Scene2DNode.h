@@ -930,6 +930,34 @@ public:
    std::string ToSvg(const Layer& l);
    // An SVG file's text as one item filling (or fitting) the document; false on a parse error.
    bool ImportSvg(int id, const std::string& svgText);
+   // SVG as editable pen paths (Scene2DSvgEdit.cpp, the agent's `path` / `svg` ops). One item per drawable element,
+   // its subpaths after the first cutting holes (Xor). Points in the SVG's own px (viewBox mapped), y down.
+   struct SvgItem
+   {
+      std::string name;
+      std::vector<Shape> shapes;
+   };
+   static bool PathDataToShapes(const std::string& d, std::vector<Shape>& out, std::string* err = nullptr);
+   static bool SvgToItems(const std::string& svg, std::vector<SvgItem>& out, float& w, float& h, std::string* err = nullptr,
+                          int* skipped = nullptr);
+   // A new vector layer above `above` holding the shapes, given in document px. One commit; 0 when empty.
+   int AddPathLayer(const std::vector<Shape>& docShapes, int above, const std::string& name = std::string());
+   // Each element a vector layer, grouped when more than one: doc px = (x, y) + svg px * scale. The group's id (or
+   // the one layer's), 0 with err set.
+   int ImportSvgEditable(const std::string& svg, int above, float x, float y, float scale, std::string* err = nullptr,
+                         int* skipped = nullptr);
+   // The agent surface (ai-tools.md 3.1, 3.6). Limits keep one batch one readable undo step and one frame's work.
+   static constexpr size_t kAgentCalls = 256, kAgentPoints = 40000, kAgentAdds = 64, kAgentText = size_t(1) << 20;
+   static constexpr int kAgentLookMin = 32, kAgentLookDefault = 768, kAgentLookMax = 2048;
+   static constexpr float kAgentStrokeMax = 1000.0f;                     // a path's stroke width, px
+   static constexpr float kAgentDepthLo = 0.5f, kAgentDepthSoft = 0.05f;  // Depth Select: the near half, a soft edge
+   // `look`: the picture (layer 0) or one layer, cropped to [x0, x1) x [y0, y1) document px and box-filtered to at most
+   // maxSide a side; RGBA, rows top first. scale = output px per document px.
+   bool AgentLook(int layer, int x0, int y0, int x1, int y1, int maxSide, int frameId, std::vector<uint8_t>& img, int& w, int& h,
+                  float& scale);
+   // Two looks the same size: the changed box in image px (box[2], box[3] exclusive) and the mean change 0..1. False
+   // when no pixel moved past the noise floor.
+   static bool AgentLookDiff(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b, int w, int h, int box[4], double& mean);
    // A text's raster size (the box a text layer has), cached.
    bool TextSize(const Layer& l, int& w, int& h);
    // Type on / in a path, vertical type and Warp Text (Scene2DType.cpp).
