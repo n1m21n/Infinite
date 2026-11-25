@@ -533,6 +533,35 @@ public:
    // Bucket fill at a document point, within `tolerance` (0..255) of the
    // clicked colour; contiguous or everywhere; sampled from the layer or the picture.
    bool Bucket(int id, float x, float y, const float rgb[3], float opacity, int tolerance, bool contiguous, bool sampleAll);
+   // ---- Remove tool (ai-tools.md 1.8) ----
+   // One stroke of the Remove tool: its points in document px (top row first) and its own brush radius.
+   struct RemoveStroke
+   {
+      std::vector<float> xy;   // x0 y0 x1 y1 ...
+      float size = 20.0f;      // the brush's diameter, document px
+      float Radius() const { return std::max(0.5f, size * 0.5f); }
+      size_t Points() const { return xy.size() / 2; }
+      float X(size_t k) const { return xy[k * 2]; }
+      float Y(size_t k) const { return xy[k * 2 + 1]; }
+      // Adds a point unless it repeats the last one.
+      void Add(float x, float y)
+      {
+         if (xy.empty() || X(Points() - 1) != x || Y(Points() - 1) != y)
+         {
+            xy.push_back(x);
+            xy.push_back(y);
+         }
+      }
+   };
+   // Removes what the strokes cover, all of them as one job: a stroke that closes on itself takes in what it
+   // encloses, the hole grows 2 px past the object's halo, the selection (if any) limits it, and the pixels are
+   // rebuilt from around it (a membrane fill for the colour, patches from nearby for the texture). It reads the
+   // layer `id`, or the picture with sampleAll; it writes into `id`, or with newLayer into a new paint layer above
+   // `id` named "Remove Tool Edits" (then " 1", " 2": the first free name). Returns the layer written, 0 when
+   // nothing changed (an empty layer, a hole the selection hides, a locked or transformed layer).
+   int Remove(int id, const std::vector<RemoveStroke>& strokes, bool sampleAll, bool newLayer);
+   // The name the next new Remove layer takes.
+   std::string RemoveLayerName() const;
    // Gradient from a to b (document px), colour A to B; radial when `radial`.
    // kind: 1 linear, 2 radial, 3 angle, 4 reflected, 5 diamond.
    // extend: past the ends 0 holds the end colour, 1 repeats, 2 reflects; dither breaks up 8-bit banding.
@@ -546,6 +575,7 @@ public:
    void SetUndoSource(int id);
    // Rebuilds the masked pixels (mask 0..255, w x h) from around them; `off` px to a clean patch, or the best nearby
    // one when autoOff. Rows and offset in the same frame as px.
+   static bool RemoveRegion(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& mask);
    static bool HealRegion(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& mask, int ox, int oy, bool autoOff);
    // Patch: the selected pixels healed from the place (dx, dy) document px away.
    // Patch: the selection mended from where it was dragged to; selIsSource sends its own pixels there instead;

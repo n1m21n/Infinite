@@ -569,6 +569,239 @@ namespace SelectMaths
       }
    }
 
+   // ---- Remove tool's hole ---------------------------------------------------------------------------------------
+   void CloseRings(std::vector<uint8_t>& mask, int w, int h)
+   {
+      if (w <= 0 || h <= 0 || mask.size() != (size_t)w * h)
+         return;
+      std::vector<uint8_t> out((size_t)w * h, 0);   // 1 = background reached from the border
+      std::vector<int> q;
+      auto push = [&](int x, int y) {
+         const size_t i = (size_t)y * w + x;
+         if (mask[i] == 0 && out[i] == 0)
+         {
+            out[i] = 1;
+            q.push_back((int)i);
+         }
+      };
+      for (int x = 0; x < w; x++)
+      {
+         push(x, 0);
+         push(x, h - 1);
+      }
+      for (int y = 0; y < h; y++)
+      {
+         push(0, y);
+         push(w - 1, y);
+      }
+      for (size_t k = 0; k < q.size(); k++)
+      {
+         const int x = q[k] % w, y = q[k] / w;
+         if (x > 0) push(x - 1, y);
+         if (x + 1 < w) push(x + 1, y);
+         if (y > 0) push(x, y - 1);
+         if (y + 1 < h) push(x, y + 1);
+      }
+      for (size_t i = 0; i < mask.size(); i++)
+         if (mask[i] == 0 && out[i] == 0)
+            mask[i] = 255;
+   }
+
+   namespace
+   {
+      // Squared Euclidean distance to the nearest pixel where `seed` is true (Felzenszwalb and Huttenlocher 2012).
+      void DistanceSq(const std::vector<uint8_t>& seed, int w, int h, std::vector<float>& d)
+      {
+         const float inf = 1e20f;
+         d.assign((size_t)w * h, inf);
+         for (size_t i = 0; i < d.size(); i++)
+            if (seed[i])
+               d[i] = 0.0f;
+         const int n = std::max(w, h);
+         std::vector<float> f(n), dd(n), z(n + 1);
+         std::vector<int> v(n);
+         auto pass = [&](int len) {
+            int k = 0;
+            v[0] = 0;
+            z[0] = -inf;
+            z[1] = inf;
+            for (int q = 1; q < len; q++)
+            {
+               float s = ((f[q] + (float)q * q) - (f[v[k]] + (float)v[k] * v[k])) / (2.0f * q - 2.0f * v[k]);
+               while (s <= z[k])
+               {
+                  k--;
+                  s = ((f[q] + (float)q * q) - (f[v[k]] + (float)v[k] * v[k])) / (2.0f * q - 2.0f * v[k]);
+               }
+               k++;
+               v[k] = q;
+               z[k] = s;
+               z[k + 1] = inf;
+            }
+            k = 0;
+            for (int q = 0; q < len; q++)
+            {
+               while (z[k + 1] < q)
+                  k++;
+               dd[q] = (float)(q - v[k]) * (q - v[k]) + f[v[k]];
+            }
+         };
+         for (int x = 0; x < w; x++)
+         {
+            for (int y = 0; y < h; y++)
+               f[y] = d[(size_t)y * w + x];
+            pass(h);
+            for (int y = 0; y < h; y++)
+               d[(size_t)y * w + x] = dd[y];
+         }
+         for (int y = 0; y < h; y++)
+         {
+            for (int x = 0; x < w; x++)
+               f[x] = d[(size_t)y * w + x];
+            pass(w);
+            for (int x = 0; x < w; x++)
+               d[(size_t)y * w + x] = dd[x];
+         }
+      }
+   }
+
+   float HoleRadius(const std::vector<uint8_t>& mask, int w, int h)
+   {
+      if (w <= 0 || h <= 0 || mask.size() != (size_t)w * h)
+         return 0.0f;
+      std::vector<uint8_t> outside((size_t)w * h);
+      bool any = false;
+      for (size_t i = 0; i < mask.size(); i++)
+      {
+         outside[i] = mask[i] == 0;
+         any = any || mask[i] != 0;
+      }
+      if (!any)
+         return 0.0f;
+      std::vector<float> d;
+      DistanceSq(outside, w, h, d);
+      float best = 0.0f;
+      for (size_t i = 0; i < mask.size(); i++)
+         if (mask[i] != 0 && d[i] < 1e19f)
+            best = std::max(best, d[i]);
+      return best > 0.0f ? std::sqrt(best) : (float)std::max(w, h);   // no outside at all: the whole picture
+   }
+
+   void Dilate(std::vector<uint8_t>& mask, int w, int h, float r)
+   {
+      if (w <= 0 || h <= 0 || mask.size() != (size_t)w * h || !(r > 0.0f))
+         return;
+      std::vector<uint8_t> in((size_t)w * h);
+      for (size_t i = 0; i < mask.size(); i++)
+         in[i] = mask[i] != 0;
+      std::vector<float> d;
+      DistanceSq(in, w, h, d);
+      const float r2 = r * r;
+      for (size_t i = 0; i < mask.size(); i++)
+         if (mask[i] == 0 && d[i] <= r2)
+            mask[i] = 255;
+   }
+
+   void HarmonicFill(std::vector<float>& img, int ch, const std::vector<uint8_t>& hole, int w, int h)
+   {
+      if (w <= 0 || h <= 0 || ch <= 0 || hole.size() != (size_t)w * h || img.size() != (size_t)w * h * ch)
+         return;
+      size_t holes = 0;
+      for (uint8_t v : hole)
+         holes += v != 0;
+      if (holes == 0 || holes == hole.size())
+         return;   // nothing to fill, or nothing to fill it from
+      if (w > 8 && h > 8)
+      {
+         // The level below: a cell is known when any of its pixels is, with their mean.
+         const int cw = (w + 1) / 2, chh = (h + 1) / 2;
+         std::vector<float> cimg((size_t)cw * chh * ch, 0.0f);
+         std::vector<uint8_t> chole((size_t)cw * chh, 1);
+         std::vector<int> cn((size_t)cw * chh, 0);
+         for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+               const size_t i = (size_t)y * w + x;
+               if (hole[i])
+                  continue;
+               const size_t c = (size_t)(y / 2) * cw + x / 2;
+               for (int k = 0; k < ch; k++)
+                  cimg[c * ch + k] += img[i * ch + k];
+               cn[c]++;
+            }
+         for (size_t c = 0; c < cn.size(); c++)
+            if (cn[c] > 0)
+            {
+               chole[c] = 0;
+               for (int k = 0; k < ch; k++)
+                  cimg[c * ch + k] /= cn[c];
+            }
+         HarmonicFill(cimg, ch, chole, cw, chh);
+         for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+               const size_t i = (size_t)y * w + x;
+               if (!hole[i])
+                  continue;
+               const float fx = std::clamp((x + 0.5f) / 2.0f - 0.5f, 0.0f, (float)cw - 1), fy = std::clamp((y + 0.5f) / 2.0f - 0.5f, 0.0f, (float)chh - 1);
+               const int ix = (int)fx, iy = (int)fy, jx = std::min(cw - 1, ix + 1), jy = std::min(chh - 1, iy + 1);
+               const float tx = fx - ix, ty = fy - iy;
+               for (int k = 0; k < ch; k++)
+               {
+                  auto at = [&](int xx, int yy) { return cimg[((size_t)yy * cw + xx) * ch + k]; };
+                  img[i * ch + k] = (at(ix, iy) * (1 - tx) + at(jx, iy) * tx) * (1 - ty) + (at(ix, jy) * (1 - tx) + at(jx, jy) * tx) * ty;
+               }
+            }
+      }
+      else
+      {
+         std::vector<double> mean(ch, 0.0);
+         for (size_t i = 0; i < hole.size(); i++)
+            if (!hole[i])
+               for (int k = 0; k < ch; k++)
+                  mean[k] += img[i * ch + k];
+         for (size_t i = 0; i < hole.size(); i++)
+            if (hole[i])
+               for (int k = 0; k < ch; k++)
+                  img[i * ch + k] = (float)(mean[k] / (double)(hole.size() - holes));
+      }
+      // Red-black over-relaxation on the hole only; image edges are mirror (no flow out).
+      std::vector<int> idx;
+      idx.reserve(holes);
+      for (size_t i = 0; i < hole.size(); i++)
+         if (hole[i])
+            idx.push_back((int)i);
+      const float omega = 1.8f;
+      for (int it = 0; it < 120; it++)
+      {
+         float worst = 0.0f;
+         for (int colour = 0; colour < 2; colour++)
+            for (int i : idx)
+            {
+               const int x = i % w, y = i / w;
+               if (((x + y) & 1) != colour)
+                  continue;
+               int nb[4], n = 0;
+               if (x > 0) nb[n++] = i - 1;
+               if (x + 1 < w) nb[n++] = i + 1;
+               if (y > 0) nb[n++] = i - w;
+               if (y + 1 < h) nb[n++] = i + w;
+               for (int k = 0; k < ch; k++)
+               {
+                  float s = 0.0f;
+                  for (int q = 0; q < n; q++)
+                     s += img[(size_t)nb[q] * ch + k];
+                  float& v = img[(size_t)i * ch + k];
+                  const float d = omega * (s / n - v);
+                  v += d;
+                  worst = std::max(worst, std::fabs(d));
+               }
+            }
+         if (worst < 1e-5f)
+            break;
+      }
+   }
+
    // ---- Depth --------------------------------------------------------------------------------------------------
    void DepthSelect(const std::vector<float>& depth, int w, int h, float lo, float hi, float soft, std::vector<uint8_t>& out)
    {

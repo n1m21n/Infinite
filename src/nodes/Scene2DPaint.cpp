@@ -476,6 +476,158 @@ bool Scene2DNode::HealRegion(std::vector<uint8_t>& px, int w, int h, const std::
    return HealTiled(px, w, h, img, orig, hole, m8, cx0, cy0, cw, chh, bx0 - cx0, by0 - cy0, bw, bh, !autoOff, ox, oy);
 }
 
+// The Remove tool's fill: as HealRegion with automatic sources, but the base colour is a membrane fill (exact on
+// smooth gradients, thin scratches take each side's colour) where the heal brushes use push-pull.
+bool Scene2DNode::RemoveRegion(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& mask)
+{
+   int bx0 = w, by0 = h, bx1 = -1, by1 = -1;
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+         if (mask[(size_t)y * w + x] > 8)
+         {
+            bx0 = std::min(bx0, x);
+            by0 = std::min(by0, y);
+            bx1 = std::max(bx1, x);
+            by1 = std::max(by1, y);
+         }
+   if (bx1 < 0)
+      return false;
+   const int bw = bx1 - bx0 + 1, bh = by1 - by0 + 1, big = std::max(bw, bh);
+   const int R = std::clamp(big / 8 + 2, 3, 24), reach = big * 2 + R + 4;
+   const int cx0 = std::max(0, bx0 - reach), cy0 = std::max(0, by0 - reach);
+   const int cx1 = std::min(w, bx1 + 1 + reach), cy1 = std::min(h, by1 + 1 + reach);
+   const int cw = cx1 - cx0, chh = cy1 - cy0;
+   std::vector<float> img((size_t)cw * chh * 4);
+   std::vector<uint8_t> hole((size_t)cw * chh), m8((size_t)cw * chh);
+   for (int y = 0; y < chh; y++)
+      for (int x = 0; x < cw; x++)
+      {
+         const size_t si = (size_t)(y + cy0) * w + (x + cx0), di = (size_t)y * cw + x;
+         for (int c = 0; c < 4; c++)
+            img[di * 4 + c] = px[si * 4 + c] / 255.0f;
+         m8[di] = mask[si];
+         hole[di] = mask[si] > 8;
+      }
+   const std::vector<float> orig = img;
+   SelectMaths::HarmonicFill(img, 4, hole, cw, chh);
+   return HealTiled(px, w, h, img, orig, hole, m8, cx0, cy0, cw, chh, bx0 - cx0, by0 - cy0, bw, bh, false, 0, 0);
+}
+
+std::string Scene2DNode::RemoveLayerName() const
+{
+   const std::string base = "Remove Tool Edits";
+   for (int n = 0;; n++)
+   {
+      const std::string name = n == 0 ? base : base + " " + std::to_string(n);
+      bool taken = false;
+      for (const Layer& l : mLayers)
+         taken = taken || l.name == name;
+      if (!taken)
+         return name;
+   }
+}
+
+int Scene2DNode::Remove(int id, const std::vector<RemoveStroke>& strokes, bool sampleAll, bool newLayer)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || strokes.empty() || !EnsurePaintShaders())
+      return 0;
+   if (!newLayer && (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return 0;
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   if (it == mSurfaces.end())
+      return 0;
+   const int W = mDoc.w, H = mDoc.h;
+   float m[6];
+   LayerMatrix(*l, m);
+   const bool aligned = std::fabs(m[0] - 1) < 1e-4f && std::fabs(m[4] - 1) < 1e-4f && std::fabs(m[1]) < 1e-4f &&
+                        std::fabs(m[3]) < 1e-4f && std::fabs(m[2]) < 1e-3f && std::fabs(m[5]) < 1e-3f && l->pw == W && l->ph == H;
+   if (!aligned)
+      return 0;
+   // The hole, rows bottom first like the surfaces: each stroke with its own radius, as capsules.
+   std::vector<uint8_t> hole((size_t)W * H, 0);
+   for (const RemoveStroke& st : strokes)
+   {
+      const float r = st.Radius();
+      const size_t n = st.xy.size() / 2;
+      for (size_t k = 0; k < n; k++)
+      {
+         const float ax = st.xy[k * 2], ay = st.xy[k * 2 + 1];
+         const float bx = st.xy[std::min(n - 1, k + 1) * 2], by = st.xy[std::min(n - 1, k + 1) * 2 + 1];
+         const int x0 = std::max(0, (int)std::floor(std::min(ax, bx) - r)), x1 = std::min(W - 1, (int)std::ceil(std::max(ax, bx) + r));
+         const int y0 = std::max(0, (int)std::floor(std::min(ay, by) - r)), y1 = std::min(H - 1, (int)std::ceil(std::max(ay, by) + r));
+         const float dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+         for (int y = y0; y <= y1; y++)
+            for (int x = x0; x <= x1; x++)
+            {
+               const float px = x + 0.5f, py = y + 0.5f;
+               const float t = len2 > 0 ? std::clamp(((px - ax) * dx + (py - ay) * dy) / len2, 0.0f, 1.0f) : 0.0f;
+               const float ex = px - (ax + t * dx), ey = py - (ay + t * dy);
+               if (ex * ex + ey * ey <= r * r)
+                  hole[(size_t)(H - 1 - y) * W + x] = 255;
+            }
+      }
+   }
+   SelectMaths::CloseRings(hole, W, H);
+   SelectMaths::Dilate(hole, W, H, 2.0f);
+   if (mSelAny && mSel.size() == hole.size())
+      for (size_t i = 0; i < hole.size(); i++)
+         if (mSel[i] == 0)
+            hole[i] = 0;
+   if (std::none_of(hole.begin(), hole.end(), [](uint8_t v) { return v != 0; }))
+      return 0;
+   std::vector<uint8_t> px;
+   if (sampleAll)
+   {
+      if (mOut.fbo == 0)
+         return 0;   // nothing composed yet to sample
+      ReadRect(mOut, 0, 0, W, H, px);
+   }
+   else
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   // An empty source has nothing to remove: no fill, no step.
+   bool any = false;
+   for (size_t i = 0; i < hole.size() && !any; i++)
+      any = px[i * 4 + 3] != 0;
+   if (!any)
+      return 0;
+   if (!RemoveRegion(px, W, H, hole))
+      return 0;
+   int dest = id;
+   if (newLayer)
+   {
+      const std::string name = RemoveLayerName();
+      Layer& nl = AddLayer(Kind::Paint, 0, id);
+      nl.name = name;
+      dest = nl.id;
+      SyncSurfaces();
+      // Only the rebuilt pixels: the rest of the new layer stays clear.
+      for (size_t i = 0; i < hole.size(); i++)
+         if (hole[i] == 0)
+            px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = px[i * 4 + 3] = 0;
+   }
+   else if (sampleAll)
+   {
+      // The picture's fill lands in the layer only in the hole; the layer keeps its own pixels elsewhere.
+      std::vector<uint8_t> own;
+      ReadRect(it->second.fbo, 0, 0, W, H, own);
+      for (size_t i = 0; i < hole.size(); i++)
+         if (hole[i] == 0)
+            std::copy(&own[i * 4], &own[i * 4] + 4, &px[i * 4]);
+   }
+   auto dt = mSurfaces.find(dest);
+   Layer* dl = FindLayer(dest);
+   if (dt == mSurfaces.end() || dl == nullptr)
+      return 0;
+   WriteRect(dt->second.fbo, 0, 0, W, H, px.data());
+   const int all[4] = { 0, 0, W, H };
+   StoreTiles(dt->second, dl->tiles, all);
+   Commit();
+   return dest;
+}
+
 namespace
 {
 

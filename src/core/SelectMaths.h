@@ -77,6 +77,21 @@ namespace SelectMaths
    void QuickRegion(const uint8_t* rgba, int w, int h, float cx, float cy, float r, float reach, std::vector<uint8_t>& out,
                     int box[4]);
 
+   // ---- Remove tool's hole ---------------------------------------------------------------------------------------
+   // A stroke that closes on itself takes in what it encloses: holes no background can reach from the picture's
+   // border (4-neighbour flood, so a loop open at one pixel encloses nothing). mask 0..255, > 0 = in the stroke.
+   void CloseRings(std::vector<uint8_t>& mask, int w, int h);
+   // The hole's radius: its thickest part, the largest distance (px, Euclidean) from a hole pixel to the outside.
+   float HoleRadius(const std::vector<uint8_t>& mask, int w, int h);
+   // Grows the hole by r px (a disc). Sizes that do not match return the input.
+   void Dilate(std::vector<uint8_t>& mask, int w, int h, float r);
+
+   // A membrane fill: the hole's pixels solve Laplace's equation with the known pixels round it as the boundary, so
+   // a smooth gradient comes back exact and a thin scratch takes the colours on each side of it. img is w x h x ch
+   // floats; hole[i] != 0 marks the unknowns. A coarse-to-fine cascade (each level half the size) starts each level
+   // from the one below, so wide holes cost a few sweeps per level, not thousands.
+   void HarmonicFill(std::vector<float>& img, int ch, const std::vector<uint8_t>& hole, int w, int h);
+
    // ---- Depth --------------------------------------------------------------------------------------------------
    // A selection from a depth map (0 far .. 1 near): full between lo and hi, falling to 0 over `soft` beyond them.
    void DepthSelect(const std::vector<float>& depth, int w, int h, float lo, float hi, float soft, std::vector<uint8_t>& out);

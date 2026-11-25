@@ -128,7 +128,7 @@ namespace
    constexpr const char* kUndo = "Edit in 2D View";
 
    // Overlay colours are an image editor's, not the app's: they are read against the picture.
-   constexpr unsigned kPasteboard = 0x282828, kOutline = 0x2D8CFF, kSmart = 0xFF2DB4, kGuide = 0x00D2E6, kGrid = 0x808080;
+   constexpr unsigned kPasteboard = 0x282828, kOutline = 0x2D8CFF, kSmart = 0xFF2DB4, kGuide = 0x00D2E6, kGrid = 0x808080, kRemoveInk = 0xFF283C;
 
    enum Tool { kMove = 0, kCrop, kHand, kZoom, kBrush, kEraser, kFill, kPick, kMarquee, kLasso, kWand, kPen, kNode, kShape, kText,
                kGradient, kClone, kHeal, kBlur, kSharpen, kDodge, kBurn, kSponge, kMedian, kUndoBrush, kColourReplace, kMixer,
@@ -201,6 +201,10 @@ namespace
    bool sSelBrushSoft = true;      // selection brush: soft edges (off: hard)
    bool sSelBrushEdges = true;     // selection brush: Quick Select, each dab grows to the picture's edges
    ImVec2 sQuickLast(0.0f, 0.0f);  // where the last Quick Select dab landed (document px)
+   // Remove tool (the J brush): strokes wait here until they are applied, each with its own brush size.
+   std::vector<Scene2DNode::RemoveStroke> sRemoveQueue;
+   bool sRemoveEach = true;        // apply after each stroke (off: strokes wait for Apply or Enter)
+   bool sRemoveNewLayer = false;   // write the fill to a new layer above the active one
    int sTolerance = 32;  // ui-audit-ok: unit (colour tolerance default (0-255))
    bool sContiguous = true, sAllLayers = false;
    int sImageFormat = 0, sVideoFormat = 0;   // the Render tab's default file types
@@ -2654,6 +2658,7 @@ namespace
    bool EnsurePixels(Scene2DNode* doc);
    bool SelectionActsOnPixels(Scene2DNode* doc);
    int PaintTarget(Scene2DNode* doc, int& target, bool make);
+   void RunRemove(Scene2DNode* doc);
 
    // A selection edit is an undo step: the selection is saved in the document text.
    void SelStep(const char* label)
@@ -3115,6 +3120,8 @@ namespace
          if (key(ImGuiKey_G)) cycle({ kFill, kGradient });
          if (key(ImGuiKey_S)) cycle({ kClone, kUndoBrush });
          if (key(ImGuiKey_J)) cycle({ kHeal, kBlemish, kPatch, kInpaint, kRedEye });
+         if (sTool == kInpaint && !sRemoveQueue.empty() && (key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter)))
+            RunRemove(doc);
          if (key(ImGuiKey_R)) cycle({ kBlur, kSharpen, kMedian });
          if (key(ImGuiKey_O)) cycle({ kDodge, kBurn, kSponge });
          if (key(ImGuiKey_I)) cycle({ kPick, kStylePick, kMeasure });
@@ -3479,6 +3486,26 @@ namespace
    // What a paint tool paints on: 2 the quick mask, 1 the active layer's pixel
    // mask, 0 a paint layer (one is made above the active layer when it is not).
    // Returns the layer id, 0 when nothing can be painted.
+   // Applies the waiting Remove strokes as one job and one undo step named "Remove Tool"; when nothing changes (an
+   // empty layer, a hole the selection hides) there is no step. The active layer stays active, so each new
+   // "Remove Tool Edits" layer lands right above it.
+   void RunRemove(Scene2DNode* doc)
+   {
+      std::vector<Scene2DNode::RemoveStroke> strokes;
+      strokes.swap(sRemoveQueue);
+      Layer* a = Active(doc);
+      if (strokes.empty() || a == nullptr || a->kind != Kind::Paint)
+         return;
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint("Remove Tool");
+      if (doc->Remove(a->id, strokes, sAllLayers, sRemoveNewLayer) == 0)
+      {
+         gUndoStack.resize(undo0);
+         return;
+      }
+      Touch();
+   }
+
    int PaintTarget(Scene2DNode* doc, int& target, bool make)
    {
       if (doc->quickMask)
@@ -3829,6 +3856,18 @@ namespace
                return;
             }
          }
+      }
+      if (sTool == kInpaint && !doc->quickMask && !sEditMask)
+      {
+         // Remove: the stroke is kept as points; the fill runs on release (or on Apply when strokes wait).
+         Scene2DNode::RemoveStroke st;
+         st.size = ToolBrush().size;
+         st.Add(at.x, at.y);
+         sRemoveQueue.push_back(st);
+         sOp = Op();
+         sOp.kind = 30;
+         sOp.docStart = at;
+         return;
       }
       if (sTool == kSelBrush && sSelBrushEdges && !doc->quickMask)
       {
@@ -7294,7 +7333,27 @@ namespace
          sPenN = 0;
       else if (sTool == kBrush && !sSurfaceStroke)
          DrawPredicted(doc, dl);
-      if (hovered && !panTool && BrushTool(sTool) && ((!io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7 || sOp.kind == 29)) || sOp.kind == 28 ||
+      if (sTool == kInpaint && !sRemoveQueue.empty())
+      {
+         // The Remove strokes, waiting or under way, in a see-through red.
+         dl->PushClipRect(sViewMn, sViewMx, true);
+         const ImU32 ink = Hex(kRemoveInk, tok::view2d_pt_col_color_alpha_mul);
+         for (const Scene2DNode::RemoveStroke& st : sRemoveQueue)
+         {
+            const size_t n = st.Points();
+            if (n == 1)
+               dl->AddCircleFilled(ToScreen(doc, st.X(0), st.Y(0)), st.Radius() * sZoom, ink);
+            ImVec2 last = n > 0 ? ToScreen(doc, st.X(0), st.Y(0)) : ImVec2();
+            for (size_t k = 1; k < n; k++)
+            {
+               const ImVec2 here = ToScreen(doc, st.X(k), st.Y(k));
+               dl->AddLine(last, here, ink, st.size * sZoom);
+               last = here;
+            }
+         }
+         dl->PopClipRect();
+      }
+      if (hovered && !panTool && BrushTool(sTool) && ((!io.KeyAlt && (sOp.kind == 0 || sOp.kind == 7 || sOp.kind == 29 || sOp.kind == 30)) || sOp.kind == 28 ||
                                                       (sizeDragHint && sOp.kind == 0)))
       {
          dl->PushClipRect(sViewMn, sViewMx, true);
@@ -7762,6 +7821,11 @@ namespace
                ZoomAt(doc, std::exp((mouse.x - sOp.start.x) * tok::view2d_exp_reach), sOp.start);
             }
          }
+         else if (sOp.kind == 30)
+         {
+            if (!sRemoveQueue.empty())
+               sRemoveQueue.back().Add(sMouseDoc.x, sMouseDoc.y);
+         }
          else if (sOp.kind == 29)
          {
             const float r = sSelBrush.size * 0.5f, gap = std::max(1.0f, r * 0.5f);
@@ -7854,6 +7918,8 @@ namespace
                doc->QuickSelectEnd();
                Touch();
             }
+            else if (sOp.kind == 30 && sRemoveEach)
+               RunRemove(doc);
             else if (sOp.kind == 19 && std::fabs(mouse.x - sOp.start.x) < tok::view2d_canvas_limit_sm)
                ZoomAt(doc, io.KeyAlt ? 0.5f : tok::view2d_zoom_at_ratio, mouse);
             else if (sOp.kind == 5 && !CropBoxOk())
@@ -8568,6 +8634,25 @@ namespace
       {
          BrushEngine::Brush& b = ToolBrush();
          BarSlider("##v2drsize", &b.size, params::view2d::size_lo, params::view2d::size_hi, "Size %.0f px", kWellL);
+         if (sTool == kInpaint)
+         {
+            gap();
+            if (TextChip(L("All layers##v2drmall"), sAllLayers, T("Sample the whole picture")))
+               sAllLayers = !sAllLayers;
+            next();
+            if (TextChip(L("New layer##v2drmnew"), sRemoveNewLayer, T("Put the fill on a new layer above")))
+               sRemoveNewLayer = !sRemoveNewLayer;
+            next();
+            if (TextChip(L("Each stroke##v2drmeach"), sRemoveEach, T("Remove after each stroke; off, strokes wait for Apply")))
+               sRemoveEach = !sRemoveEach;
+            if (!sRemoveEach && !sRemoveQueue.empty())
+            {
+               next();
+               if (TextChip(L("Apply##v2drmapply"), false, T("Remove what the waiting strokes cover (Enter)")))
+                  RunRemove(doc);
+            }
+            return;
+         }
          float hard = b.hardness * tok::view2d_hard_ratio, op = b.opacity * 100.0f, flow = b.flow * 100.0f;  // ui-audit-ok: unit (0-1 brush param shown as percent)
          BarSlider("##v2drhard", &hard, params::view2d::hard_lo, params::view2d::hard_hi, "Hardness %.0f%%", kWellL);
          BarSlider("##v2drop", &op, params::view2d::op_lo, params::view2d::op_hi, "Opacity %.0f%%", kWellL);
@@ -9888,7 +9973,7 @@ namespace
       { kHeal, "##v2dheal", IconsInfinite::Heal, "Healing brush (J). Alt-click sets the source", 2 },
       { kBlemish, "##v2dblemish", IconsInfinite::Blemish, "Blemish removal (J). Click a spot", 2 },
       { kPatch, "##v2dpatch", IconsInfinite::Patch, "Patch (J). Drag the selection to clean pixels", 2 },
-      { kInpaint, "##v2dinpaint", IconsInfinite::Inpaint, "Inpainting brush (J). Paint over to remove", 2 },
+      { kInpaint, "##v2dinpaint", IconsInfinite::Inpaint, "Remove (J). Paint over to remove; a ring takes what it encloses", 2 },
       { kRedEye, "##v2dredeye", IconsInfinite::RedEye, "Red eye (J)", 2 },
       { kBrush, "##v2dbrush", IconsInfinite::Brush, "Brush (B). Alt picks a colour, Shift-click draws a line", 2 },
       { kMixer, "##v2dmixer", IconsInfinite::PaintMixer, "Paint mixer (B). Wet paint", 2 },
@@ -16210,6 +16295,225 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          for (int id : { v, aid, g, p })
             if (doc->FindLayer(id) != nullptr)
                doc->RemoveLayer(id);
+         doc->Commit();
+      }
+      // ai-tools 1.8 Remove: red marks on a left-to-right grey gradient. The picture after a Remove is compared
+      // with the gradient as it was (the read runs bottom row first, so rows compare as they are).
+      {
+         const int p = doc->AddPaintLayer();
+         const float g0[4] = { 0.1f, 0.1f, 0.1f, 1.0f }, g1[4] = { 0.9f, 0.9f, 0.9f, 1.0f };
+         doc->Deselect();
+         doc->Gradient(p, 0, 0, W, 0, g0, g1, 1, 1.0f, 0, false);
+         doc->Commit();
+         const std::vector<uint8_t> ref = picture(doc);
+         const int iw = (int)W, ih = (int)H;
+         auto worst = [&](const std::vector<uint8_t>& a, int x0, int y0, int x1, int y1) {   // doc rect, top row first
+            int e = 0;
+            if (a.size() != ref.size() || a.size() != (size_t)iw * ih * 4)
+               return 999;
+            for (int y = std::max(0, y0); y < std::min(ih, y1); y++)
+               for (int x = std::max(0, x0); x < std::min(iw, x1); x++)
+                  for (int c = 0; c < 3; c++)
+                  {
+                     const size_t i = ((size_t)(ih - 1 - y) * iw + x) * 4 + c;
+                     e = std::max(e, std::abs((int)a[i] - (int)ref[i]));
+                  }
+            return e;
+         };
+         auto mark = [&](float x0, float y0, float x1, float y1) {
+            doc->SelectRect(x0, y0, x1, y1, Scene2DNode::kSelNew, 0, false);
+            doc->FillPixels(p, red, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+         };
+         auto line = [&](float x0, float y0, float x1, float y1, float r) {
+            Scene2DNode::RemoveStroke st;
+            st.size = r * 2.0f;
+            for (int k = 0; k <= 20; k++)
+            {
+               st.xy.push_back(x0 + (x1 - x0) * k / 20.0f);
+               st.xy.push_back(y0 + (y1 - y0) * k / 20.0f);
+            }
+            return st;
+         };
+         auto ring = [&](float cx, float cy, float R, float r) {
+            Scene2DNode::RemoveStroke st;
+            st.size = r * 2.0f;
+            for (int k = 0; k <= 48; k++)
+            {
+               st.xy.push_back(cx + R * std::cos(k * 6.2831853f / 48.0f));
+               st.xy.push_back(cy + R * std::sin(k * 6.2831853f / 48.0f));
+            }
+            return st;
+         };
+         SelectOnly(p);
+         sAllLayers = false;
+         sRemoveNewLayer = false;
+         // A wide square and a 2 px scratch, removed by two strokes of their own sizes, waiting and applied together.
+         mark(120, 120, 180, 180);
+         mark(30, 60, 270, 62);
+         size_t u0 = gUndoStack.size();
+         sRemoveQueue = { line(150, 150, 150, 150, 44.0f), line(30, 61, 270, 61, 3.0f) };
+         RunRemove(doc);
+         std::vector<uint8_t> out = picture(doc);
+         expect("parity: removes thin and wide holes from a gradient", worst(out, 0, 0, iw, ih) <= 8);
+         expect("parity: thin scratches take their surroundings", worst(out, 30, 58, 270, 65) <= 6);
+         expect("parity: several strokes apply as one job and one undo step",
+                gUndoStack.size() == u0 + 1 && gUndoStack.back().label == "Remove Tool" && sRemoveQueue.empty());
+         expect("parity: remove strokes each keep their own brush", worst(out, 100, 100, 200, 200) <= 8);
+         // A ring round a square takes the square with it.
+         mark(130, 130, 170, 170);
+         u0 = gUndoStack.size();
+         sRemoveQueue = { ring(150, 150, 40.0f, 4.0f) };
+         RunRemove(doc);
+         out = picture(doc);
+         expect("parity: remove a ring around an object removes it in one undo step", worst(out, 0, 0, iw, ih) <= 8 && gUndoStack.size() == u0 + 1);
+         // An open stroke changes only where it went; a selection limits it further.
+         mark(130, 130, 170, 170);
+         const std::vector<uint8_t> marked = picture(doc);
+         sRemoveQueue = { line(100, 150, 200, 150, 4.0f) };
+         RunRemove(doc);
+         out = picture(doc);
+         bool kept = true;
+         for (int y : { 135, 165 })
+            for (int x : { 135, 150, 165 })
+            {
+               const size_t i = ((size_t)(ih - 1 - y) * iw + x) * 4;
+               kept = kept && out.size() == marked.size() && out[i] == marked[i] && out[i + 1] == marked[i + 1];
+            }
+         doc->SelectRect(0, 0, 150, H, Scene2DNode::kSelNew, 0, false);
+         const std::vector<uint8_t> before = picture(doc);
+         sRemoveQueue = { line(140, 140, 160, 140, 4.0f) };
+         RunRemove(doc);
+         out = picture(doc);
+         const size_t lI = ((size_t)(ih - 1 - 140) * iw + 145) * 4, rI = ((size_t)(ih - 1 - 140) * iw + 156) * 4;
+         expect("parity: remove open strokes and the selection limit what changes",
+                kept && out.size() == before.size() && out[lI + 1] != before[lI + 1] && out[rI] == before[rI] && out[rI + 1] == before[rI + 1]);
+         doc->Deselect();
+         // The ring rows of the hole maths.
+         {
+            const int n = 64;
+            auto disc = [&](bool open) {
+               std::vector<uint8_t> m((size_t)n * n, 0);
+               for (int y = 0; y < n; y++)
+                  for (int x = 0; x < n; x++)
+                  {
+                     const float d = std::hypot(x - 31.5f, y - 31.5f);
+                     if (d >= 14 && d < 17 && !(open && x > 40 && (y == 31 || y == 32)))
+                        m[(size_t)y * n + x] = 255;
+                  }
+               return m;
+            };
+            std::vector<uint8_t> closed = disc(false), gap1 = disc(true), bar((size_t)n * n, 0);
+            for (int y = 30; y < 33; y++)
+               for (int x = 10; x < 50; x++)
+                  bar[(size_t)y * n + x] = 255;
+            const std::vector<uint8_t> bar0 = bar;
+            SelectMaths::CloseRings(closed, n, n);
+            SelectMaths::CloseRings(gap1, n, n);
+            SelectMaths::CloseRings(bar, n, n);
+            expect("parity: a ring closes into a disc and an open line does not", closed[32 * n + 32] == 255 && bar == bar0);
+            expect("parity: a loop open at one pixel encloses nothing", gap1[32 * n + 32] == 0);
+            std::vector<uint8_t> two((size_t)n * n, 0);
+            for (int y = 10; y < 13; y++)
+               for (int x = 5; x < 60; x++)
+                  two[(size_t)y * n + x] = 255;
+            for (int y = 30; y < 50; y++)
+               for (int x = 20; x < 40; x++)
+                  two[(size_t)y * n + x] = 255;
+            expect("parity: radius measures the thickest part", std::fabs(SelectMaths::HoleRadius(two, n, n) - 10.0f) < 0.01f);
+            std::vector<uint8_t> dot((size_t)n * n, 0);
+            dot[32 * n + 32] = 255;
+            SelectMaths::Dilate(dot, n, n, 5.0f);
+            expect("parity: dilate grows by the radius", dot[32 * n + 37] == 255 && dot[32 * n + 38] == 0 && dot[36 * n + 35] == 255);
+         }
+         // To a new layer: the target keeps its pixels, the fill lands above it, names count up and free on undo.
+         mark(130, 130, 170, 170);
+         const std::vector<uint8_t> withMark = picture(doc);
+         sRemoveNewLayer = true;
+         sAllLayers = true;
+         const size_t nl0 = doc->Layers().size();
+         u0 = gUndoStack.size();
+         sRemoveQueue = { line(150, 150, 150, 150, 30.0f) };
+         RunRemove(doc);
+         auto top = [&]() -> Scene2DNode::Layer* {   // the layer right above p
+            const auto& ls = doc->Layers();
+            for (size_t i = 0; i + 1 < ls.size(); i++)
+               if (ls[i].id == p)
+                  return doc->FindLayer(ls[i + 1].id);
+            return nullptr;
+         };
+         Scene2DNode::Layer* e0 = top();
+         const int e0id = e0 != nullptr ? e0->id : 0;
+         expect("parity: sample all layers and create new layer are one step named remove tool",
+                doc->Layers().size() == nl0 + 1 && gUndoStack.size() == u0 + 1 && gUndoStack.back().label == "Remove Tool");
+         out = picture(doc);
+         bool targetKept = false;
+         if (e0 != nullptr)
+         {
+            e0->visible = false;
+            doc->Commit();
+            targetKept = picture(doc) == withMark;
+            e0->visible = true;
+            doc->Commit();
+         }
+         expect("parity: remove to a new layer leaves the target untouched", targetKept && worst(out, 0, 0, iw, ih) <= 8);
+         sRemoveQueue = { line(150, 150, 150, 150, 30.0f) };
+         RunRemove(doc);
+         Scene2DNode::Layer* e1 = top();
+         sRemoveQueue = { line(150, 150, 150, 150, 30.0f) };
+         RunRemove(doc);
+         Scene2DNode::Layer* e2 = top();
+         const Scene2DNode::Layer* first = doc->FindLayer(e0id);
+         expect("parity: successive strokes name remove tool edits then 1 then 2 each above the active layer",
+                first != nullptr && first->name == "Remove Tool Edits" && e1 != nullptr && e2 != nullptr && e2->name == "Remove Tool Edits 2" &&
+                std::any_of(doc->Layers().begin(), doc->Layers().end(), [](const Scene2DNode::Layer& l) { return l.name == "Remove Tool Edits 1"; }));
+         expect("parity: the background job records remove tool and undo redo keep the name", gUndoStack.back().label == "Remove Tool");
+         // Without sample all layers the new layer reads the target, which still has the mark.
+         sAllLayers = false;
+         int e1id = 0;
+         for (const Scene2DNode::Layer& l : doc->Layers())
+            if (l.name == "Remove Tool Edits 1")
+               e1id = l.id;
+         if (e1id != 0)
+            doc->RemoveLayer(e1id);
+         doc->Commit();
+         expect("parity: a taken name gives the first free one", doc->RemoveLayerName() == "Remove Tool Edits 1");
+         sRemoveQueue = { line(150, 150, 150, 150, 30.0f) };
+         RunRemove(doc);
+         expect("parity: two strokes without sample all layers name remove tool edits then 1",
+                std::any_of(doc->Layers().begin(), doc->Layers().end(), [](const Scene2DNode::Layer& l) { return l.name == "Remove Tool Edits 1"; }));
+         std::vector<int> edits;
+         for (const Scene2DNode::Layer& l : doc->Layers())
+            if (l.name.rfind("Remove Tool Edits", 0) == 0)
+               edits.push_back(l.id);
+         for (int id : edits)
+            doc->RemoveLayer(id);   // what an undo of each step leaves
+         doc->Commit();
+         expect("parity: undo frees the name for the next stroke", doc->RemoveLayerName() == "Remove Tool Edits");
+         sRemoveNewLayer = false;
+         // Without a new layer the fill goes into the active layer; queued strokes are one step.
+         sRemoveEach = false;
+         mark(40, 200, 60, 220);
+         mark(240, 200, 260, 220);
+         u0 = gUndoStack.size();
+         sRemoveQueue = { line(50, 210, 50, 210, 16.0f), line(250, 210, 250, 210, 16.0f) };
+         RunRemove(doc);
+         out = picture(doc);
+         expect("parity: waiting strokes applied together are one step named remove tool",
+                gUndoStack.size() == u0 + 1 && gUndoStack.back().label == "Remove Tool");
+         expect("parity: without create new layer the fill goes into the active layer",
+                worst(out, 30, 190, 270, 230) <= 8 && doc->Layers().size() == nl0);
+         sRemoveEach = true;
+         // An empty layer has nothing to remove: no fill, no step.
+         const int empty = doc->AddPaintLayer(p);
+         SelectOnly(empty);
+         u0 = gUndoStack.size();
+         sRemoveQueue = { line(150, 150, 150, 150, 20.0f) };
+         RunRemove(doc);
+         expect("parity: remove on an empty layer is a no op without a history step", gUndoStack.size() == u0);
+         doc->RemoveLayer(empty);
+         doc->RemoveLayer(p);
          doc->Commit();
       }
       // ai-tools 1.7 Lens Blur: 4 px black and white stripes; the top half near (in focus), the bottom half far.
