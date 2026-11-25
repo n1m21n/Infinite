@@ -2516,6 +2516,17 @@ void Scene2DNode::Serialize()
          if (l.indentL != 0 || l.indentR != 0 || l.indentFirst != 0 || l.spaceBefore != 0 || l.spaceAfter != 0)
             o << "tpara " << l.id << " " << l.indentL << " " << l.indentR << " " << l.indentFirst << " " << l.spaceBefore << " "
               << l.spaceAfter << "\n";
+         if (l.typeMode != 0 || l.vertical || l.pathOffset != 0 || l.pathFlip)
+            o << "ttype " << l.id << " " << l.typeMode << " " << l.pathOffset << " " << +l.pathFlip << " " << +l.vertical << "\n";
+         for (const Shape& sh : l.typePath)
+         {
+            o << "tpath " << l.id << " " << sh.op << " " << +sh.closed << " " << sh.pts.size() / 6;
+            for (float v : sh.pts) o << " " << v;
+            o << "\n";
+         }
+         if (l.warpStyle != 0)
+            o << "twarp " << l.id << " " << l.warpStyle << " " << l.warpBend << " " << l.warpH << " " << l.warpV << " "
+              << +l.warpVert << "\n";
       }
       if (l.is3d || l.z != 0 || l.az != 0 || l.rx != 0 || l.ry != 0 || l.orient[0] != 0 || l.orient[1] != 0 ||
           l.orient[2] != 0 || l.collapse)
@@ -3030,6 +3041,50 @@ void Scene2DNode::Parse()
          }
          else if (key == "tpara")
             s >> l->indentL >> l->indentR >> l->indentFirst >> l->spaceBefore >> l->spaceAfter;
+         else if (key == "ttype")
+         {
+            int mode = 0, flip = 0, vert = 0;
+            float off = 0.0f;
+            if (s >> mode >> off >> flip >> vert)
+            {
+               l->typeMode = std::clamp(mode, 0, 2);
+               l->pathOffset = std::isfinite(off) ? off : 0.0f;
+               l->pathFlip = flip != 0;
+               l->vertical = vert != 0;
+            }
+         }
+         else if (key == "tpath")
+         {
+            Shape sh;
+            int op = 0, closed = 0;
+            size_t n = 0;
+            if (s >> op >> closed >> n && n > 0 && n <= (size_t)kTypePathAnchorsMax)
+            {
+               sh.type = Shape::kPath;
+               sh.op = std::clamp(op, 0, (int)Shape::kXor);
+               sh.closed = closed != 0;
+               sh.pts.resize(n * 6);
+               bool ok = true;
+               for (float& v : sh.pts)
+                  if (!(s >> v) || !std::isfinite(v) || std::fabs(v) > kPathCoordMax)
+                     ok = false;
+               if (ok)
+                  l->typePath.push_back(std::move(sh));
+            }
+         }
+         else if (key == "twarp")
+         {
+            int style = 0, vert = 0;
+            float b = 50.0f, h = 0.0f, v = 0.0f;
+            if (s >> style >> b >> h >> v >> vert && std::isfinite(b) && std::isfinite(h) && std::isfinite(v))
+            {
+               l->warpStyle = std::clamp(style, 0, kWarpStyleCount - 1);
+               l->warpBend = std::clamp(b, -100.0f, 100.0f);
+               l->warpH = std::clamp(h, -100.0f, 100.0f);
+               l->warpV = std::clamp(v, -100.0f, 100.0f);
+               l->warpVert = vert != 0;
+            }
+         }
          else if (key == "paint" || key == "pmask" || key == "fmask")
          {
             const bool mask = key == "pmask", fx = key == "fmask";

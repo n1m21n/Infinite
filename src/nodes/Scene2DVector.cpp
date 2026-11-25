@@ -1085,6 +1085,38 @@ int Scene2DNode::ConvertTextToShapes(int id)
    int tw = 0, th = 0;
    if (!TextSize(*src, tw, th) || tw <= 0 || th <= 0)
       return 0;
+   // Warp Text: the letters fit the box before the warp; the anchors go through the warp afterwards.
+   if (src->warpStyle != 0)
+   {
+      tw = std::max(1, mTextBoxes[id].gw);
+      th = std::max(1, mTextBoxes[id].gh);
+   }
+   // Type on / in a path and vertical type: the glyphs where they were laid, about the box centre.
+   if (UsesGlyphType(*src))
+   {
+      std::vector<std::vector<float>> glyphs;
+      if (!TypeGlyphAnchors(*src, glyphs) || glyphs.empty())
+         return 0;
+      const float gx = std::clamp(std::fabs(src->sx), 0.01f, 100.0f), gy = std::clamp(std::fabs(src->sy), 0.01f, 100.0f);
+      std::vector<Shape> out;
+      for (auto& p : glyphs)
+      {
+         Shape s;
+         s.type = Shape::kPath;
+         s.closed = true;
+         s.fillOn = true;
+         std::copy(src->textC, src->textC + 4, s.fillC);
+         s.op = out.empty() ? Shape::kAdd : Shape::kXor;
+         s.pts.resize(p.size());
+         for (size_t i = 0; i + 1 < p.size(); i += 2)
+         {
+            s.pts[i] = (p[i] + tw * 0.5f) * gx;
+            s.pts[i + 1] = (p[i + 1] + th * 0.5f) * gy;
+         }
+         out.push_back(std::move(s));
+      }
+      return ShapesLayerFromText(id, tw, th, std::move(out));
+   }
    const std::string text = src->caps ? UpperText(src->text) : src->text;
    const float letter = src->fontSize > 0.0f ? src->tracking / src->fontSize : 0.0f;
    // Cap height is one unit; an em is about 1.43 of it.
@@ -1218,7 +1250,38 @@ int Scene2DNode::ConvertTextToShapes(int id)
       }
       shapes.push_back(std::move(s));
    }
+   return ShapesLayerFromText(id, tw, th, std::move(shapes));
+}
+
+// The shapes (box px times the layer's scale) as a new vector layer above the text, which hides.
+int Scene2DNode::ShapesLayerFromText(int id, int tw, int th, std::vector<Shape> shapes)
+{
+   const Layer* src = FindConst(id);
+   if (src == nullptr || shapes.empty())
+      return 0;
+   const float bx = std::clamp(std::fabs(src->sx), 0.01f, 100.0f), by = std::clamp(std::fabs(src->sy), 0.01f, 100.0f);
+   // Warp Text: every anchor and handle through the same warp the raster had, into the warped box.
+   if (src->warpStyle != 0)
+   {
+      const TextBox& tb = mTextBoxes[id];
+      const float W0 = (float)std::max(1, tw), H0 = (float)std::max(1, th);
+      const float W1 = (float)std::max(1, tb.w), H1 = (float)std::max(1, tb.h);
+      for (Shape& s : shapes)
+         for (size_t i = 0; i + 1 < s.pts.size(); i += 2)
+         {
+            float u = s.pts[i] / bx / W0 * 2.0f - 1.0f, v = s.pts[i + 1] / by / H0 * 2.0f - 1.0f;
+            WarpStyleMap(src->warpStyle, src->warpBend, src->warpH, src->warpV, src->warpVert, u, v, H0 / W0);
+            s.pts[i] = (W1 * 0.5f + u * W0 * 0.5f) * bx;
+            s.pts[i + 1] = (H1 * 0.5f + v * H0 * 0.5f) * by;
+         }
+      tw = (int)W1;
+      th = (int)H1;
+   }
    Layer v = *src;   // copy before the add: it may move the layers
+   v.typeMode = 0;
+   v.typePath.clear();
+   v.vertical = false;
+   v.warpStyle = 0;
    const int vid = AddVectorLayer(id);
    Layer* dst = FindLayer(vid);
    if (dst == nullptr)
@@ -1268,10 +1331,20 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
    if (l.highlight)
       for (float f : l.highlightC)
          key = HF(key, f);
+   key = H(key, (unsigned)(l.typeMode | (l.pathFlip << 2) | (l.vertical << 3) | (l.warpVert << 4)));
+   key = H(key, (unsigned)l.warpStyle);
+   for (float f : { l.pathOffset, l.warpBend, l.warpH, l.warpV })
+      key = HF(key, f);
+   for (const Shape& s : l.typePath)
+      key = HashShape(key, s);
    TextBox& tb = mTextBoxes[l.id];
    if (tb.key != key || tb.rgba.empty())
    {
       tb.key = key;
+      if (UsesGlyphType(l))
+         GlyphTypeRaster(l, tb);
+      else
+      {
       // Lay out in a canvas wide enough for the longest line (or the box), then trim to the ink.
       int lines = 1, longest = 0, cur = 0;
       for (char c : l.text)
@@ -1400,6 +1473,11 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
             tb.w = nw;
          }
       }
+      }
+      tb.gw = tb.w;
+      tb.gh = tb.h;
+      if (l.warpStyle != 0)
+         WarpTypeRaster(l, tb);
    }
    w = tb.w;
    h = tb.h;

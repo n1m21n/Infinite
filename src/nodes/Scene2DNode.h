@@ -314,6 +314,17 @@ public:
       std::string lang;
       // Paragraph (a new line starts one; box text): indents and spacing, px.
       float indentL = 0.0f, indentR = 0.0f, indentFirst = 0.0f, spaceBefore = 0.0f, spaceAfter = 0.0f;
+      // Type on a path (1) or inside one (2, area type); 0 = point or box text. typePath is the text's own px about its
+      // anchor (x right, y down); pathOffset the start point, a fraction of the path; pathFlip runs it the other way.
+      // vertical: the letters stack in columns, right to left (Photoshop's Vertical Type).
+      int typeMode = 0;
+      std::vector<Shape> typePath;
+      float pathOffset = 0.0f;
+      bool pathFlip = false, vertical = false;
+      // Warp Text (and a paint layer's Warp style): 0 none, see WarpStyleName; bend and distortions -100 .. 100.
+      int warpStyle = 0;
+      float warpBend = 50.0f, warpH = 0.0f, warpV = 0.0f;
+      bool warpVert = false;
       // 3D (After Effects model): the layer is a card the comp camera sees.
       // angle is the Z rotation; x, y place the anchor as in 2D, z pushes it away.
       bool is3d = false;
@@ -921,6 +932,28 @@ public:
    bool ImportSvg(int id, const std::string& svgText);
    // A text's raster size (the box a text layer has), cached.
    bool TextSize(const Layer& l, int& w, int& h);
+   // Type on / in a path, vertical type and Warp Text (Scene2DType.cpp).
+   enum TypePathError { kTypePathOk = 0, kTypePathNoPath, kTypePathNotFinite, kTypePathTooManyAnchors };
+   static constexpr int kTypePathAnchorsMax = 4096;
+   static constexpr int kWarpStyleCount = 17;          // 0 none, 1 .. 15 Photoshop's Warp Text styles, 16 Cylinder
+   static const char* WarpStyleName(int style);
+   // (u, v) in -1 .. 1 (v down) through the style; false for style 0. aspect = box height / width (round styles).
+   static bool WarpStyleMap(int style, float bend, float hd, float vd, bool vert, float& u, float& v, float aspect = 1.0f);
+   static bool UsesGlyphType(const Layer& l) { return l.typeMode != 0 || l.vertical; }
+   // A new text layer on (inside = false) or in a document path; 0 with err set when the path will not do.
+   int AddTypeOnPath(const std::string& path, const std::string& text, bool inside, int above, int* err = nullptr);
+   int AttachTextToPath(int id, const std::string& path, bool inside);   // TypePathError
+   int SetTypePath(int id, std::vector<Shape> subs);                    // TypePathError; the path in the text's px
+   bool ReleaseTypePath(int id);   // on a path -> point text, in a path -> box text over the path's bounds
+   bool SetVerticalType(int id, bool vertical);
+   bool SetWarpText(int id, int style, float bend, float hd, float vd, bool vert);
+   // A paint layer pulled through a warp style: one 12 x 12 mesh warp, one undo step.
+   bool WarpLayerStyle(int id, int style, float bend, float hd, float vd, bool vert);
+   bool MakeWorkPathFromText(int id);   // the glyphs as the Work Path, in document px
+   // The glyphs as path anchors (x y inX inY outX outY) in the text's px about its anchor, before Warp Text.
+   bool TypeGlyphAnchors(const Layer& l, std::vector<std::vector<float>>& out);
+   // The bounds of a text layer's type path, document px; false when it has none.
+   bool TypePathBounds(const Layer& l, float& x0, float& y0, float& x1, float& y1);
    static std::string EscapeToken(const std::string& s);
    static std::string UnescapeToken(const std::string& s);
 
@@ -1138,7 +1171,11 @@ private:
    Raster* SyncRaster(std::map<int, Raster>& in, const Layer& l, bool mask);
    void SyncRasters();
    std::map<int, Raster> mVec, mVMasks;
-   struct TextBox { unsigned long long key = 0; int w = 0, h = 0; std::vector<uint8_t> rgba; };
+   // gw, gh: the size before Warp Text (the box the warp maps from).
+   struct TextBox { unsigned long long key = 0; int w = 0, h = 0, gw = 0, gh = 0; std::vector<uint8_t> rgba; };
+   void GlyphTypeRaster(const Layer& l, TextBox& tb);
+   void WarpTypeRaster(const Layer& l, TextBox& tb);
+   int ShapesLayerFromText(int id, int preW, int preH, std::vector<Shape> shapes);
    std::map<int, TextBox> mTextBoxes;
    BrushEngine::Stroke mStroke;
    int mPaintId = 0, mPaintTarget = 0;

@@ -3972,6 +3972,12 @@ namespace
          doc->MakeWorkPathFromLayer(a->id);
          Touch();
       }
+      if (MenuParts::Item(T("Work Path from Text"), nullptr, false, a != nullptr && a->kind == Kind::Text))
+      {
+         PushUndoCheckpoint("Make work path");
+         doc->MakeWorkPathFromText(a->id);
+         Touch();
+      }
       std::vector<std::string> names;
       for (const Scene2DNode::DocPath& p : doc->Paths())
          names.push_back(p.name);
@@ -4007,6 +4013,23 @@ namespace
                doc->StrokePath(name, a->id, b, sim != 0);
                Touch();
             }
+         for (int inside = 0; inside < 2; inside++)
+            if (MenuParts::Item(T(inside ? "Type in Path" : "Type on Path")))
+            {
+               PushUndoCheckpoint("Type on path");
+               int err = 0;
+               const int tid = doc->AddTypeOnPath(name, T("Type on a path"), inside != 0, a != nullptr ? a->id : 0, &err);
+               if (tid > 0)
+                  SelectOnly(tid);
+               Touch();
+            }
+         if (a != nullptr && a->kind == Kind::Text &&
+             MenuParts::Item(T("Attach Text"), nullptr, false, doc->FindPath(name) != nullptr))
+         {
+            PushUndoCheckpoint("Type on path");
+            doc->AttachTextToPath(a->id, name, false);
+            Touch();
+         }
          if (MenuParts::Item(T("Convert to Shape")))
          {
             const float col[4] = { sFg[0], sFg[1], sFg[2], 1.0f };
@@ -11430,6 +11453,19 @@ namespace
          EndFreeTransform(doc, true);
          sTool = kMeshWarp;
       }
+      // Warp styles (Photoshop's Warp presets) at a 50% bend, as one mesh warp step; the Mesh Warp tool edits it on.
+      if (a != nullptr && sSel.size() == 1 && a->kind == Kind::Paint && MenuParts::SubMenu(T("Warp Style")))
+      {
+         for (int st = 1; st < Scene2DNode::kWarpStyleCount; st++)
+            if (MenuParts::Item(T(Scene2DNode::WarpStyleName(st))))
+            {
+               EndFreeTransform(doc, true);
+               PushUndoCheckpoint("Warp style");
+               doc->WarpLayerStyle(a->id, st, 50.0f, 0.0f, 0.0f, false);
+               Touch();
+            }
+         ImGui::EndMenu();
+      }
       MenuParts::Separator();
       if (MenuParts::Item(T("Rotate 180°"))) TurnSelection(doc, 180.0f);
       if (MenuParts::Item(T("Rotate 90° Clockwise"))) TurnSelection(doc, 90.0f);
@@ -12931,6 +12967,37 @@ namespace
             BoolRow(T("Optical align"), &l->optical);
          }
          SliderRow(T("Offset X"), &l->offsetX, params::view2d::offset_x_lo, params::view2d::offset_x_hi, "%.0f px");
+         // Orientation, type on / in a path, Warp Text.
+         if (l->typeMode == 0)
+            BoolRow(T("Vertical"), &l->vertical);
+         if (l->typeMode != 0)
+         {
+            if (l->typeMode == 1)
+            {
+               SliderRow(T("Start"), &l->pathOffset, params::view2d::path_offset_lo, params::view2d::path_offset_hi, "%.2f");
+               BoolRow(T("Flip"), &l->pathFlip);
+            }
+            if (ActionButton::Draw((std::string(T("Release Path")) + "##v2dtrel").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+            {
+               PushUndoCheckpoint("Release type path");
+               doc->ReleaseTypePath(l->id);
+               Touch();
+            }
+         }
+         {
+            std::vector<std::string> styles;
+            for (int i = 0; i < Scene2DNode::kWarpStyleCount; i++)
+               styles.push_back(T(Scene2DNode::WarpStyleName(i)));
+            ComboRow(T("Warp"), &l->warpStyle, styles);
+            if (l->warpStyle != 0)
+            {
+               Pairs g;
+               BoolRow(T("Vertical warp"), &l->warpVert);
+               SliderRow(T("Bend"), &l->warpBend, params::view2d::warp_bend_lo, params::view2d::warp_bend_hi, "%.0f%%");
+               SliderRow(T("Horizontal"), &l->warpH, params::view2d::warp_bend_lo, params::view2d::warp_bend_hi, "%.0f%%");
+               SliderRow(T("Vertical distortion"), &l->warpV, params::view2d::warp_bend_lo, params::view2d::warp_bend_hi, "%.0f%%");
+            }
+         }
          {
             // OpenType language tag (e.g. tr, nl, sr-Latn); empty = none.
             char buf[24];
@@ -19287,6 +19354,160 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             if (doc->FindLayer(id) != nullptr)
                doc->RemoveLayer(id);
          doc->DeletePath("Disc");
+         doc->DeletePath(SN::kWorkPath);
+         doc->Commit();
+      }
+      // Type on a path, inside a path, vertical and Warp Text: the glyphs are laid by the app, so the Work Path made
+      // from them shows where every letter went.
+      {
+         using SN = Scene2DNode;
+         auto bounds = [&](const SN::DocPath* p, float b[4])
+         {
+            b[0] = b[1] = 1e30f;
+            b[2] = b[3] = -1e30f;
+            if (p == nullptr)
+               return false;
+            for (const SN::Shape& s : p->subs)
+               for (size_t i = 0; i + 1 < s.pts.size(); i += 6)
+               {
+                  b[0] = std::min(b[0], s.pts[i]);
+                  b[2] = std::max(b[2], s.pts[i]);
+                  b[1] = std::min(b[1], s.pts[i + 1]);
+                  b[3] = std::max(b[3], s.pts[i + 1]);
+               }
+            return b[2] >= b[0];
+         };
+         auto line = [&](float x0, float y0, float x1, float y1)
+         {
+            SN::Shape s;
+            s.type = SN::Shape::kPath;
+            s.pts = { x0, y0, x0, y0, x0, y0, x1, y1, x1, y1, x1, y1 };
+            return s;
+         };
+         // On a path: the letters stand on the line, start at its start and stay within it.
+         const float py = H * 0.6f;
+         doc->SetWorkPath({ line(W * 0.1f, py, W * 0.9f, py) });
+         int err = -1;
+         const int tp = doc->AddTypeOnPath(SN::kWorkPath, "Type", false, 0, &err);
+         const Layer* tl = doc->FindLayer(tp);
+         float b[4];
+         const bool wp = tp > 0 && doc->MakeWorkPathFromText(tp) && bounds(doc->FindPath(SN::kWorkPath), b);
+         expect("type: type attaches to a path at a document point", tp > 0 && err == SN::kTypePathOk && tl != nullptr && tl->typeMode == 1);
+         expect("type: work path and shape follow the glyphs on the path",
+                wp && b[3] <= py + 2.0f && b[1] < py - tl->fontSize * 0.4f && b[0] >= W * 0.1f - 2.0f && b[2] <= W * 0.9f + 2.0f);
+         // Editing the type path moves the type with it.
+         {
+            Layer* el = doc->FindLayer(tp);
+            std::vector<SN::Shape> moved = el->typePath;
+            for (size_t i = 1; i < moved[0].pts.size(); i += 2)
+               moved[0].pts[i] += 30.0f;
+            float b2[4];
+            const bool ok = doc->SetTypePath(tp, moved) == SN::kTypePathOk && doc->MakeWorkPathFromText(tp) &&
+                            bounds(doc->FindPath(SN::kWorkPath), b2);
+            expect("type: type follows its path when the path is edited", ok && about(b2[3] - b[3], 30.0f));
+         }
+         // A short open path hides what does not fit; a closed one never runs out.
+         {
+            Layer* el = doc->FindLayer(tp);
+            std::vector<std::vector<float>> all, part;
+            doc->TypeGlyphAnchors(*el, all);
+            el->typePath = { line(0.0f, 0.0f, el->fontSize * 0.5f, 0.0f) };
+            doc->Commit();
+            doc->TypeGlyphAnchors(*doc->FindLayer(tp), part);
+            expect("type: path end hides the overflow of an open path", !all.empty() && part.size() < all.size());
+         }
+         // Not finite, too many anchors, no path: each is its own error and changes nothing.
+         {
+            SN::Shape bad = line(0, 0, 10, 0);
+            bad.pts[3] = std::nanf("");
+            SN::Shape many;
+            many.type = SN::Shape::kPath;
+            many.pts.assign((size_t)(SN::kTypePathAnchorsMax + 1) * 6, 1.0f);
+            expect("type: a path that is not finite is an error", doc->SetTypePath(tp, { bad }) == SN::kTypePathNotFinite);
+            expect("type: too many anchors is its own error", doc->SetTypePath(tp, { many }) == SN::kTypePathTooManyAnchors);
+            int e2 = 0;
+            expect("type: no path, no type", doc->AddTypeOnPath("nope", "x", false, 0, &e2) == 0 && e2 == SN::kTypePathNoPath);
+            Layer* el = doc->FindLayer(tp);
+            el->typePath = { bad };
+            expect("type: release with a path that is not finite is an error", !doc->ReleaseTypePath(tp) && el->typeMode == 1);
+            el->typePath = { line(0, 0, 100, 0) };
+            doc->Commit();
+         }
+         expect("type: release turns type on a path into point text",
+                doc->ReleaseTypePath(tp) && doc->FindLayer(tp)->typeMode == 0 && doc->FindLayer(tp)->typePath.empty());
+         // Inside a closed path (area type): every letter inside, the overflow dropped; Release gives box text the
+         // path's width; an open path cannot hold type.
+         {
+            SN::Shape box;
+            box.type = SN::Shape::kPath;
+            box.closed = true;
+            const float r0[2] = { W * 0.3f, H * 0.3f }, r1[2] = { W * 0.7f, H * 0.7f };
+            const float pts[4][2] = { { r0[0], r0[1] }, { r1[0], r0[1] }, { r1[0], r1[1] }, { r0[0], r1[1] } };
+            for (const auto& p : pts)
+               for (int k = 0; k < 3; k++)
+                  box.pts.push_back(p[0]), box.pts.push_back(p[1]);
+            doc->SetWorkPath({ box });
+            std::string lorem;
+            for (int i = 0; i < 60; i++)
+               lorem += "word ";
+            const int at = doc->AddTypeOnPath(SN::kWorkPath, lorem, true, 0, &err);
+            float ab[4];
+            const bool ok = at > 0 && doc->MakeWorkPathFromText(at) && bounds(doc->FindPath(SN::kWorkPath), ab);
+            expect("type: fill path wraps text inside the work path in one step", ok && doc->FindLayer(at)->typeMode == 2);
+            expect("type: area type stays inside its path", ok && ab[0] >= r0[0] - 2.0f && ab[2] <= r1[0] + 2.0f && ab[1] >= r0[1] - 2.0f &&
+                   ab[3] <= r1[1] + 2.0f);
+            const bool rel = doc->ReleaseTypePath(at);
+            const Layer* rl = doc->FindLayer(at);
+            expect("type: release turns area type into box text over the path",
+                   rel && rl->typeMode == 0 && about(rl->boxW, r1[0] - r0[0]) && about(rl->x, r0[0]) && about(rl->y, r0[1]));
+            doc->SetWorkPath({ line(0, 0, 50, 50) });
+            int e3 = 0;
+            expect("type: an open path cannot hold area type", doc->AddTypeOnPath(SN::kWorkPath, "x", true, 0, &e3) == 0 &&
+                   e3 == SN::kTypePathNoPath);
+            doc->RemoveLayer(at);
+         }
+         // Vertical type: two letters stack into a column taller than wide; one undo step each way.
+         {
+            const int vt = doc->AddTextLayer("AB", W * 0.5f, H * 0.5f, 0.0f);
+            int w0 = 0, h0 = 0, w1 = 0, h1 = 0;
+            doc->TextSize(*doc->FindLayer(vt), w0, h0);
+            PushUndoCheckpoint("Vertical type");
+            const bool set = doc->SetVerticalType(vt, true);
+            doc->TextSize(*doc->FindLayer(vt), w1, h1);
+            expect("type: vertical orientation renders a column", set && w0 > h0 && h1 > w1);
+            expect("type: orientation is one step", undoBack() && !doc->FindLayer(vt)->vertical);
+            // Warp Text: Arc makes the line taller, Convert to Shape keeps the warp, undo takes it off.
+            int wa = 0, ha = 0;
+            PushUndoCheckpoint("Warp text");
+            const bool warped = doc->SetWarpText(vt, 1, 50.0f, 0.0f, 0.0f, false);
+            doc->TextSize(*doc->FindLayer(vt), wa, ha);
+            expect("type: warp style on type is warp text", warped && ha > h0 + 2 && doc->FindLayer(vt)->warpStyle == 1);
+            expect("type: a bad warp style is refused", !doc->SetWarpText(vt, SN::kWarpStyleCount, 50.0f, 0.0f, 0.0f, false));
+            expect("type: warp text undoes", undoBack() && doc->FindLayer(vt)->warpStyle == 0);
+            doc->RemoveLayer(vt);
+         }
+         // Arc on a paint layer: a band across the middle sags at its ends; one undo step.
+         {
+            const int pl = doc->AddPaintLayer();
+            doc->SelectRect(0, H * 0.45f, (float)W, H * 0.55f, SN::kSelNew, 0.0f, false);
+            doc->FillPixels(pl, red, 1.0f);
+            doc->Deselect();
+            uint8_t e0[4] = {}, e1[4] = {}, c1[4] = {};
+            pixel({ pl }, (int)(W * 0.03f), (int)(H * 0.5f), e0);
+            PushUndoCheckpoint("Warp style");
+            const bool arc = doc->WarpLayerStyle(pl, 1, 50.0f, 0.0f, 0.0f, false);
+            doc->Commit();
+            pixel({ pl }, (int)(W * 0.03f), (int)(H * 0.5f), e1);
+            pixel({ pl }, (int)(W * 0.5f), (int)(H * 0.5f), c1);
+            expect("type: arc warps pixels", arc && e0[3] > 200 && e1[3] < 100 && c1[3] > 200);
+            uint8_t e2[4] = {};
+            const bool und = undoBack();
+            pixel({ pl }, (int)(W * 0.03f), (int)(H * 0.5f), e2);
+            expect("type: arc warp undoes", und && e2[3] > 200);
+            expect("type: cylinder style needs a paint layer", !doc->WarpLayerStyle(tp, 16, 50.0f, 0.0f, 0.0f, false));
+            doc->RemoveLayer(pl);
+         }
+         doc->RemoveLayer(tp);
          doc->DeletePath(SN::kWorkPath);
          doc->Commit();
       }

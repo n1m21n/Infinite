@@ -3042,6 +3042,10 @@ namespace params
       constexpr float offset_x_hi = 400.0f;
       constexpr float base_shift_lo = -400.0f;
       constexpr float base_shift_hi = 400.0f;
+      constexpr float warp_bend_lo = -100.0f;
+      constexpr float warp_bend_hi = 100.0f;
+      constexpr float path_offset_lo = 0.0f;
+      constexpr float path_offset_hi = 1.0f;
       constexpr float text_sx_lo = 0.1f;
       constexpr float text_sx_hi = 4.0f;
       constexpr float text_sy_lo = 0.1f;
