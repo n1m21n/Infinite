@@ -1,5 +1,14 @@
 [
  {
+  "slug": "16-line-hadamard-fdn-reverb-dsp",
+  "title": "16-line Hadamard FDN reverb: diffusion, modulation, and SIMD DSP",
+  "description": "How Infinite's Reverb node pairs dual 4-stage Schroeder diffusers, a 16-line Hadamard FDN, Hermite modulation, and damping-compensated RT60 in SIMD.",
+  "date": "2026-11-26",
+  "updated": "2026-11-26",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/16-line-hadamard-fdn-reverb-dsp.html"
+ },
+ {
   "slug": "generative-melody-and-chords-in-infinite",
   "title": "Build a generative melody and chord progression",
   "description": "Patch Chorder, Arpeggiator, Random Note Generator, Analog, Delay, and Reverb in Infinite to create evolving chords and melodies without music theory.",
