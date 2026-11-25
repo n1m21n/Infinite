@@ -9701,6 +9701,17 @@ namespace
             changed |= FieldWell::Slider("##v2dvarrow", &t.arrowSize, params::view2d::arrow_size_lo, params::view2d::arrow_size_hi, "Head %.1f\xC3\x97");
             if (ImGui::IsItemActivated())
                undo();
+            if (t.arrowS == 2 || t.arrowE == 2)
+            {
+               ImGui::SetNextItemWidth(kWellL);
+               if (FieldWell::Slider("##v2dvconcave", &t.arrowConcave, params::view2d::arrow_concave_lo, params::view2d::arrow_concave_hi, "Concavity %.0f%%"))
+               {
+                  t.arrowConcave = std::round(t.arrowConcave);   // whole percents, as Photoshop's field
+                  changed = true;
+               }
+               if (ImGui::IsItemActivated())
+                  undo();
+            }
          }
          ImGui::TextDisabled("%s", T("Pressure"));
          ImGui::SetNextItemWidth(kWellL);
@@ -17928,6 +17939,33 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("triangle: the base corners are filled, above the edge is empty",
                 pixel({ vid }, 298, 199, a0) && a0[3] > 200 && pixel({ vid }, 102, 199, a1) && a1[3] > 200 &&
                     pixel({ vid }, 110, 110, a2) && a2[3] < 4);
+         doc->RemoveLayer(vid);
+         doc->Commit();
+      }
+      // Arrowhead Concavity (PhotoCraft arrow_concavity_takes_minus_fifty_to_fifty): +50 pulls the triangle's back
+      // halfway to its tip, leaving a notch; the tip stays; old out-of-range values load clamped.
+      {
+         using Sh = Scene2DNode::Shape;
+         Layer& vl = doc->AddLayer(Kind::Vector, 0, 0);
+         const int vid = vl.id;
+         Sh l;
+         l.type = Sh::kLine;
+         l.x0 = 100, l.y0 = 200, l.x1 = 300, l.y1 = 200;   // head L = 60, back at x 300, tip at 360
+         l.fillOn = false;
+         l.strokeOn = true;
+         l.strokeC[0] = 1.0f;
+         l.width = 10.0f;
+         l.arrowE = 2;
+         l.arrowSize = 6.0f;
+         vl.shapes.push_back(l);
+         doc->Commit();
+         uint8_t a0[4] = {}, a1[4] = {}, a2[4] = {};
+         const bool flat = pixel({ vid }, 320, 200, a0) && a0[3] > 200;
+         if (Layer* vv = doc->FindLayer(vid))
+            vv->shapes[0].arrowConcave = 50.0f;
+         doc->Commit();
+         expect("arrow: Concavity 50 notches the triangle's back, the tip stays",
+                flat && pixel({ vid }, 320, 200, a1) && a1[3] < 4 && pixel({ vid }, 345, 200, a2) && a2[3] > 200);
          doc->RemoveLayer(vid);
          doc->Commit();
       }

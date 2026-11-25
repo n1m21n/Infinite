@@ -111,6 +111,8 @@ public:
       bool balanced = false;                  // dashes stretched so a closed outline ends on a whole dash
       int arrowS = 0, arrowE = 0;             // 0 none, 1 arrow, 2 triangle, 3 circle, 4 square, 5 bar
       float arrowSize = 3.0f;                 // arrowheads: widths
+      float arrowConcave = 0.0f;              // triangle head: back pulled in (+) or out (-), whole % of its length, -50..50
+      static constexpr float kArrowConcaveMax = 50.0f;   // Photoshop's Concavity field range, +-
       float taperS = 0.0f, taperE = 0.0f;     // pressure: 0..1 of the length the stroke thins over at each end
       float pressMin = 0.0f;                  // pressure: the width the tapers reach, fraction of `width`
       bool behind = false;                    // stroke drawn under the fill

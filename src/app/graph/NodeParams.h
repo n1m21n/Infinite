@@ -2981,6 +2981,8 @@ namespace params
       constexpr float dash_phase_hi = 200.0f;
       constexpr float miter_hi = 100.0f;
       constexpr float miter_lo = 1.0f;
+      constexpr float arrow_concave_hi = 50.0f;
+      constexpr float arrow_concave_lo = -50.0f;
       constexpr float arrow_size_hi = 20.0f;
       constexpr float arrow_size_lo = 1.0f;
       constexpr float radius_hi = 500.0f;

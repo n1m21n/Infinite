@@ -2188,7 +2188,7 @@ void Scene2DNode::Serialize()
          for (int i = 0; i < 4; i++) o << " " << sh.cornerR[i] << " " << sh.cornerType[i];
          o << " " << sh.miter << " " << sh.dashPhase << " " << +sh.balanced << " " << sh.arrowS << " " << sh.arrowE << " "
            << sh.arrowSize << " " << sh.taperS << " " << sh.taperE << " " << sh.pressMin << " " << +sh.behind << " "
-           << +sh.scaleStroke;
+           << +sh.scaleStroke << " " << sh.arrowConcave;
          o << "\n";
       };
       if (l.kind == Kind::Vector)
@@ -2644,6 +2644,9 @@ void Scene2DNode::Parse()
                   sh.scaleStroke = sc != 0;
                   sh.arrowS = std::clamp(sh.arrowS, 0, 5);
                   sh.arrowE = std::clamp(sh.arrowE, 0, 5);
+                  float cc = 0.0f;
+                  if (s >> cc && std::isfinite(cc))   // whole percents; an old 0..100 value is clamped, not refused
+                     sh.arrowConcave = std::clamp(std::round(cc), -Shape::kArrowConcaveMax, Shape::kArrowConcaveMax);
                   sh.noise = std::clamp(sh.noise, 0.0f, 1.0f);
                   sh.miter = std::clamp(sh.miter, 1.0f, 100.0f);
                }

@@ -57,7 +57,7 @@ namespace
          h = HF(h, s.cornerR[i]);
          h = H(h, (unsigned)s.cornerType[i]);
       }
-      for (float f : { s.noise, s.miter, s.dashPhase, s.arrowSize, s.taperS, s.taperE, s.pressMin })
+      for (float f : { s.noise, s.miter, s.dashPhase, s.arrowSize, s.arrowConcave, s.taperS, s.taperE, s.pressMin })
          h = HF(h, f);
       h = H(h, (unsigned)(s.arrowS * 64 + s.arrowE * 8 + s.balanced * 4 + s.behind * 2 + s.scaleStroke));
       h = H(h, (unsigned)(s.sides * 64 + s.cap * 16 + s.join * 4 + s.align));
@@ -545,12 +545,16 @@ namespace
             plutovg_canvas_set_line_join(cv, PLUTOVG_LINE_JOIN_MITER);
             plutovg_canvas_stroke(cv);
             return;
-         case 2:   // triangle
+         case 2:   // triangle; Concavity moves the back's middle toward the tip (+) or away (-), Photoshop's arrowhead
+         {
+            const float c = std::clamp(s.arrowConcave, -Scene2DNode::Shape::kArrowConcaveMax, Scene2DNode::Shape::kArrowConcaveMax) / 100.0f * L;
             plutovg_canvas_move_to(cv, ex + nx * W, ey + ny * W);
             plutovg_canvas_line_to(cv, ex + dx * L, ey + dy * L);
             plutovg_canvas_line_to(cv, ex - nx * W, ey - ny * W);
+            plutovg_canvas_line_to(cv, ex + dx * c, ey + dy * c);
             plutovg_canvas_close_path(cv);
             break;
+         }
          case 3:   // circle
             plutovg_canvas_circle(cv, ex + dx * W * 0.5f, ey + dy * W * 0.5f, W);
             break;

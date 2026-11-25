@@ -3946,6 +3946,7 @@ bool Scene2DNode::CopyLayerStyle(int from, int to, int parts)
             t.arrowS = f.arrowS;
             t.arrowE = f.arrowE;
             t.arrowSize = f.arrowSize;
+            t.arrowConcave = f.arrowConcave;
             t.taperS = f.taperS;
             t.taperE = f.taperE;
             t.pressMin = f.pressMin;
