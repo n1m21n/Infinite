@@ -11,6 +11,8 @@
 
 #include "TileStore.h"
 #include "core/ml/AiSelect.h"
+#include "platform/Platform.h"
+#include <chrono>
 
 namespace
 {
@@ -2395,8 +2397,87 @@ int Scene2DNode::SelectObjectAi(float x0, float y0, float x1, float y1, int op, 
    return 2;
 }
 
+bool Scene2DNode::SelectSubject(int op, bool sampleAll, int layerId)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   auto px = std::make_shared<std::vector<uint8_t>>();
+   const Layer* l = FindConst(layerId);
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, *px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, *px);
+   if (px->size() != (size_t)W * H * 4 || mSubjectJob.valid())
+      return false;
+   mAiWait.on = false;
+   mSubjectW = W;
+   mSubjectH = H;
+   mSubjectOp = op;
+   mSubjectPx = px;
+   // Matting takes a second or so: never on the UI thread.
+   mSubjectJob = std::async(std::launch::async, [px, W, H]() {
+      SubjectResult r;
+      std::string err;
+      r.ok = Platform::SubjectMask(*px, W, H, Platform::MattingMode::Subject, r.mask, err) && r.mask.size() == (size_t)W * H;
+      return r;
+   });
+   return true;
+}
+
+bool Scene2DNode::SubjectLanded()
+{
+   if (!mSubjectJob.valid() || mSubjectJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+      return false;
+   SubjectResult r = mSubjectJob.get();
+   std::shared_ptr<const std::vector<uint8_t>> px = std::move(mSubjectPx);
+   const int W = mSubjectW, H = mSubjectH;
+   if (!r.ok || W != mDoc.w || H != mDoc.h || px == nullptr)
+      return false;
+   // The subject's box (document px, top row first).
+   int x0 = W, y0 = H, x1 = -1, y1 = -1;
+   for (int row = 0; row < H; row++)
+      for (int x = 0; x < W; x++)
+         if (r.mask[(size_t)row * W + x] > 127)
+         {
+            const int y = H - 1 - row;
+            x0 = std::min(x0, x); x1 = std::max(x1, x);
+            y0 = std::min(y0, y); y1 = std::max(y1, y);
+         }
+   if (x1 < x0)
+      return false;   // nothing stood out
+   if (!AiSelect::Available() || x1 - x0 < 4 || y1 - y0 < 4)
+   {
+      CombineSelection(r.mask, mSubjectOp);
+      return true;
+   }
+   auto pic = std::make_shared<AiSelect::Picture>();
+   pic->w = W;
+   pic->h = H;
+   pic->rgba.resize(px->size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&pic->rgba[(size_t)y * W * 4], &(*px)[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+   const uint64_t key = AiSelect::KeyOf(*pic);
+   const float pad = 0.02f * std::max(W, H);
+   const float p[4] = { std::max(0.0f, x0 - pad), std::max(0.0f, y0 - pad), std::min((float)W, x1 + 1 + pad), std::min((float)H, y1 + 1 + pad) };
+   if (AiSelect::Ready(key))
+      return AiDecodeApply(key, W, H, p, true, mSubjectOp, &r.mask);
+   AiSelect::Request(pic, key);
+   mAiWait.on = true;
+   mAiWait.key = key;
+   mAiWait.w = W;
+   mAiWait.h = H;
+   mAiWait.op = mSubjectOp;
+   mAiWait.box = true;
+   std::copy(p, p + 4, mAiWait.p);
+   mAiWait.guide = std::move(r.mask);
+   return false;
+}
+
 bool Scene2DNode::AiSelectPoll()
 {
+   if (SubjectLanded())
+      return true;
    if (!mAiWait.on)
       return false;
    if (mAiWait.w != mDoc.w || mAiWait.h != mDoc.h)
@@ -2411,10 +2492,12 @@ bool Scene2DNode::AiSelectPoll()
       return false;
    }
    mAiWait.on = false;
-   return AiDecodeApply(mAiWait.key, mAiWait.w, mAiWait.h, mAiWait.p, mAiWait.box, mAiWait.op);
+   const std::vector<uint8_t> guide = std::move(mAiWait.guide);
+   mAiWait.guide.clear();
+   return AiDecodeApply(mAiWait.key, mAiWait.w, mAiWait.h, mAiWait.p, mAiWait.box, mAiWait.op, guide.empty() ? nullptr : &guide);
 }
 
-bool Scene2DNode::AiDecodeApply(uint64_t key, int w, int h, const float p[4], bool box, int op)
+bool Scene2DNode::AiDecodeApply(uint64_t key, int w, int h, const float p[4], bool box, int op, const std::vector<uint8_t>* guide)
 {
    AiSelect::Prompt pr;
    if (box)
@@ -2435,6 +2518,19 @@ bool Scene2DNode::AiDecodeApply(uint64_t key, int w, int h, const float p[4], bo
    std::vector<uint8_t> region((size_t)w * h);
    for (int y = 0; y < h; y++)
       std::memcpy(&region[(size_t)(h - 1 - y) * w], &cov[(size_t)y * w], (size_t)w);
+   if (guide != nullptr && guide->size() == region.size())
+   {
+      // SAM drew something else from the subject's box (a part, or the background): keep the matting's mask.
+      size_t inter = 0, uni = 0;
+      for (size_t i = 0; i < region.size(); i++)
+      {
+         const bool a = region[i] > 127, b = (*guide)[i] > 127;
+         inter += a && b;
+         uni += a || b;
+      }
+      if (uni == 0 || inter * 2 < uni)
+         region = *guide;
+   }
    CombineSelection(region, op);
    return true;
 }
