@@ -1817,6 +1817,17 @@ void Scene2DNode::StoreSelection()
       mSelStore.h = mDoc.h;
       mSelStore.keys = SelEncode(mSel, mDoc.w, mDoc.h);
    }
+   if (!mSelApron.a.empty() && !ApronMatches())
+      mSelApron = SelApron();
+   mSelApronStore = ApronStore();
+   if (!mSelApron.a.empty())
+   {
+      mSelApronStore.x0 = mSelApron.x0;
+      mSelApronStore.y0 = mSelApron.y0;
+      mSelApronStore.w = mSelApron.w;
+      mSelApronStore.h = mSelApron.h;
+      mSelApronStore.keys = SelEncode(mSelApron.a, mSelApron.w, mSelApron.h);
+   }
    Commit();
 }
 
@@ -1824,6 +1835,7 @@ void Scene2DNode::StoreSelection()
 void Scene2DNode::RestoreSelection()
 {
    std::vector<uint8_t> sel;
+   const bool had = mSelAny;
    if (mSelStore.w == mDoc.w && mSelStore.h == mDoc.h && SelDecode(mSelStore.keys, mDoc.w, mDoc.h, sel))
    {
       mSel.swap(sel);
@@ -1832,12 +1844,22 @@ void Scene2DNode::RestoreSelection()
    else
    {
       mSelStore = SelStore();
-      if (!mSelAny)
-         return;
       mSel.clear();
       mSelAny = false;
    }
-   mSelDirty = true;
+   mSelApron = SelApron();
+   std::vector<uint8_t> a;
+   const ApronStore& as = mSelApronStore;
+   if (as.w > 0 && as.h > 0 && SelDecode(as.keys, as.w, as.h, a))
+   {
+      mSelApron = SelApron{ as.x0, as.y0, as.w, as.h, std::move(a) };
+      if (!ApronMatches())
+         mSelApron = SelApron();
+   }
+   if (mSelApron.a.empty())
+      mSelApronStore = ApronStore();
+   if (had || mSelAny)
+      mSelDirty = true;
 }
 
 std::vector<std::string> Scene2DNode::SavedSelections() const
@@ -1873,20 +1895,7 @@ bool Scene2DNode::LoadSelection(const std::string& name, int op)
    std::vector<uint8_t> t;
    if (it == mSelSaved.end() || it->w != mDoc.w || it->h != mDoc.h || !SelDecode(it->keys, it->w, it->h, t))
       return false;
-   if (mSel.size() != t.size())
-      mSel.assign(t.size(), 0);
-   if (op == kSelNew || !mSelAny)
-      mSel = op == kSelSub || op == kSelIntersect ? std::vector<uint8_t>(t.size(), 0) : t;
-   else
-      for (size_t i = 0; i < t.size(); i++)
-      {
-         if (op == kSelAdd) mSel[i] = std::max(mSel[i], t[i]);
-         else if (op == kSelSub) mSel[i] = (uint8_t)(mSel[i] * (255 - t[i]) / 255);
-         else mSel[i] = std::min(mSel[i], t[i]);
-      }
-   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
-   mSelDirty = true;
-   StoreSelection();
+   CombineSelection(t, op);
    return true;
 }
 
@@ -2040,20 +2049,7 @@ void Scene2DNode::SelectPolygon(const std::vector<float>& xy, int op, float feat
    FillPolygon(xy, W, H, t, aa);
    if (feather > 0.5f)
       Feather(t, W, H, feather);
-   if (mSel.size() != t.size())
-      mSel.assign(t.size(), 0);
-   if (op == kSelNew || !mSelAny)
-      mSel = op == kSelSub || op == kSelIntersect ? std::vector<uint8_t>(t.size(), 0) : t;
-   else
-      for (size_t i = 0; i < t.size(); i++)
-      {
-         if (op == kSelAdd) mSel[i] = std::max(mSel[i], t[i]);
-         else if (op == kSelSub) mSel[i] = (uint8_t)(mSel[i] * (255 - t[i]) / 255);
-         else mSel[i] = std::min(mSel[i], t[i]);
-      }
-   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
-   mSelDirty = true;
-   StoreSelection();
+   CombineSelection(t, op);
 }
 
 void Scene2DNode::SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse, bool aa)
@@ -2112,20 +2108,7 @@ void Scene2DNode::SelectEllipse(float x0, float y0, float x1, float y1, int op, 
    }
    if (feather > 0.5f)
       Feather(t, W, H, feather);
-   if (mSel.size() != t.size())
-      mSel.assign(t.size(), 0);
-   if (op == kSelNew || !mSelAny)
-      mSel = op == kSelSub || op == kSelIntersect ? std::vector<uint8_t>(t.size(), 0) : t;
-   else
-      for (size_t i = 0; i < t.size(); i++)
-      {
-         if (op == kSelAdd) mSel[i] = std::max(mSel[i], t[i]);
-         else if (op == kSelSub) mSel[i] = (uint8_t)(mSel[i] * (255 - t[i]) / 255);
-         else mSel[i] = std::min(mSel[i], t[i]);
-      }
-   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
-   mSelDirty = true;
-   StoreSelection();
+   CombineSelection(t, op);
 }
 
 void Scene2DNode::SelectWand(float x, float y, int tolerance, bool contiguous, int op, bool sampleAll, int layerId)
@@ -2144,20 +2127,7 @@ void Scene2DNode::SelectWand(float x, float y, int tolerance, bool contiguous, i
    std::vector<uint8_t> region;
    sMatchSoft = wandAntialias;
    MatchRegion(px, W, H, (int)std::floor(x), H - 1 - (int)std::floor(y), tolerance, contiguous, region);
-   if (mSel.size() != region.size())
-      mSel.assign(region.size(), 0);
-   if (op == kSelNew || !mSelAny)
-      mSel = op == kSelSub || op == kSelIntersect ? std::vector<uint8_t>(region.size(), 0) : region;
-   else
-      for (size_t i = 0; i < region.size(); i++)
-      {
-         if (op == kSelAdd) mSel[i] = std::max(mSel[i], region[i]);
-         else if (op == kSelSub) mSel[i] = (uint8_t)(mSel[i] * (255 - region[i]) / 255);
-         else mSel[i] = std::min(mSel[i], region[i]);
-      }
-   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
-   mSelDirty = true;
-   StoreSelection();
+   CombineSelection(region, op);
 }
 
 void Scene2DNode::SelectAll()
@@ -2171,6 +2141,7 @@ void Scene2DNode::SelectAll()
 
 void Scene2DNode::Deselect()
 {
+   mSelApron = SelApron();
    mSel.clear();
    mSelAny = false;
    mSelDirty = true;
@@ -2179,6 +2150,7 @@ void Scene2DNode::Deselect()
 
 void Scene2DNode::ReframeSelection(int w, int h, int dx, int dy)
 {
+   mSelApron = SelApron();
    if (!mSelAny || mSel.size() != (size_t)mDoc.w * mDoc.h)
    {
       mSel.clear();
@@ -2207,11 +2179,120 @@ void Scene2DNode::ReframeSelection(int w, int h, int dx, int dy)
    mSelDirty = true;
 }
 
+bool Scene2DNode::ApronMatches() const
+{
+   const int W = mDoc.w, H = mDoc.h;
+   const SelApron& p = mSelApron;
+   if (p.a.empty() || p.a.size() != (size_t)p.w * p.h)
+      return false;
+   const bool have = mSelAny && mSel.size() == (size_t)W * H;
+   for (int y = 0; y < H; y++)
+   {
+      const int ay = y - p.y0;
+      const uint8_t* row = have ? &mSel[(size_t)(H - 1 - y) * W] : nullptr;
+      for (int x = 0; x < W; x++)
+      {
+         const int ax = x - p.x0;
+         const uint8_t a = ax >= 0 && ay >= 0 && ax < p.w && ay < p.h ? p.a[(size_t)ay * p.w + ax] : 0;
+         if (a != (row != nullptr ? row[x] : 0))
+            return false;
+      }
+   }
+   return true;
+}
+
+Scene2DNode::SelApron Scene2DNode::ApronOrCanvas() const
+{
+   if (ApronMatches())
+      return mSelApron;
+   SelApron ap;
+   const int W = mDoc.w, H = mDoc.h;
+   if (!mSelAny || mSel.size() != (size_t)W * H)
+      return ap;
+   ap.w = W;
+   ap.h = H;
+   ap.a.resize((size_t)W * H);
+   for (int y = 0; y < H; y++)
+      std::copy_n(&mSel[(size_t)(H - 1 - y) * W], W, &ap.a[(size_t)y * W]);
+   return ap;
+}
+
+void Scene2DNode::SetSelectionFromApron(SelApron ap)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   // Trim to what is selected, no further than one canvas past each edge.
+   int x0 = std::max(ap.x0, -W), y0 = std::max(ap.y0, -H);
+   int x1 = std::min(ap.x0 + ap.w, 2 * W), y1 = std::min(ap.y0 + ap.h, 2 * H);
+   int bx0 = x1, by0 = y1, bx1 = x0, by1 = y0;
+   for (int y = y0; y < y1; y++)
+      for (int x = x0; x < x1; x++)
+         if (ap.a[(size_t)(y - ap.y0) * ap.w + (x - ap.x0)] != 0)
+         {
+            bx0 = std::min(bx0, x);
+            by0 = std::min(by0, y);
+            bx1 = std::max(bx1, x + 1);
+            by1 = std::max(by1, y + 1);
+         }
+   mSel.assign((size_t)W * H, 0);
+   mSelApron = SelApron();
+   if (bx1 > bx0 && by1 > by0)
+   {
+      for (int y = std::max(by0, 0); y < std::min(by1, H); y++)
+         for (int x = std::max(bx0, 0); x < std::min(bx1, W); x++)
+            mSel[(size_t)(H - 1 - y) * W + x] = ap.a[(size_t)(y - ap.y0) * ap.w + (x - ap.x0)];
+      if (bx0 < 0 || by0 < 0 || bx1 > W || by1 > H)
+      {
+         SelApron t;
+         t.x0 = bx0;
+         t.y0 = by0;
+         t.w = bx1 - bx0;
+         t.h = by1 - by0;
+         t.a.resize((size_t)t.w * t.h);
+         for (int y = 0; y < t.h; y++)
+            std::copy_n(&ap.a[(size_t)(by0 + y - ap.y0) * ap.w + (bx0 - ap.x0)], t.w, &t.a[(size_t)y * t.w]);
+         mSelApron = std::move(t);
+      }
+   }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   if (!mSelAny)
+      mSel.clear();
+   mSelDirty = true;
+}
+
+// The marquee moves by whole pixels; what passes the edge is kept (see SelApron).
 void Scene2DNode::ShiftSelection(float dx, float dy)
 {
    Layers();
-   ReframeSelection(mDoc.w, mDoc.h, (int)std::lround(dx), (int)std::lround(dy));
+   SelApron ap = ApronOrCanvas();
+   if (ap.a.empty())
+   {
+      StoreSelection();
+      return;
+   }
+   ap.x0 += (int)std::lround(dx);
+   ap.y0 += (int)std::lround(dy);
+   SetSelectionFromApron(std::move(ap));
    StoreSelection();
+}
+
+bool Scene2DNode::SelectionExtent(int& x0, int& y0, int& x1, int& y1) const
+{
+   if (ApronMatches())
+   {
+      x0 = mSelApron.x0;
+      y0 = mSelApron.y0;
+      x1 = x0 + mSelApron.w;
+      y1 = y0 + mSelApron.h;
+      return true;
+   }
+   float lo[2], hi[2];
+   if (!SelectionBounds(lo, hi))
+      return false;
+   x0 = (int)lo[0];
+   y0 = (int)lo[1];
+   x1 = (int)hi[0];
+   y1 = (int)hi[1];
+   return true;
 }
 
 void Scene2DNode::InvertSelection()
@@ -3029,11 +3110,15 @@ bool Scene2DNode::FloodErase(int id, float x, float y, int tolerance, bool conti
    const std::vector<uint8_t> keep = mSel;
    const bool keepAny = mSelAny;
    const SelStore keepStore = mSelStore;
+   const SelApron keepApron = mSelApron;
+   const ApronStore keepApronStore = mSelApronStore;
    SelectWand(x, y, tolerance, contiguous, kSelNew, sampleAll, id);
    const bool ok = mSelAny && ClearPixels(id);
    mSel = keep;
    mSelAny = keepAny;
    mSelStore = keepStore;
+   mSelApron = keepApron;
+   mSelApronStore = keepApronStore;
    mSelDirty = true;
    Commit();
    return ok;
@@ -3198,6 +3283,10 @@ void Scene2DNode::SelectObject(float x0, float y0, float x1, float y1, int op, b
 
 void Scene2DNode::CombineSelection(const std::vector<uint8_t>& region, int op)
 {
+   // Add and Subtract act on the canvas and keep what lies past its edge; New and Intersect drop it.
+   SelApron keep;
+   if ((op == kSelAdd || op == kSelSub) && ApronMatches())
+      keep = mSelApron;
    if (mSel.size() != region.size())
       mSel.assign(region.size(), 0);
    if (op == kSelNew || !mSelAny)
@@ -3211,6 +3300,22 @@ void Scene2DNode::CombineSelection(const std::vector<uint8_t>& region, int op)
       }
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
+   if (!keep.a.empty() && mSel.size() == (size_t)mDoc.w * mDoc.h)
+   {
+      // The apron grown to hold the canvas, the canvas part replaced by the new selection.
+      const int W = mDoc.w, H = mDoc.h;
+      SelApron u;
+      u.x0 = std::min(keep.x0, 0);
+      u.y0 = std::min(keep.y0, 0);
+      u.w = std::max(keep.x0 + keep.w, W) - u.x0;
+      u.h = std::max(keep.y0 + keep.h, H) - u.y0;
+      u.a.assign((size_t)u.w * u.h, 0);
+      for (int y = 0; y < keep.h; y++)
+         std::copy_n(&keep.a[(size_t)y * keep.w], keep.w, &u.a[(size_t)(keep.y0 - u.y0 + y) * u.w + (keep.x0 - u.x0)]);
+      for (int y = 0; y < H; y++)
+         std::copy_n(&mSel[(size_t)(H - 1 - y) * W], W, &u.a[(size_t)(y - u.y0) * u.w - u.x0]);
+      SetSelectionFromApron(std::move(u));
+   }
    StoreSelection();
 }
 

@@ -290,7 +290,7 @@ namespace
 
    struct Op
    {
-      int kind = 0;               // 1 move, 2 scale, 3 rotate, 4 pan, 5 crop box, 6 guide, 7 paint, 8 gradient, 9 marquee, 10 lasso, 11 pick
+      int kind = 0;               // 1 move, 2 scale, 3 rotate, 4 pan, 5 crop box, 6 guide, 7 paint, 8 gradient, 9 marquee, 10 lasso, 11 pick, 31 outline
       ImVec2 docStart;
       int selOp = 0;
       std::vector<float> path;    // freehand lasso, document px
@@ -3289,6 +3289,18 @@ namespace
          if (rep(ImGuiKey_UpArrow)) Nudge(doc, 0, -step);
          if (rep(ImGuiKey_DownArrow)) Nudge(doc, 0, step);
       }
+      // A selection tool's arrows move the outline only (Photoshop), past the canvas edge too.
+      int ex0 = 0, ey0 = 0, ex1 = 0, ey1 = 0;
+      if (!cmd && (sTool == kMarquee || sTool == kLasso) && doc->SelectionExtent(ex0, ey0, ex1, ey1))
+      {
+         const float nx = rep(ImGuiKey_LeftArrow) ? -step : rep(ImGuiKey_RightArrow) ? step : 0.0f;
+         const float ny = rep(ImGuiKey_UpArrow) ? -step : rep(ImGuiKey_DownArrow) ? step : 0.0f;
+         if (nx != 0.0f || ny != 0.0f)
+         {
+            SelStep("Nudge selection outline");
+            doc->ShiftSelection(nx, ny);
+         }
+      }
    }
 
    // ---- snapping --------------------------------------------------------
@@ -5809,6 +5821,29 @@ namespace
       Touch();
    }
 
+   // Marquee drag inside the selection: the outline moves by whole pixels, one undo step, Shift keeps it level.
+   // g0[0..1] is the offset applied so far; the node keeps what passes the canvas edge.
+   void DragOutline(Scene2DNode* doc, ImVec2 mouse)
+   {
+      if (!sOp.made && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < tok::view2d_canvas_limit_sm)
+         return;
+      const ImVec2 dd = DocDelta(mouse.x - sOp.start.x, mouse.y - sOp.start.y);
+      float dx = std::round(dd.x), dy = std::round(dd.y);
+      if (ImGui::GetIO().KeyShift)
+         (std::fabs(dx) > std::fabs(dy) ? dy : dx) = 0.0f;
+      if (dx == sOp.g0[0] && dy == sOp.g0[1])
+         return;
+      if (!sOp.made)
+      {
+         SelStep("Move selection outline");
+         sOp.made = true;
+      }
+      doc->ShiftSelection(dx - sOp.g0[0], dy - sOp.g0[1]);
+      sOp.g0[0] = dx;
+      sOp.g0[1] = dy;
+      Touch();
+   }
+
    void MoveSelection(Scene2DNode* doc, ImVec2 mouse)
    {
       const ImVec2 dd = DocDelta(mouse.x - sOp.start.x, mouse.y - sOp.start.y);
@@ -7800,6 +7835,9 @@ namespace
             sOp.docStart = sMouseDoc;
             sOp.start = mouse;
             sOp.selOp = SelOpFor(io);
+            // New, pressed inside the selection: the drag moves the outline only (Photoshop).
+            if (sOp.selOp == Scene2DNode::kSelNew && doc->SelectionAt((int)std::floor(sMouseDoc.x), (int)std::floor(sMouseDoc.y)) > 0.0f)
+               sOp.kind = 31;
          }
          else if (sTool == kLasso && sLassoKind == 1)
          {
@@ -7997,6 +8035,8 @@ namespace
             WarpActive(doc, mouse);
          else if (sOp.kind == 27)
             MeshDrag(doc);
+         else if (sOp.kind == 31)
+            DragOutline(doc, mouse);
          else if (sOp.kind == 26)
          {
             sMeasureA = sOp.docStart;
@@ -8203,6 +8243,11 @@ namespace
             else if (sOp.kind == 8 && std::hypot(mouse.x - ToScreen(doc, sOp.docStart.x, sOp.docStart.y).x,
                                                  mouse.y - ToScreen(doc, sOp.docStart.x, sOp.docStart.y).y) > tok::view2d_canvas_limit_xs)
                GradientTo(doc, sOp.docStart, sMouseDoc);
+            else if (sOp.kind == 31 && !sOp.made)
+            {
+               SelStep("Deselect");   // a click inside it without a drag drops it, as outside
+               doc->Deselect();
+            }
             else if (sOp.kind == 9)
             {
                // A click without a drag drops the selection, as in every image editor.
@@ -16505,6 +16550,62 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("parity: expand rounds the corners", doc->SelectionAt(205, 205) > 0.5f && doc->SelectionAt(208, 208) < 0.5f &&
                                                       doc->SelectionAt(208, 150) > 0.5f);
          doc->Deselect();
+         doc->Commit();
+      }
+      // Off-canvas selection (PhotoCraft selection_off_canvas): a marquee moved past the edge keeps the part
+      // outside; Add and Subtract keep it, New and Intersect drop it; undo brings it back.
+      {
+         using S = Scene2DNode;
+         auto ext = [&](int ex0, int ey0, int ex1, int ey1)
+         {
+            int a = 0, b = 0, c = 0, d = 0;
+            return doc->SelectionExtent(a, b, c, d) && a == ex0 && b == ey0 && c == ex1 && d == ey1;
+         };
+         auto box = [&]() { doc->SelectRect(10, 50, 110, 120, S::kSelNew, 0, false); };
+         box();
+         doc->ShiftSelection(-60, 0);
+         expect("off-canvas: a marquee moved past the edge keeps the part outside",
+                ext(-50, 50, 50, 120) && doc->SelectionAt(0, 60) > 0.5f && doc->SelectionAt(60, 60) < 0.5f);
+         doc->ShiftSelection(60, 0);
+         expect("off-canvas: moved back, the whole marquee returns", ext(10, 50, 110, 120) && doc->SelectionAt(10, 60) > 0.5f);
+         doc->ShiftSelection(-60, 0);
+         doc->Commit();
+         const std::string t0 = doc->DocText();
+         const size_t u0 = gUndoStack.size();
+         SelStep("Move selection outline");
+         doc->ShiftSelection(60, 0);
+         Undo();
+         doc = FindDoc();
+         expect("off-canvas: undo brings back the part outside", doc != nullptr && doc->DocText() == t0 && ext(-50, 50, 50, 120) &&
+                                                                    gUndoStack.size() == u0);
+         if (doc == nullptr)
+            return fails;
+         doc->SelectRect(200, 200, 220, 220, S::kSelAdd, 0, false);
+         doc->ShiftSelection(60, 0);
+         expect("off-canvas: Add keeps the part outside", doc->SelectionAt(10, 60) > 0.5f && doc->SelectionAt(270, 210) > 0.5f);
+         box();
+         doc->ShiftSelection(-60, 0);
+         doc->SelectRect(0, 50, 20, 120, S::kSelSub, 0, false);
+         doc->ShiftSelection(60, 0);
+         expect("off-canvas: Subtract keeps the part outside", doc->SelectionAt(15, 60) > 0.5f && doc->SelectionAt(65, 60) < 0.5f &&
+                                                                 doc->SelectionAt(90, 60) > 0.5f);
+         box();
+         doc->ShiftSelection(-60, 0);
+         doc->SelectRect(200, 200, 220, 220, S::kSelNew, 0, false);
+         expect("off-canvas: Replace drops the part outside", ext(200, 200, 220, 220));
+         box();
+         doc->ShiftSelection(-60, 0);
+         doc->SelectRect(0, 0, 30, 200, S::kSelIntersect, 0, false);
+         expect("off-canvas: Intersect drops the part outside", ext(0, 50, 30, 120));
+         box();
+         doc->ShiftSelection(-200, 0);
+         const bool gone = !doc->HasSelection();
+         doc->ShiftSelection(200, 0);
+         expect("off-canvas: moved wholly off and back, it returns", gone && ext(10, 50, 110, 120));
+         doc->ShiftSelection(-60, 0);
+         doc->Deselect();
+         doc->ShiftSelection(60, 0);
+         expect("off-canvas: Deselect forgets the part outside", !doc->HasSelection());
          doc->Commit();
       }
       // Bug 8: Patch in Destination mode ("selection is source") moves the marquee with the pixels.

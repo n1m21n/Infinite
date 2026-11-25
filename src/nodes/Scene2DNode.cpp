@@ -2107,6 +2107,13 @@ void Scene2DNode::Serialize()
    };
    if (mSelStore.w == d.w && mSelStore.h == d.h && !mSelStore.keys.empty())
       selLine("sel", mSelStore);
+   if (!mSelApronStore.keys.empty())
+   {
+      const ApronStore& as = mSelApronStore;
+      o << "selapron " << as.x0 << " " << as.y0 << " " << as.w << " " << as.h;
+      for (const std::string& k : as.keys) o << " " << k;
+      o << "\n";
+   }
    for (const SelStore& st : mSelSaved)
       selLine("selsave", st);
    for (const Layer& l : mLayers)
@@ -2284,6 +2291,7 @@ void Scene2DNode::Parse()
    panelOnly = false;
    mNextId = 1;
    mSelStore = SelStore();
+   mSelApronStore = ApronStore();
    mSelSaved.clear();
    quickMask = false;
    std::map<int, int> alias;   // a repeated layer id: the later layer's new id, for the lines that follow it
@@ -2327,6 +2335,19 @@ void Scene2DNode::Parse()
       }
       else if (key == "qmask")
          quickMask = true;
+      else if (key == "selapron")
+      {
+         ApronStore as;
+         std::string k;
+         s >> as.x0 >> as.y0 >> as.w >> as.h;
+         while (s >> k)
+            as.keys.push_back(k == "+" || TileStore::IsKey(k.data(), k.size()) ? k : "-");
+         const int lim = 3 * GLUtil::kMaxTargetSide;
+         if (as.w <= 0 || as.h <= 0 || as.w > lim || as.h > lim || std::abs(as.x0) > lim || std::abs(as.y0) > lim)
+            continue;
+         as.keys.resize((size_t)((as.w + TileStore::kTile - 1) / TileStore::kTile) * (size_t)((as.h + TileStore::kTile - 1) / TileStore::kTile), "-");
+         mSelApronStore = as;
+      }
       else if (key == "sel" || key == "selsave")
       {
          SelStore st;

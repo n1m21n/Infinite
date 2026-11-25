@@ -882,6 +882,8 @@ public:
    // Live textures this document holds (leak check).
    int LiveTextures() const;
    bool SelectionBounds(float lo[2], float hi[2]) const;
+   // The whole selection's box in document px (x1/y1 past the end), the part moved off the canvas too.
+   bool SelectionExtent(int& x0, int& y0, int& x1, int& y1) const;
    float SelectionAt(int x, int y) const;   // 0..1, document px
    // Marching ants for the selection (or the red quick-mask tint), a document-sized overlay; 0 = none.
    unsigned SelectionOverlay(float time, bool quickMask);
@@ -1066,6 +1068,18 @@ private:
    struct SelStore { std::string name; int w = 0, h = 0; std::vector<std::string> keys; };
    SelStore mSelStore;
    std::vector<SelStore> mSelSaved;
+   // Off-canvas selection (PhotoCraft selection_off_canvas): a marquee moved past the edge keeps the part outside,
+   // so moving it back brings it back; Add and Subtract keep that part, New and Intersect drop it. The apron holds
+   // the whole selection top down in document px (x0/y0 may be negative) and mSel stays its on-canvas crop. It
+   // holds only while that crop is mSel: any other change to the selection drops it. Kept within one canvas of
+   // the edge on each side.
+   struct SelApron { int x0 = 0, y0 = 0, w = 0, h = 0; std::vector<uint8_t> a; };
+   struct ApronStore { int x0 = 0, y0 = 0, w = 0, h = 0; std::vector<std::string> keys; };
+   SelApron mSelApron;
+   ApronStore mSelApronStore;
+   bool ApronMatches() const;
+   SelApron ApronOrCanvas() const;           // the apron, or the on-canvas selection as one
+   void SetSelectionFromApron(SelApron ap);  // trims it, crops mSel from it, drops it when it fits the canvas
    void StoreSelection();
    // The document changed size: the selection moves by (dx, dy) into a w x h frame (Canvas Size, Crop), or goes.
    void ReframeSelection(int w, int h, int dx, int dy);
