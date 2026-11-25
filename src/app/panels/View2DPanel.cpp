@@ -6633,6 +6633,8 @@ namespace
          sObjSoftPending = false;
          Touch();
       }
+      else if (sObjSoftPending && !doc->AiSelectWaiting())
+         sObjSoftPending = false;   // the analysis failed or found nothing: nothing to soften
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       // Chips drawn over the canvas later in the frame (Rasterize?) must be able to take the hover and the click.
       ImGui::SetNextItemAllowOverlap();
@@ -8603,6 +8605,15 @@ namespace
          next();
          if (TextChip(L("Soft edges##v2dosoft"), sObjSoft, nullptr))
             sObjSoft = !sObjSoft;
+         gap();
+         // Select Subject (Photoshop's button in this bar): the main subject, found on a worker; it lands in AiSelectPoll.
+         if (TextChip(L("Subject##v2dosubj"), false, T("Select the main subject of the picture")) && !doc->AiSelectWaiting())
+         {
+            Layer* al = Active(doc);
+            SelStep("Select subject");
+            if (doc->SelectSubject(sSelOp, sAllLayers, al != nullptr ? al->id : 0))
+               sObjSoftPending = sObjSoft;
+         }
          gap();
          SelModChips(doc);
       }
@@ -14903,11 +14914,21 @@ namespace
       else if (op == "select")
       {
          const std::string how = c.value("shape", std::string("rect"));
-         static const std::vector<std::string> kShapes = { "rect", "ellipse", "all", "none", "invert" };
+         static const std::vector<std::string> kShapes = { "rect", "ellipse", "all", "none", "invert", "expand", "contract",
+                                                           "smooth", "border", "feather", "object", "subject" };
+         const bool hasRect = c.contains("rect") && c["rect"].is_array() && c["rect"].size() == 4;
+         const bool hasAt = c.contains("at") && c["at"].is_array() && c["at"].size() == 2;
          if (std::find(kShapes.begin(), kShapes.end(), how) == kShapes.end())
             err.Add(i, "E_ENUM", "'" + how + "' is not a selection shape", V2Near(how, kShapes));
-         else if ((how == "rect" || how == "ellipse") && !(c.contains("rect") && c["rect"].is_array() && c["rect"].size() == 4))
+         else if ((how == "rect" || how == "ellipse") && !hasRect)
             err.Add(i, "E_SHAPE", "'rect' wants [x0, y0, x1, y1] in document px");
+         else if (how == "object" && !hasRect && !hasAt)
+            err.Add(i, "E_SHAPE", "'object' wants 'rect' [x0, y0, x1, y1] (a box) or 'at' [x, y] (a click) in document px");
+         else if (how == "object" && !hasRect && !AiSelect::Available())
+            err.Add(i, "E_MISSING", "a click needs the \"select\" pack (" + AiSelect::Missing() + "); give 'rect' for the classic box");
+         else if ((how == "expand" || how == "contract" || how == "smooth" || how == "border" || how == "feather") &&
+                  c.contains("px") && !c["px"].is_number())
+            err.Add(i, "E_VALUE", "'px' wants a number, 1..100");
       }
       else if (op == "fill" || op == "stroke")
       {
@@ -15036,8 +15057,26 @@ namespace
             doc->Deselect();
          else if (how == "invert")
             doc->InvertSelection();
-         else if (how == "expand" || how == "contract" || how == "smooth" || how == "border")
-            doc->ModifySelection(how == "expand" ? 0 : how == "contract" ? 1 : how == "smooth" ? 2 : how == "feather" ? 5 : 3, std::clamp(c.value("px", 4), 1, 100));
+         else if (how == "expand" || how == "contract" || how == "smooth" || how == "border" || how == "feather")
+            doc->ModifySelection(how == "expand" ? 0 : how == "contract" ? 1 : how == "smooth" ? 2 : how == "feather" ? 5 : 3,
+                                 std::clamp((int)std::lround(c.value("px", 4.0)), 1, 100));
+         else if (how == "object" || how == "subject")
+         {
+            // The same tools as the bar: the whole picture by default, or one paint layer. The analysis can take a
+            // second: the selection then lands after the batch, and the reply says "selection": "analysing".
+            const bool all = c.value("allLayers", true);
+            const int lid = c.contains("layer") ? id("layer") : 0;
+            if (how == "subject")
+               return doc->SelectSubject(sop, all, lid);
+            float r[4];
+            if (c.contains("rect"))
+               for (int k = 0; k < 4; k++)
+                  r[k] = c["rect"][k].get<float>();
+            else
+               r[0] = r[2] = c["at"][0].get<float>(), r[1] = r[3] = c["at"][1].get<float>();
+            if (doc->SelectObjectAi(r[0], r[1], r[2], r[3], sop, all, lid) == 0)
+               doc->SelectObject(r[0], r[1], r[2], r[3], sop, all, lid);
+         }
          else
          {
             const json& r = c["rect"];
@@ -15141,6 +15180,8 @@ bool View2DRpc(const json& params, json& out, std::string& error)
    sSel.erase(std::remove_if(sSel.begin(), sSel.end(), [&](int id) { return doc->FindLayer(id) == nullptr; }), sSel.end());
    Touch();
    out = { { "ok", true }, { "ids", ids }, { "undo", label } };
+   if (doc->AiSelectWaiting())
+      out["selection"] = "analysing";
    return true;
 }
 
@@ -16513,6 +16554,23 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       out = json();
       View2DRpc({ { "op", "layers" } }, out, err);
       expect("H5: layers lists the document", out.value("doc", false) && out["layers"].size() == doc->Layers().size());
+      // The select op's modify shapes reach ModifySelection (feather used to fall into the rect branch).
+      out = json();
+      View2DRpc({ { "op", "apply" }, { "calls", json::array({ { { "op", "select" }, { "shape", "rect" }, { "rect", { 20, 20, 60, 60 } } },
+                                                              { { "op", "select" }, { "shape", "feather" }, { "px", 4 } } }) } },
+                out, err);
+      doc = FindDoc();
+      const float edge = doc != nullptr ? doc->SelectionAt(20, 40) : 0.0f, mid = doc != nullptr ? doc->SelectionAt(40, 40) : 0.0f;
+      expect("H5: select feather softens the edge", out.value("ok", false) && edge > 0.15f && edge < 0.85f && mid > 0.95f);
+      if (out.value("ok", false))
+         Undo();
+      doc = FindDoc();
+      out = json();
+      View2DRpc({ { "op", "apply" }, { "calls", json::array({ { { "op", "select" }, { "shape", "object" } } }) } }, out, err);
+      expect("H5: select object without a box or a point is a typed error",
+             !out.value("ok", true) && out["errors"].size() == 1 && out["errors"][0]["code"] == "E_SHAPE");
+      if (doc == nullptr)
+         return fails;
    }
    // H7 one source, many outputs: the still export and the Output node (which also feeds the loop render and a live
    // show) read the document's own frame; the written PNG holds exactly the live pixels.
