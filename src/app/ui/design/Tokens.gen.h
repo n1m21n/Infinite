@@ -212,6 +212,7 @@ namespace tok
    constexpr float motion_s_save_settle = 1.0f;
    constexpr float motion_s_edit_settle = 0.3f;
    constexpr float motion_s_ask_hold = 6.0f;
+   constexpr float motion_s_snap_hold = 0.5f;
    constexpr float motion_s_blink_period = 1.0f;
    constexpr float motion_s_glide = 0.188f;
    constexpr float motion_rate_flash_decay = 4.0f;

@@ -571,6 +571,9 @@ public:
    // The brush may be moving (a modulator on its size / opacity / flow): the stroke follows it from the next dab.
    void PaintFollow(const BrushEngine::Brush& b);
    void EndPaint();
+   // Shape Snap: the stroke so far thrown away and drawn again along xy (doc px), on the same layer and target with
+   // the same brush, at full pressure. The stroke stays open (EndPaint on release). False when nothing is painting.
+   bool RepaintStroke(const std::vector<float>& xy);
    bool Painting() const { return mStroke.Active(); }
    int PaintingLayer() const { return mPaintId; }
    // Bucket fill at a document point, within `tolerance` (0..255) of the
@@ -849,6 +852,40 @@ public:
    // `op`. Non-vector ids are ignored. Returns the kept layer's id, or 0 with nothing changed (under two vector layers,
    // a locked one, a transform that cannot be inverted, an SVG item that would need a turn).
    int CombineShapeLayers(const std::vector<int>& ids, int op);
+   // ---- vector tools (ai-tools Block 2) ----------------------------------
+   // A point list fitted with cubic Beziers (Schneider) within `tol` px; turns sharper than cornerDeg stay corners.
+   static void FitPath(const std::vector<float>& xy, bool closed, float tol, float cornerDeg, std::vector<float>& pts,
+                       float window = 0.0f);   // window: px each side a corner is judged over, 0 = from tol
+   // Path > Simplify: the same outline with fewer anchors, within `tol` px. False when it would not drop any.
+   static bool SimplifyShape(Shape& s, float tol);
+   static constexpr float kSimplifyCornerDeg = 50.0f;
+   // The farthest any of the points lies from the item's outline, px.
+   static float OutlineDistance(const Shape& s, const std::vector<float>& xy);
+   // Shape Snap: a drawn stroke (box px) recognised as a clean item; `exact` makes it regular / upright.
+   enum SnapKind { kSnapNone = 0, kSnapLine, kSnapArc, kSnapEllipse, kSnapTriangle, kSnapRect, kSnapPolygon, kSnapStar };
+   static int SnapStroke(const std::vector<float>& xy, bool exact, Shape& out);
+   // Vector bucket: the region the layer's lines close round the doc point becomes a filled path under them; gaps
+   // up to `gap` px count as closed. False when the click is outside every closed region.
+   bool VectorFill(int id, float x, float y, float gap, const float rgba[4]);
+   static constexpr float kVectorFillGridMax = 2048.0f;
+   static constexpr float kVectorFillGap = 4.0f;   // the bucket's default: gaps this wide still close a region
+   // Image Trace (VTracer-style): pixels to filled paths, biggest first so the stack shows no gaps.
+   enum TraceMode { kTraceColour = 0, kTraceBw, kTraceLineArt };
+   struct TraceOpts
+   {
+      int mode = kTraceColour;
+      int colours = 16;       // colour mode: palette size
+      float threshold = 128;  // B&W and line art: luminance below this is ink
+      int speckle = 4;        // regions smaller than this many px are dropped
+      float corner = 60;      // degrees: sharper turns stay corners
+      float tol = 1.0f;       // curve fit, px
+   };
+   static constexpr int kTraceColoursMax = 64;
+   static constexpr int kTraceShapesMax = 20000;
+   static constexpr float kTraceCornerDeg = 60.0f;
+   static int TracePixels(const uint8_t* rgba, int w, int h, const TraceOpts& o, std::vector<Shape>& out);
+   // The layer drawn alone, traced into a new vector layer above it; the new id, 0 when nothing traced.
+   int TraceLayer(int id, int frameId, const TraceOpts& o);
    static void CopyShapeStyle(const Shape& from, Shape& to);   // fill and stroke, not geometry or op
    // The items as an SVG document (Convert to Sketch node, Copy SVG).
    std::string ToSvg(const Layer& l);
@@ -1077,6 +1114,7 @@ private:
    std::map<int, TextBox> mTextBoxes;
    BrushEngine::Stroke mStroke;
    int mPaintId = 0, mPaintTarget = 0;
+   BrushEngine::Brush mPaintBrushIn;   // the brush BeginPaint was given (before its own scaling)
    struct SkinStroke
    {
       bool on = false;

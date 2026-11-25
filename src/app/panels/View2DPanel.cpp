@@ -292,6 +292,9 @@ namespace
    struct Op
    {
       int kind = 0;               // 1 move, 2 scale, 3 rotate, 4 pan, 5 crop box, 6 guide, 7 paint, 8 gradient, 9 marquee, 10 lasso, 11 pick, 31 outline
+      bool snapOk = false;        // 7: Shape Snap may take this stroke (its points go in `path`)
+      int snapStage = 0;          // 7: 0 drawing, 1 snapped, 2 snapped exact, -1 nothing it looks like
+      float still = 0.0f;         // 7: seconds the pen has held still
       ImVec2 docStart;
       int selOp = 0;
       std::vector<float> path;    // freehand lasso, document px
@@ -330,6 +333,8 @@ namespace
    float sCropAngle = 0.0f;           // the box's turn about its centre, degrees clockwise on screen (Straighten)
    bool sCropStraighten = false;      // the next crop drag draws a line to level, not a box
    const int kCropStraightenDrag = -2;   // sOp.cropHandle while that line is drawn
+   bool sShapeSnap = true;            // brush and eraser: hold at the end of a stroke to make it a clean shape
+   float sVecFillGap = Scene2DNode::kVectorFillGap;   // vector bucket: gaps between lines up to this many px count as closed
    bool sCropPersp = false;           // Perspective Crop: four free corners, the quad becomes the document
    ImVec2 sCropQuad[4];               // TL TR BR BL, document px; with Perspective on, sOp.cropHandle 0..3 is a corner
    const float* CropQuadF() { return &sCropQuad[0].x; }
@@ -2783,6 +2788,10 @@ namespace
    }
 
    bool sFillAsk = false;          // Shift+F5: open the Fill dialog
+   bool sTraceAsk = false;         // Layer > Trace to Vector: open its settings
+   bool ApplyCrop(Scene2DNode* doc);
+   Scene2DNode::TraceOpts sTrace;
+   void DrawTraceDialog(Scene2DNode* doc);
    int sFillWith = 0;              // 0 foreground, 1 background, 2 black, 3 white, 4 50% grey
    float sFillOpacity = 1.0f;
 
@@ -4364,8 +4373,57 @@ namespace
       sOp = Op();
       sOp.kind = 7;
       sOp.docStart = at;
+      sOp.snapOk = sShapeSnap && (sTool == kBrush || sTool == kEraser) && target != 2 && !cloning && !(line && sHaveLast);
+      sOp.path = { at.x, at.y };
       if (line && sHaveLast)
          doc->PaintTo(at.x, at.y, PenNow(doc));
+   }
+
+   // Shape Snap (Procreate's QuickShape): the stroke held still at its end is redrawn as the line, arc, ellipse,
+   // rectangle, triangle, polygon or star it looks like; held on, it becomes the exact one (circle, square, 15°).
+   bool SnapNow(Scene2DNode* doc, bool exact)
+   {
+      Scene2DNode::Shape s;
+      if (Scene2DNode::SnapStroke(sOp.path, exact, s) == Scene2DNode::kSnapNone)
+         return false;
+      std::vector<std::vector<float>> lines;
+      Scene2DNode::Outline(s, lines);
+      if (lines.empty())
+         return false;
+      std::vector<float> xy = lines[0];   // RepaintStroke refuses under two points
+      if (s.type != Scene2DNode::Shape::kLine && (s.closed || s.type != Scene2DNode::Shape::kPath))
+      {
+         xy.push_back(xy[0]);
+         xy.push_back(xy[1]);
+      }
+      if (!doc->RepaintStroke(xy))
+         return false;
+      Touch();
+      return true;
+   }
+
+   void ShapeSnapTrack(Scene2DNode* doc)
+   {
+      if (!sOp.snapOk)
+         return;
+      const size_t n = sOp.path.size();
+      const float moved = std::hypot(sMouseDoc.x - sOp.path[n - 2], sMouseDoc.y - sOp.path[n - 1]) * sZoom;
+      if (moved >= tok::drag_threshold_fine)
+      {
+         // Moving again after a snap keeps the shape (the stroke is done); before one, the point is recorded.
+         if (sOp.snapStage == 0)
+         {
+            sOp.path.push_back(sMouseDoc.x);
+            sOp.path.push_back(sMouseDoc.y);
+         }
+         sOp.still = 0.0f;
+         return;
+      }
+      sOp.still += ImGui::GetIO().DeltaTime;
+      if (sOp.snapStage == 0 && sOp.still >= tok::motion_s_snap_hold)
+         sOp.snapStage = SnapNow(doc, false) ? 1 : -1;
+      else if (sOp.snapStage == 1 && sOp.still >= tok::motion_s_snap_hold + tok::motion_s_snap_hold)
+         sOp.snapStage = SnapNow(doc, true) ? 2 : 1;
    }
 
    void EndStroke(Scene2DNode* doc)
@@ -4429,6 +4487,14 @@ namespace
                   NoteColourUsed(sFg);
                   return;
                }
+            }
+            // Between the items: the region their lines close round the click becomes a filled path (Live Paint).
+            const float col[4] = { sFg[0], sFg[1], sFg[2], 1.0f };
+            if (doc->VectorFill(a->id, at.x, at.y, sVecFillGap, col))
+            {
+               Touch();
+               NoteColourUsed(sFg);
+               return;
             }
          }
       }
@@ -7350,6 +7416,7 @@ namespace
                         if (pk->type != Shape::kSvg && MenuParts::SubMenu(T("Deform Shape")))
                         {
                            if (MenuParts::Item(T("Subdivide Path"))) { PushUndoCheckpoint("Subdivide path"); Scene2DNode::SubdividePath(*pk); sTool = kNode; Touch(); }
+                           if (pk->type == Shape::kPath && MenuParts::Item(T("Simplify Path"))) { PushUndoCheckpoint("Simplify path"); Scene2DNode::SimplifyShape(*pk, 1.0f); sTool = kNode; Touch(); }
                            if (MenuParts::Item(T("Wave"))) { PushUndoCheckpoint("Wave deform"); Scene2DNode::DeformShape(*pk, 0, 18.0f, 2.0f); sTool = kNode; Touch(); }
                            if (MenuParts::Item(T("Roughen"))) { PushUndoCheckpoint("Roughen deform"); Scene2DNode::DeformShape(*pk, 1, 10.0f, 2.0f); sTool = kNode; Touch(); }
                            if (MenuParts::Item(T("Twist"))) { PushUndoCheckpoint("Twist deform"); Scene2DNode::DeformShape(*pk, 2, 24.0f, 1.5f); sTool = kNode; Touch(); }
@@ -8383,7 +8450,9 @@ namespace
                if (sTool == kBrush)
                   doc->PaintFollow(sBrush);
                const float pen = PenNow(doc);
-               doc->PaintTo(sMouseDoc.x, sMouseDoc.y, pen);
+               if (sOp.snapStage <= 0)
+                  doc->PaintTo(sMouseDoc.x, sMouseDoc.y, pen);
+               ShapeSnapTrack(doc);
                doc->PaintTick(ImGui::GetIO().DeltaTime);
                if (!sGroupStrokeIds.empty())
                   sGroupStrokePts.push_back({ sMouseDoc.x, sMouseDoc.y, pen });
@@ -8596,6 +8665,7 @@ namespace
          DrawTextEditor(doc);
       DrawRasterAsk(doc);
       DrawFillDialog(doc);
+      DrawTraceDialog(doc);
    }
    // ui-content-end
 
@@ -8824,6 +8894,50 @@ namespace
       PanelKit::GridScope::EndRow(); // a list is a full row
       FieldLabel(label);
       return BarCombo(FormParts::Id(label).c_str(), v, names, n, sFieldW);
+   }
+
+   // Layer > Trace to Vector (Illustrator's Image Trace): the layer as drawn becomes filled paths on a new vector
+   // layer above it, the original kept. Colour clusters the picture; B&W and Line Art keep only the dark ink.
+   void DrawTraceDialog(Scene2DNode* doc)
+   {
+      if (sTraceAsk)
+      {
+         sTraceAsk = false;
+         ImGui::SetNextWindowPos(ImGui::GetMousePos(), ImGuiCond_Appearing);
+         ImGui::OpenPopup("##v2dtracedlg");
+      }
+      if (!MenuParts::BeginPopup("##v2dtracedlg"))
+         return;
+      static const char* kModes[3] = { "Colour", "Black & White", "Line Art" };
+      BarCombo("##v2dtracemode", &sTrace.mode, kModes, (int)std::size(kModes), tok::view2d_field_w);
+      if (sTrace.mode == Scene2DNode::kTraceColour)
+      {
+         float cols = (float)sTrace.colours;
+         BarSlider("##v2dtracecols", &cols, params::view2d::trace_colours_lo, params::view2d::trace_colours_hi, "%.0f colours", tok::view2d_field_w);
+         sTrace.colours = (int)std::lround(cols);
+      }
+      else
+         BarSlider("##v2dtracethr", &sTrace.threshold, params::view2d::threshold_lo, params::view2d::threshold_hi, "Threshold %.0f", tok::view2d_field_w);
+      float speck = (float)sTrace.speckle;
+      BarSlider("##v2dtracespeck", &speck, params::view2d::speck_lo, params::view2d::speck_hi, "Noise %.0f px", tok::view2d_field_w);
+      sTrace.speckle = (int)std::lround(speck);
+      BarSlider("##v2dtracecorner", &sTrace.corner, params::view2d::corner_lo, params::view2d::corner_hi, "Corners %.0f°", tok::view2d_field_w);
+      BarSlider("##v2dtracetol", &sTrace.tol, params::view2d::tol_2_lo, params::view2d::tol_2_hi, "Paths %.1f px", tok::view2d_field_w);
+      Layer* a = Active(doc);
+      if (MenuParts::Item(T("Trace"), nullptr, false, a != nullptr && a->kind != Kind::Group && a->kind != Kind::Adjust))
+      {
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint("Trace to vector");
+         static int sTraceFrame = 1 << 29;
+         if (const int vid = doc->TraceLayer(a->id, ++sTraceFrame, sTrace))
+         {
+            SelectOnly(vid);
+            Touch();
+         }
+         else
+            gUndoStack.resize(undo0);
+      }
+      MenuParts::EndPopup();
    }
 
    // ---- Select and Mask, Color Range ----------------------------------------------------------------------------
@@ -9448,6 +9562,7 @@ namespace
                MorePct(T("Roundness"), &b.roundness, params::view2d::roundness_lo, params::view2d::roundness_hi);
                MoreSlider(T("Angle"), &b.angle, params::view2d::angle_lo, params::view2d::angle_hi, "%.0f°");
                MoreCheck(T("Hard edge"), &b.pencil);
+               MoreCheck(T("Shape Snap"), &sShapeSnap);
             }
             MoreHeader(T("Dynamics"));
             {
@@ -10207,6 +10322,8 @@ namespace
          if (MenuParts::BeginPopup("##v2ddefpop"))
          {
             if (MenuParts::Item(T("Subdivide Points"))) { undo(); Scene2DNode::SubdividePath(*picked); sTool = kNode; Touch(); }
+            if (MenuParts::Item(T("Simplify"), nullptr, false, picked->type == Scene2DNode::Shape::kPath)) { undo(); Scene2DNode::SimplifyShape(*picked, 1.0f); sTool = kNode; Touch(); }
+            if (MenuParts::Item(T("Simplify More"), nullptr, false, picked->type == Scene2DNode::Shape::kPath)) { undo(); Scene2DNode::SimplifyShape(*picked, 4.0f); sTool = kNode; Touch(); }
             if (MenuParts::Item(T("Wave"))) { undo(); Scene2DNode::DeformShape(*picked, 0, 18.0f, 2.0f); sTool = kNode; Touch(); }
             if (MenuParts::Item(T("Roughen"))) { undo(); Scene2DNode::DeformShape(*picked, 1, 10.0f, 2.0f); sTool = kNode; Touch(); }
             if (MenuParts::Item(T("Twist"))) { undo(); Scene2DNode::DeformShape(*picked, 2, 24.0f, 1.5f); sTool = kNode; Touch(); }
@@ -11158,7 +11275,7 @@ namespace
          if (sAlignTo == 2)
          {
             ImGui::SetNextItemWidth(kWellL);
-            FieldWell::Slider("##v2ddistgap", &sDistSpacing, params::view2d::spacing_lo, params::view2d::spacing_hi, "Spacing %.0f px");
+            FieldWell::Slider("##v2ddistgap", &sDistSpacing, params::view2d::dist_spacing_lo, params::view2d::dist_spacing_hi, "Spacing %.0f px");
          }
          ImGui::EndMenu();
       }
@@ -12206,6 +12323,7 @@ namespace
             if (l->kind == Kind::Vector && MenuParts::Item(T("Convert to Sketch Node"), nullptr)) sPending.what = Pending::ToSketch;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Text Node"), nullptr)) sPending.what = Pending::ToText;
             if (l->kind == Kind::Text && MenuParts::Item(T("Convert to Shapes"), nullptr)) sPending.what = Pending::ToShapes;
+            if (l->kind != Kind::Group && !adj && MenuParts::Item(T("Trace to Vector..."), nullptr)) sTraceAsk = true;
             if (!adj && MenuParts::Item(T("Layer as Output"), nullptr, l->output)) sPending.what = Pending::LayerOutput;
             if (!adj && doc->CanTakeBelow(*l) && MenuParts::Item(T("Effect on Below"), nullptr, l->below)) sPending.what = Pending::LayerBelow;
             if (l->warpOn && MenuParts::Item(T("Reset Distort"), nullptr))
@@ -18774,6 +18892,182 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             doc->RemoveLayer(id);
             doc->Commit();
          }
+      }
+      // Vector tools (ai-tools Block 2). Simplify: a circle drawn as 200 anchors keeps its outline within 1 px on
+      // at most 40% of them.
+      {
+         std::vector<float> ring;
+         Scene2DNode::Shape c;
+         c.type = Scene2DNode::Shape::kPath;
+         c.closed = true;
+         for (int i = 0; i < 200; i++)
+         {
+            const float t = i * 6.2831853f / 200.0f, x = 200.0f + 100.0f * std::cos(t), y = 200.0f + 100.0f * std::sin(t);
+            ring.push_back(x);
+            ring.push_back(y);
+            for (int k = 0; k < 3; k++)
+            {
+               c.pts.push_back(x);
+               c.pts.push_back(y);
+            }
+         }
+         const bool ok = Scene2DNode::SimplifyShape(c, 1.0f);
+         expect("simplify: nodes drop 60% or more", ok && c.Anchors() * 5 <= 200 * 2);
+         expect("simplify: the outline stays within 1 px", ok && Scene2DNode::OutlineDistance(c, ring) <= 1.0f);
+         // Shape Snap: a wobbly hand circle becomes an ellipse within 2 px of the one meant; a scrawled triangle, a
+         // rectangle, a straight line, an arc and a five-point star are each recognised.
+         std::vector<float> wob;
+         for (int i = 0; i <= 120; i++)
+         {
+            const float t = i * 6.2831853f / 120.0f, r = 80.0f + 2.0f * std::sin(t * 7.0f);
+            wob.push_back(300.0f + r * std::cos(t));
+            wob.push_back(300.0f + r * std::sin(t));
+         }
+         Scene2DNode::Shape e;
+         expect("shape snap: wobbly circle -> ellipse", Scene2DNode::SnapStroke(wob, false, e) == Scene2DNode::kSnapEllipse &&
+                e.type == Scene2DNode::Shape::kEllipse && about(e.x0, 220) && about(e.y0, 220) && about(e.x1, 380) && about(e.y1, 380));
+         expect("shape snap: held on, a circle exactly", Scene2DNode::SnapStroke(wob, true, e) == Scene2DNode::kSnapEllipse &&
+                std::fabs((e.x1 - e.x0) - (e.y1 - e.y0)) < 0.01f);
+         auto scrawl = [](std::initializer_list<float> c) {
+            std::vector<float> v(c), out;
+            const size_t n = v.size() / 2;
+            for (size_t i = 0; i < n; i++)
+               for (int k = 0; k < 20; k++)
+               {
+                  const float t = k / 20.0f, j = (float)(k % 3) - 1.0f;
+                  out.push_back(v[i * 2] + (v[(i + 1) % n * 2] - v[i * 2]) * t + j * 0.7f);
+                  out.push_back(v[i * 2 + 1] + (v[(i + 1) % n * 2 + 1] - v[i * 2 + 1]) * t);
+               }
+            out.push_back(v[0]);
+            out.push_back(v[1]);
+            return out;
+         };
+         expect("shape snap: triangle", Scene2DNode::SnapStroke(scrawl({ 100, 300, 200, 100, 300, 300 }), false, e) == Scene2DNode::kSnapTriangle);
+         expect("shape snap: rectangle", Scene2DNode::SnapStroke(scrawl({ 100, 100, 300, 102, 301, 200, 99, 199 }), false, e) == Scene2DNode::kSnapRect &&
+                e.type == Scene2DNode::Shape::kRect);
+         std::vector<float> line, arc, star;
+         for (int i = 0; i < 50; i++)
+         {
+            line.push_back(10.0f + i * 4.0f);
+            line.push_back(20.0f + i * 2.0f + (float)(i % 2));
+         }
+         for (int i = 0; i < 60; i++)
+         {
+            arc.push_back(200.0f + 90.0f * std::cos(i * 3.1415926f / 60.0f));
+            arc.push_back(200.0f + 90.0f * std::sin(i * 3.1415926f / 60.0f));
+         }
+         expect("shape snap: line", Scene2DNode::SnapStroke(line, false, e) == Scene2DNode::kSnapLine && e.type == Scene2DNode::Shape::kLine);
+         expect("shape snap: arc", Scene2DNode::SnapStroke(arc, false, e) == Scene2DNode::kSnapArc);
+         std::vector<float> pts;
+         for (int i = 0; i < 10; i++)
+         {
+            const float a = i * 3.1415926f / 5.0f - 1.5707963f, r = i % 2 ? 40.0f : 100.0f;
+            pts.push_back(300.0f + r * std::cos(a));
+            pts.push_back(300.0f + r * std::sin(a));
+         }
+         std::vector<float> st;
+         for (size_t i = 0; i < pts.size() / 2; i++)
+            for (int k = 0; k < 20; k++)
+            {
+               const size_t j = (i + 1) % (pts.size() / 2);
+               st.push_back(pts[i * 2] + (pts[j * 2] - pts[i * 2]) * k / 20.0f);
+               st.push_back(pts[i * 2 + 1] + (pts[j * 2 + 1] - pts[i * 2 + 1]) * k / 20.0f);
+            }
+         st.push_back(pts[0]);
+         st.push_back(pts[1]);
+         expect("shape snap: star", Scene2DNode::SnapStroke(st, false, e) == Scene2DNode::kSnapStar);
+         // Vector bucket: three crossing lines and a click inside become one closed triangle path under them; a click
+         // outside every closed region adds nothing.
+         Layer& l = doc->AddLayer(Kind::Vector, 0, 0);
+         const int id = l.id;
+         const float seg[3][4] = { { 50, 250, 350, 250 }, { 100, 300, 230, 50 }, { 300, 300, 170, 50 } };
+         for (const auto& g : seg)
+         {
+            Scene2DNode::Shape ln;
+            ln.type = Scene2DNode::Shape::kLine;
+            ln.x0 = g[0], ln.y0 = g[1], ln.x1 = g[2], ln.y1 = g[3];
+            ln.strokeOn = true;
+            ln.width = 2.0f;
+            l.shapes.push_back(ln);
+         }
+         doc->Commit();
+         float bx = 0, by = 0;
+         Layer* vl = doc->FindLayer(id);
+         doc->BoxToDoc(*vl, 200, 200, bx, by);
+         const float col[4] = { 1, 0, 0, 1 };
+         const bool filled = doc->VectorFill(id, bx, by, 2.0f, col);
+         vl = doc->FindLayer(id);
+         bool tri = filled && vl->shapes.size() == 4 && vl->shapes[0].closed && vl->shapes[0].Anchors() <= 12;
+         if (tri)
+         {
+            // Every anchor on the triangle's edges (apex near 200,108; base on y = 250).
+            for (int k = 0; k < vl->shapes[0].Anchors() && tri; k++)
+            {
+               const float x = vl->shapes[0].pts[k * 6], y = vl->shapes[0].pts[k * 6 + 1];
+               const float dBase = std::fabs(y - 250.0f);
+               const float dL = std::fabs(250.0f * (x - 100.0f) + 130.0f * (y - 300.0f)) / std::hypot(250.0f, 130.0f);
+               const float dR = std::fabs(250.0f * (x - 300.0f) - 130.0f * (y - 300.0f)) / std::hypot(250.0f, 130.0f);
+               tri = std::min({ dBase, dL, dR }) <= 4.0f;
+            }
+         }
+         expect("vector fill: three crossing lines + click -> a triangle path", tri);
+         doc->BoxToDoc(*vl, 20, 20, bx, by);
+         expect("vector fill: a click outside adds nothing", !doc->VectorFill(id, bx, by, 2.0f, col) && doc->FindLayer(id)->shapes.size() == 4);
+         doc->RemoveLayer(id);
+         doc->Commit();
+         // Image Trace: a red disc and a black square on white come back as three filled paths, biggest first.
+         const int tw = 120, th = 100;
+         std::vector<uint8_t> img((size_t)tw * th * 4, 255);
+         for (int y = 0; y < th; y++)
+            for (int x = 0; x < tw; x++)
+            {
+               uint8_t* px = &img[((size_t)y * tw + x) * 4];
+               if ((x - 40) * (x - 40) + (y - 50) * (y - 50) < 900)
+                  px[1] = px[2] = 0;
+               if (x > 80 && x < 110 && y > 20 && y < 50)
+                  px[0] = px[1] = px[2] = 0;
+            }
+         Scene2DNode::TraceOpts to;
+         to.colours = 3;
+         std::vector<Scene2DNode::Shape> traced;
+         const int got = Scene2DNode::TracePixels(img.data(), tw, th, to, traced);
+         expect("trace: three regions", got == 3 && traced[0].fillC[1] > 0.9f && traced[1].fillC[0] > 0.9f && traced[1].fillC[1] < 0.1f &&
+                traced[2].fillC[0] < 0.1f && traced[2].Anchors() <= 8);
+         // Trace to Vector on a layer: a new vector layer above it, one undo step.
+         const int tp = doc->AddPaintLayer();
+         doc->FillPixels(tp, red, 1.0f);
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint("Trace to vector");
+         const int tv = doc->TraceLayer(tp, ++sParFrame, to);
+         const Layer* tl = doc->FindLayer(tv);
+         expect("trace to vector: a vector layer of filled paths", tv != 0 && tl != nullptr && tl->kind == Kind::Vector && !tl->shapes.empty());
+         expect("trace to vector is one undo step", undoBack() && gUndoStack.size() == undo0 && doc->FindLayer(tv) == nullptr);
+         if (doc->FindLayer(tp) != nullptr)
+         {
+            doc->RemoveLayer(tp);
+            doc->Commit();
+         }
+         // Shape Snap on a brush stroke: the scribble is thrown away and the snapped line painted in its place.
+         const int sp = doc->AddPaintLayer();
+         BrushEngine::Brush b = sBrush;
+         b.size = 8.0f;
+         b.opacity = 1.0f;
+         b.flow = 1.0f;
+         b.color[0] = b.color[1] = b.color[2] = 1.0f;
+         bool repainted = false;
+         if (doc->BeginPaint(sp, 0, b, W * 0.2f, H * 0.2f, 1.0f))
+         {
+            doc->PaintTo(W * 0.2f, H * 0.8f, 1.0f);
+            const std::vector<float> straight = { W * 0.3f, H * 0.5f, W * 0.7f, H * 0.5f };
+            repainted = doc->RepaintStroke(straight);
+            doc->EndPaint();
+         }
+         doc->Commit();
+         uint8_t on[4] = {}, off[4] = {};
+         const bool read = pixel({ sp }, (int)(W * 0.5f), (int)(H * 0.5f), on) && pixel({ sp }, (int)(W * 0.2f), (int)(H * 0.6f), off);
+         expect("shape snap: the stroke is repainted as the shape", repainted && read && on[3] > 200 && off[3] < 20);
+         doc->RemoveLayer(sp);
+         doc->Commit();
       }
       // Pass Through at 50%: an Invert inside still sees the red below, so red mixes with cyan to grey (Photoshop).
       {

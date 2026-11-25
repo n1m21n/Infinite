@@ -1323,6 +1323,7 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
    Layers();
    if (mStroke.Active())
       EndPaint();
+   mPaintBrushIn = b;
    BrushEngine::Brush brush = b;
    GLUtil::Fbo* surf = nullptr;
    const Layer* l = FindConst(id);
@@ -1490,6 +1491,23 @@ void Scene2DNode::PaintFollow(const BrushEngine::Brush& b)
       return;
    if (cur.size != b.size * scale || cur.opacity != b.opacity || cur.flow != b.flow)
       mStroke.Follow(b.size * scale, b.opacity, b.flow);
+}
+
+bool Scene2DNode::RepaintStroke(const std::vector<float>& xy)
+{
+   // The stroke lives in its own coverage until EndPaint merges it, so dropping it leaves the layer untouched.
+   if (!mStroke.Active() || xy.size() < 4 || mPaintTarget == 2)
+      return false;
+   const int id = mPaintId, target = mPaintTarget;
+   const BrushEngine::Brush b = mPaintBrushIn;
+   mStroke.Cancel();
+   mSkinStroke.on = false;
+   mPaintId = 0;
+   if (!BeginPaint(id, target, b, xy[0], xy[1], 1.0f))
+      return false;
+   for (size_t i = 2; i + 1 < xy.size(); i += 2)
+      PaintTo(xy[i], xy[i + 1], 1.0f);
+   return true;
 }
 
 void Scene2DNode::EndPaint()
