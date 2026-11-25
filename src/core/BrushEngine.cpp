@@ -541,6 +541,7 @@ namespace BrushEngine
          b.opacity = opacity;
          b.flow = flow;
          b.spacing = spacing;
+         b.pressureSize = true;   // the shipped presets follow the pen unless they turn it off
          return b;
       }
 

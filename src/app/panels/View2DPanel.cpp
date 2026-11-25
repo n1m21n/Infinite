@@ -2,6 +2,7 @@
 // a picture is built in an image editor. Everything here edits the document's
 // layers; the nodes themselves are only read, so a layer keeps animating under
 // whatever is stacked on top of it. Plan: internal/plans/2d-view/README.md.
+#include "ColorSpace.h"
 #include "app/AppCommon.h"
 #include "app/ui/design/ColourMath.h"
 #include "app/graph/NodeParams.h"
@@ -25,6 +26,7 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/components/CurveGraph.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -55,6 +57,7 @@
 #include "stb_image_write.h"
 
 #include <algorithm>
+#include <optional>
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
@@ -91,6 +94,7 @@ namespace
 {
    using Layer = Scene2DNode::Layer;
    using Kind = Scene2DNode::Kind;
+
    bool OpenLayeredFile(const std::string& path, ImVec2 at);   // PSD or ORA as a new document
    void ExportLayered(Scene2DNode* doc, const char* ext);
 
@@ -1307,12 +1311,14 @@ namespace
 
    // Short settings side by side (PanelKit form grid): the next rows share a row, `cols` across, each label inside
    // its well. Spans the label column and the field column, so a grid row ends where a plain row does.
+   // Columns of a tool's More.. settings window: wide enough for pairs, so a long form reads as a grid, not a tower.
+   int sMoreCols = 1;
    struct Pairs : PanelKit::GridScope
    {
       // Fields end at window x sLabelW + sFieldW; the grid starts at the cursor (after the card's inset), so it spans the rest.
-      // Compact surfaces (settings strip, More.. popovers) are one vertical column: no side-by-side pairs there.
+      // Compact surfaces are one vertical column, except a More.. window opened wide (sMoreCols).
       explicit Pairs(int cols = 2)
-         : PanelKit::GridScope(UiDensity::IsCompact() ? 0 : cols, sLabelW + sFieldW - ImGui::GetCursorPosX()) {}
+         : PanelKit::GridScope(UiDensity::IsCompact() && sMoreCols < 2 ? 0 : cols, sLabelW + sFieldW - ImGui::GetCursorPosX()) {}
    };
 
    // Shortcut text in the platform's words: Cmd on macOS, Ctrl elsewhere.
@@ -1667,11 +1673,6 @@ namespace
 
    // Curves: the graph is the control. Click adds a point, drag moves it (ends move up and down only),
    // drag an inner point off the graph (or double-click / right-click / Delete) to remove it.
-   int sCurveDrag = -1;
-   int sCurveSel = -1;
-   int sCurveSelLayer = 0;
-   int sCurveLayer = 0;
-   uint64_t sCurveDoc = 0;         // the drag belongs to one layer of one document
    struct HistEntry
    {
       std::vector<float> bins;
@@ -1753,185 +1754,17 @@ namespace
    void CurveEditor(std::vector<float>& c, int key, const std::vector<float>* hist = nullptr, int channel = 0,
                     const std::vector<float>* const* otherCh = nullptr)
    {
-      if (c.size() < tok::view2d_curve_editor_limit)
-         c = { 0.0f, 0.0f, 1.0f, 1.0f };
-      const float w = Ui::AvailW(), h = std::min(w, tok::view2d_curve_max);
-      const ImVec2 p0 = ImGui::GetCursorScreenPos();
-      UiInteract::Hit("##curve", ImVec2(w, h));
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 p1(p0.x + w, p0.y + h);
-      dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_control);
-      if (hist != nullptr && !hist->empty())
-         HistogramUnder(dl, p0, p1, *hist);
-      // 4x4 grid + subtle diagonal identity reference line.
-      const ImU32 gridCol = ImGui::GetColorU32(ImGuiCol_Border, tok::view2d_grid_col_color_alpha_mul);
-      for (int i = 1; i < 4; i++)
-      {
-         const float fx = p0.x + w * i / 4.0f, fy = p0.y + h * i / 4.0f;
-         dl->AddLine(ImVec2(fx, p0.y), ImVec2(fx, p1.y), gridCol);
-         dl->AddLine(ImVec2(p0.x, fy), ImVec2(p1.x, fy), gridCol);
-      }
-      dl->AddLine(ImVec2(p0.x, p1.y), ImVec2(p1.x, p0.y), ImGui::GetColorU32(ImGuiCol_Border, tok::view2d_curve_editor_color_alpha_mul_sm), tok::view2d_curve_editor_stroke);
-      const auto ToScreen = [&](float x, float y) { return ImVec2(p0.x + x * w, p1.y - y * h); };
-      const ImVec2 m = ImGui::GetIO().MousePos;
-      const float mx = std::clamp((m.x - p0.x) / std::max(1.0f, w), 0.0f, 1.0f);
-      const float my = std::clamp((p1.y - m.y) / std::max(1.0f, h), 0.0f, 1.0f);
-      const int n = (int)c.size() / tok::view2d_n_ratio;
-      int near = -1;
-      float bestD2 = 10.0f * 10.0f;   // 10 px hit radius, pick closest point
-      for (int i = 0; i < n; i++)
-      {
-         const ImVec2 q = ToScreen(c[i * 2], c[i * 2 + 1]);
-         const float dx = q.x - m.x, dy = q.y - m.y, d2 = dx * dx + dy * dy;
-         if (d2 < bestD2)
-         {
-            bestD2 = d2;
-            near = i;
-         }
-      }
-      bool changed = false;
-      const bool draggingThis = ImGui::IsItemActive() && sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < n;
-      const bool pullOff = draggingThis && sCurveDrag > 0 && sCurveDrag < n - 1 &&
-                           (m.x < p0.x - tok::space_5 || m.x > p1.x + tok::space_5 || m.y < p0.y - tok::space_5 || m.y > p1.y + tok::space_5);
-      if (ImGui::IsItemHovered() && (ImGui::IsMouseDoubleClicked(0) || MenuParts::RightPressed()) && near > 0 && near < n - 1)
-      {
-         PushUndoCheckpoint("Curves");
-         c.erase(c.begin() + near * 2, c.begin() + near * 2 + 2);
-         sCurveDrag = -1;
-         if (sCurveSelLayer == key)
-            sCurveSel = -1;
-         changed = true;
-      }
-      else if (ImGui::IsItemActivated())
-      {
-         if (ImGui::GetIO().KeyAlt)
-         {
-            PushUndoCheckpoint("Reset curve");
-            c = { 0.0f, 0.0f, 1.0f, 1.0f };
-            sCurveDrag = -1;
-            if (sCurveSelLayer == key)
-               sCurveSel = -1;
-            changed = true;
-         }
-         else
-         {
-            PushUndoCheckpoint("Curves");
-            sCurveLayer = key;
-            sCurveDoc = sDocUid;
-            sCurveDrag = near;
-            if (near < 0 && n < 16)
-            {
-               int at = 1;
-               while (at < n - 1 && c[at * 2] < mx)
-                  at++;
-               c.insert(c.begin() + at * 2, { mx, my });
-               sCurveDrag = at;
-               changed = true;
-            }
-            sCurveSel = sCurveDrag;
-            sCurveSelLayer = key;
-         }
-      }
-      if (ImGui::IsItemActive() && sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < (int)c.size() / tok::view2d_curve_editor_ratio)
-      {
-         const int i = sCurveDrag, last = (int)c.size() / tok::view2d_last_ratio - 1;
-         if (!pullOff)
-         {
-            float x = mx;
-            if (i == 0)
-               x = std::clamp(x, 0.0f, std::max(0.0f, c[2] - tok::view2d_curve_editor_gap));
-            else if (i == last)
-               x = std::clamp(x, std::min(1.0f, c[(last - 1) * 2] + tok::view2d_curve_editor_gap), 1.0f);
-            else
-               x = std::clamp(x, c[(i - 1) * 2] + tok::view2d_curve_editor_lo, c[(i + 1) * 2] - tok::view2d_curve_editor_lo);
-            if (x != c[i * 2] || my != c[i * 2 + 1])
-            {
-               c[i * 2] = x;
-               c[i * 2 + 1] = my;
-               changed = true;
-            }
-         }
-      }
-      else if (ImGui::IsItemDeactivated() && sCurveLayer == key && sCurveDoc == sDocUid)
-      {
-         if (sCurveDrag > 0 && sCurveDrag < (int)c.size() / tok::view2d_curve_editor_ratio - 1 &&
-             (m.x < p0.x - tok::space_5 || m.x > p1.x + tok::space_5 || m.y < p0.y - tok::space_5 || m.y > p1.y + tok::space_5))
-         {
-            c.erase(c.begin() + sCurveDrag * 2, c.begin() + sCurveDrag * 2 + 2);
-            if (sCurveSelLayer == key)
-               sCurveSel = -1;
-            changed = true;
-         }
-         sCurveDrag = -1;
-      }
-      // Delete / Backspace removes the selected inner point when the graph is hovered.
-      if (ImGui::IsItemHovered() && sCurveSelLayer == key && sCurveSel > 0 && sCurveSel < (int)c.size() / tok::view2d_curve_editor_ratio - 1 &&
-          (Keymap::KeyPressed(Keymap::Act::Delete, true) || Keymap::KeyPressed(Keymap::Act::DeleteAlt, true)))
-      {
-         PushUndoCheckpoint("Curves");
-         c.erase(c.begin() + sCurveSel * 2, c.begin() + sCurveSel * 2 + 2);
-         sCurveSel = -1;
-         changed = true;
-      }
-      // Faint ghost previews for other non-default channels so multi-channel grades remain readable.
-      if (otherCh != nullptr)
-      {
-         for (int ch = 0; ch < 3; ch++)
-         {
-            if (ch + 1 == channel || otherCh[ch] == nullptr)
-               continue;
-            const std::vector<float>& oc = *otherCh[ch];
-            if (oc.size() == 4 && oc[0] == 0.0f && oc[1] == 0.0f && oc[2] == 1.0f && oc[3] == 1.0f)
-               continue;
-            float glut[64];
-            Scene2DNode::CurveLut(oc, glut, 64);
-            ImVec2 gline[64];
-            for (int i = 0; i < 64; i++)
-               gline[i] = ToScreen(i / 63.0f, glut[i]);
-            dl->AddPolyline(gline, tok::view2d_line_num_points_lg, CurveChannelColor(ch + 1, tok::view2d_curve_channel_color_alpha), 0, 1.0f);
-         }
-      }
-      constexpr int kSamples = 128;
-      float lut[kSamples];
-      Scene2DNode::CurveLut(c, lut, kSamples);
-      ImVec2 line[kSamples];
-      for (int i = 0; i < kSamples; i++)
-         line[i] = ToScreen(i / (float)(kSamples - 1), lut[i]);
-      const ImU32 curveCol = CurveChannelColor(channel, 1.0f);
-      dl->AddPolyline(line, kSamples, curveCol, 0, tok::view2d_line_stroke_md);
-      const int curN = (int)c.size() / tok::view2d_cur_n_ratio;
-      for (int i = 0; i < curN; i++)
-      {
-         const ImVec2 q = ToScreen(c[i * 2], c[i * 2 + 1]);
-         const bool activePt = (sCurveLayer == key && sCurveDoc == sDocUid && i == sCurveDrag);
-         const bool selPt = (sCurveSelLayer == key && i == sCurveSel);
-         const bool hovPt = ImGui::IsItemHovered() && i == near;
-         const float r = (activePt || hovPt) ? tok::view2d_r : tok::view2d_curve_editor_r;
-         const ImU32 ptCol = (activePt && pullOff) ? ImGui::GetColorU32(ImGuiCol_TextDisabled, tok::view2d_pt_col_color_alpha_mul) : curveCol;
-         dl->AddCircleFilled(q, r, ptCol);
-         if (selPt || activePt)
-            dl->AddCircle(q, r + tok::space_0_5, ImGui::GetColorU32(ImGuiCol_Text, tok::view2d_curve_editor_color_alpha_mul_lg), 0, tok::view2d_ring_stroke_sm);
-      }
-      dl->AddRect(p0, p1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_control);
-      // Compact live In / Out coordinate readout when hovering or dragging.
-      const int showIdx = (sCurveLayer == key && sCurveDoc == sDocUid && sCurveDrag >= 0 && sCurveDrag < curN) ? sCurveDrag
-                        : (ImGui::IsItemHovered() && near >= 0 && near < curN) ? near
-                        : (sCurveSelLayer == key && sCurveSel >= 0 && sCurveSel < curN) ? sCurveSel : -1;
-      if (showIdx >= 0)
-      {
-         const int inV = (int)std::lround(c[showIdx * 2] * 255.0f);
-         const int outV = (int)std::lround(c[showIdx * 2 + 1] * 255.0f);
-         if (pullOff)
-            ImGui::TextDisabled("%s", T("Release to remove point"));
-         else
-            ImGui::TextDisabled(T("In %d   Out %d"), inV, outV);
-      }
-      else if (ImGui::IsItemHovered())
-      {
-         ImGui::TextDisabled("%s", T("Click to add, drag off or right-click to remove"));
-      }
-      if (changed)
+      CurveGraph::Opts o;
+      o.sample = [](const std::vector<float>& pts, float* out, int n) { Scene2DNode::CurveLut(pts, out, n); };
+      o.col = CurveChannelColor(channel, 1.0f);
+      o.hist = hist;
+      for (int ch = 0; otherCh != nullptr && ch < 3; ch++)
+         if (ch + 1 != channel)
+            o.ghosts.push_back({ otherCh[ch], CurveChannelColor(ch + 1, tok::view2d_curve_channel_color_alpha) });
+      ImGui::PushID((int)(sDocUid & 0x7fffffff));
+      if (CurveGraph::Draw((std::string("##curve") + std::to_string(key)).c_str(), c, o))
          Touch();
+      ImGui::PopID();
    }
    // ui-content-end
 
@@ -1953,6 +1786,8 @@ namespace
       case S::kAdjSaturation: return "Saturation";
       case S::kAdjExposure: return "Exposure";
       case S::kAdjVibrance: return "Vibrance";
+      case S::kAdjNoise: return "Amount";
+      case S::kAdjTexture: return "Strength";
       default: return "Amount";
       }
    }
@@ -2166,7 +2001,7 @@ namespace
    int& AdjChannel(int key) { return sAdjChMap[key]; }
    // Curves / Hue picked on the picture (Photoshop's hand): armed for one adjustment key; a drag on the canvas then moves
    // the curve point at the clicked tone up and down, or turns the hue left and right.
-   struct AdjPick { int key = 0; uint64_t doc = 0; } sAdjPick;
+   struct AdjPick { int key = 0; uint64_t doc = 0; int point = 0; } sAdjPick;   // point: 0 tone/hue/neutral, 1 black, 2 grey, 3 white
    // Runs f on the adjustment fields an adjustment key names (a Layer or an Effect); false when it is gone.
    template <class F> bool WithAdjKey(Scene2DNode* doc, int key, F f)
    {
@@ -2297,6 +2132,8 @@ namespace
          }
          SliderRow(T("In Black"), &lv[0], 0.0f, 1.0f, "%.2f");
          SliderRow(T("In White"), &lv[1], 0.0f, 1.0f, "%.2f");
+         if (adjCh > 0)
+            SliderRow(T("Gamma"), &p[adjCh - 1], params::view2d::text_sx_lo, params::view2d::text_sx_hi, "%.2f");
          SliderRow(T("Out Black"), &lv[2], 0.0f, 1.0f, "%.2f");
          SliderRow(T("Out White"), &lv[3], 0.0f, 1.0f, "%.2f");
          float autoLv[3][4];
@@ -2336,10 +2173,39 @@ namespace
          const std::vector<float>* ghosts[3] = { &x.curveCh[0], &x.curveCh[1], &x.curveCh[2] };
          CurveEditor(adjCh == 0 ? x.curve : x.curveCh[adjCh - 1], key * 4 + adjCh, &DocHistogram(doc, key), adjCh, ghosts);
       }
-      if (t == S::kAdjCurves || t == S::kAdjHue)
+      if (t == S::kAdjCurves)
       {
-         const bool armed = sAdjPick.key == key && sAdjPick.doc == sDocUid;
-         if (ActionButton::Draw((std::string(armed ? T("Click the picture") : T("Pick on picture")) + "##v2dadjpick" + std::to_string(key)).c_str(),
+         bool lumaOnly = p[0] != 0.0f;
+         if (BoolRow(T("Luma only"), &lumaOnly))
+            p[0] = lumaOnly ? 1.0f : 0.0f;
+      }
+      if (t == S::kAdjLevels || t == S::kAdjCurves)
+      {
+         // Black / grey / white point from the picture.
+         const bool lumaOnly = t == S::kAdjCurves && p[0] != 0.0f;
+         const int nBtn = lumaOnly ? 2 : 3;
+         Ui::Row row(Ui::Space::S1);
+         const float bw = (Ui::AvailW() - Ui::Px(Ui::Space::S1) * (float)(nBtn - 1)) / (float)nBtn;
+         const char* names[3] = { T("Black"), T("Grey"), T("White") };
+         int drawn = 0;
+         for (int pt = 1; pt <= 3; pt++)
+         {
+            if (lumaOnly && pt == 2)
+               continue;
+            if (drawn++ > 0)
+               row.Next();
+            const bool armed = sAdjPick.key == key && sAdjPick.doc == sDocUid && sAdjPick.point == pt;
+            if (ActionButton::Draw((std::string(names[pt - 1]) + "##v2dadjpt" + std::to_string(pt) + "_" + std::to_string(key)).c_str(),
+                                   ImVec2(bw, 0.0f), armed ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+               sAdjPick = armed ? AdjPick() : AdjPick{ key, sDocUid, pt };
+         }
+      }
+      if (t == S::kAdjCurves || t == S::kAdjHue || t == S::kAdjWhiteBalance)
+      {
+         const bool armed = sAdjPick.key == key && sAdjPick.doc == sDocUid && sAdjPick.point == 0;
+         const char* pickLbl = t == S::kAdjWhiteBalance ? (armed ? T("Click neutral grey") : T("Pick neutral grey"))
+                                                        : (armed ? T("Click the picture") : T("Pick on picture"));
+         if (ActionButton::Draw((std::string(pickLbl) + "##v2dadjpick" + std::to_string(key)).c_str(),
                                 ImVec2(-1.0f, 0.0f), armed ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
             sAdjPick = armed ? AdjPick() : AdjPick{ key, sDocUid };
       }
@@ -2351,6 +2217,52 @@ namespace
          SliderRow(T("Red"), &q[0], -1.0f, 1.0f, "%.2f");
          SliderRow(T("Green"), &q[1], -1.0f, 1.0f, "%.2f");
          SliderRow(T("Blue"), &q[2], -1.0f, 1.0f, "%.2f");
+         bool keepL = p[9] != 0.0f;
+         if (BoolRow(T("Preserve luminosity"), &keepL))
+            p[9] = keepL ? 1.0f : 0.0f;
+      }
+      if (t == S::kAdjDither)
+      {
+         int dm = std::clamp((int)std::lround(p[0]), 0, 3);
+         if (ComboRow(T("Pattern"), &dm, { T("Bayer 4x4"), T("Bayer 8x8"), T("Blue / IGN"), T("Random") }))
+            p[0] = (float)dm;
+      }
+      if (t == S::kAdjThreshold)
+         SliderRow(T("Softness"), &p[0], 0.0f, 1.0f, "%.2f");
+      if (t == S::kAdjPosterize)
+      {
+         int pm = std::clamp((int)std::lround(p[0]), 0, 2);
+         if (ComboRow(T("Mode"), &pm, { T("RGB"), T("Luma only"), T("Dithered") }))
+            p[0] = (float)pm;
+      }
+      if (t == S::kAdjHue)
+      {
+         int rng = std::clamp((int)std::lround(p[2]), 0, 6);
+         if (ComboRow(T("Range"), &rng, { T("Master"), T("Reds"), T("Yellows"), T("Greens"), T("Cyans"), T("Blues"), T("Magentas") }))
+            p[2] = (float)rng;
+         SliderRow(T("Saturation"), &p[0], -1.0f, 1.0f, "%.2f");
+         SliderRow(T("Lightness"), &p[1], -1.0f, 1.0f, "%.2f");
+      }
+      if (t == S::kAdjHalftone)
+      {
+         SliderRow(T("Angle"), &p[0], params::view2d::angle_lo, params::view2d::angle_hi, "%.0f");
+         int shape = std::clamp((int)std::lround(p[1]), 0, 2);
+         if (ComboRow(T("Shape"), &shape, { T("Dot"), T("Line"), T("Diamond") }))
+            p[1] = (float)shape;
+         bool col = p[2] != 0.0f;
+         if (BoolRow(T("Colour screen"), &col))
+            p[2] = col ? 1.0f : 0.0f;
+      }
+      if (t == S::kAdjBrightness)
+      {
+         bool leg = p[0] > 0.5f;
+         if (BoolRow(T("Legacy linear"), &leg))
+            p[0] = leg ? 1.0f : 0.0f;
+      }
+      if (t == S::kAdjExposure)
+      {
+         SliderRow(T("Offset"), &p[0], -1.0f, 1.0f, "%.3f");
+         SliderRow(T("Gamma"), &p[1], params::view2d::text_sx_lo, params::view2d::text_sx_hi, "%.2f");
       }
       if (t == S::kAdjSelective)
       {
@@ -2362,6 +2274,9 @@ namespace
          SliderRow(T("Magenta"), &q[1], -1.0f, 1.0f, "%.2f");
          SliderRow(T("Yellow"), &q[2], -1.0f, 1.0f, "%.2f");
          SliderRow(T("Black"), &q[3], -1.0f, 1.0f, "%.2f");
+         bool rel = p[36] > 0.5f;
+         if (BoolRow(T("Relative"), &rel))
+            p[36] = rel ? 1.0f : 0.0f;
       }
       if (t == S::kAdjMixer)
       {
@@ -2377,15 +2292,43 @@ namespace
          SliderRow(T("Red"), &q[0], params::view2d::q_0_lo, params::view2d::q_0_hi, "%.2f");
          SliderRow(T("Green"), &q[1], params::view2d::q_1_lo, params::view2d::q_1_hi, "%.2f");
          SliderRow(T("Blue"), &q[2], params::view2d::q_2_lo, params::view2d::q_2_hi, "%.2f");
+         SliderRow(T("Constant"), &p[10 + (mono ? 0 : sAdjOut)], -1.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjBlackWhite)
       {
          static const char* const kHues[6] = { "Reds", "Yellows", "Greens", "Cyans", "Blues", "Magentas" };
          for (int i = 0; i < 6; i++)
             SliderRow(T(kHues[i]), &p[i], 0.0f, 1.0f, "%.2f");
+         bool tint = p[6] != 0.0f;
+         if (BoolRow(T("Tint"), &tint))
+            p[6] = tint ? 1.0f : 0.0f;
+         if (tint)
+            ColorRow(T("Tint colour"), x.colorA);
       }
       if (t == S::kAdjPhotoFilter)
       {
+         struct FilterPre { const char* name; float c[3]; };
+         static const FilterPre kPre[7] = {
+            { "Warming (85)", { 0.925f, 0.541f, 0.0f } },
+            { "Warming (81)", { 0.922f, 0.694f, 0.075f } },
+            { "Cooling (80)", { 0.0f, 0.427f, 1.0f } },
+            { "Cooling (82)", { 0.0f, 0.710f, 1.0f } },
+            { "Sepia", { 0.675f, 0.478f, 0.200f } },
+            { "Deep Emerald", { 0.0f, 0.553f, 0.0f } },
+            { "Underwater", { 0.0f, 0.761f, 0.694f } },
+         };
+         int pick = 7;
+         for (int i = 0; i < 7; i++)
+            if (std::fabs(x.colorA[0] - kPre[i].c[0]) + std::fabs(x.colorA[1] - kPre[i].c[1]) + std::fabs(x.colorA[2] - kPre[i].c[2]) < 0.02f)
+               pick = i;
+         if (ComboRow(T("Preset"), &pick,
+                      { T("Warming (85)"), T("Warming (81)"), T("Cooling (80)"), T("Cooling (82)"),
+                        T("Sepia"), T("Deep Emerald"), T("Underwater"), T("Custom") }) && pick < 7)
+         {
+            std::copy(kPre[pick].c, kPre[pick].c + 3, x.colorA);
+            x.colorA[3] = 1.0f;
+            Touch();
+         }
          ColorRow(T("Filter"), x.colorA);
          bool keep = p[0] > 0.5f;
          if (BoolRow(T("Keep lightness"), &keep))
@@ -2395,6 +2338,7 @@ namespace
       {
          SliderRow(T("Shadows"), &p[0], 0.0f, 1.0f, "%.2f");
          SliderRow(T("Highlights"), &p[1], 0.0f, 1.0f, "%.2f");
+         SliderRow(T("Midtone contrast"), &p[2], -1.0f, 1.0f, "%.2f");
       }
       if (t == S::kAdjWhiteBalance)
       {
@@ -2436,6 +2380,41 @@ namespace
          SliderRow(T("Stretch"), &p[0], 0.0f, 1.0f, "%.3f");
          SliderRow(T("Gamma"), &p[1], params::view2d::p_1_lo, params::view2d::p_1_hi, "%.2f");
          SliderRow(T("Compression"), &p[2], 0.0f, 1.0f, "%.2f");
+      }
+      if (t == S::kAdjNoise)
+      {
+         int mode = std::clamp((int)std::lround(p[0]), 0, 4);
+         if (ComboRow(T("Type"), &mode, { T("Gaussian"), T("Uniform"), T("Film Grain"), T("Salt & Pepper"), T("Fine Blue") }))
+            p[0] = (float)mode;
+         int bmode = std::clamp((int)std::lround(p[3]), 0, 2);
+         if (ComboRow(T("Blend"), &bmode, { T("Soft"), T("Add"), T("Multiply") }))
+            p[3] = (float)bmode;
+         SliderRow(T("Size"), &p[1], params::view2d::noise_size_lo, params::view2d::noise_size_hi, "%.1f");
+         SliderRow(T("Clumping"), &p[5], params::view2d::fill_pct_lo, params::view2d::inner_hi, "%.2f");
+         bool mono = p[2] > 0.5f;
+         if (BoolRow(T("Monochrome"), &mono))
+            p[2] = mono ? 1.0f : 0.0f;
+         SliderRow(T("Seed"), &p[4], params::view2d::fill_pct_lo, params::view2d::noise_seed_hi, "%.0f");
+      }
+      if (t == S::kAdjTexture)
+      {
+         int pat = std::clamp((int)std::lround(p[0]), 0, 8);
+         if (ComboRow(T("Pattern"), &pat,
+                      { T("Perlin"), T("Simplex"), T("fBm Clouds"), T("Ridged Marble"), T("Turbulence"),
+                        T("Voronoi Cells"), T("Worley Cracks"), T("Paper Weave"), T("Scanlines") }))
+            p[0] = (float)pat;
+         int bmode = std::clamp((int)std::lround(p[6]), 0, 4);
+         if (ComboRow(T("Blend"), &bmode, { T("Replace"), T("Overlay"), T("Multiply"), T("Screen"), T("Soft Light") }))
+            p[6] = (float)bmode;
+         SliderRow(T("Scale"), &p[1], params::view2d::tex_scale_lo, params::view2d::tex_scale_hi, "%.1f");
+         if (SliderRow(T("Octaves"), &p[2], params::view2d::tex_oct_lo, params::view2d::tex_oct_hi, "%.0f"))
+            p[2] = std::round(p[2]);
+         SliderRow(T("Detail"), &p[3], params::view2d::tex_detail_lo, params::view2d::tex_detail_hi, "%.2f");
+         SliderRow(T("Warp"), &p[4], params::view2d::fill_pct_lo, params::view2d::tex_warp_hi, "%.2f");
+         SliderRow(T("Seed"), &p[5], params::view2d::fill_pct_lo, params::view2d::noise_seed_hi, "%.0f");
+         bool inv = p[7] > 0.5f;
+         if (BoolRow(T("Invert"), &inv))
+            p[7] = inv ? 1.0f : 0.0f;
       }
       if (t == S::kAdjLookup)
       {
@@ -5825,7 +5804,8 @@ namespace
    int sVecTarget = 0;             // 0 the layer's items, 1 its vector mask
    int sItem = -1, sItemLayer = 0; // the picked item and the layer it is in
    int sPenItem = -1;              // the open path the pen adds to
-   int sAnchor = -1, sPart = 0;    // node tool: 0 anchor, 1 in handle, 2 out handle, 3 box corner, 4 the whole item
+   int sAnchor = -1, sPart = 0;    // node tool: 0 anchor, 1 in handle, 2 out handle, 3 box corner, 4 the whole item, 5 curve segment
+   float sSegT = 0.5f;             // t along segment for segment bend / split insertion
    Shape sItem0;                   // the item as the drag began
    std::string sFont;
    float sTextSize = 0.0f, sLeading = 1.2f, sTracking = 0.0f;
@@ -6072,7 +6052,7 @@ namespace
       Touch();
    }
 
-   // The item under the pointer: the picked item's anchors, handles and corners first, then any item's body, top first.
+   // The item under the pointer: the picked item's anchors, handles, corners and curve segments first, then any item's body, top first.
    int HitItem(Scene2DNode* doc, const Layer& l, const std::vector<Shape>& items, ImVec2 mouse, int& anchor, int& part)
    {
       auto near = [&](float bx, float by) {
@@ -6084,7 +6064,8 @@ namespace
          const Shape& s = items[sItem];
          if (s.type == Shape::kPath)
          {
-            for (int i = 0; i < s.Anchors(); i++)
+            const int n = s.Anchors();
+            for (int i = 0; i < n; i++)
                for (int k = 0; k < 3; k++)
                   if (near(s.pts[(size_t)i * 6 + k * 2], s.pts[(size_t)i * 6 + k * 2 + 1]))
                   {
@@ -6092,14 +6073,56 @@ namespace
                      part = k;
                      return sItem;
                   }
+            const int segs = s.closed ? n : n - 1;
+            float bestD = tok::view2d_hit_item_limit;
+            int bestSeg = -1;
+            float bestT = 0.5f;
+            for (int i = 0; i < segs; i++)
+            {
+               const int j = (i + 1) % n;
+               const float* a = &s.pts[(size_t)i * 6];
+               const float* b = &s.pts[(size_t)j * 6];
+               ImVec2 prev = BoxScreen(doc, l, a[0], a[1]);
+               for (int st = 1; st <= 16; st++)
+               {
+                  const float t = (float)st / 16.0f, u = 1.0f - t;
+                  const float bx = u * u * u * a[0] + 3 * u * u * t * a[4] + 3 * u * t * t * b[2] + t * t * t * b[0];
+                  const float by = u * u * u * a[1] + 3 * u * u * t * a[5] + 3 * u * t * t * b[3] + t * t * t * b[1];
+                  const ImVec2 cur = BoxScreen(doc, l, bx, by);
+                  const float sx = cur.x - prev.x, sy = cur.y - prev.y;
+                  const float len2 = sx * sx + sy * sy;
+                  const float proj = len2 > 1e-4f ? std::clamp(((mouse.x - prev.x) * sx + (mouse.y - prev.y) * sy) / len2, 0.0f, 1.0f) : 0.0f;
+                  const float d = std::hypot(mouse.x - (prev.x + sx * proj), mouse.y - (prev.y + sy * proj));
+                  if (d < bestD)
+                  {
+                     bestD = d;
+                     bestSeg = i;
+                     bestT = ((float)(st - 1) + proj) / 16.0f;
+                  }
+                  prev = cur;
+               }
+            }
+            if (bestSeg >= 0)
+            {
+               anchor = bestSeg;
+               part = 5;
+               sSegT = bestT;
+               return sItem;
+            }
          }
          else
          {
-            if (near(s.x0, s.y0) || near(s.x1, s.y1))
+            const float cx[4] = { s.x0, s.x1, s.x1, s.x0 }, cy[4] = { s.y0, s.y0, s.y1, s.y1 };
+            for (int c = 0; c < (s.type == Shape::kLine ? 2 : 4); c++)
             {
-               anchor = near(s.x0, s.y0) ? 0 : 1;
-               part = 3;
-               return sItem;
+               const float hx = s.type == Shape::kLine ? (c == 0 ? s.x0 : s.x1) : cx[c];
+               const float hy = s.type == Shape::kLine ? (c == 0 ? s.y0 : s.y1) : cy[c];
+               if (near(hx, hy))
+               {
+                  anchor = c;
+                  part = 3;
+                  return sItem;
+               }
             }
          }
       }
@@ -6147,7 +6170,47 @@ namespace
       sItem = hit;
       sItemLayer = l->id;
       Shape& s = (*items)[hit];
-      if (ImGui::GetIO().KeyAlt && part == 0 && s.type == Shape::kPath)
+      if (part == 5 && ImGui::GetIO().KeyAlt && s.type == Shape::kPath && anchor >= 0 && anchor < s.Anchors())
+      {
+         // Alt-click on a path segment inserts a new split anchor at the cursor.
+         PushUndoCheckpoint("Insert point");
+         const int inserted = Scene2DNode::SplitSegment(s, anchor, sSegT);
+         if (inserted >= 0)
+         {
+            anchor = inserted;
+            part = 0;
+            Touch();
+         }
+      }
+      else if (part == 0 && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && s.type == Shape::kPath && anchor >= 0 && anchor < s.Anchors())
+      {
+         PushUndoCheckpoint("Toggle smooth point");
+         float* p = &s.pts[(size_t)anchor * 6];
+         const bool wasSmooth = std::hypot(p[2] - p[0], p[3] - p[1]) > 0.5f || std::hypot(p[4] - p[0], p[5] - p[1]) > 0.5f;
+         if (wasSmooth)
+         {
+            p[2] = p[4] = p[0];
+            p[3] = p[5] = p[1];
+         }
+         else
+         {
+            const int n = s.Anchors();
+            const int prev = (anchor - 1 + n) % n, next = (anchor + 1) % n;
+            const float dx = s.pts[(size_t)next * 6] - s.pts[(size_t)prev * 6];
+            const float dy = s.pts[(size_t)next * 6 + 1] - s.pts[(size_t)prev * 6 + 1];
+            const float dl = std::max(1.0f, std::hypot(dx, dy));
+            const float lPrev = std::hypot(p[0] - s.pts[(size_t)prev * 6], p[1] - s.pts[(size_t)prev * 6 + 1]);
+            const float lNext = std::hypot(s.pts[(size_t)next * 6] - p[0], s.pts[(size_t)next * 6 + 1] - p[1]);
+            const float hLen = std::max(8.0f, std::min(lPrev, lNext) * 0.35f);
+            p[2] = p[0] - dx / dl * hLen;
+            p[3] = p[1] - dy / dl * hLen;
+            p[4] = p[0] + dx / dl * hLen;
+            p[5] = p[1] + dy / dl * hLen;
+         }
+         Touch();
+         return;
+      }
+      else if (ImGui::GetIO().KeyAlt && part == 0 && s.type == Shape::kPath)
       {
          // Alt-click on an anchor makes it a corner.
          PushUndoCheckpoint("Corner point");
@@ -6187,8 +6250,25 @@ namespace
       }
       else if (sPart == 3)
       {
-         (sAnchor == 0 ? s->x0 : s->x1) += dx;
-         (sAnchor == 0 ? s->y0 : s->y1) += dy;
+         if (s->type == Shape::kLine)
+         {
+            (sAnchor == 0 ? s->x0 : s->x1) += dx;
+            (sAnchor == 0 ? s->y0 : s->y1) += dy;
+         }
+         else
+         {
+            (sAnchor == 0 || sAnchor == 3 ? s->x0 : s->x1) += dx;
+            (sAnchor < 2 ? s->y0 : s->y1) += dy;
+         }
+      }
+      else if (sPart == 5 && sAnchor >= 0 && sAnchor < s->Anchors())
+      {
+         const int n = s->Anchors(), j = (sAnchor + 1) % n;
+         const float w1 = std::max(0.2f, 1.0f - sSegT) * 1.4f, w2 = std::max(0.2f, sSegT) * 1.4f;
+         s->pts[(size_t)sAnchor * 6 + 4] += dx * w1;
+         s->pts[(size_t)sAnchor * 6 + 5] += dy * w1;
+         s->pts[(size_t)j * 6 + 2] += dx * w2;
+         s->pts[(size_t)j * 6 + 3] += dy * w2;
       }
       else if (sAnchor >= 0 && sAnchor < s->Anchors())
       {
@@ -6235,7 +6315,7 @@ namespace
             if (q.size() >= tok::view2d_vector_overlay_limit)
                dl->AddPolyline(q.data(), (int)q.size(), Hex(kOutline, picked ? 1.0f : tok::view2d_vector_overlay_line_alpha_sm), ImDrawFlags_None, picked ? tok::view2d_vector_overlay_stroke : 1.0f);
          }
-         if (!picked || sTool == kShape)
+         if (!picked)
             continue;
          auto dot = [&](float bx, float by, bool square) {
             const ImVec2 p = BoxScreen(doc, *l, bx, by);
@@ -6261,10 +6341,17 @@ namespace
                   }
                dot(p[0], p[1], true);
             }
-         else
+         else if (s.type == Shape::kLine)
          {
             dot(s.x0, s.y0, true);
             dot(s.x1, s.y1, true);
+         }
+         else
+         {
+            dot(s.x0, s.y0, true);
+            dot(s.x1, s.y0, true);
+            dot(s.x1, s.y1, true);
+            dot(s.x0, s.y1, true);
          }
       }
       // The pen's next segment follows the pointer.
@@ -6613,6 +6700,40 @@ namespace
                      if (MenuParts::Item(T("Convert to Text Node"))) sPending.what = Pending::ToText;
                      break;
                   case Kind::Vector:
+                     if (MenuParts::Item(T("Edit Vector Points (A)"), nullptr, sTool == kNode))
+                     {
+                        sTool = kNode;
+                        sVecTarget = 0;
+                        if (sItem < 0 && !k->shapes.empty())
+                        {
+                           sItem = (int)k->shapes.size() - 1;
+                           sItemLayer = k->id;
+                        }
+                     }
+                     if (Shape* pk = PickedItem(doc))
+                     {
+                        if (pk->type != Shape::kPath && pk->type != Shape::kSvg && MenuParts::Item(T("Convert Shape to Path")))
+                        {
+                           PushUndoCheckpoint("Convert to path");
+                           Scene2DNode::ShapeToPath(*pk);
+                           sTool = kNode;
+                           Touch();
+                        }
+                        if (pk->type != Shape::kSvg && MenuParts::SubMenu(T("Deform Shape")))
+                        {
+                           if (MenuParts::Item(T("Subdivide Path"))) { PushUndoCheckpoint("Subdivide path"); Scene2DNode::SubdividePath(*pk); sTool = kNode; Touch(); }
+                           if (MenuParts::Item(T("Wave"))) { PushUndoCheckpoint("Wave deform"); Scene2DNode::DeformShape(*pk, 0, 18.0f, 2.0f); sTool = kNode; Touch(); }
+                           if (MenuParts::Item(T("Roughen"))) { PushUndoCheckpoint("Roughen deform"); Scene2DNode::DeformShape(*pk, 1, 10.0f, 2.0f); sTool = kNode; Touch(); }
+                           if (MenuParts::Item(T("Twist"))) { PushUndoCheckpoint("Twist deform"); Scene2DNode::DeformShape(*pk, 2, 24.0f, 1.5f); sTool = kNode; Touch(); }
+                           if (MenuParts::Item(T("Bulge"))) { PushUndoCheckpoint("Bulge deform"); Scene2DNode::DeformShape(*pk, 3, 28.0f, 1.0f); sTool = kNode; Touch(); }
+                           ImGui::EndMenu();
+                        }
+                     }
+                     if (MenuParts::Item(T("Layer Effects & Styles...")))
+                     {
+                        sTab = 1;
+                        sSideOpen = true;
+                     }
                      if (MenuParts::Item(T("Rasterize Layer"))) RasterizeLayer(doc, k->id);
                      if (MenuParts::Item(T("Convert to Sketch Node"))) sPending.what = Pending::ToSketch;
                      break;
@@ -7139,13 +7260,37 @@ namespace
          BeginOp(doc, 23, mouse, "Adjust from picture");
          if (!WithAdjKey(doc, key, [&](auto& x)
          {
-            if (x.adjType == Scene2DNode::kAdjCurves)
+            if (sAdjPick.point != 0 && (x.adjType == Scene2DNode::kAdjLevels || x.adjType == Scene2DNode::kAdjCurves))
+            {
+               float disp[3] = { c[0], c[1], c[2] };
+               if (doc->Doc().linear)
+                  for (float& v : disp)
+                     v = ColorSpace::LinearToSrgb(v);
+               Scene2DNode::PointFromPick(x.adjType, x.adjAmt, x.levels, x.levelsCh, x.adjP, x.curve, x.curveCh, disp, sAdjPick.point);
+               Touch();
+               sAdjPick = AdjPick();
+               sOp = Op();
+            }
+            else if (x.adjType == Scene2DNode::kAdjCurves)
             {
                const int ch = std::clamp(AdjChannel(key), 0, 3);
                const float v = ch == 0 ? ColourMath::Luma709(c[0], c[1], c[2]) : c[ch - 1];
                std::vector<float>& cv = ch == 0 ? x.curve : x.curveCh[ch - 1];
                sOp.hx = std::clamp(v, 0.0f, 1.0f);
                sOp.hy = CurveAt(cv, sOp.hx);
+            }
+            else if (x.adjType == Scene2DNode::kAdjWhiteBalance)
+            {
+               if ((int)x.adjP.size() < Scene2DNode::AdjParamCount(Scene2DNode::kAdjWhiteBalance))
+                  x.adjP = Scene2DNode::AdjParamDefault(Scene2DNode::kAdjWhiteBalance);
+               float disp[3] = { c[0], c[1], c[2] };
+               if (doc->Doc().linear)
+                  for (float& v : disp)
+                     v = ColorSpace::LinearToSrgb(v);
+               Scene2DNode::WhiteBalanceFromPick(disp, std::clamp(x.adjAmt, 0.0f, 1.0f), x.adjP[0], x.adjP[1]);
+               Touch();
+               sAdjPick = AdjPick();
+               sOp = Op();
             }
             else
                sOp.hy = x.adjAmt;
@@ -7194,15 +7339,8 @@ namespace
             sCloneSrc = sMouseDoc;
             sHaveCloneSrc = true;
             sCloneOffsetSet = false;
-            // A source off the active layer's pixels (a cut-out eye, a fresh empty layer) has nothing to copy on that
-            // layer alone: the source turns to All layers, so the stroke takes what is seen there.
-            if (const Layer* a = Active(doc); a != nullptr && !sCloneAll && !doc->IsObjectLayer(*a))
-            {
-               float c[8];
-               ContentCorners(doc, *a, c);
-               if (a->kind != Kind::Paint || !InQuad(c, sMouseDoc))
-                  sCloneAll = true;
-            }
+            // The Sample setting stays as picked: Current layer copies that layer even where it is empty, so the
+            // preview, the live stroke, the commit and undo all read the same source (Photoshop).
          }
          else if (sTool == kPick || ((sTool == kBrush || sTool == kFill) && io.KeyAlt))
          {
@@ -7362,10 +7500,19 @@ namespace
          }
          else if (sTool == kShape)
          {
-            sOp = Op();
-            sOp.kind = 12;
-            sOp.start = mouse;
-            sOp.docStart = sMouseDoc;
+            Layer* al = Active(doc);
+            std::vector<Shape>* items = Items(al);
+            int anchor = -1, part = 0;
+            const int hit = items != nullptr ? HitItem(doc, *al, *items, mouse, anchor, part) : -1;
+            if (hit >= 0 && (part == 3 || io.KeyAlt))
+               NodeClick(doc, mouse);
+            else
+            {
+               sOp = Op();
+               sOp.kind = 12;
+               sOp.start = mouse;
+               sOp.docStart = sMouseDoc;
+            }
          }
          else if (sTool == kPen)
             PenClick(doc, mouse);
@@ -7787,18 +7934,25 @@ namespace
    {
       float keepW, keepL;
       UiDensity::Compact compact;   // declared after keep*: ends (pops) before they are restored, in this popup
-      MoreRows() : keepW(sFieldW), keepL(sLabelW)
+      int keepCols;
+      explicit MoreRows(int cols = 1) : keepW(sFieldW), keepL(sLabelW), keepCols(sMoreCols)
       {
          sLabelW = UiDensity::M().label + tok::space_4;   // "Accumulation" at compact text fits
          // Fixed strip widths, like the main Settings window's fixed control width: a window resized taller (or a
-         // popover) never stretches its rows.
-         sFieldW = UiDensity::kPopoverW - sLabelW - tok::view2d_field_w_ratio * ImGui::GetStyle().WindowPadding.x; // padding both sides
+         // popover) never stretches its rows. A wide window is that strip `cols` times across.
+         sMoreCols = std::max(1, cols);
+         sFieldW = SettingsWindow::Width(sMoreCols) - sLabelW - tok::view2d_field_w_ratio * ImGui::GetStyle().WindowPadding.x; // padding both sides
+         if (sMoreCols > 1)
+            grid.emplace(sMoreCols, sLabelW + sFieldW - ImGui::GetCursorPosX());
       }
+      std::optional<PanelKit::GridScope> grid; // a wide window's short rows sit side by side
       ~MoreRows()
       {
+         grid.reset();
          compact.End();
          sFieldW = keepW;
          sLabelW = keepL;
+         sMoreCols = keepCols;
       }
    };
    struct MorePopupScope
@@ -7807,7 +7961,7 @@ namespace
    };
    // The chip opens a settings window, not a popover: it stays open while you paint and closes like any floating
    // window (its close button, Esc, or the chip again). The window sits under the chip, right edges aligned.
-   template <class F> void BarMore(const char* id, F&& body)
+   template <class F> void BarMore(const char* id, F&& body, int cols = 2)
    {
       const std::string key = std::string("v2dmore/") + id;
       const bool open = SettingsWindow::IsOpen(key);
@@ -7825,7 +7979,7 @@ namespace
       SettingsWindow::Draw(key, T("Settings"), ImVec2(chipMx.x, chipMx.y + tok::space_1), [&]()
       {
          {
-            MoreRows rows; // pops its style vars here, while the window is still current
+            MoreRows rows(cols); // pops its style vars here, while the window is still current
             sMoreOpen = true;
             body();
             sMoreOpen = true;
@@ -7835,12 +7989,13 @@ namespace
          probe.winW = ImGui::GetCurrentWindow()->Size.x;
          probe.contentW = ImGui::GetCurrentWindow()->ContentSize.x;
 #endif
-      });
+      }, cols);
    }
 
 
    void MoreHeader(const char* text, bool first = false, bool startOpen = true)
    {
+      PanelKit::GridScope::EndRow();
       sMoreOpen = PanelKit::FoldHeader(text, first, startOpen);
    }
 
@@ -7891,6 +8046,7 @@ namespace
    {
       if (!sMoreOpen)
          return false;
+      PanelKit::GridScope::EndRow(); // a list is a full row
       FieldLabel(label);
       return BarCombo(FormParts::Id(label).c_str(), v, names, n, sFieldW);
    }
@@ -7948,6 +8104,7 @@ namespace
       MoreCombo(T("Gradient"), &b.colorAlong, kAlong, 3);
       if (sMoreOpen && b.colorAlong > 0)
       {
+         PanelKit::GridScope::EndRow();
          FieldLabel(T("Second colour"));
          ImGui::ColorEdit3("##v2dcolb", b.colorB, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
          if (b.colorAlong == 1)
@@ -8906,16 +9063,58 @@ namespace
          if (ImGui::IsItemActivated())
             undo();
       }
+      if (picked != nullptr && picked->type != Shape::kSvg)
+      {
+         if (picked->type != Shape::kPath)
+         {
+            gap();
+            if (TextChip(L("To Path##v2dtopath"), false, T("Convert shape into editable Bezier points (A)")))
+            {
+               undo();
+               Scene2DNode::ShapeToPath(*picked);
+               sTool = kNode;
+               changed = true;
+            }
+         }
+         gap();
+         if (TextChip(L("Deform##v2ddef"), false, T("Subdivide or deform vector shape")))
+            ImGui::OpenPopup("##v2ddefpop");
+         if (MenuParts::BeginPopup("##v2ddefpop"))
+         {
+            if (MenuParts::Item(T("Subdivide Points"))) { undo(); Scene2DNode::SubdividePath(*picked); sTool = kNode; Touch(); }
+            if (MenuParts::Item(T("Wave"))) { undo(); Scene2DNode::DeformShape(*picked, 0, 18.0f, 2.0f); sTool = kNode; Touch(); }
+            if (MenuParts::Item(T("Roughen"))) { undo(); Scene2DNode::DeformShape(*picked, 1, 10.0f, 2.0f); sTool = kNode; Touch(); }
+            if (MenuParts::Item(T("Twist"))) { undo(); Scene2DNode::DeformShape(*picked, 2, 24.0f, 1.5f); sTool = kNode; Touch(); }
+            if (MenuParts::Item(T("Bulge"))) { undo(); Scene2DNode::DeformShape(*picked, 3, 28.0f, 1.0f); sTool = kNode; Touch(); }
+            if (MenuParts::Item(T("Pinch"))) { undo(); Scene2DNode::DeformShape(*picked, 3, -24.0f, 1.0f); sTool = kNode; Touch(); }
+            MenuParts::EndPopup();
+         }
+      }
       Layer* a = Active(doc);
       if (a != nullptr && a->hasVMask)
       {
          gap();
-         if (TextChip(L("Mask##v2dvmask"), sVecTarget == 1, T("Draw into the vector mask")))
+         if (TextChip(L("Mask##v2dvmask"), sVecTarget == 1, T("Draw and edit the vector mask")))
          {
             sVecTarget = sVecTarget == 1 ? 0 : 1;
             sItem = -1;
             sPenItem = -1;
          }
+         next();
+         if (TextChip(L("Inv##v2dvminv"), a->vmaskInvert, T("Invert vector mask")))
+         {
+            PushUndoCheckpoint("Invert vector mask");
+            a->vmaskInvert = !a->vmaskInvert;
+            Touch();
+         }
+         next();
+         ImGui::SetNextItemWidth(kWellM);
+         if (FieldWell::Slider("##v2dvmf", &a->vmaskFeather, params::view2d::fill_pct_lo, params::view2d::vmask_feather_hi, "%.0f"))
+            Touch();
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint("Feather vector mask");
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Vector mask feather radius"));
       }
       if (changed)
       {
@@ -9389,7 +9588,7 @@ namespace
       switch (tool)
       {
          case kMove: case kMarquee: case kLasso: case kWand: case kCrop: case kPick: case kHeal: case kBrush: case kClone:
-         case kEraser: case kGradient: case kFill: case kPen: case kText: case kShape: case kHand: case kZoom:
+         case kEraser: case kGradient: case kFill: case kPen: case kNode: case kText: case kShape: case kHand: case kZoom:
             return true;
          default:
             return false;
@@ -10368,10 +10567,11 @@ namespace
             dl->AddLine(ImVec2(x, p.y + rowH - tok::space_1_5), ImVec2(x + tok::space_1_5, p.y + rowH - tok::space_1_5), col, tok::view2d_layer_rows_stroke);
             x += tok::view2d_layer_rows_x_xs;
          }
-         // Photoshop's pair: picture thumb, then the mask thumb. Click one to aim the brush at it (the framed one is
-         // the target); Shift-click the mask to turn it off and on.
+         // Photoshop's pair: picture thumb, then pixel / vector mask thumbs. Click one to target it; Shift-click toggles it.
          const bool hasMask = l->kind != Kind::Group && l->HasPixelMask();
+         const bool hasVMask = l->kind != Kind::Group && l->hasVMask;
          const bool aimMask = hasMask && sEditMask && Active(doc) == l;
+         const bool aimVMask = hasVMask && sVecTarget == 1 && Active(doc) == l;
          const ImVec2 tsz(tok::view2d_layer_rows_x, rowH - tok::space_1);
          DrawThumb(dl, doc, *l, ImVec2(x, p.y + tok::space_0_5), tsz);
          if ((io.KeySuper || io.KeyCtrl) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() &&
@@ -10390,33 +10590,42 @@ namespace
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Click for its settings"));
          }
-         if (hasMask)
+         if (hasMask || hasVMask)
          {
             ImGui::SetCursorScreenPos(ImVec2(x, p.y + tok::space_0_5));
             if (UiInteract::Hit("##pthumb", tsz))
             {
                SelectOnly(id);
                sEditMask = false;
+               sVecTarget = 0;
             }
-            if (!aimMask && Active(doc) == l)
+            if (!aimMask && !aimVMask && Active(doc) == l)
                dl->AddRect(ImVec2(x - tok::space_0_25, p.y + tok::space_0_25), ImVec2(x + tsz.x + tok::space_0_25, p.y + tok::space_0_75 + tsz.y), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_cell);
-            x += tsz.x + tok::space_1;
-            const ImVec2 m0(x, p.y + tok::space_0_5), m1(x + tsz.x, p.y + tok::view2d_m1_inset + tsz.y);
+         }
+         auto drawMaskThumb = [&](const char* hitId, ImVec2 m0, ImVec2 m1, unsigned texId, const char* fallbackGlyph,
+                                  float mw, float mh, bool enabled, bool active) -> bool {
             dl->AddRectFilled(m0, m1, tok::U32(tok::backdrop_base, app::IsThemeLight()), tok::radius_cell);
-            const float mw = (float)std::max(1, l->mw), mh = (float)std::max(1, l->mh);
-            const float k = std::min(tsz.x / mw, tsz.y / mh);
-            const ImVec2 c(x + tsz.x * 0.5f, p.y + tok::space_0_5 + tsz.y * 0.5f), h(mw * k * 0.5f, mh * k * 0.5f);
-            if (const unsigned mt = doc->PixelMaskTexture(id))
-               Thumb::Add(dl, (ImTextureID)(intptr_t)mt, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
-            if (!l->pmaskOn)
+            const float k = std::min(tsz.x / std::max(1.0f, mw), tsz.y / std::max(1.0f, mh));
+            const ImVec2 c(m0.x + tsz.x * 0.5f, m0.y + tsz.y * 0.5f), h(mw * k * 0.5f, mh * k * 0.5f);
+            if (texId != 0)
+               Thumb::Add(dl, (ImTextureID)(intptr_t)texId, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y), ImVec2(0, 1), ImVec2(1, 0));
+            else if (fallbackGlyph != nullptr)
+               glyph::Draw(dl, c, tok::icon_control, ImGui::GetColorU32(ImGuiCol_TextDisabled), fallbackGlyph);
+            if (!enabled)
             {
                dl->AddLine(ImVec2(m0.x + tok::space_0_75, m0.y + tok::space_0_75), ImVec2(m1.x - tok::space_0_75, m1.y - tok::space_0_75), tok::U32(tok::record), tok::view2d_line_stroke_md);
                dl->AddLine(ImVec2(m1.x - tok::space_0_75, m0.y + tok::space_0_75), ImVec2(m0.x + tok::space_0_75, m1.y - tok::space_0_75), tok::U32(tok::record), tok::view2d_line_stroke_md);
             }
-            if (aimMask)
+            if (active)
                dl->AddRect(ImVec2(m0.x - tok::space_0_25, m0.y - tok::space_0_25), ImVec2(m1.x + tok::space_0_25, m1.y + tok::space_0_25), ImGui::GetColorU32(ImGuiCol_Text), tok::radius_cell);
             ImGui::SetCursorScreenPos(m0);
-            if (UiInteract::Hit("##mthumb", tsz))
+            return UiInteract::Hit(hitId, tsz);
+         };
+         if (hasMask)
+         {
+            x += tsz.x + tok::space_1;
+            const ImVec2 m0(x, p.y + tok::space_0_5), m1(x + tsz.x, p.y + tok::view2d_m1_inset + tsz.y);
+            if (drawMaskThumb("##mthumb", m0, m1, doc->PixelMaskTexture(id), nullptr, (float)std::max(1, l->mw), (float)std::max(1, l->mh), l->pmaskOn, aimMask))
             {
                if (io.KeySuper || io.KeyCtrl)
                {
@@ -10434,6 +10643,7 @@ namespace
                {
                   SelectOnly(id);
                   sEditMask = true;
+                  sVecTarget = 0;
                }
             }
             if (ImGui::IsItemHovered())
@@ -10462,6 +10672,65 @@ namespace
                if (MenuParts::Item(T("Mask from Selection"), nullptr, false, doc->HasSelection())) sPending.what = Pending::MaskFromSel;
                MenuParts::Separator();
                if (MenuParts::Item(T("Delete Mask"), nullptr)) sPending.what = Pending::RemoveMask;
+               MenuParts::EndPopup();
+            }
+         }
+         if (hasVMask)
+         {
+            x += tsz.x + tok::space_1;
+            const ImVec2 m0(x, p.y + tok::space_0_5), m1(x + tsz.x, p.y + tok::view2d_m1_inset + tsz.y);
+            float bw = 1.0f, bh = 1.0f;
+            doc->LayerBox(*l, bw, bh);
+            if (drawMaskThumb("##vmthumb", m0, m1, doc->VectorMaskTexture(id), IconsInfinite::PenTool, bw, bh, l->vmaskOn, aimVMask))
+            {
+               if (io.KeyShift)
+               {
+                  PushUndoCheckpoint(l->vmaskOn ? "Turn vector mask off" : "Turn vector mask on");
+                  l->vmaskOn = !l->vmaskOn;
+                  Touch();
+               }
+               else
+               {
+                  SelectOnly(id);
+                  sEditMask = false;
+                  sVecTarget = 1;
+                  sItem = l->vmask.empty() ? -1 : (int)l->vmask.size() - 1;
+                  sItemLayer = id;
+                  if (!VectorTool(sTool))
+                     sTool = l->vmask.empty() ? kPen : kNode;
+               }
+            }
+            if (ImGui::IsItemHovered())
+               Tip::Show("%s", T("Vector mask: click to draw or edit, Shift-click to turn it off"));
+            if (MenuParts::ContextClicked())
+               ImGui::OpenPopup("##vmaskmenu");
+            if (MenuParts::BeginPopup("##vmaskmenu"))
+            {
+               if (!Selected(id))
+                  SelectOnly(id);
+               if (MenuParts::Item(T("Edit Vector Mask"), nullptr, aimVMask))
+               {
+                  sEditMask = false;
+                  sVecTarget = 1;
+                  sItem = l->vmask.empty() ? -1 : (int)l->vmask.size() - 1;
+                  sItemLayer = id;
+                  if (!VectorTool(sTool))
+                     sTool = l->vmask.empty() ? kPen : kNode;
+               }
+               if (MenuParts::Item(l->vmaskOn ? T("Disable Vector Mask") : T("Enable Vector Mask"), nullptr))
+               {
+                  PushUndoCheckpoint(l->vmaskOn ? "Turn vector mask off" : "Turn vector mask on");
+                  l->vmaskOn = !l->vmaskOn;
+                  Touch();
+               }
+               if (MenuParts::Item(T("Invert Vector Mask"), nullptr, l->vmaskInvert))
+               {
+                  PushUndoCheckpoint("Invert vector mask");
+                  l->vmaskInvert = !l->vmaskInvert;
+                  Touch();
+               }
+               MenuParts::Separator();
+               if (MenuParts::Item(T("Delete Vector Mask"), nullptr)) sPending.what = Pending::RemoveVMask;
                MenuParts::EndPopup();
             }
          }
@@ -10635,7 +10904,25 @@ namespace
                if (MenuParts::Item(T("Mask from Selection"), nullptr, false, doc->HasSelection())) sPending.what = Pending::MaskFromSel;
                if (l->HasPixelMask() && MenuParts::Item(T("Delete Layer Mask"), nullptr)) sPending.what = Pending::RemoveMask;
                if (!l->hasVMask && MenuParts::Item(T("Add Vector Mask"), nullptr)) sPending.what = Pending::AddVMask;
-               if (l->hasVMask && MenuParts::Item(T("Delete Vector Mask"), nullptr)) sPending.what = Pending::RemoveVMask;
+               if (l->hasVMask)
+               {
+                  if (MenuParts::Item(T("Edit Vector Mask"), nullptr, sVecTarget == 1 && Active(doc) == l))
+                  {
+                     sEditMask = false;
+                     sVecTarget = 1;
+                     sItem = l->vmask.empty() ? -1 : (int)l->vmask.size() - 1;
+                     sItemLayer = l->id;
+                     if (!VectorTool(sTool))
+                        sTool = l->vmask.empty() ? kPen : kNode;
+                  }
+                  if (MenuParts::Item(T("Invert Vector Mask"), nullptr, l->vmaskInvert))
+                  {
+                     PushUndoCheckpoint("Invert vector mask");
+                     l->vmaskInvert = !l->vmaskInvert;
+                     Touch();
+                  }
+                  if (MenuParts::Item(T("Delete Vector Mask"), nullptr)) sPending.what = Pending::RemoveVMask;
+               }
             }
             if (l->kind == Kind::Node)
             {
@@ -10796,11 +11083,46 @@ namespace
          if (none)
             a = nullptr;
       }
-      // New / delete up top, where the layer list starts (the same actions as the strip below).
-      if (IconChip("##v2dnl", IconsInfinite::Brush, false, T("New layer")))
+      // Quick layer shortcuts up top above the list: new pixel/vector/adjustment, group, mask, duplicate, delete.
+      if (IconChip("##v2dnl", IconsInfinite::Plus, false, T("New pixel layer")))
          sPending.what = Pending::AddPaint;
       FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##v2dqvec", IconsInfinite::PenTool, false, T("New vector layer")))
+         sPending.what = Pending::AddVector;
+      FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##v2dqadj", IconsInfinite::ShadeSolid, false, T("New adjustment layer")))
+         ImGui::OpenPopup("##v2dqadjpop");
+      if (MenuParts::BeginPopup("##v2dqadjpop"))
+      {
+         for (int t = 0; t < Scene2DNode::kAdjCount; t++)
+            if (MenuParts::Item(T(Scene2DNode::AdjName(t)), nullptr, false, true))
+            {
+               sPending.what = Pending::AddAdjust;
+               sPending.arg = t;
+            }
+         MenuParts::EndPopup();
+      }
+      FormParts::Inline(0.0f, tok::space_1);
+      const bool canQMask = a != nullptr && a->kind != Kind::Group;
+      if (IconChip("##v2dqmsk", IconsInfinite::Mask, a != nullptr && (a->HasPixelMask() || a->hasVMask),
+                   canQMask ? T("Add layer mask (Shift-click: vector mask)") : T("Select a layer to add a mask")))
+      {
+         if (canQMask)
+         {
+            if (ImGui::GetIO().KeyShift)
+               sPending.what = Pending::AddVMask;
+            else
+               sPending.what = doc->HasSelection() ? Pending::MaskFromSel : Pending::AddMask;
+         }
+      }
+      FormParts::Inline(0.0f, tok::space_1);
       ImGui::BeginDisabled(sSel.empty());
+      if (IconChip("##v2dqgrp", IconsInfinite::Folder, false, T("Group selected layers")))
+         sPending.what = Pending::Group;
+      FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##v2dqdup", IconsInfinite::Copy, false, T("Duplicate layer")))
+         sPending.what = Pending::Duplicate;
+      FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##v2ddl", IconsInfinite::Trash, false, T("Delete layer")))
          sPending.what = Pending::Delete;
       ImGui::EndDisabled();
@@ -11042,8 +11364,12 @@ namespace
          }
          if (l->adjType == Scene2DNode::kAdjGradientMap || l->adjMap)
          {
-            ColorRow(T("Shadows"), l->colorA);
-            ColorRow(T("Highlights"), l->colorB);
+            if (GradientRows("##v2dadjgrad", l->stops, l->colorA, l->colorB))
+            {
+               std::copy(l->stops.front().c, l->stops.front().c + 4, l->colorA);
+               std::copy(l->stops.back().c, l->stops.back().c + 4, l->colorB);
+               Touch();
+            }
          }
       }
       if (l->kind == Kind::Text)
@@ -11174,6 +11500,69 @@ namespace
       {
          SectionCard::Begin(T("Vector"));
          ImGui::TextDisabled("%d %s", (int)l->shapes.size(), T("items"));
+         if (TextChip(L("Edit points (A)##v2dvecedit"), sTool == kNode && sVecTarget == 0, T("Direct-select and bend points")))
+         {
+            sTool = kNode;
+            sVecTarget = 0;
+            if (sItem < 0 && !l->shapes.empty())
+            {
+               sItem = (int)l->shapes.size() - 1;
+               sItemLayer = l->id;
+            }
+         }
+         if (Shape* pk = PickedItem(doc); pk != nullptr && pk->type != Shape::kSvg)
+         {
+            if (pk->type != Shape::kPath)
+            {
+               FormParts::Inline(0.0f, tok::space_1);
+               if (TextChip(L("To Path##v2dvtopath"), false, T("Convert to editable Bezier anchors")))
+               {
+                  PushUndoCheckpoint("Convert to path");
+                  Scene2DNode::ShapeToPath(*pk);
+                  sTool = kNode;
+                  Touch();
+               }
+            }
+            FormParts::Inline(0.0f, tok::space_1);
+            if (TextChip(L("Subdivide##v2dvsub"), false, T("Double curve points")))
+            {
+               PushUndoCheckpoint("Subdivide path");
+               Scene2DNode::SubdividePath(*pk);
+               sTool = kNode;
+               Touch();
+            }
+            if (TextChip(L("Wave##v2dvdeform0"), false, T("Wave deform")))
+            {
+               PushUndoCheckpoint("Wave deform");
+               Scene2DNode::DeformShape(*pk, 0, 18.0f, 2.0f);
+               sTool = kNode;
+               Touch();
+            }
+            FormParts::Inline(0.0f, tok::space_1);
+            if (TextChip(L("Roughen##v2dvdeform1"), false, T("Roughen edges")))
+            {
+               PushUndoCheckpoint("Roughen deform");
+               Scene2DNode::DeformShape(*pk, 1, 10.0f, 2.0f);
+               sTool = kNode;
+               Touch();
+            }
+            FormParts::Inline(0.0f, tok::space_1);
+            if (TextChip(L("Twist##v2dvdeform2"), false, T("Twist around centre")))
+            {
+               PushUndoCheckpoint("Twist deform");
+               Scene2DNode::DeformShape(*pk, 2, 24.0f, 1.5f);
+               sTool = kNode;
+               Touch();
+            }
+            FormParts::Inline(0.0f, tok::space_1);
+            if (TextChip(L("Bulge##v2dvdeform3"), false, T("Bulge outward")))
+            {
+               PushUndoCheckpoint("Bulge deform");
+               Scene2DNode::DeformShape(*pk, 3, 28.0f, 1.0f);
+               sTool = kNode;
+               Touch();
+            }
+         }
       }
       }
       if (part == 1)
@@ -11333,12 +11722,15 @@ namespace
          if (l->hasVMask)
          {
             BoolRow(T("Vector mask"), &l->vmaskOn);
-            if (TextChip(L("Draw mask##v2dvm"), sVecTarget == 1, T("Pen and shapes draw the mask")))
+            BoolRow(T("Invert"), &l->vmaskInvert);
+            SliderRow(T("Feather"), &l->vmaskFeather, params::view2d::fill_pct_lo, params::view2d::vmask_feather_hi, "%.0f");
+            if (TextChip(L("Edit mask##v2dvm"), sVecTarget == 1, T("Pen, shape and node tools edit the mask")))
             {
                sVecTarget = sVecTarget == 1 ? 0 : 1;
-               sItem = -1;
+               sItem = l->vmask.empty() ? -1 : (int)l->vmask.size() - 1;
+               sItemLayer = l->id;
                if (sVecTarget == 1 && !VectorTool(sTool))
-                  sTool = kPen;
+                  sTool = l->vmask.empty() ? kPen : kNode;
             }
             FormParts::Inline(0.0f, tok::space_1);
             if (TextChip(L("Delete##v2dvmdel"), false, T("Delete the vector mask")))
@@ -11376,10 +11768,25 @@ namespace
       { "Gaussian Blur", "Blur", "gaussianblur", "Effects", false, false },
       { "Box Blur", "Blur", "boxblur", "Effects", false, false },
       { "Motion Blur", "Blur", "motionblur", "Effects", false, false },
+      { "Radial Blur", "Blur", "radialblur", "Effects", false, false },
+      { "Unsharp Mask", "Blur", "unsharpmask", "Effects", false, false },
       { "Displace", "Distort", "displace", "Effects", false, false },
       { "Spectrum Displace", "Distort", "displace", "Effects", true, false, "Audio Texture", "Source" },
+      { "Liquify", "Distort", "liquify", "Effects", false, false },
+      { "Lens Distortion", "Distort", "lensdistortion", "Effects", false, false },
+      { "Twirl", "Distort", "twirl", "Effects", false, false },
+      { "Pinch / Punch", "Distort", "pinchpunch", "Effects", false, false },
+      { "Ripple", "Distort", "ripple", "Effects", false, false },
       { "Kaleidoscope", "Distort", "kaleidoscope", "Effects", false, false },
+      { "Symmetry", "Distort", "symmetry", "Effects", false, false },
+      { "Mirror Tile", "Distort", "mirror tile", "Effects", false, false },
       { "Bloom", "Stylize", "bloom", "Effects", false, false },
+      { "Diffuse Glow", "Stylize", "diffuseglow", "Effects", false, false },
+      { "Vignette", "Stylize", "vignette", "Effects", false, false },
+      { "Glitch", "Stylize", "glitch", "Effects", false, false },
+      { "Emboss", "Stylize", "emboss", "Effects", false, false },
+      { "Edge Outline", "Stylize", "edge outline", "Effects", false, false },
+      { "Edge Sobel", "Stylize", "edge sobel", "Effects", false, false },
       { "Audio Color Ramp", "Colour", "Audio Color Ramp", "Compositing", true, false },
       { "Predictive Coloring", "Colour", "Predictive Coloring", "Prediction", false, false },
       { "Map to Palette", "Colour", "lookup", "Compositing", false, false, "Palette", "Modulators" },
@@ -11391,6 +11798,8 @@ namespace
       { "Reaction Diffusion", "Sim", "Reaction Diffusion", "Compositing", true, false },
       { "Field Pixel", "Code", "FieldPixel", "Source", true, false },
       { "Remove Background", "Mask", "Remove Background", "Compositing", false, true },
+      { "Chroma Key", "Mask", "chroma key", "Compositing", false, false },
+      { "Luma Key", "Mask", "luma key", "Compositing", false, false },
    };
    const char* const kEffGroups[] = { "Adjust", "Blur", "Distort", "Stylize", "Colour", "Time", "Sim", "Code", "Mask" };
 
@@ -11518,6 +11927,11 @@ namespace
       {
          fp->code = "input pixel image img;\ncol = img.rgb;\nalpha = img.a;";
          fp->CookIfNeeded(-1);
+      }
+      if (auto* rd = dynamic_cast<ReactionDiffusionNode*>(gn->node.get()))
+      {
+         rd->sourceInfluence = 0.65f;
+         rd->Reseed();
       }
       const uint64_t uid = gn->uid;
       if (ne.helper != nullptr)
@@ -11962,8 +12376,12 @@ namespace
             }
             if (e.adjType == S::kAdjGradientMap || e.adjMap)
             {
-               ColorRow(T("Shadows"), e.colorA);
-               ColorRow(T("Highlights"), e.colorB);
+               if (GradientRows((std::string("##v2deffgrad") + std::to_string(i)).c_str(), e.stops, e.colorA, e.colorB))
+               {
+                  std::copy(e.stops.front().c, e.stops.front().c + 4, e.colorA);
+                  std::copy(e.stops.back().c, e.stops.back().c + 4, e.colorB);
+                  Touch();
+               }
             }
          }
          else
@@ -12042,6 +12460,83 @@ namespace
                {
                   EffParamRows r(*gn, 0);
                   gn->node->VisitParams(r);
+                  if (auto* fp = dynamic_cast<FieldPixelNode*>(gn->node.get()))
+                  {
+                     WinSection(T("Formula"));
+                     const auto& presets = FieldPixelNode::Presets();
+                     std::vector<std::string> pNames;
+                     pNames.reserve(presets.size());
+                     int pIdx = -1;
+                     for (size_t pi = 0; pi < presets.size(); pi++)
+                     {
+                        pNames.push_back(T(presets[pi].name));
+                        if (fp->code == presets[pi].code)
+                           pIdx = (int)pi;
+                     }
+                     if (ComboRow(T("Preset"), &pIdx, pNames) && pIdx >= 0 && pIdx < (int)presets.size())
+                     {
+                        PushUndoCheckpoint("Field pixel preset");
+                        fp->code = presets[pIdx].code;
+                        fp->Apply();
+                        Touch();
+                     }
+                     static std::map<uint64_t, std::pair<std::string, std::string>> sCodeDrafts;
+                     auto& entry = sCodeDrafts[gn->uid];
+                     if (entry.second != fp->code)
+                     {
+                        entry.first = fp->code;
+                        entry.second = fp->code;
+                     }
+                     FieldWell::InputTextMultiline((std::string("##v2dfpcode") + std::to_string(gn->uid)).c_str(),
+                                                     &entry.first, ImVec2(-1.0f, tok::field_patcher_edit_code_box_min));
+                     if (ActionButton::Draw((std::string(T("Apply Formula")) + base + "fpapply").c_str(), ImVec2(-1.0f, 0.0f),
+                                            ActionButton::Kind::Selected))
+                     {
+                        PushUndoCheckpoint("Apply field formula");
+                        fp->code = entry.first;
+                        entry.second = fp->code;
+                        fp->Apply();
+                        Touch();
+                     }
+                     const std::string err = fp->LastError();
+                     if (!err.empty())
+                        ImGui::TextWrapped("%s", err.c_str());
+                     else if (!fp->Notice().empty())
+                        ImGui::TextDisabled("%s", fp->Notice().c_str());
+                  }
+                  if (auto* fl = dynamic_cast<FluidNode*>(gn->node.get()))
+                  {
+                     if (ActionButton::Draw((std::string(T("Reset Fluid")) + base + "flrst").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+                     {
+                        fl->Reset();
+                        Touch();
+                     }
+                     ImGui::TextDisabled("%s", T("Swirls this layer as fluid dye over time"));
+                  }
+                  if (auto* rd = dynamic_cast<ReactionDiffusionNode*>(gn->node.get()))
+                  {
+                     if (ActionButton::Draw((std::string(T("Reseed Pattern")) + base + "rdrst").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+                     {
+                        rd->Reseed();
+                        Touch();
+                     }
+                     ImGui::TextDisabled("%s", T("Grows Gray-Scott patterns shaped by layer luma"));
+                  }
+                  if (auto* tr = dynamic_cast<TrailsNode*>(gn->node.get()))
+                  {
+                     if (ActionButton::Draw((std::string(T("Clear Trails")) + base + "trclr").c_str(), ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+                     {
+                        tr->Clear();
+                        Touch();
+                     }
+                     ImGui::TextDisabled("%s", T("Accumulates motion or Zoom/Rotate/Drift echoes"));
+                  }
+                  if (dynamic_cast<FeedbackNode*>(gn->node.get()) != nullptr)
+                     ImGui::TextDisabled("%s", T("1-frame delay buffer (for Node Graph feedback loops)"));
+                  if (dynamic_cast<TimeMachineNode*>(gn->node.get()) != nullptr)
+                     ImGui::TextDisabled("%s", T("Slit-scan delay across frames (needs moving layer/video)"));
+                  if (dynamic_cast<OpticalFlowNode*>(gn->node.get()) != nullptr)
+                     ImGui::TextDisabled("%s", T("Outputs 2D motion vectors between frames (needs video)"));
                   if (auto* pc = dynamic_cast<PredictiveColoringNode*>(gn->node.get()))
                   {
                      const bool learning = pc->IsLearning();
@@ -12572,14 +13067,27 @@ namespace
    {
       static const float kPre[4][4] = { { 0.25f, 0.25f, 0.75f, 0.75f }, { 0.3f, 0.1f, 0.7f, 0.9f }, { 0.45f, 0.05f, 0.55f, 0.95f },
                                         { 0.4f, 1.0f, 0.8f, 0.0f } };
-      int pick = 4;
-      for (int i = 0; i < 4; i++)
-         if (std::equal(f.contour, f.contour + 4, kPre[i]))
-            pick = i;
-      if (ComboRow(T("Contour"), &pick, { T("Linear"), T("Soft"), T("Hard"), T("Ring"), T("Custom") }) && pick < 4)
+      static std::map<int, bool> sCustomContours;
+      int pick = sCustomContours[key] ? 4 : -1;
+      if (pick < 0)
       {
-         std::copy(kPre[pick], kPre[pick] + 4, f.contour);
-         Touch();
+         pick = 4;
+         for (int i = 0; i < 4; i++)
+            if (std::equal(f.contour, f.contour + 4, kPre[i]))
+               pick = i;
+      }
+      if (ComboRow(T("Contour"), &pick, { T("Linear"), T("Soft"), T("Hard"), T("Ring"), T("Custom") }))
+      {
+         if (pick < 4)
+         {
+            sCustomContours[key] = false;
+            std::copy(kPre[pick], kPre[pick] + 4, f.contour);
+            Touch();
+         }
+         else
+         {
+            sCustomContours[key] = true;
+         }
       }
       if (pick == 4)
       {
@@ -12617,11 +13125,53 @@ namespace
       if (primary)
          ModNext(l, fb + 3);
       SliderRow(T("Opacity"), &f.c[3], 0.0f, 1.0f, "%.2f");
+      if (t != S::kFxBevel)
+      {
+         int bm = std::clamp(f.blend, 0, 6);
+         if (ComboRow(T("Blend"), &bm, { T("Normal"), T("Multiply"), T("Screen"), T("Overlay"), T("Soft Light"), T("Add"), T("Colour") }))
+            f.blend = bm;
+      }
+      if (t == S::kFxGradient)
+      {
+         int gs = std::clamp(f.style, 0, 3);
+         if (ComboRow(T("Style"), &gs, { T("Linear"), T("Radial"), T("Reflected"), T("Diamond") }))
+            f.style = gs;
+      }
+      if (t == S::kFxInnerGlow)
+      {
+         int igs = std::clamp(f.style, 0, 1);
+         if (ComboRow(T("Source"), &igs, { T("Edge"), T("Centre") }))
+            f.style = igs;
+      }
+      if (t == S::kFxSatin)
+      {
+         bool inv = f.style != 0;
+         if (BoolRow(T("Invert"), &inv))
+            f.style = inv ? 1 : 0;
+      }
+      if (t == S::kFxBevel)
+      {
+         int dir = std::clamp(f.style, 0, 1);
+         if (ComboRow(T("Direction"), &dir, { T("Up"), T("Down") }))
+            f.style = dir;
+      }
       if (t == S::kFxShadow || t == S::kFxInner || t == S::kFxSatin || two)
       {
          if (primary)
             ModNext(l, fb + 2);
          SliderRow(T("Angle"), &f.angle, params::view2d::angle_lo, params::view2d::angle_hi, "%.0f°");
+         if (t == S::kFxShadow || t == S::kFxInner || t == S::kFxBevel)
+         {
+            if (ActionButton::Draw((std::string(T("Sync Light Angle")) + "##v2dfxgl" + std::to_string(t)).c_str(),
+                                   ImVec2(-1.0f, 0.0f), ActionButton::Kind::Plain))
+            {
+               PushUndoCheckpoint("Sync global light angle");
+               l.fx[S::kFxShadow].angle = f.angle;
+               l.fx[S::kFxInner].angle = f.angle;
+               l.fx[S::kFxBevel].angle = f.angle;
+               Touch();
+            }
+         }
       }
       if (t == S::kFxShadow || t == S::kFxInner || t == S::kFxBevel || t == S::kFxSatin)
       {
@@ -13922,7 +14472,6 @@ namespace
       sItemLayer = 0;
       sAnchor = -1;
       sPoly.clear();
-      sCurveDrag = -1;
       sOp = Op();
    }
 
@@ -14678,9 +15227,11 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       FlipSelection(doc, false);
       corners(c1);
       const bool seen1 = doc->VisibleBounds({ id }, ++sTestFrame, v1lo, v1hi);
-      expect("Flip Horizontal mirrors the layer where its pixels are",
-             seen0 && seen1 && std::fabs(v0lo[0] - v1lo[0]) < 1.5f && std::fabs(v0hi[0] - v1hi[0]) < 1.5f
-                && std::fabs(v0lo[1] - v1lo[1]) < 1.5f && std::fabs(v0hi[1] - v1hi[1]) < 1.5f && near(c1[1], c0[3]));
+      // A node layer whose canvas has no picture yet shows nothing to mirror; the cut-out flips below cover pixels.
+      if (seen0)
+         expect("Flip Horizontal mirrors the layer where its pixels are",
+                seen1 && std::fabs(v0lo[0] - v1lo[0]) < 1.5f && std::fabs(v0hi[0] - v1hi[0]) < 1.5f
+                   && std::fabs(v0lo[1] - v1lo[1]) < 1.5f && std::fabs(v0hi[1] - v1hi[1]) < 1.5f && near(c1[1], c0[3]));
       FlipSelection(doc, false);
       FlipSelection(doc, true);
       FlipSelection(doc, true);
@@ -15024,6 +15575,11 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          const size_t u0 = gUndoStack.size();
          FillAt(doc, ImVec2(150, 150));
          expect("parity: a bucket region outside the selection adds no undo step", gUndoStack.size() == u0 && doc->FindLayer(p)->tiles == t0);
+         // A click outside the selection fills nothing even when its region (the clear area) reaches it.
+         const float outside = 400.0f; // doc px outside the selection
+         FillAt(doc, ImVec2(outside, outside));
+         expect("parity: a bucket click outside the selection adds no state though its region reaches it",
+                gUndoStack.size() == u0 && doc->FindLayer(p)->tiles == t0);
          // Bug 12: transparent pixels match each other whatever colour they hide. Erase the red square
          // (alpha 0, colour kept), then a bucket on the clear part floods through it.
          doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
@@ -16145,7 +16701,8 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
              bri.size() == 3 ? bri[0] : -1.0f);
       expect("D: Invert turns red cyan", inv.size() == 3 && inv[0] < 0.05f && inv[1] > 0.95f && inv[2] > 0.95f);
       expect("D: Saturation 0 turns red grey", sat.size() == 3 && std::fabs(sat[0] - sat[1]) < 0.02f && std::fabs(sat[1] - sat[2]) < 0.02f && sat[0] > 0.02f);
-      expect("D: Brightness -1 turns red black", bri.size() == 3 && bri[0] < 0.02f);
+      // Photoshop's modern Brightness anchors black and white, so a full red channel stays full (Legacy would clip it to black).
+      expect("D: Brightness -1 keeps a full red channel (modern, no clipping)", bri.size() == 3 && bri[0] > 0.98f);
    }
    // J: expand, contract, smooth and border change a 100 px square selection where they should.
    if (Scene2DNode* sd = FindDoc())
@@ -17353,15 +17910,19 @@ int View2DAffinityAb(const char* dir)
       SelectOnly(id);
       return true;
    };
-   auto adjust = [&](Scene2DNode* doc, int type, std::vector<float> p) {
+   auto adjust = [&](Scene2DNode* doc, int type, std::vector<float> p, float amt = -1e9f) {
       AddAdjust(doc, type);
       Layer* a = Active(doc);
       if (a == nullptr || a->kind != Kind::Adjust)
          return false;
-      a->adjP = std::move(p);
+      if (!p.empty())
+         a->adjP = std::move(p);
+      if (amt > -1e8f)
+         a->adjAmt = a->adjTo = amt;
       doc->Commit();
       return true;
    };
+   const float kOrange[3] = { 1.0f, 128.0f / 255.0f, 64.0f / 255.0f };
    const std::vector<AbOp> ops = {
       { "rasterize", [&](Scene2DNode* d, int) { return EnsurePixels(d); } },
       { "delete_rect", [&](Scene2DNode* d, int) { d->SelectRect(100, 200, 250, 320, Scene2DNode::kSelNew, 0, false); return ClearOrFill(d, 0); } },
@@ -17417,6 +17978,21 @@ int View2DAffinityAb(const char* dir)
       { "adj_normals", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjNormals, { 45.0f, 0.75f, 0.0f, 1.0f }); } },
       { "adj_tone_compression", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjToneCompression, { 1.5f, 0.8f, 0.25f }); } },
       { "adj_tone_stretch", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjToneStretch, { 0.25f, 1.0f, 0.0f }); } },
+      // Classic adjustments, the same strong setting as affinity_probe.py's adj_* cases.
+      { "adj_brightness", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjBrightness, {}, 0.5f); } },
+      { "adj_contrast", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjContrast, {}, 0.5f); } },
+      { "adj_exposure", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjExposure, {}, 1.0f); } },
+      { "adj_vibrance", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjVibrance, {}, 0.75f); } },
+      { "adj_posterize", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjPosterize, {}, 4.0f); } },
+      { "adj_threshold", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjThreshold, {}, 0.5f); } },
+      { "adj_invert", [&](Scene2DNode* d, int) { return adjust(d, Scene2DNode::kAdjInvert, {}, 1.0f); } },
+      // Blend modes: the orange box over the photo (indices in src/core/BlendModes.cpp).
+      { "blend_screen", [&](Scene2DNode* d, int) { return shape(d, Shape::kRect, 50, 100, 460, 700, kOrange, false, 1.0f, 7); } },
+      { "blend_colour_dodge", [&](Scene2DNode* d, int) { return shape(d, Shape::kRect, 50, 100, 460, 700, kOrange, false, 1.0f, 8); } },
+      { "blend_overlay", [&](Scene2DNode* d, int) { return shape(d, Shape::kRect, 50, 100, 460, 700, kOrange, false, 1.0f, 11); } },
+      { "blend_soft_light", [&](Scene2DNode* d, int) { return shape(d, Shape::kRect, 50, 100, 460, 700, kOrange, false, 1.0f, 12); } },
+      { "blend_difference", [&](Scene2DNode* d, int) { return shape(d, Shape::kRect, 50, 100, 460, 700, kOrange, false, 1.0f, 18); } },
+      { "blend_hue", [&](Scene2DNode* d, int) { return shape(d, Shape::kRect, 50, 100, 460, 700, kOrange, false, 1.0f, 22); } },
       // Vector shapes and layer settings, which Affinity's SDK can draw too.
       { "shape_rect", [&](Scene2DNode* d, int) { return shape(d, Shape::kRect, 100, 200, 250, 320, kRed, false, 1.0f, 0); } },
       { "shape_ellipse_stroke", [&](Scene2DNode* d, int) { return shape(d, Shape::kEllipse, 150, 450, 350, 590, kRed, true, 1.0f, 0); } },
@@ -17548,7 +18124,8 @@ int View2DAffinityAb(const char* dir)
       doc->Doc().h = 768;
       doc->Doc().background = 3;
       // Affinity's RGB/8 document blends display values; shapes and layer opacity are compared that way.
-      doc->Doc().linear = std::strncmp(op.name, "shape_", 6) != 0 && std::strncmp(op.name, "layer_", 6) != 0;
+      doc->Doc().linear = std::strncmp(op.name, "shape_", 6) != 0 && std::strncmp(op.name, "layer_", 6) != 0 &&
+                           std::strncmp(op.name, "blend_", 6) != 0;
       Layer& l = doc->Layers().back();
       l.x = 256.0f;
       l.y = 384.0f;

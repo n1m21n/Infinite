@@ -26,7 +26,7 @@ const char* Scene2DNode::AdjName(int type)
                                                  "Levels", "Curves", "Colour Balance", "Vibrance", "Selective Colour",
                                                  "Channel Mixer", "Black & White", "Photo Filter", "Shadows / Highlights",
                                                  "Colour Lookup", "White Balance", "Split Toning", "Recolour", "Normals",
-                                                 "Tone Compression", "Tone Stretch" };
+                                                 "Tone Compression", "Tone Stretch", "Noise & Grain", "Procedural Texture" };
    return kNames[std::clamp(type, 0, kAdjCount - 1)];
 }
 
@@ -34,7 +34,8 @@ const char* Scene2DNode::AdjGroup(int type)
 {
    switch (type)
    {
-   case kAdjPixelate: case kAdjHalftone: case kAdjDither: case kAdjThreshold: case kAdjPosterize: return "Stylize";
+   case kAdjPixelate: case kAdjHalftone: case kAdjDither: case kAdjThreshold: case kAdjPosterize:
+   case kAdjNoise: case kAdjTexture: return "Stylize";
    case kAdjGradientMap: case kAdjHue: case kAdjSaturation: case kAdjColorBalance: case kAdjVibrance: case kAdjSelective:
    case kAdjMixer: case kAdjBlackWhite: case kAdjPhotoFilter: case kAdjLookup: case kAdjInvert: case kAdjWhiteBalance:
    case kAdjSplitToning: case kAdjRecolour: return "Colour";
@@ -46,18 +47,29 @@ int Scene2DNode::AdjParamCount(int type)
 {
    switch (type)
    {
-   case kAdjColorBalance: return 9;
-   case kAdjSelective: return 36;
-   case kAdjMixer: return 10;
-   case kAdjBlackWhite: return 6;
+   case kAdjHalftone: return 3;
+   case kAdjDither: return 1;
+   case kAdjThreshold: return 1;
+   case kAdjPosterize: return 1;
+   case kAdjBrightness: return 1;
+   case kAdjHue: return 3;
+   case kAdjExposure: return 2;
+   case kAdjLevels: return 3;
+   case kAdjCurves: return 1;
+   case kAdjColorBalance: return 10;
+   case kAdjSelective: return 37;
+   case kAdjMixer: return 13;
+   case kAdjBlackWhite: return 7;
    case kAdjPhotoFilter: return 1;
-   case kAdjShadowsHighlights: return 2;
+   case kAdjShadowsHighlights: return 3;
    case kAdjWhiteBalance: return 2;
    case kAdjSplitToning: return 5;
    case kAdjRecolour: return 3;
    case kAdjNormals: return 4;
    case kAdjToneCompression: return 3;
    case kAdjToneStretch: return 3;
+   case kAdjNoise: return 6;
+   case kAdjTexture: return 8;
    default: return 0;
    }
 }
@@ -65,14 +77,30 @@ int Scene2DNode::AdjParamCount(int type)
 std::vector<float> Scene2DNode::AdjParamDefault(int type)
 {
    std::vector<float> p((size_t)AdjParamCount(type), 0.0f);
-   if (type == kAdjMixer)
-      p = { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+   if (type == kAdjHalftone)
+      p = { 45.0f, 0.0f, 0.0f };   // angle (deg), shape (0 dot, 1 line, 2 diamond), colour halftone
+   else if (type == kAdjDither || type == kAdjThreshold || type == kAdjPosterize || type == kAdjCurves)
+      p = { 0.0f };
+   else if (type == kAdjBrightness)
+      p = { 0.0f };                // 0 = modern non-clipping curve, 1 = legacy linear
+   else if (type == kAdjHue)
+      p = { 0.0f, 0.0f, 0.0f };    // saturation delta, lightness delta, hue range (0 master, 1..6 R/Y/G/C/B/M)
+   else if (type == kAdjExposure)
+      p = { 0.0f, 1.0f };          // offset, gamma
+   else if (type == kAdjLevels)
+      p = { 1.0f, 1.0f, 1.0f };    // per-channel gamma R, G, B
+   else if (type == kAdjColorBalance)
+      p[9] = 1.0f;                 // preserve luminosity on by default
+   else if (type == kAdjSelective)
+      p[36] = 1.0f;                // relative mode on by default (Photoshop default)
+   else if (type == kAdjMixer)
+      p = { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0 };   // 3x3 + mono + constant R,G,B
    else if (type == kAdjBlackWhite)
-      p = { 0.4f, 0.6f, 0.4f, 0.6f, 0.2f, 0.8f };   // Photoshop's default weights
+      p = { 0.4f, 0.6f, 0.4f, 0.6f, 0.2f, 0.8f, 0.0f };   // Photoshop's default weights + tint toggle
    else if (type == kAdjPhotoFilter)
       p = { 1.0f };
    else if (type == kAdjShadowsHighlights)
-      p = { 0.35f, 0.0f };
+      p = { 0.35f, 0.0f, 0.0f };   // shadows, highlights, midtone contrast
    else if (type == kAdjSplitToning)
       p = { 0.0f, 0.0f, 0.0f, 0.0f, 0.5f };
    else if (type == kAdjRecolour)
@@ -83,22 +111,29 @@ std::vector<float> Scene2DNode::AdjParamDefault(int type)
       p = { 1.0f, 1.0f, 0.5f };   // exposure, gamma, colour
    else if (type == kAdjToneStretch)
       p = { 0.125f, 1.0f, 0.5f };   // stretch, gamma, compression
+   else if (type == kAdjNoise)
+      p = { 2.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.25f };   // mode (Film Grain), size, mono, blend (Soft), seed, clump
+   else if (type == kAdjTexture)
+      p = { 2.0f, 8.0f, 4.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f };   // pattern (fBm Clouds), scale, octaves, detail, warp, seed, blend (Overlay), invert
    return p;
 }
 
 float Scene2DNode::AdjDefault(int type)
 {
    static const float kDef[kAdjCount] = { 16.0f, 10.0f, 3.0f, 0.5f, 0.0f, 4.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-                                          1.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.25f, 30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+                                          1.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.25f, 30.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                                          0.25f, 0.5f };
    return kDef[std::clamp(type, 0, kAdjCount - 1)];
 }
 
 void Scene2DNode::AdjRange(int type, float& lo, float& hi)
 {
    static const float kLo[kAdjCount] = { 1.0f, 2.0f, 2.0f, 0.0f, 0.0f, 2.0f, -1.0f, -1.0f, -180.0f, 0.0f, -4.0f, 0.0f, 0.1f, 0.0f,
-                                         0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+                                         0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                         0.0f, 0.0f };
    static const float kHi[kAdjCount] = { 256.0f, 128.0f, 16.0f, 1.0f, 1.0f, 32.0f, 1.0f, 1.0f, 180.0f, 2.0f, 4.0f, 1.0f, 4.0f, 1.0f,
-                                         1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 200.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+                                         1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 200.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                                         1.0f, 1.0f };
    const int t = std::clamp(type, 0, kAdjCount - 1);
    lo = kLo[t];
    hi = kHi[t];
@@ -334,6 +369,7 @@ namespace
       o << " " << f.pattern << " " << f.material;
       for (float v : f.contour) o << " " << v;
       Scene2DNode::WriteStops(o, f.stops);
+      o << " " << f.blend << " " << f.style;
    }
    void ReadFxFields(std::istream& s, Scene2DNode::Fx& f)
    {
@@ -353,6 +389,9 @@ namespace
             for (int k = 0; k < 4; k++)
                f.contour[k] = std::clamp(ct[k], 0.0f, 1.0f);
          Scene2DNode::ReadStops(s, f.stops);
+         int bm = 0, st = 0;
+         if (s >> bm) f.blend = std::clamp(bm, 0, 6);
+         if (s >> st) f.style = std::clamp(st, 0, 3);
       }
    }
 }
@@ -573,6 +612,7 @@ namespace
             "uniform int uHasPMask;\n"
             "uniform sampler2D uVMask;\n"
             "uniform int uHasVMask;\n"
+            "uniform int uVMaskInv;\n"
             "uniform sampler2D uGeoDepth;\n"
             "uniform int uHasGeoDepth;\n"
             "uniform vec2 uGeoNF;\n"
@@ -644,7 +684,7 @@ namespace
            "      layer.a *= mix(1.0, clamp(v, 0.0, 1.0), uMaskDensity);\n"
            "   }\n"
            "   if (uHasPMask == 1) layer.a *= texture(uPMask, uv).r;\n"
-           "   if (uHasVMask == 1) layer.a *= texture(uVMask, uv).a;\n"
+           "   if (uHasVMask == 1) { float va = texture(uVMask, uv).a; if (uVMaskInv == 1) va = 1.0 - va; layer.a *= clamp(va, 0.0, 1.0); }\n"
            "   float amt = uOpacity * layer.a;\n"
            "   if (uBif == 1) amt *= bifW(uBifT, gLum(layer.rgb)) * bifW(uBifU, gLum(acc.rgb));\n"
            // Normal over an opaque picture: the hardware blends it (src alpha, one minus src alpha; alpha kept at 1).
@@ -704,15 +744,17 @@ namespace
          "uniform int uLinear;\n"
          "uniform int uHead;\n"   // headroom on: light above 1.0 survives the adjustment (Photoshop 32-bit)
          "uniform vec4 uLevels;\n"
-         "uniform float uLut[64];\n"
-         "uniform float uLutC[192];\n"
+         "uniform vec4 uLut4[64];\n"     // 256 taps packed 4 per vec4: Apple GL may spend a whole vector slot per float element
+         "uniform vec4 uLutC4[192];\n"
          "uniform vec4 uLvCh[3];\n"
-         "uniform float uP[36];\n"
+         "uniform vec4 uP4[10];\n"
+         "float uP[40];\n"
          "uniform sampler3D uCube;\n"
          "uniform float uCubeN;\n"
          "uniform sampler2D uBlurL;\n")
+         + std::string(Scene2DNode::kStopGlsl)
          + GLUtil::kSrgbGlsl +
-         "float Lut(float v) { float f = clamp(v, 0.0, 1.0) * 63.0; int i = min(int(f), 62); return mix(uLut[i], uLut[i + 1], f - float(i)); }\n"
+         "float Lut(float v) { float f = clamp(v, 0.0, 1.0) * 255.0; int i = min(int(f), 254); return mix(uLut4[i >> 2][i & 3], uLut4[(i + 1) >> 2][(i + 1) & 3], f - float(i)); }\n"
          "vec3 Disp(vec4 c) { return uLinear == 1 ? SrgbEncode(max(c.rgb, 0.0)) : c.rgb; }\n"
          "float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
          // Photoshop's Threshold and Gradient Map grey: 0.30 R + 0.59 G + 0.11 B
@@ -729,6 +771,29 @@ namespace
          "   float b = (a * u1 - pow(u1, c)) / pow(u1, q);\n"
          "   if (isinf(b) || isnan(b)) return pow(u, c);\n"
          "   return a * u - b * pow(u, q);\n"
+         "}\n"
+         // Photoshop's modern Brightness (PhotoCraft adjust/tone.rs Brightness, MIT/Apache-2.0, within ~1.5 levels of
+         // every measurement), b in -150..150: raised, a line of slope 1.375^(b/50) up to a knee at 126/255, then a
+         // Hermite (or, past ~+110, a power roll-off) to white; lowered, the inverse of the curve raised as much.
+         "float BrightRaised(float x, float s, float e, float x0, float al, bool herm) {\n"
+         "   const float y0 = 126.0 / 255.0;\n"
+         "   if (x <= x0) return min(y0, s * x);\n"
+         "   float h = max(1.0 - x0, 1e-6), t = clamp((x - x0) / h, 0.0, 1.0), t2 = t * t, t3 = t2 * t;\n"
+         "   float y = herm ? (2.0 * t3 - 3.0 * t2 + 1.0) * y0 + (t3 - 2.0 * t2 + t) * h * s + (-2.0 * t3 + 3.0 * t2) + (t3 - t2) * h * e\n"
+         "                  : 1.0 - (1.0 - y0) * pow(1.0 - t, al);\n"
+         "   return clamp(y, 0.0, 1.0);\n"
+         "}\n"
+         "float ModernBright(float v, float br) {\n"
+         "   if (br == 0.0) return v;\n"
+         "   float b = abs(br), s = pow(1.375, b / 50.0), e = 1.0 / (1.0 + 0.084 * b), x0 = min((126.0 / 255.0) / s, 1.0);\n"
+         "   float sec = (1.0 - 126.0 / 255.0) / max(1.0 - x0, 1e-6), al = s / sec, be = e / sec;\n"
+         "   bool herm = al * al + be * be <= 9.0;\n"
+         "   v = clamp(v, 0.0, 1.0);\n"
+         "   if (br > 0.0) return BrightRaised(v, s, e, x0, al, herm);\n"
+         "   if (v <= 0.0 || v >= 1.0) return v;\n"
+         "   float lo = 0.0, hi = 1.0;\n"
+         "   for (int i = 0; i < 24; i++) { float m = 0.5 * (lo + hi); if (BrightRaised(m, s, e, x0, al, herm) < v) lo = m; else hi = m; }\n"
+         "   return 0.5 * (lo + hi);\n"
          "}\n"
          // Photoshop's Vibrance on a linear pixel (PhotoCraft adjust/color.rs vibrance_lin, MIT/Apache-2.0): an HSV
          // change that keeps the hue; above 0 a fitted saturation boost, damped on reds and skin.
@@ -755,7 +820,7 @@ namespace
          "   return m2 + (c - mn) * k;\n"
          "}\n"
          "vec3 LevelsGamma(vec3 u, float g) { return vec3(LevelsGamma1(u.r, g), LevelsGamma1(u.g, g), LevelsGamma1(u.b, g)); }\n"
-         "float LutC(int ch, float v) { float f = clamp(v, 0.0, 1.0) * 63.0; int i = min(int(f), 62); return mix(uLutC[ch * 64 + i], uLutC[ch * 64 + i + 1], f - float(i)); }\n"
+         "float LutC(int ch, float v) { float f = clamp(v, 0.0, 1.0) * 255.0; int i = min(int(f), 254); int a = ch * 256 + i, b = a + 1; return mix(uLutC4[a >> 2][a & 3], uLutC4[b >> 2][b & 3], f - float(i)); }\n"
          "float Hue(vec3 c) { float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), d = mx - mn;\n"
          "   if (d < 1e-5) return 0.0;\n"
          "   float h = mx == c.r ? mod((c.g - c.b) / d, 6.0) : mx == c.g ? (c.b - c.r) / d + 2.0 : (c.r - c.g) / d + 4.0;\n"
@@ -767,37 +832,149 @@ namespace
          // Photoshop's soft light, the one Affinity's Split Toning matches
          "vec3 SoftPs(vec3 b, vec3 t) { return mix(2.0 * b * (1.0 - t) + sqrt(max(b, 0.0)) * (2.0 * t - 1.0), 2.0 * b * t + b * b * (1.0 - 2.0 * t), step(t, vec3(0.5))); }\n"
          "const int kBayer[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);\n"
+         "float AdjHash12(vec2 p) {\n"
+         "   vec3 p3 = fract(vec3(p.xyx) * 0.1031);\n"
+         "   p3 += dot(p3, p3.yzx + 33.33);\n"
+         "   return fract((p3.x + p3.y) * p3.z);\n"
+         "}\n"
+         "vec2 AdjHash22(vec2 p) {\n"
+         "   vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));\n"
+         "   p3 += dot(p3, p3.yzx + 33.33);\n"
+         "   return fract((p3.xx + p3.yz) * p3.zy);\n"
+         "}\n"
+         "float AdjGauss(vec2 p, float seed) {\n"
+         "   float u1 = max(AdjHash12(p + vec2(seed * 17.3, seed * 31.7)), 1e-4);\n"
+         "   float u2 = AdjHash12(p + vec2(seed * 59.1 + 13.7, seed * 11.3 + 7.1));\n"
+         "   return clamp(sqrt(-2.0 * log(u1)) * cos(6.2831853 * u2) * 0.34, -1.0, 1.0);\n"
+         "}\n"
+         "float AdjValueNoise(vec2 p) {\n"
+         "   vec2 i = floor(p), f = fract(p);\n"
+         "   vec2 u = f * f * (3.0 - 2.0 * f);\n"
+         "   return mix(mix(AdjHash12(i), AdjHash12(i + vec2(1.0, 0.0)), u.x),\n"
+         "              mix(AdjHash12(i + vec2(0.0, 1.0)), AdjHash12(i + vec2(1.0, 1.0)), u.x), u.y);\n"
+         "}\n"
+         "float AdjPerlin(vec2 p) {\n"
+         "   vec2 i = floor(p), f = fract(p), u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);\n"
+         "   vec2 g00 = normalize(AdjHash22(i) - 0.5 + vec2(1e-4));\n"
+         "   vec2 g10 = normalize(AdjHash22(i + vec2(1.0, 0.0)) - 0.5 + vec2(1e-4));\n"
+         "   vec2 g01 = normalize(AdjHash22(i + vec2(0.0, 1.0)) - 0.5 + vec2(1e-4));\n"
+         "   vec2 g11 = normalize(AdjHash22(i + vec2(1.0, 1.0)) - 0.5 + vec2(1e-4));\n"
+         "   float a = mix(dot(g00, f), dot(g10, f - vec2(1.0, 0.0)), u.x);\n"
+         "   float b = mix(dot(g01, f - vec2(0.0, 1.0)), dot(g11, f - vec2(1.0, 1.0)), u.x);\n"
+         "   return mix(a, b, u.y) * 0.7 + 0.5;\n"
+         "}\n"
+         "float AdjSimplex(vec2 p) {\n"
+         "   const float K1 = 0.366025404, K2 = 0.211324865;\n"
+         "   vec2 i = floor(p + (p.x + p.y) * K1);\n"
+         "   vec2 a = p - i + (i.x + i.y) * K2;\n"
+         "   vec2 o = step(a.yx, a.xy);\n"
+         "   vec2 b = a - o + K2, cc = a - 1.0 + 2.0 * K2;\n"
+         "   vec3 h = max(0.5 - vec3(dot(a, a), dot(b, b), dot(cc, cc)), 0.0);\n"
+         "   vec2 ga = normalize(AdjHash22(i) - 0.5 + vec2(1e-4));\n"
+         "   vec2 gb = normalize(AdjHash22(i + o) - 0.5 + vec2(1e-4));\n"
+         "   vec2 gc = normalize(AdjHash22(i + 1.0) - 0.5 + vec2(1e-4));\n"
+         "   vec3 n = h * h * h * h * vec3(dot(a, ga), dot(b, gb), dot(cc, gc));\n"
+         "   return dot(n, vec3(70.0)) * 0.5 + 0.5;\n"
+         "}\n"
+         "float AdjFbm(vec2 p, int oct, int mode) {\n"
+         "   float sum = 0.0, amp = 0.5, norm = 0.0, freq = 1.0;\n"
+         "   for (int k = 0; k < 8; k++) {\n"
+         "      if (k >= oct) break;\n"
+         "      float v = AdjPerlin(p * freq);\n"
+         "      if (mode == 1) { float r = 1.0 - abs(v * 2.0 - 1.0); v = r * r; }\n"
+         "      else if (mode == 2) v = abs(v * 2.0 - 1.0);\n"
+         "      sum += v * amp; norm += amp; amp *= 0.5; freq *= 2.03;\n"
+         "   }\n"
+         "   return sum / max(norm, 1e-4);\n"
+         "}\n"
+         "vec2 AdjVoronoi(vec2 p) {\n"
+         "   vec2 n = floor(p), f = fract(p);\n"
+         "   float d1 = 8.0, d2 = 8.0;\n"
+         "   for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {\n"
+         "      vec2 g = vec2(float(i), float(j));\n"
+         "      vec2 o = AdjHash22(n + g);\n"
+         "      float d = length(g + o - f);\n"
+         "      if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;\n"
+         "   }\n"
+         "   return vec2(d1, d2);\n"
+         "}\n"
          "void main() {\n"
+         "   for (int k = 0; k < 10; k++) { uP[k * 4] = uP4[k].x; uP[k * 4 + 1] = uP4[k].y; uP[k * 4 + 2] = uP4[k].z; uP[k * 4 + 3] = uP4[k].w; }\n"
          "   vec2 px = gl_FragCoord.xy;\n"
          "   vec4 src = texture(uSrc, vUv);\n"
          "   vec3 c = Disp(src);\n"
-         "   if (uType == 0) {\n"
+         "   if (uType == 0) {\n"   // pixelate: 4x4 box-averaged mosaic cell (no thin-line flicker)
          "      float b = max(1.0, uAmt);\n"
-         "      vec2 q = (floor(px / b) + 0.5) * b;\n"
-         "      c = Disp(texture(uSrc, clamp(q / uDoc, vec2(0.0), vec2(1.0))));\n"
-         "   } else if (uType == 1) {\n"
-         "      float cell = max(2.0, uAmt);\n"
-         "      mat2 r = mat2(0.7071, 0.7071, -0.7071, 0.7071);\n"
-         "      vec2 p = r * px;\n"
-         "      vec2 ctr = (floor(p / cell) + 0.5) * cell;\n"
-         "      vec2 cpx = transpose(r) * ctr;\n"
-         "      float L = Luma(Disp(texture(uSrc, clamp(cpx / uDoc, vec2(0.0), vec2(1.0)))));\n"
-         "      float rad = sqrt(clamp(1.0 - L, 0.0, 1.0)) * cell * 0.7071;\n"
-         "      float d = length(p - ctr);\n"
-         "      c = vec3(smoothstep(rad - 0.75, rad + 0.75, d));\n"
-         "   } else if (uType == 2) {\n"
+         "      vec2 base = floor(px / b) * b;\n"
+         "      vec3 acc = vec3(0.0);\n"
+         "      for (int jy = 0; jy < 4; jy++) for (int jx = 0; jx < 4; jx++) {\n"
+         "         vec2 q = base + (vec2(float(jx), float(jy)) + 0.5) * (b * 0.25);\n"
+         "         acc += Disp(texture(uSrc, clamp(q / uDoc, vec2(0.0), vec2(1.0))));\n"
+         "      }\n"
+         "      c = acc * 0.0625;\n"
+         "   } else if (uType == 1) {\n"   // halftone: custom angle, Dot/Line/Diamond, mono or CMY colour screens
+         "      float cell = max(2.0, uAmt), ang0 = radians(uP[0]);\n"
+         "      int shape = int(clamp(uP[1] + 0.5, 0.0, 2.0));\n"
+         "      if (uP[2] > 0.5) {\n"
+         "         vec3 cmy = vec3(0.0);\n"
+         "         float angs[3] = float[3](ang0 + 0.2618, ang0 + 1.3090, ang0);\n"
+         "         for (int ch = 0; ch < 3; ch++) {\n"
+         "            float ca = cos(angs[ch]), sa = sin(angs[ch]);\n"
+         "            mat2 r = mat2(ca, sa, -sa, ca);\n"
+         "            vec2 p = r * px, ctr = (floor(p / cell) + 0.5) * cell, cpx = transpose(r) * ctr;\n"
+         "            vec3 sc = Disp(texture(uSrc, clamp(cpx / uDoc, vec2(0.0), vec2(1.0))));\n"
+         "            float ink = clamp(1.0 - sc[ch], 0.0, 1.0);\n"
+         "            vec2 d = (p - ctr) / (cell * 0.5);\n"
+         "            float dist = shape == 1 ? abs(d.y) : (shape == 2 ? (abs(d.x) + abs(d.y)) * 0.7071 : length(d));\n"
+         "            float rad = sqrt(ink) * 1.15;\n"
+         "            cmy[ch] = 1.0 - smoothstep(rad - 0.12, rad + 0.12, dist);\n"
+         "         }\n"
+         "         c = clamp(1.0 - cmy, 0.0, 1.0);\n"
+         "      } else {\n"
+         "         float ca = cos(ang0), sa = sin(ang0);\n"
+         "         mat2 r = mat2(ca, sa, -sa, ca);\n"
+         "         vec2 p = r * px, ctr = (floor(p / cell) + 0.5) * cell, cpx = transpose(r) * ctr;\n"
+         "         float L = Luma(Disp(texture(uSrc, clamp(cpx / uDoc, vec2(0.0), vec2(1.0)))));\n"
+         "         vec2 d = (p - ctr) / (cell * 0.5);\n"
+         "         float dist = shape == 1 ? abs(d.y) : (shape == 2 ? (abs(d.x) + abs(d.y)) * 0.7071 : length(d));\n"
+         "         float rad = sqrt(clamp(1.0 - L, 0.0, 1.0)) * 1.15;\n"
+         "         c = vec3(smoothstep(rad - 0.12, rad + 0.12, dist));\n"
+         "      }\n"
+         "   } else if (uType == 2) {\n"   // dither: 0=4x4 Bayer, 1=8x8 Bayer, 2=Blue/IGN, 3=Random
          "      float n = max(2.0, floor(uAmt + 0.5));\n"
-         "      ivec2 ip = ivec2(mod(px, 4.0));\n"
-         "      float t = (float(kBayer[ip.y * 4 + ip.x]) + 0.5) / 16.0;\n"
+         "      int dm = int(clamp(uP[0] + 0.5, 0.0, 3.0));\n"
+         "      float t = 0.5;\n"
+         "      if (dm == 0) {\n"
+         "         ivec2 ip = ivec2(mod(px, 4.0));\n"
+         "         t = (float(kBayer[ip.y * 4 + ip.x]) + 0.5) / 16.0;\n"
+         "      } else if (dm == 1) {\n"
+         "         ivec2 ip0 = ivec2(mod(px, 4.0)), ip1 = ivec2(mod(floor(px * 0.25), 2.0));\n"
+         "         int q = (ip1.y * 2 + ip1.x); int qv = q == 0 ? 0 : (q == 1 ? 2 : (q == 2 ? 3 : 1));\n"
+         "         t = (float(kBayer[ip0.y * 4 + ip0.x] * 4 + qv) + 0.5) / 64.0;\n"
+         "      } else if (dm == 2) {\n"
+         "         t = fract(52.9829189 * fract(dot(floor(px), vec2(0.06711056, 0.00583715))));\n"
+         "      } else {\n"
+         "         t = AdjHash12(floor(px));\n"
+         "      }\n"
          "      c = floor(c * (n - 1.0) + t) / (n - 1.0);\n"
-         "   } else if (uType == 3) {\n"
-         "      c = vec3(step(uAmt, LumaPs(c)));\n"
-         "   } else if (uType == 5) {\n"
+         "   } else if (uType == 3) {\n"   // threshold (+ optional smooth anti-aliased softness)
+         "      float lum = LumaPs(c), soft = max(uP[0], 0.0) * 0.25;\n"
+         "      c = vec3(soft > 1e-4 ? smoothstep(uAmt - soft, uAmt + soft, lum) : step(uAmt, lum));\n"
+         "   } else if (uType == 5) {\n"   // posterize: 0=RGB, 1=Luma-only, 2=Dithered
          "      float n = max(2.0, floor(uAmt + 0.5));\n"
-         "      c = floor(c * n) / (n - 1.0);\n"
-         "      c = min(c, vec3(1.0));\n"
-         "   } else if (uType == 6) {\n"
-         "      c = c + uAmt;\n"
+         "      int pm = int(clamp(uP[0] + 0.5, 0.0, 2.0));\n"
+         "      if (pm == 1) {\n"
+         "         float l0 = max(Luma(c), 1e-5), l1 = min(floor(l0 * n) / (n - 1.0), 1.0);\n"
+         "         c = clamp(c * (l1 / l0), 0.0, 1.0);\n"
+         "      } else if (pm == 2) {\n"
+         "         float ign = fract(52.9829189 * fract(dot(floor(px), vec2(0.06711056, 0.00583715))));\n"
+         "         c = clamp(floor(c * (n - 1.0) + ign) / (n - 1.0), 0.0, 1.0);\n"
+         "      } else {\n"
+         "         c = min(floor(c * n) / (n - 1.0), vec3(1.0));\n"
+         "      }\n"
+         "   } else if (uType == 6) {\n"   // brightness: modern non-clipping midtone curve (blacks/whites anchored), or legacy linear
+         "      if (uP[0] > 0.5) c = c + uAmt;\n"
+         "      else c = vec3(ModernBright(c.r, uAmt * 150.0), ModernBright(c.g, uAmt * 150.0), ModernBright(c.b, uAmt * 150.0));\n"
          "   } else if (uType == 7) {\n"
          // Photoshop's modern Contrast (PhotoCraft adjust/tone.rs modern_contrast, MIT/Apache-2.0, measured within
          // 0.5/255): a symmetric Hermite S-curve through 0, 0.5 and 1, end slope 1 - c/128, centre slope 1 + c/128.
@@ -808,36 +985,67 @@ namespace
          "      vec3 h = ed * 0.5 * (t3 - 2.0 * t2 + t) + (3.0 * t2 - 2.0 * t3) * 0.5 + md * 0.5 * (t3 - t2);\n"
          "      c = mix(1.0 - h, h, lo);\n"
          "   } else if (uType == 8) {\n"
-         // HSL hue shift: lightness and saturation (so max and min) stay, as in Photoshop
+         // HSL Hue / Saturation / Lightness with optional per-hue-family targeting (0 Master, 1..6 R/Y/G/C/B/M)
          "      float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));\n"
-         "      c = mn + (mx - mn) * HueRgb(Hue(c) * 360.0 + uAmt);\n"
+         "      int rng = int(clamp(uP[2] + 0.5, 0.0, 6.0));\n"
+         "      float hw = rng == 0 ? 1.0 : HueW(Hue(c), rng - 1) * smoothstep(0.02, 0.15, mx - mn);\n"
+         "      vec3 hOut = mn + (mx - mn) * HueRgb(Hue(c) * 360.0 + uAmt);\n"
+         "      hOut = mix(vec3(Luma(hOut)), hOut, clamp(1.0 + uP[0], 0.0, 2.0));\n"
+         "      hOut = uP[1] >= 0.0 ? mix(hOut, vec3(1.0), uP[1]) : mix(hOut, vec3(0.0), -uP[1]);\n"
+         "      if (uHead == 1) {\n"
+         // 32-bit (PhotoCraft adjust/color.rs hue_saturation_in + hdr_saturation_factor, MIT/Apache-2.0): Lightness
+         // first, then the hue turned and the chroma scaled about the HSL lightness by Photoshop's measured factor,
+         // unclipped, so colours at or above 1 keep their hue.
+         "         float l = clamp(uP[1], -1.0, 1.0), s = clamp(uP[0], -1.0, 1.0);\n"
+         "         vec3 v = uLinear == 1 ? max(src.rgb, 0.0) : c;\n"   // a 32-bit document's own (linear) values
+         "         vec3 lc = l > 0.0 ? v + (1.0 - v) * l : v * (1.0 + l);\n"
+         "         float lmx = max(lc.r, max(lc.g, lc.b)), lmn = min(lc.r, min(lc.g, lc.b)), ll = (lmx + lmn) * 0.5;\n"
+         "         float f = s <= 0.0 ? 1.0 - floor(-s * 256.0 + 1e-4) / 256.0\n"
+         "                            : min(floor(65280.0 / max(255.0 - floor(s * 254.0 + 1e-4), 1.0)), 32767.0) / 256.0;\n"
+         "         float d = (lmx - lmn) * f;\n"
+         "         hOut = ll - d * 0.5 + d * HueRgb(Hue(lc) * 360.0 + uAmt);\n"
+         "         c = mix(c, uLinear == 1 ? SrgbEncode(max(hOut, 0.0)) : hOut, hw);\n"
+         "      } else\n"
+         "         c = mix(c, clamp(hOut, 0.0, 1.0), hw);\n"
          "   } else if (uType == 9) {\n"
          "      c = mix(vec3(Luma(c)), c, uAmt);\n"
-         "   } else if (uType == 10) {\n"
+         "   } else if (uType == 10) {\n"   // exposure + offset + gamma correction in linear light
          "      vec3 l = uLinear == 1 ? max(src.rgb, 0.0) : SrgbDecode(c);\n"
-         "      l *= exp2(uAmt);\n"
+         "      l = max(l * exp2(uAmt) + uP[0], 0.0);\n"
+         "      l = pow(l, vec3(1.0 / max(uP[1], 0.05)));\n"
          "      c = SrgbEncode(uHead == 1 ? l : clamp(l, 0.0, 1.0));\n"
          "   } else if (uType == 11) {\n"
          "      c = mix(c, 1.0 - c, uAmt);\n"
          "   } else if (uType == 12) {\n"
-         "      c = clamp((c - uLevels.x) / max(uLevels.y - uLevels.x, 1e-3), 0.0, 1.0);\n"
+         "      c = (c - uLevels.x) / max(uLevels.y - uLevels.x, 1e-3);\n"
+         "      c = (uHead == 1 ? max(c, 0.0) : clamp(c, 0.0, 1.0));\n"
          "      c = LevelsGamma(c, max(uAmt, 0.01));\n"
          "      c = mix(vec3(uLevels.z), vec3(uLevels.w), c);\n"
          "      for (int i = 0; i < 3; i++) {\n"
          "         vec4 L = uLvCh[i];\n"
-         "         c[i] = mix(L.z, L.w, clamp((c[i] - L.x) / max(L.y - L.x, 1e-3), 0.0, 1.0));\n"
+         "         float ci = (c[i] - L.x) / max(L.y - L.x, 1e-3);\n"
+         "         ci = (uHead == 1 ? max(ci, 0.0) : clamp(ci, 0.0, 1.0));\n"
+         "         ci = LevelsGamma1(ci, max(uP[i], 0.01));\n"
+         "         c[i] = mix(L.z, L.w, ci);\n"
          "      }\n"
          "   } else if (uType == 13) {\n"
-         "      vec3 m = vec3(Lut(c.r), Lut(c.g), Lut(c.b));\n"
-         "      m = vec3(LutC(0, m.r), LutC(1, m.g), LutC(2, m.b));\n"
+         "      vec3 m;\n"
+         "      if (uP[0] > 0.5) {\n"
+         "         float l0 = max(Luma(c), 1e-5), l1 = Lut(l0);\n"
+         "         m = clamp(c * (l1 / l0), 0.0, 1.0);\n"
+         "      } else {\n"
+         "         m = vec3(Lut(c.r), Lut(c.g), Lut(c.b));\n"
+         "         m = vec3(LutC(0, m.r), LutC(1, m.g), LutC(2, m.b));\n"
+         "      }\n"
          "      c = mix(c, m, uAmt);\n"
          "   } else if (uType == 14) {\n"   // colour balance: Photoshop's, Preserve Luminosity on (PhotoCraft color_balance_channel):
          "      vec3 S = vec3(uP[0], uP[1], uP[2]) * 100.0, M = vec3(uP[3], uP[4], uP[5]) * 100.0, T = vec3(uP[6], uP[7], uP[8]) * 100.0;\n"
          "      float smax = max(S.r, max(S.g, S.b)), tmin = min(T.r, min(T.g, T.b)), mmid = (max(M.r, max(M.g, M.b)) + min(M.r, min(M.g, M.b))) * 0.5;\n"
          "      vec3 o = c;\n"   // the three tones fold into one Levels per channel: black, white, midtone gamma
+         "      bool pl = uP[9] > 0.5;\n"   // Preserve Luminosity off: a slider moves only its own channel
          "      for (int i = 0; i < 3; i++) {\n"
-         "         float b = (smax - S[i]) / 255.0, w = 1.0 - (T[i] - tmin) / 255.0;\n"
-         "         float g = exp2((M[i] - mmid) / 100.0), e = 1.0 / max(g, 0.01), v = clamp(c[i], 0.0, 1.0);\n"
+         "         float b = (pl ? smax - S[i] : max(-S[i], 0.0)) / 255.0, w = 1.0 - (pl ? T[i] - tmin : max(T[i], 0.0)) / 255.0;\n"
+         "         float g = exp2((pl ? M[i] - mmid : M[i] + (S[i] + T[i]) * 0.5) / 100.0), e = 1.0 / max(g, 0.01), v = clamp(c[i], 0.0, 1.0);\n"
          "         if (v >= w) { o[i] = 1.0; continue; }\n"
          "         if (v <= b) { o[i] = 0.0; continue; }\n"
          "         float u = (v - b) / (w - b);\n"
@@ -863,20 +1071,25 @@ namespace
          "      vec3 cmy = 1.0 - c;\n"
          "      vec3 d = vec3(0.0); float dk = 0.0;\n"
          "      for (int k = 0; k < 9; k++) { d += w[k] * vec3(uP[k * 4], uP[k * 4 + 1], uP[k * 4 + 2]); dk += w[k] * uP[k * 4 + 3]; }\n"
-         "      cmy = clamp(cmy + d * 0.5 * uAmt + dk * 0.5 * uAmt, 0.0, 1.0);\n"
+         "      vec3 delta = (d + vec3(dk)) * 0.5 * uAmt;\n"
+         "      if (uP[36] > 0.5) delta *= mix(cmy, 1.0 - cmy, step(vec3(0.0), delta));\n"
+         "      cmy = clamp(cmy + delta, 0.0, 1.0);\n"
          "      c = 1.0 - cmy;\n"
-         "   } else if (uType == 17) {\n"   // channel mixer
-         "      vec3 m = vec3(dot(c, vec3(uP[0], uP[1], uP[2])), dot(c, vec3(uP[3], uP[4], uP[5])), dot(c, vec3(uP[6], uP[7], uP[8])));\n"
+         "   } else if (uType == 17) {\n"   // channel mixer (+ per-channel constant offset)
+         "      vec3 m = vec3(dot(c, vec3(uP[0], uP[1], uP[2])) + uP[10],\n"
+         "                    dot(c, vec3(uP[3], uP[4], uP[5])) + uP[11],\n"
+         "                    dot(c, vec3(uP[6], uP[7], uP[8])) + uP[12]);\n"
          "      if (uP[9] > 0.5) m = vec3(m.r);\n"
          "      c = mix(c, m, uAmt);\n"
-         "   } else if (uType == 18) {\n"   // black & white: each hue family's weight sets how light it turns
-         // Photoshop's grey (PhotoCraft black_white_gray): smallest channel + weighted secondary (mid - min) and
-         // primary (max - mid) parts; weights reds, yellows, greens, cyans, blues, magentas.
+         "   } else if (uType == 18) {\n"   // black & white: each hue family's weight sets how light it turns + optional tint
          "      float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), md = c.r + c.g + c.b - mx - mn;\n"
          "      int pr = (c.r >= c.g && c.r >= c.b) ? 0 : (c.g >= c.b ? 2 : 4);\n"
          "      int se = (c.b <= c.r && c.b <= c.g) ? 1 : (c.r <= c.g ? 3 : 5);\n"
          "      float g = mn + (md - mn) * uP[se] + (mx - md) * uP[pr];\n"
-         "      c = mix(c, vec3(g), uAmt);\n"
+         "      g = (uHead == 1 ? max(g, 0.0) : clamp(g, 0.0, 1.0));\n"
+         "      vec3 bw = vec3(g);\n"
+         "      if (uP[6] > 0.5) bw = mix(bw, SoftPs(bw, uColA.rgb), 0.75);\n"
+         "      c = mix(c, bw, uAmt);\n"
          "   } else if (uType == 19) {\n"   // photo filter: through a coloured glass, lightness kept if asked
          // Photoshop's (PhotoCraft photo_filter_matrix): the pixel's D50 XYZ times the filter's, relative to white,
          // in linear light; Preserve Luminosity puts the encoded luminosity back as the Luminosity blend does.
@@ -892,12 +1105,18 @@ namespace
          "         if (hi > 1.0) n = L + (n - L) * (1.0 - L) / max(hi - L, 1e-6);\n"
          "      }\n"
          "      c = n;\n"
-         "   } else if (uType == 20) {\n"   // shadows / highlights: lift what sits in dark surroundings, calm the bright
-         "      float b = texture(uBlurL, vUv).r;\n"
-         "      float lift = uP[0] * (1.0 - smoothstep(0.0, 0.5, b));\n"
-         "      float cut = uP[1] * smoothstep(0.5, 1.0, b);\n"
-         "      c = c * (1.0 + 2.0 * lift);\n"
-         "      c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * (1.0 + 2.0 * cut);\n"
+         "   } else if (uType == 20) {\n"   // shadows / highlights: edge-aware bilateral luma lift/cut + midtone contrast
+         "      float b = texture(uBlurL, vUv).r, l0 = Luma(c);\n"
+         "      float edgeW = exp(-abs(l0 - b) * 5.0);\n"
+         "      float eb = mix(l0, b, edgeW);\n"
+         "      float lift = uP[0] * (1.0 - smoothstep(0.0, 0.5, eb));\n"
+         "      float cut = uP[1] * smoothstep(0.5, 1.0, eb);\n"
+         "      c = c + lift * (1.0 - c) * c * 2.2;\n"
+         "      c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * (1.0 + 1.8 * cut);\n"
+         "      if (abs(uP[2]) > 1e-3) {\n"
+         "         vec3 v = clamp(c, 0.0, 1.0);\n"
+         "         c = clamp(v + uP[2] * 0.4 * (v - 0.5) * 4.0 * v * (1.0 - v), 0.0, 1.0);\n"
+         "      }\n"
          "   } else if (uType == 21) {\n"   // colour lookup (.cube)
          "      if (uCubeN > 1.0) {\n"
          "         vec3 q = clamp(c, 0.0, 1.0) * (uCubeN - 1.0) / uCubeN + 0.5 / uCubeN;\n"
@@ -940,8 +1159,88 @@ namespace
          "      vec3 u = pow(max(c * uP[0], 0.0), vec3(pw));\n"
          "      vec3 h = (204.0 - 73.0 * k) / 255.0 * u / (u + ap);\n"
          "      c = mix(c, pow(clamp(h, 0.0, 1.0), vec3(max(uP[1], 0.01))), uAmt);\n"
+         "   } else if (uType == 28) {\n"   // noise & grain: Gaussian, Uniform, Film Grain, Salt & Pepper, Fine Blue
+         "      int mode = int(clamp(uP[0] + 0.5, 0.0, 4.0));\n"
+         "      float sz = max(uP[1], 1.0), mono = uP[2], bmode = uP[3], seed = uP[4], clump = clamp(uP[5], 0.0, 1.0);\n"
+         "      vec2 gp = floor(px / sz);\n"
+         "      vec3 n = vec3(0.0);\n"
+         "      if (mode == 0) {\n"
+         "         n = mono > 0.5 ? vec3(AdjGauss(gp, seed)) : vec3(AdjGauss(gp, seed), AdjGauss(gp, seed + 17.1), AdjGauss(gp, seed + 41.3));\n"
+         "      } else if (mode == 1) {\n"
+         "         n = mono > 0.5 ? vec3(AdjHash12(gp + seed) * 2.0 - 1.0)\n"
+         "                        : vec3(AdjHash12(gp + seed), AdjHash12(gp + seed + 17.1), AdjHash12(gp + seed + 41.3)) * 2.0 - 1.0;\n"
+         "      } else if (mode == 2) {\n"
+         "         float fg = mono > 0.5 ? AdjGauss(gp, seed) : 0.0;\n"
+         "         vec2 gp2 = gp / 2.2;\n"
+         "         float cg = AdjValueNoise(gp2 + seed * 7.3) * 2.0 - 1.0;\n"
+         "         vec3 gvec = mono > 0.5 ? vec3(fg) : vec3(AdjGauss(gp, seed), AdjGauss(gp, seed + 17.1), AdjGauss(gp, seed + 41.3));\n"
+         "         n = mix(gvec, gvec * 0.65 + vec3(cg) * 0.55, clump);\n"
+         "         float lum = clamp(Luma(c), 0.0, 1.0);\n"
+         "         n *= mix(0.4, 1.0, 4.0 * lum * (1.0 - lum));\n"
+         "      } else if (mode == 3) {\n"
+         "         float dens = mix(0.02, 0.45, clamp(uAmt, 0.0, 1.0));\n"
+         "         float h = AdjHash12(gp + seed);\n"
+         "         if (h < dens * 0.5) n = vec3(-1.0); else if (h < dens) n = vec3(1.0); else n = vec3(0.0);\n"
+         "         if (mono < 0.5 && h < dens) n *= vec3(AdjHash12(gp + seed + 3.0), AdjHash12(gp + seed + 9.0), AdjHash12(gp + seed + 27.0)) * 1.4;\n"
+         "      } else {\n"
+         "         float c0 = AdjHash12(gp + seed);\n"
+         "         float nb = 0.25 * (AdjHash12(gp + vec2(1.0, 0.0) + seed) + AdjHash12(gp - vec2(1.0, 0.0) + seed)\n"
+         "                          + AdjHash12(gp + vec2(0.0, 1.0) + seed) + AdjHash12(gp - vec2(0.0, 1.0) + seed));\n"
+         "         float b = clamp((c0 - nb) * 1.35, -1.0, 1.0);\n"
+         "         n = mono > 0.5 ? vec3(b) : vec3(b, clamp((AdjHash12(gp + seed + 13.0) - nb) * 1.35, -1.0, 1.0),\n"
+         "                                            clamp((AdjHash12(gp + seed + 29.0) - nb) * 1.35, -1.0, 1.0));\n"
+         "      }\n"
+         "      if (mode == 3) {\n"
+         "         vec3 sp = mix(c, step(0.0, n), step(0.01, abs(n)));\n"
+         "         c = mix(c, sp, clamp(uAmt, 0.0, 1.0));\n"
+         "      } else if (bmode < 0.5) {\n"
+         "         c = clamp(c + n * uAmt * 0.45 * (1.0 - abs(2.0 * c - 1.0) * 0.45), 0.0, 1.0);\n"
+         "      } else if (bmode < 1.5) {\n"
+         "         c = clamp(c + n * uAmt * 0.5, 0.0, 1.0);\n"
+         "      } else {\n"
+         "         c = clamp(c * (1.0 + n * uAmt * 0.75), 0.0, 1.0);\n"
+         "      }\n"
+         "   } else if (uType == 29) {\n"   // procedural texture: Perlin, Simplex, fBm Clouds, Ridged Marble, Turbulence, Voronoi, Worley Cracks, Weave, Scanlines
+         "      int pat = int(clamp(uP[0] + 0.5, 0.0, 8.0));\n"
+         "      float scale = max(uP[1], 0.25), warp = max(uP[4], 0.0), seed = uP[5];\n"
+         "      int oct = int(clamp(uP[2] + 0.5, 1.0, 8.0)), bmode = int(clamp(uP[6] + 0.5, 0.0, 4.0));\n"
+         "      float detail = max(uP[3], 0.05), inv = uP[7];\n"
+         "      vec2 asp = uDoc / max(min(uDoc.x, uDoc.y), 1.0);\n"
+         "      vec2 tp = (vUv * asp) * scale + vec2(seed * 3.7, seed * 7.1);\n"
+         "      if (warp > 0.001) {\n"
+         "         vec2 wv = vec2(AdjFbm(tp + vec2(1.7, 9.2), min(oct, 4), 0) - 0.5,\n"
+         "                        AdjFbm(tp + vec2(8.3, 2.8), min(oct, 4), 0) - 0.5);\n"
+         "         tp += wv * warp * 2.5;\n"
+         "      }\n"
+         "      float tv = 0.5;\n"
+         "      if (pat == 0) tv = AdjPerlin(tp);\n"
+         "      else if (pat == 1) tv = AdjSimplex(tp);\n"
+         "      else if (pat == 2) tv = AdjFbm(tp, oct, 0);\n"
+         "      else if (pat == 3) tv = AdjFbm(tp, oct, 1);\n"
+         "      else if (pat == 4) tv = AdjFbm(tp, oct, 2);\n"
+         "      else if (pat == 5) tv = clamp(AdjVoronoi(tp).x, 0.0, 1.0);\n"
+         "      else if (pat == 6) { vec2 v = AdjVoronoi(tp); tv = clamp(1.0 - (v.y - v.x) * 2.5, 0.0, 1.0); }\n"
+         "      else if (pat == 7) {\n"
+         "         float wx = 0.5 + 0.5 * sin(tp.x * 6.2831853 + 0.4 * AdjPerlin(tp * 0.5));\n"
+         "         float wy = 0.5 + 0.5 * sin(tp.y * 6.2831853 + 0.4 * AdjPerlin(tp * 0.5 + 9.1));\n"
+         "         float fib = AdjFbm(tp * 2.0, min(oct, 4), 0);\n"
+         "         tv = clamp(mix(wx, wy, 0.5 + 0.35 * sin((tp.x + tp.y) * 3.14159)) * 0.7 + fib * 0.3, 0.0, 1.0);\n"
+         "      } else {\n"
+         "         float s0 = 0.5 + 0.5 * sin(tp.y * 6.2831853);\n"
+         "         float s1 = 0.5 + 0.5 * cos(tp.x * 6.2831853 * 0.5);\n"
+         "         tv = clamp(mix(s0, s0 * s1, clamp(warp * 0.5 + 0.15, 0.0, 1.0)), 0.0, 1.0);\n"
+         "      }\n"
+         "      tv = clamp((tv - 0.5) * detail + 0.5, 0.0, 1.0);\n"
+         "      if (inv > 0.5) tv = 1.0 - tv;\n"
+         "      vec3 tc = uMap == 1 ? mix(uColA.rgb, uColB.rgb, tv) : vec3(tv);\n"
+         "      vec3 outc = tc;\n"
+         "      if (bmode == 1) outc = mix(2.0 * c * tc, 1.0 - 2.0 * (1.0 - c) * (1.0 - tc), step(vec3(0.5), c));\n"
+         "      else if (bmode == 2) outc = c * tc;\n"
+         "      else if (bmode == 3) outc = 1.0 - (1.0 - c) * (1.0 - tc);\n"
+         "      else if (bmode == 4) outc = SoftPs(c, tc);\n"
+         "      c = mix(c, outc, clamp(uAmt, 0.0, 1.0));\n"
          "   }\n"
-         "   if (uType == 4 || uMap == 1) c = mix(uColA.rgb, uColB.rgb, clamp(LumaPs(c), 0.0, 1.0));\n"
+         "   if (uType == 4 || (uMap == 1 && uType != 29)) c = gradAt(clamp(LumaPs(c), 0.0, 1.0), uColA, uColB).rgb;\n"
          "   c = uHead == 1 && uLinear == 1 ? max(c, 0.0) : clamp(c, 0.0, 1.0);\n"
          "   fragColor = vec4(uLinear == 1 ? SrgbDecode(c) : c, src.a);\n"
          "}\n";
@@ -1858,7 +2157,7 @@ void Scene2DNode::Serialize()
       }
       if (l.hasVMask)
       {
-         o << "vmask " << l.id << " " << +l.vmaskOn << "\n";
+         o << "vmask " << l.id << " " << +l.vmaskOn << " " << +l.vmaskInvert << " " << l.vmaskFeather << "\n";
          for (const Shape& sh : l.vmask)
             shapeLine("vshape", sh);
       }
@@ -2223,8 +2522,13 @@ void Scene2DNode::Parse()
          }
          else if (key == "vmask")
          {
-            int on = 1;
+            int on = 1, inv = 0;
+            float feather = 0.0f;
             s >> on;
+            if (s >> inv)
+               l->vmaskInvert = inv != 0;
+            if (s >> feather)
+               l->vmaskFeather = std::clamp(feather, 0.0f, 128.0f);
             l->hasVMask = true;
             l->vmaskOn = on != 0;
          }
@@ -2464,6 +2768,7 @@ void Scene2DNode::Pass(int depth, const PassArgs& a)
       glBindTexture(GL_TEXTURE_2D, a.vmask);
       glUniform1i(GLUtil::UniformLoc(prog, "uVMask"), 4);
       glUniform1i(GLUtil::UniformLoc(prog, "uHasVMask"), a.vmask != 0 ? 1 : 0);
+      glUniform1i(GLUtil::UniformLoc(prog, "uVMaskInv"), a.vmaskInvert ? 1 : 0);
       glActiveTexture(GL_TEXTURE0);
       glUniform2f(GLUtil::UniformLoc(prog, "uDoc"), (float)mDoc.w, (float)mDoc.h);
       glUniform3f(GLUtil::UniformLoc(prog, "uInvA"), a.inv[0], a.inv[1], a.inv[2]);
@@ -2946,7 +3251,10 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
       }
       if (l.hasVMask && l.vmaskOn && !l.vmask.empty())
          if (Raster* r = SyncRaster(mVMasks, l, true))
+         {
             a.vmask = r->tex;
+            a.vmaskInvert = l.vmaskInvert;
+         }
       Pass(depth, a);
       return;
    }
@@ -3049,7 +3357,10 @@ void Scene2DNode::DrawLayer(const Layer& l, int depth, int frameId, float opacit
    }
    if (l.hasVMask && l.vmaskOn && !l.vmask.empty())
       if (Raster* r = SyncRaster(mVMasks, l, true))
+      {
          a.vmask = r->tex;
+         a.vmaskInvert = l.vmaskInvert;
+      }
    if (!LayerRect(h, a))
       return;
    Pass(depth, a);
@@ -3160,21 +3471,22 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       glUniform1i(GLUtil::UniformLoc(prog, "uLinear"), mDoc.linear ? 1 : 0);
       glUniform1i(GLUtil::UniformLoc(prog, "uHead"), mDoc.headroom ? 1 : 0);
       glUniform4fv(GLUtil::UniformLoc(prog, "uLevels"), 1, l.levels);
-      float lut[64];
-      CurveLut(l.curve, lut, 64);
-      glUniform1fv(GLUtil::UniformLoc(prog, "uLut"), 64, lut);
-      float lutC[192];
+      float lut[256];
+      CurveLut(l.curve, lut, 256);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uLut4"), 64, lut);
+      float lutC[768];
       for (int ch = 0; ch < 3; ch++)
-         CurveLut(l.curveCh[ch], lutC + ch * 64, 64);
-      glUniform1fv(GLUtil::UniformLoc(prog, "uLutC"), 192, lutC);
+         CurveLut(l.curveCh[ch], lutC + ch * 256, 256);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uLutC4"), 192, lutC);
       glUniform4fv(GLUtil::UniformLoc(prog, "uLvCh"), 3, &l.levelsCh[0][0]);
-      float p[36] = {};
+      float p[40] = {};
       const std::vector<float> def = AdjParamDefault(l.adjType);
-      for (size_t i = 0; i < def.size() && i < 36; i++)
+      for (size_t i = 0; i < def.size() && i < 40; i++)
          p[i] = i < l.adjP.size() ? l.adjP[i] : def[i];
       if (l.adjType == kAdjWhiteBalance)
          WhiteBalanceMatrix(p[0], p[1], p + 2);
-      glUniform1fv(GLUtil::UniformLoc(prog, "uP"), 36, p);
+      glUniform4fv(GLUtil::UniformLoc(prog, "uP4"), 10, p);
+      StopUniforms(prog, l.stops);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_3D, cube);
       glUniform1i(GLUtil::UniformLoc(prog, "uCube"), 1);

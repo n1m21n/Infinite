@@ -101,6 +101,64 @@ const std::vector<FieldPixelNode::Preset>& FieldPixelNode::Presets()
 {
    static const std::vector<Preset> kPresets = {
       { "Default (UV Gradient)", "col = vec3(uv.x, uv.y, 0.5);" },
+      { "Film Grain (Formula)",
+        "# Organic luminance-weighted film grain overlay.\n"
+        "input pixel image img;\n"
+        "param float amount = 0.22 [0.0, 1.0];\n"
+        "param float size = 1.5 [1.0, 8.0];\n"
+        "param float speed = 0.0 [0.0, 24.0];\n"
+        "cell = floor(vec2(uv.x * res.x, uv.y * res.y) / max(size, 1.0));\n"
+        "zt = floor(t * speed) * 0.37;\n"
+        "n1 = white(vec3(cell * 0.13 + vec2(zt, 0.0), 1.0));\n"
+        "n2 = white(vec3(cell * 0.13 + vec2(17.3, 29.1 + zt), 2.0));\n"
+        "g = (n1 + n2 - 1.0) * 0.75;\n"
+        "lum = dot(img.rgb, vec3(0.2126, 0.7152, 0.0722));\n"
+        "weight = 1.0 - pow(abs(lum * 2.0 - 1.0), 1.6);\n"
+        "col = clamp(img.rgb + g * amount * (0.35 + 0.65 * weight), 0.0, 1.0);\n"
+        "alpha = img.a;" },
+      { "Perlin fBm Texture (Formula)",
+        "# Multi-octave Perlin fractal noise texture.\n"
+        "param float scale = 6.0 [1.0, 32.0];\n"
+        "param float octaves = 5.0 [1.0, 8.0];\n"
+        "param float speed = 0.2 [0.0, 3.0];\n"
+        "param float contrast = 1.2 [0.2, 3.0];\n"
+        "p = vec2(uv.x * aspect, uv.y) * scale;\n"
+        "n = fbm(vec3(p, t * speed), octaves, 2.0, 0.5) * 0.5 + 0.5;\n"
+        "v = clamp((n - 0.5) * contrast + 0.5, 0.0, 1.0);\n"
+        "col = vec3(v);" },
+      { "Voronoi Caustics (Formula)",
+        "# Cellular F2-F1 ridges for stone cracks or water caustics.\n"
+        "param float scale = 8.0 [1.0, 32.0];\n"
+        "param float speed = 0.4 [0.0, 3.0];\n"
+        "param float sharpness = 3.0 [0.5, 12.0];\n"
+        "p = vec2(uv.x * aspect, uv.y) * scale;\n"
+        "vr = voronoi3(vec3(p, t * speed));\n"
+        "edge = clamp(1.0 - (vr.y - vr.x) * sharpness, 0.0, 1.0);\n"
+        "col = vec3(pow(edge, 2.0));" },
+      { "Domain Warp (Formula)",
+        "# Warps the input image with 3D gradient noise.\n"
+        "input pixel image img;\n"
+        "param float scale = 5.0 [1.0, 24.0];\n"
+        "param float strength = 0.04 [0.0, 0.25];\n"
+        "param float speed = 0.3 [0.0, 3.0];\n"
+        "p = vec2(uv.x * aspect, uv.y) * scale;\n"
+        "dx = noise3(vec3(p, t * speed));\n"
+        "dy = noise3(vec3(p + vec2(31.7, 17.3), t * speed));\n"
+        "c = img(uv + vec2(dx / max(aspect, 0.01), dy) * strength);\n"
+        "col = c.rgb;\n"
+        "alpha = c.a;" },
+      { "Halftone Dots (Formula)",
+        "# Aspect-corrected procedural dot screen.\n"
+        "input pixel image img;\n"
+        "param float cells = 48.0 [8.0, 160.0];\n"
+        "param float softness = 0.12 [0.01, 0.4];\n"
+        "p = vec2(uv.x * aspect, uv.y) * cells;\n"
+        "f = fract(p) - 0.5;\n"
+        "lum = dot(img.rgb, vec3(0.2126, 0.7152, 0.0722));\n"
+        "r = sqrt(clamp(1.0 - lum, 0.0, 1.0)) * 0.65;\n"
+        "d = smoothstep(r - softness, r + softness, length(f));\n"
+        "col = vec3(d);\n"
+        "alpha = img.a;" },
       { "Levels",
         "input pixel image img;\n"
         "param float inBlack = 0.0 [0.0, 1.0];\n"

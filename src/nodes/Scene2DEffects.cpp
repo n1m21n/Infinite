@@ -1,6 +1,7 @@
 // Scene 2D effect stacks (Photoshop's smart filters): each layer's picture runs through a list of native
 // adjustments and stack-owned nodes, each with its own opacity and blend, then the stack's mask, before the
 // layer blends with what is under it. Also the colour lookup (.cube) and Shadows / Highlights helpers.
+#include "ColorSpace.h"
 #include "Scene2DNode.h"
 #include "GLUtil.h"
 #include "RemoveBgNode.h"
@@ -141,7 +142,7 @@ namespace
          }
       int n = 0;
       s >> n;
-      n = std::clamp(n, 0, 36);
+      n = std::clamp(n, 0, 40);
       x.adjP.assign((size_t)n, 0.0f);
       for (float& v : x.adjP) s >> v;
       for (int ch = 0; ch < 3; ch++)
@@ -187,6 +188,12 @@ void Scene2DNode::WriteEffectLines(std::ostream& o, const Layer& l, int id)
          o << "effentry " << id << " " << i << " " << e.entry << "\n";
       if (!e.adjFile.empty())
          o << "efffile " << id << " " << i << " " << e.adjFile << "\n";
+      if (!e.stops.empty())
+      {
+         o << "effstops " << id << " " << i;
+         WriteStops(o, e.stops);
+         o << "\n";
+      }
    }
    if (l.effMaskUid != 0)
       o << "effmask " << id << " " << l.effMaskUid << "\n";
@@ -209,7 +216,7 @@ bool Scene2DNode::ParseEffectLine(const std::string& key, std::istream& s, Layer
       s >> l.effMaskUid;
       return true;
    }
-   if (key != "eff" && key != "effentry" && key != "efffile")
+   if (key != "eff" && key != "effentry" && key != "efffile" && key != "effstops")
       return false;
    int idx = -1;
    s >> idx;
@@ -222,6 +229,8 @@ bool Scene2DNode::ParseEffectLine(const std::string& key, std::istream& s, Layer
       e.entry = RestOfLine(s);
    else if (key == "efffile")
       e.adjFile = RestOfLine(s);
+   else if (key == "effstops")
+      ReadStops(s, e.stops);
    else
    {
       int on = 1, shown = 0, anim = 0, toMask = 0, map = 0;
@@ -295,6 +304,7 @@ Scene2DNode::Layer Scene2DNode::AdjLayerOf(const Effect& e)
    }
    a.curve = e.curve;
    a.adjP = e.adjP;
+   a.stops = e.stops;
    a.adjFile = e.adjFile;
    return a;
 }
@@ -761,4 +771,231 @@ bool Scene2DNode::AutoLevels(int id, float out[3][4], int effect)
       out[ch][3] = 1.0f;
    }
    return true;
+}
+
+// ---- adjustments from a picked pixel ----------------------------------------------------------------------
+
+namespace
+{
+   float LevelsGammaCpu(float u, float g)   // the shader's LevelsGamma1
+   {
+      const float c = 1.0f / g;
+      if (u <= 0.0f)
+         return 0.0f;
+      if (g <= 1.0f)
+         return std::pow(u, c);
+      const float a = std::exp2(g), q = 2.2f;
+      const float u1 = std::pow((1.0f - c / q) / (a * (1.0f - 1.0f / q)), 1.0f / (1.0f - c));
+      if (u >= u1 || u1 <= 0.0f)
+         return std::pow(u, c);
+      const float b = (a * u1 - std::pow(u1, c)) / std::pow(u1, q);
+      if (!std::isfinite(b))
+         return std::pow(u, c);
+      return a * u - b * std::pow(u, q);
+   }
+   float LevelsStage(const float* L, float g, float v)
+   {
+      const float u = std::clamp((v - L[0]) / std::max(L[1] - L[0], 1e-3f), 0.0f, 1.0f);
+      return L[2] + (L[3] - L[2]) * LevelsGammaCpu(u, std::max(g, 0.01f));
+   }
+   // The input a monotone map on [0, 1] turns into target (bisection; a falling map is walked the other way).
+   template <class F> float InvertMonotone(F f, float target)
+   {
+      const bool up = f(1.0f) >= f(0.0f);
+      float lo = 0.0f, hi = 1.0f;
+      for (int i = 0; i < 32; i++)
+      {
+         const float mid = 0.5f * (lo + hi);
+         ((f(mid) < target) == up ? lo : hi) = mid;
+      }
+      return 0.5f * (lo + hi);
+   }
+   float LutAt(const float* t, float v)   // the shader's Lut: 256 taps, linear between
+   {
+      const float f = std::clamp(v, 0.0f, 1.0f) * 255.0f;
+      const int i = std::min((int)f, 254);
+      return t[i] + (t[i + 1] - t[i]) * (f - (float)i);
+   }
+   const float kPointGap = 0.02f;   // closest two curve points (or Levels black and white) may sit
+   // Moves a curve's first (black) or last (white) point to (x, y); points it passes are dropped.
+   void SetCurveEnd(std::vector<float>& c, bool white, float x, float y)
+   {
+      if (c.size() < 4)
+         c = { 0.0f, 0.0f, 1.0f, 1.0f };
+      const int n = (int)c.size() / 2;
+      std::vector<float> out;
+      if (!white)
+         out.insert(out.end(), { x, y });
+      else
+         out.insert(out.end(), { c[0], c[1] });
+      for (int i = 1; i < n - 1; i++)
+      {
+         const float px = c[(size_t)i * 2];
+         if (white ? px < x - kPointGap : px > x + kPointGap)
+            out.insert(out.end(), { px, c[(size_t)i * 2 + 1] });
+      }
+      if (white)
+         out.insert(out.end(), { x, y });
+      else
+         out.insert(out.end(), { c[(size_t)(n - 1) * 2], c[(size_t)(n - 1) * 2 + 1] });
+      c = std::move(out);
+   }
+   // Puts a point at (x, y): the one already near x moves, else a new one goes in (16 at most).
+   void SetCurveMid(std::vector<float>& c, float x, float y)
+   {
+      const int n = (int)c.size() / 2;
+      if (n < 2)
+         return;
+      for (int i = 1; i < n - 1; i++)
+         if (std::fabs(c[(size_t)i * 2] - x) < kPointGap * 1.5f)
+         {
+            c[(size_t)i * 2] = x;
+            c[(size_t)i * 2 + 1] = y;
+            return;
+         }
+      if (n >= 16 || x <= c[0] + kPointGap || x >= c[(size_t)(n - 1) * 2] - kPointGap)
+         return;
+      int at = 1;
+      while (at < n - 1 && c[(size_t)at * 2] < x)
+         at++;
+      c.insert(c.begin() + at * 2, { x, y });
+   }
+   float Luma709(const float c[3]) { return 0.2126f * c[0] + 0.7152f * c[1] + 0.0722f * c[2]; }
+}
+
+void Scene2DNode::WhiteBalanceFromPick(const float disp[3], float amt, float& temp, float& tint)
+{
+   // The pixel already has the current balance on it: that is undone first (the shader's forward step, iterated
+   // back: it is close to identity), then temperature and tint are searched for the most neutral result.
+   auto forward = [&](float t, float ti, const float in[3], float out[3])
+   {
+      float m[9];
+      WhiteBalanceMatrix(t, ti, m);
+      const float l[3] = { ColorSpace::SrgbToLinear(in[0]), ColorSpace::SrgbToLinear(in[1]), ColorSpace::SrgbToLinear(in[2]) };
+      for (int r = 0; r < 3; r++)
+      {
+         const float n = std::clamp(m[r * 3] * l[0] + m[r * 3 + 1] * l[1] + m[r * 3 + 2] * l[2], 0.0f, 1.0f);
+         out[r] = in[r] + (ColorSpace::LinearToSrgb(n) - in[r]) * amt;
+      }
+   };
+   float src[3] = { disp[0], disp[1], disp[2] };
+   for (int it = 0; it < 24; it++)
+   {
+      float f[3];
+      forward(temp, tint, src, f);
+      for (int k = 0; k < 3; k++)
+         src[k] = std::clamp(src[k] + (disp[k] - f[k]), 0.0f, 1.0f);
+   }
+   auto chroma = [&](float t, float ti)
+   {
+      float o[3];
+      forward(t, ti, src, o);
+      const float mean = std::max(1e-3f, (o[0] + o[1] + o[2]) / 3.0f);
+      float e = 0.0f;
+      for (float v : o)
+         e += (v - mean) * (v - mean);
+      return e / (mean * mean);
+   };
+   float bt = 0.0f, bti = 0.0f, best = chroma(0.0f, 0.0f);
+   for (int i = 0; i <= 40; i++)   // a coarse grid over [-1, 1]^2, then a shrinking local search
+      for (int j = 0; j <= 40; j++)
+      {
+         const float t = -1.0f + (float)i * 0.05f, ti = -1.0f + (float)j * 0.05f, e = chroma(t, ti);
+         if (e < best)
+            best = e, bt = t, bti = ti;
+      }
+   for (float step = 0.025f; step > 0.001f; step *= 0.5f)
+      for (int i = -2; i <= 2; i++)
+         for (int j = -2; j <= 2; j++)
+         {
+            const float t = std::clamp(bt + (float)i * step, -1.0f, 1.0f), ti = std::clamp(bti + (float)j * step, -1.0f, 1.0f);
+            const float e = chroma(t, ti);
+            if (e < best)
+               best = e, bt = t, bti = ti;
+         }
+   temp = bt;
+   tint = bti;
+}
+
+void Scene2DNode::PointFromPick(int adjType, float adjAmt, float levels[4], float levelsCh[3][4], std::vector<float>& adjP,
+                                std::vector<float>& curve, std::vector<float> curveCh[3], const float disp[3], int point)
+{
+   // The picked pixel already has the adjustment on it: each channel's forward map is run backwards to the colour
+   // that went in, and the point is set from that (Photoshop's eyedroppers act on the colour before the adjustment).
+   const std::vector<float> def = AdjParamDefault(adjType);
+   for (size_t i = adjP.size(); i < def.size(); i++)
+      adjP.push_back(def[i]);
+   if (adjType == kAdjLevels)
+   {
+      if (adjP.size() < 3)
+         return;
+      float e[3], o[3];
+      for (int ch = 0; ch < 3; ch++)
+      {
+         const float* C = levelsCh[ch];
+         const float g = adjP[(size_t)ch];
+         auto f = [&](float v) { return LevelsStage(C, g, LevelsStage(levels, adjAmt, v)); };
+         const float pre = InvertMonotone(f, disp[ch]);
+         e[ch] = LevelsStage(levels, adjAmt, pre);   // what reaches the channel's own levels
+         o[ch] = f(pre);
+      }
+      const float target = Luma709(o);
+      for (int ch = 0; ch < 3; ch++)
+      {
+         float* C = levelsCh[ch];
+         if (point == 1)
+            C[0] = std::clamp(e[ch], 0.0f, C[1] - kPointGap);
+         else if (point == 3)
+            C[1] = std::clamp(e[ch], C[0] + kPointGap, 1.0f);
+         else
+         {
+            const float u = std::clamp((e[ch] - C[0]) / std::max(C[1] - C[0], 1e-3f), 1e-4f, 1.0f - 1e-4f);
+            const float want = std::clamp((target - C[2]) / std::max(C[3] - C[2], 1e-3f), 1e-4f, 1.0f - 1e-4f);
+            float lo = 0.1f, hi = 4.0f;   // the per-channel gamma slider's range
+            for (int i = 0; i < 32; i++)
+            {
+               const float mid = 0.5f * (lo + hi);
+               (LevelsGammaCpu(u, mid) < want ? lo : hi) = mid;
+            }
+            adjP[(size_t)ch] = 0.5f * (lo + hi);
+         }
+      }
+      return;
+   }
+   if (adjType != kAdjCurves)
+      return;
+   const bool lumaOnly = !adjP.empty() && adjP[0] > 0.5f;
+   const float amt = std::clamp(adjAmt, 0.0f, 1.0f);
+   float master[256];
+   CurveLut(curve, master, 256);
+   const float lo = 0.05f, hi = 0.95f;   // a black / white / grey point's x stays this far inside the curve
+   if (lumaOnly)
+   {
+      const float pre = InvertMonotone([&](float v) { return v + (LutAt(master, v) - v) * amt; }, Luma709(disp));
+      if (point == 1)
+         SetCurveEnd(curve, false, std::clamp(pre, 0.0f, hi), 0.0f);
+      else if (point == 3)
+         SetCurveEnd(curve, true, std::clamp(pre, lo, 1.0f), 1.0f);
+      return;   // a neutral grey means nothing on luma alone
+   }
+   float e[3], o[3];
+   for (int ch = 0; ch < 3; ch++)
+   {
+      float chLut[256];
+      CurveLut(curveCh[ch], chLut, 256);
+      auto f = [&](float v) { return v + (LutAt(chLut, LutAt(master, v)) - v) * amt; };
+      const float pre = InvertMonotone(f, disp[ch]);
+      e[ch] = LutAt(master, pre);   // what reaches the channel's own curve
+      o[ch] = f(pre);
+   }
+   const float target = Luma709(o);
+   for (int ch = 0; ch < 3; ch++)
+   {
+      if (point == 1)
+         SetCurveEnd(curveCh[ch], false, std::clamp(e[ch], 0.0f, hi), 0.0f);
+      else if (point == 3)
+         SetCurveEnd(curveCh[ch], true, std::clamp(e[ch], lo, 1.0f), 1.0f);
+      else
+         SetCurveMid(curveCh[ch], std::clamp(e[ch], lo, hi), target);
+   }
 }

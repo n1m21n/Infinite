@@ -1430,6 +1430,8 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
          key = H(key, (unsigned)std::lround(strokeK * 4096.0f));
       }
    }
+   if (mask)
+      key = H(key, (unsigned)std::lround(l.vmaskFeather * 64.0f));
    key = H(H(H(key, (unsigned)w), (unsigned)h), (unsigned)l.aaMode);
    Raster& r = in[l.id];
    if (r.key == key && r.tex != 0)
@@ -1440,6 +1442,50 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
       if (l.aaMode == 2)
          for (size_t i = 3; i < px.size(); i += 4)
             px[i] = px[i] >= 128 ? 255 : 0;
+   };
+   // Separable 3-pass sliding box blur on the alpha channel for feathered vector masks.
+   auto featherAlpha = [&](std::vector<uint8_t>& px) {
+      if (!mask || l.vmaskFeather <= 0.25f || w <= 0 || h <= 0)
+         return;
+      const int rad = std::clamp((int)std::lround(l.vmaskFeather), 1, 128);
+      const size_t npix = (size_t)w * (size_t)h;
+      std::vector<float> bufA(npix), bufB(npix);
+      for (size_t i = 0; i < npix; i++)
+         bufA[i] = (float)px[i * 4 + 3];
+      for (int pass = 0; pass < 3; pass++)
+      {
+         const float denom = (float)(rad * 2 + 1);
+         for (int y = 0; y < h; y++)
+         {
+            const float* row = &bufA[(size_t)y * w];
+            float* dst = &bufB[(size_t)y * w];
+            float acc = 0.0f;
+            for (int k = -rad; k <= rad; k++)
+               acc += row[std::clamp(k, 0, w - 1)];
+            for (int x = 0; x < w; x++)
+            {
+               dst[x] = acc / denom;
+               const int addX = std::min(x + rad + 1, w - 1);
+               const int subX = std::max(x - rad, 0);
+               acc += row[addX] - row[subX];
+            }
+         }
+         for (int x = 0; x < w; x++)
+         {
+            float acc = 0.0f;
+            for (int k = -rad; k <= rad; k++)
+               acc += bufB[(size_t)std::clamp(k, 0, h - 1) * w + x];
+            for (int y = 0; y < h; y++)
+            {
+               bufA[(size_t)y * w + x] = acc / denom;
+               const int addY = std::min(y + rad + 1, h - 1);
+               const int subY = std::max(y - rad, 0);
+               acc += bufB[(size_t)addY * w + x] - bufB[(size_t)subY * w + x];
+            }
+         }
+      }
+      for (size_t i = 0; i < npix; i++)
+         px[i * 4 + 3] = (uint8_t)std::clamp((int)std::lround(bufA[i]), 0, 255);
    };
    if (l.kind == Kind::Text && !mask)
    {
@@ -1459,8 +1505,8 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
       float lo[2], hi[2];
       // A shape being drawn or dragged is the top one (Illustrator redraws only what changed): the shapes under
       // it are drawn once, and each frame only the last shape's box is redrawn, converted and uploaded.
-      const bool local = last != nullptr && last->op == Shape::kAdd && last->type != Shape::kSvg && last->noise <= 0.0f &&
-                         ShapeBounds(*last, lo, hi);
+      const bool local = !(mask && l.vmaskFeather > 0.25f) && last != nullptr && last->op == Shape::kAdd && last->type != Shape::kSvg &&
+                         last->noise <= 0.0f && ShapeBounds(*last, lo, hi);
       const unsigned long long bk = H(H(H(H(prefix, (unsigned)w), (unsigned)h), (unsigned)l.aaMode), (unsigned)std::lround(strokeK * 4096.0f) + (mask ? 7u : 0u));
       if (!local)
       {
@@ -1472,6 +1518,7 @@ Scene2DNode::Raster* Scene2DNode::SyncRaster(std::map<int, Raster>& in, const La
          std::vector<uint8_t> px;
          RasterShapes(all, w, h, mask, px, strokeK);
          hard(px);
+         featherAlpha(px);
          Upload(r.tex, r.w, r.h, w, h, px);
       }
       else
@@ -2070,4 +2117,244 @@ bool Scene2DNode::ImportSvg(int id, const std::string& svgText)
    l->shapes.push_back(s);
    Commit();
    return true;
+}
+
+unsigned Scene2DNode::VectorMaskTexture(int id)
+{
+   Layers();
+   const Layer* l = FindConst(id);
+   if (l == nullptr || !l->hasVMask || l->vmask.empty())
+      return 0;
+   Raster* r = SyncRaster(mVMasks, *l, true);
+   return r != nullptr ? r->tex : 0;
+}
+
+bool Scene2DNode::ShapeToPath(Shape& s)
+{
+   if (s.type == Shape::kPath)
+      return s.Anchors() >= 2;
+   const float x = std::min(s.x0, s.x1), y = std::min(s.y0, s.y1);
+   const float w = std::fabs(s.x1 - s.x0), h = std::fabs(s.y1 - s.y0);
+   std::vector<float> pts;
+   auto pushAnchor = [&](float px, float py, float ix, float iy, float ox, float oy) {
+      pts.insert(pts.end(), { px, py, ix, iy, ox, oy });
+   };
+   auto pushLineVerts = [&](const std::vector<float>& xy) {
+      const size_t n = xy.size() / 2;
+      for (size_t i = 0; i < n; i++)
+         pushAnchor(xy[i * 2], xy[i * 2 + 1], xy[i * 2], xy[i * 2 + 1], xy[i * 2], xy[i * 2 + 1]);
+   };
+   bool closed = true;
+   switch (s.type)
+   {
+   case Shape::kRect:
+      if (w <= 0.0f || h <= 0.0f)
+         return false;
+      if (CustomCorners(s))
+      {
+         std::vector<float> xy;
+         RectCorners(s, xy);
+         pushLineVerts(xy);
+      }
+      else if (s.radius > 0.0f)
+      {
+         const float r = std::min(s.radius, std::min(w, h) * 0.5f);
+         const float k = r * 0.55228475f;
+         const float x1 = x + w, y1 = y + h;
+         pushAnchor(x + r, y, x + r - k, y, x + r, y);
+         pushAnchor(x1 - r, y, x1 - r, y, x1 - r + k, y);
+         pushAnchor(x1, y + r, x1, y + r - k, x1, y + r);
+         pushAnchor(x1, y1 - r, x1, y1 - r, x1, y1 - r + k);
+         pushAnchor(x1 - r, y1, x1 - r + k, y1, x1 - r, y1);
+         pushAnchor(x + r, y1, x + r, y1, x + r - k, y1);
+         pushAnchor(x, y1 - r, x, y1 - r + k, x, y1 - r);
+         pushAnchor(x, y + r, x, y + r, x, y + r - k);
+      }
+      else
+      {
+         pushLineVerts({ x, y, x + w, y, x + w, y + h, x, y + h });
+      }
+      break;
+   case Shape::kEllipse:
+   {
+      if (w <= 0.0f || h <= 0.0f)
+         return false;
+      const float cx = x + w * 0.5f, cy = y + h * 0.5f, rx = w * 0.5f, ry = h * 0.5f;
+      const float kx = rx * 0.55228475f, ky = ry * 0.55228475f;
+      pushAnchor(cx, y, cx - kx, y, cx + kx, y);
+      pushAnchor(x + w, cy, x + w, cy - ky, x + w, cy + ky);
+      pushAnchor(cx, y + h, cx + kx, y + h, cx - kx, y + h);
+      pushAnchor(x, cy, x, cy + ky, x, cy - ky);
+      break;
+   }
+   case Shape::kPolygon:
+   case Shape::kStar:
+   {
+      if (w <= 0.0f || h <= 0.0f)
+         return false;
+      std::vector<float> xy;
+      StarPoints(s, s.type == Shape::kStar, xy);
+      if (xy.size() < 6)
+         return false;
+      pushLineVerts(xy);
+      break;
+   }
+   case Shape::kLine:
+      closed = false;
+      pushAnchor(s.x0, s.y0, s.x0, s.y0, s.x0, s.y0);
+      pushAnchor(s.x1, s.y1, s.x1, s.y1, s.x1, s.y1);
+      break;
+   default:
+      return false;
+   }
+   s.type = Shape::kPath;
+   s.closed = closed;
+   s.pts = std::move(pts);
+   return s.Anchors() >= 2;
+}
+
+int Scene2DNode::SplitSegment(Shape& s, int seg, float t)
+{
+   if (s.type != Shape::kPath || seg < 0 || seg >= s.Anchors())
+      return -1;
+   const int n = s.Anchors(), j = (seg + 1) % n;
+   const float ct = std::clamp(t, 0.05f, 0.95f), u = 1.0f - ct;
+   const float* a = &s.pts[(size_t)seg * 6];
+   const float* b = &s.pts[(size_t)j * 6];
+   auto mixp = [&](float p0, float p1) { return p0 * u + p1 * ct; };
+   const float q0x = mixp(a[0], a[4]), q0y = mixp(a[1], a[5]);
+   const float q1x = mixp(a[4], b[2]), q1y = mixp(a[5], b[3]);
+   const float q2x = mixp(b[2], b[0]), q2y = mixp(b[3], b[1]);
+   const float r0x = mixp(q0x, q1x), r0y = mixp(q0y, q1y);
+   const float r1x = mixp(q1x, q2x), r1y = mixp(q1y, q2y);
+   const float mx = mixp(r0x, r1x), my = mixp(r0y, r1y);
+   s.pts[(size_t)seg * 6 + 4] = q0x;
+   s.pts[(size_t)seg * 6 + 5] = q0y;
+   s.pts[(size_t)j * 6 + 2] = q2x;
+   s.pts[(size_t)j * 6 + 3] = q2y;
+   const size_t pos = (size_t)(seg + 1);
+   s.pts.insert(s.pts.begin() + (ptrdiff_t)(pos * 6), { mx, my, r0x, r0y, r1x, r1y });
+   return seg + 1;
+}
+
+void Scene2DNode::SubdividePath(Shape& s)
+{
+   if (s.type != Shape::kPath && !ShapeToPath(s))
+      return;
+   const int n = s.Anchors();
+   if (n < 2)
+      return;
+   const int segs = s.closed ? n : n - 1;
+   std::vector<float> pts(s.pts.begin(), s.pts.begin() + (size_t)n * 6);
+   std::vector<float> out;
+   out.reserve((size_t)(n + segs) * 6);
+   auto lerp = [](float a, float b) { return 0.5f * (a + b); };
+   for (int i = 0; i < n; i++)
+   {
+      out.insert(out.end(), pts.begin() + i * 6, pts.begin() + i * 6 + 6);
+      if (i >= segs)
+         continue;
+      const int j = (i + 1) % n;
+      const float x0 = pts[i * 6 + 0], y0 = pts[i * 6 + 1];
+      const float c1x = pts[i * 6 + 4], c1y = pts[i * 6 + 5];
+      const float c2x = pts[j * 6 + 2], c2y = pts[j * 6 + 3];
+      const float x3 = pts[j * 6 + 0], y3 = pts[j * 6 + 1];
+      const float q0x = lerp(x0, c1x), q0y = lerp(y0, c1y);
+      const float q1x = lerp(c1x, c2x), q1y = lerp(c1y, c2y);
+      const float q2x = lerp(c2x, x3), q2y = lerp(c2y, y3);
+      const float r0x = lerp(q0x, q1x), r0y = lerp(q0y, q1y);
+      const float r1x = lerp(q1x, q2x), r1y = lerp(q1y, q2y);
+      const float mx = lerp(r0x, r1x), my = lerp(r0y, r1y);
+      // Adjust current out-handle and next in-handle, and insert split anchor in between.
+      const size_t curBase = out.size() - 6;
+      out[curBase + 4] = q0x;
+      out[curBase + 5] = q0y;
+      pts[j * 6 + 2] = q2x;
+      pts[j * 6 + 3] = q2y;
+      if (j == 0 && !out.empty())
+      {
+         out[2] = q2x;
+         out[3] = q2y;
+      }
+      out.insert(out.end(), { mx, my, r0x, r0y, r1x, r1y });
+   }
+   s.pts = std::move(out);
+}
+
+void Scene2DNode::DeformShape(Shape& s, int mode, float amount, float freq)
+{
+   if (s.type != Shape::kPath && !ShapeToPath(s))
+      return;
+   for (int pass = 0; pass < 3 && s.Anchors() < 24; pass++)
+      SubdividePath(s);
+   const int n = s.Anchors();
+   if (n < 2)
+      return;
+   float lo[2], hi[2];
+   if (!ShapeBounds(s, lo, hi))
+      return;
+   const float cx = 0.5f * (lo[0] + hi[0]), cy = 0.5f * (lo[1] + hi[1]);
+   const float span = std::max(4.0f, 0.5f * std::hypot(hi[0] - lo[0], hi[1] - lo[1]));
+   const float f = std::max(0.25f, freq);
+   auto warpPt = [&](float px, float py, int seedIdx, float& ox, float& oy) {
+      const float dx = px - cx, dy = py - cy;
+      const float nx = dx / span, ny = dy / span;
+      switch (mode)
+      {
+      case 0:   // Wave
+      {
+         const float ph = (nx * 0.75f + ny * 0.65f) * f * 2.0f * kPi;
+         ox = px + std::sin(ph) * amount;
+         oy = py + std::cos(ny * f * 2.0f * kPi) * amount * 0.75f;
+         break;
+      }
+      case 1:   // Roughen
+      {
+         const float h1 = std::sin((float)(seedIdx * 127 + 13) * 1.37f + nx * 19.3f * f + ny * 7.1f);
+         const float h2 = std::cos((float)(seedIdx * 269 + 37) * 0.91f + ny * 23.7f * f - nx * 11.3f);
+         ox = px + h1 * amount;
+         oy = py + h2 * amount;
+         break;
+      }
+      case 2:   // Twist
+      {
+         const float dist = std::hypot(nx, ny);
+         const float ang = (amount * 0.025f) * dist * f;
+         const float ca = std::cos(ang), sa = std::sin(ang);
+         ox = cx + dx * ca - dy * sa;
+         oy = cy + dx * sa + dy * ca;
+         break;
+      }
+      default:   // Bulge / Pinch
+      {
+         const float dist = std::min(1.5f, std::hypot(nx, ny));
+         const float scale = 1.0f + (amount / span) * (1.0f - dist * dist * 0.65f);
+         ox = cx + dx * scale;
+         oy = cy + dy * scale;
+         break;
+      }
+      }
+   };
+   for (int i = 0; i < n; i++)
+   {
+      float* p = &s.pts[(size_t)i * 6];
+      const float ax = p[0], ay = p[1];
+      float nax = ax, nay = ay;
+      warpPt(ax, ay, i * 3, nax, nay);
+      const float shiftX = nax - ax, shiftY = nay - ay;
+      if (mode == 2 || mode == 3)
+      {
+         warpPt(p[2], p[3], i * 3 + 1, p[2], p[3]);
+         warpPt(p[4], p[5], i * 3 + 2, p[4], p[5]);
+      }
+      else
+      {
+         p[2] += shiftX;
+         p[3] += shiftY;
+         p[4] += shiftX;
+         p[5] += shiftY;
+      }
+      p[0] = nax;
+      p[1] = nay;
+   }
 }

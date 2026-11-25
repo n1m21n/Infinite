@@ -8,6 +8,7 @@
 #include <map>
 #include <string>
 #include "app/AppShared.h"
+#include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/UiDensity.h"
 #include "app/ui/design/components/FloatingWindow.h"
 
@@ -33,30 +34,33 @@ namespace SettingsWindow
 
    // The window's content width: the compact strip (tokens.json "compact").
    inline float Width() { return UiDensity::kPopoverW; }
+   // `cols` strips side by side, one control gap apart (a long form laid out as a grid).
+   inline float Width(int cols) { return UiDensity::kPopoverW * (float)cols + tok::space_1 * (float)(cols - 1); }
 
    // Draws the window for `key` while it is open. `title` is shown in its title bar. `at` is where it first appears,
    // as the top-right corner (it opens to the left of the panel it came from); later it stays where it was moved.
    // Returns whether the body ran.
-   template <class F> bool Draw(const std::string& key, const char* title, ImVec2 at, F&& body)
+   template <class F> bool Draw(const std::string& key, const char* title, ImVec2 at, F&& body, int cols = 1)
    {
       const auto it = Opens().find(key);
       if (it == Opens().end() || !it->second)
          return false;
       bool open = true;
       const ImGuiViewport* vp = ImGui::GetMainViewport();
+      const float w = Width(std::max(1, cols));
       FloatingWindow::Spec spec;
       spec.center = false;
-      spec.pos = ImVec2(std::max(vp->WorkPos.x + Width(), at.x), at.y);
+      spec.pos = ImVec2(std::max(vp->WorkPos.x + w, at.x), at.y);
       spec.pivot = ImVec2(1.0f, 0.0f);
       spec.placeCond = ImGuiCond_Appearing;
       // Resizes both ways like every floating window. The main Settings window's rule holds inside: controls keep one
       // fixed width whatever the window does (the body's rows are sized from Width(), never from the window), so a
       // wider window leaves room on the right instead of stretching rows. It opens at the strip's width and its
       // content's height (0 = fit once), then keeps whatever size it is dragged to (a long list scrolls).
-      spec.minSize = ImVec2(Width(), tok::window_min_h);
+      spec.minSize = ImVec2(w, tok::window_min_h);
       spec.maxSize = ImVec2(vp->WorkSize.x, vp->WorkSize.y);
       spec.flags = ImGuiWindowFlags_NoSavedSettings;
-      ImGui::SetNextWindowSize(ImVec2(Width(), 0.0f), ImGuiCond_Appearing);
+      ImGui::SetNextWindowSize(ImVec2(w, 0.0f), ImGuiCond_Appearing);
       spec.pad = false;   // the compact strip: MoreRows sizes its column from the style's own window padding
       const std::string id = std::string(title) + "###setwin" + key;
       bool ran = false;

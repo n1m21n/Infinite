@@ -1,7 +1,22 @@
 {
  "_photo": "a41112d0975d5890",
+ "adj_brightness": {
+  "flip": 0.1153
+ },
+ "adj_contrast": {
+  "flip": 0.1032
+ },
+ "adj_exposure": {
+  "flip": 0.0617
+ },
+ "adj_invert": {
+  "flip": 0.0
+ },
  "adj_normals": {
   "flip": 0.0065
+ },
+ "adj_posterize": {
+  "flip": 0.0
  },
  "adj_recolour": {
   "flip": 0.0048
@@ -9,14 +24,38 @@
  "adj_split_toning": {
   "flip": 0.007
  },
+ "adj_threshold": {
+  "flip": 0.0045
+ },
  "adj_tone_compression": {
   "flip": 0.0107
  },
  "adj_tone_stretch": {
   "flip": 0.0474
  },
+ "adj_vibrance": {
+  "flip": 0.0797
+ },
  "adj_white_balance": {
   "flip": 0.0181
+ },
+ "blend_colour_dodge": {
+  "flip": 0.0124
+ },
+ "blend_difference": {
+  "flip": 0.0
+ },
+ "blend_hue": {
+  "flip": 0.0112
+ },
+ "blend_overlay": {
+  "flip": 0.0035
+ },
+ "blend_screen": {
+  "flip": 0.0032
+ },
+ "blend_soft_light": {
+  "flip": 0.0251
  },
  "blur_brush": {
   "flip": 0.0033
@@ -37,13 +76,13 @@
   "flip": 0.0
  },
  "eraser": {
-  "flip": 0.0021
+  "flip": 0.0017
  },
  "fill_rect": {
   "flip": 0.0
  },
  "heal": {
-  "flip": 0.0014
+  "flip": 0.0013
  },
  "layer_opacity": {
   "flip": 0.0124

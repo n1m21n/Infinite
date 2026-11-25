@@ -946,9 +946,10 @@ void DrawPopupsA(FrameCtx& fc)
             // each node's own bounds sidesteps that ImGui active-item gate
             // entirely.
             const ImVec2 canvasMouse = ed::ScreenToCanvas(mp);
-            const bool overCanvas = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) ||
-               (mp.x >= gGraphScreenTL.x && mp.y >= gGraphScreenTL.y &&
-                mp.x <= gGraphScreenTL.x + gGraphScreenSize.x && mp.y <= gGraphScreenTL.y + gGraphScreenSize.y);
+            const bool overCanvas = !fc.viewFill &&
+               (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) ||
+                (mp.x >= gGraphScreenTL.x && mp.y >= gGraphScreenTL.y &&
+                 mp.x <= gGraphScreenTL.x + gGraphScreenSize.x && mp.y <= gGraphScreenTL.y + gGraphScreenSize.y));
 
             // Released over the Arrange panel instead of the canvas: route
             // to the timeline-drop import path (stashed for

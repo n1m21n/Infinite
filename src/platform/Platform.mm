@@ -3968,15 +3968,38 @@ namespace Platform
 
       @autoreleasepool
       {
-         // Incoming pixels are bottom-up (GL order); Vision wants top-down.
+         // Incoming pixels are bottom-up straight RGBA (GL order); Vision wants top-down opaque/premultiplied sRGB.
+         // Composite transparent pixels over neutral mid-grey so Vision never sees garbage RGB hidden under alpha 0.
          const size_t stride = (size_t)width * 4;
          std::vector<unsigned char> topDown(rgbaPixels.size());
          for (int y = 0; y < height; y++)
-            memcpy(&topDown[y * stride], &rgbaPixels[(height - 1 - y) * stride], stride);
+         {
+            const unsigned char* sRow = &rgbaPixels[(size_t)(height - 1 - y) * stride];
+            unsigned char* dRow = &topDown[(size_t)y * stride];
+            for (int x = 0; x < width; x++)
+            {
+               const unsigned int a = sRow[x * 4 + 3];
+               if (a == 255)
+               {
+                  dRow[x * 4 + 0] = sRow[x * 4 + 0];
+                  dRow[x * 4 + 1] = sRow[x * 4 + 1];
+                  dRow[x * 4 + 2] = sRow[x * 4 + 2];
+                  dRow[x * 4 + 3] = 255;
+               }
+               else
+               {
+                  const unsigned int bg = 128 * (255 - a);
+                  dRow[x * 4 + 0] = (unsigned char)((sRow[x * 4 + 0] * a + bg) / 255);
+                  dRow[x * 4 + 1] = (unsigned char)((sRow[x * 4 + 1] * a + bg) / 255);
+                  dRow[x * 4 + 2] = (unsigned char)((sRow[x * 4 + 2] * a + bg) / 255);
+                  dRow[x * 4 + 3] = 255;
+               }
+            }
+         }
 
          CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
          CGContextRef ctx = CGBitmapContextCreate(topDown.data(), width, height, 8, stride, cs,
-                                                  kCGImageAlphaPremultipliedLast);
+                                                  kCGImageAlphaNoneSkipLast);
          CGColorSpaceRelease(cs);
          if (ctx == NULL)
          {
@@ -4072,17 +4095,56 @@ namespace Platform
          const int mw = (int)CVPixelBufferGetWidth(maskBuffer);
          const int mh = (int)CVPixelBufferGetHeight(maskBuffer);
          const size_t mStride = CVPixelBufferGetBytesPerRow(maskBuffer);
-         const unsigned char* mSrc = (const unsigned char*)CVPixelBufferGetBaseAddress(maskBuffer);
+         const OSType pixFmt = CVPixelBufferGetPixelFormatType(maskBuffer);
+         const unsigned char* mBase = (const unsigned char*)CVPixelBufferGetBaseAddress(maskBuffer);
 
-         // Rescale (nearest) to the requested size and flip back to GL order.
+         auto sampleAt = [&](int sx, int sy) -> float
+         {
+            sx = std::clamp(sx, 0, mw - 1);
+            sy = std::clamp(sy, 0, mh - 1);
+            const unsigned char* row = mBase + (size_t)sy * mStride;
+            if (pixFmt == kCVPixelFormatType_OneComponent32Float)
+            {
+               const float* frow = reinterpret_cast<const float*>(row);
+               return std::clamp(frow[sx], 0.0f, 1.0f);
+            }
+            if (pixFmt == kCVPixelFormatType_OneComponent16Half)
+            {
+               const uint16_t h = reinterpret_cast<const uint16_t*>(row)[sx];
+               const uint32_t sign = (h & 0x8000u) << 16;
+               const uint32_t exp = (h >> 10) & 0x1Fu;
+               const uint32_t mant = h & 0x3FFu;
+               float fv = 0.0f;
+               if (exp > 0 && exp < 31)
+               {
+                  const uint32_t bits = sign | ((exp + 112u) << 23) | (mant << 13);
+                  std::memcpy(&fv, &bits, sizeof(float));
+               }
+               return std::clamp(fv, 0.0f, 1.0f);
+            }
+            return (float)row[sx] / 255.0f;
+         };
+
+         // Rescale bilinearly to the requested size and flip back to GL order.
          outMask.assign((size_t)width * height, 0);
          for (int y = 0; y < height; y++)
          {
-            const int sy = std::min(mh - 1, y * mh / height);
+            const float fy = ((float)y + 0.5f) * (float)mh / (float)height - 0.5f;
+            const int y0 = std::clamp((int)std::floor(fy), 0, mh - 1);
+            const int y1 = std::min(mh - 1, y0 + 1);
+            const float ty = std::clamp(fy - (float)y0, 0.0f, 1.0f);
             unsigned char* dstRow = &outMask[(size_t)(height - 1 - y) * width];
-            const unsigned char* srcRow = mSrc + (size_t)sy * mStride;
             for (int x = 0; x < width; x++)
-               dstRow[x] = srcRow[std::min(mw - 1, x * mw / width)];
+            {
+               const float fx = ((float)x + 0.5f) * (float)mw / (float)width - 0.5f;
+               const int x0 = std::clamp((int)std::floor(fx), 0, mw - 1);
+               const int x1 = std::min(mw - 1, x0 + 1);
+               const float tx = std::clamp(fx - (float)x0, 0.0f, 1.0f);
+               const float v00 = sampleAt(x0, y0), v10 = sampleAt(x1, y0);
+               const float v01 = sampleAt(x0, y1), v11 = sampleAt(x1, y1);
+               const float v = (v00 * (1.0f - tx) + v10 * tx) * (1.0f - ty) + (v01 * (1.0f - tx) + v11 * tx) * ty;
+               dstRow[x] = (unsigned char)std::clamp((int)std::lround(v * 255.0f), 0, 255);
+            }
          }
 
          CVPixelBufferUnlockBaseAddress(maskBuffer, kCVPixelBufferLock_ReadOnly);

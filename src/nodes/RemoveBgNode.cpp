@@ -242,12 +242,38 @@ void RemoveBgNode::SubmitMaskRequest(unsigned int srcTex, int w, int h)
    std::vector<unsigned char> pixels((size_t)w * h * 4);
    GLint prevFbo = 0;
    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+   GLint internalFmt = GL_RGBA8;
+   glBindTexture(GL_TEXTURE_2D, srcTex);
+   glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internalFmt);
+   glBindTexture(GL_TEXTURE_2D, 0);
    GLuint fbo = 0;
    glGenFramebuffers(1, &fbo);
    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, srcTex, 0);
    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-   glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+   if (internalFmt == GL_RGBA16F || internalFmt == GL_RGBA32F)
+   {
+      // Float working FBOs hold linear light in 2D View; encode to sRGB so Vision sees true display contrast.
+      std::vector<float> fp((size_t)w * h * 4);
+      glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, fp.data());
+      auto toSrgb8 = [](float v) -> unsigned char {
+         v = std::clamp(v, 0.0f, 1.0f);
+         const float s = v <= 0.0031308f ? v * 12.92f : 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
+         return (unsigned char)std::clamp((int)std::lround(s * 255.0f), 0, 255);
+      };
+      const size_t npix = (size_t)w * h;
+      for (size_t i = 0; i < npix; i++)
+      {
+         pixels[i * 4 + 0] = toSrgb8(fp[i * 4 + 0]);
+         pixels[i * 4 + 1] = toSrgb8(fp[i * 4 + 1]);
+         pixels[i * 4 + 2] = toSrgb8(fp[i * 4 + 2]);
+         pixels[i * 4 + 3] = (unsigned char)std::clamp((int)std::lround(std::clamp(fp[i * 4 + 3], 0.0f, 1.0f) * 255.0f), 0, 255);
+      }
+   }
+   else
+   {
+      glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+   }
    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
    glDeleteFramebuffers(1, &fbo);
 

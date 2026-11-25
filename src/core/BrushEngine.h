@@ -57,7 +57,7 @@ namespace BrushEngine
       float smoothing = 0.0f;      // 0..1, lazy-mouse string
       int stabiliser = 0;          // 0 off, else the brush follows a weighted average of this many pen samples
       bool pencil = false;         // hard pixels, no anti-aliasing
-      bool pressureSize = true;
+      bool pressureSize = false;   // off unless asked, as Photoshop; presets that want it say so (Make)
       bool pressureOpacity = false;
       int mode = kNormal;
       bool lockAlpha = false;

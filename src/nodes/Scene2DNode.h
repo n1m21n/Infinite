@@ -36,7 +36,7 @@ public:
                   kAdjBrightness, kAdjContrast, kAdjHue, kAdjSaturation, kAdjExposure, kAdjInvert, kAdjLevels, kAdjCurves,
                   kAdjColorBalance, kAdjVibrance, kAdjSelective, kAdjMixer, kAdjBlackWhite, kAdjPhotoFilter,
                   kAdjShadowsHighlights, kAdjLookup, kAdjWhiteBalance, kAdjSplitToning, kAdjRecolour,
-                  kAdjNormals, kAdjToneCompression, kAdjToneStretch, kAdjCount };
+                  kAdjNormals, kAdjToneCompression, kAdjToneStretch, kAdjNoise, kAdjTexture, kAdjCount };
    // adjP layout per type (AdjParamCount): Colour Balance 9 (shadows, mids, highlights rgb, -1..1); Selective
    // Colour 36 (reds, yellows, greens, cyans, blues, magentas, whites, neutrals, blacks x CMYK, -1..1); Channel
    // Mixer 10 (rows R, G, B of R G B, then mono 0/1); Black & White 6 (reds..magentas, -2..3); Photo Filter 1
@@ -44,6 +44,11 @@ public:
    // Split Toning 5 (highlight hue deg, saturation, shadow hue deg, saturation, balance 0..1); Recolour 3 (hue deg,
    // saturation, lightness -1..1). The last three are Affinity's, measured: tools/re-survey/affinity_probe.py adjust.
    static void WhiteBalanceMatrix(float temperature, float tint, float m[9]);   // linear sRGB, row-major
+   // From a picked pixel (display sRGB, with the adjustment already on it): the White Balance temperature / tint that
+   // make it neutral, and Levels' or Curves' black (1), grey (2) or white (3) point set from it.
+   static void WhiteBalanceFromPick(const float disp[3], float amt, float& temp, float& tint);
+   static void PointFromPick(int adjType, float adjAmt, float levels[4], float levelsCh[3][4], std::vector<float>& adjP,
+                             std::vector<float>& curve, std::vector<float> curveCh[3], const float disp[3], int point);
    static int AdjParamCount(int type);
    static std::vector<float> AdjParamDefault(int type);
    static const char* AdjGroup(int type);   // "Adjust", "Colour", "Stylize": the effect list's sections
@@ -127,7 +132,7 @@ public:
    // colour overlay and inner shadow on them, stroke on top.
    enum FxType { kFxShadow = 0, kFxInner, kFxGlow, kFxStroke, kFxOverlay, kFxInnerGlow, kFxBevel, kFxGradient, kFxSatin, kFxPattern,
                  kFxCount };
-   static constexpr int kFxPatternCount = 5;   // checker, dots, lines, grid, noise
+   static constexpr int kFxPatternCount = 8;   // checker, dots, lines, grid, noise, perlin, voronoi, weave
    struct Fx
    {
       bool on = false;
@@ -140,6 +145,8 @@ public:
       float c2[4] = { 1.0f, 1.0f, 1.0f, 1.0f };   // bevel: shadow colour; gradient overlay: end colour; pattern: second colour
       int pattern = 0;        // pattern overlay: kFxPatternCount kinds; size is the cell, angle turns it
       int material = -1;      // bevel: -1 plain light, else the relief materials (0 plasticine, 1 metal, 2 chrome, 3 stipple)
+      int blend = 0;          // per-style blend: 0 normal, 1 multiply, 2 screen, 3 overlay, 4 soft light, 5 add, 6 colour
+      int style = 0;          // inner glow: 0 edge / 1 centre; bevel: 0 up / 1 down; gradient: 0 lin / 1 rad / 2 refl / 3 diam; satin: 0 norm / 1 inv
       float contour[4] = { 0.25f, 0.25f, 0.75f, 0.75f };   // shadow, glow, bevel, satin: the two inner points of a 0..1 curve
       std::vector<GradStop> stops;   // gradient overlay: more than two colours (empty: c to c2)
       bool ContourIsLinear() const { return contour[0] == contour[1] && contour[2] == contour[3]; }
@@ -172,6 +179,7 @@ public:
       std::vector<float> curve = { 0.0f, 0.0f, 1.0f, 1.0f };
       std::vector<float> curveCh[3] = { { 0, 0, 1, 1 }, { 0, 0, 1, 1 }, { 0, 0, 1, 1 } };
       std::vector<float> adjP;
+      std::vector<GradStop> stops;
       std::string adjFile;
    };
    static const char* const kEffBlendNames[5];
@@ -268,7 +276,8 @@ public:
       // Vector layers: items bottom to top; pw/ph hold the box size.
       std::vector<Shape> shapes;
       // Vector mask (any layer but a group): inside the items shows. No items shows all.
-      bool hasVMask = false, vmaskOn = true;
+      bool hasVMask = false, vmaskOn = true, vmaskInvert = false;
+      float vmaskFeather = 0.0f;
       std::vector<Shape> vmask;
       // Text layers. boxW 0 = point text (no wrap); else wraps at boxW px.
       std::string text, font;
@@ -637,6 +646,12 @@ public:
    static bool ShapeHit(const Shape& s, float x, float y, float pad);
    // The layer's vector or text picture (and vector mask) as a texture; 0 = none.
    unsigned VectorTexture(int id);
+   unsigned VectorMaskTexture(int id);
+   // Convert a live shape to an editable cubic Bezier path, split a segment, subdivide, or deform points.
+   static bool ShapeToPath(Shape& s);
+   static int SplitSegment(Shape& s, int seg, float t);
+   static void SubdividePath(Shape& s);
+   static void DeformShape(Shape& s, int mode, float amount, float freq);
    // The items as an SVG document (Convert to Sketch node, Copy SVG).
    std::string ToSvg(const Layer& l);
    // An SVG file's text as one item filling (or fitting) the document; false on a parse error.
@@ -649,7 +664,8 @@ public:
    // Selection: one per document, document-sized, kept in the doc text (undo and save carry it).
    enum SelOp { kSelNew = 0, kSelAdd, kSelSub, kSelIntersect };
    void SelectRect(float x0, float y0, float x1, float y1, int op, float feather, bool ellipse, bool aa = false);
-   void SelectPolygon(const std::vector<float>& xy, int op, float feather, bool aa = false);   // aa: 1 px coverage edge (Photoshop's Anti-alias)
+   void SelectPolygon(const std::vector<float>& xy, int op, float feather, bool aa = false);
+   void SelectEllipse(float x0, float y0, float x1, float y1, int op, float feather, bool aa);   // Photoshop's measured edge   // aa: 1 px coverage edge (Photoshop's Anti-alias)
    void SelectWand(float x, float y, int tolerance, bool contiguous, int op, bool sampleAll, int layerId);
    void SelectAll();
    void Deselect();
@@ -795,6 +811,7 @@ private:
       float maskDensity = 1.0f;
       unsigned int pmask = 0;       // pixel mask, sampled with the layer
       unsigned int vmask = 0;       // vector mask, alpha
+      bool vmaskInvert = false;
       const Layer* fill = nullptr;
       const Layer* bif = nullptr;   // blend if
       float gamma = 1.0f;           // blend gamma / 2.2: colours raised to this while blending

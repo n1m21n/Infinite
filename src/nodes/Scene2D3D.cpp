@@ -113,6 +113,8 @@ uniform sampler2D uB;
 uniform sampler2D uB2;
 uniform vec2 uDoc;
 uniform int uShOn, uInOn, uGlOn, uStOn, uOvOn, uStPos, uIgOn, uBvOn, uGrOn, uSaOn, uPaOn, uPaKind, uBvMat;
+uniform int uShBm, uInBm, uGlBm, uStBm, uOvBm, uIgBm, uGrBm, uSaBm, uPaBm;
+uniform int uIgStyle, uBvStyle, uGrStyle, uSaStyle;
 uniform vec4 uShC, uInC, uGlC, uStC, uOvC, uIgC, uBvHi, uBvLo, uGrA, uGrB, uSaC, uPaA, uPaB;
 uniform vec4 uShK, uGlK, uBvK, uSaK;   // contours: two inner points (x y x y) of a 0..1 curve
 uniform vec2 uSaOff;
@@ -123,10 +125,28 @@ uniform float uIgSpread, uBvDepth;
 uniform vec2 uShOff, uInOff;
 uniform float uShSpread, uInSpread, uGlSpread, uStSize, uFill;
 //STOPS
+vec3 fxMixRgb(vec3 b, vec3 s, int mode) {
+   if (mode == 1) return b * s;
+   if (mode == 2) return 1.0 - (1.0 - b) * (1.0 - s);
+   if (mode == 3) return mix(2.0 * b * s, 1.0 - 2.0 * (1.0 - b) * (1.0 - s), step(vec3(0.5), b));
+   if (mode == 4) return mix(2.0 * b * (1.0 - s) + sqrt(max(b, 0.0)) * (2.0 * s - 1.0), 2.0 * b * s + b * b * (1.0 - 2.0 * s), step(s, vec3(0.5)));
+   if (mode == 5) return clamp(b + s, 0.0, 1.0);
+   if (mode == 6) {
+      float lb = dot(b, vec3(0.299, 0.587, 0.114)), ls = dot(s, vec3(0.299, 0.587, 0.114));
+      return clamp(s + (lb - ls), 0.0, 1.0);
+   }
+   return s;
+}
 vec4 over(vec4 d, vec4 s) {
    float a = s.a + d.a * (1.0 - s.a);
    vec3 c = a > 1e-5 ? (s.rgb * s.a + d.rgb * d.a * (1.0 - s.a)) / a : vec3(0.0);
    return vec4(c, a);
+}
+vec4 overBlend(vec4 d, vec4 s, int mode) {
+   if (mode == 0 || d.a <= 1e-5) return over(d, s);
+   vec3 blended = fxMixRgb(d.rgb, s.rgb, mode);
+   vec3 srcRgb = mix(s.rgb, blended, d.a);
+   return over(d, vec4(srcRgb, s.a));
 }
 float spreadA(float v, float sp) { return clamp(v / (1.0 - min(sp, 0.99)), 0.0, 1.0); }
 float contour(float v, vec4 k) {
@@ -135,6 +155,10 @@ float contour(float v, vec4 k) {
    return k.z < 1.0 ? mix(k.w, 1.0, (v - k.z) / (1.0 - k.z)) : k.w;
 }
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float pnoise(vec2 p) {
+   vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+   return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
 float patternAt(vec2 uv) {
    vec2 p = uv * uDoc;
    float ca = cos(uPaAngle), sa = sin(uPaAngle);
@@ -144,7 +168,19 @@ float patternAt(vec2 uv) {
    if (uPaKind == 1) return 1.0 - smoothstep(0.28, 0.34, length(f - 0.5));
    if (uPaKind == 2) return step(0.5, f.x);
    if (uPaKind == 3) return step(min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)), 0.06);
-   return hash(floor(p));
+   if (uPaKind == 4) return hash(floor(p));
+   if (uPaKind == 5) return pnoise(p) * 0.65 + pnoise(p * 2.1 + 7.3) * 0.35;
+   if (uPaKind == 6) {
+      vec2 n = floor(p); float d1 = 2.0;
+      for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+         vec2 g = vec2(float(i), float(j));
+         vec2 o = vec2(hash(n + g), hash(n + g + vec2(17.1, 31.7)));
+         d1 = min(d1, length(g + o - f));
+      }
+      return clamp(d1, 0.0, 1.0);
+   }
+   float wx = 0.5 + 0.5 * sin(p.x * 6.2831853), wy = 0.5 + 0.5 * sin(p.y * 6.2831853);
+   return mix(wx, wy, 0.5 + 0.35 * sin((p.x + p.y) * 3.14159));
 }
 // The relief layers' materials (Scene2DNode kReliefFrag): one lighting model in the whole view.
 vec3 material(int m, vec3 base, vec3 n, vec3 L) {
@@ -166,25 +202,31 @@ vec3 material(int m, vec3 base, vec3 n, vec3 L) {
 void main() {
    vec4 L = texture(uL, vUv);
    vec4 res = vec4(0.0);
-   if (uShOn == 1) res = over(res, vec4(uShC.rgb, contour(spreadA(texture(uB, vUv - uShOff).r, uShSpread), uShK) * uShC.a));
-   if (uGlOn == 1) res = over(res, vec4(uGlC.rgb, contour(spreadA(texture(uB, vUv).g, uGlSpread), uGlK) * uGlC.a));
+   if (uShOn == 1) res = overBlend(res, vec4(uShC.rgb, contour(spreadA(texture(uB, vUv - uShOff).r, uShSpread), uShK) * uShC.a), uShBm);
+   if (uGlOn == 1) res = overBlend(res, vec4(uGlC.rgb, contour(spreadA(texture(uB, vUv).g, uGlSpread), uGlK) * uGlC.a), uGlBm);
    res = over(res, vec4(L.rgb, L.a * uFill));
-   if (uPaOn == 1) res = over(res, vec4(mix(uPaB.rgb, uPaA.rgb, patternAt(vUv)), L.a * uPaA.a));
+   if (uPaOn == 1) res = overBlend(res, vec4(mix(uPaB.rgb, uPaA.rgb, patternAt(vUv)), L.a * uPaA.a), uPaBm);
    if (uGrOn == 1) {
-      float t = clamp(dot(vUv - 0.5, uGrDir) + 0.5, 0.0, 1.0);
+      vec2 gp = vUv - 0.5;
+      float t = clamp(dot(gp, uGrDir) + 0.5, 0.0, 1.0);
+      if (uGrStyle == 1) t = clamp(length(gp) * 2.0, 0.0, 1.0);
+      else if (uGrStyle == 2) t = clamp(abs(dot(gp, uGrDir)) * 2.0, 0.0, 1.0);
+      else if (uGrStyle == 3) { vec2 perp = vec2(-uGrDir.y, uGrDir.x); t = clamp((abs(dot(gp, uGrDir)) + abs(dot(gp, perp))) * 2.0, 0.0, 1.0); }
       vec4 g = gradAt(t, vec4(uGrA.rgb, 1.0), vec4(uGrB.rgb, 1.0));
-      res = over(res, vec4(g.rgb, L.a * uGrA.a * g.a));
+      res = overBlend(res, vec4(g.rgb, L.a * uGrA.a * g.a), uGrBm);
    }
-   if (uOvOn == 1) res = over(res, vec4(uOvC.rgb, L.a * uOvC.a));
+   if (uOvOn == 1) res = overBlend(res, vec4(uOvC.rgb, L.a * uOvC.a), uOvBm);
    if (uSaOn == 1) {
       float sa = abs(texture(uB2, vUv + uSaOff).b - texture(uB2, vUv - uSaOff).b);
-      res = over(res, vec4(uSaC.rgb, L.a * contour(clamp(sa, 0.0, 1.0), uSaK) * uSaC.a));
+      if (uSaStyle == 1) sa = 1.0 - clamp(sa, 0.0, 1.0);
+      res = overBlend(res, vec4(uSaC.rgb, L.a * contour(clamp(sa, 0.0, 1.0), uSaK) * uSaC.a), uSaBm);
    }
    if (uBvOn == 1) {
       vec2 px = 1.0 / uDoc;
       float gx = contour(texture(uB2, vUv + vec2(px.x, 0.0)).g, uBvK) - contour(texture(uB2, vUv - vec2(px.x, 0.0)).g, uBvK);
       float gy = contour(texture(uB2, vUv + vec2(0.0, px.y)).g, uBvK) - contour(texture(uB2, vUv - vec2(0.0, px.y)).g, uBvK);
-      vec3 n = normalize(vec3(-gx * uBvDepth, -gy * uBvDepth, 1.0));
+      float dirSgn = uBvStyle == 1 ? 1.0 : -1.0;
+      vec3 n = normalize(vec3(dirSgn * gx * uBvDepth, dirSgn * gy * uBvDepth, 1.0));
       if (uBvMat >= 0) {
          vec3 lit = clamp(material(uBvMat, res.rgb, n, normalize(uBvLight)), 0.0, 1.0);
          res = vec4(mix(res.rgb, lit, L.a * uBvHi.a), res.a);
@@ -196,11 +238,12 @@ void main() {
    }
    if (uIgOn == 1) {
       float e = spreadA(texture(uB2, vUv).r, uIgSpread);
-      res = over(res, vec4(uIgC.rgb, L.a * (1.0 - e) * uIgC.a));
+      float igA = uIgStyle == 1 ? e : (1.0 - e);
+      res = overBlend(res, vec4(uIgC.rgb, L.a * igA * uIgC.a), uIgBm);
    }
    if (uInOn == 1) {
       float lit = spreadA(texture(uB, vUv - uInOff).b, uInSpread);
-      res = over(res, vec4(uInC.rgb, L.a * (1.0 - lit) * uInC.a));
+      res = overBlend(res, vec4(uInC.rgb, L.a * (1.0 - lit) * uInC.a), uInBm);
    }
    if (uStOn == 1 && uStSize > 0.0) {
       float rOut = uStPos == 0 ? uStSize : uStPos == 2 ? uStSize * 0.5 : 0.0;
@@ -215,7 +258,7 @@ void main() {
             if (rIn > 0.0) ero = min(ero, texture(uL, vUv + d * rIn * f).a);
          }
       }
-      res = over(res, vec4(uStC.rgb, clamp(dil - ero, 0.0, 1.0) * uStC.a));
+      res = overBlend(res, vec4(uStC.rgb, clamp(dil - ero, 0.0, 1.0) * uStC.a), uStBm);
    }
    fragColor = res;
 }
@@ -287,12 +330,12 @@ bool Scene2DNode::FxSame(const Fx& a, const Fx& b)
 {
    return a.on == b.on && std::equal(a.c, a.c + 4, b.c) && a.angle == b.angle && a.dist == b.dist && a.size == b.size &&
           a.spread == b.spread && a.pos == b.pos && std::equal(a.c2, a.c2 + 4, b.c2) && a.pattern == b.pattern &&
-          a.material == b.material && std::equal(a.contour, a.contour + 4, b.contour) && a.stops == b.stops;
+          a.material == b.material && a.blend == b.blend && a.style == b.style && std::equal(a.contour, a.contour + 4, b.contour) && a.stops == b.stops;
 }
 
 const char* Scene2DNode::FxPatternName(int p)
 {
-   static const char* names[kFxPatternCount] = { "Checker", "Dots", "Lines", "Grid", "Noise" };
+   static const char* names[kFxPatternCount] = { "Checker", "Dots", "Lines", "Grid", "Noise", "Perlin", "Voronoi", "Weave" };
    return p >= 0 && p < kFxPatternCount ? names[p] : "";
 }
 
@@ -1423,6 +1466,19 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
       glUniform1i(GLUtil::UniformLoc(prog, "uPaOn"), pa.on ? 1 : 0);
       glUniform1i(GLUtil::UniformLoc(prog, "uPaKind"), std::clamp(pa.pattern, 0, kFxPatternCount - 1));
       glUniform1i(GLUtil::UniformLoc(prog, "uBvMat"), std::clamp(bv.material, -1, 3));
+      glUniform1i(GLUtil::UniformLoc(prog, "uShBm"), std::clamp(sh.blend, 0, 6));
+      glUniform1i(GLUtil::UniformLoc(prog, "uInBm"), std::clamp(in.blend, 0, 6));
+      glUniform1i(GLUtil::UniformLoc(prog, "uGlBm"), std::clamp(gl.blend, 0, 6));
+      glUniform1i(GLUtil::UniformLoc(prog, "uStBm"), std::clamp(st.blend, 0, 6));
+      glUniform1i(GLUtil::UniformLoc(prog, "uOvBm"), std::clamp(ov.blend, 0, 6));
+      glUniform1i(GLUtil::UniformLoc(prog, "uIgBm"), std::clamp(ig.blend, 0, 6));
+      glUniform1i(GLUtil::UniformLoc(prog, "uGrBm"), std::clamp(gr.blend, 0, 6));
+      glUniform1i(GLUtil::UniformLoc(prog, "uSaBm"), std::clamp(sa.blend, 0, 6));
+      glUniform1i(GLUtil::UniformLoc(prog, "uPaBm"), std::clamp(pa.blend, 0, 6));
+      glUniform1i(GLUtil::UniformLoc(prog, "uIgStyle"), std::clamp(ig.style, 0, 1));
+      glUniform1i(GLUtil::UniformLoc(prog, "uBvStyle"), std::clamp(bv.style, 0, 1));
+      glUniform1i(GLUtil::UniformLoc(prog, "uGrStyle"), std::clamp(gr.style, 0, 3));
+      glUniform1i(GLUtil::UniformLoc(prog, "uSaStyle"), std::clamp(sa.style, 0, 1));
       glUniform1f(GLUtil::UniformLoc(prog, "uPaScale"), std::max(2.0f, pa.size));
       glUniform1f(GLUtil::UniformLoc(prog, "uPaAngle"), pa.angle * kD2R);
       col(sa, "uSaC");
@@ -1484,15 +1540,74 @@ void Scene2DNode::DrawFx(const Layer& l, int depth, int frameId, float opacityMu
    });
    return true;
    };
-   if (!runFx(l, l.fill, mFxOut))
+   // A drop shadow or outer glow with its own blend mode sits under the layer and blends with the canvas below it
+   // (Photoshop): inside the fx pass it would be blended into the empty picture, so it is drawn alone and passed
+   // onto the canvas with that mode first, then left out of the layer's own pass.
+   static const int kFxBlendToMode[7] = { 0, 2, 7, 11, 12, 9, 24 };   // normal multiply screen overlay soft-light add colour
+   Layer body = l;
+   auto passUnder = [&](int kind, const Fx& f) -> bool
+   {
+      if (!f.on || f.blend <= 0 || !GLUtil::EnsureFbo(mFxExtra, W, H, fmt, "Scene2DFx"))
+         return false;
+      Layer one = plain;
+      one.fx[kind] = f;
+      if (!runFx(one, 0.0f, mFxExtra))
+         return false;
+      PassArgs u;
+      u.tex = mFxExtra.tex;
+      u.texW = W;
+      u.texH = H;
+      u.box[0] = (float)W;
+      u.box[1] = (float)H;
+      u.srgb = false;
+      u.blend = kFxBlendToMode[std::clamp(f.blend, 0, 6)];
+      u.opacity = l.opacity * opacityMul;
+      u.clipMode = clipMode;
+      u.gamma = BlendGammaOf(l);
+      Pass(depth, u);
+      return true;
+   };
+   for (int kind : { kFxShadow, kFxGlow })
+   {
+      for (auto& m : body.fxMore)
+         if (m.first == kind && passUnder(kind, m.second))
+            m.second.on = false;
+      if (passUnder(kind, l.fx[kind]))
+         body.fx[kind].on = false;
+   }
+   // A stroke's outside part also lies on empty pixels: it goes under with its mode too. A centred stroke splits
+   // into that outside half and an inside half that stays in the layer's pass, over its own pixels.
+   auto strokeUnder = [&](Fx& st)
+   {
+      if (!st.on || st.blend <= 0 || st.pos == 1)
+         return;
+      Fx outer = st;
+      outer.pos = 0;
+      if (st.pos == 2)
+         outer.size = st.size * 0.5f;
+      if (!passUnder(kFxStroke, outer))
+         return;
+      if (st.pos == 2)
+      {
+         st.pos = 1;
+         st.size *= 0.5f;
+      }
+      else
+         st.on = false;
+   };
+   strokeUnder(body.fx[kFxStroke]);
+   for (auto& m : body.fxMore)
+      if (m.first == kFxStroke)
+         strokeUnder(m.second);
+   if (!runFx(body, l.fill, mFxOut))
       return;
    unsigned outTex = mFxOut.tex;
    // More of one kind: each drawn alone (no fill) and stacked, under the result for shadows and glows, over it otherwise.
-   if (!l.fxMore.empty() && mFxCombineProgram != 0 && GLUtil::EnsureFbo(mFxExtra, W, H, fmt, "Scene2DFx") &&
+   if (!body.fxMore.empty() && mFxCombineProgram != 0 && GLUtil::EnsureFbo(mFxExtra, W, H, fmt, "Scene2DFx") &&
        GLUtil::EnsureFbo(mFxMore[0], W, H, fmt, "Scene2DFx") && GLUtil::EnsureFbo(mFxMore[1], W, H, fmt, "Scene2DFx"))
    {
       int ping = 0;
-      for (const auto& m : l.fxMore)
+      for (const auto& m : body.fxMore)
       {
          if (!m.second.on || m.first < 0 || m.first >= kFxCount)
             continue;

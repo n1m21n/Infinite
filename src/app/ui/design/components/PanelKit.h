@@ -162,7 +162,20 @@ namespace PanelKit
          keep = Grid();
          Grid() = { cols, 0, total, 0.0f };
       }
-      ~GridScope() { Grid() = keep; }
+      // The outer grid resumes on a fresh row: the next cell after this block never lands beside its last row.
+      ~GridScope()
+      {
+         if (keep.cols > 0 && keep.at % keep.cols != 0)
+            keep.at += keep.cols - keep.at % keep.cols;
+         Grid() = keep;
+      }
+      // Ends the current row early, so the next cell starts at the left (a full-width row comes next).
+      static void EndRow()
+      {
+         GridState& g = Grid();
+         if (g.cols > 0 && g.at % g.cols != 0)
+            g.at += g.cols - g.at % g.cols;
+      }
    };
 
    // Places the next cell (SameLine after the first in a row) and returns its width; 0 when no grid is active.

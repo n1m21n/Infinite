@@ -1071,8 +1071,14 @@ void DrawKeyboard(FrameCtx& fc)
 
       // Right-click (two-finger click on a Mac trackpad) opens the same
       // type-to-filter picker as double-click, so the keyboard works either way.
-      // A floating window over the canvas (chat, panels) keeps its own right-clicks.
-      const bool canvasUnderMouse = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+      // Any docked panel (child window) or floating window over the canvas keeps its own right-clicks.
+      const ImVec2 mouse = ImGui::GetMousePos();
+      const bool overGraph = !fc.viewFill &&
+                             mouse.x >= gGraphScreenTL.x &&
+                             mouse.y >= gGraphScreenTL.y &&
+                             mouse.x <= gGraphScreenTL.x + gGraphScreenSize.x &&
+                             mouse.y <= gGraphScreenTL.y + gGraphScreenSize.y;
+      const bool canvasUnderMouse = overGraph && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
       if (ed::ShowBackgroundContextMenu() && gCommentEdit.target == nullptr && canvasUnderMouse)
       {
          gSpawnPos = ed::ScreenToCanvas(ImGui::GetMousePos());

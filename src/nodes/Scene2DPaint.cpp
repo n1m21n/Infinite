@@ -1212,6 +1212,13 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
    MatchRegion(px, W, H, (int)std::floor(x), H - 1 - (int)std::floor(y), tolerance, contiguous, region);
    if (std::none_of(region.begin(), region.end(), [](uint8_t v) { return v != 0; }))
       return false;
+   // A click on a pixel the selection leaves out fills nothing, even when its region reaches the selection
+   // (Photoshop; PhotoCraft a_click_outside_the_selection_adds_no_state_even_when_its_region_reaches_it).
+   {
+      const int cx = (int)std::floor(x), cr = H - 1 - (int)std::floor(y);
+      if (mSelAny && mSel.size() == region.size() && cx >= 0 && cx < W && cr >= 0 && cr < H && mSel[(size_t)cr * W + cx] == 0)
+         return false;
+   }
    // A region the selection hides wholly changes nothing (and so is no undo step).
    if (mSelAny && mSel.size() == region.size())
    {
@@ -1679,20 +1686,72 @@ void Scene2DNode::SelectRect(float x0, float y0, float x1, float y1, int op, flo
 {
    if (x1 < x0) std::swap(x0, x1);
    if (y1 < y0) std::swap(y0, y1);
-   std::vector<float> xy;
    if (ellipse)
    {
-      const float cx = (x0 + x1) * 0.5f, cy = (y0 + y1) * 0.5f, rx = (x1 - x0) * 0.5f, ry = (y1 - y0) * 0.5f;
-      for (int i = 0; i < 128; i++)
+      SelectEllipse(x0, y0, x1, y1, op, feather, aa);
+      return;
+   }
+   const std::vector<float> xy = { x0, y0, x1, y0, x1, y1, x0, y1 };
+   SelectPolygon(xy, op, feather, false);   // Photoshop's Anti-alias only softens the ellipse
+}
+
+// The Elliptical Marquee as Photoshop draws it (PhotoCraft algo/selection/marquee.rs Ellipse, MIT/Apache-2.0):
+// hard, a pixel is in when its centre is; anti-aliased, with F the normalised radius at the centre the coverage ramps
+// linearly over the pixel's own width across the edge, (0.5 - (F - 1) F / (|dx|/rx^2 + |dy|/ry^2)). An ellipse at
+// most 3 px across keeps 4 x 4 sub-samples.
+void Scene2DNode::SelectEllipse(float x0, float y0, float x1, float y1, int op, float feather, bool aa)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> t((size_t)W * H, 0);
+   const double cx = (x0 + x1) * 0.5, cy = (y0 + y1) * 0.5, rx = (x1 - x0) * 0.5, ry = (y1 - y0) * 0.5;
+   if (rx > 0.0 && ry > 0.0)
+   {
+      const bool small = std::min(x1 - x0, y1 - y0) <= 3.0f;
+      auto inside = [&](double px, double py) { const double u = (px - cx) / rx, v = (py - cy) / ry; return u * u + v * v <= 1.0; };
+      const int ya = std::max(0, (int)std::floor(y0)), yb = std::min(H, (int)std::ceil(y1));
+      const int xa = std::max(0, (int)std::floor(x0)), xb = std::min(W, (int)std::ceil(x1));
+      for (int y = ya; y < yb; y++)
       {
-         const float a = (float)i / 128.0f * 6.2831853f;
-         xy.push_back(cx + std::cos(a) * rx);
-         xy.push_back(cy + std::sin(a) * ry);
+         uint8_t* row = &t[(size_t)(H - 1 - y) * W];
+         for (int x = xa; x < xb; x++)
+         {
+            double c;
+            if (!aa)
+               c = inside(x + 0.5, y + 0.5) ? 1.0 : 0.0;
+            else if (small)
+            {
+               int n = 0;
+               for (int i = 0; i < 16; i++)
+                  n += inside(x + ((i % 4) + 0.5) / 4.0, y + ((i / 4) + 0.5) / 4.0) ? 1 : 0;
+               c = n / 16.0;
+            }
+            else
+            {
+               const double dx = x + 0.5 - cx, dy = y + 0.5 - cy, u = dx / rx, v = dy / ry;
+               const double f = std::sqrt(u * u + v * v), across = std::fabs(dx) / (rx * rx) + std::fabs(dy) / (ry * ry);
+               c = across <= 0.0 ? 1.0 : std::clamp(0.5 - (f - 1.0) * f / across, 0.0, 1.0);
+            }
+            row[x] = (uint8_t)(c * 255.0 + 0.5);
+         }
       }
    }
+   if (feather > 0.5f)
+      Feather(t, W, H, feather);
+   if (mSel.size() != t.size())
+      mSel.assign(t.size(), 0);
+   if (op == kSelNew || !mSelAny)
+      mSel = op == kSelSub || op == kSelIntersect ? std::vector<uint8_t>(t.size(), 0) : t;
    else
-      xy = { x0, y0, x1, y0, x1, y1, x0, y1 };
-   SelectPolygon(xy, op, feather, aa && ellipse);   // Photoshop's Anti-alias only softens the ellipse
+      for (size_t i = 0; i < t.size(); i++)
+      {
+         if (op == kSelAdd) mSel[i] = std::max(mSel[i], t[i]);
+         else if (op == kSelSub) mSel[i] = (uint8_t)(mSel[i] * (255 - t[i]) / 255);
+         else mSel[i] = std::min(mSel[i], t[i]);
+      }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+   StoreSelection();
 }
 
 void Scene2DNode::SelectWand(float x, float y, int tolerance, bool contiguous, int op, bool sampleAll, int layerId)

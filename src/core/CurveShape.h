@@ -47,6 +47,18 @@ struct CurveShape
    int AddPoint(float x, float y);
    void MovePoint(int index, float x, float y);
    void RemovePoint(int index);
+   // Replaces every point (an editor's result); bumps version only when something differs.
+   void SetPoints(const std::vector<Point>& p)
+   {
+      bool same = p.size() == points.size();
+      for (size_t i = 0; same && i < p.size(); i++)
+         same = p[i].x == points[i].x && p[i].y == points[i].y;
+      if (!same && p.size() >= 2)
+      {
+         points = p;
+         version++;
+      }
+   }
 
    // Curve value at x (0..1).
    float Evaluate(float x) const;

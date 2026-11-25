@@ -2998,6 +2998,17 @@ namespace params
       constexpr float fill_pct_lo = 0.0f;
       constexpr float blend_gamma_lo = 0.1f;
       constexpr float blend_gamma_hi = 10.0f;
+      constexpr float noise_size_lo = 1.0f;
+      constexpr float noise_size_hi = 16.0f;
+      constexpr float noise_seed_hi = 100.0f;
+      constexpr float tex_scale_lo = 1.0f;
+      constexpr float tex_scale_hi = 64.0f;
+      constexpr float tex_oct_lo = 1.0f;
+      constexpr float tex_oct_hi = 8.0f;
+      constexpr float tex_detail_lo = 0.1f;
+      constexpr float tex_detail_hi = 3.0f;
+      constexpr float tex_warp_hi = 2.0f;
+      constexpr float vmask_feather_hi = 64.0f;
       constexpr float relief_light_lo = -180.0f;
       constexpr float relief_light_hi = 180.0f;
       constexpr float relief_elev_lo = 5.0f;

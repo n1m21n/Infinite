@@ -93,6 +93,22 @@ OPS += [
     {"name": "adj_tone_stretch", "proxy": False,
      "js": _adj("ToneStretch", "ap.stretchFactor = 0.25; ap.gamma = 1.0; ap.compression = 0.0;")},
 ]
+# Classic adjustments, one strong setting each. Affinity's sliders are not Photoshop's (Infinite is fitted to Photoshop
+# for contrast, vibrance and black & white), so these record how far the two apps sit apart, not which is right.
+def _adj_inv():
+    return "doc.addNode(N.InvertAdjustmentRasterNodeDefinition.create(), null, undefined, false);"
+OPS += [
+    {"name": "adj_brightness", "proxy": False, "js": _adj("BrightnessContrast", "ap.brightness = 0.5;")},
+    {"name": "adj_contrast", "proxy": False, "js": _adj("BrightnessContrast", "ap.contrast = 0.5;")},
+    {"name": "adj_exposure", "proxy": False, "js": _adj("Exposure", "ap.exposure = 1.0;")},
+    {"name": "adj_vibrance", "proxy": False, "js": _adj("Vibrance", "ap.vibrance = 0.75;")},
+    {"name": "adj_posterize", "proxy": False, "js": _adj("Posterise", "ap.levels = 4;")},
+    {"name": "adj_threshold", "proxy": False, "js": _adj("Threshold", "ap.threshold = 0.5;")},
+    {"name": "adj_invert", "proxy": False, "js": _adj_inv()},
+]
+# Layer blend modes: an orange box over the photo in each mode (Infinite's index in src/core/BlendModes.cpp).
+BLENDS = {"screen": "Screen", "colour_dodge": "ColourDodge", "overlay": "Overlay", "soft_light": "SoftLight",
+          "difference": "Difference", "hue": "Hue"}
 # Vector shapes and layer settings: Affinity draws the same items with its shape nodes. Strokes sit on the edge.
 def _shape(kind, box, fill, extra=""):
     return (f"const s = shape(S.{kind}, {box}); doc.executeCommand(DocumentCommand.createSetBrushFill(s, rgb({fill}))); "
@@ -109,6 +125,10 @@ OPS += [
      "js": _shape("ShapeRectangle", "100,200,250,320", "255,0,0", "doc.executeCommand(DocumentCommand.createSetOpacity(s, 0.5));")},
     {"name": "layer_opacity", "proxy": False, "js": "doc.executeCommand(DocumentCommand.createSetOpacity(sel(), 0.5));"},
 ]
+
+OPS += [{"name": f"blend_{k}", "proxy": False,
+         "js": _shape("ShapeRectangle", "50,100,460,700", "255,128,64", f"doc.executeCommand(DocumentCommand.createSetBlendMode(s, BlendMode.{v}));")}
+        for k, v in BLENDS.items()]
 
 # Behaviour checks, Infinite only: brush tools Affinity's SDK cannot stroke. Each names the box (x0, y0, x1, y1) the
 # stroke covers and what Affinity's help says the tool does there; outside the box (well clear of the stroke) the

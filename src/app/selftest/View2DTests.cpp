@@ -6,6 +6,7 @@
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/Scene2DNode.h"
 #include "nodes/SceneNodes.h"
+#include "core/BlendModes.h"
 #include "core/TileStore.h"
 #include "gl3.h"
 #include "stb_image_write.h"
@@ -1076,7 +1077,7 @@ void RunView2DTest()
             const Layer* cl = copy.FindLayer(L);
             Check("B7: the stack saves and reloads", cl != nullptr && cl->effects.size() == 2 && cl->effects[0].uid == blurUid &&
                                                      cl->effects[0].entry == "Gaussian Blur" && cl->effects[1].adjType == Scene2DNode::kAdjBlackWhite &&
-                                                     cl->effects[1].adjP.size() == 6);
+                                                     cl->effects[1].adjP.size() == (size_t)Scene2DNode::AdjParamCount(Scene2DNode::kAdjBlackWhite));
             Layer fresh;
             Check("B7: the stack goes through a preset", Scene2DNode::ParseEffects(Scene2DNode::EffectsText(*pic.FindLayer(L)), fresh) &&
                                                          fresh.effects.size() == 2 && fresh.effects[1].adjType == Scene2DNode::kAdjBlackWhite);
@@ -1276,6 +1277,28 @@ void RunView2DTest()
                                                               && !BrushEngine::Stroke::Predict(a, a, 8.0f, 100.0f, to));
 
       // Phase 5 brush feel: Hard round defaults, OneEuro smoothing, catch-up toggle, tilt dynamics, airbrush tick.
+      // The anti-aliased Elliptical Marquee against Photoshop's measured edge (PhotoCraft #11391): document
+      // 400 x 350, ellipse 100,100-300,250, a black fill read at x 127-132, y 119-124, within three levels.
+      {
+         static const uint8_t kSoft[6][6] = { { 255, 255, 255, 255, 255, 152 }, { 255, 255, 255, 212, 106, 0 },
+                                              { 255, 255, 172, 64, 0, 0 },       { 247, 137, 26, 0, 0, 0 },
+                                              { 105, 0, 0, 0, 0, 0 },             { 0, 0, 0, 0, 0, 0 } };
+         Scene2DNode e;
+         e.Layers();
+         e.Doc().w = 400;
+         e.Doc().h = 350;
+         e.Commit();
+         e.SelectRect(100, 100, 300, 250, Scene2DNode::kSelNew, 0, true, true);
+         const std::vector<uint8_t>& m = e.SelectionPixels();
+         int worst = 0;
+         if (m.size() == (size_t)400 * 350)
+            for (int j = 0; j < 6; j++)
+               for (int i = 0; i < 6; i++)
+                  worst = std::max(worst, std::abs((255 - (int)m[(size_t)(349 - (119 + j)) * 400 + 127 + i]) - (int)kSoft[j][i]));
+         else
+            worst = 999;
+         Check("Marquee: the anti-aliased ellipse edge matches Photoshop within three levels", worst <= 3);
+      }
       Check("Phase5: Hard round starts with pressureSize off and <=5% spacing",
             !BrushEngine::Presets()[5].brush.pressureSize && BrushEngine::Presets()[5].brush.spacing <= 0.055f);
       BrushEngine::Brush euro = pen;
@@ -2986,6 +3009,383 @@ void RunView2DTest()
          if (!(b >= 0.0f && b <= 1.0001f))
             histNorm = false;
       Check("Histogram: fast downsampled readback returns 64 normalized bins", histOk && histNorm);
+   }
+   // ---- Sweep: every adjustment, effect, layer style, style blend and layer blend, judged on the whole picture ----
+   // Each one must change the picture when it is set to do something, leave it alone when it is set to nothing,
+   // keep alpha, stay finite, and look the same after save and reopen. An effect must match the same adjustment layer.
+   {
+      using Shape = Scene2DNode::Shape;
+      using S = Scene2DNode;
+      constexpr int kW = 256, kH = 192;
+      auto Buf = [](Scene2DNode* d) {
+         const int w = d->GetOutputWidth(), h = d->GetOutputHeight();
+         std::vector<float> px((size_t)w * h * 4);
+         glBindTexture(GL_TEXTURE_2D, d->GetOutputTexture());
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         return px;
+      };
+      struct Diff { float mean = 0, maxRgb = 0, maxA = 0, changed = 0; bool finite = true; };
+      auto Compare = [](const std::vector<float>& a, const std::vector<float>& b) {
+         Diff d;
+         if (a.size() != b.size() || a.empty())
+         {
+            d.finite = false;
+            return d;
+         }
+         const size_t n = a.size() / 4;
+         double sum = 0;
+         size_t moved = 0;
+         for (size_t i = 0; i < n; i++)
+         {
+            float m = 0;
+            for (int c = 0; c < 4; c++)
+               if (!std::isfinite(b[i * 4 + c]))
+                  d.finite = false;
+            for (int c = 0; c < 3; c++)
+               m = std::max(m, std::fabs(a[i * 4 + c] - b[i * 4 + c]));
+            d.maxA = std::max(d.maxA, std::fabs(a[i * 4 + 3] - b[i * 4 + 3]));
+            d.maxRgb = std::max(d.maxRgb, m);
+            sum += m;
+            if (m > 0.02f)
+               moved++;
+         }
+         d.mean = (float)(sum / (double)n);
+         d.changed = (float)moved / (float)n;
+         return d;
+      };
+      // One vector layer of 8 x 6 cards: hues round the wheel, lightness down the rows.
+      auto Base = [&](Scene2DNode& pic) {
+         pic.Layers();
+         pic.Doc().w = kW;
+         pic.Doc().h = kH;
+         pic.Commit();
+         const int id = pic.AddVectorLayer();
+         Layer* l = pic.FindLayer(id);
+         l->pw = kW;
+         l->ph = kH;
+         l->x = kW * 0.5f;
+         l->y = kH * 0.5f;
+         l->shapes.clear();
+         for (int r = 0; r < 6; r++)
+            for (int c = 0; c < 8; c++)
+            {
+               Shape sh;
+               sh.type = Shape::kRect;
+               sh.x0 = c * 32.0f; sh.y0 = r * 32.0f; sh.x1 = sh.x0 + 32.0f; sh.y1 = sh.y0 + 32.0f;
+               const float hue = c / 8.0f * 6.0f, light = 0.1f + 0.16f * r, sat = c == 7 ? 0.0f : 0.8f;
+               for (int k = 0; k < 3; k++)
+               {
+                  const float hk = std::fmod(hue + 4.0f - 2.0f * k + 6.0f, 6.0f);
+                  const float ch = std::clamp(std::fabs(hk - 3.0f) - 1.0f, 0.0f, 1.0f);
+                  sh.fillC[k] = std::clamp(light + sat * (ch - 0.5f) * (1.0f - std::fabs(2.0f * light - 1.0f)), 0.0f, 1.0f);
+               }
+               sh.fillC[3] = 1.0f;
+               l->shapes.push_back(sh);
+            }
+         pic.Commit();
+         return id;
+      };
+      // Settings that make each adjustment do something clearly visible.
+      auto Strong = [](int t, float& amt, std::vector<float>& p, float levels[4], std::vector<float>& curve, float colA[4], float colB[4]) {
+         switch (t)
+         {
+         case S::kAdjPixelate: amt = 20.0f; break;   // not a divisor of the 32 px cards, so blocks straddle edges
+         case S::kAdjHalftone: amt = 16.0f; break;
+         case S::kAdjDither: amt = 2.0f; break;
+         case S::kAdjThreshold: amt = 0.5f; break;
+         case S::kAdjGradientMap: amt = 1.0f; colA[0] = 1; colA[1] = 0; colA[2] = 0; colB[0] = 0; colB[1] = 0; colB[2] = 1; break;
+         case S::kAdjPosterize: amt = 2.0f; break;
+         case S::kAdjBrightness: amt = 0.5f; break;
+         case S::kAdjContrast: amt = 0.8f; break;
+         case S::kAdjHue: amt = 90.0f; break;
+         case S::kAdjSaturation: amt = 0.0f; break;
+         case S::kAdjExposure: amt = 1.5f; break;
+         case S::kAdjInvert: amt = 1.0f; break;
+         case S::kAdjLevels: levels[0] = 0.3f; levels[1] = 0.7f; break;
+         case S::kAdjCurves: curve = { 0.0f, 0.0f, 0.5f, 0.85f, 1.0f, 1.0f }; break;
+         case S::kAdjColorBalance: p[3] = 0.8f; p[5] = -0.8f; break;
+         case S::kAdjVibrance: amt = 1.0f; break;
+         case S::kAdjSelective: p[36] = 0.0f; for (int k = 0; k < 6; k++) p[(size_t)k * 4] = 1.0f; break;   // more cyan in every colour, absolute
+         case S::kAdjMixer: p[0] = 0.0f; p[1] = 1.0f; break;
+         case S::kAdjBlackWhite: amt = 1.0f; break;
+         case S::kAdjPhotoFilter: amt = 1.0f; break;
+         case S::kAdjShadowsHighlights: p[0] = 1.0f; p[1] = 1.0f; break;
+         case S::kAdjWhiteBalance: p[0] = 0.8f; p[1] = 0.5f; break;
+         case S::kAdjSplitToning: p = { 30.0f, 1.0f, 220.0f, 1.0f, 0.5f }; break;
+         case S::kAdjRecolour: p = { 200.0f, 1.0f, 0.0f }; break;
+         case S::kAdjToneCompression: p[0] = 2.0f; break;
+         case S::kAdjToneStretch: p[0] = 1.0f; break;
+         case S::kAdjNoise: amt = 1.0f; break;
+         case S::kAdjTexture: amt = 1.0f; break;
+         default: break;
+         }
+      };
+      // At their defaults these change nothing (Photoshop / Affinity open them neutral).
+      auto NeutralAtDefault = [](int t) {
+         return t == S::kAdjBrightness || t == S::kAdjContrast || t == S::kAdjHue || t == S::kAdjSaturation || t == S::kAdjExposure
+                || t == S::kAdjLevels || t == S::kAdjCurves || t == S::kAdjColorBalance || t == S::kAdjSelective || t == S::kAdjMixer
+                || t == S::kAdjWhiteBalance || t == S::kAdjSplitToning;
+      };
+
+      Scene2DNode ref;
+      Base(ref);
+      Cook(&ref);
+      const std::vector<float> plain = Buf(&ref);
+      std::string noChange, notNeutral, badAlpha, badFinite, badSave, badEffect;
+      for (int t = 0; t < S::kAdjCount; t++)
+      {
+         const bool needsFile = t == S::kAdjLookup;   // a .cube file; with none it passes the picture through
+         Scene2DNode pic;
+         Base(pic);
+         Layer& a = pic.AddLayer(Kind::Adjust, 0, pic.Layers().back().id);
+         const int aid = a.id;
+         a.adjType = t;
+         a.adjAmt = a.adjTo = S::AdjDefault(t);
+         a.adjP = S::AdjParamDefault(t);
+         pic.Commit();
+         Cook(&pic);
+         const Diff dDef = Compare(plain, Buf(&pic));
+         Layer* al = pic.FindLayer(aid);
+         float amt = al->adjAmt;
+         Strong(t, amt, al->adjP, al->levels, al->curve, al->colorA, al->colorB);
+         al->adjAmt = al->adjTo = amt;
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> strong = Buf(&pic);
+         const Diff dStrong = Compare(plain, strong);
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         Cook(&copy);
+         const Diff dSave = Compare(strong, Buf(&copy));
+         // The same settings as an effect on the cards layer.
+         Scene2DNode fx;
+         const int cards = Base(fx);
+         {
+            const Layer* src = pic.FindLayer(aid);
+            S::Effect e;
+            e.adjType = t;
+            e.adjAmt = src->adjAmt;
+            e.adjP = src->adjP;
+            std::copy(src->levels, src->levels + 4, e.levels);
+            e.curve = src->curve;
+            std::copy(src->colorA, src->colorA + 4, e.colorA);
+            std::copy(src->colorB, src->colorB + 4, e.colorB);
+            fx.FindLayer(cards)->effects.push_back(e);
+            fx.Commit();
+         }
+         Cook(&fx);
+         const std::vector<float> asEffect = Buf(&fx);
+         const Diff dEff = Compare(strong, asEffect);
+         Scene2DNode fxCopy;
+         fxCopy.SetDocText(fx.DocText());
+         Cook(&fxCopy);
+         const Diff dEffSave = Compare(asEffect, Buf(&fxCopy));
+         printf("  sweep adj %-20s default %.4f/%.3f  strong %.4f/%.3f (%.0f%% moved)  save %.4f  effect %.4f save %.4f  alpha %.3f\n",
+                S::AdjName(t), dDef.mean, dDef.maxRgb, dStrong.mean, dStrong.maxRgb, dStrong.changed * 100.0f, dSave.maxRgb, dEff.mean,
+                dEffSave.maxRgb, std::max(dStrong.maxA, dEff.maxA));
+         const std::string nm = std::string(" ") + S::AdjName(t);
+         if (!needsFile && dStrong.changed < 0.05f)
+            noChange += nm;
+         if (NeutralAtDefault(t) && dDef.maxRgb > 0.01f)
+            notNeutral += nm;
+         if (dStrong.maxA > 0.01f || dEff.maxA > 0.01f)
+            badAlpha += nm;
+         if (!dDef.finite || !dStrong.finite || !dEff.finite)
+            badFinite += nm;
+         if (dSave.maxRgb > 0.01f || dEffSave.maxRgb > 0.01f)
+            badSave += nm;
+         if (dEff.mean > 0.01f)
+            badEffect += nm;
+      }
+      printf("  sweep adj: no change [%s] not neutral [%s] alpha [%s] non-finite [%s] save [%s] effect differs [%s]\n", noChange.c_str(),
+             notNeutral.c_str(), badAlpha.c_str(), badFinite.c_str(), badSave.c_str(), badEffect.c_str());
+      Check("Sweep: every adjustment changes the picture when set", noChange.empty());
+      Check("Sweep: the neutral adjustments change nothing at their defaults", notNeutral.empty());
+      Check("Sweep: no adjustment or effect touches alpha", badAlpha.empty());
+      Check("Sweep: every adjustment and effect stays finite", badFinite.empty());
+      Check("Sweep: every adjustment and effect looks the same after save and reopen", badSave.empty());
+      Check("Sweep: an effect looks like the same adjustment layer", badEffect.empty());
+
+      // Layer styles: a red card on the cards; each style shows, saves, and each of its seven blends looks different.
+      auto StyleDoc = [&](Scene2DNode& pic) {
+         Base(pic);
+         const int id = pic.AddVectorLayer();
+         Layer* l = pic.FindLayer(id);
+         l->pw = 96; l->ph = 64; l->x = kW * 0.5f; l->y = kH * 0.5f;
+         Shape sh;
+         sh.type = Shape::kRect;
+         sh.x0 = 0; sh.y0 = 0; sh.x1 = 96; sh.y1 = 64;
+         sh.fillC[0] = 0.9f; sh.fillC[1] = 0.3f; sh.fillC[2] = 0.2f; sh.fillC[3] = 1.0f;
+         l->shapes = { sh };
+         pic.Commit();
+         return id;
+      };
+      Scene2DNode sref;
+      StyleDoc(sref);
+      Cook(&sref);
+      const std::vector<float> unstyled = Buf(&sref);
+      std::string styleNone, styleSave, styleBlend;
+      for (int k = 0; k < S::kFxCount; k++)
+      {
+         std::vector<std::vector<float>> per;
+         for (int b = 0; b < 7; b++)
+         {
+            if (k == S::kFxBevel && b > 0)
+               break;
+            Scene2DNode pic;
+            const int id = StyleDoc(pic);
+            Layer* l = pic.FindLayer(id);
+            S::Fx& f = l->fx[k];
+            f = S::FxDefault(k);
+            f.on = true;
+            f.blend = b;
+            f.c[0] = 0.2f; f.c[1] = 0.7f; f.c[2] = 1.0f; f.c[3] = 1.0f;
+            if (k == S::kFxShadow || k == S::kFxInner)
+               f.dist = 12.0f;
+            if (k == S::kFxGlow || k == S::kFxInnerGlow || k == S::kFxShadow)
+               f.size = 12.0f;
+            pic.Commit();
+            Cook(&pic);
+            per.push_back(Buf(&pic));
+            if (b == 0)
+            {
+               const Diff d = Compare(unstyled, per[0]);
+               Scene2DNode copy;
+               copy.SetDocText(pic.DocText());
+               Cook(&copy);
+               const Diff ds = Compare(per[0], Buf(&copy));
+               printf("  sweep style %-16s %.4f (%.1f%% moved) save %.4f\n", S::FxName(k), d.mean, d.changed * 100.0f, ds.maxRgb);
+               if (d.changed < 0.005f)
+                  styleNone += std::string(" ") + S::FxName(k);
+               if (ds.maxRgb > 0.01f)
+                  styleSave += std::string(" ") + S::FxName(k);
+            }
+         }
+         std::string same;
+         for (size_t i = 0; i < per.size(); i++)
+            for (size_t j = i + 1; j < per.size(); j++)
+               if (Compare(per[i], per[j]).maxRgb < 0.01f)
+                  same += " " + std::to_string(i) + "=" + std::to_string(j);
+         if (!same.empty())
+         {
+            printf("  sweep style %s: blends look the same:%s\n", S::FxName(k), same.c_str());
+            styleBlend += std::string(" ") + S::FxName(k);
+         }
+      }
+      printf("  sweep styles: no change [%s] save [%s] blends alike [%s]\n", styleNone.c_str(), styleSave.c_str(), styleBlend.c_str());
+      Check("Sweep: every layer style shows", styleNone.empty());
+      Check("Sweep: every layer style looks the same after save and reopen", styleSave.empty());
+      Check("Sweep: each style's seven blends look different", styleBlend.empty());
+
+      // Layer blend modes: the red card over the cards with each mode; every live mode looks different from Normal.
+      std::string blendSame;
+      {
+         std::vector<std::vector<float>> per;
+         const int modes = BlendModes::kContrastInvertMode + 1;
+         for (int m = 0; m < modes; m++)
+         {
+            Scene2DNode pic;
+            const int id = StyleDoc(pic);
+            pic.FindLayer(id)->blend = m;
+            pic.Commit();
+            Cook(&pic);
+            per.push_back(Buf(&pic));
+         }
+         for (int m = 1; m < modes; m++)
+         {
+            if (m >= 32 && m <= 34)
+               continue;   // the three "(old)" modes
+            const Diff d = Compare(per[0], per[m]);
+            if (d.changed < 0.005f)
+               blendSame += " " + std::to_string(m);
+         }
+         printf("  sweep blends: same as Normal [%s]\n", blendSame.c_str());
+      }
+      Check("Sweep: every live layer blend mode looks different from Normal", blendSame.empty());
+
+      // Rasterize keeps the picture: a styled, masked, effected vector layer becomes pixels and looks the same.
+      {
+         Scene2DNode pic;
+         const int id = StyleDoc(pic);
+         Layer* l = pic.FindLayer(id);
+         l->fx[S::kFxStroke].on = true;
+         l->fx[S::kFxStroke].size = 4.0f;
+         l->fx[S::kFxStroke].c[3] = 1.0f;
+         l->fx[S::kFxShadow].on = true;
+         l->hasVMask = true;
+         Shape keep;
+         keep.type = Shape::kEllipse;
+         keep.x0 = 10; keep.y0 = 0; keep.x1 = 86; keep.y1 = 64;
+         keep.fillC[0] = keep.fillC[1] = keep.fillC[2] = 1.0f;
+         l->vmask = { keep };
+         l->vmaskFeather = 4.0f;
+         S::Effect e;
+         e.adjType = S::kAdjHue;
+         e.adjAmt = 60.0f;
+         e.adjP = S::AdjParamDefault(S::kAdjHue);
+         l->effects.push_back(e);
+         l->opacity = 0.8f;
+         l->blend = 2;
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> before = Buf(&pic);
+         const bool ran = pic.RasterizeLayer(id);
+         Cook(&pic);
+         const Diff d = Compare(before, Buf(&pic));
+         Scene2DNode copy;
+         copy.SetDocText(pic.DocText());
+         Cook(&copy);
+         const Diff ds = Compare(before, Buf(&copy));
+         printf("  sweep rasterize: ran %d, diff max %.4f mean %.5f, after reopen %.4f\n", ran, d.maxRgb, d.mean, ds.maxRgb);
+         Check("Sweep: rasterizing a styled, masked, effected layer keeps the picture", ran && d.maxRgb < 0.03f && ds.maxRgb < 0.03f);
+      }
+      // Vector mask: invert shows the opposite part; off shows all; feather softens the edge.
+      {
+         Scene2DNode pic;
+         const int id = StyleDoc(pic);
+         Cook(&pic);
+         const std::vector<float> full = Buf(&pic);
+         Layer* l = pic.FindLayer(id);
+         l->hasVMask = true;
+         Shape keep;
+         keep.type = Shape::kRect;
+         keep.x0 = 0; keep.y0 = 0; keep.x1 = 48; keep.y1 = 64;
+         keep.fillC[0] = keep.fillC[1] = keep.fillC[2] = 1.0f;
+         l->vmask = { keep };
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> masked = Buf(&pic);
+         pic.FindLayer(id)->vmaskInvert = true;
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> inverted = Buf(&pic);
+         pic.FindLayer(id)->vmaskInvert = false;
+         pic.FindLayer(id)->vmaskOn = false;
+         pic.Commit();
+         Cook(&pic);
+         const Diff off = Compare(full, Buf(&pic));
+         pic.FindLayer(id)->vmaskOn = true;
+         pic.FindLayer(id)->vmaskFeather = 8.0f;
+         pic.Commit();
+         Cook(&pic);
+         const std::vector<float> feathered = Buf(&pic);
+         // masked + inverted together cover the card once: their sum equals full + the cards without the layer.
+         Scene2DNode bare;
+         Base(bare);
+         Cook(&bare);
+         const std::vector<float> plain = Buf(&bare);
+         const Diff dm = Compare(full, masked), di = Compare(full, inverted), df = Compare(masked, feathered);
+         float worst = 0;
+         for (size_t i = 0; i < full.size(); i += 4)
+            for (int c = 0; c < 3; c++)
+               worst = std::max(worst, std::fabs(masked[i + c] + inverted[i + c] - full[i + c] - plain[i + c]));
+         printf("  sweep vmask: masked %.1f%% inverted %.1f%% off %.4f feather %.1f%% halves add up %.4f\n", dm.changed * 100.0f,
+                di.changed * 100.0f, off.maxRgb, df.changed * 100.0f, worst);
+         Check("Sweep: a vector mask and its inverse split the layer exactly", dm.changed > 0.01f && di.changed > 0.01f && worst < 0.02f);
+         Check("Sweep: a vector mask turned off shows the whole layer", off.maxRgb < 0.01f);
+         Check("Sweep: feathering a vector mask softens its edge", df.changed > 0.001f);
+      }
    }
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;

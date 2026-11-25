@@ -637,9 +637,10 @@ namespace
          const View2DMoreProbe& pr = View2DMoreProbes()[sOpenId];
          const float pad = 2.0f * ImGui::GetStyle().WindowPadding.x;
          char buf[256];
-         std::snprintf(buf, sizeof buf, "2D More.. %s opens as one column (window %.0f, content %.0f, limit %.0f)", sOpenId.c_str(), pr.winW,
-                       pr.contentW, UiDensity::kPopoverW);
-         Check(buf, pr.open && pr.winW <= UiDensity::kPopoverW + 1.0f && pr.contentW <= UiDensity::kPopoverW - pad + 1.0f);
+         const float lim = SettingsWindow::Width(2); // two strips side by side: a grid, not a tower
+         std::snprintf(buf, sizeof buf, "2D More.. %s opens as a two-column grid (window %.0f, content %.0f, limit %.0f)", sOpenId.c_str(), pr.winW,
+                       pr.contentW, lim);
+         Check(buf, pr.open && pr.winW <= lim + 1.0f && pr.contentW <= lim - pad + 1.0f);
          sMoreDone.push_back(sOpenId);
       }, 1);
       Do("2D: close", [] { SettingsWindow::CloseAll(); }, 2);

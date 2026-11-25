@@ -15,6 +15,7 @@
 #include "platform/AppPaths.h"
 #include "app/ui/design/UiFmt.h"
 #include "app/ui/design/UiScope.h"
+#include "app/ui/design/components/CurveGraph.h"
 
 namespace app
 {
@@ -31,124 +32,40 @@ namespace app
    void DrawCurveEditor(CurveShape& shape, ImU32 lineCol, bool resetOnEmptyRightClick = false,
                         bool crosshair = false, float liveX = -1.0f)
    {
-      const float size = kPreviewSize;
-      ImVec2 origin = ImGui::GetCursorScreenPos();
+      // The shared editor works on x, y pairs; the node keeps its own interpolation for drawing and sound.
+      std::vector<float> c;
+      for (const CurveShape::Point& p : shape.points)
+      {
+         c.push_back(p.x);
+         c.push_back(p.y);
+      }
+      CurveGraph::Opts o;
+      const bool exact = shape.exactLine;
+      o.sample = [exact](const std::vector<float>& pts, float* out, int n) {
+         CurveShape t;
+         t.points.clear();
+         for (size_t i = 0; i + 1 < pts.size(); i += 2)
+            t.points.push_back({ pts[i], pts[i + 1] });
+         t.exactLine = exact;
+         for (int i = 0; i < n; i++)
+            out[i] = t.Evaluate((float)i / (float)std::max(1, n - 1));
+      };
+      o.col = lineCol;
+      o.width = o.height = kPreviewSize;
+      o.endsMoveX = false;   // the node's end points stay at 0 and 1
+      o.resetOnEmptyRightClick = resetOnEmptyRightClick;
+      o.crosshair = crosshair;
+      o.liveX = liveX;
+      o.readout = false;     // keeps the node body its size
       ImGui::PushID(&shape);
-      UiInteract::Hit("##curve", ImVec2(size, size));
+      if (CurveGraph::Draw("##curve", c, o))
+      {
+         std::vector<CurveShape::Point> pts;
+         for (size_t i = 0; i + 1 < c.size(); i += 2)
+            pts.push_back({ c[i], c[i + 1] });
+         shape.SetPoints(pts);
+      }
       ImGui::PopID();
-      const bool hovered = ImGui::IsItemHovered();
-      const bool active = ImGui::IsItemActive();
-
-      // R12: plotted values and handles live in an inset box so nothing touches or crosses the frame.
-      const float pad = tok::space_1_5;
-      const float inner = size - tok::param_inner_ratio * pad;
-      auto toScreen = [&](float x, float y) {
-         return ImVec2(origin.x + pad + x * inner, origin.y + pad + (1.0f - y) * inner);
-      };
-      auto toCurve = [&](ImVec2 p) {
-         return ImVec2(std::min(1.0f, std::max(0.0f, (p.x - origin.x - pad) / inner)),
-                       std::min(1.0f, std::max(0.0f, 1.0f - (p.y - origin.y - pad) / inner)));
-      };
-
-      std::vector<CurveShape::Point>& pts = shape.points;
-
-      static int sDragIndex = -1;
-      static CurveShape* sDragShape = nullptr;
-
-      const ImVec2 mouse = ImGui::GetIO().MousePos;
-      int nearest = -1;
-      float nearestDist = 12.0f;
-      for (int i = 0; i < (int)pts.size(); i++)
-      {
-         ImVec2 sp = toScreen(pts[i].x, pts[i].y);
-         float d = std::sqrt((sp.x - mouse.x) * (sp.x - mouse.x) + (sp.y - mouse.y) * (sp.y - mouse.y));
-         if (d < nearestDist)
-         {
-            nearestDist = d;
-            nearest = i;
-         }
-      }
-
-      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-      {
-         PushUndoCheckpoint();
-         if (nearest >= 0)
-         {
-            sDragIndex = nearest;
-            sDragShape = &shape;
-         }
-         else
-         {
-            ImVec2 c = toCurve(mouse);
-            sDragIndex = shape.AddPoint(c.x, c.y);
-            sDragShape = &shape;
-         }
-      }
-      if (hovered && MenuParts::RightPressed())
-      {
-         if (nearest >= 0)
-         {
-            PushUndoCheckpoint();
-            shape.RemovePoint(nearest);
-         }
-         else if (resetOnEmptyRightClick)
-         {
-            PushUndoCheckpoint();
-            shape.Reset();
-         }
-      }
-
-      if (active && sDragShape == &shape && sDragIndex >= 0)
-      {
-         ImVec2 c = toCurve(mouse);
-         shape.MovePoint(sDragIndex, c.x, c.y);
-      }
-      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
-      {
-         sDragIndex = -1;
-         sDragShape = nullptr;
-      }
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 br(origin.x + size, origin.y + size);
-      const bool isLight = IsThemeLight();
-      AudioViz::Fill(dl, origin, br);
-      for (int i = 1; i < 4; i++)
-      {
-         float f = (float)i / 4.0f;
-         dl->AddLine(ImVec2(origin.x + pad + inner * f, origin.y), ImVec2(origin.x + pad + inner * f, br.y), ScopeGridCol());
-         dl->AddLine(ImVec2(origin.x, origin.y + pad + inner * f), ImVec2(br.x, origin.y + pad + inner * f), ScopeGridCol());
-      }
-      dl->AddLine(toScreen(0.0f, 0.0f), toScreen(tok::param_to_screen, tok::param_to_screen), ScopeMidLineCol()); // identity reference
-      if (crosshair)
-      {
-         ImVec2 mid = toScreen(0.5f, 0.5f);
-         dl->AddLine(ImVec2(mid.x, origin.y), ImVec2(mid.x, br.y), isLight ? tok::Base(tok::col::edge_lo_pale, tok::param_line_alpha_md) : tok::Base(tok::col::edge_mid, tok::param_line_alpha_md));
-         dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), isLight ? tok::Base(tok::col::edge_lo_pale, tok::param_line_alpha_md) : tok::Base(tok::col::edge_mid, tok::param_line_alpha_md));
-      }
-
-      const int kSegments = tok::param_segments;
-      for (int i = 1; i <= kSegments; i++)
-      {
-         float x0 = (float)(i - 1) / kSegments;
-         float x1 = (float)i / kSegments;
-         dl->AddLine(toScreen(x0, shape.Evaluate(x0)),
-                     toScreen(x1, shape.Evaluate(x1)), lineCol, tok::param_curve_editor_stroke);
-      }
-      for (int i = 0; i < (int)pts.size(); i++)
-      {
-         ImVec2 sp = toScreen(pts[i].x, pts[i].y);
-         dl->AddCircleFilled(sp, i == nearest ? tok::param_curve_editor_r : tok::param_curve_editor_dot_r_sm, lineCol);
-         dl->AddCircle(sp, i == nearest ? tok::param_curve_editor_r : tok::param_curve_editor_dot_r_sm, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, tok::param_ring_stroke_md);
-      }
-      if (liveX >= 0.0f)
-      {
-         float clampedX = std::min(1.0f, std::max(0.0f, liveX));
-         ImVec2 dot = toScreen(clampedX, shape.Evaluate(clampedX));
-         dl->AddCircleFilled(dot, tok::param_curve_editor_dot_r_lg, isLight ? tok::Base(tok::col::state_warn) : tok::Base(tok::col::role_modulation));
-         dl->AddCircle(dot, tok::param_curve_editor_dot_r_lg, isLight ? tok::Base(tok::col::edge_hi) : tok::Base(tok::col::surface_deep), 0, tok::param_ring_stroke_md);
-      }
-      AudioViz::Border(dl, origin, br);
    }
    // ui-content-end
 
