@@ -214,6 +214,16 @@ namespace
    int sLassoKind = 0;             // 0 freehand, 1 polygon
    float sFeather = 0.0f;
    float sSelModPx = tok::view2d_sel_mod_px;         // Expand / Contract / Smooth / Border, document px
+   // Select and Mask / Color Range (ai-tools.md 1.5-1.6): one live dialog at a time, previewing on the canvas.
+   int sLiveDlg = 0;                                  // 0 none, 1 Select and Mask, 2 Color Range
+   int sLiveFrame = 0;                                // the last frame its bar drew (a tool change cancels it)
+   SelectMaths::RefineParams sRefine;
+   bool sRefineDecon = false;
+   float sRefineDeconAmt = 1.0f;
+   int sRefineOut = 0;                                // 0 selection, 1 layer mask, 2 new layer with mask
+   SelectMaths::RangeParams sRange;
+   bool sRangeInvert = false;
+   std::vector<SelectMaths::Sample> sRangeSamples;
    int sSelOp = 0;                 // Scene2DNode::SelOp
    std::vector<float> sPoly;       // polygon lasso points so far, document px
    int sPolyOp = 0;
@@ -6621,6 +6631,10 @@ namespace
    }
 
    // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
+   void LiveSelDialogs(Scene2DNode* doc);
+   void LiveClose(Scene2DNode* doc, bool keep);
+   bool RangeClick(Scene2DNode* doc, ImVec2 at, bool add, bool sub);
+   void LiveOpen(Scene2DNode* doc, int which);
    void DrawCanvas(Scene2DNode* doc, ImVec2 size)
    {
       ImGuiIO& io = ImGui::GetIO();
@@ -6635,6 +6649,9 @@ namespace
       }
       else if (sObjSoftPending && !doc->AiSelectWaiting())
          sObjSoftPending = false;   // the analysis failed or found nothing: nothing to soften
+      // A live selection dialog whose bar is gone (another tool, another panel layout) is cancelled.
+      if (sLiveDlg != 0 && ImGui::GetFrameCount() - sLiveFrame > 2)
+         LiveClose(doc, false);
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       // Chips drawn over the canvas later in the frame (Rasterize?) must be able to take the hover and the click.
       ImGui::SetNextItemAllowOverlap();
@@ -7328,12 +7345,17 @@ namespace
          // gradient, clone and shape tools keep the active layer: they add, they do not edit what is there.
          // Click tools find the layer under the click. Stroke tools (brush, retouch) stay on the active layer, as in
          // Photoshop, where only Move auto-selects: a blur stroke that starts beside a word must not jump to the page.
+         // Color Range's eyedropper takes the click before any tool.
+         const bool rangePick = !(inRulerTop || inRulerLeft) && RangeClick(doc, sMouseDoc, io.KeyShift, io.KeyAlt);
          const bool targets = sTool == kWand || sTool == kFill || sTool == kEraser || sTool == kFloodErase || sTool == kBgErase ||
                               sTool == kBlemish || sTool == kObjectSel || sTool == kPerspective ||
                               (sTool == kMeshWarp && !NearMeshHandle(doc, mouse));
-         if (targets && !(inRulerTop || inRulerLeft) && !io.KeyAlt && !sEditMask && !doc->quickMask)
+         if (targets && !rangePick && !(inRulerTop || inRulerLeft) && !io.KeyAlt && !sEditMask && !doc->quickMask)
             ToolTargetAt(doc, sMouseDoc);
-         if (inRulerTop || inRulerLeft)
+         if (rangePick)
+         {
+         }
+         else if (inRulerTop || inRulerLeft)
          {
             // A guide pulled from a ruler: the top ruler makes a horizontal one.
             BeginOp(doc, 6, mouse, "Add guide");
@@ -7950,7 +7972,12 @@ namespace
             Touch();
          }
       }
+      FormParts::Inline(0.0f, tok::space_1);
+      const bool refOpen = sLiveDlg == 1;
+      if (TextChip(L("Refine##v2drefine"), refOpen, T("Select and Mask: redraw the selection's edge from the picture")))
+         LiveOpen(doc, refOpen ? 0 : 1);
       ImGui::EndDisabled();
+      LiveSelDialogs(doc);
    }
 
    // A tool's less-used settings: one icon at the bar's end opens them as a vertical form (label, well), the way
@@ -8081,6 +8108,170 @@ namespace
       PanelKit::GridScope::EndRow(); // a list is a full row
       FieldLabel(label);
       return BarCombo(FormParts::Id(label).c_str(), v, names, n, sFieldW);
+   }
+
+   // ---- Select and Mask, Color Range ----------------------------------------------------------------------------
+   // Each is a settings window off a chip on every selection tool's bar. Opening one keeps the selection as it was
+   // and reads the picture once; every change redraws the selection on the canvas; OK makes it one undo step,
+   // Cancel (or the window's close button) puts the old selection back.
+   const char* const kLiveKeys[3] = { "", "v2drefine", "v2drange" };
+
+   void LivePreview(Scene2DNode* doc)
+   {
+      if (sLiveDlg == 1)
+      {
+         doc->RefinePreview(sRefine);
+         return;
+      }
+      if (sLiveDlg == 2)
+         doc->ColorRangePreview(sRangeSamples, sRange, sRangeInvert, sSelOp);
+   }
+
+   void LiveClose(Scene2DNode* doc, bool keep)
+   {
+      const int which = sLiveDlg;
+      sLiveDlg = 0;
+      SettingsWindow::Close(kLiveKeys[1]);
+      SettingsWindow::Close(kLiveKeys[2]);
+      if (!doc->LiveSelActive())
+         return;
+      if (keep)
+         SelStep(which == 1 ? "Select and Mask" : "Color Range");
+      doc->LiveSelEnd(keep);
+      if (keep && which == 1 && sRefineOut != 0)
+         if (Layer* al = Active(doc))
+            if (const int id = doc->RefineOutput(sRefineOut, al->id, sRefineDecon ? sRefineDeconAmt : 0.0f); id != 0)
+            {
+               SelectOnly(id);
+               doc->Deselect();   // Photoshop: a mask output leaves no selection
+            }
+      Touch();
+   }
+
+   void LiveOpen(Scene2DNode* doc, int which)
+   {
+      if (sLiveDlg != 0)
+         LiveClose(doc, false);
+      if (which == 0)
+         return;
+      Layer* al = Active(doc);
+      if (!doc->LiveSelBegin(sAllLayers, al != nullptr ? al->id : 0))
+         return;
+      sLiveDlg = which;
+      SettingsWindow::Opens()[kLiveKeys[which]] = true;
+      if (which == 2)
+         sRangeSamples.clear();
+      LivePreview(doc);
+   }
+
+   // Color Range's eyedropper: a canvas click while the dialog samples colours. Shift adds, Alt subtracts.
+   bool RangeClick(Scene2DNode* doc, ImVec2 at, bool add, bool sub)
+   {
+      if (sLiveDlg != 2 || sRange.range != SelectMaths::Range::Sampled)
+         return false;
+      SelectMaths::Sample k;
+      if (!doc->LivePixel(at.x, at.y, k.rgb))
+         return true;
+      k.x = at.x;
+      k.y = at.y;
+      k.subtract = sub;
+      if (!add && !sub)
+         sRangeSamples.clear();
+      sRangeSamples.push_back(k);
+      LivePreview(doc);
+      return true;
+   }
+
+   void OkCancel(Scene2DNode* doc)
+   {
+      PanelKit::GridScope::EndRow();
+      if (TextChip(L("OK##v2dliveok"), false, nullptr))
+         LiveClose(doc, true);
+      FormParts::Inline(0.0f, tok::space_1);
+      if (TextChip(L("Cancel##v2dlivecancel"), false, nullptr))
+         LiveClose(doc, false);
+   }
+
+   void RefineRows(Scene2DNode* doc)
+   {
+      const SelectMaths::RefineParams was = sRefine;
+      MoreHeader(T("Edge Detection"), true);
+      MoreSlider(T("Radius"), &sRefine.radius, params::view2d::refine_radius_lo, params::view2d::refine_radius_hi, "%.0f px");
+      MoreCheck(T("Smart Radius"), &sRefine.smart);
+      MoreHeader(T("Global Refinements"));
+      MoreSlider(T("Smooth"), &sRefine.smooth, params::view2d::smooth_lo, params::view2d::smooth_hi, "%.0f");
+      MoreSlider(T("Feather"), &sRefine.feather, params::view2d::feather_lo, params::view2d::feather_hi, "%.1f px");
+      MoreSlider(T("Contrast"), &sRefine.contrast, params::view2d::contrast_lo, params::view2d::contrast_hi, "%.0f%%");
+      MoreSlider(T("Shift Edge"), &sRefine.shift, params::view2d::shift_lo, params::view2d::shift_hi, "%.0f%%");
+      MoreHeader(T("Output"));
+      static const char* kOut[3] = { "Selection", "Layer Mask", "New Layer with Mask" };
+      MoreCombo(T("Output To"), &sRefineOut, kOut, 3);
+      MoreCheck(T("Decontaminate"), &sRefineDecon);
+      if (sRefineDecon)
+      {
+         if (sRefineOut != 2)
+            sRefineOut = 2;   // Photoshop: decontaminated colours go to a new layer
+         MorePct(T("Amount"), &sRefineDeconAmt, params::view2d::refine_decon_amt_lo, params::view2d::refine_decon_amt_hi);
+      }
+      if (was.radius != sRefine.radius || was.smart != sRefine.smart || was.smooth != sRefine.smooth ||
+          was.feather != sRefine.feather || was.contrast != sRefine.contrast || was.shift != sRefine.shift)
+         LivePreview(doc);
+      OkCancel(doc);
+   }
+
+   void RangeRows(Scene2DNode* doc)
+   {
+      const SelectMaths::RangeParams was = sRange;
+      const bool inv = sRangeInvert;
+      static const char* kRanges[11] = { "Sampled Colors", "Reds", "Yellows", "Greens", "Cyans", "Blues", "Magentas",
+                                         "Highlights", "Midtones", "Shadows", "Skin Tones" };
+      int r = (int)sRange.range;
+      if (MoreCombo(T("Select"), &r, kRanges, 11))
+         sRange.range = (SelectMaths::Range)r;
+      if (sRange.range == SelectMaths::Range::Sampled)
+      {
+         MoreSlider(T("Fuzziness"), &sRange.fuzziness, params::view2d::fuzziness_lo, params::view2d::fuzziness_hi, "%.0f");
+         MoreCheck(T("Localized"), &sRange.localized);
+         if (sRange.localized)
+            MoreSlider(T("Range"), &sRange.localRange, params::view2d::local_range_lo, params::view2d::local_range_hi, "%.0f%%");
+         if (sMoreOpen)
+         {
+            PanelKit::GridScope::EndRow();
+            ImGui::TextDisabled("%s", T("Click the picture. Shift adds, Alt subtracts"));
+         }
+      }
+      else if (sRange.range == SelectMaths::Range::Highlights || sRange.range == SelectMaths::Range::Midtones ||
+               sRange.range == SelectMaths::Range::Shadows)
+         MoreSlider(T("Fuzziness"), &sRange.tonalFuzz, params::view2d::tonal_fuzz_lo, params::view2d::tonal_fuzz_hi, "%.0f%%");
+      MoreCheck(T("Invert"), &sRangeInvert);
+      if (was.range != sRange.range || was.fuzziness != sRange.fuzziness || was.localized != sRange.localized ||
+          was.localRange != sRange.localRange || was.tonalFuzz != sRange.tonalFuzz || inv != sRangeInvert)
+         LivePreview(doc);
+      OkCancel(doc);
+   }
+
+   void LiveSelDialogs(Scene2DNode* doc)
+   {
+      sLiveFrame = ImGui::GetFrameCount();
+      FormParts::Inline(0.0f, tok::space_1);
+      const bool rngOpen = sLiveDlg == 2;
+      if (TextChip(L("Range##v2drange"), rngOpen, T("Color Range: select by colour or tone")))
+         LiveOpen(doc, rngOpen ? 0 : 2);
+      const ImVec2 at = ImGui::GetItemRectMax();
+      for (int which = 1; which <= 2; which++)
+         SettingsWindow::Draw(kLiveKeys[which], T(which == 1 ? "Select and Mask" : "Color Range"), ImVec2(at.x, at.y + tok::space_1), [&]()
+         {
+            MoreRows rows(1);
+            sMoreOpen = true;
+            if (which == 1)
+               RefineRows(doc);
+            else
+               RangeRows(doc);
+            sMoreOpen = true;
+         });
+      // Closed by the window's own button, Esc, or the dialog's buttons: Cancel unless OK already ran.
+      if (sLiveDlg != 0 && !SettingsWindow::IsOpen(kLiveKeys[sLiveDlg]))
+         LiveClose(doc, false);
    }
 
    // The material stroke's rows: light and height, canvas texture, dual tip, colour along, wet mix.
@@ -15699,6 +15890,50 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("parity: patch source mode keeps the marquee", ok2 && doc->SelectionBounds(lo, hi) && about(lo[0], 100));
          sPatchSrc = keepSrc;
          sPatchClear = keepClear;
+         doc->Deselect();
+         doc->RemoveLayer(p);
+         doc->Commit();
+      }
+      // ai-tools 1.5-1.6: Select and Mask and Color Range on a red square (100..200) over green.
+      {
+         namespace SM = SelectMaths;
+         const int p = doc->AddPaintLayer();
+         doc->SelectRect(0, 0, (float)W, (float)H, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(p, green, 1.0f);
+         doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(p, red, 1.0f);
+         doc->Commit();
+         doc->SelectRect(92, 92, 208, 208, Scene2DNode::kSelNew, 0, false);
+         SM::RefineParams rp;
+         rp.radius = 20.0f;
+         const bool began = doc->LiveSelBegin(false, p);
+         doc->RefinePreview(rp);
+         expect("ai: refine edge snaps a rough box to the square", began && doc->SelectionAt(150, 150) > 0.95f &&
+                                                                   doc->SelectionAt(95, 150) < 0.2f && doc->SelectionAt(105, 150) > 0.8f);
+         doc->LiveSelEnd(false);
+         expect("ai: cancelling select and mask puts the selection back", doc->SelectionAt(95, 150) > 0.95f);
+         SM::Sample k;
+         std::copy(red, red + 3, k.rgb);
+         k.x = k.y = 150.0f;
+         SM::RangeParams cr;
+         doc->Deselect();
+         doc->SelectColorRange({ k }, cr, false, Scene2DNode::kSelNew, false, p);
+         expect("ai: color range takes the sampled colour", doc->SelectionAt(150, 150) > 0.95f && doc->SelectionAt(50, 50) < 0.05f);
+         doc->SelectRect(0, 0, 150, (float)H, Scene2DNode::kSelNew, 0, false);
+         doc->SelectColorRange({ k }, cr, false, Scene2DNode::kSelNew, false, p);
+         expect("ai: color range inside a selection looks only there", doc->SelectionAt(125, 150) > 0.95f && doc->SelectionAt(175, 150) < 0.05f);
+         cr.range = SM::Range::Reds;
+         doc->Deselect();
+         doc->SelectColorRange({}, cr, false, Scene2DNode::kSelNew, false, p);
+         expect("ai: the Reds range takes red, not green", doc->SelectionAt(150, 150) > 0.95f && doc->SelectionAt(50, 50) < 0.05f);
+         doc->SelectColorRange({}, cr, true, Scene2DNode::kSelNew, false, p);
+         expect("ai: inverted range flips it", doc->SelectionAt(150, 150) < 0.05f && doc->SelectionAt(50, 50) > 0.95f);
+         doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 4.0f, false);
+         const int copy = doc->RefineOutput(2, p, 1.0f);
+         const Scene2DNode::Layer* cl = copy != 0 ? doc->FindLayer(copy) : nullptr;
+         expect("ai: select and mask output makes a masked copy", cl != nullptr && cl->HasPixelMask() && copy != p);
+         if (copy != 0)
+            doc->RemoveLayer(copy);
          doc->Deselect();
          doc->RemoveLayer(p);
          doc->Commit();

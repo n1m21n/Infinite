@@ -2356,6 +2356,143 @@ void Scene2DNode::CombineSelection(const std::vector<uint8_t>& region, int op)
    StoreSelection();
 }
 
+// ---- live selection dialogs (Select and Mask, Color Range) ----------------------------------------------------
+bool Scene2DNode::LiveSelBegin(bool sampleAll, int layerId)
+{
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return false;
+   mLivePic.swap(px);
+   mLiveSelAny = mSelAny && mSel.size() == (size_t)W * H;
+   mLiveSel = mLiveSelAny ? mSel : std::vector<uint8_t>((size_t)W * H, 0);
+   return true;
+}
+
+bool Scene2DNode::LivePixel(float x, float y, float rgb[3]) const
+{
+   const int W = mDoc.w, H = mDoc.h, px = (int)std::floor(x), py = H - 1 - (int)std::floor(y);
+   if (mLivePic.size() != (size_t)W * H * 4 || px < 0 || py < 0 || px >= W || py >= H)
+      return false;
+   const uint8_t* c = &mLivePic[((size_t)py * W + px) * 4];
+   for (int k = 0; k < 3; k++)
+      rgb[k] = c[k] / 255.0f;
+   return true;
+}
+
+void Scene2DNode::LiveSelEnd(bool keep)
+{
+   if (mLivePic.empty())
+      return;
+   if (!keep)
+   {
+      mSel = mLiveSel;
+      mSelAny = mLiveSelAny;
+   }
+   mLivePic.clear();
+   mLivePic.shrink_to_fit();
+   mLiveSel.clear();
+   mLiveSel.shrink_to_fit();
+   mSelDirty = true;
+   StoreSelection();
+}
+
+void Scene2DNode::RefinePreview(const SelectMaths::RefineParams& p)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   if (mLivePic.size() != (size_t)W * H * 4 || !mLiveSelAny)
+      return;
+   mSel = mLiveSel;
+   SelectMaths::Refine(mLivePic.data(), mSel, W, H, p);
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+}
+
+int Scene2DNode::RefineOutput(int output, int layerId, float decon)
+{
+   if (output == 1)
+      return MaskFromSelection(layerId) ? layerId : 0;
+   if (output != 2)
+      return 0;
+   const int id = Duplicate(layerId);
+   if (id == 0)
+      return 0;
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l != nullptr && l->kind == Kind::Paint && decon > 0.0f && mSelAny)
+   {
+      SyncSurfaces();
+      auto it = mSurfaces.find(id);
+      float o[2], ux[2], uy[2], s = 1;
+      if (it != mSurfaces.end() && DocToSurface(*l, 0, 0, 0, o[0], o[1], s) && DocToSurface(*l, 0, 1, 0, ux[0], ux[1], s) &&
+          DocToSurface(*l, 0, 0, 1, uy[0], uy[1], s))
+      {
+         const float a = ux[0] - o[0], c = ux[1] - o[1], b = uy[0] - o[0], d = uy[1] - o[1], det = a * d - b * c;
+         if (std::fabs(det) >= 1e-9f)
+         {
+            const float inv[6] = { d / det, -b / det, -(d * o[0] - b * o[1]) / det, -c / det, a / det, -(-c * o[0] + a * o[1]) / det };
+            const int sw = it->second.fbo.w, sh = it->second.fbo.h;
+            std::vector<uint8_t> mask, px;
+            SelOnSurface(mSel, mDoc.w, mDoc.h, sw, sh, inv, mask);
+            ReadRect(it->second.fbo, 0, 0, sw, sh, px);
+            SelectMaths::Decontaminate(px.data(), mask, sw, sh, std::clamp(decon, 0.0f, 1.0f));
+            WriteRect(it->second.fbo, 0, 0, sw, sh, px.data());
+            const int all[4] = { 0, 0, sw, sh };
+            StoreTiles(it->second, l->tiles, all);
+         }
+      }
+   }
+   return MaskFromSelection(id) ? id : 0;
+}
+
+void Scene2DNode::ColorRangePreview(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert, int op)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   if (mLivePic.size() != (size_t)W * H * 4)
+      return;
+   std::vector<SelectMaths::Sample> flip = s;   // samples top row first; the picture bottom row first
+   for (SelectMaths::Sample& k : flip)
+      k.y = (float)H - k.y;
+   std::vector<uint8_t> region;
+   SelectMaths::ColorRange(mLivePic.data(), W, H, flip, p, region);
+   if (invert)
+      for (uint8_t& v : region)
+         v = (uint8_t)(255 - v);
+   if (op == kSelNew && mLiveSelAny)   // Color Range inside a selection looks only there
+      for (size_t i = 0; i < region.size(); i++)
+         region[i] = std::min(region[i], mLiveSel[i]);
+   mSel = mLiveSel;
+   mSelAny = mLiveSelAny;
+   if (op == kSelNew || !mSelAny)
+      mSel = op == kSelSub || op == kSelIntersect ? std::vector<uint8_t>(region.size(), 0) : region;
+   else
+      for (size_t i = 0; i < region.size(); i++)
+      {
+         if (op == kSelAdd) mSel[i] = std::max(mSel[i], region[i]);
+         else if (op == kSelSub) mSel[i] = (uint8_t)(mSel[i] * (255 - region[i]) / 255);
+         else mSel[i] = std::min(mSel[i], region[i]);
+      }
+   mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
+   mSelDirty = true;
+}
+
+bool Scene2DNode::SelectColorRange(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert,
+                                   int op, bool sampleAll, int layerId)
+{
+   if (!LiveSelBegin(sampleAll, layerId))
+      return false;
+   ColorRangePreview(s, p, invert, op);
+   LiveSelEnd(true);
+   return true;
+}
+
 int Scene2DNode::SelectObjectAi(float x0, float y0, float x1, float y1, int op, bool sampleAll, int layerId)
 {
    if (!AiSelect::Available())

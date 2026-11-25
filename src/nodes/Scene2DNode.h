@@ -18,6 +18,7 @@
 #include "INode.h"
 #include "GLUtil.h"
 #include "BrushEngine.h"
+#include "core/SelectMaths.h"
 
 // The 2D View's document: node outputs, fills and groups stacked into one
 // picture at the document's size. A node layer only references its node (by
@@ -569,6 +570,25 @@ public:
    bool AiSelectWaiting() const { return mAiWait.on || mSubjectJob.valid(); }
    // A region (document px, bottom row first, 0..255) joined to the selection by op (kSelNew, Add, Sub, Intersect).
    void CombineSelection(const std::vector<uint8_t>& region, int op);
+   // Live selection dialogs (Select and Mask, Color Range; ai-tools.md 1.5-1.6). LiveSelBegin keeps the selection as it
+   // was and reads the picture once (the layer, or everything with sampleAll); each preview redraws the selection from
+   // that copy without an undo step; LiveSelEnd keeps the result (one stored selection) or puts the copy back.
+   bool LiveSelBegin(bool sampleAll, int layerId);
+   bool LiveSelActive() const { return !mLivePic.empty(); }
+   // The live dialog's picture at a document point (top row first), 0..1: Color Range's eyedropper.
+   bool LivePixel(float x, float y, float rgb[3]) const;
+   void LiveSelEnd(bool keep);
+   // Select and Mask: the kept selection's edge refined against the picture (needs a selection).
+   void RefinePreview(const SelectMaths::RefineParams& p);
+   // Select and Mask's outputs, after LiveSelEnd(true): 1 the layer's pixel mask, 2 a copy of the layer masked by
+   // the selection with its edge colours decontaminated by `decon` (0..1). Returns the layer that took it (0 = none).
+   int RefineOutput(int output, int layerId, float decon);
+   // Color Range: each pixel's share of the range (samples in document px, top row first) joined by op. With a
+   // selection and op New the range is looked for only inside it, as in Photoshop. invert flips the range first.
+   void ColorRangePreview(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert, int op);
+   // One call for the agent and tests: Begin, preview, End(true).
+   bool SelectColorRange(const std::vector<SelectMaths::Sample>& s, const SelectMaths::RangeParams& p, bool invert, int op,
+                         bool sampleAll, int layerId);
    // Mesh warp: a paint layer's pixels pulled through a 4 x 4 grid. `from` is the layer's tiles when the warp
    // began; `moved` the 16 grid points' document positions, row by row from the layer's top left.
    // rest: where the 16 points sat when the warp began (document px); null = the whole surface's grid.
@@ -898,6 +918,8 @@ private:
    void SkinDab(const Layer& l, float x, float y, float pressure, bool skipMain = false);
    unsigned long long SkinRevision(const Layer& l) const;
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
+   std::vector<uint8_t> mLiveSel, mLivePic;   // a live dialog's selection before it and picture (bottom row first)
+   bool mLiveSelAny = false;
    struct AiWait
    {
       bool on = false;

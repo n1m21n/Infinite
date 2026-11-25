@@ -3083,6 +3083,20 @@ namespace params
       constexpr float opacity_hi = 1.0f;
       constexpr float flow_2_lo = 0.01f;
       constexpr float flow_2_hi = 1.0f;
+      constexpr float refine_radius_hi = 250.0f;
+      constexpr float refine_radius_lo = 0.0f;
+      constexpr float contrast_hi = 100.0f;
+      constexpr float contrast_lo = 0.0f;
+      constexpr float shift_lo = -100.0f;
+      constexpr float shift_hi = 100.0f;
+      constexpr float refine_decon_amt_hi = 100.0f;
+      constexpr float refine_decon_amt_lo = 0.0f;
+      constexpr float fuzziness_hi = 200.0f;
+      constexpr float fuzziness_lo = 0.0f;
+      constexpr float local_range_hi = 100.0f;
+      constexpr float local_range_lo = 0.0f;
+      constexpr float tonal_fuzz_hi = 100.0f;
+      constexpr float tonal_fuzz_lo = 0.0f;
    }
 
    namespace view3d
