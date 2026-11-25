@@ -4,6 +4,8 @@
   build   pick the eval sets from COCO val2017 and write masks + prompts
   models  run the pack's ONNX models (SAM 2.1 tiny, BEN2) in Python and score them
   app     score masks written by the app's INFINITE_AIEVAL=1 hook
+  ep      EP gate (section 15): CoreML vs CPU masks on S1/S2 must agree (IoU >= 0.99 per picture)
+          and loading the CoreML sessions must add <= 600 MB of resident memory
   report  print the table for every result file present
 
 Sets (under --data, default ~/Infinite/datasets/ai-eval):
@@ -117,10 +119,18 @@ def cmd_build(a):
 
 
 # ---------------------------------------------------------------- models
-def load(path):
+def load(path, coreml=None):
    import onnxruntime as ort
-   prov = ["CoreMLExecutionProvider", "CPUExecutionProvider"] if os.environ.get("AIEVAL_COREML") else ["CPUExecutionProvider"]
+   if coreml is None:
+      coreml = bool(os.environ.get("AIEVAL_COREML"))
+   prov = ["CoreMLExecutionProvider", "CPUExecutionProvider"] if coreml else ["CPUExecutionProvider"]
    return ort.InferenceSession(str(path), providers=prov)
+
+
+def rss_mb():
+   """Current resident memory of this process in MB (ps, so it is the live figure, not the peak)."""
+   import subprocess
+   return int(subprocess.run(["ps", "-o", "rss=", "-p", str(os.getpid())], capture_output=True, text=True).stdout.strip()) / 1024.0
 
 
 def sam_pre(rgb):
@@ -215,6 +225,53 @@ def cmd_app(a):
    cmd_report(a)
 
 
+def cmd_ep(a):
+   """Section 15 EP gate: the CoreML execution provider must give the CPU answer (mask IoU >= 0.99 on every
+   picture) and cost at most 600 MB of resident memory to load. Fails with exit code 1 when either bar is missed."""
+   # One model set in memory at a time (the 8 GB Mac cannot hold CPU and CoreML copies together): the CPU answers
+   # first, then each CoreML model alone, its load cost measured on its own; the bar is their sum (both open).
+   import gc
+   s1 = json.loads((a.data / "S1/set.json").read_text())[: a.limit]
+   s2 = json.loads((a.data / "S2/set.json").read_text())[: a.limit]
+   rgb1 = {it["id"]: np.asarray(Image.open(a.data / "S1" / f"{it['id']}.jpg").convert("RGB")) for it in s1}
+   rgb2 = {it["id"]: np.asarray(Image.open(a.data / "S2" / f"{it['id']}.jpg").convert("RGB")) for it in s2}
+   # The SAM decoder stays on CPU: the CoreML EP refuses its zero-sized prompt tensors (a box with no clicks), and it
+   # is a few ms anyway. The app opens every model on CPU today (AiSelect.cpp OpenModel(..., false, ...)).
+   dec = load(PACK / "sam_dec.onnx", False)
+   cpu = {}
+   enc = load(PACK / "sam_enc.onnx", False)
+   for it in s1:
+      cpu["S1_" + it["id"]], _ = sam_decode(dec, enc.run(None, {"pixel_values": sam_pre(rgb1[it["id"]])}), it["w"], it["h"], box=it["box"])
+   del enc
+   ben = load(PACK / "ben2.onnx", False)
+   for it in s2:
+      cpu["S2_" + it["id"]] = ben2_mask(ben, rgb2[it["id"]]) > 0.5
+   del ben
+   gc.collect()
+   agree, rss = [], 0.0
+   before = rss_mb()
+   enc = load(PACK / "sam_enc.onnx", True)
+   rss += rss_mb() - before
+   for it in s1:
+      mm, _ = sam_decode(dec, enc.run(None, {"pixel_values": sam_pre(rgb1[it["id"]])}), it["w"], it["h"], box=it["box"])
+      agree.append(["S1_" + it["id"], iou(cpu["S1_" + it["id"]], mm)])
+   del enc
+   gc.collect()
+   before = rss_mb()
+   ben = load(PACK / "ben2.onnx", True)
+   rss += rss_mb() - before
+   for it in s2:
+      agree.append(["S2_" + it["id"], iou(cpu["S2_" + it["id"]], ben2_mask(ben, rgb2[it["id"]]) > 0.5)])
+   del ben
+   worst = min(agree, key=lambda r: r[1])
+   ok = worst[1] >= 0.99 and rss <= 600.0
+   (a.data / "results").mkdir(exist_ok=True)
+   (a.data / "results/ep.json").write_text(json.dumps({"EP_agree": agree, "rss_delta_mb": rss, "pass": ok}, indent=1))
+   print(f"EP gate: worst CPU/CoreML IoU {worst[1]:.4f} ({worst[0]}), {len(agree)} pictures; CoreML load +{rss:.0f} MB RSS"
+         f" -> {'PASS' if ok else 'FAIL'}")
+   return 0 if ok else 1
+
+
 def stats(v):
    v = np.array(v)
    return f"mean {v.mean():.3f}  median {np.median(v):.3f}  worst {v.min():.3f}  n {len(v)}"
@@ -229,17 +286,18 @@ def cmd_report(a):
             for tk, tv in v.items():
                tv = np.array(tv) * 1000
                print(f"  {tk:22s} p50 {np.median(tv):7.1f} ms  p95 {np.percentile(tv, 95):7.1f} ms")
-         elif v:
+         elif isinstance(v, list) and v:
             print(f"  {k:22s} IoU {stats([x[1] for x in v])}")
 
 
 def main():
    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-   ap.add_argument("cmd", choices=["build", "models", "app", "report"])
+   ap.add_argument("cmd", choices=["build", "models", "app", "ep", "report"])
    ap.add_argument("--data", type=Path, default=DATA)
    ap.add_argument("--save", action="store_true", help="write model masks next to the pictures")
+   ap.add_argument("--limit", type=int, default=None, help="ep: only the first N pictures of each set")
    a = ap.parse_args()
-   {"build": cmd_build, "models": cmd_models, "app": cmd_app, "report": cmd_report}[a.cmd](a)
+   return {"build": cmd_build, "models": cmd_models, "app": cmd_app, "ep": cmd_ep, "report": cmd_report}[a.cmd](a)
 
 
 if __name__ == "__main__":
