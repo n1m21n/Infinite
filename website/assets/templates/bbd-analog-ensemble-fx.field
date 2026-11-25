@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "BBD Analog Ensemble FX",
+    "author": "Infinite",
+    "description": "Triple-phase Bucket-Brigade (BBD) analog chorus ensemble with dual slow/vibrato LFO modulation, clock-filter warmth, and stereo movement.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float slowHz = 0.62 [0.1, 2.5];\nparam float vibratoHz = 5.4 [2.0, 9.0];\nparam float depth = 0.58 [0.0, 1.0];\nparam float toneHz = 3200.0 [800.0, 7500.0];\nparam float mix = 0.68 [0.0, 1.0];\nstate float lfo1 = 0; state float lfo2 = 0;\nstate float ap1 = 0; state float ap2 = 0; state float lp1 = 0;\n\nlfo1 = (lfo1 + slowHz / sr) % 1.0;\nlfo2 = (lfo2 + vibratoHz / sr) % 1.0;\n\nmod = sin(6.2831853 * lfo1) * 0.65 + sin(6.2831853 * lfo2) * 0.35;\nc1 = clamp(0.48 + mod * 0.34 * depth, 0.08, 0.88);\nc2 = clamp(0.48 - mod * 0.30 * depth, 0.08, 0.88);\n\ny1 = -c1 * in + ap1; ap1 = in + c1 * y1;\ny2 = -c2 * in + ap2; ap2 = in + c2 * y2;\n\nbbd = (y1 + y2) * 0.52;\ng = clamp(2.0 * sin(3.14159265 * toneHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (bbd - lp1);\n\nout = (in * (1.0 - mix) + lp1 * mix) * 0.68;\n",
+    "params": {
+      "slowHz": 0.62,
+      "vibratoHz": 5.4,
+      "depth": 0.58,
+      "toneHz": 3200.0,
+      "mix": 0.68
+    }
+  }
+}

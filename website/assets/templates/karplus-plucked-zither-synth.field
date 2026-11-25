@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Karplus Plucked Zither Synth",
+    "author": "Infinite",
+    "description": "Physical-modeled plucked zither with shaped pick burst, damped harmonic string modes, sympathetic octave resonance, and wooden soundboard body filter.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float pluckBright = 0.68 [0.1, 1.0];\nparam float inharmonic = 0.14 [0.0, 0.5];\nparam float sympathetic = 0.38 [0.0, 0.8];\nparam float bodyHz = 420.0 [180.0, 1200.0];\nparam float decay = 0.9993 [0.997, 0.9997];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float env = 0; state float pickEnv = 1.0;\nstate float bp1 = 0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.22, env * decay);\npickEnv = if(gate > 0.5, pickEnv * 0.992, 1.0);\n\nf0 = clamp(freq, 55.0, 3200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.002) / sr) % 1.0;\np3 = (p3 + (f0 * (3.0 + inharmonic * 0.04)) / sr) % 1.0;\n\nh1 = sin(6.2831853 * p1);\nh2 = sin(6.2831853 * p2) * (0.45 + pickEnv * 0.35 + sympathetic * 0.2);\nh3 = sin(6.2831853 * p3) * (0.22 + pluckBright * 0.25) * (0.35 + 0.65 * pickEnv);\n\nstringSig = (h1 + h2 + h3) * env;\ng = clamp(2.0 * sin(3.14159265 * bodyHz / sr), 0.02, 0.72);\nbp1 = bp1 + g * (stringSig - lp1 - 0.65 * bp1);\nlp1 = lp1 + g * bp1;\n\nmixSig = stringSig * 0.64 + bp1 * 0.52;\nout = (mixSig / (1.0 + abs(mixSig) * 0.55)) * 0.62;\n",
+    "params": {
+      "pluckBright": 0.68,
+      "inharmonic": 0.14,
+      "sympathetic": 0.38,
+      "bodyHz": 420.0,
+      "decay": 0.9993
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

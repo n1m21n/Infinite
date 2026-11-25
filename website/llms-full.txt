@@ -394,6 +394,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Glottal Formant Choir Synth](https://infinitedevices.org/library/glottal-formant-choir-synth.html): Pitch-tracked glottal pulse and three-band parallel state-variable vowel formant synthesizer with subtle vibrato and warm saturation. (file: https://infinitedevices.org/assets/templates/glottal-formant-choir-synth.inf)
 - [Six-Stage Allpass Phaser FX](https://infinitedevices.org/library/six-stage-allpass-phaser-fx.html): Six-stage cascaded first-order allpass phaser with LFO-swept notch combs, asymmetric diode feedback saturation, and lush phase dispersion. (file: https://infinitedevices.org/assets/templates/six-stage-allpass-phaser-fx.inf)
 - [Resonant Vowel Formant FX](https://infinitedevices.org/library/resonant-vowel-formant-fx.html): Three-band parallel state-variable formant filter bank that morphs between A-E-I-O-U vocal resonances with LFO sweep and warm tube saturation. (file: https://infinitedevices.org/assets/templates/resonant-vowel-formant-fx.inf)
+- [Karplus Plucked Zither Synth](https://infinitedevices.org/library/karplus-plucked-zither-synth.html): Physical-modeled plucked zither with shaped pick burst, damped harmonic string modes, sympathetic octave resonance, and wooden soundboard body filter. (file: https://infinitedevices.org/assets/templates/karplus-plucked-zither-synth.inf)
+- [Hammond Tonewheel Organ Synth](https://infinitedevices.org/library/hammond-tonewheel-organ-synth.html): Electromagnetic 9-drawbar tonewheel organ with harmonic key-click transient, 3rd harmonic percussion decay, and warm tube-preamp saturation. (file: https://infinitedevices.org/assets/templates/hammond-tonewheel-organ-synth.inf)
+- [BBD Analog Ensemble FX](https://infinitedevices.org/library/bbd-analog-ensemble-fx.html): Triple-phase Bucket-Brigade (BBD) analog chorus ensemble with dual slow/vibrato LFO modulation, clock-filter warmth, and stereo movement. (file: https://infinitedevices.org/assets/templates/bbd-analog-ensemble-fx.inf)
+- [Shimmer Octave Reverb FX](https://infinitedevices.org/library/shimmer-octave-reverb-fx.html): Cascaded allpass diffusion tank with nonlinear octave-harmonic shimmer feedback and warm high-frequency damping. (file: https://infinitedevices.org/assets/templates/shimmer-octave-reverb-fx.inf)
 
 ## Library: Community
 
@@ -656,6 +660,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Cruz-Diez Chromosaturation Moire](https://infinitedevices.org/library/cruz-diez-chromosaturation-moire.html): Kinetic vertical chromatic louver bands and optical interference moire inspired by Carlos Cruz-Diez Physichromie reliefs. (file: https://infinitedevices.org/assets/library/pixel/cruz-diez-chromosaturation-moire.field)
 - [Turrell Skyspace Ganzfeld](https://infinitedevices.org/library/turrell-skyspace-ganzfeld.html): Concentric elliptical Ganzfeld light apertures in velvety crimson, luminous amber-gold, and warm ivory with atmospheric grain. (file: https://infinitedevices.org/assets/library/pixel/turrell-skyspace-ganzfeld.field)
 - [Gabo Ruled Perspex Waves](https://infinitedevices.org/library/gabo-ruled-perspex-waves.html): Constructivist Naum Gabo and Antoine Pevsner ruled-surface tensioned string families in brushed steel, warm bronze, and deep gunmetal. (file: https://infinitedevices.org/assets/library/pixel/gabo-ruled-perspex-waves.field)
+- [Bismuth Hopper Crystal](https://infinitedevices.org/library/bismuth-hopper-crystal.html): Stepped bismuth hopper crystal terraces with thin-film oxide interference shifting through gold, magenta, cobalt, and specular silver. (file: https://infinitedevices.org/assets/library/pixel/bismuth-hopper-crystal.field)
+- [Ebru Battal Marbling](https://infinitedevices.org/library/ebru-battal-marbling.html): Traditional Turkish Battal Ebru paper marbling with domain-warped pigment droplets in terracotta, cadmium yellow, cerulean, and carbon ink veins. (file: https://infinitedevices.org/assets/library/pixel/ebru-battal-marbling.field)
 
 ## Library: Sketch
 
@@ -787,6 +793,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Moholy Light-Space Modulator](https://infinitedevices.org/library/moholy-light-space-modulator.html): Rotating perforated aluminum stator rings, diagonal light cones, and brass baffle bars inspired by Bauhaus kinetic sculpture. (file: https://infinitedevices.org/assets/library/sketch/moholy-light-space-modulator.js)
 - [Cosmatesque Quincunx Pavement](https://infinitedevices.org/library/cosmatesque-quincunx-pavement.html): Roman opus sectile marble pavement with a five-roundel quincunx, braided guilloche stone bands, porphyry and serpentine triangles, and travertine border inlays. (file: https://infinitedevices.org/assets/library/sketch/cosmatesque-quincunx-pavement.js)
 - [Cosmatesque Octagram Medallion](https://infinitedevices.org/library/cosmatesque-octagram-medallion.html): Concentric Roman Cosmati eight-pointed marble star medallion framed by stepped chevron stone friezes, serpentine chevrons, and golden ochre tesserae. (file: https://infinitedevices.org/assets/library/sketch/cosmatesque-octagram-medallion.js)
+- [Molnar Plotter Interruptions](https://infinitedevices.org/library/molnar-plotter-interruptions.html): Algorithmic Benson plotter ink drawing with dense stochastic line segments, rectangular negative-space voids, and archival registration ticks. (file: https://infinitedevices.org/assets/library/sketch/molnar-plotter-interruptions.js)
+- [Molnar Concentric Quadrics](https://infinitedevices.org/library/molnar-concentric-quadrics.html): Nested perturbed plotter squares and trapezoidal quadrics across a seven-by-seven archival grid with controlled stochastic corner displacement. (file: https://infinitedevices.org/assets/library/sketch/molnar-concentric-quadrics.js)
 
 ## Library: Sketch 3D
 
@@ -913,6 +921,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Scarpa Venetian Water Pavilion 3D](https://infinitedevices.org/library/scarpa-venetian-water-pavilion-3d.html): Interlocking concrete vesica portals, stepped travertine plinths, and bronze-capped colonnade over a dark reflecting basin. (file: https://infinitedevices.org/assets/library/sketch/scarpa-venetian-water-pavilion-3d.js)
 - [Candela Manantiales Flower 3D](https://infinitedevices.org/library/candela-manantiales-flower-3d.html): Eight-petal intersecting hyperbolic paraboloid concrete vault inspired by Felix Candela's Los Manantiales, with doubly-ruled ribs and cobalt curtain mullions. (file: https://infinitedevices.org/assets/library/sketch/candela-manantiales-flower-3d.js)
 - [Candela Umbrella Cantilever 3D](https://infinitedevices.org/library/candela-umbrella-cantilever-3d.html): Clustered inverted hyperbolic paraboloid concrete umbrella columns with ruled timber-formwork striations and cantilevered saddle canopies. (file: https://infinitedevices.org/assets/library/sketch/candela-umbrella-cantilever-3d.js)
+- [Ito Serpentine Lattice 3D](https://infinitedevices.org/library/ito-serpentine-lattice-3d.html): Algorithmic steel-plate pavilion inspired by Toyo Ito and Cecil Balmond, featuring intersecting rotated truss ribs and cantilevered cellular planes. (file: https://infinitedevices.org/assets/library/sketch/ito-serpentine-lattice-3d.js)
+- [Ito Taichung Catenoid Vault 3D](https://infinitedevices.org/library/ito-taichung-catenoid-vault-3d.html): Parametric acoustic sound-cave inspired by Toyo Ito's National Taichung Theater, built from undulating catenoid arch rings and cellular ribs. (file: https://infinitedevices.org/assets/library/sketch/ito-taichung-catenoid-vault-3d.js)
 
 ## Library: Synths
 
@@ -1039,6 +1049,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Gamelan Ombak Metallophone Synth](https://infinitedevices.org/library/gamelan-ombak-metallophone-synth.html): Struck bronze gamelan metallophone with paired ombak beating detune, inharmonic bar partials, mallet transient, and bamboo tube resonator. (file: https://infinitedevices.org/assets/templates/gamelan-ombak-metallophone-synth.inf)
 - [CZ Phase Distortion Brass Synth](https://infinitedevices.org/library/cz-phase-distortion-brass-synth.html): Casio CZ-inspired cosine-windowed phase distortion synthesizer with envelope-swept resonant knee, sub-harmonic reinforcement, and warm saturation. (file: https://infinitedevices.org/assets/templates/cz-phase-distortion-brass-synth.inf)
 - [Glottal Formant Choir Synth](https://infinitedevices.org/library/glottal-formant-choir-synth.html): Pitch-tracked glottal pulse and three-band parallel state-variable vowel formant synthesizer with subtle vibrato and warm saturation. (file: https://infinitedevices.org/assets/templates/glottal-formant-choir-synth.inf)
+- [Karplus Plucked Zither Synth](https://infinitedevices.org/library/karplus-plucked-zither-synth.html): Physical-modeled plucked zither with shaped pick burst, damped harmonic string modes, sympathetic octave resonance, and wooden soundboard body filter. (file: https://infinitedevices.org/assets/templates/karplus-plucked-zither-synth.inf)
+- [Hammond Tonewheel Organ Synth](https://infinitedevices.org/library/hammond-tonewheel-organ-synth.html): Electromagnetic 9-drawbar tonewheel organ with harmonic key-click transient, 3rd harmonic percussion decay, and warm tube-preamp saturation. (file: https://infinitedevices.org/assets/templates/hammond-tonewheel-organ-synth.inf)
 
 ## Library: Audio Effects
 
@@ -1168,6 +1180,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Leslie Baffle Doppler Horn FX](https://infinitedevices.org/library/leslie-baffle-doppler-horn-fx.html): Dual-rotor horn and drum crossover Doppler processor with asymmetric rotation, phase-modulated cabinet reflections, and tube preamp saturation. (file: https://infinitedevices.org/assets/templates/leslie-baffle-doppler-horn-fx.inf)
 - [Six-Stage Allpass Phaser FX](https://infinitedevices.org/library/six-stage-allpass-phaser-fx.html): Six-stage cascaded first-order allpass phaser with LFO-swept notch combs, asymmetric diode feedback saturation, and lush phase dispersion. (file: https://infinitedevices.org/assets/templates/six-stage-allpass-phaser-fx.inf)
 - [Resonant Vowel Formant FX](https://infinitedevices.org/library/resonant-vowel-formant-fx.html): Three-band parallel state-variable formant filter bank that morphs between A-E-I-O-U vocal resonances with LFO sweep and warm tube saturation. (file: https://infinitedevices.org/assets/templates/resonant-vowel-formant-fx.inf)
+- [BBD Analog Ensemble FX](https://infinitedevices.org/library/bbd-analog-ensemble-fx.html): Triple-phase Bucket-Brigade (BBD) analog chorus ensemble with dual slow/vibrato LFO modulation, clock-filter warmth, and stereo movement. (file: https://infinitedevices.org/assets/templates/bbd-analog-ensemble-fx.inf)
+- [Shimmer Octave Reverb FX](https://infinitedevices.org/library/shimmer-octave-reverb-fx.html): Cascaded allpass diffusion tank with nonlinear octave-harmonic shimmer feedback and warm high-frequency damping. (file: https://infinitedevices.org/assets/templates/shimmer-octave-reverb-fx.inf)
 
 ## Nodes
 
@@ -1544,7 +1558,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 147 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 149 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1692,3 +1706,5 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Cruz-Diez Chromosaturation Moire](https://infinitedevices.org/embeds/cruz-diez-chromosaturation-moire.html): Audio-reactive Cruz-Diez Chromosaturation Moire visualizer. Bass bends the interference wave, mids shift louver density, and highs brighten the ivory chromatic slats.
 - [Turrell Skyspace Ganzfeld](https://infinitedevices.org/embeds/turrell-skyspace-ganzfeld.html): Luminous concentric Ganzfeld elliptical light apertures inspired by James Turrell. Bass expands the inner core, mids shift chromatic warmth, highs shimmer the rim.
 - [Gabo Ruled Perspex Waves](https://infinitedevices.org/embeds/gabo-ruled-perspex-waves.html): Constructivist ruled-surface string interference inspired by Naum Gabo and Antoine Pevsner. Bass flexes the saddle envelope, mids shift string tension, highs brighten specular filaments.
+- [Bismuth Hopper Crystal](https://infinitedevices.org/embeds/bismuth-hopper-crystal.html): Stepped bismuth hopper crystal terraces with thin-film oxide iridescence. Bass pulses terrace depth, mids shift oxide color phase, highs sharpen metallic facet rims.
+- [Ebru Battal Marbling](https://infinitedevices.org/embeds/ebru-battal-marbling.html): Turkish Battal Ebru floating pigment marbling. Bass swells the pigment cells, mids drive combed fluid advection, highs crisp the carbon ink veins.

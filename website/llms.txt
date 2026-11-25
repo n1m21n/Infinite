@@ -394,6 +394,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Glottal Formant Choir Synth](https://infinitedevices.org/library/glottal-formant-choir-synth.html): Pitch-tracked glottal pulse and three-band parallel state-variable vowel formant synthesizer with subtle vibrato and warm saturation. (file: https://infinitedevices.org/assets/templates/glottal-formant-choir-synth.inf)
 - [Six-Stage Allpass Phaser FX](https://infinitedevices.org/library/six-stage-allpass-phaser-fx.html): Six-stage cascaded first-order allpass phaser with LFO-swept notch combs, asymmetric diode feedback saturation, and lush phase dispersion. (file: https://infinitedevices.org/assets/templates/six-stage-allpass-phaser-fx.inf)
 - [Resonant Vowel Formant FX](https://infinitedevices.org/library/resonant-vowel-formant-fx.html): Three-band parallel state-variable formant filter bank that morphs between A-E-I-O-U vocal resonances with LFO sweep and warm tube saturation. (file: https://infinitedevices.org/assets/templates/resonant-vowel-formant-fx.inf)
+- [Karplus Plucked Zither Synth](https://infinitedevices.org/library/karplus-plucked-zither-synth.html): Physical-modeled plucked zither with shaped pick burst, damped harmonic string modes, sympathetic octave resonance, and wooden soundboard body filter. (file: https://infinitedevices.org/assets/templates/karplus-plucked-zither-synth.inf)
+- [Hammond Tonewheel Organ Synth](https://infinitedevices.org/library/hammond-tonewheel-organ-synth.html): Electromagnetic 9-drawbar tonewheel organ with harmonic key-click transient, 3rd harmonic percussion decay, and warm tube-preamp saturation. (file: https://infinitedevices.org/assets/templates/hammond-tonewheel-organ-synth.inf)
+- [BBD Analog Ensemble FX](https://infinitedevices.org/library/bbd-analog-ensemble-fx.html): Triple-phase Bucket-Brigade (BBD) analog chorus ensemble with dual slow/vibrato LFO modulation, clock-filter warmth, and stereo movement. (file: https://infinitedevices.org/assets/templates/bbd-analog-ensemble-fx.inf)
+- [Shimmer Octave Reverb FX](https://infinitedevices.org/library/shimmer-octave-reverb-fx.html): Cascaded allpass diffusion tank with nonlinear octave-harmonic shimmer feedback and warm high-frequency damping. (file: https://infinitedevices.org/assets/templates/shimmer-octave-reverb-fx.inf)
 
 ## Library: Community
 
@@ -817,7 +821,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 147 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 149 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -834,4 +838,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 132 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 134 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

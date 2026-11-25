@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ebru Battal Marbling",
+    "author": "Infinite",
+    "description": "Traditional Turkish Battal Ebru paper marbling with domain-warped pigment droplets in terracotta, cadmium yellow, cerulean, and carbon ink veins.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float warpAmp = 0.42 [0.1, 0.9];\nparam float combFreq = 5.5 [2.0, 12.0];\nparam float dropScale = 6.0 [3.0, 12.0];\nparam float veinWidth = 0.18 [0.05, 0.4];\nparam float flowSpeed = 0.22 [0.0, 0.8];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n\n# Multi-pass domain-warped Ebru fluid advection\nq = p + warpAmp * vec2(sin(p.y * combFreq + t * flowSpeed), cos(p.x * combFreq - t * flowSpeed * 0.8));\nq = q + warpAmp * 0.55 * vec2(cos(q.y * combFreq * 1.7 - t * flowSpeed * 1.1), sin(q.x * combFreq * 1.9 + t * flowSpeed));\n\ncell = sin(q.x * dropScale) * cos(q.y * dropScale) + 0.5 * sin((q.x + q.y) * dropScale * 1.4);\nvein = smoothstep(0.0, veinWidth, abs(cell));\n\ncPaper = vec3(0.953, 0.937, 0.902);\ncInk = vec3(0.082, 0.078, 0.071);\ncTerra = vec3(0.663, 0.290, 0.255);\ncYellow = vec3(0.902, 0.839, 0.118);\ncCerulean = vec3(0.118, 0.612, 0.843);\n\npigment = mix(cTerra, cCerulean, smoothstep(-0.35, 0.35, cell));\npigment = mix(pigment, cYellow, smoothstep(0.45, 0.95, sin(q.x * dropScale * 1.3 - q.y * dropScale * 0.9)));\npigment = mix(cPaper, pigment, smoothstep(-0.85, -0.25, cell));\n\ncol = mix(cInk, pigment, vein);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "warpAmp": 0.42,
+      "combFreq": 5.5,
+      "dropScale": 6.0,
+      "veinWidth": 0.18,
+      "flowSpeed": 0.22
+    }
+  }
+}

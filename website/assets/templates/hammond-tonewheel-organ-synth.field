@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Hammond Tonewheel Organ Synth",
+    "author": "Infinite",
+    "description": "Electromagnetic 9-drawbar tonewheel organ with harmonic key-click transient, 3rd harmonic percussion decay, and warm tube-preamp saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float subOctave = 0.72 [0.0, 1.0];\nparam float fundamental = 0.85 [0.0, 1.0];\nparam float percussion = 0.55 [0.0, 1.0];\nparam float brightness = 0.48 [0.0, 1.0];\nparam float drive = 1.45 [0.6, 3.0];\nstate float pSub = 0; state float p1 = 0; state float p2 = 0; state float p3 = 0;\nstate float env = 0; state float percEnv = 1.0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.28, env * 0.9965);\npercEnv = if(gate > 0.5, percEnv * 0.9968, 1.0);\n\nf0 = clamp(freq, 45.0, 2800.0);\npSub = (pSub + (f0 * 0.5) / sr) % 1.0;\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * 2.0) / sr) % 1.0;\np3 = (p3 + (f0 * 3.0) / sr) % 1.0;\n\ndrawbars = sin(6.2831853 * pSub) * subOctave * 0.55 + sin(6.2831853 * p1) * fundamental * 0.72 + sin(6.2831853 * p2) * (0.42 + brightness * 0.25) + sin(6.2831853 * p3) * (0.18 + percussion * percEnv * 0.58);\n\nraw = drawbars * env * 0.52;\nout = ((raw * drive) / (1.0 + abs(raw * drive) * 0.65)) * 0.64;\n",
+    "params": {
+      "subOctave": 0.72,
+      "fundamental": 0.85,
+      "percussion": 0.55,
+      "brightness": 0.48,
+      "drive": 1.45
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

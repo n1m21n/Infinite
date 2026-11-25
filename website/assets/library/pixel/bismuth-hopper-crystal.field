@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Bismuth Hopper Crystal",
+    "author": "Infinite",
+    "description": "Stepped bismuth hopper crystal terraces with thin-film oxide interference shifting through gold, magenta, cobalt, and specular silver.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float steps = 14.0 [6.0, 24.0];\nparam float oxideShift = 0.45 [0.0, 1.0];\nparam float facetSharp = 0.72 [0.2, 1.0];\nparam float rotSpeed = 0.16 [0.0, 0.8];\nparam float metallic = 0.85 [0.2, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nca = cos(t * rotSpeed + 0.35);\nsa = sin(t * rotSpeed + 0.35);\npr = vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca);\n\n# Nested stepped square hopper crystal field (Chebyshev distance)\nd1 = max(abs(pr.x), abs(pr.y));\nd2 = max(abs(pr.x * 0.707 - pr.y * 0.707 + 0.12), abs(pr.x * 0.707 + pr.y * 0.707 - 0.08));\nhopper = min(d1, d2 * 1.12);\n\nterrace = floor(hopper * steps) / steps;\nedgeDist = abs(fract(hopper * steps) - 0.5);\nrim = smoothstep(0.42 - facetSharp * 0.18, 0.5, edgeDist);\n\n# Thin-film oxide iridescence (gold -> magenta -> cobalt -> silver)\nphase = terrace * 9.5 + oxideShift * 6.283 + (pr.x - pr.y) * 2.4 + t * 0.25;\nirid = 0.5 + 0.5 * cos(phase + vec3(0.0, 2.094, 4.188));\n\ncBase = vec3(0.078, 0.082, 0.106);\ncSpec = vec3(0.914, 0.933, 0.949);\ncol = mix(cBase, irid * metallic, smoothstep(0.68, 0.08, hopper));\ncol = mix(col, cSpec, rim * 0.55 * smoothstep(0.75, 0.1, hopper));\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "steps": 14.0,
+      "oxideShift": 0.45,
+      "facetSharp": 0.72,
+      "rotSpeed": 0.16,
+      "metallic": 0.85
+    }
+  }
+}

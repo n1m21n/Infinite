@@ -3885,7 +3885,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "karplus-plucked-zither-synth",
+      "name": "Karplus Plucked Zither Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical-modeled plucked zither with shaped pick burst, damped harmonic string modes, sympathetic octave resonance, and wooden soundboard body filter.",
+      "price": 0,
+      "preview": "assets/templates/karplus-plucked-zither-synth.webp",
+      "file": "assets/templates/karplus-plucked-zither-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "hammond-tonewheel-organ-synth",
+      "name": "Hammond Tonewheel Organ Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Electromagnetic 9-drawbar tonewheel organ with harmonic key-click transient, 3rd harmonic percussion decay, and warm tube-preamp saturation.",
+      "price": 0,
+      "preview": "assets/templates/hammond-tonewheel-organ-synth.webp",
+      "file": "assets/templates/hammond-tonewheel-organ-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "bbd-analog-ensemble-fx",
+      "name": "BBD Analog Ensemble FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Triple-phase Bucket-Brigade (BBD) analog chorus ensemble with dual slow/vibrato LFO modulation, clock-filter warmth, and stereo movement.",
+      "price": 0,
+      "preview": "assets/templates/bbd-analog-ensemble-fx.webp",
+      "file": "assets/templates/bbd-analog-ensemble-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "shimmer-octave-reverb-fx",
+      "name": "Shimmer Octave Reverb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Cascaded allpass diffusion tank with nonlinear octave-harmonic shimmer feedback and warm high-frequency damping.",
+      "price": 0,
+      "preview": "assets/templates/shimmer-octave-reverb-fx.webp",
+      "file": "assets/templates/shimmer-octave-reverb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 237
+  "count": 241
 }

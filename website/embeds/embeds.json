@@ -735,6 +735,16 @@
       "slug": "gabo-ruled-perspex-waves",
       "title": "Gabo Ruled Perspex Waves",
       "description": "Constructivist ruled-surface string interference inspired by Naum Gabo and Antoine Pevsner. Bass flexes the saddle envelope, mids shift string tension, highs brighten specular filaments."
+    },
+    {
+      "slug": "bismuth-hopper-crystal",
+      "title": "Bismuth Hopper Crystal",
+      "description": "Stepped bismuth hopper crystal terraces with thin-film oxide iridescence. Bass pulses terrace depth, mids shift oxide color phase, highs sharpen metallic facet rims."
+    },
+    {
+      "slug": "ebru-battal-marbling",
+      "title": "Ebru Battal Marbling",
+      "description": "Turkish Battal Ebru floating pigment marbling. Bass swells the pigment cells, mids drive combed fluid advection, highs crisp the carbon ink veins."
     }
   ]
 }

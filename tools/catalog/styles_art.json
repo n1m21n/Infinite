@@ -2641,6 +2641,125 @@
         "Naum Gabo & Antoine Pevsner constructivist ruled-surface bronze and perspex sculptures",
         "Steps Mono (Velvetyne) & Martian Mono (Uncut) constructivist technical type"
       ]
+    },
+    {
+      "id": "molnar_plotter_interruptions",
+      "taxonomy": "new",
+      "name": "Vera Molnar Algorithmic Plotter",
+      "palette": [
+        "#E5E6E1",
+        "#181817",
+        "#6B6D68",
+        "#B33A2E"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "bloom"
+      ],
+      "motion": 0.15,
+      "pairs": [
+        "karplus_plucked_zither"
+      ],
+      "refs": [
+        "Vera Molnar Interruptions a recouvrements (1969) Benson plotter ink drawings",
+        "Azeret Mono (Fontshare) & Fragment Mono (Uncut) archival plotter type"
+      ]
+    },
+    {
+      "id": "toyo_ito_voronoi_pavilion",
+      "taxonomy": "new",
+      "name": "Toyo Ito Algorithmic Cellular Pavilion",
+      "palette": [
+        "#1B232B",
+        "#E4EAEF",
+        "#B4C3CE",
+        "#6E8BA3"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "shimmer_octave_reverb"
+      ],
+      "refs": [
+        "Toyo Ito & Cecil Balmond Serpentine Pavilion (2002) algorithmic steel triangulation",
+        "Grotesk (Velvetyne) & Fragment Mono (Uncut) structural architectural type"
+      ]
+    },
+    {
+      "id": "bismuth_hopper_crystal",
+      "taxonomy": "new",
+      "name": "Bismuth Oxide Hopper Crystal",
+      "palette": [
+        "#14151B",
+        "#D8B13B",
+        "#D93870",
+        "#208CD6"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "pixelate"
+      ],
+      "motion": 0.3,
+      "pairs": [
+        "hammond_tonewheel_drawbar"
+      ],
+      "refs": [
+        "Synthetic bismuth stepped hopper crystal with thin-film oxide iridescence",
+        "TINY (Velvetyne) & Azeret Mono (Fontshare) crystalline technical type"
+      ]
+    },
+    {
+      "id": "ebru_battal_marbling",
+      "taxonomy": "new",
+      "name": "Turkish Battal Ebru Marbling",
+      "palette": [
+        "#151412",
+        "#A94A41",
+        "#E6D61E",
+        "#1E9CD7"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.28,
+      "pairs": [
+        "bbd_analog_ensemble"
+      ],
+      "refs": [
+        "Traditional Turkish Battal Ebru floating pigment droplets and combed marbling",
+        "Grotesk (Velvetyne) & Azeret Mono (Fontshare) editorial pigment type"
+      ]
     }
   ]
 }

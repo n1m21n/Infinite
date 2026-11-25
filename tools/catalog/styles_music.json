@@ -4848,6 +4848,217 @@
       "notefx": [],
       "motif": "sweeping_allpass_comb",
       "groove": 0.4
+    },
+    {
+      "id": "karplus_plucked_zither",
+      "family": "acoustic_model",
+      "bpm": [
+        92,
+        114
+      ],
+      "swing": 0.06,
+      "scale": [
+        4,
+        9
+      ],
+      "drums": {},
+      "bass": "0..4.5..0..2.4..",
+      "fx": [
+        "Field Effect",
+        "Delay",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "String"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Karplus-Strong plucked zither & sympathetic bridge resonance"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 18.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.5,
+        "octave": 2,
+        "gate": 65,
+        "gain": -10.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "hammond_tonewheel_drawbar",
+      "family": "electronic",
+      "bpm": [
+        104,
+        122
+      ],
+      "swing": 0.14,
+      "scale": [
+        7,
+        11
+      ],
+      "drums": {},
+      "bass": "0...3.4.0...5.7.",
+      "fx": [
+        "Field Effect",
+        "Chorus",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.4,
+      "refs": [
+        "9-drawbar electromagnetic tonewheel organ with key-click percussion"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 5.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.45,
+        "octave": 2,
+        "gate": 75,
+        "gain": -9.0
+      },
+      "groove": 0.45
+    },
+    {
+      "id": "bbd_analog_ensemble",
+      "family": "experimental",
+      "bpm": [
+        88,
+        108
+      ],
+      "swing": 0.05,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {},
+      "bass": "0...0...2...3...",
+      "fx": [
+        "Field Effect",
+        "Chorus",
+        "Delay"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.45,
+      "refs": [
+        "Triple-delay Bucket-Brigade (BBD) analog string ensemble chorus"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 10.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gate": 70,
+        "gain": -10.0
+      },
+      "groove": 0.3
+    },
+    {
+      "id": "shimmer_octave_reverb",
+      "family": "ambient",
+      "bpm": [
+        72,
+        96
+      ],
+      "swing": 0.02,
+      "scale": [
+        6,
+        9
+      ],
+      "drums": {},
+      "bass": "0.......4.......",
+      "fx": [
+        "Field Effect",
+        "Reverb",
+        "Delay"
+      ],
+      "synth": [
+        "Wavetable",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.35,
+      "refs": [
+        "Pitch-shifted octave feedback tank & allpass shimmer dispersion"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 24.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Wavetable"
+        ],
+        "density": 0.3,
+        "octave": 2,
+        "gate": 80,
+        "gain": -11.0
+      },
+      "groove": 0.25
     }
   ]
 }
