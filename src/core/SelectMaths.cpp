@@ -346,7 +346,8 @@ namespace SelectMaths
                if (done[o] || m == 0 || m >= 250 || ms[o] < 1e-4f)
                   continue;
                done[o] = 1;
-               const float t = amt * (1.0f - m / 255.0f);
+               // At half selected or less the colour is mostly background: replaced in full. Nearer solid, less.
+               const float t = amt * std::min(1.0f, 2.0f * (1.0f - m / 255.0f));
                for (int k = 0; k < 3; k++)
                {
                   const float f = mc[k][o] / ms[o];

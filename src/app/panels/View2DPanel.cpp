@@ -15894,6 +15894,83 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->RemoveLayer(p);
          doc->Commit();
       }
+      // ai-tools 1.5-1.6 maths, on made-up pixels: Color Range rules and the Select and Mask edge sliders.
+      {
+         namespace SM = SelectMaths;
+         auto pic = [](std::initializer_list<std::array<int, 3>> cols) {
+            std::vector<uint8_t> px;
+            for (const auto& c : cols)
+               px.insert(px.end(), { (uint8_t)c[0], (uint8_t)c[1], (uint8_t)c[2], 255 });
+            return px;
+         };
+         auto sample = [](int r, int g, int b, float x, bool sub) {
+            SM::Sample k;
+            k.rgb[0] = r / 255.0f, k.rgb[1] = g / 255.0f, k.rgb[2] = b / 255.0f;
+            k.x = x + 0.5f, k.y = 0.5f, k.subtract = sub;
+            return k;
+         };
+         std::vector<uint8_t> m;
+         SM::RangeParams rp;
+         const std::vector<uint8_t> row = pic({ { 200, 0, 0 }, { 201, 0, 0 }, { 0, 200, 0 }, { 0, 0, 200 } });
+         rp.fuzziness = 0.0f;
+         SM::ColorRange(row.data(), 4, 1, { sample(200, 0, 0, 0, false) }, rp, m);
+         expect("ai: color range fuzziness zero takes the exact colour only", m[0] == 255 && m[1] == 0 && m[2] == 0);
+         rp.fuzziness = 40.0f;
+         SM::ColorRange(row.data(), 4, 1, { sample(200, 0, 0, 0, false), sample(200, 0, 0, 0, true) }, rp, m);
+         const bool cut = m[0] == 0;
+         SM::ColorRange(row.data(), 4, 1, { sample(200, 0, 0, 0, false), sample(200, 0, 0, 0, true), sample(200, 0, 0, 0, false) }, rp, m);
+         expect("ai: color range subtract follows the click order", cut && m[0] == 255);
+         SM::ColorRange(row.data(), 4, 1, { sample(200, 0, 0, 0, false), sample(0, 0, 200, 3, false) }, rp, m);
+         expect("ai: color range takes several samples", m[0] == 255 && m[3] == 255 && m[2] == 0);
+         const std::vector<uint8_t> ramp = pic({ { 200, 0, 0 }, { 200, 30, 30 }, { 200, 60, 60 }, { 200, 120, 120 } });
+         SM::ColorRange(ramp.data(), 4, 1, { sample(200, 0, 0, 0, false) }, rp, m);
+         expect("ai: color range falls off with colour distance", m[0] == 255 && m[1] > m[2] && m[2] >= m[3] && m[1] < 255 && m[3] < 128);
+         std::vector<uint8_t> wide(64 * 4, 0);
+         for (int x = 0; x < 64; x++)
+            wide[x * 4] = 200, wide[x * 4 + 3] = 255;
+         rp.localized = true;
+         rp.localRange = 10.0f;
+         SM::ColorRange(wide.data(), 64, 1, { sample(200, 0, 0, 0, false) }, rp, m);
+         expect("ai: localized color range reaches only near its sample", m[0] == 255 && m[63] == 0);
+         rp = SM::RangeParams();
+         auto w = [&](SM::Range r, int R, int G, int B) {
+            const float c[3] = { R / 255.0f, G / 255.0f, B / 255.0f };
+            return SM::RangeWeight(r, c, rp);
+         };
+         expect("ai: hue families take their own colours", w(SM::Range::Reds, 220, 20, 20) > 0.95f && w(SM::Range::Reds, 20, 220, 20) < 0.05f &&
+                                                           w(SM::Range::Blues, 20, 20, 220) > 0.95f && w(SM::Range::Greens, 20, 220, 20) > 0.95f &&
+                                                           w(SM::Range::Yellows, 220, 220, 20) > 0.95f && w(SM::Range::Reds, 128, 128, 128) < 0.05f);
+         expect("ai: hue families weigh dull colours less", w(SM::Range::Reds, 160, 120, 120) < w(SM::Range::Reds, 220, 20, 20));
+         expect("ai: tonal ranges split by lightness", w(SM::Range::Highlights, 250, 250, 250) > 0.95f && w(SM::Range::Highlights, 10, 10, 10) < 0.05f &&
+                                                       w(SM::Range::Shadows, 10, 10, 10) > 0.95f && w(SM::Range::Midtones, 128, 128, 128) > 0.95f &&
+                                                       w(SM::Range::Midtones, 250, 250, 250) < 0.05f);
+         expect("ai: skin tones take skin, not cream or white", w(SM::Range::Skin, 224, 172, 140) > 0.8f && w(SM::Range::Skin, 255, 253, 208) < 0.05f &&
+                                                                w(SM::Range::Skin, 255, 255, 255) < 0.05f);
+         // Shift Edge and Contrast on a soft ramp.
+         std::vector<uint8_t> soft(32);
+         for (int x = 0; x < 32; x++)
+            soft[x] = (uint8_t)std::lround(x * 255.0 / 31.0);
+         std::vector<uint8_t> out = soft, hard = soft;
+         SM::AdjustEdge(out, 32, 1, 0, 0, 0, 50.0f);
+         SM::AdjustEdge(hard, 32, 1, 0, 0, 80.0f, 0);
+         expect("ai: shift edge moves a soft edge out and contrast hardens it", out[16] > soft[16] + 40 && hard[24] == 255 && hard[7] == 0 && soft[24] < 255);
+         std::vector<uint8_t> all(64 * 64, 255), keep;
+         std::vector<uint8_t> grey(64 * 64 * 4, 128);
+         keep = all;
+         SM::Refine(grey.data(), keep, 64, 64, { 20.0f, true, 30.0f, 0, 0, 0 });
+         expect("ai: refine keeps a solid selection whole", keep == all);
+         // Decontaminate: a dark fringe in the soft edge takes the subject's colour.
+         std::vector<uint8_t> fr(16 * 4), fm(16);
+         for (int x = 0; x < 16; x++)
+         {
+            const bool subj = x < 8;
+            fm[x] = subj ? 255 : x == 8 ? 128 : 0;
+            const int v = subj ? 220 : 20;
+            fr[x * 4] = (uint8_t)v, fr[x * 4 + 1] = (uint8_t)(subj ? 40 : 20), fr[x * 4 + 2] = (uint8_t)(subj ? 40 : 20), fr[x * 4 + 3] = 255;
+         }
+         SM::Decontaminate(fr.data(), fm, 16, 1, 1.0f);
+         expect("ai: decontaminate pulls a dark fringe to the subject colour", fr[8 * 4] > 150 && fr[0] == 220 && fr[12 * 4] == 20);
+      }
       // ai-tools 1.5-1.6: Select and Mask and Color Range on a red square (100..200) over green.
       {
          namespace SM = SelectMaths;
@@ -15928,6 +16005,10 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("ai: the Reds range takes red, not green", doc->SelectionAt(150, 150) > 0.95f && doc->SelectionAt(50, 50) < 0.05f);
          doc->SelectColorRange({}, cr, true, Scene2DNode::kSelNew, false, p);
          expect("ai: inverted range flips it", doc->SelectionAt(150, 150) < 0.05f && doc->SelectionAt(50, 50) > 0.95f);
+         doc->SelectRect(0, 0, 150, (float)H, Scene2DNode::kSelNew, 0, false);
+         doc->SelectColorRange({}, cr, true, Scene2DNode::kSelNew, false, p);
+         expect("ai: inverted range stays inside the prior selection", doc->SelectionAt(50, 50) > 0.95f && doc->SelectionAt(125, 150) < 0.05f &&
+                                                                       doc->SelectionAt(175, 50) < 0.05f);
          doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 4.0f, false);
          const int copy = doc->RefineOutput(2, p, 1.0f);
          const Scene2DNode::Layer* cl = copy != 0 ? doc->FindLayer(copy) : nullptr;

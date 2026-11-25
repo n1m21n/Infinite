@@ -35,7 +35,8 @@ namespace SelectMaths
    // Both, in order.
    void Refine(const uint8_t* rgba, std::vector<uint8_t>& mask, int w, int h, const RefineParams& p);
    // Decontaminate Colours: in the soft edge (0 < mask < 250) the colour is pulled toward the mean of the solidly
-   // selected pixels nearby, more where the mask is weaker. amount 0..1. Pixels with mask 0 or >= 250 are untouched.
+   // selected pixels nearby: in full at half selected or less, less toward solid. amount 0..1. Pixels with mask 0
+   // or >= 250 are untouched.
    void Decontaminate(uint8_t* rgba, const std::vector<uint8_t>& mask, int w, int h, float amount);
 
    // ---- Color Range --------------------------------------------------------------------------------------------
