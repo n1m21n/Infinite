@@ -961,53 +961,132 @@ namespace
       doc->MoveLayer(a->id, target, below);
    }
 
-   // Align to the document with one layer, to the selection with more (align: 0 left, 1 centre, 2 right, 3 top, 4 middle, 5 bottom).
+   // Align To (Photoshop's Move-tool menu): 0 auto (a pixel selection's box; else the canvas for one layer, the
+   // layers' joint box for more), 1 the canvas, 2 the key object (the active layer stays, the others line up on it).
+   int sAlignTo = 0;
+   enum DistKind { kDistLeft, kDistHCentre, kDistRight, kDistTop, kDistVCentre, kDistBottom, kDistHSpace, kDistVSpace };
+   const int kBarDistribute[2] = { kDistHCentre, kDistVCentre };
+   float sDistSpacing = 0.0f;   // Distribute Spacing with a key object: this gap in px; otherwise the gaps even out
+
+   // The box Align lines up on, and the layer that must not move (key object), 0 for none.
+   bool AlignTarget(Scene2DNode* doc, float lo[2], float hi[2], int& key)
+   {
+      key = 0;
+      lo[0] = lo[1] = 0.0f;
+      hi[0] = (float)doc->Doc().w, hi[1] = (float)doc->Doc().h;
+      if (sAlignTo == 1)
+         return true;
+      if (sAlignTo == 2 && sSel.size() > 1)
+      {
+         key = sSel.back();
+         return doc->Bounds(key, lo, hi);
+      }
+      if (doc->HasSelection() && doc->SelectionBounds(lo, hi))
+         return true;
+      if (sSel.size() > 1)
+         SelBounds(doc, lo, hi);
+      return true;
+   }
+
+   void MoveLayerBy(Scene2DNode* doc, int id, float dx, float dy)
+   {
+      for (Layer& l : doc->Layers())
+         if (l.kind != Kind::Group && Movable(doc, l) && doc->IsInside(l.id, id))
+            l.x += dx, l.y += dy;
+   }
+
+   // align: 0 left, 1 centre, 2 right, 3 top, 4 middle, 5 bottom.
    void Align(Scene2DNode* doc, int how)
    {
       if (sSel.empty())
          return;
-      float lo[2] = { 0, 0 }, hi[2] = { (float)doc->Doc().w, (float)doc->Doc().h };
-      if (sSel.size() > 1)
-         SelBounds(doc, lo, hi);
+      float lo[2], hi[2];
+      int key = 0;
+      if (!AlignTarget(doc, lo, hi, key))
+         return;
       PushUndoCheckpoint("Align in 2D View");
       const int axis = how < 3 ? 0 : 1;
       const int side = how % 3;
       for (int id : sSel)
       {
          float a[2], b[2];
-         if (!doc->Bounds(id, a, b))
+         if (id == key || !doc->Bounds(id, a, b))
             continue;
          const float want = side == 0 ? lo[axis] : side == 1 ? (lo[axis] + hi[axis]) * 0.5f : hi[axis];
          const float have = side == 0 ? a[axis] : side == 1 ? (a[axis] + b[axis]) * 0.5f : b[axis];
          const float d = want - have;
-         for (Layer& l : doc->Layers())
-            if (l.kind != Kind::Group && Movable(doc, l) && doc->IsInside(l.id, id))
-               (axis == 0 ? l.x : l.y) += d;
+         MoveLayerBy(doc, id, axis == 0 ? d : 0.0f, axis == 1 ? d : 0.0f);
       }
       Touch();
    }
 
-   // Even spacing: the outer two stay, the centres between them step evenly along the axis.
-   void Distribute(Scene2DNode* doc, int axis)
+   // Distribute (PhotoCraft layer_multi_cmds/align.rs): kinds 0..5 step one edge or centre evenly (left, horizontal
+   // centres, right, top, vertical centres, bottom), the outer two staying; 6 horizontally / 7 vertically make the
+   // gaps between neighbours equal. With a key object, spacing puts sDistSpacing px between neighbours and the key
+   // object stays where it is.
+   void Distribute(Scene2DNode* doc, int kind)
    {
-      std::vector<std::pair<float, int>> order;
+      struct It { int id; float lo, hi; };
+      const bool spacing = kind >= kDistHSpace;
+      const int axis = spacing ? kind - kDistHSpace : kind < kDistTop ? 0 : 1;
+      const int side = spacing ? 0 : kind % kDistTop;
+      std::vector<It> items;
       for (int id : sSel)
       {
          float a[2], b[2];
          if (doc->Bounds(id, a, b))
-            order.push_back({ (a[axis] + b[axis]) * 0.5f, id });
+            items.push_back({ id, a[axis], b[axis] });
       }
-      if (order.size() < tok::view2d_distribute_limit)
+      const int key = sAlignTo == 2 && !sSel.empty() ? sSel.back() : 0;
+      const bool fixed = spacing && key != 0;
+      if (items.size() < (fixed ? 2u : (size_t)tok::view2d_distribute_limit))
          return;
-      std::sort(order.begin(), order.end());
-      PushUndoCheckpoint("Distribute in 2D View");
-      const float first = order.front().first, step = (order.back().first - first) / (float)(order.size() - 1);
-      for (size_t i = 1; i + 1 < order.size(); i++)
+      auto edge = [&](const It& t) { return side == 0 ? t.lo : side == 1 ? (t.lo + t.hi) * 0.5f : t.hi; };
+      if (spacing)
+         std::stable_sort(items.begin(), items.end(), [](const It& p, const It& q) { return p.lo + p.hi < q.lo + q.hi; });
+      else
+         std::stable_sort(items.begin(), items.end(), [&](const It& p, const It& q) { return edge(p) < edge(q); });
+      const size_t n = items.size();
+      std::vector<float> want(n);
+      if (fixed)
       {
-         const float d = first + step * (float)i - order[i].first;
-         for (Layer& l : doc->Layers())
-            if (l.kind != Kind::Group && Movable(doc, l) && doc->IsInside(l.id, order[i].second))
-               (axis == 0 ? l.x : l.y) += d;
+         // The key object stays; neighbours step out from it with the asked gap.
+         size_t k = 0;
+         while (k < n && items[k].id != key)
+            k++;
+         if (k == n)
+            return;
+         want[k] = items[k].lo;
+         for (size_t i = k + 1; i < n; i++)
+            want[i] = want[i - 1] + (items[i - 1].hi - items[i - 1].lo) + sDistSpacing;
+         for (size_t i = k; i-- > 0;)
+            want[i] = want[i + 1] - sDistSpacing - (items[i].hi - items[i].lo);
+      }
+      else if (spacing)
+      {
+         float total = 0.0f;
+         for (const It& t : items)
+            total += t.hi - t.lo;
+         const float gap = (items.back().hi - items.front().lo - total) / (float)(n - 1);
+         float cur = items.front().lo;
+         for (size_t i = 0; i < n; i++)
+         {
+            want[i] = cur;
+            cur += (items[i].hi - items[i].lo) + gap;
+         }
+      }
+      else
+      {
+         const float first = edge(items.front()), last = edge(items.back());
+         for (size_t i = 0; i < n; i++)
+            want[i] = first + (last - first) * (float)i / (float)(n - 1);
+      }
+      PushUndoCheckpoint("Distribute in 2D View");
+      for (size_t i = 0; i < n; i++)
+      {
+         const float d = want[i] - (spacing ? items[i].lo : edge(items[i]));
+         if (d != 0.0f)
+            MoveLayerBy(doc, items[i].id, axis == 0 ? d : 0.0f, axis == 1 ? d : 0.0f);
       }
       Touch();
    }
@@ -10819,6 +10898,48 @@ namespace
       ImGui::EndMenu();
    }
 
+   void AlignSubMenus(Scene2DNode* doc)
+   {
+      static const char* const kAlignNames[6] = { "Left Edges", "Horizontal Centres", "Right Edges", "Top Edges", "Vertical Centres", "Bottom Edges" };
+      if (MenuParts::SubMenu(T("Align"), !sSel.empty()))
+      {
+         for (int i = 0; i < 6; i++)
+         {
+            if (i == 3)
+               MenuParts::Separator();
+            if (MenuParts::Item(T(kAlignNames[i])))
+               Align(doc, i);
+         }
+         MenuParts::Separator();
+         static const char* const kTo[3] = { "Align to Selection", "Align to Canvas", "Align to Key Object" };
+         for (int i = 0; i < 3; i++)
+            if (MenuParts::Item(T(kTo[i]), nullptr, sAlignTo == i))
+               sAlignTo = i;
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(T("Distribute"), sSel.size() > 1))
+      {
+         for (int i = 0; i < 6; i++)
+         {
+            if (i == 3)
+               MenuParts::Separator();
+            if (MenuParts::Item(T(kAlignNames[i])))
+               Distribute(doc, i);
+         }
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Horizontal Spacing")))
+            Distribute(doc, 6);
+         if (MenuParts::Item(T("Vertical Spacing")))
+            Distribute(doc, 7);
+         if (sAlignTo == 2)
+         {
+            ImGui::SetNextItemWidth(kWellL);
+            FieldWell::Slider("##v2ddistgap", &sDistSpacing, params::view2d::spacing_lo, params::view2d::spacing_hi, "Spacing %.0f px");
+         }
+         ImGui::EndMenu();
+      }
+   }
+
    // Document crops from a menu: to the selection's box, or Trim to what the layers show (transparent edges cut).
    void CropToSelection(Scene2DNode* doc)
    {
@@ -11078,7 +11199,7 @@ namespace
                   dl->AddRectFilled(ImVec2(c.x - len, c.y + o - tok::view2d_context_bar_items_gap), ImVec2(c.x + len, c.y + o + tok::view2d_context_bar_items_gap), col);
             }
             if (hit)
-               Distribute(doc, i);
+               Distribute(doc, kBarDistribute[i]);   // the bar's two: centres across, centres down
          }
          {
             gap();
@@ -11758,6 +11879,8 @@ namespace
                sPending.what = Pending::Duplicate;
             if (!adj)
                TransformSubMenu(doc);
+            if (!adj)
+               AlignSubMenus(doc);
             if (l->kind == Kind::Vector)
                CombineShapesSubMenu(doc);
             if (l->kind != Kind::Fill && l->kind != Kind::Adjust && MenuParts::Item(T("Select Layer Pixels")))
@@ -18148,6 +18271,66 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             doc->Commit();
          }
          sSel = sel0;
+      }
+      // Align and Distribute (PhotoCraft layer_multi_cmds/align.rs): three bars 10, 20 and 30 px wide at x 0, 30, 100.
+      // Left edges step evenly; Horizontal Spacing evens the gaps (35 px); with a key object the key stays and the
+      // others sit the asked spacing away; Align to Key Object lines up on the key without moving it.
+      {
+         using Sh = Scene2DNode::Shape;
+         auto bar = [&](float x0, float w) {
+            Layer& l = doc->AddLayer(Kind::Vector, 0, 0);
+            Sh r;
+            r.type = Sh::kRect;
+            r.x0 = x0, r.y0 = 200, r.x1 = x0 + w, r.y1 = 220 + w;
+            l.shapes.push_back(r);
+            return l.id;
+         };
+         const int a = bar(0, 10), b = bar(30, 20), c = bar(100, 30);
+         doc->Commit();
+         auto left = [&](int id) {
+            float lo[2] = { -1, -1 }, hi[2];
+            doc->Bounds(id, lo, hi);
+            return lo[0];
+         };
+         auto reset = [&]() {
+            for (int id : { a, b, c })
+               if (Layer* l = doc->FindLayer(id))
+                  l->x = doc->Doc().w * 0.5f, l->y = doc->Doc().h * 0.5f;
+            doc->Commit();
+         };
+         const std::vector<int> sel0 = sSel;
+         const int to0 = sAlignTo;
+         const float gap0 = sDistSpacing;
+         const bool hadSel = doc->HasSelection();
+         if (hadSel)
+            doc->Deselect();
+         sAlignTo = 0;
+         sSel = { a, b, c };
+         Distribute(doc, 0);
+         expect("distribute: left edges step evenly, the outer two stay", about(left(a), 0) && about(left(b), 50) && about(left(c), 100));
+         reset();
+         Distribute(doc, 6);
+         expect("distribute: Horizontal Spacing evens the gaps", about(left(a), 0) && about(left(b), 45) && about(left(c), 100));
+         reset();
+         sAlignTo = 2;
+         sDistSpacing = 5.0f;
+         sSel = { a, c, b };   // b is the key object (the active layer)
+         Distribute(doc, 6);
+         expect("distribute: spacing round a key object keeps the key, others 5 px away", about(left(b), 30) && about(left(a), 15) && about(left(c), 55));
+         reset();
+         sSel = { a, b, c };
+         Align(doc, 0);
+         expect("align: to a key object, it stays and the others line up on it", about(left(c), 100) && about(left(a), 100) && about(left(b), 100));
+         reset();
+         sAlignTo = 1;
+         Align(doc, 2);
+         expect("align: to the canvas, right edges meet the canvas edge", about(left(a), doc->Doc().w - 10.0f) && about(left(c), doc->Doc().w - 30.0f));
+         sAlignTo = to0;
+         sDistSpacing = gap0;
+         sSel = sel0;
+         for (int id : { a, b, c })
+            doc->RemoveLayer(id);
+         doc->Commit();
       }
       // Pass Through at 50%: an Invert inside still sees the red below, so red mixes with cyan to grey (Photoshop).
       {

@@ -2872,6 +2872,8 @@ namespace params
       constexpr float pct_lo = 1.0f;
       constexpr float sel_mod_px_hi = 100.0f;
       constexpr float sel_mod_px_lo = 1.0f;
+      constexpr float spacing_lo = 0.0f;   // Distribute Spacing around a key object, px
+      constexpr float spacing_hi = 1000.0f;
       constexpr float depth_hi = 300.0f;
       constexpr float depth_lo = 0.0f;
       constexpr float light_az_lo = -180.0f;
