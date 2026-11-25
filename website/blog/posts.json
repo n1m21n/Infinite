@@ -1,5 +1,14 @@
 [
  {
+  "slug": "generative-melody-and-chords-in-infinite",
+  "title": "Build a generative melody and chord progression",
+  "description": "Patch Chorder, Arpeggiator, Random Note Generator, Analog, Delay, and Reverb in Infinite to create evolving chords and melodies without music theory.",
+  "date": "2026-11-25",
+  "updated": "2026-11-25",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/generative-melody-and-chords-in-infinite.html"
+ },
+ {
   "slug": "aliasing-free-virtual-analog-dsp-blep-zdf-oversampling",
   "title": "Aliasing-free virtual analog DSP: BLEP, 4x oversampling, and ZDF",
   "description": "How Infinite's Analog synth combines 24-tap BLEP/BLAMP oscillators, 4x half-band oversampling, ADAA drive, and 4-lane SIMD ZDF filters below -80 dB aliasing.",
