@@ -352,6 +352,59 @@ witness (bisection step 1/256 of the range) and the frozen limit:
   at every step, fl(x⁺) − x equal to the true increment to 1e-6 relative (`genuine` in `satloops.py`).
   After the fix: no witness at any certified ceiling, and all 9 real witnesses still pass.
 
+**Phase 1, corpus G** (`scripts/gen_sat.py`, `scripts/phase1_G.py`, `corpus/G.json`, `data/phase1-G.json`,
+about 40 min on 5 workers). 200 kernels: Report 2's linear generator (seed 20261122, n ≤ 6, 1-3 knobs, half
+frozen-stable by construction) with 1-3 saturators from the D2 library placed on loop paths, either on a
+state's whole update (**row**, a ladder stage) or where a state is read (**column**). Both placements keep
+the small-signal matrix equal to Report 2's A(θ), checked per kernel, so the frozen check and B4 see exactly
+the kernel Report 2 would have generated. Method details, decided in this phase:
+- **T1** runs on Report 2's covered certifier with the saturator gains δᵢ as extra box axes. A + B diag(δ) C
+  is affine in each δᵢ, so the cover is exact along them. Every vertex is held to strict decrease, δᵢ = 0
+  included: sound, and more conservative than the non-strict rule above.
+- **T3**'s corners are exact only for affine knob terms, knob-free C on every saturator and shapes tanh /
+  soft / clamp (1 kernel of 200). Elsewhere a T3 pass is recorded as grid-only and **not counted**.
+  Making T3 count on G needs a cell cover for its quadratic form (not built).
+- Report 2's cover ran with a cell budget of 20 000 (Report 2: 200 000) to fit the M2. A cover that does not
+  close is "grid-certified", counted as no proof. The 18 such T1 runs were re-run at 200 000
+  (`data/phase1-G-budget200k.json`): none closed, so the reduced budget costs no certificates. All 18 sit at a sampled radius of 0.94-0.98 with the cover stuck near 1, the gap a larger budget does not shrink.
+
+| | Kernels with a witness (73: 48 sticks, 25 grows) | Kernels without (127) |
+|---|---|---|
+| B1a, frozen check at the default knobs, says safe | **64 of 73** | |
+| B1b, frozen check on a full grid, says safe | **14 of 73** (8 stick, 6 grow) | |
+| B4, linearise and hope, certifies | **2 of 73** | 112 |
+| T1 certifies | 0 | 94 (+18 grid-only) |
+| T3 certifies (exact) | 0 | 0 (114 grid-only) |
+| **G1 = T1 or T3** | **0** | **94 of 127 = 74.0%** |
+
+- **H1 holds on G:** no T1 or T3 certificate on any kernel with a witness.
+- **H3, calibration only:** 74.0% of no-witness kernels certified at the reduced budget, over D4's 70% bar.
+  H3 is scored on extracted matrices in phase 3 and on B in phase 4; this number is not the verdict.
+- **B4 is unsound on saturating loops, so the new pass is needed.** On phase 0's set L, linearise-and-hope
+  was never wrong; on G it certified two kernels that blow up. Both fail the same way, at a *fixed* knob
+  setting, which the frozen check also calls safe: the saturator sits on a path that stabilises the loop.
+  Small signals see slope 1 and decay (small-signal radius 0.977 and 0.980). Large signals see slope near 0,
+  the path is cut, and the loop that remains has radius 1.004. That's integrator windup, found by the
+  oracle without being looked for. Direct re-run, 20 random starts per size, 20 000 samples:
+
+| Kernel | Saturator | Small-signal radius | Radius with the saturator cut (δ = 0) | Smallest start that blows up | Growth from a start of 100 |
+|---|---|---|---|---|---|
+| s122-067 | tanh, column | 0.977 | 1.004 | ‖x₀‖ ≈ 16.9 (+24.6 dB) | 2.3e34 |
+| s122-124 | clamp, row | 0.980 | 1.004 | ‖x₀‖ ≈ 10.4 (+20.3 dB) | 1.9e37 |
+
+  A state 20-25 dB over full scale is reachable with a hot input into a resonant loop, so this is a real
+  failure, not a corner case. T1 rejects both because the δ = 0 vertex is one of its corners.
+- **B1, the frozen check, is false-safe on 64 of 73 at the default knobs and 14 of 73 even on a full grid.**
+
+**H2 (write-up, owner-decided scoring, 2026-11-23).** Scored over the explicit Moog port's full declared
+cutoff range, g ≤ 0.785 (fs/8): T3 certifies k ≤ 1.141 for the whole box (`data/phase0-L.json`; 1.154 with
+the ceiling taken at g = 0.785 alone, `data/phase0-t3.json`), against Hélie's time-varying 5/3. **H2 fails
+as registered.** The reason is the port, not the method. Frozen at fs/8, the explicit filter self-oscillates
+from k = 1.288, below 5/3, so no sound method can reach 5/3 over that range. The oracle's first witness there
+is k = 1.289. The finding that stands: **T3 certifies Hélie's 5/3 automatically, from the kernel's matrices,
+for cutoff ceilings up to g = 0.524**, and stays within 0.01 of Report 2's linear common-P bound at every
+ceiling tested. No certificate lies past a witness.
+
 **Phases.**
 
 | Phase | Work | Needs a build |
@@ -392,7 +445,7 @@ exists on both sides as a cherry-pick).
 
 | Step | What | Note |
 |---|---|---|
-| Phase 1 | Generator for G (Report 2's linear generator + 1-3 saturators from the shape library on loop paths, half frozen-stable without them), fixed seed; B1, B2, B4 on G; G1 verdict = T1 or T3 | Python only; reuse `lit.py` / `satloops.oracle` / `t3cert` |
-| H2 | Score over the Moog's full cutoff range as decided: T3 1.141-1.154 at g = 0.785 vs Hélie's 5/3, so H2 fails as registered; the 0.524 crossover is the finding | Write-up only |
+| Phase 1 | **Done 2026-11-25** (section 8, "Phase 1, corpus G"): H1 holds on G, G1 74.0% on no-witness kernels (calibration), B4 unsound (2 windup kernels) | Open item: a cell cover for T3 so it can count on non-affine kernels |
+| H2 | **Written up 2026-11-25:** fails as registered (1.141 vs 5/3 over g ≤ 0.785); 5/3 certified up to g = 0.524 | Done |
 | T3 on non-injective C | svf-clip shows T3's `x_strict` rule is too strict; a detectability argument could replace it | Optional; T1 covers the case today |
 | Phase 2 | Extend `INFINITE_FIELDSTABDUMP` for saturating kernels | Needs the one build at plan end |
