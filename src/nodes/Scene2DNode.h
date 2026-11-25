@@ -519,6 +519,17 @@ public:
    // The selection made into the layer's pixel mask (all shown without one).
    bool MaskFromSelection(int id);
    void RemovePixelMask(int id);
+   // Layer > Layer Mask > Apply: a paint layer's alpha times its pixel mask (soft values kept as they show), then the
+   // mask goes. A disabled mask hides nothing: it is only removed. False: no mask, not a paint layer, or the mask and
+   // the pixels are not the same size.
+   bool ApplyPixelMask(int id);
+   // Invert with the mask targeted: white becomes black across the whole mask.
+   bool InvertPixelMask(int id);
+   // Mask view (backslash): the layer's pixel mask over the picture as Photoshop's rubylith, document size: clear
+   // where the mask shows, half red where it hides. A view only: no pixel changes. 0 = no mask.
+   unsigned MaskViewTexture(int id);
+   // The layer's pixel mask through its box at document size (bottom row first, 0..255).
+   bool MaskInDoc(int id, std::vector<uint8_t>& out);
    // Painting on a layer (target 0) or its pixel mask (1) or the quick mask (2).
    // Points are document pixels. EndPaint stores the touched tiles and commits.
    bool BeginPaint(int id, int target, const BrushEngine::Brush& b, float x, float y, float pressure);
@@ -985,6 +996,8 @@ private:
    std::vector<float> mLiveDepth;     // the live picture's depth (bottom row first), empty until it arrives
    std::vector<float> mLiveFocus;     // Focus Area's sharpness map of the live picture, made for mLiveFocusNoise
    float mLiveFocusNoise = -1.0f;
+   GLUtil::Fbo mMaskView;             // MaskViewTexture's overlay, made for mMaskViewKey
+   size_t mMaskViewKey = 0;
    // The document-sized picture a selection command reads (bottom row first): the paint layer, or the composite.
    bool ReadSelectPicture(bool sampleAll, int layerId, std::vector<uint8_t>& px);
    uint64_t mLiveDepthKey = 0;        // 0 = not asked yet

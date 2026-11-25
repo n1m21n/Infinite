@@ -1331,6 +1331,7 @@ Scene2DNode::~Scene2DNode()
             glDeleteTextures(1, &kv.second.tex);
    GLUtil::DestroyFbo(mSelTex);
    GLUtil::DestroyFbo(mSelOverlay);
+   GLUtil::DestroyFbo(mMaskView);
    GLUtil::DestroyFbo(mSelScratch);
    GLUtil::DestroyFbo(mCloneSrc);
    for (auto& kv : mUndoSurf)

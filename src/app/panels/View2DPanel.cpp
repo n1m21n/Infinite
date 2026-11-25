@@ -212,6 +212,12 @@ namespace
    bool sSurfaceStroke = false;    // the stroke now running paints a surface
    int sSkinSide = 2;              // 0..3: 512 .. 4096 px, for the next new skin
    bool sEditMask = false;         // the brush paints the active layer's pixel mask
+   int sMaskView = 0;              // Mask view (backslash): the layer whose pixel mask shows as a red overlay, 0 = off
+
+   // Backslash: the active layer's pixel mask as a red overlay, and back. Without a mask it does nothing.
+   void ToggleMaskView(Scene2DNode* doc);
+   // The view ends when its layer stops being the active one or loses its mask. Returns the layer still viewed.
+   int MaskViewLayer(Scene2DNode* doc);
    int sMarqueeShape = 0;          // 0 rectangle, 1 ellipse
    int sMarqueeRatio = 0;          // 0 free, 1 1:1, 2 4:3, 3 16:9, 4 fixed size
    float sMarqueeFixed[2] = { 256.0f, 256.0f };
@@ -307,7 +313,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ApplyMask, InvertMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -4422,6 +4428,20 @@ namespace
       Touch();
    }
 
+   void ToggleMaskView(Scene2DNode* doc)
+   {
+      if (Layer* a = Active(doc); a != nullptr && a->HasPixelMask())
+         sMaskView = sMaskView == a->id ? 0 : a->id;
+   }
+
+   int MaskViewLayer(Scene2DNode* doc)
+   {
+      const Layer* al = sMaskView != 0 ? Active(doc) : nullptr;
+      if (al == nullptr || al->id != sMaskView || !al->HasPixelMask())
+         sMaskView = 0;
+      return sMaskView;
+   }
+
    // Keys for the pixel tools. Returns true when it used the key.
    void HandlePixelKeys(Scene2DNode* doc, bool cmd, bool shift)
    {
@@ -4451,6 +4471,13 @@ namespace
          SelStep("Deselect");
          doc->Deselect();
       }
+      // Backslash: the active layer's pixel mask as a red overlay over the picture, and back.
+      if (!cmd && !shift && key(ImGuiKey_Backslash))
+         ToggleMaskView(doc);
+      // Invert with the mask targeted inverts the mask (Photoshop's Image > Adjustments > Invert on a mask).
+      if (cmd && !shift && key(ImGuiKey_I) && sEditMask)
+         if (Layer* a = Active(doc); a != nullptr && a->HasPixelMask())
+            sPending.what = Pending::InvertMask;
       if (cmd && shift && key(ImGuiKey_I))
       {
          SelStep("Invert selection");
@@ -7000,6 +7027,10 @@ namespace
          }
       }
       // The selection's marching ants, or the red quick mask, over the picture.
+      // Mask view: it ends when its layer stops being the active one or loses its mask.
+      if (MaskViewLayer(doc) != 0)
+         if (const unsigned mv = doc->MaskViewTexture(sMaskView))
+            Thumb::AddQuad(dl, (ImTextureID)(intptr_t)mv, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
       if ((doc->HasSelection() || doc->quickMask) && !(doc->HasSelection() && DrawScreenAnts(dl, doc)))
          if (const unsigned ants = doc->SelectionOverlay((float)ImGui::GetTime(), doc->quickMask))
             Thumb::AddQuad(dl, (ImTextureID)(intptr_t)ants, pq[0], pq[1], pq[2], pq[3], uv[0], uv[1], uv[2], uv[3]);
@@ -11156,7 +11187,11 @@ namespace
                   doc->SelectMaskPixels(id, Scene2DNode::kSelNew);
                }
                if (MenuParts::Item(T("Mask from Selection"), nullptr, false, doc->HasSelection())) sPending.what = Pending::MaskFromSel;
+               if (MenuParts::Item(T("Invert Mask"), Sc("Ctrl+I"))) sPending.what = Pending::InvertMask;
+               if (MenuParts::Item(T("Show Mask Overlay"), "\\", sMaskView == id))
+                  sMaskView = sMaskView == id ? 0 : id;
                MenuParts::Separator();
+               if (MenuParts::Item(T("Apply Mask"), nullptr, false, l->kind == Kind::Paint)) sPending.what = Pending::ApplyMask;
                if (MenuParts::Item(T("Delete Mask"), nullptr)) sPending.what = Pending::RemoveMask;
                MenuParts::EndPopup();
             }
@@ -14692,6 +14727,26 @@ namespace
             sEditMask = true;
          }
          break;
+      case Pending::ApplyMask:
+         if (Layer* a = Active(doc))
+         {
+            const size_t undo0 = gUndoStack.size();
+            PushUndoCheckpoint("Apply layer mask");
+            if (doc->ApplyPixelMask(a->id))
+               sEditMask = false;
+            else
+               gUndoStack.resize(undo0);
+         }
+         break;
+      case Pending::InvertMask:
+         if (Layer* a = Active(doc))
+         {
+            const size_t undo0 = gUndoStack.size();
+            PushUndoCheckpoint("Invert mask");
+            if (!doc->InvertPixelMask(a->id))
+               gUndoStack.resize(undo0);
+         }
+         break;
       case Pending::RemoveMask:
          if (Layer* a = Active(doc))
          {
@@ -16405,6 +16460,82 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("parity: a cancelled focus area keeps the old selection", doc->SelectionAt(30, 30) > 0.95f && doc->SelectionAt(60, 60) < 0.05f);
          doc->Deselect();
          doc->RemoveLayer(p);
+         doc->Commit();
+      }
+      // ledger-gaps Block A: mask view, Apply Mask (soft and disabled), Invert on the targeted mask, Reveal Selection.
+      {
+         const float red[3] = { 1, 0, 0 };
+         auto redLayer = [&]() {
+            const int id = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(id, red, 1.0f);
+            return id;
+         };
+         auto maskAt = [&](int id, int x, int y) {
+            std::vector<uint8_t> m;
+            return doc->MaskInDoc(id, m) ? (int)m[(size_t)((int)H - 1 - y) * (size_t)W + x] : -1;
+         };
+         const int p = redLayer();
+         doc->SelectRect(0, 0, W / 2, H, Scene2DNode::kSelNew, 20.0f, false);   // a feathered edge down the middle
+         doc->MaskFromSelection(p);
+         doc->Deselect();
+         doc->Commit();
+         SelectOnly(p);
+         const std::vector<uint8_t> before = picture(doc);
+         ToggleMaskView(doc);
+         expect("parity: backslash command toggles the overlay", sMaskView == p && doc->MaskViewTexture(p) != 0);
+         expect("parity: a mask view never alters pixels", picture(doc) == before);
+         ToggleMaskView(doc);
+         expect("parity: backslash again turns the overlay off", sMaskView == 0);
+         const int soft = maskAt(p, (int)W / 2, 100);
+         // Apply: the alpha takes the mask as it shows, soft edge and all.
+         const size_t u0 = gUndoStack.size();
+         sPending.what = Pending::ApplyMask;
+         RunPending(doc);
+         std::vector<uint8_t> px;
+         int pw = 0, ph = 0;
+         doc->ReadPaint(p, px, pw, ph);
+         auto alphaAt = [&](int x, int y) { return (int)px[((size_t)(ph - 1 - y) * pw + x) * 4 + 3]; };
+         const Layer* pl = doc->FindLayer(p);
+         expect("parity: applying a feathered mask preserves its soft composite",
+                pl != nullptr && !pl->HasPixelMask() && soft > 20 && soft < 235 && std::abs(alphaAt((int)W / 2, 100) - soft) <= 1 &&
+                alphaAt(10, 100) == 255 && alphaAt((int)W - 10, 100) == 0 && gUndoStack.size() == u0 + 1 &&
+                gUndoStack.back().label == "Apply layer mask");
+         // A disabled mask hides nothing, so applying it keeps every pixel.
+         const int q = redLayer();
+         doc->SelectRect(0, 0, W / 2, H, Scene2DNode::kSelNew, 0, false);
+         doc->MaskFromSelection(q);
+         doc->Deselect();
+         doc->FindLayer(q)->pmaskOn = false;
+         doc->Commit();
+         doc->ApplyPixelMask(q);
+         doc->ReadPaint(q, px, pw, ph);
+         expect("parity: applying a disabled feathered mask does not hide pixels",
+                !doc->FindLayer(q)->HasPixelMask() && alphaAt((int)W - 10, 100) == 255 && alphaAt(10, 100) == 255);
+         // Reveal Selection makes the mask and drops the selection, so Invert on the mask flips all of it.
+         const int r = redLayer();
+         doc->SelectRect(0, 0, W / 2, H, Scene2DNode::kSelNew, 0, false);
+         SelectOnly(r);
+         sPending.what = Pending::MaskFromSel;
+         RunPending(doc);
+         expect("parity: reveal selection drops the selection so invert flips the whole mask (reveal)",
+                !doc->HasSelection() && sEditMask && maskAt(r, 10, 100) == 255 && maskAt(r, (int)W - 10, 100) == 0);
+         sPending.what = Pending::InvertMask;
+         RunPending(doc);
+         expect("parity: invert with the mask targeted inverts the mask", maskAt(r, 10, 100) == 0 && maskAt(r, (int)W - 10, 100) == 255 &&
+                                                                          gUndoStack.back().label == "Invert mask");
+         SelectOnly(r);
+         ToggleMaskView(doc);
+         SelectOnly(q);
+         expect("parity: the view ends with its layer or mask (layer)", MaskViewLayer(doc) == 0);
+         SelectOnly(r);
+         ToggleMaskView(doc);
+         doc->RemovePixelMask(r);
+         expect("parity: the view ends with its layer or mask (mask)", MaskViewLayer(doc) == 0);
+         sEditMask = false;
+         for (int id : { r, q, p })
+            doc->RemoveLayer(id);
+         doc->Deselect();
          doc->Commit();
       }
       // ai-tools 1.8 Remove: red marks on a left-to-right grey gradient. The picture after a Remove is compared

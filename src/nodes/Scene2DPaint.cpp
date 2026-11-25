@@ -884,8 +884,60 @@ bool Scene2DNode::MaskFromSelection(int id)
    return true;
 }
 
-// Cmd-click on a mask thumbnail: the mask's grey, through the layer's box, as the selection (Photoshop's load mask).
-bool Scene2DNode::SelectMaskPixels(int id, int op)
+bool Scene2DNode::ApplyPixelMask(int id)
+{
+   SyncSurfaces();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || !l->HasPixelMask())
+      return false;
+   if (!l->pmaskOn)
+   {
+      RemovePixelMask(id);   // a disabled mask hides nothing, so applying it keeps every pixel
+      return true;
+   }
+   auto mt = mMasks.find(id);
+   auto pt = mSurfaces.find(id);
+   if (mt == mMasks.end() || pt == mSurfaces.end() || mt->second.fbo.fbo == 0 || l->mw != l->pw || l->mh != l->ph)
+      return false;
+   const int w = l->pw, h = l->ph;
+   std::vector<uint8_t> m, px;
+   ReadRect(mt->second.fbo, 0, 0, w, h, m);
+   ReadRect(pt->second.fbo, 0, 0, w, h, px);
+   if (m.size() != (size_t)w * h * 4 || px.size() != m.size())
+      return false;
+   for (size_t i = 0; i < (size_t)w * h; i++)   // straight alpha: only alpha scales
+      px[i * 4 + 3] = (uint8_t)((px[i * 4 + 3] * m[i * 4] + 127) / 255);
+   WriteRect(pt->second.fbo, 0, 0, w, h, px.data());
+   const int all[4] = { 0, 0, w, h };
+   StoreTiles(pt->second, l->tiles, all);
+   RemovePixelMask(id);
+   return true;
+}
+
+bool Scene2DNode::InvertPixelMask(int id)
+{
+   SyncSurfaces();
+   Layer* l = FindLayer(id);
+   auto it = mMasks.find(id);
+   if (l == nullptr || !l->HasPixelMask() || it == mMasks.end() || it->second.fbo.fbo == 0)
+      return false;
+   const int w = l->mw, h = l->mh;
+   std::vector<uint8_t> m;
+   ReadRect(it->second.fbo, 0, 0, w, h, m);
+   if (m.size() != (size_t)w * h * 4)
+      return false;
+   for (size_t i = 0; i < (size_t)w * h; i++)
+      for (int c = 0; c < 3; c++)
+         m[i * 4 + c] = (uint8_t)(255 - m[i * 4 + c]);
+   WriteRect(it->second.fbo, 0, 0, w, h, m.data());
+   const int all[4] = { 0, 0, w, h };
+   StoreTiles(it->second, l->mtiles, all);
+   Commit();
+   return true;
+}
+
+// The layer's pixel mask through its box, at document size (bottom row first, 0..255; 0 outside the box).
+bool Scene2DNode::MaskInDoc(int id, std::vector<uint8_t>& out)
 {
    SyncSurfaces();
    const Layer* l = FindConst(id);
@@ -896,27 +948,66 @@ bool Scene2DNode::SelectMaskPixels(int id, int op)
    std::vector<uint8_t> m;
    ReadRect(it->second.fbo, 0, 0, mw, mh, m);
    float bw = 1, bh = 1;
-   if (!LayerBox(*l, bw, bh))
+   if (m.size() != (size_t)mw * mh * 4 || !LayerBox(*l, bw, bh))
       return false;
    const Layer box = *l;
    const int w = mDoc.w, h = mDoc.h;
-   if (mSel.size() != (size_t)w * h)
-      mSel.assign((size_t)w * h, 0);
-   for (int y = 0; y < h; y++)   // document rows top-down; the selection keeps the bottom row first
+   out.assign((size_t)w * h, 0);
+   for (int y = 0; y < h; y++)   // document rows top-down; the output keeps the bottom row first
       for (int x = 0; x < w; x++)
       {
          float bx = 0, by = 0;
          DocToBox(box, x + 0.5f, y + 0.5f, bx, by);
          const int ix = (int)std::floor(bx * mw / bw), iy = (int)std::floor(mh - by * mh / bh);
-         const int a = ix >= 0 && iy >= 0 && ix < mw && iy < mh ? m[((size_t)iy * mw + ix) * 4] : 0;
-         uint8_t& v = mSel[(size_t)(h - 1 - y) * w + x];
-         v = (uint8_t)(op == kSelAdd ? std::max<int>(v, a) : op == kSelSub ? std::max(0, v - a)
-                                   : op == kSelIntersect ? std::min<int>(v, a) : a);
+         out[(size_t)(h - 1 - y) * w + x] = ix >= 0 && iy >= 0 && ix < mw && iy < mh ? m[((size_t)iy * mw + ix) * 4] : 0;
       }
+   return true;
+}
+
+// Cmd-click on a mask thumbnail: the mask's grey, through the layer's box, as the selection (Photoshop's load mask).
+bool Scene2DNode::SelectMaskPixels(int id, int op)
+{
+   std::vector<uint8_t> m;
+   if (!MaskInDoc(id, m))
+      return false;
+   const int w = mDoc.w, h = mDoc.h;
+   if (mSel.size() != (size_t)w * h)
+      mSel.assign((size_t)w * h, 0);
+   for (size_t i = 0; i < m.size(); i++)
+   {
+      const int a = m[i];
+      uint8_t& v = mSel[i];
+      v = (uint8_t)(op == kSelAdd ? std::max<int>(v, a) : op == kSelSub ? std::max(0, v - a)
+                                : op == kSelIntersect ? std::min<int>(v, a) : a);
+   }
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
    StoreSelection();
    return true;
+}
+
+unsigned Scene2DNode::MaskViewTexture(int id)
+{
+   const Layer* l = FindConst(id);
+   if (l == nullptr || !l->HasPixelMask())
+      return 0;
+   // Redrawn when the document changes (a finished stroke, a moved layer), not every frame.
+   const size_t key = std::hash<std::string>()(mText) ^ (size_t)id * 0x9E3779B97F4A7C15ull;
+   if (mMaskView.tex != 0 && mMaskViewKey == key && mMaskView.w == mDoc.w && mMaskView.h == mDoc.h)
+      return mMaskView.tex;
+   std::vector<uint8_t> m;
+   if (!MaskInDoc(id, m) || !GLUtil::EnsureFbo(mMaskView, mDoc.w, mDoc.h, GL_RGBA8, "Scene2DMaskView"))
+      return 0;
+   std::vector<uint8_t> rgba(m.size() * 4);
+   for (size_t i = 0; i < m.size(); i++)   // Photoshop's rubylith: half red where the mask hides
+   {
+      rgba[i * 4] = 255;
+      rgba[i * 4 + 1] = rgba[i * 4 + 2] = 0;
+      rgba[i * 4 + 3] = (uint8_t)((255 - m[i]) / 2);
+   }
+   WriteRect(mMaskView, 0, 0, mDoc.w, mDoc.h, rgba.data());
+   mMaskViewKey = key;
+   return mMaskView.tex;
 }
 
 // ---- surfaces ------------------------------------------------------------
