@@ -18385,7 +18385,7 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          auto fresh = [&](WG& m, WG& r) { m = WG(); Scene2DNode::WarpGridRest(m, box); r = m; };
          auto cols = [](const WG& g) { std::vector<float> v; for (int i = 0; i < g.Nx(); i++) v.push_back(g.pts[i * 2]); return v; };
          auto rows = [](const WG& g) { std::vector<float> v; for (int j = 0; j < g.Ny(); j++) v.push_back(g.pts[(size_t)j * g.Nx() * 2 + 1]); return v; };
-         auto near = [](const std::vector<float>& got, std::vector<float> want) {
+         auto nearVec = [](const std::vector<float>& got, std::vector<float> want) {
             if (got.size() != want.size())
                return false;
             for (size_t i = 0; i < got.size(); i++)
@@ -18402,26 +18402,26 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          WG m, r;
          fresh(m, r);
          expect("warp split H of the Default grid", split(m, r, 400, 320, Scene2DNode::kWarpSplitH) &&
-                near(cols(m), tx) && near(rows(m), { 150, 320, 450 }) && near(rows(r), { 150, 320, 450 }));
+                nearVec(cols(m), tx) && nearVec(rows(m), { 150, 320, 450 }) && nearVec(rows(r), { 150, 320, 450 }));
          expect("warp split of a split grid adds only its line", split(m, r, 300, 200, Scene2DNode::kWarpSplitV) &&
-                near(cols(m), { tx[0], 300, tx[1], tx[2], tx[3] }) && near(rows(m), { 150, 320, 450 }));
+                nearVec(cols(m), { tx[0], 300, tx[1], tx[2], tx[3] }) && nearVec(rows(m), { 150, 320, 450 }));
          fresh(m, r);
          expect("warp split V of the Default grid", split(m, r, 300, 200, Scene2DNode::kWarpSplitV) &&
-                near(cols(m), { 200, 300, 600 }) && near(rows(m), ty));
+                nearVec(cols(m), { 200, 300, 600 }) && nearVec(rows(m), ty));
          expect("removing the only V split gives the Default grid back", split(m, r, 300, 300, Scene2DNode::kWarpSplitRemove) &&
-                near(cols(m), tx) && near(rows(m), ty) && m.deflt);
+                nearVec(cols(m), tx) && nearVec(rows(m), ty) && m.deflt);
          fresh(m, r);
          expect("warp split crosswise keeps both thirds", split(m, r, 300, 320, Scene2DNode::kWarpSplitCross) &&
-                near(cols(m), { tx[0], 300, tx[1], tx[2], tx[3] }) && near(rows(m), { 150, 250, 320, 350, 450 }));
+                nearVec(cols(m), { tx[0], 300, tx[1], tx[2], tx[3] }) && nearVec(rows(m), { 150, 250, 320, 350, 450 }));
          fresh(m, r);
          split(m, r, 400, 320, Scene2DNode::kWarpSplitH);
          expect("removing the only H split gives the Default grid back", split(m, r, 400, 330, Scene2DNode::kWarpSplitRemove) &&
-                m.Nx() == 4 && m.Ny() == 4 && near(rows(m), ty) && m.deflt);
+                m.Nx() == 4 && m.Ny() == 4 && nearVec(rows(m), ty) && m.deflt);
          // A 4 x 4 grid that is not the Default one: a horizontal split keeps every section.
          fresh(m, r);
          m.deflt = r.deflt = false;
          expect("warp split H of another grid keeps its rows", split(m, r, 400, 320, Scene2DNode::kWarpSplitH) &&
-                near(rows(m), { 150, 250, 320, 350, 450 }));
+                nearVec(rows(m), { 150, 250, 320, 350, 450 }));
          // A moved point on a row third is kept by the split (nothing is lost); the plain third goes.
          fresh(m, r);
          m.pts[(1 * 4 + 1) * 2 + 1] += 20.0f;
