@@ -516,6 +516,9 @@ public:
    void CanvasSize(int w, int h, int anchor);   // anchor 0..8, row major from top left
    void ImageSize(int w, int h);                // scales every layer with the document
    void CropTo(float x0, float y0, float x1, float y1);   // document pixels
+   // A turned crop (Photoshop's crop at an angle, Straighten): the picture turns by -deg (degrees, the box's turn
+   // clockwise on screen) about the box centre (cx, cy), then the document is cropped to the w x h box. One step.
+   void CropRotated(float cx, float cy, float w, float h, float deg);
 
    // The whole document as saved, for duplicating and copying it.
    const std::string& DocText() const { return mText; }

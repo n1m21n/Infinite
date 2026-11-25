@@ -2053,6 +2053,46 @@ void Scene2DNode::CropTo(float x0, float y0, float x1, float y1)
    StoreSelection();   // commits
 }
 
+void Scene2DNode::CropRotated(float cx, float cy, float w, float h, float deg)
+{
+   Layers();
+   const float turn = -deg;
+   if (std::fabs(std::remainder(turn, 360.0f)) > 1e-4f)
+   {
+      const float r = turn * 3.14159265358979f / 180.0f, cs = std::cos(r), sn = std::sin(r);
+      for (Layer& l : mLayers)
+      {
+         // Fills, groups and adjustments are the document itself: nothing to turn.
+         if (l.kind == Kind::Fill || l.kind == Kind::Group || l.kind == Kind::Adjust)
+            continue;
+         BakeFit(*this, l);
+         // The layer's box centre turns about (cx, cy), and the layer turns with it.
+         float bw = 1, bh = 1, m0[6];
+         LayerBox(l, bw, bh);
+         LayerMatrix(l, m0);
+         const float px = m0[0] * bw * 0.5f + m0[1] * bh * 0.5f + m0[2], py = m0[3] * bw * 0.5f + m0[4] * bh * 0.5f + m0[5];
+         const float qx = cx + (px - cx) * cs - (py - cy) * sn, qy = cy + (px - cx) * sn + (py - cy) * cs;
+         l.angle = std::remainder(l.angle + turn, 360.0f);
+         float m1[6];
+         LayerMatrix(l, m1);
+         l.x += qx - (m1[0] * bw * 0.5f + m1[1] * bh * 0.5f + m1[2]);
+         l.y += qy - (m1[3] * bw * 0.5f + m1[4] * bh * 0.5f + m1[5]);
+         if (l.warpOn)
+            for (int k = 0; k < 4; k++)
+            {
+               // Pulled corners are document offsets: they turn with the layer.
+               const float wx = l.warp[k * 2], wy = l.warp[k * 2 + 1];
+               l.warp[k * 2] = wx * cs - wy * sn;
+               l.warp[k * 2 + 1] = wx * sn + wy * cs;
+            }
+      }
+      // Guides do not turn with the picture: they go, as a turned crop leaves none in place.
+      mDoc.guidesX.clear();
+      mDoc.guidesY.clear();
+   }
+   CropTo(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f);
+}
+
 // ---- saved text ---------------------------------------------------------
 
 void Scene2DNode::Commit()

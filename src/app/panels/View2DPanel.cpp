@@ -325,7 +325,10 @@ namespace
    int sImageW = 0, sImageH = 0;   // Document tab's Image size fields (namespace scope: the audit sets them)
    uint64_t sSizeFor = 0;           // the document and size those fields were last synced to
    int sSizeSeenW = 0, sSizeSeenH = 0;
-   float sCrop[4] = { 0, 0, 0, 0 };   // x0 y0 x1 y1, document px
+   float sCrop[4] = { 0, 0, 0, 0 };   // x0 y0 x1 y1, document px, before the box's turn
+   float sCropAngle = 0.0f;           // the box's turn about its centre, degrees clockwise on screen (Straighten)
+   bool sCropStraighten = false;      // the next crop drag draws a line to level, not a box
+   const int kCropStraightenDrag = -2;   // sOp.cropHandle while that line is drawn
    std::vector<Scene2DNode::Layer> sClip;   // Copy / Cut: the layers waiting to be pasted
    int sPasteCount = 0;                     // each paste of the same copy steps further from the original
    float sZoomVel = 0.0f;                   // smoothed wheel zoom: log-zoom still to apply
@@ -3328,7 +3331,7 @@ namespace
          if ((key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter)) && CropBoxOk())
          {
             PushUndoCheckpoint("Crop document");
-            doc->CropTo(sCrop[0], sCrop[1], sCrop[2], sCrop[3]);
+            ApplyCrop(doc);
             sCropOn = false;
             sTool = kMove;
             sNeedFit = true;
@@ -6128,6 +6131,39 @@ namespace
       sCrop[3] = std::round(cy + h * 0.5f);
    }
 
+   // The crop box's turn: a document point of the unturned box to where it shows, and back.
+   ImVec2 CropTurn(float x, float y, float deg)
+   {
+      const float cx = (sCrop[0] + sCrop[2]) * 0.5f, cy = (sCrop[1] + sCrop[3]) * 0.5f;
+      const float r = deg * kPi / tok::view2d_r_ratio, cs = std::cos(r), sn = std::sin(r);
+      return ImVec2(cx + (x - cx) * cs - (y - cy) * sn, cy + (x - cx) * sn + (y - cy) * cs);
+   }
+   ImVec2 CropScreen(Scene2DNode* doc, float x, float y)
+   {
+      const ImVec2 q = CropTurn(x, y, sCropAngle);
+      return ToScreen(doc, q.x, q.y);
+   }
+
+   void ApplyCrop(Scene2DNode* doc)
+   {
+      const float x0 = std::min(sCrop[0], sCrop[2]), x1 = std::max(sCrop[0], sCrop[2]);
+      const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
+      if (std::fabs(sCropAngle) < 1e-3f)
+         doc->CropTo(x0, y0, x1, y1);
+      else
+         doc->CropRotated((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, x1 - x0, y1 - y0, sCropAngle);
+      sCropAngle = 0.0f;
+      sCropStraighten = false;
+   }
+
+   // Straighten: the drawn line becomes level (or upright, when it is nearer upright), and the box turns with it.
+   float StraightenAngle(float ax, float ay, float bx, float by)
+   {
+      float deg = std::atan2(by - ay, bx - ax) * tok::view2d_r_ratio / kPi;
+      deg = std::remainder(deg, 90.0f);   // -45 .. 45: level or upright, whichever is nearer
+      return deg;
+   }
+
    // ui-content-begin: 2D canvas: the document and its on-canvas guides, handles and cursors
    void DrawCropOverlay(ImDrawList* dl, Scene2DNode* doc)
    {
@@ -6138,22 +6174,25 @@ namespace
       const ImU32 dim = !sCropReveal ? Hex(kPasteboard) : tok::U32(tok::view2d_dim_shade, sCropDarken ? tok::view2d_crop_overlay_dim_2_alpha : 0);
       const float far = 1e6f;
       const float band[4][4] = { { -far, -far, far, y0 }, { -far, y1, far, far }, { -far, y0, x0, y1 }, { x1, y0, far, y1 } };
-      ImVec2 q[4];
+      // The bands and the box turn with the box (Straighten).
       for (const auto& b : band)
-      {
-         DocRect(doc, b[0], b[1], b[2], b[3], q);
-         dl->AddQuadFilled(q[0], q[1], q[2], q[3], dim);
-      }
-      AddDocRect(dl, doc, x0, y0, x1, y1, tok::U32(tok::canvas_ink, tok::view2d_doc_rect_alpha));
+         dl->AddQuadFilled(CropScreen(doc, b[0], b[1]), CropScreen(doc, b[2], b[1]), CropScreen(doc, b[2], b[3]),
+                           CropScreen(doc, b[0], b[3]), dim);
+      const ImU32 edge = tok::U32(tok::canvas_ink, tok::view2d_doc_rect_alpha);
+      const ImVec2 box[4] = { CropScreen(doc, x0, y0), CropScreen(doc, x1, y0), CropScreen(doc, x1, y1), CropScreen(doc, x0, y1) };
+      dl->AddPolyline(box, (int)std::size(box), edge, ImDrawFlags_Closed, tok::stroke_scale_1);
       for (int i = 1; i < 3 && sCropThirds; i++)
       {
          const float x = x0 + (x1 - x0) * i / tok::view2d_x_ratio, y = y0 + (y1 - y0) * i / tok::view2d_y_ratio;
-         dl->AddLine(ToScreen(doc, x, y0), ToScreen(doc, x, y1), tok::U32(tok::canvas_ink, tok::view2d_line_alpha_sm));
-         dl->AddLine(ToScreen(doc, x0, y), ToScreen(doc, x1, y), tok::U32(tok::canvas_ink, tok::view2d_line_alpha_sm));
+         dl->AddLine(CropScreen(doc, x, y0), CropScreen(doc, x, y1), tok::U32(tok::canvas_ink, tok::view2d_line_alpha_sm));
+         dl->AddLine(CropScreen(doc, x0, y), CropScreen(doc, x1, y), tok::U32(tok::canvas_ink, tok::view2d_line_alpha_sm));
       }
+      // The Straighten line being drawn.
+      if (sOp.kind == 5 && sOp.cropHandle == kCropStraightenDrag)
+         dl->AddLine(ToScreen(doc, sOp.docStart.x, sOp.docStart.y), ToScreen(doc, sMouseDoc.x, sMouseDoc.y), tok::U32(tok::canvas_ink), tok::stroke_scale_1);
       for (int i = 0; i < 8; i++)
       {
-         const ImVec2 p = ToScreen(doc, x0 + (x1 - x0) * kHandleAt[i][0], y0 + (y1 - y0) * kHandleAt[i][1]);
+         const ImVec2 p = CropScreen(doc, x0 + (x1 - x0) * kHandleAt[i][0], y0 + (y1 - y0) * kHandleAt[i][1]);
          dl->AddRectFilled(ImVec2(p.x - tok::space_1, p.y - tok::space_1), ImVec2(p.x + tok::space_1, p.y + tok::space_1), tok::U32(tok::canvas_ink));
       }
    }
@@ -6165,18 +6204,22 @@ namespace
       const float y0 = std::min(sCrop[1], sCrop[3]), y1 = std::max(sCrop[1], sCrop[3]);
       for (int i = 0; i < 8; i++)
       {
-         const ImVec2 p = ToScreen(doc, x0 + (x1 - x0) * kHandleAt[i][0], y0 + (y1 - y0) * kHandleAt[i][1]);
+         const ImVec2 p = CropScreen(doc, x0 + (x1 - x0) * kHandleAt[i][0], y0 + (y1 - y0) * kHandleAt[i][1]);
          if (std::fabs(mouse.x - p.x) <= kHandle && std::fabs(mouse.y - p.y) <= kHandle)
             return i;
       }
-      const ImVec2 md = ToDoc(doc, mouse);
+      const ImVec2 m0 = ToDoc(doc, mouse), md = CropTurn(m0.x, m0.y, -sCropAngle);
       return md.x > x0 && md.x < x1 && md.y > y0 && md.y < y1 ? tok::view2d_hover_crop : -1;
    }
 
    void DragCrop(Scene2DNode* doc, ImVec2 mouse)
    {
-      const ImVec2 dd = DocDelta(mouse.x - sOp.start.x, mouse.y - sOp.start.y);
-      const float dx = dd.x, dy = dd.y;
+      if (sOp.cropHandle == kCropStraightenDrag)
+         return;   // the line is drawn from the press to the mouse; it lands on release
+      // The drag in the turned box's own frame.
+      const ImVec2 d0 = DocDelta(mouse.x - sOp.start.x, mouse.y - sOp.start.y);
+      const float r = -sCropAngle * kPi / tok::view2d_r_ratio;
+      const float dx = d0.x * std::cos(r) - d0.y * std::sin(r), dy = d0.x * std::sin(r) + d0.y * std::cos(r);
       float c[4];
       std::copy(sOp.crop0, sOp.crop0 + 4, c);
       // Normalise so 0,1 is the low corner.
@@ -7970,16 +8013,23 @@ namespace
             const int h = HoverCropHandle(doc, mouse);
             sOp = Op();
             sOp.start = mouse;
+            sOp.docStart = sMouseDoc;
             std::copy(sCrop, sCrop + 4, sOp.crop0);
             std::copy(sCrop, sCrop + 4, sOp.cropWas);
-            if (h >= 0)
+            if (sCropStraighten)
+            {
+               sOp.kind = 5;
+               sOp.cropHandle = kCropStraightenDrag;
+            }
+            else if (h >= 0)
             {
                sOp.kind = 5;
                sOp.cropHandle = h;
             }
             else
             {
-               // A fresh box from where the drag starts.
+               // A fresh box from where the drag starts, level.
+               sCropAngle = 0.0f;
                sOp.kind = 5;
                sOp.cropHandle = 4;
                sOp.crop0[0] = sOp.crop0[2] = std::round(sMouseDoc.x);
@@ -8267,6 +8317,12 @@ namespace
                RunRemove(doc);
             else if (sOp.kind == 19 && std::fabs(mouse.x - sOp.start.x) < tok::view2d_canvas_limit_sm)
                ZoomAt(doc, io.KeyAlt ? 0.5f : tok::view2d_zoom_at_ratio, mouse);
+            else if (sOp.kind == 5 && sOp.cropHandle == kCropStraightenDrag)
+            {
+               if (std::hypot(sMouseDoc.x - sOp.docStart.x, sMouseDoc.y - sOp.docStart.y) >= tok::view2d_canvas_limit_sm)
+                  sCropAngle = StraightenAngle(sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y);
+               sCropStraighten = false;
+            }
             else if (sOp.kind == 5 && !CropBoxOk())
                std::copy(sOp.cropWas, sOp.cropWas + 4, sCrop);   // a click without a drag keeps the box there was
             else if (sOp.kind == 13)
@@ -11247,6 +11303,11 @@ namespace
          if (BarCombo("##v2dcratio", &sCropRatio, kRatio, 7, kWellM))
             FitCropRatio(doc);
          next();
+         BarSlider("##v2dcangle", &sCropAngle, params::view2d::crop_angle_lo, params::view2d::crop_angle_hi, "Angle %.1f°", kWellM);
+         next();
+         if (TextChip(L("Straighten##v2dcstr"), sCropStraighten, T("Draw a line along what should be level")))
+            sCropStraighten = !sCropStraighten;
+         next();
          if (TextChip(L("Thirds##v2dthirds"), sCropThirds, T("Rule of thirds guides")))
             sCropThirds = !sCropThirds;
          next();
@@ -11259,7 +11320,7 @@ namespace
          if (TextChip(L("Apply##v2dcropok"), false, T("Crop the document (Enter)")) && CropBoxOk())
          {
             PushUndoCheckpoint("Crop document");
-            doc->CropTo(sCrop[0], sCrop[1], sCrop[2], sCrop[3]);
+            ApplyCrop(doc);
             sCropOn = false;
             sTool = kMove;
             sNeedFit = true;
@@ -11295,7 +11356,10 @@ namespace
       const float availW = Ui::AvailW();
       const float startX = ImGui::GetCursorPosX();
       if (sTool != kCrop)
-         sCropOn = false;
+      {
+         sCropOn = sCropStraighten = false;
+         sCropAngle = 0.0f;
+      }
       if (sTool != kLasso)
          sPoly.clear();
       if (sTool != kPen && sPenItem >= 0)
@@ -18439,6 +18503,51 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          for (int k = 1; k < 40; k++)
             split(m, r, 200 + k * 10.0f, 300, Scene2DNode::kWarpSplitV);
          expect("warp grid lines are capped", m.Nx() == Scene2DNode::kWarpLinesMax && r.Nx() == m.Nx());
+      }
+      // Crop at an angle (PhotoCraft crop_at_90_degrees_is_rotate_then_crop_in_one_step, crop_at_a_small_angle_*):
+      // the layers turn by minus the box's turn about its centre and the document takes the box's size, one step.
+      {
+         Layer& l = doc->AddLayer(Kind::Vector, 0, 0);
+         Scene2DNode::Shape r;
+         r.type = Scene2DNode::Shape::kRect;
+         r.x0 = 0, r.y0 = 0, r.x1 = 40, r.y1 = 20;
+         l.shapes.push_back(r);
+         const int id = l.id;
+         doc->Commit();
+         auto centre = [&](int lid, float& cx, float& cy) {
+            const Layer* q = doc->FindLayer(lid);
+            float bw = 1, bh = 1, m[6];
+            if (q == nullptr || !doc->LayerBox(*q, bw, bh))
+               return false;
+            doc->LayerMatrix(*q, m);
+            cx = m[0] * bw * 0.5f + m[1] * bh * 0.5f + m[2];
+            cy = m[3] * bw * 0.5f + m[4] * bh * 0.5f + m[5];
+            return true;
+         };
+         float c0[2] = { 0, 0 };
+         centre(id, c0[0], c0[1]);
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint("Crop document");
+         doc->CropRotated(W * 0.5f, H * 0.5f, (float)H, (float)W, 90.0f);
+         float c1[2] = { 0, 0 };
+         const Layer* t = doc->FindLayer(id);
+         expect("crop at 90 turns the document", doc->Doc().w == H && doc->Doc().h == W);
+         expect("crop at 90 turns the layer back", t != nullptr && std::fabs(std::remainder(t->angle + 90.0f, 360.0f)) < 0.01f);
+         expect("crop at 90 keeps the layer about the centre", centre(id, c1[0], c1[1]) &&
+                about(c1[0], H * 0.5f + (c0[1] - H * 0.5f)) && about(c1[1], W * 0.5f - (c0[0] - W * 0.5f)));
+         expect("crop at an angle is one undo step", undoBack() && gUndoStack.size() == undo0 && doc->Doc().w == W && doc->Doc().h == H);
+         PushUndoCheckpoint("Crop document");
+         doc->CropRotated(W * 0.5f, H * 0.5f, (float)W, (float)H, 3.0f);
+         expect("crop at a small angle keeps the frame size", doc->Doc().w == W && doc->Doc().h == H);
+         undoBack();
+         sCropAngle = 0.0f;
+         expect("straighten levels a line", std::fabs(StraightenAngle(0, 0, 100, 10) - 5.71f) < 0.05f &&
+                std::fabs(StraightenAngle(0, 0, -10, 100) - std::remainder(95.71f, 90.0f)) < 0.05f);
+         if (doc->FindLayer(id) != nullptr)
+         {
+            doc->RemoveLayer(id);
+            doc->Commit();
+         }
       }
       // Pass Through at 50%: an Invert inside still sees the red below, so red mixes with cyan to grey (Photoshop).
       {
