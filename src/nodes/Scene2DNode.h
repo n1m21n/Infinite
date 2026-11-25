@@ -84,7 +84,7 @@ public:
    // the layer's own box pixels, y down.
    struct Shape
    {
-      enum Type { kPath = 0, kRect, kEllipse, kPolygon, kStar, kLine, kSvg, kTypeCount };
+      enum Type { kPath = 0, kRect, kEllipse, kPolygon, kStar, kLine, kSvg, kTriangle, kTypeCount };   // appended: saved as numbers
       enum Op { kAdd = 0, kSubtract, kIntersect, kXor };
       int type = kPath;
       float x0 = 0, y0 = 0, x1 = 0, y1 = 0;   // live shapes and SVG: the box; a line: its ends

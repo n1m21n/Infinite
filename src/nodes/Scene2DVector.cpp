@@ -66,20 +66,27 @@ namespace
       return HS(h, s.svg);
    }
 
-   // Regular polygon / star corners around the box's ellipse, first point at the top.
+   // Regular polygon / star corners around the box's ellipse, first point at the top. A triangle fills its box
+   // instead, apex at the top centre whichever way the box was dragged (PhotoCraft triangle_box_geometry).
    void StarPoints(const Scene2DNode::Shape& s, bool star, std::vector<float>& xy)
    {
       const float cx = (s.x0 + s.x1) * 0.5f, cy = (s.y0 + s.y1) * 0.5f;
       const float rx = std::fabs(s.x1 - s.x0) * 0.5f, ry = std::fabs(s.y1 - s.y0) * 0.5f;
-      const int n = std::clamp(s.sides, 3, 64) * (star ? 2 : 1);
+      int n = std::clamp(s.sides, 3, 64) * (star ? 2 : 1);
       xy.clear();
-      for (int i = 0; i < n; i++)
+      if (s.type == Scene2DNode::Shape::kTriangle)
       {
-         const float a = -kPi * 0.5f + 2.0f * kPi * (float)i / (float)n;
-         const float k = star && (i % 2) == 1 ? std::clamp(s.inner, 0.01f, 1.0f) : 1.0f;
-         xy.push_back(cx + std::cos(a) * rx * k);
-         xy.push_back(cy + std::sin(a) * ry * k);
+         n = 3;
+         xy = { cx, cy - ry, cx + rx, cy + ry, cx - rx, cy + ry };
       }
+      else
+         for (int i = 0; i < n; i++)
+         {
+            const float a = -kPi * 0.5f + 2.0f * kPi * (float)i / (float)n;
+            const float k = star && (i % 2) == 1 ? std::clamp(s.inner, 0.01f, 1.0f) : 1.0f;
+            xy.push_back(cx + std::cos(a) * rx * k);
+            xy.push_back(cy + std::sin(a) * ry * k);
+         }
       // Corner radius (Photoshop's polygon/star Radius): each corner becomes a circular arc tangent to both
       // sides, the tangent run capped at half the shorter side so neighbouring arcs never cross.
       if (s.radius <= 0.0f)
@@ -236,6 +243,7 @@ namespace
          return true;
       case S::kPolygon:
       case S::kStar:
+      case S::kTriangle:
       {
          if (w <= 0 || h <= 0)
             return false;
@@ -974,6 +982,7 @@ void Scene2DNode::Outline(const Shape& s, std::vector<std::vector<float>>& out)
    }
    case Shape::kPolygon:
    case Shape::kStar:
+   case Shape::kTriangle:
    {
       std::vector<float> p;
       StarPoints(s, s.type == Shape::kStar, p);
@@ -2005,7 +2014,7 @@ std::string Scene2DNode::ToSvg(const Layer& l)
          else if (s.type == Shape::kLine)
             geo = "<line x1=\"" + std::to_string(s.x0) + "\" y1=\"" + std::to_string(s.y0) + "\" x2=\"" + std::to_string(s.x1) +
                   "\" y2=\"" + std::to_string(s.y1) + "\"";
-         else if (s.type == Shape::kPolygon || s.type == Shape::kStar)
+         else if (s.type == Shape::kPolygon || s.type == Shape::kStar || s.type == Shape::kTriangle)
          {
             std::vector<float> xy;
             StarPoints(s, s.type == Shape::kStar, xy);
@@ -2189,6 +2198,7 @@ bool Scene2DNode::ShapeToPath(Shape& s)
    }
    case Shape::kPolygon:
    case Shape::kStar:
+   case Shape::kTriangle:
    {
       if (w <= 0.0f || h <= 0.0f)
          return false;

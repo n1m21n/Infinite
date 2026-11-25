@@ -6138,7 +6138,9 @@ namespace
    using Shape = Scene2DNode::Shape;
    Shape sStyle;                   // what the next drawn item gets
    bool sLockScale = true;         // Transform tab: W and H % move together
-   int sShapeKind = 0;             // 0 rectangle, 1 rounded, 2 ellipse, 3 polygon, 4 star, 5 line
+   int sShapeKind = 0;             // 0 rectangle, 1 rounded, 2 ellipse, 3 polygon, 4 star, 5 line, 6 triangle
+   const char* const kKinds[] = { "Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line", "Triangle" };
+   constexpr int kShapeKinds = (int)std::size(kKinds);
    int sVecTarget = 0;             // 0 the layer's items, 1 its vector mask
    int sItem = -1, sItemLayer = 0; // the picked item and the layer it is in
    int sPenItem = -1;              // the open path the pen adds to
@@ -6263,16 +6265,19 @@ namespace
       {
          if (std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) < tok::view2d_drag_shape_limit)
             return;
-         PushUndoCheckpoint("Draw shape");
+         PushUndoCheckpoint(sShapeKind == 6 ? "Triangle Tool" : "Draw shape");
          Layer* l = DrawTarget(doc);
          std::vector<Shape>* items = Items(l);
          if (items == nullptr)
             return;
-         static const int kTypes[6] = { Shape::kRect, Shape::kRect, Shape::kEllipse, Shape::kPolygon, Shape::kStar, Shape::kLine };
+         static const int kTypes[kShapeKinds] = { Shape::kRect, Shape::kRect, Shape::kEllipse, Shape::kPolygon, Shape::kStar, Shape::kLine,
+                                                  Shape::kTriangle };
          TakeForeground();
          Shape s = sStyle;
-         s.type = kTypes[std::clamp(sShapeKind, 0, 5)];
-         s.radius = sShapeKind == 1 ? std::max(1.0f, sStyle.radius) : 0.0f;
+         s.type = kTypes[std::clamp(sShapeKind, 0, kShapeKinds - 1)];
+         // Rounded always rounds; polygon, star and triangle take the bar's Radius; the rest have none.
+         s.radius = sShapeKind == 1 ? std::max(1.0f, sStyle.radius) : s.type == Shape::kPolygon || s.type == Shape::kStar || s.type == Shape::kTriangle
+                                                                       ? sStyle.radius : 0.0f;
          s.pts.clear();
          s.svg.clear();
          s.closed = false;
@@ -9514,11 +9519,10 @@ namespace
       auto undo = [&]() { if (picked != nullptr) PushUndoCheckpoint("Shape style"); };
       if (sTool == kShape)
       {
-         static const char* kKinds[6] = { "Rectangle", "Rounded", "Ellipse", "Polygon", "Star", "Line" };
          ImGui::SetNextItemWidth(kWellL);
-         if (MenuParts::BeginCombo("##v2dshapekind", T(kKinds[std::clamp(sShapeKind, 0, 5)])))
+         if (MenuParts::BeginCombo("##v2dshapekind", T(kKinds[std::clamp(sShapeKind, 0, kShapeKinds - 1)])))
          {
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < kShapeKinds; i++)
                if (MenuParts::Choice(T(kKinds[i]), sShapeKind == i))
                   sShapeKind = i;
             MenuParts::EndCombo();
@@ -9749,7 +9753,8 @@ namespace
       const bool rect = picked != nullptr ? picked->type == Shape::kRect : sShapeKind <= 1;
       const bool poly = picked != nullptr ? (picked->type == Shape::kPolygon || picked->type == Shape::kStar) : (sShapeKind == 3 || sShapeKind == 4);
       const bool star = picked != nullptr ? picked->type == Shape::kStar : sShapeKind == 4;
-      if ((rect || poly) && (picked != nullptr || sTool == kShape))
+      const bool tri = picked != nullptr ? picked->type == Shape::kTriangle : sShapeKind == 6;
+      if ((rect || poly || tri) && (picked != nullptr || sTool == kShape))
       {
          gap();
          ImGui::SetNextItemWidth(kWellL);
@@ -9767,7 +9772,12 @@ namespace
             }
          }
          if (ImGui::IsItemActivated())
-            undo();
+         {
+            if (tri && picked != nullptr)
+               PushUndoCheckpoint("Change Rounded Triangle");   // PhotoCraft triangle_history_names
+            else
+               undo();
+         }
          next();
          if (TextChip(L("Absolute##v2dvrabs"), sRadiusAbs, T("Radius in px, not a percentage of the shape")))
             sRadiusAbs = !sRadiusAbs;
@@ -17872,6 +17882,52 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->Commit();
          expect("parity: a polygon's corner radius rounds its tips",
                 sharp && pixel({ vid }, 200, 104, a1) && a1[3] < 64 && pixel({ vid }, 200, 200, m) && m[3] > 200);
+         doc->RemoveLayer(vid);
+         doc->Commit();
+      }
+      // Triangle (PhotoCraft triangle_box_geometry): fills its box, apex at the top centre whichever way it was
+      // dragged; a corner radius rounds each corner with arcs tangent to both sides.
+      {
+         using Sh = Scene2DNode::Shape;
+         auto anchors = [](Sh t)
+         {
+            std::vector<float> a;
+            if (Scene2DNode::ShapeToPath(t))
+               for (int i = 0; i < t.Anchors(); i++)
+                  a.insert(a.end(), { t.pts[(size_t)i * 6], t.pts[(size_t)i * 6 + 1] });
+            return a;
+         };
+         auto near = [](const std::vector<float>& a, float x, float y)
+         {
+            for (size_t i = 0; i + 1 < a.size(); i += 2)
+               if (std::fabs(a[i] - x) < 0.01f && std::fabs(a[i + 1] - y) < 0.01f)
+                  return true;
+            return false;
+         };
+         Sh t;
+         t.type = Sh::kTriangle;
+         t.x0 = 100, t.y0 = 100, t.x1 = 300, t.y1 = 200;
+         const std::vector<float> big = anchors(t);
+         expect("triangle: fills its box, apex at the top centre",
+                big.size() == 6 && near(big, 200, 100) && near(big, 300, 200) && near(big, 100, 200));
+         Sh neg = t;
+         std::swap(neg.x0, neg.x1);
+         std::swap(neg.y0, neg.y1);
+         expect("triangle: a box dragged backwards gives the same triangle, apex up", anchors(neg) == big);
+         Sh round = t;
+         round.radius = 20.0f;
+         const std::vector<float> r = anchors(round);
+         expect("triangle: a corner radius rounds with tangent arcs", near(r, 214.142f, 114.142f) && near(r, 185.858f, 114.142f) &&
+                                                                       near(r, 251.716f, 200.0f) && near(r, 265.858f, 165.858f));
+         Layer& vl = doc->AddLayer(Kind::Vector, 0, 0);
+         const int vid = vl.id;
+         t.fillC[0] = 1.0f;
+         vl.shapes.push_back(t);
+         doc->Commit();
+         uint8_t a0[4] = {}, a1[4] = {}, a2[4] = {};
+         expect("triangle: the base corners are filled, above the edge is empty",
+                pixel({ vid }, 298, 199, a0) && a0[3] > 200 && pixel({ vid }, 102, 199, a1) && a1[3] > 200 &&
+                    pixel({ vid }, 110, 110, a2) && a2[3] < 4);
          doc->RemoveLayer(vid);
          doc->Commit();
       }
