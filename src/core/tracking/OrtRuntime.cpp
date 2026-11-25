@@ -3,6 +3,8 @@
 #include "onnxruntime_c_api.h"
 #include "platform/AppPaths.h"
 
+#include <cstring>
+
 #if defined(_WIN32)
   #include <windows.h>
 #else
@@ -15,6 +17,7 @@ namespace Tracking
    {
       OrtSession* session = nullptr;
       std::string inName;
+      std::vector<std::string> inNames;
       std::vector<std::string> outNames;
    };
 
@@ -112,12 +115,18 @@ namespace Tracking
 
       OrtAllocator* alloc = nullptr;
       if (OrtStatus* st = api->GetAllocatorWithDefaultOptions(&alloc)) api->ReleaseStatus(st);
-      char* nm = nullptr;
-      if (Check(api, api->SessionGetInputName(m->session, 0, alloc, &nm), err) && nm)
+      size_t nIn = 0;
+      if (OrtStatus* st = api->SessionGetInputCount(m->session, &nIn)) api->ReleaseStatus(st);
+      for (size_t i = 0; i < nIn; ++i)
       {
-         m->inName = nm;
-         alloc->Free(alloc, nm);
+         char* nm = nullptr;
+         if (api->SessionGetInputName(m->session, i, alloc, &nm) == nullptr && nm)
+         {
+            m->inNames.push_back(nm);
+            alloc->Free(alloc, nm);
+         }
       }
+      if (!m->inNames.empty()) m->inName = m->inNames[0];
       size_t nOut = 0;
       if (OrtStatus* st = api->SessionGetOutputCount(m->session, &nOut)) api->ReleaseStatus(st);
       for (size_t i = 0; i < nOut; ++i)
@@ -179,6 +188,103 @@ namespace Tracking
             float* p = nullptr;
             if (OrtStatus* st = api->GetTensorMutableData(res[i], reinterpret_cast<void**>(&p))) api->ReleaseStatus(st);
             if (p) outs[i].data.assign(p, p + n);
+            api->ReleaseTensorTypeAndShapeInfo(info);
+         }
+         api->ReleaseValue(res[i]);
+      }
+      return true;
+   }
+
+   std::vector<std::string> OrtRuntime::InputNames(OrtModel* m) const
+   {
+      return m ? m->inNames : std::vector<std::string>{};
+   }
+
+   // IEEE half to float (no denormal shortcut: the masks use the full range).
+   static float HalfToFloat(uint16_t h)
+   {
+      const uint32_t sign = (h & 0x8000u) << 16;
+      uint32_t exp = (h >> 10) & 0x1Fu;
+      uint32_t man = h & 0x3FFu;
+      uint32_t bits;
+      if (exp == 0)
+      {
+         if (man == 0) bits = sign;
+         else
+         {
+            exp = 1;
+            while (!(man & 0x400u)) { man <<= 1; --exp; }
+            man &= 0x3FFu;
+            bits = sign | ((exp + 112u) << 23) | (man << 13);
+         }
+      }
+      else if (exp == 31) bits = sign | 0x7F800000u | (man << 13);
+      else bits = sign | ((exp + 112u) << 23) | (man << 13);
+      float f;
+      std::memcpy(&f, &bits, sizeof f);
+      return f;
+   }
+
+   bool OrtRuntime::RunNamed(OrtModel* m, const std::vector<Input>& ins, std::vector<Tensor>& outs, std::string& err)
+   {
+      if (!m || !m_api) { err = "no model"; return false; }
+      const OrtApi* api = A(m_api);
+      OrtMemoryInfo* mi = nullptr;
+      if (!Check(api, api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &mi), err)) return false;
+      std::vector<OrtValue*> inVals;
+      std::vector<const char*> inN;
+      bool ok = true;
+      for (const Input& in : ins)
+      {
+         size_t count = 1;
+         for (int64_t d : in.shape) count *= static_cast<size_t>(d);
+         OrtValue* v = nullptr;
+         OrtStatus* st = in.i64
+            ? api->CreateTensorWithDataAsOrtValue(mi, const_cast<int64_t*>(in.i64), count * sizeof(int64_t),
+                                                  in.shape.data(), in.shape.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, &v)
+            : api->CreateTensorWithDataAsOrtValue(mi, const_cast<float*>(in.f32), count * sizeof(float),
+                                                  in.shape.data(), in.shape.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &v);
+         if (!Check(api, st, err)) { ok = false; break; }
+         inVals.push_back(v);
+         inN.push_back(in.name.c_str());
+      }
+      api->ReleaseMemoryInfo(mi);
+      if (!ok)
+      {
+         for (OrtValue* v : inVals) api->ReleaseValue(v);
+         return false;
+      }
+      std::vector<const char*> outN;
+      for (auto& s : m->outNames) outN.push_back(s.c_str());
+      std::vector<OrtValue*> res(outN.size(), nullptr);
+      OrtStatus* st = api->Run(m->session, nullptr, inN.data(), inVals.data(), inVals.size(), outN.data(), outN.size(), res.data());
+      for (OrtValue* v : inVals) api->ReleaseValue(v);
+      if (!Check(api, st, err)) return false;
+
+      outs.assign(res.size(), Tensor{});
+      for (size_t i = 0; i < res.size(); ++i)
+      {
+         OrtTensorTypeAndShapeInfo* info = nullptr;
+         if (api->GetTensorTypeAndShape(res[i], &info) == nullptr)
+         {
+            size_t nd = 0;
+            if (OrtStatus* s2 = api->GetDimensionsCount(info, &nd)) api->ReleaseStatus(s2);
+            outs[i].shape.resize(nd);
+            if (OrtStatus* s2 = api->GetDimensions(info, outs[i].shape.data(), nd)) api->ReleaseStatus(s2);
+            size_t n = 0;
+            if (OrtStatus* s2 = api->GetTensorShapeElementCount(info, &n)) api->ReleaseStatus(s2);
+            ONNXTensorElementDataType ty = ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;
+            if (OrtStatus* s2 = api->GetTensorElementType(info, &ty)) api->ReleaseStatus(s2);
+            void* p = nullptr;
+            if (OrtStatus* s2 = api->GetTensorMutableData(res[i], &p)) api->ReleaseStatus(s2);
+            if (p && ty == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT)
+               outs[i].data.assign(static_cast<float*>(p), static_cast<float*>(p) + n);
+            else if (p && ty == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16)
+            {
+               outs[i].data.resize(n);
+               const uint16_t* h = static_cast<const uint16_t*>(p);
+               for (size_t k = 0; k < n; ++k) outs[i].data[k] = HalfToFloat(h[k]);
+            }
             api->ReleaseTensorTypeAndShapeInfo(info);
          }
          api->ReleaseValue(res[i]);

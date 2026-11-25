@@ -14,6 +14,7 @@
 #include "app/ui/design/components/Tip.h"
 #include "app/AppShared.h"
 #include "core/Notices.h"
+#include "core/ml/AiSelect.h"
 #include "app/frame/CanvasLink.h"
 #include "ImageCable.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -189,6 +190,7 @@ namespace
    BrushEngine::Brush sGroupStrokeBrush;
    bool sMeshNearest = false;      // mesh warp: nearest-neighbour resampling (off: bilinear)
    bool sObjSoft = false;          // object selection: feathered edge
+   bool sObjSoftPending = false;   // the waiting AI selection is feathered when it lands
    bool sRadiusAbs = true;         // shape radius in px (off: % of the short side)
    bool sPatchSrc = false, sPatchClear = false;   // patch: selection is source; transparent
    int sStyleParts = Scene2DNode::kStAll;   // style picker: which parts travel
@@ -5074,6 +5076,13 @@ namespace
             AddDocRect(dl, doc, lo[0] + dx, lo[1] + dy, hi[0] + dx, hi[1] + dy, ink, 1.0f);
          }
       }
+      if (doc->AiSelectWaiting())
+      {
+         const char* t = T("Analysing picture");
+         const ImVec2 at(ImGui::GetIO().MousePos.x + tok::space_3_5, ImGui::GetIO().MousePos.y + tok::space_3_5);
+         dl->AddText(ImVec2(at.x + 1, at.y + 1), shade, t);
+         dl->AddText(at, ink, t);
+      }
       if (sTool == kClone && ImGui::GetTime() - sCloneAsk < tok::motion_s_hint)
       {
          const char* t = T("Alt-click to set the source");
@@ -6615,6 +6624,15 @@ namespace
    void DrawCanvas(Scene2DNode* doc, ImVec2 size)
    {
       ImGuiIO& io = ImGui::GetIO();
+      // An object selection waiting for the picture's analysis lands here once it is ready.
+      AiSelect::Tick(ImGui::GetTime());
+      if (doc->AiSelectPoll())
+      {
+         if (sObjSoftPending)
+            doc->ModifySelection(4, 2);
+         sObjSoftPending = false;
+         Touch();
+      }
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       // Chips drawn over the canvas later in the frame (Rasterize?) must be able to take the hover and the click.
       ImGui::SetNextItemAllowOverlap();
@@ -7764,12 +7782,24 @@ namespace
             }
             else if (sOp.kind == 17)
                MarqueeLayers(doc, sOp.docStart, sMouseDoc, true);   // the press already cleared it unless Shift
-            else if (sOp.kind == 24 && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= tok::view2d_canvas_limit_sm)
+            else if (sOp.kind == 24)
             {
+               // With the "select" pack a click takes the object under it and a drag the thing in the box (SAM);
+               // without it the classic box tool, which needs a drag.
+               const bool dragged = std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= tok::view2d_canvas_limit_sm;
                Layer* al = Active(doc);
-               SelStep("Object selection");
-               doc->SelectObject(sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, sOp.selOp, sAllLayers, al != nullptr ? al->id : 0);
-               if (sObjSoft)
+               const int layerId = al != nullptr ? al->id : 0;
+               const float ex = dragged ? sMouseDoc.x : sOp.docStart.x, ey = dragged ? sMouseDoc.y : sOp.docStart.y;
+               int ai = 0;
+               if (dragged || AiSelect::Available())
+               {
+                  SelStep("Object selection");
+                  ai = doc->SelectObjectAi(sOp.docStart.x, sOp.docStart.y, ex, ey, sOp.selOp, sAllLayers, layerId);
+                  if (ai == 0 && dragged)
+                     doc->SelectObject(sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, sOp.selOp, sAllLayers, layerId);
+               }
+               sObjSoftPending = sObjSoft && ai == 2;
+               if (sObjSoft && ai != 2 && (ai == 1 || dragged))
                   doc->ModifySelection(4, 2);
             }
             else if (sOp.kind == 25 && doc->HasSelection() && std::hypot(mouse.x - sOp.start.x, mouse.y - sOp.start.y) >= tok::view2d_canvas_limit_sm &&
@@ -9524,7 +9554,7 @@ namespace
       { kLasso, "##v2dlasso", IconsInfinite::Lasso, "Lasso (L)", 1 },
       { kWand, "##v2dwand", IconsInfinite::Wand, "Magic wand (W)", 1 },
       { kSelBrush, "##v2dselbrush", IconsInfinite::SelBrush, "Selection brush (W). Alt takes away", 1 },
-      { kObjectSel, "##v2dobjsel", IconsInfinite::ObjectSel, "Object selection (W). Drag a box round it", 1 },
+      { kObjectSel, "##v2dobjsel", IconsInfinite::ObjectSel, "Object selection (W). Click an object or drag a box round it", 1 },
       { kCrop, "##v2dcrop", IconsInfinite::Crop, "Crop (C). Enter applies, Esc cancels", 1 },
       { kPick, "##v2dpick", IconsInfinite::Eyedropper, "Eyedropper (I). Alt sets the background", 1 },
       { kStylePick, "##v2dstylepick", IconsInfinite::StylePick, "Style picker (I). Click to take, click to give", 1 },

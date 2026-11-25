@@ -554,6 +554,15 @@ public:
    bool FloodErase(int id, float x, float y, int tolerance, bool contiguous, bool sampleAll);
    // Object selection: the thing inside a box (document px) told from what is round its edge, as a selection.
    void SelectObject(float x0, float y0, float x1, float y1, int op, bool sampleAll, int layerId);
+   // The same with the "select" pack's model (SAM 2.1): a click (x0 == x1, y0 == y1) takes the whole object under it,
+   // a box the thing inside it. The picture is analysed once on a worker (about 1.5 s); until then the prompt waits and
+   // AiSelectPoll applies it. Returns 0 when the pack is missing (call SelectObject), 1 applied, 2 waiting.
+   int SelectObjectAi(float x0, float y0, float x1, float y1, int op, bool sampleAll, int layerId);
+   // Once a frame: applies a waiting prompt when its picture is ready. True when the selection changed.
+   bool AiSelectPoll();
+   bool AiSelectWaiting() const { return mAiWait.on; }
+   // A region (document px, bottom row first, 0..255) joined to the selection by op (kSelNew, Add, Sub, Intersect).
+   void CombineSelection(const std::vector<uint8_t>& region, int op);
    // Mesh warp: a paint layer's pixels pulled through a 4 x 4 grid. `from` is the layer's tiles when the warp
    // began; `moved` the 16 grid points' document positions, row by row from the layer's top left.
    // rest: where the 16 points sat when the warp began (document px); null = the whole surface's grid.
@@ -883,6 +892,15 @@ private:
    void SkinDab(const Layer& l, float x, float y, float pressure, bool skipMain = false);
    unsigned long long SkinRevision(const Layer& l) const;
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
+   struct AiWait
+   {
+      bool on = false;
+      uint64_t key = 0;
+      int w = 0, h = 0, op = 0;
+      bool box = false;
+      float p[4] = { 0, 0, 0, 0 };
+   } mAiWait;                          // a SelectObjectAi prompt waiting for its picture's analysis
+   bool AiDecodeApply(uint64_t key, int w, int h, const float p[4], bool box, int op);
    // The selection as tile keys, written into the doc text so undo and save carry it ("-" empty, "+" full).
    struct SelStore { std::string name; int w = 0, h = 0; std::vector<std::string> keys; };
    SelStore mSelStore;

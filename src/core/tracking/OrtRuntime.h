@@ -39,6 +39,20 @@ namespace Tracking
       bool Run(OrtModel* m, const float* input, const std::vector<int64_t>& inShape,
                std::vector<Tensor>& outs, std::vector<std::string>& outNames, std::string& err);
 
+      // Named inputs, float or int64; outputs come back as float in model
+      // output order (float16 outputs are widened). Used by the selection
+      // models, whose decoders take several inputs.
+      struct Input
+      {
+         std::string name;
+         std::vector<int64_t> shape;
+         const float* f32 = nullptr;   // one of f32 / i64
+         const int64_t* i64 = nullptr;
+      };
+      bool RunNamed(OrtModel* m, const std::vector<Input>& ins, std::vector<Tensor>& outs, std::string& err);
+      // Input names of a model, in order.
+      std::vector<std::string> InputNames(OrtModel* m) const;
+
    private:
       void* m_lib = nullptr;
       const void* m_api = nullptr;  // const OrtApi*

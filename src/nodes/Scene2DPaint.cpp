@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "TileStore.h"
+#include "core/ml/AiSelect.h"
 
 namespace
 {
@@ -2332,6 +2333,11 @@ void Scene2DNode::SelectObject(float x0, float y0, float x1, float y1, int op, b
       for (int x = 0; x < bw; x++)
          if (!outside[(size_t)y * bw + x])
             region[(size_t)(H - 1 - (by0 + y)) * W + bx0 + x] = 255;
+   CombineSelection(region, op);
+}
+
+void Scene2DNode::CombineSelection(const std::vector<uint8_t>& region, int op)
+{
    if (mSel.size() != region.size())
       mSel.assign(region.size(), 0);
    if (op == kSelNew || !mSelAny)
@@ -2346,6 +2352,91 @@ void Scene2DNode::SelectObject(float x0, float y0, float x1, float y1, int op, b
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
    StoreSelection();
+}
+
+int Scene2DNode::SelectObjectAi(float x0, float y0, float x1, float y1, int op, bool sampleAll, int layerId)
+{
+   if (!AiSelect::Available())
+      return 0;
+   Layers();
+   const int W = mDoc.w, H = mDoc.h;
+   std::vector<uint8_t> px;
+   const Layer* l = FindConst(layerId);
+   auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
+   if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
+      ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
+      ReadRect(mOut, 0, 0, W, H, px);
+   if (px.size() != (size_t)W * H * 4)
+      return 0;
+   // The encoder takes the picture top row first; the read is bottom row first.
+   auto pic = std::make_shared<AiSelect::Picture>();
+   pic->w = W;
+   pic->h = H;
+   pic->rgba.resize(px.size());
+   for (int y = 0; y < H; y++)
+      std::memcpy(&pic->rgba[(size_t)y * W * 4], &px[(size_t)(H - 1 - y) * W * 4], (size_t)W * 4);
+   const uint64_t key = AiSelect::KeyOf(*pic);
+   const bool box = std::fabs(x1 - x0) >= 4.0f && std::fabs(y1 - y0) >= 4.0f;
+   const float p[4] = { std::min(x0, x1), std::min(y0, y1), std::max(x0, x1), std::max(y0, y1) };
+   if (AiSelect::Ready(key))
+   {
+      mAiWait.on = false;
+      return AiDecodeApply(key, W, H, p, box, op) ? 1 : 0;
+   }
+   AiSelect::Request(pic, key);
+   mAiWait.on = true;
+   mAiWait.key = key;
+   mAiWait.w = W;
+   mAiWait.h = H;
+   mAiWait.op = op;
+   mAiWait.box = box;
+   std::copy(p, p + 4, mAiWait.p);
+   return 2;
+}
+
+bool Scene2DNode::AiSelectPoll()
+{
+   if (!mAiWait.on)
+      return false;
+   if (mAiWait.w != mDoc.w || mAiWait.h != mDoc.h)
+   {
+      mAiWait.on = false;   // the document changed size: the prompt no longer points at the same place
+      return false;
+   }
+   if (!AiSelect::Ready(mAiWait.key))
+   {
+      if (!AiSelect::Busy())
+         mAiWait.on = false;   // the analysis failed (LastError says why): drop the prompt
+      return false;
+   }
+   mAiWait.on = false;
+   return AiDecodeApply(mAiWait.key, mAiWait.w, mAiWait.h, mAiWait.p, mAiWait.box, mAiWait.op);
+}
+
+bool Scene2DNode::AiDecodeApply(uint64_t key, int w, int h, const float p[4], bool box, int op)
+{
+   AiSelect::Prompt pr;
+   if (box)
+   {
+      pr.hasBox = true;
+      std::copy(p, p + 4, pr.box);
+   }
+   else
+   {
+      pr.xy = { p[0], p[1] };
+      pr.labels = { 1 };
+   }
+   std::vector<uint8_t> cov;
+   std::string err;
+   if (!AiSelect::Decode(key, pr, cov, err) || cov.size() != (size_t)w * h)
+      return false;
+   // Coverage is top row first; the selection is bottom row first.
+   std::vector<uint8_t> region((size_t)w * h);
+   for (int y = 0; y < h; y++)
+      std::memcpy(&region[(size_t)(h - 1 - y) * w], &cov[(size_t)y * w], (size_t)w);
+   CombineSelection(region, op);
+   return true;
 }
 
 bool Scene2DNode::MeshRest(int id, float out[32])

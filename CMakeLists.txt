@@ -737,6 +737,7 @@ set(COMMON_SOURCES
     src/core/ShareBundle.cpp
     src/core/MediaCollect.cpp
     src/core/tracking/OrtRuntime.cpp
+    src/core/ml/AiSelect.cpp
     src/core/tracking/HandTracker.cpp
     src/core/tracking/FaceTracker.cpp
     src/core/tracking/PoseTracker.cpp

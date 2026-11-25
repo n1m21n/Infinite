@@ -8,6 +8,8 @@
 #include "nodes/SceneNodes.h"
 #include "core/BlendModes.h"
 #include "core/TileStore.h"
+#include "core/ml/AiSelect.h"
+#include "stb_image.h"
 #include "gl3.h"
 #include "stb_image_write.h"
 
@@ -21,6 +23,7 @@ extern bool gScene2DBounds;   // Scene2DNode.cpp: bounded layer passes
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace app
@@ -138,6 +141,77 @@ bool View2DDockTestStep(int frameId)
    SetViewDock(2, 0);
    gView3DOpen = false;
    return true;
+}
+
+// INFINITE_AIEVAL=1 with VIEW2DTEST: the app's own object selection on the eval set built by
+// tools/re-survey/ai_eval.py (S1/list.txt). Writes <id>_classic_box.png, <id>_app_sam_box.png, <id>_app_sam_click.png
+// (top row first, 0/255) and results/app_times.txt; `ai_eval.py app` scores them.
+static void RunAiEval()
+{
+   const char* home = std::getenv("HOME");
+   const std::string root = std::string(home != nullptr ? home : ".") + "/Infinite/datasets/ai-eval/";
+   std::FILE* lf = std::fopen((root + "S1/list.txt").c_str(), "r");
+   if (lf == nullptr)
+   {
+      printf("  AIEVAL: no %sS1/list.txt (run ai_eval.py build)\n", root.c_str());
+      return;
+   }
+   std::FILE* tf = std::fopen((root + "results/app_times.txt").c_str(), "w");
+   char id[64];
+   float bx0, by0, bx1, by1, cx, cy;
+   int n = 0;
+   while (std::fscanf(lf, "%63s %f %f %f %f %f %f", id, &bx0, &by0, &bx1, &by1, &cx, &cy) == 7)
+   {
+      int w = 0, h = 0, ch = 0;
+      unsigned char* data = stbi_load((root + "S1/" + id + ".jpg").c_str(), &w, &h, &ch, 4);
+      if (data == nullptr)
+         continue;
+      std::vector<uint8_t> rgba(data, data + (size_t)w * h * 4);
+      stbi_image_free(data);
+      Scene2DNode d;
+      d.Layers();
+      d.Doc().w = w;
+      d.Doc().h = h;
+      d.Commit();
+      d.AddFileLayer(0, "pic", 0, 0, w, h, rgba);
+      d.CookIfNeeded(++sFrame);
+      auto save = [&](const char* tag) {
+         std::vector<uint8_t> m((size_t)w * h, 0);
+         for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+               m[(size_t)y * w + x] = d.SelectionAt(x, y) > 0.5f ? 255 : 0;
+         stbi_write_png((root + "S1/" + id + "_" + tag + ".png").c_str(), w, h, 1, m.data(), w);
+      };
+      using clk = std::chrono::steady_clock;
+      auto t = clk::now();
+      d.SelectObject(bx0, by0, bx1, by1, Scene2DNode::kSelNew, true, 0);
+      const double classicMs = std::chrono::duration<double, std::milli>(clk::now() - t).count();
+      save("classic_box");
+      d.Deselect();
+      t = clk::now();
+      int r = d.SelectObjectAi(bx0, by0, bx1, by1, Scene2DNode::kSelNew, true, 0);
+      while (r == 2 && d.AiSelectWaiting())
+      {
+         if (d.AiSelectPoll())
+            break;
+         std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      }
+      const double firstMs = std::chrono::duration<double, std::milli>(clk::now() - t).count();
+      save("app_sam_box");
+      d.Deselect();
+      t = clk::now();
+      d.SelectObjectAi(cx, cy, cx, cy, Scene2DNode::kSelNew, true, 0);
+      const double clickMs = std::chrono::duration<double, std::milli>(clk::now() - t).count();
+      save("app_sam_click");
+      if (tf != nullptr)
+         std::fprintf(tf, "%s classic_ms %.1f first_box_ms %.1f click_ms %.1f\n", id, classicMs, firstMs, clickMs);
+      n++;
+   }
+   std::fclose(lf);
+   if (tf != nullptr)
+      std::fclose(tf);
+   AiSelect::Unload();
+   printf("  AIEVAL: %d pictures written under %sS1\n", n, root.c_str());
 }
 
 void RunView2DTest()
@@ -3386,6 +3460,91 @@ void RunView2DTest()
          Check("Sweep: a vector mask turned off shows the whole layer", off.maxRgb < 0.01f);
          Check("Sweep: feathering a vector mask softens its edge", df.changed > 0.001f);
       }
+   }
+   // ---- AI selection (internal/plans/2d-view/ai-tools.md, Block 1) ----
+   {
+      // The combine rules every selection tool shares, pack or no pack.
+      Scene2DNode pic;
+      pic.Layers();
+      pic.Doc().w = 64;
+      pic.Doc().h = 48;
+      pic.Commit();
+      std::vector<uint8_t> a((size_t)64 * 48, 0), b((size_t)64 * 48, 0);
+      for (int y = 0; y < 48; y++)
+         for (int x = 0; x < 64; x++)
+         {
+            a[(size_t)y * 64 + x] = x < 40 ? 255 : 0;
+            b[(size_t)y * 64 + x] = x >= 20 ? 255 : 0;
+         }
+      pic.CombineSelection(a, Scene2DNode::kSelNew);
+      pic.CombineSelection(b, Scene2DNode::kSelAdd);
+      Check("AI1: add joins two regions", pic.SelectionAt(5, 5) > 0.99f && pic.SelectionAt(60, 5) > 0.99f);
+      pic.CombineSelection(a, Scene2DNode::kSelNew);
+      pic.CombineSelection(b, Scene2DNode::kSelSub);
+      Check("AI1: subtract takes the second away", pic.SelectionAt(5, 5) > 0.99f && pic.SelectionAt(30, 5) < 0.01f);
+      pic.CombineSelection(a, Scene2DNode::kSelNew);
+      pic.CombineSelection(b, Scene2DNode::kSelIntersect);
+      Check("AI1: intersect keeps the overlap", pic.SelectionAt(5, 5) < 0.01f && pic.SelectionAt(30, 5) > 0.99f && pic.SelectionAt(60, 5) < 0.01f);
+      if (!AiSelect::Available())
+         printf("  [skip] AI1 model checks: %s\n", AiSelect::Missing().c_str());
+      else
+      {
+         // A blue card on grey: a click on it and a box round it each select the card and nothing else.
+         const int W = 320, H = 240;
+         std::vector<uint8_t> rgba((size_t)W * H * 4);
+         for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+               const bool in = x >= 100 && x < 220 && y >= 70 && y < 170;
+               uint8_t* q = &rgba[((size_t)y * W + x) * 4];
+               q[0] = in ? 30 : 150; q[1] = in ? 60 : 150; q[2] = in ? 220 : 150; q[3] = 255;
+            }
+         Scene2DNode card;
+         card.Layers();
+         card.Doc().w = W;
+         card.Doc().h = H;
+         card.Commit();
+         card.AddFileLayer(0, "card", 0, 0, W, H, rgba);
+         Cook(&card);
+         auto iouCard = [&]() {
+            int inter = 0, uni = 0;
+            for (int y = 0; y < H; y++)
+               for (int x = 0; x < W; x++)
+               {
+                  const bool s = card.SelectionAt(x, y) > 0.5f, g = x >= 100 && x < 220 && y >= 70 && y < 170;
+                  inter += s && g;
+                  uni += s || g;
+               }
+            return uni ? (float)inter / uni : 0.0f;
+         };
+         auto wait = [&]() {
+            const auto t0 = std::chrono::steady_clock::now();
+            while (card.AiSelectWaiting() && std::chrono::steady_clock::now() - t0 < std::chrono::seconds(60))
+            {
+               if (card.AiSelectPoll())
+                  return true;
+               std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+            return false;
+         };
+         const auto t0 = std::chrono::steady_clock::now();
+         const int r = card.SelectObjectAi(160, 120, 160, 120, Scene2DNode::kSelNew, true, 0);
+         const bool landed = r == 1 || (r == 2 && wait());
+         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+         const float ic = iouCard();
+         printf("  AI1 click: result %d, %.0f ms, IoU %.3f\n", r, ms, ic);
+         Check("AI1: a click waits for the analysis, then selects the card", r == 2 && landed && ic > 0.9f);
+         card.Deselect();
+         const auto t1 = std::chrono::steady_clock::now();
+         const int rb = card.SelectObjectAi(90, 60, 230, 180, Scene2DNode::kSelNew, true, 0);
+         const double msb = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
+         const float ib = iouCard();
+         printf("  AI1 box: result %d, %.0f ms, IoU %.3f\n", rb, msb, ib);
+         Check("AI1: a box on an analysed picture lands at once", rb == 1 && ib > 0.9f && msb < 500.0);
+         AiSelect::Unload();
+      }
+      if (std::getenv("INFINITE_AIEVAL") != nullptr && AiSelect::Available())
+         RunAiEval();
    }
    if (doc != nullptr && View2DPanelSelfCheck(doc) > 0)
       ok = false;
