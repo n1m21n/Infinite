@@ -405,6 +405,27 @@ is k = 1.289. The finding that stands: **T3 certifies Hélie's 5/3 automatically
 for cutoff ceilings up to g = 0.524**, and stays within 0.01 of Report 2's linear common-P bound at every
 ceiling tested. No certificate lies past a witness.
 
+**Phase 2, the Field side** (`src/app/selftest/StabilityTests.cpp`, `scripts/emit_sat.py`,
+`scripts/phase2_compare.py`, `data/phase2-compare.json`). The dump self-test learned a second mode,
+`INFINITE_FIELDSTABDUMP_SAT=1`. It walks the kernel's IR, finds each library shape on an argument that
+depends on state (tanh written as `(e - 1)/(e + 1)` with `e = exp(2*y)`, `y/(1 + abs(y))`, `clamp(y, -c, c)`,
+`sin`, `abs`, `min`/`max` against a constant), cuts it into an injected value w and a recorded argument y,
+and dumps [[A, B], [C, D]] at every grid point after Report 2's linearity gate. L was written once more as
+Field statements from the equations (not from the Python matrices), so the check compares two separate
+ports.
+
+| Set | Kernels | Dumped | Match Python (≤ 1e-5, D = 0) | Largest error |
+|---|---|---|---|---|
+| L | 11 | 11 | **11** | 8.7e-8 |
+| G | 200 | 127 | **127 of 127** | 2.9e-7 |
+
+- The 73 G kernels not dumped exceed the interpreter's 128-register cap, the same limit Report 2 hit
+  (75 of its kernels). Phase 3 scores them on the Python model and gives their Float32 bound the set's
+  largest measured error, as Report 2 did.
+- **The gate rejects what the matcher doesn't know.** Three kernels with a nonlinearity outside the
+  library on the loop (`exp(s) - 1`, `s/(1 + s²)`, `min(s, -0.5)`) all fail the gate (error 0.06-0.17) and
+  are reported out of scope; the same kernel with `clamp(s, -1, 1)` passes at 3.7e-8.
+
 **Phases.**
 
 | Phase | Work | Needs a build |
