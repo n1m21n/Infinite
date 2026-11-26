@@ -226,6 +226,7 @@ namespace
    bool sRemoveNewLayer = false;   // write the fill to a new layer above the active one
    int sTolerance = 32;  // ui-audit-ok: unit (colour tolerance default (0-255))
    bool sContiguous = true, sAllLayers = false;
+   bool sFillPattern = false;   // the bucket fills with the chosen pattern (Photoshop's Fill: Pattern)
    int sImageFormat = 0, sVideoFormat = 0;   // the Render tab's default file types
    bool sSurfacePaint = true;      // brush / eraser / eyedropper work on a 3D object's surface
    bool sSurfaceStroke = false;    // the stroke now running paints a surface
@@ -4869,6 +4870,14 @@ namespace
       sHaveLast = true;
    }
 
+   bool BucketNow(Scene2DNode* doc, int id, ImVec2 at, bool sampleAll)
+   {
+      if (!sFillPattern)
+         return doc->Bucket(id, at.x, at.y, sFg, 1.0f, sTolerance, sContiguous, sampleAll);
+      UsePattern(doc);
+      return doc->BucketPattern(id, at.x, at.y, 1.0f, sTolerance, sContiguous, sampleAll, 1.0f);
+   }
+
    void FillAt(Scene2DNode* doc, ImVec2 at)
    {
       if (PaintRefused(doc))
@@ -4928,7 +4937,7 @@ namespace
       const int id = PaintTarget(doc, target, true);
       if (fresh && id > 0 && target == 0)
       {
-         if (doc->Bucket(id, at.x, at.y, sFg, 1.0f, sTolerance, sContiguous, true))
+         if (BucketNow(doc, id, at, true))
             NoteColourUsed(sFg);
          else
          {
@@ -4947,7 +4956,7 @@ namespace
          Touch();
       }
       else if (id > 0 && target == 0)
-         landed = doc->Bucket(id, at.x, at.y, sFg, 1.0f, sTolerance, sContiguous, sAllLayers);
+         landed = BucketNow(doc, id, at, sAllLayers);
       if (!landed)
       {
          gUndoStack.resize(undo0);   // off the layer, or hidden by the selection: no step
@@ -9731,6 +9740,28 @@ namespace
       }
    }
 
+   // The pattern picker the Pattern Stamp and the bucket's Pattern fill share, with Define Pattern at its foot.
+   void PatternCombo(Scene2DNode* doc)
+   {
+      std::vector<PatternTile>& pats = Patterns();
+      sPatternPick = std::clamp(sPatternPick, 0, (int)pats.size() - 1);
+      ImGui::SetNextItemWidth(kWellL);
+      if (MenuParts::BeginCombo("##v2dpattern", T(pats[(size_t)sPatternPick].name.c_str())))
+      {
+         for (int i = 0; i < (int)pats.size(); i++)
+         {
+            ImGui::PushID(i);
+            if (MenuParts::Choice(T(pats[(size_t)i].name.c_str()), i == sPatternPick))
+               sPatternPick = i;
+            ImGui::PopID();
+         }
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Define Pattern")))
+            DefinePattern(doc);
+         MenuParts::EndCombo();
+      }
+   }
+
    void MatchChips()
    {
       // Shown as Affinity shows it, a share of the colour range (kept 0..255 inside, as patches and the wand read it).
@@ -9858,23 +9889,7 @@ namespace
          if (sTool == kPatternStamp)
          {
             gap();
-            std::vector<PatternTile>& pats = Patterns();
-            sPatternPick = std::clamp(sPatternPick, 0, (int)pats.size() - 1);
-            ImGui::SetNextItemWidth(kWellL);
-            if (MenuParts::BeginCombo("##v2dpattern", T(pats[(size_t)sPatternPick].name.c_str())))
-            {
-               for (int i = 0; i < (int)pats.size(); i++)
-               {
-                  ImGui::PushID(i);
-                  if (MenuParts::Choice(T(pats[(size_t)i].name.c_str()), i == sPatternPick))
-                     sPatternPick = i;
-                  ImGui::PopID();
-               }
-               MenuParts::Separator();
-               if (MenuParts::Item(T("Define Pattern")))
-                  DefinePattern(doc);
-               MenuParts::EndCombo();
-            }
+            PatternCombo(doc);
             next();
             if (TextChip(L("Aligned##v2dpalign"), b.patternAligned, T("The pattern keeps its place across strokes")))
                b.patternAligned = !b.patternAligned;
@@ -10347,7 +10362,17 @@ namespace
          }
       }
       else if (sTool == kFill)
+      {
          MatchChips();
+         FormParts::Inline(0.0f, tok::space_1);
+         if (TextChip(L("Pattern##v2dfillpat"), sFillPattern, T("Fill with a pattern instead of the foreground colour")))
+            sFillPattern = !sFillPattern;
+         if (sFillPattern)
+         {
+            FormParts::Inline(0.0f, tok::space_1);
+            PatternCombo(doc);
+         }
+      }
       else if (sTool == kGradient)
       {
          static const char* kKinds[5] = { "Linear", "Radial", "Angle", "Reflected", "Diamond" };
@@ -21536,11 +21561,59 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("Pattern stamp: the tile repeats (neighbouring squares differ)", one && std::fabs(c0[0] - c1[0]) > 0.9f);
       const bool two = stamp(2.0f) && doc->Pick(4.5f, y, c0, 1, pl) && doc->Pick(12.5f, y, c1, 1, pl) && doc->Pick(20.5f, y, c2, 1, pl);
       expect("Pattern stamp: scale 2 doubles the squares", two && std::fabs(c0[0] - c1[0]) < 0.1f && std::fabs(c1[0] - c2[0]) > 0.9f);
+      // Aligned keeps the document's phase wherever a stroke starts; not aligned starts the tile at the first dab.
+      auto stampAt = [&](float x0, bool aligned) {
+         BrushEngine::Brush b;
+         b.mode = BrushEngine::kPatternStamp;
+         b.hardness = 1.0f;
+         b.size = 4.0f * (float)std::max(doc->Doc().w, doc->Doc().h);
+         b.patternAligned = aligned;
+         const bool ok = doc->BeginPaint(pl, 0, b, x0, 0.5f, 1.0f);
+         if (ok)
+            doc->EndPaint();
+         return ok;
+      };
+      float a0[3] = {}, a1[3] = {};
+      const bool al = stampAt(100.0f, true) && doc->Pick(4.5f, y, a0, 1, pl) && stampAt(205.0f, true) && doc->Pick(4.5f, y, a1, 1, pl);
+      expect("Pattern stamp: aligned strokes keep the document phase", al && std::fabs(a0[0] - a1[0]) < 0.1f);
+      float n0[3] = {}, n1[3] = {};
+      const bool un = stampAt(0.0f, false) && doc->Pick(4.5f, y, n0, 1, pl) && stampAt(8.0f, false) && doc->Pick(4.5f, y, n1, 1, pl);
+      expect("Pattern stamp: not aligned, each stroke starts the tile at its first dab", un && std::fabs(n0[0] - n1[0]) > 0.9f);
       while (gUndoStack.size() > u0)
          Undo();
       doc = FindDoc();
       if (doc == nullptr)
          return fails;
+   }
+   // Bucket with a pattern (ledger-gaps Block B): the region fills with the tile aligned to the document, a red bar
+   // bounds it, and a selection limits it. One undo step.
+   {
+      const size_t u0 = gUndoStack.size();
+      PushUndoCheckpoint("Bucket pattern test");
+      const int pl = doc->AddPaintLayer();
+      const float redC[3] = { 1, 0, 0 };
+      doc->SelectRect(100, 0, 120, (float)doc->Doc().h, Scene2DNode::kSelNew, 0, false);
+      doc->FillPixels(pl, redC, 1.0f);
+      doc->SelectRect(0, 0, 60, (float)doc->Doc().h, Scene2DNode::kSelNew, 0, false);
+      sPatternPick = 0;   // Checker: 8 px squares
+      UsePattern(doc);
+      const bool filled = doc->BucketPattern(pl, 10, 4.5f, 1.0f, 0, true, false, 1.0f);
+      std::vector<uint8_t> px;
+      int pw = 0, ph = 0;
+      const bool rd = doc->ReadPaint(pl, px, pw, ph) && pw == doc->Doc().w && px.size() >= (size_t)pw * ph * 4;
+      auto at = [&](int x, int y) { return &px[((size_t)(ph - 1 - y) * pw + x) * 4]; };
+      expect("Bucket pattern: the region takes the tile, aligned to the document",
+             filled && rd && at(4, 4)[3] == 255 && at(12, 4)[3] == 255 && std::abs((int)at(4, 4)[0] - (int)at(12, 4)[0]) > 200);
+      expect("Bucket pattern: the selection limits the fill", rd && at(80, 4)[3] == 0);
+      expect("Bucket pattern: the red bar is left alone", rd && at(110, 4)[0] == 255 && at(110, 4)[1] == 0);
+      doc->Deselect();
+      expect("Bucket pattern: with no pattern loaded or a bad layer it is refused", !doc->BucketPattern(99999, 10, 4.5f, 1.0f, 0, true, false, 1.0f));
+      while (gUndoStack.size() > u0)
+         Undo();
+      doc = FindDoc();
+      if (doc == nullptr)
+         return fails;
+      doc->Layers();
    }
    // Saved brush presets (ledger-gaps Block B): save appends at the end, the text round-trips, and previous / next
    // walk the built-in presets then the saved ones, wrapping.

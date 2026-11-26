@@ -1584,7 +1584,8 @@ void Scene2DNode::EndPaint()
    mPaintId = 0;
 }
 
-bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opacity, int tolerance, bool contiguous, bool sampleAll)
+// The bucket's region in the document, bottom row first as the selection; false when the click fills nothing.
+bool Scene2DNode::BucketRegion(int id, float x, float y, int tolerance, bool contiguous, bool sampleAll, std::vector<uint8_t>& region)
 {
    Layers();
    Layer* l = FindLayer(id);
@@ -1609,7 +1610,7 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
    }
    else
       ReadRect(it->second.fbo, 0, 0, W, H, px);
-   std::vector<uint8_t> region;
+   region.clear();
    sMatchSoft = wandAntialias;
    MatchRegion(px, W, H, (int)std::floor(x), H - 1 - (int)std::floor(y), tolerance, contiguous, region);
    if (std::none_of(region.begin(), region.end(), [](uint8_t v) { return v != 0; }))
@@ -1630,6 +1631,17 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
       if (!meets)
          return false;
    }
+   return true;
+}
+
+bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opacity, int tolerance, bool contiguous, bool sampleAll)
+{
+   std::vector<uint8_t> region;
+   if (!BucketRegion(id, x, y, tolerance, contiguous, sampleAll, region))
+      return false;
+   Layer* l = FindLayer(id);
+   auto it = mSurfaces.find(id);
+   const int W = mDoc.w, H = mDoc.h;
    GLUtil::Fbo cov;
    if (!GLUtil::EnsureFbo(cov, W, H, GL_RGBA8, "Scene2DBucket"))
       return false;
@@ -1645,6 +1657,42 @@ bool Scene2DNode::Bucket(int id, float x, float y, const float rgb[3], float opa
    StoreTiles(it->second, l->tiles, all);
    Commit();
    return true;
+}
+
+// Bucket with a pattern (Photoshop's Fill: Pattern): the region, inside the selection, becomes a stroke's selection
+// for one hard Pattern Stamp dab over the whole layer, aligned to the document so neighbouring fills meet.
+bool Scene2DNode::BucketPattern(int id, float x, float y, float opacity, int tolerance, bool contiguous, bool sampleAll, float scale)
+{
+   if (mStroke.Active() || mPattern.tex == 0)
+      return false;
+   std::vector<uint8_t> region;
+   if (!BucketRegion(id, x, y, tolerance, contiguous, sampleAll, region))
+      return false;
+   const Layer* l = FindConst(id);
+   if (mSelAny && mSel.size() == region.size())
+      for (size_t i = 0; i < region.size(); i++)
+         region[i] = (uint8_t)(region[i] * mSel[i] / 255);
+   std::vector<uint8_t> keepSel = mSel;
+   const bool keepAny = mSelAny;
+   mSel.swap(region);
+   mSelAny = true;
+   mSelDirty = true;
+   BrushEngine::Brush b;
+   b.mode = BrushEngine::kPatternStamp;
+   b.hardness = 1.0f;
+   b.opacity = b.flow = std::clamp(opacity, 0.0f, 1.0f);
+   b.patternAligned = true;
+   b.patternScale = std::max(scale, kPatternScaleMin);
+   b.patternPhase[0] = b.patternPhase[1] = 0.0f;
+   const float w = (float)mDoc.w, h = (float)mDoc.h;
+   b.size = 4.0f * std::sqrt(w * w + h * h) + 4.0f * std::sqrt((float)l->pw * l->pw + (float)l->ph * l->ph);
+   const bool ok = BeginPaint(id, 0, b, w * 0.5f, h * 0.5f, 1.0f);
+   if (ok)
+      EndPaint();
+   mSel.swap(keepSel);
+   mSelAny = keepAny;
+   mSelDirty = true;
+   return ok;
 }
 
 bool Scene2DNode::Gradient(int id, float ax, float ay, float bx, float by, const float a[4], const float b[4], int kind, float opacity,

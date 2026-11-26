@@ -590,6 +590,8 @@ public:
    // Bucket fill at a document point, within `tolerance` (0..255) of the
    // clicked colour; contiguous or everywhere; sampled from the layer or the picture.
    bool Bucket(int id, float x, float y, const float rgb[3], float opacity, int tolerance, bool contiguous, bool sampleAll);
+   bool BucketPattern(int id, float x, float y, float opacity, int tolerance, bool contiguous, bool sampleAll, float scale);
+   static constexpr float kPatternScaleMin = 0.01f;
    // ---- Remove tool (ai-tools.md 1.8) ----
    // One stroke of the Remove tool: its points in document px (top row first) and its own brush radius.
    struct RemoveStroke
@@ -1187,6 +1189,7 @@ private:
    };
    Surface* SyncSurface(std::map<int, Surface>& in, int id, int w, int h, const std::vector<std::string>& keys);
    void SyncSurfaces();
+   bool BucketRegion(int id, float x, float y, int tolerance, bool contiguous, bool sampleAll, std::vector<uint8_t>& region);
    void StoreTiles(Surface& s, std::vector<std::string>& keys, const int dirty[4]);
    void ResetForFile(int w, int h);
    bool DocToSurface(const Layer& l, int target, float x, float y, float& sx, float& sy, float& scale);
