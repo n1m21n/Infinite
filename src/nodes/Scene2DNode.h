@@ -635,6 +635,18 @@ public:
    // ---- retouch (Affinity's photo tools) ---------------------------------
    // The Undo brush paints back the layer as it was when first shown (or when SetUndoSource last ran).
    void SetUndoSource(int id);
+   // History snapshots (Photoshop's History panel snapshots): the whole document at a moment, kept for this session
+   // only (not saved, as in Photoshop). A snapshot can be gone back to, or made the History source: the Undo brush,
+   // Fill from History and Erase to History then paint back to each paint layer as it was in that snapshot.
+   struct Snapshot { std::string name, text; };
+   const std::vector<Snapshot>& Snapshots() const { return mSnapshots; }
+   int AddSnapshot(const std::string& name);        // the index of the new snapshot
+   bool RenameSnapshot(int i, const std::string& name);
+   bool DeleteSnapshot(int i);
+   bool RestoreSnapshot(int i);                     // the document becomes the snapshot (the caller pushes undo)
+   bool SetHistorySource(int i);                    // -1: each layer as it is now
+   int HistorySource() const { return mHistorySrc; }
+   bool FillFromHistory(int id, float opacity);     // the layer inside the selection becomes the History source
    // Rebuilds the masked pixels (mask 0..255, w x h) from around them; `off` px to a clean patch, or the best nearby
    // one when autoOff. Rows and offset in the same frame as px.
    static bool RemoveRegion(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& mask);
@@ -1183,6 +1195,8 @@ private:
    bool StoreFilterMask(int id, const std::vector<uint8_t>& was, std::vector<uint8_t> next);
    std::map<int, std::vector<std::string>> mUndoTiles;   // the Undo brush's source per paint layer
    std::map<int, Surface> mUndoSurf;
+   std::vector<Snapshot> mSnapshots;
+   int mHistorySrc = -1;
    unsigned mWarpProgram = 0;
    // CPU-rastered layers (vector, text) and vector masks, re-rastered when their key changes.
    struct Raster

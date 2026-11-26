@@ -334,6 +334,7 @@ namespace
    float sCropAngle = 0.0f;           // the box's turn about its centre, degrees clockwise on screen (Straighten)
    bool sCropStraighten = false;      // the next crop drag draws a line to level, not a box
    const int kCropStraightenDrag = -2;   // sOp.cropHandle while that line is drawn
+   bool sEraseHistory = false;        // eraser: paints back to the History source instead of erasing (Photoshop)
    bool sShapeSnap = true;            // brush and eraser: hold at the end of a stroke to make it a clean shape
    float sVecFillGap = Scene2DNode::kVectorFillGap;   // vector bucket: gaps between lines up to this many px count as closed
    bool sCropPersp = false;           // Perspective Crop: four free corners, the quad becomes the document
@@ -3879,6 +3880,7 @@ namespace
       ImGui::SetCursorScreenPos(keep);
    }
 
+   bool FillFromHistory(Scene2DNode* doc, float opacity);
    // Shift+F5: what to fill with and how strongly; one click on a row fills (the selection, else the layer).
    void DrawFillDialog(Scene2DNode* doc)
    {
@@ -3901,7 +3903,64 @@ namespace
             sFillWith = i;
             ClearOrFill(doc, i + 1, sFillOpacity);
          }
+      const Layer* fa = Active(doc);
+      if (MenuParts::Item(T("History"), nullptr, false, fa != nullptr && fa->kind == Kind::Paint))
+         FillFromHistory(doc, sFillOpacity);
       MenuParts::EndPopup();
+   }
+
+   // Fill > History: the active paint layer, inside the selection, goes back to the History source.
+   bool FillFromHistory(Scene2DNode* doc, float opacity)
+   {
+      const Layer* a = Active(doc);
+      if (a == nullptr || a->kind != Kind::Paint || doc->quickMask || PaintRefused(doc))
+         return false;
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint("Fill from History");
+      const bool ok = doc->FillFromHistory(a->id, opacity);
+      if (!ok)
+         gUndoStack.resize(undo0);
+      Touch();
+      return ok;
+   }
+
+   // History snapshots (Photoshop's History panel top): the document at a moment, for this session.
+   void SnapshotsMenu(Scene2DNode* doc)
+   {
+      if (!MenuParts::SubMenu(T("Snapshots")))
+         return;
+      if (MenuParts::Item(T("New Snapshot")))
+         doc->AddSnapshot("");
+      const auto& snaps = doc->Snapshots();
+      if (!snaps.empty())
+         MenuParts::Separator();
+      int go = -1, src = -2, del = -1;
+      for (int i = 0; i < (int)snaps.size(); i++)
+      {
+         ImGui::PushID(i);
+         if (MenuParts::SubMenu(snaps[(size_t)i].name.c_str()))
+         {
+            if (MenuParts::Item(T("Go To")))
+               go = i;
+            if (MenuParts::Item(T("History Source"), nullptr, doc->HistorySource() == i))
+               src = doc->HistorySource() == i ? -1 : i;
+            if (MenuParts::Item(T("Delete")))
+               del = i;
+            ImGui::EndMenu();
+         }
+         ImGui::PopID();
+      }
+      ImGui::EndMenu();
+      if (go >= 0)
+      {
+         PushUndoCheckpoint("Go to snapshot");
+         doc->RestoreSnapshot(go);
+         Touch();
+      }
+      if (src >= -1)
+         doc->SetHistorySource(src);
+      if (del >= 0)
+         doc->DeleteSnapshot(del);
    }
 
    // Selections kept with the document under a name.
@@ -4118,6 +4177,11 @@ namespace
    BrushEngine::Brush EraseLocked(Scene2DNode* doc, int id, int target, BrushEngine::Brush b)
    {
       const Layer* l = doc->FindLayer(id);
+      if (target == 0 && sTool == kEraser && sEraseHistory && b.mode == BrushEngine::kErase && l != nullptr && l->kind == Kind::Paint)
+      {
+         b.mode = BrushEngine::kUndo;
+         return b;
+      }
       if (target == 0 && sTool == kEraser && b.mode == BrushEngine::kErase && l != nullptr &&
           (b.lockAlpha || (LockOf(doc, *l) & Scene2DNode::kLockAlpha) != 0))
       {
@@ -7430,6 +7494,8 @@ namespace
          Touch();
       if (sLiveDlg == 0 && V2DepthTick(doc))   // an agent's Depth Select whose map was still being made
          Touch();
+      if (doc->Snapshots().empty())
+         doc->AddSnapshot(T("Opened"));   // Photoshop keeps the opened state as the first snapshot
       // A live selection dialog whose bar is gone (another tool, another panel layout) is cancelled.
       if (sLiveDlg != 0 && ImGui::GetFrameCount() - sLiveFrame > 2)
          LiveClose(doc, false);
@@ -7595,6 +7661,7 @@ namespace
             MenuParts::Separator();
             SelectionMenu(doc);
             PathsMenu(doc);
+            SnapshotsMenu(doc);
             if (MenuParts::Item(T("Select All Layers"), Sc("Ctrl+A")))
             {
                sSel.clear();
@@ -9688,6 +9755,8 @@ namespace
                MoreSlider(T("Angle"), &b.angle, params::view2d::angle_lo, params::view2d::angle_hi, "%.0f°");
                MoreCheck(T("Hard edge"), &b.pencil);
                MoreCheck(T("Shape Snap"), &sShapeSnap);
+               if (sTool == kEraser)
+                  MoreCheck(T("Erase to History"), &sEraseHistory);
             }
             MoreHeader(T("Dynamics"));
             {
@@ -21078,6 +21147,43 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       Undo();   // the user's own checkpoint
       // Clean up: every Block 3 step back off.
       while (!gUndoStack.empty() && UndoLabelAt(0).rfind("Agent: block3", 0) == 0)
+         Undo();
+      doc = FindDoc();
+      if (doc == nullptr)
+         return fails;
+   }
+   // History snapshots (ledger-gaps Block B): a snapshot is gone back to, and as the History source it feeds
+   // Fill > History and the eraser's Erase to History.
+   {
+      const size_t u0 = gUndoStack.size();
+      PushUndoCheckpoint("History test");
+      const int hl = doc->AddPaintLayer();
+      const float red[3] = { 1, 0, 0 }, blue[3] = { 0, 0, 1 };
+      const float mx = doc->Doc().w * 0.5f, my = doc->Doc().h * 0.5f;
+      doc->Deselect();
+      doc->FillPixels(hl, red, 1.0f);
+      const int snap = doc->AddSnapshot("red");
+      doc->FillPixels(hl, blue, 1.0f);
+      float c[3] = { 0, 0, 0 };
+      expect("History: the layer is blue after the snapshot", doc->Pick(mx, my, c, 1, hl) && c[2] > 0.9f);
+      expect("History: a snapshot becomes the History source", doc->SetHistorySource(snap) && doc->HistorySource() == snap);
+      expect("History: Fill from History brings the snapshot back",
+             doc->FillFromHistory(hl, 1.0f) && doc->Pick(mx, my, c, 1, hl) && c[0] > 0.9f && c[2] < 0.1f);
+      const int toolWas = sTool;
+      const bool histWas = sEraseHistory;
+      sTool = kEraser;
+      sEraseHistory = true;
+      BrushEngine::Brush eb = sEraser;
+      eb.mode = BrushEngine::kErase;
+      expect("History: Erase to History paints with the History source", EraseLocked(doc, hl, 0, eb).mode == BrushEngine::kUndo);
+      sTool = toolWas;
+      sEraseHistory = histWas;
+      doc->FillPixels(hl, blue, 1.0f);
+      expect("History: Go To snapshot restores the document", doc->RestoreSnapshot(snap) && doc->Pick(mx, my, c, 1, hl) && c[0] > 0.9f);
+      expect("History: a missing snapshot is refused", !doc->RestoreSnapshot(9999) && !doc->SetHistorySource(9999));
+      doc->SetHistorySource(-1);
+      expect("History: a snapshot deletes", doc->DeleteSnapshot(snap));
+      while (gUndoStack.size() > u0)
          Undo();
       doc = FindDoc();
       if (doc == nullptr)

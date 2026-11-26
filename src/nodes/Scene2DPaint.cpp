@@ -2603,6 +2603,108 @@ void Scene2DNode::SetUndoSource(int id)
    mUndoTiles[id] = l->tiles;
 }
 
+// ---- history snapshots ---------------------------------------------------
+
+namespace { constexpr size_t kSnapshotsMax = 64; }
+
+int Scene2DNode::AddSnapshot(const std::string& name)
+{
+   Layers();
+   if (mSnapshots.size() >= kSnapshotsMax)
+   {
+      mSnapshots.erase(mSnapshots.begin());   // the oldest goes, as Photoshop drops the oldest state
+      mHistorySrc = mHistorySrc > 0 ? mHistorySrc - 1 : -1;
+   }
+   mSnapshots.push_back({ name.empty() ? "Snapshot " + std::to_string(mSnapshots.size() + 1) : name, mText });
+   return (int)mSnapshots.size() - 1;
+}
+
+bool Scene2DNode::RenameSnapshot(int i, const std::string& name)
+{
+   if (i < 0 || i >= (int)mSnapshots.size() || name.empty())
+      return false;
+   mSnapshots[(size_t)i].name = name;
+   return true;
+}
+
+bool Scene2DNode::DeleteSnapshot(int i)
+{
+   if (i < 0 || i >= (int)mSnapshots.size())
+      return false;
+   mSnapshots.erase(mSnapshots.begin() + i);
+   if (mHistorySrc == i)
+      SetHistorySource(-1);
+   else if (mHistorySrc > i)
+      mHistorySrc--;
+   return true;
+}
+
+bool Scene2DNode::RestoreSnapshot(int i)
+{
+   if (i < 0 || i >= (int)mSnapshots.size())
+      return false;
+   if (mSnapshots[(size_t)i].text == mText)
+      return true;
+   SetDocText(mSnapshots[(size_t)i].text);
+   Layers();
+   Commit();
+   return true;
+}
+
+bool Scene2DNode::SetHistorySource(int i)
+{
+   if (i >= (int)mSnapshots.size())
+      return false;
+   Layers();
+   if (i < 0)
+   {
+      for (const Layer& l : mLayers)
+         if (l.kind == Kind::Paint)
+            mUndoTiles[l.id] = l.tiles;
+      mHistorySrc = -1;
+      return true;
+   }
+   // Read the snapshot's layers by parsing its text, then parse the document back. A layer the snapshot lacks, or
+   // one whose pixel size changed since, keeps its current source (the Undo brush then paints it back to itself).
+   std::map<int, std::vector<std::string>> then;
+   const std::string now = mText;
+   mText = mSnapshots[(size_t)i].text;
+   Layers();
+   for (const Layer& l : mLayers)
+      if (l.kind == Kind::Paint)
+         then[l.id] = l.tiles;
+   mText = now;
+   Layers();
+   for (const Layer& l : mLayers)
+   {
+      if (l.kind != Kind::Paint)
+         continue;
+      auto t = then.find(l.id);
+      mUndoTiles[l.id] = t != then.end() && t->second.size() == l.tiles.size() ? t->second : l.tiles;
+   }
+   mHistorySrc = i;
+   return true;
+}
+
+bool Scene2DNode::FillFromHistory(int id, float opacity)
+{
+   Layers();
+   const Layer* l = FindConst(id);
+   if (l == nullptr || l->kind != Kind::Paint || mStroke.Active())
+      return false;
+   // One hard Undo-brush dab over the whole layer: the stroke already keeps to the selection and the locks.
+   BrushEngine::Brush b;
+   b.mode = BrushEngine::kUndo;
+   b.hardness = 1.0f;
+   b.opacity = b.flow = std::clamp(opacity, 0.0f, 1.0f);
+   const float w = (float)mDoc.w, h = (float)mDoc.h;
+   b.size = 4.0f * std::sqrt(w * w + h * h) + 4.0f * std::sqrt((float)l->pw * l->pw + (float)l->ph * l->ph);
+   if (!BeginPaint(id, 0, b, w * 0.5f, h * 0.5f, 1.0f))
+      return false;
+   EndPaint();
+   return true;
+}
+
 bool Scene2DNode::PatchSelection(int id, float dx, float dy, bool selIsSource, bool transparent)
 {
    Layers();
