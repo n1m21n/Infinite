@@ -62,6 +62,17 @@ namespace AiSelect
    // Blocking, on the caller's thread (tests and the eval hook only).
    bool DepthNow(const Picture& pic, uint64_t key, std::string& err);
 
+   // ---- Inpainting (MI-GAN 512 Places2, opt-in "inpaint" pack; ai-tools.md 1.8, ai-tools-licences.md) ----
+   // The weights are MIT; the training set (Places2) is offered for research and education only, so the pack is an
+   // explicit download that shows that note, never part of the select pack. The Remove tool falls back to its own fill.
+   bool InpaintAvailable();
+   std::string InpaintMissing();   // why not, for the hint ("" when it is)
+   // Fills the hole of a top-down RGBA picture (alpha ignored; the caller keeps its own). mask: w x h, > 127 = hole.
+   // out: RGBA at w x h, outside the hole unchanged, alpha copied from rgba. Blocking (about 0.5 s at 800 x 600 on
+   // an M2 CPU; the pipeline crops round the hole and works at 512): the caller crops to the hole first.
+   bool InpaintNow(const std::vector<uint8_t>& rgba, const std::vector<uint8_t>& mask, int w, int h, std::vector<uint8_t>& out,
+                   std::string& err);
+
    // Main thread, once a frame: unloads the models after 60 s idle.
    void Tick(double nowSeconds);
    // Drops the models and the cache now (tests, Settings > Extensions remove).

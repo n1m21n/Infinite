@@ -618,7 +618,10 @@ public:
    // layer `id`, or the picture with sampleAll; it writes into `id`, or with newLayer into a new paint layer above
    // `id` named "Remove Tool Edits" (then " 1", " 2": the first free name). Returns the layer written, 0 when
    // nothing changed (an empty layer, a hole the selection hides, a locked or transformed layer).
-   int Remove(int id, const std::vector<RemoveStroke>& strokes, bool sampleAll, bool newLayer);
+   // ai: when the opt-in Inpaint pack (MI-GAN) is installed, the hole's colour comes from it where the pixels round the
+   // hole are opaque; anywhere else (or without the pack) the classic fill stays. RemoveUsedAi() reports the last call.
+   int Remove(int id, const std::vector<RemoveStroke>& strokes, bool sampleAll, bool newLayer, bool ai = false);
+   bool RemoveUsedAi() const { return mRemoveUsedAi; }
    // The name the next new Remove layer takes.
    std::string RemoveLayerName() const;
    // Gradient from a to b (document px), colour A to B; radial when `radial`.
@@ -640,9 +643,13 @@ public:
    // History snapshots (Photoshop's History panel snapshots): the whole document at a moment, kept for this session
    // only (not saved, as in Photoshop). A snapshot can be gone back to, or made the History source: the Undo brush,
    // Fill from History and Erase to History then paint back to each paint layer as it was in that snapshot.
-   struct Snapshot { std::string name, text; };
+   struct Snapshot { std::string name, text; int id = 0; };   // id: stable while others are renamed or deleted
    const std::vector<Snapshot>& Snapshots() const { return mSnapshots; }
    int AddSnapshot(const std::string& name);        // the index of the new snapshot
+   // Photoshop's New Snapshot From: the full document, the visible layers merged into one, or one layer alone (with
+   // its groups). The document itself is left as it was. The index of the new snapshot, -1 when it cannot.
+   enum class SnapFrom { Document, Merged, Layer };
+   int AddSnapshotFrom(const std::string& name, SnapFrom from, int layerId, int frameId);
    bool RenameSnapshot(int i, const std::string& name);
    bool DeleteSnapshot(int i);
    bool RestoreSnapshot(int i);                     // the document becomes the snapshot (the caller pushes undo)
@@ -1208,6 +1215,10 @@ private:
    std::map<int, std::vector<std::string>> mUndoTiles;   // the Undo brush's source per paint layer
    std::map<int, Surface> mUndoSurf;
    std::vector<Snapshot> mSnapshots;
+   int mNextSnapId = 1;
+   bool mRemoveUsedAi = false;
+   bool RemoveWithAi(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& hole);
+   int PushSnapshot(const std::string& name, const std::string& text);
    int mHistorySrc = -1;
    GLUtil::Fbo mPattern;
    uint64_t mPatternKey = 0;

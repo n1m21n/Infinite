@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <set>
 
 #include "TileStore.h"
 #include "core/ml/AiSelect.h"
@@ -527,8 +528,57 @@ std::string Scene2DNode::RemoveLayerName() const
    }
 }
 
-int Scene2DNode::Remove(int id, const std::vector<RemoveStroke>& strokes, bool sampleAll, bool newLayer)
+// The MI-GAN pass over the classic fill (rows bottom first, like the surfaces): a crop round the hole, flipped
+// upright, filled by the model, its colour written into the hole only. False (px untouched) when the pixels round the
+// hole are not all opaque (the model knows no alpha) or the model fails.
+bool Scene2DNode::RemoveWithAi(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& hole)
 {
+   int bx0 = w, by0 = h, bx1 = -1, by1 = -1;
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+         if (hole[(size_t)y * w + x] > 8)
+         {
+            bx0 = std::min(bx0, x);
+            by0 = std::min(by0, y);
+            bx1 = std::max(bx1, x);
+            by1 = std::max(by1, y);
+         }
+   if (bx1 < 0)
+      return false;
+   const int pad = std::max(64, std::max(bx1 - bx0, by1 - by0));   // context for the model, as much as the hole
+   const int cx0 = std::max(0, bx0 - pad), cy0 = std::max(0, by0 - pad);
+   const int cx1 = std::min(w, bx1 + 1 + pad), cy1 = std::min(h, by1 + 1 + pad);
+   const int cw = cx1 - cx0, ch = cy1 - cy0;
+   std::vector<uint8_t> crop((size_t)cw * ch * 4), m((size_t)cw * ch);
+   for (int y = 0; y < ch; y++)
+      for (int x = 0; x < cw; x++)
+      {
+         const size_t si = (size_t)(cy0 + ch - 1 - y) * w + (cx0 + x), di = (size_t)y * cw + x;   // flipped upright
+         std::copy(&px[si * 4], &px[si * 4] + 4, &crop[di * 4]);
+         m[di] = hole[si] > 8 ? 255 : 0;
+         if (m[di] == 0 && crop[di * 4 + 3] != 255)
+            return false;
+      }
+   std::vector<uint8_t> out;
+   std::string err;
+   if (!AiSelect::InpaintNow(crop, m, cw, ch, out, err))
+      return false;
+   for (int y = 0; y < ch; y++)
+      for (int x = 0; x < cw; x++)
+      {
+         const size_t si = (size_t)(cy0 + ch - 1 - y) * w + (cx0 + x), di = (size_t)y * cw + x;
+         if (m[di] != 0)
+         {
+            std::copy(&out[di * 4], &out[di * 4] + 3, &px[si * 4]);
+            px[si * 4 + 3] = 255;
+         }
+      }
+   return true;
+}
+
+int Scene2DNode::Remove(int id, const std::vector<RemoveStroke>& strokes, bool sampleAll, bool newLayer, bool ai)
+{
+   mRemoveUsedAi = false;
    Layers();
    Layer* l = FindLayer(id);
    if (l == nullptr || l->kind != Kind::Paint || strokes.empty() || !EnsurePaintShaders())
@@ -595,6 +645,8 @@ int Scene2DNode::Remove(int id, const std::vector<RemoveStroke>& strokes, bool s
       return 0;
    if (!RemoveRegion(px, W, H, hole))
       return 0;
+   if (ai && AiSelect::InpaintAvailable())
+      mRemoveUsedAi = RemoveWithAi(px, W, H, hole);
    int dest = id;
    if (newLayer)
    {
@@ -1443,9 +1495,10 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
       brush.sourceTex = mPattern.tex;
       if (!brush.patternAligned)
       {
-         // Not aligned: the tile starts at this stroke's first dab; a new stroke starts it again.
-         brush.patternPhase[0] = -sx;
-         brush.patternPhase[1] = -sy;
+         // Not aligned: the tile starts at this stroke's first dab; a new stroke starts it again. An explicit phase
+         // still shifts it, in both modes.
+         brush.patternPhase[0] -= sx;
+         brush.patternPhase[1] -= sy;
       }
    }
    ApplyBrushSources(brush, true);
@@ -2715,8 +2768,83 @@ int Scene2DNode::AddSnapshot(const std::string& name)
       mSnapshots.erase(mSnapshots.begin());   // the oldest goes, as Photoshop drops the oldest state
       mHistorySrc = mHistorySrc > 0 ? mHistorySrc - 1 : -1;
    }
-   mSnapshots.push_back({ name.empty() ? "Snapshot " + std::to_string(mSnapshots.size() + 1) : name, mText });
+   return PushSnapshot(name, mText);
+}
+
+int Scene2DNode::PushSnapshot(const std::string& name, const std::string& text)
+{
+   const int id = mNextSnapId++;
+   mSnapshots.push_back({ name.empty() ? "Snapshot " + std::to_string(id) : name, text, id });
    return (int)mSnapshots.size() - 1;
+}
+
+int Scene2DNode::AddSnapshotFrom(const std::string& name, SnapFrom from, int layerId, int frameId)
+{
+   if (from == SnapFrom::Document)
+      return AddSnapshot(name);
+   Layers();
+   Commit();
+   if (from == SnapFrom::Layer && FindLayer(layerId) == nullptr)
+      return -1;
+   // Change the document, take its text, then put the document back from its own text: the same round trip
+   // RestoreSnapshot makes. The History source tiles are kept aside, since removing a layer drops its own.
+   const std::string now = mText;
+   const auto undoTiles = mUndoTiles;
+   if (mSnapshots.size() >= kSnapshotsMax)
+   {
+      mSnapshots.erase(mSnapshots.begin());
+      mHistorySrc = mHistorySrc > 0 ? mHistorySrc - 1 : -1;
+   }
+   if (from == SnapFrom::Merged)
+   {
+      std::vector<int> ids;
+      for (int c : ChildrenOf(0))
+         if (const Layer* l = FindLayer(c))
+            if (Shown(*l))
+               ids.push_back(c);
+      if (!ids.empty())
+         MergeLayers(ids, frameId);
+   }
+   else
+   {
+      std::set<int> keep;
+      for (int id = layerId; id != 0;)
+      {
+         const Layer* l = FindLayer(id);
+         if (l == nullptr)
+            break;
+         keep.insert(id);
+         id = l->parent;
+      }
+      for (bool gone = true; gone;)   // the layer, its groups and what the layer holds stay; the rest goes
+      {
+         gone = false;
+         for (const Layer& l : Layers())
+         {
+            bool inside = false;
+            for (int p = l.parent; p != 0 && !inside;)
+            {
+               inside = p == layerId;
+               const Layer* pl = FindLayer(p);
+               p = pl != nullptr ? pl->parent : 0;
+            }
+            if (keep.count(l.id) == 0 && !inside)
+            {
+               RemoveLayer(l.id);
+               gone = true;
+               break;
+            }
+         }
+      }
+   }
+   Layers();
+   Commit();
+   const std::string text = mText;
+   SetDocText(now);
+   Layers();
+   Commit();
+   mUndoTiles = undoTiles;
+   return PushSnapshot(name, text);
 }
 
 bool Scene2DNode::RenameSnapshot(int i, const std::string& name)

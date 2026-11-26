@@ -66,6 +66,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <set>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -224,6 +225,7 @@ namespace
    std::vector<Scene2DNode::RemoveStroke> sRemoveQueue;
    bool sRemoveEach = true;        // apply after each stroke (off: strokes wait for Apply or Enter)
    bool sRemoveNewLayer = false;   // write the fill to a new layer above the active one
+   bool sRemoveAi = true;          // MI-GAN fill when the opt-in Inpaint pack is installed (the pack is the opt-in)
    int sTolerance = 32;  // ui-audit-ok: unit (colour tolerance default (0-255))
    bool sContiguous = true, sAllLayers = false;
    bool sFillPattern = false;   // the bucket fills with the chosen pattern (Photoshop's Fill: Pattern)
@@ -3913,7 +3915,7 @@ namespace
          return;
       const size_t undo0 = gUndoStack.size();
       PushUndoCheckpoint("Remove Tool");
-      if (doc->Remove(a->id, strokes, sAllLayers, sRemoveNewLayer) == 0)
+      if (doc->Remove(a->id, strokes, sAllLayers, sRemoveNewLayer, sRemoveAi) == 0)
       {
          gUndoStack.resize(undo0);
          return;
@@ -4159,6 +4161,21 @@ namespace
       return ok;
    }
 
+   // Go To a snapshot: one undoable step, none when the document already is the snapshot.
+   bool GoToSnapshot(Scene2DNode* doc, int i)
+   {
+      if (i < 0 || i >= (int)doc->Snapshots().size())
+         return false;
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint("Go to snapshot");
+      const std::string was = doc->DocText();
+      const bool ok = doc->RestoreSnapshot(i);
+      if (!ok || doc->DocText() == was)
+         gUndoStack.resize(undo0);
+      Touch();
+      return ok;
+   }
+
    // History snapshots (Photoshop's History panel top): the document at a moment, for this session.
    void SnapshotsMenu(Scene2DNode* doc)
    {
@@ -4166,6 +4183,12 @@ namespace
          return;
       if (MenuParts::Item(T("New Snapshot")))
          doc->AddSnapshot("");
+      static int sSnapFrame = 1 << 30;
+      if (MenuParts::Item(T("New Snapshot of Merged Layers")))
+         doc->AddSnapshotFrom("", Scene2DNode::SnapFrom::Merged, 0, ++sSnapFrame);
+      const Layer* sa = Active(doc);
+      if (MenuParts::Item(T("New Snapshot of Current Layer"), nullptr, false, sa != nullptr))
+         doc->AddSnapshotFrom("", Scene2DNode::SnapFrom::Layer, sa->id, ++sSnapFrame);
       const auto& snaps = doc->Snapshots();
       if (!snaps.empty())
          MenuParts::Separator();
@@ -4187,11 +4210,7 @@ namespace
       }
       ImGui::EndMenu();
       if (go >= 0)
-      {
-         PushUndoCheckpoint("Go to snapshot");
-         doc->RestoreSnapshot(go);
-         Touch();
-      }
+         GoToSnapshot(doc, go);
       if (src >= -1)
          doc->SetHistorySource(src);
       if (del >= 0)
@@ -9829,6 +9848,15 @@ namespace
             next();
             if (TextChip(L("New layer##v2drmnew"), sRemoveNewLayer, T("Put the fill on a new layer above")))
                sRemoveNewLayer = !sRemoveNewLayer;
+            next();
+            {
+               // AI fill: the Inpaint pack's MI-GAN; without the pack the chip says how to get it.
+               const bool can = AiSelect::InpaintAvailable();
+               const std::string tip = can ? std::string(T("Fill with the MI-GAN model (Inpaint pack; trained on research-only data)"))
+                                           : AiSelect::InpaintMissing();
+               if (TextChip(L("AI fill##v2drmai"), sRemoveAi && can, tip.c_str()) && can)
+                  sRemoveAi = !sRemoveAi;
+            }
             next();
             if (TextChip(L("Each stroke##v2drmeach"), sRemoveEach, T("Remove after each stroke; off, strokes wait for Apply")))
                sRemoveEach = !sRemoveEach;
@@ -19422,6 +19450,41 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          RunRemove(doc);
          out = picture(doc);
          expect("parity: remove a ring around an object removes it in one undo step", worst(out, 0, 0, iw, ih) <= 8 && gUndoStack.size() == u0 + 1);
+         // AI fill: without the Inpaint pack Remove falls back to the classic fill; with it MI-GAN fills the hole
+         // and the pixels outside stay as they were.
+         {
+            mark(130, 130, 170, 170);
+            const std::vector<uint8_t> marked = picture(doc);
+            const bool had = sRemoveAi;
+            sRemoveAi = true;
+            u0 = gUndoStack.size();
+            sRemoveQueue = { line(150, 150, 150, 150, 30.0f) };
+            RunRemove(doc);
+            sRemoveAi = had;
+            out = picture(doc);
+            const size_t c = ((size_t)(ih - 1 - 150) * iw + 150) * 4;
+            const bool red0 = marked.size() == out.size() && marked[c] > 200 && marked[c + 1] < 60;
+            const bool gone = out.size() > c + 2 && !(out[c] > 200 && out[c + 1] < 60);
+            bool outside = out.size() == marked.size();   // rows away from the hole match the picture before
+            for (int y = 0; y < ih && outside; y++)
+               if (y < 100 || y >= 200)
+                  for (int x = 0; x < iw && outside; x++)
+                     for (int k = 0; k < 3; k++)
+                     {
+                        const size_t i = ((size_t)(ih - 1 - y) * iw + x) * 4 + k;
+                        outside = outside && std::abs((int)out[i] - (int)marked[i]) <= 1;
+                     }
+            if (!outside || !doc->RemoveUsedAi() || !gone)
+               fprintf(stderr, "  PROBE ai fill: used %d red0 %d gone %d outside %d c %d,%d,%d\n", doc->RemoveUsedAi(), red0, gone,
+                       outside, out.size() > c + 2 ? out[c] : -1, out.size() > c + 2 ? out[c + 1] : -1,
+                       out.size() > c + 2 ? out[c + 2] : -1);
+            if (AiSelect::InpaintAvailable())
+               expect("AI fill: MI-GAN removes the square and leaves the rest alone",
+                      doc->RemoveUsedAi() && red0 && gone && outside && gUndoStack.size() == u0 + 1);
+            else
+               expect("AI fill: without the Inpaint pack Remove falls back to the classic fill",
+                      !doc->RemoveUsedAi() && worst(out, 0, 0, iw, ih) <= 8 && gUndoStack.size() == u0 + 1);
+         }
          // An open stroke changes only where it went; a selection limits it further.
          mark(130, 130, 170, 170);
          const std::vector<uint8_t> marked = picture(doc);
@@ -21543,6 +21606,57 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("History: a missing snapshot is refused", !doc->RestoreSnapshot(9999) && !doc->SetHistorySource(9999));
       doc->SetHistorySource(-1);
       expect("History: a snapshot deletes", doc->DeleteSnapshot(snap));
+      {
+         const size_t s0 = gUndoStack.size();
+         const std::string t0 = doc->DocText();
+         const int a = doc->AddSnapshot("a"), b = doc->AddSnapshot("b"), c3 = doc->AddSnapshot("c");
+         expect("History: new snapshot keeps the document and is not a history state", gUndoStack.size() == s0 && doc->DocText() == t0);
+         const int idB = doc->Snapshots()[(size_t)b].id, idC = doc->Snapshots()[(size_t)c3].id;
+         doc->RenameSnapshot(b, "bee");
+         doc->DeleteSnapshot(a);
+         const auto& sn = doc->Snapshots();
+         expect("History: rename and delete snapshots keep the other ids",
+                idB != idC && sn[(size_t)b - 1].id == idB && sn[(size_t)b - 1].name == "bee" && sn[(size_t)c3 - 1].id == idC);
+         expect("History: a snapshot can be the source", doc->SetHistorySource(c3 - 1) && doc->HistorySource() == c3 - 1);
+         doc->DeleteSnapshot(c3 - 1);
+         expect("History: deleting the source snapshot leaves no source", doc->HistorySource() == -1);
+         // Go To: one undoable step that Undo takes back; none when the document already is the snapshot.
+         doc->FillPixels(hl, red, 1.0f);
+         const int r = doc->AddSnapshot("red again");
+         doc->FillPixels(hl, blue, 1.0f);
+         const std::string was = doc->DocText();
+         const size_t s1 = gUndoStack.size();
+         expect("History: select snapshot returns to it as one undoable state",
+                GoToSnapshot(doc, r) && gUndoStack.size() == s1 + 1 && doc->Pick(mx, my, c, 1, hl) && c[0] > 0.9f);
+         expect("History: selecting the snapshot it is already at is no step", GoToSnapshot(doc, r) && gUndoStack.size() == s1 + 1);
+         Undo();
+         doc = FindDoc();
+         expect("History: undo after Go To brings the document back", doc != nullptr && doc->DocText() == was);
+      }
+      // New Snapshot From: one layer alone, or the visible layers merged; the document stays as it is.
+      if (doc != nullptr)
+      {
+         const int other = doc->AddPaintLayer();
+         doc->FillPixels(other, blue, 1.0f);
+         const size_t nLayers = doc->Layers().size();
+         const std::string t0 = doc->DocText();
+         static int sTestSnapFrame = 1 << 30;
+         const int one = doc->AddSnapshotFrom("one", Scene2DNode::SnapFrom::Layer, hl, ++sTestSnapFrame);
+         const int merged = doc->AddSnapshotFrom("merged", Scene2DNode::SnapFrom::Merged, 0, ++sTestSnapFrame);
+         expect("History: snapshots from merged layers or the current layer leave the document alone",
+                one >= 0 && merged >= 0 && doc->Layers().size() == nLayers && doc->DocText() == t0);
+         const std::string mergedText = doc->Snapshots()[(size_t)merged].text;
+         GoToSnapshot(doc, one);
+         const bool oneOk = doc->Layers().size() == 1 && doc->FindLayer(hl) != nullptr && doc->FindLayer(other) == nullptr;
+         doc->SetDocText(mergedText);
+         const bool mergedOk = doc->ChildrenOf(0).size() == 1 && doc->FindLayer(hl) == nullptr;
+         expect("History: a current layer snapshot holds that layer alone", oneOk);
+         expect("History: a merged snapshot holds one layer", mergedOk);
+         Undo();
+         doc = FindDoc();
+         if (doc == nullptr)
+            return fails;
+      }
       while (gUndoStack.size() > u0)
          Undo();
       doc = FindDoc();
@@ -21668,6 +21782,72 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       float n0[3] = {}, n1[3] = {};
       const bool un = stampAt(0.0f, false) && doc->Pick(4.5f, y, n0, 1, pl) && stampAt(8.0f, false) && doc->Pick(4.5f, y, n1, 1, pl);
       expect("Pattern stamp: not aligned, each stroke starts the tile at its first dab", un && std::fabs(n0[0] - n1[0]) > 0.9f);
+      // An explicit phase of one square flips the checker in both modes.
+      auto stampPhase = [&](float x0, bool aligned, float phase) {
+         BrushEngine::Brush b;
+         b.mode = BrushEngine::kPatternStamp;
+         b.hardness = 1.0f;
+         b.size = 4.0f * (float)std::max(doc->Doc().w, doc->Doc().h);
+         b.patternAligned = aligned;
+         b.patternPhase[0] = phase;
+         const bool ok = doc->BeginPaint(pl, 0, b, x0, 0.5f, 1.0f);
+         if (ok)
+            doc->EndPaint();
+         return ok;
+      };
+      float p0[3] = {}, p1[3] = {}, q0[3] = {}, q1[3] = {};
+      const bool ph = stampPhase(100.0f, true, 0.0f) && doc->Pick(4.5f, y, p0, 1, pl) && stampPhase(100.0f, true, 8.0f) &&
+                      doc->Pick(4.5f, y, p1, 1, pl) && stampPhase(0.0f, false, 0.0f) && doc->Pick(4.5f, y, q0, 1, pl) &&
+                      stampPhase(0.0f, false, 8.0f) && doc->Pick(4.5f, y, q1, 1, pl);
+      expect("Pattern stamp: explicit phase overrides both alignment modes",
+             ph && std::fabs(p0[0] - p1[0]) > 0.9f && std::fabs(q0[0] - q1[0]) > 0.9f);
+      // A rectangular tile repeats at its own width and height.
+      {
+         const int tw = 16, th = 4;
+         std::vector<uint8_t> tile((size_t)tw * th * 4, 255);
+         for (int ty = 0; ty < th; ty++)
+            for (int tx = 0; tx < tw; tx++)
+            {
+               uint8_t* t = &tile[((size_t)ty * tw + tx) * 4];
+               t[0] = tx < tw / 2 ? 255 : 0;
+               t[1] = ty < th / 2 ? 255 : 0;
+               t[2] = 0;
+            }
+         float r0[3] = {}, r1[3] = {}, r2[3] = {}, g0[3] = {}, g1[3] = {};
+         const bool rect = doc->SetPattern(tile, tw, th, 0x5EC7A9u) && stamp(1.0f) && doc->Pick(4.5f, 0.5f, r0, 1, pl) &&
+                           doc->Pick(12.5f, 0.5f, r1, 1, pl) && doc->Pick(20.5f, 0.5f, r2, 1, pl) && doc->Pick(4.5f, 2.5f, g0, 1, pl) &&
+                           doc->Pick(4.5f, 4.5f, g1, 1, pl);
+         expect("Pattern stamp: a rectangular pattern uses each axis size",
+                rect && std::fabs(r0[0] - r1[0]) > 0.9f && std::fabs(r0[0] - r2[0]) < 0.1f && std::fabs(r0[1] - g0[1]) > 0.9f &&
+                    std::fabs(r0[1] - g1[1]) < 0.1f);
+      }
+      // One stroke, one undo step: undo leaves the layer as it was.
+      {
+         const int el = doc->AddPaintLayer();
+         sPatternPick = 0;
+         UsePattern(doc);
+         PushUndoCheckpoint("Pattern stamp");
+         BrushEngine::Brush b;
+         b.mode = BrushEngine::kPatternStamp;
+         b.hardness = 1.0f;
+         b.size = 40.0f;
+         const bool painted = doc->BeginPaint(el, 0, b, 20.0f, 20.0f, 1.0f);
+         if (painted)
+            doc->EndPaint();
+         std::vector<uint8_t> px;
+         int pw = 0, phh = 0;
+         const bool had = painted && doc->ReadPaint(el, px, pw, phh) && px.size() >= (size_t)pw * phh * 4 &&
+                          px[((size_t)(phh - 1 - 20) * pw + 20) * 4 + 3] > 0;
+         Undo();
+         doc = FindDoc();
+         bool clear = doc != nullptr && doc->ReadPaint(el, px, pw, phh) && px.size() >= (size_t)pw * phh * 4;
+         if (clear)
+            for (size_t i = 3; i < px.size() && clear; i += 4)
+               clear = px[i] == 0;
+         expect("Pattern stamp: paints the tile and one undo takes it back", had && clear);
+         if (doc == nullptr)
+            return fails;
+      }
       while (gUndoStack.size() > u0)
          Undo();
       doc = FindDoc();
@@ -21707,6 +21887,13 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
    // Saved brush presets (ledger-gaps Block B): save appends at the end, the text round-trips, and previous / next
    // walk the built-in presets then the saved ones, wrapping.
    {
+      {
+         std::set<std::string> names;
+         bool grouped = !BrushEngine::Presets().empty();
+         for (const BrushEngine::Preset& p : BrushEngine::Presets())
+            grouped = grouped && p.group != nullptr && p.group[0] != 0 && names.insert(p.name).second;
+         expect("Presets: built-ins are grouped and unique", grouped);
+      }
       const std::vector<UserPreset> keep = sUserPresets;
       const int keepPick = sUserPick, keepPickE = sUserPickErase, keepPreset = sBrushPreset, toolWas = sTool;
       const BrushEngine::Brush keepBrush = sBrush;

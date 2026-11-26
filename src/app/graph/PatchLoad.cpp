@@ -1636,6 +1636,31 @@ namespace app
    }
 
 
+   // Delete a history state (Photoshop's linear history): the state and every later one go. `undos` names a state
+   // the document is in or has passed (0 = the current one: the document steps back to the one before it); `redos`
+   // (1 = nearest) names an undone one, which only drops it and the ones after it. The document never moves for a redo.
+   bool DeleteHistoryState(int undos, int redos)
+   {
+      if (ShowLockBlocks())
+         return false;
+      if (redos > 0)
+      {
+         if ((size_t)redos > gRedoStack.size())
+            return false;
+         gRedoStack.erase(gRedoStack.begin(), gRedoStack.end() - (redos - 1));
+         gPatchStatus = "History: deleted " + std::to_string(redos == 1 ? 1 : redos) + " undone state" + (redos == 1 ? "" : "s");
+         return true;
+      }
+      if (undos < 0 || (size_t)undos + 1 > gUndoStack.size())
+         return false;
+      for (int i = 0; i <= undos && !gUndoStack.empty(); i++)
+         Undo();
+      gRedoStack.clear();
+      gPatchStatus = "History: deleted " + std::to_string(undos + 1) + " state" + (undos == 0 ? "" : "s");
+      return true;
+   }
+
+
    void JumpInHistory(int undos, int redos)
    {
       for (int i = 0; i < undos && !gUndoStack.empty(); i++)

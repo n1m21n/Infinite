@@ -41,6 +41,7 @@ namespace AiSelect
          std::shared_ptr<const Picture> queued;
          uint64_t queuedKey = 0;
          Tracking::OrtModel* depth = nullptr;
+         Tracking::OrtModel* inpaint = nullptr;
          std::shared_ptr<const Picture> depthQueued;
          uint64_t depthQueuedKey = 0, depthKey = 0;
          int depthW = 0, depthH = 0;
@@ -488,14 +489,15 @@ namespace AiSelect
       (void)nowSeconds;
       State& s = S();
       std::unique_lock<std::mutex> lk(s.m, std::try_to_lock);
-      if (!lk.owns_lock() || s.running || s.queued || s.depthQueued || (!s.enc && !s.dec && !s.depth && s.cache.empty()))
+      if (!lk.owns_lock() || s.running || s.queued || s.depthQueued || (!s.enc && !s.dec && !s.depth && !s.inpaint && s.cache.empty()))
          return;
       if (Now() - s.lastUse.load() < kIdleUnload)
          return;
       s.rt.CloseModel(s.enc);
       s.rt.CloseModel(s.dec);
       s.rt.CloseModel(s.depth);
-      s.enc = s.dec = s.depth = nullptr;
+      s.rt.CloseModel(s.inpaint);
+      s.enc = s.dec = s.depth = s.inpaint = nullptr;
       s.cache.clear();
    }
 
@@ -510,7 +512,8 @@ namespace AiSelect
       s.rt.CloseModel(s.enc);
       s.rt.CloseModel(s.dec);
       s.rt.CloseModel(s.depth);
-      s.enc = s.dec = s.depth = nullptr;
+      s.rt.CloseModel(s.inpaint);
+      s.enc = s.dec = s.depth = s.inpaint = nullptr;
       s.cache.clear();
       s.depthMap.clear();
       s.depthKey = 0;
@@ -567,6 +570,97 @@ namespace AiSelect
       s.depthW = pic.w;
       s.depthH = pic.h;
       s.lastUse = Now();
+      return true;
+   }
+
+   // ---- Inpainting ----
+
+   namespace
+   {
+      const char* kInpaintModel = "/models/migan_pipeline_v2.onnx";
+
+      // The runtime: the inpaint pack's own, else the select pack's (one library per process either way).
+      std::string InpaintRuntime()
+      {
+         const std::string own = Extensions::PackDir("inpaint");
+         if (!own.empty() && Exists(Tracking::OrtRuntime::PackLibraryPath(own)))
+            return Tracking::OrtRuntime::PackLibraryPath(own);
+         const std::string sel = Extensions::PackDir("select");
+         if (!sel.empty() && Exists(Tracking::OrtRuntime::PackLibraryPath(sel)))
+            return Tracking::OrtRuntime::PackLibraryPath(sel);
+         return std::string();
+      }
+   }
+
+   std::string InpaintMissing()
+   {
+      const std::string dir = Extensions::PackDir("inpaint");
+      if (dir.empty())
+         return "Install the Inpaint pack in Settings > Extensions";
+      if (!Exists(dir + kInpaintModel))
+         return "The Inpaint pack is missing its model: reinstall it";
+      if (InpaintRuntime().empty())
+         return "The Inpaint pack is missing its runtime: reinstall it";
+      return std::string();
+   }
+
+   bool InpaintAvailable() { return InpaintMissing().empty(); }
+
+   bool InpaintNow(const std::vector<uint8_t>& rgba, const std::vector<uint8_t>& mask, int w, int h, std::vector<uint8_t>& out,
+                   std::string& err)
+   {
+      if (w < 2 || h < 2 || rgba.size() < (size_t)w * h * 4 || mask.size() < (size_t)w * h)
+      {
+         err = "empty picture";
+         return false;
+      }
+      const std::string why = InpaintMissing();
+      if (!why.empty())
+      {
+         err = why;
+         return false;
+      }
+      const size_t plane = (size_t)w * h;
+      std::vector<uint8_t> chw(plane * 3), m1(plane);
+      for (size_t i = 0; i < plane; i++)
+      {
+         for (int k = 0; k < 3; k++)
+            chw[k * plane + i] = rgba[i * 4 + k];
+         m1[i] = mask[i] > 127 ? 255 : 0;   // MI-GAN: 255 = the hole
+      }
+      State& s = S();
+      std::lock_guard<std::mutex> lk(s.m);
+      s.lastUse = Now();
+      if (!s.inpaint)
+      {
+         if (!s.rt.Load(InpaintRuntime(), err))
+            return false;
+         bool gpu = false;
+         if (!(s.inpaint = s.rt.OpenModel(Extensions::PackDir("inpaint") + kInpaintModel, false, gpu, err)))
+            return false;
+      }
+      using In = Tracking::OrtRuntime::Input;
+      std::vector<In> ins(2);
+      ins[0].name = "image";
+      ins[0].shape = { 1, 3, h, w };
+      ins[0].u8 = chw.data();
+      ins[1].name = "mask";
+      ins[1].shape = { 1, 1, h, w };
+      ins[1].u8 = m1.data();
+      std::vector<Tracking::OrtRuntime::Tensor> outs;
+      if (!s.rt.RunNamed(s.inpaint, ins, outs, err))
+         return false;
+      if (outs.empty() || outs[0].data.size() != plane * 3)
+      {
+         err = "unexpected inpaint output";
+         return false;
+      }
+      out = rgba;
+      out.resize(plane * 4);
+      for (size_t i = 0; i < plane; i++)
+         if (m1[i] != 0)
+            for (int k = 0; k < 3; k++)
+               out[i * 4 + k] = (uint8_t)std::clamp(outs[0].data[k * plane + i], 0.0f, 255.0f);
       return true;
    }
 }

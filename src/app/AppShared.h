@@ -5956,6 +5956,7 @@ void JumpInHistory(int undos, int redos);
 // History panel > Clear History: every undo and redo step is set aside behind one "Clear History" step. Undo brings
 // them all back; the patch, its saved/unsaved state and the 2D snapshots are untouched.
 void ClearHistory();
+bool DeleteHistoryState(int undos, int redos);   // the state and every later one; 0,0 = the current state
 extern bool gHistoryOpen;
 extern float gHistoryWidth;
 void DrawHistoryDocked(const char* id, const ImVec2& size);

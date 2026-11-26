@@ -239,7 +239,10 @@ namespace Tracking
          size_t count = 1;
          for (int64_t d : in.shape) count *= static_cast<size_t>(d);
          OrtValue* v = nullptr;
-         OrtStatus* st = in.i64
+         OrtStatus* st = in.u8
+            ? api->CreateTensorWithDataAsOrtValue(mi, const_cast<uint8_t*>(in.u8), count, in.shape.data(), in.shape.size(),
+                                                  ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8, &v)
+            : in.i64
             ? api->CreateTensorWithDataAsOrtValue(mi, const_cast<int64_t*>(in.i64), count * sizeof(int64_t),
                                                   in.shape.data(), in.shape.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, &v)
             : api->CreateTensorWithDataAsOrtValue(mi, const_cast<float*>(in.f32), count * sizeof(float),
@@ -285,6 +288,8 @@ namespace Tracking
                const uint16_t* h = static_cast<const uint16_t*>(p);
                for (size_t k = 0; k < n; ++k) outs[i].data[k] = HalfToFloat(h[k]);
             }
+            else if (p && ty == ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8)
+               outs[i].data.assign(static_cast<uint8_t*>(p), static_cast<uint8_t*>(p) + n);
             api->ReleaseTensorTypeAndShapeInfo(info);
          }
          api->ReleaseValue(res[i]);

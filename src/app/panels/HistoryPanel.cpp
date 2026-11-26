@@ -33,13 +33,20 @@ namespace
    }
 
    // One row: returns true when clicked. `dim` for undone entries, `current` for the state the document is in.
-   bool Row(const char* id, const std::string& text, bool current, bool dim, float rowH)
+   // `del`, when given, gets a right-click Delete: the row's state and every later one go.
+   bool Row(const char* id, const std::string& text, bool current, bool dim, float rowH, bool* del = nullptr)
    {
       const float w = std::max(1.0f, Ui::AvailW());
       const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::PushID(id);
       const bool clicked = UiInteract::Hit("##row", ImVec2(w, rowH));
       const bool hovered = ImGui::IsItemHovered();
+      if (del != nullptr && MenuParts::BeginContextItem("##rowmenu"))
+      {
+         if (MenuParts::DangerItem(T("Delete")))
+            *del = true;
+         MenuParts::EndPopup();
+      }
       ImGui::PopID();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       if (current)
@@ -100,15 +107,21 @@ namespace
             if (row < nRedo)
             {
                const size_t j = nRedo - 1 - row; // 0 = nearest to the present
-               if (Row(("r" + std::to_string(row)).c_str(), RedoLabelAt(j), false, true, rowH))
+               bool del = false;
+               if (Row(("r" + std::to_string(row)).c_str(), RedoLabelAt(j), false, true, rowH, &del))
                   JumpInHistory(0, (int)j + 1);
+               if (del)
+                  DeleteHistoryState(0, (int)j + 1);
             }
             else if (row < nRedo + nUndo)
             {
                const size_t i = row - nRedo; // 0 = the edit the document is in
                const std::string text = (i == 0) ? TopLabel() : UndoLabelAt(i);
-               if (Row(("u" + std::to_string(i)).c_str(), text, i == 0, false, rowH) && i > 0)
+               bool del = false;
+               if (Row(("u" + std::to_string(i)).c_str(), text, i == 0, false, rowH, &del) && i > 0)
                   JumpInHistory((int)i, 0);
+               if (del)
+                  DeleteHistoryState((int)i, 0);
             }
             else
             {

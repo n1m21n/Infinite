@@ -2492,6 +2492,22 @@ void RunHistoryTest()
                                                                           FindNodeByIndex(shapeIdx)->node->bypassed == bypassBefore);
    }
 
+   // Delete a history state: it and every later state go (linear history).
+   {
+      Undo();
+      Undo();
+      const size_t u = gUndoStack.size();
+      const std::string nearRedo = RedoLabelAt(0), top = UndoLabelAt(0);
+      Check("deleting an undone state keeps the nearer ones and the document",
+            DeleteHistoryState(0, 2) && gUndoStack.size() == u && gRedoStack.size() == 1 && RedoLabelAt(0) == nearRedo && UndoLabelAt(0) == top);
+      const std::string before = UndoLabelAt(1);
+      Check("delete current state steps back and drops it",
+            DeleteHistoryState(0, 0) && gUndoStack.size() == u - 1 && gRedoStack.empty() && UndoLabelAt(0) == before);
+      Check("delete an earlier state drops it and every later one",
+            DeleteHistoryState(1, 0) && gUndoStack.size() == u - 3 && gRedoStack.empty());
+      Check("deleting a state that is not there is refused", !DeleteHistoryState(99, 0) && !DeleteHistoryState(0, 99));
+   }
+
    // Save with media keeps the live session: undo depth, routing mode and node paths repointed in place.
    {
       namespace fs = std::filesystem;

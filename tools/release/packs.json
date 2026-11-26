@@ -2,5 +2,9 @@
   "tracking": {
     "name": "Tracking",
     "purpose": "Hand, face and pose tracking from camera or image input"
+  },
+  "inpaint": {
+    "name": "Inpaint (MI-GAN)",
+    "purpose": "AI fill for the 2D Remove tool. MIT weights trained on Places2, a research and education dataset"
   }
 }

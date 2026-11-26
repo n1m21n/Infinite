@@ -40,7 +40,7 @@ namespace Tracking
                std::vector<Tensor>& outs, std::vector<std::string>& outNames, std::string& err);
 
       // Named inputs, float or int64; outputs come back as float in model
-      // output order (float16 outputs are widened). Used by the selection
+      // output order (float16 and uint8 outputs are widened). Used by the selection
       // models, whose decoders take several inputs.
       struct Input
       {
@@ -48,6 +48,7 @@ namespace Tracking
          std::vector<int64_t> shape;
          const float* f32 = nullptr;   // one of f32 / i64
          const int64_t* i64 = nullptr;
+         const uint8_t* u8 = nullptr;  // image models that take 8-bit pixels (MI-GAN)
       };
       bool RunNamed(OrtModel* m, const std::vector<Input>& ins, std::vector<Tensor>& outs, std::string& err);
       // Input names of a model, in order.
