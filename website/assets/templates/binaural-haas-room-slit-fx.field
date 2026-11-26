@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Binaural Haas Room Slit FX",
+    "author": "Infinite",
+    "description": "Architectural concrete slit-aperture spatializer using micro-delayed allpass early reflections, air-absorption damping, and warm saturation.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float aperture = 0.52 [0.1, 0.88];\nparam float airHz = 4200.0 [900.0, 8000.0];\nparam float feedback = 0.44 [0.0, 0.75];\nparam float drive = 1.35 [0.8, 2.8];\nparam float mix = 0.64 [0.0, 1.0];\nstate float ap1 = 0; state float ap2 = 0;\nstate float lp1 = 0; state float fb = 0;\n\nsrc = in + fb * feedback;\ny1 = -aperture * src + ap1; ap1 = src + aperture * y1;\ny2 = -(aperture * 0.72) * y1 + ap2; ap2 = y1 + (aperture * 0.72) * y2;\n\ng = clamp(2.0 * sin(3.14159265 * airHz / sr), 0.05, 0.88);\nlp1 = lp1 + g * (y2 - lp1);\n\ndrv = lp1 * drive;\nsat = drv / (1.0 + abs(drv));\nfb = sat;\n\nout = (in * (1.0 - mix) + sat * mix) * 0.40;\n",
+    "params": {
+      "aperture": 0.52,
+      "airHz": 4200.0,
+      "feedback": 0.44,
+      "drive": 1.35,
+      "mix": 0.64
+    }
+  }
+}

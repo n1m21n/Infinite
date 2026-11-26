@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Sho Mouth Organ Cluster Synth",
+    "author": "Infinite",
+    "description": "Gagaku free-reed harmonic cluster synthesizer with beating detuned fifths, slow breath-swell envelope, and warm reed-pipe formant filtering.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float detune = 0.0045 [0.0005, 0.02];\nparam float fifthMix = 0.58 [0.0, 1.0];\nparam float reedBright = 2400.0 [600.0, 6000.0];\nparam float swell = 0.025 [0.005, 0.25];\nparam float decay = 0.9994 [0.996, 0.9997];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0; state float p4 = 0;\nstate float env = 0; state float lp1 = 0; state float lp2 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * swell, env * decay);\n\nf0 = clamp(freq, 65.0, 2200.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + (f0 * (1.0 + detune)) / sr) % 1.0;\np3 = (p3 + (f0 * 1.498) / sr) % 1.0;\np4 = (p4 + (f0 * 2.002) / sr) % 1.0;\n\n# Free-reed odd+even harmonic pair\nr1 = sin(6.2831853 * p1) + 0.35 * sin(6.2831853 * p1 * 3.0);\nr2 = sin(6.2831853 * p2) + 0.30 * sin(6.2831853 * p2 * 2.0);\nr3 = sin(6.2831853 * p3) * fifthMix;\nr4 = sin(6.2831853 * p4) * 0.42;\n\ncluster = (r1 * 0.36 + r2 * 0.34 + r3 * 0.28 + r4 * 0.24) * env;\n\ng = clamp(2.0 * sin(3.14159265 * reedBright / sr), 0.04, 0.85);\nlp1 = lp1 + g * (cluster - lp1);\nlp2 = lp2 + g * (lp1 - lp2);\n\ndrv = lp2 * 1.4;\nout = (drv / (1.0 + abs(drv))) * 0.72;\n",
+    "params": {
+      "detune": 0.0045,
+      "fifthMix": 0.58,
+      "reedBright": 2400.0,
+      "swell": 0.025,
+      "decay": 0.9994
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

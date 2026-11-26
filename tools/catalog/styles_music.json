@@ -5677,6 +5677,211 @@
         "gain": -11.0
       },
       "groove": 0.25
+    },
+    {
+      "id": "shakuhachi_bamboo_breath",
+      "family": "ambient",
+      "bpm": [
+        64,
+        88
+      ],
+      "swing": 0.0,
+      "scale": [
+        9,
+        10
+      ],
+      "drums": {},
+      "bass": "0...............",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Distortion"
+      ],
+      "glitch": 0.0,
+      "mod": 0.28,
+      "refs": [
+        "Shakuhachi end-blown bamboo flute jet-edge breath noise & overblown octave chiff"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 30.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.35,
+        "octave": 3,
+        "gate": 75,
+        "gain": -10.0
+      },
+      "groove": 0.2
+    },
+    {
+      "id": "sho_mouth_organ_cluster",
+      "family": "ambient",
+      "bpm": [
+        60,
+        80
+      ],
+      "swing": 0.0,
+      "scale": [
+        0,
+        6
+      ],
+      "drums": {},
+      "bass": "0.......7.......",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.22,
+      "refs": [
+        "Gagaku Sho free-reed bamboo pipe aitake harmonic clusters with beating fifths"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 40.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.25,
+        "octave": 3,
+        "gate": 90,
+        "gain": -11.0
+      },
+      "groove": 0.15
+    },
+    {
+      "id": "solenoid_spring_resonator",
+      "family": "experimental",
+      "bpm": [
+        96,
+        120
+      ],
+      "swing": 0.04,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {},
+      "bass": "0...3...5...7...",
+      "fx": [
+        "Field Effect",
+        "Delay"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.05,
+      "mod": 0.42,
+      "refs": [
+        "Electro-mechanical solenoid spring-coil dispersion & metallic allpass-comb chime"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 12.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.45,
+        "octave": 3,
+        "gate": 45,
+        "gain": -9.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "binaural_haas_room_slit",
+      "family": "ambient",
+      "bpm": [
+        80,
+        108
+      ],
+      "swing": 0.02,
+      "scale": [
+        1,
+        6
+      ],
+      "drums": {},
+      "bass": "0.......5.......",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Architectural concrete slit-aperture Haas early reflections & air-absorption damping"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 18.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.3,
+        "octave": 3,
+        "gate": 70,
+        "gain": -10.0
+      },
+      "groove": 0.25
     }
   ]
 }

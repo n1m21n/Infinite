@@ -3202,6 +3202,127 @@
         "Conformal Poincare disk {4,3,3} hyperbolic circle-inversion tiling",
         "Steps Mono (Velvetyne) mathematical plate captions"
       ]
+    },
+    {
+      "id": "karesansui_zen_contours",
+      "taxonomy": "new",
+      "name": "Karesansui Raked Gravel & Moss Islands",
+      "palette": [
+        "#D8D4C9",
+        "#585D2A",
+        "#968166",
+        "#232320"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.14,
+      "pairs": [
+        "shakuhachi_bamboo_breath"
+      ],
+      "refs": [
+        "Ryoan-ji Kyoto dry garden raked limestone gravel contours and moss-rimmed rock islands",
+        "Steps Mono (Velvetyne) & Fragment Mono (Uncut) quiet architectural index type"
+      ]
+    },
+    {
+      "id": "brutalist_waffle_coffers",
+      "taxonomy": "new",
+      "name": "Brutalist Coffered Waffle Vaults",
+      "palette": [
+        "#B8B3A8",
+        "#6E6A61",
+        "#262421",
+        "#F2EFE9"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [
+        "bloom"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "kaleidoscope"
+      ],
+      "motion": 0.18,
+      "pairs": [
+        "binaural_haas_room_slit"
+      ],
+      "refs": [
+        "National Theatre Terrace & Regenstein Library cantilevered concrete waffle-slab coffers",
+        "Sligoil (Velvetyne) & Azeret Mono (Fontshare) structural grid typography"
+      ]
+    },
+    {
+      "id": "eliasson_sodium_monofrequency",
+      "taxonomy": "new",
+      "name": "Eliasson Monofrequency Sodium Chamber",
+      "palette": [
+        "#FFCC00",
+        "#E86A00",
+        "#6B1D00",
+        "#120602"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "bloom",
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "pixelate",
+        "invert"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "sho_mouth_organ_cluster"
+      ],
+      "refs": [
+        "Olafur Eliasson Tate Modern Weather Project monofrequency sodium-vapor disc & mirror ceiling",
+        "Azeret Mono (Fontshare) & Fragment Mono (Uncut) atmospheric exhibition labels"
+      ]
+    },
+    {
+      "id": "soto_kinetic_penetrable",
+      "taxonomy": "new",
+      "name": "Soto Kinetic Penetrable Moire",
+      "palette": [
+        "#163C6E",
+        "#EEF1FA",
+        "#0A1426",
+        "#7AA6D6"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "solenoid_spring_resonator"
+      ],
+      "refs": [
+        "Jesus Rafael Soto suspended vertical rod array optical parallax and kinetic moire interference",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) kinetic exhibition typography"
+      ]
     }
   ]
 }

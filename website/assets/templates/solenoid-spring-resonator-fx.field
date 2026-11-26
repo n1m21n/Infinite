@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Solenoid Spring Resonator FX",
+    "author": "Infinite",
+    "description": "Electro-mechanical spring-coil dispersion effect with staggered allpass tanks, resonant metallic chime feedback, and gentle saturation.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float tension = 0.64 [0.15, 0.92];\nparam float lfoHz = 1.15 [0.1, 5.0];\nparam float feedback = 0.56 [0.0, 0.82];\nparam float dampHz = 3100.0 [700.0, 7500.0];\nparam float mix = 0.68 [0.0, 1.0];\nstate float lfo = 0; state float ap1 = 0; state float ap2 = 0; state float ap3 = 0;\nstate float lp1 = 0; state float fb = 0;\n\nlfo = (lfo + lfoHz / sr) % 1.0;\nc1 = clamp(tension + sin(6.2831853 * lfo) * 0.14, 0.08, 0.90);\nc2 = clamp(tension * 0.85 - cos(6.2831853 * lfo) * 0.12, 0.08, 0.90);\n\nsrc = in + fb * feedback;\ny1 = -c1 * src + ap1; ap1 = src + c1 * y1;\ny2 = -c2 * y1 + ap2; ap2 = y1 + c2 * y2;\ny3 = -0.68 * y2 + ap3; ap3 = y2 + 0.68 * y3;\n\ng = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (y3 - lp1);\ndrv = lp1 * 1.25;\nfb = drv / (1.0 + abs(drv));\n\nout = (in * (1.0 - mix) + fb * mix) * 0.78;\n",
+    "params": {
+      "tension": 0.64,
+      "lfoHz": 1.15,
+      "feedback": 0.56,
+      "dampHz": 3100.0,
+      "mix": 0.68
+    }
+  }
+}

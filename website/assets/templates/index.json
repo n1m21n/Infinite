@@ -4198,7 +4198,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "shakuhachi-bamboo-breath-synth",
+      "name": "Shakuhachi Bamboo Breath Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "End-blown bamboo flute model combining deterministic jet-edge breath noise, phase-modulated bore resonance, overblown octave chiff, and soft saturation.",
+      "price": 0,
+      "preview": "assets/templates/shakuhachi-bamboo-breath-synth.webp",
+      "file": "assets/templates/shakuhachi-bamboo-breath-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "sho-mouth-organ-cluster-synth",
+      "name": "Sho Mouth Organ Cluster Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Gagaku free-reed harmonic cluster synthesizer with beating detuned fifths, slow breath-swell envelope, and warm reed-pipe formant filtering.",
+      "price": 0,
+      "preview": "assets/templates/sho-mouth-organ-cluster-synth.webp",
+      "file": "assets/templates/sho-mouth-organ-cluster-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "solenoid-spring-resonator-fx",
+      "name": "Solenoid Spring Resonator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Electro-mechanical spring-coil dispersion effect with staggered allpass tanks, resonant metallic chime feedback, and gentle saturation.",
+      "price": 0,
+      "preview": "assets/templates/solenoid-spring-resonator-fx.webp",
+      "file": "assets/templates/solenoid-spring-resonator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "binaural-haas-room-slit-fx",
+      "name": "Binaural Haas Room Slit FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Architectural concrete slit-aperture spatializer using micro-delayed allpass early reflections, air-absorption damping, and warm saturation.",
+      "price": 0,
+      "preview": "assets/templates/binaural-haas-room-slit-fx.webp",
+      "file": "assets/templates/binaural-haas-room-slit-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 256
+  "count": 260
 }

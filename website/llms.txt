@@ -413,6 +413,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Modal Marimba Bar Synth](https://infinitedevices.org/library/modal-marimba-bar-synth.html): Euler-Bernoulli stiff-bar modal resonator bank with inharmonic bar modes, cosine mallet strike transient, and wooden resonator body. (file: https://infinitedevices.org/assets/templates/modal-marimba-bar-synth.inf)
 - [Studer Tape Head Bump FX](https://infinitedevices.org/library/studer-tape-head-bump-fx.html): Analog reel-to-reel tape path with low-frequency head-bump resonance, asymmetric hysteresis saturation, and subtle wow/flutter allpass drift. (file: https://infinitedevices.org/assets/templates/studer-tape-head-bump-fx.inf)
 - [Granular Pitch Cloud FX](https://infinitedevices.org/library/granular-pitch-cloud-fx.html): Dual-window Hann-enveloped granular micro-delay cloud with modulated allpass pitch drift, resonant feedback diffusion, and warm damping. (file: https://infinitedevices.org/assets/templates/granular-pitch-cloud-fx.inf)
+- [Shakuhachi Bamboo Breath Synth](https://infinitedevices.org/library/shakuhachi-bamboo-breath-synth.html): End-blown bamboo flute model combining deterministic jet-edge breath noise, phase-modulated bore resonance, overblown octave chiff, and soft saturation. (file: https://infinitedevices.org/assets/templates/shakuhachi-bamboo-breath-synth.inf)
+- [Sho Mouth Organ Cluster Synth](https://infinitedevices.org/library/sho-mouth-organ-cluster-synth.html): Gagaku free-reed harmonic cluster synthesizer with beating detuned fifths, slow breath-swell envelope, and warm reed-pipe formant filtering. (file: https://infinitedevices.org/assets/templates/sho-mouth-organ-cluster-synth.inf)
+- [Solenoid Spring Resonator FX](https://infinitedevices.org/library/solenoid-spring-resonator-fx.html): Electro-mechanical spring-coil dispersion effect with staggered allpass tanks, resonant metallic chime feedback, and gentle saturation. (file: https://infinitedevices.org/assets/templates/solenoid-spring-resonator-fx.inf)
+- [Binaural Haas Room Slit FX](https://infinitedevices.org/library/binaural-haas-room-slit-fx.html): Architectural concrete slit-aperture spatializer using micro-delayed allpass early reflections, air-absorption damping, and warm saturation. (file: https://infinitedevices.org/assets/templates/binaural-haas-room-slit-fx.inf)
 
 ## Library: Community
 
@@ -836,7 +840,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 157 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 159 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -853,4 +857,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 142 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 144 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

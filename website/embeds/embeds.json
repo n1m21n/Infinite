@@ -785,6 +785,16 @@
       "slug": "max-bill-mobius-raymarch",
       "title": "Max Bill Mobius Raymarch",
       "description": "Raymarched Max Bill Endless Loop granite sculpture. Bass pulses the ribbon thickness, mids twist the torsion, highs catch the bronze rim."
+    },
+    {
+      "slug": "eliasson-sodium-fog-orb",
+      "title": "Eliasson Sodium Fog Orb",
+      "description": "Audio-reactive monofrequency sodium-vapor light chamber inspired by Olafur Eliasson."
+    },
+    {
+      "slug": "soto-kinetic-penetrable-moire",
+      "title": "Soto Kinetic Penetrable Moire",
+      "description": "Audio-reactive kinetic rod-array moire interference inspired by Jesus Rafael Soto."
     }
   ]
 }

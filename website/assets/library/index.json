@@ -14055,7 +14055,223 @@
       "file": "assets/library/pixel/max-bill-mobius-raymarch.field",
       "preview": "assets/library/previews/max-bill-mobius-raymarch.jpg",
       "bytes": 2322
+    },
+    {
+      "id": "karesansui-raked-contours",
+      "name": "Karesansui Raked Contours",
+      "kind": "Generator",
+      "tags": [
+        "karesansui",
+        "zen",
+        "contours",
+        "minimal",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Kyoto dry-garden raked limestone gravel lines deflecting smoothly around moss-rimmed basalt islands with fine mineral grain.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/karesansui-raked-contours.js",
+      "preview": "assets/library/previews/karesansui-raked-contours.jpg",
+      "bytes": 3866
+    },
+    {
+      "id": "karesansui-moss-archipelago",
+      "name": "Karesansui Moss Archipelago",
+      "kind": "Generator",
+      "tags": [
+        "karesansui",
+        "archipelago",
+        "zen",
+        "waves",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Asymmetric Kyoto rock-island archipelago with harmonic concentric rake waves, lichen-olive moss beds, and timber frame lines.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/karesansui-moss-archipelago.js",
+      "preview": "assets/library/previews/karesansui-moss-archipelago.jpg",
+      "bytes": 2786
+    },
+    {
+      "id": "national-theatre-waffle-vault-3d",
+      "name": "National Theatre Waffle Vault 3D",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "waffle-slab",
+        "architecture",
+        "concrete",
+        "3d",
+        "sketch"
+      ],
+      "description": "Cantilevered brutalist concrete waffle-slab ceiling with deep pyramidal coffer recesses, diagonal ribs, and architectural shadow rhythm.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 3,
+      "file": "assets/library/sketch/national-theatre-waffle-vault-3d.js",
+      "preview": "assets/library/previews/national-theatre-waffle-vault-3d.jpg",
+      "bytes": 1589
+    },
+    {
+      "id": "regenstein-coffered-atrium-3d",
+      "name": "Regenstein Coffered Atrium 3D",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "coffered",
+        "atrium",
+        "light-baffle",
+        "3d",
+        "sketch"
+      ],
+      "description": "Monumental brutalist coffered concrete atrium bays with suspended linear light-baffle frames and deep rhythmic shadow bays.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 3,
+      "file": "assets/library/sketch/regenstein-coffered-atrium-3d.js",
+      "preview": "assets/library/previews/regenstein-coffered-atrium-3d.jpg",
+      "bytes": 1367
+    },
+    {
+      "id": "shakuhachi-bamboo-breath-synth",
+      "name": "Shakuhachi Bamboo Breath Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "shakuhachi",
+        "sho",
+        "bamboo",
+        "reed",
+        "audio",
+        "dsp"
+      ],
+      "description": "End-blown bamboo flute model combining deterministic jet-edge breath noise, phase-modulated bore resonance, overblown octave chiff, and soft saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/shakuhachi-bamboo-breath-synth.inf",
+      "preview": "assets/library/previews/shakuhachi-bamboo-breath-synth.jpg",
+      "bytes": 2157
+    },
+    {
+      "id": "sho-mouth-organ-cluster-synth",
+      "name": "Sho Mouth Organ Cluster Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "shakuhachi",
+        "sho",
+        "bamboo",
+        "reed",
+        "audio",
+        "dsp"
+      ],
+      "description": "Gagaku free-reed harmonic cluster synthesizer with beating detuned fifths, slow breath-swell envelope, and warm reed-pipe formant filtering.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/sho-mouth-organ-cluster-synth.inf",
+      "preview": "assets/library/previews/sho-mouth-organ-cluster-synth.jpg",
+      "bytes": 2196
+    },
+    {
+      "id": "solenoid-spring-resonator-fx",
+      "name": "Solenoid Spring Resonator FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "spring",
+        "haas",
+        "dispersion",
+        "spatial",
+        "audio",
+        "dsp"
+      ],
+      "description": "Electro-mechanical spring-coil dispersion effect with staggered allpass tanks, resonant metallic chime feedback, and gentle saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/solenoid-spring-resonator-fx.inf",
+      "preview": "assets/library/previews/solenoid-spring-resonator-fx.jpg",
+      "bytes": 1989
+    },
+    {
+      "id": "binaural-haas-room-slit-fx",
+      "name": "Binaural Haas Room Slit FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "spring",
+        "haas",
+        "dispersion",
+        "spatial",
+        "audio",
+        "dsp"
+      ],
+      "description": "Architectural concrete slit-aperture spatializer using micro-delayed allpass early reflections, air-absorption damping, and warm saturation.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/binaural-haas-room-slit-fx.inf",
+      "preview": "assets/library/previews/binaural-haas-room-slit-fx.jpg",
+      "bytes": 1788
+    },
+    {
+      "id": "eliasson-sodium-fog-orb",
+      "name": "Eliasson Sodium Fog Orb",
+      "kind": "Generator",
+      "tags": [
+        "eliasson",
+        "sodium",
+        "atmosphere",
+        "light",
+        "shader",
+        "pixel",
+        "audioreactive"
+      ],
+      "description": "Monofrequency sodium-vapor atmospheric light chamber with mirrored horizon reflection, drifting volumetric mist, and audio-reactive solar corona.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 3,
+      "file": "assets/library/pixel/eliasson-sodium-fog-orb.field",
+      "preview": "assets/library/previews/eliasson-sodium-fog-orb.jpg",
+      "bytes": 1461
+    },
+    {
+      "id": "soto-kinetic-penetrable-moire",
+      "name": "Soto Kinetic Penetrable Moire",
+      "kind": "Generator",
+      "tags": [
+        "soto",
+        "kinetic",
+        "moire",
+        "op-art",
+        "parallax",
+        "pixel",
+        "audioreactive"
+      ],
+      "description": "Suspended vertical rod array creating optical moire parallax and shimmering cobalt-ivory interference bands driven by kinetic wave phase.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 3,
+      "file": "assets/library/pixel/soto-kinetic-penetrable-moire.field",
+      "preview": "assets/library/previews/soto-kinetic-penetrable-moire.jpg",
+      "bytes": 1302
     }
   ],
-  "count": 679
+  "count": 689
 }
