@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 1009,
+ "count": 1021,
  "items": [
   {
    "id": "first-sound",
@@ -3187,6 +3187,45 @@
    "preview": "https://infinitedevices.org/assets/templates/bode-frequency-shifter-fx.webp",
    "sample": "",
    "page": "https://infinitedevices.org/library/bode-frequency-shifter-fx.html"
+  },
+  {
+   "id": "clavinet-d6-pickup-synth",
+   "name": "Clavinet D6 Pickup Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/clavinet-d6-pickup-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/clavinet-d6-pickup-synth.webp",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/clavinet-d6-pickup-synth.html"
+  },
+  {
+   "id": "bowed-bar-marimba-synth",
+   "name": "Bowed Bar Marimba Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/bowed-bar-marimba-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/bowed-bar-marimba-synth.webp",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/bowed-bar-marimba-synth.html"
+  },
+  {
+   "id": "wavefolder-tape-saturator-fx",
+   "name": "Wavefolder Tape Saturator FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/wavefolder-tape-saturator-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/wavefolder-tape-saturator-fx.webp",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/wavefolder-tape-saturator-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -13119,6 +13158,123 @@
    "preview": "https://infinitedevices.org/assets/library/previews/voronoi-basalt-fracture.jpg",
    "sample": "",
    "page": "https://infinitedevices.org/library/voronoi-basalt-fracture.html"
+  },
+  {
+   "id": "penrose-ammann-rhombi",
+   "name": "Penrose Ammann Rhombi",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Aperiodic P3 Penrose rhombus tessellation deflated from a tenfold sun wheel with weathered granite tones, ember star cores, and continuous Ammann ribbon arcs.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/penrose-ammann-rhombi.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/penrose-ammann-rhombi.jpg",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/penrose-ammann-rhombi.html"
+  },
+  {
+   "id": "albers-chromatic-nesting",
+   "name": "Albers Chromatic Nesting",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Four-plate Homage to the Square color-interaction study with asymmetrical bottom-weighted nested planes, brushed frames, and subtle temporal luminance drift.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/albers-chromatic-nesting.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/albers-chromatic-nesting.jpg",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/albers-chromatic-nesting.html"
+  },
+  {
+   "id": "muqarnas-corbel-vault-3d",
+   "name": "Muqarnas Corbel Vault 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Tiered eightfold Islamic muqarnas honeycomb vault with stepped cobalt, turquoise, sandstone, and ochre-gold corbel niches rising toward a central oculus.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/muqarnas-corbel-vault-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/muqarnas-corbel-vault-3d.jpg",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/muqarnas-corbel-vault-3d.html"
+  },
+  {
+   "id": "frei-otto-tensile-mast-3d",
+   "name": "Frei Otto Tensile Mast 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Cable-net saddle pavilion inspired by Frei Otto with tilted anodized steel masts, ember tension collars, and intersecting hyperbolic-paraboloid aluminum ribs.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/frei-otto-tensile-mast-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/frei-otto-tensile-mast-3d.jpg",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/frei-otto-tensile-mast-3d.html"
+  },
+  {
+   "id": "clavinet-d6-pickup-synth",
+   "name": "Clavinet D6 Pickup Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/clavinet-d6-pickup-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/clavinet-d6-pickup-synth.jpg",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/clavinet-d6-pickup-synth.html"
+  },
+  {
+   "id": "bowed-bar-marimba-synth",
+   "name": "Bowed Bar Marimba Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/bowed-bar-marimba-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/bowed-bar-marimba-synth.jpg",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/bowed-bar-marimba-synth.html"
+  },
+  {
+   "id": "wavefolder-tape-saturator-fx",
+   "name": "Wavefolder Tape Saturator FX",
+   "category": "Audio effects",
+   "type": "Generator",
+   "description": "Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/wavefolder-tape-saturator-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/wavefolder-tape-saturator-fx.jpg",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/wavefolder-tape-saturator-fx.html"
+  },
+  {
+   "id": "faraday-standing-waves",
+   "name": "Faraday Standing Waves",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Subharmonic Faraday standing-wave interference lattice inside a circular fluid dish with champagne meniscus highlights and warm taupe troughs.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/faraday-standing-waves.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/faraday-standing-waves.jpg",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/faraday-standing-waves.html"
+  },
+  {
+   "id": "voronoi-basalt-caustics",
+   "name": "Voronoi Basalt Caustics",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Hexagonal columnar basalt fracture cells with refracted prismatic water caustics and slate-mineral bevels.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/voronoi-basalt-caustics.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/voronoi-basalt-caustics.jpg",
+   "sample": "",
+   "page": "https://infinitedevices.org/library/voronoi-basalt-caustics.html"
   }
  ]
 }

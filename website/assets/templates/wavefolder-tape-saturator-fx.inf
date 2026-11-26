@@ -1,0 +1,77 @@
+infinite-patch 1
+# Wavefolder Tape Saturator FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 45
+  i note1 48
+  i note2 52
+  i note3 57
+  i note4 52
+  i note5 48
+  i note6 45
+  i note7 47
+  i note8 50
+  i note9 55
+  i note10 59
+  i note11 62
+  i note12 59
+  i note13 55
+  i note14 50
+  i note15 47
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 360 1024
+  f cutoff 2400.0
+  f resonance 0.25
+  f decay 0.45
+  f volume 0.85
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 720 1024
+  s code param float foldDrive = 2.4 [1.0, 6.0];\nparam float biasSym = 0.24 [0.0, 0.6];\nparam float tapeWarmth = 2800.0 [700.0, 7500.0];\nparam float sag = 0.35 [0.0, 0.8];\nparam float mix = 0.72 [0.0, 1.0];\nstate float env = 0; state float lp1 = 0; state float dc = 0;\n\nenv = env * 0.996 + abs(in) * 0.004;\ndynDrive = foldDrive / (1.0 + env * sag * 2.2);\n\npre = in * dynDrive + biasSym;\nfolded = sin(pre * 1.45) * 0.65 + (pre / (1.0 + abs(pre) * 0.85)) * 0.45;\ndc = dc * 0.998 + folded * 0.002;\ncleanFold = folded - dc;\n\ng = clamp(2.0 * sin(3.14159265 * tapeWarmth / sr), 0.04, 0.85);\nlp1 = lp1 + g * (cleanFold - lp1);\n\nout = (in * (1.0 - mix) + lp1 * mix) * 0.66;\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1080 1024
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.28 0.22 0.16
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Wavefolder Tape Saturator FX. Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+cable out 0 pic

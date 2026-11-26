@@ -402,6 +402,9 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Polivoks Dual Op-Amp Synth](https://infinitedevices.org/library/polivoks-dual-opamp-synth.html): Detuned dual-oscillator saw/pulse synth with Soviet op-amp resonant state-variable filter sweep, wavefolder grit, and sub-octave drive. (file: https://infinitedevices.org/assets/templates/polivoks-dual-opamp-synth.inf)
 - [Dub Tape Dispersion FX](https://infinitedevices.org/library/dub-tape-dispersion-fx.html): Asymmetric tape-saturated dub resonator with capstan wow drift, 4-stage allpass phase dispersion, and damped bandpass feedback. (file: https://infinitedevices.org/assets/templates/dub-tape-dispersion-fx.inf)
 - [Bode Frequency Shifter FX](https://infinitedevices.org/library/bode-frequency-shifter-fx.html): Single-sideband Hilbert quadrature frequency shifter with dual allpass phase-splitting network, carrier detune, and metallic feedback. (file: https://infinitedevices.org/assets/templates/bode-frequency-shifter-fx.inf)
+- [Clavinet D6 Pickup Synth](https://infinitedevices.org/library/clavinet-d6-pickup-synth.html): Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit. (file: https://infinitedevices.org/assets/templates/clavinet-d6-pickup-synth.inf)
+- [Bowed Bar Marimba Synth](https://infinitedevices.org/library/bowed-bar-marimba-synth.html): Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter. (file: https://infinitedevices.org/assets/templates/bowed-bar-marimba-synth.inf)
+- [Wavefolder Tape Saturator FX](https://infinitedevices.org/library/wavefolder-tape-saturator-fx.html): Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag. (file: https://infinitedevices.org/assets/templates/wavefolder-tape-saturator-fx.inf)
 
 ## Library: Community
 
@@ -668,6 +671,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Ebru Battal Marbling](https://infinitedevices.org/library/ebru-battal-marbling.html): Traditional Turkish Battal Ebru paper marbling with domain-warped pigment droplets in terracotta, cadmium yellow, cerulean, and carbon ink veins. (file: https://infinitedevices.org/assets/library/pixel/ebru-battal-marbling.field)
 - [Phosphor Lissajous Scope](https://infinitedevices.org/library/phosphor-lissajous-scope.html): Tektronix P31 phosphor CRT oscilloscope tracing harmonic Lissajous knots with exponential beam bloom, graticule ticks, and CRT glass vignette. (file: https://infinitedevices.org/assets/library/pixel/phosphor-lissajous-scope.field)
 - [Voronoi Basalt Fracture](https://infinitedevices.org/library/voronoi-basalt-fracture.html): Polygonal Voronoi columnar basalt fracture field with faceted stone bevels, mineral shadow relief, and glowing ember fissure seams. (file: https://infinitedevices.org/assets/library/pixel/voronoi-basalt-fracture.field)
+- [Faraday Standing Waves](https://infinitedevices.org/library/faraday-standing-waves.html): Subharmonic Faraday standing-wave interference lattice inside a circular fluid dish with champagne meniscus highlights and warm taupe troughs. (file: https://infinitedevices.org/assets/library/pixel/faraday-standing-waves.field)
+- [Voronoi Basalt Caustics](https://infinitedevices.org/library/voronoi-basalt-caustics.html): Hexagonal columnar basalt fracture cells with refracted prismatic water caustics and slate-mineral bevels. (file: https://infinitedevices.org/assets/library/pixel/voronoi-basalt-caustics.field)
 
 ## Library: Sketch
 
@@ -803,6 +808,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Molnar Concentric Quadrics](https://infinitedevices.org/library/molnar-concentric-quadrics.html): Nested perturbed plotter squares and trapezoidal quadrics across a seven-by-seven archival grid with controlled stochastic corner displacement. (file: https://infinitedevices.org/assets/library/sketch/molnar-concentric-quadrics.js)
 - [Ukiyo-e Contour Archipelago](https://infinitedevices.org/library/ukiyoe-contour-archipelago.html): Edo-period woodblock bathymetric archipelago with Prussian-blue contour rings, celadon coastal shoals, compass rhumb lines, and a vermilion hanko cartouche. (file: https://infinitedevices.org/assets/library/sketch/ukiyoe-contour-archipelago.js)
 - [Ukiyo-e Seigaiha Tide Chart](https://infinitedevices.org/library/ukiyoe-seigaiha-tide-chart.html): Layered Japanese seigaiha wave fans modulated by tidal harmonic interference on aged washi paper with Prussian-blue, celadon, and ochre woodblock inks. (file: https://infinitedevices.org/assets/library/sketch/ukiyoe-seigaiha-tide-chart.js)
+- [Penrose Ammann Rhombi](https://infinitedevices.org/library/penrose-ammann-rhombi.html): Aperiodic P3 Penrose rhombus tessellation deflated from a tenfold sun wheel with weathered granite tones, ember star cores, and continuous Ammann ribbon arcs. (file: https://infinitedevices.org/assets/library/sketch/penrose-ammann-rhombi.js)
+- [Albers Chromatic Nesting](https://infinitedevices.org/library/albers-chromatic-nesting.html): Four-plate Homage to the Square color-interaction study with asymmetrical bottom-weighted nested planes, brushed frames, and subtle temporal luminance drift. (file: https://infinitedevices.org/assets/library/sketch/albers-chromatic-nesting.js)
 
 ## Library: Sketch 3D
 
@@ -933,6 +940,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Ito Taichung Catenoid Vault 3D](https://infinitedevices.org/library/ito-taichung-catenoid-vault-3d.html): Parametric acoustic sound-cave inspired by Toyo Ito's National Taichung Theater, built from undulating catenoid arch rings and cellular ribs. (file: https://infinitedevices.org/assets/library/sketch/ito-taichung-catenoid-vault-3d.js)
 - [Anechoic Wedge Chamber 3D](https://infinitedevices.org/library/anechoic-wedge-chamber-3d.html): Orthogonal acoustic anechoic chamber with alternating pyramidal absorption wedges, suspended calibration walkway, and sodium-amber datum frame. (file: https://infinitedevices.org/assets/library/sketch/anechoic-wedge-chamber-3d.js)
 - [Brutalist Coffered Oculus 3D](https://infinitedevices.org/library/brutalist-coffered-oculus-3d.html): Monumental radial coffered concrete vault ribs converging toward a stepped oculus with recessed acoustic bays and a warm sodium-amber light ring. (file: https://infinitedevices.org/assets/library/sketch/brutalist-coffered-oculus-3d.js)
+- [Muqarnas Corbel Vault 3D](https://infinitedevices.org/library/muqarnas-corbel-vault-3d.html): Tiered eightfold Islamic muqarnas honeycomb vault with stepped cobalt, turquoise, sandstone, and ochre-gold corbel niches rising toward a central oculus. (file: https://infinitedevices.org/assets/library/sketch/muqarnas-corbel-vault-3d.js)
+- [Frei Otto Tensile Mast 3D](https://infinitedevices.org/library/frei-otto-tensile-mast-3d.html): Cable-net saddle pavilion inspired by Frei Otto with tilted anodized steel masts, ember tension collars, and intersecting hyperbolic-paraboloid aluminum ribs. (file: https://infinitedevices.org/assets/library/sketch/frei-otto-tensile-mast-3d.js)
 
 ## Library: Synths
 
@@ -1063,6 +1072,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Hammond Tonewheel Organ Synth](https://infinitedevices.org/library/hammond-tonewheel-organ-synth.html): Electromagnetic 9-drawbar tonewheel organ with harmonic key-click transient, 3rd harmonic percussion decay, and warm tube-preamp saturation. (file: https://infinitedevices.org/assets/templates/hammond-tonewheel-organ-synth.inf)
 - [Modal Vibraphone Mallet Synth](https://infinitedevices.org/library/modal-vibraphone-mallet-synth.html): Struck modal vibraphone resonator with inharmonic bar overtones (1:3.99:9.96), mallet hardness transient, and motor-driven tremolo. (file: https://infinitedevices.org/assets/templates/modal-vibraphone-mallet-synth.inf)
 - [Polivoks Dual Op-Amp Synth](https://infinitedevices.org/library/polivoks-dual-opamp-synth.html): Detuned dual-oscillator saw/pulse synth with Soviet op-amp resonant state-variable filter sweep, wavefolder grit, and sub-octave drive. (file: https://infinitedevices.org/assets/templates/polivoks-dual-opamp-synth.inf)
+- [Clavinet D6 Pickup Synth](https://infinitedevices.org/library/clavinet-d6-pickup-synth.html): Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit. (file: https://infinitedevices.org/assets/templates/clavinet-d6-pickup-synth.inf)
+- [Bowed Bar Marimba Synth](https://infinitedevices.org/library/bowed-bar-marimba-synth.html): Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter. (file: https://infinitedevices.org/assets/templates/bowed-bar-marimba-synth.inf)
 
 ## Library: Audio Effects
 
@@ -1196,6 +1207,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Shimmer Octave Reverb FX](https://infinitedevices.org/library/shimmer-octave-reverb-fx.html): Cascaded allpass diffusion tank with nonlinear octave-harmonic shimmer feedback and warm high-frequency damping. (file: https://infinitedevices.org/assets/templates/shimmer-octave-reverb-fx.inf)
 - [Dub Tape Dispersion FX](https://infinitedevices.org/library/dub-tape-dispersion-fx.html): Asymmetric tape-saturated dub resonator with capstan wow drift, 4-stage allpass phase dispersion, and damped bandpass feedback. (file: https://infinitedevices.org/assets/templates/dub-tape-dispersion-fx.inf)
 - [Bode Frequency Shifter FX](https://infinitedevices.org/library/bode-frequency-shifter-fx.html): Single-sideband Hilbert quadrature frequency shifter with dual allpass phase-splitting network, carrier detune, and metallic feedback. (file: https://infinitedevices.org/assets/templates/bode-frequency-shifter-fx.inf)
+- [Wavefolder Tape Saturator FX](https://infinitedevices.org/library/wavefolder-tape-saturator-fx.html): Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag. (file: https://infinitedevices.org/assets/templates/wavefolder-tape-saturator-fx.inf)
 
 ## Nodes
 
@@ -1572,7 +1584,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 151 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 153 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1724,3 +1736,5 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Ebru Battal Marbling](https://infinitedevices.org/embeds/ebru-battal-marbling.html): Turkish Battal Ebru floating pigment marbling. Bass swells the pigment cells, mids drive combed fluid advection, highs crisp the carbon ink veins.
 - [Phosphor Lissajous Scope](https://infinitedevices.org/embeds/phosphor-lissajous-scope.html): Tektronix P31 phosphor CRT oscilloscope Lissajous trace. Bass drives harmonic knot scale, mids modulate phase ratio, highs sharpen phosphor beam bloom.
 - [Voronoi Basalt Fracture](https://infinitedevices.org/embeds/voronoi-basalt-fracture.html): Polygonal Voronoi columnar basalt fracture field. Bass pulses tectonic elevation, mids shift mineral lighting angle, highs ignite ember fissure seams.
+- [Faraday Standing Waves](https://infinitedevices.org/embeds/faraday-standing-waves.html): Audio-reactive Faraday standing-wave fluid lattice. Bass drives harmonic wave amplitude, mids shift symmetry, highs sharpen meniscus speculars.
+- [Voronoi Basalt Caustics](https://infinitedevices.org/embeds/voronoi-basalt-caustics.html): Audio-reactive columnar basalt fracture cells with refracted water caustics. Bass pulses cell relief, mids warp caustics, highs brighten edge glint.

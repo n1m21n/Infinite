@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Faraday Standing Waves",
+    "author": "Infinite",
+    "description": "Subharmonic Faraday standing-wave interference lattice inside a circular fluid dish with champagne meniscus highlights and warm taupe troughs.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float freqMode = 16.0 [6.0, 28.0];\nparam float symmetry = 6.0 [3.0, 10.0];\nparam float meniscus = 0.72 [0.2, 1.0];\nparam float damping = 0.35 [0.0, 1.0];\nparam float speed = 0.85 [0.1, 2.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\nang = atan2(p.y, p.x);\n\n# Circular Petri dish boundary & rim meniscus\ndish = smoothstep(0.46, 0.435, r);\nrim = smoothstep(0.455, 0.442, r) * smoothstep(0.425, 0.440, r);\n\n# Superposed standing plane waves (Faraday hexagonal/quasicrystal lattice)\nk = freqMode * 3.14159;\nw1 = cos(p.x * k + cos(t * speed)) * cos(p.y * k * 0.866);\nw2 = cos((p.x * 0.5 + p.y * 0.866) * k) * cos((p.x * 0.5 - p.y * 0.866) * k + sin(t * speed * 0.7));\nw3 = cos(r * k * 1.35 - t * speed * 1.5) * cos(ang * 6.0);\nwsum = (w1 * 0.45 + w2 * 0.40 + w3 * 0.30) * exp(-r * damping * 1.2);\n\nridge = smoothstep(-0.22, 0.38, wsum);\nsp = clamp(wsum * 0.85 + 0.48, 0.0, 1.0);\nspec = sp * sp * sp * sp * (0.4 + meniscus * 0.8);\n\ncTrough = vec3(0.145, 0.122, 0.102);\ncTaupe = vec3(0.545, 0.471, 0.404);\ncChampagne = vec3(0.957, 0.922, 0.863);\ncTable = vec3(0.275, 0.231, 0.192);\n\nfluid = mix(cTrough, cTaupe, ridge);\nfluid = mix(fluid, cChampagne, clamp(spec, 0.0, 1.0));\ncol = mix(cTable * (0.85 - r * 0.35), fluid, dish);\ncol = mix(col, cChampagne, rim * 0.75);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "freqMode": 16.0,
+      "symmetry": 6.0,
+      "meniscus": 0.72,
+      "damping": 0.35,
+      "speed": 0.85
+    }
+  }
+}

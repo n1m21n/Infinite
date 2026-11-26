@@ -2849,6 +2849,67 @@
         "Devils Postpile hexagonal columnar basalt jointing & glowing mineral seams",
         "Terminal Grotesque (Velvetyne) & Azeret Mono (Fontshare) geological type"
       ]
+    },
+    {
+      "id": "faraday_standing_waves",
+      "taxonomy": "new",
+      "name": "Faraday Standing-Wave Hydrodynamics",
+      "palette": [
+        "#1E1915",
+        "#5C4F44",
+        "#B8A48E",
+        "#F2E9DA"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [
+        "vignette"
+      ],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.4,
+      "pairs": [
+        "minimal_techno",
+        "ambient"
+      ],
+      "refs": [
+        "Michael Faraday (1831) subharmonic standing-wave lattices in vertically vibrated fluid",
+        "Steps Mono (Velvetyne) & Azeret Mono (Fontshare) hydrodynamic lab type"
+      ]
+    },
+    {
+      "id": "albers_color_interaction",
+      "taxonomy": "new",
+      "name": "Albers Interaction of Color",
+      "palette": [
+        "#115E4B",
+        "#C86D1F",
+        "#0D4A8C",
+        "#8C2816"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "bloom",
+        "pixelate"
+      ],
+      "motion": 0.1,
+      "pairs": [
+        "ambient_piano",
+        "minimal_techno"
+      ],
+      "refs": [
+        "Josef Albers Homage to the Square (1950-1976) asymmetrical nested chromatic planes",
+        "Cabinet Grotesk (Fontshare) & Fragment Mono (Uncut) Bauhaus gallery type"
+      ]
     }
   ]
 }

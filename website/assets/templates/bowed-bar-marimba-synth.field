@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Bowed Bar Marimba Synth",
+    "author": "Infinite",
+    "description": "Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float malletHard = 0.65 [0.1, 1.0];\nparam float bowMix = 0.42 [0.0, 1.0];\nparam float tremHz = 4.2 [0.5, 10.0];\nparam float spread = 0.18 [0.0, 0.5];\nparam float decay = 0.9994 [0.997, 0.9998];\nstate float p1 = 0; state float p2 = 0; state float p3 = 0; state float lfo = 0;\nstate float env = 0; state float bow = 0; state float mal = 1.0; state float lp1 = 0;\n\nenv = if(gate > 0.5, env + (1.0 - env) * 0.20, env * decay);\nbow = if(gate > 0.5, bow + (1.0 - bow) * 0.004, bow * 0.9992);\nmal = if(gate > 0.5, mal * 0.985, 1.0);\nlfo = (lfo + tremHz / sr) % 1.0;\n\nf0 = clamp(freq, 65.0, 2800.0);\np1 = (p1 + f0 / sr) % 1.0;\np2 = (p2 + f0 * (3.98 + spread * 0.12) / sr) % 1.0;\np3 = (p3 + f0 * 9.78 / sr) % 1.0;\n\nsig = (sin(6.2831853 * p1) * (env + bow * bowMix * 0.7) + sin(6.2831853 * p2) * malletHard * 0.55 * mal + sin(6.2831853 * p3) * malletHard * 0.2 * mal) * (0.78 + 0.22 * sin(6.2831853 * lfo));\nlp1 = lp1 + 0.18 * (sig - lp1);\nout = ((sig * 0.55 + lp1 * 0.55) / (1.0 + abs(sig) * 0.45)) * 0.25;\n",
+    "params": {
+      "malletHard": 0.65,
+      "bowMix": 0.42,
+      "tremHz": 4.2,
+      "spread": 0.18,
+      "decay": 0.9994
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

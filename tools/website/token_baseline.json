@@ -664,6 +664,14 @@
   "embeds/voronoi-basalt-fracture.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/faraday-standing-waves.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/voronoi-basalt-caustics.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

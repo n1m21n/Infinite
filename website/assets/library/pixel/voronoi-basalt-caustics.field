@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Voronoi Basalt Caustics",
+    "author": "Infinite",
+    "description": "Hexagonal columnar basalt fracture cells with refracted prismatic water caustics and slate-mineral bevels.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float scale = 5.5 [3.0, 10.0];\nparam float bevel = 0.14 [0.03, 0.35];\nparam float caustic = 0.85 [0.2, 1.0];\nparam float drift = 0.22 [0.0, 0.8];\nparam float contrast = 0.85 [0.3, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * scale;\n# Hexagonal columnar basalt lattice (3-axis projection)\nq = vec2(p.x * 1.1547, p.y + p.x * 0.57735);\nip = floor(q);\nfp = fract(q) - 0.5;\nh = fract(sin(ip.x * 127.1 + ip.y * 311.7) * 43758.5453);\n\n# Hexagonal cell distance to column wall\nax = abs(fp.x);\nay = abs(fp.y);\nhexD = max(ax, ay * 0.5 + ax * 0.866025);\nseam = smoothstep(0.49, 0.49 - bevel, hexD);\nrim = smoothstep(0.44, 0.48, hexD) * smoothstep(0.51, 0.48, hexD);\n\n# Refracted water caustics across basalt tops\nw1 = sin(p.x * 4.2 + sin(p.y * 3.1 + t * drift * 3.0) + h * 3.14);\nw2 = cos(p.y * 4.8 - sin(p.x * 3.5 - t * drift * 2.5));\ncw = clamp(0.5 + 0.5 * (w1 * 0.55 + w2 * 0.45), 0.0, 1.0);\ncaus = cw * cw * cw * caustic;\n\ncBasalt = vec3(0.065, 0.082, 0.105);\ncSlate = vec3(0.165, 0.220, 0.275) * (0.70 + 0.55 * h);\ncCaustic = vec3(0.580, 0.820, 0.925);\ncRim = vec3(0.894, 0.937, 0.961);\n\ncol = mix(cBasalt, cSlate, seam);\ncol = col + cCaustic * caus * seam * contrast;\ncol = mix(col, cRim, rim * (0.45 + 0.35 * sin(h * 12.0 + t)));\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "scale": 5.5,
+      "bevel": 0.12,
+      "caustic": 0.78,
+      "drift": 0.22,
+      "contrast": 0.82
+    }
+  }
+}

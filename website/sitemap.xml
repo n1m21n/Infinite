@@ -221,6 +221,8 @@
   <url><loc>https://infinitedevices.org/embeds/ebru-battal-marbling.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/phosphor-lissajous-scope.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/voronoi-basalt-fracture.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/faraday-standing-waves.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/voronoi-basalt-caustics.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-26</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-26</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/releases.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
@@ -487,6 +489,9 @@
   <url><loc>https://infinitedevices.org/library/polivoks-dual-opamp-synth.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/dub-tape-dispersion-fx.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bode-frequency-shifter-fx.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/clavinet-d6-pickup-synth.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bowed-bar-marimba-synth.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/wavefolder-tape-saturator-fx.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
@@ -1021,6 +1026,12 @@
   <url><loc>https://infinitedevices.org/library/brutalist-coffered-oculus-3d.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/phosphor-lissajous-scope.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/voronoi-basalt-fracture.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/penrose-ammann-rhombi.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/albers-chromatic-nesting.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/muqarnas-corbel-vault-3d.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/frei-otto-tensile-mast-3d.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/faraday-standing-waves.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/voronoi-basalt-caustics.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-26</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/3d-view.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>

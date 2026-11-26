@@ -4017,7 +4017,56 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "clavinet-d6-pickup-synth",
+      "name": "Clavinet D6 Pickup Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit.",
+      "price": 0,
+      "preview": "assets/templates/clavinet-d6-pickup-synth.webp",
+      "file": "assets/templates/clavinet-d6-pickup-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "bowed-bar-marimba-synth",
+      "name": "Bowed Bar Marimba Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter.",
+      "price": 0,
+      "preview": "assets/templates/bowed-bar-marimba-synth.webp",
+      "file": "assets/templates/bowed-bar-marimba-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "wavefolder-tape-saturator-fx",
+      "name": "Wavefolder Tape Saturator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag.",
+      "price": 0,
+      "preview": "assets/templates/wavefolder-tape-saturator-fx.webp",
+      "file": "assets/templates/wavefolder-tape-saturator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 245
+  "count": 248
 }

@@ -13430,7 +13430,200 @@
       "file": "assets/library/pixel/voronoi-basalt-fracture.field",
       "preview": "assets/library/previews/voronoi-basalt-fracture.jpg",
       "bytes": 4810
+    },
+    {
+      "id": "penrose-ammann-rhombi",
+      "name": "Penrose Ammann Rhombi",
+      "kind": "Generator",
+      "tags": [
+        "penrose",
+        "aperiodic",
+        "tessellation",
+        "quasicrystal",
+        "geometry",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Aperiodic P3 Penrose rhombus tessellation deflated from a tenfold sun wheel with weathered granite tones, ember star cores, and continuous Ammann ribbon arcs.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/penrose-ammann-rhombi.js",
+      "preview": "assets/library/previews/penrose-ammann-rhombi.jpg",
+      "bytes": 3834
+    },
+    {
+      "id": "albers-chromatic-nesting",
+      "name": "Albers Chromatic Nesting",
+      "kind": "Generator",
+      "tags": [
+        "albers",
+        "bauhaus",
+        "color",
+        "square",
+        "minimal",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Four-plate Homage to the Square color-interaction study with asymmetrical bottom-weighted nested planes, brushed frames, and subtle temporal luminance drift.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/albers-chromatic-nesting.js",
+      "preview": "assets/library/previews/albers-chromatic-nesting.jpg",
+      "bytes": 2898
+    },
+    {
+      "id": "muqarnas-corbel-vault-3d",
+      "name": "Muqarnas Corbel Vault 3D",
+      "kind": "Generator",
+      "tags": [
+        "muqarnas",
+        "islamic",
+        "architecture",
+        "vault",
+        "corbel",
+        "procedural",
+        "3d"
+      ],
+      "description": "Tiered eightfold Islamic muqarnas honeycomb vault with stepped cobalt, turquoise, sandstone, and ochre-gold corbel niches rising toward a central oculus.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/muqarnas-corbel-vault-3d.js",
+      "preview": "assets/library/previews/muqarnas-corbel-vault-3d.jpg",
+      "bytes": 1914
+    },
+    {
+      "id": "frei-otto-tensile-mast-3d",
+      "name": "Frei Otto Tensile Mast 3D",
+      "kind": "Generator",
+      "tags": [
+        "frei-otto",
+        "tensile",
+        "pavilion",
+        "architecture",
+        "hyperbolic",
+        "procedural",
+        "3d"
+      ],
+      "description": "Cable-net saddle pavilion inspired by Frei Otto with tilted anodized steel masts, ember tension collars, and intersecting hyperbolic-paraboloid aluminum ribs.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/frei-otto-tensile-mast-3d.js",
+      "preview": "assets/library/previews/frei-otto-tensile-mast-3d.jpg",
+      "bytes": 2410
+    },
+    {
+      "id": "clavinet-d6-pickup-synth",
+      "name": "Clavinet D6 Pickup Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "clavinet",
+        "marimba",
+        "audio",
+        "dsp"
+      ],
+      "description": "Physical-modeled Hohner Clavinet D6 with damped string tangent strike, asymmetric dual-coil magnetic pickup comb filtering, and warm preamp grit.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/clavinet-d6-pickup-synth.inf",
+      "preview": "assets/library/previews/clavinet-d6-pickup-synth.jpg",
+      "bytes": 2192
+    },
+    {
+      "id": "bowed-bar-marimba-synth",
+      "name": "Bowed Bar Marimba Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "clavinet",
+        "marimba",
+        "audio",
+        "dsp"
+      ],
+      "description": "Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/bowed-bar-marimba-synth.inf",
+      "preview": "assets/library/previews/bowed-bar-marimba-synth.jpg",
+      "bytes": 2110
+    },
+    {
+      "id": "wavefolder-tape-saturator-fx",
+      "name": "Wavefolder Tape Saturator FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "hilbert",
+        "wavefolder",
+        "tape",
+        "audio",
+        "dsp"
+      ],
+      "description": "Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/wavefolder-tape-saturator-fx.inf",
+      "preview": "assets/library/previews/wavefolder-tape-saturator-fx.jpg",
+      "bytes": 1881
+    },
+    {
+      "id": "faraday-standing-waves",
+      "name": "Faraday Standing Waves",
+      "kind": "Generator",
+      "tags": [
+        "faraday",
+        "cymatics",
+        "standing-waves",
+        "fluid",
+        "interference",
+        "pixel",
+        "glsl"
+      ],
+      "description": "Subharmonic Faraday standing-wave interference lattice inside a circular fluid dish with champagne meniscus highlights and warm taupe troughs.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/faraday-standing-waves.field",
+      "preview": "assets/library/previews/faraday-standing-waves.jpg",
+      "bytes": 1826
+    },
+    {
+      "id": "voronoi-basalt-caustics",
+      "name": "Voronoi Basalt Caustics",
+      "kind": "Generator",
+      "tags": [
+        "voronoi",
+        "basalt",
+        "caustics",
+        "mineral",
+        "refraction",
+        "pixel",
+        "glsl"
+      ],
+      "description": "Hexagonal columnar basalt fracture cells with refracted prismatic water caustics and slate-mineral bevels.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/voronoi-basalt-caustics.field",
+      "preview": "assets/library/previews/voronoi-basalt-caustics.jpg",
+      "bytes": 1740
     }
   ],
-  "count": 650
+  "count": 659
 }
