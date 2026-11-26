@@ -555,6 +555,14 @@ public:
    bool ApplyPixelMask(int id);
    // Invert with the mask targeted: white becomes black across the whole mask.
    bool InvertPixelMask(int id);
+   // Layer Mask > From Transparency: a paint layer's alpha becomes its mask (times one already there, same size),
+   // over the whole layer box, and its pixels opaque. False: not an unlocked paint layer with pixels.
+   bool MaskFromTransparency(int id);
+   // Layer Mask > Hide Selection: a new mask hiding the selection. False: no selection, or a mask is there already.
+   bool MaskHideSelection(int id);
+   // Mask All Objects: Select Subject's matting, run on a worker, lands in the layer's pixel mask (replacing one)
+   // through AiSelectPoll; the selection is left as it was. False: nothing to read, or a selection run is waiting.
+   bool MaskAllObjects(int id);
    // Mask view (backslash): the layer's pixel mask over the picture as Photoshop's rubylith, document size: clear
    // where the mask shows, half red where it hides. A view only: no pixel changes. 0 = no mask.
    unsigned MaskViewTexture(int id);
@@ -704,6 +712,11 @@ public:
    // a box the thing inside it. The picture is analysed once on a worker (about 1.5 s); until then the prompt waits and
    // AiSelectPoll applies it. Returns 0 when the pack is missing (call SelectObject), 1 applied, 2 waiting.
    int SelectObjectAi(float x0, float y0, float x1, float y1, int op, bool sampleAll, int layerId);
+   // A click without the pack: the shape under it. On a picture with transparency, the connected non-clear pixels
+   // (their alpha kept as soft coverage); where that would be nearly everything, the pixels reached through small
+   // steps between neighbours (a smooth ramp is one object). False when the click is on clear pixels or nothing can be read; the
+   // selection then follows op with an empty region (New clears it, Add keeps it).
+   bool SelectObjectPoint(float x, float y, int op, bool sampleAll, int layerId);
    // Select Subject: the main subject of the picture. The system's matting (Vision on macOS, u2netp elsewhere) finds it
    // on a worker; with the "select" pack SAM then redraws it from its box (sharper edges, COCO median IoU 0.77 -> 0.85),
    // keeping the matting's own mask when the two disagree. False when the picture can't be read.
@@ -723,6 +736,13 @@ public:
    void LiveSelEnd(bool keep);
    // Select and Mask: the kept selection's edge refined against the picture (needs a selection).
    void RefinePreview(const SelectMaths::RefineParams& p);
+   // Select and Mask on a targeted layer mask with no selection: the mask (through its box) is what it refines.
+   bool LiveSelFromMask(int id);
+   // Refine Edge Brush: a dab (document px, top row first) where the edge is redrawn from the picture; erase (Alt)
+   // takes it back. The next RefinePreview shows it.
+   void LiveRefineDab(float x, float y, float r, bool erase);
+   // True once after an object click or Select Subject changed the selection under Select and Mask.
+   bool LiveBaseChanged();
    // Select and Mask's outputs, after LiveSelEnd(true): 1 the layer's pixel mask, 2 a copy of the layer masked by
    // the selection with its edge colours decontaminated by `decon` (0..1). Returns the layer that took it (0 = none).
    int RefineOutput(int output, int layerId, float decon);
@@ -751,7 +771,8 @@ public:
    // or a non-pixel layer; an active group without sampleAll has nothing to read, so a dab is the disc alone.
    bool QuickSelectBegin(bool sampleAll, int layerId);
    void QuickSelectDab(float x, float y, float radius, bool subtract);   // document px, top row first
-   void QuickSelectEnd();
+   // enhanceRadius > 0: Enhance Edge, the stroke's edge refined (Select and Mask's radius and smooth) where it changed.
+   void QuickSelectEnd(float enhanceRadius = 0.0f, float enhanceSmooth = 0.0f);
    // Lens Blur: true once a depth map asked for by a Lens Blur layer has landed (the canvas redraws then).
    bool LensDepthPoll();
    // Forget a Lens Blur layer's depth so the picture below is analysed again (after it changed).
@@ -1258,6 +1279,10 @@ private:
    std::vector<uint8_t> mSel;          // document px, bottom row first, 0..255
    std::vector<uint8_t> mLiveSel, mLivePic;   // a live dialog's selection before it and picture (bottom row first)
    bool mLiveSelAny = false;
+   std::vector<uint8_t> mLiveZone;    // Refine Edge Brush strokes (bottom row first, 0..255)
+   float mLiveZoneR = 0.0f;           // the widest brush that painted it, px
+   bool mLiveRefineOn = false;        // Select and Mask is previewing: CombineSelection edits mLiveSel
+   bool mLiveBaseChanged = false;     // ... and did: the panel redraws the preview
    bool mQuickDisc = false;           // Quick Select has no picture to read: dabs are the disc alone
    std::vector<float> mLiveDepth;     // the live picture's depth (bottom row first), empty until it arrives
    std::vector<float> mLiveFocus;     // Focus Area's sharpness map of the live picture, made for mLiveFocusNoise
@@ -1283,6 +1308,7 @@ private:
    std::shared_ptr<const std::vector<uint8_t>> mSubjectPx;   // the picture it ran on, bottom row first
    bool AiDecodeApply(uint64_t key, int w, int h, const float p[4], bool box, int op, const std::vector<uint8_t>* guide = nullptr);
    bool SubjectLanded();
+   bool AiSelectStep();   // AiSelectPoll before a Mask All Objects run is finished
    // The selection as tile keys, written into the doc text so undo and save carry it ("-" empty, "+" full).
    struct SelStore { std::string name; int w = 0, h = 0; std::vector<std::string> keys; };
    SelStore mSelStore;
@@ -1297,6 +1323,7 @@ private:
    struct SelApron { int x0 = 0, y0 = 0, w = 0, h = 0; std::vector<uint8_t> a; };
    struct ApronStore { int x0 = 0, y0 = 0, w = 0, h = 0; std::vector<std::string> keys; };
    SelApron mSelApron;
+   struct MaskTo { int id = 0; std::vector<uint8_t> sel; bool any = false; SelApron apron; } mMaskTo;   // Mask All Objects: its layer and the selection to put back
    ApronStore mSelApronStore;
    bool ApronMatches() const;
    SelApron ApronOrCanvas() const;           // the apron, or the on-canvas selection as one

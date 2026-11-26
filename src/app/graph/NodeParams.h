@@ -3106,6 +3106,11 @@ namespace params
       constexpr float flow_2_hi = 1.0f;
       constexpr float refine_radius_hi = 250.0f;
       constexpr float refine_radius_lo = 0.0f;
+      constexpr float refine_brush_lo = 1.0f;     // Refine Edge Brush size, px
+      constexpr float refine_brush_hi = 500.0f;
+      constexpr float refine_brush_def = 40.0f;
+      constexpr float enhance_radius = 2.0f;      // Quick Selection's Enhance Edge: a small edge band
+      constexpr float enhance_smooth = 15.0f;
       constexpr float contrast_hi = 100.0f;
       constexpr float contrast_lo = 0.0f;
       constexpr float shift_lo = -100.0f;

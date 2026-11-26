@@ -1096,6 +1096,68 @@ bool Scene2DNode::InvertPixelMask(int id)
    return true;
 }
 
+// Layer > Layer Mask > From Transparency: the layer's alpha moves into its mask (times a mask already there) over the
+// whole layer box, past the canvas edge too, and the pixels become opaque.
+bool Scene2DNode::MaskFromTransparency(int id)
+{
+   SyncSurfaces();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return false;
+   auto pt = mSurfaces.find(id);
+   if (pt == mSurfaces.end() || pt->second.fbo.fbo == 0)
+      return false;
+   const int w = l->pw, h = l->ph;
+   if (l->HasPixelMask() && (l->mw != w || l->mh != h))
+      return false;
+   const bool had = l->HasPixelMask();
+   if (!had)
+   {
+      l->mw = w;
+      l->mh = h;
+      l->mtiles.assign((size_t)Cols(w) * Cols(h), "-");
+      l->pmaskOn = true;
+      Commit();
+      SyncSurfaces();
+      l = FindLayer(id);
+   }
+   auto mt = mMasks.find(id);
+   pt = mSurfaces.find(id);
+   if (l == nullptr || mt == mMasks.end() || mt->second.fbo.fbo == 0 || pt == mSurfaces.end())
+      return false;
+   std::vector<uint8_t> m, px;
+   ReadRect(mt->second.fbo, 0, 0, w, h, m);
+   ReadRect(pt->second.fbo, 0, 0, w, h, px);
+   if (m.size() != (size_t)w * h * 4 || px.size() != m.size())
+      return false;
+   for (size_t i = 0; i < (size_t)w * h; i++)
+   {
+      const uint8_t v = (uint8_t)(had ? (px[i * 4 + 3] * m[i * 4] + 127) / 255 : px[i * 4 + 3]);
+      m[i * 4] = m[i * 4 + 1] = m[i * 4 + 2] = v;
+      m[i * 4 + 3] = 255;
+      px[i * 4 + 3] = 255;
+   }
+   WriteRect(mt->second.fbo, 0, 0, w, h, m.data());
+   WriteRect(pt->second.fbo, 0, 0, w, h, px.data());
+   const int all[4] = { 0, 0, w, h };
+   StoreTiles(mt->second, l->mtiles, all);
+   StoreTiles(pt->second, l->tiles, all);
+   Commit();
+   return true;
+}
+
+// Layer > Layer Mask > Hide Selection: a mask that hides the selected pixels and shows the rest.
+bool Scene2DNode::MaskHideSelection(int id)
+{
+   const Layer* l = FindConst(id);
+   if (!mSelAny || l == nullptr || l->HasPixelMask())
+      return false;
+   InvertSelection();
+   const bool ok = MaskFromSelection(id);
+   InvertSelection();
+   return ok;
+}
+
 // The layer's pixel mask through its box, at document size (bottom row first, 0..255; 0 outside the box).
 bool Scene2DNode::MaskInDoc(int id, std::vector<uint8_t>& out)
 {
@@ -3464,7 +3526,7 @@ bool Scene2DNode::ContentAwarePreview(int id, const CamParams& p, int maxArea, s
       f = (float)std::sqrt(maxArea / big);
       w = std::max(1, (int)std::lround(W * f));
       h = std::max(1, (int)std::lround(H * f));
-      std::vector<uint8_t> s2((size_t)w * h * 4), m2((size_t)w * h);
+      std::vector<uint8_t> s2((size_t)w * h * 4), m2((size_t)w * h), faint((size_t)w * h);
       for (int y = 0; y < h; y++)
          for (int x = 0; x < w; x++)
          {
@@ -3481,7 +3543,12 @@ bool Scene2DNode::ContentAwarePreview(int id, const CamParams& p, int maxArea, s
             for (int c = 0; c < 4; c++)
                s2[((size_t)y * w + x) * 4 + c] = (uint8_t)(acc[c] / n);
             m2[(size_t)y * w + x] = (uint8_t)(acc[4] / n);
+            faint[(size_t)y * w + x] = acc[4] != 0;
          }
+      // A sparse faint selection that averages away entirely keeps every block it touched.
+      if (std::all_of(m2.begin(), m2.end(), [](uint8_t v) { return v == 0; }))
+         for (size_t i = 0; i < m2.size(); i++)
+            m2[i] = faint[i] ? 1 : 0;
       src.swap(s2);
       sel.swap(m2);
       q.dx = p.dx * f;
@@ -3734,6 +3801,19 @@ void Scene2DNode::SelectObject(float x0, float y0, float x1, float y1, int op, b
 
 void Scene2DNode::CombineSelection(const std::vector<uint8_t>& region, int op)
 {
+   if (mLiveRefineOn && mLiveSel.size() == region.size())
+   {
+      // Inside Select and Mask: Object Selection and Select Subject edit the selection the dialog refines.
+      std::swap(mSel, mLiveSel);
+      std::swap(mSelAny, mLiveSelAny);
+      mLiveRefineOn = false;
+      CombineSelection(region, op == kSelNew ? kSelAdd : op);
+      mLiveRefineOn = true;
+      std::swap(mSel, mLiveSel);
+      std::swap(mSelAny, mLiveSelAny);
+      mLiveBaseChanged = true;
+      return;
+   }
    // Add and Subtract act on the canvas and keep what lies past its edge; New and Intersect drop it.
    SelApron keep;
    if ((op == kSelAdd || op == kSelSub) && ApronMatches())
@@ -3780,6 +3860,8 @@ bool Scene2DNode::ReadSelectPicture(bool sampleAll, int layerId, std::vector<uin
    auto it = l != nullptr && l->kind == Kind::Paint ? mSurfaces.find(layerId) : mSurfaces.end();
    if (!sampleAll && it != mSurfaces.end() && l->pw == W && l->ph == H)
       ReadRect(it->second.fbo, 0, 0, W, H, px);
+   else if (!sampleAll && l != nullptr && l->kind == Kind::Paint && it == mSurfaces.end())
+      px.assign((size_t)W * H * 4, 0);   // a pixel layer nothing was painted on yet is clear, not the picture under it
    else if (mOut.fbo != 0 && mOut.w == W && mOut.h == H)
       ReadRect(mOut, 0, 0, W, H, px);
    return px.size() == (size_t)W * H * 4;
@@ -3829,7 +3911,46 @@ bool Scene2DNode::LiveSelBegin(bool sampleAll, int layerId)
    mLiveFocusNoise = -1.0f;
    mLiveSelAny = mSelAny && mSel.size() == (size_t)W * H;
    mLiveSel = mLiveSelAny ? mSel : std::vector<uint8_t>((size_t)W * H, 0);
+   mLiveZone.clear();
+   mLiveZoneR = 0.0f;
+   mLiveRefineOn = mLiveBaseChanged = false;
    return true;
+}
+
+bool Scene2DNode::LiveSelFromMask(int id)
+{
+   std::vector<uint8_t> m;
+   if (mLivePic.empty() || !MaskInDoc(id, m) || m.size() != mLiveSel.size())
+      return false;
+   mLiveSel.swap(m);
+   mLiveSelAny = std::any_of(mLiveSel.begin(), mLiveSel.end(), [](uint8_t v) { return v != 0; });
+   return true;
+}
+
+void Scene2DNode::LiveRefineDab(float x, float y, float r, bool erase)
+{
+   const int W = mDoc.w, H = mDoc.h;
+   if (mLivePic.empty() || r <= 0.0f)
+      return;
+   if (mLiveZone.size() != (size_t)W * H)
+      mLiveZone.assign((size_t)W * H, 0);
+   if (!erase)
+      mLiveZoneR = std::max(mLiveZoneR, r);
+   for (int yy = std::max(0, (int)(y - r - 1)); yy < std::min(H, (int)(y + r + 2)); yy++)
+      for (int xx = std::max(0, (int)(x - r - 1)); xx < std::min(W, (int)(x + r + 2)); xx++)
+      {
+         const float c = std::clamp(r + 0.5f - std::hypot(xx + 0.5f - x, yy + 0.5f - y), 0.0f, 1.0f);
+         uint8_t& z = mLiveZone[(size_t)(H - 1 - yy) * W + xx];
+         const uint8_t v = (uint8_t)std::lround(c * 255.0f);
+         z = erase ? (uint8_t)(z * (255 - v) / 255) : std::max(z, v);
+      }
+}
+
+bool Scene2DNode::LiveBaseChanged()
+{
+   const bool c = mLiveBaseChanged;
+   mLiveBaseChanged = false;
+   return c;
 }
 
 bool Scene2DNode::LivePixel(float x, float y, float rgb[3]) const
@@ -3862,6 +3983,10 @@ void Scene2DNode::LiveSelEnd(bool keep)
    mLiveFocus.clear();
    mLiveFocus.shrink_to_fit();
    mLiveFocusNoise = -1.0f;
+   mLiveZone.clear();
+   mLiveZone.shrink_to_fit();
+   mLiveZoneR = 0.0f;
+   mLiveRefineOn = mLiveBaseChanged = false;
    mSelDirty = true;
    StoreSelection();
 }
@@ -3871,8 +3996,18 @@ void Scene2DNode::RefinePreview(const SelectMaths::RefineParams& p)
    const int W = mDoc.w, H = mDoc.h;
    if (mLivePic.size() != (size_t)W * H * 4 || !mLiveSelAny)
       return;
+   mLiveRefineOn = true;   // object and subject edits now go to the selection under the dialog
    mSel = mLiveSel;
    SelectMaths::Refine(mLivePic.data(), mSel, W, H, p);
+   if (mLiveZone.size() == mSel.size() && mLiveZoneR > 0.0f)
+   {
+      // Refine Edge Brush: where it painted, the edge is redrawn from the picture over the brush's width.
+      std::vector<uint8_t> g = mSel;
+      SelectMaths::GuidedEdge(mLivePic.data(), g, W, H, mLiveZoneR, false);
+      for (size_t i = 0; i < mSel.size(); i++)
+         if (mLiveZone[i] != 0)
+            mSel[i] = (uint8_t)((mSel[i] * (255 - mLiveZone[i]) + g[i] * mLiveZone[i] + 127) / 255);
+   }
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    mSelDirty = true;
 }
@@ -3983,8 +4118,35 @@ void Scene2DNode::QuickSelectDab(float x, float y, float radius, bool subtract)
    mSelDirty = true;
 }
 
-void Scene2DNode::QuickSelectEnd()
+void Scene2DNode::QuickSelectEnd(float enhanceRadius, float enhanceSmooth)
 {
+   const int W = mDoc.w, H = mDoc.h;
+   if (enhanceRadius > 0.0f && !mQuickDisc && mLivePic.size() == (size_t)W * H * 4 && mSel.size() == (size_t)W * H &&
+       mLiveSel.size() == mSel.size())
+   {
+      // Enhance Edge: the stroke's new edge redrawn from the picture and smoothed; the rest of the selection is left.
+      int x0 = W, y0 = H, x1 = -1, y1 = -1;
+      for (int y = 0; y < H; y++)
+         for (int x = 0; x < W; x++)
+            if (mSel[(size_t)y * W + x] != mLiveSel[(size_t)y * W + x])
+            {
+               x0 = std::min(x0, x); x1 = std::max(x1, x);
+               y0 = std::min(y0, y); y1 = std::max(y1, y);
+            }
+      if (x1 >= 0)
+      {
+         const int pad = (int)std::ceil(enhanceRadius + enhanceSmooth) + 2;
+         x0 = std::max(0, x0 - pad); y0 = std::max(0, y0 - pad);
+         x1 = std::min(W - 1, x1 + pad); y1 = std::min(H - 1, y1 + pad);
+         std::vector<uint8_t> r = mSel;
+         SelectMaths::RefineParams p;
+         p.radius = enhanceRadius;
+         p.smooth = enhanceSmooth;
+         SelectMaths::Refine(mLivePic.data(), r, W, H, p);
+         for (int y = y0; y <= y1; y++)
+            std::copy(&r[(size_t)y * W + x0], &r[(size_t)y * W + x1] + 1, &mSel[(size_t)y * W + x0]);
+      }
+   }
    mSelAny = std::any_of(mSel.begin(), mSel.end(), [](uint8_t v) { return v != 0; });
    LiveSelEnd(true);
    mQuickDisc = false;
@@ -4054,6 +4216,65 @@ bool Scene2DNode::SelectColorRange(const std::vector<SelectMaths::Sample>& s, co
       return false;
    ColorRangePreview(s, p, invert, op);
    LiveSelEnd(true);
+   return true;
+}
+
+bool Scene2DNode::SelectObjectPoint(float x, float y, int op, bool sampleAll, int layerId)
+{
+   std::vector<uint8_t> px;
+   if (!ReadSelectPicture(sampleAll, layerId, px))
+      return false;
+   const int W = mDoc.w, H = mDoc.h, cx = (int)std::floor(x), cy = H - 1 - (int)std::floor(y);   // read is bottom row first
+   std::vector<uint8_t> region((size_t)W * H, 0);
+   const bool inside = cx >= 0 && cy >= 0 && cx < W && cy < H;
+   const size_t seed = inside ? (size_t)cy * W + cx : 0;
+   if (!inside || px[seed * 4 + 3] == 0)
+   {
+      CombineSelection(region, op);
+      return false;
+   }
+   // Grows the 4-connected region from the click through the pixels `take` accepts; returns how many it took.
+   std::vector<int> stack;
+   auto flood = [&](auto take) {
+      std::fill(region.begin(), region.end(), 0);
+      stack.assign(1, (int)seed);
+      region[seed] = 1;
+      size_t n = 0;
+      while (!stack.empty())
+      {
+         const int i = stack.back();
+         stack.pop_back();
+         n++;
+         const int ix = i % W, iy = i / W;
+         const int nb[4] = { ix > 0 ? i - 1 : -1, ix < W - 1 ? i + 1 : -1, iy > 0 ? i - W : -1, iy < H - 1 ? i + W : -1 };
+         for (int j : nb)
+            if (j >= 0 && region[j] == 0 && take((size_t)i, (size_t)j))
+            {
+               region[j] = 1;
+               stack.push_back(j);
+            }
+      }
+      return n;
+   };
+   const size_t shape = flood([&](size_t, size_t j) { return px[j * 4 + 3] != 0; });
+   const bool nearlyAll = shape * 10 >= (size_t)W * H * 9;
+   if (!nearlyAll)
+      for (size_t i = 0; i < region.size(); i++)
+         region[i] = region[i] != 0 ? px[i * 4 + 3] : 0;
+   else
+   {
+      // The shape is (nearly) everything: grow through pixels close to their neighbour (alpha counted), so a smooth
+      // ramp is one object and an opaque shape stands out from a faint layer of the same colour.
+      const int step = 12;   // per channel, between neighbours
+      flood([&](size_t i, size_t j) {
+         const uint8_t *a = &px[i * 4], *c = &px[j * 4];
+         return std::abs(c[0] - a[0]) <= step && std::abs(c[1] - a[1]) <= step && std::abs(c[2] - a[2]) <= step &&
+                std::abs(c[3] - a[3]) <= step;
+      });
+      for (uint8_t& v : region)
+         v = v != 0 ? 255 : 0;
+   }
+   CombineSelection(region, op);
    return true;
 }
 
@@ -4175,7 +4396,44 @@ bool Scene2DNode::SubjectLanded()
    return false;
 }
 
+// Layer > Mask All Objects: Select Subject's matting written into the layer's pixel mask; the selection stays as it was.
+bool Scene2DNode::MaskAllObjects(int id)
+{
+   const Layer* l = FindConst(id);
+   if (l == nullptr || l->kind == Kind::Group || AiSelectWaiting())
+      return false;
+   mMaskTo = { id, mSel, mSelAny, mSelApron };
+   if (!SelectSubject(kSelNew, false, id))
+   {
+      mMaskTo.id = 0;
+      return false;
+   }
+   return true;
+}
+
 bool Scene2DNode::AiSelectPoll()
+{
+   const bool landed = AiSelectStep();
+   if (mMaskTo.id == 0 || AiSelectWaiting())
+      return landed;
+   // A Mask All Objects run ended: what it found becomes the mask, and the selection before it comes back.
+   const int id = mMaskTo.id;
+   mMaskTo.id = 0;
+   bool ok = false;
+   if (landed && mSelAny)
+   {
+      RemovePixelMask(id);
+      ok = MaskFromSelection(id);
+   }
+   mSel = std::move(mMaskTo.sel);
+   mSelAny = mMaskTo.any;
+   mSelApron = std::move(mMaskTo.apron);
+   mSelDirty = true;
+   StoreSelection();
+   return ok;
+}
+
+bool Scene2DNode::AiSelectStep()
 {
    if (SubjectLanded())
       return true;

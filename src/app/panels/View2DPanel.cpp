@@ -59,7 +59,9 @@
 #include "stb_image_write.h"
 
 #include <algorithm>
+#include <chrono>
 #include <optional>
+#include <thread>
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
@@ -220,6 +222,7 @@ namespace
    bool sSelBrushSub = false;      // selection brush: takes away (Alt flips it)
    bool sSelBrushSoft = true;      // selection brush: soft edges (off: hard)
    bool sSelBrushEdges = true;     // selection brush: Quick Select, each dab grows to the picture's edges
+   bool sSelBrushEnhance = false;  // Quick Select's Enhance Edge: each stroke's edge refined to the picture
    ImVec2 sQuickLast(0.0f, 0.0f);  // where the last Quick Select dab landed (document px)
    // Remove tool (the J brush): strokes wait here until they are applied, each with its own brush size.
    std::vector<Scene2DNode::RemoveStroke> sRemoveQueue;
@@ -257,6 +260,10 @@ namespace
    bool sRefineDecon = false;
    float sRefineDeconAmt = 1.0f;
    int sRefineOut = 0;                                // 0 selection, 1 layer mask, 2 new layer with mask
+   bool sRefineBrush = false;                         // canvas drags paint the Refine Edge Brush
+   float sRefineBrushSize = params::view2d::refine_brush_def;
+   int sRefineMask = 0;                               // the layer whose mask Select and Mask refines (no selection)
+   ImVec2 sRefineLast;
    SelectMaths::RangeParams sRange;
    bool sRangeInvert = false;
    std::vector<SelectMaths::Sample> sRangeSamples;
@@ -350,7 +357,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, RemoveMask, ApplyMask, InvertMask, AddFxMask, RemoveFxMask, BlurFxMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, MaskFromAlpha, HideSel, MaskObjects, RemoveMask, ApplyMask, InvertMask, AddFxMask, RemoveFxMask, BlurFxMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -7738,6 +7745,7 @@ namespace
    void LiveSelDialogs(Scene2DNode* doc);
    void LiveClose(Scene2DNode* doc, bool keep);
    bool RangeClick(Scene2DNode* doc, ImVec2 at, bool add, bool sub);
+   void LivePreview(Scene2DNode* doc);
    void LiveOpen(Scene2DNode* doc, int which);
    bool V2DepthTick(Scene2DNode* doc);
    void DrawCanvas(Scene2DNode* doc, ImVec2 size)
@@ -7754,6 +7762,11 @@ namespace
       }
       else if (sObjSoftPending && !doc->AiSelectWaiting())
          sObjSoftPending = false;   // the analysis failed or found nothing: nothing to soften
+      if (sLiveDlg == 1 && doc->LiveBaseChanged())
+      {
+         LivePreview(doc);   // an object click or Select Subject inside Select and Mask changed what it refines
+         Touch();
+      }
       if (doc->LensDepthPoll())   // a Lens Blur layer's depth map landed
          Touch();
       if (sLiveDlg == 0 && V2DepthTick(doc))   // an agent's Depth Select whose map was still being made
@@ -7906,6 +7919,9 @@ namespace
                {
                   if (!k->HasPixelMask() && MenuParts::Item(T("Add Layer Mask")))
                      sPending.what = doc->HasSelection() ? Pending::MaskFromSel : Pending::AddMask;
+                  if (!k->HasPixelMask() && doc->HasSelection() && MenuParts::Item(T("Hide Selection"))) sPending.what = Pending::HideSel;
+                  if (k->kind == Kind::Paint && MenuParts::Item(T("Mask from Transparency"))) sPending.what = Pending::MaskFromAlpha;
+                  if (MenuParts::Item(T("Mask All Objects"), nullptr, false, !doc->AiSelectWaiting())) sPending.what = Pending::MaskObjects;
                   if (k->HasPixelMask() && MenuParts::Item(T("Delete Layer Mask"))) sPending.what = Pending::RemoveMask;
                }
                MenuParts::Separator();
@@ -8880,6 +8896,18 @@ namespace
                ZoomAt(doc, std::exp((mouse.x - sOp.start.x) * tok::view2d_exp_reach), sOp.start);
             }
          }
+         else if (sOp.kind == 32)
+         {
+            const float r = sRefineBrushSize * 0.5f, gap = std::max(1.0f, r * 0.5f);
+            const float dx = sMouseDoc.x - sRefineLast.x, dy = sMouseDoc.y - sRefineLast.y, len = std::hypot(dx, dy);
+            for (int k = 1; (float)k * gap <= len; k++)
+            {
+               const float t = (float)k * gap / len;
+               doc->LiveRefineDab(sRefineLast.x + dx * t, sRefineLast.y + dy * t, r, io.KeyAlt);
+            }
+            if (len >= gap)
+               sRefineLast = ImVec2(sRefineLast.x + dx * (std::floor(len / gap) * gap / len), sRefineLast.y + dy * (std::floor(len / gap) * gap / len));
+         }
          else if (sOp.kind == 30)
          {
             if (!sRemoveQueue.empty())
@@ -8976,11 +9004,16 @@ namespace
                EndStroke(doc);
             else if (sOp.kind == 29)
             {
-               doc->QuickSelectEnd();
+               doc->QuickSelectEnd(sSelBrushEnhance ? params::view2d::enhance_radius : 0.0f, params::view2d::enhance_smooth);
                Touch();
             }
             else if (sOp.kind == 30 && sRemoveEach)
                RunRemove(doc);
+            else if (sOp.kind == 32)
+            {
+               LivePreview(doc);   // the brush's edge shows once the stroke ends
+               Touch();
+            }
             else if (sOp.kind == 19 && std::fabs(mouse.x - sOp.start.x) < tok::view2d_canvas_limit_sm)
                ZoomAt(doc, io.KeyAlt ? 0.5f : tok::view2d_zoom_at_ratio, mouse);
             else if (sOp.kind == 5 && sOp.cropHandle == kCropStraightenDrag)
@@ -9019,6 +9052,12 @@ namespace
                   ai = doc->SelectObjectAi(sOp.docStart.x, sOp.docStart.y, ex, ey, sOp.selOp, sAllLayers, layerId);
                   if (ai == 0 && dragged)
                      doc->SelectObject(sOp.docStart.x, sOp.docStart.y, sMouseDoc.x, sMouseDoc.y, sOp.selOp, sAllLayers, layerId);
+               }
+               else
+               {
+                  // No pack and a click: the shape (or colour patch) under it.
+                  SelStep("Object selection");
+                  ai = doc->SelectObjectPoint(sOp.docStart.x, sOp.docStart.y, sOp.selOp, sAllLayers, layerId) ? 1 : 0;
                }
                sObjSoftPending = sObjSoft && ai == 2;
                if (sObjSoft && ai != 2 && (ai == 1 || dragged))
@@ -9431,6 +9470,24 @@ namespace
       if (keep)
          SelStep(kSteps[std::clamp(which, 1, 4)]);
       doc->LiveSelEnd(keep);
+      const int maskId = which == 1 ? sRefineMask : 0;
+      sRefineMask = 0;
+      if (maskId != 0)
+      {
+         // Refining a layer mask with no selection: the result goes back into that mask, and no selection is left.
+         if (keep)
+            if (const Layer* l = doc->FindLayer(maskId))
+            {
+               const bool on = l->pmaskOn;
+               doc->RemovePixelMask(maskId);
+               doc->MaskFromSelection(maskId);
+               if (Layer* m = doc->FindLayer(maskId))
+                  m->pmaskOn = on;
+            }
+         doc->Deselect();
+         Touch();
+         return;
+      }
       if (keep && which == 1 && sRefineOut != 0)
          if (Layer* al = Active(doc))
             if (const int id = doc->RefineOutput(sRefineOut, al->id, sRefineDecon ? sRefineDeconAmt : 0.0f); id != 0)
@@ -9450,6 +9507,9 @@ namespace
       Layer* al = Active(doc);
       if (!doc->LiveSelBegin(sAllLayers, al != nullptr ? al->id : 0))
          return;
+      sRefineMask = 0;
+      if (which == 1 && !doc->HasSelection() && sEditMask && al != nullptr && al->HasPixelMask() && doc->LiveSelFromMask(al->id))
+         sRefineMask = al->id;
       sLiveDlg = which;
       SettingsWindow::Opens()[kLiveKeys[which]] = true;
       if (which == 2)
@@ -9462,6 +9522,15 @@ namespace
    // Color Range's eyedropper: a canvas click while the dialog samples colours. Shift adds, Alt subtracts.
    bool RangeClick(Scene2DNode* doc, ImVec2 at, bool add, bool sub)
    {
+      if (sLiveDlg == 1 && sRefineBrush)   // Refine Edge Brush: a stroke where the edge is redrawn (Alt takes it back)
+      {
+         doc->LiveRefineDab(at.x, at.y, sRefineBrushSize * 0.5f, sub);
+         sRefineLast = at;
+         sOp = Op();
+         sOp.kind = 32;
+         sOp.docStart = at;
+         return true;
+      }
       if (sLiveDlg == 3)   // Depth: a click picks the depth there; Shift / Alt stretch the range to take it in
       {
          const float d = doc->LiveDepthAt(at.x, at.y);
@@ -9511,6 +9580,15 @@ namespace
       MoreHeader(T("Edge Detection"), true);
       MoreSlider(T("Radius"), &sRefine.radius, params::view2d::refine_radius_lo, params::view2d::refine_radius_hi, "%.0f px");
       MoreCheck(T("Smart Radius"), &sRefine.smart);
+      MoreCheck(T("Refine Edge Brush"), &sRefineBrush);
+      if (sRefineBrush)
+         MoreSlider(T("Brush Size"), &sRefineBrushSize, params::view2d::refine_brush_lo, params::view2d::refine_brush_hi, "%.0f px");
+      PanelKit::GridScope::EndRow();
+      if (TextChip(L("Select Subject##v2drefsubj"), false, T("Adds the main subject to the selection being refined")) && !doc->AiSelectWaiting())
+      {
+         Layer* al = Active(doc);
+         doc->SelectSubject(Scene2DNode::kSelAdd, sAllLayers, al != nullptr ? al->id : 0);
+      }
       MoreHeader(T("Global Refinements"));
       MoreSlider(T("Smooth"), &sRefine.smooth, params::view2d::smooth_lo, params::view2d::smooth_hi, "%.0f");
       MoreSlider(T("Feather"), &sRefine.feather, params::view2d::feather_lo, params::view2d::feather_hi, "%.1f px");
@@ -10267,6 +10345,10 @@ namespace
             if (TextChip(L("Edges##v2dsbedges"), sSelBrushEdges, T("Quick Select: each dab grows to the picture's edges")))
                sSelBrushEdges = !sSelBrushEdges;
             next();
+            if (sSelBrushEdges && TextChip(L("Enhance##v2dsbenh"), sSelBrushEnhance, T("Enhance Edge: each stroke's edge follows the picture, smoother")))
+               sSelBrushEnhance = !sSelBrushEnhance;
+            if (sSelBrushEdges)
+               next();
             if (!sSelBrushEdges && TextChip(L("Soft edges##v2dsbsoft"), sSelBrushSoft, nullptr))
                sSelBrushSoft = !sSelBrushSoft;
             gap();
@@ -12859,6 +12941,9 @@ namespace
                if (!l->HasPixelMask() && MenuParts::Item(T("Add Layer Mask"), nullptr))
                   sPending.what = doc->HasSelection() ? Pending::MaskFromSel : Pending::AddMask;
                if (MenuParts::Item(T("Mask from Selection"), nullptr, false, doc->HasSelection())) sPending.what = Pending::MaskFromSel;
+               if (MenuParts::Item(T("Hide Selection"), nullptr, false, doc->HasSelection() && !l->HasPixelMask())) sPending.what = Pending::HideSel;
+               if (l->kind == Kind::Paint && MenuParts::Item(T("Mask from Transparency"), nullptr)) sPending.what = Pending::MaskFromAlpha;
+               if (MenuParts::Item(T("Mask All Objects"), nullptr, false, !doc->AiSelectWaiting())) sPending.what = Pending::MaskObjects;
                if (l->HasPixelMask() && MenuParts::Item(T("Delete Layer Mask"), nullptr)) sPending.what = Pending::RemoveMask;
                if (!l->hasVMask && MenuParts::Item(T("Add Vector Mask"), nullptr)) sPending.what = Pending::AddVMask;
                if (l->hasVMask)
@@ -16254,6 +16339,51 @@ namespace
             sEditFxMask = false;
          }
          break;
+      case Pending::MaskFromAlpha:
+         if (Layer* a = Active(doc))
+         {
+            const size_t undo0 = gUndoStack.size();
+            PushUndoCheckpoint("Mask from transparency");
+            if (doc->MaskFromTransparency(a->id))
+            {
+               sEditMask = true;
+               sEditFxMask = false;
+            }
+            else
+               gUndoStack.resize(undo0);
+         }
+         break;
+      case Pending::HideSel:
+      {
+         // Every selected layer without a mask gets one hiding the selection, in one undo step.
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint("Hide selection");
+         std::vector<int> ids = sSel;
+         if (ids.empty())
+            if (Layer* a = Active(doc))
+               ids.push_back(a->id);
+         bool any = false;
+         for (int id : ids)
+            any = doc->MaskHideSelection(id) || any;
+         if (any)
+         {
+            doc->Deselect();
+            sEditMask = true;
+            sEditFxMask = false;
+         }
+         else
+            gUndoStack.resize(undo0);
+         break;
+      }
+      case Pending::MaskObjects:
+         if (Layer* a = Active(doc))
+         {
+            const size_t undo0 = gUndoStack.size();
+            PushUndoCheckpoint("Mask all objects");
+            if (!doc->MaskAllObjects(a->id))
+               gUndoStack.resize(undo0);   // the mask lands later, through AiSelectPoll
+         }
+         break;
       case Pending::ApplyMask:
          if (Layer* a = Active(doc))
          {
@@ -17687,7 +17817,11 @@ namespace
             else
                r[0] = r[2] = c["at"][0].get<float>(), r[1] = r[3] = c["at"][1].get<float>();
             if (doc->SelectObjectAi(r[0], r[1], r[2], r[3], sop, all, lid) == 0)
+            {
+               if (r[0] == r[2] && r[1] == r[3])
+                  return doc->SelectObjectPoint(r[0], r[1], sop, all, lid);   // false: clear pixels there
                doc->SelectObject(r[0], r[1], r[2], r[3], sop, all, lid);
+            }
          }
          else if (how == "color_range")
          {
@@ -18772,6 +18906,171 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->SelectColorRange({}, cr, true, Scene2DNode::kSelNew, false, p);
          expect("ai: inverted range stays inside the prior selection", doc->SelectionAt(50, 50) > 0.95f && doc->SelectionAt(125, 150) < 0.05f &&
                                                                        doc->SelectionAt(175, 50) < 0.05f);
+         {
+            // A new range keeps inside the selection; an Add sample reaches past it (PhotoCraft eyedropper rule).
+            SM::RangeParams one;
+            doc->SelectRect(0, 0, 150, (float)H, Scene2DNode::kSelNew, 0, false);
+            doc->SelectColorRange({ k }, one, false, Scene2DNode::kSelAdd, false, p);
+            expect("ai: color range add reaches past the selection", doc->SelectionAt(175, 150) > 0.95f &&
+                                                                     doc->SelectionAt(50, 50) > 0.95f && doc->SelectionAt(175, 50) < 0.05f);
+            // The preset ranges follow the same rule: a new one stays in the selection, an Add reaches the canvas.
+            SM::RangeParams reds;
+            reds.range = SM::Range::Reds;
+            doc->SelectRect(0, 0, 150, (float)H, Scene2DNode::kSelNew, 0, false);
+            doc->SelectColorRange({}, reds, false, Scene2DNode::kSelNew, false, p);
+            const bool scoped = doc->SelectionAt(125, 150) > 0.95f && doc->SelectionAt(175, 150) < 0.05f;
+            doc->SelectRect(0, 0, 50, (float)H, Scene2DNode::kSelNew, 0, false);
+            doc->SelectColorRange({}, reds, false, Scene2DNode::kSelAdd, false, p);
+            expect("ai: a preset range is scoped to the selection, an added one reaches the canvas",
+                   scoped && doc->SelectionAt(175, 150) > 0.95f && doc->SelectionAt(25, 50) > 0.95f && doc->SelectionAt(75, 50) < 0.05f);
+            SM::RangeParams greens;
+            greens.range = SM::Range::Greens;
+            doc->Deselect();
+            doc->SelectColorRange({}, greens, false, Scene2DNode::kSelNew, false, p);
+            expect("ai: the Greens range takes green, not red", doc->SelectionAt(50, 50) > 0.95f && doc->SelectionAt(150, 150) < 0.05f);
+            // Sample All Layers reads the visible picture, not the empty layer on top.
+            const int top = doc->AddPaintLayer();
+            doc->Commit();
+            doc->Deselect();
+            doc->SelectColorRange({ k }, one, false, Scene2DNode::kSelNew, false, top);
+            const float own = doc->SelectionAt(150, 150);
+            doc->Deselect();
+            static int rangeFrame = 7100000;   // Sample All Layers reads the drawn picture: draw it first
+            doc->CookIfNeeded(++rangeFrame);
+            doc->SelectColorRange({ k }, one, false, Scene2DNode::kSelNew, true, top);
+            const float vis = doc->SelectionAt(150, 150);
+            expect("ai: color range samples the visible layers, not the active one", own < 0.05f && vis > 0.95f &&
+                                                                                     doc->SelectionAt(50, 50) < 0.05f);
+            if (!(own < 0.05f && vis > 0.95f))
+               fprintf(stderr, "PROBE range all layers: own %.2f vis %.2f\n", own, vis);
+            doc->RemoveLayer(top);
+            doc->Commit();
+         }
+         {
+            // Object selection by a click, without the select pack (PhotoCraft object_selection_point rows).
+            doc->Deselect();
+            const bool patch = doc->SelectObjectPoint(150, 150, Scene2DNode::kSelNew, false, p);
+            expect("ai: an object click on an opaque picture takes the colour patch", patch && doc->SelectionAt(150, 150) > 0.95f &&
+                                                                                    doc->SelectionAt(50, 50) < 0.05f);
+            const int top = doc->AddPaintLayer();
+            doc->Commit();
+            doc->Deselect();
+            const bool none = doc->SelectObjectPoint(40, 40, Scene2DNode::kSelNew, false, top);
+            expect("ai: an object click on an empty layer finds nothing and says so", !none && !doc->HasSelection());
+            const float blue[3] = { 0, 0, 1 };
+            doc->SelectRect(20, 20, 60, 60, Scene2DNode::kSelNew, 0, false);
+            doc->FillPixels(top, red, 1.0f);
+            doc->SelectRect(120, 20, 160, 60, Scene2DNode::kSelNew, 0, false);
+            doc->FillPixels(top, blue, 1.0f);
+            doc->Commit();
+            doc->Deselect();
+            const bool hit = doc->SelectObjectPoint(40, 40, Scene2DNode::kSelNew, false, top);
+            expect("ai: an object click selects the shape under it, not its neighbour", hit && doc->SelectionAt(30, 30) > 0.95f &&
+                                                                                     doc->SelectionAt(140, 40) < 0.05f && doc->SelectionAt(80, 40) < 0.05f);
+            doc->SelectObjectPoint(140, 40, Scene2DNode::kSelAdd, false, top);
+            const bool both = doc->SelectionAt(30, 30) > 0.95f && doc->SelectionAt(140, 40) > 0.95f;
+            doc->SelectObjectPoint(40, 40, Scene2DNode::kSelSub, false, top);
+            expect("ai: object clicks honour add and subtract", both && doc->SelectionAt(30, 30) < 0.05f && doc->SelectionAt(140, 40) > 0.95f);
+            const bool clear = doc->SelectObjectPoint(90, 40, Scene2DNode::kSelNew, false, top);
+            expect("ai: an object click on transparency selects nothing", !clear && !doc->HasSelection());
+            {
+               // A grey ramp on the clear layer is one object from either end; Sample All Layers finds it too once
+               // the opaque layer under it is hidden; and a solid grey box stands out from a faint grey wash.
+               const float g0[4] = { 0.1f, 0.1f, 0.1f, 1 }, g1[4] = { 0.9f, 0.9f, 0.9f, 1 };
+               doc->SelectRect(20, 100, 180, 140, Scene2DNode::kSelNew, 0, false);
+               doc->Gradient(top, 20, 120, 180, 120, g0, g1, 0);
+               doc->Commit();
+               doc->Deselect();
+               const bool a = doc->SelectObjectPoint(25, 120, Scene2DNode::kSelNew, false, top) && doc->SelectionAt(175, 120) > 0.95f &&
+                              doc->SelectionAt(100, 150) < 0.05f;
+               doc->Deselect();
+               const bool b = doc->SelectObjectPoint(175, 120, Scene2DNode::kSelNew, false, top) && doc->SelectionAt(25, 120) > 0.95f;
+               expect("ai: a grey ramp on a clear layer is found from both ends", a && b);
+               if (Scene2DNode::Layer* pl = doc->FindLayer(p))
+               {
+                  pl->visible = false;
+                  doc->Commit();
+                  static int rampFrame = 7200000;
+                  doc->CookIfNeeded(++rampFrame);
+                  doc->Deselect();
+                  const bool c = doc->SelectObjectPoint(25, 120, Scene2DNode::kSelNew, true, top) && doc->SelectionAt(175, 120) > 0.95f &&
+                                 doc->SelectionAt(100, 150) < 0.05f;
+                  expect("ai: sampling all layers still finds the ramp", c);
+                  if (Scene2DNode::Layer* pl2 = doc->FindLayer(p))
+                     pl2->visible = true;
+                  doc->Commit();
+               }
+               const int wash = doc->AddPaintLayer();
+               const float grey[3] = { 0.5f, 0.5f, 0.5f };
+               doc->SelectAll();
+               doc->FillPixels(wash, grey, 0.3f);
+               doc->SelectRect(60, 60, 100, 100, Scene2DNode::kSelNew, 0, false);
+               doc->FillPixels(wash, grey, 1.0f);
+               doc->Commit();
+               doc->Deselect();
+               const bool d = doc->SelectObjectPoint(80, 80, Scene2DNode::kSelNew, false, wash) && doc->SelectionAt(70, 70) > 0.95f &&
+                              doc->SelectionAt(30, 30) < 0.05f;
+               expect("ai: a solid grey box is found on a faint grey layer", d);
+               // A soft disc: the click keeps its edge soft (Hard Edge off), the middle whole, the outside out.
+               const int disc = doc->AddPaintLayer();
+               const float discRed[3] = { 0.9f, 0.1f, 0.1f };
+               doc->SelectEllipse(130, 20, 190, 80, Scene2DNode::kSelNew, 6.0f, true);
+               doc->FillPixels(disc, discRed, 1.0f);
+               doc->Commit();
+               doc->Deselect();
+               const bool e = doc->SelectObjectPoint(160, 50, Scene2DNode::kSelNew, false, disc);
+               const float mid = doc->SelectionAt(160, 50), out = doc->SelectionAt(160, 95);
+               float rim = 0;
+               for (int x = 160; x < 200; ++x)
+               {
+                  const float v = doc->SelectionAt(x, 50);
+                  if (v > 0.1f && v < 0.9f)
+                     rim = v;
+               }
+               if (!(e && mid > 0.95f && out < 0.05f && rim > 0))
+                  fprintf(stderr, "PROBE disc e=%d mid=%.2f out=%.2f rim=%.2f\n", e, mid, out, rim);
+               expect("ai: an object click on a soft disc keeps its soft edge", e && mid > 0.95f && out < 0.05f && rim > 0);
+               doc->RemoveLayer(disc);
+               doc->Commit();
+               // Select Subject: a centred disc on a plain ground is the subject, the ground is not; with the
+               // selected layer read, and the composite when no pixel layer is picked.
+               const int subj = doc->AddPaintLayer();
+               const float ground[3] = { 0.85f, 0.85f, 0.8f };
+               doc->SelectAll();
+               doc->FillPixels(subj, ground, 1.0f);
+               doc->SelectEllipse(W * 0.35f, H * 0.3f, W * 0.65f, H * 0.7f, Scene2DNode::kSelNew, 0, true);
+               doc->FillPixels(subj, discRed, 1.0f);
+               doc->Commit();
+               doc->Deselect();
+               auto subject = [&](bool all, int layer) {
+                  doc->Deselect();
+                  if (!doc->SelectSubject(Scene2DNode::kSelNew, all, layer))
+                     return -1;
+                  for (int i = 0; i < 300 && doc->AiSelectWaiting(); i++)
+                  {
+                     doc->AiSelectPoll();
+                     std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                  }
+                  doc->AiSelectPoll();
+                  return doc->SelectionAt((int)(W * 0.5f), (int)(H * 0.5f)) > 0.9f && doc->SelectionAt(8, 8) < 0.1f ? 1 : 0;
+               };
+               const int own = subject(false, subj);
+               static int subjFrame = 7300000;
+               doc->CookIfNeeded(++subjFrame);
+               const int comp = subject(false, 0);
+               if (own != 1 || comp != 1)
+                  fprintf(stderr, "PROBE select subject: own %d composite %d\n", own, comp);
+               expect("ai: select subject takes the centred object, not the ground", own == 1);
+               expect("ai: select subject reads the selected layer, else the composite", own == 1 && comp == 1);
+               doc->RemoveLayer(subj);
+               doc->Commit();
+               doc->Deselect();
+               doc->RemoveLayer(wash);
+               doc->Commit();
+            }
+            doc->RemoveLayer(top);
+            doc->Commit();
+         }
          doc->SelectRect(100, 100, 200, 200, Scene2DNode::kSelNew, 4.0f, false);
          const int copy = doc->RefineOutput(2, p, 1.0f);
          const Scene2DNode::Layer* cl = copy != 0 ? doc->FindLayer(copy) : nullptr;
@@ -18941,6 +19240,29 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("parity: a mask view never alters pixels", picture(doc) == before);
          ToggleMaskView(doc);
          expect("parity: backslash again turns the overlay off", sMaskView == 0);
+         {
+            // The view ends with its layer or mask: another layer made active, or the mask gone.
+            ToggleMaskView(doc);
+            const int other = doc->AddPaintLayer();
+            SelectOnly(other);
+            const bool endsWithLayer = MaskViewLayer(doc) == 0;
+            doc->RemoveLayer(other);
+            SelectOnly(p);
+            const int q = redLayer();
+            doc->SelectRect(0, 0, W / 2, H, Scene2DNode::kSelNew, 0, false);
+            doc->MaskFromSelection(q);
+            doc->Deselect();
+            doc->Commit();
+            SelectOnly(q);
+            ToggleMaskView(doc);
+            const bool shown = sMaskView == q;
+            doc->RemovePixelMask(q);
+            const bool endsWithMask = MaskViewLayer(doc) == 0;
+            expect("parity: the mask view ends with its layer or mask", endsWithLayer && shown && endsWithMask);
+            doc->RemoveLayer(q);
+            doc->Commit();
+            SelectOnly(p);
+         }
          const int soft = maskAt(p, (int)W / 2, 100);
          // Apply: the alpha takes the mask as it shows, soft edge and all.
          const size_t u0 = gUndoStack.size();
@@ -18991,6 +19313,211 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             doc->RemoveLayer(id);
          doc->Deselect();
          doc->Commit();
+      }
+      // Block A commands: mask From Transparency, Hide Selection, Mask All Objects, Select and Mask's Refine Edge
+      // Brush (with object / subject edits and on a layer mask), Quick Selection's Enhance Edge.
+      {
+         const int Wi = (int)W, Hi = (int)H;
+         const float red[3] = { 1, 0, 0 };
+         auto maskAt = [&](int id, int x, int y) {
+            std::vector<uint8_t> m;
+            return doc->MaskInDoc(id, m) ? (int)m[(size_t)(Hi - 1 - y) * (size_t)Wi + x] : -1;
+         };
+         auto redLayer = [&]() {
+            const int id = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(id, red, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            return id;
+         };
+         {
+            // From Transparency: a layer wider than the canvas, opaque only in the 30 px left of it and in the left
+            // half; its alpha becomes the mask and its pixels opaque. Moved 40 px right, the strip that lay past
+            // the edge shows, so the mask kept it.
+            const int lw = Wi + 80;
+            std::vector<uint8_t> rgba((size_t)lw * Hi * 4, 0);
+            for (int y = 0; y < Hi; y++)
+               for (int x = 0; x < lw; x++)
+                  if (x < 30 || (x >= 40 && x < 40 + Wi / 2))
+                  {
+                     uint8_t* c = &rgba[((size_t)y * lw + x) * 4];
+                     c[0] = 255;
+                     c[3] = 255;
+                  }
+            const int t = doc->AddFileLayer(0, "Alpha", -40, 0, lw, Hi, rgba);
+            doc->Commit();
+            SelectOnly(t);
+            const size_t u0 = gUndoStack.size();
+            sPending.what = Pending::MaskFromAlpha;
+            RunPending(doc);
+            std::vector<uint8_t> px;
+            int pw = 0, ph = 0;
+            doc->ReadPaint(t, px, pw, ph);
+            bool opaque = px.size() == (size_t)lw * Hi * 4;
+            for (size_t i = 3; opaque && i < px.size(); i += 4)
+               opaque = px[i] == 255;
+            const bool masked = maskAt(t, 10, 100) == 255 && maskAt(t, Wi - 10, 100) == 0;
+            if (Layer* tl = doc->FindLayer(t))
+               tl->x += 40;
+            doc->Commit();
+            const bool kept = maskAt(t, 10, 100) == 255 && maskAt(t, 35, 100) == 0;
+            if (!(opaque && masked && kept))
+               fprintf(stderr, "PROBE from transparency: opaque %d masked %d kept %d (%d %d)\n", opaque, masked, kept, maskAt(t, 10, 100), maskAt(t, 35, 100));
+            expect("parity: mask from transparency moves the alpha into the mask, past the canvas too",
+                   opaque && masked && kept && gUndoStack.size() == u0 + 1 && gUndoStack.back().label == "Mask from transparency");
+            doc->RemoveLayer(t);
+            doc->Commit();
+         }
+         {
+            // Hide Selection: every selected layer gets a mask hiding the selection, one undo step, no selection left.
+            const int a = redLayer(), b = redLayer();
+            doc->SelectRect(0, 0, W / 2, H, Scene2DNode::kSelNew, 0, false);
+            sSel = { a, b };
+            const size_t u0 = gUndoStack.size();
+            sPending.what = Pending::HideSel;
+            RunPending(doc);
+            const bool both = maskAt(a, 10, 100) == 0 && maskAt(a, Wi - 10, 100) == 255 && maskAt(b, 10, 100) == 0 && maskAt(b, Wi - 10, 100) == 255;
+            expect("parity: hide selection masks every selected layer in one step",
+                   both && !doc->HasSelection() && gUndoStack.size() == u0 + 1 && gUndoStack.back().label == "Hide selection");
+            doc->SelectRect(0, 0, W / 2, H, Scene2DNode::kSelNew, 0, false);
+            expect("parity: hide selection needs a layer without a mask", !doc->MaskHideSelection(a));
+            doc->Deselect();
+            for (int id : { a, b })
+               doc->RemoveLayer(id);
+            doc->Commit();
+            sEditMask = sEditFxMask = false;
+         }
+         {
+            // Mask All Objects: the centred disc lands in the mask; the selection there before stays.
+            const int subj = doc->AddPaintLayer();
+            const float ground[3] = { 0.85f, 0.85f, 0.8f };
+            doc->SelectAll();
+            doc->FillPixels(subj, ground, 1.0f);
+            doc->SelectEllipse(W * 0.35f, H * 0.3f, W * 0.65f, H * 0.7f, Scene2DNode::kSelNew, 0, true);
+            doc->FillPixels(subj, red, 1.0f);
+            doc->Commit();
+            doc->SelectRect(0, 0, 20, 20, Scene2DNode::kSelNew, 0, false);
+            SelectOnly(subj);
+            sPending.what = Pending::MaskObjects;
+            RunPending(doc);
+            for (int i = 0; i < 300 && doc->AiSelectWaiting(); i++)
+            {
+               doc->AiSelectPoll();
+               std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
+            doc->AiSelectPoll();
+            const int mid = maskAt(subj, Wi / 2, Hi / 2), corner = maskAt(subj, Wi - 8, Hi - 8);
+            const bool selKept = doc->SelectionAt(10, 10) > 0.95f && doc->SelectionAt(Wi / 2, Hi / 2) < 0.05f;
+            if (!(mid > 230 && corner >= 0 && corner < 25 && selKept))
+               fprintf(stderr, "PROBE mask all objects: mid %d corner %d sel %d\n", mid, corner, selKept);
+            expect("parity: mask all objects masks the subject and keeps the selection", mid > 230 && corner >= 0 && corner < 25 && selKept);
+            doc->Deselect();
+            doc->RemoveLayer(subj);
+            doc->Commit();
+         }
+         {
+            // Refine Edge Brush: black left of x = W/2, white right; the selection stops 8 px into the white. A
+            // stroke over the edge at y 100 pulls it back to the picture's edge there; far from the stroke it stays.
+            const int e = doc->AddPaintLayer();
+            const float black[3] = { 0, 0, 0 }, white[3] = { 1, 1, 1 };
+            doc->SelectAll();
+            doc->FillPixels(e, white, 1.0f);
+            doc->SelectRect(0, 0, W / 2, H, Scene2DNode::kSelNew, 0, false);
+            doc->FillPixels(e, black, 1.0f);
+            doc->Commit();
+            SelectOnly(e);
+            const bool keepAll = sAllLayers;
+            sAllLayers = false;
+            sRefine = SelectMaths::RefineParams();
+            sRefineOut = 0;
+            sRefineDecon = false;
+            const float edge = W / 2 + 8;
+            doc->SelectRect(0, 0, edge, H, Scene2DNode::kSelNew, 0, false);
+            LiveOpen(doc, 1);
+            const bool open = sLiveDlg == 1;
+            sRefineBrush = true;
+            sRefineBrushSize = 40;
+            ImVec2 stroke;
+            stroke.x = W / 2 + 4;
+            stroke.y = 100;
+            RangeClick(doc, stroke, false, false);
+            sOp = Op();
+            LivePreview(doc);
+            const float near = doc->SelectionAt(Wi / 2 + 5, 100), far = doc->SelectionAt(Wi / 2 + 5, 20), inside = doc->SelectionAt(Wi / 2 - 6, 100);
+            if (!(open && near < 0.5f && far > 0.95f && inside > 0.5f))
+               fprintf(stderr, "PROBE refine brush: open %d near %.2f far %.2f inside %.2f\n", open, near, far, inside);
+            expect("parity: the refine edge brush redraws the edge where it strokes, nowhere else", open && near < 0.5f && far > 0.95f && inside > 0.5f);
+            // Its edit reaches the output: Layer Mask.
+            sRefineOut = 1;
+            LiveClose(doc, true);
+            const int mNear = maskAt(e, Wi / 2 + 5, 100), mFar = maskAt(e, Wi / 2 + 5, 20);
+            expect("parity: the refine edge brush's edit reaches the layer mask output", mNear >= 0 && mNear < 128 && mFar > 240);
+            sRefineOut = 0;
+            sRefineBrush = false;
+            doc->RemovePixelMask(e);
+            doc->Deselect();
+            // An object click and Select Subject inside Select and Mask add to the selection it refines.
+            const int o = doc->AddPaintLayer();
+            doc->SelectEllipse(W * 0.6f, H * 0.3f, W * 0.8f, H * 0.5f, Scene2DNode::kSelNew, 0, false);
+            doc->FillPixels(o, red, 1.0f);
+            doc->Commit();
+            SelectOnly(o);
+            doc->SelectRect(0, 0, 20, 20, Scene2DNode::kSelNew, 0, false);
+            LiveOpen(doc, 1);
+            doc->SelectObjectPoint(W * 0.7f, H * 0.4f, Scene2DNode::kSelNew, false, o);
+            const bool changed = doc->LiveBaseChanged();
+            LivePreview(doc);
+            const bool both = doc->SelectionAt(10, 10) > 0.95f && doc->SelectionAt((int)(W * 0.7f), (int)(H * 0.4f)) > 0.95f;
+            LiveClose(doc, true);
+            const bool keptBoth = doc->SelectionAt(10, 10) > 0.95f && doc->SelectionAt((int)(W * 0.7f), (int)(H * 0.4f)) > 0.95f;
+            if (!(changed && both && keptBoth))
+               fprintf(stderr, "PROBE refine object: changed %d both %d kept %d\n", changed, both, keptBoth);
+            expect("parity: an object click inside select and mask adds to what it refines", changed && both && keptBoth);
+            doc->RemoveLayer(o);
+            doc->Commit();
+            // On a targeted layer mask with no selection, Select and Mask refines the mask and writes it back.
+            doc->SelectRect(0, 0, W / 2, H, Scene2DNode::kSelNew, 0, false);
+            doc->MaskFromSelection(e);
+            doc->Deselect();
+            doc->Commit();
+            SelectOnly(e);
+            sEditMask = true;
+            LiveOpen(doc, 1);
+            const bool onMask = sRefineMask == e && doc->SelectionAt(10, 100) > 0.95f;
+            sRefine.feather = 8;
+            LivePreview(doc);
+            LiveClose(doc, true);
+            const int softEdge = maskAt(e, Wi / 2 - 2, 100);
+            const Layer* el = doc->FindLayer(e);
+            if (!(onMask && softEdge > 20 && softEdge < 250 && !doc->HasSelection() && el != nullptr && el->pmaskOn))
+               fprintf(stderr, "PROBE refine mask: on %d soft %d sel %d\n", onMask, softEdge, doc->HasSelection());
+            expect("parity: select and mask refines a layer mask with no selection",
+                   onMask && softEdge > 20 && softEdge < 250 && maskAt(e, 10, 100) > 240 && !doc->HasSelection() && el != nullptr && el->pmaskOn);
+            sRefine = SelectMaths::RefineParams();
+            sEditMask = false;
+            sAllLayers = keepAll;
+            // Quick Selection's Enhance Edge: subtracting from Select All, the hole's edge is refined (it differs
+            // from the plain stroke's near the hole) and nothing far from it changes.
+            auto hole = [&](bool enhance) {
+               doc->SelectAll();
+               doc->QuickSelectBegin(false, e);
+               doc->QuickSelectDab(W / 2, 100, 12, true);
+               doc->QuickSelectEnd(enhance ? 2.0f : 0.0f, 15.0f);
+               std::vector<float> v;
+               for (int y = 70; y < 130; y++)
+                  for (int x = Wi / 2 - 30; x < Wi / 2 + 30; x++)
+                     v.push_back(doc->SelectionAt(x, y));
+               return v;
+            };
+            const std::vector<float> plain = hole(false), enh = hole(true);
+            const bool holed = doc->SelectionAt(Wi / 2, 100) < 0.1f && doc->SelectionAt(10, 10) > 0.95f && doc->SelectionAt(Wi - 10, Hi - 10) > 0.95f;
+            expect("parity: quick selection subtracts from select all, and enhance edge refines the hole's edge",
+                   holed && plain != enh && plain.size() == enh.size());
+            doc->Deselect();
+            doc->RemoveLayer(e);
+            doc->Commit();
+         }
       }
       // ledger-gaps Block A: the painted filter mask. A red layer under an Invert effect shows cyan; black on its
       // filter mask brings the red back there. A layer mask hides the bottom band, so a copy can tell the two apart.
@@ -19308,6 +19835,43 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          e = Scene2DNode::ContentAwareSolve(src, cw, ch, sel, pa, out, write, selOut);
          expect("content-aware patch mends the selection from where it was dragged and keeps the selection",
                 e.empty() && !anyBlue(out, 16, 22, 35, 41) && same(out, 25, 31, 65, 31) && selOut == sel);
+         {
+            // Color: a flat grey patch moved from a grey 90 half into a grey 170 (or green) half.
+            const int w2 = 128, h2 = 64;
+            auto halves = [&](uint8_t r, uint8_t g, uint8_t b) {
+               std::vector<uint8_t> px((size_t)w2 * h2 * 4);
+               for (int y = 0; y < h2; y++)
+                  for (int x = 0; x < w2; x++)
+                  {
+                     uint8_t* c = &px[((size_t)y * w2 + x) * 4];
+                     const bool right = x >= w2 / 2;
+                     c[0] = right ? r : 90; c[1] = right ? g : 90; c[2] = right ? b : 90; c[3] = 255;
+                  }
+               return px;
+            };
+            std::vector<uint8_t> s2((size_t)w2 * h2, 0), o, wr, so;
+            for (int y = 20; y < 44; y++)
+               for (int x = 12; x < 36; x++)
+                  s2[(size_t)y * w2 + x] = 255;
+            auto mid = [&](const std::vector<uint8_t>& grey, int color, int x, int ch2) {
+               CP c;
+               c.dx = 64;
+               c.color = color;
+               if (!Scene2DNode::ContentAwareSolve(grey, w2, h2, s2, c, o, wr, so).empty())
+                  return -1;
+               return (int)o[((size_t)32 * w2 + x) * 4 + ch2];
+            };
+            const std::vector<uint8_t> light = halves(170, 170, 170), green = halves(90, 170, 90);
+            const int m0 = mid(light, 0, 88, 0), m5 = mid(light, 5, 88, 0), m7 = mid(light, 7, 88, 0), m10 = mid(light, 10, 88, 0);
+            expect("content-aware move: a brightness change shifts the middle only past color five",
+                   std::abs(m0 - 90) <= 3 && std::abs(m5 - 90) <= 3 && m7 > m5 + 15 && m7 < m10 - 15);
+            expect("content-aware move: a flat patch matches the new surroundings at color ten", std::abs(m10 - 170) <= 4);
+            const int gm = mid(green, 10, 88, 1), gr = mid(green, 10, 88, 0), ge = mid(green, 10, 77, 1);
+            expect("content-aware move: at color ten a hue change leaves the middle and blends the edge",
+                   std::abs(gm - 90) <= 3 && std::abs(gr - 90) <= 3 && ge > 95 && ge < 168);
+            if (!(std::abs(gm - 90) <= 3 && ge > 95 && ge < 168) || m7 <= m5 + 15)
+               fprintf(stderr, "PROBE cam colour: m0 %d m5 %d m7 %d m10 %d gm %d gr %d ge %d\n", m0, m5, m7, m10, gm, gr, ge);
+         }
       }
       // Content-aware move through the tool on the document: one undo step with the selection, a transparent
       // layer's old place goes clear, and Sample All Layers moves the picture onto an empty layer.
@@ -19341,6 +19905,46 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          expect("content-aware move tool: one undo brings back the pixels and the selection", doc != nullptr && doc->DocText() == t0);
          if (doc == nullptr)
             return fails;
+         {
+            // The held drop's preview: the result on its own picture, the document untouched; a big selection
+            // coarse first, then exact; scaled and extended landings inside the size limit; a faint sparse
+            // selection still shows.
+            std::vector<uint8_t> pe, pc;
+            int ew = 0, eh = 0, cw2 = 0, ch2 = 0;
+            float er[4], cr2[4];
+            Scene2DNode::CamParams q = CamParamsNow(200, 0);
+            const size_t u1 = gUndoStack.size();
+            const bool exact = doc->ContentAwarePreview(p, q, 0, pe, ew, eh, er);
+            auto pv = [&](const std::vector<uint8_t>& px, int pw2, const float* r, float x, float y) {
+               const int ix = (int)std::lround((x - r[0]) * pw2 / std::max(1.0f, r[2] - r[0]));
+               const int iy = (int)std::lround((y - r[1]) * pw2 / std::max(1.0f, r[2] - r[0]));
+               return &px[((size_t)iy * pw2 + ix) * 4];
+            };
+            const bool shows = exact && er[0] <= 95 && er[2] >= 365 && pv(pe, ew, er, 330, 130)[2] > 200 && pv(pe, ew, er, 330, 130)[0] < 40;
+            expect("content-aware move: the preview shows the result and leaves the document alone",
+                   shows && doc->DocText() == t0 && gUndoStack.size() == u1);
+            const bool coarse = doc->ContentAwarePreview(p, q, 1000, pc, cw2, ch2, cr2);
+            expect("content-aware move: a big selection previews coarse first, then exact",
+                   coarse && exact && cw2 * ch2 * 4 < ew * eh && std::fabs(cr2[0] - er[0]) < 6 && std::fabs(cr2[2] - er[2]) < 6);
+            Scene2DNode::CamParams t2 = q;
+            t2.extend = true;
+            t2.scaleX = 200;
+            t2.rotate = 0;
+            const bool tx = doc->ContentAwarePreview(p, t2, 1000, pc, cw2, ch2, cr2);
+            expect("content-aware move: a coarse preview handles transform, extend and the size limit",
+                   tx && cw2 * ch2 <= 4000 && cr2[2] - cr2[0] > 140 && cr2[0] > 200 && doc->DocText() == t0);
+            doc->Deselect();
+            for (int y = 92; y < 168; y += 12)
+               for (int x = 92; x < 168; x += 12)
+                  doc->SelectRect((float)x, (float)y, (float)x + 1, (float)y + 1, Scene2DNode::kSelAdd, 0, false);
+            doc->ModifySelection(4, 1);
+            const bool faint = doc->ContentAwarePreview(p, q, 400, pc, cw2, ch2, cr2) && cw2 > 0;
+            if (!(shows && coarse && tx && faint))
+               fprintf(stderr, "PROBE cam preview: exact %d [%.0f %.0f %.0f %.0f] %dx%d coarse %d %dx%d tx %d faint %d\n", exact, er[0], er[1], er[2],
+                       er[3], ew, eh, coarse, cw2, ch2, tx, faint);
+            expect("content-aware move: a coarse preview keeps a faint sparse selection", faint);
+            doc->SelectRect(90, 90, 170, 170, Scene2DNode::kSelNew, 0, false);
+         }
          // Refused with nothing selected: no step.
          doc->Deselect();
          u0 = gUndoStack.size();
