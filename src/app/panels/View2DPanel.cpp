@@ -11,6 +11,7 @@
 #include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/components/Thumb.h"
 #include "app/ui/design/components/ListRow.h"
+#include <limits>
 #include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Keymap.h"
 #include "app/ui/design/components/Tip.h"
@@ -7188,6 +7189,8 @@ namespace
    float sTextC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
    bool sTextFocus = false;
    std::string sTextBuf;           // grows with the text
+   size_t sTextSelLo = std::string::npos;   // the editor's caret / selection start last frame (bytes), for styled runs
+   size_t sTextSelA = 0, sTextSelB = 0;     // the editor's selection (bytes); empty = none
    bool sTextStep = false;         // editing an existing text: the undo step waits for the first keystroke
    bool sTextNew = false;          // the text layer was made by this edit
    size_t sTextUndo0 = 0;          // the undo depth before "New text", dropped again when nothing is typed
@@ -7771,6 +7774,8 @@ namespace
       sTextEdit = id;
       sTextFocus = true;
       sTextBuf = l->text;
+      sTextSelLo = std::string::npos;
+      sTextSelA = sTextSelB = 0;
       SelectOnly(id);
    }
 
@@ -7894,6 +7899,98 @@ namespace
       }
    }
 
+   // Paragraph / Character Styles: a list like the History panel's. Click applies (to the on-canvas selection, else the
+   // whole layer); "+" makes a style from the text; right-click: clear overrides, redefine, duplicate, delete.
+   // "Name+" marks text with local overrides.
+   void TypeStyleList(Scene2DNode* doc, Layer* l, bool para)
+   {
+      const Scene2DNode::TextStyles& ts = doc->TypeStyles();
+      const bool sel = sTextEdit == l->id && sTextSelA < sTextSelB && sTextSelB <= l->text.size();
+      const size_t at = sTextEdit == l->id ? std::min(sTextSelA, l->text.size()) : 0;
+      const size_t a = sel ? sTextSelA : 0, b = sel ? sTextSelB : 0;
+      const std::vector<Scene2DNode::TextRun> runs = Scene2DNode::CharRuns(*l);
+      const uint32_t cur = para ? l->paraStyle : runs[Scene2DNode::RunAt(runs, at)].st.charStyle;
+      const std::string label = doc->StyleLabel(l->id, at, para);
+      std::string err;
+      auto refused = [&](size_t undo0)
+      {
+         RollbackUndoTo(undo0);   // a refused style command is no step
+         if (!err.empty())
+            Notices::Post(Notices::Level::Warning, "view2d.typestyle", T("Can't change the style"), T(err.c_str()));
+      };
+      if (TextChip(para ? L("New style##v2dpstnew") : L("New style##v2dcstnew"), false, T("A style from the text at the caret"), sFieldW))
+      {
+         const size_t undo0 = gUndoStack.size();
+         PushUndoCheckpoint(para ? "New paragraph style" : "New character style");
+         uint32_t id = 0;
+         if (para ? doc->NewParaStyle(l->id, at, id, &err) : doc->NewCharStyle(l->id, at, id, &err))
+            Touch();
+         else
+            refused(undo0);
+      }
+      const float rowH = MenuParts::kRow - ImGui::GetStyle().ItemSpacing.y;
+      std::vector<std::pair<uint32_t, std::string>> rows;
+      rows.push_back({ 0, para ? ts.basic.name : std::string(Scene2DNode::kNoCharStyle) });
+      if (para)
+         for (const Scene2DNode::ParaStyleDef& d : ts.paragraph)
+            rows.push_back({ d.id, d.name });
+      else
+         for (const Scene2DNode::CharStyleDef& d : ts.character)
+            rows.push_back({ d.id, d.name });
+      enum { kNone, kApply, kClear, kRedefine, kDuplicate, kDelete } act = kNone;
+      uint32_t pick = 0;
+      for (const auto& [id, name] : rows)
+      {
+         ImGui::PushID((int)id);
+         const bool here = id == cur;
+         const std::string text = here && !label.empty() && label.back() == '+' ? name + "+" : name;
+         if (ListRow::Row("##tsrow", text.c_str(), here, false, rowH))
+         {
+            act = kApply;
+            pick = id;
+         }
+         if (MenuParts::BeginContextItem("##tsmenu"))
+         {
+            if (MenuParts::Item(T("Apply, Clearing Overrides")))
+               act = kClear, pick = id;
+            if ((para || id != 0) && MenuParts::Item(T("Redefine from Text")))
+               act = kRedefine, pick = id;
+            if (id != 0 && MenuParts::Item(T("Duplicate")))
+               act = kDuplicate, pick = id;
+            if (id != 0)
+            {
+               MenuParts::Separator();
+               if (MenuParts::DangerItem(T("Delete")))
+                  act = kDelete, pick = id;
+            }
+            MenuParts::EndPopup();
+         }
+         ImGui::PopID();
+      }
+      if (act == kNone)
+         return;
+      static const char* kSteps[] = { "", "Apply style", "Apply style", "Redefine style", "Duplicate style", "Delete style" };
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint(kSteps[act]);
+      uint32_t made = 0;
+      bool ok = false;
+      switch (act)
+      {
+      case kApply:
+      case kClear:
+         ok = para ? doc->ApplyParaStyle(l->id, pick, act == kClear) : doc->ApplyCharStyle(l->id, a, b, pick, act == kClear);
+         break;
+      case kRedefine: ok = doc->RedefineStyle(para, pick, l->id, at); break;
+      case kDuplicate: ok = doc->DuplicateStyle(para, pick, made, &err); break;
+      case kDelete: ok = doc->DeleteStyle(para, pick); break;
+      default: break;
+      }
+      if (ok)
+         Touch();
+      else
+         refused(undo0);
+   }
+
    // Typing happens in a field under the text; the picture above updates as you type.
    void DrawTextEditor(Scene2DNode* doc)
    {
@@ -7939,7 +8036,7 @@ namespace
          if (sTextStep)
             PushUndoCheckpoint("Edit text");   // before the layer takes the new text
          sTextStep = false;
-         l->text = sTextBuf;
+         Scene2DNode::EditRunText(*l, sTextBuf, sTextSelLo);   // the new text takes the style before the caret
          Touch();
          doc->LayerBox(*l, bw, bh);
       }
@@ -7947,6 +8044,12 @@ namespace
       {
          // The caret where the cursor is, and the selection behind the glyphs.
          UpdateTextMarks(doc, *l, bw, bh, st->GetCursorPos(), st->GetSelectionStart(), st->GetSelectionEnd());
+         {
+            const int c0 = st->GetCursorPos(), s0 = st->GetSelectionStart(), s1 = st->GetSelectionEnd();
+            sTextSelA = (size_t)std::max(0, std::min(s0, s1));
+            sTextSelB = (size_t)std::max(0, std::max(s0, s1));
+            sTextSelLo = s0 != s1 ? sTextSelA : (size_t)std::max(0, c0);
+         }
          for (const std::array<float, 4>& r : sTextMarks.sel)
             dl->AddQuadFilled(BoxScreen(doc, *l, r[0], r[1]), BoxScreen(doc, *l, r[2], r[1]), BoxScreen(doc, *l, r[2], r[3]),
                               BoxScreen(doc, *l, r[0], r[3]), Hex(kOutline, tok::view2d_fill_alpha));
@@ -13748,16 +13851,30 @@ namespace
          }
          FieldWell::PopStyle();
          UndoOnActivate("Edit text");
+         // A selection in the on-canvas editor: the character controls show its first run and set the selection only
+         // (they work on a stand-in that is folded back into the runs below).
+         const bool selRuns = sTextEdit == l->id && sTextSelA < sTextSelB && sTextSelB <= l->text.size();
+         static Layer sRunProxy;
+         Scene2DNode::RunStyle runShown;
+         if (selRuns)
+         {
+            const std::vector<Scene2DNode::TextRun> runs = Scene2DNode::CharRuns(*l);
+            runShown = runs[Scene2DNode::RunAt(runs, sTextSelA)].st;
+            sRunProxy = Layer();
+            sRunProxy.kind = Kind::Text;
+            Scene2DNode::SetSummary(sRunProxy, runShown);
+         }
+         Layer* tl = selRuns ? &sRunProxy : l;
          {
             auto undo = []() { PushUndoCheckpoint("Text style"); };
             auto next = []() { FormParts::Inline(0.0f, tok::space_1); };
             FieldLabel(T("Font"));
-            if (FontPicker("##v2dtabfont", l->font, sFieldW, undo))
+            if (FontPicker("##v2dtabfont", tl->font, sFieldW, undo))
                Touch();
             // Four chips each, filling the field column so both rows end where the wells above and below do.
             const float chipW = PanelKit::StripW(sFieldW, tok::view2d_chip_w_strip_w_n, 0);
             FieldLabel(T("Style"), sRowH);
-            if (TextStyleChips(&l->bold, &l->italic, &l->underline, &l->caps, undo, next, chipW))
+            if (TextStyleChips(&tl->bold, &tl->italic, &tl->underline, &l->caps, undo, next, chipW))
                Touch();
             FieldLabel(T("Align"), sChip);
             static const char* kGlyphs[3] = { IconsInfinite::TextLeft, IconsInfinite::TextCenter, IconsInfinite::TextRight };
@@ -13780,13 +13897,24 @@ namespace
          {
             Pairs g;
             ModNext(*l, Scene2DNode::kLfFontSize);
-            SliderRow(T("Size"), &l->fontSize, params::view2d::font_size_lo, params::view2d::font_size_hi, "%.0f px");
+            SliderRow(T("Size"), &tl->fontSize, params::view2d::font_size_lo, params::view2d::font_size_hi, "%.0f px");
             ModNext(*l, Scene2DNode::kLfLeading);
             SliderRow(T("Leading"), &l->leading, params::view2d::leading_lo, params::view2d::leading_hi, "%.2f");
             ModNext(*l, Scene2DNode::kLfTracking);
-            SliderRow(T("Tracking"), &l->tracking, params::view2d::tracking_lo, params::view2d::tracking_hi, "%.0f");
+            SliderRow(T("Tracking"), &tl->tracking, params::view2d::tracking_lo, params::view2d::tracking_hi, "%.0f");
          }
-         ColorRow(T("Colour"), l->textC);
+         ColorRow(T("Colour"), tl->textC);
+         if (selRuns)
+         {
+            Scene2DNode::RunStyle now = Scene2DNode::SummaryOf(sRunProxy);
+            now.charStyle = runShown.charStyle;
+            if (now != runShown)
+            {
+               const Scene2DNode::StyleAttrs set = Scene2DNode::DiffAttrs(Scene2DNode::CharAttrsOf(now), Scene2DNode::CharAttrsOf(runShown));
+               Scene2DNode::StyleRange(*l, sTextSelA, sTextSelB, [&](Scene2DNode::RunStyle& r) { Scene2DNode::ApplyCharAttrs(r, set); });
+               Touch();
+            }
+         }
          DragRow(T("Box width"), &l->boxW, 1.0f, "%.0f px", params::view2d::box_w_lo, params::view2d::box_w_hi);
          // Character: lines, band, position and stretch.
          if (l->underline)
@@ -13889,6 +14017,10 @@ namespace
          FieldLabel("");
          if (TextChip(L("Convert to shapes##v2dtoshapes"), false, T("Outlines as a vector layer"), sFieldW))
             sPending.what = Pending::ToShapes;
+         SectionCard::Begin(T("Paragraph Styles"));
+         TypeStyleList(doc, l, true);
+         SectionCard::Begin(T("Character Styles"));
+         TypeStyleList(doc, l, false);
       }
       if (l->kind == Kind::Vector)
       {
@@ -23970,6 +24102,269 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("parity: history fill reads only the selection inside the canvas", selFill);
       fprintf(stderr, "PROBE history fill: locked %d sel %d in %.2f out %.2f,%.2f\n", (int)lockedFill, (int)selFill, in[1], out[0], out[1]);
       doc->SetHistorySource(-1);
+      while (gUndoStack.size() > u0)
+         Undo();
+      doc = FindDoc();
+      if (doc == nullptr)
+         return fails;
+      doc->Layers();
+   }
+   // Text styles (PhotoCraft text_styles.rs and its type-style command tests): styled runs inside one text layer, and
+   // named Character / Paragraph Styles that resolve defaults <- Basic Paragraph <- paragraph <- character <- overrides.
+   {
+      const size_t u0 = gUndoStack.size();
+      PushUndoCheckpoint("Text styles test");
+      using N = Scene2DNode;
+      const float tx = doc->Doc().w * 0.25f, ty = doc->Doc().h * 0.25f;
+      auto runsOf = [&](int id) {
+         const Layer* l = doc->FindLayer(id);
+         return l != nullptr ? N::CharRuns(*l) : std::vector<N::TextRun>();
+      };
+      auto runAt = [&](int id, size_t at) {
+         const std::vector<N::TextRun> r = runsOf(id);
+         return r.empty() ? N::RunStyle() : r[N::RunAt(r, at)].st;
+      };
+      // Save and load: the document text read back from scratch.
+      auto reload = [&]() {
+         doc->Commit();
+         const std::string t = doc->DocText();
+         doc->SetDocText("");
+         doc->Layers();
+         doc->SetDocText(t);
+         doc->Layers();
+         doc->Commit();
+         return t;
+      };
+      const N::StyleAttrs boldBig = { { "bold", "1" }, { "size", "40" } };
+      const N::StyleAttrs bold = { { "bold", "1" } }, italic = { { "italic", "1" } };
+      std::string err;
+
+      // Runs and the summary.
+      const int t1 = doc->AddTextLayer("Hello world", tx, ty, 0.0f);
+      doc->StyleTextRange(t1, 0, 5, boldBig);
+      const Layer* l1 = doc->FindLayer(t1);
+      const std::vector<N::TextRun> r1 = runsOf(t1);
+      const bool summary0 = l1 != nullptr && r1.size() == 2 && r1[0].len == 5 && l1->bold && l1->fontSize == 40.0f;
+      doc->StyleTextRange(t1, 5, 11, { { "size", "20" } });
+      const bool summary1 = doc->FindLayer(t1)->fontSize == 40.0f;
+      doc->ReplaceText(t1, 0, 5, "");
+      const bool summary2 = doc->FindLayer(t1)->fontSize == 20.0f && !doc->FindLayer(t1)->bold && doc->FindLayer(t1)->text == " world";
+      expect("parity: summary follows first run", summary0 && summary1 && summary2);
+      fprintf(stderr, "PROBE summary: runs %zu bold %d size %.0f -> %.0f\n", r1.size(), (int)(l1 && l1->bold), l1 ? l1->fontSize : 0.0f,
+              doc->FindLayer(t1)->fontSize);
+
+      // Serialization.
+      doc->ReplaceText(t1, 0, 0, "Hello");
+      doc->StyleTextRange(t1, 0, 5, boldBig);
+      const std::vector<N::TextRun> before = runsOf(t1);
+      const std::string saved = reload();
+      const bool ser = runsOf(t1) == before && doc->DocText() == saved && saved.find("trun ") != std::string::npos;
+      expect("parity: styles serialize", ser);
+      fprintf(stderr, "PROBE styles serialize: runs %zu same %d\n", before.size(), (int)ser);
+
+      // Edits keep the styles of the text they don't touch.
+      {
+         Layer* l = doc->FindLayer(t1);
+         l->text = "Hello brave world";   // a straight field edit, as the Text card makes
+         doc->Commit();
+         const bool keep = runAt(t1, 0).bold && runAt(t1, 4).size == 40.0f && !runAt(t1, 8).bold && !runAt(t1, 14).bold &&
+                           runAt(t1, 14).size == 20.0f;
+         expect("parity: edit text keeps the styles of unchanged text", keep);
+         // Typing at a caret takes the style before it (the on-canvas editor's path).
+         l = doc->FindLayer(t1);
+         N::EditRunText(*l, "HelloX brave world", 5);
+         doc->Commit();
+         const bool caret = runAt(t1, 5).bold && runAt(t1, 5).size == 40.0f;
+         expect("parity: typing at the caret takes the style before it", caret);
+         fprintf(stderr, "PROBE edit keeps: keep %d caret %d text '%s'\n", (int)keep, (int)caret, doc->FindLayer(t1)->text.c_str());
+      }
+      {
+         // Replacing a range keeps the rest; the new text takes the replaced range's first character's style.
+         const int t2 = doc->AddTextLayer("abcdef", tx, ty, 0.0f);
+         doc->StyleTextRange(t2, 0, 3, bold);
+         doc->StyleTextRange(t2, 3, 6, italic);
+         doc->ReplaceText(t2, 2, 5, "XY");
+         const bool first = doc->FindLayer(t2)->text == "abXYf" && runAt(t2, 2).bold && runAt(t2, 3).bold && !runAt(t2, 3).italic &&
+                            runAt(t2, 4).italic && runAt(t2, 0).bold;
+         expect("parity: replacing a selection keeps its first characters style", first);
+         doc->ReplaceText(t2, 4, 5, "zz");
+         const bool rep = doc->FindLayer(t2)->text == "abXYzz" && runAt(t2, 4).italic && runAt(t2, 5).italic && runAt(t2, 1).bold;
+         expect("parity: edit replace keeps styles", rep);
+         fprintf(stderr, "PROBE replace: first %d rep %d runs %zu\n", (int)first, (int)rep, runsOf(t2).size());
+         // A reversed range changes nothing; empty text styles its one run.
+         doc->Commit();
+         const std::string t0 = doc->DocText();
+         doc->StyleTextRange(t2, 4, 1, boldBig);
+         expect("parity: style range reversed is a no op", doc->DocText() == t0);
+         const int t3 = doc->AddTextLayer("", tx, ty, 0.0f);
+         doc->StyleTextRange(t3, 0, 0, { { "size", "50" }, { "italic", "1" } });
+         doc->ReplaceText(t3, 0, 0, "hi");
+         const bool empty = doc->FindLayer(t3)->fontSize == 50.0f && runsOf(t3).size() == 1 && runAt(t3, 1).italic && runAt(t3, 1).size == 50.0f;
+         expect("parity: style range on empty text", empty);
+         fprintf(stderr, "PROBE empty text: size %.0f runs %zu\n", doc->FindLayer(t3)->fontSize, runsOf(t3).size());
+         doc->RemoveLayer(t3);
+         doc->RemoveLayer(t2);
+         doc->Commit();
+      }
+      {
+         // Typing then saving keeps the runs.
+         Layer* l = doc->FindLayer(t1);
+         N::EditRunText(*l, l->text + "!", l->text.size());
+         doc->Commit();
+         const std::vector<N::TextRun> b = runsOf(t1);
+         reload();
+         expect("parity: styles survive typing and save", runsOf(t1) == b && b.size() >= 2);
+      }
+
+      // Named styles: names and ids.
+      uint32_t c1 = 0, c2 = 0, c3 = 0, p1 = 0;
+      const bool made = doc->NewCharStyle(0, 0, c1, &err, &italic) && doc->NewCharStyle(0, 0, c2, &err, &bold) &&
+                        doc->DuplicateStyle(false, c1, c3, &err) && doc->NewParaStyle(0, 0, p1, &err, nullptr, nullptr);
+      const N::TextStyles& ts = doc->TypeStyles();
+      const bool names = made && c1 != 0 && c2 != c1 && c3 != c1 && c3 != c2 && ts.Char(c1)->name == "Character Style 1" &&
+                         ts.Char(c2)->name == "Character Style 2" && ts.Char(c3)->name == "Character Style 1 copy" &&
+                         ts.Para(p1)->name == "Paragraph Style 1" && ts.Para(0)->name == N::kBasicParagraph &&
+                         ts.character.size() == 3 && ts.character[1].id == c3 && !doc->RenameStyle(true, 0, "X") &&
+                         doc->RenameStyle(false, c2, "Character Style 1") && doc->TypeStyles().Char(c2)->name != "Character Style 1" &&
+                         doc->RenameStyle(false, c2, "Emphasis") && doc->TypeStyles().Char(c2)->name == "Emphasis";
+      expect("parity: names and ids", names);
+      fprintf(stderr, "PROBE names: c1 %u c2 %u c3 %u p1 %u '%s'\n", c1, c2, c3, p1, made ? doc->TypeStyles().Char(c3)->name.c_str() : "");
+
+      // Attribute sets validate and diff.
+      {
+         N::RunStyle s;
+         std::string e1, e2;
+         const bool bad = !N::ApplyCharAttrs(s, { { "bogus", "1" } }, &e1) && !N::ApplyCharAttrs(s, { { "size", "big" } }, &e2) &&
+                          e1.find("unknown") != std::string::npos && !e2.empty() && s == N::RunStyle();
+         N::RunStyle s2 = s;
+         s2.bold = true;
+         s2.size = 12.0f;
+         const N::StyleAttrs d = N::DiffAttrs(N::CharAttrsOf(s2), N::CharAttrsOf(s));
+         N::StyleAttrs back;
+         const N::StyleAttrs odd = { { "font", "A;B=C\\D" }, { "color", "1 0 0 1" } };
+         const bool text = N::ParseAttrsText(N::AttrsText(odd), back) && back == odd;
+         N::ParaStyle pp;
+         const bool para = !N::ApplyParaAttrs(pp, { { "align", "7" } }) && N::ApplyParaAttrs(pp, { { "align", "2" } }) && pp.align == 2;
+         const bool ok = bad && d.size() == 2 && d.count("bold") && d.count("size") && text && para;
+         expect("parity: attrs validate and diff", ok);
+         fprintf(stderr, "PROBE attrs: bad %d diff %zu text %d para %d err '%s'\n", (int)bad, d.size(), (int)text, (int)para, e1.c_str());
+      }
+
+      // Resolution: defaults <- Basic Paragraph <- paragraph style <- character style.
+      {
+         const int t4 = doc->AddTextLayer("abcdef", tx, ty, 0.0f);
+         const N::StyleAttrs basicChr = { { "size", "30" } };
+         const N::StyleAttrs pPara = { { "align", "2" } }, pChr = { { "bold", "1" } };
+         doc->SetStyleAttrs(true, 0, nullptr, &basicChr);
+         doc->SetStyleAttrs(true, p1, &pPara, &pChr);
+         doc->ApplyParaStyle(t4, p1, true);
+         doc->ApplyCharStyle(t4, 0, 3, c1, true);
+         const N::RunStyle a = runAt(t4, 0), b = runAt(t4, 4);
+         const bool res = a.size == 30.0f && a.bold && a.italic && a.charStyle == c1 && b.size == 30.0f && b.bold && !b.italic &&
+                          b.charStyle == 0 && doc->FindLayer(t4)->align == 2 && doc->StyleLabel(t4, 0, false) == "Character Style 1" &&
+                          doc->StyleLabel(t4, 0, true) == "Paragraph Style 1";
+         expect("parity: resolution layers styles", res);
+         fprintf(stderr, "PROBE resolution: a %.0f %d%d b %.0f %d%d align %d '%s'\n", a.size, (int)a.bold, (int)a.italic, b.size, (int)b.bold,
+                 (int)b.italic, doc->FindLayer(t4)->align, doc->StyleLabel(t4, 0, false).c_str());
+
+         // Overrides survive restyling.
+         doc->StyleTextRange(t4, 0, 3, { { "size", "70" } });
+         const N::StyleAttrs c1New = { { "italic", "1" }, { "size", "20" }, { "underline", "1" } };
+         doc->SetStyleAttrs(false, c1, nullptr, &c1New);
+         const N::RunStyle o = runAt(t4, 1);
+         const bool ov = o.size == 70.0f && o.underline && o.italic && o.bold && doc->StyleLabel(t4, 1, false) == "Character Style 1+";
+         expect("parity: overrides survive restyling", ov);
+         fprintf(stderr, "PROBE overrides: size %.0f ul %d label '%s'\n", o.size, (int)o.underline, doc->StyleLabel(t4, 1, false).c_str());
+
+         // Character style lifecycle: new, apply, change, delete (the text keeps its look).
+         uint32_t red = 0;
+         const N::StyleAttrs redA = { { "color", "1 0 0 1" } }, blueA = { { "color", "0 0 1 1" } };
+         const bool life0 = doc->NewCharStyle(0, 0, red, &err, &redA) && doc->ApplyCharStyle(t4, 3, 6, red, true) && runAt(t4, 4).c[0] == 1.0f;
+         const bool life1 = doc->SetStyleAttrs(false, red, nullptr, &blueA) && runAt(t4, 4).c[2] == 1.0f && runAt(t4, 4).c[0] == 0.0f;
+         const bool life2 = doc->DeleteStyle(false, red) && runAt(t4, 4).c[2] == 1.0f && runAt(t4, 4).charStyle == 0 &&
+                            doc->TypeStyles().Char(red) == nullptr && doc->StyleLabel(t4, 4, false) == "None+";
+         expect("parity: character style lifecycle", life0 && life1 && life2);
+         fprintf(stderr, "PROBE lifecycle: %d %d %d '%s'\n", (int)life0, (int)life1, (int)life2, doc->StyleLabel(t4, 4, false).c_str());
+
+         // Paragraph styles and Basic Paragraph.
+         const int t5 = doc->AddTextLayer("plain", tx, ty, 0.0f);
+         const bool fresh = doc->StyleLabel(t5, 0, true) == N::kBasicParagraph && doc->FindLayer(t5)->paraStyle == 0;
+         const N::StyleAttrs sb = { { "spaceBefore", "6" } };
+         doc->SetStyleAttrs(true, 0, &sb, &basicChr);
+         const bool inherit = doc->FindLayer(t4)->spaceBefore == 6.0f && doc->FindLayer(t5)->spaceBefore == 6.0f;
+         const bool guard = !doc->DeleteStyle(true, 0) && !doc->RenameStyle(true, 0, "x") && !doc->ApplyCharStyle(t4, 0, 0, 9999, false);
+         const bool del = doc->DeleteStyle(true, p1) && doc->FindLayer(t4)->align == 2 && doc->FindLayer(t4)->paraStyle == 0 && runAt(t4, 4).bold;
+         expect("parity: paragraph styles and basic paragraph", fresh && inherit && guard && del);
+         fprintf(stderr, "PROBE paragraph: fresh %d inherit %d guard %d del %d\n", (int)fresh, (int)inherit, (int)guard, (int)del);
+         doc->RemoveLayer(t5);
+
+         // New style from the text, and Redefine.
+         uint32_t fromSel = 0;
+         const bool fs = doc->NewCharStyle(t1, 0, fromSel, &err);
+         const N::CharStyleDef* fd = doc->TypeStyles().Char(fromSel);
+         const bool took = fs && fd != nullptr && fd->attrs.count("bold") && fd->attrs.at("bold") == "1" && fd->attrs.count("size") &&
+                           runAt(t1, 0).charStyle == 0;
+         doc->ApplyCharStyle(t1, 0, 5, fromSel, false);
+         const bool clean = doc->StyleLabel(t1, 0, false) == doc->TypeStyles().Char(fromSel)->name;
+         doc->StyleTextRange(t1, 0, 5, italic);
+         const bool dirty = doc->StyleLabel(t1, 0, false).back() == '+';
+         const bool redef = doc->RedefineStyle(false, fromSel, t1, 0) && doc->TypeStyles().Char(fromSel)->attrs.count("italic") &&
+                            doc->StyleLabel(t1, 0, false).back() != '+';
+         expect("parity: new style from selection and redefine", took && clean && dirty && redef);
+         fprintf(stderr, "PROBE from selection: took %d clean %d dirty %d redef %d\n", (int)took, (int)clean, (int)dirty, (int)redef);
+
+         // Preview validates without changing anything; with two layers and a local override it matches the commit.
+         doc->ApplyCharStyle(t4, 0, 0, c2, false);
+         doc->ApplyCharStyle(t1, 6, 8, c2, false);
+         doc->StyleTextRange(t1, 6, 7, { { "size", "33" } });
+         doc->Commit();
+         const std::string src = doc->DocText();
+         std::string out, perr;
+         const N::StyleAttrs badA = { { "size", "big" } }, goodA = { { "bold", "1" }, { "underline", "1" }, { "size", "18" } };
+         const bool pv0 = !doc->PreviewStyleAttrs(false, c2, nullptr, &badA, out, &perr) && out == src && doc->DocText() == src && !perr.empty();
+         const bool pv1 = doc->PreviewStyleAttrs(false, c2, nullptr, &goodA, out, &perr) && out != src && doc->DocText() == src &&
+                          !runAt(t1, 7).underline;
+         expect("parity: preview options validates without mutating source", pv0 && pv1);
+         doc->SetStyleAttrs(false, c2, nullptr, &goodA);
+         const bool same = doc->DocText() == out, keep = runAt(t1, 6).size == 33.0f, ul = runAt(t1, 7).underline && runAt(t4, 0).underline;
+         const bool match = same && keep && ul;
+         expect("parity: isolated options preview matches commit with multiple layers and local overrides", match);
+         fprintf(stderr, "PROBE preview: bad %d good %d same %d keep %d ul %d size7 %.0f err '%s'\n", (int)pv0, (int)pv1, (int)same, (int)keep,
+                 (int)ul, runAt(t1, 7).size, perr.c_str());
+
+         // Disabled states: a style that is gone, a layer that is not text.
+         const int px = doc->AddPaintLayer();
+         uint32_t none = 0;
+         std::string derr;
+         const bool dis = !doc->ApplyCharStyle(px, 0, 0, c2, false) && !doc->ApplyParaStyle(px, 0, false) && !doc->ApplyParaStyle(t4, 9999, false) &&
+                          !doc->NewCharStyle(px, 0, none, &derr) && derr == "not a text layer" && !doc->DuplicateStyle(true, 9999, none) &&
+                          !doc->RedefineStyle(false, c2, px, 0) && !doc->StyleTextRange(px, 0, 1, bold);
+         expect("parity: disabled states", dis);
+         fprintf(stderr, "PROBE disabled: %d\n", (int)dis);
+         doc->RemoveLayer(px);
+         doc->RemoveLayer(t4);
+      }
+
+      // Exhausted ids: refused with a reason, nothing changes, and still exhausted after a save.
+      {
+         doc->Doc().textStyles.character.push_back({ std::numeric_limits<uint32_t>::max(), "Last", {} });
+         doc->Doc().textStyles.paragraph.push_back({ std::numeric_limits<uint32_t>::max(), "Last", {}, {} });
+         doc->Commit();
+         const std::string t0 = doc->DocText();
+         const size_t depth = gUndoStack.size();
+         uint32_t id = 0;
+         std::string e1, e2, e3;
+         const bool refuse = !doc->NewCharStyle(0, 0, id, &e1) && e1 == "character style id space exhausted" &&
+                             !doc->NewParaStyle(0, 0, id, &e2) && e2 == "paragraph style id space exhausted" &&
+                             !doc->DuplicateStyle(false, c1, id, &e3) && doc->DocText() == t0 && gUndoStack.size() == depth;
+         expect("parity: exhausted style ids return errors without history changes", refuse);
+         reload();
+         uint32_t n1 = 0, n2 = 0;
+         const bool kept = doc->TypeStyles().Char(std::numeric_limits<uint32_t>::max()) != nullptr &&
+                           !doc->TypeStyles().NextCharId(n1) && !doc->TypeStyles().NextParaId(n2);
+         expect("parity: exhausted style ids survive serialization", kept);
+         fprintf(stderr, "PROBE exhausted: refuse %d kept %d '%s'\n", (int)refuse, (int)kept, e1.c_str());
+      }
       while (gUndoStack.size() > u0)
          Undo();
       doc = FindDoc();

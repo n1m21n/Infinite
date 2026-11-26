@@ -2542,6 +2542,9 @@ void Scene2DNode::Commit()
 // One line per fact, like the 3D View, so a patch diff reads and an agent can write it by hand.
 void Scene2DNode::Serialize()
 {
+   for (Layer& l : mLayers)
+      if (l.kind == Kind::Text)
+         SyncTextRuns(l);   // fold summary-field and text edits into the runs before they are written
    std::ostringstream o;
    const Document& d = mDoc;
    o << "next " << mNextId << "\n";
@@ -2574,6 +2577,14 @@ void Scene2DNode::Serialize()
       o << "brushlive 1\n";
    for (const ModSlot& m : d.slots)
       o << "mslot " << m.layer << " " << m.field << " " << m.slot << "\n";
+   // Named type styles: "cstyle id name attrs", "pstyle id name para chr", "pbasic para chr" (attrs as k=v;k=v).
+   if (!d.textStyles.basic.para.empty() || !d.textStyles.basic.chr.empty())
+      o << "pbasic " << EscapeToken(AttrsText(d.textStyles.basic.para)) << " " << EscapeToken(AttrsText(d.textStyles.basic.chr)) << "\n";
+   for (const CharStyleDef& c : d.textStyles.character)
+      o << "cstyle " << c.id << " " << EscapeToken(c.name) << " " << EscapeToken(AttrsText(c.attrs)) << "\n";
+   for (const ParaStyleDef& p : d.textStyles.paragraph)
+      o << "pstyle " << p.id << " " << EscapeToken(p.name) << " " << EscapeToken(AttrsText(p.para)) << " "
+        << EscapeToken(AttrsText(p.chr)) << "\n";
    if (quickMask)
       o << "qmask 1\n";
    auto selLine = [&](const char* key, const SelStore& st)
@@ -2732,6 +2743,17 @@ void Scene2DNode::Serialize()
          if (l.warpStyle != 0)
             o << "twarp " << l.id << " " << l.warpStyle << " " << l.warpBend << " " << l.warpH << " " << l.warpV << " "
               << +l.warpVert << "\n";
+         // Styled runs, only when the text is not one plain run: "trun layer len charStyle font size tracking r g b a b i u".
+         if (l.runs.size() > 1 || (l.runs.size() == 1 && l.runs[0].st.charStyle != 0))
+            for (const TextRun& r : l.runs)
+            {
+               o << "trun " << l.id << " " << r.len << " " << r.st.charStyle << " " << EscapeToken(r.st.font) << " " << r.st.size
+                 << " " << r.st.tracking;
+               for (float v : r.st.c) o << " " << v;
+               o << " " << +r.st.bold << " " << +r.st.italic << " " << +r.st.underline << "\n";
+            }
+         if (l.paraStyle != 0)
+            o << "tpstyle " << l.id << " " << l.paraStyle << "\n";
       }
       if (l.is3d || l.z != 0 || l.az != 0 || l.rx != 0 || l.ry != 0 || l.orient[0] != 0 || l.orient[1] != 0 ||
           l.orient[2] != 0 || l.collapse)
@@ -2905,6 +2927,50 @@ void Scene2DNode::Parse()
          float g = 0;
          while (s >> g)
             (key == "guidesx" ? mDoc.guidesX : mDoc.guidesY).push_back(g);
+      }
+      else if (key == "cstyle" || key == "pstyle" || key == "pbasic")
+      {
+         TextStyles& ts = mDoc.textStyles;
+         uint32_t id = 0;
+         std::string name, pa, ca;
+         if (key == "pbasic")
+         {
+            StyleAttrs a, b;
+            ParaStyle pp;
+            RunStyle cp;
+            if (s >> pa >> ca && ParseAttrsText(UnescapeToken(pa), a) && ParseAttrsText(UnescapeToken(ca), b) &&
+                ApplyParaAttrs(pp, a) && ApplyCharAttrs(cp, b))
+            {
+               ts.basic.para = a;
+               ts.basic.chr = b;
+            }
+         }
+         else if (key == "cstyle")
+         {
+            CharStyleDef c;
+            if (s >> id >> name >> ca && id != 0 && ts.Char(id) == nullptr && ParseAttrsText(UnescapeToken(ca), c.attrs))
+            {
+               RunStyle cp;
+               c.id = id;
+               c.name = UnescapeToken(name);
+               if (!c.name.empty() && ApplyCharAttrs(cp, c.attrs))
+                  ts.character.push_back(c);
+            }
+         }
+         else
+         {
+            ParaStyleDef p;
+            if (s >> id >> name >> pa >> ca && id != 0 && ts.Para(id) == nullptr && ParseAttrsText(UnescapeToken(pa), p.para) &&
+                ParseAttrsText(UnescapeToken(ca), p.chr))
+            {
+               ParaStyle pp;
+               RunStyle cp;
+               p.id = id;
+               p.name = UnescapeToken(name);
+               if (!p.name.empty() && ApplyParaAttrs(pp, p.para) && ApplyCharAttrs(cp, p.chr))
+                  ts.paragraph.push_back(p);
+            }
+         }
       }
       else if (key == "mslot")
       {
@@ -3248,6 +3314,27 @@ void Scene2DNode::Parse()
          }
          else if (key == "tpara")
             s >> l->indentL >> l->indentR >> l->indentFirst >> l->spaceBefore >> l->spaceAfter;
+         else if (key == "trun")
+         {
+            TextRun r;
+            std::string font;
+            int b = 0, i = 0, u = 0;
+            if (s >> r.len >> r.st.charStyle >> font >> r.st.size >> r.st.tracking >> r.st.c[0] >> r.st.c[1] >> r.st.c[2] >>
+                    r.st.c[3] >> b >> i >> u &&
+                std::isfinite(r.st.size) && std::isfinite(r.st.tracking) && r.len <= l->text.size() + 4)
+            {
+               r.st.font = UnescapeToken(font);
+               r.st.size = std::clamp(r.st.size, 1.0f, 2000.0f);
+               for (float& v : r.st.c)
+                  v = unit(v);
+               r.st.bold = b != 0;
+               r.st.italic = i != 0;
+               r.st.underline = u != 0;
+               l->runs.push_back(r);
+            }
+         }
+         else if (key == "tpstyle")
+            s >> l->paraStyle;
          else if (key == "ttype")
          {
             int mode = 0, flip = 0, vert = 0;
@@ -3328,6 +3415,23 @@ void Scene2DNode::Parse()
             }
          }
       }
+   }
+   // Runs: a style id that names no style falls back (None / Basic Paragraph); the runs then cover the text and lead
+   // the summary fields. No runs: one run from the fields, made on the next sync.
+   for (Layer& l : mLayers)
+   {
+      if (l.kind != Kind::Text)
+      {
+         l.runs.clear();
+         continue;
+      }
+      if (l.paraStyle != 0 && mDoc.textStyles.Para(l.paraStyle) == nullptr)
+         l.paraStyle = 0;
+      for (TextRun& r : l.runs)
+         if (r.st.charStyle != 0 && mDoc.textStyles.Char(r.st.charStyle) == nullptr)
+            r.st.charStyle = 0;
+      if (!l.runs.empty())
+         NormalizeRuns(l);
    }
    RestoreSelection();
    // A parent that is not a group (hand-written text) puts the layer back at the top level.

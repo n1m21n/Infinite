@@ -2046,36 +2046,60 @@ namespace Platform
             CFNumberRef strokeNum =
                CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &strokeSetting);
 
-            auto buildAttrString = [&](float pointSize) -> CFAttributedStringRef
+            // A font at a size; bold / italic: the family's own face when it has one, else a drawn bold (fakeBold:
+            // fill + stroke) or a slant.
+            auto styledFont = [&](const std::string& name, float pointSize, bool bold, bool italic, bool& fakeBold) -> CTFontRef
             {
-               CFStringRef nameRef = CFStringCreateWithCString(kCFAllocatorDefault, req.fontName.c_str(), kCFStringEncodingUTF8);
-               CTFontRef trialFont = CTFontCreateWithName(nameRef, pointSize, nullptr);
-               CFRelease(nameRef);
-               // Bold / italic: the family's own face when it has one; else a drawn bold (fill + stroke) or a slant.
-               bool fakeBold = false;
-               if (req.bold || req.italic)
+               CFStringRef nameRef = CFStringCreateWithCString(kCFAllocatorDefault, name.c_str(), kCFStringEncodingUTF8);
+               CTFontRef f = CTFontCreateWithName(nameRef, pointSize, nullptr);
+               if (nameRef != nullptr)
+                  CFRelease(nameRef);
+               fakeBold = false;
+               if (bold || italic)
                {
-                  const CTFontSymbolicTraits want = (req.bold ? kCTFontBoldTrait : 0) | (req.italic ? kCTFontItalicTrait : 0);
-                  CTFontRef styled = CTFontCreateCopyWithSymbolicTraits(trialFont, pointSize, nullptr, want, want);
-                  if (styled == nullptr && req.bold && req.italic)
-                     styled = CTFontCreateCopyWithSymbolicTraits(trialFont, pointSize, nullptr, kCTFontBoldTrait, kCTFontBoldTrait);
+                  const CTFontSymbolicTraits want = (bold ? kCTFontBoldTrait : 0) | (italic ? kCTFontItalicTrait : 0);
+                  CTFontRef styled = CTFontCreateCopyWithSymbolicTraits(f, pointSize, nullptr, want, want);
+                  if (styled == nullptr && bold && italic)
+                     styled = CTFontCreateCopyWithSymbolicTraits(f, pointSize, nullptr, kCTFontBoldTrait, kCTFontBoldTrait);
                   if (styled != nullptr)
                   {
-                     CFRelease(trialFont);
-                     trialFont = styled;
+                     CFRelease(f);
+                     f = styled;
                   }
-                  const CTFontSymbolicTraits got = CTFontGetSymbolicTraits(trialFont);
-                  fakeBold = req.bold && (got & kCTFontBoldTrait) == 0;
-                  if (req.italic && (got & kCTFontItalicTrait) == 0)
+                  const CTFontSymbolicTraits got = CTFontGetSymbolicTraits(f);
+                  fakeBold = bold && (got & kCTFontBoldTrait) == 0;
+                  if (italic && (got & kCTFontItalicTrait) == 0)
                   {
                      const CGAffineTransform slant = CGAffineTransformMake(1.0, 0.0, 0.21, 1.0, 0.0, 0.0);
-                     if (CTFontRef sl = CTFontCreateCopyWithAttributes(trialFont, pointSize, &slant, nullptr))
+                     if (CTFontRef sl = CTFontCreateCopyWithAttributes(f, pointSize, &slant, nullptr))
                      {
-                        CFRelease(trialFont);
-                        trialFont = sl;
+                        CFRelease(f);
+                        f = sl;
                      }
                   }
                }
+               return f;
+            };
+            // Byte offset in the UTF-8 text -> UTF-16 index, for the spans.
+            std::vector<CFIndex> u16;
+            if (!req.spans.empty())
+            {
+               u16.assign(req.text.size() + 1, 0);
+               CFIndex k = 0;
+               for (size_t i = 0; i < req.text.size(); i++)
+               {
+                  u16[i] = k;
+                  const unsigned char c = (unsigned char)req.text[i];
+                  if ((c & 0xC0) != 0x80)
+                     k += (c >= 0xF0) ? 2 : 1;
+               }
+               u16[req.text.size()] = k;
+            }
+
+            auto buildAttrString = [&](float pointSize) -> CFAttributedStringRef
+            {
+               bool fakeBold = false;
+               CTFontRef trialFont = styledFont(req.fontName, pointSize, req.bold, req.italic, fakeBold);
                float fakeStroke = -3.0f;   // percent of the size; negative = fill and stroke
                CFNumberRef fakeStrokeNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &fakeStroke);
                const bool useFake = fakeBold && req.outlineWidth <= 0.0f;
@@ -2119,6 +2143,45 @@ namespace Platform
                   CFAttributedStringCreate(kCFAllocatorDefault, cfText, attrs);
                CFRelease(attrs);
                CFRelease(trialFont);
+               if (!req.spans.empty() && result != nullptr)
+               {
+                  // Styled runs: each range gets its own font, colour, tracking, underline and drawn bold.
+                  CFMutableAttributedStringRef m = CFAttributedStringCreateMutableCopy(kCFAllocatorDefault, 0, result);
+                  CFRelease(result);
+                  const CFIndex total = CFAttributedStringGetLength(m);
+                  const float scale = req.fontSize > 0.0f ? pointSize / req.fontSize : 1.0f;
+                  for (const TextRasterRequest::Span& sp : req.spans)
+                  {
+                     if (sp.start >= req.text.size() || sp.len == 0)
+                        continue;
+                     const CFIndex a = u16[sp.start], b = u16[std::min(req.text.size(), sp.start + sp.len)];
+                     if (b <= a || b > total)
+                        continue;
+                     const CFRange r = CFRangeMake(a, b - a);
+                     bool fb = false;
+                     CTFontRef f = styledFont(sp.font, std::max(1.0f, sp.size * scale), sp.bold, sp.italic, fb);
+                     CGColorRef col = SrgbColor(colorSpace, sp.color[0], sp.color[1], sp.color[2], std::clamp(sp.color[3], 0.0f, 1.0f));
+                     float tr = sp.tracking;
+                     CFNumberRef trNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &tr);
+                     int sul = sp.underline ? kCTUnderlineStyleSingle : kCTUnderlineStyleNone;
+                     CFNumberRef sulNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &sul);
+                     const bool fake = fb && req.outlineWidth <= 0.0f;
+                     float sw = fake ? -3.0f : strokeSetting;
+                     CFNumberRef swNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &sw);
+                     CFAttributedStringSetAttribute(m, r, kCTFontAttributeName, f);
+                     CFAttributedStringSetAttribute(m, r, kCTForegroundColorAttributeName, col);
+                     CFAttributedStringSetAttribute(m, r, req.kerning ? kCTTrackingAttributeName : kCTKernAttributeName, trNum);
+                     CFAttributedStringSetAttribute(m, r, kCTUnderlineStyleAttributeName, sulNum);
+                     CFAttributedStringSetAttribute(m, r, kCTStrokeWidthAttributeName, swNum);
+                     CFAttributedStringSetAttribute(m, r, kCTStrokeColorAttributeName, fake ? col : strokeColor);
+                     CFRelease(f);
+                     CGColorRelease(col);
+                     CFRelease(trNum);
+                     CFRelease(sulNum);
+                     CFRelease(swNum);
+                  }
+                  result = m;
+               }
                return result;
             };
 

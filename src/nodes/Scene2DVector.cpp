@@ -1347,6 +1347,19 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
       key = HF(key, f);
    for (const Shape& s : l.typePath)
       key = HashShape(key, s);
+   // Styled runs, as they would be synced now (the layer's fields may have moved since the last save).
+   const std::vector<TextRun> runs = CharRuns(l);
+   float runMax = l.fontSize;
+   if (runs.size() > 1)
+      for (const TextRun& r : runs)
+      {
+         key = H(key, (unsigned)r.len);
+         key = HS(key, r.st.font);
+         for (float f : { r.st.size, r.st.tracking, r.st.c[0], r.st.c[1], r.st.c[2], r.st.c[3] })
+            key = HF(key, f);
+         key = H(key, (unsigned)(r.st.bold | (r.st.italic << 1) | (r.st.underline << 2)));
+         runMax = std::max(runMax, r.st.size);
+      }
    TextBox& tb = mTextBoxes[l.id];
    if (tb.key != key || tb.rgba.empty())
    {
@@ -1371,15 +1384,17 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
       // Super/subscript: the letters at 58%, raised by a third or dropped by a seventh of the full size.
       const float full = std::clamp(l.fontSize, 1.0f, 2000.0f);
       const float size = l.script != 0 ? full * 0.58f : full;
+      // The canvas fits the largest run (a run bigger than the first one needs the room).
+      const float roomScale = std::clamp(runMax, 1.0f, 2000.0f) / full;
       const float shift = l.baseShift + (l.script == 1 ? full * 0.33f : l.script == 2 ? -full * 0.14f : 0.0f);
       const float tsx = std::clamp(l.textSX, 0.01f, 100.0f), tsy = std::clamp(l.textSY, 0.01f, 100.0f);
-      const int pad = (int)std::ceil(size * 0.5f + std::fabs(shift)) + 4;
+      const int pad = (int)std::ceil(size * roomScale * 0.5f + std::fabs(shift)) + 4;
       // No break: the box never wraps (laid out as point text).
       const float boxW = l.noBreak ? 0.0f : l.boxW;
       int cw = boxW > 0.0f ? (int)std::ceil(boxW) + pad * 2
-                             : (int)std::ceil((longest * size * (0.9f + std::max(0.0f, l.tracking) * 0.01f) + l.indentL + l.indentFirst) * tsx) +
-                                  pad * 2 + (int)size;
-      int ch = (int)std::ceil((lines * size * std::max(0.5f, l.leading) * 1.4f + lines * (l.spaceBefore + l.spaceAfter)) * tsy) + pad * 2;
+                             : (int)std::ceil((longest * size * roomScale * (0.9f + std::max(0.0f, l.tracking) * 0.01f) + l.indentL + l.indentFirst) * tsx) +
+                                  pad * 2 + (int)(size * roomScale);
+      int ch = (int)std::ceil((lines * size * roomScale * std::max(0.5f, l.leading) * 1.4f + lines * (l.spaceBefore + l.spaceAfter)) * tsy) + pad * 2;
       if (boxW > 0.0f)
          ch = std::max(ch, (int)std::ceil(size * 1.5f * (1 + longest * size * 0.6f / std::max(1.0f, boxW)))) + pad * 2;
       cw = std::clamp(cw, 8, 8192);
@@ -1428,6 +1443,28 @@ bool Scene2DNode::TextSize(const Layer& l, int& w, int& h)
          // Width / height scale: the letters stretch about the box centre; a box keeps its width.
          req.scaleX = tsx;
          req.scaleY = tsy;
+         // Styled runs; ALL CAPS that changes the byte length (e.g. a German sharp s) draws one style.
+         if (runs.size() > 1 && req.text.size() == l.text.size())
+         {
+            const float alpha = std::max(1e-4f, std::clamp(l.textC[3], 0.0f, 1.0f));
+            size_t at = 0;
+            for (const TextRun& r : runs)
+            {
+               Platform::TextRasterRequest::Span sp;
+               sp.start = at;
+               sp.len = r.len;
+               sp.font = r.st.font;
+               sp.size = (l.script != 0 ? 0.58f : 1.0f) * std::clamp(r.st.size, 1.0f, 2000.0f);
+               sp.tracking = r.st.tracking;
+               std::copy(r.st.c, r.st.c + 3, sp.color);
+               sp.color[3] = std::clamp(r.st.c[3] / alpha, 0.0f, 1.0f);
+               sp.bold = r.st.bold;
+               sp.italic = r.st.italic;
+               sp.underline = r.st.underline;
+               req.spans.push_back(sp);
+               at += r.len;
+            }
+         }
          float fitted = size;
          Platform::RasterizeText(req, cw, ch, px.data(), fitted);
       }

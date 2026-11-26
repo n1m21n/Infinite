@@ -198,6 +198,94 @@ public:
    };
    static const char* const kEffBlendNames[5];
 
+   // ---- Styled runs and named type styles (Photoshop's Character Styles and Paragraph Styles; ported in shape from
+   // PhotoCraft's text_styles.rs, Apache-2.0). A text layer's characters are cut into runs, each with its full
+   // character style; the layer's own font / size / colour / bold / italic / underline / tracking fields are the
+   // summary (the first run's style). A run names its character style (0 = None); the layer names its paragraph style
+   // (0 = Basic Paragraph). A run's style from its styles alone is defaults <- Basic Paragraph <- paragraph style <-
+   // character style; what differs from that is a local override (shown "+").
+   struct RunStyle
+   {
+      std::string font;
+      float size = 96.0f, tracking = 0.0f;
+      float c[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      bool bold = false, italic = false, underline = false;
+      uint32_t charStyle = 0;   // character style id, 0 = None
+      bool operator==(const RunStyle& o) const
+      {
+         return font == o.font && size == o.size && tracking == o.tracking && std::equal(c, c + 4, o.c) && bold == o.bold &&
+                italic == o.italic && underline == o.underline && charStyle == o.charStyle;
+      }
+      bool operator!=(const RunStyle& o) const { return !(*this == o); }
+   };
+   struct TextRun
+   {
+      size_t len = 0;   // UTF-8 bytes
+      RunStyle st;
+      bool operator==(const TextRun& o) const { return len == o.len && st == o.st; }
+   };
+   // Paragraph attributes a paragraph style can set (the layer's own fields).
+   struct ParaStyle
+   {
+      int align = 0;
+      float leading = 1.2f, indentL = 0.0f, indentR = 0.0f, indentFirst = 0.0f, spaceBefore = 0.0f, spaceAfter = 0.0f;
+      bool operator==(const ParaStyle& o) const
+      {
+         return align == o.align && leading == o.leading && indentL == o.indentL && indentR == o.indentR &&
+                indentFirst == o.indentFirst && spaceBefore == o.spaceBefore && spaceAfter == o.spaceAfter;
+      }
+   };
+   // A partial attribute set: attribute name -> value as text ("size" -> "40", "color" -> "1 0 0 1", "bold" -> "1").
+   using StyleAttrs = std::map<std::string, std::string>;
+   struct CharStyleDef
+   {
+      uint32_t id = 0;   // >= 1
+      std::string name;
+      StyleAttrs attrs;
+      bool operator==(const CharStyleDef& o) const { return id == o.id && name == o.name && attrs == o.attrs; }
+   };
+   struct ParaStyleDef
+   {
+      uint32_t id = 0;   // >= 1; Basic Paragraph is 0
+      std::string name;
+      StyleAttrs para, chr;   // paragraph attributes, and character attributes every run in it starts from
+      bool operator==(const ParaStyleDef& o) const { return id == o.id && name == o.name && para == o.para && chr == o.chr; }
+   };
+   static constexpr const char* kBasicParagraph = "Basic Paragraph";
+   static constexpr const char* kNoCharStyle = "None";
+   struct TextStyles
+   {
+      std::vector<CharStyleDef> character;   // panel order ("None" is implicit and first)
+      std::vector<ParaStyleDef> paragraph;   // panel order (Basic Paragraph is `basic`, listed first)
+      ParaStyleDef basic = { 0, kBasicParagraph, {}, {} };
+      bool operator==(const TextStyles& o) const { return character == o.character && paragraph == o.paragraph && basic == o.basic; }
+      bool Empty() const { return character.empty() && paragraph.empty() && basic.para.empty() && basic.chr.empty(); }
+      const CharStyleDef* Char(uint32_t id) const;
+      CharStyleDef* Char(uint32_t id);
+      const ParaStyleDef* Para(uint32_t id) const;   // 0 = Basic Paragraph
+      ParaStyleDef* Para(uint32_t id);
+      // A fresh id, or false when the stored ids use up the 32-bit id space.
+      bool NextCharId(uint32_t& out) const;
+      bool NextParaId(uint32_t& out) const;
+      std::string UniqueName(bool paragraph, const std::string& base) const;   // "Character Style 1", ...
+      ParaStyle ResolvePara(uint32_t para) const;
+      // defaults <- Basic Paragraph <- paragraph style <- character style; a missing id falls back (charStyle 0).
+      RunStyle ResolveChar(uint32_t para, uint32_t chr) const;
+      StyleAttrs CharOverrides(const RunStyle& run, uint32_t para) const;
+      StyleAttrs ParaOverrides(const ParaStyle& p, uint32_t para) const;
+      // Re-resolves a run against these styles, keeping the overrides it had under `old`.
+      RunStyle RestyleChar(const TextStyles& old, const RunStyle& run, uint32_t oldPara, uint32_t newPara, uint32_t newChr) const;
+      ParaStyle RestylePara(const TextStyles& old, const ParaStyle& p, uint32_t oldPara, uint32_t newPara) const;
+   };
+   // Attribute sets: apply (false + err for an unknown name or a bad value), every attribute, and the difference.
+   static bool ApplyCharAttrs(RunStyle& s, const StyleAttrs& a, std::string* err = nullptr);
+   static bool ApplyParaAttrs(ParaStyle& s, const StyleAttrs& a, std::string* err = nullptr);
+   static StyleAttrs CharAttrsOf(const RunStyle& s);
+   static StyleAttrs ParaAttrsOf(const ParaStyle& s);
+   static StyleAttrs DiffAttrs(const StyleAttrs& a, const StyleAttrs& base);
+   static std::string AttrsText(const StyleAttrs& a);                  // "k=v;k=v" (escaped as one token when saved)
+   static bool ParseAttrsText(const std::string& t, StyleAttrs& out);
+
    struct Layer
    {
       int id = 0;
@@ -320,6 +408,12 @@ public:
       float offsetX = 0.0f, outlineW = 2.0f;
       float outlineC[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       std::string lang;
+      // Styled runs (see RunStyle): cover the text exactly, in order. runText / runSummary are what the runs were last
+      // synced against (not saved): a text or summary-field edit since then is folded in by SyncTextRuns.
+      std::vector<TextRun> runs;
+      std::string runText;
+      RunStyle runSummary;
+      uint32_t paraStyle = 0;   // paragraph style id, 0 = Basic Paragraph
       // Paragraph (a new line starts one; box text): indents and spacing, px.
       float indentL = 0.0f, indentR = 0.0f, indentFirst = 0.0f, spaceBefore = 0.0f, spaceAfter = 0.0f;
       // Type on a path (1) or inside one (2, area type); 0 = point or box text. typePath is the text's own px about its
@@ -397,6 +491,7 @@ public:
       uint64_t brushSrc[3] = { 0, 0, 0 };    // canvas nodes feeding the brush: tip, grain, colour (0 = built in)
       bool brushLive = false;                // sources follow the node mid-stroke; off = frozen when the stroke starts
       std::vector<ModSlot> slots;            // bound layer numbers (motion-first layers)
+      TextStyles textStyles;                 // named character and paragraph styles
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
@@ -954,6 +1049,50 @@ public:
    static std::string UpperText(const std::string& in);
    // Text layer -> a vector layer of its glyph outlines, same place and colour; returns the new layer's id (0 = failed).
    int ConvertTextToShapes(int id);
+   // ---- Styled runs and named type styles (Scene2DTextRuns.cpp). Byte offsets are UTF-8, snapped to characters.
+   static RunStyle SummaryOf(const Layer& l);            // the layer's summary fields as a run style
+   static void SetSummary(Layer& l, const RunStyle& s);
+   static ParaStyle ParaOf(const Layer& l);
+   static void SetPara(Layer& l, const ParaStyle& p);
+   static void NormalizeRuns(Layer& l);                  // the runs cover the text; equal neighbours merge
+   static void SyncTextRuns(Layer& l);                   // folds text / summary-field edits since the last sync in
+   // Replaces bytes [a, b) of a synced layer's text. The new text takes the style of the first replaced character,
+   // or at a caret the character before it (the first run at the start).
+   static void ReplaceRunText(Layer& l, size_t a, size_t b, const std::string& ins);
+   // The text becomes `now` (a text field's whole buffer). The edit is found by diff, its start kept at or before
+   // `hintLo` (the field's caret or selection start before the edit), so typing takes the style before the caret.
+   static void EditRunText(Layer& l, const std::string& now, size_t hintLo = std::string::npos);
+   // Styles bytes [a, b); a > b changes nothing; on empty text it styles the one (empty) run.
+   static void StyleRange(Layer& l, size_t a, size_t b, const std::function<void(RunStyle&)>& f);
+   static std::vector<TextRun> CharRuns(const Layer& l);   // the runs as they would be synced now
+   static size_t RunAt(const std::vector<TextRun>& runs, size_t at);   // the run holding byte `at` (the last at the end)
+   // Through the node (saved text, undo):
+   bool ReplaceText(int id, size_t a, size_t b, const std::string& ins);
+   bool StyleTextRange(int id, size_t a, size_t b, const StyleAttrs& set, std::string* err = nullptr);
+   const TextStyles& TypeStyles()
+   {
+      Layers();
+      return mDoc.textStyles;
+   }
+   // Style commands. False (err says why, nothing changes, no history) on failure. A new style takes the attributes of
+   // the text at byte `at` of layer `fromLayer` (0 = none: the defaults, plus `attrs` when given).
+   bool NewCharStyle(int fromLayer, size_t at, uint32_t& outId, std::string* err = nullptr, const StyleAttrs* attrs = nullptr);
+   bool NewParaStyle(int fromLayer, size_t at, uint32_t& outId, std::string* err = nullptr, const StyleAttrs* paraAttrs = nullptr,
+                     const StyleAttrs* charAttrs = nullptr);
+   bool DuplicateStyle(bool para, uint32_t id, uint32_t& outId, std::string* err = nullptr);
+   bool DeleteStyle(bool para, uint32_t id);              // its text keeps its look and goes to None / Basic Paragraph
+   bool RenameStyle(bool para, uint32_t id, const std::string& name);
+   // Applies a character style to bytes [a, b) of a layer (a == b: the whole layer); clear drops local overrides.
+   bool ApplyCharStyle(int layer, size_t a, size_t b, uint32_t id, bool clearOverrides);
+   bool ApplyParaStyle(int layer, uint32_t id, bool clearOverrides);
+   bool RedefineStyle(bool para, uint32_t id, int fromLayer, size_t at);   // the style takes the text's attributes there
+   // Style Options: replace a style's attribute sets (nullptr keeps one); every run that uses it follows, keeping its
+   // overrides. Preview returns the document text the change would make, changing nothing.
+   bool SetStyleAttrs(bool para, uint32_t id, const StyleAttrs* paraAttrs, const StyleAttrs* charAttrs, std::string* err = nullptr);
+   bool PreviewStyleAttrs(bool para, uint32_t id, const StyleAttrs* paraAttrs, const StyleAttrs* charAttrs, std::string& outText,
+                          std::string* err = nullptr);
+   // The style names at a spot ("Big", "Big+" with local overrides, "None").
+   std::string StyleLabel(int layer, size_t at, bool para);
 
    // ---- vector and text (Block C) ---------------------------------------
    int AddVectorLayer(int above = 0);

@@ -338,6 +338,18 @@ namespace Platform
       // Paragraphs ('\n' starts one; word-wrapped text only): indents and spacing in px.
       float indentL = 0.0f, indentR = 0.0f, indentFirst = 0.0f;
       float spaceBefore = 0.0f, spaceAfter = 0.0f;
+      // Styled runs (byte ranges of `text`, UTF-8): each sets its own font, size, tracking, colour (alpha as a share
+      // of the whole text's), bold, italic and underline over the request's. Empty = one style. macOS draws them;
+      // Windows and Linux draw the request's own style (a known limitation).
+      struct Span
+      {
+         size_t start = 0, len = 0;
+         std::string font;
+         float size = 24.0f, tracking = 0.0f;
+         float color[4] = { 1, 1, 1, 1 };
+         bool bold = false, italic = false, underline = false;
+      };
+      std::vector<Span> spans;
    };
 
    void RasterizeText(const TextRasterRequest& req, int width, int height,
