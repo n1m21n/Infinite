@@ -163,7 +163,16 @@ static void RunAiEval()
    while (std::fscanf(lf, "%63s %f %f %f %f %f %f", id, &bx0, &by0, &bx1, &by1, &cx, &cy) == 7)
    {
       int w = 0, h = 0, ch = 0;
-      unsigned char* data = stbi_load((root + "S1/" + id + ".jpg").c_str(), &w, &h, &ch, 4);
+      // stb is built with STBI_NO_STDIO (EnvironmentNode.cpp): read the file, decode from memory.
+      std::vector<unsigned char> bytes;
+      if (FILE* jf = std::fopen((root + "S1/" + id + ".jpg").c_str(), "rb"))
+      {
+         unsigned char buf[1 << 16];
+         for (size_t got; (got = std::fread(buf, 1, sizeof(buf), jf)) > 0;)
+            bytes.insert(bytes.end(), buf, buf + got);
+         std::fclose(jf);
+      }
+      unsigned char* data = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &w, &h, &ch, 4);
       if (data == nullptr)
          continue;
       std::vector<uint8_t> rgba(data, data + (size_t)w * h * 4);
