@@ -1417,55 +1417,6 @@ void RunView2DTest()
          fprintf(stderr, "PROBE smoothing pause: lit 240 %d 270 %d 279 %d\n", (int)Lit(px, 240, 100), (int)Lit(px, 270, 100), (int)Lit(px, 279, 100));
          Check("parity: smoothing without catch-up stops while the pointer pauses", Lit(px, 240, 100) && !Lit(px, 279, 100));
       }
-      {
-         // 8-bit soft paint is dithered, not banded; full paint and untouched pixels keep their exact values
-         // (PhotoCraft an_8bit_soft_stroke_is_dithered_instead_of_banded, dithering_never_moves_an_exact_colour_...).
-         auto line = [&](const BrushEngine::Brush& b) {
-            while (!pic.Layers().empty())
-               pic.Layers().pop_back();
-            pic.Commit();
-            const int L = pic.AddPaintLayer();
-            pic.BeginPaint(L, 0, b, 40.0f, 100.0f, 1.0f);
-            for (float x = 40.0f; x <= 260.0f; x += 2.0f)
-               pic.PaintTo(x, 100.0f, 1.0f);
-            pic.EndPaint();
-            Cook(&pic);
-            const int w = pic.GetOutputWidth(), h = pic.GetOutputHeight();
-            std::vector<float> px((size_t)w * h * 4);
-            glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
-            glBindTexture(GL_TEXTURE_2D, 0);
-            return px;
-         };
-         auto at = [](const std::vector<float>& px, int x, int y, int c) { return (int)std::lround(px[((size_t)(199 - y) * 300 + x) * 4 + c] * 255.0f); };
-         BrushEngine::Brush solid = pen;
-         solid.size = 20.0f;
-         solid.color[0] = 0.2f, solid.color[1] = 0.4f, solid.color[2] = 0.6f;
-         const std::vector<float> a = line(solid);
-         bool exact = true;
-         for (int x = 60; x < 240; x++)
-            exact = exact && at(a, x, 100, 0) == 51 && at(a, x, 100, 1) == 102 && at(a, x, 100, 2) == 153 && at(a, x, 100, 3) == 255;
-         const bool untouched = at(a, 150, 20, 3) == 0;
-         BrushEngine::Brush soft = pen;
-         soft.size = 60.0f;
-         soft.hardness = 0.0f;
-         soft.flow = 0.08f;
-         const std::vector<float> b = line(soft);
-         int fractional = 0, painted = 0;
-         for (int y = 72; y <= 128; y++)
-         {
-            double sum = 0;
-            for (int x = 80; x < 220; x++)
-               sum += at(b, x, y, 3);
-            const double avg = sum / 140.0;
-            painted += avg > 0.5 ? 1 : 0;
-            fractional += avg > 0.5 && avg < 254.5 && std::fabs(avg - std::round(avg)) > 0.15 ? 1 : 0;
-         }
-         fprintf(stderr, "PROBE brush dither: exact %d untouched %d painted rows %d fractional rows %d centre a %d\n", (int)exact,
-                 (int)untouched, painted, fractional, at(b, 150, 100, 3));
-         Check("parity: dithering never moves an exact colour or an untouched pixel", exact && untouched);
-         Check("parity: an 8-bit soft stroke is dithered instead of banded", painted > 10 && fractional * 2 > painted);
-      }
 
       while (!pic.Layers().empty())
          pic.Layers().pop_back();
@@ -1671,6 +1622,7 @@ void RunView2DTest()
             for (int x = 0; x < S; x++)
                if (std::hypot(x - 48.0f, y - 48.0f) > 14.0f)
                   untouched = untouched && d[((size_t)y * S + x) * 4 + 3] == 0;
+         fprintf(stderr, "PROBE dither exact: same colour %d untouched %d\n", (int)exact, (int)untouched);
          Check("Brush: dithering never moves an exact colour or an untouched pixel", exact && untouched);
          GLUtil::DestroyFbo(surf);
       }

@@ -357,7 +357,7 @@ namespace
 
    struct Pending
    {
-      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, MaskFromAlpha, HideSel, MaskObjects, RemoveMask, ApplyMask, InvertMask, AddFxMask, RemoveFxMask, BlurFxMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown };
+      enum What { None, NewDoc, DuplicateDoc, DeleteDoc, OpenFile, ExportPsd, ExportOra, Convert, RenderImage, RenderAnim, Group, Ungroup, Duplicate, Copy, Cut, Paste, Delete, AddFill, AddPaint, AddMask, MaskFromSel, MaskFromAlpha, HideSel, MaskObjects, RemoveMask, ApplyMask, InvertMask, AddFxMask, RemoveFxMask, BlurFxMask, ToDraw, AddVector, AddVMask, RemoveVMask, ToSketch, ToText, ToShapes, AddAdjust, AddNode, ReplaceNode, LayerOutput, LayerBelow, MergeDown, MergeVisible, Flatten, FlattenGroup, CopyMerged, StampVisible, StampDown, LinkLayers, SelectLinked };
       What what = None;
       int arg = 0;         // AddAdjust: the type
       uint64_t uid = 0;    // AddNode / ReplaceNode: the canvas node
@@ -805,14 +805,75 @@ namespace
    }
 
    // The layers that move with the selection: a group moves everything in it.
+   // Link Layers toggles (two or more selected, or a selection already in one group); Select Linked Layers needs a
+   // linked layer in the selection.
+   bool LinkedSelection(Scene2DNode* doc)
+   {
+      uint64_t g = 0;
+      bool same = !sSel.empty();
+      for (int id : sSel)
+      {
+         const Layer* l = doc->FindLayer(id);
+         const uint64_t k = l != nullptr ? l->link : 0;
+         same = same && k != 0 && (g == 0 || k == g);
+         g = k;
+      }
+      return same;
+   }
+
+   void LinkItems(Scene2DNode* doc)
+   {
+      const bool linked = LinkedSelection(doc);
+      if ((sSel.size() > 1 || linked) && MenuParts::Item(linked ? T("Unlink Layers") : T("Link Layers"), nullptr))
+         sPending.what = Pending::LinkLayers;
+      if (!doc->LinkedWith(sSel).empty() && MenuParts::Item(T("Select Linked Layers"), nullptr))
+         sPending.what = Pending::SelectLinked;
+   }
+
+   // Select Linked Layers: the selection becomes every layer linked to it, in stack order; a linked active layer
+   // stays active, else the top one is. No history step (a selection is not an edit). False when nothing is linked.
+   bool SelectLinked(Scene2DNode* doc)
+   {
+      std::vector<int> all = doc->LinkedWith(sSel);
+      if (all.empty())
+         return false;
+      const int active = sSel.empty() ? 0 : sSel.back();
+      if (std::find(all.begin(), all.end(), active) != all.end())
+      {
+         all.erase(std::find(all.begin(), all.end(), active));
+         all.push_back(active);
+      }
+      sSel = all;
+      return true;
+   }
+
+   // Link / Unlink as one history step; a repeat that changes nothing leaves no step.
+   bool LinkSelected(Scene2DNode* doc, int want = -1)
+   {
+      const size_t undo0 = gUndoStack.size();
+      PushUndoCheckpoint(want == 0 || (want < 0 && LinkedSelection(doc)) ? "Unlink layers" : "Link layers");
+      bool changed = false;
+      const bool linked = doc->LinkLayers(sSel, want, &changed);
+      if (!changed)
+         gUndoStack.resize(undo0);
+      else
+         sDirty = true;
+      return linked;
+   }
+
    std::vector<int> MovingIds(Scene2DNode* doc)
    {
+      // Linked layers move and transform with the selection (Photoshop Link Layers).
+      std::vector<int> picked = sSel;
+      for (int id : doc->LinkedWith(sSel))
+         if (!Selected(id))
+            picked.push_back(id);
       std::vector<int> out;
       for (const Layer& l : doc->Layers())
       {
          if (l.kind == Kind::Group || !Movable(doc, l))
             continue;
-         for (int id : sSel)
+         for (int id : picked)
             if (doc->IsInside(l.id, id))
             {
                out.push_back(l.id);
@@ -2893,6 +2954,7 @@ namespace
    void CamEnd(bool ok);
    bool EnsurePixels(Scene2DNode* doc);
    bool SelectionActsOnPixels(Scene2DNode* doc);
+   bool TrimByCornerColour(Scene2DNode* doc, bool bottomRight);
    int PaintTarget(Scene2DNode* doc, int& target, bool make);
    void RunRemove(Scene2DNode* doc);
 
@@ -8001,6 +8063,7 @@ namespace
             NodeChoiceMenu(T("Add Node as Layer"), doc, Pending::AddNode, 0);
             MenuParts::Separator();
             if (any && MenuParts::Item(T("Group"), Sc("Ctrl+G"))) sPending.what = Pending::Group;
+            LinkItems(doc);
             // Arrange as one submenu, as Photoshop's Layer > Arrange and Affinity's Arrange.
             if (any && MenuParts::SubMenu(T("Arrange")))
             {
@@ -13056,6 +13119,7 @@ namespace
             }
             MenuParts::Separator();
             if (MenuParts::Item(T("Group Layers"), Sc("Ctrl+G"))) sPending.what = Pending::Group;
+            LinkItems(doc);
             if (l->kind == Kind::Group && MenuParts::Item(T("Ungroup"), Sc("Shift+Ctrl+G"))) sPending.what = Pending::Ungroup;
             if (!l->clip)
                clipItem();
@@ -16349,11 +16413,41 @@ namespace
             if (const int nid = SelectionToLayer(doc, false))
                SelectOnly(nid);
          }
+         else if (sSel.size() > 1)
+         {
+            // Every selected layer (a layer inside a selected group goes with its group), each copy above its
+            // original; copies of a linked set are linked to each other, not to the originals.
+            PushUndoCheckpoint("Duplicate layers");
+            std::vector<int> tops;
+            for (int id : sSel)
+            {
+               bool inner = false;
+               for (int o : sSel)
+                  inner = inner || (o != id && doc->IsInside(id, o));
+               if (!inner && doc->FindLayer(id) != nullptr)
+                  tops.push_back(id);
+            }
+            std::vector<std::pair<int, int>> made;
+            for (int id : tops)
+               if (const int c = doc->Duplicate(id))
+                  made.push_back({ id, c });
+            doc->RelinkCopies(made);
+            sSel.clear();
+            for (const auto& m : made)
+               sSel.push_back(m.second);
+            Touch();
+         }
          else if (Layer* a = Active(doc))
          {
             PushUndoCheckpoint("Duplicate layer");
             SelectOnly(doc->Duplicate(a->id));
          }
+         break;
+      case Pending::LinkLayers:
+         LinkSelected(doc);
+         break;
+      case Pending::SelectLinked:
+         SelectLinked(doc);
          break;
       case Pending::Copy:
       case Pending::Cut:
@@ -19960,6 +20054,9 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          const M ms[4] = { { { 126, 97, 120 }, { 148, 148, 148 } }, { { 131, 103, 125 }, { 152, 152, 152 } },
                            { { 95, 69, 90 }, { 122, 122, 122 } }, { { 102, 102, 102 }, { 128, 128, 128 } } };
          bool all = true;
+         // Photoshop's numbers are an 8-bit gamma document's: the default (linear, light above 1.0) takes the 32-bit path.
+         const bool keepLinear = doc->Doc().linear, keepHead = doc->Doc().headroom;
+         doc->Doc().linear = doc->Doc().headroom = false;
          for (const M& m : ms)
          {
             const float c[3] = { m.in[0] / 255.0f, m.in[1] / 255.0f, m.in[2] / 255.0f };
@@ -19996,6 +20093,9 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             doc->RemoveLayer(base);
             doc->Commit();
          }
+         doc->Doc().linear = keepLinear;
+         doc->Doc().headroom = keepHead;
+         doc->Commit();
          expect("parity: hue ranges apply in full to dull colours (Photoshop's render)", all);
       }
       // Block B: Sample All Layers for Blur, Sharpen and Smudge. Red left, blue right on the layer below; the strokes
@@ -21474,6 +21574,230 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->RemoveLayer(id);
          doc->Deselect();
          doc->Commit();
+      }
+      // Link Layers (PhotoCraft layer_multi_cmds tests): group ids, toggles, Select Linked, linked moves, duplicates.
+      {
+         doc->Deselect();
+         doc->Commit();
+         std::vector<uint8_t> px4((size_t)16 * 4, 255);
+         auto mk = [&](int x, int y) { return doc->AddFileLayer(0, "Link", x, y, 4, 4, px4); };
+         auto grp = [&](int id) { const Layer* l = doc->FindLayer(id); return l != nullptr ? l->link : (uint64_t)0; };
+         // A file layer stores its centre: the 4 x 4 test layers' corners are 2 px up-left of it.
+         auto at = [&](int id) { const Layer* l = doc->FindLayer(id); return l != nullptr ? ImVec2(l->x - 2.0f, l->y - 2.0f) : ImVec2(-1.0f, -1.0f); };
+         auto same = [](ImVec2 a, float x, float y) { return std::fabs(a.x - x) < 0.01f && std::fabs(a.y - y) < 0.01f; };
+         auto stored = [&](std::vector<uint64_t> g) {
+            std::vector<int> ids;
+            for (uint64_t k : g)
+            {
+               ids.push_back(mk(0, 0));
+               doc->FindLayer(ids.back())->link = k;
+            }
+            return ids;
+         };
+         auto members = [&](uint64_t g) { int n = 0; for (const Layer& l : doc->Layers()) n += g != 0 && l.link == g ? 1 : 0; return n; };
+         // Link the given layers as a fresh group: one history step, every one in it and nobody else.
+         auto fresh = [&](std::vector<int> ids, bool& ok) {
+            sSel = ids;
+            const size_t u0 = gUndoStack.size();
+            const bool linked = LinkSelected(doc, -1);
+            const uint64_t g = grp(ids[0]);
+            bool all = g != 0;
+            for (int id : ids) all = all && grp(id) == g;
+            ok = ok && linked && all && gUndoStack.size() == u0 + 1 && members(g) == (int)ids.size();
+            return g;
+         };
+         auto clear = [&](std::vector<int> ids) { for (int id : ids) doc->RemoveLayer(id, false); doc->Commit(); };
+         const uint64_t kTop = UINT64_MAX;
+         {
+            bool ok = true;
+            std::vector<int> ids = stored({ 0, 0, 0, 0 });
+            const uint64_t g1 = fresh({ ids[0], ids[1] }, ok), g2 = fresh({ ids[2], ids[3] }, ok);
+            sSel = { ids[2], ids[3] };
+            const bool off = !LinkSelected(doc, -1);
+            fprintf(stderr, "PROBE link groups: g1 %llu g2 %llu off %d\n", (unsigned long long)g1, (unsigned long long)g2, (int)off);
+            expect("parity: link layers assigns working groups",
+                   ok && g1 == 1 && g2 == 2 && off && grp(ids[2]) == 0 && grp(ids[3]) == 0 && grp(ids[0]) == 1 && grp(ids[1]) == 1);
+            clear(ids);
+         }
+         {
+            bool ok = true;
+            std::vector<int> ids = stored({ kTop, 0 });
+            const uint64_t g = fresh(ids, ok);
+            sSel = ids;
+            const bool off = !LinkSelected(doc, -1) && grp(ids[0]) == 0 && grp(ids[1]) == 0;
+            const uint64_t again = fresh(ids, ok);
+            clear(ids);
+            ids = stored({ kTop, kTop, 0, 0 });
+            const uint64_t h = fresh({ ids[2], ids[3] }, ok);
+            expect("parity: link layers beside a maximal stored group",
+                   ok && g != kTop && off && again == 1 && h != kTop && grp(ids[0]) == kTop && grp(ids[1]) == kTop);
+            clear(ids);
+         }
+         {
+            bool ok = true;
+            std::vector<int> ids = stored({ kTop - 1, kTop - 1, 0, 0, 0, 0 });
+            const uint64_t g = fresh({ ids[2], ids[3] }, ok), h = fresh({ ids[4], ids[5] }, ok);
+            expect("parity: link layers near the maximum", ok && g == kTop && h != kTop && h != kTop - 1);
+            clear(ids);
+         }
+         {
+            bool ok = true;
+            std::vector<int> ids = stored({ 0, 0, kTop, kTop });
+            const uint64_t g = fresh({ ids[0], ids[1] }, ok);
+            expect("parity: link layers never reuses a group when the largest id is u64 max",
+                   ok && g == 1 && grp(ids[2]) == kTop && grp(ids[3]) == kTop);
+            clear(ids);
+         }
+         {
+            // 0 is "not linked" here, so the stored top groups are the five highest and the two lowest ids.
+            const uint64_t top[] = { kTop, kTop - 1, kTop - 2, 1, 2 };
+            std::vector<uint64_t> st;
+            for (uint64_t t : top) { st.push_back(t); st.push_back(t); }
+            for (int k = 0; k < 4; k++) st.push_back(0);
+            bool ok = true;
+            std::vector<int> ids = stored(st);
+            const size_t n = st.size() - 4;
+            const uint64_t g = fresh({ ids[n], ids[n + 1] }, ok), h = fresh({ ids[n + 2], ids[n + 3] }, ok);
+            bool kept = true, clash = false;
+            for (size_t i = 0; i < 5; i++)
+            {
+               kept = kept && grp(ids[2 * i]) == top[i] && grp(ids[2 * i + 1]) == top[i];
+               clash = clash || g == top[i] || h == top[i];
+            }
+            const std::vector<int> with = doc->LinkedWith({ ids[n] });
+            expect("parity: link layers when every group is huge",
+                   ok && !clash && g != h && kept && with.size() == 2 && with[0] == ids[n] && with[1] == ids[n + 1]);
+            clear(ids);
+         }
+         {
+            bool ok = true;
+            std::vector<int> ids = stored({ kTop, kTop, 0 });
+            sSel = { ids[0], ids[1] };
+            const bool off = !LinkSelected(doc, -1) && grp(ids[0]) == 0 && grp(ids[1]) == 0;
+            Undo();
+            doc = FindDoc();
+            if (doc == nullptr)
+               return fails;
+            const bool back = grp(ids[0]) == kTop && grp(ids[1]) == kTop;
+            fresh(ids, ok);
+            expect("parity: unlink a maximal stored group", off && back && ok);
+            clear(ids);
+         }
+         {
+            // Explicit Link on a linked pair and Unlink on unlinked layers are no edit at all.
+            const int a = mk(0, 0), b = mk(20, 20), c = mk(50, 50);
+            doc->Commit();
+            sSel = { a };
+            const bool noneAlone = doc->LinkedWith(sSel).empty() && !SelectLinked(doc);
+            sSel = { a, b };
+            const bool on = LinkSelected(doc, -1);
+            const size_t u0 = gUndoStack.size();
+            const bool repeat = LinkSelected(doc, 1) && gUndoStack.size() == u0;
+            sSel = { c };
+            const bool unlinkNone = !LinkSelected(doc, 0) && gUndoStack.size() == u0;
+            SelectOnly(a);
+            Nudge(doc, 5.0f, 3.0f);
+            const bool moved = same(at(a), 5, 3) && same(at(b), 25, 23) && same(at(c), 50, 50);
+            Undo();
+            doc = FindDoc();
+            if (doc == nullptr)
+               return fails;
+            const bool undone = same(at(a), 0, 0) && same(at(b), 20, 20);
+            SelectOnly(a);
+            const bool picked = SelectLinked(doc) && sSel.size() == 2 && Selected(a) && Selected(b) && sSel.back() == a;
+            sSel = { a, b, c };
+            Nudge(doc, -1.0f, 0.0f);
+            const bool all = same(at(c), 49, 50) && same(at(a), -1, 0) && same(at(b), 19, 20);
+            sSel = { a, b };
+            const bool toggledOff = !LinkSelected(doc, -1) && grp(a) == 0 && grp(b) == 0;
+            fprintf(stderr, "PROBE linked move: on %d repeat %d none %d moved %d undone %d picked %d all %d off %d\n", (int)on, (int)repeat,
+                    (int)unlinkNone, (int)moved, (int)undone, (int)picked, (int)all, (int)toggledOff);
+            expect("parity: linked layers move together and undo",
+                   noneAlone && on && repeat && unlinkNone && moved && undone && picked && all && toggledOff);
+            expect("parity: select linked layers requires a linked selection", noneAlone);
+            clear({ a, b, c });
+         }
+         {
+            const int a = mk(0, 0), b = mk(20, 20), other = mk(50, 50);
+            doc->Commit();
+            sSel = { a, b };
+            LinkSelected(doc, -1);
+            sSel = { a, other };
+            const size_t u0 = gUndoStack.size();
+            const bool sel = SelectLinked(doc) && sSel == std::vector<int>({ a, b }) && Active(doc) != nullptr && Active(doc)->id == b &&
+                             gUndoStack.size() == u0;
+            bool keeps = true;
+            for (int act : { a, b })
+               for (int k = 0; k < 2; k++)
+               {
+                  if (k == 0)
+                     SelectOnly(act);
+                  keeps = keeps && SelectLinked(doc) && sSel.size() == 2 && Active(doc) != nullptr && Active(doc)->id == act &&
+                          gUndoStack.size() == u0;
+               }
+            expect("parity: select linked layers excludes an unlinked active layer", sel && doc->FindLayer(other) != nullptr);
+            expect("parity: select linked layers preserves a linked active layer", keeps);
+            clear({ a, b, other });
+         }
+         {
+            // Duplicates: a lone copy joins its original's group; copies of a linked pair get a group of their own and
+            // move only each other; a lone copy beside an unlinked layer has nothing to stay linked to.
+            const int a = mk(0, 0), b = mk(20, 20), c = mk(50, 50);
+            doc->Commit();
+            sSel = { a, b };
+            LinkSelected(doc, -1);
+            const uint64_t g = grp(a);
+            SelectOnly(a);
+            sPending.what = Pending::Duplicate;
+            RunPending(doc);
+            const int lone = sSel.empty() ? 0 : sSel.back();
+            const bool joins = lone != a && lone != 0 && grp(lone) == g && members(g) == 3;
+            doc->RemoveLayer(lone, false);
+            sSel = { a, b };
+            sPending.what = Pending::Duplicate;
+            RunPending(doc);
+            const std::vector<int> pair = sSel;
+            const uint64_t f = pair.size() == 2 ? grp(pair[0]) : 0;
+            const bool own = pair.size() == 2 && f != 0 && f != g && grp(pair[1]) == f && grp(a) == g && grp(b) == g;
+            bool partner = false;
+            if (own)
+            {
+               SelectOnly(pair[0]);
+               Nudge(doc, 3.0f, 0.0f);
+               partner = same(at(pair[1]), 23, 20) && same(at(a), 0, 0) && same(at(b), 20, 20);
+            }
+            for (int id : pair)
+               doc->RemoveLayer(id, false);
+            sSel = { a, c };
+            sPending.what = Pending::Duplicate;
+            RunPending(doc);
+            const std::vector<int> two = sSel;
+            const bool apart = two.size() == 2 && grp(two[0]) == 0 && grp(two[1]) == 0 && grp(a) == g && grp(b) == g && grp(c) == 0;
+            for (int id : two)
+               doc->RemoveLayer(id, false);
+            // Layer via Copy of one linked layer (a pixel selection on a paint layer) and an Alt-drop copy go the
+            // same way as a lone duplicate.
+            const int pa = doc->AddPaintLayer();
+            const int pb = doc->AddPaintLayer();
+            const float white[3] = { 1.0f, 1.0f, 1.0f };
+            doc->SelectRect(0, 0, 10, 10, Scene2DNode::kSelNew, 0.0f, false);
+            doc->FillPixels(pa, white, 1.0f);
+            sSel = { pa, pb };
+            LinkSelected(doc, -1);
+            const uint64_t pg = grp(pa);
+            SelectOnly(pa);
+            const size_t n0 = doc->Layers().size();
+            const int via = SelectionToLayer(doc, false);
+            const bool viaOk = via != 0 && doc->Layers().size() == n0 + 1 && grp(via) == pg && grp(pa) == pg && grp(pb) == pg;
+            doc->Deselect();
+            fprintf(stderr, "PROBE link duplicates: joins %d own %d partner %d apart %d via %d\n", (int)joins, (int)own, (int)partner,
+                    (int)apart, (int)viaOk);
+            expect("parity: duplicating one linked layer keeps the copy in its link group", joins && apart);
+            expect("parity: duplicating a linked pair links the copies to each other", own && partner);
+            expect("parity: layer via copy of one linked layer keeps the copy in its link group", viaOk);
+            expect("parity: copy dragging linked layers relinks the copies", joins && own);
+            clear({ a, b, c, pa, pb, via });
+         }
       }
       // Crop at an angle (PhotoCraft crop_at_90_degrees_is_rotate_then_crop_in_one_step, crop_at_a_small_angle_*):
       // the layers turn by minus the box's turn about its centre and the document takes the box's size, one step.

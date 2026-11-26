@@ -1,5 +1,6 @@
 #include "Scene2DNode.h"
 #include <map>
+#include <set>
 
 #include "gl3.h"
 #include <algorithm>
@@ -1819,6 +1820,108 @@ int Scene2DNode::Duplicate(int id)
    return copies.empty() ? 0 : copies[0].id;
 }
 
+uint64_t Scene2DNode::UnusedLinkGroup()
+{
+   std::vector<uint64_t> used;
+   for (const Layer& l : Layers())
+      if (l.link != 0)
+         used.push_back(l.link);
+   std::sort(used.begin(), used.end());
+   used.erase(std::unique(used.begin(), used.end()), used.end());
+   if (used.empty())
+      return 1;
+   if (used.back() < UINT64_MAX)
+      return used.back() + 1;
+   // A loaded file can store any id up to the top, so max + 1 must not wrap into 0 (no link) or an existing group.
+   uint64_t free = 1;
+   for (uint64_t g : used)
+   {
+      if (g > free)
+         break;
+      if (g == free)
+         free++;
+   }
+   return free;
+}
+
+bool Scene2DNode::LinkLayers(const std::vector<int>& ids, int want, bool* changed)
+{
+   if (changed != nullptr)
+      *changed = false;
+   std::vector<Layer*> sel;
+   for (int id : ids)
+      if (Layer* l = FindLayer(id))
+         sel.push_back(l);
+   if (sel.empty())
+      return false;
+   const uint64_t first = sel[0]->link;
+   bool same = first != 0, none = true;
+   for (const Layer* l : sel)
+   {
+      same = same && l->link == first;
+      none = none && l->link == 0;
+   }
+   int members = 0;
+   for (const Layer& l : mLayers)
+      members += same && l.link == first ? 1 : 0;
+   if ((want == 1 && same && members >= 2) || (want == 0 && none))
+      return want == 1;
+   const bool unlink = (want < 0 ? same : want == 0) || sel.size() < 2;
+   const uint64_t next = unlink ? 0 : UnusedLinkGroup();
+   for (Layer* l : sel)
+      l->link = next;
+   std::map<uint64_t, int> count;
+   for (const Layer& l : mLayers)
+      if (l.link != 0)
+         count[l.link]++;
+   for (Layer& l : mLayers)
+      if (l.link != 0 && count[l.link] < 2)
+         l.link = 0;
+   if (changed != nullptr)
+      *changed = true;
+   Commit();
+   return !unlink;
+}
+
+std::vector<int> Scene2DNode::LinkedWith(const std::vector<int>& ids)
+{
+   std::set<uint64_t> groups;
+   for (int id : ids)
+      if (const Layer* l = FindConst(id); l != nullptr && l->link != 0)
+         groups.insert(l->link);
+   std::vector<int> out;
+   if (!groups.empty())
+      for (const Layer& l : Layers())
+         if (groups.count(l.link) != 0)
+            out.push_back(l.id);
+   return out;
+}
+
+void Scene2DNode::RelinkCopies(const std::vector<std::pair<int, int>>& copies)
+{
+   std::map<uint64_t, int> count;
+   for (const auto& [from, to] : copies)
+      if (const Layer* o = FindConst(from); o != nullptr && o->link != 0)
+         count[o->link]++;
+   std::map<uint64_t, uint64_t> fresh;
+   for (const auto& [from, to] : copies)
+   {
+      const Layer* o = FindConst(from);
+      Layer* c = FindLayer(to);
+      if (o == nullptr || c == nullptr)
+         continue;
+      if (o->link == 0 || count[o->link] < 2)
+      {
+         c->link = 0;
+         continue;
+      }
+      if (fresh.count(o->link) == 0)
+         fresh[o->link] = UnusedLinkGroup();
+      c->link = fresh[o->link];
+   }
+   Commit();
+}
+
 std::vector<Scene2DNode::Layer> Scene2DNode::CopyLayers(const std::vector<int>& ids)
 {
    Layers();
@@ -2508,6 +2611,8 @@ void Scene2DNode::Serialize()
       o << "layer " << l.id << " " << (int)l.kind << " " << l.parent << " " << l.uid << " " << +l.visible << " "
         << l.blend << " " << l.opacity << " " << l.fill << " " << l.lock << " " << l.label << " " << +l.clip << " "
         << +l.open << "\n";
+      if (l.link != 0)
+         o << "link " << l.id << " " << l.link << "\n";
       o << "xf " << l.id << " " << l.x << " " << l.y << " " << l.sx << " " << l.sy << " " << l.angle << " " << l.ax
         << " " << l.ay << " " << +l.flipX << " " << +l.flipY << " " << l.fit << " " << +l.nearest << "\n";
       if (l.shear != 0.0f || l.blendGamma != 2.2f || l.aaMode != 0 || l.noExport)
@@ -2872,6 +2977,8 @@ void Scene2DNode::Parse()
             l->flipY = fy != 0;
             l->nearest = nearest != 0;
          }
+         else if (key == "link")
+            s >> l->link;
          else if (key == "lx")
          {
             int ne = 0;

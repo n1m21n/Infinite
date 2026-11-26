@@ -504,8 +504,10 @@ static bool Read3dl(std::istream& f, int& size, std::vector<float>& rgb)
             size = (1 << inBits) + 1;
          continue;
       }
-      if (std::isalpha((unsigned char)line[a]))
-         continue;   // 3DMESH, LUT8, gamma lines
+      const size_t tokEnd = line.find_first_of(" \t\r", a);
+      const std::string tok = line.substr(a, tokEnd == std::string::npos ? std::string::npos : tokEnd - a);
+      if (tok.find_first_not_of("0123456789") != std::string::npos)
+         continue;   // 3DMESH (starts with a digit), LUT8, gamma lines: only rows of plain codes are data
       std::vector<int> v;
       int x = 0;
       while (s >> x)

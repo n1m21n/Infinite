@@ -211,6 +211,7 @@ public:
       unsigned lock = 0;            // Lock bits
       int label = 0;                // colour label, 0 = none, 1..7
       bool clip = false;            // clipped to the nearest unclipped layer below
+      uint64_t link = 0;            // Link Layers group, 0 = not linked; linked layers move together
       bool output = false;          // also a node output: this layer's own picture
       bool below = false;           // effect: a node layer whose first image input reads the picture under it
       bool open = true;             // a group's row is expanded in the Layers list
@@ -455,6 +456,17 @@ public:
    int GroupLayers(const std::vector<int>& ids);   // returns the new group's id
    void Ungroup(int group);
    int Duplicate(int id);
+   // Link Layers (PhotoCraft layer.linkLayers): want 1 puts `ids` in one fresh group, 0 unlinks them, -1 toggles
+   // (unlinks when they already share one group, or when there is only one). A group left with one member is dropped.
+   // Returns whether `ids` end up linked; *changed says whether anything moved (a repeat is no edit at all).
+   bool LinkLayers(const std::vector<int>& ids, int want = -1, bool* changed = nullptr);
+   // Every layer that shares a link group with one of `ids`, in stack order (bottom first); empty when none is linked.
+   std::vector<int> LinkedWith(const std::vector<int>& ids);
+   // A group id no layer uses: the largest + 1, or the lowest free one when that would pass the top of the range.
+   uint64_t UnusedLinkGroup();
+   // After several layers were duplicated at once (pairs original, copy): copies of one group are linked to each other
+   // under a fresh group, a lone copy is unlinked. A single duplicate keeps its original's group (Duplicate copies it).
+   void RelinkCopies(const std::vector<std::pair<int, int>>& copies);
    // Copy and paste: the layers (with everything inside a copied group) as a free-standing list, and back in
    // with fresh ids above `above` (0: the top), nudged by (dx, dy). Returns the new top-level ids.
    std::vector<Layer> CopyLayers(const std::vector<int>& ids);

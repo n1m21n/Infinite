@@ -459,7 +459,10 @@ namespace BrushEngine
          // Only where the stroke blends part way: full paint keeps its exact colour, untouched pixels stay.
          "   if (uDither == 1 && a > 0.0 && a < 1.0) {\n"
          "      float n = (h1(gl_FragCoord.xy) + h1(gl_FragCoord.xy + vec2(17.31, 5.77)) - 1.0) / 255.0;\n"
-         "      rgb = clamp(rgb + n, 0.0, 1.0); oa = clamp(oa + n * step(d.a, 0.999), 0.0, 1.0);\n"
+         // Colour only where the blend makes an in-between value (paint over the same colour, or over nothing, is exact);
+         // alpha only where the stroke reaches a visible 8-bit step, so the faint tail past the dab stays empty.
+         "      vec3 k = step(0.5 / 255.0, abs(src - d.rgb)) * step(0.001, d.a);\n"
+         "      rgb = clamp(rgb + n * k, 0.0, 1.0); oa = clamp(oa + n * step(d.a, 0.999) * step(1.0 / 255.0, a), 0.0, 1.0);\n"
          "   }\n"
          "   fragColor = vec4(rgb, oa);\n"
          "}\n";
