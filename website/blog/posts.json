@@ -1,5 +1,14 @@
 [
  {
+  "slug": "chop-and-remix-a-drum-loop-with-slicer",
+  "title": "Chop and remix a drum loop with Slicer",
+  "description": "Load or record a drum loop in Infinite, chop it into playable slices with Slicer, sequence new grooves with Note Sequencer, and add Delay and Reverb.",
+  "date": "2026-11-27",
+  "updated": "2026-11-27",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/chop-and-remix-a-drum-loop-with-slicer.html"
+ },
+ {
   "slug": "16-line-hadamard-fdn-reverb-dsp",
   "title": "16-line Hadamard FDN reverb: diffusion, modulation, and SIMD DSP",
   "description": "How Infinite's Reverb node pairs dual 4-stage Schroeder diffusers, a 16-line Hadamard FDN, Hermite modulation, and damping-compensated RT60 in SIMD.",
