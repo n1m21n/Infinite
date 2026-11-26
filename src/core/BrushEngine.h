@@ -116,6 +116,9 @@ namespace BrushEngine
       bool patternAligned = true;
       float patternPhase[2] = { 0.0f, 0.0f };
       bool sourceFlipX = false, sourceFlipY = false;
+      // Wrap around: the surface tiles, so a dab past one edge comes back on the opposite one and the clone / heal source
+      // reads across the seam (periodic clone). Smudge and warp never wrap: they stop at the edge.
+      bool wrap = false;
       float sourceAnchor[2] = { 0.0f, 0.0f };
       int sourceBlend = 0;         // clone: 0 normal, 1 multiply, 2 screen, 3 overlay, 4 darken, 5 lighten, 6 difference
       bool protectHue = false;     // dodge / burn / sponge: the hue stays put

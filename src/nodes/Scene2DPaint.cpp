@@ -1756,6 +1756,45 @@ bool Scene2DNode::FillPixels(int id, const float rgb[3], float opacity)
    return true;
 }
 
+bool Scene2DNode::OffsetPixels(int id, int dx, int dy, bool wrap)
+{
+   Layers();
+   Layer* l = FindLayer(id);
+   if (l == nullptr || l->kind != Kind::Paint || (EffectiveLock(*l) & (kLockPixels | kLockAll)) != 0)
+      return false;
+   SyncSurfaces();
+   auto it = mSurfaces.find(id);
+   if (it == mSurfaces.end() || l->pw <= 0 || l->ph <= 0 || (dx == 0 && dy == 0))
+      return false;
+   const int W = l->pw, H = l->ph;
+   std::vector<uint8_t> px;
+   ReadRect(it->second.fbo, 0, 0, W, H, px);
+   std::vector<uint8_t> out(px.size(), 0);
+   // Surface rows run bottom first, so a move down is a move to a lower row.
+   for (int y = 0; y < H; y++)
+   {
+      int sy = y + dy;   // destination row y takes source row y + dy (bottom-first rows)
+      if (wrap)
+         sy = ((sy % H) + H) % H;
+      else if (sy < 0 || sy >= H)
+         continue;
+      for (int x = 0; x < W; x++)
+      {
+         int sx = x - dx;
+         if (wrap)
+            sx = ((sx % W) + W) % W;
+         else if (sx < 0 || sx >= W)
+            continue;
+         std::memcpy(&out[((size_t)y * W + x) * 4], &px[((size_t)sy * W + sx) * 4], 4);
+      }
+   }
+   WriteRect(it->second.fbo, 0, 0, W, H, out.data());
+   const int all[4] = { 0, 0, W, H };
+   StoreTiles(it->second, l->tiles, all);
+   Commit();
+   return true;
+}
+
 bool Scene2DNode::BucketSelection(float x, float y, float value, int tolerance, bool contiguous)
 {
    Layers();

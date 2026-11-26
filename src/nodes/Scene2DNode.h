@@ -1064,6 +1064,10 @@ public:
    // Delete / fill: the selected pixels of a paint layer (all of it with no selection) cleared, or covered with a colour.
    bool ClearPixels(int id);
    bool FillPixels(int id, const float rgb[3], float opacity);
+   // Layer > Offset: moves a paint layer's pixels dx right, dy down inside its surface. Wrap folds what leaves one
+   // edge back in on the other (seamless tiles); without it the uncovered strip turns transparent. Masks stay put.
+   // False when there is nothing to move or the pixels are locked.
+   bool OffsetPixels(int id, int dx, int dy, bool wrap);
    // Quick mask: Bucket and Gradient aimed at the selection itself (values 0..1).
    bool BucketSelection(float x, float y, float value, int tolerance, bool contiguous);
    bool GradientSelection(float ax, float ay, float bx, float by, float va, float vb, int kind);

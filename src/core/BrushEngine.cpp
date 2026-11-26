@@ -50,6 +50,7 @@ namespace BrushEngine
          "uniform sampler2D uColTex;\n"
          "uniform int uHasColTex;\n"
          "uniform vec2 uSurfSize;\n"
+         "uniform int uWrap;\n"
          "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed) * 43758.5453); }\n"
          "float h1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
          "float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
@@ -144,6 +145,7 @@ namespace BrushEngine
          "void main() {\n"
          "   vec2 fc = gl_FragCoord.xy;\n"
          "   vec2 w = fc - uCenter;\n"
+         "   if (uWrap == 1) w -= uSurfSize * floor(w / uSurfSize + 0.5);   // the nearest copy of the dab on the tiled page\n"
          "   float c = cos(uAngle), s = sin(uAngle);\n"
          "   vec2 p = vec2(c * w.x + s * w.y, -s * w.x + c * w.y);\n"
          "   p.y /= max(uRound, 0.05);\n"
@@ -225,7 +227,8 @@ namespace BrushEngine
          "      base = clamp(col, 0.0, 1.0);\n"
          "   }\n"
          "   a = clamp(a, 0.0, 1.0) * uFlow;\n"
-         "   if (a > 1e-4) {\n"
+         // Dither only partial coverage: full coverage must stay exactly opaque (a hard dab, a bucket fill).
+         "   if (a > 1e-4 && a < 1.0) {\n"
          "      float d = (h1(fc + uSeed) + h1(fc * 1.37 + uSeed + 7.3) - 1.0) / 255.0;\n"
          "      a = clamp(a + d, 0.0, 1.0);\n"
          "   }\n"
@@ -312,7 +315,18 @@ namespace BrushEngine
          "      return mix(0.5 + 0.5 * sin(w.y * 6.2832), 0.5 + 0.5 * sin(w.x * 6.2832), chk); }\n"
          "   return h1(floor(g)) * 0.5 + vn(g * 0.5) * 0.5;\n"
          "}\n"
-         "vec4 srcAt(vec2 uv) { return uHasSrc == 1 ? texture(uSrcTex, uv) : texture(uSurf, uv); }\n"
+         "uniform int uWrap;\n"
+         // Bilinear with wrapped texel indices: the source reads across the seam, as the tiled page would.
+         "vec4 wrapTex(sampler2D t, vec2 uv) {\n"
+         "   vec2 sz = vec2(textureSize(t, 0)); vec2 p = uv * sz - 0.5; vec2 i = floor(p); vec2 f = p - i;\n"
+         "   ivec2 a = ivec2(mod(i, sz)), b = ivec2(mod(i + 1.0, sz));\n"
+         "   return mix(mix(texelFetch(t, a, 0), texelFetch(t, ivec2(b.x, a.y), 0), f.x),\n"
+         "              mix(texelFetch(t, ivec2(a.x, b.y), 0), texelFetch(t, b, 0), f.x), f.y);\n"
+         "}\n"
+         "vec4 srcAt(vec2 uv) {\n"
+         "   if (uWrap == 1) return uHasSrc == 1 ? wrapTex(uSrcTex, uv) : wrapTex(uSurf, uv);\n"
+         "   return uHasSrc == 1 ? texture(uSrcTex, uv) : texture(uSurf, uv);\n"
+         "}\n"
          "vec3 softSrc(vec2 uv) {\n"
          "   vec3 s = vec3(0.0); float w = 0.0;\n"
          "   for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) {\n"
@@ -1050,6 +1064,20 @@ namespace BrushEngine
          mDirty[2] = std::max(mDirty[2], x + r);
          mDirty[3] = std::max(mDirty[3], y + r);
       }
+      // Wrapped: a dab over an edge also lands on the far side (DrawDab widens its clip the same way).
+      if (mBrush.wrap && !WarpMode(mBrush.mode) && mBrush.mode != kSmudge)
+      {
+         if (x - r < 0.0f || x + r > (float)mW)
+         {
+            mDirty[0] = 0.0f;
+            mDirty[2] = (float)mW;
+         }
+         if (y - r < 0.0f || y + r > (float)mH)
+         {
+            mDirty[1] = 0.0f;
+            mDirty[3] = (float)mH;
+         }
+      }
    }
 
    void Stroke::Walk(float x, float y, float pressure)
@@ -1248,8 +1276,23 @@ namespace BrushEngine
       int sc[4] = { (int)std::floor(cx - r - 2), (int)std::floor(cy - r - 2), 0, 0 };
       sc[2] = (int)std::ceil(cx + r + 2) - sc[0];
       sc[3] = (int)std::ceil(cy + r + 2) - sc[1];
-      const int x0 = std::max(0, sc[0]), y0 = std::max(0, sc[1]);
-      const int x1 = std::min(mW, sc[0] + sc[2]), y1 = std::min(mH, sc[1] + sc[3]);
+      int x0 = std::max(0, sc[0]), y0 = std::max(0, sc[1]);
+      int x1 = std::min(mW, sc[0] + sc[2]), y1 = std::min(mH, sc[1] + sc[3]);
+      // Wrapped: a dab that leaves the surface comes back on the far side, so it may touch any row or column it spans
+      // modulo the size. Widen the clip to the whole span on that axis (the shader picks the nearest copy per pixel).
+      if (b.wrap)
+      {
+         if (sc[0] < 0 || sc[0] + sc[2] > mW)
+         {
+            x0 = 0;
+            x1 = mW;
+         }
+         if (sc[1] < 0 || sc[1] + sc[3] > mH)
+         {
+            y0 = 0;
+            y1 = mH;
+         }
+      }
       if (x1 <= x0 || y1 <= y0)
          return;
       const int clip[4] = { x0, y0, x1 - x0, y1 - y0 };
@@ -1315,6 +1358,7 @@ namespace BrushEngine
          glUniform1i(sDabLoc.colTex, 3);
          glUniform1i(sDabLoc.hasColTex, b.colorTex != 0 ? 1 : 0);
          glUniform2f(sDabLoc.surfSize, (float)std::max(1, mW), (float)std::max(1, mH));
+         glUniform1i(GLUtil::UniformLoc(sDab, "uWrap"), b.wrap ? 1 : 0);
          glActiveTexture(GL_TEXTURE1);
          glBindTexture(GL_TEXTURE_2D, b.tipTex);
          glActiveTexture(GL_TEXTURE2);
@@ -1520,6 +1564,7 @@ namespace BrushEngine
          glBindTexture(GL_TEXTURE_2D, mBrush.sourceTex);
          glUniform1i(GLUtil::UniformLoc(sMerge, "uSrcTex"), 3);
          glUniform1i(GLUtil::UniformLoc(sMerge, "uHasSrc"), mBrush.sourceTex != 0 ? 1 : 0);
+         glUniform1i(GLUtil::UniformLoc(sMerge, "uWrap"), mBrush.wrap && !WarpMode(mBrush.mode) && mBrush.mode != kSmudge ? 1 : 0);
          glUniform1f(GLUtil::UniformLoc(sMerge, "uSpread"), std::max(1.0f, mBrush.size * 0.06f));
          glUniform1i(GLUtil::UniformLoc(sMerge, "uGrain"), mBrush.grainTex != 0 ? std::max(1, mBrush.grain) : mBrush.grain);
          glActiveTexture(GL_TEXTURE4);

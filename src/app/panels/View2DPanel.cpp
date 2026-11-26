@@ -3532,6 +3532,7 @@ namespace
       bo("oneEuro", b.oneEuro); bo("catchUp", b.catchUp); f("pressureCurve", &b.pressureCurve, 1);
       bo("tiltSize", b.tiltSize); bo("tiltAngle", b.tiltAngle); bo("tiltRound", b.tiltRound);
       f("airbrushRate", &b.airbrushRate, 1); f("patternScale", &b.patternScale, 1); bo("patternAligned", b.patternAligned);
+      bo("wrap", b.wrap);
    }
    std::string BrushText()
    {
@@ -9927,6 +9928,12 @@ namespace
          }
          gap();
          SymmetryChip(doc);
+         if (sTool == kBrush || sTool == kEraser || sTool == kClone || sTool == kHeal || sTool == kPatternStamp)
+         {
+            next();
+            if (TextChip(L("Wrap##v2dwrap"), b.wrap, T("A stroke past one edge comes back on the other, for seamless tiles")))
+               b.wrap = !b.wrap;
+         }
          FormParts::Inline(0.0f, tok::space_1);
          BarMore("##v2drmore", [&]()
          {
@@ -12857,6 +12864,12 @@ namespace
                sSideOpen = true;
             }
             if (l->kind == Kind::Paint && MenuParts::Item(T("Convert to Draw Node"), nullptr)) sPending.what = Pending::ToDraw;
+            // Offset by half with wrap: the tile's edges meet in the middle, where a seam shows and can be painted out.
+            if (l->kind == Kind::Paint && MenuParts::Item(T("Offset Half, Wrapped"), nullptr))
+            {
+               PushUndoCheckpoint("Offset layer");
+               doc->OffsetPixels(l->id, l->pw / 2, l->ph / 2, true);
+            }
             if ((l->kind == Kind::Text || l->kind == Kind::Vector) && MenuParts::Item(T("Rasterize Layer"), nullptr))
                RasterizeLayer(doc, l->id);
             if (l->kind == Kind::Node && !l->HasSkin() && MenuParts::Item(T("Rasterize Layer"), nullptr))
@@ -21535,6 +21548,82 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       doc = FindDoc();
       if (doc == nullptr)
          return fails;
+   }
+   // Wrap around (periodic painting and clone, ledger-gaps Block B): the page tiles, so a dab past one edge comes back
+   // on the other and the clone source reads across the seam. Smudge never wraps.
+   {
+      const size_t u0 = gUndoStack.size();
+      PushUndoCheckpoint("Wrap test");
+      const int wl = doc->AddPaintLayer();
+      const float white[3] = { 1, 1, 1 }, blue[3] = { 0, 0, 1 };
+      const float W = (float)doc->Doc().w, H = (float)doc->Doc().h, my = H * 0.5f;
+      doc->Deselect();
+      auto dab = [&](int mode, float x, float y, float size, bool wrap, const float* rgb, float ox = 0.0f, float oy = 0.0f) {
+         BrushEngine::Brush b;
+         b.mode = mode;
+         b.hardness = 1.0f;
+         b.size = size;
+         b.wrap = wrap;
+         b.color[0] = rgb[0];
+         b.color[1] = rgb[1];
+         b.color[2] = rgb[2];
+         b.sourceOffset[0] = ox;
+         b.sourceOffset[1] = oy;
+         const bool ok = doc->BeginPaint(wl, 0, b, x, y, 1.0f);
+         if (ok)
+            doc->EndPaint();
+         return ok;
+      };
+      auto isBlue = [&](float x, float y) { float c[3] = {}; return doc->Pick(x, y, c, 1, wl) && c[2] > 0.9f && c[0] < 0.1f; };
+      auto isWhite = [&](float x, float y) { float c[3] = {}; return doc->Pick(x, y, c, 1, wl) && c[0] > 0.9f && c[2] > 0.9f; };
+      doc->FillPixels(wl, white, 1.0f);
+      dab(BrushEngine::kNormal, W - 2.0f, my, 16.0f, false, blue);
+      expect("Wrap: an ordinary dab stops at the edge", isBlue(W - 1.5f, my) && isWhite(3.5f, my));
+      dab(BrushEngine::kNormal, W - 2.0f, my, 16.0f, true, blue);
+      expect("every wrapping stroke paints the canvas as on the canvas tiled three by three", isBlue(3.5f, my) && isWhite(9.5f, my));
+      doc->FillPixels(wl, white, 1.0f);
+      dab(BrushEngine::kNormal, W - 2.0f, H - 2.0f, 24.0f, true, blue);
+      expect("Wrap: a dab through a corner comes back on all four", isBlue(3.5f, 3.5f) && isBlue(W - 1.5f, 3.5f) && isBlue(3.5f, H - 1.5f));
+      // Inside the canvas a wrapped dab is an ordinary one, pixel for pixel at the rim.
+      doc->FillPixels(wl, white, 1.0f);
+      dab(BrushEngine::kNormal, W * 0.5f, my, 16.0f, true, blue);
+      float rimW[3] = {}, rimO[3] = {};
+      doc->Pick(W * 0.5f + 7.5f, my, rimW, 1, wl);
+      doc->FillPixels(wl, white, 1.0f);
+      dab(BrushEngine::kNormal, W * 0.5f, my, 16.0f, false, blue);
+      doc->Pick(W * 0.5f + 7.5f, my, rimO, 1, wl);
+      expect("a wrapped stroke inside the canvas paints as an ordinary one", std::fabs(rimW[0] - rimO[0]) < 0.02f && std::fabs(rimW[2] - rimO[2]) < 0.02f);
+      // A dab bigger than the canvas, centred off it, still lands on it (the nearest copy covers every pixel).
+      doc->FillPixels(wl, white, 1.0f);
+      dab(BrushEngine::kNormal, -2.0f * W, my, 3.0f * std::max(W, H), true, blue);
+      expect("a wrapped dab bigger than the canvas stays on it", isBlue(W * 0.5f, my) && isBlue(1.5f, 1.5f));
+      // Periodic clone: the source left of x = 0 is read from the right edge.
+      doc->FillPixels(wl, white, 1.0f);
+      dab(BrushEngine::kNormal, W - 6.0f, my, 10.0f, false, blue);
+      dab(BrushEngine::kClone, 6.0f, my, 6.0f, false, white, -12.0f, 0.0f);
+      const bool clamped = isWhite(6.5f, my);
+      dab(BrushEngine::kClone, 6.0f, my, 6.0f, true, white, -12.0f, 0.0f);
+      expect("periodic clone projection is disjoint and matches pixel modulo", clamped && isBlue(6.5f, my));
+      // Smudge with Wrap on still stops at the edge.
+      doc->FillPixels(wl, white, 1.0f);
+      dab(BrushEngine::kNormal, W - 3.0f, my, 6.0f, false, blue);
+      dab(BrushEngine::kSmudge, W - 2.0f, my, 12.0f, true, blue);
+      expect("the tools the reference application does not wrap stop at the canvas edge", isWhite(2.5f, my));
+      // Offset (wrap-around move): pixels pushed past the right edge come back on the left; without wrap they are gone.
+      doc->FillPixels(wl, white, 1.0f);
+      dab(BrushEngine::kNormal, W - 3.0f, my, 6.0f, false, blue);
+      expect("translate wrap folds pixels back into the canvas",
+             doc->OffsetPixels(wl, 6, 0, true) && isBlue(2.5f, my) && isWhite(W - 3.5f, my));
+      expect("Offset: down moves the pixels down", doc->OffsetPixels(wl, 0, 4, true) && isBlue(2.5f, my + 4.0f) && isWhite(2.5f, my));
+      expect("Offset: without wrap the pixels leave and the strip clears",
+             doc->OffsetPixels(wl, 0, -(int)H, false) == true && !isBlue(2.5f, my + 4.0f) && !isWhite(2.5f, my));
+      expect("Offset: nothing to move is refused", !doc->OffsetPixels(wl, 0, 0, true));
+      while (gUndoStack.size() > u0)
+         Undo();
+      doc = FindDoc();
+      if (doc == nullptr)
+         return fails;
+      doc->Layers();
    }
    // Pattern Stamp (ledger-gaps Block B): the checker tile repeats from the surface origin, and a whole-number scale
    // repeats it exactly bigger.
