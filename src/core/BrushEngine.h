@@ -99,6 +99,8 @@ namespace BrushEngine
       // Wet mix: each dab picks up a share of the paint under it and refills from `color` as it goes.
       float wet = 0.0f;            // 0..1 pick-up
       float refill = 0.15f;        // 0..1 back toward the brush colour per dab
+      float wetJitter = 0.0f;      // 0..1, per dab: how far each dab's pick-up falls below `wet`
+      float refillJitter = 0.0f;   // 0..1, per dab: the same for `refill`
       // Node-fed: a canvas node's picture as the tip, the canvas texture or the colour (0 = built in).
       unsigned tipTex = 0;         // luma x alpha is the mask, in the tip's frame (angle, roundness, follow)
       unsigned grainTex = 0;       // tiled at its own pixel size x grainScale, fixed to the canvas
@@ -126,6 +128,7 @@ namespace BrushEngine
       int spongeMode = 0;          // sponge: 0 saturate, 1 desaturate, 2 vibrance (dull colours gain most)
       float key[3] = { 0.0f, 0.0f, 0.0f };   // colour replace / background erase: the colour sampled where the stroke began
       float keyTolerance = 0.25f;  // 0..1 of the RGB distance
+      bool protectFg = false;      // background erase: the tolerance narrows to the foreground colour, which is kept (Photoshop)
       bool wetEdges = false;       // the stroke's edge holds more paint than its middle
       bool autoClean = true;       // wet mix: each stroke starts with clean paint (off: keeps what the last one picked up)
       float accumulation = 1.0f;   // 0..1, how much overlapping dabs build up inside one stroke
@@ -140,8 +143,13 @@ namespace BrushEngine
       bool tiltSize = false;       // stylus tilt widens stroke
       bool tiltAngle = false;      // stylus tilt azimuth turns tip
       bool tiltRound = false;      // stylus tilt flattens tip roundness
-      float airbrushRate = 0.0f;   // 0..1 continuous dab build-up while pointer stays still
+      float airbrushRate = 0.0f;   // 0..1 continuous dab build-up while pointer stays still (4 + 36 x rate dabs a second)
+      bool spacingOff = false;     // one dab per pointer sample: a fast pointer spaces the dabs wider, a slow one closer
    };
+   // The airbrush rate that lays `dabsPerSecond` dabs a second while the pointer stays still.
+   inline float AirbrushRateFor(float dabsPerSecond) { return (dabsPerSecond - 4.0f) / 36.0f; }
+   // One dab's share of `base` with `jitter`: a dab's own seed picks how far below `base` it falls, so replays match.
+   float DabShare(float base, float jitter, float seed);
 
    struct Preset
    {
@@ -224,6 +232,7 @@ namespace BrushEngine
          float hard = 1, rot = 0, round = 1;   // hardness, rotation (radians) and roundness jitter
          float rgb[3];         // the dab's colour (colour jitter)
          float fromX, fromY;   // smudge: where the previous dab sat
+         float wet = 0, refill = 0;   // wet mix: the dab's pick-up and refill (wet / refill jitter)
       };
       void DrawDab(const Pending& q, float taper);
       void SmudgeDab(const Pending& q, float r, float strength);

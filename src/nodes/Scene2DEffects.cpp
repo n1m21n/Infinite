@@ -11,11 +11,13 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
 #include "BlendModes.h"
 #include "platform/AppPaths.h"
+#include "app/graph/NodeParams.h"
 
 const char* const Scene2DNode::kEffBlendNames[5] = { "Normal", "Multiply", "Screen", "Overlay", "Luminosity" };
 
@@ -476,11 +478,127 @@ void Scene2DNode::DrawEffects(const Layer& l, int depth, int frameId, float opac
 
 // ---- colour lookup, shadows / highlights -----------------------------------------------------------------
 
+// Lustre / Autodesk .3dl: an optional "Mesh <inBits> <outBits>" line gives the edge (2^inBits + 1) and the output
+// range (2^outBits - 1); otherwise the first number row is the input shaper (its count is the edge) and the range is
+// the smallest 2^k - 1 that holds every code. Rows run red slowest, blue fastest, so they are reordered to red fastest.
+static bool Read3dl(std::istream& f, int& size, std::vector<float>& rgb)
+{
+   size = 0;
+   rgb.clear();
+   int meshOut = 0;
+   bool shaper = false;
+   std::vector<int> codes;
+   std::string line;
+   while (std::getline(f, line))
+   {
+      const size_t a = line.find_first_not_of(" \t\r");
+      if (a == std::string::npos || line[a] == '#')
+         continue;
+      std::istringstream s(line.substr(a));
+      if (line.compare(a, 4, "Mesh") == 0)
+      {
+         std::string k;
+         int inBits = 0;
+         s >> k >> inBits >> meshOut;
+         if (inBits > 0 && inBits < 8)
+            size = (1 << inBits) + 1;
+         continue;
+      }
+      if (std::isalpha((unsigned char)line[a]))
+         continue;   // 3DMESH, LUT8, gamma lines
+      std::vector<int> v;
+      int x = 0;
+      while (s >> x)
+         v.push_back(x);
+      if (!shaper)
+      {
+         shaper = true;   // the input shaper row (never a node, even when it holds three codes): its count is the
+         if (size == 0)   // edge unless a Mesh line already gave it
+            size = (int)v.size();
+         continue;
+      }
+      if (v.size() == 3)
+         codes.insert(codes.end(), v.begin(), v.end());
+   }
+   if (size < 2 || size > 128 || codes.size() != (size_t)size * size * size * 3)
+      return false;
+   float range = 0;
+   if (meshOut > 0 && meshOut <= 16)
+      range = (float)((1 << meshOut) - 1);
+   else
+   {
+      int hi = 0;
+      for (int c : codes)
+         hi = std::max(hi, c);
+      for (int bits : { 8, 10, 12, 14, 16 })
+         if (hi <= (1 << bits) - 1)
+         {
+            range = (float)((1 << bits) - 1);
+            break;
+         }
+      if (range == 0)
+         return false;
+   }
+   rgb.assign(codes.size(), 0.0f);
+   for (int r = 0; r < size; ++r)
+      for (int g = 0; g < size; ++g)
+         for (int b = 0; b < size; ++b)
+         {
+            const size_t from = (((size_t)r * size + g) * size + b) * 3, to = (((size_t)b * size + g) * size + r) * 3;
+            for (int c = 0; c < 3; ++c)
+               rgb[to + c] = (float)codes[from + c] / range;
+         }
+   return true;
+}
+
+static bool LowerEndsWith(const std::string& s, const char* ext)
+{
+   const size_t n = std::strlen(ext);
+   if (s.size() < n)
+      return false;
+   for (size_t i = 0; i < n; ++i)
+      if (std::tolower((unsigned char)s[s.size() - n + i]) != ext[i])
+         return false;
+   return true;
+}
+
+std::vector<std::pair<std::string, std::string>> Scene2DNode::FolderLuts(const std::string& dir)
+{
+   std::vector<std::pair<std::string, std::string>> out;
+   if (dir.empty())
+      return out;
+   std::error_code ec;
+   std::filesystem::directory_iterator it(AppPaths::FsPath(dir), ec), end;
+   for (; !ec && it != end; it.increment(ec))
+   {
+      const std::string name = it->path().filename().u8string();
+      if (name.empty() || name[0] == '.' || !(LowerEndsWith(name, ".cube") || LowerEndsWith(name, ".3dl")))
+         continue;
+      std::error_code e2;
+      if (!std::filesystem::is_regular_file(it->path(), e2))   // follows links; folders named x.cube are not LUTs
+         continue;
+      const auto bytes = std::filesystem::file_size(it->path(), e2);
+      if (e2 || bytes > params::view2d::kFolderLutMaxBytes)
+         continue;
+      out.emplace_back(name, it->path().u8string());
+   }
+   std::sort(out.begin(), out.end(), [](const auto& a, const auto& b)
+   {
+      std::string x = a.first, y = b.first;
+      for (char& c : x) c = (char)std::tolower((unsigned char)c);
+      for (char& c : y) c = (char)std::tolower((unsigned char)c);
+      return x < y;
+   });
+   return out;
+}
+
 bool Scene2DNode::ReadCube(const std::string& path, int& size, std::vector<float>& rgb)
 {
    std::ifstream f(AppPaths::FsPath(path));
    if (!f)
       return false;
+   if (LowerEndsWith(path, ".3dl"))
+      return Read3dl(f, size, rgb);
    size = 0;
    rgb.clear();
    std::string line;

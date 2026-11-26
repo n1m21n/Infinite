@@ -2429,11 +2429,43 @@ namespace
       }
       if (t == S::kAdjHue)
       {
-         int rng = std::clamp((int)std::lround(p[2]), 0, 6);
-         if (ComboRow(T("Range"), &rng, { T("Master"), T("Reds"), T("Yellows"), T("Greens"), T("Cyans"), T("Blues"), T("Magentas") }))
-            p[2] = (float)rng;
-         SliderRow(T("Saturation"), &p[0], -1.0f, 1.0f, "%.2f");
-         SliderRow(T("Lightness"), &p[1], -1.0f, 1.0f, "%.2f");
+         // Photoshop's Hue/Saturation: the master edits plus six colour ranges at once, each with its own hue,
+         // saturation, lightness and four range sliders. A document from before keeps its one-range layer.
+         const std::vector<std::string> names = { T("Master"), T("Reds"), T("Yellows"), T("Greens"), T("Cyans"), T("Blues"), T("Magentas") };
+         int legacy = std::clamp((int)std::lround(p[2]), 0, 6);
+         if (legacy != 0)
+         {
+            if (ComboRow(T("Range"), &legacy, names))
+               p[2] = (float)legacy;
+            SliderRow(T("Saturation"), &p[0], -1.0f, 1.0f, "%.2f");
+            SliderRow(T("Lightness"), &p[1], -1.0f, 1.0f, "%.2f");
+         }
+         else
+         {
+            static std::map<int, int> sHueEdit;
+            int& ed = sHueEdit[key];
+            ComboRow(T("Edit"), &ed, names);
+            ed = std::clamp(ed, 0, 6);
+            if (ed == 0)
+            {
+               SliderRow(T("Saturation"), &p[0], -1.0f, 1.0f, "%.2f");
+               SliderRow(T("Lightness"), &p[1], -1.0f, 1.0f, "%.2f");
+            }
+            else
+            {
+               float* r = p + S::kHueRangeBase + (ed - 1) * S::kHueRangeStride;
+               SliderRow(T("Hue"), &r[0], params::view2d::kHueShiftLo, params::view2d::kHueShiftHi, "%.0f");
+               SliderRow(T("Saturation"), &r[1], -1.0f, 1.0f, "%.2f");
+               SliderRow(T("Lightness"), &r[2], -1.0f, 1.0f, "%.2f");
+               static const char* kBound[S::kHueBoundCount] = { "Fade from", "Full from", "Full to", "Fade to" };
+               float* bounds = r + S::kHueBoundAt;
+               bool moved = false;
+               for (int k = 0; k < S::kHueBoundCount; k++)
+                  moved |= SliderRow(T(kBound[k]), &bounds[k], params::view2d::kHueBoundLo, params::view2d::kHueBoundHi, "%.0f");
+               if (moved)
+                  S::CanonicalHueBounds(bounds);
+            }
+         }
       }
       if (t == S::kAdjHalftone)
       {
@@ -2635,12 +2667,44 @@ namespace
          const std::string shown = x.adjFile.empty() ? std::string(T("None")) : x.adjFile.substr(x.adjFile.find_last_of("/\\") + 1);
          if (ActionButton::Draw((shown + "##v2dcube" + std::to_string(key)).c_str(), ImVec2(sFieldW, 0.0f), ActionButton::Kind::Plain))
          {
-            const std::vector<std::string> got = Platform::OpenFilesDialog(T("Colour lookup"), { "cube" });
+            const std::vector<std::string> got = Platform::OpenFilesDialog(T("Colour lookup"), { "cube", "3dl" });
             if (!got.empty())
             {
                PushUndoCheckpoint("Colour lookup");
                x.adjFile = got[0];
                Touch();
+            }
+         }
+         // The other lookups in the same folder, one click away (the folder is read when the row draws).
+         if (!x.adjFile.empty())
+         {
+            const size_t cut = x.adjFile.find_last_of("/\\");
+            const std::string dir = cut == std::string::npos ? std::string() : x.adjFile.substr(0, cut);
+            static std::string sLutDir;
+            static std::vector<std::pair<std::string, std::string>> sLuts;
+            static double sLutAt = -1.0;
+            if (dir != sLutDir || ImGui::GetTime() - sLutAt > params::view2d::kFolderLutRescanSec)
+            {
+               sLutDir = dir;
+               sLuts = Scene2DNode::FolderLuts(dir);
+               sLutAt = ImGui::GetTime();
+            }
+            if (sLuts.size() > 1)
+            {
+               std::vector<std::string> names;
+               int at = -1;
+               for (size_t k = 0; k < sLuts.size(); k++)
+               {
+                  names.push_back(sLuts[k].first);
+                  at = sLuts[k].second == x.adjFile ? (int)k : at;
+               }
+               int pick = std::max(at, 0);
+               if (ComboRow(T("Folder"), &pick, names) && pick != at)
+               {
+                  PushUndoCheckpoint("Colour lookup");
+                  x.adjFile = sLuts[(size_t)pick].second;
+                  Touch();
+               }
             }
          }
       }
@@ -2873,9 +2937,9 @@ namespace
       if (how == 0 && a != nullptr && a->kind != Kind::Paint && a->kind != Kind::Group && SelectionActsOnPixels(doc))
       {
          PushUndoCheckpoint("Clear");
-         doc->InvertSelection();
-         doc->MaskFromSelection(a->id);
-         doc->InvertSelection();
+         // The selection as the mask, inverted: past the canvas the layer stays shown.
+         if (doc->MaskFromSelection(a->id))
+            doc->InvertPixelMask(a->id);
          Touch();
          return true;
       }
@@ -2960,9 +3024,8 @@ namespace
          else
          {
             // The cut area hidden on the live layer: a mask that shows everything but the selection.
-            doc->InvertSelection();
-            doc->MaskFromSelection(src);
-            doc->InvertSelection();
+            if (doc->MaskFromSelection(src))
+               doc->InvertPixelMask(src);
          }
       }
       return nid;
@@ -3534,14 +3597,14 @@ namespace
       // Retouch and dab settings (the wiring audit found them unsaved: a preset lost them on reload).
       f("sourceRotate", &b.sourceRotate, 1); f("sourceScale", &b.sourceScale, 1); bo("sourceFlipX", b.sourceFlipX);
       bo("sourceFlipY", b.sourceFlipY); i("sourceBlend", b.sourceBlend); bo("protectHue", b.protectHue);
-      i("sharpMode", b.sharpMode); i("spongeMode", b.spongeMode); f("keyTolerance", &b.keyTolerance, 1);
+      i("sharpMode", b.sharpMode); i("spongeMode", b.spongeMode); f("keyTolerance", &b.keyTolerance, 1); bo("protectFg", b.protectFg);
       bo("wetEdges", b.wetEdges); bo("autoClean", b.autoClean); f("accumulation", &b.accumulation, 1);
       f("accumJitter", &b.accumJitter, 1); f("hardJitter", &b.hardJitter, 1); f("angleJitter", &b.angleJitter, 1);
       f("roundJitter", &b.roundJitter, 1); f("scatterY", &b.scatterY, 1);
       bo("oneEuro", b.oneEuro); bo("catchUp", b.catchUp); f("pressureCurve", &b.pressureCurve, 1);
       bo("tiltSize", b.tiltSize); bo("tiltAngle", b.tiltAngle); bo("tiltRound", b.tiltRound);
       f("airbrushRate", &b.airbrushRate, 1); f("patternScale", &b.patternScale, 1); bo("patternAligned", b.patternAligned);
-      bo("wrap", b.wrap);
+      bo("wrap", b.wrap); f("wetJitter", &b.wetJitter, 1); f("refillJitter", &b.refillJitter, 1); bo("spacingOff", b.spacingOff);
    }
    std::string BrushText()
    {
@@ -3854,6 +3917,7 @@ namespace
    // Mesh warp: the layer, its pixels when the warp began, and the grid as moved.
    int sMeshId = 0, sMeshPoint = -1;
    std::vector<std::string> sMeshFrom, sMeshStored;
+   std::vector<std::string> sMeshMaskFrom, sMeshMaskStored;   // its pixel mask's tiles, kept the same way
    Scene2DNode::WarpGrid sMeshG, sMeshG0;   // the grid as pulled, and where its points sat when the warp began
    int sMeshSplit = -1;            // a Split / Remove Split armed for the next click (Scene2DNode::WarpSplit), -1 none
    ImVec2 sMeshGrab;               // the held point minus the mouse at the press: the point moves by the drag, not to it
@@ -4807,6 +4871,9 @@ namespace
          b.sourceAnchor[1] = sCloneAnchor.y;
          b.sampleAll = sCloneAll || cloneAbove;   // a new layer above has nothing of its own to clone
       }
+      // Blur, Sharpen and Smudge with All layers (Photoshop's Sample All Layers): they read the whole picture.
+      if (b.mode == BrushEngine::kBlur || b.mode == BrushEngine::kSharpen || b.mode == BrushEngine::kSmudge)
+         b.sampleAll = sAllLayers;
       std::copy(sFg, sFg + 3, b.color);
       if (sTool == kBrush && sBrushHue != 0.0f)
          HueTurn(b.color, sBrushHue);
@@ -5901,7 +5968,8 @@ namespace
       Layer* al = Active(doc);
       if (al == nullptr || PaintRefused(doc))
          return;
-      if (sMeshId != al->id || (al->tiles != sMeshFrom && al->tiles != sMeshStored))
+      if (sMeshId != al->id || (al->tiles != sMeshFrom && al->tiles != sMeshStored) ||
+          (al->mtiles != sMeshMaskFrom && al->mtiles != sMeshMaskStored))
       {
          if (!MeshRestFit(doc, *al, sMeshG))
             return;
@@ -5909,6 +5977,7 @@ namespace
          sMeshId = al->id;
          sMeshFrom = al->tiles;
          sMeshStored = al->tiles;
+         sMeshMaskFrom = sMeshMaskStored = al->mtiles;
       }
       sMeshPoint = -1;
       // An armed split lands where the click sits on the grid (Photoshop's Split Warp, then a click).
@@ -5960,15 +6029,18 @@ namespace
          return;
       sMeshG.pts[sMeshPoint * 2] = sMouseDoc.x + sMeshGrab.x;
       sMeshG.pts[sMeshPoint * 2 + 1] = sMouseDoc.y + sMeshGrab.y;
-      if (doc->MeshWarp(sMeshId, sMeshFrom, sMeshG, false, sMeshNearest, &sMeshG0))
+      if (doc->MeshWarp(sMeshId, sMeshFrom, sMeshG, false, sMeshNearest, &sMeshG0, &sMeshMaskFrom))
          Touch();
    }
 
    void MeshRelease(Scene2DNode* doc)
    {
-      if (sMeshPoint >= 0 && doc->MeshWarp(sMeshId, sMeshFrom, sMeshG, true, sMeshNearest, &sMeshG0))
+      if (sMeshPoint >= 0 && doc->MeshWarp(sMeshId, sMeshFrom, sMeshG, true, sMeshNearest, &sMeshG0, &sMeshMaskFrom))
          if (const Layer* l = doc->FindLayer(sMeshId))
+         {
             sMeshStored = l->tiles;
+            sMeshMaskStored = l->mtiles;
+         }
       sMeshPoint = -1;
       Touch();
    }
@@ -7950,6 +8022,8 @@ namespace
                      sSel.push_back(l.id);
             }
             if (MenuParts::Item(T("Trim Transparent Edges"))) TrimDocument(doc);
+            if (MenuParts::Item(T("Trim Top Left Colour"))) TrimByCornerColour(doc, false);
+            if (MenuParts::Item(T("Trim Bottom Right Colour"))) TrimByCornerColour(doc, true);
             if (MenuParts::Item(T("Fit on Screen"), Sc("Ctrl+0"))) FitView(doc);
             if (MenuParts::Item(T("Actual Pixels"), Sc("Ctrl+1")))
             {
@@ -8453,10 +8527,9 @@ namespace
          {
             if (sAdjPick.point != 0 && (x.adjType == Scene2DNode::kAdjLevels || x.adjType == Scene2DNode::kAdjCurves))
             {
-               float disp[3] = { c[0], c[1], c[2] };
-               if (doc->Doc().linear)
-                  for (float& v : disp)
-                     v = ColorSpace::LinearToSrgb(v);
+               // The picture's working values: Levels and Curves run on them (linear in a linear document), so
+               // the point is set from the same values it will act on.
+               const float disp[3] = { c[0], c[1], c[2] };
                Scene2DNode::PointFromPick(x.adjType, x.adjAmt, x.levels, x.levelsCh, x.adjP, x.curve, x.curveCh, disp, sAdjPick.point);
                Touch();
                sAdjPick = AdjPick();
@@ -9784,7 +9857,11 @@ namespace
       }
       MorePct(T("Wet mix"), &b.wet, params::view2d::wet_lo, params::view2d::wet_hi);
       if (b.wet > 0.0f)
+      {
          MorePct(T("Refill"), &b.refill, params::view2d::refill_lo, params::view2d::refill_hi);
+         MorePct(T("Wet jitter"), &b.wetJitter, params::view2d::wet_lo, params::view2d::wet_hi);
+         MorePct(T("Refill jitter"), &b.refillJitter, params::view2d::refill_lo, params::view2d::refill_hi);
+      }
    }
 
    // A canvas node feeds the brush: its picture as the tip, the canvas grain, or the colour (Rebelle's custom
@@ -9992,6 +10069,12 @@ namespace
             float tol = b.keyTolerance * 100.0f;
             BarSlider("##v2dkeytol", &tol, params::view2d::tol_lo, params::view2d::tol_hi, "Tolerance %.0f%%", kWellL);
             b.keyTolerance = tol / 100.0f;
+            if (sTool == kBgErase)
+            {
+               next();
+               if (TextChip(L("Protect##v2dbgprot"), b.protectFg, T("Keep the foreground colour: the tolerance stops short of it")))
+                  b.protectFg = !b.protectFg;
+            }
          }
          if (sTool == kPatternStamp)
          {
@@ -10004,6 +10087,12 @@ namespace
             float sc = b.patternScale * 100.0f;
             BarSlider("##v2dpscale", &sc, params::view2d::sc_lo, params::view2d::sc_hi, "Scale %.0f%%", kWellM);
             b.patternScale = sc / 100.0f;
+         }
+         if (sTool == kBlur || sTool == kSharpen || (sTool == kBrush && ToolBrush().mode == BrushEngine::kSmudge))
+         {
+            gap();
+            if (TextChip(L("All layers##v2dretall"), sAllLayers, T("Sample the whole picture")))
+               sAllLayers = !sAllLayers;
          }
          if (sTool == kClone || sTool == kHeal)
          {
@@ -10187,6 +10276,7 @@ namespace
             {
                Pairs g;
                MorePct(T("Spacing"), &b.spacing, params::view2d::spacing_lo, params::view2d::spacing_hi);
+               MoreCheck(T("Spacing off"), &b.spacingOff);
                MorePct(T("Roundness"), &b.roundness, params::view2d::roundness_lo, params::view2d::roundness_hi);
                MoreSlider(T("Angle"), &b.angle, params::view2d::angle_lo, params::view2d::angle_hi, "%.0f°");
                MoreCheck(T("Hard edge"), &b.pencil);
@@ -11951,6 +12041,39 @@ namespace
       doc->CropTo(lo[0], lo[1], hi[0], hi[1]);
       sNeedFit = true;
       Touch();
+   }
+
+   // Trim based on a corner's colour (Photoshop's Trim > Top Left / Bottom Right Pixel Color): the edges that are
+   // exactly that colour, alpha included, are cut. A picture that is all that colour is left alone.
+   bool TrimByCornerColour(Scene2DNode* doc, bool bottomRight)
+   {
+      static int sTrimColFrame = 1 << 26;
+      doc->CookIfNeeded(++sTrimColFrame);
+      std::vector<uint8_t> px;
+      int w = 0, h = 0;
+      if (!doc->ReadOutput(px, w, h) || w <= 0 || h <= 0 || px.size() < (size_t)w * h * params::view2d::kRgba)
+         return false;
+      // Rows come bottom first: document row y is texture row h - 1 - y.
+      auto at = [&](int x, int y) { return &px[((size_t)(h - 1 - y) * w + x) * params::view2d::kRgba]; };
+      uint8_t ref[params::view2d::kRgba];
+      std::copy_n(bottomRight ? at(w - 1, h - 1) : at(0, 0), params::view2d::kRgba, ref);
+      int x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+            if (!std::equal(ref, ref + 4, at(x, y)))
+            {
+               x0 = std::min(x0, x);
+               y0 = std::min(y0, y);
+               x1 = std::max(x1, x);
+               y1 = std::max(y1, y);
+            }
+      if (x1 < 0 || (x0 == 0 && y0 == 0 && x1 == w - 1 && y1 == h - 1))
+         return false;
+      PushUndoCheckpoint("Trim");
+      doc->CropTo((float)x0, (float)y0, (float)(x1 + 1), (float)(y1 + 1));
+      sNeedFit = true;
+      Touch();
+      return true;
    }
 
    // Cmd-click a layer thumbnail (Photoshop): its pixels become the selection; Shift adds, Alt takes away.
@@ -19370,6 +19493,34 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             doc->Commit();
          }
          {
+            // A layer 20 px past the right edge: Hide Selection with a feathered selection hides only the selection,
+            // and applying that feathered mask keeps the off-canvas pixels it reveals (PhotoCraft
+            // applying_a_feathered_mask_keeps_off_canvas_pixels_it_reveals).
+            std::vector<uint8_t> rgba((size_t)Wi * Hi * 4, 0);
+            for (size_t i = 0; i < (size_t)Wi * Hi; i++)
+            {
+               rgba[i * 4] = 255;
+               rgba[i * 4 + 3] = 255;
+            }
+            const int t = doc->AddFileLayer(0, "Past the edge", 20, 0, Wi, Hi, rgba);
+            doc->Commit();
+            doc->SelectRect(30, 30, 60, 60, Scene2DNode::kSelNew, 2.0f, false);
+            const bool hid = doc->MaskHideSelection(t);
+            doc->Deselect();
+            const int offMask = maskAt(t, 10, 100), holeMask = maskAt(t, 45, 45);
+            const bool applied = doc->ApplyPixelMask(t);
+            std::vector<uint8_t> px;
+            int pw = 0, ph = 0;
+            doc->ReadPaint(t, px, pw, ph);
+            auto a = [&](int lx, int ly) { return pw > lx && ph > ly ? (int)px[((size_t)(ph - 1 - ly) * pw + lx) * 4 + 3] : -1; };
+            fprintf(stderr, "PROBE feathered mask off canvas: hid %d applied %d mask %d hole %d alpha past edge %d hole %d\n", (int)hid,
+                    (int)applied, offMask, holeMask, a(Wi - 5, 100), a(25, 45));
+            expect("parity: applying a feathered mask keeps off-canvas pixels it reveals",
+                   hid && applied && holeMask < 5 && a(Wi - 5, 100) == 255 && a(25, 45) < 5);
+            doc->RemoveLayer(t);
+            doc->Commit();
+         }
+         {
             // Hide Selection: every selected layer gets a mask hiding the selection, one undo step, no selection left.
             const int a = redLayer(), b = redLayer();
             doc->SelectRect(0, 0, W / 2, H, Scene2DNode::kSelNew, 0, false);
@@ -19518,6 +19669,401 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             doc->RemoveLayer(e);
             doc->Commit();
          }
+      }
+      // Block B: Levels' and Curves' eyedroppers. A colour-cast layer under the adjustment; the pick reads the adjusted
+      // picture (the layer below the adjustment, through it), the point is set from the colour before it, and the
+      // picture then shows white, black or a neutral grey of the same luma. Survives the document text round trip.
+      {
+         auto expectS = [&](const std::string& what, bool pass) { expect(what.c_str(), pass); };
+         auto castDoc = [&](const float c[3], int type) {
+            const int base = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(base, c, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            AddAdjust(doc, type);
+            return std::make_pair(base, sSel.empty() ? 0 : sSel.back());
+         };
+         int pickFrame = 1 << 20;
+         auto pickAt = [&](float out[3]) {
+            doc->CookIfNeeded(++pickFrame);
+            return doc->Pick(W * 0.5f, H * 0.5f, out, 3, 0);
+         };
+         // The pick reads the picture as the eyedropper does: before this point is set (Photoshop samples the
+         // picture the adjustment is editing, not its own preview of the point).
+         auto setPointFrom = [&](int adj, int point, float c[3]) {
+            Layer* a = doc->FindLayer(adj);
+            if (a == nullptr)
+               return false;
+            Scene2DNode::PointFromPick(a->adjType, a->adjAmt, a->levels, a->levelsCh, a->adjP, a->curve, a->curveCh, c, point);
+            doc->Commit();
+            return true;
+         };
+         auto setPoint = [&](int adj, int point) {
+            float c[3];
+            return pickAt(c) && setPointFrom(adj, point, c);
+         };
+         auto luma = [](const float c[3]) { return 0.2126f * c[0] + 0.7152f * c[1] + 0.0722f * c[2]; };
+         auto neutral = [](const float c[3], float tol) {
+            return std::fabs(c[0] - c[1]) <= tol && std::fabs(c[1] - c[2]) <= tol && std::fabs(c[0] - c[2]) <= tol;
+         };
+         auto drop = [&](std::pair<int, int> ids) {
+            doc->RemoveLayer(ids.second);
+            doc->RemoveLayer(ids.first);
+            doc->Commit();
+         };
+         const float warm[3] = { 0.62f, 0.47f, 0.31f };
+         for (int type : { Scene2DNode::kAdjLevels, Scene2DNode::kAdjCurves })
+         {
+            const char* nm = type == Scene2DNode::kAdjLevels ? "levels" : "curves";
+            float before[3], after[3];
+            auto ids = castDoc(warm, type);
+            const bool w = pickAt(before) && setPointFrom(ids.second, 3, before) && pickAt(after);
+            if (const Layer* a = doc->FindLayer(ids.second))
+            {
+               fprintf(stderr, "PROBE %s white: before %.3f %.3f %.3f after %.3f %.3f %.3f amt %.3f lin %d\n", nm, before[0], before[1], before[2],
+                       after[0], after[1], after[2], a->adjAmt, (int)doc->Doc().linear);
+               for (int ch = 0; ch < 3; ch++)
+               {
+                  fprintf(stderr, "PROBE   ch%d levels %.3f %.3f %.3f %.3f g %.3f curve", ch, a->levelsCh[ch][0], a->levelsCh[ch][1], a->levelsCh[ch][2],
+                          a->levelsCh[ch][3], a->adjP.size() > 3 ? a->adjP[(size_t)ch] : -1.0f);
+                  for (float v : a->curveCh[ch])
+                     fprintf(stderr, " %.3f", v);
+                  fprintf(stderr, "\n");
+               }
+            }
+            expectS(std::string("parity: ") + nm + " white eyedropper makes the sample white",
+                   w && after[0] > 0.97f && after[1] > 0.97f && after[2] > 0.97f);
+            drop(ids);
+            ids = castDoc(warm, type);
+            const bool b = setPoint(ids.second, 1) && pickAt(after);
+            expectS(std::string("parity: ") + nm + " black eyedropper makes the sample black",
+                   b && after[0] < 0.03f && after[1] < 0.03f && after[2] < 0.03f);
+            // Black then white on the same adjustment: the input references move, black stays below white.
+            float lightSpot[3] = { 0.95f, 0.9f, 0.85f };
+            const bool both = setPointFrom(ids.second, 3, lightSpot);
+            const Layer* bl = doc->FindLayer(ids.second);
+            bool ordered = bl != nullptr;
+            if (ordered && type == Scene2DNode::kAdjLevels)
+               for (int ch = 0; ch < 3; ch++)
+                  ordered = ordered && bl->levelsCh[ch][0] < bl->levelsCh[ch][1];
+            if (ordered && type == Scene2DNode::kAdjCurves)
+               for (int ch = 0; ch < 3; ch++)
+                  for (size_t i = 2; i + 1 < bl->curveCh[ch].size(); i += 2)
+                     ordered = ordered && bl->curveCh[ch][i] > bl->curveCh[ch][i - 2] && bl->curveCh[ch][i + 1] >= bl->curveCh[ch][i - 1];
+            expectS(std::string("parity: ") + nm + " black and white eyedroppers move the input references in order", both && ordered);
+            drop(ids);
+            // The grey point, from a dark and from a light cast: neutral, luma kept.
+            const float dark[3] = { 0.26f, 0.18f, 0.11f }, light[3] = { 0.86f, 0.77f, 0.66f };
+            for (const float* c : { dark, light })
+            {
+               ids = castDoc(c, type);
+               const bool g = pickAt(before) && setPoint(ids.second, 2) && pickAt(after);
+               if (!(g && neutral(after, 0.025f) && std::fabs(luma(after) - luma(before)) < 0.03f))
+               {
+                  fprintf(stderr, "PROBE %s grey: before %.3f %.3f %.3f after %.3f %.3f %.3f\n", nm, before[0], before[1], before[2], after[0], after[1], after[2]);
+                  if (const Layer* a = doc->FindLayer(ids.second))
+                     for (int ch = 0; ch < 3; ch++)
+                     {
+                        fprintf(stderr, "PROBE   ch%d curve", ch);
+                        for (float v : a->curveCh[ch])
+                           fprintf(stderr, " %.3f", v);
+                        fprintf(stderr, "  master");
+                        for (float v : a->curve)
+                           fprintf(stderr, " %.3f", v);
+                        fprintf(stderr, "\n");
+                     }
+               }
+               expectS(std::string("parity: ") + nm + (c == dark ? " neutral grey keeps the luma of a dark cast" : " neutral grey keeps the luma of a light cast"),
+                      g && neutral(after, 0.025f) && std::fabs(luma(after) - luma(before)) < 0.03f);
+               drop(ids);
+            }
+            // Near black and near white grey samples: the points stay in range and in order, the text round-trips.
+            const float nb[3] = { 0.02f, 0.015f, 0.01f }, nw[3] = { 0.985f, 0.975f, 0.96f };
+            bool sane = true, trip = true;
+            for (const float* c : { nb, nw })
+            {
+               ids = castDoc(c, type);
+               sane = sane && setPoint(ids.second, 2) && pickAt(after);
+               for (float v : after)
+                  sane = sane && std::isfinite(v) && v >= 0.0f && v <= 1.0f;
+               if (const Layer* a = doc->FindLayer(ids.second))
+               {
+                  for (int ch = 0; ch < 3; ch++)
+                  {
+                     if (type == Scene2DNode::kAdjLevels)   // Levels keeps a gamma per channel in adjP; Curves only a flag
+                        sane = sane && a->adjP.size() >= 3 && std::isfinite(a->adjP[(size_t)ch]);
+                     for (size_t i = 2; i < a->curveCh[ch].size(); i += 2)
+                        sane = sane && a->curveCh[ch][i] > a->curveCh[ch][i - 2];
+                  }
+                  const std::string t0 = doc->DocText();
+                  doc->Commit();
+                  trip = trip && doc->DocText() == t0;
+               }
+               drop(ids);
+            }
+            if (!sane)
+               fprintf(stderr, "PROBE %s near: after %.3f %.3f %.3f\n", nm, after[0], after[1], after[2]);
+            expectS(std::string("parity: ") + nm + " grey eyedropper handles near black and near white samples", sane);
+            expectS(std::string("parity: ") + nm + " eyedropper points round-trip through the document text", trip);
+         }
+      }
+      // Block B: absolute Selective Colour against Photoshop 27.11 (PhotoCraft's measured table: range, cyan, grey,
+      // Photoshop's red, within 1.5 levels).
+      {
+         struct M { int range; float cyan; int grey, want; };
+         const M table[] = { { 7, 0.5f, 64, 32 }, { 7, 0.5f, 192, 129 }, { 7, -0.5f, 192, 223 }, { 7, -0.5f, 64, 128 },
+                             { 6, -0.5f, 192, 224 }, { 6, -0.5f, 240, 253 }, { 8, 0.5f, 64, 32 }, { 8, 0.5f, 16, 2 } };
+         bool all = true;
+         int sc = 1 << 21;
+         for (const M& m : table)
+         {
+            const float g = m.grey / 255.0f, grey[3] = { g, g, g };
+            const int base = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(base, grey, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            AddAdjust(doc, Scene2DNode::kAdjSelective);
+            const int adj = sSel.empty() ? 0 : sSel.back();
+            float out[3] = { -1, -1, -1 };
+            if (Layer* a = doc->FindLayer(adj))
+            {
+               a->adjP = Scene2DNode::AdjParamDefault(Scene2DNode::kAdjSelective);
+               a->adjP[36] = 0.0f;
+               a->adjP[(size_t)m.range * 4] = m.cyan;
+               doc->Commit();
+               doc->CookIfNeeded(++sc);
+               doc->Pick(W * 0.5f, H * 0.5f, out, 3, 0);
+            }
+            const float got = out[0] * 255.0f;
+            if (std::fabs(got - m.want) > 1.5f)
+            {
+               all = false;
+               fprintf(stderr, "PROBE selective abs: range %d cyan %.2f grey %d got %.1f want %d\n", m.range, m.cyan, m.grey, got, m.want);
+            }
+            doc->RemoveLayer(adj);
+            doc->RemoveLayer(base);
+            doc->Commit();
+         }
+         expect("parity: absolute selective colour matches Photoshop's measured table", all);
+      }
+      // Block B: .3dl lookups and the folder list. A Lustre file whose Mesh line declares a 3-wide cube and 12-bit
+      // output inverts (64,128,192) to Photoshop's (191,127,63); a 10-bit-shaper file with 12-bit codes reads its range
+      // from the codes; the folder list keeps .cube / .3dl files by name, without hidden files or folders.
+      {
+         const std::string dir = AppPaths::TempDir() + "/v2d_lut_test";
+         std::error_code ec;
+         std::filesystem::remove_all(AppPaths::FsPath(dir), ec);
+         AppPaths::EnsureDir(dir);
+         std::string mesh = "3DMESH\nMesh 1 12\n0 512 1023\n";
+         for (int r = 0; r < 3; ++r)
+            for (int g = 0; g < 3; ++g)
+               for (int b = 0; b < 3; ++b)
+               {
+                  const int c[3] = { r, g, b };
+                  for (int k = 0; k < 3; ++k)
+                     mesh += std::to_string((int)std::lround(4095.0 - 4095.0 * c[k] / 2.0)) + (k < 2 ? " " : "\n");
+               }
+         std::string plain = "0 1023\n";
+         for (int r = 0; r < 2; ++r)
+            for (int g = 0; g < 2; ++g)
+               for (int b = 0; b < 2; ++b)
+                  plain += std::to_string((1 - r) * 4095) + " " + std::to_string((1 - g) * 4095) + " " + std::to_string((1 - b) * 4095) + "\n";
+         auto put = [&](const std::string& name, const std::string& text)
+         {
+            std::ofstream o(AppPaths::FsPath(dir + "/" + name));
+            o << text;
+         };
+         put("inverse.3dl", mesh);
+         put("Plain.3DL", plain);
+         put("b.cube", "LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n");
+         put("notes.txt", "x");
+         put(".hidden.cube", "x");
+         std::filesystem::create_directory(AppPaths::FsPath(dir + "/sub.cube"), ec);
+         int n = 0;
+         std::vector<float> rgb;
+         const bool plainOk = Scene2DNode::ReadCube(dir + "/Plain.3DL", n, rgb) && n == 2 && rgb.size() == 24 &&
+                              std::fabs(rgb[0] - 1.0f) < 1e-4f && std::fabs(rgb[3 * 1 + 0]) < 1e-4f &&   // red fastest: node 1 is r=1
+                              std::fabs(rgb[3 * 1 + 1] - 1.0f) < 1e-4f;
+         if (!plainOk)
+            fprintf(stderr, "PROBE 3dl plain: n %d size %zu first %.3f %.3f %.3f\n", n, rgb.size(), rgb.size() > 2 ? rgb[0] : -1.f,
+                    rgb.size() > 4 ? rgb[3] : -1.f, rgb.size() > 4 ? rgb[4] : -1.f);
+         expect("parity: a .3dl without a Mesh line reads its range from its codes", plainOk);
+         float out[3] = { -1, -1, -1 };
+         {
+            const float c[3] = { 64 / 255.0f, 128 / 255.0f, 192 / 255.0f };
+            const int base = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(base, c, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            AddAdjust(doc, Scene2DNode::kAdjLookup);
+            const int adj = sSel.empty() ? 0 : sSel.back();
+            if (Layer* a = doc->FindLayer(adj))
+            {
+               a->adjFile = dir + "/inverse.3dl";
+               doc->Commit();
+               doc->CookIfNeeded(1 << 22);
+               doc->Pick(W * 0.5f, H * 0.5f, out, 3, 0);
+            }
+            doc->RemoveLayer(adj);
+            doc->RemoveLayer(base);
+            doc->Commit();
+         }
+         const float want[3] = { 191, 127, 63 };
+         bool meshOk = true;
+         for (int k = 0; k < 3; ++k)
+            meshOk = meshOk && std::fabs(out[k] * 255.0f - want[k]) <= 1.5f;
+         if (!meshOk)
+            fprintf(stderr, "PROBE 3dl mesh: got %.1f %.1f %.1f\n", out[0] * 255, out[1] * 255, out[2] * 255);
+         expect("parity: a Lustre .3dl honours its Mesh header", meshOk);
+         std::string names;
+         for (const auto& [nm, file] : Scene2DNode::FolderLuts(dir))
+            names += nm + ",";
+         const bool listOk = names == "b.cube,inverse.3dl,Plain.3DL," && Scene2DNode::FolderLuts("").empty() &&
+                             Scene2DNode::FolderLuts(dir + "/missing").empty();
+         if (!listOk)
+            fprintf(stderr, "PROBE lut folder: %s\n", names.c_str());
+         expect("parity: the lookup folder lists LUT files by name", listOk);
+         std::filesystem::remove_all(AppPaths::FsPath(dir), ec);
+      }
+      // Block A: Hue/Saturation's ranges (PhotoCraft doc/adjust.rs and compose tone tests, Photoshop's own render).
+      {
+         using S = Scene2DNode;
+         const std::vector<float> def = S::AdjParamDefault(S::kAdjHue);
+         const float* reds = &def[S::kHueRangeBase + 3];
+         const float* blues = &def[S::kHueRangeBase + 4 * S::kHueRangeStride + 3];
+         const float odd[4] = { 10, 10, 10, 10 };
+         const float nan[4] = { NAN, NAN, NAN, NAN };
+         const bool w = S::HueRangeWeight(reds, 0) == 1.0f && S::HueRangeWeight(reds, 350) == 1.0f &&
+                        std::fabs(S::HueRangeWeight(reds, 30) - 0.5f) < 1e-5f && std::fabs(S::HueRangeWeight(reds, 330) - 0.5f) < 1e-5f &&
+                        S::HueRangeWeight(reds, 60) == 0.0f && S::HueRangeWeight(reds, 180) == 0.0f && S::HueRangeWeight(blues, 240) == 1.0f &&
+                        S::HueRangeWeight(blues, 120) == 0.0f && std::isfinite(S::HueRangeWeight(odd, 10)) &&
+                        std::isfinite(S::HueRangeWeight(odd, 200)) && std::isfinite(S::HueRangeWeight(nan, 10));
+         if (!w)
+            fprintf(stderr, "PROBE hue weights: r0 %.3f r350 %.3f r30 %.3f r330 %.3f r60 %.3f b240 %.3f\n", S::HueRangeWeight(reds, 0),
+                    S::HueRangeWeight(reds, 350), S::HueRangeWeight(reds, 30), S::HueRangeWeight(reds, 330), S::HueRangeWeight(reds, 60),
+                    S::HueRangeWeight(blues, 240));
+         expect("parity: hue range weights match Photoshop's default ranges", w);
+         float b[4] = { 100, 90, 200, 150 };
+         S::CanonicalHueBounds(b);
+         const bool ordered = b[0] <= b[1] && b[1] <= b[2] && b[2] <= b[3] && b[3] - b[0] < 360.0f;
+         if (!ordered)
+            fprintf(stderr, "PROBE hue bounds: %.1f %.1f %.1f %.1f\n", b[0], b[1], b[2], b[3]);
+         expect("parity: hue range sliders stay ordered", ordered);
+         // Reds Lightness -11 (-57 4 82 175), Yellows +100 (12 45 75 105), Magentas +100 (-117 -50 39 104), master
+         // Lightness +17: Photoshop renders three dull magentas as greys, and a grey moves by the master alone.
+         struct R { int range; float light, b0, b1, b2, b3; };
+         const R rs[3] = { { 0, -0.11f, -57, 4, 82, 175 }, { 1, 1.0f, 12, 45, 75, 105 }, { 5, 1.0f, -117, -50, 39, 104 } };
+         struct M { int in[3], want[3]; };
+         const M ms[4] = { { { 126, 97, 120 }, { 148, 148, 148 } }, { { 131, 103, 125 }, { 152, 152, 152 } },
+                           { { 95, 69, 90 }, { 122, 122, 122 } }, { { 102, 102, 102 }, { 128, 128, 128 } } };
+         bool all = true;
+         for (const M& m : ms)
+         {
+            const float c[3] = { m.in[0] / 255.0f, m.in[1] / 255.0f, m.in[2] / 255.0f };
+            const int base = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(base, c, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            AddAdjust(doc, S::kAdjHue);
+            const int adj = sSel.empty() ? 0 : sSel.back();
+            float out[3] = { -1, -1, -1 };
+            if (Layer* a = doc->FindLayer(adj))
+            {
+               a->adjAmt = a->adjTo = 0.0f;
+               a->adjP = def;
+               a->adjP[1] = 0.17f;
+               for (const R& r : rs)
+               {
+                  float* q = &a->adjP[(size_t)(S::kHueRangeBase + r.range * S::kHueRangeStride)];
+                  q[2] = r.light;
+                  q[3] = r.b0; q[4] = r.b1; q[5] = r.b2; q[6] = r.b3;
+               }
+               doc->Commit();
+               doc->CookIfNeeded((1 << 22) + 1 + (int)(&m - ms));
+               doc->Pick(W * 0.5f, H * 0.5f, out, 3, 0);
+            }
+            for (int k = 0; k < 3; k++)
+               if (std::fabs(out[k] * 255.0f - m.want[k]) > 2.0f)
+                  all = false;
+            if (!all)
+               fprintf(stderr, "PROBE hue dull: in %d %d %d got %.1f %.1f %.1f want %d\n", m.in[0], m.in[1], m.in[2], out[0] * 255, out[1] * 255,
+                       out[2] * 255, m.want[0]);
+            doc->RemoveLayer(adj);
+            doc->RemoveLayer(base);
+            doc->Commit();
+         }
+         expect("parity: hue ranges apply in full to dull colours (Photoshop's render)", all);
+      }
+      // Block B: Sample All Layers for Blur, Sharpen and Smudge. Red left, blue right on the layer below; the strokes
+      // go on an empty layer above. With All layers they lay the picture's blur / smear there; without, nothing.
+      {
+         const float red[3] = { 1, 0, 0 }, blue[3] = { 0, 0, 1 };
+         const int under = doc->AddPaintLayer();
+         doc->SelectAll();
+         doc->FillPixels(under, blue, 1.0f);
+         doc->SelectRect(0, 0, W * 0.5f, H, Scene2DNode::kSelNew, 0, false);
+         doc->FillPixels(under, red, 1.0f);
+         doc->Deselect();
+         doc->Commit();
+         const int top = doc->AddPaintLayer();
+         doc->Commit();
+         int saFrame = 1 << 22;
+         auto strokeOn = [&](int mode, bool all, float x0, float x1) {
+            doc->CookIfNeeded(++saFrame);
+            BrushEngine::Brush b;
+            b.mode = mode;
+            b.size = 24.0f;
+            b.opacity = 1.0f;
+            b.flow = 1.0f;
+            b.sampleAll = all;
+            if (!doc->BeginPaint(top, 0, b, x0, H * 0.5f, 1.0f))
+               return false;
+            for (int i = 1; i <= 12; i++)
+               doc->PaintTo(x0 + (x1 - x0) * i / 12.0f, H * 0.5f, 1.0f);
+            doc->EndPaint();
+            doc->Commit();
+            return true;
+         };
+         auto topAt = [&](float x, float y, uint8_t out[4]) {
+            std::vector<uint8_t> px;
+            int w = 0, h = 0;
+            if (!doc->ReadPaint(top, px, w, h) || w <= 0 || h <= 0)
+               return false;
+            const int ix = std::clamp((int)x, 0, w - 1), iy = std::clamp(h - 1 - (int)y, 0, h - 1);
+            std::copy_n(&px[((size_t)iy * w + ix) * 4], 4, out);
+            return true;
+         };
+         auto clearTop = [&]() {
+            doc->SelectAll();
+            doc->ClearPixels(top);
+            doc->Deselect();
+            doc->Commit();
+         };
+         uint8_t p0[4] = {}, p1[4] = {};
+         const float mx = W * 0.5f, my = H * 0.5f;
+         for (int mode : { (int)BrushEngine::kBlur, (int)BrushEngine::kSharpen })
+         {
+            const char* nm = mode == BrushEngine::kBlur ? "blur" : "sharpen";
+            const bool on = strokeOn(mode, true, mx - 20, mx + 20) && topAt(mx, my, p0);
+            clearTop();
+            const bool off = strokeOn(mode, false, mx - 20, mx + 20) && topAt(mx, my, p1);
+            clearTop();
+            if (!(on && off && p0[3] > 200 && p1[3] == 0))
+               fprintf(stderr, "PROBE sample all %s: on %d %d %d %d off %d %d %d %d\n", nm, p0[0], p0[1], p0[2], p0[3], p1[0], p1[1], p1[2], p1[3]);
+            expect(std::string("parity: sample all layers ") .append(nm).append(" works on an empty layer").c_str(),
+                   on && off && p0[3] > 200 && p1[3] == 0 && (mode != BrushEngine::kBlur || (p0[0] > 30 && p0[2] > 30)));
+         }
+         const bool sm = strokeOn(BrushEngine::kSmudge, true, mx - 40, mx + 30) && topAt(mx + 26, my, p0);
+         if (!(sm && p0[3] > 60 && p0[0] > p0[2]))
+            fprintf(stderr, "PROBE sample all smudge: %d %d %d %d\n", p0[0], p0[1], p0[2], p0[3]);
+         expect("parity: sample all layers smudge drags colour from below", sm && p0[3] > 60 && p0[0] > p0[2]);
+         doc->RemoveLayer(top);
+         doc->RemoveLayer(under);
+         doc->Commit();
       }
       // ledger-gaps Block A: the painted filter mask. A red layer under an Invert effect shows cyan; black on its
       // filter mask brings the red back there. A layer mask hides the bottom band, so a copy can tell the two apart.
@@ -20890,6 +21436,45 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
             split(m, r, 200 + k * 10.0f, 300, Scene2DNode::kWarpSplitV);
          expect("warp grid lines are capped", m.Nx() == Scene2DNode::kWarpLinesMax && r.Nx() == m.Nx());
       }
+      // Mesh warp with a pixel mask and a selection (PhotoCraft linked_mask_with_a_selection_warps_only_the_selected_
+      // region): the selected box moves 50 px down with its mask; where it left reads clear and revealed; the
+      // unselected part of the mask stays with the unselected pixels.
+      {
+         using WG = Scene2DNode::WarpGrid;
+         const float red[3] = { 1.0f, 0.0f, 0.0f };
+         const int id = doc->AddPaintLayer();
+         doc->SelectRect(10, 10, 40, 30, Scene2DNode::kSelNew, 0.0f, false);
+         doc->FillPixels(id, red, 1.0f);
+         doc->SelectRect(10, 10, 20, 30, Scene2DNode::kSelNew, 0.0f, false);   // hidden, selected
+         doc->SelectRect(30, 10, 40, 30, Scene2DNode::kSelAdd, 0.0f, false);   // hidden, not selected
+         const bool masked = doc->MaskHideSelection(id);
+         doc->SelectRect(10, 10, 30, 30, Scene2DNode::kSelNew, 0.0f, false);
+         doc->Commit();
+         const Layer* l = doc->FindLayer(id);
+         const std::vector<std::string> from = l->tiles, mfrom = l->mtiles;
+         const float c[8] = { 10, 10, 30, 10, 30, 30, 10, 30 };
+         WG rest;
+         Scene2DNode::WarpGridRest(rest, c);
+         WG mv = rest;
+         for (int k = 0; k < mv.Count(); k++)
+            mv.pts[k * 2 + 1] += 50.0f;
+         const bool warped = doc->MeshWarp(id, from, mv, true, false, &rest, &mfrom);
+         std::vector<uint8_t> px, mk;
+         int pw = 0, ph = 0;
+         doc->ReadPaint(id, px, pw, ph);
+         const bool hasMask = doc->MaskInDoc(id, mk);
+         auto alphaAt = [&](int x, int y) { return pw > x && ph > y ? (int)px[((size_t)(ph - 1 - y) * pw + x) * 4 + 3] : -1; };
+         auto maskAt = [&](int x, int y) { return hasMask ? (int)mk[(size_t)(doc->Doc().h - 1 - y) * (size_t)doc->Doc().w + x] : -1; };
+         fprintf(stderr, "PROBE warp mask: masked %d warped %d moved a %d m %d/%d vacated a %d m %d still a %d m %d copied m %d\n",
+                 (int)masked, (int)warped, alphaAt(25, 65), maskAt(15, 65), maskAt(25, 65), alphaAt(15, 15), maskAt(15, 15),
+                 alphaAt(35, 15), maskAt(35, 15), maskAt(35, 65));
+         expect("parity: a linked mask with a selection warps only the selected region",
+                masked && warped && alphaAt(25, 65) > 250 && maskAt(15, 65) < 5 && maskAt(25, 65) > 250 && alphaAt(15, 15) < 5 &&
+                maskAt(15, 15) > 250 && alphaAt(35, 15) > 250 && maskAt(35, 15) < 5 && maskAt(35, 65) > 250);
+         doc->RemoveLayer(id);
+         doc->Deselect();
+         doc->Commit();
+      }
       // Crop at an angle (PhotoCraft crop_at_90_degrees_is_rotate_then_crop_in_one_step, crop_at_a_small_angle_*):
       // the layers turn by minus the box's turn about its centre and the document takes the box's size, one step.
       {
@@ -20926,6 +21511,31 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->CropRotated(W * 0.5f, H * 0.5f, (float)W, (float)H, 3.0f);
          expect("crop at a small angle keeps the frame size", doc->Doc().w == W && doc->Doc().h == H);
          undoBack();
+         // Trim on the top-left colour: a white ground with a red square in it trims to the square; one undo step.
+         {
+            const float white[3] = { 1, 1, 1 }, red[3] = { 1, 0, 0 };
+            const int g = doc->AddPaintLayer();
+            doc->SelectAll();
+            doc->FillPixels(g, white, 1.0f);
+            doc->SelectRect(40, 30, 80, 70, Scene2DNode::kSelNew, 0, false);
+            doc->FillPixels(g, red, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            const size_t u0 = gUndoStack.size();
+            const bool cut = TrimByCornerColour(doc, false);
+            const int tw = doc->Doc().w, th = doc->Doc().h;
+            if (!(cut && tw == 40 && th == 40))
+               fprintf(stderr, "PROBE trim colour: cut %d -> %d x %d\n", (int)cut, tw, th);
+            expect("parity: trim on the top-left colour cuts the edges of that colour", cut && tw == 40 && th == 40);
+            expect("parity: trim on the top-left colour is one undo step", undoBack() && gUndoStack.size() == u0 && doc->Doc().w == W && doc->Doc().h == H);
+            doc->SelectAll();
+            doc->FillPixels(g, white, 1.0f);
+            doc->Deselect();
+            doc->Commit();
+            expect("parity: trim on one colour everywhere leaves the picture alone", !TrimByCornerColour(doc, true) && doc->Doc().w == W);
+            doc->RemoveLayer(g);
+            doc->Commit();
+         }
          sCropAngle = 0.0f;
          expect("straighten levels a line", std::fabs(StraightenAngle(0, 0, 100, 10) - 5.71f) < 0.05f &&
                 std::fabs(StraightenAngle(0, 0, -10, 100) - std::remainder(95.71f, 90.0f)) < 0.05f);
@@ -21516,7 +22126,7 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          br.pressureSize = br.pressureOpacity = false;
          sHaveLast = false;
          const float yy = (float)(H / 2);
-         BeginStroke(doc, ImVec2(400, yy), false);
+         BeginStroke(doc, ImVec2(400.0f, yy), false);
          const bool painting = doc->Painting();
          for (int i = 1; i <= 32 && painting; i++)
             doc->PaintTo(400.0f + 100.0f * i / 32.0f, yy, 1.0f);
@@ -21525,6 +22135,43 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
          doc->Commit();
          uint8_t e[4] = {};
          expect("parity: background eraser ignores the transparency lock", painting && pixel({ p }, 450, H / 2, e) && e[3] < 40);
+         // Protect Foreground (PhotoCraft #11903): a foreground equal to the sampled red erases nothing; a far
+         // foreground (blue, beyond the tolerance) leaves the stroke as it is without protection.
+         {
+            const float fg0[3] = { sFg[0], sFg[1], sFg[2] };
+            auto erased = [&](bool protect, const float* fg) -> int
+            {
+               const int q = doc->AddPaintLayer();
+               doc->SelectAll();
+               doc->FillPixels(q, red, 1.0f);
+               doc->Deselect();
+               doc->Commit();
+               SelectOnly(q);
+               std::copy(fg, fg + 3, sFg);
+               br.protectFg = protect;
+               sHaveLast = false;
+               BeginStroke(doc, ImVec2(400.0f, yy), false);
+               const bool on = doc->Painting();
+               for (int i = 1; i <= 32 && on; i++)
+                  doc->PaintTo(400.0f + 100.0f * i / 32.0f, yy, 1.0f);
+               if (on)
+                  EndStroke(doc);
+               doc->Commit();
+               uint8_t c[4] = { 0, 0, 0, 0 };
+               const int a = on && pixel({ q }, 450, H / 2, c) ? c[3] : -1;
+               doc->RemoveLayer(q);
+               doc->Commit();
+               return a;
+            };
+            const float blue[3] = { 0.0f, 0.0f, 1.0f };
+            const int same = erased(true, red), far = erased(true, blue), off = erased(false, blue);
+            if (same != 255 || far != off)
+               fprintf(stderr, "PROBE bg protect: same %d far %d off %d\n", same, far, off);
+            expect("parity: background eraser protecting the sampled colour erases nothing", same == 255);
+            expect("parity: background eraser protecting a far foreground erases as without it", far == off && off >= 0 && off < 40);
+            std::copy(fg0, fg0 + 3, sFg);
+            br.protectFg = false;
+         }
          br = br0;
          sTool = tool0;
          doc->RemoveLayer(p);

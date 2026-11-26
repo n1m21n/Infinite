@@ -1395,6 +1395,77 @@ void RunView2DTest()
       noCatch.catchUp = false;
       const std::vector<float> shortEnd = Shaky(noCatch);
       Check("Phase5: catchUp=false stops short of the pen lift", !Lit(shortEnd, 279, 100));
+      {
+         // Held still at the end for 30 frames (the panel feeds the same sample every frame): with catch-up off the
+         // brush stays where it was, so the end of the line stays unpainted.
+         while (!pic.Layers().empty())
+            pic.Layers().pop_back();
+         pic.Commit();
+         const int L = pic.AddPaintLayer();
+         pic.BeginPaint(L, 0, noCatch, 20.0f, 100.0f, 1.0f);
+         for (float x = 26.0f; x < 280.0f; x += 6.0f)
+            pic.PaintTo(x, 100.0f, 1.0f);
+         for (int f = 0; f < 30; f++)
+            pic.PaintTo(280.0f, 100.0f, 1.0f);
+         pic.EndPaint();
+         Cook(&pic);
+         const int w = pic.GetOutputWidth(), h = pic.GetOutputHeight();
+         std::vector<float> px((size_t)w * h * 4);
+         glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         fprintf(stderr, "PROBE smoothing pause: lit 240 %d 270 %d 279 %d\n", (int)Lit(px, 240, 100), (int)Lit(px, 270, 100), (int)Lit(px, 279, 100));
+         Check("parity: smoothing without catch-up stops while the pointer pauses", Lit(px, 240, 100) && !Lit(px, 279, 100));
+      }
+      {
+         // 8-bit soft paint is dithered, not banded; full paint and untouched pixels keep their exact values
+         // (PhotoCraft an_8bit_soft_stroke_is_dithered_instead_of_banded, dithering_never_moves_an_exact_colour_...).
+         auto line = [&](const BrushEngine::Brush& b) {
+            while (!pic.Layers().empty())
+               pic.Layers().pop_back();
+            pic.Commit();
+            const int L = pic.AddPaintLayer();
+            pic.BeginPaint(L, 0, b, 40.0f, 100.0f, 1.0f);
+            for (float x = 40.0f; x <= 260.0f; x += 2.0f)
+               pic.PaintTo(x, 100.0f, 1.0f);
+            pic.EndPaint();
+            Cook(&pic);
+            const int w = pic.GetOutputWidth(), h = pic.GetOutputHeight();
+            std::vector<float> px((size_t)w * h * 4);
+            glBindTexture(GL_TEXTURE_2D, pic.GetOutputTexture());
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+            glBindTexture(GL_TEXTURE_2D, 0);
+            return px;
+         };
+         auto at = [](const std::vector<float>& px, int x, int y, int c) { return (int)std::lround(px[((size_t)(199 - y) * 300 + x) * 4 + c] * 255.0f); };
+         BrushEngine::Brush solid = pen;
+         solid.size = 20.0f;
+         solid.color[0] = 0.2f, solid.color[1] = 0.4f, solid.color[2] = 0.6f;
+         const std::vector<float> a = line(solid);
+         bool exact = true;
+         for (int x = 60; x < 240; x++)
+            exact = exact && at(a, x, 100, 0) == 51 && at(a, x, 100, 1) == 102 && at(a, x, 100, 2) == 153 && at(a, x, 100, 3) == 255;
+         const bool untouched = at(a, 150, 20, 3) == 0;
+         BrushEngine::Brush soft = pen;
+         soft.size = 60.0f;
+         soft.hardness = 0.0f;
+         soft.flow = 0.08f;
+         const std::vector<float> b = line(soft);
+         int fractional = 0, painted = 0;
+         for (int y = 72; y <= 128; y++)
+         {
+            double sum = 0;
+            for (int x = 80; x < 220; x++)
+               sum += at(b, x, y, 3);
+            const double avg = sum / 140.0;
+            painted += avg > 0.5 ? 1 : 0;
+            fractional += avg > 0.5 && avg < 254.5 && std::fabs(avg - std::round(avg)) > 0.15 ? 1 : 0;
+         }
+         fprintf(stderr, "PROBE brush dither: exact %d untouched %d painted rows %d fractional rows %d centre a %d\n", (int)exact,
+                 (int)untouched, painted, fractional, at(b, 150, 100, 3));
+         Check("parity: dithering never moves an exact colour or an untouched pixel", exact && untouched);
+         Check("parity: an 8-bit soft stroke is dithered instead of banded", painted > 10 && fractional * 2 > painted);
+      }
 
       while (!pic.Layers().empty())
          pic.Layers().pop_back();
@@ -1434,6 +1505,175 @@ void RunView2DTest()
       const float air1 = Pixel(&pic, 150, 100)[0];
       pic.EndPaint();
       Check("Phase5: airbrush Tick builds up paint while held still", air1 > air0 + 0.05f);
+
+      // ---- Block B brush engine options: airbrush click and rate, spacing off, smoothing pause, wet jitter, dither ----
+      {
+         const int S = 96;
+         GLUtil::Fbo surf;
+         GLUtil::EnsureFbo(surf, S, S, GL_RGBA8, "BrushOptionTest");
+         const auto Read = [&]()
+         {
+            std::vector<uint8_t> px((size_t)S * S * 4);
+            GLint prev = 0;
+            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, surf.fbo);
+            glReadPixels(0, 0, S, S, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
+            return px;
+         };
+         int dirty[4];
+         BrushEngine::Stroke st;
+         GLUtil::ClearFbo(surf);
+         BrushEngine::Brush ab = BrushEngine::Presets()[4].brush;
+         st.Begin(surf, ab, 48, 48, 1.0f);
+         st.Flush();
+         const int click = st.DabCount();
+         for (int k = 0; k < 8; k++)
+            st.Tick(0.125f);
+         st.Flush();
+         const int perSecond = st.DabCount() - click;
+         st.End(surf, dirty);
+         Check("Brush: an airbrush click lays two dabs", click == 2);
+         Check("Brush: the airbrush's default rate is ten dabs a second", perSecond == 10);
+
+         // A two second hold stacks its 22 dabs (2 for the click, 20 held) like 22 single dabs laid over each other.
+         BrushEngine::Brush one = ab;
+         one.airbrushRate = 0.0f;
+         one.size = 30.0f;
+         one.flow = 0.05f;
+         one.opacity = 1.0f;
+         one.pressureOpacity = false;
+         one.color[0] = one.color[1] = one.color[2] = 1.0f;
+         GLUtil::ClearFbo(surf);
+         st.Begin(surf, one, 48, 48, 1.0f);
+         st.End(surf, dirty);
+         const float a1 = Read()[((size_t)48 * S + 48) * 4 + 3] / 255.0f;
+         BrushEngine::Brush hold = one;
+         hold.airbrushRate = ab.airbrushRate;
+         GLUtil::ClearFbo(surf);
+         st.Begin(surf, hold, 48, 48, 1.0f);
+         for (int k = 0; k < 16; k++)
+            st.Tick(0.125f);
+         st.End(surf, dirty);
+         const float a22 = Read()[((size_t)48 * S + 48) * 4 + 3] / 255.0f;
+         const float want = 1.0f - std::pow(1.0f - a1, 22.0f);
+         if (std::fabs(a22 - want) > 0.04f)
+            printf("  PROBE airbrush hold: one dab %.3f, two seconds %.3f, 22 stacked %.3f\n", a1, a22, want);
+         Check("Brush: a two second airbrush hold builds up to 22 stacked dabs", a1 > 0.02f && std::fabs(a22 - want) <= 0.04f);
+
+         // Spacing off: one dab per pointer sample, however far apart the samples are.
+         BrushEngine::Brush sp = BrushEngine::Presets()[5].brush;
+         sp.size = 4.0f;
+         const auto Dabs = [&](const BrushEngine::Brush& use, float gap)
+         {
+            GLUtil::ClearFbo(surf);
+            st.Begin(surf, use, 4.0f, 20.0f, 1.0f);
+            for (int k = 1; k <= 10; k++)
+               st.MoveTo(4.0f + gap * k, 20.0f, 1.0f);
+            st.Flush();
+            const int n = st.DabCount();
+            st.End(surf, dirty);
+            return n;
+         };
+         BrushEngine::Brush off = sp;
+         off.spacingOff = true;
+         const int slow = Dabs(off, 2.0f), fast = Dabs(off, 8.0f), spaced = Dabs(sp, 8.0f);
+         Check("Brush: spacing off lays one dab per pointer sample, so the pointer's speed spaces them",
+               slow == 11 && fast == 11 && spaced > 11);
+
+         // Smoothing without catch-up: while the pointer pauses the brush stays where it is.
+         BrushEngine::Brush sm = sp;
+         sm.smoothing = 0.5f;
+         sm.catchUp = false;
+         GLUtil::ClearFbo(surf);
+         st.Begin(surf, sm, 10.0f, 20.0f, 1.0f);
+         for (int k = 1; k <= 10; k++)
+            st.MoveTo(10.0f + 6.0f * k, 20.0f, 1.0f);
+         st.Flush();
+         const int moving = st.DabCount();
+         for (int k = 0; k < 30; k++)
+            st.MoveTo(70.0f, 20.0f, 1.0f);
+         st.Flush();
+         const int paused = st.DabCount();
+         st.End(surf, dirty);
+         Check("Brush: smoothing without catch-up stops while the pointer pauses", moving > 1 && paused == moving);
+
+         // Wet and refill jitter: each dab's own share, from its seed, never above the setting.
+         float lo = 1.0f, hi = 0.0f;
+         for (int k = 0; k < 40; k++)
+         {
+            const float w = BrushEngine::DabShare(0.6f, 1.0f, k * 2.37f);
+            lo = std::min(lo, w);
+            hi = std::max(hi, w);
+         }
+         Check("Brush: wet and refill jitter vary each dab's share below the setting",
+               BrushEngine::DabShare(0.6f, 0.0f, 3.0f) == 0.6f && lo < 0.3f && hi > 0.45f && hi <= 0.6f &&
+                  BrushEngine::DabShare(0.6f, 1.0f, 5.0f) == BrushEngine::DabShare(0.6f, 1.0f, 5.0f));
+
+         // Dither: a soft 8-bit dab's pixels at the same distance from its centre differ by a level or two
+         // instead of banding; full coverage of the same colour and untouched pixels never move.
+         BrushEngine::Brush soft = one;
+         soft.size = 80.0f;
+         soft.flow = 0.35f;
+         GLUtil::ClearFbo(surf);
+         // The dab sits on pixel 48's centre, so the eight mirrored pixels around it are the same distance out
+         // (the row index may be flipped, so both centre rows are tried and the tighter one is kept).
+         st.Begin(surf, soft, 48.5f, 48.5f, 1.0f);
+         st.End(surf, dirty);
+         std::vector<uint8_t> d = Read();
+         int groups = 0, mixed = 0, spread = 0;
+         for (int cy : { 47, 48 })
+         {
+            int g = 0, m = 0, sp = 0;
+            for (int dy = 1; dy < 30; dy += 3)
+               for (int dx = dy + 1; dx < 30; dx += 2)
+               {
+                  const int pts[8][2] = { { dx, dy }, { -dx, dy }, { dx, -dy }, { -dx, -dy }, { dy, dx }, { -dy, dx }, { dy, -dx }, { -dy, -dx } };
+                  int mn = 255, mx = 0;
+                  for (const auto& q : pts)
+                  {
+                     const int v = d[((size_t)(cy + q[1]) * S + 48 + q[0]) * 4 + 3];
+                     mn = std::min(mn, v);
+                     mx = std::max(mx, v);
+                  }
+                  if (mx == 0 || mn == 255)
+                     continue;
+                  g++;
+                  m += mx != mn;
+                  sp = std::max(sp, mx - mn);
+               }
+            if (cy == 47 || sp < spread)
+            {
+               groups = g;
+               mixed = m;
+               spread = sp;
+            }
+         }
+         if (!(groups > 20 && mixed * 3 > groups && spread <= 3))
+            fprintf(stderr, "PROBE dither: groups %d mixed %d spread %d fmt %x\n", groups, mixed, spread, (unsigned)surf.internalFormat);
+         Check("Brush: an 8-bit soft stroke is dithered instead of banded", groups > 20 && mixed * 3 > groups && spread <= 3);
+         const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+         GLUtil::ClearFbo(surf, white);
+         st.Begin(surf, soft, 48, 48, 1.0f);
+         st.End(surf, dirty);
+         d = Read();
+         bool exact = true;
+         for (uint8_t v : d)
+            exact = exact && v == 255;
+         GLUtil::ClearFbo(surf);
+         BrushEngine::Brush small = soft;
+         small.size = 20.0f;
+         st.Begin(surf, small, 48, 48, 1.0f);
+         st.End(surf, dirty);
+         d = Read();
+         bool untouched = true;
+         for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+               if (std::hypot(x - 48.0f, y - 48.0f) > 14.0f)
+                  untouched = untouched && d[((size_t)y * S + x) * 4 + 3] == 0;
+         Check("Brush: dithering never moves an exact colour or an untouched pixel", exact && untouched);
+         GLUtil::DestroyFbo(surf);
+      }
    }
 
    // ---- T3 sketch: two paint layers, erase on one; tiles save, undo restores ----

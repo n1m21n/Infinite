@@ -54,7 +54,7 @@ int Scene2DNode::AdjParamCount(int type)
    case kAdjThreshold: return 1;
    case kAdjPosterize: return 1;
    case kAdjBrightness: return 1;
-   case kAdjHue: return 3;
+   case kAdjHue: return 3 + 6 * kHueRangeStride;
    case kAdjExposure: return 2;
    case kAdjLevels: return 3;
    case kAdjCurves: return 1;
@@ -77,6 +77,66 @@ int Scene2DNode::AdjParamCount(int type)
    }
 }
 
+// Hue/Saturation ranges (PhotoCraft doc/adjust.rs HueRange, MIT/Apache-2.0): how much a hue (deg) belongs to a range,
+// measured from the range's start so the wrap-around reds work.
+float Scene2DNode::HueRangeWeight(const float* b, float deg)
+{
+   if (!(std::isfinite(b[0]) && std::isfinite(deg)))
+      return 0.0f;
+   auto rel = [&](float x) { return std::isfinite(x) ? x - b[0] - 360.0f * std::floor((x - b[0]) / 360.0f) : 0.0f; };
+   const float lo = rel(b[1]), hi = std::max(rel(b[2]), lo), end = std::max(rel(b[3]), hi), h = rel(deg);
+   if (h <= lo)
+      return lo <= 0.0f ? 1.0f : h / lo;
+   if (h <= hi)
+      return 1.0f;
+   if (h <= end)
+      return end <= hi ? 1.0f : (end - h) / (end - hi);
+   return 0.0f;
+}
+
+// Four range sliders made increasing, within one turn, centre in -30..330 (the default reds are -45 -15 15 45).
+void Scene2DNode::CanonicalHueBounds(float* b)
+{
+   if (!(std::isfinite(b[0]) && std::isfinite(b[1]) && std::isfinite(b[2]) && std::isfinite(b[3])))
+   {
+      b[0] = -45.0f; b[1] = -15.0f; b[2] = 15.0f; b[3] = 45.0f;
+      return;
+   }
+   auto wrap = [](float x) { return x - 360.0f * std::floor(x / 360.0f); };
+   float o[4] = { b[0], 0, 0, 0 };
+   for (int k = 1; k < 4; k++)
+      o[k] = std::min(o[k - 1] + wrap(b[k] - o[k - 1]), o[0] + 359.0f);
+   const float centre = (o[1] + o[2]) * 0.5f, shift = wrap(centre + 30.0f) - 30.0f - centre;
+   for (int k = 0; k < 4; k++)
+      b[k] = o[k] + shift;
+}
+
+// The six ranges as three 256-tap hue tables (hue shift deg, saturation, lightness), sampled at hue k / 255 turns;
+// ranges add up where they overlap. False when every range is neutral.
+bool Scene2DNode::HueRangeTables(const std::vector<float>& p, float* out)
+{
+   bool any = false;
+   std::fill(out, out + 768, 0.0f);
+   for (int r = 0; r < 6; r++)
+   {
+      const size_t at = (size_t)(kHueRangeBase + r * kHueRangeStride);
+      if (at + kHueRangeStride > p.size())
+         break;
+      const float hue = p[at], sat = p[at + 1], light = p[at + 2];
+      if (hue == 0.0f && sat == 0.0f && light == 0.0f)
+         continue;
+      any = true;
+      for (int k = 0; k < 256; k++)
+      {
+         const float w = HueRangeWeight(&p[at + 3], k / 255.0f * 360.0f);
+         out[k] += w * hue;
+         out[256 + k] += w * sat;
+         out[512 + k] += w * light;
+      }
+   }
+   return any;
+}
+
 std::vector<float> Scene2DNode::AdjParamDefault(int type)
 {
    std::vector<float> p((size_t)AdjParamCount(type), 0.0f);
@@ -87,7 +147,18 @@ std::vector<float> Scene2DNode::AdjParamDefault(int type)
    else if (type == kAdjBrightness)
       p = { 0.0f };                // 0 = modern non-clipping curve, 1 = legacy linear
    else if (type == kAdjHue)
-      p = { 0.0f, 0.0f, 0.0f };    // saturation delta, lightness delta, hue range (0 master, 1..6 R/Y/G/C/B/M)
+   {
+      // saturation delta, lightness delta, legacy hue range (0 master; 1..6 R/Y/G/C/B/M kept for old documents), then
+      // Photoshop's six ranges, each hue (deg), saturation, lightness (-1..1) and four bounds (deg), fully on for 30
+      // degrees about the centre, fading over 30 each side.
+      p.assign((size_t)AdjParamCount(type), 0.0f);
+      for (int r = 0; r < 6; r++)
+      {
+         const float c = 60.0f * r;
+         float* b = &p[(size_t)(kHueRangeBase + r * kHueRangeStride + 3)];
+         b[0] = c - 45.0f; b[1] = c - 15.0f; b[2] = c + 15.0f; b[3] = c + 45.0f;
+      }
+   }
    else if (type == kAdjExposure)
       p = { 0.0f, 1.0f };          // offset, gamma
    else if (type == kAdjLevels)
@@ -996,6 +1067,22 @@ namespace
          // HSL Hue / Saturation / Lightness with optional per-hue-family targeting (0 Master, 1..6 R/Y/G/C/B/M)
          "      float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));\n"
          "      int rng = int(clamp(uP[2] + 0.5, 0.0, 6.0));\n"
+         // Photoshop's order (PhotoCraft adjust/color.rs hue_saturation_in + range_lightness, MIT/Apache-2.0):
+         // Lightness first, then the hue turned and the HSL saturation scaled (+50 % doubles it), then each range's
+         // Lightness towards the brightest or darkest channel. Ranges follow the original hue, in full however dull.
+         "      float h0 = Hue(c), dh = 0.0, ds = 0.0, dl = 0.0;\n"
+         "      if (uP[3] > 0.5) { dh = LutC(0, h0); ds = LutC(1, h0); dl = LutC(2, h0); }\n"
+         "      if (rng == 0 && uHead == 0) {\n"
+         "         float l = clamp(uP[1], -1.0, 1.0), s = clamp(uP[0] + ds, -1.0, 1.0);\n"
+         "         vec3 lc = l > 0.0 ? c + (1.0 - c) * l : c * (1.0 + l);\n"
+         "         float lmx = max(lc.r, max(lc.g, lc.b)), lmn = min(lc.r, min(lc.g, lc.b)), L = (lmx + lmn) * 0.5, d = lmx - lmn;\n"
+         "         float S = d <= 0.0 ? 0.0 : (L > 0.5 ? d / max(2.0 - lmx - lmn, 1e-6) : d / max(lmx + lmn, 1e-6));\n"
+         "         S = clamp(s > 0.0 ? S / max(1.0 - s, 1.0 / 512.0) : S * (1.0 + s), 0.0, 1.0);\n"
+         "         float C = (1.0 - abs(2.0 * L - 1.0)) * S;\n"
+         "         vec3 o = (L - C * 0.5) + C * HueRgb(Hue(lc) * 360.0 + uAmt + dh);\n"
+         "         float tg = dl > 0.0 ? max(o.r, max(o.g, o.b)) : min(o.r, min(o.g, o.b));\n"
+         "         c = clamp(o + (tg - o) * min(abs(dl), 1.0), 0.0, 1.0);\n"
+         "      } else {\n"
          "      float hw = rng == 0 ? 1.0 : HueW(Hue(c), rng - 1) * smoothstep(0.02, 0.15, mx - mn);\n"
          "      vec3 hOut = mn + (mx - mn) * HueRgb(Hue(c) * 360.0 + uAmt);\n"
          "      hOut = mix(vec3(Luma(hOut)), hOut, clamp(1.0 + uP[0], 0.0, 2.0));\n"
@@ -1004,17 +1091,20 @@ namespace
          // 32-bit (PhotoCraft adjust/color.rs hue_saturation_in + hdr_saturation_factor, MIT/Apache-2.0): Lightness
          // first, then the hue turned and the chroma scaled about the HSL lightness by Photoshop's measured factor,
          // unclipped, so colours at or above 1 keep their hue.
-         "         float l = clamp(uP[1], -1.0, 1.0), s = clamp(uP[0], -1.0, 1.0);\n"
+         "         float l = clamp(uP[1], -1.0, 1.0), s = clamp(uP[0] + (rng == 0 ? ds : 0.0), -1.0, 1.0);\n"
          "         vec3 v = uLinear == 1 ? max(src.rgb, 0.0) : c;\n"   // a 32-bit document's own (linear) values
          "         vec3 lc = l > 0.0 ? v + (1.0 - v) * l : v * (1.0 + l);\n"
          "         float lmx = max(lc.r, max(lc.g, lc.b)), lmn = min(lc.r, min(lc.g, lc.b)), ll = (lmx + lmn) * 0.5;\n"
          "         float f = s <= 0.0 ? 1.0 - floor(-s * 256.0 + 1e-4) / 256.0\n"
          "                            : min(floor(65280.0 / max(255.0 - floor(s * 254.0 + 1e-4), 1.0)), 32767.0) / 256.0;\n"
          "         float d = (lmx - lmn) * f;\n"
-         "         hOut = ll - d * 0.5 + d * HueRgb(Hue(lc) * 360.0 + uAmt);\n"
+         "         hOut = ll - d * 0.5 + d * HueRgb(Hue(lc) * 360.0 + uAmt + (rng == 0 ? dh : 0.0));\n"
+         "         if (rng == 0 && dl != 0.0) { float tg = dl > 0.0 ? max(hOut.r, max(hOut.g, hOut.b)) : min(hOut.r, min(hOut.g, hOut.b));\n"
+         "            hOut += (tg - hOut) * min(abs(dl), 1.0); }\n"
          "         c = mix(c, uLinear == 1 ? SrgbEncode(max(hOut, 0.0)) : hOut, hw);\n"
          "      } else\n"
          "         c = mix(c, clamp(hOut, 0.0, 1.0), hw);\n"
+         "      }\n"
          "   } else if (uType == 9) {\n"
          "      c = mix(vec3(Luma(c)), c, uAmt);\n"
          "   } else if (uType == 10) {\n"   // exposure + offset + gamma correction in linear light
@@ -1069,20 +1159,24 @@ namespace
          "      c = mix(c, o, uAmt);\n"
          "   } else if (uType == 15) {\n"   // vibrance: Photoshop's, measured (PhotoCraft vibrance_lin, MIT/Apache-2.0)
          "      c = SrgbEncode(VibranceLin(SrgbDecode(clamp(c, 0.0, 1.0)), clamp(uAmt, -1.0, 1.0)));\n"
-         "   } else if (uType == 16) {\n"   // selective colour: CMYK nudges per hue family, whites, neutrals, blacks
-         "      float h = Hue(c), s = Sat(c), l = Luma(c);\n"
-         "      float w[9];\n"
-         "      for (int k = 0; k < 6; k++) w[k] = HueW(h, k) * s;\n"
-         "      w[6] = smoothstep(0.5, 1.0, l) * (1.0 - s);\n"
-         "      w[8] = (1.0 - smoothstep(0.0, 0.5, l)) * (1.0 - s);\n"
-         "      w[7] = max(0.0, (1.0 - s) - w[6] - w[8]);\n"
-         "      vec3 cmy = 1.0 - c;\n"
-         "      vec3 d = vec3(0.0); float dk = 0.0;\n"
-         "      for (int k = 0; k < 9; k++) { d += w[k] * vec3(uP[k * 4], uP[k * 4 + 1], uP[k * 4 + 2]); dk += w[k] * uP[k * 4 + 3]; }\n"
-         "      vec3 delta = (d + vec3(dk)) * 0.5 * uAmt;\n"
-         "      if (uP[36] > 0.5) delta *= mix(cmy, 1.0 - cmy, step(vec3(0.0), delta));\n"
-         "      cmy = clamp(cmy + delta, 0.0, 1.0);\n"
-         "      c = 1.0 - cmy;\n"
+         "   } else if (uType == 16) {\n"   // selective colour: Photoshop's, measured (PhotoCraft selective_color, MIT/Apache-2.0)
+         "      float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), md = c.r + c.g + c.b - mx - mn;\n"
+         "      float w[9];\n"   // reds, yellows, greens, cyans, blues, magentas by chroma in the sector; whites, neutrals, blacks
+         "      w[0] = c.r >= mx ? mx - md : 0.0; w[1] = c.b <= mn ? md - mn : 0.0;\n"
+         "      w[2] = c.g >= mx ? mx - md : 0.0; w[3] = c.r <= mn ? md - mn : 0.0;\n"
+         "      w[4] = c.b >= mx ? mx - md : 0.0; w[5] = c.g <= mn ? md - mn : 0.0;\n"
+         "      w[6] = max((mn - 0.5) * 2.0, 0.0);\n"
+         "      w[7] = clamp(1.0 - abs(mx - 0.5) - abs(mn - 0.5), 0.0, 1.0);\n"
+         "      w[8] = max((0.5 - mx) * 2.0, 0.0);\n"
+         "      vec3 ink = 1.0 - clamp(c, 0.0, 1.0), delta = vec3(0.0);\n"
+         "      for (int k = 0; k < 9; k++) {\n"
+         "         if (w[k] <= 0.0) continue;\n"
+         "         vec3 d = vec3(uP[k * 4], uP[k * 4 + 1], uP[k * 4 + 2]) + vec3(uP[k * 4 + 3]);\n"
+         // relative: scaled by the ink already there (pure white can't be tinted); absolute: by the room the ink has
+         "         d *= uP[36] > 0.5 ? ink : mix(min(vec3(1.0), 2.0 * ink), min(vec3(1.0), 2.0 * (1.0 - ink)), step(vec3(0.0), d));\n"
+         "         delta += d * w[k];\n"
+         "      }\n"
+         "      c = clamp(c - delta * uAmt, 0.0, 1.0);\n"
          "   } else if (uType == 17) {\n"   // channel mixer (+ per-channel constant offset)
          "      vec3 m = vec3(dot(c, vec3(uP[0], uP[1], uP[2])) + uP[10],\n"
          "                    dot(c, vec3(uP[3], uP[4], uP[5])) + uP[11],\n"
@@ -1337,6 +1431,10 @@ Scene2DNode::~Scene2DNode()
    GLUtil::DestroyFbo(mMaskView);
    GLUtil::DestroyFbo(mSelScratch);
    GLUtil::DestroyFbo(mCloneSrc);
+   GLUtil::DestroyFbo(mWarpSel);
+   for (auto& kv : mWarpMaskFrom)
+      GLUtil::DestroyFbo(kv.second.fbo);
+   mWarpMaskFrom.clear();
    for (auto& kv : mUndoSurf)
       GLUtil::DestroyFbo(kv.second.fbo);
    mUndoSurf.clear();
@@ -3945,14 +4043,20 @@ bool Scene2DNode::RunAdjust(const Layer& l, unsigned src)
       CurveLut(l.curve, lut, 256);
       glUniform4fv(GLUtil::UniformLoc(prog, "uLut4"), 64, lut);
       float lutC[768];
-      for (int ch = 0; ch < 3; ch++)
-         CurveLut(l.curveCh[ch], lutC + ch * 256, 256);
+      bool hueRanges = false;   // Hue/Saturation has no channel curves: its range tables ride in the same uniform
+      if (l.adjType == kAdjHue)
+         hueRanges = HueRangeTables(l.adjP, lutC);
+      else
+         for (int ch = 0; ch < 3; ch++)
+            CurveLut(l.curveCh[ch], lutC + ch * 256, 256);
       glUniform4fv(GLUtil::UniformLoc(prog, "uLutC4"), 192, lutC);
       glUniform4fv(GLUtil::UniformLoc(prog, "uLvCh"), 3, &l.levelsCh[0][0]);
       float p[40] = {};
       const std::vector<float> def = AdjParamDefault(l.adjType);
       for (size_t i = 0; i < def.size() && i < 40; i++)
          p[i] = i < l.adjP.size() ? l.adjP[i] : def[i];
+      if (l.adjType == kAdjHue)
+         p[3] = hueRanges ? 1.0f : 0.0f;   // the shader reads the range tables only when one is set
       if (l.adjType == kAdjWhiteBalance)
          WhiteBalanceMatrix(p[0], p[1], p + 2);
       glUniform4fv(GLUtil::UniformLoc(prog, "uP4"), 10, p);

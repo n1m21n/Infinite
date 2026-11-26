@@ -2850,6 +2850,11 @@ namespace params
 
    namespace view2d
    {
+      constexpr size_t kRgba = 4;   // bytes per pixel in an RGBA8 readback
+      constexpr float kHueShiftLo = -180.0f, kHueShiftHi = 180.0f;   // Hue/Saturation range hue (deg)
+      constexpr float kHueBoundLo = -180.0f, kHueBoundHi = 540.0f;   // a range's four bounds (deg), before they are tidied
+      constexpr double kFolderLutRescanSec = 2.0;   // how often the Colour Lookup folder list is read again
+      constexpr unsigned long long kFolderLutMaxBytes = 64ull << 20;   // a folder file bigger than this is not a LUT
       constexpr float loc_hi = 100.0f;
       constexpr float loc_lo = 0.0f;
       constexpr float q_0_lo = -2.0f;

@@ -1152,10 +1152,9 @@ bool Scene2DNode::MaskHideSelection(int id)
    const Layer* l = FindConst(id);
    if (!mSelAny || l == nullptr || l->HasPixelMask())
       return false;
-   InvertSelection();
-   const bool ok = MaskFromSelection(id);
-   InvertSelection();
-   return ok;
+   // The selection as a mask, then the mask inverted: past the canvas the selection is empty, so that part of the
+   // layer stays shown (inverting the selection first would hide it).
+   return MaskFromSelection(id) && InvertPixelMask(id);
 }
 
 // The layer's pixel mask through its box, at document size (bottom row first, 0..255; 0 outside the box).
@@ -1239,7 +1238,7 @@ Scene2DNode::Surface* Scene2DNode::SyncSurface(std::map<int, Surface>& in, int i
 {
    if (w <= 0 || h <= 0)
       return nullptr;
-   const bool mask = &in == &mMasks || &in == &mFxMasks;
+   const bool mask = &in == &mMasks || &in == &mFxMasks || &in == &mWarpMaskFrom;
    Surface& s = in[id];
    if (s.fbo.w != w || s.fbo.h != h || s.fbo.tex == 0)
    {
@@ -1535,7 +1534,9 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
    mPaintId = id;
    mPaintTarget = target;
    brush.sourceTex = 0;
-   if (target == 0 && b.sampleAll && (brush.mode == BrushEngine::kClone || brush.mode == BrushEngine::kHeal) && mOut.tex != 0 &&
+   const bool readsAll = brush.mode == BrushEngine::kClone || brush.mode == BrushEngine::kHeal || brush.mode == BrushEngine::kBlur ||
+                         brush.mode == BrushEngine::kSharpen || brush.mode == BrushEngine::kSmudge;
+   if (target == 0 && b.sampleAll && readsAll && mOut.tex != 0 &&
        EnsurePaintShaders() && GLUtil::EnsureFbo(mCloneSrc, surf->w, surf->h, GL_RGBA8, "Scene2DCloneSrc"))
    {
       // All layers: the picture as it stands, laid onto this surface's pixels, is what the clone copies from.
@@ -2777,6 +2778,9 @@ namespace
       "uniform int uNx;\n"
       "uniform int uNy;\n"
       "uniform vec4 uR;\n"       // the grid's box in uv, y from the top (x0, y0, x1, y1)
+      "uniform sampler2D uSel;\n"  // the selection on this surface (red); outside it the pixels stay as they began
+      "uniform int uUseSel;\n"
+      "uniform int uIsMask;\n"   // the surface is a mask (grey, white shows)
       "vec2 disp(vec2 p) {\n"
       "   vec2 g = clamp((vec2(p.x, 1.0 - p.y) - uR.xy) / max(uR.zw - uR.xy, vec2(1e-6)), 0.0, 1.0);\n"
       "   int i = 0, j = 0;\n"
@@ -2788,8 +2792,17 @@ namespace
       "void main() {\n"
       "   vec2 p = vUv;\n"
       "   for (int it = 0; it < 12; it++) p = vUv - disp(p);\n"   // where this pixel came from
-      "   if (p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0) { fragColor = vec4(0.0); return; }\n"
-      "   fragColor = texture(uSrc, p);\n"
+      "   bool off = p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0;\n"
+      "   vec4 w = off ? vec4(0.0) : texture(uSrc, p);\n"
+      "   if (uUseSel != 1) { fragColor = w; return; }\n"
+      // A selection floats what it holds: the pulled part lands over the rest, and where it left reads empty
+      // (pixels clear, a mask white: revealed), as Photoshop and PhotoCraft #4175 leave it.
+      "   float here = texture(uSel, vUv).r, moved = off ? 0.0 : texture(uSel, p).r;\n"
+      "   vec4 b = texture(uSrc, vUv);\n"
+      "   if (uIsMask == 1) { fragColor = mix(mix(b, vec4(1.0), here), w, moved); return; }\n"
+      "   b.a *= 1.0 - here;\n"
+      "   float a = w.a * moved, oa = a + b.a * (1.0 - a);\n"
+      "   fragColor = vec4(oa > 0.0 ? (w.rgb * a + b.rgb * b.a * (1.0 - a)) / oa : vec3(0.0), oa);\n"
       "}\n";
 }
 
@@ -4728,7 +4741,7 @@ bool Scene2DNode::MeshRest(int id, WarpGrid& out)
 }
 
 bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const WarpGrid& moved, bool store, bool nearest,
-                           const WarpGrid* rest)
+                           const WarpGrid* rest, const std::vector<std::string>* maskFrom)
 {
    Layers();
    Layer* l = FindLayer(id);
@@ -4778,8 +4791,47 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const W
          d[k] = sx / (float)l->pw - ru;
          d[k + 1] = sy / (float)l->ph - rv;
       }
-   const unsigned prog = mWarpProgram, tex = src->fbo.tex;
+   // A selection limits the warp, of the pixels and of the mask alike (PhotoCraft #4175): laid onto the surface once
+   // per selection and layer box, then read by the pass.
+   bool useSel = false;
+   if (mSelAny && mSel.size() == (size_t)mDoc.w * mDoc.h)
+   {
+      float o[2], ux[2], uy[2], sc = 1;
+      if (DocToSurface(*l, 0, 0, 0, o[0], o[1], sc) && DocToSurface(*l, 0, 1, 0, ux[0], ux[1], sc) &&
+          DocToSurface(*l, 0, 0, 1, uy[0], uy[1], sc))
+      {
+         const float a = ux[0] - o[0], c = ux[1] - o[1], b = uy[0] - o[0], dd = uy[1] - o[1], det = a * dd - b * c;
+         if (std::fabs(det) >= 1e-9f)
+         {
+            UploadSelection();   // bumps mSelTexGen when the selection changed
+            const unsigned long long k2 = mSelTexGen * 1000003ull + (unsigned long long)id * 131ull + (unsigned long long)l->pw * 7ull + l->ph;
+            if (k2 != mWarpSelKey || mWarpSel.w != l->pw || mWarpSel.h != l->ph || mWarpSel.tex == 0)
+            {
+               const float inv[6] = { dd / det, -b / det, -(dd * o[0] - b * o[1]) / det, -c / det, a / det, -(-c * o[0] + a * o[1]) / det };
+               std::vector<uint8_t> m, rgba;
+               SelOnSurface(mSel, mDoc.w, mDoc.h, l->pw, l->ph, inv, m);
+               rgba.assign(m.size() * 4, 255);
+               for (size_t i = 0; i < m.size(); i++)
+                  rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = m[i];
+               if (GLUtil::EnsureFbo(mWarpSel, l->pw, l->ph, GL_RGBA8, "Scene2DWarpSel"))
+                  WriteRect(mWarpSel, 0, 0, l->pw, l->ph, rgba.data());
+               mWarpSelKey = k2;
+            }
+            useSel = mWarpSel.tex != 0;
+         }
+      }
+   }
+   const unsigned prog = mWarpProgram, tex = src->fbo.tex, selTex = useSel ? mWarpSel.tex : 0;
+   auto bindSel = [&](bool isMask) {
+      glUniform1i(GLUtil::UniformLoc(prog, "uIsMask"), isMask ? 1 : 0);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, selTex);
+      glUniform1i(GLUtil::UniformLoc(prog, "uSel"), 1);
+      glUniform1i(GLUtil::UniformLoc(prog, "uUseSel"), useSel ? 1 : 0);
+      glActiveTexture(GL_TEXTURE0);
+   };
    GLUtil::DrawPass(it->second.fbo, prog, [&]() {
+      bindSel(false);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, tex);
       const GLint filt = nearest ? GL_NEAREST : GL_LINEAR;
@@ -4800,12 +4852,49 @@ bool Scene2DNode::MeshWarp(int id, const std::vector<std::string>& from, const W
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glBindTexture(GL_TEXTURE_2D, 0);
    }
+   // A pixel mask on the same box moves with its pixels (a mask is linked to its layer), through the same grid.
+   Surface* maskSurf = nullptr;
+   if (maskFrom != nullptr && l->HasPixelMask() && l->mw == l->pw && l->mh == l->ph && maskFrom->size() == l->mtiles.size())
+   {
+      Surface* msrc = SyncSurface(mWarpMaskFrom, id, l->mw, l->mh, *maskFrom);
+      auto mt = mMasks.find(id);
+      if (msrc != nullptr && mt != mMasks.end() && mt->second.fbo.fbo != 0)
+      {
+         maskSurf = &mt->second;
+         const unsigned mtex = msrc->fbo.tex;
+         GLUtil::DrawPass(mt->second.fbo, prog, [&]() {
+            bindSel(true);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, mtex);
+            glUniform1i(GLUtil::UniformLoc(prog, "uSrc"), 0);
+            glUniform2fv(GLUtil::UniformLoc(prog, "uD"), nx * ny, d.data());
+            glUniform1fv(GLUtil::UniformLoc(prog, "uUs"), nx, moved.us.data());
+            glUniform1fv(GLUtil::UniformLoc(prog, "uVs"), ny, moved.vs.data());
+            glUniform1i(GLUtil::UniformLoc(prog, "uNx"), nx);
+            glUniform1i(GLUtil::UniformLoc(prog, "uNy"), ny);
+            glUniform4fv(GLUtil::UniformLoc(prog, "uR"), 1, box);
+         });
+      }
+   }
+   glActiveTexture(GL_TEXTURE1);
+   glBindTexture(GL_TEXTURE_2D, 0);
+   glActiveTexture(GL_TEXTURE0);
    // Shown now; the tiles follow when the drag ends.
    mPaintEdits++;
    if (store)
    {
       const int all[4] = { 0, 0, l->pw, l->ph };
       StoreTiles(it->second, l->tiles, all);
+      if (maskSurf != nullptr)
+      {
+         StoreTiles(*maskSurf, l->mtiles, all);
+         auto mf = mWarpMaskFrom.find(id);
+         if (mf != mWarpMaskFrom.end())
+         {
+            GLUtil::DestroyFbo(mf->second.fbo);
+            mWarpMaskFrom.erase(mf);
+         }
+      }
       auto u = mUndoSurf.find(-id);
       if (u != mUndoSurf.end())
       {

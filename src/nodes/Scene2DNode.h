@@ -54,6 +54,12 @@ public:
                              std::vector<float>& curve, std::vector<float> curveCh[3], const float disp[3], int point);
    static int AdjParamCount(int type);
    static std::vector<float> AdjParamDefault(int type);
+   // Hue/Saturation's six Photoshop ranges live at adjP[kHueRangeBase + range * kHueRangeStride]: hue (deg),
+   // saturation, lightness (-1..1), then four bounds (deg).
+   static constexpr int kHueRangeBase = 3, kHueRangeStride = 7, kHueBoundAt = 3, kHueBoundCount = 4;
+   static float HueRangeWeight(const float* bounds, float deg);
+   static void CanonicalHueBounds(float* bounds);
+   static bool HueRangeTables(const std::vector<float>& adjP, float* out768);
    static const char* AdjGroup(int type);   // "Adjust", "Colour", "Stylize": the effect list's sections
    static const char* AdjName(int type);
    static float AdjDefault(int type);
@@ -500,8 +506,10 @@ public:
    static bool ParseEffectLine(const std::string& key, std::istream& s, Layer& l);
    unsigned long long mEffDraws = 0;   // effect stacks drawn (tests: an unchanged stack is not redrawn)
    unsigned long long mBatched = 0, mPasses = 0;   // layers drawn in a batch / single passes (tests)
-   // Colour Lookup: a .cube file's size and RGB table (size^3 rows, red fastest); false when it cannot be read.
+   // Colour Lookup: a .cube or .3dl file's size and RGB table (size^3 rows, red fastest); false when it cannot be read.
    static bool ReadCube(const std::string& path, int& size, std::vector<float>& rgb);
+   // The .cube and .3dl files in a folder (not hidden, not folders, under the size cap), by name ignoring case.
+   static std::vector<std::pair<std::string, std::string>> FolderLuts(const std::string& dir);
    // Levels' Auto: per channel black and white at the 0.1 % tails of the picture the adjustment works on: id 0 the
    // document, an adjustment layer the picture under it, effect >= 0 that layer alone with effects from there on off.
    bool AutoLevels(int id, float out[3][4], int effect = -1);
@@ -810,8 +818,10 @@ public:
    static bool SplitWarpGrid(WarpGrid& moved, WarpGrid& rest, float s, float t, int how);
    // Mesh warp: a paint layer's pixels pulled through the grid. `from` is the layer's tiles when the warp began;
    // `moved` the grid as pulled; `rest` where its points sat when the warp began (null = the whole surface).
+   // `maskFrom`: the pixel mask's tiles when the warp began; a mask on the same box then warps with the pixels. A
+   // selection limits the warp of both (outside it they stay as they began).
    bool MeshWarp(int id, const std::vector<std::string>& from, const WarpGrid& moved, bool store, bool nearest = false,
-                 const WarpGrid* rest = nullptr);
+                 const WarpGrid* rest = nullptr, const std::vector<std::string>* maskFrom = nullptr);
    // The Default grid's rest positions (document px) for a paint layer.
    bool MeshRest(int id, WarpGrid& out);
    // Style picker: blend, opacity, fill and layer effects copied from one layer to another.
@@ -1235,6 +1245,9 @@ private:
    bool StoreFilterMask(int id, const std::vector<uint8_t>& was, std::vector<uint8_t> next);
    std::map<int, std::vector<std::string>> mUndoTiles;   // the Undo brush's source per paint layer
    std::map<int, Surface> mUndoSurf;
+   std::map<int, Surface> mWarpMaskFrom;   // mesh warp: each layer's pixel mask as the warp began
+   GLUtil::Fbo mWarpSel;                   // mesh warp: the selection laid on the warped surface
+   unsigned long long mWarpSelKey = 0;
    std::vector<Snapshot> mSnapshots;
    int mNextSnapId = 1;
    bool mRemoveUsedAi = false;
