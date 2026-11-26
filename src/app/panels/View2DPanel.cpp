@@ -2772,6 +2772,7 @@ namespace
    // ---- keys ------------------------------------------------------------
 
    void HandlePixelKeys(Scene2DNode* doc, bool cmd, bool shift);
+   void StepPreset(int dir);
 
    bool HandleVectorKeys(Scene2DNode* doc);
 
@@ -3279,6 +3280,8 @@ namespace
          if (key(ImGuiKey_A)) sTool = kNode;
          if (key(ImGuiKey_U)) sTool = kShape;
          if (key(ImGuiKey_T)) sTool = kText;
+         if (key(ImGuiKey_Comma)) StepPreset(-1);
+         if (key(ImGuiKey_Period)) StepPreset(1);
       }
       if (key(ImGuiKey_Escape) && sOp.kind != 0 && CancelOp(doc))
          return;
@@ -3549,6 +3552,143 @@ namespace
       std::error_code ec;
       std::filesystem::create_directories(AppPaths::AppSupportDir(), ec);
       std::ofstream(AppPaths::FsPath(BrushFile())) << now;
+   }
+
+   // Saved brush presets (Photoshop's New Brush Preset): the user's own, kept between runs in the support folder as
+   // "preset <b|e> <name>" lines, each followed by its "<field> <values>" lines (the same fields as the tool settings).
+   struct UserPreset { std::string name; BrushEngine::Brush brush; bool erase = false; };
+   std::vector<UserPreset> sUserPresets;
+   int sUserPick = -1, sUserPickErase = -1;   // the saved preset the brush / eraser came from
+   bool sUserLoaded = false;
+   std::string UserPresetFile() { return AppPaths::AppSupportDir() + "/2dview-brush-presets.txt"; }
+   std::string UserPresetText()
+   {
+      std::ostringstream o;
+      for (UserPreset& u : sUserPresets)
+      {
+         o << "preset " << (u.erase ? 'e' : 'b') << " " << u.name << "\n";
+         BrushFields(u.brush, [&](const char* n, float* v, int c)
+         {
+            o << n;
+            for (int k = 0; k < c; k++)
+               o << " " << v[k];
+            o << "\n";
+         });
+      }
+      return o.str();
+   }
+   void ParseUserPresets(const std::string& text)
+   {
+      sUserPresets.clear();
+      std::istringstream in(text);
+      std::string line;
+      while (std::getline(in, line))
+      {
+         std::istringstream ls(line);
+         std::string field;
+         if (!(ls >> field))
+            continue;
+         if (field == "preset")
+         {
+            char who = 0;
+            ls >> who;
+            std::string name;
+            std::getline(ls >> std::ws, name);
+            if (name.empty())
+               continue;
+            UserPreset u;
+            u.name = name;
+            u.erase = who == 'e';
+            u.brush = u.erase ? sEraser : sBrush;
+            sUserPresets.push_back(u);
+            continue;
+         }
+         if (sUserPresets.empty())
+            continue;
+         std::vector<float> vals;
+         for (float v; ls >> v;)
+            vals.push_back(v);
+         BrushFields(sUserPresets.back().brush, [&](const char* n, float* v, int c)
+         {
+            if (field == n && (int)vals.size() >= c)
+               std::copy(vals.begin(), vals.begin() + c, v);
+         });
+      }
+      for (UserPreset& u : sUserPresets)
+         if (u.erase)
+            u.brush.mode = BrushEngine::kErase;
+   }
+   void LoadUserPresets()
+   {
+      if (sUserLoaded)
+         return;
+      sUserLoaded = true;
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr)
+         return;   // the self-test keeps the user's presets untouched
+      std::ifstream in(AppPaths::FsPath(UserPresetFile()));
+      std::ostringstream all;
+      all << in.rdbuf();
+      ParseUserPresets(all.str());
+   }
+   void SaveUserPresets()
+   {
+      if (std::getenv("INFINITE_VIEW2DTEST") != nullptr)
+         return;
+      std::error_code ec;
+      std::filesystem::create_directories(AppPaths::AppSupportDir(), ec);
+      std::ofstream(AppPaths::FsPath(UserPresetFile())) << UserPresetText();
+   }
+   // Save appends at the end; Update overwrites the picked one in place; Delete removes it.
+   int SaveUserPreset(const BrushEngine::Brush& b, bool erase)
+   {
+      LoadUserPresets();
+      int n = 1;
+      for (const UserPreset& u : sUserPresets)
+         n += u.erase == erase ? 1 : 0;
+      sUserPresets.push_back({ std::string(erase ? "Eraser " : "Brush ") + std::to_string(n), b, erase });
+      SaveUserPresets();
+      return (int)sUserPresets.size() - 1;
+   }
+   // Previous / next brush (Photoshop's , and .): walks the tool's presets, built-in then saved, and wraps.
+   void StepPreset(int dir)
+   {
+      if (sTool != kBrush && sTool != kEraser)
+         return;
+      LoadUserPresets();
+      const bool erase = sTool == kEraser;
+      const auto& presets = BrushEngine::Presets();
+      std::vector<int> walk;   // >= 0 built-in index, < 0 saved index as -(i + 1)
+      for (int i = 0; i < (int)presets.size(); i++)
+         if ((presets[i].brush.mode == BrushEngine::kErase) == erase)
+            walk.push_back(i);
+      for (int i = 0; i < (int)sUserPresets.size(); i++)
+         if (sUserPresets[i].erase == erase)
+            walk.push_back(-(i + 1));
+      if (walk.empty())
+         return;
+      int& preset = erase ? sEraserPreset : sBrushPreset;
+      int& user = erase ? sUserPickErase : sUserPick;
+      const int now = user >= 0 ? -(user + 1) : preset;
+      auto at = std::find(walk.begin(), walk.end(), now);
+      const int k = at == walk.end() ? 0 : (int)(at - walk.begin());
+      const int next = walk[(size_t)((k + dir + (int)walk.size()) % (int)walk.size())];
+      BrushEngine::Brush& b = erase ? sEraser : sBrush;
+      const float keepSize = b.size;
+      if (next >= 0)
+      {
+         preset = next;
+         user = -1;
+         b = presets[(size_t)next].brush;
+         b.size = keepSize;   // Photoshop keeps the size when stepping brushes
+      }
+      else
+      {
+         user = -next - 1;
+         preset = -1;
+         b = sUserPresets[(size_t)user].brush;
+      }
+      if (erase)
+         b.mode = BrushEngine::kErase;
    }
 
    void InitBrushes()
@@ -9679,7 +9819,11 @@ namespace
          int& preset = sTool == kEraser ? sEraserPreset : sBrushPreset;
          const auto& presets = BrushEngine::Presets();
          ImGui::SetNextItemWidth(kWellL);
-         const char* shown = preset >= 0 && preset < (int)presets.size() ? presets[preset].name : "";
+         LoadUserPresets();
+         int& user = sTool == kEraser ? sUserPickErase : sUserPick;
+         if (user >= (int)sUserPresets.size())
+            user = -1;
+         const char* shown = user >= 0 ? sUserPresets[(size_t)user].name.c_str() : preset >= 0 && preset < (int)presets.size() ? presets[preset].name : "";
          ImGui::SetNextWindowSizeConstraints(ImVec2(tok::view2d_window_w_sm, 0.0f), ImVec2(FLT_MAX, MenuParts::ListMaxH()));
          if (MenuParts::BeginCombo("##v2dpreset", T(shown)))
          {
@@ -9707,6 +9851,7 @@ namespace
                if (chose)
                {
                   preset = i;
+                  user = -1;
                   b = presets[i].brush;
                   if (sTool == kEraser)
                      b.mode = BrushEngine::kErase;
@@ -9714,6 +9859,46 @@ namespace
                   else if (presets[i].group != nullptr && std::strcmp(presets[i].group, "Material") == 0)
                      std::copy(b.color, b.color + 3, sFg);
                }
+            }
+            const bool erasing = sTool == kEraser;
+            bool savedHead = false;
+            for (int i = 0; i < (int)sUserPresets.size(); i++)
+            {
+               if (sUserPresets[i].erase != erasing)
+                  continue;
+               if (!savedHead)
+               {
+                  MenuParts::Separator();
+                  ImGui::TextDisabled("%s", T("Saved"));
+                  savedHead = true;
+               }
+               ImGui::PushID(i);
+               if (MenuParts::Choice(sUserPresets[i].name.c_str(), i == user))
+               {
+                  user = i;
+                  preset = -1;
+                  b = sUserPresets[i].brush;
+               }
+               ImGui::PopID();
+            }
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Save Brush Preset")))
+            {
+               user = SaveUserPreset(b, erasing);
+               preset = -1;
+            }
+            if (MenuParts::Item(T("Update Preset"), nullptr, false, user >= 0))
+            {
+               sUserPresets[(size_t)user].brush = b;
+               SaveUserPresets();
+            }
+            if (MenuParts::Item(T("Delete Preset"), nullptr, false, user >= 0))
+            {
+               const int gone = user;
+               sUserPresets.erase(sUserPresets.begin() + gone);
+               for (int* other : { &sUserPick, &sUserPickErase })
+                  *other = *other == gone ? -1 : *other > gone ? *other - 1 : *other;
+               SaveUserPresets();
             }
             MenuParts::EndCombo();
          }
@@ -21188,6 +21373,37 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       doc = FindDoc();
       if (doc == nullptr)
          return fails;
+   }
+   // Saved brush presets (ledger-gaps Block B): save appends at the end, the text round-trips, and previous / next
+   // walk the built-in presets then the saved ones, wrapping.
+   {
+      const std::vector<UserPreset> keep = sUserPresets;
+      const int keepPick = sUserPick, keepPickE = sUserPickErase, keepPreset = sBrushPreset, toolWas = sTool;
+      const BrushEngine::Brush keepBrush = sBrush;
+      sUserLoaded = true;
+      sUserPresets.clear();
+      sBrush.size = 37.0f;
+      const int first = SaveUserPreset(sBrush, false);
+      sBrush.size = 55.0f;
+      const int second = SaveUserPreset(sBrush, false);
+      expect("Presets: save appends at the end", first == 0 && second == 1 && sUserPresets[1].name == "Brush 2");
+      sUserPresets[0].brush.hardness = 0.25f;
+      ParseUserPresets(UserPresetText());
+      expect("Presets: saved presets round-trip", sUserPresets.size() == 2 && sUserPresets[0].brush.size == 37.0f &&
+                                                  sUserPresets[0].brush.hardness == 0.25f && sUserPresets[1].name == "Brush 2");
+      sTool = kBrush;
+      sUserPick = 1;
+      sBrushPreset = -1;
+      StepPreset(1);
+      expect("Presets: next brush wraps from the last saved to the first built-in", sUserPick == -1 && sBrushPreset >= 0);
+      StepPreset(-1);
+      expect("Presets: previous brush wraps back to the last saved", sUserPick == 1 && sBrush.size == 55.0f);
+      sUserPresets = keep;
+      sUserPick = keepPick;
+      sUserPickErase = keepPickE;
+      sBrushPreset = keepPreset;
+      sBrush = keepBrush;
+      sTool = toolWas;
    }
    // H7 one source, many outputs: the still export and the Output node (which also feeds the loop render and a live
    // show) read the document's own frame; the written PNG holds exactly the live pixels.
