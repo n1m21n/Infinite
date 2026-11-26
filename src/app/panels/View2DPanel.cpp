@@ -134,12 +134,12 @@ namespace
    enum Tool { kMove = 0, kCrop, kHand, kZoom, kBrush, kEraser, kFill, kPick, kMarquee, kLasso, kWand, kPen, kNode, kShape, kText,
                kGradient, kClone, kHeal, kBlur, kSharpen, kDodge, kBurn, kSponge, kMedian, kUndoBrush, kColourReplace, kMixer,
                kBgErase, kFloodErase, kSelBrush, kObjectSel, kRedEye, kBlemish, kPatch, kInpaint, kMeshWarp, kPerspective, kStylePick,
-               kMeasure, kCAMove, kToolCount };
+               kMeasure, kCAMove, kPatternStamp, kToolCount };
    int sTool = kMove;
    bool RetouchTool(int t)
    {
       return (t >= kClone && t <= kBurn) || t == kSponge || t == kMedian || t == kUndoBrush || t == kColourReplace || t == kBgErase ||
-             t == kRedEye || t == kInpaint;
+             t == kRedEye || t == kInpaint || t == kPatternStamp;
    }
    bool BrushTool(int t) { return t == kBrush || t == kEraser || t == kMixer || t == kSelBrush || RetouchTool(t); }
    [[maybe_unused]] bool PaintTool(int t) { return BrushTool(t) || t == kFill || t == kGradient; }
@@ -3266,7 +3266,7 @@ namespace
          if (key(ImGuiKey_B)) cycle({ kBrush, kMixer, kColourReplace });
          if (key(ImGuiKey_E)) cycle({ kEraser, kBgErase, kFloodErase });
          if (key(ImGuiKey_G)) cycle({ kFill, kGradient });
-         if (key(ImGuiKey_S)) cycle({ kClone, kUndoBrush });
+         if (key(ImGuiKey_S)) cycle({ kClone, kPatternStamp, kUndoBrush });
          if (key(ImGuiKey_J)) cycle({ kHeal, kBlemish, kPatch, kCAMove, kInpaint, kRedEye });
          if (sTool == kInpaint && !sRemoveQueue.empty() && (key(ImGuiKey_Enter) || key(ImGuiKey_KeypadEnter)))
             RunRemove(doc);
@@ -3491,7 +3491,7 @@ namespace
       f("roundJitter", &b.roundJitter, 1); f("scatterY", &b.scatterY, 1);
       bo("oneEuro", b.oneEuro); bo("catchUp", b.catchUp); f("pressureCurve", &b.pressureCurve, 1);
       bo("tiltSize", b.tiltSize); bo("tiltAngle", b.tiltAngle); bo("tiltRound", b.tiltRound);
-      f("airbrushRate", &b.airbrushRate, 1);
+      f("airbrushRate", &b.airbrushRate, 1); f("patternScale", &b.patternScale, 1); bo("patternAligned", b.patternAligned);
    }
    std::string BrushText()
    {
@@ -3691,6 +3691,59 @@ namespace
          b.mode = BrushEngine::kErase;
    }
 
+   // Patterns (Photoshop's Pattern presets): the built-in tiles, then those made with Define Pattern this session.
+   struct PatternTile { std::string name; int w = 0, h = 0; std::vector<uint8_t> rgba; uint64_t key = 0; };
+   std::vector<PatternTile> sPatterns;
+   int sPatternPick = 0;
+   uint64_t sPatternKeys = 0;
+   std::vector<PatternTile>& Patterns()
+   {
+      if (sPatterns.empty())
+         for (int i = 0; i < (int)Scene2DNode::PatternNames().size(); i++)
+         {
+            PatternTile t;
+            t.name = Scene2DNode::PatternNames()[(size_t)i];
+            Scene2DNode::BuiltinPattern(i, t.rgba, t.w, t.h);
+            t.key = ++sPatternKeys;
+            sPatterns.push_back(std::move(t));
+         }
+      return sPatterns;
+   }
+   // Define Pattern: the picture inside the selection's bounds (the whole canvas with none) becomes a pattern.
+   bool DefinePattern(Scene2DNode* doc)
+   {
+      const int W = doc->Doc().w, H = doc->Doc().h;
+      int x0 = 0, y0 = 0, x1 = W, y1 = H;
+      float lo[2], hi[2];
+      if (doc->HasSelection() && doc->SelectionBounds(lo, hi))
+      {
+         x0 = std::max(0, (int)std::floor(lo[0]));
+         y0 = std::max(0, (int)std::floor(lo[1]));
+         x1 = std::min(W, (int)std::ceil(hi[0]));
+         y1 = std::min(H, (int)std::ceil(hi[1]));
+      }
+      if (x1 <= x0 || y1 <= y0)
+         return false;
+      static int frame = 1 << 26;
+      PatternTile t;
+      float k = 1.0f;
+      if (!doc->AgentLook(0, x0, y0, x1, y1, Scene2DNode::kAgentLookMax, ++frame, t.rgba, t.w, t.h, k))
+         return false;
+      Patterns();
+      t.name = std::string(T("Pattern")) + " " + std::to_string(sPatterns.size() + 1);
+      t.key = ++sPatternKeys;
+      sPatterns.push_back(std::move(t));
+      sPatternPick = (int)sPatterns.size() - 1;
+      return true;
+   }
+   void UsePattern(Scene2DNode* doc)
+   {
+      std::vector<PatternTile>& pats = Patterns();
+      sPatternPick = std::clamp(sPatternPick, 0, (int)pats.size() - 1);
+      const PatternTile& t = pats[(size_t)sPatternPick];
+      doc->SetPattern(t.rgba, t.w, t.h, t.key);
+   }
+
    void InitBrushes()
    {
       if (sBrushInit)
@@ -3770,6 +3823,7 @@ namespace
          case kSponge: sRetouch.mode = BrushEngine::kSpongeMode; break;
          case kMedian: sRetouch.mode = BrushEngine::kMedian; break;
          case kUndoBrush: sRetouch.mode = BrushEngine::kUndo; break;
+         case kPatternStamp: sRetouch.mode = BrushEngine::kPatternStamp; break;
          case kColourReplace: sRetouch.mode = BrushEngine::kColourReplace; break;
          case kBgErase: sRetouch.mode = BrushEngine::kBgErase; break;
          case kRedEye: sRetouch.mode = BrushEngine::kRedEye; break;
@@ -4689,6 +4743,8 @@ namespace
       std::copy(sFg, sFg + 3, b.color);
       if (sTool == kBrush && sBrushHue != 0.0f)
          HueTurn(b.color, sBrushHue);
+      if (sTool == kPatternStamp)
+         UsePattern(doc);
       b = EraseLocked(doc, id, target, b);
       const ImVec2 from = line && sHaveLast ? sLastPaint : at;
       if (!doc->BeginPaint(id, target, b, from.x, from.y, PenNow(doc)))
@@ -9760,6 +9816,34 @@ namespace
             BarSlider("##v2dkeytol", &tol, params::view2d::tol_lo, params::view2d::tol_hi, "Tolerance %.0f%%", kWellL);
             b.keyTolerance = tol / 100.0f;
          }
+         if (sTool == kPatternStamp)
+         {
+            gap();
+            std::vector<PatternTile>& pats = Patterns();
+            sPatternPick = std::clamp(sPatternPick, 0, (int)pats.size() - 1);
+            ImGui::SetNextItemWidth(kWellL);
+            if (MenuParts::BeginCombo("##v2dpattern", T(pats[(size_t)sPatternPick].name.c_str())))
+            {
+               for (int i = 0; i < (int)pats.size(); i++)
+               {
+                  ImGui::PushID(i);
+                  if (MenuParts::Choice(T(pats[(size_t)i].name.c_str()), i == sPatternPick))
+                     sPatternPick = i;
+                  ImGui::PopID();
+               }
+               MenuParts::Separator();
+               if (MenuParts::Item(T("Define Pattern")))
+                  DefinePattern(doc);
+               MenuParts::EndCombo();
+            }
+            next();
+            if (TextChip(L("Aligned##v2dpalign"), b.patternAligned, T("The pattern keeps its place across strokes")))
+               b.patternAligned = !b.patternAligned;
+            next();
+            float sc = b.patternScale * 100.0f;
+            BarSlider("##v2dpscale", &sc, params::view2d::sc_lo, params::view2d::sc_hi, "Scale %.0f%%", kWellM);
+            b.patternScale = sc / 100.0f;
+         }
          if (sTool == kClone || sTool == kHeal)
          {
             gap();
@@ -11172,6 +11256,7 @@ namespace
       { kMixer, "##v2dmixer", IconsInfinite::PaintMixer, "Paint mixer (B). Wet paint", 2 },
       { kColourReplace, "##v2dcolrep", IconsInfinite::ColourReplace, "Colour replacement (B)", 2 },
       { kClone, "##v2dclone", IconsInfinite::CloneStamp, "Clone stamp (S). Alt-click sets the source", 2 },
+      { kPatternStamp, "##v2dpatstamp", IconsInfinite::CloneStamp, "Pattern stamp (S). Paints the chosen pattern", 2 },
       { kUndoBrush, "##v2dundobrush", IconsInfinite::UndoBrush, "Undo brush (S). Alt-click sets the state", 2 },
       { kEraser, "##v2derase", IconsInfinite::Erase, "Eraser (E)", 2 },
       { kBgErase, "##v2dbgerase", IconsInfinite::BgErase, "Background eraser (E)", 2 },
@@ -11238,7 +11323,7 @@ namespace
            { "Select", { kMarquee, kLasso, kWand, kSelBrush, kObjectSel } },
            { "Crop and sample", { kCrop, kPick, kStylePick, kMeasure } } },
          { { "Retouch", { kHeal, kBlemish, kPatch, kCAMove, kInpaint, kRedEye } },
-           { "Paint", { kBrush, kMixer, kColourReplace, kClone, kUndoBrush } },
+           { "Paint", { kBrush, kMixer, kColourReplace, kClone, kPatternStamp, kUndoBrush } },
            { "Erase", { kEraser, kBgErase, kFloodErase } } },
          { { "Fill and tune", { kGradient, kFill, kBlur, kSharpen, kMedian, kDodge, kBurn, kSponge } },
            { "Draw and type", { kPen, kText, kNode, kShape } },
@@ -21368,6 +21453,37 @@ int View2DPanelSelfCheck(Scene2DNode* doc)
       expect("History: a missing snapshot is refused", !doc->RestoreSnapshot(9999) && !doc->SetHistorySource(9999));
       doc->SetHistorySource(-1);
       expect("History: a snapshot deletes", doc->DeleteSnapshot(snap));
+      while (gUndoStack.size() > u0)
+         Undo();
+      doc = FindDoc();
+      if (doc == nullptr)
+         return fails;
+   }
+   // Pattern Stamp (ledger-gaps Block B): the checker tile repeats from the surface origin, and a whole-number scale
+   // repeats it exactly bigger.
+   {
+      const size_t u0 = gUndoStack.size();
+      PushUndoCheckpoint("Pattern test");
+      const int pl = doc->AddPaintLayer();
+      sPatternPick = 0;   // Checker: 8 px squares
+      UsePattern(doc);
+      auto stamp = [&](float scale) {
+         BrushEngine::Brush b;
+         b.mode = BrushEngine::kPatternStamp;
+         b.hardness = 1.0f;
+         b.size = 4.0f * (float)std::max(doc->Doc().w, doc->Doc().h);
+         b.patternScale = scale;
+         const bool ok = doc->BeginPaint(pl, 0, b, doc->Doc().w * 0.5f, doc->Doc().h * 0.5f, 1.0f);
+         if (ok)
+            doc->EndPaint();
+         return ok;
+      };
+      float c0[3] = {}, c1[3] = {}, c2[3] = {};
+      const float y = 4.5f;
+      const bool one = stamp(1.0f) && doc->Pick(4.5f, y, c0, 1, pl) && doc->Pick(12.5f, y, c1, 1, pl);
+      expect("Pattern stamp: the tile repeats (neighbouring squares differ)", one && std::fabs(c0[0] - c1[0]) > 0.9f);
+      const bool two = stamp(2.0f) && doc->Pick(4.5f, y, c0, 1, pl) && doc->Pick(12.5f, y, c1, 1, pl) && doc->Pick(20.5f, y, c2, 1, pl);
+      expect("Pattern stamp: scale 2 doubles the squares", two && std::fabs(c0[0] - c1[0]) < 0.1f && std::fabs(c1[0] - c2[0]) > 0.9f);
       while (gUndoStack.size() > u0)
          Undo();
       doc = FindDoc();

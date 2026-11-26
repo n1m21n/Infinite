@@ -297,6 +297,8 @@ namespace BrushEngine
          "uniform sampler2D uGrainTex;\n"
          "uniform int uHasGrainTex;\n"
          "uniform vec2 uGrainTexSize;\n"
+         "uniform float uPatScale;\n"
+         "uniform vec2 uPatPhase;\n"
          "float h1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
          "float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
          "   return mix(mix(h1(i), h1(i + vec2(1.0, 0.0)), f.x), mix(h1(i + vec2(0.0, 1.0)), h1(i + vec2(1.0, 1.0)), f.x), f.y); }\n"
@@ -363,6 +365,9 @@ namespace BrushEngine
          "      vec2 src = (uAnchor + uOff + uSrcM * (px - uAnchor)) * uTexel;\n"
          "      if (uMode == 10) { vec4 s = srcAt(src); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"
          "         fragColor = mix(d, s, a); return; }\n"
+         "      if (uMode == 30) { vec2 ts = vec2(textureSize(uSrcTex, 0)); ivec2 q = ivec2(mod(floor((px + uPatPhase) / uPatScale), ts));\n"
+         "         vec4 s = uHasSrc == 1 ? texelFetch(uSrcTex, q, 0) : vec4(uColor, 1.0);\n"   // pattern stamp: the tile, repeated
+         "         fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"
          "      if (uMode == 24) { vec4 s = srcAt(vUv); if (uSrcBlend > 0) s.rgb = mix(s.rgb, cloneBlend(d.rgb, s.rgb), d.a);\n"
          "         fragColor = uLock == 1 ? vec4(mix(d.rgb, s.rgb, a), d.a) : mix(d, s, a); return; }\n"   // undo brush: the earlier state
          "      if (uMode == 26) { float k = 1.0 - smoothstep(uKeyTol * 0.6, uKeyTol, distance(d.rgb, uKey));\n"   // background erase
@@ -1521,6 +1526,8 @@ namespace BrushEngine
          glBindTexture(GL_TEXTURE_2D, mBrush.grainTex);
          glUniform1i(GLUtil::UniformLoc(sMerge, "uGrainTex"), 4);
          glUniform1i(GLUtil::UniformLoc(sMerge, "uHasGrainTex"), mBrush.grainTex != 0 ? 1 : 0);
+         glUniform1f(GLUtil::UniformLoc(sMerge, "uPatScale"), std::max(0.05f, mBrush.patternScale));
+         glUniform2f(GLUtil::UniformLoc(sMerge, "uPatPhase"), mBrush.patternPhase[0], mBrush.patternPhase[1]);
          glUniform2f(GLUtil::UniformLoc(sMerge, "uGrainTexSize"), (float)std::max(1, mBrush.grainTexW), (float)std::max(1, mBrush.grainTexH));
          glUniform1f(GLUtil::UniformLoc(sMerge, "uGrainScale"), std::max(0.05f, mBrush.grainScale));
          glUniform1f(GLUtil::UniformLoc(sMerge, "uGrainDepth"), std::clamp(mBrush.grainDepth, 0.0f, 1.0f));

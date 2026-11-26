@@ -646,7 +646,12 @@ public:
    bool RestoreSnapshot(int i);                     // the document becomes the snapshot (the caller pushes undo)
    bool SetHistorySource(int i);                    // -1: each layer as it is now
    int HistorySource() const { return mHistorySrc; }
-   bool FillFromHistory(int id, float opacity);     // the layer inside the selection becomes the History source
+   bool FillFromHistory(int id, float opacity);
+   // The Pattern Stamp's tile (RGBA, rows top first). key names the tile so the same one is not uploaded again.
+   bool SetPattern(const std::vector<uint8_t>& rgba, int w, int h, uint64_t key);
+   // Built-in pattern tiles (Photoshop ships a few to start with): names, and the pixels of one by index.
+   static const std::vector<std::string>& PatternNames();
+   static bool BuiltinPattern(int which, std::vector<uint8_t>& rgba, int& w, int& h);     // the layer inside the selection becomes the History source
    // Rebuilds the masked pixels (mask 0..255, w x h) from around them; `off` px to a clean patch, or the best nearby
    // one when autoOff. Rows and offset in the same frame as px.
    static bool RemoveRegion(std::vector<uint8_t>& px, int w, int h, const std::vector<uint8_t>& mask);
@@ -1197,6 +1202,8 @@ private:
    std::map<int, Surface> mUndoSurf;
    std::vector<Snapshot> mSnapshots;
    int mHistorySrc = -1;
+   GLUtil::Fbo mPattern;
+   uint64_t mPatternKey = 0;
    unsigned mWarpProgram = 0;
    // CPU-rastered layers (vector, text) and vector masks, re-rastered when their key changes.
    struct Raster

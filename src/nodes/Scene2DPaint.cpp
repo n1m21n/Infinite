@@ -1438,6 +1438,16 @@ bool Scene2DNode::BeginPaint(int id, int target, const BrushEngine::Brush& b, fl
       if (Surface* us = SyncSurface(mUndoSurf, id, l->pw, l->ph, mUndoTiles[id]))
          brush.sourceTex = us->fbo.tex;
    }
+   if (brush.mode == BrushEngine::kPatternStamp)
+   {
+      brush.sourceTex = mPattern.tex;
+      if (!brush.patternAligned)
+      {
+         // Not aligned: the tile starts at this stroke's first dab; a new stroke starts it again.
+         brush.patternPhase[0] = -sx;
+         brush.patternPhase[1] = -sy;
+      }
+   }
    ApplyBrushSources(brush, true);
    mStroke.SetMirrors(SurfaceMirrors(target == 2 ? Layer() : *l, target));
    mStroke.Begin(*surf, brush, sx, sy, pressure, sel);
@@ -2683,6 +2693,55 @@ bool Scene2DNode::SetHistorySource(int i)
       mUndoTiles[l.id] = t != then.end() && t->second.size() == l.tiles.size() ? t->second : l.tiles;
    }
    mHistorySrc = i;
+   return true;
+}
+
+bool Scene2DNode::SetPattern(const std::vector<uint8_t>& rgba, int w, int h, uint64_t key)
+{
+   if (w <= 0 || h <= 0 || rgba.size() != (size_t)w * h * 4)
+      return false;
+   if (key != 0 && key == mPatternKey && mPattern.tex != 0 && mPattern.w == w && mPattern.h == h)
+      return true;
+   if (!GLUtil::EnsureFbo(mPattern, w, h, GL_RGBA8, "Scene2DPattern"))
+      return false;
+   // Surfaces are bottom row first: flip so the tile reads upright on the canvas.
+   std::vector<uint8_t> up(rgba.size());
+   const size_t row = (size_t)w * 4;
+   for (int y = 0; y < h; y++)
+      std::copy(rgba.begin() + (size_t)(h - 1 - y) * row, rgba.begin() + (size_t)(h - y) * row, up.begin() + (size_t)y * row);
+   WriteRect(mPattern, 0, 0, w, h, up.data());
+   mPatternKey = key;
+   return true;
+}
+
+const std::vector<std::string>& Scene2DNode::PatternNames()
+{
+   static const std::vector<std::string> names = { "Checker", "Stripes", "Dots", "Grid", "Bricks" };
+   return names;
+}
+
+bool Scene2DNode::BuiltinPattern(int which, std::vector<uint8_t>& rgba, int& w, int& h)
+{
+   if (which < 0 || which >= (int)PatternNames().size())
+      return false;
+   constexpr int kSide = 16;
+   w = h = kSide;
+   rgba.assign((size_t)w * h * 4, 255);
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+      {
+         bool ink = false;
+         switch (which)
+         {
+         case 0: ink = (x < kSide / 2) != (y < kSide / 2); break;
+         case 1: ink = x < kSide / 4 || (x >= kSide / 2 && x < 3 * kSide / 4); break;
+         case 2: { const int dx = x - kSide / 2, dy = y - kSide / 2; ink = dx * dx + dy * dy <= (kSide / 4) * (kSide / 4); break; }
+         case 3: ink = x == 0 || y == 0; break;
+         default: ink = y == 0 || y == kSide / 2 || (y < kSide / 2 ? x == 0 : x == kSide / 2); break;
+         }
+         uint8_t* px = &rgba[((size_t)y * w + x) * 4];
+         px[0] = px[1] = px[2] = ink ? 0 : 255;
+      }
    return true;
 }
 

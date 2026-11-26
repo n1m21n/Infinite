@@ -31,7 +31,9 @@ namespace BrushEngine
                kPush, kTwirl, kBloat, kPinch,
                // More retouch (Affinity's brush tools): saturate / desaturate, median, paint back an earlier state,
                // replace a sampled colour, erase a sampled colour, red eye, and inpaint (filled on the CPU at the end).
-               kSpongeMode, kMedian, kUndo, kColourReplace, kBgErase, kRedEye, kInpaint };
+               kSpongeMode, kMedian, kUndo, kColourReplace, kBgErase, kRedEye, kInpaint,
+               // Pattern Stamp (Photoshop): paints a repeating pattern tile (sourceTex, tiled) instead of a colour.
+               kPatternStamp };
    inline bool RetouchMode(int m) { return (m >= kBlur && m <= kHeal) || m >= kSpongeMode; }
    inline bool MarbleMode(int m) { return m == kDrop || m == kComb || m == kSwirl; }
    inline bool LiquifyMode(int m) { return m == kPush || m == kTwirl || m == kBloat || m == kPinch; }
@@ -107,6 +109,11 @@ namespace BrushEngine
       // surface owner fills sourceAnchor (surface pixels) from the document point.
       float sourceRotate = 0.0f;   // degrees
       float sourceScale = 1.0f;
+      // Pattern Stamp: the tile's pixel scale (whole numbers repeat it exactly), and where it starts. Aligned keeps the
+      // surface origin across strokes; not aligned starts each stroke at its first dab (the surface owner sets phase).
+      float patternScale = 1.0f;
+      bool patternAligned = true;
+      float patternPhase[2] = { 0.0f, 0.0f };
       bool sourceFlipX = false, sourceFlipY = false;
       float sourceAnchor[2] = { 0.0f, 0.0f };
       int sourceBlend = 0;         // clone: 0 normal, 1 multiply, 2 screen, 3 overlay, 4 darken, 5 lighten, 6 difference
