@@ -4,6 +4,7 @@
 // The labels live on UndoEntry and are never written into a patch.
 #include "app/AppShared.h"
 #include "app/ui/design/UiInteract.h"
+#include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -59,6 +60,16 @@ namespace
       const size_t nUndo = gUndoStack.size();
       const size_t nRedo = gRedoStack.size();
       ImGui::TextUnformatted(T("History"));
+      // Clear History: one step that sets the rest aside (undo it to get them back). Hidden when it is all there is.
+      if (nRedo > 0 || nUndo > 1 || (nUndo == 1 && !gUndoStack.back().cleared))
+      {
+         const char* clearText = L("Clear History");
+         const float w = ImGui::CalcTextSize(clearText).x + tok::space_2 + tok::space_2;
+         Ui::SameRow();
+         Ui::ColumnAt(ImGui::GetCursorPosX() + std::max(0.0f, Ui::AvailW() - w));
+         if (ChipButton::Draw(clearText, false, 0.0f, w, true))
+            ClearHistory();
+      }
       ImGui::PushTextWrapPos(0.0f);
       if (nUndo >= kMaxUndoDepth)
          ImGui::TextDisabled(T("Showing the last %d edits; older ones are dropped."), (int)kMaxUndoDepth);

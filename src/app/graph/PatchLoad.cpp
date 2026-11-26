@@ -1527,6 +1527,18 @@ namespace app
       if (gUndoStack.empty())
          return;
       const std::string what = UndoLabelAt(0);
+      if (gUndoStack.back().cleared)
+      {
+         UndoEntry mark = std::move(gUndoStack.back());
+         gUndoStack.pop_back();
+         std::shared_ptr<ClearedHistory> held = std::move(mark.cleared);
+         gUndoStack = std::move(held->undo);
+         gRedoStack = std::move(held->redo);
+         mark.cleared = std::make_shared<ClearedHistory>();
+         gRedoStack.push_back(std::move(mark));
+         gPatchStatus = "Undo " + what;
+         return;
+      }
       if (gUndoStack.back().arrangeOnly)
       {
          UndoEntry prev = std::move(gUndoStack.back());
@@ -1565,6 +1577,18 @@ namespace app
       if (gRedoStack.empty())
          return;
       const std::string what = RedoLabelAt(0);
+      if (gRedoStack.back().cleared)
+      {
+         UndoEntry mark = std::move(gRedoStack.back());
+         gRedoStack.pop_back();
+         mark.cleared->undo = std::move(gUndoStack);
+         mark.cleared->redo = std::move(gRedoStack);
+         gUndoStack.clear();
+         gRedoStack.clear();
+         gUndoStack.push_back(std::move(mark));
+         gPatchStatus = "Redo " + what;
+         return;
+      }
       if (gRedoStack.back().arrangeOnly)
       {
          UndoEntry next = std::move(gRedoStack.back());
@@ -1591,6 +1615,24 @@ namespace app
       GestureRecorder::Instance().Restore(RemapGestures(next.gestures, remap), GestureClockNow());
       gPatchDirty = true;
       gPatchStatus = "Redo " + what;
+   }
+
+
+   void ClearHistory()
+   {
+      if (ShowLockBlocks())
+         return;
+      if (gUndoStack.empty() && gRedoStack.empty())
+         return;
+      UndoEntry mark;
+      mark.label = "Clear History";
+      mark.cleared = std::make_shared<ClearedHistory>();
+      mark.cleared->undo = std::move(gUndoStack);
+      mark.cleared->redo = std::move(gRedoStack);
+      gUndoStack.clear();
+      gRedoStack.clear();
+      gUndoStack.push_back(std::move(mark));
+      gPatchStatus = "Clear History";
    }
 
 

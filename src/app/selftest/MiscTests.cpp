@@ -2462,6 +2462,36 @@ void RunHistoryTest()
    PushUndoCheckpoint("Edit");
    Check("a new edit clears redo", gRedoStack.empty());
 
+   // Clear History: one step left, the picture untouched; undo brings every step back, redo clears again.
+   {
+      const size_t undoBefore = gUndoStack.size();
+      const size_t nodesBefore = gNodes.size();
+      const bool bypassBefore = FindNodeByIndex(shapeIdx) != nullptr && FindNodeByIndex(shapeIdx)->node->bypassed;
+      Undo();                                   // leave one redo step, so both sides are set aside
+      const size_t undoMid = gUndoStack.size();
+      const std::string topLabel = UndoLabelAt(0);
+      gPatchDirty = false;                      // as if just saved
+      ClearHistory();
+      Check("clear history keeps the image and leaves one state",
+            gUndoStack.size() == 1 && gRedoStack.empty() && UndoLabelAt(0) == "Clear History" && gNodes.size() == nodesBefore);
+      Check("clear history and its undo keep a saved document clean (clear)", !gPatchDirty);
+      Undo();
+      Check("undo after clear history brings the states back",
+            gUndoStack.size() == undoMid && gRedoStack.size() == 2 && UndoLabelAt(0) == topLabel && RedoLabelAt(0) == "Clear History" &&
+                RedoLabelAt(1) == "Edit");
+      Check("clear history and its undo keep a saved document clean", !gPatchDirty && gNodes.size() == nodesBefore);
+      Redo();
+      Check("redo of clear history clears again", gUndoStack.size() == 1 && gRedoStack.empty() && UndoLabelAt(0) == "Clear History");
+      Undo();
+      Redo();   // Clear History
+      Undo();   // back
+      gRedoStack.pop_back();                    // drop the Clear History step, keep the rest
+      Redo();
+      Check("history steps work again after clear history is undone", gUndoStack.size() == undoBefore && gRedoStack.empty() &&
+                                                                          FindNodeByIndex(shapeIdx) != nullptr &&
+                                                                          FindNodeByIndex(shapeIdx)->node->bypassed == bypassBefore);
+   }
+
    // Save with media keeps the live session: undo depth, routing mode and node paths repointed in place.
    {
       namespace fs = std::filesystem;

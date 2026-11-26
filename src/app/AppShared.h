@@ -2,6 +2,7 @@
 // Shared declarations for the code split out of main.cpp.
 #include "app/selftest/UiAudit.h"
 #include <cstring>
+#include <memory>
 #include <optional>
 #include <vector>
 #include "core/ModShapes.h"
@@ -5812,6 +5813,7 @@ extern bool gSuppressUndoCheckpoints;
    // user grabbed the knob predates the recording, so undoing to it removes
    // the recording, and redo brings it back. Carried across ApplyPatchData's
    // respawn through the same old-index -> new-index remap as RemapGestures.
+   struct ClearedHistory;
    struct UndoEntry
    {
       Patch::Data patch;
@@ -5828,6 +5830,14 @@ extern bool gSuppressUndoCheckpoints;
       // What the edit this entry undoes was called ("Move node"). Empty until named: a call site that passed no label
       // gets one derived from the before/after patches the first time something shows it. Never written to a patch.
       std::string label;
+      // Set only on the one entry Clear History leaves (History panel): it holds the stacks it cleared, so Undo
+      // brings them back and Redo clears them again. Changes nothing in the patch and never marks it dirty.
+      std::shared_ptr<ClearedHistory> cleared;
+   };
+   struct ClearedHistory
+   {
+      std::deque<UndoEntry> undo;
+      std::deque<UndoEntry> redo;
    };
 
 extern std::deque<UndoEntry> gUndoStack;
@@ -5943,6 +5953,9 @@ std::string UndoLabelAt(size_t indexFromTop);
 std::string RedoLabelAt(size_t indexFromNearest);
 // Moves the document `undos` steps back (positive) or `redos` forward by repeating Undo/Redo, one status line at the end.
 void JumpInHistory(int undos, int redos);
+// History panel > Clear History: every undo and redo step is set aside behind one "Clear History" step. Undo brings
+// them all back; the patch, its saved/unsaved state and the 2D snapshots are untouched.
+void ClearHistory();
 extern bool gHistoryOpen;
 extern float gHistoryWidth;
 void DrawHistoryDocked(const char* id, const ImVec2& size);
