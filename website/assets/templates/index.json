@@ -4132,7 +4132,73 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "formant-pulsar-grain-synth",
+      "name": "Formant Pulsar Grain Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Curtis Roads-inspired pulsar synthesis with raised-cosine Hann windowing, dual vocal formant carriers, and warm soft-clipped resonance.",
+      "price": 0,
+      "preview": "assets/templates/formant-pulsar-grain-synth.webp",
+      "file": "assets/templates/formant-pulsar-grain-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "modal-marimba-bar-synth",
+      "name": "Modal Marimba Bar Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Euler-Bernoulli stiff-bar modal resonator bank with inharmonic bar modes, cosine mallet strike transient, and wooden resonator body.",
+      "price": 0,
+      "preview": "assets/templates/modal-marimba-bar-synth.webp",
+      "file": "assets/templates/modal-marimba-bar-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "studer-tape-head-bump-fx",
+      "name": "Studer Tape Head Bump FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Analog reel-to-reel tape path with low-frequency head-bump resonance, asymmetric hysteresis saturation, and subtle wow/flutter allpass drift.",
+      "price": 0,
+      "preview": "assets/templates/studer-tape-head-bump-fx.webp",
+      "file": "assets/templates/studer-tape-head-bump-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "granular-pitch-cloud-fx",
+      "name": "Granular Pitch Cloud FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-window Hann-enveloped granular micro-delay cloud with modulated allpass pitch drift, resonant feedback diffusion, and warm damping.",
+      "price": 0,
+      "preview": "assets/templates/granular-pitch-cloud-fx.webp",
+      "file": "assets/templates/granular-pitch-cloud-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ],
-  "count": 252
+  "count": 256
 }

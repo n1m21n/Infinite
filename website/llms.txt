@@ -409,6 +409,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Pulsar Train Formant Synth](https://infinitedevices.org/library/pulsar-train-formant-synth.html): Windowed pulsar-train synthesizer with independent formant frequency sweep, variable duty cycle, and warm body resonance. (file: https://infinitedevices.org/assets/templates/pulsar-train-formant-synth.inf)
 - [Diode Ladder Overdrive FX](https://infinitedevices.org/library/diode-ladder-overdrive-fx.html): Four-stage nonlinear diode ladder lowpass filter with asymmetric input saturation, resonant feedback, and dry-wet blend. (file: https://infinitedevices.org/assets/templates/diode-ladder-overdrive-fx.inf)
 - [Envelope SVF Autofilter FX](https://infinitedevices.org/library/envelope-svf-autofilter-fx.html): Dual-ballistics envelope follower sweeping a resonant state-variable bandpass and lowpass filter with harmonic warmth. (file: https://infinitedevices.org/assets/templates/envelope-svf-autofilter-fx.inf)
+- [Formant Pulsar Grain Synth](https://infinitedevices.org/library/formant-pulsar-grain-synth.html): Curtis Roads-inspired pulsar synthesis with raised-cosine Hann windowing, dual vocal formant carriers, and warm soft-clipped resonance. (file: https://infinitedevices.org/assets/templates/formant-pulsar-grain-synth.inf)
+- [Modal Marimba Bar Synth](https://infinitedevices.org/library/modal-marimba-bar-synth.html): Euler-Bernoulli stiff-bar modal resonator bank with inharmonic bar modes, cosine mallet strike transient, and wooden resonator body. (file: https://infinitedevices.org/assets/templates/modal-marimba-bar-synth.inf)
+- [Studer Tape Head Bump FX](https://infinitedevices.org/library/studer-tape-head-bump-fx.html): Analog reel-to-reel tape path with low-frequency head-bump resonance, asymmetric hysteresis saturation, and subtle wow/flutter allpass drift. (file: https://infinitedevices.org/assets/templates/studer-tape-head-bump-fx.inf)
+- [Granular Pitch Cloud FX](https://infinitedevices.org/library/granular-pitch-cloud-fx.html): Dual-window Hann-enveloped granular micro-delay cloud with modulated allpass pitch drift, resonant feedback diffusion, and warm damping. (file: https://infinitedevices.org/assets/templates/granular-pitch-cloud-fx.inf)
 
 ## Library: Community
 
@@ -832,7 +836,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 155 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 157 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -849,4 +853,4 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 140 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 142 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

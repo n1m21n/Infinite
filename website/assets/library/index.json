@@ -13843,7 +13843,219 @@
       "file": "assets/library/pixel/vasarely-kinetic-mural.field",
       "preview": "assets/library/previews/vasarely-kinetic-mural.jpg",
       "bytes": 1760
+    },
+    {
+      "id": "bill-concrete-color-progression",
+      "name": "Bill Concrete Color Progression",
+      "kind": "Generator",
+      "tags": [
+        "max-bill",
+        "concrete-art",
+        "swiss",
+        "geometry",
+        "grid",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Swiss Concrete Art modular chromatic grid with rotated nested squares, mathematical hue progressions, and crisp bone-paper margins.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/bill-concrete-color-progression.js",
+      "preview": "assets/library/previews/bill-concrete-color-progression.jpg",
+      "bytes": 2453
+    },
+    {
+      "id": "bill-mobius-ribbon-projection",
+      "name": "Bill Mobius Ribbon Projection",
+      "kind": "Generator",
+      "tags": [
+        "max-bill",
+        "mobius",
+        "topology",
+        "swiss",
+        "contour",
+        "procedural",
+        "sketch"
+      ],
+      "description": "Orthographic parametric projection of Max Bill's Endless Loop granite sculpture with ruled isoparm contours and Swiss datum lines.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/bill-mobius-ribbon-projection.js",
+      "preview": "assets/library/previews/bill-mobius-ribbon-projection.jpg",
+      "bytes": 3207
+    },
+    {
+      "id": "jansen-strandbeest-linkage-3d",
+      "name": "Jansen Strandbeest Linkage 3D",
+      "kind": "Generator",
+      "tags": [
+        "jansen",
+        "strandbeest",
+        "kinetic",
+        "linkage",
+        "mechanism",
+        "3d",
+        "sketch-3d"
+      ],
+      "description": "Articulated Theo Jansen Strandbeest crank-rocker walking linkage array in cream-ochre PVC struts and graphite pivot joints.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/jansen-strandbeest-linkage-3d.js",
+      "preview": "assets/library/previews/jansen-strandbeest-linkage-3d.jpg",
+      "bytes": 1964
+    },
+    {
+      "id": "aalto-viipuri-acoustic-fins-3d",
+      "name": "Aalto Viipuri Acoustic Fins 3D",
+      "kind": "Generator",
+      "tags": [
+        "aalto",
+        "viipuri",
+        "acoustic",
+        "timber",
+        "architecture",
+        "3d",
+        "sketch-3d"
+      ],
+      "description": "Undulating laminated birch acoustic ceiling ribs inspired by Alvar Aalto's Viipuri Library lecture hall over a deep slate-teal space.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/aalto-viipuri-acoustic-fins-3d.js",
+      "preview": "assets/library/previews/aalto-viipuri-acoustic-fins-3d.jpg",
+      "bytes": 1293
+    },
+    {
+      "id": "formant-pulsar-grain-synth",
+      "name": "Formant Pulsar Grain Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "pulsar",
+        "modal",
+        "audio",
+        "dsp"
+      ],
+      "description": "Curtis Roads-inspired pulsar synthesis with raised-cosine Hann windowing, dual vocal formant carriers, and warm soft-clipped resonance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/formant-pulsar-grain-synth.inf",
+      "preview": "assets/library/previews/formant-pulsar-grain-synth.jpg",
+      "bytes": 2178
+    },
+    {
+      "id": "modal-marimba-bar-synth",
+      "name": "Modal Marimba Bar Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "pulsar",
+        "modal",
+        "audio",
+        "dsp"
+      ],
+      "description": "Euler-Bernoulli stiff-bar modal resonator bank with inharmonic bar modes, cosine mallet strike transient, and wooden resonator body.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/modal-marimba-bar-synth.inf",
+      "preview": "assets/library/previews/modal-marimba-bar-synth.jpg",
+      "bytes": 2078
+    },
+    {
+      "id": "studer-tape-head-bump-fx",
+      "name": "Studer Tape Head Bump FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "tape",
+        "granular",
+        "audio",
+        "dsp"
+      ],
+      "description": "Analog reel-to-reel tape path with low-frequency head-bump resonance, asymmetric hysteresis saturation, and subtle wow/flutter allpass drift.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/studer-tape-head-bump-fx.inf",
+      "preview": "assets/library/previews/studer-tape-head-bump-fx.jpg",
+      "bytes": 2237
+    },
+    {
+      "id": "granular-pitch-cloud-fx",
+      "name": "Granular Pitch Cloud FX",
+      "kind": "Generator",
+      "tags": [
+        "effect",
+        "tape",
+        "granular",
+        "audio",
+        "dsp"
+      ],
+      "description": "Dual-window Hann-enveloped granular micro-delay cloud with modulated allpass pitch drift, resonant feedback diffusion, and warm damping.",
+      "price": 0,
+      "domain": "effect",
+      "category": "Audio effects",
+      "params": 5,
+      "file": "assets/templates/granular-pitch-cloud-fx.inf",
+      "preview": "assets/library/previews/granular-pitch-cloud-fx.jpg",
+      "bytes": 2252
+    },
+    {
+      "id": "poincare-hyperbolic-tessellation",
+      "name": "Poincare Hyperbolic Tessellation",
+      "kind": "Generator",
+      "tags": [
+        "poincare",
+        "hyperbolic",
+        "tessellation",
+        "geometry",
+        "concrete",
+        "shader",
+        "pixel"
+      ],
+      "description": "Conformal Poincare disk hyperbolic circle-inversion tiling in De Stijl vermilion, cobalt, ochre, and ivory with crisp ink borders.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/poincare-hyperbolic-tessellation.field",
+      "preview": "assets/library/previews/poincare-hyperbolic-tessellation.jpg",
+      "bytes": 2575
+    },
+    {
+      "id": "max-bill-mobius-raymarch",
+      "name": "Max Bill Mobius Raymarch",
+      "kind": "Generator",
+      "tags": [
+        "max-bill",
+        "mobius",
+        "raymarch",
+        "sdf",
+        "granite",
+        "shader",
+        "pixel"
+      ],
+      "description": "3D SDF raymarched single-surface Mobius ribbon sculpture in warm red-oxide granite and brushed bronze with grazing sunlight.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/max-bill-mobius-raymarch.field",
+      "preview": "assets/library/previews/max-bill-mobius-raymarch.jpg",
+      "bytes": 2322
     }
   ],
-  "count": 669
+  "count": 679
 }

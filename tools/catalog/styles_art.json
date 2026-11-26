@@ -3089,6 +3089,119 @@
         "Victor Vasarely UCV ceramic tile mural in ochre-gold, burnt sienna, and charcoal",
         "Terminal Grotesque (Velvetyne) & Azeret Mono (Fontshare) modernist mural type"
       ]
+    },
+    {
+      "id": "max_bill_concrete_art",
+      "taxonomy": "new",
+      "name": "Max Bill Swiss Concrete Art",
+      "palette": [
+        "#F2EFE9",
+        "#8C3B2B",
+        "#1B498A",
+        "#E0A526",
+        "#181A20"
+      ],
+      "sources": [
+        "Sketch"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "bloom"
+      ],
+      "motion": 0.25,
+      "pairs": [
+        "formant_pulsar_grain"
+      ],
+      "refs": [
+        "Max Bill Unendliche Schleife (Essen, 1974) & Concrete Art chromatic progressions",
+        "Steps Mono (Velvetyne) & Overused Grotesk (UNCUT) Swiss grid typography"
+      ]
+    },
+    {
+      "id": "jansen_strandbeest_linkage",
+      "taxonomy": "new",
+      "name": "Theo Jansen Strandbeest Linkage",
+      "palette": [
+        "#E6DEC8",
+        "#C8B89A",
+        "#23262E",
+        "#8B4513"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.45,
+      "pairs": [
+        "modal_marimba_bar"
+      ],
+      "refs": [
+        "Theo Jansen Strandbeest crank-rocker PVC linkage trusses",
+        "Fragment Mono (UNCUT) technical kinematic notation"
+      ]
+    },
+    {
+      "id": "aalto_viipuri_acoustic",
+      "taxonomy": "new",
+      "name": "Alvar Aalto Viipuri Acoustic Wave",
+      "palette": [
+        "#F4F1EA",
+        "#D4A373",
+        "#E9C46A",
+        "#264653"
+      ],
+      "sources": [
+        "Sketch 3D"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch"
+      ],
+      "motion": 0.2,
+      "pairs": [
+        "studer_tape_head_bump"
+      ],
+      "refs": [
+        "Alvar Aalto Viipuri Library laminated birch acoustic wave ceiling",
+        "Overused Grotesk (UNCUT) Nordic functionalist signage"
+      ]
+    },
+    {
+      "id": "poincare_hyperbolic_tiling",
+      "taxonomy": "new",
+      "name": "Poincare Hyperbolic Tessellation",
+      "palette": [
+        "#F4F1EA",
+        "#D9381E",
+        "#1B498A",
+        "#E0A526",
+        "#181A20"
+      ],
+      "sources": [
+        "Field Pixel"
+      ],
+      "fx": [],
+      "comp": [],
+      "ban": [
+        "glitch",
+        "pixelate"
+      ],
+      "motion": 0.35,
+      "pairs": [
+        "granular_pitch_cloud"
+      ],
+      "refs": [
+        "Conformal Poincare disk {4,3,3} hyperbolic circle-inversion tiling",
+        "Steps Mono (Velvetyne) mathematical plate captions"
+      ]
     }
   ]
 }

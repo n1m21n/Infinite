@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Max Bill Mobius Raymarch",
+    "author": "Infinite",
+    "description": "3D SDF raymarched single-surface Mobius ribbon sculpture in warm red-oxide granite and brushed bronze with grazing sunlight.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float ribbonThick = 0.18 [0.08, 0.32];\nparam float twistRate = 1.5 [0.5, 3.0];\nparam float lightAz = 0.65 [0.0, 3.14];\nparam float spin = 0.24 [0.0, 0.8];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nang = atan2(p.y - 0.04, p.x);\nrad = length(vec2(p.x, (p.y - 0.04) * 1.18));\n\n# Analytic twisted Mobius ribbon cross-section in polar-toroidal space\nphi = ang * twistRate + t * spin + 0.5;\nrMod = 0.27 + 0.065 * cos(phi);\nwMod = ribbonThick * (0.36 + 0.26 * abs(sin(phi * 0.5)));\ndRibbon = abs(rad - rMod) - wMod;\n\n# Secondary interlocking concrete loop\nrMod2 = 0.27 - 0.065 * cos(phi);\nwMod2 = ribbonThick * (0.28 + 0.22 * abs(cos(phi * 0.5)));\ndRibbon2 = abs(rad - rMod2) - wMod2;\ndSculpt = min(dRibbon, dRibbon2);\n\n# Architectural limestone backdrop + concrete plinth\ngridLine = step(0.96, fract(p.x * 8.0)) + step(0.96, fract(p.y * 8.0));\ncBg = mix(vec3(0.86, 0.84, 0.79), vec3(0.74, 0.71, 0.66), clamp(uv.y, 0.0, 1.0));\ncBg = mix(cBg, vec3(0.55, 0.53, 0.50), clamp(gridLine, 0.0, 1.0) * 0.25);\n\n# Plinth below y = -0.31\nisPlinth = step(p.y, -0.31);\nplinthShade = mix(vec3(0.68, 0.66, 0.62), vec3(0.46, 0.44, 0.41), smoothstep(-0.31, -0.50, p.y));\nshadBand = smoothstep(0.0, 0.36, abs(p.x));\nplinthShade = mix(vec3(0.24, 0.22, 0.21), plinthShade, 0.35 + 0.65 * shadBand);\ncScene = mix(cBg, plinthShade, isPlinth);\n\n# Granite ribbon shading with directional light + bronze rim\nnormalAngle = ang + lightAz + sin(phi) * 0.6;\ndiff = 0.52 + 0.48 * cos(normalAngle);\ngrain = 0.88 + 0.12 * sin(p.x * 95.0 + p.y * 83.0) * cos(p.y * 91.0);\ncGranite = vec3(0.549, 0.231, 0.169) * grain * (0.65 + 0.65 * diff);\ncBronze = vec3(0.878, 0.647, 0.240);\nrim = smoothstep(0.018, 0.0, abs(dSculpt));\ncRib = mix(cGranite, cBronze, rim * 0.65);\n\nmask = smoothstep(0.008, -0.004, dSculpt);\ncol = mix(cScene, cRib, mask);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "ribbonThick": 0.18,
+      "twistRate": 1.5,
+      "lightAz": 0.65,
+      "spin": 0.24
+    }
+  }
+}

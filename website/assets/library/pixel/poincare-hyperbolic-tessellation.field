@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Poincare Hyperbolic Tessellation",
+    "author": "Infinite",
+    "description": "Conformal Poincare disk hyperbolic circle-inversion tiling in De Stijl vermilion, cobalt, ochre, and ivory with crisp ink borders.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float foldDepth = 8.0 [4.0, 14.0];\nparam float zoom = 0.92 [0.6, 1.25];\nparam float edgeWidth = 0.025 [0.008, 0.06];\nparam float drift = 0.18 [0.0, 0.6];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * (2.15 / zoom);\nr2 = dot(p, p);\n\n# Hyperbolic circle-inversion fold inside unit disk\nang = t * drift;\nca = cos(ang); sa = sin(ang);\nz = vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca);\n\n# Branchless hyperbolic reflection across 3 symmetry axes\ncRad = 1.28;\ncRad2 = cRad * cRad;\ncOff = vec2(1.62, 0.0);\nflips = 0.0;\n\nz = vec2(abs(z.x), abs(z.y));\nsw1 = step(z.x, z.y);\nz = mix(z, vec2(z.y, z.x), sw1);\nflips = flips + sw1;\nd2 = dot(z - cOff, z - cOff);\ninv1 = step(d2, cRad2);\nz = mix(z, cOff + (z - cOff) * (cRad2 / max(0.001, d2)), inv1);\nflips = flips + inv1;\n\nz = vec2(abs(z.x), abs(z.y));\nsw2 = step(z.x, z.y);\nz = mix(z, vec2(z.y, z.x), sw2);\nflips = flips + sw2;\nd2 = dot(z - cOff, z - cOff);\ninv2 = step(d2, cRad2);\nz = mix(z, cOff + (z - cOff) * (cRad2 / max(0.001, d2)), inv2);\nflips = flips + inv2;\n\nz = vec2(abs(z.x), abs(z.y));\nsw3 = step(z.x, z.y);\nz = mix(z, vec2(z.y, z.x), sw3);\nflips = flips + sw3;\nd2 = dot(z - cOff, z - cOff);\ninv3 = step(d2, cRad2);\nz = mix(z, cOff + (z - cOff) * (cRad2 / max(0.001, d2)), inv3);\nflips = flips + inv3;\n\nz = vec2(abs(z.x), abs(z.y));\nsw4 = step(z.x, z.y);\nz = mix(z, vec2(z.y, z.x), sw4);\nflips = flips + sw4;\n\n# Tile coloring: Ivory, Vermilion, Cobalt, Ochre, Ink\nedge = min(abs(z.x - z.y), abs(length(z - cOff) - cRad));\nborder = smoothstep(0.0, edgeWidth, edge);\n\ncIvory = vec3(0.957, 0.945, 0.918);\ncRed = vec3(0.851, 0.220, 0.118);\ncBlue = vec3(0.106, 0.286, 0.541);\ncOchre = vec3(0.878, 0.647, 0.149);\ncInk = vec3(0.094, 0.102, 0.125);\n\nsel = floor(fmod(flips, 4.0));\ntileCol = mix(cIvory, cRed, step(0.5, sel) * step(sel, 1.5));\ntileCol = mix(tileCol, cBlue, step(1.5, sel) * step(sel, 2.5));\ntileCol = mix(tileCol, cOchre, step(2.5, sel));\n\ncol = mix(cInk, tileCol, border);\ndiskMask = smoothstep(1.02, 0.98, sqrt(r2));\ncol = mix(cInk * 1.15, col, diskMask);\ncol = clamp(col, 0.0, 1.0);\n",
+    "params": {
+      "foldDepth": 8.0,
+      "zoom": 0.92,
+      "edgeWidth": 0.025,
+      "drift": 0.18
+    }
+  }
+}

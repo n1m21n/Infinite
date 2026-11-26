@@ -225,6 +225,8 @@
   <url><loc>https://infinitedevices.org/embeds/voronoi-basalt-caustics.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/moire-optical-fringes.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/vasarely-kinetic-mural.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/poincare-hyperbolic-tessellation.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/max-bill-mobius-raymarch.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/plugin.html</loc><lastmod>2026-11-26</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/buy.html</loc><lastmod>2026-11-26</lastmod><priority>0.9</priority></url>
   <url><loc>https://infinitedevices.org/releases.html</loc><lastmod>2026-11-26</lastmod><priority>0.7</priority></url>
@@ -498,6 +500,10 @@
   <url><loc>https://infinitedevices.org/library/pulsar-train-formant-synth.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/diode-ladder-overdrive-fx.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/envelope-svf-autofilter-fx.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/formant-pulsar-grain-synth.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/modal-marimba-bar-synth.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/studer-tape-head-bump-fx.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/granular-pitch-cloud-fx.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
@@ -1044,6 +1050,12 @@
   <url><loc>https://infinitedevices.org/library/schroeder-qrd-diffuser-3d.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/moire-optical-fringes.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/vasarely-kinetic-mural.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bill-concrete-color-progression.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bill-mobius-ribbon-projection.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/jansen-strandbeest-linkage-3d.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/aalto-viipuri-acoustic-fins-3d.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/poincare-hyperbolic-tessellation.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/max-bill-mobius-raymarch.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-26</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/3d-view.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-26</lastmod><priority>0.5</priority></url>

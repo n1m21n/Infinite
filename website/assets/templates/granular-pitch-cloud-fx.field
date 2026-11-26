@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Granular Pitch Cloud FX",
+    "author": "Infinite",
+    "description": "Dual-window Hann-enveloped granular micro-delay cloud with modulated allpass pitch drift, resonant feedback diffusion, and warm damping.",
+    "domain": "audio"
+  },
+  "device": {
+    "code": "param float grainRate = 4.5 [1.0, 14.0];\nparam float drift = 0.58 [0.0, 1.0];\nparam float feedback = 0.54 [0.0, 0.80];\nparam float dampHz = 3400.0 [900.0, 7500.0];\nparam float mix = 0.66 [0.0, 1.0];\nstate float gPh1 = 0; state float gPh2 = 0.5;\nstate float ap1 = 0; state float ap2 = 0; state float ap3 = 0;\nstate float lp1 = 0; state float fb = 0;\n\ngPh1 = (gPh1 + grainRate / sr) % 1.0;\ngPh2 = (gPh2 + grainRate / sr) % 1.0;\n\nw1 = 0.5 - 0.5 * cos(6.2831853 * gPh1);\nw2 = 0.5 - 0.5 * cos(6.2831853 * gPh2);\n\nsrc = in + fb * feedback;\nc1 = clamp(0.45 + sin(6.2831853 * gPh1) * 0.36 * drift, 0.08, 0.88);\nc2 = clamp(0.45 - cos(6.2831853 * gPh2) * 0.36 * drift, 0.08, 0.88);\n\ny1 = -c1 * src + ap1; ap1 = src + c1 * y1;\ny2 = -c2 * src + ap2; ap2 = src + c2 * y2;\ny3 = -0.62 * (y1 * w1 + y2 * w2) + ap3; ap3 = (y1 * w1 + y2 * w2) + 0.62 * y3;\n\ng = clamp(2.0 * sin(3.14159265 * dampHz / sr), 0.04, 0.85);\nlp1 = lp1 + g * (y3 - lp1);\nfbDrv = lp1 * 1.15;\nfb = fbDrv / (1.0 + abs(fbDrv));\n\nout = (in * (1.0 - mix) + lp1 * mix) * 0.72;\n",
+    "params": {
+      "grainRate": 4.5,
+      "drift": 0.58,
+      "feedback": 0.54,
+      "dampHz": 3400.0,
+      "mix": 0.66
+    }
+  }
+}

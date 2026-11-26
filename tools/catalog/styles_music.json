@@ -5467,6 +5467,216 @@
         "gain": -10.0
       },
       "groove": 0.45
+    },
+    {
+      "id": "formant_pulsar_grain",
+      "family": "experimental",
+      "bpm": [
+        108,
+        124
+      ],
+      "swing": 0.04,
+      "scale": [
+        4,
+        6
+      ],
+      "drums": {},
+      "bass": "0...0...3...5...",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Field Synth",
+        "Analog"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.05,
+      "mod": 0.45,
+      "refs": [
+        "Curtis Roads pulsar synthesis & dual-formant windowed impulse trains"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3,
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 18.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.4,
+        "octave": 2,
+        "gate": 65,
+        "gain": -10.0
+      },
+      "groove": 0.35
+    },
+    {
+      "id": "modal_marimba_bar",
+      "family": "ambient",
+      "bpm": [
+        96,
+        116
+      ],
+      "swing": 0.08,
+      "scale": [
+        9,
+        6
+      ],
+      "drums": {},
+      "bass": "0..2.4..0..5.4..",
+      "fx": [
+        "Reverb",
+        "Delay"
+      ],
+      "synth": [
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Distortion"
+      ],
+      "glitch": 0.0,
+      "mod": 0.3,
+      "refs": [
+        "Euler-Bernoulli stiff-bar modal resonator bank with mallet strike excitation"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          3
+        ],
+        "beats": 2.0,
+        "steps": 4,
+        "strum": 28.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Field Synth"
+        ],
+        "density": 0.55,
+        "octave": 3,
+        "gate": 50,
+        "gain": -9.0
+      },
+      "groove": 0.5
+    },
+    {
+      "id": "studer_tape_head_bump",
+      "family": "downtempo",
+      "bpm": [
+        84,
+        102
+      ],
+      "swing": 0.1,
+      "scale": [
+        1,
+        4
+      ],
+      "drums": {
+        "kick": "x.......x..o....",
+        "snare": "....x.......x...",
+        "chat": "x.o.x.o.x.o.x.o."
+      },
+      "bass": "0...0..23...5...",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "Field Synth"
+      ],
+      "ban": [
+        "Bitcrusher"
+      ],
+      "glitch": 0.0,
+      "mod": 0.35,
+      "refs": [
+        "Studer B67 analog tape head-bump LF resonance, hysteresis saturation & wow/flutter"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 22.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.35,
+        "octave": 2,
+        "gate": 70,
+        "gain": -10.0
+      },
+      "groove": 0.45
+    },
+    {
+      "id": "granular_pitch_cloud",
+      "family": "ambient",
+      "bpm": [
+        78,
+        94
+      ],
+      "swing": 0.0,
+      "scale": [
+        6,
+        4
+      ],
+      "drums": {},
+      "bass": "0.......4.......",
+      "fx": [
+        "Field Effect",
+        "Reverb"
+      ],
+      "synth": [
+        "Analog",
+        "Wavetable"
+      ],
+      "ban": [
+        "Bitcrusher",
+        "Stutter"
+      ],
+      "glitch": 0.05,
+      "mod": 0.4,
+      "refs": [
+        "Stereo Hann-windowed granular micro-delay cloud with pitch-shifted feedback"
+      ],
+      "sidechain": false,
+      "chords": {
+        "size": [
+          4
+        ],
+        "beats": 4.0,
+        "steps": 4,
+        "strum": 25.0
+      },
+      "notefx": [],
+      "motif": {
+        "synth": [
+          "Analog"
+        ],
+        "density": 0.3,
+        "octave": 2,
+        "gate": 80,
+        "gain": -11.0
+      },
+      "groove": 0.25
     }
   ]
 }

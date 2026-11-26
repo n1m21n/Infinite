@@ -409,6 +409,10 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Pulsar Train Formant Synth](https://infinitedevices.org/library/pulsar-train-formant-synth.html): Windowed pulsar-train synthesizer with independent formant frequency sweep, variable duty cycle, and warm body resonance. (file: https://infinitedevices.org/assets/templates/pulsar-train-formant-synth.inf)
 - [Diode Ladder Overdrive FX](https://infinitedevices.org/library/diode-ladder-overdrive-fx.html): Four-stage nonlinear diode ladder lowpass filter with asymmetric input saturation, resonant feedback, and dry-wet blend. (file: https://infinitedevices.org/assets/templates/diode-ladder-overdrive-fx.inf)
 - [Envelope SVF Autofilter FX](https://infinitedevices.org/library/envelope-svf-autofilter-fx.html): Dual-ballistics envelope follower sweeping a resonant state-variable bandpass and lowpass filter with harmonic warmth. (file: https://infinitedevices.org/assets/templates/envelope-svf-autofilter-fx.inf)
+- [Formant Pulsar Grain Synth](https://infinitedevices.org/library/formant-pulsar-grain-synth.html): Curtis Roads-inspired pulsar synthesis with raised-cosine Hann windowing, dual vocal formant carriers, and warm soft-clipped resonance. (file: https://infinitedevices.org/assets/templates/formant-pulsar-grain-synth.inf)
+- [Modal Marimba Bar Synth](https://infinitedevices.org/library/modal-marimba-bar-synth.html): Euler-Bernoulli stiff-bar modal resonator bank with inharmonic bar modes, cosine mallet strike transient, and wooden resonator body. (file: https://infinitedevices.org/assets/templates/modal-marimba-bar-synth.inf)
+- [Studer Tape Head Bump FX](https://infinitedevices.org/library/studer-tape-head-bump-fx.html): Analog reel-to-reel tape path with low-frequency head-bump resonance, asymmetric hysteresis saturation, and subtle wow/flutter allpass drift. (file: https://infinitedevices.org/assets/templates/studer-tape-head-bump-fx.inf)
+- [Granular Pitch Cloud FX](https://infinitedevices.org/library/granular-pitch-cloud-fx.html): Dual-window Hann-enveloped granular micro-delay cloud with modulated allpass pitch drift, resonant feedback diffusion, and warm damping. (file: https://infinitedevices.org/assets/templates/granular-pitch-cloud-fx.inf)
 
 ## Library: Community
 
@@ -679,6 +683,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Voronoi Basalt Caustics](https://infinitedevices.org/library/voronoi-basalt-caustics.html): Hexagonal columnar basalt fracture cells with refracted prismatic water caustics and slate-mineral bevels. (file: https://infinitedevices.org/assets/library/pixel/voronoi-basalt-caustics.field)
 - [Moire Optical Fringes](https://infinitedevices.org/library/moire-optical-fringes.html): Concentric silver-halide optical interference fringes with dual-center curvature warp and fine emulsion grain. (file: https://infinitedevices.org/assets/library/pixel/moire-optical-fringes.field)
 - [Vasarely Kinetic Mural](https://infinitedevices.org/library/vasarely-kinetic-mural.html): Ceramic architectural tile grid with sweeping kinetic curved cutouts in ochre-gold, burnt sienna, and deep charcoal. (file: https://infinitedevices.org/assets/library/pixel/vasarely-kinetic-mural.field)
+- [Poincare Hyperbolic Tessellation](https://infinitedevices.org/library/poincare-hyperbolic-tessellation.html): Conformal Poincare disk hyperbolic circle-inversion tiling in De Stijl vermilion, cobalt, ochre, and ivory with crisp ink borders. (file: https://infinitedevices.org/assets/library/pixel/poincare-hyperbolic-tessellation.field)
+- [Max Bill Mobius Raymarch](https://infinitedevices.org/library/max-bill-mobius-raymarch.html): 3D SDF raymarched single-surface Mobius ribbon sculpture in warm red-oxide granite and brushed bronze with grazing sunlight. (file: https://infinitedevices.org/assets/library/pixel/max-bill-mobius-raymarch.field)
 
 ## Library: Sketch
 
@@ -818,6 +824,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Albers Chromatic Nesting](https://infinitedevices.org/library/albers-chromatic-nesting.html): Four-plate Homage to the Square color-interaction study with asymmetrical bottom-weighted nested planes, brushed frames, and subtle temporal luminance drift. (file: https://infinitedevices.org/assets/library/sketch/albers-chromatic-nesting.js)
 - [Vasarely Sophia Contour Shift](https://infinitedevices.org/library/vasarely-sophia-contour-shift.html): Kinetic black-on-ivory parallel line relief with stepped diagonal and circular contour displacements framed in brutalist concrete. (file: https://infinitedevices.org/assets/library/sketch/vasarely-sophia-contour-shift.js)
 - [LeWitt Polychrome Wall Planes](https://infinitedevices.org/library/lewitt-polychrome-wall-planes.html): Intersecting architectural wall planes in matte vermilion, cobalt, emerald, and violet with fine drafting registration lines. (file: https://infinitedevices.org/assets/library/sketch/lewitt-polychrome-wall-planes.js)
+- [Bill Concrete Color Progression](https://infinitedevices.org/library/bill-concrete-color-progression.html): Swiss Concrete Art modular chromatic grid with rotated nested squares, mathematical hue progressions, and crisp bone-paper margins. (file: https://infinitedevices.org/assets/library/sketch/bill-concrete-color-progression.js)
+- [Bill Mobius Ribbon Projection](https://infinitedevices.org/library/bill-mobius-ribbon-projection.html): Orthographic parametric projection of Max Bill's Endless Loop granite sculpture with ruled isoparm contours and Swiss datum lines. (file: https://infinitedevices.org/assets/library/sketch/bill-mobius-ribbon-projection.js)
 
 ## Library: Sketch 3D
 
@@ -952,6 +960,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Frei Otto Tensile Mast 3D](https://infinitedevices.org/library/frei-otto-tensile-mast-3d.html): Cable-net saddle pavilion inspired by Frei Otto with tilted anodized steel masts, ember tension collars, and intersecting hyperbolic-paraboloid aluminum ribs. (file: https://infinitedevices.org/assets/library/sketch/frei-otto-tensile-mast-3d.js)
 - [Calatrava Ribbed Skylight 3D](https://infinitedevices.org/library/calatrava-ribbed-skylight-3d.html): Sweeping white steel structural arches framing recessed sea-glass skylight coffers over a dark basalt concourse plinth. (file: https://infinitedevices.org/assets/library/sketch/calatrava-ribbed-skylight-3d.js)
 - [Schroeder QRD Diffuser 3D](https://infinitedevices.org/library/schroeder-qrd-diffuser-3d.html): Two-dimensional quadratic residue acoustic diffuser skyline of Baltic birch and walnut timber wells following prime N=17 modular depths. (file: https://infinitedevices.org/assets/library/sketch/schroeder-qrd-diffuser-3d.js)
+- [Jansen Strandbeest Linkage 3D](https://infinitedevices.org/library/jansen-strandbeest-linkage-3d.html): Articulated Theo Jansen Strandbeest crank-rocker walking linkage array in cream-ochre PVC struts and graphite pivot joints. (file: https://infinitedevices.org/assets/library/sketch/jansen-strandbeest-linkage-3d.js)
+- [Aalto Viipuri Acoustic Fins 3D](https://infinitedevices.org/library/aalto-viipuri-acoustic-fins-3d.html): Undulating laminated birch acoustic ceiling ribs inspired by Alvar Aalto's Viipuri Library lecture hall over a deep slate-teal space. (file: https://infinitedevices.org/assets/library/sketch/aalto-viipuri-acoustic-fins-3d.js)
 
 ## Library: Synths
 
@@ -1086,6 +1096,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Bowed Bar Marimba Synth](https://infinitedevices.org/library/bowed-bar-marimba-synth.html): Modal rosewood bar percussion and bowed-mallet synthesizer with four tuned non-harmonic overtones, tremolo bow excitation, and resonant tube body filter. (file: https://infinitedevices.org/assets/templates/bowed-bar-marimba-synth.inf)
 - [Reed Clarinet Waveguide Synth](https://infinitedevices.org/library/reed-clarinet-waveguide-synth.html): Physical-modeled woodwind synthesizer coupling a nonlinear cubic reed pressure valve to a cylindrical bore delay resonator and breath exciter. (file: https://infinitedevices.org/assets/templates/reed-clarinet-waveguide-synth.inf)
 - [Pulsar Train Formant Synth](https://infinitedevices.org/library/pulsar-train-formant-synth.html): Windowed pulsar-train synthesizer with independent formant frequency sweep, variable duty cycle, and warm body resonance. (file: https://infinitedevices.org/assets/templates/pulsar-train-formant-synth.inf)
+- [Formant Pulsar Grain Synth](https://infinitedevices.org/library/formant-pulsar-grain-synth.html): Curtis Roads-inspired pulsar synthesis with raised-cosine Hann windowing, dual vocal formant carriers, and warm soft-clipped resonance. (file: https://infinitedevices.org/assets/templates/formant-pulsar-grain-synth.inf)
+- [Modal Marimba Bar Synth](https://infinitedevices.org/library/modal-marimba-bar-synth.html): Euler-Bernoulli stiff-bar modal resonator bank with inharmonic bar modes, cosine mallet strike transient, and wooden resonator body. (file: https://infinitedevices.org/assets/templates/modal-marimba-bar-synth.inf)
 
 ## Library: Audio Effects
 
@@ -1222,6 +1234,8 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Wavefolder Tape Saturator FX](https://infinitedevices.org/library/wavefolder-tape-saturator-fx.html): Asymmetric triode-tape soft-clipping saturator paired with a Lockhart sine wavefolder stage, pre-emphasis tilt, and dynamic bias sag. (file: https://infinitedevices.org/assets/templates/wavefolder-tape-saturator-fx.inf)
 - [Diode Ladder Overdrive FX](https://infinitedevices.org/library/diode-ladder-overdrive-fx.html): Four-stage nonlinear diode ladder lowpass filter with asymmetric input saturation, resonant feedback, and dry-wet blend. (file: https://infinitedevices.org/assets/templates/diode-ladder-overdrive-fx.inf)
 - [Envelope SVF Autofilter FX](https://infinitedevices.org/library/envelope-svf-autofilter-fx.html): Dual-ballistics envelope follower sweeping a resonant state-variable bandpass and lowpass filter with harmonic warmth. (file: https://infinitedevices.org/assets/templates/envelope-svf-autofilter-fx.inf)
+- [Studer Tape Head Bump FX](https://infinitedevices.org/library/studer-tape-head-bump-fx.html): Analog reel-to-reel tape path with low-frequency head-bump resonance, asymmetric hysteresis saturation, and subtle wow/flutter allpass drift. (file: https://infinitedevices.org/assets/templates/studer-tape-head-bump-fx.inf)
+- [Granular Pitch Cloud FX](https://infinitedevices.org/library/granular-pitch-cloud-fx.html): Dual-window Hann-enveloped granular micro-delay cloud with modulated allpass pitch drift, resonant feedback diffusion, and warm damping. (file: https://infinitedevices.org/assets/templates/granular-pitch-cloud-fx.inf)
 
 ## Nodes
 
@@ -1598,7 +1612,7 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 155 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 157 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -1754,3 +1768,5 @@ Infinite is created by electronic music producer and visual artist Naman Soni (n
 - [Voronoi Basalt Caustics](https://infinitedevices.org/embeds/voronoi-basalt-caustics.html): Audio-reactive columnar basalt fracture cells with refracted water caustics. Bass pulses cell relief, mids warp caustics, highs brighten edge glint.
 - [Moire Optical Fringes](https://infinitedevices.org/embeds/moire-optical-fringes.html): Audio-reactive concentric Moire optical interference fringes with silver-halide grain.
 - [Vasarely Kinetic Mural](https://infinitedevices.org/embeds/vasarely-kinetic-mural.html): Audio-reactive Vasarely-inspired kinetic ceramic tile mural in ochre-gold and burnt sienna.
+- [Poincare Hyperbolic Tessellation](https://infinitedevices.org/embeds/poincare-hyperbolic-tessellation.html): Conformal Poincare disk hyperbolic tessellation. Bass pulses the hyperbolic curvature, mids drift the conformal fold, highs sharpen the ink borders.
+- [Max Bill Mobius Raymarch](https://infinitedevices.org/embeds/max-bill-mobius-raymarch.html): Raymarched Max Bill Endless Loop granite sculpture. Bass pulses the ribbon thickness, mids twist the torsion, highs catch the bronze rim.

@@ -775,6 +775,16 @@
       "slug": "vasarely-kinetic-mural",
       "title": "Vasarely Kinetic Mural",
       "description": "Audio-reactive Vasarely-inspired kinetic ceramic tile mural in ochre-gold and burnt sienna."
+    },
+    {
+      "slug": "poincare-hyperbolic-tessellation",
+      "title": "Poincare Hyperbolic Tessellation",
+      "description": "Conformal Poincare disk hyperbolic tessellation. Bass pulses the hyperbolic curvature, mids drift the conformal fold, highs sharpen the ink borders."
+    },
+    {
+      "slug": "max-bill-mobius-raymarch",
+      "title": "Max Bill Mobius Raymarch",
+      "description": "Raymarched Max Bill Endless Loop granite sculpture. Bass pulses the ribbon thickness, mids twist the torsion, highs catch the bronze rim."
     }
   ]
 }
